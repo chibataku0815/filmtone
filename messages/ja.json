@@ -179,6 +179,7 @@
         "other": "その他"
       },
       "eventDateLabel": "イベント開催日",
+      "eventDatePlaceholder": "日付を選択",
       "attendeesLabel": "想定参加人数",
       "attendeesPlaceholder": "人数を選択",
       "attendeesOptions": {

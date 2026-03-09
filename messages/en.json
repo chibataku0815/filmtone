@@ -179,6 +179,7 @@
         "other": "Other"
       },
       "eventDateLabel": "Event Date",
+      "eventDatePlaceholder": "Select a date",
       "attendeesLabel": "Estimated Attendees",
       "attendeesPlaceholder": "Select range",
       "attendeesOptions": {
