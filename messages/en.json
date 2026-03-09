@@ -1,0 +1,224 @@
+{
+  "photography": {
+    "hero": {
+      "label": "Tokyo-Based Event Photographer",
+      "title": "Event Coverage",
+      "titleAccent": "for Tokyo teams",
+      "subtext": "Editorial photography for launches, meetups, and community nights. Same-day selects, full gallery within 72 hours, bilingual communication throughout.",
+      "ctaBook": "Start an Inquiry",
+      "ctaPortfolio": "View Contact Sheet",
+      "proofLabel": "Built for fast-moving community events",
+      "proofItems": {
+        "sameDay": {
+          "title": "Same-day preview",
+          "value": "Delivered that evening"
+        },
+        "gallery": {
+          "title": "Full gallery",
+          "value": "Ready within 72 hours"
+        },
+        "bilingual": {
+          "title": "Communication",
+          "value": "Japanese / English"
+        },
+        "coverage": {
+          "title": "Coverage modes",
+          "value": "Photo + highlight video"
+        }
+      },
+      "sideKicker": "Recent assignment",
+      "sideTitle": "Cafe Cursor Tokyo",
+      "sideBody": "Official event coverage shaped like an editorial story: arrival light, branded details, focused conversations, and the afterglow of a room full of builders.",
+      "sideMeta": {
+        "whenLabel": "When",
+        "whenValue": "March 2026",
+        "whereLabel": "Where",
+        "whereValue": "Tokyo",
+        "roleLabel": "Role",
+        "roleValue": "Official photographer"
+      },
+      "scrollLabel": "Scroll to contact sheet"
+    },
+    "gallery": {
+      "label": "Selected Frames",
+      "title": "A contact sheet with heat still in it.",
+      "subtitle": "Cafe Cursor Tokyo, the official Cursor (by Anysphere) community meetup in Tokyo.",
+      "intro": "The page is not a uniform grid on purpose. It moves from hero frames into a tighter contact sheet so the event reads like a sequence, not a folder dump.",
+      "featuredLabel": "Featured frames",
+      "sheetLabel": "Contact sheet",
+      "sheetNote": "12-frame edit. Atmosphere, people, and product energy.",
+      "images": {
+        "01": "Cafe Cursor Tokyo — venue atmosphere",
+        "02": "Cafe Cursor Tokyo — community gathering",
+        "03": "Cafe Cursor Tokyo — welcome card detail",
+        "04": "Cafe Cursor Tokyo — coding by the vintage Porsche",
+        "05": "Cafe Cursor Tokyo — ambient detail",
+        "06": "Cafe Cursor Tokyo — engineers coding together",
+        "07": "Cafe Cursor Tokyo — tote bag in natural light",
+        "08": "Cafe Cursor Tokyo — laptop stickers and engineering culture",
+        "09": "Cafe Cursor Tokyo — Cursor stickers detail",
+        "10": "Cafe Cursor Tokyo — swag preparation behind the scenes",
+        "11": "Cafe Cursor Tokyo — venue wide shot with classic car",
+        "12": "Cafe Cursor Tokyo — filament lights and silhouettes"
+      },
+      "labels": {
+        "01": "Arrival light",
+        "02": "Coffee + laptops",
+        "03": "Welcome note",
+        "04": "Builders at work",
+        "05": "Brand silhouette",
+        "06": "Shared focus",
+        "07": "Merch detail",
+        "08": "Culture markers",
+        "09": "Sticker wall",
+        "10": "Backstage prep",
+        "11": "Room tone",
+        "12": "Afterglow"
+      }
+    },
+    "services": {
+      "label": "Coverage Design",
+      "title": "Coverage shaped for speed, atmosphere, and reuse.",
+      "intro": "Each deliverable is designed to help your team publish quickly without flattening the mood of the event.",
+      "eventPhotography": {
+        "title": "Event Photography",
+        "description": "Candid interaction, keynote moments, sponsor visibility, and the quieter scenes that make a community feel real.",
+        "deliverableLabel": "Deliverable",
+        "deliverableValue": "Edited event gallery",
+        "timingLabel": "Timing",
+        "timingValue": "Preview the same day",
+        "focusLabel": "Focus",
+        "focusValue": "People, atmosphere, brand"
+      },
+      "highlightVideos": {
+        "title": "Highlight Videos",
+        "description": "Short-form recaps built for social and internal sharing, cut to keep the event's rhythm rather than just summarizing the agenda.",
+        "deliverableLabel": "Deliverable",
+        "deliverableValue": "30-60 sec recap",
+        "timingLabel": "Timing",
+        "timingValue": "Planned with photo coverage",
+        "focusLabel": "Focus",
+        "focusValue": "Momentum, pacing, energy"
+      },
+      "sameDayDelivery": {
+        "title": "Same-Day Delivery",
+        "description": "A fast-turn workflow for organizers who need polished selects while guests are still posting and the room is still warm.",
+        "deliverableLabel": "Deliverable",
+        "deliverableValue": "Selects for immediate sharing",
+        "timingLabel": "Timing",
+        "timingValue": "That evening / next morning",
+        "focusLabel": "Focus",
+        "focusValue": "Speed without looking rushed"
+      }
+    },
+    "testimonial": {
+      "label": "Case Highlight",
+      "title": "Official coverage for a room full of builders.",
+      "intro": "The assignment was to capture both credibility and warmth: the product presence, the people who came for it, and the community texture between the formal moments.",
+      "badge": "Official Photographer",
+      "event": "Cursor Tokyo Meetup",
+      "organizer": "by Anysphere",
+      "date": "March 2026",
+      "eventLabel": "Event",
+      "dateLabel": "Date",
+      "caseTitle": "What the assignment required",
+      "description": "Selected as the official photographer for Cursor's first Tokyo community meetup, documenting 200+ developers and AI enthusiasts without losing the intimacy of the venue.",
+      "outcomeTitle": "Why it worked",
+      "outcomeBody": "The visual edit balanced proof and feeling: enough hero moments for brand communication, enough small details to make the event feel lived in.",
+      "stats": {
+        "attendeesValue": "200+",
+        "attendeesLabel": "Guests documented",
+        "coverageValue": "3 hrs",
+        "coverageLabel": "Full on-site coverage",
+        "deliveryValue": "Same day",
+        "deliveryLabel": "Preview turnaround"
+      },
+      "quote": "Takumi captured the energy of our community perfectly. We had images we could share across social the very same evening.",
+      "quoteAuthor": "Cafe Cursor Tokyo",
+      "quoteRole": "Community event"
+    },
+    "about": {
+      "label": "Why Me",
+      "title": "I understand tech events",
+      "titleSub": "because I already belong in the room.",
+      "body": "I moved from full-stack engineering into event photography, which means I can read both the social flow and the technical context of the people attending.",
+      "points": {
+        "communityTitle": "Community literacy",
+        "communityBody": "I know which interactions matter because I already understand the culture around launches, demos, and meetups.",
+        "bilingualTitle": "Bilingual direction",
+        "bilingualBody": "English and Japanese communication stays consistent from inquiry through delivery.",
+        "deliveryTitle": "Fast editorial finish",
+        "deliveryBody": "The workflow is optimized to move quickly without making the output feel generic."
+      }
+    },
+    "form": {
+      "eyebrow": "Book Coverage",
+      "heading": "Let's shape the next event with intention.",
+      "subheading": "Share the event basics below. I will reply within 24 hours with availability and the best coverage shape for your format.",
+      "asideTitle": "What you can expect",
+      "asideBody": "The inquiry starts with logistics, but the work is editorial. I plan for flow, key people, and what the images need to do after the event.",
+      "notes": {
+        "replyTitle": "Reply window",
+        "replyBody": "Initial response within 24 hours.",
+        "deliverablesTitle": "Typical delivery",
+        "deliverablesBody": "Same-day selects, full gallery within 72 hours, optional highlight video.",
+        "eventScopeTitle": "Best fit",
+        "eventScopeBody": "Tech meetups, product launches, community gatherings, and small-to-mid scale branded events."
+      },
+      "nameLabel": "Name",
+      "namePlaceholder": "Your name",
+      "emailLabel": "Email",
+      "emailPlaceholder": "you@example.com",
+      "eventTypeLabel": "Event Type",
+      "eventTypePlaceholder": "Select event type",
+      "eventTypeOptions": {
+        "techMeetup": "Tech Meetup",
+        "corporateEvent": "Corporate Event",
+        "conference": "Conference",
+        "communityGathering": "Community Gathering",
+        "other": "Other"
+      },
+      "eventDateLabel": "Event Date",
+      "attendeesLabel": "Estimated Attendees",
+      "attendeesPlaceholder": "Select range",
+      "attendeesOptions": {
+        "under50": "Under 50",
+        "50-100": "50-100",
+        "100-200": "100-200",
+        "200-500": "200-500",
+        "500+": "500+"
+      },
+      "detailsLabel": "Additional Details",
+      "detailsPlaceholder": "Tell me about the venue, schedule, desired mood, or anything that should not be missed...",
+      "submit": "Send Inquiry",
+      "submitting": "Sending...",
+      "successTitle": "Inquiry received",
+      "successMessage": "I'll get back to you within 24 hours.",
+      "successSub": "If you already have reference shots or a run-of-show, feel free to include them in the follow-up email.",
+      "errors": {
+        "name": "Please enter your name",
+        "email": "Please enter a valid email address",
+        "eventType": "Please select an event type",
+        "submitConfig": "Submission configuration is not set up.",
+        "submitFailed": "Failed to send. Please try again later."
+      }
+    },
+    "metadata": {
+      "title": "Event Photography in Tokyo",
+      "description": "Editorial event photographer in Tokyo for tech meetups, launches, and community gatherings. Same-day selects, full gallery within 72 hours, bilingual support.",
+      "ogTitle": "Event Photography in Tokyo | Takumi Chiba",
+      "ogDescription": "Editorial event coverage in Tokyo with same-day selects and a full gallery within 72 hours.",
+      "ogImageAlt": "Event Photography in Tokyo by Takumi Chiba"
+    }
+  },
+  "common": {
+    "required": "*"
+  },
+  "nav": {
+    "home": "Index",
+    "skills": "Skills",
+    "photography": "Photography",
+    "profile": "Profile",
+    "contact": "Contact"
+  }
+}

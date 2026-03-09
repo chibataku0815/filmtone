@@ -1,0 +1,224 @@
+{
+  "photography": {
+    "hero": {
+      "label": "東京拠点のイベントフォトグラファー",
+      "title": "イベントの熱を",
+      "titleAccent": "東京で残す",
+      "subtext": "ミートアップ、プロダクトローンチ、コミュニティイベントの空気を編集的に記録します。当日セレクト、72時間以内の全データ納品、日英バイリンガルでの進行対応。",
+      "ctaBook": "問い合わせを始める",
+      "ctaPortfolio": "コンタクトシートを見る",
+      "proofLabel": "スピード感あるコミュニティイベント向けの撮影設計",
+      "proofItems": {
+        "sameDay": {
+          "title": "当日プレビュー",
+          "value": "その日のうちに共有"
+        },
+        "gallery": {
+          "title": "全データ納品",
+          "value": "72時間以内に完了"
+        },
+        "bilingual": {
+          "title": "コミュニケーション",
+          "value": "日本語 / English"
+        },
+        "coverage": {
+          "title": "対応範囲",
+          "value": "写真 + ハイライト動画"
+        }
+      },
+      "sideKicker": "Recent assignment",
+      "sideTitle": "Cafe Cursor Tokyo",
+      "sideBody": "公式イベントを、ただの記録ではなく一本の編集物として撮影。入場時の光、ブランドのディテール、集中した会話、熱の残るクロージングまでを一本の流れとして残しました。",
+      "sideMeta": {
+        "whenLabel": "When",
+        "whenValue": "2026年3月",
+        "whereLabel": "Where",
+        "whereValue": "東京",
+        "roleLabel": "Role",
+        "roleValue": "公式フォトグラファー"
+      },
+      "scrollLabel": "下へスクロールして実績を見る"
+    },
+    "gallery": {
+      "label": "Selected Frames",
+      "title": "熱の残るコンタクトシート。",
+      "subtitle": "Cursor（Anysphere）公式の東京コミュニティミートアップ「Cafe Cursor Tokyo」より。",
+      "intro": "あえて均一なグリッドにはしていません。印象を決めるフレームから、密度の高いコンタクトシートへ移ることで、イベントを単なる画像フォルダではなく流れとして読めるようにしています。",
+      "featuredLabel": "Featured frames",
+      "sheetLabel": "Contact sheet",
+      "sheetNote": "12カットのセレクト。空気感、人物、プロダクトの熱量を横断して記録。",
+      "images": {
+        "01": "Cafe Cursor Tokyo — 会場の雰囲気",
+        "02": "Cafe Cursor Tokyo — コミュニティの集い",
+        "03": "Cafe Cursor Tokyo — ウェルカムカードのディテール",
+        "04": "Cafe Cursor Tokyo — クラシックカー越しの作業風景",
+        "05": "Cafe Cursor Tokyo — ブランドが浮かぶシルエット",
+        "06": "Cafe Cursor Tokyo — 一緒にコードを書く参加者たち",
+        "07": "Cafe Cursor Tokyo — 自然光の中のトートバッグ",
+        "08": "Cafe Cursor Tokyo — ステッカーに現れる開発カルチャー",
+        "09": "Cafe Cursor Tokyo — Cursorステッカーのディテール",
+        "10": "Cafe Cursor Tokyo — ノベルティ準備の舞台裏",
+        "11": "Cafe Cursor Tokyo — クラシックカーと会場全景",
+        "12": "Cafe Cursor Tokyo — フィラメントの灯りと人影"
+      },
+      "labels": {
+        "01": "Arrival light",
+        "02": "Coffee + laptops",
+        "03": "Welcome note",
+        "04": "Builders at work",
+        "05": "Brand silhouette",
+        "06": "Shared focus",
+        "07": "Merch detail",
+        "08": "Culture markers",
+        "09": "Sticker wall",
+        "10": "Backstage prep",
+        "11": "Room tone",
+        "12": "Afterglow"
+      }
+    },
+    "services": {
+      "label": "Coverage Design",
+      "title": "速さと空気感、その両方を残すための設計。",
+      "intro": "納品物は、イベントの熱を損なわずに素早く発信できることを前提に組み立てています。",
+      "eventPhotography": {
+        "title": "イベント撮影",
+        "description": "自然な交流、キーノートの瞬間、スポンサー露出、そしてコミュニティらしさが滲む静かな場面まで、抜けなく記録します。",
+        "deliverableLabel": "Deliverable",
+        "deliverableValue": "編集済みイベントギャラリー",
+        "timingLabel": "Timing",
+        "timingValue": "当日中にプレビュー共有",
+        "focusLabel": "Focus",
+        "focusValue": "人物、空気感、ブランド"
+      },
+      "highlightVideos": {
+        "title": "ハイライト動画",
+        "description": "SNS や社内共有にそのまま使える短尺の recap。議事録のように並べるのではなく、イベントのリズムごと切り取ります。",
+        "deliverableLabel": "Deliverable",
+        "deliverableValue": "30〜60秒の recap",
+        "timingLabel": "Timing",
+        "timingValue": "写真撮影と一体で設計",
+        "focusLabel": "Focus",
+        "focusValue": "熱量、テンポ、余韻"
+      },
+      "sameDayDelivery": {
+        "title": "当日納品",
+        "description": "参加者の投稿熱量が残るうちに、整ったビジュアルを共有できるようにするための高速ワークフローです。",
+        "deliverableLabel": "Deliverable",
+        "deliverableValue": "即時共有向けセレクト",
+        "timingLabel": "Timing",
+        "timingValue": "当日夜〜翌朝",
+        "focusLabel": "Focus",
+        "focusValue": "急ぎでも雑に見せない"
+      }
+    },
+    "testimonial": {
+      "label": "Case Highlight",
+      "title": "つくる人たちが集まる場を、熱のまま残す。",
+      "intro": "求められたのは、信頼感とあたたかさの両立でした。プロダクトの存在感、集まった人たちの表情、そしてフォーマルな瞬間のあいだにあるコミュニティの質感まで写すこと。",
+      "badge": "公式フォトグラファー",
+      "event": "Cursor Tokyo Meetup",
+      "organizer": "by Anysphere",
+      "date": "2026年3月",
+      "eventLabel": "Event",
+      "dateLabel": "Date",
+      "caseTitle": "この案件で必要だったこと",
+      "description": "Cursor 初の東京コミュニティミートアップにて公式フォトグラファーとして撮影。200名以上の開発者と AI エンスージアストが集まる場を、会場の親密さを失わずに記録しました。",
+      "outcomeTitle": "うまく機能した理由",
+      "outcomeBody": "ブランドに使える強いカットと、イベントが本当に開催されていたことを感じさせる細部の両方を揃えたことで、証明力と温度感が共存する編集になりました。",
+      "stats": {
+        "attendeesValue": "200+",
+        "attendeesLabel": "名を撮影",
+        "coverageValue": "3時間",
+        "coverageLabel": "現地フルカバレッジ",
+        "deliveryValue": "当日",
+        "deliveryLabel": "プレビュー納品"
+      },
+      "quote": "Takumiさんは、コミュニティのエネルギーを完璧に写し取ってくれました。当日の夜にはそのままSNSで使える写真が届きました。",
+      "quoteAuthor": "Cafe Cursor Tokyo",
+      "quoteRole": "コミュニティイベント"
+    },
+    "about": {
+      "label": "Why Me",
+      "title": "テックイベントを理解できるのは",
+      "titleSub": "もともとその場の住人だからです。",
+      "body": "フルスタックエンジニアからイベントフォトグラファーへ。参加者が何に反応し、どの瞬間が後から効いてくるのかを、技術文脈ごと理解した上で撮影できます。",
+      "points": {
+        "communityTitle": "コミュニティ理解",
+        "communityBody": "ローンチ、デモ、ミートアップで何が重要かを、文化ごと把握した上でフレームを組みます。",
+        "bilingualTitle": "日英バイリンガル進行",
+        "bilingualBody": "問い合わせから当日、納品まで日本語 / English の温度差を作りません。",
+        "deliveryTitle": "速いのに量産感がない",
+        "deliveryBody": "高速ワークフローを使いつつ、仕上がりはテンプレートっぽく見せないことを重視しています。"
+      }
+    },
+    "form": {
+      "eyebrow": "Book Coverage",
+      "heading": "次のイベントも、意図ある形で残しましょう。",
+      "subheading": "まずは基本情報をお送りください。24時間以内に、空き状況とイベント形式に合った撮影プランを返答します。",
+      "asideTitle": "ご相談時に共有すること",
+      "asideBody": "問い合わせは logistics から始まりますが、実際の仕事は editorial です。導線、写すべき人物、イベント後に画像が果たす役割まで見て設計します。",
+      "notes": {
+        "replyTitle": "返信目安",
+        "replyBody": "初回返信は24時間以内。",
+        "deliverablesTitle": "標準納品",
+        "deliverablesBody": "当日セレクト、72時間以内の全データ、必要に応じてハイライト動画。",
+        "eventScopeTitle": "相性の良いイベント",
+        "eventScopeBody": "テックミートアップ、プロダクトローンチ、コミュニティイベント、小〜中規模のブランドイベント。"
+      },
+      "nameLabel": "お名前",
+      "namePlaceholder": "お名前を入力",
+      "emailLabel": "メールアドレス",
+      "emailPlaceholder": "you@example.com",
+      "eventTypeLabel": "イベントの種類",
+      "eventTypePlaceholder": "イベントの種類を選択",
+      "eventTypeOptions": {
+        "techMeetup": "テックミートアップ",
+        "corporateEvent": "企業イベント",
+        "conference": "カンファレンス",
+        "communityGathering": "コミュニティイベント",
+        "other": "その他"
+      },
+      "eventDateLabel": "イベント開催日",
+      "attendeesLabel": "想定参加人数",
+      "attendeesPlaceholder": "人数を選択",
+      "attendeesOptions": {
+        "under50": "50名未満",
+        "50-100": "50〜100名",
+        "100-200": "100〜200名",
+        "200-500": "200〜500名",
+        "500+": "500名以上"
+      },
+      "detailsLabel": "その他のご要望",
+      "detailsPlaceholder": "会場、タイムテーブル、残したい雰囲気、撮り逃したくない要素などを教えてください...",
+      "submit": "お問い合わせを送信する",
+      "submitting": "送信中...",
+      "successTitle": "お問い合わせを受け付けました",
+      "successMessage": "24時間以内にご連絡いたします。",
+      "successSub": "参考写真や進行表がある場合は、追ってメールで共有いただければ会話が早く進みます。",
+      "errors": {
+        "name": "お名前を入力してください",
+        "email": "有効なメールアドレスを入力してください",
+        "eventType": "イベントの種類を選択してください",
+        "submitConfig": "送信設定が構成されていません。",
+        "submitFailed": "送信に失敗しました。しばらくしてから再度お試しください。"
+      }
+    },
+    "metadata": {
+      "title": "東京のイベント撮影",
+      "description": "東京拠点のイベントフォトグラファー。テックミートアップ、ローンチ、コミュニティイベント向けに、当日セレクトと72時間以内の全データ納品、日英バイリンガル対応で撮影します。",
+      "ogTitle": "東京のイベント撮影 | Takumi Chiba",
+      "ogDescription": "イベントの熱量を編集的に記録する東京のイベント撮影。 当日セレクトと72時間以内の全データ納品に対応。",
+      "ogImageAlt": "東京のイベント撮影 by Takumi Chiba"
+    }
+  },
+  "common": {
+    "required": "*"
+  },
+  "nav": {
+    "home": "Index",
+    "skills": "Skills",
+    "photography": "Photography",
+    "profile": "Profile",
+    "contact": "Contact"
+  }
+}
