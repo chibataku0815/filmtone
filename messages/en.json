@@ -1,10 +1,10 @@
 {
   "photography": {
     "hero": {
-      "label": "Tokyo-Based Event Photographer",
+      "label": "Editorial Event Photographer",
       "title": "Event Coverage",
-      "titleAccent": "for Tokyo teams",
-      "subtext": "Editorial photography for launches, meetups, and community nights. Same-day selects, full gallery within 72 hours, bilingual communication throughout.",
+      "titleAccent": "shaped like a story",
+      "subtext": "Editorial photography for launches, meetups, and community nights. Same-day selects, full gallery within 72 hours, text-based English coordination throughout.",
       "ctaBook": "Start an Inquiry",
       "ctaPortfolio": "View Contact Sheet",
       "proofLabel": "Built for fast-moving community events",
@@ -18,8 +18,8 @@
           "value": "Ready within 72 hours"
         },
         "bilingual": {
-          "title": "Communication",
-          "value": "Japanese / English"
+          "title": "English support",
+          "value": "Text-based, inquiry to delivery"
         },
         "coverage": {
           "title": "Coverage modes",
@@ -145,8 +145,8 @@
       "points": {
         "communityTitle": "Community literacy",
         "communityBody": "I know which interactions matter because I already understand the culture around launches, demos, and meetups.",
-        "bilingualTitle": "Bilingual direction",
-        "bilingualBody": "English and Japanese communication stays consistent from inquiry through delivery.",
+        "bilingualTitle": "Text-first English support",
+        "bilingualBody": "Inquiries, pre-event briefs, and delivery notes work smoothly in written English — the way distributed teams already coordinate.",
         "deliveryTitle": "Fast editorial finish",
         "deliveryBody": "The workflow is optimized to move quickly without making the output feel generic."
       }
@@ -160,6 +160,8 @@
       "notes": {
         "replyTitle": "Reply window",
         "replyBody": "Initial response within 24 hours.",
+        "englishSupportTitle": "English coordination",
+        "englishSupportBody": "Email, DM, and pre-event documents work in English. Text-based coordination keeps everything clear from first inquiry through delivery.",
         "deliverablesTitle": "Typical delivery",
         "deliverablesBody": "Same-day selects, full gallery within 72 hours, optional highlight video.",
         "eventScopeTitle": "Best fit",
@@ -206,7 +208,7 @@
     },
     "metadata": {
       "title": "Event Photography in Tokyo",
-      "description": "Editorial event photographer in Tokyo for tech meetups, launches, and community gatherings. Same-day selects, full gallery within 72 hours, bilingual support.",
+      "description": "Editorial event photographer in Tokyo for tech meetups, launches, and community gatherings. Same-day selects, full gallery within 72 hours, text-based English support.",
       "ogTitle": "Event Photography in Tokyo | Takumi Chiba",
       "ogDescription": "Editorial event coverage in Tokyo with same-day selects and a full gallery within 72 hours.",
       "ogImageAlt": "Event Photography in Tokyo by Takumi Chiba"
