@@ -1,0 +1,7 @@
+<svg width="720" height="240" viewBox="0 0 720 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="720" height="240" rx="32" fill="#050505"/>
+  <rect x="72" y="56" width="108" height="108" rx="24" fill="#0B0B0B" stroke="#242424"/>
+  <path d="M154 78H97V141H154M124 78V141M97 110H138" stroke="#F5F5F5" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="224" y="118" fill="#F5F5F5" font-family="Geist, Arial, sans-serif" font-size="36" font-weight="300" letter-spacing="0.22em">TAKUMI</text>
+  <text x="224" y="160" fill="#B7B7B7" font-family="Geist, Arial, sans-serif" font-size="36" font-weight="600" letter-spacing="0.18em">CHIBA</text>
+</svg>
