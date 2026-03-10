@@ -1,7 +1,27 @@
-<svg width="720" height="240" viewBox="0 0 720 240" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="720" height="240" rx="32" fill="#050505"/>
-  <rect x="72" y="56" width="108" height="108" rx="24" fill="#0B0B0B" stroke="#242424"/>
-  <path d="M154 78H97V141H154M124 78V141M97 110H138" stroke="#F5F5F5" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-  <text x="224" y="118" fill="#F5F5F5" font-family="Geist, Arial, sans-serif" font-size="36" font-weight="300" letter-spacing="0.22em">TAKUMI</text>
-  <text x="224" y="160" fill="#B7B7B7" font-family="Geist, Arial, sans-serif" font-size="36" font-weight="600" letter-spacing="0.18em">CHIBA</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 7079 890" fill="none">
+  <!-- Symbol -->
+  <g transform="translate(3485.5, 0)">
+    <rect width="108" height="108" rx="18" fill="#0B0B0B" stroke="#242424" stroke-width="1"/>
+    <path d="M16 16H92V26H26V82H92V92H16Z M38 16H92V26H72V92H60V26H38Z" transform="scale(1)" fill="#F5F5F5" stroke="#F5F5F5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <!-- Wordmark -->
+  <g transform="translate(0, 140)">
+    <svg viewBox="0 0 7079 750" width="7079" height="750">
+      <g fill="#F5F5F5">
+      <path d="M416 746C591 746 695 643 734 492L621 466C592 582 531 647 416 647C289 647 204 546 204 376C204 207 288 103 417 103C525 103 585 162 604 259L717 253C687 98 593 4 417 4C222 4 92 147 92 376C92 607 224 746 416 746Z"/>
+      <path d="M829 730L937 730L937 416L1265 416L1265 730L1373 730L1373 20L1265 20L1265 318L937 318L937 20L829 20Z"/>
+      <path d="M1545 730L1653 730L1653 20L1545 20Z"/>
+      <path d="M1825 730L2118 730C2278 730 2368 665 2368 535C2368 440 2308 375 2194 363C2289 351 2338 293 2338 212C2338 79 2250 20 2080 20L1825 20ZM1933 323L1933 117L2078 117C2176 117 2227 150 2227 220C2227 286 2173 323 2078 323ZM1933 633L1933 415L2115 415C2204 415 2257 455 2257 525C2257 596 2204 633 2115 633Z"/>
+      <path d="M2423 730L2538 730L2608 545L2886 545L2957 730L3072 730L2793 20L2703 20ZM2636 447L2747 123L2859 447Z"/>
+      </g>
+      <g fill="#C4C4C4">
+      <path d="M3556 730L3664 730L3664 119L3886 119L3880 20L3334 20L3340 119L3556 119Z"/>
+      <path d="M3890 730L4005 730L4075 545L4353 545L4424 730L4539 730L4260 20L4170 20ZM4103 447L4214 123L4326 447Z"/>
+      <path d="M4625 730L4733 730L4733 508L4819 406L5054 730L5181 730L4883 330L5163 20L5032 20L4733 353L4733 20L4625 20Z"/>
+      <path d="M5528 746C5697 746 5804 643 5804 479L5804 19L5696 19L5696 479C5696 587 5635 647 5528 647C5421 647 5360 587 5360 479L5360 19L5252 19L5252 479C5252 643 5358 746 5528 746Z"/>
+      <path d="M5957 730L6065 730L6065 210L6266 729L6366 729L6567 210L6567 730L6675 730L6675 20L6527 20L6316 587L6105 20L5957 20Z"/>
+      <path d="M6837 730L6945 730L6945 20L6837 20Z"/>
+      </g>
+    </svg>
+  </g>
 </svg>
