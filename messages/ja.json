@@ -8,6 +8,11 @@
       "ctaBook": "問い合わせを始める",
       "ctaPortfolio": "コンタクトシートを見る",
       "proofLabel": "スピード感あるコミュニティイベント向けの撮影設計",
+      "proofMeta": "Editorial speed",
+      "microChips": {
+        "sequence": "東京の開発者イベント",
+        "afterglow": "余韻まで編集して納品"
+      },
       "proofItems": {
         "sameDay": {
           "title": "当日プレビュー",
@@ -27,6 +32,7 @@
         }
       },
       "sideKicker": "Recent assignment",
+      "sideNote": "Sequence 01",
       "sideTitle": "Cafe Cursor Tokyo",
       "sideBody": "東京の開発者コミュニティイベントを、ただの記録ではなく一本の編集物として撮影。入場時の光、ブランドのディテール、集中した会話、熱の残るクロージングまでを一本の流れとして残しました。",
       "sideMeta": {
@@ -45,8 +51,25 @@
       "subtitle": "東京の開発者コミュニティイベント「Cafe Cursor Tokyo」より。",
       "intro": "あえて均一なグリッドにはしていません。印象を決めるフレームから、密度の高いコンタクトシートへ移ることで、イベントを単なる画像フォルダではなく流れとして読めるようにしています。",
       "featuredLabel": "Featured frames",
+      "featuredMeta": "Lead edit",
       "sheetLabel": "Contact sheet",
+      "sheetMeta": "Sequence edit",
+      "frameLabel": "Frame {index}",
       "sheetNote": "11カットのセレクト。空気感、人物、プロダクトの熱量を横断して記録。",
+      "captions": {
+        "01": "開場直後の光で、場の温度を立ち上げる。",
+        "02": "コーヒーとラップトップの距離感で、コミュニティの密度を伝える。",
+        "03": "入口の歓迎ムードを、小さな紙片のディテールで拾う。",
+        "04": "ガラス越しの反射で、ブランドの存在感を遠回しに見せる。",
+        "05": "ロゴの影だけで、空間の余熱を残す。",
+        "06": "視線が一点に集まる瞬間を、共有された集中として残す。",
+        "07": "ノベルティも会場の文脈として扱う。",
+        "08": "開発カルチャーが滲む小さなマーカーを押さえる。",
+        "09": "ステッカーの集積で、参加者の気配を補強する。",
+        "10": "表に出る前の準備段階も、イベントの一部として残す。",
+        "11": "会場全体のトーンを、一枚で記憶に定着させる。",
+        "12": "最後に残る灯りと人影で、余韻を締める。"
+      },
       "images": {
         "01": "Cafe Cursor Tokyo — 会場の雰囲気",
         "02": "Cafe Cursor Tokyo — コミュニティの集い",
@@ -80,6 +103,7 @@
       "label": "Coverage Design",
       "title": "速さと空気感、その両方を残すための設計。",
       "intro": "納品物は、イベントの熱を損なわずに素早く発信できることを前提に組み立てています。",
+      "cardLabel": "Coverage {index}",
       "eventPhotography": {
         "title": "イベント撮影",
         "description": "自然な交流、キーノートの瞬間、スポンサー露出、そしてコミュニティらしさが滲む静かな場面まで、抜けなく記録します。",
@@ -115,6 +139,7 @@
       "label": "Case Study",
       "title": "開発者が集まる場を、流れのある事例へ。",
       "intro": "このケースで求められたのは、会場の熱量を残しながら、後日の告知や振り返りにも使える編集済みビジュアルへ整えることでした。",
+      "overviewLabel": "Overview",
       "event": "Cafe Cursor Tokyo",
       "date": "2026年3月",
       "eventLabel": "Case",
@@ -130,6 +155,9 @@
       "label": "Why Me",
       "title": "テックイベントを理解できるのは",
       "titleSub": "もともとその場の住人だからです。",
+      "railLabel": "Working Method",
+      "ghostWord": "METHOD",
+      "pointMeta": "Field note",
       "body": "エンジニアでもあり、イベントフォトグラファーでもあるからこそ、参加者が反応する瞬間を技術文脈ごと理解して撮れます。",
       "points": {
         "communityTitle": "コミュニティ理解",
@@ -145,6 +173,7 @@
       "heading": "次のイベントも、意図ある形で残しましょう。",
       "subheading": "まずは基本情報をお送りください。24時間以内に、空き状況とイベント形式に合った撮影プランを返答します。",
       "asideTitle": "ご相談時に共有すること",
+      "asideMeta": "Editorial intake",
       "asideBody": "問い合わせは logistics から始まりますが、実際の仕事は editorial です。導線、写すべき人物、イベント後に画像が果たす役割まで見て設計します。",
       "notes": {
         "replyTitle": "返信目安",

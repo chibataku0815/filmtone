@@ -8,6 +8,11 @@
       "ctaBook": "Start an Inquiry",
       "ctaPortfolio": "View Contact Sheet",
       "proofLabel": "Built for fast-moving community events",
+      "proofMeta": "Editorial speed",
+      "microChips": {
+        "sequence": "Tokyo developer meetup",
+        "afterglow": "Heat preserved in the edit"
+      },
       "proofItems": {
         "sameDay": {
           "title": "Same-day preview",
@@ -27,6 +32,7 @@
         }
       },
       "sideKicker": "Recent assignment",
+      "sideNote": "Sequence 01",
       "sideTitle": "Cafe Cursor Tokyo",
       "sideBody": "A Tokyo developer meetup photographed as an editorial sequence: arrival light, branded details, focused conversations, and the afterglow of a room full of builders.",
       "sideMeta": {
@@ -45,8 +51,25 @@
       "subtitle": "Scenes from Cafe Cursor Tokyo, a developer meetup in Tokyo.",
       "intro": "The page is not a uniform grid on purpose. It moves from hero frames into a tighter contact sheet so the event reads like a sequence, not a folder dump.",
       "featuredLabel": "Featured frames",
+      "featuredMeta": "Lead edit",
       "sheetLabel": "Contact sheet",
+      "sheetMeta": "Sequence edit",
+      "frameLabel": "Frame {index}",
       "sheetNote": "11-frame edit. Atmosphere, people, and product energy.",
+      "captions": {
+        "01": "Opening light that sets the room's temperature.",
+        "02": "Coffee and laptops arranged at community distance.",
+        "03": "A small welcome detail that frames the tone at the entrance.",
+        "04": "Brand presence caught indirectly through glass and reflection.",
+        "05": "A silhouette that leaves the logo as afterimage rather than statement.",
+        "06": "Shared focus held in a single concentrated frame.",
+        "07": "Merch treated as part of the event's visual context.",
+        "08": "Small cultural markers that make the room feel specific.",
+        "09": "Sticker density used as a trace of the people in the space.",
+        "10": "Backstage preparation kept as part of the event narrative.",
+        "11": "A wide frame that fixes the room's tone in memory.",
+        "12": "Filament light and silhouettes closing on the afterglow."
+      },
       "images": {
         "01": "Cafe Cursor Tokyo — venue atmosphere",
         "02": "Cafe Cursor Tokyo — community gathering",
@@ -80,6 +103,7 @@
       "label": "Coverage Design",
       "title": "Coverage shaped for speed, atmosphere, and reuse.",
       "intro": "Each deliverable is designed to help your team publish quickly without flattening the mood of the event.",
+      "cardLabel": "Coverage {index}",
       "eventPhotography": {
         "title": "Event Photography",
         "description": "Candid interaction, keynote moments, sponsor visibility, and the quieter scenes that make a community feel real.",
@@ -115,6 +139,7 @@
       "label": "Case Study",
       "title": "A developer meetup edited like a lived-in story.",
       "intro": "This case called for more than clean event coverage: the images had to preserve warmth, show product context, and still be useful for recap, social, and future promotion.",
+      "overviewLabel": "Overview",
       "event": "Cafe Cursor Tokyo",
       "date": "March 2026",
       "eventLabel": "Case",
@@ -130,6 +155,9 @@
       "label": "Why Me",
       "title": "I understand tech events",
       "titleSub": "because I already belong in the room.",
+      "railLabel": "Working Method",
+      "ghostWord": "METHOD",
+      "pointMeta": "Field note",
       "body": "I am both a full-stack engineer and an event photographer, so I can read what people respond to and which moments will matter later in tech contexts.",
       "points": {
         "communityTitle": "Community literacy",
@@ -145,6 +173,7 @@
       "heading": "Let's shape the next event with intention.",
       "subheading": "Share the event basics below. I will reply within 24 hours with availability and the best coverage shape for your format.",
       "asideTitle": "What you can expect",
+      "asideMeta": "Editorial intake",
       "asideBody": "The inquiry starts with logistics, but the work is editorial. I plan for flow, key people, and what the images need to do after the event.",
       "notes": {
         "replyTitle": "Reply window",
