@@ -28,21 +28,21 @@
       },
       "sideKicker": "Recent assignment",
       "sideTitle": "Cafe Cursor Tokyo",
-      "sideBody": "Official event coverage shaped like an editorial story: arrival light, branded details, focused conversations, and the afterglow of a room full of builders.",
+      "sideBody": "A Tokyo developer meetup photographed as an editorial sequence: arrival light, branded details, focused conversations, and the afterglow of a room full of builders.",
       "sideMeta": {
         "whenLabel": "When",
         "whenValue": "March 2026",
         "whereLabel": "Where",
         "whereValue": "Tokyo",
-        "roleLabel": "Role",
-        "roleValue": "Official photographer"
+        "roleLabel": "Format",
+        "roleValue": "Developer meetup"
       },
       "scrollLabel": "Scroll to contact sheet"
     },
     "gallery": {
       "label": "Selected Frames",
       "title": "A contact sheet with heat still in it.",
-      "subtitle": "Cafe Cursor Tokyo, the official Cursor (by Anysphere) community meetup in Tokyo.",
+      "subtitle": "Scenes from Cafe Cursor Tokyo, a developer meetup in Tokyo.",
       "intro": "The page is not a uniform grid on purpose. It moves from hero frames into a tighter contact sheet so the event reads like a sequence, not a folder dump.",
       "featuredLabel": "Featured frames",
       "sheetLabel": "Contact sheet",
@@ -112,30 +112,19 @@
       }
     },
     "testimonial": {
-      "label": "Case Highlight",
-      "title": "Official coverage for a room full of builders.",
-      "intro": "The assignment was to capture both credibility and warmth: the product presence, the people who came for it, and the community texture between the formal moments.",
-      "badge": "Official Photographer",
-      "event": "Cursor Tokyo Meetup",
-      "organizer": "by Anysphere",
+      "label": "Case Study",
+      "title": "A developer meetup edited like a lived-in story.",
+      "intro": "This case called for more than clean event coverage: the images had to preserve warmth, show product context, and still be useful for recap, social, and future promotion.",
+      "event": "Cafe Cursor Tokyo",
       "date": "March 2026",
-      "eventLabel": "Event",
+      "eventLabel": "Case",
       "dateLabel": "Date",
-      "caseTitle": "What the assignment required",
-      "description": "Selected as the official photographer for Cursor's first Tokyo community meetup, documenting 200+ developers and AI enthusiasts without losing the intimacy of the venue.",
-      "outcomeTitle": "Why it worked",
-      "outcomeBody": "The visual edit balanced proof and feeling: enough hero moments for brand communication, enough small details to make the event feel lived in.",
-      "stats": {
-        "attendeesValue": "200+",
-        "attendeesLabel": "Guests documented",
-        "coverageValue": "3 hrs",
-        "coverageLabel": "Full on-site coverage",
-        "deliveryValue": "Same day",
-        "deliveryLabel": "Preview turnaround"
-      },
-      "quote": "Takumi captured the energy of our community perfectly. We had images we could share across social the very same evening.",
-      "quoteAuthor": "Cafe Cursor Tokyo",
-      "quoteRole": "Community event"
+      "focusTitle": "Coverage Focus",
+      "focusBody": "Arrival light, table conversations, branded details, and the smaller cues that make a developer room feel real all had to remain visible in the edit.",
+      "deliverablesTitle": "Deliverables",
+      "deliverablesBody": "Same-day selects, an edited gallery for recap and reuse, and detail frames that could travel across social, decks, and future event pages.",
+      "approachTitle": "Editorial Approach",
+      "approachBody": "The sequence moves between hero frames and quieter details so the event reads as a story rather than a flat archive."
     },
     "about": {
       "label": "Why Me",

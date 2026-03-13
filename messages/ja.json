@@ -28,21 +28,21 @@
       },
       "sideKicker": "Recent assignment",
       "sideTitle": "Cafe Cursor Tokyo",
-      "sideBody": "公式イベントを、ただの記録ではなく一本の編集物として撮影。入場時の光、ブランドのディテール、集中した会話、熱の残るクロージングまでを一本の流れとして残しました。",
+      "sideBody": "東京の開発者コミュニティイベントを、ただの記録ではなく一本の編集物として撮影。入場時の光、ブランドのディテール、集中した会話、熱の残るクロージングまでを一本の流れとして残しました。",
       "sideMeta": {
         "whenLabel": "When",
         "whenValue": "2026年3月",
         "whereLabel": "Where",
         "whereValue": "東京",
-        "roleLabel": "Role",
-        "roleValue": "公式フォトグラファー"
+        "roleLabel": "Format",
+        "roleValue": "開発者コミュニティイベント"
       },
       "scrollLabel": "下へスクロールして実績を見る"
     },
     "gallery": {
       "label": "Selected Frames",
       "title": "熱の残るコンタクトシート。",
-      "subtitle": "Cursor（Anysphere）公式の東京コミュニティミートアップ「Cafe Cursor Tokyo」より。",
+      "subtitle": "東京の開発者コミュニティイベント「Cafe Cursor Tokyo」より。",
       "intro": "あえて均一なグリッドにはしていません。印象を決めるフレームから、密度の高いコンタクトシートへ移ることで、イベントを単なる画像フォルダではなく流れとして読めるようにしています。",
       "featuredLabel": "Featured frames",
       "sheetLabel": "Contact sheet",
@@ -112,30 +112,19 @@
       }
     },
     "testimonial": {
-      "label": "Case Highlight",
-      "title": "つくる人たちが集まる場を、熱のまま残す。",
-      "intro": "求められたのは、信頼感とあたたかさの両立でした。プロダクトの存在感、集まった人たちの表情、そしてフォーマルな瞬間のあいだにあるコミュニティの質感まで写すこと。",
-      "badge": "公式フォトグラファー",
-      "event": "Cursor Tokyo Meetup",
-      "organizer": "by Anysphere",
+      "label": "Case Study",
+      "title": "開発者が集まる場を、流れのある事例へ。",
+      "intro": "このケースで求められたのは、会場の熱量を残しながら、後日の告知や振り返りにも使える編集済みビジュアルへ整えることでした。",
+      "event": "Cafe Cursor Tokyo",
       "date": "2026年3月",
-      "eventLabel": "Event",
+      "eventLabel": "Case",
       "dateLabel": "Date",
-      "caseTitle": "この案件で必要だったこと",
-      "description": "Cursor 初の東京コミュニティミートアップにて公式フォトグラファーとして撮影。200名以上の開発者と AI エンスージアストが集まる場を、会場の親密さを失わずに記録しました。",
-      "outcomeTitle": "うまく機能した理由",
-      "outcomeBody": "ブランドに使える強いカットと、イベントが本当に開催されていたことを感じさせる細部の両方を揃えたことで、証明力と温度感が共存する編集になりました。",
-      "stats": {
-        "attendeesValue": "200+",
-        "attendeesLabel": "名を撮影",
-        "coverageValue": "3時間",
-        "coverageLabel": "現地フルカバレッジ",
-        "deliveryValue": "当日",
-        "deliveryLabel": "プレビュー納品"
-      },
-      "quote": "Takumiさんは、コミュニティのエネルギーを完璧に写し取ってくれました。当日の夜にはそのままSNSで使える写真が届きました。",
-      "quoteAuthor": "Cafe Cursor Tokyo",
-      "quoteRole": "コミュニティイベント"
+      "focusTitle": "Coverage Focus",
+      "focusBody": "入場時の光、会話の密度、ステッカーやノベルティのようなブランドディテールまで、場の温度が立ち上がるポイントを先に定めて撮影しました。",
+      "deliverablesTitle": "Deliverables",
+      "deliverablesBody": "当日共有しやすいセレクト、後日の告知や振り返りにも使いやすい編集済みギャラリー、SNSに転用しやすいディテールカットを整理して納品しました。",
+      "approachTitle": "Editorial Approach",
+      "approachBody": "ヒーローカットだけで終わらせず、空気感のある引きと細部の寄りを往復できる並びで編集。イベントの親密さが消えない密度を優先しました。"
     },
     "about": {
       "label": "Why Me",
