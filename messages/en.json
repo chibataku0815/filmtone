@@ -232,6 +232,13 @@
       "ogImageAlt": "Event Photography in Tokyo by Takumi Chiba"
     }
   },
+  "interactive": {
+    "demo": {
+      "title": "WebGL Study #01 — Distortion Hover",
+      "description": "GLSL displacement mapping applied to portrait photographs, creating organic hover transitions between image pairs. A reinterpretation of Codrops' distortion technique with original photography.",
+      "credit": "Inspired by Codrops WebGL Distortion Hover Effects"
+    }
+  },
   "common": {
     "required": "*"
   },

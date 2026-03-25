@@ -232,6 +232,13 @@
       "ogImageAlt": "東京のイベント撮影 by Takumi Chiba"
     }
   },
+  "interactive": {
+    "demo": {
+      "title": "WebGL Study #01 — Distortion Hover",
+      "description": "ポートレート写真にGLSLシェーダーを適用し、ホバー時にdisplacement mapで有機的な画像遷移を実現。Codropsの手法を自身の撮影作品で再解釈。",
+      "credit": "Inspired by Codrops WebGL Distortion Hover Effects"
+    }
+  },
   "common": {
     "required": "*"
   },
