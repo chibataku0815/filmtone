@@ -243,6 +243,16 @@
       "description": "A real-time color grading tool in the browser. Drop images or videos, then adjust exposure, contrast, and LUT in real-time. The effect chain follows DaVinci Resolve's color page pipeline, implemented entirely in GPU fragment shaders."
     }
   },
+  "film-lab": {
+    "back": "\u2190 Back to Interactive",
+    "metadata": {
+      "title": "Film Lab",
+      "description": "A real-time color grading tool in the browser. Drop images or videos, then adjust exposure, contrast, and LUT with GPU fragment shaders.",
+      "ogTitle": "Film Lab \u2014 Browser Color Grading Tool",
+      "ogDescription": "Drop an image or video and grade it in real-time. Exposure, contrast, LUT, and film presets powered by WebGL2 GPU shaders.",
+      "ogImageAlt": "Film Lab Color Grading Tool"
+    }
+  },
   "common": {
     "required": "*"
   },

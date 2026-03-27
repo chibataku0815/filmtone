@@ -243,6 +243,16 @@
       "description": "ブラウザで動くリアルタイムカラーグレーディングツール。画像や動画をドロップして、露出・コントラスト・LUTをリアルタイムに適用。DaVinci Resolveのカラーページに準拠したエフェクトチェーンをGPUシェーダーで実装。"
     }
   },
+  "film-lab": {
+    "back": "\u2190 Interactive に戻る",
+    "metadata": {
+      "title": "Film Lab",
+      "description": "ブラウザで動くリアルタイムカラーグレーディングツール。画像や動画をドロップして、露出・コントラスト・LUTをGPUシェーダーでリアルタイムに適用。",
+      "ogTitle": "Film Lab \u2014 ブラウザで動くカラーグレーディングツール",
+      "ogDescription": "画像や動画をドロップするだけ。露出・コントラスト・LUTをリアルタイムに適用できるWebGLカラグレツール。",
+      "ogImageAlt": "Film Lab カラーグレーディングツール"
+    }
+  },
   "common": {
     "required": "*"
   },
