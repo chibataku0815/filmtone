@@ -234,13 +234,13 @@
   },
   "interactive": {
     "demo": {
-      "title": "WebGL Study #01 — Distortion Hover",
+      "title": "Distortion Hover",
       "description": "GLSL displacement mapping applied to portrait photographs, creating organic hover transitions between image pairs. A reinterpretation of Codrops' distortion technique with original photography.",
       "credit": "Inspired by Codrops WebGL Distortion Hover Effects"
     },
     "film-lab": {
-      "title": "WebGL Study #05 — Film Lab",
-      "description": "A real-time color grading tool in the browser. Drop images or videos, then adjust exposure, contrast, and LUT in real-time. The effect chain follows DaVinci Resolve's color page pipeline, implemented entirely in GPU fragment shaders."
+      "title": "Film Lab",
+      "description": "A real-time color grading tool in the browser. Drop images or videos, then adjust exposure, contrast, and LUT in real-time. All effects implemented entirely in GPU fragment shaders."
     }
   },
   "film-lab": {

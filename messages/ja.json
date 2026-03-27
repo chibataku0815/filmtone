@@ -234,13 +234,13 @@
   },
   "interactive": {
     "demo": {
-      "title": "WebGL Study #01 — Distortion Hover",
+      "title": "Distortion Hover",
       "description": "ポートレート写真にGLSLシェーダーを適用し、ホバー時にdisplacement mapで有機的な画像遷移を実現。Codropsの手法を自身の撮影作品で再解釈。",
       "credit": "Inspired by Codrops WebGL Distortion Hover Effects"
     },
     "film-lab": {
-      "title": "WebGL Study #05 — Film Lab",
-      "description": "ブラウザで動くリアルタイムカラーグレーディングツール。画像や動画をドロップして、露出・コントラスト・LUTをリアルタイムに適用。DaVinci Resolveのカラーページに準拠したエフェクトチェーンをGPUシェーダーで実装。"
+      "title": "Film Lab",
+      "description": "ブラウザで動くリアルタイムカラーグレーディングツール。画像や動画をドロップして、露出・コントラスト・LUTをリアルタイムに適用。全エフェクトをGPUシェーダーで実装。"
     }
   },
   "film-lab": {
