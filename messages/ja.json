@@ -264,9 +264,29 @@
       "hint": "クイックはプリセットと主要カラースライダーのみ。プロはトーン詳細・エフェクト・Bloom・Halation・LUT を表示します。"
     },
     "compare": {
-      "title": "A/B 比較",
-      "hint": "左: ルック A · 右: ルック B。キャンバスをドラッグで境界移動。スライダーは選択中のスロット（A または B）に適用されます。",
-      "editLabel": "編集中"
+      "sectionTitle": "プレビューでの比べ方",
+      "beforeAfterTitle": "元の写真 ↔ いまのルック",
+      "beforeAfterHint": "素材そのものと、今かけているグレードを切り替えて見る",
+      "holdTitle": "押し続けて元画像",
+      "holdHint": "タッチは長押し・PC は Space でも同じ",
+      "title": "左と右で別ルック",
+      "taglineOff": "画面が左右に割れ、スライダーは選んだ側だけに効きます。",
+      "taglineOn": "境界はドラッグ。V で終了。",
+      "editLabel": "スライダーが効くのは",
+      "canvasLeft": "左の案",
+      "canvasRight": "右の案",
+      "slotLeft": "左",
+      "slotRight": "右",
+      "slotTooltipLeft": "画面の左半分のルックを編集",
+      "slotTooltipRight": "画面の右半分のルックを編集",
+      "editingLeftChip": "左のルックを調整中",
+      "editingRightChip": "右のルックを調整中",
+      "dragSplitHint": "境界はドラッグ"
+    },
+    "color": {
+      "tint": "ティント",
+      "shadowTone": "シャドウトーン",
+      "highlightTone": "ハイライトトーン"
     },
     "shortcuts": {
       "title": "キーボードショートカット",
@@ -281,8 +301,8 @@
       "histogram": "ヒストグラムの表示切替",
       "help": "このヘルプ",
       "toggleMode": "クイック / プロ表示の切替",
-      "toggleCompare": "A/B 比較のオンオフ",
-      "switchSlot": "比較中に編集スロットを切替"
+      "toggleCompare": "「2案を左右に並べる」のオンオフ",
+      "switchSlot": "並べたとき、左／右どちらを編集するか切替"
     }
   },
   "common": {

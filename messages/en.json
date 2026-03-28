@@ -264,9 +264,29 @@
       "hint": "Quick shows presets and core color sliders. Pro adds tone detail, effects, Bloom, Halation, and LUT."
     },
     "compare": {
-      "title": "A/B compare",
-      "hint": "Left: look A · Right: look B. Drag the canvas to move the split. Sliders edit the active slot (A or B).",
-      "editLabel": "Editing"
+      "sectionTitle": "Compare on the preview",
+      "beforeAfterTitle": "Original ↔ graded look",
+      "beforeAfterHint": "Switch between the source and your current grade",
+      "holdTitle": "Hold to see original",
+      "holdHint": "Long-press on touch · Space on desktop",
+      "title": "Two different grades, split screen",
+      "taglineOff": "Splits left/right; sliders apply to the selected side only.",
+      "taglineOn": "Drag the split · V to turn off",
+      "editLabel": "Sliders edit",
+      "canvasLeft": "Left look",
+      "canvasRight": "Right look",
+      "slotLeft": "Left",
+      "slotRight": "Right",
+      "slotTooltipLeft": "Edit the left half",
+      "slotTooltipRight": "Edit the right half",
+      "editingLeftChip": "Adjusting left look",
+      "editingRightChip": "Adjusting right look",
+      "dragSplitHint": "Drag to move split"
+    },
+    "color": {
+      "tint": "Tint",
+      "shadowTone": "Shadow tone",
+      "highlightTone": "Highlight tone"
     },
     "shortcuts": {
       "title": "Keyboard Shortcuts",
@@ -281,8 +301,8 @@
       "histogram": "Toggle histogram",
       "help": "This help",
       "toggleMode": "Toggle Quick / Pro mode",
-      "toggleCompare": "Toggle A/B compare",
-      "switchSlot": "Switch active slot (while comparing)"
+      "toggleCompare": "Toggle two-up compare",
+      "switchSlot": "Switch left/right edit target (while two-up)"
     }
   },
   "common": {
