@@ -263,6 +263,11 @@
       "pro": "プロ",
       "hint": "クイックはプリセットと主要カラースライダーのみ。プロはトーン詳細・エフェクト・Bloom・Halation・LUT を表示します。"
     },
+    "compare": {
+      "title": "A/B 比較",
+      "hint": "左: ルック A · 右: ルック B。キャンバスをドラッグで境界移動。スライダーは選択中のスロット（A または B）に適用されます。",
+      "editLabel": "編集中"
+    },
     "shortcuts": {
       "title": "キーボードショートカット",
       "closeHint": "? または Esc で閉じます",
@@ -275,7 +280,9 @@
       "redo": "やり直す",
       "histogram": "ヒストグラムの表示切替",
       "help": "このヘルプ",
-      "toggleMode": "クイック / プロ表示の切替"
+      "toggleMode": "クイック / プロ表示の切替",
+      "toggleCompare": "A/B 比較のオンオフ",
+      "switchSlot": "比較中に編集スロットを切替"
     }
   },
   "common": {

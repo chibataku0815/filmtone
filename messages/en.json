@@ -263,6 +263,11 @@
       "pro": "Pro",
       "hint": "Quick shows presets and core color sliders. Pro adds tone detail, effects, Bloom, Halation, and LUT."
     },
+    "compare": {
+      "title": "A/B compare",
+      "hint": "Left: look A · Right: look B. Drag the canvas to move the split. Sliders edit the active slot (A or B).",
+      "editLabel": "Editing"
+    },
     "shortcuts": {
       "title": "Keyboard Shortcuts",
       "closeHint": "Press ? or Esc to close",
@@ -275,7 +280,9 @@
       "redo": "Redo",
       "histogram": "Toggle histogram",
       "help": "This help",
-      "toggleMode": "Toggle Quick / Pro mode"
+      "toggleMode": "Toggle Quick / Pro mode",
+      "toggleCompare": "Toggle A/B compare",
+      "switchSlot": "Switch active slot (while comparing)"
     }
   },
   "common": {
