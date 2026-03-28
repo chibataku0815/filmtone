@@ -257,6 +257,25 @@
       "copied": "コピーしました",
       "postToX": "X に投稿",
       "postText": "Film Lab でこのルックを試せます（ブラウザでカラグレ）"
+    },
+    "mode": {
+      "quick": "クイック",
+      "pro": "プロ",
+      "hint": "クイックはプリセットと主要カラースライダーのみ。プロはトーン詳細・エフェクト・Bloom・Halation・LUT を表示します。"
+    },
+    "shortcuts": {
+      "title": "キーボードショートカット",
+      "closeHint": "? または Esc で閉じます",
+      "presetSelect": "プリセットを選択",
+      "reset": "リセット",
+      "beforeAfter": "ビフォー / アフター（押し続ける）",
+      "holdButton": "タッチ端末では長押しボタン",
+      "presetSlider": "プリセットとニュートラルのブレンド（プリセット選択時）",
+      "undo": "元に戻す",
+      "redo": "やり直す",
+      "histogram": "ヒストグラムの表示切替",
+      "help": "このヘルプ",
+      "toggleMode": "クイック / プロ表示の切替"
     }
   },
   "common": {

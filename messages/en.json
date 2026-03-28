@@ -257,6 +257,25 @@
       "copied": "Copied!",
       "postToX": "Post to X",
       "postText": "Try this grade in Film Lab \u2014 browser color grading"
+    },
+    "mode": {
+      "quick": "Quick",
+      "pro": "Pro",
+      "hint": "Quick shows presets and core color sliders. Pro adds tone detail, effects, Bloom, Halation, and LUT."
+    },
+    "shortcuts": {
+      "title": "Keyboard Shortcuts",
+      "closeHint": "Press ? or Esc to close",
+      "presetSelect": "Select preset",
+      "reset": "Reset",
+      "beforeAfter": "Before / After (hold)",
+      "holdButton": "Before / After on touch devices",
+      "presetSlider": "Blend film preset vs neutral (when preset active)",
+      "undo": "Undo",
+      "redo": "Redo",
+      "histogram": "Toggle histogram",
+      "help": "This help",
+      "toggleMode": "Toggle Quick / Pro mode"
     }
   },
   "common": {
