@@ -251,6 +251,12 @@
       "ogTitle": "Film Lab \u2014 Browser Color Grading Tool",
       "ogDescription": "Drop an image or video and grade it in real-time. Exposure, contrast, LUT, and film presets powered by WebGL2 GPU shaders.",
       "ogImageAlt": "Film Lab Color Grading Tool"
+    },
+    "share": {
+      "copyLink": "Copy look link",
+      "copied": "Copied!",
+      "postToX": "Post to X",
+      "postText": "Try this grade in Film Lab \u2014 browser color grading"
     }
   },
   "common": {

@@ -251,6 +251,12 @@
       "ogTitle": "Film Lab \u2014 ブラウザで動くカラーグレーディングツール",
       "ogDescription": "画像や動画をドロップするだけ。露出・コントラスト・LUTをリアルタイムに適用できるWebGLカラグレツール。",
       "ogImageAlt": "Film Lab カラーグレーディングツール"
+    },
+    "share": {
+      "copyLink": "ルックのリンクをコピー",
+      "copied": "コピーしました",
+      "postToX": "X に投稿",
+      "postText": "Film Lab でこのルックを試せます（ブラウザでカラグレ）"
     }
   },
   "common": {
