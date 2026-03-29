@@ -1,7 +1,22 @@
+import type { ReactElement } from "react";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
+import { NextIntlClientProvider } from "next-intl";
 
+import jaMessages from "../../../messages/ja.json";
 import { BatchTabPanel, type BatchTabPanelProps } from "./BatchTabPanel";
+
+function renderBatchPanel(ui: ReactElement) {
+  return renderToStaticMarkup(
+    <NextIntlClientProvider
+      locale="ja"
+      messages={jaMessages}
+      timeZone="Asia/Tokyo"
+    >
+      {ui}
+    </NextIntlClientProvider>,
+  );
+}
 
 const baseProps: BatchTabPanelProps = {
   batchJobMode: "video",
@@ -68,7 +83,7 @@ function withListLayout<T>(fn: () => T): T {
 describe("BatchTabPanel video export copy", () => {
   it("shows WebGL-only copy and hides the fast checkbox when fast export is disabled", () => {
     const html = withListLayout(() =>
-      renderToStaticMarkup(
+      renderBatchPanel(
         <BatchTabPanel
           {...baseProps}
           showFastFfmpegVideoExportOption={false}
@@ -81,9 +96,9 @@ describe("BatchTabPanel video export copy", () => {
     expect(html).not.toContain("プレビュー一致（WebGL・低速・既定）");
   });
 
-  it("keeps the future fast copy approximate-only and leaves accurate as the default", () => {
+  it("when fast export is enabled, summarizes fast-as-default and optional WebGL accurate", () => {
     const html = withListLayout(() =>
-      renderToStaticMarkup(
+      renderBatchPanel(
         <BatchTabPanel
           {...baseProps}
           showFastFfmpegVideoExportOption
@@ -91,8 +106,8 @@ describe("BatchTabPanel video export copy", () => {
       ),
     );
 
-    expect(html).toContain("高速・近似オプションあり／詳細は手順内");
-    expect(html).toContain("プレビュー一致（WebGL・低速・既定）");
-    expect(html).not.toContain("高速書き出し（既定）");
+    expect(html).toContain("既定は高速 ffmpeg（近似）／プレビュー一致はオプション");
+    expect(html).toContain("プレビュー一致（WebGL・低速）");
+    expect(html).toContain("高速 ffmpeg（既定・近似）");
   });
 });

@@ -12,7 +12,8 @@
  * - 開閉は Phosphor Icons（CaretLeft / CaretRight）＋ aria-label。`prefers-reduced-motion` は Tailwind で短縮。
  */
 import { CaretLeft, CaretRight } from "@phosphor-icons/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { FilmLabCanvas, type FilmLabCanvasRef } from "@film-lab/components/FilmLabCanvas";
 import { ControlPanel } from "@film-lab/components/ControlPanel";
 import { Histogram } from "@film-lab/components/ui/Histogram";
@@ -44,7 +45,10 @@ import {
   defaultVideoExportWebglAccurate,
   shouldUseFastVideoExport,
 } from "./video-export-policy";
-import { runVideoExportPipeline } from "./video-export-pipeline";
+import {
+  runVideoExportPipeline,
+  type VideoExportPipelineUserMessages,
+} from "./video-export-pipeline";
 import {
   assertVideoImportWithinCaps,
   computeExportFrameCount,
@@ -116,6 +120,23 @@ function isTextInputTarget(target: EventTarget | null): boolean {
 }
 
 export default function App() {
+  const tApp = useTranslations("film-lab.desktop.app");
+  const tLogs = useTranslations("film-lab.desktop.logs");
+
+  const videoPipelineUserMessages = useMemo(
+    (): VideoExportPipelineUserMessages => ({
+      webglUnavailable: tLogs("videoPipelineWebglUnavailable"),
+      metadataFailed: (detail: string) =>
+        tLogs("videoPipelineMetadataFailed", { msg: detail }),
+      ffmpegStartFailed: (detail: string) =>
+        tLogs("videoPipelineFfmpegStartFailed", { msg: detail }),
+      userAborted: tLogs("videoPipelineAborted"),
+      ffmpegFailed: (code: number) =>
+        tLogs("videoPipelineFfmpegFailed", { code: String(code) }),
+    }),
+    [tLogs],
+  );
+
   /** @description スマートルックがキャンバス JPEG を取得するための ref（Web のフルページと同じ配線） */
   const filmLabCanvasRef = useRef<FilmLabCanvasRef | null>(null);
   const [tab, setTab] = useState<TabId>("edit");
@@ -167,7 +188,7 @@ export default function App() {
   /** @description ffprobe 済みのメタ（UI 表示用） */
   const [videoProbeLabel, setVideoProbeLabel] = useState<string | null>(null);
   /**
-   * @description 公開製品の既定は常に WebGL accurate。将来 fast UI を戻しても、false はユーザー明示選択時のみ。
+   * @description 既定は高速 ffmpeg（false）。編集タブに揃えたいときだけ true（WebGL）。
    */
   const [videoExportWebglAccurate, setVideoExportWebglAccurate] = useState(
     defaultVideoExportWebglAccurate,
@@ -178,7 +199,7 @@ export default function App() {
   const [videoExportSuccessNonce, setVideoExportSuccessNonce] = useState(0);
 
   /**
-   * @description 高速 ffmpeg がペンディングの間は常に WebGL のみ（ユーザーが古い状態を持たないようにする）
+   * @description 高速 ffmpeg が無効なビルドでは常に WebGL のみ（フラグと UI の状態を矛盾させない）
    */
   useEffect(() => {
     if (!ENABLE_FFMPEG_FAST_VIDEO_EXPORT) {
@@ -258,7 +279,7 @@ export default function App() {
 
   const syncPreviewToBatch = useCallback(() => {
     if (!viewport) {
-      appendLog("（編集）Viewport 未準備のため同期できません");
+      appendLog(tLogs("syncNoViewport"));
       return;
     }
     const raw = viewport.getParams();
@@ -270,8 +291,8 @@ export default function App() {
       lutSize: 0,
     });
     setImportedGradeLabel(null);
-    appendLog("書き出し用のスライダー設定をプレビューからコピーしました（LUT は含みません）");
-  }, [viewport, batchGrade.params.halationHue, appendLog]);
+    appendLog(tLogs("syncCopied"));
+  }, [viewport, batchGrade.params.halationHue, appendLog, tLogs]);
 
   const applyBatchPreset = (name: PresetName) => {
     setBatchPresetChoice(name);
@@ -292,10 +313,10 @@ export default function App() {
         lutSize: g.lutSize,
       });
       setImportedGradeLabel(p);
-      appendLog(`Grade JSON を読み込み: ${p}`);
+      appendLog(tLogs("gradeJsonLoaded", { path: p }));
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      appendLog(`Grade JSON エラー: ${msg}`);
+      appendLog(tLogs("gradeJsonError", { msg }));
     }
   };
 
@@ -309,7 +330,7 @@ export default function App() {
     a.download = "film-lab-grade.json";
     a.click();
     URL.revokeObjectURL(url);
-    appendLog("Grade JSON をダウンロードしました（film-lab-grade.json）");
+    appendLog(tLogs("gradeJsonDownloaded"));
   };
 
   const finalizeSessionAfterRun = useCallback(
@@ -322,12 +343,12 @@ export default function App() {
         await window.filmLabBatch.clearBatchSession();
         activeBatchSessionRef.current = null;
         setPersistedSession(null);
-        appendLog("全枚成功のためセッションをクリアしました。");
+        appendLog(tLogs("sessionClearedAllOk"));
       } else {
         setPersistedSession(sessionSnap);
       }
     },
-    [appendLog],
+    [appendLog, tLogs],
   );
 
   const runBatchWithPaths = useCallback(
@@ -360,31 +381,32 @@ export default function App() {
       batchAbortRef.current = abortController;
       activeBatchSessionRef.current = sessionMutable;
 
-      appendLog(`Input: ${effectiveInput}`);
-      appendLog(`Output: ${effectiveOutput}`);
+      appendLog(tLogs("inputLabel", { path: effectiveInput }));
+      appendLog(tLogs("outputLabel", { path: effectiveOutput }));
       appendLog(
         importedGradeLabel
-          ? `Grade: imported JSON + メモリ上の Params`
-          : `Grade: メモリ（プリセット ${batchPresetChoice} またはプレビュー同期）`,
+          ? tLogs("gradeImportedLine")
+          : tLogs("gradeMemoryLine", { preset: batchPresetChoice }),
       );
-      appendLog(`Format: ${format}`);
+      appendLog(tLogs("formatLabel", { format }));
       const outputSuffixForPipeline =
         sessionMutable?.outputFilenameSuffix ?? batchOutputSuffix;
       appendLog(
-        `出力接尾辞: ${
-          sanitizeBatchFilenameSuffix(outputSuffixForPipeline) === ""
-            ? "（なし・ベース名のみ）"
-            : sanitizeBatchFilenameSuffix(outputSuffixForPipeline)
-        }`,
+        tLogs("suffixLabel", {
+          value:
+            sanitizeBatchFilenameSuffix(outputSuffixForPipeline) === ""
+              ? tLogs("suffixNone")
+              : sanitizeBatchFilenameSuffix(outputSuffixForPipeline),
+        }),
       );
-      appendLog(`この実行で処理する枚数: ${imagePaths.length}`);
+      appendLog(tLogs("runCountLabel", { count: imagePaths.length }));
 
       setRunning(true);
       try {
         setBatchProgress({
           current: 0,
           total: imagePaths.length,
-          fileName: "準備中…",
+          fileName: tLogs("preparing"),
         });
 
         const pathToIndex =
@@ -437,13 +459,13 @@ export default function App() {
         await finalizeSessionAfterRun(summary, snap);
 
         if (summary.aborted) {
-          appendLog("ユーザーにより中断されました。");
+          appendLog(tLogs("userAborted"));
         } else {
-          appendLog("Done.");
+          appendLog(tLogs("done"));
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        appendLog(`FATAL: ${msg}`);
+        appendLog(tLogs("fatal", { msg }));
       } finally {
         batchAbortRef.current = null;
         setBatchProgress(null);
@@ -460,6 +482,7 @@ export default function App() {
       inputDir,
       outputDir,
       batchOutputSuffix,
+      tLogs,
     ],
   );
 
@@ -467,7 +490,7 @@ export default function App() {
     if (!inputDir || !outputDir) return;
     const images = await window.filmLabBatch.listImages(inputDir);
     if (images.length === 0) {
-      appendLog("画像がありません（.jpg / .jpeg / .png）");
+      appendLog(tLogs("noImages"));
       return;
     }
     const session: FilmLabBatchSessionV1 = {
@@ -503,7 +526,7 @@ export default function App() {
       gradeSnap = await resolveBatchGradeSnapshot(s);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      appendLog(`セッションのルック復元に失敗: ${msg}`);
+      appendLog(tLogs("sessionRestoreFailed", { msg }));
       gradeSnap = batchGradeStateFromPreset(s.batchPresetChoice);
     }
     setBatchGrade(gradeSnap);
@@ -534,7 +557,7 @@ export default function App() {
     await window.filmLabBatch.clearBatchSession();
     activeBatchSessionRef.current = null;
     setPersistedSession(null);
-    appendLog("保存していた「まとめて書き出し」の途中記録を消しました。");
+    appendLog(tLogs("sessionDiscarded"));
   };
 
   const pickVideoFile = async () => {
@@ -547,29 +570,37 @@ export default function App() {
       const { outW, outH } = computeVideoExportDimensions(meta.width, meta.height);
       const frames = computeExportFrameCount(meta.durationSec);
       setVideoProbeLabel(
-        `${meta.width}×${meta.height}, ${meta.durationSec.toFixed(1)}秒 · ${meta.videoCodec || "?"} · 出力 ${outW}×${outH} · ${VIDEO_EXPORT_FPS}fps · ${frames} フレーム（読込上限 4K / ${VIDEO_IMPORT_MAX_DURATION_SEC}秒）`,
+        tLogs("videoMetaLine", {
+          w: String(meta.width),
+          h: String(meta.height),
+          sec: meta.durationSec.toFixed(1),
+          codec: meta.videoCodec || "?",
+          ow: String(outW),
+          oh: String(outH),
+          fps: String(VIDEO_EXPORT_FPS),
+          frames: String(frames),
+          maxSec: String(VIDEO_IMPORT_MAX_DURATION_SEC),
+        }),
       );
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setVideoProbeLabel(null);
-      appendLog(`動画メタデータ: ${msg}`);
+      appendLog(tLogs("videoMetaLogPrefix", { msg }));
     }
   };
 
   const runVideoExport = async () => {
     if (!videoInputPath) {
-      appendLog("動画: 先に動画ファイルを選んでください。");
+      appendLog(tLogs("videoPickFirst"));
       return;
     }
 
     let effectiveOutputDir = outputDir;
     if (!effectiveOutputDir) {
-      appendLog(
-        "動画: 出力フォルダが未設定です。保存先フォルダを選ぶダイアログを開きます。",
-      );
+      appendLog(tLogs("videoOutputUnset"));
       const picked = await window.filmLabBatch.pickOutputDir();
       if (!picked) {
-        appendLog("動画: 出力フォルダの選択がキャンセルされました。");
+        appendLog(tLogs("videoOutputCancel"));
         return;
       }
       effectiveOutputDir = picked;
@@ -593,7 +624,7 @@ export default function App() {
       estimateFrames = computeExportFrameCount(meta.durationSec);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      appendLog(`動画: 検証エラー — ${msg}`);
+      appendLog(tLogs("videoValidateErr", { msg }));
       return;
     }
 
@@ -611,7 +642,7 @@ export default function App() {
         setBatchProgress({
           current: 0,
           total: 1,
-          fileName: "動画（高速 ffmpeg）",
+          fileName: tLogs("progressVideoFast"),
         });
         const lutPath = await resolveLutCubeAbsPathForFastExport(
           window.filmLabBatch,
@@ -629,12 +660,12 @@ export default function App() {
         setBatchProgress({
           current: 1,
           total: 1,
-          fileName: "動画（高速 ffmpeg）",
+          fileName: tLogs("progressVideoFast"),
         });
         if (!res.ok) {
-          appendLog(`動画出力失敗: ${res.message}`);
+          appendLog(tLogs("videoExportFail", { msg: res.message }));
         } else {
-          appendLog("動画出力が完了しました。");
+          appendLog(tLogs("videoExportDone"));
           setVideoExportSuccessNonce((n) => n + 1);
         }
       } else {
@@ -643,7 +674,7 @@ export default function App() {
         setBatchProgress({
           current: 0,
           total: estimateFrames,
-          fileName: "動画フレーム",
+          fileName: tLogs("progressVideoFrames"),
         });
         const res = await runVideoExportPipeline({
           api: window.filmLabBatch,
@@ -656,21 +687,22 @@ export default function App() {
             setBatchProgress({
               current: pr.currentFrame,
               total: pr.totalFrames,
-              fileName: "動画フレーム",
+              fileName: tLogs("progressVideoFrames"),
             });
           },
           onLog: appendLog,
+          userMessages: videoPipelineUserMessages,
         });
         if (!res.ok) {
-          appendLog(`動画出力失敗: ${res.message}`);
+          appendLog(tLogs("videoExportFail", { msg: res.message }));
         } else {
-          appendLog("動画出力が完了しました。");
+          appendLog(tLogs("videoExportDone"));
           setVideoExportSuccessNonce((n) => n + 1);
         }
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      appendLog(`動画 FATAL: ${msg}`);
+      appendLog(tLogs("videoFatal", { msg }));
     } finally {
       batchAbortRef.current = null;
       setBatchProgress(null);
@@ -785,7 +817,7 @@ export default function App() {
     <div className="film-lab-desktop-root flex min-h-screen flex-col">
       <header className="fl-app-header fl-surface-frost">
         <span className="fl-app-title">Film Lab</span>
-        <span className="fl-app-subtitle">Desktop（フォルダから書き出し）</span>
+        <span className="fl-app-subtitle">{tApp("subtitle")}</span>
         <div className="fl-tabs ml-auto">
           <button
             type="button"
@@ -793,16 +825,16 @@ export default function App() {
             className="fl-tab"
             onClick={() => setTab("edit")}
           >
-            編集
+            {tApp("tabEdit")}
           </button>
           <button
             type="button"
             data-state={tab === "batch" ? "active" : "inactive"}
             className="fl-tab"
             onClick={() => setTab("batch")}
-            aria-label="書き出しタブ（フォルダの写真や動画を保存）"
+            aria-label={tApp("tabBatchAria")}
           >
-            書き出し
+            {tApp("tabBatch")}
           </button>
         </div>
       </header>
@@ -813,9 +845,7 @@ export default function App() {
             <section className="fl-card fl-scroll-surface relative z-0 flex min-h-0 w-full min-w-0 flex-col gap-3 overflow-y-auto max-lg:flex-none lg:absolute lg:inset-0 lg:z-0">
               <div className="fl-card-header">
                 <div className="flex min-w-[140px] flex-1 flex-col gap-1.5">
-                  <span className="fl-label">
-                    開いたときのルック（プリセット）
-                  </span>
+                  <span className="fl-label">{tApp("presetWhenOpenLabel")}</span>
                   <select
                     value={canvasPreset}
                     onChange={(e) =>
@@ -843,7 +873,7 @@ export default function App() {
               <div className="w-full max-w-full self-stretch">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <span className="fl-label normal-case tracking-normal">
-                    RGB ヒストグラム
+                    {tApp("rgbHistogram")}
                   </span>
                 </div>
                 <Histogram
@@ -858,7 +888,7 @@ export default function App() {
               <button
                 type="button"
                 className="fl-edit-pane-reveal-rail"
-                aria-label="パラメータパネルを開く"
+                aria-label={tApp("openParamsPanelAria")}
                 aria-expanded={false}
                 aria-controls="film-lab-edit-controls-pane"
                 onClick={() => setEditRightPaneExpanded(true)}
@@ -870,7 +900,7 @@ export default function App() {
             <div
               id="film-lab-edit-controls-pane"
               role="complementary"
-              aria-label="Film Lab パラメータ"
+              aria-label={tApp("paramsPanelAria")}
               aria-hidden={Boolean(
                 isLgLayout && !editRightPaneExpanded,
               )}
@@ -885,7 +915,7 @@ export default function App() {
                   <button
                     type="button"
                     className="fl-edit-pane-toolbar-btn"
-                    aria-label="パラメータパネルを閉じる"
+                    aria-label={tApp("closeParamsPanelAria")}
                     aria-expanded={editRightPaneExpanded}
                     aria-controls="film-lab-edit-controls-pane"
                     onClick={() => setEditRightPaneExpanded(false)}
@@ -917,15 +947,13 @@ export default function App() {
                     className="fl-btn-primary w-full sm:w-auto sm:min-w-[220px]"
                     onClick={syncPreviewToBatch}
                   >
-                    色を書き出しへ送る
+                    {tApp("sendGradeToExport")}
                   </button>
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    <p className="fl-caption">
-                      スライダーの数値だけ書き出しタブへ送ります。LUT は JSON などで。
-                    </p>
+                    <p className="fl-caption">{tApp("sendGradeCaption")}</p>
                     <HelpHint
-                      tip="LUT（ルックアップテーブル）は自動では渡りません。書き出しタブの「詳細: Grade JSON…」から読み込むか、.cube を後から当ててください。"
-                      assistiveLabel="色を書き出しへ送るときの注意"
+                      tip={tApp("sendGradeTip")}
+                      assistiveLabel={tApp("sendGradeTipAria")}
                     />
                   </div>
                 </div>
@@ -987,7 +1015,7 @@ export default function App() {
             onApplyEditGradeToBatch={syncPreviewToBatch}
           />
 
-          <pre className="fl-log">{logText || "ログはここに表示されます。"}</pre>
+          <pre className="fl-log">{logText || tApp("logPlaceholder")}</pre>
         </div>
       )}
     </div>

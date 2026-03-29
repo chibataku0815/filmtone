@@ -1,7 +1,7 @@
 /**
  * Film Lab デスクトップ — 高速動画書き出しの internal acceptance matrix
  *
- * @overview fast 経路は public default に戻さない。再有効化前に最低限確認すべきケースだけをコード側で固定する。
+ * @overview 高速 ffmpeg は UI 既定で使える。リグレッション確認用の最低ケース行列をコード側で固定する。
  * 実サンプル資産は別途必要だが、確認対象そのものはここでブレないようにする。
  */
 

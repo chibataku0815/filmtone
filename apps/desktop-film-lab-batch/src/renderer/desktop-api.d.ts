@@ -39,13 +39,15 @@ export type FilmLabBatchBridge = {
   pathToFileURL: (absolutePath: string) => Promise<string>;
   /** @description 1 本の動画ファイルを選択 */
   pickInputVideoFile: () => Promise<string | null>;
-  /** @description ffprobe で解像度・長尺・音声の有無を取得 */
+  /** @description ffprobe で解像度・長尺・音声の有無・ソース FPS メタを取得 */
   videoExportProbe: (absolutePath: string) => Promise<{
     width: number;
     height: number;
     durationSec: number;
     hasAudio: boolean;
     videoCodec: string;
+    sourceFrameRate: number | null;
+    sourceFrameRateTrusted: boolean;
   }>;
   /** @description ffmpeg を rawvideo stdin で起動（1 セッションのみ） */
   videoExportStart: (payload: {

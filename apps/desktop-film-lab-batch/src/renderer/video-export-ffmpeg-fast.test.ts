@@ -35,6 +35,8 @@ describe("video-export-ffmpeg-fast", () => {
     });
     const api = {
       videoExportProbe: vi.fn().mockResolvedValue({
+        sourceFrameRate: null,
+        sourceFrameRateTrusted: false,
         width: 1280,
         height: 720,
         durationSec: 3,

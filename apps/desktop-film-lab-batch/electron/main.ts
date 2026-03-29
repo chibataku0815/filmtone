@@ -14,7 +14,6 @@ import { execFile, spawn, type ChildProcessWithoutNullStreams } from "node:child
 import { createReadStream } from "node:fs";
 import fs from "node:fs/promises";
 import { Readable } from "node:stream";
-import { pipeline } from "node:stream/promises";
 import os from "node:os";
 import { randomBytes } from "node:crypto";
 import path from "node:path";
@@ -31,6 +30,7 @@ import {
   guessVideoContentType,
   parseHttpByteRange,
 } from "./video-src-protocol";
+import { deriveSourceFrameRateTrust } from "./video-export-probe-framerate";
 
 const execFileAsync = promisify(execFile);
 
@@ -178,6 +178,10 @@ async function ffprobeVideoMeta(absPath: string): Promise<{
   hasAudio: boolean;
   /** @description 先頭の動画ストリームの codec_name（HEVC 不可など切り分け用） */
   videoCodec: string;
+  /** @description avg/r_frame_rate が一致するときの代表 fps。不信任なら null */
+  sourceFrameRate: number | null;
+  /** @description 両方が有限かつ差が小さいとき true */
+  sourceFrameRateTrusted: boolean;
 }> {
   let stdout: string;
   try {
@@ -187,7 +191,7 @@ async function ffprobeVideoMeta(absPath: string): Promise<{
         "-v",
         "error",
         "-show_entries",
-        "stream=codec_type,width,height,codec_name",
+        "stream=codec_type,width,height,codec_name,avg_frame_rate,r_frame_rate",
         "-show_entries",
         "format=duration",
         "-of",
@@ -221,6 +225,8 @@ async function ffprobeVideoMeta(absPath: string): Promise<{
   let height = 0;
   let hasAudio = false;
   let videoCodec = "";
+  let avgFrameRate: unknown;
+  let rFrameRate: unknown;
   for (const s of streams) {
     if (typeof s !== "object" || s === null) continue;
     const o = s as Record<string, unknown>;
@@ -237,6 +243,8 @@ async function ffprobeVideoMeta(absPath: string): Promise<{
         const cn = o.codec_name;
         videoCodec =
           typeof cn === "string" && cn.length > 0 ? cn : "";
+        avgFrameRate = o.avg_frame_rate;
+        rFrameRate = o.r_frame_rate;
       }
     }
   }
@@ -259,7 +267,52 @@ async function ffprobeVideoMeta(absPath: string): Promise<{
     throw new Error("ffprobe: duration が不正です");
   }
 
-  return { width, height, durationSec, hasAudio, videoCodec };
+  const { sourceFrameRate, sourceFrameRateTrusted } =
+    deriveSourceFrameRateTrust(avgFrameRate, rFrameRate);
+
+  return {
+    width,
+    height,
+    durationSec,
+    hasAudio,
+    videoCodec,
+    sourceFrameRate,
+    sourceFrameRateTrusted,
+  };
+}
+
+/**
+ * @description 1 フレームぶんの raw RGB を ffmpeg stdin に書き、バックプレッシャー時は drain まで待つ
+ */
+function writeStdinWithDrain(
+  stdin: NodeJS.WritableStream,
+  chunk: Buffer,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const onErr = (e: Error) => {
+      cleanup();
+      reject(e);
+    };
+    const cleanup = () => {
+      stdin.removeListener("error", onErr);
+    };
+    stdin.once("error", onErr);
+    try {
+      const ok = stdin.write(chunk);
+      if (ok) {
+        cleanup();
+        resolve();
+      } else {
+        stdin.once("drain", () => {
+          cleanup();
+          resolve();
+        });
+      }
+    } catch (e) {
+      cleanup();
+      reject(e instanceof Error ? e : new Error(String(e)));
+    }
+  });
 }
 
 /**
@@ -1021,15 +1074,12 @@ ipcMain.handle("video-export-write-frame", async (_evt, data: unknown) => {
   const buf = Buffer.from(data.buffer, data.byteOffset, data.byteLength);
   const t0 = process.hrtime.bigint();
   try {
-    /**
-     * @description 単発 write+コールバックだと 1 フレーム数十 MB 級でバッファ溢れ・デッドロックしうる。pipeline でバックプレッシャー継承。
-     */
-    await pipeline(Readable.from(buf), stdin, { end: false });
+    await writeStdinWithDrain(stdin, buf);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     const tail = sess.stderrLines.join("").slice(-2500);
     throw new Error(
-      `video-export-write-frame: stdin pipeline 失敗 — ${msg} | ffmpeg stderr(末尾): ${tail}`,
+      `video-export-write-frame: stdin write/drain 失敗 — ${msg} | ffmpeg stderr(末尾): ${tail}`,
     );
   }
   const ms = Number(process.hrtime.bigint() - t0) / 1e6;

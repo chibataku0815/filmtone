@@ -1,7 +1,7 @@
 /**
  * Film Lab デスクトップ — 動画グレード書き出し（WebGL Viewport + ffmpeg）
  *
- * @overview 1 本のソース動画をフレーム刻みでシークし、画像バッチと同じ Viewport でグレードして raw RGBA を ffmpeg に流す。
+ * @overview 1 本のソース動画を時刻単調にデコードし（主に前方向 rVFC・シークはフォールバック）、画像バッチと同じ Viewport でグレードして raw RGBA を ffmpeg に流す。
  * @limitations 単一 GL 直列。ffprobe/ffmpeg は PATH 必須（Homebrew 等）。macOS では VideoToolbox を優先。
  */
 import * as THREE from "three";
@@ -18,6 +18,10 @@ import {
   VIDEO_EXPORT_FPS,
 } from "./video-export-constants";
 import type { BatchGradeState } from "./batch-pipeline";
+import {
+  computeTargetSourceFrameIndex,
+  shouldReuseDecodedSourceFrame,
+} from "./video-export-frame-reuse";
 
 /** @description development のとき各フレーム 1 行トレース。production では遅いフレームと間引きのみ。 */
 const VIDEO_EXPORT_LOG_EVERY_FRAME = import.meta.env.DEV === true;
@@ -25,27 +29,69 @@ const VIDEO_EXPORT_LOG_EVERY_FRAME = import.meta.env.DEV === true;
 /** @description seek がこの時間（ms）無応答なら打ち切り（どこで固まったかログに出す） */
 const SEEK_TIMEOUT_MS = 90_000;
 
+/** @description rVFC が来ないとき 2×rAF に落とすまでの待ち（ms） */
+const RVFC_TIMEOUT_MS = 250;
+
 export type VideoExportProgress = {
   currentFrame: number;
   totalFrames: number;
 };
 
 /**
- * @description Y 反転（WebGL readPixels は左下原点、動画は左上原点想定）
+ * @description `seekVideoToTime` が返す 1 フレームぶんの計測（集計ログ用）
  */
-function flipRgbaVertical(
+export type SeekVideoTimingDetail = {
+  seekWaitMs: number;
+  decodeGateMs: number;
+  usedSeek: boolean;
+  usedRvfc: boolean;
+  usedRafFallback: boolean;
+  /** @description true のとき時刻単調の前方向 rVFC で進めた（キーフレームシークなし） */
+  usedForwardScan?: boolean;
+};
+
+type VideoWithRvfc = HTMLVideoElement & {
+  requestVideoFrameCallback?: (
+    cb: (now: number, metadata: unknown) => void,
+  ) => number;
+  cancelVideoFrameCallback?: (handle: number) => void;
+};
+
+/**
+ * @description Y 反転（WebGL readPixels は左下原点、動画は左上原点想定）。`dst` に上書きし割当を避ける。
+ */
+function flipRgbaVerticalInto(
   src: Uint8Array,
   width: number,
   height: number,
-): Uint8Array {
+  dst: Uint8Array,
+): void {
   const rowBytes = width * 4;
-  const out = new Uint8Array(src.length);
   for (let y = 0; y < height; y++) {
     const srcRow = (height - 1 - y) * rowBytes;
     const dstRow = y * rowBytes;
-    out.set(src.subarray(srcRow, srcRow + rowBytes), dstRow);
+    dst.set(src.subarray(srcRow, srcRow + rowBytes), dstRow);
   }
-  return out;
+}
+
+/**
+ * @description ミリ秒配列の中央値（ソート破壊なし）
+ */
+function medianMs(values: number[]): number {
+  if (values.length === 0) return 0;
+  const s = [...values].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 === 1 ? s[m]! : ((s[m - 1]! + s[m]!) / 2);
+}
+
+/**
+ * @description ミリ秒配列の approximate 95 パーセンタイル
+ */
+function p95Ms(values: number[]): number {
+  if (values.length === 0) return 0;
+  const s = [...values].sort((a, b) => a - b);
+  const idx = Math.min(s.length - 1, Math.ceil(0.95 * s.length) - 1);
+  return s[Math.max(0, idx)]!;
 }
 
 /**
@@ -62,11 +108,11 @@ function videoDebugSnapshot(video: HTMLVideoElement): string {
 }
 
 /**
- * @description 指定時刻へシークし、可能なら requestVideoFrameCallback でデコード完了を待つ
- * @param ctx.onTrace レンダラのログへ出す詳細（seeked / rVFC のどちらで進んだか）
+ * @description 指定時刻へシークし、デコードゲート（rVFC 優先・タイムアウトで 2×rAF）を通す
+ * @param ctx.onTrace レンダラのログへ出す詳細（seeked / rVFC / フォールバック）
  * @param ctx.frameIndex 人間向けフレーム番号（1 始まり）
  */
-function seekVideoToTime(
+async function seekVideoToTime(
   video: HTMLVideoElement,
   timeSec: number,
   ctx: {
@@ -74,109 +120,332 @@ function seekVideoToTime(
     frameIndex: number;
     timeoutMs: number;
   },
-): Promise<void> {
+): Promise<SeekVideoTimingDetail> {
   const { onTrace, frameIndex, timeoutMs } = ctx;
-  return new Promise((resolve, reject) => {
-    const t = Math.max(0, timeSec);
-    let settled = false;
+  const t = Math.max(0, timeSec);
 
-    const cleanup = () => {
-      window.clearTimeout(timeoutId);
-      video.removeEventListener("seeked", onSeeked);
-      video.removeEventListener("error", onVideoError);
-    };
+  const twoRaf = () =>
+    new Promise<void>((r) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => r())),
+    );
 
-    const succeed = () => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      resolve();
-    };
-
-    const fail = (err: Error) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      reject(err);
-    };
-
-    const timeoutId = window.setTimeout(() => {
-      fail(
-        new Error(
-          `seekVideoToTime タイムアウト (${timeoutMs}ms) f=${frameIndex} targetT=${t.toFixed(6)} ${videoDebugSnapshot(video)}`,
-        ),
-      );
-    }, timeoutMs);
-
-    /**
-     * @description seeked 後にデコードを進める。pause 中の要素では requestVideoFrameCallback が永遠に来ないことがあるため、muted + play → 2 回 rAF → pause の経路を正とする。
-     */
-    const runDecodeGate = (phase: string) => {
-      const t0 = performance.now();
-      void (async () => {
-        try {
-          onTrace(
-            `[動画][seek] f=${frameIndex} ${phase} → play/2×rAF/pause（rVFC は使わない）`,
-          );
-          await video.play();
-          await new Promise<void>((r) =>
-            requestAnimationFrame(() => requestAnimationFrame(() => r())),
-          );
-          video.pause();
-        } catch (e) {
-          const m = e instanceof Error ? e.message : String(e);
-          onTrace(
-            `[動画][seek] f=${frameIndex} ${phase} → play 失敗、2×rAF のみで続行 — ${m}`,
-          );
-          await new Promise<void>((r) =>
-            requestAnimationFrame(() => requestAnimationFrame(() => r())),
-          );
-        }
-        onTrace(
-          `[動画][seek] f=${frameIndex} ${phase} → ゲート完了 +${(performance.now() - t0).toFixed(1)}ms (${videoDebugSnapshot(video)})`,
-        );
-        succeed();
-      })().catch((e) => {
-        const m = e instanceof Error ? e.message : String(e);
-        fail(new Error(`runDecodeGate 内例外 f=${frameIndex}: ${m}`));
-      });
-    };
-
-    const onVideoError = () => {
-      fail(
-        new Error(
-          `seekVideoToTime メディアエラー f=${frameIndex} ${videoDebugSnapshot(video)}`,
-        ),
-      );
-    };
-
-    const onSeeked = () => {
-      video.removeEventListener("error", onVideoError);
-      onTrace(
-        `[動画][seek] f=${frameIndex} seeked 発火 (${videoDebugSnapshot(video)})`,
-      );
-      runDecodeGate("seeked後");
-    };
+  const runSeekAndGate = async (): Promise<SeekVideoTimingDetail> => {
+    const tSeekPhase = performance.now();
+    let usedSeek = false;
+    let seekWaitMs = 0;
 
     if (Math.abs(video.currentTime - t) < 1e-4) {
       onTrace(
         `[動画][seek] f=${frameIndex} シーク省略（既に t≈${t.toFixed(6)}）${videoDebugSnapshot(video)}`,
       );
-      runDecodeGate("同一時刻");
-      return;
+      seekWaitMs = performance.now() - tSeekPhase;
+    } else {
+      usedSeek = true;
+      onTrace(
+        `[動画][seek] f=${frameIndex} currentTime 代入 ${video.currentTime.toFixed(6)} → ${t.toFixed(6)}`,
+      );
+      const tWaitSeek = performance.now();
+      await new Promise<void>((resolve, reject) => {
+        const onVideoError = () => {
+          reject(
+            new Error(
+              `seekVideoToTime メディアエラー f=${frameIndex} ${videoDebugSnapshot(video)}`,
+            ),
+          );
+        };
+        const onSeeked = () => {
+          video.removeEventListener("error", onVideoError);
+          onTrace(
+            `[動画][seek] f=${frameIndex} seeked 発火 (${videoDebugSnapshot(video)})`,
+          );
+          resolve();
+        };
+        video.addEventListener("seeked", onSeeked, { once: true });
+        video.addEventListener("error", onVideoError, { once: true });
+        try {
+          video.currentTime = t;
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          reject(
+            new Error(
+              `seekVideoToTime currentTime 代入失敗 f=${frameIndex} — ${msg}`,
+            ),
+          );
+        }
+      });
+      seekWaitMs = performance.now() - tWaitSeek;
     }
 
-    onTrace(
-      `[動画][seek] f=${frameIndex} currentTime 代入 ${video.currentTime.toFixed(6)} → ${t.toFixed(6)}`,
-    );
-    video.addEventListener("seeked", onSeeked, { once: true });
-    video.addEventListener("error", onVideoError, { once: true });
+    const tGate = performance.now();
+    let usedRvfc = false;
+    let usedRafFallback = false;
+    const v = video as VideoWithRvfc;
+
     try {
-      video.currentTime = t;
+      await video.play();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      fail(new Error(`seekVideoToTime currentTime 代入失敗 f=${frameIndex} — ${msg}`));
+      const m = e instanceof Error ? e.message : String(e);
+      onTrace(
+        `[動画][seek] f=${frameIndex} decodeGate → play 失敗、2×rAF — ${m}`,
+      );
+      usedRafFallback = true;
+      await twoRaf();
+      video.pause();
+      return {
+        seekWaitMs,
+        decodeGateMs: performance.now() - tGate,
+        usedSeek,
+        usedRvfc: false,
+        usedRafFallback: true,
+      };
     }
+
+    if (typeof v.requestVideoFrameCallback !== "function") {
+      onTrace(
+        `[動画][seek] f=${frameIndex} decodeGate → rVFC 未対応、2×rAF/pause`,
+      );
+      usedRafFallback = true;
+      await twoRaf();
+      video.pause();
+      return {
+        seekWaitMs,
+        decodeGateMs: performance.now() - tGate,
+        usedSeek,
+        usedRvfc: false,
+        usedRafFallback: true,
+      };
+    }
+
+    const gotRvfc = await new Promise<boolean>((resolve) => {
+      let done = false;
+      let handle = 0;
+      const timer = window.setTimeout(() => {
+        if (done) return;
+        done = true;
+        if (typeof v.cancelVideoFrameCallback === "function") {
+          try {
+            v.cancelVideoFrameCallback(handle);
+          } catch {
+            /* キャンセル失敗は無視 */
+          }
+        }
+        onTrace(
+          `[動画][seek] f=${frameIndex} decodeGate → rVFC ${RVFC_TIMEOUT_MS}ms タイムアウト、2×rAF`,
+        );
+        resolve(false);
+      }, RVFC_TIMEOUT_MS);
+
+      handle = v.requestVideoFrameCallback!(() => {
+        if (done) return;
+        done = true;
+        window.clearTimeout(timer);
+        video.pause();
+        onTrace(
+          `[動画][seek] f=${frameIndex} decodeGate → rVFC で完了 (${videoDebugSnapshot(video)})`,
+        );
+        resolve(true);
+      });
+    });
+
+    if (!gotRvfc) {
+      usedRafFallback = true;
+      await twoRaf();
+      video.pause();
+    } else {
+      usedRvfc = true;
+    }
+
+    return {
+      seekWaitMs,
+      decodeGateMs: performance.now() - tGate,
+      usedSeek,
+      usedRvfc,
+      usedRafFallback,
+    };
+  };
+
+  return new Promise<SeekVideoTimingDetail>((resolve, reject) => {
+    let finished = false;
+    const to = window.setTimeout(() => {
+      if (finished) return;
+      finished = true;
+      reject(
+        new Error(
+          `seekVideoToTime タイムアウト (${timeoutMs}ms) f=${frameIndex} targetT=${t.toFixed(6)} ${videoDebugSnapshot(video)}`,
+        ),
+      );
+    }, timeoutMs);
+    void runSeekAndGate()
+      .then((detail) => {
+        if (finished) return;
+        finished = true;
+        window.clearTimeout(to);
+        resolve(detail);
+      })
+      .catch((e) => {
+        if (finished) return;
+        finished = true;
+        window.clearTimeout(to);
+        reject(e instanceof Error ? e : new Error(String(e)));
+      });
+  });
+}
+
+/**
+ * @description rVFC メタまたは video の currentTime から表示時刻（秒）を得る
+ */
+function readRvfcMediaTime(
+  video: HTMLVideoElement,
+  metadata: unknown,
+): number {
+  if (
+    metadata &&
+    typeof metadata === "object" &&
+    "mediaTime" in metadata
+  ) {
+    const mt = (metadata as { mediaTime?: unknown }).mediaTime;
+    if (typeof mt === "number" && Number.isFinite(mt)) {
+      return mt;
+    }
+  }
+  return video.currentTime;
+}
+
+/**
+ * @description 書き出しは t が単調増加するので、`currentTime` を飛ばさずデコードだけ進める。キーフレームシークが減り爆速になりやすい。
+ * @limitations 巻き戻し・rVFC 非対応・play 失敗時は `seekVideoToTime` にフォールバック。
+ */
+async function advanceVideoToTimeForward(
+  video: HTMLVideoElement,
+  targetTimeSec: number,
+  ctx: {
+    onTrace: (line: string) => void;
+    frameIndex: number;
+    timeoutMs: number;
+  },
+): Promise<SeekVideoTimingDetail> {
+  const { onTrace, frameIndex, timeoutMs } = ctx;
+  const dur = Number.isFinite(video.duration) ? video.duration : targetTimeSec;
+  const tGoal = Math.max(0, Math.min(targetTimeSec, dur));
+
+  if (tGoal < video.currentTime - 0.04) {
+    onTrace(
+      `[動画][fwd] f=${frameIndex} 巻き戻し検出 goal=${tGoal.toFixed(4)} ct=${video.currentTime.toFixed(4)} → シーク`,
+    );
+    const d = await seekVideoToTime(video, tGoal, ctx);
+    return { ...d, usedForwardScan: false };
+  }
+
+  const v = video as VideoWithRvfc;
+  if (typeof v.requestVideoFrameCallback !== "function") {
+    onTrace(`[動画][fwd] f=${frameIndex} rVFC なし → シーク`);
+    const d = await seekVideoToTime(video, tGoal, ctx);
+    return { ...d, usedForwardScan: false };
+  }
+
+  const runForward = async (): Promise<SeekVideoTimingDetail> => {
+    const tGate0 = performance.now();
+    let rvfcSteps = 0;
+    const timeSlopSec = 1 / VIDEO_EXPORT_FPS / 64;
+
+    try {
+      await video.play();
+    } catch (e) {
+      const m = e instanceof Error ? e.message : String(e);
+      onTrace(`[動画][fwd] f=${frameIndex} play 失敗 → シーク — ${m}`);
+      const d = await seekVideoToTime(video, tGoal, ctx);
+      return { ...d, usedForwardScan: false };
+    }
+
+    while (!video.ended && rvfcSteps < 65536) {
+      const mt = await new Promise<number>((resolve, reject) => {
+        const stepTo = window.setTimeout(() => {
+          reject(
+            new Error(
+              `advanceVideoToTimeForward rVFC 待ちタイムアウト f=${frameIndex}`,
+            ),
+          );
+        }, 60_000);
+        try {
+          v.requestVideoFrameCallback!((_now, meta) => {
+            window.clearTimeout(stepTo);
+            resolve(readRvfcMediaTime(video, meta));
+          });
+        } catch (err) {
+          window.clearTimeout(stepTo);
+          reject(err);
+        }
+      });
+      rvfcSteps++;
+
+      if (mt + timeSlopSec >= tGoal) {
+        video.pause();
+        onTrace(
+          `[動画][fwd] f=${frameIndex} goal=${tGoal.toFixed(4)} mediaT≈${mt.toFixed(4)} steps=${rvfcSteps} (${videoDebugSnapshot(video)})`,
+        );
+        return {
+          seekWaitMs: 0,
+          decodeGateMs: performance.now() - tGate0,
+          usedSeek: false,
+          usedRvfc: true,
+          usedRafFallback: false,
+          usedForwardScan: true,
+        };
+      }
+    }
+
+    video.pause();
+    onTrace(
+      `[動画][fwd] f=${frameIndex} EOS 手前 goal=${tGoal.toFixed(4)} steps=${rvfcSteps} (${videoDebugSnapshot(video)})`,
+    );
+    return {
+      seekWaitMs: 0,
+      decodeGateMs: performance.now() - tGate0,
+      usedSeek: false,
+      usedRvfc: rvfcSteps > 0,
+      usedRafFallback: false,
+      usedForwardScan: true,
+    };
+  };
+
+  return new Promise<SeekVideoTimingDetail>((resolve, reject) => {
+    let done = false;
+    const to = window.setTimeout(() => {
+      if (done) return;
+      done = true;
+      video.pause();
+      reject(
+        new Error(
+          `advanceVideoToTimeForward タイムアウト (${timeoutMs}ms) f=${frameIndex} goal=${tGoal.toFixed(4)} ${videoDebugSnapshot(video)}`,
+        ),
+      );
+    }, timeoutMs);
+
+    void runForward()
+      .then((detail) => {
+        if (done) return;
+        done = true;
+        window.clearTimeout(to);
+        resolve(detail);
+      })
+      .catch(async (e) => {
+        if (done) return;
+        onTrace(
+          `[動画][fwd] f=${frameIndex} 失敗 → シークへ: ${e instanceof Error ? e.message : String(e)}`,
+        );
+        try {
+          video.pause();
+          const d = await seekVideoToTime(video, tGoal, ctx);
+          done = true;
+          window.clearTimeout(to);
+          resolve({ ...d, usedForwardScan: false });
+        } catch (err) {
+          done = true;
+          window.clearTimeout(to);
+          video.pause();
+          reject(err instanceof Error ? err : new Error(String(err)));
+        }
+      });
   });
 }
 
@@ -301,6 +570,17 @@ async function openVideoForExport(
 }
 
 /**
+ * @description UI に見せる日本語／英語メッセージ（レンダラの next-intl から渡す）
+ */
+export type VideoExportPipelineUserMessages = {
+  webglUnavailable: string;
+  metadataFailed: (detail: string) => string;
+  ffmpegStartFailed: (detail: string) => string;
+  userAborted: string;
+  ffmpegFailed: (code: number) => string;
+};
+
+/**
  * @description 1 本の動画をグレードして mp4 へ書き出す
  * @param options.api — preload ブリッジ（ffmpeg IPC を含む）
  * @param options.inputVideoPath — ソースの絶対パス
@@ -310,6 +590,7 @@ async function openVideoForExport(
  * @param options.signal — 中断用 AbortSignal
  * @param options.onProgress — フレーム進捗
  * @param options.onLog — ログ 1 行
+ * @param options.userMessages — 返却する message 文言の上書き（未指定時は従来の日本語固定）
  */
 export async function runVideoExportPipeline(options: {
   api: FilmLabBatchBridge;
@@ -320,6 +601,7 @@ export async function runVideoExportPipeline(options: {
   signal?: AbortSignal;
   onProgress?: (p: VideoExportProgress) => void;
   onLog: (line: string) => void;
+  userMessages?: VideoExportPipelineUserMessages;
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const {
     api,
@@ -330,10 +612,21 @@ export async function runVideoExportPipeline(options: {
     signal,
     onProgress,
     onLog,
+    userMessages,
   } = options;
 
+  const u =
+    userMessages ??
+    ({
+      webglUnavailable: "WebGL2 が利用できません",
+      metadataFailed: (detail: string) => `メタデータ取得失敗: ${detail}`,
+      ffmpegStartFailed: (detail: string) => `ffmpeg 開始失敗: ${detail}`,
+      userAborted: "中断されました",
+      ffmpegFailed: (code: number) => `ffmpeg 失敗 code=${code}`,
+    } satisfies VideoExportPipelineUserMessages);
+
   if (!isWebGL2Supported()) {
-    return { ok: false, message: "WebGL2 が利用できません" };
+    return { ok: false, message: u.webglUnavailable };
   }
 
   let probe: Awaited<ReturnType<FilmLabBatchBridge["videoExportProbe"]>>;
@@ -341,7 +634,7 @@ export async function runVideoExportPipeline(options: {
     probe = await api.videoExportProbe(inputVideoPath);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    return { ok: false, message: `メタデータ取得失敗: ${msg}` };
+    return { ok: false, message: u.metadataFailed(msg) };
   }
 
   try {
@@ -365,7 +658,10 @@ export async function runVideoExportPipeline(options: {
     `[動画] ${basename(inputVideoPath)} → ${outW}×${outH} @ ${VIDEO_EXPORT_FPS}fps, ${totalFrames} フレーム`,
   );
   onLog(
-    `[動画] ソース ${probe.width}×${probe.height}, ${probe.durationSec.toFixed(2)}s, 音声: ${probe.hasAudio ? "あり" : "なし"}, codec: ${probe.videoCodec || "unknown"}`,
+    `[動画] ソース ${probe.width}×${probe.height}, ${probe.durationSec.toFixed(2)}s, 音声: ${probe.hasAudio ? "あり" : "なし"}, codec: ${probe.videoCodec || "unknown"}` +
+      (probe.sourceFrameRateTrusted === true && probe.sourceFrameRate !== null
+        ? `, ソースFPS信頼 ~${probe.sourceFrameRate.toFixed(4)}（同一ソースフレームはシーク省略）`
+        : `, ソースFPS不信任（ソースフレーム索引の再利用なし）`),
   );
 
   let stagedPath: string | null = null;
@@ -426,8 +722,11 @@ export async function runVideoExportPipeline(options: {
 
   const gl = renderer.getContext() as WebGL2RenderingContext;
   const readBuf = new Uint8Array(outW * outH * 4);
+  const flipBuf = new Uint8Array(outW * outH * 4);
   const epsilon = 1 / VIDEO_EXPORT_FPS / 1000;
   const maxT = Math.max(0, probe.durationSec - epsilon);
+  const sourceFpsTrusted = probe.sourceFrameRateTrusted === true;
+  const sourceFpsValue = probe.sourceFrameRate;
 
   try {
     let resolvedOutPath: string;
@@ -448,6 +747,21 @@ export async function runVideoExportPipeline(options: {
       return { ok: false, message: `ffmpeg 開始失敗: ${msg}` };
     }
 
+    const wallStart = performance.now();
+    const arrSeekWait: number[] = [];
+    const arrDecode: number[] = [];
+    const arrRender: number[] = [];
+    const arrRead: number[] = [];
+    const arrFlip: number[] = [];
+    const arrIpc: number[] = [];
+    const arrTotal: number[] = [];
+    let countSeekedPaths = 0;
+    let countReusedFrames = 0;
+    let countRvfcFrames = 0;
+    let countRafFallbackFrames = 0;
+    let countForwardScans = 0;
+    let lastDecodedSourceFrameIndex: number | null = null;
+
     for (let i = 0; i < totalFrames; i++) {
       if (signal?.aborted) {
         onLog("[動画] ユーザー中断");
@@ -460,39 +774,71 @@ export async function runVideoExportPipeline(options: {
 
       viewport.setTime(t);
 
-      const tSeek0 = performance.now();
-      try {
-        await seekVideoToTime(video, t, {
-          onTrace: onLog,
-          frameIndex: i + 1,
-          timeoutMs: SEEK_TIMEOUT_MS,
-        });
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        onLog(`[動画][trace] f=${i + 1}/${totalFrames} seek 失敗: ${msg}`);
-        await api.videoExportAbort().catch(() => {});
-        return { ok: false, message: msg };
+      const targetSourceIdx = computeTargetSourceFrameIndex(
+        t,
+        sourceFpsValue,
+        sourceFpsTrusted,
+      );
+      const reuseFrame = shouldReuseDecodedSourceFrame(
+        lastDecodedSourceFrameIndex,
+        targetSourceIdx,
+      );
+
+      let seekWaitMs = 0;
+      let decodeGateMs = 0;
+
+      if (reuseFrame) {
+        countReusedFrames++;
+        seekWaitMs = 0;
+        decodeGateMs = 0;
+      } else {
+        countSeekedPaths++;
+        try {
+          const seekDetail = await advanceVideoToTimeForward(video, t, {
+            onTrace: onLog,
+            frameIndex: i + 1,
+            timeoutMs: SEEK_TIMEOUT_MS,
+          });
+          seekWaitMs = seekDetail.seekWaitMs;
+          decodeGateMs = seekDetail.decodeGateMs;
+          if (seekDetail.usedForwardScan === true) countForwardScans++;
+          if (seekDetail.usedRvfc) countRvfcFrames++;
+          if (seekDetail.usedRafFallback) countRafFallbackFrames++;
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          onLog(`[動画][trace] f=${i + 1}/${totalFrames} seek 失敗: ${msg}`);
+          await api.videoExportAbort().catch(() => {});
+          return { ok: false, message: msg };
+        }
+        if (targetSourceIdx !== null) {
+          lastDecodedSourceFrameIndex = targetSourceIdx;
+        }
       }
-      const seekMs = performance.now() - tSeek0;
+
+      arrSeekWait.push(seekWaitMs);
+      arrDecode.push(decodeGateMs);
 
       videoTexture.needsUpdate = true;
 
       const tR0 = performance.now();
       viewport.render(renderer, scene, camera);
       const renderMs = performance.now() - tR0;
+      arrRender.push(renderMs);
 
       const tP0 = performance.now();
       gl.readPixels(0, 0, outW, outH, gl.RGBA, gl.UNSIGNED_BYTE, readBuf);
       const readPxMs = performance.now() - tP0;
+      arrRead.push(readPxMs);
 
       const tF0 = performance.now();
-      const flipped = flipRgbaVertical(readBuf, outW, outH);
+      flipRgbaVerticalInto(readBuf, outW, outH, flipBuf);
       const flipMs = performance.now() - tF0;
+      arrFlip.push(flipMs);
 
       let ipcMs = 0;
       try {
         const tW0 = performance.now();
-        await api.videoExportWriteFrame(flipped);
+        await api.videoExportWriteFrame(flipBuf);
         ipcMs = performance.now() - tW0;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -500,22 +846,45 @@ export async function runVideoExportPipeline(options: {
         await api.videoExportAbort();
         return { ok: false, message: msg };
       }
+      arrIpc.push(ipcMs);
 
       const totalMs = performance.now() - tFrame0;
+      arrTotal.push(totalMs);
       const summary =
         `[動画][trace] f=${i + 1}/${totalFrames} t=${t.toFixed(4)}s ` +
-        `seek=${seekMs.toFixed(0)}ms render=${renderMs.toFixed(0)}ms readPx=${readPxMs.toFixed(0)}ms ` +
+        `reuse=${reuseFrame ? "Y" : "N"} seekWait=${seekWaitMs.toFixed(0)}ms decode=${decodeGateMs.toFixed(0)}ms ` +
+        `render=${renderMs.toFixed(0)}ms readPx=${readPxMs.toFixed(0)}ms ` +
         `flip=${flipMs.toFixed(0)}ms ipc=${ipcMs.toFixed(0)}ms total=${totalMs.toFixed(0)}ms ` +
         `| ${videoDebugSnapshot(video)}`;
 
       if (VIDEO_EXPORT_LOG_EVERY_FRAME) {
         onLog(summary);
-      } else if (totalMs > 1500 || i % 30 === 0 || i === 0 || i === totalFrames - 1) {
+      } else if (
+        totalMs > 1500 ||
+        i % VIDEO_EXPORT_FPS === 0 ||
+        i === 0 ||
+        i === totalFrames - 1
+      ) {
         onLog(summary);
       }
 
       onProgress?.({ currentFrame: i + 1, totalFrames });
     }
+
+    const wallMs = performance.now() - wallStart;
+    const mean = (a: number[]) =>
+      a.length === 0 ? 0 : a.reduce((x, y) => x + y, 0) / a.length;
+    onLog(
+      `[動画][profile] wall=${wallMs.toFixed(0)}ms frames=${totalFrames} ` +
+        `seekedFrames=${countSeekedPaths} reusedFrames=${countReusedFrames} forwardScans=${countForwardScans} rvfcFrames=${countRvfcFrames} rafFallbackFrames=${countRafFallbackFrames}\n` +
+        `  seekWait ms mean=${mean(arrSeekWait).toFixed(1)} median=${medianMs(arrSeekWait).toFixed(1)} p95=${p95Ms(arrSeekWait).toFixed(1)}\n` +
+        `  decodeGate ms mean=${mean(arrDecode).toFixed(1)} median=${medianMs(arrDecode).toFixed(1)} p95=${p95Ms(arrDecode).toFixed(1)}\n` +
+        `  render ms mean=${mean(arrRender).toFixed(1)} median=${medianMs(arrRender).toFixed(1)} p95=${p95Ms(arrRender).toFixed(1)}\n` +
+        `  readPixels ms mean=${mean(arrRead).toFixed(1)} median=${medianMs(arrRead).toFixed(1)} p95=${p95Ms(arrRead).toFixed(1)}\n` +
+        `  flip ms mean=${mean(arrFlip).toFixed(1)} median=${medianMs(arrFlip).toFixed(1)} p95=${p95Ms(arrFlip).toFixed(1)}\n` +
+        `  ipcWrite ms mean=${mean(arrIpc).toFixed(1)} median=${medianMs(arrIpc).toFixed(1)} p95=${p95Ms(arrIpc).toFixed(1)}\n` +
+        `  frameTotal ms mean=${mean(arrTotal).toFixed(1)} median=${medianMs(arrTotal).toFixed(1)} p95=${p95Ms(arrTotal).toFixed(1)}`,
+    );
 
     const fin = await api.videoExportFinish();
     if (fin.code !== 0) {

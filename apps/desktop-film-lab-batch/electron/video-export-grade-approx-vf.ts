@@ -56,8 +56,16 @@ export function buildGradeApproximationVF(params: Params): string {
     parts.push(`hue=h=${fmt(hueDeg)}`);
   }
 
+  /**
+   * @description WebGL composite は `1 - uVignette * dist²`（周辺は緩やか）。ffmpeg の `vignette=angle`
+   * はレンズモデルで、旧式 `PI*(0.14 + v*0.95)` は同じ数値でも周辺が潰れやすかった。
+   * 既定角 PI/5 付近を底にし、√v で中間を抑えてプレビューに寄せる。
+   */
   if (p.vignette > 0.015) {
-    const angle = Math.PI * (0.14 + clamp(p.vignette, 0, 1) * 0.95);
+    const v = clamp(p.vignette, 0, 1);
+    const angleMin = Math.PI / 5;
+    const angleMax = Math.PI / 2;
+    const angle = angleMin + Math.sqrt(v) * (angleMax - angleMin) * 0.45;
     parts.push(`vignette=angle=${fmt(angle)}:mode=forward`);
   }
 

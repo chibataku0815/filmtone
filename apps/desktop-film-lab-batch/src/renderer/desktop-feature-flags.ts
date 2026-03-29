@@ -6,8 +6,8 @@
  */
 
 /**
- * @description `true` のときだけ「高速 ffmpeg（1 パス）」動画書き出しをユーザーが選べる。
- * `false` の間はチェックボックスを出さず、常に WebGL 逐次（プレビュー寄り・低速）のみ。
+ * @description `true` のとき「高速 ffmpeg（1 パス）」を既定の動画書き出しにできる（UI で WebGL 逐次へ切替可）。
+ * `false` の間はチェックボックスを出さず、常に WebGL 逐次のみ。
  * メインプロセスの `video-export-transcode-fast` や `video-export-grade-approx-vf` は温存する。
  */
-export const ENABLE_FFMPEG_FAST_VIDEO_EXPORT = false;
+export const ENABLE_FFMPEG_FAST_VIDEO_EXPORT = true;

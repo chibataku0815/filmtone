@@ -6,8 +6,8 @@ import {
 } from "./video-export-policy";
 
 describe("video-export-policy", () => {
-  it("keeps WebGL accurate as the public default even if fast export is re-enabled", () => {
-    expect(defaultVideoExportWebglAccurate()).toBe(true);
+  it("defaults to fast ffmpeg (WebGL off) when the user has not chosen preview-accurate export", () => {
+    expect(defaultVideoExportWebglAccurate()).toBe(false);
   });
 
   it("uses the fast path only when the flag is enabled and accurate mode is explicitly disabled", () => {

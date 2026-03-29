@@ -1,7 +1,7 @@
 /**
  * Film Lab デスクトップ — 動画出力の製品キャップ定数
  *
- * @overview 読み込み解像度・最大尺・出力は FHD@30 に固定。実装の他ファイルから参照する単一ソース。
+ * @overview 読み込み解像度・最大尺・出力は FHD@24fps に固定。実装の他ファイルから参照する単一ソース。
  * @limitations アップスケールはしない（出力はソースを FHD 以内に収めた解像度）。
  */
 
@@ -14,8 +14,8 @@ export const VIDEO_IMPORT_MAX_HEIGHT = 2160;
 /** @description ソース動画の長さの上限（秒） */
 export const VIDEO_IMPORT_MAX_DURATION_SEC = 900;
 
-/** @description 書き出しフレームレート（固定） */
-export const VIDEO_EXPORT_FPS = 30;
+/** @description 書き出しフレームレート（固定・24fps） */
+export const VIDEO_EXPORT_FPS = 24;
 
 /** @description 書き出しの最大幅（FHD） */
 export const VIDEO_EXPORT_MAX_WIDTH = 1920;
@@ -75,7 +75,7 @@ export function assertVideoImportWithinCaps(
 }
 
 /**
- * @description 書き出し総フレーム数（30fps）。duration 終端より先は作らない。
+ * @description 書き出し総フレーム数（VIDEO_EXPORT_FPS）。duration 終端より先は作らない。
  * @param durationSec — ソースの長さ（秒）
  */
 export function computeExportFrameCount(durationSec: number): number {

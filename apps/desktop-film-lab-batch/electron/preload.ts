@@ -61,6 +61,8 @@ contextBridge.exposeInMainWorld("filmLabBatch", {
     durationSec: number;
     hasAudio: boolean;
     videoCodec: string;
+    sourceFrameRate: number | null;
+    sourceFrameRateTrusted: boolean;
   }> => ipcRenderer.invoke("video-export-probe", filePath),
   videoExportStart: (payload: {
     inputVideoPath: string;

@@ -24,7 +24,7 @@ async function renderDesktopControlPanelHtml(
     return renderToStaticMarkup(
       React.createElement(
         NextIntlClientProvider,
-        { locale: "ja", messages },
+        { locale: "ja", messages, timeZone: "Asia/Tokyo" },
         React.createElement(ControlPanel, {
           viewport: null,
           histogramVisible: true,
@@ -87,7 +87,7 @@ describe("resolveDesktopFilmLabImportMeta", () => {
   it("keeps Smart Look controls unmounted in the desktop control panel while pending", async () => {
     const html = await renderDesktopControlPanelHtml("");
 
-    expect(html).toContain("Presets");
+    expect(html).toContain("プリセット");
     expect(html).not.toContain("見本に色味を合わせる（AI・beta）");
     expect(html).not.toContain("Match colors to a sample (AI, beta)");
   });
