@@ -5,7 +5,8 @@
   "workspaces": [
     "packages/film-lab-core",
     "apps/web",
-    "apps/remotion-film-lab"
+    "apps/remotion-film-lab",
+    "apps/desktop-film-lab-batch"
   ],
   "scripts": {
     "dev": "bun run --cwd apps/web dev",

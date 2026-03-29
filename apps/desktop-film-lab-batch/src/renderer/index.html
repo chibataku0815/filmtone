@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Film Lab Batch</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 1rem;
+        background: #111;
+        color: #e8e8e8;
+      }
+      button {
+        margin: 0.25rem;
+        padding: 0.5rem 0.75rem;
+        cursor: pointer;
+      }
+      #log {
+        white-space: pre-wrap;
+        font-size: 12px;
+        background: #1a1a1a;
+        padding: 0.75rem;
+        margin-top: 1rem;
+        max-height: 420px;
+        overflow: auto;
+        border: 1px solid #333;
+      }
+      label {
+        display: inline-block;
+        min-width: 8rem;
+        color: #888;
+      }
+      .row {
+        margin: 0.35rem 0;
+      }
+      select {
+        padding: 0.35rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Film Lab — local batch (spike)</h1>
+    <div class="row">
+      <label>Input</label><span id="inputLabel">—</span>
+      <button type="button" id="btnInput">Choose folder</button>
+    </div>
+    <div class="row">
+      <label>Output</label><span id="outputLabel">—</span>
+      <button type="button" id="btnOutput">Choose folder</button>
+    </div>
+    <div class="row">
+      <label>Grade JSON</label><span id="gradeLabel">—</span>
+      <button type="button" id="btnGrade">Choose file</button>
+    </div>
+    <div class="row">
+      <label>Format</label>
+      <select id="formatSel">
+        <option value="jpeg" selected>JPEG</option>
+        <option value="png">PNG</option>
+      </select>
+    </div>
+    <button type="button" id="btnRun" disabled>Run batch</button>
+    <div id="log"></div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
