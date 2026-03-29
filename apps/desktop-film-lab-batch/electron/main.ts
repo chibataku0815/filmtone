@@ -6,12 +6,113 @@
  *
  * @description 設定は electron-store（userData 内 JSON）。ウィンドウ矩形と最後に選んだ入出力フォルダを覚える。
  */
-import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, net, protocol } from "electron";
+import { filmLabParamsSchema, type Params } from "film-lab-core";
 import Store from "electron-store";
+import { execFile, spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import fs from "node:fs/promises";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import os from "node:os";
+import { randomBytes } from "node:crypto";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
+import { promisify } from "node:util";
+
+import { buildGradeApproximationVF } from "./video-export-grade-approx-vf";
+
+const execFileAsync = promisify(execFile);
+
+/**
+ * @description Vite dev（http://127.0.0.1:5173）では `<video src="file://...">` が Chromium の URL safety で拒否される。本スキームでメインプロセス経由配信し、loadFile 本番とも同じ経路にそろえる。
+ * @limitations パスは `path-to-file-url` IPC 経由の絶対パスのみ想定（ユーザー選択・ステージング済みファイル）。
+ */
+const FILM_LAB_VIDEO_PROTOCOL = "film-lab-video";
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: FILM_LAB_VIDEO_PROTOCOL,
+    privileges: {
+      secure: true,
+      standard: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      stream: true,
+    },
+  },
+]);
+
+/**
+ * @description レンダラの video 要素用 URL（クエリに path を載せる）
+ */
+function absolutePathToVideoSrcUrl(absPath: string): string {
+  return `${FILM_LAB_VIDEO_PROTOCOL}://local/?path=${encodeURIComponent(absPath)}`;
+}
 
 const IMAGE_EXT = new Set([".jpg", ".jpeg", ".png"]);
+
+/**
+ * @description ffmpeg 子プロセスと stderr のバッファ（動画書き出しは同時に 1 本まで）
+ */
+type FfmpegVideoExportSession = {
+  child: ChildProcessWithoutNullStreams;
+  stderrLines: string[];
+};
+
+let activeVideoExport: FfmpegVideoExportSession | null = null;
+
+/**
+ * @description 高速トランスコード専用の子プロセス（rawvideo パイプとは別）。中断 IPC から kill する。
+ */
+let activeFastTranscodeChild: ChildProcessWithoutNullStreams | null = null;
+
+/**
+ * @description 進行中の ffmpeg を潰して参照を捨てる。レンダラが異常終了したあとに残るゾンビ対策。
+ * @param reason ログ用（ターミナル）
+ */
+/**
+ * @description 単発 ffmpeg（高速トランスコード）を kill する。
+ * @param reason ログ用
+ */
+function disposeActiveFastTranscode(reason: string): void {
+  const child = activeFastTranscodeChild;
+  if (child == null) {
+    return;
+  }
+  activeFastTranscodeChild = null;
+  console.warn(`[film-lab-desktop] disposeActiveFastTranscode: ${reason}`);
+  try {
+    child.kill("SIGKILL");
+  } catch {
+    /* 既に終了 */
+  }
+}
+
+function disposeActiveVideoExport(reason: string): void {
+  const sess = activeVideoExport;
+  if (sess == null) {
+    return;
+  }
+  activeVideoExport = null;
+  console.warn(`[film-lab-desktop] disposeActiveVideoExport: ${reason}`);
+  try {
+    sess.child.stdin?.destroy();
+  } catch {
+    /* stdin 欠如時など */
+  }
+  try {
+    sess.child.kill("SIGKILL");
+  } catch {
+    /* 既に終了 */
+  }
+}
+
+/**
+ * @description 動画出力の stderr / IPC を増やすとき true（ターミナルに出す。UI ログとは別）
+ */
+const DEBUG_VIDEO_EXPORT_MAIN =
+  process.env.FILM_LAB_DEBUG_VIDEO_EXPORT === "1" ||
+  process.env.FILM_LAB_DEBUG_VIDEO_EXPORT === "true";
 
 /**
  * @description デスクトップアプリ用の永続キー（型で書き忘れを防ぐ）
@@ -55,6 +156,214 @@ function isImageFile(fileName: string): boolean {
   const lower = fileName.toLowerCase();
   const ext = path.extname(lower);
   return IMAGE_EXT.has(ext);
+}
+
+/**
+ * @description ffprobe の JSON から動画ストリームと尺・音声有無を取り出す
+ * @throws ffprobe 失敗時や動画ストリーム欠如時
+ */
+async function ffprobeVideoMeta(absPath: string): Promise<{
+  width: number;
+  height: number;
+  durationSec: number;
+  hasAudio: boolean;
+  /** @description 先頭の動画ストリームの codec_name（HEVC 不可など切り分け用） */
+  videoCodec: string;
+}> {
+  let stdout: string;
+  try {
+    const r = await execFileAsync(
+      "ffprobe",
+      [
+        "-v",
+        "error",
+        "-show_entries",
+        "stream=codec_type,width,height,codec_name",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "json",
+        absPath,
+      ],
+      { maxBuffer: 10 * 1024 * 1024 },
+    );
+    stdout = r.stdout as string;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(
+      `ffprobe 実行失敗（PATH に ffmpeg/ffprobe がありますか？）: ${msg}`,
+    );
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stdout) as unknown;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(`ffprobe JSON 解析失敗: ${msg}`);
+  }
+
+  if (typeof parsed !== "object" || parsed === null) {
+    throw new Error("ffprobe JSON がオブジェクトではありません");
+  }
+  const root = parsed as { streams?: unknown; format?: unknown };
+  const streams = Array.isArray(root.streams) ? root.streams : [];
+  let width = 0;
+  let height = 0;
+  let hasAudio = false;
+  let videoCodec = "";
+  for (const s of streams) {
+    if (typeof s !== "object" || s === null) continue;
+    const o = s as Record<string, unknown>;
+    if (o.codec_type === "audio") {
+      hasAudio = true;
+      continue;
+    }
+    if (o.codec_type === "video" && width === 0) {
+      const w = typeof o.width === "number" ? o.width : Number(o.width);
+      const h = typeof o.height === "number" ? o.height : Number(o.height);
+      if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) {
+        width = w;
+        height = h;
+        const cn = o.codec_name;
+        videoCodec =
+          typeof cn === "string" && cn.length > 0 ? cn : "";
+      }
+    }
+  }
+  if (width <= 0 || height <= 0) {
+    throw new Error("ffprobe: 動画ストリームの幅・高さが取得できませんでした");
+  }
+
+  const fmt =
+    typeof root.format === "object" && root.format !== null
+      ? (root.format as Record<string, unknown>)
+      : {};
+  const durRaw = fmt.duration;
+  const durationSec =
+    typeof durRaw === "number"
+      ? durRaw
+      : typeof durRaw === "string"
+        ? Number.parseFloat(durRaw)
+        : Number.NaN;
+  if (!Number.isFinite(durationSec) || durationSec <= 0) {
+    throw new Error("ffprobe: duration が不正です");
+  }
+
+  return { width, height, durationSec, hasAudio, videoCodec };
+}
+
+/**
+ * @description プラットフォーム別のビデオコーデック引数（スループット優先）
+ */
+function ffmpegVideoCodecArgs(): string[] {
+  if (process.platform === "darwin") {
+    return ["-c:v", "h264_videotoolbox", "-b:v", "12M", "-allow_sw", "1"];
+  }
+  return ["-c:v", "libx264", "-preset", "veryfast", "-crf", "21"];
+}
+
+/**
+ * @description ソース 1 本を直接読み、（任意）Params の ffmpeg 近似 + fps + scale +（任意）LUT3D + VideoToolbox で 1 パス書き出す。
+ * @param opts.gradeParams 検証済み Params。無ければ数値ルック近似なし
+ */
+function buildFfmpegFastTranscodeArgs(opts: {
+  inputVideoPath: string;
+  outputVideoPath: string;
+  width: number;
+  height: number;
+  fps: number;
+  hasAudio: boolean;
+  lutCubeAbsPath: string | null;
+  gradeParams: Params | null;
+}): string[] {
+  const {
+    inputVideoPath,
+    outputVideoPath,
+    width,
+    height,
+    fps,
+    hasAudio,
+    lutCubeAbsPath,
+    gradeParams,
+  } = opts;
+  const vfParts: string[] = [];
+  if (gradeParams != null) {
+    vfParts.push(buildGradeApproximationVF(gradeParams));
+  }
+  vfParts.push(`fps=${fps}`, `scale=${width}:${height}:flags=lanczos`);
+  if (lutCubeAbsPath != null && lutCubeAbsPath.length > 0) {
+    const normalized = lutCubeAbsPath.replace(/\\/g, "/");
+    const escaped = normalized.replace(/'/g, "'\\''");
+    vfParts.push(`lut3d=file='${escaped}':interp=tetrahedral`);
+  }
+  const vf = vfParts.join(",");
+  const vcodec = ffmpegVideoCodecArgs();
+  const args: string[] = [
+    "-hide_banner",
+    "-loglevel",
+    "error",
+    "-y",
+    "-i",
+    inputVideoPath,
+    "-vf",
+    vf,
+    ...vcodec,
+  ];
+  if (hasAudio) {
+    args.push("-c:a", "copy", "-map", "0:v:0", "-map", "0:a:0", "-shortest");
+  } else {
+    args.push("-an");
+  }
+  args.push(outputVideoPath);
+  return args;
+}
+
+function buildFfmpegRawvideoExportArgs(opts: {
+  width: number;
+  height: number;
+  fps: number;
+  hasAudio: boolean;
+  inputVideoPath: string;
+  outputVideoPath: string;
+}): string[] {
+  const { width, height, fps, hasAudio, inputVideoPath, outputVideoPath } = opts;
+  const videoCodec = ffmpegVideoCodecArgs();
+  const head: string[] = [
+    "-hide_banner",
+    "-loglevel",
+    "error",
+    "-y",
+    "-f",
+    "rawvideo",
+    "-pix_fmt",
+    "rgba",
+    "-s",
+    `${width}x${height}`,
+    "-r",
+    String(fps),
+    "-i",
+    "pipe:0",
+  ];
+  if (hasAudio) {
+    head.push(
+      "-i",
+      inputVideoPath,
+      "-map",
+      "0:v:0",
+      "-map",
+      "1:a:0",
+      "-shortest",
+    );
+  } else {
+    head.push("-an");
+  }
+  head.push(...videoCodec);
+  if (hasAudio) {
+    head.push("-c:a", "copy");
+  }
+  head.push(outputVideoPath);
+  return head;
 }
 
 async function listImagePathsInDir(dir: string): Promise<string[]> {
@@ -139,6 +448,60 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  console.log(
+    "[film-lab-desktop] main: 動画 src は film-lab-video スキーム（path-to-file-url）。ログが file: なら bun run build:electron 未反映。",
+  );
+  protocol.handle(FILM_LAB_VIDEO_PROTOCOL, async (request) => {
+    let abs: string;
+    try {
+      const u = new URL(request.url);
+      const raw = u.searchParams.get("path");
+      if (raw == null || raw.length === 0) {
+        return new Response("film-lab-video: path query が空です", {
+          status: 400,
+        });
+      }
+      abs = path.resolve(decodeURIComponent(raw));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return new Response(`film-lab-video: URL 解析失敗 — ${msg}`, {
+        status: 400,
+      });
+    }
+    try {
+      const st = await fs.stat(abs);
+      if (!st.isFile()) {
+        return new Response(`film-lab-video: ファイルではありません — ${abs}`, {
+          status: 404,
+        });
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return new Response(`film-lab-video: パス不正 — ${abs} — ${msg}`, {
+        status: 404,
+      });
+    }
+    try {
+      const fileHref = pathToFileURL(abs).href;
+      const upstream = await net.fetch(fileHref);
+      if (!upstream.ok) {
+        return upstream;
+      }
+      const headers = new Headers(upstream.headers);
+      headers.set("Access-Control-Allow-Origin", "*");
+      return new Response(upstream.body, {
+        status: upstream.status,
+        statusText: upstream.statusText,
+        headers,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return new Response(`film-lab-video: net.fetch 失敗 — ${abs} — ${msg}`, {
+        status: 500,
+      });
+    }
+  });
+
   createWindow();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -305,3 +668,327 @@ ipcMain.handle(
     return target;
   },
 );
+
+ipcMain.handle("path-to-file-url", async (_evt, filePath: string) => {
+  if (typeof filePath !== "string" || filePath.length === 0) {
+    throw new TypeError("path-to-file-url: filePath が空です");
+  }
+  const abs = path.resolve(filePath);
+  try {
+    const st = await fs.stat(abs);
+    if (!st.isFile()) {
+      throw new Error(`path-to-file-url: ファイルではありません — ${abs}`);
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith("path-to-file-url:")) {
+      throw e;
+    }
+    throw new Error(`path-to-file-url: ファイルがありません — ${abs}`);
+  }
+  return absolutePathToVideoSrcUrl(abs);
+});
+
+ipcMain.handle("pick-input-video-file", async () => {
+  const defaultPath = await resolveExistingDir(
+    desktopSettingsStore.get("lastOutputDir"),
+  );
+  const r = await dialog.showOpenDialog({
+    properties: ["openFile"],
+    filters: [
+      {
+        name: "Video",
+        extensions: ["mp4", "mov", "m4v", "webm", "mkv"],
+      },
+    ],
+    defaultPath,
+  });
+  if (r.canceled || r.filePaths.length === 0) return null;
+  return r.filePaths[0]!;
+});
+
+ipcMain.handle("video-export-probe", async (_evt, filePath: string) => {
+  if (typeof filePath !== "string" || filePath.length === 0) {
+    throw new TypeError("video-export-probe: filePath が空です");
+  }
+  const abs = path.resolve(filePath);
+  return ffprobeVideoMeta(abs);
+});
+
+/**
+ * @description 動画を WebGL せず ffmpeg 1 発で FHD 化（+ 任意 LUT3D）。速度優先・プレビューとは一致しない。
+ */
+ipcMain.handle("video-export-transcode-fast", async (_evt, payload: unknown) => {
+  disposeActiveVideoExport("高速トランスコード直前");
+  disposeActiveFastTranscode("再入前掃除");
+
+  if (!payload || typeof payload !== "object" || payload === null) {
+    throw new TypeError("video-export-transcode-fast: payload が不正です");
+  }
+  const o = payload as Record<string, unknown>;
+  const inputVideoPath =
+    typeof o.inputVideoPath === "string" ? o.inputVideoPath : "";
+  const outputDir = typeof o.outputDir === "string" ? o.outputDir : "";
+  const outputFileName =
+    typeof o.outputFileName === "string" ? o.outputFileName : "";
+  const width = typeof o.width === "number" ? o.width : 0;
+  const height = typeof o.height === "number" ? o.height : 0;
+  const fps = typeof o.fps === "number" ? o.fps : 0;
+  const hasAudio = Boolean(o.hasAudio);
+  const lutRaw =
+    typeof o.lutCubeAbsPath === "string" ? o.lutCubeAbsPath.trim() : "";
+
+  let gradeParams: Params | null = null;
+  if (o.gradeParams != null && typeof o.gradeParams === "object") {
+    const parsed = filmLabParamsSchema.safeParse(o.gradeParams);
+    if (parsed.success) {
+      gradeParams = parsed.data;
+    }
+  }
+
+  if (
+    !inputVideoPath ||
+    !outputDir ||
+    !outputFileName ||
+    width <= 0 ||
+    height <= 0 ||
+    fps <= 0
+  ) {
+    throw new TypeError(
+      "video-export-transcode-fast: inputVideoPath / outputDir / outputFileName / width / height / fps が不正です",
+    );
+  }
+
+  const inAbs = path.resolve(inputVideoPath);
+  const safeName = path.basename(outputFileName);
+  const outputVideoPath = path.join(outputDir, safeName);
+  let lutResolved: string | null = null;
+  if (lutRaw.length > 0) {
+    const lut = path.resolve(lutRaw);
+    try {
+      const st = await fs.stat(lut);
+      if (!st.isFile()) {
+        throw new Error("LUT がファイルではありません");
+      }
+      lutResolved = lut;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(`video-export-transcode-fast: LUT パス不正 — ${lut} — ${msg}`);
+    }
+  }
+
+  await fs.mkdir(outputDir, { recursive: true });
+
+  const ffArgs = buildFfmpegFastTranscodeArgs({
+    inputVideoPath: inAbs,
+    outputVideoPath,
+    width,
+    height,
+    fps,
+    hasAudio,
+    lutCubeAbsPath: lutResolved,
+    gradeParams,
+  });
+
+  let child: ChildProcessWithoutNullStreams;
+  try {
+    child = spawn("ffmpeg", ffArgs, {
+      stdio: ["ignore", "ignore", "pipe"],
+    }) as ChildProcessWithoutNullStreams;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(`video-export-transcode-fast: ffmpeg spawn 失敗 — ${msg}`);
+  }
+
+  const stderrLines: string[] = [];
+  child.stderr?.on("data", (chunk: Buffer) => {
+    stderrLines.push(chunk.toString("utf8"));
+  });
+  child.on("error", (err) => {
+    stderrLines.push(`spawn error: ${err.message}`);
+  });
+
+  activeFastTranscodeChild = child;
+  console.log(
+    `[film-lab-desktop] ffmpeg 高速トランスコード ${width}x${height}@${fps} grade≈${gradeParams ? "yes" : "no"} LUT=${lutResolved ? "yes" : "no"} → ${outputVideoPath}`,
+  );
+  if (DEBUG_VIDEO_EXPORT_MAIN) {
+    console.log(`[film-lab-desktop] ffmpeg fast argv: ${JSON.stringify(ffArgs)}`);
+  }
+
+  const code: number | null = await new Promise((resolve) => {
+    child.on("close", (c) => resolve(c));
+  });
+  activeFastTranscodeChild = null;
+
+  return {
+    code,
+    stderrTail: stderrLines.join("").slice(-8000),
+    outputVideoPath,
+  };
+});
+
+ipcMain.handle("video-export-start", async (_evt, payload: unknown) => {
+  disposeActiveFastTranscode("rawvideo 直前");
+  if (activeVideoExport !== null) {
+    disposeActiveVideoExport(
+      "新規 video-export-start の前に前回セッションを破棄（ゾンビ・二重開始防止）",
+    );
+  }
+  if (!payload || typeof payload !== "object" || payload === null) {
+    throw new TypeError("video-export-start: payload が不正です");
+  }
+  const o = payload as Record<string, unknown>;
+  const inputVideoPath =
+    typeof o.inputVideoPath === "string" ? o.inputVideoPath : "";
+  const outputDir = typeof o.outputDir === "string" ? o.outputDir : "";
+  const outputFileName =
+    typeof o.outputFileName === "string" ? o.outputFileName : "";
+  const width = typeof o.width === "number" ? o.width : 0;
+  const height = typeof o.height === "number" ? o.height : 0;
+  const fps = typeof o.fps === "number" ? o.fps : 0;
+  const hasAudio = Boolean(o.hasAudio);
+
+  if (
+    !inputVideoPath ||
+    !outputDir ||
+    !outputFileName ||
+    width <= 0 ||
+    height <= 0 ||
+    fps <= 0
+  ) {
+    throw new TypeError(
+      "video-export-start: inputVideoPath / outputDir / outputFileName / width / height / fps が不正です",
+    );
+  }
+
+  const inAbs = path.resolve(inputVideoPath);
+  const safeName = path.basename(outputFileName);
+  const outputVideoPath = path.join(outputDir, safeName);
+  await fs.mkdir(outputDir, { recursive: true });
+
+  const ffArgs = buildFfmpegRawvideoExportArgs({
+    width,
+    height,
+    fps,
+    hasAudio,
+    inputVideoPath: inAbs,
+    outputVideoPath,
+  });
+
+  let child: ChildProcessWithoutNullStreams;
+  try {
+    child = spawn("ffmpeg", ffArgs, {
+      stdio: ["pipe", "ignore", "pipe"],
+    }) as ChildProcessWithoutNullStreams;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(`ffmpeg を起動できません: ${msg}`);
+  }
+
+  const stderrLines: string[] = [];
+  child.stderr?.on("data", (chunk: Buffer) => {
+    stderrLines.push(chunk.toString("utf8"));
+  });
+
+  child.on("error", (err) => {
+    stderrLines.push(`spawn error: ${err.message}`);
+  });
+
+  activeVideoExport = { child, stderrLines };
+
+  console.log(
+    `[film-lab-desktop] ffmpeg 起動 rawvideo ${width}x${height}@${fps} hasAudio=${hasAudio} → ${outputVideoPath}`,
+  );
+  if (DEBUG_VIDEO_EXPORT_MAIN) {
+    console.log(`[film-lab-desktop] ffmpeg argv: ${JSON.stringify(ffArgs)}`);
+  }
+
+  return { outputVideoPath };
+});
+
+ipcMain.handle("video-export-write-frame", async (_evt, data: unknown) => {
+  if (!(data instanceof Uint8Array)) {
+    throw new TypeError("video-export-write-frame: data が Uint8Array ではありません");
+  }
+  const sess = activeVideoExport;
+  if (!sess) {
+    throw new Error("video-export-write-frame: アクティブな書き出しがありません");
+  }
+  const { child } = sess;
+  const stdin = child.stdin;
+  if (stdin == null || !stdin.writable) {
+    throw new Error(
+      "video-export-write-frame: ffmpeg stdin が利用できません（null または closed）",
+    );
+  }
+  const buf = Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+  const t0 = process.hrtime.bigint();
+  try {
+    /**
+     * @description 単発 write+コールバックだと 1 フレーム数十 MB 級でバッファ溢れ・デッドロックしうる。pipeline でバックプレッシャー継承。
+     */
+    await pipeline(Readable.from(buf), stdin, { end: false });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const tail = sess.stderrLines.join("").slice(-2500);
+    throw new Error(
+      `video-export-write-frame: stdin pipeline 失敗 — ${msg} | ffmpeg stderr(末尾): ${tail}`,
+    );
+  }
+  const ms = Number(process.hrtime.bigint() - t0) / 1e6;
+  if (DEBUG_VIDEO_EXPORT_MAIN || ms > 2500) {
+    console.log(
+      `[film-lab-desktop] video-export-write-frame ok bytes=${buf.length} ms=${ms.toFixed(1)} stdin.writable=${stdin.writable}`,
+    );
+  }
+});
+
+ipcMain.handle("video-export-finish", async () => {
+  const sess = activeVideoExport;
+  if (!sess) {
+    throw new Error("video-export-finish: アクティブな書き出しがありません");
+  }
+  const { child, stderrLines } = sess;
+  activeVideoExport = null;
+
+  child.stdin.end();
+
+  const code: number | null = await new Promise((resolve) => {
+    child.on("close", (c) => resolve(c));
+  });
+
+  const stderrTail = stderrLines.join("").slice(-8000);
+  return { code, stderrTail };
+});
+
+ipcMain.handle("video-export-abort", async () => {
+  disposeActiveFastTranscode("video-export-abort IPC");
+  disposeActiveVideoExport("video-export-abort IPC");
+});
+
+ipcMain.handle("video-export-stage-source", async (_evt, filePath: string) => {
+  if (typeof filePath !== "string" || filePath.length === 0) {
+    throw new TypeError("video-export-stage-source: filePath が空です");
+  }
+  const abs = path.resolve(filePath);
+  const st = await fs.stat(abs);
+  if (!st.isFile()) {
+    throw new Error(`video-export-stage-source: ファイルではありません — ${abs}`);
+  }
+  const ext = path.extname(abs) || ".mov";
+  const staged = path.join(
+    os.tmpdir(),
+    `film-lab-video-src-${randomBytes(8).toString("hex")}${ext}`,
+  );
+  await fs.copyFile(abs, staged);
+  return { stagedPath: staged };
+});
+
+ipcMain.handle("video-export-unlink-staged", async (_evt, stagedPath: string) => {
+  if (typeof stagedPath !== "string" || stagedPath.length === 0) return;
+  try {
+    await fs.unlink(path.resolve(stagedPath));
+  } catch {
+    /* ignore */
+  }
+});

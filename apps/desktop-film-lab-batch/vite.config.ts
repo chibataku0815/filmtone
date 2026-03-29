@@ -1,5 +1,9 @@
 /**
  * Film Lab デスクトップ — Vite（React + Tailwind + Web コンポーネント alias）
+ *
+ * @description ローカルでは `.env` 無しでも動くよう、`import.meta.env` の既定をここで埋める。
+ * スマートルック UI は **明示 `VITE_FILM_LAB_SMART_LOOK_UI=true` 時のみ ON**（ペンディング中の既定は非表示）。
+ * development のときだけ支援者スタブを既定 ON（スマートルックとは別）。
  */
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,43 +13,115 @@ import { defineConfig, loadEnv } from "vite";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(__dirname, "../web");
 
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, path.resolve(__dirname), "");
-  const smartLookUi =
-    env.VITE_FILM_LAB_SMART_LOOK_UI === "true" ? "true" : "";
+/** @description よくあるローカル BFF。`VITE_FILM_LAB_API_ORIGIN` で上書き可。 */
+const DEFAULT_BFF_ORIGIN = "http://127.0.0.1:3000";
+
+/**
+ * @description Desktop 向けに `import.meta.env` の実効値を決める（未設定なら既定）。
+ * @param {string} mode - Vite の `development` | `production`
+ * @param {NodeJS.ProcessEnv} env - `loadEnv` の結果
+ */
+function resolveDesktopFilmLabImportMeta(
+  mode: string,
+  env: Record<string, string>,
+): {
+  apiOrigin: string;
+  assumeSupporter: string;
+  smartLookUiFlag: string;
+  smartLookRasterFlag: string;
+} {
+  const rawOrigin = env.VITE_FILM_LAB_API_ORIGIN?.trim() ?? "";
+  const apiOrigin =
+    rawOrigin.length > 0 ? rawOrigin.replace(/\/$/, "") : DEFAULT_BFF_ORIGIN;
+
+  const assumeRaw = env.VITE_FILM_LAB_ASSUME_SUPPORTER?.trim().toLowerCase();
+  let assumeSupporter: string;
+  if (assumeRaw === "true") {
+    assumeSupporter = "true";
+  } else if (assumeRaw === "false") {
+    assumeSupporter = "false";
+  } else {
+    assumeSupporter = mode === "development" ? "true" : "false";
+  }
+
+  /** @description opt-in のみ。未設定・false 以外の誤記はいったん OFF（Issue で再有効化手順を追う） */
+  const uiRaw = env.VITE_FILM_LAB_SMART_LOOK_UI?.trim().toLowerCase();
+  const smartLookUiFlag = uiRaw === "true" ? "true" : "";
+
+  const rasterExplicit =
+    env.VITE_FILM_LAB_SMART_LOOK_RASTER === "true" ||
+    env.NEXT_PUBLIC_FILM_LAB_SMART_LOOK_RASTER === "true";
+  const smartLookRasterFlag = rasterExplicit ? "true" : "";
 
   return {
-  root: path.resolve(__dirname, "src/renderer"),
-  base: "./",
-  publicDir: path.resolve(webRoot, "public"),
-  define: {
-    "process.env.NEXT_PUBLIC_FILM_LAB_SMART_LOOK_UI": JSON.stringify(smartLookUi),
-  },
-  plugins: [react()],
-  build: {
-    outDir: path.resolve(__dirname, "dist/renderer"),
-    emptyOutDir: true,
-  },
-  server: {
-    port: 5173,
-    fs: {
-      allow: [webRoot, path.resolve(__dirname, "..")],
+    apiOrigin,
+    assumeSupporter,
+    smartLookUiFlag,
+    smartLookRasterFlag,
+  };
+}
+
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, path.resolve(__dirname), "");
+  const resolved = resolveDesktopFilmLabImportMeta(mode, env);
+  const {
+    apiOrigin,
+    assumeSupporter,
+    smartLookUiFlag,
+    smartLookRasterFlag,
+  } = resolved;
+
+  const viteSmartLookUiTruth = smartLookUiFlag === "true" ? "true" : "false";
+  const viteSmartLookRasterTruth =
+    smartLookRasterFlag === "true" ? "true" : "false";
+
+  return {
+    root: path.resolve(__dirname, "src/renderer"),
+    base: "./",
+    publicDir: path.resolve(webRoot, "public"),
+    define: {
+      "import.meta.env.VITE_FILM_LAB_API_ORIGIN": JSON.stringify(apiOrigin),
+      "import.meta.env.VITE_FILM_LAB_ASSUME_SUPPORTER":
+        JSON.stringify(assumeSupporter),
+      /** @description process-polyfill が参照してから feature-flags が読む（空マージで消さない） */
+      "import.meta.env.VITE_FILM_LAB_SMART_LOOK_UI":
+        JSON.stringify(viteSmartLookUiTruth),
+      "import.meta.env.VITE_FILM_LAB_SMART_LOOK_RASTER":
+        JSON.stringify(viteSmartLookRasterTruth),
+      "process.env.NEXT_PUBLIC_FILM_LAB_SMART_LOOK_UI":
+        JSON.stringify(smartLookUiFlag),
+      "process.env.NEXT_PUBLIC_FILM_LAB_SMART_LOOK_RASTER":
+        JSON.stringify(smartLookRasterFlag),
     },
-  },
-  resolve: {
-    alias: {
-      "@film-lab": path.join(webRoot, "src/features/interactive/film-lab"),
-      "@/shared/gl": path.join(webRoot, "src/shared/gl"),
-      "@/shared/analytics": path.join(
-        __dirname,
-        "src/renderer/shims/shared-analytics.ts",
-      ),
-      "next/navigation": path.join(
-        __dirname,
-        "src/renderer/shims/next-navigation.ts",
-      ),
+    plugins: [react()],
+    build: {
+      outDir: path.resolve(__dirname, "dist/renderer"),
+      emptyOutDir: true,
     },
-    dedupe: ["react", "react-dom"],
-  },
-};
+    server: {
+      /** @description `localhost` のみだと ::1 になり `wait-on http://127.0.0.1:5173` と Electron の URL がずれることがある */
+      host: "127.0.0.1",
+      port: 5173,
+      /** @description 5173 占有時に勝手に別ポートへ逃げると Electron の URL とずれるので固定する */
+      strictPort: true,
+      fs: {
+        allow: [webRoot, path.resolve(__dirname, "..")],
+      },
+    },
+    resolve: {
+      alias: {
+        "@film-lab": path.join(webRoot, "src/features/interactive/film-lab"),
+        "@/shared/gl": path.join(webRoot, "src/shared/gl"),
+        "@/shared/analytics": path.join(
+          __dirname,
+          "src/renderer/shims/shared-analytics.ts",
+        ),
+        "next/navigation": path.join(
+          __dirname,
+          "src/renderer/shims/next-navigation.ts",
+        ),
+      },
+      dedupe: ["react", "react-dom"],
+    },
+  };
 });

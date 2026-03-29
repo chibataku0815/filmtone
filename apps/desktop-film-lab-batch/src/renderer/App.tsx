@@ -1,8 +1,8 @@
 /**
- * Film Lab デスクトップ — 編集（Web 踏襲）とバッチの 2 モード
+ * Film Lab デスクトップ — 編集（Web 踏襲）と書き出し（フォルダ／動画）の 2 モード
  *
- * @overview バッチの正はメモリ上の BatchGradeState。編集タブでプレビューし「バッチに反映」で同期する。
- * @limitations プレビュー上の LUT をバッチに自動複製はしない（JSON Import か .cube 再適用）。
+ * @overview 書き出し用ルックの正はメモリ上の BatchGradeState。編集タブでプレビューし「色を書き出しへ送る」で同期する。
+ * @limitations プレビュー上の LUT を書き出しへ自動複製はしない（JSON Import か .cube 再適用）。
  * シェルの色・段差は globals.css の Radix スケール準拠トークン（html.dark.dark-theme）に集約する。
  *
  * @description 編集タブのレイアウト（デスクトップ向け）
@@ -16,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FilmLabCanvas, type FilmLabCanvasRef } from "@film-lab/components/FilmLabCanvas";
 import { ControlPanel } from "@film-lab/components/ControlPanel";
 import { Histogram } from "@film-lab/components/ui/Histogram";
+import { HelpHint } from "./batch-tab/HelpHint";
 import type { Viewport } from "@film-lab/core/Viewport";
 import { PRESETS, type PresetName } from "film-lab-core";
 import {
@@ -35,8 +36,25 @@ import {
   type BatchPipelineProgressPayload,
   type BatchPipelineSummary,
 } from "./batch-pipeline";
+import {
+  resolveLutCubeAbsPathForFastExport,
+  runVideoExportFfmpegFast,
+} from "./video-export-ffmpeg-fast";
+import { runVideoExportPipeline } from "./video-export-pipeline";
+import {
+  assertVideoImportWithinCaps,
+  computeExportFrameCount,
+  computeVideoExportDimensions,
+  VIDEO_EXPORT_FPS,
+  VIDEO_IMPORT_MAX_DURATION_SEC,
+} from "./video-export-constants";
+import { ENABLE_FFMPEG_FAST_VIDEO_EXPORT } from "./desktop-feature-flags";
 import { exportGradeJsonText } from "./grade-io";
 import { viewportRecordToParams } from "./viewport-to-params";
+import {
+  BatchTabPanel,
+  type BatchJobMode,
+} from "./batch-tab/BatchTabPanel";
 
 type TabId = "edit" | "batch";
 
@@ -114,12 +132,12 @@ export default function App() {
   const [outputDir, setOutputDir] = useState<string | null>(null);
   const [logText, setLogText] = useState("");
   const [running, setRunning] = useState(false);
-  /** @description バッチ中断用。Run 開始時に差し替え、完了・エラーで null */
+  /** @description 書き出し中断用。Run 開始時に差し替え、完了・エラーで null */
   const batchAbortRef = useRef<AbortController | null>(null);
   /** @description プログレスバー用。処理中のみセット */
   const [batchProgress, setBatchProgress] =
     useState<BatchPipelineProgressPayload | null>(null);
-  /** @description 直近の正常終了したバッチの集計（画面下に短く残す） */
+  /** @description 直近の正常終了したまとめて書き出しの集計（画面下に短く残す） */
   const [lastBatchSummary, setLastBatchSummary] =
     useState<BatchPipelineSummary | null>(null);
   /** @description 直近の実行で失敗した入力パス（失敗のみ再実行用） */
@@ -136,6 +154,33 @@ export default function App() {
    * @description 出力ファイル名の接尾辞（UI の生入力。パイプラインで sanitize する）。空ならベース名のみ。
    */
   const [batchOutputSuffix, setBatchOutputSuffix] = useState("-graded");
+  /**
+   * @description 書き出しタブの主ジョブ種別。⌘↩ の実行先と UI の出し分けに使う（状態は App が正）。
+   */
+  const [batchJobMode, setBatchJobMode] = useState<BatchJobMode>("images");
+  /** @description 動画出力用のソースパス（1 本選ぶ） */
+  const [videoInputPath, setVideoInputPath] = useState<string | null>(null);
+  /** @description ffprobe 済みのメタ（UI 表示用） */
+  const [videoProbeLabel, setVideoProbeLabel] = useState<string | null>(null);
+  /**
+   * @description true のときだけ WebGL 逐次フレーム（プレビュー一致・低速）。高速 ffmpeg が UI 有効なときだけ false を許可。
+   */
+  const [videoExportWebglAccurate, setVideoExportWebglAccurate] = useState(
+    () => !ENABLE_FFMPEG_FAST_VIDEO_EXPORT,
+  );
+  /**
+   * @description 動画書き出し成功のたびに増やす。書き出しタブの「初回はウィザード→成功後は一覧」だけ検知する（BatchGradeState ではない）。
+   */
+  const [videoExportSuccessNonce, setVideoExportSuccessNonce] = useState(0);
+
+  /**
+   * @description 高速 ffmpeg がペンディングの間は常に WebGL のみ（ユーザーが古い状態を持たないようにする）
+   */
+  useEffect(() => {
+    if (!ENABLE_FFMPEG_FAST_VIDEO_EXPORT) {
+      setVideoExportWebglAccurate(true);
+    }
+  }, []);
   /**
    * @description 幅 lg 以上で右スライドパネルを表示するか。パネルは DOM を維持し `translateX` のみ（内部状態を捨てない）。
    */
@@ -167,6 +212,15 @@ export default function App() {
   /**
    * @description 起動時に userData のセッション JSON を読み、フォームへ反映する。
    */
+  /**
+   * @description 写真のまとめて書き出しが途中のセッションがあるときは UI を画像モードに揃え、再開導線と矛盾させない。
+   */
+  useEffect(() => {
+    if (persistedSession && sessionHasRemainingWork(persistedSession)) {
+      setBatchJobMode("images");
+    }
+  }, [persistedSession]);
+
   useEffect(() => {
     void (async () => {
       const raw = await window.filmLabBatch.readBatchSession();
@@ -212,7 +266,7 @@ export default function App() {
       lutSize: 0,
     });
     setImportedGradeLabel(null);
-    appendLog("（バッチ用ルック）プレビューから数値パラメータを反映しました（LUT は含みません）");
+    appendLog("書き出し用のスライダー設定をプレビューからコピーしました（LUT は含みません）");
   }, [viewport, batchGrade.params.halationHue, appendLog]);
 
   const applyBatchPreset = (name: PresetName) => {
@@ -476,10 +530,151 @@ export default function App() {
     await window.filmLabBatch.clearBatchSession();
     activeBatchSessionRef.current = null;
     setPersistedSession(null);
-    appendLog("保存していたバッチセッションを破棄しました。");
+    appendLog("保存していた「まとめて書き出し」の途中記録を消しました。");
+  };
+
+  const pickVideoFile = async () => {
+    const p = await window.filmLabBatch.pickInputVideoFile();
+    if (!p) return;
+    setVideoInputPath(p);
+    try {
+      const meta = await window.filmLabBatch.videoExportProbe(p);
+      assertVideoImportWithinCaps(meta.width, meta.height, meta.durationSec);
+      const { outW, outH } = computeVideoExportDimensions(meta.width, meta.height);
+      const frames = computeExportFrameCount(meta.durationSec);
+      setVideoProbeLabel(
+        `${meta.width}×${meta.height}, ${meta.durationSec.toFixed(1)}秒 · ${meta.videoCodec || "?"} · 出力 ${outW}×${outH} · ${VIDEO_EXPORT_FPS}fps · ${frames} フレーム（読込上限 4K / ${VIDEO_IMPORT_MAX_DURATION_SEC}秒）`,
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setVideoProbeLabel(null);
+      appendLog(`動画メタデータ: ${msg}`);
+    }
+  };
+
+  const runVideoExport = async () => {
+    if (!videoInputPath) {
+      appendLog("動画: 先に動画ファイルを選んでください。");
+      return;
+    }
+
+    let effectiveOutputDir = outputDir;
+    if (!effectiveOutputDir) {
+      appendLog(
+        "動画: 出力フォルダが未設定です。保存先フォルダを選ぶダイアログを開きます。",
+      );
+      const picked = await window.filmLabBatch.pickOutputDir();
+      if (!picked) {
+        appendLog("動画: 出力フォルダの選択がキャンセルされました。");
+        return;
+      }
+      effectiveOutputDir = picked;
+      setOutputDir(picked);
+    }
+
+    const norm = videoInputPath.replace(/\\/g, "/");
+    const base = norm.slice(norm.lastIndexOf("/") + 1) || "export";
+    const dot = base.lastIndexOf(".");
+    const stem = dot > 0 ? base.slice(0, dot) : base;
+    const outName = `${stem}-graded.mp4`;
+
+    void window.filmLabBatch.setDesktopPrefs({
+      lastOutputDir: effectiveOutputDir,
+    });
+
+    let estimateFrames = 1;
+    try {
+      const meta = await window.filmLabBatch.videoExportProbe(videoInputPath);
+      assertVideoImportWithinCaps(meta.width, meta.height, meta.durationSec);
+      estimateFrames = computeExportFrameCount(meta.durationSec);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      appendLog(`動画: 検証エラー — ${msg}`);
+      return;
+    }
+
+    setLogText("");
+    batchAbortRef.current = null;
+    setRunning(true);
+
+    try {
+      if (
+        ENABLE_FFMPEG_FAST_VIDEO_EXPORT &&
+        !videoExportWebglAccurate
+      ) {
+        setBatchProgress({
+          current: 0,
+          total: 1,
+          fileName: "動画（高速 ffmpeg）",
+        });
+        const lutPath = await resolveLutCubeAbsPathForFastExport(
+          window.filmLabBatch,
+          importedGradeLabel,
+        );
+        const res = await runVideoExportFfmpegFast({
+          api: window.filmLabBatch,
+          inputVideoPath: videoInputPath,
+          outputDir: effectiveOutputDir,
+          outputFileName: outName,
+          lutCubeAbsPath: lutPath,
+          gradeParams: batchGrade.params,
+          onLog: appendLog,
+        });
+        setBatchProgress({
+          current: 1,
+          total: 1,
+          fileName: "動画（高速 ffmpeg）",
+        });
+        if (!res.ok) {
+          appendLog(`動画出力失敗: ${res.message}`);
+        } else {
+          appendLog("動画出力が完了しました。");
+          setVideoExportSuccessNonce((n) => n + 1);
+        }
+      } else {
+        const abortController = new AbortController();
+        batchAbortRef.current = abortController;
+        setBatchProgress({
+          current: 0,
+          total: estimateFrames,
+          fileName: "動画フレーム",
+        });
+        const res = await runVideoExportPipeline({
+          api: window.filmLabBatch,
+          inputVideoPath: videoInputPath,
+          outputDir: effectiveOutputDir,
+          outputFileName: outName,
+          grade: batchGrade,
+          signal: abortController.signal,
+          onProgress: (pr) => {
+            setBatchProgress({
+              current: pr.currentFrame,
+              total: pr.totalFrames,
+              fileName: "動画フレーム",
+            });
+          },
+          onLog: appendLog,
+        });
+        if (!res.ok) {
+          appendLog(`動画出力失敗: ${res.message}`);
+        } else {
+          appendLog("動画出力が完了しました。");
+          setVideoExportSuccessNonce((n) => n + 1);
+        }
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      appendLog(`動画 FATAL: ${msg}`);
+    } finally {
+      batchAbortRef.current = null;
+      setBatchProgress(null);
+      setRunning(false);
+    }
   };
 
   const batchCanRun = Boolean(inputDir && outputDir) && !running;
+  /** @description 動画はソースさえあれば実行可。出力フォルダ未設定時はクリックでダイアログを開く */
+  const videoCanExport = Boolean(videoInputPath) && !running;
   const batchCanResume =
     Boolean(persistedSession && sessionHasRemainingWork(persistedSession)) &&
     !running;
@@ -491,36 +686,42 @@ export default function App() {
   /** @description キーボードハンドラ用。レンダーごとに最新の非同期処理を指す。 */
   const batchHotkeysRef = useRef({
     runBatch: async (): Promise<void> => {},
+    runVideoExport: async (): Promise<void> => {},
     retryFailedBatch: async (): Promise<void> => {},
     resumeBatch: async (): Promise<void> => {},
   });
   batchHotkeysRef.current.runBatch = runBatch;
+  batchHotkeysRef.current.runVideoExport = runVideoExport;
   batchHotkeysRef.current.retryFailedBatch = retryFailedBatch;
   batchHotkeysRef.current.resumeBatch = resumeBatch;
 
   /** @description キーボードハンドラ用の UI フラグ（常に最新） */
   const hotkeyUiRef = useRef({
     tab: "edit" as TabId,
+    batchJobMode: "images" as BatchJobMode,
     batchCanRun: false,
     batchCanRetryFailed: false,
     batchCanResume: false,
+    videoCanExport: false,
     running: false,
   });
   hotkeyUiRef.current = {
     tab,
+    batchJobMode,
     batchCanRun,
     batchCanRetryFailed,
     batchCanResume,
+    videoCanExport,
     running,
   };
 
   /**
    * @description デスクトップ専用ショートカット（Web 共有コンポーネントには伝播しないよう window で処理）
    * - Mod+1 / Mod+2: タブ（macOS は ⌘、Windows/Linux は Ctrl）
-   * - Mod+Enter: バッチ実行（バッチタブかつ実行可のとき）
+   * - Mod+Enter: 書き出し実行（書き出しタブかつ実行可のとき）
    * - Mod+Shift+Enter: 失敗のみ再実行
    * - Mod+Shift+Y: セッション再開（再開可能なとき）
-   * - Escape: バッチ中断
+   * - Escape: 書き出し中断
    */
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -547,9 +748,12 @@ export default function App() {
             e.preventDefault();
             void act.retryFailedBatch();
           }
-        } else if (u.batchCanRun) {
+        } else if (u.batchJobMode === "images" && u.batchCanRun) {
           e.preventDefault();
           void act.runBatch();
+        } else if (u.batchJobMode === "video" && u.videoCanExport) {
+          e.preventDefault();
+          void act.runVideoExport();
         }
         return;
       }
@@ -575,7 +779,7 @@ export default function App() {
     <div className="film-lab-desktop-root flex min-h-screen flex-col">
       <header className="fl-app-header">
         <span className="fl-app-title">Film Lab</span>
-        <span className="fl-app-subtitle">Desktop（ローカルバッチ）</span>
+        <span className="fl-app-subtitle">Desktop（フォルダから書き出し）</span>
         <div className="fl-tabs ml-auto">
           <button
             type="button"
@@ -590,8 +794,9 @@ export default function App() {
             data-state={tab === "batch" ? "active" : "inactive"}
             className="fl-tab"
             onClick={() => setTab("batch")}
+            aria-label="書き出しタブ（フォルダの写真や動画を保存）"
           >
-            バッチ
+            書き出し
           </button>
         </div>
       </header>
@@ -603,7 +808,7 @@ export default function App() {
               <div className="fl-card-header">
                 <div className="flex min-w-[140px] flex-1 flex-col gap-1.5">
                   <span className="fl-label">
-                    キャンバス用プリセット（初期読み込み）
+                    開いたときのルック（プリセット）
                   </span>
                   <select
                     value={canvasPreset}
@@ -706,12 +911,17 @@ export default function App() {
                     className="fl-btn-primary w-full sm:w-auto sm:min-w-[220px]"
                     onClick={syncPreviewToBatch}
                   >
-                    バッチ用ルックに反映（数値パラメータ）
+                    色を書き出しへ送る
                   </button>
-                  <p className="fl-caption mt-2 max-w-prose">
-                    出力フォルダで使うルックを、いまのプレビューからコピーします。LUT
-                    はバッチタブで JSON 読込するか、後続で .cube 連携してください。
-                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    <p className="fl-caption">
+                      スライダーの数値だけ書き出しタブへ送ります。LUT は JSON などで。
+                    </p>
+                    <HelpHint
+                      tip="LUT（ルックアップテーブル）は自動では渡りません。書き出しタブの「詳細: Grade JSON…」から読み込むか、.cube を後から当ててください。"
+                      assistiveLabel="色を書き出しへ送るときの注意"
+                    />
+                  </div>
                 </div>
               </section>
             </div>
@@ -719,245 +929,55 @@ export default function App() {
         </div>
       ) : (
         <div className="fl-main flex flex-1 flex-col gap-4">
-          <div
-            className="rounded-lg border px-3 py-2.5 text-xs leading-relaxed"
-            style={{
-              borderColor: "var(--amber-6)",
-              background: "var(--amber-2)",
-              color: "var(--amber-12)",
+          <BatchTabPanel
+            batchJobMode={batchJobMode}
+            onBatchJobModeChange={setBatchJobMode}
+            persistedSession={persistedSession}
+            batchCanResume={batchCanResume}
+            running={running}
+            onResumeBatch={resumeBatch}
+            onDiscardPersistedSession={discardPersistedSession}
+            batchPresetChoice={batchPresetChoice}
+            onBatchPresetChoiceChange={applyBatchPreset}
+            importedGradeLabel={importedGradeLabel}
+            onImportGradeJson={importGradeJson}
+            onExportGradeJson={exportGrade}
+            inputDir={inputDir}
+            outputDir={outputDir}
+            onPickInputDir={async () => {
+              const p = await window.filmLabBatch.pickInputDir();
+              setInputDir(p);
             }}
-          >
-            上書き防止のため、出力フォルダは入力フォルダと別にしてください。
-          </div>
-
-          {persistedSession && sessionHasRemainingWork(persistedSession) ? (
-            <div
-              className="rounded-lg border px-3 py-2.5 text-xs leading-relaxed"
-              style={{
-                borderColor: "var(--blue-6)",
-                background: "var(--blue-2)",
-                color: "var(--blue-12)",
-              }}
-            >
-              <p className="mb-2">
-                未完了のバッチがあります（残り{" "}
-                {pathsNotSucceeded(persistedSession).length}{" "}
-                枚）。保存されている入出力パスとルックで続きから再開できます。
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="fl-btn-primary"
-                  disabled={!batchCanResume}
-                  onClick={() => void resumeBatch()}
-                >
-                  再開
-                </button>
-                <button
-                  type="button"
-                  className="fl-btn-secondary"
-                  disabled={running}
-                  onClick={() => void discardPersistedSession()}
-                >
-                  セッションを破棄
-                </button>
-              </div>
-            </div>
-          ) : null}
-
-          <section className="fl-card">
-            <div className="grid gap-4 text-sm md:grid-cols-2">
-              <label className="flex flex-col gap-1.5">
-                <span className="fl-label">バッチ用プリセット（クイック）</span>
-                <select
-                  value={batchPresetChoice}
-                  onChange={(e) =>
-                    applyBatchPreset(e.target.value as PresetName)
-                  }
-                  className="w-full max-w-md"
-                >
-                  {PRESET_NAMES.map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="flex flex-col gap-1">
-                <span className="fl-label">現在のバッチルック</span>
-                <span
-                  className="text-xs leading-snug"
-                  style={{ color: "var(--fl-text-primary)" }}
-                >
-                  {importedGradeLabel
-                    ? `JSON: ${importedGradeLabel}`
-                    : `メモリ（${batchPresetChoice} または編集タブから同期）`}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className="fl-btn-secondary"
-                onClick={importGradeJson}
-              >
-                Import grade JSON（任意）
-              </button>
-              <button
-                type="button"
-                className="fl-btn-secondary"
-                onClick={exportGrade}
-              >
-                Export grade JSON
-              </button>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="w-14 shrink-0 fl-label normal-case">Input</span>
-                <button
-                  type="button"
-                  className="fl-btn-secondary"
-                  onClick={async () => {
-                    const p = await window.filmLabBatch.pickInputDir();
-                    setInputDir(p);
-                  }}
-                >
-                  Choose folder
-                </button>
-                <span className="fl-caption min-w-0 flex-1 truncate">
-                  {inputDir ?? "—"}
-                </span>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="w-14 shrink-0 fl-label normal-case">Output</span>
-                <button
-                  type="button"
-                  className="fl-btn-secondary"
-                  onClick={async () => {
-                    const p = await window.filmLabBatch.pickOutputDir();
-                    setOutputDir(p);
-                  }}
-                >
-                  Choose folder
-                </button>
-                <span className="fl-caption min-w-0 flex-1 truncate">
-                  {outputDir ?? "—"}
-                </span>
-              </div>
-            </div>
-
-            <p className="fl-caption max-w-prose">
-              選択した入出力フォルダは次回以降のダイアログの既定の場所になります（存在するパスのみ）。ウィンドウの位置とサイズも終了時に保存されます。
-            </p>
-
-            <p className="fl-caption max-w-prose">
-              キーボード: ⌘1 / ⌘2（Windows は Ctrl）でタブ切替。この画面で ⌘↩
-              実行、⇧⌘↩ 失敗のみ再実行、⇧⌘Y セッション再開、Esc
-              中断。
-            </p>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="fl-label normal-case">Format</span>
-              <select
-                id="batch-format-sel"
-                className="min-w-[6.5rem]"
-                value={batchFormat}
-                onChange={(e) => setBatchFormat(e.target.value as BatchFormat)}
-              >
-                <option value="jpeg">JPEG</option>
-                <option value="png">PNG</option>
-              </select>
-            </div>
-
-            <label className="flex max-w-md flex-col gap-1.5">
-              <span className="fl-label normal-case">出力ファイル接尾辞</span>
-              <input
-                type="text"
-                className="fl-text-input w-full max-w-md"
-                value={batchOutputSuffix}
-                onChange={(e) => setBatchOutputSuffix(e.target.value)}
-                autoComplete="off"
-                spellCheck={false}
-                aria-describedby="batch-suffix-hint"
-              />
-              <span id="batch-suffix-hint" className="fl-caption max-w-prose">
-                元ファイル名と拡張子の間に付きます（例:{" "}
-                <code className="font-mono text-[0.65rem]">-graded</code> →
-                IMG0001-graded.jpg）。空欄は接尾辞なし（別フォルダ出力推奨）。
-              </span>
-            </label>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                className="fl-btn-primary max-w-xs"
-                disabled={!batchCanRun}
-                onClick={() => void runBatch()}
-              >
-                Run batch
-              </button>
-              <button
-                type="button"
-                className="fl-btn-secondary max-w-xs"
-                disabled={!batchCanRetryFailed}
-                onClick={() => void retryFailedBatch()}
-              >
-                失敗のみ再実行
-              </button>
-              <button
-                type="button"
-                className="fl-btn-secondary"
-                disabled={!running}
-                aria-label="実行中のバッチ処理を中断する"
-                onClick={() => batchAbortRef.current?.abort()}
-              >
-                中断
-              </button>
-            </div>
-
-            {running && batchProgress && batchProgress.total > 0 ? (
-              <div
-                className="fl-batch-progress"
-                aria-live="polite"
-                aria-busy="true"
-              >
-                <div
-                  className="fl-progress"
-                  role="progressbar"
-                  aria-valuemin={0}
-                  aria-valuemax={batchProgress.total}
-                  aria-valuenow={batchProgress.current}
-                  aria-valuetext={`${batchProgress.current} / ${batchProgress.total} ${batchProgress.fileName}`}
-                >
-                  <div
-                    className="fl-progress-fill"
-                    style={{
-                      width: `${Math.min(
-                        100,
-                        Math.round(
-                          (batchProgress.current / batchProgress.total) * 100,
-                        ),
-                      )}%`,
-                    }}
-                  />
-                </div>
-                <p className="fl-caption">
-                  {batchProgress.current} / {batchProgress.total} ·{" "}
-                  {batchProgress.fileName}
-                </p>
-              </div>
-            ) : null}
-
-            {lastBatchSummary && !running ? (
-              <p className="fl-caption" aria-live="polite">
-                直近の結果: 成功 {lastBatchSummary.ok} 枚 · 読込エラー{" "}
-                {lastBatchSummary.loadFail} · 書込エラー{" "}
-                {lastBatchSummary.writeFail}
-              </p>
-            ) : null}
-          </section>
+            onPickOutputDir={async () => {
+              const p = await window.filmLabBatch.pickOutputDir();
+              setOutputDir(p);
+            }}
+            batchFormat={batchFormat}
+            onBatchFormatChange={setBatchFormat}
+            batchOutputSuffix={batchOutputSuffix}
+            onBatchOutputSuffixChange={setBatchOutputSuffix}
+            batchCanRun={batchCanRun}
+            batchCanRetryFailed={batchCanRetryFailed}
+            onRunBatch={runBatch}
+            onRetryFailedBatch={retryFailedBatch}
+            onAbortBatch={() => {
+              void window.filmLabBatch.videoExportAbort().catch(() => {});
+              batchAbortRef.current?.abort();
+            }}
+            videoExportWebglAccurate={videoExportWebglAccurate}
+            onVideoExportWebglAccurateChange={setVideoExportWebglAccurate}
+            showFastFfmpegVideoExportOption={
+              ENABLE_FFMPEG_FAST_VIDEO_EXPORT
+            }
+            batchProgress={batchProgress}
+            lastBatchSummary={lastBatchSummary}
+            videoInputPath={videoInputPath}
+            videoProbeLabel={videoProbeLabel}
+            videoCanExport={videoCanExport}
+            onPickVideoFile={pickVideoFile}
+            onRunVideoExport={runVideoExport}
+            videoExportSuccessNonce={videoExportSuccessNonce}
+          />
 
           <pre className="fl-log">{logText || "ログはここに表示されます。"}</pre>
         </div>

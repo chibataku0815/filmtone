@@ -49,4 +49,56 @@ contextBridge.exposeInMainWorld("filmLabBatch", {
     ipcRenderer.invoke("batch-session-write", payload),
   clearBatchSession: (): Promise<void> =>
     ipcRenderer.invoke("batch-session-clear"),
+  pathToFileURL: (filePath: string): Promise<string> =>
+    ipcRenderer.invoke("path-to-file-url", filePath),
+  pickInputVideoFile: (): Promise<string | null> =>
+    ipcRenderer.invoke("pick-input-video-file"),
+  videoExportProbe: (
+    filePath: string,
+  ): Promise<{
+    width: number;
+    height: number;
+    durationSec: number;
+    hasAudio: boolean;
+    videoCodec: string;
+  }> => ipcRenderer.invoke("video-export-probe", filePath),
+  videoExportStart: (payload: {
+    inputVideoPath: string;
+    outputDir: string;
+    outputFileName: string;
+    width: number;
+    height: number;
+    fps: number;
+    hasAudio: boolean;
+  }): Promise<{ outputVideoPath: string }> =>
+    ipcRenderer.invoke("video-export-start", payload),
+  videoExportWriteFrame: (data: Uint8Array): Promise<void> =>
+    ipcRenderer.invoke("video-export-write-frame", data),
+  videoExportFinish: (): Promise<{
+    code: number | null;
+    stderrTail: string;
+  }> => ipcRenderer.invoke("video-export-finish"),
+  videoExportAbort: (): Promise<void> =>
+    ipcRenderer.invoke("video-export-abort"),
+  videoExportTranscodeFast: (payload: {
+    inputVideoPath: string;
+    outputDir: string;
+    outputFileName: string;
+    width: number;
+    height: number;
+    fps: number;
+    hasAudio: boolean;
+    lutCubeAbsPath: string;
+    gradeParams: Record<string, unknown>;
+  }): Promise<{
+    code: number | null;
+    stderrTail: string;
+    outputVideoPath: string;
+  }> => ipcRenderer.invoke("video-export-transcode-fast", payload),
+  videoExportStageSource: (
+    filePath: string,
+  ): Promise<{ stagedPath: string }> =>
+    ipcRenderer.invoke("video-export-stage-source", filePath),
+  videoExportUnlinkStaged: (stagedPath: string): Promise<void> =>
+    ipcRenderer.invoke("video-export-unlink-staged", stagedPath),
 });

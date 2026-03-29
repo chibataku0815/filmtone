@@ -38,20 +38,31 @@
       "feedbackError": "Could not read or write. Check private mode or storage limits."
     },
     "smartLook": {
-      "sectionTitle": "Smart look (beta)",
-      "consentHint": "For verified supporters only. A resized JPEG preview is sent to our server and then to an AI provider. We may return a corrected preview image applied to your canvas, or numeric suggestions for sliders only, depending on the client. We do not use your images to train models. See the site privacy policy for subprocessors.",
-      "consentLabel": "I agree to send a resized preview for this analysis.",
-      "applyButton": "Balance for this photo",
-      "busy": "Analyzing…",
-      "errorGeneric": "Could not apply smart look. Try sliders or try again later.",
-      "needImage": "Open or drop media on the canvas first.",
-      "supporterOnly": "Smart look is for verified supporters. Support via Stripe from the footer to unlock.",
-      "needConsent": "Check the box above to confirm you agree."
+      "sectionTitle": "Match colors to a sample (AI, beta)",
+      "consentSummary": "Supporters only. We send two small images—your edit and one sample—and AI suggests how to align color.",
+      "consentHint": "We send (1) the graded preview on screen and (2) one sample image you pick, resized, through our server to an AI provider. The reply may be slider hints or, depending on settings, a preview image. Not used to train models. See our privacy policy for subprocessors and retention.",
+      "consentInfoAria": "What is sent and privacy details",
+      "consentLabel": "I agree to send both images",
+      "referenceSummary": "Pick one sample photo from disk with the look you want.",
+      "referenceTooltip": "Use a different file from what’s on the canvas—the canvas preview is sent automatically. JPEG, PNG, or WebP.",
+      "referenceInfoAria": "How to pick a sample",
+      "referencePickButton": "Pick sample photo",
+      "referenceClear": "Clear sample",
+      "needReference": "Pick a sample photo first.",
+      "errorReferenceRead": "Couldn’t read that file. Try JPEG, PNG, or WebP.",
+      "applyButton": "Match sample look",
+      "busy": "Working…",
+      "errorGeneric": "Something went wrong. Adjust with sliders or try again later.",
+      "needImage": "Open a photo or video here first.",
+      "supporterOnly": "This is for supporters. Support via Stripe in the footer to unlock.",
+      "needConsent": "Check the box above, then try again."
     },
     "mode": {
       "quick": "Quick",
       "pro": "Pro",
-      "hint": "Quick shows presets and core color sliders. Pro adds tone detail, effects, Bloom, Halation, and LUT."
+      "hintShort": "Quick: main sliders + presets. Pro: also tone detail, effects, Bloom, Halation, LUT.",
+      "hint": "Quick shows presets and core color sliders. Pro adds tone detail, effects, Bloom, Halation, and LUT.",
+      "hintInfoAria": "Quick vs Pro"
     },
     "compare": {
       "sectionTitle": "Compare on the preview",
