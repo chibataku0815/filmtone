@@ -251,6 +251,12 @@
       "open": "Open media",
       "savePng": "Save PNG"
     },
+    "canvas": {
+      "webgl2Required": "WebGL2 is required for Film Lab",
+      "dropHint": "Drop image, video, or .cube LUT",
+      "loadingMedia": "Loading media…",
+      "dismissError": "OK"
+    },
     "back": "\u2190 Back to Interactive",
     "metadata": {
       "title": "Film Lab",
@@ -276,6 +282,17 @@
       "feedbackLoaded": "Loaded from this browser.",
       "feedbackCleared": "Saved data removed.",
       "feedbackError": "Could not read or write. Check private mode or storage limits."
+    },
+    "smartLook": {
+      "sectionTitle": "Smart look (beta)",
+      "consentHint": "For verified supporters only. A resized JPEG preview is sent to our server and then to an AI provider to suggest small adjustments. We do not use your images to train models. See the site privacy policy for subprocessors.",
+      "consentLabel": "I agree to send a resized preview for this analysis.",
+      "applyButton": "Balance for this photo",
+      "busy": "Analyzing…",
+      "errorGeneric": "Could not apply smart look. Try sliders or try again later.",
+      "needImage": "Open or drop media on the canvas first.",
+      "supporterOnly": "Smart look is for verified supporters. Support via Stripe from the footer to unlock.",
+      "needConsent": "Check the box above to confirm you agree."
     },
     "mode": {
       "quick": "Quick",
@@ -341,6 +358,20 @@
       "present_hint": {
         "body": "Sharing your screen? Turn on Presenter mode to hide support prompts.",
         "dismiss": "Got it"
+      },
+      "thanks_page": {
+        "meta_title": "Thank you — Film Lab",
+        "meta_description": "Thank you for optionally supporting Film Lab.",
+        "title": "Thank you",
+        "body": "Your support helps us keep improving and running Film Lab. It stays free to use.",
+        "returnCta": "Back to Film Lab",
+        "returnHint": "If this page URL includes a checkout session ID, we can verify on the server before you return, for softer prompts. Otherwise you can still use the browser-only acknowledgement flow.",
+        "verifyPending": "Confirming your checkout…",
+        "verifyFailed": "We couldn’t verify automatically. You can still continue to Film Lab (prompts may stay in the default mode)."
+      },
+      "supporter": {
+        "footer_shortLine": "Thank you for your support. Enjoy Film Lab.",
+        "preset_save_modal_body": "Saved to this browser. If you’ve already supported us, thank you again. Film Lab remains free to use."
       },
       "legal_footer_short": "Not tax advice. Third-party checkout. Ask your advisor."
     },

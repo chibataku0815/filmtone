@@ -251,6 +251,12 @@
       "open": "メディアを開く",
       "savePng": "PNGを保存"
     },
+    "canvas": {
+      "webgl2Required": "Film Lab を使うには WebGL2 が必要です",
+      "dropHint": "画像・動画・.cube LUT をドロップ",
+      "loadingMedia": "読み込み中…",
+      "dismissError": "OK"
+    },
     "back": "\u2190 Interactive に戻る",
     "metadata": {
       "title": "Film Lab",
@@ -276,6 +282,17 @@
       "feedbackLoaded": "保存したルックを読み込みました。",
       "feedbackCleared": "保存データを消しました。",
       "feedbackError": "読み書きできませんでした。プライベートモードや容量を確認してください。"
+    },
+    "smartLook": {
+      "sectionTitle": "スマートルック（beta）",
+      "consentHint": "検証済みの支援者向けです。縮小した JPEG をサーバー経由で AI 提供者に送り、小さな補正案を返します。画像はモデル学習に使いません。委託先はサイトのプライバシーポリシーを参照してください。",
+      "consentLabel": "上記に同意し、解析のために縮小プレビューを送ることに同意します。",
+      "applyButton": "この写真に合わせて整える",
+      "busy": "解析中…",
+      "errorGeneric": "スマートルックを適用できませんでした。スライダーで調整するか、時間をおいて再度お試しください。",
+      "needImage": "先にキャンバスでメディアを開いてください。",
+      "supporterOnly": "スマートルックは検証済み支援者向けです。フッターから Stripe で支援すると利用できます。",
+      "needConsent": "上のチェックボックスに同意のうえお試しください。"
     },
     "mode": {
       "quick": "クイック",
@@ -341,6 +358,20 @@
       "present_hint": {
         "body": "画面共有中ですか？プレゼンモードをオンにすると、支援の案内を表示しません。",
         "dismiss": "了解"
+      },
+      "thanks_page": {
+        "meta_title": "ご支援ありがとうございます — Film Lab",
+        "meta_description": "Film Lab への任意のご支援へのお礼です。",
+        "title": "ご支援ありがとうございます",
+        "body": "改善と運用の維持にとても助かります。Film Lab は引き続き無料でお使いいただけます。",
+        "returnCta": "Film Lab に戻る",
+        "returnHint": "支払い後のリンクにセッション ID がある場合、サーバで確認してから Film Lab へ進むと案内が控えめになります。ない場合は従来どおり「このブラウザに限定」の案内抑止が使えます。",
+        "verifyPending": "決済情報を確認しています…",
+        "verifyFailed": "自動確認に失敗しました。以下から進んでも Film Lab はお使いいただけます（案内抑止は別の方法で行われます）。"
+      },
+      "supporter": {
+        "footer_shortLine": "ご支援ありがとうございます。Film Lab を引き続きお楽しみください。",
+        "preset_save_modal_body": "このブラウザに保存しました。すでにご支援いただいている場合、改めてお礼申し上げます。Film Lab は引き続き無料でご利用いただけます。"
       },
       "legal_footer_short": "税務上の助言ではありません。決済は外部サービスです。詳細は専門家にご確認ください。"
     },
