@@ -4,9 +4,16 @@
  * @overview バッチの正はメモリ上の BatchGradeState。編集タブでプレビューし「バッチに反映」で同期する。
  * @limitations プレビュー上の LUT をバッチに自動複製はしない（JSON Import か .cube 再適用）。
  * シェルの色・段差は globals.css の Radix スケール準拠トークン（html.dark.dark-theme）に集約する。
+ *
+ * @description 編集タブのレイアウト（デスクトップ向け）
+ * - 狭い画面では「上＝プレビュー＋ヒスト／下＝コントロール」の縦積み。
+ * - `lg` 以上ではプレビュー領域を親いっぱい（absolute inset-0）にし、右パネルはその上に
+ *   `translateX` でスライドインする。閉じたあともキャンバスはウィンドウ幅いっぱいを使う。
+ * - 開閉は Phosphor Icons（CaretLeft / CaretRight）＋ aria-label。`prefers-reduced-motion` は Tailwind で短縮。
  */
-import { useCallback, useState } from "react";
-import { FilmLabCanvas } from "@film-lab/components/FilmLabCanvas";
+import { CaretLeft, CaretRight } from "@phosphor-icons/react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { FilmLabCanvas, type FilmLabCanvasRef } from "@film-lab/components/FilmLabCanvas";
 import { ControlPanel } from "@film-lab/components/ControlPanel";
 import { Histogram } from "@film-lab/components/ui/Histogram";
 import type { Viewport } from "@film-lab/core/Viewport";
@@ -26,6 +33,8 @@ type TabId = "edit" | "batch";
 const PRESET_NAMES = Object.keys(PRESETS) as PresetName[];
 
 export default function App() {
+  /** @description スマートルックがキャンバス JPEG を取得するための ref（Web のフルページと同じ配線） */
+  const filmLabCanvasRef = useRef<FilmLabCanvasRef | null>(null);
   const [tab, setTab] = useState<TabId>("edit");
   const [viewport, setViewport] = useState<Viewport | null>(null);
   const [histogramVisible, setHistogramVisible] = useState(true);
@@ -44,6 +53,33 @@ export default function App() {
   const [outputDir, setOutputDir] = useState<string | null>(null);
   const [logText, setLogText] = useState("");
   const [running, setRunning] = useState(false);
+  /**
+   * @description 幅 lg 以上で右スライドパネルを表示するか。パネルは DOM を維持し `translateX` のみ（内部状態を捨てない）。
+   */
+  const [editRightPaneExpanded, setEditRightPaneExpanded] = useState(true);
+  /**
+   * @description ビューポートが Tailwind `lg` 以上か。SSR なし前提で初期値は同期読み取り。
+   */
+  const [isLgLayout, setIsLgLayout] = useState(() =>
+    typeof window !== "undefined"
+      ? window.matchMedia("(min-width: 1024px)").matches
+      : false,
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const onChange = () => setIsLgLayout(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  /** @description 狭い幅に戻したときはパネルを必ず表示（縦積みで隠れないようにする） */
+  useEffect(() => {
+    if (!isLgLayout) {
+      setEditRightPaneExpanded(true);
+    }
+  }, [isLgLayout]);
 
   const appendLog = useCallback((line: string) => {
     setLogText((t) => `${t}${line}\n`);
@@ -176,71 +212,123 @@ export default function App() {
 
       {tab === "edit" ? (
         <div className="fl-main flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
-          <section className="fl-card shrink-0">
-            <div className="fl-card-header">
-              <div className="flex min-w-[140px] flex-1 flex-col gap-1.5">
-                <span className="fl-label">キャンバス用プリセット（初期読み込み）</span>
-                <select
-                  value={canvasPreset}
-                  onChange={(e) =>
-                    setCanvasPreset(e.target.value as PresetName)
-                  }
-                  className="w-full max-w-xs"
-                >
-                  {PRESET_NAMES.map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
+          <div className="relative flex min-h-0 flex-1 flex-col gap-4 lg:min-h-0 lg:overflow-hidden">
+            <section className="fl-card relative z-0 flex min-h-0 w-full min-w-0 flex-col gap-3 overflow-y-auto max-lg:flex-none lg:absolute lg:inset-0 lg:z-0">
+              <div className="fl-card-header">
+                <div className="flex min-w-[140px] flex-1 flex-col gap-1.5">
+                  <span className="fl-label">
+                    キャンバス用プリセット（初期読み込み）
+                  </span>
+                  <select
+                    value={canvasPreset}
+                    onChange={(e) =>
+                      setCanvasPreset(e.target.value as PresetName)
+                    }
+                    className="w-full max-w-xs"
+                  >
+                    {PRESET_NAMES.map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-            </div>
-            <FilmLabCanvas
-              chromeLayout="stacked"
-              preset={canvasPreset}
-              className="w-full max-w-5xl self-center"
-              fullScreen={false}
-              onViewportReady={setViewport}
-            />
-            <hr className="fl-divider" />
-            <div className="w-full max-w-5xl self-center">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <span className="fl-label normal-case tracking-normal">
-                  RGB ヒストグラム
-                </span>
-              </div>
-              <Histogram
-                viewport={viewport}
-                visible={histogramVisible}
-                variant="inline"
+              <FilmLabCanvas
+                ref={filmLabCanvasRef}
+                chromeLayout="stacked"
+                preset={canvasPreset}
+                className="w-full max-w-full self-stretch lg:max-w-none"
+                fullScreen={false}
+                onViewportReady={setViewport}
               />
-            </div>
-          </section>
+              <hr className="fl-divider" />
+              <div className="w-full max-w-full self-stretch">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <span className="fl-label normal-case tracking-normal">
+                    RGB ヒストグラム
+                  </span>
+                </div>
+                <Histogram
+                  viewport={viewport}
+                  visible={histogramVisible}
+                  variant="inline"
+                />
+              </div>
+            </section>
 
-          <section className="fl-card fl-card-muted flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-0">
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 sm:px-4">
-              <ControlPanel
-                viewport={viewport}
-                histogramVisible={histogramVisible}
-                onHistogramToggle={() =>
-                  setHistogramVisible((v) => !v)
-                }
-              />
-            </div>
-            <div className="fl-sticky-footer rounded-b-xl">
+            {isLgLayout && !editRightPaneExpanded ? (
               <button
                 type="button"
-                className="fl-btn-primary w-full sm:w-auto sm:min-w-[220px]"
-                onClick={syncPreviewToBatch}
+                className="fl-edit-pane-reveal-rail"
+                aria-label="パラメータパネルを開く"
+                aria-expanded={false}
+                aria-controls="film-lab-edit-controls-pane"
+                onClick={() => setEditRightPaneExpanded(true)}
               >
-                バッチ用ルックに反映（数値パラメータ）
+                <CaretLeft size={22} weight="bold" aria-hidden />
               </button>
-              <p className="fl-caption mt-2 max-w-prose">
-                出力フォルダで使うルックを、いまのプレビューからコピーします。LUT
-                はバッチタブで JSON 読込するか、後続で .cube 連携してください。
-              </p>
+            ) : null}
+
+            <div
+              id="film-lab-edit-controls-pane"
+              role="complementary"
+              aria-label="Film Lab パラメータ"
+              aria-hidden={Boolean(
+                isLgLayout && !editRightPaneExpanded,
+              )}
+              className={`fl-edit-slide-panel-shell flex min-h-0 w-full min-w-0 flex-1 flex-col max-lg:relative lg:absolute lg:inset-y-0 lg:right-0 lg:z-20 lg:h-auto lg:max-h-full lg:w-[clamp(320px,42vw,680px)] lg:max-w-[min(680px,calc(100%-1.5rem))] lg:min-w-0 lg:flex-none lg:transition-transform lg:duration-300 lg:ease-out motion-reduce:lg:transition-none ${
+                editRightPaneExpanded
+                  ? "lg:translate-x-0"
+                  : "lg:pointer-events-none lg:translate-x-full"
+              }`}
+            >
+              <section className="fl-card fl-card-muted fl-edit-controls-pane flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-0 lg:rounded-r-none lg:rounded-l-xl">
+                <div className="fl-edit-pane-toolbar hidden lg:flex">
+                  <button
+                    type="button"
+                    className="fl-edit-pane-toolbar-btn"
+                    aria-label="パラメータパネルを閉じる"
+                    aria-expanded={editRightPaneExpanded}
+                    aria-controls="film-lab-edit-controls-pane"
+                    onClick={() => setEditRightPaneExpanded(false)}
+                  >
+                    <CaretRight size={20} weight="bold" aria-hidden />
+                  </button>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 sm:px-4">
+                  <ControlPanel
+                    viewport={viewport}
+                    histogramVisible={histogramVisible}
+                    onHistogramToggle={() =>
+                      setHistogramVisible((v) => !v)
+                    }
+                    filmLabCanvasRef={filmLabCanvasRef}
+                    smartLookApiBaseUrl={
+                      import.meta.env.VITE_FILM_LAB_API_ORIGIN
+                    }
+                    serverVerifiedSupporter={
+                      import.meta.env.VITE_FILM_LAB_ASSUME_SUPPORTER ===
+                      "true"
+                    }
+                  />
+                </div>
+                <div className="fl-sticky-footer rounded-b-xl lg:rounded-bl-xl">
+                  <button
+                    type="button"
+                    className="fl-btn-primary w-full sm:w-auto sm:min-w-[220px]"
+                    onClick={syncPreviewToBatch}
+                  >
+                    バッチ用ルックに反映（数値パラメータ）
+                  </button>
+                  <p className="fl-caption mt-2 max-w-prose">
+                    出力フォルダで使うルックを、いまのプレビューからコピーします。LUT
+                    はバッチタブで JSON 読込するか、後続で .cube 連携してください。
+                  </p>
+                </div>
+              </section>
             </div>
-          </section>
+          </div>
         </div>
       ) : (
         <div className="fl-main flex flex-1 flex-col gap-4">

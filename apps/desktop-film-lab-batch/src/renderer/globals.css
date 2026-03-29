@@ -57,11 +57,15 @@ body {
   color: var(--fl-text-primary);
 }
 
+/**
+ * @description デスクトップはウィンドウ幅いっぱいを使う（Web 本番の読み物レイアウト用 max-width は付けない）。
+ * プレビューとコントロールの両方に余白を確保し、横の無駄なマージンをなくす。
+ */
 .fl-main {
-  margin-left: auto;
-  margin-right: auto;
+  margin-left: 0;
+  margin-right: 0;
   width: 100%;
-  max-width: 72rem;
+  max-width: none;
   padding: 1rem;
 }
 
@@ -303,3 +307,103 @@ body {
   background: var(--fl-bg-subtle);
   padding: 0.75rem 1rem;
 }
+
+/**
+ * @description 編集タブの「パラメータ」列。lg 以上で左列（プレビュー）との区切り。
+ * 往復スクロール負荷を減らす左右分割の視覚的なリズム用（Radix の境界トークンのみ使用）。
+ */
+@media (min-width: 1024px) {
+  .fl-edit-controls-pane {
+    border-left: 1px solid var(--fl-border-subtle);
+  }
+}
+
+/**
+ * @description 編集タブ・スライドパネル上部。閉じる操作は Phosphor アイコン＋ aria-label。
+ */
+.fl-edit-pane-toolbar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--fl-border-subtle);
+  background: var(--fl-bg-subtle);
+  padding: 0.375rem 0.5rem;
+}
+
+.fl-edit-pane-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.375rem;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--fl-text-secondary);
+  padding: 0.35rem;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.fl-edit-pane-toolbar-btn:hover {
+  background: var(--fl-bg-interactive);
+  color: var(--fl-text-primary);
+  border-color: var(--fl-border-default);
+}
+
+.fl-edit-pane-toolbar-btn:focus-visible {
+  outline: 2px solid var(--fl-focus-ring);
+  outline-offset: 2px;
+}
+
+/**
+ * @description lg 以上でパネルが画面外へスライドしたとき、右端に残す「開く」取っ手。
+ */
+.fl-edit-pane-reveal-rail {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  min-height: 5rem;
+  padding: 0.25rem;
+  border: 1px solid var(--fl-border-default);
+  border-right: none;
+  border-radius: 0.5rem 0 0 0.5rem;
+  background: var(--fl-bg-raised);
+  color: var(--fl-text-secondary);
+  box-shadow: -2px 0 12px color-mix(in srgb, black 40%, transparent);
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.fl-edit-pane-reveal-rail:hover {
+  background: var(--fl-bg-interactive);
+  color: var(--fl-accent);
+  border-color: var(--fl-border-strong);
+}
+
+.fl-edit-pane-reveal-rail:focus-visible {
+  outline: 2px solid var(--fl-focus-ring);
+  outline-offset: 2px;
+}
+
+/**
+ * @description 右パネル全体のシェル（スライド＋影）。中身のカードは別クラス。
+ */
+@media (min-width: 1024px) {
+  .fl-edit-slide-panel-shell {
+    box-shadow: -16px 0 40px -12px color-mix(in srgb, black 65%, transparent);
+  }
+}
+

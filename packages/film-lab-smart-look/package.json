@@ -1,0 +1,26 @@
+{
+  "name": "film-lab-smart-look",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean --external film-lab-core,zod",
+    "test": "bun test src/"
+  },
+  "dependencies": {
+    "film-lab-core": "workspace:*",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2"
+  }
+}

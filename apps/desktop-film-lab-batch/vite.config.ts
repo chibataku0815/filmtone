@@ -4,15 +4,23 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(__dirname, "../web");
 
-export default defineConfig(() => ({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, path.resolve(__dirname), "");
+  const smartLookUi =
+    env.VITE_FILM_LAB_SMART_LOOK_UI === "true" ? "true" : "";
+
+  return {
   root: path.resolve(__dirname, "src/renderer"),
   base: "./",
   publicDir: path.resolve(webRoot, "public"),
+  define: {
+    "process.env.NEXT_PUBLIC_FILM_LAB_SMART_LOOK_UI": JSON.stringify(smartLookUi),
+  },
   plugins: [react()],
   build: {
     outDir: path.resolve(__dirname, "dist/renderer"),
@@ -39,4 +47,5 @@ export default defineConfig(() => ({
     },
     dedupe: ["react", "react-dom"],
   },
-}));
+};
+});

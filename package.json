@@ -4,6 +4,7 @@
   "packageManager": "bun@1.3.3",
   "workspaces": [
     "packages/film-lab-core",
+    "packages/film-lab-smart-look",
     "apps/web",
     "apps/remotion-film-lab",
     "apps/desktop-film-lab-batch"
@@ -15,6 +16,7 @@
     "build:web": "bun run --cwd apps/web build",
     "start:web": "bun run --cwd apps/web start",
     "build:core": "bun run --cwd packages/film-lab-core build",
-    "postinstall": "bun run build:core"
+    "build:smart-look": "bun run --cwd packages/film-lab-smart-look build",
+    "postinstall": "bun run build:core && bun run build:smart-look"
   }
 }
