@@ -24,6 +24,8 @@ import {
   runBatchPipeline,
   type BatchFormat,
   type BatchGradeState,
+  type BatchPipelineProgressPayload,
+  type BatchPipelineSummary,
 } from "./batch-pipeline";
 import { exportGradeJsonText } from "./grade-io";
 import { viewportRecordToParams } from "./viewport-to-params";
@@ -53,6 +55,14 @@ export default function App() {
   const [outputDir, setOutputDir] = useState<string | null>(null);
   const [logText, setLogText] = useState("");
   const [running, setRunning] = useState(false);
+  /** @description バッチ中断用。Run 開始時に差し替え、完了・エラーで null */
+  const batchAbortRef = useRef<AbortController | null>(null);
+  /** @description プログレスバー用。処理中のみセット */
+  const [batchProgress, setBatchProgress] =
+    useState<BatchPipelineProgressPayload | null>(null);
+  /** @description 直近の正常終了したバッチの集計（画面下に短く残す） */
+  const [lastBatchSummary, setLastBatchSummary] =
+    useState<BatchPipelineSummary | null>(null);
   /**
    * @description 幅 lg 以上で右スライドパネルを表示するか。パネルは DOM を維持し `translateX` のみ（内部状態を捨てない）。
    */
@@ -149,6 +159,10 @@ export default function App() {
     const format = (formatSel?.value ?? "jpeg") as BatchFormat;
 
     setLogText("");
+    setLastBatchSummary(null);
+    const abortController = new AbortController();
+    batchAbortRef.current = abortController;
+
     appendLog(`Input: ${inputDir}`);
     appendLog(`Output: ${outputDir}`);
     appendLog(
@@ -166,19 +180,33 @@ export default function App() {
         appendLog("画像がありません（.jpg / .jpeg / .png）");
         return;
       }
-      await runBatchPipeline({
+      setBatchProgress({
+        current: 0,
+        total: images.length,
+        fileName: "準備中…",
+      });
+      const summary = await runBatchPipeline({
         api: window.filmLabBatch,
         grade: batchGrade,
         imagePaths: images,
         outputDir,
         format,
         onLog: appendLog,
+        signal: abortController.signal,
+        onProgress: setBatchProgress,
       });
+      setLastBatchSummary(summary);
       appendLog("Done.");
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      appendLog(`FATAL: ${msg}`);
+      if (e instanceof DOMException && e.name === "AbortError") {
+        appendLog("ユーザーにより中断されました。");
+      } else {
+        const msg = e instanceof Error ? e.message : String(e);
+        appendLog(`FATAL: ${msg}`);
+      }
     } finally {
+      batchAbortRef.current = null;
+      setBatchProgress(null);
       setRunning(false);
     }
   };
@@ -438,14 +466,66 @@ export default function App() {
               </select>
             </div>
 
-            <button
-              type="button"
-              className="fl-btn-primary max-w-xs"
-              disabled={!batchCanRun}
-              onClick={() => void runBatch()}
-            >
-              Run batch
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                className="fl-btn-primary max-w-xs"
+                disabled={!batchCanRun}
+                onClick={() => void runBatch()}
+              >
+                Run batch
+              </button>
+              <button
+                type="button"
+                className="fl-btn-secondary"
+                disabled={!running}
+                aria-label="実行中のバッチ処理を中断する"
+                onClick={() => batchAbortRef.current?.abort()}
+              >
+                中断
+              </button>
+            </div>
+
+            {running && batchProgress && batchProgress.total > 0 ? (
+              <div
+                className="fl-batch-progress"
+                aria-live="polite"
+                aria-busy="true"
+              >
+                <div
+                  className="fl-progress"
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={batchProgress.total}
+                  aria-valuenow={batchProgress.current}
+                  aria-valuetext={`${batchProgress.current} / ${batchProgress.total} ${batchProgress.fileName}`}
+                >
+                  <div
+                    className="fl-progress-fill"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        Math.round(
+                          (batchProgress.current / batchProgress.total) * 100,
+                        ),
+                      )}%`,
+                    }}
+                  />
+                </div>
+                <p className="fl-caption">
+                  {batchProgress.current} / {batchProgress.total} ·{" "}
+                  {batchProgress.fileName}
+                </p>
+              </div>
+            ) : null}
+
+            {lastBatchSummary && !running ? (
+              <p className="fl-caption" aria-live="polite">
+                直近の結果: 成功 {lastBatchSummary.ok} 枚 · 読込エラー{" "}
+                {lastBatchSummary.loadFail} · 書込エラー{" "}
+                {lastBatchSummary.writeFail}
+              </p>
+            ) : null}
           </section>
 
           <pre className="fl-log">{logText || "ログはここに表示されます。"}</pre>

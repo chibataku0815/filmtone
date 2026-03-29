@@ -25,6 +25,24 @@ import {
 export type BatchFormat = "png" | "jpeg";
 
 /**
+ * @description バッチ 1 枚分の進捗（UI のプログレスバー用。current は 1 始まり）
+ */
+export type BatchPipelineProgressPayload = {
+  current: number;
+  total: number;
+  fileName: string;
+};
+
+/**
+ * @description 処理終了時の枚数集計（ログ・画面サマリー用）
+ */
+export type BatchPipelineSummary = {
+  ok: number;
+  loadFail: number;
+  writeFail: number;
+};
+
+/**
  * バッチが参照するルック状態（メモリ上の単一の真実。JSON はこれへの Import に過ぎない）
  */
 export type BatchGradeState = {
@@ -170,6 +188,8 @@ export async function resolveGradeFromJsonText(
 /**
  * 画像パスの列を順に処理し、出力フォルダへ書き出す。
  * @param options.grade — メモリ上のルック（主導線）。JSON Import 後はこの形に詰め替える。
+ * @param options.signal — 渡すと枚の境界で中断チェックし、`AbortError` を投げる。
+ * @param options.onProgress — 各ファイル処理の開始時に 1 回（current は 1 始まり）。
  */
 export async function runBatchPipeline(options: {
   api: FilmLabBatchBridge;
@@ -178,12 +198,28 @@ export async function runBatchPipeline(options: {
   outputDir: string;
   format: BatchFormat;
   onLog: (line: string) => void;
-}): Promise<void> {
-  const { api, grade, imagePaths, outputDir, format } = options;
+  signal?: AbortSignal;
+  onProgress?: (payload: BatchPipelineProgressPayload) => void;
+}): Promise<BatchPipelineSummary> {
+  const { api, grade, imagePaths, outputDir, format, signal, onProgress } =
+    options;
 
   if (!isWebGL2Supported()) {
     throw new Error("runBatchPipeline: WebGL2 が利用できません");
   }
+
+  const stats: BatchPipelineSummary = { ok: 0, loadFail: 0, writeFail: 0 };
+
+  /**
+   * @description メイン側が中断したとき、ここまでの集計をログに出して打ち切る。
+   */
+  const throwIfAborted = () => {
+    if (!signal?.aborted) return;
+    options.onLog(
+      `中断: 成功 ${stats.ok} / ${imagePaths.length}（読込失敗 ${stats.loadFail}, 書込失敗 ${stats.writeFail}）`,
+    );
+    throw new DOMException("バッチが中断されました", "AbortError");
+  };
 
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
   camera.position.z = 1;
@@ -205,11 +241,25 @@ export async function runBatchPipeline(options: {
 
   try {
     for (let i = 0; i < imagePaths.length; i++) {
+      throwIfAborted();
       const src = imagePaths[i]!;
       const shortName = basename(src);
-      options.onLog(`[${i + 1}/${imagePaths.length}] ${shortName}`);
+      const current = i + 1;
+      options.onLog(`[${current}/${imagePaths.length}] ${shortName}`);
+      onProgress?.({ current, total: imagePaths.length, fileName: shortName });
 
-      const buf = await api.readFileBuffer(src);
+      let buf: Uint8Array;
+      try {
+        buf = await api.readFileBuffer(src);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        options.onLog(`  ERROR read: ${msg}`);
+        stats.loadFail += 1;
+        continue;
+      }
+
+      throwIfAborted();
+
       const mime = mimeForImagePath(src);
       const file = new File([buf as BlobPart], shortName, { type: mime });
 
@@ -219,8 +269,11 @@ export async function runBatchPipeline(options: {
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         options.onLog(`  ERROR load: ${msg}`);
+        stats.loadFail += 1;
         continue;
       }
+
+      throwIfAborted();
 
       const { width, height, texture } = loadResult;
 
@@ -273,15 +326,23 @@ export async function runBatchPipeline(options: {
           data: outBuf,
         });
         options.onLog(`  OK → ${written}`);
+        stats.ok += 1;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         options.onLog(`  ERROR write: ${msg}`);
+        stats.writeFail += 1;
       }
 
       texture.dispose();
     }
+
+    options.onLog(
+      `集計: 成功 ${stats.ok} / ${imagePaths.length}（読込エラー ${stats.loadFail}, 書込エラー ${stats.writeFail}）`,
+    );
   } finally {
     viewport?.dispose();
     renderer.dispose();
   }
+
+  return stats;
 }

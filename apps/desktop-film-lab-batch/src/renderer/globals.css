@@ -223,6 +223,35 @@ body {
   cursor: not-allowed;
 }
 
+/* --- バッチ進捗（Radix トークンのみ） --- */
+
+.fl-batch-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.fl-progress {
+  width: 100%;
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: var(--fl-bg-interactive);
+  overflow: hidden;
+}
+
+.fl-progress-fill {
+  height: 100%;
+  border-radius: 9999px;
+  background: var(--fl-accent);
+  transition: width 0.2s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fl-progress-fill {
+    transition: none;
+  }
+}
+
 /* --- ログ / モノスペース --- */
 
 .fl-log {
