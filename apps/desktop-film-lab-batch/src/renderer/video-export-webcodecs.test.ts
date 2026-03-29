@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  computeDecodeUpperBoundUs,
+  estimateNominalFrameDurationUs,
   WEBCODECS_ACC_EXPORT_MAX_FILE_BYTES,
   isMp4LikeContainerForWebCodecs,
   shouldAttemptWebCodecsAccurateExport,
@@ -43,5 +45,39 @@ describe("video-export-webcodecs", () => {
         videoCodec: "hevc",
       }),
     ).toBe(false);
+  });
+
+  it("estimateNominalFrameDurationUs は probe から frame 時間の rough hint を作る", () => {
+    expect(
+      estimateNominalFrameDurationUs({
+        durationSec: 10,
+        nbSamples: 300,
+      }),
+    ).toBe(33333);
+
+    expect(
+      estimateNominalFrameDurationUs({
+        durationSec: 0,
+        nbSamples: 0,
+      }),
+    ).toBe(Math.round(1_000_000 / 30));
+  });
+
+  it("computeDecodeUpperBoundUs は warmup と平常時で future 側の幅を変える", () => {
+    expect(
+      computeDecodeUpperBoundUs({
+        targetUs: 1_000_000,
+        frameDurationUs: 40_000,
+        hasBufferedFrame: false,
+      }),
+    ).toBe(1_960_000);
+
+    expect(
+      computeDecodeUpperBoundUs({
+        targetUs: 1_000_000,
+        frameDurationUs: 40_000,
+        hasBufferedFrame: true,
+      }),
+    ).toBe(1_320_000);
   });
 });

@@ -640,6 +640,39 @@ export type VideoExportPipelineUserMessages = {
 };
 
 /**
+ * @description WebCodecs 実行中の失敗だけを既存 seek 経路で 1 回だけやり直すための判定。
+ *   ffmpeg や IPC の失敗はここで飲まず、そのまま FATAL にする。
+ */
+export function shouldRetryWithSeekAfterWebCodecsRuntimeFailure(
+  message: string,
+): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("webcodecsmp4exportsession") ||
+    lower.includes("videodecoder") ||
+    lower.includes("drawholdertocanvas")
+  );
+}
+
+/**
+ * @description `<video>` を停止して `src` を外す。seek 経路への再試行時に古いデコーダを残しにくくする。
+ */
+function disposeVideoElement(video: HTMLVideoElement | null): void {
+  if (!video) return;
+  try {
+    video.pause();
+  } catch {
+    /* ignore */
+  }
+  try {
+    video.removeAttribute("src");
+    video.load();
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
  * @description 1 本の動画をグレードして mp4 へ書き出す
  * @param options.api — preload ブリッジ（ffmpeg IPC を含む）
  * @param options.inputVideoPath — ソースの絶対パス
@@ -724,360 +757,435 @@ export async function runVideoExportPipeline(options: {
   );
 
   let stagedPath: string | null = null;
-  let video: HTMLVideoElement | null = null;
-  let pathForFfmpeg: string = inputVideoPath;
-  let webCodecsSession: WebCodecsMp4ExportSession | null = null;
-
   const tryWebCodecs = shouldAttemptWebCodecsAccurateExport({
     videoCodec: probe.videoCodec,
     fileSizeBytes: probe.fileSizeBytes,
     absPath: inputVideoPath,
   });
-
-  if (tryWebCodecs) {
-    try {
-      let fileBytes: Uint8Array;
-      try {
-        fileBytes = await api.readFileBuffer(inputVideoPath);
-      } catch (readErr) {
-        onLog(
-          `[動画][WebCodecs] ソース直接 read 失敗 → ステージング（${readErr instanceof Error ? readErr.message : String(readErr)}）`,
-        );
-        const st = await api.videoExportStageSource(inputVideoPath);
-        stagedPath = st.stagedPath;
-        pathForFfmpeg = st.stagedPath;
-        fileBytes = await api.readFileBuffer(st.stagedPath);
-      }
-      const ab = fileBytes.buffer.slice(
-        fileBytes.byteOffset,
-        fileBytes.byteOffset + fileBytes.byteLength,
-      );
-      webCodecsSession = await WebCodecsMp4ExportSession.create(
-        ab,
-        {
-          width: probe.width,
-          height: probe.height,
-          durationSec: probe.durationSec,
-        },
-        onLog,
-      );
-      onLog(
-        "[動画][WebCodecs] デコード: VideoDecoder + CanvasTexture（HTMLVideoElement シークなし）",
-      );
-    } catch (wcErr) {
-      const detail =
-        wcErr instanceof Error ? wcErr.message : String(wcErr);
-      onLog(`[動画][WebCodecs] 失敗、従来経路へ — ${detail}`);
-      webCodecsSession = null;
-      if (stagedPath) {
-        await api.videoExportUnlinkStaged(stagedPath).catch(() => {});
-        stagedPath = null;
-      }
-      pathForFfmpeg = inputVideoPath;
-    }
-  }
-
-  if (!webCodecsSession) {
-    try {
-      const opened = await openVideoForExport(api, inputVideoPath, onLog);
-      video = opened.video;
-      pathForFfmpeg = opened.pathForFfmpeg;
-      stagedPath = opened.stagedPath;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      return { ok: false, message: msg };
-    }
-    video.pause();
-  }
-
-  const srcTexture: THREE.Texture = webCodecsSession
-    ? webCodecsSession.texture
-    : (() => {
-        const vt = new THREE.VideoTexture(video!);
-        vt.colorSpace = THREE.SRGBColorSpace;
-        vt.minFilter = THREE.LinearFilter;
-        vt.magFilter = THREE.LinearFilter;
-        return vt;
-      })();
-
-  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
-  camera.position.z = 1;
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0a0a0a);
-
-  const renderer = new THREE.WebGLRenderer({
-    antialias: false,
-    alpha: false,
-    preserveDrawingBuffer: true,
-  });
-  renderer.setPixelRatio(1);
-  renderer.setSize(outW, outH, false);
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-
-  const viewport = new Viewport({
-    vertexShader: filmlabVertexShader,
-    fragmentShader: filmlabFragmentShader,
-    width: outW,
-    height: outH,
-  });
-  scene.add(viewport.mesh);
-
-  viewport.setResolution(outW, outH);
-  viewport.setTexture(srcTexture);
-  viewport.setImageResolution(probe.width, probe.height);
-  viewport.setParams({
-    ...grade.params,
-    halationColor: halationHueToHex(grade.params.halationHue),
-  });
-  if (grade.lutData && grade.lutSize > 0) {
-    viewport.setLUT(grade.lutData, grade.lutSize);
-    viewport.setLUTIntensity(grade.lutIntensity);
-  } else {
-    viewport.clearLUT();
-  }
-
-  const gl = renderer.getContext() as WebGL2RenderingContext;
-  const readBuf = new Uint8Array(outW * outH * 4);
-  const flipBuf = new Uint8Array(outW * outH * 4);
   const epsilon = 1 / VIDEO_EXPORT_FPS / 1000;
   const maxT = Math.max(0, probe.durationSec - epsilon);
   const sourceFpsTrusted = probe.sourceFrameRateTrusted === true;
   const sourceFpsValue = probe.sourceFrameRate;
+  const readBuf = new Uint8Array(outW * outH * 4);
+  const flipBuf = new Uint8Array(outW * outH * 4);
+  const maxAttempts = tryWebCodecs ? 2 : 1;
+
   try {
-    let resolvedOutPath: string;
-    try {
-      await api.videoExportAbort().catch(() => {});
-      const startRes = await api.videoExportStart({
-        inputVideoPath: pathForFfmpeg,
-        outputDir,
-        outputFileName: safeOutName,
-        width: outW,
-        height: outH,
-        fps: VIDEO_EXPORT_FPS,
-        hasAudio: probe.hasAudio,
-      });
-      resolvedOutPath = startRes.outputVideoPath;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      return { ok: false, message: `ffmpeg 開始失敗: ${msg}` };
-    }
+    for (let attemptIndex = 0; attemptIndex < maxAttempts; attemptIndex++) {
+      const allowWebCodecs = tryWebCodecs && attemptIndex === 0;
+      let video: HTMLVideoElement | null = null;
+      let pathForFfmpeg = stagedPath ?? inputVideoPath;
+      let webCodecsSession: WebCodecsMp4ExportSession | null = null;
+      let srcTexture: THREE.Texture | null = null;
+      let viewport: Viewport | null = null;
+      let renderer: THREE.WebGLRenderer | null = null;
+      let retryWithSeek = false;
+      let retryReason = "";
 
-    const wallStart = performance.now();
-    const arrSeekWait: number[] = [];
-    const arrDecode: number[] = [];
-    const arrRender: number[] = [];
-    const arrRead: number[] = [];
-    const arrFlip: number[] = [];
-    const arrIpc: number[] = [];
-    const arrTotal: number[] = [];
-    let countSeekedPaths = 0;
-    let countReusedFrames = 0;
-    let countRvfcFrames = 0;
-    let countRafFallbackFrames = 0;
-    let countForwardScans = 0;
-    let lastDecodedSourceFrameIndex: number | null = null;
+      try {
+        if (allowWebCodecs) {
+          try {
+            let fileBytes: Uint8Array;
+            const readSourcePath = stagedPath ?? inputVideoPath;
+            try {
+              fileBytes = await api.readFileBuffer(readSourcePath);
+              pathForFfmpeg = readSourcePath;
+            } catch (readErr) {
+              onLog(
+                `[動画][WebCodecs] ソース直接 read 失敗 → ステージング（${readErr instanceof Error ? readErr.message : String(readErr)}）`,
+              );
+              const st = await api.videoExportStageSource(inputVideoPath);
+              stagedPath = st.stagedPath;
+              pathForFfmpeg = st.stagedPath;
+              fileBytes = await api.readFileBuffer(st.stagedPath);
+            }
+            const ab = fileBytes.buffer.slice(
+              fileBytes.byteOffset,
+              fileBytes.byteOffset + fileBytes.byteLength,
+            );
+            webCodecsSession = await WebCodecsMp4ExportSession.create(
+              ab,
+              {
+                width: probe.width,
+                height: probe.height,
+                durationSec: probe.durationSec,
+              },
+              onLog,
+            );
+            onLog(
+              "[動画][WebCodecs] デコード: VideoDecoder + CanvasTexture（HTMLVideoElement シークなし）",
+            );
+          } catch (wcErr) {
+            const detail =
+              wcErr instanceof Error ? wcErr.message : String(wcErr);
+            onLog(`[動画][WebCodecs] 失敗、従来経路へ — ${detail}`);
+            webCodecsSession = null;
+            pathForFfmpeg = stagedPath ?? inputVideoPath;
+          }
+        } else if (attemptIndex > 0) {
+          onLog(
+            "[動画][WebCodecs] runtime fallback: HTMLVideoElement シーク経路で最初から再試行します",
+          );
+        }
 
-    // Double-buffer for flip output so we can overlap IPC with next seek
-    const flipBufA = flipBuf;
-    const flipBufB = new Uint8Array(outW * outH * 4);
-    let useFlipA = true;
-    let pendingIpc: Promise<void> | null = null;
-    let pendingIpcError: string | null = null;
-
-    for (let i = 0; i < totalFrames; i++) {
-      if (signal?.aborted) {
-        onLog("[動画] ユーザー中断");
-        if (pendingIpc) await pendingIpc.catch(() => {});
-        await api.videoExportAbort();
-        return { ok: false, message: "中断されました" };
-      }
-
-      const t = Math.min(i / VIDEO_EXPORT_FPS, maxT);
-      const tFrame0 = performance.now();
-
-      viewport.setTime(t);
-
-      const targetSourceIdx = computeTargetSourceFrameIndex(
-        t,
-        sourceFpsValue,
-        sourceFpsTrusted,
-      );
-      const reuseFrame = shouldReuseDecodedSourceFrame(
-        lastDecodedSourceFrameIndex,
-        targetSourceIdx,
-      );
-
-      let seekWaitMs = 0;
-      let decodeGateMs = 0;
-
-      if (reuseFrame) {
-        countReusedFrames++;
-        // Still need to await previous IPC before render (to avoid flipBuf overwrite race)
-        if (pendingIpc) {
-          await pendingIpc;
-          pendingIpc = null;
-          if (pendingIpcError) {
-            const msg = pendingIpcError;
-            pendingIpcError = null;
-            onLog(`[動画] フレーム書込エラー: ${msg}`);
-            await api.videoExportAbort();
+        if (!webCodecsSession) {
+          try {
+            const opened = await openVideoForExport(
+              api,
+              stagedPath ?? inputVideoPath,
+              onLog,
+            );
+            video = opened.video;
+            pathForFfmpeg = opened.pathForFfmpeg;
+            if (opened.stagedPath && opened.stagedPath !== stagedPath) {
+              if (stagedPath) {
+                await api.videoExportUnlinkStaged(stagedPath).catch(() => {});
+              }
+              stagedPath = opened.stagedPath;
+            }
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
             return { ok: false, message: msg };
           }
+          video.pause();
         }
-      } else {
-        countSeekedPaths++;
-        // WebCodecs: presentAtMediaTimeSec / 従来: seekToFrame。いずれも前フレーム IPC と Promise.all で重畳。
-        const syncMediaPromise = webCodecsSession
-          ? webCodecsSession.presentAtMediaTimeSec(t).then((r) => ({
-              seekWaitMs: r.advanceMs,
-            }))
-          : seekToFrame(video!, t, {
-              onTrace: onLog,
-              frameIndex: i + 1,
-              timeoutMs: SEEK_TIMEOUT_MS,
-            });
 
+        srcTexture = webCodecsSession
+          ? webCodecsSession.texture
+          : (() => {
+              const vt = new THREE.VideoTexture(video!);
+              vt.colorSpace = THREE.SRGBColorSpace;
+              vt.minFilter = THREE.LinearFilter;
+              vt.magFilter = THREE.LinearFilter;
+              return vt;
+            })();
+
+        const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
+        camera.position.z = 1;
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0a0a);
+
+        renderer = new THREE.WebGLRenderer({
+          antialias: false,
+          alpha: false,
+          preserveDrawingBuffer: true,
+        });
+        renderer.setPixelRatio(1);
+        renderer.setSize(outW, outH, false);
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+        viewport = new Viewport({
+          vertexShader: filmlabVertexShader,
+          fragmentShader: filmlabFragmentShader,
+          width: outW,
+          height: outH,
+        });
+        scene.add(viewport.mesh);
+
+        viewport.setResolution(outW, outH);
+        viewport.setTexture(srcTexture);
+        viewport.setImageResolution(probe.width, probe.height);
+        viewport.setParams({
+          ...grade.params,
+          halationColor: halationHueToHex(grade.params.halationHue),
+        });
+        if (grade.lutData && grade.lutSize > 0) {
+          viewport.setLUT(grade.lutData, grade.lutSize);
+          viewport.setLUTIntensity(grade.lutIntensity);
+        } else {
+          viewport.clearLUT();
+        }
+
+        const gl = renderer.getContext() as WebGL2RenderingContext;
+
+        let resolvedOutPath: string;
         try {
-          const [seekResult] = await Promise.all([
-            syncMediaPromise,
-            pendingIpc
-              ? pendingIpc.then(() => {
-                  pendingIpc = null;
-                  if (pendingIpcError) {
-                    const msg = pendingIpcError;
-                    pendingIpcError = null;
-                    throw new Error(msg);
-                  }
-                })
-              : Promise.resolve(),
-          ]);
-          seekWaitMs = seekResult.seekWaitMs;
-          decodeGateMs = 0;
+          await api.videoExportAbort().catch(() => {});
+          const startRes = await api.videoExportStart({
+            inputVideoPath: pathForFfmpeg,
+            outputDir,
+            outputFileName: safeOutName,
+            width: outW,
+            height: outH,
+            fps: VIDEO_EXPORT_FPS,
+            hasAudio: probe.hasAudio,
+          });
+          resolvedOutPath = startRes.outputVideoPath;
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
-          onLog(`[動画][trace] f=${i + 1}/${totalFrames} 失敗: ${msg}`);
-          await api.videoExportAbort().catch(() => {});
-          return { ok: false, message: msg };
+          return { ok: false, message: `ffmpeg 開始失敗: ${msg}` };
         }
-        if (targetSourceIdx !== null) {
-          lastDecodedSourceFrameIndex = targetSourceIdx;
+
+        const wallStart = performance.now();
+        const arrSeekWait: number[] = [];
+        const arrDecode: number[] = [];
+        const arrRender: number[] = [];
+        const arrRead: number[] = [];
+        const arrFlip: number[] = [];
+        const arrIpc: number[] = [];
+        const arrTotal: number[] = [];
+        let countSeekedPaths = 0;
+        let countReusedFrames = 0;
+        let countRvfcFrames = 0;
+        let countRafFallbackFrames = 0;
+        let countForwardScans = 0;
+        let lastDecodedSourceFrameIndex: number | null = null;
+
+        // Double-buffer for flip output so we can overlap IPC with next seek
+        const flipBufA = flipBuf;
+        const flipBufB = new Uint8Array(outW * outH * 4);
+        let useFlipA = true;
+        let pendingIpc: Promise<void> | null = null;
+        let pendingIpcError: string | null = null;
+
+        /**
+         * @description 直前フレームの非同期 IPC 書込を吸い切り、保持していたエラー文字列を返す。
+         */
+        const drainPendingIpc = async (): Promise<string | null> => {
+          if (pendingIpc) {
+            await pendingIpc.catch(() => {});
+            pendingIpc = null;
+          }
+          const msg = pendingIpcError;
+          pendingIpcError = null;
+          return msg;
+        };
+
+        for (let i = 0; i < totalFrames; i++) {
+          if (signal?.aborted) {
+            onLog("[動画] ユーザー中断");
+            await drainPendingIpc();
+            await api.videoExportAbort();
+            return { ok: false, message: u.userAborted };
+          }
+
+          const t = Math.min(i / VIDEO_EXPORT_FPS, maxT);
+          const tFrame0 = performance.now();
+
+          viewport.setTime(t);
+
+          const targetSourceIdx = computeTargetSourceFrameIndex(
+            t,
+            sourceFpsValue,
+            sourceFpsTrusted,
+          );
+          const reuseFrame = shouldReuseDecodedSourceFrame(
+            lastDecodedSourceFrameIndex,
+            targetSourceIdx,
+          );
+
+          let seekWaitMs = 0;
+          let decodeGateMs = 0;
+
+          if (reuseFrame) {
+            countReusedFrames++;
+            const ipcErr = await drainPendingIpc();
+            if (ipcErr) {
+              onLog(`[動画] フレーム書込エラー: ${ipcErr}`);
+              await api.videoExportAbort();
+              return { ok: false, message: ipcErr };
+            }
+          } else {
+            countSeekedPaths++;
+            // WebCodecs: presentAtMediaTimeSec / 従来: seekToFrame。いずれも前フレーム IPC と Promise.all で重畳。
+            const syncMediaPromise = webCodecsSession
+              ? (async () => {
+                  const tracePipe =
+                    VIDEO_EXPORT_LOG_EVERY_FRAME &&
+                    (i < 6 || i % 200 === 0 || i + 1 === totalFrames);
+                  if (tracePipe) {
+                    onLog(
+                      `[動画][WebCodecs][trace] pipeline f=${i + 1}/${totalFrames} BEFORE presentAtMediaTimeSec t=${t.toFixed(6)}s ipcWait=${pendingIpc ? "yes" : "no"}`,
+                    );
+                  }
+                  const r = await webCodecsSession.presentAtMediaTimeSec(t);
+                  if (tracePipe) {
+                    onLog(
+                      `[動画][WebCodecs][trace] pipeline f=${i + 1} AFTER presentAtMediaTimeSec advanceMs=${r.advanceMs.toFixed(1)}`,
+                    );
+                  }
+                  return { seekWaitMs: r.advanceMs };
+                })()
+              : seekToFrame(video!, t, {
+                  onTrace: onLog,
+                  frameIndex: i + 1,
+                  timeoutMs: SEEK_TIMEOUT_MS,
+                });
+
+            try {
+              const [seekResult] = await Promise.all([
+                syncMediaPromise,
+                pendingIpc
+                  ? pendingIpc.then(() => {
+                      pendingIpc = null;
+                      if (pendingIpcError) {
+                        const msg = pendingIpcError;
+                        pendingIpcError = null;
+                        throw new Error(msg);
+                      }
+                    })
+                  : Promise.resolve(),
+              ]);
+              seekWaitMs = seekResult.seekWaitMs;
+              decodeGateMs = 0;
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : String(e);
+              onLog(`[動画][trace] f=${i + 1}/${totalFrames} 失敗: ${msg}`);
+              const ipcErr = await drainPendingIpc();
+              if (ipcErr) {
+                onLog(`[動画] フレーム書込エラー: ${ipcErr}`);
+                await api.videoExportAbort().catch(() => {});
+                return { ok: false, message: ipcErr };
+              }
+              if (
+                allowWebCodecs &&
+                webCodecsSession &&
+                shouldRetryWithSeekAfterWebCodecsRuntimeFailure(msg)
+              ) {
+                retryWithSeek = true;
+                retryReason = msg;
+                await api.videoExportAbort().catch(() => {});
+                break;
+              }
+              await api.videoExportAbort().catch(() => {});
+              return { ok: false, message: msg };
+            }
+            if (targetSourceIdx !== null) {
+              lastDecodedSourceFrameIndex = targetSourceIdx;
+            }
+          }
+
+          if (retryWithSeek) {
+            break;
+          }
+
+          arrSeekWait.push(seekWaitMs);
+          arrDecode.push(decodeGateMs);
+
+          if (webCodecsSession) {
+            if (!reuseFrame) {
+              srcTexture.needsUpdate = true;
+            }
+          } else {
+            // VideoTexture: Three.js が colorSpace + UNPACK_FLIP_Y でアップロード
+            srcTexture.needsUpdate = true;
+          }
+
+          const tR0 = performance.now();
+          viewport.render(renderer, scene, camera);
+          const renderMs = performance.now() - tR0;
+          arrRender.push(renderMs);
+
+          const tP0 = performance.now();
+          gl.readPixels(0, 0, outW, outH, gl.RGBA, gl.UNSIGNED_BYTE, readBuf);
+          const readPxMs = performance.now() - tP0;
+          arrRead.push(readPxMs);
+
+          const currentFlipBuf = useFlipA ? flipBufA : flipBufB;
+          useFlipA = !useFlipA;
+
+          const tF0 = performance.now();
+          flipRgbaVerticalInto(readBuf, outW, outH, currentFlipBuf);
+          const flipMs = performance.now() - tF0;
+          arrFlip.push(flipMs);
+
+          // Fire IPC write and DON'T await — it runs in parallel with next frame's seek.
+          // The pipelined main-side handler returns quickly (no drain wait).
+          const tW0 = performance.now();
+          pendingIpc = api.videoExportWriteFrame(currentFlipBuf).then(
+            () => {
+              const ipcMs = performance.now() - tW0;
+              arrIpc.push(ipcMs);
+            },
+            (e: unknown) => {
+              const ipcMs = performance.now() - tW0;
+              arrIpc.push(ipcMs);
+              pendingIpcError = e instanceof Error ? e.message : String(e);
+            },
+          );
+
+          const totalMs = performance.now() - tFrame0;
+          arrTotal.push(totalMs);
+          const summary =
+            `[動画][trace] f=${i + 1}/${totalFrames} t=${t.toFixed(4)}s ` +
+            `reuse=${reuseFrame ? "Y" : "N"} seekWait=${seekWaitMs.toFixed(0)}ms decode=${decodeGateMs.toFixed(0)}ms ` +
+            `render=${renderMs.toFixed(0)}ms readPx=${readPxMs.toFixed(0)}ms ` +
+            `flip=${flipMs.toFixed(0)}ms ipc=async total=${totalMs.toFixed(0)}ms ` +
+            `| ${video ? videoDebugSnapshot(video) : "[WebCodecs]"}`;
+
+          if (VIDEO_EXPORT_LOG_EVERY_FRAME) {
+            onLog(summary);
+          } else if (
+            totalMs > 1500 ||
+            i % VIDEO_EXPORT_FPS === 0 ||
+            i === 0 ||
+            i === totalFrames - 1
+          ) {
+            onLog(summary);
+          }
+
+          onProgress?.({ currentFrame: i + 1, totalFrames });
         }
-      }
 
-      arrSeekWait.push(seekWaitMs);
-      arrDecode.push(decodeGateMs);
-
-      if (webCodecsSession) {
-        if (!reuseFrame) {
-          srcTexture.needsUpdate = true;
+        if (retryWithSeek) {
+          onLog(
+            `[動画][WebCodecs] 実行中に失敗したため、従来のシーク経路で最初から再試行します — ${retryReason}`,
+          );
+          continue;
         }
-      } else {
-        // VideoTexture: Three.js が colorSpace + UNPACK_FLIP_Y でアップロード
-        srcTexture.needsUpdate = true;
+
+        const finalIpcError = await drainPendingIpc();
+        if (finalIpcError) {
+          onLog(`[動画] フレーム書込エラー: ${finalIpcError}`);
+          await api.videoExportAbort();
+          return { ok: false, message: finalIpcError };
+        }
+
+        const wallMs = performance.now() - wallStart;
+        const mean = (a: number[]) =>
+          a.length === 0 ? 0 : a.reduce((x, y) => x + y, 0) / a.length;
+        onLog(
+          `[動画][profile] wall=${wallMs.toFixed(0)}ms frames=${totalFrames} ` +
+            `seekedFrames=${countSeekedPaths} reusedFrames=${countReusedFrames} forwardScans=${countForwardScans} rvfcFrames=${countRvfcFrames} rafFallbackFrames=${countRafFallbackFrames}\n` +
+            `  seekWait ms mean=${mean(arrSeekWait).toFixed(1)} median=${medianMs(arrSeekWait).toFixed(1)} p95=${p95Ms(arrSeekWait).toFixed(1)}\n` +
+            `  decodeGate ms mean=${mean(arrDecode).toFixed(1)} median=${medianMs(arrDecode).toFixed(1)} p95=${p95Ms(arrDecode).toFixed(1)}\n` +
+            `  render ms mean=${mean(arrRender).toFixed(1)} median=${medianMs(arrRender).toFixed(1)} p95=${p95Ms(arrRender).toFixed(1)}\n` +
+            `  readPixels ms mean=${mean(arrRead).toFixed(1)} median=${medianMs(arrRead).toFixed(1)} p95=${p95Ms(arrRead).toFixed(1)}\n` +
+            `  flip ms mean=${mean(arrFlip).toFixed(1)} median=${medianMs(arrFlip).toFixed(1)} p95=${p95Ms(arrFlip).toFixed(1)}\n` +
+            `  ipcWrite ms mean=${mean(arrIpc).toFixed(1)} median=${medianMs(arrIpc).toFixed(1)} p95=${p95Ms(arrIpc).toFixed(1)}\n` +
+            `  frameTotal ms mean=${mean(arrTotal).toFixed(1)} median=${medianMs(arrTotal).toFixed(1)} p95=${p95Ms(arrTotal).toFixed(1)}`,
+        );
+
+        const fin = await api.videoExportFinish();
+        if (fin.code !== 0) {
+          onLog(`[動画] ffmpeg 終了コード ${fin.code}`);
+          if (fin.stderrTail) onLog(fin.stderrTail);
+          return {
+            ok: false,
+            message: `ffmpeg 失敗 code=${fin.code}`,
+          };
+        }
+        onLog(`[動画] 完了 → ${resolvedOutPath}`);
+        return { ok: true };
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        onLog(`[動画] FATAL: ${msg}`);
+        await api.videoExportAbort().catch(() => {});
+        return { ok: false, message: msg };
+      } finally {
+        webCodecsSession?.dispose();
+        srcTexture?.dispose();
+        viewport?.dispose();
+        renderer?.dispose();
+        disposeVideoElement(video);
       }
-
-      const tR0 = performance.now();
-      viewport.render(renderer, scene, camera);
-      const renderMs = performance.now() - tR0;
-      arrRender.push(renderMs);
-
-      const tP0 = performance.now();
-      gl.readPixels(0, 0, outW, outH, gl.RGBA, gl.UNSIGNED_BYTE, readBuf);
-      const readPxMs = performance.now() - tP0;
-      arrRead.push(readPxMs);
-
-      const currentFlipBuf = useFlipA ? flipBufA : flipBufB;
-      useFlipA = !useFlipA;
-
-      const tF0 = performance.now();
-      flipRgbaVerticalInto(readBuf, outW, outH, currentFlipBuf);
-      const flipMs = performance.now() - tF0;
-      arrFlip.push(flipMs);
-
-      // Fire IPC write and DON'T await — it runs in parallel with next frame's seek.
-      // The pipelined main-side handler returns quickly (no drain wait).
-      const tW0 = performance.now();
-      pendingIpc = api.videoExportWriteFrame(currentFlipBuf).then(
-        () => {
-          const ipcMs = performance.now() - tW0;
-          arrIpc.push(ipcMs);
-        },
-        (e: unknown) => {
-          const ipcMs = performance.now() - tW0;
-          arrIpc.push(ipcMs);
-          pendingIpcError = e instanceof Error ? e.message : String(e);
-        },
-      );
-
-      const totalMs = performance.now() - tFrame0;
-      arrTotal.push(totalMs);
-      const summary =
-        `[動画][trace] f=${i + 1}/${totalFrames} t=${t.toFixed(4)}s ` +
-        `reuse=${reuseFrame ? "Y" : "N"} seekWait=${seekWaitMs.toFixed(0)}ms decode=${decodeGateMs.toFixed(0)}ms ` +
-        `render=${renderMs.toFixed(0)}ms readPx=${readPxMs.toFixed(0)}ms ` +
-        `flip=${flipMs.toFixed(0)}ms ipc=async total=${totalMs.toFixed(0)}ms ` +
-        `| ${video ? videoDebugSnapshot(video) : "[WebCodecs]"}`;
-
-      if (VIDEO_EXPORT_LOG_EVERY_FRAME) {
-        onLog(summary);
-      } else if (
-        totalMs > 1500 ||
-        i % VIDEO_EXPORT_FPS === 0 ||
-        i === 0 ||
-        i === totalFrames - 1
-      ) {
-        onLog(summary);
-      }
-
-      onProgress?.({ currentFrame: i + 1, totalFrames });
     }
 
-    // Await final pending IPC write
-    if (pendingIpc) {
-      await pendingIpc;
-      if (pendingIpcError) {
-        onLog(`[動画] フレーム書込エラー: ${pendingIpcError}`);
-        await api.videoExportAbort();
-        return { ok: false, message: pendingIpcError };
-      }
-    }
-
-    const wallMs = performance.now() - wallStart;
-    const mean = (a: number[]) =>
-      a.length === 0 ? 0 : a.reduce((x, y) => x + y, 0) / a.length;
-    onLog(
-      `[動画][profile] wall=${wallMs.toFixed(0)}ms frames=${totalFrames} ` +
-        `seekedFrames=${countSeekedPaths} reusedFrames=${countReusedFrames} forwardScans=${countForwardScans} rvfcFrames=${countRvfcFrames} rafFallbackFrames=${countRafFallbackFrames}\n` +
-        `  seekWait ms mean=${mean(arrSeekWait).toFixed(1)} median=${medianMs(arrSeekWait).toFixed(1)} p95=${p95Ms(arrSeekWait).toFixed(1)}\n` +
-        `  decodeGate ms mean=${mean(arrDecode).toFixed(1)} median=${medianMs(arrDecode).toFixed(1)} p95=${p95Ms(arrDecode).toFixed(1)}\n` +
-        `  render ms mean=${mean(arrRender).toFixed(1)} median=${medianMs(arrRender).toFixed(1)} p95=${p95Ms(arrRender).toFixed(1)}\n` +
-        `  readPixels ms mean=${mean(arrRead).toFixed(1)} median=${medianMs(arrRead).toFixed(1)} p95=${p95Ms(arrRead).toFixed(1)}\n` +
-        `  flip ms mean=${mean(arrFlip).toFixed(1)} median=${medianMs(arrFlip).toFixed(1)} p95=${p95Ms(arrFlip).toFixed(1)}\n` +
-        `  ipcWrite ms mean=${mean(arrIpc).toFixed(1)} median=${medianMs(arrIpc).toFixed(1)} p95=${p95Ms(arrIpc).toFixed(1)}\n` +
-        `  frameTotal ms mean=${mean(arrTotal).toFixed(1)} median=${medianMs(arrTotal).toFixed(1)} p95=${p95Ms(arrTotal).toFixed(1)}`,
-    );
-
-    const fin = await api.videoExportFinish();
-    if (fin.code !== 0) {
-      onLog(`[動画] ffmpeg 終了コード ${fin.code}`);
-      if (fin.stderrTail) onLog(fin.stderrTail);
-      return {
-        ok: false,
-        message: `ffmpeg 失敗 code=${fin.code}`,
-      };
-    }
-    onLog(`[動画] 完了 → ${resolvedOutPath}`);
-    return { ok: true };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    onLog(`[動画] FATAL: ${msg}`);
-    await api.videoExportAbort().catch(() => {});
-    return { ok: false, message: msg };
+    return {
+      ok: false,
+      message: "WebCodecs の実行時フォールバック後も書き出しを完了できませんでした",
+    };
   } finally {
-    webCodecsSession?.dispose();
-    srcTexture.dispose();
-    viewport.dispose();
-    renderer.dispose();
     if (stagedPath) {
       await api.videoExportUnlinkStaged(stagedPath).catch(() => {});
     }

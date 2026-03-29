@@ -117,6 +117,41 @@ const DEBUG_VIDEO_EXPORT_MAIN =
   process.env.FILM_LAB_DEBUG_VIDEO_EXPORT === "true";
 
 /**
+ * @description main がいま把握している動画書き出しフェーズ。黒画面やクラッシュの時刻と付き合わせる。
+ */
+function currentVideoExportPhase(): string {
+  if (activeVideoExport !== null) {
+    return "rawvideo";
+  }
+  if (activeFastTranscodeChild !== null) {
+    return "fast-transcode";
+  }
+  return "idle";
+}
+
+/**
+ * @description Electron の details オブジェクトを 1 行 JSON にする。循環参照でも落ちないようにする。
+ */
+function safeDesktopDebugJson(value: unknown): string {
+  try {
+    return JSON.stringify(value);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return `[unserializable:${msg}]`;
+  }
+}
+
+/**
+ * @description process / Electron / export phase の共通コンテキスト。異常時ログに毎回付ける。
+ */
+function desktopProcessContext(): string {
+  return (
+    `platform=${process.platform} electron=${process.versions.electron} ` +
+    `chrome=${process.versions.chrome} pid=${process.pid} export=${currentVideoExportPhase()}`
+  );
+}
+
+/**
  * @description build 済み Desktop を自動起動し、Smart Look UI が pending のまま hidden かを確認して終了する。
  */
 const DESKTOP_SMOKE_PENDING =
@@ -538,6 +573,22 @@ function createWindow(): BrowserWindow {
     }
   });
 
+  win.webContents.on("render-process-gone", (_event, details) => {
+    console.error(
+      `[film-lab-desktop] render-process-gone wcId=${win.webContents.id} ${desktopProcessContext()} details=${safeDesktopDebugJson(details)}`,
+    );
+  });
+  win.webContents.on("unresponsive", () => {
+    console.warn(
+      `[film-lab-desktop] renderer-unresponsive wcId=${win.webContents.id} ${desktopProcessContext()}`,
+    );
+  });
+  win.webContents.on("responsive", () => {
+    console.log(
+      `[film-lab-desktop] renderer-responsive wcId=${win.webContents.id} ${desktopProcessContext()}`,
+    );
+  });
+
   if (rendererHotReloadUrl.length > 0) {
     void win.loadURL(rendererHotReloadUrl);
     // win.webContents.openDevTools();
@@ -733,6 +784,12 @@ app.whenReady().then(() => {
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+app.on("child-process-gone", (_event, details) => {
+  console.error(
+    `[film-lab-desktop] child-process-gone ${desktopProcessContext()} details=${safeDesktopDebugJson(details)}`,
+  );
 });
 
 app.on("window-all-closed", () => {
