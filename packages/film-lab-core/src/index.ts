@@ -21,6 +21,10 @@ export {
 } from "./schema";
 export { parseCube, type CubeLUT } from "./cube-parser";
 export {
+  packCubeLutToFloatRgbaGrid,
+  type PackedCubeLut2D,
+} from "./lut-pack-2d";
+export {
   filmLookSpikeDefaultProps,
   filmLookGradeDefaultProps,
   createDefaultFilmLookGradeProps,

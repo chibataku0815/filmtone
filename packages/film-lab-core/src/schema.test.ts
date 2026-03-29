@@ -35,4 +35,37 @@ describe("filmLookGradeInputSchema", () => {
     });
     expect(r.success).toBe(false);
   });
+
+  test("optional LUT フィールドなしでも受理する", () => {
+    const r = filmLookGradeInputSchema.safeParse({
+      lookPresetId: LOOK_ID_BY_PRESET.portra,
+      presetVersion: PRESET_VERSION,
+      grade: PRESETS.portra,
+    });
+    expect(r.success).toBe(true);
+  });
+
+  test("LUT 相対パス・強度を付けて受理する", () => {
+    const r = filmLookGradeInputSchema.safeParse({
+      lookPresetId: LOOK_ID_BY_PRESET.portra,
+      presetVersion: PRESET_VERSION,
+      grade: PRESETS.portra,
+      lutCubeRelPath: "luts/warm-cinematic.cube",
+      lutEnabled: true,
+      lutIntensity: 0.85,
+    });
+    expect(r.success).toBe(true);
+  });
+
+  test("動画ソースパスと解像度を付けて受理する", () => {
+    const r = filmLookGradeInputSchema.safeParse({
+      lookPresetId: LOOK_ID_BY_PRESET.portra,
+      presetVersion: PRESET_VERSION,
+      grade: PRESETS.portra,
+      gradeSourceVideoRelPath: "videos/IMG_0513.MOV",
+      gradeSourceVideoWidth: 3840,
+      gradeSourceVideoHeight: 2160,
+    });
+    expect(r.success).toBe(true);
+  });
 });

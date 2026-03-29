@@ -329,7 +329,25 @@ var filmLabParamsSchema = z.object(paramShape);
 var filmLookGradeInputSchema = z.object({
   lookPresetId: z.string().min(1),
   presetVersion: z.literal(PRESET_VERSION),
-  grade: filmLabParamsSchema
+  grade: filmLabParamsSchema,
+  /**
+   * Remotion `public/` からの相対パス（例: `luts/warm-cinematic.cube`）。
+   * 未指定のときは LUT をかけない。
+   */
+  lutCubeRelPath: z.string().min(1).optional(),
+  /** `false` のとき `lutCubeRelPath` があっても LUT を無効化する。未指定は `true` 扱い。 */
+  lutEnabled: z.boolean().optional(),
+  /** ブラウザ Film Lab の `uLUTIntensity` に相当（0〜1）。未指定は `1`。 */
+  lutIntensity: z.number().min(0).max(1).optional(),
+  /**
+   * Remotion `public/` 内の動画（.mov / .mp4 等）。
+   * 指定時は `film-lab-default.jpg` の代わりにフレームをテクスチャに焼く（`@remotion/media`）。
+   */
+  gradeSourceVideoRelPath: z.string().min(1).optional(),
+  /** 動画の実ピクセル幅（アスペクト・cover 用）。未指定は 3840（4K 横想定）。 */
+  gradeSourceVideoWidth: z.number().int().positive().max(7680).optional(),
+  /** 動画の実ピクセル高さ。未指定は 2160。 */
+  gradeSourceVideoHeight: z.number().int().positive().max(4320).optional()
 });
 var filmLookSpikeInputSchema = z.object({
   title: z.string().min(1)
@@ -390,6 +408,31 @@ function parseCube(text) {
   return { title, size, domainMin, domainMax, data };
 }
 
+// src/lut-pack-2d.ts
+function packCubeLutToFloatRgbaGrid(lut) {
+  const n = lut.size;
+  const width = n * n;
+  const height = n;
+  const data = new Float32Array(width * height * 4);
+  const src = lut.data;
+  for (let b = 0; b < n; b++) {
+    for (let g = 0; g < n; g++) {
+      for (let r = 0; r < n; r++) {
+        const idx = r + n * g + n * n * b;
+        const sx = idx * 4;
+        const x = r + g * n;
+        const y = b;
+        const dst = (y * width + x) * 4;
+        data[dst] = src[sx] ?? 0;
+        data[dst + 1] = src[sx + 1] ?? 0;
+        data[dst + 2] = src[sx + 2] ?? 0;
+        data[dst + 3] = src[sx + 3] ?? 1;
+      }
+    }
+  }
+  return { width, height, size: n, data };
+}
+
 // src/defaults.ts
 var filmLookSpikeDefaultProps = {
   title: "Film Lab \xD7 Remotion"
@@ -424,5 +467,6 @@ export {
   hslToRgb01,
   lookIdForPreset,
   nearestHueDegreesToDirection,
+  packCubeLutToFloatRgbaGrid,
   parseCube
 };

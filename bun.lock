@@ -12,6 +12,7 @@
         "@react-three/drei": "^10.7.7",
         "@react-three/fiber": "^9.4.2",
         "@remotion/cli": "^4.0.340",
+        "@remotion/media": "^4.0.441",
         "@remotion/three": "^4.0.340",
         "@types/three": "^0.181.0",
         "film-lab-core": "workspace:*",
@@ -428,6 +429,8 @@
     "@remotion/compositor-win32-x64-msvc": ["@remotion/compositor-win32-x64-msvc@4.0.441", "", { "os": "win32", "cpu": "x64" }, "sha512-FbUVBFrNoAKxKKPEk9X0oriHQcOnxZqEUXpjhOFnH+Ndq8ro61LCK8RCC7g1hmrwKm66k46ROyHNz+CjaGXc3g=="],
 
     "@remotion/licensing": ["@remotion/licensing@4.0.441", "", {}, "sha512-wXeqlXVy9Cstv7m2DR5OPsVCj14nKTNx5/JO/pFoPRi4P5KVE2U9pb2P5Jk4WVKvKWbQTk2fbL+lkOM8vyXXNQ=="],
+
+    "@remotion/media": ["@remotion/media@4.0.441", "", { "dependencies": { "mediabunny": "1.39.2", "remotion": "4.0.441", "zod": "4.3.6" }, "peerDependencies": { "react": ">=16.8.0", "react-dom": ">=16.8.0" } }, "sha512-PtQrWZJR6i8h/EXfX0ezREGsGfXLVuXdsodsjjAMmyTWnam2240Y7mGpv3jh97mTynqdva6fQ42MUzBgH7nzSA=="],
 
     "@remotion/media-parser": ["@remotion/media-parser@4.0.441", "", {}, "sha512-yrx6S34y/NX724Lz9jX5RKT09FdJaI6S39bTq/aEUkBc0VzeGnQXkkFrKABTG+JNPoASdk6ILTGqOHWBM0W1qQ=="],
 

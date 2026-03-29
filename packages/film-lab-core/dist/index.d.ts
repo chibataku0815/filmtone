@@ -317,6 +317,12 @@ declare const filmLookGradeInputSchema: z.ZodObject<{
         shadowHue: z.ZodNumber;
         highlightHue: z.ZodNumber;
     }, z.core.$strip>;
+    lutCubeRelPath: z.ZodOptional<z.ZodString>;
+    lutEnabled: z.ZodOptional<z.ZodBoolean>;
+    lutIntensity: z.ZodOptional<z.ZodNumber>;
+    gradeSourceVideoRelPath: z.ZodOptional<z.ZodString>;
+    gradeSourceVideoWidth: z.ZodOptional<z.ZodNumber>;
+    gradeSourceVideoHeight: z.ZodOptional<z.ZodNumber>;
 }, z.core.$strip>;
 type FilmLookGradeInputProps = z.infer<typeof filmLookGradeInputSchema>;
 /**
@@ -343,6 +349,39 @@ interface CubeLUT {
     data: Float32Array;
 }
 declare function parseCube(text: string): CubeLUT;
+
+/**
+ * @fileoverview .cube（3D LUT）を WebGL1 / GLSL100 向けの **2D テクスチャ**に並べ替える。
+ *
+ * 主な仕様:
+ * - `parseCube` が返す `data` は「赤が最も速く動く」標準 .cube 順（index = r + N·g + N²·b）とみなす。
+ * - 出力は幅 N²・高さ N のグリッド。ピクセル (x,y) = (r + g·N, b) に lut(r,g,b) を置く。
+ * - Remotion のヘッドレス環境では `sampler3D` が使えないことが多いため、このパック＋シェーダ側トリリニアで代替する。
+ *
+ * 制限事項:
+ * - DOMAIN_MIN / DOMAIN_MAX が 0〜1 以外の .cube は、シェーダ側で別途リマップが必要（現状は 0〜1 前提）。
+ */
+
+/**
+ * 2D テクスチャ用の RGBA Float32 グリッド（Three.js `DataTexture` にそのまま渡せる）。
+ */
+interface PackedCubeLut2D {
+    /** テクスチャ幅（= N²） */
+    width: number;
+    /** テクスチャ高さ（= N） */
+    height: number;
+    /** 1 次元 LUT サイズ N（例: 17） */
+    size: number;
+    /** 長さ width·height·4 の RGBA 浮動小数点データ */
+    data: Float32Array;
+}
+/**
+ * 3D LUT を 2D にパックする（WebGL1 互換の LUT サンプリング用）。
+ *
+ * @param {CubeLUT} lut - `parseCube` の結果
+ * @returns {PackedCubeLut2D} RGBAFloat のグリッド
+ */
+declare function packCubeLutToFloatRgbaGrid(lut: CubeLUT): PackedCubeLut2D;
 
 /** Remotion FilmLookSpike の defaultProps */
 declare const filmLookSpikeDefaultProps: FilmLookSpikeInputProps;
@@ -388,4 +427,4 @@ declare const LEGACY_SHADOW_TONE_MAGNITUDE: number;
 /** 旧ハイライト側のノルム */
 declare const LEGACY_HIGHLIGHT_TONE_MAGNITUDE: number;
 
-export { type CubeLUT, FILM_LAB_DEFAULT_HIGHLIGHT_HUE, FILM_LAB_DEFAULT_SHADOW_HUE, type FilmLabParamsValidated, type FilmLookGradeInputProps, type FilmLookSpikeInputProps, LEGACY_HIGHLIGHT_TONE_MAGNITUDE, LEGACY_SHADOW_TONE_MAGNITUDE, LOOK_ID_BY_PRESET, PARAM_KEYS, PRESETS, PRESET_VERSION, type ParamKey, type Params, type PresetName, chromaUnitFromHueDegrees, cloneParams, createDefaultFilmLookGradeProps, filmLabParamsSchema, filmLookGradeDefaultProps, filmLookGradeInputSchema, filmLookSpikeDefaultProps, filmLookSpikeInputSchema, gradeMatchesPreset, hslToRgb01, lookIdForPreset, nearestHueDegreesToDirection, parseCube };
+export { type CubeLUT, FILM_LAB_DEFAULT_HIGHLIGHT_HUE, FILM_LAB_DEFAULT_SHADOW_HUE, type FilmLabParamsValidated, type FilmLookGradeInputProps, type FilmLookSpikeInputProps, LEGACY_HIGHLIGHT_TONE_MAGNITUDE, LEGACY_SHADOW_TONE_MAGNITUDE, LOOK_ID_BY_PRESET, PARAM_KEYS, PRESETS, PRESET_VERSION, type PackedCubeLut2D, type ParamKey, type Params, type PresetName, chromaUnitFromHueDegrees, cloneParams, createDefaultFilmLookGradeProps, filmLabParamsSchema, filmLookGradeDefaultProps, filmLookGradeInputSchema, filmLookSpikeDefaultProps, filmLookSpikeInputSchema, gradeMatchesPreset, hslToRgb01, lookIdForPreset, nearestHueDegreesToDirection, packCubeLutToFloatRgbaGrid, parseCube };

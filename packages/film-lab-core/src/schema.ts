@@ -21,6 +21,24 @@ export const filmLookGradeInputSchema = z.object({
   lookPresetId: z.string().min(1),
   presetVersion: z.literal(PRESET_VERSION),
   grade: filmLabParamsSchema,
+  /**
+   * Remotion `public/` からの相対パス（例: `luts/warm-cinematic.cube`）。
+   * 未指定のときは LUT をかけない。
+   */
+  lutCubeRelPath: z.string().min(1).optional(),
+  /** `false` のとき `lutCubeRelPath` があっても LUT を無効化する。未指定は `true` 扱い。 */
+  lutEnabled: z.boolean().optional(),
+  /** ブラウザ Film Lab の `uLUTIntensity` に相当（0〜1）。未指定は `1`。 */
+  lutIntensity: z.number().min(0).max(1).optional(),
+  /**
+   * Remotion `public/` 内の動画（.mov / .mp4 等）。
+   * 指定時は `film-lab-default.jpg` の代わりにフレームをテクスチャに焼く（`@remotion/media`）。
+   */
+  gradeSourceVideoRelPath: z.string().min(1).optional(),
+  /** 動画の実ピクセル幅（アスペクト・cover 用）。未指定は 3840（4K 横想定）。 */
+  gradeSourceVideoWidth: z.number().int().positive().max(7680).optional(),
+  /** 動画の実ピクセル高さ。未指定は 2160。 */
+  gradeSourceVideoHeight: z.number().int().positive().max(4320).optional(),
 });
 
 export type FilmLookGradeInputProps = z.infer<typeof filmLookGradeInputSchema>;
