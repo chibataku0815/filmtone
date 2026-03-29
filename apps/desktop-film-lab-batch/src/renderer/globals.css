@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "@radix-ui/colors/slate-dark.css";
 @import "@radix-ui/colors/amber-dark.css";
+@import "@radix-ui/colors/blue-dark.css";
 
 @source "../../../web/src/features/interactive/film-lab";
 @source "../../../web/src/shared/gl";
@@ -40,6 +41,17 @@ html.dark.dark-theme {
   --fl-focus-ring: color-mix(in srgb, var(--amber-9) 45%, transparent);
 
   --font-family-sans: system-ui, "Hiragino Sans", "Meiryo", sans-serif;
+
+  /**
+   * @description クローム帯の弱いマテリアル（すりガラス風）。全面透明は避け、ほぼ不透明のスクリム＋軽い blur。
+   * prefers-reduced-transparency では blur を切って既存ソリッドに戻す。
+   */
+  --fl-frost-blur: 12px;
+
+  /**
+   * @description ルートで dark を宣言し、Chromium / Electron のスクロールバーがライト(UI 白トラック)に戻るのを防ぐ。
+   */
+  color-scheme: dark;
 }
 
 body {
@@ -48,6 +60,7 @@ body {
   color: var(--fl-text-primary);
   font-family: var(--font-family-sans);
   -webkit-font-smoothing: antialiased;
+  color-scheme: dark;
 }
 
 /* --- レイアウト: カード / セクション（Radix の段差＝スケールの階層） --- */
@@ -55,6 +68,51 @@ body {
 .film-lab-desktop-root {
   background: var(--fl-bg-app);
   color: var(--fl-text-primary);
+  /**
+   * @description スクロールバーを OS ライトテーマ風にしない（Electron / Chromium の可読性）。
+   */
+  color-scheme: dark;
+}
+
+/**
+ * @description メインスクロール領域用。既定の白トラックではなく slate 系の細バー（WebKit + Firefox）。
+ * @limitations `*` よりスクロールが発生するノードだけに付与する（パフォーマンスと意図の明確化）。
+ */
+.fl-scroll-surface {
+  color-scheme: dark;
+  scrollbar-width: thin;
+  scrollbar-color: var(--fl-border-strong) var(--fl-bg-subtle);
+}
+
+/**
+ * @description WebKit / Electron: `::-webkit-scrollbar` 本体に地色を付けないと、トラックが白く見えることがある。
+ * `appearance: none` でネイティブのライト帯を剥がし、Radix の slate トークンで統一する。
+ */
+.fl-scroll-surface::-webkit-scrollbar {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 9px;
+  height: 9px;
+  background-color: var(--fl-bg-subtle);
+}
+
+.fl-scroll-surface::-webkit-scrollbar-track {
+  background-color: var(--fl-bg-subtle);
+  border-radius: 999px;
+}
+
+.fl-scroll-surface::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--fl-border-strong) 88%, var(--slate-11));
+  border-radius: 999px;
+  border: 2px solid var(--fl-bg-subtle);
+}
+
+.fl-scroll-surface::-webkit-scrollbar-thumb:hover {
+  background-color: var(--fl-border-strong);
+}
+
+.fl-scroll-surface::-webkit-scrollbar-corner {
+  background-color: var(--fl-bg-subtle);
 }
 
 /**
@@ -67,6 +125,24 @@ body {
   width: 100%;
   max-width: none;
   padding: 1rem;
+}
+
+/**
+ * @description 書き出しタブのメイン列。ルート（slate-1）より一段オクの地色にして、frost カードの奥行きが分かりやすくなる。
+ */
+.fl-main-batch {
+  background: var(--fl-bg-subtle);
+}
+
+/**
+ * @description 書き出しタブ上部の「次の一手」1 行帯。琥珀のソリッド全面をやめ、左アクセント＋ニュートラル地で情報密度とトーンを抑える。
+ * @limitations 子要素は BatchTabPanel 側の Flex。コントラストは本文色と琥珀のインセットのみ。
+ */
+.fl-export-next-strip {
+  border-radius: 0.375rem;
+  border: 1px solid var(--fl-border-subtle);
+  background: var(--fl-bg-subtle);
+  box-shadow: inset 3px 0 0 0 var(--amber-9);
 }
 
 @media (min-width: 640px) {
@@ -90,6 +166,26 @@ body {
   background: var(--fl-bg-subtle);
   border-color: var(--fl-border-subtle);
   box-shadow: none;
+}
+
+/**
+ * @description 書き出しカードなど「一段上」のパネル用。編集タブのプレビュー枠（canvas 入り）は付けない。
+ */
+.fl-card.fl-card--frost {
+  background: color-mix(in srgb, var(--fl-bg-raised) 88%, transparent);
+  border-color: color-mix(in srgb, var(--fl-border-default) 70%, transparent);
+  backdrop-filter: blur(var(--fl-frost-blur)) saturate(1.06);
+  -webkit-backdrop-filter: blur(var(--fl-frost-blur)) saturate(1.06);
+  box-shadow:
+    inset 0 1px 0 0 color-mix(in srgb, var(--slate-12) 5%, transparent),
+    0 8px 32px -10px color-mix(in srgb, black 52%, transparent);
+}
+
+.fl-card.fl-card-muted.fl-card--frost {
+  background: color-mix(in srgb, var(--fl-bg-subtle) 88%, transparent);
+  box-shadow:
+    inset 0 1px 0 0 color-mix(in srgb, var(--slate-12) 4%, transparent),
+    0 6px 28px -12px color-mix(in srgb, black 48%, transparent);
 }
 
 .fl-card-header {
@@ -266,6 +362,32 @@ body {
   font-size: 0.6875rem;
   line-height: 1.45;
   color: var(--fl-text-secondary);
+  color-scheme: dark;
+  scrollbar-width: thin;
+  scrollbar-color: var(--fl-border-strong) var(--fl-bg-subtle);
+}
+
+.fl-log::-webkit-scrollbar {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 9px;
+  height: 9px;
+  background-color: var(--fl-bg-subtle);
+}
+
+.fl-log::-webkit-scrollbar-track {
+  background-color: var(--fl-bg-subtle);
+  border-radius: 999px;
+}
+
+.fl-log::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--fl-border-strong) 88%, var(--slate-11));
+  border-radius: 999px;
+  border: 2px solid var(--fl-bg-subtle);
+}
+
+.fl-log::-webkit-scrollbar-thumb:hover {
+  background-color: var(--fl-border-strong);
 }
 
 /* --- ネイティブ select（Radix トークンのみ。矢印は slate-11） --- */
@@ -336,6 +458,16 @@ body {
   padding: 0.625rem 0.75rem;
 }
 
+/**
+ * @description ヘッダー・執拗フッター・パネルツールバー用の薄いマテリアル（タブと一体の階層感）。
+ */
+.fl-app-header.fl-surface-frost {
+  background: color-mix(in srgb, var(--fl-bg-subtle) 84%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--fl-border-subtle) 80%, transparent);
+  backdrop-filter: blur(var(--fl-frost-blur)) saturate(1.06);
+  -webkit-backdrop-filter: blur(var(--fl-frost-blur)) saturate(1.06);
+}
+
 @media (min-width: 640px) {
   .fl-app-header {
     padding: 0.75rem 1rem;
@@ -360,6 +492,12 @@ body {
   padding: 0.75rem 1rem;
 }
 
+.fl-sticky-footer.fl-surface-frost {
+  background: color-mix(in srgb, var(--fl-bg-subtle) 87%, transparent);
+  backdrop-filter: blur(var(--fl-frost-blur)) saturate(1.06);
+  -webkit-backdrop-filter: blur(var(--fl-frost-blur)) saturate(1.06);
+}
+
 /**
  * @description 編集タブの「パラメータ」列。lg 以上で左列（プレビュー）との区切り。
  * 往復スクロール負荷を減らす左右分割の視覚的なリズム用（Radix の境界トークンのみ使用）。
@@ -382,6 +520,12 @@ body {
   border-bottom: 1px solid var(--fl-border-subtle);
   background: var(--fl-bg-subtle);
   padding: 0.375rem 0.5rem;
+}
+
+.fl-edit-pane-toolbar.fl-surface-frost {
+  background: color-mix(in srgb, var(--fl-bg-subtle) 86%, transparent);
+  backdrop-filter: blur(var(--fl-frost-blur)) saturate(1.06);
+  -webkit-backdrop-filter: blur(var(--fl-frost-blur)) saturate(1.06);
 }
 
 .fl-edit-pane-toolbar-btn {
@@ -417,7 +561,10 @@ body {
 .fl-edit-pane-reveal-rail {
   position: absolute;
   top: 50%;
-  right: 0;
+  /**
+   * @description 右端 flush だとネイティブスクロールバーと同じゾーンに重なるため、トラックの内側に寄せる。
+   */
+  right: 10px;
   z-index: 25;
   display: flex;
   align-items: center;
@@ -456,6 +603,37 @@ body {
 @media (min-width: 1024px) {
   .fl-edit-slide-panel-shell {
     box-shadow: -16px 0 40px -12px color-mix(in srgb, black 65%, transparent);
+  }
+}
+
+/* --- 透明度を減らす設定（OS）では blur をやめて従来のソリッドに戻す --- */
+
+@media (prefers-reduced-transparency: reduce) {
+  .fl-card.fl-card--frost {
+    background: var(--fl-bg-raised);
+    border-color: var(--fl-border-subtle);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: inset 0 1px 0 0 color-mix(in srgb, var(--slate-12) 4%, transparent);
+  }
+
+  .fl-card.fl-card-muted.fl-card--frost {
+    background: var(--fl-bg-subtle);
+    box-shadow: none;
+  }
+
+  .fl-app-header.fl-surface-frost {
+    background: var(--fl-bg-subtle);
+    border-bottom-color: var(--fl-border-subtle);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .fl-sticky-footer.fl-surface-frost,
+  .fl-edit-pane-toolbar.fl-surface-frost {
+    background: var(--fl-bg-subtle);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 }
 

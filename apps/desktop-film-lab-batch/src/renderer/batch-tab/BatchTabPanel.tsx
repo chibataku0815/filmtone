@@ -3,8 +3,10 @@
  *
  * @description
  * ユーザー向けには「バッチ」ではなく**書き出し・フォルダの写真をまとめて**など写真用語で説明する。
+ * 「次」の案内は**手順ナビを主**にし、上部は 1 行＋移動ボタンに抑えて情報密度と重複ラベルを減らす。
  * 手順は番号付きブロックと、任意の 1 ステップ表示の切替で整理する。
  * 状態（BatchGradeState / IPC）は持たず、親の App から渡されたコールバックだけを呼ぶ。
+ * ルック段の「編集のスライダーを書き出しに反映」は編集フッターと同じ同期処理（viewport 準備済みのときだけ活性）。
  *
  * @limitations
  * - キーボードショートカットは App 側。ジョブ種別は親 state と同期する。
@@ -125,7 +127,7 @@ const TIP_JOB_IMAGES =
   "選んだフォルダにある .jpg / .jpeg / .png すべてに、いまのルックを載せて JPEG か PNG で別フォルダに保存します。";
 
 const TIP_JOB_VIDEO_FAST_OPTION =
-  "既定は高速 ffmpeg 経由（FHD・Params は ffmpeg 近似・プレビューと一致しません）。プレビューに近くしたいときは手順の「保存先と形式」で WebGL 逐次をオンにできます（非常に遅い）。PATH に ffmpeg / ffprobe が必要です。";
+  "公開上の既定はプレビュー一致の WebGL 逐次です。高速・近似を使う場合、.cube LUT を優先し、Params は ffmpeg 近似として扱います。lutIntensity / bloom / halation / split tone 細部は一致しません。PATH に ffmpeg / ffprobe が必要です。";
 
 const TIP_JOB_VIDEO_WEBGL_ONLY =
   "いまはプレビューに近い見え方で書き出す WebGL 逐次のみ（時間がかかります）。高速 ffmpeg 1 パスは製品準備中のため UI から隠しています。PATH に ffmpeg / ffprobe が必要です。";
@@ -139,6 +141,10 @@ const TIP_SOURCES_VIDEO_FILE = (maxSec: number) =>
 const TIP_LOOK_JSON_DETAILS =
   "LUT を含むルックをファイルで渡したり保存したりする場合の手順です。ふだんは編集タブの「色を書き出しへ送る」かプリセットだけで足ります。";
 
+/** @description 書き出しタブのルック段にある「編集を反映」ボタン用（編集フッターと同じ処理） */
+const TIP_APPLY_EDIT_GRADE_TO_BATCH =
+  "編集タブで動かしたスライダーやトーンの数値を、この書き出しにコピーします（編集タブ右下の「色を書き出しへ送る」と同じ）。プリセットを変えた直後はプリセットの数値が入っています。LUT（.cube など）はここでは渡りません。下の「詳細: Grade JSON」から読み込んでください。";
+
 const TIP_FILENAME_SUFFIX =
   "元ファイル名と拡張子の間に付きます。例: -graded → IMG0001-graded.jpg。空欄は接尾辞なし。元データを上書きしないよう別フォルダへ出すことを推奨します。";
 
@@ -146,7 +152,7 @@ const TIP_VIDEO_OUTPUT_NAMING = (fps: number) =>
   `ファイル名は元名に -graded.mp4 を付けます。出力は最大 FHD・${fps} fps です。`;
 
 const TIP_WEBGL_ACCURATE =
-  "オンにすると 1 フレームずつシークして readPixels でグレードします。非常に遅いですが、見た目は編集タブに近くなります。オフ（既定）なら ffmpeg の高速パスを使います（スライダーは未反映・.cube のみ一部反映など制限あり）。";
+  "オンにすると 1 フレームずつシークして readPixels でグレードします。非常に遅いですが、見た目は編集タブに最も近く、公開上の既定でもこちらを使います。オフにすると高速・近似の ffmpeg パスを使います。.cube LUT を優先し、Params は ffmpeg 近似、lutIntensity / bloom / halation / split tone 細部は一致しません。";
 
 const TIP_KEYBOARD_SHORTCUTS = (imagesLabel: string) =>
   `⌘1 / ⌘2（Windows は Ctrl）でタブ切替。書き出しタブで ⌘↩ は「${imagesLabel}」または「動画を書き出す」。⇧⌘↩ は失敗した枚だけやり直し（写真のときのみ）。⇧⌘Y は前回の続き。Esc は中断。`;
@@ -222,6 +228,15 @@ export type BatchTabPanelProps = {
    * @description 動画書き出しが成功するたびに App が 1 増やす番号。初回成功で一覧表示へ誘導するためだけに使う。
    */
   videoExportSuccessNonce: number;
+
+  /**
+   * @description 編集タブの Viewport が使えるとき true。false のとき「編集のスライダーを反映」は押せない。
+   */
+  canApplyEditGradeToBatch: boolean;
+  /**
+   * @description 編集タブのプレビューから BatchGradeState へ数値をコピー（App の syncPreviewToBatch と同一）。
+   */
+  onApplyEditGradeToBatch: () => void;
 };
 
 /**
@@ -339,6 +354,32 @@ function getNextBlockingBannerText(
 }
 
 /**
+ * @description 画面上部のコンパクトな「次の一手」1 行用。長い説明は ℹ や各段の本文に任せ、帯の情報密度を下げる。
+ * @param nextId - いまブロックしている手順 ID
+ * @param batchJobMode - 写真まとめか動画 1 本か
+ * @returns {string} 短いガイド文（title 用の長文は getNextBlockingBannerText）
+ */
+function getNextBlockingInlineHint(
+  nextId: BatchStepId,
+  batchJobMode: BatchJobMode,
+): string {
+  switch (nextId) {
+    case "sources":
+      return batchJobMode === "images"
+        ? "読み込み元で写真フォルダを選ぶ"
+        : "読み込み元で動画ファイルを選ぶ";
+    case "output":
+      return "保存先と形式でフォルダを選ぶ（写真は元と別に）";
+    case "run":
+      return batchJobMode === "images"
+        ? "実行でまとめて書き出す（ルックは手順 3）"
+        : "実行で動画を書き出す";
+    default:
+      return "手順ナビで段を開く";
+  }
+}
+
+/**
  * @description 書き出しタブのメインパネル（説明・警告・セッション・手順 UI・ログ前まで）
  */
 export function BatchTabPanel(props: BatchTabPanelProps) {
@@ -379,6 +420,8 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     onVideoExportWebglAccurateChange,
     showFastFfmpegVideoExportOption,
     videoExportSuccessNonce,
+    canApplyEditGradeToBatch,
+    onApplyEditGradeToBatch,
   } = props;
 
   /** @description 現在のステップ（0 始まり）。ジョブ種別が変わったら 0 に戻す */
@@ -491,7 +534,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         type="button"
         className={`fl-batch-step-nav-btn flex items-center gap-1 rounded-md border px-2 py-1.5 text-left text-xs font-medium transition-colors ${
           isNext
-            ? "border-[var(--amber-10)] bg-[var(--amber-4)] font-semibold text-[var(--amber-12)] shadow-[inset_0_0_0_1px_var(--amber-8)]"
+            ? "border-[var(--amber-9)] bg-[var(--fl-bg-subtle)] font-semibold text-[var(--fl-text-primary)] shadow-[inset_3px_0_0_0_var(--amber-9)]"
             : isWizardPage
               ? "border-[var(--amber-8)] bg-[var(--amber-3)] text-[var(--amber-12)]"
               : "border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] text-[var(--fl-text-secondary)] hover:bg-[var(--fl-bg-interactive)]"
@@ -519,9 +562,6 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
             {idx + 1}
           </span>{" "}
           {BATCH_STEP_LABELS[stepId]}
-          {isNext ? (
-            <span className="ml-1 text-[0.6rem] font-bold text-[var(--amber-12)]">←次</span>
-          ) : null}
         </span>
       </button>
     );
@@ -540,7 +580,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
           type="button"
           className={`flex cursor-pointer flex-col rounded-xl border-2 p-3 text-left transition-all ${
             batchJobMode === "images"
-              ? "border-[var(--amber-10)] bg-[var(--amber-3)] shadow-[inset_0_0_0_1px_var(--amber-7)] ring-2 ring-[var(--amber-9)] ring-offset-2 ring-offset-[var(--fl-bg-app)]"
+              ? "border-[var(--amber-9)] bg-[var(--fl-bg-subtle)] shadow-[inset_3px_0_0_0_var(--amber-9)]"
               : "border-[var(--fl-border-subtle)] border-dashed bg-[var(--fl-bg-subtle)] opacity-90 hover:border-[var(--fl-border-default)] hover:opacity-100"
           }`}
           onClick={() => onBatchJobModeChange("images")}
@@ -553,12 +593,12 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
             <HelpHint tip={TIP_JOB_IMAGES} assistiveLabel="フォルダの写真まとめて書き出しの説明" />
           </div>
           {batchJobMode === "images" ? (
-            <span className="mt-2 inline-flex w-fit items-center gap-1 rounded-full bg-[var(--amber-9)] px-2 py-0.5 text-[0.65rem] font-bold text-[var(--fl-on-accent)]">
+            <span className="mt-2 inline-flex w-fit items-center gap-1 text-[0.65rem] font-medium text-[var(--amber-11)]">
               <CheckCircle size={14} weight="bold" aria-hidden />
-              いま選んでいる
+              選択中
             </span>
           ) : (
-            <span className="fl-caption mt-2 text-[var(--fl-text-tertiary)]">クリックでこのモードに切替</span>
+            <span className="fl-caption mt-2 text-[var(--fl-text-tertiary)]">クリックで切替</span>
           )}
           <p className="fl-caption mt-1 text-[var(--fl-text-secondary)]">
             JPEG / PNG · 別フォルダへ保存
@@ -568,7 +608,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
           type="button"
           className={`flex cursor-pointer flex-col rounded-xl border-2 p-3 text-left transition-all ${
             batchJobMode === "video"
-              ? "border-[var(--amber-10)] bg-[var(--amber-3)] shadow-[inset_0_0_0_1px_var(--amber-7)] ring-2 ring-[var(--amber-9)] ring-offset-2 ring-offset-[var(--fl-bg-app)]"
+              ? "border-[var(--amber-9)] bg-[var(--fl-bg-subtle)] shadow-[inset_3px_0_0_0_var(--amber-9)]"
               : "border-[var(--fl-border-subtle)] border-dashed bg-[var(--fl-bg-subtle)] opacity-90 hover:border-[var(--fl-border-default)] hover:opacity-100"
           }`}
           onClick={() => onBatchJobModeChange("video")}
@@ -588,16 +628,16 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
             />
           </div>
           {batchJobMode === "video" ? (
-            <span className="mt-2 inline-flex w-fit items-center gap-1 rounded-full bg-[var(--amber-9)] px-2 py-0.5 text-[0.65rem] font-bold text-[var(--fl-on-accent)]">
+            <span className="mt-2 inline-flex w-fit items-center gap-1 text-[0.65rem] font-medium text-[var(--amber-11)]">
               <CheckCircle size={14} weight="bold" aria-hidden />
-              いま選んでいる
+              選択中
             </span>
           ) : (
-            <span className="fl-caption mt-2 text-[var(--fl-text-tertiary)]">クリックでこのモードに切替</span>
+            <span className="fl-caption mt-2 text-[var(--fl-text-tertiary)]">クリックで切替</span>
           )}
           <p className="fl-caption mt-1 text-[var(--fl-text-secondary)]">
             {showFastFfmpegVideoExportOption
-              ? "高速書き出し（既定）／詳細は手順内"
+              ? "高速・近似オプションあり／詳細は手順内"
               : "WebGL 書き出しのみ（低速）／詳細は手順内"}
           </p>
         </button>
@@ -678,12 +718,36 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
           ))}
         </select>
       </label>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className="fl-btn-secondary max-w-full sm:max-w-none"
+          disabled={running || !canApplyEditGradeToBatch}
+          title={
+            canApplyEditGradeToBatch
+              ? undefined
+              : "編集タブを開き、画像のプレビューが表示されるまでお待ちください"
+          }
+          onClick={onApplyEditGradeToBatch}
+        >
+          編集のスライダーを書き出しに反映
+        </button>
+        <HelpHint
+          tip={TIP_APPLY_EDIT_GRADE_TO_BATCH}
+          assistiveLabel="編集の数値を書き出しにコピーする説明"
+        />
+      </div>
+      <p className="fl-caption text-[var(--fl-text-secondary)]">
+        編集タブ右下の「色を書き出しへ送る」と同じ操作です。LUT は含みません。
+      </p>
+
       <div className="flex flex-col gap-1">
         <span className="fl-label">いまの書き出し用ルック</span>
         <span className="text-xs leading-snug text-[var(--fl-text-primary)]">
           {importedGradeLabel
             ? `JSON ファイル: ${importedGradeLabel}`
-            : `プリセット「${batchPresetChoice}」または編集タブの「色を書き出しへ送る」`}
+            : `プリセット「${batchPresetChoice}」を起点にできます。上のボタンで編集タブの数値に置き換えられます。`}
         </span>
       </div>
 
@@ -789,7 +853,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
                 aria-label="プレビューと一致させる低速 WebGL 書き出しを使う"
               />
               <span className="flex flex-1 items-start gap-1 text-xs leading-snug text-[var(--fl-text-secondary)]">
-                <strong className="text-[var(--fl-text-primary)]">プレビュー一致（WebGL・低速）</strong>
+                <strong className="text-[var(--fl-text-primary)]">プレビュー一致（WebGL・低速・既定）</strong>
                 <HelpHint tip={TIP_WEBGL_ACCURATE} assistiveLabel="WebGL 逐次書き出しの説明" />
               </span>
             </label>
@@ -927,18 +991,13 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         id={`export-step-${stepId}`}
         className={`flex flex-col gap-3 border-b border-[var(--fl-border-subtle)] pb-4 last:border-b-0 last:pb-0 ${
           isHighlight
-            ? "scroll-mt-4 rounded-lg bg-[var(--amber-4)] px-3 py-3 ring-2 ring-[var(--amber-9)] ring-offset-2 ring-offset-[var(--fl-bg-app)]"
+            ? "scroll-mt-4 rounded-md border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] py-2 pl-3 pr-2 shadow-[inset_3px_0_0_0_var(--amber-9)]"
             : ""
         }`}
         aria-labelledby={`batch-step-h-${stepId}`}
       >
         <h3 id={`batch-step-h-${stepId}`} className="fl-label normal-case tracking-normal">
           {idx + 1}. {BATCH_STEP_LABELS[stepId]}
-          {isHighlight ? (
-            <span className="ml-2 rounded bg-[var(--amber-9)] px-1.5 py-px text-[0.6rem] font-bold normal-case text-[var(--fl-on-accent)]">
-              次はここ
-            </span>
-          ) : null}
         </h3>
         {stepRenderers[stepId]()}
       </section>
@@ -948,7 +1007,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
   return (
     <>
       <section
-        className="fl-card fl-card-muted gap-2 border-[var(--fl-border-default)]"
+        className="fl-card fl-card-muted fl-card--frost gap-2 border-[var(--fl-border-default)]"
         aria-labelledby="export-tab-intro-heading"
       >
         <div className="flex items-start gap-2">
@@ -965,28 +1024,14 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         </p>
       </section>
 
-      <div
-        className="self-start rounded-lg border px-3 py-2.5 text-xs leading-relaxed"
-        style={{
-          borderColor: "var(--amber-6)",
-          background: "var(--amber-2)",
-          color: "var(--amber-12)",
-        }}
-      >
-        写真をまとめて書き出すときは、元データが消えないよう<strong>保存先フォルダは別</strong>にしてください。
+      <div className="self-start rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] px-3 py-2 text-xs leading-relaxed text-[var(--fl-text-secondary)] shadow-[inset_3px_0_0_0_var(--amber-9)]">
+        写真をまとめて書き出すときは、元データが消えないよう<strong className="text-[var(--fl-text-primary)]">保存先フォルダは別</strong>にしてください。
       </div>
 
       {persistedSession && sessionHasRemainingWork(persistedSession) ? (
-        <div
-          className="rounded-lg border px-3 py-2.5 text-xs leading-relaxed"
-          style={{
-            borderColor: "var(--blue-6)",
-            background: "var(--blue-2)",
-            color: "var(--blue-12)",
-          }}
-        >
+        <div className="rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] px-3 py-2.5 text-xs leading-relaxed shadow-[inset_3px_0_0_0_var(--blue-9)]">
           <div className="mb-2 flex flex-wrap items-start gap-1.5">
-            <p>
+            <p className="text-[var(--fl-text-primary)]">
               前回のまとめ書き出しが途中です（残り {pathsNotSucceeded(persistedSession).length} 枚）。
             </p>
             <HelpHint tip={TIP_RESUME_SESSION} assistiveLabel="再開と破棄の説明" />
@@ -1004,29 +1049,23 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
 
       {!running ? (
         <div
-          className="flex flex-col gap-2 rounded-xl border-2 border-[var(--amber-9)] bg-[var(--amber-3)] px-3 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
+          className="fl-export-next-strip flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2"
           role="status"
           aria-live="polite"
+          title={getNextBlockingBannerText(nextBlockingStepId, batchJobMode)}
         >
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-wide text-[var(--amber-11)]">
-                次にやること
-              </span>
-              <span className="rounded-md bg-[var(--amber-9)] px-2 py-0.5 text-xs font-bold text-[var(--fl-on-accent)]">
-                {nextBlockingIdx + 1}. {BATCH_STEP_LABELS[nextBlockingStepId]}
-              </span>
-            </div>
-            <p className="mt-1 text-sm font-medium leading-snug text-[var(--amber-12)]">
-              {getNextBlockingBannerText(nextBlockingStepId, batchJobMode)}
-            </p>
-          </div>
+          <span className="tabular-nums text-xs font-semibold text-[var(--fl-text-primary)]">
+            {nextBlockingIdx + 1}. {BATCH_STEP_LABELS[nextBlockingStepId]}
+          </span>
+          <span className="min-w-0 flex-1 basis-[14rem] text-xs leading-snug text-[var(--fl-text-secondary)]">
+            {getNextBlockingInlineHint(nextBlockingStepId, batchJobMode)}
+          </span>
           <button
             type="button"
-            className="fl-btn-primary shrink-0 text-xs sm:min-w-[11rem]"
+            className="fl-btn-secondary shrink-0 px-2.5 py-1 text-[0.65rem]"
             onClick={() => focusExportStep(nextBlockingStepId)}
           >
-            この手順へジャンプ
+            移動
           </button>
         </div>
       ) : (
@@ -1035,10 +1074,10 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         </p>
       )}
 
-      <section className="fl-card gap-4">
+      <section className="fl-card fl-card--frost gap-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <p className="text-sm font-medium text-[var(--fl-text-primary)]">
-            手順（番号は上の「次にやること」と対応）
+            手順（ナビの番号と一致）
           </p>
           <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="書き出しの手順ジャンプ">
             {BATCH_STEP_ORDER.map((id, idx) => renderStepNavButton(id, idx))}
@@ -1101,7 +1140,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
             id={`export-step-${BATCH_STEP_ORDER[activeStep]}`}
             className={`min-h-[12rem] rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] p-4 ${
               !running && BATCH_STEP_ORDER[activeStep] === nextBlockingStepId
-                ? "ring-2 ring-[var(--amber-9)] ring-offset-2 ring-offset-[var(--fl-bg-app)]"
+                ? "shadow-[inset_3px_0_0_0_var(--amber-9)]"
                 : ""
             }`}
           >

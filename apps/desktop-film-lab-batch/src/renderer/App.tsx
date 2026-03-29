@@ -40,6 +40,10 @@ import {
   resolveLutCubeAbsPathForFastExport,
   runVideoExportFfmpegFast,
 } from "./video-export-ffmpeg-fast";
+import {
+  defaultVideoExportWebglAccurate,
+  shouldUseFastVideoExport,
+} from "./video-export-policy";
 import { runVideoExportPipeline } from "./video-export-pipeline";
 import {
   assertVideoImportWithinCaps,
@@ -163,10 +167,10 @@ export default function App() {
   /** @description ffprobe 済みのメタ（UI 表示用） */
   const [videoProbeLabel, setVideoProbeLabel] = useState<string | null>(null);
   /**
-   * @description true のときだけ WebGL 逐次フレーム（プレビュー一致・低速）。高速 ffmpeg が UI 有効なときだけ false を許可。
+   * @description 公開製品の既定は常に WebGL accurate。将来 fast UI を戻しても、false はユーザー明示選択時のみ。
    */
   const [videoExportWebglAccurate, setVideoExportWebglAccurate] = useState(
-    () => !ENABLE_FFMPEG_FAST_VIDEO_EXPORT,
+    defaultVideoExportWebglAccurate,
   );
   /**
    * @description 動画書き出し成功のたびに増やす。書き出しタブの「初回はウィザード→成功後は一覧」だけ検知する（BatchGradeState ではない）。
@@ -599,8 +603,10 @@ export default function App() {
 
     try {
       if (
-        ENABLE_FFMPEG_FAST_VIDEO_EXPORT &&
-        !videoExportWebglAccurate
+        shouldUseFastVideoExport({
+          fastVideoExportEnabled: ENABLE_FFMPEG_FAST_VIDEO_EXPORT,
+          videoExportWebglAccurate,
+        })
       ) {
         setBatchProgress({
           current: 0,
@@ -777,7 +783,7 @@ export default function App() {
 
   return (
     <div className="film-lab-desktop-root flex min-h-screen flex-col">
-      <header className="fl-app-header">
+      <header className="fl-app-header fl-surface-frost">
         <span className="fl-app-title">Film Lab</span>
         <span className="fl-app-subtitle">Desktop（フォルダから書き出し）</span>
         <div className="fl-tabs ml-auto">
@@ -804,7 +810,7 @@ export default function App() {
       {tab === "edit" ? (
         <div className="fl-main flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
           <div className="relative flex min-h-0 flex-1 flex-col gap-4 lg:min-h-0 lg:overflow-hidden">
-            <section className="fl-card relative z-0 flex min-h-0 w-full min-w-0 flex-col gap-3 overflow-y-auto max-lg:flex-none lg:absolute lg:inset-0 lg:z-0">
+            <section className="fl-card fl-scroll-surface relative z-0 flex min-h-0 w-full min-w-0 flex-col gap-3 overflow-y-auto max-lg:flex-none lg:absolute lg:inset-0 lg:z-0">
               <div className="fl-card-header">
                 <div className="flex min-w-[140px] flex-1 flex-col gap-1.5">
                   <span className="fl-label">
@@ -874,8 +880,8 @@ export default function App() {
                   : "lg:pointer-events-none lg:translate-x-full"
               }`}
             >
-              <section className="fl-card fl-card-muted fl-edit-controls-pane flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-0 lg:rounded-r-none lg:rounded-l-xl">
-                <div className="fl-edit-pane-toolbar hidden lg:flex">
+              <section className="fl-card fl-card-muted fl-card--frost fl-edit-controls-pane flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-0 lg:rounded-r-none lg:rounded-l-xl">
+                <div className="fl-edit-pane-toolbar fl-surface-frost hidden lg:flex">
                   <button
                     type="button"
                     className="fl-edit-pane-toolbar-btn"
@@ -887,7 +893,7 @@ export default function App() {
                     <CaretRight size={20} weight="bold" aria-hidden />
                   </button>
                 </div>
-                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 sm:px-4">
+                <div className="fl-scroll-surface min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 sm:px-4">
                   <ControlPanel
                     viewport={viewport}
                     histogramVisible={histogramVisible}
@@ -905,7 +911,7 @@ export default function App() {
                     autoRestoreStoredSession={false}
                   />
                 </div>
-                <div className="fl-sticky-footer rounded-b-xl lg:rounded-bl-xl">
+                <div className="fl-sticky-footer fl-surface-frost rounded-b-xl lg:rounded-bl-xl">
                   <button
                     type="button"
                     className="fl-btn-primary w-full sm:w-auto sm:min-w-[220px]"
@@ -928,7 +934,7 @@ export default function App() {
           </div>
         </div>
       ) : (
-        <div className="fl-main flex flex-1 flex-col gap-4">
+        <div className="fl-main fl-main-batch fl-scroll-surface flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
           <BatchTabPanel
             batchJobMode={batchJobMode}
             onBatchJobModeChange={setBatchJobMode}
@@ -977,6 +983,8 @@ export default function App() {
             onPickVideoFile={pickVideoFile}
             onRunVideoExport={runVideoExport}
             videoExportSuccessNonce={videoExportSuccessNonce}
+            canApplyEditGradeToBatch={Boolean(viewport)}
+            onApplyEditGradeToBatch={syncPreviewToBatch}
           />
 
           <pre className="fl-log">{logText || "ログはここに表示されます。"}</pre>
