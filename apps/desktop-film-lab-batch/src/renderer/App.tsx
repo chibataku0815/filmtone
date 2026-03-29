@@ -19,9 +19,17 @@ import { Histogram } from "@film-lab/components/ui/Histogram";
 import type { Viewport } from "@film-lab/core/Viewport";
 import { PRESETS, type PresetName } from "film-lab-core";
 import {
+  initialOutcomes,
+  parseFilmLabBatchSessionV1,
+  pathsNotSucceeded,
+  sessionHasRemainingWork,
+  type FilmLabBatchSessionV1,
+} from "./batch-session";
+import {
   batchGradeStateFromPreset,
   resolveGradeFromJsonText,
   runBatchPipeline,
+  sanitizeBatchFilenameSuffix,
   type BatchFormat,
   type BatchGradeState,
   type BatchPipelineProgressPayload,
@@ -33,6 +41,57 @@ import { viewportRecordToParams } from "./viewport-to-params";
 type TabId = "edit" | "batch";
 
 const PRESET_NAMES = Object.keys(PRESETS) as PresetName[];
+
+/**
+ * @description セッションに保存した情報だけから BatchGradeState を組み立てる（再開直後のパイプライン用）
+ */
+async function resolveBatchGradeSnapshot(
+  s: FilmLabBatchSessionV1,
+): Promise<BatchGradeState> {
+  if (s.importedGradePath) {
+    const text = await window.filmLabBatch.readFileUtf8(s.importedGradePath);
+    const g = await resolveGradeFromJsonText(
+      window.filmLabBatch,
+      s.importedGradePath,
+      text,
+    );
+    return {
+      params: g.params,
+      lutIntensity: g.lutIntensity,
+      lutData: g.lutData,
+      lutSize: g.lutSize,
+    };
+  }
+  if (s.gradeParamsJson) {
+    const refPath =
+      s.imagePaths[0] ?? `${s.inputDir}/film-lab-grade.json`;
+    const g = await resolveGradeFromJsonText(
+      window.filmLabBatch,
+      refPath,
+      s.gradeParamsJson,
+    );
+    return {
+      params: g.params,
+      lutIntensity: g.lutIntensity,
+      lutData: g.lutData,
+      lutSize: g.lutSize,
+    };
+  }
+  return batchGradeStateFromPreset(s.batchPresetChoice);
+}
+
+/**
+ * @description 入力中はデスクトップショートカットを効かせない（テキスト・選択・contenteditable）
+ */
+function isTextInputTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
+    return true;
+  }
+  if (target.isContentEditable) return true;
+  return false;
+}
 
 export default function App() {
   /** @description スマートルックがキャンバス JPEG を取得するための ref（Web のフルページと同じ配線） */
@@ -63,6 +122,20 @@ export default function App() {
   /** @description 直近の正常終了したバッチの集計（画面下に短く残す） */
   const [lastBatchSummary, setLastBatchSummary] =
     useState<BatchPipelineSummary | null>(null);
+  /** @description 直近の実行で失敗した入力パス（失敗のみ再実行用） */
+  const [lastFailedPaths, setLastFailedPaths] = useState<string[]>([]);
+  /**
+   * @description メインプロセスに保存した再開用セッション。実行中も outcomes を更新して同期する。
+   */
+  const [persistedSession, setPersistedSession] =
+    useState<FilmLabBatchSessionV1 | null>(null);
+  /** @description onFileOutcome から参照する実行中セッション（再開・フルラン共通） */
+  const activeBatchSessionRef = useRef<FilmLabBatchSessionV1 | null>(null);
+  const [batchFormat, setBatchFormat] = useState<BatchFormat>("jpeg");
+  /**
+   * @description 出力ファイル名の接尾辞（UI の生入力。パイプラインで sanitize する）。空ならベース名のみ。
+   */
+  const [batchOutputSuffix, setBatchOutputSuffix] = useState("-graded");
   /**
    * @description 幅 lg 以上で右スライドパネルを表示するか。パネルは DOM を維持し `translateX` のみ（内部状態を捨てない）。
    */
@@ -90,6 +163,36 @@ export default function App() {
       setEditRightPaneExpanded(true);
     }
   }, [isLgLayout]);
+
+  /**
+   * @description 起動時に userData のセッション JSON を読み、フォームへ反映する。
+   */
+  useEffect(() => {
+    void (async () => {
+      const raw = await window.filmLabBatch.readBatchSession();
+      const parsed = raw ? parseFilmLabBatchSessionV1(raw) : null;
+      if (parsed) {
+        setPersistedSession(parsed);
+        setInputDir(parsed.inputDir);
+        setOutputDir(parsed.outputDir);
+        setBatchFormat(parsed.format);
+        setBatchOutputSuffix(parsed.outputFilenameSuffix);
+        setBatchPresetChoice(parsed.batchPresetChoice);
+        try {
+          const snap = await resolveBatchGradeSnapshot(parsed);
+          setBatchGrade(snap);
+          setImportedGradeLabel(parsed.importedGradePath);
+        } catch {
+          setBatchGrade(batchGradeStateFromPreset(parsed.batchPresetChoice));
+          setImportedGradeLabel(null);
+        }
+        return;
+      }
+      const prefs = await window.filmLabBatch.getDesktopPrefs();
+      if (prefs.lastInputDir) setInputDir(prefs.lastInputDir);
+      if (prefs.lastOutputDir) setOutputDir(prefs.lastOutputDir);
+    })();
+  }, []);
 
   const appendLog = useCallback((line: string) => {
     setLogText((t) => `${t}${line}\n`);
@@ -151,67 +254,322 @@ export default function App() {
     appendLog("Grade JSON をダウンロードしました（film-lab-grade.json）");
   };
 
-  const runBatch = async () => {
-    if (!inputDir || !outputDir) return;
-    const formatSel = document.getElementById(
-      "batch-format-sel",
-    ) as HTMLSelectElement | null;
-    const format = (formatSel?.value ?? "jpeg") as BatchFormat;
-
-    setLogText("");
-    setLastBatchSummary(null);
-    const abortController = new AbortController();
-    batchAbortRef.current = abortController;
-
-    appendLog(`Input: ${inputDir}`);
-    appendLog(`Output: ${outputDir}`);
-    appendLog(
-      importedGradeLabel
-        ? `Grade: imported JSON + メモリ上の Params`
-        : `Grade: メモリ（プリセット ${batchPresetChoice} またはプレビュー同期）`,
-    );
-    appendLog(`Format: ${format}`);
-
-    setRunning(true);
-    try {
-      const images = await window.filmLabBatch.listImages(inputDir);
-      appendLog(`Images: ${images.length}`);
-      if (images.length === 0) {
-        appendLog("画像がありません（.jpg / .jpeg / .png）");
-        return;
-      }
-      setBatchProgress({
-        current: 0,
-        total: images.length,
-        fileName: "準備中…",
-      });
-      const summary = await runBatchPipeline({
-        api: window.filmLabBatch,
-        grade: batchGrade,
-        imagePaths: images,
-        outputDir,
-        format,
-        onLog: appendLog,
-        signal: abortController.signal,
-        onProgress: setBatchProgress,
-      });
-      setLastBatchSummary(summary);
-      appendLog("Done.");
-    } catch (e) {
-      if (e instanceof DOMException && e.name === "AbortError") {
-        appendLog("ユーザーにより中断されました。");
+  const finalizeSessionAfterRun = useCallback(
+    async (
+      summary: BatchPipelineSummary,
+      sessionSnap: FilmLabBatchSessionV1 | null,
+    ) => {
+      if (!sessionSnap) return;
+      if (!summary.aborted && sessionSnap.outcomes.every((o) => o === "ok")) {
+        await window.filmLabBatch.clearBatchSession();
+        activeBatchSessionRef.current = null;
+        setPersistedSession(null);
+        appendLog("全枚成功のためセッションをクリアしました。");
       } else {
+        setPersistedSession(sessionSnap);
+      }
+    },
+    [appendLog],
+  );
+
+  const runBatchWithPaths = useCallback(
+    async (
+      imagePaths: string[],
+      format: BatchFormat,
+      sessionMutable: FilmLabBatchSessionV1 | null,
+      pathContext?: {
+        inputDir: string;
+        outputDir: string;
+        /** @description 再開直後など、state よりこのスナップショットをパイプラインに渡す */
+        grade?: BatchGradeState;
+      },
+    ) => {
+      const effectiveInput = pathContext?.inputDir ?? inputDir;
+      const effectiveOutput = pathContext?.outputDir ?? outputDir;
+      const effectiveGrade = pathContext?.grade ?? batchGrade;
+      if (!effectiveInput || !effectiveOutput) return;
+
+      void window.filmLabBatch.setDesktopPrefs({
+        lastInputDir: effectiveInput,
+        lastOutputDir: effectiveOutput,
+      });
+
+      setLogText("");
+      setLastBatchSummary(null);
+      setLastFailedPaths([]);
+
+      const abortController = new AbortController();
+      batchAbortRef.current = abortController;
+      activeBatchSessionRef.current = sessionMutable;
+
+      appendLog(`Input: ${effectiveInput}`);
+      appendLog(`Output: ${effectiveOutput}`);
+      appendLog(
+        importedGradeLabel
+          ? `Grade: imported JSON + メモリ上の Params`
+          : `Grade: メモリ（プリセット ${batchPresetChoice} またはプレビュー同期）`,
+      );
+      appendLog(`Format: ${format}`);
+      const outputSuffixForPipeline =
+        sessionMutable?.outputFilenameSuffix ?? batchOutputSuffix;
+      appendLog(
+        `出力接尾辞: ${
+          sanitizeBatchFilenameSuffix(outputSuffixForPipeline) === ""
+            ? "（なし・ベース名のみ）"
+            : sanitizeBatchFilenameSuffix(outputSuffixForPipeline)
+        }`,
+      );
+      appendLog(`この実行で処理する枚数: ${imagePaths.length}`);
+
+      setRunning(true);
+      try {
+        setBatchProgress({
+          current: 0,
+          total: imagePaths.length,
+          fileName: "準備中…",
+        });
+
+        const pathToIndex =
+          sessionMutable === null
+            ? null
+            : new Map(
+                sessionMutable.imagePaths.map((p, i) => [p, i] as const),
+              );
+
+        const summary = await runBatchPipeline({
+          api: window.filmLabBatch,
+          grade: effectiveGrade,
+          imagePaths,
+          outputDir: effectiveOutput,
+          format,
+          outputFilenameSuffix: outputSuffixForPipeline,
+          onLog: appendLog,
+          signal: abortController.signal,
+          onProgress: setBatchProgress,
+          onFileOutcome:
+            sessionMutable && pathToIndex
+              ? ({ absolutePath, outcome }) => {
+                  const idx = pathToIndex.get(absolutePath);
+                  if (idx === undefined) return;
+                  const nextOutcome =
+                    outcome === "ok"
+                      ? "ok"
+                      : outcome === "loadFail"
+                        ? "loadFail"
+                        : "writeFail";
+                  const base = activeBatchSessionRef.current;
+                  if (!base) return;
+                  const nextOutcomes = [...base.outcomes];
+                  nextOutcomes[idx] = nextOutcome;
+                  const next: FilmLabBatchSessionV1 = {
+                    ...base,
+                    outcomes: nextOutcomes,
+                    updatedAtIso: new Date().toISOString(),
+                  };
+                  activeBatchSessionRef.current = next;
+                  setPersistedSession(next);
+                  void window.filmLabBatch.writeBatchSession(next);
+                }
+              : undefined,
+        });
+
+        setLastBatchSummary(summary);
+        setLastFailedPaths(summary.failedPaths);
+        const snap = activeBatchSessionRef.current;
+        await finalizeSessionAfterRun(summary, snap);
+
+        if (summary.aborted) {
+          appendLog("ユーザーにより中断されました。");
+        } else {
+          appendLog("Done.");
+        }
+      } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         appendLog(`FATAL: ${msg}`);
+      } finally {
+        batchAbortRef.current = null;
+        setBatchProgress(null);
+        setRunning(false);
+        activeBatchSessionRef.current = null;
       }
-    } finally {
-      batchAbortRef.current = null;
-      setBatchProgress(null);
-      setRunning(false);
+    },
+    [
+      appendLog,
+      batchGrade,
+      batchPresetChoice,
+      finalizeSessionAfterRun,
+      importedGradeLabel,
+      inputDir,
+      outputDir,
+      batchOutputSuffix,
+    ],
+  );
+
+  const runBatch = async () => {
+    if (!inputDir || !outputDir) return;
+    const images = await window.filmLabBatch.listImages(inputDir);
+    if (images.length === 0) {
+      appendLog("画像がありません（.jpg / .jpeg / .png）");
+      return;
     }
+    const session: FilmLabBatchSessionV1 = {
+      version: 1,
+      updatedAtIso: new Date().toISOString(),
+      inputDir,
+      outputDir,
+      format: batchFormat,
+      imagePaths: images,
+      outcomes: initialOutcomes(images.length),
+      batchPresetChoice,
+      importedGradePath: importedGradeLabel,
+      gradeParamsJson: importedGradeLabel
+        ? null
+        : exportGradeJsonText(batchGrade.params),
+      outputFilenameSuffix: sanitizeBatchFilenameSuffix(batchOutputSuffix),
+    };
+    await window.filmLabBatch.writeBatchSession(session);
+    setPersistedSession(session);
+    await runBatchWithPaths(images, batchFormat, session);
+  };
+
+  const resumeBatch = async () => {
+    const s = persistedSession;
+    if (!s || !sessionHasRemainingWork(s)) return;
+    setInputDir(s.inputDir);
+    setOutputDir(s.outputDir);
+    setBatchFormat(s.format);
+    setBatchOutputSuffix(s.outputFilenameSuffix);
+    setBatchPresetChoice(s.batchPresetChoice);
+    let gradeSnap: BatchGradeState;
+    try {
+      gradeSnap = await resolveBatchGradeSnapshot(s);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      appendLog(`セッションのルック復元に失敗: ${msg}`);
+      gradeSnap = batchGradeStateFromPreset(s.batchPresetChoice);
+    }
+    setBatchGrade(gradeSnap);
+    setImportedGradeLabel(s.importedGradePath);
+    const todo = pathsNotSucceeded(s);
+    if (todo.length === 0) return;
+    await runBatchWithPaths(todo, s.format, s, {
+      inputDir: s.inputDir,
+      outputDir: s.outputDir,
+      grade: gradeSnap,
+    });
+  };
+
+  const retryFailedBatch = async () => {
+    if (!inputDir || !outputDir || lastFailedPaths.length === 0) return;
+    const aligned =
+      persistedSession &&
+      lastFailedPaths.every((p) => persistedSession.imagePaths.includes(p))
+        ? persistedSession
+        : null;
+    await runBatchWithPaths(lastFailedPaths, batchFormat, aligned, {
+      inputDir,
+      outputDir,
+    });
+  };
+
+  const discardPersistedSession = async () => {
+    await window.filmLabBatch.clearBatchSession();
+    activeBatchSessionRef.current = null;
+    setPersistedSession(null);
+    appendLog("保存していたバッチセッションを破棄しました。");
   };
 
   const batchCanRun = Boolean(inputDir && outputDir) && !running;
+  const batchCanResume =
+    Boolean(persistedSession && sessionHasRemainingWork(persistedSession)) &&
+    !running;
+  const batchCanRetryFailed =
+    Boolean(inputDir && outputDir) &&
+    lastFailedPaths.length > 0 &&
+    !running;
+
+  /** @description キーボードハンドラ用。レンダーごとに最新の非同期処理を指す。 */
+  const batchHotkeysRef = useRef({
+    runBatch: async (): Promise<void> => {},
+    retryFailedBatch: async (): Promise<void> => {},
+    resumeBatch: async (): Promise<void> => {},
+  });
+  batchHotkeysRef.current.runBatch = runBatch;
+  batchHotkeysRef.current.retryFailedBatch = retryFailedBatch;
+  batchHotkeysRef.current.resumeBatch = resumeBatch;
+
+  /** @description キーボードハンドラ用の UI フラグ（常に最新） */
+  const hotkeyUiRef = useRef({
+    tab: "edit" as TabId,
+    batchCanRun: false,
+    batchCanRetryFailed: false,
+    batchCanResume: false,
+    running: false,
+  });
+  hotkeyUiRef.current = {
+    tab,
+    batchCanRun,
+    batchCanRetryFailed,
+    batchCanResume,
+    running,
+  };
+
+  /**
+   * @description デスクトップ専用ショートカット（Web 共有コンポーネントには伝播しないよう window で処理）
+   * - Mod+1 / Mod+2: タブ（macOS は ⌘、Windows/Linux は Ctrl）
+   * - Mod+Enter: バッチ実行（バッチタブかつ実行可のとき）
+   * - Mod+Shift+Enter: 失敗のみ再実行
+   * - Mod+Shift+Y: セッション再開（再開可能なとき）
+   * - Escape: バッチ中断
+   */
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (isTextInputTarget(e.target)) return;
+      const mod = e.metaKey || e.ctrlKey;
+      const u = hotkeyUiRef.current;
+      const act = batchHotkeysRef.current;
+
+      if (mod && e.key === "1") {
+        e.preventDefault();
+        setTab("edit");
+        return;
+      }
+      if (mod && e.key === "2") {
+        e.preventDefault();
+        setTab("batch");
+        return;
+      }
+
+      if (mod && e.key === "Enter") {
+        if (u.tab !== "batch") return;
+        if (e.shiftKey) {
+          if (u.batchCanRetryFailed) {
+            e.preventDefault();
+            void act.retryFailedBatch();
+          }
+        } else if (u.batchCanRun) {
+          e.preventDefault();
+          void act.runBatch();
+        }
+        return;
+      }
+
+      if (mod && e.shiftKey && (e.key === "y" || e.key === "Y")) {
+        if (u.tab === "batch" && u.batchCanResume) {
+          e.preventDefault();
+          void act.resumeBatch();
+        }
+        return;
+      }
+
+      if (e.key === "Escape" && u.running) {
+        e.preventDefault();
+        batchAbortRef.current?.abort();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   return (
     <div className="film-lab-desktop-root flex min-h-screen flex-col">
@@ -372,6 +730,41 @@ export default function App() {
             上書き防止のため、出力フォルダは入力フォルダと別にしてください。
           </div>
 
+          {persistedSession && sessionHasRemainingWork(persistedSession) ? (
+            <div
+              className="rounded-lg border px-3 py-2.5 text-xs leading-relaxed"
+              style={{
+                borderColor: "var(--blue-6)",
+                background: "var(--blue-2)",
+                color: "var(--blue-12)",
+              }}
+            >
+              <p className="mb-2">
+                未完了のバッチがあります（残り{" "}
+                {pathsNotSucceeded(persistedSession).length}{" "}
+                枚）。保存されている入出力パスとルックで続きから再開できます。
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="fl-btn-primary"
+                  disabled={!batchCanResume}
+                  onClick={() => void resumeBatch()}
+                >
+                  再開
+                </button>
+                <button
+                  type="button"
+                  className="fl-btn-secondary"
+                  disabled={running}
+                  onClick={() => void discardPersistedSession()}
+                >
+                  セッションを破棄
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           <section className="fl-card">
             <div className="grid gap-4 text-sm md:grid-cols-2">
               <label className="flex flex-col gap-1.5">
@@ -455,17 +848,46 @@ export default function App() {
               </div>
             </div>
 
+            <p className="fl-caption max-w-prose">
+              選択した入出力フォルダは次回以降のダイアログの既定の場所になります（存在するパスのみ）。ウィンドウの位置とサイズも終了時に保存されます。
+            </p>
+
+            <p className="fl-caption max-w-prose">
+              キーボード: ⌘1 / ⌘2（Windows は Ctrl）でタブ切替。この画面で ⌘↩
+              実行、⇧⌘↩ 失敗のみ再実行、⇧⌘Y セッション再開、Esc
+              中断。
+            </p>
+
             <div className="flex flex-wrap items-center gap-2">
               <span className="fl-label normal-case">Format</span>
               <select
                 id="batch-format-sel"
                 className="min-w-[6.5rem]"
-                defaultValue="jpeg"
+                value={batchFormat}
+                onChange={(e) => setBatchFormat(e.target.value as BatchFormat)}
               >
                 <option value="jpeg">JPEG</option>
                 <option value="png">PNG</option>
               </select>
             </div>
+
+            <label className="flex max-w-md flex-col gap-1.5">
+              <span className="fl-label normal-case">出力ファイル接尾辞</span>
+              <input
+                type="text"
+                className="fl-text-input w-full max-w-md"
+                value={batchOutputSuffix}
+                onChange={(e) => setBatchOutputSuffix(e.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+                aria-describedby="batch-suffix-hint"
+              />
+              <span id="batch-suffix-hint" className="fl-caption max-w-prose">
+                元ファイル名と拡張子の間に付きます（例:{" "}
+                <code className="font-mono text-[0.65rem]">-graded</code> →
+                IMG0001-graded.jpg）。空欄は接尾辞なし（別フォルダ出力推奨）。
+              </span>
+            </label>
 
             <div className="flex flex-wrap items-center gap-2">
               <button
@@ -475,6 +897,14 @@ export default function App() {
                 onClick={() => void runBatch()}
               >
                 Run batch
+              </button>
+              <button
+                type="button"
+                className="fl-btn-secondary max-w-xs"
+                disabled={!batchCanRetryFailed}
+                onClick={() => void retryFailedBatch()}
+              >
+                失敗のみ再実行
               </button>
               <button
                 type="button"

@@ -40,6 +40,10 @@ export type BatchPipelineSummary = {
   ok: number;
   loadFail: number;
   writeFail: number;
+  /** @description 読込または書込に失敗した入力ファイルの絶対パス（順不同・重複なし） */
+  failedPaths: string[];
+  /** @description ユーザーが中断したとき true（未処理分は failedPaths に含めない） */
+  aborted?: boolean;
 };
 
 /**
@@ -74,6 +78,18 @@ function baseNameWithoutExt(filePath: string): string {
   const base = basename(filePath);
   const dot = base.lastIndexOf(".");
   return dot > 0 ? base.slice(0, dot) : base;
+}
+
+/**
+ * @description 出力ファイル名に付ける接尾辞を安全な形に直す（パス区切り・Windows 禁則文字を除去。
+ * 空文字は「接尾辞なし＝ベース名のみ」を意味する。
+ */
+export function sanitizeBatchFilenameSuffix(raw: string): string {
+  return raw
+    .trim()
+    .replace(/[/\\]/g, "")
+    .replace(/[<>:"|?*\u0000-\u001f]/g, "_")
+    .slice(0, 128);
 }
 
 function mimeForImagePath(filePath: string): string {
@@ -188,8 +204,10 @@ export async function resolveGradeFromJsonText(
 /**
  * 画像パスの列を順に処理し、出力フォルダへ書き出す。
  * @param options.grade — メモリ上のルック（主導線）。JSON Import 後はこの形に詰め替える。
- * @param options.signal — 渡すと枚の境界で中断チェックし、`AbortError` を投げる。
+ * @param options.signal — 渡すと枚の境界で中断チェックし、打ち切り時は aborted: true で返す。
  * @param options.onProgress — 各ファイル処理の開始時に 1 回（current は 1 始まり）。
+ * @param options.onFileOutcome — 各ファイルの成否が決まった直後に 1 回（永続化フック用）。
+ * @param options.outputFilenameSuffix — ベース名と拡張子の間。省略時は "-graded"。空でベース名のみ。
  */
 export async function runBatchPipeline(options: {
   api: FilmLabBatchBridge;
@@ -200,25 +218,57 @@ export async function runBatchPipeline(options: {
   onLog: (line: string) => void;
   signal?: AbortSignal;
   onProgress?: (payload: BatchPipelineProgressPayload) => void;
+  onFileOutcome?: (payload: {
+    absolutePath: string;
+    outcome: "ok" | "loadFail" | "writeFail";
+  }) => void;
+  outputFilenameSuffix?: string;
 }): Promise<BatchPipelineSummary> {
-  const { api, grade, imagePaths, outputDir, format, signal, onProgress } =
-    options;
+  const {
+    api,
+    grade,
+    imagePaths,
+    outputDir,
+    format,
+    signal,
+    onProgress,
+    outputFilenameSuffix,
+  } = options;
+
+  const suffixForFiles =
+    outputFilenameSuffix === undefined
+      ? sanitizeBatchFilenameSuffix("-graded")
+      : sanitizeBatchFilenameSuffix(outputFilenameSuffix);
 
   if (!isWebGL2Supported()) {
     throw new Error("runBatchPipeline: WebGL2 が利用できません");
   }
 
-  const stats: BatchPipelineSummary = { ok: 0, loadFail: 0, writeFail: 0 };
+  const failedPathSet = new Set<string>();
+  const pushFailed = (absolutePath: string) => {
+    failedPathSet.add(absolutePath);
+  };
+
+  const stats: BatchPipelineSummary = {
+    ok: 0,
+    loadFail: 0,
+    writeFail: 0,
+    failedPaths: [],
+  };
 
   /**
-   * @description メイン側が中断したとき、ここまでの集計をログに出して打ち切る。
+   * @description メイン側が中断したとき、ここまでの集計をログに出して結果を返す。
    */
-  const throwIfAborted = () => {
-    if (!signal?.aborted) return;
+  const finishIfAborted = (): BatchPipelineSummary | null => {
+    if (!signal?.aborted) return null;
     options.onLog(
       `中断: 成功 ${stats.ok} / ${imagePaths.length}（読込失敗 ${stats.loadFail}, 書込失敗 ${stats.writeFail}）`,
     );
-    throw new DOMException("バッチが中断されました", "AbortError");
+    return {
+      ...stats,
+      failedPaths: [...failedPathSet],
+      aborted: true,
+    };
   };
 
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
@@ -241,7 +291,8 @@ export async function runBatchPipeline(options: {
 
   try {
     for (let i = 0; i < imagePaths.length; i++) {
-      throwIfAborted();
+      const earlyAbort = finishIfAborted();
+      if (earlyAbort) return earlyAbort;
       const src = imagePaths[i]!;
       const shortName = basename(src);
       const current = i + 1;
@@ -255,10 +306,16 @@ export async function runBatchPipeline(options: {
         const msg = e instanceof Error ? e.message : String(e);
         options.onLog(`  ERROR read: ${msg}`);
         stats.loadFail += 1;
+        pushFailed(src);
+        options.onFileOutcome?.({
+          absolutePath: src,
+          outcome: "loadFail",
+        });
         continue;
       }
 
-      throwIfAborted();
+      const afterReadAbort = finishIfAborted();
+      if (afterReadAbort) return afterReadAbort;
 
       const mime = mimeForImagePath(src);
       const file = new File([buf as BlobPart], shortName, { type: mime });
@@ -270,10 +327,16 @@ export async function runBatchPipeline(options: {
         const msg = e instanceof Error ? e.message : String(e);
         options.onLog(`  ERROR load: ${msg}`);
         stats.loadFail += 1;
+        pushFailed(src);
+        options.onFileOutcome?.({
+          absolutePath: src,
+          outcome: "loadFail",
+        });
         continue;
       }
 
-      throwIfAborted();
+      const afterLoaderAbort = finishIfAborted();
+      if (afterLoaderAbort) return afterLoaderAbort;
 
       const { width, height, texture } = loadResult;
 
@@ -317,7 +380,7 @@ export async function runBatchPipeline(options: {
       const outBuf = new Uint8Array(await res.arrayBuffer());
 
       const ext = format === "jpeg" ? "jpg" : "png";
-      const outName = `${baseNameWithoutExt(src)}-graded.${ext}`;
+      const outName = `${baseNameWithoutExt(src)}${suffixForFiles}.${ext}`;
 
       try {
         const written = await api.writeOutputFile({
@@ -327,10 +390,16 @@ export async function runBatchPipeline(options: {
         });
         options.onLog(`  OK → ${written}`);
         stats.ok += 1;
+        options.onFileOutcome?.({ absolutePath: src, outcome: "ok" });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         options.onLog(`  ERROR write: ${msg}`);
         stats.writeFail += 1;
+        pushFailed(src);
+        options.onFileOutcome?.({
+          absolutePath: src,
+          outcome: "writeFail",
+        });
       }
 
       texture.dispose();
@@ -344,5 +413,9 @@ export async function runBatchPipeline(options: {
     renderer.dispose();
   }
 
-  return stats;
+  return {
+    ...stats,
+    failedPaths: [...failedPathSet],
+    aborted: false,
+  };
 }

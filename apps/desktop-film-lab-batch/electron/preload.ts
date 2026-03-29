@@ -12,6 +12,14 @@ export type OutputPayload = {
 };
 
 contextBridge.exposeInMainWorld("filmLabBatch", {
+  getDesktopPrefs: (): Promise<{
+    lastInputDir: string | null;
+    lastOutputDir: string | null;
+  }> => ipcRenderer.invoke("desktop-prefs-get"),
+  setDesktopPrefs: (payload: {
+    lastInputDir?: string;
+    lastOutputDir?: string;
+  }): Promise<void> => ipcRenderer.invoke("desktop-prefs-set", payload),
   pickInputDir: (): Promise<string | null> =>
     ipcRenderer.invoke("pick-input-dir"),
   pickOutputDir: (): Promise<string | null> =>
@@ -35,4 +43,10 @@ contextBridge.exposeInMainWorld("filmLabBatch", {
     ),
   writeOutputFile: (payload: OutputPayload): Promise<string> =>
     ipcRenderer.invoke("write-output-file", payload),
+  readBatchSession: (): Promise<unknown | null> =>
+    ipcRenderer.invoke("batch-session-read"),
+  writeBatchSession: (payload: unknown): Promise<void> =>
+    ipcRenderer.invoke("batch-session-write", payload),
+  clearBatchSession: (): Promise<void> =>
+    ipcRenderer.invoke("batch-session-clear"),
 });

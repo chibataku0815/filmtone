@@ -11,7 +11,9 @@
     "build:electron": "esbuild electron/main.ts --bundle --platform=node --format=cjs --outfile=dist-electron/main.cjs --external:electron && esbuild electron/preload.ts --bundle --platform=node --format=cjs --outfile=dist-electron/preload.cjs --external:electron",
     "build:renderer": "vite build",
     "build": "bun run build:electron && bun run build:renderer",
-    "dev": "bun run build:electron && concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron dist-electron/main.cjs\"",
+    "desktop": "bun run build:electron && concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && cross-env FILM_LAB_DESKTOP_RENDERER_URL=http://127.0.0.1:5173 electron dist-electron/main.cjs\"",
+    "desktop:with-bff": "concurrently -k -n bff,film-lab \"cd ../web && bun run bff:local\" \"wait-on -t 120000 http://127.0.0.1:3000 && bun run desktop\"",
+    "dev": "bun run desktop",
     "start": "bun run build && electron dist-electron/main.cjs",
     "pack:mac": "bun run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --dir",
     "dist:mac": "bun run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac"
@@ -19,6 +21,7 @@
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
     "@radix-ui/colors": "^3.0.0",
+    "electron-store": "8.2.0",
     "film-lab-core": "workspace:*",
     "film-lab-smart-look": "workspace:*",
     "next-intl": "^4.8.3",

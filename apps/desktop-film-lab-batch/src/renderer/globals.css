@@ -301,6 +301,29 @@ body {
   color: var(--fl-text-primary);
 }
 
+/* --- ネイティブ text（バッチ接尾辞など。select と同系トークン） --- */
+
+.film-lab-desktop-root input[type="text"].fl-text-input {
+  border: 1px solid var(--fl-border-default);
+  border-radius: 0.5rem;
+  background-color: var(--fl-bg-interactive);
+  color: var(--fl-text-primary);
+  padding: 0.5rem 0.65rem;
+  font-size: 0.75rem;
+  line-height: 1.25;
+  min-height: 2.25rem;
+}
+
+.film-lab-desktop-root input[type="text"].fl-text-input:hover {
+  border-color: var(--fl-border-strong);
+  background-color: var(--fl-bg-interactive-hover);
+}
+
+.film-lab-desktop-root input[type="text"].fl-text-input:focus-visible {
+  outline: 2px solid var(--fl-focus-ring);
+  outline-offset: 1px;
+}
+
 /* --- ヘッダー --- */
 
 .fl-app-header {
