@@ -336,7 +336,7 @@
       "present_mode": {
         "toggleLabel": "Presenter mode",
         "description": "Hides all donation prompts, footer support links, and post-save support modals while you share your screen.",
-        "urlHint": "You can also add ?present=1 to the URL."
+        "urlHint": "Add ?present=1 to the URL for the same. Use ?present=0 or turn the checkbox off to exit."
       },
       "present_hint": {
         "body": "Sharing your screen? Turn on Presenter mode to hide support prompts.",
