@@ -239,7 +239,7 @@
       "credit": "Inspired by Codrops WebGL Distortion Hover Effects"
     },
     "film-lab": {
-      "title": "Quiet Reel",
+      "title": "Film Lab",
       "description": "A real-time color grading tool in the browser. Drop images or videos, then adjust exposure, contrast, and LUT in real-time. All effects implemented entirely in GPU fragment shaders.",
       "sampleHint": "You're viewing a sample image—drop your own photo or video to grade your own footage.",
       "openFullApp": "Open full app"
@@ -253,18 +253,18 @@
     },
     "back": "\u2190 Back to Interactive",
     "metadata": {
-      "title": "Quiet Reel",
-      "description": "A real-time color grading tool in the browser. Drop images or videos, then adjust exposure, contrast, and LUT with GPU fragment shaders. Formerly Film Lab.",
-      "ogTitle": "Quiet Reel \u2014 Browser Color Grading Tool",
+      "title": "Film Lab",
+      "description": "A real-time color grading tool in the browser. Drop images or videos, then adjust exposure, contrast, and LUT with GPU fragment shaders.",
+      "ogTitle": "Film Lab \u2014 Browser Color Grading Tool",
       "ogDescription": "Drop an image or video and grade it in real-time. Exposure, contrast, LUT, and film presets powered by WebGL2 GPU shaders.",
-      "ogImageAlt": "Quiet Reel color grading tool"
+      "ogImageAlt": "Film Lab Color Grading Tool"
     },
     "share": {
       "sectionTitle": "Share",
       "copyLink": "Copy look link",
       "copied": "Copied!",
       "postToX": "Post to X",
-      "postText": "Try this grade in Quiet Reel \u2014 browser color grading"
+      "postText": "Try this grade in Film Lab \u2014 browser color grading"
     },
     "browser": {
       "sectionTitle": "This browser",
@@ -308,6 +308,38 @@
       "shadowTone": "Shadow tone",
       "highlightHue": "Highlight hue",
       "highlightTone": "Highlight tone"
+    },
+    "donation": {
+      "footer": {
+        "shortLine": "Film Lab stays free. Optional support helps fund improvements and hosting.",
+        "linkStripe": "Support via Stripe",
+        "linkBmc": "Tip on Buy Me a Coffee",
+        "ariaSupportSection": "Optional ways to support Film Lab. Skipping does not limit features.",
+        "ariaOpenStripe": "Open Stripe checkout for optional support in a new tab",
+        "ariaOpenBmc": "Open Buy Me a Coffee in a new tab"
+      },
+      "preset_save_modal": {
+        "title": "Saved to this browser",
+        "body": "Film Lab remains free to use. If you\u2019d like, optional support through Stripe or Buy Me a Coffee helps us keep improving. Skipping is fine\u2014nothing changes for you.",
+        "primaryStripe": "Support via Stripe (optional)",
+        "secondaryBmc": "Tip on Buy Me a Coffee",
+        "dismiss": "Not now",
+        "neverShowAgain": "Don\u2019t show this again"
+      },
+      "lut_banner": {
+        "message": "LUT loaded locally in your browser. Optional support links are in the footer if you\u2019d like to help.",
+        "dismiss": "Dismiss"
+      },
+      "present_mode": {
+        "toggleLabel": "Presenter mode",
+        "description": "Hides all donation prompts, footer support links, and post-save support modals while you share your screen.",
+        "urlHint": "You can also add ?present=1 to the URL."
+      },
+      "present_hint": {
+        "body": "Sharing your screen? Turn on Presenter mode to hide support prompts.",
+        "dismiss": "Got it"
+      },
+      "legal_footer_short": "Not tax advice. Third-party checkout. Ask your advisor."
     },
     "shortcuts": {
       "title": "Keyboard Shortcuts",

@@ -239,7 +239,7 @@
       "credit": "Inspired by Codrops WebGL Distortion Hover Effects"
     },
     "film-lab": {
-      "title": "Quiet Reel",
+      "title": "Film Lab",
       "description": "ブラウザで動くリアルタイムカラーグレーディングツール。画像や動画をドロップして、露出・コントラスト・LUTをリアルタイムに適用。全エフェクトをGPUシェーダーで実装。",
       "sampleHint": "表示中はデモ用のサンプルです。お手持ちの写真や動画をドロップすると、その素材でそのまま試せます。",
       "openFullApp": "フルアプリを開く"
@@ -253,18 +253,18 @@
     },
     "back": "\u2190 Interactive に戻る",
     "metadata": {
-      "title": "Quiet Reel",
-      "description": "ブラウザで動くリアルタイムカラーグレーディングツール。画像や動画をドロップして、露出・コントラスト・LUTをGPUシェーダーでリアルタイムに適用。旧称 Film Lab。",
-      "ogTitle": "Quiet Reel \u2014 ブラウザで動くカラーグレーディングツール",
+      "title": "Film Lab",
+      "description": "ブラウザで動くリアルタイムカラーグレーディングツール。画像や動画をドロップして、露出・コントラスト・LUTをGPUシェーダーでリアルタイムに適用。",
+      "ogTitle": "Film Lab \u2014 ブラウザで動くカラーグレーディングツール",
       "ogDescription": "画像や動画をドロップするだけ。露出・コントラスト・LUTをリアルタイムに適用できるWebGLカラグレツール。",
-      "ogImageAlt": "Quiet Reel カラーグレーディングツール"
+      "ogImageAlt": "Film Lab カラーグレーディングツール"
     },
     "share": {
       "sectionTitle": "共有",
       "copyLink": "ルックのリンクをコピー",
       "copied": "コピーしました",
       "postToX": "X に投稿",
-      "postText": "Quiet Reel でこのルックを試せます（ブラウザでカラグレ）"
+      "postText": "Film Lab でこのルックを試せます（ブラウザでカラグレ）"
     },
     "browser": {
       "sectionTitle": "このブラウザに保存",
@@ -308,6 +308,38 @@
       "shadowTone": "シャドウトーン",
       "highlightHue": "ハイライトの色相",
       "highlightTone": "ハイライトトーン"
+    },
+    "donation": {
+      "footer": {
+        "shortLine": "Film Lab は基本無料です。よろしければ、改善やサーバー費用への任意のご支援をお願いしています。",
+        "linkStripe": "Stripe で支援（任意）",
+        "linkBmc": "Buy Me a Coffee で支援",
+        "ariaSupportSection": "Film Lab への任意の支援です。スキップしても機能に影響しません。",
+        "ariaOpenStripe": "任意の支援のため Stripe の決済ページを新しいタブで開きます",
+        "ariaOpenBmc": "Buy Me a Coffee を新しいタブで開きます"
+      },
+      "preset_save_modal": {
+        "title": "このブラウザに保存しました",
+        "body": "Film Lab は引き続き無料でご利用いただけます。よろしければ Stripe または Buy Me a Coffee から任意でご支援いただけると助かります。閉じていただいてもそのままお使いいただけます。",
+        "primaryStripe": "Stripe で支援（任意）",
+        "secondaryBmc": "Buy Me a Coffee で支援",
+        "dismiss": "閉じる",
+        "neverShowAgain": "今後この案内を表示しない"
+      },
+      "lut_banner": {
+        "message": "LUT を読み込みました。処理はブラウザ内のみです。任意の支援はフッターからどうぞ。",
+        "dismiss": "閉じる"
+      },
+      "present_mode": {
+        "toggleLabel": "プレゼンモード",
+        "description": "画面共有やデモ中は、寄付案内・フッターの支援リンク・保存後の支援モーダルをすべて非表示にします。",
+        "urlHint": "URL に ?present=1 を付けても同じ表示になります。"
+      },
+      "present_hint": {
+        "body": "画面共有中ですか？プレゼンモードをオンにすると、支援の案内を表示しません。",
+        "dismiss": "了解"
+      },
+      "legal_footer_short": "税務上の助言ではありません。決済は外部サービスです。詳細は専門家にご確認ください。"
     },
     "shortcuts": {
       "title": "キーボードショートカット",
