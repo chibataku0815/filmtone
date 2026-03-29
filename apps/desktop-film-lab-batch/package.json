@@ -27,6 +27,7 @@
     "electron-store": "8.2.0",
     "film-lab-core": "workspace:*",
     "film-lab-smart-look": "workspace:*",
+    "mp4box": "^2.3.0",
     "next-intl": "^4.8.3",
     "react": "19.2.1",
     "react-dom": "19.2.1",

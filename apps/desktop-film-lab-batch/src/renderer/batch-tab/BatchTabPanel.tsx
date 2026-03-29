@@ -3,7 +3,7 @@
  *
  * @description
  * ユーザー向けには「バッチ」ではなく**書き出し・フォルダの写真をまとめて**など写真用語で説明する。
- * 「次」の案内は**手順ナビを主**にし、上部は 1 行＋移動ボタンに抑えて情報密度と重複ラベルを減らす。
+ * 「次」の案内は**手順ナビを主**にし、上部は展開時は複数行＋移動、**折りたたみ時は一行チップ**にできる（`localStorage` で記憶、**未設定時は展開**）。
  * 手順は番号付きブロックと、任意の 1 ステップ表示の切替で整理する。
  * 状態（BatchGradeState / IPC）は持たず、親の App から渡されたコールバックだけを呼ぶ。
  * ルック段の「編集のスライダーを書き出しに反映」は編集フッターと同じ同期処理（viewport 準備済みのときだけ活性）。
@@ -14,7 +14,13 @@
  * - 手順の一覧/1画面は localStorage で覚える。初回は 1 画面ずつを既定にし、初回書き出し成功後は一覧へ寄せる。
  */
 
-import { CheckCircle, Circle } from "@phosphor-icons/react";
+import {
+  CaretDown,
+  CaretUp,
+  CheckCircle,
+  Circle,
+  File,
+} from "@phosphor-icons/react";
 import {
   useCallback,
   useEffect,
@@ -23,7 +29,7 @@ import {
   useState,
   type ReactElement,
 } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { PRESETS, type PresetName } from "film-lab-core";
 import {
   pathsNotSucceeded,
@@ -63,6 +69,11 @@ const LS_EXPORT_STEP_LAYOUT = "filmLab.export.stepLayoutPref";
  * @description 初めて書き出しに成功したあと 1 を入れ、以降は初回ウィザード既定を使わない印
  */
 const LS_EXPORT_FIRST_SUCCESS = "filmLab.export.firstExportDone";
+
+/**
+ * @description 「次にやること」帯を展開するか。`1` = 展開、`0` = 折りたたみ。**キーが無いときは展開**（初回のみ広い案内を見せる）
+ */
+const LS_EXPORT_NEXT_STRIP_EXPANDED = "filmLab.export.nextStripExpanded";
 
 /**
  * @description 手順表示の初期値。localStorage に明示がなければ 1 画面ずつ（ウィザード）を既定にする。
@@ -110,6 +121,32 @@ function markFirstExportSuccessAndPreferList(
     setShowAllSteps(true);
   } catch {
     setShowAllSteps(true);
+  }
+}
+
+/**
+ * @description 「次にやること」帯の展開初期値。保存が無い・読めないときは **展開（true）**。
+ * @returns {boolean} true ならフル帯、false なら一行チップ
+ */
+function readInitialNextStripExpanded(): boolean {
+  try {
+    if (typeof localStorage === "undefined") return true;
+    return localStorage.getItem(LS_EXPORT_NEXT_STRIP_EXPANDED) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * @description 帯の開閉を次回起動まで覚える（`0` / `1` で保存）
+ * @param expanded - true でフル表示、false で一行チップ
+ */
+function persistNextStripExpanded(expanded: boolean): void {
+  try {
+    if (typeof localStorage === "undefined") return;
+    localStorage.setItem(LS_EXPORT_NEXT_STRIP_EXPANDED, expanded ? "1" : "0");
+  } catch {
+    /* プライベートモード等では無視 */
   }
 }
 
@@ -167,7 +204,7 @@ export type BatchTabPanelProps = {
   onPickVideoFile: () => void | Promise<void>;
   onRunVideoExport: () => void | Promise<void>;
 
-  /** @description true なら WebGL 逐次（低速・プレビュー寄り）。false が既定の高速 ffmpeg */
+  /** @description true なら WebGL 逐次（編集画面どおり・既定）。false なら高速 ffmpeg（近似） */
   videoExportWebglAccurate: boolean;
   onVideoExportWebglAccurateChange: (value: boolean) => void;
   /**
@@ -187,6 +224,14 @@ export type BatchTabPanelProps = {
    * @description 編集タブのプレビューから BatchGradeState へ数値をコピー（App の syncPreviewToBatch と同一）。
    */
   onApplyEditGradeToBatch: () => void;
+  /**
+   * @description 直近の「編集→反映」成功時刻（ms）。null なら表示上は JSON またはプリセット起点扱い。
+   */
+  editToExportSyncedAtMs: number | null;
+  /**
+   * @description いまの `batchPresetChoice` を film-lab-core の初期値で焼き直し、編集同期をやめる（App の applyBatchPreset と同系）。
+   */
+  onReapplyBatchPresetBaseline: () => void;
 };
 
 /**
@@ -323,9 +368,12 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     videoExportSuccessNonce,
     canApplyEditGradeToBatch,
     onApplyEditGradeToBatch,
+    editToExportSyncedAtMs,
+    onReapplyBatchPresetBaseline,
   } = props;
 
   const t = useTranslations("film-lab.desktop.batch");
+  const locale = useLocale();
   const stepLabels = useMemo(
     (): Record<BatchStepId, string> => ({
       jobType: t("steps.jobType"),
@@ -336,6 +384,54 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     }),
     [t],
   );
+
+  /**
+   * @description 書き出しルックの「正」を 1 枚に圧縮して表示（JSON / 編集同期 / プリセットの三択）
+   */
+  const lookStatusBanner = useMemo(() => {
+    if (importedGradeLabel) {
+      return {
+        Icon: File,
+        iconWeight: "duotone" as const,
+        title: t("lookStatusJsonTitle"),
+        body: t("lookStatusJsonBody", { path: importedGradeLabel }),
+        accent: "shadow-[inset_3px_0_0_0_var(--blue-9)]",
+        iconClass: "text-[var(--blue-11)]",
+      };
+    }
+    if (editToExportSyncedAtMs != null) {
+      const time = new Date(editToExportSyncedAtMs).toLocaleTimeString(
+        locale === "ja" ? "ja-JP" : locale,
+        {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        },
+      );
+      return {
+        Icon: CheckCircle,
+        iconWeight: "fill" as const,
+        title: t("lookStatusEditTitle"),
+        body: t("lookStatusEditBody", { time }),
+        accent: "shadow-[inset_3px_0_0_0_rgb(52_211_153)]",
+        iconClass: "text-[rgb(52_211_153)]",
+      };
+    }
+    return {
+      Icon: Circle,
+      iconWeight: "duotone" as const,
+      title: t("lookStatusPresetTitle", { preset: batchPresetChoice }),
+      body: t("lookStatusPresetBody"),
+      accent: "shadow-[inset_3px_0_0_0_var(--amber-9)]",
+      iconClass: "text-[var(--fl-text-secondary)]",
+    };
+  }, [
+    importedGradeLabel,
+    editToExportSyncedAtMs,
+    batchPresetChoice,
+    locale,
+    t,
+  ]);
 
   /**
    * @description 「次にやること」バナー用の長めの説明（title 属性）
@@ -392,6 +488,12 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
   const [showAllSteps, setShowAllSteps] = useState(() => readInitialShowAllSteps());
   /** @description ルックの「JSON / ファイル」詳細（デフォルト閉じる） */
   const [lookAdvancedOpen, setLookAdvancedOpen] = useState(false);
+  /**
+   * @description 上部「次にやること」帯。初回・未保存時は展開、折りたたみ時は一行チップ＋開く操作。
+   */
+  const [nextStripExpanded, setNextStripExpanded] = useState(() =>
+    readInitialNextStripExpanded(),
+  );
 
   useEffect(() => {
     setActiveStep(0);
@@ -670,56 +772,138 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
   /**
    * @description ステップ 2: ルック（プリセット＋詳細アコーディオン）
    */
-  const renderStepLook = () => (
+  const renderStepLook = () => {
+    const LookStatusIcon = lookStatusBanner.Icon;
+    return (
     <div className="flex flex-col gap-3">
       <p className="text-sm font-medium text-[var(--fl-text-primary)]">
         {t("lookSectionLead")}
       </p>
-      <label className="flex max-w-md flex-col gap-1.5">
-        <span className="fl-label">{t("presetQuickLabel")}</span>
-        <select
-          value={batchPresetChoice}
-          onChange={(e) => onBatchPresetChoiceChange(e.target.value as PresetName)}
-          className="w-full max-w-md"
-          aria-label={t("presetSelectAria")}
-        >
-          {PRESET_NAMES.map((n) => (
-            <option key={n} value={n}>
-              {n}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          className="fl-btn-secondary max-w-full sm:max-w-none"
-          disabled={running || !canApplyEditGradeToBatch}
-          title={
-            canApplyEditGradeToBatch ? undefined : t("applyEditWaitHint")
-          }
-          onClick={onApplyEditGradeToBatch}
-        >
-          {t("applyEditToExportBtn")}
-        </button>
-        <HelpHint
-          tip={t("tipApplyEditGradeToBatch")}
-          assistiveLabel={t("applyEditHintAria")}
-        />
-      </div>
-      <p className="fl-caption text-[var(--fl-text-secondary)]">
-        {t("sameAsFooterSend")}
+      <p className="fl-caption max-w-prose text-[var(--fl-text-secondary)]">
+        {t("lookSectionIntro")}
       </p>
 
-      <div className="flex flex-col gap-1">
-        <span className="fl-label">{t("currentExportLookLabel")}</span>
-        <span className="text-xs leading-snug text-[var(--fl-text-primary)]">
-          {importedGradeLabel
-            ? t("currentExportLookImportJson", { path: importedGradeLabel })
-            : t("currentExportLookPreset", { preset: batchPresetChoice })}
-        </span>
+      <div
+        className={`flex gap-2.5 rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] px-3 py-2.5 ${lookStatusBanner.accent}`}
+        role="status"
+        aria-live="polite"
+        aria-label={lookStatusBanner.title}
+      >
+        <LookStatusIcon
+          size={22}
+          weight={lookStatusBanner.iconWeight}
+          className={`mt-0.5 shrink-0 ${lookStatusBanner.iconClass}`}
+          aria-hidden
+        />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-[var(--fl-text-primary)]">
+            {lookStatusBanner.title}
+          </p>
+          <p className="fl-caption mt-0.5 max-w-prose text-[var(--fl-text-secondary)]">
+            {lookStatusBanner.body}
+          </p>
+        </div>
       </div>
+
+      <div className="flex flex-col gap-2 rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-raised)] px-3 py-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--fl-text-secondary)]">
+          {t("lookFromEditHeading")}
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className={
+              running || !canApplyEditGradeToBatch
+                ? "fl-btn-secondary max-w-full sm:max-w-none"
+                : "fl-btn-primary max-w-full sm:max-w-none"
+            }
+            disabled={running || !canApplyEditGradeToBatch}
+            title={
+              canApplyEditGradeToBatch ? undefined : t("applyEditWaitHint")
+            }
+            onClick={onApplyEditGradeToBatch}
+          >
+            {t("applyEditToExportBtn")}
+          </button>
+          <HelpHint
+            tip={t("tipApplyEditGradeToBatch")}
+            assistiveLabel={t("applyEditHintAria")}
+          />
+        </div>
+        <p className="fl-caption text-[var(--fl-text-secondary)]">
+          {t("sameAsFooterSend")}
+        </p>
+      </div>
+
+      {importedGradeLabel == null &&
+      editToExportSyncedAtMs != null ? (
+        <div className="flex max-w-md flex-col gap-2 rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] px-3 py-2.5">
+          <span className="fl-label">{t("presetQuickLabel")}</span>
+          <p className="fl-caption max-w-prose text-[var(--fl-text-secondary)]">
+            {t("lookPresetHiddenWhileSyncedBody", {
+              preset: batchPresetChoice,
+            })}
+          </p>
+          <button
+            type="button"
+            className="fl-btn-secondary self-start"
+            disabled={running}
+            onClick={onReapplyBatchPresetBaseline}
+          >
+            {t("lookRevertToPresetOnlyBtn")}
+          </button>
+        </div>
+      ) : (
+        <label className="flex max-w-md flex-col gap-1.5">
+          <span className="fl-label">{t("presetQuickLabel")}</span>
+          <select
+            data-testid="export-preset-select"
+            value={batchPresetChoice}
+            onChange={(e) =>
+              onBatchPresetChoiceChange(e.target.value as PresetName)
+            }
+            className="w-full max-w-md"
+            aria-label={t("presetSelectAria")}
+          >
+            {PRESET_NAMES.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      {/*
+       * 動画かつ「高速 ffmpeg を UI で選べる」ビルドだけ、ルック段に経路の違いを出す。
+       * WebGL のみのときは「保存先と形式」の注記と重複するためここでは出さない（認知負荷を抑える）。
+       */}
+      {batchJobMode === "video" && showFastFfmpegVideoExportOption ? (
+        <div
+          className="flex flex-col gap-1.5 rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] px-3 py-2"
+          role="status"
+          aria-label={t("lookVideoEncodeCalloutAria")}
+        >
+          <p className="text-xs font-semibold text-[var(--fl-text-primary)]">
+            {videoExportWebglAccurate
+              ? t("lookVideoEncodeAccurateTitle")
+              : t("lookVideoEncodeFastTitle")}
+          </p>
+          <p className="fl-caption max-w-prose text-[var(--fl-text-secondary)]">
+            {videoExportWebglAccurate
+              ? t("lookVideoEncodeAccurateBody")
+              : t("lookVideoEncodeFastBody")}
+          </p>
+          {!videoExportWebglAccurate ? (
+            <p className="fl-caption max-w-prose text-[var(--fl-text-tertiary)]">
+              {t("lookVideoEncodeFastDisclaimer")}
+            </p>
+          ) : null}
+          <p className="fl-caption text-[var(--fl-text-tertiary)]">
+            {t("lookVideoEncodeStepPointer")}
+          </p>
+        </div>
+      ) : null}
 
       <div className="flex items-start gap-1.5 rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] px-3 py-2">
         <details
@@ -742,7 +926,8 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         <HelpHint tip={t("tipLookJsonDetails")} assistiveLabel={t("advancedGradeJsonAria")} />
       </div>
     </div>
-  );
+    );
+  };
 
   /**
    * @description ステップ 3: 出力先・形式
@@ -1030,26 +1215,78 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
       ) : null}
 
       {!running ? (
-        <div
-          className="fl-export-next-strip flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2"
-          role="status"
-          aria-live="polite"
-          title={nextBlockingBannerText(nextBlockingStepId, batchJobMode)}
-        >
-          <span className="tabular-nums text-xs font-semibold text-[var(--fl-text-primary)]">
-            {nextBlockingIdx + 1}. {stepLabels[nextBlockingStepId]}
-          </span>
-          <span className="min-w-0 flex-1 basis-[14rem] text-xs leading-snug text-[var(--fl-text-secondary)]">
-            {nextBlockingInlineHint(nextBlockingStepId, batchJobMode)}
-          </span>
-          <button
-            type="button"
-            className="fl-btn-secondary shrink-0 px-2.5 py-1 text-[0.65rem]"
-            onClick={() => focusExportStep(nextBlockingStepId)}
+        nextStripExpanded ? (
+          <div
+            className="fl-export-next-strip flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2"
+            role="region"
+            aria-label={t("nextStripRegionAria")}
+            aria-live="polite"
+            title={nextBlockingBannerText(nextBlockingStepId, batchJobMode)}
           >
-            {t("nextStripGo")}
-          </button>
-        </div>
+            <span className="tabular-nums text-xs font-semibold text-[var(--fl-text-primary)]">
+              {nextBlockingIdx + 1}. {stepLabels[nextBlockingStepId]}
+            </span>
+            <span className="min-w-0 flex-1 basis-[14rem] text-xs leading-snug text-[var(--fl-text-secondary)]">
+              {nextBlockingInlineHint(nextBlockingStepId, batchJobMode)}
+            </span>
+            <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                className="fl-btn-secondary px-2.5 py-1 text-[0.65rem]"
+                onClick={() => focusExportStep(nextBlockingStepId)}
+              >
+                {t("nextStripGo")}
+              </button>
+              <button
+                type="button"
+                className="fl-btn-secondary inline-flex items-center gap-0.5 px-2 py-1 text-[0.65rem]"
+                aria-expanded="true"
+                onClick={() => {
+                  setNextStripExpanded(false);
+                  persistNextStripExpanded(false);
+                }}
+              >
+                <CaretUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                {t("nextStripCollapse")}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div
+            className="fl-export-next-strip flex flex-nowrap items-center gap-2 px-2.5 py-1.5"
+            role="region"
+            aria-label={t("nextStripRegionAria")}
+            aria-live="polite"
+            title={nextBlockingBannerText(nextBlockingStepId, batchJobMode)}
+          >
+            <span className="min-w-0 flex-1 truncate text-xs leading-snug text-[var(--fl-text-secondary)]">
+              <span className="font-semibold tabular-nums text-[var(--fl-text-primary)]">
+                {nextBlockingIdx + 1}. {stepLabels[nextBlockingStepId]}
+              </span>
+              <span className="text-[var(--fl-text-tertiary)]"> · </span>
+              {nextBlockingInlineHint(nextBlockingStepId, batchJobMode)}
+            </span>
+            <button
+              type="button"
+              className="fl-btn-secondary shrink-0 px-2 py-1 text-[0.65rem]"
+              onClick={() => focusExportStep(nextBlockingStepId)}
+            >
+              {t("nextStripGo")}
+            </button>
+            <button
+              type="button"
+              className="fl-btn-secondary inline-flex shrink-0 items-center gap-0.5 px-2 py-1 text-[0.65rem]"
+              aria-expanded="false"
+              onClick={() => {
+                setNextStripExpanded(true);
+                persistNextStripExpanded(true);
+              }}
+            >
+              <CaretDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              {t("nextStripExpand")}
+            </button>
+          </div>
+        )
       ) : (
         <p className="rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] px-3 py-2 text-xs text-[var(--fl-text-secondary)]">
           {t("runningNotice")}

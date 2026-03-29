@@ -2,6 +2,7 @@
  * Film Lab デスクトップ — 編集（Web 踏襲）と書き出し（フォルダ／動画）の 2 モード
  *
  * @overview 書き出し用ルックの正はメモリ上の BatchGradeState。編集タブでプレビューし「色を書き出しへ送る」で同期する。
+ * 編集／書き出しは **タブで表示だけ切り替え**、編集ツリーはアンマウントしない（WebGL Viewport を維持し「反映」を常に効かせる）。
  * @limitations プレビュー上の LUT を書き出しへ自動複製はしない（JSON Import か .cube 再適用）。
  * シェルの色・段差は globals.css の Radix スケール準拠トークン（html.dark.dark-theme）に集約する。
  *
@@ -67,6 +68,12 @@ import {
 type TabId = "edit" | "batch";
 
 const PRESET_NAMES = Object.keys(PRESETS) as PresetName[];
+
+/**
+ * @description 非表示タブに `hidden`（display:none）を使わない。WebGL キャンバスの尺寸・コンテキストを維持し、重ね順と透明・pointer-events でだけ隠す。
+ */
+const DESKTOP_INACTIVE_TAB_CLASS =
+  "pointer-events-none absolute inset-0 z-0 flex min-h-0 flex-col gap-4 overflow-hidden opacity-0";
 
 /**
  * @description セッションに保存した情報だけから BatchGradeState を組み立てる（再開直後のパイプライン用）
@@ -188,7 +195,7 @@ export default function App() {
   /** @description ffprobe 済みのメタ（UI 表示用） */
   const [videoProbeLabel, setVideoProbeLabel] = useState<string | null>(null);
   /**
-   * @description 既定は高速 ffmpeg（false）。編集タブに揃えたいときだけ true（WebGL）。
+   * @description 既定は編集画面どおり（WebGL 逐次・true）。速い近似経路はチェックを外す（false）。
    */
   const [videoExportWebglAccurate, setVideoExportWebglAccurate] = useState(
     defaultVideoExportWebglAccurate,
@@ -197,6 +204,16 @@ export default function App() {
    * @description 動画書き出し成功のたびに増やす。書き出しタブの「初回はウィザード→成功後は一覧」だけ検知する（BatchGradeState ではない）。
    */
   const [videoExportSuccessNonce, setVideoExportSuccessNonce] = useState(0);
+  /**
+   * @description 編集→書き出し同期の結果をヘッダー下に出す（ログは書き出しタブ下部のため、編集だけ見ていると気づきにくい問題の対策）
+   */
+  const [gradeSyncNotice, setGradeSyncNotice] = useState<string | null>(null);
+  /**
+   * @description 編集→書き出しへ同期が成功した時刻（ms）。null のときは JSON 由来でもプリセット起点でも「直近は編集同期ではない」。
+   */
+  const [editToExportSyncedAtMs, setEditToExportSyncedAtMs] = useState<
+    number | null
+  >(null);
 
   /**
    * @description 高速 ffmpeg が無効なビルドでは常に WebGL のみ（フラグと UI の状態を矛盾させない）
@@ -257,6 +274,7 @@ export default function App() {
         setBatchFormat(parsed.format);
         setBatchOutputSuffix(parsed.outputFilenameSuffix);
         setBatchPresetChoice(parsed.batchPresetChoice);
+        setEditToExportSyncedAtMs(null);
         try {
           const snap = await resolveBatchGradeSnapshot(parsed);
           setBatchGrade(snap);
@@ -273,6 +291,17 @@ export default function App() {
     })();
   }, []);
 
+  /**
+   * @description 同期メッセージをしばらくしたら消す（画面のノイズを抑える）
+   */
+  useEffect(() => {
+    if (!gradeSyncNotice) return;
+    const id = window.setTimeout(() => {
+      setGradeSyncNotice(null);
+    }, 6000);
+    return () => window.clearTimeout(id);
+  }, [gradeSyncNotice]);
+
   const appendLog = useCallback((line: string) => {
     setLogText((t) => `${t}${line}\n`);
   }, []);
@@ -280,24 +309,42 @@ export default function App() {
   const syncPreviewToBatch = useCallback(() => {
     if (!viewport) {
       appendLog(tLogs("syncNoViewport"));
+      setGradeSyncNotice(tApp("syncGradeNoViewport"));
       return;
     }
-    const raw = viewport.getParams();
-    const params = viewportRecordToParams(raw, batchGrade.params.halationHue);
-    setBatchGrade({
-      params,
-      lutIntensity: 1,
-      lutData: null,
-      lutSize: 0,
-    });
-    setImportedGradeLabel(null);
-    appendLog(tLogs("syncCopied"));
-  }, [viewport, batchGrade.params.halationHue, appendLog, tLogs]);
+    try {
+      const raw = viewport.getParams();
+      const params = viewportRecordToParams(raw, batchGrade.params.halationHue);
+      setBatchGrade({
+        params,
+        lutIntensity: 1,
+        lutData: null,
+        lutSize: 0,
+      });
+      setImportedGradeLabel(null);
+      setBatchPresetChoice(canvasPreset);
+      setEditToExportSyncedAtMs(Date.now());
+      appendLog(tLogs("syncCopied"));
+      setGradeSyncNotice(tApp("syncGradeOk"));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      appendLog(tLogs("syncException", { msg }));
+      setGradeSyncNotice(tApp("syncGradeError", { msg }));
+    }
+  }, [
+    viewport,
+    batchGrade.params.halationHue,
+    canvasPreset,
+    appendLog,
+    tLogs,
+    tApp,
+  ]);
 
   const applyBatchPreset = (name: PresetName) => {
     setBatchPresetChoice(name);
     setBatchGrade(batchGradeStateFromPreset(name));
     setImportedGradeLabel(null);
+    setEditToExportSyncedAtMs(null);
   };
 
   const importGradeJson = async () => {
@@ -313,6 +360,7 @@ export default function App() {
         lutSize: g.lutSize,
       });
       setImportedGradeLabel(p);
+      setEditToExportSyncedAtMs(null);
       appendLog(tLogs("gradeJsonLoaded", { path: p }));
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -839,8 +887,25 @@ export default function App() {
         </div>
       </header>
 
-      {tab === "edit" ? (
-        <div className="fl-main flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
+      {gradeSyncNotice ? (
+        <div
+          className="border-b border-[var(--amber-9)] bg-[var(--fl-bg-subtle)] px-4 py-2 text-xs leading-snug text-[var(--fl-text-primary)] shadow-[inset_0_2px_0_0_var(--amber-9)]"
+          role="status"
+          aria-live="polite"
+        >
+          {gradeSyncNotice}
+        </div>
+      ) : null}
+
+      <div className="relative flex min-h-0 flex-1 flex-col">
+      <div
+        className={
+          tab === "edit"
+            ? "relative z-10 flex min-h-0 flex-1 flex-col gap-4 overflow-hidden fl-main"
+            : DESKTOP_INACTIVE_TAB_CLASS
+        }
+        aria-hidden={tab !== "edit"}
+      >
           <div className="relative flex min-h-0 flex-1 flex-col gap-4 lg:min-h-0 lg:overflow-hidden">
             <section className="fl-card fl-scroll-surface relative z-0 flex min-h-0 w-full min-w-0 flex-col gap-3 overflow-y-auto max-lg:flex-none lg:absolute lg:inset-0 lg:z-0">
               <div className="fl-card-header">
@@ -960,9 +1025,16 @@ export default function App() {
               </section>
             </div>
           </div>
-        </div>
-      ) : (
-        <div className="fl-main fl-main-batch fl-scroll-surface flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+      </div>
+
+      <div
+        className={
+          tab === "batch"
+            ? "relative z-10 fl-main fl-main-batch fl-scroll-surface flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto"
+            : DESKTOP_INACTIVE_TAB_CLASS
+        }
+        aria-hidden={tab !== "batch"}
+      >
           <BatchTabPanel
             batchJobMode={batchJobMode}
             onBatchJobModeChange={setBatchJobMode}
@@ -1013,11 +1085,15 @@ export default function App() {
             videoExportSuccessNonce={videoExportSuccessNonce}
             canApplyEditGradeToBatch={Boolean(viewport)}
             onApplyEditGradeToBatch={syncPreviewToBatch}
+            editToExportSyncedAtMs={editToExportSyncedAtMs}
+            onReapplyBatchPresetBaseline={() => {
+              applyBatchPreset(batchPresetChoice);
+            }}
           />
 
           <pre className="fl-log">{logText || tApp("logPlaceholder")}</pre>
-        </div>
-      )}
+      </div>
+      </div>
     </div>
   );
 }

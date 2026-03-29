@@ -182,6 +182,8 @@ async function ffprobeVideoMeta(absPath: string): Promise<{
   sourceFrameRate: number | null;
   /** @description 両方が有限かつ差が小さいとき true */
   sourceFrameRateTrusted: boolean;
+  /** @description WebCodecs 経路のメモリ上限判定用（readFile 前に参照） */
+  fileSizeBytes: number;
 }> {
   let stdout: string;
   try {
@@ -206,6 +208,14 @@ async function ffprobeVideoMeta(absPath: string): Promise<{
     throw new Error(
       `ffprobe 実行失敗（PATH に ffmpeg/ffprobe がありますか？）: ${msg}`,
     );
+  }
+
+  let fileSizeBytes = 0;
+  try {
+    const st = await fs.stat(absPath);
+    if (st.isFile()) fileSizeBytes = st.size;
+  } catch {
+    fileSizeBytes = 0;
   }
 
   let parsed: unknown;
@@ -278,6 +288,7 @@ async function ffprobeVideoMeta(absPath: string): Promise<{
     videoCodec,
     sourceFrameRate,
     sourceFrameRateTrusted,
+    fileSizeBytes,
   };
 }
 
@@ -311,6 +322,48 @@ function writeStdinWithDrain(
     } catch (e) {
       cleanup();
       reject(e instanceof Error ? e : new Error(String(e)));
+    }
+  });
+}
+
+/**
+ * @description stdin.write を呼び即座に resolve。バックプレッシャー中なら前回の drain を先に待つ。
+ * renderer が seek と並列で IPC を走らせるための非同期パイプライン用。
+ */
+let pendingDrain: Promise<void> | null = null;
+
+function writeStdinPipelined(
+  stdin: NodeJS.WritableStream,
+  chunk: Buffer,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const doWrite = () => {
+      const onErr = (e: Error) => {
+        stdin.removeListener("error", onErr);
+        reject(e);
+      };
+      stdin.once("error", onErr);
+      try {
+        const ok = stdin.write(chunk);
+        stdin.removeListener("error", onErr);
+        if (!ok) {
+          pendingDrain = new Promise<void>((drainResolve) => {
+            stdin.once("drain", () => { drainResolve(); });
+          });
+        } else {
+          pendingDrain = null;
+        }
+        resolve();
+      } catch (e) {
+        stdin.removeListener("error", onErr);
+        reject(e instanceof Error ? e : new Error(String(e)));
+      }
+    };
+
+    if (pendingDrain) {
+      pendingDrain.then(doWrite, reject);
+    } else {
+      doWrite();
     }
   });
 }
@@ -1074,7 +1127,10 @@ ipcMain.handle("video-export-write-frame", async (_evt, data: unknown) => {
   const buf = Buffer.from(data.buffer, data.byteOffset, data.byteLength);
   const t0 = process.hrtime.bigint();
   try {
-    await writeStdinWithDrain(stdin, buf);
+    // Pipelined write: enqueue to stdin and return immediately.
+    // Backpressure (drain) is deferred to the next write call,
+    // allowing the renderer to start seeking the next frame in parallel.
+    await writeStdinPipelined(stdin, buf);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     const tail = sess.stderrLines.join("").slice(-2500);
@@ -1098,6 +1154,11 @@ ipcMain.handle("video-export-finish", async () => {
   const { child, stderrLines } = sess;
   activeVideoExport = null;
 
+  // Drain any pending pipelined write before closing stdin
+  if (pendingDrain) {
+    await pendingDrain;
+    pendingDrain = null;
+  }
   child.stdin.end();
 
   const code: number | null = await new Promise((resolve) => {

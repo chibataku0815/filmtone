@@ -48,6 +48,7 @@ export type FilmLabBatchBridge = {
     videoCodec: string;
     sourceFrameRate: number | null;
     sourceFrameRateTrusted: boolean;
+    fileSizeBytes: number;
   }>;
   /** @description ffmpeg を rawvideo stdin で起動（1 セッションのみ） */
   videoExportStart: (payload: {

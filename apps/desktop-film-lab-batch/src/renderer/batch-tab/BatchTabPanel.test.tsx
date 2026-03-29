@@ -57,6 +57,8 @@ const baseProps: BatchTabPanelProps = {
   videoExportSuccessNonce: 0,
   canApplyEditGradeToBatch: false,
   onApplyEditGradeToBatch: () => {},
+  editToExportSyncedAtMs: null,
+  onReapplyBatchPresetBaseline: () => {},
 };
 
 function withListLayout<T>(fn: () => T): T {
@@ -80,34 +82,85 @@ function withListLayout<T>(fn: () => T): T {
   }
 }
 
+/**
+ * @description 一覧レイアウトに加え、「次にやること」帯の localStorage を上書きしてテストする
+ * @param nextStripExpanded - false なら一行チップ（折りたたみ）の既定を再現
+ */
+function withListLayoutAndNextStripExpanded<T>(
+  nextStripExpanded: boolean,
+  fn: () => T,
+): T {
+  const original = globalThis.localStorage;
+  const localStorageMock = {
+    getItem: (key: string) => {
+      if (key === "filmLab.export.stepLayoutPref") return "list";
+      if (key === "filmLab.export.nextStripExpanded") {
+        return nextStripExpanded ? "1" : "0";
+      }
+      return null;
+    },
+    setItem: () => {},
+  } as Storage;
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: localStorageMock,
+  });
+  try {
+    return fn();
+  } finally {
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: original,
+    });
+  }
+}
+
 describe("BatchTabPanel video export copy", () => {
-  it("shows WebGL-only copy and hides the fast checkbox when fast export is disabled", () => {
+  it("uses WebGL-only video copy and no fast-ffmpeg checkbox when fast export is disabled", () => {
     const html = withListLayout(() =>
       renderBatchPanel(
-        <BatchTabPanel
-          {...baseProps}
-          showFastFfmpegVideoExportOption={false}
-        />,
+        <BatchTabPanel {...baseProps} showFastFfmpegVideoExportOption={false} />,
       ),
     );
 
-    expect(html).toContain("WebGL 書き出しのみ（低速）／詳細は手順内");
-    expect(html).toContain("高速トランスコードは準備中です。");
-    expect(html).not.toContain("プレビュー一致（WebGL・低速・既定）");
+    expect(html).toContain("編集に近い見え方で MP4／手順内で保存先を設定");
+    expect(html).toContain("動画は編集タブに近い見え方で書き出します。");
+    expect(html).toContain(
+      "1 フレームずつ処理するため、長いクリップは完了まで時間がかかることがあります。",
+    );
+    expect(html).not.toContain("高速 ffmpeg");
+    expect(html).not.toContain("速く書き出す");
   });
 
-  it("when fast export is enabled, summarizes fast-as-default and optional WebGL accurate", () => {
+  it("next-step strip is expanded by default and offers collapse control", () => {
+    const html = withListLayout(() => renderBatchPanel(<BatchTabPanel {...baseProps} />));
+
+    expect(html).toContain("たたむ");
+  });
+
+  it("next-step strip reads collapsed preference from localStorage (one-line chip + expand)", () => {
+    const html = withListLayoutAndNextStripExpanded(false, () =>
+      renderBatchPanel(<BatchTabPanel {...baseProps} />),
+    );
+
+    expect(html).toContain("開く");
+    expect(html).not.toContain("たたむ");
+    expect(html).toContain("実行で動画を書き出す");
+  });
+
+  it("look step shows edit-synced banner when editToExportSyncedAtMs is set", () => {
     const html = withListLayout(() =>
       renderBatchPanel(
         <BatchTabPanel
           {...baseProps}
-          showFastFfmpegVideoExportOption
+          editToExportSyncedAtMs={1_700_000_000_000}
         />,
       ),
     );
 
-    expect(html).toContain("既定は高速 ffmpeg（近似）／プレビュー一致はオプション");
-    expect(html).toContain("プレビュー一致（WebGL・低速）");
-    expect(html).toContain("高速 ffmpeg（既定・近似）");
+    expect(html).toContain("編集タブのスライダーどおり（反映済み）");
+    expect(html).toContain("に編集から取り込みました");
+    expect(html).toContain("プリセットの数値に戻す");
+    expect(html).not.toContain("data-testid=\"export-preset-select\"");
   });
 });

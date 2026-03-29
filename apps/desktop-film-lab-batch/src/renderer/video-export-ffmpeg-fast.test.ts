@@ -42,6 +42,7 @@ describe("video-export-ffmpeg-fast", () => {
         durationSec: 3,
         hasAudio: true,
         videoCodec: "h264",
+        fileSizeBytes: 1024,
       }),
       videoExportTranscodeFast,
     } as unknown as FilmLabBatchBridge;

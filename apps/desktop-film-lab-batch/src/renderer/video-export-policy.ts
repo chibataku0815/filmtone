@@ -1,16 +1,16 @@
 /**
  * Film Lab デスクトップ — 動画書き出しの公開ポリシー
  *
- * @overview 品質の参照として WebGL accurate は残すが、体験の既定は高速 ffmpeg（近似）に寄せる。
- * プレビュー寄りの完全一致が必要なときだけユーザーが WebGL を選ぶ。
+ * @overview 編集タブの見え方に寄せた書き出しを優先し、体験の既定は WebGL 逐次（編集画面どおり）に寄せる。
+ * 速さ優先の高速 ffmpeg（近似）はオプションで、チェックを外して選ぶ。
  */
 
 /**
- * @description 既定は WebGL を使わない（高速 ffmpeg）。`ENABLE_FFMPEG_FAST_VIDEO_EXPORT` が false のときは
- * UI 側で WebGL 固定になるため、この値は実質上書きされる。
+ * @description 既定は編集画面どおり（WebGL 逐次）。`ENABLE_FFMPEG_FAST_VIDEO_EXPORT` が false のときは
+ * UI 側で WebGL 固定のままなので、この値は実質上書きされないが矛盾は起きない。
  */
 export function defaultVideoExportWebglAccurate(): boolean {
-  return false;
+  return true;
 }
 
 /**
