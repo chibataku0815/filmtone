@@ -1,6 +1,9 @@
 import type { PresetName } from "./presets";
 
-/** スキーマと JSON で共有するプリセット定義バージョン */
+/**
+ * スキーマと JSON（共有 URL・Remotion）で使うプリセット定義のバージョンタグ。
+ * 値を変えると Look ID が変わり互換に影響する。手順は `docs/PRESET_VERSIONING.md`。
+ */
 export const PRESET_VERSION = "v1" as const;
 
 /**
