@@ -239,27 +239,32 @@
       "credit": "Inspired by Codrops WebGL Distortion Hover Effects"
     },
     "film-lab": {
-      "title": "Film Lab",
+      "title": "Quiet Reel",
       "description": "A real-time color grading tool in the browser. Drop images or videos, then adjust exposure, contrast, and LUT in real-time. All effects implemented entirely in GPU fragment shaders.",
-      "sampleHint": "You're viewing a sample image—drop your own photo or video to grade your own footage."
+      "sampleHint": "You're viewing a sample image—drop your own photo or video to grade your own footage.",
+      "openFullApp": "Open full app"
     }
   },
   "film-lab": {
     "sampleHint": "You're viewing a sample image—drop your own photo or video to grade your own footage.",
+    "toolbar": {
+      "open": "Open media",
+      "savePng": "Save PNG"
+    },
     "back": "\u2190 Back to Interactive",
     "metadata": {
-      "title": "Film Lab",
-      "description": "A real-time color grading tool in the browser. Drop images or videos, then adjust exposure, contrast, and LUT with GPU fragment shaders.",
-      "ogTitle": "Film Lab \u2014 Browser Color Grading Tool",
+      "title": "Quiet Reel",
+      "description": "A real-time color grading tool in the browser. Drop images or videos, then adjust exposure, contrast, and LUT with GPU fragment shaders. Formerly Film Lab.",
+      "ogTitle": "Quiet Reel \u2014 Browser Color Grading Tool",
       "ogDescription": "Drop an image or video and grade it in real-time. Exposure, contrast, LUT, and film presets powered by WebGL2 GPU shaders.",
-      "ogImageAlt": "Film Lab Color Grading Tool"
+      "ogImageAlt": "Quiet Reel color grading tool"
     },
     "share": {
       "sectionTitle": "Share",
       "copyLink": "Copy look link",
       "copied": "Copied!",
       "postToX": "Post to X",
-      "postText": "Try this grade in Film Lab \u2014 browser color grading"
+      "postText": "Try this grade in Quiet Reel \u2014 browser color grading"
     },
     "browser": {
       "sectionTitle": "This browser",
