@@ -158,7 +158,7 @@ export function HelpHint(props: HelpHintProps) {
         ref={tooltipRef}
         id={tipId}
         role="tooltip"
-        className="pointer-events-auto z-[2147483647] max-h-[min(17.5rem,calc(100vh-2rem))] w-[min(20rem,calc(100vw-1rem))] overflow-y-auto rounded-lg border border-[var(--fl-border-default)] bg-[var(--fl-bg-raised)] px-3 py-2 text-left text-xs leading-snug text-[var(--fl-text-primary)] shadow-lg outline-none"
+        className="fl-scroll-surface pointer-events-auto z-[2147483647] max-h-[min(17.5rem,calc(100vh-2rem))] w-[min(20rem,calc(100vw-1rem))] overflow-y-auto rounded-lg border border-[var(--fl-border-default)] bg-[var(--fl-bg-raised)] px-3 py-2 text-left text-xs leading-snug text-[var(--fl-text-primary)] shadow-lg outline-none"
         style={{
           position: "fixed",
           top: coords.top,

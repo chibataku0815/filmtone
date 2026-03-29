@@ -61,6 +61,8 @@ function resolveDesktopFilmLabImportMeta(
   };
 }
 
+export { resolveDesktopFilmLabImportMeta };
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, path.resolve(__dirname), "");
   const resolved = resolveDesktopFilmLabImportMeta(mode, env);

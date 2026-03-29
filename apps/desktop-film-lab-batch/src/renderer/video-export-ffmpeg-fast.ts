@@ -1,7 +1,7 @@
 /**
  * Film Lab デスクトップ — 動画の高速書き出し（ffmpeg のみ）
  *
- * @overview WebGL・逐次 seek は使わず、1 回の ffmpeg で scale / fps /（任意）LUT3D / エンコードする。プレビュー（シェーダー）とは一致しない。
+ * @overview WebGL・逐次 seek は使わず、1 回の ffmpeg で scale / fps /（任意）LUT3D / エンコードする。公開品質の正ではなく、internal approximation として扱う。
  * @limitations WebGL 非互換。Params は ffmpeg（eq 等）への近似のみ。bloom / halation / スプリットトーン細部は未再現。JSON .cube は lut3d。lutIntensity は未反映。
  */
 import { filmLookGradeInputSchema, type Params } from "film-lab-core";
@@ -77,7 +77,7 @@ export async function runVideoExportFfmpegFast(options: {
   outputFileName: string;
   /** @description resolveLutCubeAbsPathForFastExport の戻り。無ければ LUT でない */
   lutCubeAbsPath: string | null;
-  /** @description バッチ用プリセット／スラーダー数値（ffmpeg 近似に渡す） */
+  /** @description バッチ用プリセット／スライダー数値（ffmpeg 近似に渡す。公開品質の正は WebGL accurate） */
   gradeParams: Params;
   onLog: (line: string) => void;
 }): Promise<{ ok: true } | { ok: false; message: string }> {
@@ -116,7 +116,7 @@ export async function runVideoExportFfmpegFast(options: {
     "film-lab-export.mp4";
 
   onLog(
-    `[動画・高速] ffmpeg 1 パス（${outW}×${outH} @ ${VIDEO_EXPORT_FPS}fps）。Params→eq 等で近似。プレビューとは一致しません。LUT ファイル: ${lutCubeAbsPath ? "あり" : "なし"}`,
+    `[動画・高速] ffmpeg 1 パス（${outW}×${outH} @ ${VIDEO_EXPORT_FPS}fps）。LUT-first / Params は ffmpeg 近似。プレビューとは一致しません。LUT ファイル: ${lutCubeAbsPath ? "あり" : "なし"}`,
   );
 
   try {

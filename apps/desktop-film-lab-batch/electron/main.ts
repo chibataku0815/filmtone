@@ -6,20 +6,31 @@
  *
  * @description 設定は electron-store（userData 内 JSON）。ウィンドウ矩形と最後に選んだ入出力フォルダを覚える。
  */
-import { app, BrowserWindow, dialog, ipcMain, net, protocol } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, protocol } from "electron";
+import { existsSync } from "node:fs";
 import { filmLabParamsSchema, type Params } from "film-lab-core";
 import Store from "electron-store";
 import { execFile, spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { createReadStream } from "node:fs";
 import fs from "node:fs/promises";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import os from "node:os";
 import { randomBytes } from "node:crypto";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
 import { buildGradeApproximationVF } from "./video-export-grade-approx-vf";
+import {
+  FILM_LAB_VIDEO_PROTOCOL,
+  absolutePathToVideoSrcUrl,
+  buildFfmpegFastTranscodeArgs,
+  parseFastTranscodeRequest,
+} from "./video-export-fast-contract";
+import {
+  guessVideoContentType,
+  parseHttpByteRange,
+} from "./video-src-protocol";
 
 const execFileAsync = promisify(execFile);
 
@@ -27,8 +38,6 @@ const execFileAsync = promisify(execFile);
  * @description Vite dev（http://127.0.0.1:5173）では `<video src="file://...">` が Chromium の URL safety で拒否される。本スキームでメインプロセス経由配信し、loadFile 本番とも同じ経路にそろえる。
  * @limitations パスは `path-to-file-url` IPC 経由の絶対パスのみ想定（ユーザー選択・ステージング済みファイル）。
  */
-const FILM_LAB_VIDEO_PROTOCOL = "film-lab-video";
-
 protocol.registerSchemesAsPrivileged([
   {
     scheme: FILM_LAB_VIDEO_PROTOCOL,
@@ -41,13 +50,6 @@ protocol.registerSchemesAsPrivileged([
     },
   },
 ]);
-
-/**
- * @description レンダラの video 要素用 URL（クエリに path を載せる）
- */
-function absolutePathToVideoSrcUrl(absPath: string): string {
-  return `${FILM_LAB_VIDEO_PROTOCOL}://local/?path=${encodeURIComponent(absPath)}`;
-}
 
 const IMAGE_EXT = new Set([".jpg", ".jpeg", ".png"]);
 
@@ -113,6 +115,13 @@ function disposeActiveVideoExport(reason: string): void {
 const DEBUG_VIDEO_EXPORT_MAIN =
   process.env.FILM_LAB_DEBUG_VIDEO_EXPORT === "1" ||
   process.env.FILM_LAB_DEBUG_VIDEO_EXPORT === "true";
+
+/**
+ * @description build 済み Desktop を自動起動し、Smart Look UI が pending のまま hidden かを確認して終了する。
+ */
+const DESKTOP_SMOKE_PENDING =
+  process.env.FILM_LAB_DESKTOP_SMOKE_PENDING === "1" ||
+  process.env.FILM_LAB_DESKTOP_SMOKE_PENDING === "true";
 
 /**
  * @description デスクトップアプリ用の永続キー（型で書き忘れを防ぐ）
@@ -263,62 +272,6 @@ function ffmpegVideoCodecArgs(): string[] {
   return ["-c:v", "libx264", "-preset", "veryfast", "-crf", "21"];
 }
 
-/**
- * @description ソース 1 本を直接読み、（任意）Params の ffmpeg 近似 + fps + scale +（任意）LUT3D + VideoToolbox で 1 パス書き出す。
- * @param opts.gradeParams 検証済み Params。無ければ数値ルック近似なし
- */
-function buildFfmpegFastTranscodeArgs(opts: {
-  inputVideoPath: string;
-  outputVideoPath: string;
-  width: number;
-  height: number;
-  fps: number;
-  hasAudio: boolean;
-  lutCubeAbsPath: string | null;
-  gradeParams: Params | null;
-}): string[] {
-  const {
-    inputVideoPath,
-    outputVideoPath,
-    width,
-    height,
-    fps,
-    hasAudio,
-    lutCubeAbsPath,
-    gradeParams,
-  } = opts;
-  const vfParts: string[] = [];
-  if (gradeParams != null) {
-    vfParts.push(buildGradeApproximationVF(gradeParams));
-  }
-  vfParts.push(`fps=${fps}`, `scale=${width}:${height}:flags=lanczos`);
-  if (lutCubeAbsPath != null && lutCubeAbsPath.length > 0) {
-    const normalized = lutCubeAbsPath.replace(/\\/g, "/");
-    const escaped = normalized.replace(/'/g, "'\\''");
-    vfParts.push(`lut3d=file='${escaped}':interp=tetrahedral`);
-  }
-  const vf = vfParts.join(",");
-  const vcodec = ffmpegVideoCodecArgs();
-  const args: string[] = [
-    "-hide_banner",
-    "-loglevel",
-    "error",
-    "-y",
-    "-i",
-    inputVideoPath,
-    "-vf",
-    vf,
-    ...vcodec,
-  ];
-  if (hasAudio) {
-    args.push("-c:a", "copy", "-map", "0:v:0", "-map", "0:a:0", "-shortest");
-  } else {
-    args.push("-an");
-  }
-  args.push(outputVideoPath);
-  return args;
-}
-
 function buildFfmpegRawvideoExportArgs(opts: {
   width: number;
   height: number;
@@ -395,7 +348,40 @@ async function resolveExistingDir(
   return undefined;
 }
 
-function createWindow(): void {
+/**
+ * @description メインは `dist-electron/main.cjs` なので `__dirname` は `dist-electron`。その1つ上の `resources/` に 1024px PNG を置く。
+ * @returns Film Lab シンボルの絶対パス
+ */
+function resolveFilmLabIconPath(): string {
+  return path.join(__dirname, "..", "resources", "film-lab-icon.png");
+}
+
+/**
+ * @description macOS では開発時も `.app` の `Info.plist` アイコンが効かないため Dock が Electron 標準のままになる。`app.dock.setIcon` で差し替える。
+ * @limitations Windows はタスクバーが主に exe の埋め込みアイコン頼み。Linux は将来 `BrowserWindow.icon` 中心。
+ */
+function applyDockIconIfMac(): void {
+  if (process.platform !== "darwin") {
+    return;
+  }
+  const iconPath = resolveFilmLabIconPath();
+  if (!existsSync(iconPath)) {
+    console.warn(
+      `[film-lab-desktop] main.applyDockIconIfMac: アイコン PNG が無いためスキップ — path=${iconPath}`,
+    );
+    return;
+  }
+  try {
+    app.dock.setIcon(iconPath);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn(
+      `[film-lab-desktop] main.applyDockIconIfMac: app.dock.setIcon 失敗 — path=${iconPath} — ${msg}`,
+    );
+  }
+}
+
+function createWindow(): BrowserWindow {
   /**
    * @description ローカルで Vite が動いているとき、ウィンドウは `file://` ではなくこの URL を開く。
    * `FILM_LAB_DESKTOP_RENDERER_URL` を優先（製品向けの名前）。従来の `VITE_DEV_SERVER_URL` もそのまま使える。
@@ -413,7 +399,15 @@ function createWindow(): void {
     savedBounds.width >= 400 &&
     savedBounds.height >= 320;
 
+  const iconPath = resolveFilmLabIconPath();
+  const iconOption = existsSync(iconPath) ? { icon: iconPath } : {};
+
+  /**
+   * @description `backgroundColor` をダークにしておくと、WebKit スクロールバー周りやロード直後にライトの下地が見えにくい（Radix slate-1 に近い色）。
+   */
   const win = new BrowserWindow({
+    backgroundColor: "#0d0d0f",
+    show: !DESKTOP_SMOKE_PENDING,
     ...(hasSavedSize
       ? {
           x: savedBounds!.x,
@@ -422,6 +416,7 @@ function createWindow(): void {
           height: savedBounds!.height,
         }
       : { width: 960, height: 720 }),
+    ...iconOption,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -445,14 +440,109 @@ function createWindow(): void {
       path.join(__dirname, "../dist/renderer/index.html"),
     );
   }
+
+  return win;
+}
+
+async function runPendingRuntimeSmoke(win: BrowserWindow): Promise<void> {
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const handleFinish = (): void => {
+        cleanup();
+        resolve();
+      };
+
+      const handleFail = (
+        _event: Electron.Event,
+        code: number,
+        description: string,
+        validatedUrl: string,
+      ): void => {
+        cleanup();
+        reject(
+          new Error(
+            `Desktop smoke failed to load renderer: code=${code} description=${description} url=${validatedUrl}`,
+          ),
+        );
+      };
+
+      const timeoutId = setTimeout(() => {
+        cleanup();
+        reject(new Error("Desktop smoke timed out before the renderer finished loading"));
+      }, 30_000);
+
+      const cleanup = (): void => {
+        clearTimeout(timeoutId);
+        win.webContents.removeListener("did-finish-load", handleFinish);
+        win.webContents.removeListener("did-fail-load", handleFail);
+      };
+
+      if (!win.webContents.isLoadingMainFrame()) {
+        cleanup();
+        resolve();
+        return;
+      }
+
+      win.webContents.on("did-finish-load", handleFinish);
+      win.webContents.on("did-fail-load", handleFail);
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+
+    const result = (await win.webContents.executeJavaScript(
+      `(() => {
+        const bodyText = document.body?.innerText ?? "";
+        const hasCanvasOpen = Boolean(document.querySelector('[data-testid="film-lab-open"]'));
+        const matchedSmartLookText = [
+          "見本に色味を合わせる（AI・beta）",
+          "Match colors to a sample (AI, beta)",
+          "見本の写真を選ぶ",
+          "Pick sample photo",
+          "見本に合わせる",
+          "Match sample look",
+        ].filter((text) => bodyText.includes(text));
+
+        return {
+          hasCanvasOpen,
+          matchedSmartLookText,
+        };
+      })()`,
+      true,
+    )) as {
+      hasCanvasOpen: boolean;
+      matchedSmartLookText: string[];
+    };
+
+    if (!result.hasCanvasOpen) {
+      throw new Error("Desktop smoke did not find the main Film Lab canvas");
+    }
+    if (result.matchedSmartLookText.length > 0) {
+      throw new Error(
+        `Desktop smoke found Smart Look UI unexpectedly: ${result.matchedSmartLookText.join(", ")}`,
+      );
+    }
+
+    console.log(
+      "[film-lab-desktop] smoke: pending Smart Look UI stays hidden in Desktop runtime.",
+    );
+    app.exitCode = 0;
+    app.quit();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[film-lab-desktop] smoke: ${message}`);
+    app.exitCode = 1;
+    app.quit();
+  }
 }
 
 app.whenReady().then(() => {
   console.log(
     "[film-lab-desktop] main: 動画 src は film-lab-video スキーム（path-to-file-url）。ログが file: なら bun run build:electron 未反映。",
   );
+  applyDockIconIfMac();
   protocol.handle(FILM_LAB_VIDEO_PROTOCOL, async (request) => {
     let abs: string;
+    let fileSize = 0;
     try {
       const u = new URL(request.url);
       const raw = u.searchParams.get("path");
@@ -475,6 +565,7 @@ app.whenReady().then(() => {
           status: 404,
         });
       }
+      fileSize = st.size;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       return new Response(`film-lab-video: パス不正 — ${abs} — ${msg}`, {
@@ -482,27 +573,57 @@ app.whenReady().then(() => {
       });
     }
     try {
-      const fileHref = pathToFileURL(abs).href;
-      const upstream = await net.fetch(fileHref);
-      if (!upstream.ok) {
-        return upstream;
+      const range = parseHttpByteRange(request.headers.get("range"), fileSize);
+      const contentType = guessVideoContentType(abs);
+
+      if (request.headers.has("range") && range == null) {
+        const headers = new Headers({
+          "Content-Range": `bytes */${fileSize}`,
+          "Access-Control-Allow-Origin": "*",
+          "Accept-Ranges": "bytes",
+        });
+        return new Response("film-lab-video: Range 不正", {
+          status: 416,
+          headers,
+        });
       }
-      const headers = new Headers(upstream.headers);
-      headers.set("Access-Control-Allow-Origin", "*");
-      return new Response(upstream.body, {
-        status: upstream.status,
-        statusText: upstream.statusText,
+
+      const stream = createReadStream(
+        abs,
+        range
+          ? { start: range.start, end: range.end }
+          : undefined,
+      );
+      const headers = new Headers({
+        "Access-Control-Allow-Origin": "*",
+        "Accept-Ranges": "bytes",
+        "Content-Type": contentType,
+        "Content-Length": String(
+          range ? range.end - range.start + 1 : fileSize,
+        ),
+      });
+      if (range) {
+        headers.set(
+          "Content-Range",
+          `bytes ${range.start}-${range.end}/${fileSize}`,
+        );
+      }
+      return new Response(Readable.toWeb(stream) as ReadableStream, {
+        status: range ? 206 : 200,
         headers,
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      return new Response(`film-lab-video: net.fetch 失敗 — ${abs} — ${msg}`, {
+      return new Response(`film-lab-video: ストリーム配信失敗 — ${abs} — ${msg}`, {
         status: 500,
       });
     }
   });
 
-  createWindow();
+  const mainWindow = createWindow();
+  if (DESKTOP_SMOKE_PENDING) {
+    void runPendingRuntimeSmoke(mainWindow);
+  }
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -721,42 +842,17 @@ ipcMain.handle("video-export-transcode-fast", async (_evt, payload: unknown) => 
   disposeActiveVideoExport("高速トランスコード直前");
   disposeActiveFastTranscode("再入前掃除");
 
-  if (!payload || typeof payload !== "object" || payload === null) {
-    throw new TypeError("video-export-transcode-fast: payload が不正です");
-  }
-  const o = payload as Record<string, unknown>;
-  const inputVideoPath =
-    typeof o.inputVideoPath === "string" ? o.inputVideoPath : "";
-  const outputDir = typeof o.outputDir === "string" ? o.outputDir : "";
-  const outputFileName =
-    typeof o.outputFileName === "string" ? o.outputFileName : "";
-  const width = typeof o.width === "number" ? o.width : 0;
-  const height = typeof o.height === "number" ? o.height : 0;
-  const fps = typeof o.fps === "number" ? o.fps : 0;
-  const hasAudio = Boolean(o.hasAudio);
-  const lutRaw =
-    typeof o.lutCubeAbsPath === "string" ? o.lutCubeAbsPath.trim() : "";
-
-  let gradeParams: Params | null = null;
-  if (o.gradeParams != null && typeof o.gradeParams === "object") {
-    const parsed = filmLabParamsSchema.safeParse(o.gradeParams);
-    if (parsed.success) {
-      gradeParams = parsed.data;
-    }
-  }
-
-  if (
-    !inputVideoPath ||
-    !outputDir ||
-    !outputFileName ||
-    width <= 0 ||
-    height <= 0 ||
-    fps <= 0
-  ) {
-    throw new TypeError(
-      "video-export-transcode-fast: inputVideoPath / outputDir / outputFileName / width / height / fps が不正です",
-    );
-  }
+  const {
+    inputVideoPath,
+    outputDir,
+    outputFileName,
+    width,
+    height,
+    fps,
+    hasAudio,
+    lutCubeAbsPath: lutRaw,
+    gradeParams,
+  } = parseFastTranscodeRequest(payload);
 
   const inAbs = path.resolve(inputVideoPath);
   const safeName = path.basename(outputFileName);
@@ -787,6 +883,7 @@ ipcMain.handle("video-export-transcode-fast", async (_evt, payload: unknown) => 
     hasAudio,
     lutCubeAbsPath: lutResolved,
     gradeParams,
+    videoCodecArgs: ffmpegVideoCodecArgs(),
   });
 
   let child: ChildProcessWithoutNullStreams;

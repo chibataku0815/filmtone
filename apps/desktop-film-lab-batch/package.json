@@ -11,6 +11,8 @@
     "build:electron": "esbuild electron/main.ts --bundle --platform=node --format=cjs --outfile=dist-electron/main.cjs --external:electron && esbuild electron/preload.ts --bundle --platform=node --format=cjs --outfile=dist-electron/preload.cjs --external:electron",
     "build:renderer": "vite build",
     "build": "bun run build:electron && bun run build:renderer",
+    "test": "vitest run --config vitest.config.ts",
+    "test:smart-look-pending": "vitest run --config vitest.config.ts src/renderer/desktop-smart-look-pending.test.ts",
     "desktop": "bun run build:electron && concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && cross-env FILM_LAB_DESKTOP_RENDERER_URL=http://127.0.0.1:5173 electron dist-electron/main.cjs\"",
     "desktop:with-bff": "concurrently -k -n bff,film-lab \"cd ../web && bun run bff:local\" \"wait-on -t 120000 http://127.0.0.1:3000 && bun run desktop\"",
     "dev": "bun run desktop",
@@ -46,6 +48,7 @@
     "tailwindcss": "^4",
     "typescript": "^5.7.2",
     "vite": "^6.2.4",
+    "vitest": "^3.2.4",
     "wait-on": "^8.0.3"
   },
   "build": {
@@ -63,6 +66,7 @@
     "asar": true,
     "mac": {
       "category": "public.app-category.photography",
+      "icon": "resources/film-lab-icon.png",
       "target": [
         "dmg",
         "zip"

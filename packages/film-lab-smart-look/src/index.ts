@@ -1,11 +1,17 @@
 /**
  * @file Film Lab「スマートルック」— クラウド解析用のデルタ JSON とマージ（Web／Desktop 共用パッケージ）。
  * @description API 契約・クライアント適用の共通。OpenAI や Next は含めず、純粋な検証・パース・マージだけを置く。
- * @limitations デルタは少数キーに限定。localStorage を触れる関数はブラウザ専用（SSR では no-op または false）。
+ * @limitations デルタは少数キーに限定。localStorage を触れる関数はブラウザ専用（SSR では no-op または false）。`referenceImageBase64` があるとき BFF は 2 枚 Vision（参照スタイル優先）。`currentGrade` で preset baseline セマンティクスを揃える。
  */
 
 import { z } from "zod";
-import { PRESETS, type Params, type PresetName } from "film-lab-core";
+import {
+  PARAM_KEYS,
+  PRESETS,
+  filmLabParamsSchema,
+  type Params,
+  type PresetName,
+} from "film-lab-core";
 
 /** @description 同意文の版。API と localStorage で一致させる。 */
 export const SMART_LOOK_CONSENT_VERSION = 1 as const;
@@ -49,6 +55,11 @@ export const filmLabSmartLookDeltaSchema = z
 
 export type FilmLabSmartLookDelta = z.infer<typeof filmLabSmartLookDeltaSchema>;
 
+/** @description `PRESETS` のキーだけを許す Zod（`basePreset` 用）。 */
+const filmLabPresetNameSchema = z.enum(
+  Object.keys(PRESETS) as [PresetName, ...PresetName[]],
+);
+
 /**
  * @description POST ボディ。画像はクライアントで長辺 1024 前後に縮小済みを推奨。
  */
@@ -58,7 +69,42 @@ export const filmLabSmartLookRequestSchema = z.object({
   mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
   consentVersion: z.literal(SMART_LOOK_CONSENT_VERSION),
   consentAcknowledged: z.literal(true),
-});
+  /**
+   * @description `true` のとき、BFF はデルタに基づく **補正済みラスタ**（PNG base64）も返す（製品意図の画像レベル MVP）。省略・false は従来どおりデルタ JSON のみ。
+   */
+  includeRasterCorrection: z.boolean().optional(),
+  /**
+   * @description 現スロットのグレード全文。あるとき BFF は「**プリセット baseline + delta**」セマンティクスで LLM に指示する（省略時はレガシー: デルタは現グレードへの加算という説明）。
+   */
+  currentGrade: filmLabParamsSchema.optional(),
+  /**
+   * @description スロットの `basePreset`（手動調整なら `null`）。baseline 計算に使う。
+   */
+  basePreset: filmLabPresetNameSchema.nullable().optional(),
+  /**
+   * @description プリセット強さ 0〜1。`basePreset === presetId` のときだけ baseline 補間に使う。省略時は 1。
+   */
+  intensity: z.number().min(0).max(1).optional(),
+  /**
+   * @description **スタイル参照**用の縮小画像（base64 本文のみ）。`referenceMimeType` とセット。省略時は従来どおりプリセット基準の 1 枚 Vision。
+   */
+  referenceImageBase64: z.string().min(32).max(2_200_000).optional(),
+  /**
+   * @description 参照画像の MIME。`referenceImageBase64` とセット。
+   */
+  referenceMimeType: z.enum(["image/jpeg", "image/png", "image/webp"]).optional(),
+})
+  .superRefine((data, ctx) => {
+    const hasB64 = data.referenceImageBase64 != null;
+    const hasMime = data.referenceMimeType != null;
+    if (hasB64 !== hasMime) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "referenceImageBase64 and referenceMimeType must both be set or both omitted",
+        path: hasB64 ? ["referenceMimeType"] : ["referenceImageBase64"],
+      });
+    }
+  });
 
 export type FilmLabSmartLookRequest = z.infer<typeof filmLabSmartLookRequestSchema>;
 
@@ -207,8 +253,8 @@ export function extractSmartLookDeltaFromAssistantJson(parsed: unknown): FilmLab
 }
 
 /**
- * @description 現在のグレードにデルタを加算し、レンジ内に収める。
- * @param base - 現在スロットの Params
+ * @description `base` にデルタを加え、デルタ対象キーだけ絶対レンジ内に収める（それ以外のキーは `base` のコピー）。
+ * @param base - 足し算の基準。レガシーでは現スロット Params。目標ルックセマンティクスでは `computeSmartLookPresetBaseline` の戻り値。
  * @param delta - `parseAndClampSmartLookDelta` 済み
  */
 export function applySmartLookDelta(base: Params, delta: FilmLabSmartLookDelta): Params {
@@ -221,6 +267,49 @@ export function applySmartLookDelta(base: Params, delta: FilmLabSmartLookDelta):
     next[key] = Math.min(hi, Math.max(lo, sum)) as Params[typeof key];
   }
   return next;
+}
+
+/**
+ * @description `reset` から指定プリセットへ、強さ `intensity`（0〜1）で線形補間したグレード（Film Lab reducer の `interpolatePreset` と同じ式）。
+ * @param presetName - 目標プリセット
+ * @param intensity - 0 で reset に近い、1 でプリセット完全一致
+ */
+export function interpolateFilmLabPresetForSmartLook(
+  presetName: PresetName,
+  intensity: number,
+): Params {
+  const clamped = Math.max(0, Math.min(1, intensity));
+  const params: Params = { ...PRESETS.reset };
+  const preset = PRESETS[presetName];
+  for (const key of PARAM_KEYS) {
+    params[key] = PRESETS.reset[key] + (preset[key] - PRESETS.reset[key]) * clamped;
+  }
+  return params;
+}
+
+/**
+ * @description スマートルックのデルタを足すときの **基準 Params**（POST 本文の `presetId` = 目標ルック）。
+ *
+ * **ルール（Photo+Eng で固定）**
+ * - スロットの `basePreset` が `targetPresetId` と **一致**するとき → `intensity` で補間した baseline（そのプリセット「帯」で編集中とみなす）。
+ * - **手動**（`slotBasePreset == null`）または **別プリセットから UI で切り替えた**（`slotBasePreset !== targetPresetId`）→ `PRESETS[targetPresetId]` の **フル強度**を baseline とする（新しく選んだルックへ寄せる）。
+ *
+ * @limitations baseline は数値のみ。プレビュー JPEG は `currentGrade` で焼かれており一致しないときがある → BFF は画像を主、`currentGrade` を補助として渡す。
+ * @param args.targetPresetId - UI で選ばれている目標プリセット（`presetId` 本文と同じ）
+ * @param args.slotBasePreset - スロットの `basePreset`（手動なら null）
+ * @param args.slotIntensity - スロットの intensity（0〜1）
+ */
+export function computeSmartLookPresetBaseline(args: {
+  targetPresetId: PresetName;
+  slotBasePreset: PresetName | null;
+  slotIntensity: number;
+}): Params {
+  const { targetPresetId, slotBasePreset, slotIntensity } = args;
+  const aligned = slotBasePreset != null && slotBasePreset === targetPresetId;
+  if (aligned) {
+    return interpolateFilmLabPresetForSmartLook(targetPresetId, slotIntensity);
+  }
+  return { ...PRESETS[targetPresetId] };
 }
 
 /**
