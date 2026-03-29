@@ -7,7 +7,9 @@
     "skipLibCheck": true,
     "noEmit": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["node"]
+    "types": ["node"],
+    "jsx": "react-jsx",
+    "resolveJsonModule": true
   },
-  "include": ["src/**/*.ts", "electron/**/*.ts", "vite.config.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "electron/**/*.ts", "vite.config.ts"]
 }

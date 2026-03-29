@@ -1,0 +1,149 @@
+{
+  "film-lab": {
+    "sampleHint": "You're viewing a sample image—drop your own photo or video to grade your own footage.",
+    "toolbar": {
+      "open": "Open media",
+      "savePng": "Save PNG"
+    },
+    "canvas": {
+      "webgl2Required": "WebGL2 is required for Film Lab",
+      "dropHint": "Drop image, video, or .cube LUT",
+      "loadingMedia": "Loading media…",
+      "dismissError": "OK"
+    },
+    "back": "← Back to Interactive",
+    "metadata": {
+      "title": "Film Lab",
+      "description": "A real-time color grading tool in the browser. Drop images or videos, then adjust exposure, contrast, and LUT with GPU fragment shaders.",
+      "ogTitle": "Film Lab — Browser Color Grading Tool",
+      "ogDescription": "Drop an image or video and grade it in real-time. Exposure, contrast, LUT, and film presets powered by WebGL2 GPU shaders.",
+      "ogImageAlt": "Film Lab Color Grading Tool"
+    },
+    "share": {
+      "sectionTitle": "Share",
+      "copyLink": "Copy look link",
+      "copied": "Copied!",
+      "postToX": "Post to X",
+      "postText": "Try this grade in Film Lab — browser color grading"
+    },
+    "browser": {
+      "sectionTitle": "This browser",
+      "hint": "Keeps your look on this device only. Tap Save when you want to keep the current grade. Opening this page without a share link loads the last save automatically.",
+      "save": "Save to browser",
+      "load": "Load saved",
+      "clear": "Clear saved",
+      "feedbackSaved": "Saved to this browser.",
+      "feedbackLoaded": "Loaded from this browser.",
+      "feedbackCleared": "Saved data removed.",
+      "feedbackError": "Could not read or write. Check private mode or storage limits."
+    },
+    "smartLook": {
+      "sectionTitle": "Smart look (beta)",
+      "consentHint": "For verified supporters only. A resized JPEG preview is sent to our server and then to an AI provider to suggest small adjustments. We do not use your images to train models. See the site privacy policy for subprocessors.",
+      "consentLabel": "I agree to send a resized preview for this analysis.",
+      "applyButton": "Balance for this photo",
+      "busy": "Analyzing…",
+      "errorGeneric": "Could not apply smart look. Try sliders or try again later.",
+      "needImage": "Open or drop media on the canvas first.",
+      "supporterOnly": "Smart look is for verified supporters. Support via Stripe from the footer to unlock.",
+      "needConsent": "Check the box above to confirm you agree."
+    },
+    "mode": {
+      "quick": "Quick",
+      "pro": "Pro",
+      "hint": "Quick shows presets and core color sliders. Pro adds tone detail, effects, Bloom, Halation, and LUT."
+    },
+    "compare": {
+      "sectionTitle": "Compare on the preview",
+      "beforeAfterTitle": "Original ↔ graded look",
+      "beforeAfterHint": "Switch between the source and your current grade",
+      "holdTitle": "Hold to see original",
+      "holdHint": "Long-press on touch · Space on desktop",
+      "title": "Two different grades, split screen",
+      "taglineOff": "Splits left/right; sliders apply to the selected side only.",
+      "taglineOn": "Drag the split · V to turn off",
+      "editLabel": "Sliders edit",
+      "canvasLeft": "Left look",
+      "canvasRight": "Right look",
+      "slotLeft": "Left",
+      "slotRight": "Right",
+      "slotTooltipLeft": "Edit the left half",
+      "slotTooltipRight": "Edit the right half",
+      "editingLeftChip": "Adjusting left look",
+      "editingRightChip": "Adjusting right look",
+      "dragSplitHint": "Drag to move split"
+    },
+    "color": {
+      "tint": "Tint",
+      "shadowHue": "Shadow hue",
+      "shadowTone": "Shadow tone",
+      "highlightHue": "Highlight hue",
+      "highlightTone": "Highlight tone"
+    },
+    "donation": {
+      "footer": {
+        "shortLine": "Film Lab stays free. Optional support helps fund improvements and hosting.",
+        "linkStripe": "Support via Stripe",
+        "linkStripeAmount": "Stripe · {amountUsd} USD",
+        "linkBmc": "Tip on Buy Me a Coffee",
+        "ariaSupportSection": "Optional ways to support Film Lab. Skipping does not limit features.",
+        "ariaOpenStripe": "Open Stripe checkout for optional support in a new tab",
+        "ariaOpenStripeTier": "Open Stripe checkout for {amountUsd} USD optional support in a new tab",
+        "ariaOpenBmc": "Open Buy Me a Coffee in a new tab"
+      },
+      "preset_save_modal": {
+        "title": "Saved to this browser",
+        "body": "Film Lab remains free to use. If you’d like, optional support through Stripe or Buy Me a Coffee helps us keep improving. Skipping is fine—nothing changes for you.",
+        "primaryStripe": "Support via Stripe (optional)",
+        "stripeTierLabel": "Support {amountUsd} USD (optional)",
+        "secondaryBmc": "Tip on Buy Me a Coffee",
+        "dismiss": "Not now",
+        "neverShowAgain": "Don’t show this again"
+      },
+      "lut_banner": {
+        "message": "LUT loaded locally in your browser. Optional support links are in the footer if you’d like to help.",
+        "dismiss": "Dismiss"
+      },
+      "present_mode": {
+        "toggleLabel": "Presenter mode",
+        "description": "Hides all donation prompts, footer support links, and post-save support modals while you share your screen.",
+        "urlHint": "Add ?present=1 to the URL for the same. Use ?present=0 or turn the checkbox off to exit."
+      },
+      "present_hint": {
+        "body": "Sharing your screen? Turn on Presenter mode to hide support prompts.",
+        "dismiss": "Got it"
+      },
+      "thanks_page": {
+        "meta_title": "Thank you — Film Lab",
+        "meta_description": "Thank you for optionally supporting Film Lab.",
+        "title": "Thank you",
+        "body": "Your support helps us keep improving and running Film Lab. It stays free to use.",
+        "returnCta": "Back to Film Lab",
+        "returnHint": "If this page URL includes a checkout session ID, we can verify on the server before you return, for softer prompts. Otherwise you can still use the browser-only acknowledgement flow.",
+        "verifyPending": "Confirming your checkout…",
+        "verifyFailed": "We couldn’t verify automatically. You can still continue to Film Lab (prompts may stay in the default mode)."
+      },
+      "supporter": {
+        "footer_shortLine": "Thank you for your support. Enjoy Film Lab.",
+        "preset_save_modal_body": "Saved to this browser. If you’ve already supported us, thank you again. Film Lab remains free to use."
+      },
+      "legal_footer_short": "Not tax advice. Third-party checkout. Ask your advisor."
+    },
+    "shortcuts": {
+      "title": "Keyboard Shortcuts",
+      "closeHint": "Press ? or Esc to close",
+      "presetSelect": "Select preset",
+      "reset": "Reset",
+      "beforeAfter": "Before / After (hold)",
+      "holdButton": "Before / After on touch devices",
+      "presetSlider": "Blend film preset vs neutral (when preset active)",
+      "undo": "Undo",
+      "redo": "Redo",
+      "histogram": "Toggle histogram",
+      "help": "This help",
+      "toggleMode": "Toggle Quick / Pro mode",
+      "toggleCompare": "Toggle two-up compare",
+      "switchSlot": "Switch left/right edit target (while two-up)"
+    }
+  }
+}

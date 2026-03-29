@@ -290,6 +290,9 @@
       "applyButton": "Balance for this photo",
       "busy": "Analyzing…",
       "errorGeneric": "Could not apply smart look. Try sliders or try again later.",
+      "errorRateLimit": "Daily smart look limit reached. Try again tomorrow or adjust with sliders.",
+      "errorProvider": "Could not reach the analysis service. Try again later or use sliders.",
+      "errorInvalidResponse": "Could not interpret the auto analysis result. Try another photo or use sliders.",
       "needImage": "Open or drop media on the canvas first.",
       "supporterOnly": "Smart look is for verified supporters. Support via Stripe from the footer to unlock.",
       "needConsent": "Check the box above to confirm you agree."

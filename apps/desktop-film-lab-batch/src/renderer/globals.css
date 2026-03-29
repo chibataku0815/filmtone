@@ -1,0 +1,305 @@
+@import "tailwindcss";
+@import "@radix-ui/colors/slate-dark.css";
+@import "@radix-ui/colors/amber-dark.css";
+
+@source "../../../web/src/features/interactive/film-lab";
+@source "../../../web/src/shared/gl";
+@source ".";
+
+/**
+ * Radix Colors のスケール意味（要約）— ダークで 1–2 がアプリ背景、3–5 がサーフェス、6–8 が境界、
+ * 9–10 がソリッド UI、11 が補助テキスト、12 が高コントラスト本文。
+ * @see https://www.radix-ui.com/colors/docs/palette-composition/understanding-the-scale
+ *
+ * @radix-ui/colors v3 はトークンを `.dark, .dark-theme` にだけ定義するため、
+ * `index.html` の `<html class="dark dark-theme">` が必須（無いと var() が空になり視認性が崩れる）。
+ */
+
+html.dark.dark-theme {
+  /* Web 共有 Film Lab コンポーネントが参照する既存名 */
+  --accent-amber1: var(--amber-9);
+  --bg-dark: var(--slate-1);
+  --text-base: var(--slate-12);
+  --text-muted: var(--slate-11);
+
+  /* デスクトップシェル専用（意味ベースで Tailwind の任意色を減らす） */
+  --fl-bg-app: var(--slate-1);
+  --fl-bg-subtle: var(--slate-2);
+  --fl-bg-raised: var(--slate-3);
+  --fl-bg-interactive: var(--slate-4);
+  --fl-bg-interactive-hover: var(--slate-5);
+  --fl-border-subtle: var(--slate-6);
+  --fl-border-default: var(--slate-7);
+  --fl-border-strong: var(--slate-8);
+  --fl-text-primary: var(--slate-12);
+  --fl-text-secondary: var(--slate-11);
+  --fl-text-tertiary: var(--slate-10);
+  --fl-accent: var(--amber-9);
+  --fl-accent-emphasis: var(--amber-10);
+  --fl-on-accent: #14110a;
+  --fl-focus-ring: color-mix(in srgb, var(--amber-9) 45%, transparent);
+
+  --font-family-sans: system-ui, "Hiragino Sans", "Meiryo", sans-serif;
+}
+
+body {
+  margin: 0;
+  background: var(--fl-bg-app);
+  color: var(--fl-text-primary);
+  font-family: var(--font-family-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* --- レイアウト: カード / セクション（Radix の段差＝スケールの階層） --- */
+
+.film-lab-desktop-root {
+  background: var(--fl-bg-app);
+  color: var(--fl-text-primary);
+}
+
+.fl-main {
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+  max-width: 72rem;
+  padding: 1rem;
+}
+
+@media (min-width: 640px) {
+  .fl-main {
+    padding: 1.25rem 1.5rem;
+  }
+}
+
+.fl-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--fl-border-subtle);
+  background: var(--fl-bg-raised);
+  padding: 1rem;
+  box-shadow: inset 0 1px 0 0 color-mix(in srgb, var(--slate-12) 4%, transparent);
+}
+
+.fl-card-muted {
+  background: var(--fl-bg-subtle);
+  border-color: var(--fl-border-subtle);
+  box-shadow: none;
+}
+
+.fl-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--fl-border-subtle);
+}
+
+.fl-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fl-text-secondary);
+}
+
+.fl-caption {
+  font-size: 0.625rem;
+  line-height: 1.5;
+  color: var(--fl-text-secondary);
+}
+
+.fl-divider {
+  height: 1px;
+  background: var(--fl-border-subtle);
+  border: none;
+  margin: 0;
+}
+
+/* --- タブ（セグメントコントロール風） --- */
+
+.fl-tabs {
+  display: flex;
+  gap: 0.375rem;
+}
+
+.fl-tab {
+  border-radius: 0.5rem;
+  border: 1px solid var(--fl-border-default);
+  background: var(--fl-bg-interactive);
+  color: var(--fl-text-primary);
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.fl-tab:hover {
+  background: var(--fl-bg-interactive-hover);
+  border-color: var(--fl-border-strong);
+}
+
+.fl-tab:focus-visible {
+  outline: 2px solid var(--fl-focus-ring);
+  outline-offset: 2px;
+}
+
+.fl-tab[data-state="active"] {
+  border-color: var(--fl-accent);
+  background: var(--fl-accent);
+  color: var(--fl-on-accent);
+  box-shadow: 0 1px 2px color-mix(in srgb, black 35%, transparent);
+}
+
+.fl-tab[data-state="active"]:hover {
+  background: var(--fl-accent-emphasis);
+  border-color: var(--fl-accent-emphasis);
+}
+
+/* --- ボタン --- */
+
+.fl-btn-secondary {
+  border-radius: 0.5rem;
+  border: 1px solid var(--fl-border-default);
+  background: var(--fl-bg-interactive);
+  color: var(--fl-text-primary);
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.fl-btn-secondary:hover {
+  background: var(--fl-bg-interactive-hover);
+  border-color: var(--fl-border-strong);
+}
+
+.fl-btn-secondary:focus-visible {
+  outline: 2px solid var(--fl-focus-ring);
+  outline-offset: 2px;
+}
+
+.fl-btn-secondary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.fl-btn-primary {
+  border-radius: 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--fl-accent) 85%, black);
+  background: var(--fl-accent);
+  color: var(--fl-on-accent);
+  padding: 0.5rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.fl-btn-primary:hover {
+  background: var(--fl-accent-emphasis);
+}
+
+.fl-btn-primary:focus-visible {
+  outline: 2px solid var(--fl-focus-ring);
+  outline-offset: 2px;
+}
+
+.fl-btn-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* --- ログ / モノスペース --- */
+
+.fl-log {
+  min-height: 12.5rem;
+  flex: 1;
+  overflow: auto;
+  border-radius: 0.5rem;
+  border: 1px solid var(--fl-border-subtle);
+  background: var(--slate-1);
+  padding: 0.75rem;
+  font-family: ui-monospace, monospace;
+  font-size: 0.6875rem;
+  line-height: 1.45;
+  color: var(--fl-text-secondary);
+}
+
+/* --- ネイティブ select（Radix トークンのみ。矢印は slate-11） --- */
+
+.film-lab-desktop-root select {
+  appearance: none;
+  background-color: var(--fl-bg-interactive);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23b0b4ba' d='M1.4 0 6 4.6 10.6 0 12 1.4l-6 6-6-6z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.65rem center;
+  background-size: 10px 7px;
+  border: 1px solid var(--fl-border-default);
+  border-radius: 0.5rem;
+  color: var(--fl-text-primary);
+  padding: 0.5rem 2rem 0.5rem 0.65rem;
+  font-size: 0.75rem;
+  line-height: 1.25;
+  min-height: 2.25rem;
+}
+
+.film-lab-desktop-root select:hover {
+  border-color: var(--fl-border-strong);
+  background-color: var(--fl-bg-interactive-hover);
+}
+
+.film-lab-desktop-root select:focus-visible {
+  outline: 2px solid var(--fl-focus-ring);
+  outline-offset: 1px;
+}
+
+.film-lab-desktop-root select option {
+  background-color: var(--fl-bg-raised);
+  color: var(--fl-text-primary);
+}
+
+/* --- ヘッダー --- */
+
+.fl-app-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--fl-border-subtle);
+  background: var(--fl-bg-subtle);
+  padding: 0.625rem 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .fl-app-header {
+    padding: 0.75rem 1rem;
+  }
+}
+
+.fl-app-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--fl-text-primary);
+}
+
+.fl-app-subtitle {
+  font-size: 0.75rem;
+  color: var(--fl-text-secondary);
+}
+
+.fl-sticky-footer {
+  flex-shrink: 0;
+  border-top: 1px solid var(--fl-border-subtle);
+  background: var(--fl-bg-subtle);
+  padding: 0.75rem 1rem;
+}

@@ -24,6 +24,28 @@ import {
 
 export type BatchFormat = "png" | "jpeg";
 
+/**
+ * バッチが参照するルック状態（メモリ上の単一の真実。JSON はこれへの Import に過ぎない）
+ */
+export type BatchGradeState = {
+  params: Params;
+  lutIntensity: number;
+  lutData: Float32Array | null;
+  lutSize: number;
+};
+
+/**
+ * プリセット名から LUT なしのグレード状態を作る（P1 の既定ルック）
+ */
+export function batchGradeStateFromPreset(preset: PresetName): BatchGradeState {
+  return {
+    params: PRESETS[preset],
+    lutIntensity: 1,
+    lutData: null,
+    lutSize: 0,
+  };
+}
+
 function basename(filePath: string): string {
   const norm = filePath.replace(/\\/g, "/");
   const i = norm.lastIndexOf("/");
@@ -147,28 +169,21 @@ export async function resolveGradeFromJsonText(
 
 /**
  * 画像パスの列を順に処理し、出力フォルダへ書き出す。
+ * @param options.grade — メモリ上のルック（主導線）。JSON Import 後はこの形に詰め替える。
  */
 export async function runBatchPipeline(options: {
   api: FilmLabBatchBridge;
-  gradeJsonPath: string;
-  gradeJsonText: string;
+  grade: BatchGradeState;
   imagePaths: string[];
   outputDir: string;
   format: BatchFormat;
   onLog: (line: string) => void;
 }): Promise<void> {
-  const { api, gradeJsonPath, gradeJsonText, imagePaths, outputDir, format } =
-    options;
+  const { api, grade, imagePaths, outputDir, format } = options;
 
   if (!isWebGL2Supported()) {
     throw new Error("runBatchPipeline: WebGL2 が利用できません");
   }
-
-  const grade = await resolveGradeFromJsonText(
-    api,
-    gradeJsonPath,
-    gradeJsonText,
-  );
 
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
   camera.position.z = 1;

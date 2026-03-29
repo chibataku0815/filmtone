@@ -1,0 +1,149 @@
+{
+  "film-lab": {
+    "sampleHint": "表示中はデモ用のサンプルです。お手持ちの写真や動画をドロップすると、その素材でそのまま試せます。",
+    "toolbar": {
+      "open": "メディアを開く",
+      "savePng": "PNGを保存"
+    },
+    "canvas": {
+      "webgl2Required": "Film Lab を使うには WebGL2 が必要です",
+      "dropHint": "画像・動画・.cube LUT をドロップ",
+      "loadingMedia": "読み込み中…",
+      "dismissError": "OK"
+    },
+    "back": "← Interactive に戻る",
+    "metadata": {
+      "title": "Film Lab",
+      "description": "ブラウザで動くリアルタイムカラーグレーディングツール。画像や動画をドロップして、露出・コントラスト・LUTをGPUシェーダーでリアルタイムに適用。",
+      "ogTitle": "Film Lab — ブラウザで動くカラーグレーディングツール",
+      "ogDescription": "画像や動画をドロップするだけ。露出・コントラスト・LUTをリアルタイムに適用できるWebGLカラグレツール。",
+      "ogImageAlt": "Film Lab カラーグレーディングツール"
+    },
+    "share": {
+      "sectionTitle": "共有",
+      "copyLink": "ルックのリンクをコピー",
+      "copied": "コピーしました",
+      "postToX": "X に投稿",
+      "postText": "Film Lab でこのルックを試せます（ブラウザでカラグレ）"
+    },
+    "browser": {
+      "sectionTitle": "このブラウザに保存",
+      "hint": "この端末のブラウザにだけルックを残します。調整したら「保存」を押してください。共有リンクなしで開いたときは、前回保存分を自動で読み込みます。",
+      "save": "ブラウザに保存",
+      "load": "保存を読み込む",
+      "clear": "保存を消去",
+      "feedbackSaved": "このブラウザに保存しました。",
+      "feedbackLoaded": "保存したルックを読み込みました。",
+      "feedbackCleared": "保存データを消しました。",
+      "feedbackError": "読み書きできませんでした。プライベートモードや容量を確認してください。"
+    },
+    "smartLook": {
+      "sectionTitle": "スマートルック（beta）",
+      "consentHint": "検証済みの支援者向けです。縮小した JPEG をサーバー経由で AI 提供者に送り、小さな補正案を返します。画像はモデル学習に使いません。委託先はサイトのプライバシーポリシーを参照してください。",
+      "consentLabel": "上記に同意し、解析のために縮小プレビューを送ることに同意します。",
+      "applyButton": "この写真に合わせて整える",
+      "busy": "解析中…",
+      "errorGeneric": "スマートルックを適用できませんでした。スライダーで調整するか、時間をおいて再度お試しください。",
+      "needImage": "先にキャンバスでメディアを開いてください。",
+      "supporterOnly": "スマートルックは検証済み支援者向けです。フッターから Stripe で支援すると利用できます。",
+      "needConsent": "上のチェックボックスに同意のうえお試しください。"
+    },
+    "mode": {
+      "quick": "クイック",
+      "pro": "プロ",
+      "hint": "クイックはプリセットと主要カラースライダーのみ。プロはトーン詳細・エフェクト・Bloom・Halation・LUT を表示します。"
+    },
+    "compare": {
+      "sectionTitle": "プレビューでの比べ方",
+      "beforeAfterTitle": "元の写真 ↔ いまのルック",
+      "beforeAfterHint": "素材そのものと、今かけているグレードを切り替えて見る",
+      "holdTitle": "押し続けて元画像",
+      "holdHint": "タッチは長押し・PC は Space でも同じ",
+      "title": "左と右で別ルック",
+      "taglineOff": "画面が左右に割れ、スライダーは選んだ側だけに効きます。",
+      "taglineOn": "境界はドラッグ。V で終了。",
+      "editLabel": "スライダーが効くのは",
+      "canvasLeft": "左の案",
+      "canvasRight": "右の案",
+      "slotLeft": "左",
+      "slotRight": "右",
+      "slotTooltipLeft": "画面の左半分のルックを編集",
+      "slotTooltipRight": "画面の右半分のルックを編集",
+      "editingLeftChip": "左のルックを調整中",
+      "editingRightChip": "右のルックを調整中",
+      "dragSplitHint": "境界はドラッグ"
+    },
+    "color": {
+      "tint": "ティント",
+      "shadowHue": "シャドウの色相",
+      "shadowTone": "シャドウトーン",
+      "highlightHue": "ハイライトの色相",
+      "highlightTone": "ハイライトトーン"
+    },
+    "donation": {
+      "footer": {
+        "shortLine": "Film Lab は基本無料です。よろしければ、改善やサーバー費用への任意のご支援をお願いしています。",
+        "linkStripe": "Stripe で支援（任意）",
+        "linkStripeAmount": "Stripe · {amountUsd} USD",
+        "linkBmc": "Buy Me a Coffee で支援",
+        "ariaSupportSection": "Film Lab への任意の支援です。スキップしても機能に影響しません。",
+        "ariaOpenStripe": "任意の支援のため Stripe の決済ページを新しいタブで開きます",
+        "ariaOpenStripeTier": "{amountUsd} USD の任意支援のため Stripe を新しいタブで開きます",
+        "ariaOpenBmc": "Buy Me a Coffee を新しいタブで開きます"
+      },
+      "preset_save_modal": {
+        "title": "このブラウザに保存しました",
+        "body": "Film Lab は引き続き無料でご利用いただけます。よろしければ Stripe または Buy Me a Coffee から任意でご支援いただけると助かります。閉じていただいてもそのままお使いいただけます。",
+        "primaryStripe": "Stripe で支援（任意）",
+        "stripeTierLabel": "{amountUsd} USD で支援（任意）",
+        "secondaryBmc": "Buy Me a Coffee で支援",
+        "dismiss": "閉じる",
+        "neverShowAgain": "今後この案内を表示しない"
+      },
+      "lut_banner": {
+        "message": "LUT を読み込みました。処理はブラウザ内のみです。任意の支援はフッターからどうぞ。",
+        "dismiss": "閉じる"
+      },
+      "present_mode": {
+        "toggleLabel": "プレゼンモード",
+        "description": "画面共有やデモ中は、寄付案内・フッターの支援リンク・保存後の支援モーダルをすべて非表示にします。",
+        "urlHint": "URL に ?present=1 を付けても同じ表示になります。解除はチェックをオフにするか ?present=0 です。"
+      },
+      "present_hint": {
+        "body": "画面共有中ですか？プレゼンモードをオンにすると、支援の案内を表示しません。",
+        "dismiss": "了解"
+      },
+      "thanks_page": {
+        "meta_title": "ご支援ありがとうございます — Film Lab",
+        "meta_description": "Film Lab への任意のご支援へのお礼です。",
+        "title": "ご支援ありがとうございます",
+        "body": "改善と運用の維持にとても助かります。Film Lab は引き続き無料でお使いいただけます。",
+        "returnCta": "Film Lab に戻る",
+        "returnHint": "支払い後のリンクにセッション ID がある場合、サーバで確認してから Film Lab へ進むと案内が控えめになります。ない場合は従来どおり「このブラウザに限定」の案内抑止が使えます。",
+        "verifyPending": "決済情報を確認しています…",
+        "verifyFailed": "自動確認に失敗しました。以下から進んでも Film Lab はお使いいただけます（案内抑止は別の方法で行われます）。"
+      },
+      "supporter": {
+        "footer_shortLine": "ご支援ありがとうございます。Film Lab を引き続きお楽しみください。",
+        "preset_save_modal_body": "このブラウザに保存しました。すでにご支援いただいている場合、改めてお礼申し上げます。Film Lab は引き続き無料でご利用いただけます。"
+      },
+      "legal_footer_short": "税務上の助言ではありません。決済は外部サービスです。詳細は専門家にご確認ください。"
+    },
+    "shortcuts": {
+      "title": "キーボードショートカット",
+      "closeHint": "? または Esc で閉じます",
+      "presetSelect": "プリセットを選択",
+      "reset": "リセット",
+      "beforeAfter": "ビフォー / アフター（押し続ける）",
+      "holdButton": "タッチ端末では長押しボタン",
+      "presetSlider": "プリセットとニュートラルのブレンド（プリセット選択時）",
+      "undo": "元に戻す",
+      "redo": "やり直す",
+      "histogram": "ヒストグラムの表示切替",
+      "help": "このヘルプ",
+      "toggleMode": "クイック / プロ表示の切替",
+      "toggleCompare": "「2案を左右に並べる」のオンオフ",
+      "switchSlot": "並べたとき、左／右どちらを編集するか切替"
+    }
+  }
+}
