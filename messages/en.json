@@ -240,10 +240,12 @@
     },
     "film-lab": {
       "title": "Film Lab",
-      "description": "A real-time color grading tool in the browser. Drop images or videos, then adjust exposure, contrast, and LUT in real-time. All effects implemented entirely in GPU fragment shaders."
+      "description": "A real-time color grading tool in the browser. Drop images or videos, then adjust exposure, contrast, and LUT in real-time. All effects implemented entirely in GPU fragment shaders.",
+      "sampleHint": "You're viewing a sample image—drop your own photo or video to grade your own footage."
     }
   },
   "film-lab": {
+    "sampleHint": "You're viewing a sample image—drop your own photo or video to grade your own footage.",
     "back": "\u2190 Back to Interactive",
     "metadata": {
       "title": "Film Lab",
@@ -253,10 +255,22 @@
       "ogImageAlt": "Film Lab Color Grading Tool"
     },
     "share": {
+      "sectionTitle": "Share",
       "copyLink": "Copy look link",
       "copied": "Copied!",
       "postToX": "Post to X",
       "postText": "Try this grade in Film Lab \u2014 browser color grading"
+    },
+    "browser": {
+      "sectionTitle": "This browser",
+      "hint": "Keeps your look on this device only. Tap Save when you want to keep the current grade. Opening this page without a share link loads the last save automatically.",
+      "save": "Save to browser",
+      "load": "Load saved",
+      "clear": "Clear saved",
+      "feedbackSaved": "Saved to this browser.",
+      "feedbackLoaded": "Loaded from this browser.",
+      "feedbackCleared": "Saved data removed.",
+      "feedbackError": "Could not read or write. Check private mode or storage limits."
     },
     "mode": {
       "quick": "Quick",
