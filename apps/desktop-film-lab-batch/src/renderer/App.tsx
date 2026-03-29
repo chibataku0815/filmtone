@@ -339,6 +339,7 @@ export default function App() {
                       import.meta.env.VITE_FILM_LAB_ASSUME_SUPPORTER ===
                       "true"
                     }
+                    autoRestoreStoredSession={false}
                   />
                 </div>
                 <div className="fl-sticky-footer rounded-b-xl lg:rounded-bl-xl">
