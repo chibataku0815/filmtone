@@ -240,7 +240,7 @@
     },
     "film-lab": {
       "title": "Film Lab",
-      "description": "A real-time color grading tool in the browser. Drop images or videos, then adjust exposure, contrast, and LUT in real-time. All effects implemented entirely in GPU fragment shaders.",
+      "description": "Real-time color grading in the browser. Quick mode uses three meta sliders (film character, era, dynamics) plus presets; the full page adds Pro controls for every parameter, Bloom, Halation, and LUT—all in GPU shaders.",
       "sampleHint": "You're viewing a sample image—drop your own photo or video to grade your own footage.",
       "openFullApp": "Open full app"
     }
@@ -260,9 +260,9 @@
     "back": "← Back to Interactive",
     "metadata": {
       "title": "Film Lab",
-      "description": "A real-time color grading tool in the browser. Drop images or videos, then adjust exposure, contrast, and LUT with GPU fragment shaders.",
+      "description": "Real-time color grading in the browser. Quick: three bundled sliders and presets. Pro: full parameters, Bloom, Halation, LUT—GPU shaders.",
       "ogTitle": "Film Lab — Browser Color Grading Tool",
-      "ogDescription": "Drop an image or video and grade it in real-time. Exposure, contrast, LUT, and film presets powered by WebGL2 GPU shaders.",
+      "ogDescription": "Drop media and build a look. Quick meta sliders for broad changes; Pro for detail. Presets, LUT, WebGL2.",
       "ogImageAlt": "Film Lab Color Grading Tool"
     },
     "share": {
@@ -309,8 +309,8 @@
     "mode": {
       "quick": "Quick",
       "pro": "Pro",
-      "hintShort": "Quick: main sliders + presets. Pro: also tone detail, effects, Bloom, Halation, LUT.",
-      "hint": "Quick shows presets and core color sliders. Pro adds tone detail, effects, Bloom, Halation, and LUT.",
+      "hintShort": "Quick: three bundled sliders + presets. Pro: per-parameter controls, Bloom/Halation detail, LUT.",
+      "hint": "Quick uses three meta sliders (film character, era, dynamics) for broad changes. Pro shows every slider plus tone detail, effects, Bloom, Halation, and LUT.",
       "hintInfoAria": "Quick vs Pro"
     },
     "compare": {
@@ -411,6 +411,15 @@
     "controls": {
       "presets": "Presets",
       "presetIntensity": "Preset intensity",
+      "quick": {
+        "summary": "Three sliders adjust color, grain, halation, and bloom together. Use Pro (P) for precise values.",
+        "filmLook": "Film character",
+        "filmLookHint": "Bunches saturation, color temp, grain, vignette, and tint.",
+        "era": "Era",
+        "eraHint": "Fade, age, and halation glow (vintage optics).",
+        "dynamics": "Dynamics",
+        "dynamicsHint": "Exposure, contrast, and highlight bloom (air in the highs)."
+      },
       "color": "Color",
       "exposure": "Exposure",
       "contrast": "Contrast",

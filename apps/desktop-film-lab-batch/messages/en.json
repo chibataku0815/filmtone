@@ -63,8 +63,8 @@
     "mode": {
       "quick": "Quick",
       "pro": "Pro",
-      "hintShort": "Quick: main sliders + presets. Pro: also tone detail, effects, Bloom, Halation, LUT.",
-      "hint": "Quick shows presets and core color sliders. Pro adds tone detail, effects, Bloom, Halation, and LUT.",
+      "hintShort": "Quick: three bundled sliders + presets. Pro: per-parameter controls, Bloom/Halation detail, LUT.",
+      "hint": "Quick uses three meta sliders (film character, era, dynamics) for broad changes. Pro shows every slider plus tone detail, effects, Bloom, Halation, and LUT.",
       "hintInfoAria": "Quick vs Pro"
     },
     "compare": {
@@ -165,6 +165,15 @@
     "controls": {
       "presets": "Presets",
       "presetIntensity": "Preset intensity",
+      "quick": {
+        "summary": "Three sliders adjust color, grain, halation, and bloom together. Use Pro (P) for precise values.",
+        "filmLook": "Film character",
+        "filmLookHint": "Bunches saturation, color temp, grain, vignette, and tint.",
+        "era": "Era",
+        "eraHint": "Fade, age, and halation glow (vintage optics).",
+        "dynamics": "Dynamics",
+        "dynamicsHint": "Exposure, contrast, and highlight bloom (air in the highs)."
+      },
       "color": "Color",
       "exposure": "Exposure",
       "contrast": "Contrast",
