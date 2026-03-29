@@ -285,7 +285,7 @@
     },
     "smartLook": {
       "sectionTitle": "Smart look (beta)",
-      "consentHint": "For verified supporters only. A resized JPEG preview is sent to our server and then to an AI provider to suggest small adjustments. We do not use your images to train models. See the site privacy policy for subprocessors.",
+      "consentHint": "For verified supporters only. A resized JPEG preview is sent to our server and then to an AI provider. We may return a corrected preview image applied to your canvas, or numeric suggestions for sliders only, depending on the client. We do not use your images to train models. See the site privacy policy for subprocessors.",
       "consentLabel": "I agree to send a resized preview for this analysis.",
       "applyButton": "Balance for this photo",
       "busy": "Analyzing…",
@@ -328,6 +328,9 @@
       "shadowTone": "Shadow tone",
       "highlightHue": "Highlight hue",
       "highlightTone": "Highlight tone"
+    },
+    "effects": {
+      "rgbShiftHint": "Chromatic aberration: strongest toward the frame edges; the center stays sharp. A touch of edge softening is blended in when this slider is raised."
     },
     "donation": {
       "footer": {
