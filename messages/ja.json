@@ -313,15 +313,18 @@
       "footer": {
         "shortLine": "Film Lab は基本無料です。よろしければ、改善やサーバー費用への任意のご支援をお願いしています。",
         "linkStripe": "Stripe で支援（任意）",
+        "linkStripeAmount": "Stripe · {amountUsd} USD",
         "linkBmc": "Buy Me a Coffee で支援",
         "ariaSupportSection": "Film Lab への任意の支援です。スキップしても機能に影響しません。",
         "ariaOpenStripe": "任意の支援のため Stripe の決済ページを新しいタブで開きます",
+        "ariaOpenStripeTier": "{amountUsd} USD の任意支援のため Stripe を新しいタブで開きます",
         "ariaOpenBmc": "Buy Me a Coffee を新しいタブで開きます"
       },
       "preset_save_modal": {
         "title": "このブラウザに保存しました",
         "body": "Film Lab は引き続き無料でご利用いただけます。よろしければ Stripe または Buy Me a Coffee から任意でご支援いただけると助かります。閉じていただいてもそのままお使いいただけます。",
         "primaryStripe": "Stripe で支援（任意）",
+        "stripeTierLabel": "{amountUsd} USD で支援（任意）",
         "secondaryBmc": "Buy Me a Coffee で支援",
         "dismiss": "閉じる",
         "neverShowAgain": "今後この案内を表示しない"
