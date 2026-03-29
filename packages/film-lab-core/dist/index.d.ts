@@ -59,6 +59,10 @@ declare const PRESETS: {
         shadowHue: number;
         highlightHue: number;
     };
+    /**
+     * cinematic プリセット（v2・2026-03-31）
+     * @description 初見のフィルター感とシアン肌を抑えつつ Teal & Orange の意図は維持。変更理由はリポ外ドキュメントに記載可。
+     */
     cinematic: {
         exposure: number;
         contrast: number;
@@ -246,7 +250,10 @@ declare const PRESETS: {
 };
 type PresetName = keyof typeof PRESETS;
 
-/** スキーマと JSON で共有するプリセット定義バージョン */
+/**
+ * スキーマと JSON（共有 URL・Remotion）で使うプリセット定義のバージョンタグ。
+ * 値を変えると Look ID が変わり互換に影響する。手順は `docs/PRESET_VERSIONING.md`。
+ */
 declare const PRESET_VERSION: "v1";
 /**
  * 機械可読 Look ID（CD ストリームの命名規則）
