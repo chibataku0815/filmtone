@@ -299,7 +299,9 @@
     },
     "color": {
       "tint": "Tint",
+      "shadowHue": "Shadow hue",
       "shadowTone": "Shadow tone",
+      "highlightHue": "Highlight hue",
       "highlightTone": "Highlight tone"
     },
     "shortcuts": {

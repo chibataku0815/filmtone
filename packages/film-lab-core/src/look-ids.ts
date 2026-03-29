@@ -1,0 +1,23 @@
+import type { PresetName } from "./presets";
+
+/** スキーマと JSON で共有するプリセット定義バージョン */
+export const PRESET_VERSION = "v1" as const;
+
+/**
+ * 機械可読 Look ID（CD ストリームの命名規則）
+ */
+export function lookIdForPreset(name: PresetName): string {
+  return `look:mp:${String(name)}:${PRESET_VERSION}`;
+}
+
+export const LOOK_ID_BY_PRESET: Record<PresetName, string> = {
+  reset: lookIdForPreset("reset"),
+  cinematic: lookIdForPreset("cinematic"),
+  portra: lookIdForPreset("portra"),
+  gold200: lookIdForPreset("gold200"),
+  pro400h: lookIdForPreset("pro400h"),
+  bw: lookIdForPreset("bw"),
+  ektar100: lookIdForPreset("ektar100"),
+  superia400: lookIdForPreset("superia400"),
+  cinestill800t: lookIdForPreset("cinestill800t"),
+};

@@ -299,7 +299,9 @@
     },
     "color": {
       "tint": "ティント",
+      "shadowHue": "シャドウの色相",
       "shadowTone": "シャドウトーン",
+      "highlightHue": "ハイライトの色相",
       "highlightTone": "ハイライトトーン"
     },
     "shortcuts": {

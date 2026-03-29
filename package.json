@@ -1,0 +1,14 @@
+{
+  "name": "chibatakumi-portfolio-root",
+  "private": true,
+  "packageManager": "bun@1.3.3",
+  "workspaces": [
+    "packages/film-lab-core",
+    "apps/web",
+    "apps/remotion-film-lab"
+  ],
+  "scripts": {
+    "build:core": "bun run --cwd packages/film-lab-core build",
+    "postinstall": "bun run build:core"
+  }
+}
