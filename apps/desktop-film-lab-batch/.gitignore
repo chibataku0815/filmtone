@@ -4,3 +4,7 @@ dist-electron
 release
 .DS_Store
 *.log
+
+# Apple Notarization — ローカルのみ（`.notary.env.example` はテンプレとしてコミット可）
+.notary.env
+.vercel

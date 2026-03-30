@@ -18,8 +18,14 @@
     "desktop:with-bff": "concurrently -k -n bff,film-lab \"cd ../web && bun run bff:local\" \"wait-on -t 120000 http://127.0.0.1:3000 && bun run desktop\"",
     "dev": "bun run desktop",
     "start": "bun run build && electron dist-electron/main.cjs",
-    "pack:mac": "bun run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --dir",
-    "dist:mac": "bun run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac"
+    "pack:mac:unsigned": "bun run build && FILM_LAB_DESKTOP_SKIP_NOTARIZE=true CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --dir --arm64",
+    "pack:mac": "bun run pack:mac:unsigned",
+    "dist:mac:unsigned": "bun run build && FILM_LAB_DESKTOP_SKIP_NOTARIZE=true CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --arm64",
+    "dist:mac:release": "bun run build && electron-builder --mac --arm64",
+    "dist:mac": "bun run dist:mac:unsigned",
+    "release:staple": "bun ./scripts/staple-mac.mjs",
+    "release:checksums": "bun ./scripts/release-checksums.mjs",
+    "release:upload-blob": "bun ./scripts/upload-dmg-to-vercel-blob.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
@@ -60,20 +66,26 @@
     "directories": {
       "output": "release"
     },
+    "artifactName": "film-lab-${version}-${arch}.${ext}",
     "files": [
       "dist-electron/**/*",
       "dist/renderer/**/*",
       "package.json"
     ],
     "asar": true,
+    "afterSign": "scripts/notarize.mjs",
     "mac": {
       "category": "public.app-category.photography",
       "icon": "resources/film-lab-icon.png",
       "target": [
-        "dmg",
-        "zip"
+        "dmg"
       ],
-      "identity": null
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.inherit.plist",
+      "extendInfo": {
+        "LSMinimumSystemVersion": "11.0"
+      }
     }
   }
 }
