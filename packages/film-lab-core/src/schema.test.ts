@@ -15,6 +15,15 @@ describe("filmLabParamsSchema", () => {
     const r = filmLabParamsSchema.safeParse(bad);
     expect(r.success).toBe(false);
   });
+
+  test("grainRadialMix 省略時は既定 1（後方互換）", () => {
+    const { grainRadialMix: _omit, ...rest } = PRESETS.cinematic;
+    const r = filmLabParamsSchema.safeParse(rest);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.grainRadialMix).toBe(1);
+    }
+  });
 });
 
 describe("filmLookGradeInputSchema", () => {

@@ -3,7 +3,7 @@ import { z } from 'zod';
 /**
  * Film Lab のグレード数値パラメータ定義（ブラウザ・Remotion 共通の単一の真実）
  */
-declare const PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "grainIntensity", "vignette", "bloomThreshold", "bloomStrength", "bloomRadius", "halationIntensity", "halationSpread", "halationHue", "fade", "highlights", "shadows", "shadowTone", "highlightTone", "shadowHue", "highlightHue"];
+declare const PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "grainIntensity", "grainRadialMix", "vignette", "bloomThreshold", "bloomStrength", "bloomRadius", "halationIntensity", "halationSpread", "halationHue", "fade", "highlights", "shadows", "shadowTone", "highlightTone", "shadowHue", "highlightHue"];
 type ParamKey = (typeof PARAM_KEYS)[number];
 interface Params {
     exposure: number;
@@ -13,6 +13,8 @@ interface Params {
     tint: number;
     rgbShift: number;
     grainIntensity: number;
+    /** グレインの周辺比重（0〜1）。0 で径方向マスクなし、1 で現行の周辺強め。 */
+    grainRadialMix: number;
     vignette: number;
     bloomThreshold: number;
     bloomStrength: number;
@@ -34,6 +36,10 @@ declare function cloneParams(params: Params): Params;
 
 /**
  * 組み込みプリセット（Next Film Lab と同一数値）
+ *
+ * grainIntensity は composite で径方向マスク（中心弱・周辺強）が掛かるため、
+ * グレインを使うプリセットのみ体感が薄くならないようわずかに上げている（2026-03-30）。
+ * grainRadialMix は Pro で 0〜1 調整可。プリセット既定は 1（周辺比重オン）。
  */
 declare const PRESETS: {
     reset: {
@@ -44,6 +50,7 @@ declare const PRESETS: {
         tint: number;
         rgbShift: number;
         grainIntensity: number;
+        grainRadialMix: number;
         vignette: number;
         bloomThreshold: number;
         bloomStrength: number;
@@ -71,6 +78,7 @@ declare const PRESETS: {
         tint: number;
         rgbShift: number;
         grainIntensity: number;
+        grainRadialMix: number;
         vignette: number;
         bloomThreshold: number;
         bloomStrength: number;
@@ -94,6 +102,7 @@ declare const PRESETS: {
         tint: number;
         rgbShift: number;
         grainIntensity: number;
+        grainRadialMix: number;
         vignette: number;
         bloomThreshold: number;
         bloomStrength: number;
@@ -117,6 +126,7 @@ declare const PRESETS: {
         tint: number;
         rgbShift: number;
         grainIntensity: number;
+        grainRadialMix: number;
         vignette: number;
         bloomThreshold: number;
         bloomStrength: number;
@@ -140,6 +150,7 @@ declare const PRESETS: {
         tint: number;
         rgbShift: number;
         grainIntensity: number;
+        grainRadialMix: number;
         vignette: number;
         bloomThreshold: number;
         bloomStrength: number;
@@ -163,6 +174,7 @@ declare const PRESETS: {
         tint: number;
         rgbShift: number;
         grainIntensity: number;
+        grainRadialMix: number;
         vignette: number;
         bloomThreshold: number;
         bloomStrength: number;
@@ -186,6 +198,7 @@ declare const PRESETS: {
         tint: number;
         rgbShift: number;
         grainIntensity: number;
+        grainRadialMix: number;
         vignette: number;
         bloomThreshold: number;
         bloomStrength: number;
@@ -209,6 +222,7 @@ declare const PRESETS: {
         tint: number;
         rgbShift: number;
         grainIntensity: number;
+        grainRadialMix: number;
         vignette: number;
         bloomThreshold: number;
         bloomStrength: number;
@@ -232,6 +246,7 @@ declare const PRESETS: {
         tint: number;
         rgbShift: number;
         grainIntensity: number;
+        grainRadialMix: number;
         vignette: number;
         bloomThreshold: number;
         bloomStrength: number;
@@ -265,27 +280,7 @@ declare const LOOK_ID_BY_PRESET: Record<PresetName, string>;
  * 単体のグレードパラメータ（Film Lab の Params と同一形）
  */
 declare const filmLabParamsSchema: z.ZodObject<{
-    exposure: z.ZodNumber;
-    contrast: z.ZodNumber;
-    saturation: z.ZodNumber;
-    temperature: z.ZodNumber;
-    tint: z.ZodNumber;
-    rgbShift: z.ZodNumber;
-    grainIntensity: z.ZodNumber;
-    vignette: z.ZodNumber;
-    bloomThreshold: z.ZodNumber;
-    bloomStrength: z.ZodNumber;
-    bloomRadius: z.ZodNumber;
-    halationIntensity: z.ZodNumber;
-    halationSpread: z.ZodNumber;
-    halationHue: z.ZodNumber;
-    fade: z.ZodNumber;
-    highlights: z.ZodNumber;
-    shadows: z.ZodNumber;
-    shadowTone: z.ZodNumber;
-    highlightTone: z.ZodNumber;
-    shadowHue: z.ZodNumber;
-    highlightHue: z.ZodNumber;
+    [x: string]: z.core.$ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>>;
 }, z.core.$strip>;
 type FilmLabParamsValidated = z.infer<typeof filmLabParamsSchema>;
 /**
@@ -295,27 +290,7 @@ declare const filmLookGradeInputSchema: z.ZodObject<{
     lookPresetId: z.ZodString;
     presetVersion: z.ZodLiteral<"v1">;
     grade: z.ZodObject<{
-        exposure: z.ZodNumber;
-        contrast: z.ZodNumber;
-        saturation: z.ZodNumber;
-        temperature: z.ZodNumber;
-        tint: z.ZodNumber;
-        rgbShift: z.ZodNumber;
-        grainIntensity: z.ZodNumber;
-        vignette: z.ZodNumber;
-        bloomThreshold: z.ZodNumber;
-        bloomStrength: z.ZodNumber;
-        bloomRadius: z.ZodNumber;
-        halationIntensity: z.ZodNumber;
-        halationSpread: z.ZodNumber;
-        halationHue: z.ZodNumber;
-        fade: z.ZodNumber;
-        highlights: z.ZodNumber;
-        shadows: z.ZodNumber;
-        shadowTone: z.ZodNumber;
-        highlightTone: z.ZodNumber;
-        shadowHue: z.ZodNumber;
-        highlightHue: z.ZodNumber;
+        [x: string]: z.core.$ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>>;
     }, z.core.$strip>;
     lutCubeRelPath: z.ZodOptional<z.ZodString>;
     lutEnabled: z.ZodOptional<z.ZodBoolean>;
@@ -324,7 +299,10 @@ declare const filmLookGradeInputSchema: z.ZodObject<{
     gradeSourceVideoWidth: z.ZodOptional<z.ZodNumber>;
     gradeSourceVideoHeight: z.ZodOptional<z.ZodNumber>;
 }, z.core.$strip>;
-type FilmLookGradeInputProps = z.infer<typeof filmLookGradeInputSchema>;
+/** z.object(ZodRawShape) 経由だと grade が Record に寛容になるため、Params で上書き */
+type FilmLookGradeInputProps = Omit<z.infer<typeof filmLookGradeInputSchema>, "grade"> & {
+    grade: Params;
+};
 /**
  * Phase 0 スパイク用（ルックと無関係なテキストのみ）
  */

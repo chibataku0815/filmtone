@@ -7,6 +7,8 @@ var PARAM_KEYS = [
   "tint",
   "rgbShift",
   "grainIntensity",
+  // 0=一様、1=周辺強め（既定1で後方互換）
+  "grainRadialMix",
   "vignette",
   "bloomThreshold",
   "bloomStrength",
@@ -98,6 +100,7 @@ var PRESETS = {
     tint: 0,
     rgbShift: 0,
     grainIntensity: 0,
+    grainRadialMix: 1,
     vignette: 0,
     bloomThreshold: 0.8,
     bloomStrength: 0,
@@ -124,7 +127,8 @@ var PRESETS = {
     temperature: -0.11,
     tint: 0,
     rgbShift: 2e-3,
-    grainIntensity: 0.07,
+    grainIntensity: 0.09,
+    grainRadialMix: 1,
     vignette: 0.32,
     bloomThreshold: 0.86,
     bloomStrength: 0.24,
@@ -147,7 +151,8 @@ var PRESETS = {
     temperature: 0.1,
     tint: 0,
     rgbShift: 0,
-    grainIntensity: 0.12,
+    grainIntensity: 0.14,
+    grainRadialMix: 1,
     vignette: 0.2,
     bloomThreshold: 0.7,
     bloomStrength: 0.15,
@@ -170,7 +175,8 @@ var PRESETS = {
     temperature: 0.18,
     tint: 0,
     rgbShift: 12e-4,
-    grainIntensity: 0.1,
+    grainIntensity: 0.12,
+    grainRadialMix: 1,
     vignette: 0.25,
     bloomThreshold: 0.75,
     bloomStrength: 0.2,
@@ -193,7 +199,8 @@ var PRESETS = {
     temperature: -0.1,
     tint: 0,
     rgbShift: 0,
-    grainIntensity: 0.06,
+    grainIntensity: 0.075,
+    grainRadialMix: 1,
     vignette: 0.15,
     bloomThreshold: 0.65,
     bloomStrength: 0.1,
@@ -216,7 +223,8 @@ var PRESETS = {
     temperature: 0,
     tint: 0,
     rgbShift: 0,
-    grainIntensity: 0.15,
+    grainIntensity: 0.18,
+    grainRadialMix: 1,
     vignette: 0.5,
     bloomThreshold: 0.75,
     bloomStrength: 0.2,
@@ -239,7 +247,8 @@ var PRESETS = {
     temperature: 0.02,
     tint: 0,
     rgbShift: 0,
-    grainIntensity: 0.04,
+    grainIntensity: 0.05,
+    grainRadialMix: 1,
     vignette: 0.15,
     bloomThreshold: 0.85,
     bloomStrength: 0.1,
@@ -262,7 +271,8 @@ var PRESETS = {
     temperature: -0.08,
     tint: 0,
     rgbShift: 0,
-    grainIntensity: 0.1,
+    grainIntensity: 0.115,
+    grainRadialMix: 1,
     vignette: 0.2,
     bloomThreshold: 0.8,
     bloomStrength: 0.1,
@@ -285,7 +295,8 @@ var PRESETS = {
     temperature: -0.3,
     tint: 0,
     rgbShift: 115e-5,
-    grainIntensity: 0.12,
+    grainIntensity: 0.14,
+    grainRadialMix: 1,
     vignette: 0.3,
     bloomThreshold: 0.6,
     bloomStrength: 0.35,
@@ -323,7 +334,10 @@ var LOOK_ID_BY_PRESET = {
 // src/schema.ts
 import { z } from "zod";
 var paramShape = Object.fromEntries(
-  PARAM_KEYS.map((key) => [key, z.number()])
+  PARAM_KEYS.map((key) => [
+    key,
+    key === "grainRadialMix" ? z.number().min(0).max(1).default(1) : z.number()
+  ])
 );
 var filmLabParamsSchema = z.object(paramShape);
 var filmLookGradeInputSchema = z.object({

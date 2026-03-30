@@ -431,6 +431,8 @@
       "effects": "Effects",
       "rgbShift": "RGB Shift",
       "filmGrain": "Film grain",
+      "grainRadialMix": "Grain edge emphasis",
+      "grainRadialMixHint": "Near 0: even grain. Near 1: stronger toward frame edges (not chromatic aberration). At 1 matches the previous default.",
       "vignette": "Vignette",
       "bloom": "Bloom",
       "strength": "Strength",

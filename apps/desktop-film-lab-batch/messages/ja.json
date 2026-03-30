@@ -185,6 +185,8 @@
       "effects": "エフェクト",
       "rgbShift": "RGB シフト",
       "filmGrain": "フィルムグレイン",
+      "grainRadialMix": "グレインの周辺の強さ",
+      "grainRadialMixHint": "0 に近いほど画面全体に均一な粒子。1 に近いほど周辺が強め（色のにじみ・色収差ではなく粒子の出方）。1 が従来どおりの既定です。",
       "vignette": "ビネット",
       "bloom": "Bloom",
       "strength": "強さ",

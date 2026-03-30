@@ -9,6 +9,8 @@ export const PARAM_KEYS = [
   "tint",
   "rgbShift",
   "grainIntensity",
+  // 0=一様、1=周辺強め（既定1で後方互換）
+  "grainRadialMix",
   "vignette",
   "bloomThreshold",
   "bloomStrength",
@@ -35,6 +37,8 @@ export interface Params {
   tint: number;
   rgbShift: number;
   grainIntensity: number;
+  /** グレインの周辺比重（0〜1）。0 で径方向マスクなし、1 で現行の周辺強め。 */
+  grainRadialMix: number;
   vignette: number;
   bloomThreshold: number;
   bloomStrength: number;

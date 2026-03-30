@@ -3,9 +3,15 @@ import { PARAM_KEYS, type Params } from "./params";
 import { PRESETS, type PresetName } from "./presets";
 import { PRESET_VERSION } from "./look-ids";
 
+/** grainRadialMix だけ省略時 1（後方互換） */
 const paramShape = Object.fromEntries(
-  PARAM_KEYS.map((key) => [key, z.number()]),
-) as Record<(typeof PARAM_KEYS)[number], z.ZodNumber>;
+  PARAM_KEYS.map((key) => [
+    key,
+    key === "grainRadialMix"
+      ? z.number().min(0).max(1).default(1)
+      : z.number(),
+  ]),
+) as z.ZodRawShape;
 
 /**
  * 単体のグレードパラメータ（Film Lab の Params と同一形）
@@ -41,7 +47,13 @@ export const filmLookGradeInputSchema = z.object({
   gradeSourceVideoHeight: z.number().int().positive().max(4320).optional(),
 });
 
-export type FilmLookGradeInputProps = z.infer<typeof filmLookGradeInputSchema>;
+/** z.object(ZodRawShape) 経由だと grade が Record に寛容になるため、Params で上書き */
+export type FilmLookGradeInputProps = Omit<
+  z.infer<typeof filmLookGradeInputSchema>,
+  "grade"
+> & {
+  grade: Params;
+};
 
 /**
  * Phase 0 スパイク用（ルックと無関係なテキストのみ）

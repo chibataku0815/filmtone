@@ -6,6 +6,10 @@ import {
 
 /**
  * 組み込みプリセット（Next Film Lab と同一数値）
+ *
+ * grainIntensity は composite で径方向マスク（中心弱・周辺強）が掛かるため、
+ * グレインを使うプリセットのみ体感が薄くならないようわずかに上げている（2026-03-30）。
+ * grainRadialMix は Pro で 0〜1 調整可。プリセット既定は 1（周辺比重オン）。
  */
 export const PRESETS = {
   reset: {
@@ -16,6 +20,7 @@ export const PRESETS = {
     tint: 0,
     rgbShift: 0,
     grainIntensity: 0,
+    grainRadialMix: 1,
     vignette: 0,
     bloomThreshold: 0.8,
     bloomStrength: 0,
@@ -42,7 +47,8 @@ export const PRESETS = {
     temperature: -0.11,
     tint: 0,
     rgbShift: 0.002,
-    grainIntensity: 0.07,
+    grainIntensity: 0.09,
+    grainRadialMix: 1,
     vignette: 0.32,
     bloomThreshold: 0.86,
     bloomStrength: 0.24,
@@ -65,7 +71,8 @@ export const PRESETS = {
     temperature: 0.1,
     tint: 0,
     rgbShift: 0,
-    grainIntensity: 0.12,
+    grainIntensity: 0.14,
+    grainRadialMix: 1,
     vignette: 0.2,
     bloomThreshold: 0.7,
     bloomStrength: 0.15,
@@ -88,7 +95,8 @@ export const PRESETS = {
     temperature: 0.18,
     tint: 0,
     rgbShift: 0.0012,
-    grainIntensity: 0.1,
+    grainIntensity: 0.12,
+    grainRadialMix: 1,
     vignette: 0.25,
     bloomThreshold: 0.75,
     bloomStrength: 0.2,
@@ -111,7 +119,8 @@ export const PRESETS = {
     temperature: -0.1,
     tint: 0,
     rgbShift: 0,
-    grainIntensity: 0.06,
+    grainIntensity: 0.075,
+    grainRadialMix: 1,
     vignette: 0.15,
     bloomThreshold: 0.65,
     bloomStrength: 0.1,
@@ -134,7 +143,8 @@ export const PRESETS = {
     temperature: 0,
     tint: 0,
     rgbShift: 0,
-    grainIntensity: 0.15,
+    grainIntensity: 0.18,
+    grainRadialMix: 1,
     vignette: 0.5,
     bloomThreshold: 0.75,
     bloomStrength: 0.2,
@@ -157,7 +167,8 @@ export const PRESETS = {
     temperature: 0.02,
     tint: 0,
     rgbShift: 0,
-    grainIntensity: 0.04,
+    grainIntensity: 0.05,
+    grainRadialMix: 1,
     vignette: 0.15,
     bloomThreshold: 0.85,
     bloomStrength: 0.1,
@@ -180,7 +191,8 @@ export const PRESETS = {
     temperature: -0.08,
     tint: 0,
     rgbShift: 0,
-    grainIntensity: 0.1,
+    grainIntensity: 0.115,
+    grainRadialMix: 1,
     vignette: 0.2,
     bloomThreshold: 0.8,
     bloomStrength: 0.1,
@@ -203,7 +215,8 @@ export const PRESETS = {
     temperature: -0.3,
     tint: 0,
     rgbShift: 0.00115,
-    grainIntensity: 0.12,
+    grainIntensity: 0.14,
+    grainRadialMix: 1,
     vignette: 0.3,
     bloomThreshold: 0.6,
     bloomStrength: 0.35,
