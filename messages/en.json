@@ -282,6 +282,8 @@
       "faqAvideo": "The desktop app can export one short video as MP4 with the same look you set for your photos.",
       "faqQwindows": "Is there a Windows version?",
       "faqAwindows": "The desktop app is macOS-only (Apple Silicon). The browser version works on any OS.",
+      "roadmapLink": "Roadmap",
+      "releaseNotesLink": "Release Notes",
       "premiumHeroBadgeNew": "Desktop",
       "premiumHeroBadgeLine": "Folder workflows on macOS first — audition a look in the browser.",
       "premiumCapabilitiesEyebrow": "Capabilities",
@@ -720,6 +722,104 @@
       "webDemoDescription": "On-site experience to open your photo or video and audition preset-led grades. Folder-scale finishing stays in Filmtone Desktop.",
       "webDemoOperatingSystem": "Common desktop browser with interactive graphics support",
       "webDemoBrowserRequirements": "Modern browser with WebGL2 available"
+    },
+    "roadmap": {
+      "title": "Roadmap — Filmtone",
+      "description": "Filmtone development roadmap — upcoming features and planned improvements for Desktop and Web.",
+      "eyebrow": "ROADMAP",
+      "heroTitle": "What's Next for Filmtone",
+      "heroBody": "Our development priorities, shaped by real creative workflows. Features move from idea to release as they prove their value.",
+      "categories": {
+        "released": "Released",
+        "inDevelopment": "In Development",
+        "planned": "Planned",
+        "considering": "Considering"
+      },
+      "items": {
+        "batchJpegPng": {
+          "title": "Batch JPEG / PNG grading",
+          "description": "Grade entire folders at once — apply your chosen preset to every image in a directory."
+        },
+        "singleVideoExport": {
+          "title": "Single video export",
+          "description": "Apply the same look to one short MP4 and export with your grade baked in."
+        },
+        "fourPresets": {
+          "title": "4 film-inspired presets",
+          "description": "Kodak Portra 400, Fuji Pro 400H, Kodak Ektar 100, and Ilford HP5 Plus."
+        },
+        "browserDemo": {
+          "title": "Browser demo",
+          "description": "Try presets on your own photos before downloading the desktop app."
+        },
+        "shareLook": {
+          "title": "Share your look via URL",
+          "description": "Generate a link that opens the browser demo with your exact preset settings."
+        },
+        "presetExpansion": {
+          "title": "Preset expansion",
+          "description": "Additional film stocks and creative looks beyond the initial four."
+        },
+        "exportQuality": {
+          "title": "Export quality options",
+          "description": "More control over output resolution, format, and compression settings."
+        },
+        "smartLookAi": {
+          "title": "Smart Look AI",
+          "description": "AI-assisted image correction on Desktop — adjusts photos to better suit the chosen preset's look. Desktop-first; Web may follow later."
+        },
+        "dngRawSupport": {
+          "title": "DNG / RAW support",
+          "description": "Import and grade raw files directly without prior conversion."
+        },
+        "windowsSupport": {
+          "title": "Windows support",
+          "description": "Bring Filmtone Desktop to Windows for broader accessibility."
+        },
+        "lutExport": {
+          "title": "LUT export",
+          "description": "Export your grade as a .cube LUT for use in DaVinci Resolve, Premiere, and other editors."
+        },
+        "mobileApp": {
+          "title": "Mobile app",
+          "description": "A lightweight mobile companion for quick grading on the go."
+        },
+        "cloudSync": {
+          "title": "Cloud preset sync",
+          "description": "Sync your custom presets across Desktop, Web, and Mobile."
+        },
+        "pluginIntegration": {
+          "title": "Editor plugin integration",
+          "description": "Integrate Filmtone presets directly into photo and video editing apps."
+        }
+      },
+      "disclaimer": "This roadmap reflects our current plans and may change. Items in Planned and Considering are not commitments.",
+      "backToFilmLab": "← Back to Filmtone"
+    },
+    "releaseNotes": {
+      "title": "Release Notes — Filmtone",
+      "description": "Filmtone Desktop release history — see what's new, fixed, and improved in each version.",
+      "eyebrow": "RELEASE NOTES",
+      "heroTitle": "Filmtone Desktop Releases",
+      "heroBody": "A log of every Desktop release, from the initial launch onward. Each entry covers what was added, fixed, or changed.",
+      "latestBadge": "Latest",
+      "typeAdded": "Added",
+      "typeFixed": "Fixed",
+      "typeChanged": "Changed",
+      "entries": {
+        "v013Title": "Production optimization",
+        "v013FrameLogSuppression": "Suppressed per-frame log output during video export for cleaner console and improved performance.",
+        "v012Title": "Video color accuracy fix",
+        "v012VideoColorShift": "Fixed color shift in video export caused by the WebCodecs pipeline path.",
+        "v011Title": "Packaged app path fix",
+        "v011FfmpegPath": "Fixed ffmpeg / ffprobe path resolution in the packaged (DMG) distribution.",
+        "v010Title": "Initial release",
+        "v010BatchExport": "Batch JPEG / PNG grading — apply a preset to an entire folder at once.",
+        "v010VideoExport": "Single short video export with the same grade baked in.",
+        "v010FourPresets": "Four film-inspired presets: Kodak Portra 400, Fuji Pro 400H, Kodak Ektar 100, Ilford HP5 Plus.",
+        "v010BrowserDemo": "Browser demo — try presets on your own photos before downloading."
+      },
+      "backToFilmLab": "← Back to Filmtone"
     }
   },
   "common": {

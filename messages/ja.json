@@ -282,6 +282,8 @@
       "faqAvideo": "デスクトップ版で短尺の動画 1 本を MP4 として書き出せます。写真と同じルックを動画にも適用できます。",
       "faqQwindows": "Windows版はありますか？",
       "faqAwindows": "デスクトップ版は macOS（Apple Silicon）専用です。ブラウザ版はどの OS からでもお使いいただけます。",
+      "roadmapLink": "ロードマップ",
+      "releaseNotesLink": "リリースノート",
       "premiumHeroBadgeNew": "Desktop",
       "premiumHeroBadgeLine": "macOS でフォルダ単位の処理がメイン — 先にブラウザでルックを試せます。",
       "premiumCapabilitiesEyebrow": "できること",
@@ -720,6 +722,104 @@
       "webDemoDescription": "サイト上で、自分の写真や動画を開いてプリセットからルックを試せる体験です。フォルダ単位のまとめ処理は Filmtone Desktop が主な場所です。",
       "webDemoOperatingSystem": "インタラクティブ表示に対応した一般的なブラウザ",
       "webDemoBrowserRequirements": "一般的なブラウザで利用可能（WebGL2 が有効な環境）"
+    },
+    "roadmap": {
+      "title": "ロードマップ — Filmtone",
+      "description": "Filmtone の開発ロードマップ — Desktop・Web の今後の機能と改善予定。",
+      "eyebrow": "ロードマップ",
+      "heroTitle": "Filmtone のこれから",
+      "heroBody": "実際のクリエイティブワークフローをもとに開発の優先度を決めています。アイデアは価値が確認でき次第リリースへ進みます。",
+      "categories": {
+        "released": "リリース済み",
+        "inDevelopment": "開発中",
+        "planned": "計画中",
+        "considering": "検討中"
+      },
+      "items": {
+        "batchJpegPng": {
+          "title": "JPEG / PNG 一括グレーディング",
+          "description": "フォルダ内の全画像に選んだプリセットをまとめて適用します。"
+        },
+        "singleVideoExport": {
+          "title": "動画1本の書き出し",
+          "description": "短い MP4 にルックを焼き込んで書き出せます。"
+        },
+        "fourPresets": {
+          "title": "フィルム風プリセット 4 種",
+          "description": "Kodak Portra 400、Fuji Pro 400H、Kodak Ektar 100、Ilford HP5 Plus。"
+        },
+        "browserDemo": {
+          "title": "ブラウザデモ",
+          "description": "Desktop をダウンロードする前に、ブラウザ上でプリセットを自分の写真で試せます。"
+        },
+        "shareLook": {
+          "title": "ルック共有 URL",
+          "description": "プリセット設定を URL にして、ブラウザデモをそのまま共有できます。"
+        },
+        "presetExpansion": {
+          "title": "プリセット追加",
+          "description": "初期の 4 種に加え、新しいフィルムストック・クリエイティブルックを順次追加。"
+        },
+        "exportQuality": {
+          "title": "書き出し品質オプション",
+          "description": "解像度・フォーマット・圧縮設定をより細かく制御できるようにします。"
+        },
+        "smartLookAi": {
+          "title": "Smart Look AI",
+          "description": "Desktop での AI 画像補正 — 選んだプリセットに合うように写真を自動調整します。Desktop が主戦場で、Web は後追いの想定。"
+        },
+        "dngRawSupport": {
+          "title": "DNG / RAW 対応",
+          "description": "事前変換なしで RAW ファイルを直接読み込み・グレーディングできるようにします。"
+        },
+        "windowsSupport": {
+          "title": "Windows 対応",
+          "description": "Filmtone Desktop を Windows に展開し、より多くの方が使えるようにします。"
+        },
+        "lutExport": {
+          "title": "LUT 書き出し",
+          "description": "グレードを .cube LUT として出力し、DaVinci Resolve・Premiere 等で利用可能に。"
+        },
+        "mobileApp": {
+          "title": "モバイルアプリ",
+          "description": "外出先でもすばやくグレーディングできる軽量モバイル版。"
+        },
+        "cloudSync": {
+          "title": "プリセットのクラウド同期",
+          "description": "Desktop・Web・モバイル間でカスタムプリセットを同期。"
+        },
+        "pluginIntegration": {
+          "title": "エディタプラグイン連携",
+          "description": "写真・動画編集アプリから Filmtone のプリセットを直接呼び出せるように。"
+        }
+      },
+      "disclaimer": "このロードマップは現時点の計画であり、変更される場合があります。「計画中」「検討中」の項目は確約ではありません。",
+      "backToFilmLab": "← Filmtone に戻る"
+    },
+    "releaseNotes": {
+      "title": "リリースノート — Filmtone",
+      "description": "Filmtone Desktop のリリース履歴 — 各バージョンの追加・修正・変更を確認できます。",
+      "eyebrow": "リリースノート",
+      "heroTitle": "Filmtone Desktop リリース履歴",
+      "heroBody": "初回リリースからの全バージョンの記録です。追加・修正・変更をまとめています。",
+      "latestBadge": "最新",
+      "typeAdded": "追加",
+      "typeFixed": "修正",
+      "typeChanged": "変更",
+      "entries": {
+        "v013Title": "本番最適化",
+        "v013FrameLogSuppression": "動画書き出し中のフレーム単位ログ出力を抑制し、コンソールをクリーンにしてパフォーマンスを改善。",
+        "v012Title": "動画の色精度修正",
+        "v012VideoColorShift": "WebCodecs パス経由の動画書き出しで発生していた色ズレを修正。",
+        "v011Title": "パッケージ版パス修正",
+        "v011FfmpegPath": "DMG 配布版での ffmpeg / ffprobe パス解決を修正。",
+        "v010Title": "初回リリース",
+        "v010BatchExport": "JPEG / PNG 一括グレーディング — フォルダ全体にプリセットをまとめて適用。",
+        "v010VideoExport": "短い動画にルックを焼き込んで書き出し。",
+        "v010FourPresets": "フィルム風プリセット 4 種: Kodak Portra 400、Fuji Pro 400H、Kodak Ektar 100、Ilford HP5 Plus。",
+        "v010BrowserDemo": "ブラウザデモ — ダウンロード前にプリセットを自分の写真で試せます。"
+      },
+      "backToFilmLab": "← Filmtone に戻る"
     }
   },
   "common": {
