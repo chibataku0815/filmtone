@@ -1,6 +1,6 @@
 {
   "name": "desktop-film-lab-batch",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Filmtone — local batch grading (Electron)",
   "author": "chibatakumi",
