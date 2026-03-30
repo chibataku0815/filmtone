@@ -3,6 +3,7 @@ import {
   computeDecodeUpperBoundUs,
   estimateNominalFrameDurationUs,
   hasSatisfiedSelectionByBufferedFrames,
+  isPrefetchBudgetDominatedByPendingDecodes,
   WEBCODECS_ACC_EXPORT_MAX_FILE_BYTES,
   isMp4LikeContainerForWebCodecs,
   shouldAttemptWebCodecsAccurateExport,
@@ -109,5 +110,37 @@ describe("video-export-webcodecs", () => {
         flushCompleted: false,
       }),
     ).toBe(true);
+  });
+
+  it("isPrefetchBudgetDominatedByPendingDecodes は usable output が薄い pending 主導だけを拾う", () => {
+    expect(
+      isPrefetchBudgetDominatedByPendingDecodes({
+        bufferedFrameBudgetCount: 16,
+        outputQueueLength: 1,
+        pendingDecodes: 15,
+        steadyLeadFrames: 11,
+        resumeThresholdFrames: 6,
+      }),
+    ).toBe(true);
+
+    expect(
+      isPrefetchBudgetDominatedByPendingDecodes({
+        bufferedFrameBudgetCount: 16,
+        outputQueueLength: 6,
+        pendingDecodes: 10,
+        steadyLeadFrames: 11,
+        resumeThresholdFrames: 6,
+      }),
+    ).toBe(false);
+
+    expect(
+      isPrefetchBudgetDominatedByPendingDecodes({
+        bufferedFrameBudgetCount: 10,
+        outputQueueLength: 1,
+        pendingDecodes: 9,
+        steadyLeadFrames: 11,
+        resumeThresholdFrames: 6,
+      }),
+    ).toBe(false);
   });
 });

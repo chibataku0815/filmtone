@@ -41,6 +41,22 @@ const VIDEO_EXPORT_VERBOSE_TRACE =
  */
 const VIDEO_EXPORT_PROGRESS_LOG_INTERVAL_FRAMES = VIDEO_EXPORT_FPS * 5;
 
+/**
+ * @description debug profile 用の追加集計。verbose を戻さず「後半で遅くなるか」を end-of-run だけで読む。
+ */
+const VIDEO_EXPORT_DEBUG_PROFILE =
+  import.meta.env.VITE_FILM_LAB_DEBUG_VIDEO_EXPORT === "true";
+
+/**
+ * @description フレーム列を 4 区間へ分け、前半と後半の差を荒く比較する。
+ */
+const VIDEO_EXPORT_PROFILE_SEGMENT_COUNT = 4;
+
+/**
+ * @description UI progress callback を呼ぶ間隔。見た目は十分滑らかなまま、各フレームの再描画負荷を下げる。
+ */
+const VIDEO_EXPORT_PROGRESS_CALLBACK_INTERVAL_FRAMES = 4;
+
 /** @description seek がこの時間（ms）無応答なら打ち切り（どこで固まったかログに出す） */
 const SEEK_TIMEOUT_MS = 90_000;
 
@@ -87,6 +103,32 @@ function flipRgbaVerticalInto(
     const dstRow = y * rowBytes;
     dst.set(src.subarray(srcRow, srcRow + rowBytes), dstRow);
   }
+}
+
+/**
+ * @description ミリ秒配列の中央値（ソート破壊なし）
+ */
+function meanMs(values: number[]): number {
+  if (values.length === 0) return 0;
+  return values.reduce((x, y) => x + y, 0) / values.length;
+}
+
+/**
+ * @description フレーム番号を 4 分割のどの区間に入れるか返す。
+ */
+function profileSegmentIndex(frameIndex: number, totalFrames: number): number {
+  const safeTotalFrames = Math.max(1, totalFrames);
+  return Math.min(
+    VIDEO_EXPORT_PROFILE_SEGMENT_COUNT - 1,
+    Math.floor((frameIndex * VIDEO_EXPORT_PROFILE_SEGMENT_COUNT) / safeTotalFrames),
+  );
+}
+
+/**
+ * @description 区間ごとの mean を `q1=... q2=...` 形式でまとめる。
+ */
+function formatProfileSegmentMeans(valuesBySegment: number[][]): string {
+  return valuesBySegment.map((values, index) => `q${index + 1}=${meanMs(values).toFixed(1)}`).join(" ");
 }
 
 /**
@@ -934,6 +976,18 @@ export async function runVideoExportPipeline(options: {
         const arrFlip: number[] = [];
         const arrIpc: number[] = [];
         const arrTotal: number[] = [];
+        const arrSeekWaitBySegment = Array.from(
+          { length: VIDEO_EXPORT_PROFILE_SEGMENT_COUNT },
+          () => [] as number[],
+        );
+        const arrIpcBySegment = Array.from(
+          { length: VIDEO_EXPORT_PROFILE_SEGMENT_COUNT },
+          () => [] as number[],
+        );
+        const arrTotalBySegment = Array.from(
+          { length: VIDEO_EXPORT_PROFILE_SEGMENT_COUNT },
+          () => [] as number[],
+        );
         let countSeekedPaths = 0;
         let countReusedFrames = 0;
         let countRvfcFrames = 0;
@@ -971,6 +1025,7 @@ export async function runVideoExportPipeline(options: {
 
           const t = Math.min(i / VIDEO_EXPORT_FPS, maxT);
           const tFrame0 = performance.now();
+          const profileSegment = profileSegmentIndex(i, totalFrames);
 
           viewport.setTime(t);
 
@@ -1070,6 +1125,7 @@ export async function runVideoExportPipeline(options: {
           }
 
           arrSeekWait.push(seekWaitMs);
+          arrSeekWaitBySegment[profileSegment]!.push(seekWaitMs);
           arrDecode.push(decodeGateMs);
 
           if (webCodecsSession) {
@@ -1102,39 +1158,47 @@ export async function runVideoExportPipeline(options: {
           // Fire IPC write and DON'T await — it runs in parallel with next frame's seek.
           // The pipelined main-side handler returns quickly (no drain wait).
           const tW0 = performance.now();
+          const ipcSegment = profileSegment;
           pendingIpc = api.videoExportWriteFrame(currentFlipBuf).then(
             () => {
               const ipcMs = performance.now() - tW0;
               arrIpc.push(ipcMs);
+              arrIpcBySegment[ipcSegment]!.push(ipcMs);
             },
             (e: unknown) => {
               const ipcMs = performance.now() - tW0;
               arrIpc.push(ipcMs);
+              arrIpcBySegment[ipcSegment]!.push(ipcMs);
               pendingIpcError = e instanceof Error ? e.message : String(e);
             },
           );
 
           const totalMs = performance.now() - tFrame0;
           arrTotal.push(totalMs);
-          const summary =
-            `[動画][trace] f=${i + 1}/${totalFrames} t=${t.toFixed(4)}s ` +
-            `reuse=${reuseFrame ? "Y" : "N"} mediaSync=${seekWaitMs.toFixed(0)}ms decode=${decodeGateMs.toFixed(0)}ms ` +
-            `render=${renderMs.toFixed(0)}ms readPx=${readPxMs.toFixed(0)}ms ` +
-            `flip=${flipMs.toFixed(0)}ms ipc=async total=${totalMs.toFixed(0)}ms ` +
-            `| ${video ? videoDebugSnapshot(video) : "[WebCodecs]"}`;
-
-          if (VIDEO_EXPORT_VERBOSE_TRACE) {
-            onLog(summary);
-          } else if (
+          arrTotalBySegment[profileSegment]!.push(totalMs);
+          const shouldLogSummary =
+            VIDEO_EXPORT_VERBOSE_TRACE ||
             totalMs > 1500 ||
             (i + 1) % VIDEO_EXPORT_PROGRESS_LOG_INTERVAL_FRAMES === 0 ||
             i === 0 ||
-            i === totalFrames - 1
-          ) {
+            i === totalFrames - 1;
+          if (shouldLogSummary) {
+            const summary =
+              `[動画][trace] f=${i + 1}/${totalFrames} t=${t.toFixed(4)}s ` +
+              `reuse=${reuseFrame ? "Y" : "N"} mediaSync=${seekWaitMs.toFixed(0)}ms decode=${decodeGateMs.toFixed(0)}ms ` +
+              `render=${renderMs.toFixed(0)}ms readPx=${readPxMs.toFixed(0)}ms ` +
+              `flip=${flipMs.toFixed(0)}ms ipc=async total=${totalMs.toFixed(0)}ms ` +
+              `| ${video ? videoDebugSnapshot(video) : "[WebCodecs]"}`;
             onLog(summary);
           }
 
-          onProgress?.({ currentFrame: i + 1, totalFrames });
+          if (
+            i === 0 ||
+            i === totalFrames - 1 ||
+            (i + 1) % VIDEO_EXPORT_PROGRESS_CALLBACK_INTERVAL_FRAMES === 0
+          ) {
+            onProgress?.({ currentFrame: i + 1, totalFrames });
+          }
         }
 
         if (retryWithSeek) {
@@ -1154,18 +1218,22 @@ export async function runVideoExportPipeline(options: {
         webCodecsSession?.flushExportDebugBuckets("export-end-tail");
 
         const wallMs = performance.now() - wallStart;
-        const mean = (a: number[]) =>
-          a.length === 0 ? 0 : a.reduce((x, y) => x + y, 0) / a.length;
+        const profileDebugDetail = VIDEO_EXPORT_DEBUG_PROFILE
+          ? `\n  mediaSync segMean ${formatProfileSegmentMeans(arrSeekWaitBySegment)}\n` +
+            `  ipcWrite segMean ${formatProfileSegmentMeans(arrIpcBySegment)}\n` +
+            `  frameTotal segMean ${formatProfileSegmentMeans(arrTotalBySegment)}`
+          : "";
         onLog(
           `[動画][profile] wall=${wallMs.toFixed(0)}ms frames=${totalFrames} ` +
             `seekedFrames=${countSeekedPaths} reusedFrames=${countReusedFrames} forwardScans=${countForwardScans} rvfcFrames=${countRvfcFrames} rafFallbackFrames=${countRafFallbackFrames}\n` +
-            `  mediaSync ms mean=${mean(arrSeekWait).toFixed(1)} median=${medianMs(arrSeekWait).toFixed(1)} p95=${p95Ms(arrSeekWait).toFixed(1)}\n` +
-            `  decodeGate ms mean=${mean(arrDecode).toFixed(1)} median=${medianMs(arrDecode).toFixed(1)} p95=${p95Ms(arrDecode).toFixed(1)}\n` +
-            `  render ms mean=${mean(arrRender).toFixed(1)} median=${medianMs(arrRender).toFixed(1)} p95=${p95Ms(arrRender).toFixed(1)}\n` +
-            `  readPixels ms mean=${mean(arrRead).toFixed(1)} median=${medianMs(arrRead).toFixed(1)} p95=${p95Ms(arrRead).toFixed(1)}\n` +
-            `  flip ms mean=${mean(arrFlip).toFixed(1)} median=${medianMs(arrFlip).toFixed(1)} p95=${p95Ms(arrFlip).toFixed(1)}\n` +
-            `  ipcWrite ms mean=${mean(arrIpc).toFixed(1)} median=${medianMs(arrIpc).toFixed(1)} p95=${p95Ms(arrIpc).toFixed(1)}\n` +
-            `  frameTotal ms mean=${mean(arrTotal).toFixed(1)} median=${medianMs(arrTotal).toFixed(1)} p95=${p95Ms(arrTotal).toFixed(1)}`,
+            `  mediaSync ms mean=${meanMs(arrSeekWait).toFixed(1)} median=${medianMs(arrSeekWait).toFixed(1)} p95=${p95Ms(arrSeekWait).toFixed(1)}\n` +
+            `  decodeGate ms mean=${meanMs(arrDecode).toFixed(1)} median=${medianMs(arrDecode).toFixed(1)} p95=${p95Ms(arrDecode).toFixed(1)}\n` +
+            `  render ms mean=${meanMs(arrRender).toFixed(1)} median=${medianMs(arrRender).toFixed(1)} p95=${p95Ms(arrRender).toFixed(1)}\n` +
+            `  readPixels ms mean=${meanMs(arrRead).toFixed(1)} median=${medianMs(arrRead).toFixed(1)} p95=${p95Ms(arrRead).toFixed(1)}\n` +
+            `  flip ms mean=${meanMs(arrFlip).toFixed(1)} median=${medianMs(arrFlip).toFixed(1)} p95=${p95Ms(arrFlip).toFixed(1)}\n` +
+            `  ipcWrite ms mean=${meanMs(arrIpc).toFixed(1)} median=${medianMs(arrIpc).toFixed(1)} p95=${p95Ms(arrIpc).toFixed(1)}\n` +
+            `  frameTotal ms mean=${meanMs(arrTotal).toFixed(1)} median=${medianMs(arrTotal).toFixed(1)} p95=${p95Ms(arrTotal).toFixed(1)}` +
+            profileDebugDetail,
         );
 
         const fin = await api.videoExportFinish();

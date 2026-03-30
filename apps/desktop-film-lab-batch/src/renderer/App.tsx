@@ -48,6 +48,7 @@ import {
 } from "./video-export-policy";
 import {
   runVideoExportPipeline,
+  type VideoExportProgress,
   type VideoExportPipelineUserMessages,
 } from "./video-export-pipeline";
 import {
@@ -80,6 +81,12 @@ const DESKTOP_INACTIVE_TAB_CLASS =
  *   各フレームの `setState` 連打を避け、書き出し中の UI 負荷を下げる。
  */
 const LOG_TEXT_FLUSH_INTERVAL_MS = 120;
+
+/**
+ * @description 動画書き出し中の progress 表示を更新する最短間隔（ms）。
+ *   各フレームの `setState` を避け、React 再描画の負荷で後半が鈍らないようにする。
+ */
+const VIDEO_PROGRESS_FLUSH_INTERVAL_MS = 150;
 
 /**
  * @description セッションに保存した情報だけから BatchGradeState を組み立てる（再開直後のパイプライン用）
@@ -173,6 +180,10 @@ export default function App() {
   const pendingLogTextRef = useRef("");
   /** @description 次回 flush のタイマー ID。null のときは未予約。 */
   const logFlushTimerRef = useRef<number | null>(null);
+  /** @description 動画 progress の最新値。一定間隔ごとに UI へ反映する。 */
+  const pendingVideoProgressRef = useRef<VideoExportProgress | null>(null);
+  /** @description 動画 progress flush のタイマー ID。null のときは未予約。 */
+  const videoProgressFlushTimerRef = useRef<number | null>(null);
   const [running, setRunning] = useState(false);
   /** @description 書き出し中断用。Run 開始時に差し替え、完了・エラーで null */
   const batchAbortRef = useRef<AbortController | null>(null);
@@ -339,11 +350,63 @@ export default function App() {
     setLogText("");
   }, []);
 
+  /**
+   * @description 保留中の動画 progress を一度だけ UI へ反映する。
+   *   書き出し中の大きな React 再描画を減らしつつ、進捗表示は十分追えるようにする。
+   */
+  const flushVideoProgress = useCallback(() => {
+    if (videoProgressFlushTimerRef.current !== null) {
+      window.clearTimeout(videoProgressFlushTimerRef.current);
+      videoProgressFlushTimerRef.current = null;
+    }
+    const pendingVideoProgress = pendingVideoProgressRef.current;
+    if (!pendingVideoProgress) return;
+    pendingVideoProgressRef.current = null;
+    setBatchProgress({
+      current: pendingVideoProgress.currentFrame,
+      total: pendingVideoProgress.totalFrames,
+      fileName: tLogs("progressVideoFrames"),
+    });
+  }, [tLogs]);
+
+  /**
+   * @description 新しい動画書き出し開始前や終了時に、保留中 progress とタイマーを片付ける。
+   */
+  const resetVideoProgressBuffer = useCallback(() => {
+    pendingVideoProgressRef.current = null;
+    if (videoProgressFlushTimerRef.current !== null) {
+      window.clearTimeout(videoProgressFlushTimerRef.current);
+      videoProgressFlushTimerRef.current = null;
+    }
+  }, []);
+
+  /**
+   * @description 動画 progress は一定間隔でまとめて反映し、最終フレームだけ即時反映する。
+   */
+  const scheduleVideoProgress = useCallback(
+    (progress: VideoExportProgress) => {
+      pendingVideoProgressRef.current = progress;
+      if (progress.currentFrame <= 1 || progress.currentFrame === progress.totalFrames) {
+        flushVideoProgress();
+        return;
+      }
+      if (videoProgressFlushTimerRef.current !== null) return;
+      videoProgressFlushTimerRef.current = window.setTimeout(() => {
+        flushVideoProgress();
+      }, VIDEO_PROGRESS_FLUSH_INTERVAL_MS);
+    },
+    [flushVideoProgress],
+  );
+
   useEffect(() => {
     return () => {
       if (logFlushTimerRef.current !== null) {
         window.clearTimeout(logFlushTimerRef.current);
         logFlushTimerRef.current = null;
+      }
+      if (videoProgressFlushTimerRef.current !== null) {
+        window.clearTimeout(videoProgressFlushTimerRef.current);
+        videoProgressFlushTimerRef.current = null;
       }
     };
   }, []);
@@ -730,6 +793,7 @@ export default function App() {
     }
 
     resetLogText();
+    resetVideoProgressBuffer();
     batchAbortRef.current = null;
     setRunning(true);
 
@@ -785,11 +849,7 @@ export default function App() {
           grade: batchGrade,
           signal: abortController.signal,
           onProgress: (pr) => {
-            setBatchProgress({
-              current: pr.currentFrame,
-              total: pr.totalFrames,
-              fileName: tLogs("progressVideoFrames"),
-            });
+            scheduleVideoProgress(pr);
           },
           onLog: appendLog,
           userMessages: videoPipelineUserMessages,
@@ -805,6 +865,8 @@ export default function App() {
       const msg = e instanceof Error ? e.message : String(e);
       appendLog(tLogs("videoFatal", { msg }));
     } finally {
+      flushVideoProgress();
+      resetVideoProgressBuffer();
       batchAbortRef.current = null;
       setBatchProgress(null);
       setRunning(false);

@@ -70,10 +70,11 @@ const MAX_LIVE_VIDEO_FRAMES = 8;
 const DECODE_OUTPUT_WAIT_MS = 30_000;
 
 /**
- * @description 開発ビルドのみ。フェーズ番号付きで停滞箇所（どの await の前後か）をログする。
- *   本番では無効のままにし、ユーザーのログ汚染を防ぐ。
+ * @description フェーズ番号付きの詳細 trace は verbose 指定時だけ有効。
+ *   quiet run では bucket / summary だけを残し、速度判定に trace overhead を混ぜない。
  */
-const WEBCODECS_FINE_TRACE = import.meta.env.DEV === true;
+const WEBCODECS_FINE_TRACE =
+  import.meta.env.VITE_FILM_LAB_VERBOSE_VIDEO_EXPORT === "true";
 
 /**
  * @description `FILM_LAB_DEBUG_VIDEO_EXPORT=1` で起動したときだけ有効（Vite define 経由）。
@@ -150,6 +151,39 @@ export function computeDecodeUpperBoundUs(opts: {
     : INITIAL_DECODE_LEAD_FRAMES;
   return opts.targetUs + Math.max(1, opts.frameDurationUs) * leadFrames;
 }
+
+/**
+ * @description prefetch が `outputQueue + pendingDecodes` の合算で止まったとき、
+ *   「usable output は薄いのに pending だけで予算を食っている」状態かを返す。
+ *   いまは診断専用で、Phase 4 で prefetch 条件を見直すときの観測に使う。
+ */
+export function isPrefetchBudgetDominatedByPendingDecodes(opts: {
+  bufferedFrameBudgetCount: number;
+  outputQueueLength: number;
+  pendingDecodes: number;
+  steadyLeadFrames: number;
+  resumeThresholdFrames: number;
+}): boolean {
+  if (opts.bufferedFrameBudgetCount < opts.steadyLeadFrames) return false;
+  if (opts.outputQueueLength >= opts.resumeThresholdFrames) return false;
+  return (
+    opts.pendingDecodes >= opts.steadyLeadFrames &&
+    opts.pendingDecodes > opts.outputQueueLength
+  );
+}
+
+/**
+ * @description `waitForOutputOrError()` をどこから呼んだか。summary / bucket で待ちの主因を分けて読む。
+ */
+type WaitOutputReason = "ensureFed" | "pendingHardCap";
+
+/**
+ * @description 1 回の pump がどの理由で caller へ戻ったか。後半でどの exit が増えるかを見る。
+ */
+type PumpStopReason =
+  | "liveBudget"
+  | "pumpBudget"
+  | "targetBudget";
 
 /**
  * @description holder / outputQueue だけで、target に必要な表示選択がもう決まったかを返す。
@@ -343,6 +377,34 @@ export class WebCodecsMp4ExportSession {
   private bucketPendingDecodesPeak = 0;
   /** @description bucket 内の `outputQueue.length` 最大 */
   private bucketOutputQueuePeak = 0;
+  /** @description bucket 内で `waitOutput` が `ensureFed` 起点だった回数。 */
+  private bucketWaitOutputEnsureFedCalls = 0;
+  /** @description bucket 内で `waitOutput` が `pendingHardCap` 起点だった回数。 */
+  private bucketWaitOutputPendingHardCapCalls = 0;
+  /** @description bucket 内で `pump` が live budget で返った回数。 */
+  private bucketPumpStopLiveBudgetCalls = 0;
+  /** @description bucket 内で `pump` が per-pump budget で返った回数。 */
+  private bucketPumpStopPumpBudgetCalls = 0;
+  /** @description bucket 内で `pump` が target budget で返った回数。 */
+  private bucketPumpStopTargetBudgetCalls = 0;
+  /** @description bucket 内で prefetch が future budget 超過で見送られた回数。 */
+  private bucketPrefetchBudgetSkips = 0;
+  /** @description bucket 内で prefetch が pending 主導の budget 超過だった回数。 */
+  private bucketPrefetchPendingDominatedSkips = 0;
+  /** @description セッション全体で見た `pendingDecodes` の最大。後半で decode が溜まるかを見る。 */
+  private sessionPendingDecodesPeak = 0;
+  /** @description セッション全体で見た `outputQueue.length` の最大。output burst の大きさを見る。 */
+  private sessionOutputQueuePeak = 0;
+  /** @description セッション全体で `waitForOutputOrError` が実際に待った回数。 */
+  private sessionWaitOutputCalls = 0;
+  /** @description セッション全体の wait 合計 ms。mediaSync のうち output 待ちがどれだけ支配的かを見る。 */
+  private sessionWaitOutputTotalMs = 0;
+  /** @description セッション全体で `ensureFed` 起点の wait が何回あったか。 */
+  private sessionWaitOutputEnsureFedCalls = 0;
+  /** @description セッション全体で `pendingHardCap` 起点の wait が何回あったか。 */
+  private sessionWaitOutputPendingHardCapCalls = 0;
+  /** @description セッション全体で prefetch が pending 主導 budget に塞がれた回数。 */
+  private sessionPrefetchPendingDominatedSkips = 0;
 
   private constructor(
     probe: ProbeShape,
@@ -415,6 +477,58 @@ export class WebCodecsMp4ExportSession {
   }
 
   /**
+   * @description bucket / session に wait reason を積む。
+   * @param reason `waitOutput` へ入った呼び出し元
+   */
+  private noteWaitOutputReason(reason: WaitOutputReason): void {
+    if (reason === "ensureFed") {
+      this.bucketWaitOutputEnsureFedCalls += 1;
+      this.sessionWaitOutputEnsureFedCalls += 1;
+      return;
+    }
+    this.bucketWaitOutputPendingHardCapCalls += 1;
+    this.sessionWaitOutputPendingHardCapCalls += 1;
+  }
+
+  /**
+   * @description bucket 内で `pump` がどの理由で caller へ返ったかを記録する。
+   * @param reason 現在の pump 停止理由
+   */
+  private notePumpStopReason(reason: PumpStopReason): void {
+    if (reason === "liveBudget") {
+      this.bucketPumpStopLiveBudgetCalls += 1;
+      return;
+    }
+    if (reason === "pumpBudget") {
+      this.bucketPumpStopPumpBudgetCalls += 1;
+      return;
+    }
+    if (reason === "targetBudget") {
+      this.bucketPumpStopTargetBudgetCalls += 1;
+      return;
+    }
+  }
+
+  /**
+   * @description prefetch を budget 超過で見送ったとき、pending 主導だったかまで bucket / session に残す。
+   */
+  private notePrefetchBudgetSkip(): void {
+    this.bucketPrefetchBudgetSkips += 1;
+    if (
+      isPrefetchBudgetDominatedByPendingDecodes({
+        bufferedFrameBudgetCount: this.bufferedFrameBudgetCount(),
+        outputQueueLength: this.outputQueue.length,
+        pendingDecodes: this.pendingDecodes,
+        steadyLeadFrames: STEADY_DECODE_LEAD_FRAMES,
+        resumeThresholdFrames: PREFETCH_RESUME_THRESHOLD_FRAMES,
+      })
+    ) {
+      this.bucketPrefetchPendingDominatedSkips += 1;
+      this.sessionPrefetchPendingDominatedSkips += 1;
+    }
+  }
+
+  /**
    * @description 次の 100 フレーム区間へ進む前にカウンタを戻す。
    */
   private resetBucketAccumulators(): void {
@@ -426,6 +540,13 @@ export class WebCodecsMp4ExportSession {
     this.bucketBufferedMax = 0;
     this.bucketPendingDecodesPeak = 0;
     this.bucketOutputQueuePeak = 0;
+    this.bucketWaitOutputEnsureFedCalls = 0;
+    this.bucketWaitOutputPendingHardCapCalls = 0;
+    this.bucketPumpStopLiveBudgetCalls = 0;
+    this.bucketPumpStopPumpBudgetCalls = 0;
+    this.bucketPumpStopTargetBudgetCalls = 0;
+    this.bucketPrefetchBudgetSkips = 0;
+    this.bucketPrefetchPendingDominatedSkips = 0;
   }
 
   /**
@@ -437,6 +558,9 @@ export class WebCodecsMp4ExportSession {
       `[動画][WebCodecs][bucket] frames=${lo}-${hi} reason=${reason} ` +
         `ensureFedFast=${this.bucketEnsureFedFastPathHits} schedulePump=${this.bucketSchedulePumpCalls} ` +
         `waitOut=${this.bucketWaitOutputCalls} waitOutMs=${this.bucketWaitOutputTotalMs.toFixed(1)} ` +
+        `waitEnsure=${this.bucketWaitOutputEnsureFedCalls} waitPend=${this.bucketWaitOutputPendingHardCapCalls} ` +
+        `stopLive=${this.bucketPumpStopLiveBudgetCalls} stopPump=${this.bucketPumpStopPumpBudgetCalls} stopTarget=${this.bucketPumpStopTargetBudgetCalls} ` +
+        `prefetchSkip=${this.bucketPrefetchBudgetSkips} prefetchPendDom=${this.bucketPrefetchPendingDominatedSkips} ` +
         `bufMin=${bufLo} bufMax=${this.bucketBufferedMax} pendPeak=${this.bucketPendingDecodesPeak} outQPeak=${this.bucketOutputQueuePeak} ` +
         `inQ=${this.inQPendingCount()} live=${this.liveFrameCount()} livePeakSession=${this.liveFramePeak}`,
     );
@@ -517,6 +641,24 @@ export class WebCodecsMp4ExportSession {
   }
 
   /**
+   * @description `decode()` を投げた直後の `pendingDecodes` ピークを記録する。
+   *   live frame とは別の「裏で溜まっている decode 量」を summary に残す。
+   */
+  private notePendingDecodesPeak(): void {
+    if (this.pendingDecodes <= this.sessionPendingDecodesPeak) return;
+    this.sessionPendingDecodesPeak = this.pendingDecodes;
+  }
+
+  /**
+   * @description `decoder.output` が burst したときの queue ピークを記録する。
+   *   100-frame bucket の観測より細かく、瞬間的な膨らみも落とさず残す。
+   */
+  private noteOutputQueuePeak(): void {
+    if (this.outputQueue.length <= this.sessionOutputQueuePeak) return;
+    this.sessionOutputQueuePeak = this.outputQueue.length;
+  }
+
+  /**
    * @description sample.duration が読めたとき、target 上界の rough hint を更新する。
    */
   private noteFrameDurationHint(frameDurationUs: number | undefined): void {
@@ -569,7 +711,10 @@ export class WebCodecsMp4ExportSession {
     if (this.decodeFatal) return;
     if (this.flushPromise || this.flushCompleted) return;
     if (this.inQPendingCount() === 0) return;
-    if (this.bufferedFrameBudgetCount() >= STEADY_DECODE_LEAD_FRAMES) return;
+    if (this.bufferedFrameBudgetCount() >= STEADY_DECODE_LEAD_FRAMES) {
+      this.notePrefetchBudgetSkip();
+      return;
+    }
 
     const desiredTargetUs = this.decodeUpperBoundUsForTarget(targetUs);
     this.queuedPrefetchTargetUs =
@@ -588,7 +733,10 @@ export class WebCodecsMp4ExportSession {
           if (this.decodeFatal) return;
           if (this.inQPendingCount() === 0) return;
           if (this.liveFrameCount() >= MAX_LIVE_VIDEO_FRAMES) return;
-          if (this.bufferedFrameBudgetCount() >= STEADY_DECODE_LEAD_FRAMES) return;
+          if (this.bufferedFrameBudgetCount() >= STEADY_DECODE_LEAD_FRAMES) {
+            this.notePrefetchBudgetSkip();
+            return;
+          }
           const nextInputPtsUs = this.peekNextInputPtsUs();
           if (nextInputPtsUs !== null && nextInputPtsUs <= prefetchTargetUs) {
             this.queuedPrefetchTargetUs = prefetchTargetUs;
@@ -736,6 +884,7 @@ export class WebCodecsMp4ExportSession {
                     );
                   }
                   s.outputQueue.push(frame);
+                  s.noteOutputQueuePeak();
                   s.noteLiveFramePeak("decoder.output");
                   s.drainOutputWaiters();
                 } else {
@@ -809,12 +958,16 @@ export class WebCodecsMp4ExportSession {
   /**
    * @description VideoDecoder の output / error が来るまで待つ。来なければタイムアウトで状態を詳細に投げる（無限待ちデバッグ用）。
    * @param timeoutMs この時間超えたら例外
+   * @param reason `waitOutput` に入った呼び出し元
    */
-  private async waitForOutputOrError(timeoutMs: number = DECODE_OUTPUT_WAIT_MS): Promise<void> {
+  private async waitForOutputOrError(
+    timeoutMs: number = DECODE_OUTPUT_WAIT_MS,
+    reason: WaitOutputReason = "ensureFed",
+  ): Promise<void> {
     if (this.outputQueue.length > 0 || this.decodeFatal) return;
     const waitStartedMs = performance.now();
     this.fineTrace(
-      `STEP waitOutput BEFORE race timeout=${timeoutMs}ms | ${this.snapshotForTrace()}`,
+      `STEP waitOutput BEFORE race timeout=${timeoutMs}ms reason=${reason} | ${this.snapshotForTrace()}`,
     );
     let timer: ReturnType<typeof setTimeout> | undefined;
     let waiter: (() => void) | null = null;
@@ -843,7 +996,12 @@ export class WebCodecsMp4ExportSession {
       this.bucketWaitOutputCalls += 1;
       this.bucketWaitOutputTotalMs += performance.now() - waitStartedMs;
     }
-    this.fineTrace(`STEP waitOutput AFTER race | ${this.snapshotForTrace()}`);
+    this.noteWaitOutputReason(reason);
+    this.sessionWaitOutputCalls += 1;
+    this.sessionWaitOutputTotalMs += performance.now() - waitStartedMs;
+    this.fineTrace(
+      `STEP waitOutput AFTER race reason=${reason} | ${this.snapshotForTrace()}`,
+    );
   }
 
   /**
@@ -1035,12 +1193,14 @@ export class WebCodecsMp4ExportSession {
        *   暗転・無応答に繋がったため入れない（burst 抑制は `MAX_DECODE_SUBMITS_PER_PUMP` と yield に任せる）。
        */
       if (this.liveFrameCount() >= MAX_LIVE_VIDEO_FRAMES) {
+        this.notePumpStopReason("liveBudget");
         this.fineTrace(
           `STEP pumpImpl liveBudget stop live=${this.liveFrameCount()} max=${MAX_LIVE_VIDEO_FRAMES} targetUs=${targetUs ?? "none"}`,
         );
         break;
       }
       if (decodeSubmitsThisPump >= MAX_DECODE_SUBMITS_PER_PUMP) {
+        this.notePumpStopReason("pumpBudget");
         this.fineTrace(
           `STEP pumpImpl budget stop decodeSubmitsThisPump=${decodeSubmitsThisPump} inQ=${this.inQPendingCount()} outQ=${this.outputQueue.length}`,
         );
@@ -1062,7 +1222,10 @@ export class WebCodecsMp4ExportSession {
         this.fineTrace(
           `STEP pumpImpl BLOCKED pending>=${MAX_PENDING_DECODE_CHUNKS} → waitOutput | ${this.snapshotForTrace()}`,
         );
-        await this.waitForOutputOrError(DECODE_OUTPUT_WAIT_MS);
+        await this.waitForOutputOrError(
+          DECODE_OUTPUT_WAIT_MS,
+          "pendingHardCap",
+        );
         if (this.decodeFatal) return;
       }
       const sample = this.inputQueue[this.inputQueueReadOffset]!;
@@ -1088,6 +1251,7 @@ export class WebCodecsMp4ExportSession {
         const upperBoundUs = this.decodeUpperBoundUsForTarget(targetUs);
         const selectionReady = this.hasSatisfiedBufferedSelection(targetUs);
         if (stamp > upperBoundUs && this.liveFrameCount() > 0) {
+          this.notePumpStopReason("targetBudget");
           this.fineTrace(
             `STEP pumpImpl targetBudget stop nextStamp=${stamp} upperBoundUs=${upperBoundUs} targetUs=${targetUs} live=${this.liveFrameCount()} selectionReady=${selectionReady ? "Y" : "N"}`,
           );
@@ -1127,6 +1291,7 @@ export class WebCodecsMp4ExportSession {
           );
         }
         this.pendingDecodes++;
+        this.notePendingDecodesPeak();
         this.decoder.decode(chunk);
         this.decodeSubmitCount++;
         this.consumeInputQueueHead("after-decode");
@@ -1255,7 +1420,7 @@ export class WebCodecsMp4ExportSession {
             `STEP ensureFed i=${i} outputQueue empty → waitOutput | holderTs=${this.holder?.timestamp ?? "null"}`,
           );
         }
-        await this.waitForOutputOrError(DECODE_OUTPUT_WAIT_MS);
+        await this.waitForOutputOrError(DECODE_OUTPUT_WAIT_MS, "ensureFed");
       }
     }
     const summary = this.diagnoseStallSummary("n/a");
@@ -1307,7 +1472,12 @@ export class WebCodecsMp4ExportSession {
   dispose(): void {
     if (this.decodeSubmitCount > 0 || this.decodeOutputCount > 0) {
       this.onTrace(
-        `[動画][WebCodecs][summary] submitted=${this.decodeSubmitCount} outputCb=${this.decodeOutputCount} liveFramePeak=${this.liveFramePeak} closedFrames=${this.closedFrameCount}`,
+        `[動画][WebCodecs][summary] submitted=${this.decodeSubmitCount} outputCb=${this.decodeOutputCount} ` +
+          `liveFramePeak=${this.liveFramePeak} outQPeak=${this.sessionOutputQueuePeak} ` +
+          `pendingPeak=${this.sessionPendingDecodesPeak} waitOut=${this.sessionWaitOutputCalls} ` +
+          `waitOutMs=${this.sessionWaitOutputTotalMs.toFixed(1)} waitEnsure=${this.sessionWaitOutputEnsureFedCalls} ` +
+          `waitPend=${this.sessionWaitOutputPendingHardCapCalls} ` +
+          `prefetchPendDom=${this.sessionPrefetchPendingDominatedSkips} closedFrames=${this.closedFrameCount}`,
       );
     }
     for (const f of this.outputQueue) this.closeVideoFrame(f, "dispose.outputQueue");
