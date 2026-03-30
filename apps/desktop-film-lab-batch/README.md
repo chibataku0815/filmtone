@@ -29,8 +29,24 @@ Filmtone Desktop は、Filmtone の **macOS 向けローカル書き出しアプ
 - `bun run dist:mac:release` - 署名 + notarization 前提の本番ビルドを生成します。
 - `bun run release:staple` - 公証済みの **`release/mac-arm64/<製品名>.app`** に staple / validate（DMG ではなく .app 向け）。
 - `bun run release:checksums` - `release/SHA256SUMS.txt` を生成します。
-- `bun run release:upload-blob` - `release/film-lab-<version>-arm64.dmg` を **Vercel Blob** に載せます（要 `BLOB_READ_WRITE_TOKEN`）。`-- --sync-vercel-env` で `FILM_LAB_DESKTOP_DOWNLOAD_URL` を production に同期。
+- `bun run release:upload-blob` - `release/filmtone-<version>-arm64.dmg` を **Vercel Blob** に載せます（要 `BLOB_READ_WRITE_TOKEN`）。`-- --sync-vercel-env` で `FILM_LAB_DESKTOP_DOWNLOAD_URL` を production に同期。
 - `bun run release:upload-update-meta` - 更新案内用の **`update-meta.json`**（固定 pathname）を Blob に載せます。`-- --sync-vercel-env` で `FILM_LAB_DESKTOP_UPDATE_CHECK_URL` を production に同期。任意で `--download-page` / `--release-notes-url`。その後 **`FILM_LAB_DESKTOP_UPDATE_CHECK_URL` を付けて `bun run build`** すると、パッケージにチェック用 URL が埋め込まれます（`scripts/build-electron.mjs` の define）。
+
+## 版更新の最短運用
+
+Desktop の **配布ファイル名** と **更新通知の版数** は、どちらも `package.json` の `version` を正本にします。
+
+1. `apps/desktop-film-lab-batch/package.json` の `version` を上げる
+2. `RELEASE_NOTES-v<version>.md` を用意または更新する
+3. `bun run dist:mac:release`
+4. `bun run release:checksums`
+5. `bun run release:upload-blob -- --sync-vercel-env`
+6. `bun run release:upload-update-meta -- --sync-vercel-env`
+
+これで次の 2 つが同じ版数で揃います。
+
+- 生成される DMG: `filmtone-<version>-arm64.dmg`
+- 更新通知の `latestVersion`: `package.json` の `version`
 
 ### リリース・公証（コピペは短縮ガイドのみ）
 

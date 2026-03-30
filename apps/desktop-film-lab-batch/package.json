@@ -1,6 +1,6 @@
 {
   "name": "desktop-film-lab-batch",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Filmtone — local batch grading (Electron)",
   "author": "chibatakumi",
@@ -34,6 +34,7 @@
     "electron-store": "8.2.0",
     "film-lab-core": "workspace:*",
     "film-lab-smart-look": "workspace:*",
+    "fix-path": "^5.0.0",
     "mp4box": "^2.3.0",
     "next-intl": "^4.8.3",
     "react": "19.2.1",
@@ -67,7 +68,7 @@
     "directories": {
       "output": "release"
     },
-    "artifactName": "film-lab-${version}-${arch}.${ext}",
+    "artifactName": "filmtone-${version}-${arch}.${ext}",
     "files": [
       "dist-electron/**/*",
       "dist/renderer/**/*",

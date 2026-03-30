@@ -8,12 +8,10 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import fsPromises from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const currentFilePath = fileURLToPath(import.meta.url);
-const currentDirPath = path.dirname(currentFilePath);
-const desktopRootPath = path.resolve(currentDirPath, "..");
-const packageJsonPath = path.join(desktopRootPath, "package.json");
+import {
+  desktopRootPath,
+  readDesktopReleaseMeta,
+} from "./release-artifact-meta.mjs";
 
 /**
  * 親ディレクトリを遡り、`.vercel/project.json` がある chibatakumi-portfolio ルートを返します。
@@ -166,30 +164,27 @@ async function main() {
     return 1;
   }
 
-  let packageJsonText;
+  let releaseMeta;
   try {
-    packageJsonText = await fsPromises.readFile(packageJsonPath, "utf8");
+    releaseMeta = await readDesktopReleaseMeta();
   } catch (error) {
-    console.error(`[${functionName}] package.json を読めません`, packageJsonPath, error);
-    return 1;
-  }
-  let version;
-  try {
-    version = JSON.parse(packageJsonText).version;
-  } catch (error) {
-    console.error(`[${functionName}] package.json の version が不正です`, error);
-    return 1;
-  }
-  if (typeof version !== "string" || version.length === 0) {
-    console.error(`[${functionName}] package.json に version がありません`);
+    console.error(`[${functionName}] release meta を読めません`, error);
     return 1;
   }
 
-  const dmgFileName = `film-lab-${version}-arm64.dmg`;
+  try {
+    await fsPromises.access(releaseMeta.releaseNotesPath);
+  } catch {
+    console.warn(
+      `[${functionName}] 版付き release notes が見つかりません。` +
+        ` version=${releaseMeta.version} expected=${releaseMeta.releaseNotesFileName}`,
+    );
+  }
+
   const dmgPath =
     filteredArgs.length > 0
       ? path.resolve(process.cwd(), filteredArgs[0])
-      : path.join(desktopRootPath, "release", dmgFileName);
+      : path.join(desktopRootPath, "release", releaseMeta.dmgFileName);
 
   if (!fs.existsSync(dmgPath)) {
     console.error(
@@ -199,11 +194,12 @@ async function main() {
     return 1;
   }
 
-  const pathname = `film-lab/desktop/${dmgFileName}`;
+  const pathname = `${releaseMeta.artifactSlug}/desktop/${releaseMeta.dmgFileName}`;
 
   console.log(
     `[${functionName}] portfolio root: ${portfolioRootPath}\n` +
       `[${functionName}] upload: ${dmgPath}\n` +
+      `[${functionName}] product: ${releaseMeta.productName} version=${releaseMeta.version}\n` +
       `[${functionName}] pathname (固定): ${pathname}`,
   );
 

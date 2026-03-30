@@ -8,12 +8,7 @@ import fs from "node:fs";
 import fsPromises from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const currentFilePath = fileURLToPath(import.meta.url);
-const currentDirPath = path.dirname(currentFilePath);
-const desktopRootPath = path.resolve(currentDirPath, "..");
-const packageJsonPath = path.join(desktopRootPath, "package.json");
+import { desktopRootPath, readDesktopReleaseMeta } from "./release-artifact-meta.mjs";
 
 /**
  * 親ディレクトリを遡り、`.vercel/project.json` がある chibatakumi-portfolio ルートを返します。
@@ -144,23 +139,21 @@ async function main() {
     return 1;
   }
 
-  let packageJsonText;
+  let releaseMeta;
   try {
-    packageJsonText = await fsPromises.readFile(packageJsonPath, "utf8");
+    releaseMeta = await readDesktopReleaseMeta();
   } catch (e) {
-    console.error(`[${functionName}] package.json 読めません`, e);
+    console.error(`[${functionName}] release meta 不正`, e);
     return 1;
   }
-  let version;
+
   try {
-    version = JSON.parse(packageJsonText).version;
-  } catch (e) {
-    console.error(`[${functionName}] version 不正`, e);
-    return 1;
-  }
-  if (typeof version !== "string" || version.length === 0) {
-    console.error(`[${functionName}] version 空`);
-    return 1;
+    await fsPromises.access(releaseMeta.releaseNotesPath);
+  } catch {
+    console.warn(
+      `[${functionName}] 版付き release notes が見つかりません。` +
+        ` version=${releaseMeta.version} expected=${releaseMeta.releaseNotesFileName}`,
+    );
   }
 
   const downloadPageUrl =
@@ -175,7 +168,7 @@ async function main() {
 
   const metaBody = {
     schemaVersion: 1,
-    latestVersion: version,
+    latestVersion: releaseMeta.version,
     downloadPageUrl,
     ...(releaseNotesUrl ? { releaseNotesUrl } : {}),
   };
@@ -189,7 +182,7 @@ async function main() {
   const pathname = "film-lab/desktop/update-meta.json";
 
   console.log(
-    `[${functionName}] upload meta latestVersion=${version} pathname=${pathname}`,
+    `[${functionName}] upload meta latestVersion=${releaseMeta.version} pathname=${pathname}`,
   );
 
   const putResult = spawnSync(

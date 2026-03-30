@@ -9,6 +9,7 @@ import fs from "node:fs";
 import fsPromises from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { readDesktopReleaseMeta } from "./release-artifact-meta.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDirPath = path.dirname(currentFilePath);
@@ -50,13 +51,25 @@ async function resolveArtifactPaths(rawArgs) {
     return rawArgs.map((rawPath) => path.resolve(process.cwd(), rawPath));
   }
 
+  const releaseMeta = await readDesktopReleaseMeta();
+  const expectedCurrentDmgPath = path.join(
+    defaultReleaseDirPath,
+    releaseMeta.dmgFileName,
+  );
+  try {
+    await fsPromises.access(expectedCurrentDmgPath);
+    return [expectedCurrentDmgPath];
+  } catch {
+    /* current version artifact がまだ無いときだけ後方互換で全 .dmg を見る */
+  }
+
   const entries = await fsPromises.readdir(defaultReleaseDirPath, { withFileTypes: true });
   const preferredDmgPaths = entries
     .filter(
       (entry) =>
         entry.isFile() &&
         entry.name.endsWith(".dmg") &&
-        entry.name.startsWith("film-lab-"),
+        entry.name.startsWith(`${releaseMeta.artifactSlug}-`),
     )
     .map((entry) => path.join(defaultReleaseDirPath, entry.name))
     .sort();

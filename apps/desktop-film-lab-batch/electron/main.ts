@@ -42,6 +42,7 @@ import {
   DesktopUpdateService,
   resolveDesktopUpdateCheckUrl,
 } from "./desktop-update-service";
+import { resolveVideoCliBinary } from "./ffmpeg-cli-resolve";
 
 const execFileAsync = promisify(execFile);
 
@@ -245,10 +246,25 @@ async function ffprobeVideoMeta(absPath: string): Promise<{
   /** @description WebCodecs 経路のメモリ上限判定用（readFile 前に参照） */
   fileSizeBytes: number;
 }> {
+  const ffprobe = (() => {
+    try {
+      return resolveVideoCliBinary("ffprobe");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(
+        `ffprobe が見つかりません。動画の読み込みと書き出しには ffmpeg / ffprobe が必要です。${msg}`,
+      );
+    }
+  })();
+  if (DEBUG_VIDEO_EXPORT_MAIN) {
+    console.log(
+      `[film-lab-desktop] resolved ffprobe via ${ffprobe.source}: ${ffprobe.commandPath}`,
+    );
+  }
   let stdout: string;
   try {
     const r = await execFileAsync(
-      "ffprobe",
+      ffprobe.commandPath,
       [
         "-v",
         "error",
@@ -260,13 +276,16 @@ async function ffprobeVideoMeta(absPath: string): Promise<{
         "json",
         absPath,
       ],
-      { maxBuffer: 10 * 1024 * 1024 },
+      {
+        maxBuffer: 10 * 1024 * 1024,
+        env: ffprobe.childEnv,
+      },
     );
     stdout = r.stdout as string;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     throw new Error(
-      `ffprobe 実行失敗（PATH に ffmpeg/ffprobe がありますか？）: ${msg}`,
+      `ffprobe 実行失敗（resolved=${ffprobe.commandPath}）: ${msg}`,
     );
   }
 
@@ -1134,14 +1153,27 @@ ipcMain.handle("video-export-transcode-fast", async (_evt, payload: unknown) => 
     videoCodecArgs: ffmpegVideoCodecArgs(),
   });
 
+  const ffmpeg = (() => {
+    try {
+      return resolveVideoCliBinary("ffmpeg");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(
+        `video-export-transcode-fast: ffmpeg が見つかりません。${msg}`,
+      );
+    }
+  })();
   let child: ChildProcessWithoutNullStreams;
   try {
-    child = spawn("ffmpeg", ffArgs, {
+    child = spawn(ffmpeg.commandPath, ffArgs, {
+      env: ffmpeg.childEnv,
       stdio: ["ignore", "ignore", "pipe"],
     }) as ChildProcessWithoutNullStreams;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    throw new Error(`video-export-transcode-fast: ffmpeg spawn 失敗 — ${msg}`);
+    throw new Error(
+      `video-export-transcode-fast: ffmpeg spawn 失敗 — resolved=${ffmpeg.commandPath} — ${msg}`,
+    );
   }
 
   const stderrLines: string[] = [];
@@ -1154,7 +1186,7 @@ ipcMain.handle("video-export-transcode-fast", async (_evt, payload: unknown) => 
 
   activeFastTranscodeChild = child;
   console.log(
-    `[film-lab-desktop] ffmpeg 高速トランスコード ${width}x${height}@${fps} grade≈${gradeParams ? "yes" : "no"} LUT=${lutResolved ? "yes" : "no"} → ${outputVideoPath}`,
+    `[film-lab-desktop] ffmpeg 高速トランスコード ${width}x${height}@${fps} grade≈${gradeParams ? "yes" : "no"} LUT=${lutResolved ? "yes" : "no"} cli=${ffmpeg.commandPath} → ${outputVideoPath}`,
   );
   if (DEBUG_VIDEO_EXPORT_MAIN) {
     console.log(`[film-lab-desktop] ffmpeg fast argv: ${JSON.stringify(ffArgs)}`);
@@ -1220,14 +1252,25 @@ ipcMain.handle("video-export-start", async (_evt, payload: unknown) => {
     outputVideoPath,
   });
 
+  const ffmpeg = (() => {
+    try {
+      return resolveVideoCliBinary("ffmpeg");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(`ffmpeg が見つかりません。${msg}`);
+    }
+  })();
   let child: ChildProcessWithoutNullStreams;
   try {
-    child = spawn("ffmpeg", ffArgs, {
+    child = spawn(ffmpeg.commandPath, ffArgs, {
+      env: ffmpeg.childEnv,
       stdio: ["pipe", "ignore", "pipe"],
     }) as ChildProcessWithoutNullStreams;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    throw new Error(`ffmpeg を起動できません: ${msg}`);
+    throw new Error(
+      `ffmpeg を起動できません: resolved=${ffmpeg.commandPath} — ${msg}`,
+    );
   }
 
   const stderrLines: string[] = [];
@@ -1242,7 +1285,7 @@ ipcMain.handle("video-export-start", async (_evt, payload: unknown) => {
   activeVideoExport = { child, stderrLines };
 
   console.log(
-    `[film-lab-desktop] ffmpeg 起動 rawvideo ${width}x${height}@${fps} hasAudio=${hasAudio} → ${outputVideoPath}`,
+    `[film-lab-desktop] ffmpeg 起動 rawvideo ${width}x${height}@${fps} hasAudio=${hasAudio} cli=${ffmpeg.commandPath} → ${outputVideoPath}`,
   );
   if (DEBUG_VIDEO_EXPORT_MAIN) {
     console.log(`[film-lab-desktop] ffmpeg argv: ${JSON.stringify(ffArgs)}`);
