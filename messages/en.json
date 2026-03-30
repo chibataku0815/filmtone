@@ -458,12 +458,14 @@
       },
       "downloadCta": "Download DMG",
       "supportCtaPrefix": "Contact:",
-      "releaseNotesLead": "See each release’s notes for changes and SHA-256 checksums.",
-      "notes": {
-        "lut": "Only slider values sync from Preview to batch; load LUTs yourself for batch.",
-        "donationAndSharing": "Web donation & sharing are not in the Desktop build.",
-        "smartLook": "Smart Look AI is not included in this Desktop build."
+      "supplement": {
+        "title": "Good to know",
+        "trust": "Photo and video processing stays on your Mac. Before delivery, verify using your exported files as usual.",
+        "handoff": "Preset and slider adjustments from the Edit tab can be sent to Export. Load .cube LUTs on the export side when needed.",
+        "browserAndDesktop": "Use the browser Film Lab to try quickly or share a link. The Mac app focuses on batch export from folders and exporting one video."
       },
+      "releaseNotesEyebrow": "Release notes",
+      "releaseNotesLead": "Changes and the SHA-256 checksum for each build are listed in that build's release notes.",
       "downloadPage": {
         "eyebrow": "Download",
         "title": "Download not configured",
@@ -471,12 +473,6 @@
         "pendingLead": "Redirect target is not set (connect FILM_LAB_DESKTOP_DOWNLOAD_URL to fix).",
         "backCta": "Back to Film Lab",
         "supportCtaPrefix": "Contact:",
-        "notes": {
-          "releaseNotes": "See each release’s notes for changes and SHA-256 checksums.",
-          "lut": "Only slider values sync from Preview to batch automatically.",
-          "donationAndSharing": "Web donation & sharing are not in the Desktop build.",
-          "smartLook": "Smart Look AI is not included in this Desktop build."
-        },
         "specs": {
           "environmentLabel": "Requirements",
           "environmentBody": "macOS {minMacos}+ · {arch} only.",
