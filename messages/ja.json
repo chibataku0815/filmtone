@@ -458,14 +458,6 @@
       },
       "downloadCta": "ダウンロード（DMG）",
       "supportCtaPrefix": "お問い合わせ:",
-      "supplement": {
-        "title": "知っておくと便利",
-        "trust": "写真・動画の処理は、原則としてお使いの Mac 上で行われます。納品前の最終確認は、書き出したファイルで行ってください。",
-        "handoff": "編集タブで調整したプリセットとスライダー値は、書き出しタブへ送れます。LUT（.cube）は書き出し側で読み込んでください。",
-        "browserAndDesktop": "すぐ試す・共有用のリンクなどはブラウザ版、フォルダからの一括処理と動画 1 本の書き出しは Mac アプリ向けです。"
-      },
-      "releaseNotesEyebrow": "リリースノート",
-      "releaseNotesLead": "変更内容と SHA-256（チェックサム）は、各版のリリースノートに記載しています。",
       "downloadPage": {
         "eyebrow": "ダウンロード",
         "title": "配布ファイルの準備中です",

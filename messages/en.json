@@ -458,14 +458,6 @@
       },
       "downloadCta": "Download DMG",
       "supportCtaPrefix": "Contact:",
-      "supplement": {
-        "title": "Good to know",
-        "trust": "Photo and video processing stays on your Mac. Before delivery, verify using your exported files as usual.",
-        "handoff": "Preset and slider adjustments from the Edit tab can be sent to Export. Load .cube LUTs on the export side when needed.",
-        "browserAndDesktop": "Use the browser Film Lab to try quickly or share a link. The Mac app focuses on batch export from folders and exporting one video."
-      },
-      "releaseNotesEyebrow": "Release notes",
-      "releaseNotesLead": "Changes and the SHA-256 checksum for each build are listed in that build's release notes.",
       "downloadPage": {
         "eyebrow": "Download",
         "title": "Download not configured",
