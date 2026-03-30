@@ -4,6 +4,15 @@
  * @overview Chromium の seek が効くように、Range ヘッダを解釈して byte-range を返す。
  */
 
+export const FILM_LAB_VIDEO_PROTOCOL = "film-lab-video";
+
+/**
+ * @description レンダラの video 要素用 URL（クエリに path を載せる）
+ */
+export function absolutePathToVideoSrcUrl(absPath: string): string {
+  return `${FILM_LAB_VIDEO_PROTOCOL}://local/?path=${encodeURIComponent(absPath)}`;
+}
+
 /**
  * @description 動画ファイル拡張子から最低限の Content-Type を返す。
  */

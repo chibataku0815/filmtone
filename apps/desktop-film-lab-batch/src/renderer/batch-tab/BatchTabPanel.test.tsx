@@ -51,9 +51,6 @@ const baseProps: BatchTabPanelProps = {
   videoCanExport: true,
   onPickVideoFile: async () => {},
   onRunVideoExport: async () => {},
-  videoExportWebglAccurate: true,
-  onVideoExportWebglAccurateChange: () => {},
-  showFastFfmpegVideoExportOption: false,
   videoExportSuccessNonce: 0,
   canApplyEditGradeToBatch: false,
   onApplyEditGradeToBatch: () => {},
@@ -116,10 +113,10 @@ function withListLayoutAndNextStripExpanded<T>(
 }
 
 describe("BatchTabPanel video export copy", () => {
-  it("uses WebGL-only video copy and no fast-ffmpeg checkbox when fast export is disabled", () => {
+  it("uses WebGL-only video copy with no fast-ffmpeg references", () => {
     const html = withListLayout(() =>
       renderBatchPanel(
-        <BatchTabPanel {...baseProps} showFastFfmpegVideoExportOption={false} />,
+        <BatchTabPanel {...baseProps} />,
       ),
     );
 

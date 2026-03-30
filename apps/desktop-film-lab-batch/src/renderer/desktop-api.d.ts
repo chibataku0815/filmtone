@@ -73,24 +73,6 @@ export type FilmLabBatchBridge = {
     stderrTail: string;
   }>;
   videoExportAbort: () => Promise<void>;
-  /** @description WebGL なしの 1 パストランスコード（速度優先・見た目は近似） */
-  videoExportTranscodeFast: (payload: {
-    inputVideoPath: string;
-    outputDir: string;
-    outputFileName: string;
-    width: number;
-    height: number;
-    fps: number;
-    hasAudio: boolean;
-    /** @description 空文字で LUT なし */
-    lutCubeAbsPath: string;
-    /** @description バッチ用 Params（プリセット近似。不正ならメインで無視） */
-    gradeParams: Params;
-  }) => Promise<{
-    code: number | null;
-    stderrTail: string;
-    outputVideoPath: string;
-  }>;
   /** @description Photos 等の一時パス対策: 実ファイルを tmp にコピーしてパスを返す */
   videoExportStageSource: (
     absolutePath: string,

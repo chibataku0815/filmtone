@@ -91,21 +91,6 @@ contextBridge.exposeInMainWorld("filmLabBatch", {
   }> => ipcRenderer.invoke("video-export-finish"),
   videoExportAbort: (): Promise<void> =>
     ipcRenderer.invoke("video-export-abort"),
-  videoExportTranscodeFast: (payload: {
-    inputVideoPath: string;
-    outputDir: string;
-    outputFileName: string;
-    width: number;
-    height: number;
-    fps: number;
-    hasAudio: boolean;
-    lutCubeAbsPath: string;
-    gradeParams: Record<string, unknown>;
-  }): Promise<{
-    code: number | null;
-    stderrTail: string;
-    outputVideoPath: string;
-  }> => ipcRenderer.invoke("video-export-transcode-fast", payload),
   videoExportStageSource: (
     filePath: string,
   ): Promise<{ stagedPath: string }> =>

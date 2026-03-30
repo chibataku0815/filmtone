@@ -39,14 +39,6 @@ import {
   type BatchPipelineSummary,
 } from "./batch-pipeline";
 import {
-  resolveLutCubeAbsPathForFastExport,
-  runVideoExportFfmpegFast,
-} from "./video-export-ffmpeg-fast";
-import {
-  defaultVideoExportWebglAccurate,
-  shouldUseFastVideoExport,
-} from "./video-export-policy";
-import {
   runVideoExportPipeline,
   type VideoExportProgress,
   type VideoExportPipelineUserMessages,
@@ -58,7 +50,6 @@ import {
   VIDEO_EXPORT_FPS,
   VIDEO_IMPORT_MAX_DURATION_SEC,
 } from "./video-export-constants";
-import { ENABLE_FFMPEG_FAST_VIDEO_EXPORT } from "./desktop-feature-flags";
 import { exportGradeJsonText } from "./grade-io";
 import { viewportRecordToParams } from "./viewport-to-params";
 import {
@@ -217,12 +208,6 @@ export default function App() {
   /** @description ffprobe 済みのメタ（UI 表示用） */
   const [videoProbeLabel, setVideoProbeLabel] = useState<string | null>(null);
   /**
-   * @description 既定は編集画面どおり（WebGL 逐次・true）。速い近似経路はチェックを外す（false）。
-   */
-  const [videoExportWebglAccurate, setVideoExportWebglAccurate] = useState(
-    defaultVideoExportWebglAccurate,
-  );
-  /**
    * @description 動画書き出し成功のたびに増やす。書き出しタブの「初回はウィザード→成功後は一覧」だけ検知する（BatchGradeState ではない）。
    */
   const [videoExportSuccessNonce, setVideoExportSuccessNonce] = useState(0);
@@ -262,14 +247,6 @@ export default function App() {
     void window.filmLabBatch.setExportBusyForUpdateCheck(running);
   }, [running]);
 
-  /**
-   * @description 高速 ffmpeg が無効なビルドでは常に WebGL のみ（フラグと UI の状態を矛盾させない）
-   */
-  useEffect(() => {
-    if (!ENABLE_FFMPEG_FAST_VIDEO_EXPORT) {
-      setVideoExportWebglAccurate(true);
-    }
-  }, []);
   /**
    * @description 幅 lg 以上で右スライドパネルを表示するか。パネルは DOM を維持し `translateX` のみ（内部状態を捨てない）。
    */
@@ -824,42 +801,7 @@ export default function App() {
     setRunning(true);
 
     try {
-      if (
-        shouldUseFastVideoExport({
-          fastVideoExportEnabled: ENABLE_FFMPEG_FAST_VIDEO_EXPORT,
-          videoExportWebglAccurate,
-        })
-      ) {
-        setBatchProgress({
-          current: 0,
-          total: 1,
-          fileName: tLogs("progressVideoFast"),
-        });
-        const lutPath = await resolveLutCubeAbsPathForFastExport(
-          window.filmLabBatch,
-          importedGradeLabel,
-        );
-        const res = await runVideoExportFfmpegFast({
-          api: window.filmLabBatch,
-          inputVideoPath: videoInputPath,
-          outputDir: effectiveOutputDir,
-          outputFileName: outName,
-          lutCubeAbsPath: lutPath,
-          gradeParams: batchGrade.params,
-          onLog: appendLog,
-        });
-        setBatchProgress({
-          current: 1,
-          total: 1,
-          fileName: tLogs("progressVideoFast"),
-        });
-        if (!res.ok) {
-          appendLog(tLogs("videoExportFail", { msg: res.message }));
-        } else {
-          appendLog(tLogs("videoExportDone"));
-          setVideoExportSuccessNonce((n) => n + 1);
-        }
-      } else {
+      {
         const abortController = new AbortController();
         batchAbortRef.current = abortController;
         setBatchProgress({
@@ -1261,11 +1203,6 @@ export default function App() {
               void window.filmLabBatch.videoExportAbort().catch(() => {});
               batchAbortRef.current?.abort();
             }}
-            videoExportWebglAccurate={videoExportWebglAccurate}
-            onVideoExportWebglAccurateChange={setVideoExportWebglAccurate}
-            showFastFfmpegVideoExportOption={
-              ENABLE_FFMPEG_FAST_VIDEO_EXPORT
-            }
             batchProgress={batchProgress}
             lastBatchSummary={lastBatchSummary}
             videoInputPath={videoInputPath}

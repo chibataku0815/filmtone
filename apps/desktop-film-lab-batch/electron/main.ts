@@ -26,14 +26,9 @@ import { randomBytes } from "node:crypto";
 import path from "node:path";
 import { promisify } from "node:util";
 
-import { buildGradeApproximationVF } from "./video-export-grade-approx-vf";
 import {
   FILM_LAB_VIDEO_PROTOCOL,
   absolutePathToVideoSrcUrl,
-  buildFfmpegFastTranscodeArgs,
-  parseFastTranscodeRequest,
-} from "./video-export-fast-contract";
-import {
   guessVideoContentType,
   parseHttpByteRange,
 } from "./video-src-protocol";
@@ -75,11 +70,6 @@ type FfmpegVideoExportSession = {
 
 let activeVideoExport: FfmpegVideoExportSession | null = null;
 
-/**
- * @description 高速トランスコード専用の子プロセス（rawvideo パイプとは別）。中断 IPC から kill する。
- */
-let activeFastTranscodeChild: ChildProcessWithoutNullStreams | null = null;
-
 /** @description 更新案内 IPC の送り先ウィンドウ（最初に作ったもの） */
 let mainWindowRef: BrowserWindow | null = null;
 
@@ -90,23 +80,6 @@ let desktopUpdateService: DesktopUpdateService | null = null;
  * @description 進行中の ffmpeg を潰して参照を捨てる。レンダラが異常終了したあとに残るゾンビ対策。
  * @param reason ログ用（ターミナル）
  */
-/**
- * @description 単発 ffmpeg（高速トランスコード）を kill する。
- * @param reason ログ用
- */
-function disposeActiveFastTranscode(reason: string): void {
-  const child = activeFastTranscodeChild;
-  if (child == null) {
-    return;
-  }
-  activeFastTranscodeChild = null;
-  console.warn(`[film-lab-desktop] disposeActiveFastTranscode: ${reason}`);
-  try {
-    child.kill("SIGKILL");
-  } catch {
-    /* 既に終了 */
-  }
-}
 
 function disposeActiveVideoExport(reason: string): void {
   const sess = activeVideoExport;
@@ -148,9 +121,6 @@ const VERBOSE_VIDEO_EXPORT_MAIN =
 function currentVideoExportPhase(): string {
   if (activeVideoExport !== null) {
     return "rawvideo";
-  }
-  if (activeFastTranscodeChild !== null) {
-    return "fast-transcode";
   }
   return "idle";
 }
@@ -496,6 +466,22 @@ function buildFfmpegRawvideoExportArgs(opts: {
   } else {
     head.push("-an");
   }
+  // Color management: WebGL readPixels emits full-range sRGB (0-255).
+  // Explicitly convert to limited range (16-235) for H.264 standard compliance,
+  // and tag the output with BT.709 color metadata so players interpret correctly.
+  // See: .claude/knowledge/patterns/2026-03-03-ffmpeg-encoder-pitfalls-pattern.md §4
+  head.push(
+    "-vf",
+    "scale=in_range=full:out_range=limited",
+    "-color_range",
+    "tv",
+    "-colorspace",
+    "bt709",
+    "-color_trc",
+    "bt709",
+    "-color_primaries",
+    "bt709",
+  );
   head.push(...videoCodec);
   if (hasAudio) {
     head.push("-c:a", "copy");
@@ -836,8 +822,7 @@ app.whenReady().then(() => {
       () => mainWindowRef,
       resolveDesktopUpdateCheckUrl,
       () => app.getVersion(),
-      () =>
-        activeVideoExport !== null || activeFastTranscodeChild !== null,
+      () => activeVideoExport !== null,
     );
     desktopUpdateService.startSchedule();
   }
@@ -1102,110 +1087,7 @@ ipcMain.handle("video-export-probe", async (_evt, filePath: string) => {
   return ffprobeVideoMeta(abs);
 });
 
-/**
- * @description 動画を WebGL せず ffmpeg 1 発で FHD 化（+ 任意 LUT3D）。速度優先・プレビューとは一致しない。
- */
-ipcMain.handle("video-export-transcode-fast", async (_evt, payload: unknown) => {
-  disposeActiveVideoExport("高速トランスコード直前");
-  disposeActiveFastTranscode("再入前掃除");
-
-  const {
-    inputVideoPath,
-    outputDir,
-    outputFileName,
-    width,
-    height,
-    fps,
-    hasAudio,
-    lutCubeAbsPath: lutRaw,
-    gradeParams,
-  } = parseFastTranscodeRequest(payload);
-
-  const inAbs = path.resolve(inputVideoPath);
-  const safeName = path.basename(outputFileName);
-  const outputVideoPath = path.join(outputDir, safeName);
-  let lutResolved: string | null = null;
-  if (lutRaw.length > 0) {
-    const lut = path.resolve(lutRaw);
-    try {
-      const st = await fs.stat(lut);
-      if (!st.isFile()) {
-        throw new Error("LUT がファイルではありません");
-      }
-      lutResolved = lut;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      throw new Error(`video-export-transcode-fast: LUT パス不正 — ${lut} — ${msg}`);
-    }
-  }
-
-  await fs.mkdir(outputDir, { recursive: true });
-
-  const ffArgs = buildFfmpegFastTranscodeArgs({
-    inputVideoPath: inAbs,
-    outputVideoPath,
-    width,
-    height,
-    fps,
-    hasAudio,
-    lutCubeAbsPath: lutResolved,
-    gradeParams,
-    videoCodecArgs: ffmpegVideoCodecArgs(),
-  });
-
-  const ffmpeg = (() => {
-    try {
-      return resolveVideoCliBinary("ffmpeg");
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      throw new Error(
-        `video-export-transcode-fast: ffmpeg が見つかりません。${msg}`,
-      );
-    }
-  })();
-  let child: ChildProcessWithoutNullStreams;
-  try {
-    child = spawn(ffmpeg.commandPath, ffArgs, {
-      env: ffmpeg.childEnv,
-      stdio: ["ignore", "ignore", "pipe"],
-    }) as ChildProcessWithoutNullStreams;
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    throw new Error(
-      `video-export-transcode-fast: ffmpeg spawn 失敗 — resolved=${ffmpeg.commandPath} — ${msg}`,
-    );
-  }
-
-  const stderrLines: string[] = [];
-  child.stderr?.on("data", (chunk: Buffer) => {
-    stderrLines.push(chunk.toString("utf8"));
-  });
-  child.on("error", (err) => {
-    stderrLines.push(`spawn error: ${err.message}`);
-  });
-
-  activeFastTranscodeChild = child;
-  console.log(
-    `[film-lab-desktop] ffmpeg 高速トランスコード ${width}x${height}@${fps} grade≈${gradeParams ? "yes" : "no"} LUT=${lutResolved ? "yes" : "no"} cli=${ffmpeg.commandPath} → ${outputVideoPath}`,
-  );
-  if (DEBUG_VIDEO_EXPORT_MAIN) {
-    console.log(`[film-lab-desktop] ffmpeg fast argv: ${JSON.stringify(ffArgs)}`);
-  }
-
-  const code: number | null = await new Promise((resolve) => {
-    child.on("close", (c) => resolve(c));
-  });
-  activeFastTranscodeChild = null;
-
-  return {
-    code,
-    stderrTail: stderrLines.join("").slice(-8000),
-    outputVideoPath,
-  };
-});
-
 ipcMain.handle("video-export-start", async (_evt, payload: unknown) => {
-  disposeActiveFastTranscode("rawvideo 直前");
   if (activeVideoExport !== null) {
     disposeActiveVideoExport(
       "新規 video-export-start の前に前回セッションを破棄（ゾンビ・二重開始防止）",
@@ -1355,7 +1237,6 @@ ipcMain.handle("video-export-finish", async () => {
 });
 
 ipcMain.handle("video-export-abort", async () => {
-  disposeActiveFastTranscode("video-export-abort IPC");
   disposeActiveVideoExport("video-export-abort IPC");
 });
 

@@ -835,45 +835,14 @@ export async function runVideoExportPipeline(options: {
       let retryReason = "";
 
       try {
-        if (allowWebCodecs) {
-          try {
-            let fileBytes: Uint8Array;
-            const readSourcePath = stagedPath ?? inputVideoPath;
-            try {
-              fileBytes = await api.readFileBuffer(readSourcePath);
-              pathForFfmpeg = readSourcePath;
-            } catch (readErr) {
-              onLog(
-                `[動画][WebCodecs] ソース直接 read 失敗 → ステージング（${readErr instanceof Error ? readErr.message : String(readErr)}）`,
-              );
-              const st = await api.videoExportStageSource(inputVideoPath);
-              stagedPath = st.stagedPath;
-              pathForFfmpeg = st.stagedPath;
-              fileBytes = await api.readFileBuffer(st.stagedPath);
-            }
-            const ab = fileBytes.buffer.slice(
-              fileBytes.byteOffset,
-              fileBytes.byteOffset + fileBytes.byteLength,
-            );
-            webCodecsSession = await WebCodecsMp4ExportSession.create(
-              ab,
-              {
-                width: probe.width,
-                height: probe.height,
-                durationSec: probe.durationSec,
-              },
-              onLog,
-            );
-            onLog(
-              "[動画][WebCodecs] デコード: VideoDecoder + CanvasTexture（HTMLVideoElement シークなし）",
-            );
-          } catch (wcErr) {
-            const detail =
-              wcErr instanceof Error ? wcErr.message : String(wcErr);
-            onLog(`[動画][WebCodecs] 失敗、従来経路へ — ${detail}`);
-            webCodecsSession = null;
-            pathForFfmpeg = stagedPath ?? inputVideoPath;
-          }
+        // WebCodecs (VideoDecoder → Canvas 2D → CanvasTexture) 経路は
+        // CanvasTexture の色空間処理に起因する色ズレ（大幅な暗化）が確認されたため無効化。
+        // HTMLVideoElement シーク経路はプレビューと同じテクスチャパスを通るため色が一致する。
+        // WebCodecs の色空間問題が解決するまでは HTMLVideoElement のみ使用する。
+        // See: life#38
+        if (false && allowWebCodecs) {
+          // (WebCodecs path disabled — kept for future reference)
+          webCodecsSession = null;
         } else if (attemptIndex > 0) {
           onLog(
             "[動画][WebCodecs] runtime fallback: HTMLVideoElement シーク経路で最初から再試行します",

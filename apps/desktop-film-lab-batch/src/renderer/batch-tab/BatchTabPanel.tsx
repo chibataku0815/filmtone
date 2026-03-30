@@ -204,13 +204,6 @@ export type BatchTabPanelProps = {
   onPickVideoFile: () => void | Promise<void>;
   onRunVideoExport: () => void | Promise<void>;
 
-  /** @description true なら WebGL 逐次（編集画面どおり・既定）。false なら高速 ffmpeg（近似） */
-  videoExportWebglAccurate: boolean;
-  onVideoExportWebglAccurateChange: (value: boolean) => void;
-  /**
-   * @description false のとき高速 ffmpeg のチェックボックスを出さない（常に WebGL のみ）。実装は別フラグで再有効化する。
-   */
-  showFastFfmpegVideoExportOption: boolean;
   /**
    * @description 動画書き出しが成功するたびに App が 1 増やす番号。初回成功で一覧表示へ誘導するためだけに使う。
    */
@@ -362,9 +355,6 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     videoCanExport,
     onPickVideoFile,
     onRunVideoExport,
-    videoExportWebglAccurate,
-    onVideoExportWebglAccurateChange,
-    showFastFfmpegVideoExportOption,
     videoExportSuccessNonce,
     canApplyEditGradeToBatch,
     onApplyEditGradeToBatch,
@@ -682,11 +672,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
               {t("jobVideoTitle")}
             </span>
             <HelpHint
-              tip={
-                showFastFfmpegVideoExportOption
-                  ? t("tipJobVideoFastOption")
-                  : t("tipJobVideoWebGlOnly")
-              }
+              tip={t("tipJobVideoWebGlOnly")}
               assistiveLabel={t("jobVideoHintAria")}
             />
           </div>
@@ -701,9 +687,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
             </span>
           )}
           <p className="fl-caption mt-1 text-[var(--fl-text-secondary)]">
-            {showFastFfmpegVideoExportOption
-              ? t("jobVideoSubFastDefault")
-              : t("jobVideoSubWebGlOnly")}
+            {t("jobVideoSubWebGlOnly")}
           </p>
         </button>
       </div>
@@ -874,37 +858,6 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         </label>
       )}
 
-      {/*
-       * 動画かつ「高速 ffmpeg を UI で選べる」ビルドだけ、ルック段に経路の違いを出す。
-       * WebGL のみのときは「保存先と形式」の注記と重複するためここでは出さない（認知負荷を抑える）。
-       */}
-      {batchJobMode === "video" && showFastFfmpegVideoExportOption ? (
-        <div
-          className="flex flex-col gap-1.5 rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] px-3 py-2"
-          role="status"
-          aria-label={t("lookVideoEncodeCalloutAria")}
-        >
-          <p className="text-xs font-semibold text-[var(--fl-text-primary)]">
-            {videoExportWebglAccurate
-              ? t("lookVideoEncodeAccurateTitle")
-              : t("lookVideoEncodeFastTitle")}
-          </p>
-          <p className="fl-caption max-w-prose text-[var(--fl-text-secondary)]">
-            {videoExportWebglAccurate
-              ? t("lookVideoEncodeAccurateBody")
-              : t("lookVideoEncodeFastBody")}
-          </p>
-          {!videoExportWebglAccurate ? (
-            <p className="fl-caption max-w-prose text-[var(--fl-text-tertiary)]">
-              {t("lookVideoEncodeFastDisclaimer")}
-            </p>
-          ) : null}
-          <p className="fl-caption text-[var(--fl-text-tertiary)]">
-            {t("lookVideoEncodeStepPointer")}
-          </p>
-        </div>
-      ) : null}
-
       <div className="flex items-start gap-1.5 rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] px-3 py-2">
         <details
           className="min-w-0 flex-1"
@@ -996,32 +949,9 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
               {outputDir ?? t("videoOutputDirUnset")}
             </span>
           </div>
-          {showFastFfmpegVideoExportOption ? (
-            <label className="flex max-w-prose cursor-pointer items-start gap-2">
-              <input
-                type="checkbox"
-                className="mt-0.5"
-                checked={videoExportWebglAccurate}
-                onChange={(e) =>
-                  onVideoExportWebglAccurateChange(e.target.checked)
-                }
-                aria-label={t("videoWebglCheckboxAria")}
-              />
-              <span className="flex flex-1 items-start gap-1 text-xs leading-snug text-[var(--fl-text-secondary)]">
-                <span className="min-w-0 flex-1">
-                  <strong className="text-[var(--fl-text-primary)]">
-                    {t("videoWebglAccurateTitle")}
-                  </strong>
-                  <span>{t("videoWebglAccurateRest")}</span>
-                </span>
-                <HelpHint tip={t("tipWebglAccurate")} assistiveLabel={t("videoWebglCheckboxAria")} />
-              </span>
-            </label>
-          ) : (
-            <p className="max-w-prose text-xs leading-snug text-[var(--fl-text-secondary)]">
-              {t("videoWebglOnlyFootnote")}
-            </p>
-          )}
+          <p className="max-w-prose text-xs leading-snug text-[var(--fl-text-secondary)]">
+            {t("videoWebglOnlyFootnote")}
+          </p>
         </>
       )}
     </div>
