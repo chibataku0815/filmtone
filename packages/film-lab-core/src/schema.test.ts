@@ -24,6 +24,15 @@ describe("filmLabParamsSchema", () => {
       expect(r.data.grainRadialMix).toBe(1);
     }
   });
+
+  test("lensSoftness 省略時は既定 0（後方互換）", () => {
+    const { lensSoftness: _omit, ...rest } = PRESETS.cinematic;
+    const r = filmLabParamsSchema.safeParse(rest);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.lensSoftness).toBe(0);
+    }
+  });
 });
 
 describe("filmLookGradeInputSchema", () => {

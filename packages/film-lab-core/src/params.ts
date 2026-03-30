@@ -8,6 +8,8 @@ export const PARAM_KEYS = [
   "temperature",
   "tint",
   "rgbShift",
+  /** 周辺ほど等方ブラーを足すレンズの柔らかさ（0〜1、Pro）。中心固定。 */
+  "lensSoftness",
   "grainIntensity",
   // 0=一様、1=周辺強め（既定1で後方互換）
   "grainRadialMix",
@@ -36,6 +38,8 @@ export interface Params {
   temperature: number;
   tint: number;
   rgbShift: number;
+  /** レンズ周辺のソフトネス（0〜1）。色収差の周辺ソフトとは別 param。 */
+  lensSoftness: number;
   grainIntensity: number;
   /** グレインの周辺比重（0〜1）。0 で径方向マスクなし、1 で現行の周辺強め。 */
   grainRadialMix: number;

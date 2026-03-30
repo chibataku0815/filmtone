@@ -341,7 +341,8 @@
       "highlightTone": "Highlight tone"
     },
     "effects": {
-      "rgbShiftHint": "Chromatic aberration: strongest toward the frame edges; the center stays sharp. A touch of edge softening is blended in when this slider is raised."
+      "rgbShiftHint": "Chromatic aberration: strongest toward the frame edges; the center stays sharp. A touch of edge softening is blended in when this slider is raised.",
+      "lensSoftnessHint": "Softens detail toward the frame edges, like mild lens falloff—isotropic blur, not a motion radial or zoom blur."
     },
     "donation": {
       "footer": {
@@ -430,6 +431,7 @@
       "fade": "Fade",
       "effects": "Effects",
       "rgbShift": "RGB Shift",
+      "lensSoftness": "Lens Softness",
       "filmGrain": "Film grain",
       "grainRadialMix": "Grain edge emphasis",
       "grainRadialMixHint": "Near 0: even grain. Near 1: stronger toward frame edges (not chromatic aberration). At 1 matches the previous default.",
@@ -443,6 +445,53 @@
       "spread": "Spread",
       "histogram": "Histogram",
       "halationHue": "Hue"
+    },
+    "desktopRelease": {
+      "eyebrow": "Desktop release",
+      "title": "Film Lab Desktop for macOS",
+      "body": "Batch-grade folders locally on your Mac. The public build is a notarized DMG for Apple Silicon and uses a fixed download route.",
+      "downloadCta": "Download Film Lab Desktop",
+      "supportCtaPrefix": "Support:",
+      "releaseNotesLead": "Version differences and SHA-256 checksums are published in the release notes for each build.",
+      "notes": {
+        "lut": "LUT files are not copied automatically from the preview to batch export. Only numeric Params are synced, so final confirmation should happen on the exported file.",
+        "donationAndSharing": "Donation and sharing stay off in the Desktop build. Release notes are the source of truth for version-to-version feature differences.",
+        "smartLook": "Smart Look AI is not included in this Desktop release."
+      },
+      "specs": {
+        "minimumMacosLabel": "Minimum macOS",
+        "minimumMacosValuePrefix": "macOS",
+        "architectureLabel": "Architecture",
+        "platformLabel": "Platform",
+        "platformValue": "macOS only",
+        "artifactLabel": "Official artifact",
+        "artifactValue": "Signed + notarized DMG",
+        "updatesLabel": "Updates",
+        "updatesValue": "Manual download replacement for now"
+      },
+      "downloadPage": {
+        "eyebrow": "Fixed download URL",
+        "title": "Film Lab Desktop download is not wired yet",
+        "body": "This page will redirect to the current notarized DMG once the public asset URL is connected. Until then, use the support contact below.",
+        "pendingLead": "Public download is not live yet. The fixed route is ready, but the current build has not been attached.",
+        "backCta": "Back to Film Lab",
+        "supportCtaPrefix": "Contact:",
+        "notes": {
+          "releaseNotes": "Version differences and SHA-256 checksums are published in the release notes for each build.",
+          "lut": "LUT files are not copied automatically from the preview to batch export. Only numeric Params are synced.",
+          "donationAndSharing": "Donation and sharing stay off in the Desktop build.",
+          "smartLook": "Smart Look AI is not included in this Desktop release."
+        },
+        "specs": {
+          "minimumMacosLabel": "Minimum macOS",
+          "minimumMacosValuePrefix": "macOS",
+          "architectureLabel": "Architecture",
+          "platformLabel": "Platform",
+          "platformValue": "macOS only",
+          "updatesLabel": "Updates",
+          "updatesValue": "Manual download replacement for now"
+        }
+      }
     },
     "desktop": {
       "app": {

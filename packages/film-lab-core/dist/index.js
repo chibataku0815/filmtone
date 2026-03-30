@@ -6,6 +6,8 @@ var PARAM_KEYS = [
   "temperature",
   "tint",
   "rgbShift",
+  /** 周辺ほど等方ブラーを足すレンズの柔らかさ（0〜1、Pro）。中心固定。 */
+  "lensSoftness",
   "grainIntensity",
   // 0=一様、1=周辺強め（既定1で後方互換）
   "grainRadialMix",
@@ -99,6 +101,7 @@ var PRESETS = {
     temperature: 0,
     tint: 0,
     rgbShift: 0,
+    lensSoftness: 0,
     grainIntensity: 0,
     grainRadialMix: 1,
     vignette: 0,
@@ -127,6 +130,7 @@ var PRESETS = {
     temperature: -0.11,
     tint: 0,
     rgbShift: 2e-3,
+    lensSoftness: 0,
     grainIntensity: 0.09,
     grainRadialMix: 1,
     vignette: 0.32,
@@ -151,6 +155,7 @@ var PRESETS = {
     temperature: 0.1,
     tint: 0,
     rgbShift: 0,
+    lensSoftness: 0,
     grainIntensity: 0.14,
     grainRadialMix: 1,
     vignette: 0.2,
@@ -175,6 +180,7 @@ var PRESETS = {
     temperature: 0.18,
     tint: 0,
     rgbShift: 12e-4,
+    lensSoftness: 0,
     grainIntensity: 0.12,
     grainRadialMix: 1,
     vignette: 0.25,
@@ -199,6 +205,7 @@ var PRESETS = {
     temperature: -0.1,
     tint: 0,
     rgbShift: 0,
+    lensSoftness: 0,
     grainIntensity: 0.075,
     grainRadialMix: 1,
     vignette: 0.15,
@@ -223,6 +230,7 @@ var PRESETS = {
     temperature: 0,
     tint: 0,
     rgbShift: 0,
+    lensSoftness: 0,
     grainIntensity: 0.18,
     grainRadialMix: 1,
     vignette: 0.5,
@@ -247,6 +255,7 @@ var PRESETS = {
     temperature: 0.02,
     tint: 0,
     rgbShift: 0,
+    lensSoftness: 0,
     grainIntensity: 0.05,
     grainRadialMix: 1,
     vignette: 0.15,
@@ -271,6 +280,7 @@ var PRESETS = {
     temperature: -0.08,
     tint: 0,
     rgbShift: 0,
+    lensSoftness: 0,
     grainIntensity: 0.115,
     grainRadialMix: 1,
     vignette: 0.2,
@@ -295,6 +305,7 @@ var PRESETS = {
     temperature: -0.3,
     tint: 0,
     rgbShift: 115e-5,
+    lensSoftness: 0,
     grainIntensity: 0.14,
     grainRadialMix: 1,
     vignette: 0.3,
@@ -336,7 +347,7 @@ import { z } from "zod";
 var paramShape = Object.fromEntries(
   PARAM_KEYS.map((key) => [
     key,
-    key === "grainRadialMix" ? z.number().min(0).max(1).default(1) : z.number()
+    key === "grainRadialMix" ? z.number().min(0).max(1).default(1) : key === "lensSoftness" ? z.number().min(0).max(1).default(0) : z.number()
   ])
 );
 var filmLabParamsSchema = z.object(paramShape);

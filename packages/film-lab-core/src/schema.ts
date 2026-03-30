@@ -3,13 +3,15 @@ import { PARAM_KEYS, type Params } from "./params";
 import { PRESETS, type PresetName } from "./presets";
 import { PRESET_VERSION } from "./look-ids";
 
-/** grainRadialMix だけ省略時 1（後方互換） */
+/** grainRadialMix だけ省略時 1（後方互換）、lensSoftness は省略時 0 */
 const paramShape = Object.fromEntries(
   PARAM_KEYS.map((key) => [
     key,
     key === "grainRadialMix"
       ? z.number().min(0).max(1).default(1)
-      : z.number(),
+      : key === "lensSoftness"
+        ? z.number().min(0).max(1).default(0)
+        : z.number(),
   ]),
 ) as z.ZodRawShape;
 

@@ -95,7 +95,8 @@
       "highlightTone": "Highlight tone"
     },
     "effects": {
-      "rgbShiftHint": "Chromatic aberration: strongest toward the frame edges; the center stays sharp. A touch of edge softening is blended in when this slider is raised."
+      "rgbShiftHint": "Chromatic aberration: strongest toward the frame edges; the center stays sharp. A touch of edge softening is blended in when this slider is raised.",
+      "lensSoftnessHint": "Softens detail toward the frame edges, like mild lens falloff—isotropic blur, not a motion radial or zoom blur."
     },
     "donation": {
       "footer": {
@@ -184,6 +185,7 @@
       "fade": "Fade",
       "effects": "Effects",
       "rgbShift": "RGB Shift",
+      "lensSoftness": "Lens Softness",
       "filmGrain": "Film grain",
       "grainRadialMix": "Grain edge emphasis",
       "grainRadialMixHint": "Near 0: even grain. Near 1: stronger toward frame edges (not chromatic aberration). At 1 matches the previous default.",

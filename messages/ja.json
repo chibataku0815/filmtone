@@ -341,7 +341,8 @@
       "highlightTone": "ハイライトトーン"
     },
     "effects": {
-      "rgbShiftHint": "色収差: 画面中心はほぼそのまま、フレーム周辺ほど強くなります。スライダーを上げると周辺にごく弱いブラーが混ざります。"
+      "rgbShiftHint": "色収差: 画面中心はほぼそのまま、フレーム周辺ほど強くなります。スライダーを上げると周辺にごく弱いブラーが混ざります。",
+      "lensSoftnessHint": "フレーム周辺ほどディテールをやわらかくします（レンズの周辺落ちに近い等方ブラー）。モーション用の放射状やズーム方向のブラーではありません。"
     },
     "donation": {
       "footer": {
@@ -430,6 +431,7 @@
       "fade": "フェード",
       "effects": "エフェクト",
       "rgbShift": "RGB シフト",
+      "lensSoftness": "レンズの柔らかさ",
       "filmGrain": "フィルムグレイン",
       "grainRadialMix": "グレインの周辺の強さ",
       "grainRadialMixHint": "0 に近いほど画面全体に均一な粒子。1 に近いほど周辺が強め（色のにじみ・色収差ではなく粒子の出方）。1 が従来どおりの既定です。",
@@ -443,6 +445,53 @@
       "spread": "広がり",
       "histogram": "ヒストグラム",
       "halationHue": "色相"
+    },
+    "desktopRelease": {
+      "eyebrow": "Desktop 公開",
+      "title": "Film Lab Desktop for macOS",
+      "body": "Mac 上でフォルダ単位の書き出しを行う Desktop 版です。一般向け配布は Apple Silicon 向けの公証済み DMG を固定ダウンロード導線で案内します。",
+      "downloadCta": "Film Lab Desktop をダウンロード",
+      "supportCtaPrefix": "窓口:",
+      "releaseNotesLead": "版差分と SHA-256 チェックサムの正本は、各ビルドの release notes です。",
+      "notes": {
+        "lut": "LUT ファイルはプレビューからバッチへ自動コピーしません。同期するのは数値 Params のみなので、最終確認は必ず書き出しファイルで行ってください。",
+        "donationAndSharing": "寄付と共有は Desktop 版ではオフです。版ごとの差分の全体は release notes を正とします。",
+        "smartLook": "スマートルック AI はこの Desktop リリースには含めません。"
+      },
+      "specs": {
+        "minimumMacosLabel": "最小 macOS",
+        "minimumMacosValuePrefix": "macOS",
+        "architectureLabel": "対応アーキ",
+        "platformLabel": "対応プラットフォーム",
+        "platformValue": "macOS のみ",
+        "artifactLabel": "正規配布物",
+        "artifactValue": "署名・公証済み DMG",
+        "updatesLabel": "更新方針",
+        "updatesValue": "当面は手動ダウンロード差し替え"
+      },
+      "downloadPage": {
+        "eyebrow": "固定ダウンロード URL",
+        "title": "Film Lab Desktop のダウンロードはまだ接続されていません",
+        "body": "公開アセット URL が接続されると、このページは現行の公証済み DMG にリダイレクトします。接続前は下の窓口をご利用ください。",
+        "pendingLead": "一般向けダウンロードはまだ有効化されていません。固定ルート自体は用意済みですが、現行ビルドの公開アセットがまだ紐づいていません。",
+        "backCta": "Film Lab に戻る",
+        "supportCtaPrefix": "窓口:",
+        "notes": {
+          "releaseNotes": "版差分と SHA-256 チェックサムの正本は、各ビルドの release notes です。",
+          "lut": "LUT ファイルはプレビューからバッチへ自動コピーしません。同期するのは数値 Params のみです。",
+          "donationAndSharing": "寄付と共有は Desktop 版ではオフです。",
+          "smartLook": "スマートルック AI はこの Desktop リリースには含めません。"
+        },
+        "specs": {
+          "minimumMacosLabel": "最小 macOS",
+          "minimumMacosValuePrefix": "macOS",
+          "architectureLabel": "対応アーキ",
+          "platformLabel": "対応プラットフォーム",
+          "platformValue": "macOS のみ",
+          "updatesLabel": "更新方針",
+          "updatesValue": "当面は手動ダウンロード差し替え"
+        }
+      }
     },
     "desktop": {
       "app": {

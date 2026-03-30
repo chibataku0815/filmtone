@@ -3,7 +3,7 @@ import { z } from 'zod';
 /**
  * Film Lab のグレード数値パラメータ定義（ブラウザ・Remotion 共通の単一の真実）
  */
-declare const PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "grainIntensity", "grainRadialMix", "vignette", "bloomThreshold", "bloomStrength", "bloomRadius", "halationIntensity", "halationSpread", "halationHue", "fade", "highlights", "shadows", "shadowTone", "highlightTone", "shadowHue", "highlightHue"];
+declare const PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "grainIntensity", "grainRadialMix", "vignette", "bloomThreshold", "bloomStrength", "bloomRadius", "halationIntensity", "halationSpread", "halationHue", "fade", "highlights", "shadows", "shadowTone", "highlightTone", "shadowHue", "highlightHue"];
 type ParamKey = (typeof PARAM_KEYS)[number];
 interface Params {
     exposure: number;
@@ -12,6 +12,8 @@ interface Params {
     temperature: number;
     tint: number;
     rgbShift: number;
+    /** レンズ周辺のソフトネス（0〜1）。色収差の周辺ソフトとは別 param。 */
+    lensSoftness: number;
     grainIntensity: number;
     /** グレインの周辺比重（0〜1）。0 で径方向マスクなし、1 で現行の周辺強め。 */
     grainRadialMix: number;
@@ -49,6 +51,7 @@ declare const PRESETS: {
         temperature: number;
         tint: number;
         rgbShift: number;
+        lensSoftness: number;
         grainIntensity: number;
         grainRadialMix: number;
         vignette: number;
@@ -77,6 +80,7 @@ declare const PRESETS: {
         temperature: number;
         tint: number;
         rgbShift: number;
+        lensSoftness: number;
         grainIntensity: number;
         grainRadialMix: number;
         vignette: number;
@@ -101,6 +105,7 @@ declare const PRESETS: {
         temperature: number;
         tint: number;
         rgbShift: number;
+        lensSoftness: number;
         grainIntensity: number;
         grainRadialMix: number;
         vignette: number;
@@ -125,6 +130,7 @@ declare const PRESETS: {
         temperature: number;
         tint: number;
         rgbShift: number;
+        lensSoftness: number;
         grainIntensity: number;
         grainRadialMix: number;
         vignette: number;
@@ -149,6 +155,7 @@ declare const PRESETS: {
         temperature: number;
         tint: number;
         rgbShift: number;
+        lensSoftness: number;
         grainIntensity: number;
         grainRadialMix: number;
         vignette: number;
@@ -173,6 +180,7 @@ declare const PRESETS: {
         temperature: number;
         tint: number;
         rgbShift: number;
+        lensSoftness: number;
         grainIntensity: number;
         grainRadialMix: number;
         vignette: number;
@@ -197,6 +205,7 @@ declare const PRESETS: {
         temperature: number;
         tint: number;
         rgbShift: number;
+        lensSoftness: number;
         grainIntensity: number;
         grainRadialMix: number;
         vignette: number;
@@ -221,6 +230,7 @@ declare const PRESETS: {
         temperature: number;
         tint: number;
         rgbShift: number;
+        lensSoftness: number;
         grainIntensity: number;
         grainRadialMix: number;
         vignette: number;
@@ -245,6 +255,7 @@ declare const PRESETS: {
         temperature: number;
         tint: number;
         rgbShift: number;
+        lensSoftness: number;
         grainIntensity: number;
         grainRadialMix: number;
         vignette: number;
