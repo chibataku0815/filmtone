@@ -6,25 +6,25 @@
       "savePng": "PNGを保存"
     },
     "canvas": {
-      "webgl2Required": "Film Lab を使うには WebGL2 が必要です",
+      "webgl2Required": "Filmtone を使うには WebGL2 が必要です",
       "dropHint": "画像・動画・.cube LUT をドロップ",
       "loadingMedia": "読み込み中…",
       "dismissError": "OK"
     },
     "back": "← Interactive に戻る",
     "metadata": {
-      "title": "Film Lab",
+      "title": "Filmtone",
       "description": "ブラウザで動くリアルタイムカラーグレーディングツール。画像や動画をドロップして、露出・コントラスト・LUTをGPUシェーダーでリアルタイムに適用。",
-      "ogTitle": "Film Lab — ブラウザで動くカラーグレーディングツール",
+      "ogTitle": "Filmtone — ブラウザで動くカラーグレーディングツール",
       "ogDescription": "画像や動画をドロップするだけ。露出・コントラスト・LUTをリアルタイムに適用できるWebGLカラグレツール。",
-      "ogImageAlt": "Film Lab カラーグレーディングツール"
+      "ogImageAlt": "Filmtone カラーグレーディングツール"
     },
     "share": {
       "sectionTitle": "共有",
       "copyLink": "ルックのリンクをコピー",
       "copied": "コピーしました",
       "postToX": "X に投稿",
-      "postText": "Film Lab でこのルックを試せます（ブラウザでカラグレ）"
+      "postText": "Filmtone でこのルックを試せます（ブラウザでカラグレ）"
     },
     "browser": {
       "sectionTitle": "このブラウザに保存",
@@ -100,18 +100,18 @@
     },
     "donation": {
       "footer": {
-        "shortLine": "Film Lab は基本無料です。よろしければ、改善やサーバー費用への任意のご支援をお願いしています。",
+        "shortLine": "Filmtone は基本無料です。よろしければ、改善やサーバー費用への任意のご支援をお願いしています。",
         "linkStripe": "Stripe で支援（任意）",
         "linkStripeAmount": "Stripe · {amountUsd} USD",
         "linkBmc": "Buy Me a Coffee で支援",
-        "ariaSupportSection": "Film Lab への任意の支援です。スキップしても機能に影響しません。",
+        "ariaSupportSection": "Filmtone への任意の支援です。スキップしても機能に影響しません。",
         "ariaOpenStripe": "任意の支援のため Stripe の決済ページを新しいタブで開きます",
         "ariaOpenStripeTier": "{amountUsd} USD の任意支援のため Stripe を新しいタブで開きます",
         "ariaOpenBmc": "Buy Me a Coffee を新しいタブで開きます"
       },
       "preset_save_modal": {
         "title": "このブラウザに保存しました",
-        "body": "Film Lab は引き続き無料でご利用いただけます。よろしければ Stripe または Buy Me a Coffee から任意でご支援いただけると助かります。閉じていただいてもそのままお使いいただけます。",
+        "body": "Filmtone は引き続き無料でご利用いただけます。よろしければ Stripe または Buy Me a Coffee から任意でご支援いただけると助かります。閉じていただいてもそのままお使いいただけます。",
         "primaryStripe": "Stripe で支援（任意）",
         "stripeTierLabel": "{amountUsd} USD で支援（任意）",
         "secondaryBmc": "Buy Me a Coffee で支援",
@@ -132,18 +132,18 @@
         "dismiss": "了解"
       },
       "thanks_page": {
-        "meta_title": "ご支援ありがとうございます — Film Lab",
-        "meta_description": "Film Lab への任意のご支援へのお礼です。",
+        "meta_title": "ご支援ありがとうございます — Filmtone",
+        "meta_description": "Filmtone への任意のご支援へのお礼です。",
         "title": "ご支援ありがとうございます",
-        "body": "改善と運用の維持にとても助かります。Film Lab は引き続き無料でお使いいただけます。",
-        "returnCta": "Film Lab に戻る",
-        "returnHint": "支払い後のリンクにセッション ID がある場合、サーバで確認してから Film Lab へ進むと案内が控えめになります。ない場合は従来どおり「このブラウザに限定」の案内抑止が使えます。",
+        "body": "改善と運用の維持にとても助かります。Filmtone は引き続き無料でお使いいただけます。",
+        "returnCta": "Filmtone に戻る",
+        "returnHint": "支払い後のリンクにセッション ID がある場合、サーバで確認してから Filmtone へ進むと案内が控えめになります。ない場合は従来どおり「このブラウザに限定」の案内抑止が使えます。",
         "verifyPending": "決済情報を確認しています…",
-        "verifyFailed": "自動確認に失敗しました。以下から進んでも Film Lab はお使いいただけます（案内抑止は別の方法で行われます）。"
+        "verifyFailed": "自動確認に失敗しました。以下から進んでも Filmtone はお使いいただけます（案内抑止は別の方法で行われます）。"
       },
       "supporter": {
-        "footer_shortLine": "ご支援ありがとうございます。Film Lab を引き続きお楽しみください。",
-        "preset_save_modal_body": "このブラウザに保存しました。すでにご支援いただいている場合、改めてお礼申し上げます。Film Lab は引き続き無料でご利用いただけます。"
+        "footer_shortLine": "ご支援ありがとうございます。Filmtone を引き続きお楽しみください。",
+        "preset_save_modal_body": "このブラウザに保存しました。すでにご支援いただいている場合、改めてお礼申し上げます。Filmtone は引き続き無料でご利用いただけます。"
       },
       "legal_footer_short": "税務上の助言ではありません。決済は外部サービスです。詳細は専門家にご確認ください。"
     },
@@ -209,7 +209,7 @@
         "presetWhenOpenLabel": "開いたときのルック（プリセット）",
         "rgbHistogram": "RGB ヒストグラム",
         "openParamsPanelAria": "パラメータパネルを開く",
-        "paramsPanelAria": "Film Lab パラメータ",
+        "paramsPanelAria": "Filmtone パラメータ",
         "closeParamsPanelAria": "パラメータパネルを閉じる",
         "sendGradeToExport": "色を書き出しへ送る",
         "sendGradeCaption": "スライダーの数値だけ書き出しタブへ送ります。LUT は JSON などで。",
@@ -218,7 +218,11 @@
         "syncGradeOk": "書き出しへ反映しました（スライダーの数値をコピーしました）。書き出しタブの「ルック」で確認できます。",
         "syncGradeNoViewport": "まだプレビューが準備できていません。画像や動画を開いてから、数秒待ってからもう一度お試しください。",
         "syncGradeError": "書き出しへ反映できませんでした: {msg}",
-        "logPlaceholder": "ログはここに表示されます。"
+        "logPlaceholder": "ログはここに表示されます。",
+        "updateBannerBody": "新しい版（v{version}）があります。バックグラウンドでの自動インストールはありません。ダウンロードページから DMG を取得して差し替えてください。",
+        "updateBannerOpen": "ダウンロードページを開く",
+        "updateBannerNotes": "リリースノート",
+        "updateBannerLater": "後で"
       },
       "batch": {
         "steps": {
@@ -228,7 +232,7 @@
           "output": "保存先と形式",
           "run": "実行"
         },
-        "tipExportTabIntro": "パソコン上のフォルダに入っている写真を、Film Lab で整えた見え方のまま別フォルダへまとめて保存できます。動画を1本、同じ見え方でMP4にすることもできます。編集タブでスライダーを触ったあと、編集タブ右下の「色を書き出しへ送る」で数値をこちらに送れます。LUT（ルックアップテーブル）はJSONの読み込みなどで別途。",
+        "tipExportTabIntro": "パソコン上のフォルダに入っている写真を、Filmtone で整えた見え方のまま別フォルダへまとめて保存できます。動画を1本、同じ見え方でMP4にすることもできます。編集タブでスライダーを触ったあと、編集タブ右下の「色を書き出しへ送る」で数値をこちらに送れます。LUT（ルックアップテーブル）はJSONの読み込みなどで別途。",
         "tipJobImages": "選んだフォルダにある .jpg / .jpeg / .png すべてに、いまのルックを載せて JPEG か PNG で別フォルダに保存します。",
         "tipJobVideoFastOption": "既定はプレビューに近い WebGL 逐次（時間がかかります）。速さ優先の高速 ffmpeg（1 パス・近似）にしたいときは、手順「保存先と形式」でチェックを外します。.cube LUT を優先し、ffmpeg 経路では Params は近似、細部は一致しません。PATH に ffmpeg / ffprobe が必要です。",
         "tipJobVideoWebGlOnly": "編集タブに近い見え方になるよう、1 フレームずつグレードして MP4 にまとめます。クリップが長いと完了まで時間がかかることがあります。PATH に ffmpeg / ffprobe が必要です。",
@@ -281,7 +285,7 @@
         "presetQuickLabel": "プリセット（クイック）",
         "lookPresetHiddenWhileSyncedBody": "いま書き出しに使う数値は編集タブから取り込んだものです（参考プリセット名: {preset}）。下のボタンで、そのプリセットの初期数値だけに戻せます。",
         "lookRevertToPresetOnlyBtn": "プリセットの数値に戻す",
-        "presetSelectAria": "書き出しに使う Film Lab プリセット",
+        "presetSelectAria": "書き出しに使う Filmtone プリセット",
         "applyEditToExportBtn": "編集のスライダーを書き出しに反映",
         "applyEditWaitHint": "編集タブを開き、画像のプレビューが表示されるまでお待ちください",
         "applyEditHintAria": "編集の数値を書き出しにコピーする説明",

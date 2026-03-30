@@ -460,7 +460,7 @@ function packCubeLutToFloatRgbaGrid(lut) {
 
 // src/defaults.ts
 var filmLookSpikeDefaultProps = {
-  title: "Film Lab \xD7 Remotion"
+  title: "Filmtone \xD7 Remotion"
 };
 function createDefaultFilmLookGradeProps() {
   const grade = cloneParams(PRESETS.cinematic);

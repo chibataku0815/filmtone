@@ -6,7 +6,14 @@
  *
  * @description 設定は electron-store（userData 内 JSON）。ウィンドウ矩形と最後に選んだ入出力フォルダを覚える。
  */
-import { app, BrowserWindow, dialog, ipcMain, protocol } from "electron";
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  protocol,
+  shell,
+} from "electron";
 import { existsSync } from "node:fs";
 import { filmLabParamsSchema, type Params } from "film-lab-core";
 import Store from "electron-store";
@@ -31,6 +38,10 @@ import {
   parseHttpByteRange,
 } from "./video-src-protocol";
 import { deriveSourceFrameRateTrust } from "./video-export-probe-framerate";
+import {
+  DesktopUpdateService,
+  resolveDesktopUpdateCheckUrl,
+} from "./desktop-update-service";
 
 const execFileAsync = promisify(execFile);
 
@@ -67,6 +78,12 @@ let activeVideoExport: FfmpegVideoExportSession | null = null;
  * @description 高速トランスコード専用の子プロセス（rawvideo パイプとは別）。中断 IPC から kill する。
  */
 let activeFastTranscodeChild: ChildProcessWithoutNullStreams | null = null;
+
+/** @description 更新案内 IPC の送り先ウィンドウ（最初に作ったもの） */
+let mainWindowRef: BrowserWindow | null = null;
+
+/** @description 案 C: 公開 JSON を読むだけの更新チェッカー。スモーク時は未初期化のまま */
+let desktopUpdateService: DesktopUpdateService | null = null;
 
 /**
  * @description 進行中の ffmpeg を潰して参照を捨てる。レンダラが異常終了したあとに残るゾンビ対策。
@@ -581,6 +598,16 @@ function createWindow(): BrowserWindow {
     }
   });
 
+  win.on("closed", () => {
+    if (mainWindowRef === win) {
+      mainWindowRef = null;
+    }
+  });
+
+  win.webContents.once("did-finish-load", () => {
+    desktopUpdateService?.onRendererLoaded();
+  });
+
   win.webContents.on("render-process-gone", (_event, details) => {
     console.error(
       `[film-lab-desktop] render-process-gone wcId=${win.webContents.id} ${desktopProcessContext()} details=${safeDesktopDebugJson(details)}`,
@@ -785,12 +812,27 @@ app.whenReady().then(() => {
     }
   });
 
+  if (!DESKTOP_SMOKE_PENDING) {
+    desktopUpdateService = new DesktopUpdateService(
+      () => mainWindowRef,
+      resolveDesktopUpdateCheckUrl,
+      () => app.getVersion(),
+      () =>
+        activeVideoExport !== null || activeFastTranscodeChild !== null,
+    );
+    desktopUpdateService.startSchedule();
+  }
+
   const mainWindow = createWindow();
+  mainWindowRef = mainWindow;
   if (DESKTOP_SMOKE_PENDING) {
     void runPendingRuntimeSmoke(mainWindow);
   }
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) {
+      const w = createWindow();
+      mainWindowRef = w;
+    }
   });
 });
 
@@ -802,6 +844,41 @@ app.on("child-process-gone", (_event, details) => {
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
+});
+
+app.on("will-quit", () => {
+  desktopUpdateService?.dispose();
+  desktopUpdateService = null;
+});
+
+ipcMain.handle("desktop-update-set-export-busy", (_evt, busy: unknown) => {
+  if (typeof busy !== "boolean") {
+    throw new TypeError(
+      "desktop-update-set-export-busy: busy が boolean ではありません",
+    );
+  }
+  desktopUpdateService?.setRendererExportBusy(busy);
+});
+
+ipcMain.handle("desktop-update-dismiss", (_evt, version: unknown) => {
+  if (typeof version !== "string" || version.length === 0) {
+    throw new TypeError("desktop-update-dismiss: version が空です");
+  }
+  desktopUpdateService?.dismissVersion(version);
+});
+
+ipcMain.handle("desktop-update-open-external", async (_evt, url: unknown) => {
+  if (typeof url !== "string" || url.length === 0) {
+    throw new TypeError("desktop-update-open-external: url が空です");
+  }
+  try {
+    await shell.openExternal(url);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(
+      `desktop-update-open-external: shell.openExternal 失敗 url=${url} detail=${msg}`,
+    );
+  }
 });
 
 ipcMain.handle("desktop-prefs-get", async () => {

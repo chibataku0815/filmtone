@@ -5,7 +5,7 @@ import type { FilmLookGradeInputProps, FilmLookSpikeInputProps } from "./schema"
 
 /** Remotion FilmLookSpike の defaultProps */
 export const filmLookSpikeDefaultProps: FilmLookSpikeInputProps = {
-  title: "Film Lab × Remotion",
+  title: "Filmtone × Remotion",
 };
 
 /** Remotion FilmLookGrade の defaultProps（cinematic 基準） */

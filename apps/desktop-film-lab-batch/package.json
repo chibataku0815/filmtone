@@ -2,13 +2,13 @@
   "name": "desktop-film-lab-batch",
   "version": "0.1.0",
   "private": true,
-  "description": "Film Lab — local batch grading (Electron)",
+  "description": "Filmtone — local batch grading (Electron)",
   "author": "chibatakumi",
   "type": "module",
   "main": "dist-electron/main.cjs",
   "packageManager": "bun@1.3.3",
   "scripts": {
-    "build:electron": "esbuild electron/main.ts --bundle --platform=node --format=cjs --outfile=dist-electron/main.cjs --external:electron && esbuild electron/preload.ts --bundle --platform=node --format=cjs --outfile=dist-electron/preload.cjs --external:electron",
+    "build:electron": "bun ./scripts/build-electron.mjs",
     "build:renderer": "vite build",
     "build": "bun run build:electron && bun run build:renderer",
     "smoke:smart-look-pending": "cross-env FILM_LAB_DESKTOP_SMOKE_PENDING=1 bun run start",
@@ -25,7 +25,8 @@
     "dist:mac": "bun run dist:mac:unsigned",
     "release:staple": "bun ./scripts/staple-mac.mjs",
     "release:checksums": "bun ./scripts/release-checksums.mjs",
-    "release:upload-blob": "bun ./scripts/upload-dmg-to-vercel-blob.mjs"
+    "release:upload-blob": "bun ./scripts/upload-dmg-to-vercel-blob.mjs",
+    "release:upload-update-meta": "bun ./scripts/upload-update-meta-to-vercel-blob.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
@@ -61,7 +62,7 @@
   },
   "build": {
     "appId": "com.chibatakumi.film-lab-desktop",
-    "productName": "Film Lab",
+    "productName": "Filmtone",
     "copyright": "Copyright © 2026",
     "directories": {
       "output": "release"

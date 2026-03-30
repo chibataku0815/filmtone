@@ -2,8 +2,16 @@
  * Film Lab バッチ — preload（contextBridge）
  *
  * @overview レンダラから呼べる API だけを極小露出する。
+ * @description 更新案内（案 C）は main が IPC で送り、ここで購読だけ暴露します。
  */
 import { contextBridge, ipcRenderer } from "electron";
+
+/** @description main から届く「新しい版があります」通知の中身 */
+export type DesktopUpdateAvailablePayload = {
+  latestVersion: string;
+  downloadPageUrl: string;
+  releaseNotesUrl?: string;
+};
 
 export type OutputPayload = {
   outputDir: string;
@@ -104,4 +112,41 @@ contextBridge.exposeInMainWorld("filmLabBatch", {
     ipcRenderer.invoke("video-export-stage-source", filePath),
   videoExportUnlinkStaged: (stagedPath: string): Promise<void> =>
     ipcRenderer.invoke("video-export-unlink-staged", stagedPath),
+
+  /**
+   * @description まとめて書き出し中は更新バナーを出さないよう main に伝える
+   */
+  setExportBusyForUpdateCheck: (busy: boolean): Promise<void> =>
+    ipcRenderer.invoke("desktop-update-set-export-busy", busy),
+
+  /**
+   * @description バナーの「後で」。同じ版はしばらく再通知しない
+   */
+  dismissDesktopUpdate: (latestVersion: string): Promise<void> =>
+    ipcRenderer.invoke("desktop-update-dismiss", latestVersion),
+
+  /**
+   * @description 既定ブラウザで URL を開く（ダウンロードページなど）
+   */
+  openExternalUrl: (url: string): Promise<void> =>
+    ipcRenderer.invoke("desktop-update-open-external", url),
+
+  /**
+   * @description main から更新通知を受け取る。戻り値で購読解除
+   */
+  subscribeDesktopUpdateAvailable: (
+    callback: (payload: DesktopUpdateAvailablePayload) => void,
+  ): (() => void) => {
+    const channel = "film-lab-desktop-update-available";
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      payload: DesktopUpdateAvailablePayload,
+    ): void => {
+      callback(payload);
+    };
+    ipcRenderer.on(channel, handler);
+    return () => {
+      ipcRenderer.removeListener(channel, handler);
+    };
+  },
 });

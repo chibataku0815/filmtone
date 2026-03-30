@@ -57,7 +57,7 @@ function runCommand(command, args) {
 /**
  * package.json から productName を読みます。
  *
- * @returns {string} 製品名（未検出時は Film Lab）。
+ * @returns {string} 製品名（未検出時は Filmtone）。
  */
 function readProductName() {
   const functionName = "readProductName";
@@ -65,7 +65,7 @@ function readProductName() {
     const text = fsSync.readFileSync(packageJsonPath, "utf8");
     const pkg = JSON.parse(text);
     const name = pkg?.build?.productName;
-    return typeof name === "string" && name.length > 0 ? name : "Film Lab";
+    return typeof name === "string" && name.length > 0 ? name : "Filmtone";
   } catch (error) {
     throw new Error(`[${functionName}] package.json を読めません。path=${packageJsonPath} error=${String(error)}`);
   }

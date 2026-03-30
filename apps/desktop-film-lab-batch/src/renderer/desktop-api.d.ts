@@ -1,5 +1,12 @@
 import type { Params } from "film-lab-core";
 
+/** @description メインプロセスから届く「新しい版があります」通知 */
+export type DesktopUpdateAvailablePayload = {
+  latestVersion: string;
+  downloadPageUrl: string;
+  releaseNotesUrl?: string;
+};
+
 /**
  * window.filmLabBatch の型（preload と共有）
  */
@@ -90,6 +97,17 @@ export type FilmLabBatchBridge = {
   ) => Promise<{ stagedPath: string }>;
   /** @description videoExportStageSource で作った tmp を削除 */
   videoExportUnlinkStaged: (stagedPath: string) => Promise<void>;
+
+  /** @description 長い書き出し中は更新通知を遅らせる（main と同期） */
+  setExportBusyForUpdateCheck: (busy: boolean) => Promise<void>;
+  /** @description 更新バナーを閉じ、同じ版はしばらく再通知しない */
+  dismissDesktopUpdate: (latestVersion: string) => Promise<void>;
+  /** @description ダウンロードページなどを既定ブラウザで開く */
+  openExternalUrl: (url: string) => Promise<void>;
+  /** @description 新しい版の通知を購読。戻り値で解除 */
+  subscribeDesktopUpdateAvailable: (
+    callback: (payload: DesktopUpdateAvailablePayload) => void,
+  ) => () => void;
 };
 
 declare global {

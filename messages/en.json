@@ -239,8 +239,8 @@
       "credit": "Inspired by Codrops WebGL Distortion Hover Effects"
     },
     "film-lab": {
-      "title": "Film Lab",
-      "description": "Try Film Lab in the browser: load your own photo or video, start from presets, and steer toward a film-inspired look. Folder-scale finishing belongs in the Film Lab macOS app.",
+      "title": "Filmtone",
+      "description": "Try Filmtone in the browser: load your own photo or video, start from presets, and steer toward a film-inspired look. Folder-scale finishing belongs in the Filmtone macOS app.",
       "sampleHint": "You're viewing a sample image—drop your own photo or video to grade your own footage.",
       "openFullApp": "Open full app"
     }
@@ -248,9 +248,9 @@
   "film-lab": {
     "sampleHint": "You're viewing a sample image—drop your own photo or video to grade your own footage.",
     "lp": {
-      "heroEyebrow": "Film Lab",
+      "heroEyebrow": "Filmtone",
       "heroTitle": "Start from presets and bring stills toward a film-inspired look—fast.",
-      "heroBody": "For photographers and small teams who want many stills (and a short clip) toned cohesively before opening a heavy NLE. macOS Film Lab is the main place for folder workflows and repeat exports. Start here in the browser to audition a look on your own media.",
+      "heroBody": "For photographers and small teams who want many stills (and a short clip) toned cohesively before opening a heavy NLE. macOS Filmtone is the main place for folder workflows and repeat exports. Start here in the browser to audition a look on your own media.",
       "heroPrimaryCta": "Download for macOS",
       "heroSecondaryLine": "Apple Silicon · macOS {minMacos}+ — full requirements on the download page.",
       "proofTeaserLine": "Below, try the mood on one of your own frames—then move to the macOS app when you want that same tone across a whole folder.",
@@ -273,7 +273,7 @@
       "faqQwebVsDesktop": "How is this page different from the desktop app?",
       "faqAwebVsDesktop": "Folder-scale finishing stays centered on the macOS app. This browser page is an entry to feel a grade on your own media and share links. It is not a replacement for timeline editing or a full color-managed finishing pipeline.",
       "faqQsmartLookDesktop": "Is Smart Look (AI) included in the desktop app?",
-      "faqAsmartLookDesktop": "No. The current Film Lab Desktop release does not include Smart Look. Refer to each product surface and its release notes for what ships where.",
+      "faqAsmartLookDesktop": "No. The current Filmtone Desktop release does not include Smart Look. Refer to each product surface and its release notes for what ships where.",
       "faqQupdates": "How do updates work?",
       "faqAupdates": "Download a fresh DMG from the download page when you want to update. The app does not silently auto-install updates in the background.",
       "faqQlimitations": "Where is the list of known limitations?",
@@ -297,6 +297,7 @@
       "premiumCard4Title": "What we publish",
       "premiumCard4Body": "Platform support and export caveats stay in the download page and release notes.",
       "premiumCtaTryDemo": "Try in the browser",
+      "premiumMediaProofNote": "Temporary proof video cut from a current graded export.",
       "premiumMediaPlaceholder": "Product screenshot placeholder until real captures land."
     },
     "toolbar": {
@@ -304,25 +305,25 @@
       "savePng": "Save PNG"
     },
     "canvas": {
-      "webgl2Required": "WebGL2 is required for Film Lab",
+      "webgl2Required": "WebGL2 is required for Filmtone",
       "dropHint": "Drop image, video, or .cube LUT",
       "loadingMedia": "Loading media…",
       "dismissError": "OK"
     },
     "back": "← Back to Interactive",
     "metadata": {
-      "title": "Film Lab",
+      "title": "Filmtone",
       "description": "macOS app to align many stills (and a short clip) toward a film-inspired look starting from presets—before you dive into a heavy editor. Includes a browser session to try your own media.",
-      "ogTitle": "Film Lab — preset-led film looks for photographers",
+      "ogTitle": "Filmtone — preset-led film looks for photographers",
       "ogDescription": "Tone a folder of photos from presets, then export on macOS. Browser on this page to audition looks first.",
-      "ogImageAlt": "Film Lab — film-look tools for photographers"
+      "ogImageAlt": "Filmtone — film-look tools for photographers"
     },
     "share": {
       "sectionTitle": "Share",
       "copyLink": "Copy look link",
       "copied": "Copied!",
       "postToX": "Post to X",
-      "postText": "Try this grade in Film Lab — browser color grading"
+      "postText": "Try this grade in Filmtone — browser color grading"
     },
     "browser": {
       "sectionTitle": "This browser",
@@ -398,18 +399,18 @@
     },
     "donation": {
       "footer": {
-        "shortLine": "Film Lab stays free. Optional support helps fund improvements and hosting.",
+        "shortLine": "Filmtone stays free. Optional support helps fund improvements and hosting.",
         "linkStripe": "Support via Stripe",
         "linkStripeAmount": "Stripe · {amountUsd} USD",
         "linkBmc": "Tip on Buy Me a Coffee",
-        "ariaSupportSection": "Optional ways to support Film Lab. Skipping does not limit features.",
+        "ariaSupportSection": "Optional ways to support Filmtone. Skipping does not limit features.",
         "ariaOpenStripe": "Open Stripe checkout for optional support in a new tab",
         "ariaOpenStripeTier": "Open Stripe checkout for {amountUsd} USD optional support in a new tab",
         "ariaOpenBmc": "Open Buy Me a Coffee in a new tab"
       },
       "preset_save_modal": {
         "title": "Saved to this browser",
-        "body": "Film Lab remains free to use. If you’d like, optional support through Stripe or Buy Me a Coffee helps us keep improving. Skipping is fine—nothing changes for you.",
+        "body": "Filmtone remains free to use. If you’d like, optional support through Stripe or Buy Me a Coffee helps us keep improving. Skipping is fine—nothing changes for you.",
         "primaryStripe": "Support via Stripe (optional)",
         "stripeTierLabel": "Support {amountUsd} USD (optional)",
         "secondaryBmc": "Tip on Buy Me a Coffee",
@@ -430,18 +431,18 @@
         "dismiss": "Got it"
       },
       "thanks_page": {
-        "meta_title": "Thank you — Film Lab",
-        "meta_description": "Thank you for optionally supporting Film Lab.",
+        "meta_title": "Thank you — Filmtone",
+        "meta_description": "Thank you for optionally supporting Filmtone.",
         "title": "Thank you",
-        "body": "Your support helps us keep improving and running Film Lab. It stays free to use.",
-        "returnCta": "Back to Film Lab",
+        "body": "Your support helps us keep improving and running Filmtone. It stays free to use.",
+        "returnCta": "Back to Filmtone",
         "returnHint": "If this page URL includes a checkout session ID, we can verify on the server before you return, for softer prompts. Otherwise you can still use the browser-only acknowledgement flow.",
         "verifyPending": "Confirming your checkout…",
-        "verifyFailed": "We couldn’t verify automatically. You can still continue to Film Lab (prompts may stay in the default mode)."
+        "verifyFailed": "We couldn’t verify automatically. You can still continue to Filmtone (prompts may stay in the default mode)."
       },
       "supporter": {
-        "footer_shortLine": "Thank you for your support. Enjoy Film Lab.",
-        "preset_save_modal_body": "Saved to this browser. If you’ve already supported us, thank you again. Film Lab remains free to use."
+        "footer_shortLine": "Thank you for your support. Enjoy Filmtone.",
+        "preset_save_modal_body": "Saved to this browser. If you’ve already supported us, thank you again. Filmtone remains free to use."
       },
       "legal_footer_short": "Not tax advice. Third-party checkout. Ask your advisor."
     },
@@ -500,7 +501,7 @@
     },
     "desktopRelease": {
       "eyebrow": "Desktop",
-      "title": "Film Lab Desktop (macOS)",
+      "title": "Filmtone Desktop (macOS)",
       "body": "Batch photos in a folder and export one video. The download is a notarized DMG for Apple Silicon.",
       "essentials": {
         "environmentLabel": "Requirements",
@@ -513,9 +514,9 @@
       "downloadPage": {
         "eyebrow": "Download",
         "title": "Download not configured",
-        "body": "When the DMG URL is set in the environment, this page redirects automatically. Otherwise use the Film Lab page contact link.",
+        "body": "When the DMG URL is set in the environment, this page redirects automatically. Otherwise use the Filmtone page contact link.",
         "pendingLead": "Redirect target is not set (connect FILM_LAB_DESKTOP_DOWNLOAD_URL to fix).",
-        "backCta": "Back to Film Lab",
+        "backCta": "Back to Filmtone",
         "supportCtaPrefix": "Contact:",
         "specs": {
           "environmentLabel": "Requirements",
@@ -534,7 +535,7 @@
         "presetWhenOpenLabel": "Look when opened (preset)",
         "rgbHistogram": "RGB histogram",
         "openParamsPanelAria": "Open parameters panel",
-        "paramsPanelAria": "Film Lab parameters",
+        "paramsPanelAria": "Filmtone parameters",
         "closeParamsPanelAria": "Close parameters panel",
         "sendGradeToExport": "Send grade to Export",
         "sendGradeCaption": "Sends slider values only to the Export tab. LUT via JSON, etc.",
@@ -550,7 +551,7 @@
           "output": "Destination & format",
           "run": "Run"
         },
-        "tipExportTabIntro": "Photos in a folder can be saved in bulk to another folder with your Film Lab look. You can also export one video as MP4 with the same look. After adjusting sliders on Edit, use “Send grade to Export” (bottom right) to copy values here. LUTs are separate (e.g. load JSON).",
+        "tipExportTabIntro": "Photos in a folder can be saved in bulk to another folder with your Filmtone look. You can also export one video as MP4 with the same look. After adjusting sliders on Edit, use “Send grade to Export” (bottom right) to copy values here. LUTs are separate (e.g. load JSON).",
         "tipJobImages": "Every .jpg / .jpeg / .png in the chosen folder gets this look, saved as JPEG or PNG to another folder.",
         "tipJobVideoFastOption": "Default is fast one-pass ffmpeg (approximate). Turn on step-by-step WebGL only if you want a closer match to the preview. .cube LUT is preferred; Params are approximated in ffmpeg — lutIntensity, bloom, halation, and split-tone details may not match. ffmpeg and ffprobe must be on PATH.",
         "tipJobVideoWebGlOnly": "Only WebGL frame-by-frame export (slower) for a closer preview match. Fast one-pass ffmpeg is being prepared and hidden from the UI. ffmpeg and ffprobe must be on PATH.",
@@ -708,11 +709,11 @@
       }
     },
     "jsonLd": {
-      "desktopName": "Film Lab Desktop",
+      "desktopName": "Filmtone Desktop",
       "desktopDescription": "macOS photography app: start from presets for a film-inspired look, batch JPEG/PNG folders, and export one short MP4 with the same grade when needed. Apple Silicon; download page for support details.",
       "desktopOperatingSystem": "macOS 11.0 or later (Apple Silicon / arm64)",
-      "webDemoName": "Film Lab (try in browser)",
-      "webDemoDescription": "On-site experience to open your photo or video and audition preset-led grades. Folder-scale finishing stays in Film Lab Desktop.",
+      "webDemoName": "Filmtone (try in browser)",
+      "webDemoDescription": "On-site experience to open your photo or video and audition preset-led grades. Folder-scale finishing stays in Filmtone Desktop.",
       "webDemoOperatingSystem": "Common desktop browser with interactive graphics support",
       "webDemoBrowserRequirements": "Modern browser with WebGL2 available"
     }

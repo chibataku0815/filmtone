@@ -1,6 +1,6 @@
-# Film Lab Desktop
+# Filmtone Desktop
 
-Film Lab Desktop は、Film Lab の **macOS 向けローカル書き出しアプリ**です。写真フォルダの一括処理と、動画 1 本の MP4 書き出しを Desktop 上で行います。
+Filmtone Desktop は、Filmtone の **macOS 向けローカル書き出しアプリ**です。写真フォルダの一括処理と、動画 1 本の MP4 書き出しを Desktop 上で行います。
 
 ## 公開版の固定事項
 
@@ -9,8 +9,8 @@ Film Lab Desktop は、Film Lab の **macOS 向けローカル書き出しアプ
 - **最小 macOS:** `11.0+`
 - **対応アーキ:** Apple Silicon (`arm64`) のみ
 - **正規配布物:** 署名・公証済み `DMG`
-- **更新方針:** 当面は手動更新（ダウンロードページ / release notes で差し替え）
-- **窓口（Film Lab Desktop）:** `chiba@fores-tone.co.jp`
+- **更新方針:** バックグラウンドでの自動インストールはありません。**差し替えは常に DMG 手動取得**（ダウンロードページ / release notes）。起動後・24 時間ごとに、公開 JSON へ問い合わせて**新しい版の通知**だけ出すことがあります（`FILM_LAB_DESKTOP_UPDATE_CHECK_URL` がビルドに埋め込まれているときのみ）。
+- **窓口（Filmtone Desktop）:** `chiba@fores-tone.co.jp`
 
 > `https://www.chibatakumi.studio/film-lab/download` は固定導線です。公開アセットが接続されているときは現行ビルドへリダイレクトし、未公開時は案内ページを表示します。
 
@@ -30,6 +30,7 @@ Film Lab Desktop は、Film Lab の **macOS 向けローカル書き出しアプ
 - `bun run release:staple` - 公証済みの **`release/mac-arm64/<製品名>.app`** に staple / validate（DMG ではなく .app 向け）。
 - `bun run release:checksums` - `release/SHA256SUMS.txt` を生成します。
 - `bun run release:upload-blob` - `release/film-lab-<version>-arm64.dmg` を **Vercel Blob** に載せます（要 `BLOB_READ_WRITE_TOKEN`）。`-- --sync-vercel-env` で `FILM_LAB_DESKTOP_DOWNLOAD_URL` を production に同期。
+- `bun run release:upload-update-meta` - 更新案内用の **`update-meta.json`**（固定 pathname）を Blob に載せます。`-- --sync-vercel-env` で `FILM_LAB_DESKTOP_UPDATE_CHECK_URL` を production に同期。任意で `--download-page` / `--release-notes-url`。その後 **`FILM_LAB_DESKTOP_UPDATE_CHECK_URL` を付けて `bun run build`** すると、パッケージにチェック用 URL が埋め込まれます（`scripts/build-electron.mjs` の define）。
 
 ### リリース・公証（コピペは短縮ガイドのみ）
 
@@ -44,7 +45,7 @@ Film Lab Desktop は、Film Lab の **macOS 向けローカル書き出しアプ
 ## 「dev」という言葉について
 
 - `bff:local` は **自分の Mac 上で BFF を一時起動する**ための一般的な名前です。Web を優先する意味ではありません。
-- Film Lab Desktop の入口は **`bun run desktop`** です。ローカルでは Vite がレンダラ更新用 URL を立て、Electron の環境変数 `FILM_LAB_DESKTOP_RENDERER_URL` でその URL を開きます。
+- Filmtone Desktop の入口は **`bun run desktop`** です。ローカルでは Vite がレンダラ更新用 URL を立て、Electron の環境変数 `FILM_LAB_DESKTOP_RENDERER_URL` でその URL を開きます。
 - `dev` はスクリプト互換のために **`desktop` のエイリアス**として残しています。
 
 ## いちばん手短（開発用 BFF も一緒に起動）

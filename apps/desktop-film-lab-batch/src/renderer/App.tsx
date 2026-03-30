@@ -65,6 +65,7 @@ import {
   BatchTabPanel,
   type BatchJobMode,
 } from "./batch-tab/BatchTabPanel";
+import type { DesktopUpdateAvailablePayload } from "./desktop-api";
 
 type TabId = "edit" | "batch";
 
@@ -235,6 +236,31 @@ export default function App() {
   const [editToExportSyncedAtMs, setEditToExportSyncedAtMs] = useState<
     number | null
   >(null);
+
+  /**
+   * @description main が公開 JSON を読んで送る「新しい版があります」バナー（案 C）
+   */
+  const [desktopUpdateBanner, setDesktopUpdateBanner] =
+    useState<DesktopUpdateAvailablePayload | null>(null);
+
+  /**
+   * @description 更新通知の購読。アンマウント時に解除する。
+   */
+  useEffect(() => {
+    const unsubscribe = window.filmLabBatch.subscribeDesktopUpdateAvailable(
+      (payload) => {
+        setDesktopUpdateBanner(payload);
+      },
+    );
+    return unsubscribe;
+  }, []);
+
+  /**
+   * @description 写真バッチ／動画書き出し中は main 側で通知をキューに残す
+   */
+  useEffect(() => {
+    void window.filmLabBatch.setExportBusyForUpdateCheck(running);
+  }, [running]);
 
   /**
    * @description 高速 ffmpeg が無効なビルドでは常に WebGL のみ（フラグと UI の状態を矛盾させない）
@@ -979,7 +1005,7 @@ export default function App() {
   return (
     <div className="film-lab-desktop-root flex min-h-screen flex-col">
       <header className="fl-app-header fl-surface-frost">
-        <span className="fl-app-title">Film Lab</span>
+        <span className="fl-app-title">Filmtone</span>
         <span className="fl-app-subtitle">{tApp("subtitle")}</span>
         <div className="fl-tabs ml-auto">
           <button
@@ -1009,6 +1035,56 @@ export default function App() {
           aria-live="polite"
         >
           {gradeSyncNotice}
+        </div>
+      ) : null}
+
+      {desktopUpdateBanner ? (
+        <div
+          className="border-b border-[var(--amber-9)] bg-[var(--fl-bg-subtle)] px-4 py-3 text-xs leading-snug text-[var(--fl-text-primary)] shadow-[inset_0_2px_0_0_var(--amber-9)]"
+          role="alert"
+        >
+          <p className="mb-2">
+            {tApp("updateBannerBody", {
+              version: desktopUpdateBanner.latestVersion,
+            })}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="fl-btn-primary text-xs"
+              onClick={() => {
+                void window.filmLabBatch.openExternalUrl(
+                  desktopUpdateBanner.downloadPageUrl,
+                );
+              }}
+            >
+              {tApp("updateBannerOpen")}
+            </button>
+            {desktopUpdateBanner.releaseNotesUrl ? (
+              <button
+                type="button"
+                className="fl-btn-secondary text-xs"
+                onClick={() => {
+                  void window.filmLabBatch.openExternalUrl(
+                    desktopUpdateBanner.releaseNotesUrl!,
+                  );
+                }}
+              >
+                {tApp("updateBannerNotes")}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="fl-btn-secondary text-xs"
+              onClick={() => {
+                const v = desktopUpdateBanner.latestVersion;
+                void window.filmLabBatch.dismissDesktopUpdate(v);
+                setDesktopUpdateBanner(null);
+              }}
+            >
+              {tApp("updateBannerLater")}
+            </button>
+          </div>
         </div>
       ) : null}
 

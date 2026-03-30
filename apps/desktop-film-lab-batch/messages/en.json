@@ -6,25 +6,25 @@
       "savePng": "Save PNG"
     },
     "canvas": {
-      "webgl2Required": "WebGL2 is required for Film Lab",
+      "webgl2Required": "WebGL2 is required for Filmtone",
       "dropHint": "Drop image, video, or .cube LUT",
       "loadingMedia": "Loading media…",
       "dismissError": "OK"
     },
     "back": "← Back to Interactive",
     "metadata": {
-      "title": "Film Lab",
+      "title": "Filmtone",
       "description": "A real-time color grading tool in the browser. Drop images or videos, then adjust exposure, contrast, and LUT with GPU fragment shaders.",
-      "ogTitle": "Film Lab — Browser Color Grading Tool",
+      "ogTitle": "Filmtone — Browser Color Grading Tool",
       "ogDescription": "Drop an image or video and grade it in real-time. Exposure, contrast, LUT, and film presets powered by WebGL2 GPU shaders.",
-      "ogImageAlt": "Film Lab Color Grading Tool"
+      "ogImageAlt": "Filmtone Color Grading Tool"
     },
     "share": {
       "sectionTitle": "Share",
       "copyLink": "Copy look link",
       "copied": "Copied!",
       "postToX": "Post to X",
-      "postText": "Try this grade in Film Lab — browser color grading"
+      "postText": "Try this grade in Filmtone — browser color grading"
     },
     "browser": {
       "sectionTitle": "This browser",
@@ -100,18 +100,18 @@
     },
     "donation": {
       "footer": {
-        "shortLine": "Film Lab stays free. Optional support helps fund improvements and hosting.",
+        "shortLine": "Filmtone stays free. Optional support helps fund improvements and hosting.",
         "linkStripe": "Support via Stripe",
         "linkStripeAmount": "Stripe · {amountUsd} USD",
         "linkBmc": "Tip on Buy Me a Coffee",
-        "ariaSupportSection": "Optional ways to support Film Lab. Skipping does not limit features.",
+        "ariaSupportSection": "Optional ways to support Filmtone. Skipping does not limit features.",
         "ariaOpenStripe": "Open Stripe checkout for optional support in a new tab",
         "ariaOpenStripeTier": "Open Stripe checkout for {amountUsd} USD optional support in a new tab",
         "ariaOpenBmc": "Open Buy Me a Coffee in a new tab"
       },
       "preset_save_modal": {
         "title": "Saved to this browser",
-        "body": "Film Lab remains free to use. If you’d like, optional support through Stripe or Buy Me a Coffee helps us keep improving. Skipping is fine—nothing changes for you.",
+        "body": "Filmtone remains free to use. If you’d like, optional support through Stripe or Buy Me a Coffee helps us keep improving. Skipping is fine—nothing changes for you.",
         "primaryStripe": "Support via Stripe (optional)",
         "stripeTierLabel": "Support {amountUsd} USD (optional)",
         "secondaryBmc": "Tip on Buy Me a Coffee",
@@ -132,18 +132,18 @@
         "dismiss": "Got it"
       },
       "thanks_page": {
-        "meta_title": "Thank you — Film Lab",
-        "meta_description": "Thank you for optionally supporting Film Lab.",
+        "meta_title": "Thank you — Filmtone",
+        "meta_description": "Thank you for optionally supporting Filmtone.",
         "title": "Thank you",
-        "body": "Your support helps us keep improving and running Film Lab. It stays free to use.",
-        "returnCta": "Back to Film Lab",
+        "body": "Your support helps us keep improving and running Filmtone. It stays free to use.",
+        "returnCta": "Back to Filmtone",
         "returnHint": "If this page URL includes a checkout session ID, we can verify on the server before you return, for softer prompts. Otherwise you can still use the browser-only acknowledgement flow.",
         "verifyPending": "Confirming your checkout…",
-        "verifyFailed": "We couldn’t verify automatically. You can still continue to Film Lab (prompts may stay in the default mode)."
+        "verifyFailed": "We couldn’t verify automatically. You can still continue to Filmtone (prompts may stay in the default mode)."
       },
       "supporter": {
-        "footer_shortLine": "Thank you for your support. Enjoy Film Lab.",
-        "preset_save_modal_body": "Saved to this browser. If you’ve already supported us, thank you again. Film Lab remains free to use."
+        "footer_shortLine": "Thank you for your support. Enjoy Filmtone.",
+        "preset_save_modal_body": "Saved to this browser. If you’ve already supported us, thank you again. Filmtone remains free to use."
       },
       "legal_footer_short": "Not tax advice. Third-party checkout. Ask your advisor."
     },
@@ -209,7 +209,7 @@
         "presetWhenOpenLabel": "Look when opened (preset)",
         "rgbHistogram": "RGB histogram",
         "openParamsPanelAria": "Open parameters panel",
-        "paramsPanelAria": "Film Lab parameters",
+        "paramsPanelAria": "Filmtone parameters",
         "closeParamsPanelAria": "Close parameters panel",
         "sendGradeToExport": "Send grade to Export",
         "sendGradeCaption": "Sends slider values only to the Export tab. LUT via JSON, etc.",
@@ -218,7 +218,11 @@
         "syncGradeOk": "Applied to Export (copied slider values). Check the Look step on the Export tab.",
         "syncGradeNoViewport": "Preview isn’t ready yet. Open a photo or video, wait a moment, and try again.",
         "syncGradeError": "Could not apply to Export: {msg}",
-        "logPlaceholder": "Logs appear here."
+        "logPlaceholder": "Logs appear here.",
+        "updateBannerBody": "A newer build (v{version}) is available. The app does not auto-install updates in the background — download the DMG from the download page and replace the app.",
+        "updateBannerOpen": "Open download page",
+        "updateBannerNotes": "Release notes",
+        "updateBannerLater": "Later"
       },
       "batch": {
         "steps": {
@@ -228,7 +232,7 @@
           "output": "Destination & format",
           "run": "Run"
         },
-        "tipExportTabIntro": "Photos in a folder can be saved in bulk to another folder with your Film Lab look. You can also export one video as MP4 with the same look. After adjusting sliders on Edit, use “Send grade to Export” (bottom right) to copy values here. LUTs are separate (e.g. load JSON).",
+        "tipExportTabIntro": "Photos in a folder can be saved in bulk to another folder with your Filmtone look. You can also export one video as MP4 with the same look. After adjusting sliders on Edit, use “Send grade to Export” (bottom right) to copy values here. LUTs are separate (e.g. load JSON).",
         "tipJobImages": "Every .jpg / .jpeg / .png in the chosen folder gets this look, saved as JPEG or PNG to another folder.",
         "tipJobVideoFastOption": "Default is preview-matching WebGL (slow). Uncheck under Destination & format for fast one-pass ffmpeg (approximate). .cube LUT is preferred; Params are approximated on the ffmpeg path — lutIntensity, bloom, halation, and split-tone details may not match. ffmpeg and ffprobe must be on PATH.",
         "tipJobVideoWebGlOnly": "Exports one video as MP4 with a look close to the Edit tab, grading frame by frame. Long clips can take a while to finish. ffmpeg and ffprobe must be on PATH.",

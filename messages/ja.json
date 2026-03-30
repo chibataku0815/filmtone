@@ -239,8 +239,8 @@
       "credit": "Inspired by Codrops WebGL Distortion Hover Effects"
     },
     "film-lab": {
-      "title": "Film Lab",
-      "description": "Film Lab のブラウザ体験です。お手持ちの写真や動画を開き、プリセットを起点にフィルム調のルックを試せます。フォルダに溜まった枚数のまとめ置きは macOS の Film Lab アプリをご利用ください。",
+      "title": "Filmtone",
+      "description": "Filmtone のブラウザ体験です。お手持ちの写真や動画を開き、プリセットを起点にフィルム調のルックを試せます。フォルダに溜まった枚数のまとめ置きは macOS の Filmtone アプリをご利用ください。",
       "sampleHint": "表示中はデモ用のサンプルです。お手持ちの写真や動画をドロップすると、その素材でそのまま試せます。",
       "openFullApp": "フルアプリを開く"
     }
@@ -248,9 +248,9 @@
   "film-lab": {
     "sampleHint": "表示中はデモ用のサンプルです。お手持ちの写真や動画をドロップすると、その素材でそのまま試せます。",
     "lp": {
-      "heroEyebrow": "Film Lab",
+      "heroEyebrow": "Filmtone",
       "heroTitle": "プリセットから、写真をフィルム調の見た目にすばやくそろえられる。",
-      "heroBody": "たくさんの静止画や短いクリップを、重い編集ソフトを開く前に、プリセットを起点にフィルムっぽいトーンへそろえたい写真表現・小規模制作向けです。同じルックのまとめ置きや繰り返しの書き出しは macOS の Film Lab が主な作業場。まずはこのページのブラウザで、自分の素材の雰囲気を確かめられます。",
+      "heroBody": "たくさんの静止画や短いクリップを、重い編集ソフトを開く前に、プリセットを起点にフィルムっぽいトーンへそろえたい写真表現・小規模制作向けです。同じルックのまとめ置きや繰り返しの書き出しは macOS の Filmtone が主な作業場。まずはこのページのブラウザで、自分の素材の雰囲気を確かめられます。",
       "heroPrimaryCta": "macOS 版をダウンロード",
       "heroSecondaryLine": "Apple Silicon · macOS {minMacos} 以降 — 詳細はダウンロードページ。",
       "proofTeaserLine": "まずはこの下のブラウザで自分の一枚の雰囲気を試し、同じトーンをたくさんの写真へ広げたいときは macOS 版をご利用ください。",
@@ -273,7 +273,7 @@
       "faqQwebVsDesktop": "この Web ページとデスクトップ版の違いは？",
       "faqAwebVsDesktop": "フォルダ単位での仕上げや保存の中心は macOS アプリです。このページのブラウザは、自分の素材でルックの雰囲気を試したり共有したりする入口です。タイムライン編集や厳密な色管理まで含む総合ソフトの代替ではありません。",
       "faqQsmartLookDesktop": "スマートルック（AI）はデスクトップ版に入っていますか？",
-      "faqAsmartLookDesktop": "いいえ。現行の Film Lab Desktop にはスマートルックは含まれません。どの機能がどの版に入っているかは、それぞれの製品面とリリースノートを参照してください。",
+      "faqAsmartLookDesktop": "いいえ。現行の Filmtone Desktop にはスマートルックは含まれません。どの機能がどの版に入っているかは、それぞれの製品面とリリースノートを参照してください。",
       "faqQupdates": "アップデートの仕組みは？",
       "faqAupdates": "新しい版が必要なときはダウンロードページから DMG を取り直してください。バックグラウンドでの自動インストールはしません。",
       "faqQlimitations": "既知の制限はどこに書いてありますか？",
@@ -297,6 +297,7 @@
       "premiumCard4Title": "公開する情報",
       "premiumCard4Body": "動作環境や書き出しの注意は、ダウンロードページとリリースノートで追いかけられます。",
       "premiumCtaTryDemo": "ブラウザで試す",
+      "premiumMediaProofNote": "現在の graded export から切り出した仮 proof video です。",
       "premiumMediaPlaceholder": "実画面キャプチャ — 差し替え前のプレースホルダです。"
     },
     "toolbar": {
@@ -304,25 +305,25 @@
       "savePng": "PNGを保存"
     },
     "canvas": {
-      "webgl2Required": "Film Lab を使うには WebGL2 が必要です",
+      "webgl2Required": "Filmtone を使うには WebGL2 が必要です",
       "dropHint": "画像・動画・.cube LUT をドロップ",
       "loadingMedia": "読み込み中…",
       "dismissError": "OK"
     },
     "back": "← Interactive に戻る",
     "metadata": {
-      "title": "Film Lab",
+      "title": "Filmtone",
       "description": "プリセット起点で写真や短い動画をフィルム調にそろえられる macOS アプリ。大量の静止画のまとめ置きに向いています。このサイトには、自分の素材で雰囲気を試せるブラウザ体験もあります。",
-      "ogTitle": "Film Lab — プリセットでそろえるフィルム調ルック",
+      "ogTitle": "Filmtone — プリセットでそろえるフィルム調ルック",
       "ogDescription": "重い編集ソフトの前に、プリセットからフィルムっぽい見た目へ。macOS でフォルダ処理、ブラウザで試し見え。",
-      "ogImageAlt": "Film Lab — 写真向けのフィルム調ルック"
+      "ogImageAlt": "Filmtone — 写真向けのフィルム調ルック"
     },
     "share": {
       "sectionTitle": "共有",
       "copyLink": "ルックのリンクをコピー",
       "copied": "コピーしました",
       "postToX": "X に投稿",
-      "postText": "Film Lab でこのルックを試せます（ブラウザでカラグレ）"
+      "postText": "Filmtone でこのルックを試せます（ブラウザでカラグレ）"
     },
     "browser": {
       "sectionTitle": "このブラウザに保存",
@@ -398,18 +399,18 @@
     },
     "donation": {
       "footer": {
-        "shortLine": "Film Lab は基本無料です。よろしければ、改善やサーバー費用への任意のご支援をお願いしています。",
+        "shortLine": "Filmtone は基本無料です。よろしければ、改善やサーバー費用への任意のご支援をお願いしています。",
         "linkStripe": "Stripe で支援（任意）",
         "linkStripeAmount": "Stripe · {amountUsd} USD",
         "linkBmc": "Buy Me a Coffee で支援",
-        "ariaSupportSection": "Film Lab への任意の支援です。スキップしても機能に影響しません。",
+        "ariaSupportSection": "Filmtone への任意の支援です。スキップしても機能に影響しません。",
         "ariaOpenStripe": "任意の支援のため Stripe の決済ページを新しいタブで開きます",
         "ariaOpenStripeTier": "{amountUsd} USD の任意支援のため Stripe を新しいタブで開きます",
         "ariaOpenBmc": "Buy Me a Coffee を新しいタブで開きます"
       },
       "preset_save_modal": {
         "title": "このブラウザに保存しました",
-        "body": "Film Lab は引き続き無料でご利用いただけます。よろしければ Stripe または Buy Me a Coffee から任意でご支援いただけると助かります。閉じていただいてもそのままお使いいただけます。",
+        "body": "Filmtone は引き続き無料でご利用いただけます。よろしければ Stripe または Buy Me a Coffee から任意でご支援いただけると助かります。閉じていただいてもそのままお使いいただけます。",
         "primaryStripe": "Stripe で支援（任意）",
         "stripeTierLabel": "{amountUsd} USD で支援（任意）",
         "secondaryBmc": "Buy Me a Coffee で支援",
@@ -430,18 +431,18 @@
         "dismiss": "了解"
       },
       "thanks_page": {
-        "meta_title": "ご支援ありがとうございます — Film Lab",
-        "meta_description": "Film Lab への任意のご支援へのお礼です。",
+        "meta_title": "ご支援ありがとうございます — Filmtone",
+        "meta_description": "Filmtone への任意のご支援へのお礼です。",
         "title": "ご支援ありがとうございます",
-        "body": "改善と運用の維持にとても助かります。Film Lab は引き続き無料でお使いいただけます。",
-        "returnCta": "Film Lab に戻る",
-        "returnHint": "支払い後のリンクにセッション ID がある場合、サーバで確認してから Film Lab へ進むと案内が控えめになります。ない場合は従来どおり「このブラウザに限定」の案内抑止が使えます。",
+        "body": "改善と運用の維持にとても助かります。Filmtone は引き続き無料でお使いいただけます。",
+        "returnCta": "Filmtone に戻る",
+        "returnHint": "支払い後のリンクにセッション ID がある場合、サーバで確認してから Filmtone へ進むと案内が控えめになります。ない場合は従来どおり「このブラウザに限定」の案内抑止が使えます。",
         "verifyPending": "決済情報を確認しています…",
-        "verifyFailed": "自動確認に失敗しました。以下から進んでも Film Lab はお使いいただけます（案内抑止は別の方法で行われます）。"
+        "verifyFailed": "自動確認に失敗しました。以下から進んでも Filmtone はお使いいただけます（案内抑止は別の方法で行われます）。"
       },
       "supporter": {
-        "footer_shortLine": "ご支援ありがとうございます。Film Lab を引き続きお楽しみください。",
-        "preset_save_modal_body": "このブラウザに保存しました。すでにご支援いただいている場合、改めてお礼申し上げます。Film Lab は引き続き無料でご利用いただけます。"
+        "footer_shortLine": "ご支援ありがとうございます。Filmtone を引き続きお楽しみください。",
+        "preset_save_modal_body": "このブラウザに保存しました。すでにご支援いただいている場合、改めてお礼申し上げます。Filmtone は引き続き無料でご利用いただけます。"
       },
       "legal_footer_short": "税務上の助言ではありません。決済は外部サービスです。詳細は専門家にご確認ください。"
     },
@@ -500,7 +501,7 @@
     },
     "desktopRelease": {
       "eyebrow": "Desktop",
-      "title": "Film Lab Desktop（macOS）",
+      "title": "Filmtone Desktop（macOS）",
       "body": "フォルダ内の写真の一括処理と、動画 1 本の書き出しができます。ダウンロードは公証済みの DMG（Apple Silicon 向け）です。",
       "essentials": {
         "environmentLabel": "動作環境",
@@ -513,9 +514,9 @@
       "downloadPage": {
         "eyebrow": "ダウンロード",
         "title": "配布ファイルの準備中です",
-        "body": "環境変数に DMG の URL が入ると、このページから自動で飛びます。お急ぎの場合は Film Lab ページのお問い合わせからどうぞ。",
+        "body": "環境変数に DMG の URL が入ると、このページから自動で飛びます。お急ぎの場合は Filmtone ページのお問い合わせからどうぞ。",
         "pendingLead": "いまはリダイレクト先が未設定です（URL を接続すると解消します）。",
-        "backCta": "Film Lab に戻る",
+        "backCta": "Filmtone に戻る",
         "supportCtaPrefix": "お問い合わせ:",
         "specs": {
           "environmentLabel": "動作環境",
@@ -534,7 +535,7 @@
         "presetWhenOpenLabel": "開いたときのルック（プリセット）",
         "rgbHistogram": "RGB ヒストグラム",
         "openParamsPanelAria": "パラメータパネルを開く",
-        "paramsPanelAria": "Film Lab パラメータ",
+        "paramsPanelAria": "Filmtone パラメータ",
         "closeParamsPanelAria": "パラメータパネルを閉じる",
         "sendGradeToExport": "色を書き出しへ送る",
         "sendGradeCaption": "スライダーの数値だけ書き出しタブへ送ります。LUT は JSON などで。",
@@ -550,7 +551,7 @@
           "output": "保存先と形式",
           "run": "実行"
         },
-        "tipExportTabIntro": "パソコン上のフォルダに入っている写真を、Film Lab で整えた見え方のまま別フォルダへまとめて保存できます。動画を1本、同じ見え方でMP4にすることもできます。編集タブでスライダーを触ったあと、編集タブ右下の「色を書き出しへ送る」で数値をこちらに送れます。LUT（ルックアップテーブル）はJSONの読み込みなどで別途。",
+        "tipExportTabIntro": "パソコン上のフォルダに入っている写真を、Filmtone で整えた見え方のまま別フォルダへまとめて保存できます。動画を1本、同じ見え方でMP4にすることもできます。編集タブでスライダーを触ったあと、編集タブ右下の「色を書き出しへ送る」で数値をこちらに送れます。LUT（ルックアップテーブル）はJSONの読み込みなどで別途。",
         "tipJobImages": "選んだフォルダにある .jpg / .jpeg / .png すべてに、いまのルックを載せて JPEG か PNG で別フォルダに保存します。",
         "tipJobVideoFastOption": "既定は高速 ffmpeg（1 パス・近似）。プレビューと揃えたいときだけ手順内で WebGL 逐次をオンにします。.cube LUT を優先し、Params は ffmpeg 近似、lutIntensity / bloom / halation / split tone 細部は一致しません。PATH に ffmpeg / ffprobe が必要です。",
         "tipJobVideoWebGlOnly": "いまはプレビューに近い見え方で書き出す WebGL 逐次のみ（時間がかかります）。高速 ffmpeg 1 パスは製品準備中のため UI から隠しています。PATH に ffmpeg / ffprobe が必要です。",
@@ -584,7 +585,7 @@
         "videoOutputDirUnset": "未設定（実行時にダイアログ）",
         "lookSectionLead": "保存するときにかかるルック（色味）を決める",
         "presetQuickLabel": "プリセット（クイック）",
-        "presetSelectAria": "書き出しに使う Film Lab プリセット",
+        "presetSelectAria": "書き出しに使う Filmtone プリセット",
         "applyEditToExportBtn": "編集のスライダーを書き出しに反映",
         "applyEditWaitHint": "編集タブを開き、画像のプレビューが表示されるまでお待ちください",
         "applyEditHintAria": "編集の数値を書き出しにコピーする説明",
@@ -708,11 +709,11 @@
       }
     },
     "jsonLd": {
-      "desktopName": "Film Lab Desktop",
+      "desktopName": "Filmtone Desktop",
       "desktopDescription": "写真向けの macOS アプリ。プリセットを起点にフィルム調のルックを決め、フォルダ内の JPEG/PNG をまとめて処理できます。短い動画 1 本を同じ見え方で書き出す用途も想定。Apple Silicon 向け。条件や制限はダウンロードページ参照。",
       "desktopOperatingSystem": "macOS 11.0 以降（Apple Silicon / arm64）",
-      "webDemoName": "Film Lab（ブラウザで試す）",
-      "webDemoDescription": "サイト上で、自分の写真や動画を開いてプリセットからルックを試せる体験です。フォルダ単位のまとめ処理は Film Lab Desktop が主な場所です。",
+      "webDemoName": "Filmtone（ブラウザで試す）",
+      "webDemoDescription": "サイト上で、自分の写真や動画を開いてプリセットからルックを試せる体験です。フォルダ単位のまとめ処理は Filmtone Desktop が主な場所です。",
       "webDemoOperatingSystem": "インタラクティブ表示に対応した一般的なブラウザ",
       "webDemoBrowserRequirements": "一般的なブラウザで利用可能（WebGL2 が有効な環境）"
     }
