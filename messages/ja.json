@@ -454,7 +454,7 @@
         "environmentLabel": "動作環境",
         "environmentBody": "macOS {minMacos} 以降。{arch} のみ。Intel Mac は非対応です。",
         "distributionLabel": "配布・更新",
-        "distributionBody": "署名・公証済み DMG。更新は当面、新しい DMG を入れ替える形です（自動アップデートなし）。"
+        "distributionBody": "署名・公証済み DMG。当面の更新は、新しい DMG を入れ替える方式です。自動更新はありません。"
       },
       "downloadCta": "ダウンロード（DMG）",
       "supportCtaPrefix": "お問い合わせ:",
@@ -469,7 +469,7 @@
           "environmentLabel": "動作環境",
           "environmentBody": "macOS {minMacos} 以降。{arch} のみ。",
           "distributionLabel": "配布・更新",
-          "distributionBody": "署名・公証済み DMG。自動アップデートはありません。"
+          "distributionBody": "署名・公証済み DMG。自動更新はありません（当面は DMG の差し替え）。"
         }
       }
     },
