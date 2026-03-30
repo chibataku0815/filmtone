@@ -240,13 +240,65 @@
     },
     "film-lab": {
       "title": "Film Lab",
-      "description": "ブラウザで動くリアルタイムカラーグレーディング。クイックでは3本のメタスライダー（フィルム調・新旧・ダイナミック）とプリセットで粗く決め、フルページではプロモードで露出・Bloom・Halation・LUTまで細かく調整できます。GPUシェーダー実装。",
+      "description": "Film Lab のブラウザ体験です。お手持ちの写真や動画を開き、プリセットを起点にフィルム調のルックを試せます。フォルダに溜まった枚数のまとめ置きは macOS の Film Lab アプリをご利用ください。",
       "sampleHint": "表示中はデモ用のサンプルです。お手持ちの写真や動画をドロップすると、その素材でそのまま試せます。",
       "openFullApp": "フルアプリを開く"
     }
   },
   "film-lab": {
     "sampleHint": "表示中はデモ用のサンプルです。お手持ちの写真や動画をドロップすると、その素材でそのまま試せます。",
+    "lp": {
+      "heroEyebrow": "Film Lab",
+      "heroTitle": "プリセットから、写真をフィルム調の見た目にすばやくそろえられる。",
+      "heroBody": "たくさんの静止画や短いクリップを、重い編集ソフトを開く前に、プリセットを起点にフィルムっぽいトーンへそろえたい写真表現・小規模制作向けです。同じルックのまとめ置きや繰り返しの書き出しは macOS の Film Lab が主な作業場。まずはこのページのブラウザで、自分の素材の雰囲気を確かめられます。",
+      "heroPrimaryCta": "macOS 版をダウンロード",
+      "heroSecondaryLine": "Apple Silicon · macOS {minMacos} 以降 — 詳細はダウンロードページ。",
+      "proofTeaserLine": "まずはこの下のブラウザで自分の一枚の雰囲気を試し、同じトーンをたくさんの写真へ広げたいときは macOS 版をご利用ください。",
+      "expandAuxiliaryPanelsTitle": "さらに表示: 細かい調整・LUT・比較・ヒストグラム・保存など",
+      "expandAuxiliaryPanelsHint": "プリセットとかんたんスライダーだけで足りる場合は、開かなくて大丈夫です。",
+      "valueTitle": "macOS でトーンを揃えやすい理由",
+      "valueBullet1": "決めたルックを、たくさんの写真へ同じ空気感で伸ばしやすい導線になっています。",
+      "valueBullet2": "フォルダに入った写真をまとめて処理し、別フォルダに揃えて保存できます。短い動画 1 本も、同じ見え方に寄せられます。",
+      "valueBullet3": "このページではまず雰囲気を試せます。納品前に何度も仕上げを整えたい作業は、macOS アプリ側を想定しています。",
+      "workflowTitle": "デスクトップ版で想定しているワークフロー",
+      "workflowLead": "同じトーンを多くのファイルへ広げたいときの、ざっくりした流れです。",
+      "workflowBullet1": "写真が入ったフォルダと保存先を選び、同じルックでまとめて書き出し。",
+      "workflowBullet2": "枚数が多くても、どこまで終わったかが分かりやすい想定です。",
+      "workflowBullet3": "細かな注意はダウンロードページとリリースノートにまとめています。",
+      "demoEyebrow": "自分の素材で試す（ブラウザ）",
+      "demoTitle": "ブラウザでルックを確かめる",
+      "demoBody": "プリセットとかんたんなスライダーから試せます。さらに細かく触りたいときだけ、パネル内の「さらに表示」を開いてください。フォルダ全体を同じトーンに揃える作業は、ページ上部の macOS 版ダウンロードへ。",
+      "trustHeading": "配布の詳細・サポート",
+      "faqTitle": "よくある質問",
+      "faqQwebVsDesktop": "この Web ページとデスクトップ版の違いは？",
+      "faqAwebVsDesktop": "フォルダ単位での仕上げや保存の中心は macOS アプリです。このページのブラウザは、自分の素材でルックの雰囲気を試したり共有したりする入口です。タイムライン編集や厳密な色管理まで含む総合ソフトの代替ではありません。",
+      "faqQsmartLookDesktop": "スマートルック（AI）はデスクトップ版に入っていますか？",
+      "faqAsmartLookDesktop": "いいえ。現行の Film Lab Desktop にはスマートルックは含まれません。どの機能がどの版に入っているかは、それぞれの製品面とリリースノートを参照してください。",
+      "faqQupdates": "アップデートの仕組みは？",
+      "faqAupdates": "新しい版が必要なときはダウンロードページから DMG を取り直してください。バックグラウンドでの自動インストールはしません。",
+      "faqQlimitations": "既知の制限はどこに書いてありますか？",
+      "faqAlimitations": "動作環境・LUT まわり・動画書き出しの注意などはダウンロードページとデスクトップのリリースノートを正としてください。",
+      "premiumHeroBadgeNew": "Desktop",
+      "premiumHeroBadgeLine": "macOS でフォルダ単位の処理が主線 — 先にブラウザでルックを試せます。",
+      "premiumCapabilitiesEyebrow": "できること",
+      "premiumCapabilitiesTitle": "一度決めたルックを、枚数へ広げる。",
+      "premiumFeature1Title": "一度グレードして、大量に適用。",
+      "premiumFeature1Body": "デスクトップでプリセット主導のルックを決め、スライダー値を書き出しへ。静止画フォルダと、同じ見え方の動画 1 本まで。",
+      "premiumFeature2Title": "入る前に、ブラウザで触れる。",
+      "premiumFeature2Body": "このページのブラウザでプリセットを起点に試せます。フォルダをまたぐ作業や繰り返しの書き出しは macOS アプリが主なラインです。",
+      "premiumGridEyebrow": "デスクトップを選ぶ理由",
+      "premiumGridTitle": "納品前に、見た目のトーンを揃えたいときに。",
+      "premiumCard1Title": "バッチ優先",
+      "premiumCard1Body": "JPEG/PNG のフォルダをキューし、出力先を決めて進捗が見える流れ。",
+      "premiumCard2Title": "プリセット主導のルック",
+      "premiumCard2Body": "フィルム系プリセットから入り、必要ならトーンや質感を細かく足していけます。",
+      "premiumCard3Title": "ブラウザで試す入口",
+      "premiumCard3Body": "共有しやすいこのページから、ルックの雰囲気を掴む補助導線です。",
+      "premiumCard4Title": "公開する情報",
+      "premiumCard4Body": "動作環境や書き出しの注意は、ダウンロードページとリリースノートで追いかけられます。",
+      "premiumCtaTryDemo": "ブラウザで試す",
+      "premiumMediaPlaceholder": "実画面キャプチャ — 差し替え前のプレースホルダです。"
+    },
     "toolbar": {
       "open": "メディアを開く",
       "savePng": "PNGを保存"
@@ -260,10 +312,10 @@
     "back": "← Interactive に戻る",
     "metadata": {
       "title": "Film Lab",
-      "description": "ブラウザで動くリアルタイムカラーグレーディング。クイックは3本のメタ調整＋プリセット、プロで露出・Bloom・Halation・LUTなどをGPUシェーダーで適用。",
-      "ogTitle": "Film Lab — ブラウザで動くカラーグレーディングツール",
-      "ogDescription": "画像や動画をドロップしてルックを作成。クイックの3本でまとめ調整、プロで細部。プリセット・LUT・WebGL2。",
-      "ogImageAlt": "Film Lab カラーグレーディングツール"
+      "description": "プリセット起点で写真や短い動画をフィルム調にそろえられる macOS アプリ。大量の静止画のまとめ置きに向いています。このサイトには、自分の素材で雰囲気を試せるブラウザ体験もあります。",
+      "ogTitle": "Film Lab — プリセットでそろえるフィルム調ルック",
+      "ogDescription": "重い編集ソフトの前に、プリセットからフィルムっぽい見た目へ。macOS でフォルダ処理、ブラウザで試し見え。",
+      "ogImageAlt": "Film Lab — 写真向けのフィルム調ルック"
     },
     "share": {
       "sectionTitle": "共有",
@@ -454,7 +506,7 @@
         "environmentLabel": "動作環境",
         "environmentBody": "macOS {minMacos} 以降。{arch} のみ。Intel Mac は非対応です。",
         "distributionLabel": "配布・更新",
-        "distributionBody": "署名・公証済み DMG。当面の更新は、新しい DMG を入れ替える方式です。自動更新はありません。"
+        "distributionBody": "署名・公証済み DMG。バックグラウンドでの自動インストールはありません。新しい版はダウンロードページから DMG を取得して差し替えてください。アプリが新しい版を知らせることがあります（接続が必要です）。"
       },
       "downloadCta": "ダウンロード（DMG）",
       "supportCtaPrefix": "お問い合わせ:",
@@ -469,7 +521,7 @@
           "environmentLabel": "動作環境",
           "environmentBody": "macOS {minMacos} 以降。{arch} のみ。",
           "distributionLabel": "配布・更新",
-          "distributionBody": "署名・公証済み DMG。自動更新はありません（当面は DMG の差し替え）。"
+          "distributionBody": "署名・公証済み DMG。自動インストールはありません。DMG の差し替えで更新します。アプリが新しい版を知らせることがあります。"
         }
       }
     },
@@ -654,6 +706,15 @@
         "videoPipelineAborted": "中断されました",
         "videoPipelineFfmpegFailed": "ffmpeg 失敗 code={code}"
       }
+    },
+    "jsonLd": {
+      "desktopName": "Film Lab Desktop",
+      "desktopDescription": "写真向けの macOS アプリ。プリセットを起点にフィルム調のルックを決め、フォルダ内の JPEG/PNG をまとめて処理できます。短い動画 1 本を同じ見え方で書き出す用途も想定。Apple Silicon 向け。条件や制限はダウンロードページ参照。",
+      "desktopOperatingSystem": "macOS 11.0 以降（Apple Silicon / arm64）",
+      "webDemoName": "Film Lab（ブラウザで試す）",
+      "webDemoDescription": "サイト上で、自分の写真や動画を開いてプリセットからルックを試せる体験です。フォルダ単位のまとめ処理は Film Lab Desktop が主な場所です。",
+      "webDemoOperatingSystem": "インタラクティブ表示に対応した一般的なブラウザ",
+      "webDemoBrowserRequirements": "一般的なブラウザで利用可能（WebGL2 が有効な環境）"
     }
   },
   "common": {

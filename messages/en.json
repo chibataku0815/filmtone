@@ -240,13 +240,65 @@
     },
     "film-lab": {
       "title": "Film Lab",
-      "description": "Real-time color grading in the browser. Quick mode uses three meta sliders (film character, era, dynamics) plus presets; the full page adds Pro controls for every parameter, Bloom, Halation, and LUT—all in GPU shaders.",
+      "description": "Try Film Lab in the browser: load your own photo or video, start from presets, and steer toward a film-inspired look. Folder-scale finishing belongs in the Film Lab macOS app.",
       "sampleHint": "You're viewing a sample image—drop your own photo or video to grade your own footage.",
       "openFullApp": "Open full app"
     }
   },
   "film-lab": {
     "sampleHint": "You're viewing a sample image—drop your own photo or video to grade your own footage.",
+    "lp": {
+      "heroEyebrow": "Film Lab",
+      "heroTitle": "Start from presets and bring stills toward a film-inspired look—fast.",
+      "heroBody": "For photographers and small teams who want many stills (and a short clip) toned cohesively before opening a heavy NLE. macOS Film Lab is the main place for folder workflows and repeat exports. Start here in the browser to audition a look on your own media.",
+      "heroPrimaryCta": "Download for macOS",
+      "heroSecondaryLine": "Apple Silicon · macOS {minMacos}+ — full requirements on the download page.",
+      "proofTeaserLine": "Below, try the mood on one of your own frames—then move to the macOS app when you want that same tone across a whole folder.",
+      "expandAuxiliaryPanelsTitle": "Show more: fine controls, LUT, compare, histogram, save…",
+      "expandAuxiliaryPanelsHint": "Skip this if presets and the Quick sliders are enough.",
+      "valueTitle": "Why macOS helps you keep tone consistent",
+      "valueBullet1": "A path that makes it easier to carry one look across many stills with the same feel.",
+      "valueBullet2": "Process a folder of photos into another folder with a cohesive finish—and nudge one short clip to match when you need it.",
+      "valueBullet3": "This page is for trying the vibe first. The macOS build is where we expect repeat finishing before delivery.",
+      "workflowTitle": "What the desktop app is built for",
+      "workflowLead": "A simple path when you want one tone across many files.",
+      "workflowBullet1": "Pick the photo folder and destination, then export with the same look applied across files.",
+      "workflowBullet2": "Even with many files, you can see how far the run has gotten.",
+      "workflowBullet3": "Finer caveats live on the download page and in desktop release notes.",
+      "demoEyebrow": "Try your own media (browser)",
+      "demoTitle": "Audition a look in the browser",
+      "demoBody": "Start from presets and the Quick sliders. Open “Show more” inside the panel only when you want deeper controls. Folder-scale finishing stays in the macOS app—use the download button at the top.",
+      "trustHeading": "Release details & support",
+      "faqTitle": "FAQ",
+      "faqQwebVsDesktop": "How is this page different from the desktop app?",
+      "faqAwebVsDesktop": "Folder-scale finishing stays centered on the macOS app. This browser page is an entry to feel a grade on your own media and share links. It is not a replacement for timeline editing or a full color-managed finishing pipeline.",
+      "faqQsmartLookDesktop": "Is Smart Look (AI) included in the desktop app?",
+      "faqAsmartLookDesktop": "No. The current Film Lab Desktop release does not include Smart Look. Refer to each product surface and its release notes for what ships where.",
+      "faqQupdates": "How do updates work?",
+      "faqAupdates": "Download a fresh DMG from the download page when you want to update. The app does not silently auto-install updates in the background.",
+      "faqQlimitations": "Where is the list of known limitations?",
+      "faqAlimitations": "Use the download page and the desktop release notes as the source of truth for platform support, LUT batch notes, and video export caveats.",
+      "premiumHeroBadgeNew": "Desktop",
+      "premiumHeroBadgeLine": "Folder workflows on macOS first — audition a look in the browser.",
+      "premiumCapabilitiesEyebrow": "Capabilities",
+      "premiumCapabilitiesTitle": "Lock a look, then spread it across your stills.",
+      "premiumFeature1Title": "Grade once. Apply to many.",
+      "premiumFeature1Body": "Dial preset-led film looks on the desktop, then send slider values to batch export — for folders of stills and one video with the same look.",
+      "premiumFeature2Title": "Try before you download.",
+      "premiumFeature2Body": "Use this page in the browser to explore presets first. Folder-scale and repeat exports ride the macOS app.",
+      "premiumGridEyebrow": "Why desktop",
+      "premiumGridTitle": "When you need cohesive tone before handoff.",
+      "premiumCard1Title": "Batch-first",
+      "premiumCard1Body": "Queue JPEG/PNG folders and write to a clear output path with visible progress.",
+      "premiumCard2Title": "Preset-led looks",
+      "premiumCard2Body": "Film-inspired presets, with room to refine tone and texture when you want more control.",
+      "premiumCard3Title": "Browser entry point",
+      "premiumCard3Body": "A lightweight way to feel a grade before you download the desktop build.",
+      "premiumCard4Title": "What we publish",
+      "premiumCard4Body": "Platform support and export caveats stay in the download page and release notes.",
+      "premiumCtaTryDemo": "Try in the browser",
+      "premiumMediaPlaceholder": "Product screenshot placeholder until real captures land."
+    },
     "toolbar": {
       "open": "Open media",
       "savePng": "Save PNG"
@@ -260,10 +312,10 @@
     "back": "← Back to Interactive",
     "metadata": {
       "title": "Film Lab",
-      "description": "Real-time color grading in the browser. Quick: three bundled sliders and presets. Pro: full parameters, Bloom, Halation, LUT—GPU shaders.",
-      "ogTitle": "Film Lab — Browser Color Grading Tool",
-      "ogDescription": "Drop media and build a look. Quick meta sliders for broad changes; Pro for detail. Presets, LUT, WebGL2.",
-      "ogImageAlt": "Film Lab Color Grading Tool"
+      "description": "macOS app to align many stills (and a short clip) toward a film-inspired look starting from presets—before you dive into a heavy editor. Includes a browser session to try your own media.",
+      "ogTitle": "Film Lab — preset-led film looks for photographers",
+      "ogDescription": "Tone a folder of photos from presets, then export on macOS. Browser on this page to audition looks first.",
+      "ogImageAlt": "Film Lab — film-look tools for photographers"
     },
     "share": {
       "sectionTitle": "Share",
@@ -454,7 +506,7 @@
         "environmentLabel": "Requirements",
         "environmentBody": "macOS {minMacos} or later. {arch} only — not for Intel Macs.",
         "distributionLabel": "Download & updates",
-        "distributionBody": "Signed, notarized DMG. Updates are manual for now (replace the app by downloading a new DMG — no auto-updater)."
+        "distributionBody": "Signed, notarized DMG. The app does not auto-install updates in the background. Download a new DMG from the download page to update. The app may notify you when a newer build is available (requires a network connection)."
       },
       "downloadCta": "Download DMG",
       "supportCtaPrefix": "Contact:",
@@ -469,7 +521,7 @@
           "environmentLabel": "Requirements",
           "environmentBody": "macOS {minMacos}+ · {arch} only.",
           "distributionLabel": "Artifact & updates",
-          "distributionBody": "Signed, notarized DMG. No automatic updates."
+          "distributionBody": "Signed, notarized DMG. No automatic installation — update by replacing the app with a new DMG. The app may notify you when a newer build is available."
         }
       }
     },
@@ -654,6 +706,15 @@
         "videoPipelineAborted": "Canceled",
         "videoPipelineFfmpegFailed": "ffmpeg failed (code {code})"
       }
+    },
+    "jsonLd": {
+      "desktopName": "Film Lab Desktop",
+      "desktopDescription": "macOS photography app: start from presets for a film-inspired look, batch JPEG/PNG folders, and export one short MP4 with the same grade when needed. Apple Silicon; download page for support details.",
+      "desktopOperatingSystem": "macOS 11.0 or later (Apple Silicon / arm64)",
+      "webDemoName": "Film Lab (try in browser)",
+      "webDemoDescription": "On-site experience to open your photo or video and audition preset-led grades. Folder-scale finishing stays in Film Lab Desktop.",
+      "webDemoOperatingSystem": "Common desktop browser with interactive graphics support",
+      "webDemoBrowserRequirements": "Modern browser with WebGL2 available"
     }
   },
   "common": {
