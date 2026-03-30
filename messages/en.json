@@ -529,6 +529,12 @@
           "environmentBody": "macOS {minMacos}+ · {arch} only.",
           "distributionLabel": "Artifact & updates",
           "distributionBody": "Signed, notarized DMG. No automatic installation — update by replacing the app with a new DMG. The app may notify you when a newer build is available."
+        },
+        "metadata": {
+          "title": "Download Filmtone for macOS",
+          "description": "Download the Filmtone macOS app — preset-led film color grading for photographers. Batch-process folders of stills and export one video with the same look.",
+          "ogTitle": "Download Filmtone for macOS",
+          "ogDescription": "Preset-led film looks. Process folders of stills on macOS, free."
         }
       }
     },

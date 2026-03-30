@@ -529,6 +529,12 @@
           "environmentBody": "macOS {minMacos} 以降。{arch} のみ。",
           "distributionLabel": "配布・更新",
           "distributionBody": "署名・公証済み DMG。自動インストールはありません。DMG の差し替えで更新します。アプリが新しい版を知らせることがあります。"
+        },
+        "metadata": {
+          "title": "Filmtone macOS 版をダウンロード",
+          "description": "Filmtone macOS アプリのダウンロード — プリセット起点のフィルム調カラーグレーディング。フォルダをまとめて処理し、同じルックで動画も書き出せます。",
+          "ogTitle": "Filmtone macOS 版をダウンロード",
+          "ogDescription": "プリセットでそろえるフィルム調ルック。macOS でフォルダ処理、無料。"
         }
       }
     },
