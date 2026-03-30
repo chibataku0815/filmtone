@@ -7,4 +7,13 @@ release
 
 # Apple Notarization — ローカルのみ（`.notary.env.example` はテンプレとしてコミット可）
 .notary.env
+
+# Apple 署名関連 — repo に絶対置かない
+*.p12
+*.cer
+*.key
+*.csr
+*.certSigningRequest
+*.provisionprofile
+
 .vercel
