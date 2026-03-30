@@ -10,7 +10,7 @@ Film Lab Desktop は、Film Lab の **macOS 向けローカル書き出しアプ
 - **対応アーキ:** Apple Silicon (`arm64`) のみ
 - **正規配布物:** 署名・公証済み `DMG`
 - **更新方針:** 当面は手動更新（ダウンロードページ / release notes で差し替え）
-- **窓口（Film Lab Desktop）:** `info@fores-tone.co.jp`
+- **窓口（Film Lab Desktop）:** `chiba@fores-tone.co.jp`
 
 > `https://www.chibatakumi.studio/film-lab/download` は固定導線です。公開アセットが接続されているときは現行ビルドへリダイレクトし、未公開時は案内ページを表示します。
 
