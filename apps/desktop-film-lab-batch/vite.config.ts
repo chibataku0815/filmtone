@@ -77,6 +77,26 @@ export default defineConfig(({ mode }) => {
   const viteSmartLookRasterTruth =
     smartLookRasterFlag === "true" ? "true" : "false";
 
+  /**
+   * @description Electron 起動時に `FILM_LAB_DEBUG_VIDEO_EXPORT=1` を付けると main と同じ条件で
+   *   レンダラの WebCodecs bucket ログを有効にする（`process.env` は Vite 起動時に読む）。
+   */
+  const debugVideoExportTruth =
+    process.env.FILM_LAB_DEBUG_VIDEO_EXPORT === "1" ||
+    process.env.FILM_LAB_DEBUG_VIDEO_EXPORT === "true"
+      ? "true"
+      : "false";
+
+  /**
+   * @description 動画書き出しの各フレーム詳細ログは、明示時だけ有効にする。
+   *   既定は quiet にして、bucket / profile / summary だけで観測する。
+   */
+  const verboseVideoExportTruth =
+    process.env.FILM_LAB_VERBOSE_VIDEO_EXPORT === "1" ||
+    process.env.FILM_LAB_VERBOSE_VIDEO_EXPORT === "true"
+      ? "true"
+      : "false";
+
   return {
     root: path.resolve(__dirname, "src/renderer"),
     base: "./",
@@ -94,6 +114,10 @@ export default defineConfig(({ mode }) => {
         JSON.stringify(smartLookUiFlag),
       "process.env.NEXT_PUBLIC_FILM_LAB_SMART_LOOK_RASTER":
         JSON.stringify(smartLookRasterFlag),
+      "import.meta.env.VITE_FILM_LAB_DEBUG_VIDEO_EXPORT":
+        JSON.stringify(debugVideoExportTruth),
+      "import.meta.env.VITE_FILM_LAB_VERBOSE_VIDEO_EXPORT":
+        JSON.stringify(verboseVideoExportTruth),
     },
     plugins: [react()],
     build: {

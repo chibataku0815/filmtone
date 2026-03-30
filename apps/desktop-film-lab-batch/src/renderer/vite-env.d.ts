@@ -18,6 +18,14 @@ interface ImportMetaEnv {
    * @description `true` のとき BFF に `includeRasterCorrection: true` を送り、返却 PNG でキャンバスを差し替える（`vite.config` の define と整合）。
    */
   readonly VITE_FILM_LAB_SMART_LOOK_RASTER?: string;
+  /**
+   * @description `vite.config` が `FILM_LAB_DEBUG_VIDEO_EXPORT` から埋める。`true` のとき WebCodecs bucket ログを出す。
+   */
+  readonly VITE_FILM_LAB_DEBUG_VIDEO_EXPORT?: string;
+  /**
+   * @description `vite.config` が `FILM_LAB_VERBOSE_VIDEO_EXPORT` から埋める。`true` のときだけ各フレームの詳細ログを出す。
+   */
+  readonly VITE_FILM_LAB_VERBOSE_VIDEO_EXPORT?: string;
 }
 
 interface ImportMeta {

@@ -76,6 +76,12 @@ const DESKTOP_INACTIVE_TAB_CLASS =
   "pointer-events-none absolute inset-0 z-0 flex min-h-0 flex-col gap-4 overflow-hidden opacity-0";
 
 /**
+ * @description ログ欄の React state 更新をまとめる間隔（ms）。
+ *   各フレームの `setState` 連打を避け、書き出し中の UI 負荷を下げる。
+ */
+const LOG_TEXT_FLUSH_INTERVAL_MS = 120;
+
+/**
  * @description セッションに保存した情報だけから BatchGradeState を組み立てる（再開直後のパイプライン用）
  */
 async function resolveBatchGradeSnapshot(
@@ -163,6 +169,10 @@ export default function App() {
   const [inputDir, setInputDir] = useState<string | null>(null);
   const [outputDir, setOutputDir] = useState<string | null>(null);
   const [logText, setLogText] = useState("");
+  /** @description ログ欄へまだ反映していない追記分。一定時間ためてからまとめて描画する。 */
+  const pendingLogTextRef = useRef("");
+  /** @description 次回 flush のタイマー ID。null のときは未予約。 */
+  const logFlushTimerRef = useRef<number | null>(null);
   const [running, setRunning] = useState(false);
   /** @description 書き出し中断用。Run 開始時に差し替え、完了・エラーで null */
   const batchAbortRef = useRef<AbortController | null>(null);
@@ -302,9 +312,52 @@ export default function App() {
     return () => window.clearTimeout(id);
   }, [gradeSyncNotice]);
 
-  const appendLog = useCallback((line: string) => {
-    setLogText((t) => `${t}${line}\n`);
+  /**
+   * @description バッファ済みのログをまとめて state へ反映する。
+   *   1 行ごとに React を再描画しないよう、UI 更新を間引く。
+   */
+  const flushBufferedLogText = useCallback(() => {
+    if (logFlushTimerRef.current !== null) {
+      window.clearTimeout(logFlushTimerRef.current);
+      logFlushTimerRef.current = null;
+    }
+    const bufferedLogText = pendingLogTextRef.current;
+    if (bufferedLogText.length === 0) return;
+    pendingLogTextRef.current = "";
+    setLogText((t) => `${t}${bufferedLogText}`);
   }, []);
+
+  /**
+   * @description 新しい実行を始める前に、保留中バッファごとログ欄を空に戻す。
+   */
+  const resetLogText = useCallback(() => {
+    pendingLogTextRef.current = "";
+    if (logFlushTimerRef.current !== null) {
+      window.clearTimeout(logFlushTimerRef.current);
+      logFlushTimerRef.current = null;
+    }
+    setLogText("");
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (logFlushTimerRef.current !== null) {
+        window.clearTimeout(logFlushTimerRef.current);
+        logFlushTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  const appendLog = useCallback(
+    (line: string) => {
+      pendingLogTextRef.current += `${line}\n`;
+      if (logFlushTimerRef.current !== null) return;
+      logFlushTimerRef.current = window.setTimeout(() => {
+        flushBufferedLogText();
+      }, LOG_TEXT_FLUSH_INTERVAL_MS);
+    },
+    [flushBufferedLogText],
+  );
 
   const syncPreviewToBatch = useCallback(() => {
     if (!viewport) {
@@ -421,7 +474,7 @@ export default function App() {
         lastOutputDir: effectiveOutput,
       });
 
-      setLogText("");
+      resetLogText();
       setLastBatchSummary(null);
       setLastFailedPaths([]);
 
@@ -676,7 +729,7 @@ export default function App() {
       return;
     }
 
-    setLogText("");
+    resetLogText();
     batchAbortRef.current = null;
     setRunning(true);
 

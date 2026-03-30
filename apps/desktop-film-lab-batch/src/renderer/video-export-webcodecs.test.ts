@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   computeDecodeUpperBoundUs,
   estimateNominalFrameDurationUs,
+  hasSatisfiedSelectionByBufferedFrames,
   WEBCODECS_ACC_EXPORT_MAX_FILE_BYTES,
   isMp4LikeContainerForWebCodecs,
   shouldAttemptWebCodecsAccurateExport,
@@ -68,16 +69,45 @@ describe("video-export-webcodecs", () => {
       computeDecodeUpperBoundUs({
         targetUs: 1_000_000,
         frameDurationUs: 40_000,
-        hasBufferedFrame: false,
+        hasSatisfiedSelection: false,
       }),
-    ).toBe(1_960_000);
+    ).toBe(1_000_000 + 40_000 * 30);
 
     expect(
       computeDecodeUpperBoundUs({
         targetUs: 1_000_000,
         frameDurationUs: 40_000,
-        hasBufferedFrame: true,
+        hasSatisfiedSelection: true,
       }),
-    ).toBe(1_320_000);
+    ).toBe(1_000_000 + 40_000 * 11);
+  });
+
+  it("hasSatisfiedSelectionByBufferedFrames は holder だけでは satisfied にしない", () => {
+    expect(
+      hasSatisfiedSelectionByBufferedFrames({
+        targetUs: 0,
+        holderUs: 0,
+        nextOutputUs: null,
+        flushCompleted: false,
+      }),
+    ).toBe(false);
+
+    expect(
+      hasSatisfiedSelectionByBufferedFrames({
+        targetUs: 0,
+        holderUs: 0,
+        nextOutputUs: 33_367,
+        flushCompleted: false,
+      }),
+    ).toBe(true);
+
+    expect(
+      hasSatisfiedSelectionByBufferedFrames({
+        targetUs: 1_000_000,
+        holderUs: 1_033_000,
+        nextOutputUs: null,
+        flushCompleted: false,
+      }),
+    ).toBe(true);
   });
 });

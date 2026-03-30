@@ -28,8 +28,18 @@ import {
   WebCodecsMp4ExportSession,
 } from "./video-export-webcodecs";
 
-/** @description development のとき各フレーム 1 行トレース。production では遅いフレームと間引きのみ。 */
-const VIDEO_EXPORT_LOG_EVERY_FRAME = import.meta.env.DEV === true;
+/**
+ * @description 各フレームの詳細ログは明示時だけ有効にする。
+ *   既定は quiet にして、profile / summary / 遅いフレームだけを残す。
+ */
+const VIDEO_EXPORT_VERBOSE_TRACE =
+  import.meta.env.VITE_FILM_LAB_VERBOSE_VIDEO_EXPORT === "true";
+
+/**
+ * @description quiet モードでも完全無言にはせず、一定間隔の進捗だけは残す。
+ *   5 秒ごとなら React のログ更新負荷をかなり抑えつつ、人間の確認もしやすい。
+ */
+const VIDEO_EXPORT_PROGRESS_LOG_INTERVAL_FRAMES = VIDEO_EXPORT_FPS * 5;
 
 /** @description seek がこの時間（ms）無応答なら打ち切り（どこで固まったかログに出す） */
 const SEEK_TIMEOUT_MS = 90_000;
@@ -991,7 +1001,7 @@ export async function runVideoExportPipeline(options: {
             const syncMediaPromise = webCodecsSession
               ? (async () => {
                   const tracePipe =
-                    VIDEO_EXPORT_LOG_EVERY_FRAME &&
+                    VIDEO_EXPORT_VERBOSE_TRACE &&
                     (i < 6 || i % 200 === 0 || i + 1 === totalFrames);
                   if (tracePipe) {
                     onLog(
@@ -1108,16 +1118,16 @@ export async function runVideoExportPipeline(options: {
           arrTotal.push(totalMs);
           const summary =
             `[動画][trace] f=${i + 1}/${totalFrames} t=${t.toFixed(4)}s ` +
-            `reuse=${reuseFrame ? "Y" : "N"} seekWait=${seekWaitMs.toFixed(0)}ms decode=${decodeGateMs.toFixed(0)}ms ` +
+            `reuse=${reuseFrame ? "Y" : "N"} mediaSync=${seekWaitMs.toFixed(0)}ms decode=${decodeGateMs.toFixed(0)}ms ` +
             `render=${renderMs.toFixed(0)}ms readPx=${readPxMs.toFixed(0)}ms ` +
             `flip=${flipMs.toFixed(0)}ms ipc=async total=${totalMs.toFixed(0)}ms ` +
             `| ${video ? videoDebugSnapshot(video) : "[WebCodecs]"}`;
 
-          if (VIDEO_EXPORT_LOG_EVERY_FRAME) {
+          if (VIDEO_EXPORT_VERBOSE_TRACE) {
             onLog(summary);
           } else if (
             totalMs > 1500 ||
-            i % VIDEO_EXPORT_FPS === 0 ||
+            (i + 1) % VIDEO_EXPORT_PROGRESS_LOG_INTERVAL_FRAMES === 0 ||
             i === 0 ||
             i === totalFrames - 1
           ) {
@@ -1141,13 +1151,15 @@ export async function runVideoExportPipeline(options: {
           return { ok: false, message: finalIpcError };
         }
 
+        webCodecsSession?.flushExportDebugBuckets("export-end-tail");
+
         const wallMs = performance.now() - wallStart;
         const mean = (a: number[]) =>
           a.length === 0 ? 0 : a.reduce((x, y) => x + y, 0) / a.length;
         onLog(
           `[動画][profile] wall=${wallMs.toFixed(0)}ms frames=${totalFrames} ` +
             `seekedFrames=${countSeekedPaths} reusedFrames=${countReusedFrames} forwardScans=${countForwardScans} rvfcFrames=${countRvfcFrames} rafFallbackFrames=${countRafFallbackFrames}\n` +
-            `  seekWait ms mean=${mean(arrSeekWait).toFixed(1)} median=${medianMs(arrSeekWait).toFixed(1)} p95=${p95Ms(arrSeekWait).toFixed(1)}\n` +
+            `  mediaSync ms mean=${mean(arrSeekWait).toFixed(1)} median=${medianMs(arrSeekWait).toFixed(1)} p95=${p95Ms(arrSeekWait).toFixed(1)}\n` +
             `  decodeGate ms mean=${mean(arrDecode).toFixed(1)} median=${medianMs(arrDecode).toFixed(1)} p95=${p95Ms(arrDecode).toFixed(1)}\n` +
             `  render ms mean=${mean(arrRender).toFixed(1)} median=${medianMs(arrRender).toFixed(1)} p95=${p95Ms(arrRender).toFixed(1)}\n` +
             `  readPixels ms mean=${mean(arrRead).toFixed(1)} median=${medianMs(arrRead).toFixed(1)} p95=${p95Ms(arrRead).toFixed(1)}\n` +

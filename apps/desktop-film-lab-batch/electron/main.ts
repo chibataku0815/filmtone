@@ -117,6 +117,14 @@ const DEBUG_VIDEO_EXPORT_MAIN =
   process.env.FILM_LAB_DEBUG_VIDEO_EXPORT === "true";
 
 /**
+ * @description rawvideo の各フレーム成功ログは、明示時だけ細かく出す。
+ *   既定は quiet にし、明らかに遅い write だけを観測用に残す。
+ */
+const VERBOSE_VIDEO_EXPORT_MAIN =
+  process.env.FILM_LAB_VERBOSE_VIDEO_EXPORT === "1" ||
+  process.env.FILM_LAB_VERBOSE_VIDEO_EXPORT === "true";
+
+/**
  * @description main がいま把握している動画書き出しフェーズ。黒画面やクラッシュの時刻と付き合わせる。
  */
 function currentVideoExportPhase(): string {
@@ -1196,7 +1204,7 @@ ipcMain.handle("video-export-write-frame", async (_evt, data: unknown) => {
     );
   }
   const ms = Number(process.hrtime.bigint() - t0) / 1e6;
-  if (DEBUG_VIDEO_EXPORT_MAIN || ms > 2500) {
+  if (VERBOSE_VIDEO_EXPORT_MAIN || ms > 100) {
     console.log(
       `[film-lab-desktop] video-export-write-frame ok bytes=${buf.length} ms=${ms.toFixed(1)} stdin.writable=${stdin.writable}`,
     );

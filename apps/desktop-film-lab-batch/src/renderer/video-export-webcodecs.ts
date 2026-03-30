@@ -29,23 +29,36 @@ const MAX_PENDING_DECODE_CHUNKS = 64;
 
 /**
  * @description **1 回の pumpDecoderImpl** で `decode` するサンプル数の上限。
- *   従来は inputQueue を空にするまで 1 ポンプで回しており、**advanceHolderToTargetPts の前に**
- *   outputQueue に `VideoFrame` が大量に積まれる。4K では各フレームが GPU メモリを掴むため、
- *   数十〜百フレームの滞留で **Renderer/GPU クラッシュ（暗転）** につながる。
- *   この上限で `ensureDecoderFedForTarget` のループと `schedulePump` が交互に走り、滞留が抑えられる。
+ *   無制限に回すと `outputQueue` に `VideoFrame` が積み上がり **暗転・OOM** の原因になる一方、
+ *   小さすぎると `ensureDecoderFedForTarget` がポンプを繰り返し **`mediaSync` が嵩む**。
+ *   値を大きくしすぎると **非同期 output が一斉に届き `outputQueue` が膨らむ**。`liveFrameCount` 足切りと yield で抑える。
+ *   16 と 24 の **中間の 20**。
  */
-const MAX_DECODE_SUBMITS_PER_PUMP = 16;
+const MAX_DECODE_SUBMITS_PER_PUMP = 20;
 
 /**
  * @description `presentAtMediaTimeSec` の初回付近はまだ holder / outputQueue が空なので、
  *   B フレーム並べ替えぶんを見込んで少し広めに先読みする。
  */
-const INITIAL_DECODE_LEAD_FRAMES = 24;
+const INITIAL_DECODE_LEAD_FRAMES = 30;
 
 /**
- * @description 平常時は target PTS の少し先までだけ decode し、future 側の `VideoFrame` 滞留を抑える。
+ * @description 平常時の PTS 先読み幅（フレーム換算）。薄いと長尺で `mediaSync` が後半だけ悪化しやすい。
+ *   滞留は `MAX_LIVE_VIDEO_FRAMES` が抑える。`mediaSync` 枯れ対策で **11**。
  */
-const STEADY_DECODE_LEAD_FRAMES = 8;
+const STEADY_DECODE_LEAD_FRAMES = 11;
+
+/**
+ * @description future バッファがこれ未満になったら、描画後に background prefetch を再開する。
+ *   早めに再開すると枯れにくい（4→6）。
+ */
+const PREFETCH_RESUME_THRESHOLD_FRAMES = 6;
+
+/**
+ * @description まずは stall 回避を優先し、VideoDecoder には「出せる output を早く返してほしい」と伝える。
+ *   速度比較は同一クリップで別途 A/B するが、現時点では `targetBudget stop` との相互作用を安全側で見る。
+ */
+const WEBCODECS_OPTIMIZE_FOR_LATENCY = true;
 
 /**
  * @description JS が同時に保持する `VideoFrame` 数の上限（`holder` + `outputQueue`）。
@@ -61,6 +74,22 @@ const DECODE_OUTPUT_WAIT_MS = 30_000;
  *   本番では無効のままにし、ユーザーのログ汚染を防ぐ。
  */
 const WEBCODECS_FINE_TRACE = import.meta.env.DEV === true;
+
+/**
+ * @description `FILM_LAB_DEBUG_VIDEO_EXPORT=1` で起動したときだけ有効（Vite define 経由）。
+ *   将来バッファがどの帯で薄くなるかを、100 フレームごとの 1 行で追う。
+ */
+const WEBCODECS_BUCKET_PROFILE =
+  import.meta.env.VITE_FILM_LAB_DEBUG_VIDEO_EXPORT === "true";
+
+/** @description bucket ログを出す間隔（エクスポートの `present` 回数） */
+const WEBCODECS_BUCKET_EVERY_PRESENT_FRAMES = 100;
+
+/**
+ * @description mp4box が 1 回の `onSamples` で渡す最大サンプル数。大きいほど **JS ↔ mp4box 往復が減る**。
+ *   `onSamplesBatch` の「最終バッチ判定」と一致させること。
+ */
+const MP4_EXTRACTION_SAMPLES_PER_PULL = 256;
 
 /**
  * @description ファイルパスが mp4box 前提の拡張子かどうか（大文字小文字無視）
@@ -108,17 +137,41 @@ export function estimateNominalFrameDurationUs(opts: {
 
 /**
  * @description 現在の target PTS に対して decode してよい future 側の上界（µs）。
- *   holder / outputQueue が空の初期 warmup だけ広く取り、平常時は narrow にする。
+ *   「holder が 1 枚あるだけ」では B フレーム並べ替え待ちを見誤るため、
+ *   target をまたぐ表示候補が揃うまでは warmup 幅を維持する。
  */
 export function computeDecodeUpperBoundUs(opts: {
   targetUs: number;
   frameDurationUs: number;
-  hasBufferedFrame: boolean;
+  hasSatisfiedSelection: boolean;
 }): number {
-  const leadFrames = opts.hasBufferedFrame
+  const leadFrames = opts.hasSatisfiedSelection
     ? STEADY_DECODE_LEAD_FRAMES
     : INITIAL_DECODE_LEAD_FRAMES;
   return opts.targetUs + Math.max(1, opts.frameDurationUs) * leadFrames;
+}
+
+/**
+ * @description holder / outputQueue だけで、target に必要な表示選択がもう決まったかを返す。
+ *   holder が 1 枚あるだけでは「次の future frame がまだ無い」場合を見逃すため、
+ *   `computeDecodeUpperBoundUs` の steady への切り替え条件はこれに合わせる。
+ */
+export function hasSatisfiedSelectionByBufferedFrames(opts: {
+  targetUs: number;
+  holderUs: number | null;
+  nextOutputUs: number | null;
+  flushCompleted: boolean;
+}): boolean {
+  if (opts.holderUs === null) {
+    return false;
+  }
+  if (opts.holderUs > opts.targetUs) {
+    return true;
+  }
+  if (opts.nextOutputUs !== null) {
+    return opts.holderUs <= opts.targetUs && opts.nextOutputUs > opts.targetUs;
+  }
+  return opts.flushCompleted;
 }
 
 /**
@@ -222,6 +275,7 @@ function codedDimensionsFromMp4VideoTrack(
 export class WebCodecsMp4ExportSession {
   readonly canvas: HTMLCanvasElement;
   readonly texture: THREE.CanvasTexture;
+  private readonly canvasContext: CanvasRenderingContext2D;
   private readonly probe: ProbeShape;
   private readonly onTrace: (line: string) => void;
   private readonly mp4: ISOFile;
@@ -231,6 +285,11 @@ export class WebCodecsMp4ExportSession {
   private readonly decoderConfigureBase: VideoDecoderConfig;
   private readonly decoder: VideoDecoder;
   private inputQueue: Sample[] = [];
+  /**
+   * @description 先頭から既にデコード済み／スキップ済みのサンプル数。`shift()` は O(n) なのでインデックスで進み、
+   *   たまに `slice` で捨てる（長尺で 400 フレーム以降が急に遅くなるのを防ぐ）。
+   */
+  private inputQueueReadOffset = 0;
   private readonly outputQueue: VideoFrame[] = [];
   private extractionDone = false;
   private samplesReceived = 0;
@@ -261,6 +320,29 @@ export class WebCodecsMp4ExportSession {
   private liveFramePeak = 0;
   /** @description `close()` 済みのフレーム数（close 漏れ監査用） */
   private closedFrameCount = 0;
+  /** @description future 側を保つ background prefetch が走っているか */
+  private prefetchInFlight = false;
+  /** @description background prefetch が次に満たしたい target PTS */
+  private queuedPrefetchTargetUs: number | null = null;
+
+  /** @description デバッグ: `presentAtMediaTimeSec` が何回目か（書き出しフレーム番号と一致） */
+  private presentExportOrdinal = 0;
+  /** @description bucket 内で `ensureDecoderFedForTarget` が即 return した回数 */
+  private bucketEnsureFedFastPathHits = 0;
+  /** @description bucket 内の `schedulePump` 呼び出し回数 */
+  private bucketSchedulePumpCalls = 0;
+  /** @description bucket 内で `waitForOutputOrError` が実際に待った回数 */
+  private bucketWaitOutputCalls = 0;
+  /** @description bucket 内の wait 合計 ms */
+  private bucketWaitOutputTotalMs = 0;
+  /** @description bucket 内の `bufferedFrameBudgetCount` 最小（サンプル無しは 0 表示） */
+  private bucketBufferedMin: number | null = null;
+  /** @description bucket 内の `bufferedFrameBudgetCount` 最大 */
+  private bucketBufferedMax = 0;
+  /** @description bucket 内の `pendingDecodes` 最大 */
+  private bucketPendingDecodesPeak = 0;
+  /** @description bucket 内の `outputQueue.length` 最大 */
+  private bucketOutputQueuePeak = 0;
 
   private constructor(
     probe: ProbeShape,
@@ -271,6 +353,7 @@ export class WebCodecsMp4ExportSession {
     decoderConfigureBase: VideoDecoderConfig,
     decoder: VideoDecoder,
     canvas: HTMLCanvasElement,
+    canvasContext: CanvasRenderingContext2D,
     texture: THREE.CanvasTexture,
   ) {
     this.probe = probe;
@@ -281,6 +364,7 @@ export class WebCodecsMp4ExportSession {
     this.decoderConfigureBase = decoderConfigureBase;
     this.decoder = decoder;
     this.canvas = canvas;
+    this.canvasContext = canvasContext;
     this.texture = texture;
     this.nbSamplesTotal =
       typeof videoTrack.nb_samples === "number" && videoTrack.nb_samples > 0
@@ -318,12 +402,99 @@ export class WebCodecsMp4ExportSession {
   }
 
   /**
+   * @description 1 フレームぶんの bucket 用に、バッファ厚みのスナップショットを取る。
+   */
+  private sampleBucketQueues(): void {
+    if (!WEBCODECS_BUCKET_PROFILE) return;
+    const buf = this.bufferedFrameBudgetCount();
+    this.bucketBufferedMin =
+      this.bucketBufferedMin === null ? buf : Math.min(this.bucketBufferedMin, buf);
+    this.bucketBufferedMax = Math.max(this.bucketBufferedMax, buf);
+    this.bucketPendingDecodesPeak = Math.max(this.bucketPendingDecodesPeak, this.pendingDecodes);
+    this.bucketOutputQueuePeak = Math.max(this.bucketOutputQueuePeak, this.outputQueue.length);
+  }
+
+  /**
+   * @description 次の 100 フレーム区間へ進む前にカウンタを戻す。
+   */
+  private resetBucketAccumulators(): void {
+    this.bucketEnsureFedFastPathHits = 0;
+    this.bucketSchedulePumpCalls = 0;
+    this.bucketWaitOutputCalls = 0;
+    this.bucketWaitOutputTotalMs = 0;
+    this.bucketBufferedMin = null;
+    this.bucketBufferedMax = 0;
+    this.bucketPendingDecodesPeak = 0;
+    this.bucketOutputQueuePeak = 0;
+  }
+
+  /**
+   * @description `[動画][WebCodecs][bucket]` 1 行を出す（人間が区間比較しやすい英字キー）。
+   */
+  private emitWebCodecsBucketLine(lo: number, hi: number, reason: string): void {
+    const bufLo = this.bucketBufferedMin ?? 0;
+    this.onTrace(
+      `[動画][WebCodecs][bucket] frames=${lo}-${hi} reason=${reason} ` +
+        `ensureFedFast=${this.bucketEnsureFedFastPathHits} schedulePump=${this.bucketSchedulePumpCalls} ` +
+        `waitOut=${this.bucketWaitOutputCalls} waitOutMs=${this.bucketWaitOutputTotalMs.toFixed(1)} ` +
+        `bufMin=${bufLo} bufMax=${this.bucketBufferedMax} pendPeak=${this.bucketPendingDecodesPeak} outQPeak=${this.bucketOutputQueuePeak} ` +
+        `inQ=${this.inQPendingCount()} live=${this.liveFrameCount()} livePeakSession=${this.liveFramePeak}`,
+    );
+  }
+
+  /**
+   * @description 書き出しループ正常終了直前に呼ぶ。100 フレームに満たない端数区間を 1 行で吐く。
+   */
+  flushExportDebugBuckets(reason: string): void {
+    if (!WEBCODECS_BUCKET_PROFILE) return;
+    const ord = this.presentExportOrdinal;
+    if (ord <= 0) return;
+    const rem = ord % WEBCODECS_BUCKET_EVERY_PRESENT_FRAMES;
+    if (rem === 0) return;
+    const lo = ord - rem + 1;
+    this.emitWebCodecsBucketLine(lo, ord, reason);
+    this.resetBucketAccumulators();
+  }
+
+  /**
    * @description inputQueue 先頭の PTS（µs）。いま decode しようとしている位置の観測用。
    */
   private peekNextInputPtsUs(): number | null {
-    const sample = this.inputQueue[0];
+    const sample = this.inputQueue[this.inputQueueReadOffset];
     if (!sample) return null;
     return Math.max(0, Math.round((sample.cts / sample.timescale) * 1_000_000));
+  }
+
+  /**
+   * @description mp4box からまだデコードしていないサンプル数。
+   */
+  private inQPendingCount(): number {
+    return this.inputQueue.length - this.inputQueueReadOffset;
+  }
+
+  /**
+   * @description 先頭 1 サンプル分だけ読み取り位置を進め、オフセットが大きいときは配列を圧縮する。
+   * @param reason fineTrace 用ラベル（空サンプル破棄か decode 後か）
+   */
+  private consumeInputQueueHead(reason: string): void {
+    this.inputQueueReadOffset += 1;
+    this.compactInputQueuePrefixIfNeeded(reason);
+  }
+
+  /**
+   * @description `readOffset` が数百溜まるたびに先頭を切り捨て、内蔵配列の前詰めコストを抑える。
+   */
+  private compactInputQueuePrefixIfNeeded(reason: string): void {
+    const off = this.inputQueueReadOffset;
+    if (off < 384) return;
+    const lenBefore = this.inputQueue.length;
+    this.inputQueue = this.inputQueue.slice(off);
+    this.inputQueueReadOffset = 0;
+    if (WEBCODECS_FINE_TRACE) {
+      this.fineTrace(
+        `STEP inQ compact reason=${reason} droppedPrefix=${off} lenBefore=${lenBefore} lenAfter=${this.inputQueue.length}`,
+      );
+    }
   }
 
   /**
@@ -359,14 +530,83 @@ export class WebCodecsMp4ExportSession {
   }
 
   /**
+   * @description 現在すでに抱えている future 量の rough count。
+   * `pendingDecodes` も足しておくと、decode 済み待ちだけでなく in-flight も含めて見積もれる。
+   */
+  private bufferedFrameBudgetCount(): number {
+    return this.outputQueue.length + this.pendingDecodes;
+  }
+
+  /**
+   * @description いまの holder / outputQueue だけで target の表示候補が決まっているか。
+   *   `targetBudget stop` はこの条件が true になってから初めて強く効かせる。
+   */
+  private hasSatisfiedBufferedSelection(targetUs: number): boolean {
+    return hasSatisfiedSelectionByBufferedFrames({
+      targetUs,
+      holderUs: this.holder?.timestamp ?? null,
+      nextOutputUs: this.outputQueue[0]?.timestamp ?? null,
+      flushCompleted: this.flushCompleted,
+    });
+  }
+
+  /**
    * @description 現在の target PTS に対して decode を止める future 側の上界。
    */
   private decodeUpperBoundUsForTarget(targetUs: number): number {
     return computeDecodeUpperBoundUs({
       targetUs,
       frameDurationUs: this.frameDurationUsHint,
-      hasBufferedFrame: this.holder !== null || this.outputQueue.length > 0,
+      hasSatisfiedSelection: this.hasSatisfiedBufferedSelection(targetUs),
     });
+  }
+
+  /**
+   * @description 現在 target から見て future バッファが薄いとき、描画後に top-up を走らせる。
+   * これで fast path でも buffer を枯らし切らず、序盤の速さを維持しやすくする。
+   */
+  private requestPrefetchAhead(targetUs: number): void {
+    if (this.decodeFatal) return;
+    if (this.flushPromise || this.flushCompleted) return;
+    if (this.inQPendingCount() === 0) return;
+    if (this.bufferedFrameBudgetCount() >= STEADY_DECODE_LEAD_FRAMES) return;
+
+    const desiredTargetUs = this.decodeUpperBoundUsForTarget(targetUs);
+    this.queuedPrefetchTargetUs =
+      this.queuedPrefetchTargetUs === null
+        ? desiredTargetUs
+        : Math.max(this.queuedPrefetchTargetUs, desiredTargetUs);
+    if (this.prefetchInFlight) return;
+
+    this.prefetchInFlight = true;
+    void (async () => {
+      try {
+        while (!this.decodeFatal && this.queuedPrefetchTargetUs !== null) {
+          const prefetchTargetUs = this.queuedPrefetchTargetUs;
+          this.queuedPrefetchTargetUs = null;
+          await this.schedulePump(prefetchTargetUs);
+          if (this.decodeFatal) return;
+          if (this.inQPendingCount() === 0) return;
+          if (this.liveFrameCount() >= MAX_LIVE_VIDEO_FRAMES) return;
+          if (this.bufferedFrameBudgetCount() >= STEADY_DECODE_LEAD_FRAMES) return;
+          const nextInputPtsUs = this.peekNextInputPtsUs();
+          if (nextInputPtsUs !== null && nextInputPtsUs <= prefetchTargetUs) {
+            this.queuedPrefetchTargetUs = prefetchTargetUs;
+          }
+        }
+      } finally {
+        this.prefetchInFlight = false;
+        if (
+          !this.decodeFatal &&
+          this.queuedPrefetchTargetUs === null &&
+          this.requestedTargetUs !== null &&
+          this.inQPendingCount() > 0 &&
+          this.bufferedFrameBudgetCount() < PREFETCH_RESUME_THRESHOLD_FRAMES
+        ) {
+          this.requestPrefetchAhead(this.requestedTargetUs);
+        }
+      }
+    })();
   }
 
   /**
@@ -448,15 +688,15 @@ export class WebCodecsMp4ExportSession {
             canvas.width = codedWidth;
             canvas.height = codedHeight;
             /**
-             * Electron + VideoToolbox では同じスレッドで decode を連打すると output が一度も来ないことがある。
-             * まずソフトウェア優先を試し、ダメなら既定に戻す。
+             * Electron では HW デコード連打で不安定な事例があるため **ソフト優先**を維持。
+             * 今回は stall 側の切り分けを優先し、`optimizeForLatency` は safe side の定数でまとめて切り替える。
              */
             const preferSoftware: VideoDecoderConfig = {
               codec,
               codedWidth,
               codedHeight,
               hardwareAcceleration: "prefer-software",
-              optimizeForLatency: true,
+              optimizeForLatency: WEBCODECS_OPTIMIZE_FOR_LATENCY,
             };
             let sup = await VideoDecoder.isConfigSupported(preferSoftware);
             let decoderConfigureBase: VideoDecoderConfig = preferSoftware;
@@ -465,7 +705,7 @@ export class WebCodecsMp4ExportSession {
                 codec,
                 codedWidth,
                 codedHeight,
-                optimizeForLatency: true,
+                optimizeForLatency: WEBCODECS_OPTIMIZE_FOR_LATENCY,
               };
               sup = await VideoDecoder.isConfigSupported(fallback);
               decoderConfigureBase = fallback;
@@ -531,6 +771,7 @@ export class WebCodecsMp4ExportSession {
               decoderConfigureBase,
               decoder,
               canvas,
+              ctx,
               texture,
             );
             sessionRef.current = session;
@@ -539,7 +780,7 @@ export class WebCodecsMp4ExportSession {
             mp4.onSamples = (_id, _user, samples) => {
               session.onSamplesBatch(samples);
             };
-            mp4.setExtractionOptions(vtrack.id, {}, { nbSamples: 128 });
+            mp4.setExtractionOptions(vtrack.id, {}, { nbSamples: MP4_EXTRACTION_SAMPLES_PER_PULL });
             mp4.start();
             onTrace(
               `[動画][WebCodecs] 初期化 OK track=${vtrack.id} codec=${codec} samples=${session.nbSamplesTotal}`,
@@ -571,6 +812,7 @@ export class WebCodecsMp4ExportSession {
    */
   private async waitForOutputOrError(timeoutMs: number = DECODE_OUTPUT_WAIT_MS): Promise<void> {
     if (this.outputQueue.length > 0 || this.decodeFatal) return;
+    const waitStartedMs = performance.now();
     this.fineTrace(
       `STEP waitOutput BEFORE race timeout=${timeoutMs}ms | ${this.snapshotForTrace()}`,
     );
@@ -597,6 +839,10 @@ export class WebCodecsMp4ExportSession {
         }
       }
     }
+    if (WEBCODECS_BUCKET_PROFILE) {
+      this.bucketWaitOutputCalls += 1;
+      this.bucketWaitOutputTotalMs += performance.now() - waitStartedMs;
+    }
     this.fineTrace(`STEP waitOutput AFTER race | ${this.snapshotForTrace()}`);
   }
 
@@ -622,13 +868,15 @@ export class WebCodecsMp4ExportSession {
     const targetUs = this.requestedTargetUs;
     const upperBoundUs =
       targetUs === null ? null : this.decodeUpperBoundUsForTarget(targetUs);
+    const selectionReady =
+      targetUs === null ? null : this.hasSatisfiedBufferedSelection(targetUs);
     return (
       `decoderState=${this.decoder.state} pendingDecodes=${this.pendingDecodes} ` +
-      `inQ=${this.inputQueue.length} outQ=${this.outputQueue.length} decodeQueueSize=${decodeQueueSize} ` +
+      `inQ=${this.inQPendingCount()} outQ=${this.outputQueue.length} decodeQueueSize=${decodeQueueSize} ` +
       `submitted=${this.decodeSubmitCount} outputCb=${this.decodeOutputCount} ` +
       `liveFrames=${this.liveFrameCount()} liveFramePeak=${this.liveFramePeak} closedFrames=${this.closedFrameCount} ` +
       `frameDurationHintUs=${this.frameDurationUsHint} targetUs=${targetUs ?? "none"} ` +
-      `nextInputPtsUs=${nextInputPtsUs ?? "none"} upperBoundUs=${upperBoundUs ?? "none"} ` +
+      `nextInputPtsUs=${nextInputPtsUs ?? "none"} upperBoundUs=${upperBoundUs ?? "none"} selectionReady=${selectionReady ?? "none"} ` +
       `configured=${this.decoderConfigured} extractionDone=${this.extractionDone} fatal=${this.decodeFatal ? this.decodeFatal.message : "none"}`
     );
   }
@@ -695,7 +943,7 @@ export class WebCodecsMp4ExportSession {
       this.inputQueue.push(s);
     }
     this.samplesReceived += samples.length;
-    const extractionBatchSize = 128;
+    const extractionBatchSize = MP4_EXTRACTION_SAMPLES_PER_PULL;
     if (
       (this.nbSamplesTotal > 0 &&
         this.samplesReceived >= this.nbSamplesTotal) ||
@@ -704,7 +952,7 @@ export class WebCodecsMp4ExportSession {
       this.extractionDone = true;
     }
     this.fineTrace(
-      `STEP onSamplesBatch afterPush inQ=${this.inputQueue.length} extractionDone=${this.extractionDone} dec=${this.decoder.state}`,
+      `STEP onSamplesBatch afterPush inQ=${this.inQPendingCount()} bufLen=${this.inputQueue.length} extractionDone=${this.extractionDone} dec=${this.decoder.state}`,
     );
     if (this.requestedTargetUs !== null || this.outputWaiters.length > 0) {
       void this.schedulePump(this.requestedTargetUs);
@@ -718,16 +966,19 @@ export class WebCodecsMp4ExportSession {
    * @returns 今回キューした pumpDecoderImpl 1 回ぶんの完了 Promise（待つと入力キューが一段進む）
    */
   private schedulePump(targetUs: number | null = this.requestedTargetUs): Promise<void> {
+    if (WEBCODECS_BUCKET_PROFILE) {
+      this.bucketSchedulePumpCalls += 1;
+    }
     const scheduleId = (this.pumpScheduleId += 1);
     this.fineTrace(
-      `STEP schedulePump#${scheduleId} BEFORE chain targetUs=${targetUs ?? "none"} | inQ=${this.inputQueue.length} pend=${this.pendingDecodes} sub=${this.decodeSubmitCount} out=${this.decodeOutputCount}`,
+      `STEP schedulePump#${scheduleId} BEFORE chain targetUs=${targetUs ?? "none"} | inQ=${this.inQPendingCount()} pend=${this.pendingDecodes} sub=${this.decodeSubmitCount} out=${this.decodeOutputCount}`,
     );
     const p = this.pumpChain
       .then(async () => {
         this.fineTrace(`STEP schedulePump#${scheduleId} pumpImpl START`);
         await this.pumpDecoderImpl(targetUs);
         this.fineTrace(
-          `STEP schedulePump#${scheduleId} pumpImpl END | inQ=${this.inputQueue.length} pend=${this.pendingDecodes} sub=${this.decodeSubmitCount} out=${this.decodeOutputCount} dec=${this.decoder.state}`,
+          `STEP schedulePump#${scheduleId} pumpImpl END | inQ=${this.inQPendingCount()} pend=${this.pendingDecodes} sub=${this.decodeSubmitCount} out=${this.decodeOutputCount} dec=${this.decoder.state}`,
         );
       })
       .catch((e) => {
@@ -752,6 +1003,17 @@ export class WebCodecsMp4ExportSession {
   }
 
   /**
+   * @description 初回 output 前は毎 decode で譲り、流れ始めたら **4 回に 1 回** `setTimeout(0)`（output を間に受けやすくする）。
+   */
+  private shouldYieldAfterDecode(decodeSubmitsThisPump: number): boolean {
+    if (this.decodeOutputCount === 0) return true;
+    if (this.pendingDecodes >= Math.floor(MAX_PENDING_DECODE_CHUNKS / 2)) {
+      return true;
+    }
+    return decodeSubmitsThisPump % 4 === 0;
+  }
+
+  /**
    * @description inputQueue を decode するが、target PTS と live `VideoFrame` 数で future 側を縛る。
    * @param targetUs このポンプが満たしたい target PTS。null のときはまだ present 前。
    */
@@ -765,8 +1027,13 @@ export class WebCodecsMp4ExportSession {
     /** @description 今回の pump 内で decode した回数（VideoFrame 滞留を抑えるバジェット） */
     let decodeSubmitsThisPump = 0;
     let loopTurn = 0;
-    while (this.inputQueue.length > 0) {
+    while (this.inQPendingCount() > 0) {
       if (this.decodeFatal) return;
+      /**
+       * @description すでに JS が抱えている `VideoFrame`（holder + outputQueue）だけで足切りする。
+       *   `pendingDecodes` を同じ閾値に足すと、B フレーム並べ替えで **まだ `decode` が必要なのに送れず**詰まり、
+       *   暗転・無応答に繋がったため入れない（burst 抑制は `MAX_DECODE_SUBMITS_PER_PUMP` と yield に任せる）。
+       */
       if (this.liveFrameCount() >= MAX_LIVE_VIDEO_FRAMES) {
         this.fineTrace(
           `STEP pumpImpl liveBudget stop live=${this.liveFrameCount()} max=${MAX_LIVE_VIDEO_FRAMES} targetUs=${targetUs ?? "none"}`,
@@ -775,14 +1042,14 @@ export class WebCodecsMp4ExportSession {
       }
       if (decodeSubmitsThisPump >= MAX_DECODE_SUBMITS_PER_PUMP) {
         this.fineTrace(
-          `STEP pumpImpl budget stop decodeSubmitsThisPump=${decodeSubmitsThisPump} inQ=${this.inputQueue.length} outQ=${this.outputQueue.length}`,
+          `STEP pumpImpl budget stop decodeSubmitsThisPump=${decodeSubmitsThisPump} inQ=${this.inQPendingCount()} outQ=${this.outputQueue.length}`,
         );
         break;
       }
       loopTurn += 1;
       if (WEBCODECS_FINE_TRACE && (loopTurn <= 32 || loopTurn % 64 === 0)) {
         this.fineTrace(
-          `STEP pumpImpl loop=${loopTurn} inQ=${this.inputQueue.length} pend=${this.pendingDecodes} dec=${this.decoder.state}`,
+          `STEP pumpImpl loop=${loopTurn} inQ=${this.inQPendingCount()} pend=${this.pendingDecodes} dec=${this.decoder.state}`,
         );
       }
       while (this.pendingDecodes >= MAX_PENDING_DECODE_CHUNKS) {
@@ -798,11 +1065,11 @@ export class WebCodecsMp4ExportSession {
         await this.waitForOutputOrError(DECODE_OUTPUT_WAIT_MS);
         if (this.decodeFatal) return;
       }
-      const sample = this.inputQueue[0]!;
+      const sample = this.inputQueue[this.inputQueueReadOffset]!;
       const data = sample.data;
       if (!data || data.byteLength === 0) {
         this.fineTrace("STEP pumpImpl SKIP empty sample.data（drop 1）");
-        this.inputQueue.shift();
+        this.consumeInputQueueHead("skip-empty-sample");
         continue;
       }
       const stamp = Math.max(
@@ -819,9 +1086,10 @@ export class WebCodecsMp4ExportSession {
       this.noteFrameDurationHint(dur);
       if (targetUs !== null) {
         const upperBoundUs = this.decodeUpperBoundUsForTarget(targetUs);
+        const selectionReady = this.hasSatisfiedBufferedSelection(targetUs);
         if (stamp > upperBoundUs && this.liveFrameCount() > 0) {
           this.fineTrace(
-            `STEP pumpImpl targetBudget stop nextStamp=${stamp} upperBoundUs=${upperBoundUs} targetUs=${targetUs} live=${this.liveFrameCount()}`,
+            `STEP pumpImpl targetBudget stop nextStamp=${stamp} upperBoundUs=${upperBoundUs} targetUs=${targetUs} live=${this.liveFrameCount()} selectionReady=${selectionReady ? "Y" : "N"}`,
           );
           break;
         }
@@ -861,14 +1129,16 @@ export class WebCodecsMp4ExportSession {
         this.pendingDecodes++;
         this.decoder.decode(chunk);
         this.decodeSubmitCount++;
-        this.inputQueue.shift();
+        this.consumeInputQueueHead("after-decode");
         if (WEBCODECS_FINE_TRACE && this.decodeSubmitCount <= 24) {
           this.fineTrace(
             `STEP pumpImpl AFTER decode sub=${this.decodeSubmitCount} pend=${this.pendingDecodes} dec=${this.decoder.state}`,
           );
         }
-        await this.yieldToEventLoopForDecoder();
         decodeSubmitsThisPump += 1;
+        if (this.shouldYieldAfterDecode(decodeSubmitsThisPump)) {
+          await this.yieldToEventLoopForDecoder();
+        }
       } catch (e) {
         this.pendingDecodes = Math.max(0, this.pendingDecodes - 1);
         const msg = e instanceof Error ? e.message : String(e);
@@ -877,7 +1147,7 @@ export class WebCodecsMp4ExportSession {
         return;
       }
     }
-    if (this.extractionDone && this.inputQueue.length === 0 && !this.flushPromise) {
+    if (this.extractionDone && this.inQPendingCount() === 0 && !this.flushPromise) {
       this.fineTrace(
         `STEP pumpImpl scheduling decoder.flush sub=${this.decodeSubmitCount} out=${this.decodeOutputCount}`,
       );
@@ -921,13 +1191,37 @@ export class WebCodecsMp4ExportSession {
     );
     this.drawHolderToCanvas();
     this.texture.needsUpdate = true;
-    this.fineTrace(`STEP present EXIT advanceMs=${(performance.now() - t0).toFixed(1)}`);
-    return { advanceMs: performance.now() - t0 };
+    this.requestPrefetchAhead(targetUs);
+    const advanceMs = performance.now() - t0;
+    this.fineTrace(`STEP present EXIT advanceMs=${advanceMs.toFixed(1)}`);
+    if (WEBCODECS_BUCKET_PROFILE) {
+      this.sampleBucketQueues();
+      this.presentExportOrdinal += 1;
+      if (this.presentExportOrdinal % WEBCODECS_BUCKET_EVERY_PRESENT_FRAMES === 0) {
+        const hi = this.presentExportOrdinal;
+        const lo = hi - WEBCODECS_BUCKET_EVERY_PRESENT_FRAMES + 1;
+        this.emitWebCodecsBucketLine(lo, hi, "every100");
+        this.resetBucketAccumulators();
+      }
+    }
+    return { advanceMs };
   }
 
   private async ensureDecoderFedForTarget(targetUs: number): Promise<void> {
     await this.waitUntilDecoderConfiguredOrThrow();
     this.requestedTargetUs = targetUs;
+    this.advanceHolderToTargetPts(targetUs);
+    if (this.selectionSatisfied(targetUs)) {
+      if (WEBCODECS_BUCKET_PROFILE) {
+        this.bucketEnsureFedFastPathHits += 1;
+      }
+      if (WEBCODECS_FINE_TRACE) {
+        this.fineTrace(
+          `STEP ensureFed fast-path sat=true holderTs=${this.holder?.timestamp ?? "null"} nextOutTs=${this.outputQueue[0]?.timestamp ?? "none"}`,
+        );
+      }
+      return;
+    }
     const maxIter = Math.max(4096, this.nbSamplesTotal * 2 + 64);
     for (let i = 0; i < maxIter; i++) {
       if (this.decodeFatal) throw this.decodeFatal;
@@ -976,20 +1270,7 @@ export class WebCodecsMp4ExportSession {
    */
   private selectionSatisfied(targetUs: number): boolean {
     if (this.decodeFatal) return false;
-    if (this.holder === null) {
-      return false;
-    }
-    if (this.holder.timestamp > targetUs) {
-      return true;
-    }
-    const nextPts = this.outputQueue[0]?.timestamp;
-    if (nextPts !== undefined) {
-      return this.holder.timestamp <= targetUs && nextPts > targetUs;
-    }
-    if (!this.flushCompleted) {
-      return false;
-    }
-    return true;
+    return this.hasSatisfiedBufferedSelection(targetUs);
   }
 
   private advanceHolderToTargetPts(targetUs: number): void {
@@ -1006,17 +1287,12 @@ export class WebCodecsMp4ExportSession {
   }
 
   private drawHolderToCanvas(): void {
-    const ctx = this.canvas.getContext("2d", { colorSpace: "srgb" });
-    if (!ctx) {
-      throw new Error("drawHolderToCanvas: 2D context がありません");
-    }
     if (!this.holder) {
       throw new Error(
         "drawHolderToCanvas: VideoFrame がありません（デコード不足）",
       );
     }
-    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    ctx.drawImage(
+    this.canvasContext.drawImage(
       this.holder,
       0,
       0,
