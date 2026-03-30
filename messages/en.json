@@ -447,49 +447,41 @@
       "halationHue": "Hue"
     },
     "desktopRelease": {
-      "eyebrow": "Desktop release",
-      "title": "Film Lab Desktop for macOS",
-      "body": "Batch-grade folders locally on your Mac. The public build is a notarized DMG for Apple Silicon and uses a fixed download route.",
-      "downloadCta": "Download Film Lab Desktop",
-      "supportCtaPrefix": "Support:",
-      "releaseNotesLead": "Version differences and SHA-256 checksums are published in the release notes for each build.",
-      "notes": {
-        "lut": "LUT files are not copied automatically from the preview to batch export. Only numeric Params are synced, so final confirmation should happen on the exported file.",
-        "donationAndSharing": "Donation and sharing stay off in the Desktop build. Release notes are the source of truth for version-to-version feature differences.",
-        "smartLook": "Smart Look AI is not included in this Desktop release."
+      "eyebrow": "Desktop",
+      "title": "Film Lab Desktop (macOS)",
+      "body": "Batch photos in a folder and export one video. The download is a notarized DMG for Apple Silicon.",
+      "essentials": {
+        "environmentLabel": "Requirements",
+        "environmentBody": "macOS {minMacos} or later. {arch} only — not for Intel Macs.",
+        "distributionLabel": "Download & updates",
+        "distributionBody": "Signed, notarized DMG. Updates are manual for now (replace the app by downloading a new DMG — no auto-updater)."
       },
-      "specs": {
-        "minimumMacosLabel": "Minimum macOS",
-        "minimumMacosValuePrefix": "macOS",
-        "architectureLabel": "Architecture",
-        "platformLabel": "Platform",
-        "platformValue": "macOS only",
-        "artifactLabel": "Official artifact",
-        "artifactValue": "Signed + notarized DMG",
-        "updatesLabel": "Updates",
-        "updatesValue": "Manual download replacement for now"
+      "downloadCta": "Download DMG",
+      "supportCtaPrefix": "Contact:",
+      "releaseNotesLead": "See each release’s notes for changes and SHA-256 checksums.",
+      "notes": {
+        "lut": "Only slider values sync from Preview to batch; load LUTs yourself for batch.",
+        "donationAndSharing": "Web donation & sharing are not in the Desktop build.",
+        "smartLook": "Smart Look AI is not included in this Desktop build."
       },
       "downloadPage": {
-        "eyebrow": "Fixed download URL",
-        "title": "Film Lab Desktop download is not wired yet",
-        "body": "This page will redirect to the current notarized DMG once the public asset URL is connected. Until then, use the support contact below.",
-        "pendingLead": "Public download is not live yet. The fixed route is ready, but the current build has not been attached.",
+        "eyebrow": "Download",
+        "title": "Download not configured",
+        "body": "When the DMG URL is set in the environment, this page redirects automatically. Otherwise use the Film Lab page contact link.",
+        "pendingLead": "Redirect target is not set (connect FILM_LAB_DESKTOP_DOWNLOAD_URL to fix).",
         "backCta": "Back to Film Lab",
         "supportCtaPrefix": "Contact:",
         "notes": {
-          "releaseNotes": "Version differences and SHA-256 checksums are published in the release notes for each build.",
-          "lut": "LUT files are not copied automatically from the preview to batch export. Only numeric Params are synced.",
-          "donationAndSharing": "Donation and sharing stay off in the Desktop build.",
-          "smartLook": "Smart Look AI is not included in this Desktop release."
+          "releaseNotes": "See each release’s notes for changes and SHA-256 checksums.",
+          "lut": "Only slider values sync from Preview to batch automatically.",
+          "donationAndSharing": "Web donation & sharing are not in the Desktop build.",
+          "smartLook": "Smart Look AI is not included in this Desktop build."
         },
         "specs": {
-          "minimumMacosLabel": "Minimum macOS",
-          "minimumMacosValuePrefix": "macOS",
-          "architectureLabel": "Architecture",
-          "platformLabel": "Platform",
-          "platformValue": "macOS only",
-          "updatesLabel": "Updates",
-          "updatesValue": "Manual download replacement for now"
+          "environmentLabel": "Requirements",
+          "environmentBody": "macOS {minMacos}+ · {arch} only.",
+          "distributionLabel": "Artifact & updates",
+          "distributionBody": "Signed, notarized DMG. No automatic updates."
         }
       }
     },

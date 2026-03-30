@@ -6,7 +6,7 @@
 - Architecture: Apple Silicon (`arm64`)
 - Official artifact: signed + notarized `DMG`
 - Updates: manual download replacement for now
-- Support: `hello@takumichiba.com`
+- Support: `info@fores-tone.co.jp`
 
 ## Notes
 

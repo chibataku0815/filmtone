@@ -447,49 +447,41 @@
       "halationHue": "色相"
     },
     "desktopRelease": {
-      "eyebrow": "Desktop 公開",
-      "title": "Film Lab Desktop for macOS",
-      "body": "Mac 上でフォルダ単位の書き出しを行う Desktop 版です。一般向け配布は Apple Silicon 向けの公証済み DMG を固定ダウンロード導線で案内します。",
-      "downloadCta": "Film Lab Desktop をダウンロード",
-      "supportCtaPrefix": "窓口:",
-      "releaseNotesLead": "版差分と SHA-256 チェックサムの正本は、各ビルドの release notes です。",
-      "notes": {
-        "lut": "LUT ファイルはプレビューからバッチへ自動コピーしません。同期するのは数値 Params のみなので、最終確認は必ず書き出しファイルで行ってください。",
-        "donationAndSharing": "寄付と共有は Desktop 版ではオフです。版ごとの差分の全体は release notes を正とします。",
-        "smartLook": "スマートルック AI はこの Desktop リリースには含めません。"
+      "eyebrow": "Desktop",
+      "title": "Film Lab Desktop（macOS）",
+      "body": "フォルダ内の写真の一括処理と、動画 1 本の書き出しができます。ダウンロードは公証済みの DMG（Apple Silicon 向け）です。",
+      "essentials": {
+        "environmentLabel": "動作環境",
+        "environmentBody": "macOS {minMacos} 以降。{arch} のみ。Intel Mac は非対応です。",
+        "distributionLabel": "配布・更新",
+        "distributionBody": "署名・公証済み DMG。更新は当面、新しい DMG を入れ替える形です（自動アップデートなし）。"
       },
-      "specs": {
-        "minimumMacosLabel": "最小 macOS",
-        "minimumMacosValuePrefix": "macOS",
-        "architectureLabel": "対応アーキ",
-        "platformLabel": "対応プラットフォーム",
-        "platformValue": "macOS のみ",
-        "artifactLabel": "正規配布物",
-        "artifactValue": "署名・公証済み DMG",
-        "updatesLabel": "更新方針",
-        "updatesValue": "当面は手動ダウンロード差し替え"
+      "downloadCta": "ダウンロード（DMG）",
+      "supportCtaPrefix": "お問い合わせ:",
+      "releaseNotesLead": "変更内容と SHA-256 は各リリースの release notes を見てください。",
+      "notes": {
+        "lut": "プレビューからバッチへ自動で渡るのはスライダーの数値だけです。LUT は自分で読み込んでください。",
+        "donationAndSharing": "Web 版の寄付・共有は Desktop ではありません。",
+        "smartLook": "スマートルック AI はこの Desktop 版には入っていません。"
       },
       "downloadPage": {
-        "eyebrow": "固定ダウンロード URL",
-        "title": "Film Lab Desktop のダウンロードはまだ接続されていません",
-        "body": "公開アセット URL が接続されると、このページは現行の公証済み DMG にリダイレクトします。接続前は下の窓口をご利用ください。",
-        "pendingLead": "一般向けダウンロードはまだ有効化されていません。固定ルート自体は用意済みですが、現行ビルドの公開アセットがまだ紐づいていません。",
+        "eyebrow": "ダウンロード",
+        "title": "配布ファイルの準備中です",
+        "body": "環境変数に DMG の URL が入ると、このページから自動で飛びます。お急ぎの場合は Film Lab ページのお問い合わせからどうぞ。",
+        "pendingLead": "いまはリダイレクト先が未設定です（URL を接続すると解消します）。",
         "backCta": "Film Lab に戻る",
-        "supportCtaPrefix": "窓口:",
+        "supportCtaPrefix": "お問い合わせ:",
         "notes": {
-          "releaseNotes": "版差分と SHA-256 チェックサムの正本は、各ビルドの release notes です。",
-          "lut": "LUT ファイルはプレビューからバッチへ自動コピーしません。同期するのは数値 Params のみです。",
-          "donationAndSharing": "寄付と共有は Desktop 版ではオフです。",
-          "smartLook": "スマートルック AI はこの Desktop リリースには含めません。"
+          "releaseNotes": "変更内容と SHA-256 は各リリースの release notes を見てください。",
+          "lut": "プレビューからバッチへ自動で渡るのはスライダーの数値だけです。",
+          "donationAndSharing": "Web 版の寄付・共有は Desktop ではありません。",
+          "smartLook": "スマートルック AI はこの Desktop 版には入っていません。"
         },
         "specs": {
-          "minimumMacosLabel": "最小 macOS",
-          "minimumMacosValuePrefix": "macOS",
-          "architectureLabel": "対応アーキ",
-          "platformLabel": "対応プラットフォーム",
-          "platformValue": "macOS のみ",
-          "updatesLabel": "更新方針",
-          "updatesValue": "当面は手動ダウンロード差し替え"
+          "environmentLabel": "動作環境",
+          "environmentBody": "macOS {minMacos} 以降。{arch} のみ。",
+          "distributionLabel": "配布・更新",
+          "distributionBody": "署名・公証済み DMG。自動アップデートはありません。"
         }
       }
     },
