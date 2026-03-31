@@ -26,9 +26,15 @@ uniform vec3 uHighlightTint;
 
 uniform float uSplitPosition;
 
-uniform highp sampler3D uLUT;
-uniform float uLUTIntensity;
-uniform float uLUTEnabled;
+// Input Transform LUT (applied before color grading — Log→Rec709)
+uniform highp sampler3D uLUT1;
+uniform float uLUT1Intensity;
+uniform float uLUT1Enabled;
+
+// Creative LUT (applied after color grading — film look)
+uniform highp sampler3D uLUT2;
+uniform float uLUT2Intensity;
+uniform float uLUT2Enabled;
 
 in vec2 vUv;
 out vec4 fragColor;
@@ -71,6 +77,12 @@ void main() {
     ? rgbShiftSampleRadial(uTexture, uv, uRGBShift, uImageResolution)
     : texture(uTexture, uv);
 
+  // === Input Transform LUT (LUT1) === before color grading
+  if (uLUT1Enabled > 0.5) {
+    vec3 lut1Coord = clamp(color.rgb, 0.0, 1.0);
+    color.rgb = mix(color.rgb, texture(uLUT1, lut1Coord).rgb, uLUT1Intensity);
+  }
+
   // Exposure
   color.rgb *= pow(2.0, uExposure);
 
@@ -103,11 +115,10 @@ void main() {
   color.rgb += uShadows * (1.0 - lumHS) * 0.5;
   color.rgb += uHighlights * lumHS * 0.5;
 
-  // LUT (after all color grading)
-  if (uLUTEnabled > 0.5) {
-    vec3 lutCoord = clamp(color.rgb, 0.0, 1.0);
-    vec3 lutColor = texture(uLUT, lutCoord).rgb;
-    color.rgb = mix(color.rgb, lutColor, uLUTIntensity);
+  // === Creative LUT (LUT2) === after color grading
+  if (uLUT2Enabled > 0.5) {
+    vec3 lut2Coord = clamp(color.rgb, 0.0, 1.0);
+    color.rgb = mix(color.rgb, texture(uLUT2, lut2Coord).rgb, uLUT2Intensity);
   }
 
   color.rgb = clamp(color.rgb, 0.0, 1.0);

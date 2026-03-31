@@ -53,6 +53,11 @@ export type BatchPipelineSummary = {
  */
 export type BatchGradeState = {
   params: Params;
+  /** Input Transform LUT (before grading — Log→Rec709) */
+  lut1Intensity: number;
+  lut1Data: Float32Array | null;
+  lut1Size: number;
+  /** Creative LUT (after grading — film look) */
   lutIntensity: number;
   lutData: Float32Array | null;
   lutSize: number;
@@ -64,6 +69,9 @@ export type BatchGradeState = {
 export function batchGradeStateFromPreset(preset: PresetName): BatchGradeState {
   return {
     params: PRESETS[preset],
+    lut1Intensity: 1,
+    lut1Data: null,
+    lut1Size: 0,
     lutIntensity: 1,
     lutData: null,
     lutSize: 0,
@@ -119,6 +127,9 @@ export async function resolveGradeFromJsonText(
   jsonText: string,
 ): Promise<{
   params: Params;
+  lut1Intensity: number;
+  lut1Data: Float32Array | null;
+  lut1Size: number;
   lutIntensity: number;
   lutData: Float32Array | null;
   lutSize: number;
@@ -147,6 +158,22 @@ export async function resolveGradeFromJsonText(
       );
     }
     const g = parsed.data;
+
+    // LUT1: Input Transform
+    let lut1Data: Float32Array | null = null;
+    let lut1Size = 0;
+    const lut1On = g.lut1Enabled !== false;
+    if (lut1On && g.lut1CubeRelPath) {
+      const cube1Text = await api.readCubeRelativeToGrade(
+        gradeJsonPath,
+        g.lut1CubeRelPath,
+      );
+      const cube1 = parseCube(cube1Text);
+      lut1Data = cube1.data;
+      lut1Size = cube1.size;
+    }
+
+    // LUT2: Creative
     let lutData: Float32Array | null = null;
     let lutSize = 0;
     const lutOn = g.lutEnabled !== false;
@@ -159,8 +186,12 @@ export async function resolveGradeFromJsonText(
       lutData = cube.data;
       lutSize = cube.size;
     }
+
     return {
       params: g.grade,
+      lut1Intensity: g.lut1Intensity ?? 1,
+      lut1Data,
+      lut1Size,
       lutIntensity: g.lutIntensity ?? 1,
       lutData,
       lutSize,
@@ -171,6 +202,9 @@ export async function resolveGradeFromJsonText(
   if (flat.success) {
     return {
       params: flat.data,
+      lut1Intensity: 1,
+      lut1Data: null,
+      lut1Size: 0,
       lutIntensity: 1,
       lutData: null,
       lutSize: 0,
@@ -180,6 +214,9 @@ export async function resolveGradeFromJsonText(
   if (typeof o.preset === "string" && o.preset in PRESETS) {
     return {
       params: PRESETS[o.preset as PresetName],
+      lut1Intensity: 1,
+      lut1Data: null,
+      lut1Size: 0,
       lutIntensity: 1,
       lutData: null,
       lutSize: 0,
@@ -191,6 +228,9 @@ export async function resolveGradeFromJsonText(
     if (preset) {
       return {
         params: PRESETS[preset],
+        lut1Intensity: 1,
+        lut1Data: null,
+        lut1Size: 0,
         lutIntensity: 1,
         lutData: null,
         lutSize: 0,
@@ -362,11 +402,20 @@ export async function runBatchPipeline(options: {
         halationColor: halationHueToHex(grade.params.halationHue),
       });
 
-      if (grade.lutData && grade.lutSize > 0) {
-        viewport.setLUT(grade.lutData, grade.lutSize);
-        viewport.setLUTIntensity(grade.lutIntensity);
+      // LUT1: Input Transform (before grading)
+      if (grade.lut1Data && grade.lut1Size > 0) {
+        viewport.setLUT1(grade.lut1Data, grade.lut1Size);
+        viewport.setLUT1Intensity(grade.lut1Intensity);
       } else {
-        viewport.clearLUT();
+        viewport.clearLUT1();
+      }
+
+      // LUT2: Creative (after grading)
+      if (grade.lutData && grade.lutSize > 0) {
+        viewport.setLUT2(grade.lutData, grade.lutSize);
+        viewport.setLUT2Intensity(grade.lutIntensity);
+      } else {
+        viewport.clearLUT2();
       }
 
       viewport.setTime(0);

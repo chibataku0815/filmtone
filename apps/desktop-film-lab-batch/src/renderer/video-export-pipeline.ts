@@ -932,11 +932,19 @@ export async function runVideoExportPipeline(options: {
           ...grade.params,
           halationColor: halationHueToHex(grade.params.halationHue),
         });
-        if (grade.lutData && grade.lutSize > 0) {
-          viewport.setLUT(grade.lutData, grade.lutSize);
-          viewport.setLUTIntensity(grade.lutIntensity);
+        // LUT1: Input Transform (before grading)
+        if (grade.lut1Data && grade.lut1Size > 0) {
+          viewport.setLUT1(grade.lut1Data, grade.lut1Size);
+          viewport.setLUT1Intensity(grade.lut1Intensity);
         } else {
-          viewport.clearLUT();
+          viewport.clearLUT1();
+        }
+        // LUT2: Creative (after grading)
+        if (grade.lutData && grade.lutSize > 0) {
+          viewport.setLUT2(grade.lutData, grade.lutSize);
+          viewport.setLUT2Intensity(grade.lutIntensity);
+        } else {
+          viewport.clearLUT2();
         }
 
         const gl = renderer.getContext() as WebGL2RenderingContext;

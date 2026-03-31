@@ -283,7 +283,7 @@
                                 "applyEditToExportBtn": "Apply Edit sliders to export",
                                 "applyEditWaitHint": "Open Edit and wait until the preview is ready",
                                 "applyEditHintAria": "How copy from Edit works",
-                                "sameAsFooterSend": "Same as “Send grade to Export” on Edit. LUT not included.",
+                                "sameAsFooterSend": "Same as “Send grade to Export” on Edit. LUT included.",
                                 "currentExportLookLabel": "Current export look",
                                 "currentExportLookImportJson": "JSON file: {path}",
                                 "currentExportLookPreset": "Starting from preset “{preset}”. Use the button above to replace with Edit values.",
@@ -358,7 +358,7 @@
                         "logs": {
                                 "syncException": "Error while copying to Export: {msg}",
                                 "syncNoViewport": "(Edit) Cannot sync — viewport not ready.",
-                                "syncCopied": "Copied slider settings for export from preview (LUT not included).",
+                                "syncCopied": "Copied look settings for export from preview (including LUT).",
                                 "gradeJsonLoaded": "Loaded Grade JSON: {path}",
                                 "gradeJsonError": "Grade JSON error: {msg}",
                                 "gradeJsonDownloaded": "Downloaded Grade JSON (film-lab-grade.json).",

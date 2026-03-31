@@ -156,9 +156,12 @@ export class Viewport {
         uShadows: { value: 0.0 },
         /** -1 で分割オフ（全面がグレード後）。0〜1 で Before/After または A/B の境界 */
         uSplitPosition: { value: -1.0 },
-        uLUT: { value: null },
-        uLUTIntensity: { value: 1.0 },
-        uLUTEnabled: { value: 0.0 },
+        uLUT1: { value: null },
+        uLUT1Intensity: { value: 1.0 },
+        uLUT1Enabled: { value: 0.0 },
+        uLUT2: { value: null },
+        uLUT2Intensity: { value: 1.0 },
+        uLUT2Enabled: { value: 0.0 },
         uFlipY: { value: 0.0 },
       },
     });
@@ -613,10 +616,13 @@ export class Viewport {
 
   // ===== LUT =====
 
-  setLUT(data: Float32Array, size: number): void {
-    const prev = this.material.uniforms.uLUT?.value as THREE.Data3DTexture | null;
-    if (prev) prev.dispose();
+  /** Retained for sync (e.g. edit→batch transfer). Not used for rendering. */
+  private lut1RawData: Float32Array | null = null;
+  private lut1RawSize = 0;
+  private lut2RawData: Float32Array | null = null;
+  private lut2RawSize = 0;
 
+  private createLUT3DTexture(data: Float32Array, size: number): THREE.Data3DTexture {
     const texture = new THREE.Data3DTexture(data, size, size, size);
     texture.format = THREE.RGBAFormat;
     texture.type = THREE.FloatType;
@@ -626,20 +632,92 @@ export class Viewport {
     texture.wrapT = THREE.ClampToEdgeWrapping;
     texture.wrapR = THREE.ClampToEdgeWrapping;
     texture.needsUpdate = true;
-
-    this.material.uniforms.uLUT!.value = texture;
-    this.material.uniforms.uLUTEnabled!.value = 1.0;
+    return texture;
   }
 
+  // --- LUT1: Input Transform (before color grading — Log→Rec709) ---
+
+  setLUT1(data: Float32Array, size: number): void {
+    const prev = this.material.uniforms.uLUT1?.value as THREE.Data3DTexture | null;
+    if (prev) prev.dispose();
+    this.material.uniforms.uLUT1!.value = this.createLUT3DTexture(data, size);
+    this.material.uniforms.uLUT1Enabled!.value = 1.0;
+    this.lut1RawData = data;
+    this.lut1RawSize = size;
+  }
+
+  clearLUT1(): void {
+    const tex = this.material.uniforms.uLUT1?.value as THREE.Data3DTexture | null;
+    if (tex) tex.dispose();
+    this.material.uniforms.uLUT1!.value = null;
+    this.material.uniforms.uLUT1Enabled!.value = 0.0;
+    this.lut1RawData = null;
+    this.lut1RawSize = 0;
+  }
+
+  setLUT1Intensity(value: number): void {
+    this.material.uniforms.uLUT1Intensity!.value = value;
+  }
+
+  // --- LUT2: Creative (after color grading — film look) ---
+
+  setLUT2(data: Float32Array, size: number): void {
+    const prev = this.material.uniforms.uLUT2?.value as THREE.Data3DTexture | null;
+    if (prev) prev.dispose();
+    this.material.uniforms.uLUT2!.value = this.createLUT3DTexture(data, size);
+    this.material.uniforms.uLUT2Enabled!.value = 1.0;
+    this.lut2RawData = data;
+    this.lut2RawSize = size;
+  }
+
+  clearLUT2(): void {
+    const tex = this.material.uniforms.uLUT2?.value as THREE.Data3DTexture | null;
+    if (tex) tex.dispose();
+    this.material.uniforms.uLUT2!.value = null;
+    this.material.uniforms.uLUT2Enabled!.value = 0.0;
+    this.lut2RawData = null;
+    this.lut2RawSize = 0;
+  }
+
+  setLUT2Intensity(value: number): void {
+    this.material.uniforms.uLUT2Intensity!.value = value;
+  }
+
+  // --- Backward-compatible aliases (delegate to LUT2 / Creative) ---
+
+  /** @deprecated Use setLUT2() */
+  setLUT(data: Float32Array, size: number): void {
+    this.setLUT2(data, size);
+  }
+
+  /** @deprecated Use clearLUT2() */
   clearLUT(): void {
-    const lutTexture = this.material.uniforms.uLUT?.value as THREE.Data3DTexture | null;
-    if (lutTexture) lutTexture.dispose();
-    this.material.uniforms.uLUT!.value = null;
-    this.material.uniforms.uLUTEnabled!.value = 0.0;
+    this.clearLUT2();
   }
 
+  /** @deprecated Use setLUT2Intensity() */
   setLUTIntensity(value: number): void {
-    this.material.uniforms.uLUTIntensity!.value = value;
+    this.setLUT2Intensity(value);
+  }
+
+  // --- LUT data getters (for edit→batch sync) ---
+
+  getLUT1Snapshot(): { data: Float32Array; size: number; intensity: number } | null {
+    if (!this.lut1RawData) return null;
+    return {
+      data: this.lut1RawData,
+      size: this.lut1RawSize,
+      intensity: this.material.uniforms.uLUT1Intensity!.value as number,
+    };
+  }
+
+  getLUT2Snapshot(): { data: Float32Array; size: number; intensity: number } | null {
+    if (!this.lut2RawData) return null;
+    return {
+      data: this.lut2RawData,
+      size: this.lut2RawSize,
+      intensity: this.material.uniforms.uLUT2Intensity!.value as number,
+    };
   }
 
   // ===== Export Y-flip =====
@@ -824,8 +902,10 @@ export class Viewport {
     this.rtHalation0?.dispose();
     this.rtHalation1?.dispose();
     this.rtCompareComposite?.dispose();
-    const lutTexture = this.material.uniforms.uLUT?.value as THREE.Data3DTexture | null;
-    if (lutTexture) lutTexture.dispose();
+    const lut1Texture = this.material.uniforms.uLUT1?.value as THREE.Data3DTexture | null;
+    if (lut1Texture) lut1Texture.dispose();
+    const lut2Texture = this.material.uniforms.uLUT2?.value as THREE.Data3DTexture | null;
+    if (lut2Texture) lut2Texture.dispose();
     const mediaTexture = this.material.uniforms.uTexture?.value as THREE.Texture | null;
     if (mediaTexture) mediaTexture.dispose();
     this.histogramBuffer = null;

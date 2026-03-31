@@ -95,6 +95,9 @@ async function resolveBatchGradeSnapshot(
     );
     return {
       params: g.params,
+      lut1Intensity: g.lut1Intensity,
+      lut1Data: g.lut1Data,
+      lut1Size: g.lut1Size,
       lutIntensity: g.lutIntensity,
       lutData: g.lutData,
       lutSize: g.lutSize,
@@ -110,6 +113,9 @@ async function resolveBatchGradeSnapshot(
     );
     return {
       params: g.params,
+      lut1Intensity: g.lut1Intensity,
+      lut1Data: g.lut1Data,
+      lut1Size: g.lut1Size,
       lutIntensity: g.lutIntensity,
       lutData: g.lutData,
       lutSize: g.lutSize,
@@ -434,11 +440,16 @@ export default function App() {
     try {
       const raw = viewport.getParams();
       const params = viewportRecordToParams(raw, batchGrade.params.halationHue);
+      const lut1 = viewport.getLUT1Snapshot();
+      const lut2 = viewport.getLUT2Snapshot();
       setBatchGrade({
         params,
-        lutIntensity: 1,
-        lutData: null,
-        lutSize: 0,
+        lut1Intensity: lut1?.intensity ?? 1,
+        lut1Data: lut1?.data ?? null,
+        lut1Size: lut1?.size ?? 0,
+        lutIntensity: lut2?.intensity ?? 1,
+        lutData: lut2?.data ?? null,
+        lutSize: lut2?.size ?? 0,
       });
       setImportedGradeLabel(null);
       setBatchPresetChoice(canvasPreset);
@@ -474,6 +485,9 @@ export default function App() {
       const g = await resolveGradeFromJsonText(window.filmLabBatch, p, text);
       setBatchGrade({
         params: g.params,
+        lut1Intensity: g.lut1Intensity,
+        lut1Data: g.lut1Data,
+        lut1Size: g.lut1Size,
         lutIntensity: g.lutIntensity,
         lutData: g.lutData,
         lutSize: g.lutSize,

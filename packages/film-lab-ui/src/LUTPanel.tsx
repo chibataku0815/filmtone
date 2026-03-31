@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { parseCube } from "film-lab-core";
 import { ControlSlider } from "./ui/ControlSlider";
 import type { Viewport } from "film-lab-renderer";
@@ -12,100 +12,243 @@ interface LUTPanelProps {
 }
 
 export function LUTPanel({ viewport, onCubeLutLoaded }: LUTPanelProps) {
+  // --- Creative LUT (main slot) ---
   const [lutName, setLutName] = useState<string | null>(null);
   const [intensity, setIntensity] = useState(1.0);
   const [error, setError] = useState<string | null>(null);
 
-  const handleLoad = () => {
-    if (!viewport) {
-      setError("Viewport not ready");
-      return;
-    }
-    setError(null);
+  // --- Log Conversion (advanced, collapsed by default) ---
+  const [logOpen, setLogOpen] = useState(false);
+  const [logLutName, setLogLutName] = useState<string | null>(null);
+  const [logIntensity, setLogIntensity] = useState(1.0);
+  const [logError, setLogError] = useState<string | null>(null);
 
-    const input = document.createElement("input");
-    input.type = "file";
-    // accept を除去 — .cube はカスタム拡張子のため OS によって表示されない
-    input.onchange = async () => {
-      const file = input.files?.[0];
-      if (!file) return;
-
-      if (!file.name.endsWith(".cube")) {
-        setError("Only .cube files are supported");
+  const pickCubeFile = useCallback(
+    (
+      onSuccess: (
+        lut: { data: Float32Array; size: number; title: string },
+        fileName: string,
+      ) => void,
+      onError: (msg: string) => void,
+    ) => {
+      if (!viewport) {
+        onError("Viewport not ready");
         return;
       }
+      const input = document.createElement("input");
+      input.type = "file";
+      input.onchange = async () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        if (!file.name.endsWith(".cube")) {
+          onError("Only .cube files are supported");
+          return;
+        }
+        try {
+          const text = await file.text();
+          const lut = parseCube(text);
+          onSuccess(lut, file.name);
+        } catch (err) {
+          console.error("LUT load failed:", err);
+          onError("Failed to load LUT");
+        }
+      };
+      input.click();
+    },
+    [viewport],
+  );
 
-      try {
-        const text = await file.text();
-        const lut = parseCube(text);
-        viewport.setLUT(lut.data, lut.size);
-        setLutName(lut.title || file.name);
+  // ── Creative LUT handlers ──
+
+  const handleLoad = useCallback(() => {
+    setError(null);
+    pickCubeFile(
+      (lut, fileName) => {
+        viewport!.setLUT2(lut.data, lut.size);
+        setLutName(lut.title || fileName);
         setError(null);
         onCubeLutLoaded?.();
-      } catch (err) {
-        console.error("LUT load failed:", err);
-        setError("Failed to load LUT");
-      }
-    };
-    input.click();
-  };
+      },
+      setError,
+    );
+  }, [viewport, pickCubeFile, onCubeLutLoaded]);
 
-  const handleClear = () => {
-    viewport?.clearLUT();
+  const handleClear = useCallback(() => {
+    viewport?.clearLUT2();
     setLutName(null);
     setIntensity(1.0);
     setError(null);
-  };
+  }, [viewport]);
 
-  const handleIntensity = (value: number) => {
-    setIntensity(value);
-    viewport?.setLUTIntensity(value);
-  };
+  const handleIntensity = useCallback(
+    (value: number) => {
+      setIntensity(value);
+      viewport?.setLUT2Intensity(value);
+    },
+    [viewport],
+  );
+
+  // ── Log Conversion handlers ──
+
+  const handleLogLoad = useCallback(() => {
+    setLogError(null);
+    pickCubeFile(
+      (lut, fileName) => {
+        viewport!.setLUT1(lut.data, lut.size);
+        setLogLutName(lut.title || fileName);
+        setLogError(null);
+        onCubeLutLoaded?.();
+        if (!logOpen) setLogOpen(true);
+      },
+      setLogError,
+    );
+  }, [viewport, pickCubeFile, onCubeLutLoaded, logOpen]);
+
+  const handleLogClear = useCallback(() => {
+    viewport?.clearLUT1();
+    setLogLutName(null);
+    setLogIntensity(1.0);
+    setLogError(null);
+  }, [viewport]);
+
+  const handleLogIntensity = useCallback(
+    (value: number) => {
+      setLogIntensity(value);
+      viewport?.setLUT1Intensity(value);
+    },
+    [viewport],
+  );
 
   return (
     <div>
-      <h3 className="mb-2 mt-3 text-[10px] font-medium uppercase tracking-[0.15em] text-white/40">
+      {/* ── Section header ── */}
+      <h3 className="mb-2 mt-3 text-[10px] font-medium uppercase tracking-[0.15em] text-white/40 first:mt-0">
         LUT
       </h3>
 
-      <div className="mb-2.5 flex items-center gap-2">
-        <button
-          onClick={handleLoad}
-          disabled={!viewport}
-          className="rounded bg-white/5 px-2.5 py-1 text-[11px] text-white/60 transition-colors hover:bg-white/10 hover:text-white/80 disabled:cursor-not-allowed disabled:opacity-30"
-        >
-          Load .cube
-        </button>
-        {lutName && (
-          <>
-            <span className="flex-1 truncate font-mono text-[10px] text-[var(--accent-amber1)]">
-              {lutName}
+      {/* ── Creative LUT: main slot ── */}
+      <div className="rounded-lg border border-white/[0.08] bg-white/[0.02] p-2.5">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleLoad}
+            disabled={!viewport}
+            className="shrink-0 rounded bg-white/5 px-2.5 py-1 text-[11px] text-white/60 transition-colors hover:bg-white/10 hover:text-white/80 disabled:cursor-not-allowed disabled:opacity-30"
+          >
+            Load .cube
+          </button>
+          {lutName ? (
+            <>
+              <span className="flex-1 truncate font-mono text-[10px] text-[var(--accent-amber1)]">
+                {lutName}
+              </span>
+              <button
+                onClick={handleClear}
+                className="shrink-0 text-[10px] text-white/30 transition-colors hover:text-white/60"
+              >
+                Clear
+              </button>
+            </>
+          ) : (
+            <span className="text-[10px] text-white/25">
+              Film look / creative grade
             </span>
-            <button
-              onClick={handleClear}
-              className="text-[10px] text-white/30 transition-colors hover:text-white/60"
-            >
-              Clear
-            </button>
-          </>
+          )}
+        </div>
+
+        {error && (
+          <p className="mt-1.5 text-[10px] text-red-400">{error}</p>
+        )}
+
+        {lutName && (
+          <div className="mt-2">
+            <ControlSlider
+              label="LUT Mix"
+              value={intensity}
+              min={0}
+              max={1}
+              step={0.01}
+              defaultValue={1}
+              onChange={handleIntensity}
+            />
+          </div>
         )}
       </div>
 
-      {error && (
-        <p className="mb-2 text-[10px] text-red-400">{error}</p>
-      )}
+      {/* ── Log Conversion: advanced slot ── */}
+      <div className="mt-2">
+        <button
+          className="flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-[10px] font-medium uppercase tracking-[0.15em] text-white/40 transition-colors hover:bg-white/[0.03] hover:text-white/60"
+          onClick={() => setLogOpen(!logOpen)}
+        >
+          <span
+            className={`text-[8px] transition-transform duration-150 ${logOpen ? "rotate-90" : ""}`}
+          >
+            &#9654;
+          </span>
+          Log Conversion
+          {/* Active dot when collapsed + LUT loaded */}
+          {!logOpen && logLutName && (
+            <span className="ml-auto flex items-center gap-1.5 font-mono text-[9px] normal-case tracking-normal text-[var(--accent-amber1)]/70">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--accent-amber1)]" />
+              {logLutName}
+            </span>
+          )}
+        </button>
 
-      {lutName && (
-        <ControlSlider
-          label="Intensity"
-          value={intensity}
-          min={0}
-          max={1}
-          step={0.01}
-          defaultValue={1}
-          onChange={handleIntensity}
-        />
-      )}
+        {logOpen && (
+          <div className="mt-1.5 rounded-lg border border-white/[0.08] bg-white/[0.02] p-2.5">
+            <p className="mb-2 text-[10px] leading-snug text-white/35">
+              For Log footage (S-Log3, V-Log, Apple Log).
+              Applied before color grading.
+            </p>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleLogLoad}
+                disabled={!viewport}
+                className="shrink-0 rounded bg-white/5 px-2.5 py-1 text-[11px] text-white/60 transition-colors hover:bg-white/10 hover:text-white/80 disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                Load .cube
+              </button>
+              {logLutName ? (
+                <>
+                  <span className="flex-1 truncate font-mono text-[10px] text-[var(--accent-amber1)]">
+                    {logLutName}
+                  </span>
+                  <button
+                    onClick={handleLogClear}
+                    className="shrink-0 text-[10px] text-white/30 transition-colors hover:text-white/60"
+                  >
+                    Clear
+                  </button>
+                </>
+              ) : (
+                <span className="text-[10px] text-white/25">
+                  S-Log3, V-Log, Apple Log ...
+                </span>
+              )}
+            </div>
+
+            {logError && (
+              <p className="mt-1.5 text-[10px] text-red-400">{logError}</p>
+            )}
+
+            {logLutName && (
+              <div className="mt-2">
+                <ControlSlider
+                  label="Log Mix"
+                  value={logIntensity}
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  defaultValue={1}
+                  onChange={handleLogIntensity}
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
