@@ -5,6 +5,7 @@
   "workspaces": [
     "packages/film-lab-core",
     "packages/film-lab-renderer",
+    "packages/film-lab-ui",
     "packages/film-lab-smart-look",
     "apps/web",
     "apps/remotion-film-lab",

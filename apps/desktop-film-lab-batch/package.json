@@ -34,6 +34,7 @@
     "electron-store": "8.2.0",
     "film-lab-core": "workspace:*",
     "film-lab-renderer": "workspace:*",
+    "film-lab-ui": "workspace:*",
     "film-lab-smart-look": "workspace:*",
     "fix-path": "^5.0.0",
     "mp4box": "^2.3.0",

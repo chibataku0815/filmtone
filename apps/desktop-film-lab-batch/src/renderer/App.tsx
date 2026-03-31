@@ -15,9 +15,9 @@
 import { CaretLeft, CaretRight } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { FilmLabCanvas, type FilmLabCanvasRef } from "@film-lab/components/FilmLabCanvas";
-import { ControlPanel } from "@film-lab/components/ControlPanel";
-import { Histogram } from "@film-lab/components/ui/Histogram";
+import { FilmLabCanvas, type FilmLabCanvasRef } from "film-lab-ui";
+import { FilmLabControlPanelCore } from "film-lab-ui";
+import { Histogram } from "film-lab-ui";
 import { HelpHint } from "./batch-tab/HelpHint";
 import type { Viewport } from "film-lab-renderer";
 import { PRESETS, type PresetName } from "film-lab-core";
@@ -1122,21 +1122,12 @@ export default function App() {
                   </button>
                 </div>
                 <div className="fl-scroll-surface min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 sm:px-4">
-                  <ControlPanel
+                  <FilmLabControlPanelCore
                     viewport={viewport}
                     histogramVisible={histogramVisible}
                     onHistogramToggle={() =>
                       setHistogramVisible((v) => !v)
                     }
-                    filmLabCanvasRef={filmLabCanvasRef}
-                    smartLookApiBaseUrl={
-                      import.meta.env.VITE_FILM_LAB_API_ORIGIN
-                    }
-                    serverVerifiedSupporter={
-                      import.meta.env.VITE_FILM_LAB_ASSUME_SUPPORTER ===
-                      "true"
-                    }
-                    autoRestoreStoredSession={false}
                   />
                 </div>
                 <div className="fl-sticky-footer fl-surface-frost rounded-b-xl lg:rounded-bl-xl">

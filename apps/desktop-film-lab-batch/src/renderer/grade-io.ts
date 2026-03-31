@@ -9,7 +9,7 @@ import {
   type Params,
   type PresetName,
 } from "film-lab-core";
-import { findMatchingPreset } from "@film-lab/preset-data";
+import { findMatchingPreset } from "film-lab-core";
 
 /**
  * @param params - 現在のグレード

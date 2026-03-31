@@ -7,7 +7,7 @@ export {
   type LoadResult,
   type LoadFileOptions,
 } from "./MediaLoader";
-export { isWebGL2Supported } from "./support";
+export { isWebGL2Supported, getOptimalPixelRatio } from "./support";
 
 // Shaders
 export { filmlabVertexShader } from "./shaders/filmlab.vert";

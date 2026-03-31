@@ -4,28 +4,25 @@ import { NextIntlClientProvider } from "next-intl";
 
 import en from "../../messages/en.json";
 
-describe("Desktop smart-look pending render", () => {
-  it("renders the desktop control panel without mounting Smart Look controls", async () => {
+describe("Desktop control panel core render", () => {
+  it("renders the desktop control panel core without Web-only controls", async () => {
     await import("./process-polyfill");
-    const { ControlPanel } = await import("@film-lab/components/ControlPanel");
+    const { FilmLabControlPanelCore } = await import("film-lab-ui");
 
     const html = renderToStaticMarkup(
       <NextIntlClientProvider locale="en" messages={en} timeZone="UTC">
-        <ControlPanel
+        <FilmLabControlPanelCore
           viewport={null}
           histogramVisible
           onHistogramToggle={() => {}}
-          smartLookApiBaseUrl="http://127.0.0.1:3000"
-          serverVerifiedSupporter
-          autoRestoreStoredSession={false}
         />
       </NextIntlClientProvider>,
     );
 
     expect(html).toContain('data-testid="film-lab-preset-cinematic"');
+    // Core does not include Smart Look, Share, or Browser Storage sections
     expect(html).not.toContain("Match colors to a sample (AI, beta)");
     expect(html).not.toContain("Pick sample photo");
     expect(html).not.toContain("Match sample look");
-    expect(html).not.toContain("見本に色味を合わせる（AI・beta）");
   });
 });

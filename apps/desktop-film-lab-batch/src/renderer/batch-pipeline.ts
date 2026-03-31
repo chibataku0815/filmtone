@@ -13,7 +13,7 @@ import {
   filmlabFragmentShader,
 } from "film-lab-renderer";
 import type { FilmLabBatchBridge } from "./desktop-api";
-import { halationHueToHex } from "@film-lab/preset-data";
+import { halationHueToHex } from "film-lab-core";
 import {
   filmLabParamsSchema,
   filmLookGradeInputSchema,

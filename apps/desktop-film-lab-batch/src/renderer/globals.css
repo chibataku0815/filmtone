@@ -3,8 +3,7 @@
 @import "@radix-ui/colors/amber-dark.css";
 @import "@radix-ui/colors/blue-dark.css";
 
-@source "../../../web/src/features/interactive/film-lab";
-@source "../../../web/src/shared/gl";
+@source "../../../../packages/film-lab-ui/src";
 @source ".";
 
 /**
