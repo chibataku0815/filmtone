@@ -75,6 +75,13 @@ interface FilmLabControlPanelCoreProps {
   onCompareUiChange?: (ui: { compareMode: boolean; activeSlot: "A" | "B" }) => void;
   /** .cube 読み込み成功時 */
   onLutLoadSuccess?: () => void;
+  /** LUT が変更されたとき */
+  onLutChange?: (state: {
+    lut1: { name: string; data: Float32Array; size: number; intensity: number } | null;
+    lut2: { name: string; data: Float32Array; size: number; intensity: number } | null;
+  }) => void;
+  /** パラメータが変更されたとき */
+  onParamsChange?: () => void;
   /** 初期 UI モード */
   defaultUiMode?: UiMode;
   /** 拡張スロット */
@@ -88,6 +95,8 @@ export function FilmLabControlPanelCore({
   initialSharedParams = null,
   onCompareUiChange,
   onLutLoadSuccess,
+  onLutChange,
+  onParamsChange,
   defaultUiMode = "pro",
   slots = {},
 }: FilmLabControlPanelCoreProps) {
@@ -372,6 +381,16 @@ export function FilmLabControlPanelCore({
     };
   }, [applyPreset, onHistogramToggle, state.compareMode]);
 
+  // ── パラメータ変更を親に通知（初回レンダーはスキップ） ──
+  const isFirstParamsRender = useRef(true);
+  useEffect(() => {
+    if (isFirstParamsRender.current) {
+      isFirstParamsRender.current = false;
+      return;
+    }
+    onParamsChange?.();
+  }, [state, onParamsChange]);
+
   return (
     <>
       <div className="@container w-full min-w-0 rounded-lg border border-white/[0.06] bg-black/60 p-4 backdrop-blur-xl sm:p-5">
@@ -637,7 +656,7 @@ export function FilmLabControlPanelCore({
           <div
             className={`min-w-0 ${isPro ? "@min-[560px]:col-span-2" : "order-1 @min-[560px]:order-1"}`}
           >
-            <LUTPanel viewport={viewport} onCubeLutLoaded={onLutLoadSuccess} />
+            <LUTPanel viewport={viewport} onCubeLutLoaded={onLutLoadSuccess} onLutChange={onLutChange} />
             {slots.afterLut}
             <div className="mt-3 rounded-xl border border-white/[0.08] bg-gradient-to-b from-white/[0.04] to-black/20 p-3">
               <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.12em] text-white/60">

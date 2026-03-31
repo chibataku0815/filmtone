@@ -14,7 +14,7 @@
  */
 import { CaretLeft, CaretRight } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { FilmLabCanvas, type FilmLabCanvasRef } from "film-lab-ui";
 import { FilmLabControlPanelCore } from "film-lab-ui";
 import { Histogram } from "film-lab-ui";
@@ -140,6 +140,7 @@ function isTextInputTarget(target: EventTarget | null): boolean {
 export default function App() {
   const tApp = useTranslations("film-lab.desktop.app");
   const tLogs = useTranslations("film-lab.desktop.logs");
+  const locale = useLocale();
 
   const videoPipelineUserMessages = useMemo(
     (): VideoExportPipelineUserMessages => ({
@@ -227,6 +228,12 @@ export default function App() {
   const [editToExportSyncedAtMs, setEditToExportSyncedAtMs] = useState<
     number | null
   >(null);
+  const [editLut, setEditLut] = useState<{
+    lut1: { name: string; data: Float32Array; size: number; intensity: number } | null;
+    lut2: { name: string; data: Float32Array; size: number; intensity: number } | null;
+  }>({ lut1: null, lut2: null });
+  const [paramsChangeNonce, setParamsChangeNonce] = useState(0);
+  const [syncedAtNonce, setSyncedAtNonce] = useState(0);
 
   /**
    * @description main が公開 JSON を読んで送る「新しい版があります」バナー（案 C）
@@ -440,20 +447,19 @@ export default function App() {
     try {
       const raw = viewport.getParams();
       const params = viewportRecordToParams(raw, batchGrade.params.halationHue);
-      const lut1 = viewport.getLUT1Snapshot();
-      const lut2 = viewport.getLUT2Snapshot();
       setBatchGrade({
         params,
-        lut1Intensity: lut1?.intensity ?? 1,
-        lut1Data: lut1?.data ?? null,
-        lut1Size: lut1?.size ?? 0,
-        lutIntensity: lut2?.intensity ?? 1,
-        lutData: lut2?.data ?? null,
-        lutSize: lut2?.size ?? 0,
+        lut1Intensity: editLut.lut1?.intensity ?? 1,
+        lut1Data: editLut.lut1?.data ?? null,
+        lut1Size: editLut.lut1?.size ?? 0,
+        lutIntensity: editLut.lut2?.intensity ?? 1,
+        lutData: editLut.lut2?.data ?? null,
+        lutSize: editLut.lut2?.size ?? 0,
       });
       setImportedGradeLabel(null);
       setBatchPresetChoice(canvasPreset);
       setEditToExportSyncedAtMs(Date.now());
+      setSyncedAtNonce(paramsChangeNonce);
       appendLog(tLogs("syncCopied"));
       setGradeSyncNotice(tApp("syncGradeOk"));
     } catch (err) {
@@ -465,6 +471,8 @@ export default function App() {
     viewport,
     batchGrade.params.halationHue,
     canvasPreset,
+    editLut,
+    paramsChangeNonce,
     appendLog,
     tLogs,
     tApp,
@@ -1142,16 +1150,47 @@ export default function App() {
                     onHistogramToggle={() =>
                       setHistogramVisible((v) => !v)
                     }
+                    onLutChange={(s) => {
+                      setEditLut(s);
+                      setParamsChangeNonce((n) => n + 1);
+                    }}
+                    onParamsChange={() => setParamsChangeNonce((n) => n + 1)}
                   />
                 </div>
                 <div className="fl-sticky-footer fl-surface-frost rounded-b-xl lg:rounded-bl-xl">
-                  <button
-                    type="button"
-                    className="fl-btn-primary w-full sm:w-auto sm:min-w-[220px]"
-                    onClick={syncPreviewToBatch}
-                  >
-                    {tApp("sendGradeToExport")}
-                  </button>
+                  {(() => {
+                    const syncState = editToExportSyncedAtMs === null
+                      ? "unsynced"
+                      : paramsChangeNonce !== syncedAtNonce
+                        ? "stale"
+                        : "synced";
+                    return (
+                      <button
+                        type="button"
+                        className={[
+                          "min-h-[40px] w-full sm:w-auto sm:min-w-[220px]",
+                          syncState === "synced"
+                            ? "rounded-lg bg-[var(--slate-4)] px-4 py-2 text-sm font-medium text-[var(--slate-11)] transition-colors hover:bg-[var(--slate-5)]"
+                            : "fl-btn-primary",
+                          syncState === "stale"
+                            ? "animate-[fl-pulse-soft_2s_ease-in-out_infinite]"
+                            : "",
+                        ].join(" ")}
+                        onClick={syncPreviewToBatch}
+                      >
+                        {syncState === "synced"
+                          ? tApp("sendGradeToExportSynced", {
+                              time: new Date(editToExportSyncedAtMs!).toLocaleTimeString(
+                                locale === "ja" ? "ja-JP" : "en-US",
+                                { hour: "2-digit", minute: "2-digit" },
+                              ),
+                            })
+                          : syncState === "stale"
+                            ? tApp("sendGradeToExportStale")
+                            : tApp("sendGradeToExport")}
+                      </button>
+                    );
+                  })()}
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
                     <p className="fl-caption">{tApp("sendGradeCaption")}</p>
                     <HelpHint

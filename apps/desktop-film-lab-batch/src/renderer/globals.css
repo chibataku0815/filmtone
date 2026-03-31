@@ -318,6 +318,12 @@ body {
   cursor: not-allowed;
 }
 
+/* --- 同期ボタン脈動（stale 状態で周辺視野に変化を伝える） --- */
+@keyframes fl-pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
 /* --- バッチ進捗（Radix トークンのみ） --- */
 
 .fl-batch-progress {

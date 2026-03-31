@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { parseCube } from "film-lab-core";
 import { ControlSlider } from "./ui/ControlSlider";
 import type { Viewport } from "film-lab-renderer";
@@ -9,13 +9,21 @@ interface LUTPanelProps {
   viewport: Viewport | null;
   /** .cube の読み込みが成功したとき（寄付バナー用のフック） */
   onCubeLutLoaded?: () => void;
+  /** LUT が変更されたとき（Creative / Log 両スロットの最新状態） */
+  onLutChange?: (state: {
+    lut1: { name: string; data: Float32Array; size: number; intensity: number } | null;
+    lut2: { name: string; data: Float32Array; size: number; intensity: number } | null;
+  }) => void;
 }
 
-export function LUTPanel({ viewport, onCubeLutLoaded }: LUTPanelProps) {
+export function LUTPanel({ viewport, onCubeLutLoaded, onLutChange }: LUTPanelProps) {
   // --- Creative LUT (main slot) ---
   const [lutName, setLutName] = useState<string | null>(null);
   const [intensity, setIntensity] = useState(1.0);
   const [error, setError] = useState<string | null>(null);
+
+  const lut2Ref = useRef<{ data: Float32Array; size: number } | null>(null);
+  const lut1Ref = useRef<{ data: Float32Array; size: number } | null>(null);
 
   // --- Log Conversion (advanced, collapsed by default) ---
   const [logOpen, setLogOpen] = useState(false);
@@ -60,32 +68,56 @@ export function LUTPanel({ viewport, onCubeLutLoaded }: LUTPanelProps) {
 
   // ── Creative LUT handlers ──
 
+  /** 両スロットの最新状態を親へ通知 */
+  const fireLutChange = useCallback(
+    (patch: {
+      lut2?: { name: string; data: Float32Array; size: number; intensity: number } | null;
+      lut1?: { name: string; data: Float32Array; size: number; intensity: number } | null;
+    }) => {
+      if (!onLutChange) return;
+      const c2 = lut2Ref.current;
+      const c1 = lut1Ref.current;
+      onLutChange({
+        lut2: "lut2" in patch ? patch.lut2! : c2 ? { name: lutName ?? "", data: c2.data, size: c2.size, intensity } : null,
+        lut1: "lut1" in patch ? patch.lut1! : c1 ? { name: logLutName ?? "", data: c1.data, size: c1.size, intensity: logIntensity } : null,
+      });
+    },
+    [onLutChange, lutName, intensity, logLutName, logIntensity],
+  );
+
   const handleLoad = useCallback(() => {
     setError(null);
     pickCubeFile(
       (lut, fileName) => {
         viewport!.setLUT2(lut.data, lut.size);
-        setLutName(lut.title || fileName);
+        const name = lut.title || fileName;
+        lut2Ref.current = { data: lut.data, size: lut.size };
+        setLutName(name);
         setError(null);
         onCubeLutLoaded?.();
+        fireLutChange({ lut2: { name, data: lut.data, size: lut.size, intensity } });
       },
       setError,
     );
-  }, [viewport, pickCubeFile, onCubeLutLoaded]);
+  }, [viewport, pickCubeFile, onCubeLutLoaded, fireLutChange, intensity]);
 
   const handleClear = useCallback(() => {
     viewport?.clearLUT2();
+    lut2Ref.current = null;
     setLutName(null);
     setIntensity(1.0);
     setError(null);
-  }, [viewport]);
+    fireLutChange({ lut2: null });
+  }, [viewport, fireLutChange]);
 
   const handleIntensity = useCallback(
     (value: number) => {
       setIntensity(value);
       viewport?.setLUT2Intensity(value);
+      const d = lut2Ref.current;
+      if (d) fireLutChange({ lut2: { name: lutName ?? "", data: d.data, size: d.size, intensity: value } });
     },
-    [viewport],
+    [viewport, fireLutChange, lutName],
   );
 
   // ── Log Conversion handlers ──
@@ -95,28 +127,35 @@ export function LUTPanel({ viewport, onCubeLutLoaded }: LUTPanelProps) {
     pickCubeFile(
       (lut, fileName) => {
         viewport!.setLUT1(lut.data, lut.size);
-        setLogLutName(lut.title || fileName);
+        const name = lut.title || fileName;
+        lut1Ref.current = { data: lut.data, size: lut.size };
+        setLogLutName(name);
         setLogError(null);
         onCubeLutLoaded?.();
         if (!logOpen) setLogOpen(true);
+        fireLutChange({ lut1: { name, data: lut.data, size: lut.size, intensity: logIntensity } });
       },
       setLogError,
     );
-  }, [viewport, pickCubeFile, onCubeLutLoaded, logOpen]);
+  }, [viewport, pickCubeFile, onCubeLutLoaded, logOpen, fireLutChange, logIntensity]);
 
   const handleLogClear = useCallback(() => {
     viewport?.clearLUT1();
+    lut1Ref.current = null;
     setLogLutName(null);
     setLogIntensity(1.0);
     setLogError(null);
-  }, [viewport]);
+    fireLutChange({ lut1: null });
+  }, [viewport, fireLutChange]);
 
   const handleLogIntensity = useCallback(
     (value: number) => {
       setLogIntensity(value);
       viewport?.setLUT1Intensity(value);
+      const d = lut1Ref.current;
+      if (d) fireLutChange({ lut1: { name: logLutName ?? "", data: d.data, size: d.size, intensity: value } });
     },
-    [viewport],
+    [viewport, fireLutChange, logLutName],
   );
 
   return (
