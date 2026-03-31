@@ -536,6 +536,36 @@
           "ogTitle": "Download Filmtone for macOS",
           "ogDescription": "Preset-led film looks. Process folders of stills on macOS, free."
         }
+      },
+      "downloadComplete": {
+        "meta_title": "Download started — Filmtone",
+        "meta_description": "Your Filmtone Desktop download has started. Follow the install guide to get started.",
+        "eyebrow": "Download",
+        "title": "Your download has started",
+        "successMessage": "The DMG file is downloading. If it doesn't start automatically, click the button below.",
+        "manualDownloadCta": "Download again",
+        "installSteps": {
+          "heading": "How to install",
+          "step1": "Open the downloaded .dmg file",
+          "step2": "Drag Filmtone into the Applications folder",
+          "step3": "Eject the DMG from Finder"
+        },
+        "gatekeeperNote": {
+          "heading": "First launch on macOS",
+          "body": "macOS may block the first launch because Filmtone is distributed outside the App Store. To open it: right-click (or Control-click) the app icon, choose \"Open\" from the menu, then click \"Open\" in the dialog. You only need to do this once."
+        },
+        "donation": {
+          "heading": "Enjoying Filmtone?",
+          "body": "Filmtone is free to use. If you'd like to help fund improvements and hosting, optional support is always appreciated.",
+          "supporterMessage": "Thank you for your support! Enjoy Filmtone.",
+          "tierLabel": "{amountUsd} USD",
+          "legalNote": "Checkout is handled by Stripe."
+        },
+        "nextSteps": {
+          "heading": "Next steps",
+          "backToFilmtone": "Back to Filmtone",
+          "contactPrefix": "Questions?"
+        }
       }
     },
     "desktop": {

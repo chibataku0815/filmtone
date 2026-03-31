@@ -536,6 +536,36 @@
           "ogTitle": "Filmtone macOS 版をダウンロード",
           "ogDescription": "プリセットでそろえるフィルム調ルック。macOS でフォルダ処理、無料。"
         }
+      },
+      "downloadComplete": {
+        "meta_title": "ダウンロード開始 — Filmtone",
+        "meta_description": "Filmtone Desktop のダウンロードが始まりました。インストール手順に沿ってセットアップしてください。",
+        "eyebrow": "ダウンロード",
+        "title": "ダウンロードが始まりました",
+        "successMessage": "DMG ファイルをダウンロードしています。自動で始まらない場合は、下のボタンをクリックしてください。",
+        "manualDownloadCta": "もう一度ダウンロード",
+        "installSteps": {
+          "heading": "インストール手順",
+          "step1": "ダウンロードした .dmg ファイルを開く",
+          "step2": "Filmtone を Applications フォルダにドラッグ",
+          "step3": "Finder で DMG を取り出す"
+        },
+        "gatekeeperNote": {
+          "heading": "macOS での初回起動",
+          "body": "App Store 外の配布のため、初回起動時に macOS がブロックすることがあります。アプリアイコンを右クリック（または Control + クリック）→「開く」を選択 → ダイアログで「開く」をクリックしてください。この操作は初回のみです。"
+        },
+        "donation": {
+          "heading": "Filmtone を気に入っていただけたら",
+          "body": "Filmtone は無料でお使いいただけます。改善やサーバー費用への任意のご支援をいただけると助かります。",
+          "supporterMessage": "ご支援ありがとうございます！Filmtone をお楽しみください。",
+          "tierLabel": "{amountUsd} USD",
+          "legalNote": "決済は Stripe を利用します。"
+        },
+        "nextSteps": {
+          "heading": "次のステップ",
+          "backToFilmtone": "Filmtone に戻る",
+          "contactPrefix": "ご質問は"
+        }
       }
     },
     "desktop": {
