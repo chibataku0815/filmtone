@@ -9,6 +9,7 @@ interface ControlSliderProps {
   label: string;
   /** ラベル行に付けるネイティブ title（ツールチップ） */
   hint?: string;
+  className?: string;
   value: number;
   min: number;
   max: number;
@@ -23,6 +24,7 @@ interface ControlSliderProps {
 export function ControlSlider({
   label,
   hint,
+  className,
   value,
   min,
   max,
@@ -43,7 +45,13 @@ export function ControlSlider({
 
   return (
     <div
-      className={`group flex min-h-[44px] items-center gap-3 sm:min-h-0 ${disabled ? "opacity-45" : ""}`}
+      className={[
+        "group flex min-h-[44px] items-center gap-3 sm:min-h-0",
+        disabled ? "opacity-45" : "",
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
       onDoubleClick={handleDoubleClick}
       title={hint}
     >

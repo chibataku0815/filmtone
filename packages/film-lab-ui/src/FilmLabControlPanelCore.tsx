@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  type ComponentProps,
   useReducer,
   useState,
   useCallback,
@@ -10,7 +11,7 @@ import {
 } from "react";
 import { useTranslations } from "next-intl";
 import { PRESETS, findMatchingPreset, halationHueToHex, type PresetName } from "film-lab-core";
-import { ControlSlider } from "./ui/ControlSlider";
+import { ControlSlider as BaseControlSlider } from "./ui/ControlSlider";
 import { LUTPanel } from "./LUTPanel";
 import { PresetBar } from "./PresetBar";
 import { FilmLabInfoTip } from "./FilmLabInfoTip";
@@ -86,6 +87,10 @@ interface FilmLabControlPanelCoreProps {
   defaultUiMode?: UiMode;
   /** 拡張スロット */
   slots?: FilmLabControlPanelCoreSlots;
+}
+
+function ControlSlider(props: ComponentProps<typeof BaseControlSlider>) {
+  return <BaseControlSlider {...props} className={["lg:pr-4", props.className].filter(Boolean).join(" ")} />;
 }
 
 export function FilmLabControlPanelCore({
@@ -834,7 +839,7 @@ function SplitToneHueSlider({
 }) {
   const h = ((value % 360) + 360) % 360;
   return (
-    <div className="flex min-h-[44px] items-center gap-3 sm:min-h-0">
+    <div className="flex min-h-[44px] items-center gap-3 sm:min-h-0 lg:pr-4">
       <span className="w-16 shrink-0 text-[11px] text-white/50 sm:w-24">{label}</span>
       <div className="relative flex-1">
         <input
@@ -874,7 +879,7 @@ function HueSlider({
 }) {
   const hex = halationHueToHex(value);
   return (
-    <div className="flex min-h-[44px] items-center gap-3 sm:min-h-0">
+    <div className="flex min-h-[44px] items-center gap-3 sm:min-h-0 lg:pr-4">
       <span className="w-16 shrink-0 text-[11px] text-white/50 sm:w-24">{label}</span>
       <div className="relative flex-1">
         <input
