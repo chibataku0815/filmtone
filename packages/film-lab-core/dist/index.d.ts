@@ -275,6 +275,28 @@ declare const PRESETS: {
     };
 };
 type PresetName = keyof typeof PRESETS;
+/**
+ * プリセットの数値が、今の Params と**全部同じ**かを調べる。
+ *
+ * 概要: URL 共有や保存データの Params から、どの組み込みプリセットに一致するかを逆引きする。
+ * 仕様: `PARAM_KEYS` に並ぶキーを順番に比較し、完全一致した最初のプリセット名を返す。
+ * 制限: 少しでも数値が違うと一致扱いにしない。近い値を「だいたい同じ」とは判定しない。
+ *
+ * @param params - 照合したい Film Lab のパラメータ
+ */
+declare function findMatchingPreset(params: Params): PresetName | null;
+/**
+ * プリセットバーに並べる表示用メタ情報。
+ *
+ * 概要: ボタンの見出しと短い説明文だけをまとめ、Web / Desktop で同じ順番・同じ文言を使えるようにする。
+ * 仕様: `name` は `PRESETS` のキーと一致し、UI はこの配列順で表示できる。
+ * 制限: 見た目用の文言だけを持つ。色や数値パラメータ自体は `PRESETS` を参照する。
+ */
+declare const PRESET_BUTTONS: {
+    name: PresetName;
+    label: string;
+    subtitle: string;
+}[];
 
 /**
  * スキーマと JSON（共有 URL・Remotion）で使うプリセット定義のバージョンタグ。
@@ -415,5 +437,15 @@ declare const FILM_LAB_DEFAULT_HIGHLIGHT_HUE: number;
 declare const LEGACY_SHADOW_TONE_MAGNITUDE: number;
 /** 旧ハイライト側のノルム */
 declare const LEGACY_HIGHLIGHT_TONE_MAGNITUDE: number;
+/**
+ * Halation の色相スライダー値（0〜100）を UI 用 16 進カラーへ変換する。
+ *
+ * 概要: Film Lab の Halation は Dehancer 風に「深い赤 → オレンジ寄り」の帯だけを使う。
+ * 仕様: 0 未満は 0、100 超は 100 として扱い、その範囲を赤・緑・青それぞれ線形補間して返す。
+ * 制限: UI プレビュー用の近似色であり、シェーダ内の物理的な発光色そのものではない。
+ *
+ * @param hue - Halation の色相スライダー値
+ */
+declare function halationHueToHex(hue: number): string;
 
-export { type CubeLUT, FILM_LAB_DEFAULT_HIGHLIGHT_HUE, FILM_LAB_DEFAULT_SHADOW_HUE, type FilmLabParamsValidated, type FilmLookGradeInputProps, type FilmLookSpikeInputProps, LEGACY_HIGHLIGHT_TONE_MAGNITUDE, LEGACY_SHADOW_TONE_MAGNITUDE, LOOK_ID_BY_PRESET, PARAM_KEYS, PRESETS, PRESET_VERSION, type PackedCubeLut2D, type ParamKey, type Params, type PresetName, chromaUnitFromHueDegrees, cloneParams, createDefaultFilmLookGradeProps, filmLabParamsSchema, filmLookGradeDefaultProps, filmLookGradeInputSchema, filmLookSpikeDefaultProps, filmLookSpikeInputSchema, gradeMatchesPreset, hslToRgb01, lookIdForPreset, nearestHueDegreesToDirection, packCubeLutToFloatRgbaGrid, parseCube };
+export { type CubeLUT, FILM_LAB_DEFAULT_HIGHLIGHT_HUE, FILM_LAB_DEFAULT_SHADOW_HUE, type FilmLabParamsValidated, type FilmLookGradeInputProps, type FilmLookSpikeInputProps, LEGACY_HIGHLIGHT_TONE_MAGNITUDE, LEGACY_SHADOW_TONE_MAGNITUDE, LOOK_ID_BY_PRESET, PARAM_KEYS, PRESETS, PRESET_BUTTONS, PRESET_VERSION, type PackedCubeLut2D, type ParamKey, type Params, type PresetName, chromaUnitFromHueDegrees, cloneParams, createDefaultFilmLookGradeProps, filmLabParamsSchema, filmLookGradeDefaultProps, filmLookGradeInputSchema, filmLookSpikeDefaultProps, filmLookSpikeInputSchema, findMatchingPreset, gradeMatchesPreset, halationHueToHex, hslToRgb01, lookIdForPreset, nearestHueDegreesToDirection, packCubeLutToFloatRgbaGrid, parseCube };

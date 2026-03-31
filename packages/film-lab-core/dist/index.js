@@ -91,6 +91,13 @@ var FILM_LAB_DEFAULT_SHADOW_HUE = nearestHueDegreesToDirection(LEGACY_SHADOW_DIR
 var FILM_LAB_DEFAULT_HIGHLIGHT_HUE = nearestHueDegreesToDirection(LEGACY_HIGHLIGHT_DIR);
 var LEGACY_SHADOW_TONE_MAGNITUDE = Math.hypot(...LEGACY_SHADOW_DIR);
 var LEGACY_HIGHLIGHT_TONE_MAGNITUDE = Math.hypot(...LEGACY_HIGHLIGHT_DIR);
+function halationHueToHex(hue) {
+  const t = Math.max(0, Math.min(1, hue / 100));
+  const r = Math.round(232 + (200 - 232) * t);
+  const g = Math.round(16 + (96 - 16) * t);
+  const b = Math.round(32 + (16 - 32) * t);
+  return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+}
 
 // src/presets.ts
 var PRESETS = {
@@ -324,6 +331,25 @@ var PRESETS = {
     highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE
   }
 };
+function findMatchingPreset(params) {
+  for (const [name, preset] of Object.entries(PRESETS)) {
+    if (PARAM_KEYS.every((key) => preset[key] === params[key])) {
+      return name;
+    }
+  }
+  return null;
+}
+var PRESET_BUTTONS = [
+  { name: "cinematic", label: "Cinematic", subtitle: "Teal & Orange" },
+  { name: "portra", label: "Portra", subtitle: "Warm Pastel" },
+  { name: "gold200", label: "Gold 200", subtitle: "Saturated Warm" },
+  { name: "pro400h", label: "Pro 400H", subtitle: "Cool Soft" },
+  { name: "ektar100", label: "Ektar 100", subtitle: "Vivid Sharp" },
+  { name: "superia400", label: "Superia", subtitle: "Cool Green" },
+  { name: "cinestill800t", label: "CineStill", subtitle: "Tungsten Glow" },
+  { name: "bw", label: "B&W", subtitle: "Classic Mono" },
+  { name: "reset", label: "Reset", subtitle: "No Grade" }
+];
 
 // src/look-ids.ts
 var PRESET_VERSION = "v1";
@@ -479,6 +505,7 @@ export {
   LOOK_ID_BY_PRESET,
   PARAM_KEYS,
   PRESETS,
+  PRESET_BUTTONS,
   PRESET_VERSION,
   chromaUnitFromHueDegrees,
   cloneParams,
@@ -488,7 +515,9 @@ export {
   filmLookGradeInputSchema,
   filmLookSpikeDefaultProps,
   filmLookSpikeInputSchema,
+  findMatchingPreset,
   gradeMatchesPreset,
+  halationHueToHex,
   hslToRgb01,
   lookIdForPreset,
   nearestHueDegreesToDirection,

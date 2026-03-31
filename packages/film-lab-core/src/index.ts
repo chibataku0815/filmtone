@@ -4,7 +4,12 @@ export {
   type Params,
   cloneParams,
 } from "./params";
-export { PRESETS, type PresetName } from "./presets";
+export {
+  PRESETS,
+  PRESET_BUTTONS,
+  findMatchingPreset,
+  type PresetName,
+} from "./presets";
 export {
   PRESET_VERSION,
   lookIdForPreset,
@@ -34,6 +39,7 @@ export {
   FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
   FILM_LAB_DEFAULT_SHADOW_HUE,
   hslToRgb01,
+  halationHueToHex,
   LEGACY_HIGHLIGHT_TONE_MAGNITUDE,
   LEGACY_SHADOW_TONE_MAGNITUDE,
   nearestHueDegreesToDirection,

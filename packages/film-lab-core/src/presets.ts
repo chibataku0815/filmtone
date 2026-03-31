@@ -1,4 +1,4 @@
-import type { Params } from "./params";
+import { PARAM_KEYS, type Params } from "./params";
 import {
   FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
   FILM_LAB_DEFAULT_SHADOW_HUE,
@@ -244,3 +244,44 @@ export const PRESETS = {
 } satisfies Record<string, Params>;
 
 export type PresetName = keyof typeof PRESETS;
+
+/**
+ * プリセットの数値が、今の Params と**全部同じ**かを調べる。
+ *
+ * 概要: URL 共有や保存データの Params から、どの組み込みプリセットに一致するかを逆引きする。
+ * 仕様: `PARAM_KEYS` に並ぶキーを順番に比較し、完全一致した最初のプリセット名を返す。
+ * 制限: 少しでも数値が違うと一致扱いにしない。近い値を「だいたい同じ」とは判定しない。
+ *
+ * @param params - 照合したい Film Lab のパラメータ
+ */
+export function findMatchingPreset(params: Params): PresetName | null {
+  for (const [name, preset] of Object.entries(PRESETS) as [PresetName, Params][]) {
+    if (PARAM_KEYS.every((key) => preset[key] === params[key])) {
+      return name;
+    }
+  }
+  return null;
+}
+
+/**
+ * プリセットバーに並べる表示用メタ情報。
+ *
+ * 概要: ボタンの見出しと短い説明文だけをまとめ、Web / Desktop で同じ順番・同じ文言を使えるようにする。
+ * 仕様: `name` は `PRESETS` のキーと一致し、UI はこの配列順で表示できる。
+ * 制限: 見た目用の文言だけを持つ。色や数値パラメータ自体は `PRESETS` を参照する。
+ */
+export const PRESET_BUTTONS: {
+  name: PresetName;
+  label: string;
+  subtitle: string;
+}[] = [
+  { name: "cinematic", label: "Cinematic", subtitle: "Teal & Orange" },
+  { name: "portra", label: "Portra", subtitle: "Warm Pastel" },
+  { name: "gold200", label: "Gold 200", subtitle: "Saturated Warm" },
+  { name: "pro400h", label: "Pro 400H", subtitle: "Cool Soft" },
+  { name: "ektar100", label: "Ektar 100", subtitle: "Vivid Sharp" },
+  { name: "superia400", label: "Superia", subtitle: "Cool Green" },
+  { name: "cinestill800t", label: "CineStill", subtitle: "Tungsten Glow" },
+  { name: "bw", label: "B&W", subtitle: "Classic Mono" },
+  { name: "reset", label: "Reset", subtitle: "No Grade" },
+];

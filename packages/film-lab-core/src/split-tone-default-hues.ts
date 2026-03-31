@@ -95,3 +95,20 @@ export const LEGACY_SHADOW_TONE_MAGNITUDE = Math.hypot(...LEGACY_SHADOW_DIR);
 
 /** 旧ハイライト側のノルム */
 export const LEGACY_HIGHLIGHT_TONE_MAGNITUDE = Math.hypot(...LEGACY_HIGHLIGHT_DIR);
+
+/**
+ * Halation の色相スライダー値（0〜100）を UI 用 16 進カラーへ変換する。
+ *
+ * 概要: Film Lab の Halation は Dehancer 風に「深い赤 → オレンジ寄り」の帯だけを使う。
+ * 仕様: 0 未満は 0、100 超は 100 として扱い、その範囲を赤・緑・青それぞれ線形補間して返す。
+ * 制限: UI プレビュー用の近似色であり、シェーダ内の物理的な発光色そのものではない。
+ *
+ * @param hue - Halation の色相スライダー値
+ */
+export function halationHueToHex(hue: number): string {
+  const t = Math.max(0, Math.min(1, hue / 100));
+  const r = Math.round(0xe8 + (0xc8 - 0xe8) * t);
+  const g = Math.round(0x10 + (0x60 - 0x10) * t);
+  const b = Math.round(0x20 + (0x10 - 0x20) * t);
+  return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+}
