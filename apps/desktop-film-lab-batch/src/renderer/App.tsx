@@ -19,7 +19,7 @@ import { FilmLabCanvas, type FilmLabCanvasRef } from "@film-lab/components/FilmL
 import { ControlPanel } from "@film-lab/components/ControlPanel";
 import { Histogram } from "@film-lab/components/ui/Histogram";
 import { HelpHint } from "./batch-tab/HelpHint";
-import type { Viewport } from "@film-lab/core/Viewport";
+import type { Viewport } from "film-lab-renderer";
 import { PRESETS, type PresetName } from "film-lab-core";
 import {
   initialOutcomes,

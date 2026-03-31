@@ -6,11 +6,13 @@
  * @limitations 単一 GL 直列。ffprobe/ffmpeg は PATH 必須（Homebrew 等）。macOS では VideoToolbox を優先。
  */
 import * as THREE from "three";
-import { isWebGL2Supported } from "@/shared/gl";
+import {
+  isWebGL2Supported,
+  Viewport,
+  filmlabVertexShader,
+  filmlabFragmentShader,
+} from "film-lab-renderer";
 import type { FilmLabBatchBridge } from "./desktop-api";
-import { Viewport } from "@film-lab/core/Viewport";
-import { filmlabVertexShader } from "@film-lab/shader/filmlab.vert";
-import { filmlabFragmentShader } from "@film-lab/shader/filmlab.frag";
 import { halationHueToHex } from "@film-lab/preset-data";
 import {
   assertVideoImportWithinCaps,

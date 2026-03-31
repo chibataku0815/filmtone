@@ -1,0 +1,26 @@
+{
+  "name": "film-lab-renderer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean --external three,film-lab-core"
+  },
+  "dependencies": {
+    "film-lab-core": "workspace:*",
+    "three": "^0.181.2"
+  },
+  "devDependencies": {
+    "@types/three": "^0.181.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2"
+  }
+}
