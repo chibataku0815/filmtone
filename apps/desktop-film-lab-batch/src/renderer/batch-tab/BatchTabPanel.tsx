@@ -157,6 +157,8 @@ export type BatchTabPanelProps = {
   onApplyEditGradeToBatch: () => void;
   editToExportSyncedAtMs: number | null;
   onReapplyBatchPresetBaseline: () => void;
+  /** @description true when rendered inside the right slide panel (compact layout) */
+  compact?: boolean;
 };
 
 /**
@@ -201,6 +203,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     onApplyEditGradeToBatch,
     editToExportSyncedAtMs,
     onReapplyBatchPresetBaseline,
+    compact = false,
   } = props;
 
   const t = useTranslations("film-lab.desktop.batch");
@@ -373,74 +376,107 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
 
   const renderStepJobType = () => (
     <div className="flex flex-col gap-3" role="group" aria-labelledby="batch-step-job-type-title">
-      <p id="batch-step-job-type-title" className="text-sm font-medium text-[var(--fl-text-primary)]">
-        {t("jobTypeQuestion")}
-      </p>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <button
-          type="button"
-          className={`flex cursor-pointer flex-col rounded-xl border-2 p-3 text-left transition-all ${
-            batchJobMode === "images"
-              ? "border-[var(--amber-9)] bg-[var(--fl-bg-subtle)] shadow-[inset_3px_0_0_0_var(--amber-9)]"
-              : "border-[var(--fl-border-subtle)] border-dashed bg-[var(--fl-bg-subtle)] opacity-90 hover:border-[var(--fl-border-default)] hover:opacity-100"
-          }`}
-          onClick={() => onBatchJobModeChange("images")}
-          aria-pressed={batchJobMode === "images"}
-        >
-          <div className="flex items-start justify-between gap-2">
-            <span className="text-sm font-semibold text-[var(--fl-text-primary)]">
-              {t("jobImagesTitle")}
-            </span>
-            <HelpHint tip={t("tipJobImages")} assistiveLabel={t("jobImagesHintAria")} />
-          </div>
-          {batchJobMode === "images" ? (
-            <span className="mt-2 inline-flex w-fit items-center gap-1 text-[0.65rem] font-medium text-[var(--amber-11)]">
-              <CheckCircle size={14} weight="bold" aria-hidden />
-              {t("selected")}
-            </span>
-          ) : (
-            <span className="fl-caption mt-2 text-[var(--fl-text-tertiary)]">
-              {t("clickToSwitch")}
-            </span>
-          )}
-          <p className="fl-caption mt-1 text-[var(--fl-text-secondary)]">
-            {t("jobImagesSub")}
-          </p>
-        </button>
-        <button
-          type="button"
-          className={`flex cursor-pointer flex-col rounded-xl border-2 p-3 text-left transition-all ${
-            batchJobMode === "video"
-              ? "border-[var(--amber-9)] bg-[var(--fl-bg-subtle)] shadow-[inset_3px_0_0_0_var(--amber-9)]"
-              : "border-[var(--fl-border-subtle)] border-dashed bg-[var(--fl-bg-subtle)] opacity-90 hover:border-[var(--fl-border-default)] hover:opacity-100"
-          }`}
-          onClick={() => onBatchJobModeChange("video")}
-          aria-pressed={batchJobMode === "video"}
-        >
-          <div className="flex items-start justify-between gap-2">
-            <span className="text-sm font-semibold text-[var(--fl-text-primary)]">
-              {t("jobVideoTitle")}
-            </span>
-            <HelpHint
-              tip={t("tipJobVideoWebGlOnly")}
-              assistiveLabel={t("jobVideoHintAria")}
-            />
-          </div>
-          {batchJobMode === "video" ? (
-            <span className="mt-2 inline-flex w-fit items-center gap-1 text-[0.65rem] font-medium text-[var(--amber-11)]">
-              <CheckCircle size={14} weight="bold" aria-hidden />
-              {t("selected")}
-            </span>
-          ) : (
-            <span className="fl-caption mt-2 text-[var(--fl-text-tertiary)]">
-              {t("clickToSwitch")}
-            </span>
-          )}
-          <p className="fl-caption mt-1 text-[var(--fl-text-secondary)]">
-            {t("jobVideoSubWebGlOnly")}
-          </p>
-        </button>
-      </div>
+      {!compact && (
+        <p id="batch-step-job-type-title" className="text-sm font-medium text-[var(--fl-text-primary)]">
+          {t("jobTypeQuestion")}
+        </p>
+      )}
+      {compact ? (
+        <div className="flex rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] p-0.5" role="radiogroup" aria-label={t("jobTypeQuestion")}>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={batchJobMode === "images"}
+            className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              batchJobMode === "images"
+                ? "bg-[var(--amber-9)] text-[var(--amber-1)] shadow-sm"
+                : "text-[var(--fl-text-secondary)] hover:text-[var(--fl-text-primary)]"
+            }`}
+            onClick={() => onBatchJobModeChange("images")}
+          >
+            {t("jobImagesTitle")}
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={batchJobMode === "video"}
+            className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              batchJobMode === "video"
+                ? "bg-[var(--amber-9)] text-[var(--amber-1)] shadow-sm"
+                : "text-[var(--fl-text-secondary)] hover:text-[var(--fl-text-primary)]"
+            }`}
+            onClick={() => onBatchJobModeChange("video")}
+          >
+            {t("jobVideoTitle")}
+          </button>
+        </div>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            className={`flex cursor-pointer flex-col rounded-xl border-2 p-3 text-left transition-all ${
+              batchJobMode === "images"
+                ? "border-[var(--amber-9)] bg-[var(--fl-bg-subtle)] shadow-[inset_3px_0_0_0_var(--amber-9)]"
+                : "border-[var(--fl-border-subtle)] border-dashed bg-[var(--fl-bg-subtle)] opacity-90 hover:border-[var(--fl-border-default)] hover:opacity-100"
+            }`}
+            onClick={() => onBatchJobModeChange("images")}
+            aria-pressed={batchJobMode === "images"}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <span className="text-sm font-semibold text-[var(--fl-text-primary)]">
+                {t("jobImagesTitle")}
+              </span>
+              <HelpHint tip={t("tipJobImages")} assistiveLabel={t("jobImagesHintAria")} />
+            </div>
+            {batchJobMode === "images" ? (
+              <span className="mt-2 inline-flex w-fit items-center gap-1 text-[0.65rem] font-medium text-[var(--amber-11)]">
+                <CheckCircle size={14} weight="bold" aria-hidden />
+                {t("selected")}
+              </span>
+            ) : (
+              <span className="fl-caption mt-2 text-[var(--fl-text-tertiary)]">
+                {t("clickToSwitch")}
+              </span>
+            )}
+            <p className="fl-caption mt-1 text-[var(--fl-text-secondary)]">
+              {t("jobImagesSub")}
+            </p>
+          </button>
+          <button
+            type="button"
+            className={`flex cursor-pointer flex-col rounded-xl border-2 p-3 text-left transition-all ${
+              batchJobMode === "video"
+                ? "border-[var(--amber-9)] bg-[var(--fl-bg-subtle)] shadow-[inset_3px_0_0_0_var(--amber-9)]"
+                : "border-[var(--fl-border-subtle)] border-dashed bg-[var(--fl-bg-subtle)] opacity-90 hover:border-[var(--fl-border-default)] hover:opacity-100"
+            }`}
+            onClick={() => onBatchJobModeChange("video")}
+            aria-pressed={batchJobMode === "video"}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <span className="text-sm font-semibold text-[var(--fl-text-primary)]">
+                {t("jobVideoTitle")}
+              </span>
+              <HelpHint
+                tip={t("tipJobVideoWebGlOnly")}
+                assistiveLabel={t("jobVideoHintAria")}
+              />
+            </div>
+            {batchJobMode === "video" ? (
+              <span className="mt-2 inline-flex w-fit items-center gap-1 text-[0.65rem] font-medium text-[var(--amber-11)]">
+                <CheckCircle size={14} weight="bold" aria-hidden />
+                {t("selected")}
+              </span>
+            ) : (
+              <span className="fl-caption mt-2 text-[var(--fl-text-tertiary)]">
+                {t("clickToSwitch")}
+              </span>
+            )}
+            <p className="fl-caption mt-1 text-[var(--fl-text-secondary)]">
+              {t("jobVideoSubWebGlOnly")}
+            </p>
+          </button>
+        </div>
+      )}
     </div>
   );
 
@@ -518,7 +554,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         aria-label={lookStatusBanner.title}
       >
         <LookStatusIcon
-          size={22}
+          size={16}
           weight={lookStatusBanner.iconWeight}
           className={`mt-0.5 shrink-0 ${lookStatusBanner.iconClass}`}
           aria-hidden
@@ -818,25 +854,29 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
   return (
     <>
       {/* Intro */}
-      <section
-        className="fl-card fl-card-muted fl-card--frost gap-2 border-[var(--fl-border-default)]"
-        aria-labelledby="export-tab-intro-heading"
-      >
-        <div className="flex items-start gap-2">
-          <h2
-            id="export-tab-intro-heading"
-            className="text-sm font-semibold text-[var(--fl-text-primary)]"
-          >
-            {t("exportTitle")}
-          </h2>
-          <HelpHint tip={t("tipExportTabIntro")} assistiveLabel={t("exportTitleHintAria")} />
-        </div>
-        <p className="fl-caption text-[var(--fl-text-secondary)]">{t("exportLead")}</p>
-      </section>
+      {!compact && (
+        <section
+          className="fl-card fl-card-muted fl-card--frost gap-2 border-[var(--fl-border-default)]"
+          aria-labelledby="export-tab-intro-heading"
+        >
+          <div className="flex items-start gap-2">
+            <h2
+              id="export-tab-intro-heading"
+              className="text-sm font-semibold text-[var(--fl-text-primary)]"
+            >
+              {t("exportTitle")}
+            </h2>
+            <HelpHint tip={t("tipExportTabIntro")} assistiveLabel={t("exportTitleHintAria")} />
+          </div>
+          <p className="fl-caption text-[var(--fl-text-secondary)]">{t("exportLead")}</p>
+        </section>
+      )}
 
-      <div className="self-start rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] px-3 py-2 text-xs leading-relaxed text-[var(--fl-text-secondary)] shadow-[inset_3px_0_0_0_var(--amber-9)]">
-        {t("differentFolderWarning")}
-      </div>
+      {!compact && (
+        <div className="self-start rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] px-3 py-2 text-xs leading-relaxed text-[var(--fl-text-secondary)] shadow-[inset_3px_0_0_0_var(--amber-9)]">
+          {t("differentFolderWarning")}
+        </div>
+      )}
 
       {/* Session resume */}
       {persistedSession && sessionHasRemainingWork(persistedSession) ? (
@@ -861,7 +901,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
       ) : null}
 
       {/* Status chips */}
-      <div className="flex flex-wrap gap-2 text-[0.65rem]">
+      <div className={`flex flex-wrap ${compact ? "gap-1 py-2.5 text-[0.6rem]" : "gap-2 text-[0.65rem]"}`}>
         <span
           className={`rounded-full border px-2 py-0.5 ${
             sourceOk
@@ -895,7 +935,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
       </div>
 
       {/* Accordion sections */}
-      <div className="fl-card fl-card--frost flex flex-col divide-y divide-[var(--fl-border-subtle)]">
+      <div className={`fl-card fl-card--frost flex flex-col divide-y divide-[var(--fl-border-subtle)] ${compact ? "gap-0 p-0" : ""}`}>
         {ACCORDION_STEPS.map((id, idx) => {
           const isOpen = openSections[id];
           const synced = isSectionSynced(id);
@@ -908,7 +948,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
             <div key={id} id={`export-step-${id}`}>
               <button
                 type="button"
-                className={`flex w-full items-center gap-2 px-3 py-2.5 text-left transition-colors hover:bg-[var(--fl-bg-interactive)] ${
+                className={`flex w-full items-center gap-2 ${compact ? "px-2.5 py-2" : "px-3 py-2.5"} text-left transition-colors hover:bg-[var(--fl-bg-interactive)] ${
                   needsAttention
                     ? "shadow-[inset_3px_0_0_0_var(--amber-9)]"
                     : ""
@@ -967,7 +1007,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
               {isOpen ? (
                 <div
                   id={`export-step-body-${id}`}
-                  className="px-3 pb-4 pt-1"
+                  className={compact ? "px-2.5 pb-3 pt-1" : "px-3 pb-4 pt-1"}
                 >
                   {accordionRenderers[id]()}
                 </div>
@@ -979,7 +1019,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
 
       {/* Export / Run — always visible */}
       <section
-        className="fl-card fl-card--frost gap-3"
+        className={`fl-card fl-card--frost gap-3 ${compact ? "sticky bottom-0 z-10 rounded-t-xl shadow-[0_-4px_12px_rgba(0,0,0,0.3)]" : ""}`}
         aria-labelledby="export-run-heading"
       >
         <h3
@@ -1018,10 +1058,12 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         ) : null}
       </section>
 
-      <div className="flex flex-wrap items-center gap-1.5">
-        <p className="fl-caption">{t("prefsFootnote")}</p>
-        <HelpHint tip={t("tipDesktopPrefsPersist")} assistiveLabel={t("prefsFootnoteAria")} />
-      </div>
+      {!compact && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <p className="fl-caption">{t("prefsFootnote")}</p>
+          <HelpHint tip={t("tipDesktopPrefsPersist")} assistiveLabel={t("prefsFootnoteAria")} />
+        </div>
+      )}
     </>
   );
 }

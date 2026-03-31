@@ -45,7 +45,7 @@ html.dark.dark-theme {
    * @description クローム帯の弱いマテリアル（すりガラス風）。全面透明は避け、ほぼ不透明のスクリム＋軽い blur。
    * prefers-reduced-transparency では blur を切って既存ソリッドに戻す。
    */
-  --fl-frost-blur: 12px;
+  --fl-frost-blur: 28px;
 
   /**
    * @description ルートで dark を宣言し、Chromium / Electron のスクロールバーがライト(UI 白トラック)に戻るのを防ぐ。
@@ -55,7 +55,7 @@ html.dark.dark-theme {
 
 body {
   margin: 0;
-  background: var(--fl-bg-app);
+  background: transparent;
   color: var(--fl-text-primary);
   font-family: var(--font-family-sans);
   -webkit-font-smoothing: antialiased;
@@ -79,39 +79,36 @@ body {
  */
 .fl-scroll-surface {
   color-scheme: dark;
-  scrollbar-width: thin;
-  scrollbar-color: var(--fl-border-strong) var(--fl-bg-subtle);
+  scrollbar-width: none; /* Firefox: hide scrollbar */
 }
 
 /**
- * @description WebKit / Electron: `::-webkit-scrollbar` 本体に地色を付けないと、トラックが白く見えることがある。
- * `appearance: none` でネイティブのライト帯を剥がし、Radix の slate トークンで統一する。
+ * @description macOS ネイティブ風の薄い透明オーバーレイスクロールバー。
+ * トラックは透明、サムだけ半透明の白で表示。ガラスパネルを壊さない。
  */
 .fl-scroll-surface::-webkit-scrollbar {
   -webkit-appearance: none;
   appearance: none;
-  width: 9px;
-  height: 9px;
-  background-color: var(--fl-bg-subtle);
+  width: 6px;
+  height: 6px;
+  background: transparent;
 }
 
 .fl-scroll-surface::-webkit-scrollbar-track {
-  background-color: var(--fl-bg-subtle);
-  border-radius: 999px;
+  background: transparent;
 }
 
 .fl-scroll-surface::-webkit-scrollbar-thumb {
-  background-color: color-mix(in srgb, var(--fl-border-strong) 88%, var(--slate-11));
+  background: rgba(255, 255, 255, 0.12);
   border-radius: 999px;
-  border: 2px solid var(--fl-bg-subtle);
 }
 
 .fl-scroll-surface::-webkit-scrollbar-thumb:hover {
-  background-color: var(--fl-border-strong);
+  background: rgba(255, 255, 255, 0.25);
 }
 
 .fl-scroll-surface::-webkit-scrollbar-corner {
-  background-color: var(--fl-bg-subtle);
+  background: transparent;
 }
 
 /**
@@ -130,7 +127,7 @@ body {
  * @description 書き出しタブのメイン列。ルート（slate-1）より一段オクの地色にして、frost カードの奥行きが分かりやすくなる。
  */
 .fl-main-batch {
-  background: var(--fl-bg-subtle);
+  background: transparent;
 }
 
 /**
@@ -171,20 +168,19 @@ body {
  * @description 書き出しカードなど「一段上」のパネル用。編集タブのプレビュー枠（canvas 入り）は付けない。
  */
 .fl-card.fl-card--frost {
-  background: color-mix(in srgb, var(--fl-bg-raised) 88%, transparent);
-  border-color: color-mix(in srgb, var(--fl-border-default) 70%, transparent);
-  backdrop-filter: blur(var(--fl-frost-blur)) saturate(1.06);
-  -webkit-backdrop-filter: blur(var(--fl-frost-blur)) saturate(1.06);
+  background: color-mix(in srgb, var(--fl-bg-raised) 72%, transparent);
+  border-color: color-mix(in srgb, var(--fl-border-default) 50%, transparent);
+  backdrop-filter: blur(var(--fl-frost-blur)) saturate(1.2);
+  -webkit-backdrop-filter: blur(var(--fl-frost-blur)) saturate(1.2);
   box-shadow:
     inset 0 1px 0 0 color-mix(in srgb, var(--slate-12) 5%, transparent),
     0 8px 32px -10px color-mix(in srgb, black 52%, transparent);
 }
 
 .fl-card.fl-card-muted.fl-card--frost {
-  background: color-mix(in srgb, var(--fl-bg-subtle) 88%, transparent);
-  box-shadow:
-    inset 0 1px 0 0 color-mix(in srgb, var(--slate-12) 4%, transparent),
-    0 6px 28px -12px color-mix(in srgb, black 48%, transparent);
+  background: rgba(30, 30, 42, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
 .fl-card-header {
@@ -451,26 +447,44 @@ body {
   outline-offset: 1px;
 }
 
-/* --- ヘッダー --- */
+/* --- ドラッグゾーン（macOS タイトルバー代替） --- */
+
+.fl-drag-zone {
+  flex-shrink: 0;
+  height: 28px;
+  -webkit-app-region: drag;
+}
+
+/* --- ヘッダー（レガシー — ドラッグゾーン移行後も互換用） --- */
 
 .fl-app-header {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-  border-bottom: 1px solid var(--fl-border-subtle);
-  background: var(--fl-bg-subtle);
-  padding: 0.625rem 0.75rem;
+  border-bottom: none;
+  background: var(--fl-bg-app);
+  padding: 0.5rem 0.75rem;
+  /* macOS hiddenInset: 信号機と揃え、右にコンテンツを配置 */
+  padding-left: 80px;
+  min-height: 38px;
+  -webkit-app-region: drag;
+}
+
+/* ヘッダー内のボタン・タブはドラッグ対象外 */
+.fl-app-header button,
+.fl-app-header .fl-tabs {
+  -webkit-app-region: no-drag;
 }
 
 /**
  * @description ヘッダー・執拗フッター・パネルツールバー用の薄いマテリアル（タブと一体の階層感）。
  */
 .fl-app-header.fl-surface-frost {
-  background: color-mix(in srgb, var(--fl-bg-subtle) 84%, transparent);
-  border-bottom-color: color-mix(in srgb, var(--fl-border-subtle) 80%, transparent);
-  backdrop-filter: blur(var(--fl-frost-blur)) saturate(1.06);
-  -webkit-backdrop-filter: blur(var(--fl-frost-blur)) saturate(1.06);
+  background: var(--fl-bg-app);
+  border-bottom: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 @media (min-width: 640px) {
@@ -492,15 +506,15 @@ body {
 
 .fl-sticky-footer {
   flex-shrink: 0;
-  border-top: 1px solid var(--fl-border-subtle);
-  background: var(--fl-bg-subtle);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: transparent;
   padding: 0.75rem 1rem;
 }
 
 .fl-sticky-footer.fl-surface-frost {
-  background: color-mix(in srgb, var(--fl-bg-subtle) 87%, transparent);
-  backdrop-filter: blur(var(--fl-frost-blur)) saturate(1.06);
-  -webkit-backdrop-filter: blur(var(--fl-frost-blur)) saturate(1.06);
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 /**
@@ -509,7 +523,7 @@ body {
  */
 @media (min-width: 1024px) {
   .fl-edit-controls-pane {
-    border-left: 1px solid var(--fl-border-subtle);
+    border-left: none;
   }
 }
 
@@ -522,15 +536,15 @@ body {
   align-items: center;
   justify-content: flex-end;
   gap: 0.5rem;
-  border-bottom: 1px solid var(--fl-border-subtle);
-  background: var(--fl-bg-subtle);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: transparent;
   padding: 0.375rem 0.5rem;
 }
 
 .fl-edit-pane-toolbar.fl-surface-frost {
-  background: color-mix(in srgb, var(--fl-bg-subtle) 86%, transparent);
-  backdrop-filter: blur(var(--fl-frost-blur)) saturate(1.06);
-  -webkit-backdrop-filter: blur(var(--fl-frost-blur)) saturate(1.06);
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .fl-edit-pane-toolbar-btn {

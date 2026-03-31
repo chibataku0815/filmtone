@@ -2,7 +2,7 @@
  * Film Lab デスクトップ — 編集（Web 踏襲）と書き出し（フォルダ／動画）の 2 モード
  *
  * @overview 書き出し用ルックの正はメモリ上の BatchGradeState。編集タブでプレビューし「色を書き出しへ送る」で同期する。
- * 編集／書き出しは **タブで表示だけ切り替え**、編集ツリーはアンマウントしない（WebGL Viewport を維持し「反映」を常に効かせる）。
+ * 編集／書き出しは **右パネルの中身を切り替え**、Canvas はアンマウントしない（WebGL Viewport を維持し「反映」を常に効かせる）。
  * @limitations プレビュー上の LUT を書き出しへ自動複製はしない（JSON Import か .cube 再適用）。
  * シェルの色・段差は globals.css の Radix スケール準拠トークン（html.dark.dark-theme）に集約する。
  *
@@ -12,7 +12,7 @@
  *   `translateX` でスライドインする。閉じたあともキャンバスはウィンドウ幅いっぱいを使う。
  * - 開閉は Phosphor Icons（CaretLeft / CaretRight）＋ aria-label。`prefers-reduced-motion` は Tailwind で短縮。
  */
-import { CaretLeft, CaretRight } from "@phosphor-icons/react";
+import { Export, CaretLeft, CaretRight, CheckCircle, ArrowClockwise, SlidersHorizontal } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { FilmLabCanvas, type FilmLabCanvasRef } from "film-lab-ui";
@@ -287,6 +287,13 @@ export default function App() {
       setEditRightPaneExpanded(true);
     }
   }, [isLgLayout]);
+
+  /** @description 書き出しタブ切り替え時に右パネルを自動展開（Canvas 横にインライン表示） */
+  useEffect(() => {
+    if (tab === "batch") {
+      setEditRightPaneExpanded(true);
+    }
+  }, [tab]);
 
   /**
    * @description 起動時に userData のセッション JSON を読み、フォームへ反映する。
@@ -968,29 +975,8 @@ export default function App() {
 
   return (
     <div className="film-lab-desktop-root flex min-h-screen flex-col">
-      <header className="fl-app-header fl-surface-frost">
-        <span className="fl-app-title">Filmtone</span>
-        <span className="fl-app-subtitle">{tApp("subtitle")}</span>
-        <div className="fl-tabs ml-auto">
-          <button
-            type="button"
-            data-state={tab === "edit" ? "active" : "inactive"}
-            className="fl-tab"
-            onClick={() => setTab("edit")}
-          >
-            {tApp("tabEdit")}
-          </button>
-          <button
-            type="button"
-            data-state={tab === "batch" ? "active" : "inactive"}
-            className="fl-tab"
-            onClick={() => setTab("batch")}
-            aria-label={tApp("tabBatchAria")}
-          >
-            {tApp("tabBatch")}
-          </button>
-        </div>
-      </header>
+      {/* macOS drag zone — traffic lights sit here */}
+      <div className="fl-drag-zone" />
 
       {gradeSyncNotice ? (
         <div
@@ -1054,12 +1040,7 @@ export default function App() {
 
       <div className="relative flex min-h-0 flex-1 flex-col">
       <div
-        className={
-          tab === "edit"
-            ? "relative z-10 flex min-h-0 flex-1 flex-col gap-4 overflow-hidden fl-main"
-            : DESKTOP_INACTIVE_TAB_CLASS
-        }
-        aria-hidden={tab !== "edit"}
+        className="relative z-10 flex min-h-0 flex-1 flex-col gap-4 overflow-hidden fl-main"
       >
           <div className="relative flex min-h-0 flex-1 flex-col gap-4 lg:min-h-0 lg:overflow-hidden">
             <section className="fl-card fl-scroll-surface relative z-0 flex min-h-0 w-full min-w-0 flex-col gap-3 overflow-y-auto max-lg:flex-none lg:absolute lg:inset-0 lg:z-0">
@@ -1113,7 +1094,7 @@ export default function App() {
                 aria-controls="film-lab-edit-controls-pane"
                 onClick={() => setEditRightPaneExpanded(true)}
               >
-                <CaretLeft size={22} weight="bold" aria-hidden />
+                <CaretLeft size={16} weight="bold" aria-hidden />
               </button>
             ) : null}
 
@@ -1124,13 +1105,13 @@ export default function App() {
               aria-hidden={Boolean(
                 isLgLayout && !editRightPaneExpanded,
               )}
-              className={`fl-edit-slide-panel-shell flex min-h-0 w-full min-w-0 flex-1 flex-col max-lg:relative lg:absolute lg:inset-y-0 lg:right-0 lg:z-20 lg:h-auto lg:max-h-full lg:w-[clamp(320px,42vw,680px)] lg:max-w-[min(680px,calc(100%-1.5rem))] lg:min-w-0 lg:flex-none lg:transition-transform lg:duration-300 lg:ease-out motion-reduce:lg:transition-none ${
+              className={`fl-edit-slide-panel-shell flex min-h-0 w-full min-w-0 flex-1 flex-col max-lg:relative lg:absolute lg:inset-y-0 lg:right-0 lg:z-20 lg:h-auto lg:max-h-full ${tab === "batch" ? "lg:w-[clamp(420px,52vw,860px)] lg:max-w-[min(860px,calc(100%-1.5rem))]" : "lg:w-[clamp(320px,42vw,680px)] lg:max-w-[min(680px,calc(100%-1.5rem))]"} lg:min-w-0 lg:flex-none lg:p-2 lg:transition-transform lg:duration-300 lg:ease-out motion-reduce:lg:transition-none ${
                 editRightPaneExpanded
                   ? "lg:translate-x-0"
                   : "lg:pointer-events-none lg:translate-x-full"
               }`}
             >
-              <section className="fl-card fl-card-muted fl-card--frost fl-edit-controls-pane flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-0 lg:rounded-r-none lg:rounded-l-xl">
+              <section className="fl-card fl-card-muted fl-card--frost fl-edit-controls-pane flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-0 lg:rounded-xl">
                 <div className="fl-edit-pane-toolbar fl-surface-frost hidden lg:flex">
                   <button
                     type="button"
@@ -1138,133 +1119,173 @@ export default function App() {
                     aria-label={tApp("closeParamsPanelAria")}
                     aria-expanded={editRightPaneExpanded}
                     aria-controls="film-lab-edit-controls-pane"
-                    onClick={() => setEditRightPaneExpanded(false)}
+                    onClick={() => {
+                      if (tab === "batch") {
+                        setTab("edit");
+                      } else {
+                        setEditRightPaneExpanded(false);
+                      }
+                    }}
                   >
-                    <CaretRight size={20} weight="bold" aria-hidden />
+                    <CaretRight size={16} weight="bold" aria-hidden />
+                  </button>
+                  <div className="flex flex-1" />
+                  <button
+                    type="button"
+                    aria-label={tApp("tabEdit")}
+                    title={tApp("tabEdit")}
+                    className={`rounded-md p-1.5 transition-colors ${
+                      tab === "edit"
+                        ? "bg-[var(--amber-9)] text-[var(--amber-1)]"
+                        : "text-[var(--fl-text-tertiary)] hover:text-[var(--fl-text-primary)] hover:bg-[var(--fl-bg-interactive)]"
+                    }`}
+                    onClick={() => setTab("edit")}
+                  >
+                    <SlidersHorizontal size={14} weight={tab === "edit" ? "fill" : "regular"} aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={tApp("tabBatchAria")}
+                    title={tApp("tabBatch")}
+                    className={`rounded-md p-1.5 transition-colors ${
+                      tab === "batch"
+                        ? "bg-[var(--amber-9)] text-[var(--amber-1)]"
+                        : "text-[var(--fl-text-tertiary)] hover:text-[var(--fl-text-primary)] hover:bg-[var(--fl-bg-interactive)]"
+                    }`}
+                    onClick={() => setTab("batch")}
+                  >
+                    <Export size={14} weight={tab === "batch" ? "fill" : "regular"} aria-hidden />
                   </button>
                 </div>
-                <div className="fl-scroll-surface min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 sm:px-4">
-                  <FilmLabControlPanelCore
-                    viewport={viewport}
-                    histogramVisible={histogramVisible}
-                    onHistogramToggle={() =>
-                      setHistogramVisible((v) => !v)
-                    }
-                    onLutChange={(s) => {
-                      setEditLut(s);
-                      setParamsChangeNonce((n) => n + 1);
-                    }}
-                    onParamsChange={() => setParamsChangeNonce((n) => n + 1)}
-                  />
-                </div>
-                <div className="fl-sticky-footer fl-surface-frost rounded-b-xl lg:rounded-bl-xl">
-                  {(() => {
-                    const syncState = editToExportSyncedAtMs === null
-                      ? "unsynced"
-                      : paramsChangeNonce !== syncedAtNonce
-                        ? "stale"
-                        : "synced";
-                    return (
-                      <button
-                        type="button"
-                        className={[
-                          "min-h-[40px] w-full sm:w-auto sm:min-w-[220px]",
-                          syncState === "synced"
-                            ? "rounded-lg bg-[var(--slate-4)] px-4 py-2 text-sm font-medium text-[var(--slate-11)] transition-colors hover:bg-[var(--slate-5)]"
-                            : "fl-btn-primary",
-                          syncState === "stale"
-                            ? "animate-[fl-pulse-soft_2s_ease-in-out_infinite]"
-                            : "",
-                        ].join(" ")}
-                        onClick={syncPreviewToBatch}
-                      >
-                        {syncState === "synced"
-                          ? tApp("sendGradeToExportSynced", {
-                              time: new Date(editToExportSyncedAtMs!).toLocaleTimeString(
-                                locale === "ja" ? "ja-JP" : "en-US",
-                                { hour: "2-digit", minute: "2-digit" },
-                              ),
-                            })
-                          : syncState === "stale"
-                            ? tApp("sendGradeToExportStale")
-                            : tApp("sendGradeToExport")}
-                      </button>
-                    );
-                  })()}
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    <p className="fl-caption">{tApp("sendGradeCaption")}</p>
-                    <HelpHint
-                      tip={tApp("sendGradeTip")}
-                      assistiveLabel={tApp("sendGradeTipAria")}
+                {tab === "edit" ? (
+                  <>
+                    <div className="fl-scroll-surface min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 pr-5">
+                      <FilmLabControlPanelCore
+                        viewport={viewport}
+                        histogramVisible={histogramVisible}
+                        onHistogramToggle={() =>
+                          setHistogramVisible((v) => !v)
+                        }
+                        onLutChange={(s) => {
+                          setEditLut(s);
+                          setParamsChangeNonce((n) => n + 1);
+                        }}
+                        onParamsChange={() => setParamsChangeNonce((n) => n + 1)}
+                      />
+                    </div>
+                    <div className="fl-sticky-footer fl-surface-frost rounded-b-xl">
+                      {(() => {
+                        const syncState = editToExportSyncedAtMs === null
+                          ? "unsynced"
+                          : paramsChangeNonce !== syncedAtNonce
+                            ? "stale"
+                            : "synced";
+                        return (
+                          <button
+                            type="button"
+                            className={[
+                              "inline-flex items-center justify-center min-h-[40px] w-full sm:w-auto sm:min-w-[220px]",
+                              syncState === "synced"
+                                ? "rounded-lg bg-[var(--slate-4)] px-4 py-2 text-sm font-medium text-[var(--slate-11)] transition-colors hover:bg-[var(--slate-5)]"
+                                : "fl-btn-primary",
+                              syncState === "stale"
+                                ? "animate-[fl-pulse-soft_2s_ease-in-out_infinite]"
+                                : "",
+                            ].join(" ")}
+                            onClick={syncPreviewToBatch}
+                          >
+                            <span className="inline-flex items-center gap-1.5">
+                              {syncState === "synced" ? (
+                                <><CheckCircle size={16} weight="fill" aria-hidden />{tApp("sendGradeToExportSynced", {
+                                  time: new Date(editToExportSyncedAtMs!).toLocaleTimeString(
+                                    locale === "ja" ? "ja-JP" : "en-US",
+                                    { hour: "2-digit", minute: "2-digit" },
+                                  ),
+                                })}</>
+                              ) : syncState === "stale" ? (
+                                <><ArrowClockwise size={16} weight="bold" aria-hidden />{tApp("sendGradeToExportStale")}</>
+                              ) : (
+                                <><Export size={14} weight="bold" aria-hidden />{tApp("sendGradeToExport")}</>
+                              )}
+                            </span>
+                          </button>
+                        );
+                      })()}
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        <p className="fl-caption">{tApp("sendGradeCaption")}</p>
+                        <HelpHint
+                          tip={tApp("sendGradeTip")}
+                          assistiveLabel={tApp("sendGradeTipAria")}
+                        />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="fl-scroll-surface min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 pr-5">
+                    <BatchTabPanel
+                      compact
+                      batchJobMode={batchJobMode}
+                      onBatchJobModeChange={setBatchJobMode}
+                      persistedSession={persistedSession}
+                      batchCanResume={batchCanResume}
+                      running={running}
+                      onResumeBatch={resumeBatch}
+                      onDiscardPersistedSession={discardPersistedSession}
+                      batchPresetChoice={batchPresetChoice}
+                      onBatchPresetChoiceChange={applyBatchPreset}
+                      importedGradeLabel={importedGradeLabel}
+                      onImportGradeJson={importGradeJson}
+                      onExportGradeJson={exportGrade}
+                      inputDir={inputDir}
+                      outputDir={outputDir}
+                      onPickInputDir={async () => {
+                        const p = await window.filmLabBatch.pickInputDir();
+                        setInputDir(p);
+                      }}
+                      onPickOutputDir={async () => {
+                        const p = await window.filmLabBatch.pickOutputDir();
+                        setOutputDir(p);
+                      }}
+                      batchFormat={batchFormat}
+                      onBatchFormatChange={setBatchFormat}
+                      batchOutputSuffix={batchOutputSuffix}
+                      onBatchOutputSuffixChange={setBatchOutputSuffix}
+                      batchCanRun={batchCanRun}
+                      batchCanRetryFailed={batchCanRetryFailed}
+                      onRunBatch={runBatch}
+                      onRetryFailedBatch={retryFailedBatch}
+                      onAbortBatch={() => {
+                        void window.filmLabBatch.videoExportAbort().catch(() => {});
+                        batchAbortRef.current?.abort();
+                      }}
+                      batchProgress={batchProgress}
+                      lastBatchSummary={lastBatchSummary}
+                      videoInputPath={videoInputPath}
+                      videoProbeLabel={videoProbeLabel}
+                      videoCanExport={videoCanExport}
+                      onPickVideoFile={pickVideoFile}
+                      onRunVideoExport={runVideoExport}
+                      videoExportSuccessNonce={videoExportSuccessNonce}
+                      canApplyEditGradeToBatch={Boolean(viewport)}
+                      onApplyEditGradeToBatch={syncPreviewToBatch}
+                      editToExportSyncedAtMs={editToExportSyncedAtMs}
+                      onReapplyBatchPresetBaseline={() => {
+                        applyBatchPreset(batchPresetChoice);
+                      }}
                     />
+                    <details className="mt-2">
+                      <summary className="fl-caption cursor-pointer text-[var(--fl-text-tertiary)] hover:text-[var(--fl-text-secondary)]">
+                        {tApp("logToggle")}
+                      </summary>
+                      <pre className="fl-log mt-1 max-h-[120px]">{logText || tApp("logPlaceholder")}</pre>
+                    </details>
                   </div>
-                </div>
+                )}
               </section>
             </div>
           </div>
       </div>
 
-      <div
-        className={
-          tab === "batch"
-            ? "relative z-10 fl-main fl-main-batch fl-scroll-surface flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto"
-            : DESKTOP_INACTIVE_TAB_CLASS
-        }
-        aria-hidden={tab !== "batch"}
-      >
-          <BatchTabPanel
-            batchJobMode={batchJobMode}
-            onBatchJobModeChange={setBatchJobMode}
-            persistedSession={persistedSession}
-            batchCanResume={batchCanResume}
-            running={running}
-            onResumeBatch={resumeBatch}
-            onDiscardPersistedSession={discardPersistedSession}
-            batchPresetChoice={batchPresetChoice}
-            onBatchPresetChoiceChange={applyBatchPreset}
-            importedGradeLabel={importedGradeLabel}
-            onImportGradeJson={importGradeJson}
-            onExportGradeJson={exportGrade}
-            inputDir={inputDir}
-            outputDir={outputDir}
-            onPickInputDir={async () => {
-              const p = await window.filmLabBatch.pickInputDir();
-              setInputDir(p);
-            }}
-            onPickOutputDir={async () => {
-              const p = await window.filmLabBatch.pickOutputDir();
-              setOutputDir(p);
-            }}
-            batchFormat={batchFormat}
-            onBatchFormatChange={setBatchFormat}
-            batchOutputSuffix={batchOutputSuffix}
-            onBatchOutputSuffixChange={setBatchOutputSuffix}
-            batchCanRun={batchCanRun}
-            batchCanRetryFailed={batchCanRetryFailed}
-            onRunBatch={runBatch}
-            onRetryFailedBatch={retryFailedBatch}
-            onAbortBatch={() => {
-              void window.filmLabBatch.videoExportAbort().catch(() => {});
-              batchAbortRef.current?.abort();
-            }}
-            batchProgress={batchProgress}
-            lastBatchSummary={lastBatchSummary}
-            videoInputPath={videoInputPath}
-            videoProbeLabel={videoProbeLabel}
-            videoCanExport={videoCanExport}
-            onPickVideoFile={pickVideoFile}
-            onRunVideoExport={runVideoExport}
-            videoExportSuccessNonce={videoExportSuccessNonce}
-            canApplyEditGradeToBatch={Boolean(viewport)}
-            onApplyEditGradeToBatch={syncPreviewToBatch}
-            editToExportSyncedAtMs={editToExportSyncedAtMs}
-            onReapplyBatchPresetBaseline={() => {
-              applyBatchPreset(batchPresetChoice);
-            }}
-          />
-
-          <pre className="fl-log">{logText || tApp("logPlaceholder")}</pre>
-      </div>
       </div>
     </div>
   );

@@ -578,8 +578,11 @@ function createWindow(): BrowserWindow {
    * @description `backgroundColor` をダークにしておくと、WebKit スクロールバー周りやロード直後にライトの下地が見えにくい（Radix slate-1 に近い色）。
    */
   const win = new BrowserWindow({
-    backgroundColor: "#0d0d0f",
     show: !DESKTOP_SMOKE_PENDING,
+    titleBarStyle: "hidden",
+    trafficLightPosition: { x: 14, y: 8 },
+    vibrancy: "under-window",
+    visualEffectState: "active",
     ...(hasSavedSize
       ? {
           x: savedBounds!.x,
