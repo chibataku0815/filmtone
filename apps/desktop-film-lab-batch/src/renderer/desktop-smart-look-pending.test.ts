@@ -1,47 +1,28 @@
 import { describe, expect, it, vi } from "vitest";
 import { resolveDesktopFilmLabImportMeta } from "../../vite.config";
 
-async function renderDesktopControlPanelHtml(
-  smartLookUiFlag: "" | "true",
-): Promise<string> {
-  const originalFlag = process.env.NEXT_PUBLIC_FILM_LAB_SMART_LOOK_UI;
-
-  if (smartLookUiFlag === "true") {
-    process.env.NEXT_PUBLIC_FILM_LAB_SMART_LOOK_UI = "true";
-  } else {
-    delete process.env.NEXT_PUBLIC_FILM_LAB_SMART_LOOK_UI;
-  }
-
+async function renderDesktopControlPanelCoreHtml(): Promise<string> {
   vi.resetModules();
 
   try {
     const React = await import("react");
     const { renderToStaticMarkup } = await import("react-dom/server");
     const { NextIntlClientProvider } = await import("next-intl");
-    const { ControlPanel } = await import("@film-lab/components/ControlPanel");
+    const { FilmLabControlPanelCore } = await import("film-lab-ui");
     const messages = (await import("../../messages/ja.json")).default;
 
     return renderToStaticMarkup(
       React.createElement(
         NextIntlClientProvider,
         { locale: "ja", messages, timeZone: "Asia/Tokyo" },
-        React.createElement(ControlPanel, {
+        React.createElement(FilmLabControlPanelCore, {
           viewport: null,
           histogramVisible: true,
           onHistogramToggle: () => {},
-          filmLabCanvasRef: { current: null },
-          smartLookApiBaseUrl: "http://127.0.0.1:3000",
-          serverVerifiedSupporter: true,
-          autoRestoreStoredSession: false,
         }),
       ),
     );
   } finally {
-    if (typeof originalFlag === "string") {
-      process.env.NEXT_PUBLIC_FILM_LAB_SMART_LOOK_UI = originalFlag;
-    } else {
-      delete process.env.NEXT_PUBLIC_FILM_LAB_SMART_LOOK_UI;
-    }
     vi.resetModules();
   }
 }
@@ -84,17 +65,12 @@ describe("resolveDesktopFilmLabImportMeta", () => {
     expect(resolveDesktopFilmLabImportMeta("production", {}).smartLookRasterFlag).toBe("");
   });
 
-  it("keeps Smart Look controls unmounted in the desktop control panel while pending", async () => {
-    const html = await renderDesktopControlPanelHtml("");
+  it("renders the desktop control panel core with preset buttons", async () => {
+    const html = await renderDesktopControlPanelCoreHtml();
 
     expect(html).toContain("プリセット");
+    // Core does not include Smart Look or Browser Storage
     expect(html).not.toContain("見本に色味を合わせる（AI・beta）");
     expect(html).not.toContain("Match colors to a sample (AI, beta)");
-  });
-
-  it("would mount Smart Look controls on desktop only when the UI flag is explicitly true", async () => {
-    const html = await renderDesktopControlPanelHtml("true");
-
-    expect(html).toContain("見本に色味を合わせる（AI・beta）");
   });
 });

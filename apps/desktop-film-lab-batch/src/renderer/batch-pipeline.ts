@@ -5,13 +5,15 @@
  * @limitations GPU は 1 コンテキスト直列。巨大解像度は maxTextureSize で縮小読込（Web と同様）。
  */
 import * as THREE from "three";
-import { isWebGL2Supported } from "@/shared/gl";
+import {
+  isWebGL2Supported,
+  Viewport,
+  MediaLoader,
+  filmlabVertexShader,
+  filmlabFragmentShader,
+} from "film-lab-renderer";
 import type { FilmLabBatchBridge } from "./desktop-api";
-import { Viewport } from "@film-lab/core/Viewport";
-import { MediaLoader } from "@film-lab/core/MediaLoader";
-import { filmlabVertexShader } from "@film-lab/shader/filmlab.vert";
-import { filmlabFragmentShader } from "@film-lab/shader/filmlab.frag";
-import { halationHueToHex } from "@film-lab/preset-data";
+import { halationHueToHex } from "film-lab-core";
 import {
   filmLabParamsSchema,
   filmLookGradeInputSchema,

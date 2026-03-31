@@ -622,6 +622,15 @@ export class WebCodecsMp4ExportSession {
   }
 
   /**
+   * @description 現在表示中の VideoFrame を返す（Canvas 2D バイパス用）。
+   *   Three.js r152+ は VideoFrame を TexImageSource としてネイティブサポートするため、
+   *   drawImage(canvas) 経由の色空間二重変換を回避できる。
+   */
+  get currentFrame(): VideoFrame | null {
+    return this.holder;
+  }
+
+  /**
    * @description JS がいま保持している `VideoFrame` 数（future queue + 表示中 holder）。
    */
   private liveFrameCount(): number {
@@ -836,29 +845,54 @@ export class WebCodecsMp4ExportSession {
             canvas.width = codedWidth;
             canvas.height = codedHeight;
             /**
-             * Electron では HW デコード連打で不安定な事例があるため **ソフト優先**を維持。
-             * 今回は stall 側の切り分けを優先し、`optimizeForLatency` は safe side の定数でまとめて切り替える。
+             * 3-step fallback: prefer-hardware → prefer-software → default (no hardwareAcceleration).
+             * macOS M-series では VideoToolbox (HW) が最速。HW 非対応環境はソフト→デフォルトへ。
              */
-            const preferSoftware: VideoDecoderConfig = {
-              codec,
-              codedWidth,
-              codedHeight,
-              hardwareAcceleration: "prefer-software",
-              optimizeForLatency: WEBCODECS_OPTIMIZE_FOR_LATENCY,
-            };
-            let sup = await VideoDecoder.isConfigSupported(preferSoftware);
-            let decoderConfigureBase: VideoDecoderConfig = preferSoftware;
-            if (!sup.supported) {
-              const fallback: VideoDecoderConfig = {
-                codec,
-                codedWidth,
-                codedHeight,
-                optimizeForLatency: WEBCODECS_OPTIMIZE_FOR_LATENCY,
-              };
-              sup = await VideoDecoder.isConfigSupported(fallback);
-              decoderConfigureBase = fallback;
+            const candidates: Array<{
+              label: string;
+              config: VideoDecoderConfig;
+            }> = [
+              {
+                label: "prefer-hardware",
+                config: {
+                  codec,
+                  codedWidth,
+                  codedHeight,
+                  hardwareAcceleration: "prefer-hardware",
+                  optimizeForLatency: WEBCODECS_OPTIMIZE_FOR_LATENCY,
+                },
+              },
+              {
+                label: "prefer-software",
+                config: {
+                  codec,
+                  codedWidth,
+                  codedHeight,
+                  hardwareAcceleration: "prefer-software",
+                  optimizeForLatency: WEBCODECS_OPTIMIZE_FOR_LATENCY,
+                },
+              },
+              {
+                label: "default",
+                config: {
+                  codec,
+                  codedWidth,
+                  codedHeight,
+                  optimizeForLatency: WEBCODECS_OPTIMIZE_FOR_LATENCY,
+                },
+              },
+            ];
+            let decoderConfigureBase: VideoDecoderConfig | undefined;
+            let selectedAccel = "none";
+            for (const c of candidates) {
+              const sup = await VideoDecoder.isConfigSupported(c.config);
+              if (sup.supported) {
+                decoderConfigureBase = c.config;
+                selectedAccel = c.label;
+                break;
+              }
             }
-            if (!sup.supported) {
+            if (!decoderConfigureBase) {
               reject(
                 new Error(
                   `WebCodecsMp4ExportSession: VideoDecoder.isConfigSupported unsupported — ${codec}`,
@@ -866,6 +900,9 @@ export class WebCodecsMp4ExportSession {
               );
               return;
             }
+            onTrace(
+              `[動画][WebCodecs] VideoDecoder.configure fallback selected hwaccel=${selectedAccel}`,
+            );
 
             const decoder = new VideoDecoder({
               output: (frame) => {
@@ -881,6 +918,12 @@ export class WebCodecsMp4ExportSession {
                   if (s.decodeOutputCount <= 3) {
                     s.onTrace(
                       `[動画][WebCodecs][dbg] output #${s.decodeOutputCount} ts=${frame.timestamp}µs dur=${frame.duration ?? "n/a"}`,
+                    );
+                  }
+                  if (s.decodeOutputCount <= 1) {
+                    const cs = frame.colorSpace;
+                    s.onTrace(
+                      `[動画][WebCodecs][dbg] frame colorSpace primaries=${cs?.primaries} transfer=${cs?.transfer} matrix=${cs?.matrix} fullRange=${cs?.fullRange}`,
                     );
                   }
                   s.outputQueue.push(frame);

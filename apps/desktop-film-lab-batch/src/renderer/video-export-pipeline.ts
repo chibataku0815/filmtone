@@ -6,12 +6,14 @@
  * @limitations 単一 GL 直列。ffprobe/ffmpeg は PATH 必須（Homebrew 等）。macOS では VideoToolbox を優先。
  */
 import * as THREE from "three";
-import { isWebGL2Supported } from "@/shared/gl";
+import {
+  isWebGL2Supported,
+  Viewport,
+  filmlabVertexShader,
+  filmlabFragmentShader,
+} from "film-lab-renderer";
 import type { FilmLabBatchBridge } from "./desktop-api";
-import { Viewport } from "@film-lab/core/Viewport";
-import { filmlabVertexShader } from "@film-lab/shader/filmlab.vert";
-import { filmlabFragmentShader } from "@film-lab/shader/filmlab.frag";
-import { halationHueToHex } from "@film-lab/preset-data";
+import { halationHueToHex } from "film-lab-core";
 import {
   assertVideoImportWithinCaps,
   computeExportFrameCount,
@@ -87,23 +89,6 @@ type VideoWithRvfc = HTMLVideoElement & {
   ) => number;
   cancelVideoFrameCallback?: (handle: number) => void;
 };
-
-/**
- * @description Y 反転（WebGL readPixels は左下原点、動画は左上原点想定）。`dst` に上書きし割当を避ける。
- */
-function flipRgbaVerticalInto(
-  src: Uint8Array,
-  width: number,
-  height: number,
-  dst: Uint8Array,
-): void {
-  const rowBytes = width * 4;
-  for (let y = 0; y < height; y++) {
-    const srcRow = (height - 1 - y) * rowBytes;
-    const dstRow = y * rowBytes;
-    dst.set(src.subarray(srcRow, srcRow + rowBytes), dstRow);
-  }
-}
 
 /**
  * @description ミリ秒配列の中央値（ソート破壊なし）
@@ -817,8 +802,7 @@ export async function runVideoExportPipeline(options: {
   const maxT = Math.max(0, probe.durationSec - epsilon);
   const sourceFpsTrusted = probe.sourceFrameRateTrusted === true;
   const sourceFpsValue = probe.sourceFrameRate;
-  const readBuf = new Uint8Array(outW * outH * 4);
-  const flipBuf = new Uint8Array(outW * outH * 4);
+  const cpuBuf = new Uint8Array(outW * outH * 4);
   const maxAttempts = tryWebCodecs ? 2 : 1;
 
   try {
@@ -834,14 +818,45 @@ export async function runVideoExportPipeline(options: {
       let retryReason = "";
 
       try {
-        // WebCodecs (VideoDecoder → Canvas 2D → CanvasTexture) 経路は
-        // CanvasTexture の色空間処理に起因する色ズレ（大幅な暗化）が確認されたため無効化。
-        // HTMLVideoElement シーク経路はプレビューと同じテクスチャパスを通るため色が一致する。
-        // WebCodecs の色空間問題が解決するまでは HTMLVideoElement のみ使用する。
-        // See: life#38
-        if (false && allowWebCodecs) {
-          // (WebCodecs path disabled — kept for future reference)
-          webCodecsSession = null;
+        if (allowWebCodecs) {
+          try {
+            let fileBytes: Uint8Array;
+            const readSourcePath = stagedPath ?? inputVideoPath;
+            try {
+              fileBytes = await api.readFileBuffer(readSourcePath);
+              pathForFfmpeg = readSourcePath;
+            } catch (readErr) {
+              onLog(
+                `[動画][WebCodecs] ソース直接 read 失敗 → ステージング（${readErr instanceof Error ? readErr.message : String(readErr)}）`,
+              );
+              const st = await api.videoExportStageSource(inputVideoPath);
+              stagedPath = st.stagedPath;
+              pathForFfmpeg = st.stagedPath;
+              fileBytes = await api.readFileBuffer(st.stagedPath);
+            }
+            const ab = fileBytes.buffer.slice(
+              fileBytes.byteOffset,
+              fileBytes.byteOffset + fileBytes.byteLength,
+            );
+            webCodecsSession = await WebCodecsMp4ExportSession.create(
+              ab,
+              {
+                width: probe.width,
+                height: probe.height,
+                durationSec: probe.durationSec,
+              },
+              onLog,
+            );
+            onLog(
+              "[動画][WebCodecs] デコード: VideoDecoder + CanvasTexture（HTMLVideoElement シークなし）",
+            );
+          } catch (wcErr) {
+            const detail =
+              wcErr instanceof Error ? wcErr.message : String(wcErr);
+            onLog(`[動画][WebCodecs] 失敗、従来経路へ — ${detail}`);
+            webCodecsSession = null;
+            pathForFfmpeg = stagedPath ?? inputVideoPath;
+          }
         } else if (attemptIndex > 0) {
           onLog(
             "[動画][WebCodecs] runtime fallback: HTMLVideoElement シーク経路で最初から再試行します",
@@ -871,7 +886,14 @@ export async function runVideoExportPipeline(options: {
         }
 
         srcTexture = webCodecsSession
-          ? webCodecsSession.texture
+          ? (() => {
+              const ct = webCodecsSession.texture;
+              // Canvas 2D drawImage(videoFrame) は macOS で既に linear 化された値を返す。
+              // SRGBColorSpace を指定すると Three.js が二重に sRGB→linear 変換し暗化する。
+              // LinearSRGBColorSpace でバイパスして HTMLVideoElement 経路と色を一致させる。
+              ct.colorSpace = THREE.LinearSRGBColorSpace;
+              return ct;
+            })()
           : (() => {
               const vt = new THREE.VideoTexture(video!);
               vt.colorSpace = THREE.SRGBColorSpace;
@@ -889,6 +911,7 @@ export async function runVideoExportPipeline(options: {
           antialias: false,
           alpha: false,
           preserveDrawingBuffer: true,
+          powerPreference: "high-performance",
         });
         renderer.setPixelRatio(1);
         renderer.setSize(outW, outH, false);
@@ -918,6 +941,63 @@ export async function runVideoExportPipeline(options: {
 
         const gl = renderer.getContext() as WebGL2RenderingContext;
 
+        // --- PBO readback (WebGL2 PIXEL_PACK_BUFFER) ---
+        // PBO routes readPixels through driver-managed pinned memory, making
+        // getBufferSubData a fast memcpy.  We probe fenceSync on a dummy draw
+        // to decide the strategy:
+        //   useFence=true  → double-buffered PBOs + fenceSync (async overlap)
+        //   useFence=false → single PBO + gl.finish() (still faster than raw readPixels)
+        //   usePbo=false   → sync readPixels fallback
+        const pboSize = outW * outH * 4;
+        let usePbo = true;
+        let useFence = false;
+        const pbos: [WebGLBuffer | null, WebGLBuffer | null] = [null, null];
+        try {
+          pbos[0] = gl.createBuffer();
+          if (!pbos[0]) throw new Error("createBuffer returned null");
+          gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbos[0]);
+          gl.bufferData(gl.PIXEL_PACK_BUFFER, pboSize, gl.STREAM_READ);
+          gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+
+          // Probe fenceSync: some ANGLE/Metal backends return WAIT_FAILED
+          const probeSync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+          if (probeSync) {
+            gl.flush();
+            const probeResult = gl.clientWaitSync(
+              probeSync,
+              gl.SYNC_FLUSH_COMMANDS_BIT,
+              1_000_000_000,
+            );
+            gl.deleteSync(probeSync);
+            if (
+              probeResult === gl.ALREADY_SIGNALED ||
+              probeResult === gl.CONDITION_SATISFIED
+            ) {
+              useFence = true;
+              // Create second PBO for double-buffer
+              pbos[1] = gl.createBuffer();
+              if (!pbos[1]) throw new Error("createBuffer[1] returned null");
+              gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbos[1]);
+              gl.bufferData(gl.PIXEL_PACK_BUFFER, pboSize, gl.STREAM_READ);
+              gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+            }
+          }
+          const mode = useFence ? "PBO double-buffer + fenceSync" : "PBO + finish";
+          onLog(
+            `[動画][PBO] ${mode} (${(pboSize / 1024 / 1024).toFixed(1)}MB${useFence ? " × 2" : ""})`,
+          );
+        } catch (pboErr) {
+          usePbo = false;
+          for (const p of pbos) if (p) gl.deleteBuffer(p);
+          pbos[0] = null;
+          pbos[1] = null;
+          onLog(
+            `[動画][PBO] 作成失敗、sync readPixels にフォールバック — ${pboErr instanceof Error ? pboErr.message : String(pboErr)}`,
+          );
+        }
+        let pboIdx = 0;
+        let prevFence: WebGLSync | null = null;
+
         let resolvedOutPath: string;
         try {
           await api.videoExportAbort().catch(() => {});
@@ -941,7 +1021,6 @@ export async function runVideoExportPipeline(options: {
         const arrDecode: number[] = [];
         const arrRender: number[] = [];
         const arrRead: number[] = [];
-        const arrFlip: number[] = [];
         const arrIpc: number[] = [];
         const arrTotal: number[] = [];
         const arrSeekWaitBySegment = Array.from(
@@ -963,10 +1042,6 @@ export async function runVideoExportPipeline(options: {
         let countForwardScans = 0;
         let lastDecodedSourceFrameIndex: number | null = null;
 
-        // Double-buffer for flip output so we can overlap IPC with next seek
-        const flipBufA = flipBuf;
-        const flipBufB = new Uint8Array(outW * outH * 4);
-        let useFlipA = true;
         let pendingIpc: Promise<void> | null = null;
         let pendingIpcError: string | null = null;
 
@@ -1096,11 +1171,9 @@ export async function runVideoExportPipeline(options: {
           arrSeekWaitBySegment[profileSegment]!.push(seekWaitMs);
           arrDecode.push(decodeGateMs);
 
-          if (webCodecsSession) {
-            if (!reuseFrame) {
-              srcTexture.needsUpdate = true;
-            }
-          } else {
+          if (webCodecsSession && !reuseFrame) {
+            srcTexture.needsUpdate = true;
+          } else if (!webCodecsSession) {
             // VideoTexture: Three.js が colorSpace + UNPACK_FLIP_Y でアップロード
             srcTexture.needsUpdate = true;
           }
@@ -1110,36 +1183,103 @@ export async function runVideoExportPipeline(options: {
           const renderMs = performance.now() - tR0;
           arrRender.push(renderMs);
 
-          const tP0 = performance.now();
-          gl.readPixels(0, 0, outW, outH, gl.RGBA, gl.UNSIGNED_BYTE, readBuf);
-          const readPxMs = performance.now() - tP0;
-          arrRead.push(readPxMs);
+          // --- GPU→CPU pixel transfer (no Y-flip — ffmpeg vflip handles row order) ---
+          let readPxMs = 0;
 
-          const currentFlipBuf = useFlipA ? flipBufA : flipBufB;
-          useFlipA = !useFlipA;
+          if (usePbo && useFence) {
+            // === Path A: PBO double-buffer + fenceSync (best: async overlap) ===
+            const tP0 = performance.now();
+            gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbos[pboIdx]!);
+            gl.readPixels(0, 0, outW, outH, gl.RGBA, gl.UNSIGNED_BYTE, 0);
+            gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+            const newFence = gl.fenceSync(
+              gl.SYNC_GPU_COMMANDS_COMPLETE,
+              0,
+            );
+            gl.flush();
 
-          const tF0 = performance.now();
-          flipRgbaVerticalInto(readBuf, outW, outH, currentFlipBuf);
-          const flipMs = performance.now() - tF0;
-          arrFlip.push(flipMs);
+            if (prevFence) {
+              gl.clientWaitSync(
+                prevFence,
+                gl.SYNC_FLUSH_COMMANDS_BIT,
+                5_000_000_000,
+              );
+              gl.deleteSync(prevFence);
+              gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbos[1 - pboIdx]!);
+              gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, cpuBuf);
+              gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
 
-          // Fire IPC write and DON'T await — it runs in parallel with next frame's seek.
-          // The pipelined main-side handler returns quickly (no drain wait).
-          const tW0 = performance.now();
-          const ipcSegment = profileSegment;
-          pendingIpc = api.videoExportWriteFrame(currentFlipBuf).then(
-            () => {
-              const ipcMs = performance.now() - tW0;
-              arrIpc.push(ipcMs);
-              arrIpcBySegment[ipcSegment]!.push(ipcMs);
-            },
-            (e: unknown) => {
-              const ipcMs = performance.now() - tW0;
-              arrIpc.push(ipcMs);
-              arrIpcBySegment[ipcSegment]!.push(ipcMs);
-              pendingIpcError = e instanceof Error ? e.message : String(e);
-            },
-          );
+              readPxMs = performance.now() - tP0;
+              arrRead.push(readPxMs);
+
+              const tW0 = performance.now();
+              const ipcSegment = profileSegment;
+              pendingIpc = api.videoExportWriteFrame(cpuBuf).then(
+                () => {
+                  const ipcMs = performance.now() - tW0;
+                  arrIpc.push(ipcMs);
+                  arrIpcBySegment[ipcSegment]!.push(ipcMs);
+                },
+                (e: unknown) => {
+                  const ipcMs = performance.now() - tW0;
+                  arrIpc.push(ipcMs);
+                  arrIpcBySegment[ipcSegment]!.push(ipcMs);
+                  pendingIpcError = e instanceof Error ? e.message : String(e);
+                },
+              );
+            }
+
+            prevFence = newFence;
+            pboIdx = 1 - pboIdx;
+          } else if (usePbo) {
+            // === Path B: single PBO + gl.finish() (pinned-memory memcpy) ===
+            const tP0 = performance.now();
+            gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbos[0]!);
+            gl.readPixels(0, 0, outW, outH, gl.RGBA, gl.UNSIGNED_BYTE, 0);
+            gl.finish();
+            gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, cpuBuf);
+            gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+            readPxMs = performance.now() - tP0;
+            arrRead.push(readPxMs);
+
+            const tW0 = performance.now();
+            const ipcSegment = profileSegment;
+            pendingIpc = api.videoExportWriteFrame(cpuBuf).then(
+              () => {
+                const ipcMs = performance.now() - tW0;
+                arrIpc.push(ipcMs);
+                arrIpcBySegment[ipcSegment]!.push(ipcMs);
+              },
+              (e: unknown) => {
+                const ipcMs = performance.now() - tW0;
+                arrIpc.push(ipcMs);
+                arrIpcBySegment[ipcSegment]!.push(ipcMs);
+                pendingIpcError = e instanceof Error ? e.message : String(e);
+              },
+            );
+          } else {
+            // === Path C: sync readPixels fallback ===
+            const tP0 = performance.now();
+            gl.readPixels(0, 0, outW, outH, gl.RGBA, gl.UNSIGNED_BYTE, cpuBuf);
+            readPxMs = performance.now() - tP0;
+            arrRead.push(readPxMs);
+
+            const tW0 = performance.now();
+            const ipcSegment = profileSegment;
+            pendingIpc = api.videoExportWriteFrame(cpuBuf).then(
+              () => {
+                const ipcMs = performance.now() - tW0;
+                arrIpc.push(ipcMs);
+                arrIpcBySegment[ipcSegment]!.push(ipcMs);
+              },
+              (e: unknown) => {
+                const ipcMs = performance.now() - tW0;
+                arrIpc.push(ipcMs);
+                arrIpcBySegment[ipcSegment]!.push(ipcMs);
+                pendingIpcError = e instanceof Error ? e.message : String(e);
+              },
+            );
+          }
 
           const totalMs = performance.now() - tFrame0;
           arrTotal.push(totalMs);
@@ -1149,7 +1289,7 @@ export async function runVideoExportPipeline(options: {
               `[動画][trace] f=${i + 1}/${totalFrames} t=${t.toFixed(4)}s ` +
               `reuse=${reuseFrame ? "Y" : "N"} mediaSync=${seekWaitMs.toFixed(0)}ms decode=${decodeGateMs.toFixed(0)}ms ` +
               `render=${renderMs.toFixed(0)}ms readPx=${readPxMs.toFixed(0)}ms ` +
-              `flip=${flipMs.toFixed(0)}ms ipc=async total=${totalMs.toFixed(0)}ms`;
+              `ipc=async total=${totalMs.toFixed(0)}ms`;
             onLog(summary);
           }
 
@@ -1167,6 +1307,39 @@ export async function runVideoExportPipeline(options: {
             `[動画][WebCodecs] 実行中に失敗したため、従来のシーク経路で最初から再試行します — ${retryReason}`,
           );
           continue;
+        }
+
+        // PBO double-buffer: flush the last buffered frame (1-frame pipeline delay)
+        if (usePbo && useFence && prevFence) {
+          const prevIpcErr = await drainPendingIpc();
+          if (prevIpcErr) {
+            onLog(`[動画] フレーム書込エラー: ${prevIpcErr}`);
+            await api.videoExportAbort();
+            return { ok: false, message: prevIpcErr };
+          }
+          const tR0 = performance.now();
+          gl.clientWaitSync(
+            prevFence,
+            gl.SYNC_FLUSH_COMMANDS_BIT,
+            5_000_000_000,
+          );
+          gl.deleteSync(prevFence);
+          prevFence = null;
+          gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbos[1 - pboIdx]!);
+          gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, cpuBuf);
+          gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+          arrRead.push(performance.now() - tR0);
+
+          const tW0 = performance.now();
+          pendingIpc = api.videoExportWriteFrame(cpuBuf).then(
+            () => {
+              arrIpc.push(performance.now() - tW0);
+            },
+            (e: unknown) => {
+              arrIpc.push(performance.now() - tW0);
+              pendingIpcError = e instanceof Error ? e.message : String(e);
+            },
+          );
         }
 
         const finalIpcError = await drainPendingIpc();
@@ -1193,8 +1366,7 @@ export async function runVideoExportPipeline(options: {
               `  mediaSync ms mean=${meanMs(arrSeekWait).toFixed(1)} median=${medianMs(arrSeekWait).toFixed(1)} p95=${p95Ms(arrSeekWait).toFixed(1)}\n` +
               `  decodeGate ms mean=${meanMs(arrDecode).toFixed(1)} median=${medianMs(arrDecode).toFixed(1)} p95=${p95Ms(arrDecode).toFixed(1)}\n` +
               `  render ms mean=${meanMs(arrRender).toFixed(1)} median=${medianMs(arrRender).toFixed(1)} p95=${p95Ms(arrRender).toFixed(1)}\n` +
-              `  readPixels ms mean=${meanMs(arrRead).toFixed(1)} median=${medianMs(arrRead).toFixed(1)} p95=${p95Ms(arrRead).toFixed(1)}\n` +
-              `  flip ms mean=${meanMs(arrFlip).toFixed(1)} median=${medianMs(arrFlip).toFixed(1)} p95=${p95Ms(arrFlip).toFixed(1)}\n` +
+              `  readPixels ms mean=${meanMs(arrRead).toFixed(1)} median=${medianMs(arrRead).toFixed(1)} p95=${p95Ms(arrRead).toFixed(1)} (${usePbo ? (useFence ? "PBO+fence" : "PBO+finish") : "sync"})\n` +
               `  ipcWrite ms mean=${meanMs(arrIpc).toFixed(1)} median=${medianMs(arrIpc).toFixed(1)} p95=${p95Ms(arrIpc).toFixed(1)}\n` +
               `  frameTotal ms mean=${meanMs(arrTotal).toFixed(1)} median=${medianMs(arrTotal).toFixed(1)} p95=${p95Ms(arrTotal).toFixed(1)}` +
               profileDebugDetail,
