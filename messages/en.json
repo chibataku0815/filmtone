@@ -843,6 +843,13 @@
       "typeFixed": "Fixed",
       "typeChanged": "Changed",
       "entries": {
+        "v020Title": "Dual LUT, redesigned export, and faster video",
+        "v020DualLut": "Apply two LUT files simultaneously — Slot 1 for input transforms (e.g. Log-to-Rec709), Slot 2 for creative looks, each with independent intensity.",
+        "v020LutSync": "LUT files from the Edit tab now sync to export. A 3-state button shows whether your grade is synced, out-of-sync, or partially synced.",
+        "v020InlineExportPanel": "Export moved from a multi-step wizard to an inline accordion — canvas stays visible, frosted glass UI integrates with macOS titlebar.",
+        "v020WebCodecsReEnabled": "WebCodecs video export re-enabled with hardware decoder preference, PBO readback, and correct BT.709 color space.",
+        "v020UpdateNotify": "In-app update notification — a banner appears when a newer version is available.",
+        "v020PackageRefactor": "Internal restructuring into 4 packages (core, renderer, ui, smart-look) for cleaner code separation.",
         "v013Title": "Production optimization",
         "v013FrameLogSuppression": "Suppressed per-frame log output during video export for cleaner console and improved performance.",
         "v012Title": "Video color accuracy fix",

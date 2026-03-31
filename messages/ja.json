@@ -843,6 +843,13 @@
       "typeFixed": "修正",
       "typeChanged": "変更",
       "entries": {
+        "v020Title": "Dual LUT・書き出し刷新・動画高速化",
+        "v020DualLut": "LUT ファイルを 2 つ同時に適用 — スロット 1 は Input Transform（例: Log→Rec709）、スロット 2 は Creative LUT。独立したインテンシティ制御付き。",
+        "v020LutSync": "Edit タブの LUT ファイルが書き出しに同期。3 状態のボタンでグレードの一致・不一致・部分一致を表示。",
+        "v020InlineExportPanel": "書き出しをマルチステップウィザードからインラインアコーディオンに変更 — キャンバスを見ながら設定。すりガラス UI が macOS タイトルバーと統合。",
+        "v020WebCodecsReEnabled": "WebCodecs 動画書き出しを再有効化。ハードウェアデコーダー優先・PBO リードバック・BT.709 色空間修正。",
+        "v020UpdateNotify": "アプリ内更新通知 — 新しいバージョンが利用可能になるとバナーで通知。",
+        "v020PackageRefactor": "内部を 4 パッケージ（core・renderer・ui・smart-look）に再構成し、コード分離を改善。",
         "v013Title": "本番最適化",
         "v013FrameLogSuppression": "動画書き出し中のフレーム単位ログ出力を抑制し、コンソールをクリーンにしてパフォーマンスを改善。",
         "v012Title": "動画の色精度修正",
