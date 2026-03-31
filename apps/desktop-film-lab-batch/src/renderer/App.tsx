@@ -10,9 +10,9 @@
  * - 狭い画面では「上＝プレビュー＋ヒスト／下＝コントロール」の縦積み。
  * - `lg` 以上ではプレビュー領域を親いっぱい（absolute inset-0）にし、右パネルはその上に
  *   `translateX` でスライドインする。閉じたあともキャンバスはウィンドウ幅いっぱいを使う。
- * - 開閉は Phosphor Icons（CaretLeft / CaretRight）＋ aria-label。`prefers-reduced-motion` は Tailwind で短縮。
+ * - 開閉は Phosphor Icons の compact toggle＋ aria-label。`prefers-reduced-motion` は Tailwind で短縮。
  */
-import { Export, CaretLeft, CaretRight, CheckCircle, ArrowClockwise, SlidersHorizontal, FolderOpen, DownloadSimple } from "@phosphor-icons/react";
+import { Export, CaretRight, CheckCircle, ArrowClockwise, SlidersHorizontal, FolderOpen, DownloadSimple, SidebarSimple } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { FilmLabCanvas, type FilmLabCanvasRef } from "film-lab-ui";
@@ -1072,13 +1072,14 @@ export default function App() {
             {isLgLayout && !editRightPaneExpanded ? (
               <button
                 type="button"
-                className="fl-edit-pane-reveal-rail"
+                className="fl-edit-pane-toggle-chip"
                 aria-label={tApp("openParamsPanelAria")}
                 aria-expanded={false}
                 aria-controls="film-lab-edit-controls-pane"
+                title={tApp("openParamsPanelAria")}
                 onClick={() => setEditRightPaneExpanded(true)}
               >
-                <CaretLeft size={16} weight="bold" aria-hidden />
+                <SidebarSimple size={14} weight="regular" mirrored aria-hidden />
               </button>
             ) : null}
 

@@ -679,45 +679,65 @@ body {
 }
 
 /**
- * @description lg 以上でパネルが画面外へスライドしたとき、右端に残す「開く」取っ手。
+ * @description lg 以上でパネルが画面外へスライドしたとき、右上に残す compact disclosure chip。
+ * 旧 rail のような別パーツ感を避け、toolbar ボタンと同じ系統のクロームへ寄せる。
  */
-.fl-edit-pane-reveal-rail {
+.fl-edit-pane-toggle-chip {
   position: absolute;
-  top: 50%;
-  /**
-   * @description 右端 flush だとネイティブスクロールバーと同じゾーンに重なるため、トラックの内側に寄せる。
-   */
-  right: 10px;
+  top: 1rem;
+  right: 1rem;
   z-index: 25;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.25rem;
-  min-height: 5rem;
-  padding: 0.25rem;
-  border: 1px solid var(--fl-border-default);
-  border-right: none;
-  border-radius: 0.5rem 0 0 0.5rem;
-  background: var(--fl-bg-raised);
-  color: var(--fl-text-secondary);
-  box-shadow: -2px 0 12px color-mix(in srgb, black 40%, transparent);
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid color-mix(in srgb, var(--fl-border-default) 62%, transparent);
+  border-radius: 0.75rem;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--fl-bg-raised) 82%, transparent), color-mix(in srgb, #0f1117 70%, transparent)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 62%);
+  color: color-mix(in srgb, var(--fl-text-secondary) 88%, white 12%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 10px 24px -18px color-mix(in srgb, black 60%, transparent);
   cursor: pointer;
-  transform: translateY(-50%);
   transition:
-    background-color 0.15s ease,
+    background 0.15s ease,
     color 0.15s ease,
-    border-color 0.15s ease;
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
 }
 
-.fl-edit-pane-reveal-rail:hover {
-  background: var(--fl-bg-interactive);
-  color: var(--fl-accent);
-  border-color: var(--fl-border-strong);
+.fl-edit-pane-toggle-chip:hover {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--fl-bg-interactive) 90%, transparent), color-mix(in srgb, #151925 72%, transparent)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 62%);
+  color: color-mix(in srgb, var(--fl-text-primary) 84%, var(--amber-9) 16%);
+  border-color: color-mix(in srgb, var(--fl-border-strong) 78%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 14px 28px -18px color-mix(in srgb, black 68%, transparent);
+  transform: translateY(-1px);
 }
 
-.fl-edit-pane-reveal-rail:focus-visible {
+.fl-edit-pane-toggle-chip:focus-visible {
   outline: 2px solid var(--fl-focus-ring);
-  outline-offset: 2px;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .fl-edit-pane-toggle-chip {
+    border-color: var(--fl-border-default);
+    background: var(--fl-bg-interactive);
+    box-shadow: none;
+  }
+
+  .fl-edit-pane-toggle-chip:hover {
+    background: var(--fl-bg-interactive-hover);
+    box-shadow: none;
+  }
 }
 
 /**
