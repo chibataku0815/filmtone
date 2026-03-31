@@ -12,7 +12,7 @@
  *   `translateX` でスライドインする。閉じたあともキャンバスはウィンドウ幅いっぱいを使う。
  * - 開閉は Phosphor Icons（CaretLeft / CaretRight）＋ aria-label。`prefers-reduced-motion` は Tailwind で短縮。
  */
-import { Export, CaretLeft, CaretRight, CheckCircle, ArrowClockwise, SlidersHorizontal } from "@phosphor-icons/react";
+import { Export, CaretLeft, CaretRight, CheckCircle, ArrowClockwise, SlidersHorizontal, FolderOpen, DownloadSimple } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { FilmLabCanvas, type FilmLabCanvasRef } from "film-lab-ui";
@@ -139,6 +139,7 @@ function isTextInputTarget(target: EventTarget | null): boolean {
 
 export default function App() {
   const tApp = useTranslations("film-lab.desktop.app");
+  const tFilmLab = useTranslations("film-lab");
   const tLogs = useTranslations("film-lab.desktop.logs");
   const locale = useLocale();
 
@@ -974,7 +975,11 @@ export default function App() {
   }, []);
 
   return (
-    <div className="film-lab-desktop-root flex min-h-screen flex-col">
+    <div
+      className={`film-lab-desktop-root relative flex min-h-screen flex-col overflow-hidden ${
+        tab === "edit" ? "film-lab-desktop-root--edit" : ""
+      }`}
+    >
       {/* macOS drag zone — traffic lights sit here */}
       <div className="fl-drag-zone" />
 
@@ -1040,43 +1045,22 @@ export default function App() {
 
       <div className="relative flex min-h-0 flex-1 flex-col">
       <div
-        className="relative z-10 flex min-h-0 flex-1 flex-col gap-4 overflow-hidden fl-main"
+        className={`relative z-10 flex min-h-0 flex-1 flex-col gap-4 overflow-hidden fl-main ${
+          tab === "edit" ? "fl-main--edge" : ""
+        }`}
       >
           <div className="relative flex min-h-0 flex-1 flex-col gap-4 lg:min-h-0 lg:overflow-hidden">
-            <section className="fl-card fl-scroll-surface relative z-0 flex min-h-0 w-full min-w-0 flex-col gap-3 overflow-y-auto max-lg:flex-none lg:absolute lg:inset-0 lg:z-0">
-              <div className="fl-card-header">
-                <div className="flex min-w-[140px] flex-1 flex-col gap-1.5">
-                  <span className="fl-label">{tApp("presetWhenOpenLabel")}</span>
-                  <select
-                    value={canvasPreset}
-                    onChange={(e) =>
-                      setCanvasPreset(e.target.value as PresetName)
-                    }
-                    className="w-full max-w-xs"
-                  >
-                    {PRESET_NAMES.map((n) => (
-                      <option key={n} value={n}>
-                        {n}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+            <section className="relative z-0 min-h-[320px] w-full min-w-0 overflow-hidden rounded-[1rem] bg-[#080808] max-lg:flex-none sm:min-h-[420px] lg:absolute lg:inset-0 lg:z-0 lg:min-h-0">
               <FilmLabCanvas
                 ref={filmLabCanvasRef}
                 chromeLayout="stacked"
+                stackedToolbarVisible={false}
                 preset={canvasPreset}
-                className="w-full max-w-full self-stretch lg:max-w-none"
-                fullScreen={false}
+                className="h-full min-h-0 w-full"
+                fullScreen
                 onViewportReady={setViewport}
               />
-              <hr className="fl-divider" />
-              <div className="w-full max-w-full self-stretch">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <span className="fl-label normal-case tracking-normal">
-                    {tApp("rgbHistogram")}
-                  </span>
-                </div>
+              <div className="pointer-events-none absolute bottom-4 left-4 z-10">
                 <Histogram
                   viewport={viewport}
                   visible={histogramVisible}
@@ -1105,7 +1089,7 @@ export default function App() {
               aria-hidden={Boolean(
                 isLgLayout && !editRightPaneExpanded,
               )}
-              className={`fl-edit-slide-panel-shell flex min-h-0 w-full min-w-0 flex-1 flex-col max-lg:relative lg:absolute lg:inset-y-0 lg:right-0 lg:z-20 lg:h-auto lg:max-h-full ${tab === "batch" ? "lg:w-[clamp(420px,52vw,860px)] lg:max-w-[min(860px,calc(100%-1.5rem))]" : "lg:w-[clamp(320px,42vw,680px)] lg:max-w-[min(680px,calc(100%-1.5rem))]"} lg:min-w-0 lg:flex-none lg:p-2 lg:transition-transform lg:duration-300 lg:ease-out motion-reduce:lg:transition-none ${
+              className={`fl-edit-slide-panel-shell flex min-h-0 w-full min-w-0 flex-1 flex-col max-lg:relative lg:absolute lg:inset-y-0 lg:right-0 lg:z-20 lg:h-auto lg:max-h-full ${tab === "batch" ? "lg:w-[clamp(420px,52vw,860px)] lg:max-w-[min(860px,calc(100%-1.5rem))]" : "lg:w-[clamp(320px,42vw,680px)] lg:max-w-[min(680px,calc(100%-1.5rem))]"} lg:min-w-0 lg:flex-none lg:py-4 lg:pr-4 lg:transition-transform lg:duration-300 lg:ease-out motion-reduce:lg:transition-none ${
                 editRightPaneExpanded
                   ? "lg:translate-x-0"
                   : "lg:pointer-events-none lg:translate-x-full"
@@ -1129,6 +1113,28 @@ export default function App() {
                   >
                     <CaretRight size={16} weight="bold" aria-hidden />
                   </button>
+                  {tab === "edit" ? (
+                    <>
+                      <button
+                        type="button"
+                        className="fl-edit-pane-toolbar-btn"
+                        aria-label={tFilmLab("toolbar.open")}
+                        title={tFilmLab("toolbar.open")}
+                        onClick={() => filmLabCanvasRef.current?.openMediaPicker()}
+                      >
+                        <FolderOpen size={15} weight="regular" aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        className="fl-edit-pane-toolbar-btn"
+                        aria-label={tFilmLab("toolbar.savePng")}
+                        title={tFilmLab("toolbar.savePng")}
+                        onClick={() => filmLabCanvasRef.current?.saveCurrentPng()}
+                      >
+                        <DownloadSimple size={15} weight="regular" aria-hidden />
+                      </button>
+                    </>
+                  ) : null}
                   <div className="flex flex-1" />
                   <button
                     type="button"
@@ -1159,10 +1165,50 @@ export default function App() {
                 </div>
                 {tab === "edit" ? (
                   <>
-                    <div className="fl-scroll-surface min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 pr-5">
+                    <div className="fl-scroll-surface min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 pr-5 lg:pr-8">
                       <FilmLabControlPanelCore
                         viewport={viewport}
                         histogramVisible={histogramVisible}
+                        surface="bare"
+                        slots={{
+                          beforePresets: (
+                            <label
+                              className="fl-edit-preset-default"
+                              title={tApp("presetWhenOpenLabel")}
+                            >
+                              <span className="fl-edit-preset-default-icon" aria-hidden>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                                  <path
+                                    d="M12 4.75 13.76 8.24 17.25 10 13.76 11.76 12 15.25 10.24 11.76 6.75 10 10.24 8.24 12 4.75Z"
+                                    stroke="currentColor"
+                                    strokeWidth="1.7"
+                                    strokeLinejoin="round"
+                                  />
+                                  <path
+                                    d="M18 14.5 18.88 16.12 20.5 17 18.88 17.88 18 19.5 17.12 17.88 15.5 17 17.12 16.12 18 14.5Z"
+                                    fill="currentColor"
+                                  />
+                                </svg>
+                              </span>
+                              <span className="fl-edit-preset-default-label">
+                                {tApp("presetWhenOpenCompactLabel")}
+                              </span>
+                              <select
+                                value={canvasPreset}
+                                onChange={(e) =>
+                                  setCanvasPreset(e.target.value as PresetName)
+                                }
+                                className="fl-edit-preset-default-select"
+                              >
+                                {PRESET_NAMES.map((n) => (
+                                  <option key={n} value={n}>
+                                    {n}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          ),
+                        }}
                         onHistogramToggle={() =>
                           setHistogramVisible((v) => !v)
                         }

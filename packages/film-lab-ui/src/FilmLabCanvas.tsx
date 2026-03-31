@@ -27,6 +27,7 @@ interface FilmLabCanvasProps {
   className?: string;
   fullScreen?: boolean;
   onViewportReady?: (viewport: Viewport | null) => void;
+  stackedToolbarVisible?: boolean;
   /**
    * @description デスクトップ等でツールバーを画像の上に重ねないときに `stacked`。
    * `overlay`（既定）は Web 本番どおり左上オーバーレイ。
@@ -52,6 +53,8 @@ interface FilmLabCanvasProps {
 export type FilmLabCanvasRef = {
   getJpegBase64ForAi: (maxSide: number) => string | null;
   replaceSourceFromPngBase64Body: (pngBase64Body: string) => Promise<boolean>;
+  openMediaPicker: () => void;
+  saveCurrentPng: () => void;
 };
 
 /** ファイルピッカー用: HEIC を選びにくくしつつ、一般的な形式はそのまま選べる */
@@ -73,7 +76,7 @@ function publicAssetUrlFromWebPublic(pathFromPublicRoot: string): string {
 
 /** キャンバス左上ツールバー: 44px 級タップ／sm でコンパクト／pointer: coarse ではタブレットでも高さ維持 */
 const FILM_LAB_TOOLBAR_BUTTON_CLASS =
-  "rounded bg-black/50 px-3 py-2 text-xs flex items-center min-h-[44px] text-white/50 backdrop-blur-sm transition-colors hover:bg-black/70 hover:text-white/80 sm:min-h-0 sm:px-2.5 sm:py-1 sm:text-[11px] [@media(pointer:coarse)]:min-h-[44px] [@media(pointer:coarse)]:py-2";
+  "inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-white/8 bg-black/30 px-3 py-2 text-xs text-white/72 backdrop-blur-sm transition-colors hover:border-white/12 hover:bg-black/42 hover:text-white sm:min-h-0 sm:px-2.5 sm:py-1.5 sm:text-[11px] [@media(pointer:coarse)]:min-h-[44px] [@media(pointer:coarse)]:py-2";
 
 type MediaOverlayState =
   | { kind: "idle" }
@@ -87,6 +90,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       className,
       fullScreen,
       onViewportReady,
+      stackedToolbarVisible = true,
       initialGradeParams = null,
       onCubeLutLoaded,
       compareHud = null,
@@ -378,8 +382,10 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
           return false;
         }
       },
+      openMediaPicker: () => handleFileClick(),
+      saveCurrentPng: () => handleDownload(),
     }),
-    [supported],
+    [handleDownload, handleFileClick, supported],
   );
 
   if (!supported) {
@@ -398,7 +404,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
 
   const toolbarClassName =
     chromeLayout === "stacked"
-      ? "z-10 flex shrink-0 flex-wrap gap-1.5"
+      ? "z-10 flex shrink-0 flex-wrap items-center gap-2"
       : "absolute left-3 top-3 z-10 flex gap-1.5";
 
   const toolbar = (
@@ -409,21 +415,47 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       onPointerUp={(e) => e.stopPropagation()}
       onPointerCancel={(e) => e.stopPropagation()}
     >
-      <button
-        type="button"
-        data-testid="film-lab-open"
-        onClick={handleFileClick}
-        className={FILM_LAB_TOOLBAR_BUTTON_CLASS}
-      >
-        {tFilmLab("toolbar.open")}
-      </button>
-      <button
-        type="button"
-        onClick={handleDownload}
-        className={FILM_LAB_TOOLBAR_BUTTON_CLASS}
-      >
-        {tFilmLab("toolbar.savePng")}
-      </button>
+      {chromeLayout === "stacked" ? (
+        <>
+          <button
+            type="button"
+            data-testid="film-lab-open"
+            onClick={handleFileClick}
+            className={FILM_LAB_TOOLBAR_BUTTON_CLASS}
+          >
+            <OpenMediaIcon />
+            {tFilmLab("toolbar.open")}
+          </button>
+          <button
+            type="button"
+            onClick={handleDownload}
+            className={FILM_LAB_TOOLBAR_BUTTON_CLASS}
+          >
+            <SavePngIcon />
+            {tFilmLab("toolbar.savePng")}
+          </button>
+        </>
+      ) : (
+        <>
+          <button
+            type="button"
+            data-testid="film-lab-open"
+            onClick={handleFileClick}
+            className={FILM_LAB_TOOLBAR_BUTTON_CLASS}
+          >
+            <OpenMediaIcon />
+            {tFilmLab("toolbar.open")}
+          </button>
+          <button
+            type="button"
+            onClick={handleDownload}
+            className={FILM_LAB_TOOLBAR_BUTTON_CLASS}
+          >
+            <SavePngIcon />
+            {tFilmLab("toolbar.savePng")}
+          </button>
+        </>
+      )}
     </div>
   );
 
@@ -517,7 +549,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
   if (chromeLayout === "stacked") {
     return (
       <div className={`flex w-full flex-col gap-2 ${className ?? ""}`}>
-        {toolbar}
+        {stackedToolbarVisible ? toolbar : null}
         <div
           ref={containerRef}
           data-testid="film-lab-viewport"
@@ -543,3 +575,37 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
 });
 
 FilmLabCanvas.displayName = "FilmLabCanvas";
+
+function OpenMediaIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 opacity-90">
+      <path
+        d="M4 7.5A2.5 2.5 0 0 1 6.5 5H10l2 2H17.5A2.5 2.5 0 0 1 20 9.5v7A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-9Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+      <path d="M12 10.25v5.5M9.25 13h5.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SavePngIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 opacity-90">
+      <path
+        d="M6.5 19h11A1.5 1.5 0 0 0 19 17.5v-11A1.5 1.5 0 0 0 17.5 5h-11A1.5 1.5 0 0 0 5 6.5v11A1.5 1.5 0 0 0 6.5 19Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+      />
+      <path
+        d="M12 7.25v7M9.25 11.5 12 14.25 14.75 11.5"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M8.75 17h6.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+}

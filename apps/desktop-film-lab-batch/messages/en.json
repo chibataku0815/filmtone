@@ -207,6 +207,7 @@
                                 "tabBatch": "Export",
                                 "tabBatchAria": "Export tab — save photos or video from a folder",
                                 "presetWhenOpenLabel": "Look when opened (preset)",
+                                "presetWhenOpenCompactLabel": "Initial look",
                                 "rgbHistogram": "RGB histogram",
                                 "openParamsPanelAria": "Open parameters panel",
                                 "paramsPanelAria": "Filmtone parameters",

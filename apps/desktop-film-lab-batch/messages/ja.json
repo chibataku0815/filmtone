@@ -207,6 +207,7 @@
                                 "tabBatch": "書き出し",
                                 "tabBatchAria": "書き出しタブ（フォルダの写真や動画を保存）",
                                 "presetWhenOpenLabel": "開いたときのルック（プリセット）",
+                                "presetWhenOpenCompactLabel": "初期ルック",
                                 "rgbHistogram": "RGB ヒストグラム",
                                 "openParamsPanelAria": "パラメータパネルを開く",
                                 "paramsPanelAria": "Filmtone パラメータ",

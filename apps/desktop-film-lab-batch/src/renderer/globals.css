@@ -74,6 +74,20 @@ body {
 }
 
 /**
+ * @description 編集タブはウィンドウ外周を黒いマットにせず、Electron の vibrancy を薄く透かす。
+ * コンテンツが覆い切らない余白だけがガラスの縁に見えるようにする。
+ */
+.film-lab-desktop-root--edit {
+  background:
+    radial-gradient(circle at top left, rgba(255, 206, 94, 0.08), transparent 34%),
+    linear-gradient(180deg, rgba(10, 13, 18, 0.16), rgba(10, 13, 18, 0.08));
+}
+
+.film-lab-desktop-root--edit::before {
+  content: none;
+}
+
+/**
  * @description メインスクロール領域用。既定の白トラックではなく slate 系の細バー（WebKit + Firefox）。
  * @limitations `*` よりスクロールが発生するノードだけに付与する（パフォーマンスと意図の明確化）。
  */
@@ -123,6 +137,11 @@ body {
   padding: 1rem;
 }
 
+.fl-main--edge {
+  gap: 0;
+  padding: 0;
+}
+
 /**
  * @description 書き出しタブのメイン列。ルート（slate-1）より一段オクの地色にして、frost カードの奥行きが分かりやすくなる。
  */
@@ -144,6 +163,10 @@ body {
 @media (min-width: 640px) {
   .fl-main {
     padding: 1.25rem 1.5rem;
+  }
+
+  .fl-main--edge {
+    padding: 0;
   }
 }
 
@@ -424,6 +447,61 @@ body {
   color: var(--fl-text-primary);
 }
 
+.fl-edit-preset-default {
+  display: inline-flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.fl-edit-preset-default-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: color-mix(in srgb, var(--amber-9) 82%, white 18%);
+  opacity: 0.9;
+}
+
+.fl-edit-preset-default-label {
+  flex-shrink: 0;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--fl-text-tertiary);
+}
+
+.film-lab-desktop-root select.fl-edit-preset-default-select {
+  min-width: 0;
+  width: min(100%, 13rem);
+  margin-left: auto;
+  min-height: 2rem;
+  border-color: color-mix(in srgb, var(--fl-border-default) 55%, transparent);
+  background-color: color-mix(in srgb, var(--fl-bg-interactive) 82%, transparent);
+  background-position: right 0.35rem center;
+  padding: 0.375rem 1.4rem 0.375rem 0.65rem;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+}
+
+.film-lab-desktop-root select.fl-edit-preset-default-select:hover {
+  background-color: color-mix(in srgb, var(--fl-bg-interactive-hover) 88%, transparent);
+}
+
+.film-lab-desktop-root select.fl-edit-preset-default-select:focus-visible {
+  outline-offset: 2px;
+}
+
+@media (max-width: 639px) {
+  .fl-edit-preset-default {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .film-lab-desktop-root select.fl-edit-preset-default-select {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
 /* --- ネイティブ text（バッチ接尾辞など。select と同系トークン） --- */
 
 .film-lab-desktop-root input[type="text"].fl-text-input {
@@ -453,6 +531,12 @@ body {
   flex-shrink: 0;
   height: 28px;
   -webkit-app-region: drag;
+}
+
+.film-lab-desktop-root--edit .fl-drag-zone {
+  height: 36px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(17, 20, 27, 0.38), rgba(17, 20, 27, 0.12));
 }
 
 /* --- ヘッダー（レガシー — ドラッグゾーン移行後も互換用） --- */
@@ -524,6 +608,9 @@ body {
 @media (min-width: 1024px) {
   .fl-edit-controls-pane {
     border-left: none;
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.3),
+      -16px 0 40px -12px color-mix(in srgb, black 65%, transparent);
   }
 }
 
@@ -621,7 +708,7 @@ body {
  */
 @media (min-width: 1024px) {
   .fl-edit-slide-panel-shell {
-    box-shadow: -16px 0 40px -12px color-mix(in srgb, black 65%, transparent);
+    box-shadow: none;
   }
 }
 
@@ -655,4 +742,3 @@ body {
     -webkit-backdrop-filter: none;
   }
 }
-
