@@ -20,10 +20,7 @@ import {
   filmLabReducer,
   createInitialState,
   createInitialStateFromSharedParams,
-  type Action,
   type GradeSlotState,
-  type PresentState,
-  type State,
 } from "./film-lab-reducer";
 import {
   quickMetaDisplayValue,
@@ -82,21 +79,6 @@ interface FilmLabControlPanelCoreProps {
   defaultUiMode?: UiMode;
   /** 拡張スロット */
   slots?: FilmLabControlPanelCoreSlots;
-  /**
-   * Web wrapper がCore のstate/dispatch にアクセスするためのコールバック。
-   * Core がマウントされた直後に呼ばれ、アンマウント時に null で呼ばれる。
-   */
-  onStateReady?: (binding: {
-    state: State;
-    dispatch: React.Dispatch<Action>;
-    activePreset: PresetName;
-    savedBloomStrength: number;
-    savedHalationIntensity: number;
-    setActivePreset: (p: PresetName) => void;
-    setSavedBloomStrength: (v: number) => void;
-    setSavedHalationIntensity: (v: number) => void;
-    restorePresent: (present: PresentState) => void;
-  } | null) => void;
 }
 
 export function FilmLabControlPanelCore({
