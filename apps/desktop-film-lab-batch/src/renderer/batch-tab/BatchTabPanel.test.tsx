@@ -58,67 +58,26 @@ const baseProps: BatchTabPanelProps = {
   onReapplyBatchPresetBaseline: () => {},
 };
 
-function withListLayout<T>(fn: () => T): T {
-  const original = globalThis.localStorage;
-  const localStorageMock = {
-    getItem: (key: string) =>
-      key === "filmLab.export.stepLayoutPref" ? "list" : null,
-    setItem: () => {},
-  } as Storage;
-  Object.defineProperty(globalThis, "localStorage", {
-    configurable: true,
-    value: localStorageMock,
-  });
-  try {
-    return fn();
-  } finally {
-    Object.defineProperty(globalThis, "localStorage", {
-      configurable: true,
-      value: original,
-    });
-  }
-}
+describe("BatchTabPanel accordion layout", () => {
+  it("renders all 5 sections without wizard navigation", () => {
+    const html = renderBatchPanel(<BatchTabPanel {...baseProps} />);
 
-/**
- * @description 一覧レイアウトに加え、「次にやること」帯の localStorage を上書きしてテストする
- * @param nextStripExpanded - false なら一行チップ（折りたたみ）の既定を再現
- */
-function withListLayoutAndNextStripExpanded<T>(
-  nextStripExpanded: boolean,
-  fn: () => T,
-): T {
-  const original = globalThis.localStorage;
-  const localStorageMock = {
-    getItem: (key: string) => {
-      if (key === "filmLab.export.stepLayoutPref") return "list";
-      if (key === "filmLab.export.nextStripExpanded") {
-        return nextStripExpanded ? "1" : "0";
-      }
-      return null;
-    },
-    setItem: () => {},
-  } as Storage;
-  Object.defineProperty(globalThis, "localStorage", {
-    configurable: true,
-    value: localStorageMock,
-  });
-  try {
-    return fn();
-  } finally {
-    Object.defineProperty(globalThis, "localStorage", {
-      configurable: true,
-      value: original,
-    });
-  }
-}
+    // All accordion sections present
+    expect(html).toContain("export-step-jobType");
+    expect(html).toContain("export-step-sources");
+    expect(html).toContain("export-step-look");
+    expect(html).toContain("export-step-output");
 
-describe("BatchTabPanel video export copy", () => {
+    // Run section always visible
+    expect(html).toContain("export-run-heading");
+
+    // No wizard artifacts
+    expect(html).not.toContain("wizardBack");
+    expect(html).not.toContain("wizardNext");
+  });
+
   it("uses WebGL-only video copy with no fast-ffmpeg references", () => {
-    const html = withListLayout(() =>
-      renderBatchPanel(
-        <BatchTabPanel {...baseProps} />,
-      ),
-    );
+    const html = renderBatchPanel(<BatchTabPanel {...baseProps} />);
 
     expect(html).toContain("編集に近い見え方で MP4／手順内で保存先を設定");
     expect(html).toContain("動画は編集タブに近い見え方で書き出します。");
@@ -129,35 +88,42 @@ describe("BatchTabPanel video export copy", () => {
     expect(html).not.toContain("速く書き出す");
   });
 
-  it("next-step strip is expanded by default and offers collapse control", () => {
-    const html = withListLayout(() => renderBatchPanel(<BatchTabPanel {...baseProps} />));
-
-    expect(html).toContain("たたむ");
-  });
-
-  it("next-step strip reads collapsed preference from localStorage (one-line chip + expand)", () => {
-    const html = withListLayoutAndNextStripExpanded(false, () =>
-      renderBatchPanel(<BatchTabPanel {...baseProps} />),
+  it("look section shows synced summary in collapsed header when editToExportSyncedAtMs is set", () => {
+    const html = renderBatchPanel(
+      <BatchTabPanel
+        {...baseProps}
+        editToExportSyncedAtMs={1_700_000_000_000}
+      />,
     );
 
-    expect(html).toContain("開く");
-    expect(html).not.toContain("たたむ");
-    expect(html).toContain("実行で動画を書き出す");
-  });
-
-  it("look step shows edit-synced banner when editToExportSyncedAtMs is set", () => {
-    const html = withListLayout(() =>
-      renderBatchPanel(
-        <BatchTabPanel
-          {...baseProps}
-          editToExportSyncedAtMs={1_700_000_000_000}
-        />,
-      ),
-    );
-
+    // Collapsed header shows the synced status title
     expect(html).toContain("編集タブのスライダーどおり（反映済み）");
-    expect(html).toContain("に編集から取り込みました");
-    expect(html).toContain("プリセットの数値に戻す");
+    // Body is hidden when collapsed — preset select should not appear
     expect(html).not.toContain("data-testid=\"export-preset-select\"");
+  });
+
+  it("shows synced badge on look section when edit-synced", () => {
+    const html = renderBatchPanel(
+      <BatchTabPanel
+        {...baseProps}
+        editToExportSyncedAtMs={1_700_000_000_000}
+      />,
+    );
+
+    expect(html).toContain("synced");
+  });
+
+  it("collapses sources section when video input is already set", () => {
+    const html = renderBatchPanel(
+      <BatchTabPanel
+        {...baseProps}
+        videoInputPath="/tmp/input/clip.mov"
+      />,
+    );
+
+    // Sources header should show collapsed summary (filename)
+    expect(html).toContain("clip.mov");
+    // The section body should not be expanded (aria-expanded=false)
+    expect(html).toContain("aria-expanded=\"false\"");
   });
 });

@@ -1,17 +1,10 @@
 /**
- * @fileoverview Film Lab デスクトップの「書き出し」タブ用パネル（内部コード名 batch と向き合わせない UI）
+ * @fileoverview Film Lab デスクトップの「書き出し」タブ用パネル
  *
  * @description
- * ユーザー向けには「バッチ」ではなく**書き出し・フォルダの写真をまとめて**など写真用語で説明する。
- * 「次」の案内は**手順ナビを主**にし、上部は展開時は複数行＋移動、**折りたたみ時は一行チップ**にできる（`localStorage` で記憶、**未設定時は展開**）。
- * 手順は番号付きブロックと、任意の 1 ステップ表示の切替で整理する。
- * 状態（BatchGradeState / IPC）は持たず、親の App から渡されたコールバックだけを呼ぶ。
- * ルック段の「編集のスライダーを書き出しに反映」は編集フッターと同じ同期処理（viewport 準備済みのときだけ活性）。
- *
- * @limitations
- * - キーボードショートカットは App 側。ジョブ種別は親 state と同期する。
- * - ステップ番号は UI ローカル。タブを切り替えてもリセットしない（必要なら親で key を付ける）。
- * - 手順の一覧/1画面は localStorage で覚える。初回は 1 画面ずつを既定にし、初回書き出し成功後は一覧へ寄せる。
+ * 5 セクション（ジョブ種別 / 入力 / ルック / 出力 / 実行）をアコーディオン形式で配置。
+ * 編集タブから同期済みのセクションは折りたたみ、ユーザーは必要なセクションだけ開いて設定する。
+ * 実行セクションは常時表示で、未設定の項目があればバリデーションメッセージを表示する。
  */
 
 import {
@@ -20,15 +13,9 @@ import {
   CheckCircle,
   Circle,
   File,
+  WarningCircle,
 } from "@phosphor-icons/react";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactElement,
-} from "react";
+import { useMemo, useState, type ReactElement } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { PRESETS, type PresetName } from "film-lab-core";
 import {
@@ -48,106 +35,66 @@ export type BatchJobMode = "images" | "video";
 
 const PRESET_NAMES = Object.keys(PRESETS) as PresetName[];
 
-/** @description ウィザード風のステップ識別子（表示順と対応） */
+/** @description ステップ識別子 */
 type BatchStepId = "jobType" | "sources" | "look" | "output" | "run";
 
-const BATCH_STEP_ORDER: BatchStepId[] = [
+/** @description アコーディオン内で折りたたみ可能な 4 セクション（run は常時表示） */
+type AccordionStepId = Exclude<BatchStepId, "run">;
+
+const ACCORDION_STEPS: AccordionStepId[] = [
   "jobType",
   "sources",
   "look",
   "output",
-  "run",
 ];
 
 /**
- * @description 手順を「一覧」か「1画面ずつ」かのユーザー選択（初回は未設定でよい）
- * @limitations 読めない環境では既定のウィザード表示にフォールバックする
+ * @description パスの末尾セグメントを取得（折りたたみヘッダーのサマリ表示用）
  */
-const LS_EXPORT_STEP_LAYOUT = "filmLab.export.stepLayoutPref";
-
-/**
- * @description 初めて書き出しに成功したあと 1 を入れ、以降は初回ウィザード既定を使わない印
- */
-const LS_EXPORT_FIRST_SUCCESS = "filmLab.export.firstExportDone";
-
-/**
- * @description 「次にやること」帯を展開するか。`1` = 展開、`0` = 折りたたみ。**キーが無いときは展開**（初回のみ広い案内を見せる）
- */
-const LS_EXPORT_NEXT_STRIP_EXPANDED = "filmLab.export.nextStripExpanded";
-
-/**
- * @description 手順表示の初期値。localStorage に明示がなければ 1 画面ずつ（ウィザード）を既定にする。
- * @returns {boolean} true なら全手順一覧、false なら 1 画面ずつ
- */
-function readInitialShowAllSteps(): boolean {
-  try {
-    if (typeof localStorage === "undefined") return false;
-    const pref = localStorage.getItem(LS_EXPORT_STEP_LAYOUT);
-    if (pref === "list") return true;
-    if (pref === "wizard") return false;
-    return false;
-  } catch {
-    return false;
-  }
+function lastPathSegment(p: string): string {
+  const parts = p.replace(/\\/g, "/").split("/");
+  return parts[parts.length - 1] || p;
 }
 
 /**
- * @description チェックボックスで一覧/ウィザードを切り替えたときに保存する（次回起動も覚える）
- * @param showAllSteps - true なら全手順を一覧表示
+ * @description 入力・出力がステップの前提を満たしているか（ステータスチップ用）
  */
-function persistStepLayoutPref(showAllSteps: boolean): void {
-  try {
-    localStorage.setItem(LS_EXPORT_STEP_LAYOUT, showAllSteps ? "list" : "wizard");
-  } catch {
-    /* ストレージ無効時は握りつぶす */
+function getSourceOutputStatus(
+  mode: BatchJobMode,
+  inputDir: string | null,
+  outputDir: string | null,
+  videoInputPath: string | null,
+): { sourceOk: boolean; outputOk: boolean } {
+  if (mode === "images") {
+    return { sourceOk: Boolean(inputDir), outputOk: Boolean(outputDir) };
   }
+  return {
+    sourceOk: Boolean(videoInputPath),
+    outputOk: Boolean(outputDir),
+  };
 }
 
 /**
- * @description 初回の書き出し成功後に一覧表示へ切り替え、フラグを保存する（2回目以降は何もしない）
- * @param setShowAllSteps - React の setter（一覧表示 true を渡す）
+ * @description ステップ 1（入力）が完了とみなせるか
  */
-function markFirstExportSuccessAndPreferList(
-  setShowAllSteps: (showAll: boolean) => void,
-): void {
-  try {
-    if (typeof localStorage === "undefined") {
-      setShowAllSteps(true);
-      return;
-    }
-    if (localStorage.getItem(LS_EXPORT_FIRST_SUCCESS) === "1") return;
-    localStorage.setItem(LS_EXPORT_FIRST_SUCCESS, "1");
-    localStorage.setItem(LS_EXPORT_STEP_LAYOUT, "list");
-    setShowAllSteps(true);
-  } catch {
-    setShowAllSteps(true);
-  }
+function isSourcesStepComplete(
+  mode: BatchJobMode,
+  inputDir: string | null,
+  videoInputPath: string | null,
+): boolean {
+  if (mode === "images") return Boolean(inputDir);
+  return Boolean(videoInputPath);
 }
 
 /**
- * @description 「次にやること」帯の展開初期値。保存が無い・読めないときは **展開（true）**。
- * @returns {boolean} true ならフル帯、false なら一行チップ
+ * @description ステップ 4（出力）が完了とみなせるか
  */
-function readInitialNextStripExpanded(): boolean {
-  try {
-    if (typeof localStorage === "undefined") return true;
-    return localStorage.getItem(LS_EXPORT_NEXT_STRIP_EXPANDED) !== "0";
-  } catch {
-    return true;
-  }
-}
-
-/**
- * @description 帯の開閉を次回起動まで覚える（`0` / `1` で保存）
- * @param expanded - true でフル表示、false で一行チップ
- */
-function persistNextStripExpanded(expanded: boolean): void {
-  try {
-    if (typeof localStorage === "undefined") return;
-    localStorage.setItem(LS_EXPORT_NEXT_STRIP_EXPANDED, expanded ? "1" : "0");
-  } catch {
-    /* プライベートモード等では無視 */
-  }
+function isOutputStepComplete(
+  mode: BatchJobMode,
+  outputDir: string | null,
+): boolean {
+  if (mode === "images") return Boolean(outputDir);
+  return true;
 }
 
 /**
@@ -204,122 +151,16 @@ export type BatchTabPanelProps = {
   onPickVideoFile: () => void | Promise<void>;
   onRunVideoExport: () => void | Promise<void>;
 
-  /**
-   * @description 動画書き出しが成功するたびに App が 1 増やす番号。初回成功で一覧表示へ誘導するためだけに使う。
-   */
   videoExportSuccessNonce: number;
 
-  /**
-   * @description 編集タブの Viewport が使えるとき true。false のとき「編集のスライダーを反映」は押せない。
-   */
   canApplyEditGradeToBatch: boolean;
-  /**
-   * @description 編集タブのプレビューから BatchGradeState へ数値をコピー（App の syncPreviewToBatch と同一）。
-   */
   onApplyEditGradeToBatch: () => void;
-  /**
-   * @description 直近の「編集→反映」成功時刻（ms）。null なら表示上は JSON またはプリセット起点扱い。
-   */
   editToExportSyncedAtMs: number | null;
-  /**
-   * @description いまの `batchPresetChoice` を film-lab-core の初期値で焼き直し、編集同期をやめる（App の applyBatchPreset と同系）。
-   */
   onReapplyBatchPresetBaseline: () => void;
 };
 
 /**
- * @description 入力・出力がステップの前提を満たしているか（ステータスチップ用）
- */
-function getSourceOutputStatus(
-  mode: BatchJobMode,
-  inputDir: string | null,
-  outputDir: string | null,
-  videoInputPath: string | null,
-): { sourceOk: boolean; outputOk: boolean } {
-  if (mode === "images") {
-    return { sourceOk: Boolean(inputDir), outputOk: Boolean(outputDir) };
-  }
-  return {
-    sourceOk: Boolean(videoInputPath),
-    // 動画は未設定でも実行時にダイアログで選べるため「推奨」のみ
-    outputOk: Boolean(outputDir),
-  };
-}
-
-/**
- * @description ステップ 1（入力）が完了とみなせるか（「次へ」の活性に使う）
- */
-function isSourcesStepComplete(
-  mode: BatchJobMode,
-  inputDir: string | null,
-  videoInputPath: string | null,
-): boolean {
-  if (mode === "images") return Boolean(inputDir);
-  return Boolean(videoInputPath);
-}
-
-/**
- * @description ステップ 4（出力）が完了とみなせるか
- */
-function isOutputStepComplete(
-  mode: BatchJobMode,
-  outputDir: string | null,
-): boolean {
-  if (mode === "images") return Boolean(outputDir);
-  // 動画は出力未指定でも実行可能（実行時ピック）
-  return true;
-}
-
-/**
- * @description 単一ステップの中身を描画する内部ブロック用のインデックス
- */
-function batchStepIndex(id: BatchStepId): number {
-  return BATCH_STEP_ORDER.indexOf(id);
-}
-
-/**
- * @description 手順ナビ用：各ステップが「済」か（実行以外）。ルックは読み込み元が済みなら済扱い（プリセット既定あり）。
- */
-function isNavStepComplete(
-  stepId: BatchStepId,
-  batchJobMode: BatchJobMode,
-  sourcesComplete: boolean,
-  outputDir: string | null,
-): boolean {
-  switch (stepId) {
-    case "jobType":
-      return true;
-    case "sources":
-      return sourcesComplete;
-    case "look":
-      return sourcesComplete;
-    case "output":
-      return batchJobMode === "images" ? Boolean(outputDir) : true;
-    case "run":
-      return false;
-    default:
-      return false;
-  }
-}
-
-/**
- * @description いまユーザーが進めるべき主な手順のインデックス（1=読み込み元, 3=保存先, 4=実行）。
- * ルック（2）は必須ブロックにしないが、ナビでは読み込み後にチェック表示する。
- */
-function getNextBlockingStepIndex(
-  batchJobMode: BatchJobMode,
-  sourcesComplete: boolean,
-  outputDir: string | null,
-): number {
-  if (!sourcesComplete) return batchStepIndex("sources");
-  if (batchJobMode === "images" && !outputDir) {
-    return batchStepIndex("output");
-  }
-  return batchStepIndex("run");
-}
-
-/**
- * @description 書き出しタブのメインパネル（説明・警告・セッション・手順 UI・ログ前まで）
+ * @description 書き出しタブのメインパネル（アコーディオン直接アクセス方式）
  */
 export function BatchTabPanel(props: BatchTabPanelProps) {
   const {
@@ -355,7 +196,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     videoCanExport,
     onPickVideoFile,
     onRunVideoExport,
-    videoExportSuccessNonce,
+    // videoExportSuccessNonce — no longer consumed after wizard removal
     canApplyEditGradeToBatch,
     onApplyEditGradeToBatch,
     editToExportSyncedAtMs,
@@ -423,204 +264,113 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     t,
   ]);
 
-  /**
-   * @description 「次にやること」バナー用の長めの説明（title 属性）
-   */
-  const nextBlockingBannerText = useCallback(
-    (nextId: BatchStepId, mode: BatchJobMode) => {
-      switch (nextId) {
-        case "sources":
-          return mode === "images"
-            ? t("nextBannerSourcesImages")
-            : t("nextBannerSourcesVideo");
-        case "output":
-          return t("nextBannerOutput");
-        case "run":
-          return mode === "images"
-            ? t("nextBannerRunImages")
-            : t("nextBannerRunVideo");
-        default:
-          return t("nextBannerDefault");
-      }
-    },
-    [t],
-  );
-
-  /**
-   * @description 帯に並べる短い「次の一手」
-   */
-  const nextBlockingInlineHint = useCallback(
-    (nextId: BatchStepId, mode: BatchJobMode) => {
-      switch (nextId) {
-        case "sources":
-          return mode === "images"
-            ? t("nextInlineSourcesImages")
-            : t("nextInlineSourcesVideo");
-        case "output":
-          return t("nextInlineOutput");
-        case "run":
-          return mode === "images"
-            ? t("nextInlineRunImages")
-            : t("nextInlineRunVideo");
-        default:
-          return t("nextInlineDefault");
-      }
-    },
-    [t],
-  );
-
-  /** @description 現在のステップ（0 始まり）。ジョブ種別が変わったら 0 に戻す */
-  const [activeStep, setActiveStep] = useState(0);
-  /**
-   * @description true のときは手順を最初から縦に並べて表示。false のときは 1 ステップずつ（ウィザード）。
-   * 初回は localStorage に偏好がなければ false（ウィザード既定）。一覧チェックまたは初回書き出し成功後は一覧へ寄せる。
-   */
-  const [showAllSteps, setShowAllSteps] = useState(() => readInitialShowAllSteps());
   /** @description ルックの「JSON / ファイル」詳細（デフォルト閉じる） */
   const [lookAdvancedOpen, setLookAdvancedOpen] = useState(false);
-  /**
-   * @description 上部「次にやること」帯。初回・未保存時は展開、折りたたみ時は一行チップ＋開く操作。
-   */
-  const [nextStripExpanded, setNextStripExpanded] = useState(() =>
-    readInitialNextStripExpanded(),
+
+  /* ── Accordion state ── */
+
+  const sourcesComplete = isSourcesStepComplete(
+    batchJobMode,
+    inputDir,
+    videoInputPath,
   );
-
-  useEffect(() => {
-    setActiveStep(0);
-  }, [batchJobMode]);
-
-  /**
-   * @description 写真のまとめて書き出しが初めて成功したら一覧表示へ切り替え（中断・全失敗は除外）
-   */
-  useEffect(() => {
-    if (running) return;
-    const s = lastBatchSummary;
-    if (!s || s.aborted || s.ok < 1) return;
-    markFirstExportSuccessAndPreferList(setShowAllSteps);
-  }, [lastBatchSummary, running]);
-
-  /** @description 動画書き出し成功のたびに nonce が増えるので、初回成功時は写真と同じく一覧へ誘導する */
-  const prevVideoSuccessNonceRef = useRef(videoExportSuccessNonce);
-  useEffect(() => {
-    if (videoExportSuccessNonce <= prevVideoSuccessNonceRef.current) return;
-    prevVideoSuccessNonceRef.current = videoExportSuccessNonce;
-    markFirstExportSuccessAndPreferList(setShowAllSteps);
-  }, [videoExportSuccessNonce]);
-
   const { sourceOk, outputOk } = getSourceOutputStatus(
     batchJobMode,
     inputDir,
     outputDir,
     videoInputPath,
   );
-  const sourcesComplete = isSourcesStepComplete(
-    batchJobMode,
-    inputDir,
-    videoInputPath,
-  );
-  const outputComplete = isOutputStepComplete(batchJobMode, outputDir);
-
-  const canGoNext =
-    activeStep < BATCH_STEP_ORDER.length - 1 &&
-    (activeStep !== batchStepIndex("sources") || sourcesComplete) &&
-    (activeStep !== batchStepIndex("output") || outputComplete);
-
-  const goNext = () => {
-    if (!canGoNext) return;
-    setActiveStep((s) => Math.min(s + 1, BATCH_STEP_ORDER.length - 1));
-  };
-
-  const goPrev = () => {
-    setActiveStep((s) => Math.max(0, s - 1));
-  };
-
-  const jumpStep = (idx: number) => {
-    setActiveStep(Math.max(0, Math.min(idx, BATCH_STEP_ORDER.length - 1)));
-  };
-
-  /** @description 一覧表示時に手順ブロックへ scroll するための参照 */
-  const sectionElRefs = useRef<Partial<Record<BatchStepId, HTMLElement | null>>>(
-    {},
-  );
-
-  const nextBlockingIdx = getNextBlockingStepIndex(
-    batchJobMode,
-    sourcesComplete,
-    outputDir,
-  );
-  const nextBlockingStepId = BATCH_STEP_ORDER[nextBlockingIdx];
 
   /**
-   * @description 1 手順ブロックへスクロールし、1 画面モードならその段に切り替える
+   * @description 各アコーディオンセクションの開閉状態。
+   * 同期済み or 設定済みのセクションは初期状態で折りたたむ。
    */
-  const focusExportStep = useCallback(
-    (stepId: BatchStepId) => {
-      const idx = batchStepIndex(stepId);
-      if (!showAllSteps) setActiveStep(idx);
-      requestAnimationFrame(() => {
-        sectionElRefs.current[stepId]?.scrollIntoView({
-          behavior: "smooth",
-          block: "center",
-        });
-      });
-    },
-    [showAllSteps],
-  );
+  const [openSections, setOpenSections] = useState<
+    Record<AccordionStepId, boolean>
+  >(() => ({
+    jobType: true,
+    sources: !isSourcesStepComplete(batchJobMode, inputDir, videoInputPath),
+    look: editToExportSyncedAtMs == null && importedGradeLabel == null,
+    output: true,
+  }));
+
+  const toggleSection = (id: AccordionStepId) => {
+    setOpenSections((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
   /**
-   * @description 手順ナビ 1 ボタン分（チェック・次へのハイライトつき）
+   * @description セクションが編集タブから同期済みかどうか
    */
-  const renderStepNavButton = (stepId: BatchStepId, idx: number) => {
-    const stepDone = isNavStepComplete(
-      stepId,
-      batchJobMode,
-      sourcesComplete,
-      outputDir,
-    );
-    const isNext = !running && idx === nextBlockingIdx;
-    const isWizardPage = !showAllSteps && activeStep === idx;
-    return (
-      <button
-        key={stepId}
-        type="button"
-        className={`fl-batch-step-nav-btn flex items-center gap-1 rounded-md border px-2 py-1.5 text-left text-xs font-medium transition-colors ${
-          isNext
-            ? "border-[var(--amber-9)] bg-[var(--fl-bg-subtle)] font-semibold text-[var(--fl-text-primary)] shadow-[inset_3px_0_0_0_var(--amber-9)]"
-            : isWizardPage
-              ? "border-[var(--amber-8)] bg-[var(--amber-3)] text-[var(--amber-12)]"
-              : "border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] text-[var(--fl-text-secondary)] hover:bg-[var(--fl-bg-interactive)]"
-        }`}
-        aria-current={isWizardPage ? "step" : undefined}
-        title={
-          isNext
-            ? t("stepNavTitleNext")
-            : stepDone
-              ? t("stepNavTitleDone")
-              : t("stepNavTitleGoto")
+  const isSectionSynced = (id: AccordionStepId): boolean => {
+    switch (id) {
+      case "look":
+        return editToExportSyncedAtMs != null || importedGradeLabel != null;
+      default:
+        return false;
+    }
+  };
+
+  /**
+   * @description セクションが設定完了しているかどうか（ヘッダーにチェック表示）
+   */
+  const isSectionComplete = (id: AccordionStepId): boolean => {
+    switch (id) {
+      case "jobType":
+        return true;
+      case "sources":
+        return sourcesComplete;
+      case "look":
+        return true;
+      case "output":
+        return batchJobMode === "images" ? Boolean(outputDir) : true;
+    }
+  };
+
+  /**
+   * @description 折りたたみヘッダーに表示するサマリテキスト
+   */
+  const getSectionSummary = (id: AccordionStepId): string | null => {
+    switch (id) {
+      case "jobType":
+        return batchJobMode === "images"
+          ? t("jobImagesTitle")
+          : t("jobVideoTitle");
+      case "sources":
+        if (batchJobMode === "images") {
+          return inputDir ? lastPathSegment(inputDir) : null;
         }
-        onClick={() => {
-          jumpStep(idx);
-          focusExportStep(stepId);
-        }}
-      >
-        {stepDone ? (
-          <CheckCircle className="shrink-0 text-[var(--amber-11)]" size={16} weight="fill" aria-hidden />
-        ) : (
-          <Circle className="shrink-0 text-[var(--fl-text-tertiary)]" size={16} aria-hidden />
-        )}
-        <span>
-          <span className="tabular-nums text-[0.65rem] text-[var(--fl-text-tertiary)]">
-            {idx + 1}
-          </span>{" "}
-          {stepLabels[stepId]}
-        </span>
-      </button>
-    );
+        return videoInputPath ? lastPathSegment(videoInputPath) : null;
+      case "look":
+        return lookStatusBanner.title;
+      case "output":
+        if (batchJobMode === "images") {
+          return outputDir
+            ? `${batchFormat.toUpperCase()} → ${lastPathSegment(outputDir)}`
+            : null;
+        }
+        return outputDir ? lastPathSegment(outputDir) : null;
+    }
   };
 
   /**
-   * @description ステップ 0: ジョブの種類
+   * @description Export ボタン付近に表示するバリデーションメッセージ
    */
+  const missingItems: { label: string; section: AccordionStepId }[] = [];
+  if (!sourcesComplete) {
+    missingItems.push({
+      label:
+        batchJobMode === "images"
+          ? t("pickImageFolderTitle")
+          : t("pickVideoFileTitle"),
+      section: "sources",
+    });
+  }
+  if (batchJobMode === "images" && !outputDir) {
+    missingItems.push({ label: t("outputImageTitle"), section: "output" });
+  }
+
+  /* ── Step renderers (unchanged) ── */
+
   const renderStepJobType = () => (
     <div className="flex flex-col gap-3" role="group" aria-labelledby="batch-step-job-type-title">
       <p id="batch-step-job-type-title" className="text-sm font-medium text-[var(--fl-text-primary)]">
@@ -694,9 +444,6 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     </div>
   );
 
-  /**
-   * @description ステップ 1: 入力（画像はフォルダ、動画はファイル）
-   */
   const renderStepSources = () => (
     <div className="flex flex-col gap-3">
       {batchJobMode === "images" ? (
@@ -753,9 +500,6 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     </div>
   );
 
-  /**
-   * @description ステップ 2: ルック（プリセット＋詳細アコーディオン）
-   */
   const renderStepLook = () => {
     const LookStatusIcon = lookStatusBanner.Icon;
     return (
@@ -882,9 +626,6 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     );
   };
 
-  /**
-   * @description ステップ 3: 出力先・形式
-   */
   const renderStepOutput = () => (
     <div className="flex flex-col gap-3">
       {batchJobMode === "images" ? (
@@ -957,9 +698,6 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     </div>
   );
 
-  /**
-   * @description ステップ 4: 実行・進捗
-   */
   const renderStepRun = () => (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-1.5">
@@ -1066,43 +804,20 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     </div>
   );
 
-  const stepRenderers: Record<BatchStepId, () => ReactElement> = {
+  /* ── Accordion renderers map ── */
+
+  const accordionRenderers: Record<AccordionStepId, () => ReactElement> = {
     jobType: renderStepJobType,
     sources: renderStepSources,
     look: renderStepLook,
     output: renderStepOutput,
-    run: renderStepRun,
   };
 
-  /**
-   * @description 1 ステップ分をカード風に包む（一覧表示用）
-   */
-  const renderStepSection = (stepId: BatchStepId, idx: number) => {
-    const isHighlight = !running && stepId === nextBlockingStepId;
-    return (
-      <section
-        key={stepId}
-        ref={(el) => {
-          sectionElRefs.current[stepId] = el;
-        }}
-        id={`export-step-${stepId}`}
-        className={`flex flex-col gap-3 border-b border-[var(--fl-border-subtle)] pb-4 last:border-b-0 last:pb-0 ${
-          isHighlight
-            ? "scroll-mt-4 rounded-md border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] py-2 pl-3 pr-2 shadow-[inset_3px_0_0_0_var(--amber-9)]"
-            : ""
-        }`}
-        aria-labelledby={`batch-step-h-${stepId}`}
-      >
-        <h3 id={`batch-step-h-${stepId}`} className="fl-label normal-case tracking-normal">
-          {idx + 1}. {stepLabels[stepId]}
-        </h3>
-        {stepRenderers[stepId]()}
-      </section>
-    );
-  };
+  /* ── JSX ── */
 
   return (
     <>
+      {/* Intro */}
       <section
         className="fl-card fl-card-muted fl-card--frost gap-2 border-[var(--fl-border-default)]"
         aria-labelledby="export-tab-intro-heading"
@@ -1123,6 +838,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         {t("differentFolderWarning")}
       </div>
 
+      {/* Session resume */}
       {persistedSession && sessionHasRemainingWork(persistedSession) ? (
         <div className="rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] px-3 py-2.5 text-xs leading-relaxed shadow-[inset_3px_0_0_0_var(--blue-9)]">
           <div className="mb-2 flex flex-wrap items-start gap-1.5">
@@ -1144,176 +860,160 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         </div>
       ) : null}
 
-      {!running ? (
-        nextStripExpanded ? (
-          <div
-            className="fl-export-next-strip flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2"
-            role="region"
-            aria-label={t("nextStripRegionAria")}
-            aria-live="polite"
-            title={nextBlockingBannerText(nextBlockingStepId, batchJobMode)}
-          >
-            <span className="tabular-nums text-xs font-semibold text-[var(--fl-text-primary)]">
-              {nextBlockingIdx + 1}. {stepLabels[nextBlockingStepId]}
-            </span>
-            <span className="min-w-0 flex-1 basis-[14rem] text-xs leading-snug text-[var(--fl-text-secondary)]">
-              {nextBlockingInlineHint(nextBlockingStepId, batchJobMode)}
-            </span>
-            <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+      {/* Status chips */}
+      <div className="flex flex-wrap gap-2 text-[0.65rem]">
+        <span
+          className={`rounded-full border px-2 py-0.5 ${
+            sourceOk
+              ? "border-[var(--amber-8)] bg-[var(--amber-3)] text-[var(--amber-12)]"
+              : "border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] text-[var(--fl-text-tertiary)]"
+          }`}
+        >
+          {t("chipInput")}: {sourceOk ? t("chipInputOk") : t("chipInputPending")}
+        </span>
+        <span className="rounded-full border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] px-2 py-0.5 text-[var(--fl-text-tertiary)]">
+          {t("chipLook")}: {t("chipLookReady")}
+        </span>
+        <span
+          className={`rounded-full border px-2 py-0.5 ${
+            outputOk || batchJobMode === "video"
+              ? outputOk
+                ? "border-[var(--amber-8)] bg-[var(--amber-3)] text-[var(--amber-12)]"
+                : "border-[var(--amber-7)] bg-[var(--amber-4)] text-[var(--amber-12)]"
+              : "border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] text-[var(--fl-text-tertiary)]"
+          }`}
+        >
+          {t("chipOutput")}:{" "}
+          {batchJobMode === "video"
+            ? outputOk
+              ? t("chipOutputOk")
+              : t("chipOutputOptional")
+            : outputOk
+              ? t("chipOutputOk")
+              : t("chipOutputPending")}
+        </span>
+      </div>
+
+      {/* Accordion sections */}
+      <div className="fl-card fl-card--frost flex flex-col divide-y divide-[var(--fl-border-subtle)]">
+        {ACCORDION_STEPS.map((id, idx) => {
+          const isOpen = openSections[id];
+          const synced = isSectionSynced(id);
+          const complete = isSectionComplete(id);
+          const summary = getSectionSummary(id);
+          const needsAttention =
+            !running && missingItems.some((m) => m.section === id);
+
+          return (
+            <div key={id} id={`export-step-${id}`}>
               <button
                 type="button"
-                className="fl-btn-secondary px-2.5 py-1 text-[0.65rem]"
-                onClick={() => focusExportStep(nextBlockingStepId)}
+                className={`flex w-full items-center gap-2 px-3 py-2.5 text-left transition-colors hover:bg-[var(--fl-bg-interactive)] ${
+                  needsAttention
+                    ? "shadow-[inset_3px_0_0_0_var(--amber-9)]"
+                    : ""
+                }`}
+                onClick={() => toggleSection(id)}
+                aria-expanded={isOpen}
+                aria-controls={`export-step-body-${id}`}
               >
-                {t("nextStripGo")}
+                {complete ? (
+                  <CheckCircle
+                    className="shrink-0 text-[var(--amber-11)]"
+                    size={16}
+                    weight="fill"
+                    aria-hidden
+                  />
+                ) : (
+                  <Circle
+                    className="shrink-0 text-[var(--fl-text-tertiary)]"
+                    size={16}
+                    aria-hidden
+                  />
+                )}
+                <span className="flex min-w-0 flex-1 items-center gap-2">
+                  <span className="tabular-nums text-[0.65rem] text-[var(--fl-text-tertiary)]">
+                    {idx + 1}
+                  </span>
+                  <span className="text-sm font-medium text-[var(--fl-text-primary)]">
+                    {stepLabels[id]}
+                  </span>
+                  {synced ? (
+                    <span className="inline-flex items-center gap-0.5 rounded-full border border-emerald-700/30 bg-emerald-900/20 px-1.5 py-0.5 text-[0.6rem] font-medium text-emerald-400">
+                      <CheckCircle size={10} weight="fill" aria-hidden />
+                      synced
+                    </span>
+                  ) : null}
+                  {!isOpen && summary ? (
+                    <span className="min-w-0 truncate text-xs text-[var(--fl-text-tertiary)]">
+                      {summary}
+                    </span>
+                  ) : null}
+                </span>
+                {isOpen ? (
+                  <CaretUp
+                    className="shrink-0 text-[var(--fl-text-tertiary)]"
+                    size={14}
+                    aria-hidden
+                  />
+                ) : (
+                  <CaretDown
+                    className="shrink-0 text-[var(--fl-text-tertiary)]"
+                    size={14}
+                    aria-hidden
+                  />
+                )}
               </button>
+              {isOpen ? (
+                <div
+                  id={`export-step-body-${id}`}
+                  className="px-3 pb-4 pt-1"
+                >
+                  {accordionRenderers[id]()}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Export / Run — always visible */}
+      <section
+        className="fl-card fl-card--frost gap-3"
+        aria-labelledby="export-run-heading"
+      >
+        <h3
+          id="export-run-heading"
+          className="sr-only"
+        >
+          {stepLabels.run}
+        </h3>
+        {renderStepRun()}
+
+        {/* Validation messages */}
+        {missingItems.length > 0 && !running ? (
+          <div className="flex flex-col gap-1.5 rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] px-3 py-2">
+            {missingItems.map((item) => (
               <button
+                key={item.section}
                 type="button"
-                className="fl-btn-secondary inline-flex items-center gap-0.5 px-2 py-1 text-[0.65rem]"
-                aria-expanded="true"
+                className="flex items-center gap-1.5 text-left text-xs text-[var(--amber-11)] hover:underline"
                 onClick={() => {
-                  setNextStripExpanded(false);
-                  persistNextStripExpanded(false);
+                  setOpenSections((prev) => ({
+                    ...prev,
+                    [item.section]: true,
+                  }));
+                  requestAnimationFrame(() => {
+                    document
+                      .getElementById(`export-step-${item.section}`)
+                      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+                  });
                 }}
               >
-                <CaretUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                {t("nextStripCollapse")}
+                <WarningCircle size={14} weight="bold" aria-hidden />
+                {item.label}
               </button>
-            </div>
-          </div>
-        ) : (
-          <div
-            className="fl-export-next-strip flex flex-nowrap items-center gap-2 px-2.5 py-1.5"
-            role="region"
-            aria-label={t("nextStripRegionAria")}
-            aria-live="polite"
-            title={nextBlockingBannerText(nextBlockingStepId, batchJobMode)}
-          >
-            <span className="min-w-0 flex-1 truncate text-xs leading-snug text-[var(--fl-text-secondary)]">
-              <span className="font-semibold tabular-nums text-[var(--fl-text-primary)]">
-                {nextBlockingIdx + 1}. {stepLabels[nextBlockingStepId]}
-              </span>
-              <span className="text-[var(--fl-text-tertiary)]"> · </span>
-              {nextBlockingInlineHint(nextBlockingStepId, batchJobMode)}
-            </span>
-            <button
-              type="button"
-              className="fl-btn-secondary shrink-0 px-2 py-1 text-[0.65rem]"
-              onClick={() => focusExportStep(nextBlockingStepId)}
-            >
-              {t("nextStripGo")}
-            </button>
-            <button
-              type="button"
-              className="fl-btn-secondary inline-flex shrink-0 items-center gap-0.5 px-2 py-1 text-[0.65rem]"
-              aria-expanded="false"
-              onClick={() => {
-                setNextStripExpanded(true);
-                persistNextStripExpanded(true);
-              }}
-            >
-              <CaretDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              {t("nextStripExpand")}
-            </button>
-          </div>
-        )
-      ) : (
-        <p className="rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] px-3 py-2 text-xs text-[var(--fl-text-secondary)]">
-          {t("runningNotice")}
-        </p>
-      )}
-
-      <section className="fl-card fl-card--frost gap-4">
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-          <p className="text-sm font-medium text-[var(--fl-text-primary)]">
-            {t("workflowNavCaption")}
-          </p>
-          <div className="flex flex-wrap gap-1.5" role="tablist" aria-label={t("workflowNavAria")}>
-            {BATCH_STEP_ORDER.map((id, idx) => renderStepNavButton(id, idx))}
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2 text-[0.65rem]">
-          <span
-            className={`rounded-full border px-2 py-0.5 ${
-              sourceOk
-                ? "border-[var(--amber-8)] bg-[var(--amber-3)] text-[var(--amber-12)]"
-                : "border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] text-[var(--fl-text-tertiary)]"
-            }`}
-          >
-            {t("chipInput")}: {sourceOk ? t("chipInputOk") : t("chipInputPending")}
-          </span>
-          <span className="rounded-full border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] px-2 py-0.5 text-[var(--fl-text-tertiary)]">
-            {t("chipLook")}: {t("chipLookReady")}
-          </span>
-          <span
-            className={`rounded-full border px-2 py-0.5 ${
-              outputOk || batchJobMode === "video"
-                ? outputOk
-                  ? "border-[var(--amber-8)] bg-[var(--amber-3)] text-[var(--amber-12)]"
-                  : "border-[var(--amber-7)] bg-[var(--amber-4)] text-[var(--amber-12)]"
-                : "border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] text-[var(--fl-text-tertiary)]"
-            }`}
-          >
-            {t("chipOutput")}:{" "}
-            {batchJobMode === "video"
-              ? outputOk
-                ? t("chipOutputOk")
-                : t("chipOutputOptional")
-              : outputOk
-                ? t("chipOutputOk")
-                : t("chipOutputPending")}
-          </span>
-        </div>
-
-        <label className="flex cursor-pointer items-center gap-2 text-xs text-[var(--fl-text-secondary)]">
-          <input
-            type="checkbox"
-            checked={showAllSteps}
-            onChange={(e) => {
-              const next = e.target.checked;
-              setShowAllSteps(next);
-              persistStepLayoutPref(next);
-            }}
-            className="h-3.5 w-3.5 rounded border-[var(--fl-border-default)]"
-          />
-          {t("showAllStepsLabel")}
-        </label>
-
-        {!showAllSteps ? (
-          <div
-            ref={(el) => {
-              const id = BATCH_STEP_ORDER[activeStep];
-              sectionElRefs.current[id] = el;
-            }}
-            id={`export-step-${BATCH_STEP_ORDER[activeStep]}`}
-            className={`min-h-[12rem] rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] p-4 ${
-              !running && BATCH_STEP_ORDER[activeStep] === nextBlockingStepId
-                ? "shadow-[inset_3px_0_0_0_var(--amber-9)]"
-                : ""
-            }`}
-          >
-            {stepRenderers[BATCH_STEP_ORDER[activeStep]]()}
-          </div>
-        ) : (
-          <div className="flex flex-col gap-6">
-            {BATCH_STEP_ORDER.map((id, idx) => renderStepSection(id, idx))}
-          </div>
-        )}
-
-        {!showAllSteps ? (
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--fl-border-subtle)] pt-3">
-            <button
-              type="button"
-              className="fl-btn-secondary"
-              disabled={activeStep <= 0}
-              onClick={goPrev}
-            >
-              {t("wizardBack")}
-            </button>
-            <button type="button" className="fl-btn-primary" disabled={!canGoNext} onClick={goNext}>
-              {t("wizardNext")}
-            </button>
+            ))}
           </div>
         ) : null}
       </section>
