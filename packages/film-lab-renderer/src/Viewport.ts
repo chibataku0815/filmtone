@@ -245,8 +245,17 @@ export class Viewport {
 
   // ===== RenderTarget management =====
 
+  /**
+   * @description 0x0 の RenderTarget は WebGL warning の原因になります。
+   * 画面の幅と高さが両方そろったときだけ GPU リソースを作ります。
+   */
+  private hasRenderableResolution(): boolean {
+    return this.width > 0 && this.height > 0;
+  }
+
   private ensureRenderTargets(): void {
     if (this.rtColorGraded) return;
+    if (!this.hasRenderableResolution()) return;
 
     const w = this.width;
     const h = this.height;
@@ -269,6 +278,7 @@ export class Viewport {
 
   private resizeRenderTargets(w: number, h: number): void {
     if (!this.rtColorGraded) return;
+    if (w <= 0 || h <= 0) return;
 
     this.rtColorGraded.setSize(w, h);
     this.rtCompareComposite?.setSize(w, h);
@@ -329,7 +339,11 @@ export class Viewport {
     scene: THREE.Scene,
     camera: THREE.Camera,
   ): void {
+    if (!this.hasRenderableResolution()) return;
+
     this.ensureRenderTargets();
+    if (!this.rtColorGraded) return;
+
     this.renderer = renderer;
 
     if (this.abCompareEnabled) {
@@ -503,6 +517,7 @@ export class Viewport {
     this.width = width;
     this.height = height;
     this.material.uniforms.uResolution!.value.set(width, height);
+    this.compositeMaterial.uniforms.uResolution!.value.set(width, height);
     this.resizeRenderTargets(width, height);
   }
 

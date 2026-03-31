@@ -1,5 +1,5 @@
 // Components
-export { FilmLabCanvas, type FilmLabCanvasRef } from "./FilmLabCanvas";
+export { FilmLabCanvas, type FilmLabCanvasRef } from "./FilmLabCanvasPackageEntry";
 export {
   FilmLabControlPanelCore,
   SectionHeader,
