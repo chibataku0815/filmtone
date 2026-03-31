@@ -466,13 +466,14 @@ function buildFfmpegRawvideoExportArgs(opts: {
   } else {
     head.push("-an");
   }
-  // Color management: WebGL readPixels emits full-range sRGB (0-255).
-  // Explicitly convert to limited range (16-235) for H.264 standard compliance,
-  // and tag the output with BT.709 color metadata so players interpret correctly.
+  // Color management: WebGL readPixels emits full-range sRGB (0-255) in bottom-up row order.
+  // vflip restores top-down order (zero-copy row pointer swap in ffmpeg).
+  // scale converts full range to limited range (16-235) for H.264 standard compliance,
+  // and BT.709 color metadata tags ensure correct player interpretation.
   // See: .claude/knowledge/patterns/2026-03-03-ffmpeg-encoder-pitfalls-pattern.md §4
   head.push(
     "-vf",
-    "scale=in_range=full:out_range=limited",
+    "vflip,scale=in_range=full:out_range=limited",
     "-color_range",
     "tv",
     "-colorspace",

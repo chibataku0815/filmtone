@@ -622,6 +622,15 @@ export class WebCodecsMp4ExportSession {
   }
 
   /**
+   * @description 現在表示中の VideoFrame を返す（Canvas 2D バイパス用）。
+   *   Three.js r152+ は VideoFrame を TexImageSource としてネイティブサポートするため、
+   *   drawImage(canvas) 経由の色空間二重変換を回避できる。
+   */
+  get currentFrame(): VideoFrame | null {
+    return this.holder;
+  }
+
+  /**
    * @description JS がいま保持している `VideoFrame` 数（future queue + 表示中 holder）。
    */
   private liveFrameCount(): number {
