@@ -53,6 +53,7 @@ import {
 import { exportGradeJsonText } from "./grade-io";
 import { viewportRecordToParams } from "./viewport-to-params";
 import {
+  BatchTabCompactRunFooter,
   BatchTabPanel,
   type BatchJobMode,
 } from "./batch-tab/BatchTabPanel";
@@ -975,11 +976,7 @@ export default function App() {
   }, []);
 
   return (
-    <div
-      className={`film-lab-desktop-root relative flex min-h-screen flex-col overflow-hidden ${
-        tab === "edit" ? "film-lab-desktop-root--edit" : ""
-      }`}
-    >
+    <div className="film-lab-desktop-root film-lab-desktop-root--edit relative flex min-h-screen flex-col overflow-hidden">
       {/* macOS drag zone — traffic lights sit here */}
       <div className="fl-drag-zone" />
 
@@ -1044,11 +1041,7 @@ export default function App() {
       ) : null}
 
       <div className="relative flex min-h-0 flex-1 flex-col">
-      <div
-        className={`relative z-10 flex min-h-0 flex-1 flex-col gap-4 overflow-hidden fl-main ${
-          tab === "edit" ? "fl-main--edge" : ""
-        }`}
-      >
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col gap-4 overflow-hidden fl-main fl-main--edge">
           <div className="relative flex min-h-0 flex-1 flex-col gap-4 lg:min-h-0 lg:overflow-hidden">
             <section className="relative z-0 min-h-[320px] w-full min-w-0 overflow-hidden rounded-[1rem] bg-[#080808] max-lg:flex-none sm:min-h-[420px] lg:absolute lg:inset-0 lg:z-0 lg:min-h-0">
               <FilmLabCanvas
@@ -1091,7 +1084,7 @@ export default function App() {
               aria-hidden={Boolean(
                 isLgLayout && !editRightPaneExpanded,
               )}
-              className={`fl-edit-slide-panel-shell flex min-h-0 w-full min-w-0 flex-1 flex-col max-lg:relative lg:absolute lg:inset-y-0 lg:right-0 lg:z-20 lg:h-auto lg:max-h-full ${tab === "batch" ? "lg:w-[clamp(420px,52vw,860px)] lg:max-w-[min(860px,calc(100%-1.5rem))]" : "lg:w-[clamp(320px,42vw,680px)] lg:max-w-[min(680px,calc(100%-1.5rem))]"} lg:min-w-0 lg:flex-none lg:py-4 lg:pr-4 lg:transition-transform lg:duration-300 lg:ease-out motion-reduce:lg:transition-none ${
+              className={`fl-edit-slide-panel-shell flex min-h-0 w-full min-w-0 flex-1 flex-col max-lg:relative lg:absolute lg:inset-y-0 lg:right-0 lg:z-20 lg:h-auto lg:max-h-full lg:w-[clamp(320px,42vw,680px)] lg:max-w-[min(680px,calc(100%-1.5rem))] lg:min-w-0 lg:flex-none lg:py-4 lg:pr-4 lg:transition-transform lg:duration-300 lg:ease-out motion-reduce:lg:transition-none ${
                 editRightPaneExpanded
                   ? "lg:translate-x-0"
                   : "lg:pointer-events-none lg:translate-x-full"
@@ -1167,7 +1160,7 @@ export default function App() {
                 </div>
                 {tab === "edit" ? (
                   <>
-                    <div className="fl-scroll-surface min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 pr-5 lg:pr-8">
+                    <div className="fl-scroll-surface fl-right-panel-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 pr-5 lg:pr-8">
                       <FilmLabControlPanelCore
                         viewport={viewport}
                         histogramVisible={histogramVisible}
@@ -1269,65 +1262,88 @@ export default function App() {
                     </div>
                   </>
                 ) : (
-                  <div className="fl-scroll-surface min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 pr-5">
-                    <BatchTabPanel
-                      compact
-                      batchJobMode={batchJobMode}
-                      onBatchJobModeChange={setBatchJobMode}
-                      persistedSession={persistedSession}
-                      batchCanResume={batchCanResume}
-                      running={running}
-                      onResumeBatch={resumeBatch}
-                      onDiscardPersistedSession={discardPersistedSession}
-                      batchPresetChoice={batchPresetChoice}
-                      onBatchPresetChoiceChange={applyBatchPreset}
-                      importedGradeLabel={importedGradeLabel}
-                      onImportGradeJson={importGradeJson}
-                      onExportGradeJson={exportGrade}
-                      inputDir={inputDir}
-                      outputDir={outputDir}
-                      onPickInputDir={async () => {
-                        const p = await window.filmLabBatch.pickInputDir();
-                        setInputDir(p);
-                      }}
-                      onPickOutputDir={async () => {
-                        const p = await window.filmLabBatch.pickOutputDir();
-                        setOutputDir(p);
-                      }}
-                      batchFormat={batchFormat}
-                      onBatchFormatChange={setBatchFormat}
-                      batchOutputSuffix={batchOutputSuffix}
-                      onBatchOutputSuffixChange={setBatchOutputSuffix}
-                      batchCanRun={batchCanRun}
-                      batchCanRetryFailed={batchCanRetryFailed}
-                      onRunBatch={runBatch}
-                      onRetryFailedBatch={retryFailedBatch}
-                      onAbortBatch={() => {
-                        void window.filmLabBatch.videoExportAbort().catch(() => {});
-                        batchAbortRef.current?.abort();
-                      }}
-                      batchProgress={batchProgress}
-                      lastBatchSummary={lastBatchSummary}
-                      videoInputPath={videoInputPath}
-                      videoProbeLabel={videoProbeLabel}
-                      videoCanExport={videoCanExport}
-                      onPickVideoFile={pickVideoFile}
-                      onRunVideoExport={runVideoExport}
-                      videoExportSuccessNonce={videoExportSuccessNonce}
-                      canApplyEditGradeToBatch={Boolean(viewport)}
-                      onApplyEditGradeToBatch={syncPreviewToBatch}
-                      editToExportSyncedAtMs={editToExportSyncedAtMs}
-                      onReapplyBatchPresetBaseline={() => {
-                        applyBatchPreset(batchPresetChoice);
-                      }}
-                    />
-                    <details className="mt-2">
-                      <summary className="fl-caption cursor-pointer text-[var(--fl-text-tertiary)] hover:text-[var(--fl-text-secondary)]">
-                        {tApp("logToggle")}
-                      </summary>
-                      <pre className="fl-log mt-1 max-h-[120px]">{logText || tApp("logPlaceholder")}</pre>
-                    </details>
-                  </div>
+                  <>
+                    <div className="fl-scroll-surface fl-right-panel-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 pr-5 lg:pr-8">
+                      <BatchTabPanel
+                        compact
+                        batchJobMode={batchJobMode}
+                        onBatchJobModeChange={setBatchJobMode}
+                        persistedSession={persistedSession}
+                        batchCanResume={batchCanResume}
+                        running={running}
+                        onResumeBatch={resumeBatch}
+                        onDiscardPersistedSession={discardPersistedSession}
+                        batchPresetChoice={batchPresetChoice}
+                        onBatchPresetChoiceChange={applyBatchPreset}
+                        importedGradeLabel={importedGradeLabel}
+                        onImportGradeJson={importGradeJson}
+                        onExportGradeJson={exportGrade}
+                        inputDir={inputDir}
+                        outputDir={outputDir}
+                        onPickInputDir={async () => {
+                          const p = await window.filmLabBatch.pickInputDir();
+                          setInputDir(p);
+                        }}
+                        onPickOutputDir={async () => {
+                          const p = await window.filmLabBatch.pickOutputDir();
+                          setOutputDir(p);
+                        }}
+                        batchFormat={batchFormat}
+                        onBatchFormatChange={setBatchFormat}
+                        batchOutputSuffix={batchOutputSuffix}
+                        onBatchOutputSuffixChange={setBatchOutputSuffix}
+                        batchCanRun={batchCanRun}
+                        batchCanRetryFailed={batchCanRetryFailed}
+                        onRunBatch={runBatch}
+                        onRetryFailedBatch={retryFailedBatch}
+                        onAbortBatch={() => {
+                          void window.filmLabBatch.videoExportAbort().catch(() => {});
+                          batchAbortRef.current?.abort();
+                        }}
+                        batchProgress={batchProgress}
+                        lastBatchSummary={lastBatchSummary}
+                        videoInputPath={videoInputPath}
+                        videoProbeLabel={videoProbeLabel}
+                        videoCanExport={videoCanExport}
+                        onPickVideoFile={pickVideoFile}
+                        onRunVideoExport={runVideoExport}
+                        videoExportSuccessNonce={videoExportSuccessNonce}
+                        canApplyEditGradeToBatch={Boolean(viewport)}
+                        onApplyEditGradeToBatch={syncPreviewToBatch}
+                        editToExportSyncedAtMs={editToExportSyncedAtMs}
+                        onReapplyBatchPresetBaseline={() => {
+                          applyBatchPreset(batchPresetChoice);
+                        }}
+                      />
+                      <details className="mt-2">
+                        <summary className="fl-caption cursor-pointer text-[var(--fl-text-tertiary)] hover:text-[var(--fl-text-secondary)]">
+                          {tApp("logToggle")}
+                        </summary>
+                        <pre className="fl-log mt-1 max-h-[120px]">{logText || tApp("logPlaceholder")}</pre>
+                      </details>
+                    </div>
+                    <div className="fl-sticky-footer fl-surface-frost rounded-b-xl">
+                      <BatchTabCompactRunFooter
+                        batchJobMode={batchJobMode}
+                        inputDir={inputDir}
+                        outputDir={outputDir}
+                        videoInputPath={videoInputPath}
+                        running={running}
+                        batchCanRun={batchCanRun}
+                        batchCanRetryFailed={batchCanRetryFailed}
+                        onRunBatch={runBatch}
+                        onRetryFailedBatch={retryFailedBatch}
+                        onAbortBatch={() => {
+                          void window.filmLabBatch.videoExportAbort().catch(() => {});
+                          batchAbortRef.current?.abort();
+                        }}
+                        batchProgress={batchProgress}
+                        lastBatchSummary={lastBatchSummary}
+                        videoCanExport={videoCanExport}
+                        onRunVideoExport={runVideoExport}
+                      />
+                    </div>
+                  </>
                 )}
               </section>
             </div>
