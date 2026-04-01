@@ -10,6 +10,7 @@ import {
 import {
   FilmLabCanvas as FilmLabCanvasInner,
   type FilmLabCanvasRef,
+  type FilmLabInteractiveSourceInfo,
 } from "./FilmLabCanvas";
 
 /**
@@ -105,4 +106,4 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasIn
 
 FilmLabCanvas.displayName = "FilmLabCanvas";
 
-export type { FilmLabCanvasRef };
+export type { FilmLabCanvasRef, FilmLabInteractiveSourceInfo };

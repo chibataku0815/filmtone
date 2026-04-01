@@ -11,6 +11,11 @@ export type DesktopUpdateAvailablePayload = {
  * window.filmLabBatch の型（preload と共有）
  */
 export type FilmLabBatchBridge = {
+  /**
+   * @description ファイルピッカー／ドロップで得た `File` のディスク上の絶対パス（プレビューと書き出し入力の同期用）
+   */
+  getPathForFile: (file: File) => string;
+
   /** @description electron-store の最終入出力フォルダ（存在確認済み） */
   getDesktopPrefs: () => Promise<{
     lastInputDir: string | null;

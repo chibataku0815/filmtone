@@ -13,9 +13,10 @@ import {
   CheckCircle,
   Circle,
   File,
+  Info,
   WarningCircle,
 } from "@phosphor-icons/react";
-import { useMemo, useState, type ReactElement } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { PRESETS, type PresetName } from "film-lab-core";
 import {
@@ -34,6 +35,79 @@ import { HelpHint } from "./HelpHint";
 export type BatchJobMode = "images" | "video";
 
 const PRESET_NAMES = Object.keys(PRESETS) as PresetName[];
+
+/**
+ * @description 編集キャンバスのプレビューと書き出し入力の対応をユーザーが追えるようにするための状態（life#83）。
+ *   App が `FilmLabCanvas` の通知から組み立て、書き出しタブへ渡す。
+ */
+export type DesktopInteractivePreviewState =
+  | { kind: "sample" }
+  | {
+      kind: "file";
+      fileName: string;
+      absolutePath: string | null;
+      smartLookDerived: boolean;
+    };
+
+/** @description パス比較用に区切りと大文字小文字をそろえる */
+function normPathSegments(p: string): string {
+  return p.replace(/\\/g, "/").toLowerCase();
+}
+
+/** @description 同一ファイルパスか（OS の区切り差を吸収） */
+function pathsEqualNormalized(a: string, b: string): boolean {
+  return normPathSegments(a) === normPathSegments(b);
+}
+
+/** @description 写真バッチの入力フォルダ直下（またはその配下）にプレビューファイルがあるか */
+function isFileUnderInputDir(filePath: string, inputDir: string): boolean {
+  const nf = normPathSegments(filePath);
+  const nd = normPathSegments(inputDir).replace(/\/$/, "");
+  return nf.startsWith(`${nd}/`) || nf === nd;
+}
+
+/** @description 静止画として扱う拡張子（プレビュー種別の判定用） */
+function isRasterFileName(name: string): boolean {
+  return /\.(jpe?g|png|webp|gif)$/i.test(name);
+}
+
+/** @description 動画プレビューとして扱う拡張子 */
+function isVideoFileName(name: string): boolean {
+  return /\.(mp4|webm)$/i.test(name);
+}
+
+/**
+ * @description 「読み込み元」を開いたままにすべきか。未入力・サンプル・スマートルック由来・パス不足・種別不一致のとき true。
+ */
+function shouldAutoExpandSources(
+  mode: BatchJobMode,
+  inputDir: string | null,
+  videoInputPath: string | null,
+  preview: DesktopInteractivePreviewState | undefined,
+): boolean {
+  if (!isSourcesStepComplete(mode, inputDir, videoInputPath)) return true;
+  if (!preview) return false;
+  if (preview.kind === "sample") return true;
+  if (preview.kind === "file") {
+    if (preview.smartLookDerived) return true;
+    if (!preview.absolutePath) return true;
+    if (mode === "images") {
+      if (isVideoFileName(preview.fileName) && !isRasterFileName(preview.fileName)) {
+        return true;
+      }
+      if (!inputDir) return true;
+      return !isFileUnderInputDir(preview.absolutePath, inputDir);
+    }
+    if (mode === "video") {
+      if (isRasterFileName(preview.fileName) && !isVideoFileName(preview.fileName)) {
+        return true;
+      }
+      if (!videoInputPath) return true;
+      return !pathsEqualNormalized(preview.absolutePath, videoInputPath);
+    }
+  }
+  return false;
+}
 
 /** @description ステップ識別子 */
 type BatchStepId = "jobType" | "sources" | "look" | "output" | "run";
@@ -60,10 +134,17 @@ function createDefaultOpenSections(
   videoInputPath: string | null,
   editToExportSyncedAtMs: number | null,
   importedGradeLabel: string | null,
+  desktopInteractivePreview: DesktopInteractivePreviewState | undefined,
 ): Record<AccordionStepId, boolean> {
+  const expandSources = shouldAutoExpandSources(
+    mode,
+    inputDir,
+    videoInputPath,
+    desktopInteractivePreview,
+  );
   return {
     jobType: true,
-    sources: !isSourcesStepComplete(mode, inputDir, videoInputPath),
+    sources: expandSources,
     look: editToExportSyncedAtMs == null && importedGradeLabel == null,
     output: true,
   };
@@ -186,6 +267,11 @@ export type BatchTabPanelProps = {
   onReapplyBatchPresetBaseline: () => void;
   /** @description true when rendered inside the right slide panel (compact layout) */
   compact?: boolean;
+
+  /**
+   * @description 編集タブのプレビューと書き出し入力の関係を短く示す（life#83）。未指定時はバナーと追加の開閉ロジックをスキップ。
+   */
+  desktopInteractivePreview?: DesktopInteractivePreviewState;
 };
 
 /**
@@ -418,6 +504,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     onReapplyBatchPresetBaseline,
     compact = false,
     exportSurface,
+    desktopInteractivePreview,
   } = props;
 
   const t = useTranslations("film-lab.desktop.batch");
@@ -498,6 +585,97 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     t,
   ]);
 
+  /**
+   * @description 編集プレビューと書き出し入力の関係を短く示す（life#83）。
+   * @description フォルダ／動画パスがすでにプレビューと一致しているときはバナー自体を出さない（重複説明でユーザーが迷うため）。
+   */
+  const previewExportBridge = useMemo(() => {
+    const s = desktopInteractivePreview;
+    if (!s) return null;
+
+    if (s.kind === "sample") {
+      return {
+        tone: "neutral" as const,
+        previewLine: t("previewBridgeSamplePreviewLine"),
+        exportLine: t("previewBridgeSampleExportLine"),
+      };
+    }
+
+    if (s.smartLookDerived) {
+      return {
+        tone: "caution" as const,
+        previewLine: t("previewBridgeSmartLookPreviewLine"),
+        exportLine: t("previewBridgeSmartLookExportLine"),
+      };
+    }
+
+    if (!s.absolutePath) {
+      return {
+        tone: "caution" as const,
+        previewLine: t("previewBridgeUnknownPathPreviewLine", { name: s.fileName }),
+        exportLine: t("previewBridgeUnknownPathExportLine"),
+      };
+    }
+
+    if (isImagesMode) {
+      if (isVideoFileName(s.fileName)) {
+        return {
+          tone: "caution" as const,
+          previewLine: t("previewBridgeVideoPreviewInPhotoTabLine"),
+          exportLine: t("previewBridgeVideoPreviewInPhotoTabExportLine"),
+        };
+      }
+      if (!inputDir) {
+        return {
+          tone: "caution" as const,
+          previewLine: t("previewBridgeRasterPreviewLine", { name: s.fileName }),
+          exportLine: t("previewBridgePhotoNoFolderLine"),
+        };
+      }
+      if (isFileUnderInputDir(s.absolutePath, inputDir)) {
+        return null;
+      }
+      return {
+        tone: "caution" as const,
+        previewLine: t("previewBridgePhotoMismatchPreviewLine", { name: s.fileName }),
+        exportLine: t("previewBridgePhotoMismatchExportLine", {
+          folder: lastPathSegment(inputDir),
+        }),
+      };
+    }
+
+    if (isRasterFileName(s.fileName) && !isVideoFileName(s.fileName)) {
+      return {
+        tone: "caution" as const,
+        previewLine: t("previewBridgeRasterInVideoTabPreviewLine"),
+        exportLine: t("previewBridgeRasterInVideoTabExportLine"),
+      };
+    }
+    if (!videoInputPath) {
+      return {
+        tone: "caution" as const,
+        previewLine: t("previewBridgeVideoNamedPreviewLine", { name: s.fileName }),
+        exportLine: t("previewBridgeVideoNoFileLine"),
+      };
+    }
+    if (pathsEqualNormalized(s.absolutePath, videoInputPath)) {
+      return null;
+    }
+    return {
+      tone: "caution" as const,
+      previewLine: t("previewBridgeVideoMismatchPreviewLine", { name: s.fileName }),
+      exportLine: t("previewBridgeVideoMismatchExportLine", {
+        file: lastPathSegment(videoInputPath),
+      }),
+    };
+  }, [
+    desktopInteractivePreview,
+    inputDir,
+    isImagesMode,
+    t,
+    videoInputPath,
+  ]);
+
   /** @description ルックの「JSON / ファイル」詳細（デフォルト閉じる） */
   const [lookAdvancedOpen, setLookAdvancedOpen] = useState(false);
 
@@ -528,8 +706,34 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
       videoInputPath,
       editToExportSyncedAtMs,
       importedGradeLabel,
+      desktopInteractivePreview,
     ),
   );
+
+  /**
+   * @description 注意が必要な状態に「今なった」ときだけ読み込み元を開く。ずっと true のあいだはユーザーが閉じたままにできる（life#83）。
+   */
+  const prevNeedsSourcesAttentionRef = useRef(false);
+  useEffect(() => {
+    const next =
+      desktopInteractivePreview != null &&
+      shouldAutoExpandSources(
+        effectiveMode,
+        inputDir,
+        videoInputPath,
+        desktopInteractivePreview,
+      );
+    const prev = prevNeedsSourcesAttentionRef.current;
+    if (next && !prev) {
+      setOpenSections((s) => ({ ...s, sources: true }));
+    }
+    prevNeedsSourcesAttentionRef.current = next;
+  }, [
+    desktopInteractivePreview,
+    effectiveMode,
+    inputDir,
+    videoInputPath,
+  ]);
 
   /**
    * @description 写真と動画は別の仕事なので、切替時に開閉状態も job ごとに戻す
@@ -544,6 +748,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         videoInputPath,
         editToExportSyncedAtMs,
         importedGradeLabel,
+        desktopInteractivePreview,
       ),
     );
     setLookAdvancedOpen(false);
@@ -818,16 +1023,15 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
           <p className="text-sm font-semibold text-[var(--fl-text-primary)]">
             {lookStatusBanner.title}
           </p>
-          <p className="fl-caption mt-0.5 max-w-prose text-[var(--fl-text-secondary)]">
-            {lookStatusBanner.body}
-          </p>
+          {lookStatusBanner.body.trim().length > 0 ? (
+            <p className="fl-caption mt-0.5 max-w-prose text-[var(--fl-text-secondary)]">
+              {lookStatusBanner.body}
+            </p>
+          ) : null}
         </div>
       </div>
 
       <div className="flex flex-col gap-2 border-t border-white/[0.06] pt-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--fl-text-secondary)]">
-          {t("lookFromEditHeading")}
-        </p>
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -849,9 +1053,6 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
             assistiveLabel={t("applyEditHintAria")}
           />
         </div>
-        <p className="fl-caption text-[var(--fl-text-secondary)]">
-          {t("sameAsFooterSend")}
-        </p>
       </div>
 
       {importedGradeLabel == null &&
@@ -1131,7 +1332,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         <section
           className={
             compact
-              ? "mb-3 border-b border-[var(--fl-border-subtle)] pb-3"
+              ? "mb-4 border-b border-[var(--fl-border-subtle)] pb-4"
               : "fl-card fl-card-muted fl-card--frost gap-2 border-[var(--fl-border-default)]"
           }
           aria-labelledby="export-photo-intro-heading"
@@ -1155,7 +1356,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         <section
           className={
             compact
-              ? "mb-3 border-b border-[var(--fl-border-subtle)] pb-3"
+              ? "mb-4 border-b border-[var(--fl-border-subtle)] pb-4"
               : "fl-card fl-card-muted fl-card--frost gap-2 border-[var(--fl-border-default)]"
           }
           aria-labelledby="export-video-intro-heading"
@@ -1224,8 +1425,14 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         </div>
       ) : null}
 
-      {/* Status chips */}
-      <div className={`flex flex-wrap ${compact ? "gap-1 py-2.5 text-[0.6rem]" : "gap-2 text-[0.65rem]"}`}>
+      {/* Status chips — 下のプレビュー橋・アコーディオンと詰まらないよう余白を確保 */}
+      <div
+        className={`flex flex-wrap ${
+          compact
+            ? "mt-1 gap-1.5 py-2 text-[0.6rem] mb-3"
+            : "gap-2 py-2 text-[0.65rem] mb-4"
+        }`}
+      >
         <span
           className={`rounded-full border px-2 py-0.5 ${
             sourceOk
@@ -1258,9 +1465,51 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         </span>
       </div>
 
+      {previewExportBridge ? (
+        <section
+          className={`mb-5 rounded-xl border border-[var(--fl-border-subtle)] px-3.5 py-3.5 ${
+            previewExportBridge.tone === "ok"
+              ? "bg-[var(--fl-bg-subtle)] shadow-[inset_3px_0_0_0_rgb(52_211_153)]"
+              : previewExportBridge.tone === "caution"
+                ? "bg-[var(--fl-bg-subtle)] shadow-[inset_3px_0_0_0_var(--amber-9)]"
+                : "bg-[var(--fl-bg-subtle)] shadow-[inset_3px_0_0_0_var(--fl-border-default)]"
+          }`}
+          aria-labelledby="film-lab-preview-export-bridge-heading"
+        >
+          <div className="flex gap-3">
+            <Info
+              className={`mt-0.5 shrink-0 ${
+                previewExportBridge.tone === "ok"
+                  ? "text-[rgb(52_211_153)]"
+                  : previewExportBridge.tone === "caution"
+                    ? "text-[var(--amber-11)]"
+                    : "text-[var(--fl-text-tertiary)]"
+              }`}
+              size={18}
+              weight="bold"
+              aria-hidden
+            />
+            <div className="min-w-0 flex-1 space-y-2">
+              <p
+                id="film-lab-preview-export-bridge-heading"
+                className="text-xs font-semibold leading-snug text-[var(--fl-text-primary)]"
+              >
+                {t("previewBridgeHeading")}
+              </p>
+              <p className="fl-caption leading-relaxed text-[var(--fl-text-secondary)]">
+                {previewExportBridge.previewLine}
+              </p>
+              <p className="fl-caption leading-relaxed text-[var(--fl-text-secondary)]">
+                {previewExportBridge.exportLine}
+              </p>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       {/* Accordion sections — job selector の下には、その仕事に必要な段だけを出す */}
       <div
-        className={`flex flex-col divide-y divide-[var(--fl-border-subtle)] ${compact ? "gap-0" : "fl-card fl-card--frost gap-0 p-0"}`}
+        className={`flex flex-col divide-y divide-[var(--fl-border-subtle)] ${compact ? "mt-1 gap-0" : "fl-card fl-card--frost gap-0 p-0"}`}
       >
         {activeAccordionSteps.map((id, idx) => {
           const isOpen = openSections[id];
@@ -1274,7 +1523,11 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
             <div key={id} id={`export-step-${id}`}>
               <button
                 type="button"
-                className={`flex w-full items-center gap-2 ${compact ? "py-2.5" : "px-3 py-2.5"} text-left transition-colors hover:bg-[var(--fl-bg-interactive)] ${
+                className={`flex w-full items-center gap-2.5 text-left transition-colors hover:bg-[var(--fl-bg-interactive)] ${
+                  compact
+                    ? "py-3 pl-4 pr-3"
+                    : "px-4 py-3"
+                } ${
                   needsAttention
                     ? "shadow-[inset_3px_0_0_0_var(--amber-9)]"
                     : ""
@@ -1297,11 +1550,11 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
                     aria-hidden
                   />
                 )}
-                <span className="flex min-w-0 flex-1 items-center gap-2">
+                <span className="flex min-w-0 flex-1 items-center gap-2.5">
                   <span className="tabular-nums text-[0.65rem] text-[var(--fl-text-tertiary)]">
                     {idx + 1}
                   </span>
-                  <span className="text-sm font-medium text-[var(--fl-text-primary)]">
+                  <span className="text-sm font-medium leading-snug text-[var(--fl-text-primary)]">
                     {stepLabels[id]}
                   </span>
                   {synced ? (
@@ -1333,7 +1586,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
               {isOpen ? (
                 <div
                   id={`export-step-body-${id}`}
-                  className={compact ? "pb-4 pt-1" : "px-3 pb-4 pt-1"}
+                  className="px-4 pb-4 pt-2"
                 >
                   {accordionRenderers[id]()}
                 </div>

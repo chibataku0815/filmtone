@@ -22,6 +22,22 @@ import {
 } from "film-lab-renderer";
 import type { Params } from "film-lab-core";
 
+/**
+ * @description プレビューに載っているメディアの種類を親へ伝えるための最小ペイロード。
+ * デスクトップでは親の `getFileAbsolutePath`（例: Electron `webUtils.getPathForFile`）か `File.path` で `absolutePath` を渡します。
+ * スマートルック差し替えの合成 PNG は `sourceRole: "smartLookDerived"` とし、書き出しの正本にしないでください。
+ */
+export type FilmLabInteractiveSourceInfo =
+  | { kind: "sample" }
+  | {
+      kind: "file";
+      fileName: string;
+      /** Electron などで `File` に絶対パスが付いているときだけ。Web の通常のファイル入力では多くの場合 undefined */
+      absolutePath?: string | null;
+      /** 省略時はユーザーが選んだ／ドロップしたメディアとみなす */
+      sourceRole?: "userMedia" | "smartLookDerived";
+    };
+
 interface FilmLabCanvasProps {
   preset: PresetName;
   className?: string;
@@ -60,9 +76,30 @@ interface FilmLabCanvasProps {
    * Web LP など親が「いまキャンバスに載っている元画像」を表示したいときの任意通知。
    * `.cube` のみ読んだ場合は画像ソースが変わらないため呼ばない。
    */
-  onInteractiveSourceChange?: (
-    info: { kind: "sample" } | { kind: "file"; fileName: string },
-  ) => void;
+  onInteractiveSourceChange?: (info: FilmLabInteractiveSourceInfo) => void;
+  /**
+   * @description デスクトップ（Electron `webUtils.getPathForFile` 等）で `File` から絶対パスを取る。未指定時はレガシーの `File.path` のみ試す。
+   */
+  getFileAbsolutePath?: (file: File) => string | null;
+}
+
+/**
+ * @description 親の解決関数、または `File.path`（古い Electron）でローカル絶対パスを得る。
+ */
+function resolveLocalFileAbsolutePath(
+  file: File,
+  getPath?: (f: File) => string | null,
+): string | null {
+  try {
+    const fromHook = getPath?.(file);
+    if (typeof fromHook === "string" && fromHook.trim().length > 0) {
+      return fromHook.trim();
+    }
+  } catch {
+    // getPathForFile 等は不正な File で例外になりうる
+  }
+  const raw = (file as File & { path?: string }).path;
+  return typeof raw === "string" && raw.trim().length > 0 ? raw.trim() : null;
 }
 
 /**
@@ -145,6 +182,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       initialGradeParams = null,
       onCubeLutLoaded,
       onInteractiveSourceChange,
+      getFileAbsolutePath,
       compareHud = null,
       chromeLayout = "overlay",
     },
@@ -154,6 +192,10 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
   const onInteractiveSourceChangeRef = useRef(onInteractiveSourceChange);
   useEffect(() => {
     onInteractiveSourceChangeRef.current = onInteractiveSourceChange;
+  });
+  const getFileAbsolutePathRef = useRef(getFileAbsolutePath);
+  useEffect(() => {
+    getFileAbsolutePathRef.current = getFileAbsolutePath;
   });
   const onViewportReadyRef = useRef(onViewportReady);
   useEffect(() => {
@@ -410,7 +452,15 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
         viewportRef.current.setTexture(result.texture);
         viewportRef.current.setImageResolution(result.width, result.height);
         syncPreviewVideoBusyState(nextPreviewVideo);
-        onInteractiveSourceChangeRef.current?.({ kind: "file", fileName: file.name });
+        onInteractiveSourceChangeRef.current?.({
+          kind: "file",
+          fileName: file.name,
+          absolutePath: resolveLocalFileAbsolutePath(
+            file,
+            getFileAbsolutePathRef.current,
+          ),
+          sourceRole: "userMedia",
+        });
         setMediaOverlay({ kind: "idle" });
       } catch (err) {
         const message =
@@ -553,6 +603,8 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
           onInteractiveSourceChangeRef.current?.({
             kind: "file",
             fileName: "smart-look-corrected.png",
+            absolutePath: null,
+            sourceRole: "smartLookDerived",
           });
           return true;
         } catch (err) {

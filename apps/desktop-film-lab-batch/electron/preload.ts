@@ -4,7 +4,7 @@
  * @overview レンダラから呼べる API だけを極小露出する。
  * @description 更新案内（案 C）は main が IPC で送り、ここで購読だけ暴露します。
  */
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 
 /** @description main から届く「新しい版があります」通知の中身 */
 export type DesktopUpdateAvailablePayload = {
@@ -20,6 +20,11 @@ export type OutputPayload = {
 };
 
 contextBridge.exposeInMainWorld("filmLabBatch", {
+  /**
+   * @description `contextIsolation` では `File.path` が使えないため、Chromium が許可する `File` から絶対パスを返す（Electron 公式 API）。
+   */
+  getPathForFile: (file: File): string => webUtils.getPathForFile(file),
+
   getDesktopPrefs: (): Promise<{
     lastInputDir: string | null;
     lastOutputDir: string | null;

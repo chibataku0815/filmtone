@@ -62,8 +62,8 @@ describe("BatchTabPanel accordion layout", () => {
   it("renders all 5 sections without wizard navigation", () => {
     const html = renderBatchPanel(<BatchTabPanel {...baseProps} />);
 
-    // All accordion sections present
-    expect(html).toContain("export-step-jobType");
+    // ジョブ種別はアコーディオン外のセクション、手順は sources / look / output
+    expect(html).toContain("export-job-selector-heading");
     expect(html).toContain("export-step-sources");
     expect(html).toContain("export-step-look");
     expect(html).toContain("export-step-output");
@@ -97,7 +97,7 @@ describe("BatchTabPanel accordion layout", () => {
     );
 
     // Collapsed header shows the synced status title
-    expect(html).toContain("編集タブのスライダーどおり（反映済み）");
+    expect(html).toContain("ルック: 編集タブと一致");
     // Body is hidden when collapsed — preset select should not appear
     expect(html).not.toContain("data-testid=\"export-preset-select\"");
   });

@@ -26,7 +26,11 @@ import {
 } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { FilmLabCanvas, type FilmLabCanvasRef } from "film-lab-ui";
+import {
+  FilmLabCanvas,
+  type FilmLabCanvasRef,
+  type FilmLabInteractiveSourceInfo,
+} from "film-lab-ui";
 import { FilmLabControlPanelCore } from "film-lab-ui";
 import { Histogram } from "film-lab-ui";
 import { HelpHint } from "./batch-tab/HelpHint";
@@ -66,6 +70,7 @@ import { viewportRecordToParams } from "./viewport-to-params";
 import {
   BatchTabCompactRunFooter,
   type BatchJobMode,
+  type DesktopInteractivePreviewState,
 } from "./batch-tab/BatchTabPanel";
 import { PhotoExportPanel } from "./batch-tab/PhotoExportPanel";
 import { VideoExportPanel } from "./batch-tab/VideoExportPanel";
@@ -91,6 +96,16 @@ const LOG_TEXT_FLUSH_INTERVAL_MS = 120;
  *   各フレームの `setState` を避け、React 再描画の負荷で後半が鈍らないようにする。
  */
 const VIDEO_PROGRESS_FLUSH_INTERVAL_MS = 150;
+
+/** @description プレビューに載せたファイル名が静止画バッチ向けか（拡張子だけで判定） */
+function isRasterExportFileName(fileName: string): boolean {
+  return /\.(jpe?g|png|webp|gif)$/i.test(fileName);
+}
+
+/** @description プレビューに載せたファイル名が動画書き出し向けか */
+function isVideoExportFileName(fileName: string): boolean {
+  return /\.(mp4|webm)$/i.test(fileName);
+}
 
 /**
  * @description セッションに保存した情報だけから BatchGradeState を組み立てる（再開直後のパイプライン用）
@@ -235,6 +250,11 @@ export default function App() {
   const [batchJobMode, setBatchJobMode] = useState<BatchJobMode>("images");
   /** @description 動画出力用のソースパス（1 本選ぶ） */
   const [videoInputPath, setVideoInputPath] = useState<string | null>(null);
+  /**
+   * @description 編集キャンバスが「いま何を見せているか」。書き出し入力（フォルダ／動画）との関係を Batch 側で説明する（life#83）。
+   */
+  const [interactivePreviewSource, setInteractivePreviewSource] =
+    useState<DesktopInteractivePreviewState>({ kind: "sample" });
   /** @description ffprobe 済みのメタ（UI 表示用） */
   const [videoProbeLabel, setVideoProbeLabel] = useState<string | null>(null);
   /**
@@ -488,6 +508,96 @@ export default function App() {
     },
     [flushBufferedLogText],
   );
+
+  /**
+   * @description 動画の入力パスを state に載せ、ffprobe 由来のラベルを更新する。ピッカーとプレビューからの既定反映の共通処理。
+   */
+  const applyPickedVideoPath = useCallback(
+    async (p: string) => {
+      setVideoInputPath(p);
+      try {
+        const meta = await window.filmLabBatch.videoExportProbe(p);
+        assertVideoImportWithinCaps(meta.width, meta.height, meta.durationSec);
+        const { outW, outH } = computeVideoExportDimensions(
+          meta.width,
+          meta.height,
+        );
+        const frames = computeExportFrameCount(meta.durationSec);
+        setVideoProbeLabel(
+          tLogs("videoMetaLine", {
+            w: String(meta.width),
+            h: String(meta.height),
+            sec: meta.durationSec.toFixed(1),
+            codec: meta.videoCodec || "?",
+            ow: String(outW),
+            oh: String(outH),
+            fps: String(VIDEO_EXPORT_FPS),
+            frames: String(frames),
+            maxSec: String(VIDEO_IMPORT_MAX_DURATION_SEC),
+          }),
+        );
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setVideoProbeLabel(null);
+        appendLog(tLogs("videoMetaLogPrefix", { msg }));
+      }
+    },
+    [appendLog, tLogs],
+  );
+
+  /**
+   * @description キャンバスが載せ替わったらプレビュー状態を更新し、Electron でパスが取れるときだけ書き出し入力を寄せる（life#83）。
+   */
+  const handleInteractiveSourceChange = useCallback(
+    (info: FilmLabInteractiveSourceInfo) => {
+      if (info.kind === "sample") {
+        setInteractivePreviewSource({ kind: "sample" });
+        return;
+      }
+      const smartLookDerived = info.sourceRole === "smartLookDerived";
+      const absolutePath =
+        typeof info.absolutePath === "string" && info.absolutePath.length > 0
+          ? info.absolutePath
+          : null;
+      setInteractivePreviewSource({
+        kind: "file",
+        fileName: info.fileName,
+        absolutePath,
+        smartLookDerived,
+      });
+      if (smartLookDerived || !absolutePath) return;
+      if (isVideoExportFileName(info.fileName)) {
+        void applyPickedVideoPath(absolutePath);
+        return;
+      }
+      if (isRasterExportFileName(info.fileName)) {
+        const sep = Math.max(
+          absolutePath.lastIndexOf("/"),
+          absolutePath.lastIndexOf("\\"),
+        );
+        if (sep > 0) {
+          setInputDir(absolutePath.slice(0, sep));
+        }
+      }
+    },
+    [applyPickedVideoPath],
+  );
+
+  /**
+   * @description `contextIsolation` 下では `File.path` が空のことが多い。preload が公開する `webUtils.getPathForFile` でプレビューと書き出し入力を同期する（life#83）。
+   */
+  const resolveCanvasFileAbsolutePath = useCallback((file: File): string | null => {
+    try {
+      return window.filmLabBatch.getPathForFile(file);
+    } catch (err) {
+      console.warn("resolveCanvasFileAbsolutePath: getPathForFile failed", {
+        functionName: "resolveCanvasFileAbsolutePath",
+        fileName: file.name,
+        err,
+      });
+      return null;
+    }
+  }, []);
 
   const syncPreviewToBatch = useCallback(() => {
     if (!viewport) {
@@ -803,30 +913,7 @@ export default function App() {
   const pickVideoFile = async () => {
     const p = await window.filmLabBatch.pickInputVideoFile();
     if (!p) return;
-    setVideoInputPath(p);
-    try {
-      const meta = await window.filmLabBatch.videoExportProbe(p);
-      assertVideoImportWithinCaps(meta.width, meta.height, meta.durationSec);
-      const { outW, outH } = computeVideoExportDimensions(meta.width, meta.height);
-      const frames = computeExportFrameCount(meta.durationSec);
-      setVideoProbeLabel(
-        tLogs("videoMetaLine", {
-          w: String(meta.width),
-          h: String(meta.height),
-          sec: meta.durationSec.toFixed(1),
-          codec: meta.videoCodec || "?",
-          ow: String(outW),
-          oh: String(outH),
-          fps: String(VIDEO_EXPORT_FPS),
-          frames: String(frames),
-          maxSec: String(VIDEO_IMPORT_MAX_DURATION_SEC),
-        }),
-      );
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setVideoProbeLabel(null);
-      appendLog(tLogs("videoMetaLogPrefix", { msg }));
-    }
+    await applyPickedVideoPath(p);
   };
 
   const runVideoExport = async () => {
@@ -1102,6 +1189,8 @@ export default function App() {
                 fullScreen
                 pauseVideoPreview={running}
                 onViewportReady={setViewport}
+                onInteractiveSourceChange={handleInteractiveSourceChange}
+                getFileAbsolutePath={resolveCanvasFileAbsolutePath}
               />
               <div className="pointer-events-none absolute bottom-4 left-4 z-10">
                 <Histogram
@@ -1372,6 +1461,7 @@ export default function App() {
                           onReapplyBatchPresetBaseline={() => {
                             applyBatchPreset(batchPresetChoice);
                           }}
+                          desktopInteractivePreview={interactivePreviewSource}
                         />
                       ) : (
                         <VideoExportPanel
@@ -1423,6 +1513,7 @@ export default function App() {
                           onReapplyBatchPresetBaseline={() => {
                             applyBatchPreset(batchPresetChoice);
                           }}
+                          desktopInteractivePreview={interactivePreviewSource}
                         />
                       )}
                       <details className="mt-2">
