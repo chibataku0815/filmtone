@@ -160,6 +160,15 @@ body {
   box-shadow: inset 3px 0 0 0 var(--amber-9);
 }
 
+/**
+ * @description Edit / Export 右パネル共通のスクロール列。
+ * フォーカス移動や手動スクロール時に末尾が詰まりすぎないよう、最小限の余白だけ持たせる。
+ * @limitations 過剰な scroll-padding はキーボードフォーカス移動時のジャンプだけに効く。
+ */
+.fl-right-panel-scroll {
+  scroll-padding-bottom: 0.75rem;
+}
+
 @media (min-width: 640px) {
   .fl-main {
     padding: 1.25rem 1.5rem;
