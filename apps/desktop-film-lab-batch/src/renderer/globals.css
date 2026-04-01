@@ -74,6 +74,20 @@ body {
 }
 
 /**
+ * @description 編集タブはウィンドウ外周を黒いマットにせず、Electron の vibrancy を薄く透かす。
+ * コンテンツが覆い切らない余白だけがガラスの縁に見えるようにする。
+ */
+.film-lab-desktop-root--edit {
+  background:
+    radial-gradient(circle at top left, rgba(255, 206, 94, 0.08), transparent 34%),
+    linear-gradient(180deg, rgba(10, 13, 18, 0.16), rgba(10, 13, 18, 0.08));
+}
+
+.film-lab-desktop-root--edit::before {
+  content: none;
+}
+
+/**
  * @description メインスクロール領域用。既定の白トラックではなく slate 系の細バー（WebKit + Firefox）。
  * @limitations `*` よりスクロールが発生するノードだけに付与する（パフォーマンスと意図の明確化）。
  */
@@ -123,6 +137,11 @@ body {
   padding: 1rem;
 }
 
+.fl-main--edge {
+  gap: 0;
+  padding: 0;
+}
+
 /**
  * @description 書き出しタブのメイン列。ルート（slate-1）より一段オクの地色にして、frost カードの奥行きが分かりやすくなる。
  */
@@ -144,6 +163,10 @@ body {
 @media (min-width: 640px) {
   .fl-main {
     padding: 1.25rem 1.5rem;
+  }
+
+  .fl-main--edge {
+    padding: 0;
   }
 }
 
@@ -424,6 +447,61 @@ body {
   color: var(--fl-text-primary);
 }
 
+.fl-edit-preset-default {
+  display: inline-flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.fl-edit-preset-default-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: color-mix(in srgb, var(--amber-9) 82%, white 18%);
+  opacity: 0.9;
+}
+
+.fl-edit-preset-default-label {
+  flex-shrink: 0;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--fl-text-tertiary);
+}
+
+.film-lab-desktop-root select.fl-edit-preset-default-select {
+  min-width: 0;
+  width: min(100%, 13rem);
+  margin-left: auto;
+  min-height: 2rem;
+  border-color: color-mix(in srgb, var(--fl-border-default) 55%, transparent);
+  background-color: color-mix(in srgb, var(--fl-bg-interactive) 82%, transparent);
+  background-position: right 0.35rem center;
+  padding: 0.375rem 1.4rem 0.375rem 0.65rem;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+}
+
+.film-lab-desktop-root select.fl-edit-preset-default-select:hover {
+  background-color: color-mix(in srgb, var(--fl-bg-interactive-hover) 88%, transparent);
+}
+
+.film-lab-desktop-root select.fl-edit-preset-default-select:focus-visible {
+  outline-offset: 2px;
+}
+
+@media (max-width: 639px) {
+  .fl-edit-preset-default {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .film-lab-desktop-root select.fl-edit-preset-default-select {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
 /* --- ネイティブ text（バッチ接尾辞など。select と同系トークン） --- */
 
 .film-lab-desktop-root input[type="text"].fl-text-input {
@@ -453,6 +531,29 @@ body {
   flex-shrink: 0;
   height: 28px;
   -webkit-app-region: drag;
+}
+
+.film-lab-desktop-root--edit .fl-drag-zone {
+  height: 30px;
+  background: linear-gradient(180deg, rgba(17, 20, 27, 0.22), rgba(17, 20, 27, 0.06));
+}
+
+@media (min-width: 1024px) {
+  .film-lab-desktop-root--edit .fl-drag-zone {
+    position: absolute;
+    top: 0;
+    left: 78px;
+    z-index: 30;
+    width: min(42vw, 34rem);
+    height: 32px;
+    border-bottom: none;
+    border-bottom-left-radius: 1rem;
+    border-bottom-right-radius: 1rem;
+    background:
+      linear-gradient(180deg, rgba(17, 20, 27, 0.28), rgba(17, 20, 27, 0.08)),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.08), transparent 42%);
+    box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+  }
 }
 
 /* --- ヘッダー（レガシー — ドラッグゾーン移行後も互換用） --- */
@@ -524,6 +625,9 @@ body {
 @media (min-width: 1024px) {
   .fl-edit-controls-pane {
     border-left: none;
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.3),
+      -16px 0 40px -12px color-mix(in srgb, black 65%, transparent);
   }
 }
 
@@ -575,45 +679,65 @@ body {
 }
 
 /**
- * @description lg 以上でパネルが画面外へスライドしたとき、右端に残す「開く」取っ手。
+ * @description lg 以上でパネルが画面外へスライドしたとき、右上に残す compact disclosure chip。
+ * 旧 rail のような別パーツ感を避け、toolbar ボタンと同じ系統のクロームへ寄せる。
  */
-.fl-edit-pane-reveal-rail {
+.fl-edit-pane-toggle-chip {
   position: absolute;
-  top: 50%;
-  /**
-   * @description 右端 flush だとネイティブスクロールバーと同じゾーンに重なるため、トラックの内側に寄せる。
-   */
-  right: 10px;
+  top: 1rem;
+  right: 1rem;
   z-index: 25;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.25rem;
-  min-height: 5rem;
-  padding: 0.25rem;
-  border: 1px solid var(--fl-border-default);
-  border-right: none;
-  border-radius: 0.5rem 0 0 0.5rem;
-  background: var(--fl-bg-raised);
-  color: var(--fl-text-secondary);
-  box-shadow: -2px 0 12px color-mix(in srgb, black 40%, transparent);
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid color-mix(in srgb, var(--fl-border-default) 62%, transparent);
+  border-radius: 0.75rem;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--fl-bg-raised) 82%, transparent), color-mix(in srgb, #0f1117 70%, transparent)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 62%);
+  color: color-mix(in srgb, var(--fl-text-secondary) 88%, white 12%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 10px 24px -18px color-mix(in srgb, black 60%, transparent);
   cursor: pointer;
-  transform: translateY(-50%);
   transition:
-    background-color 0.15s ease,
+    background 0.15s ease,
     color 0.15s ease,
-    border-color 0.15s ease;
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
 }
 
-.fl-edit-pane-reveal-rail:hover {
-  background: var(--fl-bg-interactive);
-  color: var(--fl-accent);
-  border-color: var(--fl-border-strong);
+.fl-edit-pane-toggle-chip:hover {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--fl-bg-interactive) 90%, transparent), color-mix(in srgb, #151925 72%, transparent)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 62%);
+  color: color-mix(in srgb, var(--fl-text-primary) 84%, var(--amber-9) 16%);
+  border-color: color-mix(in srgb, var(--fl-border-strong) 78%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 14px 28px -18px color-mix(in srgb, black 68%, transparent);
+  transform: translateY(-1px);
 }
 
-.fl-edit-pane-reveal-rail:focus-visible {
+.fl-edit-pane-toggle-chip:focus-visible {
   outline: 2px solid var(--fl-focus-ring);
-  outline-offset: 2px;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .fl-edit-pane-toggle-chip {
+    border-color: var(--fl-border-default);
+    background: var(--fl-bg-interactive);
+    box-shadow: none;
+  }
+
+  .fl-edit-pane-toggle-chip:hover {
+    background: var(--fl-bg-interactive-hover);
+    box-shadow: none;
+  }
 }
 
 /**
@@ -621,7 +745,7 @@ body {
  */
 @media (min-width: 1024px) {
   .fl-edit-slide-panel-shell {
-    box-shadow: -16px 0 40px -12px color-mix(in srgb, black 65%, transparent);
+    box-shadow: none;
   }
 }
 
@@ -655,4 +779,3 @@ body {
     -webkit-backdrop-filter: none;
   }
 }
-

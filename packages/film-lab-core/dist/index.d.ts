@@ -325,6 +325,9 @@ declare const filmLookGradeInputSchema: z.ZodObject<{
     grade: z.ZodObject<{
         [x: string]: z.core.$ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>>;
     }, z.core.$strip>;
+    lut1CubeRelPath: z.ZodOptional<z.ZodString>;
+    lut1Enabled: z.ZodOptional<z.ZodBoolean>;
+    lut1Intensity: z.ZodOptional<z.ZodNumber>;
     lutCubeRelPath: z.ZodOptional<z.ZodString>;
     lutEnabled: z.ZodOptional<z.ZodBoolean>;
     lutIntensity: z.ZodOptional<z.ZodNumber>;

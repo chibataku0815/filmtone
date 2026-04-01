@@ -55,6 +55,8 @@ export type FilmLabDonationUiBinding = {
  * セクションを自前で描画する。
  */
 export interface FilmLabControlPanelCoreSlots {
+  /** Preset セクション内、プリセットバーの前に挿入するノード（Desktop の初期ルック等） */
+  beforePresets?: ReactNode;
   /** Preset セクションの直後に挿入するノード（Desktop の smart look prominent 位置） */
   afterPresets?: ReactNode;
   /** LUT の後に挿入するノード（browser storage, share, smart look non-prominent 等） */
@@ -71,6 +73,7 @@ interface FilmLabControlPanelCoreProps {
   viewport: Viewport | null;
   histogramVisible?: boolean;
   onHistogramToggle?: () => void;
+  surface?: "card" | "bare";
   /** サーバーで ?v=1&p= から復元したパラメータ */
   initialSharedParams?: Params | null;
   onCompareUiChange?: (ui: { compareMode: boolean; activeSlot: "A" | "B" }) => void;
@@ -97,6 +100,7 @@ export function FilmLabControlPanelCore({
   viewport,
   histogramVisible = true,
   onHistogramToggle,
+  surface = "card",
   initialSharedParams = null,
   onCompareUiChange,
   onLutLoadSuccess,
@@ -398,7 +402,13 @@ export function FilmLabControlPanelCore({
 
   return (
     <>
-      <div className="@container w-full min-w-0 rounded-lg border border-white/[0.06] bg-black/60 p-4 backdrop-blur-xl sm:p-5">
+      <div
+        className={
+          surface === "bare"
+            ? "@container w-full min-w-0"
+            : "@container w-full min-w-0 rounded-lg border border-white/[0.06] bg-black/60 p-4 backdrop-blur-xl sm:p-5"
+        }
+      >
         <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div
             className="flex rounded-lg border border-white/10 p-0.5"
@@ -464,6 +474,7 @@ export function FilmLabControlPanelCore({
 
         <div className="mb-4 min-w-0 border-b border-white/[0.06] pb-4">
           <SectionHeader title={tFilmLab("controls.presets")} />
+          {slots.beforePresets ? <div className="mb-3">{slots.beforePresets}</div> : null}
           <PresetBar activePreset={presetBarActive} onPreset={applyPreset} />
           {presetIntensityAvailable ? (
             <div className="mt-3">
