@@ -21,6 +21,7 @@ import {
   filmlabFragmentShader,
 } from "film-lab-renderer";
 import type { Params } from "film-lab-core";
+import { FILM_LAB_NEXT_INTL_NAMESPACE } from "./filmLabUiContract";
 
 /**
  * @description プレビューに載っているメディアの種類を親へ伝えるための最小ペイロード。
@@ -188,7 +189,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     },
     ref,
   ) {
-  const tFilmLab = useTranslations("film-lab");
+  const tFilmLab = useTranslations(FILM_LAB_NEXT_INTL_NAMESPACE);
   const onInteractiveSourceChangeRef = useRef(onInteractiveSourceChange);
   useEffect(() => {
     onInteractiveSourceChangeRef.current = onInteractiveSourceChange;

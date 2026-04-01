@@ -1,3 +1,13 @@
+// UI contract (life#87 — shared mental model for Web + Desktop)
+export {
+  FILM_LAB_CONTROL_PANEL_SECTION_ORDER,
+  FILM_LAB_MESSAGES_MANIFEST_PATH,
+  FILM_LAB_NEXT_INTL_NAMESPACE,
+  FILM_LAB_PRESET_PRIMARY_SURFACE_ID,
+  FILM_LAB_WRAPPER_SLOT_IDS,
+  type FilmLabControlPanelSectionId,
+  type FilmLabWrapperSlotId,
+} from "./filmLabUiContract";
 // Components
 export {
   FilmLabCanvas,
@@ -14,6 +24,7 @@ export {
 } from "./FilmLabControlPanelCore";
 export { LUTPanel } from "./LUTPanel";
 export { PresetBar } from "./PresetBar";
+export { PresetSearchSelect } from "./PresetSearchSelect";
 export { FilmLabInfoTip, type FilmLabInfoTipProps } from "./FilmLabInfoTip";
 
 // UI primitives

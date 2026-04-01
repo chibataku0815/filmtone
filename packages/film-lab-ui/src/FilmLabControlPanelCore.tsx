@@ -31,6 +31,7 @@ import {
   quickMetaPatchForValue,
   type QuickMetaAxis,
 } from "./quick-meta-sliders";
+import { FILM_LAB_NEXT_INTL_NAMESPACE } from "./filmLabUiContract";
 
 /** UI の見せ方だけを切り替える。グレードの数値（reducer）は Quick でも Pro でも同じ */
 type UiMode = "quick" | "pro";
@@ -145,7 +146,7 @@ export function FilmLabControlPanelCore({
   onUiModeChange,
   slots = {},
 }: FilmLabControlPanelCoreProps) {
-  const tFilmLab = useTranslations("film-lab");
+  const tFilmLab = useTranslations(FILM_LAB_NEXT_INTL_NAMESPACE);
 
   const [state, dispatch] = useReducer(
     filmLabReducer,
@@ -1035,7 +1036,7 @@ export function ToggleHeader({
 }
 
 function ShortcutHelp({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const t = useTranslations("film-lab.shortcuts");
+  const t = useTranslations(`${FILM_LAB_NEXT_INTL_NAMESPACE}.shortcuts`);
 
   if (!open) return null;
 
