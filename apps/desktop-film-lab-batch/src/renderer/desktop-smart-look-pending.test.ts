@@ -65,7 +65,7 @@ describe("resolveDesktopFilmLabImportMeta", () => {
     expect(resolveDesktopFilmLabImportMeta("production", {}).smartLookRasterFlag).toBe("");
   });
 
-  it("renders the desktop control panel core with preset buttons", async () => {
+  it("renders the desktop control panel core with searchable preset select", async () => {
     const html = await renderDesktopControlPanelCoreHtml();
 
     expect(html).toContain("プリセット");

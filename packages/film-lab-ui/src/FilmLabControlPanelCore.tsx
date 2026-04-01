@@ -13,8 +13,8 @@ import { useTranslations } from "next-intl";
 import { PRESETS, findMatchingPreset, halationHueToHex, type PresetName } from "film-lab-core";
 import { ControlSlider as BaseControlSlider } from "./ui/ControlSlider";
 import { LUTPanel } from "./LUTPanel";
-import { PresetBar } from "./PresetBar";
 import { FilmLabInfoTip } from "./FilmLabInfoTip";
+import { PresetSearchSelect } from "./PresetSearchSelect";
 import type { Viewport } from "film-lab-renderer";
 import type { Params } from "film-lab-core";
 import {
@@ -116,6 +116,8 @@ interface FilmLabControlPanelCoreProps {
   }) => void;
   /** パラメータが変更されたとき */
   onParamsChange?: () => void;
+  /** プリセットが選ばれたとき */
+  onPresetChange?: (preset: PresetName) => void;
   /** 初期 UI モード */
   defaultUiMode?: UiMode;
   /** UI モード変更通知（wrapper が LP 補助パネル開閉に利用） */
@@ -138,6 +140,7 @@ export function FilmLabControlPanelCore({
   onLutLoadSuccess,
   onLutChange,
   onParamsChange,
+  onPresetChange,
   defaultUiMode = "pro",
   onUiModeChange,
   slots = {},
@@ -211,7 +214,7 @@ export function FilmLabControlPanelCore({
   const presetIntensityAvailable =
     activeSlotState.basePreset != null && activeSlotState.basePreset !== "reset";
 
-  const presetBarActive: PresetName =
+  const presetSelectActive: PresetName =
     presetIntensityAvailable && activeSlotState.basePreset
       ? activeSlotState.basePreset
       : activePreset;
@@ -332,7 +335,8 @@ export function FilmLabControlPanelCore({
     const preset = PRESETS[name];
     dispatch({ type: "APPLY_PRESET", presetName: name, preset: { ...preset } as Params });
     setActivePreset(name);
-  }, []);
+    onPresetChange?.(name);
+  }, [onPresetChange]);
 
   const handleBeforeAfterPointerDown = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -541,7 +545,13 @@ export function FilmLabControlPanelCore({
         <div className="mb-4 min-w-0 border-b border-white/[0.06] pb-4">
           <SectionHeader title={tFilmLab("controls.presets")} />
           {slots.beforePresets ? <div className="mb-3">{slots.beforePresets}</div> : null}
-          <PresetBar activePreset={presetBarActive} onPreset={applyPreset} />
+          <PresetSearchSelect
+            activePreset={presetSelectActive}
+            onPreset={applyPreset}
+            triggerAriaLabel={tFilmLab("controls.presetSelectTriggerLabel")}
+            searchPlaceholder={tFilmLab("controls.presetSearchPlaceholder")}
+            emptyLabel={tFilmLab("controls.presetSearchEmpty")}
+          />
           {presetIntensityAvailable ? (
             <div className="mt-3">
               <ControlSlider

@@ -480,6 +480,9 @@
     },
     "controls": {
       "presets": "Presets",
+      "presetSelectTriggerLabel": "Choose preset",
+      "presetSearchPlaceholder": "Filter by name or mood",
+      "presetSearchEmpty": "No presets match your search",
       "presetIntensity": "Preset intensity",
       "quick": {
         "summary": "Three sliders adjust color, grain, halation, and bloom together. Use Pro (P) for precise values.",

@@ -126,6 +126,46 @@ body {
 }
 
 /**
+ * @description 検索付きプリセット一覧専用。OS 既定バーの白い溝感を消し、ポップオーバーの中に
+ * 薄いレールとして沈めます。
+ */
+.film-lab-preset-search-scroll {
+  color-scheme: dark;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.08) rgba(255, 255, 255, 0.015);
+}
+
+.film-lab-preset-search-scroll:hover {
+  scrollbar-color: rgba(255, 255, 255, 0.22) rgba(255, 255, 255, 0.028);
+}
+
+.film-lab-preset-search-scroll::-webkit-scrollbar {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 6px;
+  background: transparent;
+}
+
+.film-lab-preset-search-scroll::-webkit-scrollbar-track {
+  margin: 4px 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.film-lab-preset-search-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.film-lab-preset-search-scroll:hover::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.028);
+}
+
+.film-lab-preset-search-scroll:hover::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+/**
  * @description デスクトップはウィンドウ幅いっぱいを使う（Web 本番の読み物レイアウト用 max-width は付けない）。
  * プレビューとコントロールの両方に余白を確保し、横の無駄なマージンをなくす。
  */
@@ -158,6 +198,15 @@ body {
   border: 1px solid var(--fl-border-subtle);
   background: var(--fl-bg-subtle);
   box-shadow: inset 3px 0 0 0 var(--amber-9);
+}
+
+/**
+ * @description Edit / Export 右パネル共通のスクロール列。
+ * フォーカス移動や手動スクロール時に末尾が詰まりすぎないよう、最小限の余白だけ持たせる。
+ * @limitations 過剰な scroll-padding はキーボードフォーカス移動時のジャンプだけに効く。
+ */
+.fl-right-panel-scroll {
+  scroll-padding-bottom: 0.75rem;
 }
 
 @media (min-width: 640px) {
@@ -445,61 +494,6 @@ body {
 .film-lab-desktop-root select option {
   background-color: var(--fl-bg-raised);
   color: var(--fl-text-primary);
-}
-
-.fl-edit-preset-default {
-  display: inline-flex;
-  width: 100%;
-  align-items: center;
-  gap: 0.55rem;
-}
-
-.fl-edit-preset-default-icon {
-  display: inline-flex;
-  flex-shrink: 0;
-  color: color-mix(in srgb, var(--amber-9) 82%, white 18%);
-  opacity: 0.9;
-}
-
-.fl-edit-preset-default-label {
-  flex-shrink: 0;
-  font-size: 0.625rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--fl-text-tertiary);
-}
-
-.film-lab-desktop-root select.fl-edit-preset-default-select {
-  min-width: 0;
-  width: min(100%, 13rem);
-  margin-left: auto;
-  min-height: 2rem;
-  border-color: color-mix(in srgb, var(--fl-border-default) 55%, transparent);
-  background-color: color-mix(in srgb, var(--fl-bg-interactive) 82%, transparent);
-  background-position: right 0.35rem center;
-  padding: 0.375rem 1.4rem 0.375rem 0.65rem;
-  font-size: 0.8125rem;
-  line-height: 1.2;
-}
-
-.film-lab-desktop-root select.fl-edit-preset-default-select:hover {
-  background-color: color-mix(in srgb, var(--fl-bg-interactive-hover) 88%, transparent);
-}
-
-.film-lab-desktop-root select.fl-edit-preset-default-select:focus-visible {
-  outline-offset: 2px;
-}
-
-@media (max-width: 639px) {
-  .fl-edit-preset-default {
-    flex-wrap: wrap;
-    align-items: flex-start;
-  }
-
-  .film-lab-desktop-root select.fl-edit-preset-default-select {
-    width: 100%;
-    margin-left: 0;
-  }
 }
 
 /* --- ネイティブ text（バッチ接尾辞など。select と同系トークン） --- */

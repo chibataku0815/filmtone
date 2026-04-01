@@ -162,6 +162,191 @@ export type BatchTabPanelProps = {
 };
 
 /**
+ * @description 右パネル compact 用の実行フッターに必要な最小 props。
+ * Edit と同じく scroll の外に置き、Export だけ面が増えないようにする。
+ */
+export type BatchTabCompactRunFooterProps = Pick<
+  BatchTabPanelProps,
+  | "batchJobMode"
+  | "inputDir"
+  | "outputDir"
+  | "videoInputPath"
+  | "running"
+  | "batchCanRun"
+  | "batchCanRetryFailed"
+  | "onRunBatch"
+  | "onRetryFailedBatch"
+  | "onAbortBatch"
+  | "batchProgress"
+  | "lastBatchSummary"
+  | "videoCanExport"
+  | "onRunVideoExport"
+>;
+
+/**
+ * @description 右パネル compact 専用の実行フッター。
+ * 書き出しボタンを scroll の外へ出し、Edit の footer と同じ 1 枚の面として見せる。
+ */
+export function BatchTabCompactRunFooter(
+  props: BatchTabCompactRunFooterProps,
+) {
+  const {
+    batchJobMode,
+    inputDir,
+    outputDir,
+    videoInputPath,
+    running,
+    batchCanRun,
+    batchCanRetryFailed,
+    onRunBatch,
+    onRetryFailedBatch,
+    onAbortBatch,
+    batchProgress,
+    lastBatchSummary,
+    videoCanExport,
+    onRunVideoExport,
+  } = props;
+
+  const t = useTranslations("film-lab.desktop.batch");
+
+  const missingItems: { label: string }[] = [];
+  if (!isSourcesStepComplete(batchJobMode, inputDir, videoInputPath)) {
+    missingItems.push({
+      label:
+        batchJobMode === "images"
+          ? t("pickImageFolderTitle")
+          : t("pickVideoFileTitle"),
+    });
+  }
+  if (batchJobMode === "images" && !outputDir) {
+    missingItems.push({ label: t("outputImageTitle") });
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <p className="text-sm font-medium text-[var(--fl-text-primary)]">
+          {t("runSectionTitle")}
+        </p>
+        <HelpHint
+          tip={t("tipKeyboardShortcuts", {
+            imagesLabel:
+              batchJobMode === "images"
+                ? t("runImagesPrimary")
+                : t("runVideoExport"),
+          })}
+          assistiveLabel={t("runKeyboardHintsAria")}
+        />
+      </div>
+
+      {batchJobMode === "images" ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="fl-btn-primary w-full sm:w-auto sm:min-w-[220px]"
+            disabled={!batchCanRun}
+            onClick={() => void onRunBatch()}
+          >
+            {t("runImagesPrimary")}
+          </button>
+          <button
+            type="button"
+            className="fl-btn-secondary max-w-xs"
+            disabled={!batchCanRetryFailed}
+            onClick={() => void onRetryFailedBatch()}
+          >
+            {t("runRetryFailed")}
+          </button>
+          <button
+            type="button"
+            className="fl-btn-secondary"
+            disabled={!running}
+            aria-label={t("runAbortAria")}
+            onClick={onAbortBatch}
+          >
+            {t("runAbort")}
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="fl-btn-primary w-full sm:w-auto sm:min-w-[220px]"
+            disabled={!videoCanExport}
+            onClick={() => void onRunVideoExport()}
+          >
+            {t("runVideoExport")}
+          </button>
+          <button
+            type="button"
+            className="fl-btn-secondary"
+            disabled={!running}
+            aria-label={t("runAbortAria")}
+            onClick={onAbortBatch}
+          >
+            {t("runAbort")}
+          </button>
+        </div>
+      )}
+
+      {running && batchProgress && batchProgress.total > 0 ? (
+        <div className="fl-batch-progress" aria-live="polite" aria-busy="true">
+          <div
+            className="fl-progress"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={batchProgress.total}
+            aria-valuenow={batchProgress.current}
+            aria-valuetext={t("batchProgressAriaText", {
+              current: String(batchProgress.current),
+              total: String(batchProgress.total),
+              file: batchProgress.fileName,
+            })}
+          >
+            <div
+              className="fl-progress-fill"
+              style={{
+                width: `${Math.min(
+                  100,
+                  Math.round(
+                    (batchProgress.current / batchProgress.total) * 100,
+                  ),
+                )}%`,
+              }}
+            />
+          </div>
+          <p className="fl-caption">
+            {batchProgress.current} / {batchProgress.total} ·{" "}
+            {batchProgress.fileName}
+          </p>
+        </div>
+      ) : null}
+
+      {batchJobMode === "images" && lastBatchSummary && !running ? (
+        <p className="fl-caption" aria-live="polite">
+          {t("lastSummary", {
+            ok: String(lastBatchSummary.ok),
+            loadFail: String(lastBatchSummary.loadFail),
+            writeFail: String(lastBatchSummary.writeFail),
+          })}
+        </p>
+      ) : null}
+
+      {missingItems.length > 0 && !running ? (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--amber-11)]">
+          {missingItems.map((item) => (
+            <span key={item.label} className="inline-flex items-center gap-1.5">
+              <WarningCircle size={14} weight="bold" aria-hidden />
+              {item.label}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
  * @description 書き出しタブのメインパネル（アコーディオン直接アクセス方式）
  */
 export function BatchTabPanel(props: BatchTabPanelProps) {
@@ -548,7 +733,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
       </p>
 
       <div
-        className={`flex gap-2.5 rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] px-3 py-2.5 ${lookStatusBanner.accent}`}
+        className={`flex gap-2.5 rounded-lg border border-[rgba(255,255,255,0.06)] bg-transparent px-3 py-2.5 ${lookStatusBanner.accent}`}
         role="status"
         aria-live="polite"
         aria-label={lookStatusBanner.title}
@@ -569,7 +754,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         </div>
       </div>
 
-      <div className="flex flex-col gap-2 rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-raised)] px-3 py-3">
+      <div className="flex flex-col gap-2 border-t border-white/[0.06] pt-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-[var(--fl-text-secondary)]">
           {t("lookFromEditHeading")}
         </p>
@@ -601,7 +786,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
 
       {importedGradeLabel == null &&
       editToExportSyncedAtMs != null ? (
-        <div className="flex max-w-md flex-col gap-2 rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] px-3 py-2.5">
+        <div className="flex max-w-md flex-col gap-2 border-t border-white/[0.06] pt-3">
           <span className="fl-label">{t("presetQuickLabel")}</span>
           <p className="fl-caption max-w-prose text-[var(--fl-text-secondary)]">
             {t("lookPresetHiddenWhileSyncedBody", {
@@ -638,7 +823,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         </label>
       )}
 
-      <div className="flex items-start gap-1.5 rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] px-3 py-2">
+      <div className="flex items-start gap-1.5 border-t border-white/[0.06] pt-3">
         <details
           className="min-w-0 flex-1"
           open={lookAdvancedOpen}
@@ -752,7 +937,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            className="fl-btn-primary max-w-xs"
+            className="fl-btn-primary w-full sm:w-auto sm:min-w-[220px]"
             disabled={!batchCanRun}
             onClick={() => void onRunBatch()}
           >
@@ -780,7 +965,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            className="fl-btn-primary max-w-xs"
+            className="fl-btn-primary w-full sm:w-auto sm:min-w-[220px]"
             disabled={!videoCanExport}
             onClick={() => void onRunVideoExport()}
           >
@@ -905,7 +1090,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         <span
           className={`rounded-full border px-2 py-0.5 ${
             sourceOk
-              ? "border-[var(--amber-8)] bg-[var(--amber-3)] text-[var(--amber-12)]"
+              ? "border-[var(--fl-border-default)] bg-[var(--fl-bg-interactive)] text-[var(--fl-text-primary)]"
               : "border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] text-[var(--fl-text-tertiary)]"
           }`}
         >
@@ -918,8 +1103,8 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
           className={`rounded-full border px-2 py-0.5 ${
             outputOk || batchJobMode === "video"
               ? outputOk
-                ? "border-[var(--amber-8)] bg-[var(--amber-3)] text-[var(--amber-12)]"
-                : "border-[var(--amber-7)] bg-[var(--amber-4)] text-[var(--amber-12)]"
+                ? "border-[var(--fl-border-default)] bg-[var(--fl-bg-interactive)] text-[var(--fl-text-primary)]"
+                : "border-[var(--fl-border-default)] bg-[var(--fl-bg-interactive)] text-[var(--fl-text-secondary)]"
               : "border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] text-[var(--fl-text-tertiary)]"
           }`}
         >
@@ -934,8 +1119,10 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         </span>
       </div>
 
-      {/* Accordion sections */}
-      <div className={`fl-card fl-card--frost flex flex-col divide-y divide-[var(--fl-border-subtle)] ${compact ? "gap-0 p-0" : ""}`}>
+      {/* Accordion sections — compact では親パネルの frost と二重にならないフラットな枠（life#82） */}
+      <div
+        className={`flex flex-col divide-y divide-[var(--fl-border-subtle)] ${compact ? "gap-0" : "fl-card fl-card--frost gap-0 p-0"}`}
+      >
         {ACCORDION_STEPS.map((id, idx) => {
           const isOpen = openSections[id];
           const synced = isSectionSynced(id);
@@ -948,7 +1135,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
             <div key={id} id={`export-step-${id}`}>
               <button
                 type="button"
-                className={`flex w-full items-center gap-2 ${compact ? "px-2.5 py-2" : "px-3 py-2.5"} text-left transition-colors hover:bg-[var(--fl-bg-interactive)] ${
+                className={`flex w-full items-center gap-2 ${compact ? "py-2.5" : "px-3 py-2.5"} text-left transition-colors hover:bg-[var(--fl-bg-interactive)] ${
                   needsAttention
                     ? "shadow-[inset_3px_0_0_0_var(--amber-9)]"
                     : ""
@@ -979,7 +1166,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
                     {stepLabels[id]}
                   </span>
                   {synced ? (
-                    <span className="inline-flex items-center gap-0.5 rounded-full border border-emerald-700/30 bg-emerald-900/20 px-1.5 py-0.5 text-[0.6rem] font-medium text-emerald-400">
+                    <span className="inline-flex items-center gap-0.5 rounded-full border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-interactive)] px-1.5 py-0.5 text-[0.6rem] font-medium text-[var(--fl-text-secondary)]">
                       <CheckCircle size={10} weight="fill" aria-hidden />
                       synced
                     </span>
@@ -1007,7 +1194,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
               {isOpen ? (
                 <div
                   id={`export-step-body-${id}`}
-                  className={compact ? "px-2.5 pb-3 pt-1" : "px-3 pb-4 pt-1"}
+                  className={compact ? "pb-4 pt-1" : "px-3 pb-4 pt-1"}
                 >
                   {accordionRenderers[id]()}
                 </div>
@@ -1017,46 +1204,48 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         })}
       </div>
 
-      {/* Export / Run — always visible */}
-      <section
-        className={`fl-card fl-card--frost gap-3 ${compact ? "sticky bottom-0 z-10 rounded-t-xl shadow-[0_-4px_12px_rgba(0,0,0,0.3)]" : ""}`}
-        aria-labelledby="export-run-heading"
-      >
-        <h3
-          id="export-run-heading"
-          className="sr-only"
+      {/* Export / Run — full page では panel 内、compact は App 側 footer へ出す */}
+      {!compact ? (
+        <section
+          className="fl-card fl-card--frost gap-3"
+          aria-labelledby="export-run-heading"
         >
-          {stepLabels.run}
-        </h3>
-        {renderStepRun()}
+          <h3
+            id="export-run-heading"
+            className="sr-only"
+          >
+            {stepLabels.run}
+          </h3>
+          {renderStepRun()}
 
-        {/* Validation messages */}
-        {missingItems.length > 0 && !running ? (
-          <div className="flex flex-col gap-1.5 rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] px-3 py-2">
-            {missingItems.map((item) => (
-              <button
-                key={item.section}
-                type="button"
-                className="flex items-center gap-1.5 text-left text-xs text-[var(--amber-11)] hover:underline"
-                onClick={() => {
-                  setOpenSections((prev) => ({
-                    ...prev,
-                    [item.section]: true,
-                  }));
-                  requestAnimationFrame(() => {
-                    document
-                      .getElementById(`export-step-${item.section}`)
-                      ?.scrollIntoView({ behavior: "smooth", block: "center" });
-                  });
-                }}
-              >
-                <WarningCircle size={14} weight="bold" aria-hidden />
-                {item.label}
-              </button>
-            ))}
-          </div>
-        ) : null}
-      </section>
+          {/* Validation messages */}
+          {missingItems.length > 0 && !running ? (
+            <div className="flex flex-col gap-1.5 rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] px-3 py-2">
+              {missingItems.map((item) => (
+                <button
+                  key={item.section}
+                  type="button"
+                  className="flex items-center gap-1.5 text-left text-xs text-[var(--amber-11)] hover:underline"
+                  onClick={() => {
+                    setOpenSections((prev) => ({
+                      ...prev,
+                      [item.section]: true,
+                    }));
+                    requestAnimationFrame(() => {
+                      document
+                        .getElementById(`export-step-${item.section}`)
+                        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    });
+                  }}
+                >
+                  <WarningCircle size={14} weight="bold" aria-hidden />
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       {!compact && (
         <div className="flex flex-wrap items-center gap-1.5">
