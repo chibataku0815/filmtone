@@ -470,6 +470,9 @@
     },
     "controls": {
       "presets": "プリセット",
+      "presetSelectTriggerLabel": "プリセットを選ぶ",
+      "presetSearchPlaceholder": "名前や雰囲気で絞り込む",
+      "presetSearchEmpty": "一致するプリセットがありません",
       "presetIntensity": "プリセットの強さ",
       "quick": {
         "summary": "3本で色味・粒子・ハレ・ブルームなどをまとめて調整します。数値ごとの調整はプロモード（P）で行えます。",
