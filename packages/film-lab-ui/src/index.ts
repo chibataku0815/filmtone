@@ -35,6 +35,10 @@ export {
   type FilmLabInteractiveSourceInfo,
 } from "./FilmLabCanvasPackageEntry";
 export {
+  FilmLabWebglPanelBackdrop,
+  type FilmLabWebglPanelBackdropProps,
+} from "./FilmLabWebglPanelBackdrop";
+export {
   FilmLabControlPanelCore,
   type FilmLabControlPanelCoreSlots,
   type FilmLabCoreRenderContext,
