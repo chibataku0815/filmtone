@@ -15,7 +15,6 @@ import { ControlSlider as BaseControlSlider } from "./ui/ControlSlider";
 import { SectionHeader } from "./ui/SectionHeader";
 import { ToggleHeader } from "./ui/ToggleHeader";
 import { LUTPanel } from "./LUTPanel";
-import { FilmLabInfoTip } from "./FilmLabInfoTip";
 import { PresetSearchSelect } from "./PresetSearchSelect";
 import type { Viewport } from "film-lab-renderer";
 import type { Params } from "film-lab-core";
@@ -489,7 +488,7 @@ export function FilmLabControlPanelCore({
   return (
     <>
       <div className={filmLabPanelRootClassName(surface)}>
-        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-3">
           <div className={filmLabModeToggleGroupShell} role="group" aria-label={tFilmLab("mode.toggleGroupAria")}>
             <button
               type="button"
@@ -506,11 +505,6 @@ export function FilmLabControlPanelCore({
               {tFilmLab("mode.pro")}
             </button>
           </div>
-          <FilmLabInfoTip
-            tip={tFilmLab("mode.hint")}
-            assistiveLabel={tFilmLab("mode.hintInfoAria")}
-            className="shrink-0 self-end text-white/35 hover:text-amber-200/80 sm:self-center"
-          />
         </div>
 
         {slots.donationUi ? (

@@ -3,7 +3,12 @@
  *
  * @description
  * ON/OFF がはっきり分かるヘッダ行を共通化し、Web / Desktop で同じ family に見せます。
+ * トラック幅の計算ミス・親の flex での潰れを避けるため、スイッチ本体は Radix Switch に任せます。
+ *
+ * @limitations
+ * - 見た目は Tailwind ＋既存トークン依存。`apps/web` は globals.css の `@source` で film-lab-ui をスキャンする必要があります。
  */
+import * as Switch from "@radix-ui/react-switch";
 import { filmLabToggleHeaderTitle, filmLabToggleHeaderTrackOff, filmLabToggleHeaderTrackOn } from "../filmLabPanelTokens";
 
 export interface ToggleHeaderProps {
@@ -20,26 +25,25 @@ export interface ToggleHeaderProps {
  */
 export function ToggleHeader({ title, enabled, onToggle }: ToggleHeaderProps) {
   return (
-    <div className="mb-2 mt-3 flex items-center justify-between gap-3">
-      <h3 className={filmLabToggleHeaderTitle}>{title}</h3>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={enabled}
-        onClick={() => onToggle(!enabled)}
+    <div className="mb-2 mt-3 flex min-h-[1.5rem] min-w-0 items-center justify-between gap-3">
+      <h3 className={`min-w-0 flex-1 ${filmLabToggleHeaderTitle}`}>{title}</h3>
+      <Switch.Root
+        checked={enabled}
+        onCheckedChange={onToggle}
         className={[
-          "relative box-border h-5 w-9 shrink-0 rounded-full border transition-colors",
+          "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border px-0.5 transition-colors",
+          "outline-none focus-visible:ring-2 focus-visible:ring-amber-400/55 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent",
           enabled ? filmLabToggleHeaderTrackOn : filmLabToggleHeaderTrackOff,
         ].join(" ")}
       >
-        <span
-          aria-hidden
+        <Switch.Thumb
           className={[
-            "pointer-events-none absolute inset-y-0 my-auto block h-4 w-4 rounded-full bg-white transition-all",
-            enabled ? "right-0.5 left-auto" : "left-0.5 right-auto",
+            "pointer-events-none block size-4 shrink-0 rounded-full bg-white shadow-sm",
+            "transition-transform duration-200 ease-out will-change-transform",
+            "translate-x-0 data-[state=checked]:translate-x-4",
           ].join(" ")}
         />
-      </button>
+      </Switch.Root>
     </div>
   );
 }

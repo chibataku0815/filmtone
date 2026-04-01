@@ -24,14 +24,16 @@ export const filmLabPanelSurfaceBare = "@container w-full min-w-0";
 
 /**
  * Quick / Pro 切替の外枠（角丸ボーダーのグループ）。
+ * モバイルは横幅いっぱいのセグメント、sm 以上は中身幅に収まる inline-flex（右に無駄な空きを出さない）。
  */
-export const filmLabModeToggleGroupShell = "flex rounded-lg border border-white/10 p-0.5";
+export const filmLabModeToggleGroupShell =
+  "flex w-full max-w-full flex-nowrap items-stretch gap-0.5 rounded-lg border border-white/10 p-1 sm:inline-flex sm:w-auto";
 
 /**
  * モード切替ボタン共通（アクティブ状態は `filmLabModeToggleSegmentActive` / `filmLabModeToggleSegmentInactive` と併用）。
  */
 export const filmLabModeToggleButtonBase =
-  "min-w-[4rem] flex-1 whitespace-nowrap rounded-md px-3 py-2 text-center text-[11px] font-medium transition-colors sm:flex-none sm:px-4";
+  "min-w-[4rem] flex-1 whitespace-nowrap rounded-md px-3 py-2 text-center text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/65 focus-visible:ring-offset-2 focus-visible:ring-offset-black/50 sm:flex-none sm:px-4";
 
 /** 選択中のモードセグメント */
 export const filmLabModeToggleSegmentActive = "bg-[var(--accent-amber1)] text-black";
