@@ -8,6 +8,27 @@ export {
   type FilmLabControlPanelSectionId,
   type FilmLabWrapperSlotId,
 } from "./filmLabUiContract";
+
+/** パネル視覚トークン（Tailwind 束）。Web wrapper の見出し揃えにも使う。 */
+export {
+  filmLabCollapsibleHeaderButton,
+  filmLabDonationPresentRowShell,
+  filmLabModeHintCaption,
+  filmLabModeToggleButtonBase,
+  filmLabModeToggleButtonClassName,
+  filmLabModeToggleGroupShell,
+  filmLabModeToggleSegmentActive,
+  filmLabModeToggleSegmentInactive,
+  filmLabPanelRootClassName,
+  filmLabPanelSurfaceBare,
+  filmLabPanelSurfaceCard,
+  filmLabPresetSectionDividerBlock,
+  filmLabSectionHeaderTitle,
+  filmLabToggleHeaderTitle,
+  filmLabToggleHeaderTrackOff,
+  filmLabToggleHeaderTrackOn,
+} from "./filmLabPanelTokens";
+
 // Components
 export {
   FilmLabCanvas,
@@ -16,16 +37,22 @@ export {
 } from "./FilmLabCanvasPackageEntry";
 export {
   FilmLabControlPanelCore,
-  SectionHeader,
-  ToggleHeader,
   type FilmLabControlPanelCoreSlots,
   type FilmLabCoreRenderContext,
   type FilmLabDonationUiBinding,
 } from "./FilmLabControlPanelCore";
+export { SectionHeader, type SectionHeaderProps } from "./ui/SectionHeader";
+export { ToggleHeader, type ToggleHeaderProps } from "./ui/ToggleHeader";
 export { LUTPanel } from "./LUTPanel";
 export { PresetBar } from "./PresetBar";
 export { PresetSearchSelect } from "./PresetSearchSelect";
 export { FilmLabInfoTip, type FilmLabInfoTipProps } from "./FilmLabInfoTip";
+
+// Source visibility contract (life#87 P3 docs + types)
+export {
+  FILM_LAB_SOURCE_DISPLAY_PRIORITY_ORDER,
+  type FilmLabSourceDisplayBand,
+} from "./filmLabSourceContract";
 
 // UI primitives
 export { ControlSlider } from "./ui/ControlSlider";

@@ -12,6 +12,8 @@ import {
 import { useTranslations } from "next-intl";
 import { PRESETS, findMatchingPreset, halationHueToHex, type PresetName } from "film-lab-core";
 import { ControlSlider as BaseControlSlider } from "./ui/ControlSlider";
+import { SectionHeader } from "./ui/SectionHeader";
+import { ToggleHeader } from "./ui/ToggleHeader";
 import { LUTPanel } from "./LUTPanel";
 import { FilmLabInfoTip } from "./FilmLabInfoTip";
 import { PresetSearchSelect } from "./PresetSearchSelect";
@@ -32,6 +34,15 @@ import {
   type QuickMetaAxis,
 } from "./quick-meta-sliders";
 import { FILM_LAB_NEXT_INTL_NAMESPACE } from "./filmLabUiContract";
+import {
+  filmLabCollapsibleHeaderButton,
+  filmLabDonationPresentRowShell,
+  filmLabModeHintCaption,
+  filmLabModeToggleButtonClassName,
+  filmLabModeToggleGroupShell,
+  filmLabPanelRootClassName,
+  filmLabPresetSectionDividerBlock,
+} from "./filmLabPanelTokens";
 
 /** UI の見せ方だけを切り替える。グレードの数値（reducer）は Quick でも Pro でも同じ */
 type UiMode = "quick" | "pro";
@@ -473,44 +484,26 @@ export function FilmLabControlPanelCore({
 
   return (
     <>
-      <div
-        className={
-          surface === "bare"
-            ? "@container w-full min-w-0"
-            : "@container w-full min-w-0 rounded-lg border border-white/[0.06] bg-black/60 p-4 backdrop-blur-xl sm:p-5"
-        }
-      >
+      <div className={filmLabPanelRootClassName(surface)}>
         <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div
-            className="flex rounded-lg border border-white/10 p-0.5"
-            role="group"
-            aria-label={tFilmLab("mode.hintShort")}
-          >
+          <div className={filmLabModeToggleGroupShell} role="group" aria-label={tFilmLab("mode.hintShort")}>
             <button
               type="button"
               onClick={() => setUiMode("quick")}
-              className={`min-w-[4rem] flex-1 whitespace-nowrap rounded-md px-3 py-2 text-center text-[11px] font-medium transition-colors sm:flex-none sm:px-4 ${
-                uiMode === "quick"
-                  ? "bg-[var(--accent-amber1)] text-black"
-                  : "text-white/55 hover:text-white/75"
-              }`}
+              className={filmLabModeToggleButtonClassName(uiMode === "quick")}
             >
               {tFilmLab("mode.quick")}
             </button>
             <button
               type="button"
               onClick={() => setUiMode("pro")}
-              className={`min-w-[4rem] flex-1 whitespace-nowrap rounded-md px-3 py-2 text-center text-[11px] font-medium transition-colors sm:flex-none sm:px-4 ${
-                uiMode === "pro"
-                  ? "bg-[var(--accent-amber1)] text-black"
-                  : "text-white/55 hover:text-white/75"
-              }`}
+              className={filmLabModeToggleButtonClassName(uiMode === "pro")}
             >
               {tFilmLab("mode.pro")}
             </button>
           </div>
           <div className="flex items-start justify-end gap-1 sm:max-w-[260px]">
-            <p className="min-w-0 flex-1 text-right text-[10px] leading-snug text-white/35">
+            <p className={filmLabModeHintCaption}>
               {tFilmLab("mode.hintShort")}
             </p>
             <FilmLabInfoTip
@@ -522,7 +515,7 @@ export function FilmLabControlPanelCore({
         </div>
 
         {slots.donationUi ? (
-          <label className="mt-2 flex cursor-pointer items-start gap-2.5 rounded-lg border border-white/[0.06] bg-white/[0.03] p-2.5">
+          <label className={filmLabDonationPresentRowShell}>
             <input
               type="checkbox"
               checked={slots.donationUi.presentMode}
@@ -543,7 +536,7 @@ export function FilmLabControlPanelCore({
           </label>
         ) : null}
 
-        <div className="mb-4 min-w-0 border-b border-white/[0.06] pb-4">
+        <div className={filmLabPresetSectionDividerBlock}>
           <SectionHeader title={tFilmLab("controls.presets")} />
           {slots.beforePresets ? <div className="mb-3">{slots.beforePresets}</div> : null}
           <PresetSearchSelect
@@ -890,14 +883,6 @@ function SplitLooksPreviewIcon() {
   );
 }
 
-export function SectionHeader({ title }: { title: string }) {
-  return (
-    <h3 className="mb-2 mt-3 text-[10px] font-medium uppercase tracking-[0.15em] text-white/40 first:mt-0">
-      {title}
-    </h3>
-  );
-}
-
 function CollapsibleHeader({
   title,
   open,
@@ -909,7 +894,7 @@ function CollapsibleHeader({
 }) {
   return (
     <button
-      className="mb-2 mt-3 flex w-full items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.15em] text-white/40 transition-colors hover:text-white/60 first:mt-0"
+      className={filmLabCollapsibleHeaderButton}
       onClick={onToggle}
     >
       <span className={`text-[8px] transition-transform duration-150 ${open ? "rotate-90" : ""}`}>
@@ -995,42 +980,6 @@ function HueSlider({
         className="h-4 w-4 shrink-0 rounded-full border border-white/20"
         style={{ backgroundColor: hex }}
       />
-    </div>
-  );
-}
-
-export function ToggleHeader({
-  title,
-  enabled,
-  onToggle,
-}: {
-  title: string;
-  enabled: boolean;
-  onToggle: (on: boolean) => void;
-}) {
-  return (
-    <div className="mb-2 mt-3 flex items-center justify-between gap-3">
-      <h3 className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/65">
-        {title}
-      </h3>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={enabled}
-        onClick={() => onToggle(!enabled)}
-        className={`relative box-border h-5 w-9 shrink-0 rounded-full border transition-colors ${
-          enabled
-            ? "border-[color-mix(in_srgb,var(--accent-amber1)_70%,transparent)] bg-[var(--accent-amber1)]"
-            : "border-white/25 bg-[#1c1c1c] hover:border-white/35"
-        }`}
-      >
-        <span
-          aria-hidden
-          className={`pointer-events-none absolute inset-y-0 my-auto block h-4 w-4 rounded-full bg-white transition-all ${
-            enabled ? "right-0.5 left-auto" : "left-0.5 right-auto"
-          }`}
-        />
-      </button>
     </div>
   );
 }

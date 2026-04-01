@@ -21,6 +21,7 @@
     "build:core": "bun run --cwd packages/film-lab-core build",
     "build:renderer": "bun run --cwd packages/film-lab-renderer build",
     "build:smart-look": "bun run --cwd packages/film-lab-smart-look build",
-    "postinstall": "bun run build:core && bun run build:renderer && bun run build:smart-look"
+    "postinstall": "bun run build:core && bun run build:renderer && bun run build:smart-look",
+    "verify:film-lab-surfaces": "bun run --cwd apps/web build && bun run --cwd apps/desktop-film-lab-batch test:smart-look-pending"
   }
 }
