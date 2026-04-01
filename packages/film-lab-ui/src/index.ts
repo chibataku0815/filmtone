@@ -13,7 +13,6 @@ export {
 export {
   filmLabCollapsibleHeaderButton,
   filmLabDonationPresentRowShell,
-  filmLabModeHintCaption,
   filmLabModeToggleButtonBase,
   filmLabModeToggleButtonClassName,
   filmLabModeToggleGroupShell,

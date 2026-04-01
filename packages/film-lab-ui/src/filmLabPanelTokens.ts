@@ -40,12 +40,6 @@ export const filmLabModeToggleSegmentActive = "bg-[var(--accent-amber1)] text-bl
 export const filmLabModeToggleSegmentInactive = "text-white/55 hover:text-white/75";
 
 /**
- * モード説明の短いキャプション（右寄せの薄い字）。
- */
-export const filmLabModeHintCaption =
-  "min-w-0 flex-1 text-right text-[10px] leading-snug text-white/35";
-
-/**
  * Presets ブロック下の区切り（下ボーダー + 余白）。
  */
 export const filmLabPresetSectionDividerBlock = "mb-4 min-w-0 border-b border-white/[0.06] pb-4";

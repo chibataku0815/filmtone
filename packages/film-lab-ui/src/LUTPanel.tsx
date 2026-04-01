@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { parseCube } from "film-lab-core";
+import { FILM_LAB_NEXT_INTL_NAMESPACE } from "./filmLabUiContract";
 import { ControlSlider } from "./ui/ControlSlider";
 import type { Viewport } from "film-lab-renderer";
 
@@ -17,6 +19,8 @@ interface LUTPanelProps {
 }
 
 export function LUTPanel({ viewport, onCubeLutLoaded, onLutChange }: LUTPanelProps) {
+  const tFilmLab = useTranslations(FILM_LAB_NEXT_INTL_NAMESPACE);
+
   // --- Creative LUT (main slot) ---
   const [lutName, setLutName] = useState<string | null>(null);
   const [intensity, setIntensity] = useState(1.0);
@@ -200,19 +204,19 @@ export function LUTPanel({ viewport, onCubeLutLoaded, onLutChange }: LUTPanelPro
           <p className="mt-3 text-[10px] text-red-400">{error}</p>
         )}
 
-        {lutName && (
-          <div className="mt-4">
-            <ControlSlider
-              label="LUT Mix"
-              value={intensity}
-              min={0}
-              max={1}
-              step={0.01}
-              defaultValue={1}
-              onChange={handleIntensity}
-            />
-          </div>
-        )}
+        <div className="mt-4">
+          <ControlSlider
+            label={tFilmLab("lutPanel.creativeMix")}
+            hint={!lutName ? tFilmLab("lutPanel.creativeMixDisabledHint") : undefined}
+            value={intensity}
+            min={0}
+            max={1}
+            step={0.01}
+            defaultValue={1}
+            onChange={handleIntensity}
+            disabled={!lutName || !viewport}
+          />
+        </div>
       </div>
 
       {/* ── Log Conversion: advanced slot（見出しとカードの間は gap、カード内は四方同じ p-4） ── */}
@@ -277,19 +281,19 @@ export function LUTPanel({ viewport, onCubeLutLoaded, onLutChange }: LUTPanelPro
               <p className="mt-3 text-[10px] text-red-400">{logError}</p>
             )}
 
-            {logLutName && (
-              <div className="mt-3.5">
-                <ControlSlider
-                  label="Log Mix"
-                  value={logIntensity}
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  defaultValue={1}
-                  onChange={handleLogIntensity}
-                />
-              </div>
-            )}
+            <div className="mt-3.5">
+              <ControlSlider
+                label={tFilmLab("lutPanel.logMix")}
+                hint={!logLutName ? tFilmLab("lutPanel.logMixDisabledHint") : undefined}
+                value={logIntensity}
+                min={0}
+                max={1}
+                step={0.01}
+                defaultValue={1}
+                onChange={handleLogIntensity}
+                disabled={!logLutName || !viewport}
+              />
+            </div>
           </div>
         )}
       </div>

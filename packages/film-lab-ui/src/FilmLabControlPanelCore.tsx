@@ -37,7 +37,6 @@ import { FILM_LAB_NEXT_INTL_NAMESPACE } from "./filmLabUiContract";
 import {
   filmLabCollapsibleHeaderButton,
   filmLabDonationPresentRowShell,
-  filmLabModeHintCaption,
   filmLabModeToggleButtonClassName,
   filmLabModeToggleGroupShell,
   filmLabPanelRootClassName,
@@ -491,7 +490,7 @@ export function FilmLabControlPanelCore({
     <>
       <div className={filmLabPanelRootClassName(surface)}>
         <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className={filmLabModeToggleGroupShell} role="group" aria-label={tFilmLab("mode.hintShort")}>
+          <div className={filmLabModeToggleGroupShell} role="group" aria-label={tFilmLab("mode.toggleGroupAria")}>
             <button
               type="button"
               onClick={() => setUiMode("quick")}
@@ -507,16 +506,11 @@ export function FilmLabControlPanelCore({
               {tFilmLab("mode.pro")}
             </button>
           </div>
-          <div className="flex items-start justify-end gap-1 sm:max-w-[260px]">
-            <p className={filmLabModeHintCaption}>
-              {tFilmLab("mode.hintShort")}
-            </p>
-            <FilmLabInfoTip
-              tip={tFilmLab("mode.hint")}
-              assistiveLabel={tFilmLab("mode.hintInfoAria")}
-              className="mt-0.5 text-white/35 hover:text-amber-200/80"
-            />
-          </div>
+          <FilmLabInfoTip
+            tip={tFilmLab("mode.hint")}
+            assistiveLabel={tFilmLab("mode.hintInfoAria")}
+            className="shrink-0 self-end text-white/35 hover:text-amber-200/80 sm:self-center"
+          />
         </div>
 
         {slots.donationUi ? (

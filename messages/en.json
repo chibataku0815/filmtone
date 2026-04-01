@@ -338,6 +338,12 @@
       "loadingMedia": "Loading media…",
       "dismissError": "OK"
     },
+    "lutPanel": {
+      "creativeMix": "LUT mix",
+      "creativeMixDisabledHint": "Load a .cube file first",
+      "logMix": "Log LUT mix",
+      "logMixDisabledHint": "Load a log conversion .cube first"
+    },
     "back": "← Back to Interactive",
     "metadata": {
       "title": "Filmtone",
@@ -390,7 +396,7 @@
     "mode": {
       "quick": "Quick",
       "pro": "Pro",
-      "hintShort": "Quick: three bundled sliders + presets. Pro: per-parameter controls, Bloom/Halation detail, LUT.",
+      "toggleGroupAria": "Switch between Quick and Pro layouts",
       "hint": "Quick uses three meta sliders (film character, era, dynamics) for broad changes. Pro shows every slider plus tone detail, effects, Bloom, Halation, and LUT.",
       "hintInfoAria": "Quick vs Pro"
     },
