@@ -300,13 +300,42 @@ export class MediaLoader {
     return new Promise((resolve, reject) => {
       const url = URL.createObjectURL(file);
       const video = document.createElement("video");
-      video.src = url;
       video.muted = true;
       video.loop = true;
       video.playsInline = true;
-      video.crossOrigin = "anonymous";
+      video.preload = "auto";
+      // blob URL はローカルファイルなので crossOrigin を付けないほうが安全です。
+      video.src = url;
 
-      video.onloadedmetadata = () => {
+      /**
+       * @description video 要素が実際に表示できるフレームを持てた段階で Texture を作ります。
+       * `loadedmetadata` だけだと幅高さは分かっても、最初のフレームがまだ黒いことがあります。
+       * @param eventName 失敗したイベント名
+       * @param extra 追加で残したい詳細
+       */
+      const rejectVideoLoad = (eventName: string, extra?: unknown) => {
+        try {
+          URL.revokeObjectURL(url);
+        } catch {
+          /* ignore */
+        }
+        reject(
+          new MediaLoadError(
+            `MediaLoader.loadVideo("${file.name}", "${file.type || "unknown"}") failed at ${eventName}. Try MP4 (H.264) or WebM.`,
+            "VIDEO_DECODE_FAILED",
+          ),
+        );
+        if (extra != null) {
+          console.error("MediaLoader.loadVideo detailed failure", {
+            fileName: file.name,
+            fileType: file.type,
+            eventName,
+            extra,
+          });
+        }
+      };
+
+      video.onloadeddata = () => {
         const texture = new THREE.VideoTexture(video);
         texture.colorSpace = THREE.SRGBColorSpace;
         texture.minFilter = THREE.LinearFilter;
@@ -325,18 +354,14 @@ export class MediaLoader {
       };
 
       video.onerror = () => {
-        try {
-          URL.revokeObjectURL(url);
-        } catch {
-          /* ignore */
-        }
-        reject(
-          new MediaLoadError(
-            "Could not open this video. Try MP4 (H.264).",
-            "VIDEO_DECODE_FAILED",
-          ),
-        );
+        rejectVideoLoad("error", video.error);
       };
+
+      video.onabort = () => {
+        rejectVideoLoad("abort");
+      };
+
+      video.load();
     });
   }
 

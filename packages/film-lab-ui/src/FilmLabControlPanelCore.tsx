@@ -21,7 +21,10 @@ import {
   filmLabReducer,
   createInitialState,
   createInitialStateFromSharedParams,
+  type Action,
   type GradeSlotState,
+  type PresentState,
+  type State,
 } from "./film-lab-reducer";
 import {
   quickMetaDisplayValue,
@@ -67,6 +70,33 @@ export interface FilmLabControlPanelCoreSlots {
   lpExpandButton?: ReactNode;
   /** LP レイアウト時に LUT 以下の補助パネルを隠すフラグ */
   hideAuxPanels?: boolean;
+  /** Render-prop: Core state を受け取り Presets 直後に Web 専用セクションを挿入 */
+  renderAfterPresets?: (ctx: FilmLabCoreRenderContext) => ReactNode;
+  /** Render-prop: Core state を受け取り LUT 直後に Web 専用セクションを挿入 */
+  renderAfterLut?: (ctx: FilmLabCoreRenderContext) => ReactNode;
+}
+
+/**
+ * Web wrapper 等が Core 内部の state / dispatch にアクセスするためのコンテキスト。
+ * render-prop slots (`renderAfterPresets`, `renderAfterLut`) に渡される。
+ */
+export interface FilmLabCoreRenderContext {
+  state: State;
+  dispatch: React.Dispatch<Action>;
+  activePreset: PresetName;
+  activeSlotState: GradeSlotState;
+  savedBloomStrength: number;
+  savedHalationIntensity: number;
+  setSavedBloomStrength: (v: number) => void;
+  setSavedHalationIntensity: (v: number) => void;
+  setActivePreset: (p: PresetName) => void;
+  /** Dispatch RESTORE_PRESENT + 補助 state を一括復元 */
+  restoreSession: (session: {
+    present: PresentState;
+    savedBloomStrength: number;
+    savedHalationIntensity: number;
+    activePreset: PresetName;
+  }) => void;
 }
 
 interface FilmLabControlPanelCoreProps {
@@ -88,6 +118,8 @@ interface FilmLabControlPanelCoreProps {
   onParamsChange?: () => void;
   /** 初期 UI モード */
   defaultUiMode?: UiMode;
+  /** UI モード変更通知（wrapper が LP 補助パネル開閉に利用） */
+  onUiModeChange?: (mode: UiMode) => void;
   /** 拡張スロット */
   slots?: FilmLabControlPanelCoreSlots;
 }
@@ -107,6 +139,7 @@ export function FilmLabControlPanelCore({
   onLutChange,
   onParamsChange,
   defaultUiMode = "pro",
+  onUiModeChange,
   slots = {},
 }: FilmLabControlPanelCoreProps) {
   const tFilmLab = useTranslations("film-lab");
@@ -138,10 +171,42 @@ export function FilmLabControlPanelCore({
     }
   }, [defaultUiMode]);
 
+  useEffect(() => {
+    onUiModeChange?.(uiMode);
+  }, [uiMode, onUiModeChange]);
+
   const isPro = uiMode === "pro";
 
   const activeSlotState = state.activeSlot === "A" ? state.slotA : state.slotB;
   const params = activeSlotState.params;
+
+  const restoreSession = useCallback(
+    (session: {
+      present: PresentState;
+      savedBloomStrength: number;
+      savedHalationIntensity: number;
+      activePreset: PresetName;
+    }) => {
+      dispatch({ type: "RESTORE_PRESENT", present: session.present });
+      setSavedBloomStrength(session.savedBloomStrength);
+      setSavedHalationIntensity(session.savedHalationIntensity);
+      setActivePreset(session.activePreset);
+    },
+    [],
+  );
+
+  const coreRenderContext: FilmLabCoreRenderContext = {
+    state,
+    dispatch,
+    activePreset,
+    activeSlotState,
+    savedBloomStrength,
+    savedHalationIntensity,
+    setSavedBloomStrength,
+    setSavedHalationIntensity,
+    setActivePreset,
+    restoreSession,
+  };
 
   const presetIntensityAvailable =
     activeSlotState.basePreset != null && activeSlotState.basePreset !== "reset";
@@ -210,6 +275,7 @@ export function FilmLabControlPanelCore({
 
   const bloomEnabled = params.bloomStrength > 0;
   const halationEnabled = params.halationIntensity > 0;
+  const canToggleHistogram = typeof onHistogramToggle === "function";
 
   const updateParam = useCallback((key: keyof Params, value: number) => {
     dispatch({ type: "SET_PARAM", key, value });
@@ -418,7 +484,7 @@ export function FilmLabControlPanelCore({
             <button
               type="button"
               onClick={() => setUiMode("quick")}
-              className={`flex-1 rounded-md px-3 py-2 text-center text-[11px] font-medium transition-colors sm:flex-none sm:px-4 ${
+              className={`min-w-[4rem] flex-1 whitespace-nowrap rounded-md px-3 py-2 text-center text-[11px] font-medium transition-colors sm:flex-none sm:px-4 ${
                 uiMode === "quick"
                   ? "bg-[var(--accent-amber1)] text-black"
                   : "text-white/55 hover:text-white/75"
@@ -429,7 +495,7 @@ export function FilmLabControlPanelCore({
             <button
               type="button"
               onClick={() => setUiMode("pro")}
-              className={`flex-1 rounded-md px-3 py-2 text-center text-[11px] font-medium transition-colors sm:flex-none sm:px-4 ${
+              className={`min-w-[4rem] flex-1 whitespace-nowrap rounded-md px-3 py-2 text-center text-[11px] font-medium transition-colors sm:flex-none sm:px-4 ${
                 uiMode === "pro"
                   ? "bg-[var(--accent-amber1)] text-black"
                   : "text-white/55 hover:text-white/75"
@@ -493,7 +559,7 @@ export function FilmLabControlPanelCore({
           ) : null}
         </div>
 
-        {slots.afterPresets}
+        {slots.renderAfterPresets ? slots.renderAfterPresets(coreRenderContext) : slots.afterPresets}
 
         <div className="grid w-full min-w-0 grid-cols-1 gap-4 @min-[560px]:grid-cols-2 @min-[560px]:gap-6">
           {/* === COLOR GRADING === */}
@@ -673,7 +739,7 @@ export function FilmLabControlPanelCore({
             className={`min-w-0 ${isPro ? "@min-[560px]:col-span-2" : "order-1 @min-[560px]:order-1"}`}
           >
             <LUTPanel viewport={viewport} onCubeLutLoaded={onLutLoadSuccess} onLutChange={onLutChange} />
-            {slots.afterLut}
+            {slots.renderAfterLut ? slots.renderAfterLut(coreRenderContext) : slots.afterLut}
             <div className="mt-3 rounded-xl border border-white/[0.08] bg-gradient-to-b from-white/[0.04] to-black/20 p-3">
               <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.12em] text-white/60">
                 {tFilmLab("compare.sectionTitle")}
@@ -773,9 +839,15 @@ export function FilmLabControlPanelCore({
                 </div>
               </div>
             </div>
-            <div className="mt-3 border-t border-white/[0.06] pt-3">
-              <ToggleHeader title={tFilmLab("controls.histogram")} enabled={histogramVisible} onToggle={() => onHistogramToggle?.()} />
-            </div>
+            {canToggleHistogram ? (
+              <div className="mt-3 border-t border-white/[0.06] pt-3">
+                <ToggleHeader
+                  title={tFilmLab("controls.histogram")}
+                  enabled={histogramVisible}
+                  onToggle={() => onHistogramToggle?.()}
+                />
+              </div>
+            ) : null}
           </div>
           )}
         </div>
@@ -932,13 +1004,14 @@ export function ToggleHeader({
       </h3>
       <button
         type="button"
+        role="switch"
+        aria-checked={enabled}
         onClick={() => onToggle(!enabled)}
         className={`relative box-border h-5 w-9 shrink-0 rounded-full border transition-colors ${
           enabled
             ? "border-[color-mix(in_srgb,var(--accent-amber1)_70%,transparent)] bg-[var(--accent-amber1)]"
             : "border-white/25 bg-[#1c1c1c] hover:border-white/35"
         }`}
-        aria-pressed={enabled}
       >
         <span
           aria-hidden

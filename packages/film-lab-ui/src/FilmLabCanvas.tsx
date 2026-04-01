@@ -28,6 +28,11 @@ interface FilmLabCanvasProps {
   fullScreen?: boolean;
   onViewportReady?: (viewport: Viewport | null) => void;
   /**
+   * @description 最初に出す sample asset を親が明示したいときの URL です。
+   * Web の `/film-lab` では canonical sample asset を直接渡し、Desktop では共有の既定解決に戻せます。
+   */
+  defaultSampleAssetUrl?: string;
+  /**
    * @description true の間は、プレビューに読み込んだ動画の再生を止めます。
    * 画像プレビューには影響しません。書き出し中に preview 側の decoder / GPU 競合を
    * 減らしたいデスクトップアプリから使う前提です。
@@ -51,6 +56,13 @@ interface FilmLabCanvasProps {
   compareHud?: { activeSlot: "A" | "B" } | null;
   /** ドロップ／ファイル選択で .cube が適用できたとき（寄付ナッジ用） */
   onCubeLutLoaded?: () => void;
+  /**
+   * Web LP など親が「いまキャンバスに載っている元画像」を表示したいときの任意通知。
+   * `.cube` のみ読んだ場合は画像ソースが変わらないため呼ばない。
+   */
+  onInteractiveSourceChange?: (
+    info: { kind: "sample" } | { kind: "file"; fileName: string },
+  ) => void;
 }
 
 /**
@@ -67,6 +79,8 @@ export type FilmLabCanvasRef = {
 const FILM_LAB_FILE_ACCEPT =
   "image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif,video/mp4,video/webm,.mp4,.webm,.cube,application/octet-stream";
 
+const FILM_LAB_DEFAULT_SAMPLE_ASSET_PATH = "images/film-lab/default.jpg";
+
 /**
  * @description `apps/web/public` 直下からの相対パス（先頭スラッシュなし推奨）を、Vite の `base` に合わせた URL にする。
  */
@@ -78,6 +92,35 @@ function publicAssetUrlFromWebPublic(pathFromPublicRoot: string): string {
   const base = rawBase.endsWith("/") ? rawBase : `${rawBase}/`;
   const rel = pathFromPublicRoot.replace(/^\//, "");
   return `${base}${rel}`;
+}
+
+/**
+ * @description 親が canonical sample asset を明示したらそれを優先し、未指定なら共有既定の URL 解決を使います。
+ * @param defaultSampleAssetUrl 親が渡す sample asset URL
+ * @returns 最初に読む sample asset URL
+ */
+function resolveDefaultSampleAssetUrl(defaultSampleAssetUrl?: string): string {
+  if (
+    typeof defaultSampleAssetUrl === "string" &&
+    defaultSampleAssetUrl.trim().length > 0
+  ) {
+    return defaultSampleAssetUrl.trim();
+  }
+
+  return publicAssetUrlFromWebPublic(FILM_LAB_DEFAULT_SAMPLE_ASSET_PATH);
+}
+
+/**
+ * @description Viewport が理解できる shape に grade params をそろえます。
+ * `halationHue` は shader 側が直接読まないため、色コードへ変換して渡します。
+ * @param source 現在の grade params
+ * @returns Viewport 用の params レコード
+ */
+function buildViewportParams(source: Params): Record<string, number | string> {
+  return {
+    ...source,
+    halationColor: halationHueToHex(source.halationHue),
+  };
 }
 
 /** キャンバス左上ツールバー: 44px 級タップ／sm でコンパクト／pointer: coarse ではタブレットでも高さ維持 */
@@ -96,16 +139,26 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       className,
       fullScreen,
       onViewportReady,
+      defaultSampleAssetUrl,
       pauseVideoPreview = false,
       stackedToolbarVisible = true,
       initialGradeParams = null,
       onCubeLutLoaded,
+      onInteractiveSourceChange,
       compareHud = null,
       chromeLayout = "overlay",
     },
     ref,
   ) {
   const tFilmLab = useTranslations("film-lab");
+  const onInteractiveSourceChangeRef = useRef(onInteractiveSourceChange);
+  useEffect(() => {
+    onInteractiveSourceChangeRef.current = onInteractiveSourceChange;
+  });
+  const onViewportReadyRef = useRef(onViewportReady);
+  useEffect(() => {
+    onViewportReadyRef.current = onViewportReady;
+  }, [onViewportReady]);
   const containerRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<Viewport | null>(null);
   const mediaLoaderRef = useRef<MediaLoader | null>(null);
@@ -122,6 +175,27 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
   const [isSplitDragging, setIsSplitDragging] = useState(false);
   const [supported, setSupported] = useState(true);
   const [mediaOverlay, setMediaOverlay] = useState<MediaOverlayState>({ kind: "idle" });
+  const initialPresetRef = useRef(preset);
+  const initialResolvedGradeRef = useRef<Params>(
+    initialGradeParams ?? PRESETS[preset],
+  );
+  const defaultSampleAssetUrlRef = useRef(
+    resolveDefaultSampleAssetUrl(defaultSampleAssetUrl),
+  );
+
+  /**
+   * @description `preset` / 共有 URL 復元のどちらが来ても、現在の Viewport に同じ形で反映します。
+   * sample 画像の非同期読み込み完了後に古い preset で上書きしないため、反映ポイントを 1 箇所に寄せます。
+   */
+  const applyResolvedGradeToViewport = useCallback(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) {
+      return;
+    }
+
+    const source = initialGradeParams ?? PRESETS[preset];
+    viewport.setParams(buildViewportParams(source));
+  }, [initialGradeParams, preset]);
 
   /**
    * @description export などで busy の間は preview 動画を止め、終わったら必要なときだけ再開します。
@@ -164,15 +238,9 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     syncPreviewVideoBusyState();
   }, [syncPreviewVideoBusyState]);
 
-  // Apply preset when it changes
   useEffect(() => {
-    if (initialGradeParams) return;
-    const p = PRESETS[preset];
-    viewportRef.current?.setParams({
-      ...p,
-      halationColor: halationHueToHex(p.halationHue),
-    });
-  }, [preset, initialGradeParams]);
+    applyResolvedGradeToViewport();
+  }, [applyResolvedGradeToViewport]);
 
   // Three.js setup
   useEffect(() => {
@@ -187,8 +255,8 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
     camera.position.z = 1;
 
-    let width = container.clientWidth;
-    let height = container.clientHeight;
+    let width = Math.max(1, container.clientWidth);
+    let height = Math.max(1, container.clientHeight);
 
     const renderer = new THREE.WebGLRenderer({
       antialias: false,
@@ -214,36 +282,67 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     });
     scene.add(viewport.mesh);
     viewportRef.current = viewport;
-    onViewportReady?.(viewport);
+    onViewportReadyRef.current?.(viewport);
+    viewport.setParams(buildViewportParams(initialResolvedGradeRef.current));
 
     const mediaLoader = new MediaLoader();
     mediaLoaderRef.current = mediaLoader;
+    const defaultSampleUrl = defaultSampleAssetUrlRef.current;
 
     mediaLoader
-      .loadURL(publicAssetUrlFromWebPublic("images/film-lab/default.jpg"))
+      .loadURL(defaultSampleUrl)
       .then((result) => {
         viewport.setTexture(result.texture);
         viewport.setImageResolution(result.width, result.height);
         previewVideoElementRef.current = null;
         previewVideoShouldResumeRef.current = false;
         previewVideoPausedByBusyRef.current = false;
-        const source = initialGradeParams ?? PRESETS.cinematic;
-        viewport.setParams({
-          ...source,
-          halationColor: halationHueToHex(source.halationHue),
-        });
+        onInteractiveSourceChangeRef.current?.({ kind: "sample" });
       })
-      .catch(() => {
-        // No default image — waiting for drop
+      .catch((err) => {
+        const message = `FilmLabCanvas.loadDefaultSample("${defaultSampleUrl}") failed. Open a file manually or verify that the canonical sample asset is reachable.`;
+        console.error(message, {
+          sampleAssetUrl: defaultSampleUrl,
+          preset: initialPresetRef.current,
+          initialResolvedGrade: initialResolvedGradeRef.current,
+          err,
+        });
+        setMediaOverlay({
+          kind: "error",
+          message,
+        });
       });
 
-    const handleResize = () => {
-      width = container.clientWidth;
-      height = container.clientHeight;
+    /**
+     * @description `window.resize` だけでは、右ペイン開閉や absolute layout の再計測を取りこぼします。
+     * そのため container 自体を観測し、0 サイズから実サイズへ立ち上がった瞬間も拾います。
+     */
+    const syncViewportSize = () => {
+      const nextWidth = Math.max(1, container.clientWidth);
+      const nextHeight = Math.max(1, container.clientHeight);
+      if (nextWidth === width && nextHeight === height) {
+        return;
+      }
+
+      width = nextWidth;
+      height = nextHeight;
       renderer.setSize(width, height);
       viewport.setResolution(width, height);
     };
-    window.addEventListener("resize", handleResize);
+    syncViewportSize();
+
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => {
+            syncViewportSize();
+          })
+        : null;
+    resizeObserver?.observe(container);
+
+    const resizeRafId = window.requestAnimationFrame(() => {
+      syncViewportSize();
+    });
+    window.addEventListener("resize", syncViewportSize);
 
     const clock = new THREE.Clock();
     let animationId: number;
@@ -256,7 +355,9 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
 
     return () => {
       cancelAnimationFrame(animationId);
-      window.removeEventListener("resize", handleResize);
+      window.cancelAnimationFrame(resizeRafId);
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", syncViewportSize);
       viewport.dispose();
       renderer.dispose();
       previewVideoElementRef.current = null;
@@ -270,7 +371,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       rendererRef.current = null;
       sceneRef.current = null;
       cameraRef.current = null;
-      onViewportReady?.(null);
+      onViewportReadyRef.current?.(null);
     };
   }, []);
 
@@ -309,14 +410,15 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
         viewportRef.current.setTexture(result.texture);
         viewportRef.current.setImageResolution(result.width, result.height);
         syncPreviewVideoBusyState(nextPreviewVideo);
+        onInteractiveSourceChangeRef.current?.({ kind: "file", fileName: file.name });
         setMediaOverlay({ kind: "idle" });
       } catch (err) {
         const message =
           err instanceof MediaLoadError
             ? err.message
             : err instanceof Error
-              ? err.message
-              : "Could not load this file.";
+              ? `FilmLabCanvas.loadUserMediaFile("${file.name}", "${file.type || "unknown"}") failed: ${err.message}`
+              : `FilmLabCanvas.loadUserMediaFile("${file.name}", "${file.type || "unknown"}") failed: Could not load this file.`;
         setMediaOverlay({ kind: "error", message });
         console.error("FilmLabCanvas.loadUserMediaFile failed", {
           fileName: file.name,
@@ -448,6 +550,10 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
           previewVideoPausedByBusyRef.current = false;
           viewport.setTexture(result.texture);
           viewport.setImageResolution(result.width, result.height);
+          onInteractiveSourceChangeRef.current?.({
+            kind: "file",
+            fileName: "smart-look-corrected.png",
+          });
           return true;
         } catch (err) {
           console.error("FilmLabCanvas.replaceSourceFromPngBase64Body failed", err);

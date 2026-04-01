@@ -242,11 +242,17 @@
       "title": "Filmtone",
       "description": "Filmtone のブラウザ体験です。お手持ちの写真や動画を開き、プリセットを起点にフィルム調のルックを試せます。フォルダに溜まった枚数のまとめ置きは macOS の Filmtone アプリをご利用ください。",
       "sampleHint": "表示中はデモ用のサンプルです。お手持ちの写真や動画をドロップすると、その素材でそのまま試せます。",
-      "openFullApp": "フルアプリを開く"
+      "openFullApp": "フルアプリを開く",
+      "openParamsPanelAria": "パラメータパネルを開く",
+      "paramsPanelAria": "Filmtone パラメータ",
+      "closeParamsPanelAria": "パラメータパネルを閉じる"
     }
   },
   "film-lab": {
     "sampleHint": "表示中はデモ用のサンプルです。お手持ちの写真や動画をドロップすると、その素材でそのまま試せます。",
+    "openParamsPanelAria": "パラメータパネルを開く",
+    "paramsPanelAria": "Filmtone パラメータ",
+    "closeParamsPanelAria": "パラメータパネルを閉じる",
     "lp": {
       "heroEyebrow": "Filmtone",
       "heroTitle": "プリセットから、写真をフィルム調の見た目にすばやくそろえられる。",
@@ -268,6 +274,10 @@
       "demoEyebrow": "自分の素材で試す（ブラウザ）",
       "demoTitle": "ブラウザでルックを確かめる",
       "demoBody": "プリセットとかんたんなスライダーから試せます。さらに細かく触りたいときだけ、パネル内の「さらに表示」を開いてください。フォルダ全体を同じトーンに揃える作業は、ページ上部の macOS 版ダウンロードへ。",
+      "demoSourceEyebrow": "ソース",
+      "demoSourceSample": "サンプル画像",
+      "demoPreviewEyebrow": "プレビュー",
+      "demoStatusAria": "現在のメディアソースと分割プレビューの状態",
       "trustHeading": "配布の詳細・サポート",
       "faqTitle": "よくある質問",
       "faqQfree": "無料で使えますか？",

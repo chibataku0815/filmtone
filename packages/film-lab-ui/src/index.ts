@@ -5,6 +5,7 @@ export {
   SectionHeader,
   ToggleHeader,
   type FilmLabControlPanelCoreSlots,
+  type FilmLabCoreRenderContext,
   type FilmLabDonationUiBinding,
 } from "./FilmLabControlPanelCore";
 export { LUTPanel } from "./LUTPanel";

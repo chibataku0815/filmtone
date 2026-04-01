@@ -242,11 +242,17 @@
       "title": "Filmtone",
       "description": "Try Filmtone in the browser: load your own photo or video, start from presets, and steer toward a film-inspired look. Folder-scale finishing belongs in the Filmtone macOS app.",
       "sampleHint": "You're viewing a sample image—drop your own photo or video to grade your own footage.",
-      "openFullApp": "Open full app"
+      "openFullApp": "Open full app",
+      "openParamsPanelAria": "Open parameters panel",
+      "paramsPanelAria": "Filmtone parameters",
+      "closeParamsPanelAria": "Close parameters panel"
     }
   },
   "film-lab": {
     "sampleHint": "You're viewing a sample image—drop your own photo or video to grade your own footage.",
+    "openParamsPanelAria": "Open parameters panel",
+    "paramsPanelAria": "Filmtone parameters",
+    "closeParamsPanelAria": "Close parameters panel",
     "lp": {
       "heroEyebrow": "Filmtone",
       "heroTitle": "Start from presets and bring stills toward a film-inspired look—fast.",
@@ -268,6 +274,10 @@
       "demoEyebrow": "Try your own media (browser)",
       "demoTitle": "Audition a look in the browser",
       "demoBody": "Start from presets and the Quick sliders. Open “Show more” inside the panel only when you want deeper controls. Folder-scale finishing stays in the macOS app—use the download button at the top.",
+      "demoSourceEyebrow": "Source",
+      "demoSourceSample": "Sample image",
+      "demoPreviewEyebrow": "Preview",
+      "demoStatusAria": "Current media source and split preview state",
       "trustHeading": "Release details & support",
       "faqTitle": "FAQ",
       "faqQfree": "Is Filmtone free?",
