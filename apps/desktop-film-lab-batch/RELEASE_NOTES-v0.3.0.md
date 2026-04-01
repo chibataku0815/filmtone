@@ -34,15 +34,21 @@ Find presets quickly by typing instead of scanning long lists.
 During export work, the preview video pauses automatically so the UI
 state matches what the pipeline is doing.
 
+### Web demo preview tuning
+
+The browser Filmtone demo got preview sizing and media presentation tweaks
+for a cleaner view closer to Desktop.
+
 ## What is intentionally not in this release
 
-- **Portrait / non-16:9 export caps** (life#73) — still on the roadmap;
-  vertical 1080p sources may still scale down more than users expect.
-- **Interactive playback controls** (play / pause / scrub UI) (life#75) —
-  preview still loops automatically without a timeline control surface.
+- **Portrait / non-16:9 export caps** — still on the roadmap; vertical
+  1080p sources may still scale down more than users expect until the
+  long-edge-oriented export cap ships.
+- **Interactive playback controls** (play / pause / scrub UI) — preview
+  still loops automatically without a timeline control surface.
 - **Smart Look AI** is not the headline of this Desktop build.
-- **WebGPU / export-first migration** and related open themes (e.g.
-  life#77, life#79, life#80, life#81, life#87) remain future work.
+- **WebGPU / export-first migration** and related open infrastructure themes
+  remain future work.
 
 ## Lineage
 

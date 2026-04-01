@@ -805,6 +805,14 @@
           "title": "Share your look via URL",
           "description": "Generate a link that opens the browser demo with your exact preset settings."
         },
+        "desktopExportWorkflow033": {
+          "title": "Desktop v0.3 — export & preview refinement",
+          "description": "Clearer switching between photo batch export and single-video export, fewer mistakes bridging the graded preview into export defaults, aligned edit/export chrome, a searchable preset picker, and automatic video preview pause while export is busy."
+        },
+        "webFilmLabPreview033": {
+          "title": "Web demo preview tuning (v0.3)",
+          "description": "Adjusted preview sizing and media presentation in the browser demo for a closer match to Desktop."
+        },
         "presetExpansion": {
           "title": "Preset expansion",
           "description": "Additional film stocks and creative looks beyond the initial four."
@@ -812,6 +820,14 @@
         "exportQuality": {
           "title": "Export quality options",
           "description": "More control over output resolution, format, and compression settings."
+        },
+        "verticalVideoExportQuality": {
+          "title": "Portrait & non-16:9 video export resolution",
+          "description": "Improving scaling so vertical sources are less likely to be shrunk more than needed, using a long-edge-oriented cap."
+        },
+        "videoPreviewControls": {
+          "title": "Video preview playback controls",
+          "description": "Play, pause, and scrub controls for easier scene checks in preview."
         },
         "smartLookAi": {
           "title": "Smart Look AI",
@@ -857,11 +873,12 @@
       "typeChanged": "Changed",
       "entries": {
         "v030Title": "Desktop workflow refinement and clearer export",
-        "v030ExportIa": "Clearer separation between photo batch export and single-video export — top tabs, overlay panel, and toolbar reduce guesswork (life#84).",
-        "v030ExportSource": "The preview you are grading is bridged into export as the default input where appropriate, reducing wrong-file mistakes (life#83).",
-        "v030VisualPolish": "Export chrome and edit mode are visually aligned for less context switching (life#82).",
-        "v030PresetSearch": "Searchable preset picker — jump to a look without scanning the full list (life#86).",
+        "v030ExportIa": "Clearer separation between photo batch export and single-video export — top tabs, overlay panel, and toolbar reduce guesswork.",
+        "v030ExportSource": "The preview you are grading is bridged into export as the default input where appropriate, reducing wrong-file mistakes.",
+        "v030VisualPolish": "Export chrome and edit mode are visually aligned for less context switching.",
+        "v030PresetSearch": "Searchable preset picker — jump to a look without scanning the full list.",
         "v030ExportBusyPause": "Video preview pauses automatically while export is busy so on-screen state matches the pipeline.",
+        "v030WebPreview": "Browser demo preview height and media presentation tuned for a cleaner, more Desktop-like view.",
         "v020Title": "Dual LUT, redesigned export, and faster video",
         "v020DualLut": "Apply two LUT files simultaneously — Slot 1 for input transforms (e.g. Log-to-Rec709), Slot 2 for creative looks, each with independent intensity.",
         "v020LutSync": "LUT files from the Edit tab now sync to export. A 3-state button shows whether your grade is synced, out-of-sync, or partially synced.",
