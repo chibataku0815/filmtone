@@ -20,7 +20,7 @@ import { FilmLabControlPanelCore } from "film-lab-ui";
 import { Histogram } from "film-lab-ui";
 import { HelpHint } from "./batch-tab/HelpHint";
 import type { Viewport } from "film-lab-renderer";
-import { PRESETS, type PresetName } from "film-lab-core";
+import type { PresetName } from "film-lab-core";
 import {
   initialOutcomes,
   parseFilmLabBatchSessionV1,
@@ -60,8 +60,6 @@ import {
 import type { DesktopUpdateAvailablePayload } from "./desktop-api";
 
 type TabId = "edit" | "batch";
-
-const PRESET_NAMES = Object.keys(PRESETS) as PresetName[];
 
 /**
  * @description 非表示タブに `hidden`（display:none）を使わない。WebGL キャンバスの尺寸・コンテキストを維持し、重ね順と透明・pointer-events でだけ隠す。
@@ -163,6 +161,10 @@ export default function App() {
   const [tab, setTab] = useState<TabId>("edit");
   const [viewport, setViewport] = useState<Viewport | null>(null);
   const [histogramVisible, setHistogramVisible] = useState(true);
+  /**
+   * @description キャンバス・共有コントロール・書き出し同期が共通で参照する現在のプリセット名です。
+   * 検索付きプリセットセレクトが更新し、キャンバスの既定ルックと書き出しタブの起点に使います。
+   */
   const [canvasPreset, setCanvasPreset] = useState<PresetName>("cinematic");
 
   const [batchGrade, setBatchGrade] = useState<BatchGradeState>(() =>
@@ -236,6 +238,33 @@ export default function App() {
   }>({ lut1: null, lut2: null });
   const [paramsChangeNonce, setParamsChangeNonce] = useState(0);
   const [syncedAtNonce, setSyncedAtNonce] = useState(0);
+
+  /**
+   * @description 共有コントロールからのパラメータ変更を 1 箇所で受け、親の再レンダーで
+   * コールバック参照が毎回変わらないようにします。
+   */
+  const handleEditParamsChange = useCallback(() => {
+    setParamsChangeNonce((n) => n + 1);
+  }, []);
+
+  /**
+   * @description LUT 変更も同じく安定したコールバックにまとめ、子コンポーネント側の
+   * effect 依存で無限再描画にならないようにします。
+   */
+  const handleEditLutChange = useCallback((nextLutState: {
+    lut1: { name: string; data: Float32Array; size: number; intensity: number } | null;
+    lut2: { name: string; data: Float32Array; size: number; intensity: number } | null;
+  }) => {
+    setEditLut(nextLutState);
+    setParamsChangeNonce((n) => n + 1);
+  }, []);
+
+  /**
+   * @description ヒストグラムの表示切り替えを安定した参照で渡します。
+   */
+  const handleHistogramToggle = useCallback(() => {
+    setHistogramVisible((v) => !v);
+  }, []);
 
   /**
    * @description main が公開 JSON を読んで送る「新しい版があります」バナー（案 C）
@@ -1165,53 +1194,10 @@ export default function App() {
                         viewport={viewport}
                         histogramVisible={histogramVisible}
                         surface="bare"
-                        slots={{
-                          beforePresets: (
-                            <label
-                              className="fl-edit-preset-default"
-                              title={tApp("presetWhenOpenLabel")}
-                            >
-                              <span className="fl-edit-preset-default-icon" aria-hidden>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                                  <path
-                                    d="M12 4.75 13.76 8.24 17.25 10 13.76 11.76 12 15.25 10.24 11.76 6.75 10 10.24 8.24 12 4.75Z"
-                                    stroke="currentColor"
-                                    strokeWidth="1.7"
-                                    strokeLinejoin="round"
-                                  />
-                                  <path
-                                    d="M18 14.5 18.88 16.12 20.5 17 18.88 17.88 18 19.5 17.12 17.88 15.5 17 17.12 16.12 18 14.5Z"
-                                    fill="currentColor"
-                                  />
-                                </svg>
-                              </span>
-                              <span className="fl-edit-preset-default-label">
-                                {tApp("presetWhenOpenCompactLabel")}
-                              </span>
-                              <select
-                                value={canvasPreset}
-                                onChange={(e) =>
-                                  setCanvasPreset(e.target.value as PresetName)
-                                }
-                                className="fl-edit-preset-default-select"
-                              >
-                                {PRESET_NAMES.map((n) => (
-                                  <option key={n} value={n}>
-                                    {n}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                          ),
-                        }}
-                        onHistogramToggle={() =>
-                          setHistogramVisible((v) => !v)
-                        }
-                        onLutChange={(s) => {
-                          setEditLut(s);
-                          setParamsChangeNonce((n) => n + 1);
-                        }}
-                        onParamsChange={() => setParamsChangeNonce((n) => n + 1)}
+                        onHistogramToggle={handleHistogramToggle}
+                        onPresetChange={setCanvasPreset}
+                        onLutChange={handleEditLutChange}
+                        onParamsChange={handleEditParamsChange}
                       />
                     </div>
                     <div className="fl-sticky-footer fl-surface-frost rounded-b-xl">

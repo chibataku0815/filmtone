@@ -5,7 +5,7 @@ import { NextIntlClientProvider } from "next-intl";
 import en from "../../messages/en.json";
 
 describe("Desktop control panel core render", () => {
-  it("renders the desktop control panel core without Web-only controls", async () => {
+  it("renders the searchable preset select without Web-only controls", async () => {
     await import("./process-polyfill");
     const { FilmLabControlPanelCore } = await import("film-lab-ui");
 
@@ -19,7 +19,7 @@ describe("Desktop control panel core render", () => {
       </NextIntlClientProvider>,
     );
 
-    expect(html).toContain('data-testid="film-lab-preset-cinematic"');
+    expect(html).toContain('data-testid="film-lab-preset-select-trigger"');
     // Core does not include Smart Look, Share, or Browser Storage sections
     expect(html).not.toContain("Match colors to a sample (AI, beta)");
     expect(html).not.toContain("Pick sample photo");
