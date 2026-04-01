@@ -82,6 +82,11 @@ export interface FilmLabControlPanelCoreSlots {
   lpExpandButton?: ReactNode;
   /** LP レイアウト時に LUT 以下の補助パネルを隠すフラグ */
   hideAuxPanels?: boolean;
+  /**
+   * Web LP 向け: クイックモードでも「時代・ダイナミクス」等のメタスライダーを出さず、
+   * デュアル LUT ブロックを主役にする。
+   */
+  hideQuickMetaSliders?: boolean;
   /** Render-prop: Core state を受け取り Presets 直後に Web 専用セクションを挿入 */
   renderAfterPresets?: (ctx: FilmLabCoreRenderContext) => ReactNode;
   /** Render-prop: Core state を受け取り LUT 直後に Web 専用セクションを挿入 */
@@ -566,7 +571,8 @@ export function FilmLabControlPanelCore({
         {slots.renderAfterPresets ? slots.renderAfterPresets(coreRenderContext) : slots.afterPresets}
 
         <div className="grid w-full min-w-0 grid-cols-1 gap-4 @min-[560px]:grid-cols-2 @min-[560px]:gap-6">
-          {/* === COLOR GRADING === */}
+          {/* === COLOR GRADING ===（Web LP のクイックではメタスライダー列ごと省略し LUT を広く） */}
+          {!isPro && slots.hideQuickMetaSliders ? null : (
           <div className={`min-w-0 ${isPro ? "" : "order-2 @min-[560px]:order-2"}`}>
             <SectionHeader title={tFilmLab("controls.color")} />
             {isPro ? (
@@ -665,6 +671,7 @@ export function FilmLabControlPanelCore({
             </div>
             )}
           </div>
+          )}
 
           {/* === EFFECTS (Pro only) === */}
           {isPro ? (
@@ -740,7 +747,11 @@ export function FilmLabControlPanelCore({
             </div>
           ) : (
           <div
-            className={`min-w-0 ${isPro ? "@min-[560px]:col-span-2" : "order-1 @min-[560px]:order-1"}`}
+            className={`min-w-0 ${
+              isPro || slots.hideQuickMetaSliders
+                ? "@min-[560px]:col-span-2"
+                : "order-1 @min-[560px]:order-1"
+            }`}
           >
             <LUTPanel viewport={viewport} onCubeLutLoaded={onLutLoadSuccess} onLutChange={onLutChange} />
             {slots.renderAfterLut ? slots.renderAfterLut(coreRenderContext) : slots.afterLut}

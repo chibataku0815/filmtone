@@ -123,6 +123,10 @@ export type FilmLabCanvasRef = {
    * @param held true で描画ループをスキップし、false で解除。
    */
   holdPreviewRendering: (held: boolean) => void;
+  /**
+   * @description Web デモのパネル背後ぼかし PoC 用。Three.js の描画先（`preserveDrawingBuffer: true`）。
+   */
+  getWebGlCanvas: () => HTMLCanvasElement | null;
 };
 
 /** ファイルピッカー用: HEIC を選びにくくしつつ、一般的な形式はそのまま選べる */
@@ -650,6 +654,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       holdPreviewRendering: (held: boolean) => {
         previewRenderingHoldRef.current = held;
       },
+      getWebGlCanvas: () => rendererRef.current?.domElement ?? null,
     }),
     [handleDownload, handleFileClick, supported],
   );
