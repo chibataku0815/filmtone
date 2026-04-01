@@ -382,13 +382,23 @@ var filmLookGradeInputSchema = z.object({
   presetVersion: z.literal(PRESET_VERSION),
   grade: filmLabParamsSchema,
   /**
+   * Input Transform LUT（グレーディング前 — Log→Rec709 等）。
+   * 未指定のときは Input Transform をかけない。
+   */
+  lut1CubeRelPath: z.string().min(1).optional(),
+  /** `false` のとき `lut1CubeRelPath` があっても LUT1 を無効化する。未指定は `true` 扱い。 */
+  lut1Enabled: z.boolean().optional(),
+  /** Input Transform の適用強度（0〜1）。未指定は `1`。 */
+  lut1Intensity: z.number().min(0).max(1).optional(),
+  /**
+   * Creative LUT（グレーディング後 — フィルムルック等）。
    * Remotion `public/` からの相対パス（例: `luts/warm-cinematic.cube`）。
-   * 未指定のときは LUT をかけない。
+   * 未指定のときは Creative LUT をかけない。
    */
   lutCubeRelPath: z.string().min(1).optional(),
-  /** `false` のとき `lutCubeRelPath` があっても LUT を無効化する。未指定は `true` 扱い。 */
+  /** `false` のとき `lutCubeRelPath` があっても Creative LUT を無効化する。未指定は `true` 扱い。 */
   lutEnabled: z.boolean().optional(),
-  /** ブラウザ Film Lab の `uLUTIntensity` に相当（0〜1）。未指定は `1`。 */
+  /** Creative LUT の適用強度（0〜1）。未指定は `1`。 */
   lutIntensity: z.number().min(0).max(1).optional(),
   /**
    * Remotion `public/` 内の動画（.mov / .mp4 等）。

@@ -1058,6 +1058,7 @@ export default function App() {
                 preset={canvasPreset}
                 className="h-full min-h-0 w-full"
                 fullScreen
+                pauseVideoPreview={running}
                 onViewportReady={setViewport}
               />
               <div className="pointer-events-none absolute bottom-4 left-4 z-10">

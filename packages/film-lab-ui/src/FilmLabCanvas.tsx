@@ -27,6 +27,12 @@ interface FilmLabCanvasProps {
   className?: string;
   fullScreen?: boolean;
   onViewportReady?: (viewport: Viewport | null) => void;
+  /**
+   * @description true の間は、プレビューに読み込んだ動画の再生を止めます。
+   * 画像プレビューには影響しません。書き出し中に preview 側の decoder / GPU 競合を
+   * 減らしたいデスクトップアプリから使う前提です。
+   */
+  pauseVideoPreview?: boolean;
   stackedToolbarVisible?: boolean;
   /**
    * @description デスクトップ等でツールバーを画像の上に重ねないときに `stacked`。
@@ -90,6 +96,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       className,
       fullScreen,
       onViewportReady,
+      pauseVideoPreview = false,
       stackedToolbarVisible = true,
       initialGradeParams = null,
       onCubeLutLoaded,
@@ -105,10 +112,57 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.OrthographicCamera | null>(null);
+  /** @description 現在のプレビュー動画要素。画像のときは null。 */
+  const previewVideoElementRef = useRef<HTMLVideoElement | null>(null);
+  /** @description busy に入る直前に再生中だった動画だけ、busy 明けで再開します。 */
+  const previewVideoShouldResumeRef = useRef(false);
+  /** @description 現在の pause が busy 制御由来かどうかを覚えます。 */
+  const previewVideoPausedByBusyRef = useRef(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isSplitDragging, setIsSplitDragging] = useState(false);
   const [supported, setSupported] = useState(true);
   const [mediaOverlay, setMediaOverlay] = useState<MediaOverlayState>({ kind: "idle" });
+
+  /**
+   * @description export などで busy の間は preview 動画を止め、終わったら必要なときだけ再開します。
+   */
+  const syncPreviewVideoBusyState = useCallback(
+    (videoElement: HTMLVideoElement | null = previewVideoElementRef.current) => {
+      if (!videoElement) {
+        previewVideoShouldResumeRef.current = false;
+        previewVideoPausedByBusyRef.current = false;
+        return;
+      }
+
+      if (pauseVideoPreview) {
+        if (!previewVideoPausedByBusyRef.current) {
+          previewVideoShouldResumeRef.current =
+            !videoElement.paused && !videoElement.ended;
+          previewVideoPausedByBusyRef.current = true;
+        }
+        if (!videoElement.paused) {
+          videoElement.pause();
+        }
+        return;
+      }
+
+      const shouldResume =
+        previewVideoPausedByBusyRef.current &&
+        previewVideoShouldResumeRef.current;
+      previewVideoPausedByBusyRef.current = false;
+      previewVideoShouldResumeRef.current = false;
+      if (shouldResume && videoElement.paused) {
+        videoElement.play().catch((err) => {
+          console.warn("FilmLabCanvas.syncPreviewVideoBusyState resume failed", err);
+        });
+      }
+    },
+    [pauseVideoPreview],
+  );
+
+  useEffect(() => {
+    syncPreviewVideoBusyState();
+  }, [syncPreviewVideoBusyState]);
 
   // Apply preset when it changes
   useEffect(() => {
@@ -170,6 +224,9 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       .then((result) => {
         viewport.setTexture(result.texture);
         viewport.setImageResolution(result.width, result.height);
+        previewVideoElementRef.current = null;
+        previewVideoShouldResumeRef.current = false;
+        previewVideoPausedByBusyRef.current = false;
         const source = initialGradeParams ?? PRESETS.cinematic;
         viewport.setParams({
           ...source,
@@ -202,6 +259,9 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       window.removeEventListener("resize", handleResize);
       viewport.dispose();
       renderer.dispose();
+      previewVideoElementRef.current = null;
+      previewVideoShouldResumeRef.current = false;
+      previewVideoPausedByBusyRef.current = false;
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
       }
@@ -238,8 +298,17 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
         const result = await mediaLoaderRef.current.loadFile(file, {
           maxTextureSize: maxTex,
         });
+        const nextPreviewVideo =
+          result.type === "video" &&
+          result.texture.image instanceof HTMLVideoElement
+            ? result.texture.image
+            : null;
+        previewVideoElementRef.current = nextPreviewVideo;
+        previewVideoShouldResumeRef.current = false;
+        previewVideoPausedByBusyRef.current = false;
         viewportRef.current.setTexture(result.texture);
         viewportRef.current.setImageResolution(result.width, result.height);
+        syncPreviewVideoBusyState(nextPreviewVideo);
         setMediaOverlay({ kind: "idle" });
       } catch (err) {
         const message =
@@ -256,7 +325,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
         });
       }
     },
-    [getMaxTextureSize, onCubeLutLoaded],
+    [getMaxTextureSize, onCubeLutLoaded, syncPreviewVideoBusyState],
   );
 
   const handleDrop = useCallback(
@@ -374,6 +443,9 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
           const result = await mediaLoader.loadFile(file, {
             maxTextureSize: maxTex,
           });
+          previewVideoElementRef.current = null;
+          previewVideoShouldResumeRef.current = false;
+          previewVideoPausedByBusyRef.current = false;
           viewport.setTexture(result.texture);
           viewport.setImageResolution(result.width, result.height);
           return true;
