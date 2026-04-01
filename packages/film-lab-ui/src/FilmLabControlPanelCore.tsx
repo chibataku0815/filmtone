@@ -755,6 +755,8 @@ export function FilmLabControlPanelCore({
           >
             <LUTPanel viewport={viewport} onCubeLutLoaded={onLutLoadSuccess} onLutChange={onLutChange} />
             {slots.renderAfterLut ? slots.renderAfterLut(coreRenderContext) : slots.afterLut}
+            {/* クイックモードはシンプルに保つため、比較ガイド・スプリット切替 UI は Pro のみ表示 */}
+            {isPro ? (
             <div className="mt-3 rounded-xl border border-white/[0.08] bg-gradient-to-b from-white/[0.04] to-black/20 p-3">
               <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.12em] text-white/60">
                 {tFilmLab("compare.sectionTitle")}
@@ -854,6 +856,7 @@ export function FilmLabControlPanelCore({
                 </div>
               </div>
             </div>
+            ) : null}
             {canToggleHistogram ? (
               <div className="mt-3 border-t border-white/[0.06] pt-3">
                 <ToggleHeader
