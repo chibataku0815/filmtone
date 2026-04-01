@@ -15,7 +15,7 @@
  * 外側パネルと同様に backdrop で背面をぼかす（ネストしてもグラスブラーが途切れにくい程度の透過）。
  */
 export const filmLabPanelSurfaceCard =
-  "@container w-full min-w-0 rounded-lg border border-white/12 bg-black/45 p-4 backdrop-blur-xl backdrop-saturate-150 sm:p-5";
+  "@container w-full min-w-0 rounded-lg border border-white/12 bg-black/65 p-4 backdrop-blur-xl backdrop-saturate-150 sm:p-5";
 
 /**
  * Desktop 右パネルなど、`surface="bare"` のときの幅・アダプタ用ラッパー。
