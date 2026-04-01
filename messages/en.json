@@ -318,7 +318,19 @@
     },
     "toolbar": {
       "open": "Open media",
-      "savePng": "Save PNG"
+      "savePng": "Save PNG",
+      "exportMp4": "Export graded video (beta: MP4 or WebM, no audio)"
+    },
+    "webExport": {
+      "preparing": "Preparing Web export…",
+      "progressEncode": "Encoding frame {current} / {total}…",
+      "finalizing": "Finalizing MP4…",
+      "done": "Download started (MP4 if H.264 is available, otherwise WebM). No audio in this beta.",
+      "errorNoVideo": "Open a video file first (MP4 / WebM / MOV).",
+      "errorCompareMode": "Turn off A/B compare before exporting video.",
+      "errorTooLong": "Export limit exceeded: {message}",
+      "errorNoWebCodecs": "This browser cannot encode video. Try the latest Chrome or Edge. ({message})",
+      "errorGeneric": "Export failed: {message}"
     },
     "canvas": {
       "webgl2Required": "WebGL2 is required for Filmtone",

@@ -318,7 +318,19 @@
     },
     "toolbar": {
       "open": "メディアを開く",
-      "savePng": "PNGを保存"
+      "savePng": "PNGを保存",
+      "exportMp4": "グレード済み動画を書き出す（ベータ: MP4 または WebM・音声なし）"
+    },
+    "webExport": {
+      "preparing": "Web 書き出しを準備しています…",
+      "progressEncode": "エンコード中 {current} / {total}…",
+      "finalizing": "MP4 を仕上げています…",
+      "done": "ダウンロードを開始しました（H.264 が使えれば MP4、できなければ WebM。ベータ版は音声なし）。",
+      "errorNoVideo": "先に動画ファイルを開いてください（MP4 / WebM / MOV）。",
+      "errorCompareMode": "動画書き出しの前に A/B 比較をオフにしてください。",
+      "errorTooLong": "書き出し上限を超えています: {message}",
+      "errorNoWebCodecs": "このブラウザでは動画エンコードできません。最新の Chrome または Edge を試してください。（{message}）",
+      "errorGeneric": "書き出しに失敗しました: {message}"
     },
     "canvas": {
       "webgl2Required": "Filmtone を使うには WebGL2 が必要です",

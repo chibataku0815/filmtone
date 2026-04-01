@@ -50,9 +50,10 @@ interface FilmLabCanvasProps {
    */
   defaultSampleAssetUrl?: string;
   /**
-   * @description true の間は、プレビューに読み込んだ動画の再生を止めます。
-   * 画像プレビューには影響しません。書き出し中に preview 側の decoder / GPU 競合を
-   * 減らしたいデスクトップアプリから使う前提です。
+   * @description true の間は、プレビューに読み込んだ動画の再生を止め、**WebGL の毎フレーム描画も止めます**。
+   * 共有 `VideoTexture` へのシークが別処理（Web 動画書き出し等）と走ると画面が追従するため、
+   * RAF 内で `render` / `setTime` をスキップして最後に出したフレームで固定します。
+   * 静止画では主にフィルム粒など時間系だけ止まります。
    */
   pauseVideoPreview?: boolean;
   stackedToolbarVisible?: boolean;
@@ -111,6 +112,17 @@ export type FilmLabCanvasRef = {
   replaceSourceFromPngBase64Body: (pngBase64Body: string) => Promise<boolean>;
   openMediaPicker: () => void;
   saveCurrentPng: () => void;
+  /**
+   * @description Web 動画書き出し用。ユーザー動画を Texture に載せているときだけその `<video>` を返す。
+   * 静止画・sample のときは null。
+   */
+  getActiveVideoElement: () => HTMLVideoElement | null;
+  /**
+   * @description `pauseVideoPreview` と独立に、**親が同期で**プレビュー RAF（`viewport.render`）を止める。
+   * Next.js `dynamic()` や effect 順序で props が遅れるときでも、エンコード開始の同一コールスタックで効かせる。
+   * @param held true で描画ループをスキップし、false で解除。
+   */
+  holdPreviewRendering: (held: boolean) => void;
 };
 
 /** ファイルピッカー用: HEIC を選びにくくしつつ、一般的な形式はそのまま選べる */
@@ -214,6 +226,16 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
   const previewVideoShouldResumeRef = useRef(false);
   /** @description 現在の pause が busy 制御由来かどうかを覚えます。 */
   const previewVideoPausedByBusyRef = useRef(false);
+  /**
+   * @description Three 初期化 effect がdeps [] のため、RAF の `animate` は props を直接読めない。
+   * 最新の `pauseVideoPreview` を毎レンダーで渡す。
+   */
+  const pauseVideoPreviewRef = useRef(pauseVideoPreview);
+  pauseVideoPreviewRef.current = pauseVideoPreview;
+  /**
+   * @description 親（例: Web 書き出し）が ref 経由で同期セット。`dynamic()` 越しでも再レンダーを待たない。
+   */
+  const previewRenderingHoldRef = useRef(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isSplitDragging, setIsSplitDragging] = useState(false);
   const [supported, setSupported] = useState(true);
@@ -391,6 +413,12 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     let animationId: number;
     const animate = () => {
       animationId = requestAnimationFrame(animate);
+      if (
+        pauseVideoPreviewRef.current ||
+        previewRenderingHoldRef.current
+      ) {
+        return;
+      }
       viewport.setTime(clock.getElapsedTime());
       viewport.render(renderer, scene, camera);
     };
@@ -615,6 +643,13 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       },
       openMediaPicker: () => handleFileClick(),
       saveCurrentPng: () => handleDownload(),
+      getActiveVideoElement: () => {
+        const v = previewVideoElementRef.current;
+        return v ?? null;
+      },
+      holdPreviewRendering: (held: boolean) => {
+        previewRenderingHoldRef.current = held;
+      },
     }),
     [handleDownload, handleFileClick, supported],
   );
