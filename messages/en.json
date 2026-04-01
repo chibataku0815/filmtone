@@ -856,6 +856,12 @@
       "typeFixed": "Fixed",
       "typeChanged": "Changed",
       "entries": {
+        "v030Title": "Desktop workflow refinement and clearer export",
+        "v030ExportIa": "Clearer separation between photo batch export and single-video export — top tabs, overlay panel, and toolbar reduce guesswork (life#84).",
+        "v030ExportSource": "The preview you are grading is bridged into export as the default input where appropriate, reducing wrong-file mistakes (life#83).",
+        "v030VisualPolish": "Export chrome and edit mode are visually aligned for less context switching (life#82).",
+        "v030PresetSearch": "Searchable preset picker — jump to a look without scanning the full list (life#86).",
+        "v030ExportBusyPause": "Video preview pauses automatically while export is busy so on-screen state matches the pipeline.",
         "v020Title": "Dual LUT, redesigned export, and faster video",
         "v020DualLut": "Apply two LUT files simultaneously — Slot 1 for input transforms (e.g. Log-to-Rec709), Slot 2 for creative looks, each with independent intensity.",
         "v020LutSync": "LUT files from the Edit tab now sync to export. A 3-state button shows whether your grade is synced, out-of-sync, or partially synced.",
