@@ -1,8 +1,8 @@
 /**
- * Film Lab デスクトップ — 編集（Web 踏襲）と書き出し（フォルダ／動画）の 2 モード
+ * Film Lab デスクトップ — 編集・写真まとめ書き出し・動画 1 本書き出しの 3 トップタブ
  *
  * @overview 書き出し用ルックの正はメモリ上の BatchGradeState。編集タブでプレビューし「色を書き出しへ送る」で同期する。
- * 編集／書き出しは **右パネルの中身を切り替え**、Canvas はアンマウントしない（WebGL Viewport を維持し「反映」を常に効かせる）。
+ * 編集／各書き出しは **右パネルの中身を切り替え**、Canvas はアンマウントしない（WebGL Viewport を維持し「反映」を常に効かせる）。
  * @limitations プレビュー上の LUT を書き出しへ自動複製はしない（JSON Import か .cube 再適用）。
  * シェルの色・段差は globals.css の Radix スケール準拠トークン（html.dark.dark-theme）に集約する。
  *
@@ -12,7 +12,18 @@
  *   `translateX` でスライドインする。閉じたあともキャンバスはウィンドウ幅いっぱいを使う。
  * - 開閉は Phosphor Icons の compact toggle＋ aria-label。`prefers-reduced-motion` は Tailwind で短縮。
  */
-import { Export, CaretRight, CheckCircle, ArrowClockwise, SlidersHorizontal, FolderOpen, DownloadSimple, SidebarSimple } from "@phosphor-icons/react";
+import {
+  ArrowClockwise,
+  CaretRight,
+  CheckCircle,
+  DownloadSimple,
+  Export,
+  FilmStrip,
+  FolderOpen,
+  Images,
+  SidebarSimple,
+  SlidersHorizontal,
+} from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { FilmLabCanvas, type FilmLabCanvasRef } from "film-lab-ui";
@@ -54,12 +65,14 @@ import { exportGradeJsonText } from "./grade-io";
 import { viewportRecordToParams } from "./viewport-to-params";
 import {
   BatchTabCompactRunFooter,
-  BatchTabPanel,
   type BatchJobMode,
 } from "./batch-tab/BatchTabPanel";
+import { PhotoExportPanel } from "./batch-tab/PhotoExportPanel";
+import { VideoExportPanel } from "./batch-tab/VideoExportPanel";
 import type { DesktopUpdateAvailablePayload } from "./desktop-api";
 
-type TabId = "edit" | "batch";
+/** @description 右上ツールバーとホットキー Mod+1/2/3 の対象となるトップ面 */
+type TabId = "edit" | "photoExport" | "videoExport";
 
 /**
  * @description 非表示タブに `hidden`（display:none）を使わない。WebGL キャンバスの尺寸・コンテキストを維持し、重ね順と透明・pointer-events でだけ隠す。
@@ -155,6 +168,12 @@ export default function App() {
     }),
     [tLogs],
   );
+
+  /**
+   * @description 途中の写真バッチがあって初回だけ `photoExport` タブを開いたか。
+   *   ユーザーが他タブへ移動したあとに再度上書きしない。
+   */
+  const resumeTabAutoOpenedRef = useRef(false);
 
   /** @description スマートルックがキャンバス JPEG を取得するための ref（Web のフルページと同じ配線） */
   const filmLabCanvasRef = useRef<FilmLabCanvasRef | null>(null);
@@ -292,37 +311,26 @@ export default function App() {
   }, [running]);
 
   /**
-   * @description 幅 lg 以上で右スライドパネルを表示するか。パネルは DOM を維持し `translateX` のみ（内部状態を捨てない）。
+   * @description 右スライドパネルを画面内に出すか。全幅で同じ挙動。パネルは DOM を維持し `translateX` のみ（内部状態を捨てない）。
    */
   const [editRightPaneExpanded, setEditRightPaneExpanded] = useState(true);
-  /**
-   * @description ビューポートが Tailwind `lg` 以上か。SSR なし前提で初期値は同期読み取り。
-   */
-  const [isLgLayout, setIsLgLayout] = useState(() =>
-    typeof window !== "undefined"
-      ? window.matchMedia("(min-width: 1024px)").matches
-      : false,
-  );
 
+  /** @description 写真／動画の書き出しタブへ入ったとき右パネルを自動展開（Canvas 横にインライン表示） */
   useEffect(() => {
-    const mq = window.matchMedia("(min-width: 1024px)");
-    const onChange = () => setIsLgLayout(mq.matches);
-    onChange();
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
-
-  /** @description 狭い幅に戻したときはパネルを必ず表示（縦積みで隠れないようにする） */
-  useEffect(() => {
-    if (!isLgLayout) {
-      setEditRightPaneExpanded(true);
+    if (tab === "photoExport" || tab === "videoExport") {
+      setEditRightPaneExpanded((expanded) => (expanded ? expanded : true));
     }
-  }, [isLgLayout]);
+  }, [tab]);
 
-  /** @description 書き出しタブ切り替え時に右パネルを自動展開（Canvas 横にインライン表示） */
+  /**
+   * @description トップタブと batch 内部モードを一致させる（⌘↩ の実行先とフッターの主ボタン用）。
+   *   関数型更新で同一値なら再描画を避け、Maximum update depth を防ぐ。
+   */
   useEffect(() => {
-    if (tab === "batch") {
-      setEditRightPaneExpanded(true);
+    if (tab === "photoExport") {
+      setBatchJobMode((m) => (m === "images" ? m : "images"));
+    } else if (tab === "videoExport") {
+      setBatchJobMode((m) => (m === "video" ? m : "video"));
     }
   }, [tab]);
 
@@ -330,11 +338,16 @@ export default function App() {
    * @description 起動時に userData のセッション JSON を読み、フォームへ反映する。
    */
   /**
-   * @description 写真のまとめて書き出しが途中のセッションがあるときは UI を画像モードに揃え、再開導線と矛盾させない。
+   * @description 途中の写真バッチがあるときは画像モードに揃え、再開バナーがある写真タブへ初回だけ誘導する。
    */
   useEffect(() => {
-    if (persistedSession && sessionHasRemainingWork(persistedSession)) {
-      setBatchJobMode("images");
+    if (!persistedSession || !sessionHasRemainingWork(persistedSession)) {
+      return;
+    }
+    setBatchJobMode((m) => (m === "images" ? m : "images"));
+    if (!resumeTabAutoOpenedRef.current) {
+      resumeTabAutoOpenedRef.current = true;
+      setTab("photoExport");
     }
   }, [persistedSession]);
 
@@ -927,7 +940,6 @@ export default function App() {
   /** @description キーボードハンドラ用の UI フラグ（常に最新） */
   const hotkeyUiRef = useRef({
     tab: "edit" as TabId,
-    batchJobMode: "images" as BatchJobMode,
     batchCanRun: false,
     batchCanRetryFailed: false,
     batchCanResume: false,
@@ -936,7 +948,6 @@ export default function App() {
   });
   hotkeyUiRef.current = {
     tab,
-    batchJobMode,
     batchCanRun,
     batchCanRetryFailed,
     batchCanResume,
@@ -946,8 +957,8 @@ export default function App() {
 
   /**
    * @description デスクトップ専用ショートカット（Web 共有コンポーネントには伝播しないよう window で処理）
-   * - Mod+1 / Mod+2: タブ（macOS は ⌘、Windows/Linux は Ctrl）
-   * - Mod+Enter: 書き出し実行（書き出しタブかつ実行可のとき）
+   * - Mod+1 / Mod+2 / Mod+3: 編集・写真書き出し・動画書き出し（macOS は ⌘、Windows/Linux は Ctrl）
+   * - Mod+Enter: 写真タブでバッチ実行／動画タブで動画書き出し（実行可のとき）
    * - Mod+Shift+Enter: 失敗のみ再実行
    * - Mod+Shift+Y: セッション再開（再開可能なとき）
    * - Escape: 書き出し中断
@@ -966,21 +977,29 @@ export default function App() {
       }
       if (mod && e.key === "2") {
         e.preventDefault();
-        setTab("batch");
+        setTab("photoExport");
+        return;
+      }
+      if (mod && e.key === "3") {
+        e.preventDefault();
+        setTab("videoExport");
         return;
       }
 
       if (mod && e.key === "Enter") {
-        if (u.tab !== "batch") return;
         if (e.shiftKey) {
-          if (u.batchCanRetryFailed) {
+          if (u.tab === "photoExport" && u.batchCanRetryFailed) {
             e.preventDefault();
             void act.retryFailedBatch();
           }
-        } else if (u.batchJobMode === "images" && u.batchCanRun) {
+          return;
+        }
+        if (u.tab === "photoExport" && u.batchCanRun) {
           e.preventDefault();
           void act.runBatch();
-        } else if (u.batchJobMode === "video" && u.videoCanExport) {
+          return;
+        }
+        if (u.tab === "videoExport" && u.videoCanExport) {
           e.preventDefault();
           void act.runVideoExport();
         }
@@ -988,7 +1007,7 @@ export default function App() {
       }
 
       if (mod && e.shiftKey && (e.key === "y" || e.key === "Y")) {
-        if (u.tab === "batch" && u.batchCanResume) {
+        if (u.tab === "photoExport" && u.batchCanResume) {
           e.preventDefault();
           void act.resumeBatch();
         }
@@ -1070,9 +1089,10 @@ export default function App() {
       ) : null}
 
       <div className="relative flex min-h-0 flex-1 flex-col">
-      <div className="relative z-10 flex min-h-0 flex-1 flex-col gap-4 overflow-hidden fl-main fl-main--edge">
-          <div className="relative flex min-h-0 flex-1 flex-col gap-4 lg:min-h-0 lg:overflow-hidden">
-            <section className="relative z-0 min-h-[320px] w-full min-w-0 overflow-hidden rounded-[1rem] bg-[#080808] max-lg:flex-none sm:min-h-[420px] lg:absolute lg:inset-0 lg:z-0 lg:min-h-0">
+      {/* 幅に関係なく Canvas 全面＋右スライドパネル（縦積みは使わない） */}
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden fl-main fl-main--edge">
+          <div className="relative min-h-0 flex-1 overflow-hidden">
+            <section className="absolute inset-0 z-0 w-full min-w-0 overflow-hidden rounded-[1rem] bg-[#080808]">
               <FilmLabCanvas
                 ref={filmLabCanvasRef}
                 chromeLayout="stacked"
@@ -1092,7 +1112,7 @@ export default function App() {
               </div>
             </section>
 
-            {isLgLayout && !editRightPaneExpanded ? (
+            {!editRightPaneExpanded ? (
               <button
                 type="button"
                 className="fl-edit-pane-toggle-chip"
@@ -1110,86 +1130,124 @@ export default function App() {
               id="film-lab-edit-controls-pane"
               role="complementary"
               aria-label={tApp("paramsPanelAria")}
-              aria-hidden={Boolean(
-                isLgLayout && !editRightPaneExpanded,
-              )}
-              className={`fl-edit-slide-panel-shell flex min-h-0 w-full min-w-0 flex-1 flex-col max-lg:relative lg:absolute lg:inset-y-0 lg:right-0 lg:z-20 lg:h-auto lg:max-h-full lg:w-[clamp(320px,42vw,680px)] lg:max-w-[min(680px,calc(100%-1.5rem))] lg:min-w-0 lg:flex-none lg:py-4 lg:pr-4 lg:transition-transform lg:duration-300 lg:ease-out motion-reduce:lg:transition-none ${
+              aria-hidden={!editRightPaneExpanded}
+              className={`fl-edit-slide-panel-shell absolute inset-y-0 right-0 z-20 flex h-auto max-h-full min-h-0 w-[clamp(320px,42vw,680px)] max-w-[min(680px,calc(100%-1.5rem))] min-w-0 flex-none flex-col py-4 pr-4 transition-transform duration-300 ease-out motion-reduce:transition-none ${
                 editRightPaneExpanded
-                  ? "lg:translate-x-0"
-                  : "lg:pointer-events-none lg:translate-x-full"
+                  ? "translate-x-0"
+                  : "pointer-events-none translate-x-full"
               }`}
             >
-              <section className="fl-card fl-card-muted fl-card--frost fl-edit-controls-pane flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-0 lg:rounded-xl">
-                <div className="fl-edit-pane-toolbar fl-surface-frost hidden lg:flex">
-                  <button
-                    type="button"
-                    className="fl-edit-pane-toolbar-btn"
-                    aria-label={tApp("closeParamsPanelAria")}
-                    aria-expanded={editRightPaneExpanded}
-                    aria-controls="film-lab-edit-controls-pane"
-                    onClick={() => {
-                      if (tab === "batch") {
-                        setTab("edit");
-                      } else {
-                        setEditRightPaneExpanded(false);
-                      }
-                    }}
+              <section className="fl-card fl-card-muted fl-card--frost fl-edit-controls-pane flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl p-0">
+                {/* ブレークポイントで構成を変えない。狭い幅は横スクロールで収める（life#84） */}
+                <div className="fl-edit-pane-toolbar fl-surface-frost flex min-w-0 flex-nowrap items-center overflow-x-auto">
+                  {/* 左: パネル操作とメディア読み込み／保存（編集タブ時のみフォルダ・DL） */}
+                  <div className="flex min-h-9 min-w-0 shrink-0 items-center gap-0.5">
+                    <button
+                      type="button"
+                      className="fl-edit-pane-toolbar-btn"
+                      aria-label={tApp("closeParamsPanelAria")}
+                      aria-expanded={editRightPaneExpanded}
+                      aria-controls="film-lab-edit-controls-pane"
+                      onClick={() => {
+                        if (tab === "photoExport" || tab === "videoExport") {
+                          setTab("edit");
+                        } else {
+                          setEditRightPaneExpanded(false);
+                        }
+                      }}
+                    >
+                      <CaretRight size={16} weight="bold" aria-hidden />
+                    </button>
+                    {tab === "edit" ? (
+                      <>
+                        <button
+                          type="button"
+                          className="fl-edit-pane-toolbar-btn"
+                          aria-label={tFilmLab("toolbar.open")}
+                          title={tFilmLab("toolbar.open")}
+                          onClick={() => filmLabCanvasRef.current?.openMediaPicker()}
+                        >
+                          <FolderOpen size={15} weight="regular" aria-hidden />
+                        </button>
+                        <button
+                          type="button"
+                          className="fl-edit-pane-toolbar-btn"
+                          aria-label={tFilmLab("toolbar.savePng")}
+                          title={tFilmLab("toolbar.savePng")}
+                          onClick={() => filmLabCanvasRef.current?.saveCurrentPng()}
+                        >
+                          <DownloadSimple size={15} weight="regular" aria-hidden />
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
+                  {/* 右: 編集／写真書き出し／動画書き出しのモードタブ（エクスポート面を含む切替はここに寄せる） */}
+                  <div
+                    className="flex min-h-9 min-w-0 flex-1 items-center justify-end gap-3 pr-1"
+                    role="tablist"
+                    aria-label={tApp("desktopTabStripAria")}
                   >
-                    <CaretRight size={16} weight="bold" aria-hidden />
-                  </button>
-                  {tab === "edit" ? (
-                    <>
-                      <button
-                        type="button"
-                        className="fl-edit-pane-toolbar-btn"
-                        aria-label={tFilmLab("toolbar.open")}
-                        title={tFilmLab("toolbar.open")}
-                        onClick={() => filmLabCanvasRef.current?.openMediaPicker()}
-                      >
-                        <FolderOpen size={15} weight="regular" aria-hidden />
-                      </button>
-                      <button
-                        type="button"
-                        className="fl-edit-pane-toolbar-btn"
-                        aria-label={tFilmLab("toolbar.savePng")}
-                        title={tFilmLab("toolbar.savePng")}
-                        onClick={() => filmLabCanvasRef.current?.saveCurrentPng()}
-                      >
-                        <DownloadSimple size={15} weight="regular" aria-hidden />
-                      </button>
-                    </>
-                  ) : null}
-                  <div className="flex flex-1" />
-                  <button
-                    type="button"
-                    aria-label={tApp("tabEdit")}
-                    title={tApp("tabEdit")}
-                    className={`rounded-md p-1.5 transition-colors ${
-                      tab === "edit"
-                        ? "bg-[var(--amber-9)] text-[var(--amber-1)]"
-                        : "text-[var(--fl-text-tertiary)] hover:text-[var(--fl-text-primary)] hover:bg-[var(--fl-bg-interactive)]"
-                    }`}
-                    onClick={() => setTab("edit")}
-                  >
-                    <SlidersHorizontal size={14} weight={tab === "edit" ? "fill" : "regular"} aria-hidden />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={tApp("tabBatchAria")}
-                    title={tApp("tabBatch")}
-                    className={`rounded-md p-1.5 transition-colors ${
-                      tab === "batch"
-                        ? "bg-[var(--amber-9)] text-[var(--amber-1)]"
-                        : "text-[var(--fl-text-tertiary)] hover:text-[var(--fl-text-primary)] hover:bg-[var(--fl-bg-interactive)]"
-                    }`}
-                    onClick={() => setTab("batch")}
-                  >
-                    <Export size={14} weight={tab === "batch" ? "fill" : "regular"} aria-hidden />
-                  </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={tab === "edit"}
+                      aria-controls="film-lab-edit-tabpanel"
+                      id="film-lab-tab-edit"
+                      aria-label={tApp("tabEdit")}
+                      title={tApp("tabEdit")}
+                      className={`inline-flex min-h-9 min-w-9 shrink-0 items-center justify-center rounded-md p-1.5 transition-colors ${
+                        tab === "edit"
+                          ? "bg-[var(--amber-9)] text-[var(--amber-1)]"
+                          : "text-[var(--fl-text-tertiary)] hover:text-[var(--fl-text-primary)] hover:bg-[var(--fl-bg-interactive)]"
+                      }`}
+                      onClick={() => setTab("edit")}
+                    >
+                      <SlidersHorizontal size={14} weight={tab === "edit" ? "fill" : "regular"} aria-hidden />
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={tab === "photoExport"}
+                      aria-controls="film-lab-export-tabpanel"
+                      id="film-lab-tab-photo"
+                      aria-label={tApp("tabPhotoExportAria")}
+                      title={tApp("tabPhotoExport")}
+                      className={`inline-flex min-h-9 min-w-9 shrink-0 items-center justify-center rounded-md p-1.5 transition-colors ${
+                        tab === "photoExport"
+                          ? "bg-[var(--amber-9)] text-[var(--amber-1)]"
+                          : "text-[var(--fl-text-tertiary)] hover:text-[var(--fl-text-primary)] hover:bg-[var(--fl-bg-interactive)]"
+                      }`}
+                      onClick={() => setTab("photoExport")}
+                    >
+                      <Images size={14} weight={tab === "photoExport" ? "fill" : "regular"} aria-hidden />
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={tab === "videoExport"}
+                      aria-controls="film-lab-export-tabpanel"
+                      id="film-lab-tab-video"
+                      aria-label={tApp("tabVideoExportAria")}
+                      title={tApp("tabVideoExport")}
+                      className={`inline-flex min-h-9 min-w-9 shrink-0 items-center justify-center rounded-md p-1.5 transition-colors ${
+                        tab === "videoExport"
+                          ? "bg-[var(--amber-9)] text-[var(--amber-1)]"
+                          : "text-[var(--fl-text-tertiary)] hover:text-[var(--fl-text-primary)] hover:bg-[var(--fl-bg-interactive)]"
+                      }`}
+                      onClick={() => setTab("videoExport")}
+                    >
+                      <FilmStrip size={14} weight={tab === "videoExport" ? "fill" : "regular"} aria-hidden />
+                    </button>
+                  </div>
                 </div>
                 {tab === "edit" ? (
                   <>
-                    <div className="fl-scroll-surface fl-right-panel-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 pr-5 lg:pr-8">
+                    <div
+                      className="fl-scroll-surface fl-right-panel-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 pr-5 lg:pr-8"
+                      role="tabpanel"
+                      id="film-lab-edit-tabpanel"
+                      aria-labelledby="film-lab-tab-edit"
+                    >
                       <FilmLabControlPanelCore
                         viewport={viewport}
                         histogramVisible={histogramVisible}
@@ -1249,58 +1307,124 @@ export default function App() {
                   </>
                 ) : (
                   <>
-                    <div className="fl-scroll-surface fl-right-panel-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 pr-5 lg:pr-8">
-                      <BatchTabPanel
-                        compact
-                        batchJobMode={batchJobMode}
-                        onBatchJobModeChange={setBatchJobMode}
-                        persistedSession={persistedSession}
-                        batchCanResume={batchCanResume}
-                        running={running}
-                        onResumeBatch={resumeBatch}
-                        onDiscardPersistedSession={discardPersistedSession}
-                        batchPresetChoice={batchPresetChoice}
-                        onBatchPresetChoiceChange={applyBatchPreset}
-                        importedGradeLabel={importedGradeLabel}
-                        onImportGradeJson={importGradeJson}
-                        onExportGradeJson={exportGrade}
-                        inputDir={inputDir}
-                        outputDir={outputDir}
-                        onPickInputDir={async () => {
-                          const p = await window.filmLabBatch.pickInputDir();
-                          setInputDir(p);
-                        }}
-                        onPickOutputDir={async () => {
-                          const p = await window.filmLabBatch.pickOutputDir();
-                          setOutputDir(p);
-                        }}
-                        batchFormat={batchFormat}
-                        onBatchFormatChange={setBatchFormat}
-                        batchOutputSuffix={batchOutputSuffix}
-                        onBatchOutputSuffixChange={setBatchOutputSuffix}
-                        batchCanRun={batchCanRun}
-                        batchCanRetryFailed={batchCanRetryFailed}
-                        onRunBatch={runBatch}
-                        onRetryFailedBatch={retryFailedBatch}
-                        onAbortBatch={() => {
-                          void window.filmLabBatch.videoExportAbort().catch(() => {});
-                          batchAbortRef.current?.abort();
-                        }}
-                        batchProgress={batchProgress}
-                        lastBatchSummary={lastBatchSummary}
-                        videoInputPath={videoInputPath}
-                        videoProbeLabel={videoProbeLabel}
-                        videoCanExport={videoCanExport}
-                        onPickVideoFile={pickVideoFile}
-                        onRunVideoExport={runVideoExport}
-                        videoExportSuccessNonce={videoExportSuccessNonce}
-                        canApplyEditGradeToBatch={Boolean(viewport)}
-                        onApplyEditGradeToBatch={syncPreviewToBatch}
-                        editToExportSyncedAtMs={editToExportSyncedAtMs}
-                        onReapplyBatchPresetBaseline={() => {
-                          applyBatchPreset(batchPresetChoice);
-                        }}
-                      />
+                    <div
+                      className="fl-scroll-surface fl-right-panel-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 pr-5 lg:pr-8"
+                      role="tabpanel"
+                      id="film-lab-export-tabpanel"
+                      aria-labelledby={
+                        tab === "photoExport"
+                          ? "film-lab-tab-photo"
+                          : "film-lab-tab-video"
+                      }
+                      aria-label={
+                        tab === "photoExport"
+                          ? tApp("tabPhotoExportAria")
+                          : tApp("tabVideoExportAria")
+                      }
+                    >
+                      {tab === "photoExport" ? (
+                        <PhotoExportPanel
+                          compact
+                          batchJobMode={batchJobMode}
+                          persistedSession={persistedSession}
+                          batchCanResume={batchCanResume}
+                          running={running}
+                          onResumeBatch={resumeBatch}
+                          onDiscardPersistedSession={discardPersistedSession}
+                          batchPresetChoice={batchPresetChoice}
+                          onBatchPresetChoiceChange={applyBatchPreset}
+                          importedGradeLabel={importedGradeLabel}
+                          onImportGradeJson={importGradeJson}
+                          onExportGradeJson={exportGrade}
+                          inputDir={inputDir}
+                          outputDir={outputDir}
+                          onPickInputDir={async () => {
+                            const p = await window.filmLabBatch.pickInputDir();
+                            setInputDir(p);
+                          }}
+                          onPickOutputDir={async () => {
+                            const p = await window.filmLabBatch.pickOutputDir();
+                            setOutputDir(p);
+                          }}
+                          batchFormat={batchFormat}
+                          onBatchFormatChange={setBatchFormat}
+                          batchOutputSuffix={batchOutputSuffix}
+                          onBatchOutputSuffixChange={setBatchOutputSuffix}
+                          batchCanRun={batchCanRun}
+                          batchCanRetryFailed={batchCanRetryFailed}
+                          onRunBatch={runBatch}
+                          onRetryFailedBatch={retryFailedBatch}
+                          onAbortBatch={() => {
+                            void window.filmLabBatch.videoExportAbort().catch(() => {});
+                            batchAbortRef.current?.abort();
+                          }}
+                          batchProgress={batchProgress}
+                          lastBatchSummary={lastBatchSummary}
+                          videoInputPath={videoInputPath}
+                          videoProbeLabel={videoProbeLabel}
+                          videoCanExport={videoCanExport}
+                          onPickVideoFile={pickVideoFile}
+                          onRunVideoExport={runVideoExport}
+                          videoExportSuccessNonce={videoExportSuccessNonce}
+                          canApplyEditGradeToBatch={Boolean(viewport)}
+                          onApplyEditGradeToBatch={syncPreviewToBatch}
+                          editToExportSyncedAtMs={editToExportSyncedAtMs}
+                          onReapplyBatchPresetBaseline={() => {
+                            applyBatchPreset(batchPresetChoice);
+                          }}
+                        />
+                      ) : (
+                        <VideoExportPanel
+                          compact
+                          batchJobMode={batchJobMode}
+                          persistedSession={persistedSession}
+                          batchCanResume={batchCanResume}
+                          running={running}
+                          onResumeBatch={resumeBatch}
+                          onDiscardPersistedSession={discardPersistedSession}
+                          batchPresetChoice={batchPresetChoice}
+                          onBatchPresetChoiceChange={applyBatchPreset}
+                          importedGradeLabel={importedGradeLabel}
+                          onImportGradeJson={importGradeJson}
+                          onExportGradeJson={exportGrade}
+                          inputDir={inputDir}
+                          outputDir={outputDir}
+                          onPickInputDir={async () => {
+                            const p = await window.filmLabBatch.pickInputDir();
+                            setInputDir(p);
+                          }}
+                          onPickOutputDir={async () => {
+                            const p = await window.filmLabBatch.pickOutputDir();
+                            setOutputDir(p);
+                          }}
+                          batchFormat={batchFormat}
+                          onBatchFormatChange={setBatchFormat}
+                          batchOutputSuffix={batchOutputSuffix}
+                          onBatchOutputSuffixChange={setBatchOutputSuffix}
+                          batchCanRun={batchCanRun}
+                          batchCanRetryFailed={batchCanRetryFailed}
+                          onRunBatch={runBatch}
+                          onRetryFailedBatch={retryFailedBatch}
+                          onAbortBatch={() => {
+                            void window.filmLabBatch.videoExportAbort().catch(() => {});
+                            batchAbortRef.current?.abort();
+                          }}
+                          batchProgress={batchProgress}
+                          lastBatchSummary={lastBatchSummary}
+                          videoInputPath={videoInputPath}
+                          videoProbeLabel={videoProbeLabel}
+                          videoCanExport={videoCanExport}
+                          onPickVideoFile={pickVideoFile}
+                          onRunVideoExport={runVideoExport}
+                          videoExportSuccessNonce={videoExportSuccessNonce}
+                          canApplyEditGradeToBatch={Boolean(viewport)}
+                          onApplyEditGradeToBatch={syncPreviewToBatch}
+                          editToExportSyncedAtMs={editToExportSyncedAtMs}
+                          onReapplyBatchPresetBaseline={() => {
+                            applyBatchPreset(batchPresetChoice);
+                          }}
+                        />
+                      )}
                       <details className="mt-2">
                         <summary className="fl-caption cursor-pointer text-[var(--fl-text-tertiary)] hover:text-[var(--fl-text-secondary)]">
                           {tApp("logToggle")}

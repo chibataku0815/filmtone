@@ -613,16 +613,13 @@ body {
 }
 
 /**
- * @description 編集タブの「パラメータ」列。lg 以上で左列（プレビュー）との区切り。
- * 往復スクロール負荷を減らす左右分割の視覚的なリズム用（Radix の境界トークンのみ使用）。
+ * @description 編集タブの「パラメータ」列。Canvas オーバーレイ時も同じ陰影で区切る（幅ブレークで見た目を変えない）。
  */
-@media (min-width: 1024px) {
-  .fl-edit-controls-pane {
-    border-left: none;
-    box-shadow:
-      0 8px 32px rgba(0, 0, 0, 0.3),
-      -16px 0 40px -12px color-mix(in srgb, black 65%, transparent);
-  }
+.fl-edit-controls-pane {
+  border-left: none;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    -16px 0 40px -12px color-mix(in srgb, black 65%, transparent);
 }
 
 /**
@@ -632,7 +629,7 @@ body {
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 0.5rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   background: transparent;
@@ -680,7 +677,8 @@ body {
   position: absolute;
   top: 1rem;
   right: 1rem;
-  z-index: 25;
+  /* ドラッグゾーン（z-30）より上にし、パネル閉鎖時も必ず操作できる */
+  z-index: 40;
   display: inline-flex;
   align-items: center;
   justify-content: center;
