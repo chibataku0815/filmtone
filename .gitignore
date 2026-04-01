@@ -2,6 +2,9 @@
 
 # dependencies
 /node_modules
+# Workspace-local installs (nested packages are not covered by root /node_modules)
+packages/**/node_modules/
+
 /.pnp
 .pnp.*
 .yarn/*
@@ -23,6 +26,15 @@
 # misc
 .DS_Store
 *.pem
+
+# Local agent / browser tooling (never commit)
+.playwright-cli/
+
+# film-lab-renderer ships types from dist but build output is generated (like core, keep out of git)
+packages/film-lab-renderer/dist/
+
+# Nested `git worktree` checkouts under this repo (do not add to parent index)
+.worktrees/
 
 # debug
 npm-debug.log*
