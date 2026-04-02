@@ -115,7 +115,7 @@ export type FilmLabCanvasRef = {
 
 /** ファイルピッカー用: HEIC を選びにくくしつつ、一般的な形式はそのまま選べる */
 const FILM_LAB_FILE_ACCEPT =
-  "image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif,video/mp4,video/webm,.mp4,.webm,.cube,application/octet-stream";
+  "image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif,video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov,.m4v,.cube,application/octet-stream";
 
 const FILM_LAB_DEFAULT_SAMPLE_ASSET_PATH = "images/film-lab/default.jpg";
 

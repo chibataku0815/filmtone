@@ -44,6 +44,12 @@ export interface LoadFileOptions {
 const HEIC_MIME = /heic|heif/i;
 
 /**
+ * MIME が空・不正でも、拡張子が動画らしいときは `<video>` 経路へ回す（Finder ドロップの .mov 等）。
+ * ブラウザが実際にデコードできない容器は loadVideo 内でエラーになる。
+ */
+const LIKELY_VIDEO_EXTENSION = /\.(mp4|m4v|mov|webm|ogv)$/i;
+
+/**
  * `?filmLabDebugMedia=1` のとき true。クライアント専用。
  */
 export function isFilmLabMediaDebugEnabled(): boolean {
@@ -229,7 +235,7 @@ export class MediaLoader {
       );
     }
 
-    if (file.type.startsWith("video/")) {
+    if (file.type.startsWith("video/") || LIKELY_VIDEO_EXTENSION.test(file.name)) {
       return this.loadVideo(file);
     }
     return this.loadImage(file, options.maxTextureSize);
@@ -321,7 +327,7 @@ export class MediaLoader {
         }
         reject(
           new MediaLoadError(
-            `MediaLoader.loadVideo("${file.name}", "${file.type || "unknown"}") failed at ${eventName}. Try MP4 (H.264) or WebM.`,
+            `MediaLoader.loadVideo("${file.name}", "${file.type || "unknown"}") failed at ${eventName}. Try MP4 (H.264), WebM, or a MOV codec your browser can decode.`,
             "VIDEO_DECODE_FAILED",
           ),
         );
