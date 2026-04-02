@@ -273,6 +273,36 @@ declare const PRESETS: {
         shadowHue: number;
         highlightHue: number;
     };
+    /**
+     * Velvia 50 プリセット（v1・2026-04-02）
+     * @description Fujifilm Velvia 50 スライドポジフィルム。高彩度・高コントラスト・極細粒・ハレーションなし。
+     * fade=0 でポジらしい黒沈みを表現。saturation/contrast は Velvia の代名詞の鮮烈さに合わせた。
+     */
+    velvia50: {
+        exposure: number;
+        contrast: number;
+        saturation: number;
+        temperature: number;
+        tint: number;
+        rgbShift: number;
+        lensSoftness: number;
+        grainIntensity: number;
+        grainRadialMix: number;
+        vignette: number;
+        bloomThreshold: number;
+        bloomStrength: number;
+        bloomRadius: number;
+        halationIntensity: number;
+        halationSpread: number;
+        halationHue: number;
+        fade: number;
+        highlights: number;
+        shadows: number;
+        shadowTone: number;
+        highlightTone: number;
+        shadowHue: number;
+        highlightHue: number;
+    };
 };
 type PresetName = keyof typeof PRESETS;
 /**
@@ -288,14 +318,25 @@ declare function findMatchingPreset(params: Params): PresetName | null;
 /**
  * プリセットバーに並べる表示用メタ情報。
  *
- * 概要: ボタンの見出しと短い説明文だけをまとめ、Web / Desktop で同じ順番・同じ文言を使えるようにする。
+ * 概要: ボタンの見出し・短い説明文・カテゴリ分類・Print Medium ドキュメントをまとめ、
+ *       Web / Desktop で同じ順番・同じ文言を使えるようにする。
  * 仕様: `name` は `PRESETS` のキーと一致し、UI はこの配列順で表示できる。
- * 制限: 見た目用の文言だけを持つ。色や数値パラメータ自体は `PRESETS` を参照する。
+ * 制限: 見た目用の文言とメタ情報のみ。数値パラメータ自体は `PRESETS` を参照する。
+ *
+ * category:
+ *   - "filmStock"  : 実フィルムのエミュレーション。Film Stock セレクターに表示する。
+ *   - "look"       : フィルムではないスタイル（Teal & Orange 等）。Film Stock とは別枠。
+ *   - "utility"    : reset など。セレクターの外側に配置する。
+ *
+ * printMedium (ドキュメント用・シリアライズしない):
+ *   各プリセットが暗黙的に想定している印画媒体。UI に出さず、将来の Print Medium 独立 UI への橋渡し用。
  */
 declare const PRESET_BUTTONS: {
     name: PresetName;
     label: string;
     subtitle: string;
+    category: "filmStock" | "look" | "utility";
+    printMedium?: "color_negative" | "silver_gelatin" | "tungsten_cinema" | "slide_positive";
 }[];
 
 /**

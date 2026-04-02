@@ -12,8 +12,13 @@
  */
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { PRESET_BUTTONS, type PresetName } from "film-lab-core";
+import {
+  filterPresetRowsForSearch,
+  orderPresetButtonsForSurface,
+  type PresetButtonRow,
+} from "./presetSurfaceOrdering";
 
 /**
  * 検索付きプリセットセレクトが受け取る設定です。
@@ -32,14 +37,26 @@ interface PresetSearchSelectProps {
 }
 
 /**
- * プリセット名から表示用メタ情報を返します。
- * @param {PresetName | null} presetName 探したいプリセット名です。
- * @returns {typeof PRESET_BUTTONS[number]} 一致した表示用データです。見つからないときは先頭の cinematic を返します。
+ * トリガーに出す表示用メタを返します。
+ * @param presetName いま選ばれているプリセット名（まだ無いときは null）
+ * @param orderedRows surface 用に並べ替え済みの一覧（先頭をフォールバックに使う）
  */
-function getPresetMeta(presetName: PresetName | null) {
+function getPresetMetaForTrigger(
+  presetName: PresetName | null,
+  orderedRows: readonly PresetButtonRow[],
+): PresetButtonRow {
+  const fallbackRow = orderedRows[0];
+  if (!fallbackRow) {
+    throw new Error(
+      "getPresetMetaForTrigger: orderedRows が空です。PRESET_BUTTONS に最低 1 件必要です。",
+    );
+  }
+  if (presetName == null) {
+    return fallbackRow;
+  }
   return (
-    PRESET_BUTTONS.find((presetButton) => presetButton.name === presetName) ??
-    PRESET_BUTTONS[0]
+    orderedRows.find((presetButton) => presetButton.name === presetName) ??
+    fallbackRow
   );
 }
 
@@ -74,18 +91,26 @@ export function PresetSearchSelect({
   const rootRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
-  const activePresetMeta = getPresetMeta(activePreset);
+  const orderedPresetSurfaceRows = useMemo(
+    () => orderPresetButtonsForSurface(PRESET_BUTTONS),
+    [],
+  );
+
+  const activePresetMeta = getPresetMetaForTrigger(
+    activePreset,
+    orderedPresetSurfaceRows,
+  );
 
   const filteredPresetButtons = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
     if (normalizedQuery.length === 0) {
-      return PRESET_BUTTONS;
+      return orderedPresetSurfaceRows;
     }
 
-    return PRESET_BUTTONS.filter((presetButton) =>
+    return filterPresetRowsForSearch(PRESET_BUTTONS, (presetButton) =>
       buildSearchText(presetButton).includes(normalizedQuery),
     );
-  }, [searchQuery]);
+  }, [searchQuery, orderedPresetSurfaceRows]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -174,12 +199,24 @@ export function PresetSearchSelect({
               </p>
             ) : (
               <div className="flex flex-col gap-1">
-                {filteredPresetButtons.map((presetButton) => {
+                {filteredPresetButtons.map((presetButton, itemIndex) => {
                   const isSelected = activePresetMeta.name === presetButton.name;
+                  const previousRow =
+                    itemIndex > 0 ? filteredPresetButtons[itemIndex - 1] : null;
+                  const showCategoryDivider =
+                    previousRow != null &&
+                    previousRow.category !== presetButton.category;
 
                   return (
+                    <Fragment key={presetButton.name}>
+                      {showCategoryDivider ? (
+                        <div
+                          role="separator"
+                          aria-orientation="horizontal"
+                          className="my-1 border-t border-white/[0.08]"
+                        />
+                      ) : null}
                     <button
-                      key={presetButton.name}
                       type="button"
                       role="option"
                       aria-selected={isSelected}
@@ -219,6 +256,7 @@ export function PresetSearchSelect({
                         </svg>
                       </span>
                     </button>
+                    </Fragment>
                   );
                 })}
               </div>
