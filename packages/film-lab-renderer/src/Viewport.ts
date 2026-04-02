@@ -162,6 +162,13 @@ export class Viewport {
         uLUT2: { value: null },
         uLUT2Intensity: { value: 1.0 },
         uLUT2Enabled: { value: 0.0 },
+        // 0.4.0 の render process で追加した数値 uniform。既定値は全て無効。
+        uCompressionAmount: { value: 0.0 },
+        uCompressionRange: { value: 0.5 },
+        uCyan: { value: 0.0 },
+        uMagenta: { value: 0.0 },
+        uYellow: { value: 0.0 },
+        uPrintContrast: { value: 0.0 },
         uFlipY: { value: 0.0 },
       },
     });
@@ -795,6 +802,12 @@ export class Viewport {
       halationIntensity: this.halationIntensity,
       halationSpread: this.halationSpread,
       halationColor: `#${new THREE.Color(this.halationColor.x, this.halationColor.y, this.halationColor.z).getHexString()}`,
+      compressionAmount: this.material.uniforms.uCompressionAmount!.value as number,
+      compressionRange: this.material.uniforms.uCompressionRange!.value as number,
+      cyan: this.material.uniforms.uCyan!.value as number,
+      magenta: this.material.uniforms.uMagenta!.value as number,
+      yellow: this.material.uniforms.uYellow!.value as number,
+      printContrast: this.material.uniforms.uPrintContrast!.value as number,
     };
   }
 
@@ -872,6 +885,18 @@ export class Viewport {
       this.setHalationSpread(params.halationSpread as number);
     if (params.halationColor !== undefined)
       this.setHalationColor(params.halationColor as string);
+    if (params.compressionAmount !== undefined)
+      this.material.uniforms.uCompressionAmount!.value = params.compressionAmount as number;
+    if (params.compressionRange !== undefined)
+      this.material.uniforms.uCompressionRange!.value = params.compressionRange as number;
+    if (params.cyan !== undefined)
+      this.material.uniforms.uCyan!.value = params.cyan as number;
+    if (params.magenta !== undefined)
+      this.material.uniforms.uMagenta!.value = params.magenta as number;
+    if (params.yellow !== undefined)
+      this.material.uniforms.uYellow!.value = params.yellow as number;
+    if (params.printContrast !== undefined)
+      this.material.uniforms.uPrintContrast!.value = params.printContrast as number;
   }
 
   // ===== Histogram readback =====

@@ -514,6 +514,13 @@
         "dynamics": "ダイナミック",
         "dynamicsHint": "露出・コントラスト・ブルーム（ハイライトの空気感）を束ねます。"
       },
+      "process": "Process",
+      "compression": "Compression",
+      "compressionRange": "Comp Range",
+      "printContrast": "Print Contrast",
+      "cyan": "Cyan",
+      "magenta": "Magenta",
+      "yellow": "Yellow",
       "color": "カラー",
       "exposure": "露出",
       "contrast": "コントラスト",

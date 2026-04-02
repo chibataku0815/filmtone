@@ -46,9 +46,70 @@ export type Action =
 
 const MAX_HISTORY = 30;
 
+/**
+ * 0.4.0 で追加した render process の数値キー。
+ *
+ * @remarks
+ * 既存の `Params` に無いキーでも、UI の state には runtime で持たせる。
+ */
+export const PROCESS_PARAM_DEFAULTS = {
+  compressionAmount: 0,
+  compressionRange: 0.5,
+  printContrast: 0,
+  cyan: 0,
+  magenta: 0,
+  yellow: 0,
+} as const;
+
+export type ProcessParamKey = keyof typeof PROCESS_PARAM_DEFAULTS;
+
+export type ProcessParams = Record<ProcessParamKey, number>;
+
+export const PROCESS_PARAM_KEYS = Object.keys(
+  PROCESS_PARAM_DEFAULTS,
+) as ProcessParamKey[];
+
+/**
+ * 古い保存データや preset に、process の既定値を補う。
+ *
+ * @param params - 現在のグレード数値
+ */
+export function normalizeParamsWithProcessDefaults(
+  params: Params,
+): Params & ProcessParams {
+  const raw = params as unknown as Record<string, number | undefined>;
+  return {
+    ...params,
+    compressionAmount:
+      typeof raw.compressionAmount === "number"
+        ? raw.compressionAmount
+        : PROCESS_PARAM_DEFAULTS.compressionAmount,
+    compressionRange:
+      typeof raw.compressionRange === "number"
+        ? raw.compressionRange
+        : PROCESS_PARAM_DEFAULTS.compressionRange,
+    printContrast:
+      typeof raw.printContrast === "number"
+        ? raw.printContrast
+        : PROCESS_PARAM_DEFAULTS.printContrast,
+    cyan:
+      typeof raw.cyan === "number"
+        ? raw.cyan
+        : PROCESS_PARAM_DEFAULTS.cyan,
+    magenta:
+      typeof raw.magenta === "number"
+        ? raw.magenta
+        : PROCESS_PARAM_DEFAULTS.magenta,
+    yellow:
+      typeof raw.yellow === "number"
+        ? raw.yellow
+        : PROCESS_PARAM_DEFAULTS.yellow,
+  };
+}
+
 function cloneSlot(slot: GradeSlotState): GradeSlotState {
   return {
-    params: cloneParams(slot.params),
+    params: normalizeParamsWithProcessDefaults(cloneParams(slot.params)),
     basePreset: slot.basePreset,
     intensity: slot.intensity,
   };
@@ -93,7 +154,7 @@ function pushHistory(state: State): State {
 
 function interpolatePreset(presetName: PresetName, intensity: number): Params {
   const clamped = Math.max(0, Math.min(1, intensity));
-  const params = { ...PRESETS.reset };
+  const params = normalizeParamsWithProcessDefaults(PRESETS.reset);
   const preset = PRESETS[presetName];
 
   for (const key of PARAM_KEYS) {
@@ -104,10 +165,13 @@ function interpolatePreset(presetName: PresetName, intensity: number): Params {
 }
 
 function slotsMatch(slotA: GradeSlotState, slotB: GradeSlotState): boolean {
+  const slotAProcess = slotA.params as unknown as Record<ProcessParamKey, number>;
+  const slotBProcess = slotB.params as unknown as Record<ProcessParamKey, number>;
   return (
     slotA.basePreset === slotB.basePreset &&
     slotA.intensity === slotB.intensity &&
-    PARAM_KEYS.every((key) => slotA.params[key] === slotB.params[key])
+    PARAM_KEYS.every((key) => slotA.params[key] === slotB.params[key]) &&
+    PROCESS_PARAM_KEYS.every((key) => slotAProcess[key] === slotBProcess[key])
   );
 }
 
@@ -158,7 +222,7 @@ export function filmLabReducer(state: State, action: Action): State {
 
     case "APPLY_PRESET": {
       const next = withActiveSlot(state, () => ({
-        params: cloneParams(action.preset),
+        params: normalizeParamsWithProcessDefaults(cloneParams(action.preset)),
         basePreset: action.presetName,
         intensity: 1,
       }));
@@ -167,7 +231,7 @@ export function filmLabReducer(state: State, action: Action): State {
 
     case "APPLY_PARAMS": {
       const next = withActiveSlot(state, () => ({
-        params: cloneParams(action.params),
+        params: normalizeParamsWithProcessDefaults(cloneParams(action.params)),
         basePreset: action.basePreset,
         intensity: action.intensity ?? 1,
       }));
@@ -229,7 +293,7 @@ export function filmLabReducer(state: State, action: Action): State {
 
       const key = activeSlotKey(state.activeSlot);
       const resetSlot: GradeSlotState = {
-        params: cloneParams(PRESETS.reset),
+        params: normalizeParamsWithProcessDefaults(cloneParams(PRESETS.reset)),
         basePreset: "reset",
         intensity: 1,
       };
@@ -283,7 +347,7 @@ export function toPresentSnapshot(state: State): PresentState {
  */
 export function createInitialStateFromSharedParams(shared: Params): State {
   const slot: GradeSlotState = {
-    params: cloneParams(shared),
+    params: normalizeParamsWithProcessDefaults(cloneParams(shared)),
     basePreset: null,
     intensity: 1,
   };
@@ -308,7 +372,7 @@ export function createInitialState(
   initialPresetName: PresetName | null = null,
 ): State {
   const slot: GradeSlotState = {
-    params: cloneParams(initialParams),
+    params: normalizeParamsWithProcessDefaults(cloneParams(initialParams)),
     basePreset: initialPresetName,
     intensity: 1,
   };

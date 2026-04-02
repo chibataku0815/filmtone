@@ -22,6 +22,8 @@ import {
   filmLabReducer,
   createInitialState,
   createInitialStateFromSharedParams,
+  PROCESS_PARAM_DEFAULTS,
+  type ProcessParamKey,
   type Action,
   type GradeSlotState,
   type PresentState,
@@ -54,6 +56,17 @@ function getRgbShiftSliderMax(rgbShift: number): number {
 
 function formatRgbShiftValue(rgbShift: number): string {
   return `${Math.round((rgbShift / RGB_SHIFT_UI_MAX) * 100)}%`;
+}
+
+/**
+ * Process セクションの値を、古い保存データでも必ず表示できるようにする。
+ *
+ * @param params - 現在の grade
+ * @param key - Process の数値キー
+ */
+function getProcessParamValue(params: Params, key: ProcessParamKey): number {
+  const value = (params as Partial<Record<ProcessParamKey, number>>)[key];
+  return typeof value === "number" ? value : PROCESS_PARAM_DEFAULTS[key];
 }
 
 /** フルページ用: プレゼンモード（寄付 UI 全消し）のトグルをコントロールパネルに出す */
@@ -295,8 +308,8 @@ export function FilmLabControlPanelCore({
   const halationEnabled = params.halationIntensity > 0;
   const canToggleHistogram = typeof onHistogramToggle === "function";
 
-  const updateParam = useCallback((key: keyof Params, value: number) => {
-    dispatch({ type: "SET_PARAM", key, value });
+  const updateParam = useCallback((key: keyof Params | ProcessParamKey, value: number) => {
+    dispatch({ type: "SET_PARAM", key: key as keyof Params, value });
     setActivePreset("reset");
   }, []);
 
@@ -559,10 +572,82 @@ export function FilmLabControlPanelCore({
         {slots.renderAfterPresets ? slots.renderAfterPresets(coreRenderContext) : slots.afterPresets}
 
         <div className="grid w-full min-w-0 grid-cols-1 gap-4 @min-[560px]:grid-cols-2 @min-[560px]:gap-6">
-          {/* === COLOR GRADING ===（Web LP のクイックではメタスライダー列ごと省略し LUT を広く） */}
+          {/* === PROCESS / COLOR GRADING ===（Web LP のクイックではメタスライダー列ごと省略し LUT を広く） */}
           {!isPro && slots.hideQuickMetaSliders ? null : (
           <div className={`min-w-0 ${isPro ? "" : "order-2 @min-[560px]:order-2"}`}>
-            <SectionHeader title={tFilmLab("controls.color")} />
+            {isPro ? (
+              <>
+                <SectionHeader title={tFilmLab("controls.process")} />
+                <div className="flex flex-col gap-2.5">
+                  <ControlSlider
+                    label={tFilmLab("controls.compression")}
+                    value={getProcessParamValue(params, "compressionAmount")}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    defaultValue={PROCESS_PARAM_DEFAULTS.compressionAmount}
+                    formatValue={(v) => `${Math.round(v * 100)}%`}
+                    onChange={(v) => updateParam("compressionAmount", v)}
+                    onCommit={commit}
+                  />
+                  <ControlSlider
+                    label={tFilmLab("controls.compressionRange")}
+                    value={getProcessParamValue(params, "compressionRange")}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    defaultValue={PROCESS_PARAM_DEFAULTS.compressionRange}
+                    formatValue={(v) => `${Math.round(v * 100)}%`}
+                    onChange={(v) => updateParam("compressionRange", v)}
+                    onCommit={commit}
+                  />
+                  <ControlSlider
+                    label={tFilmLab("controls.printContrast")}
+                    value={getProcessParamValue(params, "printContrast")}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    defaultValue={PROCESS_PARAM_DEFAULTS.printContrast}
+                    formatValue={(v) => `${Math.round(v * 100)}%`}
+                    onChange={(v) => updateParam("printContrast", v)}
+                    onCommit={commit}
+                  />
+                  <ControlSlider
+                    label={tFilmLab("controls.cyan")}
+                    value={getProcessParamValue(params, "cyan")}
+                    min={-1}
+                    max={1}
+                    step={0.01}
+                    defaultValue={PROCESS_PARAM_DEFAULTS.cyan}
+                    onChange={(v) => updateParam("cyan", v)}
+                    onCommit={commit}
+                  />
+                  <ControlSlider
+                    label={tFilmLab("controls.magenta")}
+                    value={getProcessParamValue(params, "magenta")}
+                    min={-1}
+                    max={1}
+                    step={0.01}
+                    defaultValue={PROCESS_PARAM_DEFAULTS.magenta}
+                    onChange={(v) => updateParam("magenta", v)}
+                    onCommit={commit}
+                  />
+                  <ControlSlider
+                    label={tFilmLab("controls.yellow")}
+                    value={getProcessParamValue(params, "yellow")}
+                    min={-1}
+                    max={1}
+                    step={0.01}
+                    defaultValue={PROCESS_PARAM_DEFAULTS.yellow}
+                    onChange={(v) => updateParam("yellow", v)}
+                    onCommit={commit}
+                  />
+                </div>
+                <SectionHeader title={tFilmLab("controls.color")} className="mt-4" />
+              </>
+            ) : (
+              <SectionHeader title={tFilmLab("controls.color")} />
+            )}
             {isPro ? (
             <div className="flex flex-col gap-2.5">
               <ControlSlider label={tFilmLab("controls.exposure")} value={params.exposure} min={-3} max={3} step={0.01} defaultValue={0} onChange={(v) => updateParam("exposure", v)} onCommit={commit} />

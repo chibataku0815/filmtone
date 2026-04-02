@@ -39,7 +39,7 @@ export const FILM_LAB_CONTROL_PANEL_SECTION_ORDER = [
    */
   "wrapperAfterPresets",
   /**
-   * 2 カラムグリッド: Color / Effects（Quick は子ブロック順が変わる）、Compare、LUT、Histogram 等。
+   * 2 カラムグリッド: Process / Color / Effects（Quick は子ブロック順が変わる）、Compare、LUT、Histogram 等。
    */
   "colorAndEffectsGrid",
   /** `ShortcutHelp` オーバーレイ（ショートカット一覧） */

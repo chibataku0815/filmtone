@@ -12,6 +12,22 @@ import {
 } from "film-lab-core";
 
 /**
+ * 0.4.0 の render process で追加した数値キー。
+ *
+ * @remarks
+ * shared contract の worktree がまだ反映されていない状態でも、preview から export まで
+ * 値を落とさないために、ここでは raw の数値をそのまま運ぶ。
+ */
+const renderProcessParamKeys = [
+  "compressionAmount",
+  "compressionRange",
+  "printContrast",
+  "cyan",
+  "magenta",
+  "yellow",
+] as const;
+
+/**
  * @param raw - Viewport.getParams() の戻り値
  * @param halationHueFallback - halationHue が raw に無いときの既定
  */
@@ -26,6 +42,15 @@ export function viewportRecordToParams(
     if (typeof v === "number") {
       (out as Record<string, number>)[key] = v;
     }
+  }
+  for (const key of renderProcessParamKeys) {
+    const v = raw[key];
+    (out as Record<string, number>)[key] =
+      typeof v === "number"
+        ? v
+        : key === "compressionRange"
+          ? 0.5
+          : 0;
   }
   out.halationHue =
     typeof raw.halationHue === "number"
