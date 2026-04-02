@@ -471,9 +471,15 @@ function buildFfmpegRawvideoExportArgs(opts: {
   // scale converts full range to limited range (16-235) for H.264 standard compliance,
   // and BT.709 color metadata tags ensure correct player interpretation.
   // See: .claude/knowledge/patterns/2026-03-03-ffmpeg-encoder-pitfalls-pattern.md §4
+  //
+  // life#89 / portfolio#12: 先頭の表示フレームだけがほぼ真っ黒に乗り Finder サムネが黒になる。
+  // gl.finish だけでは再現が残ったため、raw 列で n==0 を捨て setpts で詰める（映像は 1 フレーム短い）。
+  // hasAudio + -shortest では短い映像に合わせて音声端が切り詰められる。
+  const colorFilterChain =
+    "vflip,scale=in_range=full:out_range=limited,select=gte(n\\,1),setpts=N/FRAME_RATE/TB";
   head.push(
     "-vf",
-    "vflip,scale=in_range=full:out_range=limited",
+    colorFilterChain,
     "-color_range",
     "tv",
     "-colorspace",

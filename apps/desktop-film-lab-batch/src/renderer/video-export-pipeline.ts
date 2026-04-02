@@ -1191,6 +1191,17 @@ export async function runVideoExportPipeline(options: {
           const renderMs = performance.now() - tR0;
           arrRender.push(renderMs);
 
+          /**
+           * @description エクスポート 1 枚目だけ `gl.finish()` してから readback する。
+           *   Metal / ANGLE 系で、初回テクスチャ upload とシェーダの結果が FBO に乗る前に
+           *   `readPixels` が走ると RGBA がゼロのまま拾われ、h264 の先頭フレームだけが真っ黒になる
+           *   （Finder サムネが黒・qlmanage は別フレームを採るため非黒、などの落差）。全フレーム
+           *   `finish` は重いので先頭のみ。
+           */
+          if (i === 0) {
+            gl.finish();
+          }
+
           // --- GPU→CPU pixel transfer (no Y-flip — ffmpeg vflip handles row order) ---
           let readPxMs = 0;
 
