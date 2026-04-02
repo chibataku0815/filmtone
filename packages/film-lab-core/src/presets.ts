@@ -241,6 +241,36 @@ export const PRESETS = {
     shadowHue: FILM_LAB_DEFAULT_SHADOW_HUE,
     highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
   },
+  /**
+   * Velvia 50 プリセット（v1・2026-04-02）
+   * @description Fujifilm Velvia 50 スライドポジフィルム。高彩度・高コントラスト・極細粒・ハレーションなし。
+   * fade=0 でポジらしい黒沈みを表現。saturation/contrast は Velvia の代名詞の鮮烈さに合わせた。
+   */
+  velvia50: {
+    exposure: 0,
+    contrast: 1.35,
+    saturation: 1.45,
+    temperature: 0.04,
+    tint: 0,
+    rgbShift: 0,
+    lensSoftness: 0,
+    grainIntensity: 0.02,
+    grainRadialMix: 1,
+    vignette: 0.1,
+    bloomThreshold: 0.9,
+    bloomStrength: 0.05,
+    bloomRadius: 0.3,
+    halationIntensity: 0,
+    halationSpread: 15,
+    halationHue: 0,
+    fade: 0,
+    highlights: 0.05,
+    shadows: -0.05,
+    shadowTone: 0,
+    highlightTone: 0,
+    shadowHue: FILM_LAB_DEFAULT_SHADOW_HUE,
+    highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
+  },
 } satisfies Record<string, Params>;
 
 export type PresetName = keyof typeof PRESETS;
@@ -266,22 +296,34 @@ export function findMatchingPreset(params: Params): PresetName | null {
 /**
  * プリセットバーに並べる表示用メタ情報。
  *
- * 概要: ボタンの見出しと短い説明文だけをまとめ、Web / Desktop で同じ順番・同じ文言を使えるようにする。
+ * 概要: ボタンの見出し・短い説明文・カテゴリ分類・Print Medium ドキュメントをまとめ、
+ *       Web / Desktop で同じ順番・同じ文言を使えるようにする。
  * 仕様: `name` は `PRESETS` のキーと一致し、UI はこの配列順で表示できる。
- * 制限: 見た目用の文言だけを持つ。色や数値パラメータ自体は `PRESETS` を参照する。
+ * 制限: 見た目用の文言とメタ情報のみ。数値パラメータ自体は `PRESETS` を参照する。
+ *
+ * category:
+ *   - "filmStock"  : 実フィルムのエミュレーション。Film Stock セレクターに表示する。
+ *   - "look"       : フィルムではないスタイル（Teal & Orange 等）。Film Stock とは別枠。
+ *   - "utility"    : reset など。セレクターの外側に配置する。
+ *
+ * printMedium (ドキュメント用・シリアライズしない):
+ *   各プリセットが暗黙的に想定している印画媒体。UI に出さず、将来の Print Medium 独立 UI への橋渡し用。
  */
 export const PRESET_BUTTONS: {
   name: PresetName;
   label: string;
   subtitle: string;
+  category: "filmStock" | "look" | "utility";
+  printMedium?: "color_negative" | "silver_gelatin" | "tungsten_cinema" | "slide_positive";
 }[] = [
-  { name: "cinematic", label: "Cinematic", subtitle: "Teal & Orange" },
-  { name: "portra", label: "Portra", subtitle: "Warm Pastel" },
-  { name: "gold200", label: "Gold 200", subtitle: "Saturated Warm" },
-  { name: "pro400h", label: "Pro 400H", subtitle: "Cool Soft" },
-  { name: "ektar100", label: "Ektar 100", subtitle: "Vivid Sharp" },
-  { name: "superia400", label: "Superia", subtitle: "Cool Green" },
-  { name: "cinestill800t", label: "CineStill", subtitle: "Tungsten Glow" },
-  { name: "bw", label: "B&W", subtitle: "Classic Mono" },
-  { name: "reset", label: "Reset", subtitle: "No Grade" },
+  { name: "portra", label: "Portra 400", subtitle: "Warm Pastel", category: "filmStock", printMedium: "color_negative" },
+  { name: "gold200", label: "Gold 200", subtitle: "Saturated Warm", category: "filmStock", printMedium: "color_negative" },
+  { name: "pro400h", label: "Pro 400H", subtitle: "Cool Soft", category: "filmStock", printMedium: "color_negative" },
+  { name: "ektar100", label: "Ektar 100", subtitle: "Vivid Sharp", category: "filmStock", printMedium: "color_negative" },
+  { name: "superia400", label: "Superia 400", subtitle: "Cool Green", category: "filmStock", printMedium: "color_negative" },
+  { name: "cinestill800t", label: "CineStill 800T", subtitle: "Tungsten Glow", category: "filmStock", printMedium: "tungsten_cinema" },
+  { name: "bw", label: "B&W", subtitle: "Classic Mono", category: "filmStock", printMedium: "silver_gelatin" },
+  { name: "velvia50", label: "Velvia 50", subtitle: "Vivid Slide", category: "filmStock", printMedium: "slide_positive" },
+  { name: "cinematic", label: "Cinematic", subtitle: "Teal & Orange", category: "look" },
+  { name: "reset", label: "Reset", subtitle: "No Grade", category: "utility" },
 ];
