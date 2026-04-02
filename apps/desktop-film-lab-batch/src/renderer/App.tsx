@@ -28,6 +28,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import {
   FilmLabCanvas,
+  FilmLabWebglPanelBackdrop,
   type FilmLabCanvasRef,
   type FilmLabInteractiveSourceInfo,
 } from "film-lab-ui";
@@ -192,6 +193,8 @@ export default function App() {
 
   /** @description スマートルックがキャンバス JPEG を取得するための ref（Web のフルページと同じ配線） */
   const filmLabCanvasRef = useRef<FilmLabCanvasRef | null>(null);
+  /** @description Web 版 lg 展開と同じ WebGL 切り出しグラス用（FilmLabWebglPanelBackdrop） */
+  const filmLabEditFrostPanelRef = useRef<HTMLElement | null>(null);
   const [tab, setTab] = useState<TabId>("edit");
   const [viewport, setViewport] = useState<Viewport | null>(null);
   const [histogramVisible, setHistogramVisible] = useState(true);
@@ -1226,7 +1229,24 @@ export default function App() {
                   : "pointer-events-none translate-x-full"
               }`}
             >
-              <section className="fl-card fl-card-muted fl-card--frost fl-edit-controls-pane flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl p-0">
+              <section
+                ref={filmLabEditFrostPanelRef}
+                className={`fl-card fl-card-muted fl-card--frost fl-edit-controls-pane flex h-full min-h-0 min-w-0 flex-1 flex-col rounded-xl border border-white/[0.08] p-0 ${
+                  editRightPaneExpanded ? "fl-card--frost-webgl-backdrop" : ""
+                }`}
+              >
+                {editRightPaneExpanded ? (
+                  <FilmLabWebglPanelBackdrop
+                    filmLabCanvasRef={filmLabCanvasRef}
+                    panelRef={filmLabEditFrostPanelRef}
+                    enabled
+                  />
+                ) : null}
+                {/*
+                 * Web `FilmLabFullPage` と同型: `overflow-hidden` は内側ラッパーへ逃がし、
+                 * 外周の frost / WebGL 背景のボケが section 角で切れにくくする。
+                 */}
+                <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[inherit]">
                 {/* ブレークポイントで構成を変えない。狭い幅は横スクロールで収める（life#84） */}
                 <div className="fl-edit-pane-toolbar fl-surface-frost flex min-w-0 flex-nowrap items-center overflow-x-auto">
                   {/* 左: パネル操作とメディア読み込み／保存（編集タブ時のみフォルダ・DL） */}
@@ -1546,6 +1566,7 @@ export default function App() {
                     </div>
                   </>
                 )}
+                </div>
               </section>
             </div>
           </div>

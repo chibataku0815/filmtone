@@ -15,7 +15,6 @@ import { ControlSlider as BaseControlSlider } from "./ui/ControlSlider";
 import { SectionHeader } from "./ui/SectionHeader";
 import { ToggleHeader } from "./ui/ToggleHeader";
 import { LUTPanel } from "./LUTPanel";
-import { FilmLabInfoTip } from "./FilmLabInfoTip";
 import { PresetSearchSelect } from "./PresetSearchSelect";
 import type { Viewport } from "film-lab-renderer";
 import type { Params } from "film-lab-core";
@@ -37,7 +36,6 @@ import { FILM_LAB_NEXT_INTL_NAMESPACE } from "./filmLabUiContract";
 import {
   filmLabCollapsibleHeaderButton,
   filmLabDonationPresentRowShell,
-  filmLabModeHintCaption,
   filmLabModeToggleButtonClassName,
   filmLabModeToggleGroupShell,
   filmLabPanelRootClassName,
@@ -82,6 +80,11 @@ export interface FilmLabControlPanelCoreSlots {
   lpExpandButton?: ReactNode;
   /** LP レイアウト時に LUT 以下の補助パネルを隠すフラグ */
   hideAuxPanels?: boolean;
+  /**
+   * Web LP 向け: クイックモードでも「時代・ダイナミクス」等のメタスライダーを出さず、
+   * デュアル LUT ブロックを主役にする。
+   */
+  hideQuickMetaSliders?: boolean;
   /** Render-prop: Core state を受け取り Presets 直後に Web 専用セクションを挿入 */
   renderAfterPresets?: (ctx: FilmLabCoreRenderContext) => ReactNode;
   /** Render-prop: Core state を受け取り LUT 直後に Web 専用セクションを挿入 */
@@ -485,8 +488,8 @@ export function FilmLabControlPanelCore({
   return (
     <>
       <div className={filmLabPanelRootClassName(surface)}>
-        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className={filmLabModeToggleGroupShell} role="group" aria-label={tFilmLab("mode.hintShort")}>
+        <div className="mb-3">
+          <div className={filmLabModeToggleGroupShell} role="group" aria-label={tFilmLab("mode.toggleGroupAria")}>
             <button
               type="button"
               onClick={() => setUiMode("quick")}
@@ -501,16 +504,6 @@ export function FilmLabControlPanelCore({
             >
               {tFilmLab("mode.pro")}
             </button>
-          </div>
-          <div className="flex items-start justify-end gap-1 sm:max-w-[260px]">
-            <p className={filmLabModeHintCaption}>
-              {tFilmLab("mode.hintShort")}
-            </p>
-            <FilmLabInfoTip
-              tip={tFilmLab("mode.hint")}
-              assistiveLabel={tFilmLab("mode.hintInfoAria")}
-              className="mt-0.5 text-white/35 hover:text-amber-200/80"
-            />
           </div>
         </div>
 
@@ -566,7 +559,8 @@ export function FilmLabControlPanelCore({
         {slots.renderAfterPresets ? slots.renderAfterPresets(coreRenderContext) : slots.afterPresets}
 
         <div className="grid w-full min-w-0 grid-cols-1 gap-4 @min-[560px]:grid-cols-2 @min-[560px]:gap-6">
-          {/* === COLOR GRADING === */}
+          {/* === COLOR GRADING ===（Web LP のクイックではメタスライダー列ごと省略し LUT を広く） */}
+          {!isPro && slots.hideQuickMetaSliders ? null : (
           <div className={`min-w-0 ${isPro ? "" : "order-2 @min-[560px]:order-2"}`}>
             <SectionHeader title={tFilmLab("controls.color")} />
             {isPro ? (
@@ -665,6 +659,7 @@ export function FilmLabControlPanelCore({
             </div>
             )}
           </div>
+          )}
 
           {/* === EFFECTS (Pro only) === */}
           {isPro ? (
@@ -740,10 +735,16 @@ export function FilmLabControlPanelCore({
             </div>
           ) : (
           <div
-            className={`min-w-0 ${isPro ? "@min-[560px]:col-span-2" : "order-1 @min-[560px]:order-1"}`}
+            className={`min-w-0 ${
+              isPro || slots.hideQuickMetaSliders
+                ? "@min-[560px]:col-span-2"
+                : "order-1 @min-[560px]:order-1"
+            }`}
           >
             <LUTPanel viewport={viewport} onCubeLutLoaded={onLutLoadSuccess} onLutChange={onLutChange} />
             {slots.renderAfterLut ? slots.renderAfterLut(coreRenderContext) : slots.afterLut}
+            {/* クイックモードはシンプルに保つため、比較ガイド・スプリット切替 UI は Pro のみ表示 */}
+            {isPro ? (
             <div className="mt-3 rounded-xl border border-white/[0.08] bg-gradient-to-b from-white/[0.04] to-black/20 p-3">
               <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.12em] text-white/60">
                 {tFilmLab("compare.sectionTitle")}
@@ -843,6 +844,7 @@ export function FilmLabControlPanelCore({
                 </div>
               </div>
             </div>
+            ) : null}
             {canToggleHistogram ? (
               <div className="mt-3 border-t border-white/[0.06] pt-3">
                 <ToggleHeader

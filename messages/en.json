@@ -318,13 +318,31 @@
     },
     "toolbar": {
       "open": "Open media",
-      "savePng": "Save PNG"
+      "savePng": "Save PNG",
+      "exportMp4": "Export graded video (beta: MP4 or WebM, no audio)"
+    },
+    "webExport": {
+      "preparing": "Preparing Web export…",
+      "progressEncode": "Encoding frame {current} / {total}…",
+      "finalizing": "Finalizing MP4…",
+      "done": "Download started (MP4 if H.264 is available, otherwise WebM). No audio in this beta.",
+      "errorNoVideo": "Open a video file first (MP4 / WebM / MOV).",
+      "errorCompareMode": "Turn off A/B compare before exporting video.",
+      "errorTooLong": "Export limit exceeded: {message}",
+      "errorNoWebCodecs": "This browser cannot encode video. Try the latest Chrome or Edge. ({message})",
+      "errorGeneric": "Export failed: {message}"
     },
     "canvas": {
       "webgl2Required": "WebGL2 is required for Filmtone",
       "dropHint": "Drop image, video, or .cube LUT",
       "loadingMedia": "Loading media…",
       "dismissError": "OK"
+    },
+    "lutPanel": {
+      "creativeMix": "LUT mix",
+      "creativeMixDisabledHint": "Load a .cube file first",
+      "logMix": "Log LUT mix",
+      "logMixDisabledHint": "Load a log conversion .cube first"
     },
     "back": "← Back to Interactive",
     "metadata": {
@@ -378,7 +396,7 @@
     "mode": {
       "quick": "Quick",
       "pro": "Pro",
-      "hintShort": "Quick: three bundled sliders + presets. Pro: per-parameter controls, Bloom/Halation detail, LUT.",
+      "toggleGroupAria": "Switch between Quick and Pro layouts",
       "hint": "Quick uses three meta sliders (film character, era, dynamics) for broad changes. Pro shows every slider plus tone detail, effects, Bloom, Halation, and LUT.",
       "hintInfoAria": "Quick vs Pro"
     },

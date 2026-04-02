@@ -12,9 +12,10 @@
 
 /**
  * パネル最外の「カード」面（Web の既定 `surface="card"`）。
+ * 外側パネルと同様に backdrop で背面をぼかす（ネストしてもグラスブラーが途切れにくい程度の透過）。
  */
 export const filmLabPanelSurfaceCard =
-  "@container w-full min-w-0 rounded-lg border border-white/[0.06] bg-black/60 p-4 backdrop-blur-xl sm:p-5";
+  "@container w-full min-w-0 rounded-lg border border-white/12 bg-black/65 p-4 backdrop-blur-xl backdrop-saturate-150 sm:p-5";
 
 /**
  * Desktop 右パネルなど、`surface="bare"` のときの幅・アダプタ用ラッパー。
@@ -23,26 +24,22 @@ export const filmLabPanelSurfaceBare = "@container w-full min-w-0";
 
 /**
  * Quick / Pro 切替の外枠（角丸ボーダーのグループ）。
+ * モバイルは横幅いっぱいのセグメント、sm 以上は中身幅に収まる inline-flex（右に無駄な空きを出さない）。
  */
-export const filmLabModeToggleGroupShell = "flex rounded-lg border border-white/10 p-0.5";
+export const filmLabModeToggleGroupShell =
+  "flex w-full max-w-full flex-nowrap items-stretch gap-0.5 rounded-lg border border-white/10 p-1 sm:inline-flex sm:w-auto";
 
 /**
  * モード切替ボタン共通（アクティブ状態は `filmLabModeToggleSegmentActive` / `filmLabModeToggleSegmentInactive` と併用）。
  */
 export const filmLabModeToggleButtonBase =
-  "min-w-[4rem] flex-1 whitespace-nowrap rounded-md px-3 py-2 text-center text-[11px] font-medium transition-colors sm:flex-none sm:px-4";
+  "min-w-[4rem] flex-1 whitespace-nowrap rounded-md px-3 py-2 text-center text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/65 focus-visible:ring-offset-2 focus-visible:ring-offset-black/50 sm:flex-none sm:px-4";
 
 /** 選択中のモードセグメント */
 export const filmLabModeToggleSegmentActive = "bg-[var(--accent-amber1)] text-black";
 
 /** 非選択のモードセグメント */
 export const filmLabModeToggleSegmentInactive = "text-white/55 hover:text-white/75";
-
-/**
- * モード説明の短いキャプション（右寄せの薄い字）。
- */
-export const filmLabModeHintCaption =
-  "min-w-0 flex-1 text-right text-[10px] leading-snug text-white/35";
 
 /**
  * Presets ブロック下の区切り（下ボーダー + 余白）。

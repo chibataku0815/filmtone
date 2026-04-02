@@ -13,7 +13,6 @@ export {
 export {
   filmLabCollapsibleHeaderButton,
   filmLabDonationPresentRowShell,
-  filmLabModeHintCaption,
   filmLabModeToggleButtonBase,
   filmLabModeToggleButtonClassName,
   filmLabModeToggleGroupShell,
@@ -35,6 +34,10 @@ export {
   type FilmLabCanvasRef,
   type FilmLabInteractiveSourceInfo,
 } from "./FilmLabCanvasPackageEntry";
+export {
+  FilmLabWebglPanelBackdrop,
+  type FilmLabWebglPanelBackdropProps,
+} from "./FilmLabWebglPanelBackdrop";
 export {
   FilmLabControlPanelCore,
   type FilmLabControlPanelCoreSlots,

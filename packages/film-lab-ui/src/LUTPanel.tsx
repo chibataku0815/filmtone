@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { parseCube } from "film-lab-core";
+import { FILM_LAB_NEXT_INTL_NAMESPACE } from "./filmLabUiContract";
 import { ControlSlider } from "./ui/ControlSlider";
 import type { Viewport } from "film-lab-renderer";
 
@@ -17,6 +19,8 @@ interface LUTPanelProps {
 }
 
 export function LUTPanel({ viewport, onCubeLutLoaded, onLutChange }: LUTPanelProps) {
+  const tFilmLab = useTranslations(FILM_LAB_NEXT_INTL_NAMESPACE);
+
   // --- Creative LUT (main slot) ---
   const [lutName, setLutName] = useState<string | null>(null);
   const [intensity, setIntensity] = useState(1.0);
@@ -165,58 +169,61 @@ export function LUTPanel({ viewport, onCubeLutLoaded, onLutChange }: LUTPanelPro
         LUT
       </h3>
 
-      {/* ── Creative LUT: main slot ── */}
-      <div className="rounded-lg border border-white/[0.08] bg-white/[0.02] p-2.5">
-        <div className="flex items-center gap-2">
+      {/* ── Creative LUT: main slot（内側 Inset は Log と同じ p-4、ボタンは py-2 で枠に貼り付かない） ── */}
+      <div className="rounded-lg border border-white/[0.08] bg-white/[0.02] p-4">
+        <div className="flex min-h-10 items-center gap-3">
           <button
+            type="button"
             onClick={handleLoad}
             disabled={!viewport}
-            className="shrink-0 rounded bg-white/5 px-2.5 py-1 text-[11px] text-white/60 transition-colors hover:bg-white/10 hover:text-white/80 disabled:cursor-not-allowed disabled:opacity-30"
+            className="shrink-0 rounded-md bg-white/5 px-3 py-2 text-[11px] leading-tight text-white/60 transition-colors hover:bg-white/10 hover:text-white/80 disabled:cursor-not-allowed disabled:opacity-30"
           >
             Load .cube
           </button>
           {lutName ? (
             <>
-              <span className="flex-1 truncate font-mono text-[10px] text-[var(--accent-amber1)]">
+              <span className="min-w-0 flex-1 truncate py-1 font-mono text-[10px] text-[var(--accent-amber1)]">
                 {lutName}
               </span>
               <button
+                type="button"
                 onClick={handleClear}
-                className="shrink-0 text-[10px] text-white/30 transition-colors hover:text-white/60"
+                className="shrink-0 rounded-md px-2 py-2 text-[10px] text-white/30 transition-colors hover:bg-white/[0.06] hover:text-white/60"
               >
                 Clear
               </button>
             </>
           ) : (
-            <span className="text-[10px] text-white/25">
+            <span className="py-1 text-[10px] leading-snug text-white/25">
               Film look / creative grade
             </span>
           )}
         </div>
 
         {error && (
-          <p className="mt-1.5 text-[10px] text-red-400">{error}</p>
+          <p className="mt-3 text-[10px] text-red-400">{error}</p>
         )}
 
-        {lutName && (
-          <div className="mt-2">
-            <ControlSlider
-              label="LUT Mix"
-              value={intensity}
-              min={0}
-              max={1}
-              step={0.01}
-              defaultValue={1}
-              onChange={handleIntensity}
-            />
-          </div>
-        )}
+        <div className="mt-4">
+          <ControlSlider
+            label={tFilmLab("lutPanel.creativeMix")}
+            hint={!lutName ? tFilmLab("lutPanel.creativeMixDisabledHint") : undefined}
+            value={intensity}
+            min={0}
+            max={1}
+            step={0.01}
+            defaultValue={1}
+            onChange={handleIntensity}
+            disabled={!lutName || !viewport}
+          />
+        </div>
       </div>
 
-      {/* ── Log Conversion: advanced slot ── */}
-      <div className="mt-2">
+      {/* ── Log Conversion: advanced slot（見出しとカードの間は gap、カード内は四方同じ p-4） ── */}
+      <div className="mt-3 flex flex-col gap-3">
         <button
-          className="flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-[10px] font-medium uppercase tracking-[0.15em] text-white/40 transition-colors hover:bg-white/[0.03] hover:text-white/60"
+          type="button"
+          className="flex w-full items-center gap-1.5 rounded-md px-1 py-2 text-left text-[10px] font-medium uppercase tracking-[0.15em] text-white/40 transition-colors hover:bg-white/[0.03] hover:text-white/60"
           onClick={() => setLogOpen(!logOpen)}
         >
           <span
@@ -235,56 +242,58 @@ export function LUTPanel({ viewport, onCubeLutLoaded, onLutChange }: LUTPanelPro
         </button>
 
         {logOpen && (
-          <div className="mt-1.5 rounded-lg border border-white/[0.08] bg-white/[0.02] p-2.5">
-            <p className="mb-2 text-[10px] leading-snug text-white/35">
+          <div className="rounded-lg border border-white/[0.08] bg-white/[0.02] p-4">
+            <p className="mb-4 text-[10px] leading-relaxed text-white/35">
               For Log footage (S-Log3, V-Log, Apple Log).
               Applied before color grading.
             </p>
 
-            <div className="flex items-center gap-2">
+            <div className="flex min-h-10 items-center gap-3">
               <button
+                type="button"
                 onClick={handleLogLoad}
                 disabled={!viewport}
-                className="shrink-0 rounded bg-white/5 px-2.5 py-1 text-[11px] text-white/60 transition-colors hover:bg-white/10 hover:text-white/80 disabled:cursor-not-allowed disabled:opacity-30"
+                className="shrink-0 rounded-md bg-white/5 px-3 py-2 text-[11px] leading-tight text-white/60 transition-colors hover:bg-white/10 hover:text-white/80 disabled:cursor-not-allowed disabled:opacity-30"
               >
                 Load .cube
               </button>
               {logLutName ? (
                 <>
-                  <span className="flex-1 truncate font-mono text-[10px] text-[var(--accent-amber1)]">
+                  <span className="min-w-0 flex-1 truncate py-1 font-mono text-[10px] text-[var(--accent-amber1)]">
                     {logLutName}
                   </span>
                   <button
+                    type="button"
                     onClick={handleLogClear}
-                    className="shrink-0 text-[10px] text-white/30 transition-colors hover:text-white/60"
+                    className="shrink-0 rounded-md px-2 py-2 text-[10px] text-white/30 transition-colors hover:bg-white/[0.06] hover:text-white/60"
                   >
                     Clear
                   </button>
                 </>
               ) : (
-                <span className="text-[10px] text-white/25">
+                <span className="py-1 text-[10px] leading-snug text-white/25">
                   S-Log3, V-Log, Apple Log ...
                 </span>
               )}
             </div>
 
             {logError && (
-              <p className="mt-1.5 text-[10px] text-red-400">{logError}</p>
+              <p className="mt-3 text-[10px] text-red-400">{logError}</p>
             )}
 
-            {logLutName && (
-              <div className="mt-2">
-                <ControlSlider
-                  label="Log Mix"
-                  value={logIntensity}
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  defaultValue={1}
-                  onChange={handleLogIntensity}
-                />
-              </div>
-            )}
+            <div className="mt-3.5">
+              <ControlSlider
+                label={tFilmLab("lutPanel.logMix")}
+                hint={!logLutName ? tFilmLab("lutPanel.logMixDisabledHint") : undefined}
+                value={logIntensity}
+                min={0}
+                max={1}
+                step={0.01}
+                defaultValue={1}
+                onChange={handleLogIntensity}
+                disabled={!logLutName || !viewport}
+              />
+            </div>
           </div>
         )}
       </div>

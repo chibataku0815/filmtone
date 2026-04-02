@@ -318,13 +318,31 @@
     },
     "toolbar": {
       "open": "メディアを開く",
-      "savePng": "PNGを保存"
+      "savePng": "PNGを保存",
+      "exportMp4": "グレード済み動画を書き出す（ベータ: MP4 または WebM・音声なし）"
+    },
+    "webExport": {
+      "preparing": "Web 書き出しを準備しています…",
+      "progressEncode": "エンコード中 {current} / {total}…",
+      "finalizing": "MP4 を仕上げています…",
+      "done": "ダウンロードを開始しました（H.264 が使えれば MP4、できなければ WebM。ベータ版は音声なし）。",
+      "errorNoVideo": "先に動画ファイルを開いてください（MP4 / WebM / MOV）。",
+      "errorCompareMode": "動画書き出しの前に A/B 比較をオフにしてください。",
+      "errorTooLong": "書き出し上限を超えています: {message}",
+      "errorNoWebCodecs": "このブラウザでは動画エンコードできません。最新の Chrome または Edge を試してください。（{message}）",
+      "errorGeneric": "書き出しに失敗しました: {message}"
     },
     "canvas": {
       "webgl2Required": "Filmtone を使うには WebGL2 が必要です",
       "dropHint": "画像・動画・.cube LUT をドロップ",
       "loadingMedia": "読み込み中…",
       "dismissError": "OK"
+    },
+    "lutPanel": {
+      "creativeMix": "LUT の強さ",
+      "creativeMixDisabledHint": "まず .cube を読み込んでください",
+      "logMix": "ログ LUT の強さ",
+      "logMixDisabledHint": "ログ用の .cube を読み込んでください"
     },
     "back": "← Interactive に戻る",
     "metadata": {
@@ -378,7 +396,7 @@
     "mode": {
       "quick": "クイック",
       "pro": "プロ",
-      "hintShort": "クイック＝3本のまとめ調整とプリセット。プロ＝個別スライダー・Bloom/Halation 詳細・LUT。",
+      "toggleGroupAria": "クイックとプロの表示切り替え",
       "hint": "クイックはプリセットと3本のメタスライダー（フィルム調・新旧・ダイナミック）で粗く調整。プロは露出・彩度などを1本ずつ、トーン詳細・エフェクト・Bloom・Halation・LUT も表示します。",
       "hintInfoAria": "クイックとプロの違い"
     },
