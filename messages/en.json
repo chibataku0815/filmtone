@@ -893,6 +893,11 @@
       "typeFixed": "Fixed",
       "typeChanged": "Changed",
       "entries": {
+        "v031Title": "Beta browser video export and Desktop reliability fixes",
+        "v031WebVideoExportBeta": "Added beta graded video export in the browser so short clips can be tested without leaving the web experience.",
+        "v031WebBrowserReliability": "Improved browser export reliability and added clearer Safari guidance, with Chrome, Edge, or Filmtone Desktop recommended when needed.",
+        "v031FinderThumb": "Fixed a black-thumbnail issue where graded MP4 exports could look broken in Finder or Quick Look even though playback was fine.",
+        "v031MovHandling": "Improved video import fallback for files whose MIME type is missing or unreliable, including MOV-style inputs.",
         "v030Title": "Desktop workflow refinement and clearer export",
         "v030ExportIa": "Clearer separation between photo batch export and single-video export — top tabs, overlay panel, and toolbar reduce guesswork.",
         "v030ExportSource": "The preview you are grading is bridged into export as the default input where appropriate, reducing wrong-file mistakes.",

@@ -893,6 +893,11 @@
       "typeFixed": "修正",
       "typeChanged": "変更",
       "entries": {
+        "v031Title": "ブラウザ動画書き出し beta と Desktop 信頼性修正",
+        "v031WebVideoExportBeta": "短い graded clip をブラウザから試せる beta の動画書き出しを追加しました。",
+        "v031WebBrowserReliability": "ブラウザ書き出しの安定性を改善し、Safari の制約をより分かりやすく案内します。必要に応じて Chrome、Edge、または Filmtone Desktop を勧めます。",
+        "v031FinderThumb": "graded MP4 が Finder や Quick Look で黒サムネに見えることがある問題を修正し、再生は正常なのに壊れて見える状態を減らしました。",
+        "v031MovHandling": "MIME が空、または不安定な動画でも拡張子から扱いやすくし、MOV 系入力の取り込み信頼性を改善しました。",
         "v030Title": "デスクトップワークフローの整理と書き出し体験の改善",
         "v030ExportIa": "写真のまとめ書き出しと動画 1 本の書き出しを、上段タブ・パネル・ツールバーで切り替えやすくしました。",
         "v030ExportSource": "編集でプレビューしている素材を、書き出し側の既定入力へ自然につなぎ、取り違えを減らします。",
