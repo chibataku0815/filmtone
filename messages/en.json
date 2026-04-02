@@ -330,7 +330,10 @@
       "errorCompareMode": "Turn off A/B compare before exporting video.",
       "errorTooLong": "Export limit exceeded: {message}",
       "errorNoWebCodecs": "This browser cannot encode video. Try the latest Chrome or Edge. ({message})",
-      "errorGeneric": "Export failed: {message}"
+      "errorGeneric": "Export failed: {message}",
+      "safariBanner": "Safari does not support the in-browser video export beta. Open this page in Chrome or Edge, or export from Filmtone Desktop.",
+      "safariAttempted": "Video export in Safari is not supported. Please use Chrome or Edge.",
+      "exportTitleSafari": "Video export unavailable in Safari — use Chrome or Edge"
     },
     "canvas": {
       "webgl2Required": "WebGL2 is required for Filmtone",

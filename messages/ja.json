@@ -330,7 +330,10 @@
       "errorCompareMode": "動画書き出しの前に A/B 比較をオフにしてください。",
       "errorTooLong": "書き出し上限を超えています: {message}",
       "errorNoWebCodecs": "このブラウザでは動画エンコードできません。最新の Chrome または Edge を試してください。（{message}）",
-      "errorGeneric": "書き出しに失敗しました: {message}"
+      "errorGeneric": "書き出しに失敗しました: {message}",
+      "safariBanner": "Safari では Web の動画書き出し（ベータ）に非対応です。Chrome または Edge で開くか、Filmtone Desktop で書き出してください。",
+      "safariAttempted": "Safari では Web 書き出しを利用できません。Chrome / Edge をご利用ください。",
+      "exportTitleSafari": "動画書き出し: Safari では利用不可（Chrome / Edge を使用）"
     },
     "canvas": {
       "webgl2Required": "Filmtone を使うには WebGL2 が必要です",
