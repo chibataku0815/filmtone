@@ -346,6 +346,9 @@
         "pauseAria": "動画を一時停止",
         "timelineAria": "再生位置を移動",
         "disabledDuringBusy": "書き出し中またはプレビュー固定中は操作できません。"
+      },
+      "filmstrip": {
+        "stripAria": "動画のおおよその位置が分かるサムネイル列"
       }
     },
     "lutPanel": {

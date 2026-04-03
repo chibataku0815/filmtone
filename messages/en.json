@@ -346,6 +346,9 @@
         "pauseAria": "Pause video preview",
         "timelineAria": "Seek preview time",
         "disabledDuringBusy": "Playback is locked while export or preview hold is active."
+      },
+      "filmstrip": {
+        "stripAria": "Approximate video timeline thumbnails"
       }
     },
     "lutPanel": {

@@ -9,7 +9,7 @@
  * - スクラブ中は動画を一時停止し、指／ポインタを離したあと「シーク前に再生中だった」なら再開します。
  *
  * @limitations
- * - フィルムストリップ風サムネイルは **未対応**（別 Issue）。ここはプログレスバーのみです。
+ * - フィルムストリップは **目安サムネ**（life#102）。現在位置の読み取り補助であり、正確なフレーム編集には使えません。
  * - `Space` は `document` のバブルフェーズで拾います。Compare モードでは Core が Capture で先に処理するため競合しません。
  */
 
@@ -23,6 +23,11 @@ import {
 import { useTranslations } from "next-intl";
 import type { FilmLabCanvasRef } from "./FilmLabCanvas";
 import { FILM_LAB_NEXT_INTL_NAMESPACE } from "./filmLabUiContract";
+import { VideoFilmstripStrip } from "./VideoFilmstripStrip";
+import {
+  FILMSTRIP_THUMB_WIDTH_PX,
+  useVideoFilmstripThumbnails,
+} from "./useVideoFilmstripThumbnails";
 
 /**
  * @description トランスポートに必要な ref。キャンバスと同じインスタンスを渡してください。
@@ -93,11 +98,15 @@ export function VideoTransportControls({
   className,
 }: VideoTransportControlsProps) {
   const tTransport = useTranslations(`${FILM_LAB_NEXT_INTL_NAMESPACE}.canvas.transport`);
+  const tFilmstrip = useTranslations(`${FILM_LAB_NEXT_INTL_NAMESPACE}.canvas.filmstrip`);
 
   const scrubbingRef = useRef(false);
   const scrubTimeRef = useRef(0);
   const wasPlayingBeforeScrubRef = useRef(false);
   const trackRef = useRef<HTMLDivElement | null>(null);
+  const filmstripMediaKeyRef = useRef("");
+  const [filmstripMediaKey, setFilmstripMediaKey] = useState("");
+  const [filmstripRegenTick, setFilmstripRegenTick] = useState(0);
 
   const [panel, setPanel] = useState<{
     open: boolean;
@@ -159,6 +168,10 @@ export function VideoTransportControls({
               }
             : p,
         );
+        if (filmstripMediaKeyRef.current !== "") {
+          filmstripMediaKeyRef.current = "";
+          setFilmstripMediaKey("");
+        }
         return;
       }
       const suppressed = api.isVideoPlaybackSuppressed();
@@ -175,6 +188,10 @@ export function VideoTransportControls({
               }
             : p,
         );
+        if (filmstripMediaKeyRef.current !== "") {
+          filmstripMediaKeyRef.current = "";
+          setFilmstripMediaKey("");
+        }
         return;
       }
       const currentTime = scrubbingRef.current
@@ -199,10 +216,33 @@ export function VideoTransportControls({
         }
         return next;
       });
+
+      const previewVideo = api.getActiveVideoElement();
+      const nextFilmstripKey =
+        next.open &&
+        previewVideo &&
+        playback.hasVideo &&
+        Number.isFinite(playback.duration) &&
+        playback.duration > 0
+          ? `${previewVideo.currentSrc}|${playback.duration.toFixed(3)}`
+          : "";
+      if (nextFilmstripKey !== filmstripMediaKeyRef.current) {
+        filmstripMediaKeyRef.current = nextFilmstripKey;
+        setFilmstripMediaKey(nextFilmstripKey);
+      }
     };
     raf = window.requestAnimationFrame(tick);
     return () => window.cancelAnimationFrame(raf);
   }, [filmLabCanvasRef]);
+
+  const { thumbnails: filmstripThumbnails, isGenerating: filmstripGenerating } =
+    useVideoFilmstripThumbnails({
+      filmLabCanvasRef,
+      scrubbingRef,
+      mediaKey: filmstripMediaKey,
+      thumbWidthPx: FILMSTRIP_THUMB_WIDTH_PX,
+      regenTick: filmstripRegenTick,
+    });
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -278,12 +318,13 @@ export function VideoTransportControls({
     if (!api.isVideoPlaybackSuppressed() && wasPlayingBeforeScrubRef.current) {
       api.videoPlaybackPlay();
     }
+    setFilmstripRegenTick((n) => n + 1);
   };
 
   return (
     <div
       className={[
-        "pointer-events-auto flex items-center gap-2 border-t border-white/10 bg-black/55 px-2 py-1.5 backdrop-blur-sm",
+        "pointer-events-auto flex min-w-0 flex-col gap-1 bg-transparent py-4",
         className ?? "",
       ]
         .filter(Boolean)
@@ -291,64 +332,78 @@ export function VideoTransportControls({
       role="group"
       aria-label={tTransport("regionAria")}
     >
-      <button
-        type="button"
-        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-white/12 bg-white/5 text-white/90 transition-colors hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+      <VideoFilmstripStrip
+        thumbnails={filmstripThumbnails}
+        isGenerating={filmstripGenerating}
+        currentTime={panel.currentTime}
+        duration={panel.duration}
         disabled={disabled}
-        aria-label={panel.isPlaying ? tTransport("pauseAria") : tTransport("playAria")}
-        title={disabled ? tTransport("disabledDuringBusy") : undefined}
-        onClick={() => {
-          const api = filmLabCanvasRef.current;
-          if (!api || disabled) {
-            return;
-          }
-          api.videoPlaybackTogglePlayPause();
-        }}
-      >
-        {panel.isPlaying ? <PauseGlyph /> : <PlayGlyph />}
-      </button>
+        thumbWidthPx={FILMSTRIP_THUMB_WIDTH_PX}
+        stripAriaLabel={tFilmstrip("stripAria")}
+      />
 
-      <div
-        ref={trackRef}
-        className="relative h-2 min-w-0 flex-1 cursor-pointer rounded-full bg-white/10"
-        role="slider"
-        tabIndex={0}
-        aria-label={tTransport("timelineAria")}
-        aria-valuemin={0}
-        aria-valuemax={Math.max(0, dur)}
-        aria-valuenow={panel.currentTime}
-        aria-disabled={disabled}
-        onKeyDown={(e) => {
-          if (disabled || !(Number.isFinite(dur) && dur > 0)) {
-            return;
-          }
-          const step = Math.max(0.05, dur / 200);
-          const api = filmLabCanvasRef.current;
-          if (!api) {
-            return;
-          }
-          if (e.key === "ArrowLeft") {
-            e.preventDefault();
-            api.videoPlaybackSeek(panel.currentTime - step);
-          } else if (e.key === "ArrowRight") {
-            e.preventDefault();
-            api.videoPlaybackSeek(panel.currentTime + step);
-          }
-        }}
-        onPointerDown={onScrubPointerDown}
-        onPointerMove={onScrubPointerMove}
-        onPointerUp={endScrub}
-        onPointerCancel={endScrub}
-      >
-        <div
-          className="absolute inset-y-0 left-0 rounded-full bg-white/55"
-          style={{ width: `${progress * 100}%` }}
-        />
+      <div className="mx-4 rounded-[1.2rem] border border-white/[0.09] bg-black/28 px-4 py-3 shadow-[0_12px_32px_rgba(0,0,0,0.24)] backdrop-blur-md">
+        <div className="flex min-w-0 items-center gap-2">
+          <button
+            type="button"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-white/12 bg-white/5 text-white/90 transition-colors hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={disabled}
+            aria-label={panel.isPlaying ? tTransport("pauseAria") : tTransport("playAria")}
+            title={disabled ? tTransport("disabledDuringBusy") : undefined}
+            onClick={() => {
+              const api = filmLabCanvasRef.current;
+              if (!api || disabled) {
+                return;
+              }
+              api.videoPlaybackTogglePlayPause();
+            }}
+          >
+            {panel.isPlaying ? <PauseGlyph /> : <PlayGlyph />}
+          </button>
+
+          <div
+            ref={trackRef}
+            className="relative h-2 min-w-0 flex-1 cursor-pointer rounded-full bg-white/10"
+            role="slider"
+            tabIndex={0}
+            aria-label={tTransport("timelineAria")}
+            aria-valuemin={0}
+            aria-valuemax={Math.max(0, dur)}
+            aria-valuenow={panel.currentTime}
+            aria-disabled={disabled}
+            onKeyDown={(e) => {
+              if (disabled || !(Number.isFinite(dur) && dur > 0)) {
+                return;
+              }
+              const step = Math.max(0.05, dur / 200);
+              const api = filmLabCanvasRef.current;
+              if (!api) {
+                return;
+              }
+              if (e.key === "ArrowLeft") {
+                e.preventDefault();
+                api.videoPlaybackSeek(panel.currentTime - step);
+              } else if (e.key === "ArrowRight") {
+                e.preventDefault();
+                api.videoPlaybackSeek(panel.currentTime + step);
+              }
+            }}
+            onPointerDown={onScrubPointerDown}
+            onPointerMove={onScrubPointerMove}
+            onPointerUp={endScrub}
+            onPointerCancel={endScrub}
+          >
+            <div
+              className="absolute inset-y-0 left-0 rounded-full bg-white/55"
+              style={{ width: `${progress * 100}%` }}
+            />
+          </div>
+
+          <span className="shrink-0 tabular-nums text-[11px] text-white/70">
+            {formatClock(panel.currentTime)} / {formatClock(panel.duration)}
+          </span>
+        </div>
       </div>
-
-      <span className="shrink-0 tabular-nums text-[11px] text-white/70">
-        {formatClock(panel.currentTime)} / {formatClock(panel.duration)}
-      </span>
     </div>
   );
 }

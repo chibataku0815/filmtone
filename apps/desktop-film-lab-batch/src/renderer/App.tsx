@@ -360,7 +360,12 @@ export default function App() {
    * @description 右スライドパネルを画面内に出すか。全幅で同じ挙動。パネルは DOM を維持し `translateX` のみ（内部状態を捨てない）。
    */
   const [editRightPaneExpanded, setEditRightPaneExpanded] = useState(true);
-
+  /**
+   * @description 右パネル展開中は filmstrip / transport だけを左レーンへ収める。
+   */
+  const editTransportClassName = editRightPaneExpanded
+    ? "absolute bottom-0 left-0 z-[18] right-[min(clamp(320px,42vw,680px),calc(100%-1.5rem))]"
+    : "absolute bottom-0 left-0 right-0 z-[18]";
   /** @description 写真／動画の書き出しタブへ入ったとき右パネルを自動展開（Canvas 横にインライン表示） */
   useEffect(() => {
     if (tab === "photoExport" || tab === "videoExport") {
@@ -1228,7 +1233,7 @@ export default function App() {
                 getFileAbsolutePath={resolveCanvasFileAbsolutePath}
               />
               <div
-                className={`pointer-events-none absolute left-4 z-10 ${canvasHasUserVideo ? "bottom-14" : "bottom-4"}`}
+                className={`pointer-events-none absolute left-4 z-[24] ${canvasHasUserVideo ? "bottom-52" : "bottom-4"}`}
               >
                 <Histogram
                   viewport={viewport}
@@ -1238,7 +1243,7 @@ export default function App() {
               </div>
               <VideoTransportControls
                 filmLabCanvasRef={filmLabCanvasRef}
-                className="absolute bottom-0 left-0 right-0 z-[18]"
+                className={editTransportClassName}
               />
             </section>
 
