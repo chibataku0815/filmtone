@@ -3,7 +3,11 @@ import { PARAM_KEYS, type Params } from "./params";
 import { PRESETS, type PresetName } from "./presets";
 import { PRESET_VERSION } from "./look-ids";
 
-/** grainRadialMix だけ省略時 1（後方互換）、lensSoftness は省略時 0 */
+/**
+ * grainRadialMix は省略時 1（後方互換）、lensSoftness は省略時 0。
+ * 0.4.0 追加: compressionRange は省略時 0.5、それ以外の新 process keys は省略時 0。
+ * デフォルト付きキーは Remotion や旧 JSON の grace fallback として機能する。
+ */
 const paramShape = Object.fromEntries(
   PARAM_KEYS.map((key) => [
     key,
@@ -11,7 +15,13 @@ const paramShape = Object.fromEntries(
       ? z.number().min(0).max(1).default(1)
       : key === "lensSoftness"
         ? z.number().min(0).max(1).default(0)
-        : z.number(),
+        : key === "compressionRange"
+          ? z.number().min(0).max(1).default(0.5)
+          : key === "compressionAmount" || key === "printContrast"
+            ? z.number().min(0).max(1).default(0)
+            : key === "cyan" || key === "magenta" || key === "yellow"
+              ? z.number().min(-1).max(1).default(0)
+              : z.number(),
   ]),
 ) as z.ZodRawShape;
 

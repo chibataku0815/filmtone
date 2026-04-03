@@ -23,4 +23,5 @@ export const LOOK_ID_BY_PRESET: Record<PresetName, string> = {
   ektar100: lookIdForPreset("ektar100"),
   superia400: lookIdForPreset("superia400"),
   cinestill800t: lookIdForPreset("cinestill800t"),
+  velvia50: lookIdForPreset("velvia50"),
 };

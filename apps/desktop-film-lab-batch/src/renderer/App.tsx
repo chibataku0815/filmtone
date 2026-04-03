@@ -316,13 +316,16 @@ export default function App() {
 
   /**
    * @description 更新通知の購読。アンマウント時に解除する。
+   *   bare Vite でレンダラだけ開いたときは `window.filmLabBatch` が無いので何もしない（Electron では preload が注入する）。
    */
   useEffect(() => {
-    const unsubscribe = window.filmLabBatch.subscribeDesktopUpdateAvailable(
-      (payload) => {
-        setDesktopUpdateBanner(payload);
-      },
-    );
+    const api = window.filmLabBatch;
+    if (!api?.subscribeDesktopUpdateAvailable) {
+      return;
+    }
+    const unsubscribe = api.subscribeDesktopUpdateAvailable((payload) => {
+      setDesktopUpdateBanner(payload);
+    });
     return unsubscribe;
   }, []);
 
@@ -330,7 +333,11 @@ export default function App() {
    * @description 写真バッチ／動画書き出し中は main 側で通知をキューに残す
    */
   useEffect(() => {
-    void window.filmLabBatch.setExportBusyForUpdateCheck(running);
+    const api = window.filmLabBatch;
+    if (!api?.setExportBusyForUpdateCheck) {
+      return;
+    }
+    void api.setExportBusyForUpdateCheck(running);
   }, [running]);
 
   /**
@@ -376,7 +383,16 @@ export default function App() {
 
   useEffect(() => {
     void (async () => {
-      const raw = await window.filmLabBatch.readBatchSession();
+      const api = window.filmLabBatch;
+      /**
+       * @description bare Vite のように preload bridge が無い実行環境では、
+       * Desktop 固有の永続化復元をスキップしてクラッシュを防ぐ。
+       */
+      if (!api?.readBatchSession || !api?.getDesktopPrefs) {
+        return;
+      }
+
+      const raw = await api.readBatchSession();
       const parsed = raw ? parseFilmLabBatchSessionV1(raw) : null;
       if (parsed) {
         setPersistedSession(parsed);
@@ -396,7 +412,7 @@ export default function App() {
         }
         return;
       }
-      const prefs = await window.filmLabBatch.getDesktopPrefs();
+      const prefs = await api.getDesktopPrefs();
       if (prefs.lastInputDir) setInputDir(prefs.lastInputDir);
       if (prefs.lastOutputDir) setOutputDir(prefs.lastOutputDir);
     })();
@@ -1349,88 +1365,94 @@ export default function App() {
                     </button>
                   </div>
                 </div>
-                {tab === "edit" ? (
-                  <>
-                    <div
-                      className="fl-scroll-surface fl-right-panel-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 pr-5 lg:pr-8"
-                      role="tabpanel"
-                      id="film-lab-edit-tabpanel"
-                      aria-labelledby="film-lab-tab-edit"
-                    >
-                      <FilmLabControlPanelCore
-                        viewport={viewport}
-                        histogramVisible={histogramVisible}
-                        surface="bare"
-                        onHistogramToggle={handleHistogramToggle}
-                        onPresetChange={setCanvasPreset}
-                        onLutChange={handleEditLutChange}
-                        onParamsChange={handleEditParamsChange}
+                {/*
+                 * Edit タブと Export タブの **中身を常にマウント**し、表示だけ `hidden` で切り替える。
+                 * 以前は `tab === "edit"` のときだけ FilmLabControlPanelCore を描画していたため、
+                 * 写真／動画書き出しタブへ切り替えるたびにパネルがアンマウント→reducer が cinematic に初期化され、
+                 * viewport.setParams が Process などをデフォルトへ戻していた（life#92 写真ギャップの主因候補）。
+                 */}
+                <div
+                  className={`flex min-h-0 min-w-0 flex-1 flex-col ${tab === "edit" ? "" : "hidden"}`}
+                  role="tabpanel"
+                  id="film-lab-edit-tabpanel"
+                  aria-labelledby="film-lab-tab-edit"
+                  hidden={tab !== "edit"}
+                >
+                  <div className="fl-scroll-surface fl-right-panel-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 pr-5 lg:pr-8">
+                    <FilmLabControlPanelCore
+                      viewport={viewport}
+                      histogramVisible={histogramVisible}
+                      surface="bare"
+                      onHistogramToggle={handleHistogramToggle}
+                      onPresetChange={setCanvasPreset}
+                      onLutChange={handleEditLutChange}
+                      onParamsChange={handleEditParamsChange}
+                    />
+                  </div>
+                  <div className="fl-sticky-footer fl-surface-frost rounded-b-xl">
+                    {(() => {
+                      const syncState = editToExportSyncedAtMs === null
+                        ? "unsynced"
+                        : paramsChangeNonce !== syncedAtNonce
+                          ? "stale"
+                          : "synced";
+                      return (
+                        <button
+                          type="button"
+                          className={[
+                            "inline-flex items-center justify-center min-h-[40px] w-full sm:w-auto sm:min-w-[220px]",
+                            syncState === "synced"
+                              ? "rounded-lg bg-[var(--slate-4)] px-4 py-2 text-sm font-medium text-[var(--slate-11)] transition-colors hover:bg-[var(--slate-5)]"
+                              : "fl-btn-primary",
+                            syncState === "stale"
+                              ? "animate-[fl-pulse-soft_2s_ease-in-out_infinite]"
+                              : "",
+                          ].join(" ")}
+                          onClick={syncPreviewToBatch}
+                        >
+                          <span className="inline-flex items-center gap-1.5">
+                            {syncState === "synced" ? (
+                              <><CheckCircle size={16} weight="fill" aria-hidden />{tApp("sendGradeToExportSynced", {
+                                time: new Date(editToExportSyncedAtMs!).toLocaleTimeString(
+                                  locale === "ja" ? "ja-JP" : "en-US",
+                                  { hour: "2-digit", minute: "2-digit" },
+                                ),
+                              })}</>
+                            ) : syncState === "stale" ? (
+                              <><ArrowClockwise size={16} weight="bold" aria-hidden />{tApp("sendGradeToExportStale")}</>
+                            ) : (
+                              <><Export size={14} weight="bold" aria-hidden />{tApp("sendGradeToExport")}</>
+                            )}
+                          </span>
+                        </button>
+                      );
+                    })()}
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <p className="fl-caption">{tApp("sendGradeCaption")}</p>
+                      <HelpHint
+                        tip={tApp("sendGradeTip")}
+                        assistiveLabel={tApp("sendGradeTipAria")}
                       />
                     </div>
-                    <div className="fl-sticky-footer fl-surface-frost rounded-b-xl">
-                      {(() => {
-                        const syncState = editToExportSyncedAtMs === null
-                          ? "unsynced"
-                          : paramsChangeNonce !== syncedAtNonce
-                            ? "stale"
-                            : "synced";
-                        return (
-                          <button
-                            type="button"
-                            className={[
-                              "inline-flex items-center justify-center min-h-[40px] w-full sm:w-auto sm:min-w-[220px]",
-                              syncState === "synced"
-                                ? "rounded-lg bg-[var(--slate-4)] px-4 py-2 text-sm font-medium text-[var(--slate-11)] transition-colors hover:bg-[var(--slate-5)]"
-                                : "fl-btn-primary",
-                              syncState === "stale"
-                                ? "animate-[fl-pulse-soft_2s_ease-in-out_infinite]"
-                                : "",
-                            ].join(" ")}
-                            onClick={syncPreviewToBatch}
-                          >
-                            <span className="inline-flex items-center gap-1.5">
-                              {syncState === "synced" ? (
-                                <><CheckCircle size={16} weight="fill" aria-hidden />{tApp("sendGradeToExportSynced", {
-                                  time: new Date(editToExportSyncedAtMs!).toLocaleTimeString(
-                                    locale === "ja" ? "ja-JP" : "en-US",
-                                    { hour: "2-digit", minute: "2-digit" },
-                                  ),
-                                })}</>
-                              ) : syncState === "stale" ? (
-                                <><ArrowClockwise size={16} weight="bold" aria-hidden />{tApp("sendGradeToExportStale")}</>
-                              ) : (
-                                <><Export size={14} weight="bold" aria-hidden />{tApp("sendGradeToExport")}</>
-                              )}
-                            </span>
-                          </button>
-                        );
-                      })()}
-                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                        <p className="fl-caption">{tApp("sendGradeCaption")}</p>
-                        <HelpHint
-                          tip={tApp("sendGradeTip")}
-                          assistiveLabel={tApp("sendGradeTipAria")}
-                        />
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div
-                      className="fl-scroll-surface fl-right-panel-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 pr-5 lg:pr-8"
-                      role="tabpanel"
-                      id="film-lab-export-tabpanel"
-                      aria-labelledby={
-                        tab === "photoExport"
-                          ? "film-lab-tab-photo"
-                          : "film-lab-tab-video"
-                      }
-                      aria-label={
-                        tab === "photoExport"
-                          ? tApp("tabPhotoExportAria")
-                          : tApp("tabVideoExportAria")
-                      }
-                    >
+                  </div>
+                </div>
+                <div
+                  className={`flex min-h-0 min-w-0 flex-1 flex-col ${tab !== "edit" ? "" : "hidden"}`}
+                  role="tabpanel"
+                  id="film-lab-export-tabpanel"
+                  aria-labelledby={
+                    tab === "photoExport"
+                      ? "film-lab-tab-photo"
+                      : "film-lab-tab-video"
+                  }
+                  aria-label={
+                    tab === "photoExport"
+                      ? tApp("tabPhotoExportAria")
+                      : tApp("tabVideoExportAria")
+                  }
+                  hidden={tab === "edit"}
+                >
+                  <div className="fl-scroll-surface fl-right-panel-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 pr-5 lg:pr-8">
                       {tab === "photoExport" ? (
                         <PhotoExportPanel
                           compact
@@ -1564,8 +1586,7 @@ export default function App() {
                         onRunVideoExport={runVideoExport}
                       />
                     </div>
-                  </>
-                )}
+                </div>
                 </div>
               </section>
             </div>

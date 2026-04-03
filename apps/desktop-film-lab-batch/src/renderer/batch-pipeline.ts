@@ -187,8 +187,19 @@ export async function resolveGradeFromJsonText(
       lutSize = cube.size;
     }
 
+    /**
+     * @description wrapper 形式の grade は古い JSON 由来で一部キーが欠ける場合があるため、
+     * ここで shared schema を通して既定値を補完する。
+     */
+    const normalizedGrade = filmLabParamsSchema.safeParse(g.grade);
+    if (!normalizedGrade.success) {
+      throw new Error(
+        `resolveGradeFromJsonText(wrapper): grade の検証失敗 — ${normalizedGrade.error.message}`,
+      );
+    }
+
     return {
-      params: g.grade,
+      params: normalizedGrade.data,
       lut1Intensity: g.lut1Intensity ?? 1,
       lut1Data,
       lut1Size,

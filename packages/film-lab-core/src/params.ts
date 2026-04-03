@@ -27,6 +27,19 @@ export const PARAM_KEYS = [
   "highlightTone",
   "shadowHue",
   "highlightHue",
+  // === 0.4.0 新規: Film Process (Negative Stage / Print Stage) ===
+  /** フィルム latitude 圧縮量（0=なし、1=フル圧縮）。range: 0–1 */
+  "compressionAmount",
+  /** 圧縮の shoulder/toe 幅（0=急峻、1=緩やか）。range: 0–1 */
+  "compressionRange",
+  /** 印画紙コントラスト（0=no effect、1=最大硬調）。range: 0–1 */
+  "printContrast",
+  /** CMY enlarger color head: Cyan filter（-1〜1、0=ニュートラル）。range: -1–1 */
+  "cyan",
+  /** CMY enlarger color head: Magenta filter（-1〜1、0=ニュートラル）。range: -1–1 */
+  "magenta",
+  /** CMY enlarger color head: Yellow filter（-1〜1、0=ニュートラル）。range: -1–1 */
+  "yellow",
 ] as const;
 
 export type ParamKey = (typeof PARAM_KEYS)[number];
@@ -59,6 +72,19 @@ export interface Params {
   shadowHue: number;
   /** ハイライトスプリットトーンの色相（度 0〜360） */
   highlightHue: number;
+  // === 0.4.0 新規: Film Process ===
+  /** フィルム latitude 圧縮量（0=なし、1=フル圧縮）。negative ステージに適用。 */
+  compressionAmount: number;
+  /** 圧縮の shoulder/toe 幅（0=急峻、1=緩やか）。compressionAmount > 0 のとき有効。 */
+  compressionRange: number;
+  /** 印画紙コントラスト（0=no effect、1=最大硬調）。print ステージに適用。 */
+  printContrast: number;
+  /** CMY enlarger color head: Cyan filter（-1〜1、0=ニュートラル）。print ステージ。 */
+  cyan: number;
+  /** CMY enlarger color head: Magenta filter（-1〜1、0=ニュートラル）。print ステージ。 */
+  magenta: number;
+  /** CMY enlarger color head: Yellow filter（-1〜1、0=ニュートラル）。print ステージ。 */
+  yellow: number;
 }
 
 export function cloneParams(params: Params): Params {

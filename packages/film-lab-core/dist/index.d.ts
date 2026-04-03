@@ -3,7 +3,7 @@ import { z } from 'zod';
 /**
  * Film Lab のグレード数値パラメータ定義（ブラウザ・Remotion 共通の単一の真実）
  */
-declare const PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "grainIntensity", "grainRadialMix", "vignette", "bloomThreshold", "bloomStrength", "bloomRadius", "halationIntensity", "halationSpread", "halationHue", "fade", "highlights", "shadows", "shadowTone", "highlightTone", "shadowHue", "highlightHue"];
+declare const PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "grainIntensity", "grainRadialMix", "vignette", "bloomThreshold", "bloomStrength", "bloomRadius", "halationIntensity", "halationSpread", "halationHue", "fade", "highlights", "shadows", "shadowTone", "highlightTone", "shadowHue", "highlightHue", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow"];
 type ParamKey = (typeof PARAM_KEYS)[number];
 interface Params {
     exposure: number;
@@ -33,6 +33,18 @@ interface Params {
     shadowHue: number;
     /** ハイライトスプリットトーンの色相（度 0〜360） */
     highlightHue: number;
+    /** フィルム latitude 圧縮量（0=なし、1=フル圧縮）。negative ステージに適用。 */
+    compressionAmount: number;
+    /** 圧縮の shoulder/toe 幅（0=急峻、1=緩やか）。compressionAmount > 0 のとき有効。 */
+    compressionRange: number;
+    /** 印画紙コントラスト（0=no effect、1=最大硬調）。print ステージに適用。 */
+    printContrast: number;
+    /** CMY enlarger color head: Cyan filter（-1〜1、0=ニュートラル）。print ステージ。 */
+    cyan: number;
+    /** CMY enlarger color head: Magenta filter（-1〜1、0=ニュートラル）。print ステージ。 */
+    magenta: number;
+    /** CMY enlarger color head: Yellow filter（-1〜1、0=ニュートラル）。print ステージ。 */
+    yellow: number;
 }
 declare function cloneParams(params: Params): Params;
 
@@ -68,6 +80,12 @@ declare const PRESETS: {
         highlightTone: number;
         shadowHue: number;
         highlightHue: number;
+        compressionAmount: number;
+        compressionRange: number;
+        printContrast: number;
+        cyan: number;
+        magenta: number;
+        yellow: number;
     };
     /**
      * cinematic プリセット（v2・2026-03-31）
@@ -97,6 +115,12 @@ declare const PRESETS: {
         highlightTone: number;
         shadowHue: number;
         highlightHue: number;
+        compressionAmount: number;
+        compressionRange: number;
+        printContrast: number;
+        cyan: number;
+        magenta: number;
+        yellow: number;
     };
     portra: {
         exposure: number;
@@ -122,6 +146,12 @@ declare const PRESETS: {
         highlightTone: number;
         shadowHue: number;
         highlightHue: number;
+        compressionAmount: number;
+        compressionRange: number;
+        printContrast: number;
+        cyan: number;
+        magenta: number;
+        yellow: number;
     };
     gold200: {
         exposure: number;
@@ -147,6 +177,12 @@ declare const PRESETS: {
         highlightTone: number;
         shadowHue: number;
         highlightHue: number;
+        compressionAmount: number;
+        compressionRange: number;
+        printContrast: number;
+        cyan: number;
+        magenta: number;
+        yellow: number;
     };
     pro400h: {
         exposure: number;
@@ -172,6 +208,12 @@ declare const PRESETS: {
         highlightTone: number;
         shadowHue: number;
         highlightHue: number;
+        compressionAmount: number;
+        compressionRange: number;
+        printContrast: number;
+        cyan: number;
+        magenta: number;
+        yellow: number;
     };
     bw: {
         exposure: number;
@@ -197,6 +239,12 @@ declare const PRESETS: {
         highlightTone: number;
         shadowHue: number;
         highlightHue: number;
+        compressionAmount: number;
+        compressionRange: number;
+        printContrast: number;
+        cyan: number;
+        magenta: number;
+        yellow: number;
     };
     ektar100: {
         exposure: number;
@@ -222,6 +270,12 @@ declare const PRESETS: {
         highlightTone: number;
         shadowHue: number;
         highlightHue: number;
+        compressionAmount: number;
+        compressionRange: number;
+        printContrast: number;
+        cyan: number;
+        magenta: number;
+        yellow: number;
     };
     superia400: {
         exposure: number;
@@ -247,6 +301,12 @@ declare const PRESETS: {
         highlightTone: number;
         shadowHue: number;
         highlightHue: number;
+        compressionAmount: number;
+        compressionRange: number;
+        printContrast: number;
+        cyan: number;
+        magenta: number;
+        yellow: number;
     };
     cinestill800t: {
         exposure: number;
@@ -272,6 +332,48 @@ declare const PRESETS: {
         highlightTone: number;
         shadowHue: number;
         highlightHue: number;
+        compressionAmount: number;
+        compressionRange: number;
+        printContrast: number;
+        cyan: number;
+        magenta: number;
+        yellow: number;
+    };
+    /**
+     * Velvia 50 プリセット（v1・2026-04-02）
+     * @description Fujifilm Velvia 50 スライドポジフィルム。高彩度・高コントラスト・極細粒・ハレーションなし。
+     * fade=0 でポジらしい黒沈みを表現。saturation/contrast は Velvia の代名詞の鮮烈さに合わせた。
+     */
+    velvia50: {
+        exposure: number;
+        contrast: number;
+        saturation: number;
+        temperature: number;
+        tint: number;
+        rgbShift: number;
+        lensSoftness: number;
+        grainIntensity: number;
+        grainRadialMix: number;
+        vignette: number;
+        bloomThreshold: number;
+        bloomStrength: number;
+        bloomRadius: number;
+        halationIntensity: number;
+        halationSpread: number;
+        halationHue: number;
+        fade: number;
+        highlights: number;
+        shadows: number;
+        shadowTone: number;
+        highlightTone: number;
+        shadowHue: number;
+        highlightHue: number;
+        compressionAmount: number;
+        compressionRange: number;
+        printContrast: number;
+        cyan: number;
+        magenta: number;
+        yellow: number;
     };
 };
 type PresetName = keyof typeof PRESETS;
@@ -288,14 +390,25 @@ declare function findMatchingPreset(params: Params): PresetName | null;
 /**
  * プリセットバーに並べる表示用メタ情報。
  *
- * 概要: ボタンの見出しと短い説明文だけをまとめ、Web / Desktop で同じ順番・同じ文言を使えるようにする。
+ * 概要: ボタンの見出し・短い説明文・カテゴリ分類・Print Medium ドキュメントをまとめ、
+ *       Web / Desktop で同じ順番・同じ文言を使えるようにする。
  * 仕様: `name` は `PRESETS` のキーと一致し、UI はこの配列順で表示できる。
- * 制限: 見た目用の文言だけを持つ。色や数値パラメータ自体は `PRESETS` を参照する。
+ * 制限: 見た目用の文言とメタ情報のみ。数値パラメータ自体は `PRESETS` を参照する。
+ *
+ * category:
+ *   - "filmStock"  : 実フィルムのエミュレーション。Film Stock セレクターに表示する。
+ *   - "look"       : フィルムではないスタイル（Teal & Orange 等）。Film Stock とは別枠。
+ *   - "utility"    : reset など。セレクターの外側に配置する。
+ *
+ * printMedium (ドキュメント用・シリアライズしない):
+ *   各プリセットが暗黙的に想定している印画媒体。UI に出さず、将来の Print Medium 独立 UI への橋渡し用。
  */
 declare const PRESET_BUTTONS: {
     name: PresetName;
     label: string;
     subtitle: string;
+    category: "filmStock" | "look" | "utility";
+    printMedium?: "color_negative" | "silver_gelatin" | "tungsten_cinema" | "slide_positive";
 }[];
 
 /**
