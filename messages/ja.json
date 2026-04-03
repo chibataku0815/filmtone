@@ -833,6 +833,14 @@
           "title": "Web デモのプレビュー調整（v0.3）",
           "description": "ブラウザ版のプレビュー高さとメディア表示を整え、Desktop に近い見え方へ寄せました。"
         },
+        "desktopFilmProcess040": {
+          "title": "Desktop v0.4 — フィルムプロセス系コントロール",
+          "description": "圧縮量・圧縮レンジ・プリントコントラスト・シアン／マゼンタ／イエローのトリムを追加。ブラウザデモのプレビューと Desktop 書き出しで値が揃います。"
+        },
+        "quickProFilmStock040": {
+          "title": "Quick / Pro の整理と Film Stock ピッカー（v0.4）",
+          "description": "Quick は最短導線に、Pro はプロセス・アーティファクト・ソーストリム・LUT の順で見えるように再編。プリセット面はカテゴリ分けし、Velvia 50 などのストックを cinematic や reset と混同しにくくしました。"
+        },
         "presetExpansion": {
           "title": "プリセット追加",
           "description": "初期の 4 種に加え、新しいフィルムストック・クリエイティブルックを順次追加。"
@@ -865,6 +873,10 @@
           "title": "LUT 書き出し",
           "description": "グレードを .cube LUT として出力し、DaVinci Resolve・Premiere 等で利用可能に。"
         },
+        "filmDeveloperFuture": {
+          "title": "フィルム風デベロップ段（検討中）",
+          "description": "専用のデベロップ相当ステップを Filmtone に置くかを検討中です。v0.4 には含めず、時期と範囲は未定です。"
+        },
         "mobileApp": {
           "title": "モバイルアプリ",
           "description": "外出先でもすばやくグレーディングできる軽量モバイル版。"
@@ -892,6 +904,12 @@
       "typeFixed": "修正",
       "typeChanged": "変更",
       "entries": {
+        "v040Title": "フィルムプロセス系コントロールと Quick / Pro・ピッカーの整理",
+        "v040FilmProcess": "圧縮量・レンジ・プリントコントラスト・CMY トリムを追加。Web プレビューと Desktop 書き出しで同じ値が通ります。",
+        "v040QuickProIa": "Quick は最短の操作順に、Pro はプロセス → アーティファクト → ソーストリム → LUT の流れで見えるよう再編しました。",
+        "v040FilmStockPicker": "Film Stock のプリセット面をカテゴリで整理し、Velvia 50 などを探しやすくしました。",
+        "v040PanelStability": "Desktop でタブを切り替えてもコントロールパネルを不必要に破棄せず、写真プレビュー中にプロセス設定が勝手に消えにくくしました。",
+        "v040ShareCompat": "共有 URL と入出力の互換を保ちつつ、新しいプロセス系パラメータも運べるようにしました。",
         "v031Title": "ブラウザ動画書き出し beta と Desktop 信頼性修正",
         "v031WebVideoExportBeta": "短い graded clip をブラウザから試せる beta の動画書き出しを追加しました。",
         "v031WebBrowserReliability": "ブラウザ書き出しの安定性を改善し、Safari の制約をより分かりやすく案内します。必要に応じて Chrome、Edge、または Filmtone Desktop を勧めます。",

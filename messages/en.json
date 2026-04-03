@@ -831,6 +831,14 @@
           "title": "Web demo preview tuning (v0.3)",
           "description": "Adjusted preview sizing and media presentation in the browser demo for a closer match to Desktop."
         },
+        "desktopFilmProcess040": {
+          "title": "Desktop v0.4 — film process controls",
+          "description": "Compression, compression range, print contrast, and cyan / magenta / yellow trim — aligned between the browser demo preview and Desktop export."
+        },
+        "quickProFilmStock040": {
+          "title": "Quick / Pro layout and Film Stock picker (v0.4)",
+          "description": "Quick stays on the shortest path; Pro exposes process, artifacts, source trim, and LUT in order. Preset surfaces group film stocks with clearer boundaries (including stocks like Velvia 50)."
+        },
         "presetExpansion": {
           "title": "Preset expansion",
           "description": "Additional film stocks and creative looks beyond the initial four."
@@ -863,6 +871,10 @@
           "title": "LUT export",
           "description": "Export your grade as a .cube LUT for use in DaVinci Resolve, Premiere, and other editors."
         },
+        "filmDeveloperFuture": {
+          "title": "Film-style develop step (under evaluation)",
+          "description": "Exploring whether a dedicated develop-style stage fits Filmtone. Not included in v0.4; timing and scope are TBD."
+        },
         "mobileApp": {
           "title": "Mobile app",
           "description": "A lightweight mobile companion for quick grading on the go."
@@ -890,6 +902,12 @@
       "typeFixed": "Fixed",
       "typeChanged": "Changed",
       "entries": {
+        "v040Title": "Film process controls, Quick / Pro refresh, and picker polish",
+        "v040FilmProcess": "Added film process controls — compression, range, print contrast, and CMY trim — with Web preview and Desktop export staying in sync.",
+        "v040QuickProIa": "Reorganized Quick (shortest path) vs Pro (process, artifacts, source trim, LUT) so the panel matches how people work.",
+        "v040FilmStockPicker": "Film Stock surfaces use category grouping so presets like Velvia 50 are easier to find alongside cinematic and reset options.",
+        "v040PanelStability": "Desktop keeps the control panel mounted across tab switches so photo preview no longer drops process settings unexpectedly.",
+        "v040ShareCompat": "Shared URLs and import/export paths stay backward compatible while carrying the new process fields when present.",
         "v031Title": "Beta browser video export and Desktop reliability fixes",
         "v031WebVideoExportBeta": "Added beta graded video export in the browser so short clips can be tested without leaving the web experience.",
         "v031WebBrowserReliability": "Improved browser export reliability and added clearer Safari guidance, with Chrome, Edge, or Filmtone Desktop recommended when needed.",
