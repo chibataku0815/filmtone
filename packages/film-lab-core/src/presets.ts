@@ -331,36 +331,6 @@ export const PRESETS = {
     magenta: 0,
     yellow: 0,
   },
-  /**
-   * Velvia 50 プリセット（v1・2026-04-02）
-   * @description Fujifilm Velvia 50 スライドポジフィルム。高彩度・高コントラスト・極細粒・ハレーションなし。
-   * fade=0 でポジらしい黒沈みを表現。saturation/contrast は Velvia の代名詞の鮮烈さに合わせた。
-   */
-  velvia50: {
-    exposure: 0,
-    contrast: 1.35,
-    saturation: 1.45,
-    temperature: 0.04,
-    tint: 0,
-    rgbShift: 0,
-    lensSoftness: 0,
-    grainIntensity: 0.02,
-    grainRadialMix: 1,
-    vignette: 0.1,
-    bloomThreshold: 0.9,
-    bloomStrength: 0.05,
-    bloomRadius: 0.3,
-    halationIntensity: 0,
-    halationSpread: 15,
-    halationHue: 0,
-    fade: 0,
-    highlights: 0.05,
-    shadows: -0.05,
-    shadowTone: 0,
-    highlightTone: 0,
-    shadowHue: FILM_LAB_DEFAULT_SHADOW_HUE,
-    highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
-  },
 } satisfies Record<string, Params>;
 
 export type PresetName = keyof typeof PRESETS;
