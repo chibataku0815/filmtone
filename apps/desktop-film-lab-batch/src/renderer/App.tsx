@@ -36,6 +36,7 @@ import {
 import { FilmLabControlPanelCore } from "film-lab-ui";
 import { Histogram } from "film-lab-ui";
 import { HelpHint } from "./batch-tab/HelpHint";
+import { GradeSyncToast, type GradeSyncToastPayload } from "./GradeSyncToast";
 import type { Viewport } from "film-lab-renderer";
 import type { PresetName } from "film-lab-core";
 import {
@@ -281,9 +282,11 @@ export default function App() {
    */
   const [videoExportSuccessNonce, setVideoExportSuccessNonce] = useState(0);
   /**
-   * @description 編集→書き出し同期の結果をヘッダー下に出す（ログは書き出しタブ下部のため、編集だけ見ていると気づきにくい問題の対策）
+   * @description 編集→書き出し同期の結果を画面下のガラス風トーストで出す（ログは書き出しタブ下部のため、編集だけ見ていると気づきにくい問題の対策）
    */
-  const [gradeSyncNotice, setGradeSyncNotice] = useState<string | null>(null);
+  const [gradeSyncNotice, setGradeSyncNotice] = useState<GradeSyncToastPayload | null>(
+    null,
+  );
   /**
    * @description 編集→書き出しへ同期が成功した時刻（ms）。null のときは JSON 由来でもプリセット起点でも「直近は編集同期ではない」。
    */
@@ -642,7 +645,10 @@ export default function App() {
   const syncPreviewToBatch = useCallback(() => {
     if (!viewport) {
       appendLog(tLogs("syncNoViewport"));
-      setGradeSyncNotice(tApp("syncGradeNoViewport"));
+      setGradeSyncNotice({
+        message: tApp("syncGradeNoViewport"),
+        variant: "info",
+      });
       return;
     }
     try {
@@ -662,11 +668,17 @@ export default function App() {
       setEditToExportSyncedAtMs(Date.now());
       setSyncedAtNonce(paramsChangeNonce);
       appendLog(tLogs("syncCopied"));
-      setGradeSyncNotice(tApp("syncGradeOk"));
+      setGradeSyncNotice({
+        message: tApp("syncGradeOk"),
+        variant: "success",
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       appendLog(tLogs("syncException", { msg }));
-      setGradeSyncNotice(tApp("syncGradeError", { msg }));
+      setGradeSyncNotice({
+        message: tApp("syncGradeError", { msg }),
+        variant: "error",
+      });
     }
   }, [
     viewport,
@@ -1155,15 +1167,7 @@ export default function App() {
       {/* macOS drag zone — traffic lights sit here */}
       <div className="fl-drag-zone" />
 
-      {gradeSyncNotice ? (
-        <div
-          className="border-b border-[var(--amber-9)] bg-[var(--fl-bg-subtle)] px-4 py-2 text-xs leading-snug text-[var(--fl-text-primary)] shadow-[inset_0_2px_0_0_var(--amber-9)]"
-          role="status"
-          aria-live="polite"
-        >
-          {gradeSyncNotice}
-        </div>
-      ) : null}
+      <GradeSyncToast payload={gradeSyncNotice} />
 
       {desktopUpdateBanner ? (
         <div

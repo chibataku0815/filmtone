@@ -83,6 +83,98 @@ body {
 }
 
 /**
+ * @description `film-lab-ui` の `ControlSlider` は `appearance-none` 付きの range。
+ * Web の `apps/web/src/app/globals.css` と同じ thumb スタイルをデスクトップにも載せないと、
+ * Chromium（Electron）でつまみのヒット領域が実質使えず「トラッククリックは効くがドラッグできない」になる。
+ * @see apps/web/src/app/globals.css（Film Lab Slider / Halation Hue Slider）
+ */
+
+/* === Film Lab Slider（Web と同型） === */
+.film-lab-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent-amber1);
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(255, 180, 50, 0.4);
+  transition: transform 0.15s ease;
+}
+
+.film-lab-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent-amber1);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 6px rgba(255, 180, 50, 0.4);
+}
+
+.film-lab-slider:hover::-webkit-slider-thumb {
+  transform: scale(1.2);
+}
+
+@media (min-width: 640px) {
+  .film-lab-slider::-webkit-slider-thumb {
+    width: 12px;
+    height: 12px;
+  }
+
+  .film-lab-slider::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+  }
+}
+
+/* === Halation Hue Slider（Web と同型） === */
+.halation-hue-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  transition: transform 0.15s ease;
+}
+
+.halation-hue-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.halation-hue-slider:hover::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+
+@media (min-width: 640px) {
+  .halation-hue-slider::-webkit-slider-thumb {
+    width: 12px;
+    height: 12px;
+  }
+
+  .halation-hue-slider::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+  }
+}
+
+/**
+ * @description Frameless ウィンドウで `-webkit-app-region: drag` が広がったときに備え、
+ * range を OS のウィンドウドラッグから除外する（Electron 公式の推奨パターン）。
+ */
+.film-lab-desktop-root input[type="range"] {
+  -webkit-app-region: no-drag;
+}
+
+/**
  * @description 編集タブはウィンドウ外周を黒いマットにせず、Electron の vibrancy を薄く透かす。
  * コンテンツが覆い切らない余白だけがガラスの縁に見えるようにする。
  */
@@ -94,6 +186,128 @@ body {
 
 .film-lab-desktop-root--edit::before {
   content: none;
+}
+
+/**
+ * @description 「書き出しへ送る」後の同期メッセージ用フローティングトースト（下中央）。
+ * 枠線は使わず、blur＋影で浮かせます。`GradeSyncToast.tsx` が `document.body` へ Portal します。
+ */
+@keyframes fl-grade-sync-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.fl-grade-sync-toast {
+  pointer-events: none;
+  position: fixed;
+  bottom: max(1.5rem, env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  z-index: 70;
+  max-width: min(28rem, calc(100vw - 2rem));
+  transform: translateX(-50%);
+  animation: fl-grade-sync-toast-in 0.22s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fl-grade-sync-toast {
+    animation: none;
+  }
+}
+
+/**
+ * @description すりガラス面。`border` は付けず、外側シャドウと内側の弱いハイライトで縁を作ります。
+ */
+.fl-grade-sync-toast__surface {
+  position: relative;
+  overflow: hidden;
+  border: none;
+  border-radius: 14px;
+  padding: 0.65rem 1rem 0.65rem 0.85rem;
+  background: color-mix(in srgb, var(--slate-3) 68%, transparent);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  box-shadow:
+    0 10px 40px rgba(0, 0, 0, 0.5),
+    0 2px 12px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/**
+ * @description 透明を嫌う環境では blur を弱め、面を少し濃くして読みやすくします。
+ */
+@media (prefers-reduced-transparency: reduce) {
+  .fl-grade-sync-toast__surface {
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    background: color-mix(in srgb, var(--slate-3) 88%, transparent);
+  }
+}
+
+/**
+ * @description 左アクセント（線の border ではなく細いグラデの帯）。種類で色が変わります。
+ */
+.fl-grade-sync-toast__surface::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 14px 0 0 14px;
+  pointer-events: none;
+}
+
+.fl-grade-sync-toast__surface--success::before {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--amber-9) 95%, transparent),
+    color-mix(in srgb, var(--amber-11) 75%, transparent)
+  );
+  box-shadow: 2px 0 12px color-mix(in srgb, var(--amber-9) 35%, transparent);
+}
+
+.fl-grade-sync-toast__surface--info::before {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--amber-10) 80%, transparent),
+    color-mix(in srgb, var(--amber-9) 50%, transparent)
+  );
+}
+
+.fl-grade-sync-toast__surface--error::before {
+  background: linear-gradient(
+    180deg,
+    rgba(248, 113, 113, 0.95),
+    rgba(185, 28, 28, 0.65)
+  );
+  box-shadow: 2px 0 12px rgba(248, 113, 113, 0.25);
+}
+
+.fl-grade-sync-toast__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+}
+
+/**
+ * @description 本文。長い翻訳でも折り返しやすい行長です。
+ */
+.fl-grade-sync-toast__text {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--fl-text-primary);
+}
+
+.fl-grade-sync-toast__surface--error .fl-grade-sync-toast__text {
+  color: color-mix(in srgb, #fecaca 88%, var(--fl-text-primary));
 }
 
 /**
