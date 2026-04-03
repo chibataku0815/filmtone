@@ -6,6 +6,8 @@
  *   Pass 2-4: Bloom threshold → blur H → blur V (1/2 res)
  *   Pass 5-7: Halation threshold+tint → blur H → blur V (1/4 res)
  *   Pass 8: Composite (A + bloom + halation + vignette + grain + split) → screen
+ *   Pass 9+: Post-composite seam for #100 light shafts → #99 dust/scratches
+ *            (#97 slow shutter hooks into the same seam later)
  */
 
 import * as THREE from "three";
@@ -86,6 +88,10 @@ export class Viewport {
   private rtHalation1: THREE.WebGLRenderTarget | null = null;
   /** A/B 比較: スロット A の最終合成（分割なし）を書き込む */
   private rtCompareComposite: THREE.WebGLRenderTarget | null = null;
+  /** #98 で確保する将来の post-composite 用フル解像度 RT（左側） */
+  private rtPostComposite0: THREE.WebGLRenderTarget | null = null;
+  /** #98 で確保する将来の post-composite 用フル解像度 RT（右側） */
+  private rtPostComposite1: THREE.WebGLRenderTarget | null = null;
 
   /** true のとき render() でスロット A→RT、続けてスロット B を画面に分割表示 */
   private abCompareEnabled = false;
@@ -299,6 +305,35 @@ export class Viewport {
     const hh = Math.max(1, Math.floor(h / 4));
     this.rtHalation0!.setSize(hw, hh);
     this.rtHalation1!.setSize(hw, hh);
+    this.resizePostCompositeRenderTargets(w, h);
+  }
+
+  /**
+   * #98 の post-composite seam が有効になったときだけ、中間 RT を作る。
+   * 無効時は呼ばれないので、Pass 8 だけの現在挙動に余計なコストを足さない。
+   */
+  private ensurePostCompositeRenderTargets(): void {
+    if (this.rtPostComposite0) return;
+    if (!this.hasRenderableResolution()) return;
+
+    const w = this.width;
+    const h = this.height;
+    this.rtPostComposite0 = new THREE.WebGLRenderTarget(w, h, RT_OPTIONS);
+    this.rtPostComposite1 = new THREE.WebGLRenderTarget(w, h, RT_OPTIONS);
+  }
+
+  /**
+   * #98 の post-composite seam で使う RT を、画面サイズに合わせて広げ直す。
+   *
+   * @param w 幅
+   * @param h 高さ
+   */
+  private resizePostCompositeRenderTargets(w: number, h: number): void {
+    if (!this.rtPostComposite0 || !this.rtPostComposite1) return;
+    if (w <= 0 || h <= 0) return;
+
+    this.rtPostComposite0.setSize(w, h);
+    this.rtPostComposite1.setSize(w, h);
   }
 
   // ===== Multi-pass render =====
@@ -325,6 +360,150 @@ export class Viewport {
       Math.max(0, rgbShift * ABERRATION_EDGE_SOFTEN_SCALE),
     );
     cu.uLensSoftness!.value = this.lensSoftness;
+  }
+
+  /**
+   * #98 時点では post-composite effect がまだ無いので false 固定。
+   * 後続 issue が light shafts / dust / slow shutter をここへつなぐ。
+   */
+  private hasPostCompositeChain(): boolean {
+    return false;
+  }
+
+  /**
+   * Pass 1〜7 をまとめて実行する。
+   * ここではまだ composite へは行かず、Pass 8 の入力を作るだけにする。
+   *
+   * @param renderer 描画先
+   * @param scene 元シーン
+   * @param camera 元カメラ
+   */
+  private renderBasePipeline(
+    renderer: THREE.WebGLRenderer,
+    scene: THREE.Scene,
+    camera: THREE.Camera,
+  ): void {
+    renderer.setRenderTarget(this.rtColorGraded);
+    renderer.render(scene, camera);
+
+    const bloomOn = this.bloomStrength > 0;
+    const halationOn = this.halationIntensity > 0;
+
+    if (bloomOn) {
+      this.renderBloom(renderer);
+    }
+
+    if (halationOn) {
+      this.renderHalation(renderer);
+    }
+  }
+
+  /**
+   * Pass 8 の合成を 1 箇所へまとめる。
+   *
+   * @param renderer 描画先
+   * @param target 出力先 RT。`null` なら画面に出す。
+   * @param splitPosition 分割線の位置
+   * @param abCompare A/B 比較かどうか
+   * @param originalTexture 左側に見せる元画像
+   */
+  private renderCompositeFrame(
+    renderer: THREE.WebGLRenderer,
+    target: THREE.WebGLRenderTarget | null,
+    splitPosition: number,
+    abCompare: number,
+    originalTexture: THREE.Texture,
+  ): void {
+    const cu = this.compositeMaterial.uniforms;
+    this.syncCompositeUniformsFromMaterial();
+    cu.uSplitPosition!.value = splitPosition;
+    cu.uAbCompare!.value = abCompare;
+    cu.uOriginalTexture!.value = originalTexture;
+
+    const black = getBlackTexture();
+    const bloomOn = this.bloomStrength > 0;
+    const halationOn = this.halationIntensity > 0;
+    cu.uSource!.value = this.rtColorGraded!.texture;
+    cu.uBloomTexture!.value = bloomOn ? this.rtBloom0!.texture : black;
+    cu.uHalationTexture!.value = halationOn ? this.rtHalation0!.texture : black;
+    this.postMesh.material = this.compositeMaterial;
+    renderer.setRenderTarget(target);
+    renderer.render(this.postScene, this.postCamera);
+  }
+
+  /**
+   * 最終出力の入口。
+   * #98 では post-composite chain が無い限り、Pass 8 をそのまま target に出す。
+   * chain が有効になったときだけ、中間 RT を使って後段へ渡す。
+   *
+   * @param renderer 描画先
+   * @param target 出力先 RT。`null` なら画面に出す。
+   * @param originalTexture 左側に見せる元画像
+   * @param splitPosition 分割線の位置
+   * @param abCompare A/B 比較かどうか
+   */
+  private renderFinalFrame(
+    renderer: THREE.WebGLRenderer,
+    target: THREE.WebGLRenderTarget | null,
+    originalTexture: THREE.Texture,
+    splitPosition: number,
+    abCompare: number,
+  ): void {
+    if (!this.hasPostCompositeChain()) {
+      this.renderCompositeFrame(
+        renderer,
+        target,
+        splitPosition,
+        abCompare,
+        originalTexture,
+      );
+      return;
+    }
+
+    this.ensurePostCompositeRenderTargets();
+    if (!this.rtPostComposite0 || !this.rtPostComposite1) {
+      this.renderCompositeFrame(
+        renderer,
+        target,
+        splitPosition,
+        abCompare,
+        originalTexture,
+      );
+      return;
+    }
+
+    this.renderCompositeFrame(
+      renderer,
+      this.rtPostComposite0,
+      splitPosition,
+      abCompare,
+      originalTexture,
+    );
+    this.renderPostCompositeChain(
+      renderer,
+      this.rtPostComposite0.texture,
+      target,
+    );
+  }
+
+  /**
+   * Pass 9+ の受け皿。
+   * ここに #100 light shafts → #99 dust/scratches を置き、#97 slow shutter は
+   * 同じ seam を別 pass として使う前提にする。
+   *
+   * @param renderer 描画先
+   * @param sourceTexture 直前の post-composite 出力
+   * @param target 最終出力先
+   */
+  private renderPostCompositeChain(
+    renderer: THREE.WebGLRenderer,
+    sourceTexture: THREE.Texture,
+    target: THREE.WebGLRenderTarget | null,
+  ): void {
+    void renderer;
+    void sourceTexture;
+    void target;
+    // #98 では seam だけを用意する。後続 issue がここへ pass を差し込む。
   }
 
   /**
@@ -358,35 +537,15 @@ export class Viewport {
       return;
     }
 
-    const cu = this.compositeMaterial.uniforms;
     const mu = this.material.uniforms;
-    this.syncCompositeUniformsFromMaterial();
-    cu.uSplitPosition!.value = mu.uSplitPosition!.value;
-    cu.uOriginalTexture!.value = mu.uTexture!.value;
-    cu.uAbCompare!.value = 0.0;
-
-    // Pass 1: Color grade → RT_A
-    renderer.setRenderTarget(this.rtColorGraded);
-    renderer.render(scene, camera);
-
-    const bloomOn = this.bloomStrength > 0;
-    const halationOn = this.halationIntensity > 0;
-
-    if (bloomOn) {
-      this.renderBloom(renderer);
-    }
-
-    if (halationOn) {
-      this.renderHalation(renderer);
-    }
-
-    renderer.setRenderTarget(null);
-    const black = getBlackTexture();
-    cu.uSource!.value = this.rtColorGraded!.texture;
-    cu.uBloomTexture!.value = bloomOn ? this.rtBloom0!.texture : black;
-    cu.uHalationTexture!.value = halationOn ? this.rtHalation0!.texture : black;
-    this.postMesh.material = this.compositeMaterial;
-    renderer.render(this.postScene, this.postCamera);
+    this.renderBasePipeline(renderer, scene, camera);
+    this.renderFinalFrame(
+      renderer,
+      null,
+      mu.uTexture!.value as THREE.Texture,
+      mu.uSplitPosition!.value as number,
+      0.0,
+    );
   }
 
   /**
@@ -397,61 +556,29 @@ export class Viewport {
     scene: THREE.Scene,
     camera: THREE.Camera,
   ): void {
-    const cu = this.compositeMaterial.uniforms;
     const mu = this.material.uniforms;
-    const black = getBlackTexture();
-
-    const runPipeline = () => {
-      renderer.setRenderTarget(this.rtColorGraded);
-      renderer.render(scene, camera);
-      const bloomOn = this.bloomStrength > 0;
-      const halationOn = this.halationIntensity > 0;
-      if (bloomOn) {
-        this.renderBloom(renderer);
-      }
-      if (halationOn) {
-        this.renderHalation(renderer);
-      }
-    };
-
-    const compositeToTarget = (
-      target: THREE.WebGLRenderTarget | null,
-      splitPosition: number,
-      abCompare: number,
-      originalTex: THREE.Texture,
-    ) => {
-      this.syncCompositeUniformsFromMaterial();
-      cu.uSplitPosition!.value = splitPosition;
-      cu.uAbCompare!.value = abCompare;
-      cu.uOriginalTexture!.value = originalTex;
-      const bloomOn = this.bloomStrength > 0;
-      const halationOn = this.halationIntensity > 0;
-      cu.uSource!.value = this.rtColorGraded!.texture;
-      cu.uBloomTexture!.value = bloomOn ? this.rtBloom0!.texture : black;
-      cu.uHalationTexture!.value = halationOn ? this.rtHalation0!.texture : black;
-      this.postMesh.material = this.compositeMaterial;
-      renderer.setRenderTarget(target);
-      renderer.render(this.postScene, this.postCamera);
-    };
+    const originalTexture = mu.uTexture!.value as THREE.Texture;
 
     // —— スロット A: 分割なしでフルフレームを比較用 RT に ——
     this.setParams(this.compareParamsA);
-    runPipeline();
-    compositeToTarget(
+    this.renderBasePipeline(renderer, scene, camera);
+    this.renderFinalFrame(
+      renderer,
       this.rtCompareComposite,
+      originalTexture,
       -1.0,
       0.0,
-      mu.uTexture!.value as THREE.Texture,
     );
 
     // —— スロット B: 左=A の合成結果、右=B ——
     this.setParams(this.compareParamsB);
-    runPipeline();
-    compositeToTarget(
+    this.renderBasePipeline(renderer, scene, camera);
+    this.renderFinalFrame(
+      renderer,
       null,
+      this.rtCompareComposite!.texture,
       mu.uSplitPosition!.value as number,
       1.0,
-      this.rtCompareComposite!.texture,
     );
   }
 
@@ -942,6 +1069,8 @@ export class Viewport {
     this.rtHalation0?.dispose();
     this.rtHalation1?.dispose();
     this.rtCompareComposite?.dispose();
+    this.rtPostComposite0?.dispose();
+    this.rtPostComposite1?.dispose();
     const lut1Texture = this.material.uniforms.uLUT1?.value as THREE.Data3DTexture | null;
     if (lut1Texture) lut1Texture.dispose();
     const lut2Texture = this.material.uniforms.uLUT2?.value as THREE.Data3DTexture | null;
