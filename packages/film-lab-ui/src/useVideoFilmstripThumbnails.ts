@@ -19,8 +19,8 @@ import type { FilmLabCanvasRef } from "./FilmLabCanvas";
 /** @description サムネイル 1 枚の最大幅（px）。縦はアスペクト比で自動。 */
 export const FILMSTRIP_THUMB_MAX_COUNT = 12;
 
-/** @description サムネイル横ピクセル（計画書の 48〜72 の中間付近）。 */
-export const FILMSTRIP_THUMB_WIDTH_PX = 56;
+/** @description サムネイル横ピクセル。tray 幾何は維持しつつ生成画質だけを上げる。 */
+export const FILMSTRIP_THUMB_WIDTH_PX = 80;
 
 /**
  * @description `video` のメタデータが揃うまで待ちます。
@@ -262,7 +262,7 @@ export function useVideoFilmstripThumbnails({
           ctx.fillRect(0, 0, canvas.width, canvas.height);
           try {
             ctx.drawImage(clone, 0, 0, vw, vh, 0, 0, thumbWidthPx, thumbH);
-            frames.push(canvas.toDataURL("image/jpeg", 0.55));
+            frames.push(canvas.toDataURL("image/jpeg", 0.72));
           } catch (err) {
             console.warn("useVideoFilmstripThumbnails: drawImage / toDataURL failed", {
               functionName: "useVideoFilmstripThumbnails",

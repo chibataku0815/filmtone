@@ -25,6 +25,7 @@ import type { FilmLabCanvasRef } from "./FilmLabCanvas";
 import { FILM_LAB_NEXT_INTL_NAMESPACE } from "./filmLabUiContract";
 import { VideoFilmstripStrip } from "./VideoFilmstripStrip";
 import {
+  FILMSTRIP_THUMB_MAX_COUNT,
   FILMSTRIP_THUMB_WIDTH_PX,
   useVideoFilmstripThumbnails,
 } from "./useVideoFilmstripThumbnails";
@@ -122,11 +123,33 @@ export function VideoTransportControls({
     suppressed: false,
   });
 
+  const seekToTime = useCallback(
+    (nextTime: number, optimisticIsPlaying?: boolean) => {
+      const canvasRef = filmLabCanvasRef.current;
+      if (!canvasRef) {
+        return;
+      }
+      const state = canvasRef.getVideoPlaybackState();
+      const dur = state.duration;
+      if (!(Number.isFinite(dur) && dur > 0)) {
+        return;
+      }
+      const clampedTime = Math.max(0, Math.min(dur, nextTime));
+      scrubTimeRef.current = clampedTime;
+      canvasRef.videoPlaybackSeek(clampedTime);
+      setPanel((prev) => ({
+        ...prev,
+        currentTime: clampedTime,
+        isPlaying: optimisticIsPlaying ?? prev.isPlaying,
+      }));
+    },
+    [filmLabCanvasRef],
+  );
+
   const seekFromClientX = useCallback(
     (clientX: number) => {
-      const canvasRef = filmLabCanvasRef.current;
       const track = trackRef.current;
-      if (!canvasRef || !track) {
+      if (!track) {
         return;
       }
       const rect = track.getBoundingClientRect();
@@ -134,21 +157,9 @@ export function VideoTransportControls({
         return;
       }
       const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-      const state = canvasRef.getVideoPlaybackState();
-      const dur = state.duration;
-      if (!(Number.isFinite(dur) && dur > 0)) {
-        return;
-      }
-      const nextTime = ratio * dur;
-      scrubTimeRef.current = nextTime;
-      canvasRef.videoPlaybackSeek(nextTime);
-      setPanel((prev) => ({
-        ...prev,
-        currentTime: nextTime,
-        isPlaying: false,
-      }));
+      seekToTime(panel.duration * ratio, false);
     },
-    [filmLabCanvasRef],
+    [panel.duration, seekToTime],
   );
 
   useEffect(() => {
@@ -339,7 +350,14 @@ export function VideoTransportControls({
         duration={panel.duration}
         disabled={disabled}
         thumbWidthPx={FILMSTRIP_THUMB_WIDTH_PX}
+        placeholderCount={FILMSTRIP_THUMB_MAX_COUNT}
         stripAriaLabel={tFilmstrip("stripAria")}
+        onSeekRequested={(time) => {
+          if (disabled) {
+            return;
+          }
+          seekToTime(time);
+        }}
       />
 
       <div className="mx-4 rounded-[1.2rem] border border-white/[0.09] bg-black/28 px-4 py-3 shadow-[0_12px_32px_rgba(0,0,0,0.24)] backdrop-blur-md">
