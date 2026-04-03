@@ -86,19 +86,37 @@ body {
  * @description `film-lab-ui` の `ControlSlider` は `appearance-none` 付きの range。
  * Web の `apps/web/src/app/globals.css` と同じ thumb スタイルをデスクトップにも載せないと、
  * Chromium（Electron）でつまみのヒット領域が実質使えず「トラッククリックは効くがドラッグできない」になる。
+ * flex 内の range は `min-w-0` と runnable-track の明示が無いと、**見た目は広いのにドラッグで値がほとんど動かない**ことがある（内部トラック幅の見積り不良）。
  * @see apps/web/src/app/globals.css（Film Lab Slider / Halation Hue Slider）
  */
 
-/* === Film Lab Slider（Web と同型） === */
+/* === Film Lab Slider（Web と同型 + Electron 向けトラック明示） === */
+.film-lab-slider::-webkit-slider-runnable-track {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: transparent;
+}
+
 .film-lab-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 20px;
   height: 20px;
+  margin-top: -7px;
   border-radius: 50%;
   background: var(--accent-amber1);
   cursor: pointer;
   box-shadow: 0 0 6px rgba(255, 180, 50, 0.4);
   transition: transform 0.15s ease;
+}
+
+.film-lab-slider::-moz-range-track {
+  width: 100%;
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: transparent;
+  border: none;
 }
 
 .film-lab-slider::-moz-range-thumb {
@@ -116,9 +134,18 @@ body {
 }
 
 @media (min-width: 640px) {
+  .film-lab-slider::-webkit-slider-runnable-track {
+    height: 0.25rem;
+  }
+
   .film-lab-slider::-webkit-slider-thumb {
     width: 12px;
     height: 12px;
+    margin-top: -4px;
+  }
+
+  .film-lab-slider::-moz-range-track {
+    height: 0.25rem;
   }
 
   .film-lab-slider::-moz-range-thumb {
@@ -127,17 +154,34 @@ body {
   }
 }
 
-/* === Halation Hue Slider（Web と同型） === */
+/* === Halation Hue Slider（同上） === */
+.halation-hue-slider::-webkit-slider-runnable-track {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: transparent;
+}
+
 .halation-hue-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 20px;
   height: 20px;
+  margin-top: -7px;
   border-radius: 50%;
   background: #fff;
   border: 2px solid rgba(0, 0, 0, 0.3);
   cursor: pointer;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
   transition: transform 0.15s ease;
+}
+
+.halation-hue-slider::-moz-range-track {
+  width: 100%;
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: transparent;
+  border: none;
 }
 
 .halation-hue-slider::-moz-range-thumb {
@@ -155,9 +199,18 @@ body {
 }
 
 @media (min-width: 640px) {
+  .halation-hue-slider::-webkit-slider-runnable-track {
+    height: 0.25rem;
+  }
+
   .halation-hue-slider::-webkit-slider-thumb {
     width: 12px;
     height: 12px;
+    margin-top: -4px;
+  }
+
+  .halation-hue-slider::-moz-range-track {
+    height: 0.25rem;
   }
 
   .halation-hue-slider::-moz-range-thumb {

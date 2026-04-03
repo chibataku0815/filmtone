@@ -61,7 +61,7 @@ export function ControlSlider({
   return (
     <div
       className={[
-        "group flex min-h-[44px] items-center gap-3 sm:min-h-0",
+        "group flex min-h-[44px] min-w-0 items-center gap-3 sm:min-h-0",
         disabled ? "opacity-45" : "",
         className,
       ]
@@ -91,7 +91,7 @@ export function ControlSlider({
         onPointerUp={() => onCommit?.()}
         onTouchEnd={() => onCommit?.()}
         disabled={disabled}
-        className="film-lab-slider h-1.5 flex-1 cursor-pointer appearance-none rounded-full touch-none disabled:cursor-not-allowed sm:h-1"
+        className="film-lab-slider h-1.5 min-w-0 w-full flex-1 cursor-pointer appearance-none rounded-full touch-none disabled:cursor-not-allowed sm:h-1"
         style={{
           background: `linear-gradient(to right, var(--accent-amber1) 0%, var(--accent-amber1) ${percent}%, rgba(255,255,255,0.08) ${percent}%, rgba(255,255,255,0.08) 100%)`,
         }}
