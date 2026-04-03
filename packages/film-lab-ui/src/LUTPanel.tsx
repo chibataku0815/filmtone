@@ -208,6 +208,7 @@ export function LUTPanel({ viewport, onCubeLutLoaded, onLutChange }: LUTPanelPro
           <ControlSlider
             label={tFilmLab("lutPanel.creativeMix")}
             hint={!lutName ? tFilmLab("lutPanel.creativeMixDisabledHint") : undefined}
+            labelResetHint={tFilmLab("controls.sliderLabelReset")}
             value={intensity}
             min={0}
             max={1}
@@ -285,6 +286,7 @@ export function LUTPanel({ viewport, onCubeLutLoaded, onLutChange }: LUTPanelPro
               <ControlSlider
                 label={tFilmLab("lutPanel.logMix")}
                 hint={!logLutName ? tFilmLab("lutPanel.logMixDisabledHint") : undefined}
+                labelResetHint={tFilmLab("controls.sliderLabelReset")}
                 value={logIntensity}
                 min={0}
                 max={1}

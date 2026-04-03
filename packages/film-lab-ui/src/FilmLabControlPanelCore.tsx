@@ -131,10 +131,6 @@ interface FilmLabControlPanelCoreProps {
   slots?: FilmLabControlPanelCoreSlots;
 }
 
-function ControlSlider(props: ComponentProps<typeof BaseControlSlider>) {
-  return <BaseControlSlider {...props} className={["lg:pr-4", props.className].filter(Boolean).join(" ")} />;
-}
-
 export function FilmLabControlPanelCore({
   viewport,
   histogramVisible = true,
@@ -151,6 +147,22 @@ export function FilmLabControlPanelCore({
   slots = {},
 }: FilmLabControlPanelCoreProps) {
   const tFilmLab = useTranslations(FILM_LAB_NEXT_INTL_NAMESPACE);
+
+  /** Pro「階調」ブロックの長い日本語ラベルが不自然に折り返されないよう、列幅と nowrap を確保する */
+  const processSliderLabelClassName =
+    "min-w-[6.75rem] shrink-0 cursor-pointer text-[11px] leading-tight text-[var(--text-muted)] select-none whitespace-nowrap sm:min-w-[7.25rem]";
+
+  const sliderLabelResetHint = tFilmLab("controls.sliderLabelReset");
+
+  function PanelControlSlider(props: ComponentProps<typeof BaseControlSlider>) {
+    return (
+      <BaseControlSlider
+        {...props}
+        labelResetHint={props.labelResetHint ?? sliderLabelResetHint}
+        className={["lg:pr-4", props.className].filter(Boolean).join(" ")}
+      />
+    );
+  }
 
   const [state, dispatch] = useReducer(
     filmLabReducer,
@@ -533,7 +545,7 @@ export function FilmLabControlPanelCore({
           />
           {presetIntensityAvailable ? (
             <div className="mt-3">
-              <ControlSlider
+              <PanelControlSlider
                 label={tFilmLab("controls.presetIntensity")}
                 value={activeSlotState.intensity}
                 min={0}
@@ -557,8 +569,10 @@ export function FilmLabControlPanelCore({
             <div className="min-w-0">
               <SectionHeader title={tFilmLab("controls.process")} />
               <div className="flex flex-col gap-2.5">
-                <ControlSlider
+                <PanelControlSlider
                   label={tFilmLab("controls.compression")}
+                  hint={tFilmLab("controls.compressionHint")}
+                  labelClassName={processSliderLabelClassName}
                   value={params.compressionAmount}
                   min={0} max={1} step={0.01} defaultValue={0}
                   formatValue={(v) => `${Math.round(v * 100)}%`}
@@ -569,8 +583,10 @@ export function FilmLabControlPanelCore({
                  * Range を 100% まで上げると輪郭付近の段差が出やすいため、UI 上限を 92% に抑える。
                  * 共有 URL 等で 1.0 が入っていても params はそのまま保持され、スライダを動かすと 0.92 以下に収まる。
                  */}
-                <ControlSlider
+                <PanelControlSlider
                   label={tFilmLab("controls.compressionRange")}
+                  hint={tFilmLab("controls.compressionRangeHint")}
+                  labelClassName={processSliderLabelClassName}
                   value={params.compressionRange}
                   min={0}
                   max={0.92}
@@ -580,30 +596,35 @@ export function FilmLabControlPanelCore({
                   onChange={(v) => updateParam("compressionRange", v)}
                   onCommit={commit}
                 />
-                <ControlSlider
+                <PanelControlSlider
                   label={tFilmLab("controls.printContrast")}
+                  hint={tFilmLab("controls.printContrastHint")}
+                  labelClassName={processSliderLabelClassName}
                   value={params.printContrast}
                   min={0} max={1} step={0.01} defaultValue={0}
                   formatValue={(v) => `${Math.round(v * 100)}%`}
                   onChange={(v) => updateParam("printContrast", v)}
                   onCommit={commit}
                 />
-                <ControlSlider
+                <PanelControlSlider
                   label={tFilmLab("controls.cyan")}
+                  labelClassName={processSliderLabelClassName}
                   value={params.cyan}
                   min={-1} max={1} step={0.01} defaultValue={0}
                   onChange={(v) => updateParam("cyan", v)}
                   onCommit={commit}
                 />
-                <ControlSlider
+                <PanelControlSlider
                   label={tFilmLab("controls.magenta")}
+                  labelClassName={processSliderLabelClassName}
                   value={params.magenta}
                   min={-1} max={1} step={0.01} defaultValue={0}
                   onChange={(v) => updateParam("magenta", v)}
                   onCommit={commit}
                 />
-                <ControlSlider
+                <PanelControlSlider
                   label={tFilmLab("controls.yellow")}
+                  labelClassName={processSliderLabelClassName}
                   value={params.yellow}
                   min={-1} max={1} step={0.01} defaultValue={0}
                   onChange={(v) => updateParam("yellow", v)}
@@ -619,22 +640,22 @@ export function FilmLabControlPanelCore({
               <CollapsibleHeader title={tFilmLab("controls.artifacts")} open={artifactsOpen} onToggle={() => setArtifactsOpen(!artifactsOpen)} />
               {artifactsOpen && (
                 <div className="flex flex-col gap-2.5">
-                  <ControlSlider label={tFilmLab("controls.filmGrain")} value={params.grainIntensity} min={0} max={0.5} step={0.01} defaultValue={0} onChange={(v) => updateParam("grainIntensity", v)} onCommit={commit} />
-                  <ControlSlider label={tFilmLab("controls.vignette")} value={params.vignette} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("vignette", v)} onCommit={commit} />
+                  <PanelControlSlider label={tFilmLab("controls.filmGrain")} value={params.grainIntensity} min={0} max={0.5} step={0.01} defaultValue={0} onChange={(v) => updateParam("grainIntensity", v)} onCommit={commit} />
+                  <PanelControlSlider label={tFilmLab("controls.vignette")} value={params.vignette} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("vignette", v)} onCommit={commit} />
                 </div>
               )}
 
               <ToggleHeader title={tFilmLab("controls.bloom")} enabled={bloomEnabled} onToggle={toggleBloom} />
               <div className={`flex flex-col gap-2.5 ${!bloomEnabled ? "pointer-events-none opacity-30" : ""}`}>
-                <ControlSlider label={tFilmLab("controls.strength")} value={params.bloomStrength} min={0} max={3} step={0.01} defaultValue={0} onChange={(v) => updateParam("bloomStrength", v)} onCommit={commit} />
-                <ControlSlider label={tFilmLab("controls.threshold")} value={params.bloomThreshold} min={0} max={1} step={0.01} defaultValue={0.8} onChange={(v) => updateParam("bloomThreshold", v)} onCommit={commit} />
-                <ControlSlider label={tFilmLab("controls.radius")} value={params.bloomRadius} min={0} max={1} step={0.01} defaultValue={0.4} onChange={(v) => updateParam("bloomRadius", v)} onCommit={commit} />
+                <PanelControlSlider label={tFilmLab("controls.strength")} value={params.bloomStrength} min={0} max={3} step={0.01} defaultValue={0} onChange={(v) => updateParam("bloomStrength", v)} onCommit={commit} />
+                <PanelControlSlider label={tFilmLab("controls.threshold")} value={params.bloomThreshold} min={0} max={1} step={0.01} defaultValue={0.8} onChange={(v) => updateParam("bloomThreshold", v)} onCommit={commit} />
+                <PanelControlSlider label={tFilmLab("controls.radius")} value={params.bloomRadius} min={0} max={1} step={0.01} defaultValue={0.4} onChange={(v) => updateParam("bloomRadius", v)} onCommit={commit} />
               </div>
 
               <ToggleHeader title={tFilmLab("controls.halation")} enabled={halationEnabled} onToggle={toggleHalation} />
               <div className={`flex flex-col gap-2.5 ${!halationEnabled ? "pointer-events-none opacity-30" : ""}`}>
-                <ControlSlider label={tFilmLab("controls.intensity")} value={params.halationIntensity} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("halationIntensity", v)} onCommit={commit} />
-                <ControlSlider label={tFilmLab("controls.spread")} value={params.halationSpread} min={0} max={50} step={0.5} defaultValue={15} onChange={(v) => updateParam("halationSpread", v)} onCommit={commit} />
+                <PanelControlSlider label={tFilmLab("controls.intensity")} value={params.halationIntensity} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("halationIntensity", v)} onCommit={commit} />
+                <PanelControlSlider label={tFilmLab("controls.spread")} value={params.halationSpread} min={0} max={50} step={0.5} defaultValue={15} onChange={(v) => updateParam("halationSpread", v)} onCommit={commit} />
                 <HueSlider
                   label={tFilmLab("controls.halationHue")}
                   value={params.halationHue}
@@ -647,7 +668,7 @@ export function FilmLabControlPanelCore({
                * Bloom/Halation と同様、Artifacts 見出しの折りたたみと無関係に常に出す（閉じると「消えた」ように見えるため）。
                */}
               <div className="mt-3 flex flex-col gap-2.5 border-t border-white/[0.08] pt-3">
-                <ControlSlider
+                <PanelControlSlider
                   label={tFilmLab("controls.rgbShift")}
                   hint={tFilmLab("effects.rgbShiftHint")}
                   value={params.rgbShift}
@@ -659,7 +680,7 @@ export function FilmLabControlPanelCore({
                   onChange={(v) => updateParam("rgbShift", v)}
                   onCommit={commit}
                 />
-                <ControlSlider
+                <PanelControlSlider
                   label={tFilmLab("controls.lensSoftness")}
                   hint={tFilmLab("effects.lensSoftnessHint")}
                   value={params.lensSoftness}
@@ -671,7 +692,7 @@ export function FilmLabControlPanelCore({
                   onChange={(v) => updateParam("lensSoftness", v)}
                   onCommit={commit}
                 />
-                <ControlSlider
+                <PanelControlSlider
                   label={tFilmLab("controls.grainRadialMix")}
                   hint={tFilmLab("controls.grainRadialMixHint")}
                   value={params.grainRadialMix}
@@ -696,11 +717,11 @@ export function FilmLabControlPanelCore({
               />
               {sourceTrimOpen && (
                 <div className="flex flex-col gap-2.5">
-                  <ControlSlider label={tFilmLab("controls.exposure")} value={params.exposure} min={-3} max={3} step={0.01} defaultValue={0} onChange={(v) => updateParam("exposure", v)} onCommit={commit} />
-                  <ControlSlider label={tFilmLab("controls.sourceTemp")} value={params.temperature} min={-1} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("temperature", v)} onCommit={commit} />
-                  <ControlSlider label={tFilmLab("controls.sourceTint")} value={params.tint} min={-1} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("tint", v)} onCommit={commit} />
-                  <ControlSlider label={tFilmLab("controls.highlightsTrim")} value={params.highlights} min={-1} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("highlights", v)} onCommit={commit} />
-                  <ControlSlider label={tFilmLab("controls.shadowsTrim")} value={params.shadows} min={-1} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("shadows", v)} onCommit={commit} />
+                  <PanelControlSlider label={tFilmLab("controls.exposure")} value={params.exposure} min={-3} max={3} step={0.01} defaultValue={0} onChange={(v) => updateParam("exposure", v)} onCommit={commit} />
+                  <PanelControlSlider label={tFilmLab("controls.sourceTemp")} value={params.temperature} min={-1} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("temperature", v)} onCommit={commit} />
+                  <PanelControlSlider label={tFilmLab("controls.sourceTint")} value={params.tint} min={-1} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("tint", v)} onCommit={commit} />
+                  <PanelControlSlider label={tFilmLab("controls.highlightsTrim")} value={params.highlights} min={-1} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("highlights", v)} onCommit={commit} />
+                  <PanelControlSlider label={tFilmLab("controls.shadowsTrim")} value={params.shadows} min={-1} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("shadows", v)} onCommit={commit} />
                 </div>
               )}
             </div>
@@ -717,7 +738,7 @@ export function FilmLabControlPanelCore({
             {slots.renderAfterLut ? slots.renderAfterLut(coreRenderContext) : slots.afterLut}
             {!isPro ? (
               <div className="mt-3">
-                <ControlSlider
+                <PanelControlSlider
                   label={tFilmLab("controls.exposure")}
                   value={params.exposure}
                   min={-3}

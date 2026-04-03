@@ -7,8 +7,12 @@
  */
 interface ControlSliderProps {
   label: string;
-  /** ラベル行に付けるネイティブ title（ツールチップ） */
+  /** ラベル行に付けるネイティブ title（ツールチップ）。`labelResetHint` と併用時は「 · 」で連結される */
   hint?: string;
+  /** ラベル列の幅・折返し（長い日本語見出しで改行崩れを防ぐときに指定） */
+  labelClassName?: string;
+  /** ラベルをタップで既定値に戻す旨（next-intl。未指定時は英語のフォールバック） */
+  labelResetHint?: string;
   className?: string;
   value: number;
   min: number;
@@ -24,6 +28,8 @@ interface ControlSliderProps {
 export function ControlSlider({
   label,
   hint,
+  labelClassName,
+  labelResetHint = "Tap to reset",
   className,
   value,
   min,
@@ -43,6 +49,15 @@ export function ControlSlider({
   // 値に応じたトラック塗り率（%）
   const percent = ((value - min) / (max - min)) * 100;
 
+  const labelTitle = [hint, labelResetHint].filter(Boolean).join(" · ");
+
+  const labelShellClass = [
+    "w-16 shrink-0 cursor-pointer text-[11px] text-[var(--text-muted)] select-none sm:w-24",
+    labelClassName,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <div
       className={[
@@ -53,15 +68,14 @@ export function ControlSlider({
         .filter(Boolean)
         .join(" ")}
       onDoubleClick={handleDoubleClick}
-      title={hint}
     >
       {/* ラベル（左） */}
       <span
-        className="w-16 shrink-0 cursor-pointer text-[11px] text-[var(--text-muted)] select-none sm:w-24"
+        className={labelShellClass}
         onClick={() => {
           if (!disabled) onChange(defaultValue);
         }}
-        title="Tap to reset"
+        title={labelTitle}
       >
         {label}
       </span>
