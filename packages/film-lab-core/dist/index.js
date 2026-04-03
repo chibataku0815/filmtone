@@ -24,7 +24,20 @@ var PARAM_KEYS = [
   "shadowTone",
   "highlightTone",
   "shadowHue",
-  "highlightHue"
+  "highlightHue",
+  // === 0.4.0 新規: Film Process (Negative Stage / Print Stage) ===
+  /** フィルム latitude 圧縮量（0=なし、1=フル圧縮）。range: 0–1 */
+  "compressionAmount",
+  /** 圧縮の shoulder/toe 幅（0=急峻、1=緩やか）。range: 0–1 */
+  "compressionRange",
+  /** 印画紙コントラスト（0=no effect、1=最大硬調）。range: 0–1 */
+  "printContrast",
+  /** CMY enlarger color head: Cyan filter（-1〜1、0=ニュートラル）。range: -1–1 */
+  "cyan",
+  /** CMY enlarger color head: Magenta filter（-1〜1、0=ニュートラル）。range: -1–1 */
+  "magenta",
+  /** CMY enlarger color head: Yellow filter（-1〜1、0=ニュートラル）。range: -1–1 */
+  "yellow"
 ];
 function cloneParams(params) {
   return { ...params };
@@ -124,7 +137,13 @@ var PRESETS = {
     shadowTone: 0,
     highlightTone: 0,
     shadowHue: FILM_LAB_DEFAULT_SHADOW_HUE,
-    highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE
+    highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
+    compressionAmount: 0,
+    compressionRange: 0.5,
+    printContrast: 0,
+    cyan: 0,
+    magenta: 0,
+    yellow: 0
   },
   /**
    * cinematic プリセット（v2・2026-03-31）
@@ -153,7 +172,13 @@ var PRESETS = {
     shadowTone: 0,
     highlightTone: 0,
     shadowHue: FILM_LAB_DEFAULT_SHADOW_HUE,
-    highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE
+    highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
+    compressionAmount: 0,
+    compressionRange: 0.5,
+    printContrast: 0,
+    cyan: 0,
+    magenta: 0,
+    yellow: 0
   },
   portra: {
     exposure: 0.2,
@@ -178,7 +203,13 @@ var PRESETS = {
     shadowTone: 0,
     highlightTone: 0,
     shadowHue: FILM_LAB_DEFAULT_SHADOW_HUE,
-    highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE
+    highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
+    compressionAmount: 0,
+    compressionRange: 0.5,
+    printContrast: 0,
+    cyan: 0,
+    magenta: 0,
+    yellow: 0
   },
   gold200: {
     exposure: 0.15,
@@ -203,7 +234,13 @@ var PRESETS = {
     shadowTone: 0,
     highlightTone: 0,
     shadowHue: FILM_LAB_DEFAULT_SHADOW_HUE,
-    highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE
+    highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
+    compressionAmount: 0,
+    compressionRange: 0.5,
+    printContrast: 0,
+    cyan: 0,
+    magenta: 0,
+    yellow: 0
   },
   pro400h: {
     exposure: 0.25,
@@ -228,7 +265,13 @@ var PRESETS = {
     shadowTone: 0,
     highlightTone: 0,
     shadowHue: FILM_LAB_DEFAULT_SHADOW_HUE,
-    highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE
+    highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
+    compressionAmount: 0,
+    compressionRange: 0.5,
+    printContrast: 0,
+    cyan: 0,
+    magenta: 0,
+    yellow: 0
   },
   bw: {
     exposure: 0.1,
@@ -253,7 +296,13 @@ var PRESETS = {
     shadowTone: 0,
     highlightTone: 0,
     shadowHue: FILM_LAB_DEFAULT_SHADOW_HUE,
-    highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE
+    highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
+    compressionAmount: 0,
+    compressionRange: 0.5,
+    printContrast: 0,
+    cyan: 0,
+    magenta: 0,
+    yellow: 0
   },
   ektar100: {
     exposure: 0.05,
@@ -278,7 +327,13 @@ var PRESETS = {
     shadowTone: 0,
     highlightTone: 0,
     shadowHue: FILM_LAB_DEFAULT_SHADOW_HUE,
-    highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE
+    highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
+    compressionAmount: 0,
+    compressionRange: 0.5,
+    printContrast: 0,
+    cyan: 0,
+    magenta: 0,
+    yellow: 0
   },
   superia400: {
     exposure: 0.1,
@@ -303,7 +358,13 @@ var PRESETS = {
     shadowTone: 0,
     highlightTone: 0,
     shadowHue: FILM_LAB_DEFAULT_SHADOW_HUE,
-    highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE
+    highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
+    compressionAmount: 0,
+    compressionRange: 0.5,
+    printContrast: 0,
+    cyan: 0,
+    magenta: 0,
+    yellow: 0
   },
   cinestill800t: {
     exposure: 0.15,
@@ -328,7 +389,13 @@ var PRESETS = {
     shadowTone: 0,
     highlightTone: 0,
     shadowHue: FILM_LAB_DEFAULT_SHADOW_HUE,
-    highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE
+    highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
+    compressionAmount: 0,
+    compressionRange: 0.5,
+    printContrast: 0,
+    cyan: 0,
+    magenta: 0,
+    yellow: 0
   },
   /**
    * Velvia 50 プリセット（v1・2026-04-02）
@@ -358,7 +425,13 @@ var PRESETS = {
     shadowTone: 0,
     highlightTone: 0,
     shadowHue: FILM_LAB_DEFAULT_SHADOW_HUE,
-    highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE
+    highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
+    compressionAmount: 0,
+    compressionRange: 0.5,
+    printContrast: 0,
+    cyan: 0,
+    magenta: 0,
+    yellow: 0
   }
 };
 function findMatchingPreset(params) {
@@ -405,7 +478,7 @@ import { z } from "zod";
 var paramShape = Object.fromEntries(
   PARAM_KEYS.map((key) => [
     key,
-    key === "grainRadialMix" ? z.number().min(0).max(1).default(1) : key === "lensSoftness" ? z.number().min(0).max(1).default(0) : z.number()
+    key === "grainRadialMix" ? z.number().min(0).max(1).default(1) : key === "lensSoftness" ? z.number().min(0).max(1).default(0) : key === "compressionRange" ? z.number().min(0).max(1).default(0.5) : key === "compressionAmount" || key === "printContrast" ? z.number().min(0).max(1).default(0) : key === "cyan" || key === "magenta" || key === "yellow" ? z.number().min(-1).max(1).default(0) : z.number()
   ])
 );
 var filmLabParamsSchema = z.object(paramShape);

@@ -1,3 +1,8 @@
+/**
+ * @fileOverview Film Lab メインカラーグレード用 GLSL3 フラグメントシェーダー文字列。
+ * @description 露出・コントラスト・0.4.0 Process（圧縮／プリント）・LUT などを 1 パスで適用する。
+ * @limitations 解像度や LUT は JS（Viewport）側の uniform で供給する。このファイル単体では描画しない。
+ */
 export const filmlabFragmentShader = /* glsl */ `
 precision highp float;
 precision highp sampler3D;
@@ -36,7 +41,7 @@ uniform highp sampler3D uLUT2;
 uniform float uLUT2Intensity;
 uniform float uLUT2Enabled;
 
-// 0.4.0 のネガ段で使う数値 uniform。
+// 0.4.0 の現像段で使う数値 uniform。
 uniform float uCompressionAmount;  // 0〜1、0 で無効
 uniform float uCompressionRange;   // 0〜1、0.5 が既定
 
@@ -80,14 +85,19 @@ float grain(vec2 uv, float time) {
   return fract(sin(dot(uv * time, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
 }
 
-// ルミナンスを保ったまま S カーブで圧縮する。
-// amount=0 なら何もしない。range は 0 で狭く、1 で広い肩と足になる。
+// ルミナンスを保ったまま S カーブで圧縮する（0.4.0）。
+// amount=0 なら何もしない。range は肩／足の広さ。高 range＋高 amount で輪郭に段差が出やすいため
+// k の振れ幅をやや抑え、sigmoid 入力を clamp し、range が極端に高いときだけ amount を軽く減衰する。
 vec3 applyFilmCompression(vec3 rgb, float amount, float range) {
   if (amount < 0.001) return rgb;
+  float r = clamp(range, 0.0, 1.0);
+  float k = mix(5.15, 2.85, r);
+  float rangeSoft = smoothstep(0.82, 1.0, r);
+  float amt = amount * (1.0 - 0.18 * rangeSoft);
   float luma = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
-  float k = mix(6.0, 2.5, clamp(range, 0.0, 1.0));
-  float s = 1.0 / (1.0 + exp(-k * (luma - 0.5)));
-  float lumaScale = luma > 0.001 ? mix(luma, s, amount) / luma : 1.0;
+  float x = clamp(k * (luma - 0.5), -5.5, 5.5);
+  float s = 1.0 / (1.0 + exp(-x));
+  float lumaScale = luma > 0.001 ? mix(luma, s, amt) / luma : 1.0;
   return clamp(rgb * lumaScale, 0.0, 1.0);
 }
 

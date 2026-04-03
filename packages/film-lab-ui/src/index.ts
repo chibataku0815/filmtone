@@ -74,9 +74,3 @@ export {
   type SlotId,
 } from "./film-lab-reducer";
 
-// Quick mode
-export {
-  quickMetaPatchForValue,
-  quickMetaDisplayValue,
-  type QuickMetaAxis,
-} from "./quick-meta-sliders";

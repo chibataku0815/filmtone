@@ -162,13 +162,13 @@ export class Viewport {
         uLUT2: { value: null },
         uLUT2Intensity: { value: 1.0 },
         uLUT2Enabled: { value: 0.0 },
-        // 0.4.0 の render process で追加した数値 uniform。既定値は全て無効。
+        // 0.4.0 の現像段・プリント段で使う数値 uniform。
         uCompressionAmount: { value: 0.0 },
         uCompressionRange: { value: 0.5 },
+        uPrintContrast: { value: 0.0 },
         uCyan: { value: 0.0 },
         uMagenta: { value: 0.0 },
         uYellow: { value: 0.0 },
-        uPrintContrast: { value: 0.0 },
         uFlipY: { value: 0.0 },
       },
     });
