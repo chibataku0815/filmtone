@@ -88,6 +88,24 @@ export function filmstripClientXToTime(
   return ratio * duration;
 }
 
+/**
+ * @description サムネ列をすき間なく並べるため、先頭と末尾だけ角丸を残します。
+ * @param index 現在のサムネ番号
+ * @param slotCount 並んでいるサムネ総数
+ */
+function getFilmstripSlotRadiusClass(index: number, slotCount: number): string {
+  if (slotCount <= 1) {
+    return "rounded-[0.8rem]";
+  }
+  if (index === 0) {
+    return "rounded-l-[0.8rem]";
+  }
+  if (index === slotCount - 1) {
+    return "rounded-r-[0.8rem]";
+  }
+  return "rounded-none";
+}
+
 export type VideoFilmstripStripProps = {
   /** @description サムネ画像（data URL）。空文字のマスはスケルトン表示。 */
   thumbnails: string[];
@@ -121,18 +139,23 @@ export function VideoFilmstripStrip({
   duration,
   disabled,
   thumbWidthPx,
-  gapPx = 3,
+  gapPx = 0,
   placeholderCount = 12,
   stripAriaLabel,
   onSeekRequested,
 }: VideoFilmstripStripProps) {
+  /** @description tray の上下左右余白。見た目を均等にそろえるため同じ値を使います。 */
+  const trayInsetPx = 4;
   const slots: { url: string | null }[] =
     isGenerating && thumbnails.length === 0
       ? Array.from({ length: placeholderCount }, () => ({ url: null }))
       : thumbnails.map((u) => ({ url: u.length > 0 ? u : null }));
 
   const effectiveCount = Math.max(slots.length, 1);
-  const thumbHeightPx = Math.max(42, Math.min(50, Math.round(thumbWidthPx * 0.6)));
+  /** @description 80px 幅サムネが横長に見える表示高さ。 */
+  const thumbHeightPx = Math.max(28, Math.min(32, Math.round(thumbWidthPx * 0.4)));
+  /** @description tray 全体の高さ。サムネ高さと均等 inset から組み立てます。 */
+  const trayHeightPx = thumbHeightPx + trayInsetPx * 2;
   const playheadPercent =
     Number.isFinite(duration) && duration > 0 && Number.isFinite(currentTime)
       ? Math.max(0, Math.min(100, (currentTime / duration) * 100))
@@ -147,7 +170,9 @@ export function VideoFilmstripStrip({
       return;
     }
     const rect = e.currentTarget.getBoundingClientRect();
-    const nextTime = filmstripClientXToTime(e.clientX, rect.left, rect.width, duration);
+    const innerRectLeft = rect.left + trayInsetPx;
+    const innerRectWidth = Math.max(1, rect.width - trayInsetPx * 2);
+    const nextTime = filmstripClientXToTime(e.clientX, innerRectLeft, innerRectWidth, duration);
     e.preventDefault();
     e.stopPropagation();
     onSeekRequested(nextTime);
@@ -164,18 +189,25 @@ export function VideoFilmstripStrip({
     >
       <div
         className={[
-          "relative mx-auto my-2 h-[4.2rem] w-full max-w-[min(720px,100%-4.5rem)] min-w-0 overflow-hidden rounded-[1.35rem] border border-white/[0.22] bg-white/[0.08] px-4 shadow-[0_16px_34px_rgba(0,0,0,0.24),inset_0_1px_0_rgba(255,255,255,0.16),inset_0_-1px_0_rgba(255,255,255,0.04)] backdrop-blur-xl",
+          "relative mx-auto my-2 w-full max-w-[min(720px,100%-4.5rem)] min-w-0 overflow-hidden rounded-[1.35rem] border border-white/[0.14] bg-white/[0.08] shadow-[0_18px_34px_rgba(0,0,0,0.24),inset_0_1px_0_rgba(255,255,255,0.14),inset_0_-1px_0_rgba(255,255,255,0.05)] backdrop-blur-xl",
           disabled ? "" : "cursor-pointer",
         ]
           .filter(Boolean)
           .join(" ")}
+        style={{ height: `${trayHeightPx}px` }}
         role="group"
         aria-label={stripAriaLabel}
         aria-disabled={disabled}
         onPointerDown={handlePointerDown}
       >
         <div
-          className="pointer-events-none absolute inset-x-5 top-1 z-0 h-6 rounded-full bg-white/12 blur-xl"
+          className="pointer-events-none absolute z-0 rounded-full bg-white/10 blur-xl"
+          style={{
+            left: `${trayInsetPx}px`,
+            right: `${trayInsetPx}px`,
+            top: "2px",
+            height: "10px",
+          }}
           aria-hidden
         />
         <div
@@ -183,26 +215,46 @@ export function VideoFilmstripStrip({
           aria-hidden
         />
         <div
-          className="pointer-events-none absolute inset-y-0 left-0 z-10 w-[3.25rem] bg-gradient-to-r from-black/38 via-black/10 to-transparent"
+          className="pointer-events-none absolute z-10 w-2 bg-gradient-to-r from-black/12 to-transparent"
+          style={{
+            left: `${trayInsetPx}px`,
+            top: `${trayInsetPx}px`,
+            bottom: `${trayInsetPx}px`,
+          }}
           aria-hidden
         />
         <div
-          className="pointer-events-none absolute inset-y-0 right-0 z-10 w-[3.25rem] bg-gradient-to-l from-black/38 via-black/10 to-transparent"
+          className="pointer-events-none absolute z-10 w-2 bg-gradient-to-l from-black/12 to-transparent"
+          style={{
+            right: `${trayInsetPx}px`,
+            top: `${trayInsetPx}px`,
+            bottom: `${trayInsetPx}px`,
+          }}
           aria-hidden
         />
         <div
-          className="pointer-events-none absolute inset-y-[0.55rem] z-20 w-[4px] -translate-x-1/2 rounded-full bg-white/95 shadow-[0_0_14px_rgba(255,255,255,0.52)]"
-          style={{ left: `${playheadPercent}%` }}
-          aria-hidden
-        />
-        <div
-          className="pointer-events-none absolute inset-0 z-[1] flex items-center"
+          className="pointer-events-none absolute z-20"
+          style={{
+            left: `${trayInsetPx}px`,
+            right: `${trayInsetPx}px`,
+            top: `${trayInsetPx}px`,
+            bottom: `${trayInsetPx}px`,
+          }}
           aria-hidden
         >
           <div
-            className="grid w-full min-w-0"
+            className="absolute inset-y-0 w-[4px] -translate-x-1/2 rounded-full bg-white/95 shadow-[0_0_16px_rgba(255,255,255,0.58)]"
+            style={{ left: `${playheadPercent}%` }}
+          />
+        </div>
+        <div
+          className="pointer-events-none absolute z-[1]"
+          style={{ inset: `${trayInsetPx}px` }}
+          aria-hidden
+        >
+          <div
+            className="grid h-full w-full min-w-0"
             style={{
-              height: `${thumbHeightPx}px`,
               gridTemplateColumns: `repeat(${effectiveCount}, minmax(0, 1fr))`,
               gap: `${gapPx}px`,
             }}
@@ -210,7 +262,12 @@ export function VideoFilmstripStrip({
             {slots.map((slot, idx) => (
               <div
                 key={idx}
-                className="overflow-hidden rounded-[0.8rem] bg-black/16 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),inset_1px_0_0_rgba(255,255,255,0.03),0_0_0_1px_rgba(255,255,255,0.035),0_10px_18px_rgba(0,0,0,0.08)] backdrop-blur-sm"
+                className={[
+                  "overflow-hidden bg-black/14",
+                  getFilmstripSlotRadiusClass(idx, slots.length),
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
               >
                 {slot.url ? (
                   <img
@@ -227,11 +284,21 @@ export function VideoFilmstripStrip({
           </div>
         </div>
         <div
-          className="pointer-events-none absolute inset-y-0 left-0 z-10 w-9 bg-gradient-to-r from-white/[0.07] to-transparent"
+          className="pointer-events-none absolute z-10 w-2 bg-gradient-to-r from-white/[0.03] to-transparent"
+          style={{
+            left: `${trayInsetPx}px`,
+            top: `${trayInsetPx}px`,
+            bottom: `${trayInsetPx}px`,
+          }}
           aria-hidden
         />
         <div
-          className="pointer-events-none absolute inset-y-0 right-0 z-10 w-9 bg-gradient-to-l from-white/[0.07] to-transparent"
+          className="pointer-events-none absolute z-10 w-2 bg-gradient-to-l from-white/[0.03] to-transparent"
+          style={{
+            right: `${trayInsetPx}px`,
+            top: `${trayInsetPx}px`,
+            bottom: `${trayInsetPx}px`,
+          }}
           aria-hidden
         />
       </div>
