@@ -375,36 +375,6 @@ declare const PRESETS: {
         magenta: number;
         yellow: number;
     };
-    /**
-     * Velvia 50 プリセット（v1・2026-04-02）
-     * @description Fujifilm Velvia 50 スライドポジフィルム。高彩度・高コントラスト・極細粒・ハレーションなし。
-     * fade=0 でポジらしい黒沈みを表現。saturation/contrast は Velvia の代名詞の鮮烈さに合わせた。
-     */
-    velvia50: {
-        exposure: number;
-        contrast: number;
-        saturation: number;
-        temperature: number;
-        tint: number;
-        rgbShift: number;
-        lensSoftness: number;
-        grainIntensity: number;
-        grainRadialMix: number;
-        vignette: number;
-        bloomThreshold: number;
-        bloomStrength: number;
-        bloomRadius: number;
-        halationIntensity: number;
-        halationSpread: number;
-        halationHue: number;
-        fade: number;
-        highlights: number;
-        shadows: number;
-        shadowTone: number;
-        highlightTone: number;
-        shadowHue: number;
-        highlightHue: number;
-    };
 };
 type PresetName = keyof typeof PRESETS;
 /**

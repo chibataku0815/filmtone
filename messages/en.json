@@ -858,6 +858,14 @@
           "title": "Quick / Pro layout and Film Stock picker (v0.4)",
           "description": "Quick stays on the shortest path; Pro exposes process, artifacts, source trim, and LUT in order. Preset surfaces group film stocks with clearer boundaries (including stocks like Velvia 50)."
         },
+        "videoTransport042": {
+          "title": "Video preview transport (v0.4.2)",
+          "description": "Play/pause, timeline scrub, timecode, and Space to toggle playback on Web and Desktop — with locks during export or preview hold, and safe interaction alongside Compare mode."
+        },
+        "proPanelVocabulary042": {
+          "title": "Pro panel vocabulary & inline hints (v0.4.2)",
+          "description": "Clearer Pro labels (film texture, source adjustments, color fringing), improved Japanese for Bloom/Halation, hover hints on collapsible headers, and a Bloom threshold tooltip."
+        },
         "presetExpansion": {
           "title": "Preset expansion",
           "description": "Additional film stocks and creative looks beyond the initial four."
@@ -869,10 +877,6 @@
         "verticalVideoExportQuality": {
           "title": "Portrait & non-16:9 video export resolution",
           "description": "Improving scaling so vertical sources are less likely to be shrunk more than needed, using a long-edge-oriented cap."
-        },
-        "videoPreviewControls": {
-          "title": "Video preview playback controls",
-          "description": "Play, pause, and scrub controls for easier scene checks in preview."
         },
         "smartLookAi": {
           "title": "Smart Look AI",
@@ -916,6 +920,7 @@
       "eyebrow": "RELEASE NOTES",
       "heroTitle": "Filmtone Desktop Releases",
       "heroBody": "A log of every Desktop release, from the initial launch onward. Each entry covers what was added, fixed, or changed.",
+      "tocTitle": "On this page",
       "latestBadge": "Latest",
       "typeAdded": "Added",
       "typeFixed": "Fixed",

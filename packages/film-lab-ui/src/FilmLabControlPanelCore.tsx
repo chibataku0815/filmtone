@@ -51,6 +51,18 @@ function formatRgbShiftValue(rgbShift: number): string {
   return `${Math.round((rgbShift / RGB_SHIFT_UI_MAX) * 100)}%`;
 }
 
+const COMPRESSION_AMOUNT_UI_MAX = 0.4;
+const COMPRESSION_RANGE_UI_MAX = 0.6;
+const COMPRESSION_AMOUNT_DEFAULT = 0.1;
+
+function getCompressionAmountSliderMax(compressionAmount: number): number {
+  return Math.max(COMPRESSION_AMOUNT_UI_MAX, compressionAmount);
+}
+
+function getCompressionRangeSliderMax(compressionRange: number): number {
+  return Math.max(COMPRESSION_RANGE_UI_MAX, compressionRange);
+}
+
 /** フルページ用: プレゼンモード（寄付 UI 全消し）のトグルをコントロールパネルに出す */
 export type FilmLabDonationUiBinding = {
   presentMode: boolean;
@@ -236,6 +248,43 @@ export function FilmLabControlPanelCore({
 
   const activeSlotState = state.activeSlot === "A" ? state.slotA : state.slotB;
   const params = activeSlotState.params;
+  const initialCompressionAmount = initialSharedParams?.compressionAmount;
+
+  /**
+   * @description ハイライト圧縮の最後の非ゼロ値を覚える。いったん 0 にしても、次にオンへ戻すと前の強さを使う。
+   */
+  const compressionAmountLastNonZeroRef = useRef<number>(
+    initialCompressionAmount != null && initialCompressionAmount > 0
+      ? initialCompressionAmount
+      : COMPRESSION_AMOUNT_DEFAULT,
+  );
+
+  /**
+   * @description compressionAmount が 0 より大きい間だけ、最後の非ゼロ値を更新する。
+   * これでプリセットや共有セッションを開き直したあとでも、オンに戻したとき自然な値へ戻せる。
+   */
+  useEffect(() => {
+    if (params.compressionAmount > 0) {
+      compressionAmountLastNonZeroRef.current = params.compressionAmount;
+    }
+  }, [params.compressionAmount]);
+
+  /**
+   * @description 色収差の最後の非ゼロ値を覚える。いったん 0 にしても、次にオンへ戻すと前の強さを使う。
+   */
+  const rgbShiftLastNonZeroRef = useRef<number>(
+    initialSharedParams?.rgbShift ?? PRESETS.cinematic.rgbShift,
+  );
+
+  /**
+   * @description rgbShift が 0 より大きい間だけ、最後の非ゼロ値を更新する。
+   * これでプリセットや共有セッションを開き直したあとでも、オンに戻したとき自然な値へ戻せる。
+   */
+  useEffect(() => {
+    if (params.rgbShift > 0) {
+      rgbShiftLastNonZeroRef.current = params.rgbShift;
+    }
+  }, [params.rgbShift]);
 
   const restoreSession = useCallback(
     (session: {
@@ -332,6 +381,8 @@ export function FilmLabControlPanelCore({
 
   const bloomEnabled = params.bloomStrength > 0;
   const halationEnabled = params.halationIntensity > 0;
+  const compressionAmountEnabled = params.compressionAmount > 0;
+  const rgbShiftEnabled = params.rgbShift > 0;
   const canToggleHistogram = typeof onHistogramToggle === "function";
 
   const updateParam = useCallback((key: keyof Params, value: number) => {
@@ -374,6 +425,58 @@ export function FilmLabControlPanelCore({
       setActivePreset("reset");
     },
     [params.halationIntensity, savedHalationIntensity],
+  );
+
+  /**
+   * @description ハイライト圧縮をオン/オフする。オフにすると 0 にし、オンにすると最後の非ゼロ値か既定値へ戻す。
+   * @param {boolean} on - つけるなら true、消すなら false。
+   */
+  const toggleCompressionAmount = useCallback(
+    (on: boolean) => {
+      if (on) {
+        const nextCompressionAmount =
+          compressionAmountLastNonZeroRef.current > 0
+            ? compressionAmountLastNonZeroRef.current
+            : COMPRESSION_AMOUNT_DEFAULT;
+        dispatch({
+          type: "SET_PARAM",
+          key: "compressionAmount",
+          value: nextCompressionAmount,
+        });
+      } else {
+        if (params.compressionAmount > 0) {
+          compressionAmountLastNonZeroRef.current = params.compressionAmount;
+        }
+        dispatch({ type: "SET_PARAM", key: "compressionAmount", value: 0 });
+      }
+      dispatch({ type: "COMMIT" });
+      setActivePreset("reset");
+    },
+    [params.compressionAmount],
+  );
+
+  /**
+   * @description 色収差をオン/オフする。オフにすると 0 にし、オンにすると最後の非ゼロ値か既定値へ戻す。
+   * @param {boolean} on - つけるなら true、消すなら false。
+   */
+  const toggleRgbShift = useCallback(
+    (on: boolean) => {
+      if (on) {
+        const nextRgbShift =
+          rgbShiftLastNonZeroRef.current > 0
+            ? rgbShiftLastNonZeroRef.current
+            : PRESETS.cinematic.rgbShift;
+        dispatch({ type: "SET_PARAM", key: "rgbShift", value: nextRgbShift });
+      } else {
+        if (params.rgbShift > 0) {
+          rgbShiftLastNonZeroRef.current = params.rgbShift;
+        }
+        dispatch({ type: "SET_PARAM", key: "rgbShift", value: 0 });
+      }
+      dispatch({ type: "COMMIT" });
+      setActivePreset("reset");
+    },
+    [params.rgbShift],
   );
 
   const applyPreset = useCallback((name: PresetName) => {
@@ -604,35 +707,48 @@ export function FilmLabControlPanelCore({
             <div className="min-w-0">
               <SectionHeader title={tFilmLab("controls.process")} />
               <div className="flex flex-col gap-2.5">
-                <PanelControlSlider
-                  sliderLabelResetHint={sliderLabelResetHint}
-                  label={tFilmLab("controls.compression")}
-                  hint={tFilmLab("controls.compressionHint")}
-                  labelClassName={processSliderLabelClassName}
-                  value={params.compressionAmount}
-                  min={0} max={1} step={0.01} defaultValue={0}
-                  formatValue={(v) => `${Math.round(v * 100)}%`}
-                  onChange={(v) => updateParam("compressionAmount", v)}
-                  onCommit={commit}
+                <ToggleHeader
+                  title={tFilmLab("controls.compression")}
+                  titleHint={tFilmLab("controls.compressionToggleHint")}
+                  enabled={compressionAmountEnabled}
+                  onToggle={toggleCompressionAmount}
                 />
-                {/*
-                 * Range を 100% まで上げると輪郭付近の段差が出やすいため、UI 上限を 92% に抑える。
-                 * 共有 URL 等で 1.0 が入っていても params はそのまま保持され、スライダを動かすと 0.92 以下に収まる。
-                 */}
-                <PanelControlSlider
-                  sliderLabelResetHint={sliderLabelResetHint}
-                  label={tFilmLab("controls.compressionRange")}
-                  hint={tFilmLab("controls.compressionRangeHint")}
-                  labelClassName={processSliderLabelClassName}
-                  value={params.compressionRange}
-                  min={0}
-                  max={0.92}
-                  step={0.01}
-                  defaultValue={0.5}
-                  formatValue={(v) => `${Math.round(v * 100)}%`}
-                  onChange={(v) => updateParam("compressionRange", v)}
-                  onCommit={commit}
-                />
+                <div
+                  className={`flex flex-col gap-2.5 ${!compressionAmountEnabled ? "pointer-events-none opacity-30" : ""}`}
+                >
+                  <PanelControlSlider
+                    sliderLabelResetHint={sliderLabelResetHint}
+                    label={tFilmLab("controls.strength")}
+                    hint={tFilmLab("controls.compressionHint")}
+                    labelClassName={processSliderLabelClassName}
+                    value={params.compressionAmount}
+                    min={0}
+                    max={getCompressionAmountSliderMax(params.compressionAmount)}
+                    step={0.01}
+                    defaultValue={COMPRESSION_AMOUNT_DEFAULT}
+                    formatValue={(v) => `${Math.round(v * 100)}%`}
+                    onChange={(v) => updateParam("compressionAmount", v)}
+                    onCommit={commit}
+                  />
+                  {/*
+                   * Range は広げるほど効き方が強くなりやすいので、UI 上限を少し狭くする。
+                   * 共有 URL 等で高い値が入っていても params はそのまま保持され、スライダを動かすと安全域へ寄る。
+                   */}
+                  <PanelControlSlider
+                    sliderLabelResetHint={sliderLabelResetHint}
+                    label={tFilmLab("controls.compressionRange")}
+                    hint={tFilmLab("controls.compressionRangeHint")}
+                    labelClassName={processSliderLabelClassName}
+                    value={params.compressionRange}
+                    min={0}
+                    max={getCompressionRangeSliderMax(params.compressionRange)}
+                    step={0.01}
+                    defaultValue={0.5}
+                    formatValue={(v) => `${Math.round(v * 100)}%`}
+                    onChange={(v) => updateParam("compressionRange", v)}
+                    onCommit={commit}
+                  />
+                </div>
                 <PanelControlSlider
                   sliderLabelResetHint={sliderLabelResetHint}
                   label={tFilmLab("controls.printContrast")}
@@ -735,19 +851,27 @@ export function FilmLabControlPanelCore({
                * Bloom/Halation と同様、Artifacts 見出しの折りたたみと無関係に常に出す（閉じると「消えた」ように見えるため）。
                */}
               <div className="mt-3 flex flex-col gap-2.5 border-t border-white/[0.08] pt-3">
-                <PanelControlSlider
-                  sliderLabelResetHint={sliderLabelResetHint}
-                  label={tFilmLab("controls.rgbShift")}
-                  hint={tFilmLab("effects.rgbShiftHint")}
-                  value={params.rgbShift}
-                  min={0}
-                  max={getRgbShiftSliderMax(params.rgbShift)}
-                  step={RGB_SHIFT_UI_STEP}
-                  defaultValue={0}
-                  formatValue={formatRgbShiftValue}
-                  onChange={(v) => updateParam("rgbShift", v)}
-                  onCommit={commit}
+                <ToggleHeader
+                  title={tFilmLab("controls.rgbShift")}
+                  titleHint={tFilmLab("controls.rgbShiftToggleHint")}
+                  enabled={rgbShiftEnabled}
+                  onToggle={toggleRgbShift}
                 />
+                <div className={`flex flex-col gap-2.5 ${!rgbShiftEnabled ? "pointer-events-none opacity-30" : ""}`}>
+                  <PanelControlSlider
+                    sliderLabelResetHint={sliderLabelResetHint}
+                    label={tFilmLab("controls.strength")}
+                    hint={tFilmLab("effects.rgbShiftHint")}
+                    value={params.rgbShift}
+                    min={0}
+                    max={getRgbShiftSliderMax(params.rgbShift)}
+                    step={RGB_SHIFT_UI_STEP}
+                    defaultValue={0}
+                    formatValue={formatRgbShiftValue}
+                    onChange={(v) => updateParam("rgbShift", v)}
+                    onCommit={commit}
+                  />
+                </div>
                 <PanelControlSlider
                   sliderLabelResetHint={sliderLabelResetHint}
                   label={tFilmLab("controls.lensSoftness")}

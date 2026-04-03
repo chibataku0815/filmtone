@@ -109,7 +109,7 @@
       "highlightTone": "Highlight tone"
     },
     "effects": {
-      "rgbShiftHint": "Chromatic aberration: strongest toward the frame edges; the center stays sharp. A touch of edge softening is blended in when this slider is raised.",
+      "rgbShiftHint": "Chromatic aberration gets stronger toward the frame edges. When enabled, the slider stays in a safe micro-adjustment range.",
       "lensSoftnessHint": "Softens detail toward the frame edges, like mild lens falloff—isotropic blur, not a motion radial or zoom blur."
     },
     "donation": {
@@ -212,14 +212,16 @@
       "highlightsTrim": "Highlights (source)",
       "shadowsTrim": "Shadows (source)",
       "compression": "Highlight softness",
-      "compressionHint": "Softens bright tones with a film-style shoulder curve. Not file or data compression.",
+      "compressionToggleHint": "Turn highlight compression on or off. Pushing it too far can break the image, so use it only when needed.",
+      "compressionHint": "Softens bright tones with a film-style shoulder curve. Push it too far and the image can go flat, so keep it in a safe range.",
       "compressionRange": "Tone span",
-      "compressionRangeHint": "Widens or narrows how much of the tonal range that softness affects (highlights through shadows).",
+      "compressionRangeHint": "Controls how far that softness spreads across the tonal range. Wider values can make the effect feel stronger, so the slider is capped conservatively.",
       "printContrast": "Print snap",
       "printContrastHint": "Adds contrast in the print-style stage—separate from the main Contrast slider in the grading stack.",
       "cyan": "Cyan",
       "magenta": "Magenta",
       "yellow": "Yellow",
+      "rgbShiftToggleHint": "Turn chromatic aberration on or off. It can break the image if pushed too far, so use it only when needed.",
       "rgbShift": "Color fringing",
       "lensSoftness": "Lens Softness",
       "grainRadialMix": "Grain edge emphasis",

@@ -860,6 +860,14 @@
           "title": "Quick / Pro の整理と Film Stock ピッカー（v0.4）",
           "description": "Quick は最短導線に、Pro はプロセス・アーティファクト・ソーストリム・LUT の順で見えるように再編。プリセット面はカテゴリ分けし、Velvia 50 などのストックを cinematic や reset と混同しにくくしました。"
         },
+        "videoTransport042": {
+          "title": "動画プレビューのトランスポート（v0.4.2）",
+          "description": "Web / Desktop で再生・一時停止・タイムラインシーク・経過時間表示、Space でのトグル。書き出し中やプレビュー固定中はロックし、Compare モードとも安全に共存します。"
+        },
+        "proPanelVocabulary042": {
+          "title": "Pro パネル語彙とインライン説明（v0.4.2）",
+          "description": "Pro 見出しの平易化（質感・素材調整・色ずれなど）、Bloom / Halation の日本語整理、折りたたみ見出しのホバー説明、Bloom しきい値のツールチップ。"
+        },
         "presetExpansion": {
           "title": "プリセット追加",
           "description": "初期の 4 種に加え、新しいフィルムストック・クリエイティブルックを順次追加。"
@@ -871,10 +879,6 @@
         "verticalVideoExportQuality": {
           "title": "縦・非 16:9 動画の書き出し解像度",
           "description": "縦動画などでも長辺を基準に、不要な過小化を減らす方向で改善を進めます。"
-        },
-        "videoPreviewControls": {
-          "title": "動画プレビューの再生操作",
-          "description": "再生・一時停止・シークなど、シーン確認しやすい操作を追加する予定です。"
         },
         "smartLookAi": {
           "title": "Smart Look AI",
@@ -918,6 +922,7 @@
       "eyebrow": "リリースノート",
       "heroTitle": "Filmtone Desktop リリース履歴",
       "heroBody": "初回リリースからの全バージョンの記録です。追加・修正・変更をまとめています。",
+      "tocTitle": "目次",
       "latestBadge": "最新",
       "typeAdded": "追加",
       "typeFixed": "修正",
