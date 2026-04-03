@@ -22,6 +22,7 @@ import {
 } from "film-lab-renderer";
 import type { Params } from "film-lab-core";
 import { FILM_LAB_NEXT_INTL_NAMESPACE } from "./filmLabUiContract";
+import type { VideoPlaybackState } from "./videoPlaybackContract";
 
 /**
  * @description プレビューに載っているメディアの種類を親へ伝えるための最小ペイロード。
@@ -117,6 +118,24 @@ export type FilmLabCanvasRef = {
    * 静止画・sample のときは null。
    */
   getActiveVideoElement: () => HTMLVideoElement | null;
+  /**
+   * @description 動画トランスポート UI 用。`HTMLVideoElement` から読み取れる範囲のスナップショット。
+   */
+  getVideoPlaybackState: () => VideoPlaybackState;
+  /**
+   * @description 書き出し中や `holdPreviewRendering` 中は再生操作を無効にするためのフラグ。
+   */
+  isVideoPlaybackSuppressed: () => boolean;
+  /**
+   * @description ユーザーの再生意図。ビジー明けの自動再開は「ユーザーが明示停止していない」ときだけ行います。
+   */
+  videoPlaybackPlay: () => void;
+  videoPlaybackPause: () => void;
+  videoPlaybackTogglePlayPause: () => void;
+  /**
+   * @param time シーク先の秒。`duration` が分かっているときは 0〜duration に丸めます。
+   */
+  videoPlaybackSeek: (time: number) => void;
   /**
    * @description `pauseVideoPreview` と独立に、**親が同期で**プレビュー RAF（`viewport.render`）を止める。
    * Next.js `dynamic()` や effect 順序で props が遅れるときでも、エンコード開始の同一コールスタックで効かせる。
@@ -231,6 +250,10 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
   /** @description 現在の pause が busy 制御由来かどうかを覚えます。 */
   const previewVideoPausedByBusyRef = useRef(false);
   /**
+   * @description ユーザーがトランスポートで止めたとき true。ビジー明けの `play()` で上書きされないようにします。
+   */
+  const previewVideoUserPausedIntentRef = useRef(false);
+  /**
    * @description Three 初期化 effect がdeps [] のため、RAF の `animate` は props を直接読めない。
    * 最新の `pauseVideoPreview` を毎レンダーで渡す。
    */
@@ -294,7 +317,11 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
         previewVideoShouldResumeRef.current;
       previewVideoPausedByBusyRef.current = false;
       previewVideoShouldResumeRef.current = false;
-      if (shouldResume && videoElement.paused) {
+      if (
+        shouldResume &&
+        videoElement.paused &&
+        !previewVideoUserPausedIntentRef.current
+      ) {
         videoElement.play().catch((err) => {
           console.warn("FilmLabCanvas.syncPreviewVideoBusyState resume failed", err);
         });
@@ -366,6 +393,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
         previewVideoElementRef.current = null;
         previewVideoShouldResumeRef.current = false;
         previewVideoPausedByBusyRef.current = false;
+        previewVideoUserPausedIntentRef.current = false;
         onInteractiveSourceChangeRef.current?.({ kind: "sample" });
       })
       .catch((err) => {
@@ -482,6 +510,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
         previewVideoElementRef.current = nextPreviewVideo;
         previewVideoShouldResumeRef.current = false;
         previewVideoPausedByBusyRef.current = false;
+        previewVideoUserPausedIntentRef.current = false;
         viewportRef.current.setTexture(result.texture);
         viewportRef.current.setImageResolution(result.width, result.height);
         syncPreviewVideoBusyState(nextPreviewVideo);
@@ -631,6 +660,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
           previewVideoElementRef.current = null;
           previewVideoShouldResumeRef.current = false;
           previewVideoPausedByBusyRef.current = false;
+          previewVideoUserPausedIntentRef.current = false;
           viewport.setTexture(result.texture);
           viewport.setImageResolution(result.width, result.height);
           onInteractiveSourceChangeRef.current?.({
@@ -650,6 +680,94 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       getActiveVideoElement: () => {
         const v = previewVideoElementRef.current;
         return v ?? null;
+      },
+      getVideoPlaybackState: (): VideoPlaybackState => {
+        const v = previewVideoElementRef.current;
+        if (!v) {
+          return {
+            hasVideo: false,
+            isPlaying: false,
+            currentTime: 0,
+            duration: 0,
+          };
+        }
+        const dur = v.duration;
+        return {
+          hasVideo: true,
+          isPlaying: !v.paused && !v.ended,
+          currentTime: v.currentTime,
+          duration: Number.isFinite(dur) ? dur : 0,
+        };
+      },
+      isVideoPlaybackSuppressed: () =>
+        pauseVideoPreviewRef.current || previewRenderingHoldRef.current,
+      videoPlaybackPlay: () => {
+        if (pauseVideoPreviewRef.current || previewRenderingHoldRef.current) {
+          return;
+        }
+        const v = previewVideoElementRef.current;
+        if (!v) {
+          return;
+        }
+        previewVideoUserPausedIntentRef.current = false;
+        v.play().catch((err) => {
+          console.warn("FilmLabCanvas.videoPlaybackPlay failed", {
+            functionName: "videoPlaybackPlay",
+            err,
+          });
+        });
+      },
+      videoPlaybackPause: () => {
+        const v = previewVideoElementRef.current;
+        if (!v) {
+          return;
+        }
+        previewVideoUserPausedIntentRef.current = true;
+        v.pause();
+      },
+      videoPlaybackTogglePlayPause: () => {
+        if (pauseVideoPreviewRef.current || previewRenderingHoldRef.current) {
+          return;
+        }
+        const v = previewVideoElementRef.current;
+        if (!v) {
+          return;
+        }
+        if (v.paused || v.ended) {
+          previewVideoUserPausedIntentRef.current = false;
+          v.play().catch((err) => {
+            console.warn("FilmLabCanvas.videoPlaybackTogglePlayPause play failed", {
+              functionName: "videoPlaybackTogglePlayPause",
+              err,
+            });
+          });
+        } else {
+          previewVideoUserPausedIntentRef.current = true;
+          v.pause();
+        }
+      },
+      videoPlaybackSeek: (time: number) => {
+        const v = previewVideoElementRef.current;
+        if (!v) {
+          return;
+        }
+        const dur = v.duration;
+        let clamped = time;
+        if (Number.isFinite(dur) && dur > 0) {
+          clamped = Math.max(0, Math.min(dur, time));
+        } else if (!Number.isFinite(time) || time < 0) {
+          clamped = 0;
+        }
+        try {
+          v.currentTime = clamped;
+        } catch (err) {
+          console.warn("FilmLabCanvas.videoPlaybackSeek failed", {
+            functionName: "videoPlaybackSeek",
+            requestedTime: time,
+            clampedTime: clamped,
+            err,
+          });
+        }
       },
       holdPreviewRendering: (held: boolean) => {
         previewRenderingHoldRef.current = held;

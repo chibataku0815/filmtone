@@ -29,6 +29,7 @@ import { useLocale, useTranslations } from "next-intl";
 import {
   FilmLabCanvas,
   FilmLabWebglPanelBackdrop,
+  VideoTransportControls,
   type FilmLabCanvasRef,
   type FilmLabInteractiveSourceInfo,
 } from "film-lab-ui";
@@ -79,6 +80,17 @@ import type { DesktopUpdateAvailablePayload } from "./desktop-api";
 
 /** @description 右上ツールバーとホットキー Mod+1/2/3 の対象となるトップ面 */
 type TabId = "edit" | "photoExport" | "videoExport";
+
+/**
+ * @description 編集キャンバスに「ユーザー動画」が載っているか。Space キーの割当（life#75）に使います。
+ * @param state `onInteractiveSourceChange` から組み立てたプレビュー状態
+ */
+function desktopPreviewShowsUserVideo(state: DesktopInteractivePreviewState): boolean {
+  if (state.kind !== "file" || state.smartLookDerived) {
+    return false;
+  }
+  return /\.(mp4|webm|m4v|mov)$/i.test(state.fileName);
+}
 
 /**
  * @description 非表示タブに `hidden`（display:none）を使わない。WebGL キャンバスの尺寸・コンテキストを維持し、重ね順と透明・pointer-events でだけ隠す。
@@ -258,6 +270,10 @@ export default function App() {
    */
   const [interactivePreviewSource, setInteractivePreviewSource] =
     useState<DesktopInteractivePreviewState>({ kind: "sample" });
+  const canvasHasUserVideo = useMemo(
+    () => desktopPreviewShowsUserVideo(interactivePreviewSource),
+    [interactivePreviewSource],
+  );
   /** @description ffprobe 済みのメタ（UI 表示用） */
   const [videoProbeLabel, setVideoProbeLabel] = useState<string | null>(null);
   /**
@@ -1211,13 +1227,19 @@ export default function App() {
                 onInteractiveSourceChange={handleInteractiveSourceChange}
                 getFileAbsolutePath={resolveCanvasFileAbsolutePath}
               />
-              <div className="pointer-events-none absolute bottom-4 left-4 z-10">
+              <div
+                className={`pointer-events-none absolute left-4 z-10 ${canvasHasUserVideo ? "bottom-14" : "bottom-4"}`}
+              >
                 <Histogram
                   viewport={viewport}
                   visible={histogramVisible}
                   variant="inline"
                 />
               </div>
+              <VideoTransportControls
+                filmLabCanvasRef={filmLabCanvasRef}
+                className="absolute bottom-0 left-0 right-0 z-[18]"
+              />
             </section>
 
             {!editRightPaneExpanded ? (
@@ -1387,6 +1409,7 @@ export default function App() {
                       onPresetChange={setCanvasPreset}
                       onLutChange={handleEditLutChange}
                       onParamsChange={handleEditParamsChange}
+                      deferSpaceKeyToVideoTransportWhenNoCompare={canvasHasUserVideo}
                     />
                   </div>
                   <div className="fl-sticky-footer fl-surface-frost rounded-b-xl">

@@ -129,6 +129,11 @@ interface FilmLabControlPanelCoreProps {
   onUiModeChange?: (mode: UiMode) => void;
   /** 拡張スロット */
   slots?: FilmLabControlPanelCoreSlots;
+  /**
+   * @description true かつ Compare モードでないとき、`Space` を「オリジナル一時表示」に使わず、
+   * 動画トランスポート（`VideoTransportControls`）へ渡します。
+   */
+  deferSpaceKeyToVideoTransportWhenNoCompare?: boolean;
 }
 
 export function FilmLabControlPanelCore({
@@ -145,6 +150,7 @@ export function FilmLabControlPanelCore({
   defaultUiMode = "pro",
   onUiModeChange,
   slots = {},
+  deferSpaceKeyToVideoTransportWhenNoCompare = false,
 }: FilmLabControlPanelCoreProps) {
   const tFilmLab = useTranslations(FILM_LAB_NEXT_INTL_NAMESPACE);
 
@@ -416,7 +422,11 @@ export function FilmLabControlPanelCore({
       }
 
       if (e.key === " ") {
+        if (deferSpaceKeyToVideoTransportWhenNoCompare && !state.compareMode) {
+          return;
+        }
         e.preventDefault();
+        e.stopPropagation();
         if (!e.repeat) {
           dispatch({ type: "BEFORE_AFTER_ON" });
         }
@@ -467,7 +477,11 @@ export function FilmLabControlPanelCore({
       ) {
         return;
       }
+      if (deferSpaceKeyToVideoTransportWhenNoCompare && !state.compareMode) {
+        return;
+      }
       e.preventDefault();
+      e.stopPropagation();
       dispatch({ type: "BEFORE_AFTER_OFF" });
     };
 
@@ -477,7 +491,7 @@ export function FilmLabControlPanelCore({
       document.removeEventListener("keydown", handleKeyDown, { capture: true });
       document.removeEventListener("keyup", handleKeyUp, { capture: true });
     };
-  }, [applyPreset, onHistogramToggle, state.compareMode]);
+  }, [applyPreset, onHistogramToggle, state.compareMode, deferSpaceKeyToVideoTransportWhenNoCompare]);
 
   // ── パラメータ変更を親に通知（初回レンダーはスキップ） ──
   const isFirstParamsRender = useRef(true);
@@ -637,7 +651,12 @@ export function FilmLabControlPanelCore({
           {/* === ARTIFACTS (旧 EFFECTS) — Pro only === */}
           {isPro && (
             <div className="min-w-0">
-              <CollapsibleHeader title={tFilmLab("controls.artifacts")} open={artifactsOpen} onToggle={() => setArtifactsOpen(!artifactsOpen)} />
+              <CollapsibleHeader
+                title={tFilmLab("controls.artifacts")}
+                titleHint={tFilmLab("controls.artifactsSectionHint")}
+                open={artifactsOpen}
+                onToggle={() => setArtifactsOpen(!artifactsOpen)}
+              />
               {artifactsOpen && (
                 <div className="flex flex-col gap-2.5">
                   <PanelControlSlider label={tFilmLab("controls.filmGrain")} value={params.grainIntensity} min={0} max={0.5} step={0.01} defaultValue={0} onChange={(v) => updateParam("grainIntensity", v)} onCommit={commit} />
@@ -645,14 +664,34 @@ export function FilmLabControlPanelCore({
                 </div>
               )}
 
-              <ToggleHeader title={tFilmLab("controls.bloom")} enabled={bloomEnabled} onToggle={toggleBloom} />
+              <ToggleHeader
+                title={tFilmLab("controls.bloom")}
+                titleHint={tFilmLab("controls.bloomToggleHint")}
+                enabled={bloomEnabled}
+                onToggle={toggleBloom}
+              />
               <div className={`flex flex-col gap-2.5 ${!bloomEnabled ? "pointer-events-none opacity-30" : ""}`}>
                 <PanelControlSlider label={tFilmLab("controls.strength")} value={params.bloomStrength} min={0} max={3} step={0.01} defaultValue={0} onChange={(v) => updateParam("bloomStrength", v)} onCommit={commit} />
-                <PanelControlSlider label={tFilmLab("controls.threshold")} value={params.bloomThreshold} min={0} max={1} step={0.01} defaultValue={0.8} onChange={(v) => updateParam("bloomThreshold", v)} onCommit={commit} />
+                <PanelControlSlider
+                  label={tFilmLab("controls.threshold")}
+                  hint={tFilmLab("controls.bloomThresholdHint")}
+                  value={params.bloomThreshold}
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  defaultValue={0.8}
+                  onChange={(v) => updateParam("bloomThreshold", v)}
+                  onCommit={commit}
+                />
                 <PanelControlSlider label={tFilmLab("controls.radius")} value={params.bloomRadius} min={0} max={1} step={0.01} defaultValue={0.4} onChange={(v) => updateParam("bloomRadius", v)} onCommit={commit} />
               </div>
 
-              <ToggleHeader title={tFilmLab("controls.halation")} enabled={halationEnabled} onToggle={toggleHalation} />
+              <ToggleHeader
+                title={tFilmLab("controls.halation")}
+                titleHint={tFilmLab("controls.halationToggleHint")}
+                enabled={halationEnabled}
+                onToggle={toggleHalation}
+              />
               <div className={`flex flex-col gap-2.5 ${!halationEnabled ? "pointer-events-none opacity-30" : ""}`}>
                 <PanelControlSlider label={tFilmLab("controls.intensity")} value={params.halationIntensity} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("halationIntensity", v)} onCommit={commit} />
                 <PanelControlSlider label={tFilmLab("controls.spread")} value={params.halationSpread} min={0} max={50} step={0.5} defaultValue={15} onChange={(v) => updateParam("halationSpread", v)} onCommit={commit} />
@@ -712,6 +751,7 @@ export function FilmLabControlPanelCore({
             <div className="min-w-0">
               <CollapsibleHeader
                 title={tFilmLab("controls.sourceTrim")}
+                titleHint={tFilmLab("controls.sourceTrimSectionHint")}
                 open={sourceTrimOpen}
                 onToggle={() => setSourceTrimOpen(!sourceTrimOpen)}
               />
@@ -895,15 +935,20 @@ function SplitLooksPreviewIcon() {
 
 function CollapsibleHeader({
   title,
+  titleHint,
   open,
   onToggle,
 }: {
   title: string;
+  /** 折りたたみ見出しホバー時の補足（ネイティブ `title`） */
+  titleHint?: string;
   open: boolean;
   onToggle: () => void;
 }) {
   return (
     <button
+      type="button"
+      title={titleHint}
       className={filmLabCollapsibleHeaderButton}
       onClick={onToggle}
     >

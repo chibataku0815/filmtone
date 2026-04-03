@@ -14,6 +14,8 @@ import { filmLabToggleHeaderTitle, filmLabToggleHeaderTrackOff, filmLabToggleHea
 export interface ToggleHeaderProps {
   /** 行のタイトル */
   title: string;
+  /** 見出しホバー時の補足（ネイティブ `title`・next-intl 済み文言を渡す） */
+  titleHint?: string;
   /** スイッチのオン状態 */
   enabled: boolean;
   /** クリックされたときに渡す次のオン状態 */
@@ -23,10 +25,12 @@ export interface ToggleHeaderProps {
 /**
  * @param {ToggleHeaderProps} props トグル行 props
  */
-export function ToggleHeader({ title, enabled, onToggle }: ToggleHeaderProps) {
+export function ToggleHeader({ title, titleHint, enabled, onToggle }: ToggleHeaderProps) {
   return (
     <div className="mb-2 mt-3 flex min-h-[1.5rem] min-w-0 items-center justify-between gap-3">
-      <h3 className={`min-w-0 flex-1 ${filmLabToggleHeaderTitle}`}>{title}</h3>
+      <h3 className={`min-w-0 flex-1 ${filmLabToggleHeaderTitle}`} title={titleHint}>
+        {title}
+      </h3>
       <Switch.Root
         checked={enabled}
         onCheckedChange={onToggle}

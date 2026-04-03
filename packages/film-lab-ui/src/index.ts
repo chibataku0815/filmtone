@@ -28,6 +28,12 @@ export {
   filmLabToggleHeaderTrackOn,
 } from "./filmLabPanelTokens";
 
+export type { VideoPlaybackState } from "./videoPlaybackContract";
+export {
+  VideoTransportControls,
+  type VideoTransportControlsProps,
+} from "./VideoTransportControls";
+
 // Components
 export {
   FilmLabCanvas,
