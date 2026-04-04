@@ -492,10 +492,14 @@ export default function App() {
     const pendingVideoProgress = pendingVideoProgressRef.current;
     if (!pendingVideoProgress) return;
     pendingVideoProgressRef.current = null;
+    const fileName =
+      pendingVideoProgress.phase === "mezzanine"
+        ? tLogs("progressMezzanine")
+        : tLogs("progressVideoFrames");
     setBatchProgress({
       current: pendingVideoProgress.currentFrame,
       total: pendingVideoProgress.totalFrames,
-      fileName: tLogs("progressVideoFrames"),
+      fileName,
     });
   }, [tLogs]);
 

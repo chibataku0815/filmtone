@@ -464,6 +464,7 @@
         "videoOutputCancel": "Video: output folder selection canceled.",
         "videoValidateErr": "Video: validation — {msg}",
         "progressVideoFrames": "Video frames",
+        "progressMezzanine": "Optimizing source…",
         "videoExportFail": "Video export failed: {msg}",
         "videoExportDone": "Video export finished.",
         "videoFatal": "Video FATAL: {msg}",

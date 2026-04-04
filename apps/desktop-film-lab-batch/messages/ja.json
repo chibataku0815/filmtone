@@ -464,6 +464,7 @@
         "videoOutputCancel": "動画: 出力フォルダの選択がキャンセルされました。",
         "videoValidateErr": "動画: 検証エラー — {msg}",
         "progressVideoFrames": "動画フレーム",
+        "progressMezzanine": "ソースを最適化しています…",
         "videoExportFail": "動画出力失敗: {msg}",
         "videoExportDone": "動画出力が完了しました。",
         "videoFatal": "動画 FATAL: {msg}",
