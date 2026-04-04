@@ -866,6 +866,10 @@
           "title": "Pro panel vocabulary & inline hints (v0.4.2)",
           "description": "Clearer Pro labels (film texture, source adjustments, color fringing), improved Japanese for Bloom/Halation, hover hints on collapsible headers, and a Bloom threshold tooltip."
         },
+        "fasterVideoExport043": {
+          "title": "Faster export for heavy codec sources (v0.4.3)",
+          "description": "4K HEVC and other heavy format sources are automatically optimized before export, delivering up to 4\u00d7 faster throughput."
+        },
         "presetExpansion": {
           "title": "Preset expansion",
           "description": "Additional film stocks and creative looks beyond the initial four."
@@ -926,6 +930,10 @@
       "typeFixed": "Fixed",
       "typeChanged": "Changed",
       "entries": {
+        "v043Title": "Faster video export for heavy sources",
+        "v043FasterHevcExport": "Up to 4\u00d7 faster export for 4K HEVC sources, cutting a 3-minute encode to under 45 seconds.",
+        "v043AutoSourceOptimize": "Heavy codec sources (HEVC, VP9, AV1, ProRes) are automatically optimized before grading. H.264 sources skip this step and export at full speed.",
+        "v043OptimizationProgress": "A progress bar appears during source optimization so exports of heavy files don't look stalled.",
         "v042Title": "Pro panel vocabulary pass—textures, glow, source, and fringing",
         "v042ProPanelVocabulary": "Renamed several Pro labels for clarity (e.g. Artifacts → Film texture, Source Trim → Source adjustments, RGB Shift → Color fringing). Japanese UI uses plainer words for Bloom/Halation and the source block.",
         "v042BloomThresholdHint": "Bloom’s threshold slider now includes a short tooltip explaining which brightness levels drive the glow.",

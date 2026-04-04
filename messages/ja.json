@@ -868,6 +868,10 @@
           "title": "Pro パネル語彙とインライン説明（v0.4.2）",
           "description": "Pro 見出しの平易化（質感・素材調整・色ずれなど）、Bloom / Halation の日本語整理、折りたたみ見出しのホバー説明、Bloom しきい値のツールチップ。"
         },
+        "fasterVideoExport043": {
+          "title": "重いコーデックの書き出し高速化（v0.4.3）",
+          "description": "4K HEVC などの重いソースを書き出し前に自動最適化し、最大 4 倍のスループット改善。"
+        },
         "presetExpansion": {
           "title": "プリセット追加",
           "description": "初期の 4 種に加え、新しいフィルムストック・クリエイティブルックを順次追加。"
@@ -928,6 +932,10 @@
       "typeFixed": "修正",
       "typeChanged": "変更",
       "entries": {
+        "v043Title": "重いソースの動画書き出し高速化",
+        "v043FasterHevcExport": "4K HEVC 素材の書き出しが最大 4 倍高速化。3 分以上かかっていたエンコードが 45 秒未満に。",
+        "v043AutoSourceOptimize": "HEVC・VP9・AV1・ProRes など重いコーデックのソースを書き出し前に自動最適化。H.264 ソースはそのまま高速に書き出します。",
+        "v043OptimizationProgress": "ソース最適化中に進捗バーを表示。重いファイルの書き出しが止まって見えることがなくなります。",
         "v042Title": "Pro パネル全体の語彙整理（質感・光・素材・色ずれ）",
         "v042ProPanelVocabulary": "Artifacts を「フィルムの質感」、Source を「素材の調整」など、誤解されやすい見出しを平易化。Bloom / Halation は日本語表記を整え、折りたたみ・トグル見出しにホバー説明を追加。",
         "v042BloomThresholdHint": "Bloom のしきい値スライダーに、どの明るさからにじみが強く出るかのツールチップを追加。",
