@@ -870,8 +870,7 @@ export async function runVideoExportPipeline(options: {
   const maxT = Math.max(0, probe.durationSec - epsilon);
   const sourceFpsTrusted = probe.sourceFrameRateTrusted === true;
   const sourceFpsValue = probe.sourceFrameRate;
-  // RGB (3 bytes/pixel) — alpha is discarded before IPC; reduces stdin drain wait by 25%
-  const cpuBuf = new Uint8Array(outW * outH * 3);
+  const cpuBuf = new Uint8Array(outW * outH * 4);
   const maxAttempts = tryWebCodecs ? 2 : 1;
 
   try {
@@ -1025,7 +1024,7 @@ export async function runVideoExportPipeline(options: {
         //   useFence=true  → double-buffered PBOs + fenceSync (async overlap)
         //   useFence=false → single PBO + gl.finish() (still faster than raw readPixels)
         //   usePbo=false   → sync readPixels fallback
-        const pboSize = outW * outH * 3; // RGB — 3 bytes/pixel
+        const pboSize = outW * outH * 4;
         let usePbo = true;
         let useFence = false;
         const pbos: [WebGLBuffer | null, WebGLBuffer | null] = [null, null];
@@ -1072,8 +1071,6 @@ export async function runVideoExportPipeline(options: {
             `[動画][PBO] 作成失敗、sync readPixels にフォールバック — ${pboErr instanceof Error ? pboErr.message : String(pboErr)}`,
           );
         }
-        // RGB readback: row stride = 3*outW may not be 4-byte aligned; disable padding
-        gl.pixelStorei(gl.PACK_ALIGNMENT, 1);
         let pboIdx = 0;
         let prevFence: WebGLSync | null = null;
 
@@ -1265,7 +1262,7 @@ export async function runVideoExportPipeline(options: {
           /**
            * @description エクスポート 1 枚目だけ `gl.finish()` してから readback する。
            *   Metal / ANGLE 系で、初回テクスチャ upload とシェーダの結果が FBO に乗る前に
-           *   `readPixels` が走ると RGB がゼロのまま拾われ、h264 の先頭フレームだけが真っ黒になる
+           *   `readPixels` が走ると RGBA がゼロのまま拾われ、h264 の先頭フレームだけが真っ黒になる
            *   （Finder サムネが黒・qlmanage は別フレームを採るため非黒、などの落差）。全フレーム
            *   `finish` は重いので先頭のみ。
            */
@@ -1280,7 +1277,7 @@ export async function runVideoExportPipeline(options: {
             // === Path A: PBO double-buffer + fenceSync (best: async overlap) ===
             const tP0 = performance.now();
             gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbos[pboIdx]!);
-            gl.readPixels(0, 0, outW, outH, gl.RGB, gl.UNSIGNED_BYTE, 0);
+            gl.readPixels(0, 0, outW, outH, gl.RGBA, gl.UNSIGNED_BYTE, 0);
             gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
             const newFence = gl.fenceSync(
               gl.SYNC_GPU_COMMANDS_COMPLETE,
@@ -1325,7 +1322,7 @@ export async function runVideoExportPipeline(options: {
             // === Path B: single PBO + gl.finish() (pinned-memory memcpy) ===
             const tP0 = performance.now();
             gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbos[0]!);
-            gl.readPixels(0, 0, outW, outH, gl.RGB, gl.UNSIGNED_BYTE, 0);
+            gl.readPixels(0, 0, outW, outH, gl.RGBA, gl.UNSIGNED_BYTE, 0);
             gl.finish();
             gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, cpuBuf);
             gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
@@ -1350,7 +1347,7 @@ export async function runVideoExportPipeline(options: {
           } else {
             // === Path C: sync readPixels fallback ===
             const tP0 = performance.now();
-            gl.readPixels(0, 0, outW, outH, gl.RGB, gl.UNSIGNED_BYTE, cpuBuf);
+            gl.readPixels(0, 0, outW, outH, gl.RGBA, gl.UNSIGNED_BYTE, cpuBuf);
             readPxMs = performance.now() - tP0;
             arrRead.push(readPxMs);
 

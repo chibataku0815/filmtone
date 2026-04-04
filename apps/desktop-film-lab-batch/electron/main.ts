@@ -544,7 +544,7 @@ function buildFfmpegRawvideoExportArgs(opts: {
     "-f",
     "rawvideo",
     "-pix_fmt",
-    "rgb24",
+    "rgba",
     "-s",
     `${width}x${height}`,
     "-r",
