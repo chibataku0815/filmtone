@@ -84,6 +84,12 @@ export type FilmLabBatchBridge = {
   ) => Promise<{ stagedPath: string }>;
   /** @description videoExportStageSource で作った tmp を削除 */
   videoExportUnlinkStaged: (stagedPath: string) => Promise<void>;
+  /** @description HEVC 等の重い素材を ProRes 422 mezzanine に事前変換 */
+  videoExportTranscodeMezzanine: (
+    absolutePath: string,
+  ) => Promise<{ mezzaninePath: string; mezzanineSizeBytes: number }>;
+  /** @description mezzanine 変換を中断 */
+  videoExportAbortMezzanine: () => Promise<void>;
 
   /** @description 長い書き出し中は更新通知を遅らせる（main と同期） */
   setExportBusyForUpdateCheck: (busy: boolean) => Promise<void>;

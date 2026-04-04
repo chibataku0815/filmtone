@@ -69,6 +69,7 @@ type FfmpegVideoExportSession = {
 };
 
 let activeVideoExport: FfmpegVideoExportSession | null = null;
+let mezzanineProcess: ChildProcessWithoutNullStreams | null = null;
 
 /** @description 更新案内 IPC の送り先ウィンドウ（最初に作ったもの） */
 let mainWindowRef: BrowserWindow | null = null;
@@ -114,6 +115,10 @@ const DEBUG_VIDEO_EXPORT_MAIN =
 const VERBOSE_VIDEO_EXPORT_MAIN =
   process.env.FILM_LAB_VERBOSE_VIDEO_EXPORT === "1" ||
   process.env.FILM_LAB_VERBOSE_VIDEO_EXPORT === "true";
+
+const SKIP_MEZZANINE =
+  process.env.FILM_LAB_SKIP_MEZZANINE === "1" ||
+  process.env.FILM_LAB_SKIP_MEZZANINE === "true";
 
 /**
  * @description main がいま把握している動画書き出しフェーズ。黒画面やクラッシュの時刻と付き合わせる。
@@ -425,6 +430,38 @@ function ffmpegVideoCodecArgs(): string[] {
     return ["-c:v", "h264_videotoolbox", "-b:v", "12M", "-allow_sw", "1"];
   }
   return ["-c:v", "libx264", "-preset", "veryfast", "-crf", "21"];
+}
+
+/**
+ * @description Visually lossless mezzanine 用の ffmpeg 引数を組み立てる。
+ *   Chromium の <video> が decode できる H.264 all-I-frame を使用。
+ *   useHwEncoder=true で h264_videotoolbox（Apple Silicon HW）、false で libx264（SW fallback）。
+ *   -g 1: 全フレームが IDR → seek が瞬時。
+ *   高ビットレート: visually lossless（ProRes 422 相当品質）。
+ */
+function buildFfmpegMezzanineArgs(
+  inputPath: string,
+  outputPath: string,
+  useHwEncoder: boolean,
+): string[] {
+  const args = ["-hide_banner", "-loglevel", "info", "-i", inputPath];
+  if (useHwEncoder) {
+    args.push(
+      "-c:v", "h264_videotoolbox",
+      "-b:v", "200M",
+      "-g", "1",
+      "-allow_sw", "1",
+    );
+  } else {
+    args.push(
+      "-c:v", "libx264",
+      "-crf", "4",
+      "-preset", "ultrafast",
+      "-g", "1",
+    );
+  }
+  args.push("-c:a", "copy", "-y", outputPath);
+  return args;
 }
 
 function buildFfmpegRawvideoExportArgs(opts: {
@@ -1274,5 +1311,124 @@ ipcMain.handle("video-export-unlink-staged", async (_evt, stagedPath: string) =>
     await fs.unlink(path.resolve(stagedPath));
   } catch {
     /* ignore */
+  }
+});
+
+/**
+ * @description HEVC 等の重いソースを ProRes 422 mezzanine に事前トランスコードする。
+ *   HW encoder (prores_videotoolbox) を優先し、失敗時は SW (prores_ks) にフォールバック。
+ */
+ipcMain.handle(
+  "video-export-transcode-mezzanine",
+  async (_evt, filePath: string) => {
+    if (typeof filePath !== "string" || filePath.length === 0) {
+      throw new TypeError(
+        "video-export-transcode-mezzanine: filePath が空です",
+      );
+    }
+    if (SKIP_MEZZANINE) {
+      throw new Error(
+        "video-export-transcode-mezzanine: FILM_LAB_SKIP_MEZZANINE=1 でスキップ",
+      );
+    }
+
+    const abs = path.resolve(filePath);
+    const st = await fs.stat(abs);
+    if (!st.isFile()) {
+      throw new Error(
+        `video-export-transcode-mezzanine: ファイルではありません — ${abs}`,
+      );
+    }
+
+    const ffmpeg = (() => {
+      try {
+        return resolveVideoCliBinary("ffmpeg");
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        throw new Error(`ffmpeg が見つかりません。${msg}`);
+      }
+    })();
+
+    const outputPath = path.join(
+      os.tmpdir(),
+      `film-lab-mezzanine-${randomBytes(8).toString("hex")}.mp4`,
+    );
+
+    const runTranscode = (useHw: boolean): Promise<void> =>
+      new Promise((resolve, reject) => {
+        const args = buildFfmpegMezzanineArgs(abs, outputPath, useHw);
+        if (DEBUG_VIDEO_EXPORT_MAIN) {
+          console.log(
+            `[film-lab-desktop][mezzanine] ffmpeg ${useHw ? "HW" : "SW"} argv: ${JSON.stringify(args)}`,
+          );
+        }
+        const child = spawn(ffmpeg.commandPath, args, {
+          env: ffmpeg.childEnv,
+          stdio: ["ignore", "ignore", "pipe"],
+        }) as ChildProcessWithoutNullStreams;
+        mezzanineProcess = child;
+
+        const stderrBuf: string[] = [];
+        child.stderr?.on("data", (chunk: Buffer) => {
+          stderrBuf.push(chunk.toString("utf8"));
+        });
+        child.on("error", (err) => {
+          mezzanineProcess = null;
+          reject(
+            new Error(
+              `ffmpeg mezzanine spawn error: ${err.message}`,
+            ),
+          );
+        });
+        child.on("close", (code) => {
+          mezzanineProcess = null;
+          if (code === 0) {
+            resolve();
+          } else {
+            const tail = stderrBuf.join("").slice(-4000);
+            reject(
+              new Error(
+                `ffmpeg mezzanine ${useHw ? "HW" : "SW"} exit code=${code} stderr: ${tail}`,
+              ),
+            );
+          }
+        });
+      });
+
+    // HW encoder first, SW fallback
+    try {
+      await runTranscode(true);
+    } catch (hwErr) {
+      if (DEBUG_VIDEO_EXPORT_MAIN) {
+        console.log(
+          `[film-lab-desktop][mezzanine] HW encoder 失敗、SW fallback: ${hwErr instanceof Error ? hwErr.message : String(hwErr)}`,
+        );
+      }
+      // Remove partial output from HW attempt
+      try {
+        await fs.unlink(outputPath);
+      } catch {
+        /* ignore */
+      }
+      await runTranscode(false);
+    }
+
+    const outStat = await fs.stat(outputPath);
+    console.log(
+      `[film-lab-desktop][mezzanine] 完了 ${outputPath} size=${(outStat.size / 1024 / 1024).toFixed(1)}MB`,
+    );
+    return { mezzaninePath: outputPath, mezzanineSizeBytes: outStat.size };
+  },
+);
+
+ipcMain.handle("video-export-abort-mezzanine", async () => {
+  if (mezzanineProcess) {
+    mezzanineProcess.kill("SIGTERM");
+    setTimeout(() => {
+      if (mezzanineProcess) {
+        mezzanineProcess.kill("SIGKILL");
+        mezzanineProcess = null;
+      }
+    }, 5000);
   }
 });

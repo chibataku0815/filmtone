@@ -102,6 +102,12 @@ contextBridge.exposeInMainWorld("filmLabBatch", {
     ipcRenderer.invoke("video-export-stage-source", filePath),
   videoExportUnlinkStaged: (stagedPath: string): Promise<void> =>
     ipcRenderer.invoke("video-export-unlink-staged", stagedPath),
+  videoExportTranscodeMezzanine: (
+    filePath: string,
+  ): Promise<{ mezzaninePath: string; mezzanineSizeBytes: number }> =>
+    ipcRenderer.invoke("video-export-transcode-mezzanine", filePath),
+  videoExportAbortMezzanine: (): Promise<void> =>
+    ipcRenderer.invoke("video-export-abort-mezzanine"),
 
   /**
    * @description まとめて書き出し中は更新バナーを出さないよう main に伝える
