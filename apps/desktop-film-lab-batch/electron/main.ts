@@ -521,7 +521,9 @@ function buildFfmpegMezzanineArgs(
       "-g", "1",
     );
   }
-  args.push("-vf", `scale=${outW}:-2`);
+  // colorspace フィルターで色空間を bt709 に正規化してから scale する。
+  // ProRes 4444 (yuv444p12le, gbr) 等で swscaler が "Unsupported input" になるのを回避。
+  args.push("-vf", `colorspace=iall=bt709:all=bt709,scale=${outW}:-2,format=yuv420p`);
   args.push("-c:a", "copy", "-y", outputPath);
   return args;
 }
