@@ -932,6 +932,9 @@
       "typeFixed": "修正",
       "typeChanged": "変更",
       "entries": {
+        "v044Title": "ProRes MOV 対応",
+        "v044ProresLoadAndExport": "ProRes MOV（LOG 素材）のプレビュー読み込みと書き出しに対応。読み込み時に自動で最適化フォーマットへ変換します。",
+        "v044Dci4kInput": "DCI 4K（4096×2160）等の UHD を超える解像度の動画入力に対応しました。",
         "v043Title": "重いソースの動画書き出し高速化",
         "v043FasterHevcExport": "4K HEVC 素材の書き出しが最大 4 倍高速化。3 分以上かかっていたエンコードが 45 秒未満に。",
         "v043AutoSourceOptimize": "HEVC・VP9・AV1・ProRes など重いコーデックのソースを書き出し前に自動最適化。H.264 ソースはそのまま高速に書き出します。",

@@ -930,6 +930,9 @@
       "typeFixed": "Fixed",
       "typeChanged": "Changed",
       "entries": {
+        "v044Title": "ProRes MOV Support",
+        "v044ProresLoadAndExport": "ProRes MOV files (LOG footage) can now be previewed and exported. The source is automatically converted to an optimized format on import.",
+        "v044Dci4kInput": "DCI 4K (4096\u00d72160) and other above-UHD resolutions are now accepted as video input.",
         "v043Title": "Faster video export for heavy sources",
         "v043FasterHevcExport": "Up to 4\u00d7 faster export for 4K HEVC sources, cutting a 3-minute encode to under 45 seconds.",
         "v043AutoSourceOptimize": "Heavy codec sources (HEVC, VP9, AV1, ProRes) are automatically optimized before grading. H.264 sources skip this step and export at full speed.",
