@@ -121,6 +121,65 @@ const SKIP_MEZZANINE =
   process.env.FILM_LAB_SKIP_MEZZANINE === "true";
 
 /**
+ * @description mezzanine 進捗を送る IPC のチャンネル名。
+ */
+const MEZZANINE_PROGRESS_CHANNEL = "film-lab-video-export-mezzanine-progress";
+
+/**
+ * @description mezzanine 進捗の分母。画面は 0-99 / 100 で見せる。
+ */
+const MEZZANINE_PROGRESS_TOTAL = 100;
+
+/**
+ * @description main から renderer に送る mezzanine 進捗。
+ */
+type MezzanineProgressPayload = {
+  /** @description 0 から 99 までの進み具合 */
+  current: number;
+  /** @description 分母。mezzanine は 100 固定 */
+  total: number;
+};
+
+/**
+ * @description ffmpeg stderr に出る `time=HH:MM:SS.xx` を秒へ変換する。
+ * @param timecode ffmpeg の time= の後ろに出る文字列
+ * @returns {number | null} 秒。読めないときは null。
+ */
+function parseFfmpegTimecodeToSeconds(timecode: string): number | null {
+  const parts = timecode.trim().split(":");
+  if (parts.length !== 3) {
+    return null;
+  }
+  const hours = Number(parts[0]);
+  const minutes = Number(parts[1]);
+  const seconds = Number(parts[2]);
+  if (
+    !Number.isFinite(hours) ||
+    !Number.isFinite(minutes) ||
+    !Number.isFinite(seconds)
+  ) {
+    return null;
+  }
+  return hours * 3600 + minutes * 60 + seconds;
+}
+
+/**
+ * @description mezzanine の進捗を mainWindowRef へ送る。
+ * @param current 0-99 で丸めた進み具合
+ */
+function sendMezzanineProgress(current: number): void {
+  const win = mainWindowRef;
+  if (win == null) {
+    return;
+  }
+  const payload: MezzanineProgressPayload = {
+    current,
+    total: MEZZANINE_PROGRESS_TOTAL,
+  };
+  win.webContents.send(MEZZANINE_PROGRESS_CHANNEL, payload);
+}
+
+/**
  * @description main がいま把握している動画書き出しフェーズ。黒画面やクラッシュの時刻と付き合わせる。
  */
 function currentVideoExportPhase(): string {
@@ -443,12 +502,14 @@ function buildFfmpegMezzanineArgs(
   inputPath: string,
   outputPath: string,
   useHwEncoder: boolean,
+  outW: number,
+  outH: number,
 ): string[] {
   const args = ["-hide_banner", "-loglevel", "info", "-i", inputPath];
   if (useHwEncoder) {
     args.push(
       "-c:v", "h264_videotoolbox",
-      "-b:v", "200M",
+      "-b:v", "80M",
       "-g", "1",
       "-allow_sw", "1",
     );
@@ -460,6 +521,7 @@ function buildFfmpegMezzanineArgs(
       "-g", "1",
     );
   }
+  args.push("-vf", `scale=${outW}:-2`);
   args.push("-c:a", "copy", "-y", outputPath);
   return args;
 }
@@ -1320,19 +1382,44 @@ ipcMain.handle("video-export-unlink-staged", async (_evt, stagedPath: string) =>
  */
 ipcMain.handle(
   "video-export-transcode-mezzanine",
-  async (_evt, filePath: string) => {
-    if (typeof filePath !== "string" || filePath.length === 0) {
+  async (_evt, payload: { filePath: string; durationSec: number; outW: number; outH: number }) => {
+    if (typeof payload !== "object" || payload == null) {
+      throw new TypeError(
+        "video-export-transcode-mezzanine: payload が空です",
+      );
+    }
+    const input = payload as {
+      filePath?: unknown;
+      durationSec?: unknown;
+      outW?: unknown;
+      outH?: unknown;
+    };
+    if (typeof input.filePath !== "string" || input.filePath.length === 0) {
       throw new TypeError(
         "video-export-transcode-mezzanine: filePath が空です",
       );
     }
+    const safeDurationSec =
+      typeof input.durationSec === "number" &&
+      Number.isFinite(input.durationSec) &&
+      input.durationSec > 0
+        ? input.durationSec
+        : 1;
+    const safeOutW =
+      typeof input.outW === "number" && input.outW > 0
+        ? Math.round(input.outW)
+        : 1920;
+    const safeOutH =
+      typeof input.outH === "number" && input.outH > 0
+        ? Math.round(input.outH)
+        : 1080;
     if (SKIP_MEZZANINE) {
       throw new Error(
         "video-export-transcode-mezzanine: FILM_LAB_SKIP_MEZZANINE=1 でスキップ",
       );
     }
 
-    const abs = path.resolve(filePath);
+    const abs = path.resolve(input.filePath);
     const st = await fs.stat(abs);
     if (!st.isFile()) {
       throw new Error(
@@ -1356,7 +1443,7 @@ ipcMain.handle(
 
     const runTranscode = (useHw: boolean): Promise<void> =>
       new Promise((resolve, reject) => {
-        const args = buildFfmpegMezzanineArgs(abs, outputPath, useHw);
+        const args = buildFfmpegMezzanineArgs(abs, outputPath, useHw, safeOutW, safeOutH);
         if (DEBUG_VIDEO_EXPORT_MAIN) {
           console.log(
             `[film-lab-desktop][mezzanine] ffmpeg ${useHw ? "HW" : "SW"} argv: ${JSON.stringify(args)}`,
@@ -1368,10 +1455,41 @@ ipcMain.handle(
         }) as ChildProcessWithoutNullStreams;
         mezzanineProcess = child;
 
+        let lastSentCurrent = -1;
+        const emitProgress = (elapsedSec: number): void => {
+          const current = Math.min(
+            99,
+            Math.max(0, Math.floor((elapsedSec / safeDurationSec) * 100)),
+          );
+          if (current <= lastSentCurrent) {
+            return;
+          }
+          lastSentCurrent = current;
+          sendMezzanineProgress(current);
+        };
+
         const stderrBuf: string[] = [];
+        let stderrTailText = "";
         child.stderr?.on("data", (chunk: Buffer) => {
-          stderrBuf.push(chunk.toString("utf8"));
+          const chunkText = chunk.toString("utf8");
+          stderrBuf.push(chunkText);
+          stderrTailText = `${stderrTailText}${chunkText}`.slice(-2048);
+          const matches = [
+            ...stderrTailText.matchAll(
+              /time=([0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.\d+)?)/g,
+            ),
+          ];
+          const timecode = matches[matches.length - 1]?.[1];
+          if (!timecode) {
+            return;
+          }
+          const elapsedSec = parseFfmpegTimecodeToSeconds(timecode);
+          if (elapsedSec == null) {
+            return;
+          }
+          emitProgress(elapsedSec);
         });
+        emitProgress(0);
         child.on("error", (err) => {
           mezzanineProcess = null;
           reject(

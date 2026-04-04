@@ -66,8 +66,12 @@ const SEEK_TIMEOUT_MS = 90_000;
 const RVFC_TIMEOUT_MS = 250;
 
 export type VideoExportProgress = {
+  /** @description 進み具合。frames なら 1 始まり、mezzanine なら 0-99 を入れる */
   currentFrame: number;
+  /** @description 総数。frames は総フレーム数、mezzanine は 100 固定 */
   totalFrames: number;
+  /** @description いまの進捗の種類。mezzanine か frames かを App 側で見分ける。 */
+  phase?: "mezzanine" | "frames";
 };
 
 /**
@@ -822,9 +826,23 @@ export async function runVideoExportPipeline(options: {
     onLog(
       `[動画][mezzanine] codec=${probe.videoCodec} → H.264 all-I-frame mezzanine を生成します...`,
     );
+    const unsubscribeMezzanineProgress = onProgress
+      ? api.subscribeMezzanineProgress((payload) => {
+          onProgress({
+            currentFrame: payload.current,
+            totalFrames: payload.total,
+            phase: "mezzanine",
+          });
+        })
+      : null;
     try {
       const t0 = performance.now();
-      const result = await api.videoExportTranscodeMezzanine(inputVideoPath);
+      const result = await api.videoExportTranscodeMezzanine({
+        filePath: inputVideoPath,
+        durationSec: probe.durationSec,
+        outW,
+        outH,
+      });
       const elapsedSec = ((performance.now() - t0) / 1000).toFixed(1);
       mezzaninePath = result.mezzaninePath;
       onLog(
@@ -836,6 +854,8 @@ export async function runVideoExportPipeline(options: {
         `[動画][mezzanine] 生成失敗、オリジナルソースで続行 — ${msg}`,
       );
       mezzaninePath = null;
+    } finally {
+      unsubscribeMezzanineProgress?.();
     }
   }
   const effectiveInputPath = mezzaninePath ?? inputVideoPath;
@@ -1365,7 +1385,7 @@ export async function runVideoExportPipeline(options: {
             i === totalFrames - 1 ||
             (i + 1) % VIDEO_EXPORT_PROGRESS_CALLBACK_INTERVAL_FRAMES === 0
           ) {
-            onProgress?.({ currentFrame: i + 1, totalFrames });
+            onProgress?.({ currentFrame: i + 1, totalFrames, phase: "frames" });
           }
         }
 

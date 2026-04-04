@@ -8,6 +8,30 @@ export type DesktopUpdateAvailablePayload = {
 };
 
 /**
+ * @description mezzanine 進捗の中身。画面のラベルは renderer が locale ごとに決める。
+ */
+export type VideoExportMezzanineProgressPayload = {
+  /** @description 0 から 99 までの進み具合 */
+  current: number;
+  /** @description 分母。mezzanine は 100 固定 */
+  total: number;
+};
+
+/**
+ * @description mezzanine 変換に渡す入力。durationSec は進捗の割合を出すために使う。
+ */
+export type VideoExportTranscodeMezzanineInput = {
+  /** @description 元動画の絶対パス */
+  filePath: string;
+  /** @description 元動画の長さ（秒） */
+  durationSec: number;
+  /** @description 書き出し幅（mezzanine を FHD にダウンスケールする） */
+  outW: number;
+  /** @description 書き出し高さ */
+  outH: number;
+};
+
+/**
  * window.filmLabBatch の型（preload と共有）
  */
 export type FilmLabBatchBridge = {
@@ -84,12 +108,18 @@ export type FilmLabBatchBridge = {
   ) => Promise<{ stagedPath: string }>;
   /** @description videoExportStageSource で作った tmp を削除 */
   videoExportUnlinkStaged: (stagedPath: string) => Promise<void>;
-  /** @description HEVC 等の重い素材を ProRes 422 mezzanine に事前変換 */
+  /** @description HEVC 等の重い素材を H.264 mezzanine に事前変換 */
   videoExportTranscodeMezzanine: (
-    absolutePath: string,
+    payload: VideoExportTranscodeMezzanineInput,
   ) => Promise<{ mezzaninePath: string; mezzanineSizeBytes: number }>;
   /** @description mezzanine 変換を中断 */
   videoExportAbortMezzanine: () => Promise<void>;
+  /**
+   * @description mezzanine 進捗を main から受け取る。戻り値は購読解除。
+   */
+  subscribeMezzanineProgress: (
+    callback: (payload: VideoExportMezzanineProgressPayload) => void,
+  ) => () => void;
 
   /** @description 長い書き出し中は更新通知を遅らせる（main と同期） */
   setExportBusyForUpdateCheck: (busy: boolean) => Promise<void>;

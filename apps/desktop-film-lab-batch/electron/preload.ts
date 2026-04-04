@@ -19,6 +19,30 @@ export type OutputPayload = {
   data: Uint8Array;
 };
 
+/**
+ * @description main から届く mezzanine 進捗。current は 0-99、total は 100 固定。
+ */
+export type VideoExportMezzanineProgressPayload = {
+  /** @description 0 から 99 までの進み具合 */
+  current: number;
+  /** @description 分母。mezzanine は 100 固定 */
+  total: number;
+};
+
+/**
+ * @description mezzanine 変換へ渡す入力。durationSec は進捗の割合を出すために使う。
+ */
+export type VideoExportTranscodeMezzanineInput = {
+  /** @description 元動画の絶対パス */
+  filePath: string;
+  /** @description 元動画の長さ（秒） */
+  durationSec: number;
+  /** @description 書き出し幅（mezzanine を FHD にダウンスケールする） */
+  outW: number;
+  /** @description 書き出し高さ */
+  outH: number;
+};
+
 contextBridge.exposeInMainWorld("filmLabBatch", {
   /**
    * @description `contextIsolation` では `File.path` が使えないため、Chromium が許可する `File` から絶対パスを返す（Electron 公式 API）。
@@ -103,11 +127,29 @@ contextBridge.exposeInMainWorld("filmLabBatch", {
   videoExportUnlinkStaged: (stagedPath: string): Promise<void> =>
     ipcRenderer.invoke("video-export-unlink-staged", stagedPath),
   videoExportTranscodeMezzanine: (
-    filePath: string,
+    payload: VideoExportTranscodeMezzanineInput,
   ): Promise<{ mezzaninePath: string; mezzanineSizeBytes: number }> =>
-    ipcRenderer.invoke("video-export-transcode-mezzanine", filePath),
+    ipcRenderer.invoke("video-export-transcode-mezzanine", payload),
   videoExportAbortMezzanine: (): Promise<void> =>
     ipcRenderer.invoke("video-export-abort-mezzanine"),
+  /**
+   * @description main からの mezzanine 進捗を受け取る。戻り値で購読解除。
+   */
+  subscribeMezzanineProgress: (
+    callback: (payload: VideoExportMezzanineProgressPayload) => void,
+  ): (() => void) => {
+    const channel = "film-lab-video-export-mezzanine-progress";
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      payload: VideoExportMezzanineProgressPayload,
+    ): void => {
+      callback(payload);
+    };
+    ipcRenderer.on(channel, handler);
+    return () => {
+      ipcRenderer.removeListener(channel, handler);
+    };
+  },
 
   /**
    * @description まとめて書き出し中は更新バナーを出さないよう main に伝える
