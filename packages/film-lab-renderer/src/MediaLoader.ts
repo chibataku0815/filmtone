@@ -47,7 +47,7 @@ const HEIC_MIME = /heic|heif/i;
  * MIME が空・不正でも、拡張子が動画らしいときは `<video>` 経路へ回す（Finder ドロップの .mov 等）。
  * ブラウザが実際にデコードできない容器は loadVideo 内でエラーになる。
  */
-const LIKELY_VIDEO_EXTENSION = /\.(mp4|m4v|mov|webm|ogv)$/i;
+export const LIKELY_VIDEO_EXTENSION = /\.(mp4|m4v|mov|webm|ogv)$/i;
 
 /**
  * `?filmLabDebugMedia=1` のとき true。クライアント専用。
@@ -349,6 +349,70 @@ export class MediaLoader {
 
         video.play().catch((err) => {
           console.warn("MediaLoader.loadVideo: autoplay blocked", err);
+        });
+
+        resolve({
+          texture,
+          width: video.videoWidth,
+          height: video.videoHeight,
+          type: "video",
+        });
+      };
+
+      video.onerror = () => {
+        rejectVideoLoad("error", video.error);
+      };
+
+      video.onabort = () => {
+        rejectVideoLoad("abort");
+      };
+
+      video.load();
+    });
+  }
+
+  /**
+   * @description URL から直接動画を読み込む。Desktop の mezzanine 変換後パス（`film-lab-video://…`）等、
+   * blob URL を経由しない動画ソース向け。`loadVideo(file)` とほぼ同じだが `createObjectURL` / `revokeObjectURL` を使わない。
+   * @param url 動画の URL（`film-lab-video://…` や `file://…` 等）
+   * @param label エラーメッセージに表示する任意のラベル（元ファイル名等）
+   */
+  async loadVideoFromURL(url: string, label?: string): Promise<LoadResult> {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement("video");
+      video.muted = true;
+      video.loop = true;
+      video.playsInline = true;
+      video.preload = "auto";
+      video.src = url;
+
+      const displayLabel = label ?? url;
+
+      const rejectVideoLoad = (eventName: string, extra?: unknown) => {
+        reject(
+          new MediaLoadError(
+            `MediaLoader.loadVideoFromURL("${displayLabel}") failed at ${eventName}. Try MP4 (H.264), WebM, or a MOV codec your browser can decode.`,
+            "VIDEO_DECODE_FAILED",
+          ),
+        );
+        if (extra != null) {
+          console.error("MediaLoader.loadVideoFromURL detailed failure", {
+            url,
+            label: displayLabel,
+            eventName,
+            extra,
+          });
+        }
+      };
+
+      video.onloadeddata = () => {
+        const texture = new THREE.VideoTexture(video);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+
+        video.play().catch((err) => {
+          console.warn("MediaLoader.loadVideoFromURL: autoplay blocked", err);
         });
 
         resolve({

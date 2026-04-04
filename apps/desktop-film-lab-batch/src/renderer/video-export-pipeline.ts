@@ -706,8 +706,8 @@ export function needsMezzanineTranscode(opts: {
   const c = opts.videoCodec.toLowerCase();
   // H.264: WebCodecs or HTMLVideoElement で十分速い → 不要
   if (c === "h264" || c === "avc") return false;
-  // ProRes: macOS AVFoundation で既に高速 decode → 不要
-  if (c === "prores") return false;
+  // ProRes: Chromium <video> は macOS でもデコード不可 → mezzanine 必要
+  if (c === "prores") return true;
   // HEVC, VP9, AV1, DNxHD 等: mezzanine 必要
   return true;
 }

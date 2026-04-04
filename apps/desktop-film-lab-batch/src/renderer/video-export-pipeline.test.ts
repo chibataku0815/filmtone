@@ -47,8 +47,8 @@ describe("needsMezzanineTranscode", () => {
     expect(needsMezzanineTranscode(opts("avc"))).toBe(false);
   });
 
-  it("ProRes → false (macOS で既に高速)", () => {
-    expect(needsMezzanineTranscode(opts("prores"))).toBe(false);
+  it("ProRes → true (Chromium は ProRes デコード不可)", () => {
+    expect(needsMezzanineTranscode(opts("prores"))).toBe(true);
   });
 
   it("HEVC → true", () => {

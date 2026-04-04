@@ -4,6 +4,7 @@ export {
   MediaLoadError,
   isLikelyHeicFile,
   isFilmLabMediaDebugEnabled,
+  LIKELY_VIDEO_EXTENSION,
   type LoadResult,
   type LoadFileOptions,
 } from "./MediaLoader";

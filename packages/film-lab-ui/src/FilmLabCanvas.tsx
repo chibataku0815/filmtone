@@ -17,6 +17,7 @@ import {
   Viewport,
   MediaLoader,
   MediaLoadError,
+  LIKELY_VIDEO_EXTENSION,
   filmlabVertexShader,
   filmlabFragmentShader,
 } from "film-lab-renderer";
@@ -84,6 +85,11 @@ interface FilmLabCanvasProps {
    * @description デスクトップ（Electron `webUtils.getPathForFile` 等）で `File` から絶対パスを取る。未指定時はレガシーの `File.path` のみ試す。
    */
   getFileAbsolutePath?: (file: File) => string | null;
+  /**
+   * @description Desktop でドロップされた動画が Chromium 非対応コーデック（ProRes 等）の場合、
+   * mezzanine H.264 に変換した URL を返す。null を返した場合はそのまま MediaLoader に渡す。
+   */
+  preprocessVideoFile?: (file: File) => Promise<string | null>;
 }
 
 /**
@@ -219,6 +225,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       onCubeLutLoaded,
       onInteractiveSourceChange,
       getFileAbsolutePath,
+      preprocessVideoFile,
       compareHud = null,
       chromeLayout = "overlay",
     },
@@ -232,6 +239,10 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
   const getFileAbsolutePathRef = useRef(getFileAbsolutePath);
   useEffect(() => {
     getFileAbsolutePathRef.current = getFileAbsolutePath;
+  });
+  const preprocessVideoFileRef = useRef(preprocessVideoFile);
+  useEffect(() => {
+    preprocessVideoFileRef.current = preprocessVideoFile;
   });
   const onViewportReadyRef = useRef(onViewportReady);
   useEffect(() => {
@@ -496,6 +507,43 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
           setMediaOverlay({ kind: "idle" });
           onCubeLutLoaded?.();
           return;
+        }
+
+        // --- Desktop mezzanine pre-processing for unsupported codecs (ProRes etc.) ---
+        const isVideo = file.type.startsWith("video/") || LIKELY_VIDEO_EXTENSION.test(file.name);
+        if (isVideo && preprocessVideoFileRef.current) {
+          try {
+            const mezzanineUrl = await preprocessVideoFileRef.current(file);
+            if (mezzanineUrl) {
+              const result = await mediaLoaderRef.current.loadVideoFromURL(mezzanineUrl, file.name);
+              const nextPreviewVideo =
+                result.type === "video" &&
+                result.texture.image instanceof HTMLVideoElement
+                  ? result.texture.image
+                  : null;
+              previewVideoElementRef.current = nextPreviewVideo;
+              previewVideoShouldResumeRef.current = false;
+              previewVideoPausedByBusyRef.current = false;
+              previewVideoUserPausedIntentRef.current = false;
+              viewportRef.current.setTexture(result.texture);
+              viewportRef.current.setImageResolution(result.width, result.height);
+              syncPreviewVideoBusyState(nextPreviewVideo);
+              onInteractiveSourceChangeRef.current?.({
+                kind: "file",
+                fileName: file.name,
+                absolutePath: resolveLocalFileAbsolutePath(
+                  file,
+                  getFileAbsolutePathRef.current,
+                ),
+                sourceRole: "userMedia",
+              });
+              setMediaOverlay({ kind: "idle" });
+              return;
+            }
+          } catch (preprocessErr) {
+            console.warn("FilmLabCanvas: preprocessVideoFile failed, falling through to direct load", preprocessErr);
+            // Fall through to normal MediaLoader path
+          }
         }
 
         const maxTex = getMaxTextureSize();

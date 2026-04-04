@@ -57,6 +57,7 @@ import {
   type BatchPipelineSummary,
 } from "./batch-pipeline";
 import {
+  needsMezzanineTranscode,
   runVideoExportPipeline,
   type VideoExportProgress,
   type VideoExportPipelineUserMessages,
@@ -644,6 +645,42 @@ export default function App() {
       });
       return null;
     }
+  }, []);
+
+  /**
+   * @description ProRes 等 Chromium 非対応コーデックの動画を、プレビュー前に H.264 mezzanine に変換する。
+   * 対応コーデック（H.264 等）の場合は null を返し、MediaLoader がそのまま読み込む。
+   */
+  const preprocessVideoFile = useCallback(async (file: File): Promise<string | null> => {
+    let absPath: string;
+    try {
+      absPath = window.filmLabBatch.getPathForFile(file);
+    } catch {
+      return null; // path resolution failed, let MediaLoader try directly
+    }
+
+    const probe = await window.filmLabBatch.videoExportProbe(absPath);
+
+    if (!needsMezzanineTranscode({
+      videoCodec: probe.videoCodec,
+      fileSizeBytes: probe.fileSizeBytes,
+      absPath,
+    })) {
+      return null; // codec is supported, no transcode needed
+    }
+
+    const outW = Math.min(probe.width, 1920);
+    // Ensure even height (required by H.264 encoder)
+    const outH = Math.round(outW * probe.height / probe.width) & ~1;
+
+    const { mezzaninePath } = await window.filmLabBatch.videoExportTranscodeMezzanine({
+      filePath: absPath,
+      durationSec: probe.durationSec,
+      outW,
+      outH,
+    });
+
+    return window.filmLabBatch.pathToFileURL(mezzaninePath);
   }, []);
 
   const syncPreviewToBatch = useCallback(() => {
@@ -1239,6 +1276,7 @@ export default function App() {
                 onViewportReady={setViewport}
                 onInteractiveSourceChange={handleInteractiveSourceChange}
                 getFileAbsolutePath={resolveCanvasFileAbsolutePath}
+                preprocessVideoFile={preprocessVideoFile}
               />
               <div
                 className={`pointer-events-none absolute left-4 z-[24] ${canvasHasUserVideo ? "bottom-52" : "bottom-4"}`}

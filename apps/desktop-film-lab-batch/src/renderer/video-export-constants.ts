@@ -58,11 +58,10 @@ export function assertVideoImportWithinCaps(
   height: number,
   durationSec: number,
 ): void {
-  if (width > VIDEO_IMPORT_MAX_WIDTH || height > VIDEO_IMPORT_MAX_HEIGHT) {
-    throw new Error(
-      `動画が大きすぎます（最大 ${VIDEO_IMPORT_MAX_WIDTH}×${VIDEO_IMPORT_MAX_HEIGHT}）。実寸: ${width}×${height}`,
-    );
-  }
+  // 解像度チェックは削除: mezzanine 変換が FHD にダウンスケールするため、
+  // DCI 4K (4096) や 6K/8K 等のソースでも書き出し可能。
+  void width;
+  void height;
   if (
     !Number.isFinite(durationSec) ||
     durationSec <= 0 ||
