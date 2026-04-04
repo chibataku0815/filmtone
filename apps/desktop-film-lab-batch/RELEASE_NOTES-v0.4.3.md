@@ -29,5 +29,6 @@ export is working, not stalled.
 
 ## Checksums
 
-After the signed + notarized DMG is finalized, publish the output of
-`bun run release:checksums`.
+```
+ccd7d44e5f905f02a18ba2ec685269ceca7155902c357a28a17b79aef84e7797  filmtone-0.4.3-arm64.dmg
+```
