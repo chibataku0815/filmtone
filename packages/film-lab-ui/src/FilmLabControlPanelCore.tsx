@@ -220,6 +220,7 @@ export function FilmLabControlPanelCore({
   // v0.5.0: postEffectsOpen removed — motionBlur moved to ARTIFACTS, section eliminated
   const [showHelp, setShowHelp] = useState(false);
   const [sourceTrimOpen, setSourceTrimOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
   const beforeAfterPointerActiveRef = useRef(false);
   const prevCompareModeRef = useRef(false);
   const prevBeforeAfterActiveRef = useRef(false);
@@ -938,45 +939,32 @@ export function FilmLabControlPanelCore({
           )}
 
           <div className="min-w-0">
-            {/* Compare section — Pro のみ */}
+            {/* Compare section — Pro のみ、折りたたみ式（デフォルト閉じ） */}
             {isPro ? (
-            <div className="mt-3 rounded-xl border border-white/[0.08] bg-gradient-to-b from-white/[0.04] to-black/20 p-3">
-              <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.12em] text-white/60">
-                {tFilmLab("compare.sectionTitle")}
-              </p>
+            <div className="min-w-0">
+              <CollapsibleHeader
+                title={tFilmLab("compare.sectionTitle")}
+                open={compareOpen}
+                onToggle={() => setCompareOpen(!compareOpen)}
+              />
+              {compareOpen && (
+                <div className="flex flex-col gap-2.5">
+                  <button
+                    type="button"
+                    onPointerDown={handleBeforeAfterPointerDown}
+                    onPointerUp={handleBeforeAfterPointerEnd}
+                    onPointerCancel={handleBeforeAfterPointerEnd}
+                    onLostPointerCapture={handleBeforeAfterLostCapture}
+                    className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-left text-[11px] text-white/65 transition-colors hover:bg-white/8 hover:text-white/80 active:bg-white/12"
+                  >
+                    <span className="font-medium text-white/85">{tFilmLab("compare.holdTitle")}</span>
+                    <span className="mt-0.5 block text-[10px] text-white/52">{tFilmLab("compare.holdHint")}</span>
+                  </button>
 
-              <div className="flex gap-3 rounded-lg border border-white/12 bg-[#111]/90 p-2.5">
-                <BeforeAfterPreviewIcon />
-                <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-medium leading-snug text-white/85">
-                    {tFilmLab("compare.beforeAfterTitle")}
-                  </p>
-                  <p className="mt-0.5 text-[10px] leading-snug text-white/52">
-                    {tFilmLab("compare.beforeAfterHint")}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onPointerDown={handleBeforeAfterPointerDown}
-                onPointerUp={handleBeforeAfterPointerEnd}
-                onPointerCancel={handleBeforeAfterPointerEnd}
-                onLostPointerCapture={handleBeforeAfterLostCapture}
-                className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-left text-[11px] text-white/65 transition-colors hover:bg-white/8 hover:text-white/80 active:bg-white/12 sm:py-2"
-              >
-                <span className="font-medium text-white/85">{tFilmLab("compare.holdTitle")}</span>
-                <span className="mt-0.5 block text-[10px] text-white/52">{tFilmLab("compare.holdHint")}</span>
-              </button>
-
-              <div className="my-3 h-px bg-white/[0.08]" />
-
-              <div className="flex gap-3">
-                <SplitLooksPreviewIcon />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-[11px] font-medium leading-snug text-white/85">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-medium text-white/85">
                       {tFilmLab("compare.title")}
-                    </h3>
+                    </span>
                     <button
                       type="button"
                       role="switch"
@@ -984,7 +972,7 @@ export function FilmLabControlPanelCore({
                       onClick={() =>
                         dispatch({ type: state.compareMode ? "COMPARE_OFF" : "COMPARE_ON" })
                       }
-                      className={`mt-0.5 h-4 w-7 shrink-0 rounded-full transition-colors ${
+                      className={`h-4 w-7 shrink-0 rounded-full transition-colors ${
                         state.compareMode ? "bg-[var(--accent-amber1)]" : "bg-white/15"
                       }`}
                     >
@@ -996,11 +984,8 @@ export function FilmLabControlPanelCore({
                       />
                     </button>
                   </div>
-                  <p className="mt-1.5 text-[10px] leading-relaxed text-white/52">
-                    {state.compareMode ? tFilmLab("compare.taglineOn") : tFilmLab("compare.taglineOff")}
-                  </p>
                   {state.compareMode ? (
-                    <div className="mt-2 flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
                       <span className="text-[10px] font-medium text-white/55">
                         {tFilmLab("compare.editLabel")}
                       </span>
@@ -1037,7 +1022,7 @@ export function FilmLabControlPanelCore({
                     </div>
                   ) : null}
                 </div>
-              </div>
+              )}
             </div>
             ) : null}
             {canToggleHistogram ? (
