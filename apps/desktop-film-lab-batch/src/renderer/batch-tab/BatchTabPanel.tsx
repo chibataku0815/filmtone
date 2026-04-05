@@ -677,7 +677,8 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
   ]);
 
   /** @description ルックの「JSON / ファイル」詳細（デフォルト閉じる） */
-  const [lookAdvancedOpen, setLookAdvancedOpen] = useState(false);
+  // v0.5.0: Grade JSON UI hidden — state preserved for future restoration
+  // const [lookAdvancedOpen, setLookAdvancedOpen] = useState(false);
 
   /* ── Accordion state ── */
 
@@ -1094,26 +1095,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         </label>
       )}
 
-      <div className="flex items-start gap-1.5 border-t border-white/[0.06] pt-3">
-        <details
-          className="min-w-0 flex-1"
-          open={lookAdvancedOpen}
-          onToggle={(e) => setLookAdvancedOpen(e.currentTarget.open)}
-        >
-          <summary className="cursor-pointer text-xs font-semibold text-[var(--fl-text-secondary)]">
-            {t("advancedGradeJsonSummary")}
-          </summary>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <button type="button" className="fl-btn-secondary" onClick={() => void onImportGradeJson()}>
-              {t("importJsonBtn")}
-            </button>
-            <button type="button" className="fl-btn-secondary" onClick={onExportGradeJson}>
-              {t("exportJsonBtn")}
-            </button>
-          </div>
-        </details>
-        <HelpHint tip={t("tipLookJsonDetails")} assistiveLabel={t("advancedGradeJsonAria")} />
-      </div>
+      {/* v0.5.0: Grade JSON import/export hidden — feature not yet available */}
     </div>
     );
   };
