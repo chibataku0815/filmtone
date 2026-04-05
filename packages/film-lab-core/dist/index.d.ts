@@ -3,7 +3,7 @@ import { z } from 'zod';
 /**
  * Film Lab のグレード数値パラメータ定義（ブラウザ・Remotion 共通の単一の真実）
  */
-declare const PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "grainIntensity", "grainRadialMix", "vignette", "bloomThreshold", "bloomStrength", "bloomRadius", "halationIntensity", "halationSpread", "halationHue", "fade", "highlights", "shadows", "shadowTone", "highlightTone", "shadowHue", "highlightHue", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow"];
+declare const PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "grainIntensity", "grainRadialMix", "grainSize", "vignette", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "fade", "highlights", "shadows", "shadowTone", "highlightTone", "shadowHue", "highlightHue", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "motionBlurAmount", "dustAmount", "scratchAmount", "shaftIntensity", "shaftDecay", "shaftOriginX", "shaftOriginY"];
 type ParamKey = (typeof PARAM_KEYS)[number];
 interface Params {
     exposure: number;
@@ -17,13 +17,25 @@ interface Params {
     grainIntensity: number;
     /** グレインの周辺比重（0〜1）。0 で径方向マスクなし、1 で現行の周辺強め。 */
     grainRadialMix: number;
+    /** グレイン粒子の粗さ（0=極細/高周波、1=極粗/低周波）。各プリセットで固有のフィルム感を表現。 */
+    grainSize: number;
     vignette: number;
     bloomThreshold: number;
     bloomStrength: number;
     bloomRadius: number;
+    /** Pro-Mist 的な全画面光拡散（0=オフ、1=最大ヘイズ）。Bloom/Halation とは独立。 */
+    diffusion: number;
     halationIntensity: number;
     halationSpread: number;
     halationHue: number;
+    /** ハレーション発火の輝度閾値（0〜1） */
+    halationThreshold: number;
+    /** ハレーションのミップウェイト分布（0〜1。halationSpread の後継） */
+    halationRadius: number;
+    /** ブルーム閾値のソフトニー幅（0〜1） */
+    bloomSoftKnee: number;
+    /** ハレーション閾値のソフトニー幅（0〜1） */
+    halationSoftKnee: number;
     fade: number;
     highlights: number;
     shadows: number;
@@ -45,6 +57,20 @@ interface Params {
     magenta: number;
     /** CMY enlarger color head: Yellow filter（-1〜1、0=ニュートラル）。print ステージ。 */
     yellow: number;
+    /** EMA モーションブラー強度（0=オフ、1=最大残像）。post-composite chain に適用。 */
+    motionBlurAmount: number;
+    /** ダスト（埃）オーバーレイ強度（0=オフ、1=最大）。post-composite chain に適用。 */
+    dustAmount: number;
+    /** スクラッチ（傷）オーバーレイ強度（0=オフ、1=最大）。post-composite chain に適用。 */
+    scratchAmount: number;
+    /** ライトシャフト強度（0=オフ、1=最大）。post-composite chain に適用。 */
+    shaftIntensity: number;
+    /** ライトシャフト減衰（0=短い光線、1=長い光線）。内部で 0.92–0.995 にマップ。 */
+    shaftDecay: number;
+    /** ライトシャフト光源 X 位置（0=左端、1=右端）。 */
+    shaftOriginX: number;
+    /** ライトシャフト光源 Y 位置（0=上端、1=下端）。 */
+    shaftOriginY: number;
 }
 declare function cloneParams(params: Params): Params;
 
@@ -66,13 +92,19 @@ declare const PRESETS: {
         lensSoftness: number;
         grainIntensity: number;
         grainRadialMix: number;
+        grainSize: number;
         vignette: number;
         bloomThreshold: number;
         bloomStrength: number;
         bloomRadius: number;
+        diffusion: number;
         halationIntensity: number;
         halationSpread: number;
         halationHue: number;
+        halationThreshold: number;
+        halationRadius: number;
+        bloomSoftKnee: number;
+        halationSoftKnee: number;
         fade: number;
         highlights: number;
         shadows: number;
@@ -86,6 +118,13 @@ declare const PRESETS: {
         cyan: number;
         magenta: number;
         yellow: number;
+        motionBlurAmount: number;
+        dustAmount: number;
+        scratchAmount: number;
+        shaftIntensity: number;
+        shaftDecay: number;
+        shaftOriginX: number;
+        shaftOriginY: number;
     };
     /**
      * cinematic プリセット（v2・2026-03-31）
@@ -101,13 +140,19 @@ declare const PRESETS: {
         lensSoftness: number;
         grainIntensity: number;
         grainRadialMix: number;
+        grainSize: number;
         vignette: number;
         bloomThreshold: number;
         bloomStrength: number;
         bloomRadius: number;
+        diffusion: number;
         halationIntensity: number;
         halationSpread: number;
         halationHue: number;
+        halationThreshold: number;
+        halationRadius: number;
+        bloomSoftKnee: number;
+        halationSoftKnee: number;
         fade: number;
         highlights: number;
         shadows: number;
@@ -121,6 +166,13 @@ declare const PRESETS: {
         cyan: number;
         magenta: number;
         yellow: number;
+        motionBlurAmount: number;
+        dustAmount: number;
+        scratchAmount: number;
+        shaftIntensity: number;
+        shaftDecay: number;
+        shaftOriginX: number;
+        shaftOriginY: number;
     };
     portra: {
         exposure: number;
@@ -132,13 +184,19 @@ declare const PRESETS: {
         lensSoftness: number;
         grainIntensity: number;
         grainRadialMix: number;
+        grainSize: number;
         vignette: number;
         bloomThreshold: number;
         bloomStrength: number;
         bloomRadius: number;
+        diffusion: number;
         halationIntensity: number;
         halationSpread: number;
         halationHue: number;
+        halationThreshold: number;
+        halationRadius: number;
+        bloomSoftKnee: number;
+        halationSoftKnee: number;
         fade: number;
         highlights: number;
         shadows: number;
@@ -152,6 +210,13 @@ declare const PRESETS: {
         cyan: number;
         magenta: number;
         yellow: number;
+        motionBlurAmount: number;
+        dustAmount: number;
+        scratchAmount: number;
+        shaftIntensity: number;
+        shaftDecay: number;
+        shaftOriginX: number;
+        shaftOriginY: number;
     };
     gold200: {
         exposure: number;
@@ -163,13 +228,19 @@ declare const PRESETS: {
         lensSoftness: number;
         grainIntensity: number;
         grainRadialMix: number;
+        grainSize: number;
         vignette: number;
         bloomThreshold: number;
         bloomStrength: number;
         bloomRadius: number;
+        diffusion: number;
         halationIntensity: number;
         halationSpread: number;
         halationHue: number;
+        halationThreshold: number;
+        halationRadius: number;
+        bloomSoftKnee: number;
+        halationSoftKnee: number;
         fade: number;
         highlights: number;
         shadows: number;
@@ -183,6 +254,13 @@ declare const PRESETS: {
         cyan: number;
         magenta: number;
         yellow: number;
+        motionBlurAmount: number;
+        dustAmount: number;
+        scratchAmount: number;
+        shaftIntensity: number;
+        shaftDecay: number;
+        shaftOriginX: number;
+        shaftOriginY: number;
     };
     pro400h: {
         exposure: number;
@@ -194,13 +272,19 @@ declare const PRESETS: {
         lensSoftness: number;
         grainIntensity: number;
         grainRadialMix: number;
+        grainSize: number;
         vignette: number;
         bloomThreshold: number;
         bloomStrength: number;
         bloomRadius: number;
+        diffusion: number;
         halationIntensity: number;
         halationSpread: number;
         halationHue: number;
+        halationThreshold: number;
+        halationRadius: number;
+        bloomSoftKnee: number;
+        halationSoftKnee: number;
         fade: number;
         highlights: number;
         shadows: number;
@@ -214,6 +298,13 @@ declare const PRESETS: {
         cyan: number;
         magenta: number;
         yellow: number;
+        motionBlurAmount: number;
+        dustAmount: number;
+        scratchAmount: number;
+        shaftIntensity: number;
+        shaftDecay: number;
+        shaftOriginX: number;
+        shaftOriginY: number;
     };
     bw: {
         exposure: number;
@@ -225,13 +316,19 @@ declare const PRESETS: {
         lensSoftness: number;
         grainIntensity: number;
         grainRadialMix: number;
+        grainSize: number;
         vignette: number;
         bloomThreshold: number;
         bloomStrength: number;
         bloomRadius: number;
+        diffusion: number;
         halationIntensity: number;
         halationSpread: number;
         halationHue: number;
+        halationThreshold: number;
+        halationRadius: number;
+        bloomSoftKnee: number;
+        halationSoftKnee: number;
         fade: number;
         highlights: number;
         shadows: number;
@@ -245,6 +342,13 @@ declare const PRESETS: {
         cyan: number;
         magenta: number;
         yellow: number;
+        motionBlurAmount: number;
+        dustAmount: number;
+        scratchAmount: number;
+        shaftIntensity: number;
+        shaftDecay: number;
+        shaftOriginX: number;
+        shaftOriginY: number;
     };
     ektar100: {
         exposure: number;
@@ -256,13 +360,19 @@ declare const PRESETS: {
         lensSoftness: number;
         grainIntensity: number;
         grainRadialMix: number;
+        grainSize: number;
         vignette: number;
         bloomThreshold: number;
         bloomStrength: number;
         bloomRadius: number;
+        diffusion: number;
         halationIntensity: number;
         halationSpread: number;
         halationHue: number;
+        halationThreshold: number;
+        halationRadius: number;
+        bloomSoftKnee: number;
+        halationSoftKnee: number;
         fade: number;
         highlights: number;
         shadows: number;
@@ -276,6 +386,13 @@ declare const PRESETS: {
         cyan: number;
         magenta: number;
         yellow: number;
+        motionBlurAmount: number;
+        dustAmount: number;
+        scratchAmount: number;
+        shaftIntensity: number;
+        shaftDecay: number;
+        shaftOriginX: number;
+        shaftOriginY: number;
     };
     superia400: {
         exposure: number;
@@ -287,13 +404,19 @@ declare const PRESETS: {
         lensSoftness: number;
         grainIntensity: number;
         grainRadialMix: number;
+        grainSize: number;
         vignette: number;
         bloomThreshold: number;
         bloomStrength: number;
         bloomRadius: number;
+        diffusion: number;
         halationIntensity: number;
         halationSpread: number;
         halationHue: number;
+        halationThreshold: number;
+        halationRadius: number;
+        bloomSoftKnee: number;
+        halationSoftKnee: number;
         fade: number;
         highlights: number;
         shadows: number;
@@ -307,6 +430,13 @@ declare const PRESETS: {
         cyan: number;
         magenta: number;
         yellow: number;
+        motionBlurAmount: number;
+        dustAmount: number;
+        scratchAmount: number;
+        shaftIntensity: number;
+        shaftDecay: number;
+        shaftOriginX: number;
+        shaftOriginY: number;
     };
     cinestill800t: {
         exposure: number;
@@ -318,13 +448,19 @@ declare const PRESETS: {
         lensSoftness: number;
         grainIntensity: number;
         grainRadialMix: number;
+        grainSize: number;
         vignette: number;
         bloomThreshold: number;
         bloomStrength: number;
         bloomRadius: number;
+        diffusion: number;
         halationIntensity: number;
         halationSpread: number;
         halationHue: number;
+        halationThreshold: number;
+        halationRadius: number;
+        bloomSoftKnee: number;
+        halationSoftKnee: number;
         fade: number;
         highlights: number;
         shadows: number;
@@ -338,6 +474,13 @@ declare const PRESETS: {
         cyan: number;
         magenta: number;
         yellow: number;
+        motionBlurAmount: number;
+        dustAmount: number;
+        scratchAmount: number;
+        shaftIntensity: number;
+        shaftDecay: number;
+        shaftOriginX: number;
+        shaftOriginY: number;
     };
     /**
      * Velvia 50 プリセット（v1・2026-04-02）
@@ -354,13 +497,19 @@ declare const PRESETS: {
         lensSoftness: number;
         grainIntensity: number;
         grainRadialMix: number;
+        grainSize: number;
         vignette: number;
         bloomThreshold: number;
         bloomStrength: number;
         bloomRadius: number;
+        diffusion: number;
         halationIntensity: number;
         halationSpread: number;
         halationHue: number;
+        halationThreshold: number;
+        halationRadius: number;
+        bloomSoftKnee: number;
+        halationSoftKnee: number;
         fade: number;
         highlights: number;
         shadows: number;
@@ -374,6 +523,13 @@ declare const PRESETS: {
         cyan: number;
         magenta: number;
         yellow: number;
+        motionBlurAmount: number;
+        dustAmount: number;
+        scratchAmount: number;
+        shaftIntensity: number;
+        shaftDecay: number;
+        shaftOriginX: number;
+        shaftOriginY: number;
     };
 };
 type PresetName = keyof typeof PRESETS;

@@ -92,6 +92,7 @@ export class Viewport {
   private rtColorGraded: THREE.WebGLRenderTarget | null = null;
   private static readonly BLOOM_MIP_LEVELS = 5;
   private static readonly HALATION_MIP_LEVELS = 6;
+  private static readonly DIFFUSION_MIP_LEVELS = 3;
   private rtBloomMips: THREE.WebGLRenderTarget[] = [];
   private rtHalationMips: THREE.WebGLRenderTarget[] = [];
   /** A/B 比較: スロット A の最終合成（分割なし）を書き込む */
@@ -117,6 +118,10 @@ export class Viewport {
   private halationRadius = 0.6;
   private bloomSoftKnee = 0.5;
   private halationSoftKnee = 0.3;
+
+  // --- Diffusion (Pro-Mist / Cinebloom) ---
+  private diffusion = 0.0;
+  private rtDiffusionMips: THREE.WebGLRenderTarget[] = [];
 
   /**
    * composite の径方向グレイン混色（0=一様、1=周辺強め）。カラーパスには無く合成パスのみ。
@@ -290,12 +295,15 @@ export class Viewport {
         uSource: { value: null },
         uBloomTexture: { value: null },
         uHalationTexture: { value: null },
+        uDiffusionTexture: { value: null },
         uOriginalTexture: { value: null },
         uBloomStrength: { value: 0.0 },
         uHalationIntensity: { value: 0.0 },
+        uDiffusion: { value: 0.0 },
         uVignette: { value: 0.0 },
         uGrainIntensity: { value: 0.0 },
         uGrainRadialMix: { value: 1.0 },
+        uGrainSize: { value: 0.3 },
         uTime: { value: 0.0 },
         uSplitPosition: { value: -1.0 },
         uAbCompare: { value: 0.0 },
@@ -364,7 +372,28 @@ export class Viewport {
       const mh = Math.max(1, Math.floor(h / Math.pow(2, i + 1)));
       this.rtHalationMips[i]!.setSize(mw, mh);
     }
+    for (let i = 0; i < this.rtDiffusionMips.length; i++) {
+      const mw = Math.max(1, Math.floor(w / Math.pow(2, i + 1)));
+      const mh = Math.max(1, Math.floor(h / Math.pow(2, i + 1)));
+      this.rtDiffusionMips[i]!.setSize(mw, mh);
+    }
     this.resizePostCompositeRenderTargets(w, h);
+  }
+
+  /**
+   * Diffusion 用 mip chain を lazy 確保。diffusion=0 のときは GPU コストゼロ。
+   */
+  private ensureDiffusionResources(): void {
+    if (this.rtDiffusionMips.length > 0) return;
+    if (!this.hasRenderableResolution()) return;
+
+    const w = this.width;
+    const h = this.height;
+    for (let i = 0; i < Viewport.DIFFUSION_MIP_LEVELS; i++) {
+      const mw = Math.max(1, Math.floor(w / Math.pow(2, i + 1)));
+      const mh = Math.max(1, Math.floor(h / Math.pow(2, i + 1)));
+      this.rtDiffusionMips.push(new THREE.WebGLRenderTarget(mw, mh, RT_OPTIONS));
+    }
   }
 
   /**
@@ -537,6 +566,7 @@ export class Viewport {
 
     const bloomOn = this.bloomStrength > 0;
     const halationOn = this.halationIntensity > 0;
+    const diffusionOn = this.diffusion > 0;
 
     if (bloomOn) {
       this.renderBloom(renderer);
@@ -544,6 +574,10 @@ export class Viewport {
 
     if (halationOn) {
       this.renderHalation(renderer);
+    }
+
+    if (diffusionOn) {
+      this.renderDiffusion(renderer);
     }
   }
 
@@ -572,9 +606,14 @@ export class Viewport {
     const black = getBlackTexture();
     const bloomOn = this.bloomStrength > 0;
     const halationOn = this.halationIntensity > 0;
+    const diffusionOn = this.diffusion > 0;
     cu.uSource!.value = this.rtColorGraded!.texture;
     cu.uBloomTexture!.value = bloomOn ? this.rtBloomMips[0]!.texture : black;
     cu.uHalationTexture!.value = halationOn ? this.rtHalationMips[0]!.texture : black;
+    cu.uDiffusionTexture!.value = diffusionOn && this.rtDiffusionMips.length > 0
+      ? this.rtDiffusionMips[0]!.texture
+      : black;
+    cu.uDiffusion!.value = this.diffusion;
     this.postMesh.material = this.compositeMaterial;
     renderer.setRenderTarget(target);
     renderer.render(this.postScene, this.postCamera);
@@ -970,6 +1009,54 @@ export class Viewport {
     renderer.autoClear = prevAutoClear2;
   }
 
+  /**
+   * Diffusion (Pro-Mist): Full-image mip pyramid blur (no threshold prefilter).
+   * Reuses downsample/upsample materials shared with bloom/halation.
+   */
+  private renderDiffusion(renderer: THREE.WebGLRenderer): void {
+    this.ensureDiffusionResources();
+    const mips = this.rtDiffusionMips;
+    if (mips.length === 0) return;
+
+    // Step 1: First downsample from rtColorGraded (NO prefilter — full image)
+    const du = this.downsampleMaterial.uniforms;
+    du.uSource!.value = this.rtColorGraded!.texture;
+    du.uTexelSize!.value.set(
+      1.0 / this.rtColorGraded!.width,
+      1.0 / this.rtColorGraded!.height,
+    );
+    this.postMesh.material = this.downsampleMaterial;
+    renderer.setRenderTarget(mips[0]!);
+    renderer.render(this.postScene, this.postCamera);
+
+    // Step 2: Progressive downsample
+    for (let i = 1; i < mips.length; i++) {
+      const src = mips[i - 1]!;
+      const dst = mips[i]!;
+      du.uSource!.value = src.texture;
+      du.uTexelSize!.value.set(1.0 / src.width, 1.0 / src.height);
+      renderer.setRenderTarget(dst);
+      renderer.render(this.postScene, this.postCamera);
+    }
+
+    // Step 3: Progressive upsample with additive blending
+    const prevAutoClear = renderer.autoClear;
+    renderer.autoClear = false;
+    const weights = Viewport.computeMipWeights(0.7, mips.length); // wide fixed radius
+    for (let i = mips.length - 2; i >= 0; i--) {
+      const lowRes = mips[i + 1]!;
+      const highRes = mips[i]!;
+      const uu = this.upsampleMaterial.uniforms;
+      uu.uSource!.value = lowRes.texture;
+      uu.uTexelSize!.value.set(1.0 / lowRes.width, 1.0 / lowRes.height);
+      uu.uWeight!.value = weights[i + 1]!;
+      this.postMesh.material = this.upsampleMaterial;
+      renderer.setRenderTarget(highRes);
+      renderer.render(this.postScene, this.postCamera);
+    }
+    renderer.autoClear = prevAutoClear;
+  }
+
   // ===== Texture =====
 
   setTexture(texture: THREE.Texture): void {
@@ -1062,6 +1149,11 @@ export class Viewport {
     const v = Math.min(1, Math.max(0, value));
     this.grainRadialMix = v;
     this.compositeMaterial.uniforms.uGrainRadialMix!.value = v;
+  }
+
+  setGrainSize(value: number): void {
+    const v = Math.min(1, Math.max(0, value));
+    this.compositeMaterial.uniforms.uGrainSize!.value = v;
   }
 
   /**
@@ -1410,6 +1502,8 @@ export class Viewport {
       this.setGrainIntensity(params.grainIntensity as number);
     if (params.grainRadialMix !== undefined)
       this.setGrainRadialMix(params.grainRadialMix as number);
+    if (params.grainSize !== undefined)
+      this.setGrainSize(params.grainSize as number);
     if (params.lensSoftness !== undefined)
       this.setLensSoftness(params.lensSoftness as number);
     if (params.vignette !== undefined)

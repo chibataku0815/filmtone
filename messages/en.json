@@ -518,6 +518,7 @@
       "highlights": "Highlights",
       "shadows": "Shadows",
       "filmGrain": "Film grain",
+      "grainSize": "Grain Size",
       "vignette": "Vignette",
       "bloom": "Bloom",
       "bloomToggleHint": "Soft glow that spreads from bright areas (bloom).",

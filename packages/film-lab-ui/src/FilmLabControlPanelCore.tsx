@@ -820,6 +820,7 @@ export function FilmLabControlPanelCore({
               {artifactsOpen && (
                 <div className="flex flex-col gap-2.5">
                   <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.filmGrain")} value={params.grainIntensity} min={0} max={0.5} step={0.01} defaultValue={0} onChange={(v) => updateParam("grainIntensity", v)} onCommit={commit} />
+                  <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.grainSize")} value={params.grainSize} min={0} max={1} step={0.01} defaultValue={0.3} onChange={(v) => updateParam("grainSize", v)} onCommit={commit} />
                   <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.vignette")} value={params.vignette} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("vignette", v)} onCommit={commit} />
                 </div>
               )}

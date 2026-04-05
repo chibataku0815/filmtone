@@ -13,7 +13,11 @@ const paramShape = Object.fromEntries(
     key,
     key === "grainRadialMix"
       ? z.number().min(0).max(1).default(1)
-      : key === "lensSoftness"
+      : key === "grainSize"
+        ? z.number().min(0).max(1).default(0.3)
+        : key === "diffusion"
+        ? z.number().min(0).max(1).default(0)
+        : key === "lensSoftness"
         ? z.number().min(0).max(1).default(0)
         : key === "compressionRange"
           ? z.number().min(0).max(1).default(0.5)

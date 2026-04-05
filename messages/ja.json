@@ -520,6 +520,7 @@
       "highlights": "ハイライト",
       "shadows": "シャドウ",
       "filmGrain": "フィルムグレイン",
+      "grainSize": "粒子の粗さ",
       "vignette": "ビネット",
       "bloom": "光のにじみ",
       "bloomToggleHint": "明るい部分のまわりに光がふわっと広がる効果（ブルーム）。",

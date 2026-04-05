@@ -22,6 +22,8 @@ uniform float uVignette;
 uniform float uGrainIntensity;
 /** 0=径方向マスク無し（一様）、1=フル周辺強め。mix(1.0, grainRadialWeight, clamp(値,0,1)) に用いる */
 uniform float uGrainRadialMix;
+/** 0=極細(高周波), 1=極粗(低周波)。Value noise の周波数スケーリングに使用 */
+uniform float uGrainSize;
 uniform float uTime;
 
 uniform float uSplitPosition;
@@ -46,8 +48,22 @@ vec2 coverUv(vec2 uv, vec2 resolution, vec2 imageResolution) {
   return (uv - 0.5) * scale + 0.5;
 }
 
-float grain(vec2 uv, float time) {
-  return fract(sin(dot(uv * time, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
+// --- Film Grain: Value Noise + Chroma/Luma Separation ---
+float grainHash(vec2 p) {
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+
+float grainNoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f); // smoothstep interpolation
+  float a = grainHash(i);
+  float b = grainHash(i + vec2(1.0, 0.0));
+  float c = grainHash(i + vec2(0.0, 1.0));
+  float d = grainHash(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y) - 0.5;
 }
 
 void main() {
@@ -101,18 +117,34 @@ void main() {
   float vig = 1.0 - uVignette * dist * dist;
   color.rgb *= clamp(vig, 0.0, 1.0);
 
-  /**
-   * グレイン強度を Pass1 色収差と同型の径方向マスクで変調する。
-   * - coverUv 後の画像座標で中心からの距離を取り、アスペクトで円形化（filmlab.rgbShiftSampleRadial と同じ 1.65 べき）。
-   * - フレーム中心付近は弱く、周辺ほど uGrainIntensity に近づく（周辺で粒子が目立ちやすい見え方）。
-   */
+  // Radial weight (unchanged logic — center weak, edge strong)
   vec2 grainCenterUv = coverUv(vUv, uResolution, uImageResolution);
   vec2 grainDelta = grainCenterUv - 0.5;
   grainDelta.x *= uImageResolution.x / max(uImageResolution.y, 1.0);
   float grainRadial = clamp(length(grainDelta) * 2.0, 0.0, 1.0);
   float grainRadialWeight = pow(grainRadial, 1.65);
   float grainRadialEffective = mix(1.0, grainRadialWeight, clamp(uGrainRadialMix, 0.0, 1.0));
-  color.rgb += grain(vUv, uTime) * uGrainIntensity * grainRadialEffective;
+
+  // Grain frequency from grainSize: 0=fine(high freq), 1=coarse(low freq)
+  float lumaFreq = mix(500.0, 100.0, clamp(uGrainSize, 0.0, 1.0));
+  float chromaFreq = lumaFreq * 0.7; // chroma crystals slightly larger
+  float seed = floor(uTime * 24.0); // per-frame temporal variation
+
+  // Pixel coordinate in noise space
+  float pixelScale = max(uResolution.x, 1.0);
+  vec2 lumaCoord = vUv * pixelScale / lumaFreq + seed * 7.13;
+  vec2 chromaCoordR = vUv * pixelScale / chromaFreq + seed * 13.37 + 100.0;
+  vec2 chromaCoordB = vUv * pixelScale / chromaFreq + seed * 23.71 + 200.0;
+
+  // Luma grain (shared across RGB) + independent chroma grain (R, B only)
+  float lumaGrain = grainNoise(lumaCoord);
+  float chromaR = grainNoise(chromaCoordR) * 0.3; // chroma weight: 30%
+  float chromaB = grainNoise(chromaCoordB) * 0.3;
+
+  float w = uGrainIntensity * grainRadialEffective;
+  color.r += (lumaGrain + chromaR) * w;
+  color.g += lumaGrain * w;               // Green: luma only (eye most sensitive)
+  color.b += (lumaGrain + chromaB) * w;
   color.rgb = clamp(color.rgb, 0.0, 1.0);
 
   // Before/After または A/B 比較の分割
