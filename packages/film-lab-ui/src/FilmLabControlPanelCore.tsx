@@ -717,6 +717,14 @@ export function FilmLabControlPanelCore({
 
         {slots.renderAfterPresets ? slots.renderAfterPresets(coreRenderContext) : slots.afterPresets}
 
+        {/* === LUT — placed directly below presets (v0.5.0) === */}
+        {isPro && !(slots.hideAuxPanels && slots.lpExpandButton) && (
+          <div className="min-w-0">
+            <LUTPanel viewport={viewport} onCubeLutLoaded={onLutLoadSuccess} onLutChange={onLutChange} />
+            {slots.renderAfterLut ? slots.renderAfterLut(coreRenderContext) : slots.afterLut}
+          </div>
+        )}
+
         <div className="flex flex-col gap-4">
 
           {/* === PROCESS — film-process-first controls === */}
@@ -895,31 +903,41 @@ export function FilmLabControlPanelCore({
             </div>
           )}
 
-          {/* === LUT + extension slots (全モード) === */}
-          {slots.hideAuxPanels && slots.lpExpandButton ? (
+          {/* === Quick mode: LUT + exposure / LP expand button === */}
+          {!isPro && (
+            slots.hideAuxPanels && slots.lpExpandButton ? (
+              <div className="min-w-0">
+                {slots.lpExpandButton}
+              </div>
+            ) : (
+              <div className="min-w-0">
+                <LUTPanel viewport={viewport} onCubeLutLoaded={onLutLoadSuccess} onLutChange={onLutChange} />
+                {slots.renderAfterLut ? slots.renderAfterLut(coreRenderContext) : slots.afterLut}
+                <div className="mt-3">
+                  <PanelControlSlider
+                    sliderLabelResetHint={sliderLabelResetHint}
+                    label={tFilmLab("controls.exposure")}
+                    value={params.exposure}
+                    min={-3}
+                    max={3}
+                    step={0.01}
+                    defaultValue={0}
+                    onChange={(v) => updateParam("exposure", v)}
+                    onCommit={commit}
+                  />
+                </div>
+              </div>
+            )
+          )}
+
+          {/* === Pro mode: LP expand button (when hideAuxPanels) === */}
+          {isPro && slots.hideAuxPanels && slots.lpExpandButton && (
             <div className="min-w-0">
               {slots.lpExpandButton}
             </div>
-          ) : (
-          <div className="min-w-0">
-            <LUTPanel viewport={viewport} onCubeLutLoaded={onLutLoadSuccess} onLutChange={onLutChange} />
-            {slots.renderAfterLut ? slots.renderAfterLut(coreRenderContext) : slots.afterLut}
-            {!isPro ? (
-              <div className="mt-3">
-                <PanelControlSlider
-                  sliderLabelResetHint={sliderLabelResetHint}
-                  label={tFilmLab("controls.exposure")}
-                  value={params.exposure}
-                  min={-3}
-                  max={3}
-                  step={0.01}
-                  defaultValue={0}
-                  onChange={(v) => updateParam("exposure", v)}
-                  onCommit={commit}
-                />
-              </div>
-            ) : null}
+          )}
 
+          <div className="min-w-0">
             {/* Compare section — Pro のみ */}
             {isPro ? (
             <div className="mt-3 rounded-xl border border-white/[0.08] bg-gradient-to-b from-white/[0.04] to-black/20 p-3">
@@ -1032,7 +1050,6 @@ export function FilmLabControlPanelCore({
               </div>
             ) : null}
           </div>
-          )}
         </div>
       </div>
       <ShortcutHelp open={showHelp} onClose={() => setShowHelp(false)} />
