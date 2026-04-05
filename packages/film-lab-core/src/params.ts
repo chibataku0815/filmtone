@@ -50,6 +50,10 @@ export const PARAM_KEYS = [
   "yellow",
   /** EMA モーションブラー強度（0=オフ、1=最大残像）。range: 0–1 */
   "motionBlurAmount",
+  /** ダスト（埃）オーバーレイ強度（0=オフ、1=最大）。range: 0–1 */
+  "dustAmount",
+  /** スクラッチ（傷）オーバーレイ強度（0=オフ、1=最大）。range: 0–1 */
+  "scratchAmount",
 ] as const;
 
 export type ParamKey = (typeof PARAM_KEYS)[number];
@@ -105,6 +109,10 @@ export interface Params {
   yellow: number;
   /** EMA モーションブラー強度（0=オフ、1=最大残像）。post-composite chain に適用。 */
   motionBlurAmount: number;
+  /** ダスト（埃）オーバーレイ強度（0=オフ、1=最大）。post-composite chain に適用。 */
+  dustAmount: number;
+  /** スクラッチ（傷）オーバーレイ強度（0=オフ、1=最大）。post-composite chain に適用。 */
+  scratchAmount: number;
 }
 
 export function cloneParams(params: Params): Params {

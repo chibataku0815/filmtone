@@ -6,8 +6,9 @@
  *   Pass 2-4: Bloom threshold → blur H → blur V (1/2 res)
  *   Pass 5-7: Halation threshold+tint → blur H → blur V (1/4 res)
  *   Pass 8: Composite (A + bloom + halation + vignette + grain + split) → screen
- *   Pass 9+: Post-composite seam for #100 light shafts → #99 dust/scratches
- *            (#97 slow shutter hooks into the same seam later)
+ *   Pass 9:  (reserved: #100 light shafts)
+ *   Pass 10: #99 Dust & Scratches overlay (screen + additive blend)
+ *   Pass 11: #97 Slow Shutter / EMA motion blur (ping-pong accumulation)
  */
 
 import * as THREE from "three";
@@ -25,6 +26,8 @@ import { downsampleFragmentShader } from "./shaders/downsample.frag";
 import { upsampleFragmentShader } from "./shaders/upsample.frag";
 import { compositeFragmentShader } from "./shaders/composite.frag";
 import { motionblurFragmentShader } from "./shaders/motionblur.frag";
+import { dustFragmentShader } from "./shaders/dust.frag";
+import { createDustTexture, createScratchTexture } from "./textures/index";
 
 export interface ViewportOptions {
   vertexShader: string;
@@ -126,6 +129,13 @@ export class Viewport {
   private motionBlurMaterial: THREE.ShaderMaterial | null = null;
   private rtMotionBlur0: THREE.WebGLRenderTarget | null = null;
   private rtMotionBlur1: THREE.WebGLRenderTarget | null = null;
+
+  // --- Dust & Scratches (Post-composite #99) ---
+  private dustAmount = 0.0;
+  private scratchAmount = 0.0;
+  private dustMaterial: THREE.ShaderMaterial | null = null;
+  private dustTexture: THREE.CanvasTexture | null = null;
+  private scratchTexture: THREE.CanvasTexture | null = null;
 
   /**
    * composite のレンズ周辺ソフト（0〜1）。色収差周辺ソフトとは別（Params.lensSoftness）。
@@ -382,6 +392,31 @@ export class Viewport {
   }
 
   /**
+   * Dust & Scratches 用の ShaderMaterial とテクスチャを遅延生成する。
+   * dustAmount > 0 || scratchAmount > 0 になるまで GPU リソースを消費しない。
+   */
+  private ensureDustResources(): void {
+    if (this.dustMaterial) return;
+    this.dustTexture = createDustTexture();
+    this.scratchTexture = createScratchTexture();
+    this.dustMaterial = new THREE.ShaderMaterial({
+      glslVersion: THREE.GLSL3,
+      vertexShader: filmlabVertexShader,
+      fragmentShader: dustFragmentShader,
+      uniforms: {
+        uSource: { value: null },
+        uDustTexture: { value: this.dustTexture },
+        uScratchTexture: { value: this.scratchTexture },
+        uDustAmount: { value: 0.0 },
+        uScratchAmount: { value: 0.0 },
+        uTime: { value: 0.0 },
+        uResolution: { value: new THREE.Vector2() },
+        uFlipY: { value: 0.0 },
+      },
+    });
+  }
+
+  /**
    * #98 の post-composite seam で使う RT を、画面サイズに合わせて広げ直す。
    *
    * @param w 幅
@@ -426,7 +461,7 @@ export class Viewport {
    */
   private hasPostCompositeChain(): boolean {
     if (this.abCompareEnabled) return false;
-    return this.motionBlurAmount > 0;
+    return this.motionBlurAmount > 0 || this.dustAmount > 0 || this.scratchAmount > 0;
   }
 
   /**
@@ -546,6 +581,31 @@ export class Viewport {
   }
 
   /**
+   * Dust & Scratches パス。Screen blend で埃、Additive で傷をオーバーレイする。
+   *
+   * @param renderer 描画先
+   * @param sourceTexture 直前の post-composite 出力
+   * @param target 出力先（null = 画面）
+   */
+  private renderDust(
+    renderer: THREE.WebGLRenderer,
+    sourceTexture: THREE.Texture,
+    target: THREE.WebGLRenderTarget | null,
+  ): void {
+    this.ensureDustResources();
+    if (!this.dustMaterial) return;
+    const du = this.dustMaterial.uniforms;
+    du.uSource!.value = sourceTexture;
+    du.uDustAmount!.value = this.dustAmount;
+    du.uScratchAmount!.value = this.scratchAmount;
+    du.uTime!.value = this.material.uniforms.uTime!.value;
+    du.uResolution!.value.set(this.width, this.height);
+    this.postMesh.material = this.dustMaterial;
+    renderer.setRenderTarget(target);
+    renderer.render(this.postScene, this.postCamera);
+  }
+
+  /**
    * EMA モーションブラー（ping-pong 蓄積）。
    * Step 1: current frame と前フレームの蓄積を EMA ブレンド → writeRT
    * Step 2: writeRT の結果を最終 target へコピー
@@ -595,8 +655,7 @@ export class Viewport {
 
   /**
    * Pass 9+ の受け皿。
-   * #97 slow shutter (EMA motion blur) をここに差し込む。
-   * 後続 issue で #100 light shafts / #99 dust/scratches を追加可能。
+   * Pass order: Shafts(9) -> Dust(10) -> MotionBlur(11)
    *
    * @param renderer 描画先
    * @param sourceTexture 直前の post-composite 出力
@@ -607,7 +666,23 @@ export class Viewport {
     sourceTexture: THREE.Texture,
     target: THREE.WebGLRenderTarget | null,
   ): void {
-    this.renderMotionBlur(renderer, sourceTexture, target);
+    const dustOn = this.dustAmount > 0 || this.scratchAmount > 0;
+    const motionBlurOn = this.motionBlurAmount > 0;
+
+    // Single effect shortcut (avoid unnecessary intermediate RT)
+    if (dustOn && !motionBlurOn) {
+      this.renderDust(renderer, sourceTexture, target);
+      return;
+    }
+    if (!dustOn && motionBlurOn) {
+      this.renderMotionBlur(renderer, sourceTexture, target);
+      return;
+    }
+
+    // Chain: Dust(10) -> MotionBlur(11)
+    // Dust writes to rtPostComposite1, MotionBlur reads from it
+    this.renderDust(renderer, sourceTexture, this.rtPostComposite1!);
+    this.renderMotionBlur(renderer, this.rtPostComposite1!.texture, target);
   }
 
   /**
@@ -804,6 +879,9 @@ export class Viewport {
     this.resizeRenderTargets(width, height);
     if (this.rtMotionBlur0) this.rtMotionBlur0.setSize(width, height);
     if (this.rtMotionBlur1) this.rtMotionBlur1.setSize(width, height);
+    if (this.dustMaterial) {
+      this.dustMaterial.uniforms.uResolution!.value.set(width, height);
+    }
     this.resetMotionBlurHistory();
   }
 
@@ -949,6 +1027,16 @@ export class Viewport {
   resetMotionBlurHistory(): void {
     this.hasMotionBlurHistory = false;
     this.motionBlurFrame = 0;
+  }
+
+  // ===== Dust & Scratches =====
+
+  setDustAmount(value: number): void {
+    this.dustAmount = Math.min(1, Math.max(0, value));
+  }
+
+  setScratchAmount(value: number): void {
+    this.scratchAmount = Math.min(1, Math.max(0, value));
   }
 
   // ===== LUT =====
@@ -1128,6 +1216,8 @@ export class Viewport {
       yellow: this.material.uniforms.uYellow!.value as number,
       printContrast: this.material.uniforms.uPrintContrast!.value as number,
       motionBlurAmount: this.motionBlurAmount,
+      dustAmount: this.dustAmount,
+      scratchAmount: this.scratchAmount,
     };
   }
 
@@ -1229,6 +1319,10 @@ export class Viewport {
       this.material.uniforms.uPrintContrast!.value = params.printContrast as number;
     if (params.motionBlurAmount !== undefined)
       this.setMotionBlurAmount(params.motionBlurAmount as number);
+    if (params.dustAmount !== undefined)
+      this.setDustAmount(params.dustAmount as number);
+    if (params.scratchAmount !== undefined)
+      this.setScratchAmount(params.scratchAmount as number);
   }
 
   // ===== Histogram readback =====
@@ -1278,6 +1372,9 @@ export class Viewport {
     this.motionBlurMaterial?.dispose();
     this.rtMotionBlur0?.dispose();
     this.rtMotionBlur1?.dispose();
+    this.dustMaterial?.dispose();
+    this.dustTexture?.dispose();
+    this.scratchTexture?.dispose();
     const lut1Texture = this.material.uniforms.uLUT1?.value as THREE.Data3DTexture | null;
     if (lut1Texture) lut1Texture.dispose();
     const lut2Texture = this.material.uniforms.uLUT2?.value as THREE.Data3DTexture | null;

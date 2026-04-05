@@ -19,3 +19,4 @@ export { downsampleFragmentShader } from "./shaders/downsample.frag";
 export { upsampleFragmentShader } from "./shaders/upsample.frag";
 export { compositeFragmentShader } from "./shaders/composite.frag";
 export { motionblurFragmentShader } from "./shaders/motionblur.frag";
+export { dustFragmentShader } from "./shaders/dust.frag";
