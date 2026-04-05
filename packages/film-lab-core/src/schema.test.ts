@@ -192,6 +192,54 @@ describe("filmLabParamsSchema", () => {
       expect(r.success).toBe(false);
     }
   });
+
+  // === 0.5.0 新規キー: grainSize / diffusion ===
+
+  test("grainSize 省略時は既定 0.3", () => {
+    const { grainSize: _omit, ...rest } = PRESETS.cinematic;
+    const r = filmLabParamsSchema.safeParse(rest);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.grainSize).toBe(0.3);
+    }
+  });
+
+  test("diffusion 省略時は既定 0", () => {
+    const { diffusion: _omit, ...rest } = PRESETS.cinematic;
+    const r = filmLabParamsSchema.safeParse(rest);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.diffusion).toBe(0);
+    }
+  });
+
+  test("grainSize が 0–1 の境界値（0, 1）を受理する", () => {
+    for (const val of [0, 1]) {
+      const r = filmLabParamsSchema.safeParse({ ...PRESETS.cinematic, grainSize: val });
+      expect(r.success).toBe(true);
+    }
+  });
+
+  test("grainSize が範囲外（-0.1, 1.1）を拒否する", () => {
+    for (const val of [-0.1, 1.1]) {
+      const r = filmLabParamsSchema.safeParse({ ...PRESETS.cinematic, grainSize: val });
+      expect(r.success).toBe(false);
+    }
+  });
+
+  test("diffusion が 0–1 の境界値（0, 1）を受理する", () => {
+    for (const val of [0, 1]) {
+      const r = filmLabParamsSchema.safeParse({ ...PRESETS.cinematic, diffusion: val });
+      expect(r.success).toBe(true);
+    }
+  });
+
+  test("diffusion が範囲外（-0.1, 1.1）を拒否する", () => {
+    for (const val of [-0.1, 1.1]) {
+      const r = filmLabParamsSchema.safeParse({ ...PRESETS.cinematic, diffusion: val });
+      expect(r.success).toBe(false);
+    }
+  });
 });
 
 describe("filmLookGradeInputSchema", () => {
