@@ -930,6 +930,9 @@
       "typeFixed": "Fixed",
       "typeChanged": "Changed",
       "entries": {
+        "v045Title": "Bloom & Halation rework",
+        "v045BloomHalationRework": "Bloom and halation effects completely redesigned — smoother glow spread, precise highlight targeting, and graceful behavior at any slider setting. Existing projects may look slightly different.",
+        "v045PresetRecalibration": "All 10 film stock presets recalibrated for more accurate and natural bloom and halation behavior.",
         "v044Title": "ProRes MOV Support",
         "v044ProresLoadAndExport": "ProRes MOV files (LOG footage) can now be previewed and exported. The source is automatically converted to an optimized format on import.",
         "v044Dci4kInput": "DCI 4K (4096\u00d72160) and other above-UHD resolutions are now accepted as video input.",
