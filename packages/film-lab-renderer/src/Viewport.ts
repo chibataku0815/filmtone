@@ -28,6 +28,8 @@ import { compositeFragmentShader } from "./shaders/composite.frag";
 import { motionblurFragmentShader } from "./shaders/motionblur.frag";
 import { dustFragmentShader } from "./shaders/dust.frag";
 import { createDustTexture, createScratchTexture } from "./textures/index";
+import { lightshaftsFragmentShader } from "./shaders/lightshafts.frag";
+import { lightshaftsBlendFragmentShader } from "./shaders/lightshafts-blend.frag";
 
 export interface ViewportOptions {
   vertexShader: string;
@@ -136,6 +138,15 @@ export class Viewport {
   private dustMaterial: THREE.ShaderMaterial | null = null;
   private dustTexture: THREE.CanvasTexture | null = null;
   private scratchTexture: THREE.CanvasTexture | null = null;
+
+  // --- Light Shafts (Post-composite #100) ---
+  private shaftIntensity = 0.0;
+  private shaftDecay = 0.5;
+  private shaftOriginX = 0.5;
+  private shaftOriginY = 0.15;
+  private shaftMaterial: THREE.ShaderMaterial | null = null;
+  private shaftBlendMaterial: THREE.ShaderMaterial | null = null;
+  private rtShaft: THREE.WebGLRenderTarget | null = null;
 
   /**
    * composite のレンズ周辺ソフト（0〜1）。色収差周辺ソフトとは別（Params.lensSoftness）。
@@ -417,6 +428,45 @@ export class Viewport {
   }
 
   /**
+   * Light shafts 用の ShaderMaterial と 1/4 解像度 RT を遅延生成する。
+   * shaftIntensity > 0 になるまで GPU リソースを消費しない。
+   */
+  private ensureShaftResources(): void {
+    if (this.shaftMaterial) return;
+
+    this.shaftMaterial = new THREE.ShaderMaterial({
+      glslVersion: THREE.GLSL3,
+      vertexShader: filmlabVertexShader,
+      fragmentShader: lightshaftsFragmentShader,
+      uniforms: {
+        uSource: { value: null },
+        uLightOrigin: { value: new THREE.Vector2(0.5, 0.85) },
+        uDecay: { value: 0.96 },
+        uDensity: { value: 0.98 },
+        uExposure: { value: 0.38 },
+        uFlipY: { value: 0.0 },
+      },
+    });
+
+    this.shaftBlendMaterial = new THREE.ShaderMaterial({
+      glslVersion: THREE.GLSL3,
+      vertexShader: filmlabVertexShader,
+      fragmentShader: lightshaftsBlendFragmentShader,
+      uniforms: {
+        uSource: { value: null },
+        uShaftTexture: { value: null },
+        uIntensity: { value: 0.0 },
+        uFlipY: { value: 0.0 },
+      },
+    });
+
+    // 1/4 resolution RT for performance
+    const qw = Math.max(1, Math.floor(this.width / 4));
+    const qh = Math.max(1, Math.floor(this.height / 4));
+    this.rtShaft = new THREE.WebGLRenderTarget(qw, qh, RT_OPTIONS);
+  }
+
+  /**
    * #98 の post-composite seam で使う RT を、画面サイズに合わせて広げ直す。
    *
    * @param w 幅
@@ -461,7 +511,12 @@ export class Viewport {
    */
   private hasPostCompositeChain(): boolean {
     if (this.abCompareEnabled) return false;
-    return this.motionBlurAmount > 0 || this.dustAmount > 0 || this.scratchAmount > 0;
+    return (
+      this.shaftIntensity > 0 ||
+      this.dustAmount > 0 ||
+      this.scratchAmount > 0 ||
+      this.motionBlurAmount > 0
+    );
   }
 
   /**
@@ -654,6 +709,42 @@ export class Viewport {
   }
 
   /**
+   * Light shafts two-sub-pass rendering.
+   * 9a: Radial blur at 1/4 resolution (64 samples, luminance threshold).
+   * 9b: Additive blend at full resolution.
+   *
+   * @param renderer 描画先
+   * @param sourceTexture composite 出力テクスチャ
+   * @param target 最終出力先（null = 画面）
+   */
+  private renderLightShafts(
+    renderer: THREE.WebGLRenderer,
+    sourceTexture: THREE.Texture,
+    target: THREE.WebGLRenderTarget | null,
+  ): void {
+    this.ensureShaftResources();
+    if (!this.shaftMaterial || !this.shaftBlendMaterial || !this.rtShaft) return;
+
+    // 9a: Radial blur at 1/4 res
+    const su = this.shaftMaterial.uniforms;
+    su.uSource!.value = sourceTexture;
+    su.uLightOrigin!.value.set(this.shaftOriginX, 1.0 - this.shaftOriginY); // UV flip
+    su.uDecay!.value = 0.92 + this.shaftDecay * 0.075; // Map 0-1 to 0.92-0.995
+    this.postMesh.material = this.shaftMaterial;
+    renderer.setRenderTarget(this.rtShaft);
+    renderer.render(this.postScene, this.postCamera);
+
+    // 9b: Additive blend at full res
+    const bu = this.shaftBlendMaterial.uniforms;
+    bu.uSource!.value = sourceTexture;
+    bu.uShaftTexture!.value = this.rtShaft.texture;
+    bu.uIntensity!.value = this.shaftIntensity;
+    this.postMesh.material = this.shaftBlendMaterial;
+    renderer.setRenderTarget(target);
+    renderer.render(this.postScene, this.postCamera);
+  }
+
+  /**
    * Pass 9+ の受け皿。
    * Pass order: Shafts(9) -> Dust(10) -> MotionBlur(11)
    *
@@ -666,23 +757,39 @@ export class Viewport {
     sourceTexture: THREE.Texture,
     target: THREE.WebGLRenderTarget | null,
   ): void {
+    const shaftOn = this.shaftIntensity > 0;
     const dustOn = this.dustAmount > 0 || this.scratchAmount > 0;
     const motionBlurOn = this.motionBlurAmount > 0;
 
-    // Single effect shortcut (avoid unnecessary intermediate RT)
-    if (dustOn && !motionBlurOn) {
-      this.renderDust(renderer, sourceTexture, target);
-      return;
-    }
-    if (!dustOn && motionBlurOn) {
-      this.renderMotionBlur(renderer, sourceTexture, target);
-      return;
-    }
+    type Pass = "shaft" | "dust" | "motionBlur";
+    const passes: Pass[] = [];
+    if (shaftOn) passes.push("shaft");
+    if (dustOn) passes.push("dust");
+    if (motionBlurOn) passes.push("motionBlur");
 
-    // Chain: Dust(10) -> MotionBlur(11)
-    // Dust writes to rtPostComposite1, MotionBlur reads from it
-    this.renderDust(renderer, sourceTexture, this.rtPostComposite1!);
-    this.renderMotionBlur(renderer, this.rtPostComposite1!.texture, target);
+    if (passes.length === 0) return;
+
+    let currentSource = sourceTexture;
+    for (let i = 0; i < passes.length; i++) {
+      const isLast = i === passes.length - 1;
+      const passTarget = isLast ? target : this.rtPostComposite1!;
+
+      switch (passes[i]) {
+        case "shaft":
+          this.renderLightShafts(renderer, currentSource, passTarget);
+          break;
+        case "dust":
+          this.renderDust(renderer, currentSource, passTarget);
+          break;
+        case "motionBlur":
+          this.renderMotionBlur(renderer, currentSource, passTarget);
+          break;
+      }
+
+      if (!isLast) {
+        currentSource = this.rtPostComposite1!.texture;
+      }
+    }
   }
 
   /**
@@ -882,6 +989,11 @@ export class Viewport {
     if (this.dustMaterial) {
       this.dustMaterial.uniforms.uResolution!.value.set(width, height);
     }
+    if (this.rtShaft) {
+      const qw = Math.max(1, Math.floor(width / 4));
+      const qh = Math.max(1, Math.floor(height / 4));
+      this.rtShaft.setSize(qw, qh);
+    }
     this.resetMotionBlurHistory();
   }
 
@@ -1037,6 +1149,24 @@ export class Viewport {
 
   setScratchAmount(value: number): void {
     this.scratchAmount = Math.min(1, Math.max(0, value));
+  }
+
+  // ===== Light Shafts =====
+
+  setShaftIntensity(value: number): void {
+    this.shaftIntensity = Math.min(1, Math.max(0, value));
+  }
+
+  setShaftDecay(value: number): void {
+    this.shaftDecay = Math.min(1, Math.max(0, value));
+  }
+
+  setShaftOriginX(value: number): void {
+    this.shaftOriginX = Math.min(1, Math.max(0, value));
+  }
+
+  setShaftOriginY(value: number): void {
+    this.shaftOriginY = Math.min(1, Math.max(0, value));
   }
 
   // ===== LUT =====
@@ -1218,6 +1348,10 @@ export class Viewport {
       motionBlurAmount: this.motionBlurAmount,
       dustAmount: this.dustAmount,
       scratchAmount: this.scratchAmount,
+      shaftIntensity: this.shaftIntensity,
+      shaftDecay: this.shaftDecay,
+      shaftOriginX: this.shaftOriginX,
+      shaftOriginY: this.shaftOriginY,
     };
   }
 
@@ -1323,6 +1457,14 @@ export class Viewport {
       this.setDustAmount(params.dustAmount as number);
     if (params.scratchAmount !== undefined)
       this.setScratchAmount(params.scratchAmount as number);
+    if (params.shaftIntensity !== undefined)
+      this.setShaftIntensity(params.shaftIntensity as number);
+    if (params.shaftDecay !== undefined)
+      this.setShaftDecay(params.shaftDecay as number);
+    if (params.shaftOriginX !== undefined)
+      this.setShaftOriginX(params.shaftOriginX as number);
+    if (params.shaftOriginY !== undefined)
+      this.setShaftOriginY(params.shaftOriginY as number);
   }
 
   // ===== Histogram readback =====
@@ -1375,6 +1517,9 @@ export class Viewport {
     this.dustMaterial?.dispose();
     this.dustTexture?.dispose();
     this.scratchTexture?.dispose();
+    this.shaftMaterial?.dispose();
+    this.shaftBlendMaterial?.dispose();
+    this.rtShaft?.dispose();
     const lut1Texture = this.material.uniforms.uLUT1?.value as THREE.Data3DTexture | null;
     if (lut1Texture) lut1Texture.dispose();
     const lut2Texture = this.material.uniforms.uLUT2?.value as THREE.Data3DTexture | null;

@@ -49,6 +49,10 @@ export const PRESETS = {
     motionBlurAmount: 0,
     dustAmount: 0,
     scratchAmount: 0,
+    shaftIntensity: 0,
+    shaftDecay: 0.5,
+    shaftOriginX: 0.5,
+    shaftOriginY: 0.15,
   },
   /**
    * cinematic プリセット（v2・2026-03-31）
@@ -91,6 +95,10 @@ export const PRESETS = {
     motionBlurAmount: 0,
     dustAmount: 0,
     scratchAmount: 0,
+    shaftIntensity: 0,
+    shaftDecay: 0.5,
+    shaftOriginX: 0.5,
+    shaftOriginY: 0.15,
   },
   portra: {
     exposure: 0.2,
@@ -129,6 +137,10 @@ export const PRESETS = {
     motionBlurAmount: 0,
     dustAmount: 0,
     scratchAmount: 0,
+    shaftIntensity: 0,
+    shaftDecay: 0.5,
+    shaftOriginX: 0.5,
+    shaftOriginY: 0.15,
   },
   gold200: {
     exposure: 0.15,
@@ -167,6 +179,10 @@ export const PRESETS = {
     motionBlurAmount: 0,
     dustAmount: 0,
     scratchAmount: 0,
+    shaftIntensity: 0,
+    shaftDecay: 0.5,
+    shaftOriginX: 0.5,
+    shaftOriginY: 0.15,
   },
   pro400h: {
     exposure: 0.25,
@@ -205,6 +221,10 @@ export const PRESETS = {
     motionBlurAmount: 0,
     dustAmount: 0,
     scratchAmount: 0,
+    shaftIntensity: 0,
+    shaftDecay: 0.5,
+    shaftOriginX: 0.5,
+    shaftOriginY: 0.15,
   },
   bw: {
     exposure: 0.1,
@@ -243,6 +263,10 @@ export const PRESETS = {
     motionBlurAmount: 0,
     dustAmount: 0,
     scratchAmount: 0,
+    shaftIntensity: 0,
+    shaftDecay: 0.5,
+    shaftOriginX: 0.5,
+    shaftOriginY: 0.15,
   },
   ektar100: {
     exposure: 0.05,
@@ -281,6 +305,10 @@ export const PRESETS = {
     motionBlurAmount: 0,
     dustAmount: 0,
     scratchAmount: 0,
+    shaftIntensity: 0,
+    shaftDecay: 0.5,
+    shaftOriginX: 0.5,
+    shaftOriginY: 0.15,
   },
   superia400: {
     exposure: 0.1,
@@ -319,6 +347,10 @@ export const PRESETS = {
     motionBlurAmount: 0,
     dustAmount: 0,
     scratchAmount: 0,
+    shaftIntensity: 0,
+    shaftDecay: 0.5,
+    shaftOriginX: 0.5,
+    shaftOriginY: 0.15,
   },
   cinestill800t: {
     exposure: 0.15,
@@ -357,6 +389,10 @@ export const PRESETS = {
     motionBlurAmount: 0,
     dustAmount: 0,
     scratchAmount: 0,
+    shaftIntensity: 0,
+    shaftDecay: 0.5,
+    shaftOriginX: 0.5,
+    shaftOriginY: 0.15,
   },
   /**
    * Velvia 50 プリセット（v1・2026-04-02）
@@ -400,6 +436,10 @@ export const PRESETS = {
     motionBlurAmount: 0,
     dustAmount: 0,
     scratchAmount: 0,
+    shaftIntensity: 0,
+    shaftDecay: 0.5,
+    shaftOriginX: 0.5,
+    shaftOriginY: 0.15,
   },
 } satisfies Record<string, Params>;
 

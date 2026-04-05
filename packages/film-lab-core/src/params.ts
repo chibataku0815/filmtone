@@ -54,6 +54,14 @@ export const PARAM_KEYS = [
   "dustAmount",
   /** スクラッチ（傷）オーバーレイ強度（0=オフ、1=最大）。range: 0–1 */
   "scratchAmount",
+  /** ライトシャフト強度（0=オフ、1=最大）。range: 0–1 */
+  "shaftIntensity",
+  /** ライトシャフト減衰（0=短い光線、1=長い光線）。range: 0–1。内部で 0.92–0.995 にマップ */
+  "shaftDecay",
+  /** ライトシャフト光源 X 位置（0=左端、1=右端）。range: 0–1 */
+  "shaftOriginX",
+  /** ライトシャフト光源 Y 位置（0=上端、1=下端）。range: 0–1 */
+  "shaftOriginY",
 ] as const;
 
 export type ParamKey = (typeof PARAM_KEYS)[number];
@@ -113,6 +121,14 @@ export interface Params {
   dustAmount: number;
   /** スクラッチ（傷）オーバーレイ強度（0=オフ、1=最大）。post-composite chain に適用。 */
   scratchAmount: number;
+  /** ライトシャフト強度（0=オフ、1=最大）。post-composite chain に適用。 */
+  shaftIntensity: number;
+  /** ライトシャフト減衰（0=短い光線、1=長い光線）。内部で 0.92–0.995 にマップ。 */
+  shaftDecay: number;
+  /** ライトシャフト光源 X 位置（0=左端、1=右端）。 */
+  shaftOriginX: number;
+  /** ライトシャフト光源 Y 位置（0=上端、1=下端）。 */
+  shaftOriginY: number;
 }
 
 export function cloneParams(params: Params): Params {
