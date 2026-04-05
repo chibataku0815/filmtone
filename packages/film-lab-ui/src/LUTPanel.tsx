@@ -29,8 +29,8 @@ export function LUTPanel({ viewport, onCubeLutLoaded, onLutChange }: LUTPanelPro
   const lut2Ref = useRef<{ data: Float32Array; size: number } | null>(null);
   const lut1Ref = useRef<{ data: Float32Array; size: number } | null>(null);
 
-  // --- Log Conversion (advanced, collapsed by default) ---
-  const [logOpen, setLogOpen] = useState(false);
+  // --- Log Conversion (open by default) ---
+  const [logOpen, setLogOpen] = useState(true);
   const [logLutName, setLogLutName] = useState<string | null>(null);
   const [logIntensity, setLogIntensity] = useState(1.0);
   const [logError, setLogError] = useState<string | null>(null);
@@ -163,7 +163,7 @@ export function LUTPanel({ viewport, onCubeLutLoaded, onLutChange }: LUTPanelPro
   );
 
   return (
-    <div>
+    <div className="mb-4">
       {/* ── Section header ── */}
       <h3 className="mb-2 mt-3 text-[10px] font-medium uppercase tracking-[0.15em] text-white/40 first:mt-0">
         LUT
