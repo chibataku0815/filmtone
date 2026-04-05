@@ -21,7 +21,9 @@ const paramShape = Object.fromEntries(
             ? z.number().min(0).max(1).default(0)
             : key === "cyan" || key === "magenta" || key === "yellow"
               ? z.number().min(-1).max(1).default(0)
-              : z.number(),
+              : key === "motionBlurAmount"
+                ? z.number().min(0).max(1).default(0)
+                : z.number(),
   ]),
 ) as z.ZodRawShape;
 

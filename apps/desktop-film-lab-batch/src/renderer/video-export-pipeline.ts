@@ -1015,6 +1015,9 @@ export async function runVideoExportPipeline(options: {
           viewport.clearLUT2();
         }
 
+        // Reset motion blur accumulation so export starts from a clean state
+        viewport.resetMotionBlurHistory();
+
         const gl = renderer.getContext() as WebGL2RenderingContext;
 
         // --- PBO readback (WebGL2 PIXEL_PACK_BUFFER) ---

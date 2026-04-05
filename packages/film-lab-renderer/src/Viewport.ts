@@ -24,6 +24,7 @@ import { halationPrefilterFragmentShader } from "./shaders/halation-prefilter.fr
 import { downsampleFragmentShader } from "./shaders/downsample.frag";
 import { upsampleFragmentShader } from "./shaders/upsample.frag";
 import { compositeFragmentShader } from "./shaders/composite.frag";
+import { motionblurFragmentShader } from "./shaders/motionblur.frag";
 
 export interface ViewportOptions {
   vertexShader: string;
@@ -116,6 +117,15 @@ export class Viewport {
    * composite の径方向グレイン混色（0=一様、1=周辺強め）。カラーパスには無く合成パスのみ。
    */
   private grainRadialMix = 1.0;
+
+  // --- Motion Blur (Post-composite #97) ---
+  private motionBlurAmount = 0.0;
+  private frameRepeat = 1; // renderer-internal, not in PARAM_KEYS
+  private motionBlurFrame = 0;
+  private hasMotionBlurHistory = false;
+  private motionBlurMaterial: THREE.ShaderMaterial | null = null;
+  private rtMotionBlur0: THREE.WebGLRenderTarget | null = null;
+  private rtMotionBlur1: THREE.WebGLRenderTarget | null = null;
 
   /**
    * composite のレンズ周辺ソフト（0〜1）。色収差周辺ソフトとは別（Params.lensSoftness）。
@@ -351,6 +361,27 @@ export class Viewport {
   }
 
   /**
+   * Motion blur 用の ShaderMaterial と ping-pong RT を遅延生成する。
+   * motionBlurAmount > 0 になるまで GPU リソースを消費しない。
+   */
+  private ensureMotionBlurResources(): void {
+    if (this.motionBlurMaterial) return;
+    this.motionBlurMaterial = new THREE.ShaderMaterial({
+      glslVersion: THREE.GLSL3,
+      vertexShader: filmlabVertexShader,
+      fragmentShader: motionblurFragmentShader,
+      uniforms: {
+        uCurrentFrame: { value: null },
+        uPrevAccum: { value: null },
+        uAmount: { value: 0.0 },
+        uFlipY: { value: 0.0 },
+      },
+    });
+    this.rtMotionBlur0 = new THREE.WebGLRenderTarget(this.width, this.height, RT_OPTIONS);
+    this.rtMotionBlur1 = new THREE.WebGLRenderTarget(this.width, this.height, RT_OPTIONS);
+  }
+
+  /**
    * #98 の post-composite seam で使う RT を、画面サイズに合わせて広げ直す。
    *
    * @param w 幅
@@ -391,11 +422,11 @@ export class Viewport {
   }
 
   /**
-   * #98 時点では post-composite effect がまだ無いので false 固定。
-   * 後続 issue が light shafts / dust / slow shutter をここへつなぐ。
+   * post-composite chain が必要かどうか。A/B 比較中は無効化する（R9 対策）。
    */
   private hasPostCompositeChain(): boolean {
-    return false;
+    if (this.abCompareEnabled) return false;
+    return this.motionBlurAmount > 0;
   }
 
   /**
@@ -515,9 +546,57 @@ export class Viewport {
   }
 
   /**
+   * EMA モーションブラー（ping-pong 蓄積）。
+   * Step 1: current frame と前フレームの蓄積を EMA ブレンド → writeRT
+   * Step 2: writeRT の結果を最終 target へコピー
+   *
+   * @param renderer 描画先
+   * @param sourceTexture composite 出力テクスチャ
+   * @param target 最終出力先（null = 画面）
+   */
+  private renderMotionBlur(
+    renderer: THREE.WebGLRenderer,
+    sourceTexture: THREE.Texture,
+    target: THREE.WebGLRenderTarget | null,
+  ): void {
+    this.ensureMotionBlurResources();
+    if (!this.motionBlurMaterial || !this.rtMotionBlur0 || !this.rtMotionBlur1) return;
+
+    // R3: Frame 0 black flash prevention
+    const effectiveAmount = this.hasMotionBlurHistory ? this.motionBlurAmount : 0.0;
+
+    // Ping-pong: read from current accumulator, write to the other
+    const readRT = this.motionBlurFrame % 2 === 0 ? this.rtMotionBlur0 : this.rtMotionBlur1;
+    const writeRT = this.motionBlurFrame % 2 === 0 ? this.rtMotionBlur1 : this.rtMotionBlur0;
+
+    const mu = this.motionBlurMaterial.uniforms;
+    mu.uCurrentFrame!.value = sourceTexture;
+    mu.uPrevAccum!.value = readRT.texture;
+    mu.uAmount!.value = effectiveAmount;
+
+    // Step 1: EMA blend -> writeRT
+    const prevAutoClear = renderer.autoClear;
+    renderer.autoClear = false;
+    this.postMesh.material = this.motionBlurMaterial;
+    renderer.setRenderTarget(writeRT);
+    renderer.render(this.postScene, this.postCamera);
+
+    // Step 2: Copy writeRT -> final target
+    mu.uCurrentFrame!.value = writeRT.texture;
+    mu.uAmount!.value = 0.0;
+    renderer.setRenderTarget(target);
+    renderer.render(this.postScene, this.postCamera);
+
+    renderer.autoClear = prevAutoClear;
+
+    this.motionBlurFrame++;
+    this.hasMotionBlurHistory = true;
+  }
+
+  /**
    * Pass 9+ の受け皿。
-   * ここに #100 light shafts → #99 dust/scratches を置き、#97 slow shutter は
-   * 同じ seam を別 pass として使う前提にする。
+   * #97 slow shutter (EMA motion blur) をここに差し込む。
+   * 後続 issue で #100 light shafts / #99 dust/scratches を追加可能。
    *
    * @param renderer 描画先
    * @param sourceTexture 直前の post-composite 出力
@@ -528,10 +607,7 @@ export class Viewport {
     sourceTexture: THREE.Texture,
     target: THREE.WebGLRenderTarget | null,
   ): void {
-    void renderer;
-    void sourceTexture;
-    void target;
-    // #98 では seam だけを用意する。後続 issue がここへ pass を差し込む。
+    this.renderMotionBlur(renderer, sourceTexture, target);
   }
 
   /**
@@ -726,6 +802,9 @@ export class Viewport {
     this.material.uniforms.uResolution!.value.set(width, height);
     this.compositeMaterial.uniforms.uResolution!.value.set(width, height);
     this.resizeRenderTargets(width, height);
+    if (this.rtMotionBlur0) this.rtMotionBlur0.setSize(width, height);
+    if (this.rtMotionBlur1) this.rtMotionBlur1.setSize(width, height);
+    this.resetMotionBlurHistory();
   }
 
   setImageResolution(width: number, height: number): void {
@@ -850,6 +929,26 @@ export class Viewport {
 
   setHalationSoftKnee(value: number): void {
     this.halationSoftKnee = value;
+  }
+
+  // ===== Motion Blur =====
+
+  setMotionBlurAmount(value: number): void {
+    const prev = this.motionBlurAmount;
+    this.motionBlurAmount = Math.min(1, Math.max(0, value));
+    // Reset history on 0 -> >0 transition to avoid stale accumulation
+    if (prev === 0 && this.motionBlurAmount > 0) {
+      this.resetMotionBlurHistory();
+    }
+  }
+
+  setFrameRepeat(value: number): void {
+    this.frameRepeat = Math.min(8, Math.max(1, Math.round(value)));
+  }
+
+  resetMotionBlurHistory(): void {
+    this.hasMotionBlurHistory = false;
+    this.motionBlurFrame = 0;
   }
 
   // ===== LUT =====
@@ -1028,6 +1127,7 @@ export class Viewport {
       magenta: this.material.uniforms.uMagenta!.value as number,
       yellow: this.material.uniforms.uYellow!.value as number,
       printContrast: this.material.uniforms.uPrintContrast!.value as number,
+      motionBlurAmount: this.motionBlurAmount,
     };
   }
 
@@ -1127,6 +1227,8 @@ export class Viewport {
       this.material.uniforms.uYellow!.value = params.yellow as number;
     if (params.printContrast !== undefined)
       this.material.uniforms.uPrintContrast!.value = params.printContrast as number;
+    if (params.motionBlurAmount !== undefined)
+      this.setMotionBlurAmount(params.motionBlurAmount as number);
   }
 
   // ===== Histogram readback =====
@@ -1173,6 +1275,9 @@ export class Viewport {
     this.rtCompareComposite?.dispose();
     this.rtPostComposite0?.dispose();
     this.rtPostComposite1?.dispose();
+    this.motionBlurMaterial?.dispose();
+    this.rtMotionBlur0?.dispose();
+    this.rtMotionBlur1?.dispose();
     const lut1Texture = this.material.uniforms.uLUT1?.value as THREE.Data3DTexture | null;
     if (lut1Texture) lut1Texture.dispose();
     const lut2Texture = this.material.uniforms.uLUT2?.value as THREE.Data3DTexture | null;

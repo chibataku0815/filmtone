@@ -18,3 +18,4 @@ export { halationPrefilterFragmentShader } from "./shaders/halation-prefilter.fr
 export { downsampleFragmentShader } from "./shaders/downsample.frag";
 export { upsampleFragmentShader } from "./shaders/upsample.frag";
 export { compositeFragmentShader } from "./shaders/composite.frag";
+export { motionblurFragmentShader } from "./shaders/motionblur.frag";
