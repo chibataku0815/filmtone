@@ -217,7 +217,7 @@ export function FilmLabControlPanelCore({
   const [savedHalationIntensity, setSavedHalationIntensity] = useState(0.25);
   const [savedShaftIntensity, setSavedShaftIntensity] = useState(0.4);
   const [artifactsOpen, setArtifactsOpen] = useState(true);
-  const [postEffectsOpen, setPostEffectsOpen] = useState(false);
+  // v0.5.0: postEffectsOpen removed — motionBlur moved to ARTIFACTS, section eliminated
   const [showHelp, setShowHelp] = useState(false);
   const [sourceTrimOpen, setSourceTrimOpen] = useState(false);
   const beforeAfterPointerActiveRef = useRef(false);
@@ -724,59 +724,7 @@ export function FilmLabControlPanelCore({
             <div className="min-w-0">
               <SectionHeader title={tFilmLab("controls.process")} />
               <div className="flex flex-col gap-2.5">
-                <ToggleHeader
-                  title={tFilmLab("controls.compression")}
-                  titleHint={tFilmLab("controls.compressionToggleHint")}
-                  enabled={compressionAmountEnabled}
-                  onToggle={toggleCompressionAmount}
-                />
-                <div
-                  className={`flex flex-col gap-2.5 ${!compressionAmountEnabled ? "pointer-events-none opacity-30" : ""}`}
-                >
-                  <PanelControlSlider
-                    sliderLabelResetHint={sliderLabelResetHint}
-                    label={tFilmLab("controls.strength")}
-                    hint={tFilmLab("controls.compressionHint")}
-                    labelClassName={processSliderLabelClassName}
-                    value={params.compressionAmount}
-                    min={0}
-                    max={getCompressionAmountSliderMax(params.compressionAmount)}
-                    step={0.01}
-                    defaultValue={COMPRESSION_AMOUNT_DEFAULT}
-                    formatValue={(v) => `${Math.round(v * 100)}%`}
-                    onChange={(v) => updateParam("compressionAmount", v)}
-                    onCommit={commit}
-                  />
-                  {/*
-                   * Range は広げるほど効き方が強くなりやすいので、UI 上限を少し狭くする。
-                   * 共有 URL 等で高い値が入っていても params はそのまま保持され、スライダを動かすと安全域へ寄る。
-                   */}
-                  <PanelControlSlider
-                    sliderLabelResetHint={sliderLabelResetHint}
-                    label={tFilmLab("controls.compressionRange")}
-                    hint={tFilmLab("controls.compressionRangeHint")}
-                    labelClassName={processSliderLabelClassName}
-                    value={params.compressionRange}
-                    min={0}
-                    max={getCompressionRangeSliderMax(params.compressionRange)}
-                    step={0.01}
-                    defaultValue={0.5}
-                    formatValue={(v) => `${Math.round(v * 100)}%`}
-                    onChange={(v) => updateParam("compressionRange", v)}
-                    onCommit={commit}
-                  />
-                </div>
-                <PanelControlSlider
-                  sliderLabelResetHint={sliderLabelResetHint}
-                  label={tFilmLab("controls.printContrast")}
-                  hint={tFilmLab("controls.printContrastHint")}
-                  labelClassName={processSliderLabelClassName}
-                  value={params.printContrast}
-                  min={0} max={1} step={0.01} defaultValue={0}
-                  formatValue={(v) => `${Math.round(v * 100)}%`}
-                  onChange={(v) => updateParam("printContrast", v)}
-                  onCommit={commit}
-                />
+                {/* v0.5.0: Compression (ハイライトの柔らかさ) + printContrast (仕上げのコントラスト) hidden — rarely used */}
                 <PanelControlSlider
                   sliderLabelResetHint={sliderLabelResetHint}
                   label={tFilmLab("controls.cyan")}
@@ -920,26 +868,9 @@ export function FilmLabControlPanelCore({
                   onChange={(v) => updateParam("grainRadialMix", v)}
                   onCommit={commit}
                 />
+                {/* v0.5.0: motionBlur moved here from POST EFFECTS (was solo item, category unnecessary) */}
+                <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.motionBlurAmount")} hint={tFilmLab("controls.motionBlurAmountHint")} value={params.motionBlurAmount} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("motionBlurAmount", v)} onCommit={commit} />
               </div>
-            </div>
-          )}
-
-          {/* === POST EFFECTS — Pro only, collapsed by default === */}
-          {isPro && (
-            <div className="min-w-0">
-              <CollapsibleHeader
-                title={tFilmLab("controls.postEffects")}
-                titleHint={tFilmLab("controls.postEffectsSectionHint")}
-                open={postEffectsOpen}
-                onToggle={() => setPostEffectsOpen(!postEffectsOpen)}
-              />
-              {postEffectsOpen && (
-                <div className="flex flex-col gap-2.5">
-                  {/* Light Shafts / Dust / Scratch — hidden until quality improvement (v0.6) */}
-
-                  <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.motionBlurAmount")} hint={tFilmLab("controls.motionBlurAmountHint")} value={params.motionBlurAmount} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("motionBlurAmount", v)} onCommit={commit} />
-                </div>
-              )}
             </div>
           )}
 
