@@ -864,6 +864,11 @@ export function FilmLabControlPanelCore({
                   onCommit={commit}
                 />
               </div>
+
+              <div className="mt-3 flex flex-col gap-2.5">
+                <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.diffusion")} value={params.diffusion} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("diffusion", v)} onCommit={commit} />
+              </div>
+
               {/**
                * Grain/Vignette は `artifactsOpen` に連動。色収差・レンズ周辺ソフト・グレイン径方向は
                * Bloom/Halation と同様、Artifacts 見出しの折りたたみと無関係に常に出す（閉じると「消えた」ように見えるため）。

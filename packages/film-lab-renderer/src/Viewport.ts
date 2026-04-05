@@ -1183,6 +1183,12 @@ export class Viewport {
     this.bloomRadius = value;
   }
 
+  // ===== Diffusion Setter =====
+
+  setDiffusion(value: number): void {
+    this.diffusion = Math.min(1, Math.max(0, value));
+  }
+
   // ===== Halation Setters =====
 
   setHalationIntensity(value: number): void {
@@ -1424,6 +1430,7 @@ export class Viewport {
       bloomThreshold: this.bloomThreshold,
       bloomStrength: this.bloomStrength,
       bloomRadius: this.bloomRadius,
+      diffusion: this.diffusion,
       halationIntensity: this.halationIntensity,
       halationSpread: this.halationSpread,
       halationThreshold: this.halationThreshold,
@@ -1517,6 +1524,8 @@ export class Viewport {
       this.setBloomStrength(params.bloomStrength as number);
     if (params.bloomRadius !== undefined)
       this.setBloomRadius(params.bloomRadius as number);
+    if (params.diffusion !== undefined)
+      this.setDiffusion(params.diffusion as number);
     if (params.halationIntensity !== undefined)
       this.setHalationIntensity(params.halationIntensity as number);
     if (params.halationSpread !== undefined)
@@ -1602,6 +1611,8 @@ export class Viewport {
     this.rtColorGraded?.dispose();
     for (const rt of this.rtBloomMips) rt.dispose();
     for (const rt of this.rtHalationMips) rt.dispose();
+    for (const rt of this.rtDiffusionMips) rt.dispose();
+    this.rtDiffusionMips = [];
     this.rtCompareComposite?.dispose();
     this.rtPostComposite0?.dispose();
     this.rtPostComposite1?.dispose();

@@ -13,10 +13,12 @@ precision highp float;
 uniform sampler2D uSource;
 uniform sampler2D uBloomTexture;
 uniform sampler2D uHalationTexture;
+uniform sampler2D uDiffusionTexture;
 uniform sampler2D uOriginalTexture;
 
 uniform float uBloomStrength;
 uniform float uHalationIntensity;
+uniform float uDiffusion;
 
 uniform float uVignette;
 uniform float uGrainIntensity;
@@ -111,6 +113,17 @@ void main() {
   vec3 halation = texture(uHalationTexture, vUv).rgb * uHalationIntensity;
   vec3 glow = bloom + halation;
   color.rgb = 1.0 - (1.0 - color.rgb) * (1.0 - glow);
+
+  // --- Diffusion: Pro-Mist / Cinebloom full-image light scattering ---
+  // Screen blend of blurred full image at controllable opacity.
+  // The 0.45 multiplier prevents over-brightening at diffusion=1.0.
+  // Unlike bloom (highlights only), diffusion scatters ALL light — creating
+  // a soft haze that reduces contrast while preserving sharpness.
+  if (uDiffusion > 0.0) {
+    vec3 diffused = texture(uDiffusionTexture, vUv).rgb;
+    vec3 diffScreen = 1.0 - (1.0 - color.rgb) * (1.0 - diffused * uDiffusion * 0.45);
+    color.rgb = diffScreen;
+  }
 
   // Vignette
   float dist = length(vUv - 0.5) * 1.414;

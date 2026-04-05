@@ -534,6 +534,7 @@
       "spread": "広がり",
       "histogram": "ヒストグラム",
       "halationHue": "色相",
+      "diffusion": "光の拡散",
       "process": "階調",
       "sliderLabelReset": "ラベルをタップで既定値に戻す",
       "artifacts": "フィルムの質感",
