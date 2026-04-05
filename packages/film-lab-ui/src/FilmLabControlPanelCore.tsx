@@ -935,27 +935,9 @@ export function FilmLabControlPanelCore({
               />
               {postEffectsOpen && (
                 <div className="flex flex-col gap-2.5">
-                  <ToggleHeader
-                    title={tFilmLab("controls.lightShafts")}
-                    titleHint={tFilmLab("controls.lightShaftsToggleHint")}
-                    enabled={shaftEnabled}
-                    onToggle={toggleShaft}
-                  />
-                  <div className={`flex flex-col gap-2.5 ${!shaftEnabled ? "pointer-events-none opacity-30" : ""}`}>
-                    <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.shaftIntensity")} hint={tFilmLab("controls.shaftIntensityHint")} value={params.shaftIntensity} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("shaftIntensity", v)} onCommit={commit} />
-                    <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.shaftDecay")} hint={tFilmLab("controls.shaftDecayHint")} value={params.shaftDecay} min={0} max={1} step={0.01} defaultValue={0.5} onChange={(v) => updateParam("shaftDecay", v)} onCommit={commit} />
-                    <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.shaftOriginX")} hint={tFilmLab("controls.shaftOriginXHint")} value={params.shaftOriginX} min={0} max={1} step={0.01} defaultValue={0.5} onChange={(v) => updateParam("shaftOriginX", v)} onCommit={commit} />
-                    <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.shaftOriginY")} hint={tFilmLab("controls.shaftOriginYHint")} value={params.shaftOriginY} min={0} max={1} step={0.01} defaultValue={0.15} onChange={(v) => updateParam("shaftOriginY", v)} onCommit={commit} />
-                  </div>
+                  {/* Light Shafts / Dust / Scratch — hidden until quality improvement (v0.6) */}
 
-                  <div className="mt-1 border-t border-white/[0.08] pt-3">
-                    <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.dustAmount")} hint={tFilmLab("controls.dustAmountHint")} value={params.dustAmount} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("dustAmount", v)} onCommit={commit} />
-                  </div>
-                  <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.scratchAmount")} hint={tFilmLab("controls.scratchAmountHint")} value={params.scratchAmount} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("scratchAmount", v)} onCommit={commit} />
-
-                  <div className="mt-1 border-t border-white/[0.08] pt-3">
-                    <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.motionBlurAmount")} hint={tFilmLab("controls.motionBlurAmountHint")} value={params.motionBlurAmount} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("motionBlurAmount", v)} onCommit={commit} />
-                  </div>
+                  <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.motionBlurAmount")} hint={tFilmLab("controls.motionBlurAmountHint")} value={params.motionBlurAmount} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("motionBlurAmount", v)} onCommit={commit} />
                 </div>
               )}
             </div>

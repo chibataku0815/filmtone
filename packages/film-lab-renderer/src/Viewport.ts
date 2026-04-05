@@ -540,12 +540,8 @@ export class Viewport {
    */
   private hasPostCompositeChain(): boolean {
     if (this.abCompareEnabled) return false;
-    return (
-      this.shaftIntensity > 0 ||
-      this.dustAmount > 0 ||
-      this.scratchAmount > 0 ||
-      this.motionBlurAmount > 0
-    );
+    // v0.5.0: Only motionBlur is user-facing. Shafts/Dust/Scratch deferred to v0.6
+    return this.motionBlurAmount > 0;
   }
 
   /**

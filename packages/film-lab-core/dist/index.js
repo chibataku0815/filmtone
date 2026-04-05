@@ -512,7 +512,7 @@ var PRESETS = {
     bloomStrength: 0.28,
     bloomRadius: 0.48,
     diffusion: 0.08,
-    halationIntensity: 0.32,
+    halationIntensity: 0,
     halationSpread: 25,
     halationHue: 12,
     halationThreshold: 0.6,

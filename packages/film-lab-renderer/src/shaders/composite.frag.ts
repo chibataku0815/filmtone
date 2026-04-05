@@ -50,22 +50,31 @@ vec2 coverUv(vec2 uv, vec2 resolution, vec2 imageResolution) {
   return (uv - 0.5) * scale + 0.5;
 }
 
-// --- Film Grain: Value Noise + Chroma/Luma Separation ---
-float grainHash(vec2 p) {
+// --- Film Grain: Per-pixel hash + chroma/luma separation + organic clumping ---
+
+// Per-pixel hash: sharp, random, no grid artifacts — like actual silver halide crystals.
+float grainPixelHash(vec2 p, float seed) {
+  return fract(sin(dot(p + seed, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
+}
+
+// Low-frequency smooth noise for grain density modulation (clumping).
+// Value noise is fine here because the scale is large (20-80px per cell) —
+// grid artifacts are invisible at this frequency.
+float grainClumpHash(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
   p3 += dot(p3, p3.yzx + 33.33);
   return fract((p3.x + p3.y) * p3.z);
 }
 
-float grainNoise(vec2 p) {
+float grainClumpNoise(vec2 p) {
   vec2 i = floor(p);
   vec2 f = fract(p);
-  f = f * f * (3.0 - 2.0 * f); // smoothstep interpolation
-  float a = grainHash(i);
-  float b = grainHash(i + vec2(1.0, 0.0));
-  float c = grainHash(i + vec2(0.0, 1.0));
-  float d = grainHash(i + vec2(1.0, 1.0));
-  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y) - 0.5;
+  f = f * f * (3.0 - 2.0 * f);
+  float a = grainClumpHash(i);
+  float b = grainClumpHash(i + vec2(1.0, 0.0));
+  float c = grainClumpHash(i + vec2(0.0, 1.0));
+  float d = grainClumpHash(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
 void main() {
@@ -121,7 +130,7 @@ void main() {
   // a soft haze that reduces contrast while preserving sharpness.
   if (uDiffusion > 0.0) {
     vec3 diffused = texture(uDiffusionTexture, vUv).rgb;
-    vec3 diffScreen = 1.0 - (1.0 - color.rgb) * (1.0 - diffused * uDiffusion * 0.45);
+    vec3 diffScreen = 1.0 - (1.0 - color.rgb) * (1.0 - diffused * uDiffusion * 0.29);
     color.rgb = diffScreen;
   }
 
@@ -138,26 +147,31 @@ void main() {
   float grainRadialWeight = pow(grainRadial, 1.65);
   float grainRadialEffective = mix(1.0, grainRadialWeight, clamp(uGrainRadialMix, 0.0, 1.0));
 
-  // Grain frequency from grainSize: 0=fine(high freq), 1=coarse(low freq)
-  float lumaFreq = mix(500.0, 100.0, clamp(uGrainSize, 0.0, 1.0));
-  float chromaFreq = lumaFreq * 0.7; // chroma crystals slightly larger
-  float seed = floor(uTime * 24.0); // per-frame temporal variation
+  // Grain temporal: ~3 grain frames/second.
+  // Each "frame" holds a stable grain pattern for ~0.33s — slow enough for
+  // still images to feel stable, fast enough for video to feel projected.
+  float grainFrame = floor(uTime * 3.0);
 
-  // Pixel coordinate in noise space
-  float pixelScale = max(uResolution.x, 1.0);
-  vec2 lumaCoord = vUv * pixelScale / lumaFreq + seed * 7.13;
-  vec2 chromaCoordR = vUv * pixelScale / chromaFreq + seed * 13.37 + 100.0;
-  vec2 chromaCoordB = vUv * pixelScale / chromaFreq + seed * 23.71 + 200.0;
+  // Per-pixel grain with per-channel seeds (chroma/luma separation).
+  // Silver halide crystals are ~1-2px at 1080p scan — per-pixel hash is correct.
+  vec2 pixCoord = vUv * uResolution;
+  float lumaGrain = grainPixelHash(pixCoord, grainFrame * 1.7);
+  float chromaR = grainPixelHash(pixCoord, grainFrame * 2.3 + 500.0) * 0.3;
+  float chromaB = grainPixelHash(pixCoord, grainFrame * 3.1 + 1000.0) * 0.3;
 
-  // Luma grain (shared across RGB) + independent chroma grain (R, B only)
-  float lumaGrain = grainNoise(lumaCoord);
-  float chromaR = grainNoise(chromaCoordR) * 0.3; // chroma weight: 30%
-  float chromaB = grainNoise(chromaCoordB) * 0.3;
+  // Organic clumping: low-frequency noise modulates grain DENSITY.
+  // grainSize controls how "clumpy" the grain is — NOT the pixel size.
+  // grainSize=0 (Velvia): uniform density -> fine, even grain.
+  // grainSize=1 (pushed HP5): clustered density -> grain forms visible groups.
+  // clumpScale: pixel size of density variation zones (large = gentle undulation).
+  float clumpScale = mix(80.0, 20.0, clamp(uGrainSize, 0.0, 1.0));
+  float clump = grainClumpNoise(vUv * uResolution / clumpScale + grainFrame * 0.5);
+  float densityMod = mix(1.0, 0.3 + clump * 1.4, clamp(uGrainSize, 0.0, 1.0) * 0.7);
 
-  float w = uGrainIntensity * grainRadialEffective;
-  color.r += (lumaGrain + chromaR) * w;
-  color.g += lumaGrain * w;               // Green: luma only (eye most sensitive)
-  color.b += (lumaGrain + chromaB) * w;
+  float w = uGrainIntensity * 0.5 * grainRadialEffective;
+  color.r += (lumaGrain + chromaR) * w * densityMod;
+  color.g += lumaGrain * w * densityMod;
+  color.b += (lumaGrain + chromaB) * w * densityMod;
   color.rgb = clamp(color.rgb, 0.0, 1.0);
 
   // Before/After または A/B 比較の分割
