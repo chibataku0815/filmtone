@@ -12,70 +12,68 @@
 
 > Film doesn't just look — it moves, ages, and breathes. Now Filmtone does too.
 
-### Grain v3
+### Grain — completely reimagined
 
-The grain engine has been rebuilt from the ground up. Three iterations
-converged on a per-pixel hash with organic clumping and separate
-chroma/luma channels — red and blue grains drift independently while
-green stays luminance-only, the way silver-halide crystals behave in
-real film stock.
+Film grain is no longer a simple noise overlay. Each stock now has its own
+grain character that behaves the way real silver-halide crystals do — fine
+and tight for Ektar, coarse and clumpy for CineStill, gentle and even for
+Portra. Color grains drift independently from luminance grains, just like
+on actual film.
 
-- **Grain Size** — a new parameter controls cluster density from
-  ultra-fine (0) to coarse (1). Each of the 10 built-in presets now
-  carries a tuned `grainSize` value matching its real-world stock.
-- **Organic clumping** — grain no longer tiles uniformly. Clusters
-  form and break naturally, eliminating the synthetic-noise look of
-  earlier versions.
-- **Temporal cadence** — grain refreshes at 3 fps, matching the
-  perceptual rhythm of projected film.
+- **Grain Size slider** — a new control lets you dial the coarseness from
+  ultra-fine to heavily textured. Each of the 10 built-in presets starts
+  at a value matched to its real-world stock, so it looks right out of
+  the box.
+- **Natural clumping** — grain clusters form and break organically instead
+  of repeating in a uniform pattern. The "digital noise" look is gone.
+- **Gentle refresh** — grain evolves slowly and naturally, the way
+  projected film feels in motion.
 
-### Diffusion (Pro-Mist filter)
+### Diffusion — like a Pro-Mist on your lens
 
-A new `diffusion` parameter adds a full-image light haze comparable to
-a Pro-Mist filter on the lens. Unlike bloom, which targets bright
-spots, diffusion lifts the entire image through a 3-level mip pyramid
-and screen blend — producing a subtle, even glow that softens contrast
-without losing detail.
+A brand-new Diffusion effect adds a soft, even glow across the entire
+image — the same quality you get from a Pro-Mist filter on the lens.
+It lifts shadows gently, softens contrast, and gives skin a beautiful
+luminosity without losing detail in the rest of the frame.
 
-Five presets ship with diffusion values where a Pro-Mist character fits
-the stock (Cinematic 0.06, Portra 0.05, Gold 200 0.04, B&W 0.04,
-CineStill 800T 0.08).
+Five presets ship with diffusion values tailored to their character:
+CineStill 800T gets the strongest glow, Cinematic and Portra sit in the
+middle, and Gold 200 and B&W receive a lighter touch.
 
-### CineStill 800T halation removed
+### CineStill 800T — halation off by default
 
-The CineStill 800T preset no longer applies halation by default
-(`halationIntensity` 0.32 → 0). The halation slider remains available
-for manual dialing.
+The red glow around lights (halation) is now turned off by default in the
+CineStill 800T preset. If you want that signature look, the halation
+slider is still there — just turn it up.
 
-### UI reorganization
+### Simpler, cleaner interface
 
-- **Hidden low-quality effects** — Light Shafts, Dust, and Scratch
-  controls are hidden from the UI while they mature. The renderer
-  guards prevent stale saved values from activating these effects.
-- **Pro panel rearranged** — LUT panel moved below presets, Log
-  Conversion opens by default, Compare section collapses by default.
-- **Cleaner labels** — LUT slider labels shortened for clarity,
-  redundant export-tab copy removed, sidebar toggle made consistent
-  across all tabs.
+- **Focused controls** — effects that are still being refined (Light
+  Shafts, Dust, Scratches) are hidden until they meet our quality bar.
+  They won't accidentally activate on existing projects either.
+- **Better layout** — the LUT panel now sits below presets where it
+  belongs, Log Conversion opens by default for a faster start, and the
+  Compare panel stays collapsed until you need it.
+- **Tidier labels** — slider names are shorter, redundant text is removed,
+  and the sidebar toggle is consistent everywhere.
 
-**Note:** Existing projects may look different when opened in v0.5.0
-due to the new grain engine and per-preset grainSize/diffusion values.
+**Note:** Existing projects may look different when opened in v0.5.0.
+Each preset now carries its own grain and diffusion settings, so your
+images will pick up the new film character automatically. If you prefer
+the previous look, set Grain Size and Diffusion to 0 manually.
 
 ## Lineage
 
-- Grain rewritten from single-pass uniform noise to per-pixel hash
-  with organic clumping and chroma/luma separation.
-- Diffusion adds a 3-level mip pyramid (no prefilter) with screen
-  blend, capped at 0.29 multiplier for tasteful maximum intensity.
-- Post-composite render target chain now active — enables future
-  per-frame temporal effects.
-- Motion blur (Slow Shutter) is the only active post-composite effect
-  in v0.5.0. Light Shafts and Dust/Scratches are implemented but
-  UI-hidden and renderer-guarded for v0.6.
-- All 10 presets recalibrated with individual grainSize and diffusion
-  values.
-- Includes all v0.4.5 features (Bloom/Halation rework) and prior
-  Desktop improvements.
+What changed from previous versions, in plain terms:
+
+- **v0.4.5 → v0.5.0**: Grain completely rebuilt — now unique per stock
+  with natural clumping and independent color grain. New Diffusion effect
+  added. CineStill 800T halation turned off by default. All 10 presets
+  recalibrated with individual grain and diffusion values. UI simplified.
+- **v0.4.5**: Bloom and halation effects redesigned for smoother, more
+  natural glow. All presets retuned.
+- **v0.4.0 and earlier**: Foundation — 10 film stock presets, LUT
+  support, batch export, signed and notarized macOS app.
 
 ## Checksums
 
