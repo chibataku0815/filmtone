@@ -21,8 +21,8 @@ more natural results.
   sources and blown highlights, so skin tones and shadows stay clean.
 - **Graceful at any setting** — even extreme slider positions produce tasteful,
   film-like results instead of visual breakdowns.
-- **Recalibrated presets** — all 10 built-in film stocks have been retuned by
-  the expert panel for more accurate bloom and halation behavior.
+- **Recalibrated presets** — all 10 built-in film stocks have been retuned
+  for more accurate and natural bloom and halation behavior.
 
 **Note:** Existing projects may look slightly different when opened in v0.4.5
 due to the improved rendering pipeline.
