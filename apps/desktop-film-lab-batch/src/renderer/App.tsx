@@ -1347,11 +1347,8 @@ export default function App() {
                       aria-expanded={editRightPaneExpanded}
                       aria-controls="film-lab-edit-controls-pane"
                       onClick={() => {
-                        if (tab === "photoExport" || tab === "videoExport") {
-                          setTab("edit");
-                        } else {
-                          setEditRightPaneExpanded(false);
-                        }
+                        // All tabs: toggle panel open/close (not navigate back)
+                        setEditRightPaneExpanded(false);
                       }}
                     >
                       <CaretRight size={16} weight="bold" aria-hidden />
