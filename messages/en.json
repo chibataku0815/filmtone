@@ -354,7 +354,7 @@
     "lutPanel": {
       "creativeMix": "LUT mix",
       "creativeMixDisabledHint": "Load a .cube file first",
-      "logMix": "Log LUT mix",
+      "logMix": "Conversion mix",
       "logMixDisabledHint": "Load a log conversion .cube first"
     },
     "back": "← Back to Interactive",

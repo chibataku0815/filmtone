@@ -354,7 +354,7 @@
     "lutPanel": {
       "creativeMix": "LUT の強さ",
       "creativeMixDisabledHint": "まず .cube を読み込んでください",
-      "logMix": "ログ LUT の強さ",
+      "logMix": "変換の適用量",
       "logMixDisabledHint": "ログ用の .cube を読み込んでください"
     },
     "back": "← Interactive に戻る",
