@@ -215,7 +215,9 @@ export function FilmLabControlPanelCore({
   );
   const [savedBloomStrength, setSavedBloomStrength] = useState(0.3);
   const [savedHalationIntensity, setSavedHalationIntensity] = useState(0.25);
+  const [savedShaftIntensity, setSavedShaftIntensity] = useState(0.4);
   const [artifactsOpen, setArtifactsOpen] = useState(true);
+  const [postEffectsOpen, setPostEffectsOpen] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [sourceTrimOpen, setSourceTrimOpen] = useState(false);
   const beforeAfterPointerActiveRef = useRef(false);
@@ -383,6 +385,7 @@ export function FilmLabControlPanelCore({
   const halationEnabled = params.halationIntensity > 0;
   const compressionAmountEnabled = params.compressionAmount > 0;
   const rgbShiftEnabled = params.rgbShift > 0;
+  const shaftEnabled = params.shaftIntensity > 0;
   const canToggleHistogram = typeof onHistogramToggle === "function";
 
   const updateParam = useCallback((key: keyof Params, value: number) => {
@@ -425,6 +428,20 @@ export function FilmLabControlPanelCore({
       setActivePreset("reset");
     },
     [params.halationIntensity, savedHalationIntensity],
+  );
+
+  const toggleShaft = useCallback(
+    (on: boolean) => {
+      if (on) {
+        dispatch({ type: "SET_PARAM", key: "shaftIntensity", value: savedShaftIntensity || 0.4 });
+      } else {
+        if (params.shaftIntensity > 0) setSavedShaftIntensity(params.shaftIntensity);
+        dispatch({ type: "SET_PARAM", key: "shaftIntensity", value: 0 });
+      }
+      dispatch({ type: "COMMIT" });
+      setActivePreset("reset");
+    },
+    [params.shaftIntensity, savedShaftIntensity],
   );
 
   /**
@@ -898,6 +915,43 @@ export function FilmLabControlPanelCore({
                   onCommit={commit}
                 />
               </div>
+            </div>
+          )}
+
+          {/* === POST EFFECTS — Pro only, collapsed by default === */}
+          {isPro && (
+            <div className="min-w-0">
+              <CollapsibleHeader
+                title={tFilmLab("controls.postEffects")}
+                titleHint={tFilmLab("controls.postEffectsSectionHint")}
+                open={postEffectsOpen}
+                onToggle={() => setPostEffectsOpen(!postEffectsOpen)}
+              />
+              {postEffectsOpen && (
+                <div className="flex flex-col gap-2.5">
+                  <ToggleHeader
+                    title={tFilmLab("controls.lightShafts")}
+                    titleHint={tFilmLab("controls.lightShaftsToggleHint")}
+                    enabled={shaftEnabled}
+                    onToggle={toggleShaft}
+                  />
+                  <div className={`flex flex-col gap-2.5 ${!shaftEnabled ? "pointer-events-none opacity-30" : ""}`}>
+                    <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.shaftIntensity")} hint={tFilmLab("controls.shaftIntensityHint")} value={params.shaftIntensity} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("shaftIntensity", v)} onCommit={commit} />
+                    <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.shaftDecay")} hint={tFilmLab("controls.shaftDecayHint")} value={params.shaftDecay} min={0} max={1} step={0.01} defaultValue={0.5} onChange={(v) => updateParam("shaftDecay", v)} onCommit={commit} />
+                    <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.shaftOriginX")} hint={tFilmLab("controls.shaftOriginXHint")} value={params.shaftOriginX} min={0} max={1} step={0.01} defaultValue={0.5} onChange={(v) => updateParam("shaftOriginX", v)} onCommit={commit} />
+                    <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.shaftOriginY")} hint={tFilmLab("controls.shaftOriginYHint")} value={params.shaftOriginY} min={0} max={1} step={0.01} defaultValue={0.15} onChange={(v) => updateParam("shaftOriginY", v)} onCommit={commit} />
+                  </div>
+
+                  <div className="mt-1 border-t border-white/[0.08] pt-3">
+                    <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.dustAmount")} hint={tFilmLab("controls.dustAmountHint")} value={params.dustAmount} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("dustAmount", v)} onCommit={commit} />
+                  </div>
+                  <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.scratchAmount")} hint={tFilmLab("controls.scratchAmountHint")} value={params.scratchAmount} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("scratchAmount", v)} onCommit={commit} />
+
+                  <div className="mt-1 border-t border-white/[0.08] pt-3">
+                    <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.motionBlurAmount")} hint={tFilmLab("controls.motionBlurAmountHint")} value={params.motionBlurAmount} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("motionBlurAmount", v)} onCommit={commit} />
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
