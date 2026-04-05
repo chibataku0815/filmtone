@@ -22,7 +22,7 @@
       }
     },
     "lutPanel": {
-      "creativeMix": "LUT の強さ",
+      "creativeMix": "適用量",
       "creativeMixDisabledHint": "まず .cube を読み込んでください",
       "logMix": "変換の適用量",
       "logMixDisabledHint": "ログ用の .cube を読み込んでください"

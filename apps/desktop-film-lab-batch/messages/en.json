@@ -22,7 +22,7 @@
       }
     },
     "lutPanel": {
-      "creativeMix": "LUT mix",
+      "creativeMix": "Mix",
       "creativeMixDisabledHint": "Load a .cube file first",
       "logMix": "Conversion mix",
       "logMixDisabledHint": "Load a log conversion .cube first"
