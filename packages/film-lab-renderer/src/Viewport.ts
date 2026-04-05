@@ -19,9 +19,10 @@ import {
   LEGACY_SHADOW_TONE_MAGNITUDE,
 } from "film-lab-core";
 import { filmlabVertexShader } from "./shaders/filmlab.vert";
-import { bloomFragmentShader } from "./shaders/bloom.frag";
-import { halationFragmentShader } from "./shaders/halation.frag";
-import { blurFragmentShader } from "./shaders/blur.frag";
+import { bloomPrefilterFragmentShader } from "./shaders/bloom-prefilter.frag";
+import { halationPrefilterFragmentShader } from "./shaders/halation-prefilter.frag";
+import { downsampleFragmentShader } from "./shaders/downsample.frag";
+import { upsampleFragmentShader } from "./shaders/upsample.frag";
 import { compositeFragmentShader } from "./shaders/composite.frag";
 
 export interface ViewportOptions {
@@ -75,17 +76,18 @@ export class Viewport {
   private postMesh: THREE.Mesh;
 
   // Post-processing materials
-  private bloomMaterial: THREE.ShaderMaterial;
-  private halationMaterial: THREE.ShaderMaterial;
-  private blurMaterial: THREE.ShaderMaterial;
+  private bloomPrefilterMaterial: THREE.ShaderMaterial;
+  private halationPrefilterMaterial: THREE.ShaderMaterial;
+  private downsampleMaterial: THREE.ShaderMaterial;
+  private upsampleMaterial: THREE.ShaderMaterial;
   private compositeMaterial: THREE.ShaderMaterial;
 
   // RenderTargets (lazy)
   private rtColorGraded: THREE.WebGLRenderTarget | null = null;
-  private rtBloom0: THREE.WebGLRenderTarget | null = null;
-  private rtBloom1: THREE.WebGLRenderTarget | null = null;
-  private rtHalation0: THREE.WebGLRenderTarget | null = null;
-  private rtHalation1: THREE.WebGLRenderTarget | null = null;
+  private static readonly BLOOM_MIP_LEVELS = 5;
+  private static readonly HALATION_MIP_LEVELS = 6;
+  private rtBloomMips: THREE.WebGLRenderTarget[] = [];
+  private rtHalationMips: THREE.WebGLRenderTarget[] = [];
   /** A/B 比較: スロット A の最終合成（分割なし）を書き込む */
   private rtCompareComposite: THREE.WebGLRenderTarget | null = null;
   /** #98 で確保する将来の post-composite 用フル解像度 RT（左側） */
@@ -105,6 +107,10 @@ export class Viewport {
   private halationIntensity = 0.0;
   private halationSpread = 15.0;
   private halationColor = new THREE.Vector3(0.91, 0.063, 0.125);
+  private halationThreshold = 0.6;
+  private halationRadius = 0.6;
+  private bloomSoftKnee = 0.5;
+  private halationSoftKnee = 0.3;
 
   /**
    * composite の径方向グレイン混色（0=一様、1=周辺強め）。カラーパスには無く合成パスのみ。
@@ -189,42 +195,59 @@ export class Viewport {
     this.postMesh = new THREE.Mesh(this.postGeometry);
     this.postScene.add(this.postMesh);
 
-    // Bloom threshold material
-    this.bloomMaterial = new THREE.ShaderMaterial({
+    // Bloom prefilter material
+    this.bloomPrefilterMaterial = new THREE.ShaderMaterial({
       glslVersion: THREE.GLSL3,
       vertexShader: filmlabVertexShader,
-      fragmentShader: bloomFragmentShader,
+      fragmentShader: bloomPrefilterFragmentShader,
       uniforms: {
         uSource: { value: null },
-        uBloomThreshold: { value: 0.8 },
+        uThreshold: { value: 0.8 },
+        uKnee: { value: 0.5 },
         uFlipY: { value: 0.0 },
       },
     });
 
-    // Halation material
-    this.halationMaterial = new THREE.ShaderMaterial({
+    // Halation prefilter material
+    this.halationPrefilterMaterial = new THREE.ShaderMaterial({
       glslVersion: THREE.GLSL3,
       vertexShader: filmlabVertexShader,
-      fragmentShader: halationFragmentShader,
+      fragmentShader: halationPrefilterFragmentShader,
       uniforms: {
         uSource: { value: null },
         uHalationColor: { value: new THREE.Vector3(0.91, 0.063, 0.125) },
+        uThreshold: { value: 0.6 },
+        uKnee: { value: 0.3 },
         uFlipY: { value: 0.0 },
       },
     });
 
-    // Blur material (shared for bloom + halation)
-    this.blurMaterial = new THREE.ShaderMaterial({
+    // Downsample material (shared for bloom + halation mip chain)
+    this.downsampleMaterial = new THREE.ShaderMaterial({
       glslVersion: THREE.GLSL3,
       vertexShader: filmlabVertexShader,
-      fragmentShader: blurFragmentShader,
+      fragmentShader: downsampleFragmentShader,
       uniforms: {
         uSource: { value: null },
-        uDirection: { value: new THREE.Vector2(1, 0) },
-        uResolution: { value: new THREE.Vector2(options.width, options.height) },
-        uRadius: { value: 0.4 },
+        uTexelSize: { value: new THREE.Vector2() },
         uFlipY: { value: 0.0 },
       },
+    });
+
+    // Upsample material (shared for bloom + halation mip chain)
+    this.upsampleMaterial = new THREE.ShaderMaterial({
+      glslVersion: THREE.GLSL3,
+      vertexShader: filmlabVertexShader,
+      fragmentShader: upsampleFragmentShader,
+      uniforms: {
+        uSource: { value: null },
+        uTexelSize: { value: new THREE.Vector2() },
+        uWeight: { value: 1.0 },
+        uFlipY: { value: 0.0 },
+      },
+      blending: THREE.AdditiveBlending,
+      depthTest: false,
+      depthWrite: false,
     });
 
     // Composite material
@@ -276,17 +299,21 @@ export class Viewport {
     this.rtColorGraded = new THREE.WebGLRenderTarget(w, h, RT_OPTIONS);
     this.rtCompareComposite = new THREE.WebGLRenderTarget(w, h, RT_OPTIONS);
 
-    // Bloom at 1/2 resolution
-    const bw = Math.max(1, Math.floor(w / 2));
-    const bh = Math.max(1, Math.floor(h / 2));
-    this.rtBloom0 = new THREE.WebGLRenderTarget(bw, bh, RT_OPTIONS);
-    this.rtBloom1 = new THREE.WebGLRenderTarget(bw, bh, RT_OPTIONS);
+    // Bloom mip chain (5 levels: W/2 .. W/32)
+    this.rtBloomMips = [];
+    for (let i = 0; i < Viewport.BLOOM_MIP_LEVELS; i++) {
+      const mw = Math.max(1, Math.floor(w / Math.pow(2, i + 1)));
+      const mh = Math.max(1, Math.floor(h / Math.pow(2, i + 1)));
+      this.rtBloomMips.push(new THREE.WebGLRenderTarget(mw, mh, RT_OPTIONS));
+    }
 
-    // Halation at 1/4 resolution
-    const hw = Math.max(1, Math.floor(w / 4));
-    const hh = Math.max(1, Math.floor(h / 4));
-    this.rtHalation0 = new THREE.WebGLRenderTarget(hw, hh, RT_OPTIONS);
-    this.rtHalation1 = new THREE.WebGLRenderTarget(hw, hh, RT_OPTIONS);
+    // Halation mip chain (6 levels: W/2 .. W/64)
+    this.rtHalationMips = [];
+    for (let i = 0; i < Viewport.HALATION_MIP_LEVELS; i++) {
+      const mw = Math.max(1, Math.floor(w / Math.pow(2, i + 1)));
+      const mh = Math.max(1, Math.floor(h / Math.pow(2, i + 1)));
+      this.rtHalationMips.push(new THREE.WebGLRenderTarget(mw, mh, RT_OPTIONS));
+    }
   }
 
   private resizeRenderTargets(w: number, h: number): void {
@@ -296,15 +323,16 @@ export class Viewport {
     this.rtColorGraded.setSize(w, h);
     this.rtCompareComposite?.setSize(w, h);
 
-    const bw = Math.max(1, Math.floor(w / 2));
-    const bh = Math.max(1, Math.floor(h / 2));
-    this.rtBloom0!.setSize(bw, bh);
-    this.rtBloom1!.setSize(bw, bh);
-
-    const hw = Math.max(1, Math.floor(w / 4));
-    const hh = Math.max(1, Math.floor(h / 4));
-    this.rtHalation0!.setSize(hw, hh);
-    this.rtHalation1!.setSize(hw, hh);
+    for (let i = 0; i < this.rtBloomMips.length; i++) {
+      const mw = Math.max(1, Math.floor(w / Math.pow(2, i + 1)));
+      const mh = Math.max(1, Math.floor(h / Math.pow(2, i + 1)));
+      this.rtBloomMips[i]!.setSize(mw, mh);
+    }
+    for (let i = 0; i < this.rtHalationMips.length; i++) {
+      const mw = Math.max(1, Math.floor(w / Math.pow(2, i + 1)));
+      const mh = Math.max(1, Math.floor(h / Math.pow(2, i + 1)));
+      this.rtHalationMips[i]!.setSize(mw, mh);
+    }
     this.resizePostCompositeRenderTargets(w, h);
   }
 
@@ -424,8 +452,8 @@ export class Viewport {
     const bloomOn = this.bloomStrength > 0;
     const halationOn = this.halationIntensity > 0;
     cu.uSource!.value = this.rtColorGraded!.texture;
-    cu.uBloomTexture!.value = bloomOn ? this.rtBloom0!.texture : black;
-    cu.uHalationTexture!.value = halationOn ? this.rtHalation0!.texture : black;
+    cu.uBloomTexture!.value = bloomOn ? this.rtBloomMips[0]!.texture : black;
+    cu.uHalationTexture!.value = halationOn ? this.rtHalationMips[0]!.texture : black;
     this.postMesh.material = this.compositeMaterial;
     renderer.setRenderTarget(target);
     renderer.render(this.postScene, this.postCamera);
@@ -582,61 +610,106 @@ export class Viewport {
     );
   }
 
+  /**
+   * Compute per-mip-level weights for the upsample accumulation.
+   * radius=0 → tight bloom (only first mips). radius=1 → diffuse wide haze.
+   */
+  private static computeMipWeights(radius: number, levels: number): number[] {
+    const weights: number[] = [];
+    for (let i = 0; i < levels; i++) {
+      const t = i / Math.max(levels - 1, 1);
+      const base = Math.exp(-3.0 * (1.0 - radius) * t);
+      const wide = Math.exp(-0.5 * radius * (1.0 - t));
+      weights.push(base * (1 - radius) + wide * radius);
+    }
+    return weights;
+  }
+
   private renderBloom(renderer: THREE.WebGLRenderer): void {
-    const bw = this.rtBloom0!.width;
-    const bh = this.rtBloom0!.height;
+    const mips = this.rtBloomMips;
 
-    // Threshold
-    this.bloomMaterial.uniforms.uSource!.value = this.rtColorGraded!.texture;
-    this.bloomMaterial.uniforms.uBloomThreshold!.value = this.bloomThreshold;
-    this.postMesh.material = this.bloomMaterial;
-    renderer.setRenderTarget(this.rtBloom0);
+    // Step 1: Prefilter into mip[0]
+    const bu = this.bloomPrefilterMaterial.uniforms;
+    bu.uSource!.value = this.rtColorGraded!.texture;
+    bu.uThreshold!.value = this.bloomThreshold;
+    bu.uKnee!.value = this.bloomSoftKnee;
+    this.postMesh.material = this.bloomPrefilterMaterial;
+    renderer.setRenderTarget(mips[0]!);
     renderer.render(this.postScene, this.postCamera);
 
-    // Blur horizontal
-    this.blurMaterial.uniforms.uSource!.value = this.rtBloom0!.texture;
-    this.blurMaterial.uniforms.uDirection!.value.set(1, 0);
-    this.blurMaterial.uniforms.uResolution!.value.set(bw, bh);
-    this.blurMaterial.uniforms.uRadius!.value = this.bloomRadius;
-    this.postMesh.material = this.blurMaterial;
-    renderer.setRenderTarget(this.rtBloom1);
-    renderer.render(this.postScene, this.postCamera);
+    // Step 2: Progressive downsample
+    for (let i = 1; i < mips.length; i++) {
+      const src = mips[i - 1]!;
+      const dst = mips[i]!;
+      const du = this.downsampleMaterial.uniforms;
+      du.uSource!.value = src.texture;
+      du.uTexelSize!.value.set(1.0 / src.width, 1.0 / src.height);
+      this.postMesh.material = this.downsampleMaterial;
+      renderer.setRenderTarget(dst);
+      renderer.render(this.postScene, this.postCamera);
+    }
 
-    // Blur vertical
-    this.blurMaterial.uniforms.uSource!.value = this.rtBloom1!.texture;
-    this.blurMaterial.uniforms.uDirection!.value.set(0, 1);
-    renderer.setRenderTarget(this.rtBloom0);
-    renderer.render(this.postScene, this.postCamera);
+    // Step 3: Progressive upsample with additive blending
+    // Disable autoClear so the existing downsample data in each mip is preserved.
+    // The upsample material uses AdditiveBlending to accumulate on top of it.
+    const prevAutoClear = renderer.autoClear;
+    renderer.autoClear = false;
+    const weights = Viewport.computeMipWeights(this.bloomRadius, mips.length);
+    for (let i = mips.length - 2; i >= 0; i--) {
+      const lowRes = mips[i + 1]!;
+      const highRes = mips[i]!;
+      const uu = this.upsampleMaterial.uniforms;
+      uu.uSource!.value = lowRes.texture;
+      uu.uTexelSize!.value.set(1.0 / lowRes.width, 1.0 / lowRes.height);
+      uu.uWeight!.value = weights[i + 1]!;
+      this.postMesh.material = this.upsampleMaterial;
+      renderer.setRenderTarget(highRes);
+      renderer.render(this.postScene, this.postCamera);
+    }
+    renderer.autoClear = prevAutoClear;
   }
 
   private renderHalation(renderer: THREE.WebGLRenderer): void {
-    const hw = this.rtHalation0!.width;
-    const hh = this.rtHalation0!.height;
+    const mips = this.rtHalationMips;
 
-    // Threshold + tint
-    this.halationMaterial.uniforms.uSource!.value = this.rtColorGraded!.texture;
-    this.halationMaterial.uniforms.uHalationColor!.value.copy(
-      this.halationColor,
-    );
-    this.postMesh.material = this.halationMaterial;
-    renderer.setRenderTarget(this.rtHalation0);
+    // Step 1: Prefilter + tint into mip[0]
+    const hu = this.halationPrefilterMaterial.uniforms;
+    hu.uSource!.value = this.rtColorGraded!.texture;
+    hu.uHalationColor!.value.copy(this.halationColor);
+    hu.uThreshold!.value = this.halationThreshold;
+    hu.uKnee!.value = this.halationSoftKnee;
+    this.postMesh.material = this.halationPrefilterMaterial;
+    renderer.setRenderTarget(mips[0]!);
     renderer.render(this.postScene, this.postCamera);
 
-    // Blur horizontal (larger radius)
-    const halationRadius = this.halationSpread / 50.0;
-    this.blurMaterial.uniforms.uSource!.value = this.rtHalation0!.texture;
-    this.blurMaterial.uniforms.uDirection!.value.set(1, 0);
-    this.blurMaterial.uniforms.uResolution!.value.set(hw, hh);
-    this.blurMaterial.uniforms.uRadius!.value = halationRadius;
-    this.postMesh.material = this.blurMaterial;
-    renderer.setRenderTarget(this.rtHalation1);
-    renderer.render(this.postScene, this.postCamera);
+    // Step 2: Progressive downsample
+    for (let i = 1; i < mips.length; i++) {
+      const src = mips[i - 1]!;
+      const dst = mips[i]!;
+      const du = this.downsampleMaterial.uniforms;
+      du.uSource!.value = src.texture;
+      du.uTexelSize!.value.set(1.0 / src.width, 1.0 / src.height);
+      this.postMesh.material = this.downsampleMaterial;
+      renderer.setRenderTarget(dst);
+      renderer.render(this.postScene, this.postCamera);
+    }
 
-    // Blur vertical
-    this.blurMaterial.uniforms.uSource!.value = this.rtHalation1!.texture;
-    this.blurMaterial.uniforms.uDirection!.value.set(0, 1);
-    renderer.setRenderTarget(this.rtHalation0);
-    renderer.render(this.postScene, this.postCamera);
+    // Step 3: Progressive upsample with additive blending
+    const prevAutoClear2 = renderer.autoClear;
+    renderer.autoClear = false;
+    const weights = Viewport.computeMipWeights(this.halationRadius, mips.length);
+    for (let i = mips.length - 2; i >= 0; i--) {
+      const lowRes = mips[i + 1]!;
+      const highRes = mips[i]!;
+      const uu = this.upsampleMaterial.uniforms;
+      uu.uSource!.value = lowRes.texture;
+      uu.uTexelSize!.value.set(1.0 / lowRes.width, 1.0 / lowRes.height);
+      uu.uWeight!.value = weights[i + 1]!;
+      this.postMesh.material = this.upsampleMaterial;
+      renderer.setRenderTarget(highRes);
+      renderer.render(this.postScene, this.postCamera);
+    }
+    renderer.autoClear = prevAutoClear2;
   }
 
   // ===== Texture =====
@@ -761,6 +834,22 @@ export class Viewport {
 
   setHalationColor(hex: string): void {
     this.halationColor = hexToVec3(hex);
+  }
+
+  setHalationThreshold(value: number): void {
+    this.halationThreshold = value;
+  }
+
+  setHalationRadius(value: number): void {
+    this.halationRadius = value;
+  }
+
+  setBloomSoftKnee(value: number): void {
+    this.bloomSoftKnee = value;
+  }
+
+  setHalationSoftKnee(value: number): void {
+    this.halationSoftKnee = value;
   }
 
   // ===== LUT =====
@@ -928,6 +1017,10 @@ export class Viewport {
       bloomRadius: this.bloomRadius,
       halationIntensity: this.halationIntensity,
       halationSpread: this.halationSpread,
+      halationThreshold: this.halationThreshold,
+      halationRadius: this.halationRadius,
+      bloomSoftKnee: this.bloomSoftKnee,
+      halationSoftKnee: this.halationSoftKnee,
       halationColor: `#${new THREE.Color(this.halationColor.x, this.halationColor.y, this.halationColor.z).getHexString()}`,
       compressionAmount: this.material.uniforms.uCompressionAmount!.value as number,
       compressionRange: this.material.uniforms.uCompressionRange!.value as number,
@@ -1012,6 +1105,16 @@ export class Viewport {
       this.setHalationSpread(params.halationSpread as number);
     if (params.halationColor !== undefined)
       this.setHalationColor(params.halationColor as string);
+    if (params.halationThreshold !== undefined)
+      this.setHalationThreshold(params.halationThreshold as number);
+    if (params.halationRadius !== undefined)
+      this.setHalationRadius(params.halationRadius as number);
+    else if (params.halationSpread !== undefined)
+      this.setHalationRadius(Math.min(1, Math.max(0, (params.halationSpread as number) / 50.0)));
+    if (params.bloomSoftKnee !== undefined)
+      this.setBloomSoftKnee(params.bloomSoftKnee as number);
+    if (params.halationSoftKnee !== undefined)
+      this.setHalationSoftKnee(params.halationSoftKnee as number);
     if (params.compressionAmount !== undefined)
       this.material.uniforms.uCompressionAmount!.value = params.compressionAmount as number;
     if (params.compressionRange !== undefined)
@@ -1059,15 +1162,14 @@ export class Viewport {
     this.geometry.dispose();
     this.material.dispose();
     this.postGeometry.dispose();
-    this.bloomMaterial.dispose();
-    this.halationMaterial.dispose();
-    this.blurMaterial.dispose();
+    this.bloomPrefilterMaterial.dispose();
+    this.halationPrefilterMaterial.dispose();
+    this.downsampleMaterial.dispose();
+    this.upsampleMaterial.dispose();
     this.compositeMaterial.dispose();
     this.rtColorGraded?.dispose();
-    this.rtBloom0?.dispose();
-    this.rtBloom1?.dispose();
-    this.rtHalation0?.dispose();
-    this.rtHalation1?.dispose();
+    for (const rt of this.rtBloomMips) rt.dispose();
+    for (const rt of this.rtHalationMips) rt.dispose();
     this.rtCompareComposite?.dispose();
     this.rtPostComposite0?.dispose();
     this.rtPostComposite1?.dispose();

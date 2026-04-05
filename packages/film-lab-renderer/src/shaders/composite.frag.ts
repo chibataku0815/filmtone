@@ -90,9 +90,11 @@ void main() {
   float softenAmt = clamp(uAberrationEdgeSoften * edgeMask + lensMix * edgeMask, 0.0, 1.0);
   vec4 color = vec4(mix(sharpRgb, blurRgb, softenAmt), texture(uSource, vUv).a);
 
-  // Bloom + Halation additive (no branching — strength=0 naturally zeros out)
-  color.rgb += texture(uBloomTexture, vUv).rgb * uBloomStrength;
-  color.rgb += texture(uHalationTexture, vUv).rgb * uHalationIntensity;
+  // Bloom + Halation screen blend (no branching — strength=0 naturally zeros out)
+  vec3 bloom = texture(uBloomTexture, vUv).rgb * uBloomStrength;
+  vec3 halation = texture(uHalationTexture, vUv).rgb * uHalationIntensity;
+  vec3 glow = bloom + halation;
+  color.rgb = 1.0 - (1.0 - color.rgb) * (1.0 - glow);
 
   // Vignette
   float dist = length(vUv - 0.5) * 1.414;

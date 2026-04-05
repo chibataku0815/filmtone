@@ -20,6 +20,14 @@ export const PARAM_KEYS = [
   "halationIntensity",
   "halationSpread",
   "halationHue",
+  /** ハレーション発火の輝度閾値（0〜1、旧ハードコード 0.6 を可変化） */
+  "halationThreshold",
+  /** ハレーションのミップウェイト分布（0=狭い、1=広い。halationSpread の後継） */
+  "halationRadius",
+  /** ブルーム閾値のソフトニー幅（0=ハード、1=最大ソフト） */
+  "bloomSoftKnee",
+  /** ハレーション閾値のソフトニー幅（0=ハード、1=最大ソフト） */
+  "halationSoftKnee",
   "fade",
   "highlights",
   "shadows",
@@ -63,6 +71,14 @@ export interface Params {
   halationIntensity: number;
   halationSpread: number;
   halationHue: number;
+  /** ハレーション発火の輝度閾値（0〜1） */
+  halationThreshold: number;
+  /** ハレーションのミップウェイト分布（0〜1。halationSpread の後継） */
+  halationRadius: number;
+  /** ブルーム閾値のソフトニー幅（0〜1） */
+  bloomSoftKnee: number;
+  /** ハレーション閾値のソフトニー幅（0〜1） */
+  halationSoftKnee: number;
   fade: number;
   highlights: number;
   shadows: number;
