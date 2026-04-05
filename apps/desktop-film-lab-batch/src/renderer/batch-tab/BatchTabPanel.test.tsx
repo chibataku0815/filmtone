@@ -80,10 +80,7 @@ describe("BatchTabPanel accordion layout", () => {
     const html = renderBatchPanel(<BatchTabPanel {...baseProps} />);
 
     expect(html).toContain("編集に近い見え方で MP4／手順内で保存先を設定");
-    expect(html).toContain("動画は編集タブに近い見え方で書き出します。");
-    expect(html).toContain(
-      "1 フレームずつ処理するため、長いクリップは完了まで時間がかかることがあります。",
-    );
+    // v0.5.0: videoWebglOnlyFootnote removed from UI
     expect(html).not.toContain("高速 ffmpeg");
     expect(html).not.toContain("速く書き出す");
   });

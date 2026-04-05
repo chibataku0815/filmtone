@@ -997,16 +997,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     const LookStatusIcon = lookStatusBanner.Icon;
     return (
     <div className="flex flex-col gap-3">
-      <p className="text-sm font-medium text-[var(--fl-text-primary)]">
-        {t("lookSectionLead")}
-      </p>
-      <p className="fl-caption max-w-prose text-[var(--fl-text-secondary)]">
-        {exportSurface === "images"
-          ? t("lookSectionIntroPhoto")
-          : exportSurface === "video"
-            ? t("lookSectionIntroVideo")
-            : t("lookSectionIntro")}
-      </p>
+      {/* v0.5.0: section lead + intro text removed — self-explanatory with Look card */}
 
       <div
         className={`flex gap-2.5 rounded-lg border border-[rgba(255,255,255,0.06)] bg-transparent px-3 py-2.5 ${lookStatusBanner.accent}`}
@@ -1164,9 +1155,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
               {outputDir ?? t("videoOutputDirUnset")}
             </span>
           </div>
-          <p className="max-w-prose text-xs leading-snug text-[var(--fl-text-secondary)]">
-            {t("videoWebglOnlyFootnote")}
-          </p>
+          {/* v0.5.0: videoWebglOnlyFootnote removed — unnecessary explanation */}
         </>
       )}
     </div>
