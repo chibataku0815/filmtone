@@ -31,12 +31,14 @@ import {
   FilmLabWebglPanelBackdrop,
   VideoTransportControls,
   type FilmLabCanvasRef,
+  type FilmLabCanvasPreprocessResult,
   type FilmLabInteractiveSourceInfo,
 } from "film-lab-ui";
 import { FilmLabControlPanelCore } from "film-lab-ui";
 import { Histogram } from "film-lab-ui";
 import { HelpHint } from "./batch-tab/HelpHint";
 import { GradeSyncToast, type GradeSyncToastPayload } from "./GradeSyncToast";
+import { QualityBadge } from "./QualityBadge";
 import type { Viewport } from "film-lab-renderer";
 import type { PresetName } from "film-lab-core";
 import {
@@ -79,6 +81,10 @@ import {
 import { PhotoExportPanel } from "./batch-tab/PhotoExportPanel";
 import { VideoExportPanel } from "./batch-tab/VideoExportPanel";
 import type { DesktopUpdateAvailablePayload } from "./desktop-api";
+import {
+  useProgressiveLoad,
+  type ProgressiveTextureSwapPayload,
+} from "./use-progressive-load";
 
 /** @description 右上ツールバーとホットキー Mod+1/2/3 の対象となるトップ面 */
 type TabId = "edit" | "photoExport" | "videoExport";
@@ -272,9 +278,12 @@ export default function App() {
    */
   const [interactivePreviewSource, setInteractivePreviewSource] =
     useState<DesktopInteractivePreviewState>({ kind: "sample" });
+  const progressiveLoad = useProgressiveLoad();
   const canvasHasUserVideo = useMemo(
-    () => desktopPreviewShowsUserVideo(interactivePreviewSource),
-    [interactivePreviewSource],
+    () =>
+      desktopPreviewShowsUserVideo(interactivePreviewSource) &&
+      progressiveLoad.qualityLabel !== "thumbnail",
+    [interactivePreviewSource, progressiveLoad.qualityLabel],
   );
   /** @description ffprobe 済みのメタ（UI 表示用） */
   const [videoProbeLabel, setVideoProbeLabel] = useState<string | null>(null);
@@ -648,14 +657,40 @@ export default function App() {
   }, []);
 
   /**
-   * @description ProRes 等 Chromium 非対応コーデックの動画を、プレビュー前に H.264 mezzanine に変換する。
-   * 対応コーデック（H.264 等）の場合は null を返し、MediaLoader がそのまま読み込む。
+   * @description 背景で準備できた proxy / mezzanine を、現在のキャンバスへシームレスに差し替えます。
    */
-  const preprocessVideoFile = useCallback(async (file: File): Promise<string | null> => {
+  const handleProgressiveTextureSwap = useCallback(
+    async (payload: ProgressiveTextureSwapPayload): Promise<void> => {
+      const canvas = filmLabCanvasRef.current;
+      if (!canvas) {
+        throw new Error(
+          `handleProgressiveTextureSwap: FilmLabCanvasRef が未初期化です stage=${payload.stage} fileName=${payload.fileName}`,
+        );
+      }
+      const ok = await canvas.swapProgressiveTexture(
+        payload.url,
+        payload.fileName,
+        payload.stage,
+      );
+      if (!ok) {
+        throw new Error(
+          `handleProgressiveTextureSwap: texture swap failed stage=${payload.stage} fileName=${payload.fileName}`,
+        );
+      }
+    },
+    [],
+  );
+
+  /**
+   * @description ProRes 等 Chromium 非対応コーデックの動画を、thumbnail → proxy → mezzanine の順で progressive load します。
+   * 対応コーデック（H.264 等）の場合は null を返し、MediaLoader がそのまま読み込みます。
+   */
+  const preprocessVideoFile = useCallback(async (file: File): Promise<FilmLabCanvasPreprocessResult | null> => {
     let absPath: string;
     try {
       absPath = window.filmLabBatch.getPathForFile(file);
     } catch {
+      progressiveLoad.cancel();
       return null; // path resolution failed, let MediaLoader try directly
     }
 
@@ -666,22 +701,50 @@ export default function App() {
       fileSizeBytes: probe.fileSizeBytes,
       absPath,
     })) {
+      progressiveLoad.cancel();
       return null; // codec is supported, no transcode needed
     }
 
-    const outW = Math.min(probe.width, 1920);
-    // Ensure even height (required by H.264 encoder)
-    const outH = Math.round(outW * probe.height / probe.width) & ~1;
+    const result = await progressiveLoad.startProgressiveLoad(
+      absPath,
+      file.name,
+      probe,
+      handleProgressiveTextureSwap,
+    );
+    if (!result) {
+      return null;
+    }
+    return {
+      url: result.url,
+      mediaKind: result.mediaKind,
+      stage: result.stage,
+    };
+  }, [
+    handleProgressiveTextureSwap,
+    progressiveLoad.cancel,
+    progressiveLoad.startProgressiveLoad,
+  ]);
 
-    const { mezzaninePath } = await window.filmLabBatch.videoExportTranscodeMezzanine({
-      filePath: absPath,
-      durationSec: probe.durationSec,
-      outW,
-      outH,
-    });
-
-    return window.filmLabBatch.pathToFileURL(mezzaninePath);
-  }, []);
+  /**
+   * @description ほかのファイルへ切り替わったら、前の Progressive loading を止めます。
+   * 画像へ切り替えたときも proxy / mezzanine が残らないようにするためです。
+   */
+  useEffect(() => {
+    const activeSourcePath = progressiveLoad.activeSourcePath;
+    if (!activeSourcePath) {
+      return;
+    }
+    if (
+      interactivePreviewSource.kind === "file" &&
+      interactivePreviewSource.absolutePath !== activeSourcePath
+    ) {
+      progressiveLoad.cancel();
+    }
+  }, [
+    interactivePreviewSource,
+    progressiveLoad.cancel,
+    progressiveLoad.activeSourcePath,
+  ]);
 
   const syncPreviewToBatch = useCallback(() => {
     if (!viewport) {
@@ -1062,6 +1125,11 @@ export default function App() {
           total: estimateFrames,
           fileName: tLogs("progressVideoFrames"),
         });
+        const reusableMezzanine =
+          progressiveLoad.stage === "ready" &&
+          progressiveLoad.activeSourcePath === videoInputPath
+            ? progressiveLoad.mezzaninePath
+            : null;
         const res = await runVideoExportPipeline({
           api: window.filmLabBatch,
           inputVideoPath: videoInputPath,
@@ -1074,6 +1142,7 @@ export default function App() {
           },
           onLog: appendLog,
           userMessages: videoPipelineUserMessages,
+          precomputedMezzaninePath: reusableMezzanine,
         });
         if (!res.ok) {
           appendLog(tLogs("videoExportFail", { msg: res.message }));
@@ -1096,7 +1165,14 @@ export default function App() {
 
   const batchCanRun = Boolean(inputDir && outputDir) && !running;
   /** @description 動画はソースさえあれば実行可。出力フォルダ未設定時はクリックでダイアログを開く */
-  const videoCanExport = Boolean(videoInputPath) && !running;
+  const videoCanExport =
+    Boolean(videoInputPath) &&
+    !running &&
+    (
+      progressiveLoad.activeSourcePath == null ||
+      progressiveLoad.activeSourcePath !== videoInputPath ||
+      progressiveLoad.stage === "ready"
+    );
   const batchCanResume =
     Boolean(persistedSession && sessionHasRemainingWork(persistedSession)) &&
     !running;
@@ -1287,6 +1363,7 @@ export default function App() {
                   variant="inline"
                 />
               </div>
+              <QualityBadge qualityLabel={progressiveLoad.qualityLabel} />
               <VideoTransportControls
                 filmLabCanvasRef={filmLabCanvasRef}
                 className={editTransportClassName}

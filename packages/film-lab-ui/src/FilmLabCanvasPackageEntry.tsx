@@ -10,7 +10,9 @@ import {
 import {
   FilmLabCanvas as FilmLabCanvasInner,
   type FilmLabCanvasRef,
+  type FilmLabCanvasPreprocessResult,
   type FilmLabInteractiveSourceInfo,
+  type ProgressiveTextureStage,
 } from "./FilmLabCanvas";
 
 /**
@@ -106,4 +108,9 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasIn
 
 FilmLabCanvas.displayName = "FilmLabCanvas";
 
-export type { FilmLabCanvasRef, FilmLabInteractiveSourceInfo };
+export type {
+  FilmLabCanvasRef,
+  FilmLabCanvasPreprocessResult,
+  FilmLabInteractiveSourceInfo,
+  ProgressiveTextureStage,
+};

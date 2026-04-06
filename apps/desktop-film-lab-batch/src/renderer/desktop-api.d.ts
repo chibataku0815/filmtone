@@ -18,6 +18,16 @@ export type VideoExportMezzanineProgressPayload = {
 };
 
 /**
+ * @description Progressive loading のプロキシ進捗。mezzanine と同じ 0-99 / 100 形式で扱います。
+ */
+export type VideoPreviewProxyProgressPayload = {
+  /** @description 0 から 99 までの進み具合 */
+  current: number;
+  /** @description 分母。proxy は 100 固定 */
+  total: number;
+};
+
+/**
  * @description mezzanine 変換に渡す入力。durationSec は進捗の割合を出すために使う。
  */
 export type VideoExportTranscodeMezzanineInput = {
@@ -29,6 +39,52 @@ export type VideoExportTranscodeMezzanineInput = {
   outW: number;
   /** @description 書き出し高さ */
   outH: number;
+};
+
+/**
+ * @description Stage 1 の JPEG サムネイル抽出入力。
+ * 元動画サイズを渡して、main 側で戻り値の width / height を安定して計算します。
+ */
+export type VideoPreviewExtractThumbnailInput = {
+  /** @description 元動画の絶対パス */
+  filePath: string;
+  /** @description 元動画の横幅 */
+  sourceWidth: number;
+  /** @description 元動画の縦幅 */
+  sourceHeight: number;
+};
+
+/**
+ * @description Stage 2 の低解像度プロキシ生成入力。
+ * durationSec は ffmpeg stderr の time= と割って進捗率を出すために使います。
+ */
+export type VideoPreviewGenerateProxyInput = {
+  /** @description 元動画の絶対パス */
+  filePath: string;
+  /** @description 元動画の長さ（秒） */
+  durationSec: number;
+};
+
+/**
+ * @description Stage 1 の JPEG サムネイル抽出結果。
+ */
+export type VideoPreviewExtractThumbnailResult = {
+  /** @description tmp に作ったサムネイル JPEG の絶対パス */
+  thumbnailPath: string;
+  /** @description プレビュー表示に使う横幅 */
+  width: number;
+  /** @description プレビュー表示に使う縦幅 */
+  height: number;
+};
+
+/**
+ * @description Stage 2 の低解像度プロキシ生成結果。
+ */
+export type VideoPreviewGenerateProxyResult = {
+  /** @description tmp に作った proxy MP4 の絶対パス */
+  proxyPath: string;
+  /** @description proxy ファイルサイズ（バイト） */
+  proxySizeBytes: number;
 };
 
 /**
@@ -108,6 +164,20 @@ export type FilmLabBatchBridge = {
   ) => Promise<{ stagedPath: string }>;
   /** @description videoExportStageSource で作った tmp を削除 */
   videoExportUnlinkStaged: (stagedPath: string) => Promise<void>;
+  /** @description Stage 1: グレード前提の 1280px JPEG サムネイルを作る */
+  videoPreviewExtractThumbnail: (
+    payload: VideoPreviewExtractThumbnailInput,
+  ) => Promise<VideoPreviewExtractThumbnailResult>;
+  /** @description Stage 2: 低解像度 H.264 proxy を作る */
+  videoPreviewGenerateProxy: (
+    payload: VideoPreviewGenerateProxyInput,
+  ) => Promise<VideoPreviewGenerateProxyResult>;
+  /** @description Stage 2 の proxy 生成を中断 */
+  videoPreviewAbortProxy: () => Promise<void>;
+  /** @description Stage 2 の proxy 進捗を main から受け取る。戻り値は購読解除。 */
+  subscribeProxyProgress: (
+    callback: (payload: VideoPreviewProxyProgressPayload) => void,
+  ) => () => void;
   /** @description HEVC 等の重い素材を H.264 mezzanine に事前変換 */
   videoExportTranscodeMezzanine: (
     payload: VideoExportTranscodeMezzanineInput,

@@ -30,6 +30,16 @@ export type VideoExportMezzanineProgressPayload = {
 };
 
 /**
+ * @description Progressive loading の proxy 進捗。current は 0-99、total は 100 固定です。
+ */
+export type VideoPreviewProxyProgressPayload = {
+  /** @description 0 から 99 までの進み具合 */
+  current: number;
+  /** @description 分母。proxy は 100 固定 */
+  total: number;
+};
+
+/**
  * @description mezzanine 変換へ渡す入力。durationSec は進捗の割合を出すために使う。
  */
 export type VideoExportTranscodeMezzanineInput = {
@@ -41,6 +51,28 @@ export type VideoExportTranscodeMezzanineInput = {
   outW: number;
   /** @description 書き出し高さ */
   outH: number;
+};
+
+/**
+ * @description Stage 1 の JPEG サムネイル抽出入力です。
+ */
+export type VideoPreviewExtractThumbnailInput = {
+  /** @description 元動画の絶対パス */
+  filePath: string;
+  /** @description 元動画の横幅 */
+  sourceWidth: number;
+  /** @description 元動画の縦幅 */
+  sourceHeight: number;
+};
+
+/**
+ * @description Stage 2 の proxy 生成入力です。
+ */
+export type VideoPreviewGenerateProxyInput = {
+  /** @description 元動画の絶対パス */
+  filePath: string;
+  /** @description 元動画の長さ（秒） */
+  durationSec: number;
 };
 
 contextBridge.exposeInMainWorld("filmLabBatch", {
@@ -126,6 +158,34 @@ contextBridge.exposeInMainWorld("filmLabBatch", {
     ipcRenderer.invoke("video-export-stage-source", filePath),
   videoExportUnlinkStaged: (stagedPath: string): Promise<void> =>
     ipcRenderer.invoke("video-export-unlink-staged", stagedPath),
+  videoPreviewExtractThumbnail: (
+    payload: VideoPreviewExtractThumbnailInput,
+  ): Promise<{ thumbnailPath: string; width: number; height: number }> =>
+    ipcRenderer.invoke("video-preview-extract-thumbnail", payload),
+  videoPreviewGenerateProxy: (
+    payload: VideoPreviewGenerateProxyInput,
+  ): Promise<{ proxyPath: string; proxySizeBytes: number }> =>
+    ipcRenderer.invoke("video-preview-generate-proxy", payload),
+  videoPreviewAbortProxy: (): Promise<void> =>
+    ipcRenderer.invoke("video-preview-abort-proxy"),
+  /**
+   * @description main からの proxy 進捗を受け取る。戻り値で購読解除。
+   */
+  subscribeProxyProgress: (
+    callback: (payload: VideoPreviewProxyProgressPayload) => void,
+  ): (() => void) => {
+    const channel = "film-lab-preview-proxy-progress";
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      payload: VideoPreviewProxyProgressPayload,
+    ): void => {
+      callback(payload);
+    };
+    ipcRenderer.on(channel, handler);
+    return () => {
+      ipcRenderer.removeListener(channel, handler);
+    };
+  },
   videoExportTranscodeMezzanine: (
     payload: VideoExportTranscodeMezzanineInput,
   ): Promise<{ mezzaninePath: string; mezzanineSizeBytes: number }> =>
