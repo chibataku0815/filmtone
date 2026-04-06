@@ -37,17 +37,30 @@ uniform vec2 uImageResolution;
 uniform float uAberrationEdgeSoften;
 /** レンズの周辺ソフト（0〜1、Params.lensSoftness。色収差周辺ソフトとは別入力で合成する） */
 uniform float uLensSoftness;
+uniform float uFitMode;
 
 in vec2 vUv;
 out vec4 fragColor;
 
-vec2 coverUv(vec2 uv, vec2 resolution, vec2 imageResolution) {
+vec2 fitUv(vec2 uv, vec2 resolution, vec2 imageResolution) {
   float screenAspect = resolution.x / resolution.y;
   float imageAspect = imageResolution.x / imageResolution.y;
-  vec2 scale = screenAspect > imageAspect
+  vec2 coverScale = screenAspect > imageAspect
     ? vec2(1.0, imageAspect / screenAspect)
     : vec2(screenAspect / imageAspect, 1.0);
-  return (uv - 0.5) * scale + 0.5;
+  vec2 containScale = screenAspect > imageAspect
+    ? vec2(screenAspect / imageAspect, 1.0)
+    : vec2(1.0, imageAspect / screenAspect);
+  vec2 scale = mix(coverScale, containScale, uFitMode);
+  vec2 result = (uv - 0.5) * scale + 0.5;
+  float narrowPortrait = step(2.0, scale.x) * uFitMode;
+  result.x += 0.18 * scale.x * narrowPortrait;
+  return result;
+}
+
+float insideUv(vec2 uv) {
+  vec2 s = step(0.0, uv) * step(uv, vec2(1.0));
+  return s.x * s.y;
 }
 
 // --- Film Grain: Per-pixel hash + chroma/luma separation + organic clumping ---
@@ -134,13 +147,16 @@ void main() {
     color.rgb = diffScreen;
   }
 
-  // Vignette
-  float dist = length(vUv - 0.5) * 1.414;
+  // Vignette in image space (follows image frame, not screen edges)
+  vec2 vigUv = fitUv(vUv, uResolution, uImageResolution);
+  float vigMask = insideUv(vigUv);
+  float dist = length((vigUv - 0.5)) * 1.414;
   float vig = 1.0 - uVignette * dist * dist;
-  color.rgb *= clamp(vig, 0.0, 1.0);
+  color.rgb *= mix(1.0, clamp(vig, 0.0, 1.0), vigMask);
 
   // Radial weight (unchanged logic — center weak, edge strong)
-  vec2 grainCenterUv = coverUv(vUv, uResolution, uImageResolution);
+  vec2 grainCenterUv = fitUv(vUv, uResolution, uImageResolution);
+  float grainBoundaryMask = insideUv(grainCenterUv);
   vec2 grainDelta = grainCenterUv - 0.5;
   grainDelta.x *= uImageResolution.x / max(uImageResolution.y, 1.0);
   float grainRadial = clamp(length(grainDelta) * 2.0, 0.0, 1.0);
@@ -168,14 +184,14 @@ void main() {
   float clump = grainClumpNoise(vUv * uResolution / clumpScale + grainFrame * 0.5);
   float densityMod = mix(1.0, 0.3 + clump * 1.4, clamp(uGrainSize, 0.0, 1.0) * 0.7);
 
-  float w = uGrainIntensity * 0.5 * grainRadialEffective;
+  float w = uGrainIntensity * 0.5 * grainRadialEffective * grainBoundaryMask;
   color.r += (lumaGrain + chromaR) * w * densityMod;
   color.g += lumaGrain * w * densityMod;
   color.b += (lumaGrain + chromaB) * w * densityMod;
   color.rgb = clamp(color.rgb, 0.0, 1.0);
 
   // Before/After または A/B 比較の分割
-  vec2 origUv = coverUv(vUv, uResolution, uImageResolution);
+  vec2 origUv = fitUv(vUv, uResolution, uImageResolution);
   vec4 leftSample = uAbCompare > 0.5
     ? texture(uOriginalTexture, vUv)
     : texture(uOriginalTexture, origUv);
@@ -184,7 +200,7 @@ void main() {
   if (vUv.x < uSplitPosition - lineWidth) {
     fragColor = leftSample;
   } else if (vUv.x < uSplitPosition + lineWidth) {
-    fragColor = vec4(1.0);
+    fragColor = vec4(vec3(1.0), color.a);
   } else {
     fragColor = color;
   }

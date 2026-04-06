@@ -51,16 +51,32 @@ uniform float uMagenta;            // -1〜1、0 で無効
 uniform float uYellow;              // -1〜1、0 で無効
 uniform float uPrintContrast;      // 0〜1、0 で無効
 
+uniform float uFitMode; // 0.0 = cover (crop), 1.0 = contain (letterbox)
+
 in vec2 vUv;
 out vec4 fragColor;
 
-vec2 coverUv(vec2 uv, vec2 resolution, vec2 imageResolution) {
+vec2 fitUv(vec2 uv, vec2 resolution, vec2 imageResolution) {
   float screenAspect = resolution.x / resolution.y;
   float imageAspect = imageResolution.x / imageResolution.y;
-  vec2 scale = screenAspect > imageAspect
+  vec2 coverScale = screenAspect > imageAspect
     ? vec2(1.0, imageAspect / screenAspect)
     : vec2(screenAspect / imageAspect, 1.0);
-  return (uv - 0.5) * scale + 0.5;
+  vec2 containScale = screenAspect > imageAspect
+    ? vec2(screenAspect / imageAspect, 1.0)
+    : vec2(1.0, imageAspect / screenAspect);
+  vec2 scale = mix(coverScale, containScale, uFitMode);
+  vec2 result = (uv - 0.5) * scale + 0.5;
+  // Contain: center narrow portraits in the left half (x=25%)
+  // Applies when image occupies < 50% of screen width (scale.x > 2.0)
+  float narrowPortrait = step(2.0, scale.x) * uFitMode;
+  result.x += 0.18 * scale.x * narrowPortrait;
+  return result;
+}
+
+float insideUv(vec2 uv) {
+  vec2 s = step(0.0, uv) * step(uv, vec2(1.0));
+  return s.x * s.y;
 }
 
 /**
@@ -111,7 +127,8 @@ vec3 applyPrintContrast(vec3 rgb, float amount) {
 }
 
 void main() {
-  vec2 uv = coverUv(vUv, uResolution, uImageResolution);
+  vec2 uv = fitUv(vUv, uResolution, uImageResolution);
+  float mask = insideUv(uv);
 
   vec4 color = uRGBShift > 0.0
     ? rgbShiftSampleRadial(uTexture, uv, uRGBShift, uImageResolution)
@@ -175,6 +192,7 @@ void main() {
   color.rgb = applyPrintContrast(color.rgb, uPrintContrast);
 
   color.rgb = clamp(color.rgb, 0.0, 1.0);
-  fragColor = color;
+
+  fragColor = vec4(color.rgb * mask, 1.0);
 }
 `;

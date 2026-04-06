@@ -420,6 +420,8 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       previewVideoUserPausedIntentRef.current = false;
       viewport.setTexture(result.texture);
       viewport.setImageResolution(result.width, result.height);
+      // Portrait (height > width) → contain with glass bg; landscape/square → cover
+      viewport.setFitMode(result.height > result.width ? "contain" : "cover");
       syncPreviewVideoBusyState(nextPreviewVideo);
       window.setTimeout(() => {
         if (previousTexture && previousTexture !== activeTextureRef.current) {
