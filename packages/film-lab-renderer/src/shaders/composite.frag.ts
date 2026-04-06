@@ -38,10 +38,8 @@ uniform float uAberrationEdgeSoften;
 /** レンズの周辺ソフト（0〜1、Params.lensSoftness。色収差周辺ソフトとは別入力で合成する） */
 uniform float uLensSoftness;
 uniform float uFitMode;
-/** A/B 比較モード: slot B のブラー済みテクスチャ */
-uniform sampler2D uBSideTexture;
-/** 1.0 = A/B モードで uBSideTexture を右パネルに使う（事前ブラー済みテクスチャ） */
-uniform float uHasBSide;
+/** 1: グレーディングをスキップし、uSource(右) と uOriginalTexture(左) のスプリットのみ実行 */
+uniform float uSplitOnly;
 
 in vec2 vUv;
 out vec4 fragColor;
@@ -95,6 +93,25 @@ float grainClumpNoise(vec2 p) {
 }
 
 void main() {
+  // Split-only モード: post-composite chain（モーションブラー等）適用後にスプリットを行う。
+  // uSource にはブラー済みグレーディング出力、uOriginalTexture には原画が入る。
+  if (uSplitOnly > 0.5) {
+    vec2 origUv = fitUv(vUv, uResolution, uImageResolution);
+    float splitMask = insideUv(origUv);
+    vec4 leftSample = texture(uOriginalTexture, origUv);
+    vec4 rightSample = texture(uSource, vUv);
+    float lineWidth = 2.0 / uResolution.x;
+
+    if (vUv.x < uSplitPosition - lineWidth) {
+      fragColor = mix(rightSample, leftSample, splitMask);
+    } else if (vUv.x < uSplitPosition + lineWidth) {
+      fragColor = vec4(vec3(1.0), rightSample.a) * splitMask + rightSample * (1.0 - splitMask);
+    } else {
+      fragColor = rightSample;
+    }
+    return;
+  }
+
   // 周辺だけごく弱いブラー（色収差と併せたフィルム的周辺柔らかさ）。
   // 色収差が強いほど、混色量に加えてサンプル半径も少しだけ広げる。
   vec2 edgeDelta = vUv - 0.5;
@@ -209,10 +226,7 @@ void main() {
     // Split line: only show inside image area
     fragColor = vec4(vec3(1.0), color.a) * splitMask + color * (1.0 - splitMask);
   } else {
-    // Right side: A/B compare mode uses pre-blurred B-side texture
-    fragColor = (uAbCompare > 0.5 && uHasBSide > 0.5)
-      ? mix(color, texture(uBSideTexture, vUv), splitMask)
-      : color;
+    fragColor = color;
   }
 }
 `;
