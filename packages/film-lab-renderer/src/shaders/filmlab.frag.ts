@@ -79,6 +79,23 @@ float insideUv(vec2 uv) {
   return s.x * s.y;
 }
 
+// Cover UV: zoom video to fill entire screen (for blurred background)
+vec2 bgCoverUv(vec2 uv, vec2 resolution, vec2 imageResolution) {
+  float screenAspect = resolution.x / resolution.y;
+  float imageAspect = imageResolution.x / imageResolution.y;
+  vec2 scale = screenAspect > imageAspect
+    ? vec2(1.0, imageAspect / screenAspect)
+    : vec2(screenAspect / imageAspect, 1.0);
+  return (uv - 0.5) * scale + 0.5;
+}
+
+// Feathered mask for soft edge between sharp image and blurred background
+float softMask(vec2 uv, float feather) {
+  vec2 d = smoothstep(vec2(0.0), vec2(feather), uv)
+         * smoothstep(vec2(0.0), vec2(feather), 1.0 - uv);
+  return d.x * d.y;
+}
+
 /**
  * レンズ周辺の色収差に近い見え方: 画像中心ではゼロ、フレーム端ほど R/B を放射方向にずらす。
  * amount はスライダ上限（周辺で最大に近い量）。アスペクト補正で距離マスクを円形に揃える。
@@ -90,10 +107,10 @@ vec4 rgbShiftSampleRadial(sampler2D tex, vec2 uv, float amount, vec2 imageResolu
   float weight = pow(radial, 1.65);
   float amt = amount * weight;
   vec2 dir = normalize(delta + vec2(1e-5));
-  float rCh = texture(tex, uv + dir * amt).r;
-  float gCh = texture(tex, uv).g;
-  float bCh = texture(tex, uv - dir * amt).b;
-  float aCh = texture(tex, uv).a;
+  float rCh = textureLod(tex, uv + dir * amt, 0.0).r;
+  float gCh = textureLod(tex, uv, 0.0).g;
+  float bCh = textureLod(tex, uv - dir * amt, 0.0).b;
+  float aCh = textureLod(tex, uv, 0.0).a;
   return vec4(rCh, gCh, bCh, aCh);
 }
 
@@ -132,7 +149,7 @@ void main() {
 
   vec4 color = uRGBShift > 0.0
     ? rgbShiftSampleRadial(uTexture, uv, uRGBShift, uImageResolution)
-    : texture(uTexture, uv);
+    : textureLod(uTexture, uv, 0.0);
 
   // === Input Transform LUT (LUT1) === before color grading
   if (uLUT1Enabled > 0.5) {
@@ -193,6 +210,31 @@ void main() {
 
   color.rgb = clamp(color.rgb, 0.0, 1.0);
 
-  fragColor = vec4(color.rgb * mask, 1.0);
+  if (uFitMode > 0.5) {
+    // Frosted glass background for letterbox areas (contain mode)
+    vec2 bgUv = bgCoverUv(vUv, uResolution, uImageResolution);
+    vec3 bgSample = textureLod(uTexture, bgUv, 3.0).rgb * 0.6
+                  + textureLod(uTexture, bgUv, 4.0).rgb * 0.4;
+
+    // Desaturate
+    float bgLuma = dot(bgSample, vec3(0.2126, 0.7152, 0.0722));
+    vec3 bgColor = mix(vec3(bgLuma), bgSample, 0.60);
+
+    // Brightness
+    bgColor *= 0.45;
+
+    // Minimum luminance floor (prevent pure black in dark scenes)
+    bgColor = max(bgColor, vec3(0.02));
+
+    // Background vignette (darken corners ~15%)
+    float bgDist = length(vUv - 0.5);
+    float bgVig = 1.0 - smoothstep(0.3, 0.85, bgDist);
+    bgColor *= mix(0.55, 1.0, bgVig);
+
+    // Blend: sharp image inside bounds, blurred background outside
+    fragColor = vec4(mix(bgColor, color.rgb, mask), 1.0);
+  } else {
+    fragColor = vec4(color.rgb, 1.0);
+  }
 }
 `;

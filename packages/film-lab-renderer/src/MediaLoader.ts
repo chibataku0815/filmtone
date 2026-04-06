@@ -344,8 +344,9 @@ export class MediaLoader {
       video.onloadeddata = () => {
         const texture = new THREE.VideoTexture(video);
         texture.colorSpace = THREE.SRGBColorSpace;
-        texture.minFilter = THREE.LinearFilter;
+        texture.minFilter = THREE.LinearMipmapLinearFilter;
         texture.magFilter = THREE.LinearFilter;
+        texture.generateMipmaps = true;
 
         video.play().catch((err) => {
           console.warn("MediaLoader.loadVideo: autoplay blocked", err);
@@ -408,8 +409,9 @@ export class MediaLoader {
       video.onloadeddata = () => {
         const texture = new THREE.VideoTexture(video);
         texture.colorSpace = THREE.SRGBColorSpace;
-        texture.minFilter = THREE.LinearFilter;
+        texture.minFilter = THREE.LinearMipmapLinearFilter;
         texture.magFilter = THREE.LinearFilter;
+        texture.generateMipmaps = true;
 
         video.play().catch((err) => {
           console.warn("MediaLoader.loadVideoFromURL: autoplay blocked", err);
