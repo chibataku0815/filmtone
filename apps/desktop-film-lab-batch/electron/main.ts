@@ -604,6 +604,19 @@ function computeProxyDimensions(
  * @description Stage 1 の JPEG サムネイル抽出引数を組み立てます。
  * -ss を入力前に置いて keyframe seek を優先し、最初の見える絵をできるだけ早く返します。
  */
+
+/**
+ * @description ffmpeg を低優先度で起動するヘルパー。
+ * `nice -n 10` でラップし、CPU 負荷によるファン回転を抑えます。
+ */
+function spawnFfmpegNice(
+  ffmpegPath: string,
+  args: string[],
+  options: { env?: NodeJS.ProcessEnv; stdio: import("child_process").StdioOptions },
+): ChildProcessWithoutNullStreams {
+  return spawn("nice", ["-n", "10", ffmpegPath, ...args], options) as ChildProcessWithoutNullStreams;
+}
+
 function buildFfmpegThumbnailArgs(
   inputPath: string,
   outputPath: string,
@@ -636,7 +649,11 @@ function buildFfmpegProxyArgs(
   outputPath: string,
   useHwEncoder: boolean,
 ): string[] {
-  const args = ["-hide_banner", "-loglevel", "info", "-i", inputPath];
+  const args = ["-hide_banner", "-loglevel", "info"];
+  if (useHwEncoder) {
+    args.push("-hwaccel", "videotoolbox");
+  }
+  args.push("-i", inputPath);
   args.push(
     "-vf",
     "colorspace=iall=bt709:all=bt709,scale=1280:-2,format=yuv420p",
@@ -682,7 +699,11 @@ function buildFfmpegMezzanineArgs(
   outW: number,
   outH: number,
 ): string[] {
-  const args = ["-hide_banner", "-loglevel", "info", "-i", inputPath];
+  const args = ["-hide_banner", "-loglevel", "info"];
+  if (useHwEncoder) {
+    args.push("-hwaccel", "videotoolbox");
+  }
+  args.push("-i", inputPath);
   if (useHwEncoder) {
     args.push(
       "-c:v", "h264_videotoolbox",
@@ -1622,10 +1643,10 @@ ipcMain.handle(
       await new Promise<void>((resolve, reject) => {
         const args = buildFfmpegThumbnailArgs(abs, outputPath);
         console.log("[progressive-main] thumbnail ffmpeg args:", args.join(" "));
-        const child = spawn(ffmpeg.commandPath, args, {
+        const child = spawnFfmpegNice(ffmpeg.commandPath, args, {
           env: ffmpeg.childEnv,
           stdio: ["ignore", "ignore", "pipe"],
-        }) as ChildProcessWithoutNullStreams;
+        });
         thumbnailProcess = child;
         const stderrBuf: string[] = [];
         child.stderr?.on("data", (chunk: Buffer) => {
@@ -1711,7 +1732,7 @@ ipcMain.handle(
     const runTranscode = (useHwEncoder: boolean): Promise<void> =>
       new Promise((resolve, reject) => {
         const args = buildFfmpegProxyArgs(abs, outputPath, useHwEncoder);
-        const child = spawn(ffmpeg.commandPath, args, {
+        const child = spawnFfmpegNice(ffmpeg.commandPath, args, {
           env: ffmpeg.childEnv,
           stdio: ["ignore", "ignore", "pipe"],
         }) as ChildProcessWithoutNullStreams;
@@ -1890,10 +1911,10 @@ ipcMain.handle(
             `[film-lab-desktop][mezzanine] ffmpeg ${useHw ? "HW" : "SW"} argv: ${JSON.stringify(args)}`,
           );
         }
-        const child = spawn(ffmpeg.commandPath, args, {
+        const child = spawnFfmpegNice(ffmpeg.commandPath, args, {
           env: ffmpeg.childEnv,
           stdio: ["ignore", "ignore", "pipe"],
-        }) as ChildProcessWithoutNullStreams;
+        });
         mezzanineProcess = child;
 
         let lastSentCurrent = -1;
