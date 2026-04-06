@@ -97,6 +97,8 @@ export class Viewport {
   private rtHalationMips: THREE.WebGLRenderTarget[] = [];
   /** A/B 比較: スロット A の最終合成（分割なし）を書き込む */
   private rtCompareComposite: THREE.WebGLRenderTarget | null = null;
+  /** A/B 比較: スロット B の中間合成用 RT（モーションブラー適用前）*/
+  private rtCompareB: THREE.WebGLRenderTarget | null = null;
   /** #98 で確保する将来の post-composite 用フル解像度 RT（左側） */
   private rtPostComposite0: THREE.WebGLRenderTarget | null = null;
   /** #98 で確保する将来の post-composite 用フル解像度 RT（右側） */
@@ -320,6 +322,8 @@ export class Viewport {
         uLensSoftness: { value: 0.0 },
         uFlipY: { value: 0.0 },
         uFitMode: { value: 0.0 },
+        uBSideTexture: { value: null },
+        uHasBSide: { value: 0.0 },
       },
     });
   }
@@ -343,6 +347,7 @@ export class Viewport {
 
     this.rtColorGraded = new THREE.WebGLRenderTarget(w, h, RT_OPTIONS);
     this.rtCompareComposite = new THREE.WebGLRenderTarget(w, h, RT_OPTIONS);
+    this.rtCompareB = new THREE.WebGLRenderTarget(w, h, RT_OPTIONS);
 
     // Bloom mip chain (5 levels: W/2 .. W/32)
     this.rtBloomMips = [];
@@ -367,6 +372,7 @@ export class Viewport {
 
     this.rtColorGraded.setSize(w, h);
     this.rtCompareComposite?.setSize(w, h);
+    this.rtCompareB?.setSize(w, h);
 
     for (let i = 0; i < this.rtBloomMips.length; i++) {
       const mw = Math.max(1, Math.floor(w / Math.pow(2, i + 1)));
@@ -621,10 +627,11 @@ export class Viewport {
   }
 
   /**
-   * post-composite chain が必要かどうか。A/B 比較中は無効化する（R9 対策）。
+   * post-composite chain が必要かどうか。
+   * A/B 比較モードは renderComparePair() で slot ごとに個別に処理するため、
+   * ここでは単純に shutterAngle をチェック。
    */
   private hasPostCompositeChain(): boolean {
-    if (this.abCompareEnabled) return false;
     // v0.5.0: Only motionBlur is user-facing. Shafts/Dust/Scratch deferred to v0.6
     return this.shutterAngle > 0;
   }
@@ -980,29 +987,65 @@ export class Viewport {
     camera: THREE.Camera,
   ): void {
     const mu = this.material.uniforms;
+    const cu = this.compositeMaterial.uniforms;
     const originalTexture = mu.uTexture!.value as THREE.Texture;
 
-    // —— スロット A: 分割なしでフルフレームを比較用 RT に ——
+    // —— Slot A: composite のみ（モーションブラーなし）——
     this.setParams(this.compareParamsA);
     this.renderBasePipeline(renderer, scene, camera);
-    this.renderFinalFrame(
+    this.renderCompositeFrame(
       renderer,
       this.rtCompareComposite,
-      originalTexture,
       -1.0,
       0.0,
+      originalTexture,
     );
 
-    // —— スロット B: 左=A の合成結果、右=B ——
+    // —— Slot B: composite → オプション: モーションブラー ——
     this.setParams(this.compareParamsB);
     this.renderBasePipeline(renderer, scene, camera);
-    this.renderFinalFrame(
+
+    let bSideTexture: THREE.Texture;
+    if (this.shutterAngle > 0) {
+      this.ensurePostCompositeRenderTargets();
+      // B をスプリットなしで中間 RT へ
+      this.renderCompositeFrame(
+        renderer,
+        this.rtCompareB,
+        -1.0,
+        0.0,
+        originalTexture,
+      );
+      // リングバッファ経由でモーションブラーを適用
+      this.renderMotionBlur(
+        renderer,
+        this.rtCompareB!.texture,
+        this.rtPostComposite0,
+      );
+      bSideTexture = this.rtPostComposite0!.texture;
+    } else {
+      // ブラーなし: B をそのまま中間 RT へ
+      this.renderCompositeFrame(
+        renderer,
+        this.rtCompareB,
+        -1.0,
+        0.0,
+        originalTexture,
+      );
+      bSideTexture = this.rtCompareB!.texture;
+    }
+
+    // —— 最終スプリット: 左=A、右=ブラー済み B ——
+    cu.uBSideTexture!.value = bSideTexture;
+    cu.uHasBSide!.value = 1.0;
+    this.renderCompositeFrame(
       renderer,
       null,
-      this.rtCompareComposite!.texture,
       mu.uSplitPosition!.value as number,
       1.0,
+      this.rtCompareComposite!.texture,
     );
+    cu.uHasBSide!.value = 0.0; // 次フレームのために reset
   }
 
   /**
@@ -1731,6 +1774,7 @@ export class Viewport {
     for (const rt of this.rtDiffusionMips) rt.dispose();
     this.rtDiffusionMips = [];
     this.rtCompareComposite?.dispose();
+    this.rtCompareB?.dispose();
     this.rtPostComposite0?.dispose();
     this.rtPostComposite1?.dispose();
     this.ringCopyMaterial?.dispose();

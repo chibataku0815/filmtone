@@ -38,6 +38,10 @@ uniform float uAberrationEdgeSoften;
 /** レンズの周辺ソフト（0〜1、Params.lensSoftness。色収差周辺ソフトとは別入力で合成する） */
 uniform float uLensSoftness;
 uniform float uFitMode;
+/** A/B 比較モード: slot B のブラー済みテクスチャ */
+uniform sampler2D uBSideTexture;
+/** 1.0 = A/B モードで uBSideTexture を右パネルに使う（事前ブラー済みテクスチャ） */
+uniform float uHasBSide;
 
 in vec2 vUv;
 out vec4 fragColor;
@@ -205,7 +209,10 @@ void main() {
     // Split line: only show inside image area
     fragColor = vec4(vec3(1.0), color.a) * splitMask + color * (1.0 - splitMask);
   } else {
-    fragColor = color;
+    // Right side: A/B compare mode uses pre-blurred B-side texture
+    fragColor = (uAbCompare > 0.5 && uHasBSide > 0.5)
+      ? mix(color, texture(uBSideTexture, vUv), splitMask)
+      : color;
   }
 }
 `;
