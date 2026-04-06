@@ -8,7 +8,7 @@
  *   Pass 8: Composite (A + bloom + halation + vignette + grain + split) → screen
  *   Pass 9:  (reserved: #100 light shafts)
  *   Pass 10: #99 Dust & Scratches overlay (screen + additive blend)
- *   Pass 11: #97 Slow Shutter / EMA motion blur (ping-pong accumulation)
+ *   Pass 11: #97 Slow Shutter / N-frame ring buffer motion blur
  */
 
 import * as THREE from "three";
@@ -25,7 +25,7 @@ import { halationPrefilterFragmentShader } from "./shaders/halation-prefilter.fr
 import { downsampleFragmentShader } from "./shaders/downsample.frag";
 import { upsampleFragmentShader } from "./shaders/upsample.frag";
 import { compositeFragmentShader } from "./shaders/composite.frag";
-import { motionblurFragmentShader } from "./shaders/motionblur.frag";
+import { motionblurFragmentShader, feedbackCopyFragmentShader } from "./shaders/motionblur.frag";
 import { dustFragmentShader } from "./shaders/dust.frag";
 import { createDustTexture, createScratchTexture } from "./textures/index";
 import { lightshaftsFragmentShader } from "./shaders/lightshafts.frag";
@@ -128,14 +128,18 @@ export class Viewport {
    */
   private grainRadialMix = 1.0;
 
-  // --- Motion Blur (Post-composite #97) ---
-  private motionBlurAmount = 0.0;
+  // --- Motion Blur: N-frame Ring Buffer (Post-composite #97) ---
+  private static readonly MOTION_BLUR_RING_SIZE = 8;
+  private shutterAngle = 0.0;
   private frameRepeat = 1; // renderer-internal, not in PARAM_KEYS
-  private motionBlurFrame = 0;
-  private hasMotionBlurHistory = false;
-  private motionBlurMaterial: THREE.ShaderMaterial | null = null;
-  private rtMotionBlur0: THREE.WebGLRenderTarget | null = null;
-  private rtMotionBlur1: THREE.WebGLRenderTarget | null = null;
+  private ringWriteIndex = 0;
+  private ringFilledFrames = 0;
+  private weightCurve: 'triangle' | 'box' | 'exponential' = 'triangle';
+  private motionThreshold = 0.0;
+  private trailIntensity = 0.0; // 0=no feedback, 0-0.95=longer trails
+  private ringCopyMaterial: THREE.ShaderMaterial | null = null;
+  private ringBlendMaterial: THREE.ShaderMaterial | null = null;
+  private rtRingBuffer: THREE.WebGLRenderTarget[] = [];
 
   // --- Dust & Scratches (Post-composite #99) ---
   private dustAmount = 0.0;
@@ -316,6 +320,7 @@ export class Viewport {
         uLensSoftness: { value: 0.0 },
         uFlipY: { value: 0.0 },
         uFitMode: { value: 0.0 },
+        uSplitOnly: { value: 0.0 },
       },
     });
   }
@@ -413,24 +418,102 @@ export class Viewport {
   }
 
   /**
-   * Motion blur 用の ShaderMaterial と ping-pong RT を遅延生成する。
-   * motionBlurAmount > 0 になるまで GPU リソースを消費しない。
+   * Motion blur 用の ShaderMaterial と N-frame ring buffer RT を遅延生成する。
+   * shutterAngle > 0 になるまで GPU リソースを消費しない。
    */
   private ensureMotionBlurResources(): void {
-    if (this.motionBlurMaterial) return;
-    this.motionBlurMaterial = new THREE.ShaderMaterial({
+    if (this.ringCopyMaterial) return;
+
+    // Feedback copy: sourceTexture + previous slot → ring slot
+    this.ringCopyMaterial = new THREE.ShaderMaterial({
+      glslVersion: THREE.GLSL3,
+      vertexShader: filmlabVertexShader,
+      fragmentShader: feedbackCopyFragmentShader,
+      uniforms: {
+        uSource: { value: null },
+        uPrevSlot: { value: null },
+        uTrail: { value: 0.0 },
+        uFlipY: { value: 0.0 },
+      },
+    });
+
+    // N-frame weighted blend
+    this.ringBlendMaterial = new THREE.ShaderMaterial({
       glslVersion: THREE.GLSL3,
       vertexShader: filmlabVertexShader,
       fragmentShader: motionblurFragmentShader,
       uniforms: {
-        uCurrentFrame: { value: null },
-        uPrevAccum: { value: null },
-        uAmount: { value: 0.0 },
+        uFrame0: { value: null },
+        uFrame1: { value: null },
+        uFrame2: { value: null },
+        uFrame3: { value: null },
+        uFrame4: { value: null },
+        uFrame5: { value: null },
+        uFrame6: { value: null },
+        uFrame7: { value: null },
+        uWeight0: { value: 1.0 },
+        uWeight1: { value: 0.0 },
+        uWeight2: { value: 0.0 },
+        uWeight3: { value: 0.0 },
+        uWeight4: { value: 0.0 },
+        uWeight5: { value: 0.0 },
+        uWeight6: { value: 0.0 },
+        uWeight7: { value: 0.0 },
+        uActiveFrames: { value: 1 },
+        uMotionThreshold: { value: 0.0 },
         uFlipY: { value: 0.0 },
       },
     });
-    this.rtMotionBlur0 = new THREE.WebGLRenderTarget(this.width, this.height, RT_OPTIONS);
-    this.rtMotionBlur1 = new THREE.WebGLRenderTarget(this.width, this.height, RT_OPTIONS);
+
+    // 8 ring buffer RenderTargets
+    this.rtRingBuffer = [];
+    for (let i = 0; i < Viewport.MOTION_BLUR_RING_SIZE; i++) {
+      this.rtRingBuffer.push(
+        new THREE.WebGLRenderTarget(this.width, this.height, RT_OPTIONS),
+      );
+    }
+  }
+
+  /**
+   * shutterAngle から有効フレーム数を算出する。
+   * 0 のときは motion blur 無効を示す 0 を返す。
+   */
+  private getActiveFrameCount(): number {
+    if (this.shutterAngle <= 0) return 0;
+    // 720° → normalized=2.0 → all 8 frames active
+    const normalized = Math.min(this.shutterAngle, 720) / 360;
+    return Math.max(1, Math.min(Viewport.MOTION_BLUR_RING_SIZE, Math.round(normalized * (Viewport.MOTION_BLUR_RING_SIZE / 2))));
+  }
+
+  /**
+   * weightCurve に応じた正規化済みブレンドウェイトを計算する。
+   * index 0 = newest, index N-1 = oldest。
+   * shutterAngle > 360° では triangle → box へ自動的にフラット化し、
+   * より長いモーショントレイルを実現する。
+   */
+  private computeBlendWeights(activeFrames: number): Float32Array {
+    const N = Viewport.MOTION_BLUR_RING_SIZE;
+    const weights = new Float32Array(N);
+    const effective = Math.min(activeFrames, this.ringFilledFrames);
+    if (effective <= 0 || effective === 1) { weights[0] = 1.0; return weights; }
+
+    // 360° 超では triangle → box へ滑らかに遷移
+    // flatness: 0.0 (pure triangle at ≤360°) → 1.0 (pure box at 720°)
+    const flatness = Math.min(1, Math.max(0, (this.shutterAngle - 360) / 360));
+
+    let sum = 0;
+    for (let i = 0; i < effective; i++) {
+      const triangleW = effective - i;
+      const boxW = 1.0;
+      switch (this.weightCurve) {
+        case 'triangle': weights[i] = triangleW * (1 - flatness) + boxW * flatness; break;
+        case 'box': weights[i] = 1.0; break;
+        case 'exponential': weights[i] = Math.exp(-1.5 * i) * (1 - flatness) + boxW * flatness; break;
+      }
+      sum += weights[i]!;
+    }
+    if (sum > 0) for (let i = 0; i < effective; i++) weights[i]! /= sum;
+    return weights;
   }
 
   /**
@@ -539,12 +622,12 @@ export class Viewport {
   }
 
   /**
-   * post-composite chain が必要かどうか。A/B 比較中は無効化する（R9 対策）。
+   * post-composite chain が必要かどうか。A/B 比較中は R9 対策として Slot A はブラーをスキップ。
+   * Slot B（abCompareEnabled=false）のみブラーを適用。
    */
   private hasPostCompositeChain(): boolean {
     if (this.abCompareEnabled) return false;
-    // v0.5.0: Only motionBlur is user-facing. Shafts/Dust/Scratch deferred to v0.6
-    return this.motionBlurAmount > 0;
+    return this.shutterAngle > 0;
   }
 
   /**
@@ -659,6 +742,18 @@ export class Viewport {
       return;
     }
 
+    // Before/After スプリット + post-chain: スプリットをブラー後に移動して
+    // 左=原画(ブラーなし)、右=グレーディング+ブラー済み を実現する。
+    if (splitPosition > 0 && abCompare < 0.5) {
+      // 1. Composite WITHOUT split → rtPostComposite0
+      this.renderCompositeFrame(renderer, this.rtPostComposite0, -1.0, 0.0, originalTexture);
+      // 2. PostChain (motionBlur etc.) → rtCompareComposite
+      this.renderPostCompositeChain(renderer, this.rtPostComposite0.texture, this.rtCompareComposite!);
+      // 3. Split-only pass: left=original, right=blurred graded → target
+      this.renderSplitOnlyComposite(renderer, target, originalTexture, this.rtCompareComposite!.texture, splitPosition);
+      return;
+    }
+
     this.renderCompositeFrame(
       renderer,
       this.rtPostComposite0,
@@ -671,6 +766,29 @@ export class Viewport {
       this.rtPostComposite0.texture,
       target,
     );
+  }
+
+  /**
+   * Split-only パス。グレーディングをスキップし、左=原画 / 右=ブラー済み出力 のスプリットのみ。
+   * Before/After モード + post-composite chain 有効時に使用。
+   */
+  private renderSplitOnlyComposite(
+    renderer: THREE.WebGLRenderer,
+    target: THREE.WebGLRenderTarget | null,
+    originalTexture: THREE.Texture,
+    blurredTexture: THREE.Texture,
+    splitPosition: number,
+  ): void {
+    const cu = this.compositeMaterial.uniforms;
+    cu.uSplitOnly!.value = 1.0;
+    cu.uSource!.value = blurredTexture;
+    cu.uOriginalTexture!.value = originalTexture;
+    cu.uSplitPosition!.value = splitPosition;
+    this.syncCompositeUniformsFromMaterial();
+    this.postMesh.material = this.compositeMaterial;
+    renderer.setRenderTarget(target);
+    renderer.render(this.postScene, this.postCamera);
+    cu.uSplitOnly!.value = 0.0;
   }
 
   /**
@@ -699,9 +817,9 @@ export class Viewport {
   }
 
   /**
-   * EMA モーションブラー（ping-pong 蓄積）。
-   * Step 1: current frame と前フレームの蓄積を EMA ブレンド → writeRT
-   * Step 2: writeRT の結果を最終 target へコピー
+   * N-frame ring buffer motion blur.
+   * Draw 1: Copy sourceTexture → rtRingBuffer[ringWriteIndex]
+   * Draw 2: Weighted blend of ring slots (newest first) → target
    *
    * @param renderer 描画先
    * @param sourceTexture composite 出力テクスチャ
@@ -713,37 +831,54 @@ export class Viewport {
     target: THREE.WebGLRenderTarget | null,
   ): void {
     this.ensureMotionBlurResources();
-    if (!this.motionBlurMaterial || !this.rtMotionBlur0 || !this.rtMotionBlur1) return;
+    if (!this.ringCopyMaterial || !this.ringBlendMaterial || this.rtRingBuffer.length === 0) return;
 
-    // R3: Frame 0 black flash prevention
-    const effectiveAmount = this.hasMotionBlurHistory ? this.motionBlurAmount : 0.0;
-
-    // Ping-pong: read from current accumulator, write to the other
-    const readRT = this.motionBlurFrame % 2 === 0 ? this.rtMotionBlur0 : this.rtMotionBlur1;
-    const writeRT = this.motionBlurFrame % 2 === 0 ? this.rtMotionBlur1 : this.rtMotionBlur0;
-
-    const mu = this.motionBlurMaterial.uniforms;
-    mu.uCurrentFrame!.value = sourceTexture;
-    mu.uPrevAccum!.value = readRT.texture;
-    mu.uAmount!.value = effectiveAmount;
-
-    // Step 1: EMA blend -> writeRT
+    const N = Viewport.MOTION_BLUR_RING_SIZE;
     const prevAutoClear = renderer.autoClear;
     renderer.autoClear = false;
-    this.postMesh.material = this.motionBlurMaterial;
-    renderer.setRenderTarget(writeRT);
+
+    // Draw 1: Feedback copy — mix(source, prevSlot, trail) → ring slot
+    const cu = this.ringCopyMaterial.uniforms;
+    cu.uSource!.value = sourceTexture;
+    // Previous slot for feedback: the most recently written slot
+    const prevSlotIdx = (this.ringWriteIndex - 1 + N) % N;
+    cu.uPrevSlot!.value = this.ringFilledFrames > 0
+      ? this.rtRingBuffer[prevSlotIdx]!.texture
+      : getBlackTexture();
+    cu.uTrail!.value = this.ringFilledFrames > 0 ? this.trailIntensity : 0.0;
+    this.postMesh.material = this.ringCopyMaterial;
+    renderer.setRenderTarget(this.rtRingBuffer[this.ringWriteIndex]!);
     renderer.render(this.postScene, this.postCamera);
 
-    // Step 2: Copy writeRT -> final target
-    mu.uCurrentFrame!.value = writeRT.texture;
-    mu.uAmount!.value = 0.0;
+    // Advance write head
+    this.ringWriteIndex = (this.ringWriteIndex + 1) % N;
+    this.ringFilledFrames = Math.min(this.ringFilledFrames + 1, N);
+
+    // Draw 2: Weighted blend → target
+    const activeFrames = this.getActiveFrameCount();
+    const weights = this.computeBlendWeights(activeFrames);
+
+    const bu = this.ringBlendMaterial.uniforms;
+    const black = getBlackTexture();
+
+    // Bind ring slots in temporal order: newest first (index 0 = newest)
+    for (let i = 0; i < N; i++) {
+      // ringWriteIndex was just advanced, so newest = ringWriteIndex - 1
+      const slotIndex = (this.ringWriteIndex - 1 - i + N * 2) % N;
+      const filled = i < this.ringFilledFrames;
+      bu[`uFrame${i}` as keyof typeof bu]!.value = filled
+        ? this.rtRingBuffer[slotIndex]!.texture
+        : black;
+      bu[`uWeight${i}` as keyof typeof bu]!.value = weights[i]!;
+    }
+    bu.uActiveFrames!.value = Math.min(activeFrames, this.ringFilledFrames);
+    bu.uMotionThreshold!.value = this.motionThreshold;
+
+    this.postMesh.material = this.ringBlendMaterial;
     renderer.setRenderTarget(target);
     renderer.render(this.postScene, this.postCamera);
 
     renderer.autoClear = prevAutoClear;
-
-    this.motionBlurFrame++;
-    this.hasMotionBlurHistory = true;
   }
 
   /**
@@ -797,7 +932,7 @@ export class Viewport {
   ): void {
     const shaftOn = this.shaftIntensity > 0;
     const dustOn = this.dustAmount > 0 || this.scratchAmount > 0;
-    const motionBlurOn = this.motionBlurAmount > 0;
+    const motionBlurOn = this.shutterAngle > 0;
 
     type Pass = "shaft" | "dust" | "motionBlur";
     const passes: Pass[] = [];
@@ -839,9 +974,13 @@ export class Viewport {
     paramsA: Record<string, number | string> | null,
     paramsB: Record<string, number | string> | null,
   ): void {
+    const wasEnabled = this.abCompareEnabled;
     this.abCompareEnabled = enabled;
     if (paramsA) this.compareParamsA = { ...paramsA };
     if (paramsB) this.compareParamsB = { ...paramsB };
+    if (enabled && !wasEnabled) {
+      this.resetMotionBlurHistory();
+    }
   }
 
   render(
@@ -883,20 +1022,18 @@ export class Viewport {
     const mu = this.material.uniforms;
     const originalTexture = mu.uTexture!.value as THREE.Texture;
 
-    // —— スロット A: 分割なしでフルフレームを比較用 RT に ——
+    // —— Slot A: abCompareEnabled=true → R9 ガード → ブラーなし ——
     this.setParams(this.compareParamsA);
     this.renderBasePipeline(renderer, scene, camera);
-    this.renderFinalFrame(
-      renderer,
-      this.rtCompareComposite,
-      originalTexture,
-      -1.0,
-      0.0,
-    );
+    this.renderFinalFrame(renderer, this.rtCompareComposite, originalTexture, -1.0, 0.0);
 
-    // —— スロット B: 左=A の合成結果、右=B ——
+    // —— Slot B: 一時的に abCompareEnabled=false でブラーを有効化 ——
+    const savedShutterAngle = this.shutterAngle;
     this.setParams(this.compareParamsB);
     this.renderBasePipeline(renderer, scene, camera);
+
+    const savedAbCompareEnabled = this.abCompareEnabled;
+    this.abCompareEnabled = false;
     this.renderFinalFrame(
       renderer,
       null,
@@ -904,6 +1041,8 @@ export class Viewport {
       mu.uSplitPosition!.value as number,
       1.0,
     );
+    this.abCompareEnabled = savedAbCompareEnabled;
+    this.shutterAngle = savedShutterAngle;
   }
 
   /**
@@ -1070,8 +1209,7 @@ export class Viewport {
     this.material.uniforms.uResolution!.value.set(width, height);
     this.compositeMaterial.uniforms.uResolution!.value.set(width, height);
     this.resizeRenderTargets(width, height);
-    if (this.rtMotionBlur0) this.rtMotionBlur0.setSize(width, height);
-    if (this.rtMotionBlur1) this.rtMotionBlur1.setSize(width, height);
+    for (const rt of this.rtRingBuffer) rt.setSize(width, height);
     if (this.dustMaterial) {
       this.dustMaterial.uniforms.uResolution!.value.set(width, height);
     }
@@ -1226,13 +1364,18 @@ export class Viewport {
 
   // ===== Motion Blur =====
 
+  setShutterAngle(degrees: number): void {
+    const prev = this.shutterAngle;
+    this.shutterAngle = Math.min(720, Math.max(0, degrees));
+    if (prev === 0 && this.shutterAngle > 0) this.resetMotionBlurHistory();
+  }
+
   setMotionBlurAmount(value: number): void {
-    const prev = this.motionBlurAmount;
-    this.motionBlurAmount = Math.min(1, Math.max(0, value));
-    // Reset history on 0 -> >0 transition to avoid stale accumulation
-    if (prev === 0 && this.motionBlurAmount > 0) {
-      this.resetMotionBlurHistory();
-    }
+    this.setShutterAngle(Math.min(1, Math.max(0, value)) * 360);
+  }
+
+  setTrailIntensity(value: number): void {
+    this.trailIntensity = Math.min(0.95, Math.max(0, value));
   }
 
   setFrameRepeat(value: number): void {
@@ -1240,8 +1383,8 @@ export class Viewport {
   }
 
   resetMotionBlurHistory(): void {
-    this.hasMotionBlurHistory = false;
-    this.motionBlurFrame = 0;
+    this.ringWriteIndex = 0;
+    this.ringFilledFrames = 0;
   }
 
   // ===== Dust & Scratches =====
@@ -1449,7 +1592,9 @@ export class Viewport {
       magenta: this.material.uniforms.uMagenta!.value as number,
       yellow: this.material.uniforms.uYellow!.value as number,
       printContrast: this.material.uniforms.uPrintContrast!.value as number,
-      motionBlurAmount: this.motionBlurAmount,
+      shutterAngle: this.shutterAngle,
+      trailIntensity: this.trailIntensity,
+      motionBlurAmount: this.shutterAngle / 360,
       dustAmount: this.dustAmount,
       scratchAmount: this.scratchAmount,
       shaftIntensity: this.shaftIntensity,
@@ -1559,8 +1704,15 @@ export class Viewport {
       this.material.uniforms.uYellow!.value = params.yellow as number;
     if (params.printContrast !== undefined)
       this.material.uniforms.uPrintContrast!.value = params.printContrast as number;
-    if (params.motionBlurAmount !== undefined)
+    // shutterAngle takes precedence; motionBlurAmount is a Ghost Param (backward compat only).
+    // If both are present, only shutterAngle is applied to prevent the ghost param from overwriting.
+    if (params.shutterAngle !== undefined && (params.shutterAngle as number) > 0) {
+      this.setShutterAngle(params.shutterAngle as number);
+    } else if (params.motionBlurAmount !== undefined) {
       this.setMotionBlurAmount(params.motionBlurAmount as number);
+    }
+    if (params.trailIntensity !== undefined)
+      this.setTrailIntensity(params.trailIntensity as number);
     if (params.dustAmount !== undefined)
       this.setDustAmount(params.dustAmount as number);
     if (params.scratchAmount !== undefined)
@@ -1621,9 +1773,10 @@ export class Viewport {
     this.rtCompareComposite?.dispose();
     this.rtPostComposite0?.dispose();
     this.rtPostComposite1?.dispose();
-    this.motionBlurMaterial?.dispose();
-    this.rtMotionBlur0?.dispose();
-    this.rtMotionBlur1?.dispose();
+    this.ringCopyMaterial?.dispose();
+    this.ringBlendMaterial?.dispose();
+    for (const rt of this.rtRingBuffer) rt.dispose();
+    this.rtRingBuffer = [];
     this.dustMaterial?.dispose();
     this.dustTexture?.dispose();
     this.scratchTexture?.dispose();

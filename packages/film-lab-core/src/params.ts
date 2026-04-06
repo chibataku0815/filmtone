@@ -52,8 +52,12 @@ export const PARAM_KEYS = [
   "magenta",
   /** CMY enlarger color head: Yellow filter（-1〜1、0=ニュートラル）。range: -1–1 */
   "yellow",
-  /** EMA モーションブラー強度（0=オフ、1=最大残像）。range: 0–1 */
+  /** @deprecated Ghost Param for URL backward compat. Use shutterAngle. */
   "motionBlurAmount",
+  /** Camera shutter angle (0=off, 180=cinema standard, 360=1F, 720=2F). Range: 0-720. */
+  "shutterAngle",
+  /** 残像フィードバック強度（0=なし、0.95=最大）。リングバッファに前フレームを畳み込んで長い残像を生成。range: 0–0.95 */
+  "trailIntensity",
   /** ダスト（埃）オーバーレイ強度（0=オフ、1=最大）。range: 0–1 */
   "dustAmount",
   /** スクラッチ（傷）オーバーレイ強度（0=オフ、1=最大）。range: 0–1 */
@@ -123,8 +127,12 @@ export interface Params {
   magenta: number;
   /** CMY enlarger color head: Yellow filter（-1〜1、0=ニュートラル）。print ステージ。 */
   yellow: number;
-  /** EMA モーションブラー強度（0=オフ、1=最大残像）。post-composite chain に適用。 */
+  /** @deprecated Ghost Param for URL backward compat. Use shutterAngle. */
   motionBlurAmount: number;
+  /** Camera shutter angle (0=off, 180=cinema standard, 360=1F, 720=2F). Range: 0-720. */
+  shutterAngle: number;
+  /** Trail feedback intensity (0=none, 0.95=max). Extends afterimage beyond ring buffer depth. */
+  trailIntensity: number;
   /** ダスト（埃）オーバーレイ強度（0=オフ、1=最大）。post-composite chain に適用。 */
   dustAmount: number;
   /** スクラッチ（傷）オーバーレイ強度（0=オフ、1=最大）。post-composite chain に適用。 */

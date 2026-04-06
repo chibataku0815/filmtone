@@ -244,8 +244,10 @@
       "dustAmountHint": "Adds random dust particles over the image, like aged film stock.",
       "scratchAmount": "Film Scratches",
       "scratchAmountHint": "Adds vertical film scratches that drift across the frame.",
-      "motionBlurAmount": "Motion Trails",
-      "motionBlurAmountHint": "Blends the previous frame into the current one, creating a trailing afterimage."
+      "shutterAngle": "Shutter Angle",
+      "shutterAngleHint": "Simulates camera shutter angle (0\u00b0=off, 180\u00b0=cinema standard)",
+      "trailIntensity": "Trail Length",
+      "trailIntensityHint": "Extends the motion trail beyond the shutter window. Higher values create longer afterimages."
     },
     "desktop": {
       "app": {

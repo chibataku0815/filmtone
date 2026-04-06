@@ -50,8 +50,12 @@ var PARAM_KEYS = [
   "magenta",
   /** CMY enlarger color head: Yellow filter（-1〜1、0=ニュートラル）。range: -1–1 */
   "yellow",
-  /** EMA モーションブラー強度（0=オフ、1=最大残像）。range: 0–1 */
+  /** @deprecated Ghost Param for URL backward compat. Use shutterAngle. */
   "motionBlurAmount",
+  /** Camera shutter angle (0=off, 180=cinema standard, 360=1F, 720=2F). Range: 0-720. */
+  "shutterAngle",
+  /** 残像フィードバック強度（0=なし、0.95=最大）。リングバッファに前フレームを畳み込んで長い残像を生成。range: 0–0.95 */
+  "trailIntensity",
   /** ダスト（埃）オーバーレイ強度（0=オフ、1=最大）。range: 0–1 */
   "dustAmount",
   /** スクラッチ（傷）オーバーレイ強度（0=オフ、1=最大）。range: 0–1 */
@@ -177,6 +181,8 @@ var PRESETS = {
     magenta: 0,
     yellow: 0,
     motionBlurAmount: 0,
+    shutterAngle: 0,
+    trailIntensity: 0,
     dustAmount: 0,
     scratchAmount: 0,
     shaftIntensity: 0,
@@ -225,6 +231,8 @@ var PRESETS = {
     magenta: 0,
     yellow: 0,
     motionBlurAmount: 0,
+    shutterAngle: 0,
+    trailIntensity: 0,
     dustAmount: 0,
     scratchAmount: 0,
     shaftIntensity: 0,
@@ -269,6 +277,8 @@ var PRESETS = {
     magenta: 0,
     yellow: 0,
     motionBlurAmount: 0,
+    shutterAngle: 0,
+    trailIntensity: 0,
     dustAmount: 0,
     scratchAmount: 0,
     shaftIntensity: 0,
@@ -313,6 +323,8 @@ var PRESETS = {
     magenta: 0,
     yellow: 0,
     motionBlurAmount: 0,
+    shutterAngle: 0,
+    trailIntensity: 0,
     dustAmount: 0,
     scratchAmount: 0,
     shaftIntensity: 0,
@@ -357,6 +369,8 @@ var PRESETS = {
     magenta: 0,
     yellow: 0,
     motionBlurAmount: 0,
+    shutterAngle: 0,
+    trailIntensity: 0,
     dustAmount: 0,
     scratchAmount: 0,
     shaftIntensity: 0,
@@ -401,6 +415,8 @@ var PRESETS = {
     magenta: 0,
     yellow: 0,
     motionBlurAmount: 0,
+    shutterAngle: 0,
+    trailIntensity: 0,
     dustAmount: 0,
     scratchAmount: 0,
     shaftIntensity: 0,
@@ -445,6 +461,8 @@ var PRESETS = {
     magenta: 0,
     yellow: 0,
     motionBlurAmount: 0,
+    shutterAngle: 0,
+    trailIntensity: 0,
     dustAmount: 0,
     scratchAmount: 0,
     shaftIntensity: 0,
@@ -489,6 +507,8 @@ var PRESETS = {
     magenta: 0,
     yellow: 0,
     motionBlurAmount: 0,
+    shutterAngle: 0,
+    trailIntensity: 0,
     dustAmount: 0,
     scratchAmount: 0,
     shaftIntensity: 0,
@@ -533,6 +553,8 @@ var PRESETS = {
     magenta: 0,
     yellow: 0,
     motionBlurAmount: 0,
+    shutterAngle: 0,
+    trailIntensity: 0,
     dustAmount: 0,
     scratchAmount: 0,
     shaftIntensity: 0,
@@ -582,6 +604,8 @@ var PRESETS = {
     magenta: 0,
     yellow: 0,
     motionBlurAmount: 0,
+    shutterAngle: 0,
+    trailIntensity: 0,
     dustAmount: 0,
     scratchAmount: 0,
     shaftIntensity: 0,
@@ -634,7 +658,7 @@ import { z } from "zod";
 var paramShape = Object.fromEntries(
   PARAM_KEYS.map((key) => [
     key,
-    key === "grainRadialMix" ? z.number().min(0).max(1).default(1) : key === "grainSize" ? z.number().min(0).max(1).default(0.3) : key === "diffusion" ? z.number().min(0).max(1).default(0) : key === "lensSoftness" ? z.number().min(0).max(1).default(0) : key === "compressionRange" ? z.number().min(0).max(1).default(0.5) : key === "compressionAmount" || key === "printContrast" ? z.number().min(0).max(1).default(0) : key === "cyan" || key === "magenta" || key === "yellow" ? z.number().min(-1).max(1).default(0) : key === "motionBlurAmount" || key === "dustAmount" || key === "scratchAmount" ? z.number().min(0).max(1).default(0) : key === "shaftIntensity" ? z.number().min(0).max(1).default(0) : key === "shaftDecay" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginX" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginY" ? z.number().min(0).max(1).default(0.15) : z.number()
+    key === "grainRadialMix" ? z.number().min(0).max(1).default(1) : key === "grainSize" ? z.number().min(0).max(1).default(0.3) : key === "diffusion" ? z.number().min(0).max(1).default(0) : key === "lensSoftness" ? z.number().min(0).max(1).default(0) : key === "compressionRange" ? z.number().min(0).max(1).default(0.5) : key === "compressionAmount" || key === "printContrast" ? z.number().min(0).max(1).default(0) : key === "cyan" || key === "magenta" || key === "yellow" ? z.number().min(-1).max(1).default(0) : key === "shutterAngle" ? z.number().min(0).max(720).default(0) : key === "trailIntensity" ? z.number().min(0).max(0.95).default(0) : key === "motionBlurAmount" || key === "dustAmount" || key === "scratchAmount" ? z.number().min(0).max(1).default(0) : key === "shaftIntensity" ? z.number().min(0).max(1).default(0) : key === "shaftDecay" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginX" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginY" ? z.number().min(0).max(1).default(0.15) : z.number()
   ])
 );
 var filmLabParamsSchema = z.object(paramShape);

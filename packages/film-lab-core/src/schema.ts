@@ -25,17 +25,21 @@ const paramShape = Object.fromEntries(
             ? z.number().min(0).max(1).default(0)
             : key === "cyan" || key === "magenta" || key === "yellow"
               ? z.number().min(-1).max(1).default(0)
-              : key === "motionBlurAmount" || key === "dustAmount" || key === "scratchAmount"
-                ? z.number().min(0).max(1).default(0)
-                : key === "shaftIntensity"
+              : key === "shutterAngle"
+                ? z.number().min(0).max(720).default(0)
+                : key === "trailIntensity"
+                ? z.number().min(0).max(0.95).default(0)
+                : key === "motionBlurAmount" || key === "dustAmount" || key === "scratchAmount"
                   ? z.number().min(0).max(1).default(0)
-                  : key === "shaftDecay"
-                    ? z.number().min(0).max(1).default(0.5)
-                    : key === "shaftOriginX"
+                  : key === "shaftIntensity"
+                    ? z.number().min(0).max(1).default(0)
+                    : key === "shaftDecay"
                       ? z.number().min(0).max(1).default(0.5)
-                      : key === "shaftOriginY"
-                        ? z.number().min(0).max(1).default(0.15)
-                        : z.number(),
+                      : key === "shaftOriginX"
+                        ? z.number().min(0).max(1).default(0.5)
+                        : key === "shaftOriginY"
+                          ? z.number().min(0).max(1).default(0.15)
+                          : z.number(),
   ]),
 ) as z.ZodRawShape;
 
