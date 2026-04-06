@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FilmLabBatchBridge } from "./desktop-api";
+import { computeVideoExportDimensions } from "./video-export-constants";
 
 /**
  * @description Progressive loading の現在地です。
@@ -167,12 +168,7 @@ function computeMezzanineDimensions(sourceWidth: number, sourceHeight: number): 
     Number.isFinite(sourceWidth) && sourceWidth > 0 ? sourceWidth : 1920;
   const safeSourceHeight =
     Number.isFinite(sourceHeight) && sourceHeight > 0 ? sourceHeight : 1080;
-  const outW = Math.min(safeSourceWidth, 1920);
-  const outH = Math.max(
-    2,
-    Math.round((outW * safeSourceHeight) / safeSourceWidth) & ~1,
-  );
-  return { outW, outH };
+  return computeVideoExportDimensions(safeSourceWidth, safeSourceHeight);
 }
 
 /**
@@ -400,21 +396,17 @@ export function useProgressiveLoad(): UseProgressiveLoadReturn {
        */
       const extractThumbnail = async (): Promise<ProgressiveInitialPreviewResult | null> => {
         try {
-          console.log("[progressive-hook] extractThumbnail: calling IPC, sessionId=", sessionId, "current=", sessionIdRef.current);
           const result = await window.filmLabBatch.videoPreviewExtractThumbnail({
             filePath: absPath,
             sourceWidth: probe.width,
             sourceHeight: probe.height,
           });
-          console.log("[progressive-hook] extractThumbnail: IPC returned, sessionId=", sessionId, "current=", sessionIdRef.current, "match=", isCurrentSession(sessionId));
           if (!isCurrentSession(sessionId)) {
-            console.warn("[progressive-hook] extractThumbnail: session stale after IPC!", { expected: sessionId, actual: sessionIdRef.current });
             await unlinkPaths([result.thumbnailPath]);
             return null;
           }
           assignTempFile(sessionId, "thumbnailPath", result.thumbnailPath);
           const url = await createUrlForCurrentSession(result.thumbnailPath);
-          console.log("[progressive-hook] extractThumbnail: url=", url ? url.slice(0, 60) : null, "sessionMatch=", isCurrentSession(sessionId));
           if (url == null) {
             return null;
           }
@@ -566,9 +558,7 @@ export function useProgressiveLoad(): UseProgressiveLoadReturn {
             initialVisibleQuality;
 
           if (visibleKey === "thumbnailPath") {
-            console.log("[progressive-hook] generating proxy...");
             const proxyAsset = await generateProxy("thumbnail");
-            console.log("[progressive-hook] proxy result", proxyAsset ? "ok" : "null");
             if (proxyAsset != null && isCurrentSession(sessionId)) {
               try {
                 await onTextureSwap({
@@ -599,9 +589,7 @@ export function useProgressiveLoad(): UseProgressiveLoadReturn {
             }
           }
 
-          console.log("[progressive-hook] generating mezzanine...");
           const mezzanineAsset = await generateMezzanine(visibleQuality);
-          console.log("[progressive-hook] mezzanine result", mezzanineAsset ? "ok" : "null");
           if (mezzanineAsset != null && isCurrentSession(sessionId)) {
             try {
               await onTextureSwap({
@@ -648,7 +636,6 @@ export function useProgressiveLoad(): UseProgressiveLoadReturn {
       };
 
       const thumbnailInitial = await extractThumbnail();
-      console.log("[progressive-hook] thumbnailInitial", thumbnailInitial ? { stage: thumbnailInitial.stage, mediaKind: thumbnailInitial.mediaKind } : null);
       if (thumbnailInitial != null) {
         continueFromVisibleStage("thumbnailPath", "thumbnail");
         return thumbnailInitial;
