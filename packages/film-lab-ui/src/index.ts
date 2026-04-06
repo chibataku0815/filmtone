@@ -38,7 +38,9 @@ export {
 export {
   FilmLabCanvas,
   type FilmLabCanvasRef,
+  type FilmLabCanvasPreprocessResult,
   type FilmLabInteractiveSourceInfo,
+  type ProgressiveTextureStage,
 } from "./FilmLabCanvasPackageEntry";
 export {
   FilmLabWebglPanelBackdrop,

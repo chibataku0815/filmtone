@@ -14,10 +14,16 @@ export function absolutePathToVideoSrcUrl(absPath: string): string {
 }
 
 /**
- * @description 動画ファイル拡張子から最低限の Content-Type を返す。
+ * @description 動画とサムネイル画像の拡張子から最低限の Content-Type を返す。
+ * Progressive loading では JPEG サムネイルも同じ custom protocol で配るため、
+ * 画像拡張子もここで吸収します。
  */
 export function guessVideoContentType(filePath: string): string {
   const lower = filePath.toLowerCase();
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".gif")) return "image/gif";
   if (lower.endsWith(".mov")) return "video/quicktime";
   if (lower.endsWith(".webm")) return "video/webm";
   if (lower.endsWith(".mkv")) return "video/x-matroska";

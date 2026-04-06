@@ -69,7 +69,15 @@ type FfmpegVideoExportSession = {
 };
 
 let activeVideoExport: FfmpegVideoExportSession | null = null;
+let thumbnailProcess: ChildProcessWithoutNullStreams | null = null;
+let proxyProcess: ChildProcessWithoutNullStreams | null = null;
 let mezzanineProcess: ChildProcessWithoutNullStreams | null = null;
+
+/**
+ * @description Progressive loading で作った tmp ファイル一覧です。
+ * アプリ終了時に残っていても拾って掃除できるよう、main プロセスで正として持ちます。
+ */
+const progressivePreviewTempPaths = new Set<string>();
 
 /** @description 更新案内 IPC の送り先ウィンドウ（最初に作ったもの） */
 let mainWindowRef: BrowserWindow | null = null;
@@ -126,9 +134,19 @@ const SKIP_MEZZANINE =
 const MEZZANINE_PROGRESS_CHANNEL = "film-lab-video-export-mezzanine-progress";
 
 /**
+ * @description proxy 進捗を送る IPC のチャンネル名。
+ */
+const PROXY_PROGRESS_CHANNEL = "film-lab-preview-proxy-progress";
+
+/**
  * @description mezzanine 進捗の分母。画面は 0-99 / 100 で見せる。
  */
 const MEZZANINE_PROGRESS_TOTAL = 100;
+
+/**
+ * @description proxy 進捗の分母。画面は 0-99 / 100 で見せる。
+ */
+const PROXY_PROGRESS_TOTAL = 100;
 
 /**
  * @description main から renderer に送る mezzanine 進捗。
@@ -137,6 +155,16 @@ type MezzanineProgressPayload = {
   /** @description 0 から 99 までの進み具合 */
   current: number;
   /** @description 分母。mezzanine は 100 固定 */
+  total: number;
+};
+
+/**
+ * @description main から renderer に送る proxy 進捗。
+ */
+type ProxyProgressPayload = {
+  /** @description 0 から 99 までの進み具合 */
+  current: number;
+  /** @description 分母。proxy は 100 固定 */
   total: number;
 };
 
@@ -180,11 +208,70 @@ function sendMezzanineProgress(current: number): void {
 }
 
 /**
+ * @description proxy の進捗を mainWindowRef へ送る。
+ * @param current 0-99 で丸めた進み具合
+ */
+function sendProxyProgress(current: number): void {
+  const win = mainWindowRef;
+  if (win == null) {
+    return;
+  }
+  const payload: ProxyProgressPayload = {
+    current,
+    total: PROXY_PROGRESS_TOTAL,
+  };
+  win.webContents.send(PROXY_PROGRESS_CHANNEL, payload);
+}
+
+/**
+ * @description Progressive loading の tmp ファイルを cleanup 対象へ登録します。
+ * @param tempPath tmp ファイルの絶対パス
+ */
+function registerProgressivePreviewTempPath(tempPath: string): void {
+  progressivePreviewTempPaths.add(path.resolve(tempPath));
+}
+
+/**
+ * @description Progressive loading の tmp ファイルを cleanup 対象から外します。
+ * @param tempPath tmp ファイルの絶対パス
+ */
+function unregisterProgressivePreviewTempPath(tempPath: string): void {
+  progressivePreviewTempPaths.delete(path.resolve(tempPath));
+}
+
+/**
+ * @description Progressive loading の tmp をすべて削除します。アプリ終了時の置き土産対策です。
+ */
+async function cleanupProgressivePreviewTempFiles(): Promise<void> {
+  const pendingPaths = [...progressivePreviewTempPaths];
+  await Promise.all(
+    pendingPaths.map(async (tempPath) => {
+      try {
+        await fs.unlink(tempPath);
+      } catch {
+        /* ignore */
+      } finally {
+        unregisterProgressivePreviewTempPath(tempPath);
+      }
+    }),
+  );
+}
+
+/**
  * @description main がいま把握している動画書き出しフェーズ。黒画面やクラッシュの時刻と付き合わせる。
  */
 function currentVideoExportPhase(): string {
   if (activeVideoExport !== null) {
     return "rawvideo";
+  }
+  if (thumbnailProcess !== null) {
+    return "thumbnail";
+  }
+  if (proxyProcess !== null) {
+    return "proxy";
+  }
+  if (mezzanineProcess !== null) {
+    return "mezzanine";
   }
   return "idle";
 }
@@ -489,6 +576,96 @@ function ffmpegVideoCodecArgs(): string[] {
     return ["-c:v", "h264_videotoolbox", "-b:v", "12M", "-allow_sw", "1"];
   }
   return ["-c:v", "libx264", "-preset", "veryfast", "-crf", "21"];
+}
+
+/**
+ * @description Progressive loading の 1280px 系ステージに合わせた偶数解像度を計算します。
+ * ffmpeg の `scale=1280:-2` と同じ考え方で、高さだけ偶数へそろえます。
+ * @param sourceWidth 元動画の横幅
+ * @param sourceHeight 元動画の縦幅
+ * @returns proxy / thumbnail 用の幅高さ
+ */
+function computeProxyDimensions(
+  sourceWidth: number,
+  sourceHeight: number,
+): { width: number; height: number } {
+  const safeSourceWidth = Number.isFinite(sourceWidth) && sourceWidth > 0 ? sourceWidth : 1920;
+  const safeSourceHeight =
+    Number.isFinite(sourceHeight) && sourceHeight > 0 ? sourceHeight : 1080;
+  const width = 1280;
+  const height = Math.max(
+    2,
+    Math.round((width * safeSourceHeight) / safeSourceWidth) & ~1,
+  );
+  return { width, height };
+}
+
+/**
+ * @description Stage 1 の JPEG サムネイル抽出引数を組み立てます。
+ * -ss を入力前に置いて keyframe seek を優先し、最初の見える絵をできるだけ早く返します。
+ */
+function buildFfmpegThumbnailArgs(
+  inputPath: string,
+  outputPath: string,
+): string[] {
+  return [
+    "-hide_banner",
+    "-loglevel",
+    "info",
+    "-ss",
+    "0",
+    "-i",
+    inputPath,
+    "-frames:v",
+    "1",
+    "-q:v",
+    "2",
+    "-vf",
+    "scale=1280:-2,format=yuv420p",
+    "-y",
+    outputPath,
+  ];
+}
+
+/**
+ * @description Stage 2 の proxy 生成引数を組み立てます。
+ * 全フレーム I-frame にして、再生開始とシークを軽くします。
+ */
+function buildFfmpegProxyArgs(
+  inputPath: string,
+  outputPath: string,
+  useHwEncoder: boolean,
+): string[] {
+  const args = ["-hide_banner", "-loglevel", "info", "-i", inputPath];
+  args.push(
+    "-vf",
+    "colorspace=iall=bt709:all=bt709,scale=1280:-2,format=yuv420p",
+  );
+  if (useHwEncoder) {
+    args.push(
+      "-c:v",
+      "h264_videotoolbox",
+      "-b:v",
+      "8M",
+      "-g",
+      "1",
+      "-allow_sw",
+      "1",
+    );
+  } else {
+    args.push(
+      "-c:v",
+      "libx264",
+      "-preset",
+      "ultrafast",
+      "-crf",
+      "28",
+      "-g",
+      "1",
+    );
+  }
+  args.push("-an", "-y", outputPath);
+  return args;
 }
 
 /**
@@ -962,6 +1139,25 @@ app.on("window-all-closed", () => {
 });
 
 app.on("will-quit", () => {
+  try {
+    thumbnailProcess?.kill("SIGKILL");
+  } catch {
+    /* ignore */
+  }
+  try {
+    proxyProcess?.kill("SIGKILL");
+  } catch {
+    /* ignore */
+  }
+  try {
+    mezzanineProcess?.kill("SIGKILL");
+  } catch {
+    /* ignore */
+  }
+  thumbnailProcess = null;
+  proxyProcess = null;
+  mezzanineProcess = null;
+  void cleanupProgressivePreviewTempFiles();
   desktopUpdateService?.dispose();
   desktopUpdateService = null;
 });
@@ -1375,6 +1571,248 @@ ipcMain.handle("video-export-unlink-staged", async (_evt, stagedPath: string) =>
     await fs.unlink(path.resolve(stagedPath));
   } catch {
     /* ignore */
+  } finally {
+    unregisterProgressivePreviewTempPath(stagedPath);
+  }
+});
+
+/**
+ * @description Progressive loading Stage 1: JPEG サムネイルを高速抽出します。
+ */
+ipcMain.handle(
+  "video-preview-extract-thumbnail",
+  async (
+    _evt,
+    payload: { filePath: string; sourceWidth: number; sourceHeight: number },
+  ) => {
+    if (typeof payload !== "object" || payload == null) {
+      throw new TypeError("video-preview-extract-thumbnail: payload が空です");
+    }
+    const input = payload as {
+      filePath?: unknown;
+      sourceWidth?: unknown;
+      sourceHeight?: unknown;
+    };
+    if (typeof input.filePath !== "string" || input.filePath.length === 0) {
+      throw new TypeError("video-preview-extract-thumbnail: filePath が空です");
+    }
+    const abs = path.resolve(input.filePath);
+    const st = await fs.stat(abs);
+    if (!st.isFile()) {
+      throw new Error(`video-preview-extract-thumbnail: ファイルではありません — ${abs}`);
+    }
+    const ffmpeg = (() => {
+      try {
+        return resolveVideoCliBinary("ffmpeg");
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        throw new Error(`video-preview-extract-thumbnail: ffmpeg が見つかりません。${msg}`);
+      }
+    })();
+    const { width, height } = computeProxyDimensions(
+      typeof input.sourceWidth === "number" ? input.sourceWidth : 0,
+      typeof input.sourceHeight === "number" ? input.sourceHeight : 0,
+    );
+    const outputPath = path.join(
+      os.tmpdir(),
+      `film-lab-thumb-${randomBytes(8).toString("hex")}.jpg`,
+    );
+    registerProgressivePreviewTempPath(outputPath);
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const args = buildFfmpegThumbnailArgs(abs, outputPath);
+        console.log("[progressive-main] thumbnail ffmpeg args:", args.join(" "));
+        const child = spawn(ffmpeg.commandPath, args, {
+          env: ffmpeg.childEnv,
+          stdio: ["ignore", "ignore", "pipe"],
+        }) as ChildProcessWithoutNullStreams;
+        thumbnailProcess = child;
+        const stderrBuf: string[] = [];
+        child.stderr?.on("data", (chunk: Buffer) => {
+          stderrBuf.push(chunk.toString("utf8"));
+        });
+        child.on("error", (err) => {
+          thumbnailProcess = null;
+          console.error("[progressive-main] thumbnail spawn error:", err.message);
+          reject(
+            new Error(
+              `video-preview-extract-thumbnail: ffmpeg spawn error: ${err.message}`,
+            ),
+          );
+        });
+        child.on("close", (code) => {
+          thumbnailProcess = null;
+          const stderr = stderrBuf.join("").slice(-4000);
+          console.log(`[progressive-main] thumbnail ffmpeg exit code=${code} stderr=${stderr.slice(0, 500)}`);
+          if (code === 0) {
+            resolve();
+            return;
+          }
+          reject(
+            new Error(
+              `video-preview-extract-thumbnail: ffmpeg exit code=${code} stderr: ${stderr}`,
+            ),
+          );
+        });
+      });
+    } catch (err) {
+      unregisterProgressivePreviewTempPath(outputPath);
+      try {
+        await fs.unlink(outputPath);
+      } catch {
+        /* ignore */
+      }
+      throw err;
+    }
+    console.log("[progressive-main] thumbnail written:", outputPath, width, height);
+    return { thumbnailPath: outputPath, width, height };
+  },
+);
+
+/**
+ * @description Progressive loading Stage 2: 低解像度 H.264 proxy を生成します。
+ * HW encoder を優先し、失敗時は libx264 へフォールバックします。
+ */
+ipcMain.handle(
+  "video-preview-generate-proxy",
+  async (_evt, payload: { filePath: string; durationSec: number }) => {
+    if (typeof payload !== "object" || payload == null) {
+      throw new TypeError("video-preview-generate-proxy: payload が空です");
+    }
+    const input = payload as { filePath?: unknown; durationSec?: unknown };
+    if (typeof input.filePath !== "string" || input.filePath.length === 0) {
+      throw new TypeError("video-preview-generate-proxy: filePath が空です");
+    }
+    const safeDurationSec =
+      typeof input.durationSec === "number" &&
+      Number.isFinite(input.durationSec) &&
+      input.durationSec > 0
+        ? input.durationSec
+        : 1;
+    const abs = path.resolve(input.filePath);
+    const st = await fs.stat(abs);
+    if (!st.isFile()) {
+      throw new Error(`video-preview-generate-proxy: ファイルではありません — ${abs}`);
+    }
+    const ffmpeg = (() => {
+      try {
+        return resolveVideoCliBinary("ffmpeg");
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        throw new Error(`video-preview-generate-proxy: ffmpeg が見つかりません。${msg}`);
+      }
+    })();
+    const outputPath = path.join(
+      os.tmpdir(),
+      `film-lab-proxy-${randomBytes(8).toString("hex")}.mp4`,
+    );
+    registerProgressivePreviewTempPath(outputPath);
+
+    const runTranscode = (useHwEncoder: boolean): Promise<void> =>
+      new Promise((resolve, reject) => {
+        const args = buildFfmpegProxyArgs(abs, outputPath, useHwEncoder);
+        const child = spawn(ffmpeg.commandPath, args, {
+          env: ffmpeg.childEnv,
+          stdio: ["ignore", "ignore", "pipe"],
+        }) as ChildProcessWithoutNullStreams;
+        proxyProcess = child;
+        let lastSentCurrent = -1;
+        const emitProgress = (elapsedSec: number): void => {
+          const current = Math.min(
+            99,
+            Math.max(0, Math.floor((elapsedSec / safeDurationSec) * 100)),
+          );
+          if (current <= lastSentCurrent) {
+            return;
+          }
+          lastSentCurrent = current;
+          sendProxyProgress(current);
+        };
+        const stderrBuf: string[] = [];
+        let stderrTailText = "";
+        child.stderr?.on("data", (chunk: Buffer) => {
+          const chunkText = chunk.toString("utf8");
+          stderrBuf.push(chunkText);
+          stderrTailText = `${stderrTailText}${chunkText}`.slice(-2048);
+          const matches = [
+            ...stderrTailText.matchAll(
+              /time=([0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.\d+)?)/g,
+            ),
+          ];
+          const timecode = matches[matches.length - 1]?.[1];
+          if (!timecode) {
+            return;
+          }
+          const elapsedSec = parseFfmpegTimecodeToSeconds(timecode);
+          if (elapsedSec == null) {
+            return;
+          }
+          emitProgress(elapsedSec);
+        });
+        emitProgress(0);
+        child.on("error", (err) => {
+          proxyProcess = null;
+          reject(
+            new Error(`video-preview-generate-proxy: ffmpeg spawn error: ${err.message}`),
+          );
+        });
+        child.on("close", (code) => {
+          proxyProcess = null;
+          if (code === 0) {
+            resolve();
+            return;
+          }
+          reject(
+            new Error(
+              `video-preview-generate-proxy: ffmpeg ${useHwEncoder ? "HW" : "SW"} exit code=${code} stderr: ${stderrBuf.join("").slice(-4000)}`,
+            ),
+          );
+        });
+      });
+
+    try {
+      try {
+        await runTranscode(true);
+      } catch (hwErr) {
+        if (DEBUG_VIDEO_EXPORT_MAIN) {
+          console.log(
+            `[film-lab-desktop][proxy] HW encoder 失敗、SW fallback: ${hwErr instanceof Error ? hwErr.message : String(hwErr)}`,
+          );
+        }
+        try {
+          await fs.unlink(outputPath);
+        } catch {
+          /* ignore */
+        }
+        await runTranscode(false);
+      }
+    } catch (err) {
+      unregisterProgressivePreviewTempPath(outputPath);
+      try {
+        await fs.unlink(outputPath);
+      } catch {
+        /* ignore */
+      }
+      throw err;
+    }
+
+    const outStat = await fs.stat(outputPath);
+    console.log(
+      `[film-lab-desktop][proxy] 完了 ${outputPath} size=${(outStat.size / 1024 / 1024).toFixed(1)}MB`,
+    );
+    return { proxyPath: outputPath, proxySizeBytes: outStat.size };
+  },
+);
+
+ipcMain.handle("video-preview-abort-proxy", async () => {
+  if (proxyProcess) {
+    proxyProcess.kill("SIGTERM");
+    setTimeout(() => {
+      if (proxyProcess) {
+        proxyProcess.kill("SIGKILL");
+        proxyProcess = null;
+      }
+    }, 5000);
   }
 });
 
@@ -1442,6 +1880,7 @@ ipcMain.handle(
       os.tmpdir(),
       `film-lab-mezzanine-${randomBytes(8).toString("hex")}.mp4`,
     );
+    registerProgressivePreviewTempPath(outputPath);
 
     const runTranscode = (useHw: boolean): Promise<void> =>
       new Promise((resolve, reject) => {
@@ -1517,20 +1956,30 @@ ipcMain.handle(
 
     // HW encoder first, SW fallback
     try {
-      await runTranscode(true);
-    } catch (hwErr) {
-      if (DEBUG_VIDEO_EXPORT_MAIN) {
-        console.log(
-          `[film-lab-desktop][mezzanine] HW encoder 失敗、SW fallback: ${hwErr instanceof Error ? hwErr.message : String(hwErr)}`,
-        );
+      try {
+        await runTranscode(true);
+      } catch (hwErr) {
+        if (DEBUG_VIDEO_EXPORT_MAIN) {
+          console.log(
+            `[film-lab-desktop][mezzanine] HW encoder 失敗、SW fallback: ${hwErr instanceof Error ? hwErr.message : String(hwErr)}`,
+          );
+        }
+        // Remove partial output from HW attempt
+        try {
+          await fs.unlink(outputPath);
+        } catch {
+          /* ignore */
+        }
+        await runTranscode(false);
       }
-      // Remove partial output from HW attempt
+    } catch (err) {
+      unregisterProgressivePreviewTempPath(outputPath);
       try {
         await fs.unlink(outputPath);
       } catch {
         /* ignore */
       }
-      await runTranscode(false);
+      throw err;
     }
 
     const outStat = await fs.stat(outputPath);

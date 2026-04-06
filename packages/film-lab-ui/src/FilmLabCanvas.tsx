@@ -18,6 +18,7 @@ import {
   MediaLoader,
   MediaLoadError,
   LIKELY_VIDEO_EXTENSION,
+  type LoadResult,
   filmlabVertexShader,
   filmlabFragmentShader,
 } from "film-lab-renderer";
@@ -40,6 +41,24 @@ export type FilmLabInteractiveSourceInfo =
       /** 省略時はユーザーが選んだ／ドロップしたメディアとみなす */
       sourceRole?: "userMedia" | "smartLookDerived";
     };
+
+/**
+ * @description Progressive loading で返す前処理結果です。
+ * 初回は JPEG サムネイル、失敗時は proxy / mezzanine がそのまま返ることがあります。
+ */
+export type FilmLabCanvasPreprocessResult = {
+  /** @description 読み込む URL */
+  url: string;
+  /** @description 画像か動画か。MediaLoader の呼び分けに使います */
+  mediaKind: "image" | "video";
+  /** @description 初回に返った品質ステージ */
+  stage: "thumbnail" | "proxy" | "mezzanine";
+};
+
+/**
+ * @description 背景で swap する対象ステージです。
+ */
+export type ProgressiveTextureStage = "proxy" | "mezzanine";
 
 interface FilmLabCanvasProps {
   preset: PresetName;
@@ -87,9 +106,9 @@ interface FilmLabCanvasProps {
   getFileAbsolutePath?: (file: File) => string | null;
   /**
    * @description Desktop でドロップされた動画が Chromium 非対応コーデック（ProRes 等）の場合、
-   * mezzanine H.264 に変換した URL を返す。null を返した場合はそのまま MediaLoader に渡す。
+   * Progressive loading の最初の見せ方を返します。null を返した場合はそのまま MediaLoader に渡します。
    */
-  preprocessVideoFile?: (file: File) => Promise<string | null>;
+  preprocessVideoFile?: (file: File) => Promise<FilmLabCanvasPreprocessResult | null>;
 }
 
 /**
@@ -117,6 +136,15 @@ function resolveLocalFileAbsolutePath(
 export type FilmLabCanvasRef = {
   getJpegBase64ForAi: (maxSide: number) => string | null;
   replaceSourceFromPngBase64Body: (pngBase64Body: string) => Promise<boolean>;
+  /**
+   * @description Progressive loading の背景ステージ完了後に、今のテクスチャをシームレスに差し替えます。
+   * proxy → mezzanine のときは再生位置もそろえます。
+   */
+  swapProgressiveTexture: (
+    url: string,
+    fileName: string,
+    stage: ProgressiveTextureStage,
+  ) => Promise<boolean>;
   openMediaPicker: () => void;
   saveCurrentPng: () => void;
   /**
@@ -254,6 +282,8 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.OrthographicCamera | null>(null);
+  /** @description 現在 viewport に渡している Texture。本体差し替え時の dispose 用です。 */
+  const activeTextureRef = useRef<THREE.Texture | null>(null);
   /** @description 現在のプレビュー動画要素。画像のときは null。 */
   const previewVideoElementRef = useRef<HTMLVideoElement | null>(null);
   /** @description busy に入る直前に再生中だった動画だけ、busy 明けで再開します。 */
@@ -345,6 +375,111 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     syncPreviewVideoBusyState();
   }, [syncPreviewVideoBusyState]);
 
+  /**
+   * @description 使い終わった `<video>` を止めて参照を切ります。
+   * macOS / Chromium では `src=""` と `load()` までやるとデコーダ解放が早いです。
+   */
+  const disposePreviewVideoElement = useCallback((videoElement: HTMLVideoElement | null) => {
+    if (!videoElement) {
+      return;
+    }
+    try {
+      videoElement.pause();
+    } catch {
+      /* ignore */
+    }
+    try {
+      videoElement.removeAttribute("src");
+      videoElement.load();
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  /**
+   * @description 新しい Texture を viewport へ原子的に差し替え、古い Texture / Video を後片付けします。
+   * 動画と静止画の分岐を 1 箇所へ寄せ、通常ロードと progressive swap の両方で再利用します。
+   */
+  const applyLoadedTextureResult = useCallback(
+    (result: LoadResult): void => {
+      const viewport = viewportRef.current;
+      if (!viewport) {
+        return;
+      }
+      const nextPreviewVideo =
+        result.type === "video" &&
+        result.texture.image instanceof HTMLVideoElement
+          ? result.texture.image
+          : null;
+      const previousTexture = activeTextureRef.current;
+      const previousVideo = previewVideoElementRef.current;
+      activeTextureRef.current = result.texture;
+      previewVideoElementRef.current = nextPreviewVideo;
+      previewVideoShouldResumeRef.current = false;
+      previewVideoPausedByBusyRef.current = false;
+      previewVideoUserPausedIntentRef.current = false;
+      viewport.setTexture(result.texture);
+      viewport.setImageResolution(result.width, result.height);
+      syncPreviewVideoBusyState(nextPreviewVideo);
+      window.setTimeout(() => {
+        if (previousTexture && previousTexture !== activeTextureRef.current) {
+          previousTexture.dispose();
+        }
+        if (previousVideo && previousVideo !== nextPreviewVideo) {
+          disposePreviewVideoElement(previousVideo);
+        }
+      }, 0);
+    },
+    [disposePreviewVideoElement, syncPreviewVideoBusyState],
+  );
+
+  /**
+   * @description すでに読み込み済みの Video 要素を指定秒へシークします。
+   * progressive swap で currentTime を合わせるために使います。
+   */
+  const seekLoadedVideoElement = useCallback(
+    async (videoElement: HTMLVideoElement, time: number): Promise<void> => {
+      const duration = videoElement.duration;
+      const safeTime =
+        Number.isFinite(duration) && duration > 0
+          ? Math.max(0, Math.min(duration, time))
+          : Math.max(0, time);
+      if (!Number.isFinite(safeTime)) {
+        return;
+      }
+      if (Math.abs(videoElement.currentTime - safeTime) < 0.033) {
+        return;
+      }
+      await new Promise<void>((resolve, reject) => {
+        const cleanup = () => {
+          videoElement.removeEventListener("seeked", handleSeeked);
+          videoElement.removeEventListener("error", handleError);
+        };
+        const handleSeeked = () => {
+          cleanup();
+          resolve();
+        };
+        const handleError = () => {
+          cleanup();
+          reject(new Error("FilmLabCanvas.seekLoadedVideoElement: seek error"));
+        };
+        videoElement.addEventListener("seeked", handleSeeked, { once: true });
+        videoElement.addEventListener("error", handleError, { once: true });
+        try {
+          videoElement.currentTime = safeTime;
+        } catch (err) {
+          cleanup();
+          reject(
+            err instanceof Error
+              ? err
+              : new Error(String(err)),
+          );
+        }
+      });
+    },
+    [],
+  );
+
   useEffect(() => {
     applyResolvedGradeToViewport();
   }, [applyResolvedGradeToViewport]);
@@ -399,12 +534,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     mediaLoader
       .loadURL(defaultSampleUrl)
       .then((result) => {
-        viewport.setTexture(result.texture);
-        viewport.setImageResolution(result.width, result.height);
-        previewVideoElementRef.current = null;
-        previewVideoShouldResumeRef.current = false;
-        previewVideoPausedByBusyRef.current = false;
-        previewVideoUserPausedIntentRef.current = false;
+        applyLoadedTextureResult(result);
         onInteractiveSourceChangeRef.current?.({ kind: "sample" });
       })
       .catch((err) => {
@@ -472,6 +602,9 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       window.cancelAnimationFrame(resizeRafId);
       resizeObserver?.disconnect();
       window.removeEventListener("resize", syncViewportSize);
+      activeTextureRef.current?.dispose();
+      activeTextureRef.current = null;
+      disposePreviewVideoElement(previewVideoElementRef.current);
       viewport.dispose();
       renderer.dispose();
       previewVideoElementRef.current = null;
@@ -487,7 +620,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       cameraRef.current = null;
       onViewportReadyRef.current?.(null);
     };
-  }, []);
+  }, [applyLoadedTextureResult, disposePreviewVideoElement]);
 
   const getMaxTextureSize = useCallback((): number => {
     return rendererRef.current?.capabilities.maxTextureSize ?? 8192;
@@ -513,21 +646,18 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
         const isVideo = file.type.startsWith("video/") || LIKELY_VIDEO_EXTENSION.test(file.name);
         if (isVideo && preprocessVideoFileRef.current) {
           try {
-            const mezzanineUrl = await preprocessVideoFileRef.current(file);
-            if (mezzanineUrl) {
-              const result = await mediaLoaderRef.current.loadVideoFromURL(mezzanineUrl, file.name);
-              const nextPreviewVideo =
-                result.type === "video" &&
-                result.texture.image instanceof HTMLVideoElement
-                  ? result.texture.image
-                  : null;
-              previewVideoElementRef.current = nextPreviewVideo;
-              previewVideoShouldResumeRef.current = false;
-              previewVideoPausedByBusyRef.current = false;
-              previewVideoUserPausedIntentRef.current = false;
-              viewportRef.current.setTexture(result.texture);
-              viewportRef.current.setImageResolution(result.width, result.height);
-              syncPreviewVideoBusyState(nextPreviewVideo);
+            const preprocessResult = await preprocessVideoFileRef.current(file);
+            console.log("[progressive-canvas] preprocessResult", preprocessResult ? { mediaKind: preprocessResult.mediaKind, stage: preprocessResult.stage } : null);
+            if (preprocessResult) {
+              const result =
+                preprocessResult.mediaKind === "image"
+                  ? await mediaLoaderRef.current.loadURL(preprocessResult.url)
+                  : await mediaLoaderRef.current.loadVideoFromURL(
+                      preprocessResult.url,
+                      file.name,
+                    );
+              console.log("[progressive-canvas] texture loaded", { type: result.type, w: result.width, h: result.height });
+              applyLoadedTextureResult(result);
               onInteractiveSourceChangeRef.current?.({
                 kind: "file",
                 fileName: file.name,
@@ -550,18 +680,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
         const result = await mediaLoaderRef.current.loadFile(file, {
           maxTextureSize: maxTex,
         });
-        const nextPreviewVideo =
-          result.type === "video" &&
-          result.texture.image instanceof HTMLVideoElement
-            ? result.texture.image
-            : null;
-        previewVideoElementRef.current = nextPreviewVideo;
-        previewVideoShouldResumeRef.current = false;
-        previewVideoPausedByBusyRef.current = false;
-        previewVideoUserPausedIntentRef.current = false;
-        viewportRef.current.setTexture(result.texture);
-        viewportRef.current.setImageResolution(result.width, result.height);
-        syncPreviewVideoBusyState(nextPreviewVideo);
+        applyLoadedTextureResult(result);
         onInteractiveSourceChangeRef.current?.({
           kind: "file",
           fileName: file.name,
@@ -587,7 +706,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
         });
       }
     },
-    [getMaxTextureSize, onCubeLutLoaded, syncPreviewVideoBusyState],
+    [applyLoadedTextureResult, getMaxTextureSize, onCubeLutLoaded],
   );
 
   const handleDrop = useCallback(
@@ -686,10 +805,9 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
         }
       },
       replaceSourceFromPngBase64Body: async (pngBase64Body: string) => {
-        const viewport = viewportRef.current;
         const mediaLoader = mediaLoaderRef.current;
         const renderer = rendererRef.current;
-        if (!viewport || !mediaLoader || !renderer || !supported) return false;
+        if (!mediaLoader || !renderer || !supported) return false;
         try {
           const binary = atob(pngBase64Body);
           const len = binary.length;
@@ -705,12 +823,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
           const result = await mediaLoader.loadFile(file, {
             maxTextureSize: maxTex,
           });
-          previewVideoElementRef.current = null;
-          previewVideoShouldResumeRef.current = false;
-          previewVideoPausedByBusyRef.current = false;
-          previewVideoUserPausedIntentRef.current = false;
-          viewport.setTexture(result.texture);
-          viewport.setImageResolution(result.width, result.height);
+          applyLoadedTextureResult(result);
           onInteractiveSourceChangeRef.current?.({
             kind: "file",
             fileName: "smart-look-corrected.png",
@@ -720,6 +833,59 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
           return true;
         } catch (err) {
           console.error("FilmLabCanvas.replaceSourceFromPngBase64Body failed", err);
+          return false;
+        }
+      },
+      swapProgressiveTexture: async (
+        url: string,
+        fileName: string,
+        stage: ProgressiveTextureStage,
+      ) => {
+        console.log("[progressive-canvas] swapProgressiveTexture called", { stage, fileName });
+        const mediaLoader = mediaLoaderRef.current;
+        if (!mediaLoader || !supported) {
+          console.warn("[progressive-canvas] swapProgressiveTexture: mediaLoader or supported missing");
+          return false;
+        }
+        try {
+          const previousVideo = previewVideoElementRef.current;
+          const previousTime =
+            previousVideo && Number.isFinite(previousVideo.currentTime)
+              ? previousVideo.currentTime
+              : 0;
+          const wasPlaying =
+            previousVideo != null && !previousVideo.paused && !previousVideo.ended;
+          const result = await mediaLoader.loadVideoFromURL(url, fileName);
+          if (
+            stage === "mezzanine" &&
+            result.texture.image instanceof HTMLVideoElement
+          ) {
+            const nextVideo = result.texture.image;
+            nextVideo.pause();
+            await seekLoadedVideoElement(nextVideo, previousTime);
+            applyLoadedTextureResult(result);
+            if (wasPlaying && !pauseVideoPreviewRef.current && !previewRenderingHoldRef.current) {
+              nextVideo.play().catch((err) => {
+                console.warn("FilmLabCanvas.swapProgressiveTexture play failed", {
+                  functionName: "swapProgressiveTexture",
+                  stage,
+                  fileName,
+                  err,
+                });
+              });
+            }
+            return true;
+          }
+          applyLoadedTextureResult(result);
+          return true;
+        } catch (err) {
+          console.error("FilmLabCanvas.swapProgressiveTexture failed", {
+            functionName: "swapProgressiveTexture",
+            url,
+            fileName,
+            stage,
+            err,
+          });
           return false;
         }
       },
@@ -822,7 +988,13 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       },
       getWebGlCanvas: () => rendererRef.current?.domElement ?? null,
     }),
-    [handleDownload, handleFileClick, supported],
+    [
+      applyLoadedTextureResult,
+      handleDownload,
+      handleFileClick,
+      seekLoadedVideoElement,
+      supported,
+    ],
   );
 
   if (!supported) {
