@@ -192,15 +192,18 @@ void main() {
 
   // Before/After または A/B 比較の分割
   vec2 origUv = fitUv(vUv, uResolution, uImageResolution);
+  float splitMask = insideUv(origUv);
   vec4 leftSample = uAbCompare > 0.5
     ? texture(uOriginalTexture, vUv)
     : texture(uOriginalTexture, origUv);
   float lineWidth = 2.0 / uResolution.x;
 
   if (vUv.x < uSplitPosition - lineWidth) {
-    fragColor = leftSample;
+    // Letterbox area: use graded output (which has blurred background)
+    fragColor = mix(color, leftSample, splitMask);
   } else if (vUv.x < uSplitPosition + lineWidth) {
-    fragColor = vec4(vec3(1.0), color.a);
+    // Split line: only show inside image area
+    fragColor = vec4(vec3(1.0), color.a) * splitMask + color * (1.0 - splitMask);
   } else {
     fragColor = color;
   }
