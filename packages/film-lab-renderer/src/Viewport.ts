@@ -218,6 +218,7 @@ export class Viewport {
         uMagenta: { value: 0.0 },
         uYellow: { value: 0.0 },
         uFlipY: { value: 0.0 },
+        uFitMode: { value: 0.0 },
       },
     });
 
@@ -314,6 +315,7 @@ export class Viewport {
         uAberrationEdgeSoften: { value: 0.0 },
         uLensSoftness: { value: 0.0 },
         uFlipY: { value: 0.0 },
+        uFitMode: { value: 0.0 },
       },
     });
   }
@@ -533,6 +535,7 @@ export class Viewport {
       Math.max(0, rgbShift * ABERRATION_EDGE_SOFTEN_SCALE),
     );
     cu.uLensSoftness!.value = this.lensSoftness;
+    cu.uFitMode!.value = mu.uFitMode!.value;
   }
 
   /**
@@ -1082,6 +1085,12 @@ export class Viewport {
 
   setImageResolution(width: number, height: number): void {
     this.material.uniforms.uImageResolution!.value.set(width, height);
+  }
+
+  setFitMode(mode: "cover" | "contain"): void {
+    const value = mode === "contain" ? 1.0 : 0.0;
+    this.material.uniforms.uFitMode!.value = value;
+    this.compositeMaterial.uniforms.uFitMode!.value = value;
   }
 
   // ===== Time =====
