@@ -647,7 +647,6 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
         if (isVideo && preprocessVideoFileRef.current) {
           try {
             const preprocessResult = await preprocessVideoFileRef.current(file);
-            console.log("[progressive-canvas] preprocessResult", preprocessResult ? { mediaKind: preprocessResult.mediaKind, stage: preprocessResult.stage } : null);
             if (preprocessResult) {
               const result =
                 preprocessResult.mediaKind === "image"
@@ -656,7 +655,6 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
                       preprocessResult.url,
                       file.name,
                     );
-              console.log("[progressive-canvas] texture loaded", { type: result.type, w: result.width, h: result.height });
               applyLoadedTextureResult(result);
               onInteractiveSourceChangeRef.current?.({
                 kind: "file",
@@ -841,7 +839,6 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
         fileName: string,
         stage: ProgressiveTextureStage,
       ) => {
-        console.log("[progressive-canvas] swapProgressiveTexture called", { stage, fileName });
         const mediaLoader = mediaLoaderRef.current;
         if (!mediaLoader || !supported) {
           console.warn("[progressive-canvas] swapProgressiveTexture: mediaLoader or supported missing");

@@ -1642,7 +1642,9 @@ ipcMain.handle(
     try {
       await new Promise<void>((resolve, reject) => {
         const args = buildFfmpegThumbnailArgs(abs, outputPath);
-        console.log("[progressive-main] thumbnail ffmpeg args:", args.join(" "));
+        if (DEBUG_VIDEO_EXPORT_MAIN) {
+          console.log("[progressive-main] thumbnail ffmpeg args:", args.join(" "));
+        }
         const child = spawnFfmpegNice(ffmpeg.commandPath, args, {
           env: ffmpeg.childEnv,
           stdio: ["ignore", "ignore", "pipe"],
@@ -1664,7 +1666,9 @@ ipcMain.handle(
         child.on("close", (code) => {
           thumbnailProcess = null;
           const stderr = stderrBuf.join("").slice(-4000);
-          console.log(`[progressive-main] thumbnail ffmpeg exit code=${code} stderr=${stderr.slice(0, 500)}`);
+          if (DEBUG_VIDEO_EXPORT_MAIN) {
+            console.log(`[progressive-main] thumbnail ffmpeg exit code=${code} stderr=${stderr.slice(0, 500)}`);
+          }
           if (code === 0) {
             resolve();
             return;
@@ -1685,7 +1689,9 @@ ipcMain.handle(
       }
       throw err;
     }
-    console.log("[progressive-main] thumbnail written:", outputPath, width, height);
+    if (DEBUG_VIDEO_EXPORT_MAIN) {
+      console.log("[progressive-main] thumbnail written:", outputPath, width, height);
+    }
     return { thumbnailPath: outputPath, width, height };
   },
 );

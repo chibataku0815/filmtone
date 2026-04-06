@@ -695,26 +695,22 @@ export default function App() {
     }
 
     const probe = await window.filmLabBatch.videoExportProbe(absPath);
-    console.log("[progressive] probe done", { codec: probe.videoCodec, w: probe.width, h: probe.height });
 
     if (!needsMezzanineTranscode({
       videoCodec: probe.videoCodec,
       fileSizeBytes: probe.fileSizeBytes,
       absPath,
     })) {
-      console.log("[progressive] codec supported, skipping progressive load");
       progressiveLoad.cancel();
       return null; // codec is supported, no transcode needed
     }
 
-    console.log("[progressive] needs mezzanine → starting progressive load");
     const result = await progressiveLoad.startProgressiveLoad(
       absPath,
       file.name,
       probe,
       handleProgressiveTextureSwap,
     );
-    console.log("[progressive] startProgressiveLoad returned", result ? { mediaKind: result.mediaKind, stage: result.stage, url: result.url.slice(0, 80) } : null);
     if (!result) {
       return null;
     }
@@ -742,11 +738,6 @@ export default function App() {
       interactivePreviewSource.kind === "file" &&
       interactivePreviewSource.absolutePath !== activeSourcePath
     ) {
-      console.warn("[progressive] useEffect CANCELLING: interactivePreviewSource mismatch", {
-        interactiveKind: interactivePreviewSource.kind,
-        interactivePath: interactivePreviewSource.kind === "file" ? interactivePreviewSource.absolutePath : null,
-        activeSourcePath,
-      });
       progressiveLoad.cancel();
     }
   }, [
