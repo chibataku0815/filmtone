@@ -25,7 +25,7 @@ import { halationPrefilterFragmentShader } from "./shaders/halation-prefilter.fr
 import { downsampleFragmentShader } from "./shaders/downsample.frag";
 import { upsampleFragmentShader } from "./shaders/upsample.frag";
 import { compositeFragmentShader } from "./shaders/composite.frag";
-import { motionblurFragmentShader, passthroughFragmentShader } from "./shaders/motionblur.frag";
+import { motionblurFragmentShader, feedbackCopyFragmentShader } from "./shaders/motionblur.frag";
 import { dustFragmentShader } from "./shaders/dust.frag";
 import { createDustTexture, createScratchTexture } from "./textures/index";
 import { lightshaftsFragmentShader } from "./shaders/lightshafts.frag";
@@ -136,6 +136,7 @@ export class Viewport {
   private ringFilledFrames = 0;
   private weightCurve: 'triangle' | 'box' | 'exponential' = 'triangle';
   private motionThreshold = 0.0;
+  private trailIntensity = 0.0; // 0=no feedback, 0-0.95=longer trails
   private ringCopyMaterial: THREE.ShaderMaterial | null = null;
   private ringBlendMaterial: THREE.ShaderMaterial | null = null;
   private rtRingBuffer: THREE.WebGLRenderTarget[] = [];
@@ -422,13 +423,15 @@ export class Viewport {
   private ensureMotionBlurResources(): void {
     if (this.ringCopyMaterial) return;
 
-    // Passthrough copy: sourceTexture → ring slot
+    // Feedback copy: sourceTexture + previous slot → ring slot
     this.ringCopyMaterial = new THREE.ShaderMaterial({
       glslVersion: THREE.GLSL3,
       vertexShader: filmlabVertexShader,
-      fragmentShader: passthroughFragmentShader,
+      fragmentShader: feedbackCopyFragmentShader,
       uniforms: {
         uSource: { value: null },
+        uPrevSlot: { value: null },
+        uTrail: { value: 0.0 },
         uFlipY: { value: 0.0 },
       },
     });
@@ -476,25 +479,35 @@ export class Viewport {
    */
   private getActiveFrameCount(): number {
     if (this.shutterAngle <= 0) return 0;
-    const normalized = Math.min(this.shutterAngle, 360) / 360;
-    return Math.max(1, Math.round(normalized * Viewport.MOTION_BLUR_RING_SIZE));
+    // 720° → normalized=2.0 → all 8 frames active
+    const normalized = Math.min(this.shutterAngle, 720) / 360;
+    return Math.max(1, Math.min(Viewport.MOTION_BLUR_RING_SIZE, Math.round(normalized * (Viewport.MOTION_BLUR_RING_SIZE / 2))));
   }
 
   /**
    * weightCurve に応じた正規化済みブレンドウェイトを計算する。
    * index 0 = newest, index N-1 = oldest。
+   * shutterAngle > 360° では triangle → box へ自動的にフラット化し、
+   * より長いモーショントレイルを実現する。
    */
   private computeBlendWeights(activeFrames: number): Float32Array {
     const N = Viewport.MOTION_BLUR_RING_SIZE;
     const weights = new Float32Array(N);
     const effective = Math.min(activeFrames, this.ringFilledFrames);
     if (effective <= 0 || effective === 1) { weights[0] = 1.0; return weights; }
+
+    // 360° 超では triangle → box へ滑らかに遷移
+    // flatness: 0.0 (pure triangle at ≤360°) → 1.0 (pure box at 720°)
+    const flatness = Math.min(1, Math.max(0, (this.shutterAngle - 360) / 360));
+
     let sum = 0;
     for (let i = 0; i < effective; i++) {
+      const triangleW = effective - i;
+      const boxW = 1.0;
       switch (this.weightCurve) {
-        case 'triangle': weights[i] = effective - i; break;
+        case 'triangle': weights[i] = triangleW * (1 - flatness) + boxW * flatness; break;
         case 'box': weights[i] = 1.0; break;
-        case 'exponential': weights[i] = Math.exp(-1.5 * i); break;
+        case 'exponential': weights[i] = Math.exp(-1.5 * i) * (1 - flatness) + boxW * flatness; break;
       }
       sum += weights[i]!;
     }
@@ -788,9 +801,15 @@ export class Viewport {
     const prevAutoClear = renderer.autoClear;
     renderer.autoClear = false;
 
-    // Draw 1: Copy sourceTexture → ring slot
+    // Draw 1: Feedback copy — mix(source, prevSlot, trail) → ring slot
     const cu = this.ringCopyMaterial.uniforms;
     cu.uSource!.value = sourceTexture;
+    // Previous slot for feedback: the most recently written slot
+    const prevSlotIdx = (this.ringWriteIndex - 1 + N) % N;
+    cu.uPrevSlot!.value = this.ringFilledFrames > 0
+      ? this.rtRingBuffer[prevSlotIdx]!.texture
+      : getBlackTexture();
+    cu.uTrail!.value = this.ringFilledFrames > 0 ? this.trailIntensity : 0.0;
     this.postMesh.material = this.ringCopyMaterial;
     renderer.setRenderTarget(this.rtRingBuffer[this.ringWriteIndex]!);
     renderer.render(this.postScene, this.postCamera);
@@ -1307,12 +1326,16 @@ export class Viewport {
 
   setShutterAngle(degrees: number): void {
     const prev = this.shutterAngle;
-    this.shutterAngle = Math.min(360, Math.max(0, degrees));
+    this.shutterAngle = Math.min(720, Math.max(0, degrees));
     if (prev === 0 && this.shutterAngle > 0) this.resetMotionBlurHistory();
   }
 
   setMotionBlurAmount(value: number): void {
     this.setShutterAngle(Math.min(1, Math.max(0, value)) * 360);
+  }
+
+  setTrailIntensity(value: number): void {
+    this.trailIntensity = Math.min(0.95, Math.max(0, value));
   }
 
   setFrameRepeat(value: number): void {
@@ -1530,6 +1553,7 @@ export class Viewport {
       yellow: this.material.uniforms.uYellow!.value as number,
       printContrast: this.material.uniforms.uPrintContrast!.value as number,
       shutterAngle: this.shutterAngle,
+      trailIntensity: this.trailIntensity,
       motionBlurAmount: this.shutterAngle / 360,
       dustAmount: this.dustAmount,
       scratchAmount: this.scratchAmount,
@@ -1647,6 +1671,8 @@ export class Viewport {
     } else if (params.motionBlurAmount !== undefined) {
       this.setMotionBlurAmount(params.motionBlurAmount as number);
     }
+    if (params.trailIntensity !== undefined)
+      this.setTrailIntensity(params.trailIntensity as number);
     if (params.dustAmount !== undefined)
       this.setDustAmount(params.dustAmount as number);
     if (params.scratchAmount !== undefined)

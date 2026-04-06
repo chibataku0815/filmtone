@@ -1,12 +1,20 @@
 /**
- * Passthrough shader — copies sourceTexture into a ring buffer slot.
+ * Feedback copy shader — writes sourceTexture into a ring buffer slot,
+ * optionally mixing in the previous slot for extended trail effect.
+ * uTrail=0: pure passthrough. uTrail=0.9: long afterimage tail.
  */
-export const passthroughFragmentShader = /* glsl */ `
+export const feedbackCopyFragmentShader = /* glsl */ `
 precision highp float;
 uniform sampler2D uSource;
+uniform sampler2D uPrevSlot;
+uniform float uTrail; // 0.0=clean copy, 0.0-0.95=feedback intensity
 in vec2 vUv;
 out vec4 fragColor;
-void main() { fragColor = texture(uSource, vUv); }
+void main() {
+  vec4 src = texture(uSource, vUv);
+  vec4 prev = texture(uPrevSlot, vUv);
+  fragColor = mix(src, prev, uTrail);
+}
 `;
 
 /**

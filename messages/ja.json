@@ -575,7 +575,9 @@
       "scratchAmount": "スクラッチ",
       "scratchAmountHint": "フレームを縦に流れるフィルム傷を追加します。",
       "shutterAngle": "シャッターアングル",
-      "shutterAngleHint": "カメラのシャッター角度をシミュレート（0\u00b0=オフ、180\u00b0=シネマ標準）"
+      "shutterAngleHint": "カメラのシャッター角度をシミュレート（0\u00b0=オフ、180\u00b0=シネマ標準）",
+      "trailIntensity": "残像の長さ",
+      "trailIntensityHint": "シャッター窓を超えて残像を延長します。値が高いほど長い残像になります。"
     },
     "desktopRelease": {
       "eyebrow": "Desktop",
