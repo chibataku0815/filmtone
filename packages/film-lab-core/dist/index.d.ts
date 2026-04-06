@@ -3,7 +3,7 @@ import { z } from 'zod';
 /**
  * Film Lab のグレード数値パラメータ定義（ブラウザ・Remotion 共通の単一の真実）
  */
-declare const PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "grainIntensity", "grainRadialMix", "grainSize", "vignette", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "fade", "highlights", "shadows", "shadowTone", "highlightTone", "shadowHue", "highlightHue", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "motionBlurAmount", "dustAmount", "scratchAmount", "shaftIntensity", "shaftDecay", "shaftOriginX", "shaftOriginY"];
+declare const PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "grainIntensity", "grainRadialMix", "grainSize", "vignette", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "fade", "highlights", "shadows", "shadowTone", "highlightTone", "shadowHue", "highlightHue", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "motionBlurAmount", "shutterAngle", "dustAmount", "scratchAmount", "shaftIntensity", "shaftDecay", "shaftOriginX", "shaftOriginY"];
 type ParamKey = (typeof PARAM_KEYS)[number];
 interface Params {
     exposure: number;
@@ -57,8 +57,10 @@ interface Params {
     magenta: number;
     /** CMY enlarger color head: Yellow filter（-1〜1、0=ニュートラル）。print ステージ。 */
     yellow: number;
-    /** EMA モーションブラー強度（0=オフ、1=最大残像）。post-composite chain に適用。 */
+    /** @deprecated Ghost Param for URL backward compat. Use shutterAngle. */
     motionBlurAmount: number;
+    /** Camera shutter angle (0=off, 180=cinema standard, 360=max). Range: 0-360. */
+    shutterAngle: number;
     /** ダスト（埃）オーバーレイ強度（0=オフ、1=最大）。post-composite chain に適用。 */
     dustAmount: number;
     /** スクラッチ（傷）オーバーレイ強度（0=オフ、1=最大）。post-composite chain に適用。 */
@@ -119,6 +121,7 @@ declare const PRESETS: {
         magenta: number;
         yellow: number;
         motionBlurAmount: number;
+        shutterAngle: number;
         dustAmount: number;
         scratchAmount: number;
         shaftIntensity: number;
@@ -167,6 +170,7 @@ declare const PRESETS: {
         magenta: number;
         yellow: number;
         motionBlurAmount: number;
+        shutterAngle: number;
         dustAmount: number;
         scratchAmount: number;
         shaftIntensity: number;
@@ -211,6 +215,7 @@ declare const PRESETS: {
         magenta: number;
         yellow: number;
         motionBlurAmount: number;
+        shutterAngle: number;
         dustAmount: number;
         scratchAmount: number;
         shaftIntensity: number;
@@ -255,6 +260,7 @@ declare const PRESETS: {
         magenta: number;
         yellow: number;
         motionBlurAmount: number;
+        shutterAngle: number;
         dustAmount: number;
         scratchAmount: number;
         shaftIntensity: number;
@@ -299,6 +305,7 @@ declare const PRESETS: {
         magenta: number;
         yellow: number;
         motionBlurAmount: number;
+        shutterAngle: number;
         dustAmount: number;
         scratchAmount: number;
         shaftIntensity: number;
@@ -343,6 +350,7 @@ declare const PRESETS: {
         magenta: number;
         yellow: number;
         motionBlurAmount: number;
+        shutterAngle: number;
         dustAmount: number;
         scratchAmount: number;
         shaftIntensity: number;
@@ -387,6 +395,7 @@ declare const PRESETS: {
         magenta: number;
         yellow: number;
         motionBlurAmount: number;
+        shutterAngle: number;
         dustAmount: number;
         scratchAmount: number;
         shaftIntensity: number;
@@ -431,6 +440,7 @@ declare const PRESETS: {
         magenta: number;
         yellow: number;
         motionBlurAmount: number;
+        shutterAngle: number;
         dustAmount: number;
         scratchAmount: number;
         shaftIntensity: number;
@@ -475,6 +485,7 @@ declare const PRESETS: {
         magenta: number;
         yellow: number;
         motionBlurAmount: number;
+        shutterAngle: number;
         dustAmount: number;
         scratchAmount: number;
         shaftIntensity: number;
@@ -524,6 +535,7 @@ declare const PRESETS: {
         magenta: number;
         yellow: number;
         motionBlurAmount: number;
+        shutterAngle: number;
         dustAmount: number;
         scratchAmount: number;
         shaftIntensity: number;

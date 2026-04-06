@@ -878,7 +878,7 @@ export function FilmLabControlPanelCore({
                   onCommit={commit}
                 />
                 {/* v0.5.0: motionBlur moved here from POST EFFECTS (was solo item, category unnecessary) */}
-                <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.motionBlurAmount")} hint={tFilmLab("controls.motionBlurAmountHint")} value={params.motionBlurAmount} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("motionBlurAmount", v)} onCommit={commit} />
+                <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.shutterAngle")} hint={tFilmLab("controls.shutterAngleHint")} value={params.shutterAngle} min={0} max={360} step={1} defaultValue={0} onChange={(v) => updateParam("shutterAngle", v)} onCommit={commit} />
               </div>
             </div>
           )}

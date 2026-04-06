@@ -244,8 +244,8 @@
       "dustAmountHint": "古いフィルムのようなホコリの粒子を画像に重ねます。",
       "scratchAmount": "スクラッチ",
       "scratchAmountHint": "フレームを縦に流れるフィルム傷を追加します。",
-      "motionBlurAmount": "残像の強さ",
-      "motionBlurAmountHint": "前のフレームを現在のフレームに混ぜ、残像のような効果を生みます。"
+      "shutterAngle": "シャッターアングル",
+      "shutterAngleHint": "カメラのシャッター角度をシミュレート（0\u00b0=オフ、180\u00b0=シネマ標準）"
     },
     "desktop": {
       "app": {

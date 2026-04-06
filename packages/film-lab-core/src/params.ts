@@ -52,8 +52,10 @@ export const PARAM_KEYS = [
   "magenta",
   /** CMY enlarger color head: Yellow filter（-1〜1、0=ニュートラル）。range: -1–1 */
   "yellow",
-  /** EMA モーションブラー強度（0=オフ、1=最大残像）。range: 0–1 */
+  /** @deprecated Ghost Param for URL backward compat. Use shutterAngle. */
   "motionBlurAmount",
+  /** Camera shutter angle (0=off, 180=cinema standard, 360=max). Range: 0-360. */
+  "shutterAngle",
   /** ダスト（埃）オーバーレイ強度（0=オフ、1=最大）。range: 0–1 */
   "dustAmount",
   /** スクラッチ（傷）オーバーレイ強度（0=オフ、1=最大）。range: 0–1 */
@@ -123,8 +125,10 @@ export interface Params {
   magenta: number;
   /** CMY enlarger color head: Yellow filter（-1〜1、0=ニュートラル）。print ステージ。 */
   yellow: number;
-  /** EMA モーションブラー強度（0=オフ、1=最大残像）。post-composite chain に適用。 */
+  /** @deprecated Ghost Param for URL backward compat. Use shutterAngle. */
   motionBlurAmount: number;
+  /** Camera shutter angle (0=off, 180=cinema standard, 360=max). Range: 0-360. */
+  shutterAngle: number;
   /** ダスト（埃）オーバーレイ強度（0=オフ、1=最大）。post-composite chain に適用。 */
   dustAmount: number;
   /** スクラッチ（傷）オーバーレイ強度（0=オフ、1=最大）。post-composite chain に適用。 */
