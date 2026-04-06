@@ -70,6 +70,12 @@ export const PARAM_KEYS = [
   "shaftOriginX",
   /** ライトシャフト光源 Y 位置（0=上端、1=下端）。range: 0–1 */
   "shaftOriginY",
+  "crossFilterStrength",
+  "crossFilterSpikes",
+  "crossFilterAngle",
+  "crossFilterLength",
+  "crossFilterThreshold",
+  "crossFilterChromatic",
 ] as const;
 
 export type ParamKey = (typeof PARAM_KEYS)[number];
@@ -145,6 +151,12 @@ export interface Params {
   shaftOriginX: number;
   /** ライトシャフト光源 Y 位置（0=上端、1=下端）。 */
   shaftOriginY: number;
+  crossFilterStrength: number;
+  crossFilterSpikes: number;
+  crossFilterAngle: number;
+  crossFilterLength: number;
+  crossFilterThreshold: number;
+  crossFilterChromatic: number;
 }
 
 export function cloneParams(params: Params): Params {

@@ -39,7 +39,19 @@ const paramShape = Object.fromEntries(
                         ? z.number().min(0).max(1).default(0.5)
                         : key === "shaftOriginY"
                           ? z.number().min(0).max(1).default(0.15)
-                          : z.number(),
+                          : key === "crossFilterStrength"
+                            ? z.number().min(0).max(1).default(0)
+                            : key === "crossFilterSpikes"
+                              ? z.number().min(4).max(8).default(4)
+                              : key === "crossFilterAngle"
+                                ? z.number().min(0).max(360).default(0)
+                                : key === "crossFilterLength"
+                                  ? z.number().min(0).max(1).default(0.4)
+                                  : key === "crossFilterThreshold"
+                                    ? z.number().min(0).max(1).default(0.92)
+                                    : key === "crossFilterChromatic"
+                                      ? z.number().min(0).max(1).default(0.3)
+                                      : z.number(),
   ]),
 ) as z.ZodRawShape;
 

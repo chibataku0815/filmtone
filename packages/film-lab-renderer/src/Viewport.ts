@@ -30,6 +30,8 @@ import { dustFragmentShader } from "./shaders/dust.frag";
 import { createDustTexture, createScratchTexture } from "./textures/index";
 import { lightshaftsFragmentShader } from "./shaders/lightshafts.frag";
 import { lightshaftsBlendFragmentShader } from "./shaders/lightshafts-blend.frag";
+import { crossFilterStreakFragmentShader } from "./shaders/cross-filter-streak.frag";
+import { crossFilterBlendFragmentShader } from "./shaders/cross-filter-blend.frag";
 
 export interface ViewportOptions {
   vertexShader: string;
@@ -156,6 +158,18 @@ export class Viewport {
   private shaftMaterial: THREE.ShaderMaterial | null = null;
   private shaftBlendMaterial: THREE.ShaderMaterial | null = null;
   private rtShaft: THREE.WebGLRenderTarget | null = null;
+
+  // --- Cross Filter (Post-composite) ---
+  private crossFilterStrength = 0;
+  private crossFilterSpikes = 4;
+  private crossFilterAngle = 0;
+  private crossFilterLength = 0.5;
+  private crossFilterThreshold = 0.8;
+  private crossFilterChromatic = 0.3;
+  private crossFilterStreakMaterial: THREE.ShaderMaterial | null = null;
+  private crossFilterBlendMaterial: THREE.ShaderMaterial | null = null;
+  private rtCrossThreshold: THREE.WebGLRenderTarget | null = null;
+  private rtCrossStreak: THREE.WebGLRenderTarget[] = [];
 
   /**
    * composite のレンズ周辺ソフト（0〜1）。色収差周辺ソフトとは別（Params.lensSoftness）。
@@ -580,6 +594,49 @@ export class Viewport {
     this.rtShaft = new THREE.WebGLRenderTarget(qw, qh, RT_OPTIONS);
   }
 
+  private ensureCrossFilterResources(): void {
+    if (this.crossFilterStreakMaterial) return;
+
+    this.crossFilterStreakMaterial = new THREE.ShaderMaterial({
+      glslVersion: THREE.GLSL3,
+      vertexShader: filmlabVertexShader,
+      fragmentShader: crossFilterStreakFragmentShader,
+      uniforms: {
+        uSource: { value: null },
+        uDirection: { value: new THREE.Vector2(1, 0) },
+        uTexelSize: { value: new THREE.Vector2() },
+        uLength: { value: 0.5 },
+        uChromatic: { value: 0.0 },
+        uBrightnessMul: { value: 1.0 },
+        uFlipY: { value: 0.0 },
+      },
+    });
+
+    this.crossFilterBlendMaterial = new THREE.ShaderMaterial({
+      glslVersion: THREE.GLSL3,
+      vertexShader: filmlabVertexShader,
+      fragmentShader: crossFilterBlendFragmentShader,
+      uniforms: {
+        uSource: { value: null },
+        uStreak0: { value: null },
+        uStreak1: { value: null },
+        uStreak2: { value: null },
+        uStreak3: { value: null },
+        uStreakCount: { value: 2 },
+        uIntensity: { value: 0.0 },
+        uFlipY: { value: 0.0 },
+      },
+    });
+
+    const hw = Math.max(1, Math.floor(this.width / 2));
+    const hh = Math.max(1, Math.floor(this.height / 2));
+    this.rtCrossThreshold = new THREE.WebGLRenderTarget(hw, hh, RT_OPTIONS);
+    this.rtCrossStreak = [];
+    for (let i = 0; i < 4; i++) {
+      this.rtCrossStreak.push(new THREE.WebGLRenderTarget(hw, hh, RT_OPTIONS));
+    }
+  }
+
   /**
    * #98 の post-composite seam で使う RT を、画面サイズに合わせて広げ直す。
    *
@@ -627,7 +684,7 @@ export class Viewport {
    */
   private hasPostCompositeChain(): boolean {
     if (this.abCompareEnabled) return false;
-    return this.shutterAngle > 0;
+    return this.shutterAngle > 0 || this.crossFilterStrength > 0;
   }
 
   /**
@@ -917,9 +974,79 @@ export class Viewport {
     renderer.render(this.postScene, this.postCamera);
   }
 
+  private renderCrossFilter(
+    renderer: THREE.WebGLRenderer,
+    sourceTexture: THREE.Texture,
+    target: THREE.WebGLRenderTarget | null,
+  ): void {
+    this.ensureCrossFilterResources();
+    if (!this.crossFilterStreakMaterial || !this.crossFilterBlendMaterial
+        || !this.rtCrossThreshold || this.rtCrossStreak.length === 0) return;
+
+    const dirCount = Math.floor(this.crossFilterSpikes / 2);
+    const angleRad = (this.crossFilterAngle * Math.PI) / 180;
+
+    // Sub-pass 1: Threshold extraction (reuse bloom prefilter shader)
+    const pu = this.bloomPrefilterMaterial.uniforms;
+    const savedThreshold = pu.uThreshold!.value;
+    const savedKnee = pu.uKnee!.value;
+    pu.uSource!.value = sourceTexture;
+    pu.uThreshold!.value = this.crossFilterThreshold;
+    pu.uKnee!.value = 0.1;
+    this.postMesh.material = this.bloomPrefilterMaterial;
+    renderer.setRenderTarget(this.rtCrossThreshold);
+    renderer.render(this.postScene, this.postCamera);
+    pu.uThreshold!.value = savedThreshold;
+    pu.uKnee!.value = savedKnee;
+
+    // Sub-pass 2..N: Directional blur per spike direction
+    const su = this.crossFilterStreakMaterial.uniforms;
+    const qw = this.rtCrossThreshold.width;
+    const qh = this.rtCrossThreshold.height;
+    su.uSource!.value = this.rtCrossThreshold.texture;
+    su.uTexelSize!.value.set(1.0 / qw, 1.0 / qh);
+    su.uChromatic!.value = this.crossFilterChromatic;
+
+    // Deterministic hash for per-direction organic variation
+    const hash = (n: number): number => {
+      const s = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+      return s - Math.floor(s);
+    };
+
+    for (let i = 0; i < dirCount; i++) {
+      const seed = i * 17 + 7;
+      const angleJitter = (hash(seed) - 0.5) * 2 * (5 * Math.PI / 180);
+      const lengthMul = 1.0 + (hash(seed + 1) - 0.5) * 0.5;
+      const brightMul = 1.0 + (hash(seed + 2) - 0.5) * 0.4;
+
+      const dirAngle = angleRad + (i * Math.PI) / dirCount + angleJitter;
+      su.uDirection!.value.set(Math.cos(dirAngle), Math.sin(dirAngle));
+      su.uLength!.value = this.crossFilterLength * lengthMul;
+      su.uBrightnessMul!.value = brightMul;
+      this.postMesh.material = this.crossFilterStreakMaterial;
+      renderer.setRenderTarget(this.rtCrossStreak[i]!);
+      renderer.render(this.postScene, this.postCamera);
+    }
+    su.uLength!.value = this.crossFilterLength;
+
+    // Final sub-pass: Screen blend
+    const black = getBlackTexture();
+    const bu = this.crossFilterBlendMaterial.uniforms;
+    bu.uSource!.value = sourceTexture;
+    bu.uStreak0!.value = dirCount >= 1 ? this.rtCrossStreak[0]!.texture : black;
+    bu.uStreak1!.value = dirCount >= 2 ? this.rtCrossStreak[1]!.texture : black;
+    bu.uStreak2!.value = dirCount >= 3 ? this.rtCrossStreak[2]!.texture : black;
+    bu.uStreak3!.value = dirCount >= 4 ? this.rtCrossStreak[3]!.texture : black;
+    bu.uStreakCount!.value = dirCount;
+    bu.uIntensity!.value = this.crossFilterStrength;
+    this.postMesh.material = this.crossFilterBlendMaterial;
+    renderer.setRenderTarget(target);
+    renderer.render(this.postScene, this.postCamera);
+  }
+
   /**
    * Pass 9+ の受け皿。
-   * Pass order: Shafts(9) -> Dust(10) -> MotionBlur(11)
+   * Pass order: CrossFilter -> Shafts(9) -> Dust(10) -> MotionBlur(11)
    *
    * @param renderer 描画先
    * @param sourceTexture 直前の post-composite 出力
@@ -930,12 +1057,14 @@ export class Viewport {
     sourceTexture: THREE.Texture,
     target: THREE.WebGLRenderTarget | null,
   ): void {
+    const crossFilterOn = this.crossFilterStrength > 0;
     const shaftOn = this.shaftIntensity > 0;
     const dustOn = this.dustAmount > 0 || this.scratchAmount > 0;
     const motionBlurOn = this.shutterAngle > 0;
 
-    type Pass = "shaft" | "dust" | "motionBlur";
+    type Pass = "crossFilter" | "shaft" | "dust" | "motionBlur";
     const passes: Pass[] = [];
+    if (crossFilterOn) passes.push("crossFilter");
     if (shaftOn) passes.push("shaft");
     if (dustOn) passes.push("dust");
     if (motionBlurOn) passes.push("motionBlur");
@@ -948,6 +1077,9 @@ export class Viewport {
       const passTarget = isLast ? target : this.rtPostComposite1!;
 
       switch (passes[i]) {
+        case "crossFilter":
+          this.renderCrossFilter(renderer, currentSource, passTarget);
+          break;
         case "shaft":
           this.renderLightShafts(renderer, currentSource, passTarget);
           break;
@@ -1029,6 +1161,7 @@ export class Viewport {
 
     // —— Slot B: 一時的に abCompareEnabled=false でブラーを有効化 ——
     const savedShutterAngle = this.shutterAngle;
+    const savedCrossFilterStrength = this.crossFilterStrength;
     this.setParams(this.compareParamsB);
     this.renderBasePipeline(renderer, scene, camera);
 
@@ -1043,6 +1176,7 @@ export class Viewport {
     );
     this.abCompareEnabled = savedAbCompareEnabled;
     this.shutterAngle = savedShutterAngle;
+    this.crossFilterStrength = savedCrossFilterStrength;
   }
 
   /**
@@ -1217,6 +1351,12 @@ export class Viewport {
       const qw = Math.max(1, Math.floor(width / 4));
       const qh = Math.max(1, Math.floor(height / 4));
       this.rtShaft.setSize(qw, qh);
+    }
+    if (this.rtCrossThreshold) {
+      const hw = Math.max(1, Math.floor(width / 2));
+      const hh = Math.max(1, Math.floor(height / 2));
+      this.rtCrossThreshold.setSize(hw, hh);
+      for (const rt of this.rtCrossStreak) rt.setSize(hw, hh);
     }
     this.resetMotionBlurHistory();
   }
@@ -1415,6 +1555,18 @@ export class Viewport {
     this.shaftOriginY = Math.min(1, Math.max(0, value));
   }
 
+  // ===== Cross Filter =====
+
+  setCrossFilterStrength(v: number): void { this.crossFilterStrength = Math.min(1, Math.max(0, v)); }
+  setCrossFilterSpikes(v: number): void {
+    const c = Math.min(8, Math.max(4, Math.round(v)));
+    this.crossFilterSpikes = c % 2 === 0 ? c : c + 1;
+  }
+  setCrossFilterAngle(v: number): void { this.crossFilterAngle = ((v % 360) + 360) % 360; }
+  setCrossFilterLength(v: number): void { this.crossFilterLength = Math.min(1, Math.max(0, v)); }
+  setCrossFilterThreshold(v: number): void { this.crossFilterThreshold = Math.min(1, Math.max(0, v)); }
+  setCrossFilterChromatic(v: number): void { this.crossFilterChromatic = Math.min(1, Math.max(0, v)); }
+
   // ===== LUT =====
 
   /** Retained for sync (e.g. edit→batch transfer). Not used for rendering. */
@@ -1601,6 +1753,12 @@ export class Viewport {
       shaftDecay: this.shaftDecay,
       shaftOriginX: this.shaftOriginX,
       shaftOriginY: this.shaftOriginY,
+      crossFilterStrength: this.crossFilterStrength,
+      crossFilterSpikes: this.crossFilterSpikes,
+      crossFilterAngle: this.crossFilterAngle,
+      crossFilterLength: this.crossFilterLength,
+      crossFilterThreshold: this.crossFilterThreshold,
+      crossFilterChromatic: this.crossFilterChromatic,
     };
   }
 
@@ -1725,6 +1883,18 @@ export class Viewport {
       this.setShaftOriginX(params.shaftOriginX as number);
     if (params.shaftOriginY !== undefined)
       this.setShaftOriginY(params.shaftOriginY as number);
+    if (params.crossFilterStrength !== undefined)
+      this.setCrossFilterStrength(params.crossFilterStrength as number);
+    if (params.crossFilterSpikes !== undefined)
+      this.setCrossFilterSpikes(params.crossFilterSpikes as number);
+    if (params.crossFilterAngle !== undefined)
+      this.setCrossFilterAngle(params.crossFilterAngle as number);
+    if (params.crossFilterLength !== undefined)
+      this.setCrossFilterLength(params.crossFilterLength as number);
+    if (params.crossFilterThreshold !== undefined)
+      this.setCrossFilterThreshold(params.crossFilterThreshold as number);
+    if (params.crossFilterChromatic !== undefined)
+      this.setCrossFilterChromatic(params.crossFilterChromatic as number);
   }
 
   // ===== Histogram readback =====
@@ -1783,6 +1953,11 @@ export class Viewport {
     this.shaftMaterial?.dispose();
     this.shaftBlendMaterial?.dispose();
     this.rtShaft?.dispose();
+    this.crossFilterStreakMaterial?.dispose();
+    this.crossFilterBlendMaterial?.dispose();
+    this.rtCrossThreshold?.dispose();
+    for (const rt of this.rtCrossStreak) rt.dispose();
+    this.rtCrossStreak = [];
     const lut1Texture = this.material.uniforms.uLUT1?.value as THREE.Data3DTexture | null;
     if (lut1Texture) lut1Texture.dispose();
     const lut2Texture = this.material.uniforms.uLUT2?.value as THREE.Data3DTexture | null;

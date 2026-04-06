@@ -216,6 +216,7 @@ export function FilmLabControlPanelCore({
   const [savedBloomStrength, setSavedBloomStrength] = useState(0.3);
   const [savedHalationIntensity, setSavedHalationIntensity] = useState(0.25);
   const [savedShaftIntensity, setSavedShaftIntensity] = useState(0.4);
+  const [savedCrossFilterStrength, setSavedCrossFilterStrength] = useState(0.5);
   const [artifactsOpen, setArtifactsOpen] = useState(true);
   // v0.5.0: postEffectsOpen removed — motionBlur moved to ARTIFACTS, section eliminated
   const [showHelp, setShowHelp] = useState(false);
@@ -387,6 +388,7 @@ export function FilmLabControlPanelCore({
   const compressionAmountEnabled = params.compressionAmount > 0;
   const rgbShiftEnabled = params.rgbShift > 0;
   const shaftEnabled = params.shaftIntensity > 0;
+  const crossFilterEnabled = params.crossFilterStrength > 0;
   const canToggleHistogram = typeof onHistogramToggle === "function";
 
   const updateParam = useCallback((key: keyof Params, value: number) => {
@@ -443,6 +445,20 @@ export function FilmLabControlPanelCore({
       setActivePreset("reset");
     },
     [params.shaftIntensity, savedShaftIntensity],
+  );
+
+  const toggleCrossFilter = useCallback(
+    (on: boolean) => {
+      if (on) {
+        dispatch({ type: "SET_PARAM", key: "crossFilterStrength", value: savedCrossFilterStrength || 0.5 });
+      } else {
+        if (params.crossFilterStrength > 0) setSavedCrossFilterStrength(params.crossFilterStrength);
+        dispatch({ type: "SET_PARAM", key: "crossFilterStrength", value: 0 });
+      }
+      dispatch({ type: "COMMIT" });
+      setActivePreset("reset");
+    },
+    [params.crossFilterStrength, savedCrossFilterStrength],
   );
 
   /**
@@ -820,6 +836,23 @@ export function FilmLabControlPanelCore({
                   onChange={updateHalationHue}
                   onCommit={commit}
                 />
+              </div>
+
+              <div className="mt-3 flex flex-col gap-2.5">
+                <ToggleHeader
+                  title={tFilmLab("controls.crossFilter")}
+                  titleHint={tFilmLab("controls.crossFilterToggleHint")}
+                  enabled={crossFilterEnabled}
+                  onToggle={toggleCrossFilter}
+                />
+                <div className={`flex flex-col gap-2.5 ${!crossFilterEnabled ? "pointer-events-none opacity-30" : ""}`}>
+                  <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.crossFilterStrengthLabel")} value={params.crossFilterStrength} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("crossFilterStrength", v)} onCommit={commit} />
+                  <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.crossFilterSpikes")} hint={tFilmLab("controls.crossFilterSpikesHint")} value={params.crossFilterSpikes} min={4} max={8} step={2} defaultValue={4} onChange={(v) => updateParam("crossFilterSpikes", v)} onCommit={commit} />
+                  <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.crossFilterAngle")} hint={tFilmLab("controls.crossFilterAngleHint")} value={params.crossFilterAngle} min={0} max={360} step={1} defaultValue={0} onChange={(v) => updateParam("crossFilterAngle", v)} onCommit={commit} formatValue={(v) => `${Math.round(v)}°`} />
+                  <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.crossFilterLength")} hint={tFilmLab("controls.crossFilterLengthHint")} value={params.crossFilterLength} min={0} max={1} step={0.01} defaultValue={0.5} onChange={(v) => updateParam("crossFilterLength", v)} onCommit={commit} />
+                  <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.crossFilterThreshold")} hint={tFilmLab("controls.crossFilterThresholdHint")} value={params.crossFilterThreshold} min={0} max={1} step={0.01} defaultValue={0.8} onChange={(v) => updateParam("crossFilterThreshold", v)} onCommit={commit} />
+                  <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.crossFilterChromatic")} hint={tFilmLab("controls.crossFilterChromaticHint")} value={params.crossFilterChromatic} min={0} max={1} step={0.01} defaultValue={0.3} onChange={(v) => updateParam("crossFilterChromatic", v)} onCommit={commit} />
+                </div>
               </div>
 
               <div className="mt-3 flex flex-col gap-2.5">

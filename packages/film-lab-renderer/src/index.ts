@@ -22,3 +22,5 @@ export { motionblurFragmentShader } from "./shaders/motionblur.frag";
 export { dustFragmentShader } from "./shaders/dust.frag";
 export { lightshaftsFragmentShader } from "./shaders/lightshafts.frag";
 export { lightshaftsBlendFragmentShader } from "./shaders/lightshafts-blend.frag";
+export { crossFilterStreakFragmentShader } from "./shaders/cross-filter-streak.frag";
+export { crossFilterBlendFragmentShader } from "./shaders/cross-filter-blend.frag";
