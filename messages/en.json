@@ -952,6 +952,11 @@
       "typeFixed": "Fixed",
       "typeChanged": "Changed",
       "entries": {
+        "v051Title": "Heavy footage, instant preview",
+        "v051ProgressiveLoading": "ProRes, 4K HEVC, and other demanding formats now preview instantly. Filmtone shows native-decoded frames the moment you open a file, then silently converts to an optimised intermediate in the background. The same intermediate is reused at export, so you never transcode the same clip twice.",
+        "v051RingBufferMotionBlur": "Motion blur has been rebuilt around an eight-frame ring buffer with real shutter-angle control (0–720°). A new Trail Intensity slider adds feedback for stylised streaks. The weight curve shifts from triangle to box automatically as you push past 360°.",
+        "v051PortraitVideo": "Vertical (9:16) footage now displays in full-frame contain mode. The letterbox areas are filled with a frosted-glass version of the video itself, giving portrait clips a polished look without manual setup.",
+        "v051ComparisonModeFix": "Before / After split view no longer applies motion blur to both sides. The original half is now rendered clean, and switching modes resets the blur buffer so no ghost frames carry over.",
         "v050Title": "Grain that looks like the real thing",
         "v050GrainV3": "The grain engine has been rebuilt from the ground up — each film stock now has its own natural clumping, texture size, and color-noise character, so Kodak and Fuji grain no longer look the same.",
         "v050Diffusion": "A new Diffusion slider wraps your image in a soft, milky haze — like shooting through a Pro-Mist filter — gently lifting contrast and flattering skin tones.",
