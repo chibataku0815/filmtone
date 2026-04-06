@@ -752,6 +752,12 @@ export async function runVideoExportPipeline(options: {
   onProgress?: (p: VideoExportProgress) => void;
   onLog: (line: string) => void;
   userMessages?: VideoExportPipelineUserMessages;
+  /**
+   * @description Progressive loading で既に生成済みの mezzanine パス。
+   * 指定時は mezzanine 再生成をスキップしてこのパスを使います。
+   * エクスポート完了後の削除はこのパイプラインでは行いません（呼び出し側が管理）。
+   */
+  precomputedMezzaninePath?: string | null;
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const {
     api,
@@ -763,6 +769,7 @@ export async function runVideoExportPipeline(options: {
     onProgress,
     onLog,
     userMessages,
+    precomputedMezzaninePath,
   } = options;
 
   const u =
@@ -816,6 +823,8 @@ export async function runVideoExportPipeline(options: {
 
   // --- Mezzanine transcode (ProRes 422) for heavy codecs ---
   let mezzaninePath: string | null = null;
+  /** @description true のとき mezzanine はこのパイプラインが作ったもの → 完了後に削除する */
+  let mezzanineOwnedByExport = false;
   if (
     needsMezzanineTranscode({
       videoCodec: probe.videoCodec,
@@ -823,39 +832,48 @@ export async function runVideoExportPipeline(options: {
       absPath: inputVideoPath,
     })
   ) {
-    onLog(
-      `[動画][mezzanine] codec=${probe.videoCodec} → H.264 all-I-frame mezzanine を生成します...`,
-    );
-    const unsubscribeMezzanineProgress = onProgress
-      ? api.subscribeMezzanineProgress((payload) => {
-          onProgress({
-            currentFrame: payload.current,
-            totalFrames: payload.total,
-            phase: "mezzanine",
-          });
-        })
-      : null;
-    try {
-      const t0 = performance.now();
-      const result = await api.videoExportTranscodeMezzanine({
-        filePath: inputVideoPath,
-        durationSec: probe.durationSec,
-        outW,
-        outH,
-      });
-      const elapsedSec = ((performance.now() - t0) / 1000).toFixed(1);
-      mezzaninePath = result.mezzaninePath;
+    if (typeof precomputedMezzaninePath === "string" && precomputedMezzaninePath.length > 0) {
+      mezzaninePath = precomputedMezzaninePath;
+      mezzanineOwnedByExport = false;
       onLog(
-        `[動画][mezzanine] 完了 size=${(result.mezzanineSizeBytes / 1024 / 1024).toFixed(0)}MB elapsed=${elapsedSec}s`,
+        `[動画][mezzanine] progressive loading の mezzanine を再利用します`,
       );
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+    } else {
       onLog(
-        `[動画][mezzanine] 生成失敗、オリジナルソースで続行 — ${msg}`,
+        `[動画][mezzanine] codec=${probe.videoCodec} → H.264 all-I-frame mezzanine を生成します...`,
       );
-      mezzaninePath = null;
-    } finally {
-      unsubscribeMezzanineProgress?.();
+      const unsubscribeMezzanineProgress = onProgress
+        ? api.subscribeMezzanineProgress((payload) => {
+            onProgress({
+              currentFrame: payload.current,
+              totalFrames: payload.total,
+              phase: "mezzanine",
+            });
+          })
+        : null;
+      try {
+        const t0 = performance.now();
+        const result = await api.videoExportTranscodeMezzanine({
+          filePath: inputVideoPath,
+          durationSec: probe.durationSec,
+          outW,
+          outH,
+        });
+        const elapsedSec = ((performance.now() - t0) / 1000).toFixed(1);
+        mezzaninePath = result.mezzaninePath;
+        mezzanineOwnedByExport = true;
+        onLog(
+          `[動画][mezzanine] 完了 size=${(result.mezzanineSizeBytes / 1024 / 1024).toFixed(0)}MB elapsed=${elapsedSec}s`,
+        );
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        onLog(
+          `[動画][mezzanine] 生成失敗、オリジナルソースで続行 — ${msg}`,
+        );
+        mezzaninePath = null;
+      } finally {
+        unsubscribeMezzanineProgress?.();
+      }
     }
   }
   const effectiveInputPath = mezzaninePath ?? inputVideoPath;
@@ -1496,7 +1514,7 @@ export async function runVideoExportPipeline(options: {
     if (stagedPath) {
       await api.videoExportUnlinkStaged(stagedPath).catch(() => {});
     }
-    if (mezzaninePath) {
+    if (mezzaninePath && mezzanineOwnedByExport) {
       await api.videoExportUnlinkStaged(mezzaninePath).catch(() => {});
     }
   }

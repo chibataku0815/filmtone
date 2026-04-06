@@ -1134,6 +1134,11 @@ export default function App() {
           total: estimateFrames,
           fileName: tLogs("progressVideoFrames"),
         });
+        const reusableMezzanine =
+          progressiveLoad.stage === "ready" &&
+          progressiveLoad.activeSourcePath === videoInputPath
+            ? progressiveLoad.mezzaninePath
+            : null;
         const res = await runVideoExportPipeline({
           api: window.filmLabBatch,
           inputVideoPath: videoInputPath,
@@ -1146,6 +1151,7 @@ export default function App() {
           },
           onLog: appendLog,
           userMessages: videoPipelineUserMessages,
+          precomputedMezzaninePath: reusableMezzanine,
         });
         if (!res.ok) {
           appendLog(tLogs("videoExportFail", { msg: res.message }));

@@ -98,6 +98,8 @@ export type UseProgressiveLoadReturn = {
   stage: ProgressiveStage;
   /** @description Progressive loading 管理中の元動画の絶対パス */
   activeSourcePath: string | null;
+  /** @description 生成済み mezzanine の tmp パス。エクスポートで再利用可能。stage=ready のとき有効 */
+  mezzaninePath: string | null;
   /**
    * @description 高速に最初のプレビューを返し、背景で proxy → mezzanine を進めます。
    * サムネイル失敗時は proxy / mezzanine が初回結果になることがあります。
@@ -711,6 +713,7 @@ export function useProgressiveLoad(): UseProgressiveLoadReturn {
     isTranscoding: state.isTranscoding,
     stage: state.stage,
     activeSourcePath: state.activeSourcePath,
+    mezzaninePath: state.tempFiles.mezzaninePath,
     startProgressiveLoad,
     cancel,
   };
