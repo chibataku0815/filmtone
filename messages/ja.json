@@ -897,6 +897,22 @@
           "title": "重いコーデックの書き出し高速化（v0.4.3）",
           "description": "4K HEVC などの重いソースを書き出し前に自動最適化し、最大 4 倍のスループット改善。"
         },
+        "progressivePreview051": {
+          "title": "重い動画の progressive preview（v0.5.1）",
+          "description": "ProRes や 4K HEVC などの重い素材でも、開いた直後にネイティブデコードのプレビューを表示し、裏側で最適化済みの中間ファイルへ切り替えるようになりました。"
+        },
+        "portraitMotionBlur051": {
+          "title": "縦動画対応とモーションブラー刷新（v0.5.1）",
+          "description": "縦動画を contain 表示で自然に扱えるようにし、モーションブラーは 8 フレームリングバッファとシャッターアングル制御の構成へ刷新しました。"
+        },
+        "crossFilter060": {
+          "title": "Cross Filter 光学エフェクト（v0.6.0）",
+          "description": "明るい点光源に回折風の光条を加える新エフェクトです。強さ、本数、回転、光条長、しきい値、色分散を調整できます。"
+        },
+        "proxyCacheAndVideoUx060": {
+          "title": "proxy cache と動画 UX の磨き込み（v0.6.0）",
+          "description": "Desktop は progressive preview 用 proxy を端末内に再利用可能な形で保持できるようになり、比較解除、倍速確認、スライダー reset の見つけやすさ、サムネイルと loading 表示も改善しました。"
+        },
         "presetExpansion": {
           "title": "プリセット追加",
           "description": "初期の 4 種に加え、新しいフィルムストック・クリエイティブルックを順次追加。"

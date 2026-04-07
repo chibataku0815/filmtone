@@ -94,5 +94,5 @@ What changed from previous versions, in plain terms:
 ## Checksums
 
 ```text
-e65df2854b7d87d191a81039642a9a9a74b92c059bd7ad7ebaa9a1f55a57af1f  filmtone-0.6.0-arm64.dmg
+be5936c5862ead54fdad6dd53fdb6fec67b634b891aef0d04a6c94a29f5fdd05  filmtone-0.6.0-arm64.dmg
 ```

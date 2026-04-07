@@ -895,6 +895,22 @@
           "title": "Faster export for heavy codec sources (v0.4.3)",
           "description": "4K HEVC and other heavy format sources are automatically optimized before export, delivering up to 4× faster throughput."
         },
+        "progressivePreview051": {
+          "title": "Progressive preview for heavy footage (v0.5.1)",
+          "description": "Heavy formats such as ProRes and 4K HEVC now open with an immediate native-decoded preview, then switch over to an optimized intermediate in the background for smoother work."
+        },
+        "portraitMotionBlur051": {
+          "title": "Portrait video + rebuilt motion blur (v0.5.1)",
+          "description": "Vertical footage now displays in full-frame contain mode, and motion blur has been rebuilt around an eight-frame ring buffer with shutter-angle control."
+        },
+        "crossFilter060": {
+          "title": "Cross Filter optical effect (v0.6.0)",
+          "description": "A new diffraction-style star filter for bright point lights, with controls for strength, point count, rotation, streak length, threshold, and chromatic split."
+        },
+        "proxyCacheAndVideoUx060": {
+          "title": "Proxy cache and video UX polish (v0.6.0)",
+          "description": "Desktop now keeps progressive preview proxies in a bounded local cache, while compare dismissal, faster playback review, slider reset discoverability, and thumbnail/loading polish have all been improved."
+        },
         "presetExpansion": {
           "title": "Preset expansion",
           "description": "Additional film stocks and creative looks beyond the initial four."
