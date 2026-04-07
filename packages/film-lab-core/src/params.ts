@@ -76,6 +76,8 @@ export const PARAM_KEYS = [
   "crossFilterLength",
   "crossFilterThreshold",
   "crossFilterChromatic",
+  "crossFilterSizeLimit",
+  "crossFilterRandomness",
 ] as const;
 
 export type ParamKey = (typeof PARAM_KEYS)[number];
@@ -157,6 +159,8 @@ export interface Params {
   crossFilterLength: number;
   crossFilterThreshold: number;
   crossFilterChromatic: number;
+  crossFilterSizeLimit: number;
+  crossFilterRandomness: number;
 }
 
 export function cloneParams(params: Params): Params {

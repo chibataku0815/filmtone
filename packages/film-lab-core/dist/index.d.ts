@@ -3,7 +3,7 @@ import { z } from 'zod';
 /**
  * Film Lab のグレード数値パラメータ定義（ブラウザ・Remotion 共通の単一の真実）
  */
-declare const PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "grainIntensity", "grainRadialMix", "grainSize", "vignette", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "fade", "highlights", "shadows", "shadowTone", "highlightTone", "shadowHue", "highlightHue", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "motionBlurAmount", "shutterAngle", "trailIntensity", "dustAmount", "scratchAmount", "shaftIntensity", "shaftDecay", "shaftOriginX", "shaftOriginY", "crossFilterStrength", "crossFilterSpikes", "crossFilterAngle", "crossFilterLength", "crossFilterThreshold", "crossFilterChromatic"];
+declare const PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "grainIntensity", "grainRadialMix", "grainSize", "vignette", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "fade", "highlights", "shadows", "shadowTone", "highlightTone", "shadowHue", "highlightHue", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "motionBlurAmount", "shutterAngle", "trailIntensity", "dustAmount", "scratchAmount", "shaftIntensity", "shaftDecay", "shaftOriginX", "shaftOriginY", "crossFilterStrength", "crossFilterSpikes", "crossFilterAngle", "crossFilterLength", "crossFilterThreshold", "crossFilterChromatic", "crossFilterSizeLimit", "crossFilterRandomness"];
 type ParamKey = (typeof PARAM_KEYS)[number];
 interface Params {
     exposure: number;
@@ -81,6 +81,8 @@ interface Params {
     crossFilterLength: number;
     crossFilterThreshold: number;
     crossFilterChromatic: number;
+    crossFilterSizeLimit: number;
+    crossFilterRandomness: number;
 }
 declare function cloneParams(params: Params): Params;
 
@@ -143,6 +145,8 @@ declare const PRESETS: {
         crossFilterLength: number;
         crossFilterThreshold: number;
         crossFilterChromatic: number;
+        crossFilterSizeLimit: number;
+        crossFilterRandomness: number;
     };
     /**
      * cinematic プリセット（v2・2026-03-31）
@@ -199,6 +203,8 @@ declare const PRESETS: {
         crossFilterLength: number;
         crossFilterThreshold: number;
         crossFilterChromatic: number;
+        crossFilterSizeLimit: number;
+        crossFilterRandomness: number;
     };
     portra: {
         exposure: number;
@@ -251,6 +257,8 @@ declare const PRESETS: {
         crossFilterLength: number;
         crossFilterThreshold: number;
         crossFilterChromatic: number;
+        crossFilterSizeLimit: number;
+        crossFilterRandomness: number;
     };
     gold200: {
         exposure: number;
@@ -303,6 +311,8 @@ declare const PRESETS: {
         crossFilterLength: number;
         crossFilterThreshold: number;
         crossFilterChromatic: number;
+        crossFilterSizeLimit: number;
+        crossFilterRandomness: number;
     };
     pro400h: {
         exposure: number;
@@ -355,6 +365,8 @@ declare const PRESETS: {
         crossFilterLength: number;
         crossFilterThreshold: number;
         crossFilterChromatic: number;
+        crossFilterSizeLimit: number;
+        crossFilterRandomness: number;
     };
     bw: {
         exposure: number;
@@ -407,6 +419,8 @@ declare const PRESETS: {
         crossFilterLength: number;
         crossFilterThreshold: number;
         crossFilterChromatic: number;
+        crossFilterSizeLimit: number;
+        crossFilterRandomness: number;
     };
     ektar100: {
         exposure: number;
@@ -459,6 +473,8 @@ declare const PRESETS: {
         crossFilterLength: number;
         crossFilterThreshold: number;
         crossFilterChromatic: number;
+        crossFilterSizeLimit: number;
+        crossFilterRandomness: number;
     };
     superia400: {
         exposure: number;
@@ -511,6 +527,8 @@ declare const PRESETS: {
         crossFilterLength: number;
         crossFilterThreshold: number;
         crossFilterChromatic: number;
+        crossFilterSizeLimit: number;
+        crossFilterRandomness: number;
     };
     cinestill800t: {
         exposure: number;
@@ -563,6 +581,8 @@ declare const PRESETS: {
         crossFilterLength: number;
         crossFilterThreshold: number;
         crossFilterChromatic: number;
+        crossFilterSizeLimit: number;
+        crossFilterRandomness: number;
     };
     /**
      * Velvia 50 プリセット（v1・2026-04-02）
@@ -620,6 +640,8 @@ declare const PRESETS: {
         crossFilterLength: number;
         crossFilterThreshold: number;
         crossFilterChromatic: number;
+        crossFilterSizeLimit: number;
+        crossFilterRandomness: number;
     };
 };
 type PresetName = keyof typeof PRESETS;

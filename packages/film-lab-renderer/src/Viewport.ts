@@ -167,6 +167,8 @@ export class Viewport {
   private crossFilterLength = 0.5;
   private crossFilterThreshold = 0.8;
   private crossFilterChromatic = 0.3;
+  private crossFilterSizeLimit = 0;
+  private crossFilterRandomness = 1;
   private crossFilterStreakMaterial: THREE.ShaderMaterial | null = null;
   private crossFilterBlendMaterial: THREE.ShaderMaterial | null = null;
   private rtCrossThreshold: THREE.WebGLRenderTarget | null = null;
@@ -611,6 +613,7 @@ export class Viewport {
         uLength: { value: 0.5 },
         uChromatic: { value: 0.0 },
         uBrightnessMul: { value: 1.0 },
+        uRandomness: { value: 1 },
         uFlipY: { value: 0.0 },
       },
     });
@@ -647,6 +650,7 @@ export class Viewport {
       uniforms: {
         uSource: { value: null },
         uTexelSize: { value: new THREE.Vector2() },
+        uSizeLimit: { value: 0 },
         uFlipY: { value: 0.0 },
       },
     });
@@ -1019,6 +1023,7 @@ export class Viewport {
     const pk = this.crossFilterPeakMaterial!.uniforms;
     pk.uSource!.value = this.rtCrossThreshold.texture;
     pk.uTexelSize!.value.set(1.0 / this.rtCrossThreshold.width, 1.0 / this.rtCrossThreshold.height);
+    pk.uSizeLimit!.value = this.crossFilterSizeLimit;
     this.postMesh.material = this.crossFilterPeakMaterial!;
     renderer.setRenderTarget(this.rtCrossPeak!);
     renderer.render(this.postScene, this.postCamera);
@@ -1030,6 +1035,7 @@ export class Viewport {
     su.uSource!.value = this.rtCrossPeak!.texture;
     su.uTexelSize!.value.set(1.0 / qw, 1.0 / qh);
     su.uChromatic!.value = this.crossFilterChromatic;
+    su.uRandomness!.value = this.crossFilterRandomness;
 
     // Deterministic hash for per-direction organic variation
     const hash = (n: number): number => {
@@ -1591,6 +1597,8 @@ export class Viewport {
   setCrossFilterLength(v: number): void { this.crossFilterLength = Math.min(1, Math.max(0, v)); }
   setCrossFilterThreshold(v: number): void { this.crossFilterThreshold = Math.min(1, Math.max(0, v)); }
   setCrossFilterChromatic(v: number): void { this.crossFilterChromatic = Math.min(1, Math.max(0, v)); }
+  setCrossFilterSizeLimit(v: number): void { this.crossFilterSizeLimit = Math.min(1, Math.max(0, v)); }
+  setCrossFilterRandomness(v: number): void { this.crossFilterRandomness = Math.min(1, Math.max(0, v)); }
 
   // ===== LUT =====
 
@@ -1784,6 +1792,8 @@ export class Viewport {
       crossFilterLength: this.crossFilterLength,
       crossFilterThreshold: this.crossFilterThreshold,
       crossFilterChromatic: this.crossFilterChromatic,
+      crossFilterSizeLimit: this.crossFilterSizeLimit,
+      crossFilterRandomness: this.crossFilterRandomness,
     };
   }
 
@@ -1920,6 +1930,10 @@ export class Viewport {
       this.setCrossFilterThreshold(params.crossFilterThreshold as number);
     if (params.crossFilterChromatic !== undefined)
       this.setCrossFilterChromatic(params.crossFilterChromatic as number);
+    if (params.crossFilterSizeLimit !== undefined)
+      this.setCrossFilterSizeLimit(params.crossFilterSizeLimit as number);
+    if (params.crossFilterRandomness !== undefined)
+      this.setCrossFilterRandomness(params.crossFilterRandomness as number);
   }
 
   // ===== Histogram readback =====

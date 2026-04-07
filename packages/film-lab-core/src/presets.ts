@@ -63,6 +63,8 @@ export const PRESETS = {
     crossFilterLength: 0.4,
     crossFilterThreshold: 0.92,
     crossFilterChromatic: 0.3,
+    crossFilterSizeLimit: 0,
+    crossFilterRandomness: 1,
   },
   /**
    * cinematic プリセット（v2・2026-03-31）
@@ -119,6 +121,8 @@ export const PRESETS = {
     crossFilterLength: 0.4,
     crossFilterThreshold: 0.92,
     crossFilterChromatic: 0.3,
+    crossFilterSizeLimit: 0,
+    crossFilterRandomness: 1,
   },
   portra: {
     exposure: 0.2,
@@ -171,6 +175,8 @@ export const PRESETS = {
     crossFilterLength: 0.4,
     crossFilterThreshold: 0.92,
     crossFilterChromatic: 0.3,
+    crossFilterSizeLimit: 0,
+    crossFilterRandomness: 1,
   },
   gold200: {
     exposure: 0.15,
@@ -223,6 +229,8 @@ export const PRESETS = {
     crossFilterLength: 0.4,
     crossFilterThreshold: 0.92,
     crossFilterChromatic: 0.3,
+    crossFilterSizeLimit: 0,
+    crossFilterRandomness: 1,
   },
   pro400h: {
     exposure: 0.25,
@@ -275,6 +283,8 @@ export const PRESETS = {
     crossFilterLength: 0.4,
     crossFilterThreshold: 0.92,
     crossFilterChromatic: 0.3,
+    crossFilterSizeLimit: 0,
+    crossFilterRandomness: 1,
   },
   bw: {
     exposure: 0.1,
@@ -327,6 +337,8 @@ export const PRESETS = {
     crossFilterLength: 0.4,
     crossFilterThreshold: 0.92,
     crossFilterChromatic: 0.3,
+    crossFilterSizeLimit: 0,
+    crossFilterRandomness: 1,
   },
   ektar100: {
     exposure: 0.05,
@@ -379,6 +391,8 @@ export const PRESETS = {
     crossFilterLength: 0.4,
     crossFilterThreshold: 0.92,
     crossFilterChromatic: 0.3,
+    crossFilterSizeLimit: 0,
+    crossFilterRandomness: 1,
   },
   superia400: {
     exposure: 0.1,
@@ -431,6 +445,8 @@ export const PRESETS = {
     crossFilterLength: 0.4,
     crossFilterThreshold: 0.92,
     crossFilterChromatic: 0.3,
+    crossFilterSizeLimit: 0,
+    crossFilterRandomness: 1,
   },
   cinestill800t: {
     exposure: 0.15,
@@ -483,6 +499,8 @@ export const PRESETS = {
     crossFilterLength: 0.4,
     crossFilterThreshold: 0.92,
     crossFilterChromatic: 0.3,
+    crossFilterSizeLimit: 0,
+    crossFilterRandomness: 1,
   },
   /**
    * Velvia 50 プリセット（v1・2026-04-02）
@@ -540,6 +558,8 @@ export const PRESETS = {
     crossFilterLength: 0.4,
     crossFilterThreshold: 0.92,
     crossFilterChromatic: 0.3,
+    crossFilterSizeLimit: 0,
+    crossFilterRandomness: 1,
   },
 } satisfies Record<string, Params>;
 

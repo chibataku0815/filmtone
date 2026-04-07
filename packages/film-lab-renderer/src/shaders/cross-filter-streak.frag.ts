@@ -7,6 +7,7 @@ uniform vec2 uTexelSize;
 uniform float uLength;
 uniform float uChromatic;
 uniform float uBrightnessMul;
+uniform float uRandomness;
 
 in vec2 vUv;
 out vec4 fragColor;
@@ -41,6 +42,8 @@ void main() {
     vec2 sampleUV = vUv - uDirection * uTexelSize * float(i);
     float peakLuma = dot(texture(uSource, sampleUV).rgb, vec3(0.2126, 0.7152, 0.0722));
     if (peakLuma > PEAK_THRESHOLD) {
+      float peakHash = fract(sin(dot(floor(sampleUV / uTexelSize), vec2(127.1, 311.7))) * 43758.5453);
+      if (peakHash > uRandomness) break;
       float t = float(i) / float(maxSteps);
       float falloff = exp(-float(i) * FALLOFF_K / float(maxSteps));
       vec3 tint = mix(vec3(1.0), wavelengthToRGB(t), uChromatic);
@@ -56,6 +59,8 @@ void main() {
     vec2 sampleUV = vUv + uDirection * uTexelSize * float(i);
     float peakLuma = dot(texture(uSource, sampleUV).rgb, vec3(0.2126, 0.7152, 0.0722));
     if (peakLuma > PEAK_THRESHOLD) {
+      float peakHash = fract(sin(dot(floor(sampleUV / uTexelSize), vec2(127.1, 311.7))) * 43758.5453);
+      if (peakHash > uRandomness) break;
       float t = float(i) / float(maxSteps);
       float falloff = exp(-float(i) * FALLOFF_K / float(maxSteps));
       vec3 tint = mix(vec3(1.0), wavelengthToRGB(t), uChromatic);
