@@ -11,35 +11,61 @@ uniform float uBrightnessMul;
 in vec2 vUv;
 out vec4 fragColor;
 
-const int HALF_SAMPLES = 32;
-const float MAX_STREAK_PX = 80.0;
-const float FALLOFF_K = 8.0;
-const float STREAK_GAIN = 4.0;
+const int MAX_STREAK_PX = 64;
+const float FALLOFF_K    = 4.0;
+const float STREAK_GAIN  = 2.5;
+const float PEAK_THRESHOLD = 0.01;
+
+// Wavelength dispersion spectrum.
+// t = 0.0 -> near peak (warm: red/orange)  — matches reference "赤->橙->黄->緑->青"
+// t = 0.5 -> mid streak (green/yellow)
+// t = 1.0 -> far tip (cool: blue/violet)
+// uChromatic = 0: white streak, uChromatic = 1: full rainbow
+vec3 wavelengthToRGB(float t) {
+  vec3 c;
+  c.r = clamp(1.0 - t * 2.0, 0.0, 1.0);
+  c.g = clamp(1.0 - abs(t - 0.45) * 3.2, 0.0, 1.0);
+  c.b = clamp((t - 0.45) * 3.0, 0.0, 1.0);
+  float maxC = max(c.r, max(c.g, c.b));
+  return c / max(maxC, 1e-4);
+}
 
 void main() {
-  vec3 sum = vec3(0.0);
-  vec2 stepUV = uDirection * uTexelSize * (uLength * MAX_STREAK_PX / float(HALF_SAMPLES));
+  int maxSteps = int(uLength * float(MAX_STREAK_PX));
+  maxSteps = clamp(maxSteps, 1, MAX_STREAK_PX);
 
-  for (int i = -HALF_SAMPLES; i <= HALF_SAMPLES; i++) {
-    float fi = float(i);
-    float w = exp(-abs(fi) * FALLOFF_K / float(HALF_SAMPLES));
-    float chromShift = fi * uChromatic * 0.18;
-    vec2 baseOffset = stepUV * fi;
-
-    float r = texture(uSource, vUv + baseOffset + stepUV * chromShift).r;
-    float g = texture(uSource, vUv + baseOffset).g;
-    float b = texture(uSource, vUv + baseOffset - stepUV * chromShift).b;
-
-    sum += vec3(r, g, b) * w;
+  // Forward: march in -uDirection to find peaks that cast a streak through this pixel
+  vec3 resultFwd = vec3(0.0);
+  for (int i = 1; i <= MAX_STREAK_PX; i++) {
+    if (i > maxSteps) break;
+    vec2 sampleUV = vUv - uDirection * uTexelSize * float(i);
+    float peakLuma = dot(texture(uSource, sampleUV).rgb, vec3(0.2126, 0.7152, 0.0722));
+    if (peakLuma > PEAK_THRESHOLD) {
+      float t = float(i) / float(maxSteps);
+      float falloff = exp(-float(i) * FALLOFF_K / float(maxSteps));
+      vec3 tint = mix(vec3(1.0), wavelengthToRGB(t), uChromatic);
+      resultFwd = peakLuma * tint * falloff;
+      break;
+    }
   }
 
-  // Boost saturation — bright highlights are near-white in source,
-  // amplify subtle color differences to reveal source tint
-  float sumLuma = dot(sum, vec3(0.2126, 0.7152, 0.0722));
-  sum = mix(vec3(sumLuma), sum, 5.0);
-  sum = max(sum, vec3(0.0));
+  // Backward: march in +uDirection to find peaks that cast a streak through this pixel
+  vec3 resultBwd = vec3(0.0);
+  for (int i = 1; i <= MAX_STREAK_PX; i++) {
+    if (i > maxSteps) break;
+    vec2 sampleUV = vUv + uDirection * uTexelSize * float(i);
+    float peakLuma = dot(texture(uSource, sampleUV).rgb, vec3(0.2126, 0.7152, 0.0722));
+    if (peakLuma > PEAK_THRESHOLD) {
+      float t = float(i) / float(maxSteps);
+      float falloff = exp(-float(i) * FALLOFF_K / float(maxSteps));
+      vec3 tint = mix(vec3(1.0), wavelengthToRGB(t), uChromatic);
+      resultBwd = peakLuma * tint * falloff;
+      break;
+    }
+  }
 
-  sum = 1.0 - exp(-sum * STREAK_GAIN * uBrightnessMul);
-  fragColor = vec4(sum, 1.0);
+  vec3 result = resultFwd + resultBwd;
+  result = 1.0 - exp(-result * STREAK_GAIN * uBrightnessMul);
+  fragColor = vec4(result, 1.0);
 }
 `;

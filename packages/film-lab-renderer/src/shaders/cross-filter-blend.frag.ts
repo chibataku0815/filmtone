@@ -18,8 +18,15 @@ void main() {
   if (uStreakCount > 2) streaks += texture(uStreak2, vUv).rgb;
   if (uStreakCount > 3) streaks += texture(uStreak3, vUv).rgb;
   streaks /= float(uStreakCount);
+
   vec3 overlay = streaks * uIntensity;
-  vec3 result = 1.0 - (1.0 - original.rgb) * (1.0 - overlay);
+
+  // Additive blend: preserves dark areas exactly (no shadow lifting).
+  // Soft Reinhard rolloff on excess prevents harsh highlight clipping.
+  vec3 combined = original.rgb + overlay;
+  vec3 excess = max(combined - 1.0, vec3(0.0));
+  vec3 result = combined - excess + excess / (1.0 + excess * 2.0);
+
   fragColor = vec4(result, original.a);
 }
 `;

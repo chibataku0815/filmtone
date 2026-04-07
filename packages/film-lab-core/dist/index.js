@@ -67,7 +67,13 @@ var PARAM_KEYS = [
   /** ライトシャフト光源 X 位置（0=左端、1=右端）。range: 0–1 */
   "shaftOriginX",
   /** ライトシャフト光源 Y 位置（0=上端、1=下端）。range: 0–1 */
-  "shaftOriginY"
+  "shaftOriginY",
+  "crossFilterStrength",
+  "crossFilterSpikes",
+  "crossFilterAngle",
+  "crossFilterLength",
+  "crossFilterThreshold",
+  "crossFilterChromatic"
 ];
 function cloneParams(params) {
   return { ...params };
@@ -188,7 +194,13 @@ var PRESETS = {
     shaftIntensity: 0,
     shaftDecay: 0.5,
     shaftOriginX: 0.5,
-    shaftOriginY: 0.15
+    shaftOriginY: 0.15,
+    crossFilterStrength: 0,
+    crossFilterSpikes: 4,
+    crossFilterAngle: 0,
+    crossFilterLength: 0.4,
+    crossFilterThreshold: 0.92,
+    crossFilterChromatic: 0.3
   },
   /**
    * cinematic プリセット（v2・2026-03-31）
@@ -238,7 +250,13 @@ var PRESETS = {
     shaftIntensity: 0,
     shaftDecay: 0.5,
     shaftOriginX: 0.5,
-    shaftOriginY: 0.15
+    shaftOriginY: 0.15,
+    crossFilterStrength: 0,
+    crossFilterSpikes: 4,
+    crossFilterAngle: 0,
+    crossFilterLength: 0.4,
+    crossFilterThreshold: 0.92,
+    crossFilterChromatic: 0.3
   },
   portra: {
     exposure: 0.2,
@@ -284,7 +302,13 @@ var PRESETS = {
     shaftIntensity: 0,
     shaftDecay: 0.5,
     shaftOriginX: 0.5,
-    shaftOriginY: 0.15
+    shaftOriginY: 0.15,
+    crossFilterStrength: 0,
+    crossFilterSpikes: 4,
+    crossFilterAngle: 0,
+    crossFilterLength: 0.4,
+    crossFilterThreshold: 0.92,
+    crossFilterChromatic: 0.3
   },
   gold200: {
     exposure: 0.15,
@@ -330,7 +354,13 @@ var PRESETS = {
     shaftIntensity: 0,
     shaftDecay: 0.5,
     shaftOriginX: 0.5,
-    shaftOriginY: 0.15
+    shaftOriginY: 0.15,
+    crossFilterStrength: 0,
+    crossFilterSpikes: 4,
+    crossFilterAngle: 0,
+    crossFilterLength: 0.4,
+    crossFilterThreshold: 0.92,
+    crossFilterChromatic: 0.3
   },
   pro400h: {
     exposure: 0.25,
@@ -376,7 +406,13 @@ var PRESETS = {
     shaftIntensity: 0,
     shaftDecay: 0.5,
     shaftOriginX: 0.5,
-    shaftOriginY: 0.15
+    shaftOriginY: 0.15,
+    crossFilterStrength: 0,
+    crossFilterSpikes: 4,
+    crossFilterAngle: 0,
+    crossFilterLength: 0.4,
+    crossFilterThreshold: 0.92,
+    crossFilterChromatic: 0.3
   },
   bw: {
     exposure: 0.1,
@@ -422,7 +458,13 @@ var PRESETS = {
     shaftIntensity: 0,
     shaftDecay: 0.5,
     shaftOriginX: 0.5,
-    shaftOriginY: 0.15
+    shaftOriginY: 0.15,
+    crossFilterStrength: 0,
+    crossFilterSpikes: 4,
+    crossFilterAngle: 0,
+    crossFilterLength: 0.4,
+    crossFilterThreshold: 0.92,
+    crossFilterChromatic: 0.3
   },
   ektar100: {
     exposure: 0.05,
@@ -468,7 +510,13 @@ var PRESETS = {
     shaftIntensity: 0,
     shaftDecay: 0.5,
     shaftOriginX: 0.5,
-    shaftOriginY: 0.15
+    shaftOriginY: 0.15,
+    crossFilterStrength: 0,
+    crossFilterSpikes: 4,
+    crossFilterAngle: 0,
+    crossFilterLength: 0.4,
+    crossFilterThreshold: 0.92,
+    crossFilterChromatic: 0.3
   },
   superia400: {
     exposure: 0.1,
@@ -514,7 +562,13 @@ var PRESETS = {
     shaftIntensity: 0,
     shaftDecay: 0.5,
     shaftOriginX: 0.5,
-    shaftOriginY: 0.15
+    shaftOriginY: 0.15,
+    crossFilterStrength: 0,
+    crossFilterSpikes: 4,
+    crossFilterAngle: 0,
+    crossFilterLength: 0.4,
+    crossFilterThreshold: 0.92,
+    crossFilterChromatic: 0.3
   },
   cinestill800t: {
     exposure: 0.15,
@@ -560,7 +614,13 @@ var PRESETS = {
     shaftIntensity: 0,
     shaftDecay: 0.5,
     shaftOriginX: 0.5,
-    shaftOriginY: 0.15
+    shaftOriginY: 0.15,
+    crossFilterStrength: 0,
+    crossFilterSpikes: 4,
+    crossFilterAngle: 0,
+    crossFilterLength: 0.4,
+    crossFilterThreshold: 0.92,
+    crossFilterChromatic: 0.3
   },
   /**
    * Velvia 50 プリセット（v1・2026-04-02）
@@ -611,7 +671,13 @@ var PRESETS = {
     shaftIntensity: 0,
     shaftDecay: 0.5,
     shaftOriginX: 0.5,
-    shaftOriginY: 0.15
+    shaftOriginY: 0.15,
+    crossFilterStrength: 0,
+    crossFilterSpikes: 4,
+    crossFilterAngle: 0,
+    crossFilterLength: 0.4,
+    crossFilterThreshold: 0.92,
+    crossFilterChromatic: 0.3
   }
 };
 function findMatchingPreset(params) {
@@ -658,7 +724,7 @@ import { z } from "zod";
 var paramShape = Object.fromEntries(
   PARAM_KEYS.map((key) => [
     key,
-    key === "grainRadialMix" ? z.number().min(0).max(1).default(1) : key === "grainSize" ? z.number().min(0).max(1).default(0.3) : key === "diffusion" ? z.number().min(0).max(1).default(0) : key === "lensSoftness" ? z.number().min(0).max(1).default(0) : key === "compressionRange" ? z.number().min(0).max(1).default(0.5) : key === "compressionAmount" || key === "printContrast" ? z.number().min(0).max(1).default(0) : key === "cyan" || key === "magenta" || key === "yellow" ? z.number().min(-1).max(1).default(0) : key === "shutterAngle" ? z.number().min(0).max(720).default(0) : key === "trailIntensity" ? z.number().min(0).max(0.95).default(0) : key === "motionBlurAmount" || key === "dustAmount" || key === "scratchAmount" ? z.number().min(0).max(1).default(0) : key === "shaftIntensity" ? z.number().min(0).max(1).default(0) : key === "shaftDecay" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginX" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginY" ? z.number().min(0).max(1).default(0.15) : z.number()
+    key === "grainRadialMix" ? z.number().min(0).max(1).default(1) : key === "grainSize" ? z.number().min(0).max(1).default(0.3) : key === "diffusion" ? z.number().min(0).max(1).default(0) : key === "lensSoftness" ? z.number().min(0).max(1).default(0) : key === "compressionRange" ? z.number().min(0).max(1).default(0.5) : key === "compressionAmount" || key === "printContrast" ? z.number().min(0).max(1).default(0) : key === "cyan" || key === "magenta" || key === "yellow" ? z.number().min(-1).max(1).default(0) : key === "shutterAngle" ? z.number().min(0).max(720).default(0) : key === "trailIntensity" ? z.number().min(0).max(0.95).default(0) : key === "motionBlurAmount" || key === "dustAmount" || key === "scratchAmount" ? z.number().min(0).max(1).default(0) : key === "shaftIntensity" ? z.number().min(0).max(1).default(0) : key === "shaftDecay" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginX" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginY" ? z.number().min(0).max(1).default(0.15) : key === "crossFilterStrength" ? z.number().min(0).max(1).default(0) : key === "crossFilterSpikes" ? z.number().min(4).max(8).default(4) : key === "crossFilterAngle" ? z.number().min(0).max(360).default(0) : key === "crossFilterLength" ? z.number().min(0).max(1).default(0.4) : key === "crossFilterThreshold" ? z.number().min(0).max(1).default(0.92) : key === "crossFilterChromatic" ? z.number().min(0).max(1).default(0.3) : z.number()
   ])
 );
 var filmLabParamsSchema = z.object(paramShape);
