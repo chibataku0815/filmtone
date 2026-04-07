@@ -80,6 +80,8 @@ export const PARAM_KEYS = [
   "crossFilterRandomness",
   /** Hard Mode toggle (0=Soft 自然な光学再現 / 1=Hard 物理超え stylized 光芒)。boolean 用途の number。 */
   "crossFilterHardMode",
+  /** 光芒の密集回避。0=制限なし、1=近接した平行 streak ほど soft に減衰。光源形状は維持する。 */
+  "crossFilterMinSpacing",
 ] as const;
 
 export type ParamKey = (typeof PARAM_KEYS)[number];
@@ -165,6 +167,8 @@ export interface Params {
   crossFilterRandomness: number;
   /** Hard Mode toggle (0=Soft / 1=Hard)。1 のとき中心 bloom + 強化 streak の stylized rendering。 */
   crossFilterHardMode: number;
+  /** 光芒の密集回避。0=制限なし、1=近接した平行 streak を soft に整理する。 */
+  crossFilterMinSpacing: number;
 }
 
 export function cloneParams(params: Params): Params {

@@ -26,7 +26,13 @@ void main() {
   // uHardMode = 1.0 → adds blurred peak halo for the "thick base, soft glow" reference look.
   vec3 bloom = texture(uCentralBloom, vUv).rgb * uHardMode * 1.5;
 
-  vec3 overlay = (streaks + bloom) * uIntensity;
+  // Phase 7: Highlight Protection Mask (Hard Mode only).
+  // Bright pixels in the original (light source centers) get the streak/bloom overlay attenuated
+  // to prevent double-bright blow-out. uHardMode=0 → centerProtect=1.0 → Phase 6 unchanged.
+  float origLuma = dot(original.rgb, vec3(0.2126, 0.7152, 0.0722));
+  float centerProtect = mix(1.0, 1.0 - smoothstep(0.65, 0.95, origLuma), uHardMode);
+
+  vec3 overlay = (streaks + bloom) * uIntensity * centerProtect;
 
   // Additive blend: preserves dark areas exactly (no shadow lifting).
   // Soft Reinhard rolloff on excess prevents harsh highlight clipping.

@@ -873,6 +873,7 @@ export function FilmLabControlPanelCore({
                     <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.crossFilterSizeLimit")} hint={tFilmLab("controls.crossFilterSizeLimitHint")} value={params.crossFilterSizeLimit} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("crossFilterSizeLimit", v)} onCommit={commit} />
                     <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.crossFilterRandomness")} hint={tFilmLab("controls.crossFilterRandomnessHint")} value={params.crossFilterRandomness} min={0} max={1} step={0.01} defaultValue={1} onChange={(v) => updateParam("crossFilterRandomness", v)} onCommit={commit} />
                   </div>
+                  <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.crossFilterMinSpacing")} hint={tFilmLab("controls.crossFilterMinSpacingHint")} value={params.crossFilterMinSpacing} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("crossFilterMinSpacing", v)} onCommit={commit} />
                 </div>
               </div>
 

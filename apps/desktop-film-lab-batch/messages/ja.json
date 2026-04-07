@@ -261,6 +261,8 @@
       "crossFilterHardModeHard": "ハード",
       "crossFilterHardModeAria": "ソフト/ハード クロスフィルター切替",
       "crossFilterHardModeOverrideHint": "ハードモード時はこれらの値が内部で固定されます。手動調整するにはソフトに戻してください。",
+      "crossFilterMinSpacing": "光芒の間隔",
+      "crossFilterMinSpacingHint": "近接した光芒が重なるほど徐々に弱めます。光源の形は保ちつつ、シャンデリアのような密集した光芒を整理します。",
       "dustAmount": "ホコリ",
       "dustAmountHint": "古いフィルムのようなホコリの粒子を画像に重ねます。",
       "scratchAmount": "スクラッチ",

@@ -3,7 +3,7 @@ import { z } from 'zod';
 /**
  * Film Lab のグレード数値パラメータ定義（ブラウザ・Remotion 共通の単一の真実）
  */
-declare const PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "grainIntensity", "grainRadialMix", "grainSize", "vignette", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "fade", "highlights", "shadows", "shadowTone", "highlightTone", "shadowHue", "highlightHue", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "motionBlurAmount", "shutterAngle", "trailIntensity", "dustAmount", "scratchAmount", "shaftIntensity", "shaftDecay", "shaftOriginX", "shaftOriginY", "crossFilterStrength", "crossFilterSpikes", "crossFilterAngle", "crossFilterLength", "crossFilterThreshold", "crossFilterChromatic", "crossFilterSizeLimit", "crossFilterRandomness", "crossFilterHardMode"];
+declare const PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "grainIntensity", "grainRadialMix", "grainSize", "vignette", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "fade", "highlights", "shadows", "shadowTone", "highlightTone", "shadowHue", "highlightHue", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "motionBlurAmount", "shutterAngle", "trailIntensity", "dustAmount", "scratchAmount", "shaftIntensity", "shaftDecay", "shaftOriginX", "shaftOriginY", "crossFilterStrength", "crossFilterSpikes", "crossFilterAngle", "crossFilterLength", "crossFilterThreshold", "crossFilterChromatic", "crossFilterSizeLimit", "crossFilterRandomness", "crossFilterHardMode", "crossFilterMinSpacing"];
 type ParamKey = (typeof PARAM_KEYS)[number];
 interface Params {
     exposure: number;
@@ -85,6 +85,8 @@ interface Params {
     crossFilterRandomness: number;
     /** Hard Mode toggle (0=Soft / 1=Hard)。1 のとき中心 bloom + 強化 streak の stylized rendering。 */
     crossFilterHardMode: number;
+    /** 光芒の密集回避。0=制限なし、1=近接した平行 streak を soft に整理する。 */
+    crossFilterMinSpacing: number;
 }
 declare function cloneParams(params: Params): Params;
 
@@ -150,6 +152,7 @@ declare const PRESETS: {
         crossFilterSizeLimit: number;
         crossFilterRandomness: number;
         crossFilterHardMode: number;
+        crossFilterMinSpacing: number;
     };
     /**
      * cinematic プリセット（v2・2026-03-31）
@@ -209,6 +212,7 @@ declare const PRESETS: {
         crossFilterSizeLimit: number;
         crossFilterRandomness: number;
         crossFilterHardMode: number;
+        crossFilterMinSpacing: number;
     };
     portra: {
         exposure: number;
@@ -264,6 +268,7 @@ declare const PRESETS: {
         crossFilterSizeLimit: number;
         crossFilterRandomness: number;
         crossFilterHardMode: number;
+        crossFilterMinSpacing: number;
     };
     gold200: {
         exposure: number;
@@ -319,6 +324,7 @@ declare const PRESETS: {
         crossFilterSizeLimit: number;
         crossFilterRandomness: number;
         crossFilterHardMode: number;
+        crossFilterMinSpacing: number;
     };
     pro400h: {
         exposure: number;
@@ -374,6 +380,7 @@ declare const PRESETS: {
         crossFilterSizeLimit: number;
         crossFilterRandomness: number;
         crossFilterHardMode: number;
+        crossFilterMinSpacing: number;
     };
     bw: {
         exposure: number;
@@ -429,6 +436,7 @@ declare const PRESETS: {
         crossFilterSizeLimit: number;
         crossFilterRandomness: number;
         crossFilterHardMode: number;
+        crossFilterMinSpacing: number;
     };
     ektar100: {
         exposure: number;
@@ -484,6 +492,7 @@ declare const PRESETS: {
         crossFilterSizeLimit: number;
         crossFilterRandomness: number;
         crossFilterHardMode: number;
+        crossFilterMinSpacing: number;
     };
     superia400: {
         exposure: number;
@@ -539,6 +548,7 @@ declare const PRESETS: {
         crossFilterSizeLimit: number;
         crossFilterRandomness: number;
         crossFilterHardMode: number;
+        crossFilterMinSpacing: number;
     };
     cinestill800t: {
         exposure: number;
@@ -594,6 +604,7 @@ declare const PRESETS: {
         crossFilterSizeLimit: number;
         crossFilterRandomness: number;
         crossFilterHardMode: number;
+        crossFilterMinSpacing: number;
     };
     /**
      * Velvia 50 プリセット（v1・2026-04-02）
@@ -654,6 +665,7 @@ declare const PRESETS: {
         crossFilterSizeLimit: number;
         crossFilterRandomness: number;
         crossFilterHardMode: number;
+        crossFilterMinSpacing: number;
     };
 };
 type PresetName = keyof typeof PRESETS;

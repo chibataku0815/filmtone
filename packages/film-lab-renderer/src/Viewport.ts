@@ -31,6 +31,7 @@ import { createDustTexture, createScratchTexture } from "./textures/index";
 import { lightshaftsFragmentShader } from "./shaders/lightshafts.frag";
 import { lightshaftsBlendFragmentShader } from "./shaders/lightshafts-blend.frag";
 import { crossFilterStreakFragmentShader } from "./shaders/cross-filter-streak.frag";
+import { crossFilterStreakDensityFragmentShader } from "./shaders/cross-filter-streak-density.frag";
 import { crossFilterBlendFragmentShader } from "./shaders/cross-filter-blend.frag";
 import { crossFilterPeakFragmentShader } from "./shaders/cross-filter-peak.frag";
 
@@ -171,11 +172,15 @@ export class Viewport {
   private crossFilterRandomness = 1;
   /** Phase 6: Hard Mode toggle (0=Soft, 1=Hard). Render-time uniform overrides for stylized look. */
   private crossFilterHardMode = 0;
+  /** Phase 8: Streak density control — 0=no suppression, 1=softly declutter nearby parallel streaks. */
+  private crossFilterMinSpacing = 0;
   private crossFilterStreakMaterial: THREE.ShaderMaterial | null = null;
+  private crossFilterStreakDensityMaterial: THREE.ShaderMaterial | null = null;
   private crossFilterBlendMaterial: THREE.ShaderMaterial | null = null;
   private rtCrossThreshold: THREE.WebGLRenderTarget | null = null;
   private rtCrossPeak: THREE.WebGLRenderTarget | null = null;
   private rtCrossStreak: THREE.WebGLRenderTarget[] = [];
+  private rtCrossStreakFiltered: THREE.WebGLRenderTarget[] = [];
   private crossFilterPeakMaterial: THREE.ShaderMaterial | null = null;
   /** Phase 6: Hard Mode central bloom mip chain (lazy alloc, only when Hard Mode first becomes active). */
   private rtCentralBloomMips: THREE.WebGLRenderTarget[] = [];
@@ -645,13 +650,28 @@ export class Viewport {
       },
     });
 
+    this.crossFilterStreakDensityMaterial = new THREE.ShaderMaterial({
+      glslVersion: THREE.GLSL3,
+      vertexShader: filmlabVertexShader,
+      fragmentShader: crossFilterStreakDensityFragmentShader,
+      uniforms: {
+        uSource: { value: null },
+        uTexelSize: { value: new THREE.Vector2() },
+        uDirection: { value: new THREE.Vector2(1, 0) },
+        uMinSpacing: { value: 0 },
+        uFlipY: { value: 0.0 },
+      },
+    });
+
     const hw = Math.max(1, Math.floor(this.width / 2));
     const hh = Math.max(1, Math.floor(this.height / 2));
     this.rtCrossThreshold = new THREE.WebGLRenderTarget(hw, hh, RT_OPTIONS);
     this.rtCrossPeak = new THREE.WebGLRenderTarget(hw, hh, RT_OPTIONS);
     this.rtCrossStreak = [];
+    this.rtCrossStreakFiltered = [];
     for (let i = 0; i < 4; i++) {
       this.rtCrossStreak.push(new THREE.WebGLRenderTarget(hw, hh, RT_OPTIONS));
+      this.rtCrossStreakFiltered.push(new THREE.WebGLRenderTarget(hw, hh, RT_OPTIONS));
     }
 
     this.crossFilterPeakMaterial = new THREE.ShaderMaterial({
@@ -1081,9 +1101,9 @@ export class Viewport {
     target: THREE.WebGLRenderTarget | null,
   ): void {
     this.ensureCrossFilterResources();
-    if (!this.crossFilterStreakMaterial || !this.crossFilterBlendMaterial
+    if (!this.crossFilterStreakMaterial || !this.crossFilterStreakDensityMaterial || !this.crossFilterBlendMaterial
         || !this.crossFilterPeakMaterial || !this.rtCrossThreshold
-        || !this.rtCrossPeak || this.rtCrossStreak.length === 0) return;
+        || !this.rtCrossPeak || this.rtCrossStreak.length === 0 || this.rtCrossStreakFiltered.length === 0) return;
 
     const dirCount = Math.floor(this.crossFilterSpikes / 2);
     const angleRad = (this.crossFilterAngle * Math.PI) / 180;
@@ -1160,14 +1180,32 @@ export class Viewport {
     }
     su.uLength!.value = this.crossFilterLength;
 
+    if (this.crossFilterMinSpacing >= 0.001) {
+      const du = this.crossFilterStreakDensityMaterial.uniforms;
+      du.uTexelSize!.value.set(1.0 / qw, 1.0 / qh);
+      du.uMinSpacing!.value = this.crossFilterMinSpacing;
+      this.postMesh.material = this.crossFilterStreakDensityMaterial;
+      for (let i = 0; i < dirCount; i++) {
+        const seed = i * 17 + 7;
+        const angleJitter = (hash(seed) - 0.5) * 2 * (5 * Math.PI / 180);
+        const dirAngle = angleRad + (i * Math.PI) / dirCount + angleJitter;
+        du.uSource!.value = this.rtCrossStreak[i]!.texture;
+        du.uDirection!.value.set(Math.cos(dirAngle), Math.sin(dirAngle));
+        renderer.setRenderTarget(this.rtCrossStreakFiltered[i]!);
+        renderer.render(this.postScene, this.postCamera);
+      }
+    }
+
     // Final sub-pass: Screen blend
     const black = getBlackTexture();
     const bu = this.crossFilterBlendMaterial.uniforms;
+    const streakTargets =
+      this.crossFilterMinSpacing >= 0.001 ? this.rtCrossStreakFiltered : this.rtCrossStreak;
     bu.uSource!.value = sourceTexture;
-    bu.uStreak0!.value = dirCount >= 1 ? this.rtCrossStreak[0]!.texture : black;
-    bu.uStreak1!.value = dirCount >= 2 ? this.rtCrossStreak[1]!.texture : black;
-    bu.uStreak2!.value = dirCount >= 3 ? this.rtCrossStreak[2]!.texture : black;
-    bu.uStreak3!.value = dirCount >= 4 ? this.rtCrossStreak[3]!.texture : black;
+    bu.uStreak0!.value = dirCount >= 1 ? streakTargets[0]!.texture : black;
+    bu.uStreak1!.value = dirCount >= 2 ? streakTargets[1]!.texture : black;
+    bu.uStreak2!.value = dirCount >= 3 ? streakTargets[2]!.texture : black;
+    bu.uStreak3!.value = dirCount >= 4 ? streakTargets[3]!.texture : black;
     // Phase 6: bind central bloom mip 0 (full half-res result), or black in Soft Mode → bloom term = 0 in shader.
     bu.uCentralBloom!.value = isHard && this.rtCentralBloomMips[0]
       ? this.rtCentralBloomMips[0].texture
@@ -1496,6 +1534,7 @@ export class Viewport {
       this.rtCrossThreshold.setSize(hw, hh);
       this.rtCrossPeak?.setSize(hw, hh);
       for (const rt of this.rtCrossStreak) rt.setSize(hw, hh);
+      for (const rt of this.rtCrossStreakFiltered) rt.setSize(hw, hh);
     }
     // Phase 6: Hard Mode central bloom mip chain (if allocated).
     if (this.rtCentralBloomMips.length > 0) {
@@ -1718,6 +1757,7 @@ export class Viewport {
   setCrossFilterSizeLimit(v: number): void { this.crossFilterSizeLimit = Math.min(1, Math.max(0, v)); }
   setCrossFilterRandomness(v: number): void { this.crossFilterRandomness = Math.min(1, Math.max(0, v)); }
   setCrossFilterHardMode(v: number): void { this.crossFilterHardMode = v >= 0.5 ? 1 : 0; }
+  setCrossFilterMinSpacing(v: number): void { this.crossFilterMinSpacing = Math.min(1, Math.max(0, v)); }
 
   // ===== LUT =====
 
@@ -1914,6 +1954,7 @@ export class Viewport {
       crossFilterSizeLimit: this.crossFilterSizeLimit,
       crossFilterRandomness: this.crossFilterRandomness,
       crossFilterHardMode: this.crossFilterHardMode,
+      crossFilterMinSpacing: this.crossFilterMinSpacing,
     };
   }
 
@@ -2056,6 +2097,8 @@ export class Viewport {
       this.setCrossFilterRandomness(params.crossFilterRandomness as number);
     if (params.crossFilterHardMode !== undefined)
       this.setCrossFilterHardMode(params.crossFilterHardMode as number);
+    if (params.crossFilterMinSpacing !== undefined)
+      this.setCrossFilterMinSpacing(params.crossFilterMinSpacing as number);
   }
 
   // ===== Histogram readback =====
@@ -2115,12 +2158,15 @@ export class Viewport {
     this.shaftBlendMaterial?.dispose();
     this.rtShaft?.dispose();
     this.crossFilterStreakMaterial?.dispose();
+    this.crossFilterStreakDensityMaterial?.dispose();
     this.crossFilterBlendMaterial?.dispose();
     this.crossFilterPeakMaterial?.dispose();
     this.rtCrossThreshold?.dispose();
     this.rtCrossPeak?.dispose();
     for (const rt of this.rtCrossStreak) rt.dispose();
     this.rtCrossStreak = [];
+    for (const rt of this.rtCrossStreakFiltered) rt.dispose();
+    this.rtCrossStreakFiltered = [];
     for (const rt of this.rtCentralBloomMips) rt.dispose();
     this.rtCentralBloomMips = [];
     const lut1Texture = this.material.uniforms.uLUT1?.value as THREE.Data3DTexture | null;
