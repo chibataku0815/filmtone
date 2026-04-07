@@ -955,6 +955,11 @@
       "typeFixed": "Fixed",
       "typeChanged": "Changed",
       "entries": {
+        "v060Title": "Cross Filter and a faster return to your footage",
+        "v060CrossFilter": "A new Cross Filter effect adds diffraction-style star streaks to bright point lights, with controls for strength, point count, rotation angle, streak length, highlight threshold, and subtle chromatic split.",
+        "v060VideoCompareUx": "Video compare and playback review are smoother: compare mode is easier to dismiss intentionally, faster playback is available for quick checks, and slider reset actions are more discoverable.",
+        "v060ThumbnailLoadingPolish": "Leading thumbnails now probe several early frames and avoid near-black picks when possible, so clips that fade in no longer look broken at first glance. Loading typography has also been aligned with the rest of the app.",
+        "v060PersistentProxyCache": "Desktop now keeps progressive preview proxies in a bounded local cache, so reopening the same heavy source is faster. Automatic pruning and manual purge keep storage under control.",
         "v051Title": "Heavy footage, instant preview",
         "v051ProgressiveLoading": "ProRes, 4K HEVC, and other demanding formats now preview instantly. Filmtone shows native-decoded frames the moment you open a file, then silently converts to an optimised intermediate in the background. The same intermediate is reused at export, so you never transcode the same clip twice.",
         "v051RingBufferMotionBlur": "Motion blur has been rebuilt around an eight-frame ring buffer with real shutter-angle control (0–720°). A new Trail Intensity slider adds feedback for stylised streaks. The weight curve shifts from triangle to box automatically as you push past 360°.",
