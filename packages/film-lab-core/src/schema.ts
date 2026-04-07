@@ -55,7 +55,9 @@ const paramShape = Object.fromEntries(
                                         ? z.number().min(0).max(1).default(0)
                                         : key === "crossFilterRandomness"
                                           ? z.number().min(0).max(1).default(1)
-                                          : z.number(),
+                                          : key === "crossFilterHardMode"
+                                            ? z.number().min(0).max(1).default(0)
+                                            : z.number(),
   ]),
 ) as z.ZodRawShape;
 

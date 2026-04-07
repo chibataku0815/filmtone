@@ -8,14 +8,19 @@ uniform float uLength;
 uniform float uChromatic;
 uniform float uBrightnessMul;
 uniform float uRandomness;
+uniform float uHardMode;
 
 in vec2 vUv;
 out vec4 fragColor;
 
 const int MAX_STREAK_PX = 64;
-const float FALLOFF_K    = 4.0;
-const float STREAK_GAIN  = 2.5;
-const float PEAK_THRESHOLD = 0.01;
+const float FALLOFF_K_SOFT  = 4.0;
+const float FALLOFF_K_HARD  = 2.0;
+const float STREAK_GAIN_SOFT = 2.5;
+const float STREAK_GAIN_HARD = 6.0;
+const float PEAK_THRESHOLD_SOFT = 0.01;
+const float PEAK_THRESHOLD_HARD = 0.005;
+const float CHROMA_HARD_FLOOR = 0.7;
 
 // Wavelength dispersion spectrum.
 // t = 0.0 -> near peak (warm: red/orange)  — matches reference "赤->橙->黄->緑->青"
@@ -32,6 +37,16 @@ vec3 wavelengthToRGB(float t) {
 }
 
 void main() {
+  // Phase 6: Hard Mode interpolated constants. uHardMode is always 0.0 (Soft) or 1.0 (Hard).
+  // mix(softVal, hardVal, 0.0) = softVal → byte-for-byte Phase 5 backward compat.
+  // MAX_STREAK_PX is restored to Phase 5 value (64) so Soft Mode behavior is bit-identical.
+  // Hard Mode's "more dramatic" character comes from gain/falloff/threshold/bloom/tone-mapping
+  // changes — NOT from longer streak marches (which would cause UV wrap on smaller images).
+  float falloffK    = mix(FALLOFF_K_SOFT, FALLOFF_K_HARD, uHardMode);
+  float streakGain  = mix(STREAK_GAIN_SOFT, STREAK_GAIN_HARD, uHardMode);
+  float peakThresh  = mix(PEAK_THRESHOLD_SOFT, PEAK_THRESHOLD_HARD, uHardMode);
+  float chromaEffective = mix(uChromatic, max(uChromatic, CHROMA_HARD_FLOOR), uHardMode);
+
   int maxSteps = int(uLength * float(MAX_STREAK_PX));
   maxSteps = clamp(maxSteps, 1, MAX_STREAK_PX);
 
@@ -41,12 +56,12 @@ void main() {
     if (i > maxSteps) break;
     vec2 sampleUV = vUv - uDirection * uTexelSize * float(i);
     float peakLuma = dot(texture(uSource, sampleUV).rgb, vec3(0.2126, 0.7152, 0.0722));
-    if (peakLuma > PEAK_THRESHOLD) {
+    if (peakLuma > peakThresh) {
       float peakHash = fract(sin(dot(floor(sampleUV / uTexelSize), vec2(127.1, 311.7))) * 43758.5453);
       if (peakHash > uRandomness) break;
       float t = float(i) / float(maxSteps);
-      float falloff = exp(-float(i) * FALLOFF_K / float(maxSteps));
-      vec3 tint = mix(vec3(1.0), wavelengthToRGB(t), uChromatic);
+      float falloff = exp(-float(i) * falloffK / float(maxSteps));
+      vec3 tint = mix(vec3(1.0), wavelengthToRGB(t), chromaEffective);
       resultFwd = peakLuma * tint * falloff;
       break;
     }
@@ -58,19 +73,23 @@ void main() {
     if (i > maxSteps) break;
     vec2 sampleUV = vUv + uDirection * uTexelSize * float(i);
     float peakLuma = dot(texture(uSource, sampleUV).rgb, vec3(0.2126, 0.7152, 0.0722));
-    if (peakLuma > PEAK_THRESHOLD) {
+    if (peakLuma > peakThresh) {
       float peakHash = fract(sin(dot(floor(sampleUV / uTexelSize), vec2(127.1, 311.7))) * 43758.5453);
       if (peakHash > uRandomness) break;
       float t = float(i) / float(maxSteps);
-      float falloff = exp(-float(i) * FALLOFF_K / float(maxSteps));
-      vec3 tint = mix(vec3(1.0), wavelengthToRGB(t), uChromatic);
+      float falloff = exp(-float(i) * falloffK / float(maxSteps));
+      vec3 tint = mix(vec3(1.0), wavelengthToRGB(t), chromaEffective);
       resultBwd = peakLuma * tint * falloff;
       break;
     }
   }
 
   vec3 result = resultFwd + resultBwd;
-  result = 1.0 - exp(-result * STREAK_GAIN * uBrightnessMul);
+  // Soft: Reinhard rolloff (= original Phase 5 behavior).
+  // Hard: linear amplification → blown-out centers.
+  vec3 toneSoft = 1.0 - exp(-result * streakGain * uBrightnessMul);
+  vec3 toneHard = result * streakGain * uBrightnessMul;
+  result = mix(toneSoft, toneHard, uHardMode);
   fragColor = vec4(result, 1.0);
 }
 `;

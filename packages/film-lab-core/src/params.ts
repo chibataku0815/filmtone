@@ -78,6 +78,8 @@ export const PARAM_KEYS = [
   "crossFilterChromatic",
   "crossFilterSizeLimit",
   "crossFilterRandomness",
+  /** Hard Mode toggle (0=Soft 自然な光学再現 / 1=Hard 物理超え stylized 光芒)。boolean 用途の number。 */
+  "crossFilterHardMode",
 ] as const;
 
 export type ParamKey = (typeof PARAM_KEYS)[number];
@@ -161,6 +163,8 @@ export interface Params {
   crossFilterChromatic: number;
   crossFilterSizeLimit: number;
   crossFilterRandomness: number;
+  /** Hard Mode toggle (0=Soft / 1=Hard)。1 のとき中心 bloom + 強化 streak の stylized rendering。 */
+  crossFilterHardMode: number;
 }
 
 export function cloneParams(params: Params): Params {

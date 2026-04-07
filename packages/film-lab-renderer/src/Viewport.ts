@@ -169,12 +169,16 @@ export class Viewport {
   private crossFilterChromatic = 0.3;
   private crossFilterSizeLimit = 0;
   private crossFilterRandomness = 1;
+  /** Phase 6: Hard Mode toggle (0=Soft, 1=Hard). Render-time uniform overrides for stylized look. */
+  private crossFilterHardMode = 0;
   private crossFilterStreakMaterial: THREE.ShaderMaterial | null = null;
   private crossFilterBlendMaterial: THREE.ShaderMaterial | null = null;
   private rtCrossThreshold: THREE.WebGLRenderTarget | null = null;
   private rtCrossPeak: THREE.WebGLRenderTarget | null = null;
   private rtCrossStreak: THREE.WebGLRenderTarget[] = [];
   private crossFilterPeakMaterial: THREE.ShaderMaterial | null = null;
+  /** Phase 6: Hard Mode central bloom mip chain (lazy alloc, only when Hard Mode first becomes active). */
+  private rtCentralBloomMips: THREE.WebGLRenderTarget[] = [];
 
   /**
    * composite のレンズ周辺ソフト（0〜1）。色収差周辺ソフトとは別（Params.lensSoftness）。
@@ -614,6 +618,10 @@ export class Viewport {
         uChromatic: { value: 0.0 },
         uBrightnessMul: { value: 1.0 },
         uRandomness: { value: 1 },
+        // Phase 6: Hard Mode toggle. uHardMode=0 → Phase 5 byte-for-byte identical.
+        // No length multiplier — Hard Mode uses the same maxSteps range as Soft Mode
+        // to avoid UV wrap artifacts on smaller images.
+        uHardMode: { value: 0.0 },
         uFlipY: { value: 0.0 },
       },
     });
@@ -628,8 +636,11 @@ export class Viewport {
         uStreak1: { value: null },
         uStreak2: { value: null },
         uStreak3: { value: null },
+        // Phase 6: Hard Mode central bloom texture (default black → no contribution when Soft).
+        uCentralBloom: { value: getBlackTexture() },
         uStreakCount: { value: 2 },
         uIntensity: { value: 0.0 },
+        uHardMode: { value: 0.0 },
         uFlipY: { value: 0.0 },
       },
     });
@@ -654,6 +665,72 @@ export class Viewport {
         uFlipY: { value: 0.0 },
       },
     });
+  }
+
+  /**
+   * Phase 6: Hard Mode central bloom mip chain (lazy alloc, 4 levels at 1/4..1/32 of source).
+   * Allocated only when Hard Mode first becomes active to keep VRAM cost off Soft-only sessions.
+   */
+  private ensureCentralBloomResources(): void {
+    if (this.rtCentralBloomMips.length > 0) return;
+    if (this.width <= 0 || this.height <= 0) return;
+    const hw = Math.max(1, Math.floor(this.width / 2));
+    const hh = Math.max(1, Math.floor(this.height / 2));
+    for (let i = 0; i < 4; i++) {
+      const mw = Math.max(1, Math.floor(hw / Math.pow(2, i + 1)));
+      const mh = Math.max(1, Math.floor(hh / Math.pow(2, i + 1)));
+      this.rtCentralBloomMips.push(new THREE.WebGLRenderTarget(mw, mh, RT_OPTIONS));
+    }
+  }
+
+  /**
+   * Phase 6: Renders the central halo around peak light sources for Hard Mode.
+   * Reuses bloom downsample/upsample materials on the rtCrossPeak texture (the
+   * point-source-only output from the cross filter peak detection pass).
+   *
+   * Pattern mirrors renderBloom():
+   *   1. Seed mip 0 by downsampling rtCrossPeak.
+   *   2. Downsample chain (mip 1 → 3).
+   *   3. Upsample chain back to mip 0 with autoClear=false (additive blend) — CRITICAL.
+   */
+  private renderCentralBloom(renderer: THREE.WebGLRenderer): void {
+    const mips = this.rtCentralBloomMips;
+    if (mips.length === 0 || !this.rtCrossPeak) return;
+
+    // Step 1: Seed mip 0 from rtCrossPeak via the downsample shader.
+    const ds = this.downsampleMaterial.uniforms;
+    ds.uSource!.value = this.rtCrossPeak.texture;
+    ds.uTexelSize!.value.set(1.0 / this.rtCrossPeak.width, 1.0 / this.rtCrossPeak.height);
+    this.postMesh.material = this.downsampleMaterial;
+    renderer.setRenderTarget(mips[0]!);
+    renderer.render(this.postScene, this.postCamera);
+
+    // Step 2: Downsample chain (mip 1 → mip last).
+    for (let i = 1; i < mips.length; i++) {
+      const src = mips[i - 1]!;
+      ds.uSource!.value = src.texture;
+      ds.uTexelSize!.value.set(1.0 / src.width, 1.0 / src.height);
+      renderer.setRenderTarget(mips[i]!);
+      renderer.render(this.postScene, this.postCamera);
+    }
+
+    // Step 3: Upsample chain (mip last → mip 0) with additive blend.
+    // CRITICAL: autoClear must be false so the previous downsample data persists in the destination mip
+    // and the upsample shader's THREE.AdditiveBlending accumulates on top.
+    const us = this.upsampleMaterial.uniforms;
+    const weights = Viewport.computeMipWeights(0.5, mips.length);
+    this.postMesh.material = this.upsampleMaterial;
+    const prevAutoClear = renderer.autoClear;
+    renderer.autoClear = false;
+    for (let i = mips.length - 2; i >= 0; i--) {
+      const src = mips[i + 1]!;
+      us.uSource!.value = src.texture;
+      us.uTexelSize!.value.set(1.0 / src.width, 1.0 / src.height);
+      us.uWeight!.value = weights[i + 1]!;
+      renderer.setRenderTarget(mips[i]!);
+      renderer.render(this.postScene, this.postCamera);
+    }
+    renderer.autoClear = prevAutoClear;
   }
 
   /**
@@ -724,7 +801,10 @@ export class Viewport {
 
     const bloomOn = this.bloomStrength > 0;
     const halationOn = this.halationIntensity > 0;
-    const diffusionOn = this.diffusion > 0;
+    // Phase 6: Hard Mode のクロスフィルターは中心 bloom を持つため、global diffusion を抑制する。
+    // user の diffusion 値はフィールドに保持されたまま (round-trip safe)、render path のみ skip。
+    const hardModeActive = this.crossFilterStrength > 0 && this.crossFilterHardMode >= 0.5;
+    const diffusionOn = this.diffusion > 0 && !hardModeActive;
 
     if (bloomOn) {
       this.renderBloom(renderer);
@@ -764,14 +844,16 @@ export class Viewport {
     const black = getBlackTexture();
     const bloomOn = this.bloomStrength > 0;
     const halationOn = this.halationIntensity > 0;
-    const diffusionOn = this.diffusion > 0;
+    // Phase 6: Hard Mode は global diffusion を抑制。フィールド値は不変、composite uniform のみ 0 化。
+    const hardModeActive = this.crossFilterStrength > 0 && this.crossFilterHardMode >= 0.5;
+    const diffusionOn = this.diffusion > 0 && !hardModeActive;
     cu.uSource!.value = this.rtColorGraded!.texture;
     cu.uBloomTexture!.value = bloomOn ? this.rtBloomMips[0]!.texture : black;
     cu.uHalationTexture!.value = halationOn ? this.rtHalationMips[0]!.texture : black;
     cu.uDiffusionTexture!.value = diffusionOn && this.rtDiffusionMips.length > 0
       ? this.rtDiffusionMips[0]!.texture
       : black;
-    cu.uDiffusion!.value = this.diffusion;
+    cu.uDiffusion!.value = diffusionOn ? this.diffusion : 0;
     this.postMesh.material = this.compositeMaterial;
     renderer.setRenderTarget(target);
     renderer.render(this.postScene, this.postCamera);
@@ -1006,12 +1088,24 @@ export class Viewport {
     const dirCount = Math.floor(this.crossFilterSpikes / 2);
     const angleRad = (this.crossFilterAngle * Math.PI) / 180;
 
+    // Phase 6: Effective values pattern.
+    // Hard Mode overrides 3 user-controlled values at uniform-set time.
+    // CRITICAL: Never mutate this.crossFilter* fields → user values stay round-trip safe.
+    // NOTE: Length is NOT boosted in Hard Mode — the streak shader uses the same MAX_STREAK_PX (64)
+    // as Phase 5 to prevent UV wrap artifacts on smaller images. Hard Mode's distinguishing
+    // character comes from gain/falloff/threshold/bloom changes instead of longer marches.
+    const isHard = this.crossFilterHardMode >= 0.5;
+    const effectiveThreshold  = isHard ? 0.70 : this.crossFilterThreshold;
+    const effectiveSizeLimit  = isHard ? 1.0  : this.crossFilterSizeLimit;
+    const effectiveRandomness = isHard ? 1.0  : this.crossFilterRandomness;
+    const hardModeUniform     = isHard ? 1.0  : 0.0;
+
     // Sub-pass 1: Threshold extraction (reuse bloom prefilter shader)
     const pu = this.bloomPrefilterMaterial.uniforms;
     const savedThreshold = pu.uThreshold!.value;
     const savedKnee = pu.uKnee!.value;
     pu.uSource!.value = sourceTexture;
-    pu.uThreshold!.value = this.crossFilterThreshold;
+    pu.uThreshold!.value = effectiveThreshold;
     pu.uKnee!.value = 0.1;
     this.postMesh.material = this.bloomPrefilterMaterial;
     renderer.setRenderTarget(this.rtCrossThreshold);
@@ -1023,10 +1117,16 @@ export class Viewport {
     const pk = this.crossFilterPeakMaterial!.uniforms;
     pk.uSource!.value = this.rtCrossThreshold.texture;
     pk.uTexelSize!.value.set(1.0 / this.rtCrossThreshold.width, 1.0 / this.rtCrossThreshold.height);
-    pk.uSizeLimit!.value = this.crossFilterSizeLimit;
+    pk.uSizeLimit!.value = effectiveSizeLimit;
     this.postMesh.material = this.crossFilterPeakMaterial!;
     renderer.setRenderTarget(this.rtCrossPeak!);
     renderer.render(this.postScene, this.postCamera);
+
+    // Phase 6 NEW: Sub-pass 1.75 — Hard Mode central bloom (skipped entirely in Soft Mode).
+    if (isHard) {
+      this.ensureCentralBloomResources();
+      this.renderCentralBloom(renderer);
+    }
 
     // Sub-pass 2..N: Directional blur per spike direction
     const su = this.crossFilterStreakMaterial.uniforms;
@@ -1035,7 +1135,8 @@ export class Viewport {
     su.uSource!.value = this.rtCrossPeak!.texture;
     su.uTexelSize!.value.set(1.0 / qw, 1.0 / qh);
     su.uChromatic!.value = this.crossFilterChromatic;
-    su.uRandomness!.value = this.crossFilterRandomness;
+    su.uRandomness!.value = effectiveRandomness;
+    su.uHardMode!.value = hardModeUniform;
 
     // Deterministic hash for per-direction organic variation
     const hash = (n: number): number => {
@@ -1067,8 +1168,13 @@ export class Viewport {
     bu.uStreak1!.value = dirCount >= 2 ? this.rtCrossStreak[1]!.texture : black;
     bu.uStreak2!.value = dirCount >= 3 ? this.rtCrossStreak[2]!.texture : black;
     bu.uStreak3!.value = dirCount >= 4 ? this.rtCrossStreak[3]!.texture : black;
+    // Phase 6: bind central bloom mip 0 (full half-res result), or black in Soft Mode → bloom term = 0 in shader.
+    bu.uCentralBloom!.value = isHard && this.rtCentralBloomMips[0]
+      ? this.rtCentralBloomMips[0].texture
+      : black;
     bu.uStreakCount!.value = dirCount;
     bu.uIntensity!.value = this.crossFilterStrength;
+    bu.uHardMode!.value = hardModeUniform;
     this.postMesh.material = this.crossFilterBlendMaterial;
     renderer.setRenderTarget(target);
     renderer.render(this.postScene, this.postCamera);
@@ -1192,6 +1298,7 @@ export class Viewport {
     // —— Slot B: 一時的に abCompareEnabled=false でブラーを有効化 ——
     const savedShutterAngle = this.shutterAngle;
     const savedCrossFilterStrength = this.crossFilterStrength;
+    const savedCrossFilterHardMode = this.crossFilterHardMode;
     this.setParams(this.compareParamsB);
     this.renderBasePipeline(renderer, scene, camera);
 
@@ -1207,6 +1314,7 @@ export class Viewport {
     this.abCompareEnabled = savedAbCompareEnabled;
     this.shutterAngle = savedShutterAngle;
     this.crossFilterStrength = savedCrossFilterStrength;
+    this.crossFilterHardMode = savedCrossFilterHardMode;
   }
 
   /**
@@ -1388,6 +1496,16 @@ export class Viewport {
       this.rtCrossThreshold.setSize(hw, hh);
       this.rtCrossPeak?.setSize(hw, hh);
       for (const rt of this.rtCrossStreak) rt.setSize(hw, hh);
+    }
+    // Phase 6: Hard Mode central bloom mip chain (if allocated).
+    if (this.rtCentralBloomMips.length > 0) {
+      const hw2 = Math.max(1, Math.floor(width / 2));
+      const hh2 = Math.max(1, Math.floor(height / 2));
+      for (let i = 0; i < this.rtCentralBloomMips.length; i++) {
+        const mw = Math.max(1, Math.floor(hw2 / Math.pow(2, i + 1)));
+        const mh = Math.max(1, Math.floor(hh2 / Math.pow(2, i + 1)));
+        this.rtCentralBloomMips[i]!.setSize(mw, mh);
+      }
     }
     this.resetMotionBlurHistory();
   }
@@ -1599,6 +1717,7 @@ export class Viewport {
   setCrossFilterChromatic(v: number): void { this.crossFilterChromatic = Math.min(1, Math.max(0, v)); }
   setCrossFilterSizeLimit(v: number): void { this.crossFilterSizeLimit = Math.min(1, Math.max(0, v)); }
   setCrossFilterRandomness(v: number): void { this.crossFilterRandomness = Math.min(1, Math.max(0, v)); }
+  setCrossFilterHardMode(v: number): void { this.crossFilterHardMode = v >= 0.5 ? 1 : 0; }
 
   // ===== LUT =====
 
@@ -1794,6 +1913,7 @@ export class Viewport {
       crossFilterChromatic: this.crossFilterChromatic,
       crossFilterSizeLimit: this.crossFilterSizeLimit,
       crossFilterRandomness: this.crossFilterRandomness,
+      crossFilterHardMode: this.crossFilterHardMode,
     };
   }
 
@@ -1934,6 +2054,8 @@ export class Viewport {
       this.setCrossFilterSizeLimit(params.crossFilterSizeLimit as number);
     if (params.crossFilterRandomness !== undefined)
       this.setCrossFilterRandomness(params.crossFilterRandomness as number);
+    if (params.crossFilterHardMode !== undefined)
+      this.setCrossFilterHardMode(params.crossFilterHardMode as number);
   }
 
   // ===== Histogram readback =====
@@ -1999,6 +2121,8 @@ export class Viewport {
     this.rtCrossPeak?.dispose();
     for (const rt of this.rtCrossStreak) rt.dispose();
     this.rtCrossStreak = [];
+    for (const rt of this.rtCentralBloomMips) rt.dispose();
+    this.rtCentralBloomMips = [];
     const lut1Texture = this.material.uniforms.uLUT1?.value as THREE.Data3DTexture | null;
     if (lut1Texture) lut1Texture.dispose();
     const lut2Texture = this.material.uniforms.uLUT2?.value as THREE.Data3DTexture | null;

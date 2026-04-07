@@ -13,6 +13,7 @@ import { useTranslations } from "next-intl";
 import { PRESETS, findMatchingPreset, halationHueToHex, type PresetName } from "film-lab-core";
 import { ControlSlider as BaseControlSlider } from "./ui/ControlSlider";
 import { SectionHeader } from "./ui/SectionHeader";
+import { SegmentedControl } from "./ui/SegmentedControl";
 import { ToggleHeader } from "./ui/ToggleHeader";
 import { LUTPanel } from "./LUTPanel";
 import { PresetSearchSelect } from "./PresetSearchSelect";
@@ -846,17 +847,39 @@ export function FilmLabControlPanelCore({
                   onToggle={toggleCrossFilter}
                 />
                 <div className={`flex flex-col gap-2.5 ${!crossFilterEnabled ? "pointer-events-none opacity-30" : ""}`}>
+                  <div className="flex justify-center">
+                    <SegmentedControl<"soft" | "hard">
+                      options={[
+                        { value: "soft", label: tFilmLab("controls.crossFilterHardModeSoft") },
+                        { value: "hard", label: tFilmLab("controls.crossFilterHardModeHard") },
+                      ]}
+                      value={params.crossFilterHardMode >= 0.5 ? "hard" : "soft"}
+                      onChange={(mode) => {
+                        updateParam("crossFilterHardMode", mode === "hard" ? 1 : 0);
+                        commit();
+                      }}
+                      ariaLabel={tFilmLab("controls.crossFilterHardModeAria")}
+                    />
+                  </div>
                   <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.crossFilterStrengthLabel")} value={params.crossFilterStrength} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("crossFilterStrength", v)} onCommit={commit} />
                   <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.crossFilterSpikes")} hint={tFilmLab("controls.crossFilterSpikesHint")} value={params.crossFilterSpikes} min={4} max={8} step={2} defaultValue={4} onChange={(v) => updateParam("crossFilterSpikes", v)} onCommit={commit} />
                   <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.crossFilterAngle")} hint={tFilmLab("controls.crossFilterAngleHint")} value={params.crossFilterAngle} min={0} max={360} step={1} defaultValue={0} onChange={(v) => updateParam("crossFilterAngle", v)} onCommit={commit} formatValue={(v) => `${Math.round(v)}°`} />
                   <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.crossFilterLength")} hint={tFilmLab("controls.crossFilterLengthHint")} value={params.crossFilterLength} min={0} max={1} step={0.01} defaultValue={0.5} onChange={(v) => updateParam("crossFilterLength", v)} onCommit={commit} />
                   <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.crossFilterChromatic")} hint={tFilmLab("controls.crossFilterChromaticHint")} value={params.crossFilterChromatic} min={0} max={1} step={0.01} defaultValue={0.3} onChange={(v) => updateParam("crossFilterChromatic", v)} onCommit={commit} />
-                  <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.crossFilterSizeLimit")} hint={tFilmLab("controls.crossFilterSizeLimitHint")} value={params.crossFilterSizeLimit} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("crossFilterSizeLimit", v)} onCommit={commit} />
-                  <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.crossFilterRandomness")} hint={tFilmLab("controls.crossFilterRandomnessHint")} value={params.crossFilterRandomness} min={0} max={1} step={0.01} defaultValue={1} onChange={(v) => updateParam("crossFilterRandomness", v)} onCommit={commit} />
+                  <div
+                    className={`flex flex-col gap-2.5 ${params.crossFilterHardMode >= 0.5 ? "pointer-events-none opacity-30" : ""}`}
+                    title={params.crossFilterHardMode >= 0.5 ? tFilmLab("controls.crossFilterHardModeOverrideHint") : undefined}
+                  >
+                    <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.crossFilterSizeLimit")} hint={tFilmLab("controls.crossFilterSizeLimitHint")} value={params.crossFilterSizeLimit} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("crossFilterSizeLimit", v)} onCommit={commit} />
+                    <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.crossFilterRandomness")} hint={tFilmLab("controls.crossFilterRandomnessHint")} value={params.crossFilterRandomness} min={0} max={1} step={0.01} defaultValue={1} onChange={(v) => updateParam("crossFilterRandomness", v)} onCommit={commit} />
+                  </div>
                 </div>
               </div>
 
-              <div className="mt-3 flex flex-col gap-2.5">
+              <div
+                className={`mt-3 flex flex-col gap-2.5 ${crossFilterEnabled && params.crossFilterHardMode >= 0.5 ? "pointer-events-none opacity-30" : ""}`}
+                title={crossFilterEnabled && params.crossFilterHardMode >= 0.5 ? tFilmLab("controls.crossFilterHardModeOverrideHint") : undefined}
+              >
                 <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.diffusion")} value={params.diffusion} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("diffusion", v)} onCommit={commit} />
               </div>
 

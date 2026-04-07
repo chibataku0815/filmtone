@@ -6,8 +6,10 @@ uniform sampler2D uStreak0;
 uniform sampler2D uStreak1;
 uniform sampler2D uStreak2;
 uniform sampler2D uStreak3;
+uniform sampler2D uCentralBloom;
 uniform int uStreakCount;
 uniform float uIntensity;
+uniform float uHardMode;
 
 in vec2 vUv;
 out vec4 fragColor;
@@ -19,7 +21,12 @@ void main() {
   if (uStreakCount > 3) streaks += texture(uStreak3, vUv).rgb;
   streaks /= float(uStreakCount);
 
-  vec3 overlay = streaks * uIntensity;
+  // Phase 6: Hard Mode central bloom contribution.
+  // uHardMode = 0.0 → bloom term is exactly vec3(0.0) → byte-for-byte Phase 5 backward compat.
+  // uHardMode = 1.0 → adds blurred peak halo for the "thick base, soft glow" reference look.
+  vec3 bloom = texture(uCentralBloom, vUv).rgb * uHardMode * 1.5;
+
+  vec3 overlay = (streaks + bloom) * uIntensity;
 
   // Additive blend: preserves dark areas exactly (no shadow lifting).
   // Soft Reinhard rolloff on excess prevents harsh highlight clipping.
