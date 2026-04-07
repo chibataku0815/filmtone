@@ -32,6 +32,7 @@ import { lightshaftsFragmentShader } from "./shaders/lightshafts.frag";
 import { lightshaftsBlendFragmentShader } from "./shaders/lightshafts-blend.frag";
 import { crossFilterStreakFragmentShader } from "./shaders/cross-filter-streak.frag";
 import { crossFilterBlendFragmentShader } from "./shaders/cross-filter-blend.frag";
+import { crossFilterPeakFragmentShader } from "./shaders/cross-filter-peak.frag";
 
 export interface ViewportOptions {
   vertexShader: string;
@@ -169,7 +170,9 @@ export class Viewport {
   private crossFilterStreakMaterial: THREE.ShaderMaterial | null = null;
   private crossFilterBlendMaterial: THREE.ShaderMaterial | null = null;
   private rtCrossThreshold: THREE.WebGLRenderTarget | null = null;
+  private rtCrossPeak: THREE.WebGLRenderTarget | null = null;
   private rtCrossStreak: THREE.WebGLRenderTarget[] = [];
+  private crossFilterPeakMaterial: THREE.ShaderMaterial | null = null;
 
   /**
    * composite のレンズ周辺ソフト（0〜1）。色収差周辺ソフトとは別（Params.lensSoftness）。
@@ -631,10 +634,22 @@ export class Viewport {
     const hw = Math.max(1, Math.floor(this.width / 2));
     const hh = Math.max(1, Math.floor(this.height / 2));
     this.rtCrossThreshold = new THREE.WebGLRenderTarget(hw, hh, RT_OPTIONS);
+    this.rtCrossPeak = new THREE.WebGLRenderTarget(hw, hh, RT_OPTIONS);
     this.rtCrossStreak = [];
     for (let i = 0; i < 4; i++) {
       this.rtCrossStreak.push(new THREE.WebGLRenderTarget(hw, hh, RT_OPTIONS));
     }
+
+    this.crossFilterPeakMaterial = new THREE.ShaderMaterial({
+      glslVersion: THREE.GLSL3,
+      vertexShader: filmlabVertexShader,
+      fragmentShader: crossFilterPeakFragmentShader,
+      uniforms: {
+        uSource: { value: null },
+        uTexelSize: { value: new THREE.Vector2() },
+        uFlipY: { value: 0.0 },
+      },
+    });
   }
 
   /**
@@ -981,7 +996,8 @@ export class Viewport {
   ): void {
     this.ensureCrossFilterResources();
     if (!this.crossFilterStreakMaterial || !this.crossFilterBlendMaterial
-        || !this.rtCrossThreshold || this.rtCrossStreak.length === 0) return;
+        || !this.crossFilterPeakMaterial || !this.rtCrossThreshold
+        || !this.rtCrossPeak || this.rtCrossStreak.length === 0) return;
 
     const dirCount = Math.floor(this.crossFilterSpikes / 2);
     const angleRad = (this.crossFilterAngle * Math.PI) / 180;
@@ -999,11 +1015,19 @@ export class Viewport {
     pu.uThreshold!.value = savedThreshold;
     pu.uKnee!.value = savedKnee;
 
+    // Sub-pass 1.5: Peak detection (suppress uniform bright areas, preserve point sources)
+    const pk = this.crossFilterPeakMaterial!.uniforms;
+    pk.uSource!.value = this.rtCrossThreshold.texture;
+    pk.uTexelSize!.value.set(1.0 / this.rtCrossThreshold.width, 1.0 / this.rtCrossThreshold.height);
+    this.postMesh.material = this.crossFilterPeakMaterial!;
+    renderer.setRenderTarget(this.rtCrossPeak!);
+    renderer.render(this.postScene, this.postCamera);
+
     // Sub-pass 2..N: Directional blur per spike direction
     const su = this.crossFilterStreakMaterial.uniforms;
-    const qw = this.rtCrossThreshold.width;
-    const qh = this.rtCrossThreshold.height;
-    su.uSource!.value = this.rtCrossThreshold.texture;
+    const qw = this.rtCrossPeak!.width;
+    const qh = this.rtCrossPeak!.height;
+    su.uSource!.value = this.rtCrossPeak!.texture;
     su.uTexelSize!.value.set(1.0 / qw, 1.0 / qh);
     su.uChromatic!.value = this.crossFilterChromatic;
 
@@ -1356,6 +1380,7 @@ export class Viewport {
       const hw = Math.max(1, Math.floor(width / 2));
       const hh = Math.max(1, Math.floor(height / 2));
       this.rtCrossThreshold.setSize(hw, hh);
+      this.rtCrossPeak?.setSize(hw, hh);
       for (const rt of this.rtCrossStreak) rt.setSize(hw, hh);
     }
     this.resetMotionBlurHistory();
@@ -1955,7 +1980,9 @@ export class Viewport {
     this.rtShaft?.dispose();
     this.crossFilterStreakMaterial?.dispose();
     this.crossFilterBlendMaterial?.dispose();
+    this.crossFilterPeakMaterial?.dispose();
     this.rtCrossThreshold?.dispose();
+    this.rtCrossPeak?.dispose();
     for (const rt of this.rtCrossStreak) rt.dispose();
     this.rtCrossStreak = [];
     const lut1Texture = this.material.uniforms.uLUT1?.value as THREE.Data3DTexture | null;

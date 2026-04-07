@@ -24,3 +24,4 @@ export { lightshaftsFragmentShader } from "./shaders/lightshafts.frag";
 export { lightshaftsBlendFragmentShader } from "./shaders/lightshafts-blend.frag";
 export { crossFilterStreakFragmentShader } from "./shaders/cross-filter-streak.frag";
 export { crossFilterBlendFragmentShader } from "./shaders/cross-filter-blend.frag";
+export { crossFilterPeakFragmentShader } from "./shaders/cross-filter-peak.frag";

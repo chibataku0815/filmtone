@@ -14,7 +14,7 @@ out vec4 fragColor;
 const int HALF_SAMPLES = 32;
 const float MAX_STREAK_PX = 80.0;
 const float FALLOFF_K = 8.0;
-const float STREAK_GAIN = 6.0;
+const float STREAK_GAIN = 4.0;
 
 void main() {
   vec3 sum = vec3(0.0);
@@ -23,7 +23,7 @@ void main() {
   for (int i = -HALF_SAMPLES; i <= HALF_SAMPLES; i++) {
     float fi = float(i);
     float w = exp(-abs(fi) * FALLOFF_K / float(HALF_SAMPLES));
-    float chromShift = fi * uChromatic * 0.10;
+    float chromShift = fi * uChromatic * 0.18;
     vec2 baseOffset = stepUV * fi;
 
     float r = texture(uSource, vUv + baseOffset + stepUV * chromShift).r;
