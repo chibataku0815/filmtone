@@ -26,6 +26,15 @@ const baseProps: BatchTabPanelProps = {
   running: false,
   onResumeBatch: async () => {},
   onDiscardPersistedSession: async () => {},
+  proxyCacheInfo: {
+    entryCount: 2,
+    totalBytes: 3145728,
+    maxEntries: 8,
+    maxTotalBytes: 2147483648,
+    maxAgeDays: 14,
+  },
+  isPurgingProxyCache: false,
+  onPurgeProxyCache: async () => {},
   batchPresetChoice: "cinematic",
   onBatchPresetChoiceChange: () => {},
   importedGradeLabel: null,
@@ -122,5 +131,24 @@ describe("BatchTabPanel accordion layout", () => {
     expect(html).toContain("clip.mov");
     // The section body should not be expanded (aria-expanded=false)
     expect(html).toContain("aria-expanded=\"false\"");
+  });
+
+  it("shows proxy cache card in both video and image modes", () => {
+    const videoHtml = renderBatchPanel(<BatchTabPanel {...baseProps} />);
+    const imageHtml = renderBatchPanel(
+      <BatchTabPanel
+        {...baseProps}
+        batchJobMode="images"
+        inputDir="/tmp/input"
+        outputDir="/tmp/output"
+        videoInputPath={null}
+      />,
+    );
+
+    expect(videoHtml).toContain("プロキシキャッシュ");
+    expect(videoHtml).toContain("2 件");
+    expect(videoHtml).toContain("プロキシキャッシュを消す");
+    expect(imageHtml).toContain("プロキシキャッシュ");
+    expect(imageHtml).toContain("プロキシキャッシュを消す");
   });
 });

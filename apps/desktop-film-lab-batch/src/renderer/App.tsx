@@ -80,7 +80,10 @@ import {
 } from "./batch-tab/BatchTabPanel";
 import { PhotoExportPanel } from "./batch-tab/PhotoExportPanel";
 import { VideoExportPanel } from "./batch-tab/VideoExportPanel";
-import type { DesktopUpdateAvailablePayload } from "./desktop-api";
+import type {
+  DesktopUpdateAvailablePayload,
+  VideoPreviewProxyCacheInfo,
+} from "./desktop-api";
 import {
   useProgressiveLoad,
   type ProgressiveTextureSwapPayload,
@@ -342,6 +345,9 @@ export default function App() {
    */
   const [desktopUpdateBanner, setDesktopUpdateBanner] =
     useState<DesktopUpdateAvailablePayload | null>(null);
+  const [proxyCacheInfo, setProxyCacheInfo] =
+    useState<VideoPreviewProxyCacheInfo | null>(null);
+  const [purgingProxyCache, setPurgingProxyCache] = useState(false);
 
   /**
    * @description 更新通知の購読。アンマウント時に解除する。
@@ -357,6 +363,30 @@ export default function App() {
     });
     return unsubscribe;
   }, []);
+
+  const refreshProxyCacheInfo = useCallback(async (): Promise<void> => {
+    const api = window.filmLabBatch;
+    if (!api?.videoPreviewGetProxyCacheInfo) {
+      return;
+    }
+    try {
+      const info = await api.videoPreviewGetProxyCacheInfo();
+      setProxyCacheInfo(info);
+    } catch (error) {
+      console.warn("refreshProxyCacheInfo failed", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshProxyCacheInfo();
+  }, [refreshProxyCacheInfo]);
+
+  useEffect(() => {
+    if (!progressiveLoad.proxyPath) {
+      return;
+    }
+    void refreshProxyCacheInfo();
+  }, [progressiveLoad.proxyPath, refreshProxyCacheInfo]);
 
   /**
    * @description 写真バッチ／動画書き出し中は main 側で通知をキューに残す
@@ -1066,6 +1096,29 @@ export default function App() {
     appendLog(tLogs("sessionDiscarded"));
   };
 
+  const purgeProxyCache = useCallback(async () => {
+    const api = window.filmLabBatch;
+    if (!api?.videoPreviewPurgeProxyCache) {
+      return;
+    }
+    setPurgingProxyCache(true);
+    try {
+      const result = await api.videoPreviewPurgeProxyCache();
+      appendLog(
+        tLogs("proxyCachePurged", {
+          entries: String(result.removedEntries),
+          bytes: String(result.removedBytes),
+        }),
+      );
+      await refreshProxyCacheInfo();
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      appendLog(`Proxy cache purge failed: ${msg}`);
+    } finally {
+      setPurgingProxyCache(false);
+    }
+  }, [appendLog, refreshProxyCacheInfo, tLogs]);
+
   const pickVideoFile = async () => {
     const p = await window.filmLabBatch.pickInputVideoFile();
     if (!p) return;
@@ -1610,6 +1663,9 @@ export default function App() {
                           running={running}
                           onResumeBatch={resumeBatch}
                           onDiscardPersistedSession={discardPersistedSession}
+                          proxyCacheInfo={proxyCacheInfo}
+                          isPurgingProxyCache={purgingProxyCache}
+                          onPurgeProxyCache={purgeProxyCache}
                           batchPresetChoice={batchPresetChoice}
                           onBatchPresetChoiceChange={applyBatchPreset}
                           importedGradeLabel={importedGradeLabel}
@@ -1662,6 +1718,9 @@ export default function App() {
                           running={running}
                           onResumeBatch={resumeBatch}
                           onDiscardPersistedSession={discardPersistedSession}
+                          proxyCacheInfo={proxyCacheInfo}
+                          isPurgingProxyCache={purgingProxyCache}
+                          onPurgeProxyCache={purgeProxyCache}
                           batchPresetChoice={batchPresetChoice}
                           onBatchPresetChoiceChange={applyBatchPreset}
                           importedGradeLabel={importedGradeLabel}

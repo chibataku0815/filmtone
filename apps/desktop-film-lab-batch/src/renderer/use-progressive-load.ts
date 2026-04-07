@@ -197,6 +197,8 @@ export function useProgressiveLoad(): UseProgressiveLoadReturn {
     sessionId: 0,
     isTranscoding: false,
     activeSourcePath: null,
+    proxyPath: null,
+    proxyCacheHit: null,
     tempFiles: createEmptyTempFiles(),
   });
   const sessionIdRef = useRef(0);

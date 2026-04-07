@@ -30,6 +30,7 @@ import {
   VIDEO_IMPORT_MAX_DURATION_SEC,
 } from "../video-export-constants";
 import { HelpHint } from "./HelpHint";
+import type { VideoPreviewProxyCacheInfo } from "../desktop-api";
 
 /** @description 書き出しタブで扱うジョブの大分類（フォルダの写真まとめて vs 動画 1 本） */
 export type BatchJobMode = "images" | "video";
@@ -158,6 +159,24 @@ function lastPathSegment(p: string): string {
   return parts[parts.length - 1] || p;
 }
 
+function formatProxyCacheBytes(locale: string, value: number): string {
+  if (!Number.isFinite(value) || value <= 0) {
+    return "0 B";
+  }
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let unitIndex = 0;
+  let current = value;
+  while (current >= 1024 && unitIndex < units.length - 1) {
+    current /= 1024;
+    unitIndex += 1;
+  }
+  const digits = current >= 10 || unitIndex === 0 ? 0 : 1;
+  return `${new Intl.NumberFormat(locale === "ja" ? "ja-JP" : locale, {
+    maximumFractionDigits: digits,
+    minimumFractionDigits: digits,
+  }).format(current)} ${units[unitIndex]}`;
+}
+
 /**
  * @description 入力・出力がステップの前提を満たしているか（ステータスチップ用）
  */
@@ -219,6 +238,9 @@ export type BatchTabPanelProps = {
   running: boolean;
   onResumeBatch: () => void | Promise<void>;
   onDiscardPersistedSession: () => void | Promise<void>;
+  proxyCacheInfo: VideoPreviewProxyCacheInfo | null;
+  isPurgingProxyCache: boolean;
+  onPurgeProxyCache: () => void | Promise<void>;
 
   batchPresetChoice: PresetName;
   onBatchPresetChoiceChange: (name: PresetName) => void;
@@ -472,6 +494,9 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     running,
     onResumeBatch,
     onDiscardPersistedSession,
+    proxyCacheInfo,
+    isPurgingProxyCache,
+    onPurgeProxyCache,
     batchPresetChoice,
     onBatchPresetChoiceChange,
     importedGradeLabel,
@@ -584,6 +609,16 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     locale,
     t,
   ]);
+
+  const proxyCacheSummary = useMemo(() => {
+    if (proxyCacheInfo == null) {
+      return t("proxyCacheSummaryLoading");
+    }
+    return t("proxyCacheSummary", {
+      entries: String(proxyCacheInfo.entryCount),
+      totalSize: formatProxyCacheBytes(locale, proxyCacheInfo.totalBytes),
+    });
+  }, [locale, proxyCacheInfo, t]);
 
   /**
    * @description 編集プレビューと書き出し入力の関係を短く示す（life#83）。
@@ -1395,6 +1430,25 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
           </div>
         </div>
       ) : null}
+
+      <div className="rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] px-3 py-2.5 text-xs leading-relaxed shadow-[inset_3px_0_0_0_var(--amber-9)]">
+        <div className="mb-2 flex flex-wrap items-start gap-1.5">
+          <p className="text-[var(--fl-text-primary)]">{t("proxyCacheTitle")}</p>
+          <HelpHint
+            tip={t("tipProxyCache")}
+            assistiveLabel={t("proxyCacheHintAria")}
+          />
+        </div>
+        <p className="mb-2 text-[var(--fl-text-secondary)]">{proxyCacheSummary}</p>
+        <button
+          type="button"
+          className="fl-btn-secondary"
+          disabled={running || isPurgingProxyCache}
+          onClick={() => void onPurgeProxyCache()}
+        >
+          {isPurgingProxyCache ? t("proxyCachePurgingBtn") : t("proxyCacheClearBtn")}
+        </button>
+      </div>
 
       {/* Status chips — 下のプレビュー橋・アコーディオンと詰まらないよう余白を確保 */}
       <div
