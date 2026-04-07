@@ -23,6 +23,7 @@ import {
 import { useTranslations } from "next-intl";
 import type { FilmLabCanvasRef } from "./FilmLabCanvas";
 import { FILM_LAB_NEXT_INTL_NAMESPACE } from "./filmLabUiContract";
+import type { VideoPlaybackRate } from "./videoPlaybackContract";
 import { VideoFilmstripStrip } from "./VideoFilmstripStrip";
 import {
   FILMSTRIP_THUMB_MAX_COUNT,
@@ -114,12 +115,14 @@ export function VideoTransportControls({
     isPlaying: boolean;
     currentTime: number;
     duration: number;
+    playbackRate: VideoPlaybackRate;
     suppressed: boolean;
   }>({
     open: false,
     isPlaying: false,
     currentTime: 0,
     duration: 0,
+    playbackRate: 1,
     suppressed: false,
   });
 
@@ -142,6 +145,17 @@ export function VideoTransportControls({
         currentTime: clampedTime,
         isPlaying: optimisticIsPlaying ?? prev.isPlaying,
       }));
+    },
+    [filmLabCanvasRef],
+  );
+
+  const handleRateChange = useCallback(
+    (rate: VideoPlaybackRate) => {
+      const api = filmLabCanvasRef.current;
+      if (!api) {
+        return;
+      }
+      api.videoPlaybackSetRate(rate);
     },
     [filmLabCanvasRef],
   );
@@ -175,6 +189,7 @@ export function VideoTransportControls({
                 isPlaying: false,
                 currentTime: 0,
                 duration: 0,
+                playbackRate: 1,
                 suppressed: false,
               }
             : p,
@@ -195,6 +210,7 @@ export function VideoTransportControls({
                 isPlaying: false,
                 currentTime: 0,
                 duration: 0,
+                playbackRate: 1,
                 suppressed: false,
               }
             : p,
@@ -213,12 +229,14 @@ export function VideoTransportControls({
         isPlaying: scrubbingRef.current ? false : playback.isPlaying,
         currentTime,
         duration: playback.duration,
+        playbackRate: playback.playbackRate,
         suppressed,
       };
       setPanel((prev) => {
         if (
           prev.open === next.open &&
           prev.isPlaying === next.isPlaying &&
+          prev.playbackRate === next.playbackRate &&
           prev.suppressed === next.suppressed &&
           Math.abs(prev.currentTime - next.currentTime) < 0.01 &&
           Math.abs(prev.duration - next.duration) < 0.0005
@@ -420,6 +438,27 @@ export function VideoTransportControls({
           <span className="shrink-0 tabular-nums text-[11px] text-white/70">
             {formatClock(panel.currentTime)} / {formatClock(panel.duration)}
           </span>
+
+          <div className="flex shrink-0 items-center gap-0.5" role="group" aria-label={tTransport("speedGroupAria")}>
+            {([1, 2, 3] as VideoPlaybackRate[]).map((rate) => (
+              <button
+                key={rate}
+                type="button"
+                disabled={disabled}
+                aria-label={tTransport("speedAria", { rate })}
+                aria-pressed={panel.playbackRate === rate}
+                onClick={() => handleRateChange(rate)}
+                className={[
+                  "inline-flex h-7 w-8 items-center justify-center rounded text-[10px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+                  panel.playbackRate === rate
+                    ? "bg-white/15 text-white"
+                    : "text-white/50 hover:bg-white/8 hover:text-white/75",
+                ].join(" ")}
+              >
+                {rate}x
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>

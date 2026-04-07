@@ -345,7 +345,9 @@
         "playAria": "Play video preview",
         "pauseAria": "Pause video preview",
         "timelineAria": "Seek preview time",
-        "disabledDuringBusy": "Playback is locked while export or preview hold is active."
+        "disabledDuringBusy": "Playback is locked while export or preview hold is active.",
+        "speedGroupAria": "Playback speed",
+        "speedAria": "{rate}x playback speed"
       },
       "filmstrip": {
         "stripAria": "Approximate video timeline thumbnails"
@@ -429,7 +431,8 @@
       "slotTooltipRight": "Edit the right half",
       "editingLeftChip": "Adjusting left look",
       "editingRightChip": "Adjusting right look",
-      "dragSplitHint": "Drag to move split"
+      "dragSplitHint": "Drag to move split",
+      "dismissButton": "Close compare"
     },
     "color": {
       "tint": "Tint",

@@ -48,7 +48,8 @@ html.dark.dark-theme {
   --fl-on-accent: #14110a;
   --fl-focus-ring: color-mix(in srgb, var(--amber-9) 45%, transparent);
 
-  --font-family-sans: system-ui, "Hiragino Sans", "Meiryo", sans-serif;
+  --font-family-sans: "Geist", "Noto Sans JP", "Hiragino Sans",
+    "Hiragino Kaku Gothic ProN", "Meiryo", system-ui, sans-serif;
 
   /**
    * @description クローム帯の弱いマテリアル（すりガラス風）。全面透明は避け、ほぼ不透明のスクリム＋軽い blur。

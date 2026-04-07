@@ -11,6 +11,7 @@ import {
   BrowserWindow,
   dialog,
   ipcMain,
+  nativeImage,
   protocol,
   shell,
 } from "electron";
@@ -38,6 +39,18 @@ import {
   resolveDesktopUpdateCheckUrl,
 } from "./desktop-update-service";
 import { resolveVideoCliBinary } from "./ffmpeg-cli-resolve";
+import {
+  PROXY_CACHE_PROFILE_VERSION,
+  buildProxyCacheKey,
+  ensureProxyCacheRoot,
+  getProxyCacheInfo,
+  proxyCacheFilePath,
+  pruneProxyCache,
+  purgeProxyCache,
+  roundProxyCacheDurationSec,
+  touchProxyCacheEntry,
+  upsertProxyCacheEntry,
+} from "./proxy-cache";
 
 const execFileAsync = promisify(execFile);
 
@@ -343,6 +356,10 @@ function batchSessionFilePath(): string {
   return path.join(app.getPath("userData"), BATCH_SESSION_BASENAME);
 }
 
+function proxyCacheRoot(): string {
+  return path.join(app.getPath("cache"), "film-lab-batch", "proxy-cache");
+}
+
 function isImageFile(fileName: string): boolean {
   const lower = fileName.toLowerCase();
   const ext = path.extname(lower);
@@ -600,6 +617,9 @@ function computeProxyDimensions(
   return { width, height };
 }
 
+const THUMBNAIL_FRAME_CANDIDATE_TIMES_SEC = [0.25, 0.5, 0.75, 1, 1.5, 2] as const;
+const THUMBNAIL_BRIGHTNESS_THRESHOLD = 0.05;
+
 /**
  * @description Stage 1 の JPEG サムネイル抽出引数を組み立てます。
  * -ss を入力前に置いて keyframe seek を優先し、最初の見える絵をできるだけ早く返します。
@@ -620,13 +640,14 @@ function spawnFfmpegNice(
 function buildFfmpegThumbnailArgs(
   inputPath: string,
   outputPath: string,
+  seekSeconds: number,
 ): string[] {
   return [
     "-hide_banner",
     "-loglevel",
     "info",
     "-ss",
-    "0",
+    `${seekSeconds}`,
     "-i",
     inputPath,
     "-frames:v",
@@ -638,6 +659,27 @@ function buildFfmpegThumbnailArgs(
     "-y",
     outputPath,
   ];
+}
+
+function computeNativeImageAverageBrightness(imagePath: string): number {
+  const image = nativeImage.createFromPath(imagePath);
+  if (image.isEmpty()) {
+    return 0;
+  }
+  const bitmap = image.toBitmap();
+  if (bitmap.length === 0) {
+    return 0;
+  }
+  let luminanceSum = 0;
+  let pixelCount = 0;
+  for (let i = 0; i < bitmap.length; i += 4) {
+    const b = bitmap[i] / 255;
+    const g = bitmap[i + 1] / 255;
+    const r = bitmap[i + 2] / 255;
+    luminanceSum += 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    pixelCount += 1;
+  }
+  return pixelCount > 0 ? luminanceSum / pixelCount : 0;
 }
 
 /**
@@ -1041,11 +1083,17 @@ async function runPendingRuntimeSmoke(win: BrowserWindow): Promise<void> {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   console.log(
     "[film-lab-desktop] main: 動画 src は film-lab-video スキーム（path-to-file-url）。ログが file: なら bun run build:electron 未反映。",
   );
   applyDockIconIfMac();
+  try {
+    await ensureProxyCacheRoot(proxyCacheRoot());
+    await pruneProxyCache(proxyCacheRoot());
+  } catch (error) {
+    console.warn("[film-lab-desktop][proxy-cache] startup prune failed", error);
+  }
   protocol.handle(FILM_LAB_VIDEO_PROTOCOL, async (request) => {
     let abs: string;
     let fileSize = 0;
@@ -1597,6 +1645,14 @@ ipcMain.handle("video-export-unlink-staged", async (_evt, stagedPath: string) =>
   }
 });
 
+ipcMain.handle("video-preview-get-proxy-cache-info", async () => {
+  return getProxyCacheInfo(proxyCacheRoot());
+});
+
+ipcMain.handle("video-preview-purge-proxy-cache", async () => {
+  return purgeProxyCache(proxyCacheRoot());
+});
+
 /**
  * @description Progressive loading Stage 1: JPEG サムネイルを高速抽出します。
  */
@@ -1634,63 +1690,113 @@ ipcMain.handle(
       typeof input.sourceWidth === "number" ? input.sourceWidth : 0,
       typeof input.sourceHeight === "number" ? input.sourceHeight : 0,
     );
-    const outputPath = path.join(
-      os.tmpdir(),
-      `film-lab-thumb-${randomBytes(8).toString("hex")}.jpg`,
-    );
-    registerProgressivePreviewTempPath(outputPath);
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const args = buildFfmpegThumbnailArgs(abs, outputPath);
-        if (DEBUG_VIDEO_EXPORT_MAIN) {
-          console.log("[progressive-main] thumbnail ffmpeg args:", args.join(" "));
-        }
-        const child = spawnFfmpegNice(ffmpeg.commandPath, args, {
-          env: ffmpeg.childEnv,
-          stdio: ["ignore", "ignore", "pipe"],
-        });
-        thumbnailProcess = child;
-        const stderrBuf: string[] = [];
-        child.stderr?.on("data", (chunk: Buffer) => {
-          stderrBuf.push(chunk.toString("utf8"));
-        });
-        child.on("error", (err) => {
-          thumbnailProcess = null;
-          console.error("[progressive-main] thumbnail spawn error:", err.message);
-          reject(
-            new Error(
-              `video-preview-extract-thumbnail: ffmpeg spawn error: ${err.message}`,
-            ),
-          );
-        });
-        child.on("close", (code) => {
-          thumbnailProcess = null;
-          const stderr = stderrBuf.join("").slice(-4000);
-          if (DEBUG_VIDEO_EXPORT_MAIN) {
-            console.log(`[progressive-main] thumbnail ffmpeg exit code=${code} stderr=${stderr.slice(0, 500)}`);
-          }
-          if (code === 0) {
-            resolve();
-            return;
-          }
-          reject(
-            new Error(
-              `video-preview-extract-thumbnail: ffmpeg exit code=${code} stderr: ${stderr}`,
-            ),
-          );
-        });
-      });
-    } catch (err) {
-      unregisterProgressivePreviewTempPath(outputPath);
+    const thumbnailCandidates: Array<{ outputPath: string; brightness: number }> = [];
+    const cleanupThumbnailPath = async (tempPath: string): Promise<void> => {
+      unregisterProgressivePreviewTempPath(tempPath);
       try {
-        await fs.unlink(outputPath);
+        await fs.unlink(tempPath);
       } catch {
         /* ignore */
       }
-      throw err;
+    };
+    const extractThumbnailCandidate = async (
+      seekSeconds: number,
+    ): Promise<{ outputPath: string; brightness: number } | null> => {
+      const outputPath = path.join(
+        os.tmpdir(),
+        `film-lab-thumb-${randomBytes(8).toString("hex")}.jpg`,
+      );
+      registerProgressivePreviewTempPath(outputPath);
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const args = buildFfmpegThumbnailArgs(abs, outputPath, seekSeconds);
+          if (DEBUG_VIDEO_EXPORT_MAIN) {
+            console.log("[progressive-main] thumbnail ffmpeg args:", args.join(" "));
+          }
+          const child = spawnFfmpegNice(ffmpeg.commandPath, args, {
+            env: ffmpeg.childEnv,
+            stdio: ["ignore", "ignore", "pipe"],
+          });
+          thumbnailProcess = child;
+          const stderrBuf: string[] = [];
+          child.stderr?.on("data", (chunk: Buffer) => {
+            stderrBuf.push(chunk.toString("utf8"));
+          });
+          child.on("error", (err) => {
+            thumbnailProcess = null;
+            console.error("[progressive-main] thumbnail spawn error:", err.message);
+            reject(
+              new Error(
+                `video-preview-extract-thumbnail: ffmpeg spawn error: ${err.message}`,
+              ),
+            );
+          });
+          child.on("close", (code) => {
+            thumbnailProcess = null;
+            const stderr = stderrBuf.join("").slice(-4000);
+            if (DEBUG_VIDEO_EXPORT_MAIN) {
+              console.log(
+                `[progressive-main] thumbnail ffmpeg exit code=${code} stderr=${stderr.slice(0, 500)}`,
+              );
+            }
+            if (code === 0) {
+              resolve();
+              return;
+            }
+            reject(
+              new Error(
+                `video-preview-extract-thumbnail: ffmpeg exit code=${code} stderr: ${stderr}`,
+              ),
+            );
+          });
+        });
+        const brightness = computeNativeImageAverageBrightness(outputPath);
+        return { outputPath, brightness };
+      } catch (err) {
+        await cleanupThumbnailPath(outputPath);
+        console.warn("video-preview-extract-thumbnail: candidate extraction failed", {
+          seekSeconds,
+          abs,
+          err,
+        });
+        return null;
+      }
+    };
+
+    let chosenThumbnail: { outputPath: string; brightness: number } | null = null;
+    for (const seekSeconds of THUMBNAIL_FRAME_CANDIDATE_TIMES_SEC) {
+      const candidate = await extractThumbnailCandidate(seekSeconds);
+      if (candidate == null) {
+        continue;
+      }
+      thumbnailCandidates.push(candidate);
+      if (chosenThumbnail == null || candidate.brightness > chosenThumbnail.brightness) {
+        chosenThumbnail = candidate;
+      }
+      if (candidate.brightness >= THUMBNAIL_BRIGHTNESS_THRESHOLD) {
+        chosenThumbnail = candidate;
+        break;
+      }
     }
+
+    if (chosenThumbnail == null) {
+      throw new Error("video-preview-extract-thumbnail: すべての候補抽出に失敗しました");
+    }
+
+    const outputPath = chosenThumbnail.outputPath;
+    await Promise.all(
+      thumbnailCandidates
+        .filter((candidate) => candidate.outputPath !== outputPath)
+        .map(async (candidate) => cleanupThumbnailPath(candidate.outputPath)),
+    );
     if (DEBUG_VIDEO_EXPORT_MAIN) {
-      console.log("[progressive-main] thumbnail written:", outputPath, width, height);
+      console.log(
+        "[progressive-main] thumbnail written:",
+        outputPath,
+        width,
+        height,
+        `brightness=${chosenThumbnail.brightness.toFixed(4)}`,
+      );
     }
     return { thumbnailPath: outputPath, width, height };
   },
@@ -1721,6 +1827,40 @@ ipcMain.handle(
     if (!st.isFile()) {
       throw new Error(`video-preview-generate-proxy: ファイルではありません — ${abs}`);
     }
+    const meta = await ffprobeVideoMeta(abs);
+    const dimensions = computeProxyDimensions(meta.width, meta.height);
+    const profile = {
+      version: PROXY_CACHE_PROFILE_VERSION,
+      width: dimensions.width,
+      height: dimensions.height,
+      encoderFlavor:
+        process.platform === "darwin"
+          ? "h264_videotoolbox-or-libx264"
+          : "libx264",
+      codec: "h264",
+      bitrateLabel: "8M",
+      gop: 1,
+      scaleFilter: "colorspace=iall=bt709:all=bt709,scale=1280:-2,format=yuv420p",
+    } as const;
+    const key = buildProxyCacheKey({
+      sourceSignature: {
+        sourcePath: abs,
+        sizeBytes: st.size,
+        mtimeMs: st.mtimeMs,
+        durationSecRounded: roundProxyCacheDurationSec(safeDurationSec),
+      },
+      proxyProfile: profile,
+    });
+    const cachePath = proxyCacheFilePath(proxyCacheRoot(), key);
+    const cacheHit = await touchProxyCacheEntry(proxyCacheRoot(), key);
+    if (cacheHit != null) {
+      console.log(`[film-lab-desktop][proxy-cache] hit ${cacheHit.proxyPath}`);
+      return {
+        proxyPath: cacheHit.proxyPath,
+        proxySizeBytes: cacheHit.sizeBytes,
+        cacheHit: true,
+      };
+    }
     const ffmpeg = (() => {
       try {
         return resolveVideoCliBinary("ffmpeg");
@@ -1730,10 +1870,9 @@ ipcMain.handle(
       }
     })();
     const outputPath = path.join(
-      os.tmpdir(),
-      `film-lab-proxy-${randomBytes(8).toString("hex")}.mp4`,
+      proxyCacheRoot(),
+      `proxy-${key}.tmp-${randomBytes(8).toString("hex")}.mp4`,
     );
-    registerProgressivePreviewTempPath(outputPath);
 
     const runTranscode = (useHwEncoder: boolean): Promise<void> =>
       new Promise((resolve, reject) => {
@@ -1814,7 +1953,6 @@ ipcMain.handle(
         await runTranscode(false);
       }
     } catch (err) {
-      unregisterProgressivePreviewTempPath(outputPath);
       try {
         await fs.unlink(outputPath);
       } catch {
@@ -1823,11 +1961,33 @@ ipcMain.handle(
       throw err;
     }
 
-    const outStat = await fs.stat(outputPath);
+    await fs.rename(outputPath, cachePath);
+    const outStat = await fs.stat(cachePath);
+    const nowIso = new Date().toISOString();
+    await upsertProxyCacheEntry(proxyCacheRoot(), {
+      key,
+      sourcePath: abs,
+      proxyPath: cachePath,
+      sizeBytes: outStat.size,
+      createdAt: nowIso,
+      lastAccessedAt: nowIso,
+      sourceSignature: {
+        sourcePath: abs,
+        sizeBytes: st.size,
+        mtimeMs: st.mtimeMs,
+        durationSecRounded: roundProxyCacheDurationSec(safeDurationSec),
+      },
+      proxyProfile: profile,
+    });
+    await pruneProxyCache(proxyCacheRoot());
     console.log(
-      `[film-lab-desktop][proxy] 完了 ${outputPath} size=${(outStat.size / 1024 / 1024).toFixed(1)}MB`,
+      `[film-lab-desktop][proxy] 完了 ${cachePath} size=${(outStat.size / 1024 / 1024).toFixed(1)}MB`,
     );
-    return { proxyPath: outputPath, proxySizeBytes: outStat.size };
+    return {
+      proxyPath: cachePath,
+      proxySizeBytes: outStat.size,
+      cacheHit: false,
+    };
   },
 );
 

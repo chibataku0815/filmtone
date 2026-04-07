@@ -12,6 +12,8 @@
 /**
  * @description トランスポートバーが表示する再生状態。`hasVideo` が false のときはバーを出しません。
  */
+export type VideoPlaybackRate = 1 | 2 | 3;
+
 export type VideoPlaybackState = {
   /** @description ユーザー動画がキャンバスに載っているとき true（静止画・sample は false） */
   hasVideo: boolean;
@@ -21,4 +23,6 @@ export type VideoPlaybackState = {
   currentTime: number;
   /** @description 秒。未知のときは 0 */
   duration: number;
+  /** @description 再生速度。1 / 2 / 3 の離散値 */
+  playbackRate: VideoPlaybackRate;
 };

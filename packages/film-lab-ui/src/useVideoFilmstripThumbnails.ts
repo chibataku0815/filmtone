@@ -22,6 +22,9 @@ export const FILMSTRIP_THUMB_MAX_COUNT = 12;
 /** @description サムネイル横ピクセル。tray 幾何は維持しつつ生成画質だけを上げる。 */
 export const FILMSTRIP_THUMB_WIDTH_PX = 80;
 
+const REPRESENTATIVE_FRAME_CANDIDATE_TIMES = [0.25, 0.5, 0.75, 1, 1.5, 2] as const;
+const REPRESENTATIVE_FRAME_BRIGHTNESS_THRESHOLD = 0.05;
+
 /**
  * @description `video` のメタデータが揃うまで待ちます。
  * @param video 対象の動画要素
@@ -134,6 +137,31 @@ function createOffscreenCloneVideo(source: HTMLVideoElement): HTMLVideoElement {
     "position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:-9999px;top:0;z-index:-1;";
   document.body.appendChild(clone);
   return clone;
+}
+
+function computeCanvasAverageBrightness(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+): number {
+  const { data } = ctx.getImageData(0, 0, width, height);
+  if (data.length === 0) {
+    return 0;
+  }
+  let luminanceSum = 0;
+  let pixelCount = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i] / 255;
+    const g = data[i + 1] / 255;
+    const b = data[i + 2] / 255;
+    luminanceSum += 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    pixelCount += 1;
+  }
+  return pixelCount > 0 ? luminanceSum / pixelCount : 0;
+}
+
+function clampSeekTime(time: number, duration: number): number {
+  return Math.max(0, Math.min(duration, time));
 }
 
 export type UseVideoFilmstripThumbnailsArgs = {
@@ -250,7 +278,52 @@ export function useVideoFilmstripThumbnails({
         const frames: string[] = [];
         clone.pause();
 
-        for (const t of stamps) {
+        let bestRepresentativeFrame:
+          | { brightness: number; dataUrl: string; time: number }
+          | null = null;
+        for (const candidateTime of REPRESENTATIVE_FRAME_CANDIDATE_TIMES) {
+          if (cancelled || scrubbingRef.current) {
+            break;
+          }
+          const clampedCandidateTime = clampSeekTime(candidateTime, dur);
+          await seekVideo(clone, clampedCandidateTime, dur);
+          if (cancelled || scrubbingRef.current) {
+            break;
+          }
+          ctx.fillStyle = "#141414";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          try {
+            ctx.drawImage(clone, 0, 0, vw, vh, 0, 0, thumbWidthPx, thumbH);
+            const brightness = computeCanvasAverageBrightness(ctx, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL("image/jpeg", 0.72);
+            if (
+              bestRepresentativeFrame == null ||
+              brightness > bestRepresentativeFrame.brightness
+            ) {
+              bestRepresentativeFrame = {
+                brightness,
+                dataUrl,
+                time: clampedCandidateTime,
+              };
+            }
+            if (brightness >= REPRESENTATIVE_FRAME_BRIGHTNESS_THRESHOLD) {
+              frames.push(dataUrl);
+              break;
+            }
+          } catch (err) {
+            console.warn("useVideoFilmstripThumbnails: representative frame probe failed", {
+              functionName: "useVideoFilmstripThumbnails",
+              time: clampedCandidateTime,
+              mediaKey,
+              err,
+            });
+          }
+        }
+        if (!cancelled && !scrubbingRef.current && frames.length === 0) {
+          frames.push(bestRepresentativeFrame?.dataUrl ?? "");
+        }
+
+        for (const t of stamps.slice(1)) {
           if (cancelled || scrubbingRef.current) {
             break;
           }

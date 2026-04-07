@@ -2,10 +2,12 @@
 
 import {
   type ComponentProps,
+  forwardRef,
   useReducer,
   useState,
   useCallback,
   useEffect,
+  useImperativeHandle,
   useRef,
   type ReactNode,
 } from "react";
@@ -63,6 +65,15 @@ function getCompressionAmountSliderMax(compressionAmount: number): number {
 function getCompressionRangeSliderMax(compressionRange: number): number {
   return Math.max(COMPRESSION_RANGE_UI_MAX, compressionRange);
 }
+
+/**
+ * @description 親から `FilmLabControlPanelCore` を命令的に操作するための ref API。
+ * `FilmLabCanvas` の HUD 解除ボタンなど、兄弟コンポーネントから compare を閉じるときに使います。
+ */
+export type FilmLabCoreRef = {
+  /** compare モードを強制的に OFF にします。 */
+  compareOff(): void;
+};
 
 /** フルページ用: プレゼンモード（寄付 UI 全消し）のトグルをコントロールパネルに出す */
 export type FilmLabDonationUiBinding = {
@@ -179,7 +190,10 @@ function PanelControlSlider({
   );
 }
 
-export function FilmLabControlPanelCore({
+export const FilmLabControlPanelCore = forwardRef<
+  FilmLabCoreRef,
+  FilmLabControlPanelCoreProps
+>(function FilmLabControlPanelCore({
   viewport,
   histogramVisible = true,
   onHistogramToggle,
@@ -194,7 +208,7 @@ export function FilmLabControlPanelCore({
   onUiModeChange,
   slots = {},
   deferSpaceKeyToVideoTransportWhenNoCompare = false,
-}: FilmLabControlPanelCoreProps) {
+}: FilmLabControlPanelCoreProps, ref) {
   const tFilmLab = useTranslations(FILM_LAB_NEXT_INTL_NAMESPACE);
 
   /** Pro「階調」ブロックの長い日本語ラベルが不自然に折り返されないよう、列幅と nowrap を確保する */
@@ -211,6 +225,11 @@ export function FilmLabControlPanelCore({
         ? createInitialStateFromSharedParams(initialSharedParams)
         : createInitialState({ ...PRESETS.cinematic } as Params, "cinematic"),
   );
+
+  useImperativeHandle(ref, () => ({
+    compareOff: () => dispatch({ type: "COMPARE_OFF" }),
+  }), []);
+
   const [activePreset, setActivePreset] = useState<PresetName>(() =>
     initialSharedParams ? findMatchingPreset(initialSharedParams) ?? "reset" : "cinematic",
   );
@@ -1099,7 +1118,7 @@ export function FilmLabControlPanelCore({
       <ShortcutHelp open={showHelp} onClose={() => setShowHelp(false)} />
     </>
   );
-}
+});
 
 /* ── Sub-components ───────────────────────────────────────────── */
 

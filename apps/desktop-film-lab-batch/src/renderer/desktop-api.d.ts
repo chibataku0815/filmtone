@@ -85,6 +85,16 @@ export type VideoPreviewGenerateProxyResult = {
   proxyPath: string;
   /** @description proxy ファイルサイズ（バイト） */
   proxySizeBytes: number;
+  /** @description persistent cache を再利用できたとき true */
+  cacheHit: boolean;
+};
+
+export type VideoPreviewProxyCacheInfo = {
+  entryCount: number;
+  totalBytes: number;
+  maxEntries: number;
+  maxTotalBytes: number;
+  maxAgeDays: number;
 };
 
 /**
@@ -172,6 +182,13 @@ export type FilmLabBatchBridge = {
   videoPreviewGenerateProxy: (
     payload: VideoPreviewGenerateProxyInput,
   ) => Promise<VideoPreviewGenerateProxyResult>;
+  /** @description proxy cache の件数と容量を返す */
+  videoPreviewGetProxyCacheInfo: () => Promise<VideoPreviewProxyCacheInfo>;
+  /** @description persistent proxy cache を空にする */
+  videoPreviewPurgeProxyCache: () => Promise<{
+    removedEntries: number;
+    removedBytes: number;
+  }>;
   /** @description Stage 2 の proxy 生成を中断 */
   videoPreviewAbortProxy: () => Promise<void>;
   /** @description Stage 2 の proxy 進捗を main から受け取る。戻り値は購読解除。 */

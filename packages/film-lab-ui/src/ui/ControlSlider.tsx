@@ -101,6 +101,24 @@ export function ControlSlider({
       <span className="w-10 shrink-0 text-right font-mono text-[10px] text-[var(--text-base-70)] tabular-nums sm:w-12 sm:text-[11px]">
         {formatValue ? formatValue(value) : value.toFixed(2)}
       </span>
+
+      {/* リセットボタン（値が defaultValue と異なるときだけ表示） */}
+      <button
+        type="button"
+        aria-label={labelResetHint}
+        disabled={disabled || value === defaultValue}
+        onClick={() => {
+          if (!disabled) onChange(defaultValue);
+        }}
+        className={[
+          "h-5 w-5 shrink-0 rounded text-[10px] transition-opacity",
+          value === defaultValue || disabled
+            ? "pointer-events-none opacity-0"
+            : "text-[var(--text-muted)] opacity-60 hover:opacity-100",
+        ].join(" ")}
+      >
+        ↺
+      </button>
     </div>
   );
 }

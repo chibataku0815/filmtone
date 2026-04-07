@@ -15,7 +15,9 @@
         "playAria": "動画を再生",
         "pauseAria": "動画を一時停止",
         "timelineAria": "再生位置を移動",
-        "disabledDuringBusy": "書き出し中またはプレビュー固定中は操作できません。"
+        "disabledDuringBusy": "書き出し中またはプレビュー固定中は操作できません。",
+        "speedGroupAria": "再生速度",
+        "speedAria": "{rate}x 再生"
       },
       "filmstrip": {
         "stripAria": "動画のおおよその位置が分かるサムネイル列"
@@ -99,7 +101,8 @@
       "slotTooltipRight": "画面の右半分のルックを編集",
       "editingLeftChip": "左のルックを調整中",
       "editingRightChip": "右のルックを調整中",
-      "dragSplitHint": "境界はドラッグ"
+      "dragSplitHint": "境界はドラッグ",
+      "dismissButton": "比較を閉じる"
     },
     "color": {
       "tint": "ティント",

@@ -75,6 +75,14 @@ export type VideoPreviewGenerateProxyInput = {
   durationSec: number;
 };
 
+export type VideoPreviewProxyCacheInfo = {
+  entryCount: number;
+  totalBytes: number;
+  maxEntries: number;
+  maxTotalBytes: number;
+  maxAgeDays: number;
+};
+
 contextBridge.exposeInMainWorld("filmLabBatch", {
   /**
    * @description `contextIsolation` では `File.path` が使えないため、Chromium が許可する `File` から絶対パスを返す（Electron 公式 API）。
@@ -164,8 +172,14 @@ contextBridge.exposeInMainWorld("filmLabBatch", {
     ipcRenderer.invoke("video-preview-extract-thumbnail", payload),
   videoPreviewGenerateProxy: (
     payload: VideoPreviewGenerateProxyInput,
-  ): Promise<{ proxyPath: string; proxySizeBytes: number }> =>
+  ): Promise<{ proxyPath: string; proxySizeBytes: number; cacheHit: boolean }> =>
     ipcRenderer.invoke("video-preview-generate-proxy", payload),
+  videoPreviewGetProxyCacheInfo: (): Promise<VideoPreviewProxyCacheInfo> =>
+    ipcRenderer.invoke("video-preview-get-proxy-cache-info"),
+  videoPreviewPurgeProxyCache: (): Promise<{
+    removedEntries: number;
+    removedBytes: number;
+  }> => ipcRenderer.invoke("video-preview-purge-proxy-cache"),
   videoPreviewAbortProxy: (): Promise<void> =>
     ipcRenderer.invoke("video-preview-abort-proxy"),
   /**

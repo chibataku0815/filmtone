@@ -49,6 +49,7 @@ export {
 export {
   FilmLabControlPanelCore,
   type FilmLabControlPanelCoreSlots,
+  type FilmLabCoreRef,
   type FilmLabCoreRenderContext,
   type FilmLabDonationUiBinding,
 } from "./FilmLabControlPanelCore";

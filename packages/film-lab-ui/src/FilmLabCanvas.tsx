@@ -24,7 +24,7 @@ import {
 } from "film-lab-renderer";
 import type { Params } from "film-lab-core";
 import { FILM_LAB_NEXT_INTL_NAMESPACE } from "./filmLabUiContract";
-import type { VideoPlaybackState } from "./videoPlaybackContract";
+import type { VideoPlaybackRate, VideoPlaybackState } from "./videoPlaybackContract";
 
 /**
  * @description プレビューに載っているメディアの種類を親へ伝えるための最小ペイロード。
@@ -90,9 +90,9 @@ interface FilmLabCanvasProps {
   initialGradeParams?: Params | null;
   /**
    * 比較モード中のみ渡す。プレビュー上に「左/右」ラベル・編集中チップ・境界ドラッグのヒントを重ねる。
-   * pointer-events-none でスプリット操作と干渉しない。
+   * pointer-events-none でスプリット操作と干渉しない（解除ボタンのみ pointer-events-auto）。
    */
-  compareHud?: { activeSlot: "A" | "B" } | null;
+  compareHud?: { activeSlot: "A" | "B"; onDismiss?: () => void } | null;
   /** ドロップ／ファイル選択で .cube が適用できたとき（寄付ナッジ用） */
   onCubeLutLoaded?: () => void;
   /**
@@ -170,6 +170,10 @@ export type FilmLabCanvasRef = {
    * @param time シーク先の秒。`duration` が分かっているときは 0〜duration に丸めます。
    */
   videoPlaybackSeek: (time: number) => void;
+  /**
+   * @description 再生速度を 1x / 2x / 3x で切り替えます。停止中・再生中・シーク後いずれも保持されます。
+   */
+  videoPlaybackSetRate: (rate: VideoPlaybackRate) => void;
   /**
    * @description `pauseVideoPreview` と独立に、**親が同期で**プレビュー RAF（`viewport.render`）を止める。
    * Next.js `dynamic()` や effect 順序で props が遅れるときでも、エンコード開始の同一コールスタックで効かせる。
@@ -902,14 +906,19 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
             isPlaying: false,
             currentTime: 0,
             duration: 0,
+            playbackRate: 1,
           };
         }
         const dur = v.duration;
+        const rawRate = v.playbackRate;
+        const playbackRate: VideoPlaybackRate =
+          rawRate >= 3 ? 3 : rawRate >= 2 ? 2 : 1;
         return {
           hasVideo: true,
           isPlaying: !v.paused && !v.ended,
           currentTime: v.currentTime,
           duration: Number.isFinite(dur) ? dur : 0,
+          playbackRate,
         };
       },
       isVideoPlaybackSuppressed: () =>
@@ -981,6 +990,13 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
             err,
           });
         }
+      },
+      videoPlaybackSetRate: (rate: VideoPlaybackRate) => {
+        const v = previewVideoElementRef.current;
+        if (!v) {
+          return;
+        }
+        v.playbackRate = rate;
       },
       holdPreviewRendering: (held: boolean) => {
         previewRenderingHoldRef.current = held;
@@ -1073,10 +1089,20 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
 
       {compareHud != null && (
         <>
-          <div className="pointer-events-none absolute left-0 right-0 top-16 z-[6] flex justify-center px-3 sm:top-[4.5rem]">
+          <div className="pointer-events-none absolute left-0 right-0 top-16 z-[6] flex items-center justify-center gap-2 px-3 sm:top-[4.5rem]">
             <span className="rounded-full bg-black/55 px-2.5 py-1 text-[10px] font-medium text-white/80 ring-1 ring-white/15 backdrop-blur-sm">
               {tFilmLab("compare.dragSplitHint")}
             </span>
+            {compareHud.onDismiss != null && (
+              <button
+                type="button"
+                className="pointer-events-auto rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-medium text-white/80 ring-1 ring-white/20 backdrop-blur-sm transition-colors hover:bg-white/20 hover:text-white"
+                onClick={compareHud.onDismiss}
+                aria-label={tFilmLab("compare.dismissButton")}
+              >
+                {tFilmLab("compare.dismissButton")}
+              </button>
+            )}
           </div>
           <div className="pointer-events-none absolute bottom-10 left-0 right-0 z-[6] flex justify-center px-3 sm:bottom-11">
             <span className="rounded-full bg-[var(--accent-amber1)]/95 px-3 py-1 text-[10px] font-semibold text-black shadow-lg ring-1 ring-black/20 backdrop-blur-sm">
@@ -1115,7 +1141,10 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
 
       {mediaOverlay.kind === "loading" && (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-black/55 backdrop-blur-[2px]">
-          <span className="rounded-lg bg-black/70 px-4 py-3 text-sm text-white/90">
+          <span
+            className="rounded-lg bg-black/70 px-4 py-3 text-sm font-medium tracking-[0.01em] text-white/90 shadow-[0_10px_24px_rgba(0,0,0,0.24)]"
+            style={{ fontFamily: "var(--font-family-sans)" }}
+          >
             {tFilmLab("canvas.loadingMedia")}
           </span>
         </div>

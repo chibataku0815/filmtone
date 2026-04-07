@@ -59,11 +59,11 @@ export type ProgressiveTextureSwapPayload = {
 type ProgressiveTempFiles = {
   /** @description Stage 1 の JPEG サムネイル */
   thumbnailPath: string | null;
-  /** @description Stage 2 の proxy MP4 */
-  proxyPath: string | null;
   /** @description Stage 3 の mezzanine MP4 */
   mezzaninePath: string | null;
 };
+
+type ProgressiveVisibleStageKey = "thumbnailPath" | "proxy";
 
 /**
  * @description 画面表示用の state です。
@@ -81,6 +81,10 @@ type ProgressiveLoadState = {
   isTranscoding: boolean;
   /** @description いま Progressive loading を管理している元動画の絶対パス */
   activeSourcePath: string | null;
+  /** @description persistent proxy cache の path。存在しても cleanup 対象ではない */
+  proxyPath: string | null;
+  /** @description 最後に使った proxy が cache hit だったか */
+  proxyCacheHit: boolean | null;
   /** @description cleanup 用の tmp ファイル一覧 */
   tempFiles: ProgressiveTempFiles;
 };
@@ -99,6 +103,10 @@ export type UseProgressiveLoadReturn = {
   stage: ProgressiveStage;
   /** @description Progressive loading 管理中の元動画の絶対パス */
   activeSourcePath: string | null;
+  /** @description いま使っている proxy path（persistent cache） */
+  proxyPath: string | null;
+  /** @description 最後の proxy が cache hit なら true */
+  proxyCacheHit: boolean | null;
   /** @description 生成済み mezzanine の tmp パス。エクスポートで再利用可能。stage=ready のとき有効 */
   mezzaninePath: string | null;
   /**
@@ -121,7 +129,6 @@ export type UseProgressiveLoadReturn = {
 function createEmptyTempFiles(): ProgressiveTempFiles {
   return {
     thumbnailPath: null,
-    proxyPath: null,
     mezzaninePath: null,
   };
 }
@@ -284,6 +291,8 @@ export function useProgressiveLoad(): UseProgressiveLoadReturn {
         sessionId: nextSessionId,
         isTranscoding: false,
         activeSourcePath: absPath,
+        proxyPath: null,
+        proxyCacheHit: null,
         tempFiles: createEmptyTempFiles(),
       });
       return nextSessionId;
@@ -346,6 +355,8 @@ export function useProgressiveLoad(): UseProgressiveLoadReturn {
       sessionId: nextSessionId,
       isTranscoding: false,
       activeSourcePath: null,
+      proxyPath: null,
+      proxyCacheHit: null,
       tempFiles: createEmptyTempFiles(),
     });
   }, [abortBackgroundStages, unlinkPaths, unsubscribeProgress]);
@@ -441,13 +452,15 @@ export function useProgressiveLoad(): UseProgressiveLoadReturn {
        */
       const generateProxy = async (
         visibleQuality: ProgressiveQualityLabel,
-      ): Promise<{ path: string; url: string } | null> => {
+      ): Promise<{ path: string; url: string; cacheHit: boolean } | null> => {
         updateSessionState(sessionId, {
           stage: "proxy",
           qualityLabel: visibleQuality,
           stageProgress: 0,
           isTranscoding: true,
           activeSourcePath: absPath,
+          proxyPath: null,
+          proxyCacheHit: null,
         });
         unsubscribeProgress();
         proxyUnsubscribeRef.current = window.filmLabBatch.subscribeProxyProgress(
@@ -469,15 +482,17 @@ export function useProgressiveLoad(): UseProgressiveLoadReturn {
           proxyUnsubscribeRef.current?.();
           proxyUnsubscribeRef.current = null;
           if (!isCurrentSession(sessionId)) {
-            await unlinkPaths([result.proxyPath]);
             return null;
           }
-          assignTempFile(sessionId, "proxyPath", result.proxyPath);
           const url = await createUrlForCurrentSession(result.proxyPath);
           if (url == null) {
             return null;
           }
-          return { path: result.proxyPath, url };
+          updateSessionState(sessionId, {
+            proxyPath: result.proxyPath,
+            proxyCacheHit: result.cacheHit,
+          });
+          return { path: result.proxyPath, url, cacheHit: result.cacheHit };
         } catch (err) {
           proxyUnsubscribeRef.current?.();
           proxyUnsubscribeRef.current = null;
@@ -549,11 +564,11 @@ export function useProgressiveLoad(): UseProgressiveLoadReturn {
        * @description 表示中の成功ステージから mezzanine までを背景で進めます。
        */
       const continueFromVisibleStage = (
-        initialVisibleKey: keyof ProgressiveTempFiles,
+        initialVisibleKey: ProgressiveVisibleStageKey,
         initialVisibleQuality: Exclude<ProgressiveQualityLabel, null | "hd">,
       ): void => {
         void (async () => {
-          let visibleKey: keyof ProgressiveTempFiles = initialVisibleKey;
+          let visibleKey: ProgressiveVisibleStageKey = initialVisibleKey;
           let visibleQuality: Exclude<ProgressiveQualityLabel, null | "hd"> =
             initialVisibleQuality;
 
@@ -569,7 +584,7 @@ export function useProgressiveLoad(): UseProgressiveLoadReturn {
                 if (!isCurrentSession(sessionId)) {
                   return;
                 }
-                visibleKey = "proxyPath";
+                visibleKey = "proxy";
                 visibleQuality = "proxy";
                 updateSessionState(sessionId, {
                   stage: "proxy",
@@ -607,9 +622,7 @@ export function useProgressiveLoad(): UseProgressiveLoadReturn {
                 isTranscoding: false,
                 activeSourcePath: absPath,
               });
-              if (visibleKey === "proxyPath") {
-                await unlinkStageTempFile(sessionId, "proxyPath");
-              } else if (visibleKey === "thumbnailPath") {
+              if (visibleKey === "thumbnailPath") {
                 await unlinkStageTempFile(sessionId, "thumbnailPath");
               }
               return;
@@ -626,7 +639,7 @@ export function useProgressiveLoad(): UseProgressiveLoadReturn {
             return;
           }
           updateSessionState(sessionId, {
-            stage: visibleKey === "proxyPath" ? "proxy" : "thumbnail",
+            stage: visibleKey === "proxy" ? "proxy" : "thumbnail",
             qualityLabel: visibleQuality,
             stageProgress: 100,
             isTranscoding: false,
@@ -650,7 +663,7 @@ export function useProgressiveLoad(): UseProgressiveLoadReturn {
           isTranscoding: true,
           activeSourcePath: absPath,
         });
-        continueFromVisibleStage("proxyPath", "proxy");
+        continueFromVisibleStage("proxy", "proxy");
         return {
           url: proxyInitial.url,
           fileName: resolvedFileName,
@@ -687,6 +700,8 @@ export function useProgressiveLoad(): UseProgressiveLoadReturn {
           stageProgress: 0,
           isTranscoding: false,
           activeSourcePath: absPath,
+          proxyPath: null,
+          proxyCacheHit: null,
         });
       }
       return null;
@@ -700,6 +715,8 @@ export function useProgressiveLoad(): UseProgressiveLoadReturn {
     isTranscoding: state.isTranscoding,
     stage: state.stage,
     activeSourcePath: state.activeSourcePath,
+    proxyPath: state.proxyPath,
+    proxyCacheHit: state.proxyCacheHit,
     mezzaninePath: state.tempFiles.mezzaninePath,
     startProgressiveLoad,
     cancel,
