@@ -178,17 +178,94 @@ type PanelControlSliderProps = ComponentProps<typeof BaseControlSlider> & {
 function PanelControlSlider({
   sliderLabelResetHint,
   className,
+  labelClassName,
   labelResetHint,
   ...props
 }: PanelControlSliderProps) {
+  const panelSliderLabelClassName = [
+    "min-w-[7.5rem] shrink-0 cursor-pointer text-[11px] leading-tight text-[var(--text-muted)] select-none whitespace-nowrap sm:min-w-[8.5rem]",
+    labelClassName,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <BaseControlSlider
       {...props}
+      labelClassName={panelSliderLabelClassName}
       labelResetHint={labelResetHint ?? sliderLabelResetHint}
       className={["lg:pr-4", className].filter(Boolean).join(" ")}
     />
   );
 }
+
+type FinishToolStarterState = {
+  id: "subtle" | "signature";
+  labelKey: "controls.finishToolsStarterSubtle" | "controls.finishToolsStarterSignature";
+  patch: Partial<Params>;
+};
+
+const CROSS_STARTER_STATES: readonly FinishToolStarterState[] = [
+  {
+    id: "subtle",
+    labelKey: "controls.finishToolsStarterSubtle",
+    patch: {
+      crossFilterStrength: 0.25,
+      crossFilterSpikes: 4,
+      crossFilterAngle: 0,
+      crossFilterLength: 0.38,
+      crossFilterThreshold: 0.92,
+      crossFilterChromatic: 0.18,
+      crossFilterSizeLimit: 0.12,
+      crossFilterRandomness: 0.9,
+      crossFilterHardMode: 0,
+      crossFilterMinSpacing: 0.1,
+    },
+  },
+  {
+    id: "signature",
+    labelKey: "controls.finishToolsStarterSignature",
+    patch: {
+      crossFilterStrength: 0.55,
+      crossFilterSpikes: 6,
+      crossFilterAngle: 15,
+      crossFilterLength: 0.62,
+      crossFilterThreshold: 0.92,
+      crossFilterChromatic: 0.4,
+      crossFilterSizeLimit: 0.24,
+      crossFilterRandomness: 0.75,
+      crossFilterHardMode: 0,
+      crossFilterMinSpacing: 0.22,
+    },
+  },
+] as const;
+
+const GLOW_STARTER_STATES: readonly FinishToolStarterState[] = [
+  {
+    id: "subtle",
+    labelKey: "controls.finishToolsStarterSubtle",
+    patch: {
+      bloomStrength: 0.14,
+      bloomThreshold: 0.8,
+      bloomRadius: 0.38,
+      halationIntensity: 0.08,
+      halationSpread: 18,
+      halationHue: 18,
+    },
+  },
+  {
+    id: "signature",
+    labelKey: "controls.finishToolsStarterSignature",
+    patch: {
+      bloomStrength: 0.28,
+      bloomThreshold: 0.74,
+      bloomRadius: 0.48,
+      halationIntensity: 0.18,
+      halationSpread: 24,
+      halationHue: 24,
+    },
+  },
+] as const;
 
 export const FilmLabControlPanelCore = forwardRef<
   FilmLabCoreRef,
@@ -238,6 +315,8 @@ export const FilmLabControlPanelCore = forwardRef<
   const [savedShaftIntensity, setSavedShaftIntensity] = useState(0.4);
   const [savedCrossFilterStrength, setSavedCrossFilterStrength] = useState(0.5);
   const [artifactsOpen, setArtifactsOpen] = useState(true);
+  const [glowAdvancedOpen, setGlowAdvancedOpen] = useState(false);
+  const [crossAdvancedOpen, setCrossAdvancedOpen] = useState(false);
   // v0.5.0: postEffectsOpen removed — motionBlur moved to ARTIFACTS, section eliminated
   const [showHelp, setShowHelp] = useState(false);
   const [sourceTrimOpen, setSourceTrimOpen] = useState(false);
@@ -257,7 +336,7 @@ export const FilmLabControlPanelCore = forwardRef<
   }, [uiMode, onUiModeChange]);
 
   /**
-   * Quick から Pro に切り替えたときは、Artifacts の補助スライダーを見える状態に戻す。
+   * Quick から Pro に切り替えたときは、Finish Tools セクションを見える状態に戻す。
    * 同じモードのまま手で閉じたときは、ここでは上書きしない。
    */
   useEffect(() => {
@@ -419,6 +498,33 @@ export const FilmLabControlPanelCore = forwardRef<
   const commit = useCallback(() => {
     dispatch({ type: "COMMIT" });
   }, []);
+
+  const applyParamPatch = useCallback((patch: Partial<Params>) => {
+    dispatch({ type: "MERGE_PARAMS", patch });
+    dispatch({ type: "COMMIT" });
+
+    if (typeof patch.bloomStrength === "number" && patch.bloomStrength > 0) {
+      setSavedBloomStrength(patch.bloomStrength);
+    }
+    if (typeof patch.halationIntensity === "number" && patch.halationIntensity > 0) {
+      setSavedHalationIntensity(patch.halationIntensity);
+    }
+    if (typeof patch.crossFilterStrength === "number" && patch.crossFilterStrength > 0) {
+      setSavedCrossFilterStrength(patch.crossFilterStrength);
+    }
+
+    setActivePreset("reset");
+  }, []);
+
+  const applyCrossStarterState = useCallback((patch: Partial<Params>) => {
+    setCrossAdvancedOpen(false);
+    applyParamPatch(patch);
+  }, [applyParamPatch]);
+
+  const applyGlowStarterState = useCallback((patch: Partial<Params>) => {
+    setGlowAdvancedOpen(true);
+    applyParamPatch(patch);
+  }, [applyParamPatch]);
 
   const updateHalationHue = useCallback((hue: number) => {
     dispatch({ type: "SET_PARAM", key: "halationHue", value: hue });
@@ -801,163 +907,418 @@ export const FilmLabControlPanelCore = forwardRef<
             </div>
           )}
 
-          {/* === ARTIFACTS (旧 EFFECTS) — Pro only === */}
+          {/* === FINISH TOOLS (replaces former Artifacts block) — Pro only === */}
           {isPro && (
             <div className="min-w-0">
               <CollapsibleHeader
-                title={tFilmLab("controls.artifacts")}
-                titleHint={tFilmLab("controls.artifactsSectionHint")}
+                title={tFilmLab("controls.finishTools")}
+                titleHint={tFilmLab("controls.finishToolsSectionHint")}
                 open={artifactsOpen}
                 onToggle={() => setArtifactsOpen(!artifactsOpen)}
               />
               {artifactsOpen && (
-                <div className="flex flex-col gap-2.5">
-                  <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.filmGrain")} value={params.grainIntensity} min={0} max={0.5} step={0.01} defaultValue={0} onChange={(v) => updateParam("grainIntensity", v)} onCommit={commit} />
-                  <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.grainSize")} value={params.grainSize} min={0} max={1} step={0.01} defaultValue={0.3} onChange={(v) => updateParam("grainSize", v)} onCommit={commit} />
-                  <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.vignette")} value={params.vignette} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("vignette", v)} onCommit={commit} />
+                <div className="mt-2 flex flex-col gap-3">
+                  {tFilmLab("controls.finishToolsSectionHint") ? (
+                    <p className="text-[10px] leading-snug text-white/50">
+                      {tFilmLab("controls.finishToolsSectionHint")}
+                    </p>
+                  ) : null}
+
+                  <FinishToolFamilyCard
+                    first
+                    title={tFilmLab("controls.finishToolsMist")}
+                  >
+                    <PanelControlSlider
+                      sliderLabelResetHint={sliderLabelResetHint}
+                      label={tFilmLab("controls.diffusion")}
+                      value={params.diffusion}
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      defaultValue={0}
+                      onChange={(v) => updateParam("diffusion", v)}
+                      onCommit={commit}
+                    />
+                  </FinishToolFamilyCard>
+
+                  <FinishToolFamilyCard
+                    title={tFilmLab("controls.finishToolsGlow")}
+                    headerAccessory={(
+                      <StarterStateButtonRow
+                        states={GLOW_STARTER_STATES}
+                        params={params}
+                        onApply={applyGlowStarterState}
+                        tFilmLab={tFilmLab}
+                      />
+                    )}
+                  >
+                    <ToggleHeader
+                      title={tFilmLab("controls.bloom")}
+                      titleHint={tFilmLab("controls.bloomToggleHint")}
+                      enabled={bloomEnabled}
+                      onToggle={toggleBloom}
+                    />
+                    <div className={`flex flex-col gap-2.5 ${!bloomEnabled ? "pointer-events-none opacity-30" : ""}`}>
+                      <PanelControlSlider
+                        sliderLabelResetHint={sliderLabelResetHint}
+                        label={tFilmLab("controls.strength")}
+                        value={params.bloomStrength}
+                        min={0}
+                        max={3}
+                        step={0.01}
+                        defaultValue={0}
+                        onChange={(v) => updateParam("bloomStrength", v)}
+                        onCommit={commit}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setGlowAdvancedOpen(!glowAdvancedOpen)}
+                      className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[10px] font-medium tracking-[0.08em] text-white/68 transition-colors hover:bg-white/[0.06] hover:text-white/84"
+                    >
+                      {glowAdvancedOpen
+                        ? tFilmLab("controls.finishToolsAdvancedHide")
+                        : tFilmLab("controls.finishToolsAdvancedShow")}
+                    </button>
+
+                    {glowAdvancedOpen ? (
+                      <div className="mt-3 flex flex-col gap-2.5 border-t border-white/[0.08] pt-3">
+                        <div className={`flex flex-col gap-2.5 ${!bloomEnabled ? "pointer-events-none opacity-30" : ""}`}>
+                          <PanelControlSlider
+                            sliderLabelResetHint={sliderLabelResetHint}
+                            label={tFilmLab("controls.threshold")}
+                            hint={tFilmLab("controls.bloomThresholdHint")}
+                            value={params.bloomThreshold}
+                            min={0}
+                            max={1}
+                            step={0.01}
+                            defaultValue={0.8}
+                            onChange={(v) => updateParam("bloomThreshold", v)}
+                            onCommit={commit}
+                          />
+                          <PanelControlSlider
+                            sliderLabelResetHint={sliderLabelResetHint}
+                            label={tFilmLab("controls.radius")}
+                            value={params.bloomRadius}
+                            min={0}
+                            max={1}
+                            step={0.01}
+                            defaultValue={0.4}
+                            onChange={(v) => updateParam("bloomRadius", v)}
+                            onCommit={commit}
+                          />
+                        </div>
+
+                        <ToggleHeader
+                          title={tFilmLab("controls.halation")}
+                          titleHint={tFilmLab("controls.halationToggleHint")}
+                          enabled={halationEnabled}
+                          onToggle={toggleHalation}
+                        />
+                        <div className={`flex flex-col gap-2.5 ${!halationEnabled ? "pointer-events-none opacity-30" : ""}`}>
+                          <PanelControlSlider
+                            sliderLabelResetHint={sliderLabelResetHint}
+                            label={tFilmLab("controls.intensity")}
+                            value={params.halationIntensity}
+                            min={0}
+                            max={1}
+                            step={0.01}
+                            defaultValue={0}
+                            onChange={(v) => updateParam("halationIntensity", v)}
+                            onCommit={commit}
+                          />
+                          <PanelControlSlider
+                            sliderLabelResetHint={sliderLabelResetHint}
+                            label={tFilmLab("controls.spread")}
+                            value={params.halationSpread}
+                            min={0}
+                            max={50}
+                            step={0.5}
+                            defaultValue={15}
+                            onChange={(v) => updateParam("halationSpread", v)}
+                            onCommit={commit}
+                          />
+                          <HueSlider
+                            label={tFilmLab("controls.halationHue")}
+                            value={params.halationHue}
+                            onChange={updateHalationHue}
+                            onCommit={commit}
+                          />
+                        </div>
+                      </div>
+                    ) : null}
+                  </FinishToolFamilyCard>
+
+                  <FinishToolFamilyCard
+                    title={tFilmLab("controls.finishToolsCross")}
+                    headerAccessory={(
+                      <StarterStateButtonRow
+                        states={CROSS_STARTER_STATES}
+                        params={params}
+                        onApply={applyCrossStarterState}
+                        tFilmLab={tFilmLab}
+                      />
+                    )}
+                  >
+                    <ToggleHeader
+                      title={tFilmLab("controls.crossFilter")}
+                      titleHint={tFilmLab("controls.crossFilterToggleHint")}
+                      enabled={crossFilterEnabled}
+                      onToggle={toggleCrossFilter}
+                    />
+                    <div className={`flex flex-col gap-2.5 ${!crossFilterEnabled ? "pointer-events-none opacity-30" : ""}`}>
+                      <PanelControlSlider
+                        sliderLabelResetHint={sliderLabelResetHint}
+                        label={tFilmLab("controls.crossFilterStrengthLabel")}
+                        value={params.crossFilterStrength}
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        defaultValue={0}
+                        onChange={(v) => updateParam("crossFilterStrength", v)}
+                        onCommit={commit}
+                      />
+                      <PanelControlSlider
+                        sliderLabelResetHint={sliderLabelResetHint}
+                        label={tFilmLab("controls.crossFilterSpikes")}
+                        hint={tFilmLab("controls.crossFilterSpikesHint")}
+                        value={params.crossFilterSpikes}
+                        min={4}
+                        max={8}
+                        step={2}
+                        defaultValue={4}
+                        onChange={(v) => updateParam("crossFilterSpikes", v)}
+                        onCommit={commit}
+                      />
+                      <PanelControlSlider
+                        sliderLabelResetHint={sliderLabelResetHint}
+                        label={tFilmLab("controls.crossFilterAngle")}
+                        hint={tFilmLab("controls.crossFilterAngleHint")}
+                        value={params.crossFilterAngle}
+                        min={0}
+                        max={360}
+                        step={1}
+                        defaultValue={0}
+                        onChange={(v) => updateParam("crossFilterAngle", v)}
+                        onCommit={commit}
+                        formatValue={(v) => `${Math.round(v)}°`}
+                      />
+                      <PanelControlSlider
+                        sliderLabelResetHint={sliderLabelResetHint}
+                        label={tFilmLab("controls.crossFilterLength")}
+                        hint={tFilmLab("controls.crossFilterLengthHint")}
+                        value={params.crossFilterLength}
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        defaultValue={0.5}
+                        onChange={(v) => updateParam("crossFilterLength", v)}
+                        onCommit={commit}
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setCrossAdvancedOpen(!crossAdvancedOpen)}
+                      className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[10px] font-medium tracking-[0.08em] text-white/68 transition-colors hover:bg-white/[0.06] hover:text-white/84"
+                    >
+                      {crossAdvancedOpen
+                        ? tFilmLab("controls.finishToolsAdvancedHide")
+                        : tFilmLab("controls.finishToolsAdvancedShow")}
+                    </button>
+
+                    {crossAdvancedOpen ? (
+                      <div className={`mt-3 flex flex-col gap-2.5 border-t border-white/[0.08] pt-3 ${!crossFilterEnabled ? "pointer-events-none opacity-30" : ""}`}>
+                        <div className="flex justify-center">
+                          <SegmentedControl<"soft" | "hard">
+                            options={[
+                              { value: "soft", label: tFilmLab("controls.crossFilterHardModeSoft") },
+                              { value: "hard", label: tFilmLab("controls.crossFilterHardModeHard") },
+                            ]}
+                            value={params.crossFilterHardMode >= 0.5 ? "hard" : "soft"}
+                            onChange={(mode) => {
+                              updateParam("crossFilterHardMode", mode === "hard" ? 1 : 0);
+                              commit();
+                            }}
+                            ariaLabel={tFilmLab("controls.crossFilterHardModeAria")}
+                          />
+                        </div>
+                        <PanelControlSlider
+                          sliderLabelResetHint={sliderLabelResetHint}
+                          label={tFilmLab("controls.crossFilterChromatic")}
+                          hint={tFilmLab("controls.crossFilterChromaticHint")}
+                          value={params.crossFilterChromatic}
+                          min={0}
+                          max={1}
+                          step={0.01}
+                          defaultValue={0.3}
+                          onChange={(v) => updateParam("crossFilterChromatic", v)}
+                          onCommit={commit}
+                        />
+                        <div
+                          className={`flex flex-col gap-2.5 ${params.crossFilterHardMode >= 0.5 ? "pointer-events-none opacity-30" : ""}`}
+                          title={params.crossFilterHardMode >= 0.5 ? tFilmLab("controls.crossFilterHardModeOverrideHint") : undefined}
+                        >
+                          <PanelControlSlider
+                            sliderLabelResetHint={sliderLabelResetHint}
+                            label={tFilmLab("controls.crossFilterSizeLimit")}
+                            hint={tFilmLab("controls.crossFilterSizeLimitHint")}
+                            value={params.crossFilterSizeLimit}
+                            min={0}
+                            max={1}
+                            step={0.01}
+                            defaultValue={0}
+                            onChange={(v) => updateParam("crossFilterSizeLimit", v)}
+                            onCommit={commit}
+                          />
+                          <PanelControlSlider
+                            sliderLabelResetHint={sliderLabelResetHint}
+                            label={tFilmLab("controls.crossFilterRandomness")}
+                            hint={tFilmLab("controls.crossFilterRandomnessHint")}
+                            value={params.crossFilterRandomness}
+                            min={0}
+                            max={1}
+                            step={0.01}
+                            defaultValue={1}
+                            onChange={(v) => updateParam("crossFilterRandomness", v)}
+                            onCommit={commit}
+                          />
+                        </div>
+                        <PanelControlSlider
+                          sliderLabelResetHint={sliderLabelResetHint}
+                          label={tFilmLab("controls.crossFilterMinSpacing")}
+                          hint={tFilmLab("controls.crossFilterMinSpacingHint")}
+                          value={params.crossFilterMinSpacing}
+                          min={0}
+                          max={1}
+                          step={0.01}
+                          defaultValue={0}
+                          onChange={(v) => updateParam("crossFilterMinSpacing", v)}
+                          onCommit={commit}
+                        />
+                      </div>
+                    ) : null}
+                  </FinishToolFamilyCard>
+
+                  <FinishToolFamilyCard
+                    title={tFilmLab("controls.finishToolsTexture")}
+                  >
+                    <PanelControlSlider
+                      sliderLabelResetHint={sliderLabelResetHint}
+                      label={tFilmLab("controls.filmGrain")}
+                      value={params.grainIntensity}
+                      min={0}
+                      max={0.5}
+                      step={0.01}
+                      defaultValue={0}
+                      onChange={(v) => updateParam("grainIntensity", v)}
+                      onCommit={commit}
+                    />
+                    <PanelControlSlider
+                      sliderLabelResetHint={sliderLabelResetHint}
+                      label={tFilmLab("controls.grainSize")}
+                      value={params.grainSize}
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      defaultValue={0.3}
+                      onChange={(v) => updateParam("grainSize", v)}
+                      onCommit={commit}
+                    />
+                    <PanelControlSlider
+                      sliderLabelResetHint={sliderLabelResetHint}
+                      label={tFilmLab("controls.vignette")}
+                      value={params.vignette}
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      defaultValue={0}
+                      onChange={(v) => updateParam("vignette", v)}
+                      onCommit={commit}
+                    />
+                    <PanelControlSlider
+                      sliderLabelResetHint={sliderLabelResetHint}
+                      label={tFilmLab("controls.grainRadialMix")}
+                      hint={tFilmLab("controls.grainRadialMixHint")}
+                      value={params.grainRadialMix}
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      defaultValue={1}
+                      onChange={(v) => updateParam("grainRadialMix", v)}
+                      onCommit={commit}
+                    />
+                  </FinishToolFamilyCard>
+
+                  <FinishToolFamilyCard
+                    title={tFilmLab("controls.finishToolsLens")}
+                  >
+                    <ToggleHeader
+                      title={tFilmLab("controls.rgbShift")}
+                      titleHint={tFilmLab("controls.rgbShiftToggleHint")}
+                      enabled={rgbShiftEnabled}
+                      onToggle={toggleRgbShift}
+                    />
+                    <div className={`flex flex-col gap-2.5 ${!rgbShiftEnabled ? "pointer-events-none opacity-30" : ""}`}>
+                      <PanelControlSlider
+                        sliderLabelResetHint={sliderLabelResetHint}
+                        label={tFilmLab("controls.strength")}
+                        hint={tFilmLab("effects.rgbShiftHint")}
+                        value={params.rgbShift}
+                        min={0}
+                        max={getRgbShiftSliderMax(params.rgbShift)}
+                        step={RGB_SHIFT_UI_STEP}
+                        defaultValue={0}
+                        formatValue={formatRgbShiftValue}
+                        onChange={(v) => updateParam("rgbShift", v)}
+                        onCommit={commit}
+                      />
+                    </div>
+                    <PanelControlSlider
+                      sliderLabelResetHint={sliderLabelResetHint}
+                      label={tFilmLab("controls.lensSoftness")}
+                      hint={tFilmLab("effects.lensSoftnessHint")}
+                      value={params.lensSoftness}
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      defaultValue={0}
+                      formatValue={(v) => `${Math.round(v * 100)}%`}
+                      onChange={(v) => updateParam("lensSoftness", v)}
+                      onCommit={commit}
+                    />
+                  </FinishToolFamilyCard>
+
+                  <FinishToolFamilyCard
+                    title={tFilmLab("controls.finishToolsMotion")}
+                  >
+                    <PanelControlSlider
+                      sliderLabelResetHint={sliderLabelResetHint}
+                      label={tFilmLab("controls.shutterAngle")}
+                      hint={tFilmLab("controls.shutterAngleHint")}
+                      value={params.shutterAngle}
+                      min={0}
+                      max={720}
+                      step={10}
+                      defaultValue={0}
+                      onChange={(v) => updateParam("shutterAngle", v < 90 ? 0 : Math.max(180, v))}
+                      onCommit={commit}
+                    />
+                    <PanelControlSlider
+                      sliderLabelResetHint={sliderLabelResetHint}
+                      label={tFilmLab("controls.trailIntensity")}
+                      hint={tFilmLab("controls.trailIntensityHint")}
+                      value={params.trailIntensity}
+                      min={0}
+                      max={0.95}
+                      step={0.05}
+                      defaultValue={0}
+                      onChange={(v) => updateParam("trailIntensity", v)}
+                      onCommit={commit}
+                    />
+                  </FinishToolFamilyCard>
                 </div>
               )}
-
-              <ToggleHeader
-                title={tFilmLab("controls.bloom")}
-                titleHint={tFilmLab("controls.bloomToggleHint")}
-                enabled={bloomEnabled}
-                onToggle={toggleBloom}
-              />
-              <div className={`flex flex-col gap-2.5 ${!bloomEnabled ? "pointer-events-none opacity-30" : ""}`}>
-                <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.strength")} value={params.bloomStrength} min={0} max={3} step={0.01} defaultValue={0} onChange={(v) => updateParam("bloomStrength", v)} onCommit={commit} />
-                <PanelControlSlider
-                  sliderLabelResetHint={sliderLabelResetHint}
-                  label={tFilmLab("controls.threshold")}
-                  hint={tFilmLab("controls.bloomThresholdHint")}
-                  value={params.bloomThreshold}
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  defaultValue={0.8}
-                  onChange={(v) => updateParam("bloomThreshold", v)}
-                  onCommit={commit}
-                />
-                <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.radius")} value={params.bloomRadius} min={0} max={1} step={0.01} defaultValue={0.4} onChange={(v) => updateParam("bloomRadius", v)} onCommit={commit} />
-              </div>
-
-              <ToggleHeader
-                title={tFilmLab("controls.halation")}
-                titleHint={tFilmLab("controls.halationToggleHint")}
-                enabled={halationEnabled}
-                onToggle={toggleHalation}
-              />
-              <div className={`flex flex-col gap-2.5 ${!halationEnabled ? "pointer-events-none opacity-30" : ""}`}>
-                <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.intensity")} value={params.halationIntensity} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("halationIntensity", v)} onCommit={commit} />
-                <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.spread")} value={params.halationSpread} min={0} max={50} step={0.5} defaultValue={15} onChange={(v) => updateParam("halationSpread", v)} onCommit={commit} />
-                <HueSlider
-                  label={tFilmLab("controls.halationHue")}
-                  value={params.halationHue}
-                  onChange={updateHalationHue}
-                  onCommit={commit}
-                />
-              </div>
-
-              <div className="mt-3 flex flex-col gap-2.5">
-                <ToggleHeader
-                  title={tFilmLab("controls.crossFilter")}
-                  titleHint={tFilmLab("controls.crossFilterToggleHint")}
-                  enabled={crossFilterEnabled}
-                  onToggle={toggleCrossFilter}
-                />
-                <div className={`flex flex-col gap-2.5 ${!crossFilterEnabled ? "pointer-events-none opacity-30" : ""}`}>
-                  <div className="flex justify-center">
-                    <SegmentedControl<"soft" | "hard">
-                      options={[
-                        { value: "soft", label: tFilmLab("controls.crossFilterHardModeSoft") },
-                        { value: "hard", label: tFilmLab("controls.crossFilterHardModeHard") },
-                      ]}
-                      value={params.crossFilterHardMode >= 0.5 ? "hard" : "soft"}
-                      onChange={(mode) => {
-                        updateParam("crossFilterHardMode", mode === "hard" ? 1 : 0);
-                        commit();
-                      }}
-                      ariaLabel={tFilmLab("controls.crossFilterHardModeAria")}
-                    />
-                  </div>
-                  <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.crossFilterStrengthLabel")} value={params.crossFilterStrength} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("crossFilterStrength", v)} onCommit={commit} />
-                  <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.crossFilterSpikes")} hint={tFilmLab("controls.crossFilterSpikesHint")} value={params.crossFilterSpikes} min={4} max={8} step={2} defaultValue={4} onChange={(v) => updateParam("crossFilterSpikes", v)} onCommit={commit} />
-                  <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.crossFilterAngle")} hint={tFilmLab("controls.crossFilterAngleHint")} value={params.crossFilterAngle} min={0} max={360} step={1} defaultValue={0} onChange={(v) => updateParam("crossFilterAngle", v)} onCommit={commit} formatValue={(v) => `${Math.round(v)}°`} />
-                  <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.crossFilterLength")} hint={tFilmLab("controls.crossFilterLengthHint")} value={params.crossFilterLength} min={0} max={1} step={0.01} defaultValue={0.5} onChange={(v) => updateParam("crossFilterLength", v)} onCommit={commit} />
-                  <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.crossFilterChromatic")} hint={tFilmLab("controls.crossFilterChromaticHint")} value={params.crossFilterChromatic} min={0} max={1} step={0.01} defaultValue={0.3} onChange={(v) => updateParam("crossFilterChromatic", v)} onCommit={commit} />
-                  <div
-                    className={`flex flex-col gap-2.5 ${params.crossFilterHardMode >= 0.5 ? "pointer-events-none opacity-30" : ""}`}
-                    title={params.crossFilterHardMode >= 0.5 ? tFilmLab("controls.crossFilterHardModeOverrideHint") : undefined}
-                  >
-                    <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.crossFilterSizeLimit")} hint={tFilmLab("controls.crossFilterSizeLimitHint")} value={params.crossFilterSizeLimit} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("crossFilterSizeLimit", v)} onCommit={commit} />
-                    <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.crossFilterRandomness")} hint={tFilmLab("controls.crossFilterRandomnessHint")} value={params.crossFilterRandomness} min={0} max={1} step={0.01} defaultValue={1} onChange={(v) => updateParam("crossFilterRandomness", v)} onCommit={commit} />
-                  </div>
-                  <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.crossFilterMinSpacing")} hint={tFilmLab("controls.crossFilterMinSpacingHint")} value={params.crossFilterMinSpacing} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("crossFilterMinSpacing", v)} onCommit={commit} />
-                </div>
-              </div>
-
-              <div
-                className={`mt-3 flex flex-col gap-2.5 ${crossFilterEnabled && params.crossFilterHardMode >= 0.5 ? "pointer-events-none opacity-30" : ""}`}
-                title={crossFilterEnabled && params.crossFilterHardMode >= 0.5 ? tFilmLab("controls.crossFilterHardModeOverrideHint") : undefined}
-              >
-                <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.diffusion")} value={params.diffusion} min={0} max={1} step={0.01} defaultValue={0} onChange={(v) => updateParam("diffusion", v)} onCommit={commit} />
-              </div>
-
-              {/**
-               * Grain/Vignette は `artifactsOpen` に連動。色収差・レンズ周辺ソフト・グレイン径方向は
-               * Bloom/Halation と同様、Artifacts 見出しの折りたたみと無関係に常に出す（閉じると「消えた」ように見えるため）。
-               */}
-              <div className="mt-3 flex flex-col gap-2.5 border-t border-white/[0.08] pt-3">
-                <ToggleHeader
-                  title={tFilmLab("controls.rgbShift")}
-                  titleHint={tFilmLab("controls.rgbShiftToggleHint")}
-                  enabled={rgbShiftEnabled}
-                  onToggle={toggleRgbShift}
-                />
-                <div className={`flex flex-col gap-2.5 ${!rgbShiftEnabled ? "pointer-events-none opacity-30" : ""}`}>
-                  <PanelControlSlider
-                    sliderLabelResetHint={sliderLabelResetHint}
-                    label={tFilmLab("controls.strength")}
-                    hint={tFilmLab("effects.rgbShiftHint")}
-                    value={params.rgbShift}
-                    min={0}
-                    max={getRgbShiftSliderMax(params.rgbShift)}
-                    step={RGB_SHIFT_UI_STEP}
-                    defaultValue={0}
-                    formatValue={formatRgbShiftValue}
-                    onChange={(v) => updateParam("rgbShift", v)}
-                    onCommit={commit}
-                  />
-                </div>
-                <PanelControlSlider
-                  sliderLabelResetHint={sliderLabelResetHint}
-                  label={tFilmLab("controls.lensSoftness")}
-                  hint={tFilmLab("effects.lensSoftnessHint")}
-                  value={params.lensSoftness}
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  defaultValue={0}
-                  formatValue={(v) => `${Math.round(v * 100)}%`}
-                  onChange={(v) => updateParam("lensSoftness", v)}
-                  onCommit={commit}
-                />
-                <PanelControlSlider
-                  sliderLabelResetHint={sliderLabelResetHint}
-                  label={tFilmLab("controls.grainRadialMix")}
-                  hint={tFilmLab("controls.grainRadialMixHint")}
-                  value={params.grainRadialMix}
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  defaultValue={1}
-                  onChange={(v) => updateParam("grainRadialMix", v)}
-                  onCommit={commit}
-                />
-                {/* v0.5.0: motionBlur moved here from POST EFFECTS (was solo item, category unnecessary) */}
-                <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.shutterAngle")} hint={tFilmLab("controls.shutterAngleHint")} value={params.shutterAngle} min={0} max={720} step={10} defaultValue={0} onChange={(v) => updateParam("shutterAngle", v < 90 ? 0 : Math.max(180, v))} onCommit={commit} />
-                <PanelControlSlider sliderLabelResetHint={sliderLabelResetHint} label={tFilmLab("controls.trailIntensity")} hint={tFilmLab("controls.trailIntensityHint")} value={params.trailIntensity} min={0} max={0.95} step={0.05} defaultValue={0} onChange={(v) => updateParam("trailIntensity", v)} onCommit={commit} />
-              </div>
             </div>
           )}
 
@@ -1166,6 +1527,72 @@ function CollapsibleHeader({
       </span>
       {title}
     </button>
+  );
+}
+
+function FinishToolFamilyCard({
+  title,
+  first = false,
+  headerAccessory,
+  children,
+}: {
+  title: string;
+  first?: boolean;
+  headerAccessory?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className={first ? "" : "border-t border-white/[0.08] pt-4"}>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/82">
+          {title}
+        </h3>
+        {headerAccessory ? (
+          <div className="shrink-0">
+            {headerAccessory}
+          </div>
+        ) : null}
+      </div>
+
+      <div>
+        {children}
+      </div>
+    </section>
+  );
+}
+
+function StarterStateButtonRow({
+  states,
+  params,
+  onApply,
+  tFilmLab,
+}: {
+  states: readonly FinishToolStarterState[];
+  params: Params;
+  onApply: (patch: Partial<Params>) => void;
+  tFilmLab: ReturnType<typeof useTranslations>;
+}) {
+  return (
+    <div className="flex flex-wrap justify-end gap-2">
+        {states.map((state) => {
+          const active = Object.entries(state.patch).every(([key, value]) => params[key as keyof Params] === value);
+          return (
+            <button
+              key={state.id}
+              type="button"
+              onClick={() => onApply(state.patch)}
+              className={[
+                "rounded-full border px-2.5 py-1 text-[10px] font-medium tracking-[0.08em] transition-colors",
+                active
+                  ? "border-[var(--accent-amber1)]/45 bg-[var(--accent-amber1)]/12 text-[var(--accent-amber1)]"
+                  : "border-white/[0.1] bg-white/[0.03] text-white/72 hover:bg-white/[0.06] hover:text-white/88",
+              ].join(" ")}
+            >
+              {tFilmLab(state.labelKey)}
+            </button>
+          );
+        })}
+    </div>
   );
 }
 
