@@ -21,7 +21,7 @@ type UpdateDismissStore = {
 };
 
 const FETCH_TIMEOUT_MS = 15_000;
-/** @description 起動直後はレンダラ起動待ちで遅らせる */
+/** @description renderer ready が来ない異常系でも、一定時間後に初回チェックする */
 const INITIAL_CHECK_DELAY_MS = 45_000;
 /** @description 定期チェック間隔（24 時間） */
 const PERIODIC_CHECK_MS = 24 * 60 * 60 * 1000;
@@ -44,6 +44,8 @@ export class DesktopUpdateService {
   private initialTimer: ReturnType<typeof setTimeout> | null = null;
 
   private periodicTimer: ReturnType<typeof setInterval> | null = null;
+
+  private hasTriggeredInitialCheck = false;
 
   /**
    * @param getWindow いまのアクティブウィンドウ（閉じたら null）
@@ -90,6 +92,7 @@ export class DesktopUpdateService {
    */
   onRendererLoaded(): void {
     this.flushPendingNotification();
+    this.triggerInitialCheck();
   }
 
   /**
@@ -105,7 +108,7 @@ export class DesktopUpdateService {
     }
     console.log("[film-lab-desktop] desktop-update: スケジュール開始");
     this.initialTimer = setTimeout(() => {
-      void this.runCheckOnce();
+      this.triggerInitialCheck();
     }, INITIAL_CHECK_DELAY_MS);
     this.periodicTimer = setInterval(() => {
       void this.runCheckOnce();
@@ -176,6 +179,18 @@ export class DesktopUpdateService {
       return;
     }
     win.webContents.send("film-lab-desktop-update-available", payload);
+  }
+
+  private triggerInitialCheck(): void {
+    if (this.hasTriggeredInitialCheck) {
+      return;
+    }
+    this.hasTriggeredInitialCheck = true;
+    if (this.initialTimer != null) {
+      clearTimeout(this.initialTimer);
+      this.initialTimer = null;
+    }
+    void this.runCheckOnce();
   }
 }
 
