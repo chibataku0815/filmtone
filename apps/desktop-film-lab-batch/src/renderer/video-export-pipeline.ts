@@ -731,6 +731,33 @@ function disposeVideoElement(video: HTMLVideoElement | null): void {
 }
 
 /**
+ * @description Export 用の一時 renderer は `dispose()` だけでなく context も明示的に落とします。
+ * Chromium/Electron では WebGL context の解放が遅れることがあり、preview 側まで黒化する温床になります。
+ */
+function disposeExportRenderer(renderer: THREE.WebGLRenderer | null): void {
+  if (!renderer) {
+    return;
+  }
+  try {
+    renderer.dispose();
+  } catch {
+    /* ignore */
+  }
+  try {
+    renderer.forceContextLoss();
+  } catch {
+    /* ignore */
+  }
+  try {
+    const canvas = renderer.domElement;
+    canvas.width = 1;
+    canvas.height = 1;
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
  * @description 1 本の動画をグレードして mp4 へ書き出す
  * @param options.api — preload ブリッジ（ffmpeg IPC を含む）
  * @param options.inputVideoPath — ソースの絶対パス
@@ -1501,7 +1528,7 @@ export async function runVideoExportPipeline(options: {
         webCodecsSession?.dispose();
         srcTexture?.dispose();
         viewport?.dispose();
-        renderer?.dispose();
+        disposeExportRenderer(renderer);
         disposeVideoElement(video);
       }
     }

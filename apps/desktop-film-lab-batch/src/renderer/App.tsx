@@ -1167,6 +1167,8 @@ export default function App() {
     resetLogText();
     resetVideoProgressBuffer();
     batchAbortRef.current = null;
+    const previewBeforeExport = filmLabCanvasRef.current?.getPreviewHealth() ?? null;
+    filmLabCanvasRef.current?.holdPreviewRendering(true);
     setRunning(true);
 
     try {
@@ -1213,6 +1215,30 @@ export default function App() {
       batchAbortRef.current = null;
       setBatchProgress(null);
       setRunning(false);
+      await new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => resolve());
+      });
+      const previewAfterExport = filmLabCanvasRef.current?.getPreviewHealth() ?? null;
+      const shouldRecoverPreview =
+        interactivePreviewSource.kind === "file" &&
+        desktopPreviewShowsUserVideo(interactivePreviewSource) &&
+        (
+          previewAfterExport?.contextLost === true ||
+          (
+            previewBeforeExport?.contextLost === false &&
+            previewAfterExport?.hasRenderer === false
+          )
+        );
+      if (shouldRecoverPreview) {
+        appendLog("[動画] export 後に preview context loss を検知したため、現在のソースを再読み込みします");
+        const requested = await filmLabCanvasRef.current?.reloadCurrentSource();
+        if (!requested) {
+          appendLog("[動画] preview 再読み込みの要求に失敗しました");
+          filmLabCanvasRef.current?.holdPreviewRendering(false);
+        }
+      } else {
+        filmLabCanvasRef.current?.holdPreviewRendering(false);
+      }
     }
   };
 

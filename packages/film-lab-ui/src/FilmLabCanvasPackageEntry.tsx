@@ -11,6 +11,7 @@ import {
   FilmLabCanvas as FilmLabCanvasInner,
   type FilmLabCanvasRef,
   type FilmLabCanvasPreprocessResult,
+  type FilmLabCanvasPreviewHealth,
   type FilmLabInteractiveSourceInfo,
   type ProgressiveTextureStage,
 } from "./FilmLabCanvas";
@@ -111,6 +112,7 @@ FilmLabCanvas.displayName = "FilmLabCanvas";
 export type {
   FilmLabCanvasRef,
   FilmLabCanvasPreprocessResult,
+  FilmLabCanvasPreviewHealth,
   FilmLabInteractiveSourceInfo,
   ProgressiveTextureStage,
 };
