@@ -55,6 +55,19 @@ export type FilmLabCanvasPreprocessResult = {
   stage: "thumbnail" | "proxy" | "mezzanine";
 };
 
+type ReloadablePreviewSource =
+  | { kind: "sample" }
+  | { kind: "userMedia"; file: File }
+  | { kind: "smartLookDerived"; pngBase64Body: string };
+
+export type FilmLabCanvasPreviewHealth = {
+  hasRenderer: boolean;
+  contextLost: boolean;
+  activeSourceKind: ReloadablePreviewSource["kind"];
+  hasActiveVideo: boolean;
+  mediaOverlayKind: "idle" | "loading" | "error";
+};
+
 /**
  * @description 背景で swap する対象ステージです。
  */
@@ -184,6 +197,15 @@ export type FilmLabCanvasRef = {
    * @description Web デモのパネル背後ぼかし PoC 用。Three.js の描画先（`preserveDrawingBuffer: true`）。
    */
   getWebGlCanvas: () => HTMLCanvasElement | null;
+  /**
+   * @description Export 前後の診断用。renderer の context 状態と現在 source の大分類だけを返します。
+   */
+  getPreviewHealth: () => FilmLabCanvasPreviewHealth;
+  /**
+   * @description 現在の sample / user media / smart-look source を新しい renderer へ読み直します。
+   * context loss 後の黒画面から復帰させるため、親は必要時だけこれを呼びます。
+   */
+  reloadCurrentSource: () => Promise<boolean>;
 };
 
 /** ファイルピッカー用: HEIC を選びにくくしつつ、一般的な形式はそのまま選べる */
@@ -219,6 +241,19 @@ function resolveDefaultSampleAssetUrl(defaultSampleAssetUrl?: string): string {
   }
 
   return publicAssetUrlFromWebPublic(FILM_LAB_DEFAULT_SAMPLE_ASSET_PATH);
+}
+
+function isRendererContextLost(
+  renderer: THREE.WebGLRenderer | null,
+): boolean {
+  if (!renderer) {
+    return false;
+  }
+  try {
+    return renderer.getContext().isContextLost();
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -298,6 +333,9 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
    * @description ユーザーがトランスポートで止めたとき true。ビジー明けの `play()` で上書きされないようにします。
    */
   const previewVideoUserPausedIntentRef = useRef(false);
+  const reloadableSourceRef = useRef<ReloadablePreviewSource>({ kind: "sample" });
+  const previewContextLostRef = useRef(false);
+  const reloadInFlightRef = useRef(false);
   /**
    * @description Three 初期化 effect がdeps [] のため、RAF の `animate` は props を直接読めない。
    * 最新の `pauseVideoPreview` を毎レンダーで渡す。
@@ -312,6 +350,10 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
   const [isSplitDragging, setIsSplitDragging] = useState(false);
   const [supported, setSupported] = useState(true);
   const [mediaOverlay, setMediaOverlay] = useState<MediaOverlayState>({ kind: "idle" });
+  const mediaOverlayKindRef = useRef<MediaOverlayState["kind"]>("idle");
+  useEffect(() => {
+    mediaOverlayKindRef.current = mediaOverlay.kind;
+  }, [mediaOverlay]);
   const initialPresetRef = useRef(preset);
   const initialResolvedGradeRef = useRef<Params>(
     initialGradeParams ?? PRESETS[preset],
@@ -319,6 +361,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
   const defaultSampleAssetUrlRef = useRef(
     resolveDefaultSampleAssetUrl(defaultSampleAssetUrl),
   );
+  const [canvasRuntimeNonce, setCanvasRuntimeNonce] = useState(0);
 
   /**
    * @description `preset` / 共有 URL 復元のどちらが来ても、現在の Viewport に同じ形で反映します。
@@ -490,6 +533,190 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     applyResolvedGradeToViewport();
   }, [applyResolvedGradeToViewport]);
 
+  const getMaxTextureSize = useCallback((): number => {
+    return rendererRef.current?.capabilities.maxTextureSize ?? 8192;
+  }, []);
+
+  const loadDefaultSampleIntoCanvas = useCallback(async (): Promise<boolean> => {
+    const mediaLoader = mediaLoaderRef.current;
+    if (!mediaLoader) {
+      return false;
+    }
+    const defaultSampleUrl = defaultSampleAssetUrlRef.current;
+    try {
+      const result = await mediaLoader.loadURL(defaultSampleUrl);
+      applyLoadedTextureResult(result);
+      reloadableSourceRef.current = { kind: "sample" };
+      previewContextLostRef.current = false;
+      reloadInFlightRef.current = false;
+      previewRenderingHoldRef.current = false;
+      onInteractiveSourceChangeRef.current?.({ kind: "sample" });
+      setMediaOverlay({ kind: "idle" });
+      return true;
+    } catch (err) {
+      const message = `FilmLabCanvas.loadDefaultSample("${defaultSampleUrl}") failed. Open a file manually or verify that the canonical sample asset is reachable.`;
+      console.error(message, {
+        sampleAssetUrl: defaultSampleUrl,
+        preset: initialPresetRef.current,
+        initialResolvedGrade: initialResolvedGradeRef.current,
+        err,
+      });
+      reloadInFlightRef.current = false;
+      previewRenderingHoldRef.current = false;
+      setMediaOverlay({
+        kind: "error",
+        message,
+      });
+      return false;
+    }
+  }, [applyLoadedTextureResult]);
+
+  const loadUserMediaFile = useCallback(
+    async (file: File) => {
+      if (!viewportRef.current || !mediaLoaderRef.current) return;
+
+      setMediaOverlay({ kind: "loading" });
+
+      try {
+        if (file.name.toLowerCase().endsWith(".cube")) {
+          const text = await file.text();
+          const lut = parseCube(text);
+          viewportRef.current.setLUT(lut.data, lut.size);
+          setMediaOverlay({ kind: "idle" });
+          onCubeLutLoaded?.();
+          return;
+        }
+
+        // --- Desktop mezzanine pre-processing for unsupported codecs (ProRes etc.) ---
+        const isVideo = file.type.startsWith("video/") || LIKELY_VIDEO_EXTENSION.test(file.name);
+        if (isVideo && preprocessVideoFileRef.current) {
+          try {
+            const preprocessResult = await preprocessVideoFileRef.current(file);
+            if (preprocessResult) {
+              const result =
+                preprocessResult.mediaKind === "image"
+                  ? await mediaLoaderRef.current.loadURL(preprocessResult.url)
+                  : await mediaLoaderRef.current.loadVideoFromURL(
+                      preprocessResult.url,
+                      file.name,
+                    );
+              applyLoadedTextureResult(result);
+              reloadableSourceRef.current = { kind: "userMedia", file };
+              previewContextLostRef.current = false;
+              reloadInFlightRef.current = false;
+              previewRenderingHoldRef.current = false;
+              onInteractiveSourceChangeRef.current?.({
+                kind: "file",
+                fileName: file.name,
+                absolutePath: resolveLocalFileAbsolutePath(
+                  file,
+                  getFileAbsolutePathRef.current,
+                ),
+                sourceRole: "userMedia",
+              });
+              setMediaOverlay({ kind: "idle" });
+              return;
+            }
+          } catch (preprocessErr) {
+            console.warn("FilmLabCanvas: preprocessVideoFile failed, falling through to direct load", preprocessErr);
+            // Fall through to normal MediaLoader path
+          }
+        }
+
+        const maxTex = getMaxTextureSize();
+        const result = await mediaLoaderRef.current.loadFile(file, {
+          maxTextureSize: maxTex,
+        });
+        applyLoadedTextureResult(result);
+        reloadableSourceRef.current = { kind: "userMedia", file };
+        previewContextLostRef.current = false;
+        reloadInFlightRef.current = false;
+        previewRenderingHoldRef.current = false;
+        onInteractiveSourceChangeRef.current?.({
+          kind: "file",
+          fileName: file.name,
+          absolutePath: resolveLocalFileAbsolutePath(
+            file,
+            getFileAbsolutePathRef.current,
+          ),
+          sourceRole: "userMedia",
+        });
+        setMediaOverlay({ kind: "idle" });
+      } catch (err) {
+        const message =
+          err instanceof MediaLoadError
+            ? err.message
+            : err instanceof Error
+              ? `FilmLabCanvas.loadUserMediaFile("${file.name}", "${file.type || "unknown"}") failed: ${err.message}`
+              : `FilmLabCanvas.loadUserMediaFile("${file.name}", "${file.type || "unknown"}") failed: Could not load this file.`;
+        reloadInFlightRef.current = false;
+        previewRenderingHoldRef.current = false;
+        setMediaOverlay({ kind: "error", message });
+        console.error("FilmLabCanvas.loadUserMediaFile failed", {
+          fileName: file.name,
+          fileType: file.type,
+          err,
+        });
+      }
+    },
+    [applyLoadedTextureResult, getMaxTextureSize, onCubeLutLoaded],
+  );
+
+  const restoreCurrentSource = useCallback(async (): Promise<boolean> => {
+    const source = reloadableSourceRef.current;
+    if (source.kind === "sample") {
+      return loadDefaultSampleIntoCanvas();
+    }
+    if (source.kind === "smartLookDerived") {
+      const mediaLoader = mediaLoaderRef.current;
+      const renderer = rendererRef.current;
+      if (!mediaLoader || !renderer || !supported) {
+        reloadInFlightRef.current = false;
+        previewRenderingHoldRef.current = false;
+        return false;
+      }
+      try {
+        const binary = atob(source.pngBase64Body);
+        const len = binary.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        const blob = new Blob([bytes], { type: "image/png" });
+        const file = new File([blob], "smart-look-corrected.png", {
+          type: "image/png",
+        });
+        const maxTex = renderer.capabilities.maxTextureSize;
+        const result = await mediaLoader.loadFile(file, {
+          maxTextureSize: maxTex,
+        });
+        applyLoadedTextureResult(result);
+        previewContextLostRef.current = false;
+        reloadInFlightRef.current = false;
+        previewRenderingHoldRef.current = false;
+        onInteractiveSourceChangeRef.current?.({
+          kind: "file",
+          fileName: "smart-look-corrected.png",
+          absolutePath: null,
+          sourceRole: "smartLookDerived",
+        });
+        setMediaOverlay({ kind: "idle" });
+        return true;
+      } catch (err) {
+        console.error("FilmLabCanvas.restoreCurrentSource smart look failed", err);
+        reloadInFlightRef.current = false;
+        previewRenderingHoldRef.current = false;
+        setMediaOverlay({
+          kind: "error",
+          message: "Could not restore the current preview.",
+        });
+        return false;
+      }
+    }
+    await loadUserMediaFile(source.file);
+    return true;
+  }, [applyLoadedTextureResult, loadDefaultSampleIntoCanvas, loadUserMediaFile, supported]);
+
   // Three.js setup
   useEffect(() => {
     const container = containerRef.current;
@@ -516,6 +743,17 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     rendererRef.current = renderer;
     container.appendChild(renderer.domElement);
+    const handleContextLost = (event: Event) => {
+      event.preventDefault();
+      previewContextLostRef.current = true;
+      previewRenderingHoldRef.current = true;
+      setMediaOverlay({ kind: "loading" });
+    };
+    renderer.domElement.addEventListener(
+      "webglcontextlost",
+      handleContextLost as EventListener,
+      false,
+    );
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0a0a0a);
@@ -535,27 +773,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
 
     const mediaLoader = new MediaLoader();
     mediaLoaderRef.current = mediaLoader;
-    const defaultSampleUrl = defaultSampleAssetUrlRef.current;
-
-    mediaLoader
-      .loadURL(defaultSampleUrl)
-      .then((result) => {
-        applyLoadedTextureResult(result);
-        onInteractiveSourceChangeRef.current?.({ kind: "sample" });
-      })
-      .catch((err) => {
-        const message = `FilmLabCanvas.loadDefaultSample("${defaultSampleUrl}") failed. Open a file manually or verify that the canonical sample asset is reachable.`;
-        console.error(message, {
-          sampleAssetUrl: defaultSampleUrl,
-          preset: initialPresetRef.current,
-          initialResolvedGrade: initialResolvedGradeRef.current,
-          err,
-        });
-        setMediaOverlay({
-          kind: "error",
-          message,
-        });
-      });
+    void restoreCurrentSource();
 
     /**
      * @description `window.resize` だけでは、右ペイン開閉や absolute layout の再計測を取りこぼします。
@@ -593,6 +811,8 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     const animate = () => {
       animationId = requestAnimationFrame(animate);
       if (
+        previewContextLostRef.current ||
+        isRendererContextLost(renderer) ||
         pauseVideoPreviewRef.current ||
         previewRenderingHoldRef.current
       ) {
@@ -608,10 +828,20 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       window.cancelAnimationFrame(resizeRafId);
       resizeObserver?.disconnect();
       window.removeEventListener("resize", syncViewportSize);
+      renderer.domElement.removeEventListener(
+        "webglcontextlost",
+        handleContextLost as EventListener,
+        false,
+      );
       activeTextureRef.current?.dispose();
       activeTextureRef.current = null;
       disposePreviewVideoElement(previewVideoElementRef.current);
       viewport.dispose();
+      try {
+        renderer.forceContextLoss();
+      } catch {
+        /* ignore */
+      }
       renderer.dispose();
       previewVideoElementRef.current = null;
       previewVideoShouldResumeRef.current = false;
@@ -626,92 +856,12 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       cameraRef.current = null;
       onViewportReadyRef.current?.(null);
     };
-  }, [applyLoadedTextureResult, disposePreviewVideoElement]);
-
-  const getMaxTextureSize = useCallback((): number => {
-    return rendererRef.current?.capabilities.maxTextureSize ?? 8192;
-  }, []);
-
-  const loadUserMediaFile = useCallback(
-    async (file: File) => {
-      if (!viewportRef.current || !mediaLoaderRef.current) return;
-
-      setMediaOverlay({ kind: "loading" });
-
-      try {
-        if (file.name.toLowerCase().endsWith(".cube")) {
-          const text = await file.text();
-          const lut = parseCube(text);
-          viewportRef.current.setLUT(lut.data, lut.size);
-          setMediaOverlay({ kind: "idle" });
-          onCubeLutLoaded?.();
-          return;
-        }
-
-        // --- Desktop mezzanine pre-processing for unsupported codecs (ProRes etc.) ---
-        const isVideo = file.type.startsWith("video/") || LIKELY_VIDEO_EXTENSION.test(file.name);
-        if (isVideo && preprocessVideoFileRef.current) {
-          try {
-            const preprocessResult = await preprocessVideoFileRef.current(file);
-            if (preprocessResult) {
-              const result =
-                preprocessResult.mediaKind === "image"
-                  ? await mediaLoaderRef.current.loadURL(preprocessResult.url)
-                  : await mediaLoaderRef.current.loadVideoFromURL(
-                      preprocessResult.url,
-                      file.name,
-                    );
-              applyLoadedTextureResult(result);
-              onInteractiveSourceChangeRef.current?.({
-                kind: "file",
-                fileName: file.name,
-                absolutePath: resolveLocalFileAbsolutePath(
-                  file,
-                  getFileAbsolutePathRef.current,
-                ),
-                sourceRole: "userMedia",
-              });
-              setMediaOverlay({ kind: "idle" });
-              return;
-            }
-          } catch (preprocessErr) {
-            console.warn("FilmLabCanvas: preprocessVideoFile failed, falling through to direct load", preprocessErr);
-            // Fall through to normal MediaLoader path
-          }
-        }
-
-        const maxTex = getMaxTextureSize();
-        const result = await mediaLoaderRef.current.loadFile(file, {
-          maxTextureSize: maxTex,
-        });
-        applyLoadedTextureResult(result);
-        onInteractiveSourceChangeRef.current?.({
-          kind: "file",
-          fileName: file.name,
-          absolutePath: resolveLocalFileAbsolutePath(
-            file,
-            getFileAbsolutePathRef.current,
-          ),
-          sourceRole: "userMedia",
-        });
-        setMediaOverlay({ kind: "idle" });
-      } catch (err) {
-        const message =
-          err instanceof MediaLoadError
-            ? err.message
-            : err instanceof Error
-              ? `FilmLabCanvas.loadUserMediaFile("${file.name}", "${file.type || "unknown"}") failed: ${err.message}`
-              : `FilmLabCanvas.loadUserMediaFile("${file.name}", "${file.type || "unknown"}") failed: Could not load this file.`;
-        setMediaOverlay({ kind: "error", message });
-        console.error("FilmLabCanvas.loadUserMediaFile failed", {
-          fileName: file.name,
-          fileType: file.type,
-          err,
-        });
-      }
-    },
-    [applyLoadedTextureResult, getMaxTextureSize, onCubeLutLoaded],
-  );
+  }, [
+    applyLoadedTextureResult,
+    disposePreviewVideoElement,
+    restoreCurrentSource,
+    canvasRuntimeNonce,
+  ]);
 
   const handleDrop = useCallback(
     async (e: React.DragEvent) => {
@@ -828,6 +978,13 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
             maxTextureSize: maxTex,
           });
           applyLoadedTextureResult(result);
+          reloadableSourceRef.current = {
+            kind: "smartLookDerived",
+            pngBase64Body,
+          };
+          previewContextLostRef.current = false;
+          reloadInFlightRef.current = false;
+          previewRenderingHoldRef.current = false;
           onInteractiveSourceChangeRef.current?.({
             kind: "file",
             fileName: "smart-look-corrected.png",
@@ -1002,6 +1159,26 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
         previewRenderingHoldRef.current = held;
       },
       getWebGlCanvas: () => rendererRef.current?.domElement ?? null,
+      getPreviewHealth: (): FilmLabCanvasPreviewHealth => ({
+        hasRenderer: rendererRef.current != null,
+        contextLost:
+          previewContextLostRef.current ||
+          isRendererContextLost(rendererRef.current),
+        activeSourceKind: reloadableSourceRef.current.kind,
+        hasActiveVideo: previewVideoElementRef.current != null,
+        mediaOverlayKind: mediaOverlayKindRef.current,
+      }),
+      reloadCurrentSource: async () => {
+        if (reloadInFlightRef.current) {
+          return false;
+        }
+        reloadInFlightRef.current = true;
+        previewContextLostRef.current = false;
+        previewRenderingHoldRef.current = true;
+        setMediaOverlay({ kind: "loading" });
+        setCanvasRuntimeNonce((value) => value + 1);
+        return true;
+      },
     }),
     [
       applyLoadedTextureResult,

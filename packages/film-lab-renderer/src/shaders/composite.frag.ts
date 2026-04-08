@@ -92,6 +92,19 @@ float grainClumpNoise(vec2 p) {
   return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
+// Convert arbitrary glow energy into a bounded screen-blend opacity.
+// Low values stay close to linear, while hot highlight cores compress softly
+// so large radius / high strength can keep their spread without turning into
+// flat white plates.
+vec3 glowShoulder(vec3 energy) {
+  return 1.0 - exp(-max(energy, vec3(0.0)));
+}
+
+float glowHeadroom(vec3 baseRgb, float floorValue) {
+  float luma = dot(baseRgb, vec3(0.2126, 0.7152, 0.0722));
+  return mix(floorValue, 1.0, sqrt(clamp(1.0 - luma, 0.0, 1.0)));
+}
+
 void main() {
   // Split-only モード: post-composite chain（モーションブラー等）適用後にスプリットを行う。
   // uSource にはブラー済みグレーディング出力、uOriginalTexture には原画が入る。
@@ -150,11 +163,13 @@ void main() {
   float lensMix = lensWeight * 0.72;
   float softenAmt = clamp(uAberrationEdgeSoften * edgeMask + lensMix * edgeMask, 0.0, 1.0);
   vec4 color = vec4(mix(sharpRgb, blurRgb, softenAmt), texture(uSource, vUv).a);
+  vec3 baseRgb = color.rgb;
 
-  // Bloom + Halation screen blend (no branching — strength=0 naturally zeros out)
+  // Bloom + Halation screen blend with a soft shoulder.
+  // This preserves wide glow tails at high radius while compressing hot cores.
   vec3 bloom = texture(uBloomTexture, vUv).rgb * uBloomStrength;
   vec3 halation = texture(uHalationTexture, vUv).rgb * uHalationIntensity;
-  vec3 glow = bloom + halation;
+  vec3 glow = glowShoulder(bloom + halation) * glowHeadroom(baseRgb, 0.82);
   color.rgb = 1.0 - (1.0 - color.rgb) * (1.0 - glow);
 
   // --- Diffusion: Pro-Mist / Cinebloom full-image light scattering ---
@@ -164,7 +179,8 @@ void main() {
   // a soft haze that reduces contrast while preserving sharpness.
   if (uDiffusion > 0.0) {
     vec3 diffused = texture(uDiffusionTexture, vUv).rgb;
-    vec3 diffScreen = 1.0 - (1.0 - color.rgb) * (1.0 - diffused * uDiffusion * 0.29);
+    vec3 diffOpacity = glowShoulder(diffused * uDiffusion * 0.29) * glowHeadroom(baseRgb, 0.88);
+    vec3 diffScreen = 1.0 - (1.0 - color.rgb) * (1.0 - diffOpacity);
     color.rgb = diffScreen;
   }
 
