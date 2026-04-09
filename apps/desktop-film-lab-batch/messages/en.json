@@ -285,6 +285,7 @@
       "crossFilterHardModeHard": "Hard",
       "crossFilterHardModeAria": "Soft / Hard cross filter mode",
       "crossFilterHardModeOverrideHint": "Hard Mode forces these values internally. Switch to Soft to control them manually.",
+      "crossFilterSoftModeFrozenHint": "Soft mode is currently frozen. Cross Filter runs in Hard mode only for now, while the Soft path stays in the codebase for future development.",
       "crossFilterMinSpacing": "Streak Spacing",
       "crossFilterMinSpacingHint": "Reduces the intensity of nearby overlapping streaks while preserving the light cluster shape. Use this to declutter dense groups such as chandeliers.",
       "dustAmount": "Dust",

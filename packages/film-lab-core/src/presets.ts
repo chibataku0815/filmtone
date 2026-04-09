@@ -65,7 +65,7 @@ export const PRESETS = {
     crossFilterChromatic: 0.3,
     crossFilterSizeLimit: 0,
     crossFilterRandomness: 1,
-    crossFilterHardMode: 0,
+    crossFilterHardMode: 1,
     crossFilterMinSpacing: 0,
   },
   /**
@@ -125,7 +125,7 @@ export const PRESETS = {
     crossFilterChromatic: 0.3,
     crossFilterSizeLimit: 0,
     crossFilterRandomness: 1,
-    crossFilterHardMode: 0,
+    crossFilterHardMode: 1,
     crossFilterMinSpacing: 0,
   },
   portra: {
@@ -181,7 +181,7 @@ export const PRESETS = {
     crossFilterChromatic: 0.3,
     crossFilterSizeLimit: 0,
     crossFilterRandomness: 1,
-    crossFilterHardMode: 0,
+    crossFilterHardMode: 1,
     crossFilterMinSpacing: 0,
   },
   gold200: {
@@ -237,7 +237,7 @@ export const PRESETS = {
     crossFilterChromatic: 0.3,
     crossFilterSizeLimit: 0,
     crossFilterRandomness: 1,
-    crossFilterHardMode: 0,
+    crossFilterHardMode: 1,
     crossFilterMinSpacing: 0,
   },
   pro400h: {
@@ -293,7 +293,7 @@ export const PRESETS = {
     crossFilterChromatic: 0.3,
     crossFilterSizeLimit: 0,
     crossFilterRandomness: 1,
-    crossFilterHardMode: 0,
+    crossFilterHardMode: 1,
     crossFilterMinSpacing: 0,
   },
   bw: {
@@ -349,7 +349,7 @@ export const PRESETS = {
     crossFilterChromatic: 0.3,
     crossFilterSizeLimit: 0,
     crossFilterRandomness: 1,
-    crossFilterHardMode: 0,
+    crossFilterHardMode: 1,
     crossFilterMinSpacing: 0,
   },
   ektar100: {
@@ -405,7 +405,7 @@ export const PRESETS = {
     crossFilterChromatic: 0.3,
     crossFilterSizeLimit: 0,
     crossFilterRandomness: 1,
-    crossFilterHardMode: 0,
+    crossFilterHardMode: 1,
     crossFilterMinSpacing: 0,
   },
   superia400: {
@@ -461,7 +461,7 @@ export const PRESETS = {
     crossFilterChromatic: 0.3,
     crossFilterSizeLimit: 0,
     crossFilterRandomness: 1,
-    crossFilterHardMode: 0,
+    crossFilterHardMode: 1,
     crossFilterMinSpacing: 0,
   },
   cinestill800t: {
@@ -517,7 +517,7 @@ export const PRESETS = {
     crossFilterChromatic: 0.3,
     crossFilterSizeLimit: 0,
     crossFilterRandomness: 1,
-    crossFilterHardMode: 0,
+    crossFilterHardMode: 1,
     crossFilterMinSpacing: 0,
   },
   /**
@@ -578,7 +578,7 @@ export const PRESETS = {
     crossFilterChromatic: 0.3,
     crossFilterSizeLimit: 0,
     crossFilterRandomness: 1,
-    crossFilterHardMode: 0,
+    crossFilterHardMode: 1,
     crossFilterMinSpacing: 0,
   },
 } satisfies Record<string, Params>;

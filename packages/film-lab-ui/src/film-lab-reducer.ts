@@ -70,6 +70,17 @@ export const PROCESS_PARAM_KEYS = Object.keys(
 ) as ProcessParamKey[];
 
 /**
+ * Cross Filter の Soft モードは現行プロダクトでは凍結中。
+ * renderer 実装は残すが、UI / 共有 URL / 保存データから復元される値は Hard に寄せる。
+ */
+function normalizeFrozenCrossFilterMode(params: Params): Params {
+  return {
+    ...params,
+    crossFilterHardMode: 1,
+  };
+}
+
+/**
  * 古い保存データや preset に、process の既定値を補う。
  *
  * @param params - 現在のグレード数値
@@ -77,9 +88,10 @@ export const PROCESS_PARAM_KEYS = Object.keys(
 export function normalizeParamsWithProcessDefaults(
   params: Params,
 ): Params & ProcessParams {
-  const raw = params as unknown as Record<string, number | undefined>;
+  const normalized = normalizeFrozenCrossFilterMode(params);
+  const raw = normalized as unknown as Record<string, number | undefined>;
   return {
-    ...params,
+    ...normalized,
     compressionAmount:
       typeof raw.compressionAmount === "number"
         ? raw.compressionAmount

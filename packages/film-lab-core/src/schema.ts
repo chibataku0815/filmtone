@@ -56,7 +56,7 @@ const paramShape = Object.fromEntries(
                                         : key === "crossFilterRandomness"
                                           ? z.number().min(0).max(1).default(1)
                                           : key === "crossFilterHardMode"
-                                            ? z.number().min(0).max(1).default(0)
+                                            ? z.number().min(0).max(1).default(1)
                                             : key === "crossFilterMinSpacing"
                                               ? z.number().min(0).max(1).default(0)
                                               : z.number(),

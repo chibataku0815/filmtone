@@ -218,7 +218,7 @@ const CROSS_STARTER_STATES: readonly FinishToolStarterState[] = [
       crossFilterChromatic: 0.18,
       crossFilterSizeLimit: 0.12,
       crossFilterRandomness: 0.9,
-      crossFilterHardMode: 0,
+      crossFilterHardMode: 1,
       crossFilterMinSpacing: 0.1,
     },
   },
@@ -234,7 +234,7 @@ const CROSS_STARTER_STATES: readonly FinishToolStarterState[] = [
       crossFilterChromatic: 0.4,
       crossFilterSizeLimit: 0.24,
       crossFilterRandomness: 0.75,
-      crossFilterHardMode: 0,
+      crossFilterHardMode: 1,
       crossFilterMinSpacing: 0.22,
     },
   },
@@ -1082,18 +1082,29 @@ export const FilmLabControlPanelCore = forwardRef<
                         onChange={(v) => updateParam("crossFilterStrength", v)}
                         onCommit={commit}
                       />
-                      <PanelControlSlider
-                        sliderLabelResetHint={sliderLabelResetHint}
-                        label={tFilmLab("controls.crossFilterSpikes")}
-                        hint={tFilmLab("controls.crossFilterSpikesHint")}
-                        value={params.crossFilterSpikes}
-                        min={4}
-                        max={8}
-                        step={2}
-                        defaultValue={4}
-                        onChange={(v) => updateParam("crossFilterSpikes", v)}
-                        onCommit={commit}
-                      />
+                      <div className="flex items-start gap-3 lg:pr-4">
+                        <div className="min-w-[7.5rem] shrink-0 text-[11px] leading-tight text-[var(--text-muted)] whitespace-nowrap sm:min-w-[8.5rem]">
+                          <div>{tFilmLab("controls.crossFilterSpikes")}</div>
+                          <div className="mt-1 whitespace-normal text-[10px] leading-snug text-white/42">
+                            {tFilmLab("controls.crossFilterSpikesHint")}
+                          </div>
+                        </div>
+                        <div className="flex-1">
+                          <SegmentedControl<"4" | "6" | "8">
+                            options={[
+                              { value: "4", label: "4" },
+                              { value: "6", label: "6" },
+                              { value: "8", label: "8" },
+                            ]}
+                            value={String(params.crossFilterSpikes) as "4" | "6" | "8"}
+                            onChange={(value) => {
+                              updateParam("crossFilterSpikes", Number(value));
+                              commit();
+                            }}
+                            ariaLabel={tFilmLab("controls.crossFilterSpikes")}
+                          />
+                        </div>
+                      </div>
                       <PanelControlSlider
                         sliderLabelResetHint={sliderLabelResetHint}
                         label={tFilmLab("controls.crossFilterAngle")}
@@ -1133,19 +1144,8 @@ export const FilmLabControlPanelCore = forwardRef<
 
                     {crossAdvancedOpen ? (
                       <div className={`mt-3 flex flex-col gap-2.5 border-t border-white/[0.08] pt-3 ${!crossFilterEnabled ? "pointer-events-none opacity-30" : ""}`}>
-                        <div className="flex justify-center">
-                          <SegmentedControl<"soft" | "hard">
-                            options={[
-                              { value: "soft", label: tFilmLab("controls.crossFilterHardModeSoft") },
-                              { value: "hard", label: tFilmLab("controls.crossFilterHardModeHard") },
-                            ]}
-                            value={params.crossFilterHardMode >= 0.5 ? "hard" : "soft"}
-                            onChange={(mode) => {
-                              updateParam("crossFilterHardMode", mode === "hard" ? 1 : 0);
-                              commit();
-                            }}
-                            ariaLabel={tFilmLab("controls.crossFilterHardModeAria")}
-                          />
+                        <div className="rounded-lg border border-white/8 bg-white/[0.03] px-3 py-2 text-[11px] leading-relaxed text-white/66">
+                          {tFilmLab("controls.crossFilterSoftModeFrozenHint")}
                         </div>
                         <PanelControlSlider
                           sliderLabelResetHint={sliderLabelResetHint}
@@ -1159,35 +1159,6 @@ export const FilmLabControlPanelCore = forwardRef<
                           onChange={(v) => updateParam("crossFilterChromatic", v)}
                           onCommit={commit}
                         />
-                        <div
-                          className={`flex flex-col gap-2.5 ${params.crossFilterHardMode >= 0.5 ? "pointer-events-none opacity-30" : ""}`}
-                          title={params.crossFilterHardMode >= 0.5 ? tFilmLab("controls.crossFilterHardModeOverrideHint") : undefined}
-                        >
-                          <PanelControlSlider
-                            sliderLabelResetHint={sliderLabelResetHint}
-                            label={tFilmLab("controls.crossFilterSizeLimit")}
-                            hint={tFilmLab("controls.crossFilterSizeLimitHint")}
-                            value={params.crossFilterSizeLimit}
-                            min={0}
-                            max={1}
-                            step={0.01}
-                            defaultValue={0}
-                            onChange={(v) => updateParam("crossFilterSizeLimit", v)}
-                            onCommit={commit}
-                          />
-                          <PanelControlSlider
-                            sliderLabelResetHint={sliderLabelResetHint}
-                            label={tFilmLab("controls.crossFilterRandomness")}
-                            hint={tFilmLab("controls.crossFilterRandomnessHint")}
-                            value={params.crossFilterRandomness}
-                            min={0}
-                            max={1}
-                            step={0.01}
-                            defaultValue={1}
-                            onChange={(v) => updateParam("crossFilterRandomness", v)}
-                            onCommit={commit}
-                          />
-                        </div>
                         <PanelControlSlider
                           sliderLabelResetHint={sliderLabelResetHint}
                           label={tFilmLab("controls.crossFilterMinSpacing")}
