@@ -956,6 +956,14 @@
           "title": "Proxy cache and video UX polish (v0.6.0)",
           "description": "Desktop now keeps progressive preview proxies in a bounded local cache, while compare dismissal, faster playback review, slider reset discoverability, and thumbnail/loading polish have all been improved."
         },
+        "desktopPolish061": {
+          "title": "Desktop stability and look polish (v0.6.1)",
+          "description": "The launch-time update banner is back, preview recovery after export is more reliable, glow was retuned for black-mist night scenes, and hard cross-filter spacing now behaves more predictably."
+        },
+        "crossFilterCleanup062": {
+          "title": "Cross Filter product-surface cleanup (v0.6.2)",
+          "description": "The public product surface now freezes Soft mode, normalises restored and shared state back to Hard, and replaces the old Spikes slider with direct 4 / 6 / 8 choices."
+        },
         "presetExpansion": {
           "title": "Preset expansion",
           "description": "Additional film stocks and creative looks beyond the initial four."
@@ -1016,6 +1024,15 @@
       "typeFixed": "Fixed",
       "typeChanged": "Changed",
       "entries": {
+        "v062Title": "Cross Filter, cleaned up for the public surface",
+        "v062HardOnlySurface": "Cross Filter now ships as Hard-only on the public product surface. The Soft implementation remains in the codebase as future reference work.",
+        "v062StateNormalization": "If restored settings or shared state still contain Soft-side values, the public app now normalises them back to the current Hard-only behaviour.",
+        "v062DiscreteSpikes": "Spikes is no longer a continuous slider. It is now a direct discrete choice between `4`, `6`, and `8`.",
+        "v061Title": "Desktop reliability and low-light finishing improvements",
+        "v061LaunchUpdateBanner": "The launch-time update check is working again, so builds with an embedded update URL can surface a newer release when the app opens.",
+        "v061PreviewRecoveryAfterExport": "Fixed cases where the live preview could stay black after export by recovering the current source more defensively when the preview runtime needs to be rebuilt.",
+        "v061GlowBlackMistRetune": "Glow has been retuned for black-mist-leaning night scenes so highlight bloom keeps more shape instead of flattening into white plates.",
+        "v061HardCrossFilterSpacing": "Hard cross-filter spacing has been corrected so nearby highlights separate more consistently before streak generation.",
         "v060Title": "Cross Filter and a faster return to your footage",
         "v060CrossFilter": "A new Cross Filter effect adds diffraction-style star streaks to bright point lights, with controls for strength, point count, rotation angle, streak length, highlight threshold, and subtle chromatic split.",
         "v060VideoCompareUx": "Video compare and playback review are smoother: compare mode is easier to dismiss intentionally, faster playback is available for quick checks, and slider reset actions are more discoverable.",

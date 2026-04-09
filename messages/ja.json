@@ -958,6 +958,14 @@
           "title": "proxy cache と動画 UX の磨き込み（v0.6.0）",
           "description": "Desktop は progressive preview 用 proxy を端末内に再利用可能な形で保持できるようになり、比較解除、倍速確認、スライダー reset の見つけやすさ、サムネイルと loading 表示も改善しました。"
         },
+        "desktopPolish061": {
+          "title": "Desktop の安定化とルック調整（v0.6.1）",
+          "description": "起動時の update banner を復旧し、export 後に preview が黒く残るケースを改善しました。黒ミスト寄りの夜景で glow を再調整し、hard cross-filter spacing も安定させました。"
+        },
+        "crossFilterCleanup062": {
+          "title": "Cross Filter のプロダクト面整理（v0.6.2）",
+          "description": "公開版では Soft mode を凍結し、復元・共有状態も Hard に正規化するようにしました。Spikes は slider ではなく 4 / 6 / 8 の離散選択です。"
+        },
         "presetExpansion": {
           "title": "プリセット追加",
           "description": "初期の 4 種に加え、新しいフィルムストック・クリエイティブルックを順次追加。"
@@ -1018,6 +1026,15 @@
       "typeFixed": "修正",
       "typeChanged": "変更",
       "entries": {
+        "v062Title": "Cross Filter のプロダクト面を整理",
+        "v062HardOnlySurface": "Cross Filter は公開プロダクト面では Hard 固定になりました。Soft 実装は将来の参照用としてコード内に残しています。",
+        "v062StateNormalization": "復元された設定や共有された状態に Soft 側の値が混ざっていても、公開 UI では Hard-only の挙動に正規化されます。",
+        "v062DiscreteSpikes": "Spikes は連続 slider ではなく、`4 / 6 / 8` から選ぶ離散コントロールになりました。",
+        "v061Title": "Desktop の信頼性と暗部の仕上がりを改善",
+        "v061LaunchUpdateBanner": "起動時の update check が復旧し、新しい版があると launch-time banner を再び出せるようになりました。",
+        "v061PreviewRecoveryAfterExport": "export 後に live preview が黒く固まることがあった問題を修正し、必要時には現在の source を安全に再読み込みします。",
+        "v061GlowBlackMistRetune": "黒ミスト寄りの夜景で glow が白く潰れすぎないように shoulder と edge behavior を再調整しました。",
+        "v061HardCrossFilterSpacing": "hard cross-filter spacing が近接したハイライトでも一貫して分離しやすいように補正しました。",
         "v060Title": "Cross Filter と、動画ワークフローの磨き込み",
         "v060CrossFilter": "明るい点光源にレンズフィルターらしい光条を加える Cross Filter を追加しました。強さ、本数、回転角度、光条の長さ、しきい値、色分散を調整できます。",
         "v060VideoCompareUx": "動画の比較・確認操作を改善しました。比較モードを意図的に解除しやすくなり、高速再生での確認がしやすくなり、スライダーのリセット操作も見つけやすくなりました。",
