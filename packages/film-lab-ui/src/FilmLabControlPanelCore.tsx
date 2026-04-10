@@ -1550,7 +1550,9 @@ function StarterStateButtonRow({
   return (
     <div className="flex flex-wrap justify-end gap-2">
         {states.map((state) => {
-          const active = Object.entries(state.patch).every(([key, value]) => params[key as keyof Params] === value);
+          const active = (Object.keys(state.patch) as Array<keyof Params>).every(
+            (key) => params[key] === state.patch[key],
+          );
           return (
             <button
               key={state.id}
