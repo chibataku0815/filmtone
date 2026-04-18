@@ -226,6 +226,19 @@ export class Viewport {
     else this.webglBackend!.clearLUT2();
   }
 
+  /**
+   * WebGL-only snapshot for edit→batch sync and video export. WebGPU path
+   * returns `null` in v1.0 — consumers must gate on `backendKind === 'webgl'`
+   * or accept the no-op fallback.
+   */
+  getLUT1Snapshot(): { data: Float32Array; size: number; intensity: number } | null {
+    return this.webglBackend?.getLUT1Snapshot() ?? null;
+  }
+
+  getLUT2Snapshot(): { data: Float32Array; size: number; intensity: number } | null {
+    return this.webglBackend?.getLUT2Snapshot() ?? null;
+  }
+
   /** @deprecated Use setLUT2() — kept for legacy apps/webgl-study debug-gui. */
   setLUT(data: Float32Array, size: number): void {
     this.setLUT2(data, size);
