@@ -135,6 +135,14 @@ struct Phase0ExportResultDTO: Encodable {
     let benchmarkRecord: Phase0ExportBenchmarkRecordDTO?
 }
 
+struct Phase0PreviewRenderResultDTO: Encodable {
+    let originalUri: String
+    let gradedUri: String
+    let width: Int
+    let height: Int
+    let posterTimeSec: Double?
+}
+
 enum FilmtoneMediaError: LocalizedError {
     case bridgeUnavailable
     case invalidURL(String)

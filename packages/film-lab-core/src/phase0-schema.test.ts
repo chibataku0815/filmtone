@@ -3,10 +3,13 @@ import { PRESETS } from "./presets";
 import {
   createDefaultPhase0Params,
   createPhase0ProjectState,
+  interpolatePhase0PresetParams,
   mergePhase0Params,
   phase0ParamsSchema,
+  phase0ProjectSchema,
   pickPhase0Params,
   PHASE0_OUTPUT_PROFILE,
+  PHASE0_PRESET_STRENGTH_DEFAULT,
 } from "./phase0-schema";
 
 describe("phase0 schema", () => {
@@ -42,5 +45,39 @@ describe("phase0 schema", () => {
     const project = createPhase0ProjectState();
     expect(project.output).toEqual(PHASE0_OUTPUT_PROFILE);
     expect(project.params).toEqual(pickPhase0Params(PRESETS.cinematic));
+    expect(project.strength).toBe(PHASE0_PRESET_STRENGTH_DEFAULT);
+    expect(project.inputLut).toBeNull();
+    expect(project.creativeLut).toBeNull();
+  });
+
+  test("interpolates preset params from reset by strength", () => {
+    const half = interpolatePhase0PresetParams("cinematic", 0.5);
+    const full = pickPhase0Params(PRESETS.cinematic);
+    const reset = pickPhase0Params(PRESETS.reset);
+
+    expect(half.exposure).toBeCloseTo((reset.exposure + full.exposure) / 2, 5);
+    expect(half.contrast).toBeCloseTo((reset.contrast + full.contrast) / 2, 5);
+  });
+
+  test("migrates legacy lut projects into creativeLut", () => {
+    const legacy = phase0ProjectSchema.parse({
+      schemaVersion: 1,
+      projectId: "legacy-project",
+      createdAt: "2026-04-19T00:00:00.000Z",
+      updatedAt: "2026-04-19T00:00:00.000Z",
+      presetName: "cinematic",
+      params: pickPhase0Params(PRESETS.cinematic),
+      lut: {
+        title: "Legacy Look",
+        size: 2,
+        data: Array(32).fill(1),
+        intensity: 0.6,
+      },
+      output: PHASE0_OUTPUT_PROFILE,
+    });
+
+    expect(legacy.inputLut).toBeNull();
+    expect(legacy.creativeLut?.title).toBe("Legacy Look");
+    expect(legacy.creativeLut?.intensity).toBe(0.6);
   });
 });

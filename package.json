@@ -23,7 +23,7 @@
     "bench:sample": "bun run scripts/aggregate-benchmark.ts benchmark/samples/",
     "dev:context": "bun run --cwd apps/web dev:context",
     "build:web": "bun run build:core && bun run build:renderer && bun run --cwd apps/web build",
-    "build:ios": "bun run build:core && bun run --cwd apps/capacitor-film-lab-ios build",
+    "build:ios": "bun run build:core && bun run --cwd apps/capacitor-film-lab-ios build && bun run --cwd apps/capacitor-film-lab-ios cap:sync:ios",
     "start:web": "bun run --cwd apps/web start",
     "build:core": "bun run --cwd packages/film-lab-core build",
     "build:renderer": "bun run --cwd packages/film-lab-renderer build",

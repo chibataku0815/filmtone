@@ -6,6 +6,7 @@ import Foundation
 final class FilmtoneExportSession {
     private let request: Phase0ExportRequestDTO
     private let sourceURL: URL
+    private let cacheStore: CacheStore
     private let outputURL: URL
     private let ciContext: CIContext
     private let preparedInputLut: PreparedLut?
@@ -20,6 +21,7 @@ final class FilmtoneExportSession {
     ) throws {
         self.request = request
         self.sourceURL = sourceURL
+        self.cacheStore = cacheStore
         self.outputURL = try cacheStore.temporaryExportURL(pathExtension: request.output.container)
         self.ciContext = CIContext(options: [
             .cacheIntermediates: false,
@@ -34,6 +36,19 @@ final class FilmtoneExportSession {
 
     func cancel() {
         cancelled = true
+    }
+
+    func renderPreviewFrame() throws -> Phase0PreviewRenderResultDTO {
+        defer {
+            ciContext.clearCaches()
+        }
+
+        switch request.sourceKind {
+        case .image:
+            return try renderStillPreview()
+        case .video:
+            return try renderVideoPreview()
+        }
     }
 
     func run(
@@ -400,6 +415,59 @@ final class FilmtoneExportSession {
         )
     }
 
+    private func renderStillPreview() throws -> Phase0PreviewRenderResultDTO {
+        guard let image = CIImage(contentsOf: sourceURL, options: [.applyOrientationProperty: true]) else {
+            throw FilmtoneMediaError.unsupportedSource("The selected image could not be loaded.")
+        }
+
+        let outputSize = Self.scaledSize(for: image.extent.size, longEdge: request.output.longEdge)
+        let original = scaledStillSourceImage(image, outputSize: outputSize)
+        let graded = applyGrade(to: original).cropped(to: original.extent)
+
+        let originalURL = try writePreviewImage(original, preferredName: "filmtone-preview-original")
+        let gradedURL = try writePreviewImage(graded, preferredName: "filmtone-preview-graded")
+
+        return Phase0PreviewRenderResultDTO(
+            originalUri: originalURL.absoluteString,
+            gradedUri: gradedURL.absoluteString,
+            width: Int(outputSize.width.rounded()),
+            height: Int(outputSize.height.rounded()),
+            posterTimeSec: nil
+        )
+    }
+
+    private func renderVideoPreview() throws -> Phase0PreviewRenderResultDTO {
+        let asset = AVURLAsset(url: sourceURL)
+        guard let videoTrack = asset.tracks(withMediaType: .video).first else {
+            throw FilmtoneMediaError.unsupportedSource("No video track was found in the selected source.")
+        }
+
+        let sourceDurationSec = CMTimeGetSeconds(asset.duration)
+        let posterTimeSec = makePreviewPosterTime(sourceDurationSec: sourceDurationSec)
+        let outputSize = Self.scaledSize(for: videoTrack, longEdge: request.output.longEdge)
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
+
+        let posterTime = CMTime(seconds: posterTimeSec, preferredTimescale: 600)
+        let cgImage = try generator.copyCGImage(at: posterTime, actualTime: nil)
+        let posterImage = CIImage(cgImage: cgImage)
+        let original = scaledStillSourceImage(posterImage, outputSize: outputSize)
+        let graded = applyGrade(to: original).cropped(to: original.extent)
+
+        let originalURL = try writePreviewImage(original, preferredName: "filmtone-preview-original")
+        let gradedURL = try writePreviewImage(graded, preferredName: "filmtone-preview-graded")
+
+        return Phase0PreviewRenderResultDTO(
+            originalUri: originalURL.absoluteString,
+            gradedUri: gradedURL.absoluteString,
+            width: Int(outputSize.width.rounded()),
+            height: Int(outputSize.height.rounded()),
+            posterTimeSec: posterTimeSec
+        )
+    }
+
     private func makeWriter(outputSize: CGSize) throws -> AVAssetWriter {
         let writer = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
         writer.movieFragmentInterval = .invalid
@@ -458,6 +526,26 @@ final class FilmtoneExportSession {
         transform: CGAffineTransform,
         outputSize: CGSize
     ) -> CIImage {
+        let base = scaledVideoFrameImage(
+            from: imageBuffer,
+            transform: transform,
+            outputSize: outputSize
+        )
+        let graded = applyGrade(to: base)
+        return graded.cropped(to: CGRect(origin: .zero, size: outputSize))
+    }
+
+    private func renderableStillImage(_ image: CIImage, outputSize: CGSize) -> CIImage {
+        let base = scaledStillSourceImage(image, outputSize: outputSize)
+        let graded = applyGrade(to: base)
+        return graded.cropped(to: CGRect(origin: .zero, size: outputSize))
+    }
+
+    private func scaledVideoFrameImage(
+        from imageBuffer: CVPixelBuffer,
+        transform: CGAffineTransform,
+        outputSize: CGSize
+    ) -> CIImage {
         let image = CIImage(cvPixelBuffer: imageBuffer)
         let oriented = image.transformed(by: transform)
         let normalized = oriented.transformed(by: CGAffineTransform(
@@ -467,21 +555,21 @@ final class FilmtoneExportSession {
 
         let scaleX = outputSize.width / normalized.extent.width
         let scaleY = outputSize.height / normalized.extent.height
-        let scaled = normalized.transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
-        let graded = applyGrade(to: scaled.cropped(to: CGRect(origin: .zero, size: outputSize)))
-        return graded.cropped(to: CGRect(origin: .zero, size: outputSize))
+        return normalized
+            .transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
+            .cropped(to: CGRect(origin: .zero, size: outputSize))
     }
 
-    private func renderableStillImage(_ image: CIImage, outputSize: CGSize) -> CIImage {
+    private func scaledStillSourceImage(_ image: CIImage, outputSize: CGSize) -> CIImage {
         let normalized = image.transformed(by: CGAffineTransform(
             translationX: -image.extent.origin.x,
             y: -image.extent.origin.y
         ))
         let scaleX = outputSize.width / normalized.extent.width
         let scaleY = outputSize.height / normalized.extent.height
-        let scaled = normalized.transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
-        let graded = applyGrade(to: scaled.cropped(to: CGRect(origin: .zero, size: outputSize)))
-        return graded.cropped(to: CGRect(origin: .zero, size: outputSize))
+        return normalized
+            .transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
+            .cropped(to: CGRect(origin: .zero, size: outputSize))
     }
 
     private func applyGrade(to image: CIImage) -> CIImage {
@@ -718,6 +806,14 @@ final class FilmtoneExportSession {
         return 0.12 + (normalized * 0.74)
     }
 
+    private func makePreviewPosterTime(sourceDurationSec: Double) -> Double {
+        guard sourceDurationSec.isFinite, sourceDurationSec > 0 else {
+            return 0
+        }
+        let candidate = sourceDurationSec * 0.25
+        return min(max(candidate, 0), sourceDurationSec)
+    }
+
     private func waitUntilReadyForMoreMediaData(
         _ input: AVAssetWriterInput,
         writer: AVAssetWriter,
@@ -762,6 +858,19 @@ final class FilmtoneExportSession {
         if cancelled {
             throw FilmtoneMediaError.exportCancelled
         }
+    }
+
+    private func writePreviewImage(_ image: CIImage, preferredName: String) throws -> URL {
+        let url = try cacheStore.temporaryPreviewURL(preferredName: preferredName, pathExtension: "jpg")
+        guard let data = ciContext.jpegRepresentation(
+            of: image,
+            colorSpace: colorSpace,
+            options: [:]
+        ) else {
+            throw FilmtoneMediaError.exportFailed("Preview JPEG data could not be created.")
+        }
+        try data.write(to: url, options: .atomic)
+        return url
     }
 
     private static func makePreparedLut(from lut: SerializableLutDTO?) -> PreparedLut? {

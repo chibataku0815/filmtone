@@ -5,6 +5,7 @@ final class CacheStore {
         case sources
         case luts
         case exports
+        case previews
     }
 
     private let fileManager: FileManager
@@ -62,6 +63,13 @@ final class CacheStore {
 
     func temporaryExportURL(pathExtension: String = "mp4") throws -> URL {
         try uniqueURL(in: .exports, preferredName: "filmtone-export", pathExtension: pathExtension)
+    }
+
+    func temporaryPreviewURL(
+        preferredName: String = "filmtone-preview",
+        pathExtension: String = "jpg"
+    ) throws -> URL {
+        try uniqueURL(in: .previews, preferredName: preferredName, pathExtension: pathExtension)
     }
 
     func purgeExports() throws {

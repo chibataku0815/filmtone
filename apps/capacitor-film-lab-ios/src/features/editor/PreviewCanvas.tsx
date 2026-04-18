@@ -1,45 +1,40 @@
 import {
   useCallback,
   useRef,
-  useState,
   type PointerEvent as ReactPointerEvent,
   type ReactElement,
 } from "react";
 
 export interface PreviewCanvasProps {
-  source: { uri: string; kind: "video" | "image"; filename: string } | null;
+  source: { filename: string } | null;
   displayUri: string | undefined;
   emptyMessage: string;
   compareLabel: string;
+  isComparing?: boolean;
   onPressHoldStart?: () => void;
   onPressHoldEnd?: () => void;
 }
 
 /**
- * Full-bleed preview canvas with press-and-hold compare gesture.
- *
- * Notes:
- * - Press-hold is wired on a transparent overlay layer that sits ABOVE the
- *   preview area but BELOW the native video controls (controls live at the
- *   bottom strip of the <video> element). The overlay uses
- *   `pointer-events-auto` only on the upper image area; the bottom strip
- *   passes through to the video controls.
- * - For images, the overlay covers the full preview because there are no
- *   native controls to preserve.
- * - PointerEvents are used so this works for mouse (browser dev) and touch
- *   (iOS Safari / WKWebView).
+ * Full-bleed still-frame preview canvas with press-and-hold compare gesture.
  */
 export function PreviewCanvas(props: PreviewCanvasProps): ReactElement {
-  const { source, displayUri, emptyMessage, compareLabel, onPressHoldStart, onPressHoldEnd } =
+  const {
+    source,
+    displayUri,
+    emptyMessage,
+    compareLabel,
+    isComparing = false,
+    onPressHoldStart,
+    onPressHoldEnd,
+  } =
     props;
 
-  const [isComparing, setIsComparing] = useState(false);
   const activePointerIdRef = useRef<number | null>(null);
 
   const endCompare = useCallback(() => {
     if (activePointerIdRef.current === null) return;
     activePointerIdRef.current = null;
-    setIsComparing(false);
     onPressHoldEnd?.();
   }, [onPressHoldEnd]);
 
@@ -55,7 +50,6 @@ export function PreviewCanvas(props: PreviewCanvasProps): ReactElement {
       } catch {
         // setPointerCapture can throw in odd environments; ignore.
       }
-      setIsComparing(true);
       onPressHoldStart?.();
     },
     [source, onPressHoldStart],
@@ -79,33 +73,13 @@ export function PreviewCanvas(props: PreviewCanvasProps): ReactElement {
       <div className="aspect-[9/16] bg-black relative">
         {source && displayUri ? (
           <>
-            {source.kind === "video" ? (
-              <video
-                className="h-full w-full object-contain"
-                src={displayUri}
-                controls
-                playsInline
-              />
-            ) : (
-              <img
-                className="h-full w-full object-contain"
-                src={displayUri}
-                alt={source.filename}
-              />
-            )}
-
-            {/*
-              Press-hold overlay.
-              For video: only covers the top ~84% so the native controls strip
-              at the bottom remains tappable.
-              For image: covers the full preview.
-            */}
+            <img
+              className="h-full w-full object-contain"
+              src={displayUri}
+              alt={source.filename}
+            />
             <div
-              className={
-                source.kind === "video"
-                  ? "absolute inset-x-0 top-0 bottom-[16%]"
-                  : "absolute inset-0"
-              }
+              className="absolute inset-0"
               style={{ touchAction: "none" }}
               onPointerDown={handlePointerDown}
               onPointerUp={handlePointerEnd}

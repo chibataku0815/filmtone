@@ -836,6 +836,7 @@ declare function applyQuickStateToPhase0Params<T extends Phase0QuickTarget>(base
 
 declare const PHASE0_SCHEMA_VERSION: 1;
 declare const PHASE0_PRESET_DEFAULT = "cinematic";
+declare const PHASE0_PRESET_STRENGTH_DEFAULT = 1;
 declare const PHASE0_PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "fade", "vignette", "grainIntensity"];
 type Phase0ParamKey = (typeof PHASE0_PARAM_KEYS)[number];
 type Phase0Params = Pick<Params, Phase0ParamKey>;
@@ -876,12 +877,13 @@ declare const phase0ProjectLutSchema: z.ZodObject<{
     data: z.ZodArray<z.ZodNumber>;
     intensity: z.ZodDefault<z.ZodNumber>;
 }, z.core.$strip>;
-declare const phase0ProjectSchema: z.ZodObject<{
+declare const phase0ProjectSchema: z.ZodPipe<z.ZodObject<{
     schemaVersion: z.ZodLiteral<1>;
     projectId: z.ZodString;
     createdAt: z.ZodString;
     updatedAt: z.ZodString;
     presetName: z.ZodString;
+    strength: z.ZodDefault<z.ZodNumber>;
     quickState: z.ZodDefault<z.ZodObject<{
         filmCharacter: z.ZodNumber;
         era: z.ZodNumber;
@@ -897,7 +899,19 @@ declare const phase0ProjectSchema: z.ZodObject<{
         vignette: z.ZodDefault<z.ZodNumber>;
         grainIntensity: z.ZodDefault<z.ZodNumber>;
     }, z.core.$strip>;
-    lut: z.ZodDefault<z.ZodNullable<z.ZodObject<{
+    lut: z.ZodOptional<z.ZodNullable<z.ZodObject<{
+        title: z.ZodString;
+        size: z.ZodNumber;
+        data: z.ZodArray<z.ZodNumber>;
+        intensity: z.ZodDefault<z.ZodNumber>;
+    }, z.core.$strip>>>;
+    inputLut: z.ZodOptional<z.ZodNullable<z.ZodObject<{
+        title: z.ZodString;
+        size: z.ZodNumber;
+        data: z.ZodArray<z.ZodNumber>;
+        intensity: z.ZodDefault<z.ZodNumber>;
+    }, z.core.$strip>>>;
+    creativeLut: z.ZodOptional<z.ZodNullable<z.ZodObject<{
         title: z.ZodString;
         size: z.ZodNumber;
         data: z.ZodArray<z.ZodNumber>;
@@ -910,11 +924,100 @@ declare const phase0ProjectSchema: z.ZodObject<{
         container: z.ZodLiteral<"mp4">;
         preserveAudio: z.ZodDefault<z.ZodBoolean>;
     }, z.core.$strip>;
-}, z.core.$strip>;
+}, z.core.$strip>, z.ZodTransform<{
+    inputLut: {
+        title: string;
+        size: number;
+        data: number[];
+        intensity: number;
+    } | null;
+    creativeLut: {
+        title: string;
+        size: number;
+        data: number[];
+        intensity: number;
+    } | null;
+    schemaVersion: 1;
+    projectId: string;
+    createdAt: string;
+    updatedAt: string;
+    presetName: string;
+    strength: number;
+    quickState: {
+        filmCharacter: number;
+        era: number;
+        dynamics: number;
+    };
+    params: {
+        exposure: number;
+        contrast: number;
+        saturation: number;
+        temperature: number;
+        tint: number;
+        fade: number;
+        vignette: number;
+        grainIntensity: number;
+    };
+    output: {
+        longEdge: 1920;
+        fps: 30;
+        codec: "h264";
+        container: "mp4";
+        preserveAudio: boolean;
+    };
+}, {
+    schemaVersion: 1;
+    projectId: string;
+    createdAt: string;
+    updatedAt: string;
+    presetName: string;
+    strength: number;
+    quickState: {
+        filmCharacter: number;
+        era: number;
+        dynamics: number;
+    };
+    params: {
+        exposure: number;
+        contrast: number;
+        saturation: number;
+        temperature: number;
+        tint: number;
+        fade: number;
+        vignette: number;
+        grainIntensity: number;
+    };
+    output: {
+        longEdge: 1920;
+        fps: 30;
+        codec: "h264";
+        container: "mp4";
+        preserveAudio: boolean;
+    };
+    lut?: {
+        title: string;
+        size: number;
+        data: number[];
+        intensity: number;
+    } | null | undefined;
+    inputLut?: {
+        title: string;
+        size: number;
+        data: number[];
+        intensity: number;
+    } | null | undefined;
+    creativeLut?: {
+        title: string;
+        size: number;
+        data: number[];
+        intensity: number;
+    } | null | undefined;
+}>>;
 type Phase0ProjectLut = z.infer<typeof phase0ProjectLutSchema>;
 type Phase0ProjectState = z.infer<typeof phase0ProjectSchema>;
 declare function pickPhase0Params(params: Params): Phase0Params;
 declare function createDefaultPhase0Params(presetName?: PresetName): Phase0Params;
+declare function interpolatePhase0PresetParams(presetName: PresetName, strength: number): Phase0Params;
 declare function mergePhase0Params(base: Phase0Params, patch: Partial<Phase0Params>): Phase0Params;
 declare function createPhase0ProjectState(presetName?: PresetName): Phase0ProjectState;
 
@@ -958,6 +1061,13 @@ interface Phase0ExportRequest {
     };
     inputLut: ParsedCubeLut | null;
     creativeLut: ParsedCubeLut | null;
+}
+interface Phase0PreviewRenderResult {
+    originalUri: string;
+    gradedUri: string;
+    width: number;
+    height: number;
+    posterTimeSec?: number;
 }
 interface Phase0ExportProgress {
     stage: Phase0ExportStage;
@@ -1005,7 +1115,7 @@ declare function assertPhase0SourceProbeWithinCaps(probe: SourceProbe): void;
 declare function buildPhase0ExportRequest(options: {
     source: SourceInfo;
     probe?: SourceProbe | null;
-    project: Pick<Phase0ProjectState, "presetName" | "quickState" | "params" | "lut">;
+    project: Pick<Phase0ProjectState, "presetName" | "quickState" | "params" | "inputLut" | "creativeLut">;
     output?: Partial<Phase0OutputProfile>;
 }): Phase0ExportRequest;
 
@@ -1466,4 +1576,4 @@ type IosPhase0LocalProject = z.infer<typeof iosPhase0LocalProjectSchema>;
 declare function pickIosPhase0Params(params: Params): IosPhase0Params;
 declare function getIosPhase0SourceCapViolations(source: Pick<IosPhase0SourceInfo, "width" | "height" | "durationSec" | "fileSizeBytes">): string[];
 
-export { type BenchmarkRow, type BenchmarkRowInput, type BenchmarkSaveResult, type BenchmarkVisualFloor, type CubeLUT, DEFAULT_QUICK_STATE, FILM_LAB_DEFAULT_HIGHLIGHT_HUE, FILM_LAB_DEFAULT_SHADOW_HUE, type FilmLabParamsValidated, type FilmLookGradeInputProps, type FilmLookSpikeInputProps, IOS_PHASE0_BENCHMARK_SLOTS, IOS_PHASE0_OUTPUT_CODEC, IOS_PHASE0_OUTPUT_FPS, IOS_PHASE0_OUTPUT_LONG_EDGE, IOS_PHASE0_PARAM_KEYS, IOS_PHASE0_SCHEMA_VERSION, IOS_PHASE0_SOURCE_CAPS, IOS_PHASE0_SOURCE_DURATION_CAP_SEC, IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES, IOS_PHASE0_SOURCE_LONG_EDGE_CAP, type IosPhase0AssetRef, type IosPhase0BenchmarkRecord, type IosPhase0BenchmarkSlot, type IosPhase0ExportPayload, type IosPhase0ExportResult, type IosPhase0ExportSettings, type IosPhase0LocalProject, type IosPhase0ParamKey, type IosPhase0Params, type IosPhase0PickedLutFile, type IosPhase0PickedSource, type IosPhase0SerializableLut, type IosPhase0SourceInfo, type IosPhase0SourceKind, LEGACY_HIGHLIGHT_TONE_MAGNITUDE, LEGACY_SHADOW_TONE_MAGNITUDE, LOOK_ID_BY_PRESET, PARAM_KEYS, PHASE0_APPROX_SOURCE_LONG_EDGE_MAX, PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES, PHASE0_BENCHMARK_GATES, PHASE0_MAX_SOURCE_DURATION_SEC, PHASE0_OUTPUT_PROFILE, PHASE0_PARAM_KEYS, PHASE0_PRESET_DEFAULT, PHASE0_SCHEMA_VERSION, PRESETS, PRESET_BUTTONS, PRESET_VERSION, type PackedCubeLut2D, type ParamKey, type Params, type ParsedBenchmarkRow, type ParsedCubeLut, type Phase0ExportBenchmarkRecord, type Phase0ExportProgress, type Phase0ExportRequest, type Phase0ExportResult, type Phase0ExportStage, type Phase0OutputProfile, type Phase0ParamKey, type Phase0Params, type Phase0ProjectLut, type Phase0ProjectState, type Phase0QuickTarget, type PickedLutFile, type PresetName, QUICK_AXIS_DEFAULT_RANGE, QUICK_AXIS_IDS, type QuickAxisId, type QuickState, type SourceInfo, type SourceKind, type SourceProbe, applyQuickStateToParams, applyQuickStateToPhase0Params, assertPhase0SourceProbeWithinCaps, benchmarkMarkdownTableHeader, buildBenchmarkRow, buildPhase0ExportRequest, chromaUnitFromHueDegrees, cloneParams, coerceQuickState, createDefaultFilmLookGradeProps, createDefaultPhase0Params, createIosPhase0SerializableLut, createPhase0ProjectState, deserializeCubeLutData, filmLabParamsSchema, filmLookGradeDefaultProps, filmLookGradeInputSchema, filmLookSpikeDefaultProps, filmLookSpikeInputSchema, findMatchingPreset, formatBenchmarkRow, getIosPhase0SourceCapViolations, getPhase0SourceCapViolations, gradeMatchesPreset, halationHueToHex, hslToRgb01, iosPhase0AssetRefSchema, iosPhase0BenchmarkRecordSchema, iosPhase0ExportPayloadSchema, iosPhase0ExportResultSchema, iosPhase0ExportSettingsSchema, iosPhase0LocalProjectSchema, iosPhase0ParamsSchema, iosPhase0PickedLutFileSchema, iosPhase0PickedSourceSchema, iosPhase0PresetIdSchema, iosPhase0SerializableLutSchema, iosPhase0SourceInfoSchema, iosPhase0SourceKindSchema, iosPhase0ThermalStateSchema, lookIdForPreset, mergePhase0Params, nearestHueDegreesToDirection, packCubeLutToFloatRgbaGrid, parseBenchmarkRow, parseCube, phase0ParamsSchema, phase0ProjectLutSchema, phase0ProjectSchema, phase0QuickStateSchema, pickIosPhase0Params, pickPhase0Params, quickStateSchema, serializeCubeLut };
+export { type BenchmarkRow, type BenchmarkRowInput, type BenchmarkSaveResult, type BenchmarkVisualFloor, type CubeLUT, DEFAULT_QUICK_STATE, FILM_LAB_DEFAULT_HIGHLIGHT_HUE, FILM_LAB_DEFAULT_SHADOW_HUE, type FilmLabParamsValidated, type FilmLookGradeInputProps, type FilmLookSpikeInputProps, IOS_PHASE0_BENCHMARK_SLOTS, IOS_PHASE0_OUTPUT_CODEC, IOS_PHASE0_OUTPUT_FPS, IOS_PHASE0_OUTPUT_LONG_EDGE, IOS_PHASE0_PARAM_KEYS, IOS_PHASE0_SCHEMA_VERSION, IOS_PHASE0_SOURCE_CAPS, IOS_PHASE0_SOURCE_DURATION_CAP_SEC, IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES, IOS_PHASE0_SOURCE_LONG_EDGE_CAP, type IosPhase0AssetRef, type IosPhase0BenchmarkRecord, type IosPhase0BenchmarkSlot, type IosPhase0ExportPayload, type IosPhase0ExportResult, type IosPhase0ExportSettings, type IosPhase0LocalProject, type IosPhase0ParamKey, type IosPhase0Params, type IosPhase0PickedLutFile, type IosPhase0PickedSource, type IosPhase0SerializableLut, type IosPhase0SourceInfo, type IosPhase0SourceKind, LEGACY_HIGHLIGHT_TONE_MAGNITUDE, LEGACY_SHADOW_TONE_MAGNITUDE, LOOK_ID_BY_PRESET, PARAM_KEYS, PHASE0_APPROX_SOURCE_LONG_EDGE_MAX, PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES, PHASE0_BENCHMARK_GATES, PHASE0_MAX_SOURCE_DURATION_SEC, PHASE0_OUTPUT_PROFILE, PHASE0_PARAM_KEYS, PHASE0_PRESET_DEFAULT, PHASE0_PRESET_STRENGTH_DEFAULT, PHASE0_SCHEMA_VERSION, PRESETS, PRESET_BUTTONS, PRESET_VERSION, type PackedCubeLut2D, type ParamKey, type Params, type ParsedBenchmarkRow, type ParsedCubeLut, type Phase0ExportBenchmarkRecord, type Phase0ExportProgress, type Phase0ExportRequest, type Phase0ExportResult, type Phase0ExportStage, type Phase0OutputProfile, type Phase0ParamKey, type Phase0Params, type Phase0PreviewRenderResult, type Phase0ProjectLut, type Phase0ProjectState, type Phase0QuickTarget, type PickedLutFile, type PresetName, QUICK_AXIS_DEFAULT_RANGE, QUICK_AXIS_IDS, type QuickAxisId, type QuickState, type SourceInfo, type SourceKind, type SourceProbe, applyQuickStateToParams, applyQuickStateToPhase0Params, assertPhase0SourceProbeWithinCaps, benchmarkMarkdownTableHeader, buildBenchmarkRow, buildPhase0ExportRequest, chromaUnitFromHueDegrees, cloneParams, coerceQuickState, createDefaultFilmLookGradeProps, createDefaultPhase0Params, createIosPhase0SerializableLut, createPhase0ProjectState, deserializeCubeLutData, filmLabParamsSchema, filmLookGradeDefaultProps, filmLookGradeInputSchema, filmLookSpikeDefaultProps, filmLookSpikeInputSchema, findMatchingPreset, formatBenchmarkRow, getIosPhase0SourceCapViolations, getPhase0SourceCapViolations, gradeMatchesPreset, halationHueToHex, hslToRgb01, interpolatePhase0PresetParams, iosPhase0AssetRefSchema, iosPhase0BenchmarkRecordSchema, iosPhase0ExportPayloadSchema, iosPhase0ExportResultSchema, iosPhase0ExportSettingsSchema, iosPhase0LocalProjectSchema, iosPhase0ParamsSchema, iosPhase0PickedLutFileSchema, iosPhase0PickedSourceSchema, iosPhase0PresetIdSchema, iosPhase0SerializableLutSchema, iosPhase0SourceInfoSchema, iosPhase0SourceKindSchema, iosPhase0ThermalStateSchema, lookIdForPreset, mergePhase0Params, nearestHueDegreesToDirection, packCubeLutToFloatRgbaGrid, parseBenchmarkRow, parseCube, phase0ParamsSchema, phase0ProjectLutSchema, phase0ProjectSchema, phase0QuickStateSchema, pickIosPhase0Params, pickPhase0Params, quickStateSchema, serializeCubeLut };

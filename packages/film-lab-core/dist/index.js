@@ -1037,6 +1037,7 @@ function applyQuickStateToPhase0Params(base, state) {
 import { z as z3 } from "zod";
 var PHASE0_SCHEMA_VERSION = 1;
 var PHASE0_PRESET_DEFAULT = "cinematic";
+var PHASE0_PRESET_STRENGTH_DEFAULT = 1;
 var PHASE0_PARAM_KEYS = [
   "exposure",
   "contrast",
@@ -1085,15 +1086,20 @@ var phase0ProjectLutSchema = z3.object({
   data: z3.array(z3.number()),
   intensity: z3.number().min(0).max(1).default(1)
 });
-var phase0ProjectSchema = z3.object({
+var phase0ProjectSchemaInput = z3.object({
   schemaVersion: z3.literal(PHASE0_SCHEMA_VERSION),
   projectId: z3.string().min(1),
   createdAt: z3.string().min(1),
   updatedAt: z3.string().min(1),
   presetName: z3.string().min(1),
+  strength: z3.number().min(0).max(1).default(PHASE0_PRESET_STRENGTH_DEFAULT),
   quickState: phase0QuickStateSchema.default(DEFAULT_QUICK_STATE),
   params: phase0ParamsSchema,
-  lut: phase0ProjectLutSchema.nullable().default(null),
+  // Legacy creative LUT slot. Keep parse-compatible so older saved projects
+  // normalize into the current dual-LUT shape on load.
+  lut: phase0ProjectLutSchema.nullable().optional(),
+  inputLut: phase0ProjectLutSchema.nullable().optional(),
+  creativeLut: phase0ProjectLutSchema.nullable().optional(),
   output: z3.object({
     longEdge: z3.literal(PHASE0_OUTPUT_PROFILE.longEdge),
     fps: z3.literal(PHASE0_OUTPUT_PROFILE.fps),
@@ -1102,6 +1108,13 @@ var phase0ProjectSchema = z3.object({
     preserveAudio: z3.boolean().default(PHASE0_OUTPUT_PROFILE.preserveAudio)
   })
 });
+var phase0ProjectSchema = phase0ProjectSchemaInput.transform(
+  ({ lut, inputLut, creativeLut, ...project }) => ({
+    ...project,
+    inputLut: inputLut ?? null,
+    creativeLut: creativeLut ?? lut ?? null
+  })
+);
 function pickPhase0Params(params) {
   return {
     exposure: params.exposure,
@@ -1116,6 +1129,16 @@ function pickPhase0Params(params) {
 }
 function createDefaultPhase0Params(presetName = PHASE0_PRESET_DEFAULT) {
   return pickPhase0Params(PRESETS[presetName]);
+}
+function interpolatePhase0PresetParams(presetName, strength) {
+  const clamped = Math.max(0, Math.min(1, strength));
+  const reset = pickPhase0Params(PRESETS.reset);
+  const target = pickPhase0Params(PRESETS[presetName]);
+  const params = { ...reset };
+  for (const key of PHASE0_PARAM_KEYS) {
+    params[key] = reset[key] + (target[key] - reset[key]) * clamped;
+  }
+  return phase0ParamsSchema.parse(params);
 }
 function mergePhase0Params(base, patch) {
   return phase0ParamsSchema.parse({ ...base, ...patch });
@@ -1135,9 +1158,11 @@ function createPhase0ProjectState(presetName = PHASE0_PRESET_DEFAULT) {
     createdAt: now,
     updatedAt: now,
     presetName,
+    strength: PHASE0_PRESET_STRENGTH_DEFAULT,
     quickState: DEFAULT_QUICK_STATE,
     params: createDefaultPhase0Params(presetName),
-    lut: null,
+    inputLut: null,
+    creativeLut: null,
     output: PHASE0_OUTPUT_PROFILE
   });
 }
@@ -1185,6 +1210,12 @@ function buildPhase0ExportRequest(options) {
   if (probe) {
     assertPhase0SourceProbeWithinCaps(probe);
   }
+  const toTransportLut = (lut) => lut ? {
+    title: lut.title,
+    size: lut.size,
+    data: lut.data,
+    intensity: lut.intensity
+  } : null;
   return {
     sourceUri: options.source.uri,
     sourceKind: options.source.kind,
@@ -1199,13 +1230,8 @@ function buildPhase0ExportRequest(options) {
       quickState: options.project.quickState,
       params: options.project.params
     },
-    inputLut: null,
-    creativeLut: options.project.lut ? {
-      title: options.project.lut.title,
-      size: options.project.lut.size,
-      data: options.project.lut.data,
-      intensity: options.project.lut.intensity
-    } : null
+    inputLut: toTransportLut(options.project.inputLut),
+    creativeLut: toTransportLut(options.project.creativeLut)
   };
 }
 
@@ -1562,6 +1588,7 @@ export {
   PHASE0_OUTPUT_PROFILE,
   PHASE0_PARAM_KEYS,
   PHASE0_PRESET_DEFAULT,
+  PHASE0_PRESET_STRENGTH_DEFAULT,
   PHASE0_SCHEMA_VERSION,
   PRESETS,
   PRESET_BUTTONS,
@@ -1594,6 +1621,7 @@ export {
   gradeMatchesPreset,
   halationHueToHex,
   hslToRgb01,
+  interpolatePhase0PresetParams,
   iosPhase0AssetRefSchema,
   iosPhase0BenchmarkRecordSchema,
   iosPhase0ExportPayloadSchema,

@@ -3,6 +3,7 @@ import type {
   Phase0ExportProgress,
   Phase0ExportRequest,
   Phase0ExportResult,
+  Phase0PreviewRenderResult,
   SourceInfo,
   SourceProbe,
 } from "film-lab-core";
@@ -17,6 +18,7 @@ export interface FilmtoneMediaPlugin {
   pickSource(): Promise<SourceInfo | null>;
   pickLutFile(options?: { slot?: "inputLut" | "creativeLut" }): Promise<PickedLutFile | null>;
   probeSource(options: { uri: string }): Promise<SourceProbe>;
+  renderPreviewFrame(request: Phase0ExportRequest): Promise<Phase0PreviewRenderResult>;
   runExport(request: Phase0ExportRequest): Promise<Phase0ExportResult>;
   saveToPhotos(options: { uri: string }): Promise<void>;
   shareOutput(options: { uri: string }): Promise<void>;

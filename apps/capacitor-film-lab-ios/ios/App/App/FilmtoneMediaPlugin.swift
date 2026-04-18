@@ -10,6 +10,7 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "pickSource", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "pickLutFile", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "probeSource", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "renderPreviewFrame", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "runExport", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "saveToPhotos", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "shareOutput", returnType: CAPPluginReturnPromise),
@@ -207,6 +208,27 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
                     }
                 }
             }
+        } catch {
+            reject(call, with: error)
+        }
+    }
+
+    @objc func renderPreviewFrame(_ call: CAPPluginCall) {
+        guard let cacheStore else {
+            reject(call, with: FilmtoneMediaError.cacheFailed("Cache store is unavailable."))
+            return
+        }
+
+        do {
+            let request = try call.decode(Phase0ExportRequestDTO.self)
+            let sourceURL = try resolveFileURL(request.sourceUri)
+            let session = try FilmtoneExportSession(
+                request: request,
+                sourceURL: sourceURL,
+                cacheStore: cacheStore
+            )
+            let result = try session.renderPreviewFrame()
+            call.resolve(with: result)
         } catch {
             reject(call, with: error)
         }

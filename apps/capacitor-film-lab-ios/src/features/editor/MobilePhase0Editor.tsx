@@ -20,10 +20,15 @@ import {
   type ImportedLut,
 } from "@/lib/phase0-storage";
 import {
-  applyLutSelection,
+  applyCompareHeld,
+  applyInputLutSelection,
   applyPresetSelection,
+  applyPreviewRenderFailure,
+  applyPreviewRenderResult,
+  applyPreviewRenderStart,
   applyProbe,
   applyQuickState,
+  applyStrength,
   buildEditorExportRequest,
   createInitialEditorState,
 } from "@/lib/phase0-state";
@@ -37,12 +42,43 @@ import { StrengthSheet } from "./StrengthSheet";
 import { LutManagerModal } from "@/features/lut-manager/LutManagerModal";
 
 const V1_CAMERA_PROFILES: ReadonlyArray<CameraProfile> = ["auto", "custom"];
+const PREVIEW_RENDER_DEBOUNCE_MS = 120;
 
 function makeImportedLutId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
   }
   return `lut_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function toDisplayUri(uri: string | null | undefined): string | undefined {
+  if (!uri) return undefined;
+  if (Capacitor.isNativePlatform()) {
+    return Capacitor.convertFileSrc(uri);
+  }
+  return uri;
+}
+
+function lutsMatch(a: ParsedCubeLut | null, b: ParsedCubeLut | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (a.title !== b.title || a.size !== b.size || a.data.length !== b.data.length) {
+    return false;
+  }
+  for (let index = 0; index < a.data.length; index += 1) {
+    if (a.data[index] !== b.data[index]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function findActiveImportedLutId(
+  imports: readonly ImportedLut[],
+  activeLut: ParsedCubeLut | null,
+): string | null {
+  const match = imports.find((entry) => lutsMatch(entry.lut, activeLut));
+  return match?.id ?? null;
 }
 
 interface MobilePhase0EditorProps {
@@ -54,17 +90,23 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
     createInitialEditorState(loadPhase0Project() ?? undefined),
   );
   const [isSaveBusy, setIsSaveBusy] = useState(false);
-  const [inputLut, setInputLut] = useState<ParsedCubeLut | null>(null);
-  const [inputLutEnabled, setInputLutEnabled] = useState(true);
-  const [cameraProfile, setCameraProfile] = useState<CameraProfile>("auto");
   const [strengthSheetOpen, setStrengthSheetOpen] = useState(false);
   const [importedLuts, setImportedLuts] = useState<ImportedLut[]>(() => loadImportedLuts());
-  const [activeImportedLutId, setActiveImportedLutId] = useState<string | null>(null);
   const [lutManagerOpen, setLutManagerOpen] = useState(false);
-  const displaySourceUri =
-    state.source && Capacitor.isNativePlatform()
-      ? Capacitor.convertFileSrc(state.source.uri)
-      : state.source?.uri;
+
+  const activeImportedLutId = findActiveImportedLutId(
+    importedLuts,
+    state.project.inputLut,
+  );
+  const cameraProfile: CameraProfile = state.project.inputLut ? "custom" : "auto";
+  const selectedPreviewUri = state.isCompareHeld
+    ? state.preview.originalPosterUri ?? state.preview.gradedPosterUri
+    : state.preview.gradedPosterUri ?? state.preview.originalPosterUri;
+  const displayPreviewUri = toDisplayUri(selectedPreviewUri);
+  const previewEmptyMessage = state.source
+    ? state.preview.error ?? strings.previewRendering
+    : strings.sourceEmpty;
+  const surfacedError = state.error ?? state.preview.error;
 
   useEffect(() => {
     let cancelled = false;
@@ -91,6 +133,37 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
   useEffect(() => {
     savePhase0Project(state.project);
   }, [state.project]);
+
+  useEffect(() => {
+    if (!state.source) {
+      return undefined;
+    }
+
+    const request = buildEditorExportRequest(state);
+    if (!request) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    setState((current) => applyPreviewRenderStart(current));
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const result = await filmtoneMedia.renderPreviewFrame(request);
+        if (cancelled) return;
+        setState((current) => applyPreviewRenderResult(current, result));
+      } catch (error) {
+        if (cancelled) return;
+        const detail = error instanceof Error ? error.message : String(error);
+        setState((current) => applyPreviewRenderFailure(current, detail));
+      }
+    }, PREVIEW_RENDER_DEBOUNCE_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [state.source?.uri, state.project.updatedAt]);
 
   async function handlePickSource() {
     try {
@@ -135,49 +208,42 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
   }
 
   function handleStrengthChange(value: number) {
-    setState((current) =>
-      applyLutSelection(
-        current,
-        current.project.lut ? { ...current.project.lut, intensity: value } : current.project.lut,
-      ),
-    );
+    setState((current) => applyStrength(current, value));
   }
 
   function handleStrengthReset() {
-    setState((current) =>
-      applyQuickState(current, { filmCharacter: 0, era: 0, dynamics: 0 }),
-    );
-    setState((current) =>
-      applyLutSelection(
-        current,
-        current.project.lut ? { ...current.project.lut, intensity: 1 } : current.project.lut,
-      ),
-    );
+    setState((current) => {
+      const quickReset = applyQuickState(current, {
+        filmCharacter: 0,
+        era: 0,
+        dynamics: 0,
+      });
+      return applyStrength(quickReset, 1);
+    });
+  }
+
+  function handleCompareHoldStart() {
+    setState((current) => applyCompareHeld(current, true));
+  }
+
+  function handleCompareHoldEnd() {
+    setState((current) => applyCompareHeld(current, false));
   }
 
   function handleCameraProfileSelect(profile: CameraProfile) {
-    setCameraProfile(profile);
     if (profile === "auto") {
-      setInputLut(null);
-      setInputLutEnabled(true);
-      setActiveImportedLutId(null);
+      setState((current) => applyInputLutSelection(current, null));
     }
   }
 
   function handleActivateImportedLut(id: string) {
     const entry = importedLuts.find((item) => item.id === id);
     if (!entry) return;
-    setInputLut(entry.lut);
-    setInputLutEnabled(true);
-    setCameraProfile("custom");
-    setActiveImportedLutId(id);
+    setState((current) => applyInputLutSelection(current, entry.lut));
   }
 
   function handleDeactivateImportedLut() {
-    setInputLut(null);
-    setInputLutEnabled(true);
-    setCameraProfile("auto");
-    setActiveImportedLutId(null);
+    setState((current) => applyInputLutSelection(current, null));
   }
 
   function handleRenameImportedLut(id: string, name: string) {
@@ -189,7 +255,7 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
     const next = removeImportedLut(id);
     setImportedLuts(next);
     if (activeImportedLutId === id) {
-      handleDeactivateImportedLut();
+      setState((current) => applyInputLutSelection(current, null));
     }
   }
 
@@ -220,10 +286,7 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
       };
       const next = appendImportedLut(entry);
       setImportedLuts(next);
-      setInputLut(lut);
-      setInputLutEnabled(true);
-      setCameraProfile("custom");
-      setActiveImportedLutId(entry.id);
+      setState((current) => applyInputLutSelection(current, lut));
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       setState((current) => ({
@@ -233,21 +296,13 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
     }
   }
 
-  function handleOpenLutManagerFromPill() {
-    setLutManagerOpen(true);
-  }
-
   async function handleExport() {
     try {
-      const baseRequest = buildEditorExportRequest(state);
-      if (!baseRequest) {
+      const request = buildEditorExportRequest(state);
+      if (!request) {
         setState((current) => ({ ...current, error: strings.exportDisabled }));
         return;
       }
-      const request = {
-        ...baseRequest,
-        inputLut: inputLutEnabled ? inputLut : null,
-      };
       setIsSaveBusy(false);
       setState((current) => ({
         ...current,
@@ -339,10 +394,13 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
 
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 pb-10 pt-[calc(env(safe-area-inset-top,0px)+72px)] sm:px-6">
         <PreviewCanvas
-          source={state.source}
-          displayUri={displaySourceUri}
-          emptyMessage={strings.sourceEmpty}
+          source={state.source ? { filename: state.source.filename } : null}
+          displayUri={displayPreviewUri}
+          emptyMessage={previewEmptyMessage}
           compareLabel={strings.compareLabel}
+          isComparing={state.isCompareHeld}
+          onPressHoldStart={handleCompareHoldStart}
+          onPressHoldEnd={handleCompareHoldEnd}
         />
 
         <div className="flex justify-center">
@@ -359,9 +417,9 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
         <div className="flex items-center gap-3">
           <CameraProfilePill
             active={cameraProfile}
-            customLutTitle={cameraProfile === "custom" ? inputLut?.title : undefined}
+            customLutTitle={cameraProfile === "custom" ? state.project.inputLut?.title : undefined}
             onSelect={handleCameraProfileSelect}
-            onPickCustomLut={handleOpenLutManagerFromPill}
+            onPickCustomLut={() => setLutManagerOpen(true)}
             cameraLabel={strings.lutInputSlotName}
             profileLabels={cameraProfileLabels}
             profiles={V1_CAMERA_PROFILES}
@@ -389,7 +447,7 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
           saveToPhotosState={state.saveToPhotosState}
           isBusy={state.isBusy}
           isSaveBusy={isSaveBusy}
-          error={state.error}
+          error={surfacedError}
           strings={strings}
           onExport={handleExport}
           onSave={handleSave}
@@ -401,9 +459,9 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
             <strong>{strings.noticePrefix}:</strong> {state.notice}
           </section>
         ) : null}
-        {state.error ? (
+        {surfacedError ? (
           <section className="rounded-[20px] border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-100">
-            <strong>{strings.errorPrefix}:</strong> {state.error}
+            <strong>{strings.errorPrefix}:</strong> {surfacedError}
           </section>
         ) : null}
       </div>
@@ -412,8 +470,10 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
         isOpen={strengthSheetOpen}
         onClose={() => setStrengthSheetOpen(false)}
         presetLabel={activePresetLabel}
-        strength={state.project.lut?.intensity ?? 1}
+        strength={state.project.strength}
         onStrengthChange={handleStrengthChange}
+        onCompareHoldStart={handleCompareHoldStart}
+        onCompareHoldEnd={handleCompareHoldEnd}
         onReset={handleStrengthReset}
         resetLabel={strings.resetLabel}
         compareLabel={strings.compareLabel}

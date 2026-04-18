@@ -5,6 +5,7 @@ import { DEFAULT_QUICK_STATE, QUICK_AXIS_IDS } from "./quick-semantics";
 
 export const PHASE0_SCHEMA_VERSION = 1 as const;
 export const PHASE0_PRESET_DEFAULT = "cinematic" satisfies PresetName;
+export const PHASE0_PRESET_STRENGTH_DEFAULT = 1;
 
 export const PHASE0_PARAM_KEYS = [
   "exposure",
@@ -66,15 +67,20 @@ export const phase0ProjectLutSchema = z.object({
   intensity: z.number().min(0).max(1).default(1),
 });
 
-export const phase0ProjectSchema = z.object({
+const phase0ProjectSchemaInput = z.object({
   schemaVersion: z.literal(PHASE0_SCHEMA_VERSION),
   projectId: z.string().min(1),
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
   presetName: z.string().min(1),
+  strength: z.number().min(0).max(1).default(PHASE0_PRESET_STRENGTH_DEFAULT),
   quickState: phase0QuickStateSchema.default(DEFAULT_QUICK_STATE),
   params: phase0ParamsSchema,
-  lut: phase0ProjectLutSchema.nullable().default(null),
+  // Legacy creative LUT slot. Keep parse-compatible so older saved projects
+  // normalize into the current dual-LUT shape on load.
+  lut: phase0ProjectLutSchema.nullable().optional(),
+  inputLut: phase0ProjectLutSchema.nullable().optional(),
+  creativeLut: phase0ProjectLutSchema.nullable().optional(),
   output: z.object({
     longEdge: z.literal(PHASE0_OUTPUT_PROFILE.longEdge),
     fps: z.literal(PHASE0_OUTPUT_PROFILE.fps),
@@ -83,6 +89,14 @@ export const phase0ProjectSchema = z.object({
     preserveAudio: z.boolean().default(PHASE0_OUTPUT_PROFILE.preserveAudio),
   }),
 });
+
+export const phase0ProjectSchema = phase0ProjectSchemaInput.transform(
+  ({ lut, inputLut, creativeLut, ...project }) => ({
+    ...project,
+    inputLut: inputLut ?? null,
+    creativeLut: creativeLut ?? lut ?? null,
+  }),
+);
 
 export type Phase0ProjectLut = z.infer<typeof phase0ProjectLutSchema>;
 export type Phase0ProjectState = z.infer<typeof phase0ProjectSchema>;
@@ -104,6 +118,22 @@ export function createDefaultPhase0Params(
   presetName: PresetName = PHASE0_PRESET_DEFAULT,
 ): Phase0Params {
   return pickPhase0Params(PRESETS[presetName]);
+}
+
+export function interpolatePhase0PresetParams(
+  presetName: PresetName,
+  strength: number,
+): Phase0Params {
+  const clamped = Math.max(0, Math.min(1, strength));
+  const reset = pickPhase0Params(PRESETS.reset);
+  const target = pickPhase0Params(PRESETS[presetName]);
+  const params = { ...reset };
+
+  for (const key of PHASE0_PARAM_KEYS) {
+    params[key] = reset[key] + (target[key] - reset[key]) * clamped;
+  }
+
+  return phase0ParamsSchema.parse(params);
 }
 
 export function mergePhase0Params(
@@ -131,9 +161,11 @@ export function createPhase0ProjectState(
     createdAt: now,
     updatedAt: now,
     presetName,
+    strength: PHASE0_PRESET_STRENGTH_DEFAULT,
     quickState: DEFAULT_QUICK_STATE,
     params: createDefaultPhase0Params(presetName),
-    lut: null,
+    inputLut: null,
+    creativeLut: null,
     output: PHASE0_OUTPUT_PROFILE,
   });
 }

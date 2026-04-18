@@ -2,6 +2,7 @@ import { WebPlugin } from "@capacitor/core";
 import type {
   Phase0ExportRequest,
   Phase0ExportResult,
+  Phase0PreviewRenderResult,
   SourceInfo,
   SourceProbe,
 } from "film-lab-core";
@@ -20,6 +21,61 @@ function pickFile(accept: string): Promise<File | null> {
 function inferSourceKind(file: File): SourceInfo["kind"] {
   if (file.type.startsWith("image/")) return "image";
   return "video";
+}
+
+function loadImage(uri: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Failed to load image preview"));
+    image.src = uri;
+  });
+}
+
+function loadVideoFrame(uri: string, timeSec: number): Promise<HTMLVideoElement> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    video.preload = "auto";
+    video.playsInline = true;
+    video.muted = true;
+
+    const cleanup = () => {
+      video.onloadedmetadata = null;
+      video.onseeked = null;
+      video.onerror = null;
+    };
+
+    video.onerror = () => {
+      cleanup();
+      reject(new Error("Failed to load video preview"));
+    };
+    video.onloadedmetadata = () => {
+      const boundedTime = Math.max(0, Math.min(timeSec, video.duration || 0));
+      video.currentTime = Number.isFinite(boundedTime) ? boundedTime : 0;
+    };
+    video.onseeked = () => {
+      cleanup();
+      resolve(video);
+    };
+
+    video.src = uri;
+  });
+}
+
+function renderFrameToDataUrl(
+  width: number,
+  height: number,
+  draw: (context: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => void,
+): string {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Canvas 2D preview context is unavailable");
+  }
+  draw(context, canvas);
+  return canvas.toDataURL("image/jpeg", 0.92);
 }
 
 export class FilmtoneMediaWeb extends WebPlugin implements FilmtoneMediaPlugin {
@@ -90,6 +146,39 @@ export class FilmtoneMediaWeb extends WebPlugin implements FilmtoneMediaPlugin {
       width: video.videoWidth,
       height: video.videoHeight,
       durationSec: Number.isFinite(video.duration) ? video.duration : undefined,
+    };
+  }
+
+  async renderPreviewFrame(
+    request: Phase0ExportRequest,
+  ): Promise<Phase0PreviewRenderResult> {
+    if (request.sourceKind === "image") {
+      const image = await loadImage(request.sourceUri);
+      return {
+        originalUri: request.sourceUri,
+        gradedUri: request.sourceUri,
+        width: image.naturalWidth,
+        height: image.naturalHeight,
+      };
+    }
+
+    const posterTimeSec =
+      typeof request.sourceProbe?.durationSec === "number" && request.sourceProbe.durationSec > 0
+        ? request.sourceProbe.durationSec * 0.25
+        : 0;
+    const video = await loadVideoFrame(request.sourceUri, posterTimeSec);
+    const width = Math.max(video.videoWidth, 1);
+    const height = Math.max(video.videoHeight, 1);
+    const frameUri = renderFrameToDataUrl(width, height, (context) => {
+      context.drawImage(video, 0, 0, width, height);
+    });
+
+    return {
+      originalUri: frameUri,
+      gradedUri: frameUri,
+      width,
+      height,
+      posterTimeSec,
     };
   }
 
