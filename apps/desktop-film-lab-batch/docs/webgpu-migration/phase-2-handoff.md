@@ -5,13 +5,18 @@
 
 ---
 
-## Entry criteria(Phase 1 完了で達成済み想定)
+## Entry criteria(Phase 1 完了で達成済み — verified 2026-04-18)
 
-- [ ] `Viewport` single-class + Backend interface、WebGL 退避済み
-- [ ] 6 primitive 実装(GpuContext / OffscreenTargetPool / Lut3DTexture / MediaTexture / RingBuffer / BlueNoiseTile)
-- [ ] 9 Simple shader WGSL 済、bloom/halation 疎通確認済
-- [ ] `test/golden/baseline-B/` 80 PNG
-- [ ] `bun run typecheck` clean
+- [x] `feature/webgpu-migration-v1` branch(5 commit, push 済み)
+- [x] WebGL backend 退避済み(`src/webgl/{WebGLBackend.ts, shaders/, textures/}`)— **class 名は `Viewport` 維持**、Phase 2 で consumer 移行と同時に改名予定(STATUS.md Decisions log 参照)
+- [x] `RenderBackend` interface skeleton(`src/webgpu/Backend.ts`)+ memoized `isWebGPUSupported()` (`src/support.ts`)
+- [x] 6 primitive: `GpuContext` / `OffscreenTargetPool` / `Lut3DTexture`(identity helper 含む) / `MediaTexture` / `RingBuffer`(depthOrArrayLayers=8) / `BlueNoiseTile` (256×256 R8, void-and-cluster pre-baked)
+- [x] 9 WGSL shader: `fullscreen.vert` (procedural 3-vertex) / `bloom-prefilter` / `halation-prefilter` / `downsample` / `upsample` / `lightshafts` / `lightshafts-blend` / `dust` / `filmlab` (identity placeholder)
+- [x] `WebGPUBackend` scaffold: `create(canvas)` で全 9 shader を compile-validate、`setMediaFromBitmap` + identity filmlab 経路で `render()` が動く。**bloom/halation pyramid 結線は未了** — Phase 2 T2-1 で filmlab.wgsl 本実装と同時に行う(T1-3 Decisions log 参照)
+- [x] `test/golden/baseline-B/` 80 PNG(105 MB、DIRECTION §10 size gate 帯 hit)+ `compareAgainstBaselineB(output, preset, image)` in `test/golden-psnr.ts`
+- [x] `jpeg-js` devDependency 追加(pure JS、baseline-B 生成専用)
+- [x] Build flag 基盤: `desktop vite.config` `import.meta.env.FILMTONE_BACKEND = "webgpu"`、`apps/web next.config` `env.FILMTONE_BACKEND = "webgl"`(Phase 2 T2-3 までに `src/index.ts` を backend 毎 sub-path export に整理して tree-shake 検証)
+- [ ] `bun run typecheck` — desktop app は pre-existing 10 errors が残る。本 phase 起因の差分ゼロ(main でも同数、Regressions log 参照)
 - [ ] DIRECTION §9-11 読了
 
 ---
@@ -177,9 +182,19 @@ fn fs(@location(0) uv: vec2f) -> @location(0) vec4f {
 
 ---
 
-## Known gotchas(Phase 2 で追記)
+## Known gotchas(Phase 1 引継ぎ + Phase 2 で追記)
 
-(実行中判明したらここに追記)
+**Phase 1 → Phase 2 引継ぎ(STATUS.md Phase 1 Known gotchas を抜粋)**
+
+- **Viewport class 名は暫定的に旧仕様**: `src/webgl/WebGLBackend.ts` の class はまだ `Viewport`(`src/index.ts` で `Viewport` として再 export)。Phase 2 で WebGPUBackend が consumer 向け asyc factory として成立する時、FilmLabCanvas / batch-pipeline / video-export-pipeline / film-lab-web-video-export の 4 consumer を `new Viewport({vert, frag, w, h})` から `await Viewport.create(canvas, {prefer})` へ移行。同時に `Viewport` → `WebGLBackend` 改名を実施。この **consumer 移行は Phase 2 T2-1 着手前の準備タスク**として組み込むか、T2-1 commit 1 の直前に挟むと clean
+- **Uniform struct pattern**: 9 Simple shader と同じ vec4 packed パターンで 31 uniform を組む(DIRECTION §10 Phase 2)。ts 側の `packGradeUniforms()` は 8 vec4 = 32 floats = 128 bytes
+- **Sampler 再利用可**: `WebGPUBackend` が持つ `linear / linear / clamp-to-edge / mipmap: nearest` sampler は LUT3D / media / bloom すべて兼用 OK
+- **`BufferSource` 型ナロー**: `device.queue.writeTexture()` / `writeBuffer()` に TypedArray を渡す時、TS 5.9 で `ArrayBufferLike` vs `ArrayBuffer` 不一致。`as unknown as BufferSource` で narrow(Phase 1 で `Lut3DTexture.ts` / `BlueNoiseTile.ts` に適用済み)
+- **WGSL `mod()` 不在**: GLSL `mod(x, 2.0)` は WGSL に無い。`x - floor(x * 0.5) * 2.0` で書き直し(downsample/upsample で適用済み)。Naga 変換後も同じ hand-fix が必要
+- **procedural fullscreen triangle**: vertex buffer を使わず `@builtin(vertex_index)` で 3-vertex triangle を生成する pattern を T1-3 で採用。全 fragment pipeline が同 vertex shader(`fullscreenVertexWgsl`)を再利用できるので、Phase 2 filmlab.wgsl も vertex module は既存 9 shader と同じで良い
+- **Backend interface はまだ minimal**: `src/webgpu/Backend.ts` の `RenderBackend` は `render / setResolution / destroy` のみ。Phase 2 で setter(setExposure, setContrast, …)群を追加する時、WebGL 側 `Viewport` の 60 setter をそのまま interface に移しても良いが、v1.0 は `setParams(record)` 1 本にまとめると WebGL の既存 API と揃う — direction default がまだ無いので最初の T2-1 commit で判断
+
+**Phase 2 で判明したらここに追記**:
 
 ---
 
