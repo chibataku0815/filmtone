@@ -356,7 +356,15 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
   const previewRenderingHoldRef = useRef(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isSplitDragging, setIsSplitDragging] = useState(false);
-  const [supported, setSupported] = useState(true);
+  /**
+   * @description WebGL2 / WebGPU support state. `'ok'` は起動経路が成立している状態。
+   * WebGPU 要求ビルドで WebGPU が使えない、あるいは WebGL2 要求ビルドで WebGL2 が使えない、
+   * または Viewport 初期化が throw した場合は該当する理由を保持し、起動を中断して explicit
+   * error UI を出す(silent fallback は作らない、feedback_no_fallback_bug_hotbed.md)。
+   */
+  const [supported, setSupported] = useState<
+    "ok" | "webgl2-missing" | "webgpu-missing" | "init-failed"
+  >("ok");
   const [mediaOverlay, setMediaOverlay] = useState<MediaOverlayState>({ kind: "idle" });
   const mediaOverlayKindRef = useRef<MediaOverlayState["kind"]>("idle");
   useEffect(() => {
@@ -677,7 +685,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     }
     if (source.kind === "smartLookDerived") {
       const mediaLoader = mediaLoaderRef.current;
-      if (!mediaLoader || !supported) {
+      if (!mediaLoader || supported !== "ok") {
         reloadInFlightRef.current = false;
         previewRenderingHoldRef.current = false;
         return false;
@@ -749,10 +757,12 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     const envPref: ViewportBackendPreference =
       envBackendRaw === "webgpu" ? "webgpu" : "webgl";
 
-    // Synchronous WebGL2 gate for the fallback path. WebGPU is probed async
-    // inside the IIFE below.
+    // WebGL2 path needs a synchronous gate; the WebGPU gate runs async inside
+    // the IIFE below (feature probe + adapter request). Callers commit to the
+    // env-selected backend with no silent downgrade — if the requested
+    // backend isn't available we surface an explicit error UI.
     if (envPref === "webgl" && !isWebGL2Supported()) {
-      setSupported(false);
+      setSupported("webgl2-missing");
       return;
     }
 
@@ -802,27 +812,35 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     window.addEventListener("resize", syncViewportSize);
 
     void (async () => {
-      // Resolve the effective backend: prefer WebGPU when the env asks for
-      // it AND the browser reports support; otherwise stay on WebGL.
-      const webgpuOk =
-        envPref === "webgpu" ? await isWebGPUSupported() : false;
-      const effectivePref: ViewportBackendPreference = webgpuOk
-        ? "webgpu"
-        : "webgl";
-
-      if (effectivePref === "webgl" && !isWebGL2Supported()) {
-        // Async fallback tripped the gate — rare (would require the feature
-        // detection to disagree with WebGL2 availability). Mark unsupported
-        // and let the cleanup below tear down the bare canvas.
-        if (!cancelled) setSupported(false);
-        return;
+      // No silent downgrade: commit to the env-selected backend. If WebGPU
+      // is requested but the browser lacks support, surface an explicit
+      // error instead of falling back. Rationale: a WebGPU-bootstrapped
+      // canvas can no longer accept a WebGL2 context, so a silent fallback
+      // would require a fresh canvas — multiplying code paths and masking
+      // broken premises. See DIRECTION §1 D1 (Pure WebGPU) + life feedback
+      // memory feedback_no_fallback_bug_hotbed.md.
+      if (envPref === "webgpu") {
+        const webgpuOk = await isWebGPUSupported();
+        if (!webgpuOk) {
+          if (!cancelled) setSupported("webgpu-missing");
+          return;
+        }
       }
 
-      const vp = await Viewport.create(canvas, {
-        prefer: effectivePref,
-        width,
-        height,
-      });
+      let vp: Viewport;
+      try {
+        vp = await Viewport.create(canvas, {
+          prefer: envPref,
+          width,
+          height,
+        });
+      } catch (err) {
+        if (!cancelled) {
+          console.error("[FilmLabCanvas] Viewport.create failed", err);
+          setSupported("init-failed");
+        }
+        return;
+      }
       if (cancelled) {
         vp.dispose();
         return;
@@ -1043,7 +1061,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     () => ({
       getJpegBase64ForAi: (maxSide: number) => {
         const src = canvasRef.current;
-        if (!src || !supported) return null;
+        if (!src || supported !== "ok") return null;
         const w = src.width;
         const h = src.height;
         if (w <= 0 || h <= 0) return null;
@@ -1067,7 +1085,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       },
       replaceSourceFromPngBase64Body: async (pngBase64Body: string) => {
         const mediaLoader = mediaLoaderRef.current;
-        if (!mediaLoader || !supported) return false;
+        if (!mediaLoader || supported !== "ok") return false;
         try {
           const binary = atob(pngBase64Body);
           const len = binary.length;
@@ -1113,7 +1131,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
         stage: ProgressiveTextureStage,
       ) => {
         const mediaLoader = mediaLoaderRef.current;
-        if (!mediaLoader || !supported) {
+        if (!mediaLoader || supported !== "ok") {
           console.warn("[progressive-canvas] swapProgressiveTexture: mediaLoader or supported missing");
           return false;
         }
@@ -1301,13 +1319,20 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     ],
   );
 
-  if (!supported) {
+  if (supported !== "ok") {
+    const messageKey =
+      supported === "webgl2-missing"
+        ? "canvas.webgl2Required"
+        : supported === "webgpu-missing"
+          ? "canvas.webgpuRequired"
+          : "canvas.webgpuInitFailed";
     return (
       <div
         className={`relative flex ${fullScreen ? "h-full" : "aspect-[4/3] sm:aspect-[16/9]"} w-full items-center justify-center rounded-lg bg-[#0a0a0a] ${className ?? ""}`}
+        role="alert"
       >
-        <span className="text-sm text-[var(--text-muted)]">
-          {tFilmLab("canvas.webgl2Required")}
+        <span className="max-w-md px-6 text-center text-sm leading-relaxed text-[var(--text-muted)]">
+          {tFilmLab(messageKey)}
         </span>
       </div>
     );

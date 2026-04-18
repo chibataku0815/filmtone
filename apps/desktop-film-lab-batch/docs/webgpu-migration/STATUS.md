@@ -192,6 +192,25 @@ STATUS.md の先頭が常に次 phase を指すため、**全 phase で同じ sn
 
 ## Last updated
 
+2026-04-18 **Phase 3 code-complete + v1.0 QA blocker fix applied (pending commit)**。
+
+macOS 26 実機 DMG 起動で発覚した 2 つの blocker(GpuContext configure spec 違反 + WebGPU→WebGL fallback 汚染)を修正。詳細は [`v1.0-qa-blocker-handoff.md`](./v1.0-qa-blocker-handoff.md) §8。headless gate 全 pass、DMG 再生成済み、commit は user 承認 1 回でバッチ実行待ち。新 DMG SHA = `a859448905cf2252690937cd199fbf85132f05a3435920b770b9cd5b77030e72`。
+
+### Fix summary (2026-04-18 追加、上記 Phase 3 commit とは別、未 commit)
+
+| File | 変更 |
+|---|---|
+| `packages/film-lab-renderer/src/webgpu/GpuContext.ts` | configure を spec 準拠(`rgba8unorm` + `viewFormats: ["rgba8unorm-srgb"]`)、view は `createView({format: "rgba8unorm-srgb"})`。pipeline / shader 不変 |
+| `packages/film-lab-renderer/src/Viewport.ts` | WebGPU→WebGL silent fallback 削除、throw で loud-fail |
+| `packages/film-lab-ui/src/FilmLabCanvas.tsx` | `supported` state を discriminated union に、WebGPU missing / init-failed で explicit error UI |
+| `apps/desktop-film-lab-batch/messages/{ja,en}.json` + `apps/web/messages/{ja,en}.json` | `canvas.webgpuRequired` + `canvas.webgpuInitFailed` 追加 |
+| `apps/desktop-film-lab-batch/RELEASE_NOTES-v1.0.0.md` | DMG SHA-256 差し替え |
+| `apps/desktop-film-lab-batch/docs/webgpu-migration/{v1.0-qa-blocker-handoff,SHIP-READINESS}.md` | fix 経緯と gate 結果追記 |
+
+---
+
+## Pre-fix snapshot (参考、2026-04-18 Phase 3 code-complete)
+
 2026-04-18 **Phase 3 code-complete (live flip + release artifacts)**。
 
 本 chat で着地した追加変更(pending commit、`feature/webgpu-migration-v1` working tree):

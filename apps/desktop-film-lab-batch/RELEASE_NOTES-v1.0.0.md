@@ -95,8 +95,10 @@ batch export also continue to run on WebGL2 for this release — the WebGPU
 ## Checksums
 
 ```text
-8cfd17342cabb9bdc6987f41e741fcc319d0df0002c22dc6019a464bff6501a8  filmtone-1.0.0-arm64.dmg
+a859448905cf2252690937cd199fbf85132f05a3435920b770b9cd5b77030e72  filmtone-1.0.0-arm64.dmg
 ```
 
 (Unsigned / ad-hoc codesign — the signed + notarized release will regenerate
-this DMG via `bun run dist:mac:release` and the checksum will change.)
+this DMG via `bun run dist:mac:release` and the checksum will change.
+Previous unsigned DMG SHA was `8cfd1734…`; this rebuild applies the WebGPU
+canvas-config spec fix + fallback removal — see `docs/webgpu-migration/v1.0-qa-blocker-handoff.md` §8.)

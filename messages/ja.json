@@ -353,6 +353,8 @@
     },
     "canvas": {
       "webgl2Required": "Filmtone を使うには WebGL2 が必要です",
+      "webgpuRequired": "このバージョンの Filmtone は WebGPU を必要とします。macOS 14 以降・Apple Silicon(Metal 3 対応 GPU)でお試しください。",
+      "webgpuInitFailed": "WebGPU の初期化に失敗しました。アプリを再起動してください。問題が続く場合は OS を最新版に更新してください。",
       "dropHint": "画像・動画・.cube LUT をドロップ",
       "loadingMedia": "読み込み中…",
       "dismissError": "OK",

@@ -32,9 +32,10 @@ without needing your machine:
 
 | Gate | Command | Result |
 |---|---|---|
-| Desktop vitest suite | `bun run test` | **52 / 52 passed**, 1.62 s. |
-| Desktop `bun run build` | — | clean; main renderer bundle `index-Bg8YtZso.js` 1388 KB (gzip 372 KB), **WebGPU split into its own chunk** `WebGPUBackend-K3LM33LH-CPb-WWr0.js` 195 KB (gzip 88 KB) — lazy load verified. |
-| Desktop DMG | `bun run dist:mac:unsigned` | **`release/filmtone-1.0.0-arm64.dmg` built (194 MB)**. Ad-hoc codesigned, notarization intentionally skipped (v1.0.0 release build will re-run `dist:mac:release` for signed + notarized). SHA-256 recorded in `RELEASE_NOTES-v1.0.0.md`. |
+| Desktop vitest suite | `bun run test` | **52 / 52 passed**, 1.48 s (re-run post GpuContext fix). |
+| Desktop `bun run build` | — | clean; main renderer bundle `index-DUzs1Rez.js` 1388 KB (gzip 372 KB), **WebGPU split into its own chunk** `WebGPUBackend-WMAUKCOP-DRIzOF_O.js` 195 KB (gzip 88 KB) — lazy load verified. |
+| Desktop DMG | `bun run dist:mac:unsigned` | **`release/filmtone-1.0.0-arm64.dmg` rebuilt (194 MB)**. Ad-hoc codesigned, notarization intentionally skipped. New SHA-256 recorded in `RELEASE_NOTES-v1.0.0.md` — supersedes the pre-fix 2026-04-18 DMG (`8cfd1734…`). |
+| WebGPU QA blocker fix | code+docs | **Applied** — see `v1.0-qa-blocker-handoff.md` §8. GpuContext canvas configure is now WebGPU-spec compliant (rgba8unorm + sRGB viewFormats), Viewport silent fallback is removed, FilmLabCanvas shows explicit `canvas.webgpuRequired` / `canvas.webgpuInitFailed` error UI when WebGPU is unavailable. |
 
 ## ⚠️ Requires user machine (irreducible)
 

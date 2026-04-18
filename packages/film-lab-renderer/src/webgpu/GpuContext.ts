@@ -2,7 +2,10 @@
  * GpuContext — adapter / device / canvas-surface bootstrap.
  *
  * Phase 1 T1-2. Backed by DIRECTION §2 canvas config:
- *   format=rgba8unorm-srgb, colorSpace=srgb, alphaMode=opaque.
+ *   configure format=rgba8unorm (spec-compliant — sRGB variants are not
+ *   valid canvas formats), viewFormats=[rgba8unorm-srgb] so views / pipeline
+ *   colorAttachments can target the sRGB encoding and the hardware OETF
+ *   performs the final linear → sRGB transform, colorSpace=srgb, alphaMode=opaque.
  */
 
 export interface GpuContextCreateOptions {
@@ -24,7 +27,14 @@ export class GpuContext {
   readonly device: GPUDevice;
   readonly canvas: HTMLCanvasElement;
   readonly context: GPUCanvasContext;
-  /** Canvas / swapchain format. `rgba8unorm-srgb` per DIRECTION §2. */
+  /**
+   * View / pipeline-attachment format.
+   *
+   * The swapchain is configured with the spec-legal `rgba8unorm`, but every
+   * pass that writes to the canvas takes a view in `rgba8unorm-srgb` so the
+   * hardware OETF performs the final linear → sRGB transform. Pipelines
+   * declare `colorAttachments[].format = ctx.canvasFormat`.
+   */
   readonly canvasFormat: GPUTextureFormat = "rgba8unorm-srgb";
   readonly validation: boolean;
   private lost = false;
@@ -72,7 +82,8 @@ export class GpuContext {
     }
     context.configure({
       device,
-      format: "rgba8unorm-srgb",
+      format: "rgba8unorm",
+      viewFormats: ["rgba8unorm-srgb"],
       alphaMode: "opaque",
       colorSpace: "srgb",
       usage:
@@ -98,7 +109,9 @@ export class GpuContext {
   }
 
   getCurrentTextureView(): GPUTextureView {
-    return this.context.getCurrentTexture().createView();
+    return this.context
+      .getCurrentTexture()
+      .createView({ format: "rgba8unorm-srgb" });
   }
 
   destroy(): void {

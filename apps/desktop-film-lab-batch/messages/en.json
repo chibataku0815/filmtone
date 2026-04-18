@@ -7,6 +7,8 @@
     },
     "canvas": {
       "webgl2Required": "WebGL2 is required for Filmtone",
+      "webgpuRequired": "This version of Filmtone requires WebGPU. Please use macOS 14+ with Apple Silicon (Metal 3 capable GPU).",
+      "webgpuInitFailed": "WebGPU initialization failed. Please restart the app. If the issue persists, update your OS to the latest version.",
       "dropHint": "Drop image, video, or .cube LUT",
       "loadingMedia": "Loading media…",
       "dismissError": "OK",

@@ -6,10 +6,15 @@
  *   - `Viewport` no longer extends `WebGLBackend`; it composes one of
  *     { `WebGLBackend`, `WebGPUBackend` } and forwards the public surface.
  *   - `backendKind` / `mesh?` are read-only introspection fields.
- *   - `Viewport.create(canvas, { prefer: 'webgpu' })` actually routes to the
- *     WebGPU backend when `isWebGPUSupported()` returns true AND the canvas
- *     does not already own a WebGL2 context (consumer-side responsibility).
- *     Falls back to WebGL silently if WebGPU bootstrap throws.
+ *   - `Viewport.create(canvas, { prefer: 'webgpu' })` routes to the WebGPU
+ *     backend when `isWebGPUSupported()` returns true AND the canvas does
+ *     not already own a WebGL2 context (consumer-side responsibility). No
+ *     silent fallback — if WebGPU is requested and unavailable, or the
+ *     backend bootstrap throws, the exception propagates. Callers decide
+ *     how to surface that to the user (e.g. explicit "WebGPU required" UI).
+ *     Rationale: silent degradation multiplies code paths and masks
+ *     premise-breaking bugs (e.g. a WebGPU-owned canvas that can no longer
+ *     accept a WebGL2 context).
  *
  * Consumer surface preserved by delegation:
  *   render / setResolution / setTexture / setMediaFromBitmap /
@@ -93,21 +98,16 @@ export class Viewport {
     );
     const prefer: ViewportBackendPreference = opts.prefer ?? "webgpu";
 
-    if (prefer === "webgpu" && (await isWebGPUSupported())) {
-      try {
-        const { WebGPUBackend } = await import("./webgpu/WebGPUBackend");
-        const backend = await WebGPUBackend.create(canvas);
-        backend.setResolution(width, height);
-        return new Viewport(null, backend);
-      } catch (err) {
-        // Bootstrap failure (e.g. canvas already owns a WebGL2 context, or
-        // adapter/device request rejected). Fall back to WebGL silently so
-        // consumers stay on a working path.
-        console.warn(
-          "[Viewport] WebGPU backend bootstrap failed — falling back to WebGL",
-          err,
+    if (prefer === "webgpu") {
+      if (!(await isWebGPUSupported())) {
+        throw new Error(
+          "[Viewport] WebGPU is required but not supported in this environment",
         );
       }
+      const { WebGPUBackend } = await import("./webgpu/WebGPUBackend");
+      const backend = await WebGPUBackend.create(canvas);
+      backend.setResolution(width, height);
+      return new Viewport(null, backend);
     }
 
     const webgl = new WebGLBackend({
