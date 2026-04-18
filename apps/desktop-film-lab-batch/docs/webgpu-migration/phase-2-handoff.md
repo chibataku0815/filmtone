@@ -23,6 +23,27 @@
 
 ## Tasks
 
+### T2-0. Phase 1 繰越 scope の消化(2-3h)[commit 0 または T2-1 に同梱]
+
+Phase 1 Exit 原文で未達、または意図的に punt された 3 項目を Phase 2 の最初に処理する。Day 2 budget 12h に対し +2-3h → Day 4 予備 4h から充当想定。
+
+1. **`RenderBackend` interface 拡張(1h)**
+   - 現状: `src/webgpu/Backend.ts` の `RenderBackend` は `render / setResolution / destroy` のみ。
+   - 追加: WebGL `Viewport` 側の setter 群を `setParams(record: Record<string, number | boolean>)` 1 本に集約する形で interface 追加、または必要最小限の setter (setExposure / setContrast / … など主要 5-10 本) を個別に足す。v1.0 は `setParams` 1 本推奨(既存 WebGL API の `viewport.setParams(buildViewportParams(grade))` と揃う)。
+2. **Bloom / halation pyramid 結線(1-1.5h)**
+   - Phase 1 Exit 原文「9 Simple shaders WGSL 移植、end-to-end で bloom/halation 描画確認(目視)」は shader 存在 + compile validate のみで止まっている。
+   - T2-1 filmlab.wgsl 本実装の直後に bloom prefilter → downsample 5-level pyramid → upsample 5-level accumulate → composite additive の ping-pong を wire。`OffscreenTargetPool.pyramid()` helper が Phase 1 で入っているので level 分のラベル付き RT は直ぐ取れる。
+3. **Viewport → WebGLBackend class 改名 + consumer 更新(1h)**
+   - Phase 1 T1-1 で先送りした 4 consumer (`apps/desktop-film-lab-batch/src/renderer/{batch-pipeline.ts, video-export-pipeline.ts}` / `packages/film-lab-ui/src/FilmLabCanvas.tsx` / `apps/web/src/features/interactive/film-lab/film-lab-web-video-export.ts`) を `await Viewport.create(canvas, { prefer })` に移行、同時に `Viewport` class 名を `WebGLBackend` に改名。
+   - 併せて `apps/web/src/features/interactive/film-lab/core/Viewport.ts`(film-lab-renderer を re-export) の型更新。
+   - `src/index.ts` から `WebGPUBackend` を直 export している部分を、web バンドルで tree-shake できるよう sub-path export に整理(`film-lab-renderer/webgl` / `film-lab-renderer/webgpu` の 2 entry に分割 or Vite/Next で dynamic import がかかる形)。
+
+Exit: typecheck clean、既存 desktop WebGL 経路で regression なし、web build で WebGPU コードが含まれない(`bun run --cwd apps/web build` → `grep -l WebGPUBackend dist/ -r` で 0 match 確認)。
+
+Commit 案: T2-0 は T2-1 と統合して commit(filmlab.wgsl 本実装と同 commit)で OK、独立したければ `Extend RenderBackend interface; rename Viewport → WebGLBackend; wire bloom/halation pyramid` で 1 commit。
+
+---
+
 ### T2-1. filmlab.wgsl primary grade 段 (4h) [commit 1]
 
 **実装順**(DIRECTION §3 のパイプライン順序に従う):
@@ -157,13 +178,21 @@ fn fs(@location(0) uv: vec2f) -> @location(0) vec4f {
 
 ---
 
-## Exit criteria(7 項目、全達必須)
+## Exit criteria(10 項目、全達必須)
+
+### Phase 1 繰越 scope(T2-0 必達)
+
+- [ ] `RenderBackend` interface が WebGL / WebGPU 双方を満たす形に拡張済み
+- [ ] bloom / halation pyramid が WebGPUBackend 側で ping-pong 結線、目視で WebGL 版と近似
+- [ ] `Viewport` → `WebGLBackend` 改名 + 4 consumer 更新、web build で WebGPUBackend が tree-shake される
+
+### Phase 2 本体
 
 - [ ] filmlab.wgsl 完全実装(primary grade + soft-shaper + LUT2 + print)
 - [ ] composite.wgsl 完全実装(21 uniforms, 4 intermediate inputs, grain, vignette)
 - [ ] motion blur 2 shader + RingBuffer 接続
 - [ ] **Golden PSNR gate**: 代表 5 preset × 10 image = 50 ケースで Baseline B 比 ≥ 40dB が 45/50 以上
-- [ ] `bun run typecheck` clean
+- [ ] `bun run typecheck` clean(可能なら pre-existing errors も整理、無理なら据え置き OK)
 - [ ] **視覚証明**: 高 DR サンプル画像(夕日 / 白ドレス)で、WebGPU 版が WebGL 版より LUT2 出力の highlight グラデーションが豊かであることを目視確認、screenshot を `docs/webgpu-migration/assets/highlight-proof/` に保存
 - [ ] STATUS.md Day 2 → done、Regression / Notes 更新
 - [ ] `phase-3-handoff.md` の Entry 欄と Known gotchas 反映

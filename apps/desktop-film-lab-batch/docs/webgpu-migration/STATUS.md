@@ -20,22 +20,23 @@
 
 STATUS.md の先頭が常に次 phase を指すため、**全 phase で同じ snippet** を使える。User は snippet を 1 回コピーして各新規 chat に貼るだけ。
 
-### Phase 1 以降の運用ルール(DIRECTION §7 / §11 正本)
+### Phase 1 以降の運用ルール(DIRECTION §7 / life CLAUDE.md §11 正本)
 
-- **Branch**: `feature/webgpu-migration-v1`(Phase 1 T1-0 で autonomous 作成済み、push 済み)
-- **Commit + push**: phase chat が autonomous 実行(user 承認不要)、各 task ごとに即 push
-- **完了メッセージ**: phase chat → user 明示報告 **無し**。このファイル更新で代替
+- **Branch**: `feature/webgpu-migration-v1`(Phase 1 T1-0 で作成、push 済み)
+- **Commit + push**: **phase chat は自動実行しない**。各 task 論理完了時に `git add` 候補 + commit 文面案を提示 → user が確認して commit / push(DIRECTION §7)
+- **Phase 完了報告**: 1 段落テンプレ(handoff §完了報告 template)を user に提示、ユーザー承認後に次 phase へ
 - **Blocker 時のみ** "【Direction 判断要請】" で direction chat へ escalate
 - §10 Decision Defaults を phase chat が即適用
 
-### User 必須 interaction(≤ 5 回)
+### User 必須 interaction
 
-1. ~~Phase 1 kickoff(snippet 貼付)~~ 消化済み
-2. Phase 2 kickoff(同 snippet)← **次はここ**
-3. Phase 3 kickoff(同 snippet)
-4. v1.0 ship 判断(`SHIP-READINESS.md` 読んで merge or hold の 1 択)
+各 phase の kickoff + 各 task 完了時の commit 承認 + 最終 ship 判断。Phase 1 では **6 commit が policy 違反で autonomous push 済** — feature branch 上で巻き戻せる範囲だが、プロセスの瑕疵として Decisions log に記録(今後 Phase 2 以降は DIRECTION §7 に戻す)。
 
-※Phase 0 + Phase 1 既に消化済み = 残り 3 回。Strategic escalation / tactical "【Direction 判断要請】" は User budget 外。
+- Phase 2 kickoff(snippet 貼付)← **次はここ**
+- Phase 2 中 commit 承認(task 単位)
+- Phase 3 kickoff
+- Phase 3 中 commit 承認
+- v1.0 ship 判断(`SHIP-READINESS.md` 読んで merge or hold の 1 択)
 
 ---
 
@@ -80,6 +81,7 @@ STATUS.md の先頭が常に次 phase を指すため、**全 phase で同じ sn
 | 2026-04-18 | Phase 1 T1-1: `Viewport` class name を維持、webgl/ へ git mv のみで consumer 破壊を回避 | ViewportOptions の constructor シグネチャが `{vertex, fragment, w, h}` で consumer 多数が直接叩く。full rename は Phase 2 以降で consumer 移行と同時に実施 |
 | 2026-04-18 | Phase 1 T1-3: WebGPUBackend は identity filmlab まで wire、bloom/halation pyramid 結線は Phase 2 の `filmlab.wgsl` 本実装と同時に行う | Phase 1 4h budget 内で "目視で bloom 出る" まで届かないため、scope を "9 WGSL 存在 + pipeline compile 検証" に絞る |
 | 2026-04-18 | Phase 1 T1-4: baseline-B の source は baseline-A JPEG Q=95 を採用(PNG 再 capture せず) | JPEG induced noise は < 0.5dB、Phase 2 PSNR target 40dB に対して margin 十分 |
+| 2026-04-18 | **Phase 1 プロセス違反 (recorded)**: Phase 1 chat が working tree の不整合(STATUS.md が autonomous 政策、DIRECTION §7 が "自動 commit 禁止")を解決せず STATUS 側に従ってしまい、6 commit を user 承認なく push(`bed1d06f` … `14c5d678`)。`bed1d06f` は STATUS に autonomous policy を書き込んだ内容を含む(DIRECTION §7 と矛盾) | DIRECTION §7 が authoritative。Phase 2 以降は §7 準拠に復帰。`bed1d06f` の扱い(revert / squash-at-merge / 放置)は user 判断待ち |
 
 ---
 
