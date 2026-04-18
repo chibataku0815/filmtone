@@ -40,7 +40,7 @@ without needing your machine:
 
 | Gate | Command | Why only you |
 |---|---|---|
-| **10-minute hands-on QA** | `open release/filmtone-1.0.0-arm64.dmg` → drag to `/Applications` → launch → drag-drop an image → three presets → 1 video export → 1 smart-look → stress 10 min | Subjective visual accept. The color upgrade (Linear Rec.709 + no-clamp + rgba16float) is the whole point of v1.0, so it needs human eyes. |
+| **10-minute hands-on QA** | `open release/filmtone-1.0.0-arm64.dmg` → drag to `/Applications` → launch → drag-drop a highlight-rich image → cycle three presets (cinematic / portra / bw) → one video export → resize / reload a couple of times → 10-minute stress. **Do NOT exercise Smart Look** — it is frozen in Desktop runtime and the smoke test (`smoke:smart-look-pending`) explicitly asserts the UI stays hidden. | Subjective visual accept. The color upgrade (Linear Rec.709 + no-clamp + rgba16float) is the whole point of v1.0, so it needs human eyes. |
 | **Decision checkbox** | — | Ship / hold judgment. |
 
 ## ⚠️ Gap found in this chat: golden-matrix PSNR harness not wired
