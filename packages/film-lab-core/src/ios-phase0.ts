@@ -166,6 +166,7 @@ export const iosPhase0ExportPayloadSchema = z.object({
   sourceKind: iosPhase0SourceKindSchema,
   presetId: iosPhase0PresetIdSchema,
   params: iosPhase0ParamsSchema,
+  inputLut: iosPhase0SerializableLutSchema.nullable().optional(),
   creativeLut: iosPhase0SerializableLutSchema.nullable().optional(),
   benchmarkSlot: z.enum(IOS_PHASE0_BENCHMARK_SLOTS).optional(),
   benchmarkRecipeId: z.string().min(1).optional(),

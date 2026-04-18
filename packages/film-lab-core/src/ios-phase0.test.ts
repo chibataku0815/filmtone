@@ -64,3 +64,100 @@ test("getIosPhase0SourceCapViolations reports cap breaches", () => {
   expect(violations).toContain("duration>300s");
   expect(violations).toContain("long-edge>3840");
 });
+
+const DUAL_LUT_CUBE_TEXT = `
+TITLE "DualSlot"
+LUT_3D_SIZE 2
+0 0 0
+1 0 0
+0 1 0
+1 1 0
+0 0 1
+1 0 1
+0 1 1
+1 1 1
+`;
+
+const DUAL_LUT_BASE_PAYLOAD = {
+  projectId: "phase0-project",
+  sourceUri: "file:///clip.mov",
+  sourceDisplayName: "clip.mov",
+  sourceKind: "video" as const,
+  presetId: "cinematic" as const,
+  params: {
+    exposure: 0,
+    contrast: 1,
+    saturation: 1,
+    temperature: 0,
+    tint: 0,
+    fade: 0,
+    vignette: 0,
+    grainIntensity: 0,
+  },
+};
+
+test("iosPhase0ExportPayloadSchema accepts inputLut only", () => {
+  const cube = parseCube(DUAL_LUT_CUBE_TEXT);
+  const inputLut = createIosPhase0SerializableLut({
+    cube,
+    name: "input.cube",
+  });
+
+  const payload = iosPhase0ExportPayloadSchema.parse({
+    ...DUAL_LUT_BASE_PAYLOAD,
+    inputLut,
+  });
+
+  expect(payload.inputLut?.name).toBe("input.cube");
+  expect(payload.creativeLut ?? null).toBeNull();
+});
+
+test("iosPhase0ExportPayloadSchema accepts creativeLut only", () => {
+  const cube = parseCube(DUAL_LUT_CUBE_TEXT);
+  const creativeLut = createIosPhase0SerializableLut({
+    cube,
+    name: "creative.cube",
+  });
+
+  const payload = iosPhase0ExportPayloadSchema.parse({
+    ...DUAL_LUT_BASE_PAYLOAD,
+    creativeLut,
+  });
+
+  expect(payload.creativeLut?.name).toBe("creative.cube");
+  expect(payload.inputLut ?? null).toBeNull();
+});
+
+test("iosPhase0ExportPayloadSchema accepts both inputLut and creativeLut", () => {
+  const cube = parseCube(DUAL_LUT_CUBE_TEXT);
+  const inputLut = createIosPhase0SerializableLut({
+    cube,
+    name: "input.cube",
+    intensity: 0.7,
+  });
+  const creativeLut = createIosPhase0SerializableLut({
+    cube,
+    name: "creative.cube",
+    intensity: 0.5,
+  });
+
+  const payload = iosPhase0ExportPayloadSchema.parse({
+    ...DUAL_LUT_BASE_PAYLOAD,
+    inputLut,
+    creativeLut,
+  });
+
+  expect(payload.inputLut?.intensity).toBe(0.7);
+  expect(payload.creativeLut?.intensity).toBe(0.5);
+});
+
+test("iosPhase0ExportPayloadSchema accepts both LUT slots null", () => {
+  const payload = iosPhase0ExportPayloadSchema.parse({
+    ...DUAL_LUT_BASE_PAYLOAD,
+    inputLut: null,
+    creativeLut: null,
+  });
+
+  expect(payload.inputLut).toBeNull();
+  expect(payload.creativeLut).toBeNull();
+});
