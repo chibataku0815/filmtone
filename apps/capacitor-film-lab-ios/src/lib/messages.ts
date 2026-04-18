@@ -79,6 +79,13 @@ const appCopy = {
     cameraProfileSlog3: "Sony S-Log3",
     cameraProfileVlog: "Panasonic V-Log",
     cameraProfileCustom: "Custom (.cube)",
+    lutManagerTitle: "LUT library",
+    lutManagerEmpty: "No LUTs yet. Import a .cube to get started.",
+    lutManagerImport: "Import .cube",
+    lutManagerActiveBadge: "Active",
+    lutManagerRename: "Rename",
+    lutManagerDelete: "Delete",
+    lutManagerClose: "Done",
   },
   ja: {
     appName: "Filmtone",
@@ -145,6 +152,13 @@ const appCopy = {
     cameraProfileSlog3: "Sony S-Log3",
     cameraProfileVlog: "Panasonic V-Log",
     cameraProfileCustom: "カスタム (.cube)",
+    lutManagerTitle: "LUT ライブラリ",
+    lutManagerEmpty: "まだ LUT がありません。.cube を読み込むと始められます。",
+    lutManagerImport: ".cube を読み込む",
+    lutManagerActiveBadge: "適用中",
+    lutManagerRename: "名前を変更",
+    lutManagerDelete: "削除",
+    lutManagerClose: "完了",
   },
 } as const;
 

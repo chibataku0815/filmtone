@@ -15,9 +15,11 @@ export interface CameraProfilePillProps {
   onPickCustomLut: () => void;
   cameraLabel: string;
   profileLabels: Record<CameraProfile, string>;
+  /** Optional whitelist; defaults to all 6 profiles. v1.0 surface uses ["auto","custom"]. */
+  profiles?: ReadonlyArray<CameraProfile>;
 }
 
-const PROFILE_ORDER: CameraProfile[] = [
+const DEFAULT_PROFILE_ORDER: CameraProfile[] = [
   "auto",
   "rec709",
   "apple-log",
@@ -33,7 +35,9 @@ export function CameraProfilePill({
   onPickCustomLut,
   cameraLabel,
   profileLabels,
+  profiles,
 }: CameraProfilePillProps) {
+  const visibleProfiles = profiles ?? DEFAULT_PROFILE_ORDER;
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -113,7 +117,7 @@ export function CameraProfilePill({
             </div>
             <div className="section-header mb-2">{cameraLabel}</div>
             <ul className="flex flex-col">
-              {PROFILE_ORDER.map((profile) => {
+              {visibleProfiles.map((profile) => {
                 const isActive = profile === active;
                 const label =
                   profile === "custom" && customLutTitle && isActive

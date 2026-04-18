@@ -11,8 +11,13 @@ import {
 import type { AppStrings } from "@/lib/messages";
 import {
   appendBenchmarkRecord,
+  appendImportedLut,
+  loadImportedLuts,
   loadPhase0Project,
+  removeImportedLut,
+  renameImportedLut,
   savePhase0Project,
+  type ImportedLut,
 } from "@/lib/phase0-storage";
 import {
   applyLutSelection,
@@ -29,6 +34,16 @@ import { PreviewCanvas } from "./PreviewCanvas";
 import { CameraProfilePill, type CameraProfile } from "./CameraProfilePill";
 import { PresetRow } from "./PresetRow";
 import { StrengthSheet } from "./StrengthSheet";
+import { LutManagerModal } from "@/features/lut-manager/LutManagerModal";
+
+const V1_CAMERA_PROFILES: ReadonlyArray<CameraProfile> = ["auto", "custom"];
+
+function makeImportedLutId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `lut_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
 
 interface MobilePhase0EditorProps {
   strings: AppStrings;
@@ -43,6 +58,9 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
   const [inputLutEnabled, setInputLutEnabled] = useState(true);
   const [cameraProfile, setCameraProfile] = useState<CameraProfile>("auto");
   const [strengthSheetOpen, setStrengthSheetOpen] = useState(false);
+  const [importedLuts, setImportedLuts] = useState<ImportedLut[]>(() => loadImportedLuts());
+  const [activeImportedLutId, setActiveImportedLutId] = useState<string | null>(null);
+  const [lutManagerOpen, setLutManagerOpen] = useState(false);
   const displaySourceUri =
     state.source && Capacitor.isNativePlatform()
       ? Capacitor.convertFileSrc(state.source.uri)
@@ -142,13 +160,40 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
     if (profile === "auto") {
       setInputLut(null);
       setInputLutEnabled(true);
-    } else if (profile !== "custom") {
-      setInputLut(null);
-      setInputLutEnabled(true);
+      setActiveImportedLutId(null);
     }
   }
 
-  async function handlePickCustomCameraLut() {
+  function handleActivateImportedLut(id: string) {
+    const entry = importedLuts.find((item) => item.id === id);
+    if (!entry) return;
+    setInputLut(entry.lut);
+    setInputLutEnabled(true);
+    setCameraProfile("custom");
+    setActiveImportedLutId(id);
+  }
+
+  function handleDeactivateImportedLut() {
+    setInputLut(null);
+    setInputLutEnabled(true);
+    setCameraProfile("auto");
+    setActiveImportedLutId(null);
+  }
+
+  function handleRenameImportedLut(id: string, name: string) {
+    const next = renameImportedLut(id, name);
+    setImportedLuts(next);
+  }
+
+  function handleDeleteImportedLut(id: string) {
+    const next = removeImportedLut(id);
+    setImportedLuts(next);
+    if (activeImportedLutId === id) {
+      handleDeactivateImportedLut();
+    }
+  }
+
+  async function handlePickFreshLut() {
     try {
       const picked = await filmtoneMedia.pickLutFile({ slot: "inputLut" });
       if (!picked) return;
@@ -167,9 +212,18 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
         title: parsed.title || picked.filename,
         intensity: 1,
       });
+      const entry: ImportedLut = {
+        id: makeImportedLutId(),
+        name: parsed.title || picked.filename,
+        lut,
+        importedAt: Date.now(),
+      };
+      const next = appendImportedLut(entry);
+      setImportedLuts(next);
       setInputLut(lut);
       setInputLutEnabled(true);
       setCameraProfile("custom");
+      setActiveImportedLutId(entry.id);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       setState((current) => ({
@@ -177,6 +231,10 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
         error: `${strings.lutInputImportError}: ${detail}`,
       }));
     }
+  }
+
+  function handleOpenLutManagerFromPill() {
+    setLutManagerOpen(true);
   }
 
   async function handleExport() {
@@ -274,9 +332,7 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
       <TopChrome
         appName={strings.appName}
         sourceLabel={state.source?.filename}
-        onMenuOpen={() => {
-          /* M3: open LUT manager + Help + Settings */
-        }}
+        onMenuOpen={() => setLutManagerOpen(true)}
         menuLabel={strings.topMenuLabel}
         autoHide={state.source != null}
       />
@@ -305,9 +361,10 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
             active={cameraProfile}
             customLutTitle={cameraProfile === "custom" ? inputLut?.title : undefined}
             onSelect={handleCameraProfileSelect}
-            onPickCustomLut={handlePickCustomCameraLut}
+            onPickCustomLut={handleOpenLutManagerFromPill}
             cameraLabel={strings.lutInputSlotName}
             profileLabels={cameraProfileLabels}
+            profiles={V1_CAMERA_PROFILES}
           />
         </div>
 
@@ -372,6 +429,27 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
             era: strings.quickEra,
             dynamics: strings.quickDynamics,
           },
+        }}
+      />
+
+      <LutManagerModal
+        isOpen={lutManagerOpen}
+        onClose={() => setLutManagerOpen(false)}
+        imports={importedLuts}
+        activeLutId={activeImportedLutId}
+        onPickFreshLut={handlePickFreshLut}
+        onActivateLut={handleActivateImportedLut}
+        onDeactivateLut={handleDeactivateImportedLut}
+        onRenameLut={handleRenameImportedLut}
+        onDeleteLut={handleDeleteImportedLut}
+        strings={{
+          lutManagerTitle: strings.lutManagerTitle,
+          lutManagerEmpty: strings.lutManagerEmpty,
+          lutManagerImport: strings.lutManagerImport,
+          lutManagerActiveBadge: strings.lutManagerActiveBadge,
+          lutManagerRename: strings.lutManagerRename,
+          lutManagerDelete: strings.lutManagerDelete,
+          lutManagerClose: strings.lutManagerClose,
         }}
       />
     </div>
