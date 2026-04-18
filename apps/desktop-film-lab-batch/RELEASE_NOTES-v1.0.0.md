@@ -95,5 +95,8 @@ batch export also continue to run on WebGL2 for this release — the WebGPU
 ## Checksums
 
 ```text
-(filled in at release-checksums step)  filmtone-1.0.0-arm64.dmg
+8cfd17342cabb9bdc6987f41e741fcc319d0df0002c22dc6019a464bff6501a8  filmtone-1.0.0-arm64.dmg
 ```
+
+(Unsigned / ad-hoc codesign — the signed + notarized release will regenerate
+this DMG via `bun run dist:mac:release` and the checksum will change.)

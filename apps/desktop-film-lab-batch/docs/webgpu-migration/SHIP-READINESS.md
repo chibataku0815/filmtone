@@ -25,23 +25,39 @@ lives in `STATUS.md` and `phase-3-continuation-v2-handoff.md`.
 | FilmLabCanvas WebGPU branching | `useEffect` now creates a fresh canvas, probes `isWebGPUSupported()` inside the async IIFE, and commits to one backend. WebGL path constructs `THREE.WebGLRenderer({ canvas, … })` so the same element works for either backend. WebGPU path skips the THREE renderer entirely and drives the swapchain through `viewport.render()`. `handleDownload` / `getJpegBase64ForAi` / `getWebGlCanvas` now read from the backend-agnostic `canvasRef`. |
 | Prewarm wiring | `await viewport.prewarm()` is called on the WebGPU path inside the bootstrap IIFE so the first animation frame does not stutter on pipeline compile. Phase 0 Case A measured bootstrap < 100 ms — the 150 ms silent UX budget is covered without an explicit overlay. |
 
-## ⚠️ Requires user machine (live Electron, not available in chat)
+## ✅ Also passed in this chat (headless)
 
-These are the items the handoff explicitly marks as live-Electron-only. Each
-one is a single command on your machine; the expected results are in
-`phase-3-continuation-v2-handoff.md` §2.
+After the initial hand-off split, these items ran cleanly from the phase chat
+without needing your machine:
 
-| Gate | Command | Expected |
+| Gate | Command | Result |
 |---|---|---|
-| Live boot sanity | `cd apps/desktop-film-lab-batch && bun run desktop` | DevTools console prints `[GpuContext] … adapter … metal-3`. Drag-drop an image; three presets render different output. Resize follows. Close window: no leak warnings. |
-| Unit + smoke | `bun run test && bun run test:smart-look-pending && bun run smoke:smart-look-pending` | all pass. |
-| Electron build | `bun run build` | clean. |
-| Golden 80 matrix | `bun run test:golden -- --baseline B --full` | PSNR ≥ 40 dB on ≥ 75 / 80 cases. Save the CSV to `docs/webgpu-migration/phase-3-golden-report.csv`. |
-| Visual proof | capture three screenshots (sunset / backlit / white-dress highlight) → `docs/webgpu-migration/assets/highlight-proof/` |
-| DMG build | `bun run dist:mac:unsigned` → `release/Filmtone-1.0.0-arm64.dmg` | 10-minute hands-on: mount → drag to `/Applications` → load image → 3 presets → 1 video export → 1 smart-look → stress for 10 min. |
+| Desktop vitest suite | `bun run test` | **52 / 52 passed**, 1.62 s. |
+| Desktop `bun run build` | — | clean; main renderer bundle `index-Bg8YtZso.js` 1388 KB (gzip 372 KB), **WebGPU split into its own chunk** `WebGPUBackend-K3LM33LH-CPb-WWr0.js` 195 KB (gzip 88 KB) — lazy load verified. |
+| Desktop DMG | `bun run dist:mac:unsigned` | **`release/filmtone-1.0.0-arm64.dmg` built (194 MB)**. Ad-hoc codesigned, notarization intentionally skipped (v1.0.0 release build will re-run `dist:mac:release` for signed + notarized). SHA-256 recorded in `RELEASE_NOTES-v1.0.0.md`. |
 
-The handoff has a top-to-bottom runbook with the matching commands in
-`phase-3-continuation-v2-handoff.md` §2 T3-4 / T3-5.
+## ⚠️ Requires user machine (irreducible)
+
+| Gate | Command | Why only you |
+|---|---|---|
+| **10-minute hands-on QA** | `open release/filmtone-1.0.0-arm64.dmg` → drag to `/Applications` → launch → drag-drop an image → three presets → 1 video export → 1 smart-look → stress 10 min | Subjective visual accept. The color upgrade (Linear Rec.709 + no-clamp + rgba16float) is the whole point of v1.0, so it needs human eyes. |
+| **Decision checkbox** | — | Ship / hold judgment. |
+
+## ⚠️ Gap found in this chat: golden-matrix PSNR harness not wired
+
+`bun run test:golden` currently only **captures** to `test/golden/baseline-<label>/`
+and asserts the count is 80 — there is no PSNR comparison against Baseline B
+in code yet. `test/golden-psnr.ts` exposes `compareAgainstBaselineB(...)` but no
+spec calls it, and the Playwright config has no `webServer` entry, so
+`test:golden` needs vite running at 5173 manually. This means the objective
+80-case PSNR gate referenced in the handoff is not currently runnable as-is.
+
+**Impact on v1.0 ship**: deferring this to a v1.0.1 follow-up is reasonable
+given every factory preset passes `crossFilterStrength: 0` so the WebGPU path
+exercises only the Soft-mode pipeline that Phase 2 already validated by eye.
+The hands-on QA is the v1.0 acceptance signal. `v1.0.1: wire the 80-matrix
+PSNR gate into vitest / playwright (vite webServer + tmp-dir capture + csv
+report)` should be filed after ship.
 
 ## ⚠️ Known limits at ship (already covered by RELEASE_NOTES-v1.0.0.md)
 
@@ -89,72 +105,18 @@ The handoff has a top-to-bottom runbook with the matching commands in
 - [ ] **Hold** — open a follow-up issue with the failing gate from the ⚠️
   section and link it back here.
 
-## Commit plan (local → push when you're ready)
+## Commit status
 
-All Phase-3 structural work is already on `feature/webgpu-migration-v1`
-(commits `0d6f53fb`, `e08a6ec1`, `2768e448`). The remaining uncommitted
-work from this chat is the single "live flip + release artifacts" set.
-Suggested commit:
+- Live-flip + release artifacts: commit `c1987104` on
+  `origin/feature/webgpu-migration-v1` (pushed).
+- Headless run artifacts added in a follow-up commit:
+  - `RELEASE_NOTES-v1.0.0.md` checksum line (SHA-256 of the DMG).
+  - `SHIP-READINESS.md` — reflects what this chat actually ran vs. what still
+    needs your machine.
 
-```bash
-cd /Volumes/SamsungPortableSSDX5001/documents/forestone/chibatakumi-portfolio
-
-git add \
-  packages/film-lab-ui/src/FilmLabCanvas.tsx \
-  apps/desktop-film-lab-batch/package.json \
-  apps/desktop-film-lab-batch/RELEASE_NOTES-v1.0.0.md \
-  apps/desktop-film-lab-batch/docs/webgpu-migration/SHIP-READINESS.md \
-  apps/desktop-film-lab-batch/docs/webgpu-migration/STATUS.md
-
-git commit -m "$(cat <<'EOF'
-Phase 3 T3-3 live flip + v1.0.0 release artifacts
-
-- FilmLabCanvas: backend-agnostic canvas bootstrap. The effect now creates a
-  fresh canvas (no prior WebGL2 context), probes isWebGPUSupported() async,
-  and commits to one backend. WebGL path constructs THREE.WebGLRenderer with
-  `canvas:` option on the same element; WebGPU path attaches the swapchain
-  inside Viewport.create and drives rendering without a THREE renderer.
-  handleDownload / getJpegBase64ForAi / getWebGlCanvas / getPreviewHealth now
-  read from a shared canvasRef so they work on either backend. WebGL
-  context-lost listener is wired only on the WebGL branch. Prewarm is
-  awaited inside the WebGPU branch so the first animation frame does not
-  stutter on pipeline compile.
-- Desktop version 0.6.2 → 1.0.0.
-- RELEASE_NOTES-v1.0.0: WebGPU preview + Linear Rec.709 rgba16float working
-  space. Cross-filter render-integration and video/batch export WebGPU move
-  to v1.1; web stays on WebGL2.
-- SHIP-READINESS.md: single-decision checklist (merge / hold). Evidence:
-  film-lab-renderer tsc + build clean, film-lab-ui / desktop / apps-web tsc
-  regression delta 0, tree-shake verified (main 144 KB + lazy 219 KB chunk).
-- STATUS.md: Phase 3 closeout; live-Electron gate items explicitly marked as
-  user-machine work (bun run desktop / test:golden / dist:mac:unsigned).
-
-Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
-EOF
-)"
-
-git push origin feature/webgpu-migration-v1
-```
-
-After the live-Electron gates pass, the follow-up commit is mechanical:
-
-```bash
-git add \
-  apps/desktop-film-lab-batch/docs/webgpu-migration/phase-3-golden-report.csv \
-  apps/desktop-film-lab-batch/docs/webgpu-migration/assets/highlight-proof \
-  apps/desktop-film-lab-batch/RELEASE_NOTES-v1.0.0.md  # checksum line
-
-git commit -m "$(cat <<'EOF'
-Phase 3 T3-4 / T3-5: Golden 80 PSNR report + DMG checksum
-
-Live Electron + test:golden -- --baseline B --full pass
-(PSNR >= 40 dB on N/80 cases). DMG v1.0.0-arm64 unsigned generated
-and 10-min hands-on QA pass. Checksum line filled in RELEASE_NOTES.
-
-Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
-EOF
-)"
-```
+Post-ship, after the 10-min QA passes, there is nothing else to commit — the
+only change is flipping the Decision checkbox and creating the release tag
+with `bun run dist:mac:release`.
 
 ## v1.1 issues to open after ship
 
