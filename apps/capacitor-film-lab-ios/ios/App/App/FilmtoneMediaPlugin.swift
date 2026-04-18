@@ -131,8 +131,10 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
         do {
             let request = try call.decode(Phase0ExportRequestDTO.self)
             let sourceURL = try resolveFileURL(request.sourceUri)
-            let thermalStateAtStart = ProcessInfo.processInfo.thermalState.filmtoneLabel
-            let memoryWarningsAtStart = memoryWarningCount
+            let collector = BenchmarkCollector(
+                request: request,
+                memoryWarningCounter: { [weak self] in self?.memoryWarningCount ?? 0 }
+            )
             let exportSession = try FilmtoneExportSession(
                 request: request,
                 sourceURL: sourceURL,
@@ -159,12 +161,7 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
                         }
                     }
 
-                    let benchmarkRecord = self.makeBenchmarkRecord(
-                        request: request,
-                        result: exportResult,
-                        thermalStateAtStart: thermalStateAtStart,
-                        memoryWarningsAtStart: memoryWarningsAtStart
-                    )
+                    let benchmarkRecord = collector.makeSuccessRecord(result: exportResult)
                     exportResult = Phase0ExportResultDTO(
                         outputUri: exportResult.outputUri,
                         elapsedMs: exportResult.elapsedMs,
@@ -184,12 +181,7 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
                         call.resolve(with: exportResult)
                     }
                 } catch {
-                    let benchmarkRecord = self.makeFailureBenchmarkRecord(
-                        request: request,
-                        thermalStateAtStart: thermalStateAtStart,
-                        memoryWarningsAtStart: memoryWarningsAtStart,
-                        error: error
-                    )
+                    let benchmarkRecord = collector.makeFailureRecord(error: error)
                     await MainActor.run {
                         self.currentExportSession = nil
                         self.currentExportTask = nil
@@ -200,11 +192,14 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
                             "message": "Export failed",
                             "errorCode": (error as? FilmtoneMediaError)?.code as Any,
                             "benchmarkRecord": [
+                                "appVersion": benchmarkRecord.appVersion,
+                                "buildNumber": benchmarkRecord.buildNumber,
                                 "deviceModel": benchmarkRecord.deviceModel,
                                 "iosVersion": benchmarkRecord.iosVersion,
                                 "elapsedMs": benchmarkRecord.elapsedMs,
                                 "thermalState": benchmarkRecord.thermalState as Any,
                                 "memoryWarningCount": benchmarkRecord.memoryWarningCount as Any,
+                                "errorDomain": benchmarkRecord.errorDomain as Any,
                                 "errorCode": benchmarkRecord.errorCode as Any,
                             ],
                         ])
@@ -362,63 +357,6 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
         exportIdleTimerActive = false
     }
 
-    private func makeBenchmarkRecord(
-        request: Phase0ExportRequestDTO,
-        result: Phase0ExportResultDTO,
-        thermalStateAtStart: String,
-        memoryWarningsAtStart: Int
-    ) -> Phase0ExportBenchmarkRecordDTO {
-        let sourceResolution: String?
-        if let width = request.sourceProbe?.width, let height = request.sourceProbe?.height {
-            sourceResolution = "\(width)x\(height)"
-        } else {
-            sourceResolution = nil
-        }
-
-        return Phase0ExportBenchmarkRecordDTO(
-            deviceModel: UIDevice.current.filmtoneModelIdentifier,
-            iosVersion: UIDevice.current.systemVersion,
-            sourceCodec: request.sourceProbe?.codec,
-            sourceResolution: sourceResolution,
-            sourceDurationSec: request.sourceProbe?.durationSec,
-            outputFileSizeBytes: result.fileSizeBytes,
-            elapsedMs: result.elapsedMs,
-            realtimeRatio: result.realtimeRatio,
-            thermalState: "\(thermalStateAtStart)->\(ProcessInfo.processInfo.thermalState.filmtoneLabel)",
-            memoryWarningCount: max(memoryWarningCount - memoryWarningsAtStart, 0),
-            permissionResult: "save-not-run",
-            errorCode: nil
-        )
-    }
-
-    private func makeFailureBenchmarkRecord(
-        request: Phase0ExportRequestDTO,
-        thermalStateAtStart: String,
-        memoryWarningsAtStart: Int,
-        error: Error
-    ) -> Phase0ExportBenchmarkRecordDTO {
-        let sourceResolution: String?
-        if let width = request.sourceProbe?.width, let height = request.sourceProbe?.height {
-            sourceResolution = "\(width)x\(height)"
-        } else {
-            sourceResolution = nil
-        }
-
-        return Phase0ExportBenchmarkRecordDTO(
-            deviceModel: UIDevice.current.filmtoneModelIdentifier,
-            iosVersion: UIDevice.current.systemVersion,
-            sourceCodec: request.sourceProbe?.codec,
-            sourceResolution: sourceResolution,
-            sourceDurationSec: request.sourceProbe?.durationSec,
-            outputFileSizeBytes: nil,
-            elapsedMs: 0,
-            realtimeRatio: nil,
-            thermalState: "\(thermalStateAtStart)->\(ProcessInfo.processInfo.thermalState.filmtoneLabel)",
-            memoryWarningCount: max(memoryWarningCount - memoryWarningsAtStart, 0),
-            permissionResult: nil,
-            errorCode: (error as? FilmtoneMediaError)?.code ?? "FILMTONE_NATIVE_ERROR"
-        )
-    }
 }
 
 private enum PhotoSaveGuardState {

@@ -90,6 +90,17 @@ const appCopy = {
     validationReportTitle: "Validation capture",
     validationReportBody:
       "Paste this into chat after the run and replace the manual-check lines after reviewing the exported file.",
+    visualFloorTitle: "Visual floor",
+    visualFloorHint:
+      "Inspect start, middle, end of the exported file. Mark Pass only if every checkpoint is acceptable.",
+    visualFloorPass: "Pass",
+    visualFloorFail: "Fail",
+    visualFloorNotChecked: "Not checked",
+    benchmarkShareTitle: "Share benchmark row",
+    benchmarkShareBody:
+      "Generates a single markdown row for benchmark/runs/. Mark visual floor first, then share to AirDrop or Messages.",
+    benchmarkShareButton: "Share benchmark result",
+    benchmarkShareCopied: "Markdown row copied to clipboard.",
     errorPrefix: "Error",
     noticePrefix: "Note",
   },
@@ -169,6 +180,17 @@ const appCopy = {
     validationReportTitle: "検証記録",
     validationReportBody:
       "run 後にこの内容をチャットへ貼り、書き出しファイルを確認して manual-check の行だけ埋めてください。",
+    visualFloorTitle: "Visual floor",
+    visualFloorHint:
+      "書き出しファイルの冒頭・中盤・終盤を確認し、いずれも許容できる場合のみ Pass にしてください。",
+    visualFloorPass: "Pass",
+    visualFloorFail: "Fail",
+    visualFloorNotChecked: "未確認",
+    benchmarkShareTitle: "ベンチ結果を共有",
+    benchmarkShareBody:
+      "benchmark/runs/ 用の markdown 1 行を生成します。先に visual floor を判定し、AirDrop / メッセージで共有してください。",
+    benchmarkShareButton: "ベンチ結果を共有",
+    benchmarkShareCopied: "Markdown 行をクリップボードにコピーしました。",
     errorPrefix: "エラー",
     noticePrefix: "補足",
   },

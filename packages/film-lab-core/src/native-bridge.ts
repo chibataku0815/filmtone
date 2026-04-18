@@ -88,6 +88,8 @@ export interface Phase0ExportResult {
 }
 
 export interface Phase0ExportBenchmarkRecord {
+  appVersion: string;
+  buildNumber: string;
   deviceModel: string;
   iosVersion: string;
   sourceCodec?: string;
@@ -99,6 +101,8 @@ export interface Phase0ExportBenchmarkRecord {
   thermalState?: string;
   memoryWarningCount?: number;
   permissionResult?: string;
+  saveToPhotosOk?: boolean;
+  errorDomain?: string;
   errorCode?: string;
 }
 

@@ -87,6 +87,17 @@ export {
   type Phase0ExportBenchmarkRecord,
 } from "./native-bridge";
 export {
+  benchmarkMarkdownTableHeader,
+  buildBenchmarkRow,
+  formatBenchmarkRow,
+  parseBenchmarkRow,
+  type BenchmarkRow,
+  type BenchmarkRowInput,
+  type BenchmarkSaveResult,
+  type BenchmarkVisualFloor,
+  type ParsedBenchmarkRow,
+} from "./benchmark-row";
+export {
   chromaUnitFromHueDegrees,
   FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
   FILM_LAB_DEFAULT_SHADOW_HUE,

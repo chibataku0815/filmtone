@@ -2,9 +2,12 @@ import { Capacitor } from "@capacitor/core";
 import { useEffect, useMemo, useState } from "react";
 import { FILM_LAB_SOURCE_DISPLAY_PRIORITY_ORDER } from "film-lab-ui";
 import {
+  buildBenchmarkRow,
+  formatBenchmarkRow,
   parseCube,
   serializeCubeLut,
   getPhase0SourceCapViolations,
+  type BenchmarkSaveResult,
   type ParsedCubeLut,
   type QuickAxisId,
   type PresetName,
@@ -27,7 +30,7 @@ import { filmtoneMedia } from "@/native/filmtoneMedia";
 import { Phase0PresetPicker } from "./Phase0PresetPicker";
 import { Phase0QuickControls } from "./Phase0QuickControls";
 import { Phase0LutPicker } from "./Phase0LutPicker";
-import { ExportSheet } from "@/features/export/ExportSheet";
+import { ExportSheet, type VisualFloorState } from "@/features/export/ExportSheet";
 
 interface MobilePhase0EditorProps {
   strings: AppStrings;
@@ -48,6 +51,7 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
   const [isSaveBusy, setIsSaveBusy] = useState(false);
   const [inputLut, setInputLut] = useState<ParsedCubeLut | null>(null);
   const [inputLutEnabled, setInputLutEnabled] = useState(true);
+  const [visualFloor, setVisualFloor] = useState<VisualFloorState>("not-checked");
   const displaySourceUri =
     state.source && Capacitor.isNativePlatform()
       ? Capacitor.convertFileSrc(state.source.uri)
@@ -217,6 +221,7 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
         },
       };
       setIsSaveBusy(false);
+      setVisualFloor("not-checked");
       setState((current) => ({
         ...current,
         isBusy: true,
@@ -274,6 +279,44 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
     if (!state.exportResult) return;
     try {
       await filmtoneMedia.shareOutput({ uri: state.exportResult.outputUri });
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        error: error instanceof Error ? error.message : String(error),
+      }));
+    }
+  }
+
+  async function handleShareBenchmark() {
+    if (!state.exportResult || !state.exportResult.benchmarkRecord) return;
+    const saveResult: BenchmarkSaveResult =
+      state.saveToPhotosState === "saved"
+        ? "ok"
+        : state.saveToPhotosState === "failed"
+        ? "fail"
+        : "not-run";
+    const clipId = state.source?.filename ?? "unknown-clip";
+    const row = buildBenchmarkRow({
+      result: state.exportResult,
+      benchmark: state.exportResult.benchmarkRecord,
+      probe: state.probe,
+      clipId,
+      visualFloor,
+      saveResult,
+    });
+    const markdown = formatBenchmarkRow(row);
+
+    try {
+      if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+        await navigator.share({ text: markdown, title: "Filmtone benchmark" });
+      } else if (typeof navigator !== "undefined" && navigator.clipboard) {
+        await navigator.clipboard.writeText(markdown);
+      }
+      setState((current) => ({
+        ...current,
+        notice: strings.benchmarkShareCopied,
+        error: null,
+      }));
     } catch (error) {
       setState((current) => ({
         ...current,
@@ -426,6 +469,7 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
         exportProgress={state.exportProgress}
         exportResult={state.exportResult}
         saveToPhotosState={state.saveToPhotosState}
+        visualFloor={visualFloor}
         isBusy={state.isBusy}
         isSaveBusy={isSaveBusy}
         error={state.error}
@@ -433,6 +477,8 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
         onExport={handleExport}
         onSave={handleSave}
         onShare={handleShare}
+        onVisualFloorChange={setVisualFloor}
+        onShareBenchmark={handleShareBenchmark}
       />
 
       {state.notice ? (

@@ -11,6 +11,8 @@ import {
   type SourceProbe,
 } from "film-lab-core";
 
+export type VisualFloorState = "not-checked" | "pass" | "fail";
+
 interface ExportSheetProps {
   project: Phase0ProjectState;
   source: SourceInfo | null;
@@ -18,6 +20,7 @@ interface ExportSheetProps {
   exportProgress: Phase0ExportProgress | null;
   exportResult: Phase0ExportResult | null;
   saveToPhotosState: "not-run" | "saved" | "failed";
+  visualFloor: VisualFloorState;
   isBusy: boolean;
   isSaveBusy: boolean;
   error: string | null;
@@ -49,10 +52,20 @@ interface ExportSheetProps {
     metricsSaveToPhotos: string;
     validationReportTitle: string;
     validationReportBody: string;
+    visualFloorTitle: string;
+    visualFloorHint: string;
+    visualFloorPass: string;
+    visualFloorFail: string;
+    visualFloorNotChecked: string;
+    benchmarkShareTitle: string;
+    benchmarkShareBody: string;
+    benchmarkShareButton: string;
   };
   onExport: () => void;
   onSave: () => void;
   onShare: () => void;
+  onVisualFloorChange: (value: VisualFloorState) => void;
+  onShareBenchmark: () => void;
 }
 
 function formatBytes(value?: number): string {
@@ -88,6 +101,7 @@ export function ExportSheet({
   exportProgress,
   exportResult,
   saveToPhotosState,
+  visualFloor,
   isBusy,
   isSaveBusy,
   error,
@@ -95,6 +109,8 @@ export function ExportSheet({
   onExport,
   onSave,
   onShare,
+  onVisualFloorChange,
+  onShareBenchmark,
 }: ExportSheetProps) {
   const violations = probe ? getPhase0SourceCapViolations(probe) : [];
   const canExport = probe != null && violations.length === 0 && !isBusy && !isSaveBusy;
@@ -304,7 +320,7 @@ export function ExportSheet({
             </div>
           </div>
 
-          <div className="mt-4 flex gap-2">
+          <div className="mt-4 flex flex-wrap gap-2">
             <button
               type="button"
               onClick={onSave}
@@ -319,6 +335,66 @@ export function ExportSheet({
               className="rounded-full border border-white/12 px-3 py-2 text-xs text-[var(--text-base-70)] transition hover:bg-white/[0.05] hover:text-white"
             >
               {strings.shareOutput}
+            </button>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-white/8 bg-black/30 p-3">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
+              {strings.visualFloorTitle}
+            </p>
+            <p className="mt-2 text-sm leading-6 text-[var(--text-base-70)]">
+              {strings.visualFloorHint}
+            </p>
+            <div
+              role="radiogroup"
+              aria-label={strings.visualFloorTitle}
+              className="mt-3 inline-flex rounded-full border border-white/10 bg-black/40 p-1"
+            >
+              {(
+                [
+                  { value: "not-checked", label: strings.visualFloorNotChecked },
+                  { value: "pass", label: strings.visualFloorPass },
+                  { value: "fail", label: strings.visualFloorFail },
+                ] as const
+              ).map((segment) => {
+                const active = visualFloor === segment.value;
+                return (
+                  <button
+                    key={segment.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => onVisualFloorChange(segment.value)}
+                    className={`rounded-full px-3 py-1.5 text-xs transition ${
+                      active
+                        ? segment.value === "pass"
+                          ? "bg-emerald-500/20 text-emerald-100"
+                          : segment.value === "fail"
+                          ? "bg-rose-500/20 text-rose-100"
+                          : "bg-white/[0.10] text-white"
+                        : "text-[var(--text-base-70)] hover:text-white"
+                    }`}
+                  >
+                    {segment.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-white/8 bg-black/30 p-3">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
+              {strings.benchmarkShareTitle}
+            </p>
+            <p className="mt-2 text-sm leading-6 text-[var(--text-base-70)]">
+              {strings.benchmarkShareBody}
+            </p>
+            <button
+              type="button"
+              onClick={onShareBenchmark}
+              className="mt-3 rounded-full bg-[var(--accent-amber1)] px-4 py-2 text-xs font-medium text-black transition hover:opacity-90"
+            >
+              {strings.benchmarkShareButton}
             </button>
           </div>
 

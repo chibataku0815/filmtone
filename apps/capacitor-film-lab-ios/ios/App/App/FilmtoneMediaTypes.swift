@@ -105,6 +105,8 @@ struct Phase0ExportProgressDTO: Encodable {
 }
 
 struct Phase0ExportBenchmarkRecordDTO: Encodable {
+    let appVersion: String
+    let buildNumber: String
     let deviceModel: String
     let iosVersion: String
     let sourceCodec: String?
@@ -116,6 +118,8 @@ struct Phase0ExportBenchmarkRecordDTO: Encodable {
     let thermalState: String?
     let memoryWarningCount: Int?
     let permissionResult: String?
+    let saveToPhotosOk: Bool?
+    let errorDomain: String?
     let errorCode: String?
 }
 

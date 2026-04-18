@@ -1211,6 +1211,103 @@ function buildPhase0ExportRequest(options) {
   };
 }
 
+// src/benchmark-row.ts
+var ROW_HEADER = "| date | device | iOS | clip_id | input_resolution | output_resolution | realtime_ratio | file_size_mb | thermal | memory_warnings | save | visual | error | duration_sec |";
+var ROW_DIVIDER = "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |";
+function buildBenchmarkRow(input) {
+  const { result, benchmark, probe, clipId, visualFloor, saveResult } = input;
+  const date = (input.date ?? /* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  const inputResolution = benchmark.sourceResolution ?? (probe?.width && probe?.height ? `${probe.width}x${probe.height}` : "unknown");
+  const outputResolution = `${result.outputWidth}x${result.outputHeight}@${result.outputFps}`;
+  const fileSizeMb = typeof result.fileSizeBytes === "number" ? Math.round(result.fileSizeBytes / (1024 * 1024) * 10) / 10 : null;
+  return {
+    date,
+    deviceModel: benchmark.deviceModel,
+    iosVersion: benchmark.iosVersion,
+    clipId,
+    inputResolution,
+    outputResolution,
+    realtimeRatio: typeof result.realtimeRatio === "number" ? Math.round(result.realtimeRatio * 100) / 100 : null,
+    fileSizeMb,
+    thermalState: benchmark.thermalState ?? "unknown",
+    memoryWarningCount: typeof benchmark.memoryWarningCount === "number" ? benchmark.memoryWarningCount : 0,
+    saveResult,
+    visualFloor,
+    errorDomain: benchmark.errorDomain ?? null,
+    errorCode: benchmark.errorCode ?? null,
+    durationSec: typeof benchmark.sourceDurationSec === "number" ? benchmark.sourceDurationSec : null
+  };
+}
+function formatBenchmarkRow(row) {
+  const realtime = row.realtimeRatio != null ? `${row.realtimeRatio}x` : "\u2014";
+  const fileSize = row.fileSizeMb != null ? `${row.fileSizeMb}MB` : "\u2014";
+  const errorCell = row.errorDomain || row.errorCode ? `${row.errorDomain ?? "\u2014"}:${row.errorCode ?? "\u2014"}` : "none";
+  const durationCell = row.durationSec != null ? row.durationSec.toFixed(1) : "\u2014";
+  return [
+    "",
+    row.date,
+    row.deviceModel,
+    row.iosVersion,
+    row.clipId,
+    row.inputResolution,
+    row.outputResolution,
+    realtime,
+    fileSize,
+    `thermal=${row.thermalState}`,
+    `mem_warn=${row.memoryWarningCount}`,
+    `save=${row.saveResult}`,
+    `visual=${row.visualFloor}`,
+    `err=${errorCell}`,
+    durationCell,
+    ""
+  ].join(" | ").trim();
+}
+function benchmarkMarkdownTableHeader() {
+  return `${ROW_HEADER}
+${ROW_DIVIDER}`;
+}
+var ROW_PATTERN = /^\|\s*(?<date>[^|]+?)\s*\|\s*(?<device>[^|]+?)\s*\|\s*(?<iosVersion>[^|]+?)\s*\|\s*(?<clipId>[^|]+?)\s*\|\s*(?<inputRes>[^|]+?)\s*\|\s*(?<outputRes>[^|]+?)\s*\|\s*(?<realtime>[^|]+?)\s*\|\s*(?<fileSize>[^|]+?)\s*\|\s*thermal=(?<thermal>[^|]+?)\s*\|\s*mem_warn=(?<mem>[^|]+?)\s*\|\s*save=(?<save>[^|]+?)\s*\|\s*visual=(?<visual>[^|]+?)\s*\|\s*err=(?<err>[^|]+?)\s*\|\s*(?<durationSec>[^|]+?)\s*\|\s*$/;
+function parseBenchmarkRow(line) {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith("|")) return null;
+  if (trimmed.startsWith("| date |") || trimmed.startsWith("| --- |")) return null;
+  const match = trimmed.match(ROW_PATTERN);
+  if (!match || !match.groups) return null;
+  const g = match.groups;
+  const realtimeRaw = g.realtime.trim().replace(/x$/, "");
+  const realtimeRatio = realtimeRaw === "\u2014" ? null : Number.parseFloat(realtimeRaw);
+  const fileRaw = g.fileSize.trim().replace(/MB$/, "");
+  const fileSizeMb = fileRaw === "\u2014" ? null : Number.parseFloat(fileRaw);
+  const errorRaw = g.err.trim();
+  let errorDomain = null;
+  let errorCode = null;
+  if (errorRaw && errorRaw !== "none") {
+    const [domain, code] = errorRaw.split(":");
+    errorDomain = domain && domain !== "\u2014" ? domain : null;
+    errorCode = code && code !== "\u2014" ? code : null;
+  }
+  const durationRaw = g.durationSec.trim();
+  const durationSec = durationRaw === "\u2014" ? null : Number.parseFloat(durationRaw);
+  return {
+    raw: trimmed,
+    date: g.date.trim(),
+    deviceModel: g.device.trim(),
+    iosVersion: g.iosVersion.trim(),
+    clipId: g.clipId.trim(),
+    inputResolution: g.inputRes.trim(),
+    outputResolution: g.outputRes.trim(),
+    realtimeRatio: realtimeRatio != null && Number.isFinite(realtimeRatio) ? realtimeRatio : null,
+    fileSizeMb: fileSizeMb != null && Number.isFinite(fileSizeMb) ? fileSizeMb : null,
+    thermalState: g.thermal.trim(),
+    memoryWarningCount: Number.parseInt(g.mem.trim(), 10) || 0,
+    saveResult: g.save.trim() ?? "not-run",
+    visualFloor: g.visual.trim() ?? "not-checked",
+    errorDomain,
+    errorCode,
+    durationSec: durationSec != null && Number.isFinite(durationSec) ? durationSec : null
+  };
+}
+
 // src/ios-phase0.ts
 import { z as z4 } from "zod";
 var IOS_PHASE0_SCHEMA_VERSION = 1;
@@ -1476,6 +1573,8 @@ export {
   applyQuickStateToParams,
   applyQuickStateToPhase0Params,
   assertPhase0SourceProbeWithinCaps,
+  benchmarkMarkdownTableHeader,
+  buildBenchmarkRow,
   buildPhase0ExportRequest,
   chromaUnitFromHueDegrees,
   cloneParams,
@@ -1491,6 +1590,7 @@ export {
   filmLookSpikeDefaultProps,
   filmLookSpikeInputSchema,
   findMatchingPreset,
+  formatBenchmarkRow,
   getIosPhase0SourceCapViolations,
   getPhase0SourceCapViolations,
   gradeMatchesPreset,
@@ -1514,6 +1614,7 @@ export {
   mergePhase0Params,
   nearestHueDegreesToDirection,
   packCubeLutToFloatRgbaGrid,
+  parseBenchmarkRow,
   parseCube,
   phase0ParamsSchema,
   phase0ProjectLutSchema,
