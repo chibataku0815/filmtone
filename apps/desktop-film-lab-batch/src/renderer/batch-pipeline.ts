@@ -18,7 +18,7 @@ import {
   type Params,
   type PresetName,
 } from "film-lab-core";
-import { createWebGLOffscreenRenderSession } from "./offscreen/webgl-offscreen-render-session";
+import { createOffscreenRenderSession } from "./offscreen/create-offscreen-render-session";
 
 export type BatchFormat = "png" | "jpeg";
 
@@ -320,10 +320,12 @@ export async function runBatchPipeline(options: {
     };
   };
 
-  const renderSession = await createWebGLOffscreenRenderSession({
+  const renderSession = await createOffscreenRenderSession({
     width: 1,
     height: 1,
+    prefer: "webgpu",
   });
+  options.onLog(`[batch] offscreen backend: ${renderSession.backendKind}`);
   renderSession.setGrade(grade);
 
   const mediaLoader = new MediaLoader();
@@ -381,7 +383,7 @@ export async function runBatchPipeline(options: {
       const { width, height, texture } = loadResult;
 
       renderSession.setRenderSize(width, height);
-      renderSession.setSource({
+      await renderSession.setSource({
         texture,
         imageWidth: width,
         imageHeight: height,

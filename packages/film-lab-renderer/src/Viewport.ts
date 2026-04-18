@@ -22,7 +22,8 @@
  *   setLUT1(+Intensity,+clear) / setLUT2(+Intensity,+clear) /
  *   setLUT/setLUTIntensity/clearLUT (deprecated aliases) /
  *   setSplitPosition / getSplitPosition / setExportFlipY /
- *   resetMotionBlurHistory / bindThree / setComparePair /
+ *   resetMotionBlurHistory / setReadbackEnabled / readbackRgba8 /
+ *   bindThree / setComparePair /
  *   getHistogramPixels / dispose / destroy / prewarm.
  *
  * Granular WebGL setters (setExposure, setCrossFilterXxx, etc.) are no
@@ -355,6 +356,17 @@ export class Viewport {
   async prewarm(): Promise<void> {
     if (!this.webgpuBackend) return;
     this.webgpuBackend.prewarm();
+  }
+
+  setReadbackEnabled(enabled: boolean): void {
+    this.webgpuBackend?.setReadbackEnabled(enabled);
+  }
+
+  async readbackRgba8(): Promise<Uint8Array> {
+    if (!this.webgpuBackend) {
+      throw new Error("[Viewport] readbackRgba8 is only available on the WebGPU backend");
+    }
+    return this.webgpuBackend.readbackRgba8();
   }
 
   // === Disposal ===

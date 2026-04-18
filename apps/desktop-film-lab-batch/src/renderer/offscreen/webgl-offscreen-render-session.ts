@@ -54,6 +54,21 @@ class WebGLOffscreenRenderSessionImpl implements WebGLOffscreenRenderSession {
     this.viewport.render(this.renderer, this.scene, this.camera);
   }
 
+  readbackRgba8(): Uint8Array {
+    const gl = this.getWebGLContext();
+    const out = new Uint8Array(this.canvas.width * this.canvas.height * 4);
+    gl.readPixels(
+      0,
+      0,
+      this.canvas.width,
+      this.canvas.height,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      out,
+    );
+    return out;
+  }
+
   toDataURL(mimeType: string, quality?: number): string {
     return this.canvas.toDataURL(mimeType, quality as never);
   }

@@ -3,6 +3,12 @@ import { PRESETS } from "film-lab-core";
 import type { BatchGradeState } from "../batch-pipeline";
 
 const mocks = vi.hoisted(() => {
+  const gl = {
+    kind: "webgl2",
+    RGBA: 0x1908,
+    UNSIGNED_BYTE: 0x1401,
+    readPixels: vi.fn(),
+  };
   const renderer = {
     domElement: {
       width: 320,
@@ -15,7 +21,7 @@ const mocks = vi.hoisted(() => {
     setPixelRatio: vi.fn(),
     setSize: vi.fn(),
     outputColorSpace: null as unknown,
-    getContext: vi.fn(() => ({ kind: "webgl2" })),
+    getContext: vi.fn(() => gl),
     dispose: vi.fn(),
     forceContextLoss: vi.fn(),
   };
@@ -47,6 +53,7 @@ const mocks = vi.hoisted(() => {
 
   return {
     renderer,
+    gl,
     scene,
     camera,
     viewport,
@@ -120,6 +127,7 @@ describe("createWebGLOffscreenRenderSession", () => {
     mocks.OrthographicCamera.mockClear();
     mocks.Color.mockClear();
     mocks.viewportCreate.mockClear();
+    mocks.gl.readPixels.mockClear();
     mocks.renderer.domElement.toDataURL.mockClear();
     mocks.renderer.domElement.width = 320;
     mocks.renderer.domElement.height = 180;
@@ -167,6 +175,7 @@ describe("createWebGLOffscreenRenderSession", () => {
     session.setTime(1.25);
     session.resetMotionBlurHistory();
     session.render();
+    session.readbackRgba8();
     session.toDataURL("image/png", 0.92);
 
     expect(mocks.viewport.setResolution).toHaveBeenCalledWith(1920, 1080);
@@ -185,11 +194,20 @@ describe("createWebGLOffscreenRenderSession", () => {
       mocks.scene,
       mocks.camera,
     );
+    expect(mocks.gl.readPixels).toHaveBeenCalledWith(
+      0,
+      0,
+      320,
+      180,
+      0x1908,
+      0x1401,
+      expect.any(Uint8Array),
+    );
     expect(mocks.renderer.domElement.toDataURL).toHaveBeenCalledWith(
       "image/png",
       0.92,
     );
-    expect(session.getWebGLContext()).toEqual({ kind: "webgl2" });
+    expect(session.getWebGLContext()).toMatchObject({ kind: "webgl2" });
 
     session.dispose();
 

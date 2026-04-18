@@ -25,7 +25,8 @@ import {
   shouldAttemptWebCodecsAccurateExport,
   WebCodecsMp4ExportSession,
 } from "./video-export-webcodecs";
-import { createWebGLOffscreenRenderSession } from "./offscreen/webgl-offscreen-render-session";
+import { createOffscreenRenderSession } from "./offscreen/create-offscreen-render-session";
+import type { WebGLOffscreenRenderSession } from "./offscreen/offscreen-render-session";
 
 /**
  * @description 各フレームの詳細ログは明示時だけ有効にする。
@@ -896,7 +897,7 @@ export async function runVideoExportPipeline(options: {
       let webCodecsSession: WebCodecsMp4ExportSession | null = null;
       let srcTexture: THREE.Texture | null = null;
       let renderSession: Awaited<
-        ReturnType<typeof createWebGLOffscreenRenderSession>
+        ReturnType<typeof createOffscreenRenderSession>
       > | null = null;
       let retryWithSeek = false;
       let retryReason = "";
@@ -986,13 +987,15 @@ export async function runVideoExportPipeline(options: {
               return vt;
             })();
 
-        renderSession = await createWebGLOffscreenRenderSession({
+        renderSession = await createOffscreenRenderSession({
           width: outW,
           height: outH,
+          prefer: "webgpu",
           powerPreference: "high-performance",
         });
+        onLog(`[動画] offscreen backend: ${renderSession.backendKind}`);
         renderSession.setGrade(grade);
-        renderSession.setSource({
+        await renderSession.setSource({
           texture: srcTexture,
           imageWidth: probe.width,
           imageHeight: probe.height,
@@ -1001,61 +1004,64 @@ export async function runVideoExportPipeline(options: {
         // Reset motion blur accumulation so export starts from a clean state
         renderSession.resetMotionBlurHistory();
 
-        const gl = renderSession.getWebGLContext();
+        const gl =
+          renderSession.backendKind === "webgl"
+            ? (renderSession as WebGLOffscreenRenderSession).getWebGLContext()
+            : null;
 
         // --- PBO readback (WebGL2 PIXEL_PACK_BUFFER) ---
-        // PBO routes readPixels through driver-managed pinned memory, making
-        // getBufferSubData a fast memcpy.  We probe fenceSync on a dummy draw
-        // to decide the strategy:
-        //   useFence=true  → double-buffered PBOs + fenceSync (async overlap)
-        //   useFence=false → single PBO + gl.finish() (still faster than raw readPixels)
-        //   usePbo=false   → sync readPixels fallback
+        // WebGL backend keeps the existing async-overlapped path. WebGPU
+        // uses the session's backend-neutral RGBA readback instead.
         const pboSize = outW * outH * 4;
-        let usePbo = true;
+        let usePbo = renderSession.backendKind === "webgl";
         let useFence = false;
         const pbos: [WebGLBuffer | null, WebGLBuffer | null] = [null, null];
-        try {
-          pbos[0] = gl.createBuffer();
-          if (!pbos[0]) throw new Error("createBuffer returned null");
-          gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbos[0]);
-          gl.bufferData(gl.PIXEL_PACK_BUFFER, pboSize, gl.STREAM_READ);
-          gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+        if (gl) {
+          try {
+            pbos[0] = gl.createBuffer();
+            if (!pbos[0]) throw new Error("createBuffer returned null");
+            gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbos[0]);
+            gl.bufferData(gl.PIXEL_PACK_BUFFER, pboSize, gl.STREAM_READ);
+            gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
 
-          // Probe fenceSync: some ANGLE/Metal backends return WAIT_FAILED
-          const probeSync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
-          if (probeSync) {
-            gl.flush();
-            const probeResult = gl.clientWaitSync(
-              probeSync,
-              gl.SYNC_FLUSH_COMMANDS_BIT,
-              1_000_000_000,
-            );
-            gl.deleteSync(probeSync);
-            if (
-              probeResult === gl.ALREADY_SIGNALED ||
-              probeResult === gl.CONDITION_SATISFIED
-            ) {
-              useFence = true;
-              // Create second PBO for double-buffer
-              pbos[1] = gl.createBuffer();
-              if (!pbos[1]) throw new Error("createBuffer[1] returned null");
-              gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbos[1]);
-              gl.bufferData(gl.PIXEL_PACK_BUFFER, pboSize, gl.STREAM_READ);
-              gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+            // Probe fenceSync: some ANGLE/Metal backends return WAIT_FAILED
+            const probeSync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+            if (probeSync) {
+              gl.flush();
+              const probeResult = gl.clientWaitSync(
+                probeSync,
+                gl.SYNC_FLUSH_COMMANDS_BIT,
+                1_000_000_000,
+              );
+              gl.deleteSync(probeSync);
+              if (
+                probeResult === gl.ALREADY_SIGNALED ||
+                probeResult === gl.CONDITION_SATISFIED
+              ) {
+                useFence = true;
+                // Create second PBO for double-buffer
+                pbos[1] = gl.createBuffer();
+                if (!pbos[1]) throw new Error("createBuffer[1] returned null");
+                gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbos[1]);
+                gl.bufferData(gl.PIXEL_PACK_BUFFER, pboSize, gl.STREAM_READ);
+                gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+              }
             }
+            const mode = useFence ? "PBO double-buffer + fenceSync" : "PBO + finish";
+            onLog(
+              `[動画][PBO] ${mode} (${(pboSize / 1024 / 1024).toFixed(1)}MB${useFence ? " × 2" : ""})`,
+            );
+          } catch (pboErr) {
+            usePbo = false;
+            for (const p of pbos) if (p) gl.deleteBuffer(p);
+            pbos[0] = null;
+            pbos[1] = null;
+            onLog(
+              `[動画][PBO] 作成失敗、sync readPixels にフォールバック — ${pboErr instanceof Error ? pboErr.message : String(pboErr)}`,
+            );
           }
-          const mode = useFence ? "PBO double-buffer + fenceSync" : "PBO + finish";
-          onLog(
-            `[動画][PBO] ${mode} (${(pboSize / 1024 / 1024).toFixed(1)}MB${useFence ? " × 2" : ""})`,
-          );
-        } catch (pboErr) {
-          usePbo = false;
-          for (const p of pbos) if (p) gl.deleteBuffer(p);
-          pbos[0] = null;
-          pbos[1] = null;
-          onLog(
-            `[動画][PBO] 作成失敗、sync readPixels にフォールバック — ${pboErr instanceof Error ? pboErr.message : String(pboErr)}`,
-          );
+        } else {
+          onLog("[動画][readback] WebGPU session readback を使用します");
         }
         let pboIdx = 0;
         let prevFence: WebGLSync | null = null;
@@ -1252,14 +1258,35 @@ export async function runVideoExportPipeline(options: {
            *   （Finder サムネが黒・qlmanage は別フレームを採るため非黒、などの落差）。全フレーム
            *   `finish` は重いので先頭のみ。
            */
-          if (i === 0) {
+          if (i === 0 && gl) {
             gl.finish();
           }
 
           // --- GPU→CPU pixel transfer (no Y-flip — ffmpeg vflip handles row order) ---
           let readPxMs = 0;
 
-          if (usePbo && useFence) {
+          if (!gl) {
+            const tP0 = performance.now();
+            const rgba = await renderSession.readbackRgba8();
+            readPxMs = performance.now() - tP0;
+            arrRead.push(readPxMs);
+
+            const tW0 = performance.now();
+            const ipcSegment = profileSegment;
+            pendingIpc = api.videoExportWriteFrame(rgba).then(
+              () => {
+                const ipcMs = performance.now() - tW0;
+                arrIpc.push(ipcMs);
+                arrIpcBySegment[ipcSegment]!.push(ipcMs);
+              },
+              (e: unknown) => {
+                const ipcMs = performance.now() - tW0;
+                arrIpc.push(ipcMs);
+                arrIpcBySegment[ipcSegment]!.push(ipcMs);
+                pendingIpcError = e instanceof Error ? e.message : String(e);
+              },
+            );
+          } else if (usePbo && useFence) {
             // === Path A: PBO double-buffer + fenceSync (best: async overlap) ===
             const tP0 = performance.now();
             gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbos[pboIdx]!);
@@ -1383,7 +1410,7 @@ export async function runVideoExportPipeline(options: {
         }
 
         // PBO double-buffer: flush the last buffered frame (1-frame pipeline delay)
-        if (usePbo && useFence && prevFence) {
+        if (gl && usePbo && useFence && prevFence) {
           const prevIpcErr = await drainPendingIpc();
           if (prevIpcErr) {
             onLog(`[動画] フレーム書込エラー: ${prevIpcErr}`);
@@ -1439,7 +1466,7 @@ export async function runVideoExportPipeline(options: {
               `  mediaSync ms mean=${meanMs(arrSeekWait).toFixed(1)} median=${medianMs(arrSeekWait).toFixed(1)} p95=${p95Ms(arrSeekWait).toFixed(1)}\n` +
               `  decodeGate ms mean=${meanMs(arrDecode).toFixed(1)} median=${medianMs(arrDecode).toFixed(1)} p95=${p95Ms(arrDecode).toFixed(1)}\n` +
               `  render ms mean=${meanMs(arrRender).toFixed(1)} median=${medianMs(arrRender).toFixed(1)} p95=${p95Ms(arrRender).toFixed(1)}\n` +
-              `  readPixels ms mean=${meanMs(arrRead).toFixed(1)} median=${medianMs(arrRead).toFixed(1)} p95=${p95Ms(arrRead).toFixed(1)} (${usePbo ? (useFence ? "PBO+fence" : "PBO+finish") : "sync"})\n` +
+              `  readPixels ms mean=${meanMs(arrRead).toFixed(1)} median=${medianMs(arrRead).toFixed(1)} p95=${p95Ms(arrRead).toFixed(1)} (${gl ? (usePbo ? (useFence ? "PBO+fence" : "PBO+finish") : "sync") : "webgpu-readback"})\n` +
               `  ipcWrite ms mean=${meanMs(arrIpc).toFixed(1)} median=${medianMs(arrIpc).toFixed(1)} p95=${p95Ms(arrIpc).toFixed(1)}\n` +
               `  frameTotal ms mean=${meanMs(arrTotal).toFixed(1)} median=${medianMs(arrTotal).toFixed(1)} p95=${p95Ms(arrTotal).toFixed(1)}` +
               profileDebugDetail,

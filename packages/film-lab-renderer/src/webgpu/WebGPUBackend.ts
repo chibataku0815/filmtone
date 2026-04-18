@@ -205,6 +205,10 @@ export class WebGPUBackend implements RenderBackend {
   private _height = 1;
   private destroyed = false;
   private gradeDirty = true;
+  private readbackEnabled = false;
+  private readbackBuffer: GPUBuffer | null = null;
+  private readbackBufferSize = 0;
+  private hasReadableFrame = false;
   private frameState: GradeFrameState;
 
   private constructor(
@@ -845,6 +849,67 @@ export class WebGPUBackend implements RenderBackend {
     this.renderInternal("prewarm-failed");
   }
 
+  setReadbackEnabled(enabled: boolean): void {
+    this.readbackEnabled = enabled;
+    this.hasReadableFrame = false;
+  }
+
+  async readbackRgba8(): Promise<Uint8Array> {
+    if (!this.readbackEnabled) {
+      throw new Error("[WebGPUBackend] readback requested before readback was enabled");
+    }
+    if (this.destroyed) {
+      throw new Error("[WebGPUBackend] readback requested after destroy");
+    }
+    const lossInfo = this.ctx.getContextLossInfo();
+    if (lossInfo) {
+      throw new Error(
+        `[WebGPUBackend] readback unavailable after context loss: ${lossInfo.reason}`,
+      );
+    }
+    if (!this.hasReadableFrame) {
+      throw new Error("[WebGPUBackend] readback requested before any frame was rendered");
+    }
+
+    const width = this._width;
+    const height = this._height;
+    const bytesPerRow = width * 4;
+    const alignedBytesPerRow = Math.ceil(bytesPerRow / 256) * 256;
+    const readbackTexture = this.pool.get("rt.present.readback", {
+      width,
+      height,
+      format: this.ctx.canvasFormat,
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+    });
+    const readbackBuffer = this.ensureReadbackBuffer(
+      alignedBytesPerRow * height,
+    );
+    const encoder = this.ctx.device.createCommandEncoder({
+      label: "filmtone.readback",
+    });
+    encoder.copyTextureToBuffer(
+      { texture: readbackTexture },
+      {
+        buffer: readbackBuffer,
+        bytesPerRow: alignedBytesPerRow,
+        rowsPerImage: height,
+      },
+      { width, height, depthOrArrayLayers: 1 },
+    );
+    this.ctx.device.queue.submit([encoder.finish()]);
+
+    await readbackBuffer.mapAsync(GPUMapMode.READ);
+    const mapped = new Uint8Array(readbackBuffer.getMappedRange());
+    const out = new Uint8Array(bytesPerRow * height);
+    for (let y = 0; y < height; y++) {
+      const srcOffset = y * alignedBytesPerRow;
+      const dstOffset = (height - 1 - y) * bytesPerRow;
+      out.set(mapped.subarray(srcOffset, srcOffset + bytesPerRow), dstOffset);
+    }
+    readbackBuffer.unmap();
+    return out;
+  }
+
   private refreshLiveVideoTexture(): void {
     const video = this.liveVideoElement;
     if (!video) return;
@@ -1315,6 +1380,16 @@ export class WebGPUBackend implements RenderBackend {
 
     // Pass 5 — post-chain → swap.
     const swapView = this.ctx.getCurrentTextureView();
+    const readbackView = this.readbackEnabled
+      ? this.pool
+          .get("rt.present.readback", {
+            width: this._width,
+            height: this._height,
+            format: this.ctx.canvasFormat,
+            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+          })
+          .createView()
+      : null;
     const shutterAngle = this.paramNumber("shutterAngle", 0);
     const motionBlurOn = shutterAngle > 0;
 
@@ -1327,8 +1402,26 @@ export class WebGPUBackend implements RenderBackend {
           { binding: 1, resource: this.sampler },
         ],
       });
+      if (readbackView) {
+        const readbackPass = encoder.beginRenderPass({
+          label: "blit.readback.pass",
+          colorAttachments: [
+            {
+              view: readbackView,
+              loadOp: "clear",
+              storeOp: "store",
+              clearValue: { r: 0, g: 0, b: 0, a: 1 },
+            },
+          ],
+        });
+        readbackPass.setPipeline(this.pipelines.blit);
+        readbackPass.setBindGroup(0, this.flagsBindGroup);
+        readbackPass.setBindGroup(1, blitBg);
+        readbackPass.draw(3, 1, 0, 0);
+        readbackPass.end();
+      }
       const pass = encoder.beginRenderPass({
-        label: "blit.pass",
+        label: "blit.present.pass",
         colorAttachments: [
           {
             view: swapView,
@@ -1445,9 +1538,27 @@ export class WebGPUBackend implements RenderBackend {
           { binding: 2, resource: this.sampler },
         ],
       });
+      if (readbackView) {
+        const readbackPass = encoder.beginRenderPass({
+          label: "motionblur.blend.readback.pass",
+          colorAttachments: [
+            {
+              view: readbackView,
+              loadOp: "clear",
+              storeOp: "store",
+              clearValue: { r: 0, g: 0, b: 0, a: 1 },
+            },
+          ],
+        });
+        readbackPass.setPipeline(this.pipelines.motionblurBlend);
+        readbackPass.setBindGroup(0, this.flagsBindGroup);
+        readbackPass.setBindGroup(1, blendBg);
+        readbackPass.draw(3, 1, 0, 0);
+        readbackPass.end();
+      }
       {
         const pass = encoder.beginRenderPass({
-          label: "motionblur.blend.pass",
+          label: "motionblur.blend.present.pass",
           colorAttachments: [
             {
               view: swapView,
@@ -1466,6 +1577,7 @@ export class WebGPUBackend implements RenderBackend {
     }
 
     device.queue.submit([encoder.finish()]);
+    this.hasReadableFrame = this.readbackEnabled;
   }
 
   setResolution(width: number, height: number): void {
@@ -1479,6 +1591,7 @@ export class WebGPUBackend implements RenderBackend {
     this.frameState.resolutionX = w;
     this.frameState.resolutionY = h;
     this.gradeDirty = true;
+    this.hasReadableFrame = false;
     // RingBuffer resize re-allocates the 8-layer array texture and
     // resets validSlots → 0 so stale content can't bleed through the
     // weighted average after a viewport change.
@@ -1501,6 +1614,7 @@ export class WebGPUBackend implements RenderBackend {
     this.halationParamsBuffer.destroy();
     this.motionblurFeedbackBuffer.destroy();
     this.motionblurBlendBuffer.destroy();
+    this.readbackBuffer?.destroy();
     for (const buf of this.bloomPyramid.downsample) buf.destroy();
     for (const buf of this.bloomPyramid.upsample) buf.destroy();
     for (const buf of this.halationPyramid.downsample) buf.destroy();
@@ -1515,5 +1629,19 @@ export class WebGPUBackend implements RenderBackend {
   }
   get height(): number {
     return this._height;
+  }
+
+  private ensureReadbackBuffer(size: number): GPUBuffer {
+    if (this.readbackBuffer && this.readbackBufferSize === size) {
+      return this.readbackBuffer;
+    }
+    this.readbackBuffer?.destroy();
+    this.readbackBuffer = this.ctx.device.createBuffer({
+      label: "filmtone.readback.buffer",
+      size,
+      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+    });
+    this.readbackBufferSize = size;
+    return this.readbackBuffer;
   }
 }
