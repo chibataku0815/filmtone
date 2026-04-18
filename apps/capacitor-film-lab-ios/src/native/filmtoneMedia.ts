@@ -15,7 +15,7 @@ export interface PickedLutFile {
 
 export interface FilmtoneMediaPlugin {
   pickSource(): Promise<SourceInfo | null>;
-  pickLutFile(options?: { slot?: "creative" }): Promise<PickedLutFile | null>;
+  pickLutFile(options?: { slot?: "inputLut" | "creativeLut" }): Promise<PickedLutFile | null>;
   probeSource(options: { uri: string }): Promise<SourceProbe>;
   runExport(request: Phase0ExportRequest): Promise<Phase0ExportResult>;
   saveToPhotos(options: { uri: string }): Promise<void>;

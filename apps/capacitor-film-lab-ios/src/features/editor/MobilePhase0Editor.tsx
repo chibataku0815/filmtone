@@ -5,6 +5,7 @@ import {
   parseCube,
   serializeCubeLut,
   getPhase0SourceCapViolations,
+  type ParsedCubeLut,
   type QuickAxisId,
   type PresetName,
 } from "film-lab-core";
@@ -45,6 +46,8 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
     createInitialEditorState(loadPhase0Project() ?? undefined),
   );
   const [isSaveBusy, setIsSaveBusy] = useState(false);
+  const [inputLut, setInputLut] = useState<ParsedCubeLut | null>(null);
+  const [inputLutEnabled, setInputLutEnabled] = useState(true);
   const displaySourceUri =
     state.source && Capacitor.isNativePlatform()
       ? Capacitor.convertFileSrc(state.source.uri)
@@ -119,25 +122,78 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
     );
   }
 
-  async function handlePickLut() {
+  async function handlePickInputLut() {
     try {
-      const picked = await filmtoneMedia.pickLutFile({ slot: "creative" });
+      const picked = await filmtoneMedia.pickLutFile({ slot: "inputLut" });
       if (!picked) return;
-      const parsed = parseCube(picked.text);
+      let parsed;
+      try {
+        parsed = parseCube(picked.text);
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
+        setState((current) => ({
+          ...current,
+          error: `${strings.lutInputParseError}: ${detail}`,
+        }));
+        return;
+      }
+      const lut = serializeCubeLut(parsed, {
+        title: parsed.title || picked.filename,
+        intensity: 1,
+      });
+      setInputLut(lut);
+      setInputLutEnabled(true);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      setState((current) => ({
+        ...current,
+        error: `${strings.lutInputImportError}: ${detail}`,
+      }));
+    }
+  }
+
+  function handleClearInputLut() {
+    setInputLut(null);
+  }
+
+  function handleToggleInputLut(enabled: boolean) {
+    setInputLutEnabled(enabled);
+  }
+
+  function handleInputIntensityChange(intensity: number) {
+    setInputLut((current) => (current ? { ...current, intensity } : current));
+  }
+
+  async function handlePickCreativeLut() {
+    try {
+      const picked = await filmtoneMedia.pickLutFile({ slot: "creativeLut" });
+      if (!picked) return;
+      let parsed;
+      try {
+        parsed = parseCube(picked.text);
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
+        setState((current) => ({
+          ...current,
+          error: `${strings.lutCreativeParseError}: ${detail}`,
+        }));
+        return;
+      }
       const lut = serializeCubeLut(parsed, {
         title: parsed.title || picked.filename,
         intensity: 1,
       });
       setState((current) => applyLutSelection(current, lut));
     } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
       setState((current) => ({
         ...current,
-        error: error instanceof Error ? error.message : String(error),
+        error: `${strings.lutCreativeImportError}: ${detail}`,
       }));
     }
   }
 
-  function handleLutIntensityChange(intensity: number) {
+  function handleCreativeIntensityChange(intensity: number) {
     setState((current) =>
       applyLutSelection(
         current,
@@ -148,11 +204,18 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
 
   async function handleExport() {
     try {
-      const request = buildEditorExportRequest(state);
-      if (!request) {
+      const baseRequest = buildEditorExportRequest(state);
+      if (!baseRequest) {
         setState((current) => ({ ...current, error: strings.exportDisabled }));
         return;
       }
+      const request = {
+        ...baseRequest,
+        lut: {
+          ...baseRequest.lut,
+          inputLut: inputLutEnabled ? inputLut : null,
+        },
+      };
       setIsSaveBusy(false);
       setState((current) => ({
         ...current,
@@ -343,11 +406,17 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
       />
 
       <Phase0LutPicker
-        lut={state.project.lut}
+        inputLut={inputLut}
+        inputLutEnabled={inputLutEnabled}
+        creativeLut={state.project.lut}
         strings={strings}
-        onPick={handlePickLut}
-        onClear={() => setState((current) => applyLutSelection(current, null))}
-        onIntensityChange={handleLutIntensityChange}
+        onPickInputLut={handlePickInputLut}
+        onClearInputLut={handleClearInputLut}
+        onToggleInputLut={handleToggleInputLut}
+        onInputIntensityChange={handleInputIntensityChange}
+        onPickCreativeLut={handlePickCreativeLut}
+        onClearCreativeLut={() => setState((current) => applyLutSelection(current, null))}
+        onCreativeIntensityChange={handleCreativeIntensityChange}
       />
 
       <ExportSheet
