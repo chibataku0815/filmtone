@@ -8,7 +8,14 @@
  * that way.
  */
 
-export { Viewport, type ViewportBackendPreference, type ViewportCreateOptions } from "./Viewport";
+export {
+  Viewport,
+  type ViewportBackendPreference,
+  type ViewportCapabilities,
+  type ViewportContextLossInfo,
+  type ViewportContextLossReason,
+  type ViewportCreateOptions,
+} from "./Viewport";
 export { WebGLBackend, type ViewportOptions } from "./webgl/WebGLBackend";
 export {
   MediaLoader,

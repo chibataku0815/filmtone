@@ -4,10 +4,18 @@
 **Target tag**: `desktop-v1.0.0`
 **Decision scope**: merge into `main` + tag + DMG release, or hold with a named issue.
 
+**Companion audit**: [`v1.0-webgpu-audit-2026-04-18.md`](./v1.0-webgpu-audit-2026-04-18.md)
+documents a later deep review of parity gaps and should be read before using
+this file as the sole release gate.
+
 This document is the one-decision gate for v1.0. Everything below is the
 evidence the phase chat collected. Read the ✅ section, the ⚠️ section, and
 the Decision section — that is the minimum. The full commit / code evidence
 lives in `STATUS.md` and `phase-3-continuation-v2-handoff.md`.
+
+**Release framing for v1.0**: treat this as **WebGPU preview migration with
+gated unsupported preview affordances**, not as full preview/export parity
+across every WebGL-era UI tool.
 
 ---
 
@@ -17,10 +25,10 @@ lives in `STATUS.md` and `phase-3-continuation-v2-handoff.md`.
 |---|---|
 | `film-lab-renderer` `bunx tsc --noEmit` | exit 0 (clean) |
 | `film-lab-renderer` `bun run build` | main `dist/index.js` 144 KB, WebGPUBackend is a lazy chunk (`chunk-Z3VCXL6F.js` 219 KB + 83-byte re-export stub). Tree-shake verified: web bundles set `FILMTONE_BACKEND=webgl` and the dynamic `import()` is never executed, so the chunk is not fetched. |
-| `film-lab-ui` `bunx tsc --noEmit` | 1 pre-existing error (`FilmLabCanvasPackageEntry.tsx:51` TS4023 — `FilmLabCanvasProps` naming, predates this branch). **Regression delta 0.** |
+| `film-lab-ui` `bunx tsc --noEmit` | clean (0 errors). The lifted preview-status / capability exports now type-check through the package entry as-is. |
 | `desktop-film-lab-batch` `bunx tsc --noEmit` | 17 errors = Phase 2 baseline exactly (11 in electron/main.ts / batch-pipeline / video-export / BatchTabPanel that predate Phase 3, 4 in smart-look tests / viewport-to-params, 2 in FilmLabCanvas for the pre-existing `BASE_URL` vitest type gap). **Regression delta 0.** |
 | `apps/web` `bunx tsc --noEmit` | clean (0 errors) — WebGPU path is dynamically imported, web-bundle type check unaffected. |
-| Viewport composition API contract | 20-method delegation surface preserved (render / setResolution / setTexture / setParams / setLUT1+setLUT2 / split / motion blur / bindThree / histogram / dispose / prewarm). `backendKind` + `mesh?` narrowed type is gated at the 3 known `scene.add(mesh)` call sites. |
+| Viewport composition API contract | 20-method delegation surface preserved (render / setResolution / setTexture / setParams / setLUT1+setLUT2 / split / motion blur / bindThree / histogram / dispose / prewarm). `backendKind` + capability reporting are now used to gate WebGPU-unsupported preview UI (`compare`, before/after, histogram, shortcut help) instead of implying parity. |
 | Electron `--enable-unsafe-webgpu` switch | Added to `electron/main.ts` before `app.whenReady()`. Harmless when WebGPU is already enabled (Phase 0 Case A). |
 | FilmLabCanvas WebGPU branching | `useEffect` now creates a fresh canvas, probes `isWebGPUSupported()` inside the async IIFE, and commits to one backend. WebGL path constructs `THREE.WebGLRenderer({ canvas, … })` so the same element works for either backend. WebGPU path skips the THREE renderer entirely and drives the swapchain through `viewport.render()`. `handleDownload` / `getJpegBase64ForAi` / `getWebGlCanvas` now read from the backend-agnostic `canvasRef`. |
 | Prewarm wiring | `await viewport.prewarm()` is called on the WebGPU path inside the bootstrap IIFE so the first animation frame does not stutter on pipeline compile. Phase 0 Case A measured bootstrap < 100 ms — the 150 ms silent UX budget is covered without an explicit overlay. |
@@ -66,6 +74,9 @@ report)` should be filed after ship.
   render-graph editing + preset round-trip is the v1.1 scope). All 8 v1.0
   factory presets have `crossFilterStrength: 0`, so the 80-matrix PSNR gate
   is not exercised by this code path.
+- Before/after, A/B compare, and histogram are gated off on the WebGPU preview
+  path for v1.0. WebGL preview behavior remains unchanged where that backend
+  is still active.
 - Video export / batch export → WebGL2 for v1.0, WebGPU `GpuRenderer` in v1.1.
 - Hard Mode temporal cross-filter → v1.1 (unchanged from v0.6.x decisions).
 - HDR / P3 output → v2.0.
@@ -79,16 +90,12 @@ report)` should be filed after ship.
   QA runbook の Step 3 で **同フレームの preview 静止画 と export 動画の frame
   を並べて目視** することが v1.0 ship 判断の主ゲート。乖離パターン別の判断
   フローは [`v1.0-qa-runbook.md`](./v1.0-qa-runbook.md) §Step 3 の Fail 時フロー。
-- **WebGPU bootstrap fails on first boot.** `Viewport.create` catches the
-  exception, logs `[Viewport] WebGPU backend bootstrap failed — falling back
-  to WebGL` and constructs a WebGL backend. BUT the fresh canvas we passed in
-  may already own a half-configured WebGPU context in that case, so the
-  subsequent WebGL2 context acquisition inside `THREE.WebGLRenderer` would
-  throw. In practice Phase 0 Case A on macOS 15.x / Electron 32 boots
-  WebGPU cleanly, so this path is exercised only on machines that fail the
-  adapter request outright. If the user hits it, the preview will be black
-  and the console will show both the fallback log and a THREE context error
-  — escalate to direction chat (DIRECTION §9 Case C).
+- **WebGPU bootstrap fails on first boot.** Silent fallback was removed. If
+  adapter/device bootstrap fails, v1.0 now surfaces explicit
+  `canvas.webgpuRequired` / `canvas.webgpuInitFailed` UI instead of pretending
+  the preview still has full WebGL-era parity. This is a release-framing
+  improvement, but it still means non-WebGPU machines cannot use the desktop
+  preview path and should be treated as a hold/escalation for v1.0.
 - **Preset round-trip (WebGPU) loses granular state.** `Viewport.getParams()`
   on the WebGPU path returns `getPendingParams()`, which is the last
   `setParams` blob the backend received. For factory presets that is

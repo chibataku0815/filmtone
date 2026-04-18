@@ -4,14 +4,11 @@
  * @overview Web Film Lab の Viewport / MediaLoader をそのまま用い、同一 grade を複数ファイルに適用する。
  * @limitations GPU は 1 コンテキスト直列。巨大解像度は maxTextureSize で縮小読込（Web と同様）。
  */
-import * as THREE from "three";
 import {
   isWebGL2Supported,
-  Viewport,
   MediaLoader,
 } from "film-lab-renderer";
 import type { FilmLabBatchBridge } from "./desktop-api";
-import { halationHueToHex } from "film-lab-core";
 import {
   filmLabParamsSchema,
   filmLookGradeInputSchema,
@@ -21,6 +18,7 @@ import {
   type Params,
   type PresetName,
 } from "film-lab-core";
+import { createWebGLOffscreenRenderSession } from "./offscreen/webgl-offscreen-render-session";
 
 export type BatchFormat = "png" | "jpeg";
 
@@ -322,23 +320,14 @@ export async function runBatchPipeline(options: {
     };
   };
 
-  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
-  camera.position.z = 1;
-
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0a0a0a);
-
-  const renderer = new THREE.WebGLRenderer({
-    antialias: false,
-    alpha: false,
-    preserveDrawingBuffer: true,
+  const renderSession = await createWebGLOffscreenRenderSession({
+    width: 1,
+    height: 1,
   });
-  renderer.setPixelRatio(1);
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderSession.setGrade(grade);
 
-  let viewport: Viewport | null = null;
   const mediaLoader = new MediaLoader();
-  const maxTextureSize = renderer.capabilities.maxTextureSize;
+  const maxTextureSize = renderSession.maxTextureSize;
 
   try {
     for (let i = 0; i < imagePaths.length; i++) {
@@ -391,51 +380,20 @@ export async function runBatchPipeline(options: {
 
       const { width, height, texture } = loadResult;
 
-      if (!viewport) {
-        viewport = await Viewport.create(renderer.domElement, {
-          prefer: "webgl",
-          width,
-          height,
-        });
-        if (viewport.backendKind === "webgl" && viewport.mesh) {
-          scene.add(viewport.mesh);
-        }
-      }
-
-      renderer.setSize(width, height, false);
-      viewport.setResolution(width, height);
-      viewport.setTexture(texture);
-      viewport.setImageResolution(width, height);
-
-      viewport.setParams({
-        ...grade.params,
-        halationColor: halationHueToHex(grade.params.halationHue),
+      renderSession.setRenderSize(width, height);
+      renderSession.setSource({
+        texture,
+        imageWidth: width,
+        imageHeight: height,
       });
-
-      // LUT1: Input Transform (before grading)
-      if (grade.lut1Data && grade.lut1Size > 0) {
-        viewport.setLUT1(grade.lut1Data, grade.lut1Size);
-        viewport.setLUT1Intensity(grade.lut1Intensity);
-      } else {
-        viewport.clearLUT1();
-      }
-
-      // LUT2: Creative (after grading)
-      if (grade.lutData && grade.lutSize > 0) {
-        viewport.setLUT2(grade.lutData, grade.lutSize);
-        viewport.setLUT2Intensity(grade.lutIntensity);
-      } else {
-        viewport.clearLUT2();
-      }
-
-      viewport.setTime(0);
-      viewport.render(renderer, scene, camera);
+      renderSession.setTime(0);
+      renderSession.render();
 
       const mimeOut = format === "png" ? "image/png" : "image/jpeg";
       const quality = format === "jpeg" ? 0.92 : undefined;
-      const dataUrl = renderer.domElement.toDataURL(
+      const dataUrl = renderSession.toDataURL(
         mimeOut,
-        quality as never,
+        quality,
       );
       const res = await fetch(dataUrl);
       const outBuf = new Uint8Array(await res.arrayBuffer());
@@ -470,8 +428,7 @@ export async function runBatchPipeline(options: {
       `集計: 成功 ${stats.ok} / ${imagePaths.length}（読込エラー ${stats.loadFail}, 書込エラー ${stats.writeFail}）`,
     );
   } finally {
-    viewport?.dispose();
-    renderer.dispose();
+    renderSession.dispose();
   }
 
   return {

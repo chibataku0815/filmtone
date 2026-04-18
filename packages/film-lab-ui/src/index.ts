@@ -37,9 +37,12 @@ export {
 // Components
 export {
   FilmLabCanvas,
+  type FilmLabCanvasProps,
   type FilmLabCanvasRef,
   type FilmLabCanvasPreprocessResult,
   type FilmLabCanvasPreviewHealth,
+  type FilmLabCanvasPreviewStatus,
+  type FilmLabCanvasPreviewStatusReason,
   type FilmLabInteractiveSourceInfo,
   type ProgressiveTextureStage,
 } from "./FilmLabCanvasPackageEntry";

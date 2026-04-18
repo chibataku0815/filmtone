@@ -12,9 +12,10 @@
 
 > v1.0 is a color-quality milestone. The interactive preview now runs on a
 > WebGPU backend with a wider internal working space, so highlights hold their
-> shape instead of clamping to the edge of sRGB. No visible feature was
-> removed at the product surface — this is the quiet foundation release before
-> the cross-filter work lands in v1.1.
+> shape instead of clamping to the edge of sRGB. This is a WebGPU preview
+> release, not a full product-surface parity release: unsupported preview
+> affordances stay gated on the WebGPU path while the cross-filter work lands
+> in v1.1.
 
 ### Wider internal working space (Linear Rec.709, no clamp)
 
@@ -29,12 +30,13 @@ that the signal that led to it is much cleaner.
 - `pow` / `log` / `sqrt` call sites are guarded with `max(x, 0.0)` so no-clamp
   negative excursions cannot poison the pipeline.
 
-### WebGPU preview backend, WebGL fallback retained
+### WebGPU preview backend, with unsupported preview tools gated
 
-The Electron preview now asks for a WebGPU adapter first and falls back to
-WebGL2 silently if the adapter is unavailable. On Apple Silicon (adapter
-`apple / metal-3`) the feature set is complete — color, grain, bloom,
-halation, motion blur, and composite all run on the WebGPU path.
+The Electron preview now asks for a WebGPU adapter first. If WebGPU is
+unavailable or initialization fails, the preview shows an explicit error state
+instead of silently dropping back to WebGL2. On Apple Silicon (adapter
+`apple / metal-3`), color, grain, bloom, halation, motion blur, and composite
+run on the WebGPU path.
 
 - Linear Rec.709 + `rgba16float` working space, `rgba8unorm-srgb` swapchain
   (hardware OETF), `colorSpace: 'srgb'` / `alphaMode: 'opaque'` canvas.
@@ -45,6 +47,9 @@ halation, motion blur, and composite all run on the WebGPU path.
 - Motion blur ring buffer is a single GPU texture with `depthOrArrayLayers = 8`
   and a `validSlots` uniform, so the first eight frames are accumulated
   correctly without a cold-start flash.
+- WebGL-only preview affordances such as before/after, A/B compare, and the
+  histogram are gated off on the WebGPU path in v1.0, so the UI does not
+  advertise tools that the backend cannot honor yet.
 
 ### WebGL2 path unchanged for web and export
 
@@ -66,21 +71,25 @@ batch export also continue to run on WebGL2 for this release — the WebGPU
 - Video export and batch export run on the WebGL2 backend for v1.0. The
   headless WebGPU renderer (`GpuRenderer`) and the nv12 / PNG export integrations
   ship in v1.1.
+- Before/after, A/B compare, and histogram are gated off on the WebGPU preview
+  path for v1.0. WebGL preview behavior stays unchanged where that backend is
+  still used.
 - HDR / P3 output is v2.0 scope (canvas stays `colorSpace: 'srgb'` for v1.x).
 
 ## Compatibility
 
 - macOS 11+ arm64, Electron 32.x.
 - If WebGPU bootstrap fails (adapter / device request rejected), the preview
-  silently falls back to WebGL2. The output will match v0.6.x in that case;
-  only the internal working space drops back to 8-bit sRGB.
+  shows an explicit error UI (`canvas.webgpuRequired` / `canvas.webgpuInitFailed`)
+  instead of silently falling back to WebGL2.
 
 ## Recent lineage
 
 - **v0.6.2 → v1.0.0**: WebGPU preview backend, `rgba16float` working space,
   no-clamp primary grade, Reinhard soft-shaper in front of LUT2, hardware sRGB
   OETF final transform. Apps/web, video export, and batch export stay on
-  WebGL2 for this release.
+  WebGL2 for this release, and unsupported preview tools are gated on the
+  WebGPU path.
 - **v0.6.1 → v0.6.2**: Cross Filter product-surface cleanup (Soft frozen,
   Spikes discrete 4/6/8).
 - **v0.6.0 → v0.6.1**: Preview recovery after export, launch-time update

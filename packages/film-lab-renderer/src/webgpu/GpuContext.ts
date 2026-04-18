@@ -8,10 +8,20 @@
  *   performs the final linear → sRGB transform, colorSpace=srgb, alphaMode=opaque.
  */
 
+import type {
+  ViewportCapabilities,
+  ViewportContextLossInfo,
+  ViewportContextLossListener,
+  ViewportContextLossReason,
+} from "../RendererRuntime";
+
 export interface GpuContextCreateOptions {
   /** Dev-mode validation scope is pushed around pipeline creation. */
   validation?: boolean;
 }
+
+export type GpuContextLossReason = ViewportContextLossReason;
+export type GpuContextLossInfo = ViewportContextLossInfo;
 
 export class GpuContextCreationError extends Error {
   readonly cause?: unknown;
@@ -27,6 +37,7 @@ export class GpuContext {
   readonly device: GPUDevice;
   readonly canvas: HTMLCanvasElement;
   readonly context: GPUCanvasContext;
+  readonly capabilities: ViewportCapabilities;
   /**
    * View / pipeline-attachment format.
    *
@@ -38,6 +49,8 @@ export class GpuContext {
   readonly canvasFormat: GPUTextureFormat = "rgba8unorm-srgb";
   readonly validation: boolean;
   private lost = false;
+  private lossInfo: GpuContextLossInfo | null = null;
+  private readonly lossListeners = new Set<ViewportContextLossListener>();
 
   private constructor(
     adapter: GPUAdapter,
@@ -51,8 +64,23 @@ export class GpuContext {
     this.canvas = canvas;
     this.context = context;
     this.validation = validation;
+    this.capabilities = Object.freeze({
+      backendKind: "webgpu",
+      supportsCompare: false,
+      supportsHistogram: false,
+      supportsBeforeAfter: false,
+      supportsABCompare: false,
+      supportsLiveVideoTexture: true,
+      maxTextureDimension2D:
+        typeof adapter.limits.maxTextureDimension2D === "number"
+          ? adapter.limits.maxTextureDimension2D
+          : 8192,
+    });
     device.lost.then((info) => {
-      this.lost = true;
+      this.markLost({
+        reason: "device-lost",
+        error: info,
+      });
       console.warn("[GpuContext] device lost:", info.reason, info.message);
     });
   }
@@ -108,6 +136,38 @@ export class GpuContext {
     return this.lost;
   }
 
+  isContextLost(): boolean {
+    return this.isLost();
+  }
+
+  getLossInfo(): GpuContextLossInfo | null {
+    return this.lossInfo;
+  }
+
+  getContextLossInfo(): GpuContextLossInfo | null {
+    return this.getLossInfo();
+  }
+
+  onLost(listener: (info: GpuContextLossInfo) => void): () => void {
+    this.lossListeners.add(listener);
+    if (this.lossInfo) {
+      listener(this.lossInfo);
+    }
+    return () => {
+      this.lossListeners.delete(listener);
+    };
+  }
+
+  onContextLost(listener: ViewportContextLossListener): () => void {
+    return this.onLost(listener);
+  }
+
+  reportFatalLoss(reason: Exclude<GpuContextLossReason, "device-lost">, error?: unknown): void {
+    if (this.lost) return;
+    console.error(`[GpuContext] ${reason}`, error);
+    this.markLost({ reason, error });
+  }
+
   getCurrentTextureView(): GPUTextureView {
     return this.context
       .getCurrentTexture()
@@ -117,5 +177,14 @@ export class GpuContext {
   destroy(): void {
     this.context.unconfigure();
     this.device.destroy();
+  }
+
+  private markLost(info: GpuContextLossInfo): void {
+    if (this.lost) return;
+    this.lost = true;
+    this.lossInfo = info;
+    for (const listener of this.lossListeners) {
+      listener(info);
+    }
   }
 }

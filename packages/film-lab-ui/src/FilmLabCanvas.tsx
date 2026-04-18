@@ -20,7 +20,10 @@ import {
   MediaLoadError,
   LIKELY_VIDEO_EXTENSION,
   type LoadResult,
+  type ViewportCapabilities,
   type ViewportBackendPreference,
+  type ViewportContextLossInfo,
+  type ViewportContextLossReason,
 } from "film-lab-renderer";
 import type { Params } from "film-lab-core";
 import { FILM_LAB_NEXT_INTL_NAMESPACE } from "./filmLabUiContract";
@@ -68,16 +71,31 @@ export type FilmLabCanvasPreviewHealth = {
   mediaOverlayKind: "idle" | "loading" | "error";
 };
 
+export type FilmLabCanvasPreviewStatusReason =
+  | "webgl2-missing"
+  | "webgpu-missing"
+  | "init-failed"
+  | ViewportContextLossReason;
+
+export type FilmLabCanvasPreviewStatus = {
+  state: "starting" | "ready" | "unsupported" | "lost" | "recovering" | "error";
+  reason?: FilmLabCanvasPreviewStatusReason;
+  hasActiveVideo: boolean;
+  canRecover: boolean;
+};
+
 /**
  * @description 背景で swap する対象ステージです。
  */
 export type ProgressiveTextureStage = "proxy" | "mezzanine";
 
-interface FilmLabCanvasProps {
+export interface FilmLabCanvasProps {
   preset: PresetName;
   className?: string;
   fullScreen?: boolean;
   onViewportReady?: (viewport: Viewport | null) => void;
+  onViewportCapabilitiesChange?: (capabilities: ViewportCapabilities | null) => void;
+  onPreviewStatusChange?: (status: FilmLabCanvasPreviewStatus) => void;
   /**
    * @description 最初に出す sample asset を親が明示したいときの URL です。
    * Web の `/film-lab` では canonical sample asset を直接渡し、Desktop では共有の既定解決に戻せます。
@@ -201,11 +219,13 @@ export type FilmLabCanvasRef = {
    * @description Export 前後の診断用。renderer の context 状態と現在 source の大分類だけを返します。
    */
   getPreviewHealth: () => FilmLabCanvasPreviewHealth;
+  getPreviewStatus: () => FilmLabCanvasPreviewStatus;
   /**
    * @description 現在の sample / user media / smart-look source を新しい renderer へ読み直します。
    * context loss 後の黒画面から復帰させるため、親は必要時だけこれを呼びます。
    */
   reloadCurrentSource: () => Promise<boolean>;
+  recoverPreview: () => Promise<{ ok: boolean; reason?: string }>;
 };
 
 /** ファイルピッカー用: HEIC を選びにくくしつつ、一般的な形式はそのまま選べる */
@@ -285,6 +305,8 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       className,
       fullScreen,
       onViewportReady,
+      onViewportCapabilitiesChange,
+      onPreviewStatusChange,
       defaultSampleAssetUrl,
       pauseVideoPreview = false,
       stackedToolbarVisible = true,
@@ -315,7 +337,17 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
   useEffect(() => {
     onViewportReadyRef.current = onViewportReady;
   }, [onViewportReady]);
+  const onViewportCapabilitiesChangeRef = useRef(onViewportCapabilitiesChange);
+  useEffect(() => {
+    onViewportCapabilitiesChangeRef.current = onViewportCapabilitiesChange;
+  }, [onViewportCapabilitiesChange]);
+  const onPreviewStatusChangeRef = useRef(onPreviewStatusChange);
+  useEffect(() => {
+    onPreviewStatusChangeRef.current = onPreviewStatusChange;
+  }, [onPreviewStatusChange]);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [viewportCapabilities, setViewportCapabilities] =
+    useState<ViewportCapabilities | null>(null);
   const viewportRef = useRef<Viewport | null>(null);
   const mediaLoaderRef = useRef<MediaLoader | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -354,6 +386,14 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
    * @description 親（例: Web 書き出し）が ref 経由で同期セット。`dynamic()` 越しでも再レンダーを待たない。
    */
   const previewRenderingHoldRef = useRef(false);
+  const previewStatusRef = useRef<FilmLabCanvasPreviewStatus>({
+    state: "starting",
+    hasActiveVideo: false,
+    canRecover: true,
+  });
+  const pendingRecoveryResolveRef = useRef<((value: { ok: boolean; reason?: string }) => void) | null>(
+    null,
+  );
   const [isDragging, setIsDragging] = useState(false);
   const [isSplitDragging, setIsSplitDragging] = useState(false);
   /**
@@ -365,6 +405,10 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
   const [supported, setSupported] = useState<
     "ok" | "webgl2-missing" | "webgpu-missing" | "init-failed"
   >("ok");
+  const supportedRef = useRef<typeof supported>("ok");
+  useEffect(() => {
+    supportedRef.current = supported;
+  }, [supported]);
   const [mediaOverlay, setMediaOverlay] = useState<MediaOverlayState>({ kind: "idle" });
   const mediaOverlayKindRef = useRef<MediaOverlayState["kind"]>("idle");
   useEffect(() => {
@@ -378,6 +422,71 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     resolveDefaultSampleAssetUrl(defaultSampleAssetUrl),
   );
   const [canvasRuntimeNonce, setCanvasRuntimeNonce] = useState(0);
+
+  const publishPreviewStatus = useCallback((status: FilmLabCanvasPreviewStatus) => {
+    previewStatusRef.current = status;
+    onPreviewStatusChangeRef.current?.(status);
+  }, []);
+
+  const settleRecovery = useCallback((result: { ok: boolean; reason?: string }) => {
+    const resolve = pendingRecoveryResolveRef.current;
+    pendingRecoveryResolveRef.current = null;
+    resolve?.(result);
+  }, []);
+
+  const setReadyPreviewStatus = useCallback(
+    (videoElement: HTMLVideoElement | null = previewVideoElementRef.current) => {
+      publishPreviewStatus({
+        state: "ready",
+        hasActiveVideo: videoElement != null,
+        canRecover: supportedRef.current === "ok",
+      });
+    },
+    [publishPreviewStatus],
+  );
+
+  const setErrorPreviewStatus = useCallback(
+    (reason?: FilmLabCanvasPreviewStatusReason) => {
+      publishPreviewStatus({
+        state: "error",
+        reason,
+        hasActiveVideo: previewVideoElementRef.current != null,
+        canRecover: supportedRef.current === "ok",
+      });
+    },
+    [publishPreviewStatus],
+  );
+
+  const markPreviewLost = useCallback(
+    (reason: ViewportContextLossReason) => {
+      previewContextLostRef.current = true;
+      previewRenderingHoldRef.current = true;
+      publishPreviewStatus({
+        state: "lost",
+        reason,
+        hasActiveVideo: previewVideoElementRef.current != null,
+        canRecover: supportedRef.current === "ok",
+      });
+      setMediaOverlay({ kind: "loading" });
+    },
+    [publishPreviewStatus],
+  );
+
+  useEffect(() => {
+    if (supported === "webgl2-missing" || supported === "webgpu-missing") {
+      setViewportCapabilities(null);
+      publishPreviewStatus({
+        state: "unsupported",
+        reason: supported,
+        hasActiveVideo: false,
+        canRecover: false,
+      });
+      return;
+    }
+    if (supported === "init-failed") {
+      setErrorPreviewStatus("init-failed");
+    }
+  }, [publishPreviewStatus, setErrorPreviewStatus, supported]);
 
   /**
    * @description `preset` / 共有 URL 復元のどちらが来ても、現在の Viewport に同じ形で反映します。
@@ -550,7 +659,11 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
   }, [applyResolvedGradeToViewport]);
 
   const getMaxTextureSize = useCallback((): number => {
-    return rendererRef.current?.capabilities.maxTextureSize ?? 8192;
+    return (
+      viewportRef.current?.getCapabilities().maxTextureDimension2D ??
+      rendererRef.current?.capabilities.maxTextureSize ??
+      8192
+    );
   }, []);
 
   const loadDefaultSampleIntoCanvas = useCallback(async (): Promise<boolean> => {
@@ -568,6 +681,8 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       previewRenderingHoldRef.current = false;
       onInteractiveSourceChangeRef.current?.({ kind: "sample" });
       setMediaOverlay({ kind: "idle" });
+      setReadyPreviewStatus();
+      settleRecovery({ ok: true });
       return true;
     } catch (err) {
       const message = `FilmLabCanvas.loadDefaultSample("${defaultSampleUrl}") failed. Open a file manually or verify that the canonical sample asset is reachable.`;
@@ -583,9 +698,11 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
         kind: "error",
         message,
       });
+      setErrorPreviewStatus();
+      settleRecovery({ ok: false, reason: "sample-load-failed" });
       return false;
     }
-  }, [applyLoadedTextureResult]);
+  }, [applyLoadedTextureResult, setErrorPreviewStatus, setReadyPreviewStatus, settleRecovery]);
 
   const loadUserMediaFile = useCallback(
     async (file: File) => {
@@ -631,6 +748,12 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
                 sourceRole: "userMedia",
               });
               setMediaOverlay({ kind: "idle" });
+              setReadyPreviewStatus(
+                result.type === "video" && result.texture.image instanceof HTMLVideoElement
+                  ? result.texture.image
+                  : null,
+              );
+              settleRecovery({ ok: true });
               return;
             }
           } catch (preprocessErr) {
@@ -658,6 +781,12 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
           sourceRole: "userMedia",
         });
         setMediaOverlay({ kind: "idle" });
+        setReadyPreviewStatus(
+          result.type === "video" && result.texture.image instanceof HTMLVideoElement
+            ? result.texture.image
+            : null,
+        );
+        settleRecovery({ ok: true });
       } catch (err) {
         const message =
           err instanceof MediaLoadError
@@ -668,6 +797,8 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
         reloadInFlightRef.current = false;
         previewRenderingHoldRef.current = false;
         setMediaOverlay({ kind: "error", message });
+        setErrorPreviewStatus();
+        settleRecovery({ ok: false, reason: "media-load-failed" });
         console.error("FilmLabCanvas.loadUserMediaFile failed", {
           fileName: file.name,
           fileType: file.type,
@@ -675,7 +806,14 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
         });
       }
     },
-    [applyLoadedTextureResult, getMaxTextureSize, onCubeLutLoaded],
+    [
+      applyLoadedTextureResult,
+      getMaxTextureSize,
+      onCubeLutLoaded,
+      setErrorPreviewStatus,
+      setReadyPreviewStatus,
+      settleRecovery,
+    ],
   );
 
   const restoreCurrentSource = useCallback(async (): Promise<boolean> => {
@@ -716,6 +854,8 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
           sourceRole: "smartLookDerived",
         });
         setMediaOverlay({ kind: "idle" });
+        setReadyPreviewStatus();
+        settleRecovery({ ok: true });
         return true;
       } catch (err) {
         console.error("FilmLabCanvas.restoreCurrentSource smart look failed", err);
@@ -725,6 +865,8 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
           kind: "error",
           message: "Could not restore the current preview.",
         });
+        setErrorPreviewStatus();
+        settleRecovery({ ok: false, reason: "restore-smart-look-failed" });
         return false;
       }
     }
@@ -735,6 +877,9 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     getMaxTextureSize,
     loadDefaultSampleIntoCanvas,
     loadUserMediaFile,
+    setErrorPreviewStatus,
+    setReadyPreviewStatus,
+    settleRecovery,
     supported,
   ]);
 
@@ -742,6 +887,11 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+      publishPreviewStatus({
+        state: reloadInFlightRef.current ? "recovering" : "starting",
+        hasActiveVideo: previewVideoElementRef.current != null,
+        canRecover: supportedRef.current === "ok",
+      });
 
     /**
      * Backend preference: desktop defaults to WebGPU per Vite build flag
@@ -793,7 +943,8 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     let resizeObserver: ResizeObserver | null = null;
     let resizeRafId = 0;
     let cancelled = false;
-    let webglContextLostHandler: ((event: Event) => void) | null = null;
+      let webglContextLostHandler: ((event: Event) => void) | null = null;
+      let detachViewportContextLost: (() => void) | null = null;
 
     const syncViewportSize = () => {
       if (!viewport) return;
@@ -846,6 +997,12 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
         return;
       }
       viewport = vp;
+      detachViewportContextLost = vp.onContextLost((info: ViewportContextLossInfo) => {
+        markPreviewLost(info.reason);
+      });
+      const capabilities = vp.getCapabilities();
+      setViewportCapabilities(capabilities);
+      onViewportCapabilitiesChangeRef.current?.(capabilities);
 
       if (vp.backendKind === "webgl") {
         // WebGL path: wire THREE.js renderer/scene/camera to the same canvas
@@ -872,9 +1029,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
 
         webglContextLostHandler = (event: Event) => {
           event.preventDefault();
-          previewContextLostRef.current = true;
-          previewRenderingHoldRef.current = true;
-          setMediaOverlay({ kind: "loading" });
+          markPreviewLost("render-failed");
         };
         canvas.addEventListener(
           "webglcontextlost",
@@ -890,7 +1045,15 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
         // Pre-warm pipeline JIT (DIRECTION §10 Phase 3). Fire-and-forget —
         // Electron bootstrap is < 100 ms in Phase 0 Case A, so the
         // 150 ms-silent UX budget is covered without an explicit overlay.
-        await vp.prewarm();
+        try {
+          await vp.prewarm();
+        } catch (err) {
+          if (!cancelled) {
+            console.error("[FilmLabCanvas] viewport.prewarm failed", err);
+            setErrorPreviewStatus("prewarm-failed");
+          }
+          return;
+        }
       }
 
       viewportRef.current = viewport;
@@ -927,10 +1090,15 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
           return;
         }
         viewport.setTime(clock.getElapsedTime());
-        if (renderer && scene && camera) {
-          viewport.render(renderer, scene, camera);
-        } else {
-          viewport.render();
+        try {
+          if (renderer && scene && camera) {
+            viewport.render(renderer, scene, camera);
+          } else {
+            viewport.render();
+          }
+        } catch (err) {
+          console.error("[FilmLabCanvas] viewport.render failed", err);
+          markPreviewLost("render-failed");
         }
       };
       animate();
@@ -941,6 +1109,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       if (animationId) cancelAnimationFrame(animationId);
       if (resizeRafId) window.cancelAnimationFrame(resizeRafId);
       resizeObserver?.disconnect();
+      detachViewportContextLost?.();
       window.removeEventListener("resize", syncViewportSize);
       if (webglContextLostHandler) {
         canvas.removeEventListener(
@@ -973,14 +1142,23 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       rendererRef.current = null;
       sceneRef.current = null;
       cameraRef.current = null;
+      setViewportCapabilities(null);
+      onViewportCapabilitiesChangeRef.current?.(null);
       onViewportReadyRef.current?.(null);
     };
   }, [
     applyLoadedTextureResult,
     disposePreviewVideoElement,
+    markPreviewLost,
+    publishPreviewStatus,
     restoreCurrentSource,
     canvasRuntimeNonce,
+    setErrorPreviewStatus,
   ]);
+
+  const previewSupportsCompare =
+    viewportCapabilities?.supportsBeforeAfter === true &&
+    viewportCapabilities?.supportsABCompare === true;
 
   const handleDrop = useCallback(
     async (e: React.DragEvent) => {
@@ -1288,32 +1466,67 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       },
       getWebGlCanvas: () => canvasRef.current,
       getPreviewHealth: (): FilmLabCanvasPreviewHealth => ({
-        hasRenderer: viewportRef.current != null && canvasRef.current != null,
-        // `isRendererContextLost` is WebGL-only; on WebGPU the renderer ref
-        // is null and we rely on the backend's `device.lost` watcher (GpuContext).
+        hasRenderer:
+          viewportRef.current != null &&
+          canvasRef.current != null &&
+          !previewContextLostRef.current &&
+          !(viewportRef.current?.isContextLost() ?? false),
         contextLost:
           previewContextLostRef.current ||
-          isRendererContextLost(rendererRef.current),
+          isRendererContextLost(rendererRef.current) ||
+          (viewportRef.current?.isContextLost() ?? false),
         activeSourceKind: reloadableSourceRef.current.kind,
         hasActiveVideo: previewVideoElementRef.current != null,
         mediaOverlayKind: mediaOverlayKindRef.current,
       }),
+      getPreviewStatus: () => previewStatusRef.current,
       reloadCurrentSource: async () => {
+        const result = await (async () => {
+          if (reloadInFlightRef.current) {
+            return { ok: false, reason: "already-recovering" };
+          }
+          reloadInFlightRef.current = true;
+          previewContextLostRef.current = false;
+          previewRenderingHoldRef.current = true;
+          setMediaOverlay({ kind: "loading" });
+          publishPreviewStatus({
+            state: "recovering",
+            hasActiveVideo: previewVideoElementRef.current != null,
+            canRecover: supportedRef.current === "ok",
+          });
+          const recovery = new Promise<{ ok: boolean; reason?: string }>((resolve) => {
+            pendingRecoveryResolveRef.current = resolve;
+          });
+          setCanvasRuntimeNonce((value) => value + 1);
+          return recovery;
+        })();
+        return result.ok;
+      },
+      recoverPreview: async () => {
         if (reloadInFlightRef.current) {
-          return false;
+          return { ok: false, reason: "already-recovering" };
         }
         reloadInFlightRef.current = true;
         previewContextLostRef.current = false;
         previewRenderingHoldRef.current = true;
         setMediaOverlay({ kind: "loading" });
+        publishPreviewStatus({
+          state: "recovering",
+          hasActiveVideo: previewVideoElementRef.current != null,
+          canRecover: supportedRef.current === "ok",
+        });
+        const recovery = new Promise<{ ok: boolean; reason?: string }>((resolve) => {
+          pendingRecoveryResolveRef.current = resolve;
+        });
         setCanvasRuntimeNonce((value) => value + 1);
-        return true;
+        return recovery;
       },
     }),
     [
       applyLoadedTextureResult,
       handleDownload,
       handleFileClick,
+      publishPreviewStatus,
       seekLoadedVideoElement,
       supported,
     ],
@@ -1338,7 +1551,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     );
   }
 
-  const viewportHostClassName = `relative ${fullScreen ? "h-full min-h-0" : "aspect-[4/3] sm:aspect-[16/9]"} w-full touch-none cursor-col-resize overflow-hidden rounded-lg bg-[#0a0a0a] ${chromeLayout === "stacked" ? "min-h-[200px] sm:min-h-[240px]" : ""}`;
+  const viewportHostClassName = `relative ${fullScreen ? "h-full min-h-0" : "aspect-[4/3] sm:aspect-[16/9]"} w-full touch-none ${previewSupportsCompare ? "cursor-col-resize" : "cursor-auto"} overflow-hidden rounded-lg bg-[#0a0a0a] ${chromeLayout === "stacked" ? "min-h-[200px] sm:min-h-[240px]" : ""}`;
 
   const toolbarClassName =
     chromeLayout === "stacked"
@@ -1401,7 +1614,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     <>
       {chromeLayout === "overlay" ? toolbar : null}
 
-      {compareHud != null && (
+      {compareHud != null && previewSupportsCompare && (
         <>
           <div className="pointer-events-none absolute left-0 right-0 top-16 z-[6] flex items-center justify-center gap-2 px-3 sm:top-[4.5rem]">
             <span className="rounded-full bg-black/55 px-2.5 py-1 text-[10px] font-medium text-white/80 ring-1 ring-white/15 backdrop-blur-sm">
@@ -1483,19 +1696,28 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     </>
   );
 
-  const viewportPointerAndDragProps = {
-    onDragOver: (e: React.DragEvent) => {
-      e.preventDefault();
-      setIsDragging(true);
-    },
-    onDragLeave: () => setIsDragging(false),
-    onDrop: handleDrop,
-    onPointerDown: handlePointerDown,
-    onPointerMove: handlePointerMove,
-    onPointerUp: handlePointerUp,
-    onPointerCancel: handlePointerUp,
-    onLostPointerCapture: handleLostPointerCapture,
-  };
+  const viewportPointerAndDragProps = previewSupportsCompare
+    ? {
+        onDragOver: (e: React.DragEvent) => {
+          e.preventDefault();
+          setIsDragging(true);
+        },
+        onDragLeave: () => setIsDragging(false),
+        onDrop: handleDrop,
+        onPointerDown: handlePointerDown,
+        onPointerMove: handlePointerMove,
+        onPointerUp: handlePointerUp,
+        onPointerCancel: handlePointerUp,
+        onLostPointerCapture: handleLostPointerCapture,
+      }
+    : {
+        onDragOver: (e: React.DragEvent) => {
+          e.preventDefault();
+          setIsDragging(true);
+        },
+        onDragLeave: () => setIsDragging(false),
+        onDrop: handleDrop,
+      };
 
   if (chromeLayout === "stacked") {
     return (

@@ -9,9 +9,12 @@ import {
 } from "react";
 import {
   FilmLabCanvas as FilmLabCanvasInner,
+  type FilmLabCanvasProps,
   type FilmLabCanvasRef,
   type FilmLabCanvasPreprocessResult,
   type FilmLabCanvasPreviewHealth,
+  type FilmLabCanvasPreviewStatus,
+  type FilmLabCanvasPreviewStatusReason,
   type FilmLabInteractiveSourceInfo,
   type ProgressiveTextureStage,
 } from "./FilmLabCanvas";
@@ -26,7 +29,9 @@ const FILM_LAB_CANVAS_SM_MEDIA_QUERY = "(min-width: 640px)";
 const FILM_LAB_CANVAS_COMPACT_ASPECT_RATIO = "4 / 3";
 const FILM_LAB_CANVAS_WIDE_ASPECT_RATIO = "16 / 9";
 
-type FilmLabCanvasInnerProps = ComponentPropsWithoutRef<typeof FilmLabCanvasInner>;
+type FilmLabCanvasInnerProps =
+  | FilmLabCanvasProps
+  | ComponentPropsWithoutRef<typeof FilmLabCanvasInner>;
 
 /**
  * @description 画面幅に応じたプレビュー比率を返します。
@@ -110,9 +115,12 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasIn
 FilmLabCanvas.displayName = "FilmLabCanvas";
 
 export type {
+  FilmLabCanvasProps,
   FilmLabCanvasRef,
   FilmLabCanvasPreprocessResult,
   FilmLabCanvasPreviewHealth,
+  FilmLabCanvasPreviewStatus,
+  FilmLabCanvasPreviewStatusReason,
   FilmLabInteractiveSourceInfo,
   ProgressiveTextureStage,
 };

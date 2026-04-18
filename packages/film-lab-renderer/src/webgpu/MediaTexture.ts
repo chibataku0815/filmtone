@@ -9,6 +9,15 @@
  * `copyExternalImageToTexture`; the caller owns RAF scheduling. When
  * `VideoFrame` is unavailable we fall back to the same `HTMLVideoElement`
  * path (DIRECTION §10 common default).
+ *
+ * **Y orientation**: upload with `flipY: true` so the WebGPU texture's row 0
+ * corresponds to the image's bottom row. Combined with the procedural
+ * fullscreen vertex shader (which derives UV.y from NDC y so that the top
+ * of the screen maps to UV.y=1.0), this reproduces the WebGL/THREE.js
+ * default orientation (top-of-screen = top-of-image). Without the flip the
+ * preview renders upside-down. `setFlipY(true)` on the shader uniform is
+ * an additional export-time knob (matching `setExportFlipY` on the WebGL
+ * backend) and composes with the upload orientation.
  */
 
 export interface MediaTextureOptions {
@@ -23,6 +32,18 @@ const DEFAULT_MEDIA_USAGE: GPUTextureUsageFlags =
   GPUTextureUsage.RENDER_ATTACHMENT;
 
 export class MediaTexture {
+  static createPlaceholder(
+    device: GPUDevice,
+    opts: MediaTextureOptions = {},
+  ): GPUTexture {
+    return device.createTexture({
+      label: opts.label ?? "media.placeholder",
+      size: { width: 1, height: 1, depthOrArrayLayers: 1 },
+      format: "rgba8unorm-srgb",
+      usage: opts.usage ?? DEFAULT_MEDIA_USAGE,
+    });
+  }
+
   static fromImageBitmap(
     device: GPUDevice,
     bitmap: ImageBitmap,
@@ -35,7 +56,7 @@ export class MediaTexture {
       usage: opts.usage ?? DEFAULT_MEDIA_USAGE,
     });
     device.queue.copyExternalImageToTexture(
-      { source: bitmap, flipY: false },
+      { source: bitmap, flipY: true },
       { texture },
       { width: bitmap.width, height: bitmap.height },
     );
@@ -69,7 +90,7 @@ export class MediaTexture {
       : (target as GPUTexture);
     if (target && needsAlloc) target.destroy();
     device.queue.copyExternalImageToTexture(
-      { source: video, flipY: false },
+      { source: video, flipY: true },
       { texture },
       { width, height },
     );

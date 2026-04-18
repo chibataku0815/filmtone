@@ -32,6 +32,7 @@ import {
   VideoTransportControls,
   type FilmLabCanvasRef,
   type FilmLabCanvasPreprocessResult,
+  type FilmLabCanvasPreviewStatus,
   type FilmLabInteractiveSourceInfo,
 } from "film-lab-ui";
 import { FilmLabControlPanelCore } from "film-lab-ui";
@@ -39,7 +40,7 @@ import { Histogram } from "film-lab-ui";
 import { HelpHint } from "./batch-tab/HelpHint";
 import { GradeSyncToast, type GradeSyncToastPayload } from "./GradeSyncToast";
 import { QualityBadge } from "./QualityBadge";
-import type { Viewport } from "film-lab-renderer";
+import type { Viewport, ViewportCapabilities } from "film-lab-renderer";
 import type { PresetName } from "film-lab-core";
 import {
   initialOutcomes,
@@ -220,6 +221,17 @@ export default function App() {
   const filmLabEditFrostPanelRef = useRef<HTMLElement | null>(null);
   const [tab, setTab] = useState<TabId>("edit");
   const [viewport, setViewport] = useState<Viewport | null>(null);
+  const [viewportCapabilities, setViewportCapabilities] =
+    useState<ViewportCapabilities | null>(null);
+  const [previewStatus, setPreviewStatus] = useState<FilmLabCanvasPreviewStatus>({
+    state: "starting",
+    hasActiveVideo: false,
+    canRecover: true,
+  });
+  const previewStatusRef = useRef(previewStatus);
+  useEffect(() => {
+    previewStatusRef.current = previewStatus;
+  }, [previewStatus]);
   const [histogramVisible, setHistogramVisible] = useState(true);
   /**
    * @description キャンバス・共有コントロール・書き出し同期が共通で参照する現在のプリセット名です。
@@ -337,8 +349,17 @@ export default function App() {
    * @description ヒストグラムの表示切り替えを安定した参照で渡します。
    */
   const handleHistogramToggle = useCallback(() => {
+    if (!viewportCapabilities?.supportsHistogram) {
+      return;
+    }
     setHistogramVisible((v) => !v);
-  }, []);
+  }, [viewportCapabilities?.supportsHistogram]);
+
+  const previewSupportsHistogram = viewportCapabilities?.supportsHistogram ?? false;
+  const previewSupportsBeforeAfter =
+    viewportCapabilities?.supportsBeforeAfter ?? false;
+  const previewSupportsABCompare =
+    viewportCapabilities?.supportsABCompare ?? false;
 
   /**
    * @description main が公開 JSON を読んで送る「新しい版があります」バナー（案 C）
@@ -1225,7 +1246,7 @@ export default function App() {
     resetLogText();
     resetVideoProgressBuffer();
     batchAbortRef.current = null;
-    const previewBeforeExport = filmLabCanvasRef.current?.getPreviewHealth() ?? null;
+    const previewBeforeExport = previewStatusRef.current;
     filmLabCanvasRef.current?.holdPreviewRendering(true);
     setRunning(true);
 
@@ -1276,22 +1297,25 @@ export default function App() {
       await new Promise<void>((resolve) => {
         window.requestAnimationFrame(() => resolve());
       });
-      const previewAfterExport = filmLabCanvasRef.current?.getPreviewHealth() ?? null;
+      const previewAfterExport = previewStatusRef.current;
+      const previewRecoveryAlreadyRunning =
+        previewAfterExport.state === "recovering";
       const shouldRecoverPreview =
         interactivePreviewSource.kind === "file" &&
         desktopPreviewShowsUserVideo(interactivePreviewSource) &&
-        (
-          previewAfterExport?.contextLost === true ||
-          (
-            previewBeforeExport?.contextLost === false &&
-            previewAfterExport?.hasRenderer === false
-          )
+        previewAfterExport.canRecover &&
+        previewAfterExport.state === "lost";
+      if (previewRecoveryAlreadyRunning) {
+        appendLog("[動画] preview 復旧はすでに進行中です");
+      } else if (shouldRecoverPreview) {
+        appendLog(
+          `[動画] export 後に preview runtime loss を検知したため、現在のソースを復旧します (${previewBeforeExport.state} → ${previewAfterExport.state})`,
         );
-      if (shouldRecoverPreview) {
-        appendLog("[動画] export 後に preview context loss を検知したため、現在のソースを再読み込みします");
-        const requested = await filmLabCanvasRef.current?.reloadCurrentSource();
-        if (!requested) {
-          appendLog("[動画] preview 再読み込みの要求に失敗しました");
+        const recovered = await filmLabCanvasRef.current?.recoverPreview();
+        if (!recovered?.ok) {
+          appendLog(
+            `[動画] preview 復旧に失敗しました${recovered?.reason ? `: ${recovered.reason}` : ""}`,
+          );
           filmLabCanvasRef.current?.holdPreviewRendering(false);
         }
       } else {
@@ -1487,6 +1511,8 @@ export default function App() {
                 fullScreen
                 pauseVideoPreview={running}
                 onViewportReady={setViewport}
+                onViewportCapabilitiesChange={setViewportCapabilities}
+                onPreviewStatusChange={setPreviewStatus}
                 onInteractiveSourceChange={handleInteractiveSourceChange}
                 getFileAbsolutePath={resolveCanvasFileAbsolutePath}
                 preprocessVideoFile={preprocessVideoFile}
@@ -1496,7 +1522,7 @@ export default function App() {
               >
                 <Histogram
                   viewport={viewport}
-                  visible={histogramVisible}
+                  visible={histogramVisible && previewSupportsHistogram}
                   variant="inline"
                 />
               </div>
@@ -1665,9 +1691,14 @@ export default function App() {
                   <div className="fl-scroll-surface fl-right-panel-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 pr-5 lg:pr-8">
                     <FilmLabControlPanelCore
                       viewport={viewport}
-                      histogramVisible={histogramVisible}
+                      histogramVisible={histogramVisible && previewSupportsHistogram}
+                      supportsHistogram={previewSupportsHistogram}
+                      supportsBeforeAfter={previewSupportsBeforeAfter}
+                      supportsABCompare={previewSupportsABCompare}
                       surface="bare"
-                      onHistogramToggle={handleHistogramToggle}
+                      onHistogramToggle={
+                        previewSupportsHistogram ? handleHistogramToggle : undefined
+                      }
                       onPresetChange={setCanvasPreset}
                       onLutChange={handleEditLutChange}
                       onParamsChange={handleEditParamsChange}

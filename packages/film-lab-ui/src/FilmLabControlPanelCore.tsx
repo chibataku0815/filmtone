@@ -131,6 +131,9 @@ export interface FilmLabCoreRenderContext {
 interface FilmLabControlPanelCoreProps {
   viewport: Viewport | null;
   histogramVisible?: boolean;
+  supportsHistogram?: boolean;
+  supportsBeforeAfter?: boolean;
+  supportsABCompare?: boolean;
   onHistogramToggle?: () => void;
   surface?: "card" | "bare";
   /** サーバーで ?v=1&p= から復元したパラメータ */
@@ -277,6 +280,9 @@ export const FilmLabControlPanelCore = forwardRef<
 >(function FilmLabControlPanelCore({
   viewport,
   histogramVisible = true,
+  supportsHistogram = true,
+  supportsBeforeAfter = true,
+  supportsABCompare = true,
   onHistogramToggle,
   surface = "card",
   initialSharedParams = null,
@@ -439,8 +445,8 @@ export const FilmLabControlPanelCore = forwardRef<
   useEffect(() => {
     if (!viewport) return;
 
-    const compareOn = state.compareMode;
-    const beforeAfterActive = state.beforeAfterStash != null;
+    const compareOn = supportsABCompare && state.compareMode;
+    const beforeAfterActive = supportsBeforeAfter && state.beforeAfterStash != null;
 
     if (compareOn) {
       viewport.setComparePair(
@@ -471,6 +477,8 @@ export const FilmLabControlPanelCore = forwardRef<
     prevBeforeAfterActiveRef.current = beforeAfterActive;
   }, [
     viewport,
+    supportsABCompare,
+    supportsBeforeAfter,
     state.compareMode,
     state.slotA,
     state.slotB,
@@ -481,10 +489,22 @@ export const FilmLabControlPanelCore = forwardRef<
 
   useEffect(() => {
     onCompareUiChange?.({
-      compareMode: state.compareMode,
+      compareMode: supportsABCompare ? state.compareMode : false,
       activeSlot: state.activeSlot,
     });
-  }, [state.compareMode, state.activeSlot, onCompareUiChange]);
+  }, [supportsABCompare, state.compareMode, state.activeSlot, onCompareUiChange]);
+
+  useEffect(() => {
+    if (!supportsABCompare && state.compareMode) {
+      dispatch({ type: "COMPARE_OFF" });
+    }
+  }, [supportsABCompare, state.compareMode]);
+
+  useEffect(() => {
+    if (!supportsBeforeAfter && state.beforeAfterStash != null) {
+      dispatch({ type: "BEFORE_AFTER_OFF" });
+    }
+  }, [supportsBeforeAfter, state.beforeAfterStash]);
 
   const bloomEnabled = params.bloomStrength > 0;
   const halationEnabled = params.halationIntensity > 0;
@@ -492,7 +512,8 @@ export const FilmLabControlPanelCore = forwardRef<
   const rgbShiftEnabled = params.rgbShift > 0;
   const shaftEnabled = params.shaftIntensity > 0;
   const crossFilterEnabled = params.crossFilterStrength > 0;
-  const canToggleHistogram = typeof onHistogramToggle === "function";
+  const canToggleHistogram =
+    supportsHistogram && typeof onHistogramToggle === "function";
 
   const updateParam = useCallback((key: keyof Params, value: number) => {
     dispatch({ type: "SET_PARAM", key, value });
@@ -709,6 +730,9 @@ export const FilmLabControlPanelCore = forwardRef<
       }
 
       if (e.key === " ") {
+        if (!supportsBeforeAfter) {
+          return;
+        }
         if (deferSpaceKeyToVideoTransportWhenNoCompare && !state.compareMode) {
           return;
         }
@@ -726,16 +750,16 @@ export const FilmLabControlPanelCore = forwardRef<
         applyPreset(presetKeys[e.key]);
         return;
       }
-      if (e.key === "h" || e.key === "H") {
+      if ((e.key === "h" || e.key === "H") && canToggleHistogram) {
         onHistogramToggle?.();
         return;
       }
-      if (e.key === "Tab" && state.compareMode) {
+      if (supportsABCompare && e.key === "Tab" && state.compareMode) {
         e.preventDefault();
         dispatch({ type: "SWITCH_SLOT" });
         return;
       }
-      if (e.key === "v" || e.key === "V") {
+      if (supportsABCompare && (e.key === "v" || e.key === "V")) {
         e.preventDefault();
         dispatch({ type: "TOGGLE_COMPARE" });
         return;
@@ -764,6 +788,9 @@ export const FilmLabControlPanelCore = forwardRef<
       ) {
         return;
       }
+      if (!supportsBeforeAfter) {
+        return;
+      }
       if (deferSpaceKeyToVideoTransportWhenNoCompare && !state.compareMode) {
         return;
       }
@@ -778,7 +805,15 @@ export const FilmLabControlPanelCore = forwardRef<
       document.removeEventListener("keydown", handleKeyDown, { capture: true });
       document.removeEventListener("keyup", handleKeyUp, { capture: true });
     };
-  }, [applyPreset, onHistogramToggle, state.compareMode, deferSpaceKeyToVideoTransportWhenNoCompare]);
+  }, [
+    applyPreset,
+    canToggleHistogram,
+    onHistogramToggle,
+    state.compareMode,
+    deferSpaceKeyToVideoTransportWhenNoCompare,
+    supportsABCompare,
+    supportsBeforeAfter,
+  ]);
 
   // ── パラメータ変更を親に通知（初回レンダーはスキップ） ──
   const isFirstParamsRender = useRef(true);
@@ -1354,7 +1389,7 @@ export const FilmLabControlPanelCore = forwardRef<
 
           <div className="min-w-0">
             {/* Compare section — Pro のみ、折りたたみ式（デフォルト閉じ） */}
-            {isPro ? (
+            {isPro && (supportsBeforeAfter || supportsABCompare) ? (
             <div className="min-w-0">
               <CollapsibleHeader
                 title={tFilmLab("compare.sectionTitle")}
@@ -1363,77 +1398,83 @@ export const FilmLabControlPanelCore = forwardRef<
               />
               {compareOpen && (
                 <div className="flex flex-col gap-2.5">
-                  <button
-                    type="button"
-                    onPointerDown={handleBeforeAfterPointerDown}
-                    onPointerUp={handleBeforeAfterPointerEnd}
-                    onPointerCancel={handleBeforeAfterPointerEnd}
-                    onLostPointerCapture={handleBeforeAfterLostCapture}
-                    className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-left text-[11px] text-white/65 transition-colors hover:bg-white/8 hover:text-white/80 active:bg-white/12"
-                  >
-                    <span className="font-medium text-white/85">{tFilmLab("compare.holdTitle")}</span>
-                    <span className="mt-0.5 block text-[10px] text-white/52">{tFilmLab("compare.holdHint")}</span>
-                  </button>
-
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-medium text-white/85">
-                      {tFilmLab("compare.title")}
-                    </span>
+                  {supportsBeforeAfter ? (
                     <button
                       type="button"
-                      role="switch"
-                      aria-checked={state.compareMode}
-                      onClick={() =>
-                        dispatch({ type: state.compareMode ? "COMPARE_OFF" : "COMPARE_ON" })
-                      }
-                      className={`h-4 w-7 shrink-0 rounded-full transition-colors ${
-                        state.compareMode ? "bg-[var(--accent-amber1)]" : "bg-white/15"
-                      }`}
+                      onPointerDown={handleBeforeAfterPointerDown}
+                      onPointerUp={handleBeforeAfterPointerEnd}
+                      onPointerCancel={handleBeforeAfterPointerEnd}
+                      onLostPointerCapture={handleBeforeAfterLostCapture}
+                      className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-left text-[11px] text-white/65 transition-colors hover:bg-white/8 hover:text-white/80 active:bg-white/12"
                     >
-                      <span className="sr-only">{tFilmLab("compare.title")}</span>
-                      <span
-                        className={`block h-3 w-3 rounded-full bg-white transition-transform ${
-                          state.compareMode ? "translate-x-3.5" : "translate-x-0.5"
-                        }`}
-                      />
+                      <span className="font-medium text-white/85">{tFilmLab("compare.holdTitle")}</span>
+                      <span className="mt-0.5 block text-[10px] text-white/52">{tFilmLab("compare.holdHint")}</span>
                     </button>
-                  </div>
-                  {state.compareMode ? (
-                    <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
-                      <span className="text-[10px] font-medium text-white/55">
-                        {tFilmLab("compare.editLabel")}
-                      </span>
-                      <div
-                        className="inline-flex rounded-lg border border-white/18 bg-black/50 p-0.5 shadow-inner shadow-black/30"
-                        role="group"
-                        aria-label={tFilmLab("compare.editLabel")}
-                      >
+                  ) : null}
+
+                  {supportsABCompare ? (
+                    <>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-medium text-white/85">
+                          {tFilmLab("compare.title")}
+                        </span>
                         <button
                           type="button"
-                          title={tFilmLab("compare.slotTooltipLeft")}
-                          onClick={() => dispatch({ type: "SWITCH_SLOT", slot: "A" })}
-                          className={`min-w-[3rem] rounded-md px-2.5 py-1.5 text-[11px] font-semibold transition-colors sm:py-1.5 ${
-                            state.activeSlot === "A"
-                              ? "bg-[var(--accent-amber1)] text-black shadow-sm"
-                              : "bg-transparent text-white/88 hover:bg-white/10 hover:text-white"
+                          role="switch"
+                          aria-checked={state.compareMode}
+                          onClick={() =>
+                            dispatch({ type: state.compareMode ? "COMPARE_OFF" : "COMPARE_ON" })
+                          }
+                          className={`h-4 w-7 shrink-0 rounded-full transition-colors ${
+                            state.compareMode ? "bg-[var(--accent-amber1)]" : "bg-white/15"
                           }`}
                         >
-                          {tFilmLab("compare.slotLeft")}
-                        </button>
-                        <button
-                          type="button"
-                          title={tFilmLab("compare.slotTooltipRight")}
-                          onClick={() => dispatch({ type: "SWITCH_SLOT", slot: "B" })}
-                          className={`min-w-[3rem] rounded-md px-2.5 py-1.5 text-[11px] font-semibold transition-colors sm:py-1.5 ${
-                            state.activeSlot === "B"
-                              ? "bg-[var(--accent-amber1)] text-black shadow-sm"
-                              : "bg-transparent text-white/88 hover:bg-white/10 hover:text-white"
-                          }`}
-                        >
-                          {tFilmLab("compare.slotRight")}
+                          <span className="sr-only">{tFilmLab("compare.title")}</span>
+                          <span
+                            className={`block h-3 w-3 rounded-full bg-white transition-transform ${
+                              state.compareMode ? "translate-x-3.5" : "translate-x-0.5"
+                            }`}
+                          />
                         </button>
                       </div>
-                    </div>
+                      {state.compareMode ? (
+                        <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+                          <span className="text-[10px] font-medium text-white/55">
+                            {tFilmLab("compare.editLabel")}
+                          </span>
+                          <div
+                            className="inline-flex rounded-lg border border-white/18 bg-black/50 p-0.5 shadow-inner shadow-black/30"
+                            role="group"
+                            aria-label={tFilmLab("compare.editLabel")}
+                          >
+                            <button
+                              type="button"
+                              title={tFilmLab("compare.slotTooltipLeft")}
+                              onClick={() => dispatch({ type: "SWITCH_SLOT", slot: "A" })}
+                              className={`min-w-[3rem] rounded-md px-2.5 py-1.5 text-[11px] font-semibold transition-colors sm:py-1.5 ${
+                                state.activeSlot === "A"
+                                  ? "bg-[var(--accent-amber1)] text-black shadow-sm"
+                                  : "bg-transparent text-white/88 hover:bg-white/10 hover:text-white"
+                              }`}
+                            >
+                              {tFilmLab("compare.slotLeft")}
+                            </button>
+                            <button
+                              type="button"
+                              title={tFilmLab("compare.slotTooltipRight")}
+                              onClick={() => dispatch({ type: "SWITCH_SLOT", slot: "B" })}
+                              className={`min-w-[3rem] rounded-md px-2.5 py-1.5 text-[11px] font-semibold transition-colors sm:py-1.5 ${
+                                state.activeSlot === "B"
+                                  ? "bg-[var(--accent-amber1)] text-black shadow-sm"
+                                  : "bg-transparent text-white/88 hover:bg-white/10 hover:text-white"
+                              }`}
+                            >
+                              {tFilmLab("compare.slotRight")}
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </>
                   ) : null}
                 </div>
               )}
@@ -1451,7 +1492,13 @@ export const FilmLabControlPanelCore = forwardRef<
           </div>
         </div>
       </div>
-      <ShortcutHelp open={showHelp} onClose={() => setShowHelp(false)} />
+      <ShortcutHelp
+        open={showHelp}
+        onClose={() => setShowHelp(false)}
+        supportsHistogram={supportsHistogram}
+        supportsBeforeAfter={supportsBeforeAfter}
+        supportsABCompare={supportsABCompare}
+      />
     </>
   );
 });
@@ -1612,7 +1659,19 @@ function HueSlider({
   );
 }
 
-function ShortcutHelp({ open, onClose }: { open: boolean; onClose: () => void }) {
+function ShortcutHelp({
+  open,
+  onClose,
+  supportsHistogram = true,
+  supportsBeforeAfter = true,
+  supportsABCompare = true,
+}: {
+  open: boolean;
+  onClose: () => void;
+  supportsHistogram?: boolean;
+  supportsBeforeAfter?: boolean;
+  supportsABCompare?: boolean;
+}) {
   const t = useTranslations(`${FILM_LAB_NEXT_INTL_NAMESPACE}.shortcuts`);
 
   if (!open) return null;
@@ -1623,17 +1682,29 @@ function ShortcutHelp({ open, onClose }: { open: boolean; onClose: () => void })
   const shortcuts: { key: string; action: string }[] = [
     { key: "1 \u2013 8", action: t("presetSelect") },
     { key: "0", action: t("reset") },
-    { key: "Space", action: t("beforeAfter") },
-    { key: "Hold button", action: t("holdButton") },
+  ];
+  if (supportsBeforeAfter) {
+    shortcuts.push(
+      { key: "Space", action: t("beforeAfter") },
+      { key: "Hold button", action: t("holdButton") },
+    );
+  }
+  shortcuts.push(
     { key: "Preset slider", action: t("presetSlider") },
     { key: `${mod}+Z`, action: t("undo") },
     { key: `${mod}+Shift+Z`, action: t("redo") },
-    { key: "V", action: t("toggleCompare") },
-    { key: "Tab", action: t("switchSlot") },
-    { key: "P", action: t("toggleMode") },
-    { key: "H", action: t("histogram") },
-    { key: "?", action: t("help") },
-  ];
+  );
+  if (supportsABCompare) {
+    shortcuts.push(
+      { key: "V", action: t("toggleCompare") },
+      { key: "Tab", action: t("switchSlot") },
+    );
+  }
+  shortcuts.push({ key: "P", action: t("toggleMode") });
+  if (supportsHistogram) {
+    shortcuts.push({ key: "H", action: t("histogram") });
+  }
+  shortcuts.push({ key: "?", action: t("help") });
 
   return (
     <div

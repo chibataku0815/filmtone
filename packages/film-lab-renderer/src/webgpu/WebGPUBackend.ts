@@ -39,7 +39,11 @@
  *     diffusion, split/A-B compare, dust.
  */
 
-import { GpuContext } from "./GpuContext";
+import {
+  GpuContext,
+  type GpuContextLossInfo,
+  type GpuContextLossReason,
+} from "./GpuContext";
 import { MediaTexture } from "./MediaTexture";
 import { OffscreenTargetPool } from "./OffscreenTargetPool";
 import { Lut3DTexture } from "./Lut3DTexture";
@@ -79,6 +83,7 @@ import {
   type CompositeFrameState,
 } from "./compositeUniforms";
 import type { RenderBackend, RenderBackendParams } from "./Backend";
+import type { ViewportCapabilities } from "../RendererRuntime";
 
 const IDENTITY_LUT_SIZE = 33;
 const BLOOM_LEVELS = 5;
@@ -165,6 +170,7 @@ interface PyramidResources {
 
 export class WebGPUBackend implements RenderBackend {
   private readonly ctx: GpuContext;
+  readonly capabilities: ViewportCapabilities;
   private readonly modules: ShaderModules;
   private readonly pool: OffscreenTargetPool;
   private readonly pipelines: Pipelines;
@@ -190,6 +196,8 @@ export class WebGPUBackend implements RenderBackend {
   private readonly motionblurBlendScratch = new Float32Array(MOTIONBLUR_BLEND_UNIFORM_FLOATS);
 
   private mediaTexture: GPUTexture | null = null;
+  private placeholderTexture: GPUTexture | null = null;
+  private liveVideoElement: HTMLVideoElement | null = null;
   private lut1Texture: GPUTexture;
   private lut2Texture: GPUTexture;
   private ringBuffer: RingBuffer;
@@ -223,6 +231,7 @@ export class WebGPUBackend implements RenderBackend {
     ringBuffer: RingBuffer,
   ) {
     this.ctx = ctx;
+    this.capabilities = ctx.capabilities;
     this.modules = modules;
     this.pool = pool;
     this.pipelines = pipelines;
@@ -700,9 +709,19 @@ export class WebGPUBackend implements RenderBackend {
   }
 
   setMediaFromBitmap(bitmap: ImageBitmap): void {
+    this.liveVideoElement = null;
     if (this.mediaTexture) this.mediaTexture.destroy();
     this.mediaTexture = MediaTexture.fromImageBitmap(this.ctx.device, bitmap);
     this.setImageResolution(bitmap.width, bitmap.height);
+  }
+
+  setMediaFromVideoElement(video: HTMLVideoElement): void {
+    this.liveVideoElement = video;
+    this.refreshLiveVideoTexture();
+  }
+
+  setVideoElement(video: HTMLVideoElement): void {
+    this.setMediaFromVideoElement(video);
   }
 
   setImageResolution(width: number, height: number): void {
@@ -724,6 +743,10 @@ export class WebGPUBackend implements RenderBackend {
   setSplitPosition(position: number): void {
     this.frameState.splitPosition = position;
     this.gradeDirty = true;
+  }
+
+  getSplitPosition(): number {
+    return this.frameState.splitPosition;
   }
 
   setLUT1(data: Float32Array, size: number): void {
@@ -793,6 +816,75 @@ export class WebGPUBackend implements RenderBackend {
 
   getPendingParams(): Readonly<RenderBackendParams> {
     return this.frameState.params;
+  }
+
+  getMaxTextureDimension2D(): number {
+    return this.capabilities.maxTextureDimension2D;
+  }
+
+  isContextLost(): boolean {
+    return this.ctx.isContextLost();
+  }
+
+  getContextLossInfo(): GpuContextLossInfo | null {
+    return this.ctx.getContextLossInfo();
+  }
+
+  onContextLost(listener: (info: GpuContextLossInfo) => void): () => void {
+    return this.ctx.onContextLost(listener);
+  }
+
+  reportFatalContextLoss(
+    reason: Exclude<GpuContextLossReason, "device-lost">,
+    error?: unknown,
+  ): void {
+    this.ctx.reportFatalLoss(reason, error);
+  }
+
+  prewarm(): void {
+    this.renderInternal("prewarm-failed");
+  }
+
+  private refreshLiveVideoTexture(): void {
+    const video = this.liveVideoElement;
+    if (!video) return;
+    const width = video.videoWidth || 0;
+    const height = video.videoHeight || 0;
+    const readyState =
+      typeof video.readyState === "number" ? video.readyState : 0;
+    if (width <= 0 || height <= 0 || readyState < 2) return;
+    try {
+      this.mediaTexture = MediaTexture.fromVideoElement(
+        this.ctx.device,
+        video,
+        this.mediaTexture,
+      );
+      if (
+        width !== this.frameState.imgResX ||
+        height !== this.frameState.imgResY
+      ) {
+        this.setImageResolution(width, height);
+      }
+    } catch (error) {
+      console.warn("[WebGPUBackend] live video upload failed", error);
+    }
+  }
+
+  private getActiveMediaTexture(
+    allowPlaceholder: boolean,
+  ): GPUTexture | null {
+    if (this.liveVideoElement) {
+      this.refreshLiveVideoTexture();
+    }
+    if (this.mediaTexture) return this.mediaTexture;
+    if (!allowPlaceholder) return null;
+    if (!this.placeholderTexture) {
+      this.placeholderTexture = MediaTexture.createPlaceholder(
+        this.ctx.device,
+        { label: "media.prewarm.placeholder" },
+      );
+    }
+    return this.placeholderTexture;
   }
 
   private paramNumber(key: string, fallback: number): number {
@@ -1092,7 +1184,24 @@ export class WebGPUBackend implements RenderBackend {
   }
 
   render(): void {
-    if (this.destroyed || !this.mediaTexture) return;
+    this.renderInternal("render-failed");
+  }
+
+  private renderInternal(
+    reason: Extract<GpuContextLossReason, "render-failed" | "prewarm-failed">,
+  ): void {
+    if (this.destroyed || this.ctx.isContextLost()) return;
+    try {
+      this.renderFrame(reason === "prewarm-failed");
+    } catch (error) {
+      this.reportFatalContextLoss(reason, error);
+      throw error;
+    }
+  }
+
+  private renderFrame(allowPlaceholderMedia: boolean): void {
+    const mediaTexture = this.getActiveMediaTexture(allowPlaceholderMedia);
+    if (!mediaTexture) return;
     const { device } = this.ctx;
     this.uploadFrameUniforms();
 
@@ -1117,7 +1226,7 @@ export class WebGPUBackend implements RenderBackend {
       layout: this.pipelines.filmlab.getBindGroupLayout(1),
       entries: [
         { binding: 0, resource: { buffer: this.gradeBuffer } },
-        { binding: 1, resource: this.mediaTexture.createView() },
+        { binding: 1, resource: mediaTexture.createView() },
         { binding: 2, resource: this.sampler },
         { binding: 3, resource: this.lut1Texture.createView({ dimension: "3d" }) },
         { binding: 4, resource: this.lut2Texture.createView({ dimension: "3d" }) },
@@ -1379,7 +1488,9 @@ export class WebGPUBackend implements RenderBackend {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.liveVideoElement = null;
     this.mediaTexture?.destroy();
+    this.placeholderTexture?.destroy();
     this.lut1Texture.destroy();
     this.lut2Texture.destroy();
     this.grainTexture.destroy();

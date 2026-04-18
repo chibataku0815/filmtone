@@ -9,7 +9,17 @@
  * Verification target: `rg -l "WebGPUBackend|GpuContext" apps/web/.next` = 0.
  */
 
-export { GpuContext, GpuContextCreationError } from "./webgpu/GpuContext";
+export {
+  GpuContext,
+  GpuContextCreationError,
+  type GpuContextLossInfo,
+  type GpuContextLossReason,
+} from "./webgpu/GpuContext";
+export type {
+  ViewportCapabilities,
+  ViewportContextLossInfo,
+  ViewportContextLossReason,
+} from "./RendererRuntime";
 export { OffscreenTargetPool } from "./webgpu/OffscreenTargetPool";
 export { Lut3DTexture } from "./webgpu/Lut3DTexture";
 export { MediaTexture } from "./webgpu/MediaTexture";

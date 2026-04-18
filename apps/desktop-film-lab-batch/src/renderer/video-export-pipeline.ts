@@ -8,10 +8,8 @@
 import * as THREE from "three";
 import {
   isWebGL2Supported,
-  Viewport,
 } from "film-lab-renderer";
 import type { FilmLabBatchBridge } from "./desktop-api";
-import { halationHueToHex } from "film-lab-core";
 import {
   assertVideoImportWithinCaps,
   computeExportFrameCount,
@@ -27,6 +25,7 @@ import {
   shouldAttemptWebCodecsAccurateExport,
   WebCodecsMp4ExportSession,
 } from "./video-export-webcodecs";
+import { createWebGLOffscreenRenderSession } from "./offscreen/webgl-offscreen-render-session";
 
 /**
  * @description 各フレームの詳細ログは明示時だけ有効にする。
@@ -729,33 +728,6 @@ function disposeVideoElement(video: HTMLVideoElement | null): void {
 }
 
 /**
- * @description Export 用の一時 renderer は `dispose()` だけでなく context も明示的に落とします。
- * Chromium/Electron では WebGL context の解放が遅れることがあり、preview 側まで黒化する温床になります。
- */
-function disposeExportRenderer(renderer: THREE.WebGLRenderer | null): void {
-  if (!renderer) {
-    return;
-  }
-  try {
-    renderer.dispose();
-  } catch {
-    /* ignore */
-  }
-  try {
-    renderer.forceContextLoss();
-  } catch {
-    /* ignore */
-  }
-  try {
-    const canvas = renderer.domElement;
-    canvas.width = 1;
-    canvas.height = 1;
-  } catch {
-    /* ignore */
-  }
-}
-
-/**
  * @description 1 本の動画をグレードして mp4 へ書き出す
  * @param options.api — preload ブリッジ（ffmpeg IPC を含む）
  * @param options.inputVideoPath — ソースの絶対パス
@@ -923,8 +895,9 @@ export async function runVideoExportPipeline(options: {
       let pathForFfmpeg = stagedPath ?? effectiveInputPath;
       let webCodecsSession: WebCodecsMp4ExportSession | null = null;
       let srcTexture: THREE.Texture | null = null;
-      let viewport: Viewport | null = null;
-      let renderer: THREE.WebGLRenderer | null = null;
+      let renderSession: Awaited<
+        ReturnType<typeof createWebGLOffscreenRenderSession>
+      > | null = null;
       let retryWithSeek = false;
       let retryReason = "";
 
@@ -1013,56 +986,22 @@ export async function runVideoExportPipeline(options: {
               return vt;
             })();
 
-        const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
-        camera.position.z = 1;
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x0a0a0a);
-
-        renderer = new THREE.WebGLRenderer({
-          antialias: false,
-          alpha: false,
-          preserveDrawingBuffer: true,
-          powerPreference: "high-performance",
-        });
-        renderer.setPixelRatio(1);
-        renderer.setSize(outW, outH, false);
-        renderer.outputColorSpace = THREE.SRGBColorSpace;
-
-        viewport = await Viewport.create(renderer.domElement, {
-          prefer: "webgl",
+        renderSession = await createWebGLOffscreenRenderSession({
           width: outW,
           height: outH,
+          powerPreference: "high-performance",
         });
-        if (viewport.backendKind === "webgl" && viewport.mesh) {
-          scene.add(viewport.mesh);
-        }
-
-        viewport.setResolution(outW, outH);
-        viewport.setTexture(srcTexture);
-        viewport.setImageResolution(probe.width, probe.height);
-        viewport.setParams({
-          ...grade.params,
-          halationColor: halationHueToHex(grade.params.halationHue),
+        renderSession.setGrade(grade);
+        renderSession.setSource({
+          texture: srcTexture,
+          imageWidth: probe.width,
+          imageHeight: probe.height,
         });
-        // LUT1: Input Transform (before grading)
-        if (grade.lut1Data && grade.lut1Size > 0) {
-          viewport.setLUT1(grade.lut1Data, grade.lut1Size);
-          viewport.setLUT1Intensity(grade.lut1Intensity);
-        } else {
-          viewport.clearLUT1();
-        }
-        // LUT2: Creative (after grading)
-        if (grade.lutData && grade.lutSize > 0) {
-          viewport.setLUT2(grade.lutData, grade.lutSize);
-          viewport.setLUT2Intensity(grade.lutIntensity);
-        } else {
-          viewport.clearLUT2();
-        }
 
         // Reset motion blur accumulation so export starts from a clean state
-        viewport.resetMotionBlurHistory();
+        renderSession.resetMotionBlurHistory();
 
-        const gl = renderer.getContext() as WebGL2RenderingContext;
+        const gl = renderSession.getWebGLContext();
 
         // --- PBO readback (WebGL2 PIXEL_PACK_BUFFER) ---
         // PBO routes readPixels through driver-managed pinned memory, making
@@ -1193,7 +1132,7 @@ export async function runVideoExportPipeline(options: {
           const tFrame0 = performance.now();
           const profileSegment = profileSegmentIndex(i, totalFrames);
 
-          viewport.setTime(t);
+          renderSession.setTime(t);
 
           const targetSourceIdx = computeTargetSourceFrameIndex(
             t,
@@ -1302,7 +1241,7 @@ export async function runVideoExportPipeline(options: {
           }
 
           const tR0 = performance.now();
-          viewport.render(renderer, scene, camera);
+          renderSession.render();
           const renderMs = performance.now() - tR0;
           arrRender.push(renderMs);
 
@@ -1526,8 +1465,7 @@ export async function runVideoExportPipeline(options: {
       } finally {
         webCodecsSession?.dispose();
         srcTexture?.dispose();
-        viewport?.dispose();
-        disposeExportRenderer(renderer);
+        renderSession?.dispose();
         disposeVideoElement(video);
       }
     }

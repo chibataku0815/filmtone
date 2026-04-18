@@ -35,6 +35,10 @@ import { WebGLBackend, type ViewportOptions } from "./webgl/WebGLBackend";
 import { filmlabVertexShader } from "./webgl/shaders/filmlab.vert";
 import { filmlabFragmentShader } from "./webgl/shaders/filmlab.frag";
 import { isWebGPUSupported } from "./support";
+import type {
+  ViewportCapabilities,
+  ViewportContextLossInfo,
+} from "./RendererRuntime";
 import type { RenderBackendParams } from "./webgpu/Backend";
 // Type-only import: keeps `WebGPUBackend` out of the web bundle. The actual
 // module is pulled in dynamically inside `Viewport.create` when the caller
@@ -45,6 +49,21 @@ import type { RenderBackendParams } from "./webgpu/Backend";
 import type { WebGPUBackend } from "./webgpu/WebGPUBackend";
 
 export type ViewportBackendPreference = "webgpu" | "webgl";
+export type {
+  ViewportCapabilities,
+  ViewportContextLossInfo,
+  ViewportContextLossReason,
+} from "./RendererRuntime";
+
+const WEBGL_VIEWPORT_CAPABILITIES: ViewportCapabilities = Object.freeze({
+  backendKind: "webgl",
+  supportsCompare: true,
+  supportsHistogram: true,
+  supportsBeforeAfter: true,
+  supportsABCompare: true,
+  supportsLiveVideoTexture: true,
+  maxTextureDimension2D: 8192,
+});
 
 export interface ViewportCreateOptions {
   /**
@@ -64,6 +83,7 @@ export class Viewport {
   private readonly webglBackend: WebGLBackend | null;
   private readonly webgpuBackend: WebGPUBackend | null;
   readonly backendKind: ViewportBackendPreference;
+  readonly capabilities: ViewportCapabilities;
 
   /**
    * WebGL-only handle to the fullscreen `THREE.Mesh`. `undefined` on the
@@ -81,6 +101,7 @@ export class Viewport {
     this.webglBackend = webgl;
     this.webgpuBackend = webgpu;
     this.backendKind = webgpu !== null ? "webgpu" : "webgl";
+    this.capabilities = webgpu?.capabilities ?? WEBGL_VIEWPORT_CAPABILITIES;
     if (webgl) this.mesh = webgl.mesh;
   }
 
@@ -194,6 +215,22 @@ export class Viewport {
     return pending as Record<string, number | string>;
   }
 
+  getCapabilities(): ViewportCapabilities {
+    return this.capabilities;
+  }
+
+  isContextLost(): boolean {
+    return this.webgpuBackend?.isContextLost() ?? false;
+  }
+
+  getContextLossInfo(): ViewportContextLossInfo | null {
+    return this.webgpuBackend?.getContextLossInfo() ?? null;
+  }
+
+  onContextLost(listener: (info: ViewportContextLossInfo) => void): () => void {
+    return this.webgpuBackend?.onContextLost(listener) ?? (() => {});
+  }
+
   // === LUTs ===
 
   setLUT1(data: Float32Array, size: number): void {
@@ -263,9 +300,7 @@ export class Viewport {
 
   getSplitPosition(): number {
     if (this.webglBackend) return this.webglBackend.getSplitPosition();
-    const pending = this.webgpuBackend?.getPendingParams() ?? {};
-    const v = (pending as Record<string, unknown>)["splitPosition"];
-    return typeof v === "number" ? v : -1;
+    return this.webgpuBackend?.getSplitPosition() ?? -1;
   }
 
   setExportFlipY(flip: boolean): void {
@@ -319,7 +354,7 @@ export class Viewport {
    */
   async prewarm(): Promise<void> {
     if (!this.webgpuBackend) return;
-    this.webgpuBackend.render();
+    this.webgpuBackend.prewarm();
   }
 
   // === Disposal ===
@@ -343,23 +378,37 @@ export class Viewport {
       (texture as { source?: { data?: unknown } }).source?.data ??
       (texture as { image?: unknown }).image;
     if (!source) return;
+    if (
+      typeof HTMLVideoElement !== "undefined" &&
+      source instanceof HTMLVideoElement
+    ) {
+      this.webgpuBackend.setMediaFromVideoElement(source);
+      return;
+    }
     try {
       let bitmap: ImageBitmap;
+      let ownsBitmap = false;
       if (source instanceof ImageBitmap) {
         bitmap = source;
       } else if (typeof createImageBitmap === "function") {
         bitmap = await createImageBitmap(
           source as ImageBitmapSource,
         );
+        ownsBitmap = true;
       } else {
         return;
       }
       if (generation !== this.webgpuSetTextureGen) {
-        bitmap.close?.();
+        if (ownsBitmap) {
+          bitmap.close?.();
+        }
         return;
       }
       if (this.webgpuBackend) {
         this.webgpuBackend.setMediaFromBitmap(bitmap);
+      }
+      if (ownsBitmap) {
+        bitmap.close?.();
       }
     } catch (err) {
       console.warn("[Viewport] setTexture → ImageBitmap failed", err);
