@@ -1,17 +1,17 @@
 /**
- * filmlab.frag (WGSL) — Phase 2 T2-1.
+ * filmlab.frag (WGSL) — Phase 2 T2-1 + T2-2.
  *
- * Primary grade only (exposure → film compression) in Linear Rec.709 +
- * rgba16float, following DIRECTION §3 pipeline order. No `clamp(0,1)` at
- * any step; `max(x, 0.0)` guards sit in front of pow/log/exp inputs per
- * DIRECTION §10 Phase 2 default. LUT1 (Log→Linear input transform) is
- * sampled before exposure; LUT2 and the print stage are added in T2-2.
+ * Full v1.0 filmlab pipeline in Linear Rec.709 + rgba16float, following
+ * DIRECTION §3 pipeline order: primary grade (exposure → film compression)
+ * → Reinhard soft-shaper → LUT2 (Creative) → print CMY cast → print
+ * contrast. No `clamp(0,1)` at any step; `max(x, 0.0)` guards sit in front
+ * of pow/log/exp inputs per DIRECTION §10 Phase 2 default. LUT1
+ * (Log→Linear input transform) is sampled before exposure; LUT2 sits after
+ * the HDR primary-grade boundary with soft-shaper as the bounded input.
  *
  * Uniform layout (9 vec4 = 144 bytes, WGSL 16-byte aligned per DIRECTION
  * §4). See `packGradeUniforms` in `webgpu/gradeUniforms.ts` for the TS-side
- * packer. The struct is allocated now at full v1.0 shape so T2-2 only
- * fills in the currently-padded fields (LUT2 intensity/enabled, print
- * CMY, print contrast).
+ * packer.
  */
 export const filmlabFragmentWgsl = /* wgsl */ `
 struct Grade {
@@ -39,6 +39,7 @@ struct Grade {
 @group(1) @binding(1) var uMedia: texture_2d<f32>;
 @group(1) @binding(2) var uSampler: sampler;
 @group(1) @binding(3) var uLUT1: texture_3d<f32>;
+@group(1) @binding(4) var uLUT2: texture_3d<f32>;
 
 const LUMA_R709 = vec3f(0.2126, 0.7152, 0.0722);
 
@@ -78,6 +79,30 @@ fn rgbShiftRadial(uv: vec2f, amount: f32, imageResolution: vec2f) -> vec4f {
   let center = textureSampleLevel(uMedia, uSampler, uv, 0.0);
   let bCh = textureSampleLevel(uMedia, uSampler, uv - dir * amt, 0.0).b;
   return vec4f(rCh, center.g, bCh, center.a);
+}
+
+// Reinhard soft-shaper — DIRECTION §3 HDR-boundary entry. Smoothly
+// compresses (≥0) HDR input toward [0, 1.5] before LUT2 sampling, so
+// highlight detail carried out of the primary grade survives the LUT2
+// lookup instead of hard-clipping at 1.0. k = 0.5 fixed (DIRECTION §10
+// Phase 2; no UI knob in v1.0).
+fn softShape(x: vec3f) -> vec3f {
+  let safe = max(x, vec3f(0.0));
+  let k = 0.5;
+  return safe / (safe + vec3f(k)) * (1.0 + k);
+}
+
+// Print stage final S-curve contrast — WebGL parity, clamp removed so the
+// final swap/composite blit handles the display-range clamp per DIRECTION
+// §2 "no clamp in intermediate stages".
+fn applyPrintContrast(rgb: vec3f, amount: f32) -> vec3f {
+  if (amount < 0.001) {
+    return rgb;
+  }
+  let k = mix(1.0, 5.0, amount);
+  let x = clamp(-k * (rgb - vec3f(0.5)), vec3f(-6.0), vec3f(6.0));
+  let s = vec3f(1.0) / (vec3f(1.0) + exp(x));
+  return mix(rgb, s, amount);
 }
 
 // Luma-preserving sigmoid compression — DIRECTION §3 step 11/12. The
@@ -186,7 +211,34 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
   color = vec4f(applyFilmCompression(color.rgb, compAmount, compRange), color.a);
 
   // --- HDR boundary ---
-  // T2-2 inserts soft-shaper + LUT2 + print stage here.
+  // 13. LUT2 (Creative) — the soft-shaper above prepares the bounded input
+  // so highlight >1 values fold gently into the lookup domain instead of
+  // hard-clipping. LUT2 output mixes back against the pre-shaped color so
+  // LUT intensity keeps its usual "how creative" meaning.
+  let lut2Intensity = uGrade.splitLut.w;
+  let lut2Enabled = uGrade.lut2PrintCmY.x;
+  if (lut2Enabled > 0.5) {
+    let shaped = softShape(color.rgb);
+    let lut2Coord = clamp(shaped, vec3f(0.0), vec3f(1.0));
+    let lut2Sample = textureSampleLevel(uLUT2, uSampler, lut2Coord, 0.0).rgb;
+    color = vec4f(mix(color.rgb, lut2Sample, lut2Intensity), color.a);
+  }
+
+  // 14. Print CMY cast — C = -R, M = -G, Y = -B darkroom analog.
+  let cyan = uGrade.lut2PrintCmY.y;
+  let magenta = uGrade.lut2PrintCmY.z;
+  let yellow = uGrade.lut2PrintCmY.w;
+  let cmyScale = 0.15;
+  color = vec4f(
+    color.r - cyan * cmyScale,
+    color.g - magenta * cmyScale,
+    color.b - yellow * cmyScale,
+    color.a,
+  );
+
+  // 15. Print contrast — final paper-hardness S-curve.
+  let printContrast = uGrade.printContrastFit.x;
+  color = vec4f(applyPrintContrast(color.rgb, printContrast), color.a);
 
   let mask = insideUv(fittedUv);
   // rgba16float output keeps values out-of-[0,1] alive; the final swap

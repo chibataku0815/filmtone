@@ -28,6 +28,7 @@ export {
   fullscreenVertexWgsl,
   filmlabFragmentWgsl,
   blitFragmentWgsl,
+  compositeFragmentWgsl,
   bloomPrefilterFragmentWgsl,
   halationPrefilterFragmentWgsl,
   downsampleFragmentWgsl,
@@ -42,3 +43,10 @@ export {
   GRADE_UNIFORM_FLOATS,
   type GradeFrameState,
 } from "./webgpu/gradeUniforms";
+export {
+  packCompositeUniforms,
+  COMPOSITE_UNIFORM_BYTES,
+  COMPOSITE_UNIFORM_FLOATS,
+  hexToRgbTriple,
+  type CompositeFrameState,
+} from "./webgpu/compositeUniforms";

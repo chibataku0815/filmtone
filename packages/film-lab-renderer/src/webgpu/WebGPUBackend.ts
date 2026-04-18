@@ -1,36 +1,45 @@
 /**
- * WebGPUBackend — Phase 2 T2-1.
+ * WebGPUBackend — Phase 2 T2-1 + T2-2 + T2-0b + T2-3.
  *
- * Responsibilities:
- *   - `create(canvas)` factory bootstraps GpuContext, compiles all WGSL
- *     modules, and builds two render pipelines:
- *       1. filmlab → rtColorGraded (`rgba16float`) — primary grade +
- *          LUT1 sampling per DIRECTION §3 steps 1–12.
- *       2. blit → swap (`rgba8unorm-srgb`) — reads rtColorGraded and
- *          relies on hardware OETF for the final linear → sRGB transform.
- *   - `setParams(record)` merges grade params and writes them into the
- *     `GradeUniforms` buffer on the next render.
- *   - `setLUT1(data, size)` uploads a new 3D LUT (rgba16float). An
- *     identity LUT is pre-uploaded at construction so the filmlab bind
- *     group is always valid.
+ * Full v1.0 render pipeline:
+ *   1. filmlab → rt.colorGraded (`rgba16float`) — LUT1 → primary grade
+ *      (DIRECTION §3 steps 1–12) → Reinhard soft-shaper → LUT2 → print
+ *      CMY → print contrast.
+ *   2. bloomPrefilter → bloom.L0; downsample chain → bloom.L[1..4];
+ *      upsample chain with additive blend back to bloom.L0 (5 mips total,
+ *      WebGL parity).
+ *   3. halationPrefilter → halation.L0; downsample chain → halation.L[1..5];
+ *      upsample chain with additive blend back to halation.L0 (6 mips).
+ *   4. composite → swap (`rgba8unorm-srgb`) — screen-blend glow shoulder,
+ *      vignette, blue-noise grain (256² tile, DIRECTION §2). Hardware OETF
+ *      handles the final linear → sRGB transform.
+ *
+ * Consumer API:
+ *   - `setParams(record)` merges the full grade + post params blob; the
+ *     uniforms it feeds are split between `GradeUniforms` (filmlab) and
+ *     `CompositeUniforms` (bloom strength / halation intensity / grain /
+ *     vignette). Bloom + halation shaping params (threshold, knee, radius,
+ *     color) are consumed directly by the pyramid bookkeeping.
+ *   - `setLUT1` / `setLUT2` upload 3D LUTs (identity pre-uploaded at
+ *     construction so the filmlab bind group is always valid).
  *   - `setMediaFromBitmap` / `setImageResolution` / `setFitMode` /
- *     `setTime` feed the remaining frame state into the uniforms.
+ *     `setTime` feed the remaining frame state.
  *
- * Still pending (Phase 2 T2-2 → T2-4):
- *   - Soft-shaper + LUT2 + print stage in filmlab.wgsl.
- *   - Bloom / halation pyramid composition.
- *   - Motion blur ring buffer.
- *   - Cross-filter chain.
+ * Still pending:
+ *   - Motion blur ring buffer (T2-4).
+ *   - Cross-filter chain, diffusion, split/A-B compare, dust (Phase 3).
  */
 
 import { GpuContext } from "./GpuContext";
 import { MediaTexture } from "./MediaTexture";
 import { OffscreenTargetPool } from "./OffscreenTargetPool";
 import { Lut3DTexture } from "./Lut3DTexture";
+import { BlueNoiseTile } from "./BlueNoiseTile";
 import {
   fullscreenVertexWgsl,
   filmlabFragmentWgsl,
   blitFragmentWgsl,
+  compositeFragmentWgsl,
   bloomPrefilterFragmentWgsl,
   halationPrefilterFragmentWgsl,
   downsampleFragmentWgsl,
@@ -45,9 +54,29 @@ import {
   packGradeUniforms,
   type GradeFrameState,
 } from "./gradeUniforms";
+import {
+  COMPOSITE_UNIFORM_BYTES,
+  COMPOSITE_UNIFORM_FLOATS,
+  hexToRgbTriple,
+  packCompositeUniforms,
+  type CompositeFrameState,
+} from "./compositeUniforms";
 import type { RenderBackend, RenderBackendParams } from "./Backend";
 
 const IDENTITY_LUT_SIZE = 33;
+const BLOOM_LEVELS = 5;
+const HALATION_LEVELS = 6;
+const BLOOM_PARAMS_BYTES = 16;
+const HALATION_PARAMS_BYTES = 32;
+const PYRAMID_LEVEL_UNIFORM_BYTES = 16;
+
+const DEFAULT_BLOOM_THRESHOLD = 0.8;
+const DEFAULT_BLOOM_KNEE = 0.5;
+const DEFAULT_BLOOM_RADIUS = 0.5;
+const DEFAULT_HALATION_THRESHOLD = 0.6;
+const DEFAULT_HALATION_KNEE = 0.5;
+const DEFAULT_HALATION_RADIUS = 0.5;
+const DEFAULT_HALATION_COLOR: [number, number, number] = [0.91, 0.063, 0.125];
 
 export interface WebGPUBackendCreateOptions {
   validation?: boolean;
@@ -57,6 +86,7 @@ interface ShaderModules {
   vert: GPUShaderModule;
   filmlab: GPUShaderModule;
   blit: GPUShaderModule;
+  composite: GPUShaderModule;
   bloomPrefilter: GPUShaderModule;
   halationPrefilter: GPUShaderModule;
   downsample: GPUShaderModule;
@@ -66,20 +96,61 @@ interface ShaderModules {
   dust: GPUShaderModule;
 }
 
+interface Pipelines {
+  filmlab: GPURenderPipeline;
+  bloomPrefilter: GPURenderPipeline;
+  halationPrefilter: GPURenderPipeline;
+  downsample: GPURenderPipeline;
+  /** Same shader as `downsample` / `upsample`-compatible layout, additive blend. */
+  upsampleAdd: GPURenderPipeline;
+  composite: GPURenderPipeline;
+}
+
+interface PrefilterGroupLayouts {
+  bloom: GPUBindGroupLayout;
+  halation: GPUBindGroupLayout;
+  pyramid: GPUBindGroupLayout;
+  composite: GPUBindGroupLayout;
+}
+
+/**
+ * Pre-allocated pyramid resources. Uniform buffers are sized up-front so a
+ * single submit() never collides multiple `writeBuffer` calls on the same
+ * buffer. Textures live in `OffscreenTargetPool` and are keyed by label so
+ * resize swaps transparently.
+ */
+interface PyramidResources {
+  readonly downsample: GPUBuffer[]; // length = levels - 1
+  readonly upsample: GPUBuffer[]; // length = levels - 1
+  readonly downsampleScratch: Float32Array[];
+  readonly upsampleScratch: Float32Array[];
+}
+
 export class WebGPUBackend implements RenderBackend {
   private readonly ctx: GpuContext;
   private readonly modules: ShaderModules;
   private readonly pool: OffscreenTargetPool;
-  private readonly filmlabPipeline: GPURenderPipeline;
-  private readonly blitPipeline: GPURenderPipeline;
+  private readonly pipelines: Pipelines;
+  private readonly layouts: PrefilterGroupLayouts;
   private readonly flagsBuffer: GPUBuffer;
   private readonly flagsBindGroup: GPUBindGroup;
   private readonly gradeBuffer: GPUBuffer;
+  private readonly compositeBuffer: GPUBuffer;
+  private readonly bloomParamsBuffer: GPUBuffer;
+  private readonly halationParamsBuffer: GPUBuffer;
+  private readonly bloomPyramid: PyramidResources;
+  private readonly halationPyramid: PyramidResources;
   private readonly sampler: GPUSampler;
+  private readonly grainSampler: GPUSampler;
+  private readonly grainTexture: GPUTexture;
   private readonly gradeScratch = new Float32Array(GRADE_UNIFORM_FLOATS);
+  private readonly compositeScratch = new Float32Array(COMPOSITE_UNIFORM_FLOATS);
+  private readonly bloomParamsScratch = new Float32Array(BLOOM_PARAMS_BYTES / 4);
+  private readonly halationParamsScratch = new Float32Array(HALATION_PARAMS_BYTES / 4);
 
   private mediaTexture: GPUTexture | null = null;
   private lut1Texture: GPUTexture;
+  private lut2Texture: GPUTexture;
   private _width = 1;
   private _height = 1;
   private destroyed = false;
@@ -90,24 +161,40 @@ export class WebGPUBackend implements RenderBackend {
     ctx: GpuContext,
     modules: ShaderModules,
     pool: OffscreenTargetPool,
-    filmlabPipeline: GPURenderPipeline,
-    blitPipeline: GPURenderPipeline,
+    pipelines: Pipelines,
+    layouts: PrefilterGroupLayouts,
     flagsBuffer: GPUBuffer,
     flagsBindGroup: GPUBindGroup,
     gradeBuffer: GPUBuffer,
+    compositeBuffer: GPUBuffer,
+    bloomParamsBuffer: GPUBuffer,
+    halationParamsBuffer: GPUBuffer,
+    bloomPyramid: PyramidResources,
+    halationPyramid: PyramidResources,
     sampler: GPUSampler,
+    grainSampler: GPUSampler,
+    grainTexture: GPUTexture,
     lut1Texture: GPUTexture,
+    lut2Texture: GPUTexture,
   ) {
     this.ctx = ctx;
     this.modules = modules;
     this.pool = pool;
-    this.filmlabPipeline = filmlabPipeline;
-    this.blitPipeline = blitPipeline;
+    this.pipelines = pipelines;
+    this.layouts = layouts;
     this.flagsBuffer = flagsBuffer;
     this.flagsBindGroup = flagsBindGroup;
     this.gradeBuffer = gradeBuffer;
+    this.compositeBuffer = compositeBuffer;
+    this.bloomParamsBuffer = bloomParamsBuffer;
+    this.halationParamsBuffer = halationParamsBuffer;
+    this.bloomPyramid = bloomPyramid;
+    this.halationPyramid = halationPyramid;
     this.sampler = sampler;
+    this.grainSampler = grainSampler;
+    this.grainTexture = grainTexture;
     this.lut1Texture = lut1Texture;
+    this.lut2Texture = lut2Texture;
     this._width = Math.max(1, ctx.canvas.width);
     this._height = Math.max(1, ctx.canvas.height);
     this.frameState = {
@@ -140,6 +227,7 @@ export class WebGPUBackend implements RenderBackend {
       vert: await make("fullscreen.vert", fullscreenVertexWgsl),
       filmlab: await make("filmlab.frag", filmlabFragmentWgsl),
       blit: await make("blit.frag", blitFragmentWgsl),
+      composite: await make("composite.frag", compositeFragmentWgsl),
       bloomPrefilter: await make("bloom-prefilter.frag", bloomPrefilterFragmentWgsl),
       halationPrefilter: await make("halation-prefilter.frag", halationPrefilterFragmentWgsl),
       downsample: await make("downsample.frag", downsampleFragmentWgsl),
@@ -167,6 +255,37 @@ export class WebGPUBackend implements RenderBackend {
           visibility: GPUShaderStage.FRAGMENT,
           texture: { sampleType: "float", viewDimension: "3d" },
         },
+        {
+          binding: 4,
+          visibility: GPUShaderStage.FRAGMENT,
+          texture: { sampleType: "float", viewDimension: "3d" },
+        },
+      ],
+    });
+
+    // Shared layout across bloom-prefilter / halation-prefilter /
+    // downsample / upsample — all take `(params uniform, source texture,
+    // sampler)` as group(1). Uniform-buffer contents differ per pass but
+    // the binding shape is identical.
+    const pyramidGroupLayout = device.createBindGroupLayout({
+      label: "pyramid.group1",
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: "uniform" } },
+        { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
+        { binding: 2, visibility: GPUShaderStage.FRAGMENT, sampler: { type: "filtering" } },
+      ],
+    });
+
+    const compositeGroupLayout = device.createBindGroupLayout({
+      label: "composite.group1",
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: "uniform" } },
+        { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
+        { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
+        { binding: 3, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
+        { binding: 4, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
+        { binding: 5, visibility: GPUShaderStage.FRAGMENT, sampler: { type: "filtering" } },
+        { binding: 6, visibility: GPUShaderStage.FRAGMENT, sampler: { type: "filtering" } },
       ],
     });
 
@@ -186,23 +305,83 @@ export class WebGPUBackend implements RenderBackend {
       }),
     );
 
-    const blitGroupLayout = device.createBindGroupLayout({
-      label: "blit.group1",
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
-        { binding: 1, visibility: GPUShaderStage.FRAGMENT, sampler: { type: "filtering" } },
-      ],
+    const pyramidPipelineLayout = device.createPipelineLayout({
+      bindGroupLayouts: [flagsLayout, pyramidGroupLayout],
     });
 
-    const blitPipeline = await ctx.withValidationScope(() =>
+    const bloomPrefilterPipeline = await ctx.withValidationScope(() =>
       device.createRenderPipeline({
-        label: "blit.present",
+        label: "bloom.prefilter",
+        layout: pyramidPipelineLayout,
+        vertex: { module: modules.vert, entryPoint: "vs_main" },
+        fragment: {
+          module: modules.bloomPrefilter,
+          entryPoint: "fs_main",
+          targets: [{ format: "rgba16float" }],
+        },
+        primitive: { topology: "triangle-list" },
+      }),
+    );
+
+    const halationPrefilterPipeline = await ctx.withValidationScope(() =>
+      device.createRenderPipeline({
+        label: "halation.prefilter",
+        layout: pyramidPipelineLayout,
+        vertex: { module: modules.vert, entryPoint: "vs_main" },
+        fragment: {
+          module: modules.halationPrefilter,
+          entryPoint: "fs_main",
+          targets: [{ format: "rgba16float" }],
+        },
+        primitive: { topology: "triangle-list" },
+      }),
+    );
+
+    const downsamplePipeline = await ctx.withValidationScope(() =>
+      device.createRenderPipeline({
+        label: "pyramid.downsample",
+        layout: pyramidPipelineLayout,
+        vertex: { module: modules.vert, entryPoint: "vs_main" },
+        fragment: {
+          module: modules.downsample,
+          entryPoint: "fs_main",
+          targets: [{ format: "rgba16float" }],
+        },
+        primitive: { topology: "triangle-list" },
+      }),
+    );
+
+    const upsampleAddPipeline = await ctx.withValidationScope(() =>
+      device.createRenderPipeline({
+        label: "pyramid.upsample.add",
+        layout: pyramidPipelineLayout,
+        vertex: { module: modules.vert, entryPoint: "vs_main" },
+        fragment: {
+          module: modules.upsample,
+          entryPoint: "fs_main",
+          targets: [
+            {
+              format: "rgba16float",
+              blend: {
+                color: { srcFactor: "one", dstFactor: "one", operation: "add" },
+                alpha: { srcFactor: "one", dstFactor: "one", operation: "add" },
+              },
+            },
+          ],
+        },
+        primitive: { topology: "triangle-list" },
+      }),
+    );
+
+    const compositePipeline = await ctx.withValidationScope(() =>
+      device.createRenderPipeline({
+        label: "composite.present",
         layout: device.createPipelineLayout({
-          bindGroupLayouts: [flagsLayout, blitGroupLayout],
+          bindGroupLayouts: [flagsLayout, compositeGroupLayout],
         }),
         vertex: { module: modules.vert, entryPoint: "vs_main" },
         fragment: {
-          module: modules.blit,
+          module: modules.composite,
           entryPoint: "fs_main",
           targets: [{ format: ctx.canvasFormat }],
         },
@@ -228,6 +407,53 @@ export class WebGPUBackend implements RenderBackend {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
+    const compositeBuffer = device.createBuffer({
+      label: "composite.uniforms",
+      size: COMPOSITE_UNIFORM_BYTES,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+
+    const bloomParamsBuffer = device.createBuffer({
+      label: "bloom.prefilter.params",
+      size: BLOOM_PARAMS_BYTES,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+
+    const halationParamsBuffer = device.createBuffer({
+      label: "halation.prefilter.params",
+      size: HALATION_PARAMS_BYTES,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+
+    const makePyramid = (label: string, levels: number): PyramidResources => {
+      const downsample: GPUBuffer[] = [];
+      const upsample: GPUBuffer[] = [];
+      const downsampleScratch: Float32Array[] = [];
+      const upsampleScratch: Float32Array[] = [];
+      for (let i = 0; i < levels - 1; i++) {
+        downsample.push(
+          device.createBuffer({
+            label: `${label}.downsample.${i}`,
+            size: PYRAMID_LEVEL_UNIFORM_BYTES,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+          }),
+        );
+        upsample.push(
+          device.createBuffer({
+            label: `${label}.upsample.${i}`,
+            size: PYRAMID_LEVEL_UNIFORM_BYTES,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+          }),
+        );
+        downsampleScratch.push(new Float32Array(4));
+        upsampleScratch.push(new Float32Array(4));
+      }
+      return { downsample, upsample, downsampleScratch, upsampleScratch };
+    };
+
+    const bloomPyramid = makePyramid("bloom", BLOOM_LEVELS);
+    const halationPyramid = makePyramid("halation", HALATION_LEVELS);
+
     const sampler = device.createSampler({
       label: "filtering",
       addressModeU: "clamp-to-edge",
@@ -238,11 +464,27 @@ export class WebGPUBackend implements RenderBackend {
       mipmapFilter: "nearest",
     });
 
-    const identityLut = Lut3DTexture.upload(
+    const grainSampler = device.createSampler({
+      label: "grain.repeat",
+      addressModeU: "repeat",
+      addressModeV: "repeat",
+      magFilter: "linear",
+      minFilter: "linear",
+    });
+
+    const grainTexture = BlueNoiseTile.load(device);
+
+    const identityLut1 = Lut3DTexture.upload(
       device,
       Lut3DTexture.identity(IDENTITY_LUT_SIZE),
       IDENTITY_LUT_SIZE,
       { label: "lut1.identity" },
+    );
+    const identityLut2 = Lut3DTexture.upload(
+      device,
+      Lut3DTexture.identity(IDENTITY_LUT_SIZE),
+      IDENTITY_LUT_SIZE,
+      { label: "lut2.identity" },
     );
 
     const pool = new OffscreenTargetPool(device);
@@ -251,13 +493,33 @@ export class WebGPUBackend implements RenderBackend {
       ctx,
       modules,
       pool,
-      filmlabPipeline,
-      blitPipeline,
+      {
+        filmlab: filmlabPipeline,
+        bloomPrefilter: bloomPrefilterPipeline,
+        halationPrefilter: halationPrefilterPipeline,
+        downsample: downsamplePipeline,
+        upsampleAdd: upsampleAddPipeline,
+        composite: compositePipeline,
+      },
+      {
+        bloom: pyramidGroupLayout,
+        halation: pyramidGroupLayout,
+        pyramid: pyramidGroupLayout,
+        composite: compositeGroupLayout,
+      },
       flagsBuffer,
       flagsBindGroup,
       gradeBuffer,
+      compositeBuffer,
+      bloomParamsBuffer,
+      halationParamsBuffer,
+      bloomPyramid,
+      halationPyramid,
       sampler,
-      identityLut,
+      grainSampler,
+      grainTexture,
+      identityLut1,
+      identityLut2,
     );
   }
 
@@ -314,6 +576,32 @@ export class WebGPUBackend implements RenderBackend {
     this.gradeDirty = true;
   }
 
+  setLUT2(data: Float32Array, size: number): void {
+    this.lut2Texture.destroy();
+    this.lut2Texture = Lut3DTexture.upload(this.ctx.device, data, size, {
+      label: "lut2",
+    });
+    this.frameState.lut2Enabled = true;
+    this.gradeDirty = true;
+  }
+
+  setLUT2Intensity(value: number): void {
+    this.frameState.lut2Intensity = value;
+    this.gradeDirty = true;
+  }
+
+  clearLUT2(): void {
+    this.lut2Texture.destroy();
+    this.lut2Texture = Lut3DTexture.upload(
+      this.ctx.device,
+      Lut3DTexture.identity(IDENTITY_LUT_SIZE),
+      IDENTITY_LUT_SIZE,
+      { label: "lut2.identity" },
+    );
+    this.frameState.lut2Enabled = false;
+    this.gradeDirty = true;
+  }
+
   setParams(params: RenderBackendParams): void {
     this.frameState.params = { ...this.frameState.params, ...params };
     this.gradeDirty = true;
@@ -331,44 +619,284 @@ export class WebGPUBackend implements RenderBackend {
     return this.frameState.params;
   }
 
-  private uploadGradeIfDirty(): void {
-    if (!this.gradeDirty) return;
-    packGradeUniforms(this.frameState, this.gradeScratch);
-    this.ctx.device.queue.writeBuffer(
-      this.gradeBuffer,
+  private paramNumber(key: string, fallback: number): number {
+    const v = this.frameState.params[key];
+    return typeof v === "number" ? v : fallback;
+  }
+
+  private paramString(key: string, fallback: string): string {
+    const v = this.frameState.params[key];
+    return typeof v === "string" ? v : fallback;
+  }
+
+  private uploadFrameUniforms(): void {
+    const { device } = this.ctx;
+
+    // Grade uniforms — filmlab path.
+    if (this.gradeDirty) {
+      packGradeUniforms(this.frameState, this.gradeScratch);
+      device.queue.writeBuffer(
+        this.gradeBuffer,
+        0,
+        this.gradeScratch.buffer,
+        this.gradeScratch.byteOffset,
+        this.gradeScratch.byteLength,
+      );
+      this.gradeDirty = false;
+    }
+
+    // Composite uniforms — always refreshed because composite reads time,
+    // which is pumped per-frame by the animation loop regardless of
+    // dirty-flag bookkeeping.
+    const compositeState: CompositeFrameState = {
+      resolutionX: this.frameState.resolutionX,
+      resolutionY: this.frameState.resolutionY,
+      imgResX: this.frameState.imgResX,
+      imgResY: this.frameState.imgResY,
+      fitMode: this.frameState.fitMode,
+      time: this.frameState.time,
+      params: this.frameState.params,
+    };
+    packCompositeUniforms(compositeState, this.compositeScratch);
+    device.queue.writeBuffer(
+      this.compositeBuffer,
       0,
-      this.gradeScratch.buffer,
-      this.gradeScratch.byteOffset,
-      this.gradeScratch.byteLength,
+      this.compositeScratch.buffer,
+      this.compositeScratch.byteOffset,
+      this.compositeScratch.byteLength,
     );
-    this.gradeDirty = false;
+
+    // Bloom prefilter params — (threshold, knee, _, _).
+    const bloomThreshold = this.paramNumber("bloomThreshold", DEFAULT_BLOOM_THRESHOLD);
+    const bloomKnee = this.paramNumber("bloomSoftKnee", DEFAULT_BLOOM_KNEE);
+    this.bloomParamsScratch[0] = bloomThreshold;
+    this.bloomParamsScratch[1] = bloomKnee;
+    this.bloomParamsScratch[2] = 0;
+    this.bloomParamsScratch[3] = 0;
+    device.queue.writeBuffer(
+      this.bloomParamsBuffer,
+      0,
+      this.bloomParamsScratch.buffer,
+      this.bloomParamsScratch.byteOffset,
+      this.bloomParamsScratch.byteLength,
+    );
+
+    // Halation prefilter params — (color.rgb, threshold) + (knee, _, _, _).
+    const halationRawColor = this.paramString("halationColor", "");
+    const halationColor =
+      halationRawColor.length > 0 ? hexToRgbTriple(halationRawColor) : DEFAULT_HALATION_COLOR;
+    const halationThreshold = this.paramNumber(
+      "halationThreshold",
+      DEFAULT_HALATION_THRESHOLD,
+    );
+    const halationKnee = this.paramNumber("halationSoftKnee", DEFAULT_HALATION_KNEE);
+    this.halationParamsScratch[0] = halationColor[0];
+    this.halationParamsScratch[1] = halationColor[1];
+    this.halationParamsScratch[2] = halationColor[2];
+    this.halationParamsScratch[3] = halationThreshold;
+    this.halationParamsScratch[4] = halationKnee;
+    this.halationParamsScratch[5] = 0;
+    this.halationParamsScratch[6] = 0;
+    this.halationParamsScratch[7] = 0;
+    device.queue.writeBuffer(
+      this.halationParamsBuffer,
+      0,
+      this.halationParamsScratch.buffer,
+      this.halationParamsScratch.byteOffset,
+      this.halationParamsScratch.byteLength,
+    );
+  }
+
+  /**
+   * Bloom / halation mip accumulation weights — WebGL parity formula.
+   * Smaller `radius` biases energy toward the sharper mips; `radius=1`
+   * spreads it outward to the low-freq tails.
+   */
+  private static computeMipWeights(radius: number, levels: number): number[] {
+    const weights: number[] = [];
+    for (let i = 0; i < levels; i++) {
+      const t = i / Math.max(levels - 1, 1);
+      const base = Math.exp(-3.0 * (1.0 - radius) * t);
+      const wide = Math.exp(-0.5 * radius * (1.0 - t));
+      weights.push(base * (1 - radius) + wide * radius);
+    }
+    return weights;
+  }
+
+  private ensurePyramidLevels(labelPrefix: string, levels: number): GPUTexture[] {
+    const out: GPUTexture[] = [];
+    for (let i = 0; i < levels; i++) {
+      const divisor = 2 ** (i + 1);
+      const w = Math.max(1, Math.floor(this._width / divisor));
+      const h = Math.max(1, Math.floor(this._height / divisor));
+      out.push(
+        this.pool.get(`${labelPrefix}.${i}`, {
+          width: w,
+          height: h,
+          format: "rgba16float",
+        }),
+      );
+    }
+    return out;
+  }
+
+  private renderPyramidChain(
+    encoder: GPUCommandEncoder,
+    label: string,
+    prefilterPipeline: GPURenderPipeline,
+    prefilterParamsBuffer: GPUBuffer,
+    sourceView: GPUTextureView,
+    levels: GPUTexture[],
+    pyramid: PyramidResources,
+    radius: number,
+  ): GPUTexture {
+    const { device } = this.ctx;
+    const weights = WebGPUBackend.computeMipWeights(radius, levels.length);
+
+    // Step 1 — prefilter: sourceView → levels[0] (clear load, no blend).
+    {
+      const bg = device.createBindGroup({
+        label: `${label}.prefilter.bg`,
+        layout: this.layouts.pyramid,
+        entries: [
+          { binding: 0, resource: { buffer: prefilterParamsBuffer } },
+          { binding: 1, resource: sourceView },
+          { binding: 2, resource: this.sampler },
+        ],
+      });
+      const pass = encoder.beginRenderPass({
+        label: `${label}.prefilter`,
+        colorAttachments: [
+          {
+            view: levels[0]!.createView(),
+            loadOp: "clear",
+            storeOp: "store",
+            clearValue: { r: 0, g: 0, b: 0, a: 1 },
+          },
+        ],
+      });
+      pass.setPipeline(prefilterPipeline);
+      pass.setBindGroup(0, this.flagsBindGroup);
+      pass.setBindGroup(1, bg);
+      pass.draw(3, 1, 0, 0);
+      pass.end();
+    }
+
+    // Step 2 — progressive downsample: levels[i-1] → levels[i].
+    for (let i = 1; i < levels.length; i++) {
+      const src = levels[i - 1]!;
+      const dst = levels[i]!;
+      const scratch = pyramid.downsampleScratch[i - 1]!;
+      scratch[0] = 1 / src.width;
+      scratch[1] = 1 / src.height;
+      scratch[2] = 0;
+      scratch[3] = 0;
+      device.queue.writeBuffer(
+        pyramid.downsample[i - 1]!,
+        0,
+        scratch.buffer,
+        scratch.byteOffset,
+        scratch.byteLength,
+      );
+      const bg = device.createBindGroup({
+        label: `${label}.downsample.${i}.bg`,
+        layout: this.layouts.pyramid,
+        entries: [
+          { binding: 0, resource: { buffer: pyramid.downsample[i - 1]! } },
+          { binding: 1, resource: src.createView() },
+          { binding: 2, resource: this.sampler },
+        ],
+      });
+      const pass = encoder.beginRenderPass({
+        label: `${label}.downsample.${i}`,
+        colorAttachments: [
+          {
+            view: dst.createView(),
+            loadOp: "clear",
+            storeOp: "store",
+            clearValue: { r: 0, g: 0, b: 0, a: 1 },
+          },
+        ],
+      });
+      pass.setPipeline(this.pipelines.downsample);
+      pass.setBindGroup(0, this.flagsBindGroup);
+      pass.setBindGroup(1, bg);
+      pass.draw(3, 1, 0, 0);
+      pass.end();
+    }
+
+    // Step 3 — progressive upsample with additive blend: levels[i+1] into
+    // levels[i] (preserve existing downsample contents via `loadOp:
+    // "load"`, accumulate with `blend: add/one/one`).
+    for (let i = levels.length - 2; i >= 0; i--) {
+      const lowRes = levels[i + 1]!;
+      const highRes = levels[i]!;
+      const scratch = pyramid.upsampleScratch[i]!;
+      scratch[0] = 1 / lowRes.width;
+      scratch[1] = 1 / lowRes.height;
+      scratch[2] = weights[i + 1]!;
+      scratch[3] = 0;
+      device.queue.writeBuffer(
+        pyramid.upsample[i]!,
+        0,
+        scratch.buffer,
+        scratch.byteOffset,
+        scratch.byteLength,
+      );
+      const bg = device.createBindGroup({
+        label: `${label}.upsample.${i}.bg`,
+        layout: this.layouts.pyramid,
+        entries: [
+          { binding: 0, resource: { buffer: pyramid.upsample[i]! } },
+          { binding: 1, resource: lowRes.createView() },
+          { binding: 2, resource: this.sampler },
+        ],
+      });
+      const pass = encoder.beginRenderPass({
+        label: `${label}.upsample.${i}`,
+        colorAttachments: [
+          {
+            view: highRes.createView(),
+            loadOp: "load",
+            storeOp: "store",
+          },
+        ],
+      });
+      pass.setPipeline(this.pipelines.upsampleAdd);
+      pass.setBindGroup(0, this.flagsBindGroup);
+      pass.setBindGroup(1, bg);
+      pass.draw(3, 1, 0, 0);
+      pass.end();
+    }
+
+    return levels[0]!;
   }
 
   render(): void {
     if (this.destroyed || !this.mediaTexture) return;
     const { device } = this.ctx;
-    this.uploadGradeIfDirty();
+    this.uploadFrameUniforms();
 
     const rtColorGraded = this.pool.get("rt.colorGraded", {
       width: this._width,
       height: this._height,
       format: "rgba16float",
     });
+    const bloomLevels = this.ensurePyramidLevels("rt.bloom", BLOOM_LEVELS);
+    const halationLevels = this.ensurePyramidLevels("rt.halation", HALATION_LEVELS);
 
     const encoder = device.createCommandEncoder({ label: "filmtone.frame" });
 
     // Pass 1 — primary grade into rgba16float offscreen.
     const filmlabBg = device.createBindGroup({
       label: "filmlab.bg",
-      layout: this.filmlabPipeline.getBindGroupLayout(1),
+      layout: this.pipelines.filmlab.getBindGroupLayout(1),
       entries: [
         { binding: 0, resource: { buffer: this.gradeBuffer } },
         { binding: 1, resource: this.mediaTexture.createView() },
         { binding: 2, resource: this.sampler },
-        {
-          binding: 3,
-          resource: this.lut1Texture.createView({ dimension: "3d" }),
-        },
+        { binding: 3, resource: this.lut1Texture.createView({ dimension: "3d" }) },
+        { binding: 4, resource: this.lut2Texture.createView({ dimension: "3d" }) },
       ],
     });
     {
@@ -383,26 +911,59 @@ export class WebGPUBackend implements RenderBackend {
           },
         ],
       });
-      pass.setPipeline(this.filmlabPipeline);
+      pass.setPipeline(this.pipelines.filmlab);
       pass.setBindGroup(0, this.flagsBindGroup);
       pass.setBindGroup(1, filmlabBg);
       pass.draw(3, 1, 0, 0);
       pass.end();
     }
 
-    // Pass 2 — blit rgba16float → swap (hw sRGB OETF).
+    const colorGradedView = rtColorGraded.createView();
+
+    // Pass 2 — bloom pyramid (prefilter → downsample → additive upsample).
+    const bloomRadius = this.paramNumber("bloomRadius", DEFAULT_BLOOM_RADIUS);
+    const bloomTop = this.renderPyramidChain(
+      encoder,
+      "bloom",
+      this.pipelines.bloomPrefilter,
+      this.bloomParamsBuffer,
+      colorGradedView,
+      bloomLevels,
+      this.bloomPyramid,
+      bloomRadius,
+    );
+
+    // Pass 3 — halation pyramid (same shape, tinted prefilter).
+    const halationRadius = this.paramNumber("halationRadius", DEFAULT_HALATION_RADIUS);
+    const halationTop = this.renderPyramidChain(
+      encoder,
+      "halation",
+      this.pipelines.halationPrefilter,
+      this.halationParamsBuffer,
+      colorGradedView,
+      halationLevels,
+      this.halationPyramid,
+      halationRadius,
+    );
+
+    // Pass 4 — composite to swap (hw sRGB OETF on rgba8unorm-srgb).
     const swapView = this.ctx.getCurrentTextureView();
-    const blitBg = device.createBindGroup({
-      label: "blit.bg",
-      layout: this.blitPipeline.getBindGroupLayout(1),
+    const compositeBg = device.createBindGroup({
+      label: "composite.bg",
+      layout: this.layouts.composite,
       entries: [
-        { binding: 0, resource: rtColorGraded.createView() },
-        { binding: 1, resource: this.sampler },
+        { binding: 0, resource: { buffer: this.compositeBuffer } },
+        { binding: 1, resource: colorGradedView },
+        { binding: 2, resource: bloomTop.createView() },
+        { binding: 3, resource: halationTop.createView() },
+        { binding: 4, resource: this.grainTexture.createView() },
+        { binding: 5, resource: this.sampler },
+        { binding: 6, resource: this.grainSampler },
       ],
     });
     {
       const pass = encoder.beginRenderPass({
-        label: "blit.pass",
+        label: "composite.pass",
         colorAttachments: [
           {
             view: swapView,
@@ -412,9 +973,9 @@ export class WebGPUBackend implements RenderBackend {
           },
         ],
       });
-      pass.setPipeline(this.blitPipeline);
+      pass.setPipeline(this.pipelines.composite);
       pass.setBindGroup(0, this.flagsBindGroup);
-      pass.setBindGroup(1, blitBg);
+      pass.setBindGroup(1, compositeBg);
       pass.draw(3, 1, 0, 0);
       pass.end();
     }
@@ -440,8 +1001,17 @@ export class WebGPUBackend implements RenderBackend {
     this.destroyed = true;
     this.mediaTexture?.destroy();
     this.lut1Texture.destroy();
+    this.lut2Texture.destroy();
+    this.grainTexture.destroy();
     this.flagsBuffer.destroy();
     this.gradeBuffer.destroy();
+    this.compositeBuffer.destroy();
+    this.bloomParamsBuffer.destroy();
+    this.halationParamsBuffer.destroy();
+    for (const buf of this.bloomPyramid.downsample) buf.destroy();
+    for (const buf of this.bloomPyramid.upsample) buf.destroy();
+    for (const buf of this.halationPyramid.downsample) buf.destroy();
+    for (const buf of this.halationPyramid.upsample) buf.destroy();
     this.pool.destroy();
     this.ctx.destroy();
   }
