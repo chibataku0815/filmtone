@@ -1117,14 +1117,14 @@ export const FilmLabControlPanelCore = forwardRef<
                         onChange={(v) => updateParam("crossFilterStrength", v)}
                         onCommit={commit}
                       />
-                      <div className="flex items-start gap-3 lg:pr-4">
-                        <div className="min-w-[7.5rem] shrink-0 text-[11px] leading-tight text-[var(--text-muted)] whitespace-nowrap sm:min-w-[8.5rem]">
+                      <div className="flex min-w-0 items-start gap-3 lg:pr-4">
+                        <div className="w-[7.5rem] shrink-0 text-[11px] leading-tight text-[var(--text-muted)] sm:w-[8.5rem]">
                           <div>{tFilmLab("controls.crossFilterSpikes")}</div>
-                          <div className="mt-1 whitespace-normal text-[10px] leading-snug text-white/42">
+                          <div className="mt-1 break-words whitespace-normal text-[10px] leading-snug text-white/42">
                             {tFilmLab("controls.crossFilterSpikesHint")}
                           </div>
                         </div>
-                        <div className="flex-1">
+                        <div className="flex min-w-0 flex-1 justify-end">
                           <SegmentedControl<"4" | "6" | "8">
                             options={[
                               { value: "4", label: "4" },
