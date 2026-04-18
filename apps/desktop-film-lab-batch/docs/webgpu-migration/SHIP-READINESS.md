@@ -38,10 +38,10 @@ without needing your machine:
 
 ## ⚠️ Requires user machine (irreducible)
 
-| Gate | Command | Why only you |
+| Gate | Runbook | Why only you |
 |---|---|---|
-| **10-minute hands-on QA** | `open release/filmtone-1.0.0-arm64.dmg` → drag to `/Applications` → launch → drag-drop a highlight-rich image → cycle three presets (cinematic / portra / bw) → one video export → resize / reload a couple of times → 10-minute stress. **Do NOT exercise Smart Look** — it is frozen in Desktop runtime and the smoke test (`smoke:smart-look-pending`) explicitly asserts the UI stays hidden. | Subjective visual accept. The color upgrade (Linear Rec.709 + no-clamp + rgba16float) is the whole point of v1.0, so it needs human eyes. |
-| **Decision checkbox** | — | Ship / hold judgment. |
+| **10〜15 分の実機 QA(動画重視)** | 専用 runbook: [`v1.0-qa-runbook.md`](./v1.0-qa-runbook.md)。Pre-flight → Step 1 静止画 → **Step 2 動画プレビュー** → **Step 3 preview vs export 色マッチ**(最重要)→ Step 4 LUT → Step 5 ストレス → Step 6 終了。Smart Look は触らない(Desktop で frozen)。 | Subjective visual accept。色マッチ確認は圧縮後動画フレームをプレビュー出力と並べて目視する作業なので自動化できない。 |
+| **Decision checkbox** | — | Ship / hold judgment。 |
 
 ## ⚠️ Gap found in this chat: golden-matrix PSNR harness not wired
 
@@ -71,6 +71,13 @@ report)` should be filed after ship.
 
 ## ⚠️ Risks
 
+- **Preview (WebGPU) と Video export (WebGL) の色が highlight で乖離する可能性
+  [最重要、v1.0 固有]**。Preview は rgba16float 線形 Rec.709 + no-clamp、Video
+  export は既存の WebGL2 パス(rgba8 + clamp)。shader と LUT は同じなので通常
+  領域では同じ見えになるが、1.0 超過の highlight を含むシーンでは理論上ズレる。
+  QA runbook の Step 3 で **同フレームの preview 静止画 と export 動画の frame
+  を並べて目視** することが v1.0 ship 判断の主ゲート。乖離パターン別の判断
+  フローは [`v1.0-qa-runbook.md`](./v1.0-qa-runbook.md) §Step 3 の Fail 時フロー。
 - **WebGPU bootstrap fails on first boot.** `Viewport.create` catches the
   exception, logs `[Viewport] WebGPU backend bootstrap failed — falling back
   to WebGL` and constructs a WebGL backend. BUT the fresh canvas we passed in
