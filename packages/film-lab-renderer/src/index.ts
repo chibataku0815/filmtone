@@ -20,6 +20,18 @@ export { Lut3DTexture } from "./webgpu/Lut3DTexture";
 export { MediaTexture } from "./webgpu/MediaTexture";
 export { RingBuffer, MOTION_BLUR_RING_SLOTS } from "./webgpu/RingBuffer";
 export { BlueNoiseTile } from "./webgpu/BlueNoiseTile";
+export { WebGPUBackend, type WebGPUBackendCreateOptions } from "./webgpu/WebGPUBackend";
+export {
+  fullscreenVertexWgsl,
+  filmlabFragmentWgsl,
+  bloomPrefilterFragmentWgsl,
+  halationPrefilterFragmentWgsl,
+  downsampleFragmentWgsl,
+  upsampleFragmentWgsl,
+  lightshaftsFragmentWgsl,
+  lightshaftsBlendFragmentWgsl,
+  dustFragmentWgsl,
+} from "./webgpu/shaders";
 
 // Shaders
 export { filmlabVertexShader } from "./webgl/shaders/filmlab.vert";

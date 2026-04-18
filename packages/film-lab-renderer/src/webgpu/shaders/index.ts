@@ -1,0 +1,17 @@
+/**
+ * WebGPU shader module re-exports.
+ *
+ * Phase 1 T1-3. All WGSL sources exposed here so `WebGPUBackend` can build
+ * `GPUShaderModule` instances and downstream apps can reuse them in
+ * export / preview pipelines.
+ */
+
+export { fullscreenVertexWgsl } from "./fullscreen.vert.wgsl";
+export { bloomPrefilterFragmentWgsl } from "./bloom-prefilter.frag.wgsl";
+export { halationPrefilterFragmentWgsl } from "./halation-prefilter.frag.wgsl";
+export { downsampleFragmentWgsl } from "./downsample.frag.wgsl";
+export { upsampleFragmentWgsl } from "./upsample.frag.wgsl";
+export { lightshaftsFragmentWgsl } from "./lightshafts.frag.wgsl";
+export { lightshaftsBlendFragmentWgsl } from "./lightshafts-blend.frag.wgsl";
+export { dustFragmentWgsl } from "./dust.frag.wgsl";
+export { filmlabFragmentWgsl } from "./filmlab.frag.wgsl";
