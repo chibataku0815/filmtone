@@ -791,7 +791,9 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
         return;
       }
       viewport = vp;
-      scene.add(viewport.mesh);
+      if (viewport.backendKind === "webgl" && viewport.mesh) {
+        scene.add(viewport.mesh);
+      }
       viewportRef.current = viewport;
       onViewportReadyRef.current?.(viewport);
       viewport.setParams(buildViewportParams(initialResolvedGradeRef.current));

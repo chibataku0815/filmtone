@@ -1033,7 +1033,9 @@ export async function runVideoExportPipeline(options: {
           width: outW,
           height: outH,
         });
-        scene.add(viewport.mesh);
+        if (viewport.backendKind === "webgl" && viewport.mesh) {
+          scene.add(viewport.mesh);
+        }
 
         viewport.setResolution(outW, outH);
         viewport.setTexture(srcTexture);

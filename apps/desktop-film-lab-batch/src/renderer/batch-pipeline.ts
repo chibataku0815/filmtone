@@ -397,7 +397,9 @@ export async function runBatchPipeline(options: {
           width,
           height,
         });
-        scene.add(viewport.mesh);
+        if (viewport.backendKind === "webgl" && viewport.mesh) {
+          scene.add(viewport.mesh);
+        }
       }
 
       renderer.setSize(width, height, false);

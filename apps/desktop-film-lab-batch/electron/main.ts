@@ -1083,6 +1083,14 @@ async function runPendingRuntimeSmoke(win: BrowserWindow): Promise<void> {
   }
 }
 
+// Phase 3 T3-3 (DIRECTION §10 Phase 0 Case A safety-net). macOS arm64
+// Electron 32 ships with `unsafeWebGPU` unflagged — Phase 0 疎通 confirmed
+// adapter=apple/metal-3, deviceOk=true without this switch. Keeping the
+// flag as a safety-net for older Electron builds and for DMG installs that
+// might hit a stale Chromium feature gate; harmless when WebGPU is already
+// enabled.
+app.commandLine.appendSwitch("enable-unsafe-webgpu");
+
 app.whenReady().then(async () => {
   console.log(
     "[film-lab-desktop] main: 動画 src は film-lab-video スキーム（path-to-file-url）。ログが file: なら bun run build:electron 未反映。",
