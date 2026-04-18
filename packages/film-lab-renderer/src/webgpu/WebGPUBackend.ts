@@ -10,9 +10,12 @@
  *      WebGL parity).
  *   3. halationPrefilter → halation.L0; downsample chain → halation.L[1..5];
  *      upsample chain with additive blend back to halation.L0 (6 mips).
- *   4. composite → rt.composited (`rgba16float`) — screen-blend glow
+ *   4. diffusion → diffusion.L0; 3-level full-image downsample/upsample
+ *      chain from rt.colorGraded, reusing the composite's legacy grain
+ *      texture slot for the top mip.
+ *   5. composite → rt.composited (`rgba16float`) — screen-blend glow
  *      shoulder, vignette, blue-noise grain (256² tile, DIRECTION §2).
- *   5. Post-chain:
+ *   6. Post-chain:
  *      - Motion blur ON (`shutterAngle > 0`): feedback copy into the
  *        ring (`depthOrArrayLayers=8`, DIRECTION §4) → weighted blend of
  *        the last N slots → swap.
@@ -36,7 +39,7 @@
  *
  * Still pending (Phase 3):
  *   - Cross-filter chain (Hard Mode temporal deferred to v1.1 per D5),
- *     diffusion, split/A-B compare, dust.
+ *     split/A-B compare, dust.
  */
 
 import {
@@ -88,6 +91,7 @@ import type { ViewportCapabilities } from "../RendererRuntime";
 const IDENTITY_LUT_SIZE = 33;
 const BLOOM_LEVELS = 5;
 const HALATION_LEVELS = 6;
+const DIFFUSION_LEVELS = 3;
 const BLOOM_PARAMS_BYTES = 16;
 const HALATION_PARAMS_BYTES = 32;
 const PYRAMID_LEVEL_UNIFORM_BYTES = 16;
@@ -162,7 +166,7 @@ interface PrefilterGroupLayouts {
  * resize swaps transparently.
  */
 interface PyramidResources {
-  readonly downsample: GPUBuffer[]; // length = levels - 1
+  readonly downsample: GPUBuffer[]; // length = levels
   readonly upsample: GPUBuffer[]; // length = levels - 1
   readonly downsampleScratch: Float32Array[];
   readonly upsampleScratch: Float32Array[];
@@ -183,6 +187,7 @@ export class WebGPUBackend implements RenderBackend {
   private readonly halationParamsBuffer: GPUBuffer;
   private readonly bloomPyramid: PyramidResources;
   private readonly halationPyramid: PyramidResources;
+  private readonly diffusionPyramid: PyramidResources;
   private readonly motionblurFeedbackBuffer: GPUBuffer;
   private readonly motionblurBlendBuffer: GPUBuffer;
   private readonly sampler: GPUSampler;
@@ -225,6 +230,7 @@ export class WebGPUBackend implements RenderBackend {
     halationParamsBuffer: GPUBuffer,
     bloomPyramid: PyramidResources,
     halationPyramid: PyramidResources,
+    diffusionPyramid: PyramidResources,
     motionblurFeedbackBuffer: GPUBuffer,
     motionblurBlendBuffer: GPUBuffer,
     sampler: GPUSampler,
@@ -248,6 +254,7 @@ export class WebGPUBackend implements RenderBackend {
     this.halationParamsBuffer = halationParamsBuffer;
     this.bloomPyramid = bloomPyramid;
     this.halationPyramid = halationPyramid;
+    this.diffusionPyramid = diffusionPyramid;
     this.motionblurFeedbackBuffer = motionblurFeedbackBuffer;
     this.motionblurBlendBuffer = motionblurBlendBuffer;
     this.sampler = sampler;
@@ -591,7 +598,7 @@ export class WebGPUBackend implements RenderBackend {
       const upsample: GPUBuffer[] = [];
       const downsampleScratch: Float32Array[] = [];
       const upsampleScratch: Float32Array[] = [];
-      for (let i = 0; i < levels - 1; i++) {
+      for (let i = 0; i < levels; i++) {
         downsample.push(
           device.createBuffer({
             label: `${label}.downsample.${i}`,
@@ -599,6 +606,8 @@ export class WebGPUBackend implements RenderBackend {
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
           }),
         );
+        downsampleScratch.push(new Float32Array(4));
+        if (i >= levels - 1) continue;
         upsample.push(
           device.createBuffer({
             label: `${label}.upsample.${i}`,
@@ -606,7 +615,6 @@ export class WebGPUBackend implements RenderBackend {
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
           }),
         );
-        downsampleScratch.push(new Float32Array(4));
         upsampleScratch.push(new Float32Array(4));
       }
       return { downsample, upsample, downsampleScratch, upsampleScratch };
@@ -614,6 +622,7 @@ export class WebGPUBackend implements RenderBackend {
 
     const bloomPyramid = makePyramid("bloom", BLOOM_LEVELS);
     const halationPyramid = makePyramid("halation", HALATION_LEVELS);
+    const diffusionPyramid = makePyramid("diffusion", DIFFUSION_LEVELS);
 
     const motionblurFeedbackBuffer = device.createBuffer({
       label: "motionblur.feedback.params",
@@ -701,6 +710,7 @@ export class WebGPUBackend implements RenderBackend {
       halationParamsBuffer,
       bloomPyramid,
       halationPyramid,
+      diffusionPyramid,
       motionblurFeedbackBuffer,
       motionblurBlendBuffer,
       sampler,
@@ -1205,6 +1215,143 @@ export class WebGPUBackend implements RenderBackend {
     return levels[0]!;
   }
 
+  private renderDiffusionPyramid(
+    encoder: GPUCommandEncoder,
+    sourceView: GPUTextureView,
+    levels: GPUTexture[],
+  ): GPUTexture {
+    const { device } = this.ctx;
+    const weights = WebGPUBackend.computeMipWeights(0.7, levels.length);
+
+    // Step 1 — full-image first downsample: rt.colorGraded → levels[0].
+    {
+      const scratch = this.diffusionPyramid.downsampleScratch[0]!;
+      scratch[0] = 1 / Math.max(this._width, 1);
+      scratch[1] = 1 / Math.max(this._height, 1);
+      scratch[2] = 0;
+      scratch[3] = 0;
+      device.queue.writeBuffer(
+        this.diffusionPyramid.downsample[0]!,
+        0,
+        scratch.buffer,
+        scratch.byteOffset,
+        scratch.byteLength,
+      );
+      const bg = device.createBindGroup({
+        label: "diffusion.downsample.0.bg",
+        layout: this.layouts.pyramid,
+        entries: [
+          { binding: 0, resource: { buffer: this.diffusionPyramid.downsample[0]! } },
+          { binding: 1, resource: sourceView },
+          { binding: 2, resource: this.sampler },
+        ],
+      });
+      const pass = encoder.beginRenderPass({
+        label: "diffusion.downsample.0",
+        colorAttachments: [
+          {
+            view: levels[0]!.createView(),
+            loadOp: "clear",
+            storeOp: "store",
+            clearValue: { r: 0, g: 0, b: 0, a: 1 },
+          },
+        ],
+      });
+      pass.setPipeline(this.pipelines.downsample);
+      pass.setBindGroup(0, this.flagsBindGroup);
+      pass.setBindGroup(1, bg);
+      pass.draw(3, 1, 0, 0);
+      pass.end();
+    }
+
+    // Step 2 — progressive downsample.
+    for (let i = 1; i < levels.length; i++) {
+      const src = levels[i - 1]!;
+      const dst = levels[i]!;
+      const scratch = this.diffusionPyramid.downsampleScratch[i]!;
+      scratch[0] = 1 / src.width;
+      scratch[1] = 1 / src.height;
+      scratch[2] = 0;
+      scratch[3] = 0;
+      device.queue.writeBuffer(
+        this.diffusionPyramid.downsample[i]!,
+        0,
+        scratch.buffer,
+        scratch.byteOffset,
+        scratch.byteLength,
+      );
+      const bg = device.createBindGroup({
+        label: `diffusion.downsample.${i}.bg`,
+        layout: this.layouts.pyramid,
+        entries: [
+          { binding: 0, resource: { buffer: this.diffusionPyramid.downsample[i]! } },
+          { binding: 1, resource: src.createView() },
+          { binding: 2, resource: this.sampler },
+        ],
+      });
+      const pass = encoder.beginRenderPass({
+        label: `diffusion.downsample.${i}`,
+        colorAttachments: [
+          {
+            view: dst.createView(),
+            loadOp: "clear",
+            storeOp: "store",
+            clearValue: { r: 0, g: 0, b: 0, a: 1 },
+          },
+        ],
+      });
+      pass.setPipeline(this.pipelines.downsample);
+      pass.setBindGroup(0, this.flagsBindGroup);
+      pass.setBindGroup(1, bg);
+      pass.draw(3, 1, 0, 0);
+      pass.end();
+    }
+
+    // Step 3 — additive upsample with the fixed wide diffusion radius.
+    for (let i = levels.length - 2; i >= 0; i--) {
+      const lowRes = levels[i + 1]!;
+      const highRes = levels[i]!;
+      const scratch = this.diffusionPyramid.upsampleScratch[i]!;
+      scratch[0] = 1 / lowRes.width;
+      scratch[1] = 1 / lowRes.height;
+      scratch[2] = weights[i + 1]!;
+      scratch[3] = 0;
+      device.queue.writeBuffer(
+        this.diffusionPyramid.upsample[i]!,
+        0,
+        scratch.buffer,
+        scratch.byteOffset,
+        scratch.byteLength,
+      );
+      const bg = device.createBindGroup({
+        label: `diffusion.upsample.${i}.bg`,
+        layout: this.layouts.pyramid,
+        entries: [
+          { binding: 0, resource: { buffer: this.diffusionPyramid.upsample[i]! } },
+          { binding: 1, resource: lowRes.createView() },
+          { binding: 2, resource: this.sampler },
+        ],
+      });
+      const pass = encoder.beginRenderPass({
+        label: `diffusion.upsample.${i}`,
+        colorAttachments: [
+          {
+            view: highRes.createView(),
+            loadOp: "load",
+            storeOp: "store",
+          },
+        ],
+      });
+      pass.setPipeline(this.pipelines.upsampleAdd);
+      pass.setBindGroup(0, this.flagsBindGroup);
+      pass.setBindGroup(1, bg);
+      pass.draw(3, 1, 0, 0);
+      pass.end();
+    }
+
+    return levels[0]!;
+  }
+
   /**
    * `shutterAngle` (degrees, 0..720) → active slot count. Matches WebGL
    * `getActiveFrameCount`: 720° uses the full 8-slot ring, 360° = 4
@@ -1282,6 +1429,7 @@ export class WebGPUBackend implements RenderBackend {
     });
     const bloomLevels = this.ensurePyramidLevels("rt.bloom", BLOOM_LEVELS);
     const halationLevels = this.ensurePyramidLevels("rt.halation", HALATION_LEVELS);
+    const diffusionAmount = Math.min(1, Math.max(0, this.paramNumber("diffusion", 0)));
 
     const encoder = device.createCommandEncoder({ label: "filmtone.frame" });
 
@@ -1344,7 +1492,17 @@ export class WebGPUBackend implements RenderBackend {
       halationRadius,
     );
 
-    // Pass 4 — composite into rgba16float intermediate. When motion blur
+    let diffusionView = this.grainTexture.createView();
+    if (diffusionAmount > 0) {
+      const diffusionLevels = this.ensurePyramidLevels("rt.diffusion", DIFFUSION_LEVELS);
+      diffusionView = this.renderDiffusionPyramid(
+        encoder,
+        colorGradedView,
+        diffusionLevels,
+      ).createView();
+    }
+
+    // Pass 5 — composite into rgba16float intermediate. When motion blur
     // is OFF we blit this straight to swap; when ON, it feeds the ring.
     const compositeBg = device.createBindGroup({
       label: "composite.bg",
@@ -1354,7 +1512,7 @@ export class WebGPUBackend implements RenderBackend {
         { binding: 1, resource: colorGradedView },
         { binding: 2, resource: bloomTop.createView() },
         { binding: 3, resource: halationTop.createView() },
-        { binding: 4, resource: this.grainTexture.createView() },
+        { binding: 4, resource: diffusionView },
         { binding: 5, resource: this.sampler },
         { binding: 6, resource: this.grainSampler },
       ],
@@ -1378,7 +1536,7 @@ export class WebGPUBackend implements RenderBackend {
       pass.end();
     }
 
-    // Pass 5 — post-chain → swap.
+    // Pass 6 — post-chain → swap.
     const swapView = this.ctx.getCurrentTextureView();
     const readbackView = this.readbackEnabled
       ? this.pool
@@ -1619,6 +1777,8 @@ export class WebGPUBackend implements RenderBackend {
     for (const buf of this.bloomPyramid.upsample) buf.destroy();
     for (const buf of this.halationPyramid.downsample) buf.destroy();
     for (const buf of this.halationPyramid.upsample) buf.destroy();
+    for (const buf of this.diffusionPyramid.downsample) buf.destroy();
+    for (const buf of this.diffusionPyramid.upsample) buf.destroy();
     this.ringBuffer.destroy();
     this.pool.destroy();
     this.ctx.destroy();

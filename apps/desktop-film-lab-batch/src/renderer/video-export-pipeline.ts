@@ -7,7 +7,7 @@
  */
 import * as THREE from "three";
 import {
-  isWebGL2Supported,
+  isWebGPUSupported,
 } from "film-lab-renderer";
 import type { FilmLabBatchBridge } from "./desktop-api";
 import {
@@ -773,14 +773,14 @@ export async function runVideoExportPipeline(options: {
   const u =
     userMessages ??
     ({
-      webglUnavailable: "WebGL2 が利用できません",
+      webglUnavailable: "WebGPU が利用できません",
       metadataFailed: (detail: string) => `メタデータ取得失敗: ${detail}`,
       ffmpegStartFailed: (detail: string) => `ffmpeg 開始失敗: ${detail}`,
       userAborted: "中断されました",
       ffmpegFailed: (code: number) => `ffmpeg 失敗 code=${code}`,
     } satisfies VideoExportPipelineUserMessages);
 
-  if (!isWebGL2Supported()) {
+  if (!(await isWebGPUSupported())) {
     return { ok: false, message: u.webglUnavailable };
   }
 
@@ -1077,6 +1077,7 @@ export async function runVideoExportPipeline(options: {
             height: outH,
             fps: VIDEO_EXPORT_FPS,
             hasAudio: probe.hasAudio,
+            dropFirstFrame: renderSession.backendKind === "webgl",
           });
           resolvedOutPath = startRes.outputVideoPath;
         } catch (e) {
@@ -1244,6 +1245,19 @@ export async function runVideoExportPipeline(options: {
           } else if (!webCodecsSession) {
             // VideoTexture: Three.js が colorSpace + UNPACK_FLIP_Y でアップロード
             srcTexture.needsUpdate = true;
+          }
+
+          if (
+            webCodecsSession &&
+            !reuseFrame &&
+            renderSession.backendKind === "webgpu"
+          ) {
+            // WebCodecs + WebGPU は advancing frame ごとに bitmap upload を更新する。
+            await renderSession.setSource({
+              texture: srcTexture,
+              imageWidth: probe.width,
+              imageHeight: probe.height,
+            });
           }
 
           const tR0 = performance.now();

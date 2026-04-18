@@ -161,6 +161,7 @@ export type FilmLabBatchBridge = {
     height: number;
     fps: number;
     hasAudio: boolean;
+    dropFirstFrame: boolean;
   }) => Promise<{ outputVideoPath: string }>;
   videoExportWriteFrame: (data: Uint8Array) => Promise<void>;
   videoExportFinish: () => Promise<{

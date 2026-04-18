@@ -9,11 +9,12 @@
  *   0: (resolutionX, resolutionY, imageResX, imageResY)
  *   1: (bloomStrength, halationIntensity, vignette, grainIntensity)
  *   2: (grainSize, grainRadialMix, fitMode, time)
- *   3: (lensSoftness, aberrationEdgeSoften, _, _)
+ *   3: (lensSoftness, aberrationEdgeSoften, diffusion, _)
  */
 
 export const COMPOSITE_UNIFORM_FLOATS = 16;
 export const COMPOSITE_UNIFORM_BYTES = COMPOSITE_UNIFORM_FLOATS * 4;
+const ABERRATION_EDGE_SOFTEN_SCALE = 32;
 
 export interface CompositeFrameState {
   resolutionX: number;
@@ -38,6 +39,7 @@ export function packCompositeUniforms(
     const v = state.params[key];
     return typeof v === "number" ? v : fallback;
   };
+  const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
   out[0] = state.resolutionX;
   out[1] = state.resolutionY;
   out[2] = state.imgResX;
@@ -51,8 +53,8 @@ export function packCompositeUniforms(
   out[10] = state.fitMode;
   out[11] = state.time;
   out[12] = n("lensSoftness", 0);
-  out[13] = n("aberrationEdgeSoften", 0);
-  out[14] = 0;
+  out[13] = clamp01(n("rgbShift", 0) * ABERRATION_EDGE_SOFTEN_SCALE);
+  out[14] = clamp01(n("diffusion", 0));
   out[15] = 0;
   return out;
 }

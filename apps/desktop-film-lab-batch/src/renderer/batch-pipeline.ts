@@ -5,7 +5,7 @@
  * @limitations GPU は 1 コンテキスト直列。巨大解像度は maxTextureSize で縮小読込（Web と同様）。
  */
 import {
-  isWebGL2Supported,
+  isWebGPUSupported,
   MediaLoader,
 } from "film-lab-renderer";
 import type { FilmLabBatchBridge } from "./desktop-api";
@@ -289,8 +289,8 @@ export async function runBatchPipeline(options: {
       ? sanitizeBatchFilenameSuffix("-graded")
       : sanitizeBatchFilenameSuffix(outputFilenameSuffix);
 
-  if (!isWebGL2Supported()) {
-    throw new Error("runBatchPipeline: WebGL2 が利用できません");
+  if (!(await isWebGPUSupported())) {
+    throw new Error("runBatchPipeline: WebGPU が利用できません");
   }
 
   const failedPathSet = new Set<string>();

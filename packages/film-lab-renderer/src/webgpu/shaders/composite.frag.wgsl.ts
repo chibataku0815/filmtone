@@ -28,9 +28,8 @@
  *     Reproduces the WebGL "film-lens soft periphery" behaviour.
  *
  * Deferred:
- *   - Split / A-B compare, diffusion (lazy 3-mip), motion blur feedback
- *     (handled upstream in the backend), dust overlay, cross-filter
- *     streaks / shafts.
+ *   - Split / A-B compare, motion blur feedback (handled upstream in the
+ *     backend), dust overlay, cross-filter streaks / shafts.
  *
  * Bind group layout (DIRECTION §10 Phase 2 — 2 bind groups):
  *   - group(0) — frame flags (`vec4f`, currently unused here but kept
@@ -40,11 +39,10 @@
  *     binding(1) uSource    : texture_2d<f32>   (rt.colorGraded)
  *     binding(2) uBloom     : texture_2d<f32>   (rt.bloom full-res mip[0])
  *     binding(3) uHalation  : texture_2d<f32>   (rt.halation full-res mip[0])
- *     binding(4) uGrain     : texture_2d<f32>   (legacy blue-noise tile,
- *                                                kept in the layout for
- *                                                compatibility; unused by
- *                                                the shader body now that
- *                                                grain is per-pixel).
+ *     binding(4) uDiffusion : texture_2d<f32>   (diffusion top mip,
+ *                                                reusing the legacy grain
+ *                                                texture slot to avoid a
+ *                                                layout change)
  *     binding(5) uSampler   : sampler           (linear, clamp-to-edge)
  *     binding(6) uGrainSamp : sampler           (linear, repeat — also
  *                                                kept for layout parity).
@@ -57,7 +55,7 @@ struct Composite {
   effects: vec4f,
   // (grainSize, grainRadialMix, fitMode, time)
   grainFit: vec4f,
-  // (lensSoftness, aberrationEdgeSoften, _, _)
+  // (lensSoftness, aberrationEdgeSoften, diffusion, _)
   lens: vec4f,
 };
 
@@ -65,7 +63,7 @@ struct Composite {
 @group(1) @binding(1) var uSource: texture_2d<f32>;
 @group(1) @binding(2) var uBloom: texture_2d<f32>;
 @group(1) @binding(3) var uHalation: texture_2d<f32>;
-@group(1) @binding(4) var uGrain: texture_2d<f32>;
+@group(1) @binding(4) var uDiffusion: texture_2d<f32>;
 @group(1) @binding(5) var uSampler: sampler;
 @group(1) @binding(6) var uGrainSampler: sampler;
 
@@ -149,6 +147,7 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
   let time = uComposite.grainFit.w;
   let lensSoftness = clamp(uComposite.lens.x, 0.0, 1.0);
   let aberrationEdgeSoften = clamp(uComposite.lens.y, 0.0, 1.0);
+  let diffusion = clamp(uComposite.lens.z, 0.0, 1.0);
 
   // --- Lens softness + aberration edge soften (WebGL parity) ---
   // Edge mask weighting: periphery gets more of the 8-tap blur. Cardinal
@@ -196,6 +195,15 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
   let glow = glowShoulder(bloom + halation) * glowHeadroom(baseRgb, 0.82);
   color = vec4f(vec3f(1.0) - (vec3f(1.0) - color.rgb) * (vec3f(1.0) - glow), color.a);
 
+  if (diffusion > 0.0) {
+    let diffused = textureSampleLevel(uDiffusion, uSampler, glowUv, 0.0).rgb;
+    let diffOpacity = glowShoulder(diffused * diffusion * 0.29) * glowHeadroom(baseRgb, 0.88);
+    color = vec4f(
+      vec3f(1.0) - (vec3f(1.0) - color.rgb) * (vec3f(1.0) - diffOpacity),
+      color.a,
+    );
+  }
+
   // Vignette in image space (follows image frame).
   let vigUv = fitUv(uv, resolution, imageResolution, fitMode);
   let vigMask = insideUv(vigUv);
@@ -237,11 +245,10 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
   rgb.b = rgb.b + (lumaGrain + chromaB) * grainWeight;
   color = vec4f(clamp(rgb, vec3f(0.0), vec3f(1.0)), color.a);
 
-  // Keep legacy grain bindings live so the pipeline layout matches the
-  // bind-group entries set up in WebGPUBackend. Sampled but scaled to 0 so
-  // it contributes nothing to the output.
-  let legacyTile = textureSampleLevel(uGrain, uGrainSampler, uv, 0.0).r;
-  color = vec4f(color.rgb + vec3f(legacyTile) * 0.0, color.a);
+  // Keep the legacy repeat sampler live so the bind-group layout does not
+  // need to change even though grain is now procedural.
+  let legacySamplerKeepalive = textureSampleLevel(uDiffusion, uGrainSampler, glowUv, 0.0).r;
+  color = vec4f(color.rgb + vec3f(legacySamplerKeepalive) * 0.0, color.a);
 
   // rgba8unorm-srgb handles the final clamp + OETF automatically.
   return vec4f(color.rgb, 1.0);

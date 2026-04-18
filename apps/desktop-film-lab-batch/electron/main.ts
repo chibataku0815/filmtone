@@ -775,8 +775,17 @@ function buildFfmpegRawvideoExportArgs(opts: {
   hasAudio: boolean;
   inputVideoPath: string;
   outputVideoPath: string;
+  dropFirstFrame: boolean;
 }): string[] {
-  const { width, height, fps, hasAudio, inputVideoPath, outputVideoPath } = opts;
+  const {
+    width,
+    height,
+    fps,
+    hasAudio,
+    inputVideoPath,
+    outputVideoPath,
+    dropFirstFrame,
+  } = opts;
   const videoCodec = ffmpegVideoCodecArgs();
   const head: string[] = [
     "-hide_banner",
@@ -813,11 +822,11 @@ function buildFfmpegRawvideoExportArgs(opts: {
   // and BT.709 color metadata tags ensure correct player interpretation.
   // See: .claude/knowledge/patterns/2026-03-03-ffmpeg-encoder-pitfalls-pattern.md §4
   //
-  // life#89 / portfolio#12: 先頭の表示フレームだけがほぼ真っ黒に乗り Finder サムネが黒になる。
-  // gl.finish だけでは再現が残ったため、raw 列で n==0 を捨て setpts で詰める（映像は 1 フレーム短い）。
-  // hasAudio + -shortest では短い映像に合わせて音声端が切り詰められる。
-  const colorFilterChain =
-    "vflip,scale=in_range=full:out_range=limited,select=gte(n\\,1),setpts=N/FRAME_RATE/TB";
+  // WebGL raw readback can emit a stale frame 0 on some Metal / ANGLE paths.
+  // Keep the drop only for that backend; WebGPU exports should preserve frame 0.
+  const colorFilterChain = dropFirstFrame
+    ? "vflip,scale=in_range=full:out_range=limited,select=gte(n\\,1),setpts=N/FRAME_RATE/TB"
+    : "vflip,scale=in_range=full:out_range=limited";
   head.push(
     "-vf",
     colorFilterChain,
@@ -1490,6 +1499,7 @@ ipcMain.handle("video-export-start", async (_evt, payload: unknown) => {
   const height = typeof o.height === "number" ? o.height : 0;
   const fps = typeof o.fps === "number" ? o.fps : 0;
   const hasAudio = Boolean(o.hasAudio);
+  const dropFirstFrame = o.dropFirstFrame === true;
 
   if (
     !inputVideoPath ||
@@ -1516,6 +1526,7 @@ ipcMain.handle("video-export-start", async (_evt, payload: unknown) => {
     hasAudio,
     inputVideoPath: inAbs,
     outputVideoPath,
+    dropFirstFrame,
   });
 
   const ffmpeg = (() => {
@@ -1551,7 +1562,7 @@ ipcMain.handle("video-export-start", async (_evt, payload: unknown) => {
   activeVideoExport = { child, stderrLines };
 
   console.log(
-    `[film-lab-desktop] ffmpeg 起動 rawvideo ${width}x${height}@${fps} hasAudio=${hasAudio} cli=${ffmpeg.commandPath} → ${outputVideoPath}`,
+    `[film-lab-desktop] ffmpeg 起動 rawvideo ${width}x${height}@${fps} hasAudio=${hasAudio} dropFirstFrame=${dropFirstFrame} cli=${ffmpeg.commandPath} → ${outputVideoPath}`,
   );
   if (DEBUG_VIDEO_EXPORT_MAIN) {
     console.log(`[film-lab-desktop] ffmpeg argv: ${JSON.stringify(ffArgs)}`);

@@ -150,6 +150,7 @@ contextBridge.exposeInMainWorld("filmLabBatch", {
     height: number;
     fps: number;
     hasAudio: boolean;
+    dropFirstFrame: boolean;
   }): Promise<{ outputVideoPath: string }> =>
     ipcRenderer.invoke("video-export-start", payload),
   videoExportWriteFrame: (data: Uint8Array): Promise<void> =>
