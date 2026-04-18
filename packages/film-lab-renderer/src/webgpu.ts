@@ -36,6 +36,8 @@ export {
   lightshaftsFragmentWgsl,
   lightshaftsBlendFragmentWgsl,
   dustFragmentWgsl,
+  motionblurFeedbackFragmentWgsl,
+  motionblurBlendFragmentWgsl,
 } from "./webgpu/shaders";
 export {
   packGradeUniforms,

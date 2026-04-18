@@ -1,5 +1,5 @@
 /**
- * WebGPUBackend — Phase 2 T2-1 + T2-2 + T2-0b + T2-3.
+ * WebGPUBackend — Phase 2 T2-1 + T2-2 + T2-0b + T2-3 + T2-4.
  *
  * Full v1.0 render pipeline:
  *   1. filmlab → rt.colorGraded (`rgba16float`) — LUT1 → primary grade
@@ -10,24 +10,33 @@
  *      WebGL parity).
  *   3. halationPrefilter → halation.L0; downsample chain → halation.L[1..5];
  *      upsample chain with additive blend back to halation.L0 (6 mips).
- *   4. composite → swap (`rgba8unorm-srgb`) — screen-blend glow shoulder,
- *      vignette, blue-noise grain (256² tile, DIRECTION §2). Hardware OETF
- *      handles the final linear → sRGB transform.
+ *   4. composite → rt.composited (`rgba16float`) — screen-blend glow
+ *      shoulder, vignette, blue-noise grain (256² tile, DIRECTION §2).
+ *   5. Post-chain:
+ *      - Motion blur ON (`shutterAngle > 0`): feedback copy into the
+ *        ring (`depthOrArrayLayers=8`, DIRECTION §4) → weighted blend of
+ *        the last N slots → swap.
+ *      - Motion blur OFF: blit rt.composited → swap.
+ *
+ *   The swap pass output is always `rgba8unorm-srgb` so the hardware OETF
+ *   handles the final linear → sRGB transform.
  *
  * Consumer API:
  *   - `setParams(record)` merges the full grade + post params blob; the
  *     uniforms it feeds are split between `GradeUniforms` (filmlab) and
  *     `CompositeUniforms` (bloom strength / halation intensity / grain /
  *     vignette). Bloom + halation shaping params (threshold, knee, radius,
- *     color) are consumed directly by the pyramid bookkeeping.
+ *     color) and motion blur (`shutterAngle`, `trailIntensity`,
+ *     `motionThreshold`) are consumed directly by the post-chain
+ *     bookkeeping.
  *   - `setLUT1` / `setLUT2` upload 3D LUTs (identity pre-uploaded at
  *     construction so the filmlab bind group is always valid).
  *   - `setMediaFromBitmap` / `setImageResolution` / `setFitMode` /
  *     `setTime` feed the remaining frame state.
  *
- * Still pending:
- *   - Motion blur ring buffer (T2-4).
- *   - Cross-filter chain, diffusion, split/A-B compare, dust (Phase 3).
+ * Still pending (Phase 3):
+ *   - Cross-filter chain (Hard Mode temporal deferred to v1.1 per D5),
+ *     diffusion, split/A-B compare, dust.
  */
 
 import { GpuContext } from "./GpuContext";
@@ -35,6 +44,7 @@ import { MediaTexture } from "./MediaTexture";
 import { OffscreenTargetPool } from "./OffscreenTargetPool";
 import { Lut3DTexture } from "./Lut3DTexture";
 import { BlueNoiseTile } from "./BlueNoiseTile";
+import { RingBuffer, MOTION_BLUR_RING_SLOTS } from "./RingBuffer";
 import {
   fullscreenVertexWgsl,
   filmlabFragmentWgsl,
@@ -47,6 +57,8 @@ import {
   lightshaftsFragmentWgsl,
   lightshaftsBlendFragmentWgsl,
   dustFragmentWgsl,
+  motionblurFeedbackFragmentWgsl,
+  motionblurBlendFragmentWgsl,
 } from "./shaders";
 import {
   GRADE_UNIFORM_BYTES,
@@ -69,6 +81,10 @@ const HALATION_LEVELS = 6;
 const BLOOM_PARAMS_BYTES = 16;
 const HALATION_PARAMS_BYTES = 32;
 const PYRAMID_LEVEL_UNIFORM_BYTES = 16;
+const MOTIONBLUR_FEEDBACK_UNIFORM_BYTES = 16;
+/** weights (2 vec4) + ring control (1 vec4) = 48 bytes. */
+const MOTIONBLUR_BLEND_UNIFORM_BYTES = 48;
+const MOTIONBLUR_BLEND_UNIFORM_FLOATS = MOTIONBLUR_BLEND_UNIFORM_BYTES / 4;
 
 const DEFAULT_BLOOM_THRESHOLD = 0.8;
 const DEFAULT_BLOOM_KNEE = 0.5;
@@ -94,6 +110,8 @@ interface ShaderModules {
   lightshafts: GPUShaderModule;
   lightshaftsBlend: GPUShaderModule;
   dust: GPUShaderModule;
+  motionblurFeedback: GPUShaderModule;
+  motionblurBlend: GPUShaderModule;
 }
 
 interface Pipelines {
@@ -104,6 +122,12 @@ interface Pipelines {
   /** Same shader as `downsample` / `upsample`-compatible layout, additive blend. */
   upsampleAdd: GPURenderPipeline;
   composite: GPURenderPipeline;
+  /** Final swap when motion blur is OFF — rgba16float → rgba8unorm-srgb hw OETF. */
+  blit: GPURenderPipeline;
+  /** Writes current composited frame into ring[newSlot], mixing ring[prevSlot] when trail > 0. */
+  motionblurFeedback: GPURenderPipeline;
+  /** N-slot weighted average → swap. */
+  motionblurBlend: GPURenderPipeline;
 }
 
 interface PrefilterGroupLayouts {
@@ -111,6 +135,9 @@ interface PrefilterGroupLayouts {
   halation: GPUBindGroupLayout;
   pyramid: GPUBindGroupLayout;
   composite: GPUBindGroupLayout;
+  blit: GPUBindGroupLayout;
+  motionblurFeedback: GPUBindGroupLayout;
+  motionblurBlend: GPUBindGroupLayout;
 }
 
 /**
@@ -140,6 +167,8 @@ export class WebGPUBackend implements RenderBackend {
   private readonly halationParamsBuffer: GPUBuffer;
   private readonly bloomPyramid: PyramidResources;
   private readonly halationPyramid: PyramidResources;
+  private readonly motionblurFeedbackBuffer: GPUBuffer;
+  private readonly motionblurBlendBuffer: GPUBuffer;
   private readonly sampler: GPUSampler;
   private readonly grainSampler: GPUSampler;
   private readonly grainTexture: GPUTexture;
@@ -147,10 +176,13 @@ export class WebGPUBackend implements RenderBackend {
   private readonly compositeScratch = new Float32Array(COMPOSITE_UNIFORM_FLOATS);
   private readonly bloomParamsScratch = new Float32Array(BLOOM_PARAMS_BYTES / 4);
   private readonly halationParamsScratch = new Float32Array(HALATION_PARAMS_BYTES / 4);
+  private readonly motionblurFeedbackScratch = new Float32Array(4);
+  private readonly motionblurBlendScratch = new Float32Array(MOTIONBLUR_BLEND_UNIFORM_FLOATS);
 
   private mediaTexture: GPUTexture | null = null;
   private lut1Texture: GPUTexture;
   private lut2Texture: GPUTexture;
+  private ringBuffer: RingBuffer;
   private _width = 1;
   private _height = 1;
   private destroyed = false;
@@ -171,11 +203,14 @@ export class WebGPUBackend implements RenderBackend {
     halationParamsBuffer: GPUBuffer,
     bloomPyramid: PyramidResources,
     halationPyramid: PyramidResources,
+    motionblurFeedbackBuffer: GPUBuffer,
+    motionblurBlendBuffer: GPUBuffer,
     sampler: GPUSampler,
     grainSampler: GPUSampler,
     grainTexture: GPUTexture,
     lut1Texture: GPUTexture,
     lut2Texture: GPUTexture,
+    ringBuffer: RingBuffer,
   ) {
     this.ctx = ctx;
     this.modules = modules;
@@ -190,11 +225,14 @@ export class WebGPUBackend implements RenderBackend {
     this.halationParamsBuffer = halationParamsBuffer;
     this.bloomPyramid = bloomPyramid;
     this.halationPyramid = halationPyramid;
+    this.motionblurFeedbackBuffer = motionblurFeedbackBuffer;
+    this.motionblurBlendBuffer = motionblurBlendBuffer;
     this.sampler = sampler;
     this.grainSampler = grainSampler;
     this.grainTexture = grainTexture;
     this.lut1Texture = lut1Texture;
     this.lut2Texture = lut2Texture;
+    this.ringBuffer = ringBuffer;
     this._width = Math.max(1, ctx.canvas.width);
     this._height = Math.max(1, ctx.canvas.height);
     this.frameState = {
@@ -235,6 +273,8 @@ export class WebGPUBackend implements RenderBackend {
       lightshafts: await make("lightshafts.frag", lightshaftsFragmentWgsl),
       lightshaftsBlend: await make("lightshafts-blend.frag", lightshaftsBlendFragmentWgsl),
       dust: await make("dust.frag", dustFragmentWgsl),
+      motionblurFeedback: await make("motionblur-feedback.frag", motionblurFeedbackFragmentWgsl),
+      motionblurBlend: await make("motionblur-blend.frag", motionblurBlendFragmentWgsl),
     };
 
     const flagsLayout = device.createBindGroupLayout({
@@ -286,6 +326,37 @@ export class WebGPUBackend implements RenderBackend {
         { binding: 4, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
         { binding: 5, visibility: GPUShaderStage.FRAGMENT, sampler: { type: "filtering" } },
         { binding: 6, visibility: GPUShaderStage.FRAGMENT, sampler: { type: "filtering" } },
+      ],
+    });
+
+    const blitGroupLayout = device.createBindGroupLayout({
+      label: "blit.group1",
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
+        { binding: 1, visibility: GPUShaderStage.FRAGMENT, sampler: { type: "filtering" } },
+      ],
+    });
+
+    const motionblurFeedbackGroupLayout = device.createBindGroupLayout({
+      label: "motionblur.feedback.group1",
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: "uniform" } },
+        { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
+        { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
+        { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: { type: "filtering" } },
+      ],
+    });
+
+    const motionblurBlendGroupLayout = device.createBindGroupLayout({
+      label: "motionblur.blend.group1",
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: "uniform" } },
+        {
+          binding: 1,
+          visibility: GPUShaderStage.FRAGMENT,
+          texture: { sampleType: "float", viewDimension: "2d-array" },
+        },
+        { binding: 2, visibility: GPUShaderStage.FRAGMENT, sampler: { type: "filtering" } },
       ],
     });
 
@@ -373,15 +444,67 @@ export class WebGPUBackend implements RenderBackend {
       }),
     );
 
+    // Composite now writes to an `rgba16float` intermediate so the
+    // optional motion-blur post-chain can feed that output into the
+    // ring. When motion blur is OFF the `blit` pipeline fans it out to
+    // the swap unchanged.
     const compositePipeline = await ctx.withValidationScope(() =>
       device.createRenderPipeline({
-        label: "composite.present",
+        label: "composite.rt",
         layout: device.createPipelineLayout({
           bindGroupLayouts: [flagsLayout, compositeGroupLayout],
         }),
         vertex: { module: modules.vert, entryPoint: "vs_main" },
         fragment: {
           module: modules.composite,
+          entryPoint: "fs_main",
+          targets: [{ format: "rgba16float" }],
+        },
+        primitive: { topology: "triangle-list" },
+      }),
+    );
+
+    const blitPipeline = await ctx.withValidationScope(() =>
+      device.createRenderPipeline({
+        label: "blit.present",
+        layout: device.createPipelineLayout({
+          bindGroupLayouts: [flagsLayout, blitGroupLayout],
+        }),
+        vertex: { module: modules.vert, entryPoint: "vs_main" },
+        fragment: {
+          module: modules.blit,
+          entryPoint: "fs_main",
+          targets: [{ format: ctx.canvasFormat }],
+        },
+        primitive: { topology: "triangle-list" },
+      }),
+    );
+
+    const motionblurFeedbackPipeline = await ctx.withValidationScope(() =>
+      device.createRenderPipeline({
+        label: "motionblur.feedback",
+        layout: device.createPipelineLayout({
+          bindGroupLayouts: [flagsLayout, motionblurFeedbackGroupLayout],
+        }),
+        vertex: { module: modules.vert, entryPoint: "vs_main" },
+        fragment: {
+          module: modules.motionblurFeedback,
+          entryPoint: "fs_main",
+          targets: [{ format: "rgba16float" }],
+        },
+        primitive: { topology: "triangle-list" },
+      }),
+    );
+
+    const motionblurBlendPipeline = await ctx.withValidationScope(() =>
+      device.createRenderPipeline({
+        label: "motionblur.blend.present",
+        layout: device.createPipelineLayout({
+          bindGroupLayouts: [flagsLayout, motionblurBlendGroupLayout],
+        }),
+        vertex: { module: modules.vert, entryPoint: "vs_main" },
+        fragment: {
+          module: modules.motionblurBlend,
           entryPoint: "fs_main",
           targets: [{ format: ctx.canvasFormat }],
         },
@@ -454,6 +577,18 @@ export class WebGPUBackend implements RenderBackend {
     const bloomPyramid = makePyramid("bloom", BLOOM_LEVELS);
     const halationPyramid = makePyramid("halation", HALATION_LEVELS);
 
+    const motionblurFeedbackBuffer = device.createBuffer({
+      label: "motionblur.feedback.params",
+      size: MOTIONBLUR_FEEDBACK_UNIFORM_BYTES,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+
+    const motionblurBlendBuffer = device.createBuffer({
+      label: "motionblur.blend.params",
+      size: MOTIONBLUR_BLEND_UNIFORM_BYTES,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+
     const sampler = device.createSampler({
       label: "filtering",
       addressModeU: "clamp-to-edge",
@@ -489,6 +624,13 @@ export class WebGPUBackend implements RenderBackend {
 
     const pool = new OffscreenTargetPool(device);
 
+    const ringBuffer = new RingBuffer(device, {
+      width: Math.max(1, canvas.width),
+      height: Math.max(1, canvas.height),
+      format: "rgba16float",
+      label: "motion-blur.ring",
+    });
+
     return new WebGPUBackend(
       ctx,
       modules,
@@ -500,12 +642,18 @@ export class WebGPUBackend implements RenderBackend {
         downsample: downsamplePipeline,
         upsampleAdd: upsampleAddPipeline,
         composite: compositePipeline,
+        blit: blitPipeline,
+        motionblurFeedback: motionblurFeedbackPipeline,
+        motionblurBlend: motionblurBlendPipeline,
       },
       {
         bloom: pyramidGroupLayout,
         halation: pyramidGroupLayout,
         pyramid: pyramidGroupLayout,
         composite: compositeGroupLayout,
+        blit: blitGroupLayout,
+        motionblurFeedback: motionblurFeedbackGroupLayout,
+        motionblurBlend: motionblurBlendGroupLayout,
       },
       flagsBuffer,
       flagsBindGroup,
@@ -515,11 +663,14 @@ export class WebGPUBackend implements RenderBackend {
       halationParamsBuffer,
       bloomPyramid,
       halationPyramid,
+      motionblurFeedbackBuffer,
+      motionblurBlendBuffer,
       sampler,
       grainSampler,
       grainTexture,
       identityLut1,
       identityLut2,
+      ringBuffer,
     );
   }
 
@@ -872,12 +1023,60 @@ export class WebGPUBackend implements RenderBackend {
     return levels[0]!;
   }
 
+  /**
+   * `shutterAngle` (degrees, 0..720) → active slot count. Matches WebGL
+   * `getActiveFrameCount`: 720° uses the full 8-slot ring, 360° = 4
+   * slots, 180° = 2 slots.
+   */
+  private activeMotionBlurFrames(shutterAngle: number): number {
+    if (shutterAngle <= 0) return 0;
+    const normalized = Math.min(shutterAngle, 720) / 360;
+    const raw = Math.round(normalized * (MOTION_BLUR_RING_SLOTS / 2));
+    return Math.max(1, Math.min(MOTION_BLUR_RING_SLOTS, raw));
+  }
+
+  /**
+   * Pre-normalized motion-blur weights (sum = 1 across active slots, 0
+   * elsewhere). Triangle/box mix follows the WebGL path: shutterAngle ≤
+   * 360° is pure triangle; > 360° smoothly flattens to box by 720°.
+   */
+  private computeMotionBlurWeights(
+    shutterAngle: number,
+    activeFrames: number,
+    validSlots: number,
+  ): Float32Array {
+    const out = new Float32Array(MOTION_BLUR_RING_SLOTS);
+    const effective = Math.min(activeFrames, validSlots);
+    if (effective <= 0) return out;
+    if (effective === 1) {
+      out[0] = 1;
+      return out;
+    }
+    const flatness = Math.min(1, Math.max(0, (shutterAngle - 360) / 360));
+    let sum = 0;
+    for (let i = 0; i < effective; i++) {
+      const triangleW = effective - i;
+      const boxW = 1;
+      out[i] = triangleW * (1 - flatness) + boxW * flatness;
+      sum += out[i]!;
+    }
+    if (sum > 0) {
+      for (let i = 0; i < effective; i++) out[i]! /= sum;
+    }
+    return out;
+  }
+
   render(): void {
     if (this.destroyed || !this.mediaTexture) return;
     const { device } = this.ctx;
     this.uploadFrameUniforms();
 
     const rtColorGraded = this.pool.get("rt.colorGraded", {
+      width: this._width,
+      height: this._height,
+      format: "rgba16float",
+    });
+    const rtComposited = this.pool.get("rt.composited", {
       width: this._width,
       height: this._height,
       format: "rgba16float",
@@ -946,8 +1145,8 @@ export class WebGPUBackend implements RenderBackend {
       halationRadius,
     );
 
-    // Pass 4 — composite to swap (hw sRGB OETF on rgba8unorm-srgb).
-    const swapView = this.ctx.getCurrentTextureView();
+    // Pass 4 — composite into rgba16float intermediate. When motion blur
+    // is OFF we blit this straight to swap; when ON, it feeds the ring.
     const compositeBg = device.createBindGroup({
       label: "composite.bg",
       layout: this.layouts.composite,
@@ -966,7 +1165,7 @@ export class WebGPUBackend implements RenderBackend {
         label: "composite.pass",
         colorAttachments: [
           {
-            view: swapView,
+            view: rtComposited.createView(),
             loadOp: "clear",
             storeOp: "store",
             clearValue: { r: 0, g: 0, b: 0, a: 1 },
@@ -978,6 +1177,158 @@ export class WebGPUBackend implements RenderBackend {
       pass.setBindGroup(1, compositeBg);
       pass.draw(3, 1, 0, 0);
       pass.end();
+    }
+
+    // Pass 5 — post-chain → swap.
+    const swapView = this.ctx.getCurrentTextureView();
+    const shutterAngle = this.paramNumber("shutterAngle", 0);
+    const motionBlurOn = shutterAngle > 0;
+
+    if (!motionBlurOn) {
+      const blitBg = device.createBindGroup({
+        label: "blit.bg",
+        layout: this.layouts.blit,
+        entries: [
+          { binding: 0, resource: rtComposited.createView() },
+          { binding: 1, resource: this.sampler },
+        ],
+      });
+      const pass = encoder.beginRenderPass({
+        label: "blit.pass",
+        colorAttachments: [
+          {
+            view: swapView,
+            loadOp: "clear",
+            storeOp: "store",
+            clearValue: { r: 0, g: 0, b: 0, a: 1 },
+          },
+        ],
+      });
+      pass.setPipeline(this.pipelines.blit);
+      pass.setBindGroup(0, this.flagsBindGroup);
+      pass.setBindGroup(1, blitBg);
+      pass.draw(3, 1, 0, 0);
+      pass.end();
+    } else {
+      // Motion blur ON — feedback copy + weighted blend.
+      const prevSlot =
+        (this.ringBuffer.validSlots > 0
+          ? // Most recently written slot is `(writeIndex - 1 + N) % N`;
+            // when the ring is empty we fall through to the new slot and
+            // let hasPrev=0 zero out the trail contribution.
+            undefined
+          : undefined);
+      const nextSlot = this.ringBuffer.nextSlot();
+      const validSlots = this.ringBuffer.validSlots; // already incremented
+      const hasPrev = validSlots > 1 ? 1 : 0;
+      const prevSlotIndex =
+        (nextSlot - 1 + MOTION_BLUR_RING_SLOTS) % MOTION_BLUR_RING_SLOTS;
+      void prevSlot; // explicitly unused; kept for future trail tuning
+
+      const trailIntensity = this.paramNumber("trailIntensity", 0);
+      this.motionblurFeedbackScratch[0] = trailIntensity;
+      this.motionblurFeedbackScratch[1] = hasPrev;
+      this.motionblurFeedbackScratch[2] = 0;
+      this.motionblurFeedbackScratch[3] = 0;
+      device.queue.writeBuffer(
+        this.motionblurFeedbackBuffer,
+        0,
+        this.motionblurFeedbackScratch.buffer,
+        this.motionblurFeedbackScratch.byteOffset,
+        this.motionblurFeedbackScratch.byteLength,
+      );
+
+      // Previous-slot view: on the very first frame there is no real
+      // previous slot; we reuse the same `nextSlot` layer (hasPrev=0 in
+      // the uniform zeroes out its contribution).
+      const prevView = this.ringBuffer.viewForSlot(hasPrev === 1 ? prevSlotIndex : nextSlot);
+      const nextView = this.ringBuffer.viewForSlot(nextSlot);
+
+      const feedbackBg = device.createBindGroup({
+        label: "motionblur.feedback.bg",
+        layout: this.layouts.motionblurFeedback,
+        entries: [
+          { binding: 0, resource: { buffer: this.motionblurFeedbackBuffer } },
+          { binding: 1, resource: rtComposited.createView() },
+          { binding: 2, resource: prevView },
+          { binding: 3, resource: this.sampler },
+        ],
+      });
+      {
+        const pass = encoder.beginRenderPass({
+          label: "motionblur.feedback.pass",
+          colorAttachments: [
+            {
+              view: nextView,
+              loadOp: "clear",
+              storeOp: "store",
+              clearValue: { r: 0, g: 0, b: 0, a: 1 },
+            },
+          ],
+        });
+        pass.setPipeline(this.pipelines.motionblurFeedback);
+        pass.setBindGroup(0, this.flagsBindGroup);
+        pass.setBindGroup(1, feedbackBg);
+        pass.draw(3, 1, 0, 0);
+        pass.end();
+      }
+
+      const activeFrames = Math.min(
+        this.activeMotionBlurFrames(shutterAngle),
+        validSlots,
+      );
+      const weights = this.computeMotionBlurWeights(
+        shutterAngle,
+        activeFrames,
+        validSlots,
+      );
+      const oldestSlot =
+        (nextSlot - (activeFrames - 1) + MOTION_BLUR_RING_SLOTS * 2) %
+        MOTION_BLUR_RING_SLOTS;
+      const motionThreshold = this.paramNumber("motionThreshold", 0);
+
+      for (let i = 0; i < MOTION_BLUR_RING_SLOTS; i++) {
+        this.motionblurBlendScratch[i] = weights[i] ?? 0;
+      }
+      this.motionblurBlendScratch[8] = nextSlot;
+      this.motionblurBlendScratch[9] = oldestSlot;
+      this.motionblurBlendScratch[10] = motionThreshold;
+      this.motionblurBlendScratch[11] = 0;
+      device.queue.writeBuffer(
+        this.motionblurBlendBuffer,
+        0,
+        this.motionblurBlendScratch.buffer,
+        this.motionblurBlendScratch.byteOffset,
+        this.motionblurBlendScratch.byteLength,
+      );
+
+      const blendBg = device.createBindGroup({
+        label: "motionblur.blend.bg",
+        layout: this.layouts.motionblurBlend,
+        entries: [
+          { binding: 0, resource: { buffer: this.motionblurBlendBuffer } },
+          { binding: 1, resource: this.ringBuffer.arrayView() },
+          { binding: 2, resource: this.sampler },
+        ],
+      });
+      {
+        const pass = encoder.beginRenderPass({
+          label: "motionblur.blend.pass",
+          colorAttachments: [
+            {
+              view: swapView,
+              loadOp: "clear",
+              storeOp: "store",
+              clearValue: { r: 0, g: 0, b: 0, a: 1 },
+            },
+          ],
+        });
+        pass.setPipeline(this.pipelines.motionblurBlend);
+        pass.setBindGroup(0, this.flagsBindGroup);
+        pass.setBindGroup(1, blendBg);
+        pass.draw(3, 1, 0, 0);
+        pass.end();
+      }
     }
 
     device.queue.submit([encoder.finish()]);
@@ -994,6 +1345,10 @@ export class WebGPUBackend implements RenderBackend {
     this.frameState.resolutionX = w;
     this.frameState.resolutionY = h;
     this.gradeDirty = true;
+    // RingBuffer resize re-allocates the 8-layer array texture and
+    // resets validSlots → 0 so stale content can't bleed through the
+    // weighted average after a viewport change.
+    this.ringBuffer.resize(w, h);
   }
 
   destroy(): void {
@@ -1008,10 +1363,13 @@ export class WebGPUBackend implements RenderBackend {
     this.compositeBuffer.destroy();
     this.bloomParamsBuffer.destroy();
     this.halationParamsBuffer.destroy();
+    this.motionblurFeedbackBuffer.destroy();
+    this.motionblurBlendBuffer.destroy();
     for (const buf of this.bloomPyramid.downsample) buf.destroy();
     for (const buf of this.bloomPyramid.upsample) buf.destroy();
     for (const buf of this.halationPyramid.downsample) buf.destroy();
     for (const buf of this.halationPyramid.upsample) buf.destroy();
+    this.ringBuffer.destroy();
     this.pool.destroy();
     this.ctx.destroy();
   }

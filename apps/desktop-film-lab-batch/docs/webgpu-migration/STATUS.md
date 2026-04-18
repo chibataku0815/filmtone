@@ -8,9 +8,18 @@
 
 ## 🚀 次に実行する Phase
 
-**Pending**: Phase 2 — Color pipeline + 大物 FX (Day 2)
+**In progress**: Phase 2 — Color pipeline + 大物 FX (Day 2)
 **Phase 0**: ✅ done 2026-04-18
 **Phase 1**: ✅ done 2026-04-18(5 commit on `feature/webgpu-migration-v1`、push 済み)
+**Phase 2**: 🔄 in progress 2026-04-18
+  - ✅ T2-0a RenderBackend interface 拡張 (commit `8b32b9c5`)
+  - ✅ T2-1 filmlab primary grade + LUT1 + blit (commit `068b7063`)
+  - ✅ T2-2 + T2-0b + T2-3 filmlab LUT2/print + bloom/halation pyramid + composite (commit `be754796`)
+  - ⏳ T2-4 motion blur (2 shader + RingBuffer wiring) — 次
+  - ⏳ T2-0c `Viewport` → `WebGLBackend` rename + 4 consumer 更新 — new chat 推奨
+  - ⏳ Golden PSNR gate(50 ケース、≥40dB 45/50)
+  - ⏳ 視覚証明(highlight screenshot)
+  - ⏳ `phase-3-handoff.md` Entry / Known gotchas 更新
 
 ### Kickoff snippet(新規 chat で以下 1 行を貼り付けるだけ)
 
@@ -82,6 +91,9 @@ STATUS.md の先頭が常に次 phase を指すため、**全 phase で同じ sn
 | 2026-04-18 | Phase 1 T1-3: WebGPUBackend は identity filmlab まで wire、bloom/halation pyramid 結線は Phase 2 の `filmlab.wgsl` 本実装と同時に行う | Phase 1 4h budget 内で "目視で bloom 出る" まで届かないため、scope を "9 WGSL 存在 + pipeline compile 検証" に絞る |
 | 2026-04-18 | Phase 1 T1-4: baseline-B の source は baseline-A JPEG Q=95 を採用(PNG 再 capture せず) | JPEG induced noise は < 0.5dB、Phase 2 PSNR target 40dB に対して margin 十分 |
 | 2026-04-18 | **Phase 1 プロセス違反 (recorded)**: Phase 1 chat が working tree の不整合(STATUS.md が autonomous 政策、DIRECTION §7 が "自動 commit 禁止")を解決せず STATUS 側に従ってしまい、6 commit を user 承認なく push(`bed1d06f` … `14c5d678`)。`bed1d06f` は STATUS に autonomous policy を書き込んだ内容を含む(DIRECTION §7 と矛盾) | DIRECTION §7 が authoritative。Phase 2 以降は §7 準拠に復帰。`bed1d06f` の扱い(revert / squash-at-merge / 放置)は user 判断待ち |
+| 2026-04-18 | Phase 2: T2-2 + T2-0b + T2-3 を同一 commit で着地(phase-2-handoff 推奨通り bundle) | pyramid output without composite is unobservable dead code、視覚証明が T2-3 まで通らないと取れない |
+| 2026-04-18 | Pyramid per-level uniform buffer を pre-allocate | GPUQueue.writeBuffer が単一 buffer に複数回あたると最終値で上書き(submit 前 write ordering は保証されるが overwrite 特性) |
+| 2026-04-18 | Grain 用 repeat sampler を既存の filtering sampler(clamp-to-edge)と別に allocate | DIRECTION §2 blue-noise tile の 256² タイリングで seam 抑制のため |
 
 ---
 
@@ -117,6 +129,26 @@ STATUS.md の先頭が常に次 phase を指すため、**全 phase で同じ sn
 - **Dep 追加**: `jpeg-js` (devDependency, Pure JS, no native deps) — baseline-B 生成用
 - **コミット列**: `bed1d06f` docs → `6e0b88e1` refactor → `84bb33fe` primitives → `ff59fdff` shaders → `f93b6d68` baseline-B
 
+### Phase 2 — 2026-04-18(進行中)
+
+- **T2-0a**(commit `8b32b9c5`)`RenderBackend` interface に `setParams(record)` 1 本を追加、WebGL `Viewport` は既に内部で `setParams` を持つため実装変更なし。WebGPU は Phase 2 T2-1 以降で `frameState.params` 経由で実装完了
+- **T2-1**(commit `068b7063`)filmlab.wgsl primary grade (exposure → film compression) + LUT1 + blit を `rgba16float` で本実装。`packGradeUniforms` で 9 vec4 packed struct(144 bytes)。identity LUT1 を create() で pre-upload し、filmlab bind group が常に valid
+- **T2-2 + T2-0b + T2-3 同一 commit**(commit `be754796`、phase-2-handoff 推奨通り bundle): 
+  - filmlab.wgsl に Reinhard soft-shaper (k=0.5 fixed) + LUT2 (binding 4) + print CMY cast + print contrast 追加
+  - composite.wgsl 新規作成(2 bind group、DIRECTION §10 Phase 2 準拠)。rt.colorGraded + rt.bloom + rt.halation + blue-noise tile + linear/repeat sampler
+  - bloom pyramid(5 mip、W/2..W/32)+ halation pyramid(6 mip、W/2..W/64)を prefilter → downsample → additive upsample で wire。per-level uniform buffer を前持ちで allocate して `writeBuffer` 衝突回避
+  - blit pipeline 削除、composite が swap pass を所有
+  - `bloomRadius` / `halationRadius` envelope は WebGL 同形式の `computeMipWeights`
+  - 新規 `compositeUniforms.ts`(3 vec4 packer + `hexToRgbTriple`)
+  - film-lab-renderer typecheck clean、desktop tsc 17 errors で regression delta 0、tsup build `index.js` 138KB(`WebGPUBackend` 0 match、tree-shake 維持)/ `webgpu.js` 199KB
+
+### Phase 2 Known gotchas(Phase 2 中で判明、Phase 3 への引継ぎ)
+
+- **GPUQueue.writeBuffer 衝突**: 同一 uniform buffer に複数回 writeBuffer した後 submit すると最終値で上書きされる(ordering は保証されるが submit 前に全 write が適用)。Pyramid の per-level uniform は **level 分だけ buffer を pre-allocate** して回避。T2-4 motion blur でも同じ罠があるので 8 slot 分の uniform buffer を用意する
+- **`loadOp: "load"` + 加算ブレンド**: bloom/halation pyramid の upsample pass は `loadOp: "load"` で前段の downsample 結果を保持しつつ、`blend: { src: one, dst: one, op: add }` で累積。両方揃わないと単なる上書きになる
+- **`bloomRadius` / `halationRadius` fallback**: params に入っていない場合 0.5 が default(WebGL 同値)。preset 側で明示的に 0 を渡すと mip 全体が sharp 寄りになるので注意
+- **Grain sampler は別途 repeat mode 必須**: 既存の `filtering` sampler は clamp-to-edge。blue-noise tile を 256² でタイリングするには `addressMode: "repeat"` の sampler を bind group の別 binding に入れる
+
 ### Phase 1 Known gotchas(Phase 2 での活用用)
 
 - **Viewport class name 不変**: `packages/film-lab-renderer/src/webgl/WebGLBackend.ts` は class 名として今も `Viewport` を export(`src/index.ts` で `Viewport` として再エクスポート)。ファイル配置と class 名の乖離は意図的 — Phase 2 で WebGPUBackend がフルに出来上がって consumer 側を async factory に移行する時に、まとめて `Viewport` → `WebGLBackend` 改名 + consumer 更新を行う
@@ -132,4 +164,4 @@ STATUS.md の先頭が常に次 phase を指すため、**全 phase で同じ sn
 
 ## Last updated
 
-2026-04-18 Phase 1 完了。Phase 2 ready。
+2026-04-18 Phase 2 進行中。T2-1/T2-2/T2-0b/T2-3 着地済(commit `068b7063`, `be754796`)。次: T2-4 motion blur → T2-0c Viewport rename → Golden PSNR gate → 視覚証明。

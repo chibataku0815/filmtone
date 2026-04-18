@@ -17,3 +17,5 @@ export { dustFragmentWgsl } from "./dust.frag.wgsl";
 export { filmlabFragmentWgsl } from "./filmlab.frag.wgsl";
 export { blitFragmentWgsl } from "./blit.frag.wgsl";
 export { compositeFragmentWgsl } from "./composite.frag.wgsl";
+export { motionblurFeedbackFragmentWgsl } from "./motionblur-feedback.frag.wgsl";
+export { motionblurBlendFragmentWgsl } from "./motionblur-blend.frag.wgsl";
