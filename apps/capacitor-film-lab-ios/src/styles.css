@@ -2,12 +2,37 @@
 @source "../../../packages/film-lab-ui/src";
 @source "./**/*.{ts,tsx}";
 
+@theme {
+  --color-app-bg: #050505;
+  --color-accent-amber1: #ffb740;
+  --color-accent-amber-soft: rgba(255, 183, 64, 0.14);
+  --color-accent-amber-glow: rgba(255, 180, 50, 0.4);
+  --color-text-base: rgba(255, 255, 255, 0.94);
+  --color-text-base-70: rgba(255, 255, 255, 0.7);
+  --color-text-muted: rgba(255, 255, 255, 0.46);
+  --color-panel-stroke: rgba(255, 255, 255, 0.12);
+  --color-panel-stroke-soft: rgba(255, 255, 255, 0.08);
+  --color-panel-fill: rgba(255, 255, 255, 0.03);
+  --color-glass-fill: rgba(0, 0, 0, 0.55);
+
+  --font-sans:
+    "Geist", "Geist Sans", "Noto Sans JP", "Hiragino Kaku Gothic ProN",
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  --font-mono:
+    "Geist Mono", ui-monospace, "SFMono-Regular", "SF Mono", Menlo,
+    Consolas, monospace;
+}
+
 :root {
-  --app-bg: #070707;
-  --text-base: rgba(255, 255, 255, 0.94);
-  --text-base-70: rgba(255, 255, 255, 0.7);
-  --text-muted: rgba(255, 255, 255, 0.46);
-  --accent-amber1: #f6b84d;
+  --app-bg: var(--color-app-bg);
+  --accent-amber1: var(--color-accent-amber1);
+  --text-base: var(--color-text-base);
+  --text-base-70: var(--color-text-base-70);
+  --text-muted: var(--color-text-muted);
+  --panel-stroke: var(--color-panel-stroke);
+  --panel-fill: var(--color-panel-fill);
+  --glass-fill: var(--color-glass-fill);
 }
 
 html,
@@ -18,18 +43,12 @@ body,
 
 body {
   margin: 0;
-  background:
-    radial-gradient(circle at top left, rgba(246, 184, 77, 0.12), transparent 26%),
-    radial-gradient(circle at bottom right, rgba(255, 255, 255, 0.06), transparent 24%),
-    var(--app-bg);
+  background: var(--app-bg);
   color: var(--text-base);
-  font-family:
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 button,
@@ -39,22 +58,41 @@ select {
   font: inherit;
 }
 
+.glass-panel {
+  background: var(--glass-fill);
+  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(28px) saturate(140%);
+  border: 1px solid var(--panel-stroke);
+}
+
+.section-header {
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--text-muted);
+}
+
 .film-lab-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 18px;
   height: 18px;
   border-radius: 999px;
-  background: #fff7e7;
-  border: 1px solid rgba(0, 0, 0, 0.28);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.32);
+  background: var(--accent-amber1);
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 0 8px var(--color-accent-amber-glow);
 }
 
 .film-lab-slider::-moz-range-thumb {
   width: 18px;
   height: 18px;
   border-radius: 999px;
-  background: #fff7e7;
-  border: 1px solid rgba(0, 0, 0, 0.28);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.32);
+  background: var(--accent-amber1);
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 0 8px var(--color-accent-amber-glow);
 }

@@ -1,8 +1,4 @@
 import {
-  PHASE0_APPROX_SOURCE_LONG_EDGE_MAX,
-  PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES,
-  PHASE0_MAX_SOURCE_DURATION_SEC,
-  PHASE0_OUTPUT_PROFILE,
   getPhase0SourceCapViolations,
   type Phase0ExportProgress,
   type Phase0ExportResult,
@@ -11,8 +7,6 @@ import {
   type SourceProbe,
 } from "film-lab-core";
 
-export type VisualFloorState = "not-checked" | "pass" | "fail";
-
 interface ExportSheetProps {
   project: Phase0ProjectState;
   source: SourceInfo | null;
@@ -20,7 +14,6 @@ interface ExportSheetProps {
   exportProgress: Phase0ExportProgress | null;
   exportResult: Phase0ExportResult | null;
   saveToPhotosState: "not-run" | "saved" | "failed";
-  visualFloor: VisualFloorState;
   isBusy: boolean;
   isSaveBusy: boolean;
   error: string | null;
@@ -33,39 +26,17 @@ interface ExportSheetProps {
     exportDisabled: string;
     saveToPhotos: string;
     shareOutput: string;
-    validationTargetTitle: string;
-    validationTargetBody: string;
-    validationTargetFootnote: string;
     resultTitle: string;
-    benchmarkTitle: string;
-    benchmarkBody: string;
-    reducedParamsTitle: string;
-    reducedParamsBody: string;
     sourceViolationsTitle: string;
     sourceAllowedTitle: string;
     metricsElapsed: string;
-    metricsRealtime: string;
     metricsOutput: string;
     metricsFileSize: string;
-    metricsThermal: string;
-    metricsMemoryWarnings: string;
     metricsSaveToPhotos: string;
-    validationReportTitle: string;
-    validationReportBody: string;
-    visualFloorTitle: string;
-    visualFloorHint: string;
-    visualFloorPass: string;
-    visualFloorFail: string;
-    visualFloorNotChecked: string;
-    benchmarkShareTitle: string;
-    benchmarkShareBody: string;
-    benchmarkShareButton: string;
   };
   onExport: () => void;
   onSave: () => void;
   onShare: () => void;
-  onVisualFloorChange: (value: VisualFloorState) => void;
-  onShareBenchmark: () => void;
 }
 
 function formatBytes(value?: number): string {
@@ -75,87 +46,47 @@ function formatBytes(value?: number): string {
   return `${value} B`;
 }
 
-function formatDuration(value?: number): string {
-  if (typeof value !== "number") return "—";
-  if (value < 60) return `${value.toFixed(1)}s`;
-  const minutes = Math.floor(value / 60);
-  const seconds = Math.round(value % 60);
-  return `${minutes}m ${seconds}s`;
-}
-
 function formatSaveState(value: "not-run" | "saved" | "failed"): string {
   switch (value) {
     case "saved":
-      return "Pass";
+      return "Saved";
     case "failed":
       return "Failed";
     default:
-      return "Not run";
+      return "—";
   }
 }
 
 export function ExportSheet({
-  project,
-  source,
+  source: _source,
   probe,
   exportProgress,
   exportResult,
   saveToPhotosState,
-  visualFloor,
   isBusy,
   isSaveBusy,
-  error,
   strings,
   onExport,
   onSave,
   onShare,
-  onVisualFloorChange,
-  onShareBenchmark,
 }: ExportSheetProps) {
   const violations = probe ? getPhase0SourceCapViolations(probe) : [];
   const canExport = probe != null && violations.length === 0 && !isBusy && !isSaveBusy;
-  const benchmarkRecord = exportResult?.benchmarkRecord;
   const progressPercent = exportProgress ? Math.round(exportProgress.progress * 100) : null;
-  const settingsProfile = [
-    `preset=${project.presetName}`,
-    `creativeLUT=${project.lut ? project.lut.title : "none"}`,
-    `grain=${project.params.grainIntensity > 0 ? project.params.grainIntensity.toFixed(2) : "off"}`,
-  ].join(" | ");
-  const validationReport = exportResult
-    ? [
-        `Device: ${benchmarkRecord?.deviceModel ?? "—"}`,
-        `iOS: ${benchmarkRecord?.iosVersion ?? "—"}`,
-        `Clip: ${source?.filename ?? "—"}`,
-        `Source codec: ${probe?.codec ?? "—"}`,
-        `Source resolution: ${probe?.width && probe?.height ? `${probe.width}x${probe.height}` : "—"}`,
-        `Source duration: ${formatDuration(probe?.durationSec)}`,
-        `Settings profile: ${settingsProfile}`,
-        `Import: ${source && probe ? "pass" : "not-run"}`,
-        `Export: pass`,
-        `Save to Photos: ${formatSaveState(saveToPhotosState)}`,
-        `Elapsed: ${exportResult.elapsedMs} ms`,
-        `Realtime ratio: ${typeof exportResult.realtimeRatio === "number" ? `${exportResult.realtimeRatio.toFixed(2)}x` : "—"}`,
-        `Output resolution / fps: ${exportResult.outputWidth}x${exportResult.outputHeight} @ ${exportResult.outputFps}fps`,
-        `Output file size: ${formatBytes(exportResult.fileSizeBytes)}`,
-        `Thermal state: ${benchmarkRecord?.thermalState ?? "—"}`,
-        `Memory warnings: ${typeof benchmarkRecord?.memoryWarningCount === "number" ? (benchmarkRecord.memoryWarningCount > 0 ? `yes (${benchmarkRecord.memoryWarningCount})` : "no") : "—"}`,
-        `Black frame: manual-check`,
-        `Visual floor: manual-check`,
-        `Errors: ${error ?? benchmarkRecord?.errorCode ?? "—"}`,
-      ].join("\n")
-    : null;
+  const elapsedSeconds =
+    typeof exportResult?.elapsedMs === "number"
+      ? (exportResult.elapsedMs / 1000).toFixed(1)
+      : null;
 
   return (
-    <section className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+    <section className="rounded-[24px] border border-[var(--panel-stroke)] bg-[var(--panel-fill)] p-4">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
-          {strings.exportSectionTitle}
-        </p>
+        <p className="section-header">{strings.exportSectionTitle}</p>
         <button
           type="button"
           onClick={onExport}
           disabled={!canExport}
-          className="rounded-full bg-[var(--accent-amber1)] px-4 py-2 text-xs font-medium text-black transition disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/40"
+          className="rounded-full bg-[var(--accent-amber1)] px-5 py-2 text-xs font-medium text-black transition disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/40"
         >
           {strings.exportStart}
         </button>
@@ -167,7 +98,7 @@ export function ExportSheet({
 
       {exportProgress ? (
         <div className="mt-4">
-          <div className="h-2 overflow-hidden rounded-full bg-white/8">
+          <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
             <div
               className="h-full rounded-full bg-[var(--accent-amber1)] transition-[width]"
               style={{ width: `${Math.max(0, Math.min(100, exportProgress.progress * 100))}%` }}
@@ -191,132 +122,38 @@ export function ExportSheet({
         </div>
       ) : null}
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-2xl border border-white/8 bg-black/20 p-3">
-          <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
-            {violations.length > 0
-              ? strings.sourceViolationsTitle
-              : strings.sourceAllowedTitle}
-          </p>
-          <div className="mt-2 space-y-2 text-sm leading-6 text-[var(--text-base-70)]">
-            {probe ? (
-              <>
-                <p>
-                  max {PHASE0_MAX_SOURCE_DURATION_SEC / 60} min · long edge {PHASE0_APPROX_SOURCE_LONG_EDGE_MAX}px · size {Math.round(
-                    PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES / (1024 * 1024 * 1024),
-                  )} GB
-                </p>
-                {violations.length > 0 ? (
-                  <ul className="list-disc space-y-1 pl-5">
-                    {violations.map((violation) => (
-                      <li key={violation}>{violation}</li>
-                    ))}
-                  </ul>
-                ) : null}
-              </>
-            ) : (
-              <p>{strings.exportDisabled}</p>
-            )}
-          </div>
+      {probe && violations.length > 0 ? (
+        <div className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+          <p className="font-medium">{strings.sourceViolationsTitle}</p>
+          <ul className="mt-1 list-disc space-y-1 pl-5 text-amber-100/90">
+            {violations.map((violation) => (
+              <li key={violation}>{violation}</li>
+            ))}
+          </ul>
         </div>
-
-        <div className="rounded-2xl border border-white/8 bg-black/20 p-3">
-          <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
-            {strings.benchmarkTitle}
-          </p>
-          <p className="mt-2 text-sm leading-6 text-[var(--text-base-70)]">
-            {strings.benchmarkBody}
-          </p>
-          <p className="mt-3 text-xs text-[var(--text-muted)]">
-            {PHASE0_OUTPUT_PROFILE.codec.toUpperCase()} / {PHASE0_OUTPUT_PROFILE.container.toUpperCase()} / {PHASE0_OUTPUT_PROFILE.fps}fps / {PHASE0_OUTPUT_PROFILE.longEdge}px long edge
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-4 rounded-2xl border border-white/8 bg-black/20 p-3">
-        <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
-          {strings.validationTargetTitle}
-        </p>
-        <p className="mt-2 text-sm leading-6 text-[var(--text-base-70)]">
-          {strings.validationTargetBody}
-        </p>
-        <p className="mt-3 text-xs text-[var(--text-muted)]">
-          {strings.validationTargetFootnote}
-        </p>
-      </div>
-
-      <div className="mt-4 rounded-2xl border border-white/8 bg-black/20 p-3">
-        <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
-          {strings.reducedParamsTitle}
-        </p>
-        <p className="mt-2 text-sm leading-6 text-[var(--text-base-70)]">
-          {strings.reducedParamsBody}
-        </p>
-      </div>
+      ) : null}
 
       {exportResult ? (
-        <div className="mt-4 rounded-2xl border border-white/8 bg-black/20 p-3">
-          <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
-            {strings.resultTitle}
-          </p>
+        <div className="mt-4 rounded-2xl border border-[var(--panel-stroke)] bg-black/20 p-3">
+          <p className="section-header">{strings.resultTitle}</p>
           <div className="mt-3 grid gap-3 text-sm text-[var(--text-base-70)] sm:grid-cols-2">
             <div>
-              <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                {strings.metricsElapsed}
-              </div>
-              <div className="mt-1 text-white">{exportResult.elapsedMs} ms</div>
+              <div className="section-header">{strings.metricsElapsed}</div>
+              <div className="mt-1 text-white">{elapsedSeconds ? `${elapsedSeconds}s` : "—"}</div>
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                {strings.metricsRealtime}
-              </div>
-              <div className="mt-1 text-white">
-                {typeof exportResult.realtimeRatio === "number"
-                  ? `${exportResult.realtimeRatio.toFixed(2)}x`
-                  : "—"}
-              </div>
-            </div>
-            <div>
-              <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                {strings.metricsOutput}
-              </div>
+              <div className="section-header">{strings.metricsOutput}</div>
               <div className="mt-1 text-white">
                 {exportResult.outputWidth}×{exportResult.outputHeight} @ {exportResult.outputFps}fps
               </div>
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                {strings.metricsFileSize}
-              </div>
+              <div className="section-header">{strings.metricsFileSize}</div>
               <div className="mt-1 text-white">{formatBytes(exportResult.fileSizeBytes)}</div>
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                {strings.metricsThermal}
-              </div>
-              <div className="mt-1 text-white">{benchmarkRecord?.thermalState ?? "—"}</div>
-            </div>
-            <div>
-              <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                {strings.metricsMemoryWarnings}
-              </div>
-              <div className="mt-1 text-white">
-                {typeof benchmarkRecord?.memoryWarningCount === "number"
-                  ? benchmarkRecord.memoryWarningCount
-                  : "—"}
-              </div>
-            </div>
-            <div>
-              <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                {strings.metricsSaveToPhotos}
-              </div>
+              <div className="section-header">{strings.metricsSaveToPhotos}</div>
               <div className="mt-1 text-white">{formatSaveState(saveToPhotosState)}</div>
-            </div>
-            <div>
-              <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                Settings
-              </div>
-              <div className="mt-1 text-white">{settingsProfile}</div>
             </div>
           </div>
 
@@ -337,80 +174,6 @@ export function ExportSheet({
               {strings.shareOutput}
             </button>
           </div>
-
-          <div className="mt-4 rounded-2xl border border-white/8 bg-black/30 p-3">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
-              {strings.visualFloorTitle}
-            </p>
-            <p className="mt-2 text-sm leading-6 text-[var(--text-base-70)]">
-              {strings.visualFloorHint}
-            </p>
-            <div
-              role="radiogroup"
-              aria-label={strings.visualFloorTitle}
-              className="mt-3 inline-flex rounded-full border border-white/10 bg-black/40 p-1"
-            >
-              {(
-                [
-                  { value: "not-checked", label: strings.visualFloorNotChecked },
-                  { value: "pass", label: strings.visualFloorPass },
-                  { value: "fail", label: strings.visualFloorFail },
-                ] as const
-              ).map((segment) => {
-                const active = visualFloor === segment.value;
-                return (
-                  <button
-                    key={segment.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={active}
-                    onClick={() => onVisualFloorChange(segment.value)}
-                    className={`rounded-full px-3 py-1.5 text-xs transition ${
-                      active
-                        ? segment.value === "pass"
-                          ? "bg-emerald-500/20 text-emerald-100"
-                          : segment.value === "fail"
-                          ? "bg-rose-500/20 text-rose-100"
-                          : "bg-white/[0.10] text-white"
-                        : "text-[var(--text-base-70)] hover:text-white"
-                    }`}
-                  >
-                    {segment.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-2xl border border-white/8 bg-black/30 p-3">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
-              {strings.benchmarkShareTitle}
-            </p>
-            <p className="mt-2 text-sm leading-6 text-[var(--text-base-70)]">
-              {strings.benchmarkShareBody}
-            </p>
-            <button
-              type="button"
-              onClick={onShareBenchmark}
-              className="mt-3 rounded-full bg-[var(--accent-amber1)] px-4 py-2 text-xs font-medium text-black transition hover:opacity-90"
-            >
-              {strings.benchmarkShareButton}
-            </button>
-          </div>
-
-          {validationReport ? (
-            <div className="mt-4 rounded-2xl border border-white/8 bg-[#090909] p-3">
-              <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                {strings.validationReportTitle}
-              </p>
-              <p className="mt-2 text-sm leading-6 text-[var(--text-base-70)]">
-                {strings.validationReportBody}
-              </p>
-              <pre className="mt-3 overflow-x-auto whitespace-pre-wrap break-words rounded-xl border border-white/8 bg-black/30 p-3 text-xs leading-6 text-white">
-                {validationReport}
-              </pre>
-            </div>
-          ) : null}
         </div>
       ) : null}
     </section>
