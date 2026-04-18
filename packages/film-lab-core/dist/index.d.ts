@@ -956,10 +956,8 @@ interface Phase0ExportRequest {
         quickState: QuickState;
         params: Phase0Params;
     };
-    lut: {
-        inputLut: ParsedCubeLut | null;
-        creativeLut: ParsedCubeLut | null;
-    };
+    inputLut: ParsedCubeLut | null;
+    creativeLut: ParsedCubeLut | null;
 }
 interface Phase0ExportProgress {
     stage: Phase0ExportStage;

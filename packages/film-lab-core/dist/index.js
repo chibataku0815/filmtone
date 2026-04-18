@@ -1199,15 +1199,13 @@ function buildPhase0ExportRequest(options) {
       quickState: options.project.quickState,
       params: options.project.params
     },
-    lut: {
-      inputLut: null,
-      creativeLut: options.project.lut ? {
-        title: options.project.lut.title,
-        size: options.project.lut.size,
-        data: options.project.lut.data,
-        intensity: options.project.lut.intensity
-      } : null
-    }
+    inputLut: null,
+    creativeLut: options.project.lut ? {
+      title: options.project.lut.title,
+      size: options.project.lut.size,
+      data: options.project.lut.data,
+      intensity: options.project.lut.intensity
+    } : null
   };
 }
 

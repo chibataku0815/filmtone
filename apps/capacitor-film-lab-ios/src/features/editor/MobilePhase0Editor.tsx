@@ -215,10 +215,7 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
       }
       const request = {
         ...baseRequest,
-        lut: {
-          ...baseRequest.lut,
-          inputLut: inputLutEnabled ? inputLut : null,
-        },
+        inputLut: inputLutEnabled ? inputLut : null,
       };
       setIsSaveBusy(false);
       setVisualFloor("not-checked");

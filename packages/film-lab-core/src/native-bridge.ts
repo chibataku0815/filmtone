@@ -61,10 +61,8 @@ export interface Phase0ExportRequest {
     quickState: QuickState;
     params: Phase0Params;
   };
-  lut: {
-    inputLut: ParsedCubeLut | null;
-    creativeLut: ParsedCubeLut | null;
-  };
+  inputLut: ParsedCubeLut | null;
+  creativeLut: ParsedCubeLut | null;
 }
 
 export interface Phase0ExportProgress {
@@ -195,16 +193,14 @@ export function buildPhase0ExportRequest(options: {
       quickState: options.project.quickState as QuickState,
       params: options.project.params,
     },
-    lut: {
-      inputLut: null,
-      creativeLut: options.project.lut
-        ? {
-            title: options.project.lut.title,
-            size: options.project.lut.size,
-            data: options.project.lut.data,
-            intensity: options.project.lut.intensity,
-          }
-        : null,
-    },
+    inputLut: null,
+    creativeLut: options.project.lut
+      ? {
+          title: options.project.lut.title,
+          size: options.project.lut.size,
+          data: options.project.lut.data,
+          intensity: options.project.lut.intensity,
+        }
+      : null,
   };
 }
