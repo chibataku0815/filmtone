@@ -17,17 +17,13 @@ Xcode opens → select connected device → Run.
 Only supported app path: `apps/capacitor-film-lab-ios`.
 Only supported workspace: `apps/capacitor-film-lab-ios/ios/App/App.xcworkspace`.
 
-## 1. Run matrix (最小工数版)
+## 1. Run matrix (最小)
 
-3 run だけ。1 端末で 10-15 分。
+**1 run だけ**。60s (S1II → H.264 tripod) を 1 回書き出す。3 分。
 
-| # | clip | take | 目的 |
-| --- | --- | --- | --- |
-| 1 | 60s (S1II → H.264 tripod) | 1 | gate anchor (aggregator が閾値判定) |
-| 2 | 5min (4m29s 1280×720) | 1 | cap 安定性 (途中で落ちないか) |
-| 3 | short (iPhone HEVC 4K30 handheld) | 1 | RS / 高 bitrate sanity |
-
-追加 run は **中間 Go に入った時のみ** 60s を 1-2 回足す。先回りしない。
+- 60s は aggregator の唯一の閾値クリップ。これで Go/No-Go が決まる。
+- 5min / short は 1 run の結果が中間 Go (1.8-2.5x) に入った時 **だけ** 追加。先回りしない。
+- Strong-Go (≤2.0x) or 明確 No-Go (>2.5x) なら 1 run で判断確定。
 
 ## 2. The three fixed clips (photo-ops lens)
 
@@ -62,7 +58,7 @@ Option B (manual): paste into `benchmark/runs/<date>-<device>-<clip>.md`. Header
 
 ## 5. Aggregate → decision line
 
-3 run 全部入ったら:
+row 追記した直後に:
 
 ```sh
 cd /Volumes/SamsungPortableSSDX5001/documents/forestone/chibatakumi-portfolio/.worktrees/filmtone-ios-phase0
