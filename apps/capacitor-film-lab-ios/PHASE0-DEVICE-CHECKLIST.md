@@ -1,69 +1,98 @@
-# Filmtone iOS Phase 0 Device Check
+# Filmtone iOS Phase 0 — Device Checklist (Phase B gate)
 
-Use this app path only:
+Single-page checklist. Consult this while tapping through exports; everything else (rules, schema, decision thresholds) is already wired.
 
-- `apps/capacitor-film-lab-ios`
+Anchor: `/Volumes/SamsungPortableSSDX5001/documents/life/docs/guides/2026-04-18-filmtone-ios-phase0-phase-a-complete-phase-b-gate-handoff.md`
 
-Use this workspace only:
+## 0. Launch
 
-- `apps/capacitor-film-lab-ios/ios/App/App.xcworkspace`
+From worktree root:
 
-## Formal 60s benchmark run
-
-1. Connect the same successful `iPhone 15+` if available.
-2. From the repo root, run:
-   `bun run open:ios-phase0`
-3. In Xcode, select the connected device and run the app.
-4. Inside the app, select one fixed exact `60-second` segment trimmed from the previously successful `4m29s` source clip.
-5. Use:
-   - `preset + creative LUT`
-6. Complete one flow:
-   `pick source -> preview -> export -> save to Photos`
-7. Review the exported file itself:
-   - first section
-   - middle section
-   - final section
-8. This run is the formal `60s <= 2.5x realtime` gate for the baseline device.
-   Treat `<= 2.0x realtime` as strong-go evidence.
-
-## Report back in this chat
-
-Use the `Clip` field to record which fixed 60-second segment you ran.
-
-Copy these fields:
-
-```text
-Device:
-iOS:
-Clip:
-Source codec:
-Source resolution:
-Source duration:
-Settings profile:
-Import:
-Export:
-Save to Photos:
-Elapsed:
-Realtime ratio:
-Output resolution / fps:
-Output file size:
-Thermal state:
-Memory warnings:
-Black frame:
-Visual floor:
-Errors:
+```sh
+bun run open:ios-phase0
 ```
 
-## Success means
+Xcode opens → select connected device → Run.
 
-- app launches on device
-- source can be selected
-- export completes
-- save to Photos completes
-- no black frames
-- no permission dead-end
-- exported file clears first / middle / final spot checks
+Only supported app path: `apps/capacitor-film-lab-ios`.
+Only supported workspace: `apps/capacitor-film-lab-ios/ios/App/App.xcworkspace`.
 
-## If it fails
+## 1. Run matrix (auto-decided by device availability)
 
-Report the exact failing step and any visible error text.
+| Devices on hand | Runs | Layout |
+| --- | --- | --- |
+| 1 device | 9 | 1 device × 3 clips × 3 takes |
+| 2 devices | 18 | 2 × 3 × 3 |
+| 3 devices | 27 | 3 × 3 × 3 |
+
+No borrowing decision needed — run whatever is on hand.
+
+## 2. The three fixed clips (photo-ops lens)
+
+| Bucket | Clip | Spec | Purpose |
+| --- | --- | --- | --- |
+| short | iPhone internal HEVC | 4K30 / 15–30s / handheld walk | RS + high-bitrate stress |
+| standard (gate anchor) | LUMIX S1II → H.264 | 1080p30 / ~60s / tripod | official 60s gate |
+| upper | existing 4m29s clip | 1280×720 avc1 | 5min cap stability |
+
+Name clips `clip-60s-take1.mov` / `clip-5min-take1.mov` / `clip-short-take1.mov` etc. — the `60s` / `5min` substring drives bucketing.
+
+## 3. Per-run 5 taps
+
+1. Pick source
+2. Apply preset + dual LUT (LUT1 "Camera Profile" ON, LUT2 "Film Look" — defaults from `cinematic`)
+3. `書き出しを実行` → wait for completion
+4. After save, tap `Pass` / `Fail` / `未確認` in the export sheet (visual floor: start / middle / end spot-check)
+5. Tap `ベンチ結果を共有` → the 1-line markdown row goes to clipboard (or share sheet)
+
+## 4. Drop the row on Mac
+
+Option A (fastest — one command):
+
+```sh
+cd /Volumes/SamsungPortableSSDX5001/documents/forestone/chibatakumi-portfolio/.worktrees/filmtone-ios-phase0
+bun run bench:append
+```
+
+Reads the Mac clipboard (AirDropped / copied row) and appends to `benchmark/runs/auto.md`, creating the header if the file does not exist.
+
+Option B (manual): paste into `benchmark/runs/<date>-<device>-<clip>.md`. Header lines (`| date |…`) and dividers (`| --- |…`) are ignored by the parser.
+
+## 5. Aggregate → decision line
+
+After all runs are in:
+
+```sh
+cd /Volumes/SamsungPortableSSDX5001/documents/forestone/chibatakumi-portfolio/.worktrees/filmtone-ios-phase0
+bun run bench
+```
+
+First line is the decision:
+
+| Decision | Condition | Next |
+| --- | --- | --- |
+| **Strong-Go** | 60s avg ≤ 2.0x AND 100% visual pass AND 100% save ok | Phase C auto-proceed (see runbook) |
+| **Go** | 60s avg ≤ 2.5x AND visual fail < 10% | ask user once: "invite 5 testers Y/N?" |
+| **No-Go** | otherwise | stop; focus on Desktop |
+
+Exit codes: `0` Strong-Go/Go, `3` No-Go, `2` empty dir.
+
+## 6. If Strong-Go
+
+Follow `docs/guides/2026-04-18-filmtone-ios-phase0-phase-c-auto-runbook.md` on life side. Two commands, no thinking.
+
+## 7. What counts as a pass (visual floor)
+
+- No black / stuck frames at start, middle, end
+- Save to Photos completes
+- Color roughly matches preview (subjective; cinematic should read as cinematic)
+- No permission dead-end
+
+If any of the above fails → `Fail`. If unsure → `未確認` (counts as unchecked, not fail).
+
+## 8. Do NOT
+
+- Re-verify Phase A (build / dual-LUT compile / 4K cap / save-to-Photos — all settled)
+- Touch UIScene / warning cleanup / App Store metadata / Metal — Phase Polish only
+- Bundle `.cube` assets (see `src/presets/luts/README.md` for the intended path)
+- Push the worktree branch or merge to main until Phase C auto-runbook says so
