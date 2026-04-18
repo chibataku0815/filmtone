@@ -1,0 +1,62 @@
+{
+  "provenance": "synthetic-phase-0",
+  "generator": "test/golden/generate-source-images.ts",
+  "seed": 12648430,
+  "size": [
+    1280,
+    720
+  ],
+  "images": [
+    {
+      "filename": "01-highlight-sunset.png",
+      "category": "highlight-rich",
+      "description": "Gradient + sun disc, highlights dominant"
+    },
+    {
+      "filename": "02-highlight-backlit.png",
+      "category": "highlight-rich",
+      "description": "Bright backlight + dark silhouette"
+    },
+    {
+      "filename": "03-highkey-whitedress.png",
+      "category": "high-key",
+      "description": "Overall high-luminance scene"
+    },
+    {
+      "filename": "04-highkey-cloud.png",
+      "category": "high-key",
+      "description": "Cloudy high-key with soft low-freq noise"
+    },
+    {
+      "filename": "05-lowkey-shadow.png",
+      "category": "low-key",
+      "description": "Near-black gradient with fine noise"
+    },
+    {
+      "filename": "06-lowkey-noir.png",
+      "category": "low-key",
+      "description": "Dark background + narrow highlight stripe"
+    },
+    {
+      "filename": "07-midtone-gray.png",
+      "category": "midtone",
+      "description": "18% gray + color/skin chart"
+    },
+    {
+      "filename": "08-midtone-gradient.png",
+      "category": "midtone",
+      "description": "RGB stripe gradients for balance"
+    },
+    {
+      "filename": "09-skin-light.png",
+      "category": "skin",
+      "description": "Light skin swatch with cheek flush"
+    },
+    {
+      "filename": "10-skin-dark.png",
+      "category": "skin",
+      "description": "Dark skin swatch with highlight/shadow range"
+    }
+  ],
+  "note": "Phase 0 synthetic. Replace with real photography in Phase 1 if perceptual review required."
+}

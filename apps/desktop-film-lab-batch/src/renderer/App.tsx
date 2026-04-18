@@ -400,6 +400,64 @@ export default function App() {
   }, [running]);
 
   /**
+   * @description Phase 0 WebGPU 移行のゴールデン撮影用テストハーネス。
+   *   `?__test=1` URL クエリが有ったときだけ `window.__filmtoneTest` を公開する。
+   *   本番ビルド（`import.meta.env.PROD === true`）では更に `__test_prod_override=1` が必要で、
+   *   配信ビルドで誤って API が露出しないようにする。
+   *
+   *   Viewport が attach されたあとに配線するため `viewport` を依存に含める。
+   *   `filmLabCanvasRef` は React ref のため再レンダー契機にはならないが意図を示すため列挙する。
+   */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const search = new URLSearchParams(window.location.search);
+    if (search.get("__test") !== "1") return;
+    if (import.meta.env.PROD === true && search.get("__test_prod_override") !== "1") {
+      return;
+    }
+
+    const harness = {
+      getViewport: (): Viewport | null => viewport,
+      getCanvasRef: (): FilmLabCanvasRef | null => filmLabCanvasRef.current,
+      getCanvasEl: (): HTMLCanvasElement | null =>
+        filmLabCanvasRef.current?.getWebGlCanvas() ?? null,
+      setParams: (p: Record<string, number | string>): void => {
+        viewport?.setParams(p);
+      },
+      setExportFlipY: (flip: boolean): void => {
+        viewport?.setExportFlipY(flip);
+      },
+      loadImage: async (pngBase64Body: string): Promise<boolean> => {
+        const ref = filmLabCanvasRef.current;
+        if (!ref) return false;
+        return ref.replaceSourceFromPngBase64Body(pngBase64Body);
+      },
+      setCanvasSize: (w: number, h: number): void => {
+        const canvas = filmLabCanvasRef.current?.getWebGlCanvas() ?? null;
+        if (canvas) {
+          canvas.width = w;
+          canvas.height = h;
+          canvas.style.width = `${w}px`;
+          canvas.style.height = `${h}px`;
+        }
+        viewport?.setResolution(w, h);
+      },
+      waitTwoFrames: (): Promise<void> =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => resolve());
+          });
+        }),
+    };
+    (window as any).__filmtoneTest = harness;
+    return () => {
+      if ((window as any).__filmtoneTest === harness) {
+        delete (window as any).__filmtoneTest;
+      }
+    };
+  }, [viewport, filmLabCanvasRef]);
+
+  /**
    * @description 右スライドパネルを画面内に出すか。全幅で同じ挙動。パネルは DOM を維持し `translateX` のみ（内部状態を捨てない）。
    */
   const [editRightPaneExpanded, setEditRightPaneExpanded] = useState(true);

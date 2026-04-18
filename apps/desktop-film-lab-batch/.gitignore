@@ -17,3 +17,8 @@ release
 *.provisionprofile
 
 .vercel
+
+# Playwright artifacts (WebGPU migration golden harness)
+test-results/
+playwright-report/
+playwright/.cache/
