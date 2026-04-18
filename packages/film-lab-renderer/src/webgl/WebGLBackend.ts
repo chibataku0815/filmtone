@@ -1,5 +1,5 @@
 /**
- * Viewport — Fullscreen quad with Film Lab color grading + Bloom/Halation multi-pass
+ * WebGLBackend — Fullscreen quad with Film Lab color grading + Bloom/Halation multi-pass
  *
  * Architecture:
  *   Pass 1: Color grade (filmlab.frag) → RenderTarget A
@@ -36,6 +36,7 @@ import { crossFilterPeakFragmentShader } from "./shaders/cross-filter-peak.frag"
 import { crossFilterPeakSpacingFragmentShader } from "./shaders/cross-filter-peak-spacing.frag";
 import { crossFilterPeakSpacingMaxFragmentShader } from "./shaders/cross-filter-peak-spacing-max.frag";
 import { crossFilterTemporalFragmentShader } from "./shaders/cross-filter-temporal.frag";
+import type { RenderBackend, RenderBackendParams } from "../webgpu/Backend";
 
 export interface ViewportOptions {
   vertexShader: string;
@@ -146,10 +147,13 @@ function hexToVec3(hex: string): THREE.Vector3 {
   return new THREE.Vector3(c.r, c.g, c.b);
 }
 
-export class Viewport {
+export class WebGLBackend implements RenderBackend {
   mesh: THREE.Mesh;
   private material: THREE.ShaderMaterial;
   private geometry: THREE.PlaneGeometry;
+  private boundRenderer: THREE.WebGLRenderer | null = null;
+  private boundScene: THREE.Scene | null = null;
+  private boundCamera: THREE.Camera | null = null;
 
   // Post-processing scene (shared quad, swap material per pass)
   private postScene: THREE.Scene;
@@ -461,7 +465,7 @@ export class Viewport {
 
     // Bloom mip chain (5 levels: W/2 .. W/32)
     this.rtBloomMips = [];
-    for (let i = 0; i < Viewport.BLOOM_MIP_LEVELS; i++) {
+    for (let i = 0; i < WebGLBackend.BLOOM_MIP_LEVELS; i++) {
       const mw = Math.max(1, Math.floor(w / Math.pow(2, i + 1)));
       const mh = Math.max(1, Math.floor(h / Math.pow(2, i + 1)));
       this.rtBloomMips.push(new THREE.WebGLRenderTarget(mw, mh, RT_OPTIONS));
@@ -469,7 +473,7 @@ export class Viewport {
 
     // Halation mip chain (6 levels: W/2 .. W/64)
     this.rtHalationMips = [];
-    for (let i = 0; i < Viewport.HALATION_MIP_LEVELS; i++) {
+    for (let i = 0; i < WebGLBackend.HALATION_MIP_LEVELS; i++) {
       const mw = Math.max(1, Math.floor(w / Math.pow(2, i + 1)));
       const mh = Math.max(1, Math.floor(h / Math.pow(2, i + 1)));
       this.rtHalationMips.push(new THREE.WebGLRenderTarget(mw, mh, RT_OPTIONS));
@@ -510,7 +514,7 @@ export class Viewport {
 
     const w = this.width;
     const h = this.height;
-    for (let i = 0; i < Viewport.DIFFUSION_MIP_LEVELS; i++) {
+    for (let i = 0; i < WebGLBackend.DIFFUSION_MIP_LEVELS; i++) {
       const mw = Math.max(1, Math.floor(w / Math.pow(2, i + 1)));
       const mh = Math.max(1, Math.floor(h / Math.pow(2, i + 1)));
       this.rtDiffusionMips.push(new THREE.WebGLRenderTarget(mw, mh, RT_OPTIONS));
@@ -581,7 +585,7 @@ export class Viewport {
 
     // 8 ring buffer RenderTargets
     this.rtRingBuffer = [];
-    for (let i = 0; i < Viewport.MOTION_BLUR_RING_SIZE; i++) {
+    for (let i = 0; i < WebGLBackend.MOTION_BLUR_RING_SIZE; i++) {
       this.rtRingBuffer.push(
         new THREE.WebGLRenderTarget(this.width, this.height, RT_OPTIONS),
       );
@@ -596,7 +600,7 @@ export class Viewport {
     if (this.shutterAngle <= 0) return 0;
     // 720° → normalized=2.0 → all 8 frames active
     const normalized = Math.min(this.shutterAngle, 720) / 360;
-    return Math.max(1, Math.min(Viewport.MOTION_BLUR_RING_SIZE, Math.round(normalized * (Viewport.MOTION_BLUR_RING_SIZE / 2))));
+    return Math.max(1, Math.min(WebGLBackend.MOTION_BLUR_RING_SIZE, Math.round(normalized * (WebGLBackend.MOTION_BLUR_RING_SIZE / 2))));
   }
 
   /**
@@ -606,7 +610,7 @@ export class Viewport {
    * より長いモーショントレイルを実現する。
    */
   private computeBlendWeights(activeFrames: number): Float32Array {
-    const N = Viewport.MOTION_BLUR_RING_SIZE;
+    const N = WebGLBackend.MOTION_BLUR_RING_SIZE;
     const weights = new Float32Array(N);
     const effective = Math.min(activeFrames, this.ringFilledFrames);
     if (effective <= 0 || effective === 1) { weights[0] = 1.0; return weights; }
@@ -871,7 +875,7 @@ export class Viewport {
     // CRITICAL: autoClear must be false so the previous downsample data persists in the destination mip
     // and the upsample shader's THREE.AdditiveBlending accumulates on top.
     const us = this.upsampleMaterial.uniforms;
-    const weights = Viewport.computeMipWeights(0.5, mips.length);
+    const weights = WebGLBackend.computeMipWeights(0.5, mips.length);
     this.postMesh.material = this.upsampleMaterial;
     const prevAutoClear = renderer.autoClear;
     renderer.autoClear = false;
@@ -1144,7 +1148,7 @@ export class Viewport {
     this.ensureMotionBlurResources();
     if (!this.ringCopyMaterial || !this.ringBlendMaterial || this.rtRingBuffer.length === 0) return;
 
-    const N = Viewport.MOTION_BLUR_RING_SIZE;
+    const N = WebGLBackend.MOTION_BLUR_RING_SIZE;
     const prevAutoClear = renderer.autoClear;
     renderer.autoClear = false;
 
@@ -1536,27 +1540,49 @@ export class Viewport {
     }
   }
 
-  render(
+  /**
+   * T2-0c: `RenderBackend.render()` is zero-arg. WebGL still needs the
+   * Three.js renderer/scene/camera; callers that migrated to the backend
+   * interface must first `bindThree(renderer, scene, camera)` once (typically
+   * during setup), after which subsequent `render()` calls use the stored
+   * bindings. Legacy 3-arg callers continue to pass them per-frame.
+   */
+  bindThree(
     renderer: THREE.WebGLRenderer,
     scene: THREE.Scene,
     camera: THREE.Camera,
   ): void {
+    this.boundRenderer = renderer;
+    this.boundScene = scene;
+    this.boundCamera = camera;
+  }
+
+  render(
+    renderer?: THREE.WebGLRenderer,
+    scene?: THREE.Scene,
+    camera?: THREE.Camera,
+  ): void {
+    const r = renderer ?? this.boundRenderer;
+    const s = scene ?? this.boundScene;
+    const c = camera ?? this.boundCamera;
+    if (!r || !s || !c) return;
+
     if (!this.hasRenderableResolution()) return;
 
     this.ensureRenderTargets();
     if (!this.rtColorGraded) return;
 
-    this.renderer = renderer;
+    this.renderer = r;
 
     if (this.abCompareEnabled) {
-      this.renderComparePair(renderer, scene, camera);
+      this.renderComparePair(r, s, c);
       return;
     }
 
     const mu = this.material.uniforms;
-    this.renderBasePipeline(renderer, scene, camera);
+    this.renderBasePipeline(r, s, c);
     this.renderFinalFrame(
-      renderer,
+      r,
       null,
       mu.uTexture!.value as THREE.Texture,
       mu.uSplitPosition!.value as number,
@@ -1651,7 +1677,7 @@ export class Viewport {
     // The upsample material uses AdditiveBlending to accumulate on top of it.
     const prevAutoClear = renderer.autoClear;
     renderer.autoClear = false;
-    const weights = Viewport.computeMipWeights(this.bloomRadius, mips.length);
+    const weights = WebGLBackend.computeMipWeights(this.bloomRadius, mips.length);
     for (let i = mips.length - 2; i >= 0; i--) {
       const lowRes = mips[i + 1]!;
       const highRes = mips[i]!;
@@ -1694,7 +1720,7 @@ export class Viewport {
     // Step 3: Progressive upsample with additive blending
     const prevAutoClear2 = renderer.autoClear;
     renderer.autoClear = false;
-    const weights = Viewport.computeMipWeights(this.halationRadius, mips.length);
+    const weights = WebGLBackend.computeMipWeights(this.halationRadius, mips.length);
     for (let i = mips.length - 2; i >= 0; i--) {
       const lowRes = mips[i + 1]!;
       const highRes = mips[i]!;
@@ -1742,7 +1768,7 @@ export class Viewport {
     // Step 3: Progressive upsample with additive blending
     const prevAutoClear = renderer.autoClear;
     renderer.autoClear = false;
-    const weights = Viewport.computeMipWeights(0.7, mips.length); // wide fixed radius
+    const weights = WebGLBackend.computeMipWeights(0.7, mips.length); // wide fixed radius
     for (let i = mips.length - 2; i >= 0; i--) {
       const lowRes = mips[i + 1]!;
       const highRes = mips[i]!;
@@ -2301,7 +2327,7 @@ export class Viewport {
     };
   }
 
-  setParams(params: Record<string, number | string>): void {
+  setParams(params: Record<string, number | string | boolean>): void {
     if (params.exposure !== undefined)
       this.setExposure(params.exposure as number);
     if (params.contrast !== undefined)
@@ -2472,6 +2498,11 @@ export class Viewport {
   }
 
   // ===== Dispose =====
+
+  /** `RenderBackend.destroy()` — alias for legacy `dispose()`. */
+  destroy(): void {
+    this.dispose();
+  }
 
   dispose(): void {
     this.geometry.dispose();

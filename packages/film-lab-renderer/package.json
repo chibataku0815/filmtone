@@ -9,10 +9,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./webgpu": {
+      "types": "./dist/webgpu.d.ts",
+      "import": "./dist/webgpu.js"
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean --external three,film-lab-core"
+    "build": "tsup src/index.ts src/webgpu.ts --format esm --dts --clean --external three,film-lab-core"
   },
   "dependencies": {
     "film-lab-core": "workspace:*",

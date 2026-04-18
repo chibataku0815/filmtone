@@ -9,8 +9,6 @@ import {
   isWebGL2Supported,
   Viewport,
   MediaLoader,
-  filmlabVertexShader,
-  filmlabFragmentShader,
 } from "film-lab-renderer";
 import type { FilmLabBatchBridge } from "./desktop-api";
 import { halationHueToHex } from "film-lab-core";
@@ -394,9 +392,8 @@ export async function runBatchPipeline(options: {
       const { width, height, texture } = loadResult;
 
       if (!viewport) {
-        viewport = new Viewport({
-          vertexShader: filmlabVertexShader,
-          fragmentShader: filmlabFragmentShader,
+        viewport = await Viewport.create(renderer.domElement, {
+          prefer: "webgl",
           width,
           height,
         });

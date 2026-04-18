@@ -1,4 +1,15 @@
-export { Viewport, type ViewportOptions } from "./webgl/WebGLBackend";
+/**
+ * Public entry point — Phase 2 T2-0c.
+ *
+ * WebGPU-specific symbols (GpuContext, WebGPUBackend, primitives, WGSL
+ * sources) are re-exported via the `film-lab-renderer/webgpu` sub-path so
+ * the `apps/web` bundle (WebGL-only) can drop them during tree-shake. The
+ * default entry intentionally imports nothing from `./webgpu/*` — keep it
+ * that way.
+ */
+
+export { Viewport, type ViewportBackendPreference, type ViewportCreateOptions } from "./Viewport";
+export { WebGLBackend, type ViewportOptions } from "./webgl/WebGLBackend";
 export {
   MediaLoader,
   MediaLoadError,
@@ -13,25 +24,11 @@ export {
   isWebGPUSupported,
   getOptimalPixelRatio,
 } from "./support";
-export type { RenderBackend } from "./webgpu/Backend";
-export { GpuContext, GpuContextCreationError } from "./webgpu/GpuContext";
-export { OffscreenTargetPool } from "./webgpu/OffscreenTargetPool";
-export { Lut3DTexture } from "./webgpu/Lut3DTexture";
-export { MediaTexture } from "./webgpu/MediaTexture";
-export { RingBuffer, MOTION_BLUR_RING_SLOTS } from "./webgpu/RingBuffer";
-export { BlueNoiseTile } from "./webgpu/BlueNoiseTile";
-export { WebGPUBackend, type WebGPUBackendCreateOptions } from "./webgpu/WebGPUBackend";
-export {
-  fullscreenVertexWgsl,
-  filmlabFragmentWgsl,
-  bloomPrefilterFragmentWgsl,
-  halationPrefilterFragmentWgsl,
-  downsampleFragmentWgsl,
-  upsampleFragmentWgsl,
-  lightshaftsFragmentWgsl,
-  lightshaftsBlendFragmentWgsl,
-  dustFragmentWgsl,
-} from "./webgpu/shaders";
+export type {
+  RenderBackend,
+  RenderBackendParams,
+  RenderBackendParamValue,
+} from "./webgpu/Backend";
 
 // Shaders
 export { filmlabVertexShader } from "./webgl/shaders/filmlab.vert";

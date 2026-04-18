@@ -9,8 +9,6 @@ import * as THREE from "three";
 import {
   isWebGL2Supported,
   Viewport,
-  filmlabVertexShader,
-  filmlabFragmentShader,
 } from "film-lab-renderer";
 import type { FilmLabBatchBridge } from "./desktop-api";
 import { halationHueToHex } from "film-lab-core";
@@ -1030,9 +1028,8 @@ export async function runVideoExportPipeline(options: {
         renderer.setSize(outW, outH, false);
         renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-        viewport = new Viewport({
-          vertexShader: filmlabVertexShader,
-          fragmentShader: filmlabFragmentShader,
+        viewport = await Viewport.create(renderer.domElement, {
+          prefer: "webgl",
           width: outW,
           height: outH,
         });

@@ -32,7 +32,7 @@ import {
   lightshaftsBlendFragmentWgsl,
   dustFragmentWgsl,
 } from "./shaders";
-import type { RenderBackend } from "./Backend";
+import type { RenderBackend, RenderBackendParams } from "./Backend";
 
 export interface WebGPUBackendCreateOptions {
   validation?: boolean;
@@ -61,6 +61,13 @@ export class WebGPUBackend implements RenderBackend {
   private _width = 1;
   private _height = 1;
   private destroyed = false;
+  /**
+   * T2-0a: stored params snapshot. Phase 2 T2-1 replaces this with a typed
+   * `GradeUniforms` pack + queue.writeBuffer call; today it simply retains
+   * the most recent record so callers migrating through `Viewport.create`
+   * keep a consistent API surface.
+   */
+  private pendingParams: RenderBackendParams = {};
 
   private constructor(
     ctx: GpuContext,
@@ -213,6 +220,17 @@ export class WebGPUBackend implements RenderBackend {
     pass.draw(3, 1, 0, 0);
     pass.end();
     device.queue.submit([encoder.finish()]);
+  }
+
+  setParams(params: RenderBackendParams): void {
+    this.pendingParams = { ...this.pendingParams, ...params };
+    // T2-1 will translate `this.pendingParams` into `GradeUniforms` and
+    // push it via `device.queue.writeBuffer(gradeUbo, 0, packed)`.
+  }
+
+  /** T2-0a: introspection so T2-1 can read the merged params when it wires GradeUniforms. */
+  getPendingParams(): Readonly<RenderBackendParams> {
+    return this.pendingParams;
   }
 
   setResolution(width: number, height: number): void {
