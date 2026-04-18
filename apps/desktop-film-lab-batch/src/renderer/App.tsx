@@ -1560,17 +1560,21 @@ export default function App() {
             >
               <section
                 ref={filmLabEditFrostPanelRef}
-                className={`fl-card fl-card-muted fl-card--frost fl-edit-controls-pane flex h-full min-h-0 min-w-0 flex-1 flex-col rounded-xl border border-white/[0.08] p-0 ${
-                  editRightPaneExpanded ? "fl-card--frost-webgl-backdrop" : ""
-                }`}
+                className="fl-card fl-card-muted fl-card--frost fl-card--frost-webgl-backdrop fl-edit-controls-pane flex h-full min-h-0 min-w-0 flex-1 flex-col rounded-xl border border-white/[0.08] p-0"
               >
-                {editRightPaneExpanded ? (
-                  <FilmLabWebglPanelBackdrop
-                    filmLabCanvasRef={filmLabCanvasRef}
-                    panelRef={filmLabEditFrostPanelRef}
-                    enabled
-                  />
-                ) : null}
+                {/*
+                 * 2026-04-18: backdrop を条件付き mount + class 条件付与にしていると、
+                 * 開閉の slide animation (transition-transform 300ms) 中で video が
+                 * unmount / remount され、一瞬 blur が外れた preview が透けて「前の状態」が
+                 * flash する。常時 mount + 常時 class 適用にして、off-screen (translate-x-full)
+                 * でも stream と CSS を維持することで visual consistency を担保する。
+                 * captureStream は 30fps GPU capture、Apple Silicon では軽微。
+                 */}
+                <FilmLabWebglPanelBackdrop
+                  filmLabCanvasRef={filmLabCanvasRef}
+                  panelRef={filmLabEditFrostPanelRef}
+                  enabled
+                />
                 {/*
                  * Web `FilmLabFullPage` と同型: `overflow-hidden` は内側ラッパーへ逃がし、
                  * 外周の frost / WebGL 背景のボケが section 角で切れにくくする。

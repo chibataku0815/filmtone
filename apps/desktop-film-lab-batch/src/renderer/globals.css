@@ -532,13 +532,15 @@ body {
  */
 .fl-card.fl-card-muted.fl-card--frost {
   position: relative;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   background: transparent;
+  /* 2026-04-18: 4 層 box-shadow (最大 0 18px 52px @ 62% + 2 つの no-offset halo)
+     は「ドロップシャドウが強すぎる」ので 2 層に縮約。
+     - 主ドロップ: 10px Y / 28px blur / 32% → 下方向の軽い影
+     - 上縁ハイライト: 1px hairline で subtle な craft 感を残す */
   box-shadow:
-    0 0 22px rgba(0, 0, 0, 0.45),
-    0 0 56px rgba(0, 0, 0, 0.35),
-    0 0 20px rgba(255, 255, 255, 0.045),
-    0 18px 52px rgba(0, 0, 0, 0.62);
+    0 10px 28px rgba(0, 0, 0, 0.32),
+    0 0 0 1px rgba(255, 255, 255, 0.045);
 }
 
 .fl-card.fl-card-muted.fl-card--frost::before {
@@ -562,9 +564,39 @@ body {
   -webkit-backdrop-filter: blur(56px) saturate(1.45) brightness(0.91);
 }
 
-/* Web 専用 WebGL 背景 PoC 用（デスクトップでは未使用だがクラスが付いても破綻しないよう正本と同形） */
+/* 2026-04-18: WebGL backdrop 利用時の baseline frost。
+   `FilmLabWebglPanelBackdrop` は useEffect + RAF で `ctx.drawImage` を毎フレーム叩くが、
+   初回マウント時 (特に WebGPU canvas ソース時) は数フレームの race で空画が描かれる瞬間がある。
+   その間、本体 background は transparent・::before も display:none のままだと、
+   テキストが背後プレビューの上に直載りしてラベルが読めなくなる。
+   対策: ::before を display:none にせず、CSS backdrop-filter で必ず baseline を敷く。
+   WebGL canvas が描画し始めたら z:0 の sibling としてその上に重なる (canvas が後勝ち)。
+   gradient は控えめに、重層ブラー対策で backdrop-filter は 56px → 28px に抑制。 */
+/*
+ * 2026-04-18 (refined v4): WebGPU canvas は Chromium で accelerated layer として
+ * 別合成されるため、`backdrop-filter` (outer も ::before も) が背後を blur できない。
+ * 対策として `FilmLabWebglPanelBackdrop` を `canvas.captureStream() + <video>` に
+ * 置き換えたので、video 要素は通常の DOM 合成レイヤーで描画され、その CSS
+ * `filter: blur()` が確実に効く。
+ *
+ * CSS 側は outer の backdrop-filter を外し、gradient tint だけ控えめに残す。
+ * video が text 読みやすさを ensure するため gradient は最小限でよい。
+ */
+.fl-card.fl-card-muted.fl-card--frost.fl-card--frost-webgl-backdrop {
+  background: linear-gradient(
+    180deg,
+    rgba(6, 8, 13, 0.28) 0%,
+    rgba(4, 5, 10, 0.38) 100%
+  );
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 .fl-card.fl-card-muted.fl-card--frost.fl-card--frost-webgl-backdrop::before {
-  display: none;
+  background: transparent;
+  box-shadow: inset 0 0 28px rgba(0, 0, 0, 0.22);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .fl-card.fl-card-muted.fl-card--frost.fl-card--frost-webgl-backdrop > *:not(.film-lab-webgl-backdrop-canvas) {
@@ -945,13 +977,18 @@ body {
 /**
  * @description 編集タブ・スライドパネル上部。閉じる操作は Phosphor アイコン＋ aria-label。
  */
+/*
+ * 2026-04-18 (refined): toolbar 下の 1px divider が glass パネル上で視覚ノイズ
+ * になっていたので除去。toolbar 自身は transparent background のままで、
+ * セクション境界はその下の padding + 内容ブロックの rhythm で十分示唆される。
+ */
 .fl-edit-pane-toolbar {
   display: flex;
   flex-shrink: 0;
   align-items: center;
   justify-content: flex-start;
   gap: 0.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: none;
   background: transparent;
   padding: 0.375rem 0.5rem;
 }

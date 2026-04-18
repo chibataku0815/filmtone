@@ -1,16 +1,22 @@
 "use client";
 
 /**
- * @fileoverview Web / Desktop 共有 — WebGL プレビュー canvas の画をパネル領域に切り出し、2D + CSS blur ですりガラス近似。
+ * @fileoverview Web / Desktop 共有 — プレビュー canvas の画をパネル背後に鏡写しし、CSS filter: blur で すりガラス化。
  *
  * @description
- * `backdrop-filter` は WebGL 背面や Transform を挟んだレイヤーで壊れやすい。
- * 毎フレーム `drawImage` で取り込み、バッファへ縮小してから `filter: blur()` を掛ける。
- * Web の `FilmLabFullPage` lg 展開時と同じ手法を Desktop でも共用する。
+ * 2026-04-18 改訂: WebGPU accelerated canvas は Chromium の compositor で別レイヤーとして
+ * 扱われ、`ctx.drawImage(webgpuCanvas)` が silent failure を起こす / `backdrop-filter` が
+ * その pixel を読めない(compositor boundary 問題)。
+ *
+ * 対策として `canvas.captureStream(30)` でプレビュー canvas を MediaStream 化し、
+ * `<video>` 要素の srcObject に挿す。video は通常の DOM 要素として描画されるため
+ * CSS `filter: blur()` が確実に効く。WebGL / WebGPU 両 backend で同一 code path。
  *
  * @limitations
- * - CPU/GPU 負荷あり。
- * - パネルとキャンバスが画面内で重ならないときはインターセクションが小さく描画をスキップする。
+ * - 30 fps ミラー。動画再生時は追従。
+ * - video element 1 つ分の追加 GPU 合成コストあり。
+ * - Panel と canvas の位置合わせは object-fit: cover + 右寄せで済ませる(完全な pixel
+ *   アライメントは不要、重 blur 下では視覚的に十分自然)。
  */
 
 import { useEffect, useRef, type RefObject } from "react";
@@ -23,100 +29,106 @@ export type FilmLabWebglPanelBackdropProps = {
   enabled: boolean;
 };
 
+type CanvasWithCaptureStream = HTMLCanvasElement & {
+  captureStream?: (frameRate?: number) => MediaStream;
+};
+
 /**
- * @description パネル矩形いっぱいに、背後 WebGL のスナップショット＋スクリムを敷く canvas。
+ * @description パネル矩形いっぱいに、背後プレビューの鏡像を blur 表示する video。
  */
 export function FilmLabWebglPanelBackdrop({
   filmLabCanvasRef,
-  panelRef,
+  panelRef: _panelRef,
   enabled,
 }: FilmLabWebglPanelBackdropProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     if (!enabled) {
       return;
     }
 
-    let alive = true;
-    let rafId = 0;
+    let cancelled = false;
+    let attachRafId = 0;
 
-    const tick = () => {
-      if (!alive) {
+    const attach = () => {
+      if (cancelled) return;
+      const video = videoRef.current;
+      const src = filmLabCanvasRef.current?.getWebGlCanvas?.() as
+        | CanvasWithCaptureStream
+        | null;
+      if (!video || !src) {
+        attachRafId = window.requestAnimationFrame(attach);
         return;
       }
-      rafId = requestAnimationFrame(tick);
-
-      const canvas = canvasRef.current;
-      const src = filmLabCanvasRef.current?.getWebGlCanvas?.();
-      const panelEl = panelRef.current;
-      if (!canvas || !src || !panelEl) {
+      if (typeof src.captureStream !== "function") {
+        console.warn(
+          "[FilmLabWebglPanelBackdrop] HTMLCanvasElement.captureStream unavailable",
+        );
         return;
       }
-
-      const ctx = canvas.getContext("2d", { alpha: true, desynchronized: true });
-      if (!ctx) {
+      // Canvas may not be sized yet on very first attach — wait a frame.
+      if (src.width < 2 || src.height < 2) {
+        attachRafId = window.requestAnimationFrame(attach);
         return;
       }
-
-      const srcRect = src.getBoundingClientRect();
-      const panelRect = panelEl.getBoundingClientRect();
-
-      const interLeft = Math.max(panelRect.left, srcRect.left);
-      const interTop = Math.max(panelRect.top, srcRect.top);
-      const interRight = Math.min(panelRect.right, srcRect.right);
-      const interBottom = Math.min(panelRect.bottom, srcRect.bottom);
-      const interW = interRight - interLeft;
-      const interH = interBottom - interTop;
-      if (interW < 2 || interH < 2) {
-        return;
-      }
-
-      const dpr = Math.min(2, typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1);
-      const destW = Math.max(1, Math.floor(panelEl.clientWidth * dpr));
-      const destH = Math.max(1, Math.floor(panelEl.clientHeight * dpr));
-      if (canvas.width !== destW || canvas.height !== destH) {
-        canvas.width = destW;
-        canvas.height = destH;
-      }
-
-      const sx = ((interLeft - srcRect.left) / srcRect.width) * src.width;
-      const sy = ((interTop - srcRect.top) / srcRect.height) * src.height;
-      const sw = (interW / srcRect.width) * src.width;
-      const sh = (interH / srcRect.height) * src.height;
-
       try {
-        ctx.clearRect(0, 0, destW, destH);
-        ctx.drawImage(src, sx, sy, sw, sh, 0, 0, destW, destH);
-        ctx.fillStyle = "rgba(6, 8, 12, 0.58)";
-        ctx.fillRect(0, 0, destW, destH);
-      } catch {
-        /* drawImage が弾かれる環境は無視 */
+        const stream = src.captureStream(30);
+        streamRef.current = stream;
+        video.srcObject = stream;
+        void video.play().catch(() => {
+          /* autoplay policy may block — muted+autoPlay should always pass in Electron */
+        });
+      } catch (err) {
+        console.warn(
+          "[FilmLabWebglPanelBackdrop] captureStream failed",
+          err,
+        );
       }
     };
 
-    rafId = requestAnimationFrame(tick);
+    attachRafId = window.requestAnimationFrame(attach);
+
     return () => {
-      alive = false;
-      cancelAnimationFrame(rafId);
+      cancelled = true;
+      if (attachRafId) window.cancelAnimationFrame(attachRafId);
+      const video = videoRef.current;
+      if (video) {
+        video.pause();
+        video.srcObject = null;
+      }
+      const stream = streamRef.current;
+      if (stream) {
+        for (const track of stream.getTracks()) {
+          track.stop();
+        }
+      }
+      streamRef.current = null;
     };
-  }, [enabled, filmLabCanvasRef, panelRef]);
+  }, [enabled, filmLabCanvasRef]);
 
   if (!enabled) {
     return null;
   }
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="film-lab-webgl-backdrop-canvas pointer-events-none absolute inset-0 z-0 rounded-[inherit]"
+    <video
+      ref={videoRef}
+      muted
+      autoPlay
+      playsInline
+      className="film-lab-webgl-backdrop-canvas pointer-events-none absolute inset-0 z-0 h-full w-full rounded-[inherit]"
       style={{
-        width: "100%",
-        height: "100%",
-        filter: "blur(22px) saturate(1.28)",
-        transform: "scale(1.06)",
-        boxShadow:
-          "inset 0 0 48px rgba(0, 0, 0, 0.38), inset 0 0 0 1px rgba(255, 255, 255, 0.09)",
+        objectFit: "cover",
+        // パネルは画面右端。canvas の右側相当を見せると視覚的に自然。
+        objectPosition: "100% center",
+        // 2026-04-18: 28px blur + 0.78 brightness が若干効きすぎだったため、
+        // 20px / 0.88 / saturate 1.18 に軽減。craft 感は残しつつ、背後が過度に
+        // 沈み込まない level へ。
+        filter: "blur(20px) saturate(1.18) brightness(0.88)",
+        // blur エッジ隠し。scale も 1.18 → 1.12 に。
+        transform: "scale(1.12)",
       }}
       aria-hidden
     />
