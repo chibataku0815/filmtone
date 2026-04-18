@@ -8,11 +8,11 @@
 
 ## 🚀 次に実行する Phase
 
-**Next**: Phase 3 live-Electron integration — FilmLabCanvas/App.tsx flip + (任意で) T3-2 GpuRenderer + T3-4 Golden + T3-5 DMG
+**Next**: user が live Electron で `SHIP-READINESS.md` の ⚠️ "Requires user machine" 節を回し、checkbox を埋めて **ship or hold** を決める。全 code / docs / RELEASE_NOTES / version bump は `feature/webgpu-migration-v1` 上に pending commit で並んでいる(SHIP-READINESS.md §Commit plan)。
 **Phase 0**: ✅ done 2026-04-18
 **Phase 1**: ✅ done 2026-04-18(5 commit on `feature/webgpu-migration-v1`、push 済み)
 **Phase 2**: ✅ done 2026-04-18(実装着地 + T2-0c consumer 移行、Golden / 視覚証明は Phase 3 T3-3 refactor 後に回収)
-**Phase 3 (進行中)**: 🟡 2026-04-18(T3-1 cross-filter WGSL 5 本 + pipeline compile-validate 着地済み、T3-3 Viewport composition + Electron flag 着地済み。残り: FilmLabCanvas/App.tsx prefer='webgpu' 切替 + T3-2 GpuRenderer(v1.1 defer 候補)+ T3-4 Golden + T3-5 DMG — いずれも live Electron 必須)
+**Phase 3**: 🟢 **code-complete 2026-04-18** — T3-1 WGSL (commit `0d6f53fb`) + T3-3 Viewport composition + Electron flag (commit `e08a6ec1`) + T3-3 残 (FilmLabCanvas/App.tsx WebGPU 分岐、本 chat の pending commit) 着地。T3-2 GpuRenderer + cross-filter render integration は v1.1 defer 確定 (Decisions log)。T3-4 Golden 80 matrix / T3-5 DMG / T3-5.5 SHIP-READINESS 実機 QA は [SHIP-READINESS.md](./SHIP-READINESS.md) で user machine へ委譲。
   - ✅ T2-0a RenderBackend interface 拡張 (commit `8b32b9c5`)
   - ✅ T2-1 filmlab primary grade + LUT1 + blit (commit `068b7063`)
   - ✅ T2-2 + T2-0b + T2-3 filmlab LUT2/print + bloom/halation pyramid + composite (commit `be754796`)
@@ -192,7 +192,45 @@ STATUS.md の先頭が常に次 phase を指すため、**全 phase で同じ sn
 
 ## Last updated
 
-2026-04-18 **Phase 3 構造着地**。T3-1(cross-filter 5 WGSL + compile-validate)+ T3-3 Viewport composition refactor + Electron `enable-unsafe-webgpu` flag の合計 3 論理 chunk が chat 内完了。残り(FilmLabCanvas 切替・App.tsx prewarm 配線・T3-2 GpuRenderer・T3-4 Golden・T3-5 DMG)は user machine の live Electron session 必須 — 次 chat が `phase-3-continuation-v2-handoff.md` を読んで着手。
+2026-04-18 **Phase 3 code-complete (live flip + release artifacts)**。
+
+本 chat で着地した追加変更(pending commit、`feature/webgpu-migration-v1` working tree):
+
+| File | 変更 |
+|---|---|
+| `packages/film-lab-ui/src/FilmLabCanvas.tsx` | `useEffect` を backend-agnostic に refactor。fresh canvas → `isWebGPUSupported()` 非同期 probe → 1 つの backend に commit。WebGL 経路は `THREE.WebGLRenderer({canvas: ...})` で同じ canvas を掴む、WebGPU 経路は `Viewport.create` 内部で swapchain を張り THREE renderer を作らない。`handleDownload` / `getJpegBase64ForAi` / `getWebGlCanvas` / `getPreviewHealth` を `canvasRef` 参照に置換。`webglcontextlost` は WebGL branch のみ、WebGPU branch は `await vp.prewarm()` で pipeline JIT を予熱。新 import: `isWebGPUSupported`, `ViewportBackendPreference`。 |
+| `apps/desktop-film-lab-batch/package.json` | version `0.6.2` → `1.0.0` |
+| `apps/desktop-film-lab-batch/RELEASE_NOTES-v1.0.0.md` | 新規。Headline は WebGPU migration + Linear Rec.709 working space。Known limits に cross-filter / video-batch export / HDR を v1.1 以降と明記。 |
+| `apps/desktop-film-lab-batch/docs/webgpu-migration/SHIP-READINESS.md` | 新規。user が 5-10 分で読み、⚠️ "Requires user machine" 節のチェックを回して ship/hold を判断するための 1 枚。commit snippet 込み。 |
+| `apps/desktop-film-lab-batch/docs/webgpu-migration/STATUS.md` | 本 update。 |
+
+**検証結果(chat 内で実行可能なもの)**:
+- `packages/film-lab-renderer` `bunx tsc --noEmit` → exit 0 (clean)
+- `packages/film-lab-renderer` `bun run build` → `dist/index.js` 144 KB、WebGPUBackend は lazy chunk (`chunk-Z3VCXL6F.js` 219 KB + 83 B stub)、tree-shake 維持
+- `packages/film-lab-ui` `bunx tsc --noEmit` → 1 pre-existing error (`FilmLabCanvasPackageEntry.tsx` TS4023 naming)、**regression delta 0**
+- `apps/desktop-film-lab-batch` `bunx tsc --noEmit` → 17 errors = Phase 2 baseline、**regression delta 0**
+- `apps/web` `bunx tsc --noEmit` → 0 errors
+
+**user machine に委譲**(SHIP-READINESS.md §"Requires user machine"):
+1. `bun run desktop` — live boot + WebGPU adapter ログ + preset 切替
+2. `bun run test` / `test:smart-look-pending` / `smoke:smart-look-pending`
+3. `bun run build`
+4. `bun run test:golden -- --baseline B --full` — PSNR ≥ 40 dB 75/80 gate、結果 CSV は `docs/webgpu-migration/phase-3-golden-report.csv`
+5. 視覚証明 3 枚 → `docs/webgpu-migration/assets/highlight-proof/`
+6. `bun run dist:mac:unsigned` → `release/Filmtone-1.0.0-arm64.dmg` + 10 min 実機 QA
+7. SHIP-READINESS.md Decision checkbox を埋めて ship or hold
+
+**Cross-filter render-time integration / T3-2 headless GpuRenderer / video export / batch export の WebGPU 化は v1.1 へ defer 確定**(Decisions log 2026-04-18 参照)。理由: 全 8 v1.0 preset が `crossFilterStrength: 0` で Golden 80 matrix に影響無く、export 経路を WebGL 固定のまま ship することで live-Electron flip regression 面積を最小化できる。
+
+### 次 chat kickoff snippet(ship 判断後、v1.0 tag 作成 / v1.1 起票が必要なら)
+
+```
+作業ディレクトリ: /Volumes/SamsungPortableSSDX5001/documents/forestone/chibatakumi-portfolio
+
+SHIP-READINESS.md を基に v1.0 を tag して release ノートを公開してください。
+併せて v1.1 issue 4 本 (cross-filter / video-export / batch / apps-web WebGPU 化) を
+`phase-3-continuation-v2-handoff.md` §4 の `gh issue create` snippet から起票。
+```
 
 **検証結果**:
 - film-lab-renderer `bunx tsc --noEmit` exit 0(clean)

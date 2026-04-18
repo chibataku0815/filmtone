@@ -13,12 +13,14 @@ import * as THREE from "three";
 import { parseCube, PRESETS, halationHueToHex, type PresetName } from "film-lab-core";
 import {
   isWebGL2Supported,
+  isWebGPUSupported,
   getOptimalPixelRatio,
   Viewport,
   MediaLoader,
   MediaLoadError,
   LIKELY_VIDEO_EXTENSION,
   type LoadResult,
+  type ViewportBackendPreference,
 } from "film-lab-renderer";
 import type { Params } from "film-lab-core";
 import { FILM_LAB_NEXT_INTL_NAMESPACE } from "./filmLabUiContract";
@@ -319,6 +321,14 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.OrthographicCamera | null>(null);
+  /**
+   * @description バックエンドに依らず描画の最終出力先となる canvas 要素。
+   * WebGL 経路では `THREE.WebGLRenderer` が `canvas:` オプションで掴み、
+   * WebGPU 経路では `Viewport.create` 内部で `canvas.getContext('webgpu')` が張る。
+   * 共通化することで `handleDownload` / `getJpegBase64ForAi` / `getWebGlCanvas` が
+   * backend を気にせずこの 1 本を参照できる。
+   */
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   /** @description 現在 viewport に渡している Texture。本体差し替え時の dispose 用です。 */
   const activeTextureRef = useRef<THREE.Texture | null>(null);
   /** @description 現在のプレビュー動画要素。画像のときは null。 */
@@ -667,8 +677,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     }
     if (source.kind === "smartLookDerived") {
       const mediaLoader = mediaLoaderRef.current;
-      const renderer = rendererRef.current;
-      if (!mediaLoader || !renderer || !supported) {
+      if (!mediaLoader || !supported) {
         reloadInFlightRef.current = false;
         previewRenderingHoldRef.current = false;
         return false;
@@ -684,7 +693,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
         const file = new File([blob], "smart-look-corrected.png", {
           type: "image/png",
         });
-        const maxTex = renderer.capabilities.maxTextureSize;
+        const maxTex = getMaxTextureSize();
         const result = await mediaLoader.loadFile(file, {
           maxTextureSize: maxTex,
         });
@@ -713,59 +722,69 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     }
     await loadUserMediaFile(source.file);
     return true;
-  }, [applyLoadedTextureResult, loadDefaultSampleIntoCanvas, loadUserMediaFile, supported]);
+  }, [
+    applyLoadedTextureResult,
+    getMaxTextureSize,
+    loadDefaultSampleIntoCanvas,
+    loadUserMediaFile,
+    supported,
+  ]);
 
-  // Three.js setup
+  // Renderer setup (WebGL or WebGPU, Phase 3 T3-3)
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    if (!isWebGL2Supported()) {
+    /**
+     * Backend preference: desktop defaults to WebGPU per Vite build flag
+     * (`FILMTONE_BACKEND=webgpu`). Web bundles set `webgl` explicitly so the
+     * WebGPU chunk is never fetched. Unknown / missing env falls back to
+     * WebGL for safety.
+     */
+    const envRecord = (import.meta.env ?? {}) as unknown as Record<
+      string,
+      unknown
+    >;
+    const envBackendRaw = envRecord.FILMTONE_BACKEND;
+    const envPref: ViewportBackendPreference =
+      envBackendRaw === "webgpu" ? "webgpu" : "webgl";
+
+    // Synchronous WebGL2 gate for the fallback path. WebGPU is probed async
+    // inside the IIFE below.
+    if (envPref === "webgl" && !isWebGL2Supported()) {
       setSupported(false);
       return;
     }
 
-    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
-    camera.position.z = 1;
-
     let width = Math.max(1, container.clientWidth);
     let height = Math.max(1, container.clientHeight);
 
-    const renderer = new THREE.WebGLRenderer({
-      antialias: false,
-      alpha: false,
-      preserveDrawingBuffer: true,
-    });
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(getOptimalPixelRatio(1.5));
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    rendererRef.current = renderer;
-    container.appendChild(renderer.domElement);
-    const handleContextLost = (event: Event) => {
-      event.preventDefault();
-      previewContextLostRef.current = true;
-      previewRenderingHoldRef.current = true;
-      setMediaOverlay({ kind: "loading" });
-    };
-    renderer.domElement.addEventListener(
-      "webglcontextlost",
-      handleContextLost as EventListener,
-      false,
-    );
-
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0a0a0a);
-    sceneRef.current = scene;
-    cameraRef.current = camera;
+    // Fresh canvas — NOT attached to any rendering context yet. WebGPU
+    // requires `canvas.getContext('webgpu')` on a canvas that has never held
+    // a WebGL2 context, so we must NOT let THREE.WebGLRenderer create its
+    // own canvas first. We decide backend → then either WebGPU attaches
+    // (inside Viewport.create) or THREE.WebGLRenderer attaches WebGL2 via
+    // the `canvas:` option.
+    const canvas = document.createElement("canvas");
+    canvas.style.display = "block";
+    canvas.style.width = "100%";
+    canvas.style.height = "100%";
+    container.appendChild(canvas);
+    canvasRef.current = canvas;
 
     const mediaLoader = new MediaLoader();
     mediaLoaderRef.current = mediaLoader;
 
+    let renderer: THREE.WebGLRenderer | null = null;
+    let scene: THREE.Scene | null = null;
+    let camera: THREE.OrthographicCamera | null = null;
     let viewport: Viewport | null = null;
     let animationId = 0;
     let resizeObserver: ResizeObserver | null = null;
     let resizeRafId = 0;
     let cancelled = false;
+    let webglContextLostHandler: ((event: Event) => void) | null = null;
+
     const syncViewportSize = () => {
       if (!viewport) return;
       const nextWidth = Math.max(1, container.clientWidth);
@@ -775,14 +794,32 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       }
       width = nextWidth;
       height = nextHeight;
-      renderer.setSize(width, height);
+      if (renderer) {
+        renderer.setSize(width, height);
+      }
       viewport.setResolution(width, height);
     };
     window.addEventListener("resize", syncViewportSize);
 
     void (async () => {
-      const vp = await Viewport.create(renderer.domElement, {
-        prefer: "webgl",
+      // Resolve the effective backend: prefer WebGPU when the env asks for
+      // it AND the browser reports support; otherwise stay on WebGL.
+      const webgpuOk =
+        envPref === "webgpu" ? await isWebGPUSupported() : false;
+      const effectivePref: ViewportBackendPreference = webgpuOk
+        ? "webgpu"
+        : "webgl";
+
+      if (effectivePref === "webgl" && !isWebGL2Supported()) {
+        // Async fallback tripped the gate — rare (would require the feature
+        // detection to disagree with WebGL2 availability). Mark unsupported
+        // and let the cleanup below tear down the bare canvas.
+        if (!cancelled) setSupported(false);
+        return;
+      }
+
+      const vp = await Viewport.create(canvas, {
+        prefer: effectivePref,
         width,
         height,
       });
@@ -791,9 +828,53 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
         return;
       }
       viewport = vp;
-      if (viewport.backendKind === "webgl" && viewport.mesh) {
-        scene.add(viewport.mesh);
+
+      if (vp.backendKind === "webgl") {
+        // WebGL path: wire THREE.js renderer/scene/camera to the same canvas
+        // so consumer hooks (split-compare, download, smart-look capture)
+        // keep working exactly as before.
+        renderer = new THREE.WebGLRenderer({
+          canvas,
+          antialias: false,
+          alpha: false,
+          preserveDrawingBuffer: true,
+        });
+        renderer.setSize(width, height);
+        renderer.setPixelRatio(getOptimalPixelRatio(1.5));
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        rendererRef.current = renderer;
+
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0a0a);
+        camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
+        camera.position.z = 1;
+        sceneRef.current = scene;
+        cameraRef.current = camera;
+        if (vp.mesh) scene.add(vp.mesh);
+
+        webglContextLostHandler = (event: Event) => {
+          event.preventDefault();
+          previewContextLostRef.current = true;
+          previewRenderingHoldRef.current = true;
+          setMediaOverlay({ kind: "loading" });
+        };
+        canvas.addEventListener(
+          "webglcontextlost",
+          webglContextLostHandler as EventListener,
+          false,
+        );
+      } else {
+        // WebGPU path: no THREE.js renderer, no scene, no camera. The
+        // backend drives the swapchain directly via `viewport.render()`.
+        rendererRef.current = null;
+        sceneRef.current = null;
+        cameraRef.current = null;
+        // Pre-warm pipeline JIT (DIRECTION §10 Phase 3). Fire-and-forget —
+        // Electron bootstrap is < 100 ms in Phase 0 Case A, so the
+        // 150 ms-silent UX budget is covered without an explicit overlay.
+        await vp.prewarm();
       }
+
       viewportRef.current = viewport;
       onViewportReadyRef.current?.(viewport);
       viewport.setParams(buildViewportParams(initialResolvedGradeRef.current));
@@ -821,14 +902,18 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
         if (
           !viewport ||
           previewContextLostRef.current ||
-          isRendererContextLost(renderer) ||
+          (renderer && isRendererContextLost(renderer)) ||
           pauseVideoPreviewRef.current ||
           previewRenderingHoldRef.current
         ) {
           return;
         }
         viewport.setTime(clock.getElapsedTime());
-        viewport.render(renderer, scene, camera);
+        if (renderer && scene && camera) {
+          viewport.render(renderer, scene, camera);
+        } else {
+          viewport.render();
+        }
       };
       animate();
     })();
@@ -839,27 +924,32 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       if (resizeRafId) window.cancelAnimationFrame(resizeRafId);
       resizeObserver?.disconnect();
       window.removeEventListener("resize", syncViewportSize);
-      renderer.domElement.removeEventListener(
-        "webglcontextlost",
-        handleContextLost as EventListener,
-        false,
-      );
+      if (webglContextLostHandler) {
+        canvas.removeEventListener(
+          "webglcontextlost",
+          webglContextLostHandler as EventListener,
+          false,
+        );
+      }
       activeTextureRef.current?.dispose();
       activeTextureRef.current = null;
       disposePreviewVideoElement(previewVideoElementRef.current);
       viewport?.dispose();
-      try {
-        renderer.forceContextLoss();
-      } catch {
-        /* ignore */
+      if (renderer) {
+        try {
+          renderer.forceContextLoss();
+        } catch {
+          /* ignore */
+        }
+        renderer.dispose();
       }
-      renderer.dispose();
       previewVideoElementRef.current = null;
       previewVideoShouldResumeRef.current = false;
       previewVideoPausedByBusyRef.current = false;
-      if (container.contains(renderer.domElement)) {
-        container.removeChild(renderer.domElement);
+      if (container.contains(canvas)) {
+        container.removeChild(canvas);
       }
+      canvasRef.current = null;
       viewportRef.current = null;
       mediaLoaderRef.current = null;
       rendererRef.current = null;
@@ -887,16 +977,23 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
 
   const handleDownload = useCallback(() => {
     const viewport = viewportRef.current;
-    const renderer = rendererRef.current;
-    const scene = sceneRef.current;
-    const camera = cameraRef.current;
-    if (!viewport || !renderer || !scene || !camera) return;
+    const canvas = canvasRef.current;
+    if (!viewport || !canvas) return;
 
     const splitBefore = viewport.getSplitPosition();
     viewport.setSplitPosition(-1.0);
-    viewport.render(renderer, scene, camera);
+    // Backend-agnostic render: WebGL path needs renderer/scene/camera,
+    // WebGPU path drives its own swapchain.
+    const renderer = rendererRef.current;
+    const scene = sceneRef.current;
+    const camera = cameraRef.current;
+    if (renderer && scene && camera) {
+      viewport.render(renderer, scene, camera);
+    } else {
+      viewport.render();
+    }
 
-    const url = renderer.domElement.toDataURL("image/png");
+    const url = canvas.toDataURL("image/png");
     const a = document.createElement("a");
     a.href = url;
     a.download = `film-lab-${Date.now()}.png`;
@@ -945,9 +1042,8 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     ref,
     () => ({
       getJpegBase64ForAi: (maxSide: number) => {
-        const renderer = rendererRef.current;
-        if (!renderer || !supported) return null;
-        const src = renderer.domElement;
+        const src = canvasRef.current;
+        if (!src || !supported) return null;
         const w = src.width;
         const h = src.height;
         if (w <= 0 || h <= 0) return null;
@@ -971,8 +1067,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       },
       replaceSourceFromPngBase64Body: async (pngBase64Body: string) => {
         const mediaLoader = mediaLoaderRef.current;
-        const renderer = rendererRef.current;
-        if (!mediaLoader || !renderer || !supported) return false;
+        if (!mediaLoader || !supported) return false;
         try {
           const binary = atob(pngBase64Body);
           const len = binary.length;
@@ -984,7 +1079,11 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
           const file = new File([blob], "smart-look-corrected.png", {
             type: "image/png",
           });
-          const maxTex = renderer.capabilities.maxTextureSize;
+          // WebGL: use THREE's maxTextureSize cap. WebGPU: GPUDevice.limits
+          // is accessed via the backend when it scales later; use a sensible
+          // conservative ceiling here so the loader doesn't reject large files.
+          const renderer = rendererRef.current;
+          const maxTex = renderer?.capabilities.maxTextureSize ?? 8192;
           const result = await mediaLoader.loadFile(file, {
             maxTextureSize: maxTex,
           });
@@ -1169,9 +1268,11 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       holdPreviewRendering: (held: boolean) => {
         previewRenderingHoldRef.current = held;
       },
-      getWebGlCanvas: () => rendererRef.current?.domElement ?? null,
+      getWebGlCanvas: () => canvasRef.current,
       getPreviewHealth: (): FilmLabCanvasPreviewHealth => ({
-        hasRenderer: rendererRef.current != null,
+        hasRenderer: viewportRef.current != null && canvasRef.current != null,
+        // `isRendererContextLost` is WebGL-only; on WebGPU the renderer ref
+        // is null and we rely on the backend's `device.lost` watcher (GpuContext).
         contextLost:
           previewContextLostRef.current ||
           isRendererContextLost(rendererRef.current),
