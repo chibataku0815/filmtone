@@ -72,6 +72,12 @@ struct ParsedCubeLutDTO: Codable {
     let intensity: Double
 }
 
+struct SerializableLutDTO: Codable {
+    let size: Int
+    let data: [Double]
+    let intensity: Double
+}
+
 struct Phase0GradeDTO: Codable {
     let presetName: String
     let presetVersion: String
@@ -86,6 +92,8 @@ struct Phase0ExportRequestDTO: Codable {
     let output: Phase0OutputProfileDTO
     let grade: Phase0GradeDTO
     let lut: ParsedCubeLutDTO?
+    let inputLut: SerializableLutDTO?
+    let creativeLut: SerializableLutDTO?
 }
 
 struct Phase0ExportProgressDTO: Encodable {

@@ -8,7 +8,8 @@ final class FilmtoneExportSession {
     private let sourceURL: URL
     private let outputURL: URL
     private let ciContext: CIContext
-    private let preparedLut: PreparedLut?
+    private let preparedInputLut: PreparedLut?
+    private let preparedCreativeLut: PreparedLut?
     private let colorSpace = CGColorSpaceCreateDeviceRGB()
     private var cancelled = false
 
@@ -24,7 +25,11 @@ final class FilmtoneExportSession {
             .cacheIntermediates: false,
             .priorityRequestLow: false,
         ])
-        self.preparedLut = Self.makePreparedLut(from: request.lut)
+        self.preparedInputLut = Self.makePreparedLut(from: request.inputLut)
+        let legacyCreativeLut = request.creativeLut ?? request.lut.map {
+            SerializableLutDTO(size: $0.size, data: $0.data, intensity: $0.intensity)
+        }
+        self.preparedCreativeLut = Self.makePreparedLut(from: legacyCreativeLut)
     }
 
     func cancel() {
@@ -483,6 +488,12 @@ final class FilmtoneExportSession {
         var current = image
         let params = request.grade.params
 
+        // Stage 1: input LUT (e.g. log-to-display normalization). Skip if nil.
+        if let preparedInputLut {
+            current = applyLut(preparedInputLut, to: current)
+        }
+
+        // Stage 2: Quick params (exposure / contrast / saturation / temp / tint / fade / vignette / grain).
         if abs(params.exposure) > 0.0001 {
             current = current.applyingFilter("CIExposureAdjust", parameters: [
                 kCIInputEVKey: params.exposure,
@@ -506,10 +517,6 @@ final class FilmtoneExportSession {
             ])
         }
 
-        if let preparedLut {
-            current = applyLut(preparedLut, to: current)
-        }
-
         if params.fade > 0.0001 {
             current = applyFade(params.fade, to: current)
         }
@@ -523,6 +530,11 @@ final class FilmtoneExportSession {
 
         if params.grainIntensity > 0.0001 {
             current = applyGrain(params.grainIntensity, to: current)
+        }
+
+        // Stage 3: creative LUT (signature look). Skip if nil.
+        if let preparedCreativeLut {
+            current = applyLut(preparedCreativeLut, to: current)
         }
 
         return current
@@ -752,7 +764,7 @@ final class FilmtoneExportSession {
         }
     }
 
-    private static func makePreparedLut(from lut: ParsedCubeLutDTO?) -> PreparedLut? {
+    private static func makePreparedLut(from lut: SerializableLutDTO?) -> PreparedLut? {
         guard let lut, lut.size > 1, !lut.data.isEmpty else {
             return nil
         }
