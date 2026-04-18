@@ -8,29 +8,28 @@
 
 ## 🚀 次に実行する Phase
 
-**In progress**: Phase 2 — Color pipeline + 大物 FX (Day 2)
+**Next**: Phase 3 — Cross-filter + Export + Ship (Day 3)
 **Phase 0**: ✅ done 2026-04-18
 **Phase 1**: ✅ done 2026-04-18(5 commit on `feature/webgpu-migration-v1`、push 済み)
-**Phase 2**: 🔄 in progress 2026-04-18
+**Phase 2**: ✅ done 2026-04-18(実装着地 + T2-0c consumer 移行、Golden / 視覚証明は Phase 3 T3-3 refactor 後に回収)
   - ✅ T2-0a RenderBackend interface 拡張 (commit `8b32b9c5`)
   - ✅ T2-1 filmlab primary grade + LUT1 + blit (commit `068b7063`)
   - ✅ T2-2 + T2-0b + T2-3 filmlab LUT2/print + bloom/halation pyramid + composite (commit `be754796`)
   - ✅ T2-4 motion blur 2-pass ring + blit fallback (commit `1c6e839b`)
-  - ⏳ **next chat に引き継ぎ**: T2-0c `Viewport` → `WebGLBackend` rename + 4 consumer 更新
-  - ⏳ Golden PSNR gate(50 ケース、≥40dB 45/50)
-  - ⏳ 視覚証明(highlight screenshot)
-  - ⏳ `phase-3-handoff.md` Entry / Known gotchas 更新
+  - ✅ **T2-0c** `Viewport` → `WebGLBackend` class rename(既に WebGLBackend.ts:150 で完了)+ `Viewport` wrapper async factory 追加 + **4 consumer 全移行**(batch-pipeline / video-export-pipeline / FilmLabCanvas / film-lab-web-video-export、FilmLabCanvas は本チャットで最後の 1 件移行)+ web build で WebGPUBackend が tree-shake される(`dist/index.js` に 0 match、`dist/webgpu.js` に 5 match)
+  - 🔜 Golden PSNR gate(50 ケース、≥40dB 45/50)→ **Phase 3 T3-4 の 80 matrix に subset として吸収**(Viewport が WebGL-backed 固定のため Phase 2 時点では WebGPU 出力を取れない、phase-3-handoff Entry criteria 引継ぎ欄参照)
+  - 🔜 視覚証明(highlight screenshot)→ **Phase 3 T3-3 後・T3-5 SHIP-READINESS 前**(同上)
 
-### Phase 2 残作業 kickoff snippet(new chat 用)
+### Phase 3 kickoff snippet(new chat 用)
 
 ```
 作業ディレクトリ: /Volumes/SamsungPortableSSDX5001/documents/forestone/chibatakumi-portfolio
 
 @apps/desktop-film-lab-batch/docs/webgpu-migration/DIRECTION.md と
-@apps/desktop-film-lab-batch/docs/webgpu-migration/phase-2-handoff.md と
-@apps/desktop-film-lab-batch/docs/webgpu-migration/STATUS.md を読んで Phase 2 残作業を実行してください。
-Master plan ~/.claude/plans/sequential-thinking-gemini-web-swirling-prism.md の Day 2 節も確認。
-残: T2-0c (Viewport→WebGLBackend rename + 4 consumer 更新) → Golden PSNR gate 50 ケース → 視覚証明 → phase-3-handoff.md 整備 → Phase 2 完了報告。
+@apps/desktop-film-lab-batch/docs/webgpu-migration/phase-3-handoff.md と
+@apps/desktop-film-lab-batch/docs/webgpu-migration/STATUS.md を読んで Phase 3 を実行してください。
+Master plan ~/.claude/plans/sequential-thinking-gemini-web-swirling-prism.md の Day 3 節も確認。
+冒頭に Phase 2 から繰越 の Golden PSNR gate + 視覚証明が含まれます(T3-3 Viewport composition refactor 完了後、T3-4 の 80 matrix で回収 / T3-5 前に highlight-proof 3 枚出力)。
 各 task 論理完了時に git add 候補 + commit 文面案を提示 → user 承認を待って commit / push。
 ```
 
@@ -68,8 +67,8 @@ STATUS.md の先頭が常に次 phase を指すため、**全 phase で同じ sn
 |---|---|---|---|---|---|
 | Day 0 | Electron WebGPU 疎通 + Golden Baseline A | 2h | **done** | [phase-0-handoff.md](./phase-0-handoff.md) | `6fdb7f64` on main |
 | Day 1 | Foundation + Simple shaders (9 本) + Baseline B | 10h | **done** | [phase-1-handoff.md](./phase-1-handoff.md) | `bed1d06f` … `f93b6d68` on feature/webgpu-migration-v1 |
-| Day 2 | filmlab.wgsl + composite.wgsl + motion blur | 12h | pending | [phase-2-handoff.md](./phase-2-handoff.md) (pre-written + Phase 1 注記付き) | — |
-| Day 3 | Cross-filter(Hard 除く)+ Export + Ship | 10h | not started | [phase-3-handoff.md](./phase-3-handoff.md) (pre-written) | — |
+| Day 2 | filmlab.wgsl + composite.wgsl + motion blur | 12h | **done** | [phase-2-handoff.md](./phase-2-handoff.md) | `8b32b9c5` / `068b7063` / `be754796` / `1c6e839b`(+ T2-0c FilmLabCanvas on feature branch) |
+| Day 3 | Cross-filter(Hard 除く)+ Export + Ship + T3-3 Viewport composition refactor | 10h | pending | [phase-3-handoff.md](./phase-3-handoff.md) | — |
 | Day 4 | 予備(条件付き) | 4h | conditional | (Phase 3 終了時に判断) | — |
 
 **Total budget**: 38h(Day 0 = 2h + Day 1-3 = 32h + Day 4 予備 = 4h)
@@ -107,6 +106,8 @@ STATUS.md の先頭が常に次 phase を指すため、**全 phase で同じ sn
 | 2026-04-18 | Phase 2: T2-2 + T2-0b + T2-3 を同一 commit で着地(phase-2-handoff 推奨通り bundle) | pyramid output without composite is unobservable dead code、視覚証明が T2-3 まで通らないと取れない |
 | 2026-04-18 | Pyramid per-level uniform buffer を pre-allocate | GPUQueue.writeBuffer が単一 buffer に複数回あたると最終値で上書き(submit 前 write ordering は保証されるが overwrite 特性) |
 | 2026-04-18 | Grain 用 repeat sampler を既存の filtering sampler(clamp-to-edge)と別に allocate | DIRECTION §2 blue-noise tile の 256² タイリングで seam 抑制のため |
+| 2026-04-18 | Phase 2 T2-0c: `Viewport` rename は既に完了(WebGLBackend.ts:150)、FilmLabCanvas.tsx の `new Viewport({...})` → `await Viewport.create(canvas, {prefer:'webgl'})` 移行で 4/4 consumer 対応 | 他 3 consumer は既に async factory 経由、最後の 1 件を閉じた。tree-shake: film-lab-renderer tsup ビルドで `dist/index.js` に `WebGPUBackend` 0 match、`dist/webgpu.js` に 5 match(sub-path export で web バンドルから除外) |
+| 2026-04-18 | **Phase 2 Exit の Golden PSNR gate(50 ケース)+ 視覚証明を Phase 3 T3-3/T3-4 に移送** | `Viewport extends WebGLBackend` の inheritance 構造上、WebGPU 出力は現状 Viewport 経路で取り出せない(App.tsx / FilmLabCanvas.tsx が `scene.add(viewport.mesh)` を前提、WebGPU backend には mesh が無い)。T3-3 で Viewport を composition に切替 → T3-4 の 80 matrix で Phase 2 の 5×10 subset を同時回収するのが最短。ad-hoc に WebGPU 専用 harness を組むと二度手間、direction default §10「PSNR near-miss は investigate」の精神で構造起因の gap を正直に繰り越し |
 
 ---
 
@@ -154,6 +155,7 @@ STATUS.md の先頭が常に次 phase を指すため、**全 phase で同じ sn
   - `bloomRadius` / `halationRadius` envelope は WebGL 同形式の `computeMipWeights`
   - 新規 `compositeUniforms.ts`(3 vec4 packer + `hexToRgbTriple`)
   - film-lab-renderer typecheck clean、desktop tsc 17 errors で regression delta 0、tsup build `index.js` 138KB(`WebGPUBackend` 0 match、tree-shake 維持)/ `webgpu.js` 199KB
+- **T2-0c**(feature branch、commit 前)`Viewport` rename は既に WebGLBackend.ts:150 / index.ts sub-path export で構造完了。残っていた FilmLabCanvas.tsx:763 の `new Viewport({vertexShader, fragmentShader, width, height})` → `await Viewport.create(canvas, {prefer:'webgl', width, height})` に移行。useEffect 内で async IIFE + cancel flag パターンで race condition 回避(unmount が init 完了前に来ても `vp.dispose()` で安全に巻き戻る)。`syncViewportSize` / `resizeObserver` / `animate` loop は viewport 生成完了後に初期化、cleanup は `viewport?.dispose()` で pre-init にも対応。`filmlabVertexShader` / `filmlabFragmentShader` import は不要になり削除。film-lab-renderer tsup build `dist/index.js` 137KB / `dist/webgpu.js` 207KB、`WebGPUBackend` は `index.js` 0 match / `webgpu.js` 5 match(tree-shake 維持)。film-lab-renderer typecheck clean、desktop tsc 17 errors で regression delta 0
 - **T2-4**(commit `1c6e839b`)motion blur 2-pass ring + blit fallback:
   - `motionblur-feedback.frag.wgsl` — src + ring[prevSlot] を `mix(src, prev, trail * hasPrev)` でリング新スロットへ書き込み。`hasPrev` フラグで初フレーム分岐を単一 pipeline 内で解消
   - `motionblur-blend.frag.wgsl` — `texture_2d_array<f32>` から 8 層の加重平均。CPU 側で `weights[i]=0 (i>=activeFrames)` に正規化済 → シェーダ内ループ分岐を排除。`motionThreshold > 0` で newest vs oldest 輝度差→ motion mask
@@ -187,4 +189,4 @@ STATUS.md の先頭が常に次 phase を指すため、**全 phase で同じ sn
 
 ## Last updated
 
-2026-04-18 Phase 2 進行中。T2-1 / T2-2 / T2-0b / T2-3 / T2-4 着地済(commit `068b7063`, `be754796`, `1c6e839b`)。**残:** T2-0c Viewport rename → Golden PSNR gate → 視覚証明 → phase-3-handoff 整備。**次チャットは先頭の "Phase 2 残作業 kickoff snippet" を貼るだけで再開可。**
+2026-04-18 **Phase 2 完了**。T2-0a / T2-1 / T2-2+T2-0b+T2-3 / T2-4 / T2-0c 全着地(commit `8b32b9c5`, `068b7063`, `be754796`, `1c6e839b` + T2-0c FilmLabCanvas migration + docs update は本チャットで pending commit)。Golden PSNR gate(50 ケース)+ 視覚証明は Phase 3 T3-3 の Viewport composition refactor 後に T3-4 80 matrix で吸収。**次チャットは先頭の "Phase 3 kickoff snippet" を貼るだけで再開可。**

@@ -19,8 +19,6 @@ import {
   MediaLoadError,
   LIKELY_VIDEO_EXTENSION,
   type LoadResult,
-  filmlabVertexShader,
-  filmlabFragmentShader,
 } from "film-lab-renderer";
 import type { Params } from "film-lab-core";
 import { FILM_LAB_NEXT_INTL_NAMESPACE } from "./filmLabUiContract";
@@ -760,72 +758,83 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     sceneRef.current = scene;
     cameraRef.current = camera;
 
-    const viewport = new Viewport({
-      vertexShader: filmlabVertexShader,
-      fragmentShader: filmlabFragmentShader,
-      width,
-      height,
-    });
-    scene.add(viewport.mesh);
-    viewportRef.current = viewport;
-    onViewportReadyRef.current?.(viewport);
-    viewport.setParams(buildViewportParams(initialResolvedGradeRef.current));
-
     const mediaLoader = new MediaLoader();
     mediaLoaderRef.current = mediaLoader;
-    void restoreCurrentSource();
 
-    /**
-     * @description `window.resize` だけでは、右ペイン開閉や absolute layout の再計測を取りこぼします。
-     * そのため container 自体を観測し、0 サイズから実サイズへ立ち上がった瞬間も拾います。
-     */
+    let viewport: Viewport | null = null;
+    let animationId = 0;
+    let resizeObserver: ResizeObserver | null = null;
+    let resizeRafId = 0;
+    let cancelled = false;
     const syncViewportSize = () => {
+      if (!viewport) return;
       const nextWidth = Math.max(1, container.clientWidth);
       const nextHeight = Math.max(1, container.clientHeight);
       if (nextWidth === width && nextHeight === height) {
         return;
       }
-
       width = nextWidth;
       height = nextHeight;
       renderer.setSize(width, height);
       viewport.setResolution(width, height);
     };
-    syncViewportSize();
-
-    const resizeObserver =
-      typeof ResizeObserver !== "undefined"
-        ? new ResizeObserver(() => {
-            syncViewportSize();
-          })
-        : null;
-    resizeObserver?.observe(container);
-
-    const resizeRafId = window.requestAnimationFrame(() => {
-      syncViewportSize();
-    });
     window.addEventListener("resize", syncViewportSize);
 
-    const clock = new THREE.Clock();
-    let animationId: number;
-    const animate = () => {
-      animationId = requestAnimationFrame(animate);
-      if (
-        previewContextLostRef.current ||
-        isRendererContextLost(renderer) ||
-        pauseVideoPreviewRef.current ||
-        previewRenderingHoldRef.current
-      ) {
+    void (async () => {
+      const vp = await Viewport.create(renderer.domElement, {
+        prefer: "webgl",
+        width,
+        height,
+      });
+      if (cancelled) {
+        vp.dispose();
         return;
       }
-      viewport.setTime(clock.getElapsedTime());
-      viewport.render(renderer, scene, camera);
-    };
-    animate();
+      viewport = vp;
+      scene.add(viewport.mesh);
+      viewportRef.current = viewport;
+      onViewportReadyRef.current?.(viewport);
+      viewport.setParams(buildViewportParams(initialResolvedGradeRef.current));
+      void restoreCurrentSource();
+
+      /**
+       * @description `window.resize` だけでは、右ペイン開閉や absolute layout の再計測を取りこぼします。
+       * そのため container 自体を観測し、0 サイズから実サイズへ立ち上がった瞬間も拾います。
+       */
+      syncViewportSize();
+      resizeObserver =
+        typeof ResizeObserver !== "undefined"
+          ? new ResizeObserver(() => {
+              syncViewportSize();
+            })
+          : null;
+      resizeObserver?.observe(container);
+      resizeRafId = window.requestAnimationFrame(() => {
+        syncViewportSize();
+      });
+
+      const clock = new THREE.Clock();
+      const animate = () => {
+        animationId = requestAnimationFrame(animate);
+        if (
+          !viewport ||
+          previewContextLostRef.current ||
+          isRendererContextLost(renderer) ||
+          pauseVideoPreviewRef.current ||
+          previewRenderingHoldRef.current
+        ) {
+          return;
+        }
+        viewport.setTime(clock.getElapsedTime());
+        viewport.render(renderer, scene, camera);
+      };
+      animate();
+    })();
 
     return () => {
-      cancelAnimationFrame(animationId);
-      window.cancelAnimationFrame(resizeRafId);
+      cancelled = true;
+      if (animationId) cancelAnimationFrame(animationId);
+      if (resizeRafId) window.cancelAnimationFrame(resizeRafId);
       resizeObserver?.disconnect();
       window.removeEventListener("resize", syncViewportSize);
       renderer.domElement.removeEventListener(
@@ -836,7 +845,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       activeTextureRef.current?.dispose();
       activeTextureRef.current = null;
       disposePreviewVideoElement(previewVideoElementRef.current);
-      viewport.dispose();
+      viewport?.dispose();
       try {
         renderer.forceContextLoss();
       } catch {

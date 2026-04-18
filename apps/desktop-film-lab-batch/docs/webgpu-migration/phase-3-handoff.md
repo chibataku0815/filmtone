@@ -5,15 +5,21 @@
 
 ---
 
-## Entry criteria(Phase 2 完了で達成済み想定)
+## Entry criteria(Phase 2 完了で達成済み — verified 2026-04-18)
 
-- [ ] filmlab.wgsl 完全実装(soft-shaper + LUT2 + print 含む)
-- [ ] composite.wgsl 実装
-- [ ] motion blur 2 shader + RingBuffer 接続
-- [ ] Golden 50 ケース ≥ 40dB(代表 5 preset × 10 image)
-- [ ] 視覚証明(highlight グラデーション改善)スクショ保存
-- [ ] `bun run typecheck` clean
+- [x] filmlab.wgsl 完全実装(primary grade + Reinhard soft-shaper k=0.5 + LUT2 + print CMY + print contrast、commit `068b7063` / `be754796`)
+- [x] composite.wgsl 実装(2 bind group、bloom/halation pyramid 結線、blue-noise grain、commit `be754796`)
+- [x] motion blur 2 shader + RingBuffer(`depthOrArrayLayers=8`)+ blit fallback(commit `1c6e839b`)
+- [x] `RenderBackend` interface + `Viewport` 単一クラス + `Viewport.create(canvas, {prefer})` async factory + 4 consumer 移行(batch-pipeline / video-export-pipeline / FilmLabCanvas / film-lab-web-video-export)
+- [x] film-lab-renderer sub-path export(`./webgpu`)で tree-shake、`dist/index.js` に `WebGPUBackend` 0 match(web バンドルに WebGPU コードが入らないことを構造で保証)
+- [x] `film-lab-renderer` typecheck clean、desktop tsc 17 errors(main 同数、regression delta 0)、film-lab-ui 1 pre-existing error(FilmLabCanvasPackageEntry.tsx:51 TS4023、本 phase 起因なし)
 - [ ] DIRECTION §9-11 読了
+
+### Phase 2 から繰越(必読)
+
+- **Golden PSNR gate(50 ケース、≥40dB 45/50)+ 視覚証明(highlight グラデーション改善)は Phase 3 T3-3 以降に実施**。Phase 2 段階では `Viewport extends WebGLBackend` の継承構造が固定化されていて、`App.tsx` / `FilmLabCanvas.tsx` が `scene.add(viewport.mesh)` を前提にしている。WebGPU 出力を Viewport 経路で取り出すには、T3-3 で Viewport を composition 化(backend を内部に保持、setter を委譲)する refactor が前提。そこが通るまで Golden harness に WebGPU 出力が渡らない。
+- Phase 3 T3-3 で `Viewport` を composition に切替 → `App.tsx` / `FilmLabCanvas.tsx` が backend-agnostic になった直後に、T3-4 の Golden 80 matrix と同時に Phase 2 由来の 50 ケース(代表 5 preset × 10 image)も測る(80 matrix は preset 8 × image 10 なので、5×10 は subset で回収可)。
+- 視覚証明 screenshot(`docs/webgpu-migration/assets/highlight-proof/`)は T3-3 後・T3-5 SHIP-READINESS 前に、`sunset.jpg` / `backlit-portrait.jpg` / `white-dress.jpg` + 代表 preset の WebGL vs WebGPU 並び 3 枚を出す。
 
 ---
 
@@ -70,7 +76,40 @@
 
 ---
 
-### T3-3. Electron 統合仕上げ (1h) [commit 3]
+### T3-3. Viewport composition refactor + Electron 統合仕上げ (2h) [commit 3]
+
+**T3-3 先頭で Viewport を composition に切替**(Phase 2 T2-0c から繰越の構造 refactor):
+
+現状 `Viewport extends WebGLBackend` のため、`Viewport.create(canvas, {prefer:'webgpu'})` は `void opts.prefer` でスルーされて WebGL-backed Viewport を返す(`packages/film-lab-renderer/src/Viewport.ts:57`)。T3-3 の最初で以下に組み替える:
+
+```ts
+// Viewport.ts (after T3-3)
+export class Viewport {
+  private backend: WebGLBackend | WebGPUBackend;
+  readonly backendKind: 'webgl' | 'webgpu';
+  readonly mesh?: THREE.Mesh;  // WebGL 分岐のみ
+
+  static async create(canvas, opts): Promise<Viewport> {
+    if (opts.prefer === 'webgpu' && await isWebGPUSupported()) {
+      const { WebGPUBackend } = await import('film-lab-renderer/webgpu');
+      return new Viewport(await WebGPUBackend.create(canvas), 'webgpu');
+    }
+    return new Viewport(new WebGLBackend({vertex, frag, w, h}), 'webgl');
+  }
+  // setParams / setLUT1 / setLUT2 / setMediaFromBitmap / setResolution / render / dispose を backend に委譲
+}
+```
+
+**consumer 側の吸収**:
+- `App.tsx` / `FilmLabCanvas.tsx` の `scene.add(viewport.mesh)` は `if (viewport.backendKind === 'webgl') scene.add(viewport.mesh!)` に
+- `viewport.render(renderer, scene, camera)` は WebGL 専用 → WebGPU 分岐では `viewport.render()`(引数無し、canvas に直描画)で三分岐
+- batch-pipeline / video-export-pipeline / film-lab-web-video-export は既に `Viewport.create` 経由なので `prefer` を渡すだけで動く
+
+**Tree-shake の維持**: `import('film-lab-renderer/webgpu')` を dynamic import にして、Vite/Next の build flag (`import.meta.env.FILMTONE_BACKEND === 'webgl'`) 分岐で chunk を除外(Phase 1 で準備済み)。
+
+---
+
+**電源投入順整理**:
 
 **電源投入順整理**:
 - `electron/main.ts`: Phase 0 で追加した flag(Case B の場合)を v1.0 リリース時も保持(旧 macOS 互換の安全網)
@@ -112,7 +151,7 @@ bun run build
 - `bun run test:golden -- --baseline B --full`
 - 8 preset × 10 image = 80 ケース実行
 - 結果 CSV を `docs/webgpu-migration/phase-3-golden-report.csv` に保存
-- **合格基準**: PSNR ≥ 40dB が **75/80 以上**(単一 regression は accept、5 件以上なら direction chat)
+- **合格基準**: PSNR ≥ 40dB が **75/80 以上**(単一 regression は accept、5 件以上なら direction chat)。**この 80 matrix は Phase 2 で punt された 50 ケース(代表 5 preset × 10 image)を subset で包含するので、Phase 2 Exit の PSNR gate も T3-4 で同時に回収**。
 
 **視覚回帰 check**:
 - 低 PSNR 順に top 5 ケースを目視 → 許容可能な差分か判定
@@ -293,7 +332,15 @@ direction chat に以下貼り付け:
 
 ## Known gotchas(Phase 3 で追記)
 
-(実行中判明したらここに追記)
+### Phase 2 引継ぎ(Viewport 構造起因)
+
+- **Viewport は現在 `extends WebGLBackend`**: `packages/film-lab-renderer/src/Viewport.ts` は `WebGLBackend` を継承しているので、`viewport.mesh` / `viewport.setParams(...)` / `viewport.render(renderer, scene, camera)` が全て Three.js API のまま露出している。WebGPU 経路では `viewport.mesh` は存在しないため、`App.tsx:scene.add(viewport.mesh)` / `FilmLabCanvas.tsx` の Three.js 連携は T3-3 で composition に切替えない限り WebGPU 分岐を呼べない。
+- **T3-3 で期待される refactor 形**: `Viewport.create(canvas, {prefer})` が内部で `WebGPUBackend.create(canvas)` or `new WebGLBackend({vertex, frag, w, h})` を分岐保持し、`setParams / setLUT1 / setLUT2 / setMediaFromBitmap / setResolution / render / dispose` を backend インスタンスへ委譲。`viewport.mesh` は WebGL 分岐のみ(WebGPU は canvas 直描画なので不要)。App.tsx / FilmLabCanvas.tsx 側の `scene.add(viewport.mesh)` は WebGL 分岐専用のコードに変わる(`if (viewport.backendKind === 'webgl') scene.add(viewport.mesh)`)。
+- **Viewport.create の `prefer` は現在 `void opts.prefer`**(Viewport.ts:57): T2-0c 時点ではインタフェースのみ、実ルーティング未接続。T3-3 で本格接続。
+- **4 consumer 全移行済**: batch-pipeline / video-export-pipeline / FilmLabCanvas / film-lab-web-video-export 全て `await Viewport.create(canvas, {...})` 経由(Phase 2 T2-0c)。T3-3 で Viewport 内部を composition に切替える際、consumer 側は再修正不要(prefer を渡すだけで分岐する)。
+- **Golden harness 入口は `window.ln`**(`apps/desktop-film-lab-batch/src/renderer/App.tsx` が `?__test=1` 時のみ expose)。T3-3 後は `window.ln.getViewport()` が backend-agnostic な委譲 wrapper を返す形になるので、既存 golden.harness.ts の `h.setParams(preset)` / `h.loadImage(base64)` / `h.setCanvasSize(w,h)` がそのまま動く想定。
+
+(Phase 3 実行中判明したらここに追記)
 
 ---
 
