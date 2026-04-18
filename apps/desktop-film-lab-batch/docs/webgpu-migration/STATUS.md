@@ -15,11 +15,24 @@
   - ✅ T2-0a RenderBackend interface 拡張 (commit `8b32b9c5`)
   - ✅ T2-1 filmlab primary grade + LUT1 + blit (commit `068b7063`)
   - ✅ T2-2 + T2-0b + T2-3 filmlab LUT2/print + bloom/halation pyramid + composite (commit `be754796`)
-  - ⏳ T2-4 motion blur (2 shader + RingBuffer wiring) — 次
-  - ⏳ T2-0c `Viewport` → `WebGLBackend` rename + 4 consumer 更新 — new chat 推奨
+  - ✅ T2-4 motion blur 2-pass ring + blit fallback (commit `1c6e839b`)
+  - ⏳ **next chat に引き継ぎ**: T2-0c `Viewport` → `WebGLBackend` rename + 4 consumer 更新
   - ⏳ Golden PSNR gate(50 ケース、≥40dB 45/50)
   - ⏳ 視覚証明(highlight screenshot)
   - ⏳ `phase-3-handoff.md` Entry / Known gotchas 更新
+
+### Phase 2 残作業 kickoff snippet(new chat 用)
+
+```
+作業ディレクトリ: /Volumes/SamsungPortableSSDX5001/documents/forestone/chibatakumi-portfolio
+
+@apps/desktop-film-lab-batch/docs/webgpu-migration/DIRECTION.md と
+@apps/desktop-film-lab-batch/docs/webgpu-migration/phase-2-handoff.md と
+@apps/desktop-film-lab-batch/docs/webgpu-migration/STATUS.md を読んで Phase 2 残作業を実行してください。
+Master plan ~/.claude/plans/sequential-thinking-gemini-web-swirling-prism.md の Day 2 節も確認。
+残: T2-0c (Viewport→WebGLBackend rename + 4 consumer 更新) → Golden PSNR gate 50 ケース → 視覚証明 → phase-3-handoff.md 整備 → Phase 2 完了報告。
+各 task 論理完了時に git add 候補 + commit 文面案を提示 → user 承認を待って commit / push。
+```
 
 ### Kickoff snippet(新規 chat で以下 1 行を貼り付けるだけ)
 
@@ -137,17 +150,27 @@ STATUS.md の先頭が常に次 phase を指すため、**全 phase で同じ sn
   - filmlab.wgsl に Reinhard soft-shaper (k=0.5 fixed) + LUT2 (binding 4) + print CMY cast + print contrast 追加
   - composite.wgsl 新規作成(2 bind group、DIRECTION §10 Phase 2 準拠)。rt.colorGraded + rt.bloom + rt.halation + blue-noise tile + linear/repeat sampler
   - bloom pyramid(5 mip、W/2..W/32)+ halation pyramid(6 mip、W/2..W/64)を prefilter → downsample → additive upsample で wire。per-level uniform buffer を前持ちで allocate して `writeBuffer` 衝突回避
-  - blit pipeline 削除、composite が swap pass を所有
+  - blit pipeline を一旦削除、composite が swap pass を所有(T2-4 で再導入)
   - `bloomRadius` / `halationRadius` envelope は WebGL 同形式の `computeMipWeights`
   - 新規 `compositeUniforms.ts`(3 vec4 packer + `hexToRgbTriple`)
   - film-lab-renderer typecheck clean、desktop tsc 17 errors で regression delta 0、tsup build `index.js` 138KB(`WebGPUBackend` 0 match、tree-shake 維持)/ `webgpu.js` 199KB
+- **T2-4**(commit `1c6e839b`)motion blur 2-pass ring + blit fallback:
+  - `motionblur-feedback.frag.wgsl` — src + ring[prevSlot] を `mix(src, prev, trail * hasPrev)` でリング新スロットへ書き込み。`hasPrev` フラグで初フレーム分岐を単一 pipeline 内で解消
+  - `motionblur-blend.frag.wgsl` — `texture_2d_array<f32>` から 8 層の加重平均。CPU 側で `weights[i]=0 (i>=activeFrames)` に正規化済 → シェーダ内ループ分岐を排除。`motionThreshold > 0` で newest vs oldest 輝度差→ motion mask
+  - WebGPUBackend は composite 出力先を `rt.composited (rgba16float)` に変更、swap pass は `blit`(motion blur OFF)/ `motionblurFeedback + motionblurBlend`(motion blur ON = `shutterAngle > 0`)の 2 経路
+  - `activeMotionBlurFrames(shutterAngle)` / `computeMotionBlurWeights(shutterAngle, activeFrames, validSlots)` は WebGL `getActiveFrameCount` / `computeBlendWeights` と同一式(triangle → box は 360°→720°で flatness 内挿)
+  - RingBuffer(`depthOrArrayLayers=8`, `rgba16float`)を create() で用意、`setResolution` が `ringBuffer.resize` → 8 層 texture 再確保 + `validSlots = 0` リセット
+  - tsup build `index.js` 138KB(0 match、tree-shake 維持)/ `webgpu.js` 208KB、desktop tsc 17 errors で regression delta 0
 
 ### Phase 2 Known gotchas(Phase 2 中で判明、Phase 3 への引継ぎ)
 
-- **GPUQueue.writeBuffer 衝突**: 同一 uniform buffer に複数回 writeBuffer した後 submit すると最終値で上書きされる(ordering は保証されるが submit 前に全 write が適用)。Pyramid の per-level uniform は **level 分だけ buffer を pre-allocate** して回避。T2-4 motion blur でも同じ罠があるので 8 slot 分の uniform buffer を用意する
+- **GPUQueue.writeBuffer 衝突**: 同一 uniform buffer に複数回 writeBuffer した後 submit すると最終値で上書きされる(ordering は保証されるが submit 前に全 write が適用)。Pyramid の per-level uniform は **level 分だけ buffer を pre-allocate** して回避。T2-4 motion blur でも個別 buffer で対応(`motionblurFeedbackBuffer` / `motionblurBlendBuffer` を別々に確保)
 - **`loadOp: "load"` + 加算ブレンド**: bloom/halation pyramid の upsample pass は `loadOp: "load"` で前段の downsample 結果を保持しつつ、`blend: { src: one, dst: one, op: add }` で累積。両方揃わないと単なる上書きになる
 - **`bloomRadius` / `halationRadius` fallback**: params に入っていない場合 0.5 が default(WebGL 同値)。preset 側で明示的に 0 を渡すと mip 全体が sharp 寄りになるので注意
 - **Grain sampler は別途 repeat mode 必須**: 既存の `filtering` sampler は clamp-to-edge。blue-noise tile を 256² でタイリングするには `addressMode: "repeat"` の sampler を bind group の別 binding に入れる
+- **RingBuffer `nextSlot()` は呼び出し時に advance + validSlots++**: `nextSlot()` が返す値は「これから書き込む層 index」。呼び出し後の `validSlots` は increment 済みなので、`hasPrev = validSlots > 1` / `prevSlotIndex = (nextSlot - 1 + 8) % 8` で prev を取る。初フレーム時の prev view は `nextSlot` と同じ層にバインド + `hasPrev=0` で uniform 側からトレイル寄与を 0 化する方が、ダミーテクスチャを別途用意するより簡潔
+- **motion blur 経路で composite 出力先が変わる**: motion blur ON では composite は `rt.composited (rgba16float)` に書く必要があり、従来の「composite → swap」直結ではバックエンド内部で format 変換できない(swap は sample 不可)。T2-4 で `rt.composited` + `blit` fallback pipeline を入れてこの制約を吸収済
+- **2d-array sampler は `viewDimension: "2d-array"` 必須**: bind group layout エントリに `texture: { sampleType: "float", viewDimension: "2d-array" }` を書かないと default(2D)で検証エラー。motion blur blend shader の bind group layout に明示
 
 ### Phase 1 Known gotchas(Phase 2 での活用用)
 
@@ -164,4 +187,4 @@ STATUS.md の先頭が常に次 phase を指すため、**全 phase で同じ sn
 
 ## Last updated
 
-2026-04-18 Phase 2 進行中。T2-1/T2-2/T2-0b/T2-3 着地済(commit `068b7063`, `be754796`)。次: T2-4 motion blur → T2-0c Viewport rename → Golden PSNR gate → 視覚証明。
+2026-04-18 Phase 2 進行中。T2-1 / T2-2 / T2-0b / T2-3 / T2-4 着地済(commit `068b7063`, `be754796`, `1c6e839b`)。**残:** T2-0c Viewport rename → Golden PSNR gate → 視覚証明 → phase-3-handoff 整備。**次チャットは先頭の "Phase 2 残作業 kickoff snippet" を貼るだけで再開可。**
