@@ -27,6 +27,7 @@ export type {
 export {
   fullscreenVertexWgsl,
   filmlabFragmentWgsl,
+  blitFragmentWgsl,
   bloomPrefilterFragmentWgsl,
   halationPrefilterFragmentWgsl,
   downsampleFragmentWgsl,
@@ -35,3 +36,9 @@ export {
   lightshaftsBlendFragmentWgsl,
   dustFragmentWgsl,
 } from "./webgpu/shaders";
+export {
+  packGradeUniforms,
+  GRADE_UNIFORM_BYTES,
+  GRADE_UNIFORM_FLOATS,
+  type GradeFrameState,
+} from "./webgpu/gradeUniforms";
