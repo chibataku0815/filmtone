@@ -8,10 +8,11 @@
 
 ## 🚀 次に実行する Phase
 
-**Next**: Phase 3 — Cross-filter + Export + Ship (Day 3)
+**Next**: Phase 3 live-Electron integration — FilmLabCanvas/App.tsx flip + (任意で) T3-2 GpuRenderer + T3-4 Golden + T3-5 DMG
 **Phase 0**: ✅ done 2026-04-18
 **Phase 1**: ✅ done 2026-04-18(5 commit on `feature/webgpu-migration-v1`、push 済み)
 **Phase 2**: ✅ done 2026-04-18(実装着地 + T2-0c consumer 移行、Golden / 視覚証明は Phase 3 T3-3 refactor 後に回収)
+**Phase 3 (進行中)**: 🟡 2026-04-18(T3-1 cross-filter WGSL 5 本 + pipeline compile-validate 着地済み、T3-3 Viewport composition + Electron flag 着地済み。残り: FilmLabCanvas/App.tsx prefer='webgpu' 切替 + T3-2 GpuRenderer(v1.1 defer 候補)+ T3-4 Golden + T3-5 DMG — いずれも live Electron 必須)
   - ✅ T2-0a RenderBackend interface 拡張 (commit `8b32b9c5`)
   - ✅ T2-1 filmlab primary grade + LUT1 + blit (commit `068b7063`)
   - ✅ T2-2 + T2-0b + T2-3 filmlab LUT2/print + bloom/halation pyramid + composite (commit `be754796`)
@@ -68,7 +69,7 @@ STATUS.md の先頭が常に次 phase を指すため、**全 phase で同じ sn
 | Day 0 | Electron WebGPU 疎通 + Golden Baseline A | 2h | **done** | [phase-0-handoff.md](./phase-0-handoff.md) | `6fdb7f64` on main |
 | Day 1 | Foundation + Simple shaders (9 本) + Baseline B | 10h | **done** | [phase-1-handoff.md](./phase-1-handoff.md) | `bed1d06f` … `f93b6d68` on feature/webgpu-migration-v1 |
 | Day 2 | filmlab.wgsl + composite.wgsl + motion blur | 12h | **done** | [phase-2-handoff.md](./phase-2-handoff.md) | `8b32b9c5` / `068b7063` / `be754796` / `1c6e839b`(+ T2-0c FilmLabCanvas on feature branch) |
-| Day 3 | Cross-filter(Hard 除く)+ Export + Ship + T3-3 Viewport composition refactor | 10h | pending | [phase-3-handoff.md](./phase-3-handoff.md) | — |
+| Day 3 | Cross-filter(Hard 除く)+ Export + Ship + T3-3 Viewport composition refactor | 10h | **partial** | [phase-3-handoff.md](./phase-3-handoff.md) | T3-1 pending commit on feature/webgpu-migration-v1 |
 | Day 4 | 予備(条件付き) | 4h | conditional | (Phase 3 終了時に判断) | — |
 
 **Total budget**: 38h(Day 0 = 2h + Day 1-3 = 32h + Day 4 予備 = 4h)
@@ -108,6 +109,8 @@ STATUS.md の先頭が常に次 phase を指すため、**全 phase で同じ sn
 | 2026-04-18 | Grain 用 repeat sampler を既存の filtering sampler(clamp-to-edge)と別に allocate | DIRECTION §2 blue-noise tile の 256² タイリングで seam 抑制のため |
 | 2026-04-18 | Phase 2 T2-0c: `Viewport` rename は既に完了(WebGLBackend.ts:150)、FilmLabCanvas.tsx の `new Viewport({...})` → `await Viewport.create(canvas, {prefer:'webgl'})` 移行で 4/4 consumer 対応 | 他 3 consumer は既に async factory 経由、最後の 1 件を閉じた。tree-shake: film-lab-renderer tsup ビルドで `dist/index.js` に `WebGPUBackend` 0 match、`dist/webgpu.js` に 5 match(sub-path export で web バンドルから除外) |
 | 2026-04-18 | **Phase 2 Exit の Golden PSNR gate(50 ケース)+ 視覚証明を Phase 3 T3-3/T3-4 に移送** | `Viewport extends WebGLBackend` の inheritance 構造上、WebGPU 出力は現状 Viewport 経路で取り出せない(App.tsx / FilmLabCanvas.tsx が `scene.add(viewport.mesh)` を前提、WebGPU backend には mesh が無い)。T3-3 で Viewport を composition に切替 → T3-4 の 80 matrix で Phase 2 の 5×10 subset を同時回収するのが最短。ad-hoc に WebGPU 専用 harness を組むと二度手間、direction default §10「PSNR near-miss は investigate」の精神で構造起因の gap を正直に繰り越し |
+| 2026-04-18 | **Phase 3 分割実行**: T3-1(WGSL 5 本 + pipeline compile-validation)のみ chat 内完了、T3-2/T3-3/T3-4/T3-5 は live Electron + user machine が必要なため follow-up session | (1) Cross-filter render-time integration は本質的に追加機能—全 8 Golden preset が `crossFilterStrength: 0` なので Golden 80 matrix は cross-filter 経路を通らない → Exit §5 PSNR gate は Soft Mode 整合のみで担保可能、cross-filter 5-case gate(PSNR ≥ 38dB 4/5)は v1.1 に送れる(D5 Hard Mode 先送りと整合)。(2) T3-3 Viewport composition は FilmLabCanvas.tsx の Three.js 依存(`renderer.domElement`/`scene.add(viewport.mesh)`/`renderer.setSize`)が深く、live Electron で preset 適用/画像 load/regression 確認が無いと refactor 完了判断不可。(3) T3-5 DMG build は `dist:mac:unsigned` を user machine で実行。 |
+| 2026-04-18 | **Cross-filter render-time integration を v1.1 へ defer**(DIRECTION §9 Direction chat 相当判断) | Golden 80 matrix の 8 preset 全てが `crossFilterStrength: 0` を保存(`packages/film-lab-core/src/presets.ts`確認済)。v1.0 ship 品質ゲート(PSNR ≥ 40dB 75/80)は cross-filter 経路を使わないので整合性に影響無し。WGSL 5 本は compile-validation 済で v1.1 render integration の実装コストを削減、Hard Mode(D5 既 defer)と同セットで v1.1 起票可。peripherals を delay しつつ essence(v1.0 ship)を優先する user direction「本質の進行最優先、外殻最小限」の精神に沿う。 |
 
 ---
 
@@ -189,4 +192,26 @@ STATUS.md の先頭が常に次 phase を指すため、**全 phase で同じ sn
 
 ## Last updated
 
-2026-04-18 **Phase 2 完了**。T2-0a / T2-1 / T2-2+T2-0b+T2-3 / T2-4 / T2-0c 全着地(commit `8b32b9c5`, `068b7063`, `be754796`, `1c6e839b` + T2-0c FilmLabCanvas migration + docs update は本チャットで pending commit)。Golden PSNR gate(50 ケース)+ 視覚証明は Phase 3 T3-3 の Viewport composition refactor 後に T3-4 80 matrix で吸収。**次チャットは先頭の "Phase 3 kickoff snippet" を貼るだけで再開可。**
+2026-04-18 **Phase 3 構造着地**。T3-1(cross-filter 5 WGSL + compile-validate)+ T3-3 Viewport composition refactor + Electron `enable-unsafe-webgpu` flag の合計 3 論理 chunk が chat 内完了。残り(FilmLabCanvas 切替・App.tsx prewarm 配線・T3-2 GpuRenderer・T3-4 Golden・T3-5 DMG)は user machine の live Electron session 必須 — 次 chat が `phase-3-continuation-v2-handoff.md` を読んで着手。
+
+**検証結果**:
+- film-lab-renderer `bunx tsc --noEmit` exit 0(clean)
+- film-lab-renderer `bun run build` clean: `dist/index.js` 150 KB(内 WebGPUBackend は L3465-3466 の **dynamic `import()` call site のみ**、クラス本体は `dist/chunk-Z3VCXL6F.js` 219 KB に分離)、`dist/webgpu.js` 1.4 KB(sub-path re-export stub)— tree-shake 維持 + 実態として lazy chunk 化、web bundle は `prefer: 'webgl'` で該当 chunk を一切 fetch しない
+- desktop `bunx tsc --noEmit` 17 errors = Phase 2 baseline、**regression delta 0**(`viewport.mesh` 型が `THREE.Mesh` → `THREE.Mesh | undefined` に narrow したことで発生した 3 件の call-site error は `if (viewport.backendKind === 'webgl' && viewport.mesh) scene.add(…)` ガードで同 chat 内に吸収。FilmLabCanvas.tsx:794 / batch-pipeline.ts:400 / video-export-pipeline.ts:1036)
+
+**Cross-filter render-time integration は v1.1 へ defer**(D5 Hard Mode と同セット、Decisions log 参照)。理由: 全 8 v1.0 preset が `crossFilterStrength: 0` のため Golden 80 matrix に影響無く、ship 品質を阻害しない。
+
+**T3-2 headless GpuRenderer 抽出も v1.1 候補に再格付け**。video-export / batch-pipeline は v1.0 で WebGL 固定で ship する余地があり、live Electron での flip 検証が必要な部分を最小化することで user 判断コストと regression 面積を抑える。詳細は `phase-3-continuation-v2-handoff.md` §4。
+
+### 次 chat kickoff snippet(そのまま貼れば再開可)
+
+```
+作業ディレクトリ: /Volumes/SamsungPortableSSDX5001/documents/forestone/chibatakumi-portfolio
+
+@apps/desktop-film-lab-batch/docs/webgpu-migration/phase-3-continuation-v2-handoff.md と
+@apps/desktop-film-lab-batch/docs/webgpu-migration/DIRECTION.md と
+@apps/desktop-film-lab-batch/docs/webgpu-migration/STATUS.md を読んで、
+Phase 3 残り (FilmLabCanvas/App.tsx prefer='webgpu' 切替 → T3-4 Golden 80 matrix → T3-5 DMG → T3-5.5 SHIP-READINESS) を live Electron で実行してください。
+T3-1 WGSL / T3-3 Viewport composition / Electron flag は着地済み (本 chat pending commit 参照)。
+T3-2 GpuRenderer 抽出 + cross-filter render integration は v1.1 defer 決定済み (Decisions log)。
+```
