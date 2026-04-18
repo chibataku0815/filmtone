@@ -14,6 +14,12 @@ export {
   getOptimalPixelRatio,
 } from "./support";
 export type { RenderBackend } from "./webgpu/Backend";
+export { GpuContext, GpuContextCreationError } from "./webgpu/GpuContext";
+export { OffscreenTargetPool } from "./webgpu/OffscreenTargetPool";
+export { Lut3DTexture } from "./webgpu/Lut3DTexture";
+export { MediaTexture } from "./webgpu/MediaTexture";
+export { RingBuffer, MOTION_BLUR_RING_SLOTS } from "./webgpu/RingBuffer";
+export { BlueNoiseTile } from "./webgpu/BlueNoiseTile";
 
 // Shaders
 export { filmlabVertexShader } from "./webgl/shaders/filmlab.vert";
