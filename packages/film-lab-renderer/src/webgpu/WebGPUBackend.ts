@@ -59,6 +59,11 @@ import {
   dustFragmentWgsl,
   motionblurFeedbackFragmentWgsl,
   motionblurBlendFragmentWgsl,
+  crossFilterPeakFragmentWgsl,
+  crossFilterPeakSpacingMaxFragmentWgsl,
+  crossFilterPeakSpacingFragmentWgsl,
+  crossFilterStreakFragmentWgsl,
+  crossFilterBlendFragmentWgsl,
 } from "./shaders";
 import {
   GRADE_UNIFORM_BYTES,
@@ -112,6 +117,11 @@ interface ShaderModules {
   dust: GPUShaderModule;
   motionblurFeedback: GPUShaderModule;
   motionblurBlend: GPUShaderModule;
+  crossFilterPeak: GPUShaderModule;
+  crossFilterPeakSpacingMax: GPUShaderModule;
+  crossFilterPeakSpacing: GPUShaderModule;
+  crossFilterStreak: GPUShaderModule;
+  crossFilterBlend: GPUShaderModule;
 }
 
 interface Pipelines {
@@ -275,6 +285,21 @@ export class WebGPUBackend implements RenderBackend {
       dust: await make("dust.frag", dustFragmentWgsl),
       motionblurFeedback: await make("motionblur-feedback.frag", motionblurFeedbackFragmentWgsl),
       motionblurBlend: await make("motionblur-blend.frag", motionblurBlendFragmentWgsl),
+      // Cross-filter chain (Phase 3 T3-1). Compile-validated here so
+      // GPU-side WGSL correctness is guaranteed at backend init; runtime
+      // render integration lives in `renderCrossFilter` (no-op when
+      // crossFilterStrength === 0 — all 8 v1.0 presets ship with 0).
+      crossFilterPeak: await make("cross-filter-peak.frag", crossFilterPeakFragmentWgsl),
+      crossFilterPeakSpacingMax: await make(
+        "cross-filter-peak-spacing-max.frag",
+        crossFilterPeakSpacingMaxFragmentWgsl,
+      ),
+      crossFilterPeakSpacing: await make(
+        "cross-filter-peak-spacing.frag",
+        crossFilterPeakSpacingFragmentWgsl,
+      ),
+      crossFilterStreak: await make("cross-filter-streak.frag", crossFilterStreakFragmentWgsl),
+      crossFilterBlend: await make("cross-filter-blend.frag", crossFilterBlendFragmentWgsl),
     };
 
     const flagsLayout = device.createBindGroupLayout({

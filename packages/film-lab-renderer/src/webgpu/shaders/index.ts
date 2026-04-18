@@ -19,3 +19,8 @@ export { blitFragmentWgsl } from "./blit.frag.wgsl";
 export { compositeFragmentWgsl } from "./composite.frag.wgsl";
 export { motionblurFeedbackFragmentWgsl } from "./motionblur-feedback.frag.wgsl";
 export { motionblurBlendFragmentWgsl } from "./motionblur-blend.frag.wgsl";
+export { crossFilterPeakFragmentWgsl } from "./cross-filter-peak.frag.wgsl";
+export { crossFilterPeakSpacingMaxFragmentWgsl } from "./cross-filter-peak-spacing-max.frag.wgsl";
+export { crossFilterPeakSpacingFragmentWgsl } from "./cross-filter-peak-spacing.frag.wgsl";
+export { crossFilterStreakFragmentWgsl } from "./cross-filter-streak.frag.wgsl";
+export { crossFilterBlendFragmentWgsl } from "./cross-filter-blend.frag.wgsl";
