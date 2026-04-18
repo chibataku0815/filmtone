@@ -118,6 +118,12 @@ export default defineConfig(({ mode }) => {
         JSON.stringify(debugVideoExportTruth),
       "import.meta.env.VITE_FILM_LAB_VERBOSE_VIDEO_EXPORT":
         JSON.stringify(verboseVideoExportTruth),
+      /**
+       * @description Phase 1 T1-1: Filmtone backend select — desktop defaults to WebGPU.
+       *   `WebGPUBackend` は dynamic import で載り、web ビルドでは `"webgl"` 固定により
+       *   tree-shake される。runtime の adapter probe 失敗時は自動で WebGL にフォールバック。
+       */
+      "import.meta.env.FILMTONE_BACKEND": JSON.stringify("webgpu"),
     },
     plugins: [react()],
     build: {
