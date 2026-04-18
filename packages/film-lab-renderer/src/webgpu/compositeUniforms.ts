@@ -1,17 +1,18 @@
 /**
  * compositeUniforms — TS packer for the composite.wgsl `Composite` struct.
  *
- * Phase 2 T2-3. Mirrors the 3-vec4 layout defined in
- * `shaders/composite.frag.wgsl.ts`. Numeric params fall back to neutral
+ * Phase 2 T2-3 + v1.0 parity (2026-04-19). Mirrors the 4-vec4 layout defined
+ * in `shaders/composite.frag.wgsl.ts`. Numeric params fall back to neutral
  * defaults so a partial params record still yields a valid upload.
  *
- * Layout (3 vec4 × 4 floats = 12 floats = 48 bytes):
+ * Layout (4 vec4 × 4 floats = 16 floats = 64 bytes):
  *   0: (resolutionX, resolutionY, imageResX, imageResY)
  *   1: (bloomStrength, halationIntensity, vignette, grainIntensity)
  *   2: (grainSize, grainRadialMix, fitMode, time)
+ *   3: (lensSoftness, aberrationEdgeSoften, _, _)
  */
 
-export const COMPOSITE_UNIFORM_FLOATS = 12;
+export const COMPOSITE_UNIFORM_FLOATS = 16;
 export const COMPOSITE_UNIFORM_BYTES = COMPOSITE_UNIFORM_FLOATS * 4;
 
 export interface CompositeFrameState {
@@ -49,6 +50,10 @@ export function packCompositeUniforms(
   out[9] = n("grainRadialMix", 1);
   out[10] = state.fitMode;
   out[11] = state.time;
+  out[12] = n("lensSoftness", 0);
+  out[13] = n("aberrationEdgeSoften", 0);
+  out[14] = 0;
+  out[15] = 0;
   return out;
 }
 

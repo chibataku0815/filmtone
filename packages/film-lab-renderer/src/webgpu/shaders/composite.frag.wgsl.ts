@@ -2,20 +2,35 @@
  * composite.frag (WGSL) — Phase 2 T2-3 final display pass.
  *
  * Inputs: `uSource` (filmlab output, rgba16float), `uBloom` + `uHalation`
- * (accumulated pyramid outputs, rgba16float), `uGrain` (256×256 r8unorm
- * blue-noise tile sampled with a repeat sampler). Output goes straight to
- * the swap chain (`rgba8unorm-srgb`) so the hardware OETF handles the
+ * (accumulated pyramid outputs, rgba16float). Output goes straight to the
+ * swap chain (`rgba8unorm-srgb`) so the hardware OETF handles the
  * linear→sRGB transform — no in-shader gamma math.
  *
- * Scope for v1.0 commit bundle (T2-0b + T2-3):
+ * v1.0 parity port (2026-04-19):
  *   - Bloom + halation screen-blend with soft shoulder (WebGL parity).
+ *   - **Bloom/halation are sampled with flipped uv.y**. The procedural
+ *     fullscreen vertex shader derives uv from NDC y (`y*0.5 + 0.5`), which
+ *     inverts texture rows once per render pass. The base reaches the swap
+ *     chain after an even number of passes (media upload + filmlab +
+ *     composite + blit); bloom/halation reach the swap chain after an odd
+ *     number of passes (media + filmlab + prefilter + …pyramid… + composite
+ *     + blit) and therefore arrive mirrored along y relative to the base.
+ *     Sampling them at `(uv.x, 1.0 - uv.y)` re-aligns the glow with the
+ *     base image without touching the pyramid or any upstream orientation.
  *   - Image-space vignette.
- *   - Blue-noise grain (DIRECTION §2: pre-baked tile, no per-pixel hash).
- *     Radial weighting mirrors the WebGL `uGrainRadialMix` pattern.
+ *   - **Per-pixel grain** — WebGL parity: silver-halide per-pixel hash, per
+ *     channel chroma/luma separation, low-frequency clump noise density
+ *     modulation, and 3 Hz temporal stepping. Replaces the earlier blue-
+ *     noise tile sampler (which looked too uniform / "smooth" to the user).
+ *   - **Lens softness + aberration edge soften** — WebGL parity: 8-tap
+ *     cross+diagonal blur on `uSource`, mixed into the base via an edge
+ *     mask whose weight follows `uLensSoftness` and `uAberrationEdgeSoften`.
+ *     Reproduces the WebGL "film-lens soft periphery" behaviour.
  *
- * Deferred (Phase 3):
- *   - Split/A-B compare, diffusion (lazy 3-mip), lens softness blur,
- *     aberration edge soften, motion blur feedback, dust overlay.
+ * Deferred:
+ *   - Split / A-B compare, diffusion (lazy 3-mip), motion blur feedback
+ *     (handled upstream in the backend), dust overlay, cross-filter
+ *     streaks / shafts.
  *
  * Bind group layout (DIRECTION §10 Phase 2 — 2 bind groups):
  *   - group(0) — frame flags (`vec4f`, currently unused here but kept
@@ -25,9 +40,14 @@
  *     binding(1) uSource    : texture_2d<f32>   (rt.colorGraded)
  *     binding(2) uBloom     : texture_2d<f32>   (rt.bloom full-res mip[0])
  *     binding(3) uHalation  : texture_2d<f32>   (rt.halation full-res mip[0])
- *     binding(4) uGrain     : texture_2d<f32>   (blue-noise 256² tile)
+ *     binding(4) uGrain     : texture_2d<f32>   (legacy blue-noise tile,
+ *                                                kept in the layout for
+ *                                                compatibility; unused by
+ *                                                the shader body now that
+ *                                                grain is per-pixel).
  *     binding(5) uSampler   : sampler           (linear, clamp-to-edge)
- *     binding(6) uGrainSamp : sampler           (linear, repeat)
+ *     binding(6) uGrainSamp : sampler           (linear, repeat — also
+ *                                                kept for layout parity).
  */
 export const compositeFragmentWgsl = /* wgsl */ `
 struct Composite {
@@ -37,6 +57,8 @@ struct Composite {
   effects: vec4f,
   // (grainSize, grainRadialMix, fitMode, time)
   grainFit: vec4f,
+  // (lensSoftness, aberrationEdgeSoften, _, _)
+  lens: vec4f,
 };
 
 @group(1) @binding(0) var<uniform> uComposite: Composite;
@@ -86,6 +108,33 @@ fn glowHeadroom(baseRgb: vec3f, floorValue: f32) -> f32 {
   return mix(floorValue, 1.0, k);
 }
 
+// --- Film grain (WebGL parity) ---
+//
+// Per-pixel hash: sharp, random, no grid artifacts — reproduces the sharp
+// silver-halide look. Ported verbatim from webgl/shaders/composite.frag.ts.
+fn grainPixelHash(p: vec2f, seed: f32) -> f32 {
+  let s = sin(dot(p + vec2f(seed), vec2f(12.9898, 78.233))) * 43758.5453;
+  return fract(s) - 0.5;
+}
+
+// Low-frequency smooth noise for grain density modulation (clumping).
+fn grainClumpHash(p: vec2f) -> f32 {
+  var p3 = fract(vec3f(p.x, p.y, p.x) * 0.1031);
+  p3 = p3 + vec3f(dot(p3, p3.yzx + vec3f(33.33)));
+  return fract((p3.x + p3.y) * p3.z);
+}
+
+fn grainClumpNoise(p: vec2f) -> f32 {
+  let i = floor(p);
+  var f = fract(p);
+  f = f * f * (vec2f(3.0) - 2.0 * f);
+  let a = grainClumpHash(i);
+  let b = grainClumpHash(i + vec2f(1.0, 0.0));
+  let c = grainClumpHash(i + vec2f(0.0, 1.0));
+  let d = grainClumpHash(i + vec2f(1.0, 1.0));
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
 @fragment
 fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
   let resolution = uComposite.resolution.xy;
@@ -97,13 +146,53 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
   let grainSize = uComposite.grainFit.x;
   let grainRadialMix = uComposite.grainFit.y;
   let fitMode = uComposite.grainFit.z;
+  let time = uComposite.grainFit.w;
+  let lensSoftness = clamp(uComposite.lens.x, 0.0, 1.0);
+  let aberrationEdgeSoften = clamp(uComposite.lens.y, 0.0, 1.0);
 
-  var color = textureSampleLevel(uSource, uSampler, uv, 0.0);
+  // --- Lens softness + aberration edge soften (WebGL parity) ---
+  // Edge mask weighting: periphery gets more of the 8-tap blur. Cardinal
+  // vs diagonal directions are both used (8 taps total) to keep the soft
+  // periphery isotropic instead of X-shaped.
+  var edgeDelta = uv - vec2f(0.5);
+  edgeDelta.x = edgeDelta.x * (resolution.x / max(resolution.y, 1.0));
+  let edgeR = clamp(length(edgeDelta) * 1.414, 0.0, 1.0);
+  let edgeMask = smoothstep(0.25, 1.0, edgeR);
+  let sharpRgb = textureSampleLevel(uSource, uSampler, uv, 0.0).rgb;
+  let lensR = clamp(length(edgeDelta) * 2.0, 0.0, 1.0);
+  let lensW = pow(lensR, 1.52);
+  // γ < 1 so mid-slider positions stay visible (matches WebGL).
+  let lensDrive = pow(lensSoftness, 0.78);
+  let lensWeight = clamp(lensDrive * lensW, 0.0, 1.0);
+  // Blur radius grows with aberration + lens softness. Capped to 4.2 px so
+  // we don't smear fine detail even at slider 1.0.
+  var blurRadiusPx = mix(1.5, 2.75, aberrationEdgeSoften) + lensWeight * 1.35;
+  blurRadiusPx = min(blurRadiusPx, 4.2);
+  let px = vec2f(1.0 / max(resolution.x, 1.0), 1.0 / max(resolution.y, 1.0)) * blurRadiusPx;
+  let diag = px * 0.70710678;
+  let blurRgb = (
+      textureSampleLevel(uSource, uSampler, uv + vec2f(px.x, 0.0), 0.0).rgb
+    + textureSampleLevel(uSource, uSampler, uv - vec2f(px.x, 0.0), 0.0).rgb
+    + textureSampleLevel(uSource, uSampler, uv + vec2f(0.0, px.y), 0.0).rgb
+    + textureSampleLevel(uSource, uSampler, uv - vec2f(0.0, px.y), 0.0).rgb
+    + textureSampleLevel(uSource, uSampler, uv + vec2f(diag.x,  diag.y), 0.0).rgb
+    + textureSampleLevel(uSource, uSampler, uv + vec2f(diag.x, -diag.y), 0.0).rgb
+    + textureSampleLevel(uSource, uSampler, uv + vec2f(-diag.x,  diag.y), 0.0).rgb
+    + textureSampleLevel(uSource, uSampler, uv + vec2f(-diag.x, -diag.y), 0.0).rgb
+  ) * 0.125;
+  let lensMix = lensWeight * 0.72;
+  let softenAmt = clamp(aberrationEdgeSoften * edgeMask + lensMix * edgeMask, 0.0, 1.0);
+  var color = vec4f(mix(sharpRgb, blurRgb, softenAmt), 1.0);
   let baseRgb = color.rgb;
 
   // Bloom + halation screen-blend with soft shoulder (WebGL parity).
-  let bloom = textureSampleLevel(uBloom, uSampler, uv, 0.0).rgb * bloomStrength;
-  let halation = textureSampleLevel(uHalation, uSampler, uv, 0.0).rgb * halationIntensity;
+  // Sample with flipped uv.y: bloom/halation accumulate an odd number of
+  // fullscreen render passes relative to uSource, so their texture rows
+  // arrive inverted along y. This single y-flip at sample time re-aligns
+  // them with the base without touching the pyramid or the vertex shader.
+  let glowUv = vec2f(uv.x, 1.0 - uv.y);
+  let bloom = textureSampleLevel(uBloom, uSampler, glowUv, 0.0).rgb * bloomStrength;
+  let halation = textureSampleLevel(uHalation, uSampler, glowUv, 0.0).rgb * halationIntensity;
   let glow = glowShoulder(bloom + halation) * glowHeadroom(baseRgb, 0.82);
   color = vec4f(vec3f(1.0) - (vec3f(1.0) - color.rgb) * (vec3f(1.0) - glow), color.a);
 
@@ -114,25 +203,45 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
   let vig = 1.0 - vignette * dist * dist;
   color = vec4f(color.rgb * mix(1.0, clamp(vig, 0.0, 1.0), vigMask), color.a);
 
-  // Grain — blue-noise tile, radial weight, 256² repeat sampling.
+  // --- Grain: per-pixel hash + per-channel chroma/luma + clump + 3 Hz temporal ---
   let grainCenterUv = fitUv(uv, resolution, imageResolution, fitMode);
   let grainBoundaryMask = insideUv(grainCenterUv);
   var grainDelta = grainCenterUv - vec2f(0.5);
   grainDelta.x = grainDelta.x * (imageResolution.x / max(imageResolution.y, 1.0));
   let grainRadial = clamp(length(grainDelta) * 2.0, 0.0, 1.0);
-  // grainSize [0..1] modulates the effective radial fall-off exponent: at 0
-  // (fine Velvia) the weight reaches mid-frame earlier, at 1 (clumpy HP5)
-  // the grain concentrates at the edges. WebGL uses per-pixel hash + a
-  // density clump; here the blue-noise tile already supplies even-dist
-  // high-freq noise, so size just reshapes the radial envelope.
-  let grainRadialWeight = pow(grainRadial, mix(1.2, 2.4, clamp(grainSize, 0.0, 1.0)));
+  let grainRadialWeight = pow(grainRadial, 1.65);
   let grainRadialEffective = mix(1.0, grainRadialWeight, clamp(grainRadialMix, 0.0, 1.0));
-  // Tile sampling — wrap via repeat sampler. 256² covers ~2k×1k frame in
-  // 8×4 repeats, visually indistinguishable from per-pixel noise.
-  let tileUv = uv * resolution / 256.0;
-  let grainSample = textureSampleLevel(uGrain, uGrainSampler, tileUv, 0.0).r - 0.5;
-  let grainWeight = grainIntensity * 0.5 * grainRadialEffective * grainBoundaryMask;
-  color = vec4f(color.rgb + vec3f(grainSample) * grainWeight, color.a);
+
+  // 3 Hz temporal stepping: each "grain frame" holds a stable pattern for
+  // ~0.33 s — still images feel stable, video feels projected.
+  let grainFrame = floor(time * 3.0);
+
+  // Per-pixel hash keyed in absolute pixel coords so granularity is tied to
+  // the presented resolution, not the image-space uv.
+  let pixCoord = uv * resolution;
+  let lumaGrain = grainPixelHash(pixCoord, grainFrame * 1.7);
+  let chromaR = grainPixelHash(pixCoord, grainFrame * 2.3 + 500.0) * 0.3;
+  let chromaB = grainPixelHash(pixCoord, grainFrame * 3.1 + 1000.0) * 0.3;
+
+  // Clump density modulation: grainSize=0 → uniform fine grain, =1 →
+  // pronounced clusters. clumpScale shrinks the zones as size grows.
+  let grainSizeClamped = clamp(grainSize, 0.0, 1.0);
+  let clumpScale = mix(80.0, 20.0, grainSizeClamped);
+  let clump = grainClumpNoise(uv * resolution / clumpScale + vec2f(grainFrame * 0.5));
+  let densityMod = mix(1.0, 0.3 + clump * 1.4, grainSizeClamped * 0.7);
+
+  let grainWeight = grainIntensity * 0.5 * grainRadialEffective * grainBoundaryMask * densityMod;
+  var rgb = color.rgb;
+  rgb.r = rgb.r + (lumaGrain + chromaR) * grainWeight;
+  rgb.g = rgb.g + lumaGrain * grainWeight;
+  rgb.b = rgb.b + (lumaGrain + chromaB) * grainWeight;
+  color = vec4f(clamp(rgb, vec3f(0.0), vec3f(1.0)), color.a);
+
+  // Keep legacy grain bindings live so the pipeline layout matches the
+  // bind-group entries set up in WebGPUBackend. Sampled but scaled to 0 so
+  // it contributes nothing to the output.
+  let legacyTile = textureSampleLevel(uGrain, uGrainSampler, uv, 0.0).r;
+  color = vec4f(color.rgb + vec3f(legacyTile) * 0.0, color.a);
 
   // rgba8unorm-srgb handles the final clamp + OETF automatically.
   return vec4f(color.rgb, 1.0);
