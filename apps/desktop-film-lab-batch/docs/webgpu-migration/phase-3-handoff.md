@@ -168,6 +168,90 @@ bun run dist:mac:unsigned
 
 ---
 
+### T3-5.5. SHIP-READINESS.md 自動生成 (15min) [commit 5]
+
+**目的**: v1.0 ship 判断のために、user が**この 1 ファイルだけ読めば決められる**状態にする。
+
+生成先: `apps/desktop-film-lab-batch/docs/webgpu-migration/SHIP-READINESS.md`
+
+Phase 3 chat が以下フォーマットで自動生成(値は実測値に差し替え):
+
+```md
+# Filmtone v1.0.0 — Ship Readiness Report
+
+**Generated**: {ISO timestamp}
+**Branch**: `feature/webgpu-migration-v1`
+**Commits in branch**: {n}
+**DMG**: `apps/desktop-film-lab-batch/release/Filmtone-1.0.0-arm64.dmg` ({size} MB)
+
+## Auto checks
+- [{✓/✗}] `bun run typecheck` pass
+- [{✓/✗}] `bun run test` pass ({n} tests)
+- [{✓/✗}] `bun run smoke:smart-look-pending` pass
+- [{✓/✗}] `bun run build` pass
+- [{✓/✗}] `bun run dist:mac:unsigned` produced DMG
+
+## Golden 80 matrix (vs Baseline B)
+- Pass ≥ 40dB: **{n}/80**
+- Fail (< 40dB): {n}/80
+- 失敗ケース一覧:
+  - {preset}/{image}: PSNR={dB}(理由: {linear pipeline 期待差 / 要調査})
+- Screenshots: `docs/webgpu-migration/assets/highlight-proof/` に {n} 枚
+
+## 視覚証明(v1.0 promise)
+- 高 DR サンプル 3 枚で LUT2 出力の highlight gradient 改善を確認:
+  - `sunset.jpg` + preset A: before / after 画像 {link}
+  - `backlit-portrait.jpg` + preset B: {link}
+  - `white-dress.jpg` + preset C: {link}
+
+## Manual QA(Phase 3 chat 実施済み)
+- [{✓/✗}] DMG install + 起動 + 画像 load + preset 切替(3 種)
+- [{✓/✗}] Video export 1 本 完走
+- [{✓/✗}] smart-look 1 回 正常
+- [{✓/✗}] クラッシュ無し(10 min 操作)
+
+## Known issues deferred to v1.1+
+- Cross-filter Hard Mode temporal(v1.1 予定、UI はグレーアウト)
+- apps/web の WebGPU 化(v1.3 予定、現状は WebGL 継続)
+- HDR / P3 出力(v2.0 ロードマップ)
+
+## Regressions accepted
+- {list, each with rationale; empty if none}
+
+## Recommendation
+
+**Phase 3 chat 判定**: **{ship-ready / hold / needs-review}**
+
+理由: {1-2 行}
+
+## User action
+
+### Ship 承認の場合
+```bash
+git checkout main
+git pull
+git merge --no-ff feature/webgpu-migration-v1 -m "Release v1.0.0: WebGPU migration"
+git push origin main
+# その後 signed DMG build:
+cd apps/desktop-film-lab-batch
+bun run dist:mac:release  # notarize 含む、10-20 min
+bun run release:staple
+bun run release:checksums
+bun run release:upload-blob
+bun run release:upload-update-meta
+```
+
+### Hold の場合
+direction chat に以下貼り付け:
+> SHIP-READINESS レビュー結果: hold。{理由 1-2 行}。Day 4 発動して {対処内容}。
+```
+
+**User の判断コスト**: この単一ファイルを 5-10 分で読む → "merge" or "hold" の 1 択。
+
+**Commit 案**: `Generate SHIP-READINESS report for v1.0.0 go/no-go`
+
+---
+
 ### T3-6. buffer + Day 4 判断 (1h)
 
 - STATUS.md に Phase 3 → done、Day 4 判断(実施 / skip)

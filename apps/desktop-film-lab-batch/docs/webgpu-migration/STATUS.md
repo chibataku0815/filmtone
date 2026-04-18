@@ -8,10 +8,20 @@
 
 ## 現在フェーズ
 
-**Phase 0 — Electron WebGPU 疎通 + Golden Baseline A** (**done** 2026-04-18)
+**Phase 0**: ✅ done 2026-04-18(commit は user 承認待ち)
+**Pending**: Phase 1 — Foundation + Simple shaders (Day 1)
 
-Phase 1 を新規チャットで実行:
-> `@apps/desktop-film-lab-batch/docs/webgpu-migration/DIRECTION.md` と `@apps/desktop-film-lab-batch/docs/webgpu-migration/phase-1-handoff.md` を読んで Phase 1 を実行してください
+### Kickoff snippet(新規 chat で貼付)
+
+```
+@apps/desktop-film-lab-batch/docs/webgpu-migration/DIRECTION.md と @apps/desktop-film-lab-batch/docs/webgpu-migration/phase-1-handoff.md を読んで Phase 1 を実行してください。
+```
+
+### Phase 1 以降の運用
+
+- Git: **自動 commit 禁止**(DIRECTION §7 / life CLAUDE.md §11)。Phase chat は commit msg 案を提示、user が実行
+- Phase chat は §10 Decision Defaults を即適用、tactical で迷ったら "【Direction 判断要請】" 書式で direction chat へ
+- Phase 完了時、STATUS.md 更新 + 完了報告 1 段落を user に出す
 
 ---
 

@@ -93,9 +93,10 @@ Reference: `/Users/chibatakumi/.claude/projects/-Volumes-SamsungPortableSSDX5001
 - Day 0 疎通失敗時は計画全体を見直す(WebGPU 路線自体の再検討)
 
 ### Git
-- **自動 commit 禁止**。ユーザーが最終確認して commit/push
-- Phase 論理完了時にステージング提案 → 確認取って commit 文面作成
-- Co-Authored-By 必須
+- **自動 commit 禁止**(life CLAUDE.md §11 に従う)
+- Phase 論理完了時にステージング提案 → user が最終確認して commit/push
+- Co-Authored-By 必須: `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>`
+- Phase chat は `git add` 候補 + commit 文面案を提示するのみ、実行は user
 
 ### Handoff 引き継ぎ
 各 phase 終了時、**次 phase の `phase-N-handoff.md` を書く**:
