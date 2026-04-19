@@ -808,6 +808,243 @@ declare const filmLookSpikeDefaultProps: FilmLookSpikeInputProps;
 declare function createDefaultFilmLookGradeProps(): FilmLookGradeInputProps;
 declare const filmLookGradeDefaultProps: FilmLookGradeInputProps;
 
+declare const QUICK_AXIS_IDS: readonly ["filmCharacter", "era", "dynamics"];
+type QuickAxisId = (typeof QUICK_AXIS_IDS)[number];
+type QuickState = Record<QuickAxisId, number>;
+interface Phase0QuickTarget {
+    exposure: number;
+    contrast: number;
+    saturation: number;
+    temperature: number;
+    tint: number;
+    fade: number;
+    vignette: number;
+    grainIntensity: number;
+}
+declare const QUICK_AXIS_DEFAULT_RANGE: {
+    readonly min: -1;
+    readonly max: 1;
+    readonly step: 0.01;
+};
+declare const DEFAULT_QUICK_STATE: QuickState;
+declare const quickStateSchema: z.ZodObject<{
+    [x: string]: z.core.$ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>>;
+}, z.core.$strip>;
+declare function coerceQuickState(input: Partial<Record<QuickAxisId, number>> | null | undefined): QuickState;
+declare function applyQuickStateToParams(base: Params, state: QuickState): Params;
+declare function applyQuickStateToPhase0Params<T extends Phase0QuickTarget>(base: T, state: QuickState): T;
+
+declare const PHASE0_SCHEMA_VERSION: 1;
+declare const PHASE0_PRESET_DEFAULT = "cinematic";
+declare const PHASE0_PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "fade", "vignette", "grainIntensity"];
+type Phase0ParamKey = (typeof PHASE0_PARAM_KEYS)[number];
+type Phase0Params = Pick<Params, Phase0ParamKey>;
+declare const PHASE0_MAX_SOURCE_DURATION_SEC: number;
+declare const PHASE0_APPROX_SOURCE_LONG_EDGE_MAX = 3840;
+declare const PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES: number;
+declare const PHASE0_OUTPUT_PROFILE: {
+    readonly longEdge: 1920;
+    readonly fps: 30;
+    readonly codec: "h264";
+    readonly container: "mp4";
+    readonly preserveAudio: true;
+};
+type Phase0OutputProfile = typeof PHASE0_OUTPUT_PROFILE;
+declare const PHASE0_BENCHMARK_GATES: {
+    readonly passRealtimeRatio: 2.5;
+    readonly strongGoRealtimeRatio: 2;
+    readonly noGoRealtimeRatio: 3;
+};
+declare const phase0ParamsSchema: z.ZodObject<{
+    exposure: z.ZodDefault<z.ZodNumber>;
+    contrast: z.ZodDefault<z.ZodNumber>;
+    saturation: z.ZodDefault<z.ZodNumber>;
+    temperature: z.ZodDefault<z.ZodNumber>;
+    tint: z.ZodDefault<z.ZodNumber>;
+    fade: z.ZodDefault<z.ZodNumber>;
+    vignette: z.ZodDefault<z.ZodNumber>;
+    grainIntensity: z.ZodDefault<z.ZodNumber>;
+}, z.core.$strip>;
+declare const phase0QuickStateSchema: z.ZodObject<{
+    filmCharacter: z.ZodNumber;
+    era: z.ZodNumber;
+    dynamics: z.ZodNumber;
+}, z.core.$strip>;
+declare const phase0ProjectLutSchema: z.ZodObject<{
+    title: z.ZodString;
+    size: z.ZodNumber;
+    data: z.ZodArray<z.ZodNumber>;
+    intensity: z.ZodDefault<z.ZodNumber>;
+}, z.core.$strip>;
+declare const phase0ProjectSchema: z.ZodObject<{
+    schemaVersion: z.ZodLiteral<1>;
+    projectId: z.ZodString;
+    createdAt: z.ZodString;
+    updatedAt: z.ZodString;
+    presetName: z.ZodString;
+    quickState: z.ZodDefault<z.ZodObject<{
+        filmCharacter: z.ZodNumber;
+        era: z.ZodNumber;
+        dynamics: z.ZodNumber;
+    }, z.core.$strip>>;
+    params: z.ZodObject<{
+        exposure: z.ZodDefault<z.ZodNumber>;
+        contrast: z.ZodDefault<z.ZodNumber>;
+        saturation: z.ZodDefault<z.ZodNumber>;
+        temperature: z.ZodDefault<z.ZodNumber>;
+        tint: z.ZodDefault<z.ZodNumber>;
+        fade: z.ZodDefault<z.ZodNumber>;
+        vignette: z.ZodDefault<z.ZodNumber>;
+        grainIntensity: z.ZodDefault<z.ZodNumber>;
+    }, z.core.$strip>;
+    lut: z.ZodDefault<z.ZodNullable<z.ZodObject<{
+        title: z.ZodString;
+        size: z.ZodNumber;
+        data: z.ZodArray<z.ZodNumber>;
+        intensity: z.ZodDefault<z.ZodNumber>;
+    }, z.core.$strip>>>;
+    output: z.ZodObject<{
+        longEdge: z.ZodLiteral<1920>;
+        fps: z.ZodLiteral<30>;
+        codec: z.ZodLiteral<"h264">;
+        container: z.ZodLiteral<"mp4">;
+        preserveAudio: z.ZodDefault<z.ZodBoolean>;
+    }, z.core.$strip>;
+}, z.core.$strip>;
+type Phase0ProjectLut = z.infer<typeof phase0ProjectLutSchema>;
+type Phase0ProjectState = z.infer<typeof phase0ProjectSchema>;
+declare function pickPhase0Params(params: Params): Phase0Params;
+declare function createDefaultPhase0Params(presetName?: PresetName): Phase0Params;
+declare function mergePhase0Params(base: Phase0Params, patch: Partial<Phase0Params>): Phase0Params;
+declare function createPhase0ProjectState(presetName?: PresetName): Phase0ProjectState;
+
+type SourceKind = "image" | "video";
+interface SourceInfo {
+    uri: string;
+    filename: string;
+    kind: SourceKind;
+    mimeType?: string;
+}
+interface SourceProbe extends SourceInfo {
+    width?: number;
+    height?: number;
+    durationSec?: number;
+    fileSizeBytes?: number;
+    codec?: string;
+    frameRate?: number;
+}
+interface ParsedCubeLut {
+    title: string;
+    size: number;
+    data: number[];
+    intensity: number;
+}
+interface PickedLutFile {
+    filename: string;
+    text: string;
+    uri?: string;
+}
+type Phase0ExportStage = "preflight" | "reading" | "rendering" | "writing" | "completed";
+interface Phase0ExportRequest {
+    sourceUri: string;
+    sourceKind: SourceKind;
+    sourceProbe?: SourceProbe;
+    output: Phase0OutputProfile;
+    grade: {
+        presetName: PresetName | string;
+        presetVersion: typeof PRESET_VERSION;
+        quickState: QuickState;
+        params: Phase0Params;
+    };
+    inputLut: ParsedCubeLut | null;
+    creativeLut: ParsedCubeLut | null;
+}
+interface Phase0ExportProgress {
+    stage: Phase0ExportStage;
+    progress: number;
+    currentFrame?: number;
+    totalFrames?: number;
+    message?: string;
+}
+interface Phase0ExportResult {
+    outputUri: string;
+    elapsedMs: number;
+    outputWidth: number;
+    outputHeight: number;
+    outputFps: number;
+    fileSizeBytes?: number;
+    realtimeRatio?: number;
+    audioPreserved?: boolean;
+    benchmarkRecord?: Phase0ExportBenchmarkRecord;
+}
+interface Phase0ExportBenchmarkRecord {
+    appVersion: string;
+    buildNumber: string;
+    deviceModel: string;
+    iosVersion: string;
+    sourceCodec?: string;
+    sourceResolution?: string;
+    sourceDurationSec?: number;
+    outputFileSizeBytes?: number;
+    elapsedMs: number;
+    realtimeRatio?: number;
+    thermalState?: string;
+    memoryWarningCount?: number;
+    permissionResult?: string;
+    saveToPhotosOk?: boolean;
+    errorDomain?: string;
+    errorCode?: string;
+}
+declare function serializeCubeLut(lut: CubeLUT, options?: {
+    title?: string;
+    intensity?: number;
+}): ParsedCubeLut;
+declare function deserializeCubeLutData(lut: ParsedCubeLut): Float32Array;
+declare function getPhase0SourceCapViolations(probe: SourceProbe): string[];
+declare function assertPhase0SourceProbeWithinCaps(probe: SourceProbe): void;
+declare function buildPhase0ExportRequest(options: {
+    source: SourceInfo;
+    probe?: SourceProbe | null;
+    project: Pick<Phase0ProjectState, "presetName" | "quickState" | "params" | "lut">;
+    output?: Partial<Phase0OutputProfile>;
+}): Phase0ExportRequest;
+
+type BenchmarkVisualFloor = "pass" | "fail" | "not-checked";
+type BenchmarkSaveResult = "ok" | "fail" | "not-run";
+interface BenchmarkRow {
+    date: string;
+    deviceModel: string;
+    iosVersion: string;
+    clipId: string;
+    inputResolution: string;
+    outputResolution: string;
+    realtimeRatio: number | null;
+    fileSizeMb: number | null;
+    thermalState: string;
+    memoryWarningCount: number;
+    saveResult: BenchmarkSaveResult;
+    visualFloor: BenchmarkVisualFloor;
+    errorDomain: string | null;
+    errorCode: string | null;
+    durationSec: number | null;
+}
+interface BenchmarkRowInput {
+    result: Phase0ExportResult;
+    benchmark: Phase0ExportBenchmarkRecord;
+    probe?: SourceProbe | null;
+    clipId: string;
+    visualFloor: BenchmarkVisualFloor;
+    saveResult: BenchmarkSaveResult;
+    date?: Date;
+}
+declare function buildBenchmarkRow(input: BenchmarkRowInput): BenchmarkRow;
+declare function formatBenchmarkRow(row: BenchmarkRow): string;
+declare function benchmarkMarkdownTableHeader(): string;
+interface ParsedBenchmarkRow extends BenchmarkRow {
+    raw: string;
+}
+declare function parseBenchmarkRow(line: string): ParsedBenchmarkRow | null;
+
 /**
  * スプリットトーンの既定色相（度）とレガシー強度スケール
  *
@@ -856,4 +1093,377 @@ declare const LEGACY_HIGHLIGHT_TONE_MAGNITUDE: number;
  */
 declare function halationHueToHex(hue: number): string;
 
-export { type CubeLUT, FILM_LAB_DEFAULT_HIGHLIGHT_HUE, FILM_LAB_DEFAULT_SHADOW_HUE, type FilmLabParamsValidated, type FilmLookGradeInputProps, type FilmLookSpikeInputProps, LEGACY_HIGHLIGHT_TONE_MAGNITUDE, LEGACY_SHADOW_TONE_MAGNITUDE, LOOK_ID_BY_PRESET, PARAM_KEYS, PRESETS, PRESET_BUTTONS, PRESET_VERSION, type PackedCubeLut2D, type ParamKey, type Params, type PresetName, chromaUnitFromHueDegrees, cloneParams, createDefaultFilmLookGradeProps, filmLabParamsSchema, filmLookGradeDefaultProps, filmLookGradeInputSchema, filmLookSpikeDefaultProps, filmLookSpikeInputSchema, findMatchingPreset, gradeMatchesPreset, halationHueToHex, hslToRgb01, lookIdForPreset, nearestHueDegreesToDirection, packCubeLutToFloatRgbaGrid, parseCube };
+declare const IOS_PHASE0_SCHEMA_VERSION: 1;
+declare const IOS_PHASE0_PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "fade", "vignette", "grainIntensity"];
+type IosPhase0ParamKey = (typeof IOS_PHASE0_PARAM_KEYS)[number];
+type IosPhase0Params = Pick<Params, IosPhase0ParamKey>;
+declare const iosPhase0ParamsSchema: z.ZodType<IosPhase0Params>;
+declare const IOS_PHASE0_OUTPUT_CODEC: "h264-mp4";
+declare const IOS_PHASE0_OUTPUT_LONG_EDGE = 1920;
+declare const IOS_PHASE0_OUTPUT_FPS = 30;
+declare const IOS_PHASE0_SOURCE_DURATION_CAP_SEC: number;
+declare const IOS_PHASE0_SOURCE_LONG_EDGE_CAP = 3840;
+declare const IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES: number;
+declare const IOS_PHASE0_SOURCE_CAPS: {
+    readonly durationSec: number;
+    readonly longEdge: 3840;
+    readonly fileSizeBytes: number;
+};
+declare const IOS_PHASE0_BENCHMARK_SLOTS: readonly ["bench-short", "bench-mid", "bench-long"];
+type IosPhase0BenchmarkSlot = (typeof IOS_PHASE0_BENCHMARK_SLOTS)[number];
+declare const iosPhase0SourceKindSchema: z.ZodEnum<{
+    image: "image";
+    video: "video";
+}>;
+type IosPhase0SourceKind = z.infer<typeof iosPhase0SourceKindSchema>;
+declare const iosPhase0SerializableLutSchema: z.ZodObject<{
+    name: z.ZodString;
+    title: z.ZodOptional<z.ZodString>;
+    size: z.ZodNumber;
+    intensity: z.ZodDefault<z.ZodNumber>;
+    domainMin: z.ZodOptional<z.ZodTuple<[z.ZodNumber, z.ZodNumber, z.ZodNumber], null>>;
+    domainMax: z.ZodOptional<z.ZodTuple<[z.ZodNumber, z.ZodNumber, z.ZodNumber], null>>;
+    rgbaData: z.ZodArray<z.ZodNumber>;
+}, z.core.$strip>;
+type IosPhase0SerializableLut = z.infer<typeof iosPhase0SerializableLutSchema>;
+declare function createIosPhase0SerializableLut(input: {
+    cube: CubeLUT;
+    name: string;
+    intensity?: number;
+}): IosPhase0SerializableLut;
+declare const iosPhase0PickedSourceSchema: z.ZodObject<{
+    uri: z.ZodString;
+    displayName: z.ZodString;
+    kind: z.ZodOptional<z.ZodEnum<{
+        image: "image";
+        video: "video";
+    }>>;
+}, z.core.$strip>;
+type IosPhase0PickedSource = z.infer<typeof iosPhase0PickedSourceSchema>;
+declare const iosPhase0PickedLutFileSchema: z.ZodObject<{
+    uri: z.ZodString;
+    displayName: z.ZodString;
+    text: z.ZodString;
+}, z.core.$strip>;
+type IosPhase0PickedLutFile = z.infer<typeof iosPhase0PickedLutFileSchema>;
+declare const iosPhase0SourceInfoSchema: z.ZodObject<{
+    uri: z.ZodString;
+    displayName: z.ZodString;
+    kind: z.ZodEnum<{
+        image: "image";
+        video: "video";
+    }>;
+    width: z.ZodOptional<z.ZodNumber>;
+    height: z.ZodOptional<z.ZodNumber>;
+    durationSec: z.ZodOptional<z.ZodNumber>;
+    fileSizeBytes: z.ZodOptional<z.ZodNumber>;
+    videoCodec: z.ZodOptional<z.ZodString>;
+    audioCodec: z.ZodOptional<z.ZodString>;
+    frameRate: z.ZodOptional<z.ZodNumber>;
+    hasAudio: z.ZodOptional<z.ZodBoolean>;
+}, z.core.$strip>;
+type IosPhase0SourceInfo = z.infer<typeof iosPhase0SourceInfoSchema>;
+declare const iosPhase0PresetIdSchema: z.ZodEnum<{
+    reset: "reset";
+    cinematic: "cinematic";
+    portra: "portra";
+    gold200: "gold200";
+    pro400h: "pro400h";
+    bw: "bw";
+    ektar100: "ektar100";
+    superia400: "superia400";
+    cinestill800t: "cinestill800t";
+    velvia50: "velvia50";
+}>;
+declare const iosPhase0ExportSettingsSchema: z.ZodObject<{
+    codec: z.ZodDefault<z.ZodLiteral<"h264-mp4">>;
+    outputLongEdge: z.ZodDefault<z.ZodNumber>;
+    outputFps: z.ZodDefault<z.ZodLiteral<30>>;
+}, z.core.$strip>;
+type IosPhase0ExportSettings = z.infer<typeof iosPhase0ExportSettingsSchema>;
+declare const iosPhase0ExportPayloadSchema: z.ZodObject<{
+    projectId: z.ZodString;
+    sourceUri: z.ZodString;
+    sourceDisplayName: z.ZodString;
+    sourceKind: z.ZodEnum<{
+        image: "image";
+        video: "video";
+    }>;
+    presetId: z.ZodEnum<{
+        reset: "reset";
+        cinematic: "cinematic";
+        portra: "portra";
+        gold200: "gold200";
+        pro400h: "pro400h";
+        bw: "bw";
+        ektar100: "ektar100";
+        superia400: "superia400";
+        cinestill800t: "cinestill800t";
+        velvia50: "velvia50";
+    }>;
+    params: z.ZodType<IosPhase0Params, unknown, z.core.$ZodTypeInternals<IosPhase0Params, unknown>>;
+    inputLut: z.ZodOptional<z.ZodNullable<z.ZodObject<{
+        name: z.ZodString;
+        title: z.ZodOptional<z.ZodString>;
+        size: z.ZodNumber;
+        intensity: z.ZodDefault<z.ZodNumber>;
+        domainMin: z.ZodOptional<z.ZodTuple<[z.ZodNumber, z.ZodNumber, z.ZodNumber], null>>;
+        domainMax: z.ZodOptional<z.ZodTuple<[z.ZodNumber, z.ZodNumber, z.ZodNumber], null>>;
+        rgbaData: z.ZodArray<z.ZodNumber>;
+    }, z.core.$strip>>>;
+    creativeLut: z.ZodOptional<z.ZodNullable<z.ZodObject<{
+        name: z.ZodString;
+        title: z.ZodOptional<z.ZodString>;
+        size: z.ZodNumber;
+        intensity: z.ZodDefault<z.ZodNumber>;
+        domainMin: z.ZodOptional<z.ZodTuple<[z.ZodNumber, z.ZodNumber, z.ZodNumber], null>>;
+        domainMax: z.ZodOptional<z.ZodTuple<[z.ZodNumber, z.ZodNumber, z.ZodNumber], null>>;
+        rgbaData: z.ZodArray<z.ZodNumber>;
+    }, z.core.$strip>>>;
+    benchmarkSlot: z.ZodOptional<z.ZodEnum<{
+        "bench-short": "bench-short";
+        "bench-mid": "bench-mid";
+        "bench-long": "bench-long";
+    }>>;
+    benchmarkRecipeId: z.ZodOptional<z.ZodString>;
+    includeAudio: z.ZodOptional<z.ZodBoolean>;
+    exportSettings: z.ZodDefault<z.ZodObject<{
+        codec: z.ZodDefault<z.ZodLiteral<"h264-mp4">>;
+        outputLongEdge: z.ZodDefault<z.ZodNumber>;
+        outputFps: z.ZodDefault<z.ZodLiteral<30>>;
+    }, z.core.$strip>>;
+}, z.core.$strip>;
+type IosPhase0ExportPayload = z.infer<typeof iosPhase0ExportPayloadSchema>;
+declare const iosPhase0ExportResultSchema: z.ZodObject<{
+    outputUri: z.ZodString;
+    outputDisplayName: z.ZodString;
+    outputWidth: z.ZodNumber;
+    outputHeight: z.ZodNumber;
+    outputFps: z.ZodNumber;
+    elapsedMs: z.ZodNumber;
+    realtimeRatio: z.ZodOptional<z.ZodNumber>;
+    fileSizeBytes: z.ZodOptional<z.ZodNumber>;
+    benchmarkRecordUri: z.ZodOptional<z.ZodString>;
+}, z.core.$strip>;
+type IosPhase0ExportResult = z.infer<typeof iosPhase0ExportResultSchema>;
+declare const iosPhase0ThermalStateSchema: z.ZodEnum<{
+    unknown: "unknown";
+    nominal: "nominal";
+    fair: "fair";
+    serious: "serious";
+    critical: "critical";
+}>;
+declare const iosPhase0BenchmarkRecordSchema: z.ZodObject<{
+    schemaVersion: z.ZodLiteral<1>;
+    recordedAt: z.ZodString;
+    slot: z.ZodEnum<{
+        "bench-short": "bench-short";
+        "bench-mid": "bench-mid";
+        "bench-long": "bench-long";
+    }>;
+    runIndex: z.ZodNumber;
+    appVersion: z.ZodString;
+    buildNumber: z.ZodString;
+    deviceModel: z.ZodString;
+    iosVersion: z.ZodString;
+    source: z.ZodObject<{
+        uri: z.ZodString;
+        displayName: z.ZodString;
+        kind: z.ZodEnum<{
+            image: "image";
+            video: "video";
+        }>;
+        width: z.ZodOptional<z.ZodNumber>;
+        height: z.ZodOptional<z.ZodNumber>;
+        durationSec: z.ZodOptional<z.ZodNumber>;
+        fileSizeBytes: z.ZodOptional<z.ZodNumber>;
+        videoCodec: z.ZodOptional<z.ZodString>;
+        audioCodec: z.ZodOptional<z.ZodString>;
+        frameRate: z.ZodOptional<z.ZodNumber>;
+        hasAudio: z.ZodOptional<z.ZodBoolean>;
+    }, z.core.$strip>;
+    output: z.ZodObject<{
+        outputUri: z.ZodString;
+        outputDisplayName: z.ZodString;
+        outputWidth: z.ZodNumber;
+        outputHeight: z.ZodNumber;
+        outputFps: z.ZodNumber;
+        elapsedMs: z.ZodNumber;
+        realtimeRatio: z.ZodOptional<z.ZodNumber>;
+        fileSizeBytes: z.ZodOptional<z.ZodNumber>;
+        benchmarkRecordUri: z.ZodOptional<z.ZodString>;
+    }, z.core.$strip>;
+    elapsedMs: z.ZodNumber;
+    realtimeRatio: z.ZodNumber;
+    thermalStateStart: z.ZodEnum<{
+        unknown: "unknown";
+        nominal: "nominal";
+        fair: "fair";
+        serious: "serious";
+        critical: "critical";
+    }>;
+    thermalStateEnd: z.ZodEnum<{
+        unknown: "unknown";
+        nominal: "nominal";
+        fair: "fair";
+        serious: "serious";
+        critical: "critical";
+    }>;
+    memoryWarningCount: z.ZodNumber;
+    permissionResults: z.ZodObject<{
+        mediaLibrary: z.ZodEnum<{
+            unknown: "unknown";
+            granted: "granted";
+            denied: "denied";
+            limited: "limited";
+            "not-required": "not-required";
+        }>;
+        fileImport: z.ZodEnum<{
+            unknown: "unknown";
+            granted: "granted";
+            denied: "denied";
+            limited: "limited";
+            "not-required": "not-required";
+        }>;
+        sharing: z.ZodEnum<{
+            unknown: "unknown";
+            granted: "granted";
+            denied: "denied";
+            limited: "limited";
+            "not-required": "not-required";
+        }>;
+    }, z.core.$strip>;
+    failureDomain: z.ZodOptional<z.ZodString>;
+    failureCode: z.ZodOptional<z.ZodString>;
+    failureMessage: z.ZodOptional<z.ZodString>;
+    previewArtifacts: z.ZodObject<{
+        firstFrameUri: z.ZodOptional<z.ZodString>;
+        midFrameUri: z.ZodOptional<z.ZodString>;
+        lastFrameUri: z.ZodOptional<z.ZodString>;
+    }, z.core.$strip>;
+}, z.core.$strip>;
+type IosPhase0BenchmarkRecord = z.infer<typeof iosPhase0BenchmarkRecordSchema>;
+declare const iosPhase0AssetRefSchema: z.ZodObject<{
+    uri: z.ZodString;
+    displayName: z.ZodString;
+    assetKind: z.ZodEnum<{
+        lut: "lut";
+        source: "source";
+        "derived-output": "derived-output";
+        "benchmark-record": "benchmark-record";
+    }>;
+    createdAt: z.ZodString;
+    byteSize: z.ZodOptional<z.ZodNumber>;
+}, z.core.$strip>;
+type IosPhase0AssetRef = z.infer<typeof iosPhase0AssetRefSchema>;
+declare const iosPhase0LocalProjectSchema: z.ZodObject<{
+    schemaVersion: z.ZodLiteral<1>;
+    projectId: z.ZodString;
+    createdAt: z.ZodString;
+    updatedAt: z.ZodString;
+    presetId: z.ZodEnum<{
+        reset: "reset";
+        cinematic: "cinematic";
+        portra: "portra";
+        gold200: "gold200";
+        pro400h: "pro400h";
+        bw: "bw";
+        ektar100: "ektar100";
+        superia400: "superia400";
+        cinestill800t: "cinestill800t";
+        velvia50: "velvia50";
+    }>;
+    params: z.ZodType<IosPhase0Params, unknown, z.core.$ZodTypeInternals<IosPhase0Params, unknown>>;
+    source: z.ZodNullable<z.ZodObject<{
+        uri: z.ZodString;
+        displayName: z.ZodString;
+        kind: z.ZodEnum<{
+            image: "image";
+            video: "video";
+        }>;
+        width: z.ZodOptional<z.ZodNumber>;
+        height: z.ZodOptional<z.ZodNumber>;
+        durationSec: z.ZodOptional<z.ZodNumber>;
+        fileSizeBytes: z.ZodOptional<z.ZodNumber>;
+        videoCodec: z.ZodOptional<z.ZodString>;
+        audioCodec: z.ZodOptional<z.ZodString>;
+        frameRate: z.ZodOptional<z.ZodNumber>;
+        hasAudio: z.ZodOptional<z.ZodBoolean>;
+    }, z.core.$strip>>;
+    sourceAssetRef: z.ZodNullable<z.ZodObject<{
+        uri: z.ZodString;
+        displayName: z.ZodString;
+        assetKind: z.ZodEnum<{
+            lut: "lut";
+            source: "source";
+            "derived-output": "derived-output";
+            "benchmark-record": "benchmark-record";
+        }>;
+        createdAt: z.ZodString;
+        byteSize: z.ZodOptional<z.ZodNumber>;
+    }, z.core.$strip>>;
+    lutAssetRef: z.ZodNullable<z.ZodObject<{
+        uri: z.ZodString;
+        displayName: z.ZodString;
+        assetKind: z.ZodEnum<{
+            lut: "lut";
+            source: "source";
+            "derived-output": "derived-output";
+            "benchmark-record": "benchmark-record";
+        }>;
+        createdAt: z.ZodString;
+        byteSize: z.ZodOptional<z.ZodNumber>;
+    }, z.core.$strip>>;
+    exportSettings: z.ZodObject<{
+        codec: z.ZodDefault<z.ZodLiteral<"h264-mp4">>;
+        outputLongEdge: z.ZodDefault<z.ZodNumber>;
+        outputFps: z.ZodDefault<z.ZodLiteral<30>>;
+    }, z.core.$strip>;
+    derivedData: z.ZodObject<{
+        lastOutput: z.ZodDefault<z.ZodNullable<z.ZodObject<{
+            uri: z.ZodString;
+            displayName: z.ZodString;
+            assetKind: z.ZodEnum<{
+                lut: "lut";
+                source: "source";
+                "derived-output": "derived-output";
+                "benchmark-record": "benchmark-record";
+            }>;
+            createdAt: z.ZodString;
+            byteSize: z.ZodOptional<z.ZodNumber>;
+        }, z.core.$strip>>>;
+        lastExportResult: z.ZodDefault<z.ZodNullable<z.ZodObject<{
+            outputUri: z.ZodString;
+            outputDisplayName: z.ZodString;
+            outputWidth: z.ZodNumber;
+            outputHeight: z.ZodNumber;
+            outputFps: z.ZodNumber;
+            elapsedMs: z.ZodNumber;
+            realtimeRatio: z.ZodOptional<z.ZodNumber>;
+            fileSizeBytes: z.ZodOptional<z.ZodNumber>;
+            benchmarkRecordUri: z.ZodOptional<z.ZodString>;
+        }, z.core.$strip>>>;
+        benchmarkRecords: z.ZodDefault<z.ZodArray<z.ZodObject<{
+            uri: z.ZodString;
+            displayName: z.ZodString;
+            assetKind: z.ZodEnum<{
+                lut: "lut";
+                source: "source";
+                "derived-output": "derived-output";
+                "benchmark-record": "benchmark-record";
+            }>;
+            createdAt: z.ZodString;
+            byteSize: z.ZodOptional<z.ZodNumber>;
+        }, z.core.$strip>>>;
+    }, z.core.$strip>;
+    cacheMetadata: z.ZodObject<{
+        workingDirectoryUri: z.ZodOptional<z.ZodString>;
+        derivedOutputUris: z.ZodDefault<z.ZodArray<z.ZodString>>;
+        lastPurgeAt: z.ZodOptional<z.ZodString>;
+    }, z.core.$strip>;
+}, z.core.$strip>;
+type IosPhase0LocalProject = z.infer<typeof iosPhase0LocalProjectSchema>;
+declare function pickIosPhase0Params(params: Params): IosPhase0Params;
+declare function getIosPhase0SourceCapViolations(source: Pick<IosPhase0SourceInfo, "width" | "height" | "durationSec" | "fileSizeBytes">): string[];
+
+export { type BenchmarkRow, type BenchmarkRowInput, type BenchmarkSaveResult, type BenchmarkVisualFloor, type CubeLUT, DEFAULT_QUICK_STATE, FILM_LAB_DEFAULT_HIGHLIGHT_HUE, FILM_LAB_DEFAULT_SHADOW_HUE, type FilmLabParamsValidated, type FilmLookGradeInputProps, type FilmLookSpikeInputProps, IOS_PHASE0_BENCHMARK_SLOTS, IOS_PHASE0_OUTPUT_CODEC, IOS_PHASE0_OUTPUT_FPS, IOS_PHASE0_OUTPUT_LONG_EDGE, IOS_PHASE0_PARAM_KEYS, IOS_PHASE0_SCHEMA_VERSION, IOS_PHASE0_SOURCE_CAPS, IOS_PHASE0_SOURCE_DURATION_CAP_SEC, IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES, IOS_PHASE0_SOURCE_LONG_EDGE_CAP, type IosPhase0AssetRef, type IosPhase0BenchmarkRecord, type IosPhase0BenchmarkSlot, type IosPhase0ExportPayload, type IosPhase0ExportResult, type IosPhase0ExportSettings, type IosPhase0LocalProject, type IosPhase0ParamKey, type IosPhase0Params, type IosPhase0PickedLutFile, type IosPhase0PickedSource, type IosPhase0SerializableLut, type IosPhase0SourceInfo, type IosPhase0SourceKind, LEGACY_HIGHLIGHT_TONE_MAGNITUDE, LEGACY_SHADOW_TONE_MAGNITUDE, LOOK_ID_BY_PRESET, PARAM_KEYS, PHASE0_APPROX_SOURCE_LONG_EDGE_MAX, PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES, PHASE0_BENCHMARK_GATES, PHASE0_MAX_SOURCE_DURATION_SEC, PHASE0_OUTPUT_PROFILE, PHASE0_PARAM_KEYS, PHASE0_PRESET_DEFAULT, PHASE0_SCHEMA_VERSION, PRESETS, PRESET_BUTTONS, PRESET_VERSION, type PackedCubeLut2D, type ParamKey, type Params, type ParsedBenchmarkRow, type ParsedCubeLut, type Phase0ExportBenchmarkRecord, type Phase0ExportProgress, type Phase0ExportRequest, type Phase0ExportResult, type Phase0ExportStage, type Phase0OutputProfile, type Phase0ParamKey, type Phase0Params, type Phase0ProjectLut, type Phase0ProjectState, type Phase0QuickTarget, type PickedLutFile, type PresetName, QUICK_AXIS_DEFAULT_RANGE, QUICK_AXIS_IDS, type QuickAxisId, type QuickState, type SourceInfo, type SourceKind, type SourceProbe, applyQuickStateToParams, applyQuickStateToPhase0Params, assertPhase0SourceProbeWithinCaps, benchmarkMarkdownTableHeader, buildBenchmarkRow, buildPhase0ExportRequest, chromaUnitFromHueDegrees, cloneParams, coerceQuickState, createDefaultFilmLookGradeProps, createDefaultPhase0Params, createIosPhase0SerializableLut, createPhase0ProjectState, deserializeCubeLutData, filmLabParamsSchema, filmLookGradeDefaultProps, filmLookGradeInputSchema, filmLookSpikeDefaultProps, filmLookSpikeInputSchema, findMatchingPreset, formatBenchmarkRow, getIosPhase0SourceCapViolations, getPhase0SourceCapViolations, gradeMatchesPreset, halationHueToHex, hslToRgb01, iosPhase0AssetRefSchema, iosPhase0BenchmarkRecordSchema, iosPhase0ExportPayloadSchema, iosPhase0ExportResultSchema, iosPhase0ExportSettingsSchema, iosPhase0LocalProjectSchema, iosPhase0ParamsSchema, iosPhase0PickedLutFileSchema, iosPhase0PickedSourceSchema, iosPhase0PresetIdSchema, iosPhase0SerializableLutSchema, iosPhase0SourceInfoSchema, iosPhase0SourceKindSchema, iosPhase0ThermalStateSchema, lookIdForPreset, mergePhase0Params, nearestHueDegreesToDirection, packCubeLutToFloatRgbaGrid, parseBenchmarkRow, parseCube, phase0ParamsSchema, phase0ProjectLutSchema, phase0ProjectSchema, phase0QuickStateSchema, pickIosPhase0Params, pickPhase0Params, quickStateSchema, serializeCubeLut };

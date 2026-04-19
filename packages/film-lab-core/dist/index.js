@@ -113,13 +113,13 @@ function chromaUnitFromHueDegrees(hueDegrees) {
   const { r, g, b } = hslToRgb01(hueDegrees, 1, 0.5);
   let x = r - 0.5;
   let y = g - 0.5;
-  let z2 = b - 0.5;
-  const len = Math.hypot(x, y, z2);
+  let z5 = b - 0.5;
+  const len = Math.hypot(x, y, z5);
   if (len < 1e-9) {
     return [0, 0, 1];
   }
   const inv = 1 / len;
-  return [x * inv, y * inv, z2 * inv];
+  return [x * inv, y * inv, z5 * inv];
 }
 function nearestHueDegreesToDirection(dir) {
   const [dx0, dy0, dz0] = dir;
@@ -904,30 +904,722 @@ function createDefaultFilmLookGradeProps() {
   };
 }
 var filmLookGradeDefaultProps = createDefaultFilmLookGradeProps();
+
+// src/quick-semantics.ts
+import { z as z2 } from "zod";
+var QUICK_AXIS_IDS = [
+  "filmCharacter",
+  "era",
+  "dynamics"
+];
+var QUICK_AXIS_DEFAULT_RANGE = {
+  min: -1,
+  max: 1,
+  step: 0.01
+};
+var DEFAULT_QUICK_STATE = {
+  filmCharacter: 0,
+  era: 0,
+  dynamics: 0
+};
+var quickStateShape = Object.fromEntries(
+  QUICK_AXIS_IDS.map((axis) => [
+    axis,
+    z2.number().min(QUICK_AXIS_DEFAULT_RANGE.min).max(QUICK_AXIS_DEFAULT_RANGE.max)
+  ])
+);
+var quickStateSchema = z2.object(quickStateShape);
+var QUICK_FULL_AXIS_WEIGHTS = {
+  filmCharacter: {
+    saturation: 0.24,
+    temperature: 0.16,
+    tint: -0.06,
+    grainIntensity: 0.22,
+    vignette: 0.12
+  },
+  era: {
+    fade: 0.18,
+    saturation: -0.14,
+    contrast: -0.08,
+    halationIntensity: 0.16,
+    halationSpread: 6
+  },
+  dynamics: {
+    exposure: 0.24,
+    contrast: 0.18,
+    bloomStrength: 0.16,
+    bloomThreshold: -0.06,
+    bloomRadius: 0.12
+  }
+};
+var QUICK_PHASE0_AXIS_WEIGHTS = {
+  filmCharacter: {
+    saturation: 0.24,
+    temperature: 0.16,
+    tint: -0.06,
+    grainIntensity: 0.22,
+    vignette: 0.12
+  },
+  era: {
+    fade: 0.18,
+    saturation: -0.12,
+    contrast: -0.06
+  },
+  dynamics: {
+    exposure: 0.24,
+    contrast: 0.18
+  }
+};
+function clampAxisValue(value) {
+  return Math.max(
+    QUICK_AXIS_DEFAULT_RANGE.min,
+    Math.min(QUICK_AXIS_DEFAULT_RANGE.max, value)
+  );
+}
+function clampParamValue(key, value) {
+  switch (key) {
+    case "exposure":
+      return Math.max(-2, Math.min(2, value));
+    case "contrast":
+    case "saturation":
+      return Math.max(0, Math.min(2, value));
+    case "temperature":
+    case "tint":
+      return Math.max(-1, Math.min(1, value));
+    case "grainIntensity":
+    case "vignette":
+    case "fade":
+    case "halationIntensity":
+    case "bloomStrength":
+    case "bloomThreshold":
+    case "bloomRadius":
+      return Math.max(0, Math.min(1, value));
+    case "halationSpread":
+      return Math.max(0, Math.min(40, value));
+    default:
+      return value;
+  }
+}
+function applyWeightedPatch(base, state, weights) {
+  const next = { ...base };
+  for (const axis of QUICK_AXIS_IDS) {
+    const axisValue = clampAxisValue(state[axis]);
+    for (const [key, weight] of Object.entries(weights[axis])) {
+      if (typeof weight !== "number") continue;
+      next[key] = clampParamValue(key, next[key] + axisValue * weight);
+    }
+  }
+  return next;
+}
+function coerceQuickState(input) {
+  return {
+    filmCharacter: clampAxisValue(input?.filmCharacter ?? 0),
+    era: clampAxisValue(input?.era ?? 0),
+    dynamics: clampAxisValue(input?.dynamics ?? 0)
+  };
+}
+function applyQuickStateToParams(base, state) {
+  return applyWeightedPatch(
+    base,
+    state,
+    QUICK_FULL_AXIS_WEIGHTS
+  );
+}
+function applyQuickStateToPhase0Params(base, state) {
+  return applyWeightedPatch(
+    base,
+    state,
+    QUICK_PHASE0_AXIS_WEIGHTS
+  );
+}
+
+// src/phase0-schema.ts
+import { z as z3 } from "zod";
+var PHASE0_SCHEMA_VERSION = 1;
+var PHASE0_PRESET_DEFAULT = "cinematic";
+var PHASE0_PARAM_KEYS = [
+  "exposure",
+  "contrast",
+  "saturation",
+  "temperature",
+  "tint",
+  "fade",
+  "vignette",
+  "grainIntensity"
+];
+var PHASE0_MAX_SOURCE_DURATION_SEC = 60 * 5;
+var PHASE0_APPROX_SOURCE_LONG_EDGE_MAX = 3840;
+var PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES = 2 * 1024 * 1024 * 1024;
+var PHASE0_OUTPUT_PROFILE = {
+  longEdge: 1920,
+  fps: 30,
+  codec: "h264",
+  container: "mp4",
+  preserveAudio: true
+};
+var PHASE0_BENCHMARK_GATES = {
+  passRealtimeRatio: 2.5,
+  strongGoRealtimeRatio: 2,
+  noGoRealtimeRatio: 3
+};
+var phase0ParamsSchema = z3.object({
+  exposure: z3.number().min(-2).max(2).default(PRESETS.reset.exposure),
+  contrast: z3.number().min(0).max(2).default(PRESETS.reset.contrast),
+  saturation: z3.number().min(0).max(2).default(PRESETS.reset.saturation),
+  temperature: z3.number().min(-1).max(1).default(PRESETS.reset.temperature),
+  tint: z3.number().min(-1).max(1).default(PRESETS.reset.tint),
+  fade: z3.number().min(0).max(1).default(PRESETS.reset.fade),
+  vignette: z3.number().min(0).max(1).default(PRESETS.reset.vignette),
+  grainIntensity: z3.number().min(0).max(1).default(PRESETS.reset.grainIntensity)
+});
+var phase0QuickStateSchema = z3.object(
+  {
+    [QUICK_AXIS_IDS[0]]: z3.number().min(-1).max(1),
+    [QUICK_AXIS_IDS[1]]: z3.number().min(-1).max(1),
+    [QUICK_AXIS_IDS[2]]: z3.number().min(-1).max(1)
+  }
+);
+var phase0ProjectLutSchema = z3.object({
+  title: z3.string().min(1),
+  size: z3.number().int().positive(),
+  data: z3.array(z3.number()),
+  intensity: z3.number().min(0).max(1).default(1)
+});
+var phase0ProjectSchema = z3.object({
+  schemaVersion: z3.literal(PHASE0_SCHEMA_VERSION),
+  projectId: z3.string().min(1),
+  createdAt: z3.string().min(1),
+  updatedAt: z3.string().min(1),
+  presetName: z3.string().min(1),
+  quickState: phase0QuickStateSchema.default(DEFAULT_QUICK_STATE),
+  params: phase0ParamsSchema,
+  lut: phase0ProjectLutSchema.nullable().default(null),
+  output: z3.object({
+    longEdge: z3.literal(PHASE0_OUTPUT_PROFILE.longEdge),
+    fps: z3.literal(PHASE0_OUTPUT_PROFILE.fps),
+    codec: z3.literal(PHASE0_OUTPUT_PROFILE.codec),
+    container: z3.literal(PHASE0_OUTPUT_PROFILE.container),
+    preserveAudio: z3.boolean().default(PHASE0_OUTPUT_PROFILE.preserveAudio)
+  })
+});
+function pickPhase0Params(params) {
+  return {
+    exposure: params.exposure,
+    contrast: params.contrast,
+    saturation: params.saturation,
+    temperature: params.temperature,
+    tint: params.tint,
+    fade: params.fade,
+    vignette: params.vignette,
+    grainIntensity: params.grainIntensity
+  };
+}
+function createDefaultPhase0Params(presetName = PHASE0_PRESET_DEFAULT) {
+  return pickPhase0Params(PRESETS[presetName]);
+}
+function mergePhase0Params(base, patch) {
+  return phase0ParamsSchema.parse({ ...base, ...patch });
+}
+function makeProjectId() {
+  const fromCrypto = globalThis.crypto?.randomUUID?.();
+  if (typeof fromCrypto === "string" && fromCrypto.length > 0) {
+    return fromCrypto;
+  }
+  return `phase0-${Date.now().toString(36)}`;
+}
+function createPhase0ProjectState(presetName = PHASE0_PRESET_DEFAULT) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  return phase0ProjectSchema.parse({
+    schemaVersion: PHASE0_SCHEMA_VERSION,
+    projectId: makeProjectId(),
+    createdAt: now,
+    updatedAt: now,
+    presetName,
+    quickState: DEFAULT_QUICK_STATE,
+    params: createDefaultPhase0Params(presetName),
+    lut: null,
+    output: PHASE0_OUTPUT_PROFILE
+  });
+}
+
+// src/native-bridge.ts
+function serializeCubeLut(lut, options) {
+  return {
+    title: options?.title ?? lut.title ?? "Custom LUT",
+    size: lut.size,
+    data: Array.from(lut.data),
+    intensity: options?.intensity ?? 1
+  };
+}
+function deserializeCubeLutData(lut) {
+  return Float32Array.from(lut.data);
+}
+function getPhase0SourceCapViolations(probe) {
+  const violations = [];
+  const longEdge = typeof probe.width === "number" && typeof probe.height === "number" ? Math.max(probe.width, probe.height) : void 0;
+  if (probe.kind === "video" && typeof probe.durationSec === "number" && probe.durationSec > PHASE0_MAX_SOURCE_DURATION_SEC) {
+    violations.push(
+      `Source duration ${probe.durationSec.toFixed(1)}s exceeds ${PHASE0_MAX_SOURCE_DURATION_SEC}s`
+    );
+  }
+  if (typeof longEdge === "number" && longEdge > PHASE0_APPROX_SOURCE_LONG_EDGE_MAX) {
+    violations.push(
+      `Source long edge ${longEdge}px exceeds ${PHASE0_APPROX_SOURCE_LONG_EDGE_MAX}px`
+    );
+  }
+  if (typeof probe.fileSizeBytes === "number" && probe.fileSizeBytes > PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES) {
+    violations.push(
+      `Source size ${probe.fileSizeBytes} bytes exceeds ${PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES} bytes`
+    );
+  }
+  return violations;
+}
+function assertPhase0SourceProbeWithinCaps(probe) {
+  const violations = getPhase0SourceCapViolations(probe);
+  if (violations.length > 0) {
+    throw new RangeError(violations.join("; "));
+  }
+}
+function buildPhase0ExportRequest(options) {
+  const probe = options.probe ?? void 0;
+  if (probe) {
+    assertPhase0SourceProbeWithinCaps(probe);
+  }
+  return {
+    sourceUri: options.source.uri,
+    sourceKind: options.source.kind,
+    sourceProbe: probe,
+    output: {
+      ...PHASE0_OUTPUT_PROFILE,
+      ...options.output
+    },
+    grade: {
+      presetName: options.project.presetName,
+      presetVersion: PRESET_VERSION,
+      quickState: options.project.quickState,
+      params: options.project.params
+    },
+    inputLut: null,
+    creativeLut: options.project.lut ? {
+      title: options.project.lut.title,
+      size: options.project.lut.size,
+      data: options.project.lut.data,
+      intensity: options.project.lut.intensity
+    } : null
+  };
+}
+
+// src/benchmark-row.ts
+var ROW_HEADER = "| date | device | iOS | clip_id | input_resolution | output_resolution | realtime_ratio | file_size_mb | thermal | memory_warnings | save | visual | error | duration_sec |";
+var ROW_DIVIDER = "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |";
+function buildBenchmarkRow(input) {
+  const { result, benchmark, probe, clipId, visualFloor, saveResult } = input;
+  const date = (input.date ?? /* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  const inputResolution = benchmark.sourceResolution ?? (probe?.width && probe?.height ? `${probe.width}x${probe.height}` : "unknown");
+  const outputResolution = `${result.outputWidth}x${result.outputHeight}@${result.outputFps}`;
+  const fileSizeMb = typeof result.fileSizeBytes === "number" ? Math.round(result.fileSizeBytes / (1024 * 1024) * 10) / 10 : null;
+  return {
+    date,
+    deviceModel: benchmark.deviceModel,
+    iosVersion: benchmark.iosVersion,
+    clipId,
+    inputResolution,
+    outputResolution,
+    realtimeRatio: typeof result.realtimeRatio === "number" ? Math.round(result.realtimeRatio * 100) / 100 : null,
+    fileSizeMb,
+    thermalState: benchmark.thermalState ?? "unknown",
+    memoryWarningCount: typeof benchmark.memoryWarningCount === "number" ? benchmark.memoryWarningCount : 0,
+    saveResult,
+    visualFloor,
+    errorDomain: benchmark.errorDomain ?? null,
+    errorCode: benchmark.errorCode ?? null,
+    durationSec: typeof benchmark.sourceDurationSec === "number" ? benchmark.sourceDurationSec : null
+  };
+}
+function formatBenchmarkRow(row) {
+  const realtime = row.realtimeRatio != null ? `${row.realtimeRatio}x` : "\u2014";
+  const fileSize = row.fileSizeMb != null ? `${row.fileSizeMb}MB` : "\u2014";
+  const errorCell = row.errorDomain || row.errorCode ? `${row.errorDomain ?? "\u2014"}:${row.errorCode ?? "\u2014"}` : "none";
+  const durationCell = row.durationSec != null ? row.durationSec.toFixed(1) : "\u2014";
+  return [
+    "",
+    row.date,
+    row.deviceModel,
+    row.iosVersion,
+    row.clipId,
+    row.inputResolution,
+    row.outputResolution,
+    realtime,
+    fileSize,
+    `thermal=${row.thermalState}`,
+    `mem_warn=${row.memoryWarningCount}`,
+    `save=${row.saveResult}`,
+    `visual=${row.visualFloor}`,
+    `err=${errorCell}`,
+    durationCell,
+    ""
+  ].join(" | ").trim();
+}
+function benchmarkMarkdownTableHeader() {
+  return `${ROW_HEADER}
+${ROW_DIVIDER}`;
+}
+var ROW_PATTERN = /^\|\s*(?<date>[^|]+?)\s*\|\s*(?<device>[^|]+?)\s*\|\s*(?<iosVersion>[^|]+?)\s*\|\s*(?<clipId>[^|]+?)\s*\|\s*(?<inputRes>[^|]+?)\s*\|\s*(?<outputRes>[^|]+?)\s*\|\s*(?<realtime>[^|]+?)\s*\|\s*(?<fileSize>[^|]+?)\s*\|\s*thermal=(?<thermal>[^|]+?)\s*\|\s*mem_warn=(?<mem>[^|]+?)\s*\|\s*save=(?<save>[^|]+?)\s*\|\s*visual=(?<visual>[^|]+?)\s*\|\s*err=(?<err>[^|]+?)\s*\|\s*(?<durationSec>[^|]+?)\s*\|\s*$/;
+function parseBenchmarkRow(line) {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith("|")) return null;
+  if (trimmed.startsWith("| date |") || trimmed.startsWith("| --- |")) return null;
+  const match = trimmed.match(ROW_PATTERN);
+  if (!match || !match.groups) return null;
+  const g = match.groups;
+  const realtimeRaw = g.realtime.trim().replace(/x$/, "");
+  const realtimeRatio = realtimeRaw === "\u2014" ? null : Number.parseFloat(realtimeRaw);
+  const fileRaw = g.fileSize.trim().replace(/MB$/, "");
+  const fileSizeMb = fileRaw === "\u2014" ? null : Number.parseFloat(fileRaw);
+  const errorRaw = g.err.trim();
+  let errorDomain = null;
+  let errorCode = null;
+  if (errorRaw && errorRaw !== "none") {
+    const [domain, code] = errorRaw.split(":");
+    errorDomain = domain && domain !== "\u2014" ? domain : null;
+    errorCode = code && code !== "\u2014" ? code : null;
+  }
+  const durationRaw = g.durationSec.trim();
+  const durationSec = durationRaw === "\u2014" ? null : Number.parseFloat(durationRaw);
+  return {
+    raw: trimmed,
+    date: g.date.trim(),
+    deviceModel: g.device.trim(),
+    iosVersion: g.iosVersion.trim(),
+    clipId: g.clipId.trim(),
+    inputResolution: g.inputRes.trim(),
+    outputResolution: g.outputRes.trim(),
+    realtimeRatio: realtimeRatio != null && Number.isFinite(realtimeRatio) ? realtimeRatio : null,
+    fileSizeMb: fileSizeMb != null && Number.isFinite(fileSizeMb) ? fileSizeMb : null,
+    thermalState: g.thermal.trim(),
+    memoryWarningCount: Number.parseInt(g.mem.trim(), 10) || 0,
+    saveResult: g.save.trim() ?? "not-run",
+    visualFloor: g.visual.trim() ?? "not-checked",
+    errorDomain,
+    errorCode,
+    durationSec: durationSec != null && Number.isFinite(durationSec) ? durationSec : null
+  };
+}
+
+// src/ios-phase0.ts
+import { z as z4 } from "zod";
+var IOS_PHASE0_SCHEMA_VERSION = 1;
+var IOS_PHASE0_PARAM_KEYS = [
+  "exposure",
+  "contrast",
+  "saturation",
+  "temperature",
+  "tint",
+  "fade",
+  "vignette",
+  "grainIntensity"
+];
+var IOS_PHASE0_PARAM_PICK = {
+  exposure: true,
+  contrast: true,
+  saturation: true,
+  temperature: true,
+  tint: true,
+  fade: true,
+  vignette: true,
+  grainIntensity: true
+};
+var iosPhase0ParamsSchema = filmLabParamsSchema.pick(IOS_PHASE0_PARAM_PICK);
+var IOS_PHASE0_OUTPUT_CODEC = "h264-mp4";
+var IOS_PHASE0_OUTPUT_LONG_EDGE = 1920;
+var IOS_PHASE0_OUTPUT_FPS = 30;
+var IOS_PHASE0_SOURCE_DURATION_CAP_SEC = 5 * 60;
+var IOS_PHASE0_SOURCE_LONG_EDGE_CAP = 3840;
+var IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES = 2 * 1024 * 1024 * 1024;
+var IOS_PHASE0_SOURCE_CAPS = {
+  durationSec: IOS_PHASE0_SOURCE_DURATION_CAP_SEC,
+  longEdge: IOS_PHASE0_SOURCE_LONG_EDGE_CAP,
+  fileSizeBytes: IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES
+};
+var IOS_PHASE0_BENCHMARK_SLOTS = [
+  "bench-short",
+  "bench-mid",
+  "bench-long"
+];
+var iosPhase0SourceKindSchema = z4.enum(["image", "video"]);
+var iosPhase0Tuple3Schema = z4.tuple([
+  z4.number().finite(),
+  z4.number().finite(),
+  z4.number().finite()
+]);
+var iosPhase0SerializableLutSchema = z4.object({
+  name: z4.string().min(1),
+  title: z4.string().min(1).optional(),
+  size: z4.number().int().positive(),
+  intensity: z4.number().min(0).max(1).default(1),
+  domainMin: iosPhase0Tuple3Schema.optional(),
+  domainMax: iosPhase0Tuple3Schema.optional(),
+  rgbaData: z4.array(z4.number().finite()).min(4).refine((data) => data.length % 4 === 0, {
+    message: "LUT rgbaData must contain RGBA quads"
+  })
+});
+function createIosPhase0SerializableLut(input) {
+  const { cube, name, intensity = 1 } = input;
+  return iosPhase0SerializableLutSchema.parse({
+    name,
+    title: cube.title || void 0,
+    size: cube.size,
+    intensity,
+    domainMin: cube.domainMin,
+    domainMax: cube.domainMax,
+    rgbaData: Array.from(cube.data)
+  });
+}
+var iosPhase0PickedSourceSchema = z4.object({
+  uri: z4.string().min(1),
+  displayName: z4.string().min(1),
+  kind: iosPhase0SourceKindSchema.optional()
+});
+var iosPhase0PickedLutFileSchema = z4.object({
+  uri: z4.string().min(1),
+  displayName: z4.string().min(1),
+  text: z4.string().min(1)
+});
+var iosPhase0SourceInfoSchema = z4.object({
+  uri: z4.string().min(1),
+  displayName: z4.string().min(1),
+  kind: iosPhase0SourceKindSchema,
+  width: z4.number().int().positive().optional(),
+  height: z4.number().int().positive().optional(),
+  durationSec: z4.number().positive().optional(),
+  fileSizeBytes: z4.number().int().nonnegative().optional(),
+  videoCodec: z4.string().min(1).optional(),
+  audioCodec: z4.string().min(1).optional(),
+  frameRate: z4.number().positive().optional(),
+  hasAudio: z4.boolean().optional()
+});
+var IOS_PHASE0_PRESET_IDS = Object.keys(PRESETS);
+var iosPhase0PresetIdSchema = z4.enum(IOS_PHASE0_PRESET_IDS);
+var iosPhase0ExportSettingsSchema = z4.object({
+  codec: z4.literal(IOS_PHASE0_OUTPUT_CODEC).default(IOS_PHASE0_OUTPUT_CODEC),
+  outputLongEdge: z4.number().int().positive().max(IOS_PHASE0_OUTPUT_LONG_EDGE).default(IOS_PHASE0_OUTPUT_LONG_EDGE),
+  outputFps: z4.literal(IOS_PHASE0_OUTPUT_FPS).default(IOS_PHASE0_OUTPUT_FPS)
+});
+var iosPhase0ExportPayloadSchema = z4.object({
+  projectId: z4.string().min(1),
+  sourceUri: z4.string().min(1),
+  sourceDisplayName: z4.string().min(1),
+  sourceKind: iosPhase0SourceKindSchema,
+  presetId: iosPhase0PresetIdSchema,
+  params: iosPhase0ParamsSchema,
+  inputLut: iosPhase0SerializableLutSchema.nullable().optional(),
+  creativeLut: iosPhase0SerializableLutSchema.nullable().optional(),
+  benchmarkSlot: z4.enum(IOS_PHASE0_BENCHMARK_SLOTS).optional(),
+  benchmarkRecipeId: z4.string().min(1).optional(),
+  includeAudio: z4.boolean().optional(),
+  exportSettings: iosPhase0ExportSettingsSchema.default({
+    codec: IOS_PHASE0_OUTPUT_CODEC,
+    outputLongEdge: IOS_PHASE0_OUTPUT_LONG_EDGE,
+    outputFps: IOS_PHASE0_OUTPUT_FPS
+  })
+});
+var iosPhase0ExportResultSchema = z4.object({
+  outputUri: z4.string().min(1),
+  outputDisplayName: z4.string().min(1),
+  outputWidth: z4.number().int().positive(),
+  outputHeight: z4.number().int().positive(),
+  outputFps: z4.number().positive(),
+  elapsedMs: z4.number().nonnegative(),
+  realtimeRatio: z4.number().positive().optional(),
+  fileSizeBytes: z4.number().int().nonnegative().optional(),
+  benchmarkRecordUri: z4.string().min(1).optional()
+});
+var iosPhase0PermissionStateSchema = z4.enum([
+  "granted",
+  "denied",
+  "limited",
+  "not-required",
+  "unknown"
+]);
+var iosPhase0ThermalStateSchema = z4.enum([
+  "nominal",
+  "fair",
+  "serious",
+  "critical",
+  "unknown"
+]);
+var iosPhase0BenchmarkRecordSchema = z4.object({
+  schemaVersion: z4.literal(IOS_PHASE0_SCHEMA_VERSION),
+  recordedAt: z4.string().min(1),
+  slot: z4.enum(IOS_PHASE0_BENCHMARK_SLOTS),
+  runIndex: z4.number().int().positive(),
+  appVersion: z4.string().min(1),
+  buildNumber: z4.string().min(1),
+  deviceModel: z4.string().min(1),
+  iosVersion: z4.string().min(1),
+  source: iosPhase0SourceInfoSchema,
+  output: iosPhase0ExportResultSchema,
+  elapsedMs: z4.number().nonnegative(),
+  realtimeRatio: z4.number().positive(),
+  thermalStateStart: iosPhase0ThermalStateSchema,
+  thermalStateEnd: iosPhase0ThermalStateSchema,
+  memoryWarningCount: z4.number().int().nonnegative(),
+  permissionResults: z4.object({
+    mediaLibrary: iosPhase0PermissionStateSchema,
+    fileImport: iosPhase0PermissionStateSchema,
+    sharing: iosPhase0PermissionStateSchema
+  }),
+  failureDomain: z4.string().min(1).optional(),
+  failureCode: z4.string().min(1).optional(),
+  failureMessage: z4.string().min(1).optional(),
+  previewArtifacts: z4.object({
+    firstFrameUri: z4.string().min(1).optional(),
+    midFrameUri: z4.string().min(1).optional(),
+    lastFrameUri: z4.string().min(1).optional()
+  })
+});
+var iosPhase0AssetRefSchema = z4.object({
+  uri: z4.string().min(1),
+  displayName: z4.string().min(1),
+  assetKind: z4.enum(["source", "lut", "derived-output", "benchmark-record"]),
+  createdAt: z4.string().min(1),
+  byteSize: z4.number().int().nonnegative().optional()
+});
+var iosPhase0LocalProjectSchema = z4.object({
+  schemaVersion: z4.literal(IOS_PHASE0_SCHEMA_VERSION),
+  projectId: z4.string().min(1),
+  createdAt: z4.string().min(1),
+  updatedAt: z4.string().min(1),
+  presetId: iosPhase0PresetIdSchema,
+  params: iosPhase0ParamsSchema,
+  source: iosPhase0SourceInfoSchema.nullable(),
+  sourceAssetRef: iosPhase0AssetRefSchema.nullable(),
+  lutAssetRef: iosPhase0AssetRefSchema.nullable(),
+  exportSettings: iosPhase0ExportSettingsSchema,
+  derivedData: z4.object({
+    lastOutput: iosPhase0AssetRefSchema.nullable().default(null),
+    lastExportResult: iosPhase0ExportResultSchema.nullable().default(null),
+    benchmarkRecords: z4.array(iosPhase0AssetRefSchema).default([])
+  }),
+  cacheMetadata: z4.object({
+    workingDirectoryUri: z4.string().min(1).optional(),
+    derivedOutputUris: z4.array(z4.string().min(1)).default([]),
+    lastPurgeAt: z4.string().min(1).optional()
+  })
+});
+function pickIosPhase0Params(params) {
+  return iosPhase0ParamsSchema.parse({
+    exposure: params.exposure,
+    contrast: params.contrast,
+    saturation: params.saturation,
+    temperature: params.temperature,
+    tint: params.tint,
+    fade: params.fade,
+    vignette: params.vignette,
+    grainIntensity: params.grainIntensity
+  });
+}
+function getIosPhase0SourceCapViolations(source) {
+  const violations = [];
+  const longEdge = typeof source.width === "number" && typeof source.height === "number" ? Math.max(source.width, source.height) : null;
+  if (typeof source.durationSec === "number" && source.durationSec > IOS_PHASE0_SOURCE_DURATION_CAP_SEC) {
+    violations.push(
+      `duration>${IOS_PHASE0_SOURCE_DURATION_CAP_SEC}s`
+    );
+  }
+  if (typeof longEdge === "number" && longEdge > IOS_PHASE0_SOURCE_LONG_EDGE_CAP) {
+    violations.push(`long-edge>${IOS_PHASE0_SOURCE_LONG_EDGE_CAP}`);
+  }
+  if (typeof source.fileSizeBytes === "number" && source.fileSizeBytes > IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES) {
+    violations.push(
+      `file-size>${IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES}`
+    );
+  }
+  return violations;
+}
 export {
+  DEFAULT_QUICK_STATE,
   FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
   FILM_LAB_DEFAULT_SHADOW_HUE,
+  IOS_PHASE0_BENCHMARK_SLOTS,
+  IOS_PHASE0_OUTPUT_CODEC,
+  IOS_PHASE0_OUTPUT_FPS,
+  IOS_PHASE0_OUTPUT_LONG_EDGE,
+  IOS_PHASE0_PARAM_KEYS,
+  IOS_PHASE0_SCHEMA_VERSION,
+  IOS_PHASE0_SOURCE_CAPS,
+  IOS_PHASE0_SOURCE_DURATION_CAP_SEC,
+  IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES,
+  IOS_PHASE0_SOURCE_LONG_EDGE_CAP,
   LEGACY_HIGHLIGHT_TONE_MAGNITUDE,
   LEGACY_SHADOW_TONE_MAGNITUDE,
   LOOK_ID_BY_PRESET,
   PARAM_KEYS,
+  PHASE0_APPROX_SOURCE_LONG_EDGE_MAX,
+  PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES,
+  PHASE0_BENCHMARK_GATES,
+  PHASE0_MAX_SOURCE_DURATION_SEC,
+  PHASE0_OUTPUT_PROFILE,
+  PHASE0_PARAM_KEYS,
+  PHASE0_PRESET_DEFAULT,
+  PHASE0_SCHEMA_VERSION,
   PRESETS,
   PRESET_BUTTONS,
   PRESET_VERSION,
+  QUICK_AXIS_DEFAULT_RANGE,
+  QUICK_AXIS_IDS,
+  applyQuickStateToParams,
+  applyQuickStateToPhase0Params,
+  assertPhase0SourceProbeWithinCaps,
+  benchmarkMarkdownTableHeader,
+  buildBenchmarkRow,
+  buildPhase0ExportRequest,
   chromaUnitFromHueDegrees,
   cloneParams,
+  coerceQuickState,
   createDefaultFilmLookGradeProps,
+  createDefaultPhase0Params,
+  createIosPhase0SerializableLut,
+  createPhase0ProjectState,
+  deserializeCubeLutData,
   filmLabParamsSchema,
   filmLookGradeDefaultProps,
   filmLookGradeInputSchema,
   filmLookSpikeDefaultProps,
   filmLookSpikeInputSchema,
   findMatchingPreset,
+  formatBenchmarkRow,
+  getIosPhase0SourceCapViolations,
+  getPhase0SourceCapViolations,
   gradeMatchesPreset,
   halationHueToHex,
   hslToRgb01,
+  iosPhase0AssetRefSchema,
+  iosPhase0BenchmarkRecordSchema,
+  iosPhase0ExportPayloadSchema,
+  iosPhase0ExportResultSchema,
+  iosPhase0ExportSettingsSchema,
+  iosPhase0LocalProjectSchema,
+  iosPhase0ParamsSchema,
+  iosPhase0PickedLutFileSchema,
+  iosPhase0PickedSourceSchema,
+  iosPhase0PresetIdSchema,
+  iosPhase0SerializableLutSchema,
+  iosPhase0SourceInfoSchema,
+  iosPhase0SourceKindSchema,
+  iosPhase0ThermalStateSchema,
   lookIdForPreset,
+  mergePhase0Params,
   nearestHueDegreesToDirection,
   packCubeLutToFloatRgbaGrid,
-  parseCube
+  parseBenchmarkRow,
+  parseCube,
+  phase0ParamsSchema,
+  phase0ProjectLutSchema,
+  phase0ProjectSchema,
+  phase0QuickStateSchema,
+  pickIosPhase0Params,
+  pickPhase0Params,
+  quickStateSchema,
+  serializeCubeLut
 };
