@@ -82,6 +82,15 @@ export class FilmtoneMediaWeb extends WebPlugin implements FilmtoneMediaPlugin {
   private readonly fileStore = new Map<string, File>();
   private exportTimer: number | null = null;
 
+  private canShareUri(uri: string): boolean {
+    try {
+      const parsed = new URL(uri);
+      return parsed.protocol === "https:" || parsed.protocol === "http:";
+    } catch {
+      return false;
+    }
+  }
+
   async pickSource(): Promise<SourceInfo | null> {
     const file = await pickFile("video/*,image/*");
     if (!file) return null;
@@ -232,9 +241,15 @@ export class FilmtoneMediaWeb extends WebPlugin implements FilmtoneMediaPlugin {
   }
 
   async shareOutput(options: { uri: string }): Promise<void> {
-    if (navigator.share) {
-      await navigator.share({ url: options.uri });
-      return;
+    if (navigator.share && this.canShareUri(options.uri)) {
+      try {
+        await navigator.share({ url: options.uri });
+        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+      }
     }
     await this.saveToPhotos(options);
   }

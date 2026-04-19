@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import { LibraryIcon } from "@/components/FilmtoneIcons";
 
 export interface TopChromeProps {
   appName: string;
+  /** Unused at the UI layer — retained for prop compatibility with the editor. */
+  modeLabel?: string;
   sourceLabel?: string;
   onMenuOpen: () => void;
   menuLabel: string;
@@ -13,6 +16,7 @@ const HIDE_AFTER_MS = 2000;
 
 export function TopChrome({
   appName,
+  modeLabel: _modeLabel,
   sourceLabel,
   onMenuOpen,
   menuLabel,
@@ -63,37 +67,26 @@ export function TopChrome({
 
   const transformClass = visible
     ? "translate-y-0 opacity-100"
-    : "-translate-y-full opacity-0 pointer-events-none";
+    : "-translate-y-6 opacity-0 pointer-events-none";
 
   return (
-    <header
-      className={`fixed top-0 left-0 right-0 z-30 px-4 pt-[calc(env(safe-area-inset-top,0px)+10px)] pb-3 glass-panel border-b border-white/12 flex items-center gap-3 transition-all duration-200 ease-out ${transformClass}`}
-    >
-      <span className="text-base font-medium tracking-[-0.01em] text-white shrink-0">
-        {appName}
-      </span>
-      <span className="flex-1 text-center text-[11px] text-[var(--text-muted)] truncate max-w-[40%] mx-auto">
-        {sourceLabel ?? ""}
-      </span>
-      <button
-        type="button"
-        onClick={onMenuOpen}
-        aria-label={menuLabel}
-        className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/[0.06] text-white/80 shrink-0"
+    <header className="fixed inset-x-0 top-0 z-30 px-4 pt-[calc(env(safe-area-inset-top,0px)+10px)]">
+      <div
+        className={`mx-auto flex max-w-3xl items-center gap-3 squircle-lg px-4 py-3 liquid-panel transition-all duration-200 ease-out ${transformClass}`}
       >
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 18 18"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          aria-hidden="true"
+        <p className="min-w-0 flex-1 truncate text-[15px] font-medium tracking-[-0.02em] text-white">
+          {sourceLabel ?? appName}
+        </p>
+
+        <button
+          type="button"
+          onClick={onMenuOpen}
+          aria-label={menuLabel}
+          className="shrink-0 p-2 -mr-1 text-white/64 active:text-white transition-colors"
         >
-          <circle cx="3.5" cy="9" r="1.4" fill="currentColor" />
-          <circle cx="9" cy="9" r="1.4" fill="currentColor" />
-          <circle cx="14.5" cy="9" r="1.4" fill="currentColor" />
-        </svg>
-      </button>
+          <LibraryIcon className="h-5 w-5" />
+        </button>
+      </div>
     </header>
   );
 }

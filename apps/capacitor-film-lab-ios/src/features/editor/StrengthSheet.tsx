@@ -12,8 +12,12 @@
  * - ESC キーやブラウザ専用ハンドラは付けない（Capacitor WebView 想定）。
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ControlSlider } from "film-lab-ui";
+import {
+  ChevronDownIcon,
+  CompareIcon,
+} from "@/components/FilmtoneIcons";
 
 type QuickAxisKey = "filmCharacter" | "era" | "dynamics";
 
@@ -38,9 +42,12 @@ interface StrengthSheetProps {
   /** Compare 長押し解除（pointerup / pointercancel 共通） */
   onCompareHoldEnd?: () => void;
   onReset: () => void;
+  closeLabel: string;
   resetLabel: string;
   compareLabel: string;
   strengthLabel: string;
+  quickHint: string;
+  sliderResetHint: string;
   /** Adjust（Quick 3）ディスクロージャ。未指定なら非表示 */
   quickAxes?: QuickAxes;
   adjustDisclosureLabel: string;
@@ -64,149 +71,215 @@ export function StrengthSheet({
   onCompareHoldStart,
   onCompareHoldEnd,
   onReset,
+  closeLabel,
   resetLabel,
   compareLabel,
   strengthLabel,
+  quickHint,
+  sliderResetHint,
   quickAxes,
   adjustDisclosureLabel,
 }: StrengthSheetProps) {
   const [adjustOpen, setAdjustOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(isOpen);
+  const activeQuickAxes = quickAxes
+    ? [
+        {
+          key: "filmCharacter",
+          label: quickAxes.labels.filmCharacter,
+          value: quickAxes.filmCharacter,
+        },
+        { key: "era", label: quickAxes.labels.era, value: quickAxes.era },
+        {
+          key: "dynamics",
+          label: quickAxes.labels.dynamics,
+          value: quickAxes.dynamics,
+        },
+      ].filter((entry) => Math.abs(entry.value) >= 0.01)
+    : [];
 
-  // unmount completely when closed so backdrop doesn't intercept taps
-  // and so transitions reset cleanly when re-opened. Keep the wrapper
-  // mounted for entrance animation by always rendering and toggling
-  // pointer-events / opacity / translate via Tailwind.
+  useEffect(() => {
+    if (isOpen) {
+      setIsMounted(true);
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setIsMounted(false);
+    }, 220);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [isOpen]);
+
+  if (!isMounted) {
+    return null;
+  }
+
   return (
     <div
       aria-hidden={!isOpen}
       className={[
-        "fixed inset-0 z-50",
+        "fixed inset-0 z-50 isolate",
         isOpen ? "pointer-events-auto" : "pointer-events-none",
       ].join(" ")}
     >
       {/* Backdrop */}
-      <button
-        type="button"
-        aria-label={resetLabel /* keep aria minimal: backdrop is decorative click target */}
-        tabIndex={-1}
+      <div
+        aria-hidden="true"
         onClick={onClose}
         className={[
-          "fixed inset-0 bg-black/40 transition-opacity duration-200 ease-out",
-          isOpen ? "opacity-100" : "opacity-0 pointer-events-none",
+          "absolute inset-0 bg-black/46 backdrop-blur-[2px] transition-opacity duration-200 ease-out",
+          isOpen ? "opacity-100" : "opacity-0",
         ].join(" ")}
       />
 
       {/* Sheet */}
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-label={`${presetLabel} — ${strengthLabel}`}
-        className={[
-          "fixed bottom-0 left-0 right-0 max-h-[60vh] overflow-y-auto glass-panel border-t border-white/12 rounded-t-[28px] p-5 pb-8 pointer-events-auto transition-transform duration-200 ease-out",
-          isOpen ? "translate-y-0" : "translate-y-full",
-        ].join(" ")}
-      >
-        {/* Drag handle */}
-        <div className="mx-auto h-1 w-10 rounded-full bg-white/24 mb-4" />
+      <div className="absolute inset-0 flex items-end">
+        <section
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${presetLabel} — ${strengthLabel}`}
+          className={[
+            "relative z-10 max-h-[76vh] w-full overflow-y-auto overscroll-contain squircle-top-xl px-5 pt-4 pb-[calc(env(safe-area-inset-bottom,0px)+20px)] pointer-events-auto liquid-panel-strong transition-transform duration-200 ease-out",
+            isOpen ? "translate-y-0" : "translate-y-full",
+          ].join(" ")}
+          style={{
+            WebkitOverflowScrolling: "touch",
+            touchAction: "pan-y",
+          }}
+        >
+          <div className="-mx-5 sticky top-0 z-10 mb-5 bg-[linear-gradient(180deg,rgba(14,14,14,0.96),rgba(14,14,14,0.88)_72%,transparent)] px-5 pb-4 pt-1 backdrop-blur-xl">
+            <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-white/22" />
 
-        {/* Header row */}
-        <header className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex flex-col gap-1">
-            <p className="section-header truncate">{presetLabel}</p>
-            <CompareHoldButton
-              label={compareLabel}
-              onHoldStart={onCompareHoldStart}
-              onHoldEnd={onCompareHoldEnd}
+            <header className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex flex-col gap-2">
+                <h2 className="truncate text-[1.6rem] font-semibold tracking-[-0.03em] text-white">
+                  {presetLabel}
+                </h2>
+                <CompareHoldButton
+                  label={compareLabel}
+                  onHoldStart={onCompareHoldStart}
+                  onHoldEnd={onCompareHoldEnd}
+                />
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  onClick={onReset}
+                  className="min-h-[44px] px-3 text-sm font-medium text-white/60 active:text-white"
+                >
+                  {resetLabel}
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  aria-label={closeLabel}
+                  className="min-h-[44px] px-3 text-sm font-medium text-[var(--accent-amber1)] active:opacity-70"
+                >
+                  {closeLabel}
+                </button>
+              </div>
+            </header>
+          </div>
+
+          {/* Strength slider */}
+          <div className="mt-5 squircle-md bg-white/[0.02] p-4">
+            <ControlSlider
+              label={strengthLabel}
+              value={strength}
+              min={0}
+              max={1}
+              step={0.01}
+              defaultValue={1}
+              formatValue={formatStrengthPercent}
+              onChange={onStrengthChange}
+              labelResetHint={sliderResetHint}
             />
           </div>
-          <button
-            type="button"
-            onClick={onReset}
-            className="text-[11px] text-[var(--text-base-70)] hover:text-white px-2 py-1 transition-colors"
-          >
-            {resetLabel}
-          </button>
-        </header>
 
-        {/* Strength slider */}
-        <div className="mt-5">
-          <ControlSlider
-            label={strengthLabel}
-            value={strength}
-            min={0}
-            max={1}
-            step={0.01}
-            defaultValue={1}
-            formatValue={formatStrengthPercent}
-            onChange={onStrengthChange}
-          />
-        </div>
+          {/* Adjust disclosure */}
+          {quickAxes && (
+            <div className="mt-5 squircle-md bg-white/[0.02] p-4">
+              <button
+                type="button"
+                onClick={() => setAdjustOpen((prev) => !prev)}
+                aria-expanded={adjustOpen}
+                className="flex w-full items-center justify-between gap-3 text-left"
+              >
+                <span className="editor-kicker">{adjustDisclosureLabel}</span>
+                <ChevronDownIcon
+                  aria-hidden="true"
+                  className={[
+                    "h-5 w-5 shrink-0 text-white/54 transition-transform duration-150 ease-out",
+                    adjustOpen ? "rotate-180" : "rotate-0",
+                  ].join(" ")}
+                />
+              </button>
 
-        {/* Adjust disclosure */}
-        {quickAxes && (
-          <div className="mt-5 border-t border-white/8 pt-4">
-            <button
-              type="button"
-              onClick={() => setAdjustOpen((prev) => !prev)}
-              aria-expanded={adjustOpen}
-              className="flex items-center justify-between w-full text-left"
-            >
-              <span className="section-header">{adjustDisclosureLabel}</span>
-              <span
-                aria-hidden="true"
+              <div className="mt-4 flex flex-wrap gap-2">
+                {activeQuickAxes.length > 0 ? (
+                  activeQuickAxes.map((entry) => (
+                    <span key={entry.key} className="editor-chip">
+                      {entry.label} {formatSignedPercent(entry.value)}
+                    </span>
+                  ))
+                ) : (
+                  <p className="text-sm leading-6 text-[var(--text-muted)]">
+                    {quickHint}
+                  </p>
+                )}
+              </div>
+
+              <div
                 className={[
-                  "text-[var(--text-muted)] text-xs transition-transform duration-150 ease-out",
-                  adjustOpen ? "rotate-180" : "rotate-0",
+                  "grid transition-[grid-template-rows] duration-150 ease-out",
+                  adjustOpen ? "mt-4 grid-rows-[1fr]" : "grid-rows-[0fr]",
                 ].join(" ")}
               >
-                ▾
-              </span>
-            </button>
-
-            <div
-              className={[
-                "grid transition-[grid-template-rows] duration-150 ease-out",
-                adjustOpen ? "grid-rows-[1fr] mt-3" : "grid-rows-[0fr]",
-              ].join(" ")}
-            >
-              <div className="overflow-hidden">
-                <div className="space-y-3">
-                  <ControlSlider
-                    label={quickAxes.labels.filmCharacter}
-                    value={quickAxes.filmCharacter}
-                    min={-1}
-                    max={1}
-                    step={0.01}
-                    defaultValue={0}
-                    formatValue={formatSignedPercent}
-                    onChange={(v) => quickAxes.onChange("filmCharacter", v)}
-                  />
-                  <ControlSlider
-                    label={quickAxes.labels.era}
-                    value={quickAxes.era}
-                    min={-1}
-                    max={1}
-                    step={0.01}
-                    defaultValue={0}
-                    formatValue={formatSignedPercent}
-                    onChange={(v) => quickAxes.onChange("era", v)}
-                  />
-                  <ControlSlider
-                    label={quickAxes.labels.dynamics}
-                    value={quickAxes.dynamics}
-                    min={-1}
-                    max={1}
-                    step={0.01}
-                    defaultValue={0}
-                    formatValue={formatSignedPercent}
-                    onChange={(v) => quickAxes.onChange("dynamics", v)}
-                  />
+                <div className="overflow-hidden">
+                  <div className="space-y-3 pt-1">
+                    <ControlSlider
+                      label={quickAxes.labels.filmCharacter}
+                      value={quickAxes.filmCharacter}
+                      min={-1}
+                      max={1}
+                      step={0.01}
+                      defaultValue={0}
+                      formatValue={formatSignedPercent}
+                      onChange={(v) => quickAxes.onChange("filmCharacter", v)}
+                      labelResetHint={sliderResetHint}
+                    />
+                    <ControlSlider
+                      label={quickAxes.labels.era}
+                      value={quickAxes.era}
+                      min={-1}
+                      max={1}
+                      step={0.01}
+                      defaultValue={0}
+                      formatValue={formatSignedPercent}
+                      onChange={(v) => quickAxes.onChange("era", v)}
+                      labelResetHint={sliderResetHint}
+                    />
+                    <ControlSlider
+                      label={quickAxes.labels.dynamics}
+                      value={quickAxes.dynamics}
+                      min={-1}
+                      max={1}
+                      step={0.01}
+                      defaultValue={0}
+                      formatValue={formatSignedPercent}
+                      onChange={(v) => quickAxes.onChange("dynamics", v)}
+                      labelResetHint={sliderResetHint}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
-      </section>
+          )}
+        </section>
+      </div>
     </div>
   );
 }
@@ -218,15 +291,39 @@ interface CompareHoldButtonProps {
 }
 
 function CompareHoldButton({ label, onHoldStart, onHoldEnd }: CompareHoldButtonProps) {
+  const activePointerIdRef = useRef<number | null>(null);
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (activePointerIdRef.current !== null) return;
+    activePointerIdRef.current = event.pointerId;
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // ignore
+    }
+    onHoldStart?.();
+  };
+
+  const handlePointerEnd = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (activePointerIdRef.current !== event.pointerId) return;
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      // ignore
+    }
+    activePointerIdRef.current = null;
+    onHoldEnd?.();
+  };
+
   return (
     <button
       type="button"
-      onPointerDown={() => onHoldStart?.()}
-      onPointerUp={() => onHoldEnd?.()}
-      onPointerCancel={() => onHoldEnd?.()}
-      onPointerLeave={() => onHoldEnd?.()}
-      className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/12 text-[10px] uppercase tracking-[0.12em] text-[var(--text-base-70)] active:bg-white/[0.08] active:text-white select-none touch-none"
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerEnd}
+      onPointerCancel={handlePointerEnd}
+      className="inline-flex min-h-[44px] items-center gap-2 squircle-pill border border-white/12 bg-white/[0.02] px-4 py-2 text-[11px] font-medium text-[var(--text-base-70)] active:bg-white/[0.08] active:text-white select-none touch-none"
     >
+      <CompareIcon className="h-3.5 w-3.5" />
       {label}
     </button>
   );
