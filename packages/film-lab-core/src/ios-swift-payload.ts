@@ -9,9 +9,11 @@ import {
   PHASE0_PRESET_STRENGTH_DEFAULT,
   PHASE0_RGB_SHIFT_MAX,
   PHASE0_SCHEMA_VERSION,
+  mergePhase0Params,
   pickPhase0Params,
   type Phase0Params,
 } from "./phase0-schema";
+import { FILMTONE_IOS_PRESET_OVERRIDES } from "./ios-preset-overrides";
 import { PRESETS, type PresetName } from "./presets";
 import {
   DEFAULT_QUICK_STATE,
@@ -41,11 +43,21 @@ export interface FilmtoneIosSwiftPayload {
   quickWeights: Record<QuickAxisId, Partial<Record<keyof Phase0Params, number>>>;
 }
 
-export function buildFilmtoneIosSwiftPayload(): FilmtoneIosSwiftPayload {
+export function buildFilmtoneIosPresetMap(
+  presetOverrides: Partial<Record<PresetName, Partial<Phase0Params>>> = FILMTONE_IOS_PRESET_OVERRIDES,
+): Record<PresetName, Phase0Params> {
   const presetNames = Object.keys(PRESETS) as PresetName[];
-  const presets = Object.fromEntries(
-    presetNames.map((name) => [name, pickPhase0Params(PRESETS[name])]),
+  return Object.fromEntries(
+    presetNames.map((name) => {
+      const base = pickPhase0Params(PRESETS[name]);
+      const patch = presetOverrides[name];
+      return [name, patch ? mergePhase0Params(base, patch) : base];
+    }),
   ) as Record<PresetName, Phase0Params>;
+}
+
+export function buildFilmtoneIosSwiftPayload(): FilmtoneIosSwiftPayload {
+  const presets = buildFilmtoneIosPresetMap();
 
   return {
     schemaVersion: PHASE0_SCHEMA_VERSION,

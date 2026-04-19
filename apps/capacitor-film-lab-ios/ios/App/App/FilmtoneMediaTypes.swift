@@ -77,6 +77,10 @@ struct Phase0ParamsDTO: Codable {
     let halationSoftKnee: Double
     let compressionAmount: Double
     let compressionRange: Double
+    let printContrast: Double
+    let cyan: Double
+    let magenta: Double
+    let yellow: Double
     let fade: Double
     let vignette: Double
     let grainIntensity: Double

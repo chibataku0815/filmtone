@@ -23,6 +23,10 @@ describe("phase0 schema", () => {
     expect(phase0.rgbShift).toBe(PRESETS.cinematic.rgbShift);
     expect(phase0.bloomStrength).toBe(PRESETS.cinematic.bloomStrength);
     expect(phase0.diffusion).toBe(PRESETS.cinematic.diffusion);
+    expect(phase0.printContrast).toBe(PRESETS.cinematic.printContrast);
+    expect(phase0.cyan).toBe(PRESETS.cinematic.cyan);
+    expect(phase0.magenta).toBe(PRESETS.cinematic.magenta);
+    expect(phase0.yellow).toBe(PRESETS.cinematic.yellow);
     expect(phase0.grainIntensity).toBe(PRESETS.cinematic.grainIntensity);
   });
 
@@ -209,5 +213,9 @@ describe("phase0 schema", () => {
     expect(legacy.params.bloomStrength).toBe(PRESETS.cinematic.bloomStrength);
     expect(legacy.params.diffusion).toBe(PRESETS.cinematic.diffusion);
     expect(legacy.params.halationHue).toBe(PRESETS.cinematic.halationHue);
+    expect(legacy.params.printContrast).toBe(PRESETS.cinematic.printContrast);
+    expect(legacy.params.cyan).toBe(PRESETS.cinematic.cyan);
+    expect(legacy.params.magenta).toBe(PRESETS.cinematic.magenta);
+    expect(legacy.params.yellow).toBe(PRESETS.cinematic.yellow);
   });
 });

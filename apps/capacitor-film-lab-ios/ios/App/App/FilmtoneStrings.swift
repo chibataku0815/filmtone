@@ -66,6 +66,7 @@ struct FilmtoneStrings {
     let advancedParamsHint: String
     let advancedAdjustmentsActive: String
     let advancedBasicLabel: String
+    let advancedProcessLabel: String
     let advancedOpticsLabel: String
     let advancedGlowLabel: String
     let advancedGrainLabel: String
@@ -117,6 +118,7 @@ struct FilmtoneStrings {
 extension FilmtoneStrings {
     init(locale: Locale = .current) {
         self.locale = locale
+        let prefersJapanese = locale.language.languageCode?.identifier.hasPrefix("ja") == true
         appName = filmtoneLocalized(
             "filmtone.app_name",
             defaultValue: "Filmtone",
@@ -257,6 +259,11 @@ extension FilmtoneStrings {
             defaultValue: "Basic",
             comment: "Group title for basic advanced params."
         )
+        advancedProcessLabel = filmtoneLocalized(
+            "filmtone.advanced.group.process",
+            defaultValue: prefersJapanese ? "プロセス" : "Process",
+            comment: "Group title for process advanced params."
+        )
         advancedOpticsLabel = filmtoneLocalized(
             "filmtone.advanced.group.optics",
             defaultValue: "Optics",
@@ -273,8 +280,8 @@ extension FilmtoneStrings {
             comment: "Group title for grain advanced params."
         )
         advancedToneLabel = filmtoneLocalized(
-            "filmtone.advanced.group.tone",
-            defaultValue: "Tone / Process",
+            "filmtone.advanced.group.tone_only",
+            defaultValue: prefersJapanese ? "階調" : "Tone",
             comment: "Group title for tone advanced params."
         )
         paramLabels = [
@@ -303,6 +310,10 @@ extension FilmtoneStrings {
             "grainRadialMix": filmtoneLocalized("filmtone.param.grain_radial_mix", defaultValue: "Grain Radial Mix", comment: "Advanced parameter label."),
             "compressionAmount": filmtoneLocalized("filmtone.param.compression_amount", defaultValue: "Compression Amount", comment: "Advanced parameter label."),
             "compressionRange": filmtoneLocalized("filmtone.param.compression_range", defaultValue: "Compression Range", comment: "Advanced parameter label."),
+            "printContrast": filmtoneLocalized("filmtone.param.print_contrast", defaultValue: "Print Contrast", comment: "Advanced parameter label."),
+            "cyan": filmtoneLocalized("filmtone.param.cyan", defaultValue: "Cyan", comment: "Advanced parameter label."),
+            "magenta": filmtoneLocalized("filmtone.param.magenta", defaultValue: "Magenta", comment: "Advanced parameter label."),
+            "yellow": filmtoneLocalized("filmtone.param.yellow", defaultValue: "Yellow", comment: "Advanced parameter label."),
         ]
         resetLabel = filmtoneLocalized(
             "filmtone.action.reset",

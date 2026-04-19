@@ -56,6 +56,10 @@ struct FilmtonePhase0Params: Codable, Equatable {
     var halationSoftKnee: Double
     var compressionAmount: Double
     var compressionRange: Double
+    var printContrast: Double
+    var cyan: Double
+    var magenta: Double
+    var yellow: Double
     var fade: Double
     var vignette: Double
     var grainIntensity: Double
@@ -85,6 +89,10 @@ struct FilmtonePhase0Params: Codable, Equatable {
         "halationSoftKnee": \.halationSoftKnee,
         "compressionAmount": \.compressionAmount,
         "compressionRange": \.compressionRange,
+        "printContrast": \.printContrast,
+        "cyan": \.cyan,
+        "magenta": \.magenta,
+        "yellow": \.yellow,
         "fade": \.fade,
         "vignette": \.vignette,
         "grainIntensity": \.grainIntensity,
@@ -139,6 +147,10 @@ struct FilmtonePhase0Params: Codable, Equatable {
             halationSoftKnee: halationSoftKnee,
             compressionAmount: compressionAmount,
             compressionRange: compressionRange,
+            printContrast: printContrast,
+            cyan: cyan,
+            magenta: magenta,
+            yellow: yellow,
             fade: fade,
             vignette: vignette,
             grainIntensity: grainIntensity
@@ -568,6 +580,8 @@ enum FilmtonePhase0Math {
             return max(0, min(2, value))
         case "temperature", "tint":
             return max(-1, min(1, value))
+        case "cyan", "magenta", "yellow":
+            return max(-1, min(1, value))
         case "halationSpread":
             return max(0, min(40, value))
         case "halationHue":
@@ -588,6 +602,7 @@ enum FilmtonePhase0Math {
              "halationSoftKnee",
              "compressionAmount",
              "compressionRange",
+             "printContrast",
              "fade",
              "vignette",
              "grainIntensity":

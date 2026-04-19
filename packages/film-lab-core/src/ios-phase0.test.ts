@@ -68,6 +68,10 @@ test("iosPhase0ExportPayloadSchema accepts widened optical params and export def
       halationSoftKnee: 0.3,
       compressionAmount: 0.12,
       compressionRange: 0.5,
+      printContrast: 0.35,
+      cyan: -0.2,
+      magenta: 0.1,
+      yellow: -0.05,
       fade: 0.02,
       vignette: 0.2,
       grainIntensity: 0.1,
@@ -78,6 +82,10 @@ test("iosPhase0ExportPayloadSchema accepts widened optical params and export def
   expect(payload.params.rgbShift).toBe(PHASE0_RGB_SHIFT_MAX);
   expect(payload.params.bloomStrength).toBe(0.24);
   expect(payload.params.compressionAmount).toBe(0.12);
+  expect(payload.params.printContrast).toBe(0.35);
+  expect(payload.params.cyan).toBe(-0.2);
+  expect(payload.params.magenta).toBe(0.1);
+  expect(payload.params.yellow).toBe(-0.05);
 });
 
 test("iosPhase0ExportPayloadSchema rejects rgbShift above the shared phase0 max", () => {
