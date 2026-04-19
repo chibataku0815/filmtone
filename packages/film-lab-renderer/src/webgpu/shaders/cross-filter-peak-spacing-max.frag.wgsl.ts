@@ -24,7 +24,9 @@ struct Params {
 @group(1) @binding(1) var uSource: texture_2d<f32>;
 @group(1) @binding(2) var uSampler: sampler;
 
-const MAX_RADIUS: i32 = 48;
+// Must cover the backend-authored public max radius for the
+// crossFilterMinSpacing 10.00 setting.
+const MAX_RADIUS: i32 = 264;
 const RANK_LUMA_SCALE: f32 = 64.0;
 const RANK_TIE_BIAS: f32 = 0.1;
 const LUMA_709: vec3f = vec3f(0.2126, 0.7152, 0.0722);

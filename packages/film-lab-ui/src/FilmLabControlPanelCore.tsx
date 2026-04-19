@@ -58,7 +58,7 @@ const COMPRESSION_AMOUNT_UI_MAX = 0.4;
 const COMPRESSION_RANGE_UI_MAX = 0.6;
 const COMPRESSION_AMOUNT_DEFAULT = 0.1;
 const CROSS_FILTER_MIN_SPACING_MIN = 1;
-const CROSS_FILTER_MIN_SPACING_MAX = 2;
+const CROSS_FILTER_MIN_SPACING_MAX = 10;
 
 function getCompressionAmountSliderMax(compressionAmount: number): number {
   return Math.max(COMPRESSION_AMOUNT_UI_MAX, compressionAmount);
@@ -1168,6 +1168,18 @@ export const FilmLabControlPanelCore = forwardRef<
                     </div>
 
                     <div className={`mt-3 flex flex-col gap-2.5 border-t border-white/[0.08] pt-3 ${!crossFilterEnabled ? "pointer-events-none opacity-30" : ""}`}>
+                      <PanelControlSlider
+                        sliderLabelResetHint={sliderLabelResetHint}
+                        label={tFilmLab("controls.crossFilterThreshold")}
+                        hint={tFilmLab("controls.crossFilterThresholdHint")}
+                        value={params.crossFilterThreshold}
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        defaultValue={0.92}
+                        onChange={(v) => updateParam("crossFilterThreshold", v)}
+                        onCommit={commit}
+                      />
                       <PanelControlSlider
                         sliderLabelResetHint={sliderLabelResetHint}
                         label={tFilmLab("controls.crossFilterChromatic")}

@@ -129,7 +129,11 @@ const CROSS_FILTER_SPACING_MAX_BYTES = 32;
 const CROSS_FILTER_STREAK_BYTES = 48;
 const CROSS_FILTER_MAX_STREAKS = 4;
 const CROSS_FILTER_SPACING_RADIUS_MAX_PX = 48.0;
-const CROSS_FILTER_SPACING_RADIUS_EXTRA_MAX_PX = 24.0;
+const CROSS_FILTER_SPACING_RADIUS_STEP_PX = 24.0;
+const CROSS_FILTER_THRESHOLD_HARD_BASELINE = 0.7;
+const CROSS_FILTER_THRESHOLD_CONTROL_BASELINE = 0.92;
+const CROSS_FILTER_MIN_SPACING_MIN = 1.0;
+const CROSS_FILTER_MIN_SPACING_MAX = 10.0;
 /** Number of cross-filter peak history ring slots (2 = ping-pong). */
 const CROSS_FILTER_HISTORY_SLOTS = 2;
 /**
@@ -151,6 +155,42 @@ const LIGHTSHAFTS_EXPOSURE = 0.38;
 /** Light shafts uniform layouts. */
 const LIGHTSHAFTS_PARAMS_BYTES = 32;
 const LIGHTSHAFTS_BLEND_PARAMS_BYTES = 16;
+
+function smoothstep01(value: number): number {
+  const clamped = Math.min(1, Math.max(0, value));
+  return clamped * clamped * (3 - 2 * clamped);
+}
+
+function computeCrossFilterEffectiveThreshold(threshold: number, hardModeActive: boolean): number {
+  if (!hardModeActive) {
+    return threshold;
+  }
+  return Math.min(
+    1,
+    Math.max(
+      0,
+      threshold -
+        (CROSS_FILTER_THRESHOLD_CONTROL_BASELINE - CROSS_FILTER_THRESHOLD_HARD_BASELINE),
+    ),
+  );
+}
+
+function computeCrossFilterSpacingRadiusPx(minSpacing: number): number {
+  const clamped = Math.min(
+    CROSS_FILTER_MIN_SPACING_MAX,
+    Math.max(CROSS_FILTER_MIN_SPACING_MIN, minSpacing),
+  );
+  let extraRadius = 0;
+  for (
+    let stepStart = CROSS_FILTER_MIN_SPACING_MIN;
+    stepStart < CROSS_FILTER_MIN_SPACING_MAX;
+    stepStart += 1
+  ) {
+    extraRadius +=
+      CROSS_FILTER_SPACING_RADIUS_STEP_PX * smoothstep01(clamped - stepStart);
+  }
+  return Math.round(CROSS_FILTER_SPACING_RADIUS_MAX_PX + extraRadius);
+}
 
 const DEFAULT_BLOOM_THRESHOLD = 0.8;
 const DEFAULT_BLOOM_KNEE = 0.5;
@@ -2218,7 +2258,10 @@ export class WebGPUBackend implements RenderBackend {
     const randomness = Math.min(1, Math.max(0, this.paramNumber("crossFilterRandomness", 1)));
     const length = Math.min(1, Math.max(0, this.paramNumber("crossFilterLength", 0.5)));
     const chromatic = Math.min(1, Math.max(0, this.paramNumber("crossFilterChromatic", 0.3)));
-    const minSpacing = Math.min(2, Math.max(1, this.paramNumber("crossFilterMinSpacing", 1)));
+    const minSpacing = Math.min(
+      CROSS_FILTER_MIN_SPACING_MAX,
+      Math.max(CROSS_FILTER_MIN_SPACING_MIN, this.paramNumber("crossFilterMinSpacing", 1)),
+    );
     const rawSpikes = Math.max(2, Math.round(this.paramNumber("crossFilterSpikes", 4)));
     const spikeCount = rawSpikes % 2 === 0 ? rawSpikes : rawSpikes + 1;
     const dirCount = Math.max(
@@ -2226,7 +2269,10 @@ export class WebGPUBackend implements RenderBackend {
       Math.min(CROSS_FILTER_MAX_STREAKS, Math.floor(spikeCount / 2)),
     );
     const angleRad = (this.paramNumber("crossFilterAngle", 0) * Math.PI) / 180;
-    const effectiveThreshold = hardModeActive ? 0.7 : threshold;
+    const effectiveThreshold = computeCrossFilterEffectiveThreshold(
+      threshold,
+      hardModeActive,
+    );
     const effectiveSizeLimit = hardModeActive ? 1.0 : sizeLimit;
     const effectiveRandomness = hardModeActive ? 1.0 : randomness;
 
@@ -2313,12 +2359,7 @@ export class WebGPUBackend implements RenderBackend {
 
     let currentPeakTexture = peakTexture;
     if (minSpacing >= 0.001) {
-      const spacingBoost = Math.min(1, Math.max(0, minSpacing - 1.0));
-      const spacingSmooth = spacingBoost * spacingBoost * (3 - 2 * spacingBoost);
-      const radiusPx = Math.round(
-        CROSS_FILTER_SPACING_RADIUS_MAX_PX +
-          CROSS_FILTER_SPACING_RADIUS_EXTRA_MAX_PX * spacingSmooth,
-      );
+      const radiusPx = computeCrossFilterSpacingRadiusPx(minSpacing);
 
       const spacingMaxScratchX = this.crossFilter.spacingMaxScratch[0]!;
       spacingMaxScratchX[0] = 1 / halfWidth;
@@ -2729,8 +2770,8 @@ export class WebGPUBackend implements RenderBackend {
     const crossFilterHardModeRaw = this.paramNumber("crossFilterHardMode", 0);
     const crossFilterHardMode = crossFilterHardModeRaw >= 0.5 ? 1 : 0;
     const crossFilterMinSpacing = Math.min(
-      2,
-      Math.max(1, this.paramNumber("crossFilterMinSpacing", 1)),
+      CROSS_FILTER_MIN_SPACING_MAX,
+      Math.max(CROSS_FILTER_MIN_SPACING_MIN, this.paramNumber("crossFilterMinSpacing", 1)),
     );
     this.maybeResetCrossFilterHistory(
       crossFilterStrength,

@@ -10,7 +10,9 @@ uniform float uReadMetadata;
 in vec2 vUv;
 out vec4 fragColor;
 
-const int MAX_RADIUS = 48;
+// Must cover the backend-authored public max radius for the
+// crossFilterMinSpacing 10.00 setting.
+const int MAX_RADIUS = 264;
 const float RANK_LUMA_SCALE = 64.0;
 const float RANK_TIE_BIAS = 0.1;
 

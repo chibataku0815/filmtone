@@ -66,7 +66,43 @@ const RT_OPTIONS: THREE.RenderTargetOptions = {
 };
 
 const CROSS_FILTER_SPACING_RADIUS_MAX_PX = 48.0;
-const CROSS_FILTER_SPACING_RADIUS_EXTRA_MAX_PX = 24.0;
+const CROSS_FILTER_SPACING_RADIUS_STEP_PX = 24.0;
+const CROSS_FILTER_THRESHOLD_HARD_BASELINE = 0.7;
+const CROSS_FILTER_THRESHOLD_CONTROL_BASELINE = 0.92;
+const CROSS_FILTER_MIN_SPACING_MIN = 1;
+const CROSS_FILTER_MIN_SPACING_MAX = 10;
+
+function computeCrossFilterEffectiveThreshold(threshold: number, hardModeActive: boolean): number {
+  if (!hardModeActive) {
+    return threshold;
+  }
+  return Math.min(
+    1,
+    Math.max(
+      0,
+      threshold -
+        (CROSS_FILTER_THRESHOLD_CONTROL_BASELINE - CROSS_FILTER_THRESHOLD_HARD_BASELINE),
+    ),
+  );
+}
+
+function computeCrossFilterSpacingRadiusPx(minSpacing: number): number {
+  const clamped = Math.min(
+    CROSS_FILTER_MIN_SPACING_MAX,
+    Math.max(CROSS_FILTER_MIN_SPACING_MIN, minSpacing),
+  );
+  let extraRadius = 0;
+  for (
+    let stepStart = CROSS_FILTER_MIN_SPACING_MIN;
+    stepStart < CROSS_FILTER_MIN_SPACING_MAX;
+    stepStart += 1
+  ) {
+    extraRadius +=
+      CROSS_FILTER_SPACING_RADIUS_STEP_PX *
+      THREE.MathUtils.smoothstep(clamped - stepStart, 0.0, 1.0);
+  }
+  return Math.round(CROSS_FILTER_SPACING_RADIUS_MAX_PX + extraRadius);
+}
 
 export type CrossFilterDebugView =
   | "off"
@@ -1307,13 +1343,18 @@ export class WebGLBackend implements RenderBackend {
     const angleRad = (this.crossFilterAngle * Math.PI) / 180;
 
     // Phase 6: Effective values pattern.
-    // Hard Mode overrides 3 user-controlled values at uniform-set time.
+    // Hard Mode still snaps size/randomness, but threshold now follows the
+    // user control through a legacy-compatible remap so the old 0.92 stored
+    // baseline preserves the prior 0.70 onset behavior.
     // CRITICAL: Never mutate this.crossFilter* fields → user values stay round-trip safe.
     // NOTE: Length is NOT boosted in Hard Mode — the streak shader uses the same MAX_STREAK_PX (64)
     // as Phase 5 to prevent UV wrap artifacts on smaller images. Hard Mode's distinguishing
     // character comes from gain/falloff/threshold/bloom changes instead of longer marches.
     const isHard = this.crossFilterHardMode >= 0.5;
-    const effectiveThreshold  = isHard ? 0.70 : this.crossFilterThreshold;
+    const effectiveThreshold  = computeCrossFilterEffectiveThreshold(
+      this.crossFilterThreshold,
+      isHard,
+    );
     const effectiveSizeLimit  = isHard ? 1.0  : this.crossFilterSizeLimit;
     const effectiveRandomness = isHard ? 1.0  : this.crossFilterRandomness;
     const hardModeUniform     = isHard ? 1.0  : 0.0;
@@ -1342,12 +1383,7 @@ export class WebGLBackend implements RenderBackend {
 
     let currentPeakTarget = this.rtCrossPeak!;
     if (this.crossFilterMinSpacing >= 0.001) {
-      const spacingBoost = Math.min(1, Math.max(0, this.crossFilterMinSpacing - 1.0));
-      const radiusPx = Math.round(
-        CROSS_FILTER_SPACING_RADIUS_MAX_PX +
-          CROSS_FILTER_SPACING_RADIUS_EXTRA_MAX_PX *
-            THREE.MathUtils.smoothstep(spacingBoost, 0.0, 1.0),
-      );
+      const radiusPx = computeCrossFilterSpacingRadiusPx(this.crossFilterMinSpacing);
 
       const smu = this.crossFilterPeakSpacingMaxMaterial.uniforms;
       smu.uSource!.value = this.rtCrossPeak.texture;
@@ -2046,7 +2082,7 @@ export class WebGLBackend implements RenderBackend {
     this.crossFilterHardMode = next;
   }
   setCrossFilterMinSpacing(v: number): void {
-    const next = Math.min(2, Math.max(1, v));
+    const next = Math.min(CROSS_FILTER_MIN_SPACING_MAX, Math.max(CROSS_FILTER_MIN_SPACING_MIN, v));
     if (Math.abs(next - this.crossFilterMinSpacing) >= 1e-4) {
       this.resetCrossFilterHistory();
     }
