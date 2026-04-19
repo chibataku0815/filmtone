@@ -518,7 +518,17 @@
         "stepNavTitleNext": "いま主に進める手順です",
         "stepNavTitleDone": "この段は設定済みです",
         "stepNavTitleGoto": "クリックでこの段を表示",
-        "videoWebglOnlyFootnote": "動画は編集タブに近い見え方で書き出します。1 フレームずつ処理するため、長いクリップは完了まで時間がかかることがあります。"
+        "videoWebglOnlyFootnote": "動画は編集タブに近い見え方で書き出します。1 フレームずつ処理するため、長いクリップは完了まで時間がかかることがあります。",
+        "presetStripAria": "書き出しプリセット",
+        "presetPhotoWebJpeg": "Web JPEG",
+        "presetPhotoMasterJpeg": "Master JPEG",
+        "presetPhotoArchivePng": "Archive PNG",
+        "presetCustom": "カスタム",
+        "presetVideoDefault": "標準",
+        "advancedDisclosureTitle": "詳細設定",
+        "videoSourceHint": "読込上限は 4K・最大 {maxSec} 秒です。PATH に ffmpeg / ffprobe が必要です。",
+        "videoOutputHint": "ファイル名は元名に -graded.mp4 を付けます。出力は最大 FHD・{fps} fps です。",
+        "filenameSuffixPlaceholder": "-graded"
       },
       "logs": {
         "syncException": "書き出しへのコピー中にエラー: {msg}",

@@ -518,7 +518,17 @@
         "prefsFootnoteAria": "What is remembered",
         "stepNavTitleNext": "Focus on this step",
         "stepNavTitleDone": "This step is configured",
-        "stepNavTitleGoto": "Show this step"
+        "stepNavTitleGoto": "Show this step",
+        "presetStripAria": "Export presets",
+        "presetPhotoWebJpeg": "Web JPEG",
+        "presetPhotoMasterJpeg": "Master JPEG",
+        "presetPhotoArchivePng": "Archive PNG",
+        "presetCustom": "Custom",
+        "presetVideoDefault": "Default",
+        "advancedDisclosureTitle": "Advanced",
+        "videoSourceHint": "Up to 4K and {maxSec} seconds. Requires ffmpeg/ffprobe on PATH.",
+        "videoOutputHint": "Adds -graded.mp4 to the original name. Output is up to FHD at {fps} fps.",
+        "filenameSuffixPlaceholder": "-graded"
       },
       "logs": {
         "syncException": "Error while copying to Export: {msg}",
