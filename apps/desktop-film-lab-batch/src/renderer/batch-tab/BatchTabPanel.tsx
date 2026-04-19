@@ -800,7 +800,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
           </div>
         </div>
 
-        <div className="flex flex-col gap-2 border-t border-[var(--fl-border-subtle)] pt-3">
+        <div className="flex flex-col gap-2 border-t border-white/10 pt-3">
           <button
             type="button"
             className="fl-btn-secondary self-start"
@@ -821,7 +821,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         </div>
 
         {batchLookSource === "editSync" ? (
-          <div className="flex max-w-md flex-col gap-2 border-t border-[var(--fl-border-subtle)] pt-3">
+          <div className="flex max-w-md flex-col gap-2 border-t border-white/10 pt-3">
             <span className="fl-label">{t("presetQuickLabel")}</span>
             <p className="fl-caption max-w-prose text-[var(--fl-text-secondary)]">
               {t("lookPresetHiddenWhileSyncedBody", {
@@ -838,7 +838,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
             </button>
           </div>
         ) : (
-          <label className="flex max-w-md flex-col gap-1.5 border-t border-[var(--fl-border-subtle)] pt-3">
+          <label className="flex max-w-md flex-col gap-1.5 border-t border-white/10 pt-3">
             <span className="fl-label">{t("presetQuickLabel")}</span>
             <select
               data-testid="export-preset-select"
@@ -1132,7 +1132,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
 
       {/* Accordion — sources / look / output の 3 セクション */}
       <div
-        className={`flex flex-col divide-y divide-[var(--fl-border-subtle)] ${
+        className={`flex flex-col divide-y divide-white/10 ${
           compact ? "mt-1 gap-0" : "fl-card fl-card--frost gap-0 p-0"
         }`}
       >
