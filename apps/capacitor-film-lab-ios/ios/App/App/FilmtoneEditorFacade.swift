@@ -3,29 +3,36 @@ import UIKit
 
 @MainActor
 final class FilmtoneEditorFacade {
-    private let cacheStore: CacheStore
     private let assetPickerService: AssetPickerService
-    private let sourceProbeService = SourceProbeService()
-    private let photoLibraryService = PhotoLibraryService()
-    private let shareSheetService = ShareSheetService()
+    private let runtime: FilmtoneMediaRuntime
+    private let memoryWarningState = FilmtoneMemoryWarningState()
     private var memoryWarningObserver: NSObjectProtocol?
-    private var memoryWarningCount = 0
-    private var idleTimerDisabledBeforeExport = false
-    private var exportIdleTimerActive = false
 
     weak var presenter: UIViewController?
 
     init() throws {
         let cacheStore = try CacheStore()
-        self.cacheStore = cacheStore
         self.assetPickerService = AssetPickerService(cacheStore: cacheStore)
+        self.runtime = FilmtoneMediaRuntime(
+            cacheStore: cacheStore,
+            memoryWarningCounter: { [memoryWarningState] in memoryWarningState.count },
+            invalidFileURLError: { _ in
+                FilmtoneMediaError.invalidURL(
+                    filmtoneLocalized(
+                        "filmtone.error.file_url.invalid",
+                        defaultValue: "The selected file is invalid or inaccessible.",
+                        comment: "Error shown when a file URL cannot be resolved."
+                    )
+                )
+            }
+        )
         self.memoryWarningObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.didReceiveMemoryWarningNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
-                self?.memoryWarningCount += 1
+                self?.memoryWarningState.count += 1
             }
         }
     }
@@ -61,144 +68,44 @@ final class FilmtoneEditorFacade {
     }
 
     func probeSource(_ source: SourceInfoDTO) throws -> SourceProbeDTO {
-        let sourceURL = try resolveFileURL(source.uri)
-        return try sourceProbeService.probeSource(at: sourceURL, fallback: source)
+        try runtime.probeSource(source)
     }
 
     func renderPreview(
         request: Phase0ExportRequestDTO
     ) async throws -> Phase0PreviewRenderResultDTO {
-        let sourceURL = try resolveFileURL(request.sourceUri)
-        let session = try FilmtoneExportSession(
-            request: request,
-            sourceURL: sourceURL,
-            cacheStore: cacheStore
-        )
-
-        return try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                do {
-                    let result = try session.renderPreviewFrame()
-                    continuation.resume(returning: result)
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        try await runtime.renderPreview(request: request)
     }
 
     func runExport(
         request: Phase0ExportRequestDTO,
         onProgress: @escaping @MainActor (Phase0ExportProgressDTO) -> Void
     ) async throws -> Phase0ExportResultDTO {
-        let sourceURL = try resolveFileURL(request.sourceUri)
-        let collector = BenchmarkCollector(
-            request: request,
-            memoryWarningCounter: { [weak self] in self?.memoryWarningCount ?? 0 }
-        )
-        let session = try FilmtoneExportSession(
-            request: request,
-            sourceURL: sourceURL,
-            cacheStore: cacheStore
-        )
-
-        beginForegroundExportActivity()
-
-        return try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                do {
-                    var result = try session.run { progress in
-                        DispatchQueue.main.async {
-                            Task { @MainActor in
-                                onProgress(progress)
-                            }
-                        }
-                    }
-
-                    let benchmarkRecord = collector.makeSuccessRecord(result: result)
-                    result = Phase0ExportResultDTO(
-                        outputUri: result.outputUri,
-                        elapsedMs: result.elapsedMs,
-                        outputWidth: result.outputWidth,
-                        outputHeight: result.outputHeight,
-                        outputFps: result.outputFps,
-                        fileSizeBytes: result.fileSizeBytes,
-                        realtimeRatio: result.realtimeRatio,
-                        audioPreserved: result.audioPreserved,
-                        benchmarkRecord: benchmarkRecord
-                    )
-
-                    DispatchQueue.main.async {
-                        self.endForegroundExportActivity()
-                        continuation.resume(returning: result)
-                    }
-                } catch {
-                    DispatchQueue.main.async {
-                        self.endForegroundExportActivity()
-                        continuation.resume(throwing: error)
-                    }
+        try await runtime.runExport(request: request) { progress in
+            DispatchQueue.main.async {
+                Task { @MainActor in
+                    onProgress(progress)
                 }
             }
         }
     }
 
     func saveToPhotos(uri: String) async throws {
-        let fileURL = try resolveFileURL(uri)
-        _ = try await photoLibraryService.saveToPhotos(fileURL: fileURL)
+        try await runtime.saveToPhotos(uri: uri)
     }
 
     func shareOutput(uri: String) async throws {
         guard let presenter else {
             throw FilmtoneMediaError.bridgeUnavailable
         }
-        let fileURL = try resolveFileURL(uri)
-        _ = try await shareSheetService.share(
-            fileURL: fileURL,
-            title: nil,
-            text: nil,
-            presenting: presenter
-        )
+        try await runtime.shareOutput(uri: uri, presenting: presenter)
     }
 
     func fileExists(uri: String) -> Bool {
-        guard let url = try? resolveFileURL(uri) else {
-            return false
-        }
-        return FileManager.default.fileExists(atPath: url.path)
+        runtime.fileExists(uri: uri)
     }
+}
 
-    private func resolveFileURL(_ uri: String) throws -> URL {
-        if let fileURL = URL(string: uri), fileURL.isFileURL {
-            return fileURL
-        }
-
-        if FileManager.default.fileExists(atPath: uri) {
-            return URL(fileURLWithPath: uri)
-        }
-
-        throw FilmtoneMediaError.invalidURL(
-            filmtoneLocalized(
-                "filmtone.error.file_url.invalid",
-                defaultValue: "The selected file is invalid or inaccessible.",
-                comment: "Error shown when a file URL cannot be resolved."
-            )
-        )
-    }
-
-    private func beginForegroundExportActivity() {
-        guard !exportIdleTimerActive else {
-            return
-        }
-        idleTimerDisabledBeforeExport = UIApplication.shared.isIdleTimerDisabled
-        UIApplication.shared.isIdleTimerDisabled = true
-        exportIdleTimerActive = true
-    }
-
-    private func endForegroundExportActivity() {
-        guard exportIdleTimerActive else {
-            return
-        }
-        UIApplication.shared.isIdleTimerDisabled = idleTimerDisabledBeforeExport
-        exportIdleTimerActive = false
-    }
+private final class FilmtoneMemoryWarningState {
+    var count = 0
 }

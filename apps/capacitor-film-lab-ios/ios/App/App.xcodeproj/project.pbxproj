@@ -27,6 +27,7 @@
 		A10000010000000000000007 /* PhotoLibraryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000007 /* PhotoLibraryService.swift */; };
 		A10000010000000000000008 /* ShareSheetService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000008 /* ShareSheetService.swift */; };
 		A10000010000000000000009 /* SourceProbeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000009 /* SourceProbeService.swift */; };
+		A10000010000000000000011 /* FilmtoneMediaRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000011 /* FilmtoneMediaRuntime.swift */; };
 		D10000010000000000000001 /* FilmtoneRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000001 /* FilmtoneRootView.swift */; };
 		D10000010000000000000002 /* FilmtoneEditorStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000002 /* FilmtoneEditorStore.swift */; };
 		D10000010000000000000003 /* FilmtoneEditorFacade.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000003 /* FilmtoneEditorFacade.swift */; };
@@ -66,6 +67,7 @@
 		B10000010000000000000007 /* PhotoLibraryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoLibraryService.swift; sourceTree = "<group>"; };
 		B10000010000000000000008 /* ShareSheetService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareSheetService.swift; sourceTree = "<group>"; };
 		B10000010000000000000009 /* SourceProbeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceProbeService.swift; sourceTree = "<group>"; };
+		B10000010000000000000011 /* FilmtoneMediaRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneMediaRuntime.swift; sourceTree = "<group>"; };
 		C10000010000000000000001 /* FilmtoneRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneRootView.swift; sourceTree = "<group>"; };
 		C10000010000000000000002 /* FilmtoneEditorStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneEditorStore.swift; sourceTree = "<group>"; };
 		C10000010000000000000003 /* FilmtoneEditorFacade.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneEditorFacade.swift; sourceTree = "<group>"; };
@@ -134,6 +136,7 @@
 				B10000010000000000000008 /* ShareSheetService.swift */,
 				B10000010000000000000002 /* CacheStore.swift */,
 				B10000010000000000000006 /* FilmtoneMediaTypes.swift */,
+				B10000010000000000000011 /* FilmtoneMediaRuntime.swift */,
 				B10000010000000000000010 /* BenchmarkCollector.swift */,
 				C10000010000000000000001 /* FilmtoneRootView.swift */,
 				C10000010000000000000002 /* FilmtoneEditorStore.swift */,
@@ -296,6 +299,7 @@
 				A10000010000000000000007 /* PhotoLibraryService.swift in Sources */,
 				A10000010000000000000008 /* ShareSheetService.swift in Sources */,
 				A10000010000000000000009 /* SourceProbeService.swift in Sources */,
+				A10000010000000000000011 /* FilmtoneMediaRuntime.swift in Sources */,
 				A10000010000000000000010 /* BenchmarkCollector.swift in Sources */,
 				D10000010000000000000001 /* FilmtoneRootView.swift in Sources */,
 				D10000010000000000000002 /* FilmtoneEditorStore.swift in Sources */,
