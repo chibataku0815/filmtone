@@ -16,9 +16,16 @@ final class FilmtoneExportSession {
     private var cancelled = false
     private static let aberrationEdgeSoftenScale = 32.0
     private static let glowBaseScale = 0.5
-    private static let bloomMipLevels = 5
+    // Product-facing iOS tuning: keep payload semantics stable while making
+    // the glow family read much stronger at the same saved values.
+    private static let bloomCompositeBoost = 3.0
+    private static let halationCompositeBoost = 3.0
+    private static let bloomSpreadBoost = 1.25
+    private static let halationSpreadDivisor = 12.0
+    private static let diffusionCompositeBase = 0.87
+    private static let bloomMipLevels = 6
     private static let halationMipLevels = 6
-    private static let diffusionMipLevels = 3
+    private static let diffusionMipLevels = 4
     private static let glowUpsampleBlurRadius = 1.0
 
     init(
@@ -733,7 +740,7 @@ final class FilmtoneExportSession {
                 from: bloomPlate,
                 radius: params.bloomRadius,
                 levelCount: Self.bloomMipLevels,
-                spreadMultiplier: 1.0,
+                spreadMultiplier: Self.bloomSpreadBoost,
                 useTentResampling: true
             )
         } else {
@@ -752,7 +759,8 @@ final class FilmtoneExportSession {
                 from: halationPlate,
                 radius: params.halationRadius,
                 levelCount: Self.halationMipLevels,
-                spreadMultiplier: 1.0 + max(params.halationSpread, 0) / 40.0
+                spreadMultiplier: 1.0 + max(params.halationSpread, 0) / Self.halationSpreadDivisor,
+                useTentResampling: true
             )
         } else {
             halationImage = black
@@ -762,9 +770,10 @@ final class FilmtoneExportSession {
         if params.diffusion > 0.0001 {
             diffusionImage = buildMipBlurComposite(
                 from: image,
-                radius: 0.7,
+                radius: 0.9,
                 levelCount: Self.diffusionMipLevels,
-                spreadMultiplier: 1.0
+                spreadMultiplier: 1.15,
+                useTentResampling: true
             )
         } else {
             diffusionImage = black
@@ -790,6 +799,9 @@ final class FilmtoneExportSession {
             params.bloomStrength,
             params.halationIntensity,
             params.diffusion,
+            Self.bloomCompositeBoost,
+            Self.halationCompositeBoost,
+            Self.diffusionCompositeBase,
         ]) ?? image
     }
 
@@ -1493,15 +1505,15 @@ float glowHeadroom(vec3 baseRgb, float floorValue) {
     return mix(floorValue, 1.0, sqrt(clamp(1.0 - luma, 0.0, 1.0)));
 }
 
-kernel vec4 glowComposite(__sample base, __sample bloom, __sample halation, __sample diffusionImage, float bloomStrength, float halationIntensity, float diffusionAmount) {
+kernel vec4 glowComposite(__sample base, __sample bloom, __sample halation, __sample diffusionImage, float bloomStrength, float halationIntensity, float diffusionAmount, float bloomBoost, float halationBoost, float diffusionBase) {
     vec3 baseRgb = base.rgb;
     vec3 result = baseRgb;
-    vec3 glowEnergy = bloom.rgb * bloomStrength + halation.rgb * halationIntensity;
+    vec3 glowEnergy = bloom.rgb * bloomStrength * bloomBoost + halation.rgb * halationIntensity * halationBoost;
     vec3 glow = glowShoulder(glowEnergy) * glowHeadroom(baseRgb, 0.82);
     result = 1.0 - (1.0 - result) * (1.0 - glow);
 
     if (diffusionAmount > 0.0) {
-        vec3 diffOpacity = glowShoulder(diffusionImage.rgb * diffusionAmount * 0.29) * glowHeadroom(baseRgb, 0.88);
+        vec3 diffOpacity = glowShoulder(diffusionImage.rgb * diffusionAmount * diffusionBase) * glowHeadroom(baseRgb, 0.88);
         result = 1.0 - (1.0 - result) * (1.0 - diffOpacity);
     }
 
