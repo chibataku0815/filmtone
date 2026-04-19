@@ -42,6 +42,13 @@ export interface GradeFrameState {
   time: number;
   /** Before/after split slider in [-1, 1]; -1 disables the split UI. */
   splitPosition: number;
+  /**
+   * v1 compare-bar toggle: when true, the present pass is replaced by a
+   * full-screen "ungraded source" pipeline. Slot params are not honored
+   * on WebGPU v1 (dual-slot simultaneous A/B is deferred); see
+   * `compare-source.frag.wgsl.ts`.
+   */
+  compareEnabled: boolean;
   /** Raw grade parameters (keys in film-lab-core `Params`). */
   params: Record<string, number | string | boolean>;
   /** LUT1 intensity (multiplied against lut1Enabled at pack time). */

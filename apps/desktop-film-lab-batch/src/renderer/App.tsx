@@ -233,6 +233,13 @@ export default function App() {
     previewStatusRef.current = previewStatus;
   }, [previewStatus]);
   const [histogramVisible, setHistogramVisible] = useState(true);
+  const [compareUi, setCompareUi] = useState<{
+    compareMode: boolean;
+    activeSlot: "A" | "B";
+  }>({
+    compareMode: false,
+    activeSlot: "A",
+  });
   /**
    * @description キャンバス・共有コントロール・書き出し同期が共通で参照する現在のプリセット名です。
    * 検索付きプリセットセレクトが更新し、キャンバスの既定ルックと書き出しタブの起点に使います。
@@ -1516,6 +1523,7 @@ export default function App() {
                 onInteractiveSourceChange={handleInteractiveSourceChange}
                 getFileAbsolutePath={resolveCanvasFileAbsolutePath}
                 preprocessVideoFile={preprocessVideoFile}
+                compareHud={compareUi.compareMode ? { activeSlot: compareUi.activeSlot } : null}
               />
               <div
                 className={`pointer-events-none absolute left-4 z-[24] ${canvasHasUserVideo ? "bottom-52" : "bottom-4"}`}
@@ -1706,6 +1714,7 @@ export default function App() {
                       onPresetChange={setCanvasPreset}
                       onLutChange={handleEditLutChange}
                       onParamsChange={handleEditParamsChange}
+                      onCompareUiChange={setCompareUi}
                       deferSpaceKeyToVideoTransportWhenNoCompare={canvasHasUserVideo}
                     />
                   </div>

@@ -317,6 +317,26 @@ export class Viewport {
     // Phase 3 T3-2 GpuRenderer extract will expose one if needed.
   }
 
+  // === Compare ===
+
+  /**
+   * v1 compare-bar: WebGPU honors `enabled` only and renders a full-screen
+   * "ungraded source" present pass when active (slot params ignored —
+   * dual-slot simultaneous A/B parity stays deferred). WebGL retains full
+   * dual-grade behavior.
+   */
+  setComparePair(
+    enabled: boolean,
+    paramsA: Record<string, number | string> | null,
+    paramsB: Record<string, number | string> | null,
+  ): void {
+    if (this.webgpuBackend) {
+      this.webgpuBackend.setComparePair(enabled, paramsA, paramsB);
+      return;
+    }
+    this.webglBackend?.setComparePair(enabled, paramsA, paramsB);
+  }
+
   // === WebGL-only (no-op on WebGPU in v1.0) ===
 
   bindThree(
@@ -325,14 +345,6 @@ export class Viewport {
     camera: THREE.Camera,
   ): void {
     this.webglBackend?.bindThree(renderer, scene, camera);
-  }
-
-  setComparePair(
-    enabled: boolean,
-    paramsA: Record<string, number | string> | null,
-    paramsB: Record<string, number | string> | null,
-  ): void {
-    this.webglBackend?.setComparePair(enabled, paramsA, paramsB);
   }
 
   getHistogramPixels():

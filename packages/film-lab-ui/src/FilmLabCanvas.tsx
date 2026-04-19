@@ -1159,6 +1159,8 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
   const previewSupportsCompare =
     viewportCapabilities?.supportsBeforeAfter === true &&
     viewportCapabilities?.supportsABCompare === true;
+  const compareInteractionActive =
+    previewSupportsCompare && compareHud != null;
 
   const handleDrop = useCallback(
     async (e: React.DragEvent) => {
@@ -1551,7 +1553,10 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     );
   }
 
-  const viewportHostClassName = `relative ${fullScreen ? "h-full min-h-0" : "aspect-[4/3] sm:aspect-[16/9]"} w-full touch-none ${previewSupportsCompare ? "cursor-col-resize" : "cursor-auto"} overflow-hidden rounded-lg bg-[#0a0a0a] ${chromeLayout === "stacked" ? "min-h-[200px] sm:min-h-[240px]" : ""}`;
+  const viewportCursorClassName = isSplitDragging
+    ? "cursor-col-resize"
+    : "cursor-auto";
+  const viewportHostClassName = `relative ${fullScreen ? "h-full min-h-0" : "aspect-[4/3] sm:aspect-[16/9]"} w-full touch-none ${viewportCursorClassName} overflow-hidden rounded-lg bg-[#0a0a0a] ${chromeLayout === "stacked" ? "min-h-[200px] sm:min-h-[240px]" : ""}`;
 
   const toolbarClassName =
     chromeLayout === "stacked"
@@ -1614,7 +1619,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     <>
       {chromeLayout === "overlay" ? toolbar : null}
 
-      {compareHud != null && previewSupportsCompare && (
+      {compareInteractionActive && (
         <>
           <div className="pointer-events-none absolute left-0 right-0 top-16 z-[6] flex items-center justify-center gap-2 px-3 sm:top-[4.5rem]">
             <span className="rounded-full bg-black/55 px-2.5 py-1 text-[10px] font-medium text-white/80 ring-1 ring-white/15 backdrop-blur-sm">
@@ -1696,7 +1701,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     </>
   );
 
-  const viewportPointerAndDragProps = previewSupportsCompare
+  const viewportPointerAndDragProps = compareInteractionActive
     ? {
         onDragOver: (e: React.DragEvent) => {
           e.preventDefault();
