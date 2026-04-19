@@ -206,7 +206,11 @@ enum FilmtoneMediaError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .bridgeUnavailable:
-            return "Bridge view controller is unavailable."
+            return filmtoneLocalized(
+                "filmtone.error.bridge_unavailable",
+                defaultValue: "The Filmtone view is unavailable right now.",
+                comment: "Error shown when the native presenter is unavailable."
+            )
         case .invalidURL(let message),
              .missingSource(let message),
              .unsupportedSource(let message),
@@ -218,9 +222,17 @@ enum FilmtoneMediaError: LocalizedError {
              .cacheFailed(let message):
             return message
         case .exportBusy:
-            return "An export is already in progress."
+            return filmtoneLocalized(
+                "filmtone.error.export_busy",
+                defaultValue: "An export is already in progress.",
+                comment: "Error shown when a second export starts while one is already running."
+            )
         case .exportCancelled:
-            return "The export was cancelled."
+            return filmtoneLocalized(
+                "filmtone.error.export_cancelled",
+                defaultValue: "The export was cancelled.",
+                comment: "Error shown when export is cancelled."
+            )
         }
     }
 }

@@ -142,7 +142,7 @@ final class FilmtoneEditorStore: ObservableObject {
             }
             return nil
         }()
-        let posterTime = preview.posterTimeSec.map(Self.compactDurationLabel)
+        let posterTime = preview.posterTimeSec.map(strings.compactDurationLabel)
         return [dimensions, posterTime]
             .compactMap { $0 }
             .joined(separator: " · ")
@@ -196,7 +196,7 @@ final class FilmtoneEditorStore: ObservableObject {
             schedulePreviewRender()
         } catch {
             isBusy = false
-            self.error = error.localizedDescription
+            self.error = strings.userMessage(for: error, context: .pickSource)
         }
     }
 
@@ -248,7 +248,12 @@ final class FilmtoneEditorStore: ObservableObject {
             persist()
             schedulePreviewRender()
         } catch {
-            self.error = "\(strings.lutImportError): \(error.localizedDescription)"
+            if let mediaError = error as? FilmtoneMediaError,
+               mediaError.code == "UNSUPPORTED_SOURCE" {
+                self.error = strings.lutParseError
+            } else {
+                self.error = strings.userMessage(for: error, context: .importLut)
+            }
         }
     }
 
@@ -284,7 +289,7 @@ final class FilmtoneEditorStore: ObservableObject {
         } catch {
             isBusy = false
             exportProgress = nil
-            self.error = error.localizedDescription
+            self.error = strings.userMessage(for: error, context: .export)
         }
     }
 
@@ -300,7 +305,7 @@ final class FilmtoneEditorStore: ObservableObject {
             error = nil
         } catch {
             saveToPhotosState = .failed
-            self.error = error.localizedDescription
+            self.error = strings.userMessage(for: error, context: .saveToPhotos)
         }
     }
 
@@ -312,7 +317,7 @@ final class FilmtoneEditorStore: ObservableObject {
         do {
             try await facade.shareOutput(uri: exportResult.outputUri)
         } catch {
-            self.error = error.localizedDescription
+            self.error = strings.userMessage(for: error, context: .share)
         }
     }
 
@@ -394,22 +399,13 @@ final class FilmtoneEditorStore: ObservableObject {
                 return
             } catch {
                 self.preview.isRendering = false
-                self.preview.error = error.localizedDescription
+                self.preview.error = strings.userMessage(for: error, context: .preview)
             }
         }
     }
 
     private func persist() {
         FilmtonePersistence.save(project: project, source: source, probe: probe)
-    }
-
-    private static func compactDurationLabel(_ durationSec: Double) -> String {
-        let roundedTenth = (durationSec * 10).rounded() / 10
-        if roundedTenth < 60 {
-            return String(format: "%.1fs", roundedTenth)
-        }
-        let totalSeconds = Int(durationSec.rounded())
-        return "\(totalSeconds / 60)m \(totalSeconds % 60)s"
     }
 
     private static func signedPercentLabel(for value: Double) -> String {

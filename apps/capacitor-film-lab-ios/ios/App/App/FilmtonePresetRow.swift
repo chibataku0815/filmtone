@@ -10,6 +10,7 @@ struct FilmtonePresetRow: View {
             HStack(spacing: 12) {
                 ForEach(presets) { preset in
                     let isActive = preset.name == activePresetName
+                    let cardShape = RoundedRectangle(cornerRadius: 16, style: .continuous)
 
                     Button {
                         onTap(preset, isActive)
@@ -18,7 +19,6 @@ struct FilmtonePresetRow: View {
                             Text(categoryLabel(for: preset.category))
                                 .font(.caption2.weight(.semibold))
                                 .foregroundStyle(accentColor(for: preset.category).opacity(isActive ? 0.86 : 0.58))
-                                .tracking(1.4)
 
                             Spacer(minLength: 22)
 
@@ -27,32 +27,34 @@ struct FilmtonePresetRow: View {
                                     .font(.headline.weight(.semibold))
                                     .foregroundStyle(.white)
                                     .lineLimit(2)
+                                    .minimumScaleFactor(0.92)
 
                                 Text(preset.subtitle)
                                     .font(.caption)
                                     .foregroundStyle(.white.opacity(0.58))
                                     .multilineTextAlignment(.leading)
-                                    .lineLimit(2)
+                                    .lineLimit(3)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
                         }
                         .padding(15)
-                        .frame(width: 136, height: 136, alignment: .bottomLeading)
+                        .frame(width: 148, height: 148, alignment: .bottomLeading)
                         .background(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .fill(baseFill(isActive: isActive))
+                            cardShape.fill(baseFill(isActive: isActive))
                         )
                         .overlay(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .stroke(
-                                    isActive ? Color.filmtoneAmber : Color.white.opacity(0.08),
-                                    lineWidth: isActive ? 1.6 : 1
-                                )
+                            cardShape.strokeBorder(
+                                isActive ? Color.filmtoneAmber : Color.white.opacity(0.08),
+                                lineWidth: isActive ? 1.6 : 1
+                            )
                         )
                         .overlay(alignment: .top) {
                             Rectangle()
                                 .fill(isActive ? accentColor(for: preset.category) : Color.white.opacity(0.10))
                                 .frame(height: isActive ? 2 : 1)
+                                .padding(.top, 1)
+                                .padding(.horizontal, 18)
+                                .clipShape(Capsule(style: .continuous))
                         }
                         .shadow(color: Color.black.opacity(isActive ? 0.16 : 0.10), radius: isActive ? 12 : 6, x: 0, y: isActive ? 8 : 4)
                     }
@@ -87,13 +89,6 @@ struct FilmtonePresetRow: View {
     }
 
     private func categoryLabel(for category: FilmtonePresetCategory) -> String {
-        switch category {
-        case .filmStock:
-            return "FILM"
-        case .look:
-            return "LOOK"
-        case .utility:
-            return "UTILITY"
-        }
+        FilmtoneStringsCatalog.current.categoryLabel(for: category)
     }
 }

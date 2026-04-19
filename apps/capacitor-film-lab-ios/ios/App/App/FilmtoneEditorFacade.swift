@@ -176,7 +176,13 @@ final class FilmtoneEditorFacade {
             return URL(fileURLWithPath: uri)
         }
 
-        throw FilmtoneMediaError.invalidURL("The file URL '\(uri)' is invalid or inaccessible.")
+        throw FilmtoneMediaError.invalidURL(
+            filmtoneLocalized(
+                "filmtone.error.file_url.invalid",
+                defaultValue: "The selected file is invalid or inaccessible.",
+                comment: "Error shown when a file URL cannot be resolved."
+            )
+        )
     }
 
     private func beginForegroundExportActivity() {

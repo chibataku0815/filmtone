@@ -31,7 +31,13 @@ final class AssetPickerService: NSObject {
         route: FilmtoneSourcePickerRoute = .photoLibrary
     ) async throws -> SourceInfoDTO? {
         guard sourceContinuation == nil, lutContinuation == nil else {
-            throw FilmtoneMediaError.pickerUnavailable("A source picker is already active.")
+            throw FilmtoneMediaError.pickerUnavailable(
+                filmtoneLocalized(
+                    "filmtone.error.asset_picker.source_active",
+                    defaultValue: "A source picker is already active.",
+                    comment: "Error shown when a second source picker is opened while one is already active."
+                )
+            )
         }
 
         return try await withCheckedThrowingContinuation { continuation in
@@ -63,7 +69,13 @@ final class AssetPickerService: NSObject {
     @MainActor
     func pickLutFile(presenting viewController: UIViewController) async throws -> PickedLutFileDTO? {
         guard sourceContinuation == nil, lutContinuation == nil else {
-            throw FilmtoneMediaError.pickerUnavailable("A LUT picker is already active.")
+            throw FilmtoneMediaError.pickerUnavailable(
+                filmtoneLocalized(
+                    "filmtone.error.asset_picker.lut_active",
+                    defaultValue: "A camera profile picker is already active.",
+                    comment: "Error shown when a second LUT picker is opened while one is already active."
+                )
+            )
         }
 
         return try await withCheckedThrowingContinuation { continuation in
@@ -91,7 +103,13 @@ final class AssetPickerService: NSObject {
 
         let selectedType = movieType ?? imageType
         guard let selectedType else {
-            throw FilmtoneMediaError.unsupportedSource("The selected asset is not an image or video.")
+            throw FilmtoneMediaError.unsupportedSource(
+                filmtoneLocalized(
+                    "filmtone.error.asset_picker.selected_asset_type",
+                    defaultValue: "The selected item isn't a photo or video.",
+                    comment: "Error shown when an unsupported asset is selected from the photo picker."
+                )
+            )
         }
 
         let type = UTType(selectedType)
@@ -201,8 +219,15 @@ final class AssetPickerService: NSObject {
                 options: requestOptions
             ) { error in
                 if let error {
+                    _ = error
                     continuation.resume(
-                        throwing: FilmtoneMediaError.cacheFailed(error.localizedDescription)
+                        throwing: FilmtoneMediaError.cacheFailed(
+                            filmtoneLocalized(
+                                "filmtone.error.generic.pick_source",
+                                defaultValue: "Media selection couldn't be completed.",
+                                comment: "Fallback error for source picking."
+                            )
+                        )
                     )
                 } else {
                     continuation.resume(returning: ())
@@ -254,7 +279,13 @@ final class AssetPickerService: NSObject {
             return type
         }
 
-        throw FilmtoneMediaError.unsupportedSource("The selected file is not an image or video.")
+        throw FilmtoneMediaError.unsupportedSource(
+            filmtoneLocalized(
+                "filmtone.error.asset_picker.selected_file_type",
+                defaultValue: "The selected file isn't a photo or video.",
+                comment: "Error shown when an unsupported file is selected from Files."
+            )
+        )
     }
 
     private func isSupportedSourceType(_ type: UTType) -> Bool {
@@ -288,22 +319,27 @@ final class AssetPickerService: NSObject {
         suggestedName: String?,
         bucket: CacheStore.Bucket
     ) async throws -> URL {
-        try await withCheckedThrowingContinuation { continuation in
+        let cacheMessage = genericCacheMessage(for: bucket)
+        let cacheStore = self.cacheStore
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
             provider.loadFileRepresentation(forTypeIdentifier: typeIdentifier) { url, error in
                 if let error {
-                    continuation.resume(throwing: FilmtoneMediaError.cacheFailed(error.localizedDescription))
+                    _ = error
+                    continuation.resume(
+                        throwing: FilmtoneMediaError.cacheFailed(cacheMessage)
+                    )
                     return
                 }
 
                 guard let url else {
                     continuation.resume(
-                        throwing: FilmtoneMediaError.cacheFailed("The selected file could not be staged.")
+                        throwing: FilmtoneMediaError.cacheFailed(cacheMessage)
                     )
                     return
                 }
 
                 do {
-                    let importedURL = try self.cacheStore.importItem(
+                    let importedURL = try cacheStore.importItem(
                         from: url,
                         suggestedName: suggestedName,
                         bucket: bucket
@@ -311,10 +347,27 @@ final class AssetPickerService: NSObject {
                     continuation.resume(returning: importedURL)
                 } catch {
                     continuation.resume(
-                        throwing: FilmtoneMediaError.cacheFailed(error.localizedDescription)
+                        throwing: FilmtoneMediaError.cacheFailed(cacheMessage)
                     )
                 }
             }
+        }
+    }
+
+    private func genericCacheMessage(for bucket: CacheStore.Bucket) -> String {
+        switch bucket {
+        case .luts:
+            return filmtoneLocalized(
+                "filmtone.error.generic.import_lut",
+                defaultValue: "The camera profile couldn't be imported.",
+                comment: "Fallback error for LUT import."
+            )
+        default:
+            return filmtoneLocalized(
+                "filmtone.error.generic.pick_source",
+                defaultValue: "Media selection couldn't be completed.",
+                comment: "Fallback error for source picking."
+            )
         }
     }
 }

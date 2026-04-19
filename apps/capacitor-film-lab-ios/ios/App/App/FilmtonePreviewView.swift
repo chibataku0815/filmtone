@@ -5,6 +5,8 @@ struct FilmtonePreviewView: View {
     let source: SourceInfoDTO?
     let displayURI: String?
     let emptyMessage: String
+    let emptyEyebrow: String
+    let emptyHint: String
     let compareLabel: String
     let isRendering: Bool
     let metaLabel: String?
@@ -47,10 +49,9 @@ struct FilmtonePreviewView: View {
                 }
             } else {
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("QUICK PREVIEW")
+                    Text(emptyEyebrow)
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.white.opacity(0.36))
-                        .tracking(2.2)
 
                     Rectangle()
                         .fill(Color.filmtoneAmber.opacity(0.72))
@@ -60,11 +61,13 @@ struct FilmtonePreviewView: View {
                         .font(.system(size: 28, weight: .medium))
                         .foregroundStyle(.white.opacity(0.90))
                         .lineSpacing(2)
-                        .frame(maxWidth: 220, alignment: .leading)
+                        .lineLimit(3)
+                        .frame(maxWidth: 280, alignment: .leading)
 
-                    Text("Looks render here as you grade.")
+                    Text(emptyHint)
                         .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.52))
+                        .lineLimit(3)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
                 .padding(28)

@@ -1,6 +1,43 @@
 import Foundation
 
+func filmtoneLocalized(
+    _ key: String,
+    defaultValue: String,
+    comment: String
+) -> String {
+    NSLocalizedString(
+        key,
+        tableName: nil,
+        bundle: .main,
+        value: defaultValue,
+        comment: comment
+    )
+}
+
+func filmtoneLocalizedFormat(
+    _ key: String,
+    defaultValue: String,
+    arguments: [CVarArg],
+    comment: String
+) -> String {
+    let format = filmtoneLocalized(key, defaultValue: defaultValue, comment: comment)
+    return String(format: format, locale: Locale.current, arguments: arguments)
+}
+
+func filmtoneLocalizedNumber(
+    _ value: Double,
+    maximumFractionDigits: Int
+) -> String {
+    let formatter = NumberFormatter()
+    formatter.locale = .current
+    formatter.numberStyle = .decimal
+    formatter.minimumFractionDigits = 0
+    formatter.maximumFractionDigits = maximumFractionDigits
+    return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
+}
+
 struct FilmtoneStrings {
+    let locale: Locale
     let appName: String
     let sourceEmpty: String
     let pickSource: String
@@ -11,6 +48,8 @@ struct FilmtoneStrings {
     let probePending: String
     let previewRendering: String
     let previewSheetHint: String
+    let previewEmptyEyebrow: String
+    let previewEmptyHint: String
     let compareLabel: String
     let compareHint: String
     let presetTitle: String
@@ -54,183 +93,581 @@ struct FilmtoneStrings {
     let clearLut: String
     let lutImportError: String
     let lutParseError: String
+    let exportStagePreflight: String
+    let exportStageReading: String
+    let exportStageRendering: String
+    let exportStageWriting: String
+    let exportStageCompleted: String
+    let saveStateSaved: String
+    let saveStateFailed: String
+    let presetCategoryFilmStock: String
+    let presetCategoryLook: String
+    let presetCategoryUtility: String
+    let genericPickSourceError: String
+    let genericImportLutError: String
+    let genericExportError: String
+    let genericSaveToPhotosError: String
+    let genericShareError: String
+    let genericPreviewError: String
 }
 
 extension FilmtoneStrings {
+    init(locale: Locale = .current) {
+        self.locale = locale
+        appName = filmtoneLocalized(
+            "filmtone.app_name",
+            defaultValue: "Filmtone",
+            comment: "App name shown in the UI."
+        )
+        sourceEmpty = filmtoneLocalized(
+            "filmtone.source.empty",
+            defaultValue: "Pick a photo or video to begin.",
+            comment: "Empty state message shown before any media is selected."
+        )
+        pickSource = filmtoneLocalized(
+            "filmtone.source.pick",
+            defaultValue: "Pick media",
+            comment: "Primary action to pick source media."
+        )
+        repickSource = filmtoneLocalized(
+            "filmtone.source.repick",
+            defaultValue: "Replace media",
+            comment: "Action to replace selected source media."
+        )
+        sourcePickerTitle = filmtoneLocalized(
+            "filmtone.source.picker_title",
+            defaultValue: "Choose Source",
+            comment: "Title shown in the source picker confirmation dialog."
+        )
+        pickFromPhotoLibrary = filmtoneLocalized(
+            "filmtone.source.photo_library",
+            defaultValue: "Photo Library",
+            comment: "Source picker option for the photo library."
+        )
+        pickFromFiles = filmtoneLocalized(
+            "filmtone.source.files",
+            defaultValue: "Files",
+            comment: "Source picker option for the Files app."
+        )
+        probePending = filmtoneLocalized(
+            "filmtone.source.inspecting",
+            defaultValue: "Inspecting media…",
+            comment: "Notice shown while the app probes the selected source."
+        )
+        previewRendering = filmtoneLocalized(
+            "filmtone.preview.rendering",
+            defaultValue: "Generating preview…",
+            comment: "Notice shown while the app renders a preview."
+        )
+        previewSheetHint = filmtoneLocalized(
+            "filmtone.preview.sheet_hint",
+            defaultValue: "Preview updates through the native render path.",
+            comment: "Hint shown below the preview inside the sheet."
+        )
+        previewEmptyEyebrow = filmtoneLocalized(
+            "filmtone.preview.empty_eyebrow",
+            defaultValue: "Quick Preview",
+            comment: "Eyebrow shown above the preview empty state."
+        )
+        previewEmptyHint = filmtoneLocalized(
+            "filmtone.preview.empty_hint",
+            defaultValue: "Looks render here as you grade.",
+            comment: "Hint shown in the preview empty state."
+        )
+        compareLabel = filmtoneLocalized(
+            "filmtone.preview.compare_label",
+            defaultValue: "Original",
+            comment: "Badge shown while comparing with the original."
+        )
+        compareHint = filmtoneLocalized(
+            "filmtone.preview.compare_hint",
+            defaultValue: "Press and hold the preview to compare.",
+            comment: "Hint that explains compare interaction."
+        )
+        presetTitle = filmtoneLocalized(
+            "filmtone.preset.title",
+            defaultValue: "Film Presets",
+            comment: "Section title for presets."
+        )
+        strengthLabel = filmtoneLocalized(
+            "filmtone.adjustment.strength",
+            defaultValue: "Strength",
+            comment: "Label for the strength control."
+        )
+        adjustLabel = filmtoneLocalized(
+            "filmtone.adjustment.title",
+            defaultValue: "Adjust",
+            comment: "Section title for adjustments."
+        )
+        quickHint = filmtoneLocalized(
+            "filmtone.quick.hint",
+            defaultValue: "Three quick axes to shape the look.",
+            comment: "Hint shown when quick adjustments are empty."
+        )
+        quickFilmCharacter = filmtoneLocalized(
+            "filmtone.quick.exposure",
+            defaultValue: "Exposure",
+            comment: "Quick adjustment axis label."
+        )
+        quickEra = filmtoneLocalized(
+            "filmtone.quick.contrast",
+            defaultValue: "Contrast",
+            comment: "Quick adjustment axis label."
+        )
+        quickDynamics = filmtoneLocalized(
+            "filmtone.quick.saturation",
+            defaultValue: "Saturation",
+            comment: "Quick adjustment axis label."
+        )
+        advancedParamsLabel = filmtoneLocalized(
+            "filmtone.advanced.title",
+            defaultValue: "Advanced Params",
+            comment: "Section title for advanced parameters."
+        )
+        advancedParamsHint = filmtoneLocalized(
+            "filmtone.advanced.hint",
+            defaultValue: "Fine-tune the optical mix directly.",
+            comment: "Hint shown when no advanced params are overridden."
+        )
+        advancedAdjustmentsActive = filmtoneLocalized(
+            "filmtone.advanced.active",
+            defaultValue: "Advanced tuning active.",
+            comment: "Summary text shown when advanced adjustments are active."
+        )
+        advancedBasicLabel = filmtoneLocalized(
+            "filmtone.advanced.group.basic",
+            defaultValue: "Basic",
+            comment: "Group title for basic advanced params."
+        )
+        advancedOpticsLabel = filmtoneLocalized(
+            "filmtone.advanced.group.optics",
+            defaultValue: "Optics",
+            comment: "Group title for optics advanced params."
+        )
+        advancedGlowLabel = filmtoneLocalized(
+            "filmtone.advanced.group.glow",
+            defaultValue: "Glow",
+            comment: "Group title for glow advanced params."
+        )
+        advancedGrainLabel = filmtoneLocalized(
+            "filmtone.advanced.group.grain",
+            defaultValue: "Grain",
+            comment: "Group title for grain advanced params."
+        )
+        advancedToneLabel = filmtoneLocalized(
+            "filmtone.advanced.group.tone",
+            defaultValue: "Tone / Process",
+            comment: "Group title for tone advanced params."
+        )
+        paramLabels = [
+            "exposure": filmtoneLocalized("filmtone.param.exposure", defaultValue: "Exposure", comment: "Advanced parameter label."),
+            "contrast": filmtoneLocalized("filmtone.param.contrast", defaultValue: "Contrast", comment: "Advanced parameter label."),
+            "saturation": filmtoneLocalized("filmtone.param.saturation", defaultValue: "Saturation", comment: "Advanced parameter label."),
+            "temperature": filmtoneLocalized("filmtone.param.temperature", defaultValue: "Temperature", comment: "Advanced parameter label."),
+            "tint": filmtoneLocalized("filmtone.param.tint", defaultValue: "Tint", comment: "Advanced parameter label."),
+            "fade": filmtoneLocalized("filmtone.param.fade", defaultValue: "Fade", comment: "Advanced parameter label."),
+            "rgbShift": filmtoneLocalized("filmtone.param.rgb_shift", defaultValue: "RGB Shift", comment: "Advanced parameter label."),
+            "lensSoftness": filmtoneLocalized("filmtone.param.lens_softness", defaultValue: "Lens Softness", comment: "Advanced parameter label."),
+            "vignette": filmtoneLocalized("filmtone.param.vignette", defaultValue: "Vignette", comment: "Advanced parameter label."),
+            "bloomThreshold": filmtoneLocalized("filmtone.param.bloom_threshold", defaultValue: "Bloom Threshold", comment: "Advanced parameter label."),
+            "bloomStrength": filmtoneLocalized("filmtone.param.bloom_strength", defaultValue: "Bloom Strength", comment: "Advanced parameter label."),
+            "bloomRadius": filmtoneLocalized("filmtone.param.bloom_radius", defaultValue: "Bloom Radius", comment: "Advanced parameter label."),
+            "bloomSoftKnee": filmtoneLocalized("filmtone.param.bloom_soft_knee", defaultValue: "Bloom Soft Knee", comment: "Advanced parameter label."),
+            "halationIntensity": filmtoneLocalized("filmtone.param.halation_intensity", defaultValue: "Halation Intensity", comment: "Advanced parameter label."),
+            "halationSpread": filmtoneLocalized("filmtone.param.halation_spread", defaultValue: "Halation Spread", comment: "Advanced parameter label."),
+            "halationHue": filmtoneLocalized("filmtone.param.halation_hue", defaultValue: "Halation Hue", comment: "Advanced parameter label."),
+            "halationThreshold": filmtoneLocalized("filmtone.param.halation_threshold", defaultValue: "Halation Threshold", comment: "Advanced parameter label."),
+            "halationRadius": filmtoneLocalized("filmtone.param.halation_radius", defaultValue: "Halation Radius", comment: "Advanced parameter label."),
+            "halationSoftKnee": filmtoneLocalized("filmtone.param.halation_soft_knee", defaultValue: "Halation Soft Knee", comment: "Advanced parameter label."),
+            "diffusion": filmtoneLocalized("filmtone.param.diffusion", defaultValue: "Diffusion", comment: "Advanced parameter label."),
+            "grainIntensity": filmtoneLocalized("filmtone.param.grain_intensity", defaultValue: "Grain Intensity", comment: "Advanced parameter label."),
+            "grainSize": filmtoneLocalized("filmtone.param.grain_size", defaultValue: "Grain Size", comment: "Advanced parameter label."),
+            "grainRadialMix": filmtoneLocalized("filmtone.param.grain_radial_mix", defaultValue: "Grain Radial Mix", comment: "Advanced parameter label."),
+            "compressionAmount": filmtoneLocalized("filmtone.param.compression_amount", defaultValue: "Compression Amount", comment: "Advanced parameter label."),
+            "compressionRange": filmtoneLocalized("filmtone.param.compression_range", defaultValue: "Compression Range", comment: "Advanced parameter label."),
+        ]
+        resetLabel = filmtoneLocalized(
+            "filmtone.action.reset",
+            defaultValue: "Reset",
+            comment: "Action label to reset adjustments."
+        )
+        exportSectionTitle = filmtoneLocalized(
+            "filmtone.export.title",
+            defaultValue: "Export",
+            comment: "Section title for export."
+        )
+        exportIdle = filmtoneLocalized(
+            "filmtone.export.ready",
+            defaultValue: "Ready to export.",
+            comment: "Status shown before export starts."
+        )
+        exportRunning = filmtoneLocalized(
+            "filmtone.export.running",
+            defaultValue: "Exporting…",
+            comment: "Status shown while export runs."
+        )
+        exportWritingHint = filmtoneLocalized(
+            "filmtone.export.writing_hint",
+            defaultValue: "Finalizing. Larger photos or videos may take a moment.",
+            comment: "Hint shown during the writing stage."
+        )
+        exportStart = filmtoneLocalized(
+            "filmtone.export.start",
+            defaultValue: "Export",
+            comment: "Primary export action."
+        )
+        exportDisabled = filmtoneLocalized(
+            "filmtone.export.disabled",
+            defaultValue: "This source can't be exported. See the source notes above.",
+            comment: "Message shown when the current source fails export validation."
+        )
+        saveToPhotos = filmtoneLocalized(
+            "filmtone.export.save_to_photos",
+            defaultValue: "Save to Photos",
+            comment: "Action to save the output to Photos."
+        )
+        saveToPhotosDone = filmtoneLocalized(
+            "filmtone.export.save_to_photos_done",
+            defaultValue: "Saved to Photos.",
+            comment: "Notice shown when saving to Photos succeeds."
+        )
+        shareOutput = filmtoneLocalized(
+            "filmtone.export.share",
+            defaultValue: "Share",
+            comment: "Action to share the exported output."
+        )
+        resultTitle = filmtoneLocalized(
+            "filmtone.export.last_result",
+            defaultValue: "Last export",
+            comment: "Title shown for the latest export result."
+        )
+        metricsElapsed = filmtoneLocalized(
+            "filmtone.metric.elapsed",
+            defaultValue: "Elapsed",
+            comment: "Metric label for elapsed time."
+        )
+        metricsOutput = filmtoneLocalized(
+            "filmtone.metric.output",
+            defaultValue: "Output",
+            comment: "Metric label for output resolution."
+        )
+        metricsFileSize = filmtoneLocalized(
+            "filmtone.metric.file_size",
+            defaultValue: "File size",
+            comment: "Metric label for file size."
+        )
+        metricsSaveToPhotos = filmtoneLocalized(
+            "filmtone.metric.save_to_photos",
+            defaultValue: "Save to Photos",
+            comment: "Metric label for save-to-Photos state."
+        )
+        noticePrefix = filmtoneLocalized(
+            "filmtone.message.note",
+            defaultValue: "Note",
+            comment: "Prefix used for informational message panels."
+        )
+        errorPrefix = filmtoneLocalized(
+            "filmtone.message.error",
+            defaultValue: "Error",
+            comment: "Prefix used for error message panels."
+        )
+        doneLabel = filmtoneLocalized(
+            "filmtone.action.done",
+            defaultValue: "Done",
+            comment: "Action label to close a sheet."
+        )
+        cameraLabel = filmtoneLocalized(
+            "filmtone.camera.title",
+            defaultValue: "Camera",
+            comment: "Label for the camera profile control."
+        )
+        cameraDescription = filmtoneLocalized(
+            "filmtone.camera.description",
+            defaultValue: "Normalize log source media before the look. Phase 1 supports Auto or one imported .cube.",
+            comment: "Description shown for camera profile behavior."
+        )
+        cameraAuto = filmtoneLocalized(
+            "filmtone.camera.auto",
+            defaultValue: "Auto",
+            comment: "Default camera profile state."
+        )
+        cameraImport = filmtoneLocalized(
+            "filmtone.camera.import",
+            defaultValue: "Import .cube",
+            comment: "Action label to import a camera .cube."
+        )
+        clearLut = filmtoneLocalized(
+            "filmtone.camera.clear",
+            defaultValue: "Clear",
+            comment: "Action label to clear the imported LUT."
+        )
+        lutImportError = filmtoneLocalized(
+            "filmtone.lut.import_error",
+            defaultValue: "Camera profile import failed",
+            comment: "Error prefix for LUT import problems."
+        )
+        lutParseError = filmtoneLocalized(
+            "filmtone.lut.parse_error",
+            defaultValue: "Camera profile .cube could not be parsed",
+            comment: "Error shown when parsing a LUT file fails."
+        )
+        exportStagePreflight = filmtoneLocalized(
+            "filmtone.export.stage.preflight",
+            defaultValue: "Preparing",
+            comment: "Label for the export preflight stage."
+        )
+        exportStageReading = filmtoneLocalized(
+            "filmtone.export.stage.reading",
+            defaultValue: "Reading",
+            comment: "Label for the export reading stage."
+        )
+        exportStageRendering = filmtoneLocalized(
+            "filmtone.export.stage.rendering",
+            defaultValue: "Rendering",
+            comment: "Label for the export rendering stage."
+        )
+        exportStageWriting = filmtoneLocalized(
+            "filmtone.export.stage.writing",
+            defaultValue: "Writing",
+            comment: "Label for the export writing stage."
+        )
+        exportStageCompleted = filmtoneLocalized(
+            "filmtone.export.stage.completed",
+            defaultValue: "Completed",
+            comment: "Label for the export completed stage."
+        )
+        saveStateSaved = filmtoneLocalized(
+            "filmtone.export.save_state.saved",
+            defaultValue: "Saved",
+            comment: "State badge shown after Save to Photos succeeds."
+        )
+        saveStateFailed = filmtoneLocalized(
+            "filmtone.export.save_state.failed",
+            defaultValue: "Failed",
+            comment: "State badge shown after Save to Photos fails."
+        )
+        presetCategoryFilmStock = filmtoneLocalized(
+            "filmtone.preset.category.film_stock",
+            defaultValue: "Film",
+            comment: "Preset category label for film stock presets."
+        )
+        presetCategoryLook = filmtoneLocalized(
+            "filmtone.preset.category.look",
+            defaultValue: "Look",
+            comment: "Preset category label for look presets."
+        )
+        presetCategoryUtility = filmtoneLocalized(
+            "filmtone.preset.category.utility",
+            defaultValue: "Utility",
+            comment: "Preset category label for utility presets."
+        )
+        genericPickSourceError = filmtoneLocalized(
+            "filmtone.error.generic.pick_source",
+            defaultValue: "Media selection couldn't be completed.",
+            comment: "Fallback error for source picking."
+        )
+        genericImportLutError = filmtoneLocalized(
+            "filmtone.error.generic.import_lut",
+            defaultValue: "The camera profile couldn't be imported.",
+            comment: "Fallback error for LUT import."
+        )
+        genericExportError = filmtoneLocalized(
+            "filmtone.error.generic.export",
+            defaultValue: "Export couldn't be completed.",
+            comment: "Fallback error for export."
+        )
+        genericSaveToPhotosError = filmtoneLocalized(
+            "filmtone.error.generic.save_to_photos",
+            defaultValue: "Saving to Photos couldn't be completed.",
+            comment: "Fallback error for saving to Photos."
+        )
+        genericShareError = filmtoneLocalized(
+            "filmtone.error.generic.share",
+            defaultValue: "Sharing couldn't be completed.",
+            comment: "Fallback error for sharing."
+        )
+        genericPreviewError = filmtoneLocalized(
+            "filmtone.error.generic.preview",
+            defaultValue: "Preview couldn't be generated.",
+            comment: "Fallback error for preview rendering."
+        )
+    }
+
     func paramLabel(for key: String) -> String {
         paramLabels[key] ?? key
+    }
+
+    var usesJapaneseTypography: Bool {
+        locale.language.languageCode?.identifier.hasPrefix("ja") == true
+    }
+
+    func stageLabel(for stage: Phase0ExportStage) -> String {
+        switch stage {
+        case .preflight:
+            return exportStagePreflight
+        case .reading:
+            return exportStageReading
+        case .rendering:
+            return exportStageRendering
+        case .writing:
+            return exportStageWriting
+        case .completed:
+            return exportStageCompleted
+        }
+    }
+
+    func saveStateLabel(_ state: FilmtoneSaveToPhotosState) -> String {
+        switch state {
+        case .notRun:
+            return "—"
+        case .saved:
+            return saveStateSaved
+        case .failed:
+            return saveStateFailed
+        }
+    }
+
+    func categoryLabel(for category: FilmtonePresetCategory) -> String {
+        switch category {
+        case .filmStock:
+            return presetCategoryFilmStock
+        case .look:
+            return presetCategoryLook
+        case .utility:
+            return presetCategoryUtility
+        }
+    }
+
+    func byteLabel(_ fileSizeBytes: Int?) -> String {
+        guard let fileSizeBytes else {
+            return "—"
+        }
+        return ByteCountFormatter.string(
+            fromByteCount: Int64(fileSizeBytes),
+            countStyle: .file
+        )
+    }
+
+    func elapsedLabel(_ elapsedMs: Int) -> String {
+        compactDurationLabel(Double(elapsedMs) / 1000)
+    }
+
+    func outputSummaryLabel(width: Int, height: Int, fps: Int) -> String {
+        filmtoneLocalizedFormat(
+            "filmtone.metric.output_value",
+            defaultValue: "%1$@×%2$@ @ %3$@ fps",
+            arguments: [
+                String(width),
+                String(height),
+                filmtoneLocalizedNumber(Double(fps), maximumFractionDigits: 0)
+            ],
+            comment: "Formatted output metric that shows resolution and frame rate."
+        )
+    }
+
+    func compactDurationLabel(_ durationSec: Double) -> String {
+        let roundedTenth = (durationSec * 10).rounded() / 10
+        if roundedTenth < 60 {
+            let seconds = filmtoneLocalizedNumber(roundedTenth, maximumFractionDigits: 1)
+            return filmtoneLocalizedFormat(
+                "filmtone.duration.seconds",
+                defaultValue: "%@s",
+                arguments: [seconds],
+                comment: "Duration string for a value in seconds."
+            )
+        }
+
+        let totalSeconds = Int(durationSec.rounded())
+        let minutes = String(totalSeconds / 60)
+        let seconds = String(totalSeconds % 60)
+        return filmtoneLocalizedFormat(
+            "filmtone.duration.minutes_seconds",
+            defaultValue: "%1$@m %2$@s",
+            arguments: [minutes, seconds],
+            comment: "Duration string for values in minutes and seconds."
+        )
+    }
+
+    func userMessage(for error: Error, context: FilmtoneUserErrorContext) -> String {
+        if let mediaError = error as? FilmtoneMediaError {
+            return mediaError.userFacingMessage(strings: self, context: context)
+        }
+
+        if let requestError = error as? FilmtoneRequestBuildError {
+            return requestError.localizedDescription
+        }
+
+        switch context {
+        case .pickSource:
+            return genericPickSourceError
+        case .importLut:
+            return genericImportLutError
+        case .export:
+            return genericExportError
+        case .saveToPhotos:
+            return genericSaveToPhotosError
+        case .share:
+            return genericShareError
+        case .preview:
+            return genericPreviewError
+        }
     }
 }
 
 enum FilmtoneStringsCatalog {
     static var current: FilmtoneStrings {
-        let localeCode = Locale.current.language.languageCode?.identifier ?? Locale.current.identifier
-        return localeCode.hasPrefix("ja") ? .ja : .en
+        FilmtoneStrings(locale: .current)
     }
 }
 
-private extension FilmtoneStrings {
-    static let en = FilmtoneStrings(
-        appName: "Filmtone",
-        sourceEmpty: "Pick a photo or video to begin.",
-        pickSource: "Pick media",
-        repickSource: "Replace media",
-        sourcePickerTitle: "Choose Source",
-        pickFromPhotoLibrary: "Photo Library",
-        pickFromFiles: "Files",
-        probePending: "Inspecting media…",
-        previewRendering: "Generating preview…",
-        previewSheetHint: "Preview updates through the native render path.",
-        compareLabel: "Original",
-        compareHint: "Press and hold the preview to compare.",
-        presetTitle: "Film Presets",
-        strengthLabel: "Strength",
-        adjustLabel: "Adjust",
-        quickHint: "Three quick axes to shape the look.",
-        quickFilmCharacter: "Exposure",
-        quickEra: "Contrast",
-        quickDynamics: "Saturation",
-        advancedParamsLabel: "Advanced Params",
-        advancedParamsHint: "Fine-tune the optical mix directly.",
-        advancedAdjustmentsActive: "Advanced tuning active.",
-        advancedBasicLabel: "Basic",
-        advancedOpticsLabel: "Optics",
-        advancedGlowLabel: "Glow",
-        advancedGrainLabel: "Grain",
-        advancedToneLabel: "Tone / Process",
-        paramLabels: [
-            "exposure": "Exposure",
-            "contrast": "Contrast",
-            "saturation": "Saturation",
-            "temperature": "Temperature",
-            "tint": "Tint",
-            "fade": "Fade",
-            "rgbShift": "RGB Shift",
-            "lensSoftness": "Lens Softness",
-            "vignette": "Vignette",
-            "bloomThreshold": "Bloom Threshold",
-            "bloomStrength": "Bloom Strength",
-            "bloomRadius": "Bloom Radius",
-            "bloomSoftKnee": "Bloom Soft Knee",
-            "halationIntensity": "Halation Intensity",
-            "halationSpread": "Halation Spread",
-            "halationHue": "Halation Hue",
-            "halationThreshold": "Halation Threshold",
-            "halationRadius": "Halation Radius",
-            "halationSoftKnee": "Halation Soft Knee",
-            "diffusion": "Diffusion",
-            "grainIntensity": "Grain Intensity",
-            "grainSize": "Grain Size",
-            "grainRadialMix": "Grain Radial Mix",
-            "compressionAmount": "Compression Amount",
-            "compressionRange": "Compression Range",
-        ],
-        resetLabel: "Reset",
-        exportSectionTitle: "Export",
-        exportIdle: "Ready to export.",
-        exportRunning: "Exporting…",
-        exportWritingHint: "Finalizing. Larger photos or videos may take a moment.",
-        exportStart: "Export",
-        exportDisabled: "This source can't be exported. See the source notes above.",
-        saveToPhotos: "Save to Photos",
-        saveToPhotosDone: "Saved to Photos.",
-        shareOutput: "Share",
-        resultTitle: "Last export",
-        metricsElapsed: "Elapsed",
-        metricsOutput: "Output",
-        metricsFileSize: "File size",
-        metricsSaveToPhotos: "Save to Photos",
-        noticePrefix: "Note",
-        errorPrefix: "Error",
-        doneLabel: "Done",
-        cameraLabel: "Camera",
-        cameraDescription: "Normalize log source media before the look. Phase 1 supports Auto or one imported .cube.",
-        cameraAuto: "Auto",
-        cameraImport: "Import .cube",
-        clearLut: "Clear",
-        lutImportError: "Camera profile import failed",
-        lutParseError: "Camera profile .cube could not be parsed"
-    )
+enum FilmtoneUserErrorContext {
+    case pickSource
+    case importLut
+    case export
+    case saveToPhotos
+    case share
+    case preview
+}
 
-    static let ja = FilmtoneStrings(
-        appName: "Filmtone",
-        sourceEmpty: "写真または動画を選んでください。",
-        pickSource: "素材を選ぶ",
-        repickSource: "素材を差し替える",
-        sourcePickerTitle: "取り込み元を選択",
-        pickFromPhotoLibrary: "フォトライブラリ",
-        pickFromFiles: "ファイル",
-        probePending: "素材を確認しています…",
-        previewRendering: "プレビューを生成しています…",
-        previewSheetHint: "プレビューは native の render path をそのまま反映します。",
-        compareLabel: "オリジナル",
-        compareHint: "プレビューを長押しで比較します。",
-        presetTitle: "フィルムプリセット",
-        strengthLabel: "強さ",
-        adjustLabel: "調整",
-        quickHint: "3 軸で素早くルックを整えます。",
-        quickFilmCharacter: "明るさ",
-        quickEra: "コントラスト",
-        quickDynamics: "彩度",
-        advancedParamsLabel: "詳細パラメータ",
-        advancedParamsHint: "光学系の効きを直接微調整します。",
-        advancedAdjustmentsActive: "詳細調整を適用中。",
-        advancedBasicLabel: "基本",
-        advancedOpticsLabel: "光学",
-        advancedGlowLabel: "グロー",
-        advancedGrainLabel: "グレイン",
-        advancedToneLabel: "階調 / プロセス",
-        paramLabels: [
-            "exposure": "露出",
-            "contrast": "コントラスト",
-            "saturation": "彩度",
-            "temperature": "色温度",
-            "tint": "ティント",
-            "fade": "フェード",
-            "rgbShift": "RGB シフト",
-            "lensSoftness": "レンズソフト",
-            "vignette": "周辺減光",
-            "bloomThreshold": "ブルームしきい値",
-            "bloomStrength": "ブルーム量",
-            "bloomRadius": "ブルーム半径",
-            "bloomSoftKnee": "ブルームソフトニー",
-            "halationIntensity": "ハレーション量",
-            "halationSpread": "ハレーション広がり",
-            "halationHue": "ハレーション色相",
-            "halationThreshold": "ハレーションしきい値",
-            "halationRadius": "ハレーション半径",
-            "halationSoftKnee": "ハレーションソフトニー",
-            "diffusion": "ディフュージョン",
-            "grainIntensity": "グレイン量",
-            "grainSize": "グレイン粒径",
-            "grainRadialMix": "グレイン周辺ミックス",
-            "compressionAmount": "圧縮量",
-            "compressionRange": "圧縮レンジ",
-        ],
-        resetLabel: "リセット",
-        exportSectionTitle: "書き出し",
-        exportIdle: "書き出しの準備ができています。",
-        exportRunning: "書き出し中…",
-        exportWritingHint: "出力を仕上げ中です。大きな写真や動画の場合は少し時間がかかります。",
-        exportStart: "書き出す",
-        exportDisabled: "この素材は書き出せません。素材の注意事項を確認してください。",
-        saveToPhotos: "写真へ保存",
-        saveToPhotosDone: "写真への保存が完了しました。",
-        shareOutput: "共有",
-        resultTitle: "直近の書き出し",
-        metricsElapsed: "経過時間",
-        metricsOutput: "出力",
-        metricsFileSize: "ファイルサイズ",
-        metricsSaveToPhotos: "写真への保存",
-        noticePrefix: "補足",
-        errorPrefix: "エラー",
-        doneLabel: "完了",
-        cameraLabel: "カメラ",
-        cameraDescription: "ルック適用前に log 素材を補正します。Phase 1 はオートまたは 1 本の .cube 読み込みに絞ります。",
-        cameraAuto: "オート",
-        cameraImport: ".cube を読み込む",
-        clearLut: "外す",
-        lutImportError: "カメラプロファイルの読み込みに失敗しました",
-        lutParseError: "カメラプロファイルの .cube を解釈できませんでした"
-    )
+extension FilmtoneMediaError {
+    func userFacingMessage(strings: FilmtoneStrings, context: FilmtoneUserErrorContext) -> String {
+        switch self {
+        case .bridgeUnavailable,
+             .exportBusy,
+             .exportCancelled:
+            return localizedDescription
+        case .invalidURL(let message),
+             .missingSource(let message),
+             .unsupportedSource(let message),
+             .permissionDenied(let message),
+             .pickerUnavailable(let message):
+            return message
+        case .exportFailed:
+            switch context {
+            case .preview:
+                return strings.genericPreviewError
+            default:
+                return strings.genericExportError
+            }
+        case .saveFailed:
+            return strings.genericSaveToPhotosError
+        case .shareFailed:
+            return strings.genericShareError
+        case .cacheFailed:
+            switch context {
+            case .pickSource:
+                return strings.genericPickSourceError
+            case .importLut:
+                return strings.genericImportLutError
+            case .export:
+                return strings.genericExportError
+            case .saveToPhotos:
+                return strings.genericSaveToPhotosError
+            case .share:
+                return strings.genericShareError
+            case .preview:
+                return strings.genericPreviewError
+            }
+        }
+    }
 }

@@ -41,13 +41,24 @@ enum FilmtoneCubeParser {
         }
 
         guard let size, size > 1 else {
-            throw FilmtoneMediaError.unsupportedSource("The .cube file is missing LUT_3D_SIZE.")
+            throw FilmtoneMediaError.unsupportedSource(
+                filmtoneLocalized(
+                    "filmtone.error.lut.missing_size",
+                    defaultValue: "The .cube file is missing LUT_3D_SIZE.",
+                    comment: "Error shown when an imported LUT file is missing LUT_3D_SIZE."
+                )
+            )
         }
 
         let expectedCount = size * size * size * 3
         guard values.count == expectedCount else {
             throw FilmtoneMediaError.unsupportedSource(
-                "The .cube payload has \(values.count) values but \(expectedCount) are required."
+                filmtoneLocalizedFormat(
+                    "filmtone.error.lut.value_count",
+                    defaultValue: "The .cube file has %@ values, but %@ are required.",
+                    arguments: [String(values.count), String(expectedCount)],
+                    comment: "Error shown when an imported LUT file contains the wrong number of values."
+                )
             )
         }
 

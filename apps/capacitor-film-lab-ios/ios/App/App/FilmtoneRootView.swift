@@ -98,7 +98,8 @@ struct FilmtoneRootView: View {
                     Text(store.sourceLabel ?? store.strings.appName)
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(.white.opacity(0.90))
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
                 }
 
                 Spacer(minLength: 12)
@@ -172,6 +173,8 @@ struct FilmtoneRootView: View {
                 source: store.source,
                 displayURI: store.selectedPreviewURI,
                 emptyMessage: previewEmptyMessage,
+                emptyEyebrow: store.strings.previewEmptyEyebrow,
+                emptyHint: store.strings.previewEmptyHint,
                 compareLabel: store.strings.compareLabel,
                 isRendering: store.preview.isRendering,
                 metaLabel: store.previewMetaLabel,
@@ -211,7 +214,6 @@ struct FilmtoneRootView: View {
                             Text(store.activePresetLabel)
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(.white.opacity(0.5))
-                                .textCase(.uppercase)
 
                             HStack(alignment: .lastTextBaseline, spacing: 2) {
                                 Text(strengthValueLabel)
@@ -231,7 +233,6 @@ struct FilmtoneRootView: View {
                         Text(store.strings.strengthLabel)
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.white.opacity(0.46))
-                            .textCase(.uppercase)
                     }
 
                     Text(adjustSummaryText)
@@ -267,7 +268,6 @@ struct FilmtoneRootView: View {
                 Text(store.strings.cameraLabel)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.52))
-                    .textCase(.uppercase)
 
                 Text(store.project.inputLut?.title ?? store.strings.cameraAuto)
                     .font(.title3.weight(.semibold))
@@ -342,7 +342,6 @@ struct FilmtoneRootView: View {
             Text(title)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(tint.opacity(0.92))
-                .textCase(.uppercase)
 
             Text(message)
                 .font(.subheadline)
@@ -398,8 +397,6 @@ struct FilmtoneSectionHeader: View {
         Text(title)
             .font(.caption.weight(.semibold))
             .foregroundStyle(.white.opacity(0.5))
-            .tracking(1.8)
-            .textCase(.uppercase)
     }
 }
 

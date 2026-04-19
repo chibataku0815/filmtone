@@ -95,7 +95,7 @@ struct FilmtoneExportPanel: View {
 
                 Spacer()
 
-                Text(stageLabel(progress.stage))
+                Text(store.strings.stageLabel(for: progress.stage))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.black)
                     .padding(.horizontal, 12)
@@ -124,19 +124,18 @@ struct FilmtoneExportPanel: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top, spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(elapsedLabel(result.elapsedMs))
+                    Text(store.strings.elapsedLabel(result.elapsedMs))
                         .font(.system(size: 34, weight: .semibold))
                         .foregroundStyle(.white)
 
                     Text(store.strings.metricsElapsed)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.white.opacity(0.5))
-                        .textCase(.uppercase)
                 }
 
                 Spacer(minLength: 12)
 
-                Text(saveStateLabel(store.saveToPhotosState))
+                Text(store.strings.saveStateLabel(store.saveToPhotosState))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(store.saveToPhotosState == .saved ? .black : .white.opacity(0.76))
                     .padding(.horizontal, 10)
@@ -147,11 +146,15 @@ struct FilmtoneExportPanel: View {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                 MetricCard(
                     label: store.strings.metricsOutput,
-                    value: "\(result.outputWidth)×\(result.outputHeight) @ \(result.outputFps)fps"
+                    value: store.strings.outputSummaryLabel(
+                        width: result.outputWidth,
+                        height: result.outputHeight,
+                        fps: result.outputFps
+                    )
                 )
-                MetricCard(label: store.strings.metricsFileSize, value: byteLabel(result.fileSizeBytes))
+                MetricCard(label: store.strings.metricsFileSize, value: store.strings.byteLabel(result.fileSizeBytes))
                 MetricCard(label: store.strings.cameraLabel, value: store.project.inputLut?.title ?? store.strings.cameraAuto)
-                MetricCard(label: store.strings.metricsSaveToPhotos, value: saveStateLabel(store.saveToPhotosState))
+                MetricCard(label: store.strings.metricsSaveToPhotos, value: store.strings.saveStateLabel(store.saveToPhotosState))
             }
 
             HStack(spacing: 12) {
@@ -199,45 +202,13 @@ struct FilmtoneExportPanel: View {
     private func progressLabel(progress: Phase0ExportProgressDTO) -> String {
         let percent = Int((progress.progress * 100).rounded())
         if let currentFrame = progress.currentFrame, let totalFrames = progress.totalFrames {
-            return "\(percent)% · \(stageLabel(progress.stage)) · \(currentFrame) / \(totalFrames)"
+            return "\(percent)% · \(store.strings.stageLabel(for: progress.stage)) · \(currentFrame) / \(totalFrames)"
         }
-        return "\(percent)% · \(stageLabel(progress.stage))"
-    }
-
-    private func stageLabel(_ stage: Phase0ExportStage) -> String {
-        stage.rawValue.capitalized
-    }
-
-    private func elapsedLabel(_ elapsedMs: Int) -> String {
-        String(format: "%.1fs", Double(elapsedMs) / 1000)
-    }
-
-    private func byteLabel(_ fileSizeBytes: Int?) -> String {
-        guard let fileSizeBytes else {
-            return "—"
-        }
-        if fileSizeBytes > 1024 * 1024 {
-            return String(format: "%.1f MB", Double(fileSizeBytes) / (1024 * 1024))
-        }
-        if fileSizeBytes > 1024 {
-            return String(format: "%.1f KB", Double(fileSizeBytes) / 1024)
-        }
-        return "\(fileSizeBytes) B"
+        return "\(percent)% · \(store.strings.stageLabel(for: progress.stage))"
     }
 
     private func percentLabel(_ value: Double) -> String {
         "\(Int((value * 100).rounded()))%"
-    }
-
-    private func saveStateLabel(_ state: FilmtoneSaveToPhotosState) -> String {
-        switch state {
-        case .notRun:
-            return "—"
-        case .saved:
-            return "Saved"
-        case .failed:
-            return "Failed"
-        }
     }
 
     private var divider: some View {

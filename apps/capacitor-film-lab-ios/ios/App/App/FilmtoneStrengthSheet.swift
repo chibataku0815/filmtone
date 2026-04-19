@@ -112,7 +112,6 @@ struct FilmtoneStrengthSheet: View {
                     Text(store.strings.strengthLabel)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.white.opacity(0.52))
-                        .textCase(.uppercase)
 
                     Text(Self.percentLabel(store.project.strength))
                         .font(.system(size: 42, weight: .semibold))
@@ -146,7 +145,6 @@ struct FilmtoneStrengthSheet: View {
                         Text(store.strings.adjustLabel)
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.white.opacity(0.52))
-                            .textCase(.uppercase)
 
                         Text(quickSummaryText)
                             .font(.subheadline)
@@ -219,7 +217,6 @@ struct FilmtoneStrengthSheet: View {
                         Text(store.strings.advancedParamsLabel)
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.white.opacity(0.52))
-                            .textCase(.uppercase)
 
                         Text(store.advancedSummaryText)
                             .font(.subheadline)
@@ -246,7 +243,6 @@ struct FilmtoneStrengthSheet: View {
                             Text(group.title)
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(.white.opacity(0.52))
-                                .textCase(.uppercase)
 
                             ForEach(group.controls) { control in
                                 FilmtoneSliderRow(
