@@ -40,11 +40,14 @@ final class FilmtoneEditorFacade {
         self.presenter = presenter
     }
 
-    func pickSource() async throws -> SourceInfoDTO? {
+    func pickSource(route: FilmtoneSourcePickerRoute = .photoLibrary) async throws -> SourceInfoDTO? {
         guard let presenter else {
             throw FilmtoneMediaError.bridgeUnavailable
         }
-        return try await assetPickerService.pickSource(presenting: presenter)
+        return try await assetPickerService.pickSource(
+            presenting: presenter,
+            route: route
+        )
     }
 
     func pickInputLut() async throws -> ParsedCubeLutDTO? {

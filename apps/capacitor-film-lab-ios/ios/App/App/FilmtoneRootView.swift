@@ -4,6 +4,7 @@ import UIKit
 struct FilmtoneRootView: View {
     @ObservedObject var store: FilmtoneEditorStore
     @State private var strengthSheetPresented = false
+    @State private var sourcePickerDialogPresented = false
 
     var body: some View {
         ZStack {
@@ -29,6 +30,19 @@ struct FilmtoneRootView: View {
         .sheet(isPresented: $strengthSheetPresented) {
             FilmtoneStrengthSheet(store: store) {
                 strengthSheetPresented = false
+            }
+        }
+        .confirmationDialog(
+            store.strings.sourcePickerTitle,
+            isPresented: $sourcePickerDialogPresented,
+            titleVisibility: .visible
+        ) {
+            Button(store.strings.pickFromPhotoLibrary) {
+                Task { await store.pickSource(route: .photoLibrary) }
+            }
+
+            Button(store.strings.pickFromFiles) {
+                Task { await store.pickSource(route: .files) }
             }
         }
     }
@@ -90,7 +104,7 @@ struct FilmtoneRootView: View {
                 Spacer(minLength: 12)
 
                 Button(store.source == nil ? store.strings.pickSource : store.strings.repickSource) {
-                    Task { await store.pickSource() }
+                    sourcePickerDialogPresented = true
                 }
                 .buttonStyle(FilmtoneTopBarActionStyle())
                 .disabled(store.isBusy)

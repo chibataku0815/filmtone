@@ -4,10 +4,21 @@ import PhotosUI
 import UIKit
 import UniformTypeIdentifiers
 
+enum FilmtoneSourcePickerRoute: String, Codable, Sendable {
+    case photoLibrary = "photo-library"
+    case files
+}
+
 final class AssetPickerService: NSObject {
+    private enum DocumentPickerPurpose {
+        case source
+        case lut
+    }
+
     private let cacheStore: CacheStore
     private var sourceContinuation: CheckedContinuation<SourceInfoDTO?, Error>?
     private var lutContinuation: CheckedContinuation<PickedLutFileDTO?, Error>?
+    private var activeDocumentPickerPurpose: DocumentPickerPurpose?
 
     init(cacheStore: CacheStore) {
         self.cacheStore = cacheStore
@@ -15,33 +26,49 @@ final class AssetPickerService: NSObject {
     }
 
     @MainActor
-    func pickSource(presenting viewController: UIViewController) async throws -> SourceInfoDTO? {
-        guard sourceContinuation == nil else {
+    func pickSource(
+        presenting viewController: UIViewController,
+        route: FilmtoneSourcePickerRoute = .photoLibrary
+    ) async throws -> SourceInfoDTO? {
+        guard sourceContinuation == nil, lutContinuation == nil else {
             throw FilmtoneMediaError.pickerUnavailable("A source picker is already active.")
         }
 
         return try await withCheckedThrowingContinuation { continuation in
             self.sourceContinuation = continuation
 
-            var configuration = PHPickerConfiguration(photoLibrary: .shared())
-            configuration.filter = .any(of: [.videos, .images])
-            configuration.selectionLimit = 1
-            configuration.preferredAssetRepresentationMode = .current
+            switch route {
+            case .photoLibrary:
+                var configuration = PHPickerConfiguration(photoLibrary: .shared())
+                configuration.filter = .any(of: [.videos, .images])
+                configuration.selectionLimit = 1
+                configuration.preferredAssetRepresentationMode = .current
 
-            let picker = PHPickerViewController(configuration: configuration)
-            picker.delegate = self
-            viewController.present(picker, animated: true)
+                let picker = PHPickerViewController(configuration: configuration)
+                picker.delegate = self
+                viewController.present(picker, animated: true)
+            case .files:
+                self.activeDocumentPickerPurpose = .source
+                let picker = UIDocumentPickerViewController(
+                    forOpeningContentTypes: [.image, .movie, .video],
+                    asCopy: false
+                )
+                picker.delegate = self
+                picker.allowsMultipleSelection = false
+                viewController.present(picker, animated: true)
+            }
         }
     }
 
     @MainActor
     func pickLutFile(presenting viewController: UIViewController) async throws -> PickedLutFileDTO? {
-        guard lutContinuation == nil else {
+        guard sourceContinuation == nil, lutContinuation == nil else {
             throw FilmtoneMediaError.pickerUnavailable("A LUT picker is already active.")
         }
 
         return try await withCheckedThrowingContinuation { continuation in
             self.lutContinuation = continuation
+            self.activeDocumentPickerPurpose = .lut
             let cubeType = UTType(filenameExtension: "cube") ?? .plainText
             let picker = UIDocumentPickerViewController(
                 forOpeningContentTypes: [cubeType, .plainText],
@@ -93,6 +120,19 @@ final class AssetPickerService: NSObject {
             kind: kind,
             mimeType: type?.preferredMIMEType
         )
+    }
+
+    private func importSource(from url: URL) async throws -> SourceInfoDTO {
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    let picked = try self.importDocumentSource(from: url)
+                    continuation.resume(returning: picked)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
 
     private func importSelectedVideoAsset(
@@ -192,6 +232,48 @@ final class AssetPickerService: NSObject {
         return current
     }
 
+    private func importDocumentSource(from url: URL) throws -> SourceInfoDTO {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer {
+            if scoped {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        let type = try sourceType(for: url)
+        let kind: FilmtoneSourceKind = type.conforms(to: .image) ? .image : .video
+        let importedURL = try cacheStore.importItem(
+            from: url,
+            suggestedName: url.lastPathComponent,
+            bucket: .sources
+        )
+
+        return SourceInfoDTO(
+            uri: importedURL.absoluteString,
+            filename: url.lastPathComponent,
+            kind: kind,
+            mimeType: type.preferredMIMEType
+        )
+    }
+
+    private func sourceType(for url: URL) throws -> UTType {
+        if let contentType = try url.resourceValues(forKeys: [.contentTypeKey]).contentType,
+           isSupportedSourceType(contentType) {
+            return contentType
+        }
+
+        if let type = UTType(filenameExtension: url.pathExtension),
+           isSupportedSourceType(type) {
+            return type
+        }
+
+        throw FilmtoneMediaError.unsupportedSource("The selected file is not an image or video.")
+    }
+
+    private func isSupportedSourceType(_ type: UTType) -> Bool {
+        type.conforms(to: .image) || type.conforms(to: .movie) || type.conforms(to: .video)
+    }
+
     private func importLut(from url: URL) throws -> PickedLutFileDTO {
         let scoped = url.startAccessingSecurityScopedResource()
         defer {
@@ -281,29 +363,65 @@ extension AssetPickerService: PHPickerViewControllerDelegate {
 
 extension AssetPickerService: UIDocumentPickerDelegate {
     func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
-        let continuation = lutContinuation
-        lutContinuation = nil
-        continuation?.resume(returning: nil)
+        switch activeDocumentPickerPurpose {
+        case .source:
+            let continuation = sourceContinuation
+            sourceContinuation = nil
+            activeDocumentPickerPurpose = nil
+            continuation?.resume(returning: nil)
+        case .lut:
+            let continuation = lutContinuation
+            lutContinuation = nil
+            activeDocumentPickerPurpose = nil
+            continuation?.resume(returning: nil)
+        case .none:
+            break
+        }
     }
 
     func documentPicker(
         _ controller: UIDocumentPickerViewController,
         didPickDocumentsAt urls: [URL]
     ) {
-        let continuation = lutContinuation
-        lutContinuation = nil
+        switch activeDocumentPickerPurpose {
+        case .source:
+            let continuation = sourceContinuation
+            sourceContinuation = nil
+            activeDocumentPickerPurpose = nil
 
-        guard let continuation else { return }
-        guard let url = urls.first else {
-            continuation.resume(returning: nil)
-            return
-        }
+            guard let continuation else { return }
+            guard let url = urls.first else {
+                continuation.resume(returning: nil)
+                return
+            }
 
-        do {
-            let picked = try importLut(from: url)
-            continuation.resume(returning: picked)
-        } catch {
-            continuation.resume(throwing: error)
+            Task {
+                do {
+                    let picked = try await importSource(from: url)
+                    continuation.resume(returning: picked)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        case .lut:
+            let continuation = lutContinuation
+            lutContinuation = nil
+            activeDocumentPickerPurpose = nil
+
+            guard let continuation else { return }
+            guard let url = urls.first else {
+                continuation.resume(returning: nil)
+                return
+            }
+
+            do {
+                let picked = try importLut(from: url)
+                continuation.resume(returning: picked)
+            } catch {
+                continuation.resume(throwing: error)
+            }
+        case .none:
+            break
         }
     }
 }

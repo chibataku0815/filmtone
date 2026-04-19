@@ -68,7 +68,10 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
 
         Task { @MainActor in
             do {
-                if let source = try await assetPickerService.pickSource(presenting: viewController) {
+                if let source = try await assetPickerService.pickSource(
+                    presenting: viewController,
+                    route: .photoLibrary
+                ) {
                     call.resolve(with: source)
                 } else {
                     call.resolve()

@@ -165,13 +165,13 @@ final class FilmtoneEditorStore: ObservableObject {
         facade.attachPresenter(presenter)
     }
 
-    func pickSource() async {
+    func pickSource(route: FilmtoneSourcePickerRoute = .photoLibrary) async {
         do {
             isBusy = true
             notice = nil
             error = nil
 
-            guard let source = try await facade.pickSource() else {
+            guard let source = try await facade.pickSource(route: route) else {
                 isBusy = false
                 return
             }

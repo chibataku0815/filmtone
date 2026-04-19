@@ -5,6 +5,9 @@ struct FilmtoneStrings {
     let sourceEmpty: String
     let pickSource: String
     let repickSource: String
+    let sourcePickerTitle: String
+    let pickFromPhotoLibrary: String
+    let pickFromFiles: String
     let probePending: String
     let previewRendering: String
     let previewSheetHint: String
@@ -69,10 +72,13 @@ enum FilmtoneStringsCatalog {
 private extension FilmtoneStrings {
     static let en = FilmtoneStrings(
         appName: "Filmtone",
-        sourceEmpty: "Pick a video to begin.",
-        pickSource: "Pick video",
-        repickSource: "Replace video",
-        probePending: "Inspecting video…",
+        sourceEmpty: "Pick a photo or video to begin.",
+        pickSource: "Pick media",
+        repickSource: "Replace media",
+        sourcePickerTitle: "Choose Source",
+        pickFromPhotoLibrary: "Photo Library",
+        pickFromFiles: "Files",
+        probePending: "Inspecting media…",
         previewRendering: "Generating preview…",
         previewSheetHint: "Preview updates through the native render path.",
         compareLabel: "Original",
@@ -123,9 +129,9 @@ private extension FilmtoneStrings {
         exportSectionTitle: "Export",
         exportIdle: "Ready to export.",
         exportRunning: "Exporting…",
-        exportWritingHint: "Finalizing. Long clips may take a moment.",
+        exportWritingHint: "Finalizing. Larger photos or videos may take a moment.",
         exportStart: "Export",
-        exportDisabled: "This video can't be exported. See the source notes above.",
+        exportDisabled: "This source can't be exported. See the source notes above.",
         saveToPhotos: "Save to Photos",
         saveToPhotosDone: "Saved to Photos.",
         shareOutput: "Share",
@@ -138,7 +144,7 @@ private extension FilmtoneStrings {
         errorPrefix: "Error",
         doneLabel: "Done",
         cameraLabel: "Camera",
-        cameraDescription: "Translate log footage before the look. Phase 1 supports Auto or one imported .cube.",
+        cameraDescription: "Normalize log source media before the look. Phase 1 supports Auto or one imported .cube.",
         cameraAuto: "Auto",
         cameraImport: "Import .cube",
         clearLut: "Clear",
@@ -148,10 +154,13 @@ private extension FilmtoneStrings {
 
     static let ja = FilmtoneStrings(
         appName: "Filmtone",
-        sourceEmpty: "動画を選んでください。",
-        pickSource: "動画を選ぶ",
-        repickSource: "動画を差し替える",
-        probePending: "動画を確認しています…",
+        sourceEmpty: "写真または動画を選んでください。",
+        pickSource: "素材を選ぶ",
+        repickSource: "素材を差し替える",
+        sourcePickerTitle: "取り込み元を選択",
+        pickFromPhotoLibrary: "フォトライブラリ",
+        pickFromFiles: "ファイル",
+        probePending: "素材を確認しています…",
         previewRendering: "プレビューを生成しています…",
         previewSheetHint: "プレビューは native の render path をそのまま反映します。",
         compareLabel: "オリジナル",
@@ -202,9 +211,9 @@ private extension FilmtoneStrings {
         exportSectionTitle: "書き出し",
         exportIdle: "書き出しの準備ができています。",
         exportRunning: "書き出し中…",
-        exportWritingHint: "出力を仕上げ中です。長尺の場合少し時間がかかります。",
+        exportWritingHint: "出力を仕上げ中です。大きな写真や動画の場合は少し時間がかかります。",
         exportStart: "書き出す",
-        exportDisabled: "この動画は書き出せません。素材の注意事項を確認してください。",
+        exportDisabled: "この素材は書き出せません。素材の注意事項を確認してください。",
         saveToPhotos: "写真へ保存",
         saveToPhotosDone: "写真への保存が完了しました。",
         shareOutput: "共有",
@@ -217,7 +226,7 @@ private extension FilmtoneStrings {
         errorPrefix: "エラー",
         doneLabel: "完了",
         cameraLabel: "カメラ",
-        cameraDescription: "ルック適用前に log 動画を変換します。Phase 1 はオートまたは 1 本の .cube 読み込みに絞ります。",
+        cameraDescription: "ルック適用前に log 素材を補正します。Phase 1 はオートまたは 1 本の .cube 読み込みに絞ります。",
         cameraAuto: "オート",
         cameraImport: ".cube を読み込む",
         clearLut: "外す",
