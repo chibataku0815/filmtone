@@ -7,10 +7,10 @@ struct FilmtonePresetRow: View {
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 ForEach(presets) { preset in
                     let isActive = preset.name == activePresetName
-                    let cardShape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    let cardShape = RoundedRectangle(cornerRadius: filmtoneSurfaceCornerRadius, style: .continuous)
 
                     Button {
                         onTap(preset, isActive)
@@ -18,45 +18,37 @@ struct FilmtonePresetRow: View {
                         VStack(alignment: .leading, spacing: 0) {
                             Text(categoryLabel(for: preset.category))
                                 .font(.caption2.weight(.semibold))
-                                .foregroundStyle(accentColor(for: preset.category).opacity(isActive ? 0.86 : 0.58))
+                                .foregroundStyle(isActive ? Color.filmtoneAmber.opacity(0.92) : Color.white.opacity(0.38))
 
-                            Spacer(minLength: 22)
+                            Spacer(minLength: 18)
 
                             VStack(alignment: .leading, spacing: 8) {
                                 Text(preset.label)
                                     .font(.headline.weight(.semibold))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(isActive ? .white : .white.opacity(0.92))
                                     .lineLimit(2)
                                     .minimumScaleFactor(0.92)
 
                                 Text(preset.subtitle)
                                     .font(.caption)
-                                    .foregroundStyle(.white.opacity(0.58))
+                                    .foregroundStyle(.white.opacity(isActive ? 0.62 : 0.48))
                                     .multilineTextAlignment(.leading)
                                     .lineLimit(3)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
                         }
-                        .padding(15)
-                        .frame(width: 148, height: 148, alignment: .bottomLeading)
+                        .padding(14)
+                        .frame(width: 146, height: 136, alignment: .bottomLeading)
                         .background(
                             cardShape.fill(baseFill(isActive: isActive))
                         )
                         .overlay(
                             cardShape.strokeBorder(
-                                isActive ? Color.filmtoneAmber : Color.white.opacity(0.08),
-                                lineWidth: isActive ? 1.6 : 1
+                                isActive ? Color.filmtoneAmber : Color.white.opacity(0.06),
+                                lineWidth: isActive ? 1.3 : 1
                             )
                         )
-                        .overlay(alignment: .top) {
-                            Rectangle()
-                                .fill(isActive ? accentColor(for: preset.category) : Color.white.opacity(0.10))
-                                .frame(height: isActive ? 2 : 1)
-                                .padding(.top, 1)
-                                .padding(.horizontal, 18)
-                                .clipShape(Capsule(style: .continuous))
-                        }
-                        .shadow(color: Color.black.opacity(isActive ? 0.16 : 0.10), radius: isActive ? 12 : 6, x: 0, y: isActive ? 8 : 4)
+                        .shadow(color: Color.black.opacity(isActive ? 0.14 : 0.08), radius: isActive ? 8 : 4, x: 0, y: isActive ? 5 : 2)
                     }
                     .buttonStyle(.plain)
                 }
@@ -66,22 +58,11 @@ struct FilmtonePresetRow: View {
         }
     }
 
-    private func accentColor(for category: FilmtonePresetCategory) -> Color {
-        switch category {
-        case .filmStock:
-            return Color.filmtoneAmber
-        case .look:
-            return Color.filmtoneSky
-        case .utility:
-            return .white.opacity(0.68)
-        }
-    }
-
     private func baseFill(isActive: Bool) -> LinearGradient {
         LinearGradient(
             colors: [
-                Color.white.opacity(isActive ? 0.09 : 0.035),
-                Color.white.opacity(isActive ? 0.045 : 0.015),
+                isActive ? Color.filmtoneAmber.opacity(0.08) : Color.white.opacity(0.035),
+                isActive ? Color.white.opacity(0.04) : Color.white.opacity(0.015),
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing

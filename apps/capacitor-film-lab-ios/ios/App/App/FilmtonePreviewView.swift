@@ -23,7 +23,7 @@ struct FilmtonePreviewView: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: filmtonePreviewCornerRadius, style: .continuous)
                 .fill(Color.black)
 
             LinearGradient(
@@ -34,7 +34,7 @@ struct FilmtonePreviewView: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: filmtonePreviewCornerRadius, style: .continuous))
 
             mediaBody
 
@@ -42,12 +42,15 @@ struct FilmtonePreviewView: View {
                 videoChrome(videoPreview)
                     .padding(16)
             } else if isStillComparing {
-                Label(originalLabel, systemImage: "square.on.square")
+                Text(originalLabel)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.black)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(Color.filmtoneAmber, in: Capsule())
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Color.filmtoneAmber)
+                    )
                     .padding(16)
             }
 
@@ -59,9 +62,12 @@ struct FilmtonePreviewView: View {
                         Text(metaLabel)
                             .font(.caption2.monospaced())
                             .foregroundStyle(.white.opacity(0.48))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(Color.black.opacity(0.22), in: Capsule())
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 5)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(Color.black.opacity(0.24))
+                            )
                             .padding(16)
                     }
                 }
@@ -79,9 +85,12 @@ struct FilmtonePreviewView: View {
                                 .font(.caption.weight(.medium))
                                 .foregroundStyle(.white.opacity(0.8))
                         }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .background(Color.black.opacity(0.26), in: Capsule())
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(Color.black.opacity(0.28))
+                        )
 
                         Spacer()
                     }
@@ -91,10 +100,10 @@ struct FilmtonePreviewView: View {
         }
         .frame(minHeight: 360, maxHeight: 540)
         .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: filmtonePreviewCornerRadius, style: .continuous)
                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: filmtonePreviewCornerRadius, style: .continuous))
         .shadow(color: Color.black.opacity(0.24), radius: 24, x: 0, y: 18)
         .fullScreenCover(isPresented: $fullscreenPresented) {
             FilmtoneFullscreenPreviewView(
@@ -114,14 +123,14 @@ struct FilmtonePreviewView: View {
     private var mediaBody: some View {
         if let videoPreview {
             FilmtonePreviewPlayerView(player: videoPreview.player)
-                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: filmtonePreviewCornerRadius, style: .continuous))
         } else if let source, let displayURI, let image = filmtonePreviewImage(from: displayURI) {
             GeometryReader { geometry in
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFit()
                     .frame(width: geometry.size.width, height: geometry.size.height)
-                    .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: filmtonePreviewCornerRadius, style: .continuous))
                     .onLongPressGesture(
                         minimumDuration: 0.18,
                         maximumDistance: 24,
@@ -187,7 +196,7 @@ struct FilmtonePreviewView: View {
             } label: {
                 Label(expandLabel, systemImage: "arrow.up.left.and.arrow.down.right")
             }
-            .buttonStyle(FilmtonePreviewCapsuleButtonStyle())
+            .buttonStyle(FilmtonePreviewControlButtonStyle())
         }
     }
 }
@@ -264,9 +273,12 @@ private struct FilmtoneFullscreenPreviewView: View {
                                 .font(.caption.weight(.medium))
                                 .foregroundStyle(.white.opacity(0.8))
                         }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .background(Color.black.opacity(0.26), in: Capsule())
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(Color.black.opacity(0.28))
+                        )
 
                         Spacer()
                     }
@@ -296,20 +308,34 @@ private struct FilmtonePreviewToggleButton: View {
                 .foregroundStyle(isActive ? Color.black : .white.opacity(0.82))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 9)
-                .background(isActive ? Color.filmtoneAmber : Color.black.opacity(0.42), in: Capsule())
+                .background(
+                    RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
+                        .fill(isActive ? Color.filmtoneAmber : Color.black.opacity(0.42))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
+                        .stroke(isActive ? Color.filmtoneAmber : Color.white.opacity(0.08), lineWidth: 1)
+                )
         }
         .buttonStyle(.plain)
     }
 }
 
-private struct FilmtonePreviewCapsuleButtonStyle: ButtonStyle {
+private struct FilmtonePreviewControlButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.caption.weight(.semibold))
             .foregroundStyle(.white.opacity(0.9))
             .padding(.horizontal, 12)
             .padding(.vertical, 9)
-            .background(Color.black.opacity(configuration.isPressed ? 0.58 : 0.42), in: Capsule())
+            .background(
+                RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
+                    .fill(Color.black.opacity(configuration.isPressed ? 0.58 : 0.42))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
     }
 }

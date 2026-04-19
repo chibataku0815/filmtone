@@ -451,7 +451,10 @@ private struct FilmtoneSheetPreview: View {
                     .foregroundStyle(Color.filmtoneAmber)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
-                    .background(Color.black.opacity(0.65), in: Capsule())
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Color.black.opacity(0.65))
+                    )
                     .padding(12)
             }
 
@@ -465,7 +468,10 @@ private struct FilmtoneSheetPreview: View {
                             .foregroundStyle(.white.opacity(0.68))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 8)
-                            .background(Color.black.opacity(0.5))
+                            .background(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(Color.black.opacity(0.5))
+                            )
                             .padding(12)
                     }
                 }
@@ -487,7 +493,10 @@ private struct FilmtoneSheetPreview: View {
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
-                    .background(Color.black.opacity(0.6))
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Color.black.opacity(0.6))
+                    )
                 }
                 .padding(12)
             }
@@ -520,7 +529,14 @@ private struct FilmtoneSheetPreviewToggleButton: View {
                 .foregroundStyle(isActive ? Color.black : .white.opacity(0.82))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 9)
-                .background(isActive ? Color.filmtoneAmber : Color.black.opacity(0.54), in: Capsule())
+                .background(
+                    RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
+                        .fill(isActive ? Color.filmtoneAmber : Color.black.opacity(0.54))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
+                        .stroke(isActive ? Color.filmtoneAmber : Color.white.opacity(0.08), lineWidth: 1)
+                )
         }
         .buttonStyle(.plain)
     }
@@ -577,7 +593,7 @@ struct FilmtoneSheetPrimaryActionStyle: ButtonStyle {
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(
-                Rectangle()
+                RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
                     .fill(Color.filmtoneAmber.opacity(configuration.isPressed ? 0.84 : 1))
             )
             .scaleEffect(configuration.isPressed ? 0.99 : 1)
@@ -592,11 +608,11 @@ struct FilmtoneSheetSecondaryActionStyle: ButtonStyle {
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(
-                Rectangle()
+                RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
                     .fill(Color.white.opacity(configuration.isPressed ? 0.10 : 0.04))
             )
             .overlay(
-                Rectangle()
+                RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
                     .stroke(Color.white.opacity(0.08), lineWidth: 1)
             )
             .scaleEffect(configuration.isPressed ? 0.99 : 1)

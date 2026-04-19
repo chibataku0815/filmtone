@@ -14,8 +14,11 @@ struct FilmtoneRootView: View {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 24) {
                     heroSection
+                        .accessibilityIdentifier("filmtone.section.hero")
                     presetSection
+                        .accessibilityIdentifier("filmtone.section.presets")
                     tuningSection
+                        .accessibilityIdentifier("filmtone.section.tuning")
                     FilmtoneExportPanel(store: store)
                     messageStack
                 }
@@ -23,6 +26,7 @@ struct FilmtoneRootView: View {
                 .padding(.top, 28)
                 .padding(.bottom, 32)
             }
+            .accessibilityIdentifier("filmtone.root.scroll")
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             topChrome
@@ -30,6 +34,11 @@ struct FilmtoneRootView: View {
         .sheet(isPresented: $strengthSheetPresented) {
             FilmtoneStrengthSheet(store: store) {
                 strengthSheetPresented = false
+            }
+        }
+        .onAppear {
+            if FilmtoneSnapshotScene.current == .quick {
+                strengthSheetPresented = true
             }
         }
         .confirmationDialog(
@@ -64,13 +73,13 @@ struct FilmtoneRootView: View {
 
             RadialGradient(
                 colors: [
-                    Color.filmtoneSky.opacity(0.16),
-                    Color.filmtoneSky.opacity(0.03),
+                    Color.filmtoneAmber.opacity(0.10),
+                    Color.filmtoneAmber.opacity(0.02),
                     .clear,
                 ],
                 center: .topTrailing,
                 startRadius: 24,
-                endRadius: 300
+                endRadius: 280
             )
 
             LinearGradient(
@@ -88,19 +97,11 @@ struct FilmtoneRootView: View {
     private var topChrome: some View {
         VStack(spacing: 0) {
             HStack(spacing: 14) {
-                HStack(spacing: 8) {
-                    if store.source != nil {
-                        Capsule()
-                            .fill(Color.filmtoneAmber)
-                            .frame(width: 12, height: 3)
-                    }
-
-                    Text(store.sourceLabel ?? store.strings.appName)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.white.opacity(0.90))
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                }
+                Text(store.sourceLabel ?? store.strings.appName)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.90))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
 
                 Spacer(minLength: 12)
 
@@ -112,27 +113,17 @@ struct FilmtoneRootView: View {
             }
             .padding(.horizontal, 20)
             .padding(.top, 8)
-            .padding(.bottom, 10)
+            .padding(.bottom, 12)
 
             Rectangle()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.08),
-                            Color.white.opacity(0.03),
-                            .clear,
-                        ],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
+                .fill(Color.white.opacity(0.06))
                 .frame(height: 1)
         }
         .background(
             LinearGradient(
                 colors: [
-                    Color.black.opacity(0.22),
-                    Color.black.opacity(0.08),
+                    Color.black.opacity(0.32),
+                    Color.black.opacity(0.12),
                     .clear,
                 ],
                 startPoint: .top,
@@ -144,28 +135,16 @@ struct FilmtoneRootView: View {
     private var heroSection: some View {
         VStack(alignment: .leading, spacing: 18) {
             if store.source != nil {
-                HStack(alignment: .bottom, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 8) {
-                            Circle()
-                                .fill(Color.filmtoneAmber)
-                                .frame(width: 7, height: 7)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(store.activePresetLabel)
+                        .font(.system(size: 34, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
 
-                            Text(store.activePresetLabel)
-                                .font(.system(size: 34, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .lineLimit(2)
-                        }
-
-                        Text(store.adjustmentSummaryText)
-                            .font(.subheadline)
-                            .foregroundStyle(.white.opacity(0.66))
-                            .lineLimit(2)
-                    }
-
-                    Spacer(minLength: 12)
-
-                    strengthBadge
+                    Text(store.adjustmentSummaryText)
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.66))
+                        .lineLimit(2)
                 }
             }
 
@@ -215,30 +194,25 @@ struct FilmtoneRootView: View {
                 strengthSheetPresented = true
             } label: {
                 VStack(alignment: .leading, spacing: 14) {
-                    HStack(alignment: .firstTextBaseline) {
+                    HStack(alignment: .firstTextBaseline, spacing: 16) {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(store.activePresetLabel)
+                            Text(store.strings.strengthLabel)
                                 .font(.caption.weight(.semibold))
-                                .foregroundStyle(.white.opacity(0.5))
+                                .foregroundStyle(.white.opacity(0.48))
 
-                            HStack(alignment: .lastTextBaseline, spacing: 2) {
-                                Text(strengthValueLabel)
-                                    .font(.system(size: 58, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                    .tracking(-1.4)
-
-                                Text("%")
-                                    .font(.system(size: 24, weight: .semibold))
-                                    .foregroundStyle(.white.opacity(0.82))
-                                    .offset(y: -6)
-                            }
+                            Text(percentLabel(store.project.strength))
+                                .font(.system(size: 34, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .monospacedDigit()
                         }
 
                         Spacer(minLength: 12)
 
-                        Text(store.strings.strengthLabel)
+                        Text(store.activePresetLabel)
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(.white.opacity(0.46))
+                            .foregroundStyle(Color.filmtoneAmber.opacity(0.92))
+                            .multilineTextAlignment(.trailing)
+                            .lineLimit(2)
                     }
 
                     Text(adjustSummaryText)
@@ -248,21 +222,18 @@ struct FilmtoneRootView: View {
                         .lineLimit(3)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 16)
-                .overlay(alignment: .bottom) {
-                    LinearGradient(
-                        colors: [
-                            Color.filmtoneAmber.opacity(0.34),
-                            Color.white.opacity(0.06),
-                            .clear,
-                        ],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                    .frame(height: 1)
-                }
+                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: filmtoneSurfaceCornerRadius, style: .continuous)
+                        .fill(Color.white.opacity(0.03))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: filmtoneSurfaceCornerRadius, style: .continuous)
+                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                )
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("filmtone.adjust.open")
 
             cameraProfileCard
         }
@@ -301,31 +272,32 @@ struct FilmtoneRootView: View {
                     .foregroundStyle(.white.opacity(0.86))
                     .padding(.horizontal, 14)
                     .padding(.vertical, 11)
-                    .background(Color.white.opacity(0.05), in: Capsule())
+                    .background(
+                        RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
+                            .fill(Color.white.opacity(0.05))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
+                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                    )
             }
         }
-        .padding(.top, 4)
-    }
-
-    private var strengthBadge: some View {
-        VStack(alignment: .trailing, spacing: 4) {
-            Text(percentLabel(store.project.strength))
-                .font(.subheadline.monospacedDigit().weight(.semibold))
-                .foregroundStyle(.black)
-
-            Text(store.strings.strengthLabel)
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.black.opacity(0.74))
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(Color.filmtoneAmber, in: Capsule())
+        .accessibilityIdentifier("filmtone.card.cameraProfile")
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: filmtoneSurfaceCornerRadius, style: .continuous)
+                .fill(Color.white.opacity(0.03))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: filmtoneSurfaceCornerRadius, style: .continuous)
+                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+        )
     }
 
     @ViewBuilder
     private var messageStack: some View {
         if let notice = store.notice {
-            messagePanel(title: store.strings.noticePrefix, message: notice, tint: Color.filmtoneSky)
+            messagePanel(title: store.strings.noticePrefix, message: notice, tint: Color.filmtoneAmber)
         }
 
         if let error = store.bannerError {
@@ -356,21 +328,17 @@ struct FilmtoneRootView: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(tint.opacity(0.08))
+            RoundedRectangle(cornerRadius: filmtoneSurfaceCornerRadius, style: .continuous)
+                .fill(tint.opacity(0.06))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(tint.opacity(0.16), lineWidth: 1)
+            RoundedRectangle(cornerRadius: filmtoneSurfaceCornerRadius, style: .continuous)
+                .stroke(tint.opacity(0.12), lineWidth: 1)
         )
     }
 
     private func percentLabel(_ value: Double) -> String {
         "\(Int((value * 100).rounded()))%"
-    }
-
-    private var strengthValueLabel: String {
-        "\(Int((store.project.strength * 100).rounded()))"
     }
 
     private var adjustSummaryText: String {
@@ -413,7 +381,10 @@ struct FilmtoneChromeActionStyle: ButtonStyle {
             .foregroundStyle(.black)
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .background(Color.filmtoneAmber.opacity(configuration.isPressed ? 0.84 : 1), in: Capsule())
+            .background(
+                RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
+                    .fill(Color.filmtoneAmber.opacity(configuration.isPressed ? 0.84 : 1))
+            )
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
     }
 }
@@ -425,14 +396,21 @@ struct FilmtoneTopBarActionStyle: ButtonStyle {
             .foregroundStyle(Color.filmtoneAmber)
             .padding(.horizontal, 13)
             .padding(.vertical, 10)
-            .background(Color.white.opacity(configuration.isPressed ? 0.08 : 0.05), in: Capsule())
+            .background(
+                RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
+                    .fill(Color.white.opacity(configuration.isPressed ? 0.08 : 0.05))
+            )
             .overlay(
-                Capsule()
+                RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
                     .stroke(Color.white.opacity(0.06), lineWidth: 1)
             )
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
     }
 }
+
+let filmtonePreviewCornerRadius: CGFloat = 24
+let filmtoneSurfaceCornerRadius: CGFloat = 12
+let filmtoneControlCornerRadius: CGFloat = 10
 
 extension Color {
     static let filmtoneAmber = Color(red: 1.0, green: 0.72, blue: 0.25)

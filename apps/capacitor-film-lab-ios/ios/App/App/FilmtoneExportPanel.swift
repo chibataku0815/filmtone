@@ -9,6 +9,7 @@ struct FilmtoneExportPanel: View {
             statePanel
         }
         .padding(.top, 8)
+        .accessibilityIdentifier("filmtone.section.export")
     }
 
     private var header: some View {
@@ -79,9 +80,12 @@ struct FilmtoneExportPanel: View {
         }
         .padding(.vertical, 16)
         .padding(.horizontal, 16)
-        .background(Color.filmtoneAmber.opacity(0.05), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(
+            Color.filmtoneAmber.opacity(0.05),
+            in: RoundedRectangle(cornerRadius: filmtoneSurfaceCornerRadius, style: .continuous)
+        )
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: filmtoneSurfaceCornerRadius, style: .continuous)
                 .stroke(Color.filmtoneAmber.opacity(0.16), lineWidth: 1)
         )
     }
@@ -100,7 +104,10 @@ struct FilmtoneExportPanel: View {
                     .foregroundStyle(.black)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(Color.filmtoneAmber, in: Capsule())
+                    .background(
+                        RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
+                            .fill(Color.filmtoneAmber)
+                    )
             }
 
             ProgressView(value: progress.progress)
@@ -140,7 +147,10 @@ struct FilmtoneExportPanel: View {
                     .foregroundStyle(store.saveToPhotosState == .saved ? .black : .white.opacity(0.76))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 8)
-                    .background(saveStateBackground, in: Capsule())
+                    .background(
+                        RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
+                            .fill(saveStateBackground)
+                    )
             }
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
@@ -245,7 +255,10 @@ struct FilmtonePrimaryButtonStyle: ButtonStyle {
             .foregroundStyle(.black)
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .background(Color.filmtoneAmber.opacity(configuration.isPressed ? 0.84 : 1), in: Capsule())
+            .background(
+                RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
+                    .fill(Color.filmtoneAmber.opacity(configuration.isPressed ? 0.84 : 1))
+            )
             .opacity(configuration.role == .destructive ? 0.8 : 1)
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
     }
@@ -258,7 +271,14 @@ struct FilmtoneSecondaryButtonStyle: ButtonStyle {
             .foregroundStyle(.white.opacity(0.84))
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .background(Color.white.opacity(configuration.isPressed ? 0.08 : 0.04), in: Capsule())
+            .background(
+                RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
+                    .fill(Color.white.opacity(configuration.isPressed ? 0.08 : 0.04))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
     }
 }
