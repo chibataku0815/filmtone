@@ -15,6 +15,12 @@ final class FilmtoneExportSession {
     private let colorSpace = CGColorSpaceCreateDeviceRGB()
     private var cancelled = false
     private static let aberrationEdgeSoftenScale = 32.0
+    private static let aberrationEdgeSoftenMax = 0.52
+    private static let aberrationEdgeSoftenCurve = 1.55
+    private static let aberrationBlurRadiusMin = 1.6
+    private static let aberrationBlurRadiusMax = 6.2
+    private static let aberrationBlurRadiusCap = 7.8
+    private static let lensSoftnessBlurBoost = 1.85
     private static let glowBaseScale = 0.5
     // Product-facing iOS tuning: keep payload semantics stable while making
     // the glow family read much stronger at the same saved values.
@@ -584,14 +590,16 @@ final class FilmtoneExportSession {
         transform: CGAffineTransform,
         outputSize: CGSize,
         timeSeconds: Double
-    ) -> CIImage {
+    ) throws -> CIImage {
         let base = scaledVideoSourceImage(
             image,
             transform: transform,
             outputSize: outputSize
         )
         let graded = applyGrade(to: base, timeSeconds: timeSeconds)
-        return graded.cropped(to: CGRect(origin: .zero, size: outputSize))
+        let cropped = graded.cropped(to: CGRect(origin: .zero, size: outputSize))
+        try validatePreviewVideoImage(cropped, outputSize: outputSize)
+        return cropped
     }
 
     private func scaledVideoFrameImage(
@@ -636,6 +644,44 @@ final class FilmtoneExportSession {
             .cropped(to: CGRect(origin: .zero, size: outputSize))
     }
 
+    private func validatePreviewVideoImage(_ image: CIImage, outputSize: CGSize) throws {
+        let extent = image.extent.standardized
+        guard
+            extent.origin.x.isFinite,
+            extent.origin.y.isFinite,
+            extent.size.width.isFinite,
+            extent.size.height.isFinite,
+            !extent.isNull,
+            !extent.isInfinite,
+            extent.size.width > 0.5,
+            extent.size.height > 0.5
+        else {
+            throw FilmtoneMediaError.exportFailed(
+                filmtoneLocalized(
+                    "filmtone.preview.video.invalid_extent",
+                    defaultValue: "The live video preview produced an invalid frame.",
+                    comment: "Error shown when the live video preview frame is invalid."
+                )
+            )
+        }
+
+        let expected = CGRect(origin: .zero, size: outputSize).standardized
+        guard
+            abs(extent.origin.x - expected.origin.x) < 0.5,
+            abs(extent.origin.y - expected.origin.y) < 0.5,
+            abs(extent.size.width - expected.size.width) < 0.5,
+            abs(extent.size.height - expected.size.height) < 0.5
+        else {
+            throw FilmtoneMediaError.exportFailed(
+                filmtoneLocalized(
+                    "filmtone.preview.video.unexpected_extent",
+                    defaultValue: "The live video preview frame size was invalid.",
+                    comment: "Error shown when the live video preview frame extent is unexpected."
+                )
+            )
+        }
+    }
+
     fileprivate func applyGrade(to image: CIImage, timeSeconds: Double) -> CIImage {
         let params = request.grade.params
         var current = image
@@ -648,6 +694,7 @@ final class FilmtoneExportSession {
         current = applyVignetteStage(to: current, params: params)
         current = applyGrainStage(to: current, params: params, timeSeconds: timeSeconds)
         current = applyCreativeLutStage(to: current)
+        current = applyPrintStage(to: current, params: params)
 
         return current.cropped(to: image.extent)
     }
@@ -712,7 +759,10 @@ final class FilmtoneExportSession {
             current = applyRadialRGBShift(params.rgbShift, to: current)
         }
 
-        let aberrationSoften = Self.clamp(params.rgbShift * Self.aberrationEdgeSoftenScale)
+        let rgbShiftNormalized = Self.clamp(
+            params.rgbShift / max(FilmtonePhase0Generated.rgbShiftMax, 0.0001)
+        )
+        let aberrationSoften = Self.aberrationEdgeSoften(for: rgbShiftNormalized)
         if aberrationSoften > 0.0001 || params.lensSoftness > 0.0001 {
             current = applyEdgeSoftness(
                 to: current,
@@ -851,6 +901,30 @@ final class FilmtoneExportSession {
         return applyLut(preparedCreativeLut, to: image)
     }
 
+    private func applyPrintStage(to image: CIImage, params: Phase0ParamsDTO) -> CIImage {
+        let epsilon = 0.0001
+        guard
+            params.printContrast > epsilon ||
+            abs(params.cyan) > epsilon ||
+            abs(params.magenta) > epsilon ||
+            abs(params.yellow) > epsilon
+        else {
+            return image
+        }
+
+        guard let kernel = OpticalKernels.printStage else {
+            return image
+        }
+
+        return kernel.apply(extent: image.extent, arguments: [
+            image,
+            params.printContrast,
+            params.cyan,
+            params.magenta,
+            params.yellow,
+        ]) ?? image
+    }
+
     private func applyLut(_ lut: PreparedLut, to image: CIImage) -> CIImage {
         let lutImage = image.applyingFilter("CIColorCubeWithColorSpace", parameters: [
             "inputCubeDimension": lut.size,
@@ -916,7 +990,18 @@ final class FilmtoneExportSession {
         lensSoftness: Double
     ) -> CIImage {
         let lensDrive = pow(Self.clamp(lensSoftness), 0.78)
-        let blurRadius = min(Self.lerp(1.5, 2.75, Self.clamp(aberrationSoften)) + (lensDrive * 1.35), 4.2)
+        let aberrationDrive = pow(
+            Self.clamp(aberrationSoften / Self.aberrationEdgeSoftenMax),
+            0.82
+        )
+        let blurRadius = min(
+            Self.lerp(
+                Self.aberrationBlurRadiusMin,
+                Self.aberrationBlurRadiusMax,
+                aberrationDrive
+            ) + (lensDrive * Self.lensSoftnessBlurBoost),
+            Self.aberrationBlurRadiusCap
+        )
         guard blurRadius > 0.0001, let kernel = OpticalKernels.edgeSoftnessBlend else {
             return image
         }
@@ -1161,6 +1246,17 @@ final class FilmtoneExportSession {
         let green = (0x10 + ((0x60 - 0x10) * t)) / 255.0
         let blue = (0x20 + ((0x10 - 0x20) * t)) / 255.0
         return CIColor(red: red, green: green, blue: blue, alpha: 1)
+    }
+
+    private static func aberrationEdgeSoften(for normalizedRgbShift: Double) -> Double {
+        let normalized = clamp(normalizedRgbShift)
+        guard normalized > 0.0001 else {
+            return 0
+        }
+
+        let linear = normalized * (aberrationEdgeSoftenScale * FilmtonePhase0Generated.rgbShiftMax)
+        let boosted = pow(normalized, aberrationEdgeSoftenCurve) * aberrationEdgeSoftenMax
+        return min(aberrationEdgeSoftenMax, max(linear, boosted))
     }
 
     private static func makeStableSourceSeed(from string: String) -> Double {
@@ -1421,14 +1517,21 @@ final class FilmtoneSharedGradeProcessor {
         let composition = AVMutableVideoComposition(
             asset: asset,
             applyingCIFiltersWithHandler: { [session] request in
-                let timeSeconds = CMTimeGetSeconds(request.compositionTime)
-                let processed = session.renderablePreviewVideoImage(
-                    from: request.sourceImage,
-                    transform: videoTrack.preferredTransform,
-                    outputSize: outputSize,
-                    timeSeconds: timeSeconds.isFinite ? timeSeconds : 0
-                )
-                request.finish(with: processed, context: nil)
+                do {
+                    let timeSeconds = CMTimeGetSeconds(request.compositionTime)
+                    let processed = try session.renderablePreviewVideoImage(
+                        from: request.sourceImage,
+                        transform: videoTrack.preferredTransform,
+                        outputSize: outputSize,
+                        timeSeconds: timeSeconds.isFinite ? timeSeconds : 0
+                    )
+                    request.finish(with: processed, context: nil)
+                } catch {
+                    filmtonePreviewCompositionDebugLog(
+                        "live composition frame failed at \(CMTimeGetSeconds(request.compositionTime))s: \(error.localizedDescription)"
+                    )
+                    request.finish(with: error)
+                }
             }
         )
         composition.renderSize = outputSize
@@ -1438,6 +1541,12 @@ final class FilmtoneSharedGradeProcessor {
         )
         return composition
     }
+}
+
+private func filmtonePreviewCompositionDebugLog(_ message: @autoclosure () -> String) {
+    #if DEBUG
+    print("[FilmtonePreview][Composition] \(message())")
+    #endif
 }
 
 private struct PreparedLut {
@@ -1480,6 +1589,27 @@ kernel vec4 filmCompression(__sample image, float amount, float range) {
     float scale = luma > 0.001 ? mix(luma, s, amt) / luma : 1.0;
     color.rgb = clamp(color.rgb * scale, 0.0, 1.0);
     return color;
+}
+""")
+
+    static let printStage = CIColorKernel(source: """
+vec3 applyPrintContrast(vec3 rgb, float amount) {
+    if (amount < 0.001) {
+        return rgb;
+    }
+    float k = mix(1.0, 5.0, amount);
+    vec3 s = 1.0 / (1.0 + exp(-k * (rgb - 0.5)));
+    return clamp(mix(rgb, s, amount), 0.0, 1.0);
+}
+
+kernel vec4 printStage(__sample image, float printContrast, float cyan, float magenta, float yellow) {
+    vec4 color = image;
+    float cmyScale = 0.15;
+    color.r -= cyan * cmyScale;
+    color.g -= magenta * cmyScale;
+    color.b -= yellow * cmyScale;
+    color.rgb = applyPrintContrast(color.rgb, printContrast);
+    return vec4(clamp(color.rgb, 0.0, 1.0), image.a);
 }
 """)
 

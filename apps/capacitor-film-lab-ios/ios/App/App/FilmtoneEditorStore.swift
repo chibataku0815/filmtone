@@ -207,6 +207,34 @@ final class FilmtoneVideoPreviewSession {
         )
     }
 
+    func refreshPreparedGradedComposition(_ prepared: FilmtonePreparedVideoPreviewComposition) async {
+        let transition = compareMode == .graded && player.currentItem === gradedItem
+            ? beginTransition()
+            : nil
+
+        width = prepared.width
+        height = prepared.height
+        durationSec = prepared.durationSec ?? durationSec
+        lastError = nil
+        isPreparing = false
+
+        FilmtonePreviewRefreshDebug.log("assigning refreshed graded video composition")
+        gradedItem.videoComposition = prepared.videoComposition
+        gradedItem.seekingWaitsForVideoCompositionRendering = true
+
+        guard let transition else {
+            return
+        }
+
+        FilmtonePreviewRefreshDebug.log(
+            "forcing graded preview redraw at \(CMTimeGetSeconds(transition.playbackState.time).filmtoneSanitizedSeconds)s"
+        )
+        await rerenderCurrentItem(
+            preserving: transition.playbackState,
+            generation: transition.generation
+        )
+    }
+
     func setCompareMode(_ mode: FilmtoneVideoCompareMode) async {
         guard compareMode != mode else {
             return
@@ -257,6 +285,22 @@ final class FilmtoneVideoPreviewSession {
         player.pause()
         player.replaceCurrentItem(with: item)
         await player.filmtoneSeek(to: playbackState.time)
+        completeTransition(playbackState, generation: generation)
+    }
+
+    private func rerenderCurrentItem(
+        preserving playbackState: (time: CMTime, shouldPlay: Bool),
+        generation: UInt64
+    ) async {
+        player.pause()
+        await player.filmtoneSeek(to: playbackState.time)
+        completeTransition(playbackState, generation: generation)
+    }
+
+    private func completeTransition(
+        _ playbackState: (time: CMTime, shouldPlay: Bool),
+        generation: UInt64
+    ) {
         guard generation == transitionGeneration else {
             return
         }
@@ -454,6 +498,25 @@ final class FilmtoneEditorStore: ObservableObject {
         facade.attachPresenter(presenter)
     }
 
+    func applySnapshotScene(_ scene: FilmtoneSnapshotScene) {
+        previewTask?.cancel()
+        previewTask = nil
+
+        let fixture = FilmtoneSnapshotFixture.make(scene: scene)
+        project = fixture.project
+        source = fixture.source
+        probe = fixture.probe
+        preview = fixture.preview
+        videoPreviewSession = nil
+        isCompareHeld = false
+        exportProgress = nil
+        exportResult = fixture.exportResult
+        saveToPhotosState = fixture.saveToPhotosState
+        isBusy = false
+        notice = nil
+        error = nil
+    }
+
     func pickSource(route: FilmtoneSourcePickerRoute = .photoLibrary) async {
         do {
             isBusy = true
@@ -495,6 +558,9 @@ final class FilmtoneEditorStore: ObservableObject {
     }
 
     func setParamOverride(_ value: Double, for key: String) {
+        if FilmtonePreviewRefreshDebug.isProcessParam(key), source?.kind == .video {
+            FilmtonePreviewRefreshDebug.log("process param override changed: \(key)=\(value)")
+        }
         let base = FilmtonePhase0Math.deriveParams(
             presetName: project.presetName,
             strength: project.strength,
@@ -625,8 +691,15 @@ final class FilmtoneEditorStore: ObservableObject {
     }
 
     private func applyProbe(source: SourceInfoDTO, probe: SourceProbeDTO) {
+        let isSourceReplacement = self.source?.uri != source.uri
         self.source = source
         self.probe = probe
+        // Camera/input LUTs are source-specific. Carrying one across clips can
+        // mis-normalize non-log footage when replacing a prior log source.
+        if isSourceReplacement, project.inputLut != nil {
+            project.inputLut = nil
+            project.updatedAt = FilmtonePhase0Math.isoTimestamp()
+        }
         self.preview = .empty
         self.videoPreviewSession = nil
         self.isCompareHeld = false
@@ -697,16 +770,13 @@ final class FilmtoneEditorStore: ObservableObject {
                         throw CancellationError()
                     } catch {
                         let fallbackError = self.strings.userMessage(for: error, context: .preview)
-                        if let videoPreviewSession = self.videoPreviewSession,
-                           videoPreviewSession.sourceURI == source.uri {
-                            videoPreviewSession.setError(fallbackError)
-                            self.syncPreviewFromVideoSession()
-                        } else {
-                            try await self.renderStillFallbackPreview(
-                                request: request,
-                                errorMessage: fallbackError
-                            )
-                        }
+                        FilmtonePreviewRefreshDebug.log(
+                            "video preview failed for \(source.filename): \(error.localizedDescription); falling back to still preview"
+                        )
+                        try await self.renderStillFallbackPreview(
+                            request: request,
+                            errorMessage: fallbackError
+                        )
                     }
                 }
             } catch is CancellationError {
@@ -731,17 +801,11 @@ final class FilmtoneEditorStore: ObservableObject {
         source: SourceInfoDTO
     ) async throws {
         if let videoPreviewSession, videoPreviewSession.sourceURI == source.uri {
-            videoPreviewSession.beginPreparing()
-            videoPreviewSession.clearError()
-            syncPreviewFromVideoSession()
-
-            let graded = try await facade.makeGradedPreviewItem(request: request)
-            try Task.checkCancellation()
-            await videoPreviewSession.updatePreparedGradedItem(graded)
-            syncPreviewFromVideoSession()
+            try await refreshExistingVideoPreviewSession(videoPreviewSession, request: request)
             return
         }
 
+        FilmtonePreviewRefreshDebug.log("creating initial video preview session for \(source.filename)")
         videoPreviewSession = nil
         preview = .still(.init(isRendering: true))
 
@@ -758,6 +822,29 @@ final class FilmtoneEditorStore: ObservableObject {
             graded: graded
         )
         videoPreviewSession = session
+        syncPreviewFromVideoSession()
+    }
+
+    private func refreshExistingVideoPreviewSession(
+        _ videoPreviewSession: FilmtoneVideoPreviewSession,
+        request: Phase0ExportRequestDTO
+    ) async throws {
+        FilmtonePreviewRefreshDebug.log("refreshing existing graded video preview item")
+        videoPreviewSession.beginPreparing()
+        videoPreviewSession.clearError()
+        syncPreviewFromVideoSession()
+
+        if FilmtonePreviewRefreshDebug.shouldForceVideoRefreshFailure {
+            FilmtonePreviewRefreshDebug.log("forcing video preview refresh failure via debug flag")
+            throw FilmtoneMediaError.exportFailed("Forced video preview refresh failure.")
+        }
+
+        let composition = try await facade.makeGradedPreviewComposition(
+            request: request,
+            asset: videoPreviewSession.gradedItem.asset
+        )
+        try Task.checkCancellation()
+        await videoPreviewSession.refreshPreparedGradedComposition(composition)
         syncPreviewFromVideoSession()
     }
 
@@ -829,6 +916,37 @@ private extension Double {
             return 0
         }
         return max(self, 0)
+    }
+}
+
+private enum FilmtonePreviewRefreshDebug {
+    private static let processParamKeys: Set<String> = [
+        "cyan",
+        "magenta",
+        "yellow",
+        "printContrast",
+        "compressionAmount",
+        "compressionRange",
+    ]
+
+    static func isProcessParam(_ key: String) -> Bool {
+        processParamKeys.contains(key)
+    }
+
+    static var shouldForceVideoRefreshFailure: Bool {
+        #if DEBUG
+        let processInfo = ProcessInfo.processInfo
+        return processInfo.arguments.contains("-filmtoneDebugForceVideoPreviewRefreshFailure")
+            || processInfo.environment["FILMTONE_DEBUG_FORCE_VIDEO_PREVIEW_REFRESH_FAILURE"] == "1"
+        #else
+        return false
+        #endif
+    }
+
+    static func log(_ message: @autoclosure () -> String) {
+        #if DEBUG
+        print("[FilmtonePreview] \(message())")
+        #endif
     }
 }
 

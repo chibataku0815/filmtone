@@ -8,8 +8,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         do {
+            let snapshotScene = FilmtoneSnapshotScene.current
+            if snapshotScene != nil {
+                FilmtonePersistence.clear()
+                UIView.setAnimationsEnabled(false)
+            }
             let facade = try FilmtoneEditorFacade()
             let store = FilmtoneEditorStore(facade: facade)
+            if let snapshotScene {
+                store.applySnapshotScene(snapshotScene)
+            }
             let window = UIWindow(frame: UIScreen.main.bounds)
             window.rootViewController = FilmtoneRootHostingController(store: store)
             window.makeKeyAndVisible()

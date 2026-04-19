@@ -9,6 +9,13 @@ struct FilmtonePreparedVideoPreviewItem {
     let durationSec: Double?
 }
 
+struct FilmtonePreparedVideoPreviewComposition {
+    let videoComposition: AVVideoComposition
+    let width: Int
+    let height: Int
+    let durationSec: Double?
+}
+
 final class FilmtoneMediaRuntime {
     private let cacheStore: CacheStore
     private let sourceProbeService = SourceProbeService()
@@ -159,6 +166,45 @@ final class FilmtoneMediaRuntime {
                     let durationSec = CMTimeGetSeconds(asset.duration)
                     continuation.resume(returning: .init(
                         item: item,
+                        width: Int(outputSize.width.rounded()),
+                        height: Int(outputSize.height.rounded()),
+                        durationSec: durationSec.isFinite ? durationSec : nil
+                    ))
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    func makeGradedPreviewComposition(
+        request: Phase0ExportRequestDTO,
+        asset: AVAsset,
+        sourceURL: URL? = nil
+    ) async throws -> FilmtonePreparedVideoPreviewComposition {
+        let resolvedSourceURL = try sourceURL ?? resolveFileURL(request.sourceUri)
+        return try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    guard let videoTrack = asset.tracks(withMediaType: .video).first else {
+                        throw FilmtoneMediaError.unsupportedSource("No video track was found in the selected source.")
+                    }
+                    let outputSize = FilmtoneExportSession.scaledSize(
+                        for: videoTrack,
+                        longEdge: request.output.longEdge
+                    )
+                    let processor = try self.makeSharedGradeProcessor(
+                        request: request,
+                        sourceURL: resolvedSourceURL
+                    )
+                    let composition = processor.makeVideoComposition(
+                        asset: asset,
+                        videoTrack: videoTrack,
+                        outputSize: outputSize
+                    )
+                    let durationSec = CMTimeGetSeconds(asset.duration)
+                    continuation.resume(returning: .init(
+                        videoComposition: composition,
                         width: Int(outputSize.width.rounded()),
                         height: Int(outputSize.height.rounded()),
                         durationSec: durationSec.isFinite ? durationSec : nil

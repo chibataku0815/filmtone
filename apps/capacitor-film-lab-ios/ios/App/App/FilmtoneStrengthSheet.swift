@@ -35,6 +35,7 @@ struct FilmtoneStrengthSheet: View {
                 }
             }
         }
+        .accessibilityIdentifier("filmtone.sheet.strength")
         .onAppear {
             if !adjustmentsExpanded {
                 adjustmentsExpanded = store.hasQuickAdjustments
@@ -130,7 +131,8 @@ struct FilmtoneStrengthSheet: View {
                 label: store.strings.strengthLabel,
                 value: store.project.strength,
                 range: 0...1,
-                format: { Self.percentLabel($0) }
+                format: { Self.percentLabel($0) },
+                accessibilityIdentifier: "filmtone.sheet.slider.strength"
             ) { value in
                 store.setStrength(value)
             }
@@ -139,49 +141,25 @@ struct FilmtoneStrengthSheet: View {
     }
 
     private var adjustmentsSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Button {
-                withAnimation(.easeOut(duration: 0.18)) {
-                    adjustmentsExpanded.toggle()
+        FilmtoneDisclosureSection(
+            title: store.strings.adjustLabel,
+            summary: quickSummaryText,
+            accessibilityIdentifier: "filmtone.sheet.adjustments",
+            isExpanded: $adjustmentsExpanded
+        ) {
+            VStack(alignment: .leading, spacing: 16) {
+                if store.hasQuickAdjustments {
+                    Text(store.quickSummaryText)
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.56))
                 }
-            } label: {
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(store.strings.adjustLabel)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.white.opacity(0.52))
-
-                        Text(quickSummaryText)
-                            .font(.subheadline)
-                            .foregroundStyle(.white.opacity(0.78))
-                            .multilineTextAlignment(.leading)
-                            .lineLimit(adjustmentsExpanded ? nil : 2)
-                    }
-
-                    Spacer(minLength: 12)
-
-                    Image(systemName: "chevron.down")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.6))
-                        .rotationEffect(.degrees(adjustmentsExpanded ? 180 : 0))
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            if adjustmentsExpanded {
-                VStack(alignment: .leading, spacing: 16) {
-                    if store.hasQuickAdjustments {
-                        Text(store.quickSummaryText)
-                            .font(.caption)
-                            .foregroundStyle(.white.opacity(0.56))
-                    }
 
                     FilmtoneSliderRow(
                         label: store.strings.quickFilmCharacter,
                         value: store.project.quickState.filmCharacter,
                         range: -1...1,
-                        format: { Self.signedPercentLabel($0) }
+                        format: { Self.signedPercentLabel($0) },
+                        accessibilityIdentifier: "filmtone.sheet.slider.quick.filmCharacter"
                     ) { value in
                         store.setQuickValue(value, for: \.filmCharacter)
                     }
@@ -190,7 +168,8 @@ struct FilmtoneStrengthSheet: View {
                         label: store.strings.quickEra,
                         value: store.project.quickState.era,
                         range: -1...1,
-                        format: { Self.signedPercentLabel($0) }
+                        format: { Self.signedPercentLabel($0) },
+                        accessibilityIdentifier: "filmtone.sheet.slider.quick.era"
                     ) { value in
                         store.setQuickValue(value, for: \.era)
                     }
@@ -199,55 +178,29 @@ struct FilmtoneStrengthSheet: View {
                         label: store.strings.quickDynamics,
                         value: store.project.quickState.dynamics,
                         range: -1...1,
-                        format: { Self.signedPercentLabel($0) }
+                        format: { Self.signedPercentLabel($0) },
+                        accessibilityIdentifier: "filmtone.sheet.slider.quick.dynamics"
                     ) { value in
                         store.setQuickValue(value, for: \.dynamics)
                     }
-                }
-                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .sectionDivider()
     }
 
     private var advancedParamsSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Button {
-                withAnimation(.easeOut(duration: 0.18)) {
-                    advancedParamsExpanded.toggle()
-                }
-            } label: {
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(store.strings.advancedParamsLabel)
+        FilmtoneDisclosureSection(
+            title: store.strings.advancedParamsLabel,
+            summary: store.advancedSummaryText,
+            accessibilityIdentifier: "filmtone.sheet.advanced",
+            isExpanded: $advancedParamsExpanded,
+            contentSpacing: 20
+        ) {
+            VStack(alignment: .leading, spacing: 20) {
+                ForEach(advancedParamGroups) { group in
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text(group.title)
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.white.opacity(0.52))
-
-                        Text(store.advancedSummaryText)
-                            .font(.subheadline)
-                            .foregroundStyle(.white.opacity(0.78))
-                            .multilineTextAlignment(.leading)
-                            .lineLimit(advancedParamsExpanded ? nil : 2)
-                    }
-
-                    Spacer(minLength: 12)
-
-                    Image(systemName: "chevron.down")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.6))
-                        .rotationEffect(.degrees(advancedParamsExpanded ? 180 : 0))
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            if advancedParamsExpanded {
-                VStack(alignment: .leading, spacing: 20) {
-                    ForEach(advancedParamGroups) { group in
-                        VStack(alignment: .leading, spacing: 14) {
-                            Text(group.title)
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.white.opacity(0.52))
 
                             ForEach(group.controls) { control in
                                 FilmtoneSliderRow(
@@ -255,18 +208,16 @@ struct FilmtoneStrengthSheet: View {
                                     value: store.effectiveParamValue(for: control.key),
                                     range: control.range,
                                     format: control.format,
-                                    isActive: store.isParamOverridden(control.key)
+                                    isActive: store.isParamOverridden(control.key),
+                                    accessibilityIdentifier: "filmtone.sheet.slider.param.\(control.key)"
                                 ) { value in
                                     store.setParamOverride(value, for: control.key)
                                 }
                             }
-                        }
                     }
                 }
-                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .sectionDivider()
     }
 
     private var quickSummaryText: String {
@@ -286,15 +237,15 @@ struct FilmtoneStrengthSheet: View {
     private var advancedParamGroups: [FilmtoneAdvancedParamGroup] {
         [
             .init(
-                id: "basic",
-                title: store.strings.advancedBasicLabel,
+                id: "process",
+                title: store.strings.advancedProcessLabel,
                 controls: [
-                    control("exposure", range: -2...2),
-                    control("contrast", range: 0...2),
-                    control("saturation", range: 0...2),
-                    control("temperature", range: -1...1),
-                    control("tint", range: -1...1),
-                    control("fade", range: 0...1),
+                    control("cyan", range: -1...1),
+                    control("magenta", range: -1...1),
+                    control("yellow", range: -1...1),
+                    control("printContrast", range: 0...1),
+                    control("compressionAmount", range: 0...1),
+                    control("compressionRange", range: 0...1),
                 ]
             ),
             .init(
@@ -336,8 +287,12 @@ struct FilmtoneStrengthSheet: View {
                 id: "tone",
                 title: store.strings.advancedToneLabel,
                 controls: [
-                    control("compressionAmount", range: 0...1),
-                    control("compressionRange", range: 0...1),
+                    control("exposure", range: -2...2),
+                    control("contrast", range: 0...2),
+                    control("saturation", range: 0...2),
+                    control("temperature", range: -1...1),
+                    control("tint", range: -1...1),
+                    control("fade", range: 0...1),
                 ]
             ),
         ]
@@ -394,6 +349,7 @@ private struct FilmtoneSheetPreview: View {
 
             if let videoPreview {
                 FilmtonePreviewPlayerView(player: videoPreview.player)
+                    .accessibilityIdentifier("filmtone.sheet.preview.video")
             } else if let source, let displayURI, let image = previewImage(from: displayURI) {
                 GeometryReader { geometry in
                     Image(uiImage: image)
@@ -432,14 +388,16 @@ private struct FilmtoneSheetPreview: View {
                 HStack(spacing: 6) {
                     FilmtoneSheetPreviewToggleButton(
                         label: gradedLabel,
-                        isActive: videoPreview.compareMode == .graded
+                        isActive: videoPreview.compareMode == .graded,
+                        accessibilityIdentifier: "filmtone.sheet.preview.compare.graded"
                     ) {
                         onVideoCompareModeSelected(.graded)
                     }
 
                     FilmtoneSheetPreviewToggleButton(
                         label: originalLabel,
-                        isActive: videoPreview.compareMode == .original
+                        isActive: videoPreview.compareMode == .original,
+                        accessibilityIdentifier: "filmtone.sheet.preview.compare.original"
                     ) {
                         onVideoCompareModeSelected(.original)
                     }
@@ -499,6 +457,7 @@ private struct FilmtoneSheetPreview: View {
                     )
                 }
                 .padding(12)
+                .accessibilityIdentifier("filmtone.sheet.preview.loading")
             }
         }
         .frame(height: 210)
@@ -520,6 +479,7 @@ private struct FilmtoneSheetPreview: View {
 private struct FilmtoneSheetPreviewToggleButton: View {
     let label: String
     let isActive: Bool
+    let accessibilityIdentifier: String
     let action: () -> Void
 
     var body: some View {
@@ -539,6 +499,7 @@ private struct FilmtoneSheetPreviewToggleButton: View {
                 )
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier(accessibilityIdentifier)
     }
 }
 
@@ -557,12 +518,132 @@ private struct FilmtoneAdvancedParamControl: Identifiable {
     var id: String { key }
 }
 
+private struct FilmtoneDisclosureSection<Content: View>: View {
+    let title: String
+    let summary: String
+    let accessibilityIdentifier: String
+    let contentSpacing: CGFloat
+    @Binding var isExpanded: Bool
+    let content: Content
+
+    private var disclosureAnimation: Animation {
+        .smooth(duration: 0.24, extraBounce: 0)
+    }
+
+    init(
+        title: String,
+        summary: String,
+        accessibilityIdentifier: String,
+        isExpanded: Binding<Bool>,
+        contentSpacing: CGFloat = 16,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.title = title
+        self.summary = summary
+        self.accessibilityIdentifier = accessibilityIdentifier
+        self._isExpanded = isExpanded
+        self.contentSpacing = contentSpacing
+        self.content = content()
+    }
+
+    var body: some View {
+        let sectionShape = RoundedRectangle(
+            cornerRadius: filmtoneSurfaceCornerRadius,
+            style: .continuous
+        )
+
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(disclosureAnimation) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack(alignment: .top, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(title)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white.opacity(isExpanded ? 0.64 : 0.52))
+
+                        Text(summary)
+                            .font(.subheadline)
+                            .foregroundStyle(.white.opacity(isExpanded ? 0.84 : 0.76))
+                            .multilineTextAlignment(.leading)
+                            .lineLimit(2)
+                    }
+
+                    Spacer(minLength: 12)
+
+                    Image(systemName: "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white.opacity(isExpanded ? 0.88 : 0.62))
+                        .frame(width: 28, height: 28)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(Color.white.opacity(isExpanded ? 0.08 : 0.035))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(Color.white.opacity(isExpanded ? 0.10 : 0.06), lineWidth: 1)
+                        )
+                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                        .padding(.top, 2)
+                }
+                .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 16)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier(accessibilityIdentifier)
+
+            Rectangle()
+                .fill(Color.white.opacity(0.08))
+                .frame(height: 1)
+                .padding(.horizontal, 16)
+                .opacity(isExpanded ? 1 : 0)
+
+            if isExpanded {
+                VStack(alignment: .leading, spacing: contentSpacing) {
+                    content
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 14)
+                .padding(.bottom, 16)
+                .transition(.opacity)
+            }
+        }
+        .background(
+            sectionShape
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(isExpanded ? 0.06 : 0.045),
+                            Color.white.opacity(isExpanded ? 0.028 : 0.02),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        )
+        .overlay(
+            sectionShape
+                .stroke(
+                    Color.white.opacity(isExpanded ? 0.10 : 0.07),
+                    lineWidth: 1
+                )
+        )
+        .clipShape(sectionShape)
+        .animation(disclosureAnimation, value: isExpanded)
+    }
+}
+
 private struct FilmtoneSliderRow: View {
     let label: String
     let value: Double
     let range: ClosedRange<Double>
     let format: (Double) -> String
     var isActive = false
+    let accessibilityIdentifier: String
     let onChange: (Double) -> Void
 
     var body: some View {
@@ -581,6 +662,7 @@ private struct FilmtoneSliderRow: View {
 
             Slider(value: Binding(get: { value }, set: onChange), in: range)
                 .tint(Color.filmtoneAmber)
+                .accessibilityIdentifier(accessibilityIdentifier)
         }
     }
 }

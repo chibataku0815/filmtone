@@ -90,6 +90,16 @@ final class FilmtoneEditorFacade {
         try await runtime.makeGradedPreviewItem(request: request)
     }
 
+    func makeGradedPreviewComposition(
+        request: Phase0ExportRequestDTO,
+        asset: AVAsset
+    ) async throws -> FilmtonePreparedVideoPreviewComposition {
+        try await runtime.makeGradedPreviewComposition(
+            request: request,
+            asset: asset
+        )
+    }
+
     func runExport(
         request: Phase0ExportRequestDTO,
         onProgress: @escaping @MainActor (Phase0ExportProgressDTO) -> Void

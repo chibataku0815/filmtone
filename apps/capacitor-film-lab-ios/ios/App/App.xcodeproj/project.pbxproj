@@ -16,6 +16,7 @@
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		E10000010000000000000001 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = F10000010000000000000001 /* Localizable.xcstrings */; };
 		E10000010000000000000002 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = F10000010000000000000003 /* InfoPlist.strings */; };
+		E10000010000000000000003 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = F10000010000000000000004 /* PrivacyInfo.xcprivacy */; };
 		A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */; };
 		A10000010000000000000010 /* BenchmarkCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000010 /* BenchmarkCollector.swift */; };
 		A10000010000000000000001 /* AssetPickerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000001 /* AssetPickerService.swift */; };
@@ -42,7 +43,21 @@
 			D1000001000000000000000B /* FilmtoneStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1000001000000000000000B /* FilmtoneStrings.swift */; };
 			D1000001000000000000000C /* FilmtoneCubeParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1000001000000000000000C /* FilmtoneCubeParser.swift */; };
 			D1000001000000000000000D /* FilmtonePhase0Generated.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1000001000000000000000D /* FilmtonePhase0Generated.swift */; };
+		D1000001000000000000000F /* FilmtoneSnapshotSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1000001000000000000000F /* FilmtoneSnapshotSupport.swift */; };
+		E20000010000000000000001 /* FilmtoneSnapshotsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000010000000000000002 /* FilmtoneSnapshotsUITests.swift */; };
+		E20000010000000000000002 /* SnapshotHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000010000000000000003 /* SnapshotHelper.swift */; };
+		E20000010000000000000003 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F20000010000000000000004 /* XCTest.framework */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		E20000010000000000000005 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 504EC3031FED79650016851F;
+			remoteInfo = App;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
@@ -56,6 +71,7 @@
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		F10000010000000000000001 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		F10000010000000000000002 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		F10000010000000000000004 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_App.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.release.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig"; sourceTree = "<group>"; };
 		B10000010000000000000010 /* BenchmarkCollector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BenchmarkCollector.swift; sourceTree = "<group>"; };
@@ -83,6 +99,11 @@
 			C1000001000000000000000B /* FilmtoneStrings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneStrings.swift; sourceTree = "<group>"; };
 			C1000001000000000000000C /* FilmtoneCubeParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCubeParser.swift; sourceTree = "<group>"; };
 			C1000001000000000000000D /* FilmtonePhase0Generated.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtonePhase0Generated.swift; sourceTree = "<group>"; };
+		C1000001000000000000000F /* FilmtoneSnapshotSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneSnapshotSupport.swift; sourceTree = "<group>"; };
+		F20000010000000000000001 /* FilmtoneSnapshotsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FilmtoneSnapshotsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F20000010000000000000002 /* FilmtoneSnapshotsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneSnapshotsUITests.swift; sourceTree = "<group>"; };
+		F20000010000000000000003 /* SnapshotHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotHelper.swift; sourceTree = "<group>"; };
+		F20000010000000000000004 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
 		FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.debug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.debug.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -92,6 +113,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E20000010000000000000009 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E20000010000000000000003 /* XCTest.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -110,6 +139,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3061FED79650016851F /* App */,
+				E20000010000000000000004 /* FilmtoneSnapshotsUITests */,
 				504EC3051FED79650016851F /* Products */,
 				7F8756D8B27F46E3366F6CEA /* Pods */,
 				27E2DDA53C4D2A4D1A88CE4A /* Frameworks */,
@@ -120,6 +150,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
+				F20000010000000000000001 /* FilmtoneSnapshotsUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -153,17 +184,28 @@
 					C1000001000000000000000D /* FilmtonePhase0Generated.swift */,
 					C1000001000000000000000A /* FilmtonePhase0Math.swift */,
 					C1000001000000000000000B /* FilmtoneStrings.swift */,
-					C1000001000000000000000C /* FilmtoneCubeParser.swift */,
+				C1000001000000000000000C /* FilmtoneCubeParser.swift */,
+				C1000001000000000000000F /* FilmtoneSnapshotSupport.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
 				504EC3131FED79650016851F /* Info.plist */,
 				F10000010000000000000003 /* InfoPlist.strings */,
 				F10000010000000000000001 /* Localizable.xcstrings */,
+				F10000010000000000000004 /* PrivacyInfo.xcprivacy */,
 				2FAD9762203C412B000D30F8 /* config.xml */,
 				50B271D01FEDC1A000F3C39B /* public */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		E20000010000000000000004 /* FilmtoneSnapshotsUITests */ = {
+			isa = PBXGroup;
+			children = (
+				F20000010000000000000002 /* FilmtoneSnapshotsUITests.swift */,
+				F20000010000000000000003 /* SnapshotHelper.swift */,
+			);
+			path = FilmtoneSnapshotsUITests;
 			sourceTree = "<group>";
 		};
 		7F8756D8B27F46E3366F6CEA /* Pods */ = {
@@ -197,6 +239,24 @@
 			productReference = 504EC3041FED79650016851F /* App.app */;
 			productType = "com.apple.product-type.application";
 		};
+		E20000010000000000000007 /* FilmtoneSnapshotsUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E2000001000000000000000D /* Build configuration list for PBXNativeTarget "FilmtoneSnapshotsUITests" */;
+			buildPhases = (
+				E20000010000000000000008 /* Sources */,
+				E20000010000000000000009 /* Frameworks */,
+				E2000001000000000000000A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E20000010000000000000006 /* PBXTargetDependency */,
+			);
+			name = FilmtoneSnapshotsUITests;
+			productName = FilmtoneSnapshotsUITests;
+			productReference = F20000010000000000000001 /* FilmtoneSnapshotsUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -210,6 +270,10 @@
 						CreatedOnToolsVersion = 9.2;
 						LastSwiftMigration = 1100;
 						ProvisioningStyle = Automatic;
+					};
+					E20000010000000000000007 = {
+						CreatedOnToolsVersion = 17.0;
+						TestTargetID = 504EC3031FED79650016851F;
 					};
 				};
 			};
@@ -230,6 +294,7 @@
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
+				E20000010000000000000007 /* FilmtoneSnapshotsUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -245,8 +310,16 @@
 				50379B232058CBB4000EE86E /* capacitor.config.json in Resources */,
 				E10000010000000000000002 /* InfoPlist.strings in Resources */,
 				E10000010000000000000001 /* Localizable.xcstrings in Resources */,
+				E10000010000000000000003 /* PrivacyInfo.xcprivacy in Resources */,
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,
 				2FAD9763203C412B000D30F8 /* config.xml in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E2000001000000000000000A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -318,11 +391,29 @@
 					D1000001000000000000000A /* FilmtonePhase0Math.swift in Sources */,
 					D1000001000000000000000B /* FilmtoneStrings.swift in Sources */,
 				D1000001000000000000000C /* FilmtoneCubeParser.swift in Sources */,
+				D1000001000000000000000F /* FilmtoneSnapshotSupport.swift in Sources */,
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E20000010000000000000008 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E20000010000000000000001 /* FilmtoneSnapshotsUITests.swift in Sources */,
+				E20000010000000000000002 /* SnapshotHelper.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		E20000010000000000000006 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 504EC3031FED79650016851F /* App */;
+			targetProxy = E20000010000000000000005 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
 		504EC30B1FED79650016851F /* Main.storyboard */ = {
@@ -381,7 +472,6 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -438,7 +528,6 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
@@ -500,6 +589,51 @@
 			};
 			name = Release;
 		};
+		E2000001000000000000000B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = C3G77H8NM6;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.chibatakumi.film.lab.iosUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = App;
+			};
+			name = Debug;
+		};
+		E2000001000000000000000C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = C3G77H8NM6;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.chibatakumi.film.lab.iosUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = App;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -517,6 +651,15 @@
 			buildConfigurations = (
 				504EC3171FED79650016851F /* Debug */,
 				504EC3181FED79650016851F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E2000001000000000000000D /* Build configuration list for PBXNativeTarget "FilmtoneSnapshotsUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E2000001000000000000000B /* Debug */,
+				E2000001000000000000000C /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
