@@ -5,6 +5,9 @@ import { describe, expect, it } from "vitest";
 // without touching the WebGPU global.
 import {
   CROSS_FILTER_MIN_SPACING_EPSILON,
+  CROSS_FILTER_TEMPORAL_REFERENCE_DECAY,
+  CROSS_FILTER_TEMPORAL_REFERENCE_FPS,
+  computeCrossFilterTemporalDecay,
   effectiveDiffusionAmount,
   isCrossFilterHardModeActive,
   shouldResetCrossFilterHistory,
@@ -104,5 +107,38 @@ describe("shouldResetCrossFilterHistory", () => {
         { ...neutral, minSpacing: 0.2 + CROSS_FILTER_MIN_SPACING_EPSILON / 2 },
       ),
     ).toBe(false);
+  });
+});
+
+describe("computeCrossFilterTemporalDecay", () => {
+  it("matches the legacy decay at the 24 fps reference step", () => {
+    expect(
+      computeCrossFilterTemporalDecay(1 / CROSS_FILTER_TEMPORAL_REFERENCE_FPS),
+    ).toBeCloseTo(CROSS_FILTER_TEMPORAL_REFERENCE_DECAY);
+  });
+
+  it("decays less over half a reference frame", () => {
+    expect(
+      computeCrossFilterTemporalDecay(1 / (CROSS_FILTER_TEMPORAL_REFERENCE_FPS * 2)),
+    ).toBeCloseTo(Math.sqrt(CROSS_FILTER_TEMPORAL_REFERENCE_DECAY));
+  });
+
+  it("decays more over two reference frames", () => {
+    expect(
+      computeCrossFilterTemporalDecay(2 / CROSS_FILTER_TEMPORAL_REFERENCE_FPS),
+    ).toBeCloseTo(CROSS_FILTER_TEMPORAL_REFERENCE_DECAY ** 2);
+  });
+
+  it("returns identity decay for repeated renders at the same timestamp", () => {
+    expect(computeCrossFilterTemporalDecay(0)).toBe(1);
+  });
+
+  it("falls back to the reference decay for non-finite input", () => {
+    expect(computeCrossFilterTemporalDecay(Number.NaN)).toBe(
+      CROSS_FILTER_TEMPORAL_REFERENCE_DECAY,
+    );
+    expect(computeCrossFilterTemporalDecay(Number.POSITIVE_INFINITY)).toBe(
+      CROSS_FILTER_TEMPORAL_REFERENCE_DECAY,
+    );
   });
 });

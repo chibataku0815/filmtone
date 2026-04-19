@@ -64,6 +64,9 @@ export {
 } from "./webgpu/compositeUniforms";
 export {
   CROSS_FILTER_MIN_SPACING_EPSILON,
+  CROSS_FILTER_TEMPORAL_REFERENCE_DECAY,
+  CROSS_FILTER_TEMPORAL_REFERENCE_FPS,
+  computeCrossFilterTemporalDecay,
   effectiveDiffusionAmount,
   isCrossFilterHardModeActive,
   shouldResetCrossFilterHistory,

@@ -13,6 +13,14 @@
  * as the same setting and do NOT force a temporal-history reset.
  */
 export const CROSS_FILTER_MIN_SPACING_EPSILON = 1e-4;
+/**
+ * Hard-mode temporal hold was authored as "0.82 per frame" in WebGL.
+ * Preview, however, renders on RAF cadence while export renders at the
+ * fixed video-export cadence. Treat 24 fps as the reference contract so
+ * both paths can derive the same real-time decay.
+ */
+export const CROSS_FILTER_TEMPORAL_REFERENCE_FPS = 24;
+export const CROSS_FILTER_TEMPORAL_REFERENCE_DECAY = 0.82;
 
 /**
  * Hard Mode is "active" only when the user has both:
@@ -44,6 +52,26 @@ export function effectiveDiffusionAmount(
   if (hardModeActive) return 0;
   if (!Number.isFinite(userDiffusion)) return 0;
   return Math.min(1, Math.max(0, userDiffusion));
+}
+
+/**
+ * Convert the legacy "0.82 per 24 fps frame" temporal hold into an
+ * elapsed-time-based decay factor. This keeps preview (RAF cadence) and
+ * fixed-fps export aligned in real time instead of render-count space.
+ */
+export function computeCrossFilterTemporalDecay(
+  deltaSeconds: number,
+  referenceFps: number = CROSS_FILTER_TEMPORAL_REFERENCE_FPS,
+  referenceDecay: number = CROSS_FILTER_TEMPORAL_REFERENCE_DECAY,
+): number {
+  if (!Number.isFinite(deltaSeconds)) return referenceDecay;
+  if (!Number.isFinite(referenceFps) || referenceFps <= 0) return referenceDecay;
+  if (!Number.isFinite(referenceDecay) || referenceDecay < 0 || referenceDecay > 1) {
+    return CROSS_FILTER_TEMPORAL_REFERENCE_DECAY;
+  }
+  const clampedDelta = Math.max(0, deltaSeconds);
+  if (clampedDelta === 0) return 1;
+  return Math.pow(referenceDecay, clampedDelta * referenceFps);
 }
 
 export interface CrossFilterHistorySnapshot {

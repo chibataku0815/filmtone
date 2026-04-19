@@ -22,9 +22,11 @@
  *   6. Post-chain (active when `crossFilterStrength > 0` or
  *      `shutterAngle > 0`):
  *      - Cross-filter: threshold → peak → optional spacing gate →
- *        (Hard-mode only) 2-slot half-res temporal hold → (Hard-mode
- *        only) 4-level central-bloom mip chain seeded from held peaks →
- *        directional streaks → blend with center-protection.
+ *        (Hard-mode only) active WebGPU intentionally bypasses the
+ *        legacy temporal hold so the 4-level central-bloom chain and
+ *        directional streaks read current peaks directly, while the
+ *        preserved temporal infrastructure remains available for future
+ *        tuning → blend with center-protection.
  *      - Light Shafts (when `shaftIntensity > 0` and post chain active):
  *        radial 64-tap occlusion at ¼ res → additive full-res blend.
  *      - Motion blur (`shutterAngle > 0`): feedback copy into the ring
@@ -102,6 +104,8 @@ import {
   type CompositeFrameState,
 } from "./compositeUniforms";
 import {
+  CROSS_FILTER_TEMPORAL_REFERENCE_FPS,
+  computeCrossFilterTemporalDecay,
   effectiveDiffusionAmount,
   isCrossFilterHardModeActive,
   shouldResetCrossFilterHistory,
@@ -126,10 +130,15 @@ const CROSS_FILTER_STREAK_BYTES = 48;
 const CROSS_FILTER_MAX_STREAKS = 4;
 const CROSS_FILTER_SPACING_RADIUS_MIN_PX = 2.0;
 const CROSS_FILTER_SPACING_RADIUS_MAX_PX = 48.0;
-/** Hard-mode temporal hold decay (WebGL parity, {@see crossFilterTemporalFragmentWgsl}). */
-const CROSS_FILTER_TEMPORAL_DECAY = 0.82;
 /** Number of cross-filter peak history ring slots (2 = ping-pong). */
 const CROSS_FILTER_HISTORY_SLOTS = 2;
+/**
+ * Product divergence from WebGL parity: active WebGPU Hard Mode bypasses
+ * the legacy temporal hold to remove the user-reported cross-filter trail.
+ * The preserved history path stays compiled so its resources/state contract
+ * and the elapsed-time normalization work remain intact for future tuning.
+ */
+const WEBGPU_CROSS_FILTER_TEMPORAL_HOLD_ENABLED = false;
 /** Hard-mode central bloom pyramid depth (WebGL parity). */
 const CENTRAL_BLOOM_LEVELS = 4;
 /** Central bloom upsample radius (fixed, WebGL parity). */
@@ -306,19 +315,22 @@ export class WebGPUBackend implements RenderBackend {
   private hasReadableFrame = false;
   private frameState: GradeFrameState;
   /**
-   * Hard-mode temporal hold bookkeeping — WebGL parity.
+   * Preserved temporal-hold bookkeeping.
    *
-   * The two half-resolution history textures are managed by
-   * `OffscreenTargetPool` under dedicated labels
-   * (`rt.crossfilter.peak-history.{0,1}`). They persist as long as the
-   * resolution is unchanged, so the ping-pong remains valid across frames.
-   * The counters below get reset whenever the history should be treated as
-   * empty — resolution changes, `crossFilterStrength` transitions to 0,
-   * `crossFilterHardMode` flips, or `crossFilterMinSpacing` crosses an
-   * epsilon.
+   * WebGL and the dormant WebGPU temporal path use two half-resolution
+   * history textures managed by `OffscreenTargetPool` under dedicated
+   * labels (`rt.crossfilter.peak-history.{0,1}`). They persist as long as
+   * the resolution is unchanged, so the ping-pong remains valid across
+   * frames whenever the hold is re-enabled. The counters below get reset
+   * whenever the history should be treated as empty — resolution changes,
+   * `crossFilterStrength` transitions to 0, `crossFilterHardMode` flips,
+   * or `crossFilterMinSpacing` crosses an epsilon. We also track the last
+   * history timestamp so temporal decay can stay normalized to elapsed
+   * time instead of render count.
    */
   private crossFilterPeakHistoryWriteIndex = 0;
   private crossFilterPeakHistoryFilledFrames = 0;
+  private lastCrossFilterHistoryTime: number | null = null;
   private lastCrossFilterStrength = 0;
   private lastCrossFilterHardMode: 0 | 1 = 0;
   private lastCrossFilterMinSpacing = 0;
@@ -1807,8 +1819,9 @@ export class WebGPUBackend implements RenderBackend {
   }
 
   /**
-   * Hard-mode cross-filter uses a 2-slot half-resolution history for
-   * temporal hold. WebGL resets that history under four conditions:
+   * WebGL and the preserved dormant WebGPU temporal path use a 2-slot
+   * half-resolution history for temporal hold. That history is reset under
+   * four conditions:
    *   1. resolution change (handled in `setResolution`)
    *   2. `crossFilterStrength` transitions to 0
    *   3. `crossFilterHardMode` flip (0 ↔ 1)
@@ -1832,6 +1845,7 @@ export class WebGPUBackend implements RenderBackend {
     if (reset) {
       this.crossFilterPeakHistoryWriteIndex = 0;
       this.crossFilterPeakHistoryFilledFrames = 0;
+      this.lastCrossFilterHistoryTime = null;
     }
     this.lastCrossFilterStrength = strength;
     this.lastCrossFilterHardMode = hardMode;
@@ -1839,16 +1853,17 @@ export class WebGPUBackend implements RenderBackend {
   }
 
   /**
-   * Hard-mode central bloom, 4-level pyramid. WebGL parity:
-   *   1. seed mip 0 by downsampling the held peak mask (not the raw
-   *      threshold).
+   * Hard-mode central bloom, 4-level pyramid.
+   *   1. seed mip 0 by downsampling the active peak mask (WebGL used held
+   *      peaks; active WebGPU currently passes current peaks because the
+   *      temporal hold is intentionally bypassed).
    *   2. progressive downsample mip 0 → mip 3.
    *   3. additive upsample back to mip 0 with fixed radius 0.5.
    *
    * Returns mip 0 so the caller can feed it to the cross-filter blend
    * shader's `uCentralBloom` binding. Mip 0 runs at quarter-resolution of
-   * the full output (the held peak texture is half-res, then we halve
-   * again on seed).
+   * the full output (the peak texture is half-res, then we halve again on
+   * seed).
    */
   private renderCentralBloom(
     encoder: GPUCommandEncoder,
@@ -2437,11 +2452,13 @@ export class WebGPUBackend implements RenderBackend {
       currentPeakTexture = spacingTexture;
     }
 
-    // Hard-mode temporal hold (WebGL parity) — runs after peak detection
-    // and optional spacing suppression, before central bloom + streak
-    // generation. Held peaks feed both central bloom and the streak march.
+    // Active WebGPU Hard Mode intentionally bypasses the legacy temporal
+    // hold so current peaks feed both central bloom and the streak march
+    // directly. Keep the dormant temporal path behind a feature flag so
+    // the preserved history resources/state and elapsed-time normalization
+    // work remain intact without affecting the live product behavior.
     let heldPeakTexture = currentPeakTexture;
-    if (hardModeActive) {
+    if (hardModeActive && WEBGPU_CROSS_FILTER_TEMPORAL_HOLD_ENABLED) {
       const historyTextures = [
         this.pool.get("rt.crossfilter.peak-history.0", {
           width: halfWidth,
@@ -2463,8 +2480,13 @@ export class WebGPUBackend implements RenderBackend {
           ? historyTextures[prevIndex]!
           : this.crossFilter.blackTexture;
       const writeTexture = historyTextures[writeIndex]!;
+      const temporalDeltaSeconds =
+        this.lastCrossFilterHistoryTime === null
+          ? 1 / CROSS_FILTER_TEMPORAL_REFERENCE_FPS
+          : this.frameState.time - this.lastCrossFilterHistoryTime;
+      const temporalDecay = computeCrossFilterTemporalDecay(temporalDeltaSeconds);
 
-      this.crossFilter.temporalScratch[0] = CROSS_FILTER_TEMPORAL_DECAY;
+      this.crossFilter.temporalScratch[0] = temporalDecay;
       this.crossFilter.temporalScratch[1] = 0;
       this.crossFilter.temporalScratch[2] = 0;
       this.crossFilter.temporalScratch[3] = 0;
@@ -2514,6 +2536,7 @@ export class WebGPUBackend implements RenderBackend {
         this.crossFilterPeakHistoryFilledFrames + 1,
         CROSS_FILTER_HISTORY_SLOTS,
       );
+      this.lastCrossFilterHistoryTime = this.frameState.time;
     }
 
     // Hard-mode central bloom (skipped entirely in Soft Mode; the blend
@@ -3092,6 +3115,7 @@ export class WebGPUBackend implements RenderBackend {
     // textures.
     this.crossFilterPeakHistoryWriteIndex = 0;
     this.crossFilterPeakHistoryFilledFrames = 0;
+    this.lastCrossFilterHistoryTime = null;
   }
 
   destroy(): void {
