@@ -51,7 +51,7 @@ final class AssetPickerService: NSObject {
                 self.activeDocumentPickerPurpose = .source
                 let picker = UIDocumentPickerViewController(
                     forOpeningContentTypes: [.image, .movie, .video],
-                    asCopy: false
+                    asCopy: true
                 )
                 picker.delegate = self
                 picker.allowsMultipleSelection = false
@@ -120,19 +120,6 @@ final class AssetPickerService: NSObject {
             kind: kind,
             mimeType: type?.preferredMIMEType
         )
-    }
-
-    private func importSource(from url: URL) async throws -> SourceInfoDTO {
-        try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                do {
-                    let picked = try self.importDocumentSource(from: url)
-                    continuation.resume(returning: picked)
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
     }
 
     private func importSelectedVideoAsset(
@@ -395,9 +382,9 @@ extension AssetPickerService: UIDocumentPickerDelegate {
                 return
             }
 
-            Task {
+            DispatchQueue.global(qos: .userInitiated).async {
                 do {
-                    let picked = try await importSource(from: url)
+                    let picked = try self.importDocumentSource(from: url)
                     continuation.resume(returning: picked)
                 } catch {
                     continuation.resume(throwing: error)

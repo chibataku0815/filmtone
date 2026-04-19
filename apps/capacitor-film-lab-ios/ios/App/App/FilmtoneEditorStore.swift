@@ -153,6 +153,18 @@ final class FilmtoneEditorStore: ObservableObject {
         FilmtonePhase0Math.sourceCapViolations(for: probe)
     }
 
+    var bannerError: String? {
+        if let error {
+            return error
+        }
+
+        guard sourceViolations.isEmpty else {
+            return nil
+        }
+
+        return preview.error
+    }
+
     func effectiveParamValue(for key: String) -> Double {
         project.params.value(for: key)
     }

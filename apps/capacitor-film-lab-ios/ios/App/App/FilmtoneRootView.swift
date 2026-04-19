@@ -322,7 +322,7 @@ struct FilmtoneRootView: View {
             messagePanel(title: store.strings.noticePrefix, message: notice, tint: Color.filmtoneSky)
         }
 
-        if let error = store.error ?? store.preview.error {
+        if let error = store.bannerError {
             messagePanel(title: store.strings.errorPrefix, message: error, tint: .red)
         }
     }

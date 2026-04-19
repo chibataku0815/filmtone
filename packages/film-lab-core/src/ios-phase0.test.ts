@@ -200,7 +200,7 @@ test("getIosPhase0SourceCapViolations reports cap breaches", () => {
     width: 4096,
     height: 2160,
     durationSec: IOS_PHASE0_SOURCE_DURATION_CAP_SEC + 1,
-    fileSizeBytes: 3 * 1024 * 1024 * 1024,
+    fileSizeBytes: 9 * 1024 * 1024 * 1024,
   });
 
   expect(violations).toContain("duration>300s");

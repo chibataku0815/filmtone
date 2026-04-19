@@ -470,6 +470,10 @@ enum FilmtonePhase0Math {
         }
 
         var violations: [String] = []
+        if let compatibilityViolation = sourceCompatibilityViolation(for: probe) {
+            violations.append(compatibilityViolation)
+        }
+
         if let durationSec = probe.durationSec, durationSec > sourceDurationCapSec {
             violations.append(
                 "Source duration \(String(format: "%.1f", durationSec))s exceeds \(Int(sourceDurationCapSec))s"
@@ -489,6 +493,25 @@ enum FilmtonePhase0Math {
         }
 
         return violations
+    }
+
+    private static func sourceCompatibilityViolation(for probe: SourceProbeDTO) -> String? {
+        guard probe.kind == .video else {
+            return nil
+        }
+
+        switch normalizedSourceCodec(probe.codec) {
+        case "avdh":
+            return "Avid DNxHR / DNxHD video can't be previewed or exported on iPhone. Convert this file to H.264, HEVC, or ProRes first."
+        default:
+            return nil
+        }
+    }
+
+    private static func normalizedSourceCodec(_ codec: String?) -> String {
+        codec?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased() ?? ""
     }
 
     static func buildExportRequest(

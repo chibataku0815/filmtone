@@ -37,7 +37,7 @@ LUT_3D_SIZE 2
       width: 4096,
       height: 2160,
       durationSec: 301,
-      fileSizeBytes: 3 * 1024 * 1024 * 1024,
+      fileSizeBytes: 9 * 1024 * 1024 * 1024,
     });
     expect(violations.length).toBe(3);
   });

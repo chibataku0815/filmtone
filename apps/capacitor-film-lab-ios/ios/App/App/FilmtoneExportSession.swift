@@ -453,13 +453,9 @@ final class FilmtoneExportSession {
         let sourceDurationSec = CMTimeGetSeconds(asset.duration)
         let posterTimeSec = makePreviewPosterTime(sourceDurationSec: sourceDurationSec)
         let outputSize = Self.scaledSize(for: videoTrack, longEdge: request.output.longEdge)
-        let generator = AVAssetImageGenerator(asset: asset)
-        generator.appliesPreferredTrackTransform = true
-        generator.requestedTimeToleranceBefore = .zero
-        generator.requestedTimeToleranceAfter = .zero
 
         let posterTime = CMTime(seconds: posterTimeSec, preferredTimescale: 600)
-        let cgImage = try generator.copyCGImage(at: posterTime, actualTime: nil)
+        let cgImage = try copyPreviewCGImage(for: asset, at: posterTime)
         let posterImage = CIImage(cgImage: cgImage)
         let original = scaledStillSourceImage(posterImage, outputSize: outputSize)
         let graded = applyGrade(to: original, timeSeconds: posterTimeSec).cropped(to: original.extent)
@@ -474,6 +470,24 @@ final class FilmtoneExportSession {
             height: Int(outputSize.height.rounded()),
             posterTimeSec: posterTimeSec
         )
+    }
+
+    private func copyPreviewCGImage(for asset: AVAsset, at time: CMTime) throws -> CGImage {
+        do {
+            return try configuredPreviewGenerator(asset: asset, tolerance: .zero).copyCGImage(at: time, actualTime: nil)
+        } catch {
+            let fallbackTolerance = CMTime(seconds: 0.5, preferredTimescale: 600)
+            return try configuredPreviewGenerator(asset: asset, tolerance: fallbackTolerance)
+                .copyCGImage(at: time, actualTime: nil)
+        }
+    }
+
+    private func configuredPreviewGenerator(asset: AVAsset, tolerance: CMTime) -> AVAssetImageGenerator {
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.requestedTimeToleranceBefore = tolerance
+        generator.requestedTimeToleranceAfter = tolerance
+        return generator
     }
 
     private func makeWriter(outputSize: CGSize) throws -> AVAssetWriter {
