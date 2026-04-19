@@ -225,40 +225,32 @@ private struct FilmtoneFullscreenPreviewView: View {
             }
             .ignoresSafeArea()
 
-            HStack(alignment: .top, spacing: 12) {
+            VStack(spacing: 0) {
                 if let videoPreview {
-                    HStack(spacing: 6) {
-                        FilmtonePreviewToggleButton(
-                            label: gradedLabel,
-                            isActive: videoPreview.compareMode == .graded
-                        ) {
-                            onVideoCompareModeSelected(.graded)
-                        }
+                    HStack {
+                        Spacer(minLength: 0)
+                        HStack(spacing: 6) {
+                            FilmtonePreviewToggleButton(
+                                label: gradedLabel,
+                                isActive: videoPreview.compareMode == .graded
+                            ) {
+                                onVideoCompareModeSelected(.graded)
+                            }
 
-                        FilmtonePreviewToggleButton(
-                            label: originalLabel,
-                            isActive: videoPreview.compareMode == .original
-                        ) {
-                            onVideoCompareModeSelected(.original)
+                            FilmtonePreviewToggleButton(
+                                label: originalLabel,
+                                isActive: videoPreview.compareMode == .original
+                            ) {
+                                onVideoCompareModeSelected(.original)
+                            }
                         }
+                        Spacer(minLength: 0)
                     }
+                    .padding(.top, 92)
+                    .padding(.horizontal, 20)
                 }
-
-                Spacer(minLength: 12)
-
-                Button(
-                    filmtoneLocalized(
-                        "filmtone.action.done",
-                        defaultValue: "Done",
-                        comment: "Action label to close the full screen preview."
-                    )
-                ) {
-                    dismiss()
-                }
-                .buttonStyle(FilmtonePreviewCapsuleButtonStyle())
+                Spacer()
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 16)
 
             if isRendering {
                 VStack {
