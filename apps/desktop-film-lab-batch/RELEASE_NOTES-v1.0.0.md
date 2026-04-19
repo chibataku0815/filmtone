@@ -13,9 +13,9 @@
 > v1.0 is a color-quality milestone. The interactive preview now runs on a
 > WebGPU backend with a wider internal working space, so highlights hold their
 > shape instead of clamping to the edge of sRGB. This is a WebGPU preview
-> release, not a full product-surface parity release: unsupported preview
-> affordances stay gated on the WebGPU path while the cross-filter work lands
-> in v1.1.
+> release, not a full preview/export parity release: unsupported preview
+> affordances stay gated on the WebGPU path, while Cross Filter now ships live
+> on the preview path with the current inline controls.
 
 ### Wider internal working space (Linear Rec.709, no clamp)
 
@@ -47,6 +47,11 @@ run on the WebGPU path.
 - Motion blur ring buffer is a single GPU texture with `depthOrArrayLayers = 8`
   and a `validSlots` uniform, so the first eight frames are accumulated
   correctly without a cold-start flash.
+- Cross Filter is live on the WebGPU preview path. The inline control cluster
+  exposes `crossFilterThreshold`, `crossFilterChromatic`, and
+  `crossFilterMinSpacing`; `crossFilterMinSpacing` now ships as `1.00 .. 10.00`,
+  and Hard Mode keeps a compatibility remap so the default UI threshold `0.92`
+  preserves the historical onset baseline.
 - WebGL-only preview affordances such as before/after, A/B compare, and the
   histogram are gated off on the WebGPU path in v1.0, so the UI does not
   advertise tools that the backend cannot honor yet.
@@ -60,12 +65,12 @@ batch export also continue to run on WebGL2 for this release — the WebGPU
 
 ## Known limits (v1.0)
 
-- Cross-filter streaks (peak / peak-spacing / streak / blend) are
-  compile-validated in the WebGPU backend but not yet wired into the render
-  graph at runtime. All v1.0 factory presets ship with `crossFilterStrength: 0`,
-  so the visible output is identical to v0.6.x for every factory preset. User
-  presets with `crossFilterStrength > 0` saved from v0.6.x will render as if
-  cross-filter is off until v1.1.
+- Cross Filter is live on the WebGPU preview path, but all v1.0 factory
+  presets still ship with `crossFilterStrength: 0`. The shipped preview
+  controls are `crossFilterThreshold`, `crossFilterChromatic`, and
+  `crossFilterMinSpacing (1.00 .. 10.00)`; non-default user presets should be
+  evaluated by eye because the factory-preset QA matrix does not exercise this
+  path.
 - Hard-mode cross-filter temporal accumulation stays deferred to v1.1 (no
   change from v0.6.x).
 - Video export and batch export run on the WebGL2 backend for v1.0. The
@@ -87,9 +92,10 @@ batch export also continue to run on WebGL2 for this release — the WebGPU
 
 - **v0.6.2 → v1.0.0**: WebGPU preview backend, `rgba16float` working space,
   no-clamp primary grade, Reinhard soft-shaper in front of LUT2, hardware sRGB
-  OETF final transform. Apps/web, video export, and batch export stay on
-  WebGL2 for this release, and unsupported preview tools are gated on the
-  WebGPU path.
+  OETF final transform, and live Cross Filter preview controls
+  (`threshold` / `chromatic` / `minSpacing`). Apps/web, video export, and
+  batch export stay on WebGL2 for this release, and unsupported preview tools
+  are gated on the WebGPU path.
 - **v0.6.1 → v0.6.2**: Cross Filter product-surface cleanup (Soft frozen,
   Spikes discrete 4/6/8).
 - **v0.6.0 → v0.6.1**: Preview recovery after export, launch-time update

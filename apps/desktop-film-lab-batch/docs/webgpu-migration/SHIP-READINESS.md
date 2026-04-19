@@ -2,7 +2,9 @@
 
 **Branch**: `feature/webgpu-migration-v1`
 **Target tag**: `desktop-v1.0.0`
-**Decision scope**: merge into `main` + tag + DMG release, or hold with a named issue.
+**Decision scope**: merge the approved clean release candidate into `main`
+and create tag `desktop-v1.0.0`, or hold with a named issue. Signed/notarized
+DMG regeneration remains a separate release-ops step.
 
 **Companion audit**: [`v1.0-webgpu-audit-2026-04-18.md`](./v1.0-webgpu-audit-2026-04-18.md)
 documents a later deep review of parity gaps and should be read before using
@@ -14,8 +16,8 @@ the Decision section — that is the minimum. The full commit / code evidence
 lives in `STATUS.md` and `phase-3-continuation-v2-handoff.md`.
 
 **Release framing for v1.0**: treat this as **WebGPU preview migration with
-gated unsupported preview affordances**, not as full preview/export parity
-across every WebGL-era UI tool.
+gated unsupported preview affordances and live Cross Filter preview controls**,
+not as full preview/export parity across every WebGL-era UI tool.
 
 ---
 
@@ -62,23 +64,26 @@ spec calls it, and the Playwright config has no `webServer` entry, so
 80-case PSNR gate referenced in the handoff is not currently runnable as-is.
 
 **Impact on v1.0 ship**: deferring this to a v1.0.1 follow-up is reasonable
-given every factory preset passes `crossFilterStrength: 0` so the WebGPU path
-exercises only the Soft-mode pipeline that Phase 2 already validated by eye.
-The hands-on QA is the v1.0 acceptance signal. `v1.0.1: wire the 80-matrix
-PSNR gate into vitest / playwright (vite webServer + tmp-dir capture + csv
-report)` should be filed after ship.
+because every factory preset still passes `crossFilterStrength: 0`, so the
+80-case PSNR gate does not exercise the shipped non-default Cross Filter path.
+Hands-on QA remains the acceptance signal for preview-only Cross Filter usage.
+`v1.0.1: wire the 80-matrix PSNR gate into vitest / playwright (vite webServer
++ tmp-dir capture + csv report)` should be filed after ship.
 
 ## ⚠️ Known limits at ship (already covered by RELEASE_NOTES-v1.0.0.md)
 
-- Cross-filter render-time integration → v1.1 (WGSL is compile-validated,
-  render-graph editing + preset round-trip is the v1.1 scope). All 8 v1.0
-  factory presets have `crossFilterStrength: 0`, so the 80-matrix PSNR gate
-  is not exercised by this code path.
+- Cross Filter is live on the WebGPU preview path. The shipped inline controls
+  are `crossFilterThreshold`, `crossFilterChromatic`, and
+  `crossFilterMinSpacing (1.00 .. 10.00)`, but all v1.0 factory presets still
+  keep `crossFilterStrength: 0`, so the 80-matrix PSNR gate does not exercise
+  this non-default path.
 - Before/after, A/B compare, and histogram are gated off on the WebGPU preview
   path for v1.0. WebGL preview behavior remains unchanged where that backend
   is still active.
 - Video export / batch export → WebGL2 for v1.0, WebGPU `GpuRenderer` in v1.1.
-- Hard Mode temporal cross-filter → v1.1 (unchanged from v0.6.x decisions).
+- Hard Mode temporal cross-filter trail remains intentionally deferred /
+  disabled in v1.0. The shipped default UI threshold `0.92` preserves the
+  historical hard-mode onset baseline through a compatibility remap.
 - HDR / P3 output → v2.0.
 
 ## ⚠️ Risks
@@ -114,9 +119,8 @@ report)` should be filed after ship.
 
 ## Decision
 
-- [ ] **Ship v1.0.0** — merge `feature/webgpu-migration-v1` into `main`, tag
-  `desktop-v1.0.0`, run `bun run dist:mac:release` once signed+notarized
-  release is planned.
+- [x] **Ship v1.0.0** — merge the approved clean release candidate into
+  `main`, then tag `desktop-v1.0.0`.
 - [ ] **Hold** — open a follow-up issue with the failing gate from the ⚠️
   section and link it back here.
 
@@ -129,16 +133,17 @@ report)` should be filed after ship.
   - `SHIP-READINESS.md` — reflects what this chat actually ran vs. what still
     needs your machine.
 
-Post-ship, after the 10-min QA passes, there is nothing else to commit — the
-only change is flipping the Decision checkbox and creating the release tag
-with `bun run dist:mac:release`.
+Post-ship, after the doc corrections above, there is no further product-code
+commit required for this pass. The remaining source-control steps are merging
+the clean release candidate into `main` and creating the `desktop-v1.0.0`
+tag. Signed/notarized DMG regeneration remains separate release operations.
 
 ## v1.1 issues to open after ship
 
 From `phase-3-continuation-v2-handoff.md` §4, to be created once v1.0 is
 tagged:
 
-- `v1.1: activate WebGPU cross-filter render integration (Soft + Hard Mode)`
+- `v1.1: evaluate post-release WebGPU cross-filter follow-up (Hard Mode trail + parity tuning)`
 - `v1.1: migrate video-export-pipeline to WebGPU headless GpuRenderer`
 - `v1.1: migrate batch-pipeline to WebGPU headless GpuRenderer`
 - `v1.3: migrate apps/web film-lab canvas to WebGPU`
