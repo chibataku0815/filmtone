@@ -85,7 +85,7 @@ interface Params {
     crossFilterRandomness: number;
     /** Hard Mode toggle (0=Soft / 1=Hard)。1 のとき中心 bloom + 強化 streak の stylized rendering。 */
     crossFilterHardMode: number;
-    /** 光芒の密集回避。0=制限なし、1=近接した平行 streak を soft に整理する。 */
+    /** 光芒の密集回避。現行プロダクトでは 1 が下限で、1–2 の範囲で扱う。古い下位値は 1 へ正規化する。 */
     crossFilterMinSpacing: number;
 }
 declare function cloneParams(params: Params): Params;

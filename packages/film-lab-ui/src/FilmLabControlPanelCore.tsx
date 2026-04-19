@@ -57,6 +57,8 @@ function formatRgbShiftValue(rgbShift: number): string {
 const COMPRESSION_AMOUNT_UI_MAX = 0.4;
 const COMPRESSION_RANGE_UI_MAX = 0.6;
 const COMPRESSION_AMOUNT_DEFAULT = 0.1;
+const CROSS_FILTER_MIN_SPACING_MIN = 1;
+const CROSS_FILTER_MIN_SPACING_MAX = 2;
 
 function getCompressionAmountSliderMax(compressionAmount: number): number {
   return Math.max(COMPRESSION_AMOUNT_UI_MAX, compressionAmount);
@@ -222,7 +224,7 @@ const CROSS_STARTER_STATES: readonly FinishToolStarterState[] = [
       crossFilterSizeLimit: 0.12,
       crossFilterRandomness: 0.9,
       crossFilterHardMode: 1,
-      crossFilterMinSpacing: 0.1,
+      crossFilterMinSpacing: 1,
     },
   },
   {
@@ -238,7 +240,7 @@ const CROSS_STARTER_STATES: readonly FinishToolStarterState[] = [
       crossFilterSizeLimit: 0.24,
       crossFilterRandomness: 0.75,
       crossFilterHardMode: 1,
-      crossFilterMinSpacing: 0.22,
+      crossFilterMinSpacing: 1,
     },
   },
 ] as const;
@@ -326,7 +328,6 @@ export const FilmLabControlPanelCore = forwardRef<
   const [savedCrossFilterStrength, setSavedCrossFilterStrength] = useState(0.5);
   const [artifactsOpen, setArtifactsOpen] = useState(true);
   const [glowAdvancedOpen, setGlowAdvancedOpen] = useState(false);
-  const [crossAdvancedOpen, setCrossAdvancedOpen] = useState(false);
   // v0.5.0: postEffectsOpen removed — motionBlur moved to ARTIFACTS, section eliminated
   const [showHelp, setShowHelp] = useState(false);
   const [sourceTrimOpen, setSourceTrimOpen] = useState(false);
@@ -542,7 +543,6 @@ export const FilmLabControlPanelCore = forwardRef<
   }, []);
 
   const applyCrossStarterState = useCallback((patch: Partial<Params>) => {
-    setCrossAdvancedOpen(false);
     applyParamPatch(patch);
   }, [applyParamPatch]);
 
@@ -1167,47 +1167,33 @@ export const FilmLabControlPanelCore = forwardRef<
                       />
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setCrossAdvancedOpen(!crossAdvancedOpen)}
-                      className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[10px] font-medium tracking-[0.08em] text-white/68 transition-colors hover:bg-white/[0.06] hover:text-white/84"
-                    >
-                      {crossAdvancedOpen
-                        ? tFilmLab("controls.finishToolsAdvancedHide")
-                        : tFilmLab("controls.finishToolsAdvancedShow")}
-                    </button>
-
-                    {crossAdvancedOpen ? (
-                      <div className={`mt-3 flex flex-col gap-2.5 border-t border-white/[0.08] pt-3 ${!crossFilterEnabled ? "pointer-events-none opacity-30" : ""}`}>
-                        <div className="rounded-lg border border-white/8 bg-white/[0.03] px-3 py-2 text-[11px] leading-relaxed text-white/66">
-                          {tFilmLab("controls.crossFilterSoftModeFrozenHint")}
-                        </div>
-                        <PanelControlSlider
-                          sliderLabelResetHint={sliderLabelResetHint}
-                          label={tFilmLab("controls.crossFilterChromatic")}
-                          hint={tFilmLab("controls.crossFilterChromaticHint")}
-                          value={params.crossFilterChromatic}
-                          min={0}
-                          max={1}
-                          step={0.01}
-                          defaultValue={0.3}
-                          onChange={(v) => updateParam("crossFilterChromatic", v)}
-                          onCommit={commit}
-                        />
-                        <PanelControlSlider
-                          sliderLabelResetHint={sliderLabelResetHint}
-                          label={tFilmLab("controls.crossFilterMinSpacing")}
-                          hint={tFilmLab("controls.crossFilterMinSpacingHint")}
-                          value={params.crossFilterMinSpacing}
-                          min={0}
-                          max={1}
-                          step={0.01}
-                          defaultValue={0}
-                          onChange={(v) => updateParam("crossFilterMinSpacing", v)}
-                          onCommit={commit}
-                        />
-                      </div>
-                    ) : null}
+                    <div className={`mt-3 flex flex-col gap-2.5 border-t border-white/[0.08] pt-3 ${!crossFilterEnabled ? "pointer-events-none opacity-30" : ""}`}>
+                      <PanelControlSlider
+                        sliderLabelResetHint={sliderLabelResetHint}
+                        label={tFilmLab("controls.crossFilterChromatic")}
+                        hint={tFilmLab("controls.crossFilterChromaticHint")}
+                        value={params.crossFilterChromatic}
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        defaultValue={0.3}
+                        onChange={(v) => updateParam("crossFilterChromatic", v)}
+                        onCommit={commit}
+                      />
+                      <PanelControlSlider
+                        sliderLabelResetHint={sliderLabelResetHint}
+                        label={tFilmLab("controls.crossFilterMinSpacing")}
+                        hint={tFilmLab("controls.crossFilterMinSpacingHint")}
+                        value={params.crossFilterMinSpacing}
+                        min={CROSS_FILTER_MIN_SPACING_MIN}
+                        max={CROSS_FILTER_MIN_SPACING_MAX}
+                        step={0.01}
+                        defaultValue={CROSS_FILTER_MIN_SPACING_MIN}
+                        onChange={(v) => updateParam("crossFilterMinSpacing", v)}
+                        onCommit={commit}
+                        formatValue={(v) => v.toFixed(2)}
+                      />
+                    </div>
                   </FinishToolFamilyCard>
 
                   <FinishToolFamilyCard

@@ -69,13 +69,31 @@ export const PROCESS_PARAM_KEYS = Object.keys(
   PROCESS_PARAM_DEFAULTS,
 ) as ProcessParamKey[];
 
+const CROSS_FILTER_MIN_SPACING_FLOOR = 1;
+const CROSS_FILTER_MIN_SPACING_CEILING = 2;
+
+function normalizeCrossFilterSpacingFloor(params: Params): Params {
+  return {
+    ...params,
+    crossFilterMinSpacing: Math.min(
+      CROSS_FILTER_MIN_SPACING_CEILING,
+      Math.max(
+        CROSS_FILTER_MIN_SPACING_FLOOR,
+        Number.isFinite(params.crossFilterMinSpacing)
+          ? params.crossFilterMinSpacing
+          : CROSS_FILTER_MIN_SPACING_FLOOR,
+      ),
+    ),
+  };
+}
+
 /**
  * Cross Filter の Soft モードは現行プロダクトでは凍結中。
  * renderer 実装は残すが、UI / 共有 URL / 保存データから復元される値は Hard に寄せる。
  */
 function normalizeFrozenCrossFilterMode(params: Params): Params {
   return {
-    ...params,
+    ...normalizeCrossFilterSpacingFloor(params),
     crossFilterHardMode: 1,
   };
 }

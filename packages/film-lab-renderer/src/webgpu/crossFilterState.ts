@@ -9,8 +9,9 @@
 
 /**
  * Minimum |Δ| on `crossFilterMinSpacing` that counts as a "material"
- * change, matching WebGL (`1e-4`). Values closer than this are treated
- * as the same setting and do NOT force a temporal-history reset.
+ * change. The current product floor fixes spacing at 1.0, but keep the
+ * legacy epsilon contract so older snapshots remain well-defined if this
+ * parameter becomes variable again.
  */
 export const CROSS_FILTER_MIN_SPACING_EPSILON = 1e-4;
 /**
@@ -79,7 +80,7 @@ export interface CrossFilterHistorySnapshot {
   readonly strength: number;
   /** Quantized Hard Mode — 0 or 1. */
   readonly hardMode: 0 | 1;
-  /** Clamped `crossFilterMinSpacing` ∈ [0, 1]. */
+  /** Current public `crossFilterMinSpacing` snapshot (1–2 in current UI). */
   readonly minSpacing: number;
 }
 

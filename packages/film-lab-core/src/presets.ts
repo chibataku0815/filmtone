@@ -66,7 +66,7 @@ export const PRESETS = {
     crossFilterSizeLimit: 0,
     crossFilterRandomness: 1,
     crossFilterHardMode: 1,
-    crossFilterMinSpacing: 0,
+    crossFilterMinSpacing: 1,
   },
   /**
    * cinematic プリセット（v2・2026-03-31）
@@ -126,7 +126,7 @@ export const PRESETS = {
     crossFilterSizeLimit: 0,
     crossFilterRandomness: 1,
     crossFilterHardMode: 1,
-    crossFilterMinSpacing: 0,
+    crossFilterMinSpacing: 1,
   },
   portra: {
     exposure: 0.2,
@@ -182,7 +182,7 @@ export const PRESETS = {
     crossFilterSizeLimit: 0,
     crossFilterRandomness: 1,
     crossFilterHardMode: 1,
-    crossFilterMinSpacing: 0,
+    crossFilterMinSpacing: 1,
   },
   gold200: {
     exposure: 0.15,
@@ -238,7 +238,7 @@ export const PRESETS = {
     crossFilterSizeLimit: 0,
     crossFilterRandomness: 1,
     crossFilterHardMode: 1,
-    crossFilterMinSpacing: 0,
+    crossFilterMinSpacing: 1,
   },
   pro400h: {
     exposure: 0.25,
@@ -294,7 +294,7 @@ export const PRESETS = {
     crossFilterSizeLimit: 0,
     crossFilterRandomness: 1,
     crossFilterHardMode: 1,
-    crossFilterMinSpacing: 0,
+    crossFilterMinSpacing: 1,
   },
   bw: {
     exposure: 0.1,
@@ -350,7 +350,7 @@ export const PRESETS = {
     crossFilterSizeLimit: 0,
     crossFilterRandomness: 1,
     crossFilterHardMode: 1,
-    crossFilterMinSpacing: 0,
+    crossFilterMinSpacing: 1,
   },
   ektar100: {
     exposure: 0.05,
@@ -406,7 +406,7 @@ export const PRESETS = {
     crossFilterSizeLimit: 0,
     crossFilterRandomness: 1,
     crossFilterHardMode: 1,
-    crossFilterMinSpacing: 0,
+    crossFilterMinSpacing: 1,
   },
   superia400: {
     exposure: 0.1,
@@ -462,7 +462,7 @@ export const PRESETS = {
     crossFilterSizeLimit: 0,
     crossFilterRandomness: 1,
     crossFilterHardMode: 1,
-    crossFilterMinSpacing: 0,
+    crossFilterMinSpacing: 1,
   },
   cinestill800t: {
     exposure: 0.15,
@@ -518,7 +518,7 @@ export const PRESETS = {
     crossFilterSizeLimit: 0,
     crossFilterRandomness: 1,
     crossFilterHardMode: 1,
-    crossFilterMinSpacing: 0,
+    crossFilterMinSpacing: 1,
   },
   /**
    * Velvia 50 プリセット（v1・2026-04-02）
@@ -579,7 +579,7 @@ export const PRESETS = {
     crossFilterSizeLimit: 0,
     crossFilterRandomness: 1,
     crossFilterHardMode: 1,
-    crossFilterMinSpacing: 0,
+    crossFilterMinSpacing: 1,
   },
 } satisfies Record<string, Params>;
 

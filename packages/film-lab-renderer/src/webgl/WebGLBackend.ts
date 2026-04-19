@@ -65,8 +65,8 @@ const RT_OPTIONS: THREE.RenderTargetOptions = {
   type: THREE.HalfFloatType,
 };
 
-const CROSS_FILTER_SPACING_RADIUS_MIN_PX = 2.0;
 const CROSS_FILTER_SPACING_RADIUS_MAX_PX = 48.0;
+const CROSS_FILTER_SPACING_RADIUS_EXTRA_MAX_PX = 24.0;
 
 export type CrossFilterDebugView =
   | "off"
@@ -249,7 +249,7 @@ export class WebGLBackend implements RenderBackend {
   /** Phase 6: Hard Mode toggle (0=Soft, 1=Hard). Render-time uniform overrides for stylized look. */
   private crossFilterHardMode = 0;
   /** Peak-level spacing control — prefers separated highlight sources before streak generation. */
-  private crossFilterMinSpacing = 0;
+  private crossFilterMinSpacing = 1;
   private crossFilterStreakMaterial: THREE.ShaderMaterial | null = null;
   private crossFilterBlendMaterial: THREE.ShaderMaterial | null = null;
   private rtCrossThreshold: THREE.WebGLRenderTarget | null = null;
@@ -1342,12 +1342,11 @@ export class WebGLBackend implements RenderBackend {
 
     let currentPeakTarget = this.rtCrossPeak!;
     if (this.crossFilterMinSpacing >= 0.001) {
+      const spacingBoost = Math.min(1, Math.max(0, this.crossFilterMinSpacing - 1.0));
       const radiusPx = Math.round(
-        THREE.MathUtils.lerp(
-          CROSS_FILTER_SPACING_RADIUS_MIN_PX,
-          CROSS_FILTER_SPACING_RADIUS_MAX_PX,
-          THREE.MathUtils.smoothstep(this.crossFilterMinSpacing, 0.0, 1.0),
-        ),
+        CROSS_FILTER_SPACING_RADIUS_MAX_PX +
+          CROSS_FILTER_SPACING_RADIUS_EXTRA_MAX_PX *
+            THREE.MathUtils.smoothstep(spacingBoost, 0.0, 1.0),
       );
 
       const smu = this.crossFilterPeakSpacingMaxMaterial.uniforms;
@@ -2047,7 +2046,7 @@ export class WebGLBackend implements RenderBackend {
     this.crossFilterHardMode = next;
   }
   setCrossFilterMinSpacing(v: number): void {
-    const next = Math.min(1, Math.max(0, v));
+    const next = Math.min(2, Math.max(1, v));
     if (Math.abs(next - this.crossFilterMinSpacing) >= 1e-4) {
       this.resetCrossFilterHistory();
     }

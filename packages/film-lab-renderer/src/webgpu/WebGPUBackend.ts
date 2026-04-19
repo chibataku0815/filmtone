@@ -128,8 +128,8 @@ const CROSS_FILTER_PARAMS_BYTES = 16;
 const CROSS_FILTER_SPACING_MAX_BYTES = 32;
 const CROSS_FILTER_STREAK_BYTES = 48;
 const CROSS_FILTER_MAX_STREAKS = 4;
-const CROSS_FILTER_SPACING_RADIUS_MIN_PX = 2.0;
 const CROSS_FILTER_SPACING_RADIUS_MAX_PX = 48.0;
+const CROSS_FILTER_SPACING_RADIUS_EXTRA_MAX_PX = 24.0;
 /** Number of cross-filter peak history ring slots (2 = ping-pong). */
 const CROSS_FILTER_HISTORY_SLOTS = 2;
 /**
@@ -2218,7 +2218,7 @@ export class WebGPUBackend implements RenderBackend {
     const randomness = Math.min(1, Math.max(0, this.paramNumber("crossFilterRandomness", 1)));
     const length = Math.min(1, Math.max(0, this.paramNumber("crossFilterLength", 0.5)));
     const chromatic = Math.min(1, Math.max(0, this.paramNumber("crossFilterChromatic", 0.3)));
-    const minSpacing = Math.min(1, Math.max(0, this.paramNumber("crossFilterMinSpacing", 0)));
+    const minSpacing = Math.min(2, Math.max(1, this.paramNumber("crossFilterMinSpacing", 1)));
     const rawSpikes = Math.max(2, Math.round(this.paramNumber("crossFilterSpikes", 4)));
     const spikeCount = rawSpikes % 2 === 0 ? rawSpikes : rawSpikes + 1;
     const dirCount = Math.max(
@@ -2313,12 +2313,11 @@ export class WebGPUBackend implements RenderBackend {
 
     let currentPeakTexture = peakTexture;
     if (minSpacing >= 0.001) {
-      const spacingT = Math.min(1, Math.max(0, minSpacing));
-      const spacingSmooth = spacingT * spacingT * (3 - 2 * spacingT);
+      const spacingBoost = Math.min(1, Math.max(0, minSpacing - 1.0));
+      const spacingSmooth = spacingBoost * spacingBoost * (3 - 2 * spacingBoost);
       const radiusPx = Math.round(
-        CROSS_FILTER_SPACING_RADIUS_MIN_PX +
-          (CROSS_FILTER_SPACING_RADIUS_MAX_PX - CROSS_FILTER_SPACING_RADIUS_MIN_PX) *
-            spacingSmooth,
+        CROSS_FILTER_SPACING_RADIUS_MAX_PX +
+          CROSS_FILTER_SPACING_RADIUS_EXTRA_MAX_PX * spacingSmooth,
       );
 
       const spacingMaxScratchX = this.crossFilter.spacingMaxScratch[0]!;
@@ -2730,8 +2729,8 @@ export class WebGPUBackend implements RenderBackend {
     const crossFilterHardModeRaw = this.paramNumber("crossFilterHardMode", 0);
     const crossFilterHardMode = crossFilterHardModeRaw >= 0.5 ? 1 : 0;
     const crossFilterMinSpacing = Math.min(
-      1,
-      Math.max(0, this.paramNumber("crossFilterMinSpacing", 0)),
+      2,
+      Math.max(1, this.paramNumber("crossFilterMinSpacing", 1)),
     );
     this.maybeResetCrossFilterHistory(
       crossFilterStrength,
