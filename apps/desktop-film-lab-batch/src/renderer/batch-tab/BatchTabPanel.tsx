@@ -1220,13 +1220,18 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
       </div>
 
       {/* Advanced disclosure — proxy cache / preview-export bridge（既定閉） */}
-      <AdvancedDisclosure
-        previewExportBridge={previewExportBridge}
-        proxyCacheInfo={proxyCacheInfo}
-        isPurgingProxyCache={isPurgingProxyCache}
-        running={running}
-        onPurgeProxyCache={onPurgeProxyCache}
-      />
+      <section
+        className={compact ? "" : "fl-card fl-card--frost gap-2 py-3"}
+        aria-label={t("advancedDisclosureTitle")}
+      >
+        <AdvancedDisclosure
+          previewExportBridge={previewExportBridge}
+          proxyCacheInfo={proxyCacheInfo}
+          isPurgingProxyCache={isPurgingProxyCache}
+          running={running}
+          onPurgeProxyCache={onPurgeProxyCache}
+        />
+      </section>
 
       {/* Footer (run) — full page 時のみ panel 内。compact は App.tsx の sticky footer へ */}
       {!compact ? renderFooter() : null}
