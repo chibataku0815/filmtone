@@ -172,15 +172,21 @@ struct FilmtoneRootView: View {
             FilmtonePreviewView(
                 source: store.source,
                 displayURI: store.selectedPreviewURI,
+                videoPreview: store.videoPreviewState,
                 emptyMessage: previewEmptyMessage,
                 emptyEyebrow: store.strings.previewEmptyEyebrow,
                 emptyHint: store.strings.previewEmptyHint,
-                compareLabel: store.strings.compareLabel,
+                loadingMessage: store.strings.previewRendering,
+                originalLabel: store.strings.compareLabel,
+                gradedLabel: store.strings.previewGradedLabel,
+                expandLabel: store.strings.previewExpandLabel,
                 isRendering: store.preview.isRendering,
                 metaLabel: store.previewMetaLabel,
-                isComparing: store.isCompareHeld,
-                onCompareHeld: store.setCompareHeld
-            )
+                isStillComparing: store.isCompareHeld,
+                onStillCompareHeld: store.setCompareHeld
+            ) { mode in
+                Task { await store.setVideoCompareMode(mode) }
+            }
         }
     }
 
@@ -331,7 +337,7 @@ struct FilmtoneRootView: View {
         if store.source == nil {
             return store.strings.sourceEmpty
         }
-        if let error = store.preview.error {
+        if let error = store.previewError {
             return error
         }
         return store.strings.previewRendering

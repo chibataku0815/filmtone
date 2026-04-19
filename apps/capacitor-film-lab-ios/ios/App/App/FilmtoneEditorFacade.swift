@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 import UIKit
 
 @MainActor
@@ -75,6 +76,18 @@ final class FilmtoneEditorFacade {
         request: Phase0ExportRequestDTO
     ) async throws -> Phase0PreviewRenderResultDTO {
         try await runtime.renderPreview(request: request)
+    }
+
+    func makeOriginalPreviewItem(
+        request: Phase0ExportRequestDTO
+    ) async throws -> FilmtonePreparedVideoPreviewItem {
+        try await runtime.makeOriginalPreviewItem(request: request)
+    }
+
+    func makeGradedPreviewItem(
+        request: Phase0ExportRequestDTO
+    ) async throws -> FilmtonePreparedVideoPreviewItem {
+        try await runtime.makeGradedPreviewItem(request: request)
     }
 
     func runExport(

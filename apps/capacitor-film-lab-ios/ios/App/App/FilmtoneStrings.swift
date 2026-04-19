@@ -52,6 +52,9 @@ struct FilmtoneStrings {
     let previewEmptyHint: String
     let compareLabel: String
     let compareHint: String
+    let previewGradedLabel: String
+    let previewExpandLabel: String
+    let previewVideoHint: String
     let presetTitle: String
     let strengthLabel: String
     let adjustLabel: String
@@ -183,6 +186,21 @@ extension FilmtoneStrings {
             "filmtone.preview.compare_hint",
             defaultValue: "Press and hold the preview to compare.",
             comment: "Hint that explains compare interaction."
+        )
+        previewGradedLabel = filmtoneLocalized(
+            "filmtone.preview.graded_label",
+            defaultValue: "Graded",
+            comment: "Label for the graded video preview mode."
+        )
+        previewExpandLabel = filmtoneLocalized(
+            "filmtone.preview.expand",
+            defaultValue: "Full Screen",
+            comment: "Action label to open the video preview in full screen."
+        )
+        previewVideoHint = filmtoneLocalized(
+            "filmtone.preview.video_hint",
+            defaultValue: "Play, scrub, or switch between graded and original.",
+            comment: "Hint shown for the live video preview interaction."
         )
         presetTitle = filmtoneLocalized(
             "filmtone.preset.title",

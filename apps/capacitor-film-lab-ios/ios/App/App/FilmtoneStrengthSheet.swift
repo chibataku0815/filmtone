@@ -90,16 +90,21 @@ struct FilmtoneStrengthSheet: View {
             FilmtoneSheetPreview(
                 source: store.source,
                 displayURI: store.selectedPreviewURI,
+                videoPreview: store.videoPreviewState,
                 emptyMessage: previewEmptyMessage,
+                loadingMessage: store.strings.previewRendering,
                 hintMessage: store.strings.previewSheetHint,
-                compareLabel: store.strings.compareLabel,
+                originalLabel: store.strings.compareLabel,
+                gradedLabel: store.strings.previewGradedLabel,
                 metaLabel: store.previewMetaLabel,
                 isRendering: store.preview.isRendering,
-                isComparing: store.isCompareHeld,
-                onCompareHeld: store.setCompareHeld
-            )
+                isStillComparing: store.isCompareHeld,
+                onStillCompareHeld: store.setCompareHeld
+            ) { mode in
+                Task { await store.setVideoCompareMode(mode) }
+            }
 
-            Text(store.strings.compareHint)
+            Text(store.previewInteractionHint)
                 .font(.caption)
                 .foregroundStyle(.white.opacity(0.56))
         }
@@ -269,7 +274,7 @@ struct FilmtoneStrengthSheet: View {
     }
 
     private var previewEmptyMessage: String {
-        if let error = store.preview.error {
+        if let error = store.previewError {
             return error
         }
         if store.source == nil {
@@ -370,20 +375,26 @@ struct FilmtoneStrengthSheet: View {
 private struct FilmtoneSheetPreview: View {
     let source: SourceInfoDTO?
     let displayURI: String?
+    let videoPreview: FilmtoneVideoPreviewState?
     let emptyMessage: String
+    let loadingMessage: String
     let hintMessage: String
-    let compareLabel: String
+    let originalLabel: String
+    let gradedLabel: String
     let metaLabel: String?
     let isRendering: Bool
-    let isComparing: Bool
-    let onCompareHeld: (Bool) -> Void
+    let isStillComparing: Bool
+    let onStillCompareHeld: (Bool) -> Void
+    let onVideoCompareModeSelected: (FilmtoneVideoCompareMode) -> Void
 
     var body: some View {
         ZStack(alignment: .topLeading) {
             Rectangle()
                 .fill(Color.black)
 
-            if let source, let displayURI, let image = previewImage(from: displayURI) {
+            if let videoPreview {
+                FilmtonePreviewPlayerView(player: videoPreview.player)
+            } else if let source, let displayURI, let image = previewImage(from: displayURI) {
                 GeometryReader { geometry in
                     Image(uiImage: image)
                         .resizable()
@@ -397,7 +408,7 @@ private struct FilmtoneSheetPreview: View {
                                 if source.filename.isEmpty {
                                     return
                                 }
-                                onCompareHeld(isPressing)
+                                onStillCompareHeld(isPressing)
                             },
                             perform: {}
                         )
@@ -417,13 +428,30 @@ private struct FilmtoneSheetPreview: View {
                 .padding(16)
             }
 
-            if isComparing {
-                Text(compareLabel)
+            if let videoPreview {
+                HStack(spacing: 6) {
+                    FilmtoneSheetPreviewToggleButton(
+                        label: gradedLabel,
+                        isActive: videoPreview.compareMode == .graded
+                    ) {
+                        onVideoCompareModeSelected(.graded)
+                    }
+
+                    FilmtoneSheetPreviewToggleButton(
+                        label: originalLabel,
+                        isActive: videoPreview.compareMode == .original
+                    ) {
+                        onVideoCompareModeSelected(.original)
+                    }
+                }
+                .padding(12)
+            } else if isStillComparing {
+                Text(originalLabel)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(Color.filmtoneAmber)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
-                    .background(Color.black.opacity(0.65))
+                    .background(Color.black.opacity(0.65), in: Capsule())
                     .padding(12)
             }
 
@@ -451,7 +479,7 @@ private struct FilmtoneSheetPreview: View {
                             .progressViewStyle(.circular)
                             .tint(Color.filmtoneAmber)
 
-                        Text(emptyMessage)
+                        Text(loadingMessage)
                             .font(.caption.weight(.medium))
                             .foregroundStyle(.white.opacity(0.82))
 
@@ -477,6 +505,24 @@ private struct FilmtoneSheetPreview: View {
             return nil
         }
         return UIImage(contentsOfFile: url.path)
+    }
+}
+
+private struct FilmtoneSheetPreviewToggleButton: View {
+    let label: String
+    let isActive: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(label)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(isActive ? Color.black : .white.opacity(0.82))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .background(isActive ? Color.filmtoneAmber : Color.black.opacity(0.54), in: Capsule())
+        }
+        .buttonStyle(.plain)
     }
 }
 

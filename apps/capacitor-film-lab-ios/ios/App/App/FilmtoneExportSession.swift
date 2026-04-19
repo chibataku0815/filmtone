@@ -46,6 +46,10 @@ final class FilmtoneExportSession {
         cancelled = true
     }
 
+    func makeSharedGradeProcessor() -> FilmtoneSharedGradeProcessor {
+        FilmtoneSharedGradeProcessor(session: self)
+    }
+
     func renderPreviewFrame() throws -> Phase0PreviewRenderResultDTO {
         defer {
             ciContext.clearCaches()
@@ -549,8 +553,8 @@ final class FilmtoneExportSession {
         outputSize: CGSize,
         timeSeconds: Double
     ) -> CIImage {
-        let base = scaledVideoFrameImage(
-            from: imageBuffer,
+        let base = scaledVideoSourceImage(
+            CIImage(cvPixelBuffer: imageBuffer),
             transform: transform,
             outputSize: outputSize
         )
@@ -568,12 +572,38 @@ final class FilmtoneExportSession {
         return graded.cropped(to: CGRect(origin: .zero, size: outputSize))
     }
 
+    fileprivate func renderablePreviewVideoImage(
+        from image: CIImage,
+        transform: CGAffineTransform,
+        outputSize: CGSize,
+        timeSeconds: Double
+    ) -> CIImage {
+        let base = scaledVideoSourceImage(
+            image,
+            transform: transform,
+            outputSize: outputSize
+        )
+        let graded = applyGrade(to: base, timeSeconds: timeSeconds)
+        return graded.cropped(to: CGRect(origin: .zero, size: outputSize))
+    }
+
     private func scaledVideoFrameImage(
         from imageBuffer: CVPixelBuffer,
         transform: CGAffineTransform,
         outputSize: CGSize
     ) -> CIImage {
-        let image = CIImage(cvPixelBuffer: imageBuffer)
+        scaledVideoSourceImage(
+            CIImage(cvPixelBuffer: imageBuffer),
+            transform: transform,
+            outputSize: outputSize
+        )
+    }
+
+    private func scaledVideoSourceImage(
+        _ image: CIImage,
+        transform: CGAffineTransform,
+        outputSize: CGSize
+    ) -> CIImage {
         let oriented = image.transformed(by: transform)
         let normalized = oriented.transformed(by: CGAffineTransform(
             translationX: -oriented.extent.origin.x,
@@ -599,7 +629,7 @@ final class FilmtoneExportSession {
             .cropped(to: CGRect(origin: .zero, size: outputSize))
     }
 
-    private func applyGrade(to image: CIImage, timeSeconds: Double) -> CIImage {
+    fileprivate func applyGrade(to image: CIImage, timeSeconds: Double) -> CIImage {
         let params = request.grade.params
         var current = image
 
@@ -613,6 +643,10 @@ final class FilmtoneExportSession {
         current = applyCreativeLutStage(to: current)
 
         return current.cropped(to: image.extent)
+    }
+
+    fileprivate var outputFrameRate: Int {
+        request.output.fps
     }
 
     private func applyInputLutStage(to image: CIImage) -> CIImage {
@@ -699,7 +733,8 @@ final class FilmtoneExportSession {
                 from: bloomPlate,
                 radius: params.bloomRadius,
                 levelCount: Self.bloomMipLevels,
-                spreadMultiplier: 1.0
+                spreadMultiplier: 1.0,
+                useTentResampling: true
             )
         } else {
             bloomImage = black
@@ -899,7 +934,8 @@ final class FilmtoneExportSession {
         from image: CIImage,
         radius: Double,
         levelCount: Int,
-        spreadMultiplier: Double
+        spreadMultiplier: Double,
+        useTentResampling: Bool = false
     ) -> CIImage {
         let extent = image.extent.integral
         guard levelCount > 0 else {
@@ -909,7 +945,8 @@ final class FilmtoneExportSession {
         var mips = Self.buildMipPyramid(
             from: image,
             levelCount: levelCount,
-            initialScale: Self.glowBaseScale / max(spreadMultiplier, 0.0001)
+            initialScale: Self.glowBaseScale / max(spreadMultiplier, 0.0001),
+            useTentResampling: useTentResampling
         )
         guard !mips.isEmpty else {
             return Self.blackImage(for: extent)
@@ -920,26 +957,34 @@ final class FilmtoneExportSession {
             for index in stride(from: mips.count - 2, through: 0, by: -1) {
                 let lowRes = mips[index + 1]
                 let highRes = mips[index]
-                let restored = Self.upsampledImage(lowRes, to: highRes.extent)
+                let restored = useTentResampling
+                    ? Self.tentUpsampledImage(lowRes, to: highRes.extent)
+                    : Self.upsampledImage(lowRes, to: highRes.extent)
                 let weighted = Self.weightedImage(restored, weight: weights[index + 1])
                 mips[index] = Self.addImages(weighted, highRes).cropped(to: highRes.extent)
             }
         }
 
-        return Self.upsampledImage(mips[0], to: extent).cropped(to: extent)
+        let output = useTentResampling
+            ? Self.tentUpsampledImage(mips[0], to: extent)
+            : Self.upsampledImage(mips[0], to: extent)
+        return output.cropped(to: extent)
     }
 
     private static func buildMipPyramid(
         from image: CIImage,
         levelCount: Int,
-        initialScale: Double
+        initialScale: Double,
+        useTentResampling: Bool = false
     ) -> [CIImage] {
         guard levelCount > 0 else {
             return []
         }
 
         var mips: [CIImage] = []
-        var current = downsampledImage(image, scale: initialScale)
+        var current = useTentResampling
+            ? tentDownsampledImage(image, scale: initialScale)
+            : downsampledImage(image, scale: initialScale)
         mips.append(current)
 
         guard levelCount > 1 else {
@@ -947,7 +992,9 @@ final class FilmtoneExportSession {
         }
 
         for _ in 1..<levelCount {
-            current = downsampledImage(current, scale: 0.5)
+            current = useTentResampling
+                ? tentDownsampledImage(current, scale: 0.5)
+                : downsampledImage(current, scale: 0.5)
             mips.append(current)
         }
 
@@ -981,6 +1028,62 @@ final class FilmtoneExportSession {
                 kCIInputRadiusKey: glowUpsampleBlurRadius,
             ])
             .cropped(to: extent)
+    }
+
+    private static func tentDownsampledImage(_ image: CIImage, scale: Double) -> CIImage {
+        let safeScale = min(1.0, max(scale, 0.0001))
+        let sourceExtent = image.extent.integral
+        let targetSize = CGSize(
+            width: max(1.0, round(sourceExtent.width * safeScale)),
+            height: max(1.0, round(sourceExtent.height * safeScale))
+        )
+        let targetExtent = CGRect(origin: .zero, size: targetSize)
+
+        guard let kernel = OpticalKernels.tentDownsample else {
+            return downsampledImage(image, scale: scale)
+        }
+
+        return kernel.apply(
+            extent: targetExtent,
+            roiCallback: { _, _ in sourceExtent },
+            arguments: [
+                image,
+                extentOriginVector(for: sourceExtent),
+                extentSizeVector(for: sourceExtent),
+                extentOriginVector(for: targetExtent),
+                CIVector(
+                    x: sourceExtent.width / max(targetExtent.width, 1.0),
+                    y: sourceExtent.height / max(targetExtent.height, 1.0)
+                ),
+            ]
+        )?.cropped(to: targetExtent) ?? downsampledImage(image, scale: scale)
+    }
+
+    private static func tentUpsampledImage(_ image: CIImage, to extent: CGRect) -> CIImage {
+        guard image.extent.width > 0.0001, image.extent.height > 0.0001 else {
+            return blackImage(for: extent)
+        }
+        let sourceExtent = image.extent.integral
+        let targetExtent = extent.integral
+
+        guard let kernel = OpticalKernels.tentUpsample else {
+            return upsampledImage(image, to: extent)
+        }
+
+        return kernel.apply(
+            extent: targetExtent,
+            roiCallback: { _, _ in sourceExtent },
+            arguments: [
+                image,
+                extentOriginVector(for: sourceExtent),
+                extentSizeVector(for: sourceExtent),
+                extentOriginVector(for: targetExtent),
+                CIVector(
+                    x: sourceExtent.width / max(targetExtent.width, 1.0),
+                    y: sourceExtent.height / max(targetExtent.height, 1.0)
+                ),
+            ]
+        )?.cropped(to: targetExtent) ?? upsampledImage(image, to: extent)
     }
 
     private static func scaledImage(_ image: CIImage, scale: Double) -> CIImage {
@@ -1291,6 +1394,40 @@ private struct CompletedExport {
     let audioPreserved: Bool
 }
 
+final class FilmtoneSharedGradeProcessor {
+    private let session: FilmtoneExportSession
+
+    init(session: FilmtoneExportSession) {
+        self.session = session
+    }
+
+    func makeVideoComposition(
+        asset: AVAsset,
+        videoTrack: AVAssetTrack,
+        outputSize: CGSize
+    ) -> AVMutableVideoComposition {
+        let composition = AVMutableVideoComposition(
+            asset: asset,
+            applyingCIFiltersWithHandler: { [session] request in
+                let timeSeconds = CMTimeGetSeconds(request.compositionTime)
+                let processed = session.renderablePreviewVideoImage(
+                    from: request.sourceImage,
+                    transform: videoTrack.preferredTransform,
+                    outputSize: outputSize,
+                    timeSeconds: timeSeconds.isFinite ? timeSeconds : 0
+                )
+                request.finish(with: processed, context: nil)
+            }
+        )
+        composition.renderSize = outputSize
+        composition.frameDuration = CMTime(
+            value: 1,
+            timescale: CMTimeScale(max(1, session.outputFrameRate))
+        )
+        return composition
+    }
+}
+
 private struct PreparedLut {
     let size: Int
     let intensity: Double
@@ -1446,6 +1583,82 @@ kernel vec4 radialRGBSplit(sampler image, float amount, vec2 extentOrigin, vec2 
     float r = sample(image, samplerTransform(image, coord + offset)).r;
     float b = sample(image, samplerTransform(image, coord - offset)).b;
     return vec4(r, center.g, b, center.a);
+}
+""")
+
+    static let tentDownsample = CIKernel(source: """
+vec2 mirrorCoord(vec2 coord, vec2 origin, vec2 size) {
+    vec2 safeSize = max(size, vec2(1.0, 1.0));
+    vec2 uv = (coord - origin) / safeSize;
+    vec2 tiled = mod(uv, 2.0);
+    vec2 mirroredUv = 1.0 - abs(tiled - 1.0);
+    return origin + (mirroredUv * safeSize);
+}
+
+vec4 sampleMirror(sampler image, vec2 coord, vec2 origin, vec2 size) {
+    return sample(image, samplerTransform(image, mirrorCoord(coord, origin, size)));
+}
+
+kernel vec4 tentDownsample(sampler image, vec2 sourceOrigin, vec2 sourceSize, vec2 targetOrigin, vec2 sourceStep) {
+    vec2 coord = destCoord();
+    vec2 sourceCoord = sourceOrigin + ((coord - targetOrigin) * sourceStep);
+
+    vec4 a = sampleMirror(image, sourceCoord + vec2(-2.0,  2.0), sourceOrigin, sourceSize);
+    vec4 b = sampleMirror(image, sourceCoord + vec2( 0.0,  2.0), sourceOrigin, sourceSize);
+    vec4 c = sampleMirror(image, sourceCoord + vec2( 2.0,  2.0), sourceOrigin, sourceSize);
+
+    vec4 dd = sampleMirror(image, sourceCoord + vec2(-1.0,  1.0), sourceOrigin, sourceSize);
+    vec4 e  = sampleMirror(image, sourceCoord + vec2( 1.0,  1.0), sourceOrigin, sourceSize);
+
+    vec4 f = sampleMirror(image, sourceCoord + vec2(-2.0, 0.0), sourceOrigin, sourceSize);
+    vec4 g = sampleMirror(image, sourceCoord, sourceOrigin, sourceSize);
+    vec4 h = sampleMirror(image, sourceCoord + vec2( 2.0, 0.0), sourceOrigin, sourceSize);
+
+    vec4 ii = sampleMirror(image, sourceCoord + vec2(-1.0, -1.0), sourceOrigin, sourceSize);
+    vec4 j  = sampleMirror(image, sourceCoord + vec2( 1.0, -1.0), sourceOrigin, sourceSize);
+
+    vec4 k = sampleMirror(image, sourceCoord + vec2(-2.0, -2.0), sourceOrigin, sourceSize);
+    vec4 l = sampleMirror(image, sourceCoord + vec2( 0.0, -2.0), sourceOrigin, sourceSize);
+    vec4 m = sampleMirror(image, sourceCoord + vec2( 2.0, -2.0), sourceOrigin, sourceSize);
+
+    return ((dd + e + ii + j) * 0.125)
+         + (g * 0.125)
+         + ((a + c + k + m) * 0.03125)
+         + ((b + f + h + l) * 0.0625);
+}
+""")
+
+    static let tentUpsample = CIKernel(source: """
+vec2 mirrorCoord(vec2 coord, vec2 origin, vec2 size) {
+    vec2 safeSize = max(size, vec2(1.0, 1.0));
+    vec2 uv = (coord - origin) / safeSize;
+    vec2 tiled = mod(uv, 2.0);
+    vec2 mirroredUv = 1.0 - abs(tiled - 1.0);
+    return origin + (mirroredUv * safeSize);
+}
+
+vec4 sampleMirror(sampler image, vec2 coord, vec2 origin, vec2 size) {
+    return sample(image, samplerTransform(image, mirrorCoord(coord, origin, size)));
+}
+
+kernel vec4 tentUpsample(sampler image, vec2 sourceOrigin, vec2 sourceSize, vec2 targetOrigin, vec2 sourceStep) {
+    vec2 coord = destCoord();
+    vec2 sourceCoord = sourceOrigin + ((coord - targetOrigin) * sourceStep);
+
+    vec4 s  = sampleMirror(image, sourceCoord, sourceOrigin, sourceSize);
+    vec4 s0 = sampleMirror(image, sourceCoord + vec2(-1.0,  1.0), sourceOrigin, sourceSize);
+    vec4 s1 = sampleMirror(image, sourceCoord + vec2( 0.0,  1.0), sourceOrigin, sourceSize);
+    vec4 s2 = sampleMirror(image, sourceCoord + vec2( 1.0,  1.0), sourceOrigin, sourceSize);
+    vec4 s3 = sampleMirror(image, sourceCoord + vec2(-1.0,  0.0), sourceOrigin, sourceSize);
+    vec4 s4 = sampleMirror(image, sourceCoord + vec2( 1.0,  0.0), sourceOrigin, sourceSize);
+    vec4 s5 = sampleMirror(image, sourceCoord + vec2(-1.0, -1.0), sourceOrigin, sourceSize);
+    vec4 s6 = sampleMirror(image, sourceCoord + vec2( 0.0, -1.0), sourceOrigin, sourceSize);
+    vec4 s7 = sampleMirror(image, sourceCoord + vec2( 1.0, -1.0), sourceOrigin, sourceSize);
+
+    vec4 upsampled = (s * 4.0)
+                   + ((s1 + s3 + s4 + s6) * 2.0)
+                   + (s0 + s2 + s5 + s7);
+    return upsampled / 16.0;
 }
 """)
 

@@ -1,5 +1,13 @@
+import AVFoundation
 import Foundation
 import UIKit
+
+struct FilmtonePreparedVideoPreviewItem {
+    let item: AVPlayerItem
+    let width: Int
+    let height: Int
+    let durationSec: Double?
+}
 
 final class FilmtoneMediaRuntime {
     private let cacheStore: CacheStore
@@ -78,6 +86,88 @@ final class FilmtoneMediaRuntime {
             sourceURL: resolvedSourceURL,
             cacheStore: cacheStore
         )
+    }
+
+    func makeSharedGradeProcessor(
+        request: Phase0ExportRequestDTO,
+        sourceURL: URL? = nil
+    ) throws -> FilmtoneSharedGradeProcessor {
+        try makeExportSession(
+            request: request,
+            sourceURL: sourceURL
+        ).makeSharedGradeProcessor()
+    }
+
+    func makeOriginalPreviewItem(
+        request: Phase0ExportRequestDTO,
+        sourceURL: URL? = nil
+    ) async throws -> FilmtonePreparedVideoPreviewItem {
+        let resolvedSourceURL = try sourceURL ?? resolveFileURL(request.sourceUri)
+        return try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    let asset = AVURLAsset(url: resolvedSourceURL)
+                    guard let videoTrack = asset.tracks(withMediaType: .video).first else {
+                        throw FilmtoneMediaError.unsupportedSource("No video track was found in the selected source.")
+                    }
+                    let outputSize = FilmtoneExportSession.scaledSize(
+                        for: videoTrack,
+                        longEdge: request.output.longEdge
+                    )
+                    let item = AVPlayerItem(asset: asset)
+                    let durationSec = CMTimeGetSeconds(asset.duration)
+                    continuation.resume(returning: .init(
+                        item: item,
+                        width: Int(outputSize.width.rounded()),
+                        height: Int(outputSize.height.rounded()),
+                        durationSec: durationSec.isFinite ? durationSec : nil
+                    ))
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    func makeGradedPreviewItem(
+        request: Phase0ExportRequestDTO,
+        sourceURL: URL? = nil
+    ) async throws -> FilmtonePreparedVideoPreviewItem {
+        let resolvedSourceURL = try sourceURL ?? resolveFileURL(request.sourceUri)
+        return try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    let asset = AVURLAsset(url: resolvedSourceURL)
+                    guard let videoTrack = asset.tracks(withMediaType: .video).first else {
+                        throw FilmtoneMediaError.unsupportedSource("No video track was found in the selected source.")
+                    }
+                    let outputSize = FilmtoneExportSession.scaledSize(
+                        for: videoTrack,
+                        longEdge: request.output.longEdge
+                    )
+                    let processor = try self.makeSharedGradeProcessor(
+                        request: request,
+                        sourceURL: resolvedSourceURL
+                    )
+                    let item = AVPlayerItem(asset: asset)
+                    item.videoComposition = processor.makeVideoComposition(
+                        asset: asset,
+                        videoTrack: videoTrack,
+                        outputSize: outputSize
+                    )
+                    item.seekingWaitsForVideoCompositionRendering = true
+                    let durationSec = CMTimeGetSeconds(asset.duration)
+                    continuation.resume(returning: .init(
+                        item: item,
+                        width: Int(outputSize.width.rounded()),
+                        height: Int(outputSize.height.rounded()),
+                        durationSec: durationSec.isFinite ? durationSec : nil
+                    ))
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
 
     func runExport(

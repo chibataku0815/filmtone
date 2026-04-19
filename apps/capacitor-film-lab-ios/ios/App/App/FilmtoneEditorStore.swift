@@ -1,8 +1,9 @@
+import AVFoundation
 import Foundation
 import SwiftUI
 import UIKit
 
-struct FilmtonePreviewState {
+struct FilmtoneStillPreviewState {
     var originalPosterURI: String?
     var gradedPosterURI: String?
     var width: Int?
@@ -11,7 +12,103 @@ struct FilmtonePreviewState {
     var isRendering = false
     var error: String?
 
-    static let empty = FilmtonePreviewState()
+    static let empty = FilmtoneStillPreviewState()
+}
+
+enum FilmtoneVideoCompareMode: String {
+    case graded
+    case original
+}
+
+struct FilmtoneVideoPreviewState {
+    let player: AVPlayer
+    let compareMode: FilmtoneVideoCompareMode
+    let width: Int?
+    let height: Int?
+    let durationSec: Double?
+    let isPreparing: Bool
+    let error: String?
+}
+
+enum FilmtonePreviewState {
+    case empty
+    case still(FilmtoneStillPreviewState)
+    case video(FilmtoneVideoPreviewState)
+
+    var isRendering: Bool {
+        switch self {
+        case .empty:
+            return false
+        case .still(let preview):
+            return preview.isRendering
+        case .video(let preview):
+            return preview.isPreparing
+        }
+    }
+
+    var error: String? {
+        switch self {
+        case .empty:
+            return nil
+        case .still(let preview):
+            return preview.error
+        case .video(let preview):
+            return preview.error
+        }
+    }
+
+    var width: Int? {
+        switch self {
+        case .empty:
+            return nil
+        case .still(let preview):
+            return preview.width
+        case .video(let preview):
+            return preview.width
+        }
+    }
+
+    var height: Int? {
+        switch self {
+        case .empty:
+            return nil
+        case .still(let preview):
+            return preview.height
+        case .video(let preview):
+            return preview.height
+        }
+    }
+
+    var posterTimeSec: Double? {
+        guard case .still(let preview) = self else {
+            return nil
+        }
+        return preview.posterTimeSec
+    }
+
+    var durationSec: Double? {
+        guard case .video(let preview) = self else {
+            return nil
+        }
+        return preview.durationSec
+    }
+
+    var videoState: FilmtoneVideoPreviewState? {
+        guard case .video(let preview) = self else {
+            return nil
+        }
+        return preview
+    }
+
+    func stillDisplayURI(isComparing: Bool) -> String? {
+        guard case .still(let preview) = self else {
+            return nil
+        }
+        if isComparing {
+            return preview.originalPosterURI ?? preview.gradedPosterURI
+        }
+        return preview.gradedPosterURI ?? preview.originalPosterURI
+    }
 }
 
 enum FilmtoneSaveToPhotosState: String {
@@ -21,11 +118,174 @@ enum FilmtoneSaveToPhotosState: String {
 }
 
 @MainActor
+final class FilmtoneVideoPreviewSession {
+    let sourceURI: String
+    let player: AVPlayer
+
+    private(set) var originalItem: AVPlayerItem
+    private(set) var gradedItem: AVPlayerItem
+    private(set) var compareMode: FilmtoneVideoCompareMode
+    private(set) var currentTimeSec: Double
+    private(set) var isPreparing: Bool
+    private(set) var lastError: String?
+    private(set) var width: Int
+    private(set) var height: Int
+    private(set) var durationSec: Double?
+
+    private var timeObserver: Any?
+    private var transitionGeneration: UInt64 = 0
+    private var pendingPlaybackState: (time: CMTime, shouldPlay: Bool)?
+
+    init(
+        sourceURI: String,
+        original: FilmtonePreparedVideoPreviewItem,
+        graded: FilmtonePreparedVideoPreviewItem
+    ) {
+        self.sourceURI = sourceURI
+        self.player = AVPlayer(playerItem: graded.item)
+        self.originalItem = original.item
+        self.gradedItem = graded.item
+        self.compareMode = .graded
+        self.currentTimeSec = 0
+        self.isPreparing = false
+        self.lastError = nil
+        self.width = graded.width
+        self.height = graded.height
+        self.durationSec = graded.durationSec ?? original.durationSec
+        self.player.actionAtItemEnd = .pause
+        attachTimeObserver()
+    }
+
+    deinit {
+        if let timeObserver {
+            player.removeTimeObserver(timeObserver)
+        }
+    }
+
+    var snapshot: FilmtoneVideoPreviewState {
+        .init(
+            player: player,
+            compareMode: compareMode,
+            width: width,
+            height: height,
+            durationSec: durationSec,
+            isPreparing: isPreparing,
+            error: lastError
+        )
+    }
+
+    func beginPreparing() {
+        isPreparing = true
+    }
+
+    func setError(_ message: String?) {
+        lastError = message
+        isPreparing = false
+    }
+
+    func clearError() {
+        lastError = nil
+    }
+
+    func updatePreparedGradedItem(_ prepared: FilmtonePreparedVideoPreviewItem) async {
+        gradedItem = prepared.item
+        width = prepared.width
+        height = prepared.height
+        durationSec = prepared.durationSec ?? durationSec
+        lastError = nil
+        isPreparing = false
+
+        guard compareMode == .graded else {
+            return
+        }
+
+        let transition = beginTransition()
+        await replaceCurrentItem(
+            prepared.item,
+            preserving: transition.playbackState,
+            generation: transition.generation
+        )
+    }
+
+    func setCompareMode(_ mode: FilmtoneVideoCompareMode) async {
+        guard compareMode != mode else {
+            return
+        }
+
+        compareMode = mode
+        let transition = beginTransition()
+        await replaceCurrentItem(
+            item(for: mode),
+            preserving: transition.playbackState,
+            generation: transition.generation
+        )
+    }
+
+    private func item(for mode: FilmtoneVideoCompareMode) -> AVPlayerItem {
+        switch mode {
+        case .graded:
+            return gradedItem
+        case .original:
+            return originalItem
+        }
+    }
+
+    private func capturePlaybackState() -> (time: CMTime, shouldPlay: Bool) {
+        let time = player.currentTime()
+        let shouldPlay = player.timeControlStatus == .playing || player.rate > 0
+        return (time: time, shouldPlay: shouldPlay)
+    }
+
+    private func beginTransition() -> (
+        generation: UInt64,
+        playbackState: (time: CMTime, shouldPlay: Bool)
+    ) {
+        transitionGeneration += 1
+        let playbackState = pendingPlaybackState ?? capturePlaybackState()
+        pendingPlaybackState = playbackState
+        return (
+            generation: transitionGeneration,
+            playbackState: playbackState
+        )
+    }
+
+    private func replaceCurrentItem(
+        _ item: AVPlayerItem,
+        preserving playbackState: (time: CMTime, shouldPlay: Bool),
+        generation: UInt64
+    ) async {
+        player.pause()
+        player.replaceCurrentItem(with: item)
+        await player.filmtoneSeek(to: playbackState.time)
+        guard generation == transitionGeneration else {
+            return
+        }
+        currentTimeSec = CMTimeGetSeconds(playbackState.time).filmtoneSanitizedSeconds
+        pendingPlaybackState = nil
+        if playbackState.shouldPlay {
+            player.play()
+        }
+    }
+
+    private func attachTimeObserver() {
+        let interval = CMTime(seconds: 0.25, preferredTimescale: 600)
+        timeObserver = player.addPeriodicTimeObserver(
+            forInterval: interval,
+            queue: .main
+        ) { [weak self] time in
+            Task { @MainActor [weak self] in
+                self?.currentTimeSec = CMTimeGetSeconds(time).filmtoneSanitizedSeconds
+            }
+        }
+    }
+}
+
+@MainActor
 final class FilmtoneEditorStore: ObservableObject {
     @Published var project: FilmtoneProjectState
     @Published var source: SourceInfoDTO?
     @Published var probe: SourceProbeDTO?
-    @Published var preview = FilmtonePreviewState.empty
+    @Published var preview: FilmtonePreviewState = .empty
     @Published var isCompareHeld = false
     @Published var exportProgress: Phase0ExportProgressDTO?
     @Published var exportResult: Phase0ExportResultDTO?
@@ -37,6 +297,7 @@ final class FilmtoneEditorStore: ObservableObject {
     let strings: FilmtoneStrings
     private let facade: FilmtoneEditorFacade
     private var previewTask: Task<Void, Never>?
+    private var videoPreviewSession: FilmtoneVideoPreviewSession?
 
     init(facade: FilmtoneEditorFacade, strings: FilmtoneStrings = FilmtoneStringsCatalog.current) {
         self.facade = facade
@@ -76,10 +337,19 @@ final class FilmtoneEditorStore: ObservableObject {
     }
 
     var selectedPreviewURI: String? {
-        if isCompareHeld {
-            return preview.originalPosterURI ?? preview.gradedPosterURI
-        }
-        return preview.gradedPosterURI ?? preview.originalPosterURI
+        preview.stillDisplayURI(isComparing: isCompareHeld)
+    }
+
+    var videoPreviewState: FilmtoneVideoPreviewState? {
+        preview.videoState
+    }
+
+    var previewError: String? {
+        preview.error
+    }
+
+    var previewInteractionHint: String {
+        videoPreviewState != nil ? strings.previewVideoHint : strings.compareHint
     }
 
     var quickSummaryText: String {
@@ -142,8 +412,15 @@ final class FilmtoneEditorStore: ObservableObject {
             }
             return nil
         }()
-        let posterTime = preview.posterTimeSec.map(strings.compactDurationLabel)
-        return [dimensions, posterTime]
+
+        let timing: String? = {
+            if let durationSec = preview.durationSec ?? probe?.durationSec {
+                return strings.compactDurationLabel(durationSec)
+            }
+            return preview.posterTimeSec.map(strings.compactDurationLabel)
+        }()
+
+        return [dimensions, timing]
             .compactMap { $0 }
             .joined(separator: " · ")
             .nilIfEmpty
@@ -235,7 +512,18 @@ final class FilmtoneEditorStore: ObservableObject {
     }
 
     func setCompareHeld(_ isHeld: Bool) {
+        guard videoPreviewState == nil else {
+            return
+        }
         isCompareHeld = isHeld
+    }
+
+    func setVideoCompareMode(_ mode: FilmtoneVideoCompareMode) async {
+        guard let videoPreviewSession else {
+            return
+        }
+        await videoPreviewSession.setCompareMode(mode)
+        syncPreviewFromVideoSession()
     }
 
     func importInputLut() async {
@@ -339,19 +627,21 @@ final class FilmtoneEditorStore: ObservableObject {
     private func applyProbe(source: SourceInfoDTO, probe: SourceProbeDTO) {
         self.source = source
         self.probe = probe
-        preview = .empty
-        isCompareHeld = false
-        saveToPhotosState = .notRun
-        error = nil
-        notice = nil
-        exportResult = nil
-        exportProgress = nil
+        self.preview = .empty
+        self.videoPreviewSession = nil
+        self.isCompareHeld = false
+        self.saveToPhotosState = .notRun
+        self.error = nil
+        self.notice = nil
+        self.exportResult = nil
+        self.exportProgress = nil
     }
 
     private func schedulePreviewRender() {
         previewTask?.cancel()
 
-        guard source != nil else {
+        guard let source else {
+            videoPreviewSession = nil
             preview = .empty
             return
         }
@@ -361,7 +651,8 @@ final class FilmtoneEditorStore: ObservableObject {
 
             let violations = FilmtonePhase0Math.sourceCapViolations(for: self.probe)
             if !violations.isEmpty {
-                self.preview = .init(
+                self.videoPreviewSession = nil
+                self.preview = .still(.init(
                     originalPosterURI: nil,
                     gradedPosterURI: nil,
                     width: nil,
@@ -369,38 +660,146 @@ final class FilmtoneEditorStore: ObservableObject {
                     posterTimeSec: nil,
                     isRendering: false,
                     error: violations.joined(separator: "\n")
-                )
+                ))
                 return
             }
-
-            self.preview.isRendering = true
-            self.preview.error = nil
 
             do {
                 try await Task.sleep(nanoseconds: FilmtonePhase0Math.previewRenderDebounceNanoseconds)
                 try Task.checkCancellation()
+
                 let request = try FilmtonePhase0Math.buildExportRequest(
                     source: self.source,
                     probe: self.probe,
                     project: self.project
                 )
-                let result = try await self.facade.renderPreview(request: request)
-                try Task.checkCancellation()
-                self.preview = .init(
-                    originalPosterURI: result.originalUri,
-                    gradedPosterURI: result.gradedUri,
-                    width: result.width,
-                    height: result.height,
-                    posterTimeSec: result.posterTimeSec,
-                    isRendering: false,
-                    error: nil
-                )
+
+                switch source.kind {
+                case .image:
+                    self.videoPreviewSession = nil
+                    self.preview = .still(.init(isRendering: true))
+                    let result = try await self.facade.renderPreview(request: request)
+                    try Task.checkCancellation()
+                    self.preview = .still(.init(
+                        originalPosterURI: result.originalUri,
+                        gradedPosterURI: result.gradedUri,
+                        width: result.width,
+                        height: result.height,
+                        posterTimeSec: result.posterTimeSec,
+                        isRendering: false,
+                        error: nil
+                    ))
+
+                case .video:
+                    do {
+                        try await self.prepareVideoPreview(request: request, source: source)
+                    } catch is CancellationError {
+                        throw CancellationError()
+                    } catch {
+                        let fallbackError = self.strings.userMessage(for: error, context: .preview)
+                        if let videoPreviewSession = self.videoPreviewSession,
+                           videoPreviewSession.sourceURI == source.uri {
+                            videoPreviewSession.setError(fallbackError)
+                            self.syncPreviewFromVideoSession()
+                        } else {
+                            try await self.renderStillFallbackPreview(
+                                request: request,
+                                errorMessage: fallbackError
+                            )
+                        }
+                    }
+                }
             } catch is CancellationError {
                 return
             } catch {
-                self.preview.isRendering = false
-                self.preview.error = strings.userMessage(for: error, context: .preview)
+                self.videoPreviewSession = nil
+                self.preview = .still(.init(
+                    originalPosterURI: nil,
+                    gradedPosterURI: nil,
+                    width: nil,
+                    height: nil,
+                    posterTimeSec: nil,
+                    isRendering: false,
+                    error: strings.userMessage(for: error, context: .preview)
+                ))
             }
+        }
+    }
+
+    private func prepareVideoPreview(
+        request: Phase0ExportRequestDTO,
+        source: SourceInfoDTO
+    ) async throws {
+        if let videoPreviewSession, videoPreviewSession.sourceURI == source.uri {
+            videoPreviewSession.beginPreparing()
+            videoPreviewSession.clearError()
+            syncPreviewFromVideoSession()
+
+            let graded = try await facade.makeGradedPreviewItem(request: request)
+            try Task.checkCancellation()
+            await videoPreviewSession.updatePreparedGradedItem(graded)
+            syncPreviewFromVideoSession()
+            return
+        }
+
+        videoPreviewSession = nil
+        preview = .still(.init(isRendering: true))
+
+        async let originalPrepared = facade.makeOriginalPreviewItem(request: request)
+        async let gradedPrepared = facade.makeGradedPreviewItem(request: request)
+
+        let original = try await originalPrepared
+        let graded = try await gradedPrepared
+        try Task.checkCancellation()
+
+        let session = FilmtoneVideoPreviewSession(
+            sourceURI: source.uri,
+            original: original,
+            graded: graded
+        )
+        videoPreviewSession = session
+        syncPreviewFromVideoSession()
+    }
+
+    private func renderStillFallbackPreview(
+        request: Phase0ExportRequestDTO,
+        errorMessage: String
+    ) async throws {
+        videoPreviewSession = nil
+        preview = .still(.init(isRendering: true))
+
+        do {
+            let result = try await facade.renderPreview(request: request)
+            try Task.checkCancellation()
+            preview = .still(.init(
+                originalPosterURI: result.originalUri,
+                gradedPosterURI: result.gradedUri,
+                width: result.width,
+                height: result.height,
+                posterTimeSec: result.posterTimeSec,
+                isRendering: false,
+                error: errorMessage
+            ))
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            preview = .still(.init(
+                originalPosterURI: nil,
+                gradedPosterURI: nil,
+                width: nil,
+                height: nil,
+                posterTimeSec: nil,
+                isRendering: false,
+                error: errorMessage
+            ))
+        }
+    }
+
+    private func syncPreviewFromVideoSession() {
+        if let videoPreviewSession {
+            preview = .video(videoPreviewSession.snapshot)
+        } else if case .video = preview {
+            preview = .empty
         }
     }
 
@@ -411,6 +810,25 @@ final class FilmtoneEditorStore: ObservableObject {
     private static func signedPercentLabel(for value: Double) -> String {
         let sign = value > 0 ? "+" : ""
         return "\(sign)\(Int((value * 100).rounded()))%"
+    }
+}
+
+private extension AVPlayer {
+    func filmtoneSeek(to time: CMTime) async {
+        await withCheckedContinuation { continuation in
+            seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { _ in
+                continuation.resume()
+            }
+        }
+    }
+}
+
+private extension Double {
+    var filmtoneSanitizedSeconds: Double {
+        guard isFinite, !isNaN else {
+            return 0
+        }
+        return max(self, 0)
     }
 }
 
