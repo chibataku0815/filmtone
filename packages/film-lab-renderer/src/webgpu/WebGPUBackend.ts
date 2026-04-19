@@ -1,5 +1,6 @@
 /**
- * WebGPUBackend — Phase 2 T2-1 + T2-2 + T2-0b + T2-3 + T2-4.
+ * WebGPUBackend — Phase 2 T2-1 + T2-2 + T2-0b + T2-3 + T2-4 + Phase 3
+ * (Hard Mode temporal + central bloom + diffusion suppression + shafts).
  *
  * Full v1.0 render pipeline:
  *   1. filmlab → rt.colorGraded (`rgba16float`) — LUT1 → primary grade
@@ -12,17 +13,26 @@
  *      upsample chain with additive blend back to halation.L0 (6 mips).
  *   4. diffusion → diffusion.L0; 3-level full-image downsample/upsample
  *      chain from rt.colorGraded, reusing the composite's legacy grain
- *      texture slot for the top mip.
+ *      texture slot for the top mip. Skipped entirely when Hard-mode
+ *      cross-filter is active (WebGL parity).
  *   5. composite → rt.composited (`rgba16float`) — screen-blend glow
  *      shoulder, vignette, blue-noise grain (256² tile, DIRECTION §2).
- *   6. Post-chain:
- *      - Cross-filter ON (`crossFilterStrength > 0`): threshold → peak →
- *        optional spacing gate → directional streaks → blend into a
- *        full-res post-composite texture.
- *      - Motion blur ON (`shutterAngle > 0`): feedback copy into the
- *        ring (`depthOrArrayLayers=8`, DIRECTION §4) → weighted blend of
- *        the last N slots → swap.
+ *      Composite's diffusion uniform is forced to 0 when Hard-mode
+ *      cross-filter is active, independently of user's `diffusion` field.
+ *   6. Post-chain (active when `crossFilterStrength > 0` or
+ *      `shutterAngle > 0`):
+ *      - Cross-filter: threshold → peak → optional spacing gate →
+ *        (Hard-mode only) 2-slot half-res temporal hold → (Hard-mode
+ *        only) 4-level central-bloom mip chain seeded from held peaks →
+ *        directional streaks → blend with center-protection.
+ *      - Light Shafts (when `shaftIntensity > 0` and post chain active):
+ *        radial 64-tap occlusion at ¼ res → additive full-res blend.
+ *      - Motion blur (`shutterAngle > 0`): feedback copy into the ring
+ *        (`depthOrArrayLayers=8`, DIRECTION §4) → weighted blend of the
+ *        last N slots → swap.
  *      - Motion blur OFF: blit the post-composite source → swap.
+ *
+ *   Active WebGPU post tail: `CrossFilter → Shafts → MotionBlur`.
  *
  *   The swap pass output is always `rgba8unorm-srgb` so the hardware OETF
  *   handles the final linear → sRGB transform.
@@ -32,17 +42,19 @@
  *     uniforms it feeds are split between `GradeUniforms` (filmlab) and
  *     `CompositeUniforms` (bloom strength / halation intensity / grain /
  *     vignette). Bloom + halation shaping params (threshold, knee, radius,
- *     color) and motion blur (`shutterAngle`, `trailIntensity`,
- *     `motionThreshold`) are consumed directly by the post-chain
- *     bookkeeping.
+ *     color), motion blur (`shutterAngle`, `trailIntensity`,
+ *     `motionThreshold`), cross-filter (Hard Mode / temporal / spacing
+ *     state), and light shafts (`shaftIntensity`, `shaftDecay`,
+ *     `shaftOriginX`, `shaftOriginY`) are consumed directly by the
+ *     post-chain bookkeeping via `paramNumber(...)`.
  *   - `setLUT1` / `setLUT2` upload 3D LUTs (identity pre-uploaded at
  *     construction so the filmlab bind group is always valid).
  *   - `setMediaFromBitmap` / `setImageResolution` / `setFitMode` /
  *     `setTime` feed the remaining frame state.
  *
- * Still pending (Phase 3):
- *   - Cross-filter Hard Mode temporal / central bloom parity,
- *     split/A-B compare, dust.
+ * Explicit defers (v1 migration scope):
+ *   - Split / A-B compare (capability-gated off on WebGPU).
+ *   - Dust / Scratches (intentionally deferred beyond v1).
  */
 
 import {
@@ -73,6 +85,7 @@ import {
   crossFilterPeakSpacingMaxFragmentWgsl,
   crossFilterPeakSpacingFragmentWgsl,
   crossFilterStreakFragmentWgsl,
+  crossFilterTemporalFragmentWgsl,
   crossFilterBlendFragmentWgsl,
 } from "./shaders";
 import {
@@ -88,6 +101,11 @@ import {
   packCompositeUniforms,
   type CompositeFrameState,
 } from "./compositeUniforms";
+import {
+  effectiveDiffusionAmount,
+  isCrossFilterHardModeActive,
+  shouldResetCrossFilterHistory,
+} from "./crossFilterState";
 import type { RenderBackend, RenderBackendParams } from "./Backend";
 import type { ViewportCapabilities } from "../RendererRuntime";
 
@@ -108,6 +126,22 @@ const CROSS_FILTER_STREAK_BYTES = 48;
 const CROSS_FILTER_MAX_STREAKS = 4;
 const CROSS_FILTER_SPACING_RADIUS_MIN_PX = 2.0;
 const CROSS_FILTER_SPACING_RADIUS_MAX_PX = 48.0;
+/** Hard-mode temporal hold decay (WebGL parity, {@see crossFilterTemporalFragmentWgsl}). */
+const CROSS_FILTER_TEMPORAL_DECAY = 0.82;
+/** Number of cross-filter peak history ring slots (2 = ping-pong). */
+const CROSS_FILTER_HISTORY_SLOTS = 2;
+/** Hard-mode central bloom pyramid depth (WebGL parity). */
+const CENTRAL_BLOOM_LEVELS = 4;
+/** Central bloom upsample radius (fixed, WebGL parity). */
+const CENTRAL_BLOOM_RADIUS = 0.5;
+/** Light shafts quarter-resolution divisor (WebGL parity). */
+const LIGHTSHAFTS_RES_DIVISOR = 4;
+/** Light shafts radial sampling defaults (WebGL parity). */
+const LIGHTSHAFTS_DENSITY = 0.98;
+const LIGHTSHAFTS_EXPOSURE = 0.38;
+/** Light shafts uniform layouts. */
+const LIGHTSHAFTS_PARAMS_BYTES = 32;
+const LIGHTSHAFTS_BLEND_PARAMS_BYTES = 16;
 
 const DEFAULT_BLOOM_THRESHOLD = 0.8;
 const DEFAULT_BLOOM_KNEE = 0.5;
@@ -139,6 +173,7 @@ interface ShaderModules {
   crossFilterPeakSpacingMax: GPUShaderModule;
   crossFilterPeakSpacing: GPUShaderModule;
   crossFilterStreak: GPUShaderModule;
+  crossFilterTemporal: GPUShaderModule;
   crossFilterBlend: GPUShaderModule;
 }
 
@@ -160,7 +195,11 @@ interface Pipelines {
   crossFilterPeakSpacingMax: GPURenderPipeline;
   crossFilterPeakSpacing: GPURenderPipeline;
   crossFilterStreak: GPURenderPipeline;
+  crossFilterTemporal: GPURenderPipeline;
   crossFilterBlend: GPURenderPipeline;
+  /** Hard-mode central bloom reuses the generic `downsample` / `upsampleAdd` pipelines. */
+  lightshafts: GPURenderPipeline;
+  lightshaftsBlend: GPURenderPipeline;
 }
 
 interface PrefilterGroupLayouts {
@@ -172,7 +211,10 @@ interface PrefilterGroupLayouts {
   motionblurFeedback: GPUBindGroupLayout;
   motionblurBlend: GPUBindGroupLayout;
   crossFilterPeakSpacing: GPUBindGroupLayout;
+  crossFilterTemporal: GPUBindGroupLayout;
   crossFilterBlend: GPUBindGroupLayout;
+  lightshafts: GPUBindGroupLayout;
+  lightshaftsBlend: GPUBindGroupLayout;
 }
 
 /**
@@ -194,6 +236,7 @@ interface CrossFilterResources {
   readonly spacingMaxBuffers: GPUBuffer[];
   readonly spacingBuffer: GPUBuffer;
   readonly streakBuffers: GPUBuffer[];
+  readonly temporalBuffer: GPUBuffer;
   readonly blendBuffer: GPUBuffer;
   readonly blackTexture: GPUTexture;
   readonly thresholdScratch: Float32Array;
@@ -201,7 +244,15 @@ interface CrossFilterResources {
   readonly spacingMaxScratch: Float32Array[];
   readonly spacingScratch: Float32Array;
   readonly streakScratch: Float32Array[];
+  readonly temporalScratch: Float32Array;
   readonly blendScratch: Float32Array;
+}
+
+interface LightShaftsResources {
+  readonly paramsBuffer: GPUBuffer;
+  readonly blendParamsBuffer: GPUBuffer;
+  readonly paramsScratch: Float32Array;
+  readonly blendParamsScratch: Float32Array;
 }
 
 export class WebGPUBackend implements RenderBackend {
@@ -224,9 +275,11 @@ export class WebGPUBackend implements RenderBackend {
   private readonly bloomPyramid: PyramidResources;
   private readonly halationPyramid: PyramidResources;
   private readonly diffusionPyramid: PyramidResources;
+  private readonly centralBloomPyramid: PyramidResources;
   private readonly motionblurFeedbackBuffer: GPUBuffer;
   private readonly motionblurBlendBuffer: GPUBuffer;
   private readonly crossFilter: CrossFilterResources;
+  private readonly lightShafts: LightShaftsResources;
   private readonly sampler: GPUSampler;
   private readonly grainSampler: GPUSampler;
   private readonly grainTexture: GPUTexture;
@@ -252,6 +305,23 @@ export class WebGPUBackend implements RenderBackend {
   private readbackBufferSize = 0;
   private hasReadableFrame = false;
   private frameState: GradeFrameState;
+  /**
+   * Hard-mode temporal hold bookkeeping — WebGL parity.
+   *
+   * The two half-resolution history textures are managed by
+   * `OffscreenTargetPool` under dedicated labels
+   * (`rt.crossfilter.peak-history.{0,1}`). They persist as long as the
+   * resolution is unchanged, so the ping-pong remains valid across frames.
+   * The counters below get reset whenever the history should be treated as
+   * empty — resolution changes, `crossFilterStrength` transitions to 0,
+   * `crossFilterHardMode` flips, or `crossFilterMinSpacing` crosses an
+   * epsilon.
+   */
+  private crossFilterPeakHistoryWriteIndex = 0;
+  private crossFilterPeakHistoryFilledFrames = 0;
+  private lastCrossFilterStrength = 0;
+  private lastCrossFilterHardMode: 0 | 1 = 0;
+  private lastCrossFilterMinSpacing = 0;
 
   private constructor(
     ctx: GpuContext,
@@ -272,9 +342,11 @@ export class WebGPUBackend implements RenderBackend {
     bloomPyramid: PyramidResources,
     halationPyramid: PyramidResources,
     diffusionPyramid: PyramidResources,
+    centralBloomPyramid: PyramidResources,
     motionblurFeedbackBuffer: GPUBuffer,
     motionblurBlendBuffer: GPUBuffer,
     crossFilter: CrossFilterResources,
+    lightShafts: LightShaftsResources,
     sampler: GPUSampler,
     grainSampler: GPUSampler,
     grainTexture: GPUTexture,
@@ -301,9 +373,11 @@ export class WebGPUBackend implements RenderBackend {
     this.bloomPyramid = bloomPyramid;
     this.halationPyramid = halationPyramid;
     this.diffusionPyramid = diffusionPyramid;
+    this.centralBloomPyramid = centralBloomPyramid;
     this.motionblurFeedbackBuffer = motionblurFeedbackBuffer;
     this.motionblurBlendBuffer = motionblurBlendBuffer;
     this.crossFilter = crossFilter;
+    this.lightShafts = lightShafts;
     this.sampler = sampler;
     this.grainSampler = grainSampler;
     this.grainTexture = grainTexture;
@@ -366,6 +440,10 @@ export class WebGPUBackend implements RenderBackend {
         crossFilterPeakSpacingFragmentWgsl,
       ),
       crossFilterStreak: await make("cross-filter-streak.frag", crossFilterStreakFragmentWgsl),
+      crossFilterTemporal: await make(
+        "cross-filter-temporal.frag",
+        crossFilterTemporalFragmentWgsl,
+      ),
       crossFilterBlend: await make("cross-filter-blend.frag", crossFilterBlendFragmentWgsl),
     };
 
@@ -473,6 +551,38 @@ export class WebGPUBackend implements RenderBackend {
         { binding: 5, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
         { binding: 6, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
         { binding: 7, visibility: GPUShaderStage.FRAGMENT, sampler: { type: "filtering" } },
+      ],
+    });
+
+    // Hard-mode temporal hold: `(uniform, uSource, uPrev, uSampler)`.
+    const crossFilterTemporalGroupLayout = device.createBindGroupLayout({
+      label: "crossfilter.temporal.group1",
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: "uniform" } },
+        { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
+        { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
+        { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: { type: "filtering" } },
+      ],
+    });
+
+    // Light shafts 9a (radial blur): `(uniform, uSource, uSampler)`.
+    const lightshaftsGroupLayout = device.createBindGroupLayout({
+      label: "lightshafts.group1",
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: "uniform" } },
+        { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
+        { binding: 2, visibility: GPUShaderStage.FRAGMENT, sampler: { type: "filtering" } },
+      ],
+    });
+
+    // Light shafts 9b (additive blend): `(uniform, uScene, uShafts, uSampler)`.
+    const lightshaftsBlendGroupLayout = device.createBindGroupLayout({
+      label: "lightshafts.blend.group1",
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: "uniform" } },
+        { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
+        { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
+        { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: { type: "filtering" } },
       ],
     });
 
@@ -702,6 +812,54 @@ export class WebGPUBackend implements RenderBackend {
       }),
     );
 
+    const crossFilterTemporalPipeline = await ctx.withValidationScope(() =>
+      device.createRenderPipeline({
+        label: "crossfilter.temporal",
+        layout: device.createPipelineLayout({
+          bindGroupLayouts: [flagsLayout, crossFilterTemporalGroupLayout],
+        }),
+        vertex: { module: modules.vert, entryPoint: "vs_main" },
+        fragment: {
+          module: modules.crossFilterTemporal,
+          entryPoint: "fs_main",
+          targets: [{ format: "rgba16float" }],
+        },
+        primitive: { topology: "triangle-list" },
+      }),
+    );
+
+    const lightshaftsPipeline = await ctx.withValidationScope(() =>
+      device.createRenderPipeline({
+        label: "lightshafts.radial",
+        layout: device.createPipelineLayout({
+          bindGroupLayouts: [flagsLayout, lightshaftsGroupLayout],
+        }),
+        vertex: { module: modules.vert, entryPoint: "vs_main" },
+        fragment: {
+          module: modules.lightshafts,
+          entryPoint: "fs_main",
+          targets: [{ format: "rgba16float" }],
+        },
+        primitive: { topology: "triangle-list" },
+      }),
+    );
+
+    const lightshaftsBlendPipeline = await ctx.withValidationScope(() =>
+      device.createRenderPipeline({
+        label: "lightshafts.blend",
+        layout: device.createPipelineLayout({
+          bindGroupLayouts: [flagsLayout, lightshaftsBlendGroupLayout],
+        }),
+        vertex: { module: modules.vert, entryPoint: "vs_main" },
+        fragment: {
+          module: modules.lightshaftsBlend,
+          entryPoint: "fs_main",
+          targets: [{ format: "rgba16float" }],
+        },
+        primitive: { topology: "triangle-list" },
+      }),
+    );
+
     const displayFlagsBuffer = device.createBuffer({
       label: "frame.flags.display",
       size: 16,
@@ -790,6 +948,7 @@ export class WebGPUBackend implements RenderBackend {
     const bloomPyramid = makePyramid("bloom", BLOOM_LEVELS);
     const halationPyramid = makePyramid("halation", HALATION_LEVELS);
     const diffusionPyramid = makePyramid("diffusion", DIFFUSION_LEVELS);
+    const centralBloomPyramid = makePyramid("centralBloom", CENTRAL_BLOOM_LEVELS);
 
     const motionblurFeedbackBuffer = device.createBuffer({
       label: "motionblur.feedback.params",
@@ -844,6 +1003,24 @@ export class WebGPUBackend implements RenderBackend {
     const crossFilterBlendBuffer = device.createBuffer({
       label: "crossfilter.blend.params",
       size: CROSS_FILTER_PARAMS_BYTES,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+
+    const crossFilterTemporalBuffer = device.createBuffer({
+      label: "crossfilter.temporal.params",
+      size: CROSS_FILTER_PARAMS_BYTES,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+
+    const lightshaftsBuffer = device.createBuffer({
+      label: "lightshafts.params",
+      size: LIGHTSHAFTS_PARAMS_BYTES,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+
+    const lightshaftsBlendBuffer = device.createBuffer({
+      label: "lightshafts.blend.params",
+      size: LIGHTSHAFTS_BLEND_PARAMS_BYTES,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
@@ -919,7 +1096,10 @@ export class WebGPUBackend implements RenderBackend {
         crossFilterPeakSpacingMax: crossFilterPeakSpacingMaxPipeline,
         crossFilterPeakSpacing: crossFilterPeakSpacingPipeline,
         crossFilterStreak: crossFilterStreakPipeline,
+        crossFilterTemporal: crossFilterTemporalPipeline,
         crossFilterBlend: crossFilterBlendPipeline,
+        lightshafts: lightshaftsPipeline,
+        lightshaftsBlend: lightshaftsBlendPipeline,
       },
       {
         bloom: pyramidGroupLayout,
@@ -930,7 +1110,10 @@ export class WebGPUBackend implements RenderBackend {
         motionblurFeedback: motionblurFeedbackGroupLayout,
         motionblurBlend: motionblurBlendGroupLayout,
         crossFilterPeakSpacing: crossFilterPeakSpacingGroupLayout,
+        crossFilterTemporal: crossFilterTemporalGroupLayout,
         crossFilterBlend: crossFilterBlendGroupLayout,
+        lightshafts: lightshaftsGroupLayout,
+        lightshaftsBlend: lightshaftsBlendGroupLayout,
       },
       displayFlagsBuffer,
       offscreenFlagsBuffer,
@@ -945,6 +1128,7 @@ export class WebGPUBackend implements RenderBackend {
       bloomPyramid,
       halationPyramid,
       diffusionPyramid,
+      centralBloomPyramid,
       motionblurFeedbackBuffer,
       motionblurBlendBuffer,
       {
@@ -953,6 +1137,7 @@ export class WebGPUBackend implements RenderBackend {
         spacingMaxBuffers: crossFilterSpacingMaxBuffers,
         spacingBuffer: crossFilterSpacingBuffer,
         streakBuffers: crossFilterStreakBuffers,
+        temporalBuffer: crossFilterTemporalBuffer,
         blendBuffer: crossFilterBlendBuffer,
         blackTexture: crossFilterBlackTexture,
         thresholdScratch: new Float32Array(CROSS_FILTER_PARAMS_BYTES / 4),
@@ -966,7 +1151,14 @@ export class WebGPUBackend implements RenderBackend {
           { length: CROSS_FILTER_MAX_STREAKS },
           () => new Float32Array(CROSS_FILTER_STREAK_BYTES / 4),
         ),
+        temporalScratch: new Float32Array(CROSS_FILTER_PARAMS_BYTES / 4),
         blendScratch: new Float32Array(CROSS_FILTER_PARAMS_BYTES / 4),
+      },
+      {
+        paramsBuffer: lightshaftsBuffer,
+        blendParamsBuffer: lightshaftsBlendBuffer,
+        paramsScratch: new Float32Array(LIGHTSHAFTS_PARAMS_BYTES / 4),
+        blendParamsScratch: new Float32Array(LIGHTSHAFTS_BLEND_PARAMS_BYTES / 4),
       },
       sampler,
       grainSampler,
@@ -1227,7 +1419,7 @@ export class WebGPUBackend implements RenderBackend {
     return typeof v === "string" ? v : fallback;
   }
 
-  private uploadFrameUniforms(): void {
+  private uploadFrameUniforms(suppressDiffusion: boolean): void {
     const { device } = this.ctx;
 
     // Grade uniforms — filmlab path.
@@ -1256,6 +1448,13 @@ export class WebGPUBackend implements RenderBackend {
       params: this.frameState.params,
     };
     packCompositeUniforms(compositeState, this.compositeScratch);
+    // Hard-mode cross-filter suppresses global diffusion at the
+    // composite-input level (WebGL parity). The user's `diffusion` field
+    // stays untouched in `frameState.params`; we simply zero the packed
+    // uniform slot for this frame so `composite.wgsl` sees `diffusion=0`.
+    if (suppressDiffusion) {
+      this.compositeScratch[14] = 0;
+    }
     device.queue.writeBuffer(
       this.compositeBuffer,
       0,
@@ -1607,6 +1806,346 @@ export class WebGPUBackend implements RenderBackend {
     return levels[0]!;
   }
 
+  /**
+   * Hard-mode cross-filter uses a 2-slot half-resolution history for
+   * temporal hold. WebGL resets that history under four conditions:
+   *   1. resolution change (handled in `setResolution`)
+   *   2. `crossFilterStrength` transitions to 0
+   *   3. `crossFilterHardMode` flip (0 ↔ 1)
+   *   4. `crossFilterMinSpacing` crosses a small epsilon
+   *
+   * The latter three are detected here by snapshotting last-frame values.
+   */
+  private maybeResetCrossFilterHistory(
+    strength: number,
+    hardMode: 0 | 1,
+    minSpacing: number,
+  ): void {
+    const reset = shouldResetCrossFilterHistory(
+      {
+        strength: this.lastCrossFilterStrength,
+        hardMode: this.lastCrossFilterHardMode,
+        minSpacing: this.lastCrossFilterMinSpacing,
+      },
+      { strength, hardMode, minSpacing },
+    );
+    if (reset) {
+      this.crossFilterPeakHistoryWriteIndex = 0;
+      this.crossFilterPeakHistoryFilledFrames = 0;
+    }
+    this.lastCrossFilterStrength = strength;
+    this.lastCrossFilterHardMode = hardMode;
+    this.lastCrossFilterMinSpacing = minSpacing;
+  }
+
+  /**
+   * Hard-mode central bloom, 4-level pyramid. WebGL parity:
+   *   1. seed mip 0 by downsampling the held peak mask (not the raw
+   *      threshold).
+   *   2. progressive downsample mip 0 → mip 3.
+   *   3. additive upsample back to mip 0 with fixed radius 0.5.
+   *
+   * Returns mip 0 so the caller can feed it to the cross-filter blend
+   * shader's `uCentralBloom` binding. Mip 0 runs at quarter-resolution of
+   * the full output (the held peak texture is half-res, then we halve
+   * again on seed).
+   */
+  private renderCentralBloom(
+    encoder: GPUCommandEncoder,
+    heldPeakTexture: GPUTexture,
+  ): GPUTexture {
+    const { device } = this.ctx;
+    const halfWidth = Math.max(1, Math.floor(this._width / 2));
+    const halfHeight = Math.max(1, Math.floor(this._height / 2));
+    const levels: GPUTexture[] = [];
+    for (let i = 0; i < CENTRAL_BLOOM_LEVELS; i++) {
+      const divisor = 2 ** (i + 1);
+      const w = Math.max(1, Math.floor(halfWidth / divisor));
+      const h = Math.max(1, Math.floor(halfHeight / divisor));
+      levels.push(
+        this.pool.get(`rt.crossfilter.central-bloom.${i}`, {
+          width: w,
+          height: h,
+          format: "rgba16float",
+        }),
+      );
+    }
+    const weights = WebGPUBackend.computeMipWeights(
+      CENTRAL_BLOOM_RADIUS,
+      levels.length,
+    );
+
+    const sourceView = heldPeakTexture.createView();
+
+    // Step 1 — seed mip 0 via `downsample` pipeline (not prefilter):
+    // heldPeak (half-res) → mip 0 (half-res / 2).
+    {
+      const scratch = this.centralBloomPyramid.downsampleScratch[0]!;
+      scratch[0] = 1 / heldPeakTexture.width;
+      scratch[1] = 1 / heldPeakTexture.height;
+      scratch[2] = 0;
+      scratch[3] = 0;
+      device.queue.writeBuffer(
+        this.centralBloomPyramid.downsample[0]!,
+        0,
+        scratch.buffer,
+        scratch.byteOffset,
+        scratch.byteLength,
+      );
+      const bg = device.createBindGroup({
+        label: "centralBloom.seed.bg",
+        layout: this.layouts.pyramid,
+        entries: [
+          { binding: 0, resource: { buffer: this.centralBloomPyramid.downsample[0]! } },
+          { binding: 1, resource: sourceView },
+          { binding: 2, resource: this.sampler },
+        ],
+      });
+      const pass = encoder.beginRenderPass({
+        label: "centralBloom.seed",
+        colorAttachments: [
+          {
+            view: levels[0]!.createView(),
+            loadOp: "clear",
+            storeOp: "store",
+            clearValue: { r: 0, g: 0, b: 0, a: 1 },
+          },
+        ],
+      });
+      pass.setPipeline(this.pipelines.downsample);
+      // Central bloom rides on the cross-filter (no-flip) contract for
+      // every pass — mip 0 is sampled by `crossfilter.blend` alongside
+      // the streak textures, which are themselves written under the
+      // cross-filter contract. The generic bloom/halation pyramids use
+      // the offscreen contract because they feed composite (which runs
+      // under offscreen flags); this pyramid must NOT inherit that.
+      pass.setBindGroup(0, this.crossFilterFlagsBindGroup);
+      pass.setBindGroup(1, bg);
+      pass.draw(3, 1, 0, 0);
+      pass.end();
+    }
+
+    // Step 2 — progressive downsample mip[i-1] → mip[i].
+    for (let i = 1; i < levels.length; i++) {
+      const src = levels[i - 1]!;
+      const dst = levels[i]!;
+      const scratch = this.centralBloomPyramid.downsampleScratch[i]!;
+      scratch[0] = 1 / src.width;
+      scratch[1] = 1 / src.height;
+      scratch[2] = 0;
+      scratch[3] = 0;
+      device.queue.writeBuffer(
+        this.centralBloomPyramid.downsample[i]!,
+        0,
+        scratch.buffer,
+        scratch.byteOffset,
+        scratch.byteLength,
+      );
+      const bg = device.createBindGroup({
+        label: `centralBloom.downsample.${i}.bg`,
+        layout: this.layouts.pyramid,
+        entries: [
+          { binding: 0, resource: { buffer: this.centralBloomPyramid.downsample[i]! } },
+          { binding: 1, resource: src.createView() },
+          { binding: 2, resource: this.sampler },
+        ],
+      });
+      const pass = encoder.beginRenderPass({
+        label: `centralBloom.downsample.${i}`,
+        colorAttachments: [
+          {
+            view: dst.createView(),
+            loadOp: "clear",
+            storeOp: "store",
+            clearValue: { r: 0, g: 0, b: 0, a: 1 },
+          },
+        ],
+      });
+      pass.setPipeline(this.pipelines.downsample);
+      pass.setBindGroup(0, this.crossFilterFlagsBindGroup);
+      pass.setBindGroup(1, bg);
+      pass.draw(3, 1, 0, 0);
+      pass.end();
+    }
+
+    // Step 3 — additive upsample back to mip 0.
+    for (let i = levels.length - 2; i >= 0; i--) {
+      const lowRes = levels[i + 1]!;
+      const highRes = levels[i]!;
+      const scratch = this.centralBloomPyramid.upsampleScratch[i]!;
+      scratch[0] = 1 / lowRes.width;
+      scratch[1] = 1 / lowRes.height;
+      scratch[2] = weights[i + 1]!;
+      scratch[3] = 0;
+      device.queue.writeBuffer(
+        this.centralBloomPyramid.upsample[i]!,
+        0,
+        scratch.buffer,
+        scratch.byteOffset,
+        scratch.byteLength,
+      );
+      const bg = device.createBindGroup({
+        label: `centralBloom.upsample.${i}.bg`,
+        layout: this.layouts.pyramid,
+        entries: [
+          { binding: 0, resource: { buffer: this.centralBloomPyramid.upsample[i]! } },
+          { binding: 1, resource: lowRes.createView() },
+          { binding: 2, resource: this.sampler },
+        ],
+      });
+      const pass = encoder.beginRenderPass({
+        label: `centralBloom.upsample.${i}`,
+        colorAttachments: [
+          {
+            view: highRes.createView(),
+            loadOp: "load",
+            storeOp: "store",
+          },
+        ],
+      });
+      pass.setPipeline(this.pipelines.upsampleAdd);
+      pass.setBindGroup(0, this.crossFilterFlagsBindGroup);
+      pass.setBindGroup(1, bg);
+      pass.draw(3, 1, 0, 0);
+      pass.end();
+    }
+
+    return levels[0]!;
+  }
+
+  /**
+   * Light shafts two-sub-pass rendering (WebGL parity):
+   *   9a: radial blur at 1/4 resolution (64 taps, luminance threshold).
+   *   9b: additive blend at full resolution.
+   *
+   * Returns a full-resolution texture the caller can feed to the next post
+   * stage (motion blur / blit). Preserves WebGL activation semantics — the
+   * caller is responsible for the `shaftIntensity > 0 && (crossFilter ||
+   * motionBlur) active` gate.
+   */
+  private renderLightShafts(
+    encoder: GPUCommandEncoder,
+    sourceTexture: GPUTexture,
+  ): GPUTexture {
+    const { device } = this.ctx;
+    const shaftWidth = Math.max(1, Math.floor(this._width / LIGHTSHAFTS_RES_DIVISOR));
+    const shaftHeight = Math.max(1, Math.floor(this._height / LIGHTSHAFTS_RES_DIVISOR));
+    const shaftTexture = this.pool.get("rt.lightshafts.quarter", {
+      width: shaftWidth,
+      height: shaftHeight,
+      format: "rgba16float",
+    });
+    const blendOutput = this.pool.get("rt.lightshafts.output", {
+      width: this._width,
+      height: this._height,
+      format: "rgba16float",
+    });
+
+    const originX = Math.min(1, Math.max(0, this.paramNumber("shaftOriginX", 0.5)));
+    const originYParam = Math.min(1, Math.max(0, this.paramNumber("shaftOriginY", 0.85)));
+    const shaftDecay = Math.min(1, Math.max(0, this.paramNumber("shaftDecay", 0)));
+    const shaftIntensity = Math.min(
+      1,
+      Math.max(0, this.paramNumber("shaftIntensity", 0)),
+    );
+    const decay = 0.92 + shaftDecay * 0.075;
+
+    // Pack shaft shader params: (originX, 1-originY, decay, density), (exposure, _, _, _).
+    const paramsScratch = this.lightShafts.paramsScratch;
+    paramsScratch[0] = originX;
+    paramsScratch[1] = 1 - originYParam;
+    paramsScratch[2] = decay;
+    paramsScratch[3] = LIGHTSHAFTS_DENSITY;
+    paramsScratch[4] = LIGHTSHAFTS_EXPOSURE;
+    paramsScratch[5] = 0;
+    paramsScratch[6] = 0;
+    paramsScratch[7] = 0;
+    device.queue.writeBuffer(
+      this.lightShafts.paramsBuffer,
+      0,
+      paramsScratch.buffer,
+      paramsScratch.byteOffset,
+      paramsScratch.byteLength,
+    );
+
+    const sourceView = sourceTexture.createView();
+    {
+      const bg = device.createBindGroup({
+        label: "lightshafts.radial.bg",
+        layout: this.layouts.lightshafts,
+        entries: [
+          { binding: 0, resource: { buffer: this.lightShafts.paramsBuffer } },
+          { binding: 1, resource: sourceView },
+          { binding: 2, resource: this.sampler },
+        ],
+      });
+      const pass = encoder.beginRenderPass({
+        label: "lightshafts.radial",
+        colorAttachments: [
+          {
+            view: shaftTexture.createView(),
+            loadOp: "clear",
+            storeOp: "store",
+            clearValue: { r: 0, g: 0, b: 0, a: 1 },
+          },
+        ],
+      });
+      pass.setPipeline(this.pipelines.lightshafts);
+      // Light shafts must stay on the no-flip (cross-filter) contract for
+      // both subpasses. The blend pass samples uScene (post-composite,
+      // upright) and uShafts at the same UV; inheriting the offscreen
+      // (flipY=0 → flips) contract here would invert the shaft RT
+      // relative to the scene input and desync origin / decay.
+      pass.setBindGroup(0, this.crossFilterFlagsBindGroup);
+      pass.setBindGroup(1, bg);
+      pass.draw(3, 1, 0, 0);
+      pass.end();
+    }
+
+    const blendParamsScratch = this.lightShafts.blendParamsScratch;
+    blendParamsScratch[0] = shaftIntensity;
+    blendParamsScratch[1] = 0;
+    blendParamsScratch[2] = 0;
+    blendParamsScratch[3] = 0;
+    device.queue.writeBuffer(
+      this.lightShafts.blendParamsBuffer,
+      0,
+      blendParamsScratch.buffer,
+      blendParamsScratch.byteOffset,
+      blendParamsScratch.byteLength,
+    );
+    {
+      const bg = device.createBindGroup({
+        label: "lightshafts.blend.bg",
+        layout: this.layouts.lightshaftsBlend,
+        entries: [
+          { binding: 0, resource: { buffer: this.lightShafts.blendParamsBuffer } },
+          { binding: 1, resource: sourceView },
+          { binding: 2, resource: shaftTexture.createView() },
+          { binding: 3, resource: this.sampler },
+        ],
+      });
+      const pass = encoder.beginRenderPass({
+        label: "lightshafts.blend",
+        colorAttachments: [
+          {
+            view: blendOutput.createView(),
+            loadOp: "clear",
+            storeOp: "store",
+            clearValue: { r: 0, g: 0, b: 0, a: 1 },
+          },
+        ],
+      });
+      pass.setPipeline(this.pipelines.lightshaftsBlend);
+      pass.setBindGroup(0, this.crossFilterFlagsBindGroup);
+      pass.setBindGroup(1, bg);
+      pass.draw(3, 1, 0, 0);
+      pass.end();
+    }
+
+    return blendOutput;
+  }
+
   private renderCrossFilter(
     encoder: GPUCommandEncoder,
     sourceTexture: GPUTexture,
@@ -1898,6 +2437,93 @@ export class WebGPUBackend implements RenderBackend {
       currentPeakTexture = spacingTexture;
     }
 
+    // Hard-mode temporal hold (WebGL parity) — runs after peak detection
+    // and optional spacing suppression, before central bloom + streak
+    // generation. Held peaks feed both central bloom and the streak march.
+    let heldPeakTexture = currentPeakTexture;
+    if (hardModeActive) {
+      const historyTextures = [
+        this.pool.get("rt.crossfilter.peak-history.0", {
+          width: halfWidth,
+          height: halfHeight,
+          format: "rgba16float",
+        }),
+        this.pool.get("rt.crossfilter.peak-history.1", {
+          width: halfWidth,
+          height: halfHeight,
+          format: "rgba16float",
+        }),
+      ];
+      const writeIndex =
+        this.crossFilterPeakHistoryWriteIndex % CROSS_FILTER_HISTORY_SLOTS;
+      const prevIndex =
+        (writeIndex + CROSS_FILTER_HISTORY_SLOTS - 1) % CROSS_FILTER_HISTORY_SLOTS;
+      const prevTexture =
+        this.crossFilterPeakHistoryFilledFrames > 0
+          ? historyTextures[prevIndex]!
+          : this.crossFilter.blackTexture;
+      const writeTexture = historyTextures[writeIndex]!;
+
+      this.crossFilter.temporalScratch[0] = CROSS_FILTER_TEMPORAL_DECAY;
+      this.crossFilter.temporalScratch[1] = 0;
+      this.crossFilter.temporalScratch[2] = 0;
+      this.crossFilter.temporalScratch[3] = 0;
+      device.queue.writeBuffer(
+        this.crossFilter.temporalBuffer,
+        0,
+        this.crossFilter.temporalScratch.buffer,
+        this.crossFilter.temporalScratch.byteOffset,
+        this.crossFilter.temporalScratch.byteLength,
+      );
+      const temporalBg = device.createBindGroup({
+        label: "crossfilter.temporal.bg",
+        layout: this.layouts.crossFilterTemporal,
+        entries: [
+          { binding: 0, resource: { buffer: this.crossFilter.temporalBuffer } },
+          { binding: 1, resource: currentPeakTexture.createView() },
+          { binding: 2, resource: prevTexture.createView() },
+          { binding: 3, resource: this.sampler },
+        ],
+      });
+      const pass = encoder.beginRenderPass({
+        label: "crossfilter.temporal",
+        colorAttachments: [
+          {
+            view: writeTexture.createView(),
+            loadOp: "clear",
+            storeOp: "store",
+            clearValue: { r: 0, g: 0, b: 0, a: 1 },
+          },
+        ],
+      });
+      pass.setPipeline(this.pipelines.crossFilterTemporal);
+      // Stay on the cross-filter (no-flip) contract so heldPeakTexture
+      // shares the upright row order with the rest of the post-peak
+      // subchain (spacing → streak → blend). Using the offscreen contract
+      // here would inject an asymmetric Y flip and mirror the held peak
+      // mask relative to the source frame.
+      pass.setBindGroup(0, this.crossFilterFlagsBindGroup);
+      pass.setBindGroup(1, temporalBg);
+      pass.draw(3, 1, 0, 0);
+      pass.end();
+
+      heldPeakTexture = writeTexture;
+      this.crossFilterPeakHistoryWriteIndex =
+        (writeIndex + 1) % CROSS_FILTER_HISTORY_SLOTS;
+      this.crossFilterPeakHistoryFilledFrames = Math.min(
+        this.crossFilterPeakHistoryFilledFrames + 1,
+        CROSS_FILTER_HISTORY_SLOTS,
+      );
+    }
+
+    // Hard-mode central bloom (skipped entirely in Soft Mode; the blend
+    // shader multiplies the bloom term by `uHardMode` so a black texture
+    // would zero it out, but building the pyramid anyway wastes GPU time).
+    let centralBloomTexture: GPUTexture | null = null;
+    if (hardModeActive) {
+      centralBloomTexture = this.renderCentralBloom(encoder, heldPeakTexture);
+    }
+
     const hash = (seed: number): number => {
       const value = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
       return value - Math.floor(value);
@@ -1912,8 +2538,8 @@ export class WebGPUBackend implements RenderBackend {
       const streakScratch = this.crossFilter.streakScratch[i]!;
       streakScratch[0] = Math.cos(dirAngle);
       streakScratch[1] = Math.sin(dirAngle);
-      streakScratch[2] = 1 / currentPeakTexture.width;
-      streakScratch[3] = 1 / currentPeakTexture.height;
+      streakScratch[2] = 1 / heldPeakTexture.width;
+      streakScratch[3] = 1 / heldPeakTexture.height;
       streakScratch[4] = length * lengthMul;
       streakScratch[5] = chromatic;
       streakScratch[6] = brightMul;
@@ -1934,7 +2560,7 @@ export class WebGPUBackend implements RenderBackend {
         layout: this.layouts.pyramid,
         entries: [
           { binding: 0, resource: { buffer: this.crossFilter.streakBuffers[i]! } },
-          { binding: 1, resource: currentPeakTexture.createView() },
+          { binding: 1, resource: heldPeakTexture.createView() },
           { binding: 2, resource: this.sampler },
         ],
       });
@@ -1968,6 +2594,9 @@ export class WebGPUBackend implements RenderBackend {
       this.crossFilter.blendScratch.byteLength,
     );
     {
+      const centralBloomView = centralBloomTexture
+        ? centralBloomTexture.createView()
+        : blackView;
       const blendEntries: GPUBindGroupEntry[] = [
         { binding: 0, resource: { buffer: this.crossFilter.blendBuffer } },
         { binding: 1, resource: sourceView },
@@ -1975,7 +2604,7 @@ export class WebGPUBackend implements RenderBackend {
         { binding: 3, resource: dirCount >= 2 ? streakTextures[1]!.createView() : blackView },
         { binding: 4, resource: dirCount >= 3 ? streakTextures[2]!.createView() : blackView },
         { binding: 5, resource: dirCount >= 4 ? streakTextures[3]!.createView() : blackView },
-        { binding: 6, resource: blackView },
+        { binding: 6, resource: centralBloomView },
         { binding: 7, resource: this.sampler },
       ];
       const bg = device.createBindGroup({
@@ -2067,7 +2696,31 @@ export class WebGPUBackend implements RenderBackend {
     const mediaTexture = this.getActiveMediaTexture(allowPlaceholderMedia);
     if (!mediaTexture) return;
     const { device } = this.ctx;
-    this.uploadFrameUniforms();
+
+    // Cross-filter hard-mode gate is needed before uniform upload because
+    // the composite uniform zeroes its diffusion slot when hard mode is
+    // active. It also drives the temporal-history reset heuristic.
+    const crossFilterStrength = Math.min(
+      1,
+      Math.max(0, this.paramNumber("crossFilterStrength", 0)),
+    );
+    const crossFilterHardModeRaw = this.paramNumber("crossFilterHardMode", 0);
+    const crossFilterHardMode = crossFilterHardModeRaw >= 0.5 ? 1 : 0;
+    const crossFilterMinSpacing = Math.min(
+      1,
+      Math.max(0, this.paramNumber("crossFilterMinSpacing", 0)),
+    );
+    this.maybeResetCrossFilterHistory(
+      crossFilterStrength,
+      crossFilterHardMode,
+      crossFilterMinSpacing,
+    );
+    const hardModeActive = isCrossFilterHardModeActive(
+      crossFilterStrength,
+      crossFilterHardMode,
+    );
+
+    this.uploadFrameUniforms(hardModeActive);
 
     const rtColorGraded = this.pool.get("rt.colorGraded", {
       width: this._width,
@@ -2081,7 +2734,13 @@ export class WebGPUBackend implements RenderBackend {
     });
     const bloomLevels = this.ensurePyramidLevels("rt.bloom", BLOOM_LEVELS);
     const halationLevels = this.ensurePyramidLevels("rt.halation", HALATION_LEVELS);
-    const diffusionAmount = Math.min(1, Math.max(0, this.paramNumber("diffusion", 0)));
+    // Hard-mode suppresses the diffusion pyramid build (parity with
+    // WebGL's `renderBasePipeline`). The composite-input uniform is
+    // independently zeroed inside `uploadFrameUniforms`.
+    const diffusionAmount = effectiveDiffusionAmount(
+      this.paramNumber("diffusion", 0),
+      hardModeActive,
+    );
 
     const encoder = device.createCommandEncoder({ label: "filmtone.frame" });
 
@@ -2188,8 +2847,7 @@ export class WebGPUBackend implements RenderBackend {
       pass.end();
     }
 
-    const postCompositeTexture = this.renderCrossFilter(encoder, rtComposited);
-    const postCompositeView = postCompositeTexture.createView();
+    let postCompositeTexture = this.renderCrossFilter(encoder, rtComposited);
 
     // Pass 6 — post-chain → swap.
     const swapView = this.ctx.getCurrentTextureView();
@@ -2205,6 +2863,23 @@ export class WebGPUBackend implements RenderBackend {
       : null;
     const shutterAngle = this.paramNumber("shutterAngle", 0);
     const motionBlurOn = shutterAngle > 0;
+
+    // Light shafts (WebGL parity): run after cross-filter, before motion
+    // blur. Activation matches WebGL: the post chain must be active via
+    // cross-filter or motion blur, and `shaftIntensity > 0`. Dust /
+    // Scratches stays deferred on WebGPU in v1.
+    const shaftIntensity = Math.min(
+      1,
+      Math.max(0, this.paramNumber("shaftIntensity", 0)),
+    );
+    const postChainActive = crossFilterStrength > 0 || motionBlurOn;
+    if (shaftIntensity > 0 && postChainActive) {
+      postCompositeTexture = this.renderLightShafts(
+        encoder,
+        postCompositeTexture,
+      );
+    }
+    const postCompositeView = postCompositeTexture.createView();
 
     if (!motionBlurOn) {
       const blitBg = device.createBindGroup({
@@ -2409,6 +3084,14 @@ export class WebGPUBackend implements RenderBackend {
     // resets validSlots → 0 so stale content can't bleed through the
     // weighted average after a viewport change.
     this.ringBuffer.resize(w, h);
+    // Cross-filter temporal history lives in the pool under labeled
+    // half-resolution textures; those are destroyed + recreated on the
+    // next `pool.get` when dimensions change. We still drop the filled
+    // counter here so the first post-resize frame reads the black
+    // fallback, not the undefined contents of the freshly allocated
+    // textures.
+    this.crossFilterPeakHistoryWriteIndex = 0;
+    this.crossFilterPeakHistoryFilledFrames = 0;
   }
 
   destroy(): void {
@@ -2432,10 +3115,13 @@ export class WebGPUBackend implements RenderBackend {
     this.crossFilter.thresholdBuffer.destroy();
     this.crossFilter.peakBuffer.destroy();
     this.crossFilter.spacingBuffer.destroy();
+    this.crossFilter.temporalBuffer.destroy();
     this.crossFilter.blendBuffer.destroy();
     for (const buf of this.crossFilter.spacingMaxBuffers) buf.destroy();
     for (const buf of this.crossFilter.streakBuffers) buf.destroy();
     this.crossFilter.blackTexture.destroy();
+    this.lightShafts.paramsBuffer.destroy();
+    this.lightShafts.blendParamsBuffer.destroy();
     this.readbackBuffer?.destroy();
     for (const buf of this.bloomPyramid.downsample) buf.destroy();
     for (const buf of this.bloomPyramid.upsample) buf.destroy();
@@ -2443,6 +3129,8 @@ export class WebGPUBackend implements RenderBackend {
     for (const buf of this.halationPyramid.upsample) buf.destroy();
     for (const buf of this.diffusionPyramid.downsample) buf.destroy();
     for (const buf of this.diffusionPyramid.upsample) buf.destroy();
+    for (const buf of this.centralBloomPyramid.downsample) buf.destroy();
+    for (const buf of this.centralBloomPyramid.upsample) buf.destroy();
     this.ringBuffer.destroy();
     this.pool.destroy();
     this.ctx.destroy();

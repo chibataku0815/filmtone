@@ -23,4 +23,5 @@ export { crossFilterPeakFragmentWgsl } from "./cross-filter-peak.frag.wgsl";
 export { crossFilterPeakSpacingMaxFragmentWgsl } from "./cross-filter-peak-spacing-max.frag.wgsl";
 export { crossFilterPeakSpacingFragmentWgsl } from "./cross-filter-peak-spacing.frag.wgsl";
 export { crossFilterStreakFragmentWgsl } from "./cross-filter-streak.frag.wgsl";
+export { crossFilterTemporalFragmentWgsl } from "./cross-filter-temporal.frag.wgsl";
 export { crossFilterBlendFragmentWgsl } from "./cross-filter-blend.frag.wgsl";

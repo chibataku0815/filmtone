@@ -62,3 +62,10 @@ export {
   hexToRgbTriple,
   type CompositeFrameState,
 } from "./webgpu/compositeUniforms";
+export {
+  CROSS_FILTER_MIN_SPACING_EPSILON,
+  effectiveDiffusionAmount,
+  isCrossFilterHardModeActive,
+  shouldResetCrossFilterHistory,
+  type CrossFilterHistorySnapshot,
+} from "./webgpu/crossFilterState";
