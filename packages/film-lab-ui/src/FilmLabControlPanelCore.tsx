@@ -12,7 +12,13 @@ import {
   type ReactNode,
 } from "react";
 import { useTranslations } from "next-intl";
-import { PRESETS, findMatchingPreset, halationHueToHex, type PresetName } from "film-lab-core";
+import {
+  PHASE0_RGB_SHIFT_MAX,
+  PRESETS,
+  findMatchingPreset,
+  halationHueToHex,
+  type PresetName,
+} from "film-lab-core";
 import { ControlSlider as BaseControlSlider } from "./ui/ControlSlider";
 import { SectionHeader } from "./ui/SectionHeader";
 import { SegmentedControl } from "./ui/SegmentedControl";
@@ -43,7 +49,7 @@ import {
 /** UI の見せ方だけを切り替える。グレードの数値（reducer）は Quick でも Pro でも同じ */
 type UiMode = "quick" | "pro";
 
-const RGB_SHIFT_UI_MAX = 0.01;
+const RGB_SHIFT_UI_MAX = PHASE0_RGB_SHIFT_MAX;
 const RGB_SHIFT_UI_STEP = 0.0001;
 
 function getRgbShiftSliderMax(rgbShift: number): number {

@@ -1,6 +1,13 @@
 import { expect, test } from "bun:test";
 import { parseCube } from "./cube-parser";
 import {
+  PHASE0_HALATION_HUE_MAX,
+  PHASE0_HALATION_HUE_MIN,
+  PHASE0_RGB_SHIFT_MAX,
+} from "./phase0-schema";
+import { buildFilmtoneIosSwiftPayload } from "./ios-swift-payload";
+import {
+  IOS_PHASE0_RGB_SHIFT_MAX,
   IOS_PHASE0_SOURCE_DURATION_CAP_SEC,
   createIosPhase0SerializableLut,
   getIosPhase0SourceCapViolations,
@@ -31,7 +38,7 @@ LUT_3D_SIZE 2
   expect(lut.rgbaData[3]).toBe(1);
 });
 
-test("iosPhase0ExportPayloadSchema accepts reduced params and export defaults", () => {
+test("iosPhase0ExportPayloadSchema accepts widened optical params and export defaults", () => {
   const payload = iosPhase0ExportPayloadSchema.parse({
     projectId: "phase0-project",
     sourceUri: "file:///clip.mov",
@@ -44,6 +51,23 @@ test("iosPhase0ExportPayloadSchema accepts reduced params and export defaults", 
       saturation: 0.9,
       temperature: 0,
       tint: 0,
+      rgbShift: PHASE0_RGB_SHIFT_MAX,
+      lensSoftness: 0.1,
+      grainRadialMix: 1,
+      grainSize: 0.3,
+      bloomThreshold: 0.76,
+      bloomStrength: 0.24,
+      bloomRadius: 0.5,
+      diffusion: 0.08,
+      halationIntensity: 0.06,
+      halationSpread: 20,
+      halationHue: 18,
+      halationThreshold: 0.6,
+      halationRadius: 0.4,
+      bloomSoftKnee: 0.5,
+      halationSoftKnee: 0.3,
+      compressionAmount: 0.12,
+      compressionRange: 0.5,
       fade: 0.02,
       vignette: 0.2,
       grainIntensity: 0.1,
@@ -51,6 +75,124 @@ test("iosPhase0ExportPayloadSchema accepts reduced params and export defaults", 
   });
 
   expect(payload.exportSettings.outputFps).toBe(30);
+  expect(payload.params.rgbShift).toBe(PHASE0_RGB_SHIFT_MAX);
+  expect(payload.params.bloomStrength).toBe(0.24);
+  expect(payload.params.compressionAmount).toBe(0.12);
+});
+
+test("iosPhase0ExportPayloadSchema rejects rgbShift above the shared phase0 max", () => {
+  expect(() =>
+    iosPhase0ExportPayloadSchema.parse({
+      projectId: "phase0-project",
+      sourceUri: "file:///clip.mov",
+      sourceDisplayName: "clip.mov",
+      sourceKind: "video",
+      presetId: "cinematic",
+      params: {
+        exposure: 0.1,
+        contrast: 1.1,
+        saturation: 0.9,
+        temperature: 0,
+        tint: 0,
+        rgbShift: PHASE0_RGB_SHIFT_MAX + 0.0001,
+        lensSoftness: 0.1,
+        grainRadialMix: 1,
+        grainSize: 0.3,
+        bloomThreshold: 0.76,
+        bloomStrength: 0.24,
+        bloomRadius: 0.5,
+        diffusion: 0.08,
+        halationIntensity: 0.06,
+        halationSpread: 20,
+        halationHue: 18,
+        halationThreshold: 0.6,
+        halationRadius: 0.4,
+        bloomSoftKnee: 0.5,
+        halationSoftKnee: 0.3,
+        compressionAmount: 0.12,
+        compressionRange: 0.5,
+        fade: 0.02,
+        vignette: 0.2,
+        grainIntensity: 0.1,
+      },
+    }),
+  ).toThrow();
+});
+
+test("iosPhase0ExportPayloadSchema rejects halationHue outside the slider range", () => {
+  expect(() =>
+    iosPhase0ExportPayloadSchema.parse({
+      projectId: "phase0-project",
+      sourceUri: "file:///clip.mov",
+      sourceDisplayName: "clip.mov",
+      sourceKind: "video",
+      presetId: "cinematic",
+      params: {
+        exposure: 0.1,
+        contrast: 1.1,
+        saturation: 0.9,
+        temperature: 0,
+        tint: 0,
+        rgbShift: 0.002,
+        lensSoftness: 0.1,
+        grainRadialMix: 1,
+        grainSize: 0.3,
+        bloomThreshold: 0.76,
+        bloomStrength: 0.24,
+        bloomRadius: 0.5,
+        diffusion: 0.08,
+        halationIntensity: 0.06,
+        halationSpread: 20,
+        halationHue: PHASE0_HALATION_HUE_MAX + 1,
+        halationThreshold: 0.6,
+        halationRadius: 0.4,
+        bloomSoftKnee: 0.5,
+        halationSoftKnee: 0.3,
+        compressionAmount: 0.12,
+        compressionRange: 0.5,
+        fade: 0.02,
+        vignette: 0.2,
+        grainIntensity: 0.1,
+      },
+    }),
+  ).toThrow();
+
+  expect(() =>
+    iosPhase0ExportPayloadSchema.parse({
+      projectId: "phase0-project",
+      sourceUri: "file:///clip.mov",
+      sourceDisplayName: "clip.mov",
+      sourceKind: "video",
+      presetId: "cinematic",
+      params: {
+        exposure: 0.1,
+        contrast: 1.1,
+        saturation: 0.9,
+        temperature: 0,
+        tint: 0,
+        rgbShift: 0.002,
+        lensSoftness: 0.1,
+        grainRadialMix: 1,
+        grainSize: 0.3,
+        bloomThreshold: 0.76,
+        bloomStrength: 0.24,
+        bloomRadius: 0.5,
+        diffusion: 0.08,
+        halationIntensity: 0.06,
+        halationSpread: 20,
+        halationHue: PHASE0_HALATION_HUE_MIN - 1,
+        halationThreshold: 0.6,
+        halationRadius: 0.4,
+        bloomSoftKnee: 0.5,
+        halationSoftKnee: 0.3,
+        compressionAmount: 0.12,
+        compressionRange: 0.5,
+        fade: 0.02,
+        vignette: 0.2,
+        grainIntensity: 0.1,
+      },
+    }),
+  ).toThrow();
 });
 
 test("getIosPhase0SourceCapViolations reports cap breaches", () => {
@@ -160,4 +302,11 @@ test("iosPhase0ExportPayloadSchema accepts both LUT slots null", () => {
 
   expect(payload.inputLut).toBeNull();
   expect(payload.creativeLut).toBeNull();
+});
+
+test("swift payload generation exposes the shared rgbShift max", () => {
+  const payload = buildFilmtoneIosSwiftPayload();
+
+  expect(IOS_PHASE0_RGB_SHIFT_MAX).toBe(PHASE0_RGB_SHIFT_MAX);
+  expect(payload.rgbShiftMax).toBe(PHASE0_RGB_SHIFT_MAX);
 });

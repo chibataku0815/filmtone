@@ -142,7 +142,7 @@ struct FilmtoneRootView: View {
                                 .lineLimit(2)
                         }
 
-                        Text(store.quickSummaryText)
+                        Text(store.adjustmentSummaryText)
                             .font(.subheadline)
                             .foregroundStyle(.white.opacity(0.66))
                             .lineLimit(2)
@@ -358,7 +358,7 @@ struct FilmtoneRootView: View {
         if store.source == nil {
             return store.strings.quickHint
         }
-        return store.quickSummaryText
+        return store.adjustmentSummaryText
     }
 }
 

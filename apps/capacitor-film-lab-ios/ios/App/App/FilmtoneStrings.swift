@@ -7,7 +7,9 @@ struct FilmtoneStrings {
     let repickSource: String
     let probePending: String
     let previewRendering: String
+    let previewSheetHint: String
     let compareLabel: String
+    let compareHint: String
     let presetTitle: String
     let strengthLabel: String
     let adjustLabel: String
@@ -15,6 +17,15 @@ struct FilmtoneStrings {
     let quickFilmCharacter: String
     let quickEra: String
     let quickDynamics: String
+    let advancedParamsLabel: String
+    let advancedParamsHint: String
+    let advancedAdjustmentsActive: String
+    let advancedBasicLabel: String
+    let advancedOpticsLabel: String
+    let advancedGlowLabel: String
+    let advancedGrainLabel: String
+    let advancedToneLabel: String
+    let paramLabels: [String: String]
     let resetLabel: String
     let exportSectionTitle: String
     let exportIdle: String
@@ -42,6 +53,12 @@ struct FilmtoneStrings {
     let lutParseError: String
 }
 
+extension FilmtoneStrings {
+    func paramLabel(for key: String) -> String {
+        paramLabels[key] ?? key
+    }
+}
+
 enum FilmtoneStringsCatalog {
     static var current: FilmtoneStrings {
         let localeCode = Locale.current.language.languageCode?.identifier ?? Locale.current.identifier
@@ -57,7 +74,9 @@ private extension FilmtoneStrings {
         repickSource: "Replace video",
         probePending: "Inspecting video…",
         previewRendering: "Generating preview…",
+        previewSheetHint: "Preview updates through the native render path.",
         compareLabel: "Original",
+        compareHint: "Press and hold the preview to compare.",
         presetTitle: "Film Presets",
         strengthLabel: "Strength",
         adjustLabel: "Adjust",
@@ -65,6 +84,41 @@ private extension FilmtoneStrings {
         quickFilmCharacter: "Exposure",
         quickEra: "Contrast",
         quickDynamics: "Saturation",
+        advancedParamsLabel: "Advanced Params",
+        advancedParamsHint: "Fine-tune the optical mix directly.",
+        advancedAdjustmentsActive: "Advanced tuning active.",
+        advancedBasicLabel: "Basic",
+        advancedOpticsLabel: "Optics",
+        advancedGlowLabel: "Glow",
+        advancedGrainLabel: "Grain",
+        advancedToneLabel: "Tone / Process",
+        paramLabels: [
+            "exposure": "Exposure",
+            "contrast": "Contrast",
+            "saturation": "Saturation",
+            "temperature": "Temperature",
+            "tint": "Tint",
+            "fade": "Fade",
+            "rgbShift": "RGB Shift",
+            "lensSoftness": "Lens Softness",
+            "vignette": "Vignette",
+            "bloomThreshold": "Bloom Threshold",
+            "bloomStrength": "Bloom Strength",
+            "bloomRadius": "Bloom Radius",
+            "bloomSoftKnee": "Bloom Soft Knee",
+            "halationIntensity": "Halation Intensity",
+            "halationSpread": "Halation Spread",
+            "halationHue": "Halation Hue",
+            "halationThreshold": "Halation Threshold",
+            "halationRadius": "Halation Radius",
+            "halationSoftKnee": "Halation Soft Knee",
+            "diffusion": "Diffusion",
+            "grainIntensity": "Grain Intensity",
+            "grainSize": "Grain Size",
+            "grainRadialMix": "Grain Radial Mix",
+            "compressionAmount": "Compression Amount",
+            "compressionRange": "Compression Range",
+        ],
         resetLabel: "Reset",
         exportSectionTitle: "Export",
         exportIdle: "Ready to export.",
@@ -99,7 +153,9 @@ private extension FilmtoneStrings {
         repickSource: "動画を差し替える",
         probePending: "動画を確認しています…",
         previewRendering: "プレビューを生成しています…",
+        previewSheetHint: "プレビューは native の render path をそのまま反映します。",
         compareLabel: "オリジナル",
+        compareHint: "プレビューを長押しで比較します。",
         presetTitle: "フィルムプリセット",
         strengthLabel: "強さ",
         adjustLabel: "調整",
@@ -107,6 +163,41 @@ private extension FilmtoneStrings {
         quickFilmCharacter: "明るさ",
         quickEra: "コントラスト",
         quickDynamics: "彩度",
+        advancedParamsLabel: "詳細パラメータ",
+        advancedParamsHint: "光学系の効きを直接微調整します。",
+        advancedAdjustmentsActive: "詳細調整を適用中。",
+        advancedBasicLabel: "基本",
+        advancedOpticsLabel: "光学",
+        advancedGlowLabel: "グロー",
+        advancedGrainLabel: "グレイン",
+        advancedToneLabel: "階調 / プロセス",
+        paramLabels: [
+            "exposure": "露出",
+            "contrast": "コントラスト",
+            "saturation": "彩度",
+            "temperature": "色温度",
+            "tint": "ティント",
+            "fade": "フェード",
+            "rgbShift": "RGB シフト",
+            "lensSoftness": "レンズソフト",
+            "vignette": "周辺減光",
+            "bloomThreshold": "ブルームしきい値",
+            "bloomStrength": "ブルーム量",
+            "bloomRadius": "ブルーム半径",
+            "bloomSoftKnee": "ブルームソフトニー",
+            "halationIntensity": "ハレーション量",
+            "halationSpread": "ハレーション広がり",
+            "halationHue": "ハレーション色相",
+            "halationThreshold": "ハレーションしきい値",
+            "halationRadius": "ハレーション半径",
+            "halationSoftKnee": "ハレーションソフトニー",
+            "diffusion": "ディフュージョン",
+            "grainIntensity": "グレイン量",
+            "grainSize": "グレイン粒径",
+            "grainRadialMix": "グレイン周辺ミックス",
+            "compressionAmount": "圧縮量",
+            "compressionRange": "圧縮レンジ",
+        ],
         resetLabel: "リセット",
         exportSectionTitle: "書き出し",
         exportIdle: "書き出しの準備ができています。",

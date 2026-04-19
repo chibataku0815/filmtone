@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Params } from "./params";
+import { PHASE0_RGB_SHIFT_MAX } from "./phase0-schema";
 
 export const QUICK_AXIS_IDS = [
   "filmCharacter",
@@ -17,9 +18,26 @@ export interface Phase0QuickTarget {
   saturation: number;
   temperature: number;
   tint: number;
+  rgbShift: number;
+  lensSoftness: number;
   fade: number;
   vignette: number;
   grainIntensity: number;
+  grainRadialMix: number;
+  grainSize: number;
+  bloomThreshold: number;
+  bloomStrength: number;
+  bloomRadius: number;
+  diffusion: number;
+  halationIntensity: number;
+  halationSpread: number;
+  halationHue: number;
+  halationThreshold: number;
+  halationRadius: number;
+  bloomSoftKnee: number;
+  halationSoftKnee: number;
+  compressionAmount: number;
+  compressionRange: number;
 }
 
 export const QUICK_AXIS_DEFAULT_RANGE = {
@@ -64,7 +82,7 @@ type QuickFullPatch = Partial<
 
 type QuickPhase0Patch = Partial<Phase0QuickTarget>;
 
-const QUICK_FULL_AXIS_WEIGHTS: Record<QuickAxisId, QuickFullPatch> = {
+export const QUICK_FULL_AXIS_WEIGHTS: Record<QuickAxisId, QuickFullPatch> = {
   filmCharacter: {
     saturation: 0.24,
     temperature: 0.16,
@@ -88,7 +106,7 @@ const QUICK_FULL_AXIS_WEIGHTS: Record<QuickAxisId, QuickFullPatch> = {
   },
 };
 
-const QUICK_PHASE0_AXIS_WEIGHTS: Record<QuickAxisId, QuickPhase0Patch> = {
+export const QUICK_PHASE0_AXIS_WEIGHTS: Record<QuickAxisId, QuickPhase0Patch> = {
   filmCharacter: {
     saturation: 0.24,
     temperature: 0.16,
@@ -98,12 +116,17 @@ const QUICK_PHASE0_AXIS_WEIGHTS: Record<QuickAxisId, QuickPhase0Patch> = {
   },
   era: {
     fade: 0.18,
-    saturation: -0.12,
-    contrast: -0.06,
+    saturation: -0.14,
+    contrast: -0.08,
+    halationIntensity: 0.16,
+    halationSpread: 6,
   },
   dynamics: {
     exposure: 0.24,
     contrast: 0.18,
+    bloomStrength: 0.16,
+    bloomThreshold: -0.06,
+    bloomRadius: 0.12,
   },
 };
 
@@ -124,13 +147,25 @@ function clampParamValue(key: string, value: number): number {
     case "temperature":
     case "tint":
       return Math.max(-1, Math.min(1, value));
+    case "rgbShift":
+      return Math.max(0, Math.min(PHASE0_RGB_SHIFT_MAX, value));
     case "grainIntensity":
     case "vignette":
     case "fade":
+    case "lensSoftness":
+    case "grainRadialMix":
+    case "grainSize":
     case "halationIntensity":
+    case "halationThreshold":
+    case "halationRadius":
     case "bloomStrength":
     case "bloomThreshold":
     case "bloomRadius":
+    case "diffusion":
+    case "bloomSoftKnee":
+    case "halationSoftKnee":
+    case "compressionAmount":
+    case "compressionRange":
       return Math.max(0, Math.min(1, value));
     case "halationSpread":
       return Math.max(0, Math.min(40, value));

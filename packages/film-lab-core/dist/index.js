@@ -962,12 +962,17 @@ var QUICK_PHASE0_AXIS_WEIGHTS = {
   },
   era: {
     fade: 0.18,
-    saturation: -0.12,
-    contrast: -0.06
+    saturation: -0.14,
+    contrast: -0.08,
+    halationIntensity: 0.16,
+    halationSpread: 6
   },
   dynamics: {
     exposure: 0.24,
-    contrast: 0.18
+    contrast: 0.18,
+    bloomStrength: 0.16,
+    bloomThreshold: -0.06,
+    bloomRadius: 0.12
   }
 };
 function clampAxisValue(value) {
@@ -989,10 +994,21 @@ function clampParamValue(key, value) {
     case "grainIntensity":
     case "vignette":
     case "fade":
+    case "rgbShift":
+    case "lensSoftness":
+    case "grainRadialMix":
+    case "grainSize":
     case "halationIntensity":
+    case "halationThreshold":
+    case "halationRadius":
     case "bloomStrength":
     case "bloomThreshold":
     case "bloomRadius":
+    case "diffusion":
+    case "bloomSoftKnee":
+    case "halationSoftKnee":
+    case "compressionAmount":
+    case "compressionRange":
       return Math.max(0, Math.min(1, value));
     case "halationSpread":
       return Math.max(0, Math.min(40, value));
@@ -1035,15 +1051,34 @@ function applyQuickStateToPhase0Params(base, state) {
 
 // src/phase0-schema.ts
 import { z as z3 } from "zod";
-var PHASE0_SCHEMA_VERSION = 1;
+var PHASE0_SCHEMA_VERSION = 2;
 var PHASE0_PRESET_DEFAULT = "cinematic";
 var PHASE0_PRESET_STRENGTH_DEFAULT = 1;
+var PHASE0_HALATION_HUE_MIN = 0;
+var PHASE0_HALATION_HUE_MAX = 100;
 var PHASE0_PARAM_KEYS = [
   "exposure",
   "contrast",
   "saturation",
   "temperature",
   "tint",
+  "rgbShift",
+  "lensSoftness",
+  "grainRadialMix",
+  "grainSize",
+  "bloomThreshold",
+  "bloomStrength",
+  "bloomRadius",
+  "diffusion",
+  "halationIntensity",
+  "halationSpread",
+  "halationHue",
+  "halationThreshold",
+  "halationRadius",
+  "bloomSoftKnee",
+  "halationSoftKnee",
+  "compressionAmount",
+  "compressionRange",
   "fade",
   "vignette",
   "grainIntensity"
@@ -1063,15 +1098,60 @@ var PHASE0_BENCHMARK_GATES = {
   strongGoRealtimeRatio: 2,
   noGoRealtimeRatio: 3
 };
+var phase0HalationHueSchema = z3.number().min(PHASE0_HALATION_HUE_MIN).max(PHASE0_HALATION_HUE_MAX);
 var phase0ParamsSchema = z3.object({
   exposure: z3.number().min(-2).max(2).default(PRESETS.reset.exposure),
   contrast: z3.number().min(0).max(2).default(PRESETS.reset.contrast),
   saturation: z3.number().min(0).max(2).default(PRESETS.reset.saturation),
   temperature: z3.number().min(-1).max(1).default(PRESETS.reset.temperature),
   tint: z3.number().min(-1).max(1).default(PRESETS.reset.tint),
+  rgbShift: z3.number().min(0).max(1).default(PRESETS.reset.rgbShift),
+  lensSoftness: z3.number().min(0).max(1).default(PRESETS.reset.lensSoftness),
+  grainRadialMix: z3.number().min(0).max(1).default(PRESETS.reset.grainRadialMix),
+  grainSize: z3.number().min(0).max(1).default(PRESETS.reset.grainSize),
+  bloomThreshold: z3.number().min(0).max(1).default(PRESETS.reset.bloomThreshold),
+  bloomStrength: z3.number().min(0).max(1).default(PRESETS.reset.bloomStrength),
+  bloomRadius: z3.number().min(0).max(1).default(PRESETS.reset.bloomRadius),
+  diffusion: z3.number().min(0).max(1).default(PRESETS.reset.diffusion),
+  halationIntensity: z3.number().min(0).max(1).default(PRESETS.reset.halationIntensity),
+  halationSpread: z3.number().min(0).max(40).default(PRESETS.reset.halationSpread),
+  halationHue: phase0HalationHueSchema.default(PRESETS.reset.halationHue),
+  halationThreshold: z3.number().min(0).max(1).default(PRESETS.reset.halationThreshold),
+  halationRadius: z3.number().min(0).max(1).default(PRESETS.reset.halationRadius),
+  bloomSoftKnee: z3.number().min(0).max(1).default(PRESETS.reset.bloomSoftKnee),
+  halationSoftKnee: z3.number().min(0).max(1).default(PRESETS.reset.halationSoftKnee),
+  compressionAmount: z3.number().min(0).max(1).default(PRESETS.reset.compressionAmount),
+  compressionRange: z3.number().min(0).max(1).default(PRESETS.reset.compressionRange),
   fade: z3.number().min(0).max(1).default(PRESETS.reset.fade),
   vignette: z3.number().min(0).max(1).default(PRESETS.reset.vignette),
   grainIntensity: z3.number().min(0).max(1).default(PRESETS.reset.grainIntensity)
+});
+var phase0ParamsPatchSchema = z3.object({
+  exposure: z3.number().min(-2).max(2).optional(),
+  contrast: z3.number().min(0).max(2).optional(),
+  saturation: z3.number().min(0).max(2).optional(),
+  temperature: z3.number().min(-1).max(1).optional(),
+  tint: z3.number().min(-1).max(1).optional(),
+  rgbShift: z3.number().min(0).max(1).optional(),
+  lensSoftness: z3.number().min(0).max(1).optional(),
+  grainRadialMix: z3.number().min(0).max(1).optional(),
+  grainSize: z3.number().min(0).max(1).optional(),
+  bloomThreshold: z3.number().min(0).max(1).optional(),
+  bloomStrength: z3.number().min(0).max(1).optional(),
+  bloomRadius: z3.number().min(0).max(1).optional(),
+  diffusion: z3.number().min(0).max(1).optional(),
+  halationIntensity: z3.number().min(0).max(1).optional(),
+  halationSpread: z3.number().min(0).max(40).optional(),
+  halationHue: phase0HalationHueSchema.optional(),
+  halationThreshold: z3.number().min(0).max(1).optional(),
+  halationRadius: z3.number().min(0).max(1).optional(),
+  bloomSoftKnee: z3.number().min(0).max(1).optional(),
+  halationSoftKnee: z3.number().min(0).max(1).optional(),
+  compressionAmount: z3.number().min(0).max(1).optional(),
+  compressionRange: z3.number().min(0).max(1).optional(),
+  fade: z3.number().min(0).max(1).optional(),
+  vignette: z3.number().min(0).max(1).optional(),
+  grainIntensity: z3.number().min(0).max(1).optional()
 });
 var phase0QuickStateSchema = z3.object(
   {
@@ -1094,7 +1174,7 @@ var phase0ProjectSchemaInput = z3.object({
   presetName: z3.string().min(1),
   strength: z3.number().min(0).max(1).default(PHASE0_PRESET_STRENGTH_DEFAULT),
   quickState: phase0QuickStateSchema.default(DEFAULT_QUICK_STATE),
-  params: phase0ParamsSchema,
+  params: phase0ParamsPatchSchema,
   // Legacy creative LUT slot. Keep parse-compatible so older saved projects
   // normalize into the current dual-LUT shape on load.
   lut: phase0ProjectLutSchema.nullable().optional(),
@@ -1109,23 +1189,27 @@ var phase0ProjectSchemaInput = z3.object({
   })
 });
 var phase0ProjectSchema = phase0ProjectSchemaInput.transform(
-  ({ lut, inputLut, creativeLut, ...project }) => ({
-    ...project,
-    inputLut: inputLut ?? null,
-    creativeLut: creativeLut ?? lut ?? null
-  })
+  ({ lut, inputLut, creativeLut, ...project }) => {
+    const safePresetName = Object.prototype.hasOwnProperty.call(PRESETS, project.presetName) ? project.presetName : PHASE0_PRESET_DEFAULT;
+    const derivedParams = applyQuickStateToPhase0Params(
+      interpolatePhase0PresetParams(safePresetName, project.strength),
+      project.quickState
+    );
+    return {
+      ...project,
+      presetName: safePresetName,
+      params: mergePhase0Params(derivedParams, project.params),
+      inputLut: inputLut ?? null,
+      creativeLut: creativeLut ?? lut ?? null
+    };
+  }
 );
 function pickPhase0Params(params) {
-  return {
-    exposure: params.exposure,
-    contrast: params.contrast,
-    saturation: params.saturation,
-    temperature: params.temperature,
-    tint: params.tint,
-    fade: params.fade,
-    vignette: params.vignette,
-    grainIntensity: params.grainIntensity
-  };
+  const next = {};
+  for (const key of PHASE0_PARAM_KEYS) {
+    next[key] = params[key];
+  }
+  return phase0ParamsSchema.parse(next);
 }
 function createDefaultPhase0Params(presetName = PHASE0_PRESET_DEFAULT) {
   return pickPhase0Params(PRESETS[presetName]);
@@ -1334,34 +1418,15 @@ function parseBenchmarkRow(line) {
 
 // src/ios-phase0.ts
 import { z as z4 } from "zod";
-var IOS_PHASE0_SCHEMA_VERSION = 1;
-var IOS_PHASE0_PARAM_KEYS = [
-  "exposure",
-  "contrast",
-  "saturation",
-  "temperature",
-  "tint",
-  "fade",
-  "vignette",
-  "grainIntensity"
-];
-var IOS_PHASE0_PARAM_PICK = {
-  exposure: true,
-  contrast: true,
-  saturation: true,
-  temperature: true,
-  tint: true,
-  fade: true,
-  vignette: true,
-  grainIntensity: true
-};
-var iosPhase0ParamsSchema = filmLabParamsSchema.pick(IOS_PHASE0_PARAM_PICK);
+var IOS_PHASE0_SCHEMA_VERSION = 2;
+var IOS_PHASE0_PARAM_KEYS = PHASE0_PARAM_KEYS;
+var iosPhase0ParamsSchema = phase0ParamsSchema;
 var IOS_PHASE0_OUTPUT_CODEC = "h264-mp4";
-var IOS_PHASE0_OUTPUT_LONG_EDGE = 1920;
-var IOS_PHASE0_OUTPUT_FPS = 30;
-var IOS_PHASE0_SOURCE_DURATION_CAP_SEC = 5 * 60;
-var IOS_PHASE0_SOURCE_LONG_EDGE_CAP = 3840;
-var IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES = 2 * 1024 * 1024 * 1024;
+var IOS_PHASE0_OUTPUT_LONG_EDGE = PHASE0_OUTPUT_PROFILE.longEdge;
+var IOS_PHASE0_OUTPUT_FPS = PHASE0_OUTPUT_PROFILE.fps;
+var IOS_PHASE0_SOURCE_DURATION_CAP_SEC = PHASE0_MAX_SOURCE_DURATION_SEC;
+var IOS_PHASE0_SOURCE_LONG_EDGE_CAP = PHASE0_APPROX_SOURCE_LONG_EDGE_MAX;
+var IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES = PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES;
 var IOS_PHASE0_SOURCE_CAPS = {
   durationSec: IOS_PHASE0_SOURCE_DURATION_CAP_SEC,
   longEdge: IOS_PHASE0_SOURCE_LONG_EDGE_CAP,
@@ -1534,16 +1599,7 @@ var iosPhase0LocalProjectSchema = z4.object({
   })
 });
 function pickIosPhase0Params(params) {
-  return iosPhase0ParamsSchema.parse({
-    exposure: params.exposure,
-    contrast: params.contrast,
-    saturation: params.saturation,
-    temperature: params.temperature,
-    tint: params.tint,
-    fade: params.fade,
-    vignette: params.vignette,
-    grainIntensity: params.grainIntensity
-  });
+  return pickPhase0Params(params);
 }
 function getIosPhase0SourceCapViolations(source) {
   const violations = [];

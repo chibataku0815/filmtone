@@ -11,8 +11,15 @@ final class FilmtoneExportSession {
     private let ciContext: CIContext
     private let preparedInputLut: PreparedLut?
     private let preparedCreativeLut: PreparedLut?
+    private let sourceSeed: Double
     private let colorSpace = CGColorSpaceCreateDeviceRGB()
     private var cancelled = false
+    private static let aberrationEdgeSoftenScale = 32.0
+    private static let glowBaseScale = 0.5
+    private static let bloomMipLevels = 5
+    private static let halationMipLevels = 6
+    private static let diffusionMipLevels = 3
+    private static let glowUpsampleBlurRadius = 1.0
 
     init(
         request: Phase0ExportRequestDTO,
@@ -32,6 +39,7 @@ final class FilmtoneExportSession {
             SerializableLutDTO(size: $0.size, data: $0.data, intensity: $0.intensity)
         }
         self.preparedCreativeLut = Self.makePreparedLut(from: legacyCreativeLut)
+        self.sourceSeed = Self.makeStableSourceSeed(from: sourceURL.absoluteString)
     }
 
     func cancel() {
@@ -362,7 +370,7 @@ final class FilmtoneExportSession {
         writer.startSession(atSourceTime: .zero)
 
         let frameCount = max(request.output.fps * 3, 1)
-        let filteredImage = renderableStillImage(image, outputSize: outputSize)
+        let filteredImage = renderableStillImage(image, outputSize: outputSize, timeSeconds: 0)
         guard let pixelBufferPool = adaptor.pixelBufferPool else {
             throw FilmtoneMediaError.exportFailed("Pixel buffer pool is unavailable.")
         }
@@ -422,7 +430,7 @@ final class FilmtoneExportSession {
 
         let outputSize = Self.scaledSize(for: image.extent.size, longEdge: request.output.longEdge)
         let original = scaledStillSourceImage(image, outputSize: outputSize)
-        let graded = applyGrade(to: original).cropped(to: original.extent)
+        let graded = applyGrade(to: original, timeSeconds: 0).cropped(to: original.extent)
 
         let originalURL = try writePreviewImage(original, preferredName: "filmtone-preview-original")
         let gradedURL = try writePreviewImage(graded, preferredName: "filmtone-preview-graded")
@@ -454,7 +462,7 @@ final class FilmtoneExportSession {
         let cgImage = try generator.copyCGImage(at: posterTime, actualTime: nil)
         let posterImage = CIImage(cgImage: cgImage)
         let original = scaledStillSourceImage(posterImage, outputSize: outputSize)
-        let graded = applyGrade(to: original).cropped(to: original.extent)
+        let graded = applyGrade(to: original, timeSeconds: posterTimeSec).cropped(to: original.extent)
 
         let originalURL = try writePreviewImage(original, preferredName: "filmtone-preview-original")
         let gradedURL = try writePreviewImage(graded, preferredName: "filmtone-preview-graded")
@@ -524,20 +532,25 @@ final class FilmtoneExportSession {
     private func renderableImage(
         from imageBuffer: CVPixelBuffer,
         transform: CGAffineTransform,
-        outputSize: CGSize
+        outputSize: CGSize,
+        timeSeconds: Double
     ) -> CIImage {
         let base = scaledVideoFrameImage(
             from: imageBuffer,
             transform: transform,
             outputSize: outputSize
         )
-        let graded = applyGrade(to: base)
+        let graded = applyGrade(to: base, timeSeconds: timeSeconds)
         return graded.cropped(to: CGRect(origin: .zero, size: outputSize))
     }
 
-    private func renderableStillImage(_ image: CIImage, outputSize: CGSize) -> CIImage {
+    private func renderableStillImage(
+        _ image: CIImage,
+        outputSize: CGSize,
+        timeSeconds: Double
+    ) -> CIImage {
         let base = scaledStillSourceImage(image, outputSize: outputSize)
-        let graded = applyGrade(to: base)
+        let graded = applyGrade(to: base, timeSeconds: timeSeconds)
         return graded.cropped(to: CGRect(origin: .zero, size: outputSize))
     }
 
@@ -572,60 +585,209 @@ final class FilmtoneExportSession {
             .cropped(to: CGRect(origin: .zero, size: outputSize))
     }
 
-    private func applyGrade(to image: CIImage) -> CIImage {
-        var current = image
+    private func applyGrade(to image: CIImage, timeSeconds: Double) -> CIImage {
         let params = request.grade.params
+        var current = image
 
-        // Stage 1: input LUT (e.g. log-to-display normalization). Skip if nil.
-        if let preparedInputLut {
-            current = applyLut(preparedInputLut, to: current)
+        current = applyInputLutStage(to: current)
+        current = applyBaseGradeStage(to: current, params: params)
+        current = applyToneCompressionStage(to: current, params: params)
+        current = applyEdgeOpticsStage(to: current, params: params)
+        current = applyGlowFamilyStage(to: current, params: params)
+        current = applyVignetteStage(to: current, params: params)
+        current = applyGrainStage(to: current, params: params, timeSeconds: timeSeconds)
+        current = applyCreativeLutStage(to: current)
+
+        return current.cropped(to: image.extent)
+    }
+
+    private func applyInputLutStage(to image: CIImage) -> CIImage {
+        guard let preparedInputLut else {
+            return image
+        }
+        return applyLut(preparedInputLut, to: image)
+    }
+
+    private func applyBaseGradeStage(to image: CIImage, params: Phase0ParamsDTO) -> CIImage {
+        let epsilon = 0.0001
+        guard
+            abs(params.exposure) > epsilon ||
+            abs(params.contrast - 1.0) > epsilon ||
+            abs(params.saturation - 1.0) > epsilon ||
+            abs(params.temperature) > epsilon ||
+            abs(params.tint) > epsilon ||
+            abs(params.fade) > epsilon
+        else {
+            return image
         }
 
-        // Stage 2: Quick params (exposure / contrast / saturation / temp / tint / fade / vignette / grain).
-        if abs(params.exposure) > 0.0001 {
-            current = current.applyingFilter("CIExposureAdjust", parameters: [
-                kCIInputEVKey: params.exposure,
-            ])
+        guard let kernel = OpticalKernels.baseGrade else {
+            return image
         }
 
-        if abs(params.saturation - 1.0) > 0.0001 || abs(params.contrast - 1.0) > 0.0001 {
-            current = current.applyingFilter("CIColorControls", parameters: [
-                kCIInputSaturationKey: params.saturation,
-                kCIInputContrastKey: params.contrast,
-            ])
+        return kernel.apply(extent: image.extent, arguments: [
+            image,
+            params.exposure,
+            params.contrast,
+            params.saturation,
+            params.temperature,
+            params.tint,
+            params.fade,
+        ]) ?? image
+    }
+
+    private func applyToneCompressionStage(to image: CIImage, params: Phase0ParamsDTO) -> CIImage {
+        guard params.compressionAmount > 0.0001 else {
+            return image
+        }
+        guard let kernel = OpticalKernels.filmCompression else {
+            return image
+        }
+        return kernel.apply(extent: image.extent, arguments: [
+            image,
+            params.compressionAmount,
+            params.compressionRange,
+        ]) ?? image
+    }
+
+    private func applyEdgeOpticsStage(to image: CIImage, params: Phase0ParamsDTO) -> CIImage {
+        var current = image
+
+        if params.rgbShift > 0.0001 {
+            current = applyRadialRGBShift(params.rgbShift, to: current)
         }
 
-        if abs(params.temperature) > 0.0001 || abs(params.tint) > 0.0001 {
-            current = current.applyingFilter("CITemperatureAndTint", parameters: [
-                "inputNeutral": CIVector(x: 6500, y: 0),
-                "inputTargetNeutral": CIVector(
-                    x: 6500 + (params.temperature * 1800),
-                    y: params.tint * 150
-                ),
-            ])
-        }
-
-        if params.fade > 0.0001 {
-            current = applyFade(params.fade, to: current)
-        }
-
-        if params.vignette > 0.0001 {
-            current = current.applyingFilter("CIVignette", parameters: [
-                kCIInputIntensityKey: params.vignette * 1.2,
-                kCIInputRadiusKey: min(current.extent.width, current.extent.height) * 0.55,
-            ])
-        }
-
-        if params.grainIntensity > 0.0001 {
-            current = applyGrain(params.grainIntensity, to: current)
-        }
-
-        // Stage 3: creative LUT (signature look). Skip if nil.
-        if let preparedCreativeLut {
-            current = applyLut(preparedCreativeLut, to: current)
+        let aberrationSoften = Self.clamp(params.rgbShift * Self.aberrationEdgeSoftenScale)
+        if aberrationSoften > 0.0001 || params.lensSoftness > 0.0001 {
+            current = applyEdgeSoftness(
+                to: current,
+                aberrationSoften: aberrationSoften,
+                lensSoftness: params.lensSoftness
+            )
         }
 
         return current
+    }
+
+    private func applyGlowFamilyStage(to image: CIImage, params: Phase0ParamsDTO) -> CIImage {
+        let extent = image.extent
+        let black = Self.blackImage(for: extent)
+
+        let bloomImage: CIImage
+        if params.bloomStrength > 0.0001 {
+            let bloomPlate = extractHighlightPlate(
+                from: image,
+                threshold: params.bloomThreshold,
+                knee: params.bloomSoftKnee,
+                tintColor: CIColor(red: 1, green: 1, blue: 1, alpha: 1)
+            )
+            bloomImage = buildMipBlurComposite(
+                from: bloomPlate,
+                radius: params.bloomRadius,
+                levelCount: Self.bloomMipLevels,
+                spreadMultiplier: 1.0
+            )
+        } else {
+            bloomImage = black
+        }
+
+        let halationImage: CIImage
+        if params.halationIntensity > 0.0001 {
+            let halationPlate = extractHighlightPlate(
+                from: image,
+                threshold: params.halationThreshold,
+                knee: params.halationSoftKnee,
+                tintColor: Self.halationColor(for: params.halationHue)
+            )
+            halationImage = buildMipBlurComposite(
+                from: halationPlate,
+                radius: params.halationRadius,
+                levelCount: Self.halationMipLevels,
+                spreadMultiplier: 1.0 + max(params.halationSpread, 0) / 40.0
+            )
+        } else {
+            halationImage = black
+        }
+
+        let diffusionImage: CIImage
+        if params.diffusion > 0.0001 {
+            diffusionImage = buildMipBlurComposite(
+                from: image,
+                radius: 0.7,
+                levelCount: Self.diffusionMipLevels,
+                spreadMultiplier: 1.0
+            )
+        } else {
+            diffusionImage = black
+        }
+
+        guard
+            params.bloomStrength > 0.0001 ||
+            params.halationIntensity > 0.0001 ||
+            params.diffusion > 0.0001
+        else {
+            return image
+        }
+
+        guard let kernel = OpticalKernels.glowComposite else {
+            return image
+        }
+
+        return kernel.apply(extent: extent, arguments: [
+            image,
+            bloomImage,
+            halationImage,
+            diffusionImage,
+            params.bloomStrength,
+            params.halationIntensity,
+            params.diffusion,
+        ]) ?? image
+    }
+
+    private func applyVignetteStage(to image: CIImage, params: Phase0ParamsDTO) -> CIImage {
+        guard params.vignette > 0.0001 else {
+            return image
+        }
+        guard let kernel = OpticalKernels.vignette else {
+            return image
+        }
+        return kernel.apply(extent: image.extent, arguments: [
+            image,
+            params.vignette,
+            Self.extentOriginVector(for: image.extent),
+            Self.extentSizeVector(for: image.extent),
+        ]) ?? image
+    }
+
+    private func applyGrainStage(
+        to image: CIImage,
+        params: Phase0ParamsDTO,
+        timeSeconds: Double
+    ) -> CIImage {
+        guard params.grainIntensity > 0.0001 else {
+            return image
+        }
+        guard let kernel = OpticalKernels.grain else {
+            return image
+        }
+        let normalizedTime = timeSeconds.isFinite ? max(timeSeconds, 0) : 0
+        return kernel.apply(extent: image.extent, arguments: [
+            image,
+            params.grainIntensity,
+            params.grainRadialMix,
+            params.grainSize,
+            normalizedTime,
+            sourceSeed,
+            Self.extentOriginVector(for: image.extent),
+            Self.extentSizeVector(for: image.extent),
+        ]) ?? image
+    }
+
+    private func applyCreativeLutStage(to image: CIImage) -> CIImage {
+        guard let preparedCreativeLut else {
+            return image
+        }
+        return applyLut(preparedCreativeLut, to: image)
     }
 
     private func applyLut(_ lut: PreparedLut, to image: CIImage) -> CIImage {
@@ -649,47 +811,244 @@ final class FilmtoneExportSession {
             .cropped(to: image.extent)
     }
 
-    private func applyFade(_ fade: Double, to image: CIImage) -> CIImage {
-        let overlay = CIImage(color: CIColor(
-            red: 0.95,
-            green: 0.93,
-            blue: 0.9,
-            alpha: CGFloat(min(max(fade * 0.12, 0), 0.2))
-        ))
-        .cropped(to: image.extent)
+    private func extractHighlightPlate(
+        from image: CIImage,
+        threshold: Double,
+        knee: Double,
+        tintColor: CIColor
+    ) -> CIImage {
+        guard let kernel = OpticalKernels.softKneeHighlight else {
+            return Self.blackImage(for: image.extent)
+        }
 
-        let softened = overlay
-            .applyingFilter("CISourceOverCompositing", parameters: [
-                kCIInputBackgroundImageKey: image,
-            ])
-            .cropped(to: image.extent)
-
-        return softened.applyingFilter("CIColorControls", parameters: [
-            kCIInputBrightnessKey: fade * 0.02,
-            kCIInputContrastKey: max(0.78, 1 - (fade * 0.18)),
-        ])
+        return kernel.apply(extent: image.extent, arguments: [
+            image,
+            Self.clamp(threshold),
+            Self.clamp(knee),
+            tintColor,
+        ]) ?? Self.blackImage(for: image.extent)
     }
 
-    private func applyGrain(_ intensity: Double, to image: CIImage) -> CIImage {
-        guard let noise = CIFilter(name: "CIRandomGenerator")?.outputImage else {
+    private func applyRadialRGBShift(_ amount: Double, to image: CIImage) -> CIImage {
+        guard let kernel = OpticalKernels.radialRGBSplit else {
             return image
         }
 
-        let monochrome = noise
-            .cropped(to: image.extent)
-            .applyingFilter("CIColorControls", parameters: [
-                kCIInputSaturationKey: 0,
-            ])
+        let padding = CGFloat(max(4.0, abs(amount) * max(image.extent.width, image.extent.height)))
+        return kernel.apply(
+            extent: image.extent,
+            roiCallback: { _, rect in
+                rect.insetBy(dx: -padding, dy: -padding)
+            },
+            arguments: [
+                image,
+                amount,
+                Self.extentOriginVector(for: image.extent),
+                Self.extentSizeVector(for: image.extent),
+            ]
+        ) ?? image
+    }
 
-        let alphaAdjusted = monochrome.applyingFilter("CIColorMatrix", parameters: [
-            "inputAVector": CIVector(x: 0, y: 0, z: 0, w: intensity * 0.08),
+    private func applyEdgeSoftness(
+        to image: CIImage,
+        aberrationSoften: Double,
+        lensSoftness: Double
+    ) -> CIImage {
+        let lensDrive = pow(Self.clamp(lensSoftness), 0.78)
+        let blurRadius = min(Self.lerp(1.5, 2.75, Self.clamp(aberrationSoften)) + (lensDrive * 1.35), 4.2)
+        guard blurRadius > 0.0001, let kernel = OpticalKernels.edgeSoftnessBlend else {
+            return image
+        }
+
+        let blurred = image
+            .clampedToExtent()
+            .applyingFilter("CIGaussianBlur", parameters: [
+                kCIInputRadiusKey: blurRadius,
+            ])
+            .cropped(to: image.extent)
+
+        return kernel.apply(
+            extent: image.extent,
+            roiCallback: { _, rect in rect },
+            arguments: [
+                image,
+                blurred,
+                Self.clamp(aberrationSoften),
+                Self.clamp(lensSoftness),
+                Self.extentOriginVector(for: image.extent),
+                Self.extentSizeVector(for: image.extent),
+            ]
+        ) ?? image
+    }
+
+    private func buildMipBlurComposite(
+        from image: CIImage,
+        radius: Double,
+        levelCount: Int,
+        spreadMultiplier: Double
+    ) -> CIImage {
+        let extent = image.extent.integral
+        guard levelCount > 0 else {
+            return Self.blackImage(for: extent)
+        }
+
+        var mips = Self.buildMipPyramid(
+            from: image,
+            levelCount: levelCount,
+            initialScale: Self.glowBaseScale / max(spreadMultiplier, 0.0001)
+        )
+        guard !mips.isEmpty else {
+            return Self.blackImage(for: extent)
+        }
+
+        let weights = Self.computeMipWeights(radius: Self.clamp(radius), levels: mips.count)
+        if mips.count > 1 {
+            for index in stride(from: mips.count - 2, through: 0, by: -1) {
+                let lowRes = mips[index + 1]
+                let highRes = mips[index]
+                let restored = Self.upsampledImage(lowRes, to: highRes.extent)
+                let weighted = Self.weightedImage(restored, weight: weights[index + 1])
+                mips[index] = Self.addImages(weighted, highRes).cropped(to: highRes.extent)
+            }
+        }
+
+        return Self.upsampledImage(mips[0], to: extent).cropped(to: extent)
+    }
+
+    private static func buildMipPyramid(
+        from image: CIImage,
+        levelCount: Int,
+        initialScale: Double
+    ) -> [CIImage] {
+        guard levelCount > 0 else {
+            return []
+        }
+
+        var mips: [CIImage] = []
+        var current = downsampledImage(image, scale: initialScale)
+        mips.append(current)
+
+        guard levelCount > 1 else {
+            return mips
+        }
+
+        for _ in 1..<levelCount {
+            current = downsampledImage(current, scale: 0.5)
+            mips.append(current)
+        }
+
+        return mips
+    }
+
+    private static func downsampledImage(_ image: CIImage, scale: Double) -> CIImage {
+        let safeScale = min(1.0, max(scale, 0.0001))
+        let targetSize = CGSize(
+            width: max(1.0, round(image.extent.width * safeScale)),
+            height: max(1.0, round(image.extent.height * safeScale))
+        )
+        let scaled = scaledImage(image, scale: safeScale)
+        return scaled.cropped(to: CGRect(origin: .zero, size: targetSize))
+    }
+
+    private static func upsampledImage(_ image: CIImage, to extent: CGRect) -> CIImage {
+        guard image.extent.width > 0.0001, image.extent.height > 0.0001 else {
+            return blackImage(for: extent)
+        }
+
+        let scale = extent.width / image.extent.width
+        let upsampled = scaledImage(image, scale: scale).cropped(to: extent)
+        guard scale > 1.0001, glowUpsampleBlurRadius > 0.0001 else {
+            return upsampled
+        }
+
+        return upsampled
+            .clampedToExtent()
+            .applyingFilter("CIGaussianBlur", parameters: [
+                kCIInputRadiusKey: glowUpsampleBlurRadius,
+            ])
+            .cropped(to: extent)
+    }
+
+    private static func scaledImage(_ image: CIImage, scale: Double) -> CIImage {
+        guard abs(scale - 1.0) > 0.0001 else {
+            return image
+        }
+        return image.applyingFilter("CILanczosScaleTransform", parameters: [
+            kCIInputScaleKey: scale,
+            kCIInputAspectRatioKey: 1.0,
         ])
+    }
 
-        return alphaAdjusted
-            .applyingFilter("CISoftLightBlendMode", parameters: [
-                kCIInputBackgroundImageKey: image,
+    private static func weightedImage(_ image: CIImage, weight: Double) -> CIImage {
+        guard weight > 0 else {
+            return blackImage(for: image.extent)
+        }
+        guard abs(weight - 1.0) > 0.0001 else {
+            return image
+        }
+        let vector = CIVector(x: weight, y: 0, z: 0, w: 0)
+        let zero = CIVector(x: 0, y: 0, z: 0, w: 0)
+        return image.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": vector,
+            "inputGVector": CIVector(x: 0, y: weight, z: 0, w: 0),
+            "inputBVector": CIVector(x: 0, y: 0, z: weight, w: 0),
+            "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+            "inputBiasVector": zero,
+        ])
+    }
+
+    private static func addImages(_ foreground: CIImage, _ background: CIImage) -> CIImage {
+        foreground
+            .applyingFilter("CIAdditionCompositing", parameters: [
+                kCIInputBackgroundImageKey: background,
             ])
-            .cropped(to: image.extent)
+            .cropped(to: background.extent)
+    }
+
+    private static func blackImage(for extent: CGRect) -> CIImage {
+        CIImage(color: CIColor(red: 0, green: 0, blue: 0, alpha: 1)).cropped(to: extent)
+    }
+
+    private static func extentOriginVector(for extent: CGRect) -> CIVector {
+        CIVector(x: extent.origin.x, y: extent.origin.y)
+    }
+
+    private static func extentSizeVector(for extent: CGRect) -> CIVector {
+        CIVector(x: extent.width, y: extent.height)
+    }
+
+    private static func computeMipWeights(radius: Double, levels: Int) -> [Double] {
+        (0..<levels).map { index in
+            let t = Double(index) / Double(max(levels - 1, 1))
+            let base = exp(-3.0 * (1.0 - radius) * t)
+            let wide = exp(-0.5 * radius * (1.0 - t))
+            return (base * (1.0 - radius)) + (wide * radius)
+        }
+    }
+
+    private static func halationColor(for hue: Double) -> CIColor {
+        let t = clamp(hue / 100.0)
+        let red = (0xe8 + ((0xc8 - 0xe8) * t)) / 255.0
+        let green = (0x10 + ((0x60 - 0x10) * t)) / 255.0
+        let blue = (0x20 + ((0x10 - 0x20) * t)) / 255.0
+        return CIColor(red: red, green: green, blue: blue, alpha: 1)
+    }
+
+    private static func makeStableSourceSeed(from string: String) -> Double {
+        var hash: UInt64 = 1_469_598_103_934_665_603
+        for byte in string.utf8 {
+            hash ^= UInt64(byte)
+            hash &*= 1_099_511_628_211
+        }
+        return Double(hash % 8_192)
+    }
+
+    private static func clamp(_ value: Double, min minValue: Double = 0, max maxValue: Double = 1) -> Double {
+        min(max(value, minValue), maxValue)
+    }
+
+    private static func lerp(_ start: Double, _ end: Double, _ t: Double) -> Double {
+        start + ((end - start) * t)
     }
 
     private func appendVideoSample(
@@ -715,10 +1074,12 @@ final class FilmtoneExportSession {
             }
 
             let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+            let presentationTimeSec = CMTimeGetSeconds(presentationTime)
             let frameImage = renderableImage(
                 from: imageBuffer,
                 transform: videoTrack.preferredTransform,
-                outputSize: outputSize
+                outputSize: outputSize,
+                timeSeconds: presentationTimeSec.isFinite ? presentationTimeSec : 0
             )
 
             var renderedBuffer: CVPixelBuffer?
@@ -920,4 +1281,177 @@ private struct PreparedLut {
     let size: Int
     let intensity: Double
     let cubeData: Data
+}
+
+private enum OpticalKernels {
+    static let baseGrade = CIColorKernel(source: """
+kernel vec4 baseGrade(__sample image, float exposure, float contrast, float saturation, float temperature, float tint, float fade) {
+    vec4 color = image;
+    color.rgb *= pow(2.0, exposure);
+    color.rgb = (color.rgb - 0.5) * contrast + 0.5;
+    float luma = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+    color.rgb = mix(vec3(luma), color.rgb, saturation);
+    color.r += temperature * 0.1;
+    color.b -= temperature * 0.1;
+    color.r += tint * 0.05;
+    color.g -= tint * 0.08;
+    color.b += tint * 0.05;
+    color.rgb = color.rgb + fade * (1.0 - color.rgb);
+    return color;
+}
+""")
+
+    static let filmCompression = CIColorKernel(source: """
+kernel vec4 filmCompression(__sample image, float amount, float range) {
+    vec4 color = image;
+    if (amount < 0.001) {
+        return color;
+    }
+    float r = clamp(range, 0.0, 1.0);
+    float k = mix(5.15, 2.85, r);
+    float rangeSoft = smoothstep(0.82, 1.0, r);
+    float amt = amount * (1.0 - 0.18 * rangeSoft);
+    float luma = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+    float x = clamp(k * (luma - 0.5), -5.5, 5.5);
+    float s = 1.0 / (1.0 + exp(-x));
+    float scale = luma > 0.001 ? mix(luma, s, amt) / luma : 1.0;
+    color.rgb = clamp(color.rgb * scale, 0.0, 1.0);
+    return color;
+}
+""")
+
+    static let softKneeHighlight = CIColorKernel(source: """
+kernel vec4 softKneeHighlight(__sample image, float threshold, float knee, __color tintColor) {
+    float luma = dot(image.rgb, vec3(0.2126, 0.7152, 0.0722));
+    float safeThreshold = max(threshold, 1e-4);
+    float safeKnee = max(knee * safeThreshold, 1e-4);
+    float t = clamp((luma - threshold + safeKnee) / (2.0 * safeKnee), 0.0, 1.0);
+    float contribution = t * t * mix(safeKnee, 1.0, t);
+    contribution = max(contribution, max(0.0, luma - threshold));
+    return vec4(image.rgb * contribution * tintColor.rgb, image.a);
+}
+""")
+
+    static let glowComposite = CIColorKernel(source: """
+vec3 glowShoulder(vec3 energy) {
+    return 1.0 - exp(-max(energy, vec3(0.0)));
+}
+
+float glowHeadroom(vec3 baseRgb, float floorValue) {
+    float luma = dot(baseRgb, vec3(0.2126, 0.7152, 0.0722));
+    return mix(floorValue, 1.0, sqrt(clamp(1.0 - luma, 0.0, 1.0)));
+}
+
+kernel vec4 glowComposite(__sample base, __sample bloom, __sample halation, __sample diffusionImage, float bloomStrength, float halationIntensity, float diffusionAmount) {
+    vec3 baseRgb = base.rgb;
+    vec3 result = baseRgb;
+    vec3 glowEnergy = bloom.rgb * bloomStrength + halation.rgb * halationIntensity;
+    vec3 glow = glowShoulder(glowEnergy) * glowHeadroom(baseRgb, 0.82);
+    result = 1.0 - (1.0 - result) * (1.0 - glow);
+
+    if (diffusionAmount > 0.0) {
+        vec3 diffOpacity = glowShoulder(diffusionImage.rgb * diffusionAmount * 0.29) * glowHeadroom(baseRgb, 0.88);
+        result = 1.0 - (1.0 - result) * (1.0 - diffOpacity);
+    }
+
+    return vec4(clamp(result, 0.0, 1.0), base.a);
+}
+""")
+
+    static let vignette = CIColorKernel(source: """
+kernel vec4 vignette(__sample image, float intensity, vec2 extentOrigin, vec2 extentSize) {
+    vec4 color = image;
+    vec2 uv = (destCoord() - extentOrigin) / extentSize;
+    float dist = length(uv - vec2(0.5, 0.5)) * 1.414;
+    float vig = 1.0 - intensity * dist * dist;
+    color.rgb *= clamp(vig, 0.0, 1.0);
+    return color;
+}
+""")
+
+    static let grain = CIColorKernel(source: """
+float grainPixelHash(vec2 p, float seed) {
+    return fract(sin(dot(p + vec2(seed, seed * 0.73), vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
+}
+
+float grainClumpHash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+float grainClumpNoise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float a = grainClumpHash(i);
+    float b = grainClumpHash(i + vec2(1.0, 0.0));
+    float c = grainClumpHash(i + vec2(0.0, 1.0));
+    float d = grainClumpHash(i + vec2(1.0, 1.0));
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+kernel vec4 grain(__sample image, float intensity, float radialMix, float grainSize, float timeSeconds, float sourceSeed, vec2 extentOrigin, vec2 extentSize) {
+    vec4 color = image;
+    vec2 uv = (destCoord() - extentOrigin) / extentSize;
+    vec2 grainDelta = uv - vec2(0.5, 0.5);
+    grainDelta.x *= extentSize.x / max(extentSize.y, 1.0);
+    float grainRadial = clamp(length(grainDelta) * 2.0, 0.0, 1.0);
+    float grainRadialWeight = pow(grainRadial, 1.65);
+    float grainRadialEffective = mix(1.0, grainRadialWeight, clamp(radialMix, 0.0, 1.0));
+
+    float grainFrame = floor(max(timeSeconds, 0.0) * 3.0);
+    vec2 pixelCoord = uv * extentSize;
+    float lumaGrain = grainPixelHash(pixelCoord, grainFrame * 1.7 + sourceSeed * 13.0);
+    float chromaR = grainPixelHash(pixelCoord, grainFrame * 2.3 + 500.0 + sourceSeed * 7.0) * 0.3;
+    float chromaB = grainPixelHash(pixelCoord, grainFrame * 3.1 + 1000.0 + sourceSeed * 5.0) * 0.3;
+
+    float clumpScale = mix(80.0, 20.0, clamp(grainSize, 0.0, 1.0));
+    float clump = grainClumpNoise((uv * extentSize / clumpScale) + vec2(grainFrame * 0.5 + sourceSeed * 0.1, sourceSeed * 0.07));
+    float densityMod = mix(1.0, 0.3 + clump * 1.4, clamp(grainSize, 0.0, 1.0) * 0.7);
+
+    float weight = intensity * 0.5 * grainRadialEffective;
+    color.r += (lumaGrain + chromaR) * weight * densityMod;
+    color.g += lumaGrain * weight * densityMod;
+    color.b += (lumaGrain + chromaB) * weight * densityMod;
+    color.rgb = clamp(color.rgb, 0.0, 1.0);
+    return color;
+}
+""")
+
+    static let radialRGBSplit = CIKernel(source: """
+kernel vec4 radialRGBSplit(sampler image, float amount, vec2 extentOrigin, vec2 extentSize) {
+    vec2 coord = destCoord();
+    vec2 uv = (coord - extentOrigin) / extentSize;
+    vec2 delta = uv - vec2(0.5, 0.5);
+    delta.x *= extentSize.x / max(extentSize.y, 1.0);
+    float radial = clamp(length(delta) * 2.0, 0.0, 1.0);
+    float weight = pow(radial, 1.65);
+    float amt = amount * weight;
+    vec2 dir = normalize(delta + vec2(1e-5, 1e-5));
+    vec2 offset = vec2(dir.x * amt * extentSize.x, dir.y * amt * extentSize.y);
+    vec4 center = sample(image, samplerTransform(image, coord));
+    float r = sample(image, samplerTransform(image, coord + offset)).r;
+    float b = sample(image, samplerTransform(image, coord - offset)).b;
+    return vec4(r, center.g, b, center.a);
+}
+""")
+
+    static let edgeSoftnessBlend = CIKernel(source: """
+kernel vec4 edgeSoftnessBlend(sampler sharp, sampler blurred, float aberrationSoften, float lensSoftness, vec2 extentOrigin, vec2 extentSize) {
+    vec2 coord = destCoord();
+    vec2 uv = (coord - extentOrigin) / extentSize;
+    vec2 edgeDelta = uv - vec2(0.5, 0.5);
+    edgeDelta.x *= extentSize.x / max(extentSize.y, 1.0);
+    float edgeR = clamp(length(edgeDelta) * 1.414, 0.0, 1.0);
+    float edgeMask = smoothstep(0.25, 1.0, edgeR);
+    float lensR = clamp(length(edgeDelta) * 2.0, 0.0, 1.0);
+    float lensW = pow(lensR, 1.52);
+    float lensDrive = pow(clamp(lensSoftness, 0.0, 1.0), 0.78);
+    float lensWeight = clamp(lensDrive * lensW, 0.0, 1.0);
+    float lensMix = lensWeight * 0.72;
+    float softenAmt = clamp((aberrationSoften * edgeMask) + (lensMix * edgeMask), 0.0, 1.0);
+    vec4 sharpSample = sample(sharp, samplerTransform(sharp, coord));
+    vec4 blurSample = sample(blurred, samplerTransform(blurred, coord));
+    return mix(sharpSample, blurSample, softenAmt);
+}
+""")
 }

@@ -60,6 +60,23 @@ struct Phase0ParamsDTO: Codable {
     let saturation: Double
     let temperature: Double
     let tint: Double
+    let rgbShift: Double
+    let lensSoftness: Double
+    let grainRadialMix: Double
+    let grainSize: Double
+    let bloomThreshold: Double
+    let bloomStrength: Double
+    let bloomRadius: Double
+    let diffusion: Double
+    let halationIntensity: Double
+    let halationSpread: Double
+    let halationHue: Double
+    let halationThreshold: Double
+    let halationRadius: Double
+    let bloomSoftKnee: Double
+    let halationSoftKnee: Double
+    let compressionAmount: Double
+    let compressionRange: Double
     let fade: Double
     let vignette: Double
     let grainIntensity: Double

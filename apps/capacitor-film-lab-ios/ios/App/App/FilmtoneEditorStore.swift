@@ -99,6 +99,40 @@ final class FilmtoneEditorStore: ObservableObject {
             .joined(separator: " · ")
     }
 
+    var hasQuickAdjustments: Bool {
+        abs(project.quickState.filmCharacter) >= 0.01 ||
+            abs(project.quickState.era) >= 0.01 ||
+            abs(project.quickState.dynamics) >= 0.01
+    }
+
+    var hasAdvancedAdjustments: Bool {
+        !project.paramOverrides.isEmpty
+    }
+
+    var hasAnyAdjustments: Bool {
+        hasQuickAdjustments || hasAdvancedAdjustments
+    }
+
+    var advancedSummaryText: String {
+        hasAdvancedAdjustments ? strings.advancedAdjustmentsActive : strings.advancedParamsHint
+    }
+
+    var adjustmentSummaryText: String {
+        if hasQuickAdjustments && hasAdvancedAdjustments {
+            return "\(quickSummaryText) · \(strings.advancedAdjustmentsActive)"
+        }
+
+        if hasQuickAdjustments {
+            return quickSummaryText
+        }
+
+        if hasAdvancedAdjustments {
+            return strings.advancedAdjustmentsActive
+        }
+
+        return strings.quickHint
+    }
+
     var previewMetaLabel: String? {
         let width = preview.width ?? probe?.width
         let height = preview.height ?? probe?.height
@@ -117,6 +151,14 @@ final class FilmtoneEditorStore: ObservableObject {
 
     var sourceViolations: [String] {
         FilmtonePhase0Math.sourceCapViolations(for: probe)
+    }
+
+    func effectiveParamValue(for key: String) -> Double {
+        project.params.value(for: key)
+    }
+
+    func isParamOverridden(_ key: String) -> Bool {
+        project.paramOverrides.values[key] != nil
     }
 
     func attachPresenter(_ presenter: UIViewController) {
@@ -150,14 +192,7 @@ final class FilmtoneEditorStore: ObservableObject {
         project.presetName = presetName
         project.strength = FilmtonePhase0Math.presetStrengthDefault
         project.quickState = .zero
-        project.params = FilmtonePhase0Math.deriveParams(
-            presetName: presetName,
-            strength: project.strength,
-            quickState: project.quickState
-        )
-        project.updatedAt = FilmtonePhase0Math.isoTimestamp()
-        persist()
-        schedulePreviewRender()
+        recomputeProjectParams()
     }
 
     func setStrength(_ strength: Double) {
@@ -170,9 +205,20 @@ final class FilmtoneEditorStore: ObservableObject {
         recomputeProjectParams()
     }
 
+    func setParamOverride(_ value: Double, for key: String) {
+        let base = FilmtonePhase0Math.deriveParams(
+            presetName: project.presetName,
+            strength: project.strength,
+            quickState: project.quickState
+        )
+        project.paramOverrides = project.paramOverrides.settingValue(value, for: key, over: base)
+        recomputeProjectParams()
+    }
+
     func resetAdjustments() {
         project.quickState = .zero
         project.strength = FilmtonePhase0Math.presetStrengthDefault
+        project.paramOverrides = .empty
         recomputeProjectParams()
     }
 
@@ -260,11 +306,14 @@ final class FilmtoneEditorStore: ObservableObject {
 
     private func recomputeProjectParams() {
         project.quickState = project.quickState.clamped()
-        project.params = FilmtonePhase0Math.deriveParams(
+        let resolved = FilmtonePhase0Math.resolveParams(
             presetName: project.presetName,
             strength: project.strength,
-            quickState: project.quickState
+            quickState: project.quickState,
+            paramOverrides: project.paramOverrides
         )
+        project.paramOverrides = resolved.overrides
+        project.params = resolved.effective
         project.updatedAt = FilmtonePhase0Math.isoTimestamp()
         persist()
         schedulePreviewRender()
