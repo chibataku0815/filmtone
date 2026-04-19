@@ -65,6 +65,7 @@ import {
   type VideoExportProgress,
   type VideoExportPipelineUserMessages,
 } from "./video-export-pipeline";
+import { applyBatchGradeToViewport } from "./offscreen/apply-batch-grade-to-viewport";
 import {
   assertVideoImportWithinCaps,
   computeExportFrameCount,
@@ -141,6 +142,37 @@ function isRasterExportFileName(fileName: string): boolean {
 /** @description プレビューに載せたファイル名が動画書き出し向けか */
 function isVideoExportFileName(fileName: string): boolean {
   return /\.(mp4|webm)$/i.test(fileName);
+}
+
+type EditLutState = {
+  lut1: { name: string; data: Float32Array; size: number; intensity: number } | null;
+  lut2: { name: string; data: Float32Array; size: number; intensity: number } | null;
+};
+
+function buildEditLutStateFromBatchGrade(
+  grade: BatchGradeState,
+  lutRefs: MetadataLutRefs,
+): EditLutState {
+  return {
+    lut1:
+      grade.lut1Data && grade.lut1Size > 0
+        ? {
+            name: lutRefs.lut1.displayName ?? "",
+            data: grade.lut1Data,
+            size: grade.lut1Size,
+            intensity: grade.lut1Intensity,
+          }
+        : null,
+    lut2:
+      grade.lutData && grade.lutSize > 0
+        ? {
+            name: lutRefs.lut2.displayName ?? "",
+            data: grade.lutData,
+            size: grade.lutSize,
+            intensity: grade.lutIntensity,
+          }
+        : null,
+  };
 }
 
 /**
@@ -365,10 +397,20 @@ export default function App() {
   const [editToExportSyncedAtMs, setEditToExportSyncedAtMs] = useState<
     number | null
   >(null);
-  const [editLut, setEditLut] = useState<{
-    lut1: { name: string; data: Float32Array; size: number; intensity: number } | null;
-    lut2: { name: string; data: Float32Array; size: number; intensity: number } | null;
-  }>({ lut1: null, lut2: null });
+  const [editLut, setEditLut] = useState<EditLutState>({
+    lut1: null,
+    lut2: null,
+  });
+  /**
+   * @description metadata import 時だけ、編集パネルを imported params で再初期化して
+   * プレビューと右パネルの数値状態を揃える。
+   */
+  const [importedPreviewParams, setImportedPreviewParams] = useState<
+    BatchGradeState["params"] | null
+  >(null);
+  const [importedPreviewGrade, setImportedPreviewGrade] =
+    useState<BatchGradeState | null>(null);
+  const [importedPreviewPanelNonce, setImportedPreviewPanelNonce] = useState(0);
   const [paramsChangeNonce, setParamsChangeNonce] = useState(0);
   const [syncedAtNonce, setSyncedAtNonce] = useState(0);
 
@@ -384,10 +426,7 @@ export default function App() {
    * @description LUT 変更も同じく安定したコールバックにまとめ、子コンポーネント側の
    * effect 依存で無限再描画にならないようにします。
    */
-  const handleEditLutChange = useCallback((nextLutState: {
-    lut1: { name: string; data: Float32Array; size: number; intensity: number } | null;
-    lut2: { name: string; data: Float32Array; size: number; intensity: number } | null;
-  }) => {
+  const handleEditLutChange = useCallback((nextLutState: EditLutState) => {
     setEditLut(nextLutState);
     setParamsChangeNonce((n) => n + 1);
   }, []);
@@ -455,6 +494,13 @@ export default function App() {
     }
     void refreshProxyCacheInfo();
   }, [progressiveLoad.proxyPath, refreshProxyCacheInfo]);
+
+  useEffect(() => {
+    if (!viewport || !importedPreviewGrade) {
+      return;
+    }
+    applyBatchGradeToViewport(viewport, importedPreviewGrade);
+  }, [viewport, importedPreviewGrade]);
 
   /**
    * @description 写真バッチ／動画書き出し中は main 側で通知をキューに残す
@@ -766,6 +812,100 @@ export default function App() {
     [appendLog, tLogs],
   );
 
+  const restoreImportedMetadataFromPath = useCallback(
+    async (p: string) => {
+      const text = await window.filmLabBatch.readFileUtf8(p);
+      const restored = await resolveImportedMetadataJson(
+        window.filmLabBatch,
+        p,
+        text,
+      );
+      const restoredEditLut = buildEditLutStateFromBatchGrade(
+        restored.batchGrade,
+        restored.lutRefs,
+      );
+      setBatchGrade(restored.batchGrade);
+      setBatchPresetChoice(restored.batchPresetChoice);
+      setBatchLookSource(restored.lookSource);
+      setBatchLutRefs(restored.lutRefs);
+      setImportedGradeLabel(restored.importedFilePath);
+      setEditToExportSyncedAtMs(restored.syncedAtMs);
+      setCanvasPreset(restored.batchPresetChoice);
+      setEditLut(restoredEditLut);
+      setImportedPreviewParams(restored.batchGrade.params);
+      setImportedPreviewGrade({
+        params: restored.batchGrade.params,
+        lut1Intensity: restored.batchGrade.lut1Intensity,
+        lut1Data: restored.batchGrade.lut1Data,
+        lut1Size: restored.batchGrade.lut1Size,
+        lutIntensity: restored.batchGrade.lutIntensity,
+        lutData: restored.batchGrade.lutData,
+        lutSize: restored.batchGrade.lutSize,
+      });
+      setImportedPreviewPanelNonce((value) => value + 1);
+
+      if (restored.sidecar) {
+        const sidecar = restored.sidecar;
+        const restoreImages = sidecar.job === "images";
+        setBatchJobMode(restoreImages ? "images" : "video");
+        setTab(restoreImages ? "photoExport" : "videoExport");
+        setInputDir(restoreImages ? sidecar.input.inputDir : null);
+        setOutputDir(sidecar.output.outputDir);
+        if (restoreImages) {
+          setBatchFormat(sidecar.output.imageFormat ?? "jpeg");
+          setBatchOutputSuffix(sidecar.output.outputFilenameSuffix ?? "-graded");
+          setVideoInputPath(null);
+          setVideoProbeLabel(null);
+        } else {
+          setBatchOutputSuffix(sidecar.output.outputFilenameSuffix ?? "-graded");
+          if (sidecar.input.videoInputPath) {
+            await applyPickedVideoPath(sidecar.input.videoInputPath);
+          } else {
+            setVideoInputPath(null);
+            setVideoProbeLabel(null);
+          }
+        }
+        appendLog(tLogs("metadataJsonLoaded", { path: p }));
+      } else {
+        appendLog(tLogs("gradeJsonLoaded", { path: p }));
+      }
+      for (const warning of restored.warnings) {
+        appendLog(tLogs("metadataJsonLutWarning", { detail: warning }));
+      }
+    },
+    [applyPickedVideoPath, appendLog, tLogs],
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const harness = (window as any).__filmtoneTest as
+      | {
+          importMetadataJsonFromPath?: (filePath: string) => Promise<{
+            ok: boolean;
+            error?: string;
+          }>;
+        }
+      | undefined;
+    if (!harness) return;
+    const importFromPath = async (filePath: string) => {
+      try {
+        await restoreImportedMetadataFromPath(filePath);
+        return { ok: true };
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    };
+    harness.importMetadataJsonFromPath = importFromPath;
+    return () => {
+      if (harness.importMetadataJsonFromPath === importFromPath) {
+        delete harness.importMetadataJsonFromPath;
+      }
+    };
+  }, [restoreImportedMetadataFromPath, viewport]);
+
   /**
    * @description キャンバスが載せ替わったらプレビュー状態を更新し、Electron でパスが取れるときだけ書き出し入力を寄せる（life#83）。
    */
@@ -977,47 +1117,7 @@ export default function App() {
     const p = await window.filmLabBatch.pickMetadataJson();
     if (!p) return;
     try {
-      const text = await window.filmLabBatch.readFileUtf8(p);
-      const restored = await resolveImportedMetadataJson(
-        window.filmLabBatch,
-        p,
-        text,
-      );
-      setBatchGrade(restored.batchGrade);
-      setBatchPresetChoice(restored.batchPresetChoice);
-      setBatchLookSource(restored.lookSource);
-      setBatchLutRefs(restored.lutRefs);
-      setImportedGradeLabel(restored.importedFilePath);
-      setEditToExportSyncedAtMs(restored.syncedAtMs);
-
-      if (restored.sidecar) {
-        const sidecar = restored.sidecar;
-        const restoreImages = sidecar.job === "images";
-        setBatchJobMode(restoreImages ? "images" : "video");
-        setTab(restoreImages ? "photoExport" : "videoExport");
-        setInputDir(sidecar.input.inputDir);
-        setOutputDir(sidecar.output.outputDir);
-        if (restoreImages) {
-          setBatchFormat(sidecar.output.imageFormat ?? "jpeg");
-          setBatchOutputSuffix(sidecar.output.outputFilenameSuffix ?? "-graded");
-          setVideoInputPath(null);
-          setVideoProbeLabel(null);
-        } else {
-          setBatchOutputSuffix(sidecar.output.outputFilenameSuffix ?? "-graded");
-          if (sidecar.input.videoInputPath) {
-            await applyPickedVideoPath(sidecar.input.videoInputPath);
-          } else {
-            setVideoInputPath(null);
-            setVideoProbeLabel(null);
-          }
-        }
-        appendLog(tLogs("metadataJsonLoaded", { path: p }));
-      } else {
-        appendLog(tLogs("gradeJsonLoaded", { path: p }));
-      }
-      for (const warning of restored.warnings) {
-        appendLog(tLogs("metadataJsonLutWarning", { detail: warning }));
-      }
+      await restoreImportedMetadataFromPath(p);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       appendLog(tLogs("gradeJsonError", { msg }));
@@ -1918,12 +2018,14 @@ export default function App() {
                 >
                   <div className="fl-scroll-surface fl-right-panel-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 pr-5 lg:pr-8">
                     <FilmLabControlPanelCore
+                      key={importedPreviewPanelNonce}
                       viewport={viewport}
                       histogramVisible={histogramVisible && previewSupportsHistogram}
                       supportsHistogram={previewSupportsHistogram}
                       supportsBeforeAfter={previewSupportsBeforeAfter}
                       supportsABCompare={previewSupportsABCompare}
                       surface="bare"
+                      initialSharedParams={importedPreviewParams}
                       onHistogramToggle={
                         previewSupportsHistogram ? handleHistogramToggle : undefined
                       }

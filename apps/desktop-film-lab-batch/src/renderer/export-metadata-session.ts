@@ -206,6 +206,10 @@ export function buildFilmtoneExportSession(params: {
   gradeParams: Params;
   lutRefs: MetadataLutRefs;
 }): FilmtoneExportSessionV1 {
+  const normalizedInputDir = params.job === "images" ? params.inputDir : null;
+  const normalizedVideoInputPath =
+    params.job === "video" ? params.videoInputPath : null;
+
   return {
     kind: "filmtone-export-session",
     version: 1,
@@ -213,8 +217,8 @@ export function buildFilmtoneExportSession(params: {
     appVersion: params.appVersion,
     job: params.job,
     input: {
-      inputDir: params.inputDir,
-      videoInputPath: params.videoInputPath,
+      inputDir: normalizedInputDir,
+      videoInputPath: normalizedVideoInputPath,
     },
     output: {
       outputDir: params.outputDir,

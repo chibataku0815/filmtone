@@ -49,6 +49,54 @@ describe("export metadata session", () => {
     expect(parsed).toEqual(session);
   });
 
+  it("forces video sidecars to omit image-batch inputDir state", () => {
+    const cinematic = batchGradeStateFromPreset("cinematic");
+    const session = buildFilmtoneExportSession({
+      exportedAtIso: "2026-04-19T12:34:56.000Z",
+      appVersion: "1.2.3",
+      job: "video",
+      inputDir: "/Users/tester/stale-image-folder",
+      videoInputPath: "/Users/tester/input/clip.mov",
+      outputDir: "/Users/tester/output",
+      imageFormat: null,
+      outputFilenameSuffix: null,
+      outputFileName: "clip-graded.mp4",
+      batchPresetChoice: "cinematic",
+      lookSource: "editSync",
+      gradeParams: cinematic.params,
+      lutRefs: createEmptyMetadataLutRefs(),
+    });
+
+    expect(session.input).toEqual({
+      inputDir: null,
+      videoInputPath: "/Users/tester/input/clip.mov",
+    });
+  });
+
+  it("forces image sidecars to omit video input state", () => {
+    const cinematic = batchGradeStateFromPreset("cinematic");
+    const session = buildFilmtoneExportSession({
+      exportedAtIso: "2026-04-19T12:34:56.000Z",
+      appVersion: "1.2.3",
+      job: "images",
+      inputDir: "/Users/tester/input",
+      videoInputPath: "/Users/tester/input/clip.mov",
+      outputDir: "/Users/tester/output",
+      imageFormat: "jpeg",
+      outputFilenameSuffix: "-graded",
+      outputFileName: null,
+      batchPresetChoice: "cinematic",
+      lookSource: "preset",
+      gradeParams: cinematic.params,
+      lutRefs: createEmptyMetadataLutRefs(),
+    });
+
+    expect(session.input).toEqual({
+      inputDir: "/Users/tester/input",
+      videoInputPath: null,
+    });
+  });
+
   it("creates timestamped photo sidecar filenames", () => {
     expect(
       buildPhotoMetadataSidecarFileName("2026-04-19T12:34:56.789Z"),
