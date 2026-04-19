@@ -117,10 +117,15 @@ export type FilmLabBatchBridge = {
   }) => Promise<void>;
   pickInputDir: () => Promise<string | null>;
   pickOutputDir: () => Promise<string | null>;
+  pickMetadataJson: () => Promise<string | null>;
   pickGradeJson: () => Promise<string | null>;
   listImages: (dir: string) => Promise<string[]>;
   readFileUtf8: (filePath: string) => Promise<string>;
   readFileBuffer: (filePath: string) => Promise<Uint8Array>;
+  writeFileUtf8: (payload: {
+    filePath: string;
+    text: string;
+  }) => Promise<void>;
   readCubeRelativeToGrade: (
     gradeJsonPath: string,
     relPath: string,

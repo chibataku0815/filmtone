@@ -70,7 +70,7 @@ export const PROCESS_PARAM_KEYS = Object.keys(
 ) as ProcessParamKey[];
 
 const CROSS_FILTER_MIN_SPACING_FLOOR = 1;
-const CROSS_FILTER_MIN_SPACING_CEILING = 10;
+const CROSS_FILTER_MIN_SPACING_CEILING = 2;
 
 function normalizeCrossFilterSpacingFloor(params: Params): Params {
   return {

@@ -73,6 +73,17 @@ import {
   VIDEO_IMPORT_MAX_DURATION_SEC,
 } from "./video-export-constants";
 import { exportGradeJsonText } from "./grade-io";
+import {
+  buildFilmtoneExportSession,
+  buildPhotoMetadataSidecarPath,
+  buildVideoMetadataSidecarPath,
+  createEmptyMetadataLutRefs,
+  createMetadataLutRefFromRuntime,
+  exportFilmtoneExportSessionJsonText,
+  type MetadataLookSource,
+  type MetadataLutRefs,
+} from "./export-metadata-session";
+import { resolveImportedMetadataJson } from "./metadata-json-runtime";
 import { viewportRecordToParams } from "./viewport-to-params";
 import {
   BatchTabCompactRunFooter,
@@ -137,22 +148,28 @@ function isVideoExportFileName(fileName: string): boolean {
  */
 async function resolveBatchGradeSnapshot(
   s: FilmLabBatchSessionV1,
-): Promise<BatchGradeState> {
+): Promise<{
+  grade: BatchGradeState;
+  batchPresetChoice: PresetName;
+  lookSource: MetadataLookSource;
+  lutRefs: MetadataLutRefs;
+  syncedAtMs: number | null;
+  importedFilePath: string | null;
+}> {
   if (s.importedGradePath) {
     const text = await window.filmLabBatch.readFileUtf8(s.importedGradePath);
-    const g = await resolveGradeFromJsonText(
+    const restored = await resolveImportedMetadataJson(
       window.filmLabBatch,
       s.importedGradePath,
       text,
     );
     return {
-      params: g.params,
-      lut1Intensity: g.lut1Intensity,
-      lut1Data: g.lut1Data,
-      lut1Size: g.lut1Size,
-      lutIntensity: g.lutIntensity,
-      lutData: g.lutData,
-      lutSize: g.lutSize,
+      grade: restored.batchGrade,
+      batchPresetChoice: restored.batchPresetChoice,
+      lookSource: restored.lookSource,
+      lutRefs: restored.lutRefs,
+      syncedAtMs: restored.syncedAtMs,
+      importedFilePath: restored.importedFilePath,
     };
   }
   if (s.gradeParamsJson) {
@@ -164,16 +181,30 @@ async function resolveBatchGradeSnapshot(
       s.gradeParamsJson,
     );
     return {
-      params: g.params,
-      lut1Intensity: g.lut1Intensity,
-      lut1Data: g.lut1Data,
-      lut1Size: g.lut1Size,
-      lutIntensity: g.lutIntensity,
-      lutData: g.lutData,
-      lutSize: g.lutSize,
+      grade: {
+        params: g.params,
+        lut1Intensity: g.lut1Intensity,
+        lut1Data: g.lut1Data,
+        lut1Size: g.lut1Size,
+        lutIntensity: g.lutIntensity,
+        lutData: g.lutData,
+        lutSize: g.lutSize,
+      },
+      batchPresetChoice: s.batchPresetChoice,
+      lookSource: "preset",
+      lutRefs: createEmptyMetadataLutRefs(),
+      syncedAtMs: null,
+      importedFilePath: null,
     };
   }
-  return batchGradeStateFromPreset(s.batchPresetChoice);
+  return {
+    grade: batchGradeStateFromPreset(s.batchPresetChoice),
+    batchPresetChoice: s.batchPresetChoice,
+    lookSource: "preset",
+    lutRefs: createEmptyMetadataLutRefs(),
+    syncedAtMs: null,
+    importedFilePath: null,
+  };
 }
 
 /**
@@ -194,6 +225,9 @@ export default function App() {
   const tFilmLab = useTranslations("film-lab");
   const tLogs = useTranslations("film-lab.desktop.logs");
   const locale = useLocale();
+  const appVersion = String(
+    import.meta.env.VITE_FILMTONE_DESKTOP_VERSION ?? "0.0.0",
+  );
 
   const videoPipelineUserMessages = useMemo(
     (): VideoExportPipelineUserMessages => ({
@@ -251,6 +285,12 @@ export default function App() {
   );
   const [batchPresetChoice, setBatchPresetChoice] =
     useState<PresetName>("cinematic");
+  const [batchLookSource, setBatchLookSource] =
+    useState<MetadataLookSource>("preset");
+  const [batchLutRefs, setBatchLutRefs] = useState<MetadataLutRefs>(
+    createEmptyMetadataLutRefs,
+  );
+  /** @description 最後に import した JSON ファイル。session 復元にも使うため、表示上の look source とは分離する。 */
   const [importedGradeLabel, setImportedGradeLabel] = useState<string | null>(
     null,
   );
@@ -551,13 +591,21 @@ export default function App() {
         setBatchFormat(parsed.format);
         setBatchOutputSuffix(parsed.outputFilenameSuffix);
         setBatchPresetChoice(parsed.batchPresetChoice);
+        setBatchLookSource("preset");
+        setBatchLutRefs(createEmptyMetadataLutRefs());
         setEditToExportSyncedAtMs(null);
         try {
           const snap = await resolveBatchGradeSnapshot(parsed);
-          setBatchGrade(snap);
-          setImportedGradeLabel(parsed.importedGradePath);
+          setBatchGrade(snap.grade);
+          setBatchPresetChoice(snap.batchPresetChoice);
+          setBatchLookSource(snap.lookSource);
+          setBatchLutRefs(snap.lutRefs);
+          setImportedGradeLabel(snap.importedFilePath);
+          setEditToExportSyncedAtMs(snap.syncedAtMs);
         } catch {
           setBatchGrade(batchGradeStateFromPreset(parsed.batchPresetChoice));
+          setBatchLookSource("preset");
+          setBatchLutRefs(createEmptyMetadataLutRefs());
           setImportedGradeLabel(null);
         }
         return;
@@ -883,6 +931,11 @@ export default function App() {
         lutData: editLut.lut2?.data ?? null,
         lutSize: editLut.lut2?.size ?? 0,
       });
+      setBatchLookSource("editSync");
+      setBatchLutRefs({
+        lut1: createMetadataLutRefFromRuntime(editLut.lut1),
+        lut2: createMetadataLutRefFromRuntime(editLut.lut2),
+      });
       setImportedGradeLabel(null);
       setBatchPresetChoice(canvasPreset);
       setEditToExportSyncedAtMs(Date.now());
@@ -914,28 +967,57 @@ export default function App() {
   const applyBatchPreset = (name: PresetName) => {
     setBatchPresetChoice(name);
     setBatchGrade(batchGradeStateFromPreset(name));
+    setBatchLookSource("preset");
+    setBatchLutRefs(createEmptyMetadataLutRefs());
     setImportedGradeLabel(null);
     setEditToExportSyncedAtMs(null);
   };
 
   const importGradeJson = async () => {
-    const p = await window.filmLabBatch.pickGradeJson();
+    const p = await window.filmLabBatch.pickMetadataJson();
     if (!p) return;
     try {
       const text = await window.filmLabBatch.readFileUtf8(p);
-      const g = await resolveGradeFromJsonText(window.filmLabBatch, p, text);
-      setBatchGrade({
-        params: g.params,
-        lut1Intensity: g.lut1Intensity,
-        lut1Data: g.lut1Data,
-        lut1Size: g.lut1Size,
-        lutIntensity: g.lutIntensity,
-        lutData: g.lutData,
-        lutSize: g.lutSize,
-      });
-      setImportedGradeLabel(p);
-      setEditToExportSyncedAtMs(null);
-      appendLog(tLogs("gradeJsonLoaded", { path: p }));
+      const restored = await resolveImportedMetadataJson(
+        window.filmLabBatch,
+        p,
+        text,
+      );
+      setBatchGrade(restored.batchGrade);
+      setBatchPresetChoice(restored.batchPresetChoice);
+      setBatchLookSource(restored.lookSource);
+      setBatchLutRefs(restored.lutRefs);
+      setImportedGradeLabel(restored.importedFilePath);
+      setEditToExportSyncedAtMs(restored.syncedAtMs);
+
+      if (restored.sidecar) {
+        const sidecar = restored.sidecar;
+        const restoreImages = sidecar.job === "images";
+        setBatchJobMode(restoreImages ? "images" : "video");
+        setTab(restoreImages ? "photoExport" : "videoExport");
+        setInputDir(sidecar.input.inputDir);
+        setOutputDir(sidecar.output.outputDir);
+        if (restoreImages) {
+          setBatchFormat(sidecar.output.imageFormat ?? "jpeg");
+          setBatchOutputSuffix(sidecar.output.outputFilenameSuffix ?? "-graded");
+          setVideoInputPath(null);
+          setVideoProbeLabel(null);
+        } else {
+          setBatchOutputSuffix(sidecar.output.outputFilenameSuffix ?? "-graded");
+          if (sidecar.input.videoInputPath) {
+            await applyPickedVideoPath(sidecar.input.videoInputPath);
+          } else {
+            setVideoInputPath(null);
+            setVideoProbeLabel(null);
+          }
+        }
+        appendLog(tLogs("metadataJsonLoaded", { path: p }));
+      } else {
+        appendLog(tLogs("gradeJsonLoaded", { path: p }));
+      }
+      for (const warning of restored.warnings) {
+        appendLog(tLogs("metadataJsonLutWarning", { detail: warning }));
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       appendLog(tLogs("gradeJsonError", { msg }));
@@ -954,6 +1036,44 @@ export default function App() {
     URL.revokeObjectURL(url);
     appendLog(tLogs("gradeJsonDownloaded"));
   };
+
+  const buildMetadataSessionJsonText = useCallback(
+    (payload: {
+      job: "images" | "video";
+      inputDir: string | null;
+      videoInputPath: string | null;
+      outputDir: string;
+      imageFormat: BatchFormat | null;
+      outputFilenameSuffix: string | null;
+      outputFileName: string | null;
+      grade?: BatchGradeState;
+      batchPresetChoice?: PresetName;
+      lookSource?: MetadataLookSource;
+      lutRefs?: MetadataLutRefs;
+    }) => {
+      const exportedAtIso = new Date().toISOString();
+      const session = buildFilmtoneExportSession({
+        exportedAtIso,
+        appVersion,
+        job: payload.job,
+        inputDir: payload.inputDir,
+        videoInputPath: payload.videoInputPath,
+        outputDir: payload.outputDir,
+        imageFormat: payload.imageFormat,
+        outputFilenameSuffix: payload.outputFilenameSuffix,
+        outputFileName: payload.outputFileName,
+        batchPresetChoice: payload.batchPresetChoice ?? batchPresetChoice,
+        lookSource: payload.lookSource ?? batchLookSource,
+        gradeParams: (payload.grade ?? batchGrade).params,
+        lutRefs: payload.lutRefs ?? batchLutRefs,
+      });
+      return {
+        exportedAtIso,
+        jsonText: exportFilmtoneExportSessionJsonText(session),
+      };
+    },
+    [appVersion, batchGrade, batchLookSource, batchLutRefs, batchPresetChoice],
+  );
 
   const finalizeSessionAfterRun = useCallback(
     async (
@@ -983,11 +1103,21 @@ export default function App() {
         outputDir: string;
         /** @description 再開直後など、state よりこのスナップショットをパイプラインに渡す */
         grade?: BatchGradeState;
+        batchPresetChoice?: PresetName;
+        lookSource?: MetadataLookSource;
+        lutRefs?: MetadataLutRefs;
+        importedGradePath?: string | null;
       },
     ) => {
       const effectiveInput = pathContext?.inputDir ?? inputDir;
       const effectiveOutput = pathContext?.outputDir ?? outputDir;
       const effectiveGrade = pathContext?.grade ?? batchGrade;
+      const effectiveBatchPresetChoice =
+        pathContext?.batchPresetChoice ?? batchPresetChoice;
+      const effectiveLookSource = pathContext?.lookSource ?? batchLookSource;
+      const effectiveLutRefs = pathContext?.lutRefs ?? batchLutRefs;
+      const effectiveImportedGradePath =
+        pathContext?.importedGradePath ?? importedGradeLabel;
       if (!effectiveInput || !effectiveOutput) return;
 
       void window.filmLabBatch.setDesktopPrefs({
@@ -999,29 +1129,71 @@ export default function App() {
       setLastBatchSummary(null);
       setLastFailedPaths([]);
 
-      const abortController = new AbortController();
-      batchAbortRef.current = abortController;
-      activeBatchSessionRef.current = sessionMutable;
-
       appendLog(tLogs("inputLabel", { path: effectiveInput }));
       appendLog(tLogs("outputLabel", { path: effectiveOutput }));
-      appendLog(
-        importedGradeLabel
-          ? tLogs("gradeImportedLine")
-          : tLogs("gradeMemoryLine", { preset: batchPresetChoice }),
-      );
-      appendLog(tLogs("formatLabel", { format }));
       const outputSuffixForPipeline =
         sessionMutable?.outputFilenameSuffix ?? batchOutputSuffix;
+      const sanitizedOutputSuffix =
+        sanitizeBatchFilenameSuffix(outputSuffixForPipeline);
+      switch (effectiveLookSource) {
+        case "importedJson":
+          appendLog(
+            tLogs("gradeImportedLine", {
+              path: effectiveImportedGradePath ?? "",
+            }),
+          );
+          break;
+        case "editSync":
+          appendLog(tLogs("gradeEditSyncLine"));
+          break;
+        default:
+          appendLog(
+            tLogs("gradePresetLine", {
+              preset: effectiveBatchPresetChoice,
+            }),
+          );
+          break;
+      }
+      appendLog(tLogs("formatLabel", { format }));
       appendLog(
         tLogs("suffixLabel", {
-          value:
-            sanitizeBatchFilenameSuffix(outputSuffixForPipeline) === ""
-              ? tLogs("suffixNone")
-              : sanitizeBatchFilenameSuffix(outputSuffixForPipeline),
+          value: sanitizedOutputSuffix === "" ? tLogs("suffixNone") : sanitizedOutputSuffix,
         }),
       );
       appendLog(tLogs("runCountLabel", { count: imagePaths.length }));
+
+      const photoSidecar = buildMetadataSessionJsonText({
+        job: "images",
+        inputDir: effectiveInput,
+        videoInputPath: null,
+        outputDir: effectiveOutput,
+        imageFormat: format,
+        outputFilenameSuffix: sanitizedOutputSuffix,
+        outputFileName: null,
+        grade: effectiveGrade,
+        batchPresetChoice: effectiveBatchPresetChoice,
+        lookSource: effectiveLookSource,
+        lutRefs: effectiveLutRefs,
+      });
+      const photoSidecarPath = buildPhotoMetadataSidecarPath(
+        effectiveOutput,
+        photoSidecar.exportedAtIso,
+      );
+      try {
+        await window.filmLabBatch.writeFileUtf8({
+          filePath: photoSidecarPath,
+          text: photoSidecar.jsonText,
+        });
+        appendLog(tLogs("metadataJsonSaved", { path: photoSidecarPath }));
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        appendLog(tLogs("metadataJsonSaveFailed", { msg }));
+        return;
+      }
+
+      const abortController = new AbortController();
+      batchAbortRef.current = abortController;
+      activeBatchSessionRef.current = sessionMutable;
 
       setRunning(true);
       try {
@@ -1098,8 +1270,11 @@ export default function App() {
     [
       appendLog,
       batchGrade,
+      batchLookSource,
+      batchLutRefs,
       batchPresetChoice,
       finalizeSessionAfterRun,
+      buildMetadataSessionJsonText,
       importedGradeLabel,
       inputDir,
       outputDir,
@@ -1143,22 +1318,37 @@ export default function App() {
     setBatchFormat(s.format);
     setBatchOutputSuffix(s.outputFilenameSuffix);
     setBatchPresetChoice(s.batchPresetChoice);
-    let gradeSnap: BatchGradeState;
+    let gradeSnap: Awaited<ReturnType<typeof resolveBatchGradeSnapshot>>;
     try {
       gradeSnap = await resolveBatchGradeSnapshot(s);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       appendLog(tLogs("sessionRestoreFailed", { msg }));
-      gradeSnap = batchGradeStateFromPreset(s.batchPresetChoice);
+      gradeSnap = {
+        grade: batchGradeStateFromPreset(s.batchPresetChoice),
+        batchPresetChoice: s.batchPresetChoice,
+        lookSource: "preset",
+        lutRefs: createEmptyMetadataLutRefs(),
+        syncedAtMs: null,
+        importedFilePath: s.importedGradePath,
+      };
     }
-    setBatchGrade(gradeSnap);
-    setImportedGradeLabel(s.importedGradePath);
+    setBatchGrade(gradeSnap.grade);
+    setBatchPresetChoice(gradeSnap.batchPresetChoice);
+    setBatchLookSource(gradeSnap.lookSource);
+    setBatchLutRefs(gradeSnap.lutRefs);
+    setImportedGradeLabel(gradeSnap.importedFilePath);
+    setEditToExportSyncedAtMs(gradeSnap.syncedAtMs);
     const todo = pathsNotSucceeded(s);
     if (todo.length === 0) return;
     await runBatchWithPaths(todo, s.format, s, {
       inputDir: s.inputDir,
       outputDir: s.outputDir,
-      grade: gradeSnap,
+      grade: gradeSnap.grade,
+      batchPresetChoice: gradeSnap.batchPresetChoice,
+      lookSource: gradeSnap.lookSource,
+      lutRefs: gradeSnap.lutRefs,
+      importedGradePath: gradeSnap.importedFilePath,
     });
   };
 
@@ -1253,6 +1443,32 @@ export default function App() {
     resetLogText();
     resetVideoProgressBuffer();
     batchAbortRef.current = null;
+
+    const videoSidecar = buildMetadataSessionJsonText({
+      job: "video",
+      inputDir,
+      videoInputPath,
+      outputDir: effectiveOutputDir,
+      imageFormat: null,
+      outputFilenameSuffix: null,
+      outputFileName: outName,
+    });
+    const videoSidecarPath = buildVideoMetadataSidecarPath(
+      effectiveOutputDir,
+      outName,
+    );
+    try {
+      await window.filmLabBatch.writeFileUtf8({
+        filePath: videoSidecarPath,
+        text: videoSidecar.jsonText,
+      });
+      appendLog(tLogs("metadataJsonSaved", { path: videoSidecarPath }));
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      appendLog(tLogs("metadataJsonSaveFailed", { msg }));
+      return;
+    }
+
     const previewBeforeExport = previewStatusRef.current;
     filmLabCanvasRef.current?.holdPreviewRendering(true);
     setRunning(true);
@@ -1795,6 +2011,7 @@ export default function App() {
                           isPurgingProxyCache={purgingProxyCache}
                           onPurgeProxyCache={purgeProxyCache}
                           batchPresetChoice={batchPresetChoice}
+                          batchLookSource={batchLookSource}
                           onBatchPresetChoiceChange={applyBatchPreset}
                           importedGradeLabel={importedGradeLabel}
                           onImportGradeJson={importGradeJson}
@@ -1850,6 +2067,7 @@ export default function App() {
                           isPurgingProxyCache={purgingProxyCache}
                           onPurgeProxyCache={purgeProxyCache}
                           batchPresetChoice={batchPresetChoice}
+                          batchLookSource={batchLookSource}
                           onBatchPresetChoiceChange={applyBatchPreset}
                           importedGradeLabel={importedGradeLabel}
                           onImportGradeJson={importGradeJson}

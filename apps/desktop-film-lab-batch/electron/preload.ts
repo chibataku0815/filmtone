@@ -101,6 +101,8 @@ contextBridge.exposeInMainWorld("filmLabBatch", {
     ipcRenderer.invoke("pick-input-dir"),
   pickOutputDir: (): Promise<string | null> =>
     ipcRenderer.invoke("pick-output-dir"),
+  pickMetadataJson: (): Promise<string | null> =>
+    ipcRenderer.invoke("pick-metadata-json"),
   pickGradeJson: (): Promise<string | null> =>
     ipcRenderer.invoke("pick-grade-json"),
   listImages: (dir: string): Promise<string[]> =>
@@ -109,6 +111,10 @@ contextBridge.exposeInMainWorld("filmLabBatch", {
     ipcRenderer.invoke("read-file-utf8", filePath),
   readFileBuffer: (filePath: string): Promise<Uint8Array> =>
     ipcRenderer.invoke("read-file-buffer", filePath),
+  writeFileUtf8: (payload: {
+    filePath: string;
+    text: string;
+  }): Promise<void> => ipcRenderer.invoke("write-file-utf8", payload),
   readCubeRelativeToGrade: (
     gradeJsonPath: string,
     relPath: string,

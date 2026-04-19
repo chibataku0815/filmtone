@@ -36,6 +36,7 @@ const baseProps: BatchTabPanelProps = {
   isPurgingProxyCache: false,
   onPurgeProxyCache: async () => {},
   batchPresetChoice: "cinematic",
+  batchLookSource: "preset",
   onBatchPresetChoiceChange: () => {},
   importedGradeLabel: null,
   onImportGradeJson: async () => {},
@@ -98,6 +99,7 @@ describe("BatchTabPanel accordion layout", () => {
     const html = renderBatchPanel(
       <BatchTabPanel
         {...baseProps}
+        batchLookSource="editSync"
         editToExportSyncedAtMs={1_700_000_000_000}
       />,
     );
@@ -112,11 +114,31 @@ describe("BatchTabPanel accordion layout", () => {
     const html = renderBatchPanel(
       <BatchTabPanel
         {...baseProps}
+        batchLookSource="editSync"
         editToExportSyncedAtMs={1_700_000_000_000}
       />,
     );
 
     expect(html).toContain("synced");
+  });
+
+  it("renders the visible Metadata JSON restore action", () => {
+    const html = renderBatchPanel(<BatchTabPanel {...baseProps} />);
+
+    expect(html).toContain("Metadata JSON を読み込む");
+  });
+
+  it("shows preset look status for preset-based metadata restores", () => {
+    const html = renderBatchPanel(
+      <BatchTabPanel
+        {...baseProps}
+        importedGradeLabel="/tmp/filmtone-export-session.json"
+        batchLookSource="preset"
+      />,
+    );
+
+    expect(html).toContain("ルック: プリセット「cinematic」");
+    expect(html).not.toContain("ルック: JSON");
   });
 
   it("collapses sources section when video input is already set", () => {

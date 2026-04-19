@@ -31,6 +31,7 @@ import {
 } from "../video-export-constants";
 import { HelpHint } from "./HelpHint";
 import type { VideoPreviewProxyCacheInfo } from "../desktop-api";
+import type { MetadataLookSource } from "../export-metadata-session";
 
 /** @description 書き出しタブで扱うジョブの大分類（フォルダの写真まとめて vs 動画 1 本） */
 export type BatchJobMode = "images" | "video";
@@ -133,8 +134,7 @@ function createDefaultOpenSections(
   mode: BatchJobMode,
   inputDir: string | null,
   videoInputPath: string | null,
-  editToExportSyncedAtMs: number | null,
-  importedGradeLabel: string | null,
+  batchLookSource: MetadataLookSource,
   desktopInteractivePreview: DesktopInteractivePreviewState | undefined,
 ): Record<AccordionStepId, boolean> {
   const expandSources = shouldAutoExpandSources(
@@ -146,7 +146,7 @@ function createDefaultOpenSections(
   return {
     jobType: true,
     sources: expandSources,
-    look: editToExportSyncedAtMs == null && importedGradeLabel == null,
+    look: batchLookSource === "preset",
     output: true,
   };
 }
@@ -243,6 +243,7 @@ export type BatchTabPanelProps = {
   onPurgeProxyCache: () => void | Promise<void>;
 
   batchPresetChoice: PresetName;
+  batchLookSource: MetadataLookSource;
   onBatchPresetChoiceChange: (name: PresetName) => void;
   importedGradeLabel: string | null;
   onImportGradeJson: () => void | Promise<void>;
@@ -498,6 +499,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     isPurgingProxyCache,
     onPurgeProxyCache,
     batchPresetChoice,
+    batchLookSource,
     onBatchPresetChoiceChange,
     importedGradeLabel,
     onImportGradeJson,
@@ -566,30 +568,33 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
    * @description 書き出しルックの「正」を 1 枚に圧縮して表示（JSON / 編集同期 / プリセットの三択）
    */
   const lookStatusBanner = useMemo(() => {
-    if (importedGradeLabel) {
+    if (batchLookSource === "importedJson") {
       return {
         Icon: File,
         iconWeight: "duotone" as const,
         title: t("lookStatusJsonTitle"),
-        body: t("lookStatusJsonBody", { path: importedGradeLabel }),
+        body: t("lookStatusJsonBody", { path: importedGradeLabel ?? "" }),
         accent: "shadow-[inset_3px_0_0_0_var(--blue-9)]",
         iconClass: "text-[var(--blue-11)]",
       };
     }
-    if (editToExportSyncedAtMs != null) {
-      const time = new Date(editToExportSyncedAtMs).toLocaleTimeString(
-        locale === "ja" ? "ja-JP" : locale,
-        {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        },
-      );
+    if (batchLookSource === "editSync") {
+      const time =
+        editToExportSyncedAtMs != null
+          ? new Date(editToExportSyncedAtMs).toLocaleTimeString(
+              locale === "ja" ? "ja-JP" : locale,
+              {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              },
+            )
+          : "";
       return {
         Icon: CheckCircle,
         iconWeight: "fill" as const,
         title: t("lookStatusEditTitle"),
-        body: t("lookStatusEditBody", { time }),
+        body: editToExportSyncedAtMs != null ? t("lookStatusEditBody", { time }) : "",
         accent: "shadow-[inset_3px_0_0_0_rgb(52_211_153)]",
         iconClass: "text-[rgb(52_211_153)]",
       };
@@ -603,6 +608,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
       iconClass: "text-[var(--fl-text-secondary)]",
     };
   }, [
+    batchLookSource,
     importedGradeLabel,
     editToExportSyncedAtMs,
     batchPresetChoice,
@@ -740,8 +746,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
       exportSurface ?? batchJobMode,
       inputDir,
       videoInputPath,
-      editToExportSyncedAtMs,
-      importedGradeLabel,
+      batchLookSource,
       desktopInteractivePreview,
     ),
   );
@@ -782,12 +787,10 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         nextMode,
         inputDir,
         videoInputPath,
-        editToExportSyncedAtMs,
-        importedGradeLabel,
+        batchLookSource,
         desktopInteractivePreview,
       ),
     );
-    setLookAdvancedOpen(false);
     onBatchJobModeChange(nextMode);
   };
 
@@ -801,7 +804,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
   const isSectionSynced = (id: AccordionStepId): boolean => {
     switch (id) {
       case "look":
-        return editToExportSyncedAtMs != null || importedGradeLabel != null;
+        return batchLookSource !== "preset";
       default:
         return false;
     }
@@ -1080,10 +1083,23 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
             assistiveLabel={t("applyEditHintAria")}
           />
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="fl-btn-secondary max-w-full sm:max-w-none"
+            disabled={running}
+            onClick={() => void onImportGradeJson()}
+          >
+            {t("loadMetadataJsonBtn")}
+          </button>
+          <HelpHint
+            tip={t("tipLoadMetadataJson")}
+            assistiveLabel={t("loadMetadataJsonHintAria")}
+          />
+        </div>
       </div>
 
-      {importedGradeLabel == null &&
-      editToExportSyncedAtMs != null ? (
+      {batchLookSource === "editSync" ? (
         <div className="flex max-w-md flex-col gap-2 border-t border-white/[0.06] pt-3">
           <span className="fl-label">{t("presetQuickLabel")}</span>
           <p className="fl-caption max-w-prose text-[var(--fl-text-secondary)]">
@@ -1121,7 +1137,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         </label>
       )}
 
-      {/* v0.5.0: Grade JSON import/export hidden — feature not yet available */}
+      {/* Metadata export is automatic during run; only restore stays visible here. */}
     </div>
     );
   };
@@ -1493,22 +1509,18 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
       {previewExportBridge ? (
         <section
           className={`mb-5 rounded-xl border border-[var(--fl-border-subtle)] px-3.5 py-3.5 ${
-            previewExportBridge.tone === "ok"
-              ? "bg-[var(--fl-bg-subtle)] shadow-[inset_3px_0_0_0_rgb(52_211_153)]"
-              : previewExportBridge.tone === "caution"
-                ? "bg-[var(--fl-bg-subtle)] shadow-[inset_3px_0_0_0_var(--amber-9)]"
-                : "bg-[var(--fl-bg-subtle)] shadow-[inset_3px_0_0_0_var(--fl-border-default)]"
+            previewExportBridge.tone === "caution"
+              ? "bg-[var(--fl-bg-subtle)] shadow-[inset_3px_0_0_0_var(--amber-9)]"
+              : "bg-[var(--fl-bg-subtle)] shadow-[inset_3px_0_0_0_var(--fl-border-default)]"
           }`}
           aria-labelledby="film-lab-preview-export-bridge-heading"
         >
           <div className="flex gap-3">
             <Info
               className={`mt-0.5 shrink-0 ${
-                previewExportBridge.tone === "ok"
-                  ? "text-[rgb(52_211_153)]"
-                  : previewExportBridge.tone === "caution"
-                    ? "text-[var(--amber-11)]"
-                    : "text-[var(--fl-text-tertiary)]"
+                previewExportBridge.tone === "caution"
+                  ? "text-[var(--amber-11)]"
+                  : "text-[var(--fl-text-tertiary)]"
               }`}
               size={18}
               weight="bold"
