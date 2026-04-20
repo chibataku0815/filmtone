@@ -15,12 +15,18 @@
   "scripts": {
     "dev": "bun run build:core && bun run build:renderer && bun run --cwd apps/web dev",
     "dev:web": "bun run build:core && bun run build:renderer && bun run --cwd apps/web dev",
+    "dev:desktop": "bun run --cwd apps/desktop-film-lab-batch dev",
+    "dev:ios": "bun run --cwd .worktrees/filmtone-ios-phase0/apps/capacitor-film-lab-ios dev",
     "dev:context": "bun run --cwd apps/web dev:context",
     "build:web": "bun run build:core && bun run build:renderer && bun run --cwd apps/web build",
     "start:web": "bun run --cwd apps/web start",
     "build:core": "bun run --cwd packages/film-lab-core build",
     "build:renderer": "bun run --cwd packages/film-lab-renderer build",
     "build:smart-look": "bun run --cwd packages/film-lab-smart-look build",
+    "typecheck:desktop": "bun run --cwd apps/desktop-film-lab-batch tsc -p tsconfig.json --noEmit",
+    "typecheck:shared": "sh ./scripts/typecheck-shared.sh",
+    "verify:desktop": "sh ./scripts/verify-desktop.sh",
+    "verify:ios": "sh ./scripts/verify-ios.sh",
     "postinstall": "bun run build:core && bun run build:renderer && bun run build:smart-look",
     "verify:film-lab-surfaces": "bun run --cwd apps/web build && bun run --cwd apps/desktop-film-lab-batch test:smart-look-pending"
   }
