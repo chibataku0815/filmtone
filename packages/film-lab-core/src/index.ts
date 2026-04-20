@@ -50,6 +50,8 @@ export {
   PHASE0_SCHEMA_VERSION,
   PHASE0_PARAM_KEYS,
   PHASE0_PRESET_DEFAULT,
+  PHASE0_PRESET_STRENGTH_DEFAULT,
+  PHASE0_RGB_SHIFT_MAX,
   PHASE0_MAX_SOURCE_DURATION_SEC,
   PHASE0_APPROX_SOURCE_LONG_EDGE_MAX,
   PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES,
@@ -61,6 +63,7 @@ export {
   phase0ProjectSchema,
   pickPhase0Params,
   createDefaultPhase0Params,
+  interpolatePhase0PresetParams,
   createPhase0ProjectState,
   mergePhase0Params,
   type Phase0ParamKey,
@@ -85,6 +88,7 @@ export {
   type Phase0ExportResult,
   type Phase0ExportStage,
   type Phase0ExportBenchmarkRecord,
+  type Phase0PreviewRenderResult,
 } from "./native-bridge";
 export {
   benchmarkMarkdownTableHeader,

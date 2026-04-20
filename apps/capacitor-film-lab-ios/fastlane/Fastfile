@@ -1,0 +1,434 @@
+default_platform(:ios)
+
+require "fileutils"
+require "shellwords"
+require "tmpdir"
+
+APP_ROOT = File.expand_path("..", __dir__)
+FASTLANE_DIR = __dir__
+IOS_WORKSPACE = File.join(APP_ROOT, "ios", "App", "App.xcworkspace")
+BUILD_OUTPUT_DIR = File.join(APP_ROOT, "build", "fastlane")
+DEVELOPMENT_TEAM_ID = "C3G77H8NM6"
+SCREENSHOTS_PATH = File.join(FASTLANE_DIR, "screenshots")
+METADATA_TEMPLATE_PATH = File.join(FASTLANE_DIR, "metadata")
+GENERATED_PATH = File.join(FASTLANE_DIR, ".generated")
+SCREENSHOT_CACHE_ROOT = File.expand_path("~/Library/Caches/tools.fastlane")
+SCREENSHOT_CACHE_PATH = File.join(SCREENSHOT_CACHE_ROOT, "screenshots")
+SCREENSHOT_LOCALES = ["ja", "en-US"].freeze
+SCREENSHOT_FILE_SUFFIXES = [
+  "01_source_loaded_preview",
+  "02_preset_row",
+  "03_strength_quick_controls",
+  "04_camera_profile_route",
+  "05_export_save_share",
+].freeze
+
+DEFAULT_CANONICAL_BASE_URL = "https://www.chibatakumi.studio"
+DEFAULT_REVIEW_FIRST_NAME = "Takumi"
+DEFAULT_REVIEW_LAST_NAME = "Chiba"
+DEFAULT_REVIEW_EMAIL = "chiba@fores-tone.co.jp"
+SCREENSHOT_SIMULATOR_DEVICE = "iPhone 17 Pro Max"
+SCREENSHOT_SIMULATOR_UDID = "D3011FE4-52CA-4B7F-B181-A55D9998E192"
+
+def normalized_env(name)
+  value = ENV[name]
+  return nil if value.nil?
+
+  stripped = value.strip
+  stripped.empty? ? nil : stripped
+end
+
+def truthy_env?(name)
+  %w[1 true yes on].include?(ENV[name].to_s.downcase)
+end
+
+def env!(name)
+  value = normalized_env(name)
+  UI.user_error!("Missing required environment variable #{name}") if value.nil?
+  value
+end
+
+def asc_api_key_configured?
+  normalized_env("ASC_KEY_ID") &&
+    normalized_env("ASC_ISSUER_ID") &&
+    (normalized_env("ASC_KEY_CONTENT") || normalized_env("ASC_KEY_PATH"))
+end
+
+def load_asc_api_key!
+  UI.user_error!(
+    "Set ASC_KEY_ID, ASC_ISSUER_ID, and either ASC_KEY_CONTENT or ASC_KEY_PATH"
+  ) unless asc_api_key_configured?
+
+  options = {
+    key_id: env!("ASC_KEY_ID"),
+    issuer_id: env!("ASC_ISSUER_ID"),
+    duration: 1200,
+  }
+
+  if (key_content = normalized_env("ASC_KEY_CONTENT"))
+    options[:key_content] = key_content.gsub("\\n", "\n")
+  else
+    options[:key_filepath] = File.expand_path(env!("ASC_KEY_PATH"), APP_ROOT)
+  end
+
+  app_store_connect_api_key(**options)
+end
+
+def resolve_asc_key_file_path!
+  if (key_content = normalized_env("ASC_KEY_CONTENT"))
+    key_id = env!("ASC_KEY_ID")
+    temp_path = File.join(Dir.tmpdir, "AuthKey_#{key_id}_#{Process.pid}.p8")
+    File.write(temp_path, key_content.gsub("\\n", "\n"))
+    File.chmod(0o600, temp_path)
+    temp_path
+  else
+    File.expand_path(env!("ASC_KEY_PATH"), APP_ROOT)
+  end
+end
+
+def localized_env_key(prefix, locale)
+  "#{prefix}_#{locale.tr("-", "_").upcase}"
+end
+
+def localized_url(prefix, locale, default_value)
+  normalized_env(localized_env_key(prefix, locale)) ||
+    normalized_env(prefix) ||
+    default_value
+end
+
+def marketing_url_for(locale)
+  base_url = normalized_env("FILMTONE_CANONICAL_BASE_URL") || DEFAULT_CANONICAL_BASE_URL
+  default_path = locale == "ja" ? "/film-lab" : "/en/film-lab"
+  localized_url("FILMTONE_MARKETING_URL", locale, "#{base_url}#{default_path}")
+end
+
+def support_url_for(locale)
+  base_url = normalized_env("FILMTONE_CANONICAL_BASE_URL") || DEFAULT_CANONICAL_BASE_URL
+  default_path = locale == "ja" ? "/film-lab/support" : "/en/film-lab/support"
+  localized_url("FILMTONE_SUPPORT_URL", locale, "#{base_url}#{default_path}")
+end
+
+def privacy_url_for(locale)
+  base_url = normalized_env("FILMTONE_CANONICAL_BASE_URL") || DEFAULT_CANONICAL_BASE_URL
+  default_path = locale == "ja" ? "/film-lab/privacy" : "/en/film-lab/privacy"
+  localized_url("FILMTONE_PRIVACY_URL", locale, "#{base_url}#{default_path}")
+end
+
+def read_text_if_present(path)
+  return nil unless File.exist?(path)
+
+  value = File.read(path).strip
+  value.empty? ? nil : value
+end
+
+def localized_release_notes
+  {
+    "ja" => read_text_if_present(File.join(METADATA_TEMPLATE_PATH, "ja", "release_notes.txt")),
+    "en-US" => read_text_if_present(File.join(METADATA_TEMPLATE_PATH, "en-US", "release_notes.txt")),
+  }.each_with_object({}) do |(locale, notes), memo|
+    memo[locale] = { whats_new: notes } if notes
+  end
+end
+
+def stage_metadata!
+  staged_path = File.join(GENERATED_PATH, "metadata")
+  FileUtils.rm_rf(staged_path)
+  FileUtils.mkdir_p(staged_path)
+  FileUtils.cp_r(Dir.glob(File.join(METADATA_TEMPLATE_PATH, "*")), staged_path)
+
+  %w[ja en-US].each do |locale|
+    locale_dir = File.join(staged_path, locale)
+    FileUtils.mkdir_p(locale_dir)
+    File.write(File.join(locale_dir, "marketing_url.txt"), "#{marketing_url_for(locale)}\n")
+    File.write(File.join(locale_dir, "support_url.txt"), "#{support_url_for(locale)}\n")
+    File.write(File.join(locale_dir, "privacy_url.txt"), "#{privacy_url_for(locale)}\n")
+  end
+
+  staged_path
+end
+
+def snapshot_capture_locale
+  normalized_env("SNAPSHOT_BASE_LOCALE") || "ja"
+end
+
+def snapshot_language_for(locale)
+  case locale
+  when "ja"
+    "ja"
+  when "en-US"
+    "en"
+  else
+    locale.split("-").first
+  end
+end
+
+def snapshot_locale_identifier_for(locale)
+  case locale
+  when "ja"
+    "ja_JP"
+  when "en-US"
+    "en_US"
+  else
+    locale.tr("-", "_")
+  end
+end
+
+def run_command!(command)
+  UI.command(command.map(&:shellescape).join(" "))
+  success = system(*command)
+  raise "Command failed: #{command.join(' ')}" unless success
+end
+
+def write_snapshot_cache!(locale:)
+  FileUtils.mkdir_p(SCREENSHOT_CACHE_ROOT)
+  FileUtils.rm_rf(SCREENSHOT_CACHE_PATH)
+  File.write(File.join(SCREENSHOT_CACHE_ROOT, "language.txt"), "#{snapshot_language_for(locale)}\n")
+  File.write(File.join(SCREENSHOT_CACHE_ROOT, "locale.txt"), "#{snapshot_locale_identifier_for(locale)}\n")
+  File.write(File.join(SCREENSHOT_CACHE_ROOT, "snapshot-launch_arguments.txt"), "\n")
+end
+
+def run_snapshot_ui_test!(locale:)
+  write_snapshot_cache!(locale: locale)
+  run_command!(
+    [
+      "xcodebuild",
+      "-workspace",
+      IOS_WORKSPACE,
+      "-scheme",
+      "App",
+      "-destination",
+      "id=#{SCREENSHOT_SIMULATOR_UDID}",
+      "CODE_SIGNING_ALLOWED=NO",
+      "-only-testing:FilmtoneSnapshotsUITests/FilmtoneSnapshotsUITests/testCaptureAppStoreScreenshots",
+      "test",
+    ]
+  )
+end
+
+def expected_screenshot_paths(device_name)
+  SCREENSHOT_FILE_SUFFIXES.map do |suffix|
+    File.join(SCREENSHOT_CACHE_PATH, "#{device_name}-#{suffix}.png")
+  end
+end
+
+def stage_screenshots_for_release!(device_name)
+  screenshot_paths = expected_screenshot_paths(device_name)
+  missing_paths = screenshot_paths.reject { |path| File.exist?(path) }
+
+  UI.user_error!(
+    "Missing expected screenshots: #{missing_paths.join(', ')}"
+  ) unless missing_paths.empty?
+
+  SCREENSHOT_LOCALES.each do |locale|
+    locale_dir = File.join(SCREENSHOTS_PATH, locale)
+    FileUtils.rm_rf(locale_dir)
+    FileUtils.mkdir_p(locale_dir)
+    screenshot_paths.each do |path|
+      FileUtils.cp(path, File.join(locale_dir, File.basename(path)))
+    end
+  end
+end
+
+def app_review_information!
+  {
+    first_name: normalized_env("REVIEW_FIRST_NAME") || DEFAULT_REVIEW_FIRST_NAME,
+    last_name: normalized_env("REVIEW_LAST_NAME") || DEFAULT_REVIEW_LAST_NAME,
+    phone_number: env!("REVIEW_PHONE"),
+    email_address: normalized_env("REVIEW_EMAIL") || DEFAULT_REVIEW_EMAIL,
+    demo_user: normalized_env("REVIEW_DEMO_USER"),
+    demo_password: normalized_env("REVIEW_DEMO_PASSWORD"),
+    notes: normalized_env("REVIEW_NOTES") ||
+      "Filmtone is local-first. Review the flow by importing a photo or short clip, choosing a preset, adjusting Quick controls, optionally applying Camera Profile and Film Look LUTs, then exporting and saving to Photos. No login, subscription, AI generation, or cloud sync is required.",
+  }.compact
+end
+
+def explicit_ipa_path!(options, lane:)
+  explicit_path = options[:ipa] || options["ipa"]
+  UI.user_error!(
+    "Pass ipa:... to `fastlane ios #{lane}`. Implicit archive fallback is disabled."
+  ) if explicit_path.nil?
+
+  ipa_path = File.expand_path(explicit_path, APP_ROOT)
+  UI.user_error!("IPA not found at #{ipa_path}") unless File.exist?(ipa_path)
+  ipa_path
+end
+
+def staged_release_screenshot_paths
+  SCREENSHOT_LOCALES.each_with_object({}) do |locale, memo|
+    memo[locale] = Dir.glob(File.join(SCREENSHOTS_PATH, locale, "*.{png,jpg,jpeg}")).sort
+  end
+end
+
+def validate_release_screenshots!
+  screenshot_paths = staged_release_screenshot_paths
+  missing_locales = screenshot_paths.select { |_, paths| paths.empty? }.keys
+
+  unless missing_locales.empty?
+    UI.user_error!(
+      "Missing staged screenshots for locales: #{missing_locales.join(', ')} under #{SCREENSHOTS_PATH}. Run `fastlane ios screenshots` first."
+    )
+  end
+
+  counts = screenshot_paths.transform_values(&:count)
+  count_summary = counts.map { |locale, count| "#{locale}=#{count}" }.join(", ")
+
+  unless counts.values.all? { |count| count.between?(1, 10) }
+    UI.user_error!("Each locale must have between 1 and 10 screenshots. Current counts: #{count_summary}")
+  end
+
+  unless counts.values.uniq.one?
+    UI.user_error!("Screenshot counts differ by locale: #{count_summary}")
+  end
+
+  expected_basenames = nil
+  screenshot_paths.each do |locale, paths|
+    basenames = paths.map { |path| File.basename(path) }
+    expected_basenames ||= basenames
+    next if basenames == expected_basenames
+
+    UI.user_error!(
+      "Screenshot filenames must match across locales. #{locale} has #{basenames.join(', ')}."
+    )
+  end
+
+  screenshot_paths
+end
+
+platform :ios do
+  desc "Archive Filmtone with Xcode automatic signing and app-store export"
+  lane :archive do
+    FileUtils.mkdir_p(BUILD_OUTPUT_DIR)
+
+    xcargs_parts = ["-allowProvisioningUpdates"]
+    temp_key_path = nil
+
+    if asc_api_key_configured?
+      temp_key_path = resolve_asc_key_file_path! if normalized_env("ASC_KEY_CONTENT")
+      key_file_path = temp_key_path || File.expand_path(env!("ASC_KEY_PATH"), APP_ROOT)
+      xcargs_parts.concat(
+        [
+          "-authenticationKeyIssuerID", env!("ASC_ISSUER_ID"),
+          "-authenticationKeyID", env!("ASC_KEY_ID"),
+          "-authenticationKeyPath", key_file_path,
+        ]
+      )
+    end
+
+    xcargs = xcargs_parts.map(&:shellescape).join(" ")
+
+    begin
+      build_app(
+        workspace: IOS_WORKSPACE,
+        scheme: "App",
+        clean: true,
+        export_method: "app-store",
+        output_directory: BUILD_OUTPUT_DIR,
+        output_name: "Filmtone",
+        build_path: BUILD_OUTPUT_DIR,
+        xcargs: xcargs,
+        export_xcargs: xcargs,
+        export_options: {
+          method: "app-store",
+          signingStyle: "automatic",
+          teamID: DEVELOPMENT_TEAM_ID,
+        }
+      )
+    ensure
+      FileUtils.rm_f(temp_key_path) if temp_key_path
+    end
+  end
+
+  desc "Capture App Store screenshots with a deterministic UI test rail"
+  lane :screenshots do
+    UI.message(
+      "Capturing common App Store assets from locale #{snapshot_capture_locale} on #{SCREENSHOT_SIMULATOR_DEVICE} (#{SCREENSHOT_SIMULATOR_UDID}) and staging them for #{SCREENSHOT_LOCALES.join(', ')}."
+    )
+    run_snapshot_ui_test!(locale: snapshot_capture_locale)
+    stage_screenshots_for_release!(SCREENSHOT_SIMULATOR_DEVICE)
+    validate_release_screenshots!
+  end
+
+  desc "Upload localized App Store metadata and review info"
+  lane :metadata do
+    upload_to_app_store(
+      api_key: load_asc_api_key!,
+      metadata_path: stage_metadata!,
+      skip_binary_upload: true,
+      skip_screenshots: true,
+      force: true,
+      precheck_include_in_app_purchases: false,
+      copyright: File.read(File.join(METADATA_TEMPLATE_PATH, "copyright.txt")).strip,
+      support_url: {
+        "ja" => support_url_for("ja"),
+        "en-US" => support_url_for("en-US"),
+      },
+      marketing_url: {
+        "ja" => marketing_url_for("ja"),
+        "en-US" => marketing_url_for("en-US"),
+      },
+      privacy_url: {
+        "ja" => privacy_url_for("ja"),
+        "en-US" => privacy_url_for("en-US"),
+      },
+      app_review_information: app_review_information!,
+      submission_information: {
+        export_compliance_uses_encryption: false,
+      }
+    )
+  end
+
+  desc "Upload an archive to TestFlight"
+  lane :beta do |options|
+    ipa_path = explicit_ipa_path!(options, lane: "beta")
+    upload_options = {
+      api_key: load_asc_api_key!,
+      ipa: ipa_path,
+      app_platform: "ios",
+      skip_waiting_for_build_processing: truthy_env?("SKIP_WAITING_FOR_BUILD_PROCESSING"),
+      distribute_external: false,
+      notify_external_testers: false,
+    }
+    upload_options[:localized_build_info] = localized_release_notes unless localized_release_notes.empty?
+
+    upload_to_testflight(**upload_options)
+  end
+
+  desc "Upload the app-store build, metadata, and screenshots to App Store Connect"
+  lane :release do |options|
+    ipa_path = explicit_ipa_path!(options, lane: "release")
+    validate_release_screenshots!
+    upload_options = {
+      api_key: load_asc_api_key!,
+      ipa: ipa_path,
+      metadata_path: stage_metadata!,
+      skip_binary_upload: false,
+      skip_metadata: false,
+      submit_for_review: truthy_env?("SUBMIT_FOR_REVIEW"),
+      automatic_release: truthy_env?("AUTOMATIC_RELEASE"),
+      force: true,
+      precheck_include_in_app_purchases: false,
+      copyright: File.read(File.join(METADATA_TEMPLATE_PATH, "copyright.txt")).strip,
+      support_url: {
+        "ja" => support_url_for("ja"),
+        "en-US" => support_url_for("en-US"),
+      },
+      marketing_url: {
+        "ja" => marketing_url_for("ja"),
+        "en-US" => marketing_url_for("en-US"),
+      },
+      privacy_url: {
+        "ja" => privacy_url_for("ja"),
+        "en-US" => privacy_url_for("en-US"),
+      },
+      app_review_information: app_review_information!,
+      submission_information: {
+        export_compliance_uses_encryption: false,
+      },
+      screenshots_path: SCREENSHOTS_PATH,
+      skip_screenshots: false,
+      overwrite_screenshots: truthy_env?("OVERWRITE_SCREENSHOTS"),
+    }
+
+    upload_to_app_store(**upload_options)
+  end
+end

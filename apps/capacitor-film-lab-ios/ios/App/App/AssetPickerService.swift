@@ -4,10 +4,21 @@ import PhotosUI
 import UIKit
 import UniformTypeIdentifiers
 
+enum FilmtoneSourcePickerRoute: String, Codable, Sendable {
+    case photoLibrary = "photo-library"
+    case files
+}
+
 final class AssetPickerService: NSObject {
+    private enum DocumentPickerPurpose {
+        case source
+        case lut
+    }
+
     private let cacheStore: CacheStore
     private var sourceContinuation: CheckedContinuation<SourceInfoDTO?, Error>?
     private var lutContinuation: CheckedContinuation<PickedLutFileDTO?, Error>?
+    private var activeDocumentPickerPurpose: DocumentPickerPurpose?
 
     init(cacheStore: CacheStore) {
         self.cacheStore = cacheStore
@@ -15,33 +26,61 @@ final class AssetPickerService: NSObject {
     }
 
     @MainActor
-    func pickSource(presenting viewController: UIViewController) async throws -> SourceInfoDTO? {
-        guard sourceContinuation == nil else {
-            throw FilmtoneMediaError.pickerUnavailable("A source picker is already active.")
+    func pickSource(
+        presenting viewController: UIViewController,
+        route: FilmtoneSourcePickerRoute = .photoLibrary
+    ) async throws -> SourceInfoDTO? {
+        guard sourceContinuation == nil, lutContinuation == nil else {
+            throw FilmtoneMediaError.pickerUnavailable(
+                filmtoneLocalized(
+                    "filmtone.error.asset_picker.source_active",
+                    defaultValue: "A source picker is already active.",
+                    comment: "Error shown when a second source picker is opened while one is already active."
+                )
+            )
         }
 
         return try await withCheckedThrowingContinuation { continuation in
             self.sourceContinuation = continuation
 
-            var configuration = PHPickerConfiguration(photoLibrary: .shared())
-            configuration.filter = .any(of: [.videos, .images])
-            configuration.selectionLimit = 1
-            configuration.preferredAssetRepresentationMode = .current
+            switch route {
+            case .photoLibrary:
+                var configuration = PHPickerConfiguration(photoLibrary: .shared())
+                configuration.filter = .any(of: [.videos, .images])
+                configuration.selectionLimit = 1
+                configuration.preferredAssetRepresentationMode = .current
 
-            let picker = PHPickerViewController(configuration: configuration)
-            picker.delegate = self
-            viewController.present(picker, animated: true)
+                let picker = PHPickerViewController(configuration: configuration)
+                picker.delegate = self
+                viewController.present(picker, animated: true)
+            case .files:
+                self.activeDocumentPickerPurpose = .source
+                let picker = UIDocumentPickerViewController(
+                    forOpeningContentTypes: [.image, .movie, .video],
+                    asCopy: true
+                )
+                picker.delegate = self
+                picker.allowsMultipleSelection = false
+                viewController.present(picker, animated: true)
+            }
         }
     }
 
     @MainActor
     func pickLutFile(presenting viewController: UIViewController) async throws -> PickedLutFileDTO? {
-        guard lutContinuation == nil else {
-            throw FilmtoneMediaError.pickerUnavailable("A LUT picker is already active.")
+        guard sourceContinuation == nil, lutContinuation == nil else {
+            throw FilmtoneMediaError.pickerUnavailable(
+                filmtoneLocalized(
+                    "filmtone.error.asset_picker.lut_active",
+                    defaultValue: "A camera profile picker is already active.",
+                    comment: "Error shown when a second LUT picker is opened while one is already active."
+                )
+            )
         }
 
         return try await withCheckedThrowingContinuation { continuation in
             self.lutContinuation = continuation
+            self.activeDocumentPickerPurpose = .lut
             let cubeType = UTType(filenameExtension: "cube") ?? .plainText
             let picker = UIDocumentPickerViewController(
                 forOpeningContentTypes: [cubeType, .plainText],
@@ -64,7 +103,13 @@ final class AssetPickerService: NSObject {
 
         let selectedType = movieType ?? imageType
         guard let selectedType else {
-            throw FilmtoneMediaError.unsupportedSource("The selected asset is not an image or video.")
+            throw FilmtoneMediaError.unsupportedSource(
+                filmtoneLocalized(
+                    "filmtone.error.asset_picker.selected_asset_type",
+                    defaultValue: "The selected item isn't a photo or video.",
+                    comment: "Error shown when an unsupported asset is selected from the photo picker."
+                )
+            )
         }
 
         let type = UTType(selectedType)
@@ -174,8 +219,15 @@ final class AssetPickerService: NSObject {
                 options: requestOptions
             ) { error in
                 if let error {
+                    _ = error
                     continuation.resume(
-                        throwing: FilmtoneMediaError.cacheFailed(error.localizedDescription)
+                        throwing: FilmtoneMediaError.cacheFailed(
+                            filmtoneLocalized(
+                                "filmtone.error.generic.pick_source",
+                                defaultValue: "Media selection couldn't be completed.",
+                                comment: "Fallback error for source picking."
+                            )
+                        )
                     )
                 } else {
                     continuation.resume(returning: ())
@@ -190,6 +242,54 @@ final class AssetPickerService: NSObject {
             return await PHPhotoLibrary.requestAuthorization(for: .readWrite)
         }
         return current
+    }
+
+    private func importDocumentSource(from url: URL) throws -> SourceInfoDTO {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer {
+            if scoped {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        let type = try sourceType(for: url)
+        let kind: FilmtoneSourceKind = type.conforms(to: .image) ? .image : .video
+        let importedURL = try cacheStore.importItem(
+            from: url,
+            suggestedName: url.lastPathComponent,
+            bucket: .sources
+        )
+
+        return SourceInfoDTO(
+            uri: importedURL.absoluteString,
+            filename: url.lastPathComponent,
+            kind: kind,
+            mimeType: type.preferredMIMEType
+        )
+    }
+
+    private func sourceType(for url: URL) throws -> UTType {
+        if let contentType = try url.resourceValues(forKeys: [.contentTypeKey]).contentType,
+           isSupportedSourceType(contentType) {
+            return contentType
+        }
+
+        if let type = UTType(filenameExtension: url.pathExtension),
+           isSupportedSourceType(type) {
+            return type
+        }
+
+        throw FilmtoneMediaError.unsupportedSource(
+            filmtoneLocalized(
+                "filmtone.error.asset_picker.selected_file_type",
+                defaultValue: "The selected file isn't a photo or video.",
+                comment: "Error shown when an unsupported file is selected from Files."
+            )
+        )
+    }
+
+    private func isSupportedSourceType(_ type: UTType) -> Bool {
+        type.conforms(to: .image) || type.conforms(to: .movie) || type.conforms(to: .video)
     }
 
     private func importLut(from url: URL) throws -> PickedLutFileDTO {
@@ -219,22 +319,27 @@ final class AssetPickerService: NSObject {
         suggestedName: String?,
         bucket: CacheStore.Bucket
     ) async throws -> URL {
-        try await withCheckedThrowingContinuation { continuation in
+        let cacheMessage = genericCacheMessage(for: bucket)
+        let cacheStore = self.cacheStore
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
             provider.loadFileRepresentation(forTypeIdentifier: typeIdentifier) { url, error in
                 if let error {
-                    continuation.resume(throwing: FilmtoneMediaError.cacheFailed(error.localizedDescription))
+                    _ = error
+                    continuation.resume(
+                        throwing: FilmtoneMediaError.cacheFailed(cacheMessage)
+                    )
                     return
                 }
 
                 guard let url else {
                     continuation.resume(
-                        throwing: FilmtoneMediaError.cacheFailed("The selected file could not be staged.")
+                        throwing: FilmtoneMediaError.cacheFailed(cacheMessage)
                     )
                     return
                 }
 
                 do {
-                    let importedURL = try self.cacheStore.importItem(
+                    let importedURL = try cacheStore.importItem(
                         from: url,
                         suggestedName: suggestedName,
                         bucket: bucket
@@ -242,10 +347,27 @@ final class AssetPickerService: NSObject {
                     continuation.resume(returning: importedURL)
                 } catch {
                     continuation.resume(
-                        throwing: FilmtoneMediaError.cacheFailed(error.localizedDescription)
+                        throwing: FilmtoneMediaError.cacheFailed(cacheMessage)
                     )
                 }
             }
+        }
+    }
+
+    private func genericCacheMessage(for bucket: CacheStore.Bucket) -> String {
+        switch bucket {
+        case .luts:
+            return filmtoneLocalized(
+                "filmtone.error.generic.import_lut",
+                defaultValue: "The camera profile couldn't be imported.",
+                comment: "Fallback error for LUT import."
+            )
+        default:
+            return filmtoneLocalized(
+                "filmtone.error.generic.pick_source",
+                defaultValue: "Media selection couldn't be completed.",
+                comment: "Fallback error for source picking."
+            )
         }
     }
 }
@@ -281,29 +403,65 @@ extension AssetPickerService: PHPickerViewControllerDelegate {
 
 extension AssetPickerService: UIDocumentPickerDelegate {
     func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
-        let continuation = lutContinuation
-        lutContinuation = nil
-        continuation?.resume(returning: nil)
+        switch activeDocumentPickerPurpose {
+        case .source:
+            let continuation = sourceContinuation
+            sourceContinuation = nil
+            activeDocumentPickerPurpose = nil
+            continuation?.resume(returning: nil)
+        case .lut:
+            let continuation = lutContinuation
+            lutContinuation = nil
+            activeDocumentPickerPurpose = nil
+            continuation?.resume(returning: nil)
+        case .none:
+            break
+        }
     }
 
     func documentPicker(
         _ controller: UIDocumentPickerViewController,
         didPickDocumentsAt urls: [URL]
     ) {
-        let continuation = lutContinuation
-        lutContinuation = nil
+        switch activeDocumentPickerPurpose {
+        case .source:
+            let continuation = sourceContinuation
+            sourceContinuation = nil
+            activeDocumentPickerPurpose = nil
 
-        guard let continuation else { return }
-        guard let url = urls.first else {
-            continuation.resume(returning: nil)
-            return
-        }
+            guard let continuation else { return }
+            guard let url = urls.first else {
+                continuation.resume(returning: nil)
+                return
+            }
 
-        do {
-            let picked = try importLut(from: url)
-            continuation.resume(returning: picked)
-        } catch {
-            continuation.resume(throwing: error)
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    let picked = try self.importDocumentSource(from: url)
+                    continuation.resume(returning: picked)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        case .lut:
+            let continuation = lutContinuation
+            lutContinuation = nil
+            activeDocumentPickerPurpose = nil
+
+            guard let continuation else { return }
+            guard let url = urls.first else {
+                continuation.resume(returning: nil)
+                return
+            }
+
+            do {
+                let picked = try importLut(from: url)
+                continuation.resume(returning: picked)
+            } catch {
+                continuation.resume(throwing: error)
+            }
+        case .none:
+            break
         }
     }
 }

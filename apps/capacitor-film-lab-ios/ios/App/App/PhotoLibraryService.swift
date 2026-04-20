@@ -5,7 +5,13 @@ final class PhotoLibraryService {
     func saveToPhotos(fileURL: URL) async throws -> String? {
         let authorization = await requestAuthorizationIfNeeded()
         guard authorization == .authorized || authorization == .limited else {
-            throw FilmtoneMediaError.permissionDenied("Photos access was denied.")
+            throw FilmtoneMediaError.permissionDenied(
+                filmtoneLocalized(
+                    "filmtone.error.photos.permission_denied",
+                    defaultValue: "Photos access was denied.",
+                    comment: "Error shown when photo library permission is denied."
+                )
+            )
         }
 
         return try await withCheckedThrowingContinuation { continuation in
@@ -21,11 +27,28 @@ final class PhotoLibraryService {
                 }
             }, completionHandler: { success, error in
                 if let error {
-                    continuation.resume(throwing: FilmtoneMediaError.saveFailed(error.localizedDescription))
+                    _ = error
+                    continuation.resume(
+                        throwing: FilmtoneMediaError.saveFailed(
+                            filmtoneLocalized(
+                                "filmtone.error.photos.save_failed",
+                                defaultValue: "Saving to Photos couldn't be completed.",
+                                comment: "Error shown when saving to Photos fails."
+                            )
+                        )
+                    )
                     return
                 }
                 guard success else {
-                    continuation.resume(throwing: FilmtoneMediaError.saveFailed("Photos save did not complete."))
+                    continuation.resume(
+                        throwing: FilmtoneMediaError.saveFailed(
+                            filmtoneLocalized(
+                                "filmtone.error.photos.save_incomplete",
+                                defaultValue: "Saving to Photos didn't complete.",
+                                comment: "Error shown when Photos reports an incomplete save."
+                            )
+                        )
+                    )
                     return
                 }
                 continuation.resume(returning: localIdentifier)

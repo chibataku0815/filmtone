@@ -22,7 +22,16 @@ final class ShareSheetService {
             let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
             controller.completionWithItemsHandler = { _, completed, _, error in
                 if let error {
-                    continuation.resume(throwing: FilmtoneMediaError.shareFailed(error.localizedDescription))
+                    _ = error
+                    continuation.resume(
+                        throwing: FilmtoneMediaError.shareFailed(
+                            filmtoneLocalized(
+                                "filmtone.error.generic.share",
+                                defaultValue: "Sharing couldn't be completed.",
+                                comment: "Fallback error for sharing."
+                            )
+                        )
+                    )
                     return
                 }
                 continuation.resume(returning: completed)

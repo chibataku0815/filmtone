@@ -906,7 +906,225 @@ function createDefaultFilmLookGradeProps() {
 var filmLookGradeDefaultProps = createDefaultFilmLookGradeProps();
 
 // src/quick-semantics.ts
+import { z as z3 } from "zod";
+
+// src/phase0-schema.ts
 import { z as z2 } from "zod";
+var PHASE0_SCHEMA_VERSION = 2;
+var PHASE0_PRESET_DEFAULT = "cinematic";
+var PHASE0_PRESET_STRENGTH_DEFAULT = 1;
+var PHASE0_HALATION_HUE_MIN = 0;
+var PHASE0_HALATION_HUE_MAX = 100;
+var PHASE0_RGB_SHIFT_MAX = 5e-3;
+var PHASE0_PARAM_KEYS = [
+  "exposure",
+  "contrast",
+  "saturation",
+  "temperature",
+  "tint",
+  "rgbShift",
+  "lensSoftness",
+  "grainRadialMix",
+  "grainSize",
+  "bloomThreshold",
+  "bloomStrength",
+  "bloomRadius",
+  "diffusion",
+  "halationIntensity",
+  "halationSpread",
+  "halationHue",
+  "halationThreshold",
+  "halationRadius",
+  "bloomSoftKnee",
+  "halationSoftKnee",
+  "compressionAmount",
+  "compressionRange",
+  "printContrast",
+  "cyan",
+  "magenta",
+  "yellow",
+  "fade",
+  "vignette",
+  "grainIntensity"
+];
+var PHASE0_MAX_SOURCE_DURATION_SEC = 60 * 5;
+var PHASE0_APPROX_SOURCE_LONG_EDGE_MAX = 3840;
+var PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES = 8 * 1024 * 1024 * 1024;
+var PHASE0_OUTPUT_PROFILE = {
+  longEdge: 1920,
+  fps: 30,
+  codec: "h264",
+  container: "mp4",
+  preserveAudio: true
+};
+var PHASE0_BENCHMARK_GATES = {
+  passRealtimeRatio: 2.5,
+  strongGoRealtimeRatio: 2,
+  noGoRealtimeRatio: 3
+};
+var phase0HalationHueSchema = z2.number().min(PHASE0_HALATION_HUE_MIN).max(PHASE0_HALATION_HUE_MAX);
+var phase0RgbShiftSchema = z2.number().min(0).max(PHASE0_RGB_SHIFT_MAX);
+var phase0ParamsSchema = z2.object({
+  exposure: z2.number().min(-2).max(2).default(PRESETS.reset.exposure),
+  contrast: z2.number().min(0).max(2).default(PRESETS.reset.contrast),
+  saturation: z2.number().min(0).max(2).default(PRESETS.reset.saturation),
+  temperature: z2.number().min(-1).max(1).default(PRESETS.reset.temperature),
+  tint: z2.number().min(-1).max(1).default(PRESETS.reset.tint),
+  rgbShift: phase0RgbShiftSchema.default(PRESETS.reset.rgbShift),
+  lensSoftness: z2.number().min(0).max(1).default(PRESETS.reset.lensSoftness),
+  grainRadialMix: z2.number().min(0).max(1).default(PRESETS.reset.grainRadialMix),
+  grainSize: z2.number().min(0).max(1).default(PRESETS.reset.grainSize),
+  bloomThreshold: z2.number().min(0).max(1).default(PRESETS.reset.bloomThreshold),
+  bloomStrength: z2.number().min(0).max(1).default(PRESETS.reset.bloomStrength),
+  bloomRadius: z2.number().min(0).max(1).default(PRESETS.reset.bloomRadius),
+  diffusion: z2.number().min(0).max(1).default(PRESETS.reset.diffusion),
+  halationIntensity: z2.number().min(0).max(1).default(PRESETS.reset.halationIntensity),
+  halationSpread: z2.number().min(0).max(40).default(PRESETS.reset.halationSpread),
+  halationHue: phase0HalationHueSchema.default(PRESETS.reset.halationHue),
+  halationThreshold: z2.number().min(0).max(1).default(PRESETS.reset.halationThreshold),
+  halationRadius: z2.number().min(0).max(1).default(PRESETS.reset.halationRadius),
+  bloomSoftKnee: z2.number().min(0).max(1).default(PRESETS.reset.bloomSoftKnee),
+  halationSoftKnee: z2.number().min(0).max(1).default(PRESETS.reset.halationSoftKnee),
+  compressionAmount: z2.number().min(0).max(1).default(PRESETS.reset.compressionAmount),
+  compressionRange: z2.number().min(0).max(1).default(PRESETS.reset.compressionRange),
+  printContrast: z2.number().min(0).max(1).default(PRESETS.reset.printContrast),
+  cyan: z2.number().min(-1).max(1).default(PRESETS.reset.cyan),
+  magenta: z2.number().min(-1).max(1).default(PRESETS.reset.magenta),
+  yellow: z2.number().min(-1).max(1).default(PRESETS.reset.yellow),
+  fade: z2.number().min(0).max(1).default(PRESETS.reset.fade),
+  vignette: z2.number().min(0).max(1).default(PRESETS.reset.vignette),
+  grainIntensity: z2.number().min(0).max(1).default(PRESETS.reset.grainIntensity)
+});
+var phase0ParamsPatchSchema = z2.object({
+  exposure: z2.number().min(-2).max(2).optional(),
+  contrast: z2.number().min(0).max(2).optional(),
+  saturation: z2.number().min(0).max(2).optional(),
+  temperature: z2.number().min(-1).max(1).optional(),
+  tint: z2.number().min(-1).max(1).optional(),
+  rgbShift: phase0RgbShiftSchema.optional(),
+  lensSoftness: z2.number().min(0).max(1).optional(),
+  grainRadialMix: z2.number().min(0).max(1).optional(),
+  grainSize: z2.number().min(0).max(1).optional(),
+  bloomThreshold: z2.number().min(0).max(1).optional(),
+  bloomStrength: z2.number().min(0).max(1).optional(),
+  bloomRadius: z2.number().min(0).max(1).optional(),
+  diffusion: z2.number().min(0).max(1).optional(),
+  halationIntensity: z2.number().min(0).max(1).optional(),
+  halationSpread: z2.number().min(0).max(40).optional(),
+  halationHue: phase0HalationHueSchema.optional(),
+  halationThreshold: z2.number().min(0).max(1).optional(),
+  halationRadius: z2.number().min(0).max(1).optional(),
+  bloomSoftKnee: z2.number().min(0).max(1).optional(),
+  halationSoftKnee: z2.number().min(0).max(1).optional(),
+  compressionAmount: z2.number().min(0).max(1).optional(),
+  compressionRange: z2.number().min(0).max(1).optional(),
+  printContrast: z2.number().min(0).max(1).optional(),
+  cyan: z2.number().min(-1).max(1).optional(),
+  magenta: z2.number().min(-1).max(1).optional(),
+  yellow: z2.number().min(-1).max(1).optional(),
+  fade: z2.number().min(0).max(1).optional(),
+  vignette: z2.number().min(0).max(1).optional(),
+  grainIntensity: z2.number().min(0).max(1).optional()
+});
+var phase0QuickStateSchema = z2.object(
+  {
+    [QUICK_AXIS_IDS[0]]: z2.number().min(-1).max(1),
+    [QUICK_AXIS_IDS[1]]: z2.number().min(-1).max(1),
+    [QUICK_AXIS_IDS[2]]: z2.number().min(-1).max(1)
+  }
+);
+var phase0ProjectLutSchema = z2.object({
+  title: z2.string().min(1),
+  size: z2.number().int().positive(),
+  data: z2.array(z2.number()),
+  intensity: z2.number().min(0).max(1).default(1)
+});
+var phase0ProjectSchemaInput = z2.object({
+  schemaVersion: z2.literal(PHASE0_SCHEMA_VERSION),
+  projectId: z2.string().min(1),
+  createdAt: z2.string().min(1),
+  updatedAt: z2.string().min(1),
+  presetName: z2.string().min(1),
+  strength: z2.number().min(0).max(1).default(PHASE0_PRESET_STRENGTH_DEFAULT),
+  quickState: phase0QuickStateSchema.default(DEFAULT_QUICK_STATE),
+  params: phase0ParamsPatchSchema,
+  // Legacy creative LUT slot. Keep parse-compatible so older saved projects
+  // normalize into the current dual-LUT shape on load.
+  lut: phase0ProjectLutSchema.nullable().optional(),
+  inputLut: phase0ProjectLutSchema.nullable().optional(),
+  creativeLut: phase0ProjectLutSchema.nullable().optional(),
+  output: z2.object({
+    longEdge: z2.literal(PHASE0_OUTPUT_PROFILE.longEdge),
+    fps: z2.literal(PHASE0_OUTPUT_PROFILE.fps),
+    codec: z2.literal(PHASE0_OUTPUT_PROFILE.codec),
+    container: z2.literal(PHASE0_OUTPUT_PROFILE.container),
+    preserveAudio: z2.boolean().default(PHASE0_OUTPUT_PROFILE.preserveAudio)
+  })
+});
+var phase0ProjectSchema = phase0ProjectSchemaInput.transform(
+  ({ lut, inputLut, creativeLut, ...project }) => {
+    const safePresetName = Object.prototype.hasOwnProperty.call(PRESETS, project.presetName) ? project.presetName : PHASE0_PRESET_DEFAULT;
+    const derivedParams = applyQuickStateToPhase0Params(
+      interpolatePhase0PresetParams(safePresetName, project.strength),
+      project.quickState
+    );
+    return {
+      ...project,
+      presetName: safePresetName,
+      params: mergePhase0Params(derivedParams, project.params),
+      inputLut: inputLut ?? null,
+      creativeLut: creativeLut ?? lut ?? null
+    };
+  }
+);
+function pickPhase0Params(params) {
+  const next = {};
+  for (const key of PHASE0_PARAM_KEYS) {
+    next[key] = params[key];
+  }
+  return phase0ParamsSchema.parse(next);
+}
+function createDefaultPhase0Params(presetName = PHASE0_PRESET_DEFAULT) {
+  return pickPhase0Params(PRESETS[presetName]);
+}
+function interpolatePhase0PresetParams(presetName, strength) {
+  const clamped = Math.max(0, Math.min(1, strength));
+  const reset = pickPhase0Params(PRESETS.reset);
+  const target = pickPhase0Params(PRESETS[presetName]);
+  const params = { ...reset };
+  for (const key of PHASE0_PARAM_KEYS) {
+    params[key] = reset[key] + (target[key] - reset[key]) * clamped;
+  }
+  return phase0ParamsSchema.parse(params);
+}
+function mergePhase0Params(base, patch) {
+  return phase0ParamsSchema.parse({ ...base, ...patch });
+}
+function makeProjectId() {
+  const fromCrypto = globalThis.crypto?.randomUUID?.();
+  if (typeof fromCrypto === "string" && fromCrypto.length > 0) {
+    return fromCrypto;
+  }
+  return `phase0-${Date.now().toString(36)}`;
+}
+function createPhase0ProjectState(presetName = PHASE0_PRESET_DEFAULT) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  return phase0ProjectSchema.parse({
+    schemaVersion: PHASE0_SCHEMA_VERSION,
+    projectId: makeProjectId(),
+    createdAt: now,
+    updatedAt: now,
+    presetName,
+    strength: PHASE0_PRESET_STRENGTH_DEFAULT,
+    quickState: DEFAULT_QUICK_STATE,
+    params: createDefaultPhase0Params(presetName),
+    inputLut: null,
+    creativeLut: null,
+    output: PHASE0_OUTPUT_PROFILE
+  });
+}
+
+// src/quick-semantics.ts
 var QUICK_AXIS_IDS = [
   "filmCharacter",
   "era",
@@ -925,10 +1143,10 @@ var DEFAULT_QUICK_STATE = {
 var quickStateShape = Object.fromEntries(
   QUICK_AXIS_IDS.map((axis) => [
     axis,
-    z2.number().min(QUICK_AXIS_DEFAULT_RANGE.min).max(QUICK_AXIS_DEFAULT_RANGE.max)
+    z3.number().min(QUICK_AXIS_DEFAULT_RANGE.min).max(QUICK_AXIS_DEFAULT_RANGE.max)
   ])
 );
-var quickStateSchema = z2.object(quickStateShape);
+var quickStateSchema = z3.object(quickStateShape);
 var QUICK_FULL_AXIS_WEIGHTS = {
   filmCharacter: {
     saturation: 0.24,
@@ -962,12 +1180,17 @@ var QUICK_PHASE0_AXIS_WEIGHTS = {
   },
   era: {
     fade: 0.18,
-    saturation: -0.12,
-    contrast: -0.06
+    saturation: -0.14,
+    contrast: -0.08,
+    halationIntensity: 0.16,
+    halationSpread: 6
   },
   dynamics: {
     exposure: 0.24,
-    contrast: 0.18
+    contrast: 0.18,
+    bloomStrength: 0.16,
+    bloomThreshold: -0.06,
+    bloomRadius: 0.12
   }
 };
 function clampAxisValue(value) {
@@ -986,13 +1209,25 @@ function clampParamValue(key, value) {
     case "temperature":
     case "tint":
       return Math.max(-1, Math.min(1, value));
+    case "rgbShift":
+      return Math.max(0, Math.min(PHASE0_RGB_SHIFT_MAX, value));
     case "grainIntensity":
     case "vignette":
     case "fade":
+    case "lensSoftness":
+    case "grainRadialMix":
+    case "grainSize":
     case "halationIntensity":
+    case "halationThreshold":
+    case "halationRadius":
     case "bloomStrength":
     case "bloomThreshold":
     case "bloomRadius":
+    case "diffusion":
+    case "bloomSoftKnee":
+    case "halationSoftKnee":
+    case "compressionAmount":
+    case "compressionRange":
       return Math.max(0, Math.min(1, value));
     case "halationSpread":
       return Math.max(0, Math.min(40, value));
@@ -1031,115 +1266,6 @@ function applyQuickStateToPhase0Params(base, state) {
     state,
     QUICK_PHASE0_AXIS_WEIGHTS
   );
-}
-
-// src/phase0-schema.ts
-import { z as z3 } from "zod";
-var PHASE0_SCHEMA_VERSION = 1;
-var PHASE0_PRESET_DEFAULT = "cinematic";
-var PHASE0_PARAM_KEYS = [
-  "exposure",
-  "contrast",
-  "saturation",
-  "temperature",
-  "tint",
-  "fade",
-  "vignette",
-  "grainIntensity"
-];
-var PHASE0_MAX_SOURCE_DURATION_SEC = 60 * 5;
-var PHASE0_APPROX_SOURCE_LONG_EDGE_MAX = 3840;
-var PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES = 2 * 1024 * 1024 * 1024;
-var PHASE0_OUTPUT_PROFILE = {
-  longEdge: 1920,
-  fps: 30,
-  codec: "h264",
-  container: "mp4",
-  preserveAudio: true
-};
-var PHASE0_BENCHMARK_GATES = {
-  passRealtimeRatio: 2.5,
-  strongGoRealtimeRatio: 2,
-  noGoRealtimeRatio: 3
-};
-var phase0ParamsSchema = z3.object({
-  exposure: z3.number().min(-2).max(2).default(PRESETS.reset.exposure),
-  contrast: z3.number().min(0).max(2).default(PRESETS.reset.contrast),
-  saturation: z3.number().min(0).max(2).default(PRESETS.reset.saturation),
-  temperature: z3.number().min(-1).max(1).default(PRESETS.reset.temperature),
-  tint: z3.number().min(-1).max(1).default(PRESETS.reset.tint),
-  fade: z3.number().min(0).max(1).default(PRESETS.reset.fade),
-  vignette: z3.number().min(0).max(1).default(PRESETS.reset.vignette),
-  grainIntensity: z3.number().min(0).max(1).default(PRESETS.reset.grainIntensity)
-});
-var phase0QuickStateSchema = z3.object(
-  {
-    [QUICK_AXIS_IDS[0]]: z3.number().min(-1).max(1),
-    [QUICK_AXIS_IDS[1]]: z3.number().min(-1).max(1),
-    [QUICK_AXIS_IDS[2]]: z3.number().min(-1).max(1)
-  }
-);
-var phase0ProjectLutSchema = z3.object({
-  title: z3.string().min(1),
-  size: z3.number().int().positive(),
-  data: z3.array(z3.number()),
-  intensity: z3.number().min(0).max(1).default(1)
-});
-var phase0ProjectSchema = z3.object({
-  schemaVersion: z3.literal(PHASE0_SCHEMA_VERSION),
-  projectId: z3.string().min(1),
-  createdAt: z3.string().min(1),
-  updatedAt: z3.string().min(1),
-  presetName: z3.string().min(1),
-  quickState: phase0QuickStateSchema.default(DEFAULT_QUICK_STATE),
-  params: phase0ParamsSchema,
-  lut: phase0ProjectLutSchema.nullable().default(null),
-  output: z3.object({
-    longEdge: z3.literal(PHASE0_OUTPUT_PROFILE.longEdge),
-    fps: z3.literal(PHASE0_OUTPUT_PROFILE.fps),
-    codec: z3.literal(PHASE0_OUTPUT_PROFILE.codec),
-    container: z3.literal(PHASE0_OUTPUT_PROFILE.container),
-    preserveAudio: z3.boolean().default(PHASE0_OUTPUT_PROFILE.preserveAudio)
-  })
-});
-function pickPhase0Params(params) {
-  return {
-    exposure: params.exposure,
-    contrast: params.contrast,
-    saturation: params.saturation,
-    temperature: params.temperature,
-    tint: params.tint,
-    fade: params.fade,
-    vignette: params.vignette,
-    grainIntensity: params.grainIntensity
-  };
-}
-function createDefaultPhase0Params(presetName = PHASE0_PRESET_DEFAULT) {
-  return pickPhase0Params(PRESETS[presetName]);
-}
-function mergePhase0Params(base, patch) {
-  return phase0ParamsSchema.parse({ ...base, ...patch });
-}
-function makeProjectId() {
-  const fromCrypto = globalThis.crypto?.randomUUID?.();
-  if (typeof fromCrypto === "string" && fromCrypto.length > 0) {
-    return fromCrypto;
-  }
-  return `phase0-${Date.now().toString(36)}`;
-}
-function createPhase0ProjectState(presetName = PHASE0_PRESET_DEFAULT) {
-  const now = (/* @__PURE__ */ new Date()).toISOString();
-  return phase0ProjectSchema.parse({
-    schemaVersion: PHASE0_SCHEMA_VERSION,
-    projectId: makeProjectId(),
-    createdAt: now,
-    updatedAt: now,
-    presetName,
-    quickState: DEFAULT_QUICK_STATE,
-    params: createDefaultPhase0Params(presetName),
-    lut: null,
-    output: PHASE0_OUTPUT_PROFILE
-  });
 }
 
 // src/native-bridge.ts
@@ -1185,6 +1311,12 @@ function buildPhase0ExportRequest(options) {
   if (probe) {
     assertPhase0SourceProbeWithinCaps(probe);
   }
+  const toTransportLut = (lut) => lut ? {
+    title: lut.title,
+    size: lut.size,
+    data: lut.data,
+    intensity: lut.intensity
+  } : null;
   return {
     sourceUri: options.source.uri,
     sourceKind: options.source.kind,
@@ -1199,13 +1331,8 @@ function buildPhase0ExportRequest(options) {
       quickState: options.project.quickState,
       params: options.project.params
     },
-    inputLut: null,
-    creativeLut: options.project.lut ? {
-      title: options.project.lut.title,
-      size: options.project.lut.size,
-      data: options.project.lut.data,
-      intensity: options.project.lut.intensity
-    } : null
+    inputLut: toTransportLut(options.project.inputLut),
+    creativeLut: toTransportLut(options.project.creativeLut)
   };
 }
 
@@ -1308,34 +1435,15 @@ function parseBenchmarkRow(line) {
 
 // src/ios-phase0.ts
 import { z as z4 } from "zod";
-var IOS_PHASE0_SCHEMA_VERSION = 1;
-var IOS_PHASE0_PARAM_KEYS = [
-  "exposure",
-  "contrast",
-  "saturation",
-  "temperature",
-  "tint",
-  "fade",
-  "vignette",
-  "grainIntensity"
-];
-var IOS_PHASE0_PARAM_PICK = {
-  exposure: true,
-  contrast: true,
-  saturation: true,
-  temperature: true,
-  tint: true,
-  fade: true,
-  vignette: true,
-  grainIntensity: true
-};
-var iosPhase0ParamsSchema = filmLabParamsSchema.pick(IOS_PHASE0_PARAM_PICK);
+var IOS_PHASE0_SCHEMA_VERSION = 2;
+var IOS_PHASE0_PARAM_KEYS = PHASE0_PARAM_KEYS;
+var iosPhase0ParamsSchema = phase0ParamsSchema;
 var IOS_PHASE0_OUTPUT_CODEC = "h264-mp4";
-var IOS_PHASE0_OUTPUT_LONG_EDGE = 1920;
-var IOS_PHASE0_OUTPUT_FPS = 30;
-var IOS_PHASE0_SOURCE_DURATION_CAP_SEC = 5 * 60;
-var IOS_PHASE0_SOURCE_LONG_EDGE_CAP = 3840;
-var IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES = 2 * 1024 * 1024 * 1024;
+var IOS_PHASE0_OUTPUT_LONG_EDGE = PHASE0_OUTPUT_PROFILE.longEdge;
+var IOS_PHASE0_OUTPUT_FPS = PHASE0_OUTPUT_PROFILE.fps;
+var IOS_PHASE0_SOURCE_DURATION_CAP_SEC = PHASE0_MAX_SOURCE_DURATION_SEC;
+var IOS_PHASE0_SOURCE_LONG_EDGE_CAP = PHASE0_APPROX_SOURCE_LONG_EDGE_MAX;
+var IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES = PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES;
 var IOS_PHASE0_SOURCE_CAPS = {
   durationSec: IOS_PHASE0_SOURCE_DURATION_CAP_SEC,
   longEdge: IOS_PHASE0_SOURCE_LONG_EDGE_CAP,
@@ -1508,16 +1616,7 @@ var iosPhase0LocalProjectSchema = z4.object({
   })
 });
 function pickIosPhase0Params(params) {
-  return iosPhase0ParamsSchema.parse({
-    exposure: params.exposure,
-    contrast: params.contrast,
-    saturation: params.saturation,
-    temperature: params.temperature,
-    tint: params.tint,
-    fade: params.fade,
-    vignette: params.vignette,
-    grainIntensity: params.grainIntensity
-  });
+  return pickPhase0Params(params);
 }
 function getIosPhase0SourceCapViolations(source) {
   const violations = [];
@@ -1562,6 +1661,8 @@ export {
   PHASE0_OUTPUT_PROFILE,
   PHASE0_PARAM_KEYS,
   PHASE0_PRESET_DEFAULT,
+  PHASE0_PRESET_STRENGTH_DEFAULT,
+  PHASE0_RGB_SHIFT_MAX,
   PHASE0_SCHEMA_VERSION,
   PRESETS,
   PRESET_BUTTONS,
@@ -1594,6 +1695,7 @@ export {
   gradeMatchesPreset,
   halationHueToHex,
   hslToRgb01,
+  interpolatePhase0PresetParams,
   iosPhase0AssetRefSchema,
   iosPhase0BenchmarkRecordSchema,
   iosPhase0ExportPayloadSchema,

@@ -1,0 +1,1 @@
+film,video,photo,LUT,color grading,export,local-first

@@ -60,6 +60,27 @@ struct Phase0ParamsDTO: Codable {
     let saturation: Double
     let temperature: Double
     let tint: Double
+    let rgbShift: Double
+    let lensSoftness: Double
+    let grainRadialMix: Double
+    let grainSize: Double
+    let bloomThreshold: Double
+    let bloomStrength: Double
+    let bloomRadius: Double
+    let diffusion: Double
+    let halationIntensity: Double
+    let halationSpread: Double
+    let halationHue: Double
+    let halationThreshold: Double
+    let halationRadius: Double
+    let bloomSoftKnee: Double
+    let halationSoftKnee: Double
+    let compressionAmount: Double
+    let compressionRange: Double
+    let printContrast: Double
+    let cyan: Double
+    let magenta: Double
+    let yellow: Double
     let fade: Double
     let vignette: Double
     let grainIntensity: Double
@@ -135,6 +156,14 @@ struct Phase0ExportResultDTO: Encodable {
     let benchmarkRecord: Phase0ExportBenchmarkRecordDTO?
 }
 
+struct Phase0PreviewRenderResultDTO: Encodable {
+    let originalUri: String
+    let gradedUri: String
+    let width: Int
+    let height: Int
+    let posterTimeSec: Double?
+}
+
 enum FilmtoneMediaError: LocalizedError {
     case bridgeUnavailable
     case invalidURL(String)
@@ -181,7 +210,11 @@ enum FilmtoneMediaError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .bridgeUnavailable:
-            return "Bridge view controller is unavailable."
+            return filmtoneLocalized(
+                "filmtone.error.bridge_unavailable",
+                defaultValue: "The Filmtone view is unavailable right now.",
+                comment: "Error shown when the native presenter is unavailable."
+            )
         case .invalidURL(let message),
              .missingSource(let message),
              .unsupportedSource(let message),
@@ -193,9 +226,17 @@ enum FilmtoneMediaError: LocalizedError {
              .cacheFailed(let message):
             return message
         case .exportBusy:
-            return "An export is already in progress."
+            return filmtoneLocalized(
+                "filmtone.error.export_busy",
+                defaultValue: "An export is already in progress.",
+                comment: "Error shown when a second export starts while one is already running."
+            )
         case .exportCancelled:
-            return "The export was cancelled."
+            return filmtoneLocalized(
+                "filmtone.error.export_cancelled",
+                defaultValue: "The export was cancelled.",
+                comment: "Error shown when export is cancelled."
+            )
         }
     }
 }
