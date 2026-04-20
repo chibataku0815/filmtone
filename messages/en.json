@@ -1323,5 +1323,34 @@
     "photography": "Photography",
     "profile": "Profile",
     "contact": "Contact"
+  },
+  "filmtone-signature": {
+    "metadata": {
+      "title": "Filmtone Signature Pack — Waitlist",
+      "description": "Buy-once look & finish system for short-form creators. Join the waitlist for early access.",
+      "ogTitle": "Filmtone Signature Pack",
+      "ogDescription": "Make short clips feel finished fast. Waitlist now open.",
+      "ogImageAlt": "Filmtone Signature Pack preview"
+    },
+    "eyebrow": "Coming soon",
+    "headline": "Make short clips feel finished fast",
+    "subheadline": "Filmtone Signature Pack gives you the Base Looks, finish recipes, and signature tools that turn rough short-form footage into a repeatable finished feel without a full grading session.",
+    "waitlistTitle": "Early access waitlist",
+    "waitlistBenefit": "First 100 members get $10 off. Members 101–300 get two bonus recipes. Waitlist members see launch 24 hours before public release.",
+    "emailPlaceholder": "your@email.com",
+    "cta": "Join the waitlist",
+    "submitting": "Joining…",
+    "thanks": "You're in. We'll email you when we open.",
+    "alreadyOnList": "Already on the list — we've got you.",
+    "error": "Something went wrong. Try again in a moment.",
+    "scopeLine": "Filmtone Signature Pack is currently Desktop/Web-first. iOS support will follow in a later lane.",
+    "whatItIsTitle": "What you get",
+    "whatItIsItem1": "8 Base Looks + 12 signature recipes for clips, covers, and stills",
+    "whatItIsItem2": "Full Finish Tools: Mist, Glow, Cross, Texture, Lens, Motion",
+    "whatItIsItem3": "Desktop-grade playback trust with play-while-you-judge compare",
+    "pricingTitle": "Pricing",
+    "pricingBody": "Filmtone Signature Pack — $39",
+    "buyOnceLine": "Buy once. No subscription.",
+    "refundLine": "If Filmtone Signature Pack does not fit your footage or workflow, contact us within 14 days of purchase and we will process a simple refund."
   }
 }

@@ -1325,5 +1325,34 @@
     "photography": "Photography",
     "profile": "Profile",
     "contact": "Contact"
+  },
+  "filmtone-signature": {
+    "metadata": {
+      "title": "Filmtone Signature Pack — ウェイトリスト",
+      "description": "短尺動画のための買い切り look / finish システム。早期アクセスをウェイトリストで。",
+      "ogTitle": "Filmtone Signature Pack",
+      "ogDescription": "短尺クリップを、速く finished に。ウェイトリスト受付中。",
+      "ogImageAlt": "Filmtone Signature Pack プレビュー"
+    },
+    "eyebrow": "近日公開",
+    "headline": "短尺クリップを、速く finished に。",
+    "subheadline": "Filmtone Signature Pack は、Base Looks、finish recipe、signature tool を一式で揃えた買い切りの look / finish システムです。フルのグレーディングセッションをせずに、短尺素材を repeatable に仕上げられます。",
+    "waitlistTitle": "早期アクセスウェイトリスト",
+    "waitlistBenefit": "先着 100 名は $10 OFF、101-300 名にはボーナス recipe 2 本を付与。ウェイトリスト会員は公開 24 時間前に先行アクセス可能。",
+    "emailPlaceholder": "your@email.com",
+    "cta": "ウェイトリストに参加",
+    "submitting": "送信中…",
+    "thanks": "ウェイトリストに登録しました。公開時にメールでお知らせします。",
+    "alreadyOnList": "すでに登録済みです。",
+    "error": "送信に失敗しました。少し時間をおいてお試しください。",
+    "scopeLine": "Filmtone Signature Pack は現在 Desktop/Web 先行です。iOS 対応は後段レーンで扱います。",
+    "whatItIsTitle": "同梱内容",
+    "whatItIsItem1": "Base Looks 8 本、signature recipe 12 本（clip / cover / still 対応）",
+    "whatItIsItem2": "Finish Tools フルセット: Mist / Glow / Cross / Texture / Lens / Motion",
+    "whatItIsItem3": "Desktop の play-while-you-judge 比較体験で、信頼できる仕上げを",
+    "pricingTitle": "価格",
+    "pricingBody": "Filmtone Signature Pack — $39",
+    "buyOnceLine": "買い切り。サブスクリプションではありません。",
+    "refundLine": "Filmtone Signature Pack が素材やワークフローに合わなかった場合、購入後 14 日以内にご連絡いただければ簡易返金いたします。"
   }
 }
