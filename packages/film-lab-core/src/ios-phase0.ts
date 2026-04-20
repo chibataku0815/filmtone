@@ -1,45 +1,35 @@
 import { z } from "zod";
 import type { CubeLUT } from "./cube-parser";
-import { type Params } from "./params";
 import { PRESETS, type PresetName } from "./presets";
-import { filmLabParamsSchema } from "./schema";
+import {
+  PHASE0_APPROX_SOURCE_LONG_EDGE_MAX,
+  PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES,
+  PHASE0_MAX_SOURCE_DURATION_SEC,
+  PHASE0_OUTPUT_PROFILE,
+  PHASE0_PARAM_KEYS,
+  PHASE0_RGB_SHIFT_MAX,
+  phase0ParamsSchema,
+  pickPhase0Params,
+  type Phase0ParamKey,
+  type Phase0Params,
+} from "./phase0-schema";
 
-export const IOS_PHASE0_SCHEMA_VERSION = 1 as const;
+export const IOS_PHASE0_SCHEMA_VERSION = 2 as const;
 
-export const IOS_PHASE0_PARAM_KEYS = [
-  "exposure",
-  "contrast",
-  "saturation",
-  "temperature",
-  "tint",
-  "fade",
-  "vignette",
-  "grainIntensity",
-] as const;
+export const IOS_PHASE0_PARAM_KEYS = PHASE0_PARAM_KEYS;
 
-export type IosPhase0ParamKey = (typeof IOS_PHASE0_PARAM_KEYS)[number];
-export type IosPhase0Params = Pick<Params, IosPhase0ParamKey>;
+export type IosPhase0ParamKey = Phase0ParamKey;
+export type IosPhase0Params = Phase0Params;
 
-const IOS_PHASE0_PARAM_PICK = {
-  exposure: true,
-  contrast: true,
-  saturation: true,
-  temperature: true,
-  tint: true,
-  fade: true,
-  vignette: true,
-  grainIntensity: true,
-} as const;
-
-export const iosPhase0ParamsSchema =
-  filmLabParamsSchema.pick(IOS_PHASE0_PARAM_PICK) as unknown as z.ZodType<IosPhase0Params>;
+export const iosPhase0ParamsSchema = phase0ParamsSchema;
 
 export const IOS_PHASE0_OUTPUT_CODEC = "h264-mp4" as const;
-export const IOS_PHASE0_OUTPUT_LONG_EDGE = 1920;
-export const IOS_PHASE0_OUTPUT_FPS = 30;
-export const IOS_PHASE0_SOURCE_DURATION_CAP_SEC = 5 * 60;
-export const IOS_PHASE0_SOURCE_LONG_EDGE_CAP = 3840;
-export const IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES = 2 * 1024 * 1024 * 1024;
+export const IOS_PHASE0_OUTPUT_LONG_EDGE = PHASE0_OUTPUT_PROFILE.longEdge;
+export const IOS_PHASE0_OUTPUT_FPS = PHASE0_OUTPUT_PROFILE.fps;
+export const IOS_PHASE0_SOURCE_DURATION_CAP_SEC = PHASE0_MAX_SOURCE_DURATION_SEC;
+export const IOS_PHASE0_SOURCE_LONG_EDGE_CAP = PHASE0_APPROX_SOURCE_LONG_EDGE_MAX;
+export const IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES = PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES;
+export const IOS_PHASE0_RGB_SHIFT_MAX = PHASE0_RGB_SHIFT_MAX;
 
 export const IOS_PHASE0_SOURCE_CAPS = {
   durationSec: IOS_PHASE0_SOURCE_DURATION_CAP_SEC,
@@ -286,17 +276,8 @@ export type IosPhase0LocalProject = z.infer<
   typeof iosPhase0LocalProjectSchema
 >;
 
-export function pickIosPhase0Params(params: Params): IosPhase0Params {
-  return iosPhase0ParamsSchema.parse({
-    exposure: params.exposure,
-    contrast: params.contrast,
-    saturation: params.saturation,
-    temperature: params.temperature,
-    tint: params.tint,
-    fade: params.fade,
-    vignette: params.vignette,
-    grainIntensity: params.grainIntensity,
-  });
+export function pickIosPhase0Params(params: IosPhase0Params): IosPhase0Params {
+  return pickPhase0Params(params);
 }
 
 export function getIosPhase0SourceCapViolations(

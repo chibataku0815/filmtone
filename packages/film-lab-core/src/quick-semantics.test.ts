@@ -25,7 +25,7 @@ describe("quick semantics", () => {
     expect(next.vignette).toBeGreaterThan(PRESETS.reset.vignette);
   });
 
-  test("phase0 quick mapping touches only the reduced subset", () => {
+  test("phase0 quick mapping carries optical weights used by desktop parity", () => {
     const next = applyQuickStateToPhase0Params(pickPhase0Params(PRESETS.reset), {
       filmCharacter: 0,
       era: 1,
@@ -34,6 +34,8 @@ describe("quick semantics", () => {
     expect(next.fade).toBeGreaterThan(0);
     expect(next.exposure).toBeGreaterThan(0);
     expect(next.contrast).toBeGreaterThan(1);
+    expect(next.bloomStrength).toBeGreaterThan(0);
+    expect(next.halationIntensity).toBeGreaterThan(0);
   });
 
   test("coerceQuickState clamps out-of-range values", () => {

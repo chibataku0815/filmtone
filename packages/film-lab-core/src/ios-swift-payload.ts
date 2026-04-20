@@ -1,0 +1,180 @@
+import { PRESET_VERSION } from "./look-ids";
+import {
+  PHASE0_APPROX_SOURCE_LONG_EDGE_MAX,
+  PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES,
+  PHASE0_MAX_SOURCE_DURATION_SEC,
+  PHASE0_OUTPUT_PROFILE,
+  PHASE0_PARAM_KEYS,
+  PHASE0_PRESET_DEFAULT,
+  PHASE0_PRESET_STRENGTH_DEFAULT,
+  PHASE0_RGB_SHIFT_MAX,
+  PHASE0_SCHEMA_VERSION,
+  mergePhase0Params,
+  pickPhase0Params,
+  type Phase0Params,
+} from "./phase0-schema";
+import { FILMTONE_IOS_PRESET_OVERRIDES } from "./ios-preset-overrides";
+import { PRESETS, type PresetName } from "./presets";
+import {
+  DEFAULT_QUICK_STATE,
+  QUICK_AXIS_DEFAULT_RANGE,
+  QUICK_AXIS_IDS,
+  QUICK_PHASE0_AXIS_WEIGHTS,
+  type QuickAxisId,
+} from "./quick-semantics";
+
+export interface FilmtoneIosSwiftPayload {
+  schemaVersion: number;
+  presetVersion: string;
+  presetDefault: PresetName;
+  presetStrengthDefault: number;
+  paramKeys: readonly string[];
+  quickAxisIds: readonly string[];
+  quickAxisRange: typeof QUICK_AXIS_DEFAULT_RANGE;
+  defaultQuickState: typeof DEFAULT_QUICK_STATE;
+  outputProfile: typeof PHASE0_OUTPUT_PROFILE;
+  rgbShiftMax: number;
+  sourceCaps: {
+    durationSec: number;
+    longEdge: number;
+    fileSizeBytes: number;
+  };
+  presets: Record<PresetName, Phase0Params>;
+  quickWeights: Record<QuickAxisId, Partial<Record<keyof Phase0Params, number>>>;
+}
+
+export function buildFilmtoneIosPresetMap(
+  presetOverrides: Partial<Record<PresetName, Partial<Phase0Params>>> = FILMTONE_IOS_PRESET_OVERRIDES,
+): Record<PresetName, Phase0Params> {
+  const presetNames = Object.keys(PRESETS) as PresetName[];
+  return Object.fromEntries(
+    presetNames.map((name) => {
+      const base = pickPhase0Params(PRESETS[name]);
+      const patch = presetOverrides[name];
+      return [name, patch ? mergePhase0Params(base, patch) : base];
+    }),
+  ) as Record<PresetName, Phase0Params>;
+}
+
+export function buildFilmtoneIosSwiftPayload(): FilmtoneIosSwiftPayload {
+  const presets = buildFilmtoneIosPresetMap();
+
+  return {
+    schemaVersion: PHASE0_SCHEMA_VERSION,
+    presetVersion: PRESET_VERSION,
+    presetDefault: PHASE0_PRESET_DEFAULT,
+    presetStrengthDefault: PHASE0_PRESET_STRENGTH_DEFAULT,
+    paramKeys: PHASE0_PARAM_KEYS,
+    quickAxisIds: QUICK_AXIS_IDS,
+    quickAxisRange: QUICK_AXIS_DEFAULT_RANGE,
+    defaultQuickState: DEFAULT_QUICK_STATE,
+    outputProfile: PHASE0_OUTPUT_PROFILE,
+    rgbShiftMax: PHASE0_RGB_SHIFT_MAX,
+    sourceCaps: {
+      durationSec: PHASE0_MAX_SOURCE_DURATION_SEC,
+      longEdge: PHASE0_APPROX_SOURCE_LONG_EDGE_MAX,
+      fileSizeBytes: PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES,
+    },
+    presets,
+    quickWeights: QUICK_PHASE0_AXIS_WEIGHTS as Record<
+      QuickAxisId,
+      Partial<Record<keyof Phase0Params, number>>
+    >,
+  };
+}
+
+function renderSwiftString(value: string): string {
+  return JSON.stringify(value);
+}
+
+function renderSwiftNumber(value: number): string {
+  if (Number.isInteger(value)) {
+    return value.toFixed(1);
+  }
+  const rendered = value.toString();
+  return rendered.includes("e") ? value.toFixed(8) : rendered;
+}
+
+function renderSwiftStringArray(values: readonly string[]): string {
+  return `[${values.map(renderSwiftString).join(", ")}]`;
+}
+
+function renderPhase0ParamsInit(params: Phase0Params, indent = "        "): string {
+  const lines = PHASE0_PARAM_KEYS.map((key) => `${indent}${key}: ${renderSwiftNumber(params[key])}`);
+  const closingIndent = indent.slice(0, -4);
+  return [
+    ".init(",
+    lines.join(",\n"),
+    `${closingIndent})`,
+  ].join("\n");
+}
+
+function renderPresetMap(presets: Record<PresetName, Phase0Params>): string {
+  const presetNames = Object.keys(presets) as PresetName[];
+  return [
+    "[",
+    presetNames
+      .map((name) => `        ${renderSwiftString(name)}: ${renderPhase0ParamsInit(presets[name], "            ")}`)
+      .join(",\n"),
+    "    ]",
+  ].join("\n");
+}
+
+function renderQuickWeights(
+  quickWeights: Record<QuickAxisId, Partial<Record<keyof Phase0Params, number>>>,
+): string {
+  return [
+    "[",
+    QUICK_AXIS_IDS.map((axis) => {
+      const weights = quickWeights[axis];
+      const entries = Object.entries(weights)
+        .filter(([, value]) => typeof value === "number")
+        .map(([key, value]) => `            ${renderSwiftString(key)}: ${renderSwiftNumber(value)}`)
+        .join(",\n");
+      return [
+        `        ${renderSwiftString(axis)}: [`,
+        entries,
+        "        ]",
+      ].join("\n");
+    }).join(",\n"),
+    "    ]",
+  ].join("\n");
+}
+
+export function renderFilmtoneIosSwiftPayload(payload = buildFilmtoneIosSwiftPayload()): string {
+  const resetParams = renderPhase0ParamsInit(payload.presets.reset, "        ").replace(/^/gm, "    ");
+  return `import Foundation
+
+enum FilmtonePhase0Generated {
+    static let schemaVersion = ${payload.schemaVersion}
+    static let presetVersion = ${renderSwiftString(payload.presetVersion)}
+    static let presetDefault = ${renderSwiftString(payload.presetDefault)}
+    static let presetStrengthDefault = ${renderSwiftNumber(payload.presetStrengthDefault)}
+    static let paramKeys: [String] = ${renderSwiftStringArray(payload.paramKeys)}
+    static let quickAxisIds: [String] = ${renderSwiftStringArray(payload.quickAxisIds)}
+    static let quickAxisMin = ${renderSwiftNumber(payload.quickAxisRange.min)}
+    static let quickAxisMax = ${renderSwiftNumber(payload.quickAxisRange.max)}
+    static let quickAxisStep = ${renderSwiftNumber(payload.quickAxisRange.step)}
+    static let defaultQuickState = FilmtoneQuickState(
+        filmCharacter: ${renderSwiftNumber(payload.defaultQuickState.filmCharacter)},
+        era: ${renderSwiftNumber(payload.defaultQuickState.era)},
+        dynamics: ${renderSwiftNumber(payload.defaultQuickState.dynamics)}
+    )
+    static let outputProfile = Phase0OutputProfileDTO(
+        longEdge: ${payload.outputProfile.longEdge},
+        fps: ${payload.outputProfile.fps},
+        codec: ${renderSwiftString(payload.outputProfile.codec)},
+        container: ${renderSwiftString(payload.outputProfile.container)},
+        preserveAudio: ${payload.outputProfile.preserveAudio ? "true" : "false"}
+    )
+    static let rgbShiftMax = ${renderSwiftNumber(payload.rgbShiftMax)}
+    static let sourceDurationCapSec = ${renderSwiftNumber(payload.sourceCaps.durationSec)}
+    static let sourceLongEdgeCap = ${payload.sourceCaps.longEdge}
+    static let sourceFileSizeCapBytes = ${payload.sourceCaps.fileSizeBytes}
+    static let resetParams: FilmtonePhase0Params =
+${resetParams}
+    static let paramsByName: [String: FilmtonePhase0Params] = ${renderPresetMap(payload.presets)}
+    static let quickWeights: [String: [String: Double]] = ${renderQuickWeights(payload.quickWeights)}
+}
+`;
+}

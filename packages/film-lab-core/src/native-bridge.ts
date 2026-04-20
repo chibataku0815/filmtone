@@ -65,6 +65,14 @@ export interface Phase0ExportRequest {
   creativeLut: ParsedCubeLut | null;
 }
 
+export interface Phase0PreviewRenderResult {
+  originalUri: string;
+  gradedUri: string;
+  width: number;
+  height: number;
+  posterTimeSec?: number;
+}
+
 export interface Phase0ExportProgress {
   stage: Phase0ExportStage;
   progress: number;
@@ -171,13 +179,26 @@ export function assertPhase0SourceProbeWithinCaps(probe: SourceProbe): void {
 export function buildPhase0ExportRequest(options: {
   source: SourceInfo;
   probe?: SourceProbe | null;
-  project: Pick<Phase0ProjectState, "presetName" | "quickState" | "params" | "lut">;
+  project: Pick<
+    Phase0ProjectState,
+    "presetName" | "quickState" | "params" | "inputLut" | "creativeLut"
+  >;
   output?: Partial<Phase0OutputProfile>;
 }): Phase0ExportRequest {
   const probe = options.probe ?? undefined;
   if (probe) {
     assertPhase0SourceProbeWithinCaps(probe);
   }
+
+  const toTransportLut = (lut: Phase0ProjectState["inputLut"] | null) =>
+    lut
+      ? {
+          title: lut.title,
+          size: lut.size,
+          data: lut.data,
+          intensity: lut.intensity,
+        }
+      : null;
 
   return {
     sourceUri: options.source.uri,
@@ -193,14 +214,7 @@ export function buildPhase0ExportRequest(options: {
       quickState: options.project.quickState as QuickState,
       params: options.project.params,
     },
-    inputLut: null,
-    creativeLut: options.project.lut
-      ? {
-          title: options.project.lut.title,
-          size: options.project.lut.size,
-          data: options.project.lut.data,
-          intensity: options.project.lut.intensity,
-        }
-      : null,
+    inputLut: toTransportLut(options.project.inputLut),
+    creativeLut: toTransportLut(options.project.creativeLut),
   };
 }

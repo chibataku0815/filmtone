@@ -37,7 +37,7 @@ LUT_3D_SIZE 2
       width: 4096,
       height: 2160,
       durationSec: 301,
-      fileSizeBytes: 3 * 1024 * 1024 * 1024,
+      fileSizeBytes: 9 * 1024 * 1024 * 1024,
     });
     expect(violations.length).toBe(3);
   });
@@ -75,5 +75,43 @@ LUT_3D_SIZE 2
     expect(request.output.container).toBe("mp4");
     expect(request.output.fps).toBe(30);
     expect(request.grade.presetName).toBe(project.presetName);
+  });
+
+  test("maps input and creative LUT slots independently", () => {
+    const lut = parseCube(`
+TITLE "Transport"
+LUT_3D_SIZE 2
+0 0 0
+1 0 0
+0 1 0
+1 1 0
+0 0 1
+1 0 1
+0 1 1
+1 1 1
+`);
+    const inputLut = serializeCubeLut(lut, { title: "Input", intensity: 0.8 });
+    const creativeLut = serializeCubeLut(lut, {
+      title: "Creative",
+      intensity: 0.45,
+    });
+
+    const request = buildPhase0ExportRequest({
+      source: {
+        uri: "file:///clip.mov",
+        filename: "clip.mov",
+        kind: "video",
+      },
+      project: {
+        ...createPhase0ProjectState(),
+        inputLut,
+        creativeLut,
+      },
+    });
+
+    expect(request.inputLut?.title).toBe("Input");
+    expect(request.inputLut?.intensity).toBe(0.8);
+    expect(request.creativeLut?.title).toBe("Creative");
+    expect(request.creativeLut?.intensity).toBe(0.45);
   });
 });

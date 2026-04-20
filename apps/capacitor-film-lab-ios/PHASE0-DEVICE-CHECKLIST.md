@@ -1,4 +1,4 @@
-# Filmtone iOS Phase 0 — Device Checklist (Phase B gate)
+# Filmtone iOS Historical v1.0 Device Checklist (Phase B gate)
 
 Single-page checklist. Consult this while tapping through exports; everything else (rules, schema, decision thresholds) is already wired.
 
@@ -9,7 +9,7 @@ Anchor: `/Volumes/SamsungPortableSSDX5001/documents/life/docs/guides/2026-04-18-
 From worktree root:
 
 ```sh
-bun run open:ios-phase0
+bun run open:ios
 ```
 
 Xcode opens → select connected device → Run.
@@ -48,7 +48,7 @@ Name clips `clip-60s-take1.mov` / `clip-5min-take1.mov` / `clip-short-take1.mov`
 Option A (fastest — one command):
 
 ```sh
-cd /Volumes/SamsungPortableSSDX5001/documents/forestone/chibatakumi-portfolio/.worktrees/filmtone-ios-phase0
+cd <repo-root>
 bun run bench:append
 ```
 
@@ -61,7 +61,7 @@ Option B (manual): paste into `benchmark/runs/<date>-<device>-<clip>.md`. Header
 row 追記した直後に:
 
 ```sh
-cd /Volumes/SamsungPortableSSDX5001/documents/forestone/chibatakumi-portfolio/.worktrees/filmtone-ios-phase0
+cd <repo-root>
 bun run bench
 ```
 
@@ -77,7 +77,7 @@ Exit codes: `0` Strong-Go/Go, `3` No-Go, `2` empty dir.
 
 ## 6. If Strong-Go
 
-Follow `docs/guides/2026-04-18-filmtone-ios-phase0-phase-c-auto-runbook.md` on life side. Two commands, no thinking.
+Follow the historical `docs/guides/2026-04-18-filmtone-ios-phase0-phase-c-auto-runbook.md` on the life side. Two commands, no thinking.
 
 ## 7. What counts as a pass (visual floor)
 
@@ -93,4 +93,4 @@ If any of the above fails → `Fail`. If unsure → `未確認` (counts as unche
 - Re-verify Phase A (build / dual-LUT compile / 4K cap / save-to-Photos — all settled)
 - Touch UIScene / warning cleanup / App Store metadata / Metal — Phase Polish only
 - Bundle `.cube` assets (see `src/presets/luts/README.md` for the intended path)
-- Push the worktree branch or merge to main until Phase C auto-runbook says so
+- Treat the `phase0` lane as the live day-to-day work lane

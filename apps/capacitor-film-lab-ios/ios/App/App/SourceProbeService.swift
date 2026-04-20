@@ -46,7 +46,13 @@ final class SourceProbeService {
             let source = CGImageSourceCreateWithURL(url as CFURL, nil),
             let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
         else {
-            throw FilmtoneMediaError.unsupportedSource("Unable to read image metadata.")
+            throw FilmtoneMediaError.unsupportedSource(
+                filmtoneLocalized(
+                    "filmtone.error.source.image_metadata",
+                    defaultValue: "This image couldn't be read.",
+                    comment: "Error shown when image metadata cannot be read from the selected source."
+                )
+            )
         }
 
         let width = properties[kCGImagePropertyPixelWidth] as? Int
@@ -74,7 +80,13 @@ final class SourceProbeService {
     ) throws -> SourceProbeDTO {
         let asset = AVURLAsset(url: url)
         guard let track = asset.tracks(withMediaType: .video).first else {
-            throw FilmtoneMediaError.unsupportedSource("No video track was found in the selected source.")
+            throw FilmtoneMediaError.unsupportedSource(
+                filmtoneLocalized(
+                    "filmtone.error.source.no_video_track",
+                    defaultValue: "No video track was found in the selected source.",
+                    comment: "Error shown when the selected video file has no video track."
+                )
+            )
         }
 
         let transformedSize = track.naturalSize.applying(track.preferredTransform)

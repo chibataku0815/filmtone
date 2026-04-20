@@ -1,0 +1,17 @@
+scheme(ENV.fetch("SNAPSHOT_SCHEME", "App"))
+workspace("./ios/App/App.xcworkspace")
+
+devices(
+  [
+    ENV.fetch("SNAPSHOT_IPHONE_DEVICE", "iPhone 17 Pro Max"),
+  ]
+)
+
+languages(["ja", "en-US"])
+output_directory("./fastlane/screenshots")
+clear_previous_screenshots(false)
+override_status_bar(true)
+reinstall_app(true)
+localize_simulator(true)
+stop_after_first_error(true)
+skip_open_summary(true)

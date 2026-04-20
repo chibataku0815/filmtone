@@ -10,21 +10,18 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "pickSource", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "pickLutFile", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "probeSource", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "renderPreviewFrame", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "runExport", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "saveToPhotos", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "shareOutput", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "cancelExport", returnType: CAPPluginReturnPromise),
     ]
 
-    private var cacheStore: CacheStore?
     private var assetPickerService: AssetPickerService?
-    private let sourceProbeService = SourceProbeService()
-    private let photoLibraryService = PhotoLibraryService()
+    private var runtime: FilmtoneMediaRuntime?
     private var currentExportSession: FilmtoneExportSession?
     private var currentExportTask: Task<Void, Never>?
     private var memoryWarningCount = 0
-    private var idleTimerDisabledBeforeExport = false
-    private var exportIdleTimerActive = false
     private let photoSaveLock = NSLock()
     private var inFlightPhotoSaveURI: String?
     private var lastSavedPhotoURI: String?
@@ -33,8 +30,14 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
         super.load()
         do {
             let cacheStore = try CacheStore()
-            self.cacheStore = cacheStore
             self.assetPickerService = AssetPickerService(cacheStore: cacheStore)
+            self.runtime = FilmtoneMediaRuntime(
+                cacheStore: cacheStore,
+                memoryWarningCounter: { [weak self] in self?.memoryWarningCount ?? 0 },
+                invalidFileURLError: { uri in
+                    FilmtoneMediaError.invalidURL("The file URL '\(uri)' is invalid or inaccessible.")
+                }
+            )
         } catch {
             CAPLog.print("FilmtoneMediaPlugin cache init failed:", error.localizedDescription)
         }
@@ -67,7 +70,10 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
 
         Task { @MainActor in
             do {
-                if let source = try await assetPickerService.pickSource(presenting: viewController) {
+                if let source = try await assetPickerService.pickSource(
+                    presenting: viewController,
+                    route: .photoLibrary
+                ) {
                     call.resolve(with: source)
                 } else {
                     call.resolve()
@@ -102,6 +108,11 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func probeSource(_ call: CAPPluginCall) {
+        guard let runtime else {
+            reject(call, with: FilmtoneMediaError.cacheFailed("Cache store is unavailable."))
+            return
+        }
+
         do {
             let options = try call.decode(UriOptions.self)
             let sourceURL = try resolveFileURL(options.uri)
@@ -111,7 +122,7 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
                 kind: inferKind(from: sourceURL),
                 mimeType: nil
             )
-            let probe = try sourceProbeService.probeSource(at: sourceURL, fallback: fallback)
+            let probe = try runtime.probeSource(fallback, sourceURL: sourceURL)
             call.resolve(with: probe)
         } catch {
             reject(call, with: error)
@@ -123,7 +134,7 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
             reject(call, with: FilmtoneMediaError.exportBusy)
             return
         }
-        guard let cacheStore else {
+        guard let runtime else {
             reject(call, with: FilmtoneMediaError.cacheFailed("Cache store is unavailable."))
             return
         }
@@ -131,24 +142,22 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
         do {
             let request = try call.decode(Phase0ExportRequestDTO.self)
             let sourceURL = try resolveFileURL(request.sourceUri)
-            let collector = BenchmarkCollector(
+            let benchmarkCollector = runtime.makeBenchmarkCollector(request: request)
+            let exportSession = try runtime.makeExportSession(
                 request: request,
-                memoryWarningCounter: { [weak self] in self?.memoryWarningCount ?? 0 }
-            )
-            let exportSession = try FilmtoneExportSession(
-                request: request,
-                sourceURL: sourceURL,
-                cacheStore: cacheStore
+                sourceURL: sourceURL
             )
             currentExportSession = exportSession
-            DispatchQueue.main.async {
-                self.beginForegroundExportActivity()
-            }
 
             currentExportTask = Task.detached(priority: .userInitiated) { [weak self] in
                 guard let self else { return }
                 do {
-                    var exportResult = try exportSession.run { progress in
+                    let exportResult = try await runtime.runExport(
+                        request: request,
+                        sourceURL: sourceURL,
+                        session: exportSession,
+                        collector: benchmarkCollector
+                    ) { progress in
                         let payload: [String: Any] = [
                             "stage": progress.stage.rawValue,
                             "progress": progress.progress,
@@ -161,31 +170,19 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
                         }
                     }
 
-                    let benchmarkRecord = collector.makeSuccessRecord(result: exportResult)
-                    exportResult = Phase0ExportResultDTO(
-                        outputUri: exportResult.outputUri,
-                        elapsedMs: exportResult.elapsedMs,
-                        outputWidth: exportResult.outputWidth,
-                        outputHeight: exportResult.outputHeight,
-                        outputFps: exportResult.outputFps,
-                        fileSizeBytes: exportResult.fileSizeBytes,
-                        realtimeRatio: exportResult.realtimeRatio,
-                        audioPreserved: exportResult.audioPreserved,
-                        benchmarkRecord: benchmarkRecord
-                    )
-
                     await MainActor.run {
                         self.currentExportSession = nil
                         self.currentExportTask = nil
-                        self.endForegroundExportActivity()
                         call.resolve(with: exportResult)
                     }
                 } catch {
-                    let benchmarkRecord = collector.makeFailureRecord(error: error)
+                    let benchmarkRecord = runtime.makeFailureBenchmarkRecord(
+                        collector: benchmarkCollector,
+                        error: error
+                    )
                     await MainActor.run {
                         self.currentExportSession = nil
                         self.currentExportTask = nil
-                        self.endForegroundExportActivity()
                         self.notifyListeners("exportProgress", data: [
                             "stage": Phase0ExportStage.completed.rawValue,
                             "progress": 1,
@@ -212,7 +209,33 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    @objc func renderPreviewFrame(_ call: CAPPluginCall) {
+        guard let runtime else {
+            reject(call, with: FilmtoneMediaError.cacheFailed("Cache store is unavailable."))
+            return
+        }
+
+        Task {
+            do {
+                let request = try call.decode(Phase0ExportRequestDTO.self)
+                let sourceURL = try resolveFileURL(request.sourceUri)
+                let result = try await runtime.renderPreview(
+                    request: request,
+                    sourceURL: sourceURL
+                )
+                call.resolve(with: result)
+            } catch {
+                reject(call, with: error)
+            }
+        }
+    }
+
     @objc func saveToPhotos(_ call: CAPPluginCall) {
+        guard let runtime else {
+            reject(call, with: FilmtoneMediaError.cacheFailed("Cache store is unavailable."))
+            return
+        }
+
         Task {
             do {
                 let options = try call.decode(UriOptions.self)
@@ -231,7 +254,7 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
 
                 do {
-                    _ = try await photoLibraryService.saveToPhotos(fileURL: fileURL)
+                    try await runtime.saveToPhotos(fileURL: fileURL)
                     finishPhotoSave(for: photoSaveURI, succeeded: true)
                     call.resolve()
                 } catch {
@@ -245,6 +268,10 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func shareOutput(_ call: CAPPluginCall) {
+        guard let runtime else {
+            reject(call, with: FilmtoneMediaError.cacheFailed("Cache store is unavailable."))
+            return
+        }
         guard let viewController = bridge?.viewController else {
             reject(call, with: FilmtoneMediaError.bridgeUnavailable)
             return
@@ -254,8 +281,7 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
             do {
                 let options = try call.decode(ShareOptions.self)
                 let fileURL = try resolveFileURL(options.uri)
-                let shareSheetService = ShareSheetService()
-                _ = try await shareSheetService.share(
+                try await runtime.shareOutput(
                     fileURL: fileURL,
                     title: options.title,
                     text: options.text,
@@ -273,9 +299,6 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
         currentExportTask?.cancel()
         currentExportSession = nil
         currentExportTask = nil
-        DispatchQueue.main.async {
-            self.endForegroundExportActivity()
-        }
         call.resolve()
     }
 
@@ -288,19 +311,14 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func resolveFileURL(_ uri: String) throws -> URL {
-        if let fileURL = URL(string: uri), fileURL.isFileURL {
-            return fileURL
-        }
-
         if let webURL = URL(string: uri), let localURL = bridge?.localURL(fromWebURL: webURL) {
             return localURL
         }
 
-        if FileManager.default.fileExists(atPath: uri) {
-            return URL(fileURLWithPath: uri)
+        guard let runtime else {
+            throw FilmtoneMediaError.cacheFailed("Cache store is unavailable.")
         }
-
-        throw FilmtoneMediaError.invalidURL("The file URL '\(uri)' is invalid or inaccessible.")
+        return try runtime.resolveFileURL(uri)
     }
 
     private func inferKind(from url: URL) -> FilmtoneSourceKind {
@@ -337,26 +355,6 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
             lastSavedPhotoURI = uri
         }
     }
-
-    @MainActor
-    private func beginForegroundExportActivity() {
-        guard !exportIdleTimerActive else {
-            return
-        }
-        idleTimerDisabledBeforeExport = UIApplication.shared.isIdleTimerDisabled
-        UIApplication.shared.isIdleTimerDisabled = true
-        exportIdleTimerActive = true
-    }
-
-    @MainActor
-    private func endForegroundExportActivity() {
-        guard exportIdleTimerActive else {
-            return
-        }
-        UIApplication.shared.isIdleTimerDisabled = idleTimerDisabledBeforeExport
-        exportIdleTimerActive = false
-    }
-
 }
 
 private enum PhotoSaveGuardState {

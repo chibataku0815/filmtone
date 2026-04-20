@@ -1,0 +1,614 @@
+import Foundation
+
+struct FilmtoneQuickState: Codable, Equatable {
+    var filmCharacter: Double
+    var era: Double
+    var dynamics: Double
+
+    static let zero = FilmtoneQuickState(filmCharacter: 0, era: 0, dynamics: 0)
+
+    func clamped() -> FilmtoneQuickState {
+        .init(
+            filmCharacter: Self.clampAxis(filmCharacter),
+            era: Self.clampAxis(era),
+            dynamics: Self.clampAxis(dynamics)
+        )
+    }
+
+    func value(forAxis axis: String) -> Double {
+        switch axis {
+        case "filmCharacter":
+            return filmCharacter
+        case "era":
+            return era
+        case "dynamics":
+            return dynamics
+        default:
+            return 0
+        }
+    }
+
+    private static func clampAxis(_ value: Double) -> Double {
+        max(FilmtonePhase0Generated.quickAxisMin, min(FilmtonePhase0Generated.quickAxisMax, value))
+    }
+}
+
+struct FilmtonePhase0Params: Codable, Equatable {
+    var exposure: Double
+    var contrast: Double
+    var saturation: Double
+    var temperature: Double
+    var tint: Double
+    var rgbShift: Double
+    var lensSoftness: Double
+    var grainRadialMix: Double
+    var grainSize: Double
+    var bloomThreshold: Double
+    var bloomStrength: Double
+    var bloomRadius: Double
+    var diffusion: Double
+    var halationIntensity: Double
+    var halationSpread: Double
+    var halationHue: Double
+    var halationThreshold: Double
+    var halationRadius: Double
+    var bloomSoftKnee: Double
+    var halationSoftKnee: Double
+    var compressionAmount: Double
+    var compressionRange: Double
+    var printContrast: Double
+    var cyan: Double
+    var magenta: Double
+    var yellow: Double
+    var fade: Double
+    var vignette: Double
+    var grainIntensity: Double
+
+    static let reset = FilmtonePhase0Generated.resetParams
+
+    static let keyPaths: [String: WritableKeyPath<FilmtonePhase0Params, Double>] = [
+        "exposure": \.exposure,
+        "contrast": \.contrast,
+        "saturation": \.saturation,
+        "temperature": \.temperature,
+        "tint": \.tint,
+        "rgbShift": \.rgbShift,
+        "lensSoftness": \.lensSoftness,
+        "grainRadialMix": \.grainRadialMix,
+        "grainSize": \.grainSize,
+        "bloomThreshold": \.bloomThreshold,
+        "bloomStrength": \.bloomStrength,
+        "bloomRadius": \.bloomRadius,
+        "diffusion": \.diffusion,
+        "halationIntensity": \.halationIntensity,
+        "halationSpread": \.halationSpread,
+        "halationHue": \.halationHue,
+        "halationThreshold": \.halationThreshold,
+        "halationRadius": \.halationRadius,
+        "bloomSoftKnee": \.bloomSoftKnee,
+        "halationSoftKnee": \.halationSoftKnee,
+        "compressionAmount": \.compressionAmount,
+        "compressionRange": \.compressionRange,
+        "printContrast": \.printContrast,
+        "cyan": \.cyan,
+        "magenta": \.magenta,
+        "yellow": \.yellow,
+        "fade": \.fade,
+        "vignette": \.vignette,
+        "grainIntensity": \.grainIntensity,
+    ]
+
+    func value(for key: String) -> Double {
+        guard let keyPath = Self.keyPaths[key] else {
+            return 0
+        }
+        return self[keyPath: keyPath]
+    }
+
+    mutating func setValue(_ value: Double, for key: String) {
+        guard let keyPath = Self.keyPaths[key] else {
+            return
+        }
+        self[keyPath: keyPath] = value
+    }
+
+    func applyingPatch(_ patch: FilmtonePhase0ParamsPatch?) -> FilmtonePhase0Params {
+        guard let patch else {
+            return self
+        }
+        var next = self
+        for (key, value) in patch.values {
+            next.setValue(value, for: key)
+        }
+        return next
+    }
+
+    func asDTO() -> Phase0ParamsDTO {
+        .init(
+            exposure: exposure,
+            contrast: contrast,
+            saturation: saturation,
+            temperature: temperature,
+            tint: tint,
+            rgbShift: rgbShift,
+            lensSoftness: lensSoftness,
+            grainRadialMix: grainRadialMix,
+            grainSize: grainSize,
+            bloomThreshold: bloomThreshold,
+            bloomStrength: bloomStrength,
+            bloomRadius: bloomRadius,
+            diffusion: diffusion,
+            halationIntensity: halationIntensity,
+            halationSpread: halationSpread,
+            halationHue: halationHue,
+            halationThreshold: halationThreshold,
+            halationRadius: halationRadius,
+            bloomSoftKnee: bloomSoftKnee,
+            halationSoftKnee: halationSoftKnee,
+            compressionAmount: compressionAmount,
+            compressionRange: compressionRange,
+            printContrast: printContrast,
+            cyan: cyan,
+            magenta: magenta,
+            yellow: yellow,
+            fade: fade,
+            vignette: vignette,
+            grainIntensity: grainIntensity
+        )
+    }
+}
+
+struct FilmtonePhase0ParamsPatch: Codable, Equatable {
+    var values: [String: Double]
+
+    static let empty = FilmtonePhase0ParamsPatch(values: [:])
+
+    init(values: [String: Double] = [:]) {
+        self.values = values
+    }
+
+    var isEmpty: Bool {
+        values.isEmpty
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: FilmtoneDynamicCodingKey.self)
+        var values: [String: Double] = [:]
+
+        for key in FilmtonePhase0Generated.paramKeys {
+            guard let codingKey = FilmtoneDynamicCodingKey(stringValue: key) else {
+                continue
+            }
+            if let value = try container.decodeIfPresent(Double.self, forKey: codingKey) {
+                values[key] = value
+            }
+        }
+
+        self.values = values
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: FilmtoneDynamicCodingKey.self)
+        for key in FilmtonePhase0Generated.paramKeys {
+            guard let value = values[key], let codingKey = FilmtoneDynamicCodingKey(stringValue: key) else {
+                continue
+            }
+            try container.encode(value, forKey: codingKey)
+        }
+    }
+
+    func normalized(over base: FilmtonePhase0Params) -> FilmtonePhase0ParamsPatch {
+        var normalized: [String: Double] = [:]
+
+        for key in FilmtonePhase0Generated.paramKeys {
+            guard let value = values[key] else {
+                continue
+            }
+
+            let clampedValue = FilmtonePhase0Math.clampParam(key, value)
+            if abs(clampedValue - base.value(for: key)) >= FilmtonePhase0Math.paramEqualityTolerance {
+                normalized[key] = clampedValue
+            }
+        }
+
+        return .init(values: normalized)
+    }
+
+    func settingValue(
+        _ value: Double,
+        for key: String,
+        over base: FilmtonePhase0Params
+    ) -> FilmtonePhase0ParamsPatch {
+        var next = values
+        let clampedValue = FilmtonePhase0Math.clampParam(key, value)
+
+        if abs(clampedValue - base.value(for: key)) < FilmtonePhase0Math.paramEqualityTolerance {
+            next.removeValue(forKey: key)
+        } else {
+            next[key] = clampedValue
+        }
+
+        return .init(values: next)
+    }
+
+    func removingValue(for key: String) -> FilmtonePhase0ParamsPatch {
+        var next = values
+        next.removeValue(forKey: key)
+        return .init(values: next)
+    }
+}
+
+private struct FilmtoneDynamicCodingKey: CodingKey {
+    let stringValue: String
+    let intValue: Int? = nil
+
+    init?(stringValue: String) {
+        self.stringValue = stringValue
+    }
+
+    init?(intValue: Int) {
+        return nil
+    }
+}
+
+struct FilmtoneProjectState: Codable {
+    var schemaVersion: Int
+    var projectId: String
+    var createdAt: String
+    var updatedAt: String
+    var presetName: String
+    var strength: Double
+    var quickState: FilmtoneQuickState
+    var paramOverrides: FilmtonePhase0ParamsPatch
+    var params: FilmtonePhase0Params
+    var inputLut: ParsedCubeLutDTO?
+    var creativeLut: ParsedCubeLutDTO?
+    var output: Phase0OutputProfileDTO
+
+    init(
+        schemaVersion: Int = FilmtonePhase0Math.projectSchemaVersion,
+        projectId: String,
+        createdAt: String,
+        updatedAt: String,
+        presetName: String,
+        strength: Double,
+        quickState: FilmtoneQuickState,
+        paramOverrides: FilmtonePhase0ParamsPatch = .empty,
+        params: FilmtonePhase0Params,
+        inputLut: ParsedCubeLutDTO?,
+        creativeLut: ParsedCubeLutDTO?,
+        output: Phase0OutputProfileDTO
+    ) {
+        self.schemaVersion = schemaVersion
+        self.projectId = projectId
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.presetName = presetName
+        self.strength = strength
+        self.quickState = quickState
+        self.paramOverrides = paramOverrides
+        self.params = params
+        self.inputLut = inputLut
+        self.creativeLut = creativeLut
+        self.output = output
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case projectId
+        case createdAt
+        case updatedAt
+        case presetName
+        case strength
+        case quickState
+        case params
+        case lut
+        case inputLut
+        case creativeLut
+        case output
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? FilmtonePhase0Math.projectSchemaVersion
+        projectId = try container.decode(String.self, forKey: .projectId)
+        createdAt = try container.decode(String.self, forKey: .createdAt)
+        updatedAt = try container.decode(String.self, forKey: .updatedAt)
+
+        let decodedPresetName = try container.decode(String.self, forKey: .presetName)
+        presetName = FilmtonePhase0Math.safePresetName(decodedPresetName)
+        strength = try container.decodeIfPresent(Double.self, forKey: .strength) ?? FilmtonePhase0Math.presetStrengthDefault
+        quickState = (try container.decodeIfPresent(FilmtoneQuickState.self, forKey: .quickState) ?? .zero).clamped()
+
+        let derivedParams = FilmtonePhase0Math.deriveParams(
+            presetName: presetName,
+            strength: strength,
+            quickState: quickState
+        )
+        let decodedPatch = try container.decodeIfPresent(FilmtonePhase0ParamsPatch.self, forKey: .params) ?? .empty
+        paramOverrides = decodedPatch.normalized(over: derivedParams)
+        params = derivedParams.applyingPatch(paramOverrides)
+
+        inputLut = try container.decodeIfPresent(ParsedCubeLutDTO.self, forKey: .inputLut)
+        let legacyLut = try container.decodeIfPresent(ParsedCubeLutDTO.self, forKey: .lut)
+        creativeLut = try container.decodeIfPresent(ParsedCubeLutDTO.self, forKey: .creativeLut) ?? legacyLut
+        output = try container.decodeIfPresent(Phase0OutputProfileDTO.self, forKey: .output) ?? FilmtonePhase0Math.outputProfile
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(schemaVersion, forKey: .schemaVersion)
+        try container.encode(projectId, forKey: .projectId)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(updatedAt, forKey: .updatedAt)
+        try container.encode(presetName, forKey: .presetName)
+        try container.encode(strength, forKey: .strength)
+        try container.encode(quickState, forKey: .quickState)
+        try container.encode(paramOverrides, forKey: .params)
+        try container.encodeIfPresent(inputLut, forKey: .inputLut)
+        try container.encodeIfPresent(creativeLut, forKey: .creativeLut)
+        try container.encode(output, forKey: .output)
+    }
+}
+
+enum FilmtoneRequestBuildError: LocalizedError {
+    case missingSource
+    case sourceCaps([String])
+
+    var errorDescription: String? {
+        switch self {
+        case .missingSource:
+            return "A source must be selected before building an export request."
+        case .sourceCaps(let violations):
+            return violations.joined(separator: "\n")
+        }
+    }
+}
+
+enum FilmtonePhase0Math {
+    static let rgbShiftMax = FilmtonePhase0Generated.rgbShiftMax
+    static let projectSchemaVersion = FilmtonePhase0Generated.schemaVersion
+    static let presetVersion = FilmtonePhase0Generated.presetVersion
+    static let presetStrengthDefault = FilmtonePhase0Generated.presetStrengthDefault
+    static let sourceDurationCapSec = FilmtonePhase0Generated.sourceDurationCapSec
+    static let sourceLongEdgeCap = FilmtonePhase0Generated.sourceLongEdgeCap
+    static let sourceFileSizeCapBytes = FilmtonePhase0Generated.sourceFileSizeCapBytes
+    static let previewRenderDebounceNanoseconds: UInt64 = 120_000_000
+    static let paramEqualityTolerance = 0.0001
+
+    static let outputProfile = FilmtonePhase0Generated.outputProfile
+
+    static func safePresetName(_ presetName: String) -> String {
+        FilmtonePhase0Generated.paramsByName[presetName] == nil ? FilmtonePhase0Generated.presetDefault : presetName
+    }
+
+    static func createProjectState(presetName: String = FilmtonePhase0Generated.presetDefault) -> FilmtoneProjectState {
+        let now = isoTimestamp()
+        let safePresetName = safePresetName(presetName)
+        return FilmtoneProjectState(
+            projectId: UUID().uuidString.lowercased(),
+            createdAt: now,
+            updatedAt: now,
+            presetName: safePresetName,
+            strength: presetStrengthDefault,
+            quickState: .zero,
+            paramOverrides: .empty,
+            params: deriveParams(
+                presetName: safePresetName,
+                strength: presetStrengthDefault,
+                quickState: .zero
+            ),
+            inputLut: nil,
+            creativeLut: nil,
+            output: outputProfile
+        )
+    }
+
+    static func clampStrength(_ value: Double) -> Double {
+        max(0, min(1, value))
+    }
+
+    static func deriveParams(
+        presetName: String,
+        strength: Double,
+        quickState: FilmtoneQuickState
+    ) -> FilmtonePhase0Params {
+        let base = interpolatePresetParams(presetName: presetName, strength: strength)
+        return applyQuickState(to: base, quickState: quickState)
+    }
+
+    static func resolveParams(
+        presetName: String,
+        strength: Double,
+        quickState: FilmtoneQuickState,
+        paramOverrides: FilmtonePhase0ParamsPatch
+    ) -> (base: FilmtonePhase0Params, overrides: FilmtonePhase0ParamsPatch, effective: FilmtonePhase0Params) {
+        let base = deriveParams(
+            presetName: presetName,
+            strength: strength,
+            quickState: quickState
+        )
+        let normalizedOverrides = paramOverrides.normalized(over: base)
+        return (
+            base,
+            normalizedOverrides,
+            base.applyingPatch(normalizedOverrides)
+        )
+    }
+
+    static func interpolatePresetParams(
+        presetName: String,
+        strength: Double
+    ) -> FilmtonePhase0Params {
+        let target = FilmtonePhase0Generated.paramsByName[safePresetName(presetName)] ?? .reset
+        let reset = FilmtonePhase0Params.reset
+        let clampedStrength = clampStrength(strength)
+        var next = reset
+
+        for key in FilmtonePhase0Generated.paramKeys {
+            let interpolated = reset.value(for: key) + (target.value(for: key) - reset.value(for: key)) * clampedStrength
+            next.setValue(interpolated, for: key)
+        }
+
+        return next
+    }
+
+    static func applyQuickState(
+        to base: FilmtonePhase0Params,
+        quickState: FilmtoneQuickState
+    ) -> FilmtonePhase0Params {
+        let quick = quickState.clamped()
+        var next = base
+
+        for axis in FilmtonePhase0Generated.quickAxisIds {
+            let axisValue = quick.value(forAxis: axis)
+            guard let weights = FilmtonePhase0Generated.quickWeights[axis] else {
+                continue
+            }
+
+            for (key, weight) in weights {
+                let nextValue = clampParam(key, next.value(for: key) + axisValue * weight)
+                next.setValue(nextValue, for: key)
+            }
+        }
+
+        return next
+    }
+
+    static func sourceCapViolations(for probe: SourceProbeDTO?) -> [String] {
+        guard let probe else {
+            return []
+        }
+
+        var violations: [String] = []
+        if let compatibilityViolation = sourceCompatibilityViolation(for: probe) {
+            violations.append(compatibilityViolation)
+        }
+
+        if let durationSec = probe.durationSec, durationSec > sourceDurationCapSec {
+            violations.append(
+                "Source duration \(String(format: "%.1f", durationSec))s exceeds \(Int(sourceDurationCapSec))s"
+            )
+        }
+
+        if let width = probe.width, let height = probe.height, max(width, height) > sourceLongEdgeCap {
+            violations.append(
+                "Source long edge \(max(width, height))px exceeds \(sourceLongEdgeCap)px"
+            )
+        }
+
+        if let fileSizeBytes = probe.fileSizeBytes, fileSizeBytes > sourceFileSizeCapBytes {
+            violations.append(
+                "Source size \(fileSizeBytes) bytes exceeds \(sourceFileSizeCapBytes) bytes"
+            )
+        }
+
+        return violations
+    }
+
+    private static func sourceCompatibilityViolation(for probe: SourceProbeDTO) -> String? {
+        guard probe.kind == .video else {
+            return nil
+        }
+
+        switch normalizedSourceCodec(probe.codec) {
+        case "avdh":
+            return "Avid DNxHR / DNxHD video can't be previewed or exported on iPhone. Convert this file to H.264, HEVC, or ProRes first."
+        default:
+            return nil
+        }
+    }
+
+    private static func normalizedSourceCodec(_ codec: String?) -> String {
+        codec?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased() ?? ""
+    }
+
+    static func buildExportRequest(
+        source: SourceInfoDTO?,
+        probe: SourceProbeDTO?,
+        project: FilmtoneProjectState
+    ) throws -> Phase0ExportRequestDTO {
+        guard let source else {
+            throw FilmtoneRequestBuildError.missingSource
+        }
+
+        let violations = sourceCapViolations(for: probe)
+        if !violations.isEmpty {
+            throw FilmtoneRequestBuildError.sourceCaps(violations)
+        }
+
+        return Phase0ExportRequestDTO(
+            sourceUri: source.uri,
+            sourceKind: source.kind,
+            sourceProbe: probe,
+            output: project.output,
+            grade: Phase0GradeDTO(
+                presetName: project.presetName,
+                presetVersion: presetVersion,
+                quickState: .init(
+                    filmCharacter: project.quickState.filmCharacter,
+                    era: project.quickState.era,
+                    dynamics: project.quickState.dynamics
+                ),
+                params: project.params.asDTO()
+            ),
+            lut: nil,
+            inputLut: transportLut(project.inputLut),
+            creativeLut: transportLut(project.creativeLut)
+        )
+    }
+
+    static func isoTimestamp() -> String {
+        ISO8601DateFormatter().string(from: Date())
+    }
+
+    private static func transportLut(_ lut: ParsedCubeLutDTO?) -> SerializableLutDTO? {
+        guard let lut else {
+            return nil
+        }
+        return .init(size: lut.size, data: lut.data, intensity: lut.intensity)
+    }
+
+    static func clampParam(_ key: String, _ value: Double) -> Double {
+        switch key {
+        case "exposure":
+            return max(-2, min(2, value))
+        case "contrast", "saturation":
+            return max(0, min(2, value))
+        case "temperature", "tint":
+            return max(-1, min(1, value))
+        case "cyan", "magenta", "yellow":
+            return max(-1, min(1, value))
+        case "halationSpread":
+            return max(0, min(40, value))
+        case "halationHue":
+            return max(0, min(100, value))
+        case "rgbShift":
+            return max(0, min(rgbShiftMax, value))
+        case "lensSoftness",
+             "grainRadialMix",
+             "grainSize",
+             "bloomThreshold",
+             "bloomStrength",
+             "bloomRadius",
+             "diffusion",
+             "halationIntensity",
+             "halationThreshold",
+             "halationRadius",
+             "bloomSoftKnee",
+             "halationSoftKnee",
+             "compressionAmount",
+             "compressionRange",
+             "printContrast",
+             "fade",
+             "vignette",
+             "grainIntensity":
+            return max(0, min(1, value))
+        default:
+            return value
+        }
+    }
+}
