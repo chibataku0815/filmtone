@@ -1,0 +1,1 @@
+Initial release with presets, Quick controls, dual LUT slots, export, and save/share to Photos.

@@ -1,0 +1,1 @@
+最初の公開版です。プリセット、Quick 3 軸、Camera Profile / Film Look の dual LUT、書き出し、写真への保存 / 共有を利用できます。
