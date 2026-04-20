@@ -4,6 +4,9 @@ import {
   filmLookGradeInputSchema,
   findMatchingPreset,
   lookIdForPreset,
+  type BehaviorProfile,
+  type OpticalFamily,
+  type OpticalRecipeId,
   type PresetName,
   type Params,
 } from "film-lab-core";
@@ -14,6 +17,7 @@ export const METADATA_LOOK_SOURCES = [
   "preset",
   "editSync",
   "importedJson",
+  "analysisRecommendation",
 ] as const;
 
 export type MetadataLookSource = (typeof METADATA_LOOK_SOURCES)[number];
@@ -28,6 +32,14 @@ export type MetadataLutRef = {
 export type MetadataLutRefs = {
   lut1: MetadataLutRef;
   lut2: MetadataLutRef;
+};
+
+export type AppliedOpticalRecommendationMetadata = {
+  family: OpticalFamily;
+  profile: BehaviorProfile;
+  recipe: OpticalRecipeId | null;
+  analyzerVersion: string;
+  appliedAtIso: string;
 };
 
 const [FIRST_PRESET_NAME, ...REST_PRESET_NAMES] = Object.keys(PRESETS) as [
@@ -45,6 +57,32 @@ const metadataLutRefSchema = z.object({
 });
 
 const metadataLookSourceSchema = z.enum(METADATA_LOOK_SOURCES);
+
+const opticalFamilySchema = z.enum(["mist", "glow", "cross", "lens"]);
+const behaviorProfileSchema = z.enum([
+  "clean",
+  "warm",
+  "night",
+  "portrait",
+  "spotlight",
+  "product",
+  "stillMatch",
+]);
+const opticalRecipeIdSchema = z.enum([
+  "warmIndoor",
+  "nightCity",
+  "skinCloseUp",
+  "nightSpot",
+  "productEdge",
+  "coverStillMatch",
+]);
+const opticalRecommendationMetadataSchema = z.object({
+  family: opticalFamilySchema,
+  profile: behaviorProfileSchema,
+  recipe: opticalRecipeIdSchema.nullable(),
+  analyzerVersion: z.string().min(1),
+  appliedAtIso: z.string().min(1),
+});
 
 const filmtoneExportSessionSchema = z.object({
   kind: z.literal("filmtone-export-session"),
@@ -66,6 +104,7 @@ const filmtoneExportSessionSchema = z.object({
     batchPresetChoice: presetNameSchema,
     source: metadataLookSourceSchema,
     grade: filmLookGradeInputSchema,
+    opticalRecommendation: opticalRecommendationMetadataSchema.optional(),
   }),
   lutRefs: z.object({
     lut1: metadataLutRefSchema,
@@ -205,6 +244,7 @@ export function buildFilmtoneExportSession(params: {
   lookSource: MetadataLookSource;
   gradeParams: Params;
   lutRefs: MetadataLutRefs;
+  opticalRecommendation?: AppliedOpticalRecommendationMetadata | null;
 }): FilmtoneExportSessionV1 {
   const normalizedInputDir = params.job === "images" ? params.inputDir : null;
   const normalizedVideoInputPath =
@@ -231,6 +271,9 @@ export function buildFilmtoneExportSession(params: {
       source: params.lookSource,
       grade:
         buildGradeJsonPayload(params.gradeParams) as unknown as FilmtoneExportSessionV1["look"]["grade"],
+      ...(params.opticalRecommendation
+        ? { opticalRecommendation: params.opticalRecommendation }
+        : {}),
     },
     lutRefs: params.lutRefs,
   };

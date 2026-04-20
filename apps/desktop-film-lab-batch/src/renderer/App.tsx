@@ -27,6 +27,11 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import {
+  buildOpticalParamPatch,
+  type OpticalRecommendationV1,
+  type PresetName,
+} from "film-lab-core";
+import {
   FilmLabCanvas,
   FilmLabWebglPanelBackdrop,
   VideoTransportControls,
@@ -39,9 +44,13 @@ import { FilmLabControlPanelCore } from "film-lab-ui";
 import { Histogram } from "film-lab-ui";
 import { HelpHint } from "./batch-tab/HelpHint";
 import { GradeSyncToast, type GradeSyncToastPayload } from "./GradeSyncToast";
+import {
+  OpticalFinishRecommendationPanel,
+  type OpticalRecommendationDebugInfo,
+  type OpticalFinishRecommendationPanelState,
+} from "./OpticalFinishRecommendationPanel";
 import { QualityBadge } from "./QualityBadge";
 import type { Viewport, ViewportCapabilities } from "film-lab-renderer";
-import type { PresetName } from "film-lab-core";
 import {
   initialOutcomes,
   parseFilmLabBatchSessionV1,
@@ -75,6 +84,7 @@ import {
 } from "./video-export-constants";
 import { exportGradeJsonText } from "./grade-io";
 import {
+  type AppliedOpticalRecommendationMetadata,
   buildFilmtoneExportSession,
   buildPhotoMetadataSidecarPath,
   buildVideoMetadataSidecarPath,
@@ -85,6 +95,10 @@ import {
   type MetadataLutRefs,
 } from "./export-metadata-session";
 import { resolveImportedMetadataJson } from "./metadata-json-runtime";
+import {
+  createSceneAnalysisCacheKey,
+  DesktopOpticalAnalyzerService,
+} from "./optical-scene-analysis";
 import { viewportRecordToParams } from "./viewport-to-params";
 import {
   BatchTabCompactRunFooter,
@@ -187,6 +201,7 @@ async function resolveBatchGradeSnapshot(
   lutRefs: MetadataLutRefs;
   syncedAtMs: number | null;
   importedFilePath: string | null;
+  appliedOpticalRecommendation: AppliedOpticalRecommendationMetadata | null;
 }> {
   if (s.importedGradePath) {
     const text = await window.filmLabBatch.readFileUtf8(s.importedGradePath);
@@ -202,6 +217,7 @@ async function resolveBatchGradeSnapshot(
       lutRefs: restored.lutRefs,
       syncedAtMs: restored.syncedAtMs,
       importedFilePath: restored.importedFilePath,
+      appliedOpticalRecommendation: restored.appliedOpticalRecommendation,
     };
   }
   if (s.gradeParamsJson) {
@@ -227,6 +243,7 @@ async function resolveBatchGradeSnapshot(
       lutRefs: createEmptyMetadataLutRefs(),
       syncedAtMs: null,
       importedFilePath: null,
+      appliedOpticalRecommendation: null,
     };
   }
   return {
@@ -236,6 +253,7 @@ async function resolveBatchGradeSnapshot(
     lutRefs: createEmptyMetadataLutRefs(),
     syncedAtMs: null,
     importedFilePath: null,
+    appliedOpticalRecommendation: null,
   };
 }
 
@@ -322,6 +340,8 @@ export default function App() {
   const [batchLutRefs, setBatchLutRefs] = useState<MetadataLutRefs>(
     createEmptyMetadataLutRefs,
   );
+  const [appliedOpticalRecommendation, setAppliedOpticalRecommendation] =
+    useState<AppliedOpticalRecommendationMetadata | null>(null);
   /** @description 最後に import した JSON ファイル。session 復元にも使うため、表示上の look source とは分離する。 */
   const [importedGradeLabel, setImportedGradeLabel] = useState<string | null>(
     null,
@@ -372,6 +392,19 @@ export default function App() {
    */
   const [interactivePreviewSource, setInteractivePreviewSource] =
     useState<DesktopInteractivePreviewState>({ kind: "sample" });
+  const [opticalRecommendationPanel, setOpticalRecommendationPanel] =
+    useState<OpticalFinishRecommendationPanelState>({ state: "idle" });
+  const [opticalRecommendationDebugInfo, setOpticalRecommendationDebugInfo] =
+    useState<OpticalRecommendationDebugInfo | null>(null);
+  const [opticalRecommendationEventLog, setOpticalRecommendationEventLog] =
+    useState<string[]>([]);
+  const [opticalAnalysisRetryNonce, setOpticalAnalysisRetryNonce] = useState(0);
+  const opticalAnalyzerServiceRef = useRef<DesktopOpticalAnalyzerService | null>(
+    null,
+  );
+  if (opticalAnalyzerServiceRef.current === null) {
+    opticalAnalyzerServiceRef.current = new DesktopOpticalAnalyzerService();
+  }
   const progressiveLoad = useProgressiveLoad();
   const canvasHasUserVideo = useMemo(
     () =>
@@ -421,6 +454,27 @@ export default function App() {
   const handleEditParamsChange = useCallback(() => {
     setParamsChangeNonce((n) => n + 1);
   }, []);
+
+  const formatOpticalAnalysisEvent = useCallback((message: string) => {
+    return `${new Date().toISOString().slice(11, 23)} ${message}`;
+  }, []);
+
+  const replaceOpticalAnalysisEventLog = useCallback(
+    (message: string) => {
+      setOpticalRecommendationEventLog([formatOpticalAnalysisEvent(message)]);
+    },
+    [formatOpticalAnalysisEvent],
+  );
+
+  const appendOpticalAnalysisEvent = useCallback(
+    (message: string) => {
+      setOpticalRecommendationEventLog((current) => [
+        ...current.slice(-11),
+        formatOpticalAnalysisEvent(message),
+      ]);
+    },
+    [formatOpticalAnalysisEvent],
+  );
 
   /**
    * @description LUT 変更も同じく安定したコールバックにまとめ、子コンポーネント側の
@@ -639,6 +693,7 @@ export default function App() {
         setBatchPresetChoice(parsed.batchPresetChoice);
         setBatchLookSource("preset");
         setBatchLutRefs(createEmptyMetadataLutRefs());
+        setAppliedOpticalRecommendation(null);
         setEditToExportSyncedAtMs(null);
         try {
           const snap = await resolveBatchGradeSnapshot(parsed);
@@ -646,12 +701,14 @@ export default function App() {
           setBatchPresetChoice(snap.batchPresetChoice);
           setBatchLookSource(snap.lookSource);
           setBatchLutRefs(snap.lutRefs);
+          setAppliedOpticalRecommendation(snap.appliedOpticalRecommendation);
           setImportedGradeLabel(snap.importedFilePath);
           setEditToExportSyncedAtMs(snap.syncedAtMs);
         } catch {
           setBatchGrade(batchGradeStateFromPreset(parsed.batchPresetChoice));
           setBatchLookSource("preset");
           setBatchLutRefs(createEmptyMetadataLutRefs());
+          setAppliedOpticalRecommendation(null);
           setImportedGradeLabel(null);
         }
         return;
@@ -828,6 +885,7 @@ export default function App() {
       setBatchPresetChoice(restored.batchPresetChoice);
       setBatchLookSource(restored.lookSource);
       setBatchLutRefs(restored.lutRefs);
+      setAppliedOpticalRecommendation(restored.appliedOpticalRecommendation);
       setImportedGradeLabel(restored.importedFilePath);
       setEditToExportSyncedAtMs(restored.syncedAtMs);
       setCanvasPreset(restored.batchPresetChoice);
@@ -1050,6 +1108,293 @@ export default function App() {
     progressiveLoad.activeSourcePath,
   ]);
 
+  useEffect(() => {
+    const service = opticalAnalyzerServiceRef.current;
+    const activeVideoElement = filmLabCanvasRef.current?.getActiveVideoElement() ?? null;
+    const currentSrc =
+      typeof activeVideoElement?.currentSrc === "string" &&
+      activeVideoElement.currentSrc.length > 0
+        ? activeVideoElement.currentSrc
+        : null;
+    const durationSec =
+      activeVideoElement && Number.isFinite(activeVideoElement.duration)
+        ? Math.max(0, activeVideoElement.duration)
+        : null;
+    const resolvedSourcePath =
+      interactivePreviewSource.kind === "file"
+        ? interactivePreviewSource.absolutePath ?? currentSrc
+        : null;
+    const buildDebugInfo = (
+      patch: Partial<OpticalRecommendationDebugInfo>,
+    ): OpticalRecommendationDebugInfo => ({
+      effectState: "idle",
+      previewState: previewStatus.state,
+      previewReason: previewStatus.reason,
+      hasActiveVideo: previewStatus.hasActiveVideo,
+      interactiveSourceKind: interactivePreviewSource.kind,
+      smartLookDerived:
+        interactivePreviewSource.kind === "file"
+          ? interactivePreviewSource.smartLookDerived
+          : false,
+      absolutePath:
+        interactivePreviewSource.kind === "file"
+          ? interactivePreviewSource.absolutePath
+          : null,
+      sourcePath: resolvedSourcePath,
+      currentSrc,
+      activeSourcePath: progressiveLoad.activeSourcePath,
+      durationSec,
+      progressiveStage: progressiveLoad.stage,
+      qualityLabel: progressiveLoad.qualityLabel,
+      analyzerVersion: service?.analyzerVersion ?? "scene-aware-v1",
+      updatedAtIso: new Date().toISOString(),
+      ...patch,
+    });
+
+    if (!service) {
+      setOpticalRecommendationPanel({ state: "idle" });
+      replaceOpticalAnalysisEventLog("scene analysis service unavailable");
+      setOpticalRecommendationDebugInfo(
+        buildDebugInfo({
+          effectState: "error",
+          reason: "service-unavailable",
+          activity: "scene analysis service unavailable",
+          lastError: "Scene analysis service is unavailable.",
+        }),
+      );
+      return;
+    }
+    if (previewStatus.state !== "ready") {
+      setOpticalRecommendationPanel({ state: "idle" });
+      replaceOpticalAnalysisEventLog("skipped: preview not ready");
+      setOpticalRecommendationDebugInfo(
+        buildDebugInfo({
+          effectState: "skipped",
+          reason: "preview-not-ready",
+          activity: "waiting for preview to become ready",
+        }),
+      );
+      return;
+    }
+    if (!previewStatus.hasActiveVideo) {
+      setOpticalRecommendationPanel({ state: "idle" });
+      replaceOpticalAnalysisEventLog("skipped: no active video");
+      setOpticalRecommendationDebugInfo(
+        buildDebugInfo({
+          effectState: "skipped",
+          reason: "no-active-video",
+          activity: "current preview is not an active video",
+        }),
+      );
+      return;
+    }
+    if (interactivePreviewSource.kind !== "file") {
+      setOpticalRecommendationPanel({ state: "idle" });
+      replaceOpticalAnalysisEventLog("skipped: sample preview");
+      setOpticalRecommendationDebugInfo(
+        buildDebugInfo({
+          effectState: "skipped",
+          reason: "sample-preview",
+          activity: "sample preview is excluded from scene analysis",
+        }),
+      );
+      return;
+    }
+    if (interactivePreviewSource.smartLookDerived) {
+      setOpticalRecommendationPanel({ state: "idle" });
+      replaceOpticalAnalysisEventLog("skipped: smart look derived");
+      setOpticalRecommendationDebugInfo(
+        buildDebugInfo({
+          effectState: "skipped",
+          reason: "smart-look-derived",
+          activity: "Smart Look derived preview is excluded from scene analysis",
+        }),
+      );
+      return;
+    }
+    if (!resolvedSourcePath) {
+      setOpticalRecommendationPanel({ state: "idle" });
+      replaceOpticalAnalysisEventLog("skipped: missing source path");
+      setOpticalRecommendationDebugInfo(
+        buildDebugInfo({
+          effectState: "skipped",
+          reason: "missing-source-path",
+          activity: "source path could not be resolved",
+        }),
+      );
+      return;
+    }
+
+    const safeDurationSec = durationSec ?? 0;
+    const cacheKey = createSceneAnalysisCacheKey({
+      sourcePath: resolvedSourcePath,
+      trimStartSec: 0,
+      trimEndSec: safeDurationSec,
+      sourceDurationSec: safeDurationSec,
+      analyzerVersion: service.analyzerVersion,
+    });
+
+    let cancelled = false;
+    setOpticalRecommendationPanel({ state: "analyzing" });
+    replaceOpticalAnalysisEventLog("analysis requested");
+    setOpticalRecommendationDebugInfo(
+      buildDebugInfo({
+        effectState: "analyzing",
+        sourcePath: resolvedSourcePath,
+        cacheKey,
+        activity: "analysis requested",
+      }),
+    );
+
+    void service
+      .analyze({
+        sourcePath: resolvedSourcePath,
+        sourceUrl:
+          interactivePreviewSource.absolutePath == null
+            ? currentSrc ?? undefined
+            : undefined,
+        trimStartSec: 0,
+        trimEndSec: safeDurationSec,
+        sourceDurationSec: safeDurationSec,
+      }, (progress) => {
+        if (cancelled) return;
+        appendOpticalAnalysisEvent(progress.message);
+        setOpticalRecommendationDebugInfo(
+          buildDebugInfo({
+            effectState: "analyzing",
+            sourcePath: resolvedSourcePath,
+            cacheKey: progress.cacheKey,
+            sourceUrlKind: progress.sourceUrlKind,
+            activity: progress.message,
+          }),
+        );
+      })
+      .then((result) => {
+        if (cancelled) return;
+        if (
+          (result.state === "ready" || result.state === "low-confidence") &&
+          result.recommendation
+        ) {
+          appendOpticalAnalysisEvent(`analysis complete: ${result.state}`);
+          setOpticalRecommendationPanel({
+            state: result.state,
+            recommendation: result.recommendation,
+          });
+          setOpticalRecommendationDebugInfo(
+            buildDebugInfo({
+              effectState: result.state,
+              sourcePath: resolvedSourcePath,
+              cacheKey: result.cacheKey,
+              analyzerVersion: result.analyzerVersion,
+              sourceUrlKind:
+                interactivePreviewSource.absolutePath == null
+                  ? "provided-url"
+                  : "video-src",
+              sampleCount:
+                result.descriptor?.sampleCount ??
+                result.recommendation.descriptor.sampleCount ??
+                null,
+              activity: `analysis complete: ${result.state}`,
+            }),
+          );
+          return;
+        }
+        if (result.state === "error") {
+          appendOpticalAnalysisEvent(
+            `analysis failed: ${result.errorMessage ?? "unknown error"}`,
+          );
+          setOpticalRecommendationPanel({
+            state: "error",
+            message: result.errorMessage,
+          });
+          setOpticalRecommendationDebugInfo(
+            buildDebugInfo({
+              effectState: "error",
+              reason: "analysis-error",
+              sourcePath: resolvedSourcePath,
+              cacheKey: result.cacheKey,
+              analyzerVersion: result.analyzerVersion,
+              sourceUrlKind:
+                interactivePreviewSource.absolutePath == null
+                  ? "provided-url"
+                  : "video-src",
+              activity: "analysis failed",
+              lastError: result.errorMessage,
+            }),
+          );
+          return;
+        }
+        appendOpticalAnalysisEvent("analysis returned no result");
+        setOpticalRecommendationPanel({ state: "idle" });
+        setOpticalRecommendationDebugInfo(
+          buildDebugInfo({
+            effectState: "skipped",
+            reason: "empty-result",
+            sourcePath: resolvedSourcePath,
+            cacheKey: result.cacheKey,
+            analyzerVersion: result.analyzerVersion,
+            sourceUrlKind:
+              interactivePreviewSource.absolutePath == null
+                ? "provided-url"
+                : "video-src",
+            activity: "analysis returned no result",
+          }),
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    interactivePreviewSource,
+    opticalAnalysisRetryNonce,
+    appendOpticalAnalysisEvent,
+    previewStatus.reason,
+    previewStatus.hasActiveVideo,
+    previewStatus.state,
+    progressiveLoad.activeSourcePath,
+    progressiveLoad.qualityLabel,
+    progressiveLoad.stage,
+    replaceOpticalAnalysisEventLog,
+  ]);
+
+  const commitOpticalRecommendationToBatch = useCallback(
+    (recommendation: OpticalRecommendationV1, index: number) => {
+      const selected =
+        index === 0
+          ? recommendation.primary
+          : recommendation.alternates[index - 1];
+      if (!selected) {
+        return;
+      }
+
+      const patch = buildOpticalParamPatch({
+        ...recommendation,
+        primary: selected,
+      });
+      setBatchGrade((current) => ({
+        ...current,
+        params: {
+          ...current.params,
+          ...patch,
+        },
+      }));
+      setBatchLookSource("analysisRecommendation");
+      setImportedGradeLabel(null);
+      setEditToExportSyncedAtMs(null);
+      setAppliedOpticalRecommendation({
+        family: selected.family,
+        profile: selected.profile,
+        recipe: selected.recipe,
+        analyzerVersion:
+          opticalAnalyzerServiceRef.current?.analyzerVersion ?? "scene-aware-v1",
+        appliedAtIso: new Date().toISOString(),
+      });
+      return selected;
+    },
+    [],
+  );
+
   const syncPreviewToBatch = useCallback(() => {
     if (!viewport) {
       appendLog(tLogs("syncNoViewport"));
@@ -1109,6 +1454,7 @@ export default function App() {
     setBatchGrade(batchGradeStateFromPreset(name));
     setBatchLookSource("preset");
     setBatchLutRefs(createEmptyMetadataLutRefs());
+    setAppliedOpticalRecommendation(null);
     setImportedGradeLabel(null);
     setEditToExportSyncedAtMs(null);
   };
@@ -1150,6 +1496,7 @@ export default function App() {
       batchPresetChoice?: PresetName;
       lookSource?: MetadataLookSource;
       lutRefs?: MetadataLutRefs;
+      opticalRecommendation?: AppliedOpticalRecommendationMetadata | null;
     }) => {
       const exportedAtIso = new Date().toISOString();
       const session = buildFilmtoneExportSession({
@@ -1166,13 +1513,22 @@ export default function App() {
         lookSource: payload.lookSource ?? batchLookSource,
         gradeParams: (payload.grade ?? batchGrade).params,
         lutRefs: payload.lutRefs ?? batchLutRefs,
+        opticalRecommendation:
+          payload.opticalRecommendation ?? appliedOpticalRecommendation,
       });
       return {
         exportedAtIso,
         jsonText: exportFilmtoneExportSessionJsonText(session),
       };
     },
-    [appVersion, batchGrade, batchLookSource, batchLutRefs, batchPresetChoice],
+    [
+      appVersion,
+      appliedOpticalRecommendation,
+      batchGrade,
+      batchLookSource,
+      batchLutRefs,
+      batchPresetChoice,
+    ],
   );
 
   const finalizeSessionAfterRun = useCallback(
@@ -1206,6 +1562,7 @@ export default function App() {
         batchPresetChoice?: PresetName;
         lookSource?: MetadataLookSource;
         lutRefs?: MetadataLutRefs;
+        opticalRecommendation?: AppliedOpticalRecommendationMetadata | null;
         importedGradePath?: string | null;
       },
     ) => {
@@ -1216,6 +1573,8 @@ export default function App() {
         pathContext?.batchPresetChoice ?? batchPresetChoice;
       const effectiveLookSource = pathContext?.lookSource ?? batchLookSource;
       const effectiveLutRefs = pathContext?.lutRefs ?? batchLutRefs;
+      const effectiveOpticalRecommendation =
+        pathContext?.opticalRecommendation ?? appliedOpticalRecommendation;
       const effectiveImportedGradePath =
         pathContext?.importedGradePath ?? importedGradeLabel;
       if (!effectiveInput || !effectiveOutput) return;
@@ -1246,6 +1605,9 @@ export default function App() {
         case "editSync":
           appendLog(tLogs("gradeEditSyncLine"));
           break;
+        case "analysisRecommendation":
+          appendLog(tLogs("gradeRecommendationLine"));
+          break;
         default:
           appendLog(
             tLogs("gradePresetLine", {
@@ -1274,6 +1636,7 @@ export default function App() {
         batchPresetChoice: effectiveBatchPresetChoice,
         lookSource: effectiveLookSource,
         lutRefs: effectiveLutRefs,
+        opticalRecommendation: effectiveOpticalRecommendation,
       });
       const photoSidecarPath = buildPhotoMetadataSidecarPath(
         effectiveOutput,
@@ -1369,6 +1732,7 @@ export default function App() {
     },
     [
       appendLog,
+      appliedOpticalRecommendation,
       batchGrade,
       batchLookSource,
       batchLutRefs,
@@ -1431,12 +1795,14 @@ export default function App() {
         lutRefs: createEmptyMetadataLutRefs(),
         syncedAtMs: null,
         importedFilePath: s.importedGradePath,
+        appliedOpticalRecommendation: null,
       };
     }
     setBatchGrade(gradeSnap.grade);
     setBatchPresetChoice(gradeSnap.batchPresetChoice);
     setBatchLookSource(gradeSnap.lookSource);
     setBatchLutRefs(gradeSnap.lutRefs);
+    setAppliedOpticalRecommendation(gradeSnap.appliedOpticalRecommendation);
     setImportedGradeLabel(gradeSnap.importedFilePath);
     setEditToExportSyncedAtMs(gradeSnap.syncedAtMs);
     const todo = pathsNotSucceeded(s);
@@ -1448,6 +1814,7 @@ export default function App() {
       batchPresetChoice: gradeSnap.batchPresetChoice,
       lookSource: gradeSnap.lookSource,
       lutRefs: gradeSnap.lutRefs,
+      opticalRecommendation: gradeSnap.appliedOpticalRecommendation,
       importedGradePath: gradeSnap.importedFilePath,
     });
   };
@@ -2034,6 +2401,69 @@ export default function App() {
                       onParamsChange={handleEditParamsChange}
                       onCompareUiChange={setCompareUi}
                       deferSpaceKeyToVideoTransportWhenNoCompare={canvasHasUserVideo}
+                      slots={{
+                        renderBeforeFinishTools: (coreRenderContext) => (
+                          <OpticalFinishRecommendationPanel
+                            analysis={opticalRecommendationPanel}
+                            appliedSelection={
+                              appliedOpticalRecommendation
+                                ? {
+                                    family: appliedOpticalRecommendation.family,
+                                    recipe: appliedOpticalRecommendation.recipe,
+                                  }
+                                : null
+                            }
+                            debugInfo={opticalRecommendationDebugInfo}
+                            debugLog={opticalRecommendationEventLog}
+                            onRetry={() => {
+                              setOpticalAnalysisRetryNonce((value) => value + 1);
+                            }}
+                            onApply={(recommendation, index) => {
+                              const selected =
+                                index === 0
+                                  ? recommendation.primary
+                                  : recommendation.alternates[index - 1];
+                              if (!selected) {
+                                return;
+                              }
+                              const patch = buildOpticalParamPatch({
+                                ...recommendation,
+                                primary: selected,
+                              });
+                              coreRenderContext.dispatch({
+                                type: "MERGE_PARAMS",
+                                patch,
+                              });
+                              coreRenderContext.dispatch({ type: "COMMIT" });
+                              const appliedSelection =
+                                commitOpticalRecommendationToBatch(
+                                recommendation,
+                                index,
+                              );
+                              const appliedRecipe =
+                                selected.recipe ?? selected.profile;
+                              appendOpticalAnalysisEvent(
+                                `apply clicked: ${selected.family}/${appliedRecipe}`,
+                              );
+                              setOpticalRecommendationDebugInfo((current) =>
+                                current
+                                  ? {
+                                      ...current,
+                                      activity: `applied ${selected.family}/${appliedRecipe}`,
+                                      updatedAtIso: new Date().toISOString(),
+                                    }
+                                  : current,
+                              );
+                              console.info("[optical-analysis] apply clicked", {
+                                family: selected.family,
+                                recipe: selected.recipe,
+                                index,
+                                appliedSelection,
+                              });
+                            }}
+                          />
+                        ),
+                      }}
                     />
                   </div>
                   <div className="fl-sticky-footer fl-surface-frost rounded-b-xl">
@@ -2114,6 +2544,7 @@ export default function App() {
                           onPurgeProxyCache={purgeProxyCache}
                           batchPresetChoice={batchPresetChoice}
                           batchLookSource={batchLookSource}
+                          appliedOpticalRecommendation={appliedOpticalRecommendation}
                           onBatchPresetChoiceChange={applyBatchPreset}
                           importedGradeLabel={importedGradeLabel}
                           onImportGradeJson={importGradeJson}
@@ -2170,6 +2601,7 @@ export default function App() {
                           onPurgeProxyCache={purgeProxyCache}
                           batchPresetChoice={batchPresetChoice}
                           batchLookSource={batchLookSource}
+                          appliedOpticalRecommendation={appliedOpticalRecommendation}
                           onBatchPresetChoiceChange={applyBatchPreset}
                           importedGradeLabel={importedGradeLabel}
                           onImportGradeJson={importGradeJson}

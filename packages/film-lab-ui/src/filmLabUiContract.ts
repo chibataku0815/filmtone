@@ -59,10 +59,12 @@ export type FilmLabControlPanelSectionId =
 export const FILM_LAB_WRAPPER_SLOT_IDS = [
   "beforePresets",
   "afterPresets",
+  "beforeFinishTools",
   "afterLut",
   "donationUi",
   "lpExpandButton",
   "renderAfterPresets",
+  "renderBeforeFinishTools",
   "renderAfterLut",
 ] as const;
 

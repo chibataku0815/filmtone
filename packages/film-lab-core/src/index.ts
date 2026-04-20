@@ -112,6 +112,17 @@ export {
   nearestHueDegreesToDirection,
 } from "./split-tone-default-hues";
 export {
+  buildOpticalParamPatch,
+  recommendOpticalFinish,
+  type BehaviorProfile,
+  type OpticalAnalyzerProvider,
+  type OpticalFamily,
+  type OpticalRecipeId,
+  type OpticalRecommendationV1,
+  type SceneAnalysisState,
+  type SceneDescriptorV1,
+} from "./optical-recommendation";
+export {
   IOS_PHASE0_BENCHMARK_SLOTS,
   IOS_PHASE0_OUTPUT_CODEC,
   IOS_PHASE0_OUTPUT_FPS,

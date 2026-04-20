@@ -100,6 +100,8 @@ export interface FilmLabControlPanelCoreSlots {
   beforePresets?: ReactNode;
   /** Preset セクションの直後に挿入するノード（Desktop の smart look prominent 位置） */
   afterPresets?: ReactNode;
+  /** Finish Tools セクション先頭に挿入するノード（Desktop の clip recommendation 位置） */
+  beforeFinishTools?: ReactNode;
   /** LUT の後に挿入するノード（browser storage, share, smart look non-prominent 等） */
   afterLut?: ReactNode;
   /** Donation/present mode UI */
@@ -110,6 +112,8 @@ export interface FilmLabControlPanelCoreSlots {
   hideAuxPanels?: boolean;
   /** Render-prop: Core state を受け取り Presets 直後に Web 専用セクションを挿入 */
   renderAfterPresets?: (ctx: FilmLabCoreRenderContext) => ReactNode;
+  /** Render-prop: Core state を受け取り Finish Tools 先頭に platform 固有セクションを挿入 */
+  renderBeforeFinishTools?: (ctx: FilmLabCoreRenderContext) => ReactNode;
   /** Render-prop: Core state を受け取り LUT 直後に Web 専用セクションを挿入 */
   renderAfterLut?: (ctx: FilmLabCoreRenderContext) => ReactNode;
 }
@@ -955,6 +959,9 @@ export const FilmLabControlPanelCore = forwardRef<
           {/* === FINISH TOOLS (replaces former Artifacts block) — Pro only === */}
           {isPro && (
             <div className="min-w-0">
+              {slots.renderBeforeFinishTools
+                ? slots.renderBeforeFinishTools(coreRenderContext)
+                : slots.beforeFinishTools}
               <CollapsibleHeader
                 title={tFilmLab("controls.finishTools")}
                 titleHint={tFilmLab("controls.finishToolsSectionHint")}

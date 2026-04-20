@@ -38,6 +38,7 @@ const baseProps: BatchTabPanelProps = {
   onPurgeProxyCache: async () => {},
   batchPresetChoice: "cinematic",
   batchLookSource: "preset",
+  appliedOpticalRecommendation: null,
   onBatchPresetChoiceChange: () => {},
   importedGradeLabel: null,
   onImportGradeJson: async () => {},
@@ -120,6 +121,26 @@ describe("BatchTabPanel glass-unified layout (2026-04-19)", () => {
     );
 
     expect(html).toContain("synced");
+  });
+
+  it("shows recommendation summary and hides preset select when analysis recommendation is active", () => {
+    const html = renderBatchPanel(
+      <BatchTabPanel
+        {...baseProps}
+        batchLookSource="analysisRecommendation"
+        appliedOpticalRecommendation={{
+          family: "glow",
+          profile: "warm",
+          recipe: "warmIndoor",
+          analyzerVersion: "scene-aware-v1",
+          appliedAtIso: "2026-04-20T09:00:00.000Z",
+        }}
+      />,
+    );
+
+    expect(html).toContain("Glow");
+    expect(html).toContain("室内のあたたかい光");
+    expect(html).not.toContain("data-testid=\"export-preset-select\"");
   });
 
   it("renders the visible Metadata JSON restore action inside look section", () => {

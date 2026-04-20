@@ -1,6 +1,7 @@
 import { parseCube, type PresetName } from "film-lab-core";
 import type { FilmLabBatchBridge } from "./desktop-api";
 import {
+  type AppliedOpticalRecommendationMetadata,
   createEmptyMetadataLutRefs,
   extractMetadataLutRefsFromGradeJsonText,
   inferPresetChoiceFromImportedJson,
@@ -19,6 +20,7 @@ export type ResolvedImportedMetadataJson = {
   lutRefs: MetadataLutRefs;
   importedFilePath: string;
   syncedAtMs: number | null;
+  appliedOpticalRecommendation: AppliedOpticalRecommendationMetadata | null;
   sidecar: FilmtoneExportSessionV1 | null;
   warnings: string[];
 };
@@ -111,6 +113,7 @@ export async function resolveImportedMetadataJson(
         sidecar.look.source === "editSync" && Number.isFinite(parsedSyncTime)
           ? parsedSyncTime
           : null,
+      appliedOpticalRecommendation: sidecar.look.opticalRecommendation ?? null,
       sidecar,
       warnings: loaded.warnings,
     };
@@ -135,6 +138,7 @@ export async function resolveImportedMetadataJson(
     lutRefs: extractMetadataLutRefsFromGradeJsonText(filePath, jsonText),
     importedFilePath: filePath,
     syncedAtMs: null,
+    appliedOpticalRecommendation: null,
     sidecar: null,
     warnings: [],
   };
@@ -156,6 +160,7 @@ export function emptyResolvedMetadataJson(filePath: string): ResolvedImportedMet
     lutRefs: createEmptyMetadataLutRefs(),
     importedFilePath: filePath,
     syncedAtMs: null,
+    appliedOpticalRecommendation: null,
     sidecar: null,
     warnings: [],
   };

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Params } from "./params";
-import { PHASE0_RGB_SHIFT_MAX } from "./phase0-schema";
+import { PHASE0_RGB_SHIFT_MAX } from "./phase0-constants";
 
 export const QUICK_AXIS_IDS = [
   "filmCharacter",

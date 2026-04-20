@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Params } from "./params";
+import { PHASE0_RGB_SHIFT_MAX } from "./phase0-constants";
 import { PRESETS, type PresetName } from "./presets";
 import {
   DEFAULT_QUICK_STATE,
@@ -7,12 +8,13 @@ import {
   applyQuickStateToPhase0Params,
 } from "./quick-semantics";
 
+export { PHASE0_RGB_SHIFT_MAX } from "./phase0-constants";
+
 export const PHASE0_SCHEMA_VERSION = 2 as const;
 export const PHASE0_PRESET_DEFAULT = "cinematic" satisfies PresetName;
 export const PHASE0_PRESET_STRENGTH_DEFAULT = 1;
 export const PHASE0_HALATION_HUE_MIN = 0;
 export const PHASE0_HALATION_HUE_MAX = 100;
-export const PHASE0_RGB_SHIFT_MAX = 0.005;
 
 export const PHASE0_PARAM_KEYS = [
   "exposure",
