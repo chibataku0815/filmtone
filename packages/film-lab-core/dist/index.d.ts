@@ -856,4 +856,53 @@ declare const LEGACY_HIGHLIGHT_TONE_MAGNITUDE: number;
  */
 declare function halationHueToHex(hue: number): string;
 
-export { type CubeLUT, FILM_LAB_DEFAULT_HIGHLIGHT_HUE, FILM_LAB_DEFAULT_SHADOW_HUE, type FilmLabParamsValidated, type FilmLookGradeInputProps, type FilmLookSpikeInputProps, LEGACY_HIGHLIGHT_TONE_MAGNITUDE, LEGACY_SHADOW_TONE_MAGNITUDE, LOOK_ID_BY_PRESET, PARAM_KEYS, PRESETS, PRESET_BUTTONS, PRESET_VERSION, type PackedCubeLut2D, type ParamKey, type Params, type PresetName, chromaUnitFromHueDegrees, cloneParams, createDefaultFilmLookGradeProps, filmLabParamsSchema, filmLookGradeDefaultProps, filmLookGradeInputSchema, filmLookSpikeDefaultProps, filmLookSpikeInputSchema, findMatchingPreset, gradeMatchesPreset, halationHueToHex, hslToRgb01, lookIdForPreset, nearestHueDegreesToDirection, packCubeLutToFloatRgbaGrid, parseCube };
+type OpticalFamily = "mist" | "glow" | "cross" | "lens";
+type BehaviorProfile = "clean" | "warm" | "night" | "portrait" | "spotlight" | "product" | "stillMatch";
+type OpticalRecipeId = "warmIndoor" | "nightCity" | "skinCloseUp" | "nightSpot" | "productEdge" | "coverStillMatch";
+type SceneAnalysisState = "idle" | "analyzing" | "ready" | "low-confidence" | "error";
+interface SceneDescriptorV1 {
+    medianLuma: number;
+    highlightCoverage: number;
+    specularIslands: number;
+    pointLightScore: number;
+    globalContrast: number;
+    warmthScore: number;
+    portraitLikelihood: number;
+    nightScore: number;
+    sceneComplexity: number;
+    dominantShotCoverage: number;
+    sampleCount?: number;
+}
+type RecommendationConfidence = "low" | "medium" | "high";
+type RationaleTag = "practicalLights" | "portraitSafe" | "pointLights" | "mixedScenes";
+type OpticalRecommendationEntry = {
+    family: OpticalFamily;
+    profile: BehaviorProfile;
+    recipe: OpticalRecipeId | null;
+    confidence: RecommendationConfidence;
+    rationale: RationaleTag[];
+};
+interface OpticalRecommendationV1 {
+    state: Extract<SceneAnalysisState, "ready" | "low-confidence">;
+    descriptor: SceneDescriptorV1;
+    primary: OpticalRecommendationEntry;
+    alternates: OpticalRecommendationEntry[];
+}
+interface OpticalAnalyzerProvider {
+    readonly analyzerVersion: string;
+    analyze(input: {
+        sourcePath: string;
+        sourceUrl?: string | null;
+        trimStartSec: number;
+        trimEndSec: number;
+        sourceDurationSec: number;
+    }): Promise<{
+        state: SceneAnalysisState;
+        descriptor: SceneDescriptorV1 | null;
+        recommendation: OpticalRecommendationV1 | null;
+    }>;
+}
+declare function recommendOpticalFinish(descriptor: SceneDescriptorV1): OpticalRecommendationV1;
+declare function buildOpticalParamPatch(recommendation: OpticalRecommendationV1): Partial<Params>;
+
+export { type BehaviorProfile, type CubeLUT, FILM_LAB_DEFAULT_HIGHLIGHT_HUE, FILM_LAB_DEFAULT_SHADOW_HUE, type FilmLabParamsValidated, type FilmLookGradeInputProps, type FilmLookSpikeInputProps, LEGACY_HIGHLIGHT_TONE_MAGNITUDE, LEGACY_SHADOW_TONE_MAGNITUDE, LOOK_ID_BY_PRESET, type OpticalAnalyzerProvider, type OpticalFamily, type OpticalRecipeId, type OpticalRecommendationV1, PARAM_KEYS, PRESETS, PRESET_BUTTONS, PRESET_VERSION, type PackedCubeLut2D, type ParamKey, type Params, type PresetName, type SceneAnalysisState, type SceneDescriptorV1, buildOpticalParamPatch, chromaUnitFromHueDegrees, cloneParams, createDefaultFilmLookGradeProps, filmLabParamsSchema, filmLookGradeDefaultProps, filmLookGradeInputSchema, filmLookSpikeDefaultProps, filmLookSpikeInputSchema, findMatchingPreset, gradeMatchesPreset, halationHueToHex, hslToRgb01, lookIdForPreset, nearestHueDegreesToDirection, packCubeLutToFloatRgbaGrid, parseCube, recommendOpticalFinish };

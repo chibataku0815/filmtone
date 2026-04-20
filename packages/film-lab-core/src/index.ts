@@ -44,3 +44,14 @@ export {
   LEGACY_SHADOW_TONE_MAGNITUDE,
   nearestHueDegreesToDirection,
 } from "./split-tone-default-hues";
+export {
+  buildOpticalParamPatch,
+  recommendOpticalFinish,
+  type BehaviorProfile,
+  type OpticalAnalyzerProvider,
+  type OpticalFamily,
+  type OpticalRecipeId,
+  type OpticalRecommendationV1,
+  type SceneAnalysisState,
+  type SceneDescriptorV1,
+} from "./optical-recommendation";

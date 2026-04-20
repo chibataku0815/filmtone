@@ -18,6 +18,7 @@ import {
   CheckCircle,
   Circle,
   File,
+  Sparkle,
   WarningCircle,
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
@@ -34,7 +35,10 @@ import {
   VIDEO_IMPORT_MAX_DURATION_SEC,
 } from "../video-export-constants";
 import type { VideoPreviewProxyCacheInfo } from "../desktop-api";
-import type { MetadataLookSource } from "../export-metadata-session";
+import type {
+  AppliedOpticalRecommendationMetadata,
+  MetadataLookSource,
+} from "../export-metadata-session";
 import { PresetStrip } from "./PresetStrip";
 import {
   AdvancedDisclosure,
@@ -182,6 +186,7 @@ export type BatchTabPanelProps = {
 
   batchPresetChoice: PresetName;
   batchLookSource: MetadataLookSource;
+  appliedOpticalRecommendation?: AppliedOpticalRecommendationMetadata | null;
   onBatchPresetChoiceChange: (name: PresetName) => void;
   importedGradeLabel: string | null;
   onImportGradeJson: () => void | Promise<void>;
@@ -415,6 +420,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     onPurgeProxyCache,
     batchPresetChoice,
     batchLookSource,
+    appliedOpticalRecommendation = null,
     onBatchPresetChoiceChange,
     importedGradeLabel,
     onImportGradeJson,
@@ -463,6 +469,48 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     [isImagesMode, t],
   );
 
+  const recommendationFamilyLabel = useMemo(
+    () =>
+      (family: AppliedOpticalRecommendationMetadata["family"]): string => {
+        switch (family) {
+          case "glow":
+            return t("recommendationFamilyGlow");
+          case "cross":
+            return t("recommendationFamilyCross");
+          case "lens":
+            return t("recommendationFamilyLens");
+          default:
+            return t("recommendationFamilyMist");
+        }
+      },
+    [t],
+  );
+
+  const recommendationRecipeLabel = useMemo(
+    () =>
+      (
+        recipe: AppliedOpticalRecommendationMetadata["recipe"],
+      ): string => {
+        switch (recipe) {
+          case "warmIndoor":
+            return t("recommendationRecipeWarmIndoor");
+          case "nightCity":
+            return t("recommendationRecipeNightCity");
+          case "skinCloseUp":
+            return t("recommendationRecipeSkinCloseUp");
+          case "nightSpot":
+            return t("recommendationRecipeNightSpot");
+          case "productEdge":
+            return t("recommendationRecipeProductEdge");
+          case "coverStillMatch":
+            return t("recommendationRecipeCoverStillMatch");
+          default:
+            return t("recommendationRecipeClean");
+        }
+      },
+    [t],
+  );
+
   const lookStatusBanner = useMemo(() => {
     if (batchLookSource === "importedJson") {
       return {
@@ -493,6 +541,24 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         iconClass: "text-[var(--fl-text-secondary)]",
       };
     }
+    if (batchLookSource === "analysisRecommendation") {
+      const familyLabel = appliedOpticalRecommendation
+        ? recommendationFamilyLabel(appliedOpticalRecommendation.family)
+        : t("recommendationFamilyMist");
+      const recipeLabel = recommendationRecipeLabel(
+        appliedOpticalRecommendation?.recipe ?? null,
+      );
+      return {
+        Icon: Sparkle,
+        iconWeight: "duotone" as const,
+        title: t("lookStatusRecommendationTitle"),
+        body: t("lookStatusRecommendationBody", {
+          family: familyLabel,
+          recipe: recipeLabel,
+        }),
+        iconClass: "text-[var(--amber-11)]",
+      };
+    }
     return {
       Icon: Circle,
       iconWeight: "duotone" as const,
@@ -503,9 +569,12 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
   }, [
     batchLookSource,
     importedGradeLabel,
+    appliedOpticalRecommendation,
     editToExportSyncedAtMs,
     batchPresetChoice,
     locale,
+    recommendationFamilyLabel,
+    recommendationRecipeLabel,
     t,
   ]);
 
@@ -673,7 +742,9 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         }
         return videoInputPath ? lastPathSegment(videoInputPath) : null;
       case "look":
-        return lookStatusBanner.title;
+        return batchLookSource === "analysisRecommendation"
+          ? lookStatusBanner.body || lookStatusBanner.title
+          : lookStatusBanner.title;
       case "output":
         if (isImagesMode) {
           return outputDir
@@ -820,13 +891,17 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
           </button>
         </div>
 
-        {batchLookSource === "editSync" ? (
+        {batchLookSource === "editSync" || batchLookSource === "analysisRecommendation" ? (
           <div className="flex max-w-md flex-col gap-2 border-t border-white/10 pt-3">
             <span className="fl-label">{t("presetQuickLabel")}</span>
             <p className="fl-caption max-w-prose text-[var(--fl-text-secondary)]">
-              {t("lookPresetHiddenWhileSyncedBody", {
-                preset: batchPresetChoice,
-              })}
+              {batchLookSource === "editSync"
+                ? t("lookPresetHiddenWhileSyncedBody", {
+                    preset: batchPresetChoice,
+                  })
+                : t("lookPresetHiddenWhileRecommendedBody", {
+                    preset: batchPresetChoice,
+                  })}
             </p>
             <button
               type="button"

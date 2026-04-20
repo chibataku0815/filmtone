@@ -1332,6 +1332,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
             nextVideo.pause();
             await seekLoadedVideoElement(nextVideo, previousTime);
             applyLoadedTextureResult(result);
+            setReadyPreviewStatus(nextVideo);
             if (wasPlaying && !pauseVideoPreviewRef.current && !previewRenderingHoldRef.current) {
               nextVideo.play().catch((err) => {
                 console.warn("FilmLabCanvas.swapProgressiveTexture play failed", {
@@ -1345,6 +1346,11 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
             return true;
           }
           applyLoadedTextureResult(result);
+          setReadyPreviewStatus(
+            result.texture.image instanceof HTMLVideoElement
+              ? result.texture.image
+              : null,
+          );
           return true;
         } catch (err) {
           console.error("FilmLabCanvas.swapProgressiveTexture failed", {

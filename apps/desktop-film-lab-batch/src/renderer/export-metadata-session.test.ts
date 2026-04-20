@@ -97,6 +97,40 @@ describe("export metadata session", () => {
     });
   });
 
+  it("includes optional optical recommendation metadata only when provided", () => {
+    const cinematic = batchGradeStateFromPreset("cinematic");
+    const session = buildFilmtoneExportSession({
+      exportedAtIso: "2026-04-20T12:34:56.000Z",
+      appVersion: "1.2.3",
+      job: "video",
+      inputDir: null,
+      videoInputPath: "/Users/tester/input/clip.mov",
+      outputDir: "/Users/tester/output",
+      imageFormat: null,
+      outputFilenameSuffix: null,
+      outputFileName: "clip-graded.mp4",
+      batchPresetChoice: "cinematic",
+      lookSource: "analysisRecommendation",
+      gradeParams: cinematic.params,
+      lutRefs: createEmptyMetadataLutRefs(),
+      opticalRecommendation: {
+        family: "glow",
+        profile: "warm",
+        recipe: "warmIndoor",
+        analyzerVersion: "scene-aware-v1",
+        appliedAtIso: "2026-04-20T12:00:00.000Z",
+      },
+    });
+
+    expect(session.look.opticalRecommendation).toEqual({
+      family: "glow",
+      profile: "warm",
+      recipe: "warmIndoor",
+      analyzerVersion: "scene-aware-v1",
+      appliedAtIso: "2026-04-20T12:00:00.000Z",
+    });
+  });
+
   it("creates timestamped photo sidecar filenames", () => {
     expect(
       buildPhotoMetadataSidecarFileName("2026-04-19T12:34:56.789Z"),
