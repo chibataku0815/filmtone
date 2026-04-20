@@ -303,7 +303,7 @@
       "roadmapLink": "ロードマップ",
       "releaseNotesLink": "リリースノート",
       "premiumHeroBadgeNew": "Desktop",
-      "premiumHeroBadgeLine": "v0.6.2 を macOS で公開中",
+      "premiumHeroBadgeLine": "v1.0.0 を macOS で公開中",
       "premiumCapabilitiesEyebrow": "仕上がり例",
       "premiumCapabilitiesTitle": "動画で見る、Filmtone の仕上がり。",
       "premiumFeature1Title": "光のにじみや空気感まで変わる。",
@@ -316,8 +316,8 @@
       "premiumCard1Body": "止めたり、送ったり、見比べたりしながら調整できます。",
       "premiumCard2Title": "重い動画でも作業しやすい",
       "premiumCard2Body": "プレビューやプロキシを使いながら、長い待ち時間を減らして作業できます。",
-      "premiumCard3Title": "Cross Filter も調整しやすい",
-      "premiumCard3Body": "v0.6.2 では Cross Filter の見せ方と操作を整理し、使いやすくしました。",
+      "premiumCard3Title": "Cross Filter をリアルタイムで追い込める",
+      "premiumCard3Body": "v1.0 では Cross Filter が WebGPU プレビュー上でリアルタイムに反映され、threshold・chromatic・spacing をインラインで調整できます。",
       "premiumCard4Title": "写真にも同じ雰囲気を広げられる",
       "premiumCard4Body": "動画を仕上げたあと、その雰囲気をカバー画像やサムネイルにもつなげられます。",
       "premiumCompareTitle": "見比べながら仕上がりを確認できる。",
@@ -641,7 +641,7 @@
       "scratchAmount": "スクラッチ",
       "scratchAmountHint": "フレームを縦に流れるフィルム傷を追加します。",
       "shutterAngle": "シャッターアングル",
-      "shutterAngleHint": "カメラのシャッター角度をシミュレート（0\u00b0=オフ、180\u00b0=シネマ標準）",
+      "shutterAngleHint": "カメラのシャッター角度をシミュレート（0°=オフ、180°=シネマ標準）",
       "trailIntensity": "残像の長さ",
       "trailIntensityHint": "シャッター窓を超えて残像を延長します。値が高いほど長い残像になります。"
     },
@@ -984,13 +984,17 @@
           "title": "Cross Filter のプロダクト面整理（v0.6.2）",
           "description": "公開版では Soft mode を凍結し、復元・共有状態も Hard に正規化するようにしました。Spikes は slider ではなく 4 / 6 / 8 の離散選択です。"
         },
+        "webgpuPreview100": {
+          "title": "Desktop v1.0 — WebGPU プレビュー基盤",
+          "description": "Desktop のプレビューは WebGPU 経路へ移行し、ハイライトの余裕が広がりました。Cross Filter もこのプレビュー経路上で live になり、threshold・chromatic・spacing をインラインで調整できます。"
+        },
         "presetExpansion": {
           "title": "プリセット追加",
           "description": "初期の 4 種に加え、新しいフィルムストック・クリエイティブルックを順次追加。"
         },
         "exportQuality": {
-          "title": "書き出し品質オプション",
-          "description": "解像度・フォーマット・圧縮設定をより細かく制御できるようにします。"
+          "title": "動画・バッチの preview/export 整合",
+          "description": "新しい WebGPU preview と動画書き出し・バッチ出力の見え方を近づけ、特にハイライトの転び方をより安定して一致させます。"
         },
         "verticalVideoExportQuality": {
           "title": "縦・非 16:9 動画の書き出し解像度",
@@ -1036,33 +1040,38 @@
       "title": "リリースノート — Filmtone",
       "description": "Filmtone Desktop のリリース履歴 — 各バージョンの追加・修正・変更を確認できます。",
       "eyebrow": "リリースノート",
-      "heroTitle": "Filmtone Desktop リリース履歴",
-      "heroBody": "初回リリースからの全バージョンの記録です。追加・修正・変更をまとめています。",
+      "heroTitle": "Filmtone Desktop の更新履歴",
+      "heroBody": "Filmtone Desktop の初回リリースから現在までの変更履歴です。バージョンごとに、新しく加わった機能、使い勝手の改善、修正した不具合をまとめています。",
       "tocTitle": "目次",
       "latestBadge": "最新",
       "typeAdded": "追加",
       "typeFixed": "修正",
       "typeChanged": "変更",
       "entries": {
-        "v062Title": "Cross Filter のプロダクト面を整理",
-        "v062HardOnlySurface": "Cross Filter は公開プロダクト面では Hard 固定になりました。Soft 実装は将来の参照用としてコード内に残しています。",
-        "v062StateNormalization": "復元された設定や共有された状態に Soft 側の値が混ざっていても、公開 UI では Hard-only の挙動に正規化されます。",
-        "v062DiscreteSpikes": "Spikes は連続 slider ではなく、`4 / 6 / 8` から選ぶ離散コントロールになりました。",
-        "v061Title": "Desktop の信頼性と暗部の仕上がりを改善",
-        "v061LaunchUpdateBanner": "起動時の update check が復旧し、新しい版があると launch-time banner を再び出せるようになりました。",
-        "v061PreviewRecoveryAfterExport": "export 後に live preview が黒く固まることがあった問題を修正し、必要時には現在の source を安全に再読み込みします。",
-        "v061GlowBlackMistRetune": "黒ミスト寄りの夜景で glow が白く潰れすぎないように shoulder と edge behavior を再調整しました。",
-        "v061HardCrossFilterSpacing": "hard cross-filter spacing が近接したハイライトでも一貫して分離しやすいように補正しました。",
-        "v060Title": "Cross Filter と、動画ワークフローの磨き込み",
-        "v060CrossFilter": "明るい点光源にレンズフィルターらしい光条を加える Cross Filter を追加しました。強さ、本数、回転角度、光条の長さ、しきい値、色分散を調整できます。",
-        "v060VideoCompareUx": "動画の比較・確認操作を改善しました。比較モードを意図的に解除しやすくなり、高速再生での確認がしやすくなり、スライダーのリセット操作も見つけやすくなりました。",
-        "v060ThumbnailLoadingPolish": "先頭サムネイルは複数の初期フレーム候補を見て、可能な限り黒すぎるコマを避けるようになりました。フェードイン素材でも最初の印象が自然になります。loading 表示の字体もアプリ全体に合わせて整えています。",
-        "v060PersistentProxyCache": "Desktop は progressive preview 用 proxy を端末内キャッシュに保持できるようになりました。同じ重い素材を開き直すと再利用でき、自動 prune と手動 purge で容量も管理できます。",
+        "v100Title": "Filmtone Desktop v1.0 — 初の正式リリース",
+        "v100WebgpuPreview": "プレビューの色処理を一新しました。明るい部分の階調の粘りがより自然になり、最終的な仕上がりを画面上で判断しやすくなっています。",
+        "v100CrossFilterPreviewControls": "Cross Filter（光の筋）を、プレビューを見ながらその場で調整できるようになりました。効き始める明るさ、色のばらけ具合、光と光の間隔を動かすと、結果がそのまま画面に反映されます。",
+        "v100SignedNotarizedDmg": "macOS 版は Apple の認証を受けた公式版として配布しています。ダウンロードページとアプリ内のアップデート通知は、いずれもこの v1.0.0 をご案内します。",
+        "v100DesktopFirstReleaseScope": "v1.0 は、まず Desktop のプレビュー品質の向上に集中しました。ブラウザ版、動画の書き出し、写真の一括書き出しは、これまで通りお使いいただけます。",
+        "v062Title": "Cross Filter をシンプルに",
+        "v062HardOnlySurface": "Cross Filter は、仕上がりの安定したひとつのモードに絞って提供するようにしました。迷わず使えるよう整理しています。",
+        "v062StateNormalization": "古い設定や共有リンクを読み込んでも、現在のモードに自動で合わせて表示されます。以前の設定が原因で見え方が変わる心配はありません。",
+        "v062DiscreteSpikes": "光の筋の本数は、4 本・6 本・8 本からワンタップで選べるようになりました。",
+        "v061Title": "アップデート通知の復活と、夜景の光の磨き込み",
+        "v061LaunchUpdateBanner": "アプリ起動時に、新しいバージョンがあるとお知らせするバナーが再び出るようになりました。",
+        "v061PreviewRecoveryAfterExport": "書き出しのあとに、プレビューが黒いまま止まってしまう問題を修正しました。必要なときはプレビューが自動で復旧します。",
+        "v061GlowBlackMistRetune": "黒ミスト系の夜景で、光が真っ白に潰れてしまわず、のびやかに広がって見えるように調整しました。",
+        "v061HardCrossFilterSpacing": "Cross Filter の光の筋が、明るい点光源の密集した場面でも綺麗に分離して描かれるように補正しました。",
+        "v060Title": "Cross Filter 登場と、動画まわりの磨き込み",
+        "v060CrossFilter": "明るい点光源に星形の光の筋を加えるレンズフィルター風エフェクト「Cross Filter」を追加しました。強さ、本数、角度、長さ、効き始める明るさ、色のばらけ具合まで、好みの表情を細かく作り込めます。",
+        "v060VideoCompareUx": "動画の比較・確認操作を見直しました。比較モードを解除しやすく、高速再生での確認もしやすく、スライダーのリセット方法も見つけやすくなっています。",
+        "v060ThumbnailLoadingPolish": "先頭のサムネイルが黒くなりがちな素材でも、自動で明るいコマを選んで表示するようになりました。読み込み中の文字デザインもアプリ全体に合わせて整えています。",
+        "v060PersistentProxyCache": "Desktop は、重い素材のプレビュー用データを端末内に保存しておけるようになりました。同じ素材を開き直すときの待ち時間が短くなり、空き容量は自動・手動どちらでも整理できます。",
         "v051Title": "重い素材も、開いた瞬間にプレビュー",
-        "v051ProgressiveLoading": "ProRes や 4K HEVC など重い動画をドラッグするだけで即座にプレビューが表示されます。裏側で最適な中間ファイルへ自動変換し、完了後にシームレスに高品質再生へ切り替わります。エクスポート時にも同じ中間ファイルを再利用するため、二重変換の待ち時間がありません。",
-        "v051RingBufferMotionBlur": "モーションブラーを 8 フレームリングバッファ方式に刷新。シャッターアングル（0〜720°）で効果量を制御でき、新しいトレイル強度スライダーで残像を延長できます。360° 以下は三角分布、超えるとボックス分布へ自動的に切り替わります。",
-        "v051PortraitVideo": "9:16 の縦動画をフレーム全体で表示する contain モードを追加。レターボックス領域にはフロステッドグラス風の映像背景が入り、手動調整なしで見栄えの良い表示になります。",
-        "v051ComparisonModeFix": "Before/After 比較表示でモーションブラーが左右両方にかかるバグを修正しました。オリジナル側はエフェクトなしのクリーンな映像が表示され、モード切替時にブラーバッファもリセットされます。",
+        "v051ProgressiveLoading": "ProRes や 4K HEVC など重い動画も、読み込んだ瞬間からプレビューが始まります。裏側で扱いやすい形に自動で準備し、書き出し時もそのデータを再利用するため、同じ素材を二度待つことはありません。",
+        "v051RingBufferMotionBlur": "モーションブラーを刷新しました。シャッターアングル（0°〜720°）で効果量を直感的に決められ、別のスライダーで残像の伸ばし方も細かく調整できます。",
+        "v051PortraitVideo": "9:16 の縦動画を画面全体で見せる表示モードを追加しました。映像の両脇は本編をぼかした曇りガラス風の背景で埋まり、縦動画を自然に美しく見せられます。",
+        "v051ComparisonModeFix": "Before / After 比較表示で、オリジナル側にもモーションブラーがかかっていた問題を修正しました。モードを切り替えたときに残像が引きずられることもなくなっています。",
         "v050Title": "グレインが進化・ソフトフォーカス効果を追加",
         "v050GrainV3": "粒子の質感を根本から作り直しました。銀塩フィルム特有の粗さと色のばらつきが自然に再現され、プリセットごとに粒子の大きさが変わります。",
         "v050Diffusion": "Pro-Mist フィルターのような柔らかい光の広がりを追加。ハイライトがふわっとにじみ、フィルムらしい空気感が出ます。",
@@ -1124,6 +1133,187 @@
         "v010BrowserDemo": "ブラウザから自分の写真でプリセットを試せます。ダウンロード前に仕上がりを確認できます。"
       },
       "backToFilmLab": "← Filmtone に戻る"
+    },
+    "supportPage": {
+      "metadata": {
+        "title": "Filmtone iPhone 版サポート",
+        "description": "Filmtone iPhone 版のサポート窓口、対応端末、対応コーデック、現時点での非対応事項。"
+      },
+      "eyebrow": "Support",
+      "heroTitle": "Filmtone iPhone 版サポート",
+      "heroBody": "公開中の iPhone 版について、問い合わせ先、対応端末、対応コーデック、現時点の制限事項をまとめたページです。",
+      "facts": {
+        "operatorLabel": "運営者",
+        "operatorValue": "{operatorName}",
+        "contactLabel": "お問い合わせ",
+        "contactCaption": "不具合、互換性、権限まわりの問い合わせ窓口です。",
+        "devicesLabel": "対応端末",
+        "devicesValue": "{deviceFamily} ・ iOS {minIos} 以降",
+        "codecsLabel": "現在のコーデック範囲",
+        "codecsValue": "{inputCodecs} を読込 ・ {outputCodec} {outputContainer} で書出"
+      },
+      "contact": {
+        "eyebrow": "Contact flow",
+        "title": "お問い合わせの流れ",
+        "body": "不具合、互換性、公開版の挙動についてはメールでお問い合わせください。再現に必要な情報を最初から入れていただくと、往復が少なくなります。",
+        "emailLabel": "サポート窓口",
+        "emailHint": "App Store 公開版の不具合、メディア互換性、権限に関する相談はこちらへどうぞ。",
+        "detailsTitle": "添えてほしい情報",
+        "flow": {
+          "sendEmail": {
+            "title": "窓口へメールする",
+            "body": "返信を受け取りたいメールアドレスから送ってください。日本語・英語どちらでも構いません。"
+          },
+          "includeContext": {
+            "title": "端末と素材の情報を書く",
+            "body": "iPhone の機種、iOS の版、Photos か Files か、何が起きたかを添えてください。"
+          },
+          "replyByEmail": {
+            "title": "メールで折り返します",
+            "body": "対処方法や追加確認事項をメールでご案内します。サンプル素材が必要な場合は、先にこちらからお願いします。"
+          }
+        },
+        "details": {
+          "device": "iPhone の機種名。",
+          "iosVersion": "iOS のバージョン。",
+          "sourceRoute": "Photo Library / Files のどちらから読み込んだか。",
+          "mediaInfo": "素材の種類、コーデック、解像度、長さ、音声の有無。",
+          "reproSteps": "何をタップしたか、期待した結果、表示されたエラーやスクリーンショット。"
+        }
+      },
+      "devices": {
+        "eyebrow": "Devices",
+        "title": "対応端末と読み込み経路",
+        "body": "現行の公開版は意図的に範囲を絞っています。iPhone 向け、iOS 17 以降、ユーザーが選んだ Photos / Files の素材が前提です。",
+        "cards": {
+          "deviceFamily": {
+            "title": "対応端末",
+            "body": "{deviceFamily} のみ。iPad 共通バイナリではありません。"
+          },
+          "os": {
+            "title": "対応 OS",
+            "body": "iOS {minIos} 以降。"
+          },
+          "importRoutes": {
+            "title": "読み込み経路",
+            "body": "Photo Library または Files から、写真または動画を 1 点ずつ選んで読み込みます。"
+          }
+        }
+      },
+      "media": {
+        "eyebrow": "Media",
+        "title": "対応コーデックと書き出しプロファイル",
+        "body": "動画互換性は、iPhone や一般的なカメラ納品で多い形式を中心にしています。書き出しは単純で予測しやすい MP4 プロファイルに固定しています。",
+        "inputTitle": "対応している動画入力",
+        "outputTitle": "現在の書き出しプロファイル",
+        "audioPreserved": "元素材に入っていれば保持します",
+        "audioRemoved": "書き出しに含みません",
+        "inputItems": {
+          "h264": "{codec} の動画",
+          "hevc": "{codec} の動画",
+          "prores": "{codec} の動画"
+        },
+        "outputItems": {
+          "container": "{outputCodec} / {outputContainer} で書き出します。",
+          "frameSize": "長辺最大 {outputLongEdgePx}px・{outputFrameRate}fps。",
+          "audio": "音声は {audioPolicy}。"
+        }
+      },
+      "unsupported": {
+        "eyebrow": "Known unsupported",
+        "title": "現時点の非対応事項と上限",
+        "body": "以下は現時点の公開版の境界です。今後の永続的な方針を約束するものではありません。範囲外の素材は、読み込みを拒否したり、事前変換を求めたりする場合があります。",
+        "items": {
+          "dnxhr": "{unsupportedCodec} の動画は iPhone で非対応です。先に H.264 / HEVC / ProRes へ変換してください。",
+          "overLength": "{maxDurationMinutes} 分を超える素材は公開版の上限外です。",
+          "overResolution": "長辺 {sourceLongEdgeCapPx}px を超える素材は公開版の上限外です。",
+          "overSize": "{sourceFileSizeCapGiB} GB を超える素材は公開版の上限外です。",
+          "ipad": "この公開版は iPad 非対応です。",
+          "nonMedia": "写真・動画以外のファイル、または video track を持たない動画は非対応です。"
+        }
+      },
+      "footer": {
+        "privacyCta": "プライバシーポリシー",
+        "backToFilmLab": "Filmtone に戻る"
+      }
+    },
+    "privacyPage": {
+      "metadata": {
+        "title": "Filmtone iPhone 版プライバシー",
+        "description": "Filmtone iPhone 版のプライバシー概要。local-first、アカウント不要、analytics SDK なし、third-party tracking なし、データ収集なし。"
+      },
+      "eyebrow": "Privacy",
+      "heroTitle": "Filmtone iPhone 版プライバシー",
+      "heroBody": "Filmtone iPhone 版は local-first です。アカウントは不要で、analytics SDK や third-party tracking を入れておらず、写真・動画・利用データを収集しません。",
+      "facts": {
+        "localFirstLabel": "Local-first",
+        "localFirstValue": "編集・プレビュー・書き出しは端末上で動作します。",
+        "noAccountLabel": "アカウント不要",
+        "noAccountValue": "サインイン不要。プロフィールやクラウド前提なし。",
+        "noAnalyticsLabel": "analytics SDK なし",
+        "noAnalyticsValue": "analytics SDK なし。広告 SDK なし。",
+        "noCollectionLabel": "データ収集なし",
+        "noCollectionValue": "収集データなし。third-party tracking なし。"
+      },
+      "localFirst": {
+        "eyebrow": "On-device",
+        "title": "編集は iPhone の中で完結します",
+        "body": "この公開版では、メディア処理の中心は端末内で完結します。アカウントやクラウド処理を前提にしていません。",
+        "items": {
+          "editing": {
+            "title": "編集は端末内",
+            "body": "ルック適用、プレビュー生成、書き出しは iPhone 上で実行されます。"
+          },
+          "storage": {
+            "title": "作業データは端末内",
+            "body": "現在の編集状態を続けられるよう、作業用ファイルや設定を端末内に保持することがあります。"
+          },
+          "server": {
+            "title": "グレーディングのための送信なし",
+            "body": "iPhone 版は、プレビュー・グレーディング・書き出しのために選択した写真や動画を当方サーバーへ送信しません。"
+          }
+        }
+      },
+      "permissions": {
+        "eyebrow": "Permissions",
+        "title": "写真ライブラリ権限は読み込みと保存のときだけ使います",
+        "body": "権限は、その機能を使うときだけ要求します。",
+        "cards": {
+          "photoImport": {
+            "title": "写真ライブラリからの読み込み",
+            "body": "写真ライブラリ権限は、写真ライブラリから読み込む操作を選んだときだけ使います。"
+          },
+          "photoSave": {
+            "title": "写真へ保存",
+            "body": "写真ライブラリへの追加権限は、書き出し結果で「写真へ保存」を選んだときだけ使います。"
+          },
+          "files": {
+            "title": "Files からの読み込み",
+            "body": "Files を選んだ場合、iOS がユーザーの選んだ項目だけをアプリに渡します。"
+          }
+        }
+      },
+      "tracking": {
+        "eyebrow": "Tracking",
+        "title": "analytics SDK なし、third-party tracking なし",
+        "body": "公開中の iPhone 版には analytics や third-party tracking を入れていません。",
+        "items": {
+          "noAccount": "アカウント機能はありません。",
+          "noAnalytics": "analytics SDK は入っていません。",
+          "noTracking": "third-party tracking や tracking domain はありません。",
+          "noCollection": "アプリによるデータ収集はありません。"
+        }
+      },
+      "contact": {
+        "eyebrow": "Contact",
+        "title": "プライバシーに関する問い合わせ",
+        "body": "このプライバシーページや公開版の挙動についての質問は、{operatorName} までメールでご連絡ください。",
+        "emailLabel": "プライバシー窓口"
+      },
+      "footer": {
+        "supportCta": "サポートページ",
+        "backToFilmLab": "Filmtone に戻る"
+      }
     }
   },
   "common": {

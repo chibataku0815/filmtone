@@ -303,7 +303,7 @@
       "roadmapLink": "Roadmap",
       "releaseNotesLink": "Release Notes",
       "premiumHeroBadgeNew": "Desktop",
-      "premiumHeroBadgeLine": "v0.6.2 now live on macOS",
+      "premiumHeroBadgeLine": "v1.0.0 now live on macOS",
       "premiumCapabilitiesEyebrow": "Motion proof",
       "premiumCapabilitiesTitle": "See the finish land in motion.",
       "premiumFeature1Title": "Low-light finish, fast.",
@@ -316,8 +316,8 @@
       "premiumCard1Body": "Play, scrub, compare, and review quickly. Playback judgment is part of the product, not a side note.",
       "premiumCard2Title": "Heavy footage, faster return",
       "premiumCard2Body": "Progressive preview and reusable proxies keep real camera files workable instead of blocking the finish.",
-      "premiumCard3Title": "Cross Filter, cleaned up",
-      "premiumCard3Body": "v0.6.2 keeps Cross Filter on a clearer public surface with Hard-only behavior and discrete 4 / 6 / 8 spikes.",
+      "premiumCard3Title": "Cross Filter, live in preview",
+      "premiumCard3Body": "In v1.0, Cross Filter runs live on the WebGPU preview path, with inline threshold, chromatic, and spacing controls.",
       "premiumCard4Title": "Same world, wider delivery",
       "premiumCard4Body": "Desktop is built to finish short-form video first, then carry that mood into stills, covers, and supporting frames.",
       "premiumCompareTitle": "Show the shipped surface on a real compare pass.",
@@ -639,7 +639,7 @@
       "scratchAmount": "Film Scratches",
       "scratchAmountHint": "Adds vertical film scratches that drift across the frame.",
       "shutterAngle": "Shutter Angle",
-      "shutterAngleHint": "Simulates camera shutter angle (0\u00b0=off, 180\u00b0=cinema standard)",
+      "shutterAngleHint": "Simulates camera shutter angle (0°=off, 180°=cinema standard)",
       "trailIntensity": "Trail Length",
       "trailIntensityHint": "Extends the motion trail beyond the shutter window. Higher values create longer afterimages."
     },
@@ -982,13 +982,17 @@
           "title": "Cross Filter product-surface cleanup (v0.6.2)",
           "description": "The public product surface now freezes Soft mode, normalises restored and shared state back to Hard, and replaces the old Spikes slider with direct 4 / 6 / 8 choices."
         },
+        "webgpuPreview100": {
+          "title": "Desktop v1.0 — WebGPU preview backend",
+          "description": "Desktop preview now runs on a WebGPU path with wider highlight headroom, and Cross Filter ships live on that preview path with inline threshold, chromatic, and spacing controls."
+        },
         "presetExpansion": {
           "title": "Preset expansion",
           "description": "Additional film stocks and creative looks beyond the initial four."
         },
         "exportQuality": {
-          "title": "Export quality options",
-          "description": "More control over output resolution, format, and compression settings."
+          "title": "Preview/export parity for video and batch",
+          "description": "Bring video export and batch output closer to the new WebGPU preview path so highlight rolloff and overall rendering match more reliably."
         },
         "verticalVideoExportQuality": {
           "title": "Portrait & non-16:9 video export resolution",
@@ -1034,33 +1038,38 @@
       "title": "Release Notes — Filmtone",
       "description": "Filmtone Desktop release history — see what's new, fixed, and improved in each version.",
       "eyebrow": "RELEASE NOTES",
-      "heroTitle": "Filmtone Desktop Releases",
-      "heroBody": "A log of every Desktop release, from the initial launch onward. Each entry covers what was added, fixed, or changed.",
+      "heroTitle": "Filmtone Desktop release notes",
+      "heroBody": "Every Filmtone Desktop release, from the very first build to today. Each entry covers what was added, what was improved, and what was fixed.",
       "tocTitle": "On this page",
       "latestBadge": "Latest",
       "typeAdded": "Added",
       "typeFixed": "Fixed",
       "typeChanged": "Changed",
       "entries": {
-        "v062Title": "Cross Filter, cleaned up for the public surface",
-        "v062HardOnlySurface": "Cross Filter now ships as Hard-only on the public product surface. The Soft implementation remains in the codebase as future reference work.",
-        "v062StateNormalization": "If restored settings or shared state still contain Soft-side values, the public app now normalises them back to the current Hard-only behaviour.",
-        "v062DiscreteSpikes": "Spikes is no longer a continuous slider. It is now a direct discrete choice between `4`, `6`, and `8`.",
-        "v061Title": "Desktop reliability and low-light finishing improvements",
-        "v061LaunchUpdateBanner": "The launch-time update check is working again, so builds with an embedded update URL can surface a newer release when the app opens.",
-        "v061PreviewRecoveryAfterExport": "Fixed cases where the live preview could stay black after export by recovering the current source more defensively when the preview runtime needs to be rebuilt.",
-        "v061GlowBlackMistRetune": "Glow has been retuned for black-mist-leaning night scenes so highlight bloom keeps more shape instead of flattening into white plates.",
-        "v061HardCrossFilterSpacing": "Hard cross-filter spacing has been corrected so nearby highlights separate more consistently before streak generation.",
-        "v060Title": "Cross Filter and a faster return to your footage",
-        "v060CrossFilter": "A new Cross Filter effect adds diffraction-style star streaks to bright point lights, with controls for strength, point count, rotation angle, streak length, highlight threshold, and subtle chromatic split.",
-        "v060VideoCompareUx": "Video compare and playback review are smoother: compare mode is easier to dismiss intentionally, faster playback is available for quick checks, and slider reset actions are more discoverable.",
-        "v060ThumbnailLoadingPolish": "Leading thumbnails now probe several early frames and avoid near-black picks when possible, so clips that fade in no longer look broken at first glance. Loading typography has also been aligned with the rest of the app.",
-        "v060PersistentProxyCache": "Desktop now keeps progressive preview proxies in a bounded local cache, so reopening the same heavy source is faster. Automatic pruning and manual purge keep storage under control.",
+        "v100Title": "Filmtone Desktop v1.0 — the first public release",
+        "v100WebgpuPreview": "Preview has been reworked end-to-end. Bright highlights now hold their shape more naturally, so it is easier to judge the finished look right on screen.",
+        "v100CrossFilterPreviewControls": "Cross Filter now responds live while you preview your image. Fine-tune the brightness that triggers the streaks, how much they split into color, and how close they sit, and the result updates immediately.",
+        "v100SignedNotarizedDmg": "The macOS build is now signed and notarized by Apple. The download page and the in-app update prompt both point to this v1.0.0 release, so installing is simple and trusted.",
+        "v100DesktopFirstReleaseScope": "v1.0 focuses on improving Desktop preview. The browser demo, video export, and photo batch export continue to work exactly as they did before.",
+        "v062Title": "Cross Filter, simpler to use",
+        "v062HardOnlySurface": "Cross Filter now ships as a single, well-tuned mode, trimmed down so it is easier to reach for without hesitation.",
+        "v062StateNormalization": "Old settings files and shared links open correctly and automatically fit into the current mode — nothing looks different from what you originally saved.",
+        "v062DiscreteSpikes": "Pick the number of streaks in one tap: 4, 6, or 8.",
+        "v061Title": "Update notifications are back, and night-scene glow feels better",
+        "v061LaunchUpdateBanner": "Filmtone again shows a banner at launch when a newer version is available.",
+        "v061PreviewRecoveryAfterExport": "Fixed cases where preview could stay black after exporting — preview now recovers on its own whenever it is needed.",
+        "v061GlowBlackMistRetune": "Glow in Black-Mist-style night scenes now keeps its shape instead of flattening into blown-out white patches.",
+        "v061HardCrossFilterSpacing": "Cross Filter streaks now separate cleanly even when bright highlights sit close together.",
+        "v060Title": "Cross Filter arrives, and video feels smoother",
+        "v060CrossFilter": "Cross Filter adds lens-style star streaks to bright points in your image. Dial in the strength, the number of streaks, the angle, the length, the brightness that triggers them, and a touch of color split, to find your own look.",
+        "v060VideoCompareUx": "Video compare and review feel smoother — compare mode is easier to exit, slider resets are easier to find, and a faster playback option makes quick checks more natural.",
+        "v060ThumbnailLoadingPolish": "Leading thumbnails now pick a brighter frame automatically, so clips that fade in look right from the very first glance. Loading text has also been aligned with the rest of the app.",
+        "v060PersistentProxyCache": "Desktop can now keep preview data for heavy footage on your computer, so opening the same clip again is faster. You can let Filmtone manage the space automatically or clear it yourself whenever you want.",
         "v051Title": "Heavy footage, instant preview",
-        "v051ProgressiveLoading": "ProRes, 4K HEVC, and other demanding formats now preview instantly. Filmtone shows native-decoded frames the moment you open a file, then silently converts to an optimised intermediate in the background. The same intermediate is reused at export, so you never transcode the same clip twice.",
-        "v051RingBufferMotionBlur": "Motion blur has been rebuilt around an eight-frame ring buffer with real shutter-angle control (0–720°). A new Trail Intensity slider adds feedback for stylised streaks. The weight curve shifts from triangle to box automatically as you push past 360°.",
-        "v051PortraitVideo": "Vertical (9:16) footage now displays in full-frame contain mode. The letterbox areas are filled with a frosted-glass version of the video itself, giving portrait clips a polished look without manual setup.",
-        "v051ComparisonModeFix": "Before / After split view no longer applies motion blur to both sides. The original half is now rendered clean, and switching modes resets the blur buffer so no ghost frames carry over.",
+        "v051ProgressiveLoading": "ProRes, 4K HEVC, and other demanding formats preview the moment you drop them in. Filmtone prepares an optimized copy in the background and reuses it at export, so you never wait on the same clip twice.",
+        "v051RingBufferMotionBlur": "Motion blur has been rebuilt with real shutter-angle control (0° to 720°), and a separate Trail Intensity slider for stylised streaks, so you can shape the look more intuitively.",
+        "v051PortraitVideo": "9:16 vertical clips now display full-frame. The side areas are filled with a softly blurred version of the footage itself, so portrait video looks polished without any manual setup.",
+        "v051ComparisonModeFix": "Fixed Before / After compare so only the graded side shows motion blur — the original stays clean, and no ghost frames carry over when you switch modes.",
         "v050Title": "Grain that looks like the real thing",
         "v050GrainV3": "The grain engine has been rebuilt from the ground up — each film stock now has its own natural clumping, texture size, and color-noise character, so Kodak and Fuji grain no longer look the same.",
         "v050Diffusion": "A new Diffusion slider wraps your image in a soft, milky haze — like shooting through a Pro-Mist filter — gently lifting contrast and flattering skin tones.",
@@ -1122,6 +1131,187 @@
         "v010BrowserDemo": "Try any preset on your own photos in the browser before downloading the Desktop app."
       },
       "backToFilmLab": "← Back to Filmtone"
+    },
+    "supportPage": {
+      "metadata": {
+        "title": "Filmtone iPhone Support",
+        "description": "Support contact, supported devices, codec support, and known unsupported items for the Filmtone iPhone release."
+      },
+      "eyebrow": "Support",
+      "heroTitle": "Filmtone for iPhone support",
+      "heroBody": "Use this page for public-release support details: contact, supported devices, supported codecs, and the current boundaries of the iPhone build.",
+      "facts": {
+        "operatorLabel": "Operator",
+        "operatorValue": "{operatorName}",
+        "contactLabel": "Contact",
+        "contactCaption": "Email support for release issues, media compatibility questions, and permission problems.",
+        "devicesLabel": "Supported devices",
+        "devicesValue": "{deviceFamily} · iOS {minIos}+",
+        "codecsLabel": "Current codec surface",
+        "codecsValue": "{inputCodecs} in · {outputCodec} {outputContainer} out"
+      },
+      "contact": {
+        "eyebrow": "Contact flow",
+        "title": "How to contact support",
+        "body": "For bugs, compatibility questions, or release issues, contact the operator by email. Include enough device and source detail so we can reproduce the problem without asking you to restate the basics.",
+        "emailLabel": "Support email",
+        "emailHint": "Use this address for App Store release support, media compatibility questions, and permission-related issues.",
+        "detailsTitle": "Include these details",
+        "flow": {
+          "sendEmail": {
+            "title": "Email the support address",
+            "body": "Send your message from the mailbox you want us to reply to. Japanese or English is fine."
+          },
+          "includeContext": {
+            "title": "Add device and source details",
+            "body": "Tell us the iPhone model, iOS version, whether the source came from Photos or Files, and what happened."
+          },
+          "replyByEmail": {
+            "title": "We follow up by email",
+            "body": "We reply with troubleshooting steps or follow-up questions. If we need a sample file, we will ask before you send anything."
+          }
+        },
+        "details": {
+          "device": "iPhone model.",
+          "iosVersion": "iOS version.",
+          "sourceRoute": "Whether you imported from Photo Library or Files.",
+          "mediaInfo": "Source type, codec, resolution, duration, and whether audio is present.",
+          "reproSteps": "What you tapped, what you expected, and the exact error or screenshot."
+        }
+      },
+      "devices": {
+        "eyebrow": "Devices",
+        "title": "Supported devices and import paths",
+        "body": "Current public-release support is intentionally narrow: one iPhone target, iOS 17+, and user-selected media from Photos or Files.",
+        "cards": {
+          "deviceFamily": {
+            "title": "Device family",
+            "body": "{deviceFamily} only. This release is not a universal iPad build."
+          },
+          "os": {
+            "title": "OS",
+            "body": "iOS {minIos} or later."
+          },
+          "importRoutes": {
+            "title": "Import routes",
+            "body": "Pick one photo or video at a time from Photo Library or Files."
+          }
+        }
+      },
+      "media": {
+        "eyebrow": "Media",
+        "title": "Supported codecs and export profile",
+        "body": "Video compatibility is centered on common iPhone and camera-delivery formats. Export is fixed to a simple, predictable MP4 profile for this release.",
+        "inputTitle": "Supported video input codecs",
+        "outputTitle": "Current export profile",
+        "audioPreserved": "preserved when the source contains audio",
+        "audioRemoved": "not included",
+        "inputItems": {
+          "h264": "{codec} video",
+          "hevc": "{codec} video",
+          "prores": "{codec} video"
+        },
+        "outputItems": {
+          "container": "{outputCodec} in {outputContainer}.",
+          "frameSize": "Up to {outputLongEdgePx}px long edge at {outputFrameRate} fps.",
+          "audio": "Source audio policy: {audioPolicy}."
+        }
+      },
+      "unsupported": {
+        "eyebrow": "Known unsupported",
+        "title": "Current unsupported items and limits",
+        "body": "These are current release boundaries, not a lifetime promise. If your file falls outside them, the iPhone app may reject it or ask you to convert it first.",
+        "items": {
+          "dnxhr": "{unsupportedCodec} video is not supported on iPhone. Convert to H.264, HEVC, or ProRes first.",
+          "overLength": "Sources longer than {maxDurationMinutes} minutes are outside the release cap.",
+          "overResolution": "Sources above {sourceLongEdgeCapPx}px on the long edge are outside the release cap.",
+          "overSize": "Sources larger than {sourceFileSizeCapGiB} GB are outside the release cap.",
+          "ipad": "iPad is not supported in this public iPhone release.",
+          "nonMedia": "Files that are not photos or videos, or videos with no video track, are not supported."
+        }
+      },
+      "footer": {
+        "privacyCta": "Privacy policy",
+        "backToFilmLab": "Back to Filmtone"
+      }
+    },
+    "privacyPage": {
+      "metadata": {
+        "title": "Filmtone iPhone Privacy",
+        "description": "Privacy summary for Filmtone on iPhone: local-first operation, no account, no analytics SDK, no third-party tracking, and no data collection."
+      },
+      "eyebrow": "Privacy",
+      "heroTitle": "Filmtone for iPhone privacy",
+      "heroBody": "Filmtone on iPhone is local-first. The app does not require an account, does not include analytics or third-party tracking SDKs, and does not collect your photos, videos, or usage data.",
+      "facts": {
+        "localFirstLabel": "Local-first",
+        "localFirstValue": "Editing, preview, and export run on your device.",
+        "noAccountLabel": "No account",
+        "noAccountValue": "No sign-in, no profile, no cloud sync requirement.",
+        "noAnalyticsLabel": "No analytics SDK",
+        "noAnalyticsValue": "No analytics SDK. No ad-tech SDK.",
+        "noCollectionLabel": "No data collection",
+        "noCollectionValue": "No collected data types. No third-party tracking."
+      },
+      "localFirst": {
+        "eyebrow": "On-device",
+        "title": "Editing stays on your iPhone",
+        "body": "This release keeps the media workflow on device. The app is designed to work without an account or cloud processing.",
+        "items": {
+          "editing": {
+            "title": "Editing runs locally",
+            "body": "Applying looks, generating previews, and exporting media happen on the iPhone itself."
+          },
+          "storage": {
+            "title": "Working files stay on device",
+            "body": "The app may keep local working files and current settings on your device so the current session can continue."
+          },
+          "server": {
+            "title": "No media upload for grading",
+            "body": "The iPhone release does not send your selected photos or videos to our server for preview, grading, or export."
+          }
+        }
+      },
+      "permissions": {
+        "eyebrow": "Permissions",
+        "title": "Photo Library permission is used only for import and save",
+        "body": "Permissions are requested only when the related feature is used.",
+        "cards": {
+          "photoImport": {
+            "title": "Photo Library import",
+            "body": "Photo Library access is requested only when you choose to import from Photo Library."
+          },
+          "photoSave": {
+            "title": "Save to Photos",
+            "body": "Photo Library add access is requested only when you choose Save to Photos for an export."
+          },
+          "files": {
+            "title": "Files import",
+            "body": "If you choose Files, iOS gives the app only the item you selected."
+          }
+        }
+      },
+      "tracking": {
+        "eyebrow": "Tracking",
+        "title": "No analytics SDK, no third-party tracking",
+        "body": "The public iPhone release does not use analytics or third-party tracking.",
+        "items": {
+          "noAccount": "No account system.",
+          "noAnalytics": "No analytics SDK.",
+          "noTracking": "No third-party tracking or tracking domains.",
+          "noCollection": "No data collection by the app."
+        }
+      },
+      "contact": {
+        "eyebrow": "Contact",
+        "title": "Questions about privacy",
+        "body": "Questions about this privacy page or a specific release behavior can be sent to {operatorName} by email.",
+        "emailLabel": "Privacy contact"
+      },
+      "footer": {
+        "supportCta": "Support page",
+        "backToFilmLab": "Back to Filmtone"
+      }
     }
   },
   "common": {
