@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
+    "verify:swift-contract": "./scripts/verify-phase0-contract.sh",
     "cap:add:ios": "cap add ios",
     "cap:sync:ios": "cap sync ios",
     "ios:open": "cap open ios",

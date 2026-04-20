@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 2,
+  "projectId": "legacy-project-001",
+  "createdAt": "2026-04-20T00:00:00.000Z",
+  "updatedAt": "2026-04-20T00:00:00.000Z",
+  "presetName": "cinematic",
+  "strength": 0.72,
+  "quickState": {
+    "filmCharacter": 0.2,
+    "era": -0.1,
+    "dynamics": 0.15
+  },
+  "params": {
+    "exposure": 0.1,
+    "contrast": 1.1,
+    "saturation": 1.05
+  },
+  "lut": {
+    "title": "Legacy Creative LUT",
+    "size": 2,
+    "data": [0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1],
+    "intensity": 0.8
+  },
+  "output": {
+    "longEdge": 1920,
+    "fps": 30,
+    "codec": "h264",
+    "container": "mp4",
+    "preserveAudio": true
+  }
+}

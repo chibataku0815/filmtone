@@ -1,0 +1,74 @@
+{
+  "sourceUri": "file:///tmp/phase0-source.mov",
+  "sourceKind": "video",
+  "sourceProbe": {
+    "uri": "file:///tmp/phase0-source.mov",
+    "filename": "phase0-source.mov",
+    "kind": "video",
+    "mimeType": "video/quicktime",
+    "width": 1920,
+    "height": 1080,
+    "durationSec": 12.5,
+    "fileSizeBytes": 12345678,
+    "codec": "h264",
+    "frameRate": 30
+  },
+  "output": {
+    "longEdge": 1920,
+    "fps": 30,
+    "codec": "h264",
+    "container": "mp4",
+    "preserveAudio": true
+  },
+  "grade": {
+    "presetName": "cinematic",
+    "presetVersion": "v1",
+    "quickState": {
+      "filmCharacter": 0.15,
+      "era": -0.05,
+      "dynamics": 0.2
+    },
+    "params": {
+      "exposure": 0.12,
+      "contrast": 1.08,
+      "saturation": 1.04,
+      "temperature": 0.03,
+      "tint": -0.02,
+      "rgbShift": 0.001,
+      "lensSoftness": 0.05,
+      "grainRadialMix": 1,
+      "grainSize": 0.32,
+      "bloomThreshold": 0.78,
+      "bloomStrength": 0.1,
+      "bloomRadius": 0.42,
+      "diffusion": 0.08,
+      "halationIntensity": 0.14,
+      "halationSpread": 18,
+      "halationHue": 12,
+      "halationThreshold": 0.62,
+      "halationRadius": 0.58,
+      "bloomSoftKnee": 0.5,
+      "halationSoftKnee": 0.33,
+      "compressionAmount": 0.2,
+      "compressionRange": 0.55,
+      "printContrast": 0.18,
+      "cyan": -0.02,
+      "magenta": 0.01,
+      "yellow": 0.03,
+      "fade": 0.04,
+      "vignette": 0.15,
+      "grainIntensity": 0.12
+    }
+  },
+  "lut": null,
+  "inputLut": {
+    "size": 2,
+    "data": [0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1],
+    "intensity": 1
+  },
+  "creativeLut": {
+    "size": 2,
+    "data": [0.02, 0, 0, 1, 0.01, 0, 0, 0.98, 0.01, 1, 1, 0.02, 0, 0.01, 1, 1, 0.02, 1, 0.01, 1, 1, 1, 1, 1],
+    "intensity": 0.72
+  }
+}
