@@ -6,12 +6,18 @@
  * development のときだけ支援者スタブを既定 ON（スマートルックとは別）。
  */
 import path from "node:path";
+import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv } from "vite";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(__dirname, "../web");
+const desktopPackageJson = JSON.parse(
+  fs.readFileSync(path.resolve(__dirname, "package.json"), "utf-8"),
+) as {
+  version?: string;
+};
 
 /** @description よくあるローカル BFF。`VITE_FILM_LAB_API_ORIGIN` で上書き可。 */
 const DEFAULT_BFF_ORIGIN = "http://127.0.0.1:3000";
@@ -118,6 +124,9 @@ export default defineConfig(({ mode }) => {
         JSON.stringify(debugVideoExportTruth),
       "import.meta.env.VITE_FILM_LAB_VERBOSE_VIDEO_EXPORT":
         JSON.stringify(verboseVideoExportTruth),
+      "import.meta.env.VITE_FILMTONE_DESKTOP_VERSION": JSON.stringify(
+        desktopPackageJson.version ?? "0.0.0",
+      ),
       /**
        * @description Phase 1 T1-1: Filmtone backend select — desktop defaults to WebGPU.
        *   `WebGPUBackend` は dynamic import で載り、web ビルドでは `"webgl"` 固定により

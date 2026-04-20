@@ -80,7 +80,7 @@ export interface CrossFilterHistorySnapshot {
   readonly strength: number;
   /** Quantized Hard Mode — 0 or 1. */
   readonly hardMode: 0 | 1;
-  /** Current public `crossFilterMinSpacing` snapshot (1–10 in current UI). */
+  /** Current public `crossFilterMinSpacing` snapshot (1–2 in current UI). */
   readonly minSpacing: number;
 }
 

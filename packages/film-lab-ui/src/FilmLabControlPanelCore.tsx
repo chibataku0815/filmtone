@@ -30,6 +30,7 @@ import {
   type PresentState,
   type State,
 } from "./film-lab-reducer";
+import { resolveCompareViewportSyncPlan } from "./compareViewportSync";
 import { FILM_LAB_NEXT_INTL_NAMESPACE } from "./filmLabUiContract";
 import {
   filmLabCollapsibleHeaderButton,
@@ -445,37 +446,36 @@ export const FilmLabControlPanelCore = forwardRef<
 
   useEffect(() => {
     if (!viewport) return;
+    const active = state.activeSlot === "A" ? state.slotA : state.slotB;
 
-    const compareOn = supportsABCompare && state.compareMode;
-    const beforeAfterActive = supportsBeforeAfter && state.beforeAfterStash != null;
+    const compareSyncPlan = resolveCompareViewportSyncPlan({
+      backendKind: viewport.backendKind,
+      supportsABCompare,
+      supportsBeforeAfter,
+      compareMode: state.compareMode,
+      beforeAfterStashPresent: state.beforeAfterStash != null,
+      prevCompareMode: prevCompareModeRef.current,
+      prevBeforeAfterActive: prevBeforeAfterActiveRef.current,
+    });
 
-    if (compareOn) {
+    viewport.setParams(gradeToViewportRecord(active));
+
+    if (compareSyncPlan.comparePresentOn) {
       viewport.setComparePair(
         true,
         gradeToViewportRecord(state.slotA),
         gradeToViewportRecord(state.slotB),
       );
-      if (!prevCompareModeRef.current) {
-        viewport.setSplitPosition(0.5);
-      }
     } else {
       viewport.setComparePair(false, {}, {});
-      const active = state.activeSlot === "A" ? state.slotA : state.slotB;
-      viewport.setParams(gradeToViewportRecord(active));
-
-      if (prevCompareModeRef.current && !compareOn) {
-        if (!beforeAfterActive) {
-          viewport.setSplitPosition(-1.0);
-        }
-      } else if (beforeAfterActive && !prevBeforeAfterActiveRef.current) {
-        viewport.setSplitPosition(0.5);
-      } else if (!beforeAfterActive && prevBeforeAfterActiveRef.current) {
-        viewport.setSplitPosition(-1.0);
-      }
     }
 
-    prevCompareModeRef.current = compareOn;
-    prevBeforeAfterActiveRef.current = beforeAfterActive;
+    if (compareSyncPlan.nextSplitPosition != null) {
+      viewport.setSplitPosition(compareSyncPlan.nextSplitPosition);
+    }
+
+    prevCompareModeRef.current = compareSyncPlan.compareOn;
+    prevBeforeAfterActiveRef.current = compareSyncPlan.beforeAfterActive;
   }, [
     viewport,
     supportsABCompare,

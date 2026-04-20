@@ -68,8 +68,15 @@ export class GpuContext {
       backendKind: "webgpu",
       supportsCompare: false,
       supportsHistogram: false,
-      supportsBeforeAfter: false,
-      supportsABCompare: false,
+      // v1 compare-bar (toggle-only, no draggable split bar): WebGPU
+      // backend now exposes `setComparePair` + a `compare-source` present
+      // pipeline that swaps the swap-chain pass for an ungraded-source
+      // sample when `frameState.compareEnabled` is true. Slot params are
+      // not honored on v1 (dual-slot simultaneous A/B parity stays
+      // deferred). The two flags are flipped together because
+      // `FilmLabCanvas.tsx`'s `previewSupportsCompare` ANDs them.
+      supportsBeforeAfter: true,
+      supportsABCompare: true,
       supportsLiveVideoTexture: true,
       maxTextureDimension2D:
         typeof adapter.limits.maxTextureDimension2D === "number"

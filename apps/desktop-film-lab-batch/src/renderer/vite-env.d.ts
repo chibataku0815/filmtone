@@ -26,6 +26,8 @@ interface ImportMetaEnv {
    * @description `vite.config` が `FILM_LAB_VERBOSE_VIDEO_EXPORT` から埋める。`true` のときだけ各フレームの詳細ログを出す。
    */
   readonly VITE_FILM_LAB_VERBOSE_VIDEO_EXPORT?: string;
+  /** @description デスクトップ版 Filmtone の公開バージョン。metadata sidecar に埋め込む。 */
+  readonly VITE_FILMTONE_DESKTOP_VERSION?: string;
 }
 
 interface ImportMeta {

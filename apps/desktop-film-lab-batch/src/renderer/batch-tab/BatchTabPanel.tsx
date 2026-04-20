@@ -1,10 +1,15 @@
 /**
- * @fileoverview Film Lab デスクトップの「書き出し」タブ用パネル
+ * @fileoverview Film Lab デスクトップの「書き出し」タブ用パネル（glass 統一・2026-04-19 再設計）
  *
  * @description
- * 5 セクション（ジョブ種別 / 入力 / ルック / 出力 / 実行）をアコーディオン形式で配置。
- * 編集タブから同期済みのセクションは折りたたみ、ユーザーは必要なセクションだけ開いて設定する。
- * 実行セクションは常時表示で、未設定の項目があればバリデーションメッセージを表示する。
+ * 4 製品研究（Lightroom / Capture One / Apple Photos / DaVinci Deliver）の共通則から導出した
+ * rulebook（apps/desktop-film-lab-batch/docs/ui-rulebook-glass-unified.md）に準拠。
+ * - material: `.fl-card--frost` 1 種のみ、ソリッド黒系カード全廃
+ * - preset strip: DaVinci 型、画面最上部の横 1 行タイル帯
+ * - accordion: sources / look / output の 3 セクション（jobType は単独、run は footer 内）
+ * - advanced disclosure: proxy cache / preview-export bridge を既定閉で格納
+ * - primary accent: amber は実行 CTA 1 個のみ
+ * - ⓘ icon: 17 → 最小（proxy cache のみ残存）
  */
 
 import {
@@ -13,7 +18,6 @@ import {
   CheckCircle,
   Circle,
   File,
-  Info,
   WarningCircle,
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
@@ -29,18 +33,20 @@ import {
   VIDEO_EXPORT_FPS,
   VIDEO_IMPORT_MAX_DURATION_SEC,
 } from "../video-export-constants";
-import { HelpHint } from "./HelpHint";
 import type { VideoPreviewProxyCacheInfo } from "../desktop-api";
+import type { MetadataLookSource } from "../export-metadata-session";
+import { PresetStrip } from "./PresetStrip";
+import {
+  AdvancedDisclosure,
+  type PreviewBridgeLines,
+} from "./AdvancedDisclosure";
 
-/** @description 書き出しタブで扱うジョブの大分類（フォルダの写真まとめて vs 動画 1 本） */
+/** @description 書き出しタブで扱うジョブの大分類 */
 export type BatchJobMode = "images" | "video";
 
 const PRESET_NAMES = Object.keys(PRESETS) as PresetName[];
 
-/**
- * @description 編集キャンバスのプレビューと書き出し入力の対応をユーザーが追えるようにするための状態（life#83）。
- *   App が `FilmLabCanvas` の通知から組み立て、書き出しタブへ渡す。
- */
+/** @description 編集プレビューと書き出し入力の対応を追うための状態（life#83） */
 export type DesktopInteractivePreviewState =
   | { kind: "sample" }
   | {
@@ -55,31 +61,24 @@ function normPathSegments(p: string): string {
   return p.replace(/\\/g, "/").toLowerCase();
 }
 
-/** @description 同一ファイルパスか（OS の区切り差を吸収） */
 function pathsEqualNormalized(a: string, b: string): boolean {
   return normPathSegments(a) === normPathSegments(b);
 }
 
-/** @description 写真バッチの入力フォルダ直下（またはその配下）にプレビューファイルがあるか */
 function isFileUnderInputDir(filePath: string, inputDir: string): boolean {
   const nf = normPathSegments(filePath);
   const nd = normPathSegments(inputDir).replace(/\/$/, "");
   return nf.startsWith(`${nd}/`) || nf === nd;
 }
 
-/** @description 静止画として扱う拡張子（プレビュー種別の判定用） */
 function isRasterFileName(name: string): boolean {
   return /\.(jpe?g|png|webp|gif)$/i.test(name);
 }
 
-/** @description 動画プレビューとして扱う拡張子 */
 function isVideoFileName(name: string): boolean {
   return /\.(mp4|webm)$/i.test(name);
 }
 
-/**
- * @description 「読み込み元」を開いたままにすべきか。未入力・サンプル・スマートルック由来・パス不足・種別不一致のとき true。
- */
 function shouldAutoExpandSources(
   mode: BatchJobMode,
   inputDir: string | null,
@@ -110,31 +109,16 @@ function shouldAutoExpandSources(
   return false;
 }
 
-/** @description ステップ識別子 */
 type BatchStepId = "jobType" | "sources" | "look" | "output" | "run";
+type AccordionStepId = Exclude<BatchStepId, "jobType" | "run">;
 
-/** @description アコーディオン内で折りたたみ可能な 4 セクション（run は常時表示） */
-type AccordionStepId = Exclude<BatchStepId, "run">;
+const ACCORDION_STEPS: AccordionStepId[] = ["sources", "look", "output"];
 
-const ACCORDION_STEPS: AccordionStepId[] = [
-  "jobType",
-  "sources",
-  "look",
-  "output",
-];
-
-/**
- * @description ジョブ種別ごとの初期 open state を作る
- *
- * 写真と動画は最初に確認したい段が違うので、
- * 切替時に開いている段も job に合わせて戻す。
- */
 function createDefaultOpenSections(
   mode: BatchJobMode,
   inputDir: string | null,
   videoInputPath: string | null,
-  editToExportSyncedAtMs: number | null,
-  importedGradeLabel: string | null,
+  batchLookSource: MetadataLookSource,
   desktopInteractivePreview: DesktopInteractivePreviewState | undefined,
 ): Record<AccordionStepId, boolean> {
   const expandSources = shouldAutoExpandSources(
@@ -144,42 +128,17 @@ function createDefaultOpenSections(
     desktopInteractivePreview,
   );
   return {
-    jobType: true,
     sources: expandSources,
-    look: editToExportSyncedAtMs == null && importedGradeLabel == null,
+    look: batchLookSource === "preset",
     output: true,
   };
 }
 
-/**
- * @description パスの末尾セグメントを取得（折りたたみヘッダーのサマリ表示用）
- */
 function lastPathSegment(p: string): string {
   const parts = p.replace(/\\/g, "/").split("/");
   return parts[parts.length - 1] || p;
 }
 
-function formatProxyCacheBytes(locale: string, value: number): string {
-  if (!Number.isFinite(value) || value <= 0) {
-    return "0 B";
-  }
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  let unitIndex = 0;
-  let current = value;
-  while (current >= 1024 && unitIndex < units.length - 1) {
-    current /= 1024;
-    unitIndex += 1;
-  }
-  const digits = current >= 10 || unitIndex === 0 ? 0 : 1;
-  return `${new Intl.NumberFormat(locale === "ja" ? "ja-JP" : locale, {
-    maximumFractionDigits: digits,
-    minimumFractionDigits: digits,
-  }).format(current)} ${units[unitIndex]}`;
-}
-
-/**
- * @description 入力・出力がステップの前提を満たしているか（ステータスチップ用）
- */
 function getSourceOutputStatus(
   mode: BatchJobMode,
   inputDir: string | null,
@@ -195,9 +154,6 @@ function getSourceOutputStatus(
   };
 }
 
-/**
- * @description ステップ 1（入力）が完了とみなせるか
- */
 function isSourcesStepComplete(
   mode: BatchJobMode,
   inputDir: string | null,
@@ -208,29 +164,11 @@ function isSourcesStepComplete(
 }
 
 /**
- * @description ステップ 4（出力）が完了とみなせるか
- */
-function isOutputStepComplete(
-  mode: BatchJobMode,
-  outputDir: string | null,
-): boolean {
-  if (mode === "images") return Boolean(outputDir);
-  return true;
-}
-
-/**
- * @description BatchTabPanel が親から受け取る props（イベントはすべて App のハンドラに委譲）
+ * @description BatchTabPanel が親から受け取る props
  */
 export type BatchTabPanelProps = {
-  /** @description フォルダの写真まとめて / 動画 1 本のどちらを主導線にするか */
   batchJobMode: BatchJobMode;
-  /** @description ジョブ種別変更時。種類が変わったらステップを先頭に戻す（exportSurface 指定時は UI から呼ばれない） */
   onBatchJobModeChange: (mode: BatchJobMode) => void;
-
-  /**
-   * @description トップタブで写真／動画が既に分かれているときに指定する。
-   * 指定すると「やること」ジョブ選択 UI を出さず、常にこのモードとして扱う（life#84）。
-   */
   exportSurface?: "images" | "video";
 
   persistedSession: FilmLabBatchSessionV1 | null;
@@ -243,6 +181,7 @@ export type BatchTabPanelProps = {
   onPurgeProxyCache: () => void | Promise<void>;
 
   batchPresetChoice: PresetName;
+  batchLookSource: MetadataLookSource;
   onBatchPresetChoiceChange: (name: PresetName) => void;
   importedGradeLabel: string | null;
   onImportGradeJson: () => void | Promise<void>;
@@ -290,15 +229,11 @@ export type BatchTabPanelProps = {
   /** @description true when rendered inside the right slide panel (compact layout) */
   compact?: boolean;
 
-  /**
-   * @description 編集タブのプレビューと書き出し入力の関係を短く示す（life#83）。未指定時はバナーと追加の開閉ロジックをスキップ。
-   */
   desktopInteractivePreview?: DesktopInteractivePreviewState;
 };
 
 /**
- * @description 右パネル compact 用の実行フッターに必要な最小 props。
- * Edit と同じく scroll の外に置き、Export だけ面が増えないようにする。
+ * @description 右パネル compact 用の実行フッターに必要な最小 props
  */
 export type BatchTabCompactRunFooterProps = Pick<
   BatchTabPanelProps,
@@ -319,8 +254,7 @@ export type BatchTabCompactRunFooterProps = Pick<
 >;
 
 /**
- * @description 右パネル compact 専用の実行フッター。
- * 書き出しボタンを scroll の外へ出し、Edit の footer と同じ 1 枚の面として見せる。
+ * @description 右パネル compact 専用の実行フッター（書き出しボタンを scroll の外へ出す）
  */
 export function BatchTabCompactRunFooter(
   props: BatchTabCompactRunFooterProps,
@@ -348,10 +282,7 @@ export function BatchTabCompactRunFooter(
   const missingItems: { label: string }[] = [];
   if (!isSourcesStepComplete(batchJobMode, inputDir, videoInputPath)) {
     missingItems.push({
-      label:
-        isImagesMode
-          ? t("pickImageFolderTitle")
-          : t("pickVideoFileTitle"),
+      label: isImagesMode ? t("pickImageFolderTitle") : t("pickVideoFileTitle"),
     });
   }
   if (isImagesMode && !outputDir) {
@@ -360,21 +291,6 @@ export function BatchTabCompactRunFooter(
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-1.5">
-        <p className="text-sm font-medium text-[var(--fl-text-primary)]">
-          {isImagesMode ? t("stepRunImages") : t("stepRunVideo")}
-        </p>
-        <HelpHint
-          tip={t("tipKeyboardShortcuts", {
-            imagesLabel:
-              isImagesMode
-                ? t("runImagesPrimary")
-                : t("runVideoExport"),
-          })}
-          assistiveLabel={t("runKeyboardHintsAria")}
-        />
-      </div>
-
       {isImagesMode ? (
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -483,7 +399,7 @@ export function BatchTabCompactRunFooter(
 }
 
 /**
- * @description 書き出しタブのメインパネル（アコーディオン直接アクセス方式）
+ * @description 書き出しタブのメインパネル
  */
 export function BatchTabPanel(props: BatchTabPanelProps) {
   const {
@@ -498,10 +414,10 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     isPurgingProxyCache,
     onPurgeProxyCache,
     batchPresetChoice,
+    batchLookSource,
     onBatchPresetChoiceChange,
     importedGradeLabel,
     onImportGradeJson,
-    onExportGradeJson,
     inputDir,
     outputDir,
     onPickInputDir,
@@ -522,7 +438,6 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     videoCanExport,
     onPickVideoFile,
     onRunVideoExport,
-    // videoExportSuccessNonce — no longer consumed after wizard removal
     canApplyEditGradeToBatch,
     onApplyEditGradeToBatch,
     editToExportSyncedAtMs,
@@ -534,9 +449,9 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
 
   const t = useTranslations("film-lab.desktop.batch");
   const locale = useLocale();
-  /** @description トップタブ分割時は exportSurface、従来は batchJobMode を正とする */
   const effectiveMode: BatchJobMode = exportSurface ?? batchJobMode;
   const isImagesMode = effectiveMode === "images";
+
   const stepLabels = useMemo(
     (): Record<BatchStepId, string> => ({
       jobType: t("steps.jobType"),
@@ -547,51 +462,35 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     }),
     [isImagesMode, t],
   );
-  const jobModeSummary = useMemo(
-    () => ({
-      accentClass: isImagesMode
-        ? "shadow-[inset_3px_0_0_0_var(--amber-9)]"
-        : "shadow-[inset_3px_0_0_0_var(--blue-9)]",
-      titleClass: isImagesMode
-        ? "text-[var(--amber-11)]"
-        : "text-[var(--blue-11)]",
-      lead: isImagesMode ? t("exportLeadImages") : t("exportLeadVideo"),
-      next: isImagesMode ? t("jobModeImagesNext") : t("jobModeVideoNext"),
-      title: isImagesMode ? t("jobImagesTitle") : t("jobVideoTitle"),
-    }),
-    [isImagesMode, t],
-  );
 
-  /**
-   * @description 書き出しルックの「正」を 1 枚に圧縮して表示（JSON / 編集同期 / プリセットの三択）
-   */
   const lookStatusBanner = useMemo(() => {
-    if (importedGradeLabel) {
+    if (batchLookSource === "importedJson") {
       return {
         Icon: File,
         iconWeight: "duotone" as const,
         title: t("lookStatusJsonTitle"),
-        body: t("lookStatusJsonBody", { path: importedGradeLabel }),
-        accent: "shadow-[inset_3px_0_0_0_var(--blue-9)]",
-        iconClass: "text-[var(--blue-11)]",
+        body: t("lookStatusJsonBody", { path: importedGradeLabel ?? "" }),
+        iconClass: "text-[var(--fl-text-secondary)]",
       };
     }
-    if (editToExportSyncedAtMs != null) {
-      const time = new Date(editToExportSyncedAtMs).toLocaleTimeString(
-        locale === "ja" ? "ja-JP" : locale,
-        {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        },
-      );
+    if (batchLookSource === "editSync") {
+      const time =
+        editToExportSyncedAtMs != null
+          ? new Date(editToExportSyncedAtMs).toLocaleTimeString(
+              locale === "ja" ? "ja-JP" : locale,
+              {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              },
+            )
+          : "";
       return {
         Icon: CheckCircle,
         iconWeight: "fill" as const,
         title: t("lookStatusEditTitle"),
-        body: t("lookStatusEditBody", { time }),
-        accent: "shadow-[inset_3px_0_0_0_rgb(52_211_153)]",
-        iconClass: "text-[rgb(52_211_153)]",
+        body: editToExportSyncedAtMs != null ? t("lookStatusEditBody", { time }) : "",
+        iconClass: "text-[var(--fl-text-secondary)]",
       };
     }
     return {
@@ -599,10 +498,10 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
       iconWeight: "duotone" as const,
       title: t("lookStatusPresetTitle", { preset: batchPresetChoice }),
       body: t("lookStatusPresetBody"),
-      accent: "shadow-[inset_3px_0_0_0_var(--amber-9)]",
-      iconClass: "text-[var(--fl-text-secondary)]",
+      iconClass: "text-[var(--fl-text-tertiary)]",
     };
   }, [
+    batchLookSource,
     importedGradeLabel,
     editToExportSyncedAtMs,
     batchPresetChoice,
@@ -610,27 +509,16 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     t,
   ]);
 
-  const proxyCacheSummary = useMemo(() => {
-    if (proxyCacheInfo == null) {
-      return t("proxyCacheSummaryLoading");
-    }
-    return t("proxyCacheSummary", {
-      entries: String(proxyCacheInfo.entryCount),
-      totalSize: formatProxyCacheBytes(locale, proxyCacheInfo.totalBytes),
-    });
-  }, [locale, proxyCacheInfo, t]);
-
   /**
-   * @description 編集プレビューと書き出し入力の関係を短く示す（life#83）。
-   * @description フォルダ／動画パスがすでにプレビューと一致しているときはバナー自体を出さない（重複説明でユーザーが迷うため）。
+   * @description 編集プレビューと書き出し入力の関係（life#83、Advanced disclosure 内に降格）
    */
-  const previewExportBridge = useMemo(() => {
+  const previewExportBridge = useMemo((): PreviewBridgeLines | null => {
     const s = desktopInteractivePreview;
     if (!s) return null;
 
     if (s.kind === "sample") {
       return {
-        tone: "neutral" as const,
+        tone: "neutral",
         previewLine: t("previewBridgeSamplePreviewLine"),
         exportLine: t("previewBridgeSampleExportLine"),
       };
@@ -638,7 +526,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
 
     if (s.smartLookDerived) {
       return {
-        tone: "caution" as const,
+        tone: "caution",
         previewLine: t("previewBridgeSmartLookPreviewLine"),
         exportLine: t("previewBridgeSmartLookExportLine"),
       };
@@ -646,7 +534,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
 
     if (!s.absolutePath) {
       return {
-        tone: "caution" as const,
+        tone: "caution",
         previewLine: t("previewBridgeUnknownPathPreviewLine", { name: s.fileName }),
         exportLine: t("previewBridgeUnknownPathExportLine"),
       };
@@ -655,23 +543,21 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     if (isImagesMode) {
       if (isVideoFileName(s.fileName)) {
         return {
-          tone: "caution" as const,
+          tone: "caution",
           previewLine: t("previewBridgeVideoPreviewInPhotoTabLine"),
           exportLine: t("previewBridgeVideoPreviewInPhotoTabExportLine"),
         };
       }
       if (!inputDir) {
         return {
-          tone: "caution" as const,
+          tone: "caution",
           previewLine: t("previewBridgeRasterPreviewLine", { name: s.fileName }),
           exportLine: t("previewBridgePhotoNoFolderLine"),
         };
       }
-      if (isFileUnderInputDir(s.absolutePath, inputDir)) {
-        return null;
-      }
+      if (isFileUnderInputDir(s.absolutePath, inputDir)) return null;
       return {
-        tone: "caution" as const,
+        tone: "caution",
         previewLine: t("previewBridgePhotoMismatchPreviewLine", { name: s.fileName }),
         exportLine: t("previewBridgePhotoMismatchExportLine", {
           folder: lastPathSegment(inputDir),
@@ -681,39 +567,27 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
 
     if (isRasterFileName(s.fileName) && !isVideoFileName(s.fileName)) {
       return {
-        tone: "caution" as const,
+        tone: "caution",
         previewLine: t("previewBridgeRasterInVideoTabPreviewLine"),
         exportLine: t("previewBridgeRasterInVideoTabExportLine"),
       };
     }
     if (!videoInputPath) {
       return {
-        tone: "caution" as const,
+        tone: "caution",
         previewLine: t("previewBridgeVideoNamedPreviewLine", { name: s.fileName }),
         exportLine: t("previewBridgeVideoNoFileLine"),
       };
     }
-    if (pathsEqualNormalized(s.absolutePath, videoInputPath)) {
-      return null;
-    }
+    if (pathsEqualNormalized(s.absolutePath, videoInputPath)) return null;
     return {
-      tone: "caution" as const,
+      tone: "caution",
       previewLine: t("previewBridgeVideoMismatchPreviewLine", { name: s.fileName }),
       exportLine: t("previewBridgeVideoMismatchExportLine", {
         file: lastPathSegment(videoInputPath),
       }),
     };
-  }, [
-    desktopInteractivePreview,
-    inputDir,
-    isImagesMode,
-    t,
-    videoInputPath,
-  ]);
-
-  /** @description ルックの「JSON / ファイル」詳細（デフォルト閉じる） */
-  // v0.5.0: Grade JSON UI hidden — state preserved for future restoration
-  // const [lookAdvancedOpen, setLookAdvancedOpen] = useState(false);
+  }, [desktopInteractivePreview, inputDir, isImagesMode, t, videoInputPath]);
 
   /* ── Accordion state ── */
 
@@ -722,17 +596,13 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     inputDir,
     videoInputPath,
   );
-  const { sourceOk, outputOk } = getSourceOutputStatus(
+  const { outputOk } = getSourceOutputStatus(
     effectiveMode,
     inputDir,
     outputDir,
     videoInputPath,
   );
 
-  /**
-   * @description 各アコーディオンセクションの開閉状態。
-   * 同期済み or 設定済みのセクションは初期状態で折りたたむ。
-   */
   const [openSections, setOpenSections] = useState<
     Record<AccordionStepId, boolean>
   >(() =>
@@ -740,15 +610,11 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
       exportSurface ?? batchJobMode,
       inputDir,
       videoInputPath,
-      editToExportSyncedAtMs,
-      importedGradeLabel,
+      batchLookSource,
       desktopInteractivePreview,
     ),
   );
 
-  /**
-   * @description 注意が必要な状態に「今なった」ときだけ読み込み元を開く。ずっと true のあいだはユーザーが閉じたままにできる（life#83）。
-   */
   const prevNeedsSourcesAttentionRef = useRef(false);
   useEffect(() => {
     const next =
@@ -764,16 +630,8 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
       setOpenSections((s) => ({ ...s, sources: true }));
     }
     prevNeedsSourcesAttentionRef.current = next;
-  }, [
-    desktopInteractivePreview,
-    effectiveMode,
-    inputDir,
-    videoInputPath,
-  ]);
+  }, [desktopInteractivePreview, effectiveMode, inputDir, videoInputPath]);
 
-  /**
-   * @description 写真と動画は別の仕事なので、切替時に開閉状態も job ごとに戻す
-   */
   const handleBatchJobModeChange = (nextMode: BatchJobMode) => {
     if (exportSurface) return;
     if (nextMode === batchJobMode) return;
@@ -782,12 +640,10 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         nextMode,
         inputDir,
         videoInputPath,
-        editToExportSyncedAtMs,
-        importedGradeLabel,
+        batchLookSource,
         desktopInteractivePreview,
       ),
     );
-    setLookAdvancedOpen(false);
     onBatchJobModeChange(nextMode);
   };
 
@@ -795,25 +651,11 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     setOpenSections((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  /**
-   * @description セクションが編集タブから同期済みかどうか
-   */
-  const isSectionSynced = (id: AccordionStepId): boolean => {
-    switch (id) {
-      case "look":
-        return editToExportSyncedAtMs != null || importedGradeLabel != null;
-      default:
-        return false;
-    }
-  };
+  const isSectionSynced = (id: AccordionStepId): boolean =>
+    id === "look" && batchLookSource !== "preset";
 
-  /**
-   * @description セクションが設定完了しているかどうか（ヘッダーにチェック表示）
-   */
   const isSectionComplete = (id: AccordionStepId): boolean => {
     switch (id) {
-      case "jobType":
-        return true;
       case "sources":
         return sourcesComplete;
       case "look":
@@ -823,15 +665,8 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     }
   };
 
-  /**
-   * @description 折りたたみヘッダーに表示するサマリテキスト
-   */
   const getSectionSummary = (id: AccordionStepId): string | null => {
     switch (id) {
-      case "jobType":
-        return isImagesMode
-          ? t("jobImagesTitle")
-          : t("jobVideoTitle");
       case "sources":
         if (isImagesMode) {
           return inputDir ? lastPathSegment(inputDir) : null;
@@ -849,16 +684,10 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     }
   };
 
-  /**
-   * @description Export ボタン付近に表示するバリデーションメッセージ
-   */
   const missingItems: { label: string; section: AccordionStepId }[] = [];
   if (!sourcesComplete) {
     missingItems.push({
-      label:
-        isImagesMode
-          ? t("pickImageFolderTitle")
-          : t("pickVideoFileTitle"),
+      label: isImagesMode ? t("pickImageFolderTitle") : t("pickVideoFileTitle"),
       section: "sources",
     });
   }
@@ -866,147 +695,62 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     missingItems.push({ label: t("outputImageTitle"), section: "output" });
   }
 
-  /* ── Step renderers (unchanged) ── */
+  /* ── Section renderers ── */
 
-  const renderStepJobType = () => (
-    <div className="flex flex-col gap-3" role="group" aria-labelledby="batch-step-job-type-title">
-      <p id="batch-step-job-type-title" className="sr-only">
-        {t("jobTypeQuestion")}
-      </p>
-      {compact ? (
-        <div className="flex rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] p-0.5" role="radiogroup" aria-label={t("jobTypeQuestion")}>
-          <button
-            type="button"
-            role="radio"
-            aria-checked={isImagesMode}
-            className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-              isImagesMode
-                ? "bg-[var(--amber-9)] text-[var(--amber-1)] shadow-sm"
-                : "text-[var(--fl-text-secondary)] hover:text-[var(--fl-text-primary)]"
-            }`}
-            onClick={() => handleBatchJobModeChange("images")}
-          >
-            {t("jobImagesTitle")}
-          </button>
-          <button
-            type="button"
-            role="radio"
-            aria-checked={batchJobMode === "video"}
-            className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-              batchJobMode === "video"
-                ? "bg-[var(--amber-9)] text-[var(--amber-1)] shadow-sm"
-                : "text-[var(--fl-text-secondary)] hover:text-[var(--fl-text-primary)]"
-            }`}
-            onClick={() => handleBatchJobModeChange("video")}
-          >
-            {t("jobVideoTitle")}
-          </button>
-        </div>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <button
-            type="button"
-            className={`flex cursor-pointer flex-col rounded-xl border-2 p-3 text-left transition-all ${
-              isImagesMode
-                ? "border-[var(--amber-9)] bg-[var(--fl-bg-subtle)] shadow-[inset_3px_0_0_0_var(--amber-9)]"
-                : "border-[var(--fl-border-subtle)] border-dashed bg-[var(--fl-bg-subtle)] opacity-90 hover:border-[var(--fl-border-default)] hover:opacity-100"
-            }`}
-            onClick={() => handleBatchJobModeChange("images")}
-            aria-pressed={isImagesMode}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <span className="text-sm font-semibold text-[var(--fl-text-primary)]">
-                {t("jobImagesTitle")}
-              </span>
-              <HelpHint tip={t("tipJobImages")} assistiveLabel={t("jobImagesHintAria")} />
-            </div>
-            {isImagesMode ? (
-              <span className="mt-2 inline-flex w-fit items-center gap-1 text-[0.65rem] font-medium text-[var(--amber-11)]">
-                <CheckCircle size={14} weight="bold" aria-hidden />
-                {t("selected")}
-              </span>
-            ) : (
-              <span className="fl-caption mt-2 text-[var(--fl-text-tertiary)]">
-                {t("clickToSwitch")}
-              </span>
-            )}
-            <p className="fl-caption mt-1 text-[var(--fl-text-secondary)]">
-              {t("jobImagesSub")}
-            </p>
-          </button>
-          <button
-            type="button"
-            className={`flex cursor-pointer flex-col rounded-xl border-2 p-3 text-left transition-all ${
-              !isImagesMode
-                ? "border-[var(--amber-9)] bg-[var(--fl-bg-subtle)] shadow-[inset_3px_0_0_0_var(--amber-9)]"
-                : "border-[var(--fl-border-subtle)] border-dashed bg-[var(--fl-bg-subtle)] opacity-90 hover:border-[var(--fl-border-default)] hover:opacity-100"
-            }`}
-            onClick={() => handleBatchJobModeChange("video")}
-            aria-pressed={!isImagesMode}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <span className="text-sm font-semibold text-[var(--fl-text-primary)]">
-                {t("jobVideoTitle")}
-              </span>
-              <HelpHint
-                tip={t("tipJobVideoWebGlOnly")}
-                assistiveLabel={t("jobVideoHintAria")}
-              />
-            </div>
-            {!isImagesMode ? (
-              <span className="mt-2 inline-flex w-fit items-center gap-1 text-[0.65rem] font-medium text-[var(--amber-11)]">
-                <CheckCircle size={14} weight="bold" aria-hidden />
-                {t("selected")}
-              </span>
-            ) : (
-              <span className="fl-caption mt-2 text-[var(--fl-text-tertiary)]">
-                {t("clickToSwitch")}
-              </span>
-            )}
-            <p className="fl-caption mt-1 text-[var(--fl-text-secondary)]">
-              {t("jobVideoSubWebGlOnly")}
-            </p>
-          </button>
-        </div>
-      )}
+  const renderJobModeToggle = (): ReactElement => (
+    <div
+      className="fl-segment"
+      role="radiogroup"
+      aria-label={t("jobTypeQuestion")}
+    >
+      <button
+        type="button"
+        role="radio"
+        aria-checked={isImagesMode}
+        className={`fl-segment-option ${isImagesMode ? "fl-segment-option--active" : ""}`}
+        onClick={() => handleBatchJobModeChange("images")}
+      >
+        {t("jobImagesTitle")}
+      </button>
+      <button
+        type="button"
+        role="radio"
+        aria-checked={!isImagesMode}
+        className={`fl-segment-option ${!isImagesMode ? "fl-segment-option--active" : ""}`}
+        onClick={() => handleBatchJobModeChange("video")}
+      >
+        {t("jobVideoTitle")}
+      </button>
     </div>
   );
 
-  const renderStepSources = () => (
+  const renderSourcesSection = (): ReactElement => (
     <div className="flex flex-col gap-3">
       {isImagesMode ? (
         <>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <p className="text-sm font-medium text-[var(--fl-text-primary)]">
-              {t("pickImageFolderTitle")}
-            </p>
-            <HelpHint
-              tip={t("tipSourcesImagesFolder")}
-              assistiveLabel={t("pickImageFolderHintAria")}
-            />
-          </div>
+          <p className="fl-field-label">{t("pickImageFolderTitle")}</p>
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" className="fl-btn-secondary" onClick={() => void onPickInputDir()}>
+            <button
+              type="button"
+              className="fl-btn-secondary"
+              onClick={() => void onPickInputDir()}
+            >
               {t("pickInputFolderBtn")}
             </button>
-            <span className="fl-caption min-w-0 flex-1 truncate" title={inputDir ?? undefined}>
+            <span
+              className="fl-caption min-w-0 flex-1 truncate"
+              title={inputDir ?? undefined}
+            >
               {inputDir ?? t("notSelected")}
             </span>
           </div>
         </>
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <p className="text-sm font-medium text-[var(--fl-text-primary)]">
-              {t("pickVideoFileTitle")}
-            </p>
-            <HelpHint
-              tip={t("tipSourcesVideoFile", {
-                maxSec: String(VIDEO_IMPORT_MAX_DURATION_SEC),
-              })}
-              assistiveLabel={t("pickVideoFileHintAria")}
-            />
-          </div>
+          <p className="fl-field-label">{t("pickVideoFileTitle")}</p>
+          <p className="fl-caption text-[var(--fl-text-tertiary)]">
+            {t("videoSourceHint", { maxSec: String(VIDEO_IMPORT_MAX_DURATION_SEC) })}
+          </p>
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -1016,150 +760,130 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
             >
               {t("pickVideoBtn")}
             </button>
-            <span className="fl-caption min-w-0 flex-1 truncate" title={videoInputPath ?? undefined}>
+            <span
+              className="fl-caption min-w-0 flex-1 truncate"
+              title={videoInputPath ?? undefined}
+            >
               {videoInputPath ?? t("notSelected")}
             </span>
           </div>
           {videoProbeLabel ? (
-            <p className="fl-caption max-w-prose text-[var(--fl-text-secondary)]">{videoProbeLabel}</p>
+            <p className="fl-caption max-w-prose text-[var(--fl-text-secondary)]">
+              {videoProbeLabel}
+            </p>
           ) : null}
         </>
       )}
     </div>
   );
 
-  const renderStepLook = () => {
+  const renderLookSection = (): ReactElement => {
     const LookStatusIcon = lookStatusBanner.Icon;
     return (
-    <div className="flex flex-col gap-3">
-      {/* v0.5.0: section lead + intro text removed — self-explanatory with Look card */}
-
-      <div
-        className={`flex gap-2.5 rounded-lg border border-[rgba(255,255,255,0.06)] bg-transparent px-3 py-2.5 ${lookStatusBanner.accent}`}
-        role="status"
-        aria-live="polite"
-        aria-label={lookStatusBanner.title}
-      >
-        <LookStatusIcon
-          size={16}
-          weight={lookStatusBanner.iconWeight}
-          className={`mt-0.5 shrink-0 ${lookStatusBanner.iconClass}`}
-          aria-hidden
-        />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-[var(--fl-text-primary)]">
-            {lookStatusBanner.title}
-          </p>
-          {lookStatusBanner.body.trim().length > 0 ? (
-            <p className="fl-caption mt-0.5 max-w-prose text-[var(--fl-text-secondary)]">
-              {lookStatusBanner.body}
+      <div className="flex flex-col gap-3">
+        <div className="flex gap-2.5" role="status" aria-live="polite">
+          <LookStatusIcon
+            size={16}
+            weight={lookStatusBanner.iconWeight}
+            className={`mt-0.5 shrink-0 ${lookStatusBanner.iconClass}`}
+            aria-hidden
+          />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-[var(--fl-text-primary)]">
+              {lookStatusBanner.title}
             </p>
-          ) : null}
+            {lookStatusBanner.body.trim().length > 0 ? (
+              <p className="fl-caption mt-0.5 max-w-prose text-[var(--fl-text-secondary)]">
+                {lookStatusBanner.body}
+              </p>
+            ) : null}
+          </div>
         </div>
-      </div>
 
-      <div className="flex flex-col gap-2 border-t border-white/[0.06] pt-3">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-col gap-2 border-t border-white/10 pt-3">
           <button
             type="button"
-            className={
-              running || !canApplyEditGradeToBatch
-                ? "fl-btn-secondary max-w-full sm:max-w-none"
-                : "fl-btn-primary max-w-full sm:max-w-none"
-            }
+            className="fl-btn-secondary self-start"
             disabled={running || !canApplyEditGradeToBatch}
-            title={
-              canApplyEditGradeToBatch ? undefined : t("applyEditWaitHint")
-            }
+            title={canApplyEditGradeToBatch ? undefined : t("applyEditWaitHint")}
             onClick={onApplyEditGradeToBatch}
           >
             {t("applyEditToExportBtn")}
           </button>
-          <HelpHint
-            tip={t("tipApplyEditGradeToBatch")}
-            assistiveLabel={t("applyEditHintAria")}
-          />
-        </div>
-      </div>
-
-      {importedGradeLabel == null &&
-      editToExportSyncedAtMs != null ? (
-        <div className="flex max-w-md flex-col gap-2 border-t border-white/[0.06] pt-3">
-          <span className="fl-label">{t("presetQuickLabel")}</span>
-          <p className="fl-caption max-w-prose text-[var(--fl-text-secondary)]">
-            {t("lookPresetHiddenWhileSyncedBody", {
-              preset: batchPresetChoice,
-            })}
-          </p>
           <button
             type="button"
             className="fl-btn-secondary self-start"
             disabled={running}
-            onClick={onReapplyBatchPresetBaseline}
+            onClick={() => void onImportGradeJson()}
           >
-            {t("lookRevertToPresetOnlyBtn")}
+            {t("loadMetadataJsonBtn")}
           </button>
         </div>
-      ) : (
-        <label className="flex max-w-md flex-col gap-1.5">
-          <span className="fl-label">{t("presetQuickLabel")}</span>
-          <select
-            data-testid="export-preset-select"
-            value={batchPresetChoice}
-            onChange={(e) =>
-              onBatchPresetChoiceChange(e.target.value as PresetName)
-            }
-            className="w-full max-w-md"
-            aria-label={t("presetSelectAria")}
-          >
-            {PRESET_NAMES.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
 
-      {/* v0.5.0: Grade JSON import/export hidden — feature not yet available */}
-    </div>
+        {batchLookSource === "editSync" ? (
+          <div className="flex max-w-md flex-col gap-2 border-t border-white/10 pt-3">
+            <span className="fl-label">{t("presetQuickLabel")}</span>
+            <p className="fl-caption max-w-prose text-[var(--fl-text-secondary)]">
+              {t("lookPresetHiddenWhileSyncedBody", {
+                preset: batchPresetChoice,
+              })}
+            </p>
+            <button
+              type="button"
+              className="fl-btn-secondary self-start"
+              disabled={running}
+              onClick={onReapplyBatchPresetBaseline}
+            >
+              {t("lookRevertToPresetOnlyBtn")}
+            </button>
+          </div>
+        ) : (
+          <label className="flex max-w-md flex-col gap-1.5 border-t border-white/10 pt-3">
+            <span className="fl-label">{t("presetQuickLabel")}</span>
+            <select
+              data-testid="export-preset-select"
+              value={batchPresetChoice}
+              onChange={(e) =>
+                onBatchPresetChoiceChange(e.target.value as PresetName)
+              }
+              className="w-full max-w-md"
+              aria-label={t("presetSelectAria")}
+            >
+              {PRESET_NAMES.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
     );
   };
 
-  const renderStepOutput = () => (
+  const renderOutputSection = (): ReactElement => (
     <div className="flex flex-col gap-3">
       {isImagesMode ? (
         <>
-          <p className="text-sm font-medium text-[var(--fl-text-primary)]">
-            {t("outputImageTitle")}
-          </p>
+          <p className="fl-field-label">{t("outputImageTitle")}</p>
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" className="fl-btn-secondary" onClick={() => void onPickOutputDir()}>
+            <button
+              type="button"
+              className="fl-btn-secondary"
+              onClick={() => void onPickOutputDir()}
+            >
               {t("pickOutputFolderBtn")}
             </button>
-            <span className="fl-caption min-w-0 flex-1 truncate" title={outputDir ?? undefined}>
+            <span
+              className="fl-caption min-w-0 flex-1 truncate"
+              title={outputDir ?? undefined}
+            >
               {outputDir ?? t("notSelected")}
             </span>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <label htmlFor="batch-format-sel-panel" className="fl-label normal-case">
-              {t("outputFormatLabel")}
-            </label>
-            <select
-              id="batch-format-sel-panel"
-              className="min-w-[6.5rem]"
-              value={batchFormat}
-              onChange={(e) => onBatchFormatChange(e.target.value as BatchFormat)}
-              aria-label={t("formatSelectAria")}
-            >
-              <option value="jpeg">JPEG</option>
-              <option value="png">PNG</option>
-            </select>
-          </div>
           <label className="flex max-w-md flex-col gap-1.5">
-            <span className="fl-label normal-case flex items-center gap-1">
+            <span className="fl-label normal-case">
               {t("filenameSuffixLabel")}
-              <HelpHint tip={t("tipFilenameSuffix")} assistiveLabel={t("filenameSuffixAria")} />
             </span>
             <input
               type="text"
@@ -1168,48 +892,53 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
               onChange={(e) => onBatchOutputSuffixChange(e.target.value)}
               autoComplete="off"
               spellCheck={false}
+              placeholder={t("filenameSuffixPlaceholder")}
             />
           </label>
         </>
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <p className="text-sm font-medium text-[var(--fl-text-primary)]">
-              {t("videoOutputFolderTitle")}
-            </p>
-            <HelpHint
-              tip={t("tipVideoOutputNaming", { fps: String(VIDEO_EXPORT_FPS) })}
-              assistiveLabel={t("videoOutputNamingAria")}
-            />
-          </div>
+          <p className="fl-field-label">{t("videoOutputFolderTitle")}</p>
+          <p className="fl-caption text-[var(--fl-text-tertiary)]">
+            {t("videoOutputHint", { fps: String(VIDEO_EXPORT_FPS) })}
+          </p>
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" className="fl-btn-secondary" onClick={() => void onPickOutputDir()}>
+            <button
+              type="button"
+              className="fl-btn-secondary"
+              onClick={() => void onPickOutputDir()}
+            >
               {t("pickOutputFolderBtn")}
             </button>
-            <span className="fl-caption min-w-0 flex-1 truncate" title={outputDir ?? undefined}>
+            <span
+              className="fl-caption min-w-0 flex-1 truncate"
+              title={outputDir ?? undefined}
+            >
               {outputDir ?? t("videoOutputDirUnset")}
             </span>
           </div>
-          {/* v0.5.0: videoWebglOnlyFootnote removed — unnecessary explanation */}
         </>
       )}
     </div>
   );
 
-  const renderStepRun = () => (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-1.5">
-        <p className="text-sm font-medium text-[var(--fl-text-primary)]">
-          {stepLabels.run}
-        </p>
-        <HelpHint
-          tip={t("tipKeyboardShortcuts", {
-            imagesLabel:
-              isImagesMode ? t("runImagesPrimary") : t("runVideoExport"),
-          })}
-          assistiveLabel={t("runKeyboardHintsAria")}
-        />
-      </div>
+  const accordionRenderers: Record<AccordionStepId, () => ReactElement> = {
+    sources: renderSourcesSection,
+    look: renderLookSection,
+    output: renderOutputSection,
+  };
+
+  /* ── Footer (run) ── */
+
+  const renderFooter = (): ReactElement => (
+    <section
+      className="fl-card fl-card--frost gap-3"
+      aria-labelledby="export-run-heading"
+    >
+      <h3 id="export-run-heading" className="sr-only">
+        {stepLabels.run}
+      </h3>
+
       {isImagesMode ? (
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -1218,7 +947,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
             disabled={!batchCanRun}
             onClick={() => void onRunBatch()}
           >
-            {t("runImagesPrimary")}
+            {running ? t("runAbort") : t("runImagesPrimary")}
           </button>
           <button
             type="button"
@@ -1279,13 +1008,16 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
               style={{
                 width: `${Math.min(
                   100,
-                  Math.round((batchProgress.current / batchProgress.total) * 100),
+                  Math.round(
+                    (batchProgress.current / batchProgress.total) * 100,
+                  ),
                 )}%`,
               }}
             />
           </div>
           <p className="fl-caption">
-            {batchProgress.current} / {batchProgress.total} · {batchProgress.fileName}
+            {batchProgress.current} / {batchProgress.total} ·{" "}
+            {batchProgress.fileName}
           </p>
         </div>
       ) : null}
@@ -1299,244 +1031,112 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
           })}
         </p>
       ) : null}
-    </div>
+
+      {missingItems.length > 0 && !running ? (
+        <div className="flex flex-col gap-1.5">
+          {missingItems.map((item) => (
+            <button
+              key={item.section}
+              type="button"
+              className="flex items-center gap-1.5 text-left text-xs text-[var(--amber-11)] hover:underline"
+              onClick={() => {
+                setOpenSections((prev) => ({ ...prev, [item.section]: true }));
+                requestAnimationFrame(() => {
+                  document
+                    .getElementById(`export-step-${item.section}`)
+                    ?.scrollIntoView({ behavior: "smooth", block: "center" });
+                });
+              }}
+            >
+              <WarningCircle size={14} weight="bold" aria-hidden />
+              {item.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </section>
   );
-
-  /* ── Accordion renderers map ── */
-
-  const accordionRenderers: Record<AccordionStepId, () => ReactElement> = {
-    jobType: renderStepJobType,
-    sources: renderStepSources,
-    look: renderStepLook,
-    output: renderStepOutput,
-  };
-  const activeAccordionSteps: AccordionStepId[] = ["sources", "look", "output"];
 
   /* ── JSX ── */
 
   return (
     <>
-      {/* Intro — フル幅レイアウトのみ。トップタブ分割時は写真／動画それぞれの短い説明に切り替える */}
-      {!compact && !exportSurface ? (
-        <section
-          className="fl-card fl-card-muted fl-card--frost gap-2 border-[var(--fl-border-default)]"
-          aria-labelledby="export-tab-intro-heading"
-        >
-          <div className="flex items-start gap-2">
-            <h2
-              id="export-tab-intro-heading"
-              className="text-sm font-semibold text-[var(--fl-text-primary)]"
-            >
-              {t("exportTitle")}
-            </h2>
-            <HelpHint tip={t("tipExportTabIntro")} assistiveLabel={t("exportTitleHintAria")} />
-          </div>
-          <p className="fl-caption text-[var(--fl-text-secondary)]">{jobModeSummary.lead}</p>
-        </section>
-      ) : null}
-      {exportSurface === "images" ? (
-        <section
-          className={
-            compact
-              ? "mb-4 border-b border-[var(--fl-border-subtle)] pb-4"
-              : "fl-card fl-card-muted fl-card--frost gap-2 border-[var(--fl-border-default)]"
-          }
-          aria-labelledby="export-photo-intro-heading"
-        >
-          <div className="flex items-start gap-2">
-            <h2
-              id="export-photo-intro-heading"
-              className="text-sm font-semibold text-[var(--fl-text-primary)]"
-            >
-              {t("photoExportPanelTitle")}
-            </h2>
-            <HelpHint
-              tip={t("tipPhotoExportPanelIntro")}
-              assistiveLabel={t("photoExportPanelTitleHintAria")}
-            />
-          </div>
-          <p className="fl-caption text-[var(--fl-text-secondary)]">{t("exportLeadImages")}</p>
-        </section>
-      ) : null}
-      {exportSurface === "video" ? (
-        <section
-          className={
-            compact
-              ? "mb-4 border-b border-[var(--fl-border-subtle)] pb-4"
-              : "fl-card fl-card-muted fl-card--frost gap-2 border-[var(--fl-border-default)]"
-          }
-          aria-labelledby="export-video-intro-heading"
-        >
-          <div className="flex items-start gap-2">
-            <h2
-              id="export-video-intro-heading"
-              className="text-sm font-semibold text-[var(--fl-text-primary)]"
-            >
-              {t("videoExportPanelTitle")}
-            </h2>
-            <HelpHint
-              tip={t("tipVideoExportPanelIntro")}
-              assistiveLabel={t("videoExportPanelTitleHintAria")}
-            />
-          </div>
-          <p className="fl-caption text-[var(--fl-text-secondary)]">{t("exportLeadVideo")}</p>
-        </section>
+      {/* 画面タイトル — compact 時は省略（右パネル内で扱うため） */}
+      {!compact ? (
+        <header className="flex flex-col gap-1">
+          <h2
+            id="export-tab-intro-heading"
+            className="text-lg font-semibold text-[var(--fl-text-primary)]"
+          >
+            {exportSurface === "images"
+              ? t("photoExportPanelTitle")
+              : exportSurface === "video"
+                ? t("videoExportPanelTitle")
+                : t("exportTitle")}
+          </h2>
+          <p className="fl-caption text-[var(--fl-text-secondary)]">
+            {isImagesMode ? t("exportLeadImages") : t("exportLeadVideo")}
+          </p>
+        </header>
       ) : null}
 
-      {/* ジョブ種別 — 単一「書き出し」タブのときだけ表示（トップで写真／動画が分かれているときは省略） */}
+      {/* Preset strip — DaVinci 型、画面最上部の横 1 行 */}
+      <PresetStrip
+        isImagesMode={isImagesMode}
+        batchFormat={batchFormat}
+        batchOutputSuffix={batchOutputSuffix}
+        onBatchFormatChange={onBatchFormatChange}
+        onBatchOutputSuffixChange={onBatchOutputSuffixChange}
+        disabled={running}
+      />
+
+      {/* § 1 ジョブ — 単一「書き出し」タブのときだけ（トップで写真／動画が分かれているときは省略） */}
       {!exportSurface ? (
         <section
-          className={`rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] px-3 py-2.5 ${jobModeSummary.accentClass}`}
+          className="fl-card fl-card--frost gap-2"
           aria-labelledby="export-job-selector-heading"
         >
-          <div className="flex flex-col gap-3">
-            <div>
-              <p id="export-job-selector-heading" className="fl-label">
-                {t("jobTypeQuestion")}
-              </p>
-              <p className="fl-caption mt-1 text-[var(--fl-text-tertiary)]">
-                {t("jobModeNextLabel")} {jobModeSummary.next}
-              </p>
-            </div>
-            {renderStepJobType()}
-          </div>
+          <p id="export-job-selector-heading" className="fl-field-label">
+            {t("jobTypeQuestion")}
+          </p>
+          {renderJobModeToggle()}
         </section>
       ) : null}
 
-      {!compact && isImagesMode && (
-        <div className="self-start rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] px-3 py-2 text-xs leading-relaxed text-[var(--fl-text-secondary)] shadow-[inset_3px_0_0_0_var(--amber-9)]">
-          {t("differentFolderWarning")}
-        </div>
-      )}
-
-      {/* Session resume */}
+      {/* Session resume — inline（前回未完了の写真バッチ復元用、banner ではなく 1 行＋ボタン） */}
       {isImagesMode && persistedSession && sessionHasRemainingWork(persistedSession) ? (
-        <div className="rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] px-3 py-2.5 text-xs leading-relaxed shadow-[inset_3px_0_0_0_var(--blue-9)]">
-          <div className="mb-2 flex flex-wrap items-start gap-1.5">
-            <p className="text-[var(--fl-text-primary)]">
-              {t("resumeLeadImages", {
-                remaining: String(pathsNotSucceeded(persistedSession).length),
-              })}
-            </p>
-            <HelpHint tip={t("tipResumeSession")} assistiveLabel={t("resumeHintAria")} />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" className="fl-btn-primary" disabled={!batchCanResume} onClick={() => void onResumeBatch()}>
-              {t("resumeBtn")}
-            </button>
-            <button type="button" className="fl-btn-secondary" disabled={running} onClick={() => void onDiscardPersistedSession()}>
-              {t("discardSessionBtn")}
-            </button>
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs text-[var(--fl-text-secondary)]">
+            {t("resumeLeadImages", {
+              remaining: String(pathsNotSucceeded(persistedSession).length),
+            })}
+          </p>
+          <button
+            type="button"
+            className="fl-btn-primary"
+            disabled={!batchCanResume}
+            onClick={() => void onResumeBatch()}
+          >
+            {t("resumeBtn")}
+          </button>
+          <button
+            type="button"
+            className="fl-btn-secondary"
+            disabled={running}
+            onClick={() => void onDiscardPersistedSession()}
+          >
+            {t("discardSessionBtn")}
+          </button>
         </div>
       ) : null}
 
-      <div className="rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] px-3 py-2.5 text-xs leading-relaxed shadow-[inset_3px_0_0_0_var(--amber-9)]">
-        <div className="mb-2 flex flex-wrap items-start gap-1.5">
-          <p className="text-[var(--fl-text-primary)]">{t("proxyCacheTitle")}</p>
-          <HelpHint
-            tip={t("tipProxyCache")}
-            assistiveLabel={t("proxyCacheHintAria")}
-          />
-        </div>
-        <p className="mb-2 text-[var(--fl-text-secondary)]">{proxyCacheSummary}</p>
-        <button
-          type="button"
-          className="fl-btn-secondary"
-          disabled={running || isPurgingProxyCache}
-          onClick={() => void onPurgeProxyCache()}
-        >
-          {isPurgingProxyCache ? t("proxyCachePurgingBtn") : t("proxyCacheClearBtn")}
-        </button>
-      </div>
-
-      {/* Status chips — 下のプレビュー橋・アコーディオンと詰まらないよう余白を確保 */}
+      {/* Accordion — sources / look / output の 3 セクション */}
       <div
-        className={`flex flex-wrap ${
-          compact
-            ? "mt-1 gap-1.5 py-2 text-[0.6rem] mb-3"
-            : "gap-2 py-2 text-[0.65rem] mb-4"
+        className={`flex flex-col divide-y divide-white/10 ${
+          compact ? "mt-1 gap-0" : "fl-card fl-card--frost gap-0 p-0"
         }`}
       >
-        <span
-          className={`rounded-full border px-2 py-0.5 ${
-            sourceOk
-              ? "border-[var(--fl-border-default)] bg-[var(--fl-bg-interactive)] text-[var(--fl-text-primary)]"
-              : "border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] text-[var(--fl-text-tertiary)]"
-          }`}
-        >
-          {t("chipInput")}: {sourceOk ? t("chipInputOk") : t("chipInputPending")}
-        </span>
-        <span className="rounded-full border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] px-2 py-0.5 text-[var(--fl-text-tertiary)]">
-          {t("chipLook")}: {t("chipLookReady")}
-        </span>
-        <span
-          className={`rounded-full border px-2 py-0.5 ${
-            outputOk || !isImagesMode
-              ? outputOk
-                ? "border-[var(--fl-border-default)] bg-[var(--fl-bg-interactive)] text-[var(--fl-text-primary)]"
-                : "border-[var(--fl-border-default)] bg-[var(--fl-bg-interactive)] text-[var(--fl-text-secondary)]"
-              : "border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] text-[var(--fl-text-tertiary)]"
-          }`}
-        >
-          {t("chipOutput")}:{" "}
-          {!isImagesMode
-            ? outputOk
-              ? t("chipOutputOk")
-              : t("chipOutputOptional")
-            : outputOk
-              ? t("chipOutputOk")
-              : t("chipOutputPending")}
-        </span>
-      </div>
-
-      {previewExportBridge ? (
-        <section
-          className={`mb-5 rounded-xl border border-[var(--fl-border-subtle)] px-3.5 py-3.5 ${
-            previewExportBridge.tone === "ok"
-              ? "bg-[var(--fl-bg-subtle)] shadow-[inset_3px_0_0_0_rgb(52_211_153)]"
-              : previewExportBridge.tone === "caution"
-                ? "bg-[var(--fl-bg-subtle)] shadow-[inset_3px_0_0_0_var(--amber-9)]"
-                : "bg-[var(--fl-bg-subtle)] shadow-[inset_3px_0_0_0_var(--fl-border-default)]"
-          }`}
-          aria-labelledby="film-lab-preview-export-bridge-heading"
-        >
-          <div className="flex gap-3">
-            <Info
-              className={`mt-0.5 shrink-0 ${
-                previewExportBridge.tone === "ok"
-                  ? "text-[rgb(52_211_153)]"
-                  : previewExportBridge.tone === "caution"
-                    ? "text-[var(--amber-11)]"
-                    : "text-[var(--fl-text-tertiary)]"
-              }`}
-              size={18}
-              weight="bold"
-              aria-hidden
-            />
-            <div className="min-w-0 flex-1 space-y-2">
-              <p
-                id="film-lab-preview-export-bridge-heading"
-                className="text-xs font-semibold leading-snug text-[var(--fl-text-primary)]"
-              >
-                {t("previewBridgeHeading")}
-              </p>
-              <p className="fl-caption leading-relaxed text-[var(--fl-text-secondary)]">
-                {previewExportBridge.previewLine}
-              </p>
-              <p className="fl-caption leading-relaxed text-[var(--fl-text-secondary)]">
-                {previewExportBridge.exportLine}
-              </p>
-            </div>
-          </div>
-        </section>
-      ) : null}
-
-      {/* Accordion sections — job selector の下には、その仕事に必要な段だけを出す */}
-      <div
-        className={`flex flex-col divide-y divide-[var(--fl-border-subtle)] ${compact ? "mt-1 gap-0" : "fl-card fl-card--frost gap-0 p-0"}`}
-      >
-        {activeAccordionSteps.map((id, idx) => {
+        {ACCORDION_STEPS.map((id, idx) => {
           const isOpen = openSections[id];
           const synced = isSectionSynced(id);
           const complete = isSectionComplete(id);
@@ -1548,14 +1148,8 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
             <div key={id} id={`export-step-${id}`}>
               <button
                 type="button"
-                className={`flex w-full items-center gap-2.5 text-left transition-colors hover:bg-[var(--fl-bg-interactive)] ${
-                  compact
-                    ? "py-3 pl-4 pr-3"
-                    : "px-4 py-3"
-                } ${
-                  needsAttention
-                    ? "shadow-[inset_3px_0_0_0_var(--amber-9)]"
-                    : ""
+                className={`flex w-full items-center gap-2.5 text-left transition-colors hover:bg-white/[0.04] focus-visible:bg-white/[0.06] focus-visible:outline-none ${
+                  compact ? "py-3 pl-4 pr-3" : "px-4 py-3"
                 }`}
                 onClick={() => toggleSection(id)}
                 aria-expanded={isOpen}
@@ -1563,9 +1157,16 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
               >
                 {complete ? (
                   <CheckCircle
-                    className="shrink-0 text-[var(--amber-11)]"
+                    className="shrink-0 text-[var(--fl-text-secondary)]"
                     size={16}
                     weight="fill"
+                    aria-hidden
+                  />
+                ) : needsAttention ? (
+                  <WarningCircle
+                    className="shrink-0 text-[var(--amber-11)]"
+                    size={16}
+                    weight="bold"
                     aria-hidden
                   />
                 ) : (
@@ -1576,14 +1177,11 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
                   />
                 )}
                 <span className="flex min-w-0 flex-1 items-center gap-2.5">
-                  <span className="tabular-nums text-[0.65rem] text-[var(--fl-text-tertiary)]">
-                    {idx + 1}
-                  </span>
                   <span className="text-sm font-medium leading-snug text-[var(--fl-text-primary)]">
                     {stepLabels[id]}
                   </span>
                   {synced ? (
-                    <span className="inline-flex items-center gap-0.5 rounded-full border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-interactive)] px-1.5 py-0.5 text-[0.6rem] font-medium text-[var(--fl-text-secondary)]">
+                    <span className="fl-badge-synced">
                       <CheckCircle size={10} weight="fill" aria-hidden />
                       synced
                     </span>
@@ -1621,55 +1219,22 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         })}
       </div>
 
-      {/* Export / Run — full page では panel 内、compact は App 側 footer へ出す */}
-      {!compact ? (
-        <section
-          className="fl-card fl-card--frost gap-3"
-          aria-labelledby="export-run-heading"
-        >
-          <h3
-            id="export-run-heading"
-            className="sr-only"
-          >
-            {stepLabels.run}
-          </h3>
-          {renderStepRun()}
+      {/* Advanced disclosure — proxy cache / preview-export bridge（既定閉） */}
+      <section
+        className={compact ? "" : "fl-card fl-card--frost gap-2 py-3"}
+        aria-label={t("advancedDisclosureTitle")}
+      >
+        <AdvancedDisclosure
+          previewExportBridge={previewExportBridge}
+          proxyCacheInfo={proxyCacheInfo}
+          isPurgingProxyCache={isPurgingProxyCache}
+          running={running}
+          onPurgeProxyCache={onPurgeProxyCache}
+        />
+      </section>
 
-          {/* Validation messages */}
-          {missingItems.length > 0 && !running ? (
-            <div className="flex flex-col gap-1.5 rounded-lg border border-[var(--fl-border-subtle)] bg-[var(--fl-bg-subtle)] px-3 py-2">
-              {missingItems.map((item) => (
-                <button
-                  key={item.section}
-                  type="button"
-                  className="flex items-center gap-1.5 text-left text-xs text-[var(--amber-11)] hover:underline"
-                  onClick={() => {
-                    setOpenSections((prev) => ({
-                      ...prev,
-                      [item.section]: true,
-                    }));
-                    requestAnimationFrame(() => {
-                      document
-                        .getElementById(`export-step-${item.section}`)
-                        ?.scrollIntoView({ behavior: "smooth", block: "center" });
-                    });
-                  }}
-                >
-                  <WarningCircle size={14} weight="bold" aria-hidden />
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </section>
-      ) : null}
-
-      {!compact && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <p className="fl-caption">{t("prefsFootnote")}</p>
-          <HelpHint tip={t("tipDesktopPrefsPersist")} assistiveLabel={t("prefsFootnoteAria")} />
-        </div>
-      )}
+      {/* Footer (run) — full page 時のみ panel 内。compact は App.tsx の sticky footer へ */}
+      {!compact ? renderFooter() : null}
     </>
   );
 }

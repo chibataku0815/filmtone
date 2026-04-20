@@ -1332,6 +1332,19 @@ ipcMain.handle("pick-output-dir", async () => {
   return chosen;
 });
 
+ipcMain.handle("pick-metadata-json", async () => {
+  const defaultPath =
+    (await resolveExistingDir(desktopSettingsStore.get("lastOutputDir"))) ??
+    (await resolveExistingDir(desktopSettingsStore.get("lastInputDir")));
+  const r = await dialog.showOpenDialog({
+    properties: ["openFile"],
+    filters: [{ name: "JSON", extensions: ["json"] }],
+    defaultPath,
+  });
+  if (r.canceled || r.filePaths.length === 0) return null;
+  return r.filePaths[0]!;
+});
+
 ipcMain.handle("pick-grade-json", async () => {
   const defaultPath =
     (await resolveExistingDir(desktopSettingsStore.get("lastInputDir"))) ??
@@ -1366,6 +1379,19 @@ ipcMain.handle("read-file-buffer", async (_evt, filePath: string) => {
   const buf = await fs.readFile(filePath);
   return new Uint8Array(buf);
 });
+
+ipcMain.handle(
+  "write-file-utf8",
+  async (_evt, payload: { filePath: string; text: string }) => {
+    const { filePath, text } = payload;
+    if (typeof filePath !== "string" || typeof text !== "string") {
+      throw new TypeError("write-file-utf8: filePath / text が不正です");
+    }
+    const target = path.resolve(filePath);
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    await fs.writeFile(target, text, "utf-8");
+  },
+);
 
 ipcMain.handle(
   "read-cube-relative-to-grade",

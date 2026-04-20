@@ -73,6 +73,7 @@ import {
   fullscreenVertexWgsl,
   filmlabFragmentWgsl,
   blitFragmentWgsl,
+  compareSourceFragmentWgsl,
   compositeFragmentWgsl,
   bloomPrefilterFragmentWgsl,
   halationPrefilterFragmentWgsl,
@@ -208,6 +209,7 @@ interface ShaderModules {
   vert: GPUShaderModule;
   filmlab: GPUShaderModule;
   blit: GPUShaderModule;
+  compareSource: GPUShaderModule;
   composite: GPUShaderModule;
   bloomPrefilter: GPUShaderModule;
   halationPrefilter: GPUShaderModule;
@@ -236,6 +238,12 @@ interface Pipelines {
   composite: GPURenderPipeline;
   /** Final swap when motion blur is OFF — rgba16float → rgba8unorm-srgb hw OETF. */
   blit: GPURenderPipeline;
+  /**
+   * Compare present pass: mixes raw `mediaTexture` and graded post-composite
+   * output by `splitPosition`, then draws a divider line. Replaces the blit /
+   * motion-blur present pass when `frameState.compareEnabled` is true.
+   */
+  compareSource: GPURenderPipeline;
   /** Writes current composited frame into ring[newSlot], mixing ring[prevSlot] when trail > 0. */
   motionblurFeedback: GPURenderPipeline;
   /** N-slot weighted average → swap. */
@@ -257,6 +265,7 @@ interface PrefilterGroupLayouts {
   pyramid: GPUBindGroupLayout;
   composite: GPUBindGroupLayout;
   blit: GPUBindGroupLayout;
+  compareSource: GPUBindGroupLayout;
   motionblurFeedback: GPUBindGroupLayout;
   motionblurBlend: GPUBindGroupLayout;
   crossFilterPeakSpacing: GPUBindGroupLayout;
@@ -338,6 +347,9 @@ export class WebGPUBackend implements RenderBackend {
   private readonly halationParamsScratch = new Float32Array(HALATION_PARAMS_BYTES / 4);
   private readonly motionblurFeedbackScratch = new Float32Array(4);
   private readonly motionblurBlendScratch = new Float32Array(MOTIONBLUR_BLEND_UNIFORM_FLOATS);
+  /** Compare present uniform: 2 vec4 = 8 floats = 32 B. */
+  private readonly compareSourceBuffer: GPUBuffer;
+  private readonly compareSourceScratch = new Float32Array(8);
 
   private mediaTexture: GPUTexture | null = null;
   private placeholderTexture: GPUTexture | null = null;
@@ -405,6 +417,7 @@ export class WebGPUBackend implements RenderBackend {
     lut1Texture: GPUTexture,
     lut2Texture: GPUTexture,
     ringBuffer: RingBuffer,
+    compareSourceBuffer: GPUBuffer,
   ) {
     this.ctx = ctx;
     this.capabilities = ctx.capabilities;
@@ -436,6 +449,7 @@ export class WebGPUBackend implements RenderBackend {
     this.lut1Texture = lut1Texture;
     this.lut2Texture = lut2Texture;
     this.ringBuffer = ringBuffer;
+    this.compareSourceBuffer = compareSourceBuffer;
     this._width = Math.max(1, ctx.canvas.width);
     this._height = Math.max(1, ctx.canvas.height);
     this.frameState = {
@@ -446,6 +460,7 @@ export class WebGPUBackend implements RenderBackend {
       fitMode: 0,
       time: 0,
       splitPosition: -1,
+      compareEnabled: false,
       params: {},
       lut1Intensity: 1,
       lut1Enabled: false,
@@ -468,6 +483,7 @@ export class WebGPUBackend implements RenderBackend {
       vert: await make("fullscreen.vert", fullscreenVertexWgsl),
       filmlab: await make("filmlab.frag", filmlabFragmentWgsl),
       blit: await make("blit.frag", blitFragmentWgsl),
+      compareSource: await make("compare-source.frag", compareSourceFragmentWgsl),
       composite: await make("composite.frag", compositeFragmentWgsl),
       bloomPrefilter: await make("bloom-prefilter.frag", bloomPrefilterFragmentWgsl),
       halationPrefilter: await make("halation-prefilter.frag", halationPrefilterFragmentWgsl),
@@ -556,6 +572,19 @@ export class WebGPUBackend implements RenderBackend {
       entries: [
         { binding: 0, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
         { binding: 1, visibility: GPUShaderStage.FRAGMENT, sampler: { type: "filtering" } },
+      ],
+    });
+
+    // Compare present pass — `(uniform, mediaTex, gradedTex, sampler)`.
+    // Binding count cross-checked with WGSL `@binding(0..3)` in
+    // `shaders/compare-source.frag.wgsl.ts` (4 entries, 4 declarations).
+    const compareSourceGroupLayout = device.createBindGroupLayout({
+      label: "compare-source.group1",
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: "uniform" } },
+        { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
+        { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
+        { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: { type: "filtering" } },
       ],
     });
 
@@ -751,6 +780,22 @@ export class WebGPUBackend implements RenderBackend {
         vertex: { module: modules.vert, entryPoint: "vs_main" },
         fragment: {
           module: modules.blit,
+          entryPoint: "fs_main",
+          targets: [{ format: ctx.canvasFormat }],
+        },
+        primitive: { topology: "triangle-list" },
+      }),
+    );
+
+    const compareSourcePipeline = await ctx.withValidationScope(() =>
+      device.createRenderPipeline({
+        label: "compare-source.present",
+        layout: device.createPipelineLayout({
+          bindGroupLayouts: [flagsLayout, compareSourceGroupLayout],
+        }),
+        vertex: { module: modules.vert, entryPoint: "vs_main" },
+        fragment: {
+          module: modules.compareSource,
           entryPoint: "fs_main",
           targets: [{ format: ctx.canvasFormat }],
         },
@@ -1076,6 +1121,13 @@ export class WebGPUBackend implements RenderBackend {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
+    // Compare present uniform: 2 vec4 = 8 floats = 32 B.
+    const compareSourceBuffer = device.createBuffer({
+      label: "compare-source.params",
+      size: 32,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+
     const sampler = device.createSampler({
       label: "filtering",
       addressModeU: "clamp-to-edge",
@@ -1142,6 +1194,7 @@ export class WebGPUBackend implements RenderBackend {
         upsampleAdd: upsampleAddPipeline,
         composite: compositePipeline,
         blit: blitPipeline,
+        compareSource: compareSourcePipeline,
         motionblurFeedback: motionblurFeedbackPipeline,
         motionblurBlend: motionblurBlendPipeline,
         crossFilterPeak: crossFilterPeakPipeline,
@@ -1159,6 +1212,7 @@ export class WebGPUBackend implements RenderBackend {
         pyramid: pyramidGroupLayout,
         composite: compositeGroupLayout,
         blit: blitGroupLayout,
+        compareSource: compareSourceGroupLayout,
         motionblurFeedback: motionblurFeedbackGroupLayout,
         motionblurBlend: motionblurBlendGroupLayout,
         crossFilterPeakSpacing: crossFilterPeakSpacingGroupLayout,
@@ -1218,6 +1272,7 @@ export class WebGPUBackend implements RenderBackend {
       identityLut1,
       identityLut2,
       ringBuffer,
+      compareSourceBuffer,
     );
   }
 
@@ -1260,6 +1315,26 @@ export class WebGPUBackend implements RenderBackend {
 
   getSplitPosition(): number {
     return this.frameState.splitPosition;
+  }
+
+  /**
+   * Compare API. WebGPU backend still only honors the `enabled` flag —
+   * when true, the present pass is replaced by the `compare-source`
+   * pipeline that mixes raw `mediaTexture` and graded output by the
+   * current `splitPosition`. Slot params (`paramsA` / `paramsB`) are
+   * intentionally ignored on WebGPU v1; the WebGL dual-slot
+   * simultaneous A/B render parity stays deferred. The active slot's
+   * params still drive the normal grade pipeline (via `setParams` from
+   * the control panel), so toggling Tab in compare mode updates the
+   * graded side as expected.
+   */
+  setComparePair(
+    enabled: boolean,
+    _paramsA: Record<string, number | string> | null,
+    _paramsB: Record<string, number | string> | null,
+  ): void {
+    this.frameState.compareEnabled = enabled;
+    this.gradeDirty = true;
   }
 
   setLUT1(data: Float32Array, size: number): void {
@@ -2944,7 +3019,73 @@ export class WebGPUBackend implements RenderBackend {
     }
     const postCompositeView = postCompositeTexture.createView();
 
-    if (!motionBlurOn) {
+    // Compare branch: when toggled, replace both the blit and the
+    // motion-blur present passes with a split compare pass
+    // (`left = raw source`, `right = graded output`, divider line).
+    // Motion blur is skipped while compare is on (`compare > motion blur`).
+    if (this.frameState.compareEnabled) {
+      this.compareSourceScratch[0] = this._width;
+      this.compareSourceScratch[1] = this._height;
+      this.compareSourceScratch[2] = this.frameState.imgResX;
+      this.compareSourceScratch[3] = this.frameState.imgResY;
+      this.compareSourceScratch[4] = this.frameState.fitMode;
+      this.compareSourceScratch[5] = this.frameState.splitPosition >= 0
+        ? this.frameState.splitPosition
+        : 0.5;
+      this.compareSourceScratch[6] = 2.0;
+      this.compareSourceScratch[7] = 0;
+      device.queue.writeBuffer(
+        this.compareSourceBuffer,
+        0,
+        this.compareSourceScratch.buffer,
+        this.compareSourceScratch.byteOffset,
+        this.compareSourceScratch.byteLength,
+      );
+      const compareBg = device.createBindGroup({
+        label: "compare-source.bg",
+        layout: this.layouts.compareSource,
+        entries: [
+          { binding: 0, resource: { buffer: this.compareSourceBuffer } },
+          { binding: 1, resource: mediaTexture.createView() },
+          { binding: 2, resource: postCompositeView },
+          { binding: 3, resource: this.sampler },
+        ],
+      });
+      if (readbackView) {
+        const readbackPass = encoder.beginRenderPass({
+          label: "compare-source.readback.pass",
+          colorAttachments: [
+            {
+              view: readbackView,
+              loadOp: "clear",
+              storeOp: "store",
+              clearValue: { r: 0, g: 0, b: 0, a: 1 },
+            },
+          ],
+        });
+        readbackPass.setPipeline(this.pipelines.compareSource);
+        readbackPass.setBindGroup(0, this.displayFlagsBindGroup);
+        readbackPass.setBindGroup(1, compareBg);
+        readbackPass.draw(3, 1, 0, 0);
+        readbackPass.end();
+      }
+      const pass = encoder.beginRenderPass({
+        label: "compare-source.present.pass",
+        colorAttachments: [
+          {
+            view: swapView,
+            loadOp: "clear",
+            storeOp: "store",
+            clearValue: { r: 0, g: 0, b: 0, a: 1 },
+          },
+        ],
+      });
+      pass.setPipeline(this.pipelines.compareSource);
+      pass.setBindGroup(0, this.displayFlagsBindGroup);
+      pass.setBindGroup(1, compareBg);
+      pass.draw(3, 1, 0, 0);
+      pass.end();
+    } else if (!motionBlurOn) {
       const blitBg = device.createBindGroup({
         label: "blit.bg",
         layout: this.layouts.blit,
