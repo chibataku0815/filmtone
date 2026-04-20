@@ -72,7 +72,7 @@ finished and less patchworked.
 ## Checksums
 
 ```text
-{{DMG_SHA256}}  filmtone-1.0.1-arm64.dmg
+eb3f573b4f5d1e646f95f24688197aa2c560914c9c67827fe5a2c8f03b4163ad  filmtone-1.0.1-arm64.dmg
 ```
 
 ## Feedback
