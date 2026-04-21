@@ -18,10 +18,15 @@ import {
 import { existsSync } from "node:fs";
 import { filmLabParamsSchema, type Params } from "film-lab-core";
 import Store from "electron-store";
-import { execFile, spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import {
+  execFile,
+  spawn,
+  type ChildProcessByStdio,
+  type ChildProcessWithoutNullStreams,
+} from "node:child_process";
 import { createReadStream } from "node:fs";
 import fs from "node:fs/promises";
-import { Readable } from "node:stream";
+import { Readable, Writable } from "node:stream";
 import os from "node:os";
 import { randomBytes } from "node:crypto";
 import path from "node:path";
@@ -76,8 +81,10 @@ const IMAGE_EXT = new Set([".jpg", ".jpeg", ".png"]);
 /**
  * @description ffmpeg 子プロセスと stderr のバッファ（動画書き出しは同時に 1 本まで）
  */
+type FfmpegExportChildProcess = ChildProcessByStdio<Writable, null, Readable>;
+
 type FfmpegVideoExportSession = {
-  child: ChildProcessWithoutNullStreams;
+  child: FfmpegExportChildProcess;
   stderrLines: string[];
 };
 
@@ -357,7 +364,7 @@ function batchSessionFilePath(): string {
 }
 
 function proxyCacheRoot(): string {
-  return path.join(app.getPath("cache"), "film-lab-batch", "proxy-cache");
+  return path.join(app.getPath("sessionData"), "film-lab-batch", "proxy-cache");
 }
 
 function isImageFile(fileName: string): boolean {
@@ -899,8 +906,12 @@ function applyDockIconIfMac(): void {
     );
     return;
   }
+  const dock = app.dock;
+  if (!dock) {
+    return;
+  }
   try {
-    app.dock.setIcon(iconPath);
+    dock.setIcon(iconPath);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.warn(
@@ -1082,12 +1093,12 @@ async function runPendingRuntimeSmoke(win: BrowserWindow): Promise<void> {
     console.log(
       "[film-lab-desktop] smoke: pending Smart Look UI stays hidden in Desktop runtime.",
     );
-    app.exitCode = 0;
+    process.exitCode = 0;
     app.quit();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[film-lab-desktop] smoke: ${message}`);
-    app.exitCode = 1;
+    process.exitCode = 1;
     app.quit();
   }
 }
@@ -1563,12 +1574,13 @@ ipcMain.handle("video-export-start", async (_evt, payload: unknown) => {
       throw new Error(`ffmpeg が見つかりません。${msg}`);
     }
   })();
-  let child: ChildProcessWithoutNullStreams;
+  let child: FfmpegExportChildProcess;
   try {
+    const ffmpegStdio: ["pipe", "ignore", "pipe"] = ["pipe", "ignore", "pipe"];
     child = spawn(ffmpeg.commandPath, ffArgs, {
       env: ffmpeg.childEnv,
-      stdio: ["pipe", "ignore", "pipe"],
-    }) as ChildProcessWithoutNullStreams;
+      stdio: ffmpegStdio,
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     throw new Error(

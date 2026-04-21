@@ -12,6 +12,7 @@ import * as THREE from "three";
 import {
   createFile,
   DataStream,
+  Endianness,
   MP4BoxBuffer,
   type ISOFile,
   type Sample,
@@ -233,7 +234,7 @@ function avcCDescriptionBytesFromSampleEntry(description: unknown): Uint8Array |
   if (!avcC) return null;
 
   const stream = new DataStream();
-  stream.endianness = DataStream.BIG_ENDIAN;
+  stream.endianness = Endianness.BIG_ENDIAN;
 
   const cfgVer = avcC.configurationVersion ?? 1;
   const profile = avcC.AVCProfileIndication ?? 0;
@@ -788,10 +789,10 @@ export class WebCodecsMp4ExportSession {
   }
 
   /**
-   * @description ArrayBuffer（ファイル丸ごと）からセッションを生成。失敗時は例外（呼び出し側でフォールバック）
+   * @description ArrayBufferLike（ファイル丸ごと）からセッションを生成。失敗時は例外（呼び出し側でフォールバック）
    */
   static async create(
-    arrayBuffer: ArrayBuffer,
+    arrayBuffer: ArrayBufferLike,
     probe: ProbeShape,
     onTrace: (line: string) => void,
   ): Promise<WebCodecsMp4ExportSession> {

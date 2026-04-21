@@ -1,7 +1,63 @@
 import { z } from "zod";
-import { PARAM_KEYS, type Params } from "./params";
+import { PARAM_KEYS, type ParamKey, type Params } from "./params";
 import { PRESETS, type PresetName } from "./presets";
 import { PRESET_VERSION } from "./look-ids";
+
+type ParamSchemaShape = {
+  [K in ParamKey]: z.ZodType<Params[K]>;
+};
+
+function schemaForParamKey(key: ParamKey): z.ZodType<number> {
+  return key === "grainRadialMix"
+    ? z.number().min(0).max(1).default(1)
+    : key === "grainSize"
+      ? z.number().min(0).max(1).default(0.3)
+      : key === "diffusion"
+        ? z.number().min(0).max(1).default(0)
+        : key === "lensSoftness"
+          ? z.number().min(0).max(1).default(0)
+          : key === "compressionRange"
+            ? z.number().min(0).max(1).default(0.5)
+            : key === "compressionAmount" || key === "printContrast"
+              ? z.number().min(0).max(1).default(0)
+              : key === "cyan" || key === "magenta" || key === "yellow"
+                ? z.number().min(-1).max(1).default(0)
+                : key === "shutterAngle"
+                  ? z.number().min(0).max(720).default(0)
+                  : key === "trailIntensity"
+                    ? z.number().min(0).max(0.95).default(0)
+                    : key === "motionBlurAmount" || key === "dustAmount" || key === "scratchAmount"
+                      ? z.number().min(0).max(1).default(0)
+                      : key === "shaftIntensity"
+                        ? z.number().min(0).max(1).default(0)
+                        : key === "shaftDecay"
+                          ? z.number().min(0).max(1).default(0.5)
+                          : key === "shaftOriginX"
+                            ? z.number().min(0).max(1).default(0.5)
+                            : key === "shaftOriginY"
+                              ? z.number().min(0).max(1).default(0.15)
+                              : key === "crossFilterStrength"
+                                ? z.number().min(0).max(1).default(0)
+                                : key === "crossFilterSpikes"
+                                  ? z.number().min(4).max(8).default(4)
+                                  : key === "crossFilterAngle"
+                                    ? z.number().min(0).max(360).default(0)
+                                    : key === "crossFilterLength"
+                                      ? z.number().min(0).max(1).default(0.4)
+                                      : key === "crossFilterThreshold"
+                                        ? z.number().min(0).max(1).default(0.92)
+                                        : key === "crossFilterChromatic"
+                                          ? z.number().min(0).max(1).default(0.3)
+                                          : key === "crossFilterSizeLimit"
+                                            ? z.number().min(0).max(1).default(0)
+                                            : key === "crossFilterRandomness"
+                                              ? z.number().min(0).max(1).default(1)
+                                              : key === "crossFilterHardMode"
+                                                ? z.number().min(0).max(1).default(1)
+                                                : key === "crossFilterMinSpacing"
+                                                  ? z.number().min(0).max(2).default(1)
+                                                  : z.number();
+}
 
 /**
  * grainRadialMix は省略時 1（後方互換）、lensSoftness は省略時 0。
@@ -9,59 +65,8 @@ import { PRESET_VERSION } from "./look-ids";
  * デフォルト付きキーは Remotion や旧 JSON の grace fallback として機能する。
  */
 const paramShape = Object.fromEntries(
-  PARAM_KEYS.map((key) => [
-    key,
-    key === "grainRadialMix"
-      ? z.number().min(0).max(1).default(1)
-      : key === "grainSize"
-        ? z.number().min(0).max(1).default(0.3)
-        : key === "diffusion"
-        ? z.number().min(0).max(1).default(0)
-        : key === "lensSoftness"
-        ? z.number().min(0).max(1).default(0)
-        : key === "compressionRange"
-          ? z.number().min(0).max(1).default(0.5)
-          : key === "compressionAmount" || key === "printContrast"
-            ? z.number().min(0).max(1).default(0)
-            : key === "cyan" || key === "magenta" || key === "yellow"
-              ? z.number().min(-1).max(1).default(0)
-              : key === "shutterAngle"
-                ? z.number().min(0).max(720).default(0)
-                : key === "trailIntensity"
-                ? z.number().min(0).max(0.95).default(0)
-                : key === "motionBlurAmount" || key === "dustAmount" || key === "scratchAmount"
-                  ? z.number().min(0).max(1).default(0)
-                  : key === "shaftIntensity"
-                    ? z.number().min(0).max(1).default(0)
-                    : key === "shaftDecay"
-                      ? z.number().min(0).max(1).default(0.5)
-                      : key === "shaftOriginX"
-                        ? z.number().min(0).max(1).default(0.5)
-                        : key === "shaftOriginY"
-                          ? z.number().min(0).max(1).default(0.15)
-                          : key === "crossFilterStrength"
-                            ? z.number().min(0).max(1).default(0)
-                            : key === "crossFilterSpikes"
-                              ? z.number().min(4).max(8).default(4)
-                              : key === "crossFilterAngle"
-                                ? z.number().min(0).max(360).default(0)
-                                : key === "crossFilterLength"
-                                  ? z.number().min(0).max(1).default(0.4)
-                                  : key === "crossFilterThreshold"
-                                    ? z.number().min(0).max(1).default(0.92)
-                                    : key === "crossFilterChromatic"
-                                      ? z.number().min(0).max(1).default(0.3)
-                                      : key === "crossFilterSizeLimit"
-                                        ? z.number().min(0).max(1).default(0)
-                                        : key === "crossFilterRandomness"
-                                          ? z.number().min(0).max(1).default(1)
-                                          : key === "crossFilterHardMode"
-                                            ? z.number().min(0).max(1).default(1)
-                                            : key === "crossFilterMinSpacing"
-                                              ? z.number().min(0).max(2).default(1)
-                                              : z.number(),
-  ]),
-) as z.ZodRawShape;
+  PARAM_KEYS.map((key) => [key, schemaForParamKey(key)]),
+) as ParamSchemaShape;
 
 /**
  * 単体のグレードパラメータ（Film Lab の Params と同一形）

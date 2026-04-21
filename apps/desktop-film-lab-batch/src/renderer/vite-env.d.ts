@@ -6,6 +6,8 @@ interface ImportMetaEnv {
   readonly MODE: string;
   readonly DEV: boolean;
   readonly PROD: boolean;
+  /** @description Vite が提供する public base path。shared UI package でも参照する。 */
+  readonly BASE_URL?: string;
 
   readonly VITE_FILM_LAB_API_ORIGIN?: string;
   /** @description `true` のときだけスマートルック UI を出す（Web の NEXT_PUBLIC と同義の挙動に寄せる） */

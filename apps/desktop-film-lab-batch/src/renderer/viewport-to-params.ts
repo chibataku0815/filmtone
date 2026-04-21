@@ -11,6 +11,8 @@ import {
   type Params,
 } from "film-lab-core";
 
+type ViewportParamKey = Exclude<(typeof PARAM_KEYS)[number], "halationHue">;
+
 /**
  * 0.4.0 の render process で追加した数値キー。
  *
@@ -27,6 +29,10 @@ const renderProcessParamKeys = [
   "yellow",
 ] as const;
 
+function isViewportParamKey(key: (typeof PARAM_KEYS)[number]): key is ViewportParamKey {
+  return key !== "halationHue";
+}
+
 /**
  * @param raw - Viewport.getParams() の戻り値
  * @param halationHueFallback - halationHue が raw に無いときの既定
@@ -36,21 +42,15 @@ export function viewportRecordToParams(
   halationHueFallback: number,
 ): Params {
   const out = cloneParams(PRESETS.cinematic);
-  for (const key of PARAM_KEYS) {
-    if (key === "halationHue") continue;
+  for (const key of PARAM_KEYS.filter(isViewportParamKey)) {
     const v = raw[key];
     if (typeof v === "number") {
-      (out as Record<string, number>)[key] = v;
+      out[key] = v;
     }
   }
   for (const key of renderProcessParamKeys) {
     const v = raw[key];
-    (out as Record<string, number>)[key] =
-      typeof v === "number"
-        ? v
-        : key === "compressionRange"
-          ? 0.5
-          : 0;
+    out[key] = typeof v === "number" ? v : key === "compressionRange" ? 0.5 : 0;
   }
   out.halationHue =
     typeof raw.halationHue === "number"

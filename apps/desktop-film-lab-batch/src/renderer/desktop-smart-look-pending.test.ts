@@ -10,17 +10,19 @@ async function renderDesktopControlPanelCoreHtml(): Promise<string> {
     const { NextIntlClientProvider } = await import("next-intl");
     const { FilmLabControlPanelCore } = await import("film-lab-ui");
     const messages = (await import("../../messages/ja.json")).default;
+    const core = React.createElement(FilmLabControlPanelCore, {
+      viewport: null,
+      histogramVisible: true,
+      onHistogramToggle: () => {},
+    });
 
     return renderToStaticMarkup(
-      React.createElement(
-        NextIntlClientProvider,
-        { locale: "ja", messages, timeZone: "Asia/Tokyo" },
-        React.createElement(FilmLabControlPanelCore, {
-          viewport: null,
-          histogramVisible: true,
-          onHistogramToggle: () => {},
-        }),
-      ),
+      React.createElement(NextIntlClientProvider, {
+        locale: "ja",
+        messages,
+        timeZone: "Asia/Tokyo",
+        children: core,
+      }),
     );
   } finally {
     vi.resetModules();
