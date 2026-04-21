@@ -45,7 +45,22 @@ describe("createSceneAnalysisCacheKey", () => {
 });
 
 describe("resolveSceneAnalysisSourceUrl", () => {
-  it("prefers the desktop video protocol when an absolute file path exists", () => {
+  it("prefers a film-lab-video:// sourceUrl (mezzanine) over an absolute source path", () => {
+    const mezzanineUrl =
+      "film-lab-video://local/?path=%2Fvar%2Ffolders%2Ft3%2Ffilm-lab-mezzanine-abc.mp4";
+    const result = resolveSceneAnalysisSourceUrl({
+      sourcePath: "/Users/me/Downloads/raw.mov",
+      sourceUrl: mezzanineUrl,
+      trimStartSec: 0,
+      trimEndSec: 12,
+      sourceDurationSec: 24,
+    });
+
+    expect(result.sourceUrlKind).toBe("provided-url");
+    expect(result.sourceUrl).toBe(mezzanineUrl);
+  });
+
+  it("falls back to the desktop video protocol derived from the absolute path when no mezzanine URL is provided", () => {
     const result = resolveSceneAnalysisSourceUrl({
       sourcePath: "/clips/a.mov",
       sourceUrl: "blob:http://127.0.0.1:5173/example",

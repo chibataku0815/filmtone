@@ -62,6 +62,12 @@ type FrameSummary = {
   hsvHistogram: Histogram;
 };
 
+export type SampledAnalyzerFrame = {
+  index: number;
+  timeSec: number;
+  jpegDataUrl: string;
+};
+
 export type DesktopSceneAnalysisResult = {
   state: SceneAnalysisState;
   descriptor: SceneDescriptorV1 | null;
@@ -69,6 +75,11 @@ export type DesktopSceneAnalysisResult = {
   analyzerVersion: string;
   cacheKey: string;
   errorMessage?: string;
+  sampledFrames?: SampledAnalyzerFrame[];
+};
+
+export type DesktopSceneAnalysisOptions = {
+  captureFrameJpegs?: boolean;
 };
 
 type DesktopSceneAnalysisProgressListener = (
@@ -108,6 +119,19 @@ export function resolveSceneAnalysisSourceUrl(input: AnalyzerInput): {
   sourceUrl: string;
   sourceUrlKind: "video-src" | "provided-url" | "source-path";
 } {
+  // Prefer an already-playing `film-lab-video://` URL (mezzanine served by the
+  // main process). The raw source path can be a codec HTMLVideoElement cannot
+  // decode (ProRes, DNxHD, 10-bit 4K H.265, etc.); the preview already proved
+  // this URL works, so reuse it for hidden analysis.
+  if (
+    typeof input.sourceUrl === "string" &&
+    input.sourceUrl.startsWith("film-lab-video://")
+  ) {
+    return {
+      sourceUrl: input.sourceUrl,
+      sourceUrlKind: "provided-url",
+    };
+  }
   if (isLikelyAbsoluteFilePath(input.sourcePath)) {
     return {
       sourceUrl: absolutePathToVideoSrcUrl(input.sourcePath),
@@ -736,6 +760,7 @@ async function detectFaceBoost(
 async function analyzeSource(
   input: AnalyzerInput,
   onProgress?: DesktopSceneAnalysisProgressListener,
+  options?: DesktopSceneAnalysisOptions,
 ): Promise<DesktopSceneAnalysisResult> {
   const trimStartSec = Math.max(0, input.trimStartSec);
   const trimEndSec = Math.max(trimStartSec, input.trimEndSec);
@@ -790,6 +815,10 @@ async function analyzeSource(
       effectiveTrimEnd,
     );
     const frames: FrameSummary[] = [];
+    const captureFrameJpegs = options?.captureFrameJpegs === true;
+    const sampledFrames: SampledAnalyzerFrame[] | undefined = captureFrameJpegs
+      ? []
+      : undefined;
 
     for (const [index, timeSec] of sampleTimes.entries()) {
       emitSceneAnalysisProgress(onProgress, {
@@ -804,6 +833,13 @@ async function analyzeSource(
         timeSec,
       });
       await drawVideoFrame(video, timeSec, canvas, context);
+      if (sampledFrames) {
+        sampledFrames.push({
+          index,
+          timeSec,
+          jpegDataUrl: canvas.toDataURL("image/jpeg", 0.75),
+        });
+      }
       frames.push(analyzeCanvasFrame(canvas, context, timeSec));
     }
 
@@ -860,6 +896,7 @@ async function analyzeSource(
       recommendation,
       analyzerVersion: OPTICAL_ANALYZER_VERSION,
       cacheKey,
+      ...(sampledFrames ? { sampledFrames } : {}),
     };
   } finally {
     releaseVideo(video);
@@ -874,14 +911,19 @@ export class DesktopOpticalAnalyzerService implements OpticalAnalyzerProvider {
   analyze(
     input: AnalyzerInput,
     onProgress?: DesktopSceneAnalysisProgressListener,
+    options?: DesktopSceneAnalysisOptions,
   ): Promise<DesktopSceneAnalysisResult> {
-    const cacheKey = createSceneAnalysisCacheKey({
+    const baseCacheKey = createSceneAnalysisCacheKey({
       sourcePath: input.sourcePath,
       trimStartSec: input.trimStartSec,
       trimEndSec: input.trimEndSec,
       sourceDurationSec: input.sourceDurationSec,
       analyzerVersion: this.analyzerVersion,
     });
+    const captureFrameJpegs = options?.captureFrameJpegs === true;
+    const cacheKey = captureFrameJpegs
+      ? `${baseCacheKey}::withJpegs`
+      : baseCacheKey;
     const cached = this.cache.get(cacheKey);
     if (cached) {
       const { sourceUrl, sourceUrlKind } = resolveSceneAnalysisSourceUrl(input);
@@ -896,7 +938,7 @@ export class DesktopOpticalAnalyzerService implements OpticalAnalyzerProvider {
       return cached;
     }
 
-    const run = analyzeSource(input, onProgress).catch((error) => {
+    const run = analyzeSource(input, onProgress, options).catch((error) => {
       console.error("[optical-analysis] analysis failed", {
         cacheKey,
         sourcePath: input.sourcePath,

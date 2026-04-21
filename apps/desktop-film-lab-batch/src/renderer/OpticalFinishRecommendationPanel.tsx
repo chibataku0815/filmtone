@@ -2,6 +2,8 @@ import type { CSSProperties } from "react";
 import { ArrowClockwise, Sparkle } from "@phosphor-icons/react";
 import { useTranslations } from "next-intl";
 import type { OpticalRecommendationV1 } from "film-lab-core";
+import type { AiScenePickResult } from "./ai-scene-pick";
+import type { SampledAnalyzerFrame } from "./optical-scene-analysis";
 
 const NO_DRAG_STYLE = { WebkitAppRegion: "no-drag" } as CSSProperties;
 
@@ -44,6 +46,16 @@ export type OpticalFinishRecommendationPanelState =
       recommendation: OpticalRecommendationV1;
     };
 
+export type AiScenePickPanelState =
+  | { status: "idle" }
+  | { status: "running" }
+  | {
+      status: "ready";
+      result: AiScenePickResult;
+      frames: SampledAnalyzerFrame[];
+    }
+  | { status: "error"; message: string };
+
 export type OpticalFinishRecommendationPanelProps = {
   analysis: OpticalFinishRecommendationPanelState;
   debugInfo?: OpticalRecommendationDebugInfo | null;
@@ -52,6 +64,10 @@ export type OpticalFinishRecommendationPanelProps = {
     family: OpticalRecommendationV1["primary"]["family"];
     recipe: OpticalRecommendationV1["primary"]["recipe"];
   } | null;
+  /** @description Dev-only PoC. When true, renders a secondary AI card below alternates. */
+  aiDevEnabled?: boolean;
+  aiScenePick?: AiScenePickPanelState;
+  onApplyAi?: () => void;
   onApply: (recommendation: OpticalRecommendationV1, index: number) => void;
   onRetry: () => void;
 };
@@ -193,6 +209,177 @@ function RecommendationCard(props: {
   );
 }
 
+function AiDevToggle(props: { armedByModule: boolean }) {
+  if (typeof window === "undefined") return null;
+  let stored: string | null = null;
+  try {
+    stored = window.localStorage?.getItem("filmtone.scenePickDev") ?? null;
+  } catch {
+    return null;
+  }
+  const storageOn = stored === "1";
+  const armed = props.armedByModule;
+  const label = armed ? "ON" : "OFF";
+  const willBe = storageOn ? "0" : "1";
+  const buttonLabel = storageOn
+    ? "OFF にして reload"
+    : "ON にして reload";
+  const handleClick = () => {
+    try {
+      window.localStorage.setItem("filmtone.scenePickDev", willBe);
+    } catch {
+      // ignore
+    }
+    window.location.reload();
+  };
+  return (
+    <div
+      className="mb-2 flex items-center justify-between gap-2"
+      style={NO_DRAG_STYLE}
+      data-testid="ai-scene-pick-dev-toggle"
+    >
+      <span
+        className={[
+          "rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.2em]",
+          armed
+            ? "border-amber-400/30 bg-amber-400/10 text-amber-200/90"
+            : "border-white/12 bg-white/[0.04] text-white/56",
+        ].join(" ")}
+      >
+        AI PICK (DEV) — {label}
+      </span>
+      <button
+        type="button"
+        onClick={handleClick}
+        className="rounded-md border border-white/12 bg-white/[0.04] px-2 py-1 text-[10px] font-medium text-white/76 transition-colors hover:bg-white/[0.08] hover:text-white/92"
+        style={NO_DRAG_STYLE}
+      >
+        {buttonLabel}
+      </button>
+    </div>
+  );
+}
+
+function AiScenePickCard(props: {
+  state: AiScenePickPanelState;
+  onApply: (() => void) | undefined;
+  appliedSelection?: OpticalFinishRecommendationPanelProps["appliedSelection"];
+}) {
+  const { state, onApply, appliedSelection } = props;
+  const appliedMatchesAi =
+    state.status === "ready" &&
+    !state.result.manualFallback &&
+    state.result.family != null &&
+    appliedSelection?.family === state.result.family &&
+    appliedSelection?.recipe === (state.result.recipe ?? null);
+  return (
+    <div
+      className={[
+        "rounded-xl border border-dashed px-3 py-3",
+        appliedMatchesAi
+          ? "border-[var(--accent-amber1)]/55 bg-[var(--accent-amber1)]/[0.12]"
+          : "border-white/15 bg-white/[0.03]",
+      ].join(" ")}
+      style={NO_DRAG_STYLE}
+      data-testid="ai-scene-pick-card"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/56">
+          AI PICK
+        </p>
+        <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.18em] text-white/56">
+          experimental / dev
+        </span>
+      </div>
+
+      {state.status === "idle" ? (
+        <p className="mt-2 text-[11px] text-white/52">
+          heuristic 解析後に AI 判定を実行します
+        </p>
+      ) : null}
+
+      {state.status === "running" ? (
+        <p className="mt-2 text-[11px] text-white/64">
+          AI にフレームを問い合わせ中...
+        </p>
+      ) : null}
+
+      {state.status === "error" ? (
+        <p className="mt-2 text-[11px] text-white/56">
+          AI 呼び出しに失敗: {state.message}
+        </p>
+      ) : null}
+
+      {state.status === "ready" ? (
+        <div className="mt-2 flex flex-col gap-2">
+          {state.result.bestFrameIndex != null &&
+          state.frames[state.result.bestFrameIndex] ? (
+            <div className="flex items-start gap-3">
+              <img
+                src={state.frames[state.result.bestFrameIndex].jpegDataUrl}
+                alt={`AI picked frame ${state.result.bestFrameIndex}`}
+                className="h-12 w-20 shrink-0 rounded-md border border-white/10 object-cover"
+                draggable={false}
+              />
+              <div className="min-w-0 flex-1 text-[11px] leading-snug text-white/72">
+                <p className="font-mono text-[10px] text-white/52">
+                  frame #{state.result.bestFrameIndex} ·{" "}
+                  {state.frames[state.result.bestFrameIndex].timeSec.toFixed(2)}s
+                </p>
+                <p className="mt-0.5 text-white/92">
+                  {state.result.family ?? "—"} /{" "}
+                  {state.result.recipe ?? "clean"}
+                </p>
+                <p className="mt-0.5 text-white/56">
+                  conf: {state.result.confidence} · latency:{" "}
+                  {Math.round(state.result.latencyMs)}ms
+                </p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-[11px] text-white/56">
+              フレームが選択されませんでした
+            </p>
+          )}
+
+          {state.result.reason ? (
+            <p className="rounded-md border border-white/8 bg-black/20 px-2.5 py-2 text-[10px] leading-snug text-white/64">
+              {state.result.reason}
+            </p>
+          ) : null}
+
+          {state.result.manualFallback ? (
+            <p className="text-[10px] text-white/48">
+              AI は確信を持てませんでした — 手動選択を推奨
+            </p>
+          ) : null}
+
+          <div className="flex justify-end">
+            <button
+              type="button"
+              disabled={
+                state.result.manualFallback || state.result.family == null || onApply == null
+              }
+              onClick={() => onApply?.()}
+              className={[
+                "rounded-lg px-3 py-2 text-[11px] font-medium transition-colors",
+                state.result.manualFallback || state.result.family == null
+                  ? "cursor-not-allowed border border-white/8 bg-white/[0.02] text-white/36"
+                  : appliedMatchesAi
+                    ? "bg-[var(--accent-amber1)] text-[var(--accent-amber12)]"
+                    : "border border-white/12 bg-white/[0.06] text-white/88 hover:bg-white/[0.1]",
+              ].join(" ")}
+              style={NO_DRAG_STYLE}
+            >
+              {appliedMatchesAi ? "適用済み" : "AI の候補を適用"}
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function DebugRow(props: {
   label: string;
   value: boolean | number | string | null | undefined;
@@ -216,7 +403,10 @@ export function OpticalFinishRecommendationPanel(
     appliedSelection,
     debugInfo,
     debugLog,
+    aiDevEnabled,
+    aiScenePick,
     onApply,
+    onApplyAi,
     onRetry,
   } = props;
   const t = useTranslations("film-lab");
@@ -231,6 +421,7 @@ export function OpticalFinishRecommendationPanel(
       className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3"
       style={NO_DRAG_STYLE}
     >
+      <AiDevToggle armedByModule={aiDevEnabled === true} />
       <div className="flex items-start gap-2.5">
         <div className="mt-0.5 shrink-0 rounded-full border border-white/10 bg-white/[0.04] p-1.5">
           <Sparkle size={14} weight="duotone" className="text-white/72" />
@@ -309,6 +500,16 @@ export function OpticalFinishRecommendationPanel(
               onApply={() => onApply(analysis.recommendation, index + 1)}
             />
           ))}
+        </div>
+      ) : null}
+
+      {aiDevEnabled && aiScenePick ? (
+        <div className="mt-3">
+          <AiScenePickCard
+            state={aiScenePick}
+            onApply={onApplyAi}
+            appliedSelection={appliedSelection}
+          />
         </div>
       ) : null}
 

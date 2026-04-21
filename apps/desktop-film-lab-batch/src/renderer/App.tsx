@@ -98,7 +98,14 @@ import { resolveImportedMetadataJson } from "./metadata-json-runtime";
 import {
   createSceneAnalysisCacheKey,
   DesktopOpticalAnalyzerService,
+  type SampledAnalyzerFrame,
 } from "./optical-scene-analysis";
+import {
+  BffAiScenePickProvider,
+  type AiScenePickProvider,
+  type AiScenePickResult,
+} from "./ai-scene-pick";
+import { buildAiRecommendation } from "./ai-recommendation-builder";
 import { viewportRecordToParams } from "./viewport-to-params";
 import {
   BatchTabCompactRunFooter,
@@ -270,6 +277,40 @@ function isTextInputTarget(target: EventTarget | null): boolean {
   return false;
 }
 
+/**
+ * @description Dev-only PoC toggle for AI scene pick. Flip via DevTools:
+ * `localStorage.setItem('filmtone.scenePickDev','1')` + reload,
+ * or reach the app with `?aiScenePick=1`. Read once at module load to keep
+ * the side-path out of the heuristic flow when disabled.
+ */
+const AI_SCENE_PICK_DEV_ENABLED = (() => {
+  if (typeof window === "undefined") return false;
+  try {
+    if (window.localStorage?.getItem("filmtone.scenePickDev") === "1") {
+      return true;
+    }
+  } catch {
+    // localStorage access can throw in sandboxed contexts.
+  }
+  try {
+    const search =
+      typeof window.location?.search === "string" ? window.location.search : "";
+    return new URLSearchParams(search).get("aiScenePick") === "1";
+  } catch {
+    return false;
+  }
+})();
+
+type AiScenePickPanelState =
+  | { status: "idle" }
+  | { status: "running" }
+  | {
+      status: "ready";
+      result: AiScenePickResult;
+      frames: SampledAnalyzerFrame[];
+    }
+  | { status: "error"; message: string };
+
 export default function App() {
   const tApp = useTranslations("film-lab.desktop.app");
   const tFilmLab = useTranslations("film-lab");
@@ -405,6 +446,23 @@ export default function App() {
   if (opticalAnalyzerServiceRef.current === null) {
     opticalAnalyzerServiceRef.current = new DesktopOpticalAnalyzerService();
   }
+  const [aiScenePickPanel, setAiScenePickPanel] = useState<AiScenePickPanelState>(
+    { status: "idle" },
+  );
+  const aiScenePickProviderRef = useRef<AiScenePickProvider | null>(null);
+  if (AI_SCENE_PICK_DEV_ENABLED && aiScenePickProviderRef.current === null) {
+    aiScenePickProviderRef.current = new BffAiScenePickProvider();
+  }
+  /**
+   * @description AI pick は LLM 課金が発生するので cacheKey 単位でメモ化する。
+   * heuristic analyzer 側は cache-hit で同じ Promise を返すが、そこから
+   * 走る AI pick 側はキャッシュされていないため、同一クリップで useEffect が
+   * 再実行される（preview ready の flip など）だけで毎回 LLM を叩いていた。
+   */
+  const aiScenePickResultCacheRef = useRef<Map<string, AiScenePickResult>>(
+    new Map(),
+  );
+  const aiScenePickInflightRef = useRef<Set<string>>(new Set());
   const progressiveLoad = useProgressiveLoad();
   const canvasHasUserVideo = useMemo(
     () =>
@@ -1151,6 +1209,10 @@ export default function App() {
       ...patch,
     });
 
+    if (AI_SCENE_PICK_DEV_ENABLED) {
+      setAiScenePickPanel({ status: "idle" });
+    }
+
     if (!service) {
       setOpticalRecommendationPanel({ state: "idle" });
       replaceOpticalAnalysisEventLog("scene analysis service unavailable");
@@ -1237,6 +1299,13 @@ export default function App() {
     let cancelled = false;
     setOpticalRecommendationPanel({ state: "analyzing" });
     replaceOpticalAnalysisEventLog("analysis requested");
+    const storedScenePickFlag =
+      typeof window !== "undefined"
+        ? window.localStorage?.getItem("filmtone.scenePickDev") ?? "n/a"
+        : "n/a";
+    appendOpticalAnalysisEvent(
+      `ai pick dev: module=${AI_SCENE_PICK_DEV_ENABLED} storage=${storedScenePickFlag}`,
+    );
     setOpticalRecommendationDebugInfo(
       buildDebugInfo({
         effectState: "analyzing",
@@ -1247,28 +1316,32 @@ export default function App() {
     );
 
     void service
-      .analyze({
-        sourcePath: resolvedSourcePath,
-        sourceUrl:
-          interactivePreviewSource.absolutePath == null
-            ? currentSrc ?? undefined
-            : undefined,
-        trimStartSec: 0,
-        trimEndSec: safeDurationSec,
-        sourceDurationSec: safeDurationSec,
-      }, (progress) => {
-        if (cancelled) return;
-        appendOpticalAnalysisEvent(progress.message);
-        setOpticalRecommendationDebugInfo(
-          buildDebugInfo({
-            effectState: "analyzing",
-            sourcePath: resolvedSourcePath,
-            cacheKey: progress.cacheKey,
-            sourceUrlKind: progress.sourceUrlKind,
-            activity: progress.message,
-          }),
-        );
-      })
+      .analyze(
+        {
+          sourcePath: resolvedSourcePath,
+          // Always forward currentSrc: when it's a mezzanine `film-lab-video://`
+          // URL, the analyzer prefers it over re-deriving a URL from the raw
+          // absolute path (which fails for codecs HTMLVideoElement can't decode).
+          sourceUrl: currentSrc ?? undefined,
+          trimStartSec: 0,
+          trimEndSec: safeDurationSec,
+          sourceDurationSec: safeDurationSec,
+        },
+        (progress) => {
+          if (cancelled) return;
+          appendOpticalAnalysisEvent(progress.message);
+          setOpticalRecommendationDebugInfo(
+            buildDebugInfo({
+              effectState: "analyzing",
+              sourcePath: resolvedSourcePath,
+              cacheKey: progress.cacheKey,
+              sourceUrlKind: progress.sourceUrlKind,
+              activity: progress.message,
+            }),
+          );
+        },
+        AI_SCENE_PICK_DEV_ENABLED ? { captureFrameJpegs: true } : undefined,
+      )
       .then((result) => {
         if (cancelled) return;
         if (
@@ -1297,6 +1370,72 @@ export default function App() {
               activity: `analysis complete: ${result.state}`,
             }),
           );
+
+          if (
+            AI_SCENE_PICK_DEV_ENABLED &&
+            result.sampledFrames &&
+            result.sampledFrames.length > 0 &&
+            aiScenePickProviderRef.current
+          ) {
+            const frames = result.sampledFrames;
+            const provider = aiScenePickProviderRef.current;
+            const aiCacheKey = result.cacheKey;
+            const cachedAi =
+              aiScenePickResultCacheRef.current.get(aiCacheKey);
+            if (cachedAi) {
+              setAiScenePickPanel({
+                status: "ready",
+                result: cachedAi,
+                frames,
+              });
+              appendOpticalAnalysisEvent(
+                `ai pick: cached (${aiCacheKey.slice(-24)})`,
+              );
+            } else if (aiScenePickInflightRef.current.has(aiCacheKey)) {
+              appendOpticalAnalysisEvent(
+                `ai pick: skip in-flight (${aiCacheKey.slice(-24)})`,
+              );
+            } else {
+              aiScenePickInflightRef.current.add(aiCacheKey);
+              setAiScenePickPanel({ status: "running" });
+              appendOpticalAnalysisEvent(
+                `ai pick: running (${frames.length} frames)`,
+              );
+              void provider
+                .pick({
+                  sourcePath: resolvedSourcePath,
+                  trimStartSec: 0,
+                  trimEndSec: safeDurationSec,
+                  frames,
+                })
+                .then((aiResult) => {
+                  aiScenePickResultCacheRef.current.set(aiCacheKey, aiResult);
+                  if (cancelled) return;
+                  setAiScenePickPanel({
+                    status: "ready",
+                    result: aiResult,
+                    frames,
+                  });
+                  const summary = aiResult.manualFallback
+                    ? `fallback (${aiResult.reason || "no-reason"})`
+                    : `${aiResult.family ?? "?"}/${aiResult.recipe ?? "clean"} conf=${aiResult.confidence} frame=${aiResult.bestFrameIndex ?? "?"}`;
+                  appendOpticalAnalysisEvent(
+                    `ai pick: ready ${summary} ${Math.round(aiResult.latencyMs)}ms`,
+                  );
+                  console.info("[ai-scene-pick] result", aiResult);
+                })
+                .catch((error) => {
+                  if (cancelled) return;
+                  const message =
+                    error instanceof Error ? error.message : String(error);
+                  setAiScenePickPanel({ status: "error", message });
+                  appendOpticalAnalysisEvent(`ai pick: error ${message}`);
+                })
+                .finally(() => {
+                  aiScenePickInflightRef.current.delete(aiCacheKey);
+                });
+            }
+          }
           return;
         }
         if (result.state === "error") {
@@ -2415,6 +2554,8 @@ export default function App() {
                             }
                             debugInfo={opticalRecommendationDebugInfo}
                             debugLog={opticalRecommendationEventLog}
+                            aiDevEnabled={AI_SCENE_PICK_DEV_ENABLED}
+                            aiScenePick={aiScenePickPanel}
                             onRetry={() => {
                               setOpticalAnalysisRetryNonce((value) => value + 1);
                             }}
@@ -2460,6 +2601,101 @@ export default function App() {
                                 index,
                                 appliedSelection,
                               });
+                            }}
+                            onApplyAi={() => {
+                              appendOpticalAnalysisEvent("ai apply: clicked");
+                              try {
+                                if (aiScenePickPanel.status !== "ready") {
+                                  appendOpticalAnalysisEvent(
+                                    `ai apply: skip status=${aiScenePickPanel.status}`,
+                                  );
+                                  return;
+                                }
+                                const descriptor =
+                                  opticalRecommendationPanel.state === "ready" ||
+                                  opticalRecommendationPanel.state === "low-confidence"
+                                    ? opticalRecommendationPanel.recommendation
+                                        .descriptor
+                                    : null;
+                                const aiRecommendation = buildAiRecommendation(
+                                  aiScenePickPanel.result,
+                                  descriptor,
+                                );
+                                if (!aiRecommendation) {
+                                  appendOpticalAnalysisEvent(
+                                    "ai apply: skip builder-null (fallback or missing family)",
+                                  );
+                                  return;
+                                }
+                                const patch = buildOpticalParamPatch(
+                                  aiRecommendation,
+                                );
+                                const patchKeys = Object.keys(patch);
+                                appendOpticalAnalysisEvent(
+                                  `ai apply: patch keys=${patchKeys.length}`,
+                                );
+                                coreRenderContext.dispatch({
+                                  type: "MERGE_PARAMS",
+                                  patch,
+                                });
+                                coreRenderContext.dispatch({ type: "COMMIT" });
+                                appendOpticalAnalysisEvent(
+                                  "ai apply: core dispatched",
+                                );
+                                commitOpticalRecommendationToBatch(
+                                  aiRecommendation,
+                                  0,
+                                );
+                                const viewportInstance = viewport;
+                                if (viewportInstance) {
+                                  try {
+                                    const current =
+                                      viewportInstance.getParams();
+                                    viewportInstance.setParams({
+                                      ...current,
+                                      ...patch,
+                                    });
+                                    appendOpticalAnalysisEvent(
+                                      "ai apply: viewport.setParams ok",
+                                    );
+                                  } catch (vpErr) {
+                                    appendOpticalAnalysisEvent(
+                                      `ai apply: viewport.setParams error ${
+                                        vpErr instanceof Error
+                                          ? vpErr.message
+                                          : String(vpErr)
+                                      }`,
+                                    );
+                                  }
+                                } else {
+                                  appendOpticalAnalysisEvent(
+                                    "ai apply: no viewport instance",
+                                  );
+                                }
+                                const { family, recipe } =
+                                  aiRecommendation.primary;
+                                appendOpticalAnalysisEvent(
+                                  `ai apply: done ${family}/${recipe ?? "clean"}`,
+                                );
+                                console.info("[ai-scene-pick] apply clicked", {
+                                  family,
+                                  recipe,
+                                  bestFrameIndex:
+                                    aiScenePickPanel.result.bestFrameIndex,
+                                  confidence:
+                                    aiScenePickPanel.result.confidence,
+                                  patchKeys,
+                                });
+                              } catch (err) {
+                                appendOpticalAnalysisEvent(
+                                  `ai apply: error ${
+                                    err instanceof Error
+                                      ? err.message
+                                      : String(err)
+                                  }`,
+                                );
+                                throw err;
+                              }
                             }}
                           />
                         ),
