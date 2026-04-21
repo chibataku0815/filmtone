@@ -184,6 +184,14 @@ export class Viewport {
     this.webgpuBackend?.setMediaFromBitmap(bitmap);
   }
 
+  /**
+   * Dev-only: upload a 32x32 depth probe. No-op on WebGL. Pair with the
+   * `depthMistGain` composite param (0..1) to enable depth-modulated mist.
+   */
+  setDepthFromBitmap(bitmap: ImageBitmap): void {
+    this.webgpuBackend?.setDepthFromBitmap(bitmap);
+  }
+
   setImageResolution(width: number, height: number): void {
     if (this.webgpuBackend) this.webgpuBackend.setImageResolution(width, height);
     else this.webglBackend!.setImageResolution(width, height);

@@ -46,6 +46,11 @@
  *     binding(5) uSampler   : sampler           (linear, clamp-to-edge)
  *     binding(6) uGrainSamp : sampler           (linear, repeat — also
  *                                                kept for layout parity).
+ *     binding(7) uDepth     : texture_2d<f32>   (dev-only AI depth probe,
+ *                                                32x32 grayscale, 0=near /
+ *                                                1=far. Gated by
+ *                                                uComposite.lens.w =
+ *                                                depthMistGain).
  */
 export const compositeFragmentWgsl = /* wgsl */ `
 struct Composite {
@@ -66,6 +71,7 @@ struct Composite {
 @group(1) @binding(4) var uDiffusion: texture_2d<f32>;
 @group(1) @binding(5) var uSampler: sampler;
 @group(1) @binding(6) var uGrainSampler: sampler;
+@group(1) @binding(7) var uDepth: texture_2d<f32>;
 
 const LUMA_R709 = vec3f(0.2126, 0.7152, 0.0722);
 
@@ -148,6 +154,23 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
   let lensSoftness = clamp(uComposite.lens.x, 0.0, 1.0);
   let aberrationEdgeSoften = clamp(uComposite.lens.y, 0.0, 1.0);
   let diffusion = clamp(uComposite.lens.z, 0.0, 1.0);
+  // Dev-only AI depth probe:
+  //   0.0      = no depth modulation (uniform mist, WebGL parity)
+  //   0.0..1.0 = depth-modulated mist (near = 0x, far = (1 + 4*gain)x)
+  //   >= 1.5   = debug view: render raw depth texture as grayscale
+  //              (bypasses all subsequent stages — for alignment check only).
+  let depthMistGain = clamp(uComposite.lens.w, 0.0, 2.0);
+
+  // Debug view: show the depth texture directly over the image-space UV
+  // so we can confirm the AI depth map is uploaded and aligned before
+  // judging its effect on mist. The depth PNG is in IMAGE aspect, while
+  // the canvas may be a different aspect — so sample in image-fit UV
+  // (same transform vignette uses).
+  if (depthMistGain >= 1.5) {
+    let depthUv = fitUv(uv, uComposite.resolution.xy, uComposite.resolution.zw, uComposite.grainFit.z);
+    let d = textureSampleLevel(uDepth, uSampler, depthUv, 0.0).r;
+    return vec4f(d, d, d, 1.0);
+  }
 
   // --- Lens softness + aberration edge soften (WebGL parity) ---
   // Edge mask weighting: periphery gets more of the 8-tap blur. Cardinal
@@ -196,6 +219,14 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
   color = vec4f(vec3f(1.0) - (vec3f(1.0) - color.rgb) * (vec3f(1.0) - glow), color.a);
 
   if (diffusion > 0.0) {
+    // Dev-only AI depth probe: depth shaping is now applied UPSTREAM, in
+    // diffusion-depth-prefilter.frag, so the diffusion pyramid input is
+    // already depth-weighted at the source before any blur. Composite
+    // therefore just samples the pre-baked halo without a per-pixel depth
+    // mask, which removes the ghost / double-image that appeared when a
+    // sharp depth cut was applied after the pyramid had bled across
+    // silhouettes. WebGL parity is preserved: when depthMistGain = 0 the
+    // prefilter is skipped and the pyramid receives raw colorGraded.
     let diffused = textureSampleLevel(uDiffusion, uSampler, glowUv, 0.0).rgb;
     let diffOpacity = glowShoulder(diffused * diffusion * 0.29) * glowHeadroom(baseRgb, 0.88);
     color = vec4f(
