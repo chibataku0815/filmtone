@@ -9,6 +9,9 @@
 export { fullscreenVertexWgsl } from "./fullscreen.vert.wgsl";
 export { bloomPrefilterFragmentWgsl } from "./bloom-prefilter.frag.wgsl";
 export { halationPrefilterFragmentWgsl } from "./halation-prefilter.frag.wgsl";
+export { diffusionDepthPrefilterFragmentWgsl } from "./diffusion-depth-prefilter.frag.wgsl";
+export { bloomDepthPrefilterFragmentWgsl } from "./bloom-depth-prefilter.frag.wgsl";
+export { halationDepthPrefilterFragmentWgsl } from "./halation-depth-prefilter.frag.wgsl";
 export { downsampleFragmentWgsl } from "./downsample.frag.wgsl";
 export { upsampleFragmentWgsl } from "./upsample.frag.wgsl";
 export { lightshaftsFragmentWgsl } from "./lightshafts.frag.wgsl";

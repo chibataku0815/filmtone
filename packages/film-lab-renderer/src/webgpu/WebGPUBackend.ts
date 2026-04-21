@@ -77,6 +77,9 @@ import {
   compositeFragmentWgsl,
   bloomPrefilterFragmentWgsl,
   halationPrefilterFragmentWgsl,
+  diffusionDepthPrefilterFragmentWgsl,
+  bloomDepthPrefilterFragmentWgsl,
+  halationDepthPrefilterFragmentWgsl,
   downsampleFragmentWgsl,
   upsampleFragmentWgsl,
   lightshaftsFragmentWgsl,
@@ -213,6 +216,9 @@ interface ShaderModules {
   composite: GPUShaderModule;
   bloomPrefilter: GPUShaderModule;
   halationPrefilter: GPUShaderModule;
+  diffusionDepthPrefilter: GPUShaderModule;
+  bloomDepthPrefilter: GPUShaderModule;
+  halationDepthPrefilter: GPUShaderModule;
   downsample: GPUShaderModule;
   upsample: GPUShaderModule;
   lightshafts: GPUShaderModule;
@@ -232,6 +238,12 @@ interface Pipelines {
   filmlab: GPURenderPipeline;
   bloomPrefilter: GPURenderPipeline;
   halationPrefilter: GPURenderPipeline;
+  /** Dev-only: depth-weighted source mask feeding into the diffusion pyramid. */
+  diffusionDepthPrefilter: GPURenderPipeline;
+  /** Dev-only: depth-weighted source mask feeding into the bloom pyramid. */
+  bloomDepthPrefilter: GPURenderPipeline;
+  /** Dev-only: depth-weighted source mask feeding into the halation pyramid. */
+  halationDepthPrefilter: GPURenderPipeline;
   downsample: GPURenderPipeline;
   /** Same shader as `downsample` / `upsample`-compatible layout, additive blend. */
   upsampleAdd: GPURenderPipeline;
@@ -263,6 +275,7 @@ interface PrefilterGroupLayouts {
   bloom: GPUBindGroupLayout;
   halation: GPUBindGroupLayout;
   pyramid: GPUBindGroupLayout;
+  diffusionDepthPrefilter: GPUBindGroupLayout;
   composite: GPUBindGroupLayout;
   blit: GPUBindGroupLayout;
   compareSource: GPUBindGroupLayout;
@@ -330,6 +343,12 @@ export class WebGPUBackend implements RenderBackend {
   private readonly compositeBuffer: GPUBuffer;
   private readonly bloomParamsBuffer: GPUBuffer;
   private readonly halationParamsBuffer: GPUBuffer;
+  private readonly diffusionDepthPrefilterBuffer: GPUBuffer;
+  private readonly diffusionDepthPrefilterScratch: Float32Array;
+  private readonly bloomDepthPrefilterBuffer: GPUBuffer;
+  private readonly bloomDepthPrefilterScratch: Float32Array;
+  private readonly halationDepthPrefilterBuffer: GPUBuffer;
+  private readonly halationDepthPrefilterScratch: Float32Array;
   private readonly bloomPyramid: PyramidResources;
   private readonly halationPyramid: PyramidResources;
   private readonly diffusionPyramid: PyramidResources;
@@ -341,6 +360,8 @@ export class WebGPUBackend implements RenderBackend {
   private readonly sampler: GPUSampler;
   private readonly grainSampler: GPUSampler;
   private readonly grainTexture: GPUTexture;
+  /** Dev-only AI depth probe texture (32x32, r=0 near / r=1 far). */
+  private readonly depthTexture: GPUTexture;
   private readonly gradeScratch = new Float32Array(GRADE_UNIFORM_FLOATS);
   private readonly compositeScratch = new Float32Array(COMPOSITE_UNIFORM_FLOATS);
   private readonly bloomParamsScratch = new Float32Array(BLOOM_PARAMS_BYTES / 4);
@@ -446,10 +467,66 @@ export class WebGPUBackend implements RenderBackend {
     this.sampler = sampler;
     this.grainSampler = grainSampler;
     this.grainTexture = grainTexture;
+
+    // Dev-only AI depth probe: 512x288 rgba8unorm (Depth Anything V2 Base
+    // at 512-wide input), init to neutral 0.5 so depth-off
+    // (depthMistGain=0) leaves mist unchanged.
+    {
+      const DEPTH_W = 512;
+      const DEPTH_H = 288;
+      this.depthTexture = ctx.device.createTexture({
+        label: "depth.probe",
+        size: { width: DEPTH_W, height: DEPTH_H, depthOrArrayLayers: 1 },
+        format: "rgba8unorm",
+        usage:
+          GPUTextureUsage.TEXTURE_BINDING |
+          GPUTextureUsage.COPY_DST |
+          GPUTextureUsage.RENDER_ATTACHMENT,
+      });
+      const neutral = new Uint8Array(DEPTH_W * DEPTH_H * 4);
+      for (let i = 0; i < DEPTH_W * DEPTH_H; i++) {
+        neutral[i * 4] = 128;
+        neutral[i * 4 + 1] = 128;
+        neutral[i * 4 + 2] = 128;
+        neutral[i * 4 + 3] = 255;
+      }
+      ctx.device.queue.writeTexture(
+        { texture: this.depthTexture },
+        neutral,
+        { bytesPerRow: DEPTH_W * 4 },
+        { width: DEPTH_W, height: DEPTH_H, depthOrArrayLayers: 1 },
+      );
+    }
+
     this.lut1Texture = lut1Texture;
     this.lut2Texture = lut2Texture;
     this.ringBuffer = ringBuffer;
     this.compareSourceBuffer = compareSourceBuffer;
+
+    // Dev-only: diffusion depth prefilter params — 2 vec4 = 32 bytes.
+    //   misc: (depthMistGain, fitMode, _, _)
+    //   size: (resolutionX, resolutionY, imageResX, imageResY)
+    this.diffusionDepthPrefilterBuffer = ctx.device.createBuffer({
+      label: "diffusion-depth-prefilter.params",
+      size: 32,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    this.diffusionDepthPrefilterScratch = new Float32Array(8);
+    // Separate uniform buffers per pyramid: a single buffer shared across
+    // all three pillars would silently overwrite in submit order (last
+    // writeBuffer wins) — see feedback_webgpu_writebuffer_per_layer.md.
+    this.bloomDepthPrefilterBuffer = ctx.device.createBuffer({
+      label: "bloom-depth-prefilter.params",
+      size: 32,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    this.bloomDepthPrefilterScratch = new Float32Array(8);
+    this.halationDepthPrefilterBuffer = ctx.device.createBuffer({
+      label: "halation-depth-prefilter.params",
+      size: 32,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    this.halationDepthPrefilterScratch = new Float32Array(8);
     this._width = Math.max(1, ctx.canvas.width);
     this._height = Math.max(1, ctx.canvas.height);
     this.frameState = {
@@ -487,6 +564,18 @@ export class WebGPUBackend implements RenderBackend {
       composite: await make("composite.frag", compositeFragmentWgsl),
       bloomPrefilter: await make("bloom-prefilter.frag", bloomPrefilterFragmentWgsl),
       halationPrefilter: await make("halation-prefilter.frag", halationPrefilterFragmentWgsl),
+      diffusionDepthPrefilter: await make(
+        "diffusion-depth-prefilter.frag",
+        diffusionDepthPrefilterFragmentWgsl,
+      ),
+      bloomDepthPrefilter: await make(
+        "bloom-depth-prefilter.frag",
+        bloomDepthPrefilterFragmentWgsl,
+      ),
+      halationDepthPrefilter: await make(
+        "halation-depth-prefilter.frag",
+        halationDepthPrefilterFragmentWgsl,
+      ),
       downsample: await make("downsample.frag", downsampleFragmentWgsl),
       upsample: await make("upsample.frag", upsampleFragmentWgsl),
       lightshafts: await make("lightshafts.frag", lightshaftsFragmentWgsl),
@@ -554,6 +643,19 @@ export class WebGPUBackend implements RenderBackend {
       ],
     });
 
+    // Dev-only: diffusion depth prefilter — `(uniform, uSource, uDepth, uSampler)`.
+    // Runs before the diffusion pyramid so the pyramid input is already
+    // depth-weighted. See `shaders/diffusion-depth-prefilter.frag.wgsl.ts`.
+    const diffusionDepthPrefilterGroupLayout = device.createBindGroupLayout({
+      label: "diffusion-depth-prefilter.group1",
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: "uniform" } },
+        { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
+        { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
+        { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: { type: "filtering" } },
+      ],
+    });
+
     const compositeGroupLayout = device.createBindGroupLayout({
       label: "composite.group1",
       entries: [
@@ -564,6 +666,7 @@ export class WebGPUBackend implements RenderBackend {
         { binding: 4, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
         { binding: 5, visibility: GPUShaderStage.FRAGMENT, sampler: { type: "filtering" } },
         { binding: 6, visibility: GPUShaderStage.FRAGMENT, sampler: { type: "filtering" } },
+        { binding: 7, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
       ],
     });
 
@@ -708,6 +811,60 @@ export class WebGPUBackend implements RenderBackend {
         vertex: { module: modules.vert, entryPoint: "vs_main" },
         fragment: {
           module: modules.halationPrefilter,
+          entryPoint: "fs_main",
+          targets: [{ format: "rgba16float" }],
+        },
+        primitive: { topology: "triangle-list" },
+      }),
+    );
+
+    // Dev-only: depth-weighted source prefilter for the diffusion pyramid.
+    const diffusionDepthPrefilterPipeline = await ctx.withValidationScope(() =>
+      device.createRenderPipeline({
+        label: "diffusion-depth.prefilter",
+        layout: device.createPipelineLayout({
+          bindGroupLayouts: [flagsLayout, diffusionDepthPrefilterGroupLayout],
+        }),
+        vertex: { module: modules.vert, entryPoint: "vs_main" },
+        fragment: {
+          module: modules.diffusionDepthPrefilter,
+          entryPoint: "fs_main",
+          targets: [{ format: "rgba16float" }],
+        },
+        primitive: { topology: "triangle-list" },
+      }),
+    );
+
+    // Dev-only: depth-weighted source prefilter for the bloom pyramid.
+    // Reuses the Mist prefilter's bind group layout (uniform, source,
+    // depth, sampler) — only the near/far coefficients differ, and those
+    // live inside the WGSL constant.
+    const bloomDepthPrefilterPipeline = await ctx.withValidationScope(() =>
+      device.createRenderPipeline({
+        label: "bloom-depth.prefilter",
+        layout: device.createPipelineLayout({
+          bindGroupLayouts: [flagsLayout, diffusionDepthPrefilterGroupLayout],
+        }),
+        vertex: { module: modules.vert, entryPoint: "vs_main" },
+        fragment: {
+          module: modules.bloomDepthPrefilter,
+          entryPoint: "fs_main",
+          targets: [{ format: "rgba16float" }],
+        },
+        primitive: { topology: "triangle-list" },
+      }),
+    );
+
+    // Dev-only: depth-weighted source prefilter for the halation pyramid.
+    const halationDepthPrefilterPipeline = await ctx.withValidationScope(() =>
+      device.createRenderPipeline({
+        label: "halation-depth.prefilter",
+        layout: device.createPipelineLayout({
+          bindGroupLayouts: [flagsLayout, diffusionDepthPrefilterGroupLayout],
+        }),
+        vertex: { module: modules.vert, entryPoint: "vs_main" },
+        fragment: {
+          module: modules.halationDepthPrefilter,
           entryPoint: "fs_main",
           targets: [{ format: "rgba16float" }],
         },
@@ -1190,6 +1347,9 @@ export class WebGPUBackend implements RenderBackend {
         filmlab: filmlabPipeline,
         bloomPrefilter: bloomPrefilterPipeline,
         halationPrefilter: halationPrefilterPipeline,
+        diffusionDepthPrefilter: diffusionDepthPrefilterPipeline,
+        bloomDepthPrefilter: bloomDepthPrefilterPipeline,
+        halationDepthPrefilter: halationDepthPrefilterPipeline,
         downsample: downsamplePipeline,
         upsampleAdd: upsampleAddPipeline,
         composite: compositePipeline,
@@ -1210,6 +1370,7 @@ export class WebGPUBackend implements RenderBackend {
         bloom: pyramidGroupLayout,
         halation: pyramidGroupLayout,
         pyramid: pyramidGroupLayout,
+        diffusionDepthPrefilter: diffusionDepthPrefilterGroupLayout,
         composite: compositeGroupLayout,
         blit: blitGroupLayout,
         compareSource: compareSourceGroupLayout,
@@ -1275,6 +1436,20 @@ export class WebGPUBackend implements RenderBackend {
       compareSourceBuffer,
     );
   }
+
+  /**
+   * Dev-only: upload a 512x288 depth probe ImageBitmap (red channel = depth,
+   * 0 = near, 255 = far). Pair with `compositeUniforms.lens.w > 0` to
+   * enable depth-modulated mist in the composite pass.
+   */
+  setDepthFromBitmap(bitmap: ImageBitmap): void {
+    this.ctx.device.queue.copyExternalImageToTexture(
+      { source: bitmap, flipY: false },
+      { texture: this.depthTexture },
+      { width: 512, height: 288, depthOrArrayLayers: 1 },
+    );
+  }
+
 
   setMediaFromBitmap(bitmap: ImageBitmap): void {
     this.liveVideoElement = null;
@@ -1794,6 +1969,215 @@ export class WebGPUBackend implements RenderBackend {
     }
 
     return levels[0]!;
+  }
+
+  /**
+   * Dev-only AI depth probe — produce a depth-weighted source mask feeding
+   * the diffusion pyramid. Output goes to `rt.diffusion.prefiltered`
+   * (full-res rgba16float), which the caller then passes to
+   * `renderDiffusionPyramid` in place of the raw colorGraded view.
+   *
+   * Physical model: Pro-Mist scatters light at the source, so weighting the
+   * source by depth *before* the pyramid is built is the physically correct
+   * location. Post-composite modulation (the prior approach) re-cut an
+   * already-bled halo with a sharp depth mask, which read as a ghost / double
+   * image along silhouette edges.
+   */
+  private renderDiffusionDepthPrefilter(
+    encoder: GPUCommandEncoder,
+    sourceView: GPUTextureView,
+    depthMistGain: number,
+  ): GPUTextureView {
+    const { device } = this.ctx;
+    const scratchRT = this.pool.get("rt.diffusion.prefiltered", {
+      width: this._width,
+      height: this._height,
+      format: "rgba16float",
+    });
+    const scratchView = scratchRT.createView();
+
+    const s = this.diffusionDepthPrefilterScratch;
+    s[0] = depthMistGain;
+    s[1] = this.frameState.fitMode;
+    s[2] = 0;
+    s[3] = 0;
+    s[4] = this._width;
+    s[5] = this._height;
+    s[6] = this.frameState.imgResX;
+    s[7] = this.frameState.imgResY;
+    device.queue.writeBuffer(
+      this.diffusionDepthPrefilterBuffer,
+      0,
+      s.buffer,
+      s.byteOffset,
+      s.byteLength,
+    );
+
+    const bg = device.createBindGroup({
+      label: "diffusion-depth-prefilter.bg",
+      layout: this.layouts.diffusionDepthPrefilter,
+      entries: [
+        { binding: 0, resource: { buffer: this.diffusionDepthPrefilterBuffer } },
+        { binding: 1, resource: sourceView },
+        { binding: 2, resource: this.depthTexture.createView() },
+        { binding: 3, resource: this.sampler },
+      ],
+    });
+
+    const pass = encoder.beginRenderPass({
+      label: "diffusion-depth-prefilter.pass",
+      colorAttachments: [
+        {
+          view: scratchView,
+          loadOp: "clear",
+          storeOp: "store",
+          clearValue: { r: 0, g: 0, b: 0, a: 1 },
+        },
+      ],
+    });
+    pass.setPipeline(this.pipelines.diffusionDepthPrefilter);
+    pass.setBindGroup(0, this.offscreenFlagsBindGroup);
+    pass.setBindGroup(1, bg);
+    pass.draw(3, 1, 0, 0);
+    pass.end();
+
+    return scratchView;
+  }
+
+  /**
+   * Dev-only AI depth probe — depth-weighted source mask feeding the
+   * bloom pyramid. Output goes to `rt.bloom.depth-prefiltered` (full-res
+   * rgba16float), which the caller passes to `renderPyramidChain` as the
+   * `sourceView`; the existing bloom luma-gate prefilter then reads from
+   * this intermediate. Near/far coefficients live in the WGSL constant
+   * (`bloom-depth-prefilter.frag.wgsl.ts`).
+   */
+  private renderBloomDepthPrefilter(
+    encoder: GPUCommandEncoder,
+    sourceView: GPUTextureView,
+    gain: number,
+  ): GPUTextureView {
+    const { device } = this.ctx;
+    const scratchRT = this.pool.get("rt.bloom.depth-prefiltered", {
+      width: this._width,
+      height: this._height,
+      format: "rgba16float",
+    });
+    const scratchView = scratchRT.createView();
+
+    const s = this.bloomDepthPrefilterScratch;
+    s[0] = gain;
+    s[1] = this.frameState.fitMode;
+    s[2] = 0;
+    s[3] = 0;
+    s[4] = this._width;
+    s[5] = this._height;
+    s[6] = this.frameState.imgResX;
+    s[7] = this.frameState.imgResY;
+    device.queue.writeBuffer(
+      this.bloomDepthPrefilterBuffer,
+      0,
+      s.buffer,
+      s.byteOffset,
+      s.byteLength,
+    );
+
+    const bg = device.createBindGroup({
+      label: "bloom-depth-prefilter.bg",
+      layout: this.layouts.diffusionDepthPrefilter,
+      entries: [
+        { binding: 0, resource: { buffer: this.bloomDepthPrefilterBuffer } },
+        { binding: 1, resource: sourceView },
+        { binding: 2, resource: this.depthTexture.createView() },
+        { binding: 3, resource: this.sampler },
+      ],
+    });
+
+    const pass = encoder.beginRenderPass({
+      label: "bloom-depth-prefilter.pass",
+      colorAttachments: [
+        {
+          view: scratchView,
+          loadOp: "clear",
+          storeOp: "store",
+          clearValue: { r: 0, g: 0, b: 0, a: 1 },
+        },
+      ],
+    });
+    pass.setPipeline(this.pipelines.bloomDepthPrefilter);
+    pass.setBindGroup(0, this.offscreenFlagsBindGroup);
+    pass.setBindGroup(1, bg);
+    pass.draw(3, 1, 0, 0);
+    pass.end();
+
+    return scratchView;
+  }
+
+  /**
+   * Dev-only AI depth probe — depth-weighted source mask feeding the
+   * halation pyramid. Mirrors `renderBloomDepthPrefilter`; only the
+   * scratch RT label and uniform buffer differ (separate buffers per
+   * pyramid to avoid writeBuffer aliasing).
+   */
+  private renderHalationDepthPrefilter(
+    encoder: GPUCommandEncoder,
+    sourceView: GPUTextureView,
+    gain: number,
+  ): GPUTextureView {
+    const { device } = this.ctx;
+    const scratchRT = this.pool.get("rt.halation.depth-prefiltered", {
+      width: this._width,
+      height: this._height,
+      format: "rgba16float",
+    });
+    const scratchView = scratchRT.createView();
+
+    const s = this.halationDepthPrefilterScratch;
+    s[0] = gain;
+    s[1] = this.frameState.fitMode;
+    s[2] = 0;
+    s[3] = 0;
+    s[4] = this._width;
+    s[5] = this._height;
+    s[6] = this.frameState.imgResX;
+    s[7] = this.frameState.imgResY;
+    device.queue.writeBuffer(
+      this.halationDepthPrefilterBuffer,
+      0,
+      s.buffer,
+      s.byteOffset,
+      s.byteLength,
+    );
+
+    const bg = device.createBindGroup({
+      label: "halation-depth-prefilter.bg",
+      layout: this.layouts.diffusionDepthPrefilter,
+      entries: [
+        { binding: 0, resource: { buffer: this.halationDepthPrefilterBuffer } },
+        { binding: 1, resource: sourceView },
+        { binding: 2, resource: this.depthTexture.createView() },
+        { binding: 3, resource: this.sampler },
+      ],
+    });
+
+    const pass = encoder.beginRenderPass({
+      label: "halation-depth-prefilter.pass",
+      colorAttachments: [
+        {
+          view: scratchView,
+          loadOp: "clear",
+          storeOp: "store",
+          clearValue: { r: 0, g: 0, b: 0, a: 1 },
+        },
+      ],
+    });
+    pass.setPipeline(this.pipelines.halationDepthPrefilter);
+    pass.setBindGroup(0, this.offscreenFlagsBindGroup);
+    pass.setBindGroup(1, bg);
+    pass.draw(3, 1, 0, 0);
+    pass.end();
+
+    return scratchView;
   }
 
   private renderDiffusionPyramid(
@@ -2915,14 +3299,32 @@ export class WebGPUBackend implements RenderBackend {
 
     const colorGradedView = rtColorGraded.createView();
 
+    // Dev-only AI depth probe.
+    //   - `depthMistGain` drives the diffusion (Mist) pyramid prefilter and
+    //     the composite `>= 1.5` debug view.
+    //   - `depthGlowGain` drives the bloom + halation pyramid prefilters.
+    // Both live in `(0, 1.5)` when active; values >= 1.5 on `depthMistGain`
+    // switch composite into the raw-depth debug view and skip prefiltering.
+    // Splitting the two gains lets presets / dev tooling toggle Mist and
+    // Glow depth-weighting independently (Phase D close-out). Lens and
+    // Cross pillars are out of scope for AI depth by design — see
+    // `docs/guides/2026-04-20-filmtone-optical-finish-pack-master-plan.md` §2.3.
+    const depthMistGain = this.paramNumber("depthMistGain", 0);
+    const depthGlowGain = this.paramNumber("depthGlowGain", 0);
+    const depthMistActive = depthMistGain > 0 && depthMistGain < 1.5;
+    const depthGlowActive = depthGlowGain > 0 && depthGlowGain < 1.5;
+
     // Pass 2 — bloom pyramid (prefilter → downsample → additive upsample).
     const bloomRadius = this.paramNumber("bloomRadius", DEFAULT_BLOOM_RADIUS);
+    const bloomSourceView = depthGlowActive
+      ? this.renderBloomDepthPrefilter(encoder, colorGradedView, depthGlowGain)
+      : colorGradedView;
     const bloomTop = this.renderPyramidChain(
       encoder,
       "bloom",
       this.pipelines.bloomPrefilter,
       this.bloomParamsBuffer,
-      colorGradedView,
+      bloomSourceView,
       bloomLevels,
       this.bloomPyramid,
       bloomRadius,
@@ -2930,12 +3332,15 @@ export class WebGPUBackend implements RenderBackend {
 
     // Pass 3 — halation pyramid (same shape, tinted prefilter).
     const halationRadius = this.paramNumber("halationRadius", DEFAULT_HALATION_RADIUS);
+    const halationSourceView = depthGlowActive
+      ? this.renderHalationDepthPrefilter(encoder, colorGradedView, depthGlowGain)
+      : colorGradedView;
     const halationTop = this.renderPyramidChain(
       encoder,
       "halation",
       this.pipelines.halationPrefilter,
       this.halationParamsBuffer,
-      colorGradedView,
+      halationSourceView,
       halationLevels,
       this.halationPyramid,
       halationRadius,
@@ -2944,9 +3349,19 @@ export class WebGPUBackend implements RenderBackend {
     let diffusionView = this.grainTexture.createView();
     if (diffusionAmount > 0) {
       const diffusionLevels = this.ensurePyramidLevels("rt.diffusion", DIFFUSION_LEVELS);
+      // Dev-only AI depth probe: build the diffusion pyramid from a
+      // depth-weighted source mask instead of the raw colorGraded view.
+      // The composite no longer modulates the halo by depth (see
+      // `composite.frag.wgsl.ts`), so all depth shaping is baked into the
+      // pyramid input. Values >= 1.5 on `depthMistGain` are reserved for
+      // the composite debug view and should bypass prefiltering —
+      // `depthMistActive` gates this above.
+      const pyramidInputView = depthMistActive
+        ? this.renderDiffusionDepthPrefilter(encoder, colorGradedView, depthMistGain)
+        : colorGradedView;
       diffusionView = this.renderDiffusionPyramid(
         encoder,
-        colorGradedView,
+        pyramidInputView,
         diffusionLevels,
       ).createView();
     }
@@ -2964,6 +3379,7 @@ export class WebGPUBackend implements RenderBackend {
         { binding: 4, resource: diffusionView },
         { binding: 5, resource: this.sampler },
         { binding: 6, resource: this.grainSampler },
+        { binding: 7, resource: this.depthTexture.createView() },
       ],
     });
     {
