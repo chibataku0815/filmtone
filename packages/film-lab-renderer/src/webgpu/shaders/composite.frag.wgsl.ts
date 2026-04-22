@@ -46,10 +46,12 @@
  *     binding(5) uSampler   : sampler           (linear, clamp-to-edge)
  *     binding(6) uGrainSamp : sampler           (linear, repeat — also
  *                                                kept for layout parity).
- *     binding(7) uDepth     : texture_2d<f32>   (dev-only AI depth probe,
- *                                                32x32 grayscale, 0=near /
- *                                                1=far. Gated by
- *                                                uComposite.lens.w =
+ *     binding(7) uDepth     : texture_2d<f32>   (shared depth texture for
+ *                                                Mist / Glow, populated by
+ *                                                either the runtime depth
+ *                                                track or the internal
+ *                                                debug probe; 0=near / 1=far.
+ *                                                Gated by uComposite.lens.w =
  *                                                depthMistGain).
  */
 export const compositeFragmentWgsl = /* wgsl */ `
@@ -154,10 +156,10 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
   let lensSoftness = clamp(uComposite.lens.x, 0.0, 1.0);
   let aberrationEdgeSoften = clamp(uComposite.lens.y, 0.0, 1.0);
   let diffusion = clamp(uComposite.lens.z, 0.0, 1.0);
-  // Dev-only AI depth probe:
+  // Shared depth-aware Mist control:
   //   0.0      = no depth modulation (uniform mist, WebGL parity)
   //   0.0..1.0 = depth-modulated mist (near = 0x, far = (1 + 4*gain)x)
-  //   >= 1.5   = debug view: render raw depth texture as grayscale
+  //   >= 1.5   = internal debug view: render raw depth texture as grayscale
   //              (bypasses all subsequent stages — for alignment check only).
   let depthMistGain = clamp(uComposite.lens.w, 0.0, 2.0);
 
@@ -219,7 +221,7 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
   color = vec4f(vec3f(1.0) - (vec3f(1.0) - color.rgb) * (vec3f(1.0) - glow), color.a);
 
   if (diffusion > 0.0) {
-    // Dev-only AI depth probe: depth shaping is now applied UPSTREAM, in
+    // Shared depth-aware Mist path: depth shaping is now applied UPSTREAM, in
     // diffusion-depth-prefilter.frag, so the diffusion pyramid input is
     // already depth-weighted at the source before any blur. Composite
     // therefore just samples the pre-baked halo without a per-pixel depth

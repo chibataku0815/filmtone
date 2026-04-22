@@ -360,7 +360,11 @@ export class WebGPUBackend implements RenderBackend {
   private readonly sampler: GPUSampler;
   private readonly grainSampler: GPUSampler;
   private readonly grainTexture: GPUTexture;
-  /** Dev-only AI depth probe texture (32x32, r=0 near / r=1 far). */
+  /**
+   * Shared depth texture for depth-aware Mist / Glow.
+   * Runtime depth tracks and the internal `?depthProbe=1|2` debug fallback
+   * both upload into this surface.
+   */
   private readonly depthTexture: GPUTexture;
   private readonly gradeScratch = new Float32Array(GRADE_UNIFORM_FLOATS);
   private readonly compositeScratch = new Float32Array(COMPOSITE_UNIFORM_FLOATS);
@@ -1971,7 +1975,7 @@ export class WebGPUBackend implements RenderBackend {
   }
 
   /**
-   * Dev-only AI depth probe — produce a depth-weighted source mask feeding
+   * Shared depth-aware Mist path — produce a depth-weighted source mask feeding
    * the diffusion pyramid. Output goes to `rt.diffusion.prefiltered`
    * (full-res rgba16float), which the caller then passes to
    * `renderDiffusionPyramid` in place of the raw colorGraded view.
@@ -2044,7 +2048,7 @@ export class WebGPUBackend implements RenderBackend {
   }
 
   /**
-   * Dev-only AI depth probe — depth-weighted source mask feeding the
+   * Shared depth-aware Glow path — depth-weighted source mask feeding the
    * bloom pyramid. Output goes to `rt.bloom.depth-prefiltered` (full-res
    * rgba16float), which the caller passes to `renderPyramidChain` as the
    * `sourceView`; the existing bloom luma-gate prefilter then reads from
@@ -2113,7 +2117,7 @@ export class WebGPUBackend implements RenderBackend {
   }
 
   /**
-   * Dev-only AI depth probe — depth-weighted source mask feeding the
+   * Shared depth-aware Glow path — depth-weighted source mask feeding the
    * halation pyramid. Mirrors `renderBloomDepthPrefilter`; only the
    * scratch RT label and uniform buffer differ (separate buffers per
    * pyramid to avoid writeBuffer aliasing).
@@ -3347,7 +3351,7 @@ export class WebGPUBackend implements RenderBackend {
     let diffusionView = this.grainTexture.createView();
     if (diffusionAmount > 0) {
       const diffusionLevels = this.ensurePyramidLevels("rt.diffusion", DIFFUSION_LEVELS);
-      // Dev-only AI depth probe: build the diffusion pyramid from a
+      // Shared depth-aware Mist path: build the diffusion pyramid from a
       // depth-weighted source mask instead of the raw colorGraded view.
       // The composite no longer modulates the halo by depth (see
       // `composite.frag.wgsl.ts`), so all depth shaping is baked into the

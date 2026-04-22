@@ -1,5 +1,5 @@
 /**
- * Halation depth prefilter (WGSL) — dev-only AI depth source mask for the
+ * Halation depth prefilter (WGSL) — shared depth-aware source mask for the
  * halation pyramid. Same structure as `bloom-depth-prefilter` and the Mist
  * reference; differs only in the near/far coefficients.
  *
@@ -11,7 +11,7 @@
  * Bind group layout mirrors `diffusionDepthPrefilterGroupLayout` —
  *   @binding(0) uParams  : Params uniform (gain, fitMode, resolution)
  *   @binding(1) uSource  : texture_2d<f32>  (rt.colorGraded)
- *   @binding(2) uDepth   : texture_2d<f32>  (depth probe, rgba8unorm)
+ *   @binding(2) uDepth   : texture_2d<f32>  (shared depth texture, rgba8unorm)
  *   @binding(3) uSampler : sampler          (linear, clamp-to-edge)
  *
  * Output feeds the existing halation pyramid as its `sourceView`,

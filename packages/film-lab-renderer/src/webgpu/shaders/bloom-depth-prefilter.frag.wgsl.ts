@@ -1,5 +1,5 @@
 /**
- * Bloom depth prefilter (WGSL) — dev-only AI depth source mask for the
+ * Bloom depth prefilter (WGSL) — shared depth-aware source mask for the
  * bloom pyramid. Mirrors the Mist diffusion prefilter pattern
  * (see `diffusion-depth-prefilter.frag.wgsl.ts` and
  * `.claude/knowledge/patterns/2026-04-21-depth-weighted-source-masking-for-atmospheric-filters.md`)
@@ -15,7 +15,7 @@
  * Bind group layout mirrors `diffusionDepthPrefilterGroupLayout` —
  *   @binding(0) uParams  : Params uniform (gain, fitMode, resolution)
  *   @binding(1) uSource  : texture_2d<f32>  (rt.colorGraded)
- *   @binding(2) uDepth   : texture_2d<f32>  (depth probe, rgba8unorm)
+ *   @binding(2) uDepth   : texture_2d<f32>  (shared depth texture, rgba8unorm)
  *   @binding(3) uSampler : sampler          (linear, clamp-to-edge)
  *
  * Output feeds the existing bloom pyramid as its `sourceView`, replacing

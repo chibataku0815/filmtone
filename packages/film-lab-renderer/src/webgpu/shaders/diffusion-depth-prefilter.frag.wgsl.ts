@@ -1,5 +1,5 @@
 /**
- * Diffusion depth prefilter (WGSL) — dev-only AI depth source mask.
+ * Diffusion depth prefilter (WGSL) — shared depth-aware source mask.
  *
  * Physical model: a Pro-Mist / diffusion filter scatters light *at the source*
  * (in front of the lens), not as a post-composite opacity cut. Weighting the
@@ -17,7 +17,7 @@
  * Bind group layout (group 1):
  *   @binding(0) uParams  : Params uniform (gain, fitMode, resolution)
  *   @binding(1) uSource  : texture_2d<f32>  (rt.colorGraded)
- *   @binding(2) uDepth   : texture_2d<f32>  (depth probe, rgba8unorm)
+ *   @binding(2) uDepth   : texture_2d<f32>  (shared depth texture, rgba8unorm)
  *   @binding(3) uSampler : sampler          (linear, clamp-to-edge)
  *
  * `fitUv` mirrors the same image-aspect fit used by composite's vignette and
