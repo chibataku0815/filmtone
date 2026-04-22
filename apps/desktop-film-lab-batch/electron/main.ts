@@ -45,6 +45,10 @@ import {
 } from "./desktop-update-service";
 import { resolveVideoCliBinary } from "./ffmpeg-cli-resolve";
 import {
+  createVideoExportPipeController,
+  type VideoExportPipeController,
+} from "./video-export-stdin";
+import {
   PROXY_CACHE_PROFILE_VERSION,
   buildProxyCacheKey,
   ensureProxyCacheRoot,
@@ -86,6 +90,7 @@ type FfmpegExportChildProcess = ChildProcessByStdio<Writable, null, Readable>;
 type FfmpegVideoExportSession = {
   child: FfmpegExportChildProcess;
   stderrLines: string[];
+  pipeController: VideoExportPipeController;
 };
 
 let activeVideoExport: FfmpegVideoExportSession | null = null;
@@ -514,82 +519,6 @@ async function ffprobeVideoMeta(absPath: string): Promise<{
     sourceFrameRateTrusted,
     fileSizeBytes,
   };
-}
-
-/**
- * @description 1 フレームぶんの raw RGB を ffmpeg stdin に書き、バックプレッシャー時は drain まで待つ
- */
-function writeStdinWithDrain(
-  stdin: NodeJS.WritableStream,
-  chunk: Buffer,
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const onErr = (e: Error) => {
-      cleanup();
-      reject(e);
-    };
-    const cleanup = () => {
-      stdin.removeListener("error", onErr);
-    };
-    stdin.once("error", onErr);
-    try {
-      const ok = stdin.write(chunk);
-      if (ok) {
-        cleanup();
-        resolve();
-      } else {
-        stdin.once("drain", () => {
-          cleanup();
-          resolve();
-        });
-      }
-    } catch (e) {
-      cleanup();
-      reject(e instanceof Error ? e : new Error(String(e)));
-    }
-  });
-}
-
-/**
- * @description stdin.write を呼び即座に resolve。バックプレッシャー中なら前回の drain を先に待つ。
- * renderer が seek と並列で IPC を走らせるための非同期パイプライン用。
- */
-let pendingDrain: Promise<void> | null = null;
-
-function writeStdinPipelined(
-  stdin: NodeJS.WritableStream,
-  chunk: Buffer,
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const doWrite = () => {
-      const onErr = (e: Error) => {
-        stdin.removeListener("error", onErr);
-        reject(e);
-      };
-      stdin.once("error", onErr);
-      try {
-        const ok = stdin.write(chunk);
-        stdin.removeListener("error", onErr);
-        if (!ok) {
-          pendingDrain = new Promise<void>((drainResolve) => {
-            stdin.once("drain", () => { drainResolve(); });
-          });
-        } else {
-          pendingDrain = null;
-        }
-        resolve();
-      } catch (e) {
-        stdin.removeListener("error", onErr);
-        reject(e instanceof Error ? e : new Error(String(e)));
-      }
-    };
-
-    if (pendingDrain) {
-      pendingDrain.then(doWrite, reject);
-    } else {
-      doWrite();
-    }
-  });
 }
 
 /**
@@ -1597,7 +1526,8 @@ ipcMain.handle("video-export-start", async (_evt, payload: unknown) => {
     stderrLines.push(`spawn error: ${err.message}`);
   });
 
-  activeVideoExport = { child, stderrLines };
+  const pipeController = createVideoExportPipeController(child);
+  activeVideoExport = { child, stderrLines, pipeController };
 
   console.log(
     `[film-lab-desktop] ffmpeg 起動 rawvideo ${width}x${height}@${fps} hasAudio=${hasAudio} dropFirstFrame=${dropFirstFrame} cli=${ffmpeg.commandPath} → ${outputVideoPath}`,
@@ -1617,7 +1547,7 @@ ipcMain.handle("video-export-write-frame", async (_evt, data: unknown) => {
   if (!sess) {
     throw new Error("video-export-write-frame: アクティブな書き出しがありません");
   }
-  const { child } = sess;
+  const { child, pipeController } = sess;
   const stdin = child.stdin;
   if (stdin == null || !stdin.writable) {
     throw new Error(
@@ -1627,10 +1557,7 @@ ipcMain.handle("video-export-write-frame", async (_evt, data: unknown) => {
   const buf = Buffer.from(data.buffer, data.byteOffset, data.byteLength);
   const t0 = process.hrtime.bigint();
   try {
-    // Pipelined write: enqueue to stdin and return immediately.
-    // Backpressure (drain) is deferred to the next write call,
-    // allowing the renderer to start seeking the next frame in parallel.
-    await writeStdinPipelined(stdin, buf);
+    await pipeController.write(buf);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     const tail = sess.stderrLines.join("").slice(-2500);
@@ -1651,22 +1578,24 @@ ipcMain.handle("video-export-finish", async () => {
   if (!sess) {
     throw new Error("video-export-finish: アクティブな書き出しがありません");
   }
-  const { child, stderrLines } = sess;
+  const { child, stderrLines, pipeController } = sess;
   activeVideoExport = null;
 
-  // Drain any pending pipelined write before closing stdin
-  if (pendingDrain) {
-    await pendingDrain;
-    pendingDrain = null;
+  pipeController.markFinishing();
+  try {
+    await pipeController.waitForPendingDrain();
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    const stderrTail = stderrLines.join("").slice(-8000);
+    throw new Error(
+      `video-export-finish: stdin drain 失敗 — ${msg} | ffmpeg stderr(末尾): ${stderrTail}`,
+    );
   }
   child.stdin.end();
 
-  const code: number | null = await new Promise((resolve) => {
-    child.on("close", (c) => resolve(c));
-  });
-
+  const closeInfo = await pipeController.waitForClose();
   const stderrTail = stderrLines.join("").slice(-8000);
-  return { code, stderrTail };
+  return { code: closeInfo.code, stderrTail };
 });
 
 ipcMain.handle("video-export-abort", async () => {
