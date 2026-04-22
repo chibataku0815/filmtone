@@ -18,10 +18,10 @@
  *     Sampling them at `(uv.x, 1.0 - uv.y)` re-aligns the glow with the
  *     base image without touching the pyramid or any upstream orientation.
  *   - Image-space vignette.
- *   - **Per-pixel grain** — WebGL parity: silver-halide per-pixel hash, per
- *     channel chroma/luma separation, low-frequency clump noise density
- *     modulation, and 3 Hz temporal stepping. Replaces the earlier blue-
- *     noise tile sampler (which looked too uniform / "smooth" to the user).
+ *   - **Hybrid grain** — WebGL parity: low-end uses calmer fine-grain
+ *     structured noise with weak chroma, while mid/high keeps the existing
+ *     silver-halide per-pixel hash + clump modulation. `grainSize` blends
+ *     between the two so 0.01–0.10 remains perceptually useful.
  *   - **Lens softness + aberration edge soften** — WebGL parity: 8-tap
  *     cross+diagonal blur on `uSource`, mixed into the base via an edge
  *     mask whose weight follows `uLensSoftness` and `uAberrationEdgeSoften`.
@@ -116,8 +116,8 @@ fn glowHeadroom(baseRgb: vec3f, floorValue: f32) -> f32 {
 
 // --- Film grain (WebGL parity) ---
 //
-// Per-pixel hash: sharp, random, no grid artifacts — reproduces the sharp
-// silver-halide look. Ported verbatim from webgl/shaders/composite.frag.ts.
+// Coarse path uses the current per-pixel hash silver-halide look; low-end uses
+// a calmer structured fine-grain basis and smoothly crossfades into coarse.
 fn grainPixelHash(p: vec2f, seed: f32) -> f32 {
   let s = sin(dot(p + vec2f(seed), vec2f(12.9898, 78.233))) * 43758.5453;
   return fract(s) - 0.5;
@@ -139,6 +139,23 @@ fn grainClumpNoise(p: vec2f) -> f32 {
   let c = grainClumpHash(i + vec2f(0.0, 1.0));
   let d = grainClumpHash(i + vec2f(1.0, 1.0));
   return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+fn grainRotate(p: vec2f, angle: f32) -> vec2f {
+  let s = sin(angle);
+  let c = cos(angle);
+  return vec2f(p.x * c - p.y * s, p.x * s + p.y * c);
+}
+
+fn grainFineNoise(p: vec2f, fineScale: f32, seedA: f32, seedB: f32) -> f32 {
+  let q0 = grainRotate(p * fineScale + vec2f(seedA * 0.37, seedB * 0.19), 0.61);
+  let q1 = grainRotate(
+    p * (fineScale * 1.41) + vec2f(seedB * 0.23 + 17.0, seedA * 0.41 + 9.0),
+    -0.73,
+  );
+  let n0 = grainClumpNoise(q0) - 0.5;
+  let n1 = grainClumpNoise(q1) - 0.5;
+  return mix(n0, n1, 0.42);
 }
 
 @fragment
@@ -244,7 +261,7 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
   let vig = 1.0 - vignette * dist * dist;
   color = vec4f(color.rgb * mix(1.0, clamp(vig, 0.0, 1.0), vigMask), color.a);
 
-  // --- Grain: per-pixel hash + per-channel chroma/luma + clump + 3 Hz temporal ---
+  // --- Grain: low-end fine grain + high-end clumped silver-halide hybrid ---
   let grainCenterUv = fitUv(uv, resolution, imageResolution, fitMode);
   let grainBoundaryMask = insideUv(grainCenterUv);
   var grainDelta = grainCenterUv - vec2f(0.5);
@@ -253,29 +270,66 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
   let grainRadialWeight = pow(grainRadial, 1.65);
   let grainRadialEffective = mix(1.0, grainRadialWeight, clamp(grainRadialMix, 0.0, 1.0));
 
-  // 3 Hz temporal stepping: each "grain frame" holds a stable pattern for
-  // ~0.33 s — still images feel stable, video feels projected.
-  let grainFrame = floor(time * 3.0);
-
-  // Per-pixel hash keyed in absolute pixel coords so granularity is tied to
-  // the presented resolution, not the image-space uv.
-  let pixCoord = uv * resolution;
-  let lumaGrain = grainPixelHash(pixCoord, grainFrame * 1.7);
-  let chromaR = grainPixelHash(pixCoord, grainFrame * 2.3 + 500.0) * 0.3;
-  let chromaB = grainPixelHash(pixCoord, grainFrame * 3.1 + 1000.0) * 0.3;
-
-  // Clump density modulation: grainSize=0 → uniform fine grain, =1 →
-  // pronounced clusters. clumpScale shrinks the zones as size grows.
   let grainSizeClamped = clamp(grainSize, 0.0, 1.0);
-  let clumpScale = mix(80.0, 20.0, grainSizeClamped);
-  let clump = grainClumpNoise(uv * resolution / clumpScale + vec2f(grainFrame * 0.5));
-  let densityMod = mix(1.0, 0.3 + clump * 1.4, grainSizeClamped * 0.7);
+  let coarseBlend = smoothstep(0.08, 0.28, grainSizeClamped);
 
-  let grainWeight = grainIntensity * 0.5 * grainRadialEffective * grainBoundaryMask * densityMod;
+  // Deterministic temporal stepping for preview/export parity. Fine grain
+  // updates a little more slowly than coarse grain to keep the low end calm.
+  let grainFrame = floor(time * mix(2.0, 3.0, coarseBlend));
+
+  let pixCoord = uv * resolution;
+  let fineWarp = vec2f(
+    grainClumpNoise(pixCoord / 96.0 + vec2f(11.7, grainFrame * 0.07 + 3.1)),
+    grainClumpNoise(pixCoord / 96.0 + vec2f(grainFrame * 0.09 + 5.3, 23.4)),
+  ) - vec2f(0.5);
+  let fineCoord = pixCoord + fineWarp * 1.45;
+  let fineScale = mix(1.75, 1.05, smoothstep(0.0, 0.25, grainSizeClamped));
+  let fineLuma = grainFineNoise(
+    fineCoord,
+    fineScale,
+    grainFrame * 1.13 + 7.0,
+    grainFrame * 1.71 + 19.0,
+  );
+  let fineChromaStrength = mix(0.035, 0.16, smoothstep(0.02, 0.24, grainSizeClamped));
+  let fineChromaR = grainFineNoise(
+    fineCoord + vec2f(17.0, 0.0),
+    fineScale * 1.07,
+    grainFrame * 1.37 + 41.0,
+    grainFrame * 1.91 + 67.0,
+  ) * fineChromaStrength;
+  let fineChromaB = grainFineNoise(
+    fineCoord + vec2f(0.0, 19.0),
+    fineScale * 1.11,
+    grainFrame * 1.53 + 83.0,
+    grainFrame * 2.07 + 109.0,
+  ) * fineChromaStrength;
+
+  // Coarse path preserves the current sharp per-pixel character.
+  let coarseLuma = grainPixelHash(pixCoord, grainFrame * 1.7);
+  let coarseChromaR = grainPixelHash(pixCoord, grainFrame * 2.3 + 500.0) * 0.3;
+  let coarseChromaB = grainPixelHash(pixCoord, grainFrame * 3.1 + 1000.0) * 0.3;
+
+  let fineDensity = mix(
+    0.92,
+    1.08,
+    grainClumpNoise(pixCoord / 180.0 + vec2f(grainFrame * 0.11, 31.0)),
+  );
+  let clumpScale = mix(80.0, 20.0, grainSizeClamped);
+  let coarseClump = grainClumpNoise(pixCoord / clumpScale + vec2f(grainFrame * 0.5));
+  let coarseDensity = mix(1.0, 0.3 + coarseClump * 1.4, grainSizeClamped * 0.7);
+  let densityMod = mix(fineDensity, coarseDensity, coarseBlend);
+
+  let lumaGrain = mix(fineLuma, coarseLuma, coarseBlend);
+  let chromaR = mix(fineChromaR, coarseChromaR, coarseBlend);
+  let chromaB = mix(fineChromaB, coarseChromaB, coarseBlend);
+  let lowEndPresence = mix(1.06, 1.0, coarseBlend);
+
+  let grainWeight =
+    grainIntensity * 0.5 * grainRadialEffective * grainBoundaryMask * lowEndPresence;
   var rgb = color.rgb;
-  rgb.r = rgb.r + (lumaGrain + chromaR) * grainWeight;
-  rgb.g = rgb.g + lumaGrain * grainWeight;
-  rgb.b = rgb.b + (lumaGrain + chromaB) * grainWeight;
+  rgb.r = rgb.r + (lumaGrain + chromaR) * grainWeight * densityMod;
+  rgb.g = rgb.g + lumaGrain * grainWeight * densityMod;
+  rgb.b = rgb.b + (lumaGrain + chromaB) * grainWeight * densityMod;
   color = vec4f(clamp(rgb, vec3f(0.0), vec3f(1.0)), color.a);
 
   // Keep the legacy repeat sampler live so the bind-group layout does not

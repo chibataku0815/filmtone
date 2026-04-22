@@ -2282,6 +2282,7 @@ export class WebGLBackend implements RenderBackend {
       rgbShift: this.material.uniforms.uRGBShift!.value as number,
       grainIntensity: this.material.uniforms.uGrainIntensity!.value as number,
       grainRadialMix: this.grainRadialMix,
+      grainSize: this.material.uniforms.uGrainSize!.value as number,
       lensSoftness: this.lensSoftness,
       vignette: this.material.uniforms.uVignette!.value as number,
       fade: this.material.uniforms.uFade!.value as number,

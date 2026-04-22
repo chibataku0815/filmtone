@@ -24,7 +24,7 @@ uniform float uVignette;
 uniform float uGrainIntensity;
 /** 0=径方向マスク無し（一様）、1=フル周辺強め。mix(1.0, grainRadialWeight, clamp(値,0,1)) に用いる */
 uniform float uGrainRadialMix;
-/** 0=極細(高周波), 1=極粗(低周波)。Value noise の周波数スケーリングに使用 */
+/** 0=極細/均一寄り、1=極粗/クランプ強め。low-end fine grain と high-end coarse grain の補間に使う */
 uniform float uGrainSize;
 uniform float uTime;
 
@@ -65,7 +65,7 @@ float insideUv(vec2 uv) {
   return s.x * s.y;
 }
 
-// --- Film Grain: Per-pixel hash + chroma/luma separation + organic clumping ---
+// --- Film Grain: low-end fine grain + high-end clumped silver-halide hybrid ---
 
 // Per-pixel hash: sharp, random, no grid artifacts — like actual silver halide crystals.
 float grainPixelHash(vec2 p, float seed) {
@@ -90,6 +90,23 @@ float grainClumpNoise(vec2 p) {
   float c = grainClumpHash(i + vec2(0.0, 1.0));
   float d = grainClumpHash(i + vec2(1.0, 1.0));
   return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+vec2 grainRotate(vec2 p, float angle) {
+  float s = sin(angle);
+  float c = cos(angle);
+  return vec2(p.x * c - p.y * s, p.x * s + p.y * c);
+}
+
+float grainFineNoise(vec2 p, float fineScale, float seedA, float seedB) {
+  vec2 q0 = grainRotate(p * fineScale + vec2(seedA * 0.37, seedB * 0.19), 0.61);
+  vec2 q1 = grainRotate(
+    p * (fineScale * 1.41) + vec2(seedB * 0.23 + 17.0, seedA * 0.41 + 9.0),
+    -0.73
+  );
+  float n0 = grainClumpNoise(q0) - 0.5;
+  float n1 = grainClumpNoise(q1) - 0.5;
+  return mix(n0, n1, 0.42);
 }
 
 // Convert arbitrary glow energy into a bounded screen-blend opacity.
@@ -200,28 +217,63 @@ void main() {
   float grainRadialWeight = pow(grainRadial, 1.65);
   float grainRadialEffective = mix(1.0, grainRadialWeight, clamp(uGrainRadialMix, 0.0, 1.0));
 
-  // Grain temporal: ~3 grain frames/second.
-  // Each "frame" holds a stable grain pattern for ~0.33s — slow enough for
-  // still images to feel stable, fast enough for video to feel projected.
-  float grainFrame = floor(uTime * 3.0);
+  float grainSizeClamped = clamp(uGrainSize, 0.0, 1.0);
+  float coarseBlend = smoothstep(0.08, 0.28, grainSizeClamped);
 
-  // Per-pixel grain with per-channel seeds (chroma/luma separation).
-  // Silver halide crystals are ~1-2px at 1080p scan — per-pixel hash is correct.
+  // Temporal stepping stays deterministic for preview/export parity. Fine grain
+  // holds slightly longer than coarse grain so the low end reads calmer.
+  float grainFrame = floor(uTime * mix(2.0, 3.0, coarseBlend));
+
   vec2 pixCoord = vUv * uResolution;
-  float lumaGrain = grainPixelHash(pixCoord, grainFrame * 1.7);
-  float chromaR = grainPixelHash(pixCoord, grainFrame * 2.3 + 500.0) * 0.3;
-  float chromaB = grainPixelHash(pixCoord, grainFrame * 3.1 + 1000.0) * 0.3;
+  vec2 fineWarp = vec2(
+    grainClumpNoise(pixCoord / 96.0 + vec2(11.7, grainFrame * 0.07 + 3.1)),
+    grainClumpNoise(pixCoord / 96.0 + vec2(grainFrame * 0.09 + 5.3, 23.4))
+  ) - 0.5;
+  vec2 fineCoord = pixCoord + fineWarp * 1.45;
+  float fineScale = mix(1.75, 1.05, smoothstep(0.0, 0.25, grainSizeClamped));
+  float fineLuma = grainFineNoise(
+    fineCoord,
+    fineScale,
+    grainFrame * 1.13 + 7.0,
+    grainFrame * 1.71 + 19.0
+  );
+  float fineChromaStrength = mix(0.035, 0.16, smoothstep(0.02, 0.24, grainSizeClamped));
+  float fineChromaR = grainFineNoise(
+    fineCoord + vec2(17.0, 0.0),
+    fineScale * 1.07,
+    grainFrame * 1.37 + 41.0,
+    grainFrame * 1.91 + 67.0
+  ) * fineChromaStrength;
+  float fineChromaB = grainFineNoise(
+    fineCoord + vec2(0.0, 19.0),
+    fineScale * 1.11,
+    grainFrame * 1.53 + 83.0,
+    grainFrame * 2.07 + 109.0
+  ) * fineChromaStrength;
 
-  // Organic clumping: low-frequency noise modulates grain DENSITY.
-  // grainSize controls how "clumpy" the grain is — NOT the pixel size.
-  // grainSize=0 (Velvia): uniform density -> fine, even grain.
-  // grainSize=1 (pushed HP5): clustered density -> grain forms visible groups.
-  // clumpScale: pixel size of density variation zones (large = gentle undulation).
-  float clumpScale = mix(80.0, 20.0, clamp(uGrainSize, 0.0, 1.0));
-  float clump = grainClumpNoise(vUv * uResolution / clumpScale + grainFrame * 0.5);
-  float densityMod = mix(1.0, 0.3 + clump * 1.4, clamp(uGrainSize, 0.0, 1.0) * 0.7);
+  // Coarse path preserves the existing sharp per-pixel silver-halide character.
+  float coarseLuma = grainPixelHash(pixCoord, grainFrame * 1.7);
+  float coarseChromaR = grainPixelHash(pixCoord, grainFrame * 2.3 + 500.0) * 0.3;
+  float coarseChromaB = grainPixelHash(pixCoord, grainFrame * 3.1 + 1000.0) * 0.3;
 
-  float w = uGrainIntensity * 0.5 * grainRadialEffective * grainBoundaryMask;
+  // Low-end grain now changes actual frequency/distribution instead of only
+  // clump density. High-end stays on the existing cluster-driven path.
+  float fineDensity = mix(
+    0.92,
+    1.08,
+    grainClumpNoise(pixCoord / 180.0 + vec2(grainFrame * 0.11, 31.0))
+  );
+  float clumpScale = mix(80.0, 20.0, grainSizeClamped);
+  float coarseClump = grainClumpNoise(pixCoord / clumpScale + vec2(grainFrame * 0.5));
+  float coarseDensity = mix(1.0, 0.3 + coarseClump * 1.4, grainSizeClamped * 0.7);
+  float densityMod = mix(fineDensity, coarseDensity, coarseBlend);
+
+  float lumaGrain = mix(fineLuma, coarseLuma, coarseBlend);
+  float chromaR = mix(fineChromaR, coarseChromaR, coarseBlend);
+  float chromaB = mix(fineChromaB, coarseChromaB, coarseBlend);
+  float lowEndPresence = mix(1.06, 1.0, coarseBlend);
+
+  float w = uGrainIntensity * 0.5 * grainRadialEffective * grainBoundaryMask * lowEndPresence;
   color.r += (lumaGrain + chromaR) * w * densityMod;
   color.g += lumaGrain * w * densityMod;
   color.b += (lumaGrain + chromaB) * w * densityMod;

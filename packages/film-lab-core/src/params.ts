@@ -13,7 +13,7 @@ export const PARAM_KEYS = [
   "grainIntensity",
   // 0=一様、1=周辺強め（既定1で後方互換）
   "grainRadialMix",
-  /** グレイン粒子の粗さ（0=極細、1=極粗）。Value noise の周波数を制御。range: 0–1 */
+  /** グレイン粒子の粗さ（0=極細、1=極粗）。低域は fine grain、高域は clumped grain に寄せる。range: 0–1 */
   "grainSize",
   "vignette",
   "bloomThreshold",
@@ -102,7 +102,7 @@ export interface Params {
   grainIntensity: number;
   /** グレインの周辺比重（0〜1）。0 で径方向マスクなし、1 で現行の周辺強め。 */
   grainRadialMix: number;
-  /** グレイン粒子の粗さ（0=極細/高周波、1=極粗/低周波）。各プリセットで固有のフィルム感を表現。 */
+  /** グレイン粒子の粗さ（0=極細/均一寄り、1=極粗/クランプ強め）。各プリセットで固有のフィルム感を表現。 */
   grainSize: number;
   vignette: number;
   bloomThreshold: number;

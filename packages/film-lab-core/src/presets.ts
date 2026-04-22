@@ -31,6 +31,7 @@ function withDepthContractDefaults<T extends Record<string, BasePresetParams>>(
  * grainIntensity は composite で径方向マスク（中心弱・周辺強）が掛かるため、
  * グレインを使うプリセットのみ体感が薄くならないようわずかに上げている（2026-03-30）。
  * grainRadialMix は Pro で 0〜1 調整可。プリセット既定は 1（周辺比重オン）。
+ * grainSize は 2026-04-22 low-end uplift 以降、低域で actual fine grain が見える前提で調整する。
  */
 const RAW_PRESETS = {
   reset: {
@@ -159,7 +160,7 @@ const RAW_PRESETS = {
     lensSoftness: 0,
     grainIntensity: 0.14,
     grainRadialMix: 1,
-    grainSize: 0.35,
+    grainSize: 0.32,
     vignette: 0.2,
     bloomThreshold: 0.78,
     bloomStrength: 0.14,
@@ -215,7 +216,7 @@ const RAW_PRESETS = {
     lensSoftness: 0,
     grainIntensity: 0.12,
     grainRadialMix: 1,
-    grainSize: 0.30,
+    grainSize: 0.28,
     vignette: 0.25,
     bloomThreshold: 0.80,
     bloomStrength: 0.16,
@@ -271,7 +272,7 @@ const RAW_PRESETS = {
     lensSoftness: 0,
     grainIntensity: 0.075,
     grainRadialMix: 1,
-    grainSize: 0.28,
+    grainSize: 0.25,
     vignette: 0.15,
     bloomThreshold: 0.84,
     bloomStrength: 0.06,
@@ -327,7 +328,7 @@ const RAW_PRESETS = {
     lensSoftness: 0,
     grainIntensity: 0.18,
     grainRadialMix: 1,
-    grainSize: 0.45,
+    grainSize: 0.43,
     vignette: 0.5,
     bloomThreshold: 0.80,
     bloomStrength: 0.16,
@@ -383,7 +384,7 @@ const RAW_PRESETS = {
     lensSoftness: 0,
     grainIntensity: 0.05,
     grainRadialMix: 1,
-    grainSize: 0.15,
+    grainSize: 0.12,
     vignette: 0.15,
     bloomThreshold: 0.86,
     bloomStrength: 0.08,
@@ -495,7 +496,7 @@ const RAW_PRESETS = {
     lensSoftness: 0,
     grainIntensity: 0.14,
     grainRadialMix: 1,
-    grainSize: 0.60,
+    grainSize: 0.58,
     vignette: 0.3,
     bloomThreshold: 0.64,
     bloomStrength: 0.40,
@@ -556,7 +557,7 @@ const RAW_PRESETS = {
     lensSoftness: 0,
     grainIntensity: 0.02,
     grainRadialMix: 1,
-    grainSize: 0.10,
+    grainSize: 0.08,
     vignette: 0.1,
     bloomThreshold: 0.9,
     bloomStrength: 0.04,

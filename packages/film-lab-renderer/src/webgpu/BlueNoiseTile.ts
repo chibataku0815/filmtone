@@ -1,9 +1,10 @@
 /**
  * BlueNoiseTile — 256×256 `r8unorm` texture built from a pre-baked tile.
  *
- * Phase 1 T1-2. DIRECTION §2: grain uses a blue-noise tile, not a per-frame
- * hash. The underlying bytes are void-and-cluster-generated at build time
- * (see `scripts/generate-blue-noise.mjs`).
+ * The current composite grain is procedural again, but this tile is still kept
+ * around for legacy bind-group compatibility and as a harmless fallback view
+ * when the diffusion pyramid is inactive. The underlying bytes are void-and-
+ * cluster-generated at build time (see `scripts/generate-blue-noise.mjs`).
  */
 
 import { BLUE_NOISE_256_BYTES, BLUE_NOISE_256_SIZE } from "./assets/blue-noise-256";

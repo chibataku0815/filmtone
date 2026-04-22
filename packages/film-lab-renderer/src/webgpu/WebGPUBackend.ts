@@ -16,7 +16,7 @@
  *      texture slot for the top mip. Skipped entirely when Hard-mode
  *      cross-filter is active (WebGL parity).
  *   5. composite → rt.composited (`rgba16float`) — screen-blend glow
- *      shoulder, vignette, blue-noise grain (256² tile, DIRECTION §2).
+ *      shoulder, vignette, hybrid fine/coarse grain.
  *      Composite's diffusion uniform is forced to 0 when Hard-mode
  *      cross-filter is active, independently of user's `diffusion` field.
  *   6. Post-chain (active when `crossFilterStrength > 0` or
