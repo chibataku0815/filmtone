@@ -2821,7 +2821,6 @@ export default function App() {
                           onRunBatch={runBatch}
                           onRetryFailedBatch={retryFailedBatch}
                           onAbortBatch={() => {
-                            void window.filmLabBatch.videoExportAbort().catch(() => {});
                             batchAbortRef.current?.abort();
                           }}
                           batchProgress={batchProgress}
@@ -2878,7 +2877,6 @@ export default function App() {
                           onRunBatch={runBatch}
                           onRetryFailedBatch={retryFailedBatch}
                           onAbortBatch={() => {
-                            void window.filmLabBatch.videoExportAbort().catch(() => {});
                             batchAbortRef.current?.abort();
                           }}
                           batchProgress={batchProgress}
@@ -2917,7 +2915,6 @@ export default function App() {
                         onRunBatch={runBatch}
                         onRetryFailedBatch={retryFailedBatch}
                         onAbortBatch={() => {
-                          void window.filmLabBatch.videoExportAbort().catch(() => {});
                           batchAbortRef.current?.abort();
                         }}
                         batchProgress={batchProgress}

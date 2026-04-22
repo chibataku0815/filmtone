@@ -1066,10 +1066,32 @@ export async function runVideoExportPipeline(options: {
         }
         let pboIdx = 0;
         let prevFence: WebGLSync | null = null;
+        let exportSessionId: string | null = null;
+
+        const invokeVideoExportWriteFrame = (
+          frameBytes: Uint8Array,
+        ): Promise<void> => {
+          const currentSessionId = exportSessionId;
+          if (!currentSessionId) {
+            return Promise.reject(
+              new Error("video-export-write-frame: セッションが初期化されていません"),
+            );
+          }
+          return api.videoExportWriteFrame({
+            sessionId: currentSessionId,
+            data: frameBytes,
+          });
+        };
+
+        const abortActiveVideoExport = async (): Promise<void> => {
+          const currentSessionId = exportSessionId;
+          exportSessionId = null;
+          await api.videoExportAbort(currentSessionId).catch(() => {});
+        };
 
         let resolvedOutPath: string;
         try {
-          await api.videoExportAbort().catch(() => {});
+          await api.videoExportAbort(null).catch(() => {});
           const startRes = await api.videoExportStart({
             inputVideoPath: pathForFfmpeg,
             outputDir,
@@ -1081,6 +1103,7 @@ export async function runVideoExportPipeline(options: {
             dropFirstFrame: renderSession.backendKind === "webgl",
           });
           resolvedOutPath = startRes.outputVideoPath;
+          exportSessionId = startRes.sessionId;
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           return { ok: false, message: `ffmpeg 開始失敗: ${msg}` };
@@ -1132,7 +1155,7 @@ export async function runVideoExportPipeline(options: {
           if (signal?.aborted) {
             onLog("[動画] ユーザー中断");
             await drainPendingIpc();
-            await api.videoExportAbort();
+            await abortActiveVideoExport();
             return { ok: false, message: u.userAborted };
           }
 
@@ -1160,7 +1183,7 @@ export async function runVideoExportPipeline(options: {
             const ipcErr = await drainPendingIpc();
             if (ipcErr) {
               onLog(`[動画] フレーム書込エラー: ${ipcErr}`);
-              await api.videoExportAbort();
+              await abortActiveVideoExport();
               return { ok: false, message: ipcErr };
             }
           } else {
@@ -1212,7 +1235,7 @@ export async function runVideoExportPipeline(options: {
               const ipcErr = await drainPendingIpc();
               if (ipcErr) {
                 onLog(`[動画] フレーム書込エラー: ${ipcErr}`);
-                await api.videoExportAbort().catch(() => {});
+                await abortActiveVideoExport();
                 return { ok: false, message: ipcErr };
               }
               if (
@@ -1222,10 +1245,10 @@ export async function runVideoExportPipeline(options: {
               ) {
                 retryWithSeek = true;
                 retryReason = msg;
-                await api.videoExportAbort().catch(() => {});
+                await abortActiveVideoExport();
                 break;
               }
-              await api.videoExportAbort().catch(() => {});
+              await abortActiveVideoExport();
               return { ok: false, message: msg };
             }
             if (targetSourceIdx !== null) {
@@ -1288,7 +1311,7 @@ export async function runVideoExportPipeline(options: {
 
             const tW0 = performance.now();
             const ipcSegment = profileSegment;
-            pendingIpc = api.videoExportWriteFrame(rgba).then(
+            pendingIpc = invokeVideoExportWriteFrame(rgba).then(
               () => {
                 const ipcMs = performance.now() - tW0;
                 arrIpc.push(ipcMs);
@@ -1329,7 +1352,7 @@ export async function runVideoExportPipeline(options: {
 
               const tW0 = performance.now();
               const ipcSegment = profileSegment;
-              pendingIpc = api.videoExportWriteFrame(cpuBuf).then(
+              pendingIpc = invokeVideoExportWriteFrame(cpuBuf).then(
                 () => {
                   const ipcMs = performance.now() - tW0;
                   arrIpc.push(ipcMs);
@@ -1359,7 +1382,7 @@ export async function runVideoExportPipeline(options: {
 
             const tW0 = performance.now();
             const ipcSegment = profileSegment;
-            pendingIpc = api.videoExportWriteFrame(cpuBuf).then(
+            pendingIpc = invokeVideoExportWriteFrame(cpuBuf).then(
               () => {
                 const ipcMs = performance.now() - tW0;
                 arrIpc.push(ipcMs);
@@ -1381,7 +1404,7 @@ export async function runVideoExportPipeline(options: {
 
             const tW0 = performance.now();
             const ipcSegment = profileSegment;
-            pendingIpc = api.videoExportWriteFrame(cpuBuf).then(
+            pendingIpc = invokeVideoExportWriteFrame(cpuBuf).then(
               () => {
                 const ipcMs = performance.now() - tW0;
                 arrIpc.push(ipcMs);
@@ -1429,7 +1452,7 @@ export async function runVideoExportPipeline(options: {
           const prevIpcErr = await drainPendingIpc();
           if (prevIpcErr) {
             onLog(`[動画] フレーム書込エラー: ${prevIpcErr}`);
-            await api.videoExportAbort();
+            await abortActiveVideoExport();
             return { ok: false, message: prevIpcErr };
           }
           const tR0 = performance.now();
@@ -1446,7 +1469,7 @@ export async function runVideoExportPipeline(options: {
           arrRead.push(performance.now() - tR0);
 
           const tW0 = performance.now();
-          pendingIpc = api.videoExportWriteFrame(cpuBuf).then(
+          pendingIpc = invokeVideoExportWriteFrame(cpuBuf).then(
             () => {
               arrIpc.push(performance.now() - tW0);
             },
@@ -1460,7 +1483,7 @@ export async function runVideoExportPipeline(options: {
         const finalIpcError = await drainPendingIpc();
         if (finalIpcError) {
           onLog(`[動画] フレーム書込エラー: ${finalIpcError}`);
-          await api.videoExportAbort();
+          await abortActiveVideoExport();
           return { ok: false, message: finalIpcError };
         }
 
@@ -1488,7 +1511,11 @@ export async function runVideoExportPipeline(options: {
           );
         }
 
-        const fin = await api.videoExportFinish();
+        if (!exportSessionId) {
+          throw new Error("video-export-finish: セッションが初期化されていません");
+        }
+        const fin = await api.videoExportFinish(exportSessionId);
+        exportSessionId = null;
         if (fin.code !== 0) {
           onLog(`[動画] ffmpeg 終了コード ${fin.code}`);
           if (fin.stderrTail) onLog(fin.stderrTail);
@@ -1502,7 +1529,7 @@ export async function runVideoExportPipeline(options: {
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         onLog(`[動画] FATAL: ${msg}`);
-        await api.videoExportAbort().catch(() => {});
+        await abortActiveVideoExport();
         return { ok: false, message: msg };
       } finally {
         webCodecsSession?.dispose();

@@ -157,16 +157,19 @@ contextBridge.exposeInMainWorld("filmLabBatch", {
     fps: number;
     hasAudio: boolean;
     dropFirstFrame: boolean;
-  }): Promise<{ outputVideoPath: string }> =>
+  }): Promise<{ outputVideoPath: string; sessionId: string }> =>
     ipcRenderer.invoke("video-export-start", payload),
-  videoExportWriteFrame: (data: Uint8Array): Promise<void> =>
-    ipcRenderer.invoke("video-export-write-frame", data),
-  videoExportFinish: (): Promise<{
+  videoExportWriteFrame: (payload: {
+    sessionId: string;
+    data: Uint8Array;
+  }): Promise<void> =>
+    ipcRenderer.invoke("video-export-write-frame", payload),
+  videoExportFinish: (sessionId: string): Promise<{
     code: number | null;
     stderrTail: string;
-  }> => ipcRenderer.invoke("video-export-finish"),
-  videoExportAbort: (): Promise<void> =>
-    ipcRenderer.invoke("video-export-abort"),
+  }> => ipcRenderer.invoke("video-export-finish", sessionId),
+  videoExportAbort: (sessionId?: string | null): Promise<void> =>
+    ipcRenderer.invoke("video-export-abort", sessionId ?? null),
   videoExportStageSource: (
     filePath: string,
   ): Promise<{ stagedPath: string }> =>

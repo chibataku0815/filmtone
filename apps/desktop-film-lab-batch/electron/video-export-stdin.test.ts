@@ -1,7 +1,10 @@
 import { EventEmitter } from "node:events";
 import { describe, expect, it } from "vitest";
 
-import { createVideoExportPipeController } from "./video-export-stdin";
+import {
+  createVideoExportPipeController,
+  describeVideoExportPipeUnavailable,
+} from "./video-export-stdin";
 
 class MockWritable extends EventEmitter {
   writable = true;
@@ -104,5 +107,49 @@ describe("createVideoExportPipeController", () => {
     await expect(controller.write(Buffer.from([1]))).rejects.toThrow(
       "ffmpeg exited before finish",
     );
+  });
+
+  it("describeVideoExportPipeUnavailable prefers a stored failure", () => {
+    const stdin = new MockWritable();
+    const child = new MockChild(stdin);
+    const controller = createVideoExportPipeController(child);
+
+    stdin.emit("error", new Error("write EPIPE"));
+
+    expect(
+      describeVideoExportPipeUnavailable({
+        stdin,
+        controller,
+      }),
+    ).toContain("write EPIPE");
+  });
+
+  it("describeVideoExportPipeUnavailable falls back to child exit info", () => {
+    const stdin = new MockWritable();
+    stdin.destroy();
+    const child = new MockChild(stdin);
+    const controller = createVideoExportPipeController(child);
+
+    expect(
+      describeVideoExportPipeUnavailable({
+        stdin,
+        controller,
+        childExitCode: 1,
+      }),
+    ).toBe("ffmpeg exited before finish (code=1)");
+  });
+
+  it("describeVideoExportPipeUnavailable reports closed stdin when exit details are pending", () => {
+    const stdin = new MockWritable();
+    stdin.destroy();
+    const child = new MockChild(stdin);
+    const controller = createVideoExportPipeController(child);
+
+    expect(
+      describeVideoExportPipeUnavailable({
+        stdin,
+        controller,
+      }),
+    ).toBe("ffmpeg stdin はすでに閉じています");
   });
 });

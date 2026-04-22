@@ -1,4 +1,4 @@
-type VideoExportCloseInfo = {
+export type VideoExportCloseInfo = {
   code: number | null;
   signal: NodeJS.Signals | null;
 };
@@ -40,6 +40,41 @@ function buildCloseError(
     return new Error(`ffmpeg exited ${formatCloseInfo(info)}`);
   }
   return new Error(`ffmpeg exited before finish (${formatCloseInfo(info)})`);
+}
+
+export function describeVideoExportPipeUnavailable(opts: {
+  stdin: Pick<NodeJS.WritableStream, "writable"> | null;
+  controller: Pick<VideoExportPipeController, "getCloseInfo" | "getFailure">;
+  childExitCode?: number | null;
+  childSignal?: NodeJS.Signals | null;
+}): string {
+  const failure = opts.controller.getFailure();
+  if (failure) {
+    return failure.message;
+  }
+
+  const closeInfo = opts.controller.getCloseInfo();
+  if (closeInfo) {
+    return buildCloseError(closeInfo, false).message;
+  }
+
+  if (opts.childExitCode != null || opts.childSignal != null) {
+    return buildCloseError(
+      {
+        code: opts.childExitCode ?? null,
+        signal: opts.childSignal ?? null,
+      },
+      false,
+    ).message;
+  }
+
+  if (opts.stdin == null) {
+    return "ffmpeg stdin が初期化されていません";
+  }
+  if (!opts.stdin.writable) {
+    return "ffmpeg stdin はすでに閉じています";
+  }
+  return "ffmpeg stdin が利用できません";
 }
 
 export function createVideoExportPipeController(

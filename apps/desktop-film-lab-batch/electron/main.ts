@@ -46,6 +46,7 @@ import {
 import { resolveVideoCliBinary } from "./ffmpeg-cli-resolve";
 import {
   createVideoExportPipeController,
+  describeVideoExportPipeUnavailable,
   type VideoExportPipeController,
 } from "./video-export-stdin";
 import {
@@ -88,6 +89,7 @@ const IMAGE_EXT = new Set([".jpg", ".jpeg", ".png"]);
 type FfmpegExportChildProcess = ChildProcessByStdio<Writable, null, Readable>;
 
 type FfmpegVideoExportSession = {
+  sessionId: string;
   child: FfmpegExportChildProcess;
   stderrLines: string[];
   pipeController: VideoExportPipeController;
@@ -1527,19 +1529,29 @@ ipcMain.handle("video-export-start", async (_evt, payload: unknown) => {
   });
 
   const pipeController = createVideoExportPipeController(child);
-  activeVideoExport = { child, stderrLines, pipeController };
+  const sessionId = randomBytes(12).toString("hex");
+  activeVideoExport = { sessionId, child, stderrLines, pipeController };
 
   console.log(
-    `[film-lab-desktop] ffmpeg 起動 rawvideo ${width}x${height}@${fps} hasAudio=${hasAudio} dropFirstFrame=${dropFirstFrame} cli=${ffmpeg.commandPath} → ${outputVideoPath}`,
+    `[film-lab-desktop] ffmpeg 起動 session=${sessionId} rawvideo ${width}x${height}@${fps} hasAudio=${hasAudio} dropFirstFrame=${dropFirstFrame} cli=${ffmpeg.commandPath} → ${outputVideoPath}`,
   );
   if (DEBUG_VIDEO_EXPORT_MAIN) {
     console.log(`[film-lab-desktop] ffmpeg argv: ${JSON.stringify(ffArgs)}`);
   }
 
-  return { outputVideoPath };
+  return { outputVideoPath, sessionId };
 });
 
-ipcMain.handle("video-export-write-frame", async (_evt, data: unknown) => {
+ipcMain.handle("video-export-write-frame", async (_evt, payload: unknown) => {
+  if (!payload || typeof payload !== "object" || payload === null) {
+    throw new TypeError("video-export-write-frame: payload が不正です");
+  }
+  const o = payload as Record<string, unknown>;
+  const sessionId = typeof o.sessionId === "string" ? o.sessionId : "";
+  const data = o.data;
+  if (!sessionId) {
+    throw new TypeError("video-export-write-frame: sessionId が空です");
+  }
   if (!(data instanceof Uint8Array)) {
     throw new TypeError("video-export-write-frame: data が Uint8Array ではありません");
   }
@@ -1547,11 +1559,23 @@ ipcMain.handle("video-export-write-frame", async (_evt, data: unknown) => {
   if (!sess) {
     throw new Error("video-export-write-frame: アクティブな書き出しがありません");
   }
+  if (sess.sessionId !== sessionId) {
+    throw new Error(
+      "video-export-write-frame: アクティブな書き出しセッションが一致しません（stale IPC）",
+    );
+  }
   const { child, pipeController } = sess;
   const stdin = child.stdin;
   if (stdin == null || !stdin.writable) {
+    const detail = describeVideoExportPipeUnavailable({
+      stdin,
+      controller: pipeController,
+      childExitCode: child.exitCode,
+      childSignal: child.signalCode ?? null,
+    });
+    const tail = sess.stderrLines.join("").slice(-2500);
     throw new Error(
-      "video-export-write-frame: ffmpeg stdin が利用できません（null または closed）",
+      `video-export-write-frame: ${detail} | ffmpeg stderr(末尾): ${tail}`,
     );
   }
   const buf = Buffer.from(data.buffer, data.byteOffset, data.byteLength);
@@ -1573,13 +1597,20 @@ ipcMain.handle("video-export-write-frame", async (_evt, data: unknown) => {
   }
 });
 
-ipcMain.handle("video-export-finish", async () => {
+ipcMain.handle("video-export-finish", async (_evt, sessionId: unknown) => {
+  if (typeof sessionId !== "string" || sessionId.length === 0) {
+    throw new TypeError("video-export-finish: sessionId が空です");
+  }
   const sess = activeVideoExport;
   if (!sess) {
     throw new Error("video-export-finish: アクティブな書き出しがありません");
   }
+  if (sess.sessionId !== sessionId) {
+    throw new Error(
+      "video-export-finish: アクティブな書き出しセッションが一致しません（stale IPC）",
+    );
+  }
   const { child, stderrLines, pipeController } = sess;
-  activeVideoExport = null;
 
   pipeController.markFinishing();
   try {
@@ -1594,12 +1625,28 @@ ipcMain.handle("video-export-finish", async () => {
   child.stdin.end();
 
   const closeInfo = await pipeController.waitForClose();
+  if (activeVideoExport?.sessionId === sessionId) {
+    activeVideoExport = null;
+  }
   const stderrTail = stderrLines.join("").slice(-8000);
   return { code: closeInfo.code, stderrTail };
 });
 
-ipcMain.handle("video-export-abort", async () => {
-  disposeActiveVideoExport("video-export-abort IPC");
+ipcMain.handle("video-export-abort", async (_evt, sessionId: unknown) => {
+  const requestedSessionId =
+    typeof sessionId === "string" && sessionId.length > 0 ? sessionId : null;
+  const sess = activeVideoExport;
+  if (!sess) {
+    return;
+  }
+  if (requestedSessionId && sess.sessionId !== requestedSessionId) {
+    return;
+  }
+  disposeActiveVideoExport(
+    requestedSessionId
+      ? `video-export-abort IPC session=${requestedSessionId}`
+      : "video-export-abort IPC",
+  );
 });
 
 ipcMain.handle("video-export-stage-source", async (_evt, filePath: string) => {

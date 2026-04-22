@@ -167,13 +167,16 @@ export type FilmLabBatchBridge = {
     fps: number;
     hasAudio: boolean;
     dropFirstFrame: boolean;
-  }) => Promise<{ outputVideoPath: string }>;
-  videoExportWriteFrame: (data: Uint8Array) => Promise<void>;
-  videoExportFinish: () => Promise<{
+  }) => Promise<{ outputVideoPath: string; sessionId: string }>;
+  videoExportWriteFrame: (payload: {
+    sessionId: string;
+    data: Uint8Array;
+  }) => Promise<void>;
+  videoExportFinish: (sessionId: string) => Promise<{
     code: number | null;
     stderrTail: string;
   }>;
-  videoExportAbort: () => Promise<void>;
+  videoExportAbort: (sessionId?: string | null) => Promise<void>;
   /** @description Photos 等の一時パス対策: 実ファイルを tmp にコピーしてパスを返す */
   videoExportStageSource: (
     absolutePath: string,
