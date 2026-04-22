@@ -130,7 +130,8 @@ export default defineConfig(({ mode }) => {
       /**
        * @description Phase 1 T1-1: Filmtone backend select — desktop defaults to WebGPU.
        *   `WebGPUBackend` は dynamic import で載り、web ビルドでは `"webgl"` 固定により
-       *   tree-shake される。runtime の adapter probe 失敗時は自動で WebGL にフォールバック。
+       *   tree-shake される。desktop は WebGL へ silent downgrade せず、WebGPU
+       *   bootstrap 失敗は caller 側で explicit error UI として扱う。
        */
       "import.meta.env.FILMTONE_BACKEND": JSON.stringify("webgpu"),
     },

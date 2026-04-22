@@ -19,6 +19,12 @@ lives in `STATUS.md` and `phase-3-continuation-v2-handoff.md`.
 gated unsupported preview affordances and live Cross Filter preview controls**,
 not as full preview/export parity across every WebGL-era UI tool.
 
+> Historical note (2026-04-22): this file remains the v1.0 ship gate snapshot
+> from 2026-04-18. Current `main` later moved batch/video export onto the
+> WebGPU offscreen path and carries `depthTrack` through grade JSON plus export
+> metadata sidecars, so do not read the v1.0 known-limit bullets below as the
+> latest runtime/export SSOT.
+
 ---
 
 ## ✅ Passed (phase chat, Claude-side)
@@ -80,7 +86,9 @@ Hands-on QA remains the acceptance signal for preview-only Cross Filter usage.
 - Before/after, A/B compare, and histogram are gated off on the WebGPU preview
   path for v1.0. WebGL preview behavior remains unchanged where that backend
   is still active.
-- Video export / batch export → WebGL2 for v1.0, WebGPU `GpuRenderer` in v1.1.
+- Historical v1.0 limit only: video export / batch export → WebGL2 for v1.0,
+  WebGPU `GpuRenderer` in v1.1. Current `main` later replaced this with a
+  WebGPU-first offscreen export path.
 - Hard Mode temporal cross-filter trail remains intentionally deferred /
   disabled in v1.0. The shipped default UI threshold `0.92` preserves the
   historical hard-mode onset baseline through a compatibility remap.
