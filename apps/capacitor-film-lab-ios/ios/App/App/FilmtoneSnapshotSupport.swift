@@ -10,6 +10,8 @@ enum FilmtoneSnapshotScene: String {
     case camera
     case export
     case processVideo
+    case sourceImportLoading
+    case sourceProbeLoading
 
     static var current: FilmtoneSnapshotScene? {
         let arguments = ProcessInfo.processInfo.arguments
@@ -28,10 +30,19 @@ struct FilmtoneSnapshotFixture {
     let preview: FilmtonePreviewState
     let exportResult: Phase0ExportResultDTO?
     let saveToPhotosState: FilmtoneSaveToPhotosState
+    let sourceLoadState: FilmtoneSourceLoadState?
 
     static func make(scene: FilmtoneSnapshotScene) -> FilmtoneSnapshotFixture {
         if scene == .processVideo {
             return makeProcessVideoFixture()
+        }
+
+        if scene == .sourceImportLoading {
+            return makeSourceImportLoadingFixture()
+        }
+
+        if scene == .sourceProbeLoading {
+            return makeSourceProbeLoadingFixture()
         }
 
         let posters = FilmtoneSnapshotPosterSet.prepare()
@@ -66,7 +77,8 @@ struct FilmtoneSnapshotFixture {
                 probe: probe,
                 preview: posters.preview,
                 exportResult: nil,
-                saveToPhotosState: .notRun
+                saveToPhotosState: .notRun,
+                sourceLoadState: nil
             )
         case .presets:
             return .init(
@@ -79,7 +91,8 @@ struct FilmtoneSnapshotFixture {
                 probe: probe,
                 preview: posters.preview,
                 exportResult: nil,
-                saveToPhotosState: .notRun
+                saveToPhotosState: .notRun,
+                sourceLoadState: nil
             )
         case .quick:
             return .init(
@@ -92,7 +105,8 @@ struct FilmtoneSnapshotFixture {
                 probe: probe,
                 preview: posters.preview,
                 exportResult: nil,
-                saveToPhotosState: .notRun
+                saveToPhotosState: .notRun,
+                sourceLoadState: nil
             )
         case .camera:
             return .init(
@@ -106,7 +120,8 @@ struct FilmtoneSnapshotFixture {
                 probe: probe,
                 preview: posters.preview,
                 exportResult: nil,
-                saveToPhotosState: .notRun
+                saveToPhotosState: .notRun,
+                sourceLoadState: nil
             )
         case .export:
             return .init(
@@ -129,11 +144,93 @@ struct FilmtoneSnapshotFixture {
                     audioPreserved: true,
                     benchmarkRecord: nil
                 ),
-                saveToPhotosState: .saved
+                saveToPhotosState: .saved,
+                sourceLoadState: nil
             )
         case .processVideo:
             preconditionFailure("processVideo is handled before poster-backed snapshot fixtures are created.")
+        case .sourceImportLoading, .sourceProbeLoading:
+            preconditionFailure("Loading scenes are handled before poster-backed snapshot fixtures are created.")
         }
+    }
+
+    private static func makeSourceImportLoadingFixture() -> FilmtoneSnapshotFixture {
+        .init(
+            project: makeProject(
+                presetName: "cinematic",
+                strength: 0.84,
+                quickState: .init(filmCharacter: 0.28, era: -0.18, dynamics: 0.16)
+            ),
+            source: SourceInfoDTO(
+                uri: "filmtone://source-import-loading",
+                filename: "tokyo-night.hevc.mov",
+                kind: .video,
+                mimeType: "video/quicktime"
+            ),
+            probe: SourceProbeDTO(
+                uri: "filmtone://source-import-loading",
+                filename: "tokyo-night.hevc.mov",
+                kind: .video,
+                mimeType: "video/quicktime",
+                width: 0,
+                height: 0,
+                durationSec: 0,
+                fileSizeBytes: 0,
+                codec: "",
+                frameRate: 0
+            ),
+            preview: .empty,
+            exportResult: nil,
+            saveToPhotosState: .notRun,
+            sourceLoadState: .init(
+                stage: .importing,
+                route: .photoLibrary,
+                message: "Importing source…",
+                progress: 0.38,
+                isDeterminate: true
+            )
+        )
+    }
+
+    private static func makeSourceProbeLoadingFixture() -> FilmtoneSnapshotFixture {
+        let posters = FilmtoneSnapshotPosterSet.prepare()
+        let source = SourceInfoDTO(
+            uri: posters.originalURI,
+            filename: "tokyo-night.hevc.mov",
+            kind: .video,
+            mimeType: "video/quicktime"
+        )
+
+        return .init(
+            project: makeProject(
+                presetName: "cinematic",
+                strength: 0.84,
+                quickState: .init(filmCharacter: 0.28, era: -0.18, dynamics: 0.16)
+            ),
+            source: source,
+            probe: SourceProbeDTO(
+                uri: source.uri,
+                filename: source.filename,
+                kind: .video,
+                mimeType: source.mimeType,
+                width: 1170,
+                height: 2532,
+                durationSec: 0,
+                fileSizeBytes: 24_300_000,
+                codec: "",
+                frameRate: 30
+            ),
+            preview: .empty,
+            exportResult: nil,
+            saveToPhotosState: .notRun,
+            sourceLoadState: .init(
+                stage: .probing,
+                route: .photoLibrary,
+                message: "Inspecting media…",
+                progress: nil,
+                isDeterminate: false
+            )
+        )
     }
 
     private static func makeProcessVideoFixture() -> FilmtoneSnapshotFixture {
@@ -151,7 +248,8 @@ struct FilmtoneSnapshotFixture {
             probe: video.probe,
             preview: .empty,
             exportResult: nil,
-            saveToPhotosState: .notRun
+            saveToPhotosState: .notRun,
+            sourceLoadState: nil
         )
     }
 

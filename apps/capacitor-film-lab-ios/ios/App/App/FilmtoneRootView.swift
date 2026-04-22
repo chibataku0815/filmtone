@@ -29,7 +29,12 @@ struct FilmtoneRootView: View {
             .accessibilityIdentifier("filmtone.root.scroll")
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            topChrome
+            VStack(spacing: 0) {
+                topChrome
+                if let sourceLoadState = store.sourceLoadState {
+                    sourceLoadBanner(sourceLoadState)
+                }
+            }
         }
         .sheet(isPresented: $strengthSheetPresented) {
             FilmtoneStrengthSheet(store: store) {
@@ -130,6 +135,59 @@ struct FilmtoneRootView: View {
                 endPoint: .bottom
             )
         )
+    }
+
+    private func sourceLoadBanner(_ state: FilmtoneSourceLoadState) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(store.strings.sourceLoadTitle(for: state.stage))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.filmtoneAmber.opacity(0.95))
+
+                    Text(state.message)
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.84))
+                        .lineLimit(2)
+                        .accessibilityIdentifier("filmtone.banner.sourceLoad.label")
+                }
+
+                Spacer(minLength: 12)
+
+                if state.isDeterminate, let progress = state.clampedProgress {
+                    Text(percentLabel(progress))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.72))
+                        .monospacedDigit()
+                } else {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .tint(Color.filmtoneAmber)
+                }
+            }
+
+            if state.isDeterminate, let progress = state.clampedProgress {
+                ProgressView(value: progress)
+                    .tint(Color.filmtoneAmber)
+                    .padding(.top, 12)
+                    .accessibilityIdentifier("filmtone.banner.sourceLoad.progress")
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
+        .padding(.bottom, 10)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.62),
+                    Color.black.opacity(0.38),
+                    Color.clear,
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+        .accessibilityIdentifier("filmtone.banner.sourceLoad")
     }
 
     private var heroSection: some View {

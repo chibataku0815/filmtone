@@ -9,6 +9,32 @@ enum FilmtoneSourcePickerRoute: String, Codable, Sendable {
     case files
 }
 
+enum FilmtoneSourceImportProgressPhase: Sendable {
+    case importing
+    case downloadingFromCloud
+}
+
+struct FilmtoneSourceImportProgress: Sendable {
+    let phase: FilmtoneSourceImportProgressPhase
+    let fractionCompleted: Double?
+    let isDeterminate: Bool
+
+    static func importing(
+        progress: Double? = nil,
+        isDeterminate: Bool = false
+    ) -> FilmtoneSourceImportProgress {
+        .init(phase: .importing, fractionCompleted: progress, isDeterminate: isDeterminate)
+    }
+
+    static func downloadingFromCloud(progress: Double) -> FilmtoneSourceImportProgress {
+        .init(
+            phase: .downloadingFromCloud,
+            fractionCompleted: progress,
+            isDeterminate: true
+        )
+    }
+}
+
 final class AssetPickerService: NSObject {
     private enum DocumentPickerPurpose {
         case source
@@ -19,6 +45,7 @@ final class AssetPickerService: NSObject {
     private var sourceContinuation: CheckedContinuation<SourceInfoDTO?, Error>?
     private var lutContinuation: CheckedContinuation<PickedLutFileDTO?, Error>?
     private var activeDocumentPickerPurpose: DocumentPickerPurpose?
+    private var sourceImportProgressHandler: (@MainActor (FilmtoneSourceImportProgress) -> Void)?
 
     init(cacheStore: CacheStore) {
         self.cacheStore = cacheStore
@@ -28,7 +55,8 @@ final class AssetPickerService: NSObject {
     @MainActor
     func pickSource(
         presenting viewController: UIViewController,
-        route: FilmtoneSourcePickerRoute = .photoLibrary
+        route: FilmtoneSourcePickerRoute = .photoLibrary,
+        onImportProgress: (@MainActor (FilmtoneSourceImportProgress) -> Void)? = nil
     ) async throws -> SourceInfoDTO? {
         guard sourceContinuation == nil, lutContinuation == nil else {
             throw FilmtoneMediaError.pickerUnavailable(
@@ -42,6 +70,7 @@ final class AssetPickerService: NSObject {
 
         return try await withCheckedThrowingContinuation { continuation in
             self.sourceContinuation = continuation
+            self.sourceImportProgressHandler = onImportProgress
 
             switch route {
             case .photoLibrary:
@@ -93,6 +122,7 @@ final class AssetPickerService: NSObject {
     }
 
     private func importSource(from result: PHPickerResult) async throws -> SourceInfoDTO {
+        reportSourceImportProgress(.importing())
         let provider = result.itemProvider
         let movieType = provider.registeredTypeIdentifiers.first(where: {
             UTType($0)?.conforms(to: .movie) == true || UTType($0)?.conforms(to: .video) == true
@@ -207,6 +237,11 @@ final class AssetPickerService: NSObject {
     private func writeAssetResource(_ resource: PHAssetResource, to destinationURL: URL) async throws {
         let requestOptions = PHAssetResourceRequestOptions()
         requestOptions.isNetworkAccessAllowed = true
+        requestOptions.progressHandler = { [weak self] progress in
+            self?.reportSourceImportProgress(
+                .downloadingFromCloud(progress: max(0, min(1, progress)))
+            )
+        }
 
         if FileManager.default.fileExists(atPath: destinationURL.path) {
             try FileManager.default.removeItem(at: destinationURL)
@@ -322,7 +357,11 @@ final class AssetPickerService: NSObject {
         let cacheMessage = genericCacheMessage(for: bucket)
         let cacheStore = self.cacheStore
         return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
-            provider.loadFileRepresentation(forTypeIdentifier: typeIdentifier) { url, error in
+            self.reportSourceImportProgress(.importing())
+
+            var progressObservation: NSKeyValueObservation?
+            let progress = provider.loadFileRepresentation(forTypeIdentifier: typeIdentifier) { url, error in
+                progressObservation = nil
                 if let error {
                     _ = error
                     continuation.resume(
@@ -351,6 +390,25 @@ final class AssetPickerService: NSObject {
                     )
                 }
             }
+
+            if progress.totalUnitCount > 0 {
+                progressObservation = progress.observe(
+                    \.fractionCompleted,
+                    options: [.initial, .new]
+                ) { [weak self] observedProgress, _ in
+                    let fractionCompleted = observedProgress.fractionCompleted
+                    guard fractionCompleted.isFinite, !fractionCompleted.isNaN else {
+                        return
+                    }
+
+                    self?.reportSourceImportProgress(
+                        .importing(
+                            progress: max(0, min(1, fractionCompleted)),
+                            isDeterminate: true
+                        )
+                    )
+                }
+            }
         }
     }
 
@@ -370,6 +428,20 @@ final class AssetPickerService: NSObject {
             )
         }
     }
+
+    private func reportSourceImportProgress(_ progress: FilmtoneSourceImportProgress) {
+        guard let handler = sourceImportProgressHandler else {
+            return
+        }
+
+        Task { @MainActor in
+            handler(progress)
+        }
+    }
+
+    private func clearSourceImportProgressHandler() {
+        sourceImportProgressHandler = nil
+    }
 }
 
 private extension String {
@@ -386,15 +458,18 @@ extension AssetPickerService: PHPickerViewControllerDelegate {
 
         guard let continuation else { return }
         guard let result = results.first else {
+            clearSourceImportProgressHandler()
             continuation.resume(returning: nil)
             return
         }
 
         Task {
             do {
+                defer { self.clearSourceImportProgressHandler() }
                 let picked = try await importSource(from: result)
                 continuation.resume(returning: picked)
             } catch {
+                clearSourceImportProgressHandler()
                 continuation.resume(throwing: error)
             }
         }
@@ -408,6 +483,7 @@ extension AssetPickerService: UIDocumentPickerDelegate {
             let continuation = sourceContinuation
             sourceContinuation = nil
             activeDocumentPickerPurpose = nil
+            clearSourceImportProgressHandler()
             continuation?.resume(returning: nil)
         case .lut:
             let continuation = lutContinuation
@@ -431,15 +507,19 @@ extension AssetPickerService: UIDocumentPickerDelegate {
 
             guard let continuation else { return }
             guard let url = urls.first else {
+                clearSourceImportProgressHandler()
                 continuation.resume(returning: nil)
                 return
             }
 
+            reportSourceImportProgress(.importing())
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
                     let picked = try self.importDocumentSource(from: url)
+                    self.clearSourceImportProgressHandler()
                     continuation.resume(returning: picked)
                 } catch {
+                    self.clearSourceImportProgressHandler()
                     continuation.resume(throwing: error)
                 }
             }

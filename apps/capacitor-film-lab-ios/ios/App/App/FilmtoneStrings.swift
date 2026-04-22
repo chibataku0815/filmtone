@@ -46,6 +46,11 @@ struct FilmtoneStrings {
     let pickFromPhotoLibrary: String
     let pickFromFiles: String
     let probePending: String
+    let sourceLoadImportingTitle: String
+    let sourceLoadProbingTitle: String
+    let sourceLoadImportingMessage: String
+    let sourceLoadImportingFromFilesMessage: String
+    let sourceLoadDownloadingFromCloudMessage: String
     let previewRendering: String
     let previewSheetHint: String
     let previewEmptyEyebrow: String
@@ -158,6 +163,31 @@ extension FilmtoneStrings {
             "filmtone.source.inspecting",
             defaultValue: "Inspecting media…",
             comment: "Notice shown while the app probes the selected source."
+        )
+        sourceLoadImportingTitle = filmtoneLocalized(
+            "filmtone.source.load_title.importing",
+            defaultValue: prefersJapanese ? "読み込み中" : "Loading",
+            comment: "Title shown while the selected media is still being imported."
+        )
+        sourceLoadProbingTitle = filmtoneLocalized(
+            "filmtone.source.load_title.probing",
+            defaultValue: prefersJapanese ? "素材を確認中" : "Inspecting",
+            comment: "Title shown while the selected media is being probed."
+        )
+        sourceLoadImportingMessage = filmtoneLocalized(
+            "filmtone.source.load_message.importing",
+            defaultValue: prefersJapanese ? "選択した素材を読み込んでいます…" : "Loading the selected media…",
+            comment: "Message shown while the selected media is being imported."
+        )
+        sourceLoadImportingFromFilesMessage = filmtoneLocalized(
+            "filmtone.source.load_message.importing_files",
+            defaultValue: prefersJapanese ? "ファイルを読み込んでいます…" : "Importing the selected file…",
+            comment: "Message shown while importing media from Files."
+        )
+        sourceLoadDownloadingFromCloudMessage = filmtoneLocalized(
+            "filmtone.source.load_message.cloud",
+            defaultValue: prefersJapanese ? "iCloud から取得しています…" : "Downloading from iCloud…",
+            comment: "Message shown while the selected media is downloading from iCloud."
         )
         previewRendering = filmtoneLocalized(
             "filmtone.preview.rendering",
@@ -542,6 +572,32 @@ extension FilmtoneStrings {
             return exportStageWriting
         case .completed:
             return exportStageCompleted
+        }
+    }
+
+    func sourceLoadTitle(for stage: FilmtoneSourceLoadState.Stage) -> String {
+        switch stage {
+        case .importing:
+            return sourceLoadImportingTitle
+        case .probing:
+            return sourceLoadProbingTitle
+        }
+    }
+
+    func sourceImportMessage(
+        for phase: FilmtoneSourceImportProgressPhase,
+        route: FilmtoneSourcePickerRoute
+    ) -> String {
+        switch phase {
+        case .importing:
+            switch route {
+            case .photoLibrary:
+                return sourceLoadImportingMessage
+            case .files:
+                return sourceLoadImportingFromFilesMessage
+            }
+        case .downloadingFromCloud:
+            return sourceLoadDownloadingFromCloudMessage
         }
     }
 

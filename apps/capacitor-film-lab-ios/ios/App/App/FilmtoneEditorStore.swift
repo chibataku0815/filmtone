@@ -117,6 +117,26 @@ enum FilmtoneSaveToPhotosState: String {
     case failed
 }
 
+struct FilmtoneSourceLoadState {
+    enum Stage {
+        case importing
+        case probing
+    }
+
+    let stage: Stage
+    let route: FilmtoneSourcePickerRoute
+    let message: String
+    let progress: Double?
+    let isDeterminate: Bool
+
+    var clampedProgress: Double? {
+        guard let progress, progress.isFinite, !progress.isNaN else {
+            return nil
+        }
+        return max(0, min(1, progress))
+    }
+}
+
 @MainActor
 final class FilmtoneVideoPreviewSession {
     let sourceURI: String
@@ -334,6 +354,7 @@ final class FilmtoneEditorStore: ObservableObject {
     @Published var exportProgress: Phase0ExportProgressDTO?
     @Published var exportResult: Phase0ExportResultDTO?
     @Published var saveToPhotosState: FilmtoneSaveToPhotosState = .notRun
+    @Published var sourceLoadState: FilmtoneSourceLoadState?
     @Published var isBusy = false
     @Published var notice: String?
     @Published var error: String?
@@ -512,6 +533,7 @@ final class FilmtoneEditorStore: ObservableObject {
         exportProgress = nil
         exportResult = fixture.exportResult
         saveToPhotosState = fixture.saveToPhotosState
+        sourceLoadState = fixture.sourceLoadState
         isBusy = false
         notice = nil
         error = nil
@@ -522,20 +544,35 @@ final class FilmtoneEditorStore: ObservableObject {
             isBusy = true
             notice = nil
             error = nil
+            sourceLoadState = nil
 
-            guard let source = try await facade.pickSource(route: route) else {
+            guard let source = try await facade.pickSource(
+                route: route,
+                onImportProgress: { [weak self] progress in
+                    self?.applySourceImportProgress(progress, route: route)
+                }
+            ) else {
                 isBusy = false
+                sourceLoadState = nil
                 return
             }
 
-            notice = strings.probePending
+            sourceLoadState = .init(
+                stage: .probing,
+                route: route,
+                message: strings.probePending,
+                progress: nil,
+                isDeterminate: false
+            )
             let probe = try facade.probeSource(source)
             applyProbe(source: source, probe: probe)
             isBusy = false
+            sourceLoadState = nil
             persist()
             schedulePreviewRender()
         } catch {
             isBusy = false
+            sourceLoadState = nil
             self.error = strings.userMessage(for: error, context: .pickSource)
         }
     }
@@ -708,6 +745,20 @@ final class FilmtoneEditorStore: ObservableObject {
         self.notice = nil
         self.exportResult = nil
         self.exportProgress = nil
+        self.sourceLoadState = nil
+    }
+
+    private func applySourceImportProgress(
+        _ progress: FilmtoneSourceImportProgress,
+        route: FilmtoneSourcePickerRoute
+    ) {
+        sourceLoadState = .init(
+            stage: .importing,
+            route: route,
+            message: strings.sourceImportMessage(for: progress.phase, route: route),
+            progress: progress.fractionCompleted,
+            isDeterminate: progress.isDeterminate
+        )
     }
 
     private func schedulePreviewRender() {

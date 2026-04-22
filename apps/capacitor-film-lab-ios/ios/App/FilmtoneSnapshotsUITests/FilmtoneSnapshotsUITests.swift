@@ -7,6 +7,8 @@ private enum SnapshotScene: String {
     case camera
     case export
     case processVideo
+    case sourceImportLoading
+    case sourceProbeLoading
 }
 
 @MainActor
@@ -21,6 +23,8 @@ final class FilmtoneSnapshotsUITests: XCTestCase {
         captureQuickControls()
         captureCameraProfile()
         captureExportFlow()
+        captureSourceImportLoading()
+        captureSourceProbeLoading()
     }
 
     func testCaptureProcessVideoRefreshRegression() throws {
@@ -97,6 +101,22 @@ final class FilmtoneSnapshotsUITests: XCTestCase {
         app.terminate()
     }
 
+    private func captureSourceImportLoading() {
+        let app = launch(scene: .sourceImportLoading)
+        waitForAppToSettle(app)
+        assertSourceLoadBanner(in: app, expectsProgress: true)
+        snapshot("07_source_import_loading", timeWaitingForIdle: 0)
+        app.terminate()
+    }
+
+    private func captureSourceProbeLoading() {
+        let app = launch(scene: .sourceProbeLoading)
+        waitForAppToSettle(app)
+        assertSourceLoadBanner(in: app, expectsProgress: false)
+        snapshot("08_source_probe_loading", timeWaitingForIdle: 0)
+        app.terminate()
+    }
+
     private func launch(scene: SnapshotScene) -> XCUIApplication {
         let app = XCUIApplication()
         setupSnapshot(app, waitForAnimations: false)
@@ -125,6 +145,23 @@ final class FilmtoneSnapshotsUITests: XCTestCase {
             XCTAssertTrue(waitForElementToDisappear(loadingIndicator, timeout: 20))
         } else {
             pauseForLayout(1.2)
+        }
+    }
+
+    private func assertSourceLoadBanner(
+        in app: XCUIApplication,
+        expectsProgress: Bool
+    ) {
+        let banner = app.descendants(matching: .any)["filmtone.banner.sourceLoad"]
+        let label = app.descendants(matching: .any)["filmtone.banner.sourceLoad.label"]
+        let progress = app.descendants(matching: .any)["filmtone.banner.sourceLoad.progress"]
+
+        XCTAssertTrue(banner.waitForExistence(timeout: 10))
+        XCTAssertTrue(label.waitForExistence(timeout: 10))
+        if expectsProgress {
+            XCTAssertTrue(progress.waitForExistence(timeout: 10))
+        } else {
+            XCTAssertFalse(progress.waitForExistence(timeout: 2))
         }
     }
 

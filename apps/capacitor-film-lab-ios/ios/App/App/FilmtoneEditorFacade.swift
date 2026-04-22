@@ -48,13 +48,17 @@ final class FilmtoneEditorFacade {
         self.presenter = presenter
     }
 
-    func pickSource(route: FilmtoneSourcePickerRoute = .photoLibrary) async throws -> SourceInfoDTO? {
+    func pickSource(
+        route: FilmtoneSourcePickerRoute = .photoLibrary,
+        onImportProgress: (@MainActor (FilmtoneSourceImportProgress) -> Void)? = nil
+    ) async throws -> SourceInfoDTO? {
         guard let presenter else {
             throw FilmtoneMediaError.bridgeUnavailable
         }
         return try await assetPickerService.pickSource(
             presenting: presenter,
-            route: route
+            route: route,
+            onImportProgress: onImportProgress
         )
     }
 
