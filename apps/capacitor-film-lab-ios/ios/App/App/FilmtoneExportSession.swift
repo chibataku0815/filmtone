@@ -587,15 +587,10 @@ final class FilmtoneExportSession {
 
     fileprivate func renderablePreviewVideoImage(
         from image: CIImage,
-        transform: CGAffineTransform,
         outputSize: CGSize,
         timeSeconds: Double
     ) throws -> CIImage {
-        let base = scaledVideoSourceImage(
-            image,
-            transform: transform,
-            outputSize: outputSize
-        )
+        let base = scaledPreviewVideoSourceImage(image, outputSize: outputSize)
         let graded = applyGrade(to: base, timeSeconds: timeSeconds)
         let cropped = graded.cropped(to: CGRect(origin: .zero, size: outputSize))
         try validatePreviewVideoImage(cropped, outputSize: outputSize)
@@ -619,12 +614,28 @@ final class FilmtoneExportSession {
         transform: CGAffineTransform,
         outputSize: CGSize
     ) -> CIImage {
-        let oriented = image.transformed(by: transform)
+        let oriented = image.transformed(by: Self.coreImageVideoTransform(
+            for: transform,
+            sourceExtent: image.extent
+        ))
         let normalized = oriented.transformed(by: CGAffineTransform(
             translationX: -oriented.extent.origin.x,
             y: -oriented.extent.origin.y
         ))
 
+        let scaleX = outputSize.width / normalized.extent.width
+        let scaleY = outputSize.height / normalized.extent.height
+        return normalized
+            .transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
+            .cropped(to: CGRect(origin: .zero, size: outputSize))
+    }
+
+    private func scaledPreviewVideoSourceImage(_ image: CIImage, outputSize: CGSize) -> CIImage {
+        // AVVideoComposition's CI filtering request already respects track presentation.
+        let normalized = image.transformed(by: CGAffineTransform(
+            translationX: -image.extent.origin.x,
+            y: -image.extent.origin.y
+        ))
         let scaleX = outputSize.width / normalized.extent.width
         let scaleY = outputSize.height / normalized.extent.height
         return normalized
@@ -680,6 +691,24 @@ final class FilmtoneExportSession {
                 )
             )
         }
+    }
+
+    static func coreImageVideoTransform(
+        for preferredTransform: CGAffineTransform,
+        sourceExtent: CGRect
+    ) -> CGAffineTransform {
+        // AVAssetTrack.preferredTransform is expressed in the track's top-left
+        // coordinate space. Convert it into Core Image's bottom-left space
+        // before rasterizing decoded buffers or portrait clips land 180° off.
+        let sourceRect = CGRect(origin: .zero, size: sourceExtent.size)
+        let displayedRect = sourceRect.applying(preferredTransform).standardized
+        let inputFlip = CGAffineTransform(scaleX: 1, y: -1)
+            .translatedBy(x: 0, y: -sourceRect.height)
+        let outputFlip = CGAffineTransform(scaleX: 1, y: -1)
+            .translatedBy(x: 0, y: -displayedRect.height)
+        return inputFlip
+            .concatenating(preferredTransform)
+            .concatenating(outputFlip)
     }
 
     fileprivate func applyGrade(to image: CIImage, timeSeconds: Double) -> CIImage {
@@ -1511,7 +1540,7 @@ final class FilmtoneSharedGradeProcessor {
 
     func makeVideoComposition(
         asset: AVAsset,
-        videoTrack: AVAssetTrack,
+        videoTrack _: AVAssetTrack,
         outputSize: CGSize
     ) -> AVMutableVideoComposition {
         let composition = AVMutableVideoComposition(
@@ -1521,7 +1550,6 @@ final class FilmtoneSharedGradeProcessor {
                     let timeSeconds = CMTimeGetSeconds(request.compositionTime)
                     let processed = try session.renderablePreviewVideoImage(
                         from: request.sourceImage,
-                        transform: videoTrack.preferredTransform,
                         outputSize: outputSize,
                         timeSeconds: timeSeconds.isFinite ? timeSeconds : 0
                     )
