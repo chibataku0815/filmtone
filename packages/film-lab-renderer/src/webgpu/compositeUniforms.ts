@@ -11,8 +11,9 @@
  *   2: (grainSize, grainRadialMix, fitMode, time)
  *   3: (lensSoftness, aberrationEdgeSoften, diffusion, depthMistGain)
  *
- * `depthMistGain` is a dev-only AI depth probe knob (0 = uniform mist,
- * 1 = full depth modulation). See `composite.frag.wgsl.ts` binding(7) uDepth.
+ * `depthMistGain` is the shared depth-aware Mist gain (0 = uniform mist,
+ * 1 = full depth modulation). Values >= 1.5 stay reserved for the internal
+ * raw-depth debug view. See `composite.frag.wgsl.ts` binding(7) uDepth.
  */
 
 export const COMPOSITE_UNIFORM_FLOATS = 16;
@@ -58,8 +59,8 @@ export function packCompositeUniforms(
   out[12] = n("lensSoftness", 0);
   out[13] = clamp01(n("rgbShift", 0) * ABERRATION_EDGE_SOFTEN_SCALE);
   out[14] = clamp01(n("diffusion", 0));
-  // depthMistGain: 0..1 = modulated mist, >=1.5 = debug depth view.
-  // Allow up to 2.0 so the debug branch in the shader can be selected.
+  // depthMistGain: 0..1 = shared depth-aware Mist modulation.
+  // Values >= 1.5 are reserved for the internal raw-depth debug view.
   out[15] = Math.min(2, Math.max(0, n("depthMistGain", 0)));
   return out;
 }

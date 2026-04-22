@@ -3,10 +3,15 @@ import { PRESETS } from "film-lab-core";
 import type { BatchGradeState } from "../batch-pipeline";
 
 const mocks = vi.hoisted(() => {
+  const canvas2dContext = {
+    fillStyle: "",
+    fillRect: vi.fn(),
+  };
   const canvas = {
     width: 320,
     height: 180,
     toDataURL: vi.fn(() => "data:image/png;base64,AAA"),
+    getContext: vi.fn(() => canvas2dContext),
   };
   const viewport = {
     backendKind: "webgpu" as const,
@@ -23,6 +28,7 @@ const mocks = vi.hoisted(() => {
     setMediaFromBitmap: vi.fn(),
     setTexture: vi.fn(),
     setParams: vi.fn(),
+    setDepthFromBitmap: vi.fn(),
     setLUT1: vi.fn(),
     setLUT1Intensity: vi.fn(),
     clearLUT1: vi.fn(),
@@ -39,6 +45,7 @@ const mocks = vi.hoisted(() => {
 
   return {
     canvas,
+    canvas2dContext,
     viewport,
     viewportCreate: vi.fn(async () => viewport),
     createElement: vi.fn(),
@@ -46,6 +53,11 @@ const mocks = vi.hoisted(() => {
       width: 3840,
       height: 2160,
       close: vi.fn(),
+    })),
+    fetch: vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      blob: async () => new Blob(["depth"], { type: "image/png" }),
     })),
   };
 });
@@ -64,6 +76,7 @@ function makeGrade(
       ...Object.values(PRESETS)[0]!,
       halationHue: 48,
     },
+    depthTrack: null,
     lut1Intensity: 0.8,
     lut1Data: new Float32Array([0, 1]),
     lut1Size: 2,
@@ -84,7 +97,10 @@ describe("createWebGPUOffscreenRenderSession", () => {
     mocks.viewportCreate.mockClear();
     mocks.createElement.mockClear();
     mocks.createImageBitmap.mockClear();
+    mocks.fetch.mockClear();
     mocks.canvas.toDataURL.mockClear();
+    mocks.canvas.getContext.mockClear();
+    mocks.canvas2dContext.fillRect.mockClear();
     mocks.canvas.width = 320;
     mocks.canvas.height = 180;
     mocks.createElement.mockImplementation(() => mocks.canvas);
@@ -92,6 +108,7 @@ describe("createWebGPUOffscreenRenderSession", () => {
       createElement: mocks.createElement,
     });
     vi.stubGlobal("createImageBitmap", mocks.createImageBitmap);
+    vi.stubGlobal("fetch", mocks.fetch);
   });
 
   it("wraps a WebGPU viewport behind the session contract", async () => {
@@ -182,5 +199,59 @@ describe("createWebGPUOffscreenRenderSession", () => {
     expect(mocks.viewport.setTexture).toHaveBeenCalledWith(texture);
     expect(mocks.createImageBitmap).not.toHaveBeenCalled();
     expect(mocks.viewport.setMediaFromBitmap).not.toHaveBeenCalled();
+  });
+
+  it("decodes a depth track and uploads nearest frames as time advances", async () => {
+    const createdBitmaps: Array<{ close: ReturnType<typeof vi.fn> }> = [];
+    mocks.createImageBitmap.mockImplementation(async () => {
+      const bitmap = {
+        width: 512,
+        height: 288,
+        close: vi.fn(),
+      };
+      createdBitmaps.push(bitmap);
+      return bitmap;
+    });
+
+    const { createWebGPUOffscreenRenderSession } = await import(
+      "./webgpu-offscreen-render-session"
+    );
+    const session = await createWebGPUOffscreenRenderSession({
+      width: 640,
+      height: 360,
+    });
+
+    await session.setDepthTrack({
+      source: {
+        kind: "frameSequence",
+        fps: 2,
+        frameRelPaths: ["depth/0001.png", "depth/0002.png", "depth/0003.png"],
+      },
+      absolutePaths: [
+        "/tmp/depth/0001.png",
+        "/tmp/depth/0002.png",
+        "/tmp/depth/0003.png",
+      ],
+      frameUrls: ["blob:depth-1", "blob:depth-2", "blob:depth-3"],
+    });
+    session.setTime(0.51);
+    session.setTime(1.02);
+    session.dispose();
+
+    expect(mocks.fetch).toHaveBeenCalledTimes(3);
+    expect(mocks.viewport.setDepthFromBitmap).toHaveBeenCalledTimes(4);
+    expect(mocks.viewport.setDepthFromBitmap.mock.calls[1]?.[0]).toBe(
+      createdBitmaps[1],
+    );
+    expect(mocks.viewport.setDepthFromBitmap.mock.calls[2]?.[0]).toBe(
+      createdBitmaps[2],
+    );
+    expect(mocks.viewport.setDepthFromBitmap.mock.calls[3]?.[0]).toBe(
+      createdBitmaps[3],
+    );
+    expect(createdBitmaps[0]?.close).toHaveBeenCalledTimes(1);
+    expect(createdBitmaps[1]?.close).toHaveBeenCalledTimes(1);
+    expect(createdBitmaps[2]?.close).toHaveBeenCalledTimes(1);
+    expect(createdBitmaps[3]?.close).toHaveBeenCalledTimes(1);
   });
 });

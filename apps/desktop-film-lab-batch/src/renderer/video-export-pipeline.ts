@@ -995,6 +995,7 @@ export async function runVideoExportPipeline(options: {
         });
         onLog(`[動画] offscreen backend: ${renderSession.backendKind}`);
         renderSession.setGrade(grade);
+        await renderSession.setDepthTrack(grade.depthTrack);
         await renderSession.setSource({
           texture: srcTexture,
           imageWidth: probe.width,

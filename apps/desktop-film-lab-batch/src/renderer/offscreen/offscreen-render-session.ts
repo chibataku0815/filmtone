@@ -1,5 +1,6 @@
 import type * as THREE from "three";
 import type { BatchGradeState } from "../batch-pipeline";
+import type { BatchDepthTrack } from "../depth-track";
 
 export type OffscreenRenderBackendKind = "webgl" | "webgpu";
 export type OffscreenRenderSessionPreference = "webgl" | "webgpu";
@@ -27,6 +28,7 @@ export interface OffscreenRenderSession {
   setRenderSize(width: number, height: number): void;
   setSource(source: OffscreenRenderSource): void | Promise<void>;
   setGrade(grade: BatchGradeState): void;
+  setDepthTrack(depthTrack: BatchDepthTrack | null): void | Promise<void>;
   setTime(timeSeconds: number): void;
   resetMotionBlurHistory(): void;
   render(): void;

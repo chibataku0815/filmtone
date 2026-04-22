@@ -12,6 +12,7 @@ function makeGrade(
   };
   return {
     params,
+    depthTrack: null,
     lut1Intensity: 0.7,
     lut1Data: new Float32Array([0, 0.5, 1]),
     lut1Size: 2,

@@ -468,9 +468,9 @@ export class WebGPUBackend implements RenderBackend {
     this.grainSampler = grainSampler;
     this.grainTexture = grainTexture;
 
-    // Dev-only AI depth probe: 512x288 rgba8unorm (Depth Anything V2 Base
-    // at 512-wide input), init to neutral 0.5 so depth-off
-    // (depthMistGain=0) leaves mist unchanged.
+    // Shared depth texture for depth-aware Mist / Glow. Keep it neutral 0.5
+    // so depth-off (depthMistGain=0 / depthGlowGain=0) leaves the optical
+    // finish unchanged until a runtime depth frame is uploaded.
     {
       const DEPTH_W = 512;
       const DEPTH_H = 288;
@@ -503,7 +503,7 @@ export class WebGPUBackend implements RenderBackend {
     this.ringBuffer = ringBuffer;
     this.compareSourceBuffer = compareSourceBuffer;
 
-    // Dev-only: diffusion depth prefilter params — 2 vec4 = 32 bytes.
+    // Diffusion depth prefilter params — 2 vec4 = 32 bytes.
     //   misc: (depthMistGain, fitMode, _, _)
     //   size: (resolutionX, resolutionY, imageResX, imageResY)
     this.diffusionDepthPrefilterBuffer = ctx.device.createBuffer({
@@ -1438,9 +1438,8 @@ export class WebGPUBackend implements RenderBackend {
   }
 
   /**
-   * Dev-only: upload a 512x288 depth probe ImageBitmap (red channel = depth,
-   * 0 = near, 255 = far). Pair with `compositeUniforms.lens.w > 0` to
-   * enable depth-modulated mist in the composite pass.
+   * Upload a 512x288 depth frame (red channel = depth, 0 = near, 255 = far)
+   * for the shared depth-aware Mist / Glow path.
    */
   setDepthFromBitmap(bitmap: ImageBitmap): void {
     this.ctx.device.queue.copyExternalImageToTexture(
@@ -3299,15 +3298,14 @@ export class WebGPUBackend implements RenderBackend {
 
     const colorGradedView = rtColorGraded.createView();
 
-    // Dev-only AI depth probe.
+    // Shared depth-aware Mist / Glow controls.
     //   - `depthMistGain` drives the diffusion (Mist) pyramid prefilter and
     //     the composite `>= 1.5` debug view.
     //   - `depthGlowGain` drives the bloom + halation pyramid prefilters.
     // Both live in `(0, 1.5)` when active; values >= 1.5 on `depthMistGain`
     // switch composite into the raw-depth debug view and skip prefiltering.
-    // Splitting the two gains lets presets / dev tooling toggle Mist and
-    // Glow depth-weighting independently (Phase D close-out). Lens and
-    // Cross pillars are out of scope for AI depth by design — see
+    // Splitting the two gains lets the shared contract modulate Mist and
+    // Glow independently. Lens and Cross pillars are out of scope by design — see
     // `docs/guides/2026-04-20-filmtone-optical-finish-pack-master-plan.md` §2.3.
     const depthMistGain = this.paramNumber("depthMistGain", 0);
     const depthGlowGain = this.paramNumber("depthGlowGain", 0);

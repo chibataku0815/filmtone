@@ -4,6 +4,27 @@ import {
   FILM_LAB_DEFAULT_SHADOW_HUE,
 } from "./split-tone-default-hues";
 
+type BasePresetParams = Omit<Params, "depthMistGain" | "depthGlowGain">;
+
+const DEPTH_CONTRACT_DEFAULTS = {
+  depthMistGain: 0,
+  depthGlowGain: 0,
+} as const;
+
+function withDepthContractDefaults<T extends Record<string, BasePresetParams>>(
+  presets: T,
+): { [K in keyof T]: Params } {
+  return Object.fromEntries(
+    Object.entries(presets).map(([name, preset]) => [
+      name,
+      {
+        ...preset,
+        ...DEPTH_CONTRACT_DEFAULTS,
+      },
+    ]),
+  ) as { [K in keyof T]: Params };
+}
+
 /**
  * 組み込みプリセット（Next Film Lab と同一数値）
  *
@@ -11,7 +32,7 @@ import {
  * グレインを使うプリセットのみ体感が薄くならないようわずかに上げている（2026-03-30）。
  * grainRadialMix は Pro で 0〜1 調整可。プリセット既定は 1（周辺比重オン）。
  */
-export const PRESETS = {
+const RAW_PRESETS = {
   reset: {
     exposure: 0,
     contrast: 1,
@@ -581,7 +602,9 @@ export const PRESETS = {
     crossFilterHardMode: 1,
     crossFilterMinSpacing: 1,
   },
-} satisfies Record<string, Params>;
+} satisfies Record<string, BasePresetParams>;
+
+export const PRESETS = withDepthContractDefaults(RAW_PRESETS);
 
 export type PresetName = keyof typeof PRESETS;
 

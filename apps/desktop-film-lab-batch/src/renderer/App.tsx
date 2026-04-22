@@ -238,6 +238,7 @@ async function resolveBatchGradeSnapshot(
     return {
       grade: {
         params: g.params,
+        depthTrack: g.depthTrack,
         lut1Intensity: g.lut1Intensity,
         lut1Data: g.lut1Data,
         lut1Size: g.lut1Size,
@@ -951,6 +952,7 @@ export default function App() {
       setImportedPreviewParams(restored.batchGrade.params);
       setImportedPreviewGrade({
         params: restored.batchGrade.params,
+        depthTrack: restored.batchGrade.depthTrack,
         lut1Intensity: restored.batchGrade.lut1Intensity,
         lut1Data: restored.batchGrade.lut1Data,
         lut1Size: restored.batchGrade.lut1Size,
@@ -1548,6 +1550,7 @@ export default function App() {
       const params = viewportRecordToParams(raw, batchGrade.params.halationHue);
       setBatchGrade({
         params,
+        depthTrack: batchGrade.depthTrack,
         lut1Intensity: editLut.lut1?.intensity ?? 1,
         lut1Data: editLut.lut1?.data ?? null,
         lut1Size: editLut.lut1?.size ?? 0,
@@ -1579,6 +1582,7 @@ export default function App() {
     }
   }, [
     viewport,
+    batchGrade.depthTrack,
     batchGrade.params.halationHue,
     canvasPreset,
     editLut,
@@ -1610,9 +1614,17 @@ export default function App() {
   };
 
   const exportGrade = () => {
-    const blob = new Blob([exportGradeJsonText(batchGrade.params)], {
-      type: "application/json",
-    });
+    const blob = new Blob(
+      [
+        exportGradeJsonText(
+          batchGrade.params,
+          batchGrade.depthTrack?.source ?? null,
+        ),
+      ],
+      {
+        type: "application/json",
+      },
+    );
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -1651,6 +1663,7 @@ export default function App() {
         batchPresetChoice: payload.batchPresetChoice ?? batchPresetChoice,
         lookSource: payload.lookSource ?? batchLookSource,
         gradeParams: (payload.grade ?? batchGrade).params,
+        depthTrack: (payload.grade ?? batchGrade).depthTrack,
         lutRefs: payload.lutRefs ?? batchLutRefs,
         opticalRecommendation:
           payload.opticalRecommendation ?? appliedOpticalRecommendation,
@@ -1905,7 +1918,10 @@ export default function App() {
       importedGradePath: importedGradeLabel,
       gradeParamsJson: importedGradeLabel
         ? null
-        : exportGradeJsonText(batchGrade.params),
+        : exportGradeJsonText(
+            batchGrade.params,
+            batchGrade.depthTrack?.source ?? null,
+          ),
       outputFilenameSuffix: sanitizeBatchFilenameSuffix(batchOutputSuffix),
     };
     await window.filmLabBatch.writeBatchSession(session);
@@ -2336,6 +2352,7 @@ export default function App() {
                 chromeLayout="stacked"
                 stackedToolbarVisible={false}
                 preset={canvasPreset}
+                depthTrack={batchGrade.depthTrack}
                 className="h-full min-h-0 w-full"
                 fullScreen
                 pauseVideoPreview={running}

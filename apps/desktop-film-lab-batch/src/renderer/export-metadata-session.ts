@@ -11,6 +11,7 @@ import {
   type Params,
 } from "film-lab-core";
 import type { BatchFormat } from "./batch-pipeline";
+import type { BatchDepthTrack } from "./depth-track";
 import { buildGradeJsonPayload } from "./grade-io";
 
 export const METADATA_LOOK_SOURCES = [
@@ -32,6 +33,12 @@ export type MetadataLutRef = {
 export type MetadataLutRefs = {
   lut1: MetadataLutRef;
   lut2: MetadataLutRef;
+};
+
+export type MetadataDepthTrackRef = {
+  enabled: boolean;
+  fps: number;
+  framePaths: string[];
 };
 
 export type AppliedOpticalRecommendationMetadata = {
@@ -57,6 +64,11 @@ const metadataLutRefSchema = z.object({
 });
 
 const metadataLookSourceSchema = z.enum(METADATA_LOOK_SOURCES);
+const metadataDepthTrackRefSchema = z.object({
+  enabled: z.boolean(),
+  fps: z.number().positive().max(120),
+  framePaths: z.array(z.string().min(1)),
+});
 
 const opticalFamilySchema = z.enum(["mist", "glow", "cross", "lens"]);
 const behaviorProfileSchema = z.enum([
@@ -110,6 +122,7 @@ const filmtoneExportSessionSchema = z.object({
     lut1: metadataLutRefSchema,
     lut2: metadataLutRefSchema,
   }),
+  depthTrack: metadataDepthTrackRefSchema,
 });
 
 export type FilmtoneExportSessionV1 = z.infer<
@@ -169,6 +182,27 @@ export function createEmptyMetadataLutRefs(): MetadataLutRefs {
   return {
     lut1: createEmptyMetadataLutRef(),
     lut2: createEmptyMetadataLutRef(),
+  };
+}
+
+export function createEmptyMetadataDepthTrackRef(): MetadataDepthTrackRef {
+  return {
+    enabled: false,
+    fps: 25,
+    framePaths: [],
+  };
+}
+
+export function createMetadataDepthTrackRefFromRuntime(
+  depthTrack: BatchDepthTrack | null | undefined,
+): MetadataDepthTrackRef {
+  if (!depthTrack) {
+    return createEmptyMetadataDepthTrackRef();
+  }
+  return {
+    enabled: depthTrack.absolutePaths.length > 0,
+    fps: depthTrack.source.fps,
+    framePaths: [...depthTrack.absolutePaths],
   };
 }
 
@@ -243,6 +277,7 @@ export function buildFilmtoneExportSession(params: {
   batchPresetChoice: PresetName;
   lookSource: MetadataLookSource;
   gradeParams: Params;
+  depthTrack: BatchDepthTrack | null;
   lutRefs: MetadataLutRefs;
   opticalRecommendation?: AppliedOpticalRecommendationMetadata | null;
 }): FilmtoneExportSessionV1 {
@@ -270,12 +305,16 @@ export function buildFilmtoneExportSession(params: {
       batchPresetChoice: params.batchPresetChoice,
       source: params.lookSource,
       grade:
-        buildGradeJsonPayload(params.gradeParams) as unknown as FilmtoneExportSessionV1["look"]["grade"],
+        buildGradeJsonPayload(
+          params.gradeParams,
+          params.depthTrack?.source ?? null,
+        ) as unknown as FilmtoneExportSessionV1["look"]["grade"],
       ...(params.opticalRecommendation
         ? { opticalRecommendation: params.opticalRecommendation }
         : {}),
     },
     lutRefs: params.lutRefs,
+    depthTrack: createMetadataDepthTrackRefFromRuntime(params.depthTrack),
   };
 }
 

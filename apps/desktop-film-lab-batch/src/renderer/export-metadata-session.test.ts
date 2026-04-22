@@ -39,6 +39,7 @@ describe("export metadata session", () => {
       batchPresetChoice: "cinematic",
       lookSource: "preset",
       gradeParams: cinematic.params,
+      depthTrack: null,
       lutRefs: createEmptyMetadataLutRefs(),
     });
 
@@ -64,6 +65,7 @@ describe("export metadata session", () => {
       batchPresetChoice: "cinematic",
       lookSource: "editSync",
       gradeParams: cinematic.params,
+      depthTrack: null,
       lutRefs: createEmptyMetadataLutRefs(),
     });
 
@@ -88,6 +90,7 @@ describe("export metadata session", () => {
       batchPresetChoice: "cinematic",
       lookSource: "preset",
       gradeParams: cinematic.params,
+      depthTrack: null,
       lutRefs: createEmptyMetadataLutRefs(),
     });
 
@@ -112,6 +115,7 @@ describe("export metadata session", () => {
       batchPresetChoice: "cinematic",
       lookSource: "analysisRecommendation",
       gradeParams: cinematic.params,
+      depthTrack: null,
       lutRefs: createEmptyMetadataLutRefs(),
       opticalRecommendation: {
         family: "glow",
@@ -128,6 +132,47 @@ describe("export metadata session", () => {
       recipe: "warmIndoor",
       analyzerVersion: "scene-aware-v1",
       appliedAtIso: "2026-04-20T12:00:00.000Z",
+    });
+  });
+
+  it("serializes depth-track metadata in both wrapper and sidecar roots", () => {
+    const cinematic = batchGradeStateFromPreset("cinematic");
+    const depthTrack = {
+      source: {
+        kind: "frameSequence" as const,
+        fps: 25,
+        frameRelPaths: ["depth/0001.png", "depth/0002.png"],
+      },
+      absolutePaths: [
+        "/Users/tester/output/depth/0001.png",
+        "/Users/tester/output/depth/0002.png",
+      ],
+      frameUrls: ["blob:depth-1", "blob:depth-2"],
+    };
+    const session = buildFilmtoneExportSession({
+      exportedAtIso: "2026-04-20T12:34:56.000Z",
+      appVersion: "1.2.3",
+      job: "images",
+      inputDir: "/Users/tester/input",
+      videoInputPath: null,
+      outputDir: "/Users/tester/output",
+      imageFormat: "png",
+      outputFilenameSuffix: "-graded",
+      outputFileName: null,
+      batchPresetChoice: "cinematic",
+      lookSource: "importedJson",
+      gradeParams: cinematic.params,
+      depthTrack,
+      lutRefs: createEmptyMetadataLutRefs(),
+    });
+
+    expect(
+      (session.look.grade as { depthTrack?: unknown }).depthTrack,
+    ).toEqual(depthTrack.source);
+    expect(session.depthTrack).toEqual({
+      enabled: true,
+      fps: 25,
+      framePaths: depthTrack.absolutePaths,
     });
   });
 

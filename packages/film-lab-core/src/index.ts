@@ -16,10 +16,12 @@ export {
   LOOK_ID_BY_PRESET,
 } from "./look-ids";
 export {
+  filmLabDepthTrackSchema,
   filmLabParamsSchema,
   filmLookGradeInputSchema,
   filmLookSpikeInputSchema,
   gradeMatchesPreset,
+  type FilmLabDepthTrackInput,
   type FilmLabParamsValidated,
   type FilmLookGradeInputProps,
   type FilmLookSpikeInputProps,

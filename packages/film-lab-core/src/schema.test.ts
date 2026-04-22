@@ -213,6 +213,20 @@ describe("filmLabParamsSchema", () => {
     }
   });
 
+  test("depthMistGain / depthGlowGain 省略時は既定 0", () => {
+    const {
+      depthMistGain: _omitMist,
+      depthGlowGain: _omitGlow,
+      ...rest
+    } = PRESETS.cinematic;
+    const r = filmLabParamsSchema.safeParse(rest);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.depthMistGain).toBe(0);
+      expect(r.data.depthGlowGain).toBe(0);
+    }
+  });
+
   test("grainSize が 0–1 の境界値（0, 1）を受理する", () => {
     for (const val of [0, 1]) {
       const r = filmLabParamsSchema.safeParse({ ...PRESETS.cinematic, grainSize: val });
@@ -238,6 +252,30 @@ describe("filmLabParamsSchema", () => {
     for (const val of [-0.1, 1.1]) {
       const r = filmLabParamsSchema.safeParse({ ...PRESETS.cinematic, diffusion: val });
       expect(r.success).toBe(false);
+    }
+  });
+
+  test("depthMistGain / depthGlowGain が 0–1 の境界値を受理する", () => {
+    for (const key of ["depthMistGain", "depthGlowGain"] as const) {
+      for (const val of [0, 1]) {
+        const r = filmLabParamsSchema.safeParse({
+          ...PRESETS.cinematic,
+          [key]: val,
+        });
+        expect(r.success).toBe(true);
+      }
+    }
+  });
+
+  test("depthMistGain / depthGlowGain が範囲外（-0.1, 1.1）を拒否する", () => {
+    for (const key of ["depthMistGain", "depthGlowGain"] as const) {
+      for (const val of [-0.1, 1.1]) {
+        const r = filmLabParamsSchema.safeParse({
+          ...PRESETS.cinematic,
+          [key]: val,
+        });
+        expect(r.success).toBe(false);
+      }
     }
   });
 });
@@ -290,6 +328,20 @@ describe("filmLookGradeInputSchema", () => {
       gradeSourceVideoRelPath: "videos/IMG_0513.MOV",
       gradeSourceVideoWidth: 3840,
       gradeSourceVideoHeight: 2160,
+    });
+    expect(r.success).toBe(true);
+  });
+
+  test("depthTrack を付けて受理する", () => {
+    const r = filmLookGradeInputSchema.safeParse({
+      lookPresetId: LOOK_ID_BY_PRESET.portra,
+      presetVersion: PRESET_VERSION,
+      grade: PRESETS.portra,
+      depthTrack: {
+        kind: "frameSequence",
+        fps: 25,
+        frameRelPaths: ["depth/0001.png"],
+      },
     });
     expect(r.success).toBe(true);
   });

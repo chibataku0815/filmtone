@@ -14,6 +14,8 @@ function schemaForParamKey(key: ParamKey): z.ZodType<number> {
       ? z.number().min(0).max(1).default(0.3)
       : key === "diffusion"
         ? z.number().min(0).max(1).default(0)
+        : key === "depthMistGain" || key === "depthGlowGain"
+          ? z.number().min(0).max(1).default(0)
         : key === "lensSoftness"
           ? z.number().min(0).max(1).default(0)
           : key === "compressionRange"
@@ -61,6 +63,7 @@ function schemaForParamKey(key: ParamKey): z.ZodType<number> {
 
 /**
  * grainRadialMix は省略時 1（後方互換）、lensSoftness は省略時 0。
+ * depth-aware Mist / Glow gains は省略時 0（uniform）。
  * 0.4.0 追加: compressionRange は省略時 0.5、それ以外の新 process keys は省略時 0。
  * デフォルト付きキーは Remotion や旧 JSON の grace fallback として機能する。
  */
@@ -76,12 +79,29 @@ export const filmLabParamsSchema = z.object(paramShape);
 export type FilmLabParamsValidated = z.infer<typeof filmLabParamsSchema>;
 
 /**
+ * Shared depth-track contract.
+ *
+ * `frameRelPaths` are resolved relative to the imported grade JSON so the
+ * same look can round-trip through preview, export, and saved-session
+ * surfaces without falling back to renderer-only state.
+ */
+export const filmLabDepthTrackSchema = z.object({
+  kind: z.literal("frameSequence"),
+  fps: z.number().positive().max(120).default(25),
+  frameRelPaths: z.array(z.string().min(1)).min(1),
+});
+
+export type FilmLabDepthTrackInput = z.infer<typeof filmLabDepthTrackSchema>;
+
+/**
  * Remotion Composition 向け: ルック ID + バージョン + 数値グレード
  */
 export const filmLookGradeInputSchema = z.object({
   lookPresetId: z.string().min(1),
   presetVersion: z.literal(PRESET_VERSION),
   grade: filmLabParamsSchema,
+  /** Optional depth track that drives depth-aware Mist / Glow across preview and export. */
+  depthTrack: filmLabDepthTrackSchema.optional(),
   /**
    * Input Transform LUT（グレーディング前 — Log→Rec709 等）。
    * 未指定のときは Input Transform をかけない。

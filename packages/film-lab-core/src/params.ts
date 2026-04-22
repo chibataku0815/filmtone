@@ -21,6 +21,10 @@ export const PARAM_KEYS = [
   "bloomRadius",
   /** Pro-Mist 的な全画面光拡散（0=オフ、1=最大ヘイズ）。range: 0–1 */
   "diffusion",
+  /** Depth-aware Mist weighting（0=uniform、1=full depth weighting）。shared contract では 0–1。 */
+  "depthMistGain",
+  /** Depth-aware Glow weighting（0=uniform、1=full depth weighting）。Bloom + Halation に適用。 */
+  "depthGlowGain",
   "halationIntensity",
   "halationSpread",
   "halationHue",
@@ -106,6 +110,10 @@ export interface Params {
   bloomRadius: number;
   /** Pro-Mist 的な全画面光拡散（0=オフ、1=最大ヘイズ）。Bloom/Halation とは独立。 */
   diffusion: number;
+  /** Depth-aware Mist weighting（0=uniform、1=full depth weighting）。 */
+  depthMistGain: number;
+  /** Depth-aware Glow weighting（0=uniform、1=full depth weighting）。Bloom + Halation に適用。 */
+  depthGlowGain: number;
   halationIntensity: number;
   halationSpread: number;
   halationHue: number;

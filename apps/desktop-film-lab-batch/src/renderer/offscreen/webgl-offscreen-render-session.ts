@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { Viewport } from "film-lab-renderer";
 import type { BatchGradeState } from "../batch-pipeline";
+import type { BatchDepthTrack } from "../depth-track";
 import { applyBatchGradeToViewport } from "./apply-batch-grade-to-viewport";
 import type {
   OffscreenRenderSource,
@@ -40,6 +41,10 @@ class WebGLOffscreenRenderSessionImpl implements WebGLOffscreenRenderSession {
 
   setGrade(grade: BatchGradeState): void {
     applyBatchGradeToViewport(this.viewport, grade);
+  }
+
+  setDepthTrack(_depthTrack: BatchDepthTrack | null): void {
+    // WebGL does not consume depth tracks; keep the contract aligned with WebGPU.
   }
 
   setTime(timeSeconds: number): void {

@@ -7,10 +7,12 @@ import {
   inferPresetChoiceFromImportedJson,
   parseFilmtoneExportSessionV1,
   type FilmtoneExportSessionV1,
+  type MetadataDepthTrackRef,
   type MetadataLookSource,
   type MetadataLutRefs,
 } from "./export-metadata-session";
 import type { BatchGradeState } from "./batch-pipeline";
+import { loadBatchDepthTrackFromAbsolutePaths } from "./depth-track";
 import { resolveGradeFromJsonText } from "./batch-pipeline";
 
 export type ResolvedImportedMetadataJson = {
@@ -29,6 +31,7 @@ async function loadBatchGradeFromLutRefs(
   api: FilmLabBatchBridge,
   params: BatchGradeState["params"],
   lutRefs: MetadataLutRefs,
+  depthTrackRef: MetadataDepthTrackRef,
 ): Promise<{
   batchGrade: BatchGradeState;
   resolvedLutRefs: MetadataLutRefs;
@@ -41,6 +44,7 @@ async function loadBatchGradeFromLutRefs(
   };
   const batchGrade: BatchGradeState = {
     params,
+    depthTrack: null,
     lut1Intensity: lutRefs.lut1.intensity,
     lut1Data: null,
     lut1Size: 0,
@@ -80,6 +84,22 @@ async function loadBatchGradeFromLutRefs(
 
   await loadSlot("lut1");
   await loadSlot("lut2");
+  if (depthTrackRef.enabled) {
+    if (depthTrackRef.framePaths.length === 0) {
+      warnings.push("depthTrack: no frame paths");
+    } else {
+      try {
+        batchGrade.depthTrack = await loadBatchDepthTrackFromAbsolutePaths(
+          api,
+          depthTrackRef.framePaths,
+          depthTrackRef.fps,
+        );
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        warnings.push(`depthTrack: ${msg}`);
+      }
+    }
+  }
   return { batchGrade, resolvedLutRefs, warnings };
 }
 
@@ -101,6 +121,7 @@ export async function resolveImportedMetadataJson(
       api,
       sidecar.look.grade.grade as unknown as BatchGradeState["params"],
       sidecar.lutRefs,
+      sidecar.depthTrack,
     );
     const parsedSyncTime = Date.parse(sidecar.exportedAtIso);
     return {
@@ -123,6 +144,7 @@ export async function resolveImportedMetadataJson(
   return {
     batchGrade: {
       params: resolvedGrade.params,
+      depthTrack: resolvedGrade.depthTrack,
       lut1Intensity: resolvedGrade.lut1Intensity,
       lut1Data: resolvedGrade.lut1Data,
       lut1Size: resolvedGrade.lut1Size,
@@ -148,6 +170,7 @@ export function emptyResolvedMetadataJson(filePath: string): ResolvedImportedMet
   return {
     batchGrade: {
       params: {} as BatchGradeState["params"],
+      depthTrack: null,
       lut1Intensity: 1,
       lut1Data: null,
       lut1Size: 0,

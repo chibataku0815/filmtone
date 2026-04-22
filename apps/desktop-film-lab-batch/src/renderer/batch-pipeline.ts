@@ -19,6 +19,11 @@ import {
   type PresetName,
 } from "film-lab-core";
 import { createOffscreenRenderSession } from "./offscreen/create-offscreen-render-session";
+import {
+  loadBatchDepthTrackFromGrade,
+  type BatchDepthTrackSource,
+  type BatchDepthTrack,
+} from "./depth-track";
 
 export type BatchFormat = "png" | "jpeg";
 
@@ -49,6 +54,8 @@ export type BatchPipelineSummary = {
  */
 export type BatchGradeState = {
   params: Params;
+  /** Optional depth track for depth-aware Mist / Glow. */
+  depthTrack: BatchDepthTrack | null;
   /** Input Transform LUT (before grading — Log→Rec709) */
   lut1Intensity: number;
   lut1Data: Float32Array | null;
@@ -65,6 +72,7 @@ export type BatchGradeState = {
 export function batchGradeStateFromPreset(preset: PresetName): BatchGradeState {
   return {
     params: PRESETS[preset],
+    depthTrack: null,
     lut1Intensity: 1,
     lut1Data: null,
     lut1Size: 0,
@@ -123,6 +131,7 @@ export async function resolveGradeFromJsonText(
   jsonText: string,
 ): Promise<{
   params: Params;
+  depthTrack: BatchDepthTrack | null;
   lut1Intensity: number;
   lut1Data: Float32Array | null;
   lut1Size: number;
@@ -154,6 +163,10 @@ export async function resolveGradeFromJsonText(
       );
     }
     const g = parsed.data;
+    const depthTrackSource = (g as { depthTrack?: BatchDepthTrackSource }).depthTrack;
+    const depthTrack = depthTrackSource
+      ? await loadBatchDepthTrackFromGrade(api, gradeJsonPath, depthTrackSource)
+      : null;
 
     // LUT1: Input Transform
     let lut1Data: Float32Array | null = null;
@@ -196,6 +209,7 @@ export async function resolveGradeFromJsonText(
 
     return {
       params: normalizedGrade.data,
+      depthTrack,
       lut1Intensity: g.lut1Intensity ?? 1,
       lut1Data,
       lut1Size,
@@ -209,6 +223,7 @@ export async function resolveGradeFromJsonText(
   if (flat.success) {
     return {
       params: flat.data,
+      depthTrack: null,
       lut1Intensity: 1,
       lut1Data: null,
       lut1Size: 0,
@@ -221,6 +236,7 @@ export async function resolveGradeFromJsonText(
   if (typeof o.preset === "string" && o.preset in PRESETS) {
     return {
       params: PRESETS[o.preset as PresetName],
+      depthTrack: null,
       lut1Intensity: 1,
       lut1Data: null,
       lut1Size: 0,
@@ -233,9 +249,10 @@ export async function resolveGradeFromJsonText(
   if (typeof o.lookPresetId === "string") {
     const preset = presetFromLookId(o.lookPresetId);
     if (preset) {
-      return {
-        params: PRESETS[preset],
-        lut1Intensity: 1,
+    return {
+      params: PRESETS[preset],
+      depthTrack: null,
+      lut1Intensity: 1,
         lut1Data: null,
         lut1Size: 0,
         lutIntensity: 1,
@@ -327,6 +344,7 @@ export async function runBatchPipeline(options: {
   });
   options.onLog(`[batch] offscreen backend: ${renderSession.backendKind}`);
   renderSession.setGrade(grade);
+  await renderSession.setDepthTrack(grade.depthTrack);
 
   const mediaLoader = new MediaLoader();
   const maxTextureSize = renderSession.maxTextureSize;

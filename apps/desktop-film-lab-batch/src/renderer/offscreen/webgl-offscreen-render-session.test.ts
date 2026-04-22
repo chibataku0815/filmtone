@@ -95,6 +95,7 @@ function makeGrade(
       ...Object.values(PRESETS)[0]!,
       halationHue: 48,
     },
+    depthTrack: null,
     lut1Intensity: 0.8,
     lut1Data: new Float32Array([0, 1]),
     lut1Size: 2,

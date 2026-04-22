@@ -185,8 +185,9 @@ export class Viewport {
   }
 
   /**
-   * Dev-only: upload a 32x32 depth probe. No-op on WebGL. Pair with the
-   * `depthMistGain` composite param (0..1) to enable depth-modulated mist.
+   * Upload a shared depth map for depth-aware Mist / Glow. No-op on WebGL.
+   * `depthMistGain` / `depthGlowGain` stay in the shared grade contract; the
+   * WebGPU renderer consumes the uploaded depth texture when those gains are > 0.
    */
   setDepthFromBitmap(bitmap: ImageBitmap): void {
     this.webgpuBackend?.setDepthFromBitmap(bitmap);

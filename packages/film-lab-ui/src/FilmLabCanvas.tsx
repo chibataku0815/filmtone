@@ -36,11 +36,10 @@ import {
 } from "./dev-depth-probe-data";
 
 /**
- * Dev-only AI depth probe. Enabled when the URL contains `?depthProbe=1`.
- * When active, the 10 pre-bundled depth keyframes are decoded to ImageBitmap
- * and the nearest keyframe is uploaded to the WebGPU renderer per video
- * frame. `depthMistGain` is forced to 1.0 in the composite uniform, which
- * is a no-op on the WebGL backend.
+ * Legacy debug fallback for depth-aware Mist / Glow.
+ * When no runtime `depthTrack` prop is supplied, `?depthProbe=1|2` keeps the
+ * pre-bundled probe frames available for local debugging without making the
+ * shared preview/export contract depend on URL state.
  */
 /**
  * Reads `?depthProbe=` from the URL.
@@ -62,6 +61,34 @@ function readDepthProbeGain(): number {
 
 function readDepthProbeFlag(): boolean {
   return readDepthProbeGain() > 0;
+}
+
+const DEPTH_TEXTURE_WIDTH = 512;
+const DEPTH_TEXTURE_HEIGHT = 288;
+
+function closeImageBitmaps(bitmaps: ImageBitmap[] | null | undefined): void {
+  for (const bitmap of bitmaps ?? []) {
+    bitmap.close();
+  }
+}
+
+async function createNeutralDepthBitmap(): Promise<ImageBitmap> {
+  if (typeof document === "undefined") {
+    throw new Error("document is required for depth-track reset");
+  }
+  if (typeof createImageBitmap !== "function") {
+    throw new Error("createImageBitmap is required for depth-track reset");
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = DEPTH_TEXTURE_WIDTH;
+  canvas.height = DEPTH_TEXTURE_HEIGHT;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("2D canvas is required for depth-track reset");
+  }
+  ctx.fillStyle = "rgba(128, 128, 128, 1)";
+  ctx.fillRect(0, 0, DEPTH_TEXTURE_WIDTH, DEPTH_TEXTURE_HEIGHT);
+  return createImageBitmap(canvas);
 }
 
 /**
@@ -119,6 +146,11 @@ export type FilmLabCanvasPreviewStatus = {
   canRecover: boolean;
 };
 
+export type FilmLabCanvasDepthTrack = {
+  source: { fps: number };
+  frameUrls: string[];
+};
+
 /**
  * @description 背景で swap する対象ステージです。
  */
@@ -128,6 +160,7 @@ export interface FilmLabCanvasProps {
   preset: PresetName;
   className?: string;
   fullScreen?: boolean;
+  depthTrack?: FilmLabCanvasDepthTrack | null;
   onViewportReady?: (viewport: Viewport | null) => void;
   onViewportCapabilitiesChange?: (capabilities: ViewportCapabilities | null) => void;
   onPreviewStatusChange?: (status: FilmLabCanvasPreviewStatus) => void;
@@ -315,20 +348,22 @@ function isRendererContextLost(
  * @description Viewport が理解できる shape に grade params をそろえます。
  * `halationHue` は shader 側が直接読まないため、色コードへ変換して渡します。
  * @param source 現在の grade params
+ * @param legacyDepthProbeGain legacy `?depthProbe=` fallback. Shared grade state
+ *   never reads URL flags directly; this is only for local debug preview.
  * @returns Viewport 用の params レコード
  */
-function buildViewportParams(source: Params): Record<string, number | string> {
-  const depthGain = readDepthProbeGain();
+function buildViewportParams(
+  source: Params,
+  legacyDepthProbeGain = 0,
+): Record<string, number | string> {
   return {
     ...source,
     halationColor: halationHueToHex(source.halationHue),
-    // Dev-only AI depth probe: `?depthProbe=1` activates depth-weighted
-    // source masking on both pillars (Mist + Glow). `depthGlowGain` covers
-    // bloom + halation pyramids; `depthMistGain` covers the diffusion
-    // pyramid (and its `>= 1.5` debug branch in composite.frag). Split so
-    // future presets can toggle them independently.
-    ...(depthGain > 0
-      ? { depthMistGain: depthGain, depthGlowGain: depthGain }
+    ...(legacyDepthProbeGain > 0
+      ? {
+          depthMistGain: legacyDepthProbeGain,
+          depthGlowGain: legacyDepthProbeGain,
+        }
       : {}),
   };
 }
@@ -348,6 +383,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       preset,
       className,
       fullScreen,
+      depthTrack = null,
       onViewportReady,
       onViewportCapabilitiesChange,
       onPreviewStatusChange,
@@ -410,10 +446,12 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
   /** @description 現在のプレビュー動画要素。画像のときは null。 */
   const previewVideoElementRef = useRef<HTMLVideoElement | null>(null);
   /**
-   * Dev-only: decoded AI depth probe keyframes. Populated when `?depthProbe=1`
-   * URL flag is active. null when not initialized or already disposed.
+   * Legacy debug fallback frames loaded from `?depthProbe=1|2`.
    */
   const depthProbeBitmapsRef = useRef<ImageBitmap[] | null>(null);
+  /** @description Shared runtime depth-track frames. Preview/export parity uses this first. */
+  const runtimeDepthTrackBitmapsRef = useRef<ImageBitmap[] | null>(null);
+  const runtimeDepthTrackFpsRef = useRef(0);
   /** @description busy に入る直前に再生中だった動画だけ、busy 明けで再開します。 */
   const previewVideoShouldResumeRef = useRef(false);
   /** @description 現在の pause が busy 制御由来かどうかを覚えます。 */
@@ -431,6 +469,8 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
    */
   const pauseVideoPreviewRef = useRef(pauseVideoPreview);
   pauseVideoPreviewRef.current = pauseVideoPreview;
+  const runtimeDepthTrackRef = useRef<FilmLabCanvasDepthTrack | null>(depthTrack);
+  runtimeDepthTrackRef.current = depthTrack;
   /**
    * @description 親（例: Web 書き出し）が ref 経由で同期セット。`dynamic()` 越しでも再レンダーを待たない。
    */
@@ -477,10 +517,22 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     onPreviewStatusChangeRef.current?.(status);
   }, []);
 
+  const resetViewportDepthToNeutral = useCallback(async () => {
+    const viewport = viewportRef.current;
+    if (!viewport) {
+      return;
+    }
+    const bitmap = await createNeutralDepthBitmap();
+    try {
+      viewport.setDepthFromBitmap(bitmap);
+    } finally {
+      bitmap.close();
+    }
+  }, []);
+
   /**
-   * Dev-only: decode the pre-bundled AI depth probe keyframes into
-   * ImageBitmaps once, when `?depthProbe=1` is present in the URL.
-   * Cleanup closes the bitmaps on unmount.
+   * Legacy debug fallback: decode the pre-bundled probe frames when the URL
+   * asks for `?depthProbe=1|2`. Shared runtime depth tracks still win.
    */
   useEffect(() => {
     if (!readDepthProbeFlag()) return;
@@ -509,6 +561,52 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       depthProbeBitmapsRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    closeImageBitmaps(runtimeDepthTrackBitmapsRef.current);
+    runtimeDepthTrackBitmapsRef.current = null;
+    runtimeDepthTrackFpsRef.current = depthTrack?.source.fps ?? 0;
+    void resetViewportDepthToNeutral().catch((err) => {
+      console.error("[FilmLabCanvas] depth-track: neutral reset failed", err);
+    });
+
+    if (!depthTrack || depthTrack.frameUrls.length === 0) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    (async () => {
+      try {
+        const bitmaps = await Promise.all(
+          depthTrack.frameUrls.map(async (frameUrl) => {
+            const response = await fetch(frameUrl);
+            if (!response.ok) {
+              throw new Error(`fetch failed: ${response.status}`);
+            }
+            const blob = await response.blob();
+            return createImageBitmap(blob);
+          }),
+        );
+        if (cancelled) {
+          closeImageBitmaps(bitmaps);
+          return;
+        }
+        runtimeDepthTrackBitmapsRef.current = bitmaps;
+        runtimeDepthTrackFpsRef.current = depthTrack.source.fps;
+      } catch (err) {
+        console.error("[FilmLabCanvas] depth-track: decode failed", err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      closeImageBitmaps(runtimeDepthTrackBitmapsRef.current);
+      runtimeDepthTrackBitmapsRef.current = null;
+      runtimeDepthTrackFpsRef.current = 0;
+    };
+  }, [depthTrack, resetViewportDepthToNeutral]);
 
   const settleRecovery = useCallback((result: { ok: boolean; reason?: string }) => {
     const resolve = pendingRecoveryResolveRef.current;
@@ -581,7 +679,9 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     }
 
     const source = initialGradeParams ?? PRESETS[preset];
-    viewport.setParams(buildViewportParams(source));
+    const legacyDepthProbeGain =
+      runtimeDepthTrackRef.current == null ? readDepthProbeGain() : 0;
+    viewport.setParams(buildViewportParams(source, legacyDepthProbeGain));
   }, [initialGradeParams, preset]);
 
   /**
@@ -1140,7 +1240,11 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
 
       viewportRef.current = viewport;
       onViewportReadyRef.current?.(viewport);
-      viewport.setParams(buildViewportParams(initialResolvedGradeRef.current));
+      const legacyDepthProbeGain =
+        runtimeDepthTrackRef.current == null ? readDepthProbeGain() : 0;
+      viewport.setParams(
+        buildViewportParams(initialResolvedGradeRef.current, legacyDepthProbeGain),
+      );
       void restoreCurrentSource();
 
       /**
@@ -1172,18 +1276,32 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
           return;
         }
         viewport.setTime(clock.getElapsedTime());
-        // Dev-only AI depth probe upload (no-op unless ?depthProbe=1 or 2).
-        // Per-frame mode: one depth map per video frame (no ghosting).
-        // Keyframe mode: nearest-neighbor over sparse keyframes (legacy).
-        const depthBitmaps = depthProbeBitmapsRef.current;
-        if (depthBitmaps && depthBitmaps.length > 0) {
+        const runtimeDepthBitmaps = runtimeDepthTrackBitmapsRef.current;
+        const legacyDepthBitmaps = depthProbeBitmapsRef.current;
+        if (runtimeDepthBitmaps && runtimeDepthBitmaps.length > 0) {
+          const video = previewVideoElementRef.current;
+          const tSec = video?.currentTime ?? 0;
+          const rawIdx = Math.round(
+            tSec * Math.max(1, runtimeDepthTrackFpsRef.current),
+          );
+          const idx = Math.max(
+            0,
+            Math.min(runtimeDepthBitmaps.length - 1, rawIdx),
+          );
+          viewport.setDepthFromBitmap(runtimeDepthBitmaps[idx]!);
+        } else if (legacyDepthBitmaps && legacyDepthBitmaps.length > 0) {
           const video = previewVideoElementRef.current;
           const tSec = video?.currentTime ?? 0;
           const rawIdx = DEV_DEPTH_PROBE_PER_FRAME
             ? Math.round(tSec * DEV_DEPTH_PROBE_FPS)
-            : Math.round((tSec * DEV_DEPTH_PROBE_FPS) / DEV_DEPTH_PROBE_KEYFRAME_STRIDE);
-          const idx = Math.max(0, Math.min(depthBitmaps.length - 1, rawIdx));
-          viewport.setDepthFromBitmap(depthBitmaps[idx]);
+            : Math.round(
+                (tSec * DEV_DEPTH_PROBE_FPS) / DEV_DEPTH_PROBE_KEYFRAME_STRIDE,
+              );
+          const idx = Math.max(
+            0,
+            Math.min(legacyDepthBitmaps.length - 1, rawIdx),
+          );
+          viewport.setDepthFromBitmap(legacyDepthBitmaps[idx]!);
         }
         try {
           if (renderer && scene && camera) {
