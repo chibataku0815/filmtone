@@ -6,6 +6,22 @@ import { buildFilmtoneIosPresetMap, renderFilmtoneIosSwiftPayload } from "./ios-
 import { phase0ParamsSchema, pickPhase0Params } from "./phase0-schema";
 import { PRESETS, type PresetName } from "./presets";
 
+const EXPECTED_CINEMATIC_IOS_ENVELOPE = {
+  contrast: 1.24,
+  saturation: 0.87,
+  rgbShift: 0.001,
+  bloomThreshold: 0.78,
+  bloomStrength: 0.18,
+  bloomRadius: 0.42,
+  diffusion: 0.05,
+  halationIntensity: 0.02,
+  halationSpread: 18,
+  halationRadius: 0.36,
+  compressionAmount: 0.08,
+  printContrast: 0.08,
+  vignette: 0.32,
+} as const;
+
 test("generated Swift payload stays in sync with current iOS phase0 payload truth", () => {
   const repoRoot = resolve(import.meta.dir, "../../..");
   const generatedPath = resolve(
@@ -29,10 +45,14 @@ test("iOS preset map applies mobile-only overrides without mutating shared prese
   expect(PRESETS.cinematic.printContrast).toBe(0);
 
   expect(presetMap.cinematic).toMatchObject(FILMTONE_IOS_PRESET_OVERRIDES.cinematic ?? {});
+  expect(presetMap.cinematic).toMatchObject(EXPECTED_CINEMATIC_IOS_ENVELOPE);
   expect(presetMap.cinematic).not.toEqual(sharedCinematic);
-  expect(presetMap.cinematic.contrast).toBe(1.3);
-  expect(presetMap.cinematic.compressionAmount).toBe(0.18);
-  expect(presetMap.cinematic.printContrast).toBe(0.22);
+  expect(presetMap.cinematic.contrast).toBe(1.24);
+  expect(presetMap.cinematic.rgbShift).toBe(0.001);
+  expect(presetMap.cinematic.bloomStrength).toBe(0.18);
+  expect(presetMap.cinematic.halationIntensity).toBe(0.02);
+  expect(presetMap.cinematic.compressionAmount).toBe(0.08);
+  expect(presetMap.cinematic.printContrast).toBe(0.08);
   expect(presetMap.cinestill800t.bloomStrength).toBe(0.24);
   expect(presetMap.velvia50.printContrast).toBe(0.16);
   expect(renderFilmtoneIosSwiftPayload()).toContain('static let schemaVersion = 2');

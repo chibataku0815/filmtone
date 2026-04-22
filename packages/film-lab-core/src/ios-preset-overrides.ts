@@ -10,14 +10,19 @@ import type { PresetName } from "./presets";
  */
 export const FILMTONE_IOS_PRESET_OVERRIDES = {
   cinematic: {
-    contrast: 1.3,
-    vignette: 0.44,
-    saturation: 0.92,
-    bloomStrength: 0.21,
-    diffusion: 0.09,
-    halationIntensity: 0.03,
-    compressionAmount: 0.18,
-    printContrast: 0.22,
+    contrast: 1.24,
+    saturation: 0.87,
+    rgbShift: 0.001,
+    bloomThreshold: 0.78,
+    bloomStrength: 0.18,
+    bloomRadius: 0.42,
+    diffusion: 0.05,
+    halationIntensity: 0.02,
+    halationSpread: 18,
+    halationRadius: 0.36,
+    compressionAmount: 0.08,
+    printContrast: 0.08,
+    vignette: 0.32,
   },
   portra: {
     contrast: 1.04,

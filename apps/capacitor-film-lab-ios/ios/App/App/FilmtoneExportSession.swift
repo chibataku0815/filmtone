@@ -12,7 +12,7 @@ final class FilmtoneExportSession {
     private let preparedInputLut: PreparedLut?
     private let preparedCreativeLut: PreparedLut?
     private let sourceSeed: Double
-    private let colorSpace = CGColorSpaceCreateDeviceRGB()
+    private let outputColorSpace: CGColorSpace
     private var cancelled = false
     private static let aberrationEdgeSoftenScale = 32.0
     private static let aberrationEdgeSoftenMax = 0.52
@@ -22,10 +22,6 @@ final class FilmtoneExportSession {
     private static let aberrationBlurRadiusCap = 7.8
     private static let lensSoftnessBlurBoost = 1.85
     private static let glowBaseScale = 0.5
-    // Product-facing iOS tuning: keep payload semantics stable while making
-    // the glow family read much stronger at the same saved values.
-    private static let bloomCompositeBoost = 3.0
-    private static let halationCompositeBoost = 3.0
     private static let bloomSpreadBoost = 1.25
     private static let halationSpreadDivisor = 12.0
     private static let diffusionCompositeBase = 0.87
@@ -43,9 +39,15 @@ final class FilmtoneExportSession {
         self.sourceURL = sourceURL
         self.cacheStore = cacheStore
         self.outputURL = try cacheStore.temporaryExportURL(pathExtension: request.output.container)
+        let workingColorSpace = CGColorSpace(name: CGColorSpace.linearSRGB) ?? CGColorSpaceCreateDeviceRGB()
+        let outputColorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+        self.outputColorSpace = outputColorSpace
         self.ciContext = CIContext(options: [
             .cacheIntermediates: false,
             .priorityRequestLow: false,
+            .workingColorSpace: workingColorSpace,
+            .workingFormat: NSNumber(value: CIFormat.RGBAh.rawValue),
+            .outputColorSpace: outputColorSpace,
         ])
         self.preparedInputLut = Self.makePreparedLut(from: request.inputLut)
         let legacyCreativeLut = request.creativeLut ?? request.lut.map {
@@ -360,7 +362,7 @@ final class FilmtoneExportSession {
     private func exportStillImage(
         progress: @escaping (Phase0ExportProgressDTO) -> Void
     ) throws -> CompletedExport {
-        guard let image = CIImage(contentsOf: sourceURL, options: [.applyOrientationProperty: true]) else {
+        guard let image = loadedSourceImage(at: sourceURL) else {
             throw FilmtoneMediaError.unsupportedSource("The selected image could not be loaded.")
         }
 
@@ -407,7 +409,7 @@ final class FilmtoneExportSession {
                     filteredImage,
                     to: renderedBuffer,
                     bounds: CGRect(origin: .zero, size: outputSize),
-                    colorSpace: colorSpace
+                    colorSpace: outputColorSpace
                 )
 
                 let presentationTime = CMTime(value: CMTimeValue(frameIndex), timescale: CMTimeScale(request.output.fps))
@@ -441,7 +443,7 @@ final class FilmtoneExportSession {
     }
 
     private func renderStillPreview() throws -> Phase0PreviewRenderResultDTO {
-        guard let image = CIImage(contentsOf: sourceURL, options: [.applyOrientationProperty: true]) else {
+        guard let image = loadedSourceImage(at: sourceURL) else {
             throw FilmtoneMediaError.unsupportedSource("The selected image could not be loaded.")
         }
 
@@ -567,7 +569,7 @@ final class FilmtoneExportSession {
         timeSeconds: Double
     ) -> CIImage {
         let base = scaledVideoSourceImage(
-            CIImage(cvPixelBuffer: imageBuffer),
+            sourceVideoImage(from: imageBuffer),
             transform: transform,
             outputSize: outputSize
         )
@@ -590,7 +592,10 @@ final class FilmtoneExportSession {
         outputSize: CGSize,
         timeSeconds: Double
     ) throws -> CIImage {
-        let base = scaledPreviewVideoSourceImage(image, outputSize: outputSize)
+        let base = scaledPreviewVideoSourceImage(
+            sourcePreviewVideoImage(from: image),
+            outputSize: outputSize
+        )
         let graded = applyGrade(to: base, timeSeconds: timeSeconds)
         let cropped = graded.cropped(to: CGRect(origin: .zero, size: outputSize))
         try validatePreviewVideoImage(cropped, outputSize: outputSize)
@@ -603,7 +608,7 @@ final class FilmtoneExportSession {
         outputSize: CGSize
     ) -> CIImage {
         scaledVideoSourceImage(
-            CIImage(cvPixelBuffer: imageBuffer),
+            sourceVideoImage(from: imageBuffer),
             transform: transform,
             outputSize: outputSize
         )
@@ -878,8 +883,6 @@ final class FilmtoneExportSession {
             params.bloomStrength,
             params.halationIntensity,
             params.diffusion,
-            Self.bloomCompositeBoost,
-            Self.halationCompositeBoost,
             Self.diffusionCompositeBase,
         ]) ?? image
     }
@@ -958,7 +961,7 @@ final class FilmtoneExportSession {
         let lutImage = image.applyingFilter("CIColorCubeWithColorSpace", parameters: [
             "inputCubeDimension": lut.size,
             "inputCubeData": lut.cubeData,
-            "inputColorSpace": colorSpace,
+            "inputColorSpace": outputColorSpace,
         ])
 
         guard lut.intensity < 0.999 else {
@@ -1346,7 +1349,7 @@ final class FilmtoneExportSession {
                 frameImage,
                 to: renderedBuffer,
                 bounds: CGRect(origin: .zero, size: outputSize),
-                colorSpace: colorSpace
+                colorSpace: outputColorSpace
             )
 
             if !adaptor.append(renderedBuffer, withPresentationTime: presentationTime) {
@@ -1479,13 +1482,47 @@ final class FilmtoneExportSession {
         let url = try cacheStore.temporaryPreviewURL(preferredName: preferredName, pathExtension: "jpg")
         guard let data = ciContext.jpegRepresentation(
             of: image,
-            colorSpace: colorSpace,
+            colorSpace: outputColorSpace,
             options: [:]
         ) else {
             throw FilmtoneMediaError.exportFailed("Preview JPEG data could not be created.")
         }
         try data.write(to: url, options: .atomic)
         return url
+    }
+
+    private func loadedSourceImage(at url: URL) -> CIImage? {
+        CIImage(contentsOf: url, options: [
+            .applyOrientationProperty: true,
+            .toneMapHDRtoSDR: true,
+        ])
+    }
+
+    private func sourceVideoImage(from imageBuffer: CVPixelBuffer) -> CIImage {
+        let options: [CIImageOption: Any] = shouldToneMapHDRToSDR(imageBuffer)
+            ? [.toneMapHDRtoSDR: true]
+            : [:]
+        return CIImage(cvPixelBuffer: imageBuffer, options: options)
+    }
+
+    private func sourcePreviewVideoImage(from image: CIImage) -> CIImage {
+        guard let pixelBuffer = image.pixelBuffer else {
+            return image
+        }
+        return sourceVideoImage(from: pixelBuffer)
+    }
+
+    private func shouldToneMapHDRToSDR(_ imageBuffer: CVPixelBuffer) -> Bool {
+        guard let transferFunction = CVBufferGetAttachment(
+            imageBuffer,
+            kCVImageBufferTransferFunctionKey,
+            nil
+        )?.takeUnretainedValue() else {
+            return false
+        }
+
+        return CFEqual(transferFunction, kCVImageBufferTransferFunction_ITU_R_2100_HLG) ||
+            CFEqual(transferFunction, kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ)
     }
 
     private static func makePreparedLut(from lut: SerializableLutDTO?) -> PreparedLut? {
@@ -1663,16 +1700,16 @@ float glowHeadroom(vec3 baseRgb, float floorValue) {
     return mix(floorValue, 1.0, sqrt(clamp(1.0 - luma, 0.0, 1.0)));
 }
 
-kernel vec4 glowComposite(__sample base, __sample bloom, __sample halation, __sample diffusionImage, float bloomStrength, float halationIntensity, float diffusionAmount, float bloomBoost, float halationBoost, float diffusionBase) {
+kernel vec4 glowComposite(__sample base, __sample bloom, __sample halation, __sample diffusionImage, float bloomStrength, float halationIntensity, float diffusionAmount, float diffusionBase) {
     vec3 baseRgb = base.rgb;
     vec3 result = baseRgb;
-    vec3 glowEnergy = bloom.rgb * bloomStrength * bloomBoost + halation.rgb * halationIntensity * halationBoost;
+    vec3 glowEnergy = bloom.rgb * bloomStrength + halation.rgb * halationIntensity;
     vec3 glow = glowShoulder(glowEnergy) * glowHeadroom(baseRgb, 0.82);
-    result = 1.0 - (1.0 - result) * (1.0 - glow);
+    result = result + min(glow, max(vec3(0.0), vec3(1.0) - result));
 
     if (diffusionAmount > 0.0) {
         vec3 diffOpacity = glowShoulder(diffusionImage.rgb * diffusionAmount * diffusionBase) * glowHeadroom(baseRgb, 0.88);
-        result = 1.0 - (1.0 - result) * (1.0 - diffOpacity);
+        result = result + min(diffOpacity, max(vec3(0.0), vec3(1.0) - result));
     }
 
     return vec4(clamp(result, 0.0, 1.0), base.a);
