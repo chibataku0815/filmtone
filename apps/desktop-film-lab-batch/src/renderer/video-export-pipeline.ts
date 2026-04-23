@@ -901,6 +901,13 @@ export async function runVideoExportPipeline(options: {
       > | null = null;
       let retryWithSeek = false;
       let retryReason = "";
+      let exportSessionId: string | null = null;
+
+      const abortActiveVideoExport = async (): Promise<void> => {
+        const currentSessionId = exportSessionId;
+        exportSessionId = null;
+        await api.videoExportAbort(currentSessionId).catch(() => {});
+      };
 
       try {
         if (allowWebCodecs) {
@@ -1066,7 +1073,6 @@ export async function runVideoExportPipeline(options: {
         }
         let pboIdx = 0;
         let prevFence: WebGLSync | null = null;
-        let exportSessionId: string | null = null;
 
         const invokeVideoExportWriteFrame = (
           frameBytes: Uint8Array,
@@ -1081,12 +1087,6 @@ export async function runVideoExportPipeline(options: {
             sessionId: currentSessionId,
             data: frameBytes,
           });
-        };
-
-        const abortActiveVideoExport = async (): Promise<void> => {
-          const currentSessionId = exportSessionId;
-          exportSessionId = null;
-          await api.videoExportAbort(currentSessionId).catch(() => {});
         };
 
         let resolvedOutPath: string;
