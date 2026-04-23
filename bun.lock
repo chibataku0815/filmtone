@@ -32,7 +32,7 @@
     },
     "apps/desktop-film-lab-batch": {
       "name": "desktop-film-lab-batch",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "dependencies": {
         "@phosphor-icons/react": "^2.1.10",
         "@radix-ui/colors": "^3.0.0",
