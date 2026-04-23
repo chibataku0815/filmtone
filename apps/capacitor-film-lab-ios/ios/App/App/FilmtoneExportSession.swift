@@ -7,7 +7,9 @@ final class FilmtoneExportSession {
     private let request: Phase0ExportRequestDTO
     private let sourceURL: URL
     private let cacheStore: CacheStore
+    private let mezzanineService: MezzanineService?
     private let outputURL: URL
+    private(set) var didUseMezzanine: Bool = false
     private let ciContext: CIContext
     private let preparedInputLut: PreparedLut?
     private let preparedCreativeLut: PreparedLut?
@@ -33,11 +35,13 @@ final class FilmtoneExportSession {
     init(
         request: Phase0ExportRequestDTO,
         sourceURL: URL,
-        cacheStore: CacheStore
+        cacheStore: CacheStore,
+        mezzanineService: MezzanineService? = nil
     ) throws {
         self.request = request
         self.sourceURL = sourceURL
         self.cacheStore = cacheStore
+        self.mezzanineService = mezzanineService
         self.outputURL = try cacheStore.temporaryExportURL(pathExtension: request.output.container)
         let workingColorSpace = CGColorSpace(name: CGColorSpace.linearSRGB) ?? CGColorSpaceCreateDeviceRGB()
         let outputColorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
@@ -123,7 +127,9 @@ final class FilmtoneExportSession {
     private func exportVideo(
         progress: @escaping (Phase0ExportProgressDTO) -> Void
     ) throws -> CompletedExport {
-        let asset = AVURLAsset(url: sourceURL)
+        let effectiveSourceURL = resolvedVideoSourceURL()
+        didUseMezzanine = (effectiveSourceURL != sourceURL)
+        let asset = AVURLAsset(url: effectiveSourceURL)
         guard let videoTrack = asset.tracks(withMediaType: .video).first else {
             throw FilmtoneMediaError.unsupportedSource("No video track was found in the selected source.")
         }
@@ -1540,6 +1546,13 @@ final class FilmtoneExportSession {
             intensity: lut.intensity,
             cubeData: cubeData
         )
+    }
+
+    private func resolvedVideoSourceURL() -> URL {
+        // Standard-quality preview/export must grade the original capture.
+        // Mezzanine reuse stays available for a later speed-focused lane.
+        _ = mezzanineService
+        return sourceURL
     }
 
     static func scaledSize(for track: AVAssetTrack, longEdge: Int) -> CGSize {

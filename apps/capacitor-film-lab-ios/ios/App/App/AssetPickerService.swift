@@ -42,14 +42,23 @@ final class AssetPickerService: NSObject {
     }
 
     private let cacheStore: CacheStore
+    private let mezzanineService: MezzanineService
     private var sourceContinuation: CheckedContinuation<SourceInfoDTO?, Error>?
     private var lutContinuation: CheckedContinuation<PickedLutFileDTO?, Error>?
     private var activeDocumentPickerPurpose: DocumentPickerPurpose?
     private var sourceImportProgressHandler: (@MainActor (FilmtoneSourceImportProgress) -> Void)?
 
-    init(cacheStore: CacheStore) {
+    init(cacheStore: CacheStore, mezzanineService: MezzanineService) {
         self.cacheStore = cacheStore
+        self.mezzanineService = mezzanineService
         super.init()
+    }
+
+    private func kickOffMezzanine(for sourceURL: URL) {
+        let service = mezzanineService
+        Task.detached(priority: .utility) {
+            _ = try? await service.ensureMezzanine(sourceURL: sourceURL)
+        }
     }
 
     @MainActor
@@ -160,6 +169,10 @@ final class AssetPickerService: NSObject {
                 suggestedName: provider.suggestedName,
                 bucket: .sources
             )
+        }
+
+        if kind == .video {
+            kickOffMezzanine(for: importedURL)
         }
 
         return SourceInfoDTO(
@@ -294,6 +307,10 @@ final class AssetPickerService: NSObject {
             suggestedName: url.lastPathComponent,
             bucket: .sources
         )
+
+        if kind == .video {
+            kickOffMezzanine(for: importedURL)
+        }
 
         return SourceInfoDTO(
             uri: importedURL.absoluteString,

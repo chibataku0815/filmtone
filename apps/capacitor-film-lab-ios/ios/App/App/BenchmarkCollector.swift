@@ -25,6 +25,16 @@ final class BenchmarkCollector {
         self.iosVersion = UIDevice.current.systemVersion
     }
 
+    private(set) var exportUsedMezzanine: Bool?
+    private(set) var mezzanineGenerationMs: Int?
+
+    func recordMezzanineUsage(used: Bool, generationMs: Int? = nil) {
+        exportUsedMezzanine = used
+        if let generationMs {
+            mezzanineGenerationMs = generationMs
+        }
+    }
+
     func makeSuccessRecord(
         result: Phase0ExportResultDTO,
         saveToPhotosOk: Bool? = nil
@@ -45,7 +55,9 @@ final class BenchmarkCollector {
             permissionResult: saveToPhotosOk == true ? "granted" : (saveToPhotosOk == false ? "denied" : "save-not-run"),
             saveToPhotosOk: saveToPhotosOk,
             errorDomain: nil,
-            errorCode: nil
+            errorCode: nil,
+            exportUsedMezzanine: exportUsedMezzanine,
+            mezzanineGenerationMs: mezzanineGenerationMs
         )
     }
 
@@ -68,7 +80,9 @@ final class BenchmarkCollector {
             permissionResult: nil,
             saveToPhotosOk: nil,
             errorDomain: nsError.domain,
-            errorCode: mediaError?.code ?? "FILMTONE_NATIVE_ERROR"
+            errorCode: mediaError?.code ?? "FILMTONE_NATIVE_ERROR",
+            exportUsedMezzanine: exportUsedMezzanine,
+            mezzanineGenerationMs: mezzanineGenerationMs
         )
     }
 

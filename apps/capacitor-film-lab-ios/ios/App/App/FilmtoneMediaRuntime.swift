@@ -18,6 +18,7 @@ struct FilmtonePreparedVideoPreviewComposition {
 
 final class FilmtoneMediaRuntime {
     private let cacheStore: CacheStore
+    private let mezzanineService: MezzanineService
     private let sourceProbeService = SourceProbeService()
     private let photoLibraryService = PhotoLibraryService()
     private let memoryWarningCounter: () -> Int
@@ -27,10 +28,12 @@ final class FilmtoneMediaRuntime {
 
     init(
         cacheStore: CacheStore,
+        mezzanineService: MezzanineService,
         memoryWarningCounter: @escaping () -> Int = { 0 },
         invalidFileURLError: @escaping (String) -> Error
     ) {
         self.cacheStore = cacheStore
+        self.mezzanineService = mezzanineService
         self.memoryWarningCounter = memoryWarningCounter
         self.invalidFileURLError = invalidFileURLError
     }
@@ -91,7 +94,8 @@ final class FilmtoneMediaRuntime {
         return try FilmtoneExportSession(
             request: request,
             sourceURL: resolvedSourceURL,
-            cacheStore: cacheStore
+            cacheStore: cacheStore,
+            mezzanineService: mezzanineService
         )
     }
 
@@ -315,6 +319,7 @@ final class FilmtoneMediaRuntime {
         onProgress: @escaping (Phase0ExportProgressDTO) -> Void
     ) throws -> Phase0ExportResultDTO {
         var result = try session.run(progress: onProgress)
+        collector.recordMezzanineUsage(used: session.didUseMezzanine)
         let benchmarkRecord = collector.makeSuccessRecord(result: result)
         result = Phase0ExportResultDTO(
             outputUri: result.outputUri,

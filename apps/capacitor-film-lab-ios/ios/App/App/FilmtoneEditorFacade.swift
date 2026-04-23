@@ -13,9 +13,14 @@ final class FilmtoneEditorFacade {
 
     init() throws {
         let cacheStore = try CacheStore()
-        self.assetPickerService = AssetPickerService(cacheStore: cacheStore)
+        let mezzanineService = MezzanineService(cacheStore: cacheStore)
+        self.assetPickerService = AssetPickerService(
+            cacheStore: cacheStore,
+            mezzanineService: mezzanineService
+        )
         self.runtime = FilmtoneMediaRuntime(
             cacheStore: cacheStore,
+            mezzanineService: mezzanineService,
             memoryWarningCounter: { [memoryWarningState] in memoryWarningState.count },
             invalidFileURLError: { _ in
                 FilmtoneMediaError.invalidURL(

@@ -30,9 +30,14 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
         super.load()
         do {
             let cacheStore = try CacheStore()
-            self.assetPickerService = AssetPickerService(cacheStore: cacheStore)
+            let mezzanineService = MezzanineService(cacheStore: cacheStore)
+            self.assetPickerService = AssetPickerService(
+                cacheStore: cacheStore,
+                mezzanineService: mezzanineService
+            )
             self.runtime = FilmtoneMediaRuntime(
                 cacheStore: cacheStore,
+                mezzanineService: mezzanineService,
                 memoryWarningCounter: { [weak self] in self?.memoryWarningCount ?? 0 },
                 invalidFileURLError: { uri in
                     FilmtoneMediaError.invalidURL("The file URL '\(uri)' is invalid or inaccessible.")

@@ -19,6 +19,15 @@ struct SourceInfoDTO: Codable {
     let filename: String
     let kind: FilmtoneSourceKind
     let mimeType: String?
+    let mezzanineStatus: String?
+
+    init(uri: String, filename: String, kind: FilmtoneSourceKind, mimeType: String?, mezzanineStatus: String? = nil) {
+        self.uri = uri
+        self.filename = filename
+        self.kind = kind
+        self.mimeType = mimeType
+        self.mezzanineStatus = mezzanineStatus
+    }
 }
 
 struct PickedLutFileDTO: Codable {
@@ -142,6 +151,8 @@ struct Phase0ExportBenchmarkRecordDTO: Encodable {
     let saveToPhotosOk: Bool?
     let errorDomain: String?
     let errorCode: String?
+    let exportUsedMezzanine: Bool?
+    let mezzanineGenerationMs: Int?
 }
 
 struct Phase0ExportResultDTO: Encodable {

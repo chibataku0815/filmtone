@@ -6,6 +6,7 @@ final class CacheStore {
         case luts
         case exports
         case previews
+        case mezzanine
     }
 
     private let fileManager: FileManager
@@ -80,6 +81,69 @@ final class CacheStore {
         ) {
             try fileManager.removeItem(at: entry)
         }
+    }
+
+    func mezzanineFileURL(signature: String) throws -> URL {
+        let directoryURL = try directory(for: .mezzanine)
+        return directoryURL.appendingPathComponent("\(signature).mp4")
+    }
+
+    @discardableResult
+    func pruneMezzanine(maxBytes: Int64, maxEntries: Int) throws -> (removedCount: Int, retainedBytes: Int64) {
+        let directoryURL = try directory(for: .mezzanine)
+        let resourceKeys: [URLResourceKey] = [.fileSizeKey, .contentAccessDateKey, .isRegularFileKey]
+        let entries = try fileManager.contentsOfDirectory(
+            at: directoryURL,
+            includingPropertiesForKeys: resourceKeys,
+            options: [.skipsHiddenFiles]
+        )
+
+        struct Entry {
+            let url: URL
+            let sizeBytes: Int64
+            let accessDate: Date
+        }
+
+        var descriptors: [Entry] = []
+        descriptors.reserveCapacity(entries.count)
+
+        for url in entries {
+            let values = try url.resourceValues(forKeys: Set(resourceKeys))
+            guard values.isRegularFile == true else { continue }
+            // Any *.partial is from an interrupted transcode in a prior session.
+            // Drop it outright — it's not usable and shouldn't occupy the budget.
+            if url.pathExtension == "partial" {
+                try? fileManager.removeItem(at: url)
+                continue
+            }
+            let size = Int64(values.fileSize ?? 0)
+            let access = values.contentAccessDate ?? .distantPast
+            descriptors.append(Entry(url: url, sizeBytes: size, accessDate: access))
+        }
+
+        // Newest-first retention. Evict oldest until both caps satisfied.
+        descriptors.sort { $0.accessDate > $1.accessDate }
+
+        var retainedBytes: Int64 = 0
+        var retainedCount = 0
+        var removed: [URL] = []
+
+        for entry in descriptors {
+            let wouldExceedEntries = retainedCount + 1 > maxEntries
+            let wouldExceedBytes = retainedBytes + entry.sizeBytes > maxBytes
+            if wouldExceedEntries || wouldExceedBytes {
+                removed.append(entry.url)
+            } else {
+                retainedBytes += entry.sizeBytes
+                retainedCount += 1
+            }
+        }
+
+        for url in removed {
+            try? fileManager.removeItem(at: url)
+        }
+
+        return (removedCount: removed.count, retainedBytes: retainedBytes)
     }
 
     private func ensureDirectory(at url: URL) throws {
