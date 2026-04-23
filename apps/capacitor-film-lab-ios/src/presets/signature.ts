@@ -1,8 +1,12 @@
-import { PHASE0_PRESET_DEFAULT, PRESETS, type PresetName } from "film-lab-core";
+import {
+  PHASE0_PRESET_DEFAULT,
+  createDefaultPhase0Params,
+  type PresetName,
+} from "film-lab-core";
 
 export const SIGNATURE_PRESET_NAME: PresetName = PHASE0_PRESET_DEFAULT;
 
-export const SIGNATURE_PRESET_PARAMS = PRESETS[SIGNATURE_PRESET_NAME];
+export const SIGNATURE_PRESET_PARAMS = createDefaultPhase0Params(SIGNATURE_PRESET_NAME);
 
 export interface SignatureLutSlotPlan {
   slot: "inputLut" | "creativeLut";
@@ -31,7 +35,7 @@ export const SIGNATURE_LUT_PLAN: readonly SignatureLutSlotPlan[] = [
 
 export const SIGNATURE_PRESET_BUNDLE_NOTE = [
   "Signature preset = the canonical Filmtone iOS Phase 0 default look.",
-  "It is wired through PHASE0_PRESET_DEFAULT (\"cinematic\") so createPhase0ProjectState() already selects it on first launch and after Reset.",
+  "It is wired through PHASE0_PRESET_DEFAULT (\"reset\") so createPhase0ProjectState() already selects Neutral / Clean Base with the soft finish on first launch and after Reset.",
   "LUT slots default to empty until .cube assets are dropped into apps/capacitor-film-lab-ios/src/presets/luts/ and SIGNATURE_LUT_PLAN.bundledRelPath is filled in.",
   "Until then, the user picks LUT1 / LUT2 manually via Phase0LutPicker. The dual-LUT pipeline behaves the same.",
 ].join(" ");

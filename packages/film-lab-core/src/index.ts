@@ -67,6 +67,7 @@ export {
   phase0ProjectLutSchema,
   phase0ProjectSchema,
   pickPhase0Params,
+  createFilmtoneDefaultPhase0Params,
   createDefaultPhase0Params,
   interpolatePhase0PresetParams,
   createPhase0ProjectState,

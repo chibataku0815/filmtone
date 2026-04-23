@@ -22,4 +22,4 @@ The dual-LUT pipeline still works — the user picks LUT1 / LUT2 manually via `P
 
 ## Why this is not blocking Phase 0
 
-Phase 0 is a kill-test of export viability with dual-LUT support, not a polished first-run experience. The signature preset's params already produce a representative Filmtone look without LUTs. Bundled LUTs only sharpen the first-launch impression for non-technical testers.
+Phase 0 is a kill-test of export viability with dual-LUT support, not a polished first-run experience. The signature preset starts from Neutral / Clean Base with the shared soft finish, so it already produces a representative Filmtone look without LUTs. Bundled LUTs only sharpen the first-launch impression for non-technical testers.

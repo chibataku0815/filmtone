@@ -9,6 +9,7 @@ import {
   PHASE0_PRESET_STRENGTH_DEFAULT,
   PHASE0_RGB_SHIFT_MAX,
   PHASE0_SCHEMA_VERSION,
+  createFilmtoneDefaultPhase0Params,
   mergePhase0Params,
   pickPhase0Params,
   type Phase0Params,
@@ -39,6 +40,7 @@ export interface FilmtoneIosSwiftPayload {
     longEdge: number;
     fileSizeBytes: number;
   };
+  resetParams: Phase0Params;
   presets: Record<PresetName, Phase0Params>;
   quickWeights: Record<QuickAxisId, Partial<Record<keyof Phase0Params, number>>>;
 }
@@ -49,7 +51,9 @@ export function buildFilmtoneIosPresetMap(
   const presetNames = Object.keys(PRESETS) as PresetName[];
   return Object.fromEntries(
     presetNames.map((name) => {
-      const base = pickPhase0Params(PRESETS[name]);
+      const base = name === PHASE0_PRESET_DEFAULT
+        ? createFilmtoneDefaultPhase0Params()
+        : pickPhase0Params(PRESETS[name]);
       const patch = presetOverrides[name];
       return [name, patch ? mergePhase0Params(base, patch) : base];
     }),
@@ -75,6 +79,7 @@ export function buildFilmtoneIosSwiftPayload(): FilmtoneIosSwiftPayload {
       longEdge: PHASE0_APPROX_SOURCE_LONG_EDGE_MAX,
       fileSizeBytes: PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES,
     },
+    resetParams: pickPhase0Params(PRESETS.reset),
     presets,
     quickWeights: QUICK_PHASE0_AXIS_WEIGHTS as Record<
       QuickAxisId,
@@ -142,7 +147,7 @@ function renderQuickWeights(
 }
 
 export function renderFilmtoneIosSwiftPayload(payload = buildFilmtoneIosSwiftPayload()): string {
-  const resetParams = renderPhase0ParamsInit(payload.presets.reset, "        ").replace(/^/gm, "    ");
+  const resetParams = renderPhase0ParamsInit(payload.resetParams, "        ").replace(/^/gm, "    ");
   return `import Foundation
 
 enum FilmtonePhase0Generated {

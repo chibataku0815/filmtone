@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { PRESETS } from "./presets";
 import {
   createDefaultPhase0Params,
+  createFilmtoneDefaultPhase0Params,
   createPhase0ProjectState,
   interpolatePhase0PresetParams,
   mergePhase0Params,
@@ -13,6 +14,7 @@ import {
   PHASE0_OUTPUT_PROFILE,
   PHASE0_RGB_SHIFT_MAX,
   PHASE0_SCHEMA_VERSION,
+  PHASE0_PRESET_DEFAULT,
   PHASE0_PRESET_STRENGTH_DEFAULT,
 } from "./phase0-schema";
 
@@ -30,9 +32,16 @@ describe("phase0 schema", () => {
     expect(phase0.grainIntensity).toBe(PRESETS.cinematic.grainIntensity);
   });
 
-  test("defaults to the cinematic preset", () => {
+  test("defaults to reset identity with the shared soft finish", () => {
     const phase0 = createDefaultPhase0Params();
-    expect(phase0).toEqual(pickPhase0Params(PRESETS.cinematic));
+    const pureReset = pickPhase0Params(PRESETS.reset);
+    const softDefault = createFilmtoneDefaultPhase0Params();
+
+    expect(PHASE0_PRESET_DEFAULT).toBe("reset");
+    expect(phase0).toEqual(softDefault);
+    expect(phase0).not.toEqual(pureReset);
+    expect(phase0.bloomStrength).toBeGreaterThan(pureReset.bloomStrength);
+    expect(phase0.halationIntensity).toBeGreaterThan(pureReset.halationIntensity);
   });
 
   test("accepts halationHue slider boundary values", () => {
@@ -117,10 +126,30 @@ describe("phase0 schema", () => {
   test("creates a project state with the fixed output profile", () => {
     const project = createPhase0ProjectState();
     expect(project.output).toEqual(PHASE0_OUTPUT_PROFILE);
-    expect(project.params).toEqual(pickPhase0Params(PRESETS.cinematic));
+    expect(project.presetName).toBe("reset");
+    expect(project.params).toEqual(createFilmtoneDefaultPhase0Params());
     expect(project.strength).toBe(PHASE0_PRESET_STRENGTH_DEFAULT);
     expect(project.inputLut).toBeNull();
     expect(project.creativeLut).toBeNull();
+  });
+
+  test("interpolates the reset default from pure reset to soft finish", () => {
+    const pureReset = pickPhase0Params(PRESETS.reset);
+    const softDefault = createFilmtoneDefaultPhase0Params();
+    const zero = interpolatePhase0PresetParams("reset", 0);
+    const full = interpolatePhase0PresetParams("reset", 1);
+    const half = interpolatePhase0PresetParams("reset", 0.5);
+
+    expect(zero).toEqual(pureReset);
+    expect(full).toEqual(softDefault);
+    expect(half.bloomStrength).toBeCloseTo(
+      (pureReset.bloomStrength + softDefault.bloomStrength) / 2,
+      5,
+    );
+    expect(half.halationIntensity).toBeCloseTo(
+      (pureReset.halationIntensity + softDefault.halationIntensity) / 2,
+      5,
+    );
   });
 
   test("interpolates preset params from reset by strength", () => {
@@ -163,6 +192,21 @@ describe("phase0 schema", () => {
     expect(patched.params.halationHue).toBe(PHASE0_HALATION_HUE_MAX);
     expect(patched.params.exposure).toBe(base.params.exposure);
     expect(patched.params.halationSpread).toBe(base.params.halationSpread);
+  });
+
+  test("falls back unknown presets to the reset soft default", () => {
+    const parsed = phase0ProjectSchema.parse({
+      schemaVersion: PHASE0_SCHEMA_VERSION,
+      projectId: "unknown-preset-project",
+      createdAt: "2026-04-19T00:00:00.000Z",
+      updatedAt: "2026-04-19T00:00:00.000Z",
+      presetName: "missing-preset",
+      params: {},
+      output: PHASE0_OUTPUT_PROFILE,
+    });
+
+    expect(parsed.presetName).toBe("reset");
+    expect(parsed.params).toEqual(createFilmtoneDefaultPhase0Params());
   });
 
   test("rejects out-of-range project param patches", () => {

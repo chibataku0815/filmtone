@@ -1,7 +1,11 @@
 import { z } from "zod";
 import type { Params } from "./params";
 import { PHASE0_RGB_SHIFT_MAX } from "./phase0-constants";
-import { PRESETS, type PresetName } from "./presets";
+import {
+  PRESETS,
+  createFilmtoneDefaultParams,
+  type PresetName,
+} from "./presets";
 import {
   DEFAULT_QUICK_STATE,
   QUICK_AXIS_IDS,
@@ -11,7 +15,7 @@ import {
 export { PHASE0_RGB_SHIFT_MAX } from "./phase0-constants";
 
 export const PHASE0_SCHEMA_VERSION = 2 as const;
-export const PHASE0_PRESET_DEFAULT = "cinematic" satisfies PresetName;
+export const PHASE0_PRESET_DEFAULT = "reset" satisfies PresetName;
 export const PHASE0_PRESET_STRENGTH_DEFAULT = 1;
 export const PHASE0_HALATION_HUE_MIN = 0;
 export const PHASE0_HALATION_HUE_MAX = 100;
@@ -212,10 +216,22 @@ export function pickPhase0Params(
   return phase0ParamsSchema.parse(next);
 }
 
+export function createFilmtoneDefaultPhase0Params(): Phase0Params {
+  return pickPhase0Params(createFilmtoneDefaultParams());
+}
+
+function phase0PresetTargetParams(presetName: PresetName): Phase0Params {
+  if (presetName === PHASE0_PRESET_DEFAULT) {
+    return createFilmtoneDefaultPhase0Params();
+  }
+
+  return pickPhase0Params(PRESETS[presetName]);
+}
+
 export function createDefaultPhase0Params(
   presetName: PresetName = PHASE0_PRESET_DEFAULT,
 ): Phase0Params {
-  return pickPhase0Params(PRESETS[presetName]);
+  return phase0PresetTargetParams(presetName);
 }
 
 export function interpolatePhase0PresetParams(
@@ -224,7 +240,7 @@ export function interpolatePhase0PresetParams(
 ): Phase0Params {
   const clamped = Math.max(0, Math.min(1, strength));
   const reset = pickPhase0Params(PRESETS.reset);
-  const target = pickPhase0Params(PRESETS[presetName]);
+  const target = phase0PresetTargetParams(presetName);
   const params = { ...reset };
 
   for (const key of PHASE0_PARAM_KEYS) {

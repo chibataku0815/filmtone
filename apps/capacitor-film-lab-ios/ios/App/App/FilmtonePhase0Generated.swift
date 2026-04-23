@@ -3,7 +3,7 @@ import Foundation
 enum FilmtonePhase0Generated {
     static let schemaVersion = 2
     static let presetVersion = "v1"
-    static let presetDefault = "cinematic"
+    static let presetDefault = "reset"
     static let presetStrengthDefault = 1.0
     static let paramKeys: [String] = ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "grainRadialMix", "grainSize", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "fade", "vignette", "grainIntensity"]
     static let quickAxisIds: [String] = ["filmCharacter", "era", "dynamics"]
@@ -69,15 +69,15 @@ enum FilmtonePhase0Generated {
             lensSoftness: 0.0,
             grainRadialMix: 1.0,
             grainSize: 0.3,
-            bloomThreshold: 0.8,
-            bloomStrength: 0.0,
-            bloomRadius: 0.4,
-            diffusion: 0.0,
-            halationIntensity: 0.0,
-            halationSpread: 15.0,
-            halationHue: 0.0,
+            bloomThreshold: 0.72,
+            bloomStrength: 0.22,
+            bloomRadius: 0.52,
+            diffusion: 0.08,
+            halationIntensity: 0.1,
+            halationSpread: 22.0,
+            halationHue: 20.0,
             halationThreshold: 0.6,
-            halationRadius: 0.6,
+            halationRadius: 0.44,
             bloomSoftKnee: 0.5,
             halationSoftKnee: 0.3,
             compressionAmount: 0.0,

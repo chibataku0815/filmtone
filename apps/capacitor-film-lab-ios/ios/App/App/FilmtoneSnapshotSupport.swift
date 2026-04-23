@@ -69,9 +69,9 @@ struct FilmtoneSnapshotFixture {
         case .hero:
             return .init(
                 project: makeProject(
-                    presetName: "cinematic",
-                    strength: 0.84,
-                    quickState: .init(filmCharacter: 0.28, era: -0.18, dynamics: 0.16)
+                    presetName: "reset",
+                    strength: FilmtonePhase0Math.presetStrengthDefault,
+                    quickState: .zero
                 ),
                 source: source,
                 probe: probe,

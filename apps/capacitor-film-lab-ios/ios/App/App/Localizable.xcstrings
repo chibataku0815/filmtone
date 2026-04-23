@@ -2053,13 +2053,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No Grade"
+            "value" : "Clean Base"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "補正なし"
+            "value" : "クリーンベース"
           }
         }
       }

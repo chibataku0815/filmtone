@@ -2,8 +2,16 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { FILMTONE_IOS_PRESET_OVERRIDES } from "./ios-preset-overrides";
-import { buildFilmtoneIosPresetMap, renderFilmtoneIosSwiftPayload } from "./ios-swift-payload";
-import { phase0ParamsSchema, pickPhase0Params } from "./phase0-schema";
+import {
+  buildFilmtoneIosPresetMap,
+  buildFilmtoneIosSwiftPayload,
+  renderFilmtoneIosSwiftPayload,
+} from "./ios-swift-payload";
+import {
+  createFilmtoneDefaultPhase0Params,
+  phase0ParamsSchema,
+  pickPhase0Params,
+} from "./phase0-schema";
 import { PRESETS, type PresetName } from "./presets";
 
 const EXPECTED_CINEMATIC_IOS_ENVELOPE = {
@@ -38,8 +46,10 @@ test("generated Swift payload stays in sync with current iOS phase0 payload trut
 test("iOS preset map applies mobile-only overrides without mutating shared presets", () => {
   const presetMap = buildFilmtoneIosPresetMap();
   const sharedCinematic = pickPhase0Params(PRESETS.cinematic);
+  const pureReset = pickPhase0Params(PRESETS.reset);
 
-  expect(presetMap.reset).toEqual(pickPhase0Params(PRESETS.reset));
+  expect(presetMap.reset).toEqual(createFilmtoneDefaultPhase0Params());
+  expect(presetMap.reset).not.toEqual(pureReset);
   expect(sharedCinematic).toEqual(pickPhase0Params(PRESETS.cinematic));
   expect(PRESETS.cinematic.contrast).toBe(1.24);
   expect(PRESETS.cinematic.printContrast).toBe(0);
@@ -57,6 +67,16 @@ test("iOS preset map applies mobile-only overrides without mutating shared prese
   expect(presetMap.velvia50.printContrast).toBe(0.16);
   expect(renderFilmtoneIosSwiftPayload()).toContain('static let schemaVersion = 2');
   expect(renderFilmtoneIosSwiftPayload()).toContain('static let rgbShiftMax = 0.005');
+});
+
+test("iOS Swift payload keeps pure reset separate from the default reset target", () => {
+  const payload = buildFilmtoneIosSwiftPayload();
+
+  expect(payload.presetDefault).toBe("reset");
+  expect(payload.resetParams).toEqual(pickPhase0Params(PRESETS.reset));
+  expect(payload.presets.reset).toEqual(createFilmtoneDefaultPhase0Params());
+  expect(payload.presets.reset.bloomStrength).toBeGreaterThan(payload.resetParams.bloomStrength);
+  expect(renderFilmtoneIosSwiftPayload()).toContain('static let presetDefault = "reset"');
 });
 
 test("iOS override leaves shared PRESETS byte-identical for all presets", () => {

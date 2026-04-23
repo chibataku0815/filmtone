@@ -1102,7 +1102,7 @@ function applyQuickStateToPhase0Params(base, state) {
 // src/phase0-schema.ts
 import { z as z3 } from "zod";
 var PHASE0_SCHEMA_VERSION = 2;
-var PHASE0_PRESET_DEFAULT = "cinematic";
+var PHASE0_PRESET_DEFAULT = "reset";
 var PHASE0_PRESET_STRENGTH_DEFAULT = 1;
 var PHASE0_HALATION_HUE_MIN = 0;
 var PHASE0_HALATION_HUE_MAX = 100;
@@ -1274,13 +1274,22 @@ function pickPhase0Params(params) {
   }
   return phase0ParamsSchema.parse(next);
 }
-function createDefaultPhase0Params(presetName = PHASE0_PRESET_DEFAULT) {
+function createFilmtoneDefaultPhase0Params() {
+  return pickPhase0Params(createFilmtoneDefaultParams());
+}
+function phase0PresetTargetParams(presetName) {
+  if (presetName === PHASE0_PRESET_DEFAULT) {
+    return createFilmtoneDefaultPhase0Params();
+  }
   return pickPhase0Params(PRESETS[presetName]);
+}
+function createDefaultPhase0Params(presetName = PHASE0_PRESET_DEFAULT) {
+  return phase0PresetTargetParams(presetName);
 }
 function interpolatePhase0PresetParams(presetName, strength) {
   const clamped = Math.max(0, Math.min(1, strength));
   const reset = pickPhase0Params(PRESETS.reset);
-  const target = pickPhase0Params(PRESETS[presetName]);
+  const target = phase0PresetTargetParams(presetName);
   const params = { ...reset };
   for (const key of PHASE0_PARAM_KEYS) {
     params[key] = reset[key] + (target[key] - reset[key]) * clamped;
@@ -1994,6 +2003,7 @@ export {
   createDefaultFilmLookGradeProps,
   createDefaultPhase0Params,
   createFilmtoneDefaultParams,
+  createFilmtoneDefaultPhase0Params,
   createIosPhase0SerializableLut,
   createPhase0ProjectState,
   deserializeCubeLutData,

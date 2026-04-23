@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  createFilmtoneDefaultPhase0Params,
   serializeCubeLut,
   type ParsedCubeLut,
 } from "film-lab-core";
@@ -30,6 +31,13 @@ LUT_3D_SIZE 2
 }
 
 describe("phase0 state", () => {
+  test("initial state uses the reset soft-finish default", () => {
+    const initial = createInitialEditorState();
+
+    expect(initial.project.presetName).toBe("reset");
+    expect(initial.project.params).toEqual(createFilmtoneDefaultPhase0Params());
+  });
+
   test("preset changes reset strength and quick state but preserve input LUT", () => {
     const inputLut = makeTestLut("Camera LUT");
     const initial = applyInputLutSelection(createInitialEditorState(), inputLut);
@@ -52,7 +60,8 @@ describe("phase0 state", () => {
 
     expect(next.project.inputLut).toEqual(inputLut);
     expect(next.project.strength).toBeCloseTo(0.35, 5);
-    expect(next.project.params.contrast).toBeLessThan(initial.project.params.contrast);
+    expect(next.project.params.bloomStrength).toBeLessThan(initial.project.params.bloomStrength);
+    expect(next.project.params.halationIntensity).toBeLessThan(initial.project.params.halationIntensity);
   });
 
   test("quick changes rebuild params on top of the current strength", () => {

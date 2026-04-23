@@ -38,7 +38,7 @@ Name clips `clip-60s-take1.mov` / `clip-5min-take1.mov` / `clip-short-take1.mov`
 ## 3. Per-run 5 taps
 
 1. Pick source
-2. Apply preset + dual LUT (LUT1 "Camera Profile" ON, LUT2 "Film Look" — defaults from `cinematic`)
+2. Apply preset + dual LUT (LUT1 "Camera Profile" ON, LUT2 "Film Look" — default starts from Neutral / Clean Base with soft finish)
 3. `書き出しを実行` → wait for completion
 4. After save, tap `Pass` / `Fail` / `未確認` in the export sheet (visual floor: start / middle / end spot-check)
 5. Tap `ベンチ結果を共有` → the 1-line markdown row goes to clipboard (or share sheet)
@@ -83,7 +83,7 @@ Follow the historical `docs/guides/2026-04-18-filmtone-ios-phase0-phase-c-auto-r
 
 - No black / stuck frames at start, middle, end
 - Save to Photos completes
-- Color roughly matches preview (subjective; cinematic should read as cinematic)
+- Color roughly matches preview (subjective; Neutral / Clean Base should keep the source natural with visible soft finish)
 - No permission dead-end
 
 If any of the above fails → `Fail`. If unsure → `未確認` (counts as unchecked, not fail).
