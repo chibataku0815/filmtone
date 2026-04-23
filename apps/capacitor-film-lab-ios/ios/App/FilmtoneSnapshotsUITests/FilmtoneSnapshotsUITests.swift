@@ -31,12 +31,12 @@ final class FilmtoneSnapshotsUITests: XCTestCase {
         let app = launch(scene: .processVideo)
         waitForAppToSettle(app)
 
-        let openAdjustmentsButton = app.buttons["filmtone.adjust.open"]
+        let openAdjustmentsButton = app.descendants(matching: .any)["filmtone.adjust.open"]
         reveal(openAdjustmentsButton, in: app)
         XCTAssertTrue(openAdjustmentsButton.waitForExistence(timeout: 5))
         openAdjustmentsButton.tap()
 
-        let strengthSheet = app.otherElements["filmtone.sheet.strength"]
+        let strengthSheet = app.descendants(matching: .any)["filmtone.sheet.strength"]
         XCTAssertTrue(strengthSheet.waitForExistence(timeout: 5))
 
         let advancedButton = app.buttons["filmtone.sheet.advanced"]
@@ -50,10 +50,11 @@ final class FilmtoneSnapshotsUITests: XCTestCase {
         XCTAssertTrue(processSlider.waitForExistence(timeout: 5))
 
         processSlider.adjust(toNormalizedSliderPosition: 0.82)
-        waitForLivePreviewReady(in: app)
+        waitForSheetCompareReady(in: app)
 
+        reveal(processSlider, in: app, maxSwipes: 3)
         processSlider.adjust(toNormalizedSliderPosition: 0.28)
-        waitForRefreshToSettle(in: app)
+        waitForSheetCompareReady(in: app)
 
         pauseForLayout(0.6)
         snapshot("06_live_video_process_refresh", timeWaitingForIdle: 0)
@@ -130,12 +131,11 @@ final class FilmtoneSnapshotsUITests: XCTestCase {
         pauseForLayout(1.0)
     }
 
-    private func waitForLivePreviewReady(in app: XCUIApplication) {
-        let videoPreview = app.otherElements["filmtone.sheet.preview.video"]
-        let originalCompare = app.buttons["filmtone.sheet.preview.compare.original"]
+    private func waitForSheetCompareReady(in app: XCUIApplication) {
+        let compareSlider = app.descendants(matching: .any)["filmtone.sheet.preview.compare.slider"]
 
-        XCTAssertTrue(videoPreview.waitForExistence(timeout: 15))
-        XCTAssertTrue(originalCompare.waitForExistence(timeout: 15))
+        revealAbove(compareSlider, in: app, maxSwipes: 4)
+        XCTAssertTrue(compareSlider.waitForExistence(timeout: 20))
         waitForRefreshToSettle(in: app)
     }
 
@@ -182,6 +182,19 @@ final class FilmtoneSnapshotsUITests: XCTestCase {
         var swipeCount = 0
         while swipeCount < maxSwipes && (!element.exists || !element.isHittable) {
             app.swipeUp()
+            pauseForLayout(0.25)
+            swipeCount += 1
+        }
+    }
+
+    private func revealAbove(
+        _ element: XCUIElement,
+        in app: XCUIApplication,
+        maxSwipes: Int = 4
+    ) {
+        var swipeCount = 0
+        while swipeCount < maxSwipes && (!element.exists || !element.isHittable) {
+            app.swipeDown()
             pauseForLayout(0.25)
             swipeCount += 1
         }

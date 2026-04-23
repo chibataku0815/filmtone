@@ -1,868 +1,2441 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@%%" : {
+
+    },
+    "• %@" : {
+
+    },
     "filmtone.action.done" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Done" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "完了" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完了"
+          }
+        }
       }
     },
     "filmtone.action.reset" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Reset" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "リセット" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リセット"
+          }
+        }
+      }
+    },
+    "filmtone.adjustment.open" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fine Tune"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "詳細調整"
+          }
+        }
       }
     },
     "filmtone.adjustment.strength" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Strength" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "強さ" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strength"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "強さ"
+          }
+        }
       }
     },
     "filmtone.adjustment.title" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Adjust" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "調整" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adjust"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "調整"
+          }
+        }
       }
     },
     "filmtone.advanced.active" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Advanced tuning active." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "詳細調整を適用中です。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Advanced tuning active."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "詳細調整を適用中です。"
+          }
+        }
       }
     },
     "filmtone.advanced.group.basic" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Basic" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "基本" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Basic"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "基本"
+          }
+        }
       }
     },
     "filmtone.advanced.group.glow" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Glow" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "グロー" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glow"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "グロー"
+          }
+        }
       }
     },
     "filmtone.advanced.group.grain" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Grain" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "グレイン" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grain"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "グレイン"
+          }
+        }
       }
     },
     "filmtone.advanced.group.optics" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Optics" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "光学" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Optics"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "光学"
+          }
+        }
       }
     },
     "filmtone.advanced.group.tone" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Tone / Process" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "階調 / プロセス" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tone / Process"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "階調 / プロセス"
+          }
+        }
       }
     },
     "filmtone.advanced.hint" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Fine-tune the optical mix directly." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "光学系の効きを直接微調整します。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fine-tune the optical mix directly."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "光学系の効きを直接微調整します。"
+          }
+        }
       }
     },
     "filmtone.advanced.title" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Advanced Params" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "詳細パラメータ" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Advanced Params"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "詳細パラメータ"
+          }
+        }
       }
     },
     "filmtone.app_name" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Filmtone" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Filmtone" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filmtone"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filmtone"
+          }
+        }
       }
     },
     "filmtone.camera.auto" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Auto" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "オート" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オート"
+          }
+        }
       }
     },
     "filmtone.camera.clear" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Clear" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "外す" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "外す"
+          }
+        }
       }
     },
     "filmtone.camera.description" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Normalize log source media before the look. Phase 1 supports Auto or one imported .cube." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ルック適用前に log 素材を補正します。Phase 1 はオートまたは 1 本の .cube 読み込みに絞ります。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Normalize log source media before the look. Phase 1 supports Auto or one imported .cube."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ルック適用前に log 素材を補正します。Phase 1 はオートまたは 1 本の .cube 読み込みに絞ります。"
+          }
+        }
       }
     },
     "filmtone.camera.import" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Import .cube" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : ".cube を読み込む" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import .cube"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : ".cube を読み込む"
+          }
+        }
       }
     },
     "filmtone.camera.title" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Camera" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "カメラ" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Camera"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カメラ"
+          }
+        }
       }
     },
     "filmtone.duration.minutes_seconds" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "%1$@m %2$@s" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "%1$@分 %2$@秒" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@m %2$@s"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@分 %2$@秒"
+          }
+        }
       }
     },
     "filmtone.duration.seconds" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@s" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "%@秒" } }
-      }
-    },
-    "filmtone.error.bridge_unavailable" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "The Filmtone view is unavailable right now." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Filmtone の画面を開けませんでした。" } }
-      }
-    },
-    "filmtone.error.cache.import_failed" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "The selected file couldn't be imported." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "選択したファイルを取り込めませんでした。" } }
-      }
-    },
-    "filmtone.error.cache.stage_failed" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "The selected file couldn't be prepared." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "選択したファイルを準備できませんでした。" } }
-      }
-    },
-    "filmtone.error.cache.stage_missing" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "The selected file couldn't be prepared." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "選択したファイルを準備できませんでした。" } }
-      }
-    },
-    "filmtone.error.cache.write_failed" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "The selected file couldn't be prepared." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "選択したファイルを準備できませんでした。" } }
-      }
-    },
-    "filmtone.error.export_busy" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "An export is already in progress." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "すでに書き出し中です。" } }
-      }
-    },
-    "filmtone.error.export_cancelled" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "The export was cancelled." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "書き出しをキャンセルしました。" } }
-      }
-    },
-    "filmtone.error.file_url.invalid" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "The selected file is invalid or inaccessible." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "選択したファイルにアクセスできません。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@s"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@秒"
+          }
+        }
       }
     },
     "filmtone.error.asset_picker.lut_active" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "A camera profile picker is already active." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "カメラプロファイルの選択画面はすでに開いています。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A camera profile picker is already active."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カメラプロファイルの選択画面はすでに開いています。"
+          }
+        }
       }
     },
     "filmtone.error.asset_picker.selected_asset_type" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "The selected item isn't a photo or video." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "選択した項目は写真または動画ではありません。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The selected item isn't a photo or video."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択した項目は写真または動画ではありません。"
+          }
+        }
       }
     },
     "filmtone.error.asset_picker.selected_file_type" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "The selected file isn't a photo or video." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "選択したファイルは写真または動画ではありません。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The selected file isn't a photo or video."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択したファイルは写真または動画ではありません。"
+          }
+        }
       }
     },
     "filmtone.error.asset_picker.source_active" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "A source picker is already active." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "素材の選択画面はすでに開いています。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A source picker is already active."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "素材の選択画面はすでに開いています。"
+          }
+        }
+      }
+    },
+    "filmtone.error.bridge_unavailable" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Filmtone view is unavailable right now."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filmtone の画面を開けませんでした。"
+          }
+        }
+      }
+    },
+    "filmtone.error.cache.import_failed" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The selected file couldn't be imported."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択したファイルを取り込めませんでした。"
+          }
+        }
+      }
+    },
+    "filmtone.error.cache.stage_failed" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The selected file couldn't be prepared."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択したファイルを準備できませんでした。"
+          }
+        }
+      }
+    },
+    "filmtone.error.cache.stage_missing" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The selected file couldn't be prepared."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択したファイルを準備できませんでした。"
+          }
+        }
+      }
+    },
+    "filmtone.error.cache.write_failed" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The selected file couldn't be prepared."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択したファイルを準備できませんでした。"
+          }
+        }
+      }
+    },
+    "filmtone.error.export_busy" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An export is already in progress."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すでに書き出し中です。"
+          }
+        }
+      }
+    },
+    "filmtone.error.export_cancelled" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The export was cancelled."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "書き出しをキャンセルしました。"
+          }
+        }
+      }
+    },
+    "filmtone.error.file_url.invalid" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The selected file is invalid or inaccessible."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択したファイルにアクセスできません。"
+          }
+        }
       }
     },
     "filmtone.error.generic.export" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Export couldn't be completed." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "書き出しを完了できませんでした。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export couldn't be completed."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "書き出しを完了できませんでした。"
+          }
+        }
       }
     },
     "filmtone.error.generic.import_lut" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "The camera profile couldn't be imported." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "カメラプロファイルを読み込めませんでした。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The camera profile couldn't be imported."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カメラプロファイルを読み込めませんでした。"
+          }
+        }
       }
     },
     "filmtone.error.generic.pick_source" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Media selection couldn't be completed." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "素材の選択を完了できませんでした。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Media selection couldn't be completed."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "素材の選択を完了できませんでした。"
+          }
+        }
       }
     },
     "filmtone.error.generic.preview" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Preview couldn't be generated." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "プレビューを生成できませんでした。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preview couldn't be generated."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プレビューを生成できませんでした。"
+          }
+        }
       }
     },
     "filmtone.error.generic.save_to_photos" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Saving to Photos couldn't be completed." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "写真への保存を完了できませんでした。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saving to Photos couldn't be completed."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真への保存を完了できませんでした。"
+          }
+        }
       }
     },
     "filmtone.error.generic.share" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Sharing couldn't be completed." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "共有を完了できませんでした。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sharing couldn't be completed."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共有を完了できませんでした。"
+          }
+        }
       }
     },
     "filmtone.error.lut.missing_size" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "The .cube file is missing LUT_3D_SIZE." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : ".cube ファイルに LUT_3D_SIZE がありません。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The .cube file is missing LUT_3D_SIZE."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : ".cube ファイルに LUT_3D_SIZE がありません。"
+          }
+        }
       }
     },
     "filmtone.error.lut.value_count" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "The .cube file has %@ values, but %@ are required." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : ".cube ファイルの値は %@ 個ですが、%@ 個必要です。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The .cube file has %@ values, but %@ are required."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : ".cube ファイルの値は %@ 個ですが、%@ 個必要です。"
+          }
+        }
       }
     },
     "filmtone.error.photos.permission_denied" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Photos access was denied." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "写真へのアクセスが許可されていません。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos access was denied."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真へのアクセスが許可されていません。"
+          }
+        }
       }
     },
     "filmtone.error.photos.save_failed" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Saving to Photos couldn't be completed." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "写真への保存を完了できませんでした。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saving to Photos couldn't be completed."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真への保存を完了できませんでした。"
+          }
+        }
       }
     },
     "filmtone.error.photos.save_incomplete" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Saving to Photos didn't complete." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "写真への保存が完了しませんでした。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saving to Photos didn't complete."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真への保存が完了しませんでした。"
+          }
+        }
       }
     },
     "filmtone.error.picker.lut_already_active" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "A camera profile picker is already active." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "カメラプロファイルの選択画面はすでに開いています。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A camera profile picker is already active."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カメラプロファイルの選択画面はすでに開いています。"
+          }
+        }
       }
     },
     "filmtone.error.picker.source_already_active" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "A source picker is already active." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "素材の選択画面はすでに開いています。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A source picker is already active."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "素材の選択画面はすでに開いています。"
+          }
+        }
       }
     },
     "filmtone.error.preview.jpeg_failed" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Preview couldn't be generated." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "プレビューを生成できませんでした。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preview couldn't be generated."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プレビューを生成できませんでした。"
+          }
+        }
       }
     },
     "filmtone.error.request.missing_source" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pick a photo or video before exporting." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "書き出す前に写真または動画を選んでください。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pick a photo or video before exporting."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "書き出す前に写真または動画を選んでください。"
+          }
+        }
       }
     },
     "filmtone.error.source.asset_not_supported" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "The selected asset isn't an image or video." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "選択した素材は写真または動画ではありません。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The selected asset isn't an image or video."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択した素材は写真または動画ではありません。"
+          }
+        }
       }
     },
     "filmtone.error.source.file_not_supported" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "The selected file isn't an image or video." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "選択したファイルは写真または動画ではありません。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The selected file isn't an image or video."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択したファイルは写真または動画ではありません。"
+          }
+        }
       }
     },
     "filmtone.error.source.image_load_failed" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "The selected image couldn't be loaded." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "選択した画像を読み込めませんでした。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The selected image couldn't be loaded."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択した画像を読み込めませんでした。"
+          }
+        }
       }
     },
     "filmtone.error.source.image_metadata" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "This image couldn't be read." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "この画像を読み取れませんでした。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This image couldn't be read."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この画像を読み取れませんでした。"
+          }
+        }
       }
     },
     "filmtone.error.source.no_video_track" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "No video track was found in the selected source." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "選択した素材に動画トラックが見つかりませんでした。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No video track was found in the selected source."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択した素材に動画トラックが見つかりませんでした。"
+          }
+        }
       }
     },
     "filmtone.export.disabled" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "This source can't be exported. See the source notes above." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "この素材は書き出せません。素材の注意事項を確認してください。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This source can't be exported. See the source notes above."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この素材は書き出せません。素材の注意事項を確認してください。"
+          }
+        }
       }
     },
     "filmtone.export.last_result" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Last export" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "直近の書き出し" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last export"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直近の書き出し"
+          }
+        }
       }
     },
     "filmtone.export.progress.complete" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Export complete" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "書き出しが完了しました" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export complete"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "書き出しが完了しました"
+          }
+        }
       }
     },
     "filmtone.export.progress.preparing" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Preparing export" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "書き出しを準備しています" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparing export"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "書き出しを準備しています"
+          }
+        }
       }
     },
     "filmtone.export.progress.reading" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Reading source" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "素材を読み込んでいます" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reading source"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "素材を読み込んでいます"
+          }
+        }
       }
     },
     "filmtone.export.progress.rendering_frames" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Rendering frames" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "フレームを処理しています" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rendering frames"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フレームを処理しています"
+          }
+        }
       }
     },
     "filmtone.export.progress.rendering_still" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Rendering still image" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "静止画を処理しています" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rendering still image"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "静止画を処理しています"
+          }
+        }
       }
     },
     "filmtone.export.progress.writing" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Writing output" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "出力を書き込んでいます" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Writing output"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "出力を書き込んでいます"
+          }
+        }
       }
     },
     "filmtone.export.ready" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Ready to export." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "書き出しの準備ができています。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ready to export."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "書き出しの準備ができています。"
+          }
+        }
       }
     },
     "filmtone.export.running" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Exporting…" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "書き出し中…" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exporting…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "書き出し中…"
+          }
+        }
       }
     },
     "filmtone.export.save_state.failed" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Failed" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "失敗" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Failed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "失敗"
+          }
+        }
       }
     },
     "filmtone.export.save_state.saved" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Saved" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "保存済み" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存済み"
+          }
+        }
       }
     },
     "filmtone.export.save_to_photos" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Save to Photos" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "写真へ保存" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save to Photos"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真へ保存"
+          }
+        }
       }
     },
     "filmtone.export.save_to_photos_done" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Saved to Photos." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "写真への保存が完了しました。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved to Photos."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真への保存が完了しました。"
+          }
+        }
       }
     },
     "filmtone.export.share" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Share" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "共有" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共有"
+          }
+        }
       }
     },
     "filmtone.export.stage.completed" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Completed" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "完了" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Completed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完了"
+          }
+        }
       }
     },
     "filmtone.export.stage.preflight" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Preparing" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "準備" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparing"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "準備"
+          }
+        }
       }
     },
     "filmtone.export.stage.reading" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Reading" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "読込中" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reading"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読込中"
+          }
+        }
       }
     },
     "filmtone.export.stage.rendering" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Rendering" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "処理中" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rendering"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "処理中"
+          }
+        }
       }
     },
     "filmtone.export.stage.writing" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Writing" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "出力中" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Writing"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "出力中"
+          }
+        }
       }
     },
     "filmtone.export.start" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Export" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "書き出す" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "書き出す"
+          }
+        }
       }
     },
     "filmtone.export.title" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Export" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "書き出し" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "書き出し"
+          }
+        }
       }
     },
     "filmtone.export.writing_hint" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Finalizing. Larger photos or videos may take a moment." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "出力を仕上げ中です。大きな写真や動画の場合は少し時間がかかります。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finalizing. Larger photos or videos may take a moment."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "出力を仕上げ中です。大きな写真や動画の場合は少し時間がかかります。"
+          }
+        }
       }
     },
     "filmtone.lut.import_error" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Camera profile import failed" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "カメラプロファイルの読み込みに失敗しました" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Camera profile import failed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カメラプロファイルの読み込みに失敗しました"
+          }
+        }
       }
     },
     "filmtone.lut.parse_error" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Camera profile .cube could not be parsed" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "カメラプロファイルの .cube を解釈できませんでした" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Camera profile .cube could not be parsed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カメラプロファイルの .cube を解釈できませんでした"
+          }
+        }
       }
     },
     "filmtone.message.error" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Error" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "エラー" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Error"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "エラー"
+          }
+        }
       }
     },
     "filmtone.message.note" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Note" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "補足" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Note"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "補足"
+          }
+        }
       }
     },
     "filmtone.metric.elapsed" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Elapsed" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "経過時間" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elapsed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "経過時間"
+          }
+        }
       }
     },
     "filmtone.metric.file_size" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "File size" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ファイルサイズ" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "File size"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ファイルサイズ"
+          }
+        }
       }
     },
     "filmtone.metric.output" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Output" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "出力" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Output"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "出力"
+          }
+        }
       }
     },
     "filmtone.metric.output_value" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "%1$@×%2$@ @ %3$@ fps" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "%1$@×%2$@・%3$@fps" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@×%2$@ @ %3$@ fps"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@×%2$@・%3$@fps"
+          }
+        }
       }
     },
     "filmtone.metric.save_to_photos" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Save to Photos" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "写真への保存" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save to Photos"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真への保存"
+          }
+        }
       }
     },
     "filmtone.param.bloom_radius" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Bloom Radius" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ブルーム半径" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bloom Radius"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブルーム半径"
+          }
+        }
       }
     },
     "filmtone.param.bloom_soft_knee" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Bloom Soft Knee" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ブルームソフトニー" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bloom Soft Knee"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブルームソフトニー"
+          }
+        }
       }
     },
     "filmtone.param.bloom_strength" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Bloom Strength" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ブルーム量" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bloom Strength"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブルーム量"
+          }
+        }
       }
     },
     "filmtone.param.bloom_threshold" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Bloom Threshold" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ブルームしきい値" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bloom Threshold"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブルームしきい値"
+          }
+        }
       }
     },
     "filmtone.param.compression_amount" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Compression Amount" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "圧縮量" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compression Amount"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "圧縮量"
+          }
+        }
       }
     },
     "filmtone.param.compression_range" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Compression Range" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "圧縮レンジ" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compression Range"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "圧縮レンジ"
+          }
+        }
       }
     },
     "filmtone.param.contrast" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Contrast" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "コントラスト" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contrast"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コントラスト"
+          }
+        }
       }
     },
     "filmtone.param.diffusion" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Diffusion" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ディフュージョン" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diffusion"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ディフュージョン"
+          }
+        }
       }
     },
     "filmtone.param.exposure" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Exposure" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "露出" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exposure"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "露出"
+          }
+        }
       }
     },
     "filmtone.param.fade" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Fade" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "フェード" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fade"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フェード"
+          }
+        }
       }
     },
     "filmtone.param.grain_intensity" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Grain Intensity" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "グレイン量" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grain Intensity"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "グレイン量"
+          }
+        }
       }
     },
     "filmtone.param.grain_radial_mix" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Grain Radial Mix" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "グレイン周辺ミックス" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grain Radial Mix"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "グレイン周辺ミックス"
+          }
+        }
       }
     },
     "filmtone.param.grain_size" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Grain Size" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "グレイン粒径" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grain Size"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "グレイン粒径"
+          }
+        }
       }
     },
     "filmtone.param.halation_hue" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Halation Hue" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ハレーション色相" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Halation Hue"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ハレーション色相"
+          }
+        }
       }
     },
     "filmtone.param.halation_intensity" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Halation Intensity" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ハレーション量" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Halation Intensity"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ハレーション量"
+          }
+        }
       }
     },
     "filmtone.param.halation_radius" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Halation Radius" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ハレーション半径" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Halation Radius"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ハレーション半径"
+          }
+        }
       }
     },
     "filmtone.param.halation_soft_knee" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Halation Soft Knee" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ハレーションソフトニー" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Halation Soft Knee"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ハレーションソフトニー"
+          }
+        }
       }
     },
     "filmtone.param.halation_spread" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Halation Spread" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ハレーション広がり" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Halation Spread"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ハレーション広がり"
+          }
+        }
       }
     },
     "filmtone.param.halation_threshold" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Halation Threshold" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ハレーションしきい値" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Halation Threshold"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ハレーションしきい値"
+          }
+        }
       }
     },
     "filmtone.param.lens_softness" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Lens Softness" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "レンズソフト" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lens Softness"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レンズソフト"
+          }
+        }
       }
     },
     "filmtone.param.rgb_shift" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "RGB Shift" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "RGB シフト" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "RGB Shift"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "RGB シフト"
+          }
+        }
       }
     },
     "filmtone.param.saturation" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Saturation" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "彩度" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saturation"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "彩度"
+          }
+        }
       }
     },
     "filmtone.param.temperature" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Temperature" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "色温度" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Temperature"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "色温度"
+          }
+        }
       }
     },
     "filmtone.param.tint" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Tint" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ティント" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tint"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ティント"
+          }
+        }
       }
     },
     "filmtone.param.vignette" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Vignette" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "周辺減光" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vignette"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "周辺減光"
+          }
+        }
       }
     },
     "filmtone.preset.bw.subtitle" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Classic Mono" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クラシックモノクロ" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Classic Mono"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クラシックモノクロ"
+          }
+        }
       }
     },
     "filmtone.preset.category.film_stock" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Film" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "フィルム" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Film"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フィルム"
+          }
+        }
       }
     },
     "filmtone.preset.category.look" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Look" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ルック" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Look"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ルック"
+          }
+        }
       }
     },
     "filmtone.preset.category.utility" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Utility" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "基本" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utility"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "基本"
+          }
+        }
       }
     },
     "filmtone.preset.cinematic.subtitle" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Teal & Orange" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ティール&オレンジ" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Teal & Orange"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ティール&オレンジ"
+          }
+        }
       }
     },
     "filmtone.preset.cinestill800t.subtitle" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Tungsten Glow" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "タングステングロー" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tungsten Glow"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タングステングロー"
+          }
+        }
       }
     },
     "filmtone.preset.ektar100.subtitle" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Vivid Sharp" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "鮮やかでシャープ" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vivid Sharp"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "鮮やかでシャープ"
+          }
+        }
       }
     },
     "filmtone.preset.gold200.subtitle" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Saturated Warm" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "濃くて暖かい" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saturated Warm"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "濃くて暖かい"
+          }
+        }
       }
     },
     "filmtone.preset.portra.subtitle" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Warm Pastel" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "暖かいパステル" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Warm Pastel"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暖かいパステル"
+          }
+        }
       }
     },
     "filmtone.preset.pro400h.subtitle" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Cool Soft" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "涼しくやわらかい" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cool Soft"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "涼しくやわらかい"
+          }
+        }
       }
     },
     "filmtone.preset.reset.subtitle" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "No Grade" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "補正なし" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Grade"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "補正なし"
+          }
+        }
       }
     },
     "filmtone.preset.superia400.subtitle" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Cool Green" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "涼しいグリーン" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cool Green"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "涼しいグリーン"
+          }
+        }
       }
     },
     "filmtone.preset.title" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Film Presets" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "フィルムプリセット" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Film Presets"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フィルムプリセット"
+          }
+        }
       }
     },
     "filmtone.preset.velvia50.subtitle" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Vivid Slide" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "鮮やかなスライド" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vivid Slide"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "鮮やかなスライド"
+          }
+        }
       }
     },
     "filmtone.preview.compare_hint" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Press and hold the preview to compare." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "プレビューを長押しで比較します。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Press and hold the preview to compare."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プレビューを長押しで比較します。"
+          }
+        }
       }
     },
     "filmtone.preview.compare_label" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Original" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "オリジナル" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Original"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オリジナル"
+          }
+        }
       }
     },
     "filmtone.preview.empty_eyebrow" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Quick Preview" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クイックプレビュー" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quick Preview"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クイックプレビュー"
+          }
+        }
       }
     },
     "filmtone.preview.empty_hint" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Looks render here as you grade." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ここにルックのプレビューが表示されます。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Looks render here as you grade."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ここにルックのプレビューが表示されます。"
+          }
+        }
       }
     },
     "filmtone.preview.rendering" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Generating preview…" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "プレビューを生成しています…" } }
-      }
-    },
-    "filmtone.preview.sheet_hint" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Preview updates through the native render path." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "プレビューは native の render path をそのまま反映します。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generating preview…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プレビューを生成しています…"
+          }
+        }
       }
     },
     "filmtone.quick.contrast" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Contrast" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "コントラスト" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contrast"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コントラスト"
+          }
+        }
       }
     },
     "filmtone.quick.exposure" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Exposure" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "明るさ" } }
-      }
-    },
-    "filmtone.quick.hint" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Three quick axes to shape the look." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "3 軸で素早くルックを整えます。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exposure"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "明るさ"
+          }
+        }
       }
     },
     "filmtone.quick.saturation" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Saturation" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "彩度" } }
-      }
-    },
-    "filmtone.source.empty" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pick a photo or video to begin." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "写真または動画を選んでください。" } }
-      }
-    },
-    "filmtone.source.files" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Files" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ファイル" } }
-      }
-    },
-    "filmtone.source.inspecting" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Inspecting media…" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "素材を確認しています…" } }
-      }
-    },
-    "filmtone.source.photo_library" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Photo Library" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "フォトライブラリ" } }
-      }
-    },
-    "filmtone.source.pick" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pick media" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "素材を選ぶ" } }
-      }
-    },
-    "filmtone.source.picker_title" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose Source" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "取り込み元を選択" } }
-      }
-    },
-    "filmtone.source.repick" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Replace media" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "素材を差し替える" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saturation"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "彩度"
+          }
+        }
       }
     },
     "filmtone.source_violation.codec_dnxhr" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Avid DNxHR / DNxHD video can't be previewed or exported on iPhone. Convert this file to H.264, HEVC, or ProRes first." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Avid DNxHR / DNxHD の動画は iPhone でプレビューや書き出しができません。先に H.264、HEVC、または ProRes に変換してください。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avid DNxHR / DNxHD video can't be previewed or exported on iPhone. Convert this file to H.264, HEVC, or ProRes first."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avid DNxHR / DNxHD の動画は iPhone でプレビューや書き出しができません。先に H.264、HEVC、または ProRes に変換してください。"
+          }
+        }
       }
     },
     "filmtone.source_violation.duration" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Source duration %@ exceeds %@." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "素材の長さ %@ は上限 %@ を超えています。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source duration %@ exceeds %@."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "素材の長さ %@ は上限 %@ を超えています。"
+          }
+        }
       }
     },
     "filmtone.source_violation.file_size" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Source size %@ exceeds %@." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "素材サイズ %@ は上限 %@ を超えています。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source size %@ exceeds %@."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "素材サイズ %@ は上限 %@ を超えています。"
+          }
+        }
       }
     },
     "filmtone.source_violation.long_edge" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Source long edge %@px exceeds %@px." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "素材の長辺 %@px は上限 %@px を超えています。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source long edge %@px exceeds %@px."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "素材の長辺 %@px は上限 %@px を超えています。"
+          }
+        }
+      }
+    },
+    "filmtone.source.empty" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pick a photo or video to begin."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真または動画を選んでください。"
+          }
+        }
+      }
+    },
+    "filmtone.source.files" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Files"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ファイル"
+          }
+        }
+      }
+    },
+    "filmtone.source.inspecting" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inspecting media…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "素材を確認しています…"
+          }
+        }
+      }
+    },
+    "filmtone.source.photo_library" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo Library"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フォトライブラリ"
+          }
+        }
+      }
+    },
+    "filmtone.source.pick" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pick media"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "素材を選ぶ"
+          }
+        }
+      }
+    },
+    "filmtone.source.picker_title" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose Source"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取り込み元を選択"
+          }
+        }
+      }
+    },
+    "filmtone.source.repick" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replace media"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "素材を差し替える"
+          }
+        }
       }
     }
   },

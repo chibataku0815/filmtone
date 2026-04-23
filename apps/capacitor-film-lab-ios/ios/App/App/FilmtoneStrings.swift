@@ -52,18 +52,16 @@ struct FilmtoneStrings {
     let sourceLoadImportingFromFilesMessage: String
     let sourceLoadDownloadingFromCloudMessage: String
     let previewRendering: String
-    let previewSheetHint: String
     let previewEmptyEyebrow: String
     let previewEmptyHint: String
     let compareLabel: String
     let compareHint: String
     let previewGradedLabel: String
     let previewExpandLabel: String
-    let previewVideoHint: String
     let presetTitle: String
     let strengthLabel: String
     let adjustLabel: String
-    let quickHint: String
+    let adjustOpenLabel: String
     let quickFilmCharacter: String
     let quickEra: String
     let quickDynamics: String
@@ -194,11 +192,6 @@ extension FilmtoneStrings {
             defaultValue: "Generating preview…",
             comment: "Notice shown while the app renders a preview."
         )
-        previewSheetHint = filmtoneLocalized(
-            "filmtone.preview.sheet_hint",
-            defaultValue: "Preview updates through the native render path.",
-            comment: "Hint shown below the preview inside the sheet."
-        )
         previewEmptyEyebrow = filmtoneLocalized(
             "filmtone.preview.empty_eyebrow",
             defaultValue: "Quick Preview",
@@ -229,11 +222,6 @@ extension FilmtoneStrings {
             defaultValue: "Full Screen",
             comment: "Action label to open the video preview in full screen."
         )
-        previewVideoHint = filmtoneLocalized(
-            "filmtone.preview.video_hint",
-            defaultValue: "Play, scrub, or switch between graded and original.",
-            comment: "Hint shown for the live video preview interaction."
-        )
         presetTitle = filmtoneLocalized(
             "filmtone.preset.title",
             defaultValue: "Film Presets",
@@ -249,10 +237,10 @@ extension FilmtoneStrings {
             defaultValue: "Adjust",
             comment: "Section title for adjustments."
         )
-        quickHint = filmtoneLocalized(
-            "filmtone.quick.hint",
-            defaultValue: "Three quick axes to shape the look.",
-            comment: "Hint shown when quick adjustments are empty."
+        adjustOpenLabel = filmtoneLocalized(
+            "filmtone.adjustment.open",
+            defaultValue: "Fine Tune",
+            comment: "Title for the button that opens detailed look controls."
         )
         quickFilmCharacter = filmtoneLocalized(
             "filmtone.quick.exposure",

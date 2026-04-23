@@ -35,7 +35,6 @@ struct FilmtoneStrengthSheet: View {
                 }
             }
         }
-        .accessibilityIdentifier("filmtone.sheet.strength")
         .onAppear {
             if !adjustmentsExpanded {
                 adjustmentsExpanded = store.hasQuickAdjustments
@@ -63,11 +62,14 @@ struct FilmtoneStrengthSheet: View {
                 Text(store.activePresetLabel)
                     .font(.system(size: 28, weight: .semibold))
                     .foregroundStyle(.white)
+                    .accessibilityIdentifier("filmtone.sheet.strength")
 
-                Text(store.adjustmentSummaryText)
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.64))
-                    .lineLimit(2)
+                if store.hasAnyAdjustments {
+                    Text(store.adjustmentSummaryText)
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.64))
+                        .lineLimit(2)
+                }
             }
 
             Spacer(minLength: 12)
@@ -87,46 +89,21 @@ struct FilmtoneStrengthSheet: View {
     }
 
     private var sheetPreview: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            FilmtoneSheetPreview(
-                source: store.source,
-                displayURI: store.selectedPreviewURI,
-                videoPreview: store.videoPreviewState,
-                emptyMessage: previewEmptyMessage,
-                loadingMessage: store.strings.previewRendering,
-                hintMessage: store.strings.previewSheetHint,
-                originalLabel: store.strings.compareLabel,
-                gradedLabel: store.strings.previewGradedLabel,
-                metaLabel: store.previewMetaLabel,
-                isRendering: store.preview.isRendering,
-                isStillComparing: store.isCompareHeld,
-                onStillCompareHeld: store.setCompareHeld
-            ) { mode in
-                Task { await store.setVideoCompareMode(mode) }
-            }
-
-            Text(store.previewInteractionHint)
-                .font(.caption)
-                .foregroundStyle(.white.opacity(0.56))
-        }
+        FilmtoneSheetPreview(
+            displayURI: store.selectedPreviewURI,
+            compareFrame: store.comparePreviewFrame,
+            videoPreview: store.videoPreviewState,
+            emptyMessage: previewEmptyMessage,
+            loadingMessage: store.strings.previewRendering,
+            originalLabel: store.strings.compareLabel,
+            gradedLabel: store.strings.previewGradedLabel,
+            metaLabel: store.previewMetaLabel,
+            isRendering: store.preview.isRendering
+        )
     }
 
     private var strengthSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .bottom, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(store.strings.strengthLabel)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.52))
-
-                    Text(Self.percentLabel(store.project.strength))
-                        .font(.system(size: 42, weight: .semibold))
-                        .foregroundStyle(.white)
-                }
-
-                Spacer()
-            }
-
             FilmtoneSliderRow(
                 label: store.strings.strengthLabel,
                 value: store.project.strength,
@@ -221,7 +198,7 @@ struct FilmtoneStrengthSheet: View {
     }
 
     private var quickSummaryText: String {
-        store.hasQuickAdjustments ? store.quickSummaryText : store.strings.quickHint
+        store.hasQuickAdjustments ? store.quickSummaryText : ""
     }
 
     private var previewEmptyMessage: String {
@@ -328,92 +305,45 @@ struct FilmtoneStrengthSheet: View {
 }
 
 private struct FilmtoneSheetPreview: View {
-    let source: SourceInfoDTO?
     let displayURI: String?
+    let compareFrame: FilmtoneComparePreviewFrame?
     let videoPreview: FilmtoneVideoPreviewState?
     let emptyMessage: String
     let loadingMessage: String
-    let hintMessage: String
     let originalLabel: String
     let gradedLabel: String
     let metaLabel: String?
     let isRendering: Bool
-    let isStillComparing: Bool
-    let onStillCompareHeld: (Bool) -> Void
-    let onVideoCompareModeSelected: (FilmtoneVideoCompareMode) -> Void
 
     var body: some View {
         ZStack(alignment: .topLeading) {
             Rectangle()
                 .fill(Color.black)
 
-            if let videoPreview {
+            if let compareFrame {
+                FilmtoneCompareRevealPreview(
+                    frame: compareFrame,
+                    originalLabel: originalLabel,
+                    gradedLabel: gradedLabel
+                )
+            } else if let videoPreview {
                 FilmtonePreviewPlayerView(player: videoPreview.player)
                     .accessibilityIdentifier("filmtone.sheet.preview.video")
-            } else if let source, let displayURI, let image = previewImage(from: displayURI) {
+            } else if let displayURI, let image = previewImage(from: displayURI) {
                 GeometryReader { geometry in
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFit()
                         .frame(width: geometry.size.width, height: geometry.size.height)
                         .contentShape(Rectangle())
-                        .onLongPressGesture(
-                            minimumDuration: 0.18,
-                            maximumDistance: 24,
-                            pressing: { isPressing in
-                                if source.filename.isEmpty {
-                                    return
-                                }
-                                onStillCompareHeld(isPressing)
-                            },
-                            perform: {}
-                        )
                 }
             } else {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(emptyMessage)
-                        .font(.title3.weight(.medium))
-                        .foregroundStyle(.white.opacity(0.88))
-                        .lineSpacing(2)
-
-                    Text(hintMessage)
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.52))
-                }
+                Text(emptyMessage)
+                    .font(.title3.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.88))
+                    .lineSpacing(2)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
                 .padding(16)
-            }
-
-            if let videoPreview {
-                HStack(spacing: 6) {
-                    FilmtoneSheetPreviewToggleButton(
-                        label: gradedLabel,
-                        isActive: videoPreview.compareMode == .graded,
-                        accessibilityIdentifier: "filmtone.sheet.preview.compare.graded"
-                    ) {
-                        onVideoCompareModeSelected(.graded)
-                    }
-
-                    FilmtoneSheetPreviewToggleButton(
-                        label: originalLabel,
-                        isActive: videoPreview.compareMode == .original,
-                        accessibilityIdentifier: "filmtone.sheet.preview.compare.original"
-                    ) {
-                        onVideoCompareModeSelected(.original)
-                    }
-                }
-                .padding(12)
-            } else if isStillComparing {
-                Text(originalLabel)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color.filmtoneAmber)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(Color.black.opacity(0.65))
-                    )
-                    .padding(12)
             }
 
             if let metaLabel {
@@ -476,30 +406,122 @@ private struct FilmtoneSheetPreview: View {
     }
 }
 
-private struct FilmtoneSheetPreviewToggleButton: View {
-    let label: String
-    let isActive: Bool
-    let accessibilityIdentifier: String
-    let action: () -> Void
+private struct FilmtoneCompareRevealPreview: View {
+    let frame: FilmtoneComparePreviewFrame
+    let originalLabel: String
+    let gradedLabel: String
+
+    @State private var revealAmount = 0.58
 
     var body: some View {
-        Button(action: action) {
-            Text(label)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(isActive ? Color.black : .white.opacity(0.82))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 9)
-                .background(
-                    RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
-                        .fill(isActive ? Color.filmtoneAmber : Color.black.opacity(0.54))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
-                        .stroke(isActive ? Color.filmtoneAmber : Color.white.opacity(0.08), lineWidth: 1)
-                )
+        GeometryReader { geometry in
+            let width = max(geometry.size.width, 1)
+            let height = max(geometry.size.height, 1)
+            let dividerX = min(max(width * revealAmount, 18), width - 18)
+
+            ZStack {
+                if let originalImage = previewImage(from: frame.originalURI),
+                   let gradedImage = previewImage(from: frame.gradedURI) {
+                    Image(uiImage: originalImage)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: width, height: height)
+
+                    Image(uiImage: gradedImage)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: width, height: height)
+                        .mask(alignment: .leading) {
+                            Rectangle()
+                                .frame(width: dividerX, height: height)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+
+                    labelPills
+                        .padding(12)
+
+                    Rectangle()
+                        .fill(Color.white.opacity(0.84))
+                        .frame(width: 2, height: height)
+                        .position(x: dividerX, y: height / 2)
+
+                    Image(systemName: "arrow.left.and.right")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.black.opacity(0.82))
+                        .frame(width: 34, height: 34)
+                        .background(
+                            Circle()
+                                .fill(Color.filmtoneAmber)
+                        )
+                        .shadow(color: Color.black.opacity(0.34), radius: 12, x: 0, y: 4)
+                        .position(x: dividerX, y: height / 2)
+                } else {
+                    Color.black
+                }
+            }
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        revealAmount = min(max(value.location.x / width, 0), 1)
+                    }
+            )
+            .accessibilityElement(children: .ignore)
+            .accessibilityIdentifier("filmtone.sheet.preview.compare.slider")
+            .accessibilityLabel("\(gradedLabel) / \(originalLabel)")
+            .accessibilityValue("\(Int((revealAmount * 100).rounded()))%")
+            .accessibilityAdjustableAction { direction in
+                switch direction {
+                case .increment:
+                    revealAmount = min(revealAmount + 0.05, 1)
+                case .decrement:
+                    revealAmount = max(revealAmount - 0.05, 0)
+                @unknown default:
+                    break
+                }
+            }
         }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier(accessibilityIdentifier)
+    }
+
+    private var labelPills: some View {
+        VStack {
+            HStack {
+                Text(gradedLabel)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.black.opacity(0.88))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Color.filmtoneAmber)
+                    )
+
+                Spacer()
+
+                Text(originalLabel)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.86))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Color.black.opacity(0.56))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                    )
+            }
+
+            Spacer()
+        }
+    }
+
+    private func previewImage(from uri: String) -> UIImage? {
+        guard let url = URL(string: uri), url.isFileURL else {
+            return nil
+        }
+        return UIImage(contentsOfFile: url.path)
     }
 }
 
@@ -564,11 +586,13 @@ private struct FilmtoneDisclosureSection<Content: View>: View {
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.white.opacity(isExpanded ? 0.64 : 0.52))
 
-                        Text(summary)
-                            .font(.subheadline)
-                            .foregroundStyle(.white.opacity(isExpanded ? 0.84 : 0.76))
-                            .multilineTextAlignment(.leading)
-                            .lineLimit(2)
+                        if !summary.isEmpty {
+                            Text(summary)
+                                .font(.subheadline)
+                                .foregroundStyle(.white.opacity(isExpanded ? 0.84 : 0.76))
+                                .multilineTextAlignment(.leading)
+                                .lineLimit(2)
+                        }
                     }
 
                     Spacer(minLength: 12)

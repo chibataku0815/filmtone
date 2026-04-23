@@ -18,7 +18,6 @@ struct FilmtoneRootView: View {
                     presetSection
                         .accessibilityIdentifier("filmtone.section.presets")
                     tuningSection
-                        .accessibilityIdentifier("filmtone.section.tuning")
                     FilmtoneExportPanel(store: store)
                     messageStack
                 }
@@ -199,10 +198,12 @@ struct FilmtoneRootView: View {
                         .foregroundStyle(.white)
                         .lineLimit(2)
 
-                    Text(store.adjustmentSummaryText)
-                        .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.66))
-                        .lineLimit(2)
+                    if store.hasAnyAdjustments {
+                        Text(store.adjustmentSummaryText)
+                            .font(.subheadline)
+                            .foregroundStyle(.white.opacity(0.66))
+                            .lineLimit(2)
+                    }
                 }
             }
 
@@ -247,37 +248,41 @@ struct FilmtoneRootView: View {
     private var tuningSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             FilmtoneSectionHeader(title: store.strings.adjustLabel)
+                .accessibilityIdentifier("filmtone.section.tuning")
 
             Button {
                 strengthSheetPresented = true
             } label: {
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack(alignment: .firstTextBaseline, spacing: 16) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(store.strings.strengthLabel)
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.white.opacity(0.48))
-
-                            Text(percentLabel(store.project.strength))
-                                .font(.system(size: 34, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .monospacedDigit()
-                        }
-
-                        Spacer(minLength: 12)
-
-                        Text(store.activePresetLabel)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(Color.filmtoneAmber.opacity(0.92))
-                            .multilineTextAlignment(.trailing)
+                HStack(alignment: .center, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(store.strings.adjustOpenLabel)
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(.white)
                             .lineLimit(2)
+
+                        if let summary = adjustSummaryText {
+                            Text(summary)
+                                .font(.subheadline)
+                                .foregroundStyle(.white.opacity(0.72))
+                                .multilineTextAlignment(.leading)
+                                .lineLimit(2)
+                        }
                     }
 
-                    Text(adjustSummaryText)
-                        .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.74))
-                        .multilineTextAlignment(.leading)
-                        .lineLimit(3)
+                    Spacer(minLength: 12)
+
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(Color.filmtoneAmber.opacity(0.92))
+                        .frame(width: 38, height: 38)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(Color.white.opacity(0.05))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                        )
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(16)
@@ -289,6 +294,9 @@ struct FilmtoneRootView: View {
                     RoundedRectangle(cornerRadius: filmtoneSurfaceCornerRadius, style: .continuous)
                         .stroke(Color.white.opacity(0.06), lineWidth: 1)
                 )
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityIdentifier("filmtone.adjust.open")
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("filmtone.adjust.open")
@@ -399,9 +407,9 @@ struct FilmtoneRootView: View {
         "\(Int((value * 100).rounded()))%"
     }
 
-    private var adjustSummaryText: String {
-        if store.source == nil {
-            return store.strings.quickHint
+    private var adjustSummaryText: String? {
+        guard store.hasAnyAdjustments else {
+            return nil
         }
         return store.adjustmentSummaryText
     }

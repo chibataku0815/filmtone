@@ -15,6 +15,31 @@ struct FilmtoneStillPreviewState {
     static let empty = FilmtoneStillPreviewState()
 }
 
+struct FilmtoneComparePreviewFrame {
+    let originalURI: String
+    let gradedURI: String
+    let width: Int?
+    let height: Int?
+    let posterTimeSec: Double?
+
+    init?(
+        originalURI: String?,
+        gradedURI: String?,
+        width: Int? = nil,
+        height: Int? = nil,
+        posterTimeSec: Double? = nil
+    ) {
+        guard let originalURI, let gradedURI else {
+            return nil
+        }
+        self.originalURI = originalURI
+        self.gradedURI = gradedURI
+        self.width = width
+        self.height = height
+        self.posterTimeSec = posterTimeSec
+    }
+}
+
 enum FilmtoneVideoCompareMode: String {
     case graded
     case original
@@ -98,6 +123,19 @@ enum FilmtonePreviewState {
             return nil
         }
         return preview
+    }
+
+    var comparePreviewFrame: FilmtoneComparePreviewFrame? {
+        guard case .still(let preview) = self else {
+            return nil
+        }
+        return FilmtoneComparePreviewFrame(
+            originalURI: preview.originalPosterURI,
+            gradedURI: preview.gradedPosterURI,
+            width: preview.width,
+            height: preview.height,
+            posterTimeSec: preview.posterTimeSec
+        )
     }
 
     func stillDisplayURI(isComparing: Bool) -> String? {
@@ -350,6 +388,7 @@ final class FilmtoneEditorStore: ObservableObject {
     @Published var source: SourceInfoDTO?
     @Published var probe: SourceProbeDTO?
     @Published var preview: FilmtonePreviewState = .empty
+    @Published var comparePreviewFrame: FilmtoneComparePreviewFrame?
     @Published var isCompareHeld = false
     @Published var exportProgress: Phase0ExportProgressDTO?
     @Published var exportResult: Phase0ExportResultDTO?
@@ -413,10 +452,6 @@ final class FilmtoneEditorStore: ObservableObject {
         preview.error
     }
 
-    var previewInteractionHint: String {
-        videoPreviewState != nil ? strings.previewVideoHint : strings.compareHint
-    }
-
     var quickSummaryText: String {
         let entries: [(String, Double)] = [
             (strings.quickFilmCharacter, project.quickState.filmCharacter),
@@ -426,7 +461,7 @@ final class FilmtoneEditorStore: ObservableObject {
         .filter { abs($0.1) >= 0.01 }
 
         if entries.isEmpty {
-            return strings.quickHint
+            return ""
         }
 
         return entries
@@ -465,7 +500,7 @@ final class FilmtoneEditorStore: ObservableObject {
             return strings.advancedAdjustmentsActive
         }
 
-        return strings.quickHint
+        return ""
     }
 
     var previewMetaLabel: String? {
@@ -528,6 +563,7 @@ final class FilmtoneEditorStore: ObservableObject {
         source = fixture.source
         probe = fixture.probe
         preview = fixture.preview
+        comparePreviewFrame = fixture.preview.comparePreviewFrame
         videoPreviewSession = nil
         isCompareHeld = false
         exportProgress = nil
@@ -738,6 +774,7 @@ final class FilmtoneEditorStore: ObservableObject {
             project.updatedAt = FilmtonePhase0Math.isoTimestamp()
         }
         self.preview = .empty
+        self.comparePreviewFrame = nil
         self.videoPreviewSession = nil
         self.isCompareHeld = false
         self.saveToPhotosState = .notRun
@@ -767,11 +804,13 @@ final class FilmtoneEditorStore: ObservableObject {
         guard let source else {
             videoPreviewSession = nil
             preview = .empty
+            comparePreviewFrame = nil
             return
         }
 
         previewTask = Task { @MainActor [weak self] in
             guard let self else { return }
+            self.comparePreviewFrame = nil
 
             let violations = FilmtonePhase0Math.sourceCapViolations(for: self.probe)
             if !violations.isEmpty {
@@ -813,6 +852,7 @@ final class FilmtoneEditorStore: ObservableObject {
                         isRendering: false,
                         error: nil
                     ))
+                    self.comparePreviewFrame = self.makeCompareFrame(from: result)
 
                 case .video:
                     do {
@@ -843,6 +883,7 @@ final class FilmtoneEditorStore: ObservableObject {
                     isRendering: false,
                     error: strings.userMessage(for: error, context: .preview)
                 ))
+                self.comparePreviewFrame = nil
             }
         }
     }
@@ -874,6 +915,7 @@ final class FilmtoneEditorStore: ObservableObject {
         )
         videoPreviewSession = session
         syncPreviewFromVideoSession()
+        try await renderComparePreviewFrame(request: request)
     }
 
     private func refreshExistingVideoPreviewSession(
@@ -897,6 +939,7 @@ final class FilmtoneEditorStore: ObservableObject {
         try Task.checkCancellation()
         await videoPreviewSession.refreshPreparedGradedComposition(composition)
         syncPreviewFromVideoSession()
+        try await renderComparePreviewFrame(request: request)
     }
 
     private func renderStillFallbackPreview(
@@ -918,6 +961,7 @@ final class FilmtoneEditorStore: ObservableObject {
                 isRendering: false,
                 error: errorMessage
             ))
+            comparePreviewFrame = makeCompareFrame(from: result)
         } catch is CancellationError {
             throw CancellationError()
         } catch {
@@ -930,7 +974,35 @@ final class FilmtoneEditorStore: ObservableObject {
                 isRendering: false,
                 error: errorMessage
             ))
+            comparePreviewFrame = nil
         }
+    }
+
+    private func renderComparePreviewFrame(request: Phase0ExportRequestDTO) async throws {
+        do {
+            let result = try await facade.renderPreview(request: request)
+            try Task.checkCancellation()
+            comparePreviewFrame = makeCompareFrame(from: result)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            FilmtonePreviewRefreshDebug.log(
+                "compare preview frame failed: \(error.localizedDescription)"
+            )
+            comparePreviewFrame = nil
+        }
+    }
+
+    private func makeCompareFrame(
+        from result: Phase0PreviewRenderResultDTO
+    ) -> FilmtoneComparePreviewFrame? {
+        FilmtoneComparePreviewFrame(
+            originalURI: result.originalUri,
+            gradedURI: result.gradedUri,
+            width: result.width,
+            height: result.height,
+            posterTimeSec: result.posterTimeSec
+        )
     }
 
     private func syncPreviewFromVideoSession() {
