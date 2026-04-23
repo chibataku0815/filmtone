@@ -58,7 +58,9 @@ closer to the current finishing model.
 
 ## Checksums
 
-Pending final signed DMG.
+```text
+f5d150f38ff67e83a4397d4a13aa6428606d9a0ee600e90ca0edb18f31276afa  filmtone-1.0.2-arm64.dmg
+```
 
 ## Feedback
 
