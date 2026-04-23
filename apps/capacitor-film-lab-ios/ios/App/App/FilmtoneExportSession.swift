@@ -1506,10 +1506,10 @@ final class FilmtoneExportSession {
     }
 
     private func sourcePreviewVideoImage(from image: CIImage) -> CIImage {
-        guard let pixelBuffer = image.pixelBuffer else {
-            return image
-        }
-        return sourceVideoImage(from: pixelBuffer)
+        // AVVideoComposition already provides this image in presentation
+        // orientation. Rewrapping its backing pixel buffer drops that transform
+        // and makes portrait clips preview as raw landscape frames.
+        return image
     }
 
     private func shouldToneMapHDRToSDR(_ imageBuffer: CVPixelBuffer) -> Bool {
