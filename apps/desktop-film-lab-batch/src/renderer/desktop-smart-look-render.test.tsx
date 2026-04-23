@@ -20,6 +20,8 @@ describe("Desktop control panel core render", () => {
     );
 
     expect(html).toContain('data-testid="film-lab-preset-select-trigger"');
+    expect(html).toContain("Neutral");
+    expect(html).toContain("Clean Base");
     // Core does not include Smart Look, Share, or Browser Storage sections
     expect(html).not.toContain("Match colors to a sample (AI, beta)");
     expect(html).not.toContain("Pick sample photo");

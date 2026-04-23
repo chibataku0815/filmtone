@@ -7,7 +7,7 @@
 import {
   PARAM_KEYS,
   cloneParams,
-  PRESETS,
+  createFilmtoneDefaultParams,
   type Params,
 } from "film-lab-core";
 
@@ -41,7 +41,7 @@ export function viewportRecordToParams(
   raw: Record<string, number | string>,
   halationHueFallback: number,
 ): Params {
-  const out = cloneParams(PRESETS.cinematic);
+  const out = cloneParams(createFilmtoneDefaultParams());
   for (const key of PARAM_KEYS.filter(isViewportParamKey)) {
     const v = raw[key];
     if (typeof v === "number") {

@@ -36,7 +36,7 @@ const baseProps: BatchTabPanelProps = {
   },
   isPurgingProxyCache: false,
   onPurgeProxyCache: async () => {},
-  batchPresetChoice: "cinematic",
+  batchPresetChoice: "reset",
   batchLookSource: "preset",
   appliedOpticalRecommendation: null,
   onBatchPresetChoiceChange: () => {},
@@ -158,7 +158,7 @@ describe("BatchTabPanel glass-unified layout (2026-04-19)", () => {
       />,
     );
 
-    expect(html).toContain("ルック: プリセット「cinematic」");
+    expect(html).toContain("ルック: プリセット「Neutral / Clean Base」");
     expect(html).not.toContain("ルック: JSON");
   });
 

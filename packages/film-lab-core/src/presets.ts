@@ -1,4 +1,4 @@
-import { PARAM_KEYS, type Params } from "./params";
+import { PARAM_KEYS, cloneParams, type Params } from "./params";
 import {
   FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
   FILM_LAB_DEFAULT_SHADOW_HUE,
@@ -609,6 +609,26 @@ export const PRESETS = withDepthContractDefaults(RAW_PRESETS);
 
 export type PresetName = keyof typeof PRESETS;
 
+export const FILMTONE_DEFAULT_BASE_PRESET = "reset" satisfies PresetName;
+
+export const FILMTONE_SOFT_FINISH_PATCH = {
+  bloomStrength: 0.22,
+  bloomThreshold: 0.72,
+  bloomRadius: 0.52,
+  diffusion: 0.08,
+  halationIntensity: 0.10,
+  halationSpread: 22,
+  halationRadius: 0.44,
+  halationHue: 20,
+} satisfies Partial<Params>;
+
+export function createFilmtoneDefaultParams(): Params {
+  return Object.assign(
+    cloneParams(PRESETS[FILMTONE_DEFAULT_BASE_PRESET]),
+    FILMTONE_SOFT_FINISH_PATCH,
+  );
+}
+
 /**
  * プリセットの数値が、今の Params と**全部同じ**かを調べる。
  *
@@ -650,6 +670,7 @@ export const PRESET_BUTTONS: {
   category: "filmStock" | "look" | "utility";
   printMedium?: "color_negative" | "silver_gelatin" | "tungsten_cinema" | "slide_positive";
 }[] = [
+  { name: "reset", label: "Neutral", subtitle: "Clean Base", category: "utility" },
   { name: "portra", label: "Portra 400", subtitle: "Warm Pastel", category: "filmStock", printMedium: "color_negative" },
   { name: "gold200", label: "Gold 200", subtitle: "Saturated Warm", category: "filmStock", printMedium: "color_negative" },
   { name: "pro400h", label: "Pro 400H", subtitle: "Cool Soft", category: "filmStock", printMedium: "color_negative" },
@@ -659,5 +680,4 @@ export const PRESET_BUTTONS: {
   { name: "bw", label: "B&W", subtitle: "Classic Mono", category: "filmStock", printMedium: "silver_gelatin" },
   { name: "velvia50", label: "Velvia 50", subtitle: "Vivid Slide", category: "filmStock", printMedium: "slide_positive" },
   { name: "cinematic", label: "Cinematic", subtitle: "Teal & Orange", category: "look" },
-  { name: "reset", label: "Reset", subtitle: "No Grade", category: "utility" },
 ];

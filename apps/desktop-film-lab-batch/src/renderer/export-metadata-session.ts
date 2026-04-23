@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  FILMTONE_DEFAULT_BASE_PRESET,
   PRESETS,
   filmLookGradeInputSchema,
   findMatchingPreset,
@@ -385,11 +386,11 @@ export function inferPresetChoiceFromImportedJson(
   try {
     raw = JSON.parse(jsonText) as unknown;
   } catch {
-    return findMatchingPreset(resolvedParams) ?? "cinematic";
+    return findMatchingPreset(resolvedParams) ?? FILMTONE_DEFAULT_BASE_PRESET;
   }
 
   if (!raw || typeof raw !== "object") {
-    return findMatchingPreset(resolvedParams) ?? "cinematic";
+    return findMatchingPreset(resolvedParams) ?? FILMTONE_DEFAULT_BASE_PRESET;
   }
 
   const record = raw as Record<string, unknown>;
@@ -408,7 +409,7 @@ export function inferPresetChoiceFromImportedJson(
     }
   }
 
-  return findMatchingPreset(resolvedParams) ?? "cinematic";
+  return findMatchingPreset(resolvedParams) ?? FILMTONE_DEFAULT_BASE_PRESET;
 }
 
 export function describeMetadataJsonPath(filePath: string): string {

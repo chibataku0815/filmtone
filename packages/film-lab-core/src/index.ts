@@ -7,6 +7,9 @@ export {
 export {
   PRESETS,
   PRESET_BUTTONS,
+  FILMTONE_DEFAULT_BASE_PRESET,
+  FILMTONE_SOFT_FINISH_PATCH,
+  createFilmtoneDefaultParams,
   findMatchingPreset,
   type PresetName,
 } from "./presets";

@@ -71,6 +71,8 @@ describe("resolveDesktopFilmLabImportMeta", () => {
     const html = await renderDesktopControlPanelCoreHtml();
 
     expect(html).toContain("プリセット");
+    expect(html).toContain("Neutral");
+    expect(html).toContain("Clean Base");
     // Core does not include Smart Look or Browser Storage
     expect(html).not.toContain("見本に色味を合わせる（AI・beta）");
     expect(html).not.toContain("Match colors to a sample (AI, beta)");

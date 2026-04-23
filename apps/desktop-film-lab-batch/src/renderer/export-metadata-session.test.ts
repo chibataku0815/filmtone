@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { PRESETS, type PresetName } from "film-lab-core";
+import {
+  FILMTONE_DEFAULT_BASE_PRESET,
+  PRESETS,
+  createFilmtoneDefaultParams,
+  type PresetName,
+} from "film-lab-core";
 import { batchGradeStateFromPreset } from "./batch-pipeline";
 import { buildGradeJsonPayload } from "./grade-io";
 import {
@@ -234,5 +239,20 @@ describe("export metadata session", () => {
     );
 
     expect(inferred).toBe(explicitPreset);
+  });
+
+  it("falls back unmatched grade JSON exports to the neutral reset look id", () => {
+    const payload = buildGradeJsonPayload(createFilmtoneDefaultParams());
+
+    expect(payload.lookPresetId).toBe("look:mp:reset:v1");
+  });
+
+  it("infers reset instead of cinematic for malformed unmatched imports", () => {
+    const inferred = inferPresetChoiceFromImportedJson(
+      "{not-json",
+      createFilmtoneDefaultParams(),
+    );
+
+    expect(inferred).toBe(FILMTONE_DEFAULT_BASE_PRESET);
   });
 });

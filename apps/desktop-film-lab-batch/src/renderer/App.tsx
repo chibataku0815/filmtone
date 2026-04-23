@@ -27,8 +27,11 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import {
+  FILMTONE_DEFAULT_BASE_PRESET,
   buildOpticalParamPatch,
+  createFilmtoneDefaultParams,
   type OpticalRecommendationV1,
+  type Params,
   type PresetName,
 } from "film-lab-core";
 import {
@@ -60,6 +63,7 @@ import {
 } from "./batch-session";
 import {
   batchGradeStateFromPreset,
+  createDefaultBatchGradeState,
   resolveGradeFromJsonText,
   runBatchPipeline,
   sanitizeBatchFilenameSuffix,
@@ -370,13 +374,17 @@ export default function App() {
    * @description キャンバス・共有コントロール・書き出し同期が共通で参照する現在のプリセット名です。
    * 検索付きプリセットセレクトが更新し、キャンバスの既定ルックと書き出しタブの起点に使います。
    */
-  const [canvasPreset, setCanvasPreset] = useState<PresetName>("cinematic");
+  const [canvasPreset, setCanvasPreset] = useState<PresetName>(
+    FILMTONE_DEFAULT_BASE_PRESET,
+  );
+  const [canvasInitialGradeParams, setCanvasInitialGradeParams] =
+    useState<Params | null>(() => createFilmtoneDefaultParams());
 
   const [batchGrade, setBatchGrade] = useState<BatchGradeState>(() =>
-    batchGradeStateFromPreset("cinematic"),
+    createDefaultBatchGradeState(),
   );
   const [batchPresetChoice, setBatchPresetChoice] =
-    useState<PresetName>("cinematic");
+    useState<PresetName>(FILMTONE_DEFAULT_BASE_PRESET);
   const [batchLookSource, setBatchLookSource] =
     useState<MetadataLookSource>("preset");
   const [batchLutRefs, setBatchLutRefs] = useState<MetadataLutRefs>(
@@ -947,6 +955,7 @@ export default function App() {
       setAppliedOpticalRecommendation(restored.appliedOpticalRecommendation);
       setImportedGradeLabel(restored.importedFilePath);
       setEditToExportSyncedAtMs(restored.syncedAtMs);
+      setCanvasInitialGradeParams(null);
       setCanvasPreset(restored.batchPresetChoice);
       setEditLut(restoredEditLut);
       setImportedPreviewParams(restored.batchGrade.params);
@@ -1601,6 +1610,11 @@ export default function App() {
     setImportedGradeLabel(null);
     setEditToExportSyncedAtMs(null);
   };
+
+  const handleControlPanelPresetChange = useCallback((name: PresetName) => {
+    setCanvasInitialGradeParams(null);
+    setCanvasPreset(name);
+  }, []);
 
   const importGradeJson = async () => {
     const p = await window.filmLabBatch.pickMetadataJson();
@@ -2353,6 +2367,7 @@ export default function App() {
                 stackedToolbarVisible={false}
                 preset={canvasPreset}
                 depthTrack={batchGrade.depthTrack}
+                initialGradeParams={canvasInitialGradeParams}
                 className="h-full min-h-0 w-full"
                 fullScreen
                 pauseVideoPreview={running}
@@ -2552,7 +2567,7 @@ export default function App() {
                       onHistogramToggle={
                         previewSupportsHistogram ? handleHistogramToggle : undefined
                       }
-                      onPresetChange={setCanvasPreset}
+                      onPresetChange={handleControlPanelPresetChange}
                       onLutChange={handleEditLutChange}
                       onParamsChange={handleEditParamsChange}
                       onCompareUiChange={setCompareUi}

@@ -4,6 +4,7 @@
  * @overview findMatchingPreset で look ID を決め、grade 本体は Params のまま保存する。
  */
 import {
+  FILMTONE_DEFAULT_BASE_PRESET,
   lookIdForPreset,
   PRESET_VERSION,
   type FilmLookGradeInputProps,
@@ -25,7 +26,8 @@ export function buildGradeJsonPayload(
   params: Params,
   depthTrack: BatchDepthTrackSource | null = null,
 ): GradeJsonPayload {
-  const preset: PresetName = findMatchingPreset(params) ?? "cinematic";
+  const preset: PresetName =
+    findMatchingPreset(params) ?? FILMTONE_DEFAULT_BASE_PRESET;
   return {
     lookPresetId: lookIdForPreset(preset),
     presetVersion: PRESET_VERSION,

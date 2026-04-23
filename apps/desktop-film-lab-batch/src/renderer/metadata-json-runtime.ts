@@ -1,4 +1,8 @@
-import { parseCube, type PresetName } from "film-lab-core";
+import {
+  FILMTONE_DEFAULT_BASE_PRESET,
+  parseCube,
+  type PresetName,
+} from "film-lab-core";
 import type { FilmLabBatchBridge } from "./desktop-api";
 import {
   type AppliedOpticalRecommendationMetadata,
@@ -178,7 +182,7 @@ export function emptyResolvedMetadataJson(filePath: string): ResolvedImportedMet
       lutData: null,
       lutSize: 0,
     },
-    batchPresetChoice: "cinematic",
+    batchPresetChoice: FILMTONE_DEFAULT_BASE_PRESET,
     lookSource: "preset",
     lutRefs: createEmptyMetadataLutRefs(),
     importedFilePath: filePath,

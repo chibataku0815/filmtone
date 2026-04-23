@@ -1,10 +1,10 @@
 /**
- * @file プリセット一覧を「Film Stock 主・Look 従・Utility 最後」に並べ替える小さなヘルパー。
+ * @file プリセット一覧を「Utility（Neutral）・Film Stock・Look」に並べ替える小さなヘルパー。
  * @description
  * 概要: `film-lab-core` の `PRESET_BUTTONS` は正本ですが、UI はここで **カテゴリ順を固定** して並べます。
  * 主な仕様:
  * - 同じカテゴリの中では、`PRESET_BUTTONS` に書いてある元の順番をそのまま使います。
- * - カテゴリの優先順位は `filmStock` → `look` → `utility` です。
+ * - カテゴリの優先順位は `utility` → `filmStock` → `look` です。
  * 制限事項:
  * - ラベル文言やプリセットの追加・削除は `film-lab-core` 側で行い、このファイルは並べ替えだけを担当します。
  * - Quick / Pro の大きなパネル再設計（life#95）はここではしません。
@@ -20,9 +20,9 @@ export type PresetButtonRow = (typeof PRESET_BUTTONS)[number];
  * カテゴリの並び順を数字にします。数字が小さいほど上に来ます。
  */
 const presetCategoryRank: Record<PresetButtonRow["category"], number> = {
-  filmStock: 0,
-  look: 1,
-  utility: 2,
+  utility: 0,
+  filmStock: 1,
+  look: 2,
 };
 
 /**

@@ -13,8 +13,11 @@ import {
 } from "react";
 import { useTranslations } from "next-intl";
 import {
+  FILMTONE_DEFAULT_BASE_PRESET,
+  FILMTONE_SOFT_FINISH_PATCH,
   PHASE0_RGB_SHIFT_MAX,
   PRESETS,
+  createFilmtoneDefaultParams,
   findMatchingPreset,
   halationHueToHex,
   type PresetName,
@@ -260,16 +263,7 @@ const GLOW_STARTER_STATES: readonly FinishToolStarterState[] = [
   {
     id: "subtle",
     labelKey: "controls.finishToolsStarterSubtle",
-    patch: {
-      bloomStrength: 0.22,
-      bloomThreshold: 0.72,
-      bloomRadius: 0.52,
-      diffusion: 0.08,
-      halationIntensity: 0.10,
-      halationSpread: 22,
-      halationRadius: 0.44,
-      halationHue: 20,
-    },
+    patch: FILMTONE_SOFT_FINISH_PATCH,
   },
   {
     id: "signature",
@@ -323,7 +317,10 @@ export const FilmLabControlPanelCore = forwardRef<
     () =>
       initialSharedParams
         ? createInitialStateFromSharedParams(initialSharedParams)
-        : createInitialState({ ...PRESETS.cinematic } as Params, "cinematic"),
+        : createInitialState(
+            createFilmtoneDefaultParams(),
+            FILMTONE_DEFAULT_BASE_PRESET,
+          ),
   );
 
   useImperativeHandle(ref, () => ({
@@ -331,7 +328,9 @@ export const FilmLabControlPanelCore = forwardRef<
   }), []);
 
   const [activePreset, setActivePreset] = useState<PresetName>(() =>
-    initialSharedParams ? findMatchingPreset(initialSharedParams) ?? "reset" : "cinematic",
+    initialSharedParams
+      ? findMatchingPreset(initialSharedParams) ?? FILMTONE_DEFAULT_BASE_PRESET
+      : FILMTONE_DEFAULT_BASE_PRESET,
   );
   const [savedBloomStrength, setSavedBloomStrength] = useState(0.3);
   const [savedHalationIntensity, setSavedHalationIntensity] = useState(0.25);

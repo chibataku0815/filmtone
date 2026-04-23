@@ -23,7 +23,7 @@ import {
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { PRESETS, type PresetName } from "film-lab-core";
+import { PRESETS, PRESET_BUTTONS, type PresetName } from "film-lab-core";
 import {
   pathsNotSucceeded,
   sessionHasRemainingWork,
@@ -49,6 +49,13 @@ import {
 export type BatchJobMode = "images" | "video";
 
 const PRESET_NAMES = Object.keys(PRESETS) as PresetName[];
+
+function formatPresetChoiceLabel(presetName: PresetName): string {
+  const presetButton = PRESET_BUTTONS.find((row) => row.name === presetName);
+  return presetButton
+    ? `${presetButton.label} / ${presetButton.subtitle}`
+    : presetName;
+}
 
 /** @description 編集プレビューと書き出し入力の対応を追うための状態（life#83） */
 export type DesktopInteractivePreviewState =
@@ -562,7 +569,9 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     return {
       Icon: Circle,
       iconWeight: "duotone" as const,
-      title: t("lookStatusPresetTitle", { preset: batchPresetChoice }),
+      title: t("lookStatusPresetTitle", {
+        preset: formatPresetChoiceLabel(batchPresetChoice),
+      }),
       body: t("lookStatusPresetBody"),
       iconClass: "text-[var(--fl-text-tertiary)]",
     };
@@ -897,10 +906,10 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
             <p className="fl-caption max-w-prose text-[var(--fl-text-secondary)]">
               {batchLookSource === "editSync"
                 ? t("lookPresetHiddenWhileSyncedBody", {
-                    preset: batchPresetChoice,
+                    preset: formatPresetChoiceLabel(batchPresetChoice),
                   })
                 : t("lookPresetHiddenWhileRecommendedBody", {
-                    preset: batchPresetChoice,
+                    preset: formatPresetChoiceLabel(batchPresetChoice),
                   })}
             </p>
             <button
@@ -926,7 +935,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
             >
               {PRESET_NAMES.map((n) => (
                 <option key={n} value={n}>
-                  {n}
+                  {formatPresetChoiceLabel(n)}
                 </option>
               ))}
             </select>

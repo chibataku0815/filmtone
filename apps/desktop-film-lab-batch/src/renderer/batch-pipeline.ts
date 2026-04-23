@@ -12,6 +12,7 @@ import type { FilmLabBatchBridge } from "./desktop-api";
 import {
   filmLabParamsSchema,
   filmLookGradeInputSchema,
+  createFilmtoneDefaultParams,
   PRESETS,
   LOOK_ID_BY_PRESET,
   parseCube,
@@ -72,6 +73,19 @@ export type BatchGradeState = {
 export function batchGradeStateFromPreset(preset: PresetName): BatchGradeState {
   return {
     params: PRESETS[preset],
+    depthTrack: null,
+    lut1Intensity: 1,
+    lut1Data: null,
+    lut1Size: 0,
+    lutIntensity: 1,
+    lutData: null,
+    lutSize: 0,
+  };
+}
+
+export function createDefaultBatchGradeState(): BatchGradeState {
+  return {
+    params: createFilmtoneDefaultParams(),
     depthTrack: null,
     lut1Intensity: 1,
     lut1Data: null,
