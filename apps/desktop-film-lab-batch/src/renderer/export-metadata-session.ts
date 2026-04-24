@@ -124,6 +124,9 @@ const hdrToSdrFilterSelectionSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("zscale-tonemap"),
     source: z.enum(["hdr-pq", "hdr-hlg"]),
+    chainId: z.enum(["pq-zscale-hable-npl100", "hlg-zscale-mobius-npl100"]),
+    enabledByEnv: z.literal(true),
+    ffmpegPath: z.string().min(1).nullable(),
     transferIn: z.enum(["smpte2084", "arib-std-b67"]),
     tonemap: z.enum(["hable", "mobius"]),
     nominalPeakNits: z.literal(100),
@@ -133,6 +136,9 @@ const hdrToSdrFilterSelectionSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("libplacebo"),
     source: z.enum(["hdr-pq", "hdr-hlg"]),
+    chainId: z.enum(["pq-libplacebo-bt2390", "hlg-libplacebo-bt2390"]),
+    enabledByEnv: z.literal(true),
+    ffmpegPath: z.string().min(1).nullable(),
     tonemapping: z.literal("bt.2390"),
     gamutMode: z.literal("perceptual"),
     output: z.literal("bt709-sdr"),

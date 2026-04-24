@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildCameraOpticsMetadataArgs,
+  buildFfmpegMezzanineVideoFilter,
   buildFfmpegRawvideoExportArgs,
   buildHdrToSdrFilterChain,
   normalizeCameraOptics,
@@ -167,6 +168,9 @@ describe("video-export-ffmpeg-args", () => {
       buildHdrToSdrFilterChain({
         kind: "zscale-tonemap",
         source: "hdr-pq",
+        chainId: "pq-zscale-hable-npl100",
+        enabledByEnv: true,
+        ffmpegPath: "/tmp/ffmpeg",
         transferIn: "smpte2084",
         tonemap: "hable",
         nominalPeakNits: 100,
@@ -183,6 +187,9 @@ describe("video-export-ffmpeg-args", () => {
       buildHdrToSdrFilterChain({
         kind: "zscale-tonemap",
         source: "hdr-hlg",
+        chainId: "hlg-zscale-mobius-npl100",
+        enabledByEnv: true,
+        ffmpegPath: "/tmp/ffmpeg",
         transferIn: "arib-std-b67",
         tonemap: "mobius",
         nominalPeakNits: 100,
@@ -199,12 +206,37 @@ describe("video-export-ffmpeg-args", () => {
       buildHdrToSdrFilterChain({
         kind: "libplacebo",
         source: "hdr-pq",
+        chainId: "pq-libplacebo-bt2390",
+        enabledByEnv: true,
+        ffmpegPath: "/tmp/ffmpeg",
         tonemapping: "bt.2390",
         gamutMode: "perceptual",
         output: "bt709-sdr",
       }),
     ).toBe(
-      "libplacebo=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv:tonemapping=bt.2390:gamut_mode=perceptual:format=yuv420p",
+      "libplacebo=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv:tonemapping=bt.2390:gamut_mode=perceptual,format=yuv420p",
+    );
+  });
+
+  it("places scale before final yuv420p conversion for HDR mezzanine filters", () => {
+    expect(
+      buildFfmpegMezzanineVideoFilter({
+        outW: 320,
+        hdrFilterSelection: {
+          kind: "zscale-tonemap",
+          source: "hdr-pq",
+          chainId: "pq-zscale-hable-npl100",
+          enabledByEnv: true,
+          ffmpegPath: "/tmp/ffmpeg",
+          transferIn: "smpte2084",
+          tonemap: "hable",
+          nominalPeakNits: 100,
+          desat: 0,
+          output: "bt709-sdr",
+        },
+      }),
+    ).toBe(
+      "zscale=tin=smpte2084:pin=2020:min=2020_ncl:rin=tv:t=linear:npl=100,format=gbrpf32le,zscale=p=709,tonemap=tonemap=hable:desat=0,zscale=t=709:m=709:r=tv,scale=320:-2,format=yuv420p",
     );
   });
 

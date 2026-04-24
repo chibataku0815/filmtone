@@ -21,7 +21,7 @@
  *      cross-filter is active, independently of user's `diffusion` field.
  *   6. Post-chain (active when `crossFilterStrength > 0` or
  *      `shutterAngle > 0`):
- *      - Cross-filter: threshold → peak → optional spacing gate →
+ *      - Cross-filter: compact source gate → peak → optional spacing gate →
  *        (Hard-mode only) active WebGPU intentionally bypasses the
  *        legacy temporal hold so the 4-level central-bloom chain and
  *        directional streaks read current peaks directly, while the
@@ -88,6 +88,7 @@ import {
   dustFragmentWgsl,
   motionblurFeedbackFragmentWgsl,
   motionblurBlendFragmentWgsl,
+  crossFilterSourceFragmentWgsl,
   crossFilterPeakFragmentWgsl,
   crossFilterPeakSpacingMaxFragmentWgsl,
   crossFilterPeakSpacingFragmentWgsl,
@@ -246,6 +247,7 @@ interface ShaderModules {
   dust: GPUShaderModule;
   motionblurFeedback: GPUShaderModule;
   motionblurBlend: GPUShaderModule;
+  crossFilterSource: GPUShaderModule;
   crossFilterPeak: GPUShaderModule;
   crossFilterPeakSpacingMax: GPUShaderModule;
   crossFilterPeakSpacing: GPUShaderModule;
@@ -280,6 +282,7 @@ interface Pipelines {
   motionblurFeedback: GPURenderPipeline;
   /** N-slot weighted average → swap. */
   motionblurBlend: GPURenderPipeline;
+  crossFilterSource: GPURenderPipeline;
   crossFilterPeak: GPURenderPipeline;
   crossFilterPeakSpacingMax: GPURenderPipeline;
   crossFilterPeakSpacing: GPURenderPipeline;
@@ -615,6 +618,7 @@ export class WebGPUBackend implements RenderBackend {
       // GPU-side WGSL correctness is guaranteed at backend init; runtime
       // render integration lives in `renderCrossFilter` (no-op when
       // crossFilterStrength === 0 — all 8 v1.0 presets ship with 0).
+      crossFilterSource: await make("cross-filter-source.frag", crossFilterSourceFragmentWgsl),
       crossFilterPeak: await make("cross-filter-peak.frag", crossFilterPeakFragmentWgsl),
       crossFilterPeakSpacingMax: await make(
         "cross-filter-peak-spacing-max.frag",
@@ -1030,6 +1034,20 @@ export class WebGPUBackend implements RenderBackend {
       }),
     );
 
+    const crossFilterSourcePipeline = await ctx.withValidationScope(() =>
+      device.createRenderPipeline({
+        label: "crossfilter.source",
+        layout: pyramidPipelineLayout,
+        vertex: { module: modules.vert, entryPoint: "vs_main" },
+        fragment: {
+          module: modules.crossFilterSource,
+          entryPoint: "fs_main",
+          targets: [{ format: "rgba16float" }],
+        },
+        primitive: { topology: "triangle-list" },
+      }),
+    );
+
     const crossFilterPeakPipeline = await ctx.withValidationScope(() =>
       device.createRenderPipeline({
         label: "crossfilter.peak",
@@ -1397,6 +1415,7 @@ export class WebGPUBackend implements RenderBackend {
         compareSource: compareSourcePipeline,
         motionblurFeedback: motionblurFeedbackPipeline,
         motionblurBlend: motionblurBlendPipeline,
+        crossFilterSource: crossFilterSourcePipeline,
         crossFilterPeak: crossFilterPeakPipeline,
         crossFilterPeakSpacingMax: crossFilterPeakSpacingMaxPipeline,
         crossFilterPeakSpacing: crossFilterPeakSpacingPipeline,
@@ -2780,7 +2799,7 @@ export class WebGPUBackend implements RenderBackend {
 
     const halfWidth = Math.max(1, Math.floor(this._width / 2));
     const halfHeight = Math.max(1, Math.floor(this._height / 2));
-    const thresholdTexture = this.pool.get("rt.crossfilter.threshold", {
+    const sourceGateTexture = this.pool.get("rt.crossfilter.source-gate", {
       width: halfWidth,
       height: halfHeight,
       format: "rgba16float",
@@ -2888,8 +2907,8 @@ export class WebGPUBackend implements RenderBackend {
     const blackView = this.crossFilter.blackTexture.createView();
 
     this.crossFilter.thresholdScratch[0] = effectiveThreshold;
-    this.crossFilter.thresholdScratch[1] = 0.1;
-    this.crossFilter.thresholdScratch[2] = 0;
+    this.crossFilter.thresholdScratch[1] = 0.12;
+    this.crossFilter.thresholdScratch[2] = hardModeUniform;
     this.crossFilter.thresholdScratch[3] = 0;
     device.queue.writeBuffer(
       this.crossFilter.thresholdBuffer,
@@ -2900,7 +2919,7 @@ export class WebGPUBackend implements RenderBackend {
     );
     {
       const bg = device.createBindGroup({
-        label: "crossfilter.threshold.bg",
+        label: "crossfilter.source.bg",
         layout: this.layouts.pyramid,
         entries: [
           { binding: 0, resource: { buffer: this.crossFilter.thresholdBuffer } },
@@ -2909,17 +2928,17 @@ export class WebGPUBackend implements RenderBackend {
         ],
       });
       const pass = encoder.beginRenderPass({
-        label: "crossfilter.threshold",
+        label: "crossfilter.source",
         colorAttachments: [
           {
-            view: thresholdTexture.createView(),
+            view: sourceGateTexture.createView(),
             loadOp: "clear",
             storeOp: "store",
             clearValue: { r: 0, g: 0, b: 0, a: 1 },
           },
         ],
       });
-      pass.setPipeline(this.pipelines.bloomPrefilter);
+      pass.setPipeline(this.pipelines.crossFilterSource);
       pass.setBindGroup(0, this.offscreenFlagsBindGroup);
       pass.setBindGroup(1, bg);
       pass.draw(3, 1, 0, 0);
@@ -2943,7 +2962,7 @@ export class WebGPUBackend implements RenderBackend {
         layout: this.layouts.pyramid,
         entries: [
           { binding: 0, resource: { buffer: this.crossFilter.peakBuffer } },
-          { binding: 1, resource: thresholdTexture.createView() },
+          { binding: 1, resource: sourceGateTexture.createView() },
           { binding: 2, resource: this.sampler },
         ],
       });

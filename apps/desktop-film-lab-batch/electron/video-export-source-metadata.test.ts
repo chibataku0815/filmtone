@@ -8,6 +8,7 @@ import {
   deriveDesktopHdrPreparationPolicy,
   deriveSourceColorMetadataFromFfprobeStream,
   deriveVideoDisplayGeometryFromFfprobeStream,
+  normalizeHdrToSdrFilterSelection,
   type SourceColorMetadata,
   type SourceVideoMetadata,
 } from "./video-export-source-metadata";
@@ -372,7 +373,34 @@ describe("desktop HDR preparation policy", () => {
     expect(policy.warning).toContain("HLG");
   });
 
-  it("keeps prepare-sdr-mezzanine for HDR PQ when zscale is available", () => {
+  it("defers HDR PQ preparation when zscale exists without the tonemap filter", () => {
+    const color = deriveSourceColorMetadataFromFfprobeStream({
+      color_space: "bt2020nc",
+      color_transfer: "smpte2084",
+      color_primaries: "bt2020",
+    });
+
+    const policy = deriveDesktopHdrPreparationPolicy(
+      sourceMetadataForColor(color),
+      {
+        hasZscale: true,
+        hasLibplacebo: false,
+        hasTonemap: false,
+        hasColorspace: true,
+      },
+      {
+        enableHdrTonemap: true,
+        ffmpegPath: "/tmp/ffmpeg",
+      },
+    );
+
+    expect(policy.strategy).toBe("defer-unknown");
+    expect(policy.reason).toBe("ffmpeg-missing-hdr-filters");
+    expect(policy.filterSelection).toBeUndefined();
+    expect(policy.warning).toContain("tonemap");
+  });
+
+  it("keeps HDR PQ filter selection disabled by default when zscale is available", () => {
     const color = deriveSourceColorMetadataFromFfprobeStream({
       color_space: "bt2020nc",
       color_transfer: "smpte2084",
@@ -392,9 +420,37 @@ describe("desktop HDR preparation policy", () => {
     expect(policy.strategy).toBe("prepare-sdr-mezzanine");
     expect(policy.reason).toBe("source-is-hdr-pq");
     expect(policy.warning).toBeNull();
+    expect(policy.filterSelection).toBeUndefined();
+  });
+
+  it("selects the PQ zscale chain when HDR tone-map dev flag is enabled", () => {
+    const color = deriveSourceColorMetadataFromFfprobeStream({
+      color_space: "bt2020nc",
+      color_transfer: "smpte2084",
+      color_primaries: "bt2020",
+    });
+
+    const policy = deriveDesktopHdrPreparationPolicy(
+      sourceMetadataForColor(color),
+      {
+        hasZscale: true,
+        hasLibplacebo: false,
+        hasTonemap: true,
+        hasColorspace: true,
+      },
+      {
+        enableHdrTonemap: true,
+        ffmpegPath: "/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg",
+      },
+    );
+
+    expect(policy.strategy).toBe("prepare-sdr-mezzanine");
     expect(policy.filterSelection).toEqual({
       kind: "zscale-tonemap",
       source: "hdr-pq",
+      chainId: "pq-zscale-hable-npl100",
+      enabledByEnv: true,
+      ffmpegPath: "/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg",
       transferIn: "smpte2084",
       tonemap: "hable",
       nominalPeakNits: 100,
@@ -403,7 +459,7 @@ describe("desktop HDR preparation policy", () => {
     });
   });
 
-  it("keeps prepare-sdr-mezzanine for HDR HLG when libplacebo is available", () => {
+  it("does not select libplacebo by default even when it is the only HDR path", () => {
     const color = deriveSourceColorMetadataFromFfprobeStream({
       color_space: "bt2020nc",
       color_transfer: "arib-std-b67",
@@ -418,20 +474,53 @@ describe("desktop HDR preparation policy", () => {
         hasTonemap: false,
         hasColorspace: true,
       },
+      {
+        enableHdrTonemap: true,
+        ffmpegPath: "/tmp/ffmpeg",
+      },
     );
 
     expect(policy.strategy).toBe("prepare-sdr-mezzanine");
     expect(policy.reason).toBe("source-is-hdr-hlg");
+    expect(policy.filterSelection).toBeUndefined();
+  });
+
+  it("selects libplacebo only when the dev engine is explicitly requested", () => {
+    const color = deriveSourceColorMetadataFromFfprobeStream({
+      color_space: "bt2020nc",
+      color_transfer: "arib-std-b67",
+      color_primaries: "bt2020",
+    });
+
+    const policy = deriveDesktopHdrPreparationPolicy(
+      sourceMetadataForColor(color),
+      {
+        hasZscale: false,
+        hasLibplacebo: true,
+        hasTonemap: false,
+        hasColorspace: true,
+      },
+      {
+        enableHdrTonemap: true,
+        enginePreference: "libplacebo",
+        ffmpegPath: "/tmp/ffmpeg",
+      },
+    );
+
+    expect(policy.strategy).toBe("prepare-sdr-mezzanine");
     expect(policy.filterSelection).toEqual({
       kind: "libplacebo",
       source: "hdr-hlg",
+      chainId: "hlg-libplacebo-bt2390",
+      enabledByEnv: true,
+      ffmpegPath: "/tmp/ffmpeg",
       tonemapping: "bt.2390",
       gamutMode: "perceptual",
       output: "bt709-sdr",
     });
   });
 
-  it("prefers zscale when both HDR filter paths are available", () => {
+  it("prefers zscale when both HDR filter paths are available and dev flag is enabled", () => {
     const color = deriveSourceColorMetadataFromFfprobeStream({
       color_space: "bt2020nc",
       color_transfer: "smpte2084",
@@ -446,6 +535,10 @@ describe("desktop HDR preparation policy", () => {
         hasTonemap: true,
         hasColorspace: true,
       },
+      {
+        enableHdrTonemap: true,
+        ffmpegPath: "/tmp/ffmpeg-full",
+      },
     );
 
     expect(policy.strategy).toBe("prepare-sdr-mezzanine");
@@ -453,6 +546,9 @@ describe("desktop HDR preparation policy", () => {
     expect(policy.filterSelection).toEqual({
       kind: "zscale-tonemap",
       source: "hdr-pq",
+      chainId: "pq-zscale-hable-npl100",
+      enabledByEnv: true,
+      ffmpegPath: "/tmp/ffmpeg-full",
       transferIn: "smpte2084",
       tonemap: "hable",
       nominalPeakNits: 100,
@@ -480,5 +576,61 @@ describe("desktop HDR preparation policy", () => {
 
     expect(policy.strategy).toBe("none");
     expect(policy.reason).toBe("source-is-sdr-bt709");
+  });
+
+  it("normalizes only the dev-flagged HDR filter selection shapes used by IPC", () => {
+    expect(
+      normalizeHdrToSdrFilterSelection({
+        kind: "zscale-tonemap",
+        source: "hdr-pq",
+        chainId: "pq-zscale-hable-npl100",
+        enabledByEnv: true,
+        ffmpegPath: "/tmp/ffmpeg",
+        transferIn: "smpte2084",
+        tonemap: "hable",
+        nominalPeakNits: 100,
+        desat: 0,
+        output: "bt709-sdr",
+      }),
+    ).toEqual({
+      kind: "zscale-tonemap",
+      source: "hdr-pq",
+      chainId: "pq-zscale-hable-npl100",
+      enabledByEnv: true,
+      ffmpegPath: "/tmp/ffmpeg",
+      transferIn: "smpte2084",
+      tonemap: "hable",
+      nominalPeakNits: 100,
+      desat: 0,
+      output: "bt709-sdr",
+    });
+
+    expect(
+      normalizeHdrToSdrFilterSelection({
+        kind: "zscale-tonemap",
+        source: "hdr-pq",
+        chainId: "hlg-zscale-mobius-npl100",
+        enabledByEnv: true,
+        ffmpegPath: "/tmp/ffmpeg",
+        transferIn: "smpte2084",
+        tonemap: "hable",
+        nominalPeakNits: 100,
+        desat: 0,
+        output: "bt709-sdr",
+      }),
+    ).toBeNull();
+
+    expect(
+      normalizeHdrToSdrFilterSelection({
+        kind: "libplacebo",
+        source: "hdr-hlg",
+        chainId: "hlg-libplacebo-bt2390",
+        enabledByEnv: false,
+        ffmpegPath: "/tmp/ffmpeg",
+        tonemapping: "bt.2390",
+        gamutMode: "perceptual",
+        output: "bt709-sdr",
+      }),
+    ).toBeNull();
   });
 });

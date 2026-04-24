@@ -56,6 +56,9 @@ export type HdrToSdrFilterSelection =
   | {
       kind: "zscale-tonemap";
       source: "hdr-pq" | "hdr-hlg";
+      chainId: "pq-zscale-hable-npl100" | "hlg-zscale-mobius-npl100";
+      enabledByEnv: true;
+      ffmpegPath: string | null;
       transferIn: "smpte2084" | "arib-std-b67";
       tonemap: "hable" | "mobius";
       nominalPeakNits: 100;
@@ -65,6 +68,9 @@ export type HdrToSdrFilterSelection =
   | {
       kind: "libplacebo";
       source: "hdr-pq" | "hdr-hlg";
+      chainId: "pq-libplacebo-bt2390" | "hlg-libplacebo-bt2390";
+      enabledByEnv: true;
+      ffmpegPath: string | null;
       tonemapping: "bt.2390";
       gamutMode: "perceptual";
       output: "bt709-sdr";
@@ -118,6 +124,8 @@ export type VideoExportTranscodeMezzanineInput = {
   outW: number;
   /** @description 書き出し高さ */
   outH: number;
+  /** @description HDR→SDR tone-map 選択を含む source metadata（dev flag 有効時のみ使用） */
+  sourceVideoMetadata?: SourceVideoMetadata;
 };
 
 /**

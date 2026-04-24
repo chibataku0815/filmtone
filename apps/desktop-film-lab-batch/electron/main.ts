@@ -45,7 +45,10 @@ import {
   deriveDesktopHdrPreparationPolicy,
   deriveSourceColorMetadataFromFfprobeStream,
   deriveVideoDisplayGeometryFromFfprobeStream,
+  normalizeHdrToSdrFilterSelection,
   type FFmpegHdrCapabilities,
+  type HdrToSdrFilterSelection,
+  type HdrTonemapEnginePreference,
   type SourceVideoMetadata,
 } from "./video-export-source-metadata";
 import { probeFfmpegHdrCapabilities } from "./ffmpeg-capability-probe";
@@ -60,6 +63,7 @@ import {
   type VideoExportPipeController,
 } from "./video-export-stdin";
 import {
+  buildFfmpegMezzanineVideoFilter,
   buildFfmpegRawvideoExportArgs,
   normalizeCameraOptics,
 } from "./video-export-ffmpeg-args";
@@ -168,6 +172,23 @@ const VERBOSE_VIDEO_EXPORT_MAIN =
 const SKIP_MEZZANINE =
   process.env.FILM_LAB_SKIP_MEZZANINE === "1" ||
   process.env.FILM_LAB_SKIP_MEZZANINE === "true";
+
+const ENABLE_HDR_TONEMAP =
+  process.env.FILM_LAB_ENABLE_HDR_TONEMAP === "1" ||
+  process.env.FILM_LAB_ENABLE_HDR_TONEMAP === "true";
+
+function parseHdrTonemapEnginePreference(
+  value: string | undefined,
+): HdrTonemapEnginePreference {
+  if (value === "zscale-tonemap" || value === "libplacebo") {
+    return value;
+  }
+  return "auto";
+}
+
+const HDR_TONEMAP_ENGINE = parseHdrTonemapEnginePreference(
+  process.env.FILM_LAB_HDR_TONEMAP_ENGINE,
+);
 
 /**
  * @description mezzanine 進捗を送る IPC のチャンネル名。
@@ -413,18 +434,27 @@ function isImageFile(fileName: string): boolean {
  * 1 回だけ ffmpeg を解決して capability を確定する。SDR / unknown には触らない。
  * 解決に失敗した場合は null を返し、policy は capability 未確定として扱う（既存挙動と同じ）。
  */
+type FfmpegHdrCapabilityProbeResult = {
+  capabilities: FFmpegHdrCapabilities;
+  ffmpegPath: string;
+};
+
 async function resolveFfmpegHdrCapabilitiesIfNeeded(
   colorClass: SourceVideoMetadata["colorClass"],
-): Promise<FFmpegHdrCapabilities | null> {
+): Promise<FfmpegHdrCapabilityProbeResult | null> {
   if (colorClass !== "hdr-pq" && colorClass !== "hdr-hlg") {
     return null;
   }
   try {
     const ffmpeg = resolveVideoCliBinary("ffmpeg");
-    return await probeFfmpegHdrCapabilities({
+    const capabilities = await probeFfmpegHdrCapabilities({
       commandPath: ffmpeg.commandPath,
       env: ffmpeg.childEnv,
     });
+    return {
+      capabilities,
+      ffmpegPath: ffmpeg.commandPath,
+    };
   } catch (e) {
     if (DEBUG_VIDEO_EXPORT_MAIN) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -581,12 +611,17 @@ async function ffprobeVideoMeta(absPath: string): Promise<{
     colorClass: classifySourceColorForExport(sourceColorMetadata),
     timing: sourceFrameRateInfo,
   };
-  const ffmpegHdrCapabilities = await resolveFfmpegHdrCapabilitiesIfNeeded(
+  const ffmpegHdrProbe = await resolveFfmpegHdrCapabilitiesIfNeeded(
     sourceVideoMetadata.colorClass,
   );
   sourceVideoMetadata.hdrPreparationPolicy = deriveDesktopHdrPreparationPolicy(
     sourceVideoMetadata,
-    ffmpegHdrCapabilities,
+    ffmpegHdrProbe?.capabilities ?? null,
+    {
+      enableHdrTonemap: ENABLE_HDR_TONEMAP,
+      enginePreference: HDR_TONEMAP_ENGINE,
+      ffmpegPath: ffmpegHdrProbe?.ffmpegPath ?? null,
+    },
   );
   const cameraOptics = deriveCameraOpticsFromFfprobeMeta({
     rawWidth: width,
@@ -754,13 +789,15 @@ function buildFfmpegMezzanineArgs(
   useHwEncoder: boolean,
   outW: number,
   outH: number,
+  hdrFilterSelection: HdrToSdrFilterSelection | null = null,
 ): string[] {
   const args = ["-hide_banner", "-loglevel", "info"];
-  if (useHwEncoder) {
+  const useHardwarePath = useHwEncoder && hdrFilterSelection === null;
+  if (useHardwarePath) {
     args.push("-hwaccel", "videotoolbox");
   }
   args.push("-i", inputPath);
-  if (useHwEncoder) {
+  if (useHardwarePath) {
     args.push(
       "-c:v", "h264_videotoolbox",
       "-b:v", "80M",
@@ -775,11 +812,55 @@ function buildFfmpegMezzanineArgs(
       "-g", "1",
     );
   }
-  // colorspace フィルターで色空間を bt709 に正規化してから scale する。
+  // colorspace / HDR tone-map filter で bt709 SDR に正規化してから scale する。
   // ProRes 4444 (yuv444p12le, gbr) 等で swscaler が "Unsupported input" になるのを回避。
-  args.push("-vf", `colorspace=iall=bt709:all=bt709,scale=${outW}:-2,format=yuv420p`);
+  args.push(
+    "-vf",
+    buildFfmpegMezzanineVideoFilter({ outW, hdrFilterSelection }),
+  );
+  if (hdrFilterSelection) {
+    args.push(
+      "-color_range",
+      "tv",
+      "-colorspace",
+      "bt709",
+      "-color_trc",
+      "bt709",
+      "-color_primaries",
+      "bt709",
+    );
+  }
   args.push("-c:a", "copy", "-y", outputPath);
   return args;
+}
+
+function hdrFilterSelectionFromSourceVideoMetadataPayload(
+  value: unknown,
+): HdrToSdrFilterSelection | null {
+  if (!ENABLE_HDR_TONEMAP) {
+    return null;
+  }
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+  const metadata = value as { hdrPreparationPolicy?: unknown };
+  if (
+    typeof metadata.hdrPreparationPolicy !== "object" ||
+    metadata.hdrPreparationPolicy === null
+  ) {
+    return null;
+  }
+  const policy = metadata.hdrPreparationPolicy as {
+    filterSelection?: unknown;
+  };
+  const selection = normalizeHdrToSdrFilterSelection(policy.filterSelection);
+  if (!selection) {
+    return null;
+  }
+  if (HDR_TONEMAP_ENGINE === "libplacebo") {
+    return selection.kind === "libplacebo" ? selection : null;
+  }
+  return selection.kind === "zscale-tonemap" ? selection : null;
 }
 
 async function listImagePathsInDir(dir: string): Promise<string[]> {
@@ -2054,7 +2135,16 @@ ipcMain.handle("video-preview-abort-proxy", async () => {
  */
 ipcMain.handle(
   "video-export-transcode-mezzanine",
-  async (_evt, payload: { filePath: string; durationSec: number; outW: number; outH: number }) => {
+  async (
+    _evt,
+    payload: {
+      filePath: string;
+      durationSec: number;
+      outW: number;
+      outH: number;
+      sourceVideoMetadata?: unknown;
+    },
+  ) => {
     if (typeof payload !== "object" || payload == null) {
       throw new TypeError(
         "video-export-transcode-mezzanine: payload が空です",
@@ -2065,6 +2155,7 @@ ipcMain.handle(
       durationSec?: unknown;
       outW?: unknown;
       outH?: unknown;
+      sourceVideoMetadata?: unknown;
     };
     if (typeof input.filePath !== "string" || input.filePath.length === 0) {
       throw new TypeError(
@@ -2113,13 +2204,25 @@ ipcMain.handle(
       `film-lab-mezzanine-${randomBytes(8).toString("hex")}.mp4`,
     );
     registerProgressivePreviewTempPath(outputPath);
+    const hdrFilterSelection = hdrFilterSelectionFromSourceVideoMetadataPayload(
+      input.sourceVideoMetadata,
+    );
 
     const runTranscode = (useHw: boolean): Promise<void> =>
       new Promise((resolve, reject) => {
-        const args = buildFfmpegMezzanineArgs(abs, outputPath, useHw, safeOutW, safeOutH);
+        const args = buildFfmpegMezzanineArgs(
+          abs,
+          outputPath,
+          useHw,
+          safeOutW,
+          safeOutH,
+          hdrFilterSelection,
+        );
         if (DEBUG_VIDEO_EXPORT_MAIN) {
           console.log(
-            `[film-lab-desktop][mezzanine] ffmpeg ${useHw ? "HW" : "SW"} argv: ${JSON.stringify(args)}`,
+            `[film-lab-desktop][mezzanine] ffmpeg ${useHw ? "HW" : "SW"}${
+              hdrFilterSelection ? ` hdr=${hdrFilterSelection.chainId}` : ""
+            } argv: ${JSON.stringify(args)}`,
           );
         }
         const child = spawnFfmpegNice(ffmpeg.commandPath, args, {
@@ -2186,23 +2289,27 @@ ipcMain.handle(
         });
       });
 
-    // HW encoder first, SW fallback
+    // HW encoder first, SW fallback. HDR tone-map filters run on the SW path.
     try {
-      try {
-        await runTranscode(true);
-      } catch (hwErr) {
-        if (DEBUG_VIDEO_EXPORT_MAIN) {
-          console.log(
-            `[film-lab-desktop][mezzanine] HW encoder 失敗、SW fallback: ${hwErr instanceof Error ? hwErr.message : String(hwErr)}`,
-          );
-        }
-        // Remove partial output from HW attempt
-        try {
-          await fs.unlink(outputPath);
-        } catch {
-          /* ignore */
-        }
+      if (hdrFilterSelection) {
         await runTranscode(false);
+      } else {
+        try {
+          await runTranscode(true);
+        } catch (hwErr) {
+          if (DEBUG_VIDEO_EXPORT_MAIN) {
+            console.log(
+              `[film-lab-desktop][mezzanine] HW encoder 失敗、SW fallback: ${hwErr instanceof Error ? hwErr.message : String(hwErr)}`,
+            );
+          }
+          // Remove partial output from HW attempt
+          try {
+            await fs.unlink(outputPath);
+          } catch {
+            /* ignore */
+          }
+          await runTranscode(false);
+        }
       }
     } catch (err) {
       unregisterProgressivePreviewTempPath(outputPath);

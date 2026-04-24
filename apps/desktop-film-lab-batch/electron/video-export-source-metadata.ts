@@ -51,8 +51,29 @@ export type HdrPreparationPolicy = {
   filterSelection?: HdrToSdrFilterSelection | null;
 };
 
+export type HdrTonemapEnginePreference =
+  | "auto"
+  | "zscale-tonemap"
+  | "libplacebo";
+
+export type HdrPreparationPolicyOptions = {
+  enableHdrTonemap?: boolean;
+  enginePreference?: HdrTonemapEnginePreference;
+  ffmpegPath?: string | null;
+};
+
+type HdrToSdrFilterSelectionBase = {
+  chainId:
+    | "pq-zscale-hable-npl100"
+    | "hlg-zscale-mobius-npl100"
+    | "pq-libplacebo-bt2390"
+    | "hlg-libplacebo-bt2390";
+  enabledByEnv: true;
+  ffmpegPath: string | null;
+};
+
 export type HdrToSdrFilterSelection =
-  | {
+  | (HdrToSdrFilterSelectionBase & {
       kind: "zscale-tonemap";
       source: "hdr-pq" | "hdr-hlg";
       transferIn: "smpte2084" | "arib-std-b67";
@@ -60,14 +81,14 @@ export type HdrToSdrFilterSelection =
       nominalPeakNits: 100;
       desat: 0;
       output: "bt709-sdr";
-    }
-  | {
+    })
+  | (HdrToSdrFilterSelectionBase & {
       kind: "libplacebo";
       source: "hdr-pq" | "hdr-hlg";
       tonemapping: "bt.2390";
       gamutMode: "perceptual";
       output: "bt709-sdr";
-    };
+    });
 
 /**
  * @description local ffmpeg ビルドが持つ filter のうち、HDR→SDR 変換に関係するものだけを記録する。
@@ -311,6 +332,7 @@ export function classifySourceColorForExport(
 function missingHdrFilterList(capabilities: FFmpegHdrCapabilities): string[] {
   const missing: string[] = [];
   if (!capabilities.hasZscale) missing.push("zscale");
+  if (!capabilities.hasTonemap) missing.push("tonemap");
   if (!capabilities.hasLibplacebo) missing.push("libplacebo");
   return missing;
 }
@@ -319,39 +341,126 @@ function ffmpegCapabilityBlocksHdrPrep(
   capabilities: FFmpegHdrCapabilities | null | undefined,
 ): boolean {
   if (!capabilities) return false;
-  return !capabilities.hasZscale && !capabilities.hasLibplacebo;
+  return (
+    !(capabilities.hasZscale && capabilities.hasTonemap) &&
+    !capabilities.hasLibplacebo
+  );
 }
 
 function selectHdrToSdrFilter(
   colorClass: Extract<SourceColorClass, "hdr-pq" | "hdr-hlg">,
   capabilities: FFmpegHdrCapabilities | null | undefined,
+  options: HdrPreparationPolicyOptions,
 ): HdrToSdrFilterSelection | null {
+  if (options.enableHdrTonemap !== true) {
+    return null;
+  }
   if (!capabilities || ffmpegCapabilityBlocksHdrPrep(capabilities)) {
     return null;
   }
 
-  // Prefer the CPU zscale path when available. The libplacebo filter can be
-  // compiled in but still fail at runtime on machines without a Vulkan device.
-  if (capabilities.hasZscale) {
-    return {
-      kind: "zscale-tonemap",
-      source: colorClass,
-      transferIn: colorClass === "hdr-pq" ? "smpte2084" : "arib-std-b67",
-      tonemap: colorClass === "hdr-pq" ? "hable" : "mobius",
-      nominalPeakNits: 100,
-      desat: 0,
-      output: "bt709-sdr",
-    };
+  const ffmpegPath = options.ffmpegPath ?? null;
+  const enginePreference = options.enginePreference ?? "auto";
+
+  const buildZscaleSelection = (): HdrToSdrFilterSelection => ({
+    kind: "zscale-tonemap",
+    source: colorClass,
+    chainId:
+      colorClass === "hdr-pq"
+        ? "pq-zscale-hable-npl100"
+        : "hlg-zscale-mobius-npl100",
+    enabledByEnv: true,
+    ffmpegPath,
+    transferIn: colorClass === "hdr-pq" ? "smpte2084" : "arib-std-b67",
+    tonemap: colorClass === "hdr-pq" ? "hable" : "mobius",
+    nominalPeakNits: 100,
+    desat: 0,
+    output: "bt709-sdr",
+  });
+
+  const buildLibplaceboSelection = (): HdrToSdrFilterSelection => ({
+    kind: "libplacebo",
+    source: colorClass,
+    chainId:
+      colorClass === "hdr-pq"
+        ? "pq-libplacebo-bt2390"
+        : "hlg-libplacebo-bt2390",
+    enabledByEnv: true,
+    ffmpegPath,
+    tonemapping: "bt.2390",
+    gamutMode: "perceptual",
+    output: "bt709-sdr",
+  });
+
+  if (
+    (enginePreference === "auto" || enginePreference === "zscale-tonemap") &&
+    capabilities.hasZscale &&
+    capabilities.hasTonemap
+  ) {
+    return buildZscaleSelection();
   }
 
-  if (capabilities.hasLibplacebo) {
-    return {
-      kind: "libplacebo",
-      source: colorClass,
-      tonemapping: "bt.2390",
-      gamutMode: "perceptual",
-      output: "bt709-sdr",
-    };
+  if (enginePreference === "libplacebo" && capabilities.hasLibplacebo) {
+    return buildLibplaceboSelection();
+  }
+
+  return null;
+}
+
+export function normalizeHdrToSdrFilterSelection(
+  value: unknown,
+): HdrToSdrFilterSelection | null {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+  const input = value as Record<string, unknown>;
+  const common =
+    (input.source === "hdr-pq" || input.source === "hdr-hlg") &&
+    input.enabledByEnv === true &&
+    (input.ffmpegPath === null || typeof input.ffmpegPath === "string") &&
+    typeof input.chainId === "string" &&
+    input.output === "bt709-sdr";
+  if (!common) {
+    return null;
+  }
+
+  if (input.kind === "zscale-tonemap") {
+    const expected =
+      input.source === "hdr-pq"
+        ? {
+            chainId: "pq-zscale-hable-npl100",
+            transferIn: "smpte2084",
+            tonemap: "hable",
+          }
+        : {
+            chainId: "hlg-zscale-mobius-npl100",
+            transferIn: "arib-std-b67",
+            tonemap: "mobius",
+          };
+    if (
+      input.chainId === expected.chainId &&
+      input.transferIn === expected.transferIn &&
+      input.tonemap === expected.tonemap &&
+      input.nominalPeakNits === 100 &&
+      input.desat === 0
+    ) {
+      return input as HdrToSdrFilterSelection;
+    }
+    return null;
+  }
+
+  if (input.kind === "libplacebo") {
+    const expectedChainId =
+      input.source === "hdr-pq"
+        ? "pq-libplacebo-bt2390"
+        : "hlg-libplacebo-bt2390";
+    if (
+      input.chainId === expectedChainId &&
+      input.tonemapping === "bt.2390" &&
+      input.gamutMode === "perceptual"
+    ) {
+      return input as HdrToSdrFilterSelection;
+    }
   }
 
   return null;
@@ -360,6 +469,7 @@ function selectHdrToSdrFilter(
 export function deriveDesktopHdrPreparationPolicy(
   sourceVideoMetadata: SourceVideoMetadata,
   capabilities?: FFmpegHdrCapabilities | null,
+  options: HdrPreparationPolicyOptions = {},
 ): HdrPreparationPolicy {
   switch (sourceVideoMetadata.colorClass) {
     case "sdr-bt709":
@@ -379,7 +489,11 @@ export function deriveDesktopHdrPreparationPolicy(
         };
       }
       {
-        const filterSelection = selectHdrToSdrFilter("hdr-pq", capabilities);
+        const filterSelection = selectHdrToSdrFilter(
+          "hdr-pq",
+          capabilities,
+          options,
+        );
         return {
           strategy: "prepare-sdr-mezzanine",
           reason: "source-is-hdr-pq",
@@ -398,7 +512,11 @@ export function deriveDesktopHdrPreparationPolicy(
         };
       }
       {
-        const filterSelection = selectHdrToSdrFilter("hdr-hlg", capabilities);
+        const filterSelection = selectHdrToSdrFilter(
+          "hdr-hlg",
+          capabilities,
+          options,
+        );
         return {
           strategy: "prepare-sdr-mezzanine",
           reason: "source-is-hdr-hlg",

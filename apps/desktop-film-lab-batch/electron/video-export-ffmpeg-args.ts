@@ -150,21 +150,33 @@ export function buildCameraOpticsMetadataArgs(opts: {
 
 export function buildHdrToSdrFilterChain(
   selection: HdrToSdrFilterSelection | null | undefined,
+  opts: { scaleWidth?: number } = {},
 ): string | null {
   if (!selection) {
     return null;
   }
 
+  const scaleWidth =
+    typeof opts.scaleWidth === "number" &&
+    Number.isFinite(opts.scaleWidth) &&
+    opts.scaleWidth > 0
+      ? Math.round(opts.scaleWidth)
+      : null;
+  const outputFilters =
+    scaleWidth === null
+      ? ["format=yuv420p"]
+      : [`scale=${scaleWidth}:-2`, "format=yuv420p"];
+
   if (selection.kind === "libplacebo") {
-    return [
+    const filter = [
       "libplacebo=colorspace=bt709",
       "color_primaries=bt709",
       "color_trc=bt709",
       "range=tv",
       `tonemapping=${selection.tonemapping}`,
       `gamut_mode=${selection.gamutMode}`,
-      "format=yuv420p",
     ].join(":");
+    return [filter, ...outputFilters].join(",");
   }
 
   return [
@@ -173,8 +185,23 @@ export function buildHdrToSdrFilterChain(
     "zscale=p=709",
     `tonemap=tonemap=${selection.tonemap}:desat=${selection.desat}`,
     "zscale=t=709:m=709:r=tv",
-    "format=yuv420p",
+    ...outputFilters,
   ].join(",");
+}
+
+export function buildFfmpegMezzanineVideoFilter(opts: {
+  outW: number;
+  hdrFilterSelection?: HdrToSdrFilterSelection | null;
+}): string {
+  const outW =
+    Number.isFinite(opts.outW) && opts.outW > 0 ? Math.round(opts.outW) : 1920;
+  const hdrFilter = buildHdrToSdrFilterChain(opts.hdrFilterSelection, {
+    scaleWidth: outW,
+  });
+  if (hdrFilter) {
+    return hdrFilter;
+  }
+  return `colorspace=iall=bt709:all=bt709,scale=${outW}:-2,format=yuv420p`;
 }
 
 export function buildFfmpegRawvideoExportArgs(

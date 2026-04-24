@@ -337,6 +337,9 @@ describe("export metadata session", () => {
           filterSelection: {
             kind: "libplacebo",
             source: "hdr-pq",
+            chainId: "pq-libplacebo-bt2390",
+            enabledByEnv: true,
+            ffmpegPath: "/tmp/ffmpeg",
             tonemapping: "bt.2390",
             gamutMode: "perceptual",
             output: "bt709-sdr",
@@ -359,6 +362,9 @@ describe("export metadata session", () => {
       filterSelection: {
         kind: "libplacebo",
         source: "hdr-pq",
+        chainId: "pq-libplacebo-bt2390",
+        enabledByEnv: true,
+        ffmpegPath: "/tmp/ffmpeg",
         tonemapping: "bt.2390",
         gamutMode: "perceptual",
         output: "bt709-sdr",

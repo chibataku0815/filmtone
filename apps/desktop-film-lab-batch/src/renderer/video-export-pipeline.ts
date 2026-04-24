@@ -805,6 +805,10 @@ export async function runVideoExportPipeline(options: {
   const sourceColorClass = probe.sourceVideoMetadata?.colorClass ?? null;
   const sourceHdrPreparationPolicy =
     probe.sourceVideoMetadata?.hdrPreparationPolicy ?? null;
+  const hdrFilterSelection = sourceHdrPreparationPolicy?.filterSelection ?? null;
+  const shouldToneMapHdrToSdr =
+    sourceHdrPreparationPolicy?.strategy === "prepare-sdr-mezzanine" &&
+    hdrFilterSelection != null;
   const sourceTimingMetadata = probe.sourceVideoMetadata?.timing;
 
   try {
@@ -873,14 +877,17 @@ export async function runVideoExportPipeline(options: {
   let mezzaninePath: string | null = null;
   /** @description true のとき mezzanine はこのパイプラインが作ったもの → 完了後に削除する */
   let mezzanineOwnedByExport = false;
-  if (
-    needsMezzanineTranscode({
-      videoCodec: probe.videoCodec,
-      fileSizeBytes: probe.fileSizeBytes,
-      absPath: inputVideoPath,
-    })
-  ) {
-    if (typeof precomputedMezzaninePath === "string" && precomputedMezzaninePath.length > 0) {
+  const needsCodecMezzanine = needsMezzanineTranscode({
+    videoCodec: probe.videoCodec,
+    fileSizeBytes: probe.fileSizeBytes,
+    absPath: inputVideoPath,
+  });
+  if (shouldToneMapHdrToSdr || needsCodecMezzanine) {
+    if (
+      !shouldToneMapHdrToSdr &&
+      typeof precomputedMezzaninePath === "string" &&
+      precomputedMezzaninePath.length > 0
+    ) {
       mezzaninePath = precomputedMezzaninePath;
       mezzanineOwnedByExport = false;
       onLog(
@@ -888,7 +895,9 @@ export async function runVideoExportPipeline(options: {
       );
     } else {
       onLog(
-        `[動画][mezzanine] codec=${probe.videoCodec} → H.264 all-I-frame mezzanine を生成します...`,
+        shouldToneMapHdrToSdr
+          ? `[動画][mezzanine] HDR→SDR tone-map ${hdrFilterSelection.kind} (${hdrFilterSelection.chainId}) → H.264 all-I-frame mezzanine を生成します...`
+          : `[動画][mezzanine] codec=${probe.videoCodec} → H.264 all-I-frame mezzanine を生成します...`,
       );
       const unsubscribeMezzanineProgress = onProgress
         ? api.subscribeMezzanineProgress((payload) => {
@@ -906,6 +915,7 @@ export async function runVideoExportPipeline(options: {
           durationSec: probe.durationSec,
           outW,
           outH,
+          sourceVideoMetadata: probe.sourceVideoMetadata,
         });
         const elapsedSec = ((performance.now() - t0) / 1000).toFixed(1);
         mezzaninePath = result.mezzaninePath;
