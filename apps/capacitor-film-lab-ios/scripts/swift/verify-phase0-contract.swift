@@ -57,7 +57,7 @@ struct VerifyPhase0Contract {
             "canonical exposure drift"
         )
         try expect(
-            abs(canonical.grade.params.grainIntensity - 0.12) < 0.0001,
+            abs(canonical.grade.params.grainIntensity - 0.1) < 0.0001,
             "canonical grainIntensity drift"
         )
 

@@ -255,7 +255,7 @@ struct FilmtoneStrengthSheet: View {
                 id: "grain",
                 title: store.strings.advancedGrainLabel,
                 controls: [
-                    control("grainIntensity", range: 0...1),
+                    control("grainIntensity", range: 0...FilmtonePhase0Generated.grainIntensityMax),
                     control("grainSize", range: 0...1),
                     control("grainRadialMix", range: 0...1),
                 ]

@@ -1,4 +1,5 @@
 import { PRESET_VERSION } from "./look-ids";
+import { FILM_GRAIN_INTENSITY_MAX } from "./params";
 import {
   PHASE0_APPROX_SOURCE_LONG_EDGE_MAX,
   PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES,
@@ -35,6 +36,7 @@ export interface FilmtoneIosSwiftPayload {
   defaultQuickState: typeof DEFAULT_QUICK_STATE;
   outputProfile: typeof PHASE0_OUTPUT_PROFILE;
   rgbShiftMax: number;
+  grainIntensityMax: number;
   sourceCaps: {
     durationSec: number;
     longEdge: number;
@@ -74,6 +76,7 @@ export function buildFilmtoneIosSwiftPayload(): FilmtoneIosSwiftPayload {
     defaultQuickState: DEFAULT_QUICK_STATE,
     outputProfile: PHASE0_OUTPUT_PROFILE,
     rgbShiftMax: PHASE0_RGB_SHIFT_MAX,
+    grainIntensityMax: FILM_GRAIN_INTENSITY_MAX,
     sourceCaps: {
       durationSec: PHASE0_MAX_SOURCE_DURATION_SEC,
       longEdge: PHASE0_APPROX_SOURCE_LONG_EDGE_MAX,
@@ -173,6 +176,7 @@ enum FilmtonePhase0Generated {
         preserveAudio: ${payload.outputProfile.preserveAudio ? "true" : "false"}
     )
     static let rgbShiftMax = ${renderSwiftNumber(payload.rgbShiftMax)}
+    static let grainIntensityMax = ${renderSwiftNumber(payload.grainIntensityMax)}
     static let sourceDurationCapSec = ${renderSwiftNumber(payload.sourceCaps.durationSec)}
     static let sourceLongEdgeCap = ${payload.sourceCaps.longEdge}
     static let sourceFileSizeCapBytes = ${payload.sourceCaps.fileSizeBytes}

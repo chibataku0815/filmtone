@@ -17,6 +17,7 @@ import {
   PHASE0_PRESET_DEFAULT,
   PHASE0_PRESET_STRENGTH_DEFAULT,
 } from "./phase0-schema";
+import { FILM_GRAIN_INTENSITY_MAX } from "./params";
 
 describe("phase0 schema", () => {
   test("picks the reduced subset from a full preset", () => {
@@ -78,6 +79,14 @@ describe("phase0 schema", () => {
       vignette: 2,
     });
     expect(result.success).toBe(false);
+  });
+
+  test("caps legacy over-strong reduced grain at the product-safe maximum", () => {
+    const result = phase0ParamsSchema.parse({
+      ...pickPhase0Params(PRESETS.reset),
+      grainIntensity: 0.18,
+    });
+    expect(result.grainIntensity).toBe(FILM_GRAIN_INTENSITY_MAX);
   });
 
   test("rejects out-of-range halationHue slider values", () => {

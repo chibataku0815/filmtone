@@ -2,6 +2,8 @@ export {
   PARAM_KEYS,
   type ParamKey,
   type Params,
+  FILM_GRAIN_INTENSITY_MAX,
+  clampGrainIntensity,
   cloneParams,
 } from "./params";
 export {

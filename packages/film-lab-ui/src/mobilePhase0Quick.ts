@@ -1,4 +1,4 @@
-import type { Params } from "film-lab-core";
+import { clampGrainIntensity, type Params } from "film-lab-core";
 
 export const MOBILE_PHASE0_QUICK_KEYS = [
   "filmLook",
@@ -41,10 +41,8 @@ export function createMobilePhase0QuickPatch(
   const tint = clamp(base.tint + filmLook * 0.04 - era * 0.05, -1, 1);
   const fade = clamp(base.fade + era * 0.12, 0, 1);
   const vignette = clamp(base.vignette + filmLook * 0.16, 0, 1);
-  const grainIntensity = clamp(
-    base.grainIntensity + Math.max(0, filmLook) * 0.08 + Math.abs(era) * 0.03,
-    0,
-    1,
+  const grainIntensity = clampGrainIntensity(
+    base.grainIntensity + Math.max(0, filmLook) * 0.045 + Math.abs(era) * 0.015,
   );
   const exposure = clamp(base.exposure + dynamics * 0.22, -2, 2);
   const contrast = clamp(base.contrast + dynamics * 0.2 - era * 0.03, 0, 2);

@@ -18,6 +18,8 @@
  * raw-depth debug view. See `composite.frag.wgsl.ts` binding(7) uDepth.
  */
 
+import { clampGrainIntensity } from "film-lab-core";
+
 export const COMPOSITE_UNIFORM_FLOATS = 24;
 export const COMPOSITE_UNIFORM_BYTES = COMPOSITE_UNIFORM_FLOATS * 4;
 const ABERRATION_EDGE_SOFTEN_SCALE = 32;
@@ -53,7 +55,7 @@ export function packCompositeUniforms(
   out[4] = n("bloomStrength", 0);
   out[5] = n("halationIntensity", 0);
   out[6] = n("vignette", 0);
-  out[7] = n("grainIntensity", 0);
+  out[7] = clampGrainIntensity(n("grainIntensity", 0));
   out[8] = n("grainSize", 0);
   out[9] = n("grainRadialMix", 1);
   out[10] = state.fitMode;

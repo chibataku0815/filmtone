@@ -913,7 +913,8 @@ final class FilmtoneExportSession {
         params: Phase0ParamsDTO,
         timeSeconds: Double
     ) -> CIImage {
-        guard params.grainIntensity > 0.0001 else {
+        let grainIntensity = max(0, min(FilmtonePhase0Generated.grainIntensityMax, params.grainIntensity))
+        guard grainIntensity > 0.0001 else {
             return image
         }
         guard let kernel = OpticalKernels.grain else {
@@ -922,7 +923,7 @@ final class FilmtoneExportSession {
         let normalizedTime = timeSeconds.isFinite ? max(timeSeconds, 0) : 0
         return kernel.apply(extent: image.extent, arguments: [
             image,
-            params.grainIntensity,
+            grainIntensity,
             params.grainRadialMix,
             params.grainSize,
             normalizedTime,

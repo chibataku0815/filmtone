@@ -588,6 +588,8 @@ enum FilmtonePhase0Math {
             return max(0, min(100, value))
         case "rgbShift":
             return max(0, min(rgbShiftMax, value))
+        case "grainIntensity":
+            return max(0, min(FilmtonePhase0Generated.grainIntensityMax, value))
         case "lensSoftness",
              "grainRadialMix",
              "grainSize",
@@ -604,8 +606,7 @@ enum FilmtonePhase0Math {
              "compressionRange",
              "printContrast",
              "fade",
-             "vignette",
-             "grainIntensity":
+             "vignette":
             return max(0, min(1, value))
         default:
             return value

@@ -7,6 +7,7 @@ import {
   DEFAULT_QUICK_STATE,
 } from "./quick-semantics";
 import { pickPhase0Params } from "./phase0-schema";
+import { FILM_GRAIN_INTENSITY_MAX } from "./params";
 
 describe("quick semantics", () => {
   test("zeroed quick state keeps params unchanged", () => {
@@ -36,6 +37,21 @@ describe("quick semantics", () => {
     expect(next.contrast).toBeGreaterThan(1);
     expect(next.bloomStrength).toBeGreaterThan(0);
     expect(next.halationIntensity).toBeGreaterThan(0);
+  });
+
+  test("quick mapping never exceeds the safe grain maximum", () => {
+    const full = applyQuickStateToParams(PRESETS.bw, {
+      filmCharacter: 1,
+      era: 1,
+      dynamics: 1,
+    });
+    const phase0 = applyQuickStateToPhase0Params(pickPhase0Params(PRESETS.bw), {
+      filmCharacter: 1,
+      era: 1,
+      dynamics: 1,
+    });
+    expect(full.grainIntensity).toBe(FILM_GRAIN_INTENSITY_MAX);
+    expect(phase0.grainIntensity).toBe(FILM_GRAIN_INTENSITY_MAX);
   });
 
   test("coerceQuickState clamps out-of-range values", () => {

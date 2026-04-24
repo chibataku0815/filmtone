@@ -2,11 +2,37 @@ import { describe, expect, test } from "bun:test";
 import { filmLabParamsSchema, filmLookGradeInputSchema } from "./schema";
 import { PRESETS } from "./presets";
 import { LOOK_ID_BY_PRESET, PRESET_VERSION } from "./look-ids";
+import { FILM_GRAIN_INTENSITY_MAX } from "./params";
 
 describe("filmLabParamsSchema", () => {
   test("accepts cinematic preset", () => {
     const r = filmLabParamsSchema.safeParse(PRESETS.cinematic);
     expect(r.success).toBe(true);
+  });
+
+  test("caps legacy over-strong grain at the product-safe maximum", () => {
+    const r = filmLabParamsSchema.safeParse({
+      ...PRESETS.cinematic,
+      grainIntensity: 0.18,
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.grainIntensity).toBe(FILM_GRAIN_INTENSITY_MAX);
+    }
+  });
+
+  test("rejects negative grain intensity", () => {
+    const r = filmLabParamsSchema.safeParse({
+      ...PRESETS.cinematic,
+      grainIntensity: -0.01,
+    });
+    expect(r.success).toBe(false);
+  });
+
+  test("all built-in presets stay within the product-safe grain maximum", () => {
+    for (const preset of Object.values(PRESETS)) {
+      expect(preset.grainIntensity).toBeLessThanOrEqual(FILM_GRAIN_INTENSITY_MAX);
+    }
   });
 
   test("rejects missing key", () => {

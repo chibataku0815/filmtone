@@ -14,6 +14,7 @@
 import * as THREE from "three";
 import {
   chromaUnitFromHueDegrees,
+  clampGrainIntensity,
   FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
   FILM_LAB_DEFAULT_SHADOW_HUE,
   LEGACY_HIGHLIGHT_TONE_MAGNITUDE,
@@ -1891,7 +1892,7 @@ export class WebGLBackend implements RenderBackend {
   }
 
   setGrainIntensity(value: number): void {
-    this.material.uniforms.uGrainIntensity!.value = value;
+    this.material.uniforms.uGrainIntensity!.value = clampGrainIntensity(value);
   }
 
   /**

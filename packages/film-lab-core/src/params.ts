@@ -124,6 +124,15 @@ export const PARAM_KEYS = [
 
 export type ParamKey = (typeof PARAM_KEYS)[number];
 
+export const FILM_GRAIN_INTENSITY_MAX = 0.1;
+
+export function clampGrainIntensity(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.min(FILM_GRAIN_INTENSITY_MAX, Math.max(0, value));
+}
+
 export interface Params {
   exposure: number;
   contrast: number;

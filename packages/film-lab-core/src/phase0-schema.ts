@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Params } from "./params";
+import { clampGrainIntensity } from "./params";
 import { PHASE0_RGB_SHIFT_MAX } from "./phase0-constants";
 import {
   PRESETS,
@@ -110,7 +111,7 @@ export const phase0ParamsSchema = z.object({
   yellow: z.number().min(-1).max(1).default(PRESETS.reset.yellow),
   fade: z.number().min(0).max(1).default(PRESETS.reset.fade),
   vignette: z.number().min(0).max(1).default(PRESETS.reset.vignette),
-  grainIntensity: z.number().min(0).max(1).default(PRESETS.reset.grainIntensity),
+  grainIntensity: z.number().min(0).transform(clampGrainIntensity).default(PRESETS.reset.grainIntensity),
 });
 
 const phase0ParamsPatchSchema = z.object({
@@ -142,7 +143,7 @@ const phase0ParamsPatchSchema = z.object({
   yellow: z.number().min(-1).max(1).optional(),
   fade: z.number().min(0).max(1).optional(),
   vignette: z.number().min(0).max(1).optional(),
-  grainIntensity: z.number().min(0).max(1).optional(),
+  grainIntensity: z.number().min(0).transform(clampGrainIntensity).optional(),
 });
 
 export const phase0QuickStateSchema = z.object(

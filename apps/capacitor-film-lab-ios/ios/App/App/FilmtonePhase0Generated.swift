@@ -23,6 +23,7 @@ enum FilmtonePhase0Generated {
         preserveAudio: true
     )
     static let rgbShiftMax = 0.005
+    static let grainIntensityMax = 0.1
     static let sourceDurationCapSec = 300.0
     static let sourceLongEdgeCap = 3840
     static let sourceFileSizeCapBytes = 8589934592
@@ -119,7 +120,7 @@ enum FilmtonePhase0Generated {
             yellow: 0.0,
             fade: 0.025,
             vignette: 0.32,
-            grainIntensity: 0.09
+            grainIntensity: 0.05
         ),
         "portra": .init(
             exposure: 0.2,
@@ -150,7 +151,7 @@ enum FilmtonePhase0Generated {
             yellow: 0.06,
             fade: 0.05,
             vignette: 0.2,
-            grainIntensity: 0.12
+            grainIntensity: 0.07
         ),
         "gold200": .init(
             exposure: 0.15,
@@ -181,7 +182,7 @@ enum FilmtonePhase0Generated {
             yellow: 0.07,
             fade: 0.03,
             vignette: 0.27,
-            grainIntensity: 0.12
+            grainIntensity: 0.07
         ),
         "pro400h": .init(
             exposure: 0.31,
@@ -212,7 +213,7 @@ enum FilmtonePhase0Generated {
             yellow: -0.03,
             fade: 0.11,
             vignette: 0.1,
-            grainIntensity: 0.06
+            grainIntensity: 0.035
         ),
         "bw": .init(
             exposure: 0.1,
@@ -243,7 +244,7 @@ enum FilmtonePhase0Generated {
             yellow: 0.0,
             fade: 0.0,
             vignette: 0.56,
-            grainIntensity: 0.16
+            grainIntensity: 0.09
         ),
         "ektar100": .init(
             exposure: 0.03,
@@ -274,7 +275,7 @@ enum FilmtonePhase0Generated {
             yellow: 0.0,
             fade: 0.0,
             vignette: 0.18,
-            grainIntensity: 0.035
+            grainIntensity: 0.02
         ),
         "superia400": .init(
             exposure: 0.13,
@@ -305,7 +306,7 @@ enum FilmtonePhase0Generated {
             yellow: -0.02,
             fade: 0.07,
             vignette: 0.2,
-            grainIntensity: 0.13
+            grainIntensity: 0.07
         ),
         "cinestill800t": .init(
             exposure: 0.11,
@@ -336,7 +337,7 @@ enum FilmtonePhase0Generated {
             yellow: -0.03,
             fade: 0.03,
             vignette: 0.3,
-            grainIntensity: 0.15
+            grainIntensity: 0.085
         ),
         "velvia50": .init(
             exposure: 0.0,
@@ -367,7 +368,7 @@ enum FilmtonePhase0Generated {
             yellow: 0.0,
             fade: 0.0,
             vignette: 0.12,
-            grainIntensity: 0.01
+            grainIntensity: 0.005
         )
     ]
     static let quickWeights: [String: [String: Double]] = [
@@ -375,7 +376,7 @@ enum FilmtonePhase0Generated {
             "saturation": 0.24,
             "temperature": 0.16,
             "tint": -0.06,
-            "grainIntensity": 0.22,
+            "grainIntensity": 0.1,
             "vignette": 0.12
         ],
         "era": [

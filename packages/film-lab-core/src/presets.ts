@@ -66,8 +66,7 @@ function withContractDefaults<T extends Record<string, BasePresetParams>>(
 /**
  * 組み込みプリセット（Next Film Lab と同一数値）
  *
- * grainIntensity は composite で径方向マスク（中心弱・周辺強）が掛かるため、
- * グレインを使うプリセットのみ体感が薄くならないようわずかに上げている（2026-03-30）。
+ * grainIntensity は 0.10 を安全上限とし、0.10 超えの旧値は schema/runtime で丸める。
  * grainRadialMix は Pro で 0〜1 調整可。プリセット既定は 1（周辺比重オン）。
  * grainSize は 2026-04-22 low-end uplift 以降、低域で actual fine grain が見える前提で調整する。
  */
@@ -140,7 +139,7 @@ const RAW_PRESETS = {
     tint: 0,
     rgbShift: 0.002,
     lensSoftness: 0,
-    grainIntensity: 0.09,
+    grainIntensity: 0.05,
     grainRadialMix: 1,
     grainSize: 0.32,
     vignette: 0.32,
@@ -196,7 +195,7 @@ const RAW_PRESETS = {
     tint: 0,
     rgbShift: 0,
     lensSoftness: 0,
-    grainIntensity: 0.14,
+    grainIntensity: 0.08,
     grainRadialMix: 1,
     grainSize: 0.32,
     vignette: 0.2,
@@ -252,7 +251,7 @@ const RAW_PRESETS = {
     tint: 0,
     rgbShift: 0.0012,
     lensSoftness: 0,
-    grainIntensity: 0.12,
+    grainIntensity: 0.07,
     grainRadialMix: 1,
     grainSize: 0.28,
     vignette: 0.25,
@@ -308,7 +307,7 @@ const RAW_PRESETS = {
     tint: 0,
     rgbShift: 0,
     lensSoftness: 0,
-    grainIntensity: 0.075,
+    grainIntensity: 0.04,
     grainRadialMix: 1,
     grainSize: 0.25,
     vignette: 0.15,
@@ -364,7 +363,7 @@ const RAW_PRESETS = {
     tint: 0,
     rgbShift: 0,
     lensSoftness: 0,
-    grainIntensity: 0.18,
+    grainIntensity: 0.1,
     grainRadialMix: 1,
     grainSize: 0.43,
     vignette: 0.5,
@@ -420,7 +419,7 @@ const RAW_PRESETS = {
     tint: 0,
     rgbShift: 0,
     lensSoftness: 0,
-    grainIntensity: 0.05,
+    grainIntensity: 0.03,
     grainRadialMix: 1,
     grainSize: 0.12,
     vignette: 0.15,
@@ -476,7 +475,7 @@ const RAW_PRESETS = {
     tint: 0,
     rgbShift: 0,
     lensSoftness: 0,
-    grainIntensity: 0.115,
+    grainIntensity: 0.065,
     grainRadialMix: 1,
     grainSize: 0.40,
     vignette: 0.2,
@@ -532,7 +531,7 @@ const RAW_PRESETS = {
     tint: 0,
     rgbShift: 0.00115,
     lensSoftness: 0,
-    grainIntensity: 0.14,
+    grainIntensity: 0.08,
     grainRadialMix: 1,
     grainSize: 0.58,
     vignette: 0.3,
@@ -593,7 +592,7 @@ const RAW_PRESETS = {
     tint: 0,
     rgbShift: 0,
     lensSoftness: 0,
-    grainIntensity: 0.02,
+    grainIntensity: 0.01,
     grainRadialMix: 1,
     grainSize: 0.08,
     vignette: 0.1,

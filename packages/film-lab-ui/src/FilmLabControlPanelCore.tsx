@@ -1229,7 +1229,7 @@ export const FilmLabControlPanelCore = forwardRef<
                       label={tFilmLab("controls.filmGrain")}
                       value={params.grainIntensity}
                       min={0}
-                      max={0.5}
+                      max={0.1}
                       step={0.01}
                       defaultValue={0}
                       onChange={(v) => updateParam("grainIntensity", v)}

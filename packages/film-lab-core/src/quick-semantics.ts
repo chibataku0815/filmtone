@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Params } from "./params";
+import { clampGrainIntensity } from "./params";
 import { PHASE0_RGB_SHIFT_MAX } from "./phase0-constants";
 
 export const QUICK_AXIS_IDS = [
@@ -87,7 +88,7 @@ export const QUICK_FULL_AXIS_WEIGHTS: Record<QuickAxisId, QuickFullPatch> = {
     saturation: 0.24,
     temperature: 0.16,
     tint: -0.06,
-    grainIntensity: 0.22,
+    grainIntensity: 0.1,
     vignette: 0.12,
   },
   era: {
@@ -111,7 +112,7 @@ export const QUICK_PHASE0_AXIS_WEIGHTS: Record<QuickAxisId, QuickPhase0Patch> = 
     saturation: 0.24,
     temperature: 0.16,
     tint: -0.06,
-    grainIntensity: 0.22,
+    grainIntensity: 0.1,
     vignette: 0.12,
   },
   era: {
@@ -150,6 +151,7 @@ function clampParamValue(key: string, value: number): number {
     case "rgbShift":
       return Math.max(0, Math.min(PHASE0_RGB_SHIFT_MAX, value));
     case "grainIntensity":
+      return clampGrainIntensity(value);
     case "vignette":
     case "fade":
     case "lensSoftness":

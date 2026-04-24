@@ -66,7 +66,7 @@
       "yellow": 0.03,
       "fade": 0.04,
       "vignette": 0.15,
-      "grainIntensity": 0.12
+      "grainIntensity": 0.1
     }
   },
   "lut": null,

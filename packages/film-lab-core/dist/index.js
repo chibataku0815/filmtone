@@ -119,6 +119,13 @@ var PARAM_KEYS = [
   /** Cross filter streak strength field modulation（0=uniform、1=max edge strength boost）。 */
   "crossFilterEdgeStrengthGain"
 ];
+var FILM_GRAIN_INTENSITY_MAX = 0.1;
+function clampGrainIntensity(value) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.min(FILM_GRAIN_INTENSITY_MAX, Math.max(0, value));
+}
 function cloneParams(params) {
   return { ...params };
 }
@@ -294,7 +301,7 @@ var RAW_PRESETS = {
     tint: 0,
     rgbShift: 2e-3,
     lensSoftness: 0,
-    grainIntensity: 0.09,
+    grainIntensity: 0.05,
     grainRadialMix: 1,
     grainSize: 0.32,
     vignette: 0.32,
@@ -350,7 +357,7 @@ var RAW_PRESETS = {
     tint: 0,
     rgbShift: 0,
     lensSoftness: 0,
-    grainIntensity: 0.14,
+    grainIntensity: 0.08,
     grainRadialMix: 1,
     grainSize: 0.32,
     vignette: 0.2,
@@ -406,7 +413,7 @@ var RAW_PRESETS = {
     tint: 0,
     rgbShift: 12e-4,
     lensSoftness: 0,
-    grainIntensity: 0.12,
+    grainIntensity: 0.07,
     grainRadialMix: 1,
     grainSize: 0.28,
     vignette: 0.25,
@@ -462,7 +469,7 @@ var RAW_PRESETS = {
     tint: 0,
     rgbShift: 0,
     lensSoftness: 0,
-    grainIntensity: 0.075,
+    grainIntensity: 0.04,
     grainRadialMix: 1,
     grainSize: 0.25,
     vignette: 0.15,
@@ -518,7 +525,7 @@ var RAW_PRESETS = {
     tint: 0,
     rgbShift: 0,
     lensSoftness: 0,
-    grainIntensity: 0.18,
+    grainIntensity: 0.1,
     grainRadialMix: 1,
     grainSize: 0.43,
     vignette: 0.5,
@@ -574,7 +581,7 @@ var RAW_PRESETS = {
     tint: 0,
     rgbShift: 0,
     lensSoftness: 0,
-    grainIntensity: 0.05,
+    grainIntensity: 0.03,
     grainRadialMix: 1,
     grainSize: 0.12,
     vignette: 0.15,
@@ -630,7 +637,7 @@ var RAW_PRESETS = {
     tint: 0,
     rgbShift: 0,
     lensSoftness: 0,
-    grainIntensity: 0.115,
+    grainIntensity: 0.065,
     grainRadialMix: 1,
     grainSize: 0.4,
     vignette: 0.2,
@@ -686,7 +693,7 @@ var RAW_PRESETS = {
     tint: 0,
     rgbShift: 115e-5,
     lensSoftness: 0,
-    grainIntensity: 0.14,
+    grainIntensity: 0.08,
     grainRadialMix: 1,
     grainSize: 0.58,
     vignette: 0.3,
@@ -747,7 +754,7 @@ var RAW_PRESETS = {
     tint: 0,
     rgbShift: 0,
     lensSoftness: 0,
-    grainIntensity: 0.02,
+    grainIntensity: 0.01,
     grainRadialMix: 1,
     grainSize: 0.08,
     vignette: 0.1,
@@ -856,7 +863,7 @@ var LOOK_ID_BY_PRESET = {
 // src/schema.ts
 import { z } from "zod";
 function schemaForParamKey(key) {
-  return key === "grainRadialMix" ? z.number().min(0).max(1).default(1) : key === "grainSize" ? z.number().min(0).max(1).default(0.3) : key === "diffusion" ? z.number().min(0).max(1).default(0) : key === "depthMistGain" || key === "depthGlowGain" ? z.number().min(0).max(1).default(0) : key === "depthRayAngleGamma" ? z.number().min(0.1).max(4).default(1.4) : key === "depthRayAngleInnerThreshold" ? z.number().min(0).max(0.8).default(0.1) : key === "depthMistRayAngleGain" ? z.number().min(0).max(1).default(0.35) : key === "depthBloomRayAngleGain" ? z.number().min(0).max(1).default(0.25) : key === "depthHalationRayAngleGain" ? z.number().min(0).max(1).default(0.18) : key === "depthMistFieldPsfGain" || key === "depthBloomFieldPsfGain" || key === "depthHalationFieldPsfGain" ? z.number().min(0).max(1).default(1) : key === "depthMistFieldPsfRadiusPx" ? z.number().min(0).max(64).default(18) : key === "depthBloomFieldPsfRadiusPx" ? z.number().min(0).max(64).default(9) : key === "depthHalationFieldPsfRadiusPx" ? z.number().min(0).max(64).default(12) : key === "lensSoftness" ? z.number().min(0).max(1).default(0) : key === "compressionRange" ? z.number().min(0).max(1).default(0.5) : key === "compressionAmount" || key === "printContrast" ? z.number().min(0).max(1).default(0) : key === "cyan" || key === "magenta" || key === "yellow" ? z.number().min(-1).max(1).default(0) : key === "shutterAngle" ? z.number().min(0).max(720).default(0) : key === "trailIntensity" ? z.number().min(0).max(0.95).default(0) : key === "motionBlurAmount" || key === "dustAmount" || key === "scratchAmount" ? z.number().min(0).max(1).default(0) : key === "shaftIntensity" ? z.number().min(0).max(1).default(0) : key === "shaftDecay" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginX" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginY" ? z.number().min(0).max(1).default(0.15) : key === "crossFilterStrength" ? z.number().min(0).max(1).default(0) : key === "crossFilterSpikes" ? z.number().min(4).max(8).default(4) : key === "crossFilterAngle" ? z.number().min(0).max(360).default(0) : key === "crossFilterLength" ? z.number().min(0).max(1).default(0.4) : key === "crossFilterThreshold" ? z.number().min(0).max(1).default(0.92) : key === "crossFilterChromatic" ? z.number().min(0).max(1).default(0.3) : key === "crossFilterSizeLimit" ? z.number().min(0).max(1).default(0) : key === "crossFilterRandomness" ? z.number().min(0).max(1).default(1) : key === "crossFilterHardMode" ? z.number().min(0).max(1).default(1) : key === "crossFilterMinSpacing" ? z.number().min(0).max(2).default(1) : key === "crossFilterDepthGain" ? z.number().min(0).max(1).default(0.25) : key === "crossFilterAngleGain" ? z.number().min(0).max(1).default(0.35) : key === "crossFilterAngleGamma" ? z.number().min(0.1).max(4).default(1.4) : key === "crossFilterAngleInnerThreshold" ? z.number().min(0).max(0.8).default(0.1) : key === "crossFilterEdgeLengthGain" ? z.number().min(0).max(1).default(0.45) : key === "crossFilterEdgeStrengthGain" ? z.number().min(0).max(1).default(0.25) : z.number();
+  return key === "grainIntensity" ? z.number().min(0).transform(clampGrainIntensity) : key === "grainRadialMix" ? z.number().min(0).max(1).default(1) : key === "grainSize" ? z.number().min(0).max(1).default(0.3) : key === "diffusion" ? z.number().min(0).max(1).default(0) : key === "depthMistGain" || key === "depthGlowGain" ? z.number().min(0).max(1).default(0) : key === "depthRayAngleGamma" ? z.number().min(0.1).max(4).default(1.4) : key === "depthRayAngleInnerThreshold" ? z.number().min(0).max(0.8).default(0.1) : key === "depthMistRayAngleGain" ? z.number().min(0).max(1).default(0.35) : key === "depthBloomRayAngleGain" ? z.number().min(0).max(1).default(0.25) : key === "depthHalationRayAngleGain" ? z.number().min(0).max(1).default(0.18) : key === "depthMistFieldPsfGain" || key === "depthBloomFieldPsfGain" || key === "depthHalationFieldPsfGain" ? z.number().min(0).max(1).default(1) : key === "depthMistFieldPsfRadiusPx" ? z.number().min(0).max(64).default(18) : key === "depthBloomFieldPsfRadiusPx" ? z.number().min(0).max(64).default(9) : key === "depthHalationFieldPsfRadiusPx" ? z.number().min(0).max(64).default(12) : key === "lensSoftness" ? z.number().min(0).max(1).default(0) : key === "compressionRange" ? z.number().min(0).max(1).default(0.5) : key === "compressionAmount" || key === "printContrast" ? z.number().min(0).max(1).default(0) : key === "cyan" || key === "magenta" || key === "yellow" ? z.number().min(-1).max(1).default(0) : key === "shutterAngle" ? z.number().min(0).max(720).default(0) : key === "trailIntensity" ? z.number().min(0).max(0.95).default(0) : key === "motionBlurAmount" || key === "dustAmount" || key === "scratchAmount" ? z.number().min(0).max(1).default(0) : key === "shaftIntensity" ? z.number().min(0).max(1).default(0) : key === "shaftDecay" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginX" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginY" ? z.number().min(0).max(1).default(0.15) : key === "crossFilterStrength" ? z.number().min(0).max(1).default(0) : key === "crossFilterSpikes" ? z.number().min(4).max(8).default(4) : key === "crossFilterAngle" ? z.number().min(0).max(360).default(0) : key === "crossFilterLength" ? z.number().min(0).max(1).default(0.4) : key === "crossFilterThreshold" ? z.number().min(0).max(1).default(0.92) : key === "crossFilterChromatic" ? z.number().min(0).max(1).default(0.3) : key === "crossFilterSizeLimit" ? z.number().min(0).max(1).default(0) : key === "crossFilterRandomness" ? z.number().min(0).max(1).default(1) : key === "crossFilterHardMode" ? z.number().min(0).max(1).default(1) : key === "crossFilterMinSpacing" ? z.number().min(0).max(2).default(1) : key === "crossFilterDepthGain" ? z.number().min(0).max(1).default(0.25) : key === "crossFilterAngleGain" ? z.number().min(0).max(1).default(0.35) : key === "crossFilterAngleGamma" ? z.number().min(0.1).max(4).default(1.4) : key === "crossFilterAngleInnerThreshold" ? z.number().min(0).max(0.8).default(0.1) : key === "crossFilterEdgeLengthGain" ? z.number().min(0).max(1).default(0.45) : key === "crossFilterEdgeStrengthGain" ? z.number().min(0).max(1).default(0.25) : z.number();
 }
 var paramShape = Object.fromEntries(
   PARAM_KEYS.map((key) => [key, schemaForParamKey(key)])
@@ -1049,7 +1056,7 @@ var QUICK_FULL_AXIS_WEIGHTS = {
     saturation: 0.24,
     temperature: 0.16,
     tint: -0.06,
-    grainIntensity: 0.22,
+    grainIntensity: 0.1,
     vignette: 0.12
   },
   era: {
@@ -1072,7 +1079,7 @@ var QUICK_PHASE0_AXIS_WEIGHTS = {
     saturation: 0.24,
     temperature: 0.16,
     tint: -0.06,
-    grainIntensity: 0.22,
+    grainIntensity: 0.1,
     vignette: 0.12
   },
   era: {
@@ -1109,6 +1116,7 @@ function clampParamValue(key, value) {
     case "rgbShift":
       return Math.max(0, Math.min(PHASE0_RGB_SHIFT_MAX, value));
     case "grainIntensity":
+      return clampGrainIntensity(value);
     case "vignette":
     case "fade":
     case "lensSoftness":
@@ -1249,7 +1257,7 @@ var phase0ParamsSchema = z3.object({
   yellow: z3.number().min(-1).max(1).default(PRESETS.reset.yellow),
   fade: z3.number().min(0).max(1).default(PRESETS.reset.fade),
   vignette: z3.number().min(0).max(1).default(PRESETS.reset.vignette),
-  grainIntensity: z3.number().min(0).max(1).default(PRESETS.reset.grainIntensity)
+  grainIntensity: z3.number().min(0).transform(clampGrainIntensity).default(PRESETS.reset.grainIntensity)
 });
 var phase0ParamsPatchSchema = z3.object({
   exposure: z3.number().min(-2).max(2).optional(),
@@ -1280,7 +1288,7 @@ var phase0ParamsPatchSchema = z3.object({
   yellow: z3.number().min(-1).max(1).optional(),
   fade: z3.number().min(0).max(1).optional(),
   vignette: z3.number().min(0).max(1).optional(),
-  grainIntensity: z3.number().min(0).max(1).optional()
+  grainIntensity: z3.number().min(0).transform(clampGrainIntensity).optional()
 });
 var phase0QuickStateSchema = z3.object(
   {
@@ -2035,6 +2043,7 @@ export {
   DEFAULT_QUICK_STATE,
   FILMTONE_DEFAULT_BASE_PRESET,
   FILMTONE_SOFT_FINISH_PATCH,
+  FILM_GRAIN_INTENSITY_MAX,
   FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
   FILM_LAB_DEFAULT_SHADOW_HUE,
   IOS_PHASE0_BENCHMARK_SLOTS,
@@ -2075,6 +2084,7 @@ export {
   buildPhase0ExportRequest,
   cameraOpticsSchema,
   chromaUnitFromHueDegrees,
+  clampGrainIntensity,
   cloneParams,
   coerceQuickState,
   createDefaultFilmLookGradeProps,

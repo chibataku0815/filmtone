@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { PARAM_KEYS, type ParamKey, type Params } from "./params";
+import {
+  PARAM_KEYS,
+  clampGrainIntensity,
+  type ParamKey,
+  type Params,
+} from "./params";
 import { PRESETS, type PresetName } from "./presets";
 import { PRESET_VERSION } from "./look-ids";
 import type { CameraOptics } from "./native-bridge";
@@ -9,7 +14,9 @@ type ParamSchemaShape = {
 };
 
 function schemaForParamKey(key: ParamKey): z.ZodType<number> {
-  return key === "grainRadialMix"
+  return key === "grainIntensity"
+    ? z.number().min(0).transform(clampGrainIntensity)
+    : key === "grainRadialMix"
     ? z.number().min(0).max(1).default(1)
     : key === "grainSize"
       ? z.number().min(0).max(1).default(0.3)
