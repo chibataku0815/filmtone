@@ -267,9 +267,13 @@ export function useProgressiveLoad(): UseProgressiveLoadReturn {
    * thumbnail は短命なので abort IPC を作らず、proxy / mezzanine のみ止めます。
    */
   const abortBackgroundStages = useCallback(async (): Promise<void> => {
+    const api = window.filmLabBatch;
+    if (!api?.videoPreviewAbortProxy || !api?.videoExportAbortMezzanine) {
+      return;
+    }
     await Promise.all([
-      window.filmLabBatch.videoPreviewAbortProxy().catch(() => {}),
-      window.filmLabBatch.videoExportAbortMezzanine().catch(() => {}),
+      api.videoPreviewAbortProxy().catch(() => {}),
+      api.videoExportAbortMezzanine().catch(() => {}),
     ]);
   }, []);
 

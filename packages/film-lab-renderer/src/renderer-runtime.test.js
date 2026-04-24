@@ -6,8 +6,8 @@ const WEBGPU_CAPABILITIES = Object.freeze({
   backendKind: "webgpu",
   supportsCompare: false,
   supportsHistogram: false,
-  supportsBeforeAfter: false,
-  supportsABCompare: false,
+  supportsBeforeAfter: true,
+  supportsABCompare: true,
   supportsLiveVideoTexture: true,
   maxTextureDimension2D: 16384,
 });
