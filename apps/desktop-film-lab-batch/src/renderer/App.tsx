@@ -2899,6 +2899,9 @@ export default function App() {
                           videoInputPath={videoInputPath}
                           videoProbeLabel={videoProbeLabel}
                           videoHdrPolicy={videoHdrPolicy}
+                          onOpenHdrFixtureDoc={() => {
+                            void window.filmLabBatch.openHdrFixtureDoc();
+                          }}
                           videoCanExport={videoCanExport}
                           onPickVideoFile={pickVideoFile}
                           onRunVideoExport={runVideoExport}
@@ -2956,6 +2959,9 @@ export default function App() {
                           videoInputPath={videoInputPath}
                           videoProbeLabel={videoProbeLabel}
                           videoHdrPolicy={videoHdrPolicy}
+                          onOpenHdrFixtureDoc={() => {
+                            void window.filmLabBatch.openHdrFixtureDoc();
+                          }}
                           videoCanExport={videoCanExport}
                           onPickVideoFile={pickVideoFile}
                           onRunVideoExport={runVideoExport}

@@ -27,7 +27,7 @@
  * a broken dev environment does not silently pass this gate.
  */
 import { execFile } from "node:child_process";
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, statSync, type Dirent } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -131,9 +131,12 @@ function discoverFixtureCases(root: string): FixtureCase[] {
   const stack: string[] = [root];
   while (stack.length > 0) {
     const current = stack.pop() as string;
-    let entries: ReturnType<typeof readdirSync>;
+    let entries: Dirent<string>[];
     try {
-      entries = readdirSync(current, { withFileTypes: true });
+      entries = readdirSync(current, {
+        withFileTypes: true,
+        encoding: "utf8",
+      });
     } catch {
       continue;
     }

@@ -286,6 +286,8 @@ export type FilmLabBatchBridge = {
   dismissDesktopUpdate: (latestVersion: string) => Promise<void>;
   /** @description ダウンロードページなどを既定ブラウザで開く */
   openExternalUrl: (url: string) => Promise<void>;
+  /** @description HDR fixture inventory document を既定アプリで開く */
+  openHdrFixtureDoc: () => Promise<void>;
   /** @description 新しい版の通知を購読。戻り値で解除 */
   subscribeDesktopUpdateAvailable: (
     callback: (payload: DesktopUpdateAvailablePayload) => void,

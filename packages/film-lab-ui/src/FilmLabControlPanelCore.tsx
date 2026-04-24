@@ -755,8 +755,9 @@ export const FilmLabControlPanelCore = forwardRef<
 
       if (e.repeat) return;
 
-      if (presetKeys[e.key]) {
-        applyPreset(presetKeys[e.key]);
+      const presetShortcutKey = e.code.match(/^Numpad([0-8])$/)?.[1] ?? e.key;
+      if (presetKeys[presetShortcutKey]) {
+        applyPreset(presetKeys[presetShortcutKey]);
         return;
       }
       if ((e.key === "h" || e.key === "H") && canToggleHistogram) {

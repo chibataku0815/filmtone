@@ -88,6 +88,12 @@
       "dist/renderer/**/*",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "docs/metadata-driven-export-quality-hdr-fixture-inventory-2026-04-24.md",
+        "to": "docs/metadata-driven-export-quality-hdr-fixture-inventory-2026-04-24.md"
+      }
+    ],
     "asar": true,
     "afterSign": "scripts/notarize.mjs",
     "mac": {

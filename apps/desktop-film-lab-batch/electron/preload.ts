@@ -316,6 +316,8 @@ contextBridge.exposeInMainWorld("filmLabBatch", {
    */
   openExternalUrl: (url: string): Promise<void> =>
     ipcRenderer.invoke("desktop-update-open-external", url),
+  openHdrFixtureDoc: (): Promise<void> =>
+    ipcRenderer.invoke("open-hdr-fixture-doc"),
 
   /**
    * @description main から更新通知を受け取る。戻り値で購読解除

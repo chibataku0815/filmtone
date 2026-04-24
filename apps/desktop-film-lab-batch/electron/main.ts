@@ -173,6 +173,20 @@ const SKIP_MEZZANINE =
  * @description mezzanine 進捗を送る IPC のチャンネル名。
  */
 const MEZZANINE_PROGRESS_CHANNEL = "film-lab-video-export-mezzanine-progress";
+const HDR_FIXTURE_INVENTORY_DOC_RELATIVE_PATH = path.join(
+  "docs",
+  "metadata-driven-export-quality-hdr-fixture-inventory-2026-04-24.md",
+);
+
+function resolveHdrFixtureInventoryDocPath(): string {
+  if (app.isPackaged) {
+    return path.join(
+      process.resourcesPath,
+      HDR_FIXTURE_INVENTORY_DOC_RELATIVE_PATH,
+    );
+  }
+  return path.resolve(__dirname, "..", HDR_FIXTURE_INVENTORY_DOC_RELATIVE_PATH);
+}
 
 /**
  * @description proxy 進捗を送る IPC のチャンネル名。
@@ -1200,6 +1214,19 @@ ipcMain.handle("desktop-update-open-external", async (_evt, url: unknown) => {
     throw new Error(
       `desktop-update-open-external: shell.openExternal 失敗 url=${url} detail=${msg}`,
     );
+  }
+});
+
+ipcMain.handle("open-hdr-fixture-doc", async () => {
+  const docPath = resolveHdrFixtureInventoryDocPath();
+  if (!existsSync(docPath)) {
+    throw new Error(
+      `open-hdr-fixture-doc: doc not found path=${docPath}`,
+    );
+  }
+  const errorMessage = await shell.openPath(docPath);
+  if (errorMessage.length > 0) {
+    throw new Error(`open-hdr-fixture-doc: ${errorMessage}`);
   }
 });
 

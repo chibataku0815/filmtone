@@ -8,6 +8,9 @@ export default defineConfig({
   reporter: [['list']],
   use: {
     headless: true,
+    launchOptions: {
+      args: ["--enable-unsafe-webgpu", "--use-angle=metal"],
+    },
     viewport: { width: 1400, height: 900 },
   },
 });
