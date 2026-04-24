@@ -36,6 +36,18 @@ export type SourceColorClass =
   | "wide-gamut-unknown"
   | "unknown";
 
+export type HdrPreparationPolicy = {
+  strategy: "none" | "prepare-sdr-mezzanine" | "defer-unknown";
+  reason:
+    | "source-is-sdr-bt709"
+    | "source-is-hdr-pq"
+    | "source-is-hdr-hlg"
+    | "wide-gamut-transfer-unknown"
+    | "source-color-unknown";
+  requiresFixtureValidation: boolean;
+  warning: string | null;
+};
+
 export type SourceVideoTimingMetadata = {
   avgFrameRate: string | null;
   rFrameRate: string | null;
@@ -258,4 +270,50 @@ export function classifySourceColorForExport(
   }
 
   return "unknown";
+}
+
+export function deriveDesktopHdrPreparationPolicy(
+  sourceVideoMetadata: SourceVideoMetadata,
+): HdrPreparationPolicy {
+  switch (sourceVideoMetadata.colorClass) {
+    case "sdr-bt709":
+      return {
+        strategy: "none",
+        reason: "source-is-sdr-bt709",
+        requiresFixtureValidation: false,
+        warning: null,
+      };
+    case "hdr-pq":
+      return {
+        strategy: "prepare-sdr-mezzanine",
+        reason: "source-is-hdr-pq",
+        requiresFixtureValidation: true,
+        warning: null,
+      };
+    case "hdr-hlg":
+      return {
+        strategy: "prepare-sdr-mezzanine",
+        reason: "source-is-hdr-hlg",
+        requiresFixtureValidation: true,
+        warning: null,
+      };
+    case "wide-gamut-unknown":
+      return {
+        strategy: "defer-unknown",
+        reason: "wide-gamut-transfer-unknown",
+        requiresFixtureValidation: false,
+        warning:
+          "Source has wide-gamut or HDR-adjacent metadata without a trusted HDR transfer; leave pixels unchanged until fixture-backed policy exists.",
+      };
+    case "unknown":
+      return {
+        strategy: "none",
+        reason: "source-color-unknown",
+        requiresFixtureValidation: false,
+        warning: null,
+      };
+  }
+
+  const exhaustive: never = sourceVideoMetadata.colorClass;
+  return exhaustive;
 }

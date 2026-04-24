@@ -5,9 +5,29 @@ import { describe, expect, it } from "vitest";
 
 import {
   classifySourceColorForExport,
+  deriveDesktopHdrPreparationPolicy,
   deriveSourceColorMetadataFromFfprobeStream,
   deriveVideoDisplayGeometryFromFfprobeStream,
+  type SourceColorMetadata,
+  type SourceVideoMetadata,
 } from "./video-export-source-metadata";
+
+const testDisplay: SourceVideoMetadata["display"] = {
+  rawWidth: 1920,
+  rawHeight: 1080,
+  displayWidth: 1920,
+  displayHeight: 1080,
+  rotationDeg: null,
+  source: "raw",
+};
+
+function sourceMetadataForColor(color: SourceColorMetadata): SourceVideoMetadata {
+  return {
+    display: testDisplay,
+    color,
+    colorClass: classifySourceColorForExport(color),
+  };
+}
 
 describe("video-export-source-metadata", () => {
   it("keeps raw dimensions when no rotation metadata is present", () => {
@@ -219,5 +239,87 @@ describe("source color metadata", () => {
       hasContentLightMetadata: false,
     });
     expect(classifySourceColorForExport(color)).toBe("unknown");
+  });
+});
+
+describe("desktop HDR preparation policy", () => {
+  it("does not prepare explicit BT.709 SDR sources", () => {
+    const color = deriveSourceColorMetadataFromFfprobeStream({
+      color_space: "bt709",
+      color_transfer: "bt709",
+      color_primaries: "bt709",
+    });
+
+    expect(
+      deriveDesktopHdrPreparationPolicy(sourceMetadataForColor(color)),
+    ).toEqual({
+      strategy: "none",
+      reason: "source-is-sdr-bt709",
+      requiresFixtureValidation: false,
+      warning: null,
+    });
+  });
+
+  it("prepares HDR PQ sources as SDR mezzanine candidates with fixture validation required", () => {
+    const color = deriveSourceColorMetadataFromFfprobeStream({
+      color_space: "bt2020nc",
+      color_transfer: "smpte2084",
+      color_primaries: "bt2020",
+    });
+
+    expect(
+      deriveDesktopHdrPreparationPolicy(sourceMetadataForColor(color)),
+    ).toEqual({
+      strategy: "prepare-sdr-mezzanine",
+      reason: "source-is-hdr-pq",
+      requiresFixtureValidation: true,
+      warning: null,
+    });
+  });
+
+  it("prepares HDR HLG sources as SDR mezzanine candidates with fixture validation required", () => {
+    const color = deriveSourceColorMetadataFromFfprobeStream({
+      color_space: "bt2020nc",
+      color_transfer: "arib-std-b67",
+      color_primaries: "bt2020",
+    });
+
+    expect(
+      deriveDesktopHdrPreparationPolicy(sourceMetadataForColor(color)),
+    ).toEqual({
+      strategy: "prepare-sdr-mezzanine",
+      reason: "source-is-hdr-hlg",
+      requiresFixtureValidation: true,
+      warning: null,
+    });
+  });
+
+  it("defers wide-gamut sources without trusted transfer metadata", () => {
+    const color = deriveSourceColorMetadataFromFfprobeStream({
+      color_space: "bt2020nc",
+      color_primaries: "bt2020",
+    });
+
+    const policy = deriveDesktopHdrPreparationPolicy(
+      sourceMetadataForColor(color),
+    );
+
+    expect(policy.strategy).toBe("defer-unknown");
+    expect(policy.reason).toBe("wide-gamut-transfer-unknown");
+    expect(policy.requiresFixtureValidation).toBe(false);
+    expect(policy.warning).toContain("leave pixels unchanged");
+  });
+
+  it("does not automatically change sources with unknown color metadata", () => {
+    const color = deriveSourceColorMetadataFromFfprobeStream(undefined);
+
+    expect(
+      deriveDesktopHdrPreparationPolicy(sourceMetadataForColor(color)),
+    ).toEqual({
+      strategy: "none",
+      reason: "source-color-unknown",
+      requiresFixtureValidation: false,
+      warning: null,
+    });
   });
 });
