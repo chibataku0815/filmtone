@@ -4,14 +4,28 @@ import {
   FILM_LAB_DEFAULT_SHADOW_HUE,
 } from "./split-tone-default-hues";
 
-type BasePresetParams = Omit<Params, "depthMistGain" | "depthGlowGain">;
+type ContractDefaultKey =
+  | "depthMistGain"
+  | "depthGlowGain"
+  | "crossFilterDepthGain"
+  | "crossFilterAngleGain"
+  | "crossFilterAngleGamma"
+  | "crossFilterEdgeLengthGain"
+  | "crossFilterEdgeStrengthGain";
 
-const DEPTH_CONTRACT_DEFAULTS = {
+type BasePresetParams = Omit<Params, ContractDefaultKey>;
+
+const CONTRACT_DEFAULTS: Pick<Params, ContractDefaultKey> = {
   depthMistGain: 0,
   depthGlowGain: 0,
+  crossFilterDepthGain: 0.25,
+  crossFilterAngleGain: 0.35,
+  crossFilterAngleGamma: 1.4,
+  crossFilterEdgeLengthGain: 0.45,
+  crossFilterEdgeStrengthGain: 0.25,
 } as const;
 
-function withDepthContractDefaults<T extends Record<string, BasePresetParams>>(
+function withContractDefaults<T extends Record<string, BasePresetParams>>(
   presets: T,
 ): { [K in keyof T]: Params } {
   return Object.fromEntries(
@@ -19,7 +33,7 @@ function withDepthContractDefaults<T extends Record<string, BasePresetParams>>(
       name,
       {
         ...preset,
-        ...DEPTH_CONTRACT_DEFAULTS,
+        ...CONTRACT_DEFAULTS,
       },
     ]),
   ) as { [K in keyof T]: Params };
@@ -605,7 +619,7 @@ const RAW_PRESETS = {
   },
 } satisfies Record<string, BasePresetParams>;
 
-export const PRESETS = withDepthContractDefaults(RAW_PRESETS);
+export const PRESETS = withContractDefaults(RAW_PRESETS);
 
 export type PresetName = keyof typeof PRESETS;
 

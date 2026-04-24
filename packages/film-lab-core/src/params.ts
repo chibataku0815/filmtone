@@ -86,6 +86,16 @@ export const PARAM_KEYS = [
   "crossFilterHardMode",
   /** 光芒の密集回避。現行プロダクトでは 1 が下限で、1–2 の範囲で扱う。古い下位値は 1 へ正規化する。 */
   "crossFilterMinSpacing",
+  /** Cross filter source depth weighting（0=uniform、1=full depth weighting）。 */
+  "crossFilterDepthGain",
+  /** Cross filter source ray-angle weighting（0=off、1=max edge source boost）。 */
+  "crossFilterAngleGain",
+  /** Cross filter ray-angle mask gamma。65deg hfov の斜入射近似に適用。 */
+  "crossFilterAngleGamma",
+  /** Cross filter streak length field modulation（0=uniform、1=max edge length boost）。 */
+  "crossFilterEdgeLengthGain",
+  /** Cross filter streak strength field modulation（0=uniform、1=max edge strength boost）。 */
+  "crossFilterEdgeStrengthGain",
 ] as const;
 
 export type ParamKey = (typeof PARAM_KEYS)[number];
@@ -177,6 +187,16 @@ export interface Params {
   crossFilterHardMode: number;
   /** 光芒の密集回避。現行プロダクトでは 1 が下限で、1–2 の範囲で扱う。古い下位値は 1 へ正規化する。 */
   crossFilterMinSpacing: number;
+  /** Cross filter source depth weighting（0=uniform、1=full depth weighting）。 */
+  crossFilterDepthGain: number;
+  /** Cross filter source ray-angle weighting（0=off、1=max edge source boost）。 */
+  crossFilterAngleGain: number;
+  /** Cross filter ray-angle mask gamma。65deg hfov の斜入射近似に適用。 */
+  crossFilterAngleGamma: number;
+  /** Cross filter streak length field modulation（0=uniform、1=max edge length boost）。 */
+  crossFilterEdgeLengthGain: number;
+  /** Cross filter streak strength field modulation（0=uniform、1=max edge strength boost）。 */
+  crossFilterEdgeStrengthGain: number;
 }
 
 export function cloneParams(params: Params): Params {

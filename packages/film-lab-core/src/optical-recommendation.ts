@@ -101,6 +101,11 @@ const OPTICAL_PARAM_KEYS = [
   "crossFilterRandomness",
   "crossFilterHardMode",
   "crossFilterMinSpacing",
+  "crossFilterDepthGain",
+  "crossFilterAngleGain",
+  "crossFilterAngleGamma",
+  "crossFilterEdgeLengthGain",
+  "crossFilterEdgeStrengthGain",
   "rgbShift",
   "lensSoftness",
 ] as const;
@@ -148,6 +153,11 @@ const OPTICAL_RECIPE_PATCHES: Record<
     crossFilterRandomness: 0.9,
     crossFilterHardMode: 1,
     crossFilterMinSpacing: 1,
+    crossFilterDepthGain: 0.25,
+    crossFilterAngleGain: 0.35,
+    crossFilterAngleGamma: 1.4,
+    crossFilterEdgeLengthGain: 0.45,
+    crossFilterEdgeStrengthGain: 0.25,
   },
   "lens:clean": {
     rgbShift: 0.0008,

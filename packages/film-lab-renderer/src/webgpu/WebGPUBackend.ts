@@ -203,6 +203,16 @@ const DEFAULT_HALATION_THRESHOLD = 0.6;
 const DEFAULT_HALATION_KNEE = 0.5;
 const DEFAULT_HALATION_RADIUS = 0.5;
 const DEFAULT_HALATION_COLOR: [number, number, number] = [0.91, 0.063, 0.125];
+const DEFAULT_DEPTH_RAY_ANGLE_GAMMA = 1.4;
+const DEFAULT_DEPTH_MIST_RAY_ANGLE_GAIN = 0.35;
+const DEFAULT_DEPTH_BLOOM_RAY_ANGLE_GAIN = 0.25;
+const DEFAULT_DEPTH_HALATION_RAY_ANGLE_GAIN = 0.18;
+const DEFAULT_DEPTH_MIST_FIELD_PSF_GAIN = 1.0;
+const DEFAULT_DEPTH_BLOOM_FIELD_PSF_GAIN = 1.0;
+const DEFAULT_DEPTH_HALATION_FIELD_PSF_GAIN = 1.0;
+const DEFAULT_DEPTH_MIST_FIELD_PSF_RADIUS_PX = 18.0;
+const DEFAULT_DEPTH_BLOOM_FIELD_PSF_RADIUS_PX = 9.0;
+const DEFAULT_DEPTH_HALATION_FIELD_PSF_RADIUS_PX = 12.0;
 
 export interface WebGPUBackendCreateOptions {
   validation?: boolean;
@@ -507,30 +517,31 @@ export class WebGPUBackend implements RenderBackend {
     this.ringBuffer = ringBuffer;
     this.compareSourceBuffer = compareSourceBuffer;
 
-    // Diffusion depth prefilter params — 2 vec4 = 32 bytes.
-    //   misc: (depthMistGain, fitMode, _, _)
+    // Diffusion depth prefilter params — 4 vec4 = 64 bytes.
+    //   misc: (depthMistGain, fitMode, rayAngleGain, rayAngleGamma)
     //   size: (resolutionX, resolutionY, imageResX, imageResY)
+    //   psf:  (fieldPsfGain, fieldPsfRadiusPx, _, _)
     this.diffusionDepthPrefilterBuffer = ctx.device.createBuffer({
       label: "diffusion-depth-prefilter.params",
-      size: 32,
+      size: 64,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
-    this.diffusionDepthPrefilterScratch = new Float32Array(8);
+    this.diffusionDepthPrefilterScratch = new Float32Array(16);
     // Separate uniform buffers per pyramid: a single buffer shared across
     // all three pillars would silently overwrite in submit order (last
     // writeBuffer wins) — see feedback_webgpu_writebuffer_per_layer.md.
     this.bloomDepthPrefilterBuffer = ctx.device.createBuffer({
       label: "bloom-depth-prefilter.params",
-      size: 32,
+      size: 64,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
-    this.bloomDepthPrefilterScratch = new Float32Array(8);
+    this.bloomDepthPrefilterScratch = new Float32Array(16);
     this.halationDepthPrefilterBuffer = ctx.device.createBuffer({
       label: "halation-depth-prefilter.params",
-      size: 32,
+      size: 64,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
-    this.halationDepthPrefilterScratch = new Float32Array(8);
+    this.halationDepthPrefilterScratch = new Float32Array(16);
     this._width = Math.max(1, ctx.canvas.width);
     this._height = Math.max(1, ctx.canvas.height);
     this.frameState = {
@@ -1990,6 +2001,10 @@ export class WebGPUBackend implements RenderBackend {
     encoder: GPUCommandEncoder,
     sourceView: GPUTextureView,
     depthMistGain: number,
+    rayAngleGain: number,
+    rayAngleGamma: number,
+    fieldPsfGain: number,
+    fieldPsfRadiusPx: number,
   ): GPUTextureView {
     const { device } = this.ctx;
     const scratchRT = this.pool.get("rt.diffusion.prefiltered", {
@@ -2002,12 +2017,20 @@ export class WebGPUBackend implements RenderBackend {
     const s = this.diffusionDepthPrefilterScratch;
     s[0] = depthMistGain;
     s[1] = this.frameState.fitMode;
-    s[2] = 0;
-    s[3] = 0;
+    s[2] = rayAngleGain;
+    s[3] = rayAngleGamma;
     s[4] = this._width;
     s[5] = this._height;
     s[6] = this.frameState.imgResX;
     s[7] = this.frameState.imgResY;
+    s[8] = fieldPsfGain;
+    s[9] = fieldPsfRadiusPx;
+    s[10] = 0;
+    s[11] = 0;
+    s[12] = 0;
+    s[13] = 0;
+    s[14] = 0;
+    s[15] = 0;
     device.queue.writeBuffer(
       this.diffusionDepthPrefilterBuffer,
       0,
@@ -2059,6 +2082,10 @@ export class WebGPUBackend implements RenderBackend {
     encoder: GPUCommandEncoder,
     sourceView: GPUTextureView,
     gain: number,
+    rayAngleGain: number,
+    rayAngleGamma: number,
+    fieldPsfGain: number,
+    fieldPsfRadiusPx: number,
   ): GPUTextureView {
     const { device } = this.ctx;
     const scratchRT = this.pool.get("rt.bloom.depth-prefiltered", {
@@ -2071,12 +2098,20 @@ export class WebGPUBackend implements RenderBackend {
     const s = this.bloomDepthPrefilterScratch;
     s[0] = gain;
     s[1] = this.frameState.fitMode;
-    s[2] = 0;
-    s[3] = 0;
+    s[2] = rayAngleGain;
+    s[3] = rayAngleGamma;
     s[4] = this._width;
     s[5] = this._height;
     s[6] = this.frameState.imgResX;
     s[7] = this.frameState.imgResY;
+    s[8] = fieldPsfGain;
+    s[9] = fieldPsfRadiusPx;
+    s[10] = 0;
+    s[11] = 0;
+    s[12] = 0;
+    s[13] = 0;
+    s[14] = 0;
+    s[15] = 0;
     device.queue.writeBuffer(
       this.bloomDepthPrefilterBuffer,
       0,
@@ -2126,6 +2161,10 @@ export class WebGPUBackend implements RenderBackend {
     encoder: GPUCommandEncoder,
     sourceView: GPUTextureView,
     gain: number,
+    rayAngleGain: number,
+    rayAngleGamma: number,
+    fieldPsfGain: number,
+    fieldPsfRadiusPx: number,
   ): GPUTextureView {
     const { device } = this.ctx;
     const scratchRT = this.pool.get("rt.halation.depth-prefiltered", {
@@ -2138,12 +2177,20 @@ export class WebGPUBackend implements RenderBackend {
     const s = this.halationDepthPrefilterScratch;
     s[0] = gain;
     s[1] = this.frameState.fitMode;
-    s[2] = 0;
-    s[3] = 0;
+    s[2] = rayAngleGain;
+    s[3] = rayAngleGamma;
     s[4] = this._width;
     s[5] = this._height;
     s[6] = this.frameState.imgResX;
     s[7] = this.frameState.imgResY;
+    s[8] = fieldPsfGain;
+    s[9] = fieldPsfRadiusPx;
+    s[10] = 0;
+    s[11] = 0;
+    s[12] = 0;
+    s[13] = 0;
+    s[14] = 0;
+    s[15] = 0;
     device.queue.writeBuffer(
       this.halationDepthPrefilterBuffer,
       0,
@@ -3315,11 +3362,68 @@ export class WebGPUBackend implements RenderBackend {
     const depthGlowGain = this.paramNumber("depthGlowGain", 0);
     const depthMistActive = depthMistGain > 0 && depthMistGain < 1.5;
     const depthGlowActive = depthGlowGain > 0 && depthGlowGain < 1.5;
+    const depthRayAngleGamma = Math.max(
+      0.001,
+      this.paramNumber("depthRayAngleGamma", DEFAULT_DEPTH_RAY_ANGLE_GAMMA),
+    );
+    const depthMistRayAngleGain = Math.max(
+      0,
+      this.paramNumber("depthMistRayAngleGain", DEFAULT_DEPTH_MIST_RAY_ANGLE_GAIN),
+    );
+    const depthBloomRayAngleGain = Math.max(
+      0,
+      this.paramNumber("depthBloomRayAngleGain", DEFAULT_DEPTH_BLOOM_RAY_ANGLE_GAIN),
+    );
+    const depthHalationRayAngleGain = Math.max(
+      0,
+      this.paramNumber("depthHalationRayAngleGain", DEFAULT_DEPTH_HALATION_RAY_ANGLE_GAIN),
+    );
+    const depthMistFieldPsfGain = Math.max(
+      0,
+      this.paramNumber("depthMistFieldPsfGain", DEFAULT_DEPTH_MIST_FIELD_PSF_GAIN),
+    );
+    const depthBloomFieldPsfGain = Math.max(
+      0,
+      this.paramNumber("depthBloomFieldPsfGain", DEFAULT_DEPTH_BLOOM_FIELD_PSF_GAIN),
+    );
+    const depthHalationFieldPsfGain = Math.max(
+      0,
+      this.paramNumber("depthHalationFieldPsfGain", DEFAULT_DEPTH_HALATION_FIELD_PSF_GAIN),
+    );
+    const depthMistFieldPsfRadiusPx = Math.max(
+      0,
+      this.paramNumber(
+        "depthMistFieldPsfRadiusPx",
+        DEFAULT_DEPTH_MIST_FIELD_PSF_RADIUS_PX,
+      ),
+    );
+    const depthBloomFieldPsfRadiusPx = Math.max(
+      0,
+      this.paramNumber(
+        "depthBloomFieldPsfRadiusPx",
+        DEFAULT_DEPTH_BLOOM_FIELD_PSF_RADIUS_PX,
+      ),
+    );
+    const depthHalationFieldPsfRadiusPx = Math.max(
+      0,
+      this.paramNumber(
+        "depthHalationFieldPsfRadiusPx",
+        DEFAULT_DEPTH_HALATION_FIELD_PSF_RADIUS_PX,
+      ),
+    );
 
     // Pass 2 — bloom pyramid (prefilter → downsample → additive upsample).
     const bloomRadius = this.paramNumber("bloomRadius", DEFAULT_BLOOM_RADIUS);
     const bloomSourceView = depthGlowActive
-      ? this.renderBloomDepthPrefilter(encoder, colorGradedView, depthGlowGain)
+      ? this.renderBloomDepthPrefilter(
+          encoder,
+          colorGradedView,
+          depthGlowGain,
+          depthBloomRayAngleGain,
+          depthRayAngleGamma,
+          depthBloomFieldPsfGain,
+          depthBloomFieldPsfRadiusPx,
+        )
       : colorGradedView;
     const bloomTop = this.renderPyramidChain(
       encoder,
@@ -3335,7 +3439,15 @@ export class WebGPUBackend implements RenderBackend {
     // Pass 3 — halation pyramid (same shape, tinted prefilter).
     const halationRadius = this.paramNumber("halationRadius", DEFAULT_HALATION_RADIUS);
     const halationSourceView = depthGlowActive
-      ? this.renderHalationDepthPrefilter(encoder, colorGradedView, depthGlowGain)
+      ? this.renderHalationDepthPrefilter(
+          encoder,
+          colorGradedView,
+          depthGlowGain,
+          depthHalationRayAngleGain,
+          depthRayAngleGamma,
+          depthHalationFieldPsfGain,
+          depthHalationFieldPsfRadiusPx,
+        )
       : colorGradedView;
     const halationTop = this.renderPyramidChain(
       encoder,
@@ -3359,7 +3471,15 @@ export class WebGPUBackend implements RenderBackend {
       // the composite debug view and should bypass prefiltering —
       // `depthMistActive` gates this above.
       const pyramidInputView = depthMistActive
-        ? this.renderDiffusionDepthPrefilter(encoder, colorGradedView, depthMistGain)
+        ? this.renderDiffusionDepthPrefilter(
+            encoder,
+            colorGradedView,
+            depthMistGain,
+            depthMistRayAngleGain,
+            depthRayAngleGamma,
+            depthMistFieldPsfGain,
+            depthMistFieldPsfRadiusPx,
+          )
         : colorGradedView;
       diffusionView = this.renderDiffusionPyramid(
         encoder,
