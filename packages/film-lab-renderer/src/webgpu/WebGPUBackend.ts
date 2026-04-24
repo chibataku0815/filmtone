@@ -130,7 +130,7 @@ const MOTIONBLUR_BLEND_UNIFORM_BYTES = 48;
 const MOTIONBLUR_BLEND_UNIFORM_FLOATS = MOTIONBLUR_BLEND_UNIFORM_BYTES / 4;
 const CROSS_FILTER_PARAMS_BYTES = 16;
 const CROSS_FILTER_SPACING_MAX_BYTES = 32;
-const CROSS_FILTER_STREAK_BYTES = 48;
+const CROSS_FILTER_STREAK_BYTES = 80;
 const CROSS_FILTER_MAX_STREAKS = 4;
 const CROSS_FILTER_SPACING_RADIUS_MAX_PX = 48.0;
 const CROSS_FILTER_SPACING_RADIUS_STEP_PX = 24.0;
@@ -213,6 +213,10 @@ const DEFAULT_DEPTH_HALATION_FIELD_PSF_GAIN = 1.0;
 const DEFAULT_DEPTH_MIST_FIELD_PSF_RADIUS_PX = 18.0;
 const DEFAULT_DEPTH_BLOOM_FIELD_PSF_RADIUS_PX = 9.0;
 const DEFAULT_DEPTH_HALATION_FIELD_PSF_RADIUS_PX = 12.0;
+const DEFAULT_CROSS_FILTER_DEPTH_GAIN = 0.25;
+const DEFAULT_CROSS_FILTER_ANGLE_GAIN = 0.35;
+const DEFAULT_CROSS_FILTER_EDGE_LENGTH_GAIN = 0.45;
+const DEFAULT_CROSS_FILTER_EDGE_STRENGTH_GAIN = 0.25;
 
 export interface WebGPUBackendCreateOptions {
   validation?: boolean;
@@ -292,6 +296,7 @@ interface PrefilterGroupLayouts {
   motionblurFeedback: GPUBindGroupLayout;
   motionblurBlend: GPUBindGroupLayout;
   crossFilterPeakSpacing: GPUBindGroupLayout;
+  crossFilterStreak: GPUBindGroupLayout;
   crossFilterTemporal: GPUBindGroupLayout;
   crossFilterBlend: GPUBindGroupLayout;
   lightshafts: GPUBindGroupLayout;
@@ -739,6 +744,16 @@ export class WebGPUBackend implements RenderBackend {
       ],
     });
 
+    const crossFilterStreakGroupLayout = device.createBindGroupLayout({
+      label: "crossfilter.streak.group1",
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: "uniform" } },
+        { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
+        { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
+        { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: { type: "filtering" } },
+      ],
+    });
+
     const crossFilterBlendGroupLayout = device.createBindGroupLayout({
       label: "crossfilter.blend.group1",
       entries: [
@@ -1054,7 +1069,9 @@ export class WebGPUBackend implements RenderBackend {
     const crossFilterStreakPipeline = await ctx.withValidationScope(() =>
       device.createRenderPipeline({
         label: "crossfilter.streak",
-        layout: pyramidPipelineLayout,
+        layout: device.createPipelineLayout({
+          bindGroupLayouts: [flagsLayout, crossFilterStreakGroupLayout],
+        }),
         vertex: { module: modules.vert, entryPoint: "vs_main" },
         fragment: {
           module: modules.crossFilterStreak,
@@ -1392,6 +1409,7 @@ export class WebGPUBackend implements RenderBackend {
         motionblurFeedback: motionblurFeedbackGroupLayout,
         motionblurBlend: motionblurBlendGroupLayout,
         crossFilterPeakSpacing: crossFilterPeakSpacingGroupLayout,
+        crossFilterStreak: crossFilterStreakGroupLayout,
         crossFilterTemporal: crossFilterTemporalGroupLayout,
         crossFilterBlend: crossFilterBlendGroupLayout,
         lightshafts: lightshaftsGroupLayout,

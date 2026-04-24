@@ -83,7 +83,17 @@ var PARAM_KEYS = [
   /** Hard Mode toggle (0=Soft 自然な光学再現 / 1=Hard 物理超え stylized 光芒)。boolean 用途の number。 */
   "crossFilterHardMode",
   /** 光芒の密集回避。現行プロダクトでは 1 が下限で、1–2 の範囲で扱う。古い下位値は 1 へ正規化する。 */
-  "crossFilterMinSpacing"
+  "crossFilterMinSpacing",
+  /** Cross filter source depth weighting（0=uniform、1=full depth weighting）。 */
+  "crossFilterDepthGain",
+  /** Cross filter source ray-angle weighting（0=off、1=max edge source boost）。 */
+  "crossFilterAngleGain",
+  /** Cross filter ray-angle mask gamma。65deg hfov の斜入射近似に適用。 */
+  "crossFilterAngleGamma",
+  /** Cross filter streak length field modulation（0=uniform、1=max edge length boost）。 */
+  "crossFilterEdgeLengthGain",
+  /** Cross filter streak strength field modulation（0=uniform、1=max edge strength boost）。 */
+  "crossFilterEdgeStrengthGain"
 ];
 function cloneParams(params) {
   return { ...params };
@@ -159,17 +169,22 @@ function halationHueToHex(hue) {
 }
 
 // src/presets.ts
-var DEPTH_CONTRACT_DEFAULTS = {
+var CONTRACT_DEFAULTS = {
   depthMistGain: 0,
-  depthGlowGain: 0
+  depthGlowGain: 0,
+  crossFilterDepthGain: 0.25,
+  crossFilterAngleGain: 0.35,
+  crossFilterAngleGamma: 1.4,
+  crossFilterEdgeLengthGain: 0.45,
+  crossFilterEdgeStrengthGain: 0.25
 };
-function withDepthContractDefaults(presets) {
+function withContractDefaults(presets) {
   return Object.fromEntries(
     Object.entries(presets).map(([name, preset]) => [
       name,
       {
         ...preset,
-        ...DEPTH_CONTRACT_DEFAULTS
+        ...CONTRACT_DEFAULTS
       }
     ])
   );
@@ -745,7 +760,7 @@ var RAW_PRESETS = {
     crossFilterMinSpacing: 1
   }
 };
-var PRESETS = withDepthContractDefaults(RAW_PRESETS);
+var PRESETS = withContractDefaults(RAW_PRESETS);
 var FILMTONE_DEFAULT_BASE_PRESET = "reset";
 var FILMTONE_SOFT_FINISH_PATCH = {
   bloomStrength: 0.22,
@@ -805,7 +820,7 @@ var LOOK_ID_BY_PRESET = {
 // src/schema.ts
 import { z } from "zod";
 function schemaForParamKey(key) {
-  return key === "grainRadialMix" ? z.number().min(0).max(1).default(1) : key === "grainSize" ? z.number().min(0).max(1).default(0.3) : key === "diffusion" ? z.number().min(0).max(1).default(0) : key === "depthMistGain" || key === "depthGlowGain" ? z.number().min(0).max(1).default(0) : key === "lensSoftness" ? z.number().min(0).max(1).default(0) : key === "compressionRange" ? z.number().min(0).max(1).default(0.5) : key === "compressionAmount" || key === "printContrast" ? z.number().min(0).max(1).default(0) : key === "cyan" || key === "magenta" || key === "yellow" ? z.number().min(-1).max(1).default(0) : key === "shutterAngle" ? z.number().min(0).max(720).default(0) : key === "trailIntensity" ? z.number().min(0).max(0.95).default(0) : key === "motionBlurAmount" || key === "dustAmount" || key === "scratchAmount" ? z.number().min(0).max(1).default(0) : key === "shaftIntensity" ? z.number().min(0).max(1).default(0) : key === "shaftDecay" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginX" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginY" ? z.number().min(0).max(1).default(0.15) : key === "crossFilterStrength" ? z.number().min(0).max(1).default(0) : key === "crossFilterSpikes" ? z.number().min(4).max(8).default(4) : key === "crossFilterAngle" ? z.number().min(0).max(360).default(0) : key === "crossFilterLength" ? z.number().min(0).max(1).default(0.4) : key === "crossFilterThreshold" ? z.number().min(0).max(1).default(0.92) : key === "crossFilterChromatic" ? z.number().min(0).max(1).default(0.3) : key === "crossFilterSizeLimit" ? z.number().min(0).max(1).default(0) : key === "crossFilterRandomness" ? z.number().min(0).max(1).default(1) : key === "crossFilterHardMode" ? z.number().min(0).max(1).default(1) : key === "crossFilterMinSpacing" ? z.number().min(0).max(2).default(1) : z.number();
+  return key === "grainRadialMix" ? z.number().min(0).max(1).default(1) : key === "grainSize" ? z.number().min(0).max(1).default(0.3) : key === "diffusion" ? z.number().min(0).max(1).default(0) : key === "depthMistGain" || key === "depthGlowGain" ? z.number().min(0).max(1).default(0) : key === "lensSoftness" ? z.number().min(0).max(1).default(0) : key === "compressionRange" ? z.number().min(0).max(1).default(0.5) : key === "compressionAmount" || key === "printContrast" ? z.number().min(0).max(1).default(0) : key === "cyan" || key === "magenta" || key === "yellow" ? z.number().min(-1).max(1).default(0) : key === "shutterAngle" ? z.number().min(0).max(720).default(0) : key === "trailIntensity" ? z.number().min(0).max(0.95).default(0) : key === "motionBlurAmount" || key === "dustAmount" || key === "scratchAmount" ? z.number().min(0).max(1).default(0) : key === "shaftIntensity" ? z.number().min(0).max(1).default(0) : key === "shaftDecay" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginX" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginY" ? z.number().min(0).max(1).default(0.15) : key === "crossFilterStrength" ? z.number().min(0).max(1).default(0) : key === "crossFilterSpikes" ? z.number().min(4).max(8).default(4) : key === "crossFilterAngle" ? z.number().min(0).max(360).default(0) : key === "crossFilterLength" ? z.number().min(0).max(1).default(0.4) : key === "crossFilterThreshold" ? z.number().min(0).max(1).default(0.92) : key === "crossFilterChromatic" ? z.number().min(0).max(1).default(0.3) : key === "crossFilterSizeLimit" ? z.number().min(0).max(1).default(0) : key === "crossFilterRandomness" ? z.number().min(0).max(1).default(1) : key === "crossFilterHardMode" ? z.number().min(0).max(1).default(1) : key === "crossFilterMinSpacing" ? z.number().min(0).max(2).default(1) : key === "crossFilterDepthGain" ? z.number().min(0).max(1).default(0.25) : key === "crossFilterAngleGain" ? z.number().min(0).max(1).default(0.35) : key === "crossFilterAngleGamma" ? z.number().min(0.1).max(4).default(1.4) : key === "crossFilterEdgeLengthGain" ? z.number().min(0).max(1).default(0.45) : key === "crossFilterEdgeStrengthGain" ? z.number().min(0).max(1).default(0.25) : z.number();
 }
 var paramShape = Object.fromEntries(
   PARAM_KEYS.map((key) => [key, schemaForParamKey(key)])
@@ -1511,6 +1526,11 @@ var OPTICAL_PARAM_KEYS = [
   "crossFilterRandomness",
   "crossFilterHardMode",
   "crossFilterMinSpacing",
+  "crossFilterDepthGain",
+  "crossFilterAngleGain",
+  "crossFilterAngleGamma",
+  "crossFilterEdgeLengthGain",
+  "crossFilterEdgeStrengthGain",
   "rgbShift",
   "lensSoftness"
 ];
@@ -1548,7 +1568,12 @@ var OPTICAL_RECIPE_PATCHES = {
     crossFilterSizeLimit: 0.12,
     crossFilterRandomness: 0.9,
     crossFilterHardMode: 1,
-    crossFilterMinSpacing: 1
+    crossFilterMinSpacing: 1,
+    crossFilterDepthGain: 0.25,
+    crossFilterAngleGain: 0.35,
+    crossFilterAngleGamma: 1.4,
+    crossFilterEdgeLengthGain: 0.45,
+    crossFilterEdgeStrengthGain: 0.25
   },
   "lens:clean": {
     rgbShift: 8e-4,

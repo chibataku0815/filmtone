@@ -3,7 +3,7 @@ import { z } from 'zod';
 /**
  * Film Lab のグレード数値パラメータ定義（ブラウザ・Remotion 共通の単一の真実）
  */
-declare const PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "grainIntensity", "grainRadialMix", "grainSize", "vignette", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "depthMistGain", "depthGlowGain", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "fade", "highlights", "shadows", "shadowTone", "highlightTone", "shadowHue", "highlightHue", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "motionBlurAmount", "shutterAngle", "trailIntensity", "dustAmount", "scratchAmount", "shaftIntensity", "shaftDecay", "shaftOriginX", "shaftOriginY", "crossFilterStrength", "crossFilterSpikes", "crossFilterAngle", "crossFilterLength", "crossFilterThreshold", "crossFilterChromatic", "crossFilterSizeLimit", "crossFilterRandomness", "crossFilterHardMode", "crossFilterMinSpacing"];
+declare const PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "grainIntensity", "grainRadialMix", "grainSize", "vignette", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "depthMistGain", "depthGlowGain", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "fade", "highlights", "shadows", "shadowTone", "highlightTone", "shadowHue", "highlightHue", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "motionBlurAmount", "shutterAngle", "trailIntensity", "dustAmount", "scratchAmount", "shaftIntensity", "shaftDecay", "shaftOriginX", "shaftOriginY", "crossFilterStrength", "crossFilterSpikes", "crossFilterAngle", "crossFilterLength", "crossFilterThreshold", "crossFilterChromatic", "crossFilterSizeLimit", "crossFilterRandomness", "crossFilterHardMode", "crossFilterMinSpacing", "crossFilterDepthGain", "crossFilterAngleGain", "crossFilterAngleGamma", "crossFilterEdgeLengthGain", "crossFilterEdgeStrengthGain"];
 type ParamKey = (typeof PARAM_KEYS)[number];
 interface Params {
     exposure: number;
@@ -91,6 +91,16 @@ interface Params {
     crossFilterHardMode: number;
     /** 光芒の密集回避。現行プロダクトでは 1 が下限で、1–2 の範囲で扱う。古い下位値は 1 へ正規化する。 */
     crossFilterMinSpacing: number;
+    /** Cross filter source depth weighting（0=uniform、1=full depth weighting）。 */
+    crossFilterDepthGain: number;
+    /** Cross filter source ray-angle weighting（0=off、1=max edge source boost）。 */
+    crossFilterAngleGain: number;
+    /** Cross filter ray-angle mask gamma。65deg hfov の斜入射近似に適用。 */
+    crossFilterAngleGamma: number;
+    /** Cross filter streak length field modulation（0=uniform、1=max edge length boost）。 */
+    crossFilterEdgeLengthGain: number;
+    /** Cross filter streak strength field modulation（0=uniform、1=max edge strength boost）。 */
+    crossFilterEdgeStrengthGain: number;
 }
 declare function cloneParams(params: Params): Params;
 
@@ -224,6 +234,11 @@ declare const filmLabParamsSchema: z.ZodObject<{
     crossFilterRandomness: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
     crossFilterHardMode: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
     crossFilterMinSpacing: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    crossFilterDepthGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    crossFilterAngleGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    crossFilterAngleGamma: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    crossFilterEdgeLengthGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    crossFilterEdgeStrengthGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
 }, z.core.$strip>;
 type FilmLabParamsValidated = z.infer<typeof filmLabParamsSchema>;
 /**
@@ -302,6 +317,11 @@ declare const filmLookGradeInputSchema: z.ZodObject<{
         crossFilterRandomness: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         crossFilterHardMode: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         crossFilterMinSpacing: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        crossFilterDepthGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        crossFilterAngleGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        crossFilterAngleGamma: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        crossFilterEdgeLengthGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        crossFilterEdgeStrengthGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
     }, z.core.$strip>;
     depthTrack: z.ZodOptional<z.ZodObject<{
         kind: z.ZodLiteral<"frameSequence">;
