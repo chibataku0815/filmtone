@@ -900,11 +900,36 @@ final class FilmtoneExportSession {
         guard let kernel = OpticalKernels.vignette else {
             return image
         }
+
+        let optics = request.sourceProbe?.cameraOptics
+        let resolved = FilmtoneRayAngleOptics.resolve(
+            optics: optics,
+            imageWidth: Double(image.extent.width),
+            imageHeight: Double(image.extent.height)
+        )
+        let opticsPack = FilmtoneRayAngleOptics.kernelArgs(
+            resolved: resolved,
+            imageWidth: Double(image.extent.width),
+            imageHeight: Double(image.extent.height)
+        )
+        // Mask only activates on trustworthy lens metadata — `"assumed"` /
+        // nil / `"fallback65"` sources keep vignette byte-identical with
+        // pre-Stream-2 output. Stream 4 will route gamma / inner through
+        // `FilmtonePhase0Generated.hiddenDefaults`; the constants below are
+        // the same values (1.4 / 0.1).
+        let applyMask: Double = (optics?.source == "metadata") ? 1.0 : 0.0
+        let gamma = FilmtoneRayAngleOptics.defaultGamma
+        let innerThreshold = FilmtoneRayAngleOptics.defaultInnerThreshold
+
         return kernel.apply(extent: image.extent, arguments: [
             image,
             params.vignette,
             Self.extentOriginVector(for: image.extent),
             Self.extentSizeVector(for: image.extent),
+            gamma,
+            innerThreshold,
+            opticsPack,
+            applyMask,
         ]) ?? image
     }
 
@@ -1729,13 +1754,35 @@ kernel vec4 glowComposite(__sample base, __sample bloom, __sample halation, __sa
 }
 """)
 
+    // Vignette kernel with optional ray-angle field mask (T3, Stream 2, v1.1).
+    //
+    // `opticsPack` = vec3(tanHalfFovX, tanHalfFovY, referenceIncidence).
+    // `applyMask` is 1.0 only when `cameraOptics.source == "metadata"`;
+    // for `"assumed"` / nil / fallback65 sources it stays 0.0, which makes
+    // `mix(1.0, mask, applyMask) == 1.0` and the kernel output is
+    // byte-identical to the pre-Stream-2 behavior.
     static let vignette = CIColorKernel(source: """
-kernel vec4 vignette(__sample image, float intensity, vec2 extentOrigin, vec2 extentSize) {
+kernel vec4 vignette(__sample image, float intensity, vec2 extentOrigin, vec2 extentSize, float rayAngleGamma, float rayAngleInner, vec3 opticsPack, float applyMask) {
     vec4 color = image;
     vec2 uv = (destCoord() - extentOrigin) / extentSize;
     float dist = length(uv - vec2(0.5, 0.5)) * 1.414;
     float vig = 1.0 - intensity * dist * dist;
-    color.rgb *= clamp(vig, 0.0, 1.0);
+
+    vec2 sensor = (uv - vec2(0.5, 0.5)) * 2.0;
+    float rayX = sensor.x * opticsPack.x;
+    float rayY = sensor.y * opticsPack.y;
+    float viewZ = 1.0 / sqrt(rayX * rayX + rayY * rayY + 1.0);
+    float incidence = 1.0 - viewZ;
+    float refIncidence = max(opticsPack.z, 1.0e-5);
+    float normalized = clamp(incidence / refIncidence, 0.0, 1.0);
+    float gammaSafe = max(rayAngleGamma, 0.001);
+    float innerSafe = clamp(rayAngleInner, 0.0, 0.8);
+    float shaped = pow(normalized, gammaSafe);
+    float t = clamp((shaped - innerSafe) / max(1.0 - innerSafe, 1.0e-6), 0.0, 1.0);
+    float mask = t * t * (3.0 - 2.0 * t);
+    float effectiveMask = mix(1.0, mask, clamp(applyMask, 0.0, 1.0));
+
+    color.rgb *= clamp(vig * effectiveMask, 0.0, 1.0);
     return color;
 }
 """)
