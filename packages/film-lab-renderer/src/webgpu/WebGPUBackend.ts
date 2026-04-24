@@ -376,7 +376,7 @@ export class WebGPUBackend implements RenderBackend {
   private readonly grainSampler: GPUSampler;
   private readonly grainTexture: GPUTexture;
   /**
-   * Shared depth texture for depth-aware Mist / Glow.
+   * Shared depth texture for depth-aware Mist / Glow / Cross.
    * Runtime depth tracks and the internal `?depthProbe=1|2` debug fallback
    * both upload into this surface.
    */
@@ -487,7 +487,7 @@ export class WebGPUBackend implements RenderBackend {
     this.grainSampler = grainSampler;
     this.grainTexture = grainTexture;
 
-    // Shared depth texture for depth-aware Mist / Glow. Keep it neutral 0.5
+    // Shared depth texture for depth-aware Mist / Glow / Cross. Keep it neutral 0.5
     // so depth-off (depthMistGain=0 / depthGlowGain=0) leaves the optical
     // finish unchanged until a runtime depth frame is uploaded.
     {
@@ -2785,6 +2785,35 @@ export class WebGPUBackend implements RenderBackend {
     const randomness = Math.min(1, Math.max(0, this.paramNumber("crossFilterRandomness", 1)));
     const length = Math.min(1, Math.max(0, this.paramNumber("crossFilterLength", 0.5)));
     const chromatic = Math.min(1, Math.max(0, this.paramNumber("crossFilterChromatic", 0.3)));
+    const crossFilterDepthGain = Math.min(
+      1,
+      Math.max(0, this.paramNumber("crossFilterDepthGain", DEFAULT_CROSS_FILTER_DEPTH_GAIN)),
+    );
+    const crossFilterAngleGain = Math.min(
+      1,
+      Math.max(0, this.paramNumber("crossFilterAngleGain", DEFAULT_CROSS_FILTER_ANGLE_GAIN)),
+    );
+    const crossFilterAngleGamma = Math.max(
+      0.001,
+      this.paramNumber("crossFilterAngleGamma", DEFAULT_DEPTH_RAY_ANGLE_GAMMA),
+    );
+    const crossFilterEdgeLengthGain = Math.min(
+      1,
+      Math.max(
+        0,
+        this.paramNumber("crossFilterEdgeLengthGain", DEFAULT_CROSS_FILTER_EDGE_LENGTH_GAIN),
+      ),
+    );
+    const crossFilterEdgeStrengthGain = Math.min(
+      1,
+      Math.max(
+        0,
+        this.paramNumber(
+          "crossFilterEdgeStrengthGain",
+          DEFAULT_CROSS_FILTER_EDGE_STRENGTH_GAIN,
+        ),
+      ),
+    );
     const minSpacing = Math.min(
       CROSS_FILTER_MIN_SPACING_MAX,
       Math.max(CROSS_FILTER_MIN_SPACING_MIN, this.paramNumber("crossFilterMinSpacing", 1)),
@@ -2804,6 +2833,7 @@ export class WebGPUBackend implements RenderBackend {
     const effectiveRandomness = hardModeActive ? 1.0 : randomness;
 
     const sourceView = sourceTexture.createView();
+    const depthView = this.depthTexture.createView();
     const blackView = this.crossFilter.blackTexture.createView();
 
     this.crossFilter.thresholdScratch[0] = effectiveThreshold;
@@ -3135,9 +3165,17 @@ export class WebGPUBackend implements RenderBackend {
       streakScratch[6] = brightMul;
       streakScratch[7] = effectiveRandomness;
       streakScratch[8] = hardModeUniform;
-      streakScratch[9] = 0;
-      streakScratch[10] = 0;
-      streakScratch[11] = 0;
+      streakScratch[9] = crossFilterDepthGain;
+      streakScratch[10] = crossFilterAngleGain;
+      streakScratch[11] = crossFilterAngleGamma;
+      streakScratch[12] = crossFilterEdgeLengthGain;
+      streakScratch[13] = crossFilterEdgeStrengthGain;
+      streakScratch[14] = this.frameState.fitMode;
+      streakScratch[15] = 0;
+      streakScratch[16] = this._width;
+      streakScratch[17] = this._height;
+      streakScratch[18] = this.frameState.imgResX;
+      streakScratch[19] = this.frameState.imgResY;
       device.queue.writeBuffer(
         this.crossFilter.streakBuffers[i]!,
         0,
@@ -3147,11 +3185,12 @@ export class WebGPUBackend implements RenderBackend {
       );
       const bg = device.createBindGroup({
         label: `crossfilter.streak.${i}.bg`,
-        layout: this.layouts.pyramid,
+        layout: this.layouts.crossFilterStreak,
         entries: [
           { binding: 0, resource: { buffer: this.crossFilter.streakBuffers[i]! } },
           { binding: 1, resource: heldPeakTexture.createView() },
-          { binding: 2, resource: this.sampler },
+          { binding: 2, resource: depthView },
+          { binding: 3, resource: this.sampler },
         ],
       });
       const pass = encoder.beginRenderPass({
@@ -3374,8 +3413,8 @@ export class WebGPUBackend implements RenderBackend {
     // Both live in `(0, 1.5)` when active; values >= 1.5 on `depthMistGain`
     // switch composite into the raw-depth debug view and skip prefiltering.
     // Splitting the two gains lets the shared contract modulate Mist and
-    // Glow independently. Lens and Cross pillars are out of scope by design — see
-    // `docs/guides/2026-04-20-filmtone-optical-finish-pack-master-plan.md` §2.3.
+    // Glow independently. Cross uses its own compact-source depth/ray-angle
+    // shaping inside `renderCrossFilter`; Lens remains out of scope here.
     const depthMistGain = this.paramNumber("depthMistGain", 0);
     const depthGlowGain = this.paramNumber("depthGlowGain", 0);
     const depthMistActive = depthMistGain > 0 && depthMistGain < 1.5;
