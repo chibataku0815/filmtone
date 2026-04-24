@@ -2437,6 +2437,182 @@
           }
         }
       }
+    },
+    "filmtone.hdr.notice.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HDR source handling"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HDR ソースの取り扱い"
+          }
+        }
+      }
+    },
+    "filmtone.hdr.notice.body.pq" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HDR (PQ) source detected. It may be converted to SDR when exporting on iOS, and dynamic range could be compressed."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HDR (PQ) ソースを検出しました。iOS 書き出し時に SDR に変換される場合があります。ダイナミックレンジが圧縮される可能性があります。"
+          }
+        }
+      }
+    },
+    "filmtone.hdr.notice.body.hlg" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HDR (HLG) source detected. It may be converted to SDR when exporting on iOS."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HDR (HLG) ソースを検出しました。iOS 書き出し時に SDR に変換される場合があります。"
+          }
+        }
+      }
+    },
+    "filmtone.hdr.notice.body.wideGamutUnknown" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wide-gamut source, but the HDR transfer function could not be identified. Export will proceed as SDR — please verify colour handling."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "広色域ソースですが HDR transfer を判定できません。SDR として書き出しますが、色の扱いは要確認です。"
+          }
+        }
+      }
+    },
+    "filmtone.optics.source.metadata" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "metadata"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メタデータ"
+          }
+        }
+      }
+    },
+    "filmtone.optics.source.assumed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "assumed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "推定"
+          }
+        }
+      }
+    },
+    "filmtone.optics.source.accessibility.metadata" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "from camera metadata"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メタデータから取得"
+          }
+        }
+      }
+    },
+    "filmtone.optics.source.accessibility.assumed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "assumed defaults"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "既定値で推定"
+          }
+        }
+      }
+    },
+    "filmtone.optics.label.hfov" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HFOV %@°"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HFOV %@°"
+          }
+        }
+      }
+    },
+    "filmtone.optics.label.separator" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "・"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "・"
+          }
+        }
+      }
+    },
+    "filmtone.metric.optics" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Optics"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "光学系"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
