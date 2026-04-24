@@ -855,6 +855,9 @@ export async function runVideoExportPipeline(options: {
   if (sourceHdrPreparationPolicy) {
     onLog(
       `[動画] HDR準備ポリシー ${sourceHdrPreparationPolicy.strategy}: reason=${sourceHdrPreparationPolicy.reason}, fixtureValidation=${sourceHdrPreparationPolicy.requiresFixtureValidation ? "required" : "not-required"}` +
+        (sourceHdrPreparationPolicy.filterSelection
+          ? `, filterSelection=${JSON.stringify(sourceHdrPreparationPolicy.filterSelection)}`
+          : "") +
         (sourceHdrPreparationPolicy.warning
           ? `, warning=${sourceHdrPreparationPolicy.warning}`
           : ""),

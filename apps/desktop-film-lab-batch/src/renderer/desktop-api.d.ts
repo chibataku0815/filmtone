@@ -52,6 +52,24 @@ export type SourceColorClass =
   | "wide-gamut-unknown"
   | "unknown";
 
+export type HdrToSdrFilterSelection =
+  | {
+      kind: "zscale-tonemap";
+      source: "hdr-pq" | "hdr-hlg";
+      transferIn: "smpte2084" | "arib-std-b67";
+      tonemap: "hable" | "mobius";
+      nominalPeakNits: 100;
+      desat: 0;
+      output: "bt709-sdr";
+    }
+  | {
+      kind: "libplacebo";
+      source: "hdr-pq" | "hdr-hlg";
+      tonemapping: "bt.2390";
+      gamutMode: "perceptual";
+      output: "bt709-sdr";
+    };
+
 export type HdrPreparationPolicy = {
   strategy: "none" | "prepare-sdr-mezzanine" | "defer-unknown";
   reason:
@@ -63,6 +81,7 @@ export type HdrPreparationPolicy = {
     | "ffmpeg-missing-hdr-filters";
   requiresFixtureValidation: boolean;
   warning: string | null;
+  filterSelection?: HdrToSdrFilterSelection | null;
 };
 
 export type SourceVideoTimingMetadata = {

@@ -343,6 +343,7 @@ describe("desktop HDR preparation policy", () => {
     expect(policy.strategy).toBe("defer-unknown");
     expect(policy.reason).toBe("ffmpeg-missing-hdr-filters");
     expect(policy.requiresFixtureValidation).toBe(true);
+    expect(policy.filterSelection).toBeUndefined();
     expect(policy.warning).toContain("zscale");
     expect(policy.warning).toContain("libplacebo");
     expect(policy.warning).toContain("PQ");
@@ -367,6 +368,7 @@ describe("desktop HDR preparation policy", () => {
 
     expect(policy.strategy).toBe("defer-unknown");
     expect(policy.reason).toBe("ffmpeg-missing-hdr-filters");
+    expect(policy.filterSelection).toBeUndefined();
     expect(policy.warning).toContain("HLG");
   });
 
@@ -390,6 +392,15 @@ describe("desktop HDR preparation policy", () => {
     expect(policy.strategy).toBe("prepare-sdr-mezzanine");
     expect(policy.reason).toBe("source-is-hdr-pq");
     expect(policy.warning).toBeNull();
+    expect(policy.filterSelection).toEqual({
+      kind: "zscale-tonemap",
+      source: "hdr-pq",
+      transferIn: "smpte2084",
+      tonemap: "hable",
+      nominalPeakNits: 100,
+      desat: 0,
+      output: "bt709-sdr",
+    });
   });
 
   it("keeps prepare-sdr-mezzanine for HDR HLG when libplacebo is available", () => {
@@ -411,6 +422,43 @@ describe("desktop HDR preparation policy", () => {
 
     expect(policy.strategy).toBe("prepare-sdr-mezzanine");
     expect(policy.reason).toBe("source-is-hdr-hlg");
+    expect(policy.filterSelection).toEqual({
+      kind: "libplacebo",
+      source: "hdr-hlg",
+      tonemapping: "bt.2390",
+      gamutMode: "perceptual",
+      output: "bt709-sdr",
+    });
+  });
+
+  it("prefers zscale when both HDR filter paths are available", () => {
+    const color = deriveSourceColorMetadataFromFfprobeStream({
+      color_space: "bt2020nc",
+      color_transfer: "smpte2084",
+      color_primaries: "bt2020",
+    });
+
+    const policy = deriveDesktopHdrPreparationPolicy(
+      sourceMetadataForColor(color),
+      {
+        hasZscale: true,
+        hasLibplacebo: true,
+        hasTonemap: true,
+        hasColorspace: true,
+      },
+    );
+
+    expect(policy.strategy).toBe("prepare-sdr-mezzanine");
+    expect(policy.reason).toBe("source-is-hdr-pq");
+    expect(policy.filterSelection).toEqual({
+      kind: "zscale-tonemap",
+      source: "hdr-pq",
+      transferIn: "smpte2084",
+      tonemap: "hable",
+      nominalPeakNits: 100,
+      desat: 0,
+      output: "bt709-sdr",
+    });
   });
 
   it("does not branch on capabilities for non-HDR color classes", () => {

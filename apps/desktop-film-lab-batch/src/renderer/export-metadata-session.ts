@@ -120,6 +120,24 @@ const sourceVideoTimingMetadataSchema = z.object({
     "within-relative-tolerance",
   ]),
 });
+const hdrToSdrFilterSelectionSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("zscale-tonemap"),
+    source: z.enum(["hdr-pq", "hdr-hlg"]),
+    transferIn: z.enum(["smpte2084", "arib-std-b67"]),
+    tonemap: z.enum(["hable", "mobius"]),
+    nominalPeakNits: z.literal(100),
+    desat: z.literal(0),
+    output: z.literal("bt709-sdr"),
+  }),
+  z.object({
+    kind: z.literal("libplacebo"),
+    source: z.enum(["hdr-pq", "hdr-hlg"]),
+    tonemapping: z.literal("bt.2390"),
+    gamutMode: z.literal("perceptual"),
+    output: z.literal("bt709-sdr"),
+  }),
+]);
 const hdrPreparationPolicySchema = z.object({
   strategy: z.enum(["none", "prepare-sdr-mezzanine", "defer-unknown"]),
   reason: z.enum([
@@ -132,6 +150,7 @@ const hdrPreparationPolicySchema = z.object({
   ]),
   requiresFixtureValidation: z.boolean(),
   warning: z.string().min(1).nullable(),
+  filterSelection: hdrToSdrFilterSelectionSchema.nullable().optional(),
 });
 const sourceVideoMetadataSchema = z.object({
   display: sourceDisplayGeometrySchema,

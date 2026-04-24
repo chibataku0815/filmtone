@@ -1,5 +1,6 @@
 import path from "node:path";
 import type { CameraOptics, CameraOpticsSource } from "film-lab-core";
+import type { HdrToSdrFilterSelection } from "./video-export-source-metadata";
 
 const CAMERA_OPTICS_SOURCES = new Set<CameraOpticsSource>([
   "metadata",
@@ -145,6 +146,35 @@ export function buildCameraOpticsMetadataArgs(opts: {
     "use_metadata_tags",
     ...entries.flatMap(([key, value]) => ["-metadata", `${key}=${value}`]),
   ];
+}
+
+export function buildHdrToSdrFilterChain(
+  selection: HdrToSdrFilterSelection | null | undefined,
+): string | null {
+  if (!selection) {
+    return null;
+  }
+
+  if (selection.kind === "libplacebo") {
+    return [
+      "libplacebo=colorspace=bt709",
+      "color_primaries=bt709",
+      "color_trc=bt709",
+      "range=tv",
+      `tonemapping=${selection.tonemapping}`,
+      `gamut_mode=${selection.gamutMode}`,
+      "format=yuv420p",
+    ].join(":");
+  }
+
+  return [
+    `zscale=tin=${selection.transferIn}:pin=2020:min=2020_ncl:rin=tv:t=linear:npl=${selection.nominalPeakNits}`,
+    "format=gbrpf32le",
+    "zscale=p=709",
+    `tonemap=tonemap=${selection.tonemap}:desat=${selection.desat}`,
+    "zscale=t=709:m=709:r=tv",
+    "format=yuv420p",
+  ].join(",");
 }
 
 export function buildFfmpegRawvideoExportArgs(

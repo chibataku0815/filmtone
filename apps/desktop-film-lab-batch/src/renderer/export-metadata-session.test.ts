@@ -334,6 +334,13 @@ describe("export metadata session", () => {
           reason: "source-is-hdr-pq",
           requiresFixtureValidation: true,
           warning: null,
+          filterSelection: {
+            kind: "libplacebo",
+            source: "hdr-pq",
+            tonemapping: "bt.2390",
+            gamutMode: "perceptual",
+            output: "bt709-sdr",
+          },
         },
       },
     });
@@ -349,6 +356,13 @@ describe("export metadata session", () => {
       reason: "source-is-hdr-pq",
       requiresFixtureValidation: true,
       warning: null,
+      filterSelection: {
+        kind: "libplacebo",
+        source: "hdr-pq",
+        tonemapping: "bt.2390",
+        gamutMode: "perceptual",
+        output: "bt709-sdr",
+      },
     });
   });
 

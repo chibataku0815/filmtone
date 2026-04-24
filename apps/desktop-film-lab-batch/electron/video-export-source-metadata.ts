@@ -48,7 +48,26 @@ export type HdrPreparationPolicy = {
     | "ffmpeg-missing-hdr-filters";
   requiresFixtureValidation: boolean;
   warning: string | null;
+  filterSelection?: HdrToSdrFilterSelection | null;
 };
+
+export type HdrToSdrFilterSelection =
+  | {
+      kind: "zscale-tonemap";
+      source: "hdr-pq" | "hdr-hlg";
+      transferIn: "smpte2084" | "arib-std-b67";
+      tonemap: "hable" | "mobius";
+      nominalPeakNits: 100;
+      desat: 0;
+      output: "bt709-sdr";
+    }
+  | {
+      kind: "libplacebo";
+      source: "hdr-pq" | "hdr-hlg";
+      tonemapping: "bt.2390";
+      gamutMode: "perceptual";
+      output: "bt709-sdr";
+    };
 
 /**
  * @description local ffmpeg ビルドが持つ filter のうち、HDR→SDR 変換に関係するものだけを記録する。
@@ -303,6 +322,41 @@ function ffmpegCapabilityBlocksHdrPrep(
   return !capabilities.hasZscale && !capabilities.hasLibplacebo;
 }
 
+function selectHdrToSdrFilter(
+  colorClass: Extract<SourceColorClass, "hdr-pq" | "hdr-hlg">,
+  capabilities: FFmpegHdrCapabilities | null | undefined,
+): HdrToSdrFilterSelection | null {
+  if (!capabilities || ffmpegCapabilityBlocksHdrPrep(capabilities)) {
+    return null;
+  }
+
+  // Prefer the CPU zscale path when available. The libplacebo filter can be
+  // compiled in but still fail at runtime on machines without a Vulkan device.
+  if (capabilities.hasZscale) {
+    return {
+      kind: "zscale-tonemap",
+      source: colorClass,
+      transferIn: colorClass === "hdr-pq" ? "smpte2084" : "arib-std-b67",
+      tonemap: colorClass === "hdr-pq" ? "hable" : "mobius",
+      nominalPeakNits: 100,
+      desat: 0,
+      output: "bt709-sdr",
+    };
+  }
+
+  if (capabilities.hasLibplacebo) {
+    return {
+      kind: "libplacebo",
+      source: colorClass,
+      tonemapping: "bt.2390",
+      gamutMode: "perceptual",
+      output: "bt709-sdr",
+    };
+  }
+
+  return null;
+}
+
 export function deriveDesktopHdrPreparationPolicy(
   sourceVideoMetadata: SourceVideoMetadata,
   capabilities?: FFmpegHdrCapabilities | null,
@@ -324,12 +378,16 @@ export function deriveDesktopHdrPreparationPolicy(
           warning: `Local ffmpeg build lacks HDR transfer filters (${missingHdrFilterList(capabilities!).join(", ")}); leaving HDR PQ source unchanged until a zscale- or libplacebo-capable ffmpeg is available.`,
         };
       }
-      return {
-        strategy: "prepare-sdr-mezzanine",
-        reason: "source-is-hdr-pq",
-        requiresFixtureValidation: true,
-        warning: null,
-      };
+      {
+        const filterSelection = selectHdrToSdrFilter("hdr-pq", capabilities);
+        return {
+          strategy: "prepare-sdr-mezzanine",
+          reason: "source-is-hdr-pq",
+          requiresFixtureValidation: true,
+          warning: null,
+          ...(filterSelection ? { filterSelection } : {}),
+        };
+      }
     case "hdr-hlg":
       if (ffmpegCapabilityBlocksHdrPrep(capabilities)) {
         return {
@@ -339,12 +397,16 @@ export function deriveDesktopHdrPreparationPolicy(
           warning: `Local ffmpeg build lacks HDR transfer filters (${missingHdrFilterList(capabilities!).join(", ")}); leaving HDR HLG source unchanged until a zscale- or libplacebo-capable ffmpeg is available.`,
         };
       }
-      return {
-        strategy: "prepare-sdr-mezzanine",
-        reason: "source-is-hdr-hlg",
-        requiresFixtureValidation: true,
-        warning: null,
-      };
+      {
+        const filterSelection = selectHdrToSdrFilter("hdr-hlg", capabilities);
+        return {
+          strategy: "prepare-sdr-mezzanine",
+          reason: "source-is-hdr-hlg",
+          requiresFixtureValidation: true,
+          warning: null,
+          ...(filterSelection ? { filterSelection } : {}),
+        };
+      }
     case "wide-gamut-unknown":
       return {
         strategy: "defer-unknown",

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildCameraOpticsMetadataArgs,
   buildFfmpegRawvideoExportArgs,
+  buildHdrToSdrFilterChain,
   normalizeCameraOptics,
 } from "./video-export-ffmpeg-args";
 
@@ -159,5 +160,56 @@ describe("video-export-ffmpeg-args", () => {
       fxPx: 1234,
       cameraMake: "Filmtone",
     });
+  });
+
+  it("builds the PQ zscale + tonemap candidate without touching export wiring", () => {
+    expect(
+      buildHdrToSdrFilterChain({
+        kind: "zscale-tonemap",
+        source: "hdr-pq",
+        transferIn: "smpte2084",
+        tonemap: "hable",
+        nominalPeakNits: 100,
+        desat: 0,
+        output: "bt709-sdr",
+      }),
+    ).toBe(
+      "zscale=tin=smpte2084:pin=2020:min=2020_ncl:rin=tv:t=linear:npl=100,format=gbrpf32le,zscale=p=709,tonemap=tonemap=hable:desat=0,zscale=t=709:m=709:r=tv,format=yuv420p",
+    );
+  });
+
+  it("builds the HLG zscale + mobius candidate", () => {
+    expect(
+      buildHdrToSdrFilterChain({
+        kind: "zscale-tonemap",
+        source: "hdr-hlg",
+        transferIn: "arib-std-b67",
+        tonemap: "mobius",
+        nominalPeakNits: 100,
+        desat: 0,
+        output: "bt709-sdr",
+      }),
+    ).toBe(
+      "zscale=tin=arib-std-b67:pin=2020:min=2020_ncl:rin=tv:t=linear:npl=100,format=gbrpf32le,zscale=p=709,tonemap=tonemap=mobius:desat=0,zscale=t=709:m=709:r=tv,format=yuv420p",
+    );
+  });
+
+  it("builds the libplacebo BT.2390 candidate", () => {
+    expect(
+      buildHdrToSdrFilterChain({
+        kind: "libplacebo",
+        source: "hdr-pq",
+        tonemapping: "bt.2390",
+        gamutMode: "perceptual",
+        output: "bt709-sdr",
+      }),
+    ).toBe(
+      "libplacebo=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv:tonemapping=bt.2390:gamut_mode=perceptual:format=yuv420p",
+    );
+  });
+
+  it("returns null when no HDR filter was selected", () => {
+    expect(buildHdrToSdrFilterChain(null)).toBeNull();
+    expect(buildHdrToSdrFilterChain(undefined)).toBeNull();
   });
 });
