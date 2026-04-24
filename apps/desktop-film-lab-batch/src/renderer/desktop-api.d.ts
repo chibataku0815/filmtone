@@ -27,6 +27,19 @@ export type VideoPreviewProxyProgressPayload = {
   total: number;
 };
 
+export type SourceDisplayGeometry = {
+  rawWidth: number;
+  rawHeight: number;
+  displayWidth: number;
+  displayHeight: number;
+  rotationDeg: 0 | 90 | 180 | 270 | null;
+  source: "ffprobe-side-data" | "ffprobe-tags" | "raw";
+};
+
+export type SourceVideoMetadata = {
+  display: SourceDisplayGeometry;
+};
+
 /**
  * @description mezzanine 変換に渡す入力。durationSec は進捗の割合を出すために使う。
  */
@@ -157,6 +170,7 @@ export type FilmLabBatchBridge = {
     sourceFrameRateTrusted: boolean;
     fileSizeBytes: number;
     cameraOptics: CameraOptics;
+    sourceVideoMetadata?: SourceVideoMetadata;
   }>;
   /** @description ffmpeg を rawvideo stdin で起動（1 セッションのみ） */
   videoExportStart: (payload: {

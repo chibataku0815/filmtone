@@ -3,6 +3,8 @@
  */
 import type { CameraOptics } from "film-lab-core";
 
+import { deriveVideoDisplayGeometryFromFfprobeStream } from "./video-export-source-metadata";
+
 const ASSUMED_DIAGONAL_FOV_DEG = 70;
 const FULL_FRAME_WIDTH_MM = 36;
 const FULL_FRAME_HEIGHT_MM = 24;
@@ -139,24 +141,6 @@ function diagonalFovFrom35mmFocal(focalLength35mm: number): number {
   return fovFromFocalPx(diagMm, focalLength35mm);
 }
 
-function normalizeRotationDeg(value: unknown): number {
-  const raw = signedNumberFromValue(value) ?? 0;
-  const normalized = ((Math.round(raw / 90) * 90) % 360 + 360) % 360;
-  return normalized;
-}
-
-function rotationFromSideData(stream: FfprobeRecord | undefined): number {
-  const sideData = Array.isArray(stream?.side_data_list)
-    ? stream.side_data_list
-    : [];
-  for (const item of sideData) {
-    if (!isRecord(item)) continue;
-    if (item.side_data_type !== "Display Matrix") continue;
-    return normalizeRotationDeg(item.rotation);
-  }
-  return 0;
-}
-
 function normalizedKey(key: string): string {
   return key.replace(/[^a-z0-9]/gi, "").toLowerCase();
 }
@@ -177,17 +161,6 @@ function horizontalFovFromSideData(stream: FfprobeRecord | undefined): number | 
     }
   }
   return null;
-}
-
-function displayDimensions(
-  rawWidth: number,
-  rawHeight: number,
-  rotationDeg: number,
-): { width: number; height: number } {
-  if (rotationDeg === 90 || rotationDeg === 270) {
-    return { width: rawHeight, height: rawWidth };
-  }
-  return { width: rawWidth, height: rawHeight };
 }
 
 function opticsFromDiagonalFov(
@@ -223,8 +196,11 @@ export function deriveCameraOpticsFromFfprobeMeta(
   const rawHeight = finitePositive(input.rawHeight) ?? 1080;
   const streamTags = tagsFrom(input.stream);
   const formatTags = tagsFrom(input.format);
-  const rotationDeg = rotationFromSideData(input.stream);
-  const display = displayDimensions(rawWidth, rawHeight, rotationDeg);
+  const display = deriveVideoDisplayGeometryFromFfprobeStream({
+    rawWidth,
+    rawHeight,
+    stream: input.stream,
+  });
   const taggedOpticsSource = firstTagOpticsSource(streamTags, formatTags);
   const cameraMake = firstTagString(streamTags, formatTags, [
     "camera.make",
@@ -272,15 +248,15 @@ export function deriveCameraOpticsFromFfprobeMeta(
   };
 
   if (fovXDeg !== null && fovXDeg > 0 && fovXDeg < 179) {
-    const focalPx = focalPxFromFov(display.width, fovXDeg);
+    const focalPx = focalPxFromFov(display.displayWidth, fovXDeg);
     return compactOptics({
       source: taggedOpticsSource ?? "metadata",
       fxPx: focalPx,
       fyPx: focalPx,
-      cxPx: display.width / 2,
-      cyPx: display.height / 2,
+      cxPx: display.displayWidth / 2,
+      cyPx: display.displayHeight / 2,
       fovXDeg,
-      fovYDeg: fovFromFocalPx(display.height, focalPx),
+      fovYDeg: fovFromFocalPx(display.displayHeight, focalPx),
       ...extra,
     });
   }
@@ -289,8 +265,8 @@ export function deriveCameraOpticsFromFfprobeMeta(
     return compactOptics(
       opticsFromDiagonalFov(
         taggedOpticsSource ?? "metadata",
-        display.width,
-        display.height,
+        display.displayWidth,
+        display.displayHeight,
         diagonalFovFrom35mmFocal(focalLength35mm),
         extra,
       ),
@@ -300,8 +276,8 @@ export function deriveCameraOpticsFromFfprobeMeta(
   return compactOptics(
     opticsFromDiagonalFov(
       "assumed",
-      display.width,
-      display.height,
+      display.displayWidth,
+      display.displayHeight,
       ASSUMED_DIAGONAL_FOV_DEG,
       extra,
     ),

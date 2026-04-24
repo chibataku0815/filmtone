@@ -41,6 +41,10 @@ import {
 import { deriveCameraOpticsFromFfprobeMeta } from "./video-export-camera-optics";
 import { deriveSourceFrameRateTrust } from "./video-export-probe-framerate";
 import {
+  deriveVideoDisplayGeometryFromFfprobeStream,
+  type SourceVideoMetadata,
+} from "./video-export-source-metadata";
+import {
   DesktopUpdateService,
   resolveDesktopUpdateCheckUrl,
 } from "./desktop-update-service";
@@ -403,6 +407,7 @@ async function ffprobeVideoMeta(absPath: string): Promise<{
   /** @description WebCodecs 経路のメモリ上限判定用（readFile 前に参照） */
   fileSizeBytes: number;
   cameraOptics: CameraOptics;
+  sourceVideoMetadata: SourceVideoMetadata;
 }> {
   const ffprobe = (() => {
     try {
@@ -516,6 +521,13 @@ async function ffprobeVideoMeta(absPath: string): Promise<{
 
   const { sourceFrameRate, sourceFrameRateTrusted } =
     deriveSourceFrameRateTrust(avgFrameRate, rFrameRate);
+  const sourceVideoMetadata: SourceVideoMetadata = {
+    display: deriveVideoDisplayGeometryFromFfprobeStream({
+      rawWidth: width,
+      rawHeight: height,
+      stream: videoStream,
+    }),
+  };
   const cameraOptics = deriveCameraOpticsFromFfprobeMeta({
     rawWidth: width,
     rawHeight: height,
@@ -524,8 +536,8 @@ async function ffprobeVideoMeta(absPath: string): Promise<{
   });
 
   return {
-    width,
-    height,
+    width: sourceVideoMetadata.display.displayWidth,
+    height: sourceVideoMetadata.display.displayHeight,
     durationSec,
     hasAudio,
     videoCodec,
@@ -533,6 +545,7 @@ async function ffprobeVideoMeta(absPath: string): Promise<{
     sourceFrameRateTrusted,
     fileSizeBytes,
     cameraOptics,
+    sourceVideoMetadata,
   };
 }
 

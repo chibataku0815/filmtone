@@ -795,10 +795,17 @@ export async function runVideoExportPipeline(options: {
     return { ok: false, message: u.metadataFailed(msg) };
   }
 
+  const sourceDisplayGeometry = probe.sourceVideoMetadata?.display;
+  const sourceWidthForExport = sourceDisplayGeometry?.displayWidth ?? probe.width;
+  const sourceHeightForExport = sourceDisplayGeometry?.displayHeight ?? probe.height;
+  const sourceRawWidth = sourceDisplayGeometry?.rawWidth ?? probe.width;
+  const sourceRawHeight = sourceDisplayGeometry?.rawHeight ?? probe.height;
+  const sourceRotationDeg = sourceDisplayGeometry?.rotationDeg ?? null;
+
   try {
     assertVideoImportWithinCaps(
-      probe.width,
-      probe.height,
+      sourceWidthForExport,
+      sourceHeightForExport,
       probe.durationSec,
     );
   } catch (e) {
@@ -806,7 +813,10 @@ export async function runVideoExportPipeline(options: {
     return { ok: false, message: msg };
   }
 
-  const { outW, outH } = computeVideoExportDimensions(probe.width, probe.height);
+  const { outW, outH } = computeVideoExportDimensions(
+    sourceWidthForExport,
+    sourceHeightForExport,
+  );
   const totalFrames = computeExportFrameCount(probe.durationSec);
   const safeOutName =
     outputFileName.replace(/[/\\]/g, "_").replace(/[<>:"|?*\u0000-\u001f]/g, "_") ||
@@ -816,7 +826,14 @@ export async function runVideoExportPipeline(options: {
     `[動画] ${basename(inputVideoPath)} → ${outW}×${outH} @ ${VIDEO_EXPORT_FPS}fps, ${totalFrames} フレーム`,
   );
   onLog(
-    `[動画] ソース ${probe.width}×${probe.height}, ${probe.durationSec.toFixed(2)}s, 音声: ${probe.hasAudio ? "あり" : "なし"}, codec: ${probe.videoCodec || "unknown"}` +
+    `[動画] ソース ${sourceWidthForExport}×${sourceHeightForExport}` +
+      (sourceDisplayGeometry &&
+      (sourceRawWidth !== sourceWidthForExport ||
+        sourceRawHeight !== sourceHeightForExport ||
+        sourceRotationDeg !== null)
+        ? `（raw ${sourceRawWidth}×${sourceRawHeight}, rotation ${sourceRotationDeg ?? "none"}）`
+        : "") +
+      `, ${probe.durationSec.toFixed(2)}s, 音声: ${probe.hasAudio ? "あり" : "なし"}, codec: ${probe.videoCodec || "unknown"}` +
       (probe.sourceFrameRateTrusted === true && probe.sourceFrameRate !== null
         ? `, ソースFPS信頼 ~${probe.sourceFrameRate.toFixed(4)}（同一ソースフレームはシーク省略）`
         : `, ソースFPS不信任（ソースフレーム索引の再利用なし）`),
@@ -880,11 +897,18 @@ export async function runVideoExportPipeline(options: {
   const effectiveInputPath = mezzaninePath ?? inputVideoPath;
 
   let stagedPath: string | null = null;
-  const tryWebCodecs = shouldAttemptWebCodecsAccurateExport({
+  const hasDisplayRotation =
+    sourceRotationDeg !== null && sourceRotationDeg !== 0;
+  const tryWebCodecs = !hasDisplayRotation && shouldAttemptWebCodecsAccurateExport({
     videoCodec: probe.videoCodec,
     fileSizeBytes: probe.fileSizeBytes,
     absPath: inputVideoPath,
   });
+  if (hasDisplayRotation) {
+    onLog(
+      `[動画][WebCodecs] display rotation ${sourceRotationDeg}° のため HTMLVideoElement シーク経路を使います`,
+    );
+  }
   const epsilon = 1 / VIDEO_EXPORT_FPS / 1000;
   const maxT = Math.max(0, probe.durationSec - epsilon);
   const sourceFpsTrusted = probe.sourceFrameRateTrusted === true;
@@ -936,8 +960,8 @@ export async function runVideoExportPipeline(options: {
             webCodecsSession = await WebCodecsMp4ExportSession.create(
               ab,
               {
-                width: probe.width,
-                height: probe.height,
+                width: sourceRawWidth,
+                height: sourceRawHeight,
                 durationSec: probe.durationSec,
               },
               onLog,
@@ -1008,8 +1032,8 @@ export async function runVideoExportPipeline(options: {
         await renderSession.setDepthTrack(grade.depthTrack);
         await renderSession.setSource({
           texture: srcTexture,
-          imageWidth: probe.width,
-          imageHeight: probe.height,
+          imageWidth: sourceWidthForExport,
+          imageHeight: sourceHeightForExport,
         });
 
         // Reset motion blur accumulation so export starts from a clean state
@@ -1283,8 +1307,8 @@ export async function runVideoExportPipeline(options: {
             // WebCodecs + WebGPU は advancing frame ごとに bitmap upload を更新する。
             await renderSession.setSource({
               texture: srcTexture,
-              imageWidth: probe.width,
-              imageHeight: probe.height,
+              imageWidth: sourceWidthForExport,
+              imageHeight: sourceHeightForExport,
             });
           }
 
