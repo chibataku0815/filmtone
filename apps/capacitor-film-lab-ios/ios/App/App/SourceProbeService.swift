@@ -91,6 +91,8 @@ final class SourceProbeService {
             )
         }
 
+        let rawWidth = Int(abs(track.naturalSize.width).rounded())
+        let rawHeight = Int(abs(track.naturalSize.height).rounded())
         let transformedSize = track.naturalSize.applying(track.preferredTransform)
         let width = Int(abs(transformedSize.width).rounded())
         let height = Int(abs(transformedSize.height).rounded())
@@ -100,6 +102,13 @@ final class SourceProbeService {
         let cameraOptics = cameraOptics(
             for: track,
             asset: asset,
+            displayWidth: width,
+            displayHeight: height
+        )
+        let sourceVideoMetadata = sourceVideoMetadata(
+            for: track,
+            rawWidth: rawWidth,
+            rawHeight: rawHeight,
             displayWidth: width,
             displayHeight: height
         )
@@ -115,7 +124,150 @@ final class SourceProbeService {
             fileSizeBytes: fileSizeBytes,
             codec: codec,
             frameRate: frameRate,
-            cameraOptics: cameraOptics
+            cameraOptics: cameraOptics,
+            sourceVideoMetadata: sourceVideoMetadata
+        )
+    }
+
+    // MARK: - Source video metadata (T1 HDR + T4 display/timing)
+
+    private func sourceVideoMetadata(
+        for track: AVAssetTrack,
+        rawWidth: Int,
+        rawHeight: Int,
+        displayWidth: Int,
+        displayHeight: Int
+    ) -> SourceVideoMetadataDTO {
+        let colorMetadata = colorMetadataDTO(for: track)
+        let colorClass = SourceColorClassifier.classify(colorMetadata)
+        let hdrPolicy = HdrPreparationPolicyDeriver.derive(colorClass: colorClass)
+        let displayGeometry = displayGeometryDTO(
+            for: track,
+            rawWidth: rawWidth,
+            rawHeight: rawHeight,
+            displayWidth: displayWidth,
+            displayHeight: displayHeight
+        )
+        let timing = timingMetadataDTO(for: track)
+        return SourceVideoMetadataDTO(
+            display: displayGeometry,
+            color: colorMetadata,
+            colorClass: colorClass,
+            hdrPreparationPolicy: hdrPolicy,
+            timing: timing
+        )
+    }
+
+    private func colorMetadataDTO(for track: AVAssetTrack) -> SourceColorMetadataDTO {
+        let extensions: [CFString: Any] = {
+            guard let description = track.formatDescriptions.first else { return [:] }
+            let cmDescription = description as! CMFormatDescription
+            return (CMFormatDescriptionGetExtensions(cmDescription) as? [CFString: Any]) ?? [:]
+        }()
+
+        let rawTransfer = FormatExtensionReader.string(
+            in: extensions,
+            cfKey: kCMFormatDescriptionExtension_TransferFunction,
+            stringKey: "TransferFunction"
+        )
+        let rawPrimaries = FormatExtensionReader.string(
+            in: extensions,
+            cfKey: kCMFormatDescriptionExtension_ColorPrimaries,
+            stringKey: "ColorPrimaries"
+        )
+        let rawMatrix = FormatExtensionReader.string(
+            in: extensions,
+            cfKey: kCMFormatDescriptionExtension_YCbCrMatrix,
+            stringKey: "YCbCrMatrix"
+        )
+        // Mastering display and content light CFString constants are not reliably
+        // exported by every SDK. Always pass nil for cfKey and rely on the String
+        // lookup. Presence alone is enough; payload is not inspected in v1.1.
+        let hasMasteringDisplay = FormatExtensionReader.hasKey(
+            in: extensions,
+            cfKey: nil,
+            stringKey: "MasteringDisplayColorVolume"
+        )
+        let hasContentLight = FormatExtensionReader.hasKey(
+            in: extensions,
+            cfKey: nil,
+            stringKey: "ContentLightLevelInfo"
+        )
+
+        let normalizedTransfer = SourceColorMetadataNormalizer.normalizeTransfer(rawTransfer)
+        let normalizedPrimaries = SourceColorMetadataNormalizer.normalizePrimaries(rawPrimaries)
+        let normalizedMatrix = SourceColorMetadataNormalizer.normalizeMatrix(rawMatrix)
+
+        return SourceColorMetadataDTO(
+            colorRange: nil,
+            // iOS has no separate "color space" attachment at the formatDescription level;
+            // the YCbCr matrix is the closest analog. The classifier accepts bt2020nc/c
+            // from this slot to keep wide-gamut detection working for iPhone HLG clips.
+            colorSpace: normalizedMatrix,
+            colorTransfer: normalizedTransfer,
+            colorPrimaries: normalizedPrimaries,
+            hasMasteringDisplayMetadata: hasMasteringDisplay,
+            hasContentLightMetadata: hasContentLight
+        )
+    }
+
+    private func displayGeometryDTO(
+        for track: AVAssetTrack,
+        rawWidth: Int,
+        rawHeight: Int,
+        displayWidth: Int,
+        displayHeight: Int
+    ) -> SourceDisplayGeometryDTO {
+        let (rotationDeg, source) = rotationFromTransform(track.preferredTransform)
+        return SourceDisplayGeometryDTO(
+            rawWidth: rawWidth,
+            rawHeight: rawHeight,
+            displayWidth: displayWidth,
+            displayHeight: displayHeight,
+            rotationDeg: rotationDeg,
+            source: source
+        )
+    }
+
+    private func rotationFromTransform(_ transform: CGAffineTransform) -> (Int?, String) {
+        // Classify the 4 canonical MP4/MOV rotations. preferredTransform is the
+        // concatenation of rotation + flip; for portrait clips iOS emits one of:
+        //   0:   identity                (a= 1, b= 0, c= 0, d= 1)
+        //   90:  clockwise               (a= 0, b= 1, c=-1, d= 0)
+        //   180: upside-down             (a=-1, b= 0, c= 0, d=-1)
+        //   270: counter-clockwise       (a= 0, b=-1, c= 1, d= 0)
+        let epsilon = 0.01
+        let a = transform.a
+        let b = transform.b
+        let c = transform.c
+        let d = transform.d
+        func near(_ lhs: CGFloat, _ rhs: CGFloat) -> Bool { abs(lhs - rhs) < epsilon }
+
+        if near(a, 1), near(b, 0), near(c, 0), near(d, 1) {
+            return (0, "preferred-transform")
+        }
+        if near(a, 0), near(b, 1), near(c, -1), near(d, 0) {
+            return (90, "preferred-transform")
+        }
+        if near(a, -1), near(b, 0), near(c, 0), near(d, -1) {
+            return (180, "preferred-transform")
+        }
+        if near(a, 0), near(b, -1), near(c, 1), near(d, 0) {
+            return (270, "preferred-transform")
+        }
+        return (nil, "raw")
+    }
+
+    private func timingMetadataDTO(for track: AVAssetTrack) -> SourceVideoTimingMetadataDTO {
+        let nominal = Double(track.nominalFrameRate)
+        let isValid = nominal.isFinite && nominal > 0
+        return SourceVideoTimingMetadataDTO(
+            nominalFrameRate: isValid ? nominal : nil,
+            // v1.1 does not probe sample buffers, so estimatedFrameRate stays nil.
+            // VFR / rates-diverged detection is deferred to v1.2 bounded sampling.
+            estimatedFrameRate: nil,
+            sourceFrameRateTrusted: isValid,
+            trustReason: isValid ? "nominal-only" : "missing-or-invalid-rate"
         )
     }
 

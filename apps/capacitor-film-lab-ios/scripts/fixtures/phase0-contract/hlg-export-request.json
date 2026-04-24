@@ -1,48 +1,51 @@
 {
-  "sourceUri": "file:///tmp/phase0-source.mov",
+  "sourceUri": "file:///tmp/phase0-source-hlg.mov",
   "sourceKind": "video",
   "sourceProbe": {
-    "uri": "file:///tmp/phase0-source.mov",
-    "filename": "phase0-source.mov",
+    "uri": "file:///tmp/phase0-source-hlg.mov",
+    "filename": "phase0-source-hlg.mov",
     "kind": "video",
     "mimeType": "video/quicktime",
     "width": 1920,
     "height": 1080,
-    "durationSec": 12.5,
-    "fileSizeBytes": 12345678,
-    "codec": "h264",
+    "durationSec": 8.0,
+    "fileSizeBytes": 20480000,
+    "codec": "hvc1",
     "frameRate": 30,
     "cameraOptics": {
-      "source": "assumed",
+      "source": "metadata",
       "fxPx": 1566.7,
       "fyPx": 1566.7,
       "cxPx": 960,
       "cyPx": 540,
       "fovXDeg": 63,
-      "fovYDeg": 38
+      "fovYDeg": 38,
+      "lensModel": "iPhone 15 Pro back camera 6.765mm f/1.78",
+      "cameraMake": "Apple",
+      "cameraModel": "iPhone 15 Pro"
     },
     "sourceVideoMetadata": {
       "display": {
         "rawWidth": 1920,
         "rawHeight": 1080,
-        "displayWidth": 1920,
-        "displayHeight": 1080,
-        "rotationDeg": 0,
+        "displayWidth": 1080,
+        "displayHeight": 1920,
+        "rotationDeg": 90,
         "source": "preferred-transform"
       },
       "color": {
         "colorRange": null,
-        "colorSpace": "bt709",
-        "colorTransfer": "bt709",
-        "colorPrimaries": "bt709",
+        "colorSpace": "bt2020nc",
+        "colorTransfer": "arib-std-b67",
+        "colorPrimaries": "bt2020",
         "hasMasteringDisplayMetadata": false,
         "hasContentLightMetadata": false
       },
-      "colorClass": "sdr-bt709",
+      "colorClass": "hdr-hlg",
       "hdrPreparationPolicy": {
-        "strategy": "none",
-        "reason": "source-is-sdr-bt709",
-        "requiresFixtureValidation": false,
+        "strategy": "core-image-tone-map-sdr",
+        "reason": "source-is-hdr-hlg",
+        "requiresFixtureValidation": true,
         "warning": null
       },
       "timing": {

@@ -45,6 +45,72 @@ export interface SourceProbe extends SourceInfo {
   codec?: string;
   frameRate?: number;
   cameraOptics?: CameraOptics;
+  sourceVideoMetadata?: SourceVideoMetadata;
+}
+
+// --- iOS v1.1 source video metadata (T1 HDR policy + T4 display/timing) ---
+//
+// The iOS probe builds this DTO in SourceProbeService. Desktop's own
+// HdrPreparationPolicy (apps/desktop-film-lab-batch/electron/
+// video-export-source-metadata.ts) is ffmpeg-oriented; iOS reports what its
+// Core Image pipeline does through `IosHdrPreparationStrategy`. The bridge
+// carries both via the shared `SourceVideoMetadata` envelope.
+
+export type SourceColorClass =
+  | "sdr-bt709"
+  | "hdr-pq"
+  | "hdr-hlg"
+  | "wide-gamut-unknown"
+  | "unknown";
+
+export type IosHdrPreparationStrategy =
+  | "none"
+  | "core-image-tone-map-sdr"
+  | "defer-visible-warning";
+
+export interface IosHdrPreparationPolicy {
+  strategy: IosHdrPreparationStrategy;
+  // Reason vocab overlaps with Desktop where possible:
+  //   "source-is-sdr-bt709" | "source-is-hdr-pq" | "source-is-hdr-hlg"
+  //   | "wide-gamut-transfer-unknown" | "source-color-unknown"
+  reason: string;
+  requiresFixtureValidation: boolean;
+  warning: string | null;
+}
+
+export interface SourceColorMetadata {
+  colorRange: string | null;
+  colorSpace: string | null;
+  colorTransfer: string | null;
+  colorPrimaries: string | null;
+  hasMasteringDisplayMetadata: boolean;
+  hasContentLightMetadata: boolean;
+}
+
+export interface SourceDisplayGeometry {
+  rawWidth: number;
+  rawHeight: number;
+  displayWidth: number;
+  displayHeight: number;
+  rotationDeg: 0 | 90 | 180 | 270 | null;
+  source: "preferred-transform" | "raw";
+}
+
+export interface SourceVideoTimingMetadata {
+  nominalFrameRate: number | null;
+  estimatedFrameRate: number | null;
+  sourceFrameRateTrusted: boolean;
+  // v1.1 vocab: "nominal-only" | "missing-or-invalid-rate"
+  // v1.2 extension: "within-absolute-tolerance" | "rates-diverged"
+  trustReason: string;
+}
+
+export interface SourceVideoMetadata {
+  display: SourceDisplayGeometry;
+  color: SourceColorMetadata;
+  colorClass: SourceColorClass;
+  hdrPreparationPolicy?: IosHdrPreparationPolicy;
+  timing?: SourceVideoTimingMetadata;
 }
 
 export interface ParsedCubeLut {
@@ -108,6 +174,9 @@ export interface Phase0ExportResult {
   realtimeRatio?: number;
   audioPreserved?: boolean;
   benchmarkRecord?: Phase0ExportBenchmarkRecord;
+  // v1.1: filmtone-ios-export-session-v1 sidecar JSON URI (app container temp URL).
+  //       Absent when sidecar write failed or the caller disabled sidecar output.
+  sidecarUri?: string;
 }
 
 export interface Phase0ExportBenchmarkRecord {
