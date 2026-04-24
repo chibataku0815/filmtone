@@ -120,6 +120,18 @@ const sourceVideoTimingMetadataSchema = z.object({
     "within-relative-tolerance",
   ]),
 });
+const hdrPreparationPolicySchema = z.object({
+  strategy: z.enum(["none", "prepare-sdr-mezzanine", "defer-unknown"]),
+  reason: z.enum([
+    "source-is-sdr-bt709",
+    "source-is-hdr-pq",
+    "source-is-hdr-hlg",
+    "wide-gamut-transfer-unknown",
+    "source-color-unknown",
+  ]),
+  requiresFixtureValidation: z.boolean(),
+  warning: z.string().min(1).nullable(),
+});
 const sourceVideoMetadataSchema = z.object({
   display: sourceDisplayGeometrySchema,
   color: sourceColorMetadataSchema,
@@ -130,6 +142,7 @@ const sourceVideoMetadataSchema = z.object({
     "wide-gamut-unknown",
     "unknown",
   ]),
+  hdrPreparationPolicy: hdrPreparationPolicySchema.optional(),
   timing: sourceVideoTimingMetadataSchema.optional(),
 });
 

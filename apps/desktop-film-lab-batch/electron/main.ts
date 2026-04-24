@@ -42,6 +42,7 @@ import { deriveCameraOpticsFromFfprobeMeta } from "./video-export-camera-optics"
 import { deriveSourceFrameRateTrust } from "./video-export-probe-framerate";
 import {
   classifySourceColorForExport,
+  deriveDesktopHdrPreparationPolicy,
   deriveSourceColorMetadataFromFfprobeStream,
   deriveVideoDisplayGeometryFromFfprobeStream,
   type SourceVideoMetadata,
@@ -538,6 +539,8 @@ async function ffprobeVideoMeta(absPath: string): Promise<{
     colorClass: classifySourceColorForExport(sourceColorMetadata),
     timing: sourceFrameRateInfo,
   };
+  sourceVideoMetadata.hdrPreparationPolicy =
+    deriveDesktopHdrPreparationPolicy(sourceVideoMetadata);
   const cameraOptics = deriveCameraOpticsFromFfprobeMeta({
     rawWidth: width,
     rawHeight: height,

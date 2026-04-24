@@ -17,6 +17,7 @@ export type SourceVideoMetadata = {
   display: SourceDisplayGeometry;
   color: SourceColorMetadata;
   colorClass: SourceColorClass;
+  hdrPreparationPolicy?: HdrPreparationPolicy;
   timing?: SourceVideoTimingMetadata;
 };
 

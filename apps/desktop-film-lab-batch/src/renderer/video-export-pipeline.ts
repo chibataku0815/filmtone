@@ -803,6 +803,8 @@ export async function runVideoExportPipeline(options: {
   const sourceRotationDeg = sourceDisplayGeometry?.rotationDeg ?? null;
   const sourceColorMetadata = probe.sourceVideoMetadata?.color;
   const sourceColorClass = probe.sourceVideoMetadata?.colorClass ?? null;
+  const sourceHdrPreparationPolicy =
+    probe.sourceVideoMetadata?.hdrPreparationPolicy ?? null;
   const sourceTimingMetadata = probe.sourceVideoMetadata?.timing;
 
   try {
@@ -848,6 +850,14 @@ export async function runVideoExportPipeline(options: {
           ? ", mastering-display"
           : "") +
         (sourceColorMetadata.hasContentLightMetadata ? ", content-light" : ""),
+    );
+  }
+  if (sourceHdrPreparationPolicy) {
+    onLog(
+      `[動画] HDR準備ポリシー ${sourceHdrPreparationPolicy.strategy}: reason=${sourceHdrPreparationPolicy.reason}, fixtureValidation=${sourceHdrPreparationPolicy.requiresFixtureValidation ? "required" : "not-required"}` +
+        (sourceHdrPreparationPolicy.warning
+          ? `, warning=${sourceHdrPreparationPolicy.warning}`
+          : ""),
     );
   }
   if (sourceTimingMetadata) {

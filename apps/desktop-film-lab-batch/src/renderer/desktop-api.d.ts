@@ -52,6 +52,18 @@ export type SourceColorClass =
   | "wide-gamut-unknown"
   | "unknown";
 
+export type HdrPreparationPolicy = {
+  strategy: "none" | "prepare-sdr-mezzanine" | "defer-unknown";
+  reason:
+    | "source-is-sdr-bt709"
+    | "source-is-hdr-pq"
+    | "source-is-hdr-hlg"
+    | "wide-gamut-transfer-unknown"
+    | "source-color-unknown";
+  requiresFixtureValidation: boolean;
+  warning: string | null;
+};
+
 export type SourceVideoTimingMetadata = {
   avgFrameRate: string | null;
   rFrameRate: string | null;
@@ -70,6 +82,7 @@ export type SourceVideoMetadata = {
   display: SourceDisplayGeometry;
   color: SourceColorMetadata;
   colorClass: SourceColorClass;
+  hdrPreparationPolicy?: HdrPreparationPolicy;
   timing?: SourceVideoTimingMetadata;
 };
 

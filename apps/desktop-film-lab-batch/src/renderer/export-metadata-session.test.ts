@@ -294,6 +294,64 @@ describe("export metadata session", () => {
     });
   });
 
+  it("round-trips optional HDR preparation policy on video sidecars", () => {
+    const cinematic = batchGradeStateFromPreset("cinematic");
+    const session = buildFilmtoneExportSession({
+      exportedAtIso: "2026-04-24T12:34:56.000Z",
+      appVersion: "1.2.3",
+      job: "video",
+      inputDir: null,
+      videoInputPath: "/Users/tester/input/hdr-pq.mov",
+      outputDir: "/Users/tester/output",
+      imageFormat: null,
+      outputFilenameSuffix: null,
+      outputFileName: "hdr-pq-graded.mp4",
+      batchPresetChoice: "cinematic",
+      lookSource: "preset",
+      gradeParams: cinematic.params,
+      depthTrack: null,
+      lutRefs: createEmptyMetadataLutRefs(),
+      sourceVideoMetadata: {
+        display: {
+          rawWidth: 3840,
+          rawHeight: 2160,
+          displayWidth: 3840,
+          displayHeight: 2160,
+          rotationDeg: null,
+          source: "raw",
+        },
+        color: {
+          colorRange: "tv",
+          colorSpace: "bt2020nc",
+          colorTransfer: "smpte2084",
+          colorPrimaries: "bt2020",
+          hasMasteringDisplayMetadata: true,
+          hasContentLightMetadata: true,
+        },
+        colorClass: "hdr-pq",
+        hdrPreparationPolicy: {
+          strategy: "prepare-sdr-mezzanine",
+          reason: "source-is-hdr-pq",
+          requiresFixtureValidation: true,
+          warning: null,
+        },
+      },
+    });
+
+    const parsed = parseFilmtoneExportSessionV1(
+      JSON.parse(exportFilmtoneExportSessionJsonText(session)) as unknown,
+    );
+
+    expect(
+      parsed?.input.sourceVideoMetadata?.hdrPreparationPolicy,
+    ).toEqual({
+      strategy: "prepare-sdr-mezzanine",
+      reason: "source-is-hdr-pq",
+      requiresFixtureValidation: true,
+      warning: null,
+    });
+  });
+
   it("serializes depth-track metadata in both wrapper and sidecar roots", () => {
     const cinematic = batchGradeStateFromPreset("cinematic");
     const depthTrack = {
