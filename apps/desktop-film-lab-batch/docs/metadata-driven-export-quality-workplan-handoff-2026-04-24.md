@@ -23,8 +23,10 @@ Metadata-related commits added on top of the earlier `main` work:
 - `f5690cf2 Classify source video color metadata`
 - `1c1b435e Store source video metadata in export sidecars`
 - `7e8ab59a Record source frame timing diagnostics`
+- `0cb2c778 Derive desktop HDR preparation policy`
+- `aa2a21e5 Surface HDR preparation policy metadata`
 
-The branch was `main...origin/main [ahead 6]` at handoff time.
+The branch was `main...origin/main [ahead 9]` before this handoff-doc update.
 
 Unrelated dirty files existed before/alongside this work and must not be reverted or mixed into metadata commits:
 
@@ -133,6 +135,33 @@ Tests:
 - `electron/video-export-probe-framerate.test.ts`
 - Sidecar roundtrip includes timing metadata.
 
+### P0-C: HDR-to-SDR Preparation Policy Foundation
+
+Implemented:
+
+- Added pure helper:
+  - `deriveDesktopHdrPreparationPolicy(sourceVideoMetadata): HdrPreparationPolicy`
+- Policy output is descriptive only:
+  - `strategy: "none" | "prepare-sdr-mezzanine" | "defer-unknown"`
+  - `reason`
+  - `requiresFixtureValidation`
+  - `warning`
+- Classification behavior:
+  - `sdr-bt709` -> no preparation
+  - `hdr-pq` -> prepare SDR mezzanine, fixture validation required
+  - `hdr-hlg` -> prepare SDR mezzanine, fixture validation required
+  - `wide-gamut-unknown` -> defer / warn, no automatic tone map
+  - `unknown` -> no automatic change
+- Desktop probe now derives `sourceVideoMetadata.hdrPreparationPolicy`.
+- Bridge types and sidecar schema accept optional `hdrPreparationPolicy`.
+- Video export logs the policy when present.
+- No FFmpeg filters, mezzanine branch changes, export FPS changes, or pixel-changing tone mapping were added.
+
+Tests:
+
+- `electron/video-export-source-metadata.test.ts`
+- `src/renderer/export-metadata-session.test.ts`
+
 ## 4. Verification Run
 
 Last verified commands:
@@ -145,7 +174,7 @@ bun run --cwd apps/desktop-film-lab-batch build:renderer
 
 Results at handoff:
 
-- Vitest: 30 files / 173 tests passed
+- Vitest: 30 files / 179 tests passed
 - Electron build: passed
 - Renderer build: passed
 
@@ -155,28 +184,23 @@ Known non-blocking note:
 
 ## 5. Remaining Work
 
-### Next Recommended Phase: P0-C HDR-to-SDR Preparation Policy
+### Next Recommended Phase: P0-C Fixture-Backed HDR Preparation
 
-Start with policy and fixture inventory. Do not immediately wire pixel-changing FFmpeg filters.
+The pure policy and visibility layer are complete. The next step is fixture and capability inventory before any pixel-changing implementation.
 
-Suggested first implementation:
+Recommended next work:
 
-- Add pure helper:
-  - `deriveDesktopHdrPreparationPolicy(sourceVideoMetadata): HdrPreparationPolicy`
-- Inputs:
-  - `sourceVideoMetadata.color`
-  - `sourceVideoMetadata.colorClass`
-- Outputs should be descriptive first:
-  - `strategy: "none" | "prepare-sdr-mezzanine" | "defer-unknown"`
-  - `reason`
-  - `requiresFixtureValidation`
-  - optional future FFmpeg filter hints
-- Unit tests:
-  - SDR BT.709 -> no preparation
-  - HDR PQ -> prepare SDR mezzanine, fixture validation required
-  - HDR HLG -> prepare SDR mezzanine, fixture validation required
-  - wide gamut unknown -> defer / warn, no automatic tone map
-  - unknown -> no preparation, existing behavior
+- Inventory or add real sample fixtures:
+  - at least one PQ source
+  - at least one HLG source
+  - one SDR BT.709 regression source
+- Record safe fixture metadata:
+  - dimensions / duration
+  - color fields
+  - HDR side data presence
+  - expected visual behavior after SDR preparation
+- Check local FFmpeg filter support for future HDR-to-SDR preparation.
+- Design fixture-backed validation before wiring any filter chain.
 
 Only after real fixtures are available:
 
@@ -210,7 +234,7 @@ P3: Gyro / IMU / rolling shutter inventory
 - Do not change export FPS behavior while working on metadata diagnostics.
 - Do not auto-select camera profile / input LUT from make/model.
 - Do not add pixel-changing HDR tone mapping without real PQ/HLG fixtures.
-- Keep new work pure-helper-first with focused unit tests.
+- Keep new work fixture-backed with focused tests.
 - Keep sidecar schema backward-compatible.
 - Use `rg` for search and `apply_patch` for edits.
 
@@ -226,12 +250,14 @@ Filmtone の metadata-driven export quality 改善を続けてください。
 
 現在地:
 - main は origin/main より ahead。
-- metadata 関連の最新コミットは `7e8ab59a Record source frame timing diagnostics`。
+- metadata 関連の最新実装コミットは `aa2a21e5 Surface HDR preparation policy metadata`。
 - 完了済み:
   - P0-A display geometry / rotation 正規化
   - P0-B source color / HDR classification
   - P1-A normalized source metadata sidecar 保存
   - P1-B frame timing diagnostics
+  - P0-C HDR preparation policy pure helper
+  - P0-C HDR preparation policy log / sidecar visibility
 - 全体計画:
   - apps/desktop-film-lab-batch/docs/metadata-driven-export-quality-plan-2026-04-24.md
 - 現在地・引き継ぎ:
@@ -244,21 +270,17 @@ Filmtone の metadata-driven export quality 改善を続けてください。
 - HDR tone mapping は pixel-changing なので、real PQ/HLG fixtures が揃うまでは直接 wire しないでください。
 
 次の推奨作業:
-P0-C の最初として、pixel は変えずに HDR-to-SDR preparation policy の pure helper と unit test を作ってください。
+P0-C の次として、pixel は変えずに HDR fixture / FFmpeg capability inventory を作ってください。
 
-推奨 helper:
-`deriveDesktopHdrPreparationPolicy(sourceVideoMetadata): HdrPreparationPolicy`
-
-期待する分類:
-- `sdr-bt709` -> no preparation
-- `hdr-pq` -> prepare SDR mezzanine, fixture validation required
-- `hdr-hlg` -> prepare SDR mezzanine, fixture validation required
-- `wide-gamut-unknown` -> defer / warn
-- `unknown` -> no automatic change
+期待する作業:
+- PQ / HLG / SDR BT.709 fixture の所在・不足を確認する
+- fixture 追加ができる場合は privacy-safe な小さいものに限定する
+- local FFmpeg が将来必要になる HDR-to-SDR filter を持つか確認する
+- まだ FFmpeg tone mapping を export path に wire しない
+- export FPS の挙動は変えない
 
 検証は最低限:
 `bun run --cwd apps/desktop-film-lab-batch test`
 `bun run --cwd apps/desktop-film-lab-batch build:electron`
 `bun run --cwd apps/desktop-film-lab-batch build:renderer`
 ```
-
