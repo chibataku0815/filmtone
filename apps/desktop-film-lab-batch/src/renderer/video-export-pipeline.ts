@@ -2,8 +2,8 @@
  * Film Lab デスクトップ — 動画グレード書き出し（WebGL Viewport + ffmpeg）
  *
  * @overview 1 本のソース動画を時刻単調にデコードし、画像バッチと同じ Viewport でグレードして raw RGBA を ffmpeg に流す。
- *   MP4/H.264 かつ条件一致時は WebCodecs + CanvasTexture を優先し、それ以外は HTMLVideoElement の seek。
- * @limitations 単一 GL 直列。ffprobe/ffmpeg は PATH 必須（Homebrew 等）。macOS では VideoToolbox を優先。
+ *   既定はプレビューと同じ HTMLVideoElement + VideoTexture 経路でデコードし、raw RGBA を ffmpeg へ渡す。
+ * @limitations 単一 GL 直列。macOS では同梱 CLI + VideoToolbox を優先。
  */
 import * as THREE from "three";
 import {
@@ -15,7 +15,8 @@ import {
   assertVideoImportWithinCaps,
   computeExportFrameCount,
   computeVideoExportDimensions,
-  VIDEO_EXPORT_FPS,
+  formatVideoExportFps,
+  selectVideoExportFps,
 } from "./video-export-constants";
 import type { BatchGradeState } from "./batch-pipeline";
 import {
@@ -37,12 +38,6 @@ const VIDEO_EXPORT_VERBOSE_TRACE =
   import.meta.env.VITE_FILM_LAB_VERBOSE_VIDEO_EXPORT === "true";
 
 /**
- * @description quiet モードでも完全無言にはせず、一定間隔の進捗だけは残す。
- *   5 秒ごとなら React のログ更新負荷をかなり抑えつつ、人間の確認もしやすい。
- */
-const VIDEO_EXPORT_PROGRESS_LOG_INTERVAL_FRAMES = VIDEO_EXPORT_FPS * 5;
-
-/**
  * @description debug profile 用の追加集計。verbose を戻さず「後半で遅くなるか」を end-of-run だけで読む。
  */
 const VIDEO_EXPORT_DEBUG_PROFILE =
@@ -57,6 +52,13 @@ const VIDEO_EXPORT_PROFILE_SEGMENT_COUNT = 4;
  * @description UI progress callback を呼ぶ間隔。見た目は十分滑らかなまま、各フレームの再描画負荷を下げる。
  */
 const VIDEO_EXPORT_PROGRESS_CALLBACK_INTERVAL_FRAMES = 4;
+
+/**
+ * @description WebCodecs は速いがプレビューの HTMLVideoElement 経路と色処理が微妙にズレうる。
+ *   品質・見た目一致を既定にし、速度検証時だけ opt-in する。
+ */
+const ENABLE_WEBCODECS_VIDEO_EXPORT =
+  import.meta.env.VITE_FILM_LAB_ENABLE_WEBCODECS_EXPORT === "true";
 
 /** @description seek がこの時間（ms）無応答なら打ち切り（どこで固まったかログに出す） */
 const SEEK_TIMEOUT_MS = 90_000;
@@ -367,9 +369,10 @@ async function advanceVideoToTimeForward(
     onTrace: (line: string) => void;
     frameIndex: number;
     timeoutMs: number;
+    exportFps: number;
   },
 ): Promise<SeekVideoTimingDetail> {
-  const { onTrace, frameIndex, timeoutMs } = ctx;
+  const { onTrace, frameIndex, timeoutMs, exportFps } = ctx;
   const dur = Number.isFinite(video.duration) ? video.duration : targetTimeSec;
   const tGoal = Math.max(0, Math.min(targetTimeSec, dur));
 
@@ -391,7 +394,7 @@ async function advanceVideoToTimeForward(
   const runForward = async (): Promise<SeekVideoTimingDetail> => {
     const tGate0 = performance.now();
     let rvfcSteps = 0;
-    const timeSlopSec = 1 / VIDEO_EXPORT_FPS / 64;
+    const timeSlopSec = 1 / exportFps / 64;
 
     try {
       await video.play();
@@ -675,7 +678,7 @@ export type VideoExportPipelineUserMessages = {
   metadataFailed: (detail: string) => string;
   ffmpegStartFailed: (detail: string) => string;
   userAborted: string;
-  ffmpegFailed: (code: number) => string;
+  ffmpegFailed: (code: number | null) => string;
 };
 
 /**
@@ -778,9 +781,11 @@ export async function runVideoExportPipeline(options: {
     ({
       webglUnavailable: "WebGPU が利用できません",
       metadataFailed: (detail: string) => `メタデータ取得失敗: ${detail}`,
-      ffmpegStartFailed: (detail: string) => `ffmpeg 開始失敗: ${detail}`,
+      ffmpegStartFailed: (detail: string) =>
+        `動画エンジンを開始できませんでした: ${detail}`,
       userAborted: "中断されました",
-      ffmpegFailed: (code: number) => `ffmpeg 失敗 code=${code}`,
+      ffmpegFailed: (code: number | null) =>
+        `動画エンジンが停止しました code=${code ?? "unknown"}`,
     } satisfies VideoExportPipelineUserMessages);
 
   if (!(await isWebGPUSupported())) {
@@ -826,13 +831,19 @@ export async function runVideoExportPipeline(options: {
     sourceWidthForExport,
     sourceHeightForExport,
   );
-  const totalFrames = computeExportFrameCount(probe.durationSec);
+  const exportFps = selectVideoExportFps({
+    sourceFrameRate: probe.sourceFrameRate,
+    sourceFrameRateTrusted: probe.sourceFrameRateTrusted,
+  });
+  const exportFpsText = formatVideoExportFps(exportFps);
+  const totalFrames = computeExportFrameCount(probe.durationSec, exportFps);
+  const progressLogIntervalFrames = Math.max(1, Math.round(exportFps * 5));
   const safeOutName =
     outputFileName.replace(/[/\\]/g, "_").replace(/[<>:"|?*\u0000-\u001f]/g, "_") ||
     "film-lab-export.mp4";
 
   onLog(
-    `[動画] ${basename(inputVideoPath)} → ${outW}×${outH} @ ${VIDEO_EXPORT_FPS}fps, ${totalFrames} フレーム`,
+    `[動画] ${basename(inputVideoPath)} → ${outW}×${outH} @ ${exportFpsText}fps, ${totalFrames} フレーム`,
   );
   onLog(
     `[動画] ソース ${sourceWidthForExport}×${sourceHeightForExport}` +
@@ -872,6 +883,9 @@ export async function runVideoExportPipeline(options: {
       `[動画] フレームレート判定 avg=${sourceTimingMetadata.avgFrameRate ?? "unknown"} (${sourceTimingMetadata.avgFrameRateParsed?.toFixed(4) ?? "invalid"}), r=${sourceTimingMetadata.rFrameRate ?? "unknown"} (${sourceTimingMetadata.rFrameRateParsed?.toFixed(4) ?? "invalid"}), reason=${sourceTimingMetadata.trustReason}`,
     );
   }
+  onLog(
+    `[動画] 書き出しfps: ${exportFpsText}fps (${probe.sourceFrameRateTrusted === true && probe.sourceFrameRate !== null ? "trusted source fps" : "fallback"})`,
+  );
 
   // --- Mezzanine transcode (ProRes 422) for heavy codecs ---
   let mezzaninePath: string | null = null;
@@ -939,17 +953,25 @@ export async function runVideoExportPipeline(options: {
   let stagedPath: string | null = null;
   const hasDisplayRotation =
     sourceRotationDeg !== null && sourceRotationDeg !== 0;
-  const tryWebCodecs = !hasDisplayRotation && shouldAttemptWebCodecsAccurateExport({
-    videoCodec: probe.videoCodec,
-    fileSizeBytes: probe.fileSizeBytes,
-    absPath: inputVideoPath,
-  });
+  const webCodecsCandidate =
+    !hasDisplayRotation &&
+    shouldAttemptWebCodecsAccurateExport({
+      videoCodec: probe.videoCodec,
+      fileSizeBytes: probe.fileSizeBytes,
+      absPath: inputVideoPath,
+    });
+  const tryWebCodecs = ENABLE_WEBCODECS_VIDEO_EXPORT && webCodecsCandidate;
+  if (webCodecsCandidate && !ENABLE_WEBCODECS_VIDEO_EXPORT) {
+    onLog(
+      "[動画][decode] プレビュー一致優先: WebCodecs を使わず HTMLVideoElement + VideoTexture 経路で書き出します",
+    );
+  }
   if (hasDisplayRotation) {
     onLog(
       `[動画][WebCodecs] display rotation ${sourceRotationDeg}° のため HTMLVideoElement シーク経路を使います`,
     );
   }
-  const epsilon = 1 / VIDEO_EXPORT_FPS / 1000;
+  const epsilon = 1 / exportFps / 1000;
   const maxT = Math.max(0, probe.durationSec - epsilon);
   const sourceFpsTrusted = probe.sourceFrameRateTrusted === true;
   const sourceFpsValue = probe.sourceFrameRate;
@@ -1166,7 +1188,7 @@ export async function runVideoExportPipeline(options: {
             outputFileName: safeOutName,
             width: outW,
             height: outH,
-            fps: VIDEO_EXPORT_FPS,
+            fps: exportFps,
             hasAudio: probe.hasAudio,
             dropFirstFrame: renderSession.backendKind === "webgl",
             cameraOptics: cameraOptics ?? probe.cameraOptics,
@@ -1175,7 +1197,10 @@ export async function runVideoExportPipeline(options: {
           exportSessionId = startRes.sessionId;
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
-          return { ok: false, message: `ffmpeg 開始失敗: ${msg}` };
+          return {
+            ok: false,
+            message: u.ffmpegStartFailed(msg),
+          };
         }
 
         const wallStart = performance.now();
@@ -1228,7 +1253,7 @@ export async function runVideoExportPipeline(options: {
             return { ok: false, message: u.userAborted };
           }
 
-          const t = Math.min(i / VIDEO_EXPORT_FPS, maxT);
+          const t = Math.min(i / exportFps, maxT);
           const tFrame0 = performance.now();
           const profileSegment = profileSegmentIndex(i, totalFrames);
 
@@ -1498,6 +1523,12 @@ export async function runVideoExportPipeline(options: {
               `render=${renderMs.toFixed(0)}ms readPx=${readPxMs.toFixed(0)}ms ` +
               `ipc=async total=${totalMs.toFixed(0)}ms`;
             onLog(summary);
+          } else if (
+            i === 0 ||
+            i === totalFrames - 1 ||
+            (i + 1) % progressLogIntervalFrames === 0
+          ) {
+            onLog(`[動画] フレーム ${i + 1}/${totalFrames}`);
           }
 
           if (
@@ -1586,11 +1617,11 @@ export async function runVideoExportPipeline(options: {
         const fin = await api.videoExportFinish(exportSessionId);
         exportSessionId = null;
         if (fin.code !== 0) {
-          onLog(`[動画] ffmpeg 終了コード ${fin.code}`);
+          onLog(`[動画] 動画エンジン終了コード ${fin.code}`);
           if (fin.stderrTail) onLog(fin.stderrTail);
           return {
             ok: false,
-            message: `ffmpeg 失敗 code=${fin.code}`,
+            message: u.ffmpegFailed(fin.code),
           };
         }
         onLog(`[動画] 完了 → ${resolvedOutPath}`);

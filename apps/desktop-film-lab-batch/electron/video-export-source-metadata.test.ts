@@ -459,6 +459,42 @@ describe("desktop HDR preparation policy", () => {
     });
   });
 
+  it("selects the HLG zscale chain when bundled HDR filters are available", () => {
+    const color = deriveSourceColorMetadataFromFfprobeStream({
+      color_space: "bt2020nc",
+      color_transfer: "arib-std-b67",
+      color_primaries: "bt2020",
+    });
+
+    const policy = deriveDesktopHdrPreparationPolicy(
+      sourceMetadataForColor(color),
+      {
+        hasZscale: true,
+        hasLibplacebo: false,
+        hasTonemap: true,
+        hasColorspace: true,
+      },
+      {
+        enableHdrTonemap: true,
+        ffmpegPath: "/Applications/Filmtone.app/Contents/Resources/bin/darwin-arm64/ffmpeg",
+      },
+    );
+
+    expect(policy.strategy).toBe("prepare-sdr-mezzanine");
+    expect(policy.filterSelection).toEqual({
+      kind: "zscale-tonemap",
+      source: "hdr-hlg",
+      chainId: "hlg-zscale-mobius-npl100",
+      enabledByEnv: true,
+      ffmpegPath: "/Applications/Filmtone.app/Contents/Resources/bin/darwin-arm64/ffmpeg",
+      transferIn: "arib-std-b67",
+      tonemap: "mobius",
+      nominalPeakNits: 100,
+      desat: 0,
+      output: "bt709-sdr",
+    });
+  });
+
   it("does not select libplacebo by default even when it is the only HDR path", () => {
     const color = deriveSourceColorMetadataFromFfprobeStream({
       color_space: "bt2020nc",

@@ -291,6 +291,10 @@ describe.skipIf(!hasFixtures)("fixture-policy integration", () => {
           const policy = deriveDesktopHdrPreparationPolicy(
             sourceMeta,
             capabilityCase.capabilities,
+            {
+              enableHdrTonemap: true,
+              ffmpegPath: "/bundled/ffmpeg",
+            },
           );
           expect(
             {
@@ -299,6 +303,18 @@ describe.skipIf(!hasFixtures)("fixture-policy integration", () => {
             },
             capabilityCase.label,
           ).toEqual(policyByCapability[capabilityCase.key]);
+          if (
+            policy.strategy === "prepare-sdr-mezzanine" &&
+            capabilityCase.capabilities.hasZscale &&
+            capabilityCase.capabilities.hasTonemap
+          ) {
+            expect(policy.filterSelection?.kind, capabilityCase.label).toBe(
+              "zscale-tonemap",
+            );
+            expect(policy.filterSelection?.ffmpegPath, capabilityCase.label).toBe(
+              "/bundled/ffmpeg",
+            );
+          }
         }
         return;
       }

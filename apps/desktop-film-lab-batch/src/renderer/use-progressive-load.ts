@@ -541,6 +541,7 @@ export function useProgressiveLoad(): UseProgressiveLoadReturn {
             durationSec: probe.durationSec,
             outW,
             outH,
+            sourceVideoMetadata: probe.sourceVideoMetadata,
           });
           mezzanineUnsubscribeRef.current?.();
           mezzanineUnsubscribeRef.current = null;

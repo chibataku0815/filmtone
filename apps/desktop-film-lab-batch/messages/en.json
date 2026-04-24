@@ -391,9 +391,9 @@
         },
         "tipExportTabIntro": "Photos in a folder can be saved in bulk to another folder with your Filmtone look. You can also export one video as MP4 with the same look. After adjusting sliders on Edit, use “Send grade to Export” (bottom right) to copy values here. LUTs are separate (e.g. load JSON).",
         "tipJobImages": "Every .jpg / .jpeg / .png in the chosen folder gets this look, saved as JPEG or PNG to another folder.",
-        "tipJobVideoWebGlOnly": "Exports one video as MP4 with a look close to the Edit tab, grading frame by frame. Long clips can take a while to finish. ffmpeg and ffprobe must be on PATH.",
+        "tipJobVideoWebGlOnly": "Exports one video as MP4 with a look close to the Edit tab, grading frame by frame. Long clips can take a while to finish.",
         "tipSourcesImagesFolder": "Only .jpg / .jpeg / .png in that folder (not subfolders by default in UI copy). Not for video conversion.",
-        "tipSourcesVideoFile": "Import limit: up to 4K and max {maxSec}s. ffmpeg and ffprobe must be on PATH.",
+        "tipSourcesVideoFile": "Import limit: up to 4K and max {maxSec}s.",
         "tipLookJsonDetails": "Use when passing or saving a full look (including LUT) as a file. Usually “Send grade to Export” or preset is enough.",
         "tipApplyEditGradeToBatch": "Copies Edit sliders here (same as “Send grade to Export”). After a preset change, preset values stay until you sync. To restore LUT-aware state, use “Load Metadata JSON”.",
         "tipLoadMetadataJson": "Loads a Metadata JSON sidecar and restores export mode, input/output paths, format, suffix, look, and LUT references. If the file does not match the new schema, it falls back to the legacy Grade JSON importer.",
@@ -457,7 +457,7 @@
         "tipPhotoExportPanelIntro": "Choose a folder of .jpg / .jpeg / .png, set the destination and format, then run. After adjusting on Edit, use “Send grade to Export” to copy the look here.",
         "videoExportPanelTitle": "Video export",
         "videoExportPanelTitleHintAria": "About single video export",
-        "tipVideoExportPanelIntro": "Choose one video file, set the destination if needed, then export as MP4. Long clips take time; ffmpeg must be on PATH.",
+        "tipVideoExportPanelIntro": "Choose one video file, set the destination if needed, then export as MP4. Long clips take time.",
         "lookStatusJsonTitle": "Look: JSON",
         "lookStatusJsonBody": "{path}",
         "lookStatusEditTitle": "Look: matches Edit",
@@ -587,19 +587,11 @@
         "presetCustom": "Custom",
         "presetVideoDefault": "Default",
         "advancedDisclosureTitle": "Advanced",
-        "videoSourceHint": "Up to 4K and {maxSec} seconds. Requires ffmpeg/ffprobe on PATH.",
-        "videoOutputHint": "Adds -graded.mp4 to the original name. Output is up to FHD at {fps} fps.",
+        "videoSourceHint": "Up to 4K and {maxSec} seconds.",
+        "videoOutputHint": "Adds -graded.mp4 to the original name. Output is up to FHD and keeps source fps when trusted (falls back to {fps}fps).",
         "filenameSuffixPlaceholder": "-graded",
-        "hdrPolicyNoticeTitle": "HDR source detected — your ffmpeg can't linearize it",
-        "hdrPolicyNoticeBody": "This clip is HDR (PQ / HLG), but your local ffmpeg build is missing zscale / libplacebo, so HDR→SDR tone mapping is deferred. SDR clips continue to export normally.",
-        "hdrPolicyNoticeDetailLabel": "Details:",
-        "hdrPolicyNoticeInstallLead": "Switch to an HDR-capable ffmpeg by running:",
-        "hdrPolicyNoticeCopyBtn": "Copy command",
-        "hdrPolicyNoticeCopyAria": "Copy the HDR-capable ffmpeg install command to the clipboard",
-        "hdrPolicyNoticeCopied": "Copied!",
-        "hdrPolicyNoticeCopyFailed": "Copy failed",
-        "hdrPolicyNoticeFixtureDocBtn": "Why — HDR fixture status",
-        "hdrPolicyNoticeFixtureDocAria": "Open the HDR fixture status document"
+        "hdrPolicyNoticeTitle": "HDR video loaded",
+        "hdrPolicyNoticeBody": "This environment may not be able to convert HDR video into a standard SDR video accurately. You can continue exporting, but brightness or color may look different in other apps. For color-critical exports, convert the clip to SDR in your camera app or editor before importing it."
       },
       "logs": {
         "syncException": "Error while copying to Export: {msg}",
@@ -651,9 +643,9 @@
         "batchPipelineCount": "Items this run: {count}",
         "videoPipelineWebglUnavailable": "WebGL2 is not available",
         "videoPipelineMetadataFailed": "Could not read metadata: {msg}",
-        "videoPipelineFfmpegStartFailed": "Could not start ffmpeg: {msg}",
+        "videoPipelineFfmpegStartFailed": "Could not start the video engine: {msg}",
         "videoPipelineAborted": "Canceled",
-        "videoPipelineFfmpegFailed": "ffmpeg failed (code {code})"
+        "videoPipelineFfmpegFailed": "The video engine stopped (code {code})"
       }
     }
   }

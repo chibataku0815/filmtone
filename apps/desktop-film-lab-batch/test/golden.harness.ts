@@ -10,6 +10,7 @@ import { promises as fs } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { PRESETS } from "film-lab-core";
+import { PNG } from "pngjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -86,6 +87,81 @@ export async function captureAdapterInfo(page: Page): Promise<void> {
 function stripDataUrlPrefix(dataUrl: string): string {
   const comma = dataUrl.indexOf(",");
   return comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
+}
+
+export function sourceImagePath(filename: string): string {
+  return path.join(SOURCE_IMAGES_DIR, filename);
+}
+
+export async function captureParamsPngBuffer(
+  page: Page,
+  imagePath: string,
+  params: Record<string, number | string>,
+  size: { width: number; height: number } = { width: 640, height: 360 },
+): Promise<Buffer> {
+  const imageBuf = await fs.readFile(imagePath);
+  const imageBase64 = imageBuf.toString("base64");
+  const ok = await page.evaluate(
+    async (args: {
+      base64: string;
+      params: Record<string, number | string>;
+      width: number;
+      height: number;
+    }) => {
+      const h = (window as any).__filmtoneTest;
+      if (!h) return { ok: false, reason: "harness-missing" };
+      const loaded = await h.loadImage(args.base64);
+      if (!loaded) return { ok: false, reason: "loadImage-failed" };
+      await h.waitTwoFrames();
+      h.setCanvasSize(args.width, args.height);
+      h.setParams(args.params);
+      await h.waitTwoFrames();
+      h.setExportFlipY(true);
+      await h.waitTwoFrames();
+      const canvas = h.getCanvasEl() as HTMLCanvasElement | null;
+      if (!canvas) return { ok: false, reason: "canvas-null" };
+      const dataUrl = canvas.toDataURL("image/png");
+      return { ok: true, dataUrl };
+    },
+    {
+      base64: imageBase64,
+      params,
+      width: size.width,
+      height: size.height,
+    },
+  );
+
+  if (!ok.ok) {
+    throw new Error(`captureParamsPngBuffer failed: ${ok.reason ?? "unknown"}`);
+  }
+  return Buffer.from(stripDataUrlPrefix(ok.dataUrl as string), "base64");
+}
+
+export function diffPngBuffers(
+  aBuffer: Buffer,
+  bBuffer: Buffer,
+): { meanAbs: number; changedRatio: number } {
+  const a = PNG.sync.read(aBuffer);
+  const b = PNG.sync.read(bBuffer);
+  if (a.width !== b.width || a.height !== b.height) {
+    throw new Error(`PNG size mismatch: ${a.width}x${a.height} vs ${b.width}x${b.height}`);
+  }
+  let totalAbs = 0;
+  let changedPixels = 0;
+  const pixels = a.width * a.height;
+  for (let i = 0; i < a.data.length; i += 4) {
+    const dr = Math.abs(a.data[i]! - b.data[i]!);
+    const dg = Math.abs(a.data[i + 1]! - b.data[i + 1]!);
+    const db = Math.abs(a.data[i + 2]! - b.data[i + 2]!);
+    totalAbs += dr + dg + db;
+    if (dr + dg + db >= 6) {
+      changedPixels += 1;
+    }
+  }
+  return {
+    meanAbs: totalAbs / Math.max(1, pixels * 3),
+    changedRatio: changedPixels / Math.max(1, pixels),
+  };
 }
 
 /**

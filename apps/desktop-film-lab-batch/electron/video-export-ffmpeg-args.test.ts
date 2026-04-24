@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildCameraOpticsMetadataArgs,
+  buildFfmpegMezzanineTranscodeArgs,
   buildFfmpegMezzanineVideoFilter,
   buildFfmpegRawvideoExportArgs,
   buildHdrToSdrFilterChain,
@@ -44,21 +45,25 @@ describe("video-export-ffmpeg-args", () => {
       "1:a:0",
       "-shortest",
       "-vf",
-      "vflip,scale=in_range=full:out_range=limited",
+      "vflip,scale=in_range=full:out_range=full,format=yuv420p",
       "-color_range",
-      "tv",
+      "pc",
       "-colorspace",
       "bt709",
       "-color_trc",
       "bt709",
       "-color_primaries",
       "bt709",
+      "-pix_fmt",
+      "yuv420p",
       "-c:v",
       "libx264",
       "-preset",
-      "veryfast",
+      "slow",
       "-crf",
-      "21",
+      "16",
+      "-tune",
+      "film",
       "-c:a",
       "copy",
       "/tmp/output.mp4",
@@ -91,6 +96,9 @@ describe("video-export-ffmpeg-args", () => {
     const movflagsIndex = args.indexOf("-movflags");
 
     expect(args[outputIndex]).toBe("/tmp/output.mp4");
+    expect(args).toContain("vflip,scale=in_range=full:out_range=full,format=yuv420p,select=gte(n\\,1),setpts=N/FRAME_RATE/TB");
+    expect(args).toContain("h264_videotoolbox");
+    expect(args).toContain("24M");
     expect(movflagsIndex).toBeGreaterThan(-1);
     expect(movflagsIndex).toBeLessThan(outputIndex);
     expect(args.slice(movflagsIndex, outputIndex)).toEqual([
@@ -237,6 +245,67 @@ describe("video-export-ffmpeg-args", () => {
       }),
     ).toBe(
       "zscale=tin=smpte2084:pin=2020:min=2020_ncl:rin=tv:t=linear:npl=100,format=gbrpf32le,zscale=p=709,tonemap=tonemap=hable:desat=0,zscale=t=709:m=709:r=tv,scale=320:-2,format=yuv420p",
+    );
+  });
+
+  it("uses VideoToolbox encoding for HDR mezzanine while disabling hardware decode", () => {
+    const args = buildFfmpegMezzanineTranscodeArgs({
+      inputPath: "/tmp/input-hdr.mov",
+      outputPath: "/tmp/output-sdr.mp4",
+      useHwEncoder: true,
+      outW: 960,
+      hdrFilterSelection: {
+        kind: "zscale-tonemap",
+        source: "hdr-pq",
+        chainId: "pq-zscale-hable-npl100",
+        enabledByEnv: true,
+        ffmpegPath: "/tmp/ffmpeg",
+        transferIn: "smpte2084",
+        tonemap: "hable",
+        nominalPeakNits: 100,
+        desat: 0,
+        output: "bt709-sdr",
+      },
+    });
+
+    expect(args).not.toContain("-hwaccel");
+    expect(args).toContain("h264_videotoolbox");
+    expect(args).not.toContain("libx264");
+    expect(args).toContain(
+      "zscale=tin=smpte2084:pin=2020:min=2020_ncl:rin=tv:t=linear:npl=100,format=gbrpf32le,zscale=p=709,tonemap=tonemap=hable:desat=0,zscale=t=709:m=709:r=tv,scale=960:-2,format=yuv420p",
+    );
+    expect(args).toEqual(
+      expect.arrayContaining([
+        "-color_range",
+        "tv",
+        "-colorspace",
+        "bt709",
+        "-color_trc",
+        "bt709",
+        "-color_primaries",
+        "bt709",
+      ]),
+    );
+  });
+
+  it("keeps hardware decode for SDR mezzanine when VideoToolbox is enabled", () => {
+    const args = buildFfmpegMezzanineTranscodeArgs({
+      inputPath: "/tmp/input-sdr.mov",
+      outputPath: "/tmp/output-sdr.mp4",
+      useHwEncoder: true,
+      outW: 960,
+    });
+
+    expect(args).toEqual(
+      expect.arrayContaining([
+        "-hwaccel",
+        "videotoolbox",
+        "-c:v",
+        "h264_videotoolbox",
+      ]),
+    );
+    expect(args).toContain(
+      "colorspace=iall=bt709:all=bt709,scale=960:-2,format=yuv420p",
     );
   });
 

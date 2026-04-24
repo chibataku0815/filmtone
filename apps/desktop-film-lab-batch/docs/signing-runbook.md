@@ -105,6 +105,7 @@ source .notary.env
 bun run dist:mac:release
 
 # → electron-builder が Keychain から証明書を自動検出して署名
+# → Contents/Resources/bin/darwin-arm64/ffmpeg と ffprobe は mac.binaries で app 署名前に署名
 # → afterSign hook (scripts/notarize.mjs) が Apple に提出
 # → 公証完了まで数分待つ
 ```
@@ -114,6 +115,15 @@ bun run dist:mac:release
 # 署名の検証
 codesign --verify --deep --strict release/mac-arm64/Filmtone.app
 # → "valid on disk" が出れば OK
+
+# 同梱 FFmpeg / FFprobe の署名と依存関係を検証
+codesign --verify --strict release/mac-arm64/Filmtone.app/Contents/Resources/bin/darwin-arm64/ffmpeg
+codesign --verify --strict release/mac-arm64/Filmtone.app/Contents/Resources/bin/darwin-arm64/ffprobe
+otool -L release/mac-arm64/Filmtone.app/Contents/Resources/bin/darwin-arm64/ffmpeg
+# → /opt/homebrew など開発機固有の dylib が出ないこと
+
+# 第三者 notice が同梱されていること
+test -f release/mac-arm64/Filmtone.app/Contents/Resources/third-party/ffmpeg/NOTICE.md
 
 # Gatekeeper 検証
 spctl --assess --type exec release/mac-arm64/Filmtone.app

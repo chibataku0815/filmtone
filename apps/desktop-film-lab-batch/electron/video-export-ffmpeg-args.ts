@@ -39,16 +39,24 @@ export type FfmpegRawvideoExportArgsOptions = {
   platform?: NodeJS.Platform;
 };
 
+export type FfmpegMezzanineTranscodeArgsOptions = {
+  inputPath: string;
+  outputPath: string;
+  useHwEncoder: boolean;
+  outW: number;
+  hdrFilterSelection?: HdrToSdrFilterSelection | null;
+};
+
 /**
- * @description プラットフォーム別のビデオコーデック引数（スループット優先）
+ * @description プラットフォーム別のビデオコーデック引数（画質優先）
  */
 export function ffmpegVideoCodecArgs(
   platform: NodeJS.Platform = process.platform,
 ): string[] {
   if (platform === "darwin") {
-    return ["-c:v", "h264_videotoolbox", "-b:v", "12M", "-allow_sw", "1"];
+    return ["-c:v", "h264_videotoolbox", "-b:v", "24M", "-allow_sw", "1"];
   }
-  return ["-c:v", "libx264", "-preset", "veryfast", "-crf", "21"];
+  return ["-c:v", "libx264", "-preset", "slow", "-crf", "16", "-tune", "film"];
 }
 
 function finiteNumber(value: unknown): number | undefined {
@@ -204,6 +212,65 @@ export function buildFfmpegMezzanineVideoFilter(opts: {
   return `colorspace=iall=bt709:all=bt709,scale=${outW}:-2,format=yuv420p`;
 }
 
+export function buildFfmpegMezzanineTranscodeArgs(
+  opts: FfmpegMezzanineTranscodeArgsOptions,
+): string[] {
+  const {
+    inputPath,
+    outputPath,
+    useHwEncoder,
+    outW,
+    hdrFilterSelection = null,
+  } = opts;
+  const args = ["-hide_banner", "-loglevel", "info"];
+  const useHardwareDecode = useHwEncoder && hdrFilterSelection === null;
+  if (useHardwareDecode) {
+    args.push("-hwaccel", "videotoolbox");
+  }
+  args.push("-i", inputPath);
+  if (useHwEncoder) {
+    args.push(
+      "-c:v",
+      "h264_videotoolbox",
+      "-b:v",
+      "80M",
+      "-g",
+      "1",
+      "-allow_sw",
+      "1",
+    );
+  } else {
+    args.push(
+      "-c:v",
+      "libx264",
+      "-crf",
+      "4",
+      "-preset",
+      "ultrafast",
+      "-g",
+      "1",
+    );
+  }
+  args.push(
+    "-vf",
+    buildFfmpegMezzanineVideoFilter({ outW, hdrFilterSelection }),
+  );
+  if (hdrFilterSelection) {
+    args.push(
+      "-color_range",
+      "tv",
+      "-colorspace",
+      "bt709",
+      "-color_trc",
+      "bt709",
+      "-color_primaries",
+      "bt709",
+    );
+  }
+  args.push("-c:a", "copy", "-y", outputPath);
+  return args;
+}
+
 export function buildFfmpegRawvideoExportArgs(
   opts: FfmpegRawvideoExportArgsOptions,
 ): string[] {
@@ -248,28 +315,28 @@ export function buildFfmpegRawvideoExportArgs(
   } else {
     head.push("-an");
   }
-  // Color management: WebGL readPixels emits full-range sRGB (0-255) in bottom-up row order.
-  // vflip restores top-down order (zero-copy row pointer swap in ffmpeg).
-  // scale converts full range to limited range (16-235) for H.264 standard compliance,
-  // and BT.709 color metadata tags ensure correct player interpretation.
-  // See: .claude/knowledge/patterns/2026-03-03-ffmpeg-encoder-pitfalls-pattern.md §4
+  // Color management: GPU readback emits full-range sRGB (0-255) in bottom-up row order.
+  // vflip restores top-down order. Keep full range by default so preview highlights,
+  // mist, bloom, and halation do not get re-shaped by a final full-to-limited squeeze.
   //
   // WebGL raw readback can emit a stale frame 0 on some Metal / ANGLE paths.
   // Keep the drop only for that backend; WebGPU exports should preserve frame 0.
   const colorFilterChain = dropFirstFrame
-    ? "vflip,scale=in_range=full:out_range=limited,select=gte(n\\,1),setpts=N/FRAME_RATE/TB"
-    : "vflip,scale=in_range=full:out_range=limited";
+    ? "vflip,scale=in_range=full:out_range=full,format=yuv420p,select=gte(n\\,1),setpts=N/FRAME_RATE/TB"
+    : "vflip,scale=in_range=full:out_range=full,format=yuv420p";
   head.push(
     "-vf",
     colorFilterChain,
     "-color_range",
-    "tv",
+    "pc",
     "-colorspace",
     "bt709",
     "-color_trc",
     "bt709",
     "-color_primaries",
     "bt709",
+    "-pix_fmt",
+    "yuv420p",
   );
   head.push(...videoCodec);
   if (hasAudio) {

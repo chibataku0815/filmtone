@@ -391,9 +391,9 @@
         },
         "tipExportTabIntro": "パソコン上のフォルダに入っている写真を、Filmtone で整えた見え方のまま別フォルダへまとめて保存できます。動画を1本、同じ見え方でMP4にすることもできます。編集タブでスライダーを触ったあと、編集タブ右下の「色を書き出しへ送る」で数値をこちらに送れます。LUT（ルックアップテーブル）はJSONの読み込みなどで別途。",
         "tipJobImages": "選んだフォルダにある .jpg / .jpeg / .png すべてに、いまのルックを載せて JPEG か PNG で別フォルダに保存します。",
-        "tipJobVideoWebGlOnly": "編集タブに近い見え方になるよう、1 フレームずつグレードして MP4 にまとめます。クリップが長いと完了まで時間がかかることがあります。PATH に ffmpeg / ffprobe が必要です。",
+        "tipJobVideoWebGlOnly": "編集タブに近い見え方になるよう、1 フレームずつグレードして MP4 にまとめます。クリップが長いと完了まで時間がかかることがあります。",
         "tipSourcesImagesFolder": "そのフォルダ直下の .jpg / .jpeg / .png だけが対象です。動画ファイルの変換には使いません。",
-        "tipSourcesVideoFile": "読込上限は 4K・最大 {maxSec} 秒です。PATH に ffmpeg / ffprobe が必要です。",
+        "tipSourcesVideoFile": "読込上限は 4K・最大 {maxSec} 秒です。",
         "tipLookJsonDetails": "LUT を含むルックをファイルで渡したり保存したりする場合の手順です。ふだんは編集タブの「色を書き出しへ送る」かプリセットだけで足ります。",
         "tipApplyEditGradeToBatch": "編集タブのスライダーをここへコピー（右下の「色を書き出しへ送る」と同じ）。プリセット変更直後はその数値のまま。LUT を含む復元は「Metadata JSON を読み込む」から行えます。",
         "tipLoadMetadataJson": "Metadata JSON を読み込んで、書き出し種別・入出力パス・形式・接尾辞・ルック・LUT 参照を復元します。新形式に合わない場合は、従来の Grade JSON として読み込みます。",
@@ -457,7 +457,7 @@
         "tipPhotoExportPanelIntro": "フォルダ内の .jpg / .jpeg / .png を選び、保存先と形式を決めて実行します。編集タブで調整したあと「色を書き出しへ送る」でルックをこちらへコピーできます。",
         "videoExportPanelTitle": "動画の書き出し",
         "videoExportPanelTitleHintAria": "動画 1 本の書き出しの説明",
-        "tipVideoExportPanelIntro": "書き出す動画を 1 本選び、必要なら保存先を決めて MP4 にします。長いクリップは時間がかかります。PATH に ffmpeg / ffprobe が必要です。",
+        "tipVideoExportPanelIntro": "書き出す動画を 1 本選び、必要なら保存先を決めて MP4 にします。長いクリップは時間がかかります。",
         "lookStatusJsonTitle": "ルック: JSON",
         "lookStatusJsonBody": "{path}",
         "lookStatusEditTitle": "ルック: 編集タブと一致",
@@ -587,19 +587,11 @@
         "presetCustom": "カスタム",
         "presetVideoDefault": "標準",
         "advancedDisclosureTitle": "詳細設定",
-        "videoSourceHint": "読込上限は 4K・最大 {maxSec} 秒です。PATH に ffmpeg / ffprobe が必要です。",
-        "videoOutputHint": "ファイル名は元名に -graded.mp4 を付けます。出力は最大 FHD・{fps} fps です。",
+        "videoSourceHint": "読込上限は 4K・最大 {maxSec} 秒です。",
+        "videoOutputHint": "ファイル名は元名に -graded.mp4 を付けます。出力は最大 FHD、fps はソースに合わせます（不明時 {fps}fps）。",
         "filenameSuffixPlaceholder": "-graded",
-        "hdrPolicyNoticeTitle": "HDR ソースを検知しましたが、ffmpeg が線形化できません",
-        "hdrPolicyNoticeBody": "この動画は HDR（PQ / HLG）ですが、お使いの ffmpeg ビルドには zscale / libplacebo が無いため、書き出し時の HDR→SDR トーンマッピングは保留されます。SDR クリップはそのまま書き出せます。",
-        "hdrPolicyNoticeDetailLabel": "詳細:",
-        "hdrPolicyNoticeInstallLead": "HDR 対応 ffmpeg に切り替えるには以下を実行:",
-        "hdrPolicyNoticeCopyBtn": "コマンドをコピー",
-        "hdrPolicyNoticeCopyAria": "HDR 対応 ffmpeg のインストールコマンドをクリップボードにコピー",
-        "hdrPolicyNoticeCopied": "コピーしました",
-        "hdrPolicyNoticeCopyFailed": "コピーに失敗",
-        "hdrPolicyNoticeFixtureDocBtn": "HDR フィクスチャ状況を開く",
-        "hdrPolicyNoticeFixtureDocAria": "HDR フィクスチャ状況ドキュメントを開く"
+        "hdrPolicyNoticeTitle": "HDR動画を読み込みました",
+        "hdrPolicyNoticeBody": "この環境では、HDR動画を標準のSDR動画として正確に変換できない場合があります。書き出しは続行できますが、他のアプリで見ると明るさや色が元動画と違って見えることがあります。正確な色で書き出したい場合は、カメラアプリや編集アプリでSDR動画に変換してから読み込んでください。"
       },
       "logs": {
         "syncException": "書き出しへのコピー中にエラー: {msg}",
@@ -651,9 +643,9 @@
         "batchPipelineCount": "この実行で処理する枚数: {count}",
         "videoPipelineWebglUnavailable": "WebGL2 が利用できません",
         "videoPipelineMetadataFailed": "メタデータ取得失敗: {msg}",
-        "videoPipelineFfmpegStartFailed": "ffmpeg 開始失敗: {msg}",
+        "videoPipelineFfmpegStartFailed": "動画エンジンを開始できませんでした: {msg}",
         "videoPipelineAborted": "中断されました",
-        "videoPipelineFfmpegFailed": "ffmpeg 失敗 code={code}"
+        "videoPipelineFfmpegFailed": "動画エンジンが停止しました code={code}"
       }
     }
   }

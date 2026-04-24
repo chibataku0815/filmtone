@@ -1,7 +1,7 @@
 /**
  * Film Lab デスクトップ — 編集・写真まとめ書き出し・動画 1 本書き出しの 3 トップタブ
  *
- * @overview 書き出し用ルックの正はメモリ上の BatchGradeState。編集タブでプレビューし「色を書き出しへ送る」で同期する。
+ * @overview 書き出し開始時の正は現在の Viewport。Viewport が無い場合だけメモリ上の BatchGradeState へフォールバックする。
  * 編集／各書き出しは **右パネルの中身を切り替え**、Canvas はアンマウントしない（WebGL Viewport を維持し「反映」を常に効かせる）。
  * @limitations プレビュー上の LUT を書き出しへ自動複製はしない（JSON Import か .cube 再適用）。
  * シェルの色・段差は globals.css の Radix スケール準拠トークン（html.dark.dark-theme）に集約する。
@@ -85,7 +85,8 @@ import {
   assertVideoImportWithinCaps,
   computeExportFrameCount,
   computeVideoExportDimensions,
-  VIDEO_EXPORT_FPS,
+  formatVideoExportFps,
+  selectVideoExportFps,
   VIDEO_IMPORT_MAX_DURATION_SEC,
 } from "./video-export-constants";
 import { exportGradeJsonText } from "./grade-io";
@@ -95,7 +96,6 @@ import {
   buildPhotoMetadataSidecarPath,
   buildVideoMetadataSidecarPath,
   createEmptyMetadataLutRefs,
-  createMetadataLutRefFromRuntime,
   exportFilmtoneExportSessionJsonText,
   type MetadataLookSource,
   type MetadataLutRefs,
@@ -112,7 +112,12 @@ import {
   type AiScenePickResult,
 } from "./ai-scene-pick";
 import { buildAiRecommendation } from "./ai-recommendation-builder";
-import { viewportRecordToParams } from "./viewport-to-params";
+import {
+  buildEffectiveExportGradeSnapshot,
+  collectEffectiveExportGradeWarnings,
+  formatEffectiveExportGradeSummary,
+  type EffectiveExportGradeSnapshot,
+} from "./effective-export-grade";
 import {
   BatchTabCompactRunFooter,
   type BatchJobMode,
@@ -141,7 +146,7 @@ function desktopPreviewShowsUserVideo(state: DesktopInteractivePreviewState): bo
   if (state.kind !== "file" || state.smartLookDerived) {
     return false;
   }
-  return /\.(mp4|webm|m4v|mov)$/i.test(state.fileName);
+  return isVideoExportFileName(state.fileName);
 }
 
 /**
@@ -169,7 +174,7 @@ function isRasterExportFileName(fileName: string): boolean {
 
 /** @description プレビューに載せたファイル名が動画書き出し向けか */
 function isVideoExportFileName(fileName: string): boolean {
-  return /\.(mp4|webm)$/i.test(fileName);
+  return /\.(mp4|webm|m4v|mov)$/i.test(fileName);
 }
 
 type EditLutState = {
@@ -340,8 +345,10 @@ export default function App() {
       ffmpegStartFailed: (detail: string) =>
         tLogs("videoPipelineFfmpegStartFailed", { msg: detail }),
       userAborted: tLogs("videoPipelineAborted"),
-      ffmpegFailed: (code: number) =>
-        tLogs("videoPipelineFfmpegFailed", { code: String(code) }),
+      ffmpegFailed: (code: number | null) =>
+        tLogs("videoPipelineFfmpegFailed", {
+          code: code === null ? "unknown" : String(code),
+        }),
     }),
     [tLogs],
   );
@@ -935,7 +942,11 @@ export default function App() {
           meta.width,
           meta.height,
         );
-        const frames = computeExportFrameCount(meta.durationSec);
+        const exportFps = selectVideoExportFps({
+          sourceFrameRate: meta.sourceFrameRate,
+          sourceFrameRateTrusted: meta.sourceFrameRateTrusted,
+        });
+        const frames = computeExportFrameCount(meta.durationSec, exportFps);
         setVideoProbeLabel(
           tLogs("videoMetaLine", {
             w: String(meta.width),
@@ -944,7 +955,7 @@ export default function App() {
             codec: meta.videoCodec || "?",
             ow: String(outW),
             oh: String(outH),
-            fps: String(VIDEO_EXPORT_FPS),
+            fps: formatVideoExportFps(exportFps),
             frames: String(frames),
             maxSec: String(VIDEO_IMPORT_MAX_DURATION_SEC),
             camera: formatCameraOpticsForProbeLabel(displayCameraOptics),
@@ -1581,6 +1592,48 @@ export default function App() {
     [],
   );
 
+  const captureEffectiveExportGrade = useCallback((): EffectiveExportGradeSnapshot => {
+    let viewportParams: Record<string, number | string> | null = null;
+    let captureError: string | null = null;
+    if (viewport) {
+      try {
+        viewportParams = viewport.getParams();
+      } catch (error) {
+        captureError = error instanceof Error ? error.message : String(error);
+      }
+    }
+    return buildEffectiveExportGradeSnapshot({
+      viewportParams,
+      currentBatchGrade: batchGrade,
+      editLut,
+      canvasPreset,
+      fallbackBatchPresetChoice: batchPresetChoice,
+      fallbackLookSource: batchLookSource,
+      fallbackLutRefs: batchLutRefs,
+      captureError,
+    });
+  }, [
+    viewport,
+    batchGrade,
+    editLut,
+    canvasPreset,
+    batchPresetChoice,
+    batchLookSource,
+    batchLutRefs,
+  ]);
+
+  const appendEffectiveExportGradeLog = useCallback(
+    (snapshot: EffectiveExportGradeSnapshot) => {
+      appendLog(
+        `[書き出し] effectiveGrade ${formatEffectiveExportGradeSummary(snapshot)}`,
+      );
+      for (const warning of collectEffectiveExportGradeWarnings(snapshot)) {
+        appendLog(`[書き出し] ${warning}`);
+      }
+    },
+    [appendLog],
+  );
+
   const syncPreviewToBatch = useCallback(() => {
     if (!viewport) {
       appendLog(tLogs("syncNoViewport"));
@@ -1591,25 +1644,15 @@ export default function App() {
       return;
     }
     try {
-      const raw = viewport.getParams();
-      const params = viewportRecordToParams(raw, batchGrade.params.halationHue);
-      setBatchGrade({
-        params,
-        depthTrack: batchGrade.depthTrack,
-        lut1Intensity: editLut.lut1?.intensity ?? 1,
-        lut1Data: editLut.lut1?.data ?? null,
-        lut1Size: editLut.lut1?.size ?? 0,
-        lutIntensity: editLut.lut2?.intensity ?? 1,
-        lutData: editLut.lut2?.data ?? null,
-        lutSize: editLut.lut2?.size ?? 0,
-      });
-      setBatchLookSource("editSync");
-      setBatchLutRefs({
-        lut1: createMetadataLutRefFromRuntime(editLut.lut1),
-        lut2: createMetadataLutRefFromRuntime(editLut.lut2),
-      });
+      const snapshot = captureEffectiveExportGrade();
+      if (snapshot.source !== "preview") {
+        throw new Error(snapshot.captureError ?? "Preview params are unavailable");
+      }
+      setBatchGrade(snapshot.grade);
+      setBatchLookSource(snapshot.lookSource);
+      setBatchLutRefs(snapshot.lutRefs);
       setImportedGradeLabel(null);
-      setBatchPresetChoice(canvasPreset);
+      setBatchPresetChoice(snapshot.batchPresetChoice);
       setEditToExportSyncedAtMs(Date.now());
       setSyncedAtNonce(paramsChangeNonce);
       appendLog(tLogs("syncCopied"));
@@ -1627,10 +1670,7 @@ export default function App() {
     }
   }, [
     viewport,
-    batchGrade.depthTrack,
-    batchGrade.params.halationHue,
-    canvasPreset,
-    editLut,
+    captureEffectiveExportGrade,
     paramsChangeNonce,
     appendLog,
     tLogs,
@@ -1664,11 +1704,13 @@ export default function App() {
   };
 
   const exportGrade = () => {
+    const exportSnapshot = captureEffectiveExportGrade();
+    appendEffectiveExportGradeLog(exportSnapshot);
     const blob = new Blob(
       [
         exportGradeJsonText(
-          batchGrade.params,
-          batchGrade.depthTrack?.source ?? null,
+          exportSnapshot.grade.params,
+          exportSnapshot.grade.depthTrack?.source ?? null,
           sourceCameraOptics,
         ),
       ],
@@ -1778,15 +1820,34 @@ export default function App() {
     ) => {
       const effectiveInput = pathContext?.inputDir ?? inputDir;
       const effectiveOutput = pathContext?.outputDir ?? outputDir;
-      const effectiveGrade = pathContext?.grade ?? batchGrade;
+      const capturedSnapshot = pathContext?.grade
+        ? null
+        : captureEffectiveExportGrade();
+      const effectiveGrade = pathContext?.grade ?? capturedSnapshot!.grade;
       const effectiveBatchPresetChoice =
-        pathContext?.batchPresetChoice ?? batchPresetChoice;
-      const effectiveLookSource = pathContext?.lookSource ?? batchLookSource;
-      const effectiveLutRefs = pathContext?.lutRefs ?? batchLutRefs;
+        pathContext?.batchPresetChoice ??
+        capturedSnapshot?.batchPresetChoice ??
+        batchPresetChoice;
+      const effectiveLookSource =
+        pathContext?.lookSource ?? capturedSnapshot?.lookSource ?? batchLookSource;
+      const effectiveLutRefs =
+        pathContext?.lutRefs ?? capturedSnapshot?.lutRefs ?? batchLutRefs;
       const effectiveOpticalRecommendation =
-        pathContext?.opticalRecommendation ?? appliedOpticalRecommendation;
+        pathContext?.opticalRecommendation ??
+        (effectiveLookSource === "analysisRecommendation"
+          ? appliedOpticalRecommendation
+          : null);
       const effectiveImportedGradePath =
-        pathContext?.importedGradePath ?? importedGradeLabel;
+        pathContext?.importedGradePath ??
+        (capturedSnapshot?.source === "preview" ? null : importedGradeLabel);
+      const effectiveSnapshot: EffectiveExportGradeSnapshot = {
+        grade: effectiveGrade,
+        batchPresetChoice: effectiveBatchPresetChoice,
+        lookSource: effectiveLookSource,
+        lutRefs: effectiveLutRefs,
+        source: capturedSnapshot?.source ?? "batch",
+        captureError: capturedSnapshot?.captureError ?? null,
+      };
       if (!effectiveInput || !effectiveOutput) return;
 
       void window.filmLabBatch.setDesktopPrefs({
@@ -1833,6 +1894,7 @@ export default function App() {
         }),
       );
       appendLog(tLogs("runCountLabel", { count: imagePaths.length }));
+      appendEffectiveExportGradeLog(effectiveSnapshot);
 
       const photoSidecar = buildMetadataSessionJsonText({
         job: "images",
@@ -1942,11 +2004,12 @@ export default function App() {
     },
     [
       appendLog,
+      appendEffectiveExportGradeLog,
       appliedOpticalRecommendation,
-      batchGrade,
       batchLookSource,
       batchLutRefs,
       batchPresetChoice,
+      captureEffectiveExportGrade,
       finalizeSessionAfterRun,
       buildMetadataSessionJsonText,
       importedGradeLabel,
@@ -1964,6 +2027,17 @@ export default function App() {
       appendLog(tLogs("noImages"));
       return;
     }
+    const exportSnapshot = captureEffectiveExportGrade();
+    const sessionImportedGradePath =
+      exportSnapshot.source === "preview" ? null : importedGradeLabel;
+    const sessionGradeParamsJson =
+      exportSnapshot.source === "preview" || !sessionImportedGradePath
+        ? exportGradeJsonText(
+            exportSnapshot.grade.params,
+            exportSnapshot.grade.depthTrack?.source ?? null,
+            sourceCameraOptics,
+          )
+        : null;
     const session: FilmLabBatchSessionV1 = {
       version: 1,
       updatedAtIso: new Date().toISOString(),
@@ -1972,20 +2046,26 @@ export default function App() {
       format: batchFormat,
       imagePaths: images,
       outcomes: initialOutcomes(images.length),
-      batchPresetChoice,
-      importedGradePath: importedGradeLabel,
-      gradeParamsJson: importedGradeLabel
-        ? null
-        : exportGradeJsonText(
-            batchGrade.params,
-            batchGrade.depthTrack?.source ?? null,
-            sourceCameraOptics,
-          ),
+      batchPresetChoice: exportSnapshot.batchPresetChoice,
+      importedGradePath: sessionImportedGradePath,
+      gradeParamsJson: sessionGradeParamsJson,
       outputFilenameSuffix: sanitizeBatchFilenameSuffix(batchOutputSuffix),
     };
     await window.filmLabBatch.writeBatchSession(session);
     setPersistedSession(session);
-    await runBatchWithPaths(images, batchFormat, session);
+    await runBatchWithPaths(images, batchFormat, session, {
+      inputDir,
+      outputDir,
+      grade: exportSnapshot.grade,
+      batchPresetChoice: exportSnapshot.batchPresetChoice,
+      lookSource: exportSnapshot.lookSource,
+      lutRefs: exportSnapshot.lutRefs,
+      opticalRecommendation:
+        exportSnapshot.lookSource === "analysisRecommendation"
+          ? appliedOpticalRecommendation
+          : null,
+      importedGradePath: sessionImportedGradePath,
+    });
   };
 
   const resumeBatch = async () => {
@@ -2042,9 +2122,20 @@ export default function App() {
       lastFailedPaths.every((p) => persistedSession.imagePaths.includes(p))
         ? persistedSession
         : null;
+    const exportSnapshot = captureEffectiveExportGrade();
     await runBatchWithPaths(lastFailedPaths, batchFormat, aligned, {
       inputDir,
       outputDir,
+      grade: exportSnapshot.grade,
+      batchPresetChoice: exportSnapshot.batchPresetChoice,
+      lookSource: exportSnapshot.lookSource,
+      lutRefs: exportSnapshot.lutRefs,
+      opticalRecommendation:
+        exportSnapshot.lookSource === "analysisRecommendation"
+          ? appliedOpticalRecommendation
+          : null,
+      importedGradePath:
+        exportSnapshot.source === "preview" ? null : importedGradeLabel,
     });
   };
 
@@ -2121,7 +2212,13 @@ export default function App() {
       videoSourceMetadata = meta.sourceVideoMetadata ?? null;
       setSourceCameraOptics(videoCameraOptics);
       assertVideoImportWithinCaps(meta.width, meta.height, meta.durationSec);
-      estimateFrames = computeExportFrameCount(meta.durationSec);
+      estimateFrames = computeExportFrameCount(
+        meta.durationSec,
+        selectVideoExportFps({
+          sourceFrameRate: meta.sourceFrameRate,
+          sourceFrameRateTrusted: meta.sourceFrameRateTrusted,
+        }),
+      );
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       appendLog(tLogs("videoValidateErr", { msg }));
@@ -2131,6 +2228,8 @@ export default function App() {
     resetLogText();
     resetVideoProgressBuffer();
     batchAbortRef.current = null;
+    const videoExportSnapshot = captureEffectiveExportGrade();
+    appendEffectiveExportGradeLog(videoExportSnapshot);
 
     const videoSidecar = buildMetadataSessionJsonText({
       job: "video",
@@ -2140,6 +2239,14 @@ export default function App() {
       imageFormat: null,
       outputFilenameSuffix: null,
       outputFileName: outName,
+      grade: videoExportSnapshot.grade,
+      batchPresetChoice: videoExportSnapshot.batchPresetChoice,
+      lookSource: videoExportSnapshot.lookSource,
+      lutRefs: videoExportSnapshot.lutRefs,
+      opticalRecommendation:
+        videoExportSnapshot.lookSource === "analysisRecommendation"
+          ? appliedOpticalRecommendation
+          : null,
       cameraOptics: videoCameraOptics,
       sourceVideoMetadata: videoSourceMetadata,
     });
@@ -2182,7 +2289,7 @@ export default function App() {
           inputVideoPath: videoInputPath,
           outputDir: effectiveOutputDir,
           outputFileName: outName,
-          grade: batchGrade,
+          grade: videoExportSnapshot.grade,
           cameraOptics: videoCameraOptics,
           signal: abortController.signal,
           onProgress: (pr) => {

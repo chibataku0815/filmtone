@@ -56,14 +56,17 @@ import {
   DesktopUpdateService,
   resolveDesktopUpdateCheckUrl,
 } from "./desktop-update-service";
-import { resolveVideoCliBinary } from "./ffmpeg-cli-resolve";
+import {
+  resolveVideoCliBinary,
+  type VideoCliBinaryName,
+} from "./ffmpeg-cli-resolve";
 import {
   createVideoExportPipeController,
   describeVideoExportPipeUnavailable,
   type VideoExportPipeController,
 } from "./video-export-stdin";
 import {
-  buildFfmpegMezzanineVideoFilter,
+  buildFfmpegMezzanineTranscodeArgs,
   buildFfmpegRawvideoExportArgs,
   normalizeCameraOptics,
 } from "./video-export-ffmpeg-args";
@@ -161,6 +164,17 @@ const DEBUG_VIDEO_EXPORT_MAIN =
   process.env.FILM_LAB_DEBUG_VIDEO_EXPORT === "1" ||
   process.env.FILM_LAB_DEBUG_VIDEO_EXPORT === "true";
 
+function videoCliUnavailableError(
+  binaryName: VideoCliBinaryName,
+  error: unknown,
+): Error {
+  const detail = error instanceof Error ? error.message : String(error);
+  console.warn(`[film-lab-desktop] ${binaryName} unavailable: ${detail}`);
+  return new Error(
+    "動画エンジンを開始できません。アプリを再インストールしてからもう一度お試しください。",
+  );
+}
+
 /**
  * @description rawvideo の各フレーム成功ログは、明示時だけ細かく出す。
  *   既定は quiet にし、明らかに遅い write だけを観測用に残す。
@@ -174,8 +188,8 @@ const SKIP_MEZZANINE =
   process.env.FILM_LAB_SKIP_MEZZANINE === "true";
 
 const ENABLE_HDR_TONEMAP =
-  process.env.FILM_LAB_ENABLE_HDR_TONEMAP === "1" ||
-  process.env.FILM_LAB_ENABLE_HDR_TONEMAP === "true";
+  process.env.FILM_LAB_ENABLE_HDR_TONEMAP !== "0" &&
+  process.env.FILM_LAB_ENABLE_HDR_TONEMAP !== "false";
 
 function parseHdrTonemapEnginePreference(
   value: string | undefined,
@@ -488,10 +502,7 @@ async function ffprobeVideoMeta(absPath: string): Promise<{
     try {
       return resolveVideoCliBinary("ffprobe");
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      throw new Error(
-        `ffprobe が見つかりません。動画の読み込みと書き出しには ffmpeg / ffprobe が必要です。${msg}`,
-      );
+      throw videoCliUnavailableError("ffprobe", e);
     }
   })();
   if (DEBUG_VIDEO_EXPORT_MAIN) {
@@ -773,64 +784,6 @@ function buildFfmpegProxyArgs(
     );
   }
   args.push("-an", "-y", outputPath);
-  return args;
-}
-
-/**
- * @description Visually lossless mezzanine 用の ffmpeg 引数を組み立てる。
- *   Chromium の <video> が decode できる H.264 all-I-frame を使用。
- *   useHwEncoder=true で h264_videotoolbox（Apple Silicon HW）、false で libx264（SW fallback）。
- *   -g 1: 全フレームが IDR → seek が瞬時。
- *   高ビットレート: visually lossless（ProRes 422 相当品質）。
- */
-function buildFfmpegMezzanineArgs(
-  inputPath: string,
-  outputPath: string,
-  useHwEncoder: boolean,
-  outW: number,
-  outH: number,
-  hdrFilterSelection: HdrToSdrFilterSelection | null = null,
-): string[] {
-  const args = ["-hide_banner", "-loglevel", "info"];
-  const useHardwarePath = useHwEncoder && hdrFilterSelection === null;
-  if (useHardwarePath) {
-    args.push("-hwaccel", "videotoolbox");
-  }
-  args.push("-i", inputPath);
-  if (useHardwarePath) {
-    args.push(
-      "-c:v", "h264_videotoolbox",
-      "-b:v", "80M",
-      "-g", "1",
-      "-allow_sw", "1",
-    );
-  } else {
-    args.push(
-      "-c:v", "libx264",
-      "-crf", "4",
-      "-preset", "ultrafast",
-      "-g", "1",
-    );
-  }
-  // colorspace / HDR tone-map filter で bt709 SDR に正規化してから scale する。
-  // ProRes 4444 (yuv444p12le, gbr) 等で swscaler が "Unsupported input" になるのを回避。
-  args.push(
-    "-vf",
-    buildFfmpegMezzanineVideoFilter({ outW, hdrFilterSelection }),
-  );
-  if (hdrFilterSelection) {
-    args.push(
-      "-color_range",
-      "tv",
-      "-colorspace",
-      "bt709",
-      "-color_trc",
-      "bt709",
-      "-color_primaries",
-      "bt709",
-    );
-  }
-  args.push("-c:a", "copy", "-y", outputPath);
   return args;
 }
 
@@ -1594,8 +1547,7 @@ ipcMain.handle("video-export-start", async (_evt, payload: unknown) => {
     try {
       return resolveVideoCliBinary("ffmpeg");
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      throw new Error(`ffmpeg が見つかりません。${msg}`);
+      throw videoCliUnavailableError("ffmpeg", e);
     }
   })();
   let child: FfmpegExportChildProcess;
@@ -1808,8 +1760,7 @@ ipcMain.handle(
       try {
         return resolveVideoCliBinary("ffmpeg");
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        throw new Error(`video-preview-extract-thumbnail: ffmpeg が見つかりません。${msg}`);
+        throw videoCliUnavailableError("ffmpeg", e);
       }
     })();
     const { width, height } = computeProxyDimensions(
@@ -1991,8 +1942,7 @@ ipcMain.handle(
       try {
         return resolveVideoCliBinary("ffmpeg");
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        throw new Error(`video-preview-generate-proxy: ffmpeg が見つかりません。${msg}`);
+        throw videoCliUnavailableError("ffmpeg", e);
       }
     })();
     const outputPath = path.join(
@@ -2172,10 +2122,6 @@ ipcMain.handle(
       typeof input.outW === "number" && input.outW > 0
         ? Math.round(input.outW)
         : 1920;
-    const safeOutH =
-      typeof input.outH === "number" && input.outH > 0
-        ? Math.round(input.outH)
-        : 1080;
     if (SKIP_MEZZANINE) {
       throw new Error(
         "video-export-transcode-mezzanine: FILM_LAB_SKIP_MEZZANINE=1 でスキップ",
@@ -2194,8 +2140,7 @@ ipcMain.handle(
       try {
         return resolveVideoCliBinary("ffmpeg");
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        throw new Error(`ffmpeg が見つかりません。${msg}`);
+        throw videoCliUnavailableError("ffmpeg", e);
       }
     })();
 
@@ -2210,14 +2155,13 @@ ipcMain.handle(
 
     const runTranscode = (useHw: boolean): Promise<void> =>
       new Promise((resolve, reject) => {
-        const args = buildFfmpegMezzanineArgs(
-          abs,
+        const args = buildFfmpegMezzanineTranscodeArgs({
+          inputPath: abs,
           outputPath,
-          useHw,
-          safeOutW,
-          safeOutH,
+          useHwEncoder: useHw,
+          outW: safeOutW,
           hdrFilterSelection,
-        );
+        });
         if (DEBUG_VIDEO_EXPORT_MAIN) {
           console.log(
             `[film-lab-desktop][mezzanine] ffmpeg ${useHw ? "HW" : "SW"}${
@@ -2289,27 +2233,23 @@ ipcMain.handle(
         });
       });
 
-    // HW encoder first, SW fallback. HDR tone-map filters run on the SW path.
+    // HW encoder first, SW fallback. HDR tone-map filters stay in the video filter graph.
     try {
-      if (hdrFilterSelection) {
-        await runTranscode(false);
-      } else {
-        try {
-          await runTranscode(true);
-        } catch (hwErr) {
-          if (DEBUG_VIDEO_EXPORT_MAIN) {
-            console.log(
-              `[film-lab-desktop][mezzanine] HW encoder 失敗、SW fallback: ${hwErr instanceof Error ? hwErr.message : String(hwErr)}`,
-            );
-          }
-          // Remove partial output from HW attempt
-          try {
-            await fs.unlink(outputPath);
-          } catch {
-            /* ignore */
-          }
-          await runTranscode(false);
+      try {
+        await runTranscode(true);
+      } catch (hwErr) {
+        if (DEBUG_VIDEO_EXPORT_MAIN) {
+          console.log(
+            `[film-lab-desktop][mezzanine] HW encoder 失敗、SW fallback: ${hwErr instanceof Error ? hwErr.message : String(hwErr)}`,
+          );
         }
+        // Remove partial output from HW attempt
+        try {
+          await fs.unlink(outputPath);
+        } catch {
+          /* ignore */
+        }
+        await runTranscode(false);
       }
     } catch (err) {
       unregisterProgressivePreviewTempPath(outputPath);

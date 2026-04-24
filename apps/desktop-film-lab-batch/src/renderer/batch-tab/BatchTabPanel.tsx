@@ -31,7 +31,7 @@ import {
 } from "../batch-session";
 import type { BatchFormat } from "../batch-pipeline";
 import {
-  VIDEO_EXPORT_FPS,
+  VIDEO_EXPORT_FALLBACK_FPS,
   VIDEO_IMPORT_MAX_DURATION_SEC,
 } from "../video-export-constants";
 import type {
@@ -1001,7 +1001,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
         <>
           <p className="fl-field-label">{t("videoOutputFolderTitle")}</p>
           <p className="fl-caption text-[var(--fl-text-tertiary)]">
-            {t("videoOutputHint", { fps: String(VIDEO_EXPORT_FPS) })}
+            {t("videoOutputHint", { fps: String(VIDEO_EXPORT_FALLBACK_FPS) })}
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <button

@@ -1,7 +1,7 @@
 /**
  * Film Lab デスクトップ — 動画出力の製品キャップ定数
  *
- * @overview 読み込み解像度・最大尺・出力は FHD@24fps に固定。実装の他ファイルから参照する単一ソース。
+ * @overview 読み込み解像度・最大尺・出力解像度の上限を管理する。fps は信頼できるソース fps を保持する。
  * @limitations アップスケールはしない（出力はソースを FHD 以内に収めた解像度）。
  */
 
@@ -14,8 +14,8 @@ export const VIDEO_IMPORT_MAX_HEIGHT = 2160;
 /** @description ソース動画の長さの上限（秒） */
 export const VIDEO_IMPORT_MAX_DURATION_SEC = 900;
 
-/** @description 書き出しフレームレート（固定・24fps） */
-export const VIDEO_EXPORT_FPS = 24;
+/** @description ソース fps を信頼できない場合の書き出しフレームレート */
+export const VIDEO_EXPORT_FALLBACK_FPS = 24;
 
 /** @description 書き出しの最大幅（FHD） */
 export const VIDEO_EXPORT_MAX_WIDTH = 1920;
@@ -74,10 +74,57 @@ export function assertVideoImportWithinCaps(
 }
 
 /**
- * @description 書き出し総フレーム数（VIDEO_EXPORT_FPS）。duration 終端より先は作らない。
+ * @description 書き出し総フレーム数。duration 終端より先は作らない。
  * @param durationSec — ソースの長さ（秒）
+ * @param fps — 書き出し fps
  */
-export function computeExportFrameCount(durationSec: number): number {
-  const raw = Math.floor(durationSec * VIDEO_EXPORT_FPS + 1e-6);
+export function computeExportFrameCount(
+  durationSec: number,
+  fps = VIDEO_EXPORT_FALLBACK_FPS,
+): number {
+  const safeFps = sanitizeVideoExportFps(fps) ?? VIDEO_EXPORT_FALLBACK_FPS;
+  const raw = Math.floor(durationSec * safeFps + 1e-6);
   return Math.max(1, raw);
+}
+
+/**
+ * @description ffmpeg / UI に渡せる範囲の fps だけを採用する。
+ */
+export function sanitizeVideoExportFps(fps: number | null | undefined): number | null {
+  if (typeof fps !== "number" || !Number.isFinite(fps)) {
+    return null;
+  }
+  if (fps < 1 || fps > 120) {
+    return null;
+  }
+  return fps;
+}
+
+/**
+ * @description trusted CFR メタがある場合はソース fps を保持し、なければ従来の 24fps に戻す。
+ */
+export function selectVideoExportFps(opts: {
+  sourceFrameRate: number | null;
+  sourceFrameRateTrusted: boolean;
+}): number {
+  if (opts.sourceFrameRateTrusted) {
+    const sourceFps = sanitizeVideoExportFps(opts.sourceFrameRate);
+    if (sourceFps !== null) {
+      return sourceFps;
+    }
+  }
+  return VIDEO_EXPORT_FALLBACK_FPS;
+}
+
+/**
+ * @description ログ/UI向けに過剰な小数を落とす。
+ */
+export function formatVideoExportFps(fps: number): string {
+  if (!Number.isFinite(fps)) {
+    return String(VIDEO_EXPORT_FALLBACK_FPS);
+  }
+  if (Math.abs(fps - Math.round(fps)) < 1e-6) {
+    return String(Math.round(fps));
+  }
+  return fps.toFixed(3).replace(/0+$/u, "").replace(/\.$/u, "");
 }

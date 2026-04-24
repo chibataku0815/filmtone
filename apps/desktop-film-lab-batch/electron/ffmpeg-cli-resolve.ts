@@ -7,11 +7,9 @@
  *
  * このファイルでは、次の順で「どの実行ファイルを使うか」を決めます。
  * 1. 明示 override（`FILM_LAB_FFMPEG_PATH` / `FILM_LAB_FFPROBE_PATH`）
- * 2. `fix-path` による GUI 用 `PATH` 補正
- * 3. 既知の Homebrew / system ディレクトリを追加した `PATH`
- *
- * @limitations いまは同梱バイナリ（`process.resourcesPath` 配下）は扱いません。
- * 将来バンドルする場合は、この resolver の優先順位に追加します。
+ * 2. 同梱 resource binary（packaged app では `process.resourcesPath/bin/<platform-arch>`）
+ * 3. `fix-path` による GUI 用 `PATH` 補正
+ * 4. 既知の Homebrew / system ディレクトリを追加した `PATH`
  */
 import { accessSync, constants as fsConstants } from "node:fs";
 import path from "node:path";
@@ -22,6 +20,11 @@ import fixPath from "fix-path";
  * @description このアプリで扱う CLI 名。動画の probe / export に限定します。
  */
 export type VideoCliBinaryName = "ffmpeg" | "ffprobe";
+
+export type VideoCliBinarySource =
+  | "env-override"
+  | "bundled-resource"
+  | "path-search";
 
 /**
  * @description resolver が返す診断情報。
@@ -35,7 +38,7 @@ export type ResolvedVideoCliBinary = {
   binaryName: VideoCliBinaryName;
   commandPath: string;
   childEnv: NodeJS.ProcessEnv;
-  source: "env-override" | "path-search";
+  source: VideoCliBinarySource;
   searchedPaths: string[];
 };
 
@@ -86,6 +89,52 @@ function uniqueOrdered(values: readonly string[]): string[] {
     out.push(value);
   }
   return out;
+}
+
+function getProcessResourcesPath(): string | undefined {
+  const processWithElectronResources = process as NodeJS.Process & {
+    resourcesPath?: string;
+  };
+  const resourcesPath = processWithElectronResources.resourcesPath?.trim();
+  return resourcesPath && resourcesPath.length > 0 ? resourcesPath : undefined;
+}
+
+function getDefaultVideoCliResourceRoots(): string[] {
+  return uniqueOrdered([
+    getProcessResourcesPath() ?? "",
+    path.resolve(process.cwd(), "resources"),
+  ].filter((entry) => entry.length > 0));
+}
+
+export function getVideoCliResourcePlatformArch(
+  platform: NodeJS.Platform = process.platform,
+  arch: NodeJS.Architecture = process.arch,
+): string {
+  return `${platform}-${arch}`;
+}
+
+export function buildBundledVideoCliCandidatePaths(
+  binaryName: VideoCliBinaryName,
+  options: {
+    resourceRoots?: readonly string[];
+    platform?: NodeJS.Platform;
+    arch?: NodeJS.Architecture;
+  } = {},
+): string[] {
+  const resourceRoots =
+    options.resourceRoots ?? getDefaultVideoCliResourceRoots();
+  const platformArch = getVideoCliResourcePlatformArch(
+    options.platform,
+    options.arch,
+  );
+  return uniqueOrdered(
+    resourceRoots
+      .map((resourceRoot) => resourceRoot.trim())
+      .filter((resourceRoot) => resourceRoot.length > 0)
+      .map((resourceRoot) =>
+        path.join(path.resolve(resourceRoot), "bin", platformArch, binaryName),
+      ),
+  );
 }
 
 /**
@@ -150,6 +199,7 @@ export function prepareVideoCliChildEnv(
  * @param binaryName 探す CLI 名
  * @param options.envPath 探索対象の `PATH`
  * @param options.envOverridePath 明示指定があれば最優先
+ * @param options.bundledResourceRoots 同梱 resource root の差し替え
  * @param options.isExecutable 実行可否判定の差し替え
  */
 export function resolveVideoCliBinaryFromPath(
@@ -157,15 +207,25 @@ export function resolveVideoCliBinaryFromPath(
   options: {
     envPath?: string;
     envOverridePath?: string;
+    bundledResourceRoots?: readonly string[];
+    platform?: NodeJS.Platform;
+    arch?: NodeJS.Architecture;
     isExecutable?: (absPath: string) => boolean;
   } = {},
 ): Omit<ResolvedVideoCliBinary, "binaryName" | "childEnv"> {
   const checkExecutable = options.isExecutable ?? isExecutableFile;
   const searchedPaths: string[] = [];
+  const pushSearchedPath = (absPath: string): boolean => {
+    if (searchedPaths.includes(absPath)) {
+      return false;
+    }
+    searchedPaths.push(absPath);
+    return true;
+  };
   const overridePath = options.envOverridePath?.trim() ?? "";
   if (overridePath.length > 0) {
     const resolvedOverride = path.resolve(overridePath);
-    searchedPaths.push(resolvedOverride);
+    pushSearchedPath(resolvedOverride);
     if (checkExecutable(resolvedOverride)) {
       return {
         commandPath: resolvedOverride,
@@ -175,12 +235,28 @@ export function resolveVideoCliBinaryFromPath(
     }
   }
 
-  for (const dirPath of splitPathEntries(options.envPath)) {
-    const absPath = path.join(dirPath, binaryName);
-    if (searchedPaths.includes(absPath)) {
+  for (const absPath of buildBundledVideoCliCandidatePaths(binaryName, {
+    resourceRoots: options.bundledResourceRoots,
+    platform: options.platform,
+    arch: options.arch,
+  })) {
+    if (!pushSearchedPath(absPath)) {
       continue;
     }
-    searchedPaths.push(absPath);
+    if (checkExecutable(absPath)) {
+      return {
+        commandPath: absPath,
+        source: "bundled-resource",
+        searchedPaths,
+      };
+    }
+  }
+
+  for (const dirPath of splitPathEntries(options.envPath)) {
+    const absPath = path.join(dirPath, binaryName);
+    if (!pushSearchedPath(absPath)) {
+      continue;
+    }
     if (checkExecutable(absPath)) {
       return {
         commandPath: absPath,
@@ -194,9 +270,9 @@ export function resolveVideoCliBinaryFromPath(
   const extraHint =
     overridePath.length > 0
       ? `${overrideEnvName}=${path.resolve(overridePath)} でも解決できませんでした。`
-      : `${overrideEnvName} を指定するか、Homebrew の ffmpeg を確認してください。`;
+      : `同梱 resource と PATH を確認してください。開発時は ${overrideEnvName} を指定できます。`;
   throw new Error(
-    `${binaryName} が見つかりません。${extraHint} searched=${searchedPaths.join(", ")}`,
+    `${binaryName} 実行ファイルが見つかりません。${extraHint} searched=${searchedPaths.join(", ")}`,
   );
 }
 
