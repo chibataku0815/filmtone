@@ -87,6 +87,8 @@ export {
   type SourceKind,
   type SourceInfo,
   type SourceProbe,
+  type CameraOptics,
+  type CameraOpticsSource,
   type PickedLutFile,
   type ParsedCubeLut,
   type Phase0ExportRequest,

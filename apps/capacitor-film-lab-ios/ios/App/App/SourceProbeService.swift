@@ -4,6 +4,8 @@ import ImageIO
 import UniformTypeIdentifiers
 
 final class SourceProbeService {
+    private let assumedDiagonalFovDeg = 70.0
+
     func probeSource(at url: URL, fallback: SourceInfoDTO?) throws -> SourceProbeDTO {
         let filename = fallback?.filename ?? url.lastPathComponent
         let kind = fallback?.kind ?? inferKind(for: url)
@@ -95,6 +97,12 @@ final class SourceProbeService {
         let durationSec = CMTimeGetSeconds(asset.duration)
         let frameRate = track.nominalFrameRate > 0 ? Double(track.nominalFrameRate) : nil
         let codec = codecLabel(for: track)
+        let cameraOptics = cameraOptics(
+            for: track,
+            asset: asset,
+            displayWidth: width,
+            displayHeight: height
+        )
 
         return SourceProbeDTO(
             uri: url.absoluteString,
@@ -106,8 +114,154 @@ final class SourceProbeService {
             durationSec: durationSec.isFinite ? durationSec : nil,
             fileSizeBytes: fileSizeBytes,
             codec: codec,
-            frameRate: frameRate
+            frameRate: frameRate,
+            cameraOptics: cameraOptics
         )
+    }
+
+    private func cameraOptics(
+        for track: AVAssetTrack,
+        asset: AVAsset,
+        displayWidth: Int,
+        displayHeight: Int
+    ) -> CameraOpticsDTO {
+        let width = safeDimension(displayWidth, fallback: 1920)
+        let height = safeDimension(displayHeight, fallback: 1080)
+        let make = metadataString(
+            in: asset,
+            commonKeys: ["make"],
+            identifierFragments: ["make"]
+        )
+        let model = metadataString(
+            in: asset,
+            commonKeys: ["model"],
+            identifierFragments: ["model"]
+        )
+        let lens = metadataString(
+            in: asset,
+            commonKeys: [],
+            identifierFragments: ["lens"]
+        )
+
+        if let horizontalFov = horizontalFieldOfViewDeg(for: track),
+           horizontalFov > 0,
+           horizontalFov < 179
+        {
+            let rotated = isRightAngleRotation(track.preferredTransform)
+            let focal = focalPxFromFov(
+                sizePx: rotated ? height : width,
+                fovDeg: horizontalFov
+            )
+            return cameraOptics(
+                source: "metadata",
+                width: width,
+                height: height,
+                focalPx: focal,
+                lensModel: lens,
+                cameraMake: make,
+                cameraModel: model
+            )
+        }
+
+        let diagonal = hypot(width, height)
+        let focal = focalPxFromFov(sizePx: diagonal, fovDeg: assumedDiagonalFovDeg)
+        return cameraOptics(
+            source: "assumed",
+            width: width,
+            height: height,
+            focalPx: focal,
+            lensModel: lens,
+            cameraMake: make,
+            cameraModel: model
+        )
+    }
+
+    private func cameraOptics(
+        source: String,
+        width: Double,
+        height: Double,
+        focalPx: Double,
+        lensModel: String?,
+        cameraMake: String?,
+        cameraModel: String?
+    ) -> CameraOpticsDTO {
+        return CameraOpticsDTO(
+            source: source,
+            fxPx: focalPx,
+            fyPx: focalPx,
+            cxPx: width / 2,
+            cyPx: height / 2,
+            fovXDeg: fovFromFocalPx(sizePx: width, focalPx: focalPx),
+            fovYDeg: fovFromFocalPx(sizePx: height, focalPx: focalPx),
+            focalLength35mm: nil,
+            lensModel: lensModel,
+            cameraMake: cameraMake,
+            cameraModel: cameraModel
+        )
+    }
+
+    private func horizontalFieldOfViewDeg(for track: AVAssetTrack) -> Double? {
+        guard let description = track.formatDescriptions.first else {
+            return nil
+        }
+        let cmDescription = description as! CMFormatDescription
+        guard
+            let extensions = CMFormatDescriptionGetExtensions(cmDescription) as? [CFString: Any],
+            let raw = extensions[kCMFormatDescriptionExtension_HorizontalFieldOfView] as? NSNumber
+        else {
+            return nil
+        }
+        let deg = raw.doubleValue / 1000.0
+        return deg.isFinite ? deg : nil
+    }
+
+    private func metadataString(
+        in asset: AVAsset,
+        commonKeys: [String],
+        identifierFragments: [String]
+    ) -> String? {
+        let commonKeySet = Set(commonKeys.map { $0.lowercased() })
+        let fragments = identifierFragments.map { $0.lowercased() }
+        for item in asset.commonMetadata + asset.metadata {
+            if let key = item.commonKey {
+                let normalizedKey = String(describing: key).lowercased()
+                if commonKeySet.contains(where: { normalizedKey.contains($0) }) {
+                    return trimmedMetadataString(item.stringValue)
+                }
+            }
+            if let identifier = item.identifier {
+                let normalized = String(describing: identifier).lowercased()
+                if fragments.contains(where: { normalized.contains($0) }) {
+                    return trimmedMetadataString(item.stringValue)
+                }
+            }
+        }
+        return nil
+    }
+
+    private func trimmedMetadataString(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmed.isEmpty
+        else {
+            return nil
+        }
+        return trimmed
+    }
+
+    private func safeDimension(_ value: Int, fallback: Double) -> Double {
+        return value > 0 ? Double(value) : fallback
+    }
+
+    private func isRightAngleRotation(_ transform: CGAffineTransform) -> Bool {
+        return abs(transform.b) > 0.5 && abs(transform.c) > 0.5
+    }
+
+    private func focalPxFromFov(sizePx: Double, fovDeg: Double) -> Double {
+        return sizePx / (2 * tan((fovDeg * .pi / 180) / 2))
+    }
+
+    private func fovFromFocalPx(sizePx: Double, focalPx: Double) -> Double {
+        return 2 * atan(sizePx / (2 * focalPx)) * 180 / .pi
     }
 
     private func codecLabel(for track: AVAssetTrack) -> String? {

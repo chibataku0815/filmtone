@@ -1,6 +1,7 @@
 import {
   FILMTONE_DEFAULT_BASE_PRESET,
   parseCube,
+  type CameraOptics,
   type PresetName,
 } from "film-lab-core";
 import type { FilmLabBatchBridge } from "./desktop-api";
@@ -27,6 +28,7 @@ export type ResolvedImportedMetadataJson = {
   importedFilePath: string;
   syncedAtMs: number | null;
   appliedOpticalRecommendation: AppliedOpticalRecommendationMetadata | null;
+  cameraOptics: CameraOptics | null;
   sidecar: FilmtoneExportSessionV1 | null;
   warnings: string[];
 };
@@ -139,6 +141,7 @@ export async function resolveImportedMetadataJson(
           ? parsedSyncTime
           : null,
       appliedOpticalRecommendation: sidecar.look.opticalRecommendation ?? null,
+      cameraOptics: sidecar.input.cameraOptics ?? null,
       sidecar,
       warnings: loaded.warnings,
     };
@@ -165,6 +168,7 @@ export async function resolveImportedMetadataJson(
     importedFilePath: filePath,
     syncedAtMs: null,
     appliedOpticalRecommendation: null,
+    cameraOptics: null,
     sidecar: null,
     warnings: [],
   };
@@ -188,6 +192,7 @@ export function emptyResolvedMetadataJson(filePath: string): ResolvedImportedMet
     importedFilePath: filePath,
     syncedAtMs: null,
     appliedOpticalRecommendation: null,
+    cameraOptics: null,
     sidecar: null,
     warnings: [],
   };

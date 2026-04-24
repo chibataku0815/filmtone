@@ -140,6 +140,71 @@ describe("export metadata session", () => {
     });
   });
 
+  it("round-trips optional source camera optics on video sidecars", () => {
+    const cinematic = batchGradeStateFromPreset("cinematic");
+    const session = buildFilmtoneExportSession({
+      exportedAtIso: "2026-04-20T12:34:56.000Z",
+      appVersion: "1.2.3",
+      job: "video",
+      inputDir: null,
+      videoInputPath: "/Users/tester/input/clip.mov",
+      outputDir: "/Users/tester/output",
+      imageFormat: null,
+      outputFilenameSuffix: null,
+      outputFileName: "clip-graded.mp4",
+      batchPresetChoice: "cinematic",
+      lookSource: "preset",
+      gradeParams: cinematic.params,
+      depthTrack: null,
+      lutRefs: createEmptyMetadataLutRefs(),
+      cameraOptics: {
+        source: "assumed",
+        fxPx: 1566.7,
+        fyPx: 1566.7,
+        cxPx: 960,
+        cyPx: 540,
+        fovXDeg: 63,
+        fovYDeg: 38,
+      },
+    });
+
+    const parsed = parseFilmtoneExportSessionV1(
+      JSON.parse(exportFilmtoneExportSessionJsonText(session)) as unknown,
+    );
+
+    expect(parsed?.input.cameraOptics).toEqual({
+      source: "assumed",
+      fxPx: 1566.7,
+      fyPx: 1566.7,
+      cxPx: 960,
+      cyPx: 540,
+      fovXDeg: 63,
+      fovYDeg: 38,
+    });
+  });
+
+  it("parses v1 sidecars without camera optics", () => {
+    const cinematic = batchGradeStateFromPreset("cinematic");
+    const session = buildFilmtoneExportSession({
+      exportedAtIso: "2026-04-20T12:34:56.000Z",
+      appVersion: "1.2.3",
+      job: "video",
+      inputDir: null,
+      videoInputPath: "/Users/tester/input/clip.mov",
+      outputDir: "/Users/tester/output",
+      imageFormat: null,
+      outputFilenameSuffix: null,
+      outputFileName: "clip-graded.mp4",
+      batchPresetChoice: "cinematic",
+      lookSource: "preset",
+      gradeParams: cinematic.params,
+      depthTrack: null,
+      lutRefs: createEmptyMetadataLutRefs(),
+    });
+
+    expect(parseFilmtoneExportSessionV1(session)?.input.cameraOptics).toBeUndefined();
+  });
+
   it("serializes depth-track metadata in both wrapper and sidecar roots", () => {
     const cinematic = batchGradeStateFromPreset("cinematic");
     const depthTrack = {

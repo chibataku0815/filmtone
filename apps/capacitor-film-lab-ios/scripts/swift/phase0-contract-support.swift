@@ -12,6 +12,20 @@ struct SourceInfoDTO: Codable {
     let mimeType: String?
 }
 
+struct CameraOpticsDTO: Codable {
+    let source: String
+    let fxPx: Double?
+    let fyPx: Double?
+    let cxPx: Double?
+    let cyPx: Double?
+    let fovXDeg: Double?
+    let fovYDeg: Double?
+    let focalLength35mm: Double?
+    let lensModel: String?
+    let cameraMake: String?
+    let cameraModel: String?
+}
+
 struct SourceProbeDTO: Codable {
     let uri: String
     let filename: String
@@ -23,6 +37,7 @@ struct SourceProbeDTO: Codable {
     let fileSizeBytes: Int?
     let codec: String?
     let frameRate: Double?
+    let cameraOptics: CameraOpticsDTO?
 }
 
 struct Phase0OutputProfileDTO: Codable, Equatable {

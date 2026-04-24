@@ -5,6 +5,7 @@
  * @description 更新案内（案 C）は main が IPC で送り、ここで購読だけ暴露します。
  */
 import { contextBridge, ipcRenderer, webUtils } from "electron";
+import type { CameraOptics } from "film-lab-core";
 
 /** @description main から届く「新しい版があります」通知の中身 */
 export type DesktopUpdateAvailablePayload = {
@@ -147,6 +148,7 @@ contextBridge.exposeInMainWorld("filmLabBatch", {
     sourceFrameRate: number | null;
     sourceFrameRateTrusted: boolean;
     fileSizeBytes: number;
+    cameraOptics: CameraOptics;
   }> => ipcRenderer.invoke("video-export-probe", filePath),
   videoExportStart: (payload: {
     inputVideoPath: string;

@@ -30,6 +30,7 @@ import {
   FILMTONE_DEFAULT_BASE_PRESET,
   buildOpticalParamPatch,
   createFilmtoneDefaultParams,
+  type CameraOptics,
   type OpticalRecommendationV1,
   type Params,
   type PresetName,
@@ -213,6 +214,7 @@ async function resolveBatchGradeSnapshot(
   syncedAtMs: number | null;
   importedFilePath: string | null;
   appliedOpticalRecommendation: AppliedOpticalRecommendationMetadata | null;
+  cameraOptics: CameraOptics | null;
 }> {
   if (s.importedGradePath) {
     const text = await window.filmLabBatch.readFileUtf8(s.importedGradePath);
@@ -229,6 +231,7 @@ async function resolveBatchGradeSnapshot(
       syncedAtMs: restored.syncedAtMs,
       importedFilePath: restored.importedFilePath,
       appliedOpticalRecommendation: restored.appliedOpticalRecommendation,
+      cameraOptics: restored.cameraOptics,
     };
   }
   if (s.gradeParamsJson) {
@@ -256,6 +259,7 @@ async function resolveBatchGradeSnapshot(
       syncedAtMs: null,
       importedFilePath: null,
       appliedOpticalRecommendation: null,
+      cameraOptics: null,
     };
   }
   return {
@@ -266,6 +270,7 @@ async function resolveBatchGradeSnapshot(
     syncedAtMs: null,
     importedFilePath: null,
     appliedOpticalRecommendation: null,
+    cameraOptics: null,
   };
 }
 
@@ -392,6 +397,8 @@ export default function App() {
   );
   const [appliedOpticalRecommendation, setAppliedOpticalRecommendation] =
     useState<AppliedOpticalRecommendationMetadata | null>(null);
+  const [sourceCameraOptics, setSourceCameraOptics] =
+    useState<CameraOptics | null>(null);
   /** @description 最後に import した JSON ファイル。session 復元にも使うため、表示上の look source とは分離する。 */
   const [importedGradeLabel, setImportedGradeLabel] = useState<string | null>(
     null,
@@ -761,6 +768,7 @@ export default function App() {
         setBatchLookSource("preset");
         setBatchLutRefs(createEmptyMetadataLutRefs());
         setAppliedOpticalRecommendation(null);
+        setSourceCameraOptics(null);
         setEditToExportSyncedAtMs(null);
         try {
           const snap = await resolveBatchGradeSnapshot(parsed);
@@ -769,6 +777,7 @@ export default function App() {
           setBatchLookSource(snap.lookSource);
           setBatchLutRefs(snap.lutRefs);
           setAppliedOpticalRecommendation(snap.appliedOpticalRecommendation);
+          setSourceCameraOptics(snap.cameraOptics);
           setImportedGradeLabel(snap.importedFilePath);
           setEditToExportSyncedAtMs(snap.syncedAtMs);
         } catch {
@@ -776,6 +785,7 @@ export default function App() {
           setBatchLookSource("preset");
           setBatchLutRefs(createEmptyMetadataLutRefs());
           setAppliedOpticalRecommendation(null);
+          setSourceCameraOptics(null);
           setImportedGradeLabel(null);
         }
         return;
@@ -904,10 +914,11 @@ export default function App() {
    * @description 動画の入力パスを state に載せ、ffprobe 由来のラベルを更新する。ピッカーとプレビューからの既定反映の共通処理。
    */
   const applyPickedVideoPath = useCallback(
-    async (p: string) => {
+    async (p: string, preferredCameraOptics: CameraOptics | null = null) => {
       setVideoInputPath(p);
       try {
         const meta = await window.filmLabBatch.videoExportProbe(p);
+        setSourceCameraOptics(preferredCameraOptics ?? meta.cameraOptics);
         assertVideoImportWithinCaps(meta.width, meta.height, meta.durationSec);
         const { outW, outH } = computeVideoExportDimensions(
           meta.width,
@@ -929,6 +940,7 @@ export default function App() {
         );
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
+        setSourceCameraOptics(preferredCameraOptics);
         setVideoProbeLabel(null);
         appendLog(tLogs("videoMetaLogPrefix", { msg }));
       }
@@ -953,6 +965,7 @@ export default function App() {
       setBatchLookSource(restored.lookSource);
       setBatchLutRefs(restored.lutRefs);
       setAppliedOpticalRecommendation(restored.appliedOpticalRecommendation);
+      setSourceCameraOptics(restored.cameraOptics);
       setImportedGradeLabel(restored.importedFilePath);
       setEditToExportSyncedAtMs(restored.syncedAtMs);
       setCanvasInitialGradeParams(null);
@@ -983,13 +996,18 @@ export default function App() {
           setBatchOutputSuffix(sidecar.output.outputFilenameSuffix ?? "-graded");
           setVideoInputPath(null);
           setVideoProbeLabel(null);
+          setSourceCameraOptics(null);
         } else {
           setBatchOutputSuffix(sidecar.output.outputFilenameSuffix ?? "-graded");
           if (sidecar.input.videoInputPath) {
-            await applyPickedVideoPath(sidecar.input.videoInputPath);
+            await applyPickedVideoPath(
+              sidecar.input.videoInputPath,
+              sidecar.input.cameraOptics ?? null,
+            );
           } else {
             setVideoInputPath(null);
             setVideoProbeLabel(null);
+            setSourceCameraOptics(sidecar.input.cameraOptics ?? null);
           }
         }
         appendLog(tLogs("metadataJsonLoaded", { path: p }));
@@ -1662,8 +1680,11 @@ export default function App() {
       lookSource?: MetadataLookSource;
       lutRefs?: MetadataLutRefs;
       opticalRecommendation?: AppliedOpticalRecommendationMetadata | null;
+      cameraOptics?: CameraOptics | null;
     }) => {
       const exportedAtIso = new Date().toISOString();
+      const cameraOptics =
+        payload.cameraOptics ?? (payload.job === "video" ? sourceCameraOptics : null);
       const session = buildFilmtoneExportSession({
         exportedAtIso,
         appVersion,
@@ -1681,6 +1702,7 @@ export default function App() {
         lutRefs: payload.lutRefs ?? batchLutRefs,
         opticalRecommendation:
           payload.opticalRecommendation ?? appliedOpticalRecommendation,
+        cameraOptics,
       });
       return {
         exportedAtIso,
@@ -1694,6 +1716,7 @@ export default function App() {
       batchLookSource,
       batchLutRefs,
       batchPresetChoice,
+      sourceCameraOptics,
     ],
   );
 
@@ -1965,6 +1988,7 @@ export default function App() {
         syncedAtMs: null,
         importedFilePath: s.importedGradePath,
         appliedOpticalRecommendation: null,
+        cameraOptics: null,
       };
     }
     setBatchGrade(gradeSnap.grade);
@@ -1972,6 +1996,7 @@ export default function App() {
     setBatchLookSource(gradeSnap.lookSource);
     setBatchLutRefs(gradeSnap.lutRefs);
     setAppliedOpticalRecommendation(gradeSnap.appliedOpticalRecommendation);
+    setSourceCameraOptics(gradeSnap.cameraOptics);
     setImportedGradeLabel(gradeSnap.importedFilePath);
     setEditToExportSyncedAtMs(gradeSnap.syncedAtMs);
     const todo = pathsNotSucceeded(s);
@@ -2066,8 +2091,11 @@ export default function App() {
     });
 
     let estimateFrames = 1;
+    let videoCameraOptics: CameraOptics | null = null;
     try {
       const meta = await window.filmLabBatch.videoExportProbe(videoInputPath);
+      videoCameraOptics = meta.cameraOptics;
+      setSourceCameraOptics(meta.cameraOptics);
       assertVideoImportWithinCaps(meta.width, meta.height, meta.durationSec);
       estimateFrames = computeExportFrameCount(meta.durationSec);
     } catch (e) {
@@ -2088,6 +2116,7 @@ export default function App() {
       imageFormat: null,
       outputFilenameSuffix: null,
       outputFileName: outName,
+      cameraOptics: videoCameraOptics,
     });
     const videoSidecarPath = buildVideoMetadataSidecarPath(
       effectiveOutputDir,

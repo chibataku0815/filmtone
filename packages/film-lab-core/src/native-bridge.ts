@@ -21,6 +21,22 @@ export interface SourceInfo {
   mimeType?: string;
 }
 
+export type CameraOpticsSource = "metadata" | "assumed" | "manual";
+
+export interface CameraOptics {
+  source: CameraOpticsSource;
+  fxPx?: number;
+  fyPx?: number;
+  cxPx?: number;
+  cyPx?: number;
+  fovXDeg?: number;
+  fovYDeg?: number;
+  focalLength35mm?: number;
+  lensModel?: string;
+  cameraMake?: string;
+  cameraModel?: string;
+}
+
 export interface SourceProbe extends SourceInfo {
   width?: number;
   height?: number;
@@ -28,6 +44,7 @@ export interface SourceProbe extends SourceInfo {
   fileSizeBytes?: number;
   codec?: string;
   frameRate?: number;
+  cameraOptics?: CameraOptics;
 }
 
 export interface ParsedCubeLut {

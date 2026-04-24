@@ -11,7 +11,16 @@
     "durationSec": 12.5,
     "fileSizeBytes": 12345678,
     "codec": "h264",
-    "frameRate": 30
+    "frameRate": 30,
+    "cameraOptics": {
+      "source": "assumed",
+      "fxPx": 1566.7,
+      "fyPx": 1566.7,
+      "cxPx": 960,
+      "cyPx": 540,
+      "fovXDeg": 63,
+      "fovYDeg": 38
+    }
   },
   "output": {
     "longEdge": 1920,

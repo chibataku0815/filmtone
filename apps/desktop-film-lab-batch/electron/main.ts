@@ -16,7 +16,7 @@ import {
   shell,
 } from "electron";
 import { existsSync } from "node:fs";
-import { filmLabParamsSchema, type Params } from "film-lab-core";
+import { filmLabParamsSchema, type CameraOptics, type Params } from "film-lab-core";
 import Store from "electron-store";
 import {
   execFile,
@@ -38,6 +38,7 @@ import {
   guessVideoContentType,
   parseHttpByteRange,
 } from "./video-src-protocol";
+import { deriveCameraOpticsFromFfprobeMeta } from "./video-export-camera-optics";
 import { deriveSourceFrameRateTrust } from "./video-export-probe-framerate";
 import {
   DesktopUpdateService,
@@ -397,6 +398,7 @@ async function ffprobeVideoMeta(absPath: string): Promise<{
   sourceFrameRateTrusted: boolean;
   /** @description WebCodecs 経路のメモリ上限判定用（readFile 前に参照） */
   fileSizeBytes: number;
+  cameraOptics: CameraOptics;
 }> {
   const ffprobe = (() => {
     try {
@@ -420,10 +422,8 @@ async function ffprobeVideoMeta(absPath: string): Promise<{
       [
         "-v",
         "error",
-        "-show_entries",
-        "stream=codec_type,width,height,codec_name,avg_frame_rate,r_frame_rate",
-        "-show_entries",
-        "format=duration",
+        "-show_streams",
+        "-show_format",
         "-of",
         "json",
         absPath,
@@ -468,6 +468,7 @@ async function ffprobeVideoMeta(absPath: string): Promise<{
   let videoCodec = "";
   let avgFrameRate: unknown;
   let rFrameRate: unknown;
+  let videoStream: Record<string, unknown> | undefined;
   for (const s of streams) {
     if (typeof s !== "object" || s === null) continue;
     const o = s as Record<string, unknown>;
@@ -486,6 +487,7 @@ async function ffprobeVideoMeta(absPath: string): Promise<{
           typeof cn === "string" && cn.length > 0 ? cn : "";
         avgFrameRate = o.avg_frame_rate;
         rFrameRate = o.r_frame_rate;
+        videoStream = o;
       }
     }
   }
@@ -510,6 +512,12 @@ async function ffprobeVideoMeta(absPath: string): Promise<{
 
   const { sourceFrameRate, sourceFrameRateTrusted } =
     deriveSourceFrameRateTrust(avgFrameRate, rFrameRate);
+  const cameraOptics = deriveCameraOpticsFromFfprobeMeta({
+    rawWidth: width,
+    rawHeight: height,
+    stream: videoStream,
+    format: fmt,
+  });
 
   return {
     width,
@@ -520,6 +528,7 @@ async function ffprobeVideoMeta(absPath: string): Promise<{
     sourceFrameRate,
     sourceFrameRateTrusted,
     fileSizeBytes,
+    cameraOptics,
   };
 }
 

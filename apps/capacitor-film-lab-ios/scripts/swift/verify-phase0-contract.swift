@@ -46,6 +46,10 @@ struct VerifyPhase0Contract {
             canonical.sourceUri == "file:///tmp/phase0-source.mov",
             "canonical sourceUri drift"
         )
+        try expect(
+            canonical.sourceProbe?.cameraOptics?.source == "assumed",
+            "canonical cameraOptics drift"
+        )
         try expect(canonical.inputLut != nil, "canonical request is missing inputLut")
         try expect(canonical.creativeLut != nil, "canonical request is missing creativeLut")
         try expect(

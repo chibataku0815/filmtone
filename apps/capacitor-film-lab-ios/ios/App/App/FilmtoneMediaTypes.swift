@@ -36,6 +36,20 @@ struct PickedLutFileDTO: Codable {
     let uri: String?
 }
 
+struct CameraOpticsDTO: Codable {
+    let source: String
+    let fxPx: Double?
+    let fyPx: Double?
+    let cxPx: Double?
+    let cyPx: Double?
+    let fovXDeg: Double?
+    let fovYDeg: Double?
+    let focalLength35mm: Double?
+    let lensModel: String?
+    let cameraMake: String?
+    let cameraModel: String?
+}
+
 struct SourceProbeDTO: Codable {
     let uri: String
     let filename: String
@@ -47,6 +61,33 @@ struct SourceProbeDTO: Codable {
     let fileSizeBytes: Int?
     let codec: String?
     let frameRate: Double?
+    let cameraOptics: CameraOpticsDTO?
+
+    init(
+        uri: String,
+        filename: String,
+        kind: FilmtoneSourceKind,
+        mimeType: String?,
+        width: Int?,
+        height: Int?,
+        durationSec: Double?,
+        fileSizeBytes: Int?,
+        codec: String?,
+        frameRate: Double?,
+        cameraOptics: CameraOpticsDTO? = nil
+    ) {
+        self.uri = uri
+        self.filename = filename
+        self.kind = kind
+        self.mimeType = mimeType
+        self.width = width
+        self.height = height
+        self.durationSec = durationSec
+        self.fileSizeBytes = fileSizeBytes
+        self.codec = codec
+        self.frameRate = frameRate
+        self.cameraOptics = cameraOptics
+    }
 }
 
 struct Phase0OutputProfileDTO: Codable {

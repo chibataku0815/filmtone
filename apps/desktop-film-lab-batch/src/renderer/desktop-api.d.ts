@@ -1,4 +1,4 @@
-import type { Params } from "film-lab-core";
+import type { CameraOptics, Params } from "film-lab-core";
 
 /** @description メインプロセスから届く「新しい版があります」通知 */
 export type DesktopUpdateAvailablePayload = {
@@ -156,6 +156,7 @@ export type FilmLabBatchBridge = {
     sourceFrameRate: number | null;
     sourceFrameRateTrusted: boolean;
     fileSizeBytes: number;
+    cameraOptics: CameraOptics;
   }>;
   /** @description ffmpeg を rawvideo stdin で起動（1 セッションのみ） */
   videoExportStart: (payload: {

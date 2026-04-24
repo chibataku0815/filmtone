@@ -6,6 +6,7 @@ import {
   findMatchingPreset,
   lookIdForPreset,
   type BehaviorProfile,
+  type CameraOptics,
   type OpticalFamily,
   type OpticalRecipeId,
   type PresetName,
@@ -70,6 +71,19 @@ const metadataDepthTrackRefSchema = z.object({
   fps: z.number().positive().max(120),
   framePaths: z.array(z.string().min(1)),
 });
+const cameraOpticsSchema = z.object({
+  source: z.enum(["metadata", "assumed", "manual"]),
+  fxPx: z.number().optional(),
+  fyPx: z.number().optional(),
+  cxPx: z.number().optional(),
+  cyPx: z.number().optional(),
+  fovXDeg: z.number().optional(),
+  fovYDeg: z.number().optional(),
+  focalLength35mm: z.number().optional(),
+  lensModel: z.string().min(1).optional(),
+  cameraMake: z.string().min(1).optional(),
+  cameraModel: z.string().min(1).optional(),
+});
 
 const opticalFamilySchema = z.enum(["mist", "glow", "cross", "lens"]);
 const behaviorProfileSchema = z.enum([
@@ -106,6 +120,7 @@ const filmtoneExportSessionSchema = z.object({
   input: z.object({
     inputDir: z.string().min(1).nullable(),
     videoInputPath: z.string().min(1).nullable(),
+    cameraOptics: cameraOpticsSchema.optional(),
   }),
   output: z.object({
     outputDir: z.string().min(1),
@@ -281,6 +296,7 @@ export function buildFilmtoneExportSession(params: {
   depthTrack: BatchDepthTrack | null;
   lutRefs: MetadataLutRefs;
   opticalRecommendation?: AppliedOpticalRecommendationMetadata | null;
+  cameraOptics?: CameraOptics | null;
 }): FilmtoneExportSessionV1 {
   const normalizedInputDir = params.job === "images" ? params.inputDir : null;
   const normalizedVideoInputPath =
@@ -295,6 +311,7 @@ export function buildFilmtoneExportSession(params: {
     input: {
       inputDir: normalizedInputDir,
       videoInputPath: normalizedVideoInputPath,
+      ...(params.cameraOptics ? { cameraOptics: params.cameraOptics } : {}),
     },
     output: {
       outputDir: params.outputDir,

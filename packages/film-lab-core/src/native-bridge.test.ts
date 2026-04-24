@@ -77,6 +77,45 @@ LUT_3D_SIZE 2
     expect(request.grade.presetName).toBe(project.presetName);
   });
 
+  test("preserves source camera optics in export payload", () => {
+    const project = createPhase0ProjectState();
+    const request = buildPhase0ExportRequest({
+      source: {
+        uri: "file:///clip.mov",
+        filename: "clip.mov",
+        kind: "video",
+      },
+      probe: {
+        uri: "file:///clip.mov",
+        filename: "clip.mov",
+        kind: "video",
+        width: 1920,
+        height: 1080,
+        durationSec: 60,
+        cameraOptics: {
+          source: "assumed",
+          fxPx: 1566.7,
+          fyPx: 1566.7,
+          cxPx: 960,
+          cyPx: 540,
+          fovXDeg: 63.0,
+          fovYDeg: 38.0,
+        },
+      },
+      project,
+    });
+
+    expect(request.sourceProbe?.cameraOptics).toEqual({
+      source: "assumed",
+      fxPx: 1566.7,
+      fyPx: 1566.7,
+      cxPx: 960,
+      cyPx: 540,
+      fovXDeg: 63.0,
+      fovYDeg: 38.0,
+    });
+  });
+
   test("maps input and creative LUT slots independently", () => {
     const lut = parseCube(`
 TITLE "Transport"
