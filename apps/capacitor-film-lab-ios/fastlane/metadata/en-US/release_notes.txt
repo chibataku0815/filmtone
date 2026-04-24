@@ -1,1 +1,3 @@
-Initial release with presets, Quick controls, dual LUT slots, export, and save/share to Photos.
+v1.1 brings source transparency to iPhone clips. HDR and wide-gamut sources now show an in-app notice so you can see how iOS will handle them. Camera and optics metadata flow into the vignette model for more physically accurate corner falloff on supported clips.
+
+Exports now include a sidecar JSON alongside the media, so the grade, preset, and camera context round-trip cleanly with the desktop app. ProRes and Apple Log import handling is clearer, and unsupported conversion paths are recorded in the sidecar.
