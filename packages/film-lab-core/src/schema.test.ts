@@ -227,6 +227,26 @@ describe("filmLabParamsSchema", () => {
     }
   });
 
+  test("cross filter depth/ray-angle hidden controls 省略時は推奨既定値", () => {
+    const {
+      crossFilterDepthGain: _omitDepth,
+      crossFilterAngleGain: _omitAngle,
+      crossFilterAngleGamma: _omitGamma,
+      crossFilterEdgeLengthGain: _omitLength,
+      crossFilterEdgeStrengthGain: _omitStrength,
+      ...rest
+    } = PRESETS.cinematic;
+    const r = filmLabParamsSchema.safeParse(rest);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.crossFilterDepthGain).toBe(0.25);
+      expect(r.data.crossFilterAngleGain).toBe(0.35);
+      expect(r.data.crossFilterAngleGamma).toBe(1.4);
+      expect(r.data.crossFilterEdgeLengthGain).toBe(0.45);
+      expect(r.data.crossFilterEdgeStrengthGain).toBe(0.25);
+    }
+  });
+
   test("grainSize が 0–1 の境界値（0, 1）を受理する", () => {
     for (const val of [0, 1]) {
       const r = filmLabParamsSchema.safeParse({ ...PRESETS.cinematic, grainSize: val });
@@ -276,6 +296,40 @@ describe("filmLabParamsSchema", () => {
         });
         expect(r.success).toBe(false);
       }
+    }
+  });
+
+  test("cross filter hidden gains が 0–1 の境界値を受理する", () => {
+    for (const key of [
+      "crossFilterDepthGain",
+      "crossFilterAngleGain",
+      "crossFilterEdgeLengthGain",
+      "crossFilterEdgeStrengthGain",
+    ] as const) {
+      for (const val of [0, 1]) {
+        const r = filmLabParamsSchema.safeParse({
+          ...PRESETS.cinematic,
+          [key]: val,
+        });
+        expect(r.success).toBe(true);
+      }
+    }
+  });
+
+  test("crossFilterAngleGamma は 0.1–4 の範囲だけ受理する", () => {
+    for (const val of [0.1, 1.4, 4]) {
+      const r = filmLabParamsSchema.safeParse({
+        ...PRESETS.cinematic,
+        crossFilterAngleGamma: val,
+      });
+      expect(r.success).toBe(true);
+    }
+    for (const val of [0.09, 4.1]) {
+      const r = filmLabParamsSchema.safeParse({
+        ...PRESETS.cinematic,
+        crossFilterAngleGamma: val,
+      });
+      expect(r.success).toBe(false);
     }
   });
 });
