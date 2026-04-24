@@ -589,7 +589,17 @@
         "advancedDisclosureTitle": "詳細設定",
         "videoSourceHint": "読込上限は 4K・最大 {maxSec} 秒です。PATH に ffmpeg / ffprobe が必要です。",
         "videoOutputHint": "ファイル名は元名に -graded.mp4 を付けます。出力は最大 FHD・{fps} fps です。",
-        "filenameSuffixPlaceholder": "-graded"
+        "filenameSuffixPlaceholder": "-graded",
+        "hdrPolicyNoticeTitle": "HDR ソースを検知しましたが、ffmpeg が線形化できません",
+        "hdrPolicyNoticeBody": "この動画は HDR（PQ / HLG）ですが、お使いの ffmpeg ビルドには zscale / libplacebo が無いため、書き出し時の HDR→SDR トーンマッピングは保留されます。SDR クリップはそのまま書き出せます。",
+        "hdrPolicyNoticeDetailLabel": "詳細:",
+        "hdrPolicyNoticeInstallLead": "HDR 対応 ffmpeg に切り替えるには以下を実行:",
+        "hdrPolicyNoticeCopyBtn": "コマンドをコピー",
+        "hdrPolicyNoticeCopyAria": "HDR 対応 ffmpeg のインストールコマンドをクリップボードにコピー",
+        "hdrPolicyNoticeCopied": "コピーしました",
+        "hdrPolicyNoticeCopyFailed": "コピーに失敗",
+        "hdrPolicyNoticeFixtureDocBtn": "HDR フィクスチャ状況を開く",
+        "hdrPolicyNoticeFixtureDocAria": "HDR フィクスチャ状況ドキュメントを開く"
       },
       "logs": {
         "syncException": "書き出しへのコピー中にエラー: {msg}",

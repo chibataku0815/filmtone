@@ -47,7 +47,7 @@ import {
 import { FilmLabControlPanelCore } from "film-lab-ui";
 import { Histogram } from "film-lab-ui";
 import { HelpHint } from "./batch-tab/HelpHint";
-import type { SourceVideoMetadata } from "./desktop-api";
+import type { HdrPreparationPolicy, SourceVideoMetadata } from "./desktop-api";
 import { GradeSyncToast, type GradeSyncToastPayload } from "./GradeSyncToast";
 import {
   OpticalFinishRecommendationPanel,
@@ -491,6 +491,12 @@ export default function App() {
   /** @description ffprobe 済みのメタ（UI 表示用） */
   const [videoProbeLabel, setVideoProbeLabel] = useState<string | null>(null);
   /**
+   * @description 最後に probe した動画の HDR 準備ポリシー（S-4 capability probe 経由）。
+   *   capability-gated defer のときだけ `<HdrPolicyNotice />` をソース行下に表示する（Stream D）。
+   */
+  const [videoHdrPolicy, setVideoHdrPolicy] =
+    useState<HdrPreparationPolicy | null>(null);
+  /**
    * @description 動画書き出し成功のたびに増やす。書き出しタブの「初回はウィザード→成功後は一覧」だけ検知する（BatchGradeState ではない）。
    */
   const [videoExportSuccessNonce, setVideoExportSuccessNonce] = useState(0);
@@ -919,6 +925,7 @@ export default function App() {
     async (p: string, preferredCameraOptics: CameraOptics | null = null) => {
       setVideoInputPath(p);
       setSourceCameraOptics(preferredCameraOptics);
+      setVideoHdrPolicy(null);
       try {
         const meta = await window.filmLabBatch.videoExportProbe(p);
         const displayCameraOptics = preferredCameraOptics ?? meta.cameraOptics;
@@ -943,10 +950,14 @@ export default function App() {
             camera: formatCameraOpticsForProbeLabel(displayCameraOptics),
           }),
         );
+        setVideoHdrPolicy(
+          meta.sourceVideoMetadata?.hdrPreparationPolicy ?? null,
+        );
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         setSourceCameraOptics(preferredCameraOptics);
         setVideoProbeLabel(null);
+        setVideoHdrPolicy(null);
         appendLog(tLogs("videoMetaLogPrefix", { msg }));
       }
     },
@@ -1001,6 +1012,7 @@ export default function App() {
           setBatchOutputSuffix(sidecar.output.outputFilenameSuffix ?? "-graded");
           setVideoInputPath(null);
           setVideoProbeLabel(null);
+          setVideoHdrPolicy(null);
           setSourceCameraOptics(null);
         } else {
           setBatchOutputSuffix(sidecar.output.outputFilenameSuffix ?? "-graded");
@@ -1012,6 +1024,7 @@ export default function App() {
           } else {
             setVideoInputPath(null);
             setVideoProbeLabel(null);
+            setVideoHdrPolicy(null);
             setSourceCameraOptics(sidecar.input.cameraOptics ?? null);
           }
         }
@@ -2882,6 +2895,7 @@ export default function App() {
                           lastBatchSummary={lastBatchSummary}
                           videoInputPath={videoInputPath}
                           videoProbeLabel={videoProbeLabel}
+                          videoHdrPolicy={videoHdrPolicy}
                           videoCanExport={videoCanExport}
                           onPickVideoFile={pickVideoFile}
                           onRunVideoExport={runVideoExport}
@@ -2938,6 +2952,7 @@ export default function App() {
                           lastBatchSummary={lastBatchSummary}
                           videoInputPath={videoInputPath}
                           videoProbeLabel={videoProbeLabel}
+                          videoHdrPolicy={videoHdrPolicy}
                           videoCanExport={videoCanExport}
                           onPickVideoFile={pickVideoFile}
                           onRunVideoExport={runVideoExport}

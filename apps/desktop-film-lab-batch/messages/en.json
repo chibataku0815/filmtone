@@ -589,7 +589,17 @@
         "advancedDisclosureTitle": "Advanced",
         "videoSourceHint": "Up to 4K and {maxSec} seconds. Requires ffmpeg/ffprobe on PATH.",
         "videoOutputHint": "Adds -graded.mp4 to the original name. Output is up to FHD at {fps} fps.",
-        "filenameSuffixPlaceholder": "-graded"
+        "filenameSuffixPlaceholder": "-graded",
+        "hdrPolicyNoticeTitle": "HDR source detected — your ffmpeg can't linearize it",
+        "hdrPolicyNoticeBody": "This clip is HDR (PQ / HLG), but your local ffmpeg build is missing zscale / libplacebo, so HDR→SDR tone mapping is deferred. SDR clips continue to export normally.",
+        "hdrPolicyNoticeDetailLabel": "Details:",
+        "hdrPolicyNoticeInstallLead": "Switch to an HDR-capable ffmpeg by running:",
+        "hdrPolicyNoticeCopyBtn": "Copy command",
+        "hdrPolicyNoticeCopyAria": "Copy the HDR-capable ffmpeg install command to the clipboard",
+        "hdrPolicyNoticeCopied": "Copied!",
+        "hdrPolicyNoticeCopyFailed": "Copy failed",
+        "hdrPolicyNoticeFixtureDocBtn": "Why — HDR fixture status",
+        "hdrPolicyNoticeFixtureDocAria": "Open the HDR fixture status document"
       },
       "logs": {
         "syncException": "Error while copying to Export: {msg}",

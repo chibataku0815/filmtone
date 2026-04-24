@@ -34,7 +34,11 @@ import {
   VIDEO_EXPORT_FPS,
   VIDEO_IMPORT_MAX_DURATION_SEC,
 } from "../video-export-constants";
-import type { VideoPreviewProxyCacheInfo } from "../desktop-api";
+import type {
+  HdrPreparationPolicy,
+  VideoPreviewProxyCacheInfo,
+} from "../desktop-api";
+import { HdrPolicyNotice } from "../HdrPolicyNotice";
 import type {
   AppliedOpticalRecommendationMetadata,
   MetadataLookSource,
@@ -228,6 +232,13 @@ export type BatchTabPanelProps = {
 
   videoInputPath: string | null;
   videoProbeLabel: string | null;
+  /**
+   * @description 最後に probe した動画の HDR 準備ポリシー。capability-gated defer のときだけ
+   *   ソース行のすぐ下に `<HdrPolicyNotice />` を出す（S-4 capability probe / Stream D）。
+   */
+  videoHdrPolicy?: HdrPreparationPolicy | null;
+  /** @description 「HDR フィクスチャ状況」ドキュメントを開くハンドラ。未指定ならリンクを出さない。 */
+  onOpenHdrFixtureDoc?: () => void;
   videoCanExport: boolean;
   onPickVideoFile: () => void | Promise<void>;
   onRunVideoExport: () => void | Promise<void>;
@@ -448,6 +459,8 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     lastBatchSummary,
     videoInputPath,
     videoProbeLabel,
+    videoHdrPolicy = null,
+    onOpenHdrFixtureDoc,
     videoCanExport,
     onPickVideoFile,
     onRunVideoExport,
@@ -852,6 +865,10 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
               {videoProbeLabel}
             </p>
           ) : null}
+          <HdrPolicyNotice
+            policy={videoHdrPolicy}
+            onOpenFixtureDoc={onOpenHdrFixtureDoc}
+          />
         </>
       )}
     </div>
