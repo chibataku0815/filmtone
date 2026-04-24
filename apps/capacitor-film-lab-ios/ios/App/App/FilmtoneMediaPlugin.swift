@@ -287,7 +287,7 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
                 let options = try call.decode(ShareOptions.self)
                 let fileURL = try resolveFileURL(options.uri)
                 try await runtime.shareOutput(
-                    fileURL: fileURL,
+                    fileURLs: [fileURL],
                     title: options.title,
                     text: options.text,
                     presenting: viewController

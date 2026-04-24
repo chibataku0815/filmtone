@@ -3,8 +3,12 @@ import UIKit
 
 @MainActor
 final class ShareSheetService {
+    /// Share a set of on-disk files (media + optional sidecar companions).
+    /// Items are passed to `UIActivityViewController` in the order supplied —
+    /// the primary media asset should come first so targets that accept only
+    /// one item (e.g. some social apps) still receive the media.
     func share(
-        fileURL: URL,
+        fileURLs: [URL],
         title: String?,
         text: String?,
         presenting viewController: UIViewController
@@ -17,7 +21,7 @@ final class ShareSheetService {
             if let text, !text.isEmpty {
                 items.append(text)
             }
-            items.append(fileURL)
+            items.append(contentsOf: fileURLs as [Any])
 
             let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
             controller.completionWithItemsHandler = { _, completed, _, error in
