@@ -44,9 +44,21 @@ export type HdrPreparationPolicy = {
     | "source-is-hdr-pq"
     | "source-is-hdr-hlg"
     | "wide-gamut-transfer-unknown"
-    | "source-color-unknown";
+    | "source-color-unknown"
+    | "ffmpeg-missing-hdr-filters";
   requiresFixtureValidation: boolean;
   warning: string | null;
+};
+
+/**
+ * @description local ffmpeg ビルドが持つ filter のうち、HDR→SDR 変換に関係するものだけを記録する。
+ * 値は ffmpeg-capability-probe.ts が populate する。policy 判定は純粋にこの data を使う。
+ */
+export type FFmpegHdrCapabilities = {
+  hasZscale: boolean;
+  hasLibplacebo: boolean;
+  hasTonemap: boolean;
+  hasColorspace: boolean;
 };
 
 export type SourceVideoTimingMetadata = {
@@ -273,8 +285,27 @@ export function classifySourceColorForExport(
   return "unknown";
 }
 
+/**
+ * @description PQ / HLG fixture が揃う前でも、ffmpeg が HDR 変換 filter を持たないビルドなら
+ * policy を defer-unknown へ落とし、pixel 変更は一切行わない。
+ */
+function missingHdrFilterList(capabilities: FFmpegHdrCapabilities): string[] {
+  const missing: string[] = [];
+  if (!capabilities.hasZscale) missing.push("zscale");
+  if (!capabilities.hasLibplacebo) missing.push("libplacebo");
+  return missing;
+}
+
+function ffmpegCapabilityBlocksHdrPrep(
+  capabilities: FFmpegHdrCapabilities | null | undefined,
+): boolean {
+  if (!capabilities) return false;
+  return !capabilities.hasZscale && !capabilities.hasLibplacebo;
+}
+
 export function deriveDesktopHdrPreparationPolicy(
   sourceVideoMetadata: SourceVideoMetadata,
+  capabilities?: FFmpegHdrCapabilities | null,
 ): HdrPreparationPolicy {
   switch (sourceVideoMetadata.colorClass) {
     case "sdr-bt709":
@@ -285,6 +316,14 @@ export function deriveDesktopHdrPreparationPolicy(
         warning: null,
       };
     case "hdr-pq":
+      if (ffmpegCapabilityBlocksHdrPrep(capabilities)) {
+        return {
+          strategy: "defer-unknown",
+          reason: "ffmpeg-missing-hdr-filters",
+          requiresFixtureValidation: true,
+          warning: `Local ffmpeg build lacks HDR transfer filters (${missingHdrFilterList(capabilities!).join(", ")}); leaving HDR PQ source unchanged until a zscale- or libplacebo-capable ffmpeg is available.`,
+        };
+      }
       return {
         strategy: "prepare-sdr-mezzanine",
         reason: "source-is-hdr-pq",
@@ -292,6 +331,14 @@ export function deriveDesktopHdrPreparationPolicy(
         warning: null,
       };
     case "hdr-hlg":
+      if (ffmpegCapabilityBlocksHdrPrep(capabilities)) {
+        return {
+          strategy: "defer-unknown",
+          reason: "ffmpeg-missing-hdr-filters",
+          requiresFixtureValidation: true,
+          warning: `Local ffmpeg build lacks HDR transfer filters (${missingHdrFilterList(capabilities!).join(", ")}); leaving HDR HLG source unchanged until a zscale- or libplacebo-capable ffmpeg is available.`,
+        };
+      }
       return {
         strategy: "prepare-sdr-mezzanine",
         reason: "source-is-hdr-hlg",

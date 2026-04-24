@@ -45,8 +45,10 @@ import {
   deriveDesktopHdrPreparationPolicy,
   deriveSourceColorMetadataFromFfprobeStream,
   deriveVideoDisplayGeometryFromFfprobeStream,
+  type FFmpegHdrCapabilities,
   type SourceVideoMetadata,
 } from "./video-export-source-metadata";
+import { probeFfmpegHdrCapabilities } from "./ffmpeg-capability-probe";
 import {
   DesktopUpdateService,
   resolveDesktopUpdateCheckUrl,
@@ -393,6 +395,32 @@ function isImageFile(fileName: string): boolean {
 }
 
 /**
+ * @description HDR preparation policy が ffmpeg filter 能力に依存する色分類のときだけ、
+ * 1 回だけ ffmpeg を解決して capability を確定する。SDR / unknown には触らない。
+ * 解決に失敗した場合は null を返し、policy は capability 未確定として扱う（既存挙動と同じ）。
+ */
+async function resolveFfmpegHdrCapabilitiesIfNeeded(
+  colorClass: SourceVideoMetadata["colorClass"],
+): Promise<FFmpegHdrCapabilities | null> {
+  if (colorClass !== "hdr-pq" && colorClass !== "hdr-hlg") {
+    return null;
+  }
+  try {
+    const ffmpeg = resolveVideoCliBinary("ffmpeg");
+    return await probeFfmpegHdrCapabilities({
+      commandPath: ffmpeg.commandPath,
+      env: ffmpeg.childEnv,
+    });
+  } catch (e) {
+    if (DEBUG_VIDEO_EXPORT_MAIN) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(`[film-lab-desktop] ffmpeg HDR capability probe skipped: ${msg}`);
+    }
+    return null;
+  }
+}
+
+/**
  * @description ffprobe の JSON から動画ストリームと尺・音声有無を取り出す
  * @throws ffprobe 失敗時や動画ストリーム欠如時
  */
@@ -539,8 +567,13 @@ async function ffprobeVideoMeta(absPath: string): Promise<{
     colorClass: classifySourceColorForExport(sourceColorMetadata),
     timing: sourceFrameRateInfo,
   };
-  sourceVideoMetadata.hdrPreparationPolicy =
-    deriveDesktopHdrPreparationPolicy(sourceVideoMetadata);
+  const ffmpegHdrCapabilities = await resolveFfmpegHdrCapabilitiesIfNeeded(
+    sourceVideoMetadata.colorClass,
+  );
+  sourceVideoMetadata.hdrPreparationPolicy = deriveDesktopHdrPreparationPolicy(
+    sourceVideoMetadata,
+    ffmpegHdrCapabilities,
+  );
   const cameraOptics = deriveCameraOpticsFromFfprobeMeta({
     rawWidth: width,
     rawHeight: height,

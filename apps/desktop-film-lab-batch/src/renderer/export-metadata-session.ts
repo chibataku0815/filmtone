@@ -128,6 +128,7 @@ const hdrPreparationPolicySchema = z.object({
     "source-is-hdr-hlg",
     "wide-gamut-transfer-unknown",
     "source-color-unknown",
+    "ffmpeg-missing-hdr-filters",
   ]),
   requiresFixtureValidation: z.boolean(),
   warning: z.string().min(1).nullable(),

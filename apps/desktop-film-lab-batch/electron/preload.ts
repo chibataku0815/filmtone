@@ -72,7 +72,8 @@ export type HdrPreparationPolicy = {
     | "source-is-hdr-pq"
     | "source-is-hdr-hlg"
     | "wide-gamut-transfer-unknown"
-    | "source-color-unknown";
+    | "source-color-unknown"
+    | "ffmpeg-missing-hdr-filters";
   requiresFixtureValidation: boolean;
   warning: string | null;
 };

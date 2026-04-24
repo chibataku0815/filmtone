@@ -322,4 +322,115 @@ describe("desktop HDR preparation policy", () => {
       warning: null,
     });
   });
+
+  it("defers HDR PQ preparation when local ffmpeg lacks zscale and libplacebo", () => {
+    const color = deriveSourceColorMetadataFromFfprobeStream({
+      color_space: "bt2020nc",
+      color_transfer: "smpte2084",
+      color_primaries: "bt2020",
+    });
+
+    const policy = deriveDesktopHdrPreparationPolicy(
+      sourceMetadataForColor(color),
+      {
+        hasZscale: false,
+        hasLibplacebo: false,
+        hasTonemap: true,
+        hasColorspace: true,
+      },
+    );
+
+    expect(policy.strategy).toBe("defer-unknown");
+    expect(policy.reason).toBe("ffmpeg-missing-hdr-filters");
+    expect(policy.requiresFixtureValidation).toBe(true);
+    expect(policy.warning).toContain("zscale");
+    expect(policy.warning).toContain("libplacebo");
+    expect(policy.warning).toContain("PQ");
+  });
+
+  it("defers HDR HLG preparation when local ffmpeg lacks zscale and libplacebo", () => {
+    const color = deriveSourceColorMetadataFromFfprobeStream({
+      color_space: "bt2020nc",
+      color_transfer: "arib-std-b67",
+      color_primaries: "bt2020",
+    });
+
+    const policy = deriveDesktopHdrPreparationPolicy(
+      sourceMetadataForColor(color),
+      {
+        hasZscale: false,
+        hasLibplacebo: false,
+        hasTonemap: true,
+        hasColorspace: true,
+      },
+    );
+
+    expect(policy.strategy).toBe("defer-unknown");
+    expect(policy.reason).toBe("ffmpeg-missing-hdr-filters");
+    expect(policy.warning).toContain("HLG");
+  });
+
+  it("keeps prepare-sdr-mezzanine for HDR PQ when zscale is available", () => {
+    const color = deriveSourceColorMetadataFromFfprobeStream({
+      color_space: "bt2020nc",
+      color_transfer: "smpte2084",
+      color_primaries: "bt2020",
+    });
+
+    const policy = deriveDesktopHdrPreparationPolicy(
+      sourceMetadataForColor(color),
+      {
+        hasZscale: true,
+        hasLibplacebo: false,
+        hasTonemap: true,
+        hasColorspace: true,
+      },
+    );
+
+    expect(policy.strategy).toBe("prepare-sdr-mezzanine");
+    expect(policy.reason).toBe("source-is-hdr-pq");
+    expect(policy.warning).toBeNull();
+  });
+
+  it("keeps prepare-sdr-mezzanine for HDR HLG when libplacebo is available", () => {
+    const color = deriveSourceColorMetadataFromFfprobeStream({
+      color_space: "bt2020nc",
+      color_transfer: "arib-std-b67",
+      color_primaries: "bt2020",
+    });
+
+    const policy = deriveDesktopHdrPreparationPolicy(
+      sourceMetadataForColor(color),
+      {
+        hasZscale: false,
+        hasLibplacebo: true,
+        hasTonemap: false,
+        hasColorspace: true,
+      },
+    );
+
+    expect(policy.strategy).toBe("prepare-sdr-mezzanine");
+    expect(policy.reason).toBe("source-is-hdr-hlg");
+  });
+
+  it("does not branch on capabilities for non-HDR color classes", () => {
+    const sdrColor = deriveSourceColorMetadataFromFfprobeStream({
+      color_space: "bt709",
+      color_transfer: "bt709",
+      color_primaries: "bt709",
+    });
+
+    const policy = deriveDesktopHdrPreparationPolicy(
+      sourceMetadataForColor(sdrColor),
+      {
+        hasZscale: false,
+        hasLibplacebo: false,
+        hasTonemap: false,
+        hasColorspace: false,
+      },
+    );
+
+    expect(policy.strategy).toBe("none");
+    expect(policy.reason).toBe("source-is-sdr-bt709");
+  });
 });
