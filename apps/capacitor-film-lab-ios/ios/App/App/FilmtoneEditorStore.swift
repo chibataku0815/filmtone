@@ -520,7 +520,7 @@ final class FilmtoneEditorStore: ObservableObject {
             return preview.posterTimeSec.map(strings.compactDurationLabel)
         }()
 
-        return [dimensions, timing]
+        return [dimensions, timing, cameraOpticsLabel]
             .compactMap { $0 }
             .joined(separator: " · ")
             .nilIfEmpty
@@ -528,6 +528,27 @@ final class FilmtoneEditorStore: ObservableObject {
 
     var sourceViolations: [String] {
         FilmtonePhase0Math.sourceCapViolations(for: probe)
+    }
+
+    /// Current HDR preparation policy derived from the active source probe.
+    ///
+    /// Field path: `probe?.sourceVideoMetadata?.hdrPreparationPolicy`.
+    /// Refreshes automatically whenever `probe` is reassigned (SwiftUI picks
+    /// it up via the `@Published probe` publisher; no separate publisher is
+    /// needed).
+    var hdrPolicy: HdrPreparationPolicyDTO? {
+        probe?.sourceVideoMetadata?.hdrPreparationPolicy
+    }
+
+    /// Compact optics label for preview / export chips.
+    /// Returns `nil` when no optics metadata is available.
+    var cameraOpticsLabel: String? {
+        FilmtoneCameraOpticsFormatter.formatCompact(probe?.cameraOptics, strings: strings)
+    }
+
+    /// Accessibility-friendly optics label for VoiceOver.
+    var cameraOpticsAccessibilityLabel: String? {
+        FilmtoneCameraOpticsFormatter.formatAccessibility(probe?.cameraOptics, strings: strings)
     }
 
     var bannerError: String? {
