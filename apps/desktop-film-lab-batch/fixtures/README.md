@@ -38,7 +38,7 @@ The oracle is the **declaration of what the fixture is** — not a verbatim copy
 
 1. the live probe output is a **structural superset** of `ffprobe` (extra keys on the live side are fine; only what the oracle declares is pinned),
 2. the derived `colorClass` equals `expected.colorClass`,
-3. the derived `deriveDesktopHdrPreparationPolicy(...)` returns `expected.policy.strategy` + `expected.policy.reason`.
+3. the derived `deriveDesktopHdrPreparationPolicy(...)` returns the `expected.policyByCapability.*.strategy` + `.reason` branch for each deterministic ffmpeg capability snapshot.
 
 ### 4.1 Required shape
 
@@ -46,9 +46,23 @@ The oracle is the **declaration of what the fixture is** — not a verbatim copy
 {
   "expected": {
     "colorClass": "hdr-hlg",
-    "policy": {
-      "strategy": "prepare-sdr-mezzanine",
-      "reason":   "source-is-hdr-hlg"
+    "policyByCapability": {
+      "missingHdrFilters": {
+        "strategy": "defer-unknown",
+        "reason": "ffmpeg-missing-hdr-filters"
+      },
+      "zscaleOnly": {
+        "strategy": "prepare-sdr-mezzanine",
+        "reason": "source-is-hdr-hlg"
+      },
+      "libplaceboOnly": {
+        "strategy": "prepare-sdr-mezzanine",
+        "reason": "source-is-hdr-hlg"
+      },
+      "zscaleAndLibplacebo": {
+        "strategy": "prepare-sdr-mezzanine",
+        "reason": "source-is-hdr-hlg"
+      }
     }
   },
   "ffprobe": {
@@ -73,16 +87,22 @@ The oracle is the **declaration of what the fixture is** — not a verbatim copy
 ### 4.2 Field reference
 
 - `expected.colorClass` — one of `sdr-bt709`, `hdr-pq`, `hdr-hlg`, `wide-gamut-unknown`, `unknown`.
-- `expected.policy.strategy` — one of `none`, `prepare-sdr-mezzanine`, `defer-unknown`.
-- `expected.policy.reason` — one of `source-is-sdr-bt709`, `source-is-hdr-pq`, `source-is-hdr-hlg`, `wide-gamut-transfer-unknown`, `source-color-unknown`, `ffmpeg-missing-hdr-filters`.
+- `expected.policyByCapability` — deterministic policy expectations for the four capability snapshots the integration suite injects. This avoids making the oracle depend on the developer or CI machine's locally installed ffmpeg.
+- `expected.policyByCapability.missingHdrFilters` — expected branch for `{ hasZscale: false, hasLibplacebo: false }`.
+- `expected.policyByCapability.zscaleOnly` — expected branch for `{ hasZscale: true, hasLibplacebo: false }`.
+- `expected.policyByCapability.libplaceboOnly` — expected branch for `{ hasZscale: false, hasLibplacebo: true }`.
+- `expected.policyByCapability.zscaleAndLibplacebo` — expected branch for `{ hasZscale: true, hasLibplacebo: true }`.
+- Each policy object's `strategy` is one of `none`, `prepare-sdr-mezzanine`, `defer-unknown`.
+- Each policy object's `reason` is one of `source-is-sdr-bt709`, `source-is-hdr-pq`, `source-is-hdr-hlg`, `wide-gamut-transfer-unknown`, `source-color-unknown`, `ffmpeg-missing-hdr-filters`.
 - `ffprobe.streams[0]` — minimal subset actually consumed by the source-metadata normalizer. Pin the fields that identify the fixture (e.g. `color_transfer`, `color_primaries`, `color_space`, `pix_fmt`, `codec_type`), but **do not** pin volatile / environment-dependent fields like `bit_rate`, `duration`, `nb_frames`, `start_time`.
 - `ffprobe.format.tags` — pin only tags the fixture truly carries (e.g. manufacturer / software) and that matter to downstream logic. Optional.
 
 ### 4.3 Authoring tips
 
-- Keep the oracle minimal and hand-editable. A fixture plus a 20-line JSON oracle is easier to review than a 200-line ffprobe dump.
+- Keep the oracle minimal and hand-editable. A fixture plus a compact capability-matrix JSON oracle is easier to review than a 200-line ffprobe dump.
 - When the oracle lists a value, it becomes a hard contract. When it omits one, the live value is free.
-- If your dev ffmpeg lacks `zscale` / `libplacebo`, an HDR fixture's `expected.policy` must still match whatever the current capability-aware policy returns — i.e. `strategy: "defer-unknown"` / `reason: "ffmpeg-missing-hdr-filters"`. Once ffmpeg is upgraded (see `docs/metadata-driven-export-quality-hdr-fixture-inventory-2026-04-24.md` §6), update the oracle to `prepare-sdr-mezzanine` + `source-is-hdr-pq` / `source-is-hdr-hlg`.
+- HDR fixtures should usually declare `missingHdrFilters` as `defer-unknown` / `ffmpeg-missing-hdr-filters`, and every capability-present branch as `prepare-sdr-mezzanine` / `source-is-hdr-pq` or `source-is-hdr-hlg`.
+- Do not flip oracle policy branches after upgrading local ffmpeg. The test injects capability snapshots, so the oracle should be stable across machines.
 - The integration suite skips entirely when no fixtures are present. Empty directories keep CI green.
 
 ## 5. Capture recipes

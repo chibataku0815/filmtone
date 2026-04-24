@@ -10,15 +10,17 @@
  *      bit_rate / duration are simply not pinned by the oracle).
  *   3. Feeds the live probe metadata into `classifySourceColorForExport` and
  *      asserts the resulting colorClass matches the oracle's expected value.
- *   4. Probes local ffmpeg HDR capabilities (zscale / libplacebo availability)
- *      and runs `deriveDesktopHdrPreparationPolicy` — the returned strategy +
- *      reason must match the oracle's declared branch.
+ *   4. Runs `deriveDesktopHdrPreparationPolicy` against deterministic ffmpeg
+ *      capability snapshots — missing filters, zscale-only, libplacebo-only,
+ *      and both-capable. The returned strategy + reason must match the
+ *      oracle's declared branch for each snapshot, so the test result does not
+ *      depend on the runner's locally installed ffmpeg.
  *
  * When no fixtures exist the entire suite is skipped via `it.skip`, so CI stays
  * green until real HDR / SDR trims are added under `fixtures/video/{hdr,sdr}/`.
  * See `fixtures/README.md` for the capture recipe and oracle schema.
  *
- * @limitations This test invokes real ffprobe / ffmpeg binaries resolved via
+ * @limitations This test invokes the real ffprobe binary resolved via
  * `resolveVideoCliBinary`. It therefore needs the same PATH-sensitive runtime
  * that the Electron main process uses. Failures from binary resolution surface
  * as real test failures when fixtures are present — intentionally loud so that
@@ -32,13 +34,10 @@ import { promisify } from "node:util";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import {
-  probeFfmpegHdrCapabilities,
-  __resetFfmpegHdrCapabilityCacheForTesting,
-} from "./ffmpeg-capability-probe";
-import {
   parseFixtureOracle,
   isStructuralSubset,
   type FixtureOracle,
+  type FixturePolicyCapabilityKey,
 } from "./fixture-oracle";
 import { resolveVideoCliBinary } from "./ffmpeg-cli-resolve";
 import {
@@ -57,6 +56,53 @@ const VIDEO_EXTENSIONS = new Set([".mov", ".mp4", ".mkv"]);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const FIXTURES_ROOT = path.resolve(__dirname, "..", "fixtures", "video");
+
+const POLICY_CAPABILITY_CASES: Array<{
+  key: FixturePolicyCapabilityKey;
+  label: string;
+  capabilities: FFmpegHdrCapabilities;
+}> = [
+  {
+    key: "missingHdrFilters",
+    label: "missing HDR filters",
+    capabilities: {
+      hasZscale: false,
+      hasLibplacebo: false,
+      hasTonemap: true,
+      hasColorspace: true,
+    },
+  },
+  {
+    key: "zscaleOnly",
+    label: "zscale only",
+    capabilities: {
+      hasZscale: true,
+      hasLibplacebo: false,
+      hasTonemap: true,
+      hasColorspace: true,
+    },
+  },
+  {
+    key: "libplaceboOnly",
+    label: "libplacebo only",
+    capabilities: {
+      hasZscale: false,
+      hasLibplacebo: true,
+      hasTonemap: false,
+      hasColorspace: true,
+    },
+  },
+  {
+    key: "zscaleAndLibplacebo",
+    label: "zscale and libplacebo",
+    capabilities: {
+      hasZscale: true,
+      hasLibplacebo: true,
+      hasTonemap: true,
+      hasColorspace: true,
+    },
+  },
+];
 
 type FixtureCase = {
   /** Relative path like `hdr/iphone-hlg-1s-abcd.mov`, stable test label */
@@ -214,21 +260,6 @@ describe.skipIf(hasFixtures)(
 );
 
 describe.skipIf(!hasFixtures)("fixture-policy integration", () => {
-  let capabilities: FFmpegHdrCapabilities | null = null;
-
-  beforeAll(async () => {
-    __resetFfmpegHdrCapabilityCacheForTesting();
-    try {
-      const ffmpeg = resolveVideoCliBinary("ffmpeg");
-      capabilities = await probeFfmpegHdrCapabilities({
-        commandPath: ffmpeg.commandPath,
-        env: ffmpeg.childEnv,
-      });
-    } catch {
-      capabilities = null;
-    }
-  });
-
   describe.each(fixtureCases)("$relativePath", (fixture) => {
     let probe: ProbedFixture;
 
@@ -249,12 +280,29 @@ describe.skipIf(!hasFixtures)("fixture-policy integration", () => {
       expect(sourceMeta.colorClass).toBe(fixture.oracle.expected.colorClass);
     });
 
-    it("derives the oracle's expected HDR preparation policy branch", () => {
+    it("derives the oracle's expected HDR preparation policy branches", () => {
       const sourceMeta = buildSourceVideoMetadata(probe);
-      const policy = deriveDesktopHdrPreparationPolicy(
-        sourceMeta,
-        capabilities,
-      );
+      const policyByCapability = fixture.oracle.expected.policyByCapability;
+      if (policyByCapability) {
+        for (const capabilityCase of POLICY_CAPABILITY_CASES) {
+          const policy = deriveDesktopHdrPreparationPolicy(
+            sourceMeta,
+            capabilityCase.capabilities,
+          );
+          expect(
+            {
+              strategy: policy.strategy,
+              reason: policy.reason,
+            },
+            capabilityCase.label,
+          ).toEqual(policyByCapability[capabilityCase.key]);
+        }
+        return;
+      }
+
+      // Backward-compatible fallback for local pre-S-5 fixture experiments.
+      // New committed fixtures should use policyByCapability.
+      const policy = deriveDesktopHdrPreparationPolicy(sourceMeta, null);
       expect({
         strategy: policy.strategy,
         reason: policy.reason,

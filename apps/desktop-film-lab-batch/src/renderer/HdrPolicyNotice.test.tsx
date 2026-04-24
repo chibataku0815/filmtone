@@ -237,7 +237,7 @@ describe("copyInstallCommandToClipboard", () => {
 describe("HDR_FFMPEG_INSTALL_COMMAND literal", () => {
   it("is the exact homebrew-ffmpeg tap command (contract with the S-4 runbook)", () => {
     expect(HDR_FFMPEG_INSTALL_COMMAND).toBe(
-      "brew tap homebrew-ffmpeg/ffmpeg && brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-libzimg --with-libplacebo",
+      "brew tap homebrew-ffmpeg/ffmpeg && brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-zimg --with-libplacebo",
     );
   });
 });

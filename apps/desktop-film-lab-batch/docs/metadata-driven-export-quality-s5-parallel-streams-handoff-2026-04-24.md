@@ -83,14 +83,14 @@ Four commits on `main`:
 New files:
 - `apps/desktop-film-lab-batch/electron/fixture-oracle.ts` (+242)
   - Pure oracle JSON parser and structural subset matcher.
-  - `parseOracle(rawJson) → Oracle` — Zod-validated.
-  - `matchSubset(expected, actual) → { match: boolean, mismatches: PathedMismatch[] }` — recursive, path-qualified.
+  - `parseFixtureOracle(rawJson) → FixtureOracle` — dependency-free runtime validation.
+  - `isStructuralSubset(expected, actual) → string[]` — recursive, path-qualified mismatch reporting.
   - Zero I/O, zero runtime deps.
-- `apps/desktop-film-lab-batch/electron/fixture-oracle.test.ts` (+155) — 12 unit tests for the parser and matcher. Always-on.
+- `apps/desktop-film-lab-batch/electron/fixture-oracle.test.ts` (+155) — 12 unit tests for the parser and matcher at S-5 boundary; review follow-up raises this to 14. Always-on.
 - `apps/desktop-film-lab-batch/electron/fixture-policy.integration.test.ts` (+264) — the skip-gracefully integration runner.
 
 Modified:
-- `apps/desktop-film-lab-batch/fixtures/README.md` — new §4 formalizing the oracle schema (required keys, field reference, authoring tips). §4.3 explicitly states that until the user upgrades ffmpeg, every HDR oracle's `expected.policy` should be `{ strategy: "defer-unknown", reason: "ffmpeg-missing-hdr-filters" }`; after the homebrew-ffmpeg tap is installed, oracles flip to `prepare-sdr-mezzanine` / `source-is-hdr-pq|hlg`.
+- `apps/desktop-film-lab-batch/fixtures/README.md` — new §4 formalizing the oracle schema (required keys, field reference, authoring tips). Review follow-up corrected this to use `expected.policyByCapability`, so the fixture suite injects deterministic capability snapshots instead of depending on the developer or CI machine's installed ffmpeg. Do not flip oracle policy branches after upgrading local ffmpeg.
 
 ### 4.2 Stream B — PQ → SDR BT.709 filter chain design doc
 
@@ -111,7 +111,7 @@ Key points:
 New file: `apps/desktop-film-lab-batch/docs/metadata-driven-export-quality-hlg-filter-chain-design-2026-04-24.md` (4,808 words / 413 lines).
 
 Key points:
-- **Canonical zscale+tonemap chain (Candidate A)** — 7-filter pipeline: decode → zscale to linear via `arib-std-b67` → OOTF inverse (system γ=1.2 at Lw=1000) → BT.2020→BT.709 primaries → tonemap `mobius:desat=0` → yuv420p.
+- **Canonical zscale+tonemap chain (Candidate A)** — 6-stage pipeline: decode → zscale linearization with input-side `tin=arib-std-b67:pin=2020:min=2020_ncl:rin=tv` → OOTF inverse (system γ=1.2 at Lw=1000) → BT.2020→BT.709 primaries → tonemap `mobius:desat=0` → yuv420p.
 - **Candidate B (libplacebo)** — single `libplacebo=tonemapping=bt2390` pass, trusted to handle HLG OOTF + OOTF inverse + gamut correctly.
 - **Preference order for HLG is reversed from PQ**: when both capabilities exist, HLG prefers **libplacebo** (Candidate B) because the HLG OOTF math is specifically modeled in libplacebo per BBC reference conversion. Dispatch by `colorClass`.
 - **Default tonemap on zscale path**: `mobius` with `desat=0` — softer mid-tone behavior better suited to HLG's scene-referred grading; `hable` is a viable alternative (S-6 can A/B both against fixture).
@@ -136,7 +136,7 @@ Behavior:
   - Title + body explaining the situation.
   - `policy.warning` verbatim (lists which filters are missing).
   - A `<pre>` block with the exact install command:
-    `brew tap homebrew-ffmpeg/ffmpeg && brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-libzimg --with-libplacebo`
+    `brew tap homebrew-ffmpeg/ffmpeg && brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-zimg --with-libplacebo`
   - "Copy command" / "コマンドをコピー" button using `navigator.clipboard.writeText` with a textarea `document.execCommand('copy')` fallback for Electron insecure-origin corners.
   - "Copied!" / "コピーしました" confirmation for 2 s.
   - Opt-in "Why — HDR fixture status" button (only renders when `onOpenFixtureDoc` handler is passed; currently App.tsx does not pass one — deferred as a follow-up, see §8).
@@ -158,7 +158,7 @@ UX judgment calls recorded in the agent's report:
 
 ## 5. Verification
 
-All three verification steps green on the final run (after all 4 stream commits landed):
+All three verification steps were green on the final S-5 run (after all 4 stream commits landed):
 
 ```bash
 bun run --cwd apps/desktop-film-lab-batch test
@@ -173,9 +173,24 @@ bun run --cwd apps/desktop-film-lab-batch build:renderer
 # passed (pre-existing chunk-size warning, unrelated)
 ```
 
+Review follow-up correction on 2026-04-24 updated the oracle schema to `policyByCapability` and re-ran the fast suite:
+
+```bash
+bun run --cwd apps/desktop-film-lab-batch test
+# Vitest: 33 files / 226 tests passed + 1 skipped (227 total)
+
+bun run --cwd apps/desktop-film-lab-batch build:electron
+# passed
+
+bun run --cwd apps/desktop-film-lab-batch build:renderer
+# passed (pre-existing chunk-size warning, unrelated)
+```
+
 Non-blocking: `bunx tsc -p apps/desktop-film-lab-batch/tsconfig.json --noEmit` still stops on the pre-existing CSS side-effect import issue in `src/renderer/main.tsx`. Verification path is the three commands above.
 
-## 6. Git state at the end of the session
+## 6. Git state
+
+Historical S-5 boundary:
 
 ```
 Current branch: main
@@ -193,7 +208,21 @@ tip:
   1d32b848 Finalize cross filter runtime follow-ups  ← depth-aware thread tip
 ```
 
-No worktrees used. `push` was not performed. `main` is 22 ahead of `origin/main`.
+No worktrees used. `push` was not performed at S-5 boundary.
+
+Review-time continuation state before this correction patch:
+
+```
+Current branch: main
+main...origin/main [ahead 24]
+
+tip:
+  96f5d437 Fix ray-angle optics contract and rendering
+  221cc82d Add S-5 parallel-streams session handoff
+  a59077b3 Surface ffmpeg-missing-hdr-filters to user with inline install CTA
+  78e61270 Add HLG-to-SDR filter chain design doc (Stream C / S-5)
+  778565eb HDR プレパレーションポリシー用の fixture 駆動インテグレーションテスト基盤を追加
+```
 
 Parallel thread (depth-aware cross filter) tip: `1d32b848`. Commits since then are all metadata-driven-export-quality work. Safe to treat these two threads as independent for any future merge / rebase.
 
@@ -230,7 +259,7 @@ Parallel thread (depth-aware cross filter) tip: `1d32b848`. Commits since then a
 
 ```bash
 brew tap homebrew-ffmpeg/ffmpeg
-brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-libzimg --with-libplacebo
+brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-zimg --with-libplacebo
 brew link --overwrite homebrew-ffmpeg/ffmpeg/ffmpeg  # if a previous ffmpeg is linked
 ffmpeg -hide_banner -filters | grep -E 'zscale|libplacebo'
 ```
@@ -254,9 +283,23 @@ Each fixture must have a matching `<basename>.ffprobe.json` oracle following the
 {
   "expected": {
     "colorClass": "hdr-hlg",
-    "policy": {
-      "strategy": "defer-unknown",
-      "reason": "ffmpeg-missing-hdr-filters"
+    "policyByCapability": {
+      "missingHdrFilters": {
+        "strategy": "defer-unknown",
+        "reason": "ffmpeg-missing-hdr-filters"
+      },
+      "zscaleOnly": {
+        "strategy": "prepare-sdr-mezzanine",
+        "reason": "source-is-hdr-hlg"
+      },
+      "libplaceboOnly": {
+        "strategy": "prepare-sdr-mezzanine",
+        "reason": "source-is-hdr-hlg"
+      },
+      "zscaleAndLibplacebo": {
+        "strategy": "prepare-sdr-mezzanine",
+        "reason": "source-is-hdr-hlg"
+      }
     }
   },
   "ffprobe": {
@@ -265,13 +308,13 @@ Each fixture must have a matching `<basename>.ffprobe.json` oracle following the
 }
 ```
 
-§4.3 documents the oracle-flip procedure after §8.1 is done (`defer-unknown` → `prepare-sdr-mezzanine`, `ffmpeg-missing-hdr-filters` → `source-is-hdr-hlg|pq`).
+§4.3 documents that oracle policy branches are stable across machines: `missingHdrFilters` stays `defer-unknown` / `ffmpeg-missing-hdr-filters`, and capability-present branches stay `prepare-sdr-mezzanine` / `source-is-hdr-hlg|pq`.
 
 No people, no landmarks. Strip GPS with `exiftool -GPS*:all= fixture.mov` before committing.
 
 ### 8.3 Push vs keep local
 
-`main...origin/main [ahead 22]`. Not pushed. When the user wants CI coverage or remote backup, push; otherwise local is fine.
+At S-5 boundary `main...origin/main [ahead 22]`; at review-time continuation `main...origin/main [ahead 24]`. Not pushed. When the user wants CI coverage or remote backup, push; otherwise local is fine.
 
 ## 9. Guardrails for the next chat (consolidated)
 
@@ -320,12 +363,12 @@ Paste the block below into a fresh chat to continue. Everything the next chat ne
 ```text
 Filmtone Metadata-Driven Export Quality の続きをお願いします。
 対象 repo: /Volumes/SamsungPortableSSDX5001/documents/forestone/chibatakumi-portfolio
-Branch: main (origin/main の 22 コミット先行。push は未実行。)
+Branch: main (review 時点で origin/main の 24 コミット先行。push は未実行。)
 
 直前セッション (S-5, 4 ストリーム並列) の成果:
 - Stream A (778565eb): fixture 駆動 integration test 基盤。
   electron/fixture-oracle.ts (pure oracle parser + subset matcher)、
-  electron/fixture-oracle.test.ts (12 unit tests, 常時実行)、
+  electron/fixture-oracle.test.ts (S-5 境界 12 unit tests、review follow-up 後 14 unit tests、常時実行)、
   electron/fixture-policy.integration.test.ts (describe.skipIf で fixture 到着時のみ発火)、
   fixtures/README.md §4 に oracle schema を形式化。
 - Stream B (08c495a3): PQ→SDR filter chain design doc。
@@ -334,7 +377,7 @@ Branch: main (origin/main の 22 コミット先行。push は未実行。)
   integration 接点は buildHdrToSdrFilterChain(selection) + policy.filterSelection union、
   open questions 6 件 (HDR10+ / DoVi / dynamic npl / default alg / mezz bit depth / bundling)。
 - Stream C (78e61270): HLG→SDR filter chain design doc。
-  zscale+OOTF inverse+tonemap=mobius:desat=0 chain (Candidate A, 7 filters)、
+  zscale+OOTF inverse+tonemap=mobius:desat=0 chain (Candidate A, 6 stages, input-side tin/pin/min/rin)、
   libplacebo bt2390 (Candidate B, HLG では B を優先)、
   npl=1000 system γ=1.2、SDR diffuse white=100 cd/m²、
   open questions 10 件、7 件に default 推奨あり。
@@ -344,7 +387,7 @@ Branch: main (origin/main の 22 コミット先行。push は未実行。)
   brew tap homebrew-ffmpeg/ffmpeg 〜 の install コマンドを one-click コピー、
   navigator.clipboard + textarea fallback、+27 tests。
 
-検証: 33 files / 223 tests passed + 1 skipped, build:electron / build:renderer green。
+検証: S-5 境界では 33 files / 223 tests passed + 1 skipped。review follow-up 後は 33 files / 226 tests passed + 1 skipped。build:electron / build:renderer green。
 commit は 4 本、main に stack。push なし。worktree 未使用。
 
 唯一のフル session-level handoff ドキュメント:
@@ -355,8 +398,8 @@ apps/desktop-film-lab-batch/docs/metadata-driven-export-quality-s5-parallel-stre
    入っていれば capability probe の出力が変わり、<HdrPolicyNotice> が HDR clip で出なくなる。
 2. fixtures/video/{hdr,sdr}/ に実ファイル + <basename>.ffprobe.json oracle が到着したら、
    Stream A の integration suite が自動発火する (skipIf 解除)。
-   oracle は fixtures/README.md §4 のスキーマで 20 行程度。
-   ffmpeg 対応完了後は oracle の expected.policy を §4.3 手順で flip。
+   oracle は fixtures/README.md §4 の `policyByCapability` スキーマで capability 別に固定する。
+   ffmpeg 対応完了後も oracle は flip しない。integration suite が capability snapshot を注入する。
 3. 揃ったら Stream B の design doc に従って PQ 1 branch だけ fixture-backed で wire:
    - electron/video-export-ffmpeg-args.ts に buildHdrToSdrFilterChain(selection) を実装
    - policy に filterSelection discriminated union (kind: "none" | "zscale-tonemap" | "libplacebo") を追加
@@ -398,16 +441,16 @@ git -C /Volumes/SamsungPortableSSDX5001/documents/forestone/chibatakumi-portfoli
 # expect: main
 
 git -C /Volumes/SamsungPortableSSDX5001/documents/forestone/chibatakumi-portfolio status --short
-# expect: empty (unless user added fixtures)
+# expect: empty unless review-fix work or user changes are still uncommitted
 
 # 2) Tip of main
 git -C /Volumes/SamsungPortableSSDX5001/documents/forestone/chibatakumi-portfolio log --oneline -5
 # expect:
+#   96f5d437 Fix ray-angle optics contract and rendering
+#   221cc82d Add S-5 parallel-streams session handoff
 #   a59077b3 Surface ffmpeg-missing-hdr-filters to user with inline install CTA
 #   78e61270 Add HLG-to-SDR filter chain design doc (Stream C / S-5)
 #   778565eb HDR プレパレーションポリシー用の fixture 駆動インテグレーションテスト基盤を追加
-#   08c495a3 Add PQ-to-SDR filter chain design doc (Stream B / S-5)
-#   b09ab70f Add capability-probe session handoff for HDR work
 
 # 3) FFmpeg capability truth (decides next phase)
 ffmpeg -hide_banner -filters | grep -E '\b(zscale|libplacebo)\b' || echo "still missing — §8.1 runbook pending"
@@ -417,14 +460,14 @@ ls apps/desktop-film-lab-batch/fixtures/video/hdr apps/desktop-film-lab-batch/fi
 
 # 5) Fast verify
 bun run --cwd apps/desktop-film-lab-batch test
-# expect: 33 files / 223 passed + 1 skipped (S-5 baseline)
+# expect after review follow-up: 33 files / 226 passed + 1 skipped
 ```
 
 Decision tree:
 - If `3` still reports missing filters AND `4` returns empty: next chat stays in "wait for user action + polish" mode. Consider Stream E (filter chain stub + type contract), F (ffmpeg bundling research), or H (onOpenFixtureDoc wiring).
 - If `3` reports both filters AND `4` has fixtures: next chat is **S-6 — wire `buildHdrToSdrFilterChain` for PQ**, fixture-backed, per the B design doc.
-- If `3` reports both but `4` empty: ffmpeg ready, still waiting on fixtures. Test the capability probe under a real HDR-capable ffmpeg (oracle `expected.policy` for an HDR fixture would flip to `prepare-sdr-mezzanine` once that fixture lands).
-- If `3` missing but `4` has fixtures: unusual case — the HDR oracles' `expected.policy` is still `defer-unknown`, so integration suite should pass; exercise it and verify skipIf behavior for SDR.
+- If `3` reports both but `4` empty: ffmpeg ready, still waiting on fixtures. Test the capability probe under a real HDR-capable ffmpeg; fixture oracles remain stable because `policyByCapability` covers both missing-filter and capable-filter branches.
+- If `3` missing but `4` has fixtures: exercise the fixture suite; HDR oracles should still pass because the policy test injects deterministic capability snapshots rather than reading local ffmpeg.
 
 ---
 

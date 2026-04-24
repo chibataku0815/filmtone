@@ -35,5 +35,5 @@ Next:
 8. Report the result in this chat.
 
 Historical v1.0 checklist:
-${APP_DIR}/PHASE0-DEVICE-CHECKLIST.md
+${APP_DIR}/IOS-DEVICE-CHECKLIST.md
 EOF

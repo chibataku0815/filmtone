@@ -53,7 +53,7 @@ P0-C の pure helper と sidecar/log visibility は landed。次は pixel を変
 
 | 候補 | 入手性 | 利点 | 課題 |
 |---|---|---|---|
-| `brew tap homebrew-ffmpeg/ffmpeg` + `brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-libzimg --with-libplacebo` | 中 | 開発機で最短、zscale + libplacebo 両対応 | user 環境に依存。Filmtone Desktop の end user は別。packaged app は bundled ffmpeg が別途必要 |
+| `brew tap homebrew-ffmpeg/ffmpeg` + `brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-zimg --with-libplacebo` | 中 | 開発機で最短、zscale + libplacebo 両対応 | user 環境に依存。Filmtone Desktop の end user は別。packaged app は bundled ffmpeg が別途必要 |
 | 公式 static build (`johnvansickle`, `BtbN/FFmpeg-Builds`) | 高 | zscale/libplacebo 同梱、Apple Silicon もあり | 再配布ライセンス注意。ユーザーが手動 install |
 | 自前 compile (`--enable-libzimg --enable-libplacebo`) | 低 | フル制御 | メンテコスト高。CI 遅延 |
 | bundled ffmpeg (app resources に同梱) | 低 | end-user に意識させない、再現性高 | app size 増・署名/公証要件・`resolveVideoCliBinary` 拡張 |
@@ -138,7 +138,7 @@ Filmtone Desktop の end-user 向け判断は別途。開発・検証用に開�
 
 ```bash
 brew tap homebrew-ffmpeg/ffmpeg
-brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-libzimg --with-libplacebo
+brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-zimg --with-libplacebo
 # 既存 ffmpeg と衝突する場合
 brew link --overwrite homebrew-ffmpeg/ffmpeg/ffmpeg
 ffmpeg -filters | grep -E 'zscale|libplacebo'

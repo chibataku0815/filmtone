@@ -34,7 +34,7 @@ import type { HdrPreparationPolicy } from "./desktop-api";
  * Exported so tests can assert the literal string without duplicating it.
  */
 export const HDR_FFMPEG_INSTALL_COMMAND =
-  "brew tap homebrew-ffmpeg/ffmpeg && brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-libzimg --with-libplacebo";
+  "brew tap homebrew-ffmpeg/ffmpeg && brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-zimg --with-libplacebo";
 
 /**
  * @description Relative path of the fixture inventory doc inside the app.

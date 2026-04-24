@@ -1,8 +1,8 @@
-# Filmtone iOS Historical v1.0 Device Checklist (Phase B gate)
+# Filmtone iOS Historical v1.0 Device Checklist
 
-Single-page checklist. Consult this while tapping through exports; everything else (rules, schema, decision thresholds) is already wired.
+Single-page historical checklist. The iOS v1.0 gate is complete; keep this only as procedural reference.
 
-Anchor: `/Volumes/SamsungPortableSSDX5001/documents/life/docs/guides/2026-04-18-filmtone-ios-phase0-phase-a-complete-phase-b-gate-handoff.md`
+Historical anchor: the April 18 iOS gate handoff in the `life` repo.
 
 ## 0. Launch
 
@@ -69,7 +69,7 @@ First line is the decision:
 
 | Decision | Condition | Next |
 | --- | --- | --- |
-| **Strong-Go** | 60s avg ≤ 2.0x AND 100% visual pass AND 100% save ok | Phase C auto-proceed (see runbook) |
+| **Strong-Go** | 60s avg <= 2.0x AND 100% visual pass AND 100% save ok | auto-proceed using the historical runbook |
 | **Go** | 60s avg ≤ 2.5x AND visual fail < 10% | ask user once: "invite 5 testers Y/N?" |
 | **No-Go** | otherwise | stop; focus on Desktop |
 
@@ -77,7 +77,7 @@ Exit codes: `0` Strong-Go/Go, `3` No-Go, `2` empty dir.
 
 ## 6. If Strong-Go
 
-Follow the historical `docs/guides/2026-04-18-filmtone-ios-phase0-phase-c-auto-runbook.md` on the life side. Two commands, no thinking.
+Follow the historical April 18 iOS auto-runbook on the life side. Two commands, no thinking.
 
 ## 7. What counts as a pass (visual floor)
 
@@ -90,7 +90,7 @@ If any of the above fails → `Fail`. If unsure → `未確認` (counts as unche
 
 ## 8. Do NOT
 
-- Re-verify Phase A (build / dual-LUT compile / 4K cap / save-to-Photos — all settled)
-- Touch UIScene / warning cleanup / App Store metadata / Metal — Phase Polish only
+- Re-verify the completed build / dual-LUT compile / 4K cap / save-to-Photos work
+- Touch UIScene / warning cleanup / App Store metadata / Metal
 - Bundle `.cube` assets (see `src/presets/luts/README.md` for the intended path)
-- Treat the `phase0` lane as the live day-to-day work lane
+- Treat the historical gate lane as the live day-to-day work lane

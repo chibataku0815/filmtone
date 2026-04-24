@@ -15,9 +15,23 @@ describe("parseFixtureOracle", () => {
     const oracle = parseFixtureOracle({
       expected: {
         colorClass: "hdr-hlg",
-        policy: {
-          strategy: "prepare-sdr-mezzanine",
-          reason: "source-is-hdr-hlg",
+        policyByCapability: {
+          missingHdrFilters: {
+            strategy: "defer-unknown",
+            reason: "ffmpeg-missing-hdr-filters",
+          },
+          zscaleOnly: {
+            strategy: "prepare-sdr-mezzanine",
+            reason: "source-is-hdr-hlg",
+          },
+          libplaceboOnly: {
+            strategy: "prepare-sdr-mezzanine",
+            reason: "source-is-hdr-hlg",
+          },
+          zscaleAndLibplacebo: {
+            strategy: "prepare-sdr-mezzanine",
+            reason: "source-is-hdr-hlg",
+          },
         },
       },
       ffprobe: {
@@ -31,12 +45,18 @@ describe("parseFixtureOracle", () => {
     });
 
     expect(oracle.expected.colorClass).toBe("hdr-hlg");
-    expect(oracle.expected.policy.strategy).toBe("prepare-sdr-mezzanine");
-    expect(oracle.expected.policy.reason).toBe("source-is-hdr-hlg");
+    expect(oracle.expected.policyByCapability?.missingHdrFilters).toEqual({
+      strategy: "defer-unknown",
+      reason: "ffmpeg-missing-hdr-filters",
+    });
+    expect(oracle.expected.policyByCapability?.zscaleOnly).toEqual({
+      strategy: "prepare-sdr-mezzanine",
+      reason: "source-is-hdr-hlg",
+    });
     expect(oracle.ffprobe.streams?.[0]?.color_transfer).toBe("arib-std-b67");
   });
 
-  it("fills empty ffprobe when the oracle omits the key entirely", () => {
+  it("accepts the legacy single policy shape for local experiments", () => {
     const oracle = parseFixtureOracle({
       expected: {
         colorClass: "sdr-bt709",
@@ -44,7 +64,46 @@ describe("parseFixtureOracle", () => {
       },
     });
 
+    expect(oracle.expected.policy).toEqual({
+      strategy: "none",
+      reason: "source-is-sdr-bt709",
+    });
+    expect(oracle.expected.policyByCapability).toBeUndefined();
+  });
+
+  it("fills empty ffprobe when the oracle omits the key entirely", () => {
+    const oracle = parseFixtureOracle({
+      expected: {
+        colorClass: "sdr-bt709",
+        policyByCapability: {
+          missingHdrFilters: { strategy: "none", reason: "source-is-sdr-bt709" },
+          zscaleOnly: { strategy: "none", reason: "source-is-sdr-bt709" },
+          libplaceboOnly: { strategy: "none", reason: "source-is-sdr-bt709" },
+          zscaleAndLibplacebo: {
+            strategy: "none",
+            reason: "source-is-sdr-bt709",
+          },
+        },
+      },
+    });
+
     expect(oracle.ffprobe).toEqual({});
+  });
+
+  it("rejects policyByCapability when a capability branch is missing", () => {
+    expect(() =>
+      parseFixtureOracle({
+        expected: {
+          colorClass: "hdr-pq",
+          policyByCapability: {
+            missingHdrFilters: {
+              strategy: "defer-unknown",
+              reason: "ffmpeg-missing-hdr-filters",
+            },
+          },
+        },
+      }),
+    ).toThrowError(/policyByCapability\.zscaleOnly/);
   });
 
   it("rejects an unknown colorClass with a path-qualified error", () => {

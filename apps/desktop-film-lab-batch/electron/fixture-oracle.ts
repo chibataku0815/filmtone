@@ -9,7 +9,12 @@
  *   {
  *     "expected": {
  *       "colorClass":  "hdr-hlg" | "hdr-pq" | "sdr-bt709" | ...,
- *       "policy":      { "strategy": "...", "reason": "..." }
+ *       "policyByCapability": {
+ *         "missingHdrFilters":  { "strategy": "...", "reason": "..." },
+ *         "zscaleOnly":         { "strategy": "...", "reason": "..." },
+ *         "libplaceboOnly":     { "strategy": "...", "reason": "..." },
+ *         "zscaleAndLibplacebo": { "strategy": "...", "reason": "..." }
+ *       }
  *     },
  *     "ffprobe":  {
  *       "streams": [ { "color_transfer": "...", ... } ],
@@ -64,6 +69,13 @@ const VALID_POLICY_REASONS: readonly HdrPreparationPolicy["reason"][] = [
   "ffmpeg-missing-hdr-filters",
 ] as const;
 
+const VALID_POLICY_CAPABILITY_KEYS = [
+  "missingHdrFilters",
+  "zscaleOnly",
+  "libplaceboOnly",
+  "zscaleAndLibplacebo",
+] as const;
+
 /**
  * @description The portion of ffprobe JSON that fixture oracles may pin.
  * Any property is optional; only the keys the oracle explicitly lists will
@@ -76,12 +88,26 @@ export type FixtureOracleProbeShape = {
   } & Record<string, unknown>;
 };
 
+export type FixturePolicyCapabilityKey =
+  (typeof VALID_POLICY_CAPABILITY_KEYS)[number];
+
+export type FixtureOracleExpectedPolicy = {
+  strategy: HdrPreparationPolicy["strategy"];
+  reason: HdrPreparationPolicy["reason"];
+};
+
 export type FixtureOracleExpected = {
   colorClass: SourceColorClass;
-  policy: {
-    strategy: HdrPreparationPolicy["strategy"];
-    reason: HdrPreparationPolicy["reason"];
-  };
+  /**
+   * @deprecated Single-policy oracles are accepted for old local fixtures only.
+   * New fixtures should use `policyByCapability` so tests are deterministic
+   * across stock and HDR-capable ffmpeg builds.
+   */
+  policy?: FixtureOracleExpectedPolicy;
+  policyByCapability?: Record<
+    FixturePolicyCapabilityKey,
+    FixtureOracleExpectedPolicy
+  >;
 };
 
 export type FixtureOracle = {
@@ -109,6 +135,53 @@ function requireOneOf<T extends string>(
   return value as T;
 }
 
+function parseExpectedPolicy(
+  raw: unknown,
+  path: string,
+): FixtureOracleExpectedPolicy {
+  if (!isPlainObject(raw)) {
+    throw new Error(`${path} must be an object`);
+  }
+  const strategy = requireOneOf(
+    raw.strategy,
+    VALID_POLICY_STRATEGIES,
+    `${path}.strategy`,
+  );
+  const reason = requireOneOf(
+    raw.reason,
+    VALID_POLICY_REASONS,
+    `${path}.reason`,
+  );
+  return { strategy, reason };
+}
+
+function parsePolicyByCapability(
+  raw: unknown,
+): Record<FixturePolicyCapabilityKey, FixtureOracleExpectedPolicy> {
+  const path = "oracle.expected.policyByCapability";
+  if (!isPlainObject(raw)) {
+    throw new Error(`${path} must be an object`);
+  }
+
+  const allowedKeys = new Set<string>(VALID_POLICY_CAPABILITY_KEYS);
+  for (const key of Object.keys(raw)) {
+    if (!allowedKeys.has(key)) {
+      throw new Error(
+        `${path} contains unknown key "${key}"; expected [${VALID_POLICY_CAPABILITY_KEYS.join(", ")}]`,
+      );
+    }
+  }
+
+  const parsed = {} as Record<
+    FixturePolicyCapabilityKey,
+    FixtureOracleExpectedPolicy
+  >;
+  for (const key of VALID_POLICY_CAPABILITY_KEYS) {
+    parsed[key] = parseExpectedPolicy(raw[key], `${path}.${key}`);
+  }
+  return parsed;
+}
+
 /**
  * @description Parse and validate a raw oracle JSON object. Throws a descriptive
  * error on any shape violation so a broken oracle fails loudly at test load time.
@@ -126,20 +199,19 @@ export function parseFixtureOracle(raw: unknown): FixtureOracle {
     VALID_COLOR_CLASSES,
     "oracle.expected.colorClass",
   );
-  const policy = expected.policy;
-  if (!isPlainObject(policy)) {
-    throw new Error("oracle.expected.policy must be an object");
+  const policy =
+    expected.policy !== undefined
+      ? parseExpectedPolicy(expected.policy, "oracle.expected.policy")
+      : undefined;
+  const policyByCapability =
+    expected.policyByCapability !== undefined
+      ? parsePolicyByCapability(expected.policyByCapability)
+      : undefined;
+  if (!policy && !policyByCapability) {
+    throw new Error(
+      "oracle.expected must include policyByCapability (preferred) or policy",
+    );
   }
-  const strategy = requireOneOf(
-    policy.strategy,
-    VALID_POLICY_STRATEGIES,
-    "oracle.expected.policy.strategy",
-  );
-  const reason = requireOneOf(
-    policy.reason,
-    VALID_POLICY_REASONS,
-    "oracle.expected.policy.reason",
-  );
 
   let ffprobe: FixtureOracleProbeShape = {};
   if (raw.ffprobe !== undefined) {
@@ -170,7 +242,11 @@ export function parseFixtureOracle(raw: unknown): FixtureOracle {
   }
 
   return {
-    expected: { colorClass, policy: { strategy, reason } },
+    expected: {
+      colorClass,
+      ...(policy ? { policy } : {}),
+      ...(policyByCapability ? { policyByCapability } : {}),
+    },
     ffprobe,
   };
 }

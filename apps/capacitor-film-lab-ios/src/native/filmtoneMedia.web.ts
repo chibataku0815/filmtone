@@ -236,7 +236,7 @@ export class FilmtoneMediaWeb extends WebPlugin implements FilmtoneMediaPlugin {
   async saveToPhotos(options: { uri: string }): Promise<void> {
     const anchor = document.createElement("a");
     anchor.href = options.uri;
-    anchor.download = "filmtone-phase0-output";
+    anchor.download = "filmtone-ios-output";
     anchor.click();
   }
 

@@ -105,13 +105,11 @@ Below, the `<source>` feeds an ffmpeg `-i` input with HLG tags. The output is co
 ### 3.1 Candidate A — `zscale`-canonical (recommended default)
 
 ```
-zscale=t=arib-std-b67:m=bt2020nc:p=bt2020:r=tv,
-format=yuv420p10le,
-zscale=t=linear:npl=1000,
+zscale=tin=arib-std-b67:pin=2020:min=2020_ncl:rin=tv:t=linear:npl=1000,
 format=gbrpf32le,
-zscale=p=bt709,
+zscale=p=709,
 tonemap=tonemap=mobius:desat=0,
-zscale=t=bt709:m=bt709:r=tv,
+zscale=t=709:m=709:r=tv,
 format=yuv420p
 ```
 
@@ -119,18 +117,16 @@ Parameter-by-parameter:
 
 | step | filter | parameter | meaning | failure if wrong |
 |---|---|---|---|---|
-| 1 | `zscale` | `t=arib-std-b67:m=bt2020nc:p=bt2020:r=tv` | Reassert HLG input tags. Some clips come with partially-missing tags; this pins them before linearization. | If `t` mis-set, `zscale` cannot apply the HLG inverse OETF. Visual: shadows crushed and blacks lifted because a BT.709 gamma is applied to an HLG curve. |
-| 2 | `format` | `yuv420p10le` | Force 10-bit pixel format before float conversion. Preserves shadow precision. | If omitted on an 8-bit intermediate, linear-light banding in shadows becomes visible. |
-| 3 | `zscale` | `t=linear:npl=1000` | **The critical step.** Applies the HLG inverse OETF to produce scene-linear, then applies the OOTF for `Lw = npl` (nominal peak luminance in cd/m²), producing display-linear light. `npl=1000` means "target a 1000-nit HDR display" — this is the default HLG authoring intent. | If `npl` wrong: the OOTF gamma is wrong, producing either washed-out midtones (too low) or crushed shadows (too high). If `t=linear` omitted, no OOTF is applied and the signal remains scene-referred — tone mapping afterwards will be wrong. |
-| 4 | `format` | `gbrpf32le` | Planar float32 RGB, required by `tonemap` filter. | `tonemap` errors out on integer formats. |
-| 5 | `zscale` | `p=bt709` | Converts primaries from BT.2020 to BT.709 in linear light (correct place). | If done after OETF (step 7), out-of-gamut BT.2020 values become negative BT.709 after matrix, and OETF clips them — producing cyan shadows / magenta highlights. |
-| 6 | `tonemap` | `tonemap=mobius:desat=0` | S-curve luminance compression to bring the post-OOTF display-linear range into BT.709's ~100-nit headroom. `desat=0` keeps chroma unchanged (we defer any saturation shaping to the Filmtone creative stage). | Without it, specular highlights above 100 cd/m² clip to 1.0 in BT.709 — visible as hard white plates on bright skies / reflections. With `hable` instead, midtones darken more (see §4). |
-| 7 | `zscale` | `t=bt709:m=bt709:r=tv` | Applies the BT.709 OETF (gamma ~2.4 in signal sense) and writes BT.709 matrix, limited range. | Wrong matrix → greenish cast. Wrong range → crushed blacks or lifted whites. |
-| 8 | `format` | `yuv420p` | Chroma-subsampled 4:2:0 8-bit, matching the existing Filmtone export output pixel format. | If swapped for `yuv420p10le`, the downstream H.264 encoder branch in `ffmpegVideoCodecArgs` (hardware `h264_videotoolbox` on macOS) may either re-quantize or reject depending on platform. |
+| 1 | `zscale` | `tin=arib-std-b67:pin=2020:min=2020_ncl:rin=tv:t=linear:npl=1000` | **Input-tag reassertion + critical linearization.** The `*in` options describe the source as HLG / BT.2020 / limited-range before conversion, then `t=linear:npl=1000` applies the HLG inverse OETF and the BT.2100 reference OOTF for `Lw = npl` (nominal peak luminance in cd/m²), producing display-linear light. | If `tin` is wrong, `zscale` cannot apply the HLG inverse OETF. If output-side `t/m/p/r` are used here instead of `tin/min/pin/rin`, the recipe rewrites tags rather than describing the input. If `npl` is wrong, the OOTF gamma shifts, producing washed-out midtones or crushed shadows. |
+| 2 | `format` | `gbrpf32le` | Planar float32 RGB, required by `tonemap` filter and high enough precision to preserve the 10-bit source through the OOTF stage. | `tonemap` errors out on integer formats, or visible banding appears if the signal is quantized before the float intermediate. |
+| 3 | `zscale` | `p=709` | Converts primaries from BT.2020 to BT.709 in linear light (correct place). | If done after OETF (step 5), out-of-gamut BT.2020 values become negative BT.709 after matrix, and OETF clips them — producing cyan shadows / magenta highlights. |
+| 4 | `tonemap` | `tonemap=mobius:desat=0` | S-curve luminance compression to bring the post-OOTF display-linear range into BT.709's ~100-nit headroom. `desat=0` keeps chroma unchanged (we defer any saturation shaping to the Filmtone creative stage). | Without it, specular highlights above 100 cd/m² clip to 1.0 in BT.709 — visible as hard white plates on bright skies / reflections. With `hable` instead, midtones darken more (see §4). |
+| 5 | `zscale` | `t=709:m=709:r=tv` | Applies the BT.709 OETF (gamma ~2.4 in signal sense) and writes BT.709 matrix, limited range. | Wrong matrix → greenish cast. Wrong range → crushed blacks or lifted whites. |
+| 6 | `format` | `yuv420p` | Chroma-subsampled 4:2:0 8-bit, matching the existing Filmtone export output pixel format. | If swapped for `yuv420p10le`, the downstream H.264 encoder branch in `ffmpegVideoCodecArgs` (hardware `h264_videotoolbox` on macOS) may either re-quantize or reject depending on platform. |
 
 **Why `npl=1000` and not `npl=100`**: `npl` in zscale's HLG path is the *nominal peak luminance of the OOTF target display*, i.e. `Lw` in BT.2100. Setting `npl=100` means "apply the OOTF for a 100-nit display" — gamma becomes `gamma = 1.2 + 0.42 * log10(0.1) ≈ 0.78` (inverse gamma, darkens). That is not what BT.709 SDR wants; BT.709 SDR wants the scene rendered with a **system gamma near 1.0** at diffuse white, then tone-mapped. Setting `npl=1000` applies the authoring-intended OOTF (display-linear at 1000 nits), and the subsequent `tonemap=mobius` step is what brings the range down to BT.709.
 
-**Alternative interpretation** (TBD — research pending: the zscale source code `libavfilter/vf_zscale.c` vs zimg's `zimg_graph_builder_params.nominal_peak_luminance` need direct inspection before S-6 commits): some documentation suggests `npl` is also used by the *inverse* OETF step as the HLG display reference. If so, setting `npl=1000` in step 3 means "treat scene-linear values as authored for a 1000-nit display", which is the BT.2100 reference condition. Either interpretation converges on `npl=1000` being the right value for default iPhone HLG. This is an S-6 verification task against real fixtures.
+**Alternative interpretation** (TBD — research pending: the zscale source code `libavfilter/vf_zscale.c` vs zimg's `zimg_graph_builder_params.nominal_peak_luminance` need direct inspection before S-6 commits): some documentation suggests `npl` is also used by the *inverse* OETF step as the HLG display reference. If so, setting `npl=1000` in the first zscale stage means "treat scene-linear values as authored for a 1000-nit display", which is the BT.2100 reference condition. Either interpretation converges on `npl=1000` being the right value for default iPhone HLG. This is an S-6 verification task against real fixtures.
 
 ### 3.2 Candidate B — `libplacebo` single-pass
 
@@ -184,7 +180,7 @@ For S-6:
 |---|---|---|---|---|---|
 | `colorspace` only | nobody (filter does not touch transfer) | nobody | trivial | silently wrong for HLG | ❌ never |
 | `tonemap` only (no `zscale` linearize) | nobody | tonemap | trivial | washed-out (OOTF missing) | ❌ never |
-| `zscale` linearize + `tonemap` (Candidate A) | `zscale t=linear:npl=…` | `tonemap mobius/hable/reinhard` | canonical, well-documented, works on any zimg build | 7-filter chain, needs correct `npl` and float intermediate | ✅ default when `hasZscale` |
+| `zscale` linearize + `tonemap` (Candidate A) | `zscale tin=…:t=linear:npl=…` | `tonemap mobius/hable/reinhard` | canonical, well-documented, works on any zimg build | 6-stage chain, needs correct `npl` and float intermediate | ✅ default when `hasZscale` |
 | `libplacebo` single-pass (Candidate B) | libplacebo internal | libplacebo BT.2390 EETF | 1 filter, best gradients, GPU path | requires Vulkan+libplacebo linkage | ✅ preferred when both available, fallback to A otherwise |
 | 3D LUT (`lut3d`) | LUT author | LUT author | cheap runtime | LUT is fixed to one authoring display Lw; no OOTF adaptation; bakes in creative choices | ❌ not suitable for a metadata-driven correctness pipeline |
 | `colorspace=iall=…:all=…` | in newer ffmpeg builds has HDR support | limited | attractive because it's a single filter | HLG OOTF handling has historically lagged zscale; not trusted as the canonical for 2026 | ❌ not default; reconsider if zscale availability collapses |
@@ -255,7 +251,7 @@ Note the preference order (Candidate B wins when both are available) is **revers
 
 | symptom | likely cause | how to detect |
 |---|---|---|
-| Midtones washed out, skin tones pale | OOTF not applied (step 3 missing or wrong `t=`) | Compare against reference SDR QuickTime Player HLG render; look at 18% grey / skin |
+| Midtones washed out, skin tones pale | OOTF not applied (first zscale stage missing `t=linear` or has wrong `tin=`) | Compare against reference SDR QuickTime Player HLG render; look at 18% grey / skin |
 | Shadows crushed, blacks clipping | OOTF applied twice, or `npl` too high | Histogram clipping below code 16 in limited range |
 | Highlights hard-clipping to pure white plates | Tone mapper skipped, or Candidate B with `target_peak` unset | Specular reflections / sky lose gradient |
 | Greenish / cyan cast | Matrix left as `bt2020nc` at final step | Compare swatches of 50% grey / skin swatch; non-neutral implies matrix error |
@@ -396,7 +392,7 @@ All accessed 2026-04-24 via WebSearch / WebFetch / Gemini CLI during the Stream 
 
 10. **libplacebo options documentation**, [libplacebo.org/options/](https://libplacebo.org/options/). Tone-mapping parameter surface, including `bt2390` EETF description and `knee_offset` default of 1.0 (vs ITU spec 0.5).
 
-11. **FFmpeg mailing list — HDR bt.2020 to SDR bt.709 conversion thread (2023-10)**, [ffmpeg.org/pipermail/ffmpeg-user/2023-October/057045.html](https://ffmpeg.org/pipermail/ffmpeg-user/2023-October/057045.html). Community-canonical zscale+tonemap filter chain. Shows the same 7-filter shape this doc adopts, plus a cautionary note on remaining color shifts.
+11. **FFmpeg mailing list — HDR bt.2020 to SDR bt.709 conversion thread (2023-10)**, [ffmpeg.org/pipermail/ffmpeg-user/2023-October/057045.html](https://ffmpeg.org/pipermail/ffmpeg-user/2023-October/057045.html). Community-canonical zscale+tonemap filter chain. Shows the same linearize → float → gamut convert → tonemap → encode shape this doc adopts, plus a cautionary note on remaining color shifts.
 
 12. **BinaryTides — Color grading HLG videos with FFmpeg**, [binarytides.com/color-grading-hlg-videos-with-ffmpeg/](https://www.binarytides.com/color-grading-hlg-videos-with-ffmpeg/). iPhone-centric HLG workflow, useful as a pragmatic reference; relies on a 3D LUT (`hlg2020_to_rec709.cube`) rather than zscale, which this doc rejects for a metadata-driven pipeline (§4.1).
 

@@ -243,7 +243,7 @@ Homebrew’s default `ffmpeg` bottle no longer ships `libzimg` or `libplacebo`. 
 
 ```bash
 brew tap homebrew-ffmpeg/ffmpeg
-brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-libzimg --with-libplacebo
+brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-zimg --with-libplacebo
 brew link --overwrite homebrew-ffmpeg/ffmpeg/ffmpeg   # if a previous ffmpeg is linked
 ffmpeg -filters | grep -E 'zscale|libplacebo'
 ```
