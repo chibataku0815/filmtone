@@ -20,7 +20,7 @@ Filmtone Desktop は、Filmtone の **macOS 向けローカル書き出しアプ
 - **LUT（3D LUT）** はプレビューからバッチへ **自動コピーしません**。同期するのは数値 `Params` のみです。最終確認は必ず出力ファイルで行ってください。
 - **寄付 / 共有** は Desktop 版ではオフです。Web との差分の全体は release notes を正とします。
 - **スマートルック AI** は、この Desktop リリースには含めません。
-- **動画書き出し**には `ffmpeg` / `ffprobe` が `PATH` 上に必要です。
+- **動画書き出し**は同梱の `ffmpeg` / `ffprobe` を優先します。検証や緊急回避では `FILM_LAB_FFMPEG_PATH` / `FILM_LAB_FFPROBE_PATH` で上書きできます。
 
 ## リリース用コマンド
 
@@ -105,4 +105,4 @@ bun run build
 
 バッチタブ下部の **「動画を書き出す」** が利用できます。入力は最大 **3840×2160・900 秒**、出力は最大 **1920×1080・24fps**（アップスケールなし）です。バッチ用ルック（プリセット / JSON）がそのまま適用されます。動画は **編集タブに近い見え方** になるよう、**1 フレームずつグレードして MP4** にします。
 
-**必須:** `PATH` 上に **`ffmpeg`** と **`ffprobe`** があること（例: `brew install ffmpeg`）。macOS では H.264 エンコードに **VideoToolbox** を優先します。
+通常は同梱の **`ffmpeg`** と **`ffprobe`** を使います。macOS では H.264 エンコードに **VideoToolbox** を優先します。検証や緊急回避では `FILM_LAB_FFMPEG_PATH` / `FILM_LAB_FFPROBE_PATH` で別バイナリを指定できます。
