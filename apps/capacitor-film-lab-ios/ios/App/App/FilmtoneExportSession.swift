@@ -1826,15 +1826,21 @@ kernel vec4 glowComposite(__sample base, __sample bloom, __sample halation, __sa
     //
     // `opticsPack` = vec3(tanHalfFovX, tanHalfFovY, referenceIncidence).
     // `applyMask` is 1.0 only when `cameraOptics.source == "metadata"`;
-    // for `"assumed"` / nil / fallback65 sources it stays 0.0, which makes
-    // `mix(1.0, mask, applyMask) == 1.0` and the kernel output is
-    // byte-identical to the pre-Stream-2 behavior.
+    // for `"assumed"` / nil / fallback65 sources it stays 0.0.
+    //
+    // Math note: the mask must modulate the *darkening amount*, not the final
+    // pixel multiplier. At the center `mask = 0` (no edge falloff); applying
+    // that as a final multiplier would drive the center to black. Instead we
+    // fold the mask into `intensity * dist^2` so the center always stays
+    // untouched (`vig = 1.0`) and only the edge falloff is scaled by
+    // optics-aware weight. When `applyMask = 0`, `effectiveMask = 1.0` and
+    // the formula collapses to the original `1 - intensity * dist^2`,
+    // byte-identical with pre-Stream-2 output.
     static let vignette = CIColorKernel(source: """
 kernel vec4 vignette(__sample image, float intensity, vec2 extentOrigin, vec2 extentSize, float rayAngleGamma, float rayAngleInner, vec3 opticsPack, float applyMask) {
     vec4 color = image;
     vec2 uv = (destCoord() - extentOrigin) / extentSize;
     float dist = length(uv - vec2(0.5, 0.5)) * 1.414;
-    float vig = 1.0 - intensity * dist * dist;
 
     vec2 sensor = (uv - vec2(0.5, 0.5)) * 2.0;
     float rayX = sensor.x * opticsPack.x;
@@ -1850,7 +1856,8 @@ kernel vec4 vignette(__sample image, float intensity, vec2 extentOrigin, vec2 ex
     float mask = t * t * (3.0 - 2.0 * t);
     float effectiveMask = mix(1.0, mask, clamp(applyMask, 0.0, 1.0));
 
-    color.rgb *= clamp(vig * effectiveMask, 0.0, 1.0);
+    float vig = 1.0 - intensity * dist * dist * effectiveMask;
+    color.rgb *= clamp(vig, 0.0, 1.0);
     return color;
 }
 """)
