@@ -19,8 +19,8 @@ struct VerifyPhase0Contract {
     static func main() throws {
         let args = Array(CommandLine.arguments.dropFirst())
         try expect(
-            args.count == 2,
-            "usage: verify-phase0-contract <canonical-export-request> <legacy-project-state>"
+            args.count == 2 || args.count == 3,
+            "usage: verify-phase0-contract <canonical-export-request> <legacy-project-state> [<hlg-export-request>]"
         )
 
         let decoder = JSONDecoder()
@@ -87,6 +87,49 @@ struct VerifyPhase0Contract {
             !reencodedString.contains("\"lut\""),
             "re-encoded legacy state still contains lut"
         )
+
+        // --- Hidden defaults SSOT (CONTRACT_DEFAULTS 19 keys) ---
+        // Confirms that the generated Swift block matches the TS source of
+        // truth. Three drift sensors: two hot keys (ray-angle, used by T3)
+        // plus a distant field (crossFilterEdgeLengthGain) to catch a
+        // half-emitted block.
+        try expect(
+            abs(FilmtonePhase0Generated.hiddenDefaults.depthRayAngleGamma - 1.4) < 1e-6,
+            "hidden defaults: depthRayAngleGamma drift"
+        )
+        try expect(
+            abs(FilmtonePhase0Generated.hiddenDefaults.depthRayAngleInnerThreshold - 0.1) < 1e-6,
+            "hidden defaults: depthRayAngleInnerThreshold drift"
+        )
+        try expect(
+            abs(FilmtonePhase0Generated.hiddenDefaults.crossFilterEdgeLengthGain - 0.45) < 1e-6,
+            "hidden defaults: crossFilterEdgeLengthGain drift (distant key sanity check)"
+        )
+
+        // --- Preset count sanity ---
+        try expect(
+            FilmtonePhase0Generated.paramsByName.count == 10,
+            "preset count should be 10 (got \(FilmtonePhase0Generated.paramsByName.count))"
+        )
+
+        // --- Optional HLG fixture decode (Stream 1 produced fixture) ---
+        if args.count == 3 {
+            let hlgURL = URL(fileURLWithPath: args[2])
+            if FileManager.default.fileExists(atPath: hlgURL.path) {
+                let hlg = try decoder.decode(
+                    Phase0ExportRequestDTO.self,
+                    from: Data(contentsOf: hlgURL)
+                )
+                try expect(
+                    hlg.sourceProbe?.sourceVideoMetadata?.colorClass == .hdrHlg,
+                    "HLG fixture colorClass should be .hdrHlg"
+                )
+                try expect(
+                    hlg.sourceProbe?.sourceVideoMetadata?.hdrPreparationPolicy?.strategy == .coreImageToneMapSdr,
+                    "HLG fixture hdrPreparationPolicy.strategy should be .coreImageToneMapSdr"
+                )
+            }
+        }
 
         print("Phase0 contract fixtures verified")
     }
