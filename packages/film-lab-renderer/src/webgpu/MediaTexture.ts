@@ -96,4 +96,39 @@ export class MediaTexture {
     );
     return texture;
   }
+
+  static fromExternalImageSource(
+    device: GPUDevice,
+    source: ImageBitmapSource,
+    width: number,
+    height: number,
+    target: GPUTexture | null,
+    opts: MediaTextureOptions = {},
+  ): GPUTexture {
+    const safeWidth = Math.max(1, Math.round(width));
+    const safeHeight = Math.max(1, Math.round(height));
+    const needsAlloc =
+      !target ||
+      target.width !== safeWidth ||
+      target.height !== safeHeight;
+    const texture = needsAlloc
+      ? device.createTexture({
+          label: opts.label ?? "media.external-image",
+          size: {
+            width: safeWidth,
+            height: safeHeight,
+            depthOrArrayLayers: 1,
+          },
+          format: "rgba8unorm-srgb",
+          usage: opts.usage ?? DEFAULT_MEDIA_USAGE,
+        })
+      : target;
+    if (target && needsAlloc) target.destroy();
+    device.queue.copyExternalImageToTexture(
+      { source: source as GPUCopyExternalImageSource, flipY: true },
+      { texture },
+      { width: safeWidth, height: safeHeight },
+    );
+    return texture;
+  }
 }

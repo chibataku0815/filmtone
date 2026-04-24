@@ -5,6 +5,7 @@ import type {
   MetadataLutRefs,
 } from "./export-metadata-session";
 import { createMetadataLutRefFromRuntime } from "./export-metadata-session";
+import type { ExportRenderGeometry } from "./export-render-geometry";
 import { viewportRecordToParams } from "./viewport-to-params";
 
 export type ExportGradeLutSlot = {
@@ -28,6 +29,7 @@ export type EffectiveExportGradeSnapshot = {
   lutRefs: MetadataLutRefs;
   source: EffectiveExportGradeSource;
   captureError: string | null;
+  exportRenderGeometry: ExportRenderGeometry | null;
 };
 
 export type BuildEffectiveExportGradeSnapshotInput = {
@@ -39,6 +41,7 @@ export type BuildEffectiveExportGradeSnapshotInput = {
   fallbackLookSource: MetadataLookSource;
   fallbackLutRefs: MetadataLutRefs;
   captureError?: string | null;
+  exportRenderGeometry?: ExportRenderGeometry | null;
 };
 
 export function buildEffectiveExportGradeSnapshot({
@@ -50,6 +53,7 @@ export function buildEffectiveExportGradeSnapshot({
   fallbackLookSource,
   fallbackLutRefs,
   captureError = null,
+  exportRenderGeometry = null,
 }: BuildEffectiveExportGradeSnapshotInput): EffectiveExportGradeSnapshot {
   if (!viewportParams) {
     return {
@@ -59,6 +63,7 @@ export function buildEffectiveExportGradeSnapshot({
       lutRefs: fallbackLutRefs,
       source: "batch",
       captureError,
+      exportRenderGeometry,
     };
   }
 
@@ -84,6 +89,7 @@ export function buildEffectiveExportGradeSnapshot({
     },
     source: "preview",
     captureError,
+    exportRenderGeometry,
   };
 }
 
@@ -114,7 +120,10 @@ export function formatEffectiveExportGradeSummary(
     `scratchAmount=${formatNumber(p.scratchAmount)}`,
     `shaftIntensity=${formatNumber(p.shaftIntensity)}`,
     `crossFilterStrength=${formatNumber(p.crossFilterStrength)}`,
-  ].join(" ");
+    snapshot.exportRenderGeometry
+      ? `renderGeometry=${snapshot.exportRenderGeometry.renderWidth}x${snapshot.exportRenderGeometry.renderHeight}/${snapshot.exportRenderGeometry.fitMode}`
+      : null,
+  ].filter((part): part is string => part !== null).join(" ");
 }
 
 export function collectEffectiveExportGradeWarnings(

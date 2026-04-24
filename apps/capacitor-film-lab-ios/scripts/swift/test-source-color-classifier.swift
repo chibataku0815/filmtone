@@ -15,11 +15,13 @@ func expect(_ condition: @autoclosure () -> Bool, _ message: String) throws {
 struct TestSourceColorClassifier {
     static func main() throws {
         try runNormalizerTransferTests()
+        try runNormalizerLogTransferTests()
         try runNormalizerPrimariesTests()
         try runNormalizerMatrixTests()
         try runClassifierBranchTests()
         try runPolicyDeriverTests()
         try runHlgFixtureRoundTrip()
+        try runAppleLogFixtureRoundTrips()
         print("Source color classifier + normalizer + HDR policy tests passed")
     }
 
@@ -65,6 +67,21 @@ struct TestSourceColorClassifier {
                 "kCMFormatDescriptionTransferFunction_ITU_R_2100_HLG"
             ) == "arib-std-b67",
             "transfer with kCMFormatDescription prefix"
+        )
+    }
+
+    static func runNormalizerLogTransferTests() throws {
+        try expect(
+            SourceColorMetadataNormalizer.normalizeLogTransferFunction("kCMFormatDescriptionLogTransferFunction_AppleLog") == .appleLog,
+            "log transfer AppleLog constant -> appleLog"
+        )
+        try expect(
+            SourceColorMetadataNormalizer.normalizeLogTransferFunction("kCVImageBufferLogTransferFunction_AppleLog2") == .appleLog2,
+            "log transfer AppleLog2 constant -> appleLog2"
+        )
+        try expect(
+            SourceColorMetadataNormalizer.normalizeLogTransferFunction("apple-log") == .appleLog,
+            "log transfer apple-log -> appleLog"
         )
     }
 
@@ -128,6 +145,18 @@ struct TestSourceColorClassifier {
             SourceColorClassifier.classify(metadata(transfer: "bt709", primaries: "bt2020")) == .wideGamutUnknown,
             "classifier: primaries=bt2020 -> wideGamutUnknown"
         )
+        try expect(
+            SourceColorClassifier.classify(metadata(
+                transfer: "apple-log", primaries: "bt2020", logTransfer: .appleLog
+            )) == .appleLog,
+            "classifier: Apple Log -> appleLog"
+        )
+        try expect(
+            SourceColorClassifier.classify(metadata(
+                transfer: "apple-log2", primaries: "apple-wide-gamut", logTransfer: .appleLog2
+            )) == .appleLog2,
+            "classifier: Apple Log 2 -> appleLog2"
+        )
         // Branch 3: wide-gamut via mastering display presence
         try expect(
             SourceColorClassifier.classify(metadata(
@@ -185,6 +214,22 @@ struct TestSourceColorClassifier {
         try expect(wg.reason == "wide-gamut-transfer-unknown", "deriver: wide-gamut reason")
         try expect(wg.requiresFixtureValidation == true, "deriver: wide-gamut fixture=true")
 
+        let appleLog = SourceInputTransformPolicyDeriver.derive(
+            colorClass: .appleLog,
+            codecFamily: .prores422,
+            logTransferFunction: .appleLog
+        )
+        try expect(appleLog.strategy == .appleLogToRec709, "input deriver: Apple Log -> appleLogToRec709")
+        try expect(appleLog.reason == "source-is-apple-log", "input deriver: Apple Log reason")
+
+        let raw = SourceInputTransformPolicyDeriver.derive(
+            colorClass: .appleLog2,
+            codecFamily: .proresRaw,
+            logTransferFunction: .appleLog2
+        )
+        try expect(raw.strategy == .unsupported, "input deriver: ProRes RAW -> unsupported")
+        try expect(raw.reason == "source-is-prores-raw", "input deriver: ProRes RAW reason")
+
         let unknown = HdrPreparationPolicyDeriver.derive(colorClass: .unknown)
         try expect(unknown.strategy == .none, "deriver: unknown -> none")
         try expect(unknown.reason == "source-color-unknown", "deriver: unknown reason")
@@ -226,12 +271,150 @@ struct TestSourceColorClassifier {
         )
     }
 
+    // MARK: - Apple Log / ProRes fixture round-trips
+
+    static func runAppleLogFixtureRoundTrips() throws {
+        let args = Array(CommandLine.arguments.dropFirst())
+        let hlgURL = URL(fileURLWithPath: args[0])
+        let fixtureDir = hlgURL.deletingLastPathComponent()
+
+        try assertAppleLogFixture(
+            fixtureDir.appendingPathComponent("apple-log-prores-422-export-request.json"),
+            expectedCodec: "apcn",
+            expectedTransfer: "apple-log",
+            expectedLogTransfer: .appleLog,
+            expectedCodecFamily: .prores422,
+            expectedColorClass: .appleLog,
+            expectedInputStrategy: .appleLogToRec709,
+            expectedInputReason: "source-is-apple-log",
+            expectedHdrStrategy: .none,
+            expectedHdrReason: "source-is-apple-log",
+            expectedHdrRequiresFixtureValidation: true,
+            expectedDisplayWidth: 3840,
+            expectedDisplayHeight: 2160,
+            expectedRotation: 0,
+            expectedFrameRate: 30,
+            label: "Apple Log / ProRes 422"
+        )
+
+        try assertAppleLogFixture(
+            fixtureDir.appendingPathComponent("apple-log-2-prores-raw-export-request.json"),
+            expectedCodec: "aprn",
+            expectedTransfer: "apple-log2",
+            expectedLogTransfer: .appleLog2,
+            expectedCodecFamily: .proresRaw,
+            expectedColorClass: .unsupported,
+            expectedInputStrategy: .unsupported,
+            expectedInputReason: "source-is-prores-raw",
+            expectedHdrStrategy: .deferVisibleWarning,
+            expectedHdrReason: "source-unsupported",
+            expectedHdrRequiresFixtureValidation: false,
+            expectedDisplayWidth: 2160,
+            expectedDisplayHeight: 3840,
+            expectedRotation: 90,
+            expectedFrameRate: 24,
+            label: "Apple Log 2 / ProRes RAW"
+        )
+    }
+
+    static func assertAppleLogFixture(
+        _ url: URL,
+        expectedCodec: String,
+        expectedTransfer: String,
+        expectedLogTransfer: SourceLogTransferFunctionDTO,
+        expectedCodecFamily: SourceCodecFamilyDTO,
+        expectedColorClass: SourceColorClassDTO,
+        expectedInputStrategy: SourceInputTransformStrategyDTO,
+        expectedInputReason: String,
+        expectedHdrStrategy: HdrPreparationStrategyDTO,
+        expectedHdrReason: String,
+        expectedHdrRequiresFixtureValidation: Bool,
+        expectedDisplayWidth: Int,
+        expectedDisplayHeight: Int,
+        expectedRotation: Int,
+        expectedFrameRate: Double,
+        label: String
+    ) throws {
+        let decoder = JSONDecoder()
+        let request = try decoder.decode(Phase0ExportRequestDTO.self, from: Data(contentsOf: url))
+        let probe = request.sourceProbe
+        let metadata = probe?.sourceVideoMetadata
+
+        try expect(probe?.codec == expectedCodec, "\(label) codec should be \(expectedCodec)")
+        try expect(probe?.codecFamily == expectedCodecFamily, "\(label) codecFamily should be \(expectedCodecFamily.rawValue)")
+        try expect(probe?.logTransferFunction == expectedLogTransfer, "\(label) top-level logTransferFunction should match")
+        try expect(probe?.inputTransformPolicy?.strategy == expectedInputStrategy, "\(label) top-level input strategy should match")
+        try expect(probe?.inputTransformPolicy?.reason == expectedInputReason, "\(label) top-level input reason should match")
+        try expect(metadata != nil, "\(label) fixture missing sourceVideoMetadata")
+        try expect(
+            metadata?.color.colorTransfer == expectedTransfer,
+            "\(label) colorTransfer should be \(expectedTransfer)"
+        )
+        try expect(
+            metadata?.color.logTransferFunction == expectedLogTransfer,
+            "\(label) color.logTransferFunction should match"
+        )
+        try expect(
+            metadata?.codecFamily == expectedCodecFamily,
+            "\(label) metadata.codecFamily should match"
+        )
+        try expect(
+            metadata?.logTransferFunction == expectedLogTransfer,
+            "\(label) metadata.logTransferFunction should match"
+        )
+        try expect(
+            metadata?.inputTransformPolicy?.strategy == expectedInputStrategy,
+            "\(label) metadata input strategy should match"
+        )
+        try expect(
+            metadata?.inputTransformPolicy?.reason == expectedInputReason,
+            "\(label) metadata input reason should match"
+        )
+        try expect(
+            metadata?.colorClass == expectedColorClass,
+            "\(label) colorClass should be \(expectedColorClass.rawValue)"
+        )
+        try expect(
+            metadata?.hdrPreparationPolicy?.strategy == expectedHdrStrategy,
+            "\(label) HDR strategy should be \(expectedHdrStrategy.rawValue)"
+        )
+        try expect(
+            metadata?.hdrPreparationPolicy?.reason == expectedHdrReason,
+            "\(label) HDR reason should be \(expectedHdrReason)"
+        )
+        try expect(
+            metadata?.hdrPreparationPolicy?.requiresFixtureValidation == expectedHdrRequiresFixtureValidation,
+            "\(label) requiresFixtureValidation should be \(expectedHdrRequiresFixtureValidation)"
+        )
+        try expect(
+            metadata?.display.displayWidth == expectedDisplayWidth,
+            "\(label) displayWidth should be \(expectedDisplayWidth)"
+        )
+        try expect(
+            metadata?.display.displayHeight == expectedDisplayHeight,
+            "\(label) displayHeight should be \(expectedDisplayHeight)"
+        )
+        try expect(
+            metadata?.display.rotationDeg == expectedRotation,
+            "\(label) rotationDeg should be \(expectedRotation)"
+        )
+        try expect(
+            metadata?.timing?.nominalFrameRate == expectedFrameRate,
+            "\(label) nominalFrameRate should be \(expectedFrameRate)"
+        )
+        try expect(
+            metadata?.timing?.trustReason == "nominal-only",
+            "\(label) trustReason should be nominal-only"
+        )
+    }
+
     // MARK: - Fixture helpers
 
     static func metadata(
         transfer: String?,
         primaries: String?,
         space: String? = nil,
+        logTransfer: SourceLogTransferFunctionDTO? = nil,
         hasMastering: Bool = false,
         hasContentLight: Bool = false
     ) -> SourceColorMetadataDTO {
@@ -240,6 +423,7 @@ struct TestSourceColorClassifier {
             colorSpace: space,
             colorTransfer: transfer,
             colorPrimaries: primaries,
+            logTransferFunction: logTransfer,
             hasMasteringDisplayMetadata: hasMastering,
             hasContentLightMetadata: hasContentLight
         )

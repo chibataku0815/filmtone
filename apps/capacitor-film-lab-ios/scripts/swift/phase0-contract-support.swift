@@ -32,8 +32,25 @@ enum SourceColorClassDTO: String, Codable {
     case sdrBt709         = "sdr-bt709"
     case hdrPq            = "hdr-pq"
     case hdrHlg           = "hdr-hlg"
+    case appleLog         = "apple-log"
+    case appleLog2        = "apple-log2"
     case wideGamutUnknown = "wide-gamut-unknown"
+    case unsupported      = "unsupported"
     case unknown          = "unknown"
+}
+
+enum SourceCodecFamilyDTO: String, Codable {
+    case h264
+    case hevc
+    case prores422 = "prores-422"
+    case prores4444 = "prores-4444"
+    case proresRaw = "prores-raw"
+    case other
+}
+
+enum SourceLogTransferFunctionDTO: String, Codable {
+    case appleLog = "apple-log"
+    case appleLog2 = "apple-log2"
 }
 
 enum HdrPreparationStrategyDTO: String, Codable {
@@ -49,13 +66,48 @@ struct HdrPreparationPolicyDTO: Codable {
     let warning: String?
 }
 
+enum SourceInputTransformStrategyDTO: String, Codable {
+    case none = "none"
+    case appleLogToRec709 = "apple-log-to-rec709"
+    case appleLog2ToRec709 = "apple-log2-to-rec709"
+    case coreImageToneMapSdr = "core-image-tone-map-sdr"
+    case deferVisibleWarning = "defer-visible-warning"
+    case unsupported = "unsupported"
+}
+
+struct SourceInputTransformPolicyDTO: Codable {
+    let strategy: SourceInputTransformStrategyDTO
+    let reason: String
+    let requiresFixtureValidation: Bool
+    let warning: String?
+}
+
 struct SourceColorMetadataDTO: Codable {
     let colorRange: String?
     let colorSpace: String?
     let colorTransfer: String?
     let colorPrimaries: String?
+    let logTransferFunction: SourceLogTransferFunctionDTO?
     let hasMasteringDisplayMetadata: Bool
     let hasContentLightMetadata: Bool
+
+    init(
+        colorRange: String?,
+        colorSpace: String?,
+        colorTransfer: String?,
+        colorPrimaries: String?,
+        logTransferFunction: SourceLogTransferFunctionDTO? = nil,
+        hasMasteringDisplayMetadata: Bool,
+        hasContentLightMetadata: Bool
+    ) {
+        self.colorRange = colorRange
+        self.colorSpace = colorSpace
+        self.colorTransfer = colorTransfer
+        self.colorPrimaries = colorPrimaries
+        self.logTransferFunction = logTransferFunction
+        self.hasMasteringDisplayMetadata = hasMasteringDisplayMetadata
+        self.hasContentLightMetadata = hasContentLightMetadata
+    }
 }
 
 struct SourceDisplayGeometryDTO: Codable {
@@ -80,6 +132,29 @@ struct SourceVideoMetadataDTO: Codable {
     let colorClass: SourceColorClassDTO
     let hdrPreparationPolicy: HdrPreparationPolicyDTO?
     let timing: SourceVideoTimingMetadataDTO?
+    let codecFamily: SourceCodecFamilyDTO?
+    let logTransferFunction: SourceLogTransferFunctionDTO?
+    let inputTransformPolicy: SourceInputTransformPolicyDTO?
+
+    init(
+        display: SourceDisplayGeometryDTO,
+        color: SourceColorMetadataDTO,
+        colorClass: SourceColorClassDTO,
+        hdrPreparationPolicy: HdrPreparationPolicyDTO?,
+        timing: SourceVideoTimingMetadataDTO?,
+        codecFamily: SourceCodecFamilyDTO? = nil,
+        logTransferFunction: SourceLogTransferFunctionDTO? = nil,
+        inputTransformPolicy: SourceInputTransformPolicyDTO? = nil
+    ) {
+        self.display = display
+        self.color = color
+        self.colorClass = colorClass
+        self.hdrPreparationPolicy = hdrPreparationPolicy
+        self.timing = timing
+        self.codecFamily = codecFamily
+        self.logTransferFunction = logTransferFunction
+        self.inputTransformPolicy = inputTransformPolicy
+    }
 }
 
 struct SourceProbeDTO: Codable {
@@ -92,7 +167,10 @@ struct SourceProbeDTO: Codable {
     let durationSec: Double?
     let fileSizeBytes: Int?
     let codec: String?
+    let codecFamily: SourceCodecFamilyDTO?
     let frameRate: Double?
+    let logTransferFunction: SourceLogTransferFunctionDTO?
+    let inputTransformPolicy: SourceInputTransformPolicyDTO?
     let cameraOptics: CameraOpticsDTO?
     let sourceVideoMetadata: SourceVideoMetadataDTO?
 }

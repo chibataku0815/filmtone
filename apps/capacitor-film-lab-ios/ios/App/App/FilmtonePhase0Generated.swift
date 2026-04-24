@@ -25,7 +25,7 @@ enum FilmtonePhase0Generated {
     static let rgbShiftMax = 0.005
     static let grainIntensityMax = 0.1
     static let sourceDurationCapSec = 300.0
-    static let sourceLongEdgeCap = 3840
+    static let sourceLongEdgeCap = 4096
     static let sourceFileSizeCapBytes = 8589934592
     static let resetParams: FilmtonePhase0Params =
     .init(

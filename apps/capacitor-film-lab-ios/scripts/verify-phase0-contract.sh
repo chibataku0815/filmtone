@@ -36,6 +36,20 @@ xcrun swiftc \
 
 "$HOST_BINARY" "$CANONICAL_FIXTURE" "$LEGACY_FIXTURE" "$HLG_FIXTURE"
 
+# --- Stream C: .cube parser DOMAIN_MIN / DOMAIN_MAX test ---
+CUBE_PARSER_SCRIPT="$SCRIPT_DIR/swift/test-cube-parser.swift"
+CUBE_PARSER_SRC="$APP_DIR/ios/App/App/FilmtoneCubeParser.swift"
+if [ -f "$CUBE_PARSER_SCRIPT" ] && [ -f "$CUBE_PARSER_SRC" ]; then
+  echo "==> cube parser test"
+  CUBE_PARSER_BIN=$(mktemp "${TMPDIR:-/tmp}/phase0-cube-parser-check.XXXXXX")
+  CLEANUP_FILES="$CLEANUP_FILES $CUBE_PARSER_BIN"
+  xcrun swiftc \
+    -o "$CUBE_PARSER_BIN" \
+    "$CUBE_PARSER_SRC" \
+    "$CUBE_PARSER_SCRIPT"
+  "$CUBE_PARSER_BIN"
+fi
+
 # --- Stream 1: source-color-classifier test (landed in foundation branch) ---
 CLASSIFIER_SCRIPT="$SCRIPT_DIR/swift/test-source-color-classifier.swift"
 if [ -f "$CLASSIFIER_SCRIPT" ]; then

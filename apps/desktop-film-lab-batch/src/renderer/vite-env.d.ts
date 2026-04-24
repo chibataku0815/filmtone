@@ -29,7 +29,7 @@ interface ImportMetaEnv {
    */
   readonly VITE_FILM_LAB_VERBOSE_VIDEO_EXPORT?: string;
   /**
-   * @description `vite.config` が `FILM_LAB_ENABLE_WEBCODECS_EXPORT` から埋める。`true` のときだけ高速 WebCodecs 書き出しを使う。
+   * @description `vite.config` が WebCodecs export の診断フラグから埋める。既定は `true`、`FILM_LAB_ENABLE_WEBCODECS_EXPORT=0|false` または `FILM_LAB_DISABLE_WEBCODECS_EXPORT=1|true` で `false`。
    */
   readonly VITE_FILM_LAB_ENABLE_WEBCODECS_EXPORT?: string;
   /** @description デスクトップ版 Filmtone の公開バージョン。metadata sidecar に埋め込む。 */

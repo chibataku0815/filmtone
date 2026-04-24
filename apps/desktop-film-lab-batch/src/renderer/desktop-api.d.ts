@@ -128,6 +128,46 @@ export type VideoExportTranscodeMezzanineInput = {
   sourceVideoMetadata?: SourceVideoMetadata;
 };
 
+export type VideoExportDecodeFrameBaseInput = {
+  /** @description デコード対象 MP4 / MOV 等の絶対パス */
+  filePath: string;
+  /** @description 任意の出力幅。height 省略時はアスペクト比を維持する。 */
+  width?: number;
+  /** @description 任意の出力高さ。width 省略時はアスペクト比を維持する。 */
+  height?: number;
+};
+
+export type VideoExportDecodeFrameInput =
+  | (VideoExportDecodeFrameBaseInput & {
+      /** @description デコードする秒位置。frameIndex+fps とは排他。 */
+      timeSec: number;
+      frameIndex?: never;
+      fps?: never;
+    })
+  | (VideoExportDecodeFrameBaseInput & {
+      timeSec?: never;
+      /** @description デコードするフレーム番号。fps とセットで秒位置へ変換する。 */
+      frameIndex: number;
+      /** @description frameIndex を秒位置へ変換するための FPS。 */
+      fps: number;
+    });
+
+export type VideoExportDecodeFrameResult = {
+  /** @description ffmpeg が stdout に出した PNG bytes。 */
+  bytes: Uint8Array;
+  width: number;
+  height: number;
+  format: "png";
+  ffmpeg: {
+    commandPath: string;
+    source: "env-override" | "bundled-resource" | "path-search";
+    stderrTail: string;
+    requestedTimeSec: number;
+    requestedFrameIndex: number | null;
+    requestedFps: number | null;
+  };
+};
+
 /**
  * @description Stage 1 の JPEG サムネイル抽出入力。
  * 元動画サイズを渡して、main 側で戻り値の width / height を安定して計算します。
@@ -246,6 +286,10 @@ export type FilmLabBatchBridge = {
     cameraOptics: CameraOptics;
     sourceVideoMetadata?: SourceVideoMetadata;
   }>;
+  /** @description Diagnostic: completed MP4/MOV の 1 frame を PNG bytes として ffmpeg でデコード */
+  videoExportDecodeFrame: (
+    payload: VideoExportDecodeFrameInput,
+  ) => Promise<VideoExportDecodeFrameResult>;
   /** @description ffmpeg を rawvideo stdin で起動（1 セッションのみ） */
   videoExportStart: (payload: {
     inputVideoPath: string;

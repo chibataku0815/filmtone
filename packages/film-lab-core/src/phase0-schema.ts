@@ -57,7 +57,9 @@ export type Phase0ParamKey = (typeof PHASE0_PARAM_KEYS)[number];
 export type Phase0Params = Pick<Params, Phase0ParamKey>;
 
 export const PHASE0_MAX_SOURCE_DURATION_SEC = 60 * 5;
-export const PHASE0_APPROX_SOURCE_LONG_EDGE_MAX = 3840;
+export const PHASE0_APPROX_SOURCE_LONG_EDGE_MAX = 4096;
+// Compatibility export only. Runtime import now uses available-storage preflight
+// instead of a fixed source-size rejection.
 export const PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES = 8 * 1024 * 1024 * 1024;
 
 export const PHASE0_OUTPUT_PROFILE = {

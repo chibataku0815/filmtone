@@ -529,12 +529,6 @@ enum FilmtonePhase0Math {
             )
         }
 
-        if let fileSizeBytes = probe.fileSizeBytes, fileSizeBytes > sourceFileSizeCapBytes {
-            violations.append(
-                "Source size \(fileSizeBytes) bytes exceeds \(sourceFileSizeCapBytes) bytes"
-            )
-        }
-
         return violations
     }
 
@@ -543,7 +537,16 @@ enum FilmtonePhase0Math {
             return nil
         }
 
+        if probe.codecFamily == .proresRaw ||
+            probe.inputTransformPolicy?.strategy == .unsupported ||
+            probe.sourceVideoMetadata?.inputTransformPolicy?.strategy == .unsupported
+        {
+            return "ProRes RAW is not supported in this version. Use standard ProRes 422, H.264, or HEVC."
+        }
+
         switch normalizedSourceCodec(probe.codec) {
+        case "aprn", "aprh":
+            return "ProRes RAW is not supported in this version. Use standard ProRes 422, H.264, or HEVC."
         case "avdh":
             return "Avid DNxHR / DNxHD video can't be previewed or exported on iPhone. Convert this file to H.264, HEVC, or ProRes first."
         default:

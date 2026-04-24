@@ -3,7 +3,6 @@ import type { PresetName } from "./presets";
 import type { CubeLUT } from "./cube-parser";
 import {
   PHASE0_APPROX_SOURCE_LONG_EDGE_MAX,
-  PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES,
   PHASE0_MAX_SOURCE_DURATION_SEC,
   PHASE0_OUTPUT_PROFILE,
   type Phase0OutputProfile,
@@ -19,6 +18,34 @@ export interface SourceInfo {
   filename: string;
   kind: SourceKind;
   mimeType?: string;
+}
+
+export type SourceCodecFamily =
+  | "h264"
+  | "hevc"
+  | "prores-422"
+  | "prores-4444"
+  | "prores-raw"
+  | "other"
+  | "unknown";
+
+export type SourceLogTransferFunction =
+  | "apple-log"
+  | "apple-log2";
+
+export type SourceInputTransformStrategy =
+  | "none"
+  | "apple-log-to-rec709"
+  | "apple-log2-to-rec709"
+  | "core-image-tone-map-sdr"
+  | "defer-visible-warning"
+  | "unsupported";
+
+export interface SourceInputTransformPolicy {
+  strategy: SourceInputTransformStrategy;
+  reason: string;
+  requiresFixtureValidation: boolean;
+  warning: string | null;
 }
 
 export type CameraOpticsSource = "metadata" | "assumed" | "manual";
@@ -43,6 +70,9 @@ export interface SourceProbe extends SourceInfo {
   durationSec?: number;
   fileSizeBytes?: number;
   codec?: string;
+  codecFamily?: SourceCodecFamily;
+  logTransferFunction?: SourceLogTransferFunction;
+  inputTransformPolicy?: SourceInputTransformPolicy;
   frameRate?: number;
   cameraOptics?: CameraOptics;
   sourceVideoMetadata?: SourceVideoMetadata;
@@ -60,7 +90,10 @@ export type SourceColorClass =
   | "sdr-bt709"
   | "hdr-pq"
   | "hdr-hlg"
+  | "apple-log"
+  | "apple-log2"
   | "wide-gamut-unknown"
+  | "unsupported"
   | "unknown";
 
 export type IosHdrPreparationStrategy =
@@ -83,6 +116,7 @@ export interface SourceColorMetadata {
   colorSpace: string | null;
   colorTransfer: string | null;
   colorPrimaries: string | null;
+  logTransferFunction?: SourceLogTransferFunction | null;
   hasMasteringDisplayMetadata: boolean;
   hasContentLightMetadata: boolean;
 }
@@ -111,6 +145,9 @@ export interface SourceVideoMetadata {
   colorClass: SourceColorClass;
   hdrPreparationPolicy?: IosHdrPreparationPolicy;
   timing?: SourceVideoTimingMetadata;
+  codecFamily?: SourceCodecFamily;
+  logTransferFunction?: SourceLogTransferFunction | null;
+  inputTransformPolicy?: SourceInputTransformPolicy;
 }
 
 export interface ParsedCubeLut {
@@ -240,15 +277,6 @@ export function getPhase0SourceCapViolations(probe: SourceProbe): string[] {
   ) {
     violations.push(
       `Source long edge ${longEdge}px exceeds ${PHASE0_APPROX_SOURCE_LONG_EDGE_MAX}px`,
-    );
-  }
-
-  if (
-    typeof probe.fileSizeBytes === "number" &&
-    probe.fileSizeBytes > PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES
-  ) {
-    violations.push(
-      `Source size ${probe.fileSizeBytes} bytes exceeds ${PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES} bytes`,
     );
   }
 

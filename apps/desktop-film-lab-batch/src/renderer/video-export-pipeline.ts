@@ -14,10 +14,10 @@ import type { FilmLabBatchBridge } from "./desktop-api";
 import {
   assertVideoImportWithinCaps,
   computeExportFrameCount,
-  computeVideoExportDimensions,
   formatVideoExportFps,
   selectVideoExportFps,
 } from "./video-export-constants";
+import { computeExportRenderGeometry } from "./export-render-geometry";
 import type { BatchGradeState } from "./batch-pipeline";
 import {
   computeTargetSourceFrameIndex,
@@ -54,11 +54,11 @@ const VIDEO_EXPORT_PROFILE_SEGMENT_COUNT = 4;
 const VIDEO_EXPORT_PROGRESS_CALLBACK_INTERVAL_FRAMES = 4;
 
 /**
- * @description WebCodecs は速いがプレビューの HTMLVideoElement 経路と色処理が微妙にズレうる。
- *   品質・見た目一致を既定にし、速度検証時だけ opt-in する。
+ * @description WebCodecs は supported H.264 で既定 ON。`FILM_LAB_ENABLE_WEBCODECS_EXPORT=0|false`
+ *   または `FILM_LAB_DISABLE_WEBCODECS_EXPORT=1|true` のときだけ診断用に HTMLVideoElement seek 経路へ戻す。
  */
 const ENABLE_WEBCODECS_VIDEO_EXPORT =
-  import.meta.env.VITE_FILM_LAB_ENABLE_WEBCODECS_EXPORT === "true";
+  import.meta.env.VITE_FILM_LAB_ENABLE_WEBCODECS_EXPORT !== "false";
 
 /** @description seek がこの時間（ms）無応答なら打ち切り（どこで固まったかログに出す） */
 const SEEK_TIMEOUT_MS = 90_000;
@@ -73,6 +73,33 @@ export type VideoExportProgress = {
   totalFrames: number;
   /** @description いまの進捗の種類。mezzanine か frames かを App 側で見分ける。 */
   phase?: "mezzanine" | "frames";
+};
+
+export type VideoExportDebugFrameSample = {
+  frameIndex: number;
+  timeSec: number;
+  width: number;
+  height: number;
+  rgba: Uint8Array;
+  backendKind: "webgl" | "webgpu";
+  decodeMode: "webcodecs" | "html-video";
+  renderGeometry: {
+    renderWidth: number;
+    renderHeight: number;
+    sourceWidth: number;
+    sourceHeight: number;
+    sourceDisplayWidth: number;
+    sourceDisplayHeight: number;
+    fitMode: "cover" | "contain";
+    fps?: number;
+  };
+};
+
+export type VideoExportDebugFrameSampler = {
+  frameIndexes?: number[];
+  timeSec?: number;
+  timeToleranceSec?: number;
+  onFrame: (sample: VideoExportDebugFrameSample) => void | Promise<void>;
 };
 
 /**
@@ -139,6 +166,24 @@ function p95Ms(values: number[]): number {
   const s = [...values].sort((a, b) => a - b);
   const idx = Math.min(s.length - 1, Math.ceil(0.95 * s.length) - 1);
   return s[Math.max(0, idx)]!;
+}
+
+function shouldCaptureDebugFrame(
+  sampler: VideoExportDebugFrameSampler | null | undefined,
+  frameIndexZeroBased: number,
+  timeSec: number,
+): boolean {
+  if (!sampler) {
+    return false;
+  }
+  if (sampler.frameIndexes?.some((idx) => idx === frameIndexZeroBased || idx === frameIndexZeroBased + 1)) {
+    return true;
+  }
+  if (typeof sampler.timeSec === "number" && Number.isFinite(sampler.timeSec)) {
+    const tolerance = Math.max(0, sampler.timeToleranceSec ?? 1 / 120);
+    return Math.abs(timeSec - sampler.timeSec) <= tolerance;
+  }
+  return false;
 }
 
 /**
@@ -755,6 +800,7 @@ export async function runVideoExportPipeline(options: {
   onProgress?: (p: VideoExportProgress) => void;
   onLog: (line: string) => void;
   userMessages?: VideoExportPipelineUserMessages;
+  debugFrameSampler?: VideoExportDebugFrameSampler | null;
   /**
    * @description Progressive loading で既に生成済みの mezzanine パス。
    * 指定時は mezzanine 再生成をスキップしてこのパスを使います。
@@ -773,6 +819,7 @@ export async function runVideoExportPipeline(options: {
     onProgress,
     onLog,
     userMessages,
+    debugFrameSampler,
     precomputedMezzaninePath,
   } = options;
 
@@ -827,14 +874,19 @@ export async function runVideoExportPipeline(options: {
     return { ok: false, message: msg };
   }
 
-  const { outW, outH } = computeVideoExportDimensions(
-    sourceWidthForExport,
-    sourceHeightForExport,
-  );
   const exportFps = selectVideoExportFps({
     sourceFrameRate: probe.sourceFrameRate,
     sourceFrameRateTrusted: probe.sourceFrameRateTrusted,
   });
+  const exportGeometry = computeExportRenderGeometry({
+    sourceWidth: sourceRawWidth,
+    sourceHeight: sourceRawHeight,
+    sourceDisplayWidth: sourceWidthForExport,
+    sourceDisplayHeight: sourceHeightForExport,
+    fps: exportFps,
+  });
+  const outW = exportGeometry.renderWidth;
+  const outH = exportGeometry.renderHeight;
   const exportFpsText = formatVideoExportFps(exportFps);
   const totalFrames = computeExportFrameCount(probe.durationSec, exportFps);
   const progressLogIntervalFrames = Math.max(1, Math.round(exportFps * 5));
@@ -963,7 +1015,7 @@ export async function runVideoExportPipeline(options: {
   const tryWebCodecs = ENABLE_WEBCODECS_VIDEO_EXPORT && webCodecsCandidate;
   if (webCodecsCandidate && !ENABLE_WEBCODECS_VIDEO_EXPORT) {
     onLog(
-      "[動画][decode] プレビュー一致優先: WebCodecs を使わず HTMLVideoElement + VideoTexture 経路で書き出します",
+      "[動画][decode] 診断フラグにより WebCodecs を使わず HTMLVideoElement + VideoTexture 経路で書き出します",
     );
   }
   if (hasDisplayRotation) {
@@ -1069,10 +1121,8 @@ export async function runVideoExportPipeline(options: {
         srcTexture = webCodecsSession
           ? (() => {
               const ct = webCodecsSession.texture;
-              // Canvas 2D drawImage(videoFrame) は macOS で既に linear 化された値を返す。
-              // SRGBColorSpace を指定すると Three.js が二重に sRGB→linear 変換し暗化する。
-              // LinearSRGBColorSpace でバイパスして HTMLVideoElement 経路と色を一致させる。
-              ct.colorSpace = THREE.LinearSRGBColorSpace;
+              // Preview の HTMLVideoElement / VideoTexture と同じ Rec.709/sRGB source contract に統一する。
+              ct.colorSpace = THREE.SRGBColorSpace;
               return ct;
             })()
           : (() => {
@@ -1231,6 +1281,33 @@ export async function runVideoExportPipeline(options: {
 
         let pendingIpc: Promise<void> | null = null;
         let pendingIpcError: string | null = null;
+
+        const maybeCaptureDebugFrame = async (
+          frameBytes: Uint8Array,
+          frameIndexZeroBased: number,
+          timeSec: number,
+        ): Promise<void> => {
+          if (
+            !debugFrameSampler ||
+            !shouldCaptureDebugFrame(
+              debugFrameSampler,
+              frameIndexZeroBased,
+              timeSec,
+            )
+          ) {
+            return;
+          }
+          await debugFrameSampler.onFrame({
+            frameIndex: frameIndexZeroBased,
+            timeSec,
+            width: outW,
+            height: outH,
+            rgba: new Uint8Array(frameBytes),
+            backendKind: renderSession!.backendKind,
+            decodeMode: webCodecsSession ? "webcodecs" : "html-video",
+            renderGeometry: exportGeometry,
+          });
+        };
 
         /**
          * @description 直前フレームの非同期 IPC 書込を吸い切り、保持していたエラー文字列を返す。
@@ -1402,6 +1479,7 @@ export async function runVideoExportPipeline(options: {
             const rgba = await renderSession.readbackRgba8();
             readPxMs = performance.now() - tP0;
             arrRead.push(readPxMs);
+            await maybeCaptureDebugFrame(rgba, i, t);
 
             const tW0 = performance.now();
             const ipcSegment = profileSegment;
@@ -1443,6 +1521,12 @@ export async function runVideoExportPipeline(options: {
 
               readPxMs = performance.now() - tP0;
               arrRead.push(readPxMs);
+              const bufferedFrameIndex = Math.max(0, i - 1);
+              await maybeCaptureDebugFrame(
+                cpuBuf,
+                bufferedFrameIndex,
+                Math.min(bufferedFrameIndex / exportFps, maxT),
+              );
 
               const tW0 = performance.now();
               const ipcSegment = profileSegment;
@@ -1473,6 +1557,7 @@ export async function runVideoExportPipeline(options: {
             gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
             readPxMs = performance.now() - tP0;
             arrRead.push(readPxMs);
+            await maybeCaptureDebugFrame(cpuBuf, i, t);
 
             const tW0 = performance.now();
             const ipcSegment = profileSegment;
@@ -1495,6 +1580,7 @@ export async function runVideoExportPipeline(options: {
             gl.readPixels(0, 0, outW, outH, gl.RGBA, gl.UNSIGNED_BYTE, cpuBuf);
             readPxMs = performance.now() - tP0;
             arrRead.push(readPxMs);
+            await maybeCaptureDebugFrame(cpuBuf, i, t);
 
             const tW0 = performance.now();
             const ipcSegment = profileSegment;
@@ -1567,6 +1653,11 @@ export async function runVideoExportPipeline(options: {
           gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, cpuBuf);
           gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
           arrRead.push(performance.now() - tR0);
+          await maybeCaptureDebugFrame(
+            cpuBuf,
+            totalFrames - 1,
+            Math.min((totalFrames - 1) / exportFps, maxT),
+          );
 
           const tW0 = performance.now();
           pendingIpc = invokeVideoExportWriteFrame(cpuBuf).then(

@@ -1522,6 +1522,22 @@ export class WebGPUBackend implements RenderBackend {
     this.refreshLiveVideoTexture();
   }
 
+  setMediaFromExternalImageSource(
+    source: ImageBitmapSource,
+    width: number,
+    height: number,
+  ): void {
+    this.liveVideoElement = null;
+    this.mediaTexture = MediaTexture.fromExternalImageSource(
+      this.ctx.device,
+      source,
+      width,
+      height,
+      this.mediaTexture,
+    );
+    this.setImageResolution(width, height);
+  }
+
   setVideoElement(video: HTMLVideoElement): void {
     this.setMediaFromVideoElement(video);
   }

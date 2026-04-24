@@ -81,6 +81,27 @@ enum SourceColorMetadataNormalizer {
         }
     }
 
+    static func normalizeLogTransferFunction(_ raw: String?) -> SourceLogTransferFunctionDTO? {
+        guard let token = normalizedToken(raw) else { return nil }
+        switch token {
+        case "apple-log", "apple_log", "applelog",
+             "applelogprofile", "com.apple.coremedia.applelog",
+             "com.apple.quicktime.applelog":
+            return .appleLog
+        case "apple-log2", "apple-log-2", "apple_log2", "apple_log_2", "applelog2",
+             "com.apple.coremedia.applelog2", "com.apple.quicktime.applelog2":
+            return .appleLog2
+        default:
+            if token.contains("apple") && token.contains("log2") {
+                return .appleLog2
+            }
+            if token.contains("apple") && token.contains("log") {
+                return .appleLog
+            }
+            return nil
+        }
+    }
+
     // MARK: - Internal
 
     /// Return a lower-cased, whitespace-trimmed, CoreMedia-prefixed-tolerant token.
@@ -94,6 +115,8 @@ enum SourceColorMetadataNormalizer {
         // Strip CoreMedia constant prefixes.
         let prefixes = [
             "kcmformatdescriptiontransferfunction_",
+            "kcmformatdescriptionlogtransferfunction_",
+            "kcvimagebufferlogtransferfunction_",
             "kcmformatdescriptioncolorprimaries_",
             "kcmformatdescriptionycbcrmatrix_",
         ]

@@ -22,6 +22,45 @@ function closeImageBitmaps(bitmaps: ImageBitmap[]): void {
   }
 }
 
+function isReusableExternalImageSource(value: unknown): value is ImageBitmapSource {
+  return (
+    (typeof HTMLCanvasElement !== "undefined" &&
+      value instanceof HTMLCanvasElement) ||
+    (typeof OffscreenCanvas !== "undefined" &&
+      value instanceof OffscreenCanvas) ||
+    (typeof VideoFrame !== "undefined" &&
+      value instanceof VideoFrame)
+  );
+}
+
+function externalImageSourceSize(
+  value: ImageBitmapSource,
+): { width: number; height: number } | null {
+  const width =
+    "displayWidth" in value && typeof value.displayWidth === "number"
+      ? value.displayWidth
+      : "width" in value && typeof value.width === "number"
+        ? value.width
+        : null;
+  const height =
+    "displayHeight" in value && typeof value.displayHeight === "number"
+      ? value.displayHeight
+      : "height" in value && typeof value.height === "number"
+        ? value.height
+        : null;
+  if (
+    typeof width !== "number" ||
+    typeof height !== "number" ||
+    !Number.isFinite(width) ||
+    !Number.isFinite(height) ||
+    width <= 0 ||
+    height <= 0
+  ) {
+    return null;
+  }
+  return { width, height };
+}
+
 async function createNeutralDepthBitmap(): Promise<ImageBitmap> {
   if (typeof document === "undefined") {
     throw new Error("document is required for WebGPU depth-track reset");
@@ -100,6 +139,17 @@ class WebGPUOffscreenRenderSessionImpl implements OffscreenRenderSession {
       textureSource instanceof ImageBitmap
     ) {
       this.viewport.setMediaFromBitmap(textureSource);
+      return;
+    }
+
+    if (isReusableExternalImageSource(textureSource)) {
+      const size = externalImageSourceSize(textureSource);
+      this.viewport.setMediaFromExternalImageSource(
+        textureSource,
+        size?.width ?? source.imageWidth,
+        size?.height ?? source.imageHeight,
+      );
+      this.viewport.setImageResolution(source.imageWidth, source.imageHeight);
       return;
     }
 

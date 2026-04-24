@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FilmLabBatchBridge } from "./desktop-api";
-import { computeVideoExportDimensions } from "./video-export-constants";
+import { computeExportRenderGeometry } from "./export-render-geometry";
 
 /**
  * @description Progressive loading の現在地です。
@@ -175,7 +175,11 @@ function computeMezzanineDimensions(sourceWidth: number, sourceHeight: number): 
     Number.isFinite(sourceWidth) && sourceWidth > 0 ? sourceWidth : 1920;
   const safeSourceHeight =
     Number.isFinite(sourceHeight) && sourceHeight > 0 ? sourceHeight : 1080;
-  return computeVideoExportDimensions(safeSourceWidth, safeSourceHeight);
+  const geometry = computeExportRenderGeometry({
+    sourceWidth: safeSourceWidth,
+    sourceHeight: safeSourceHeight,
+  });
+  return { outW: geometry.renderWidth, outH: geometry.renderHeight };
 }
 
 /**
@@ -393,8 +397,10 @@ export function useProgressiveLoad(): UseProgressiveLoadReturn {
       const sessionId = await beginSession(absPath);
       const resolvedFileName =
         fileName.trim().length > 0 ? fileName : basenameFromAbsolutePath(absPath);
-      const proxyDimensions = computeProxyDimensions(probe.width, probe.height);
-      const { outW, outH } = computeMezzanineDimensions(probe.width, probe.height);
+      const displayWidth = probe.sourceVideoMetadata?.display.displayWidth ?? probe.width;
+      const displayHeight = probe.sourceVideoMetadata?.display.displayHeight ?? probe.height;
+      const proxyDimensions = computeProxyDimensions(displayWidth, displayHeight);
+      const { outW, outH } = computeMezzanineDimensions(displayWidth, displayHeight);
 
       /**
        * @description main が作った tmp から custom protocol URL を作り、stale ならすぐ掃除します。

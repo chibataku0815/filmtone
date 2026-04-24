@@ -258,6 +258,27 @@ type ProxyProgressPayload = {
   total: number;
 };
 
+type VideoDecodeFrameInput = {
+  filePath: string;
+  timeSec?: number;
+  frameIndex?: number;
+  fps?: number;
+  width?: number;
+  height?: number;
+};
+
+type NormalizedVideoDecodeFrameInput = {
+  filePath: string;
+  timeSec: number;
+  frameIndex: number | null;
+  fps: number | null;
+  width?: number;
+  height?: number;
+};
+
+const VIDEO_DECODE_FRAME_MAX_BUFFER_BYTES = 256 * 1024 * 1024;
+const VIDEO_DECODE_FRAME_MAX_DIMENSION = 16384;
+
 /**
  * @description ffmpeg stderr に出る `time=HH:MM:SS.xx` を秒へ変換する。
  * @param timecode ffmpeg の time= の後ろに出る文字列
@@ -719,6 +740,154 @@ function buildFfmpegThumbnailArgs(
     "-y",
     outputPath,
   ];
+}
+
+function normalizeVideoDecodeFrameInput(
+  payload: unknown,
+): NormalizedVideoDecodeFrameInput {
+  if (typeof payload !== "object" || payload === null) {
+    throw new TypeError("video-export-decode-frame: payload が空です");
+  }
+  const input = payload as VideoDecodeFrameInput;
+  if (typeof input.filePath !== "string" || input.filePath.length === 0) {
+    throw new TypeError("video-export-decode-frame: filePath が空です");
+  }
+
+  const hasTimeSec = input.timeSec !== undefined;
+  const hasFrameSeek = input.frameIndex !== undefined || input.fps !== undefined;
+  if (hasTimeSec === hasFrameSeek) {
+    throw new TypeError(
+      "video-export-decode-frame: timeSec または frameIndex+fps のどちらか一方を指定してください",
+    );
+  }
+
+  let timeSec: number;
+  let frameIndex: number | null = null;
+  let fps: number | null = null;
+  if (hasTimeSec) {
+    if (
+      typeof input.timeSec !== "number" ||
+      !Number.isFinite(input.timeSec) ||
+      input.timeSec < 0
+    ) {
+      throw new TypeError("video-export-decode-frame: timeSec が不正です");
+    }
+    timeSec = input.timeSec;
+  } else {
+    if (
+      typeof input.frameIndex !== "number" ||
+      !Number.isInteger(input.frameIndex) ||
+      input.frameIndex < 0
+    ) {
+      throw new TypeError("video-export-decode-frame: frameIndex が不正です");
+    }
+    if (
+      typeof input.fps !== "number" ||
+      !Number.isFinite(input.fps) ||
+      input.fps <= 0
+    ) {
+      throw new TypeError("video-export-decode-frame: fps が不正です");
+    }
+    frameIndex = input.frameIndex;
+    fps = input.fps;
+    timeSec = input.frameIndex / input.fps;
+  }
+
+  const width = normalizeVideoDecodeFrameDimension(input.width, "width");
+  const height = normalizeVideoDecodeFrameDimension(input.height, "height");
+  return {
+    filePath: input.filePath,
+    timeSec,
+    frameIndex,
+    fps,
+    ...(width !== undefined ? { width } : {}),
+    ...(height !== undefined ? { height } : {}),
+  };
+}
+
+function normalizeVideoDecodeFrameDimension(
+  value: unknown,
+  label: "width" | "height",
+): number | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (
+    typeof value !== "number" ||
+    !Number.isInteger(value) ||
+    value <= 0 ||
+    value > VIDEO_DECODE_FRAME_MAX_DIMENSION
+  ) {
+    throw new TypeError(`video-export-decode-frame: ${label} が不正です`);
+  }
+  return value;
+}
+
+function buildFfmpegDecodeFramePngArgs(
+  inputPath: string,
+  input: NormalizedVideoDecodeFrameInput,
+): string[] {
+  const filters: string[] = [];
+  if (input.width !== undefined || input.height !== undefined) {
+    filters.push(
+      `scale=${input.width ?? -1}:${input.height ?? -1}:flags=lanczos`,
+    );
+  }
+  filters.push("format=rgba");
+
+  return [
+    "-hide_banner",
+    "-loglevel",
+    "info",
+    "-nostdin",
+    "-i",
+    inputPath,
+    "-ss",
+    input.timeSec.toFixed(6),
+    "-map",
+    "0:v:0",
+    "-frames:v",
+    "1",
+    "-an",
+    "-sn",
+    "-dn",
+    "-vf",
+    filters.join(","),
+    "-f",
+    "image2pipe",
+    "-vcodec",
+    "png",
+    "-pix_fmt",
+    "rgba",
+    "pipe:1",
+  ];
+}
+
+function readPngDimensions(
+  data: Buffer,
+): { width: number; height: number } | null {
+  if (data.length < 24) {
+    return null;
+  }
+  const isPng =
+    data[0] === 0x89 &&
+    data[1] === 0x50 &&
+    data[2] === 0x4e &&
+    data[3] === 0x47 &&
+    data[4] === 0x0d &&
+    data[5] === 0x0a &&
+    data[6] === 0x1a &&
+    data[7] === 0x0a &&
+    data.toString("ascii", 12, 16) === "IHDR";
+  if (!isPng) {
+    return null;
+  }
+  const width = data.readUInt32BE(16);
+  const height = data.readUInt32BE(20);
+  if (width <= 0 || height <= 0) {
+    return null;
+  }
+  return { width, height };
 }
 
 function computeNativeImageAverageBrightness(imagePath: string): number {
@@ -1490,6 +1659,80 @@ ipcMain.handle("video-export-probe", async (_evt, filePath: string) => {
   }
   const abs = path.resolve(filePath);
   return ffprobeVideoMeta(abs);
+});
+
+ipcMain.handle("video-export-decode-frame", async (_evt, payload: unknown) => {
+  const input = normalizeVideoDecodeFrameInput(payload);
+  const abs = path.resolve(input.filePath);
+  const st = await fs.stat(abs);
+  if (!st.isFile()) {
+    throw new Error(`video-export-decode-frame: ファイルではありません — ${abs}`);
+  }
+
+  const ffmpeg = (() => {
+    try {
+      return resolveVideoCliBinary("ffmpeg");
+    } catch (e) {
+      throw videoCliUnavailableError("ffmpeg", e);
+    }
+  })();
+  const args = buildFfmpegDecodeFramePngArgs(abs, input);
+  let stdout: Buffer;
+  let stderr: Buffer | string;
+  try {
+    const result = (await execFileAsync(ffmpeg.commandPath, args, {
+      encoding: "buffer",
+      env: ffmpeg.childEnv,
+      maxBuffer: VIDEO_DECODE_FRAME_MAX_BUFFER_BYTES,
+    })) as { stdout: Buffer; stderr: Buffer | string };
+    stdout = result.stdout;
+    stderr = result.stderr;
+  } catch (e) {
+    const err = e as {
+      message?: unknown;
+      stderr?: Buffer | string;
+    };
+    const message =
+      typeof err.message === "string" ? err.message : String(e);
+    const stderrTail =
+      typeof err.stderr === "string"
+        ? err.stderr.slice(-4000)
+        : Buffer.isBuffer(err.stderr)
+          ? err.stderr.toString("utf8").slice(-4000)
+          : "";
+    throw new Error(
+      `video-export-decode-frame: ffmpeg 実行失敗（resolved=${ffmpeg.commandPath}）: ${message}${
+        stderrTail ? ` stderr: ${stderrTail}` : ""
+      }`,
+    );
+  }
+
+  if (stdout.length === 0) {
+    throw new Error("video-export-decode-frame: ffmpeg の PNG 出力が空です");
+  }
+  const dimensions = readPngDimensions(stdout);
+  if (dimensions == null) {
+    throw new Error("video-export-decode-frame: ffmpeg 出力 PNG のサイズを読めません");
+  }
+
+  const stderrTail =
+    typeof stderr === "string"
+      ? stderr.slice(-4000)
+      : stderr.toString("utf8").slice(-4000);
+  return {
+    bytes: new Uint8Array(stdout),
+    width: dimensions.width,
+    height: dimensions.height,
+    format: "png" as const,
+    ffmpeg: {
+      commandPath: ffmpeg.commandPath,
+      source: ffmpeg.source,
+      stderrTail,
+      requestedTimeSec: input.timeSec,
+      requestedFrameIndex: input.frameIndex,
+      requestedFps: input.fps,
+    },
+  };
 });
 
 ipcMain.handle("video-export-start", async (_evt, payload: unknown) => {

@@ -16,6 +16,7 @@ final class FilmtoneExportSession {
     private let preparedCreativeLut: PreparedLut?
     private let sourceSeed: Double
     private let outputColorSpace: CGColorSpace
+    private var degradedDecodePath = false
     private var cancelled = false
     private static let aberrationEdgeSoftenScale = 32.0
     private static let aberrationEdgeSoftenMax = 0.52
@@ -55,6 +56,7 @@ final class FilmtoneExportSession {
             .outputColorSpace: outputColorSpace,
         ])
         self.preparedInputLut = Self.makePreparedLut(from: request.inputLut)
+            ?? Self.makeAutomaticInputLut(for: request.sourceProbe?.inputTransformPolicy)
         let legacyCreativeLut = request.creativeLut ?? request.lut.map {
             SerializableLutDTO(size: $0.size, data: $0.data, intensity: $0.intensity)
         }
@@ -160,6 +162,7 @@ final class FilmtoneExportSession {
             request: request,
             sourceProbe: request.sourceProbe,
             hdrPolicy: hdrPolicy,
+            degradedDecodePath: degradedDecodePath,
             outputURL: outputURL,
             outputSize: outputSize,
             fileSizeBytes: fileSizeBytes,
@@ -226,16 +229,16 @@ final class FilmtoneExportSession {
         }
 
         let reader = try AVAssetReader(asset: asset)
-        let videoOutput = AVAssetReaderTrackOutput(
-            track: videoTrack,
-            outputSettings: [
-                kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA),
-            ]
+        let videoOutputSelection = makeVideoReaderOutput(
+            for: videoTrack,
+            reader: reader,
+            codecFamily: request.sourceProbe?.codecFamily ?? request.sourceProbe?.sourceVideoMetadata?.codecFamily
         )
-        videoOutput.alwaysCopiesSampleData = false
-        guard reader.canAdd(videoOutput) else {
+        guard let videoOutputSelection else {
             throw FilmtoneMediaError.exportFailed("Video reader output could not be added.")
         }
+        let videoOutput = videoOutputSelection.output
+        degradedDecodePath = videoOutputSelection.degradedDecodePath
         reader.add(videoOutput)
 
         if let audioOutput, reader.canAdd(audioOutput) {
@@ -475,6 +478,7 @@ final class FilmtoneExportSession {
                     bounds: CGRect(origin: .zero, size: outputSize),
                     colorSpace: outputColorSpace
                 )
+                attachRec709Metadata(to: renderedBuffer)
 
                 let presentationTime = CMTime(value: CMTimeValue(frameIndex), timescale: CMTimeScale(request.output.fps))
                 if !adaptor.append(renderedBuffer, withPresentationTime: presentationTime) {
@@ -593,11 +597,51 @@ final class FilmtoneExportSession {
                 AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
                 AVVideoAllowFrameReorderingKey: false,
             ],
+            AVVideoColorPropertiesKey: [
+                AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
+                AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
+                AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2,
+            ],
         ]
         let input = AVAssetWriterInput(mediaType: .video, outputSettings: settings)
         input.expectsMediaDataInRealTime = false
         input.transform = .identity
         return input
+    }
+
+    private func makeVideoReaderOutput(
+        for track: AVAssetTrack,
+        reader: AVAssetReader,
+        codecFamily: SourceCodecFamilyDTO?
+    ) -> (output: AVAssetReaderTrackOutput, degradedDecodePath: Bool)? {
+        let candidates: [(pixelFormat: OSType, degraded: Bool)]
+        if codecFamily == .prores422 {
+            candidates = [
+                (kCVPixelFormatType_422YpCbCr16, false),
+                (kCVPixelFormatType_64RGBAHalf, true),
+                (kCVPixelFormatType_32BGRA, true),
+            ]
+        } else {
+            candidates = [
+                (kCVPixelFormatType_32BGRA, false),
+            ]
+        }
+
+        for candidate in candidates {
+            let output = AVAssetReaderTrackOutput(
+                track: track,
+                outputSettings: [
+                    kCVPixelBufferPixelFormatTypeKey as String: Int(candidate.pixelFormat),
+                    AVVideoAllowWideColorKey: true,
+                ]
+            )
+            output.alwaysCopiesSampleData = false
+            if reader.canAdd(output) {
+                return (output, candidate.degraded)
+            }
+        }
+
+        return nil
     }
 
     private func makeAudioPipeline(
@@ -1441,6 +1485,7 @@ final class FilmtoneExportSession {
                 bounds: CGRect(origin: .zero, size: outputSize),
                 colorSpace: outputColorSpace
             )
+            attachRec709Metadata(to: renderedBuffer)
 
             if !adaptor.append(renderedBuffer, withPresentationTime: presentationTime) {
                 throw FilmtoneMediaError.exportFailed(writer.error?.localizedDescription ?? "The frame could not be appended.")
@@ -1615,12 +1660,33 @@ final class FilmtoneExportSession {
             CFEqual(transferFunction, kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ)
     }
 
+    private func attachRec709Metadata(to imageBuffer: CVPixelBuffer) {
+        CVBufferSetAttachment(
+            imageBuffer,
+            kCVImageBufferColorPrimariesKey,
+            kCVImageBufferColorPrimaries_ITU_R_709_2,
+            .shouldPropagate
+        )
+        CVBufferSetAttachment(
+            imageBuffer,
+            kCVImageBufferTransferFunctionKey,
+            kCVImageBufferTransferFunction_ITU_R_709_2,
+            .shouldPropagate
+        )
+        CVBufferSetAttachment(
+            imageBuffer,
+            kCVImageBufferYCbCrMatrixKey,
+            kCVImageBufferYCbCrMatrix_ITU_R_709_2,
+            .shouldPropagate
+        )
+    }
+
     private static func makePreparedLut(from lut: SerializableLutDTO?) -> PreparedLut? {
         guard let lut, lut.size > 1, !lut.data.isEmpty else {
             return nil
         }
 
-        let floatData = lut.data.map(Float.init)
+        let floatData = rgbaCubeData(from: lut.data, size: lut.size)
         let cubeData = floatData.withUnsafeBufferPointer { pointer in
             Data(buffer: pointer)
         }
@@ -1630,6 +1696,146 @@ final class FilmtoneExportSession {
             intensity: lut.intensity,
             cubeData: cubeData
         )
+    }
+
+    private static func makeAutomaticInputLut(for policy: SourceInputTransformPolicyDTO?) -> PreparedLut? {
+        switch policy?.strategy {
+        case .appleLogToRec709:
+            return makeAppleLogToRec709Lut(size: 33, rec2020GamutMap: true)
+        case .appleLog2ToRec709:
+            return makeAppleLogToRec709Lut(size: 33, rec2020GamutMap: true)
+        default:
+            return nil
+        }
+    }
+
+    private static func rgbaCubeData(from data: [Double], size: Int) -> [Float] {
+        let expectedRGBCount = size * size * size * 3
+        let expectedRGBACount = size * size * size * 4
+        if data.count == expectedRGBACount {
+            return data.map(Float.init)
+        }
+
+        var rgba: [Float] = []
+        rgba.reserveCapacity(expectedRGBACount)
+        let count = min(data.count, expectedRGBCount)
+        var index = 0
+        while index < count {
+            rgba.append(Float(data[index]))
+            rgba.append(Float(index + 1 < count ? data[index + 1] : 0))
+            rgba.append(Float(index + 2 < count ? data[index + 2] : 0))
+            rgba.append(1)
+            index += 3
+        }
+
+        while rgba.count < expectedRGBACount {
+            rgba.append(0)
+            rgba.append(0)
+            rgba.append(0)
+            rgba.append(1)
+        }
+        return rgba
+    }
+
+    private static func makeAppleLogToRec709Lut(size: Int, rec2020GamutMap: Bool) -> PreparedLut? {
+        guard size > 1 else {
+            return nil
+        }
+
+        var values: [Float] = []
+        values.reserveCapacity(size * size * size * 4)
+        for blueIndex in 0..<size {
+            let blue = Double(blueIndex) / Double(size - 1)
+            for greenIndex in 0..<size {
+                let green = Double(greenIndex) / Double(size - 1)
+                for redIndex in 0..<size {
+                    let red = Double(redIndex) / Double(size - 1)
+                    let converted = appleLogPixelToRec709(
+                        red: red,
+                        green: green,
+                        blue: blue,
+                        rec2020GamutMap: rec2020GamutMap
+                    )
+                    values.append(Float(converted.red))
+                    values.append(Float(converted.green))
+                    values.append(Float(converted.blue))
+                    values.append(1)
+                }
+            }
+        }
+
+        let cubeData = values.withUnsafeBufferPointer { pointer in
+            Data(buffer: pointer)
+        }
+        return PreparedLut(size: size, intensity: 1, cubeData: cubeData)
+    }
+
+    private static func appleLogPixelToRec709(
+        red: Double,
+        green: Double,
+        blue: Double,
+        rec2020GamutMap: Bool
+    ) -> (red: Double, green: Double, blue: Double) {
+        let linearRed = appleLogDecode(red)
+        let linearGreen = appleLogDecode(green)
+        let linearBlue = appleLogDecode(blue)
+
+        let mapped: (red: Double, green: Double, blue: Double)
+        if rec2020GamutMap {
+            mapped = rec2020ToRec709(red: linearRed, green: linearGreen, blue: linearBlue)
+        } else {
+            mapped = (linearRed, linearGreen, linearBlue)
+        }
+
+        return (
+            rec709Encode(filmtoneSdrShoulder(mapped.red)),
+            rec709Encode(filmtoneSdrShoulder(mapped.green)),
+            rec709Encode(filmtoneSdrShoulder(mapped.blue))
+        )
+    }
+
+    private static func appleLogDecode(_ encoded: Double) -> Double {
+        let r0 = -0.05641088
+        let rt = 0.01
+        let sigma = 47.28711236
+        let beta = 0.00964052
+        let gamma = 0.08550479
+        let delta = 0.69336945
+        let pt = sigma * pow(rt - r0, 2)
+
+        if encoded >= pt {
+            return pow(2, (encoded - delta) / gamma) - beta
+        }
+        if encoded >= 0 {
+            return sqrt(max(encoded / sigma, 0)) + r0
+        }
+        return r0
+    }
+
+    private static func rec2020ToRec709(
+        red: Double,
+        green: Double,
+        blue: Double
+    ) -> (red: Double, green: Double, blue: Double) {
+        (
+            red: 1.6605 * red - 0.5876 * green - 0.0728 * blue,
+            green: -0.1246 * red + 1.1329 * green - 0.0083 * blue,
+            blue: -0.0182 * red - 0.1006 * green + 1.1187 * blue
+        )
+    }
+
+    private static func filmtoneSdrShoulder(_ linear: Double) -> Double {
+        let exposed = max(0, linear * 1.18)
+        let shoulder = exposed / (1 + max(exposed - 0.18, 0) * 0.42)
+        return clamp(shoulder, min: 0, max: 1)
+    }
+
+    private static func rec709Encode(_ linear: Double) -> Double {
+        let value = clamp(linear, min: 0, max: 1)
+        if value < 0.018 {
+            return value * 4.5
+        }
+        return 1.099 * pow(value, 0.45) - 0.099
     }
 
     private func resolvedVideoSourceURL() -> URL {

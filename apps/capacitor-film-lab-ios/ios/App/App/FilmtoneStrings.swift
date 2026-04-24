@@ -96,6 +96,9 @@ struct FilmtoneStrings {
     let cameraLabel: String
     let cameraDescription: String
     let cameraAuto: String
+    let cameraAutoAppleLogDetected: String
+    let cameraAutoAppleLog2Detected: String
+    let cameraCustom: String
     let cameraImport: String
     let clearLut: String
     let lutImportError: String
@@ -450,6 +453,21 @@ extension FilmtoneStrings {
             "filmtone.camera.auto",
             defaultValue: "Auto",
             comment: "Default camera profile state."
+        )
+        cameraAutoAppleLogDetected = filmtoneLocalized(
+            "filmtone.camera.auto_apple_log_detected",
+            defaultValue: "Auto -> Apple Log detected",
+            comment: "Camera profile state when Apple Log is automatically detected."
+        )
+        cameraAutoAppleLog2Detected = filmtoneLocalized(
+            "filmtone.camera.auto_apple_log2_detected",
+            defaultValue: "Auto -> Apple Log 2 detected",
+            comment: "Camera profile state when Apple Log 2 is automatically detected."
+        )
+        cameraCustom = filmtoneLocalized(
+            "filmtone.camera.custom",
+            defaultValue: "Custom",
+            comment: "Camera profile state when a custom input LUT is selected."
         )
         cameraImport = filmtoneLocalized(
             "filmtone.camera.import",

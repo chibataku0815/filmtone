@@ -41,6 +41,7 @@ import {
   VideoTransportControls,
   type FilmLabCanvasRef,
   type FilmLabCanvasPreprocessResult,
+  type FilmLabCanvasExportParityGeometry,
   type FilmLabCanvasPreviewStatus,
   type FilmLabInteractiveSourceInfo,
 } from "film-lab-ui";
@@ -84,11 +85,14 @@ import { applyBatchGradeToViewport } from "./offscreen/apply-batch-grade-to-view
 import {
   assertVideoImportWithinCaps,
   computeExportFrameCount,
-  computeVideoExportDimensions,
   formatVideoExportFps,
   selectVideoExportFps,
   VIDEO_IMPORT_MAX_DURATION_SEC,
 } from "./video-export-constants";
+import {
+  computeExportRenderGeometry,
+  type ExportRenderGeometry,
+} from "./export-render-geometry";
 import { exportGradeJsonText } from "./grade-io";
 import {
   type AppliedOpticalRecommendationMetadata,
@@ -453,6 +457,11 @@ export default function App() {
   const [batchJobMode, setBatchJobMode] = useState<BatchJobMode>("images");
   /** @description 動画出力用のソースパス（1 本選ぶ） */
   const [videoInputPath, setVideoInputPath] = useState<string | null>(null);
+  /** @description preview と export が共有する render geometry。UI CSS サイズではなく export size を正にする。 */
+  const [videoExportGeometry, setVideoExportGeometry] =
+    useState<ExportRenderGeometry | null>(null);
+  const [testExportParityGeometryOverride, setTestExportParityGeometryOverride] =
+    useState<FilmLabCanvasExportParityGeometry | null>(null);
   /**
    * @description 編集キャンバスが「いま何を見せているか」。書き出し入力（フォルダ／動画）との関係を Batch 側で説明する（life#83）。
    */
@@ -495,6 +504,42 @@ export default function App() {
       progressiveLoad.qualityLabel !== "thumbnail",
     [interactivePreviewSource, progressiveLoad.qualityLabel],
   );
+  const canvasExportParityGeometry = useMemo(
+    (): FilmLabCanvasExportParityGeometry | null => {
+      if (!videoExportGeometry || !videoInputPath) {
+        return null;
+      }
+      if (
+        interactivePreviewSource.kind !== "file" ||
+        interactivePreviewSource.smartLookDerived ||
+        interactivePreviewSource.absolutePath !== videoInputPath
+      ) {
+        return null;
+      }
+      const progressiveOwnsSource =
+        progressiveLoad.activeSourcePath === videoInputPath;
+      if (
+        progressiveOwnsSource &&
+        progressiveLoad.stage !== "ready"
+      ) {
+        return null;
+      }
+      return {
+        enabled: true,
+        ...videoExportGeometry,
+        stage: progressiveOwnsSource ? "mezzanine" : "direct",
+      };
+    },
+    [
+      interactivePreviewSource,
+      progressiveLoad.activeSourcePath,
+      progressiveLoad.stage,
+      videoExportGeometry,
+      videoInputPath,
+    ],
+  );
+  const effectiveCanvasExportParityGeometry =
+    testExportParityGeometryOverride ?? canvasExportParityGeometry;
   /** @description ffprobe 済みのメタ（UI 表示用） */
   const [videoProbeLabel, setVideoProbeLabel] = useState<string | null>(null);
   /**
@@ -678,6 +723,20 @@ export default function App() {
       getCanvasRef: (): FilmLabCanvasRef | null => filmLabCanvasRef.current,
       getCanvasEl: (): HTMLCanvasElement | null =>
         filmLabCanvasRef.current?.getWebGlCanvas() ?? null,
+      getExportParityGeometry: (): FilmLabCanvasExportParityGeometry | null =>
+        effectiveCanvasExportParityGeometry,
+      setExportParityGeometry: (
+        geometry: FilmLabCanvasExportParityGeometry | null,
+      ): void => {
+        setTestExportParityGeometryOverride(geometry);
+      },
+      capturePreviewFrame: (
+        options?: Parameters<FilmLabCanvasRef["capturePreviewFrame"]>[0],
+      ) => {
+        const ref = filmLabCanvasRef.current;
+        if (!ref) return Promise.resolve({ ok: false, reason: "canvas-ref-null" });
+        return ref.capturePreviewFrame(options);
+      },
       setParams: (p: Record<string, number | string>): void => {
         viewport?.setParams(p);
       },
@@ -712,7 +771,7 @@ export default function App() {
         delete (window as any).__filmtoneTest;
       }
     };
-  }, [viewport, filmLabCanvasRef]);
+  }, [viewport, filmLabCanvasRef, effectiveCanvasExportParityGeometry]);
 
   /**
    * @description 右スライドパネルを画面内に出すか。全幅で同じ挙動。パネルは DOM を維持し `translateX` のみ（内部状態を捨てない）。
@@ -937,24 +996,33 @@ export default function App() {
         const meta = await window.filmLabBatch.videoExportProbe(p);
         const displayCameraOptics = preferredCameraOptics ?? meta.cameraOptics;
         setSourceCameraOptics(displayCameraOptics);
-        assertVideoImportWithinCaps(meta.width, meta.height, meta.durationSec);
-        const { outW, outH } = computeVideoExportDimensions(
-          meta.width,
-          meta.height,
-        );
         const exportFps = selectVideoExportFps({
           sourceFrameRate: meta.sourceFrameRate,
           sourceFrameRateTrusted: meta.sourceFrameRateTrusted,
         });
+        const display = meta.sourceVideoMetadata?.display;
+        const geometry = computeExportRenderGeometry({
+          sourceWidth: display?.rawWidth ?? meta.width,
+          sourceHeight: display?.rawHeight ?? meta.height,
+          sourceDisplayWidth: display?.displayWidth ?? meta.width,
+          sourceDisplayHeight: display?.displayHeight ?? meta.height,
+          fps: exportFps,
+        });
+        assertVideoImportWithinCaps(
+          geometry.sourceDisplayWidth,
+          geometry.sourceDisplayHeight,
+          meta.durationSec,
+        );
+        setVideoExportGeometry(geometry);
         const frames = computeExportFrameCount(meta.durationSec, exportFps);
         setVideoProbeLabel(
           tLogs("videoMetaLine", {
-            w: String(meta.width),
-            h: String(meta.height),
+            w: String(geometry.sourceDisplayWidth),
+            h: String(geometry.sourceDisplayHeight),
             sec: meta.durationSec.toFixed(1),
             codec: meta.videoCodec || "?",
-            ow: String(outW),
-            oh: String(outH),
+            ow: String(geometry.renderWidth),
+            oh: String(geometry.renderHeight),
             fps: formatVideoExportFps(exportFps),
             frames: String(frames),
             maxSec: String(VIDEO_IMPORT_MAX_DURATION_SEC),
@@ -967,6 +1035,7 @@ export default function App() {
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         setSourceCameraOptics(preferredCameraOptics);
+        setVideoExportGeometry(null);
         setVideoProbeLabel(null);
         setVideoHdrPolicy(null);
         appendLog(tLogs("videoMetaLogPrefix", { msg }));
@@ -1022,6 +1091,7 @@ export default function App() {
           setBatchFormat(sidecar.output.imageFormat ?? "jpeg");
           setBatchOutputSuffix(sidecar.output.outputFilenameSuffix ?? "-graded");
           setVideoInputPath(null);
+          setVideoExportGeometry(null);
           setVideoProbeLabel(null);
           setVideoHdrPolicy(null);
           setSourceCameraOptics(null);
@@ -1034,6 +1104,7 @@ export default function App() {
             );
           } else {
             setVideoInputPath(null);
+            setVideoExportGeometry(null);
             setVideoProbeLabel(null);
             setVideoHdrPolicy(null);
             setSourceCameraOptics(sidecar.input.cameraOptics ?? null);
@@ -1611,6 +1682,7 @@ export default function App() {
       fallbackLookSource: batchLookSource,
       fallbackLutRefs: batchLutRefs,
       captureError,
+      exportRenderGeometry: batchJobMode === "video" ? videoExportGeometry : null,
     });
   }, [
     viewport,
@@ -1620,6 +1692,8 @@ export default function App() {
     batchPresetChoice,
     batchLookSource,
     batchLutRefs,
+    batchJobMode,
+    videoExportGeometry,
   ]);
 
   const appendEffectiveExportGradeLog = useCallback(
@@ -1847,6 +1921,7 @@ export default function App() {
         lutRefs: effectiveLutRefs,
         source: capturedSnapshot?.source ?? "batch",
         captureError: capturedSnapshot?.captureError ?? null,
+        exportRenderGeometry: capturedSnapshot?.exportRenderGeometry ?? null,
       };
       if (!effectiveInput || !effectiveOutput) return;
 
@@ -2540,6 +2615,7 @@ export default function App() {
                 onInteractiveSourceChange={handleInteractiveSourceChange}
                 getFileAbsolutePath={resolveCanvasFileAbsolutePath}
                 preprocessVideoFile={preprocessVideoFile}
+                exportParityGeometry={effectiveCanvasExportParityGeometry}
                 compareHud={compareUi.compareMode ? { activeSlot: compareUi.activeSlot } : null}
               />
               <div

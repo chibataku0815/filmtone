@@ -18,6 +18,7 @@ struct SidecarBuildInputs {
     let request: Phase0ExportRequestDTO
     let sourceProbe: SourceProbeDTO?
     let hdrPolicy: HdrPreparationPolicyDTO?
+    let degradedDecodePath: Bool
     let outputURL: URL
     let outputSize: CGSize
     let fileSizeBytes: Int?
@@ -90,6 +91,7 @@ struct SidecarOutput: Encodable {
     let codec: String
     let container: String
     let preserveAudio: Bool
+    let degradedDecodePath: Bool
     let outputUri: String
     let outputWidth: Int
     let outputHeight: Int
@@ -161,6 +163,7 @@ enum FilmtoneExportSidecarBuilder {
             codec: request.output.codec,
             container: request.output.container,
             preserveAudio: request.output.preserveAudio,
+            degradedDecodePath: inputs.degradedDecodePath,
             outputUri: inputs.outputURL.absoluteString,
             outputWidth: Int(inputs.outputSize.width.rounded()),
             outputHeight: Int(inputs.outputSize.height.rounded()),

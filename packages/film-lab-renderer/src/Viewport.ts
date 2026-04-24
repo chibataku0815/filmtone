@@ -185,6 +185,15 @@ export class Viewport {
     this.webgpuBackend?.setMediaFromBitmap(bitmap);
   }
 
+  /** WebGPU-native path for reusable Canvas / VideoFrame-style uploads. */
+  setMediaFromExternalImageSource(
+    source: ImageBitmapSource,
+    width: number,
+    height: number,
+  ): void {
+    this.webgpuBackend?.setMediaFromExternalImageSource(source, width, height);
+  }
+
   /**
    * Upload a shared depth map for depth-aware Mist / Glow. No-op on WebGL.
    * `depthMistGain` / `depthGlowGain` stay in the shared grade contract; the

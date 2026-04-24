@@ -1212,7 +1212,7 @@ var PHASE0_PARAM_KEYS = [
   "grainIntensity"
 ];
 var PHASE0_MAX_SOURCE_DURATION_SEC = 60 * 5;
-var PHASE0_APPROX_SOURCE_LONG_EDGE_MAX = 3840;
+var PHASE0_APPROX_SOURCE_LONG_EDGE_MAX = 4096;
 var PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES = 8 * 1024 * 1024 * 1024;
 var PHASE0_OUTPUT_PROFILE = {
   longEdge: 1920,
@@ -1420,11 +1420,6 @@ function getPhase0SourceCapViolations(probe) {
   if (typeof longEdge === "number" && longEdge > PHASE0_APPROX_SOURCE_LONG_EDGE_MAX) {
     violations.push(
       `Source long edge ${longEdge}px exceeds ${PHASE0_APPROX_SOURCE_LONG_EDGE_MAX}px`
-    );
-  }
-  if (typeof probe.fileSizeBytes === "number" && probe.fileSizeBytes > PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES) {
-    violations.push(
-      `Source size ${probe.fileSizeBytes} bytes exceeds ${PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES} bytes`
     );
   }
   return violations;
@@ -1858,6 +1853,40 @@ var IOS_PHASE0_BENCHMARK_SLOTS = [
   "bench-long"
 ];
 var iosPhase0SourceKindSchema = z4.enum(["image", "video"]);
+var IOS_PHASE0_CODEC_FAMILIES = [
+  "h264",
+  "hevc",
+  "prores-422",
+  "prores-4444",
+  "prores-raw",
+  "other",
+  "unknown"
+];
+var IOS_PHASE0_LOG_TRANSFER_FUNCTIONS = [
+  "apple-log",
+  "apple-log2"
+];
+var IOS_PHASE0_INPUT_TRANSFORM_STRATEGIES = [
+  "none",
+  "apple-log-to-rec709",
+  "apple-log2-to-rec709",
+  "core-image-tone-map-sdr",
+  "defer-visible-warning",
+  "unsupported"
+];
+var iosPhase0CodecFamilySchema = z4.enum(IOS_PHASE0_CODEC_FAMILIES);
+var iosPhase0LogTransferFunctionSchema = z4.enum(
+  IOS_PHASE0_LOG_TRANSFER_FUNCTIONS
+);
+var iosPhase0InputTransformStrategySchema = z4.enum(
+  IOS_PHASE0_INPUT_TRANSFORM_STRATEGIES
+);
+var iosPhase0InputTransformPolicySchema = z4.object({
+  strategy: iosPhase0InputTransformStrategySchema,
+  reason: z4.string().min(1),
+  requiresFixtureValidation: z4.boolean(),
+  warning: z4.string().nullable().optional()
+});
 var iosPhase0Tuple3Schema = z4.tuple([
   z4.number().finite(),
   z4.number().finite(),
@@ -1905,6 +1934,9 @@ var iosPhase0SourceInfoSchema = z4.object({
   durationSec: z4.number().positive().optional(),
   fileSizeBytes: z4.number().int().nonnegative().optional(),
   videoCodec: z4.string().min(1).optional(),
+  codecFamily: iosPhase0CodecFamilySchema.optional(),
+  logTransferFunction: iosPhase0LogTransferFunctionSchema.optional(),
+  inputTransformPolicy: iosPhase0InputTransformPolicySchema.optional(),
   audioCodec: z4.string().min(1).optional(),
   frameRate: z4.number().positive().optional(),
   hasAudio: z4.boolean().optional()
@@ -2031,11 +2063,6 @@ function getIosPhase0SourceCapViolations(source) {
   }
   if (typeof longEdge === "number" && longEdge > IOS_PHASE0_SOURCE_LONG_EDGE_CAP) {
     violations.push(`long-edge>${IOS_PHASE0_SOURCE_LONG_EDGE_CAP}`);
-  }
-  if (typeof source.fileSizeBytes === "number" && source.fileSizeBytes > IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES) {
-    violations.push(
-      `file-size>${IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES}`
-    );
   }
   return violations;
 }

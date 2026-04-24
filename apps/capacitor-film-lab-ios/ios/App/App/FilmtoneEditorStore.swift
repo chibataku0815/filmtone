@@ -530,6 +530,21 @@ final class FilmtoneEditorStore: ObservableObject {
         FilmtonePhase0Math.sourceCapViolations(for: probe)
     }
 
+    var cameraProfileLabel: String {
+        if project.inputLut != nil {
+            return strings.cameraCustom
+        }
+
+        switch probe?.inputTransformPolicy?.strategy ?? probe?.sourceVideoMetadata?.inputTransformPolicy?.strategy {
+        case .appleLogToRec709:
+            return strings.cameraAutoAppleLogDetected
+        case .appleLog2ToRec709:
+            return strings.cameraAutoAppleLog2Detected
+        default:
+            return strings.cameraAuto
+        }
+    }
+
     /// Current HDR preparation policy derived from the active source probe.
     ///
     /// Field path: `probe?.sourceVideoMetadata?.hdrPreparationPolicy`.

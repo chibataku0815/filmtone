@@ -262,6 +262,40 @@
         }
       }
     },
+    "filmtone.camera.auto_apple_log2_detected" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto -> Apple Log 2 detected"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto -> Apple Log 2 検出"
+          }
+        }
+      }
+    },
+    "filmtone.camera.auto_apple_log_detected" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto -> Apple Log detected"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto -> Apple Log 検出"
+          }
+        }
+      }
+    },
     "filmtone.camera.clear" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -275,6 +309,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "外す"
+          }
+        }
+      }
+    },
+    "filmtone.camera.custom" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Custom"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カスタム"
           }
         }
       }
@@ -411,6 +462,57 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "選択したファイルは写真または動画ではありません。"
+          }
+        }
+      }
+    },
+    "filmtone.error.asset_picker.files_copy_insufficient_space" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not enough free space to import this file. It needs about %1$@ free, but only %2$@ is available."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このファイルを読み込むための空き容量が不足しています。約 %1$@ が必要ですが、現在利用できるのは %2$@ です。"
+          }
+        }
+      }
+    },
+    "filmtone.error.asset_picker.photos_resource_write_failed" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos couldn't prepare the original video for import. Keep Filmtone open and try again, or choose the file from Files."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真アプリが元の動画を読み込み用に準備できませんでした。Filmtone を開いたまま再試行するか、ファイルアプリから選択してください。"
+          }
+        }
+      }
+    },
+    "filmtone.error.asset_picker.photos_resource_write_insufficient_space" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not enough free space to import the original video from Photos. Free up storage, then try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真から元の動画を読み込むための空き容量が不足しています。ストレージの空きを増やしてから再試行してください。"
           }
         }
       }

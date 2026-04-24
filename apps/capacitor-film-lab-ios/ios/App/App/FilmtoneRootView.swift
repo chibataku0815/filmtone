@@ -318,7 +318,7 @@ struct FilmtoneRootView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.52))
 
-                Text(store.project.inputLut?.title ?? store.strings.cameraAuto)
+                Text(store.cameraProfileLabel)
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(.white)
                     .lineLimit(2)

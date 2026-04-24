@@ -186,6 +186,53 @@ export type FilmLabCanvasDepthTrack = {
   frameUrls: string[];
 };
 
+export type FilmLabCanvasExportParityGeometry = {
+  enabled: boolean;
+  renderWidth: number;
+  renderHeight: number;
+  sourceWidth: number;
+  sourceHeight: number;
+  sourceDisplayWidth: number;
+  sourceDisplayHeight: number;
+  fitMode: "cover" | "contain";
+  fps?: number | null;
+  stage?: "direct" | "mezzanine" | "proxy" | "thumbnail" | "unknown";
+};
+
+export type FilmLabCanvasPreviewFrameCaptureOptions = {
+  timeSec?: number;
+  frameIndex?: number;
+  fps?: number | null;
+  format?: "rgba8" | "png";
+  settleFrames?: number;
+};
+
+export type FilmLabCanvasPreviewFrameCaptureResult =
+  | {
+      ok: true;
+      format: "png";
+      pngBase64Body: string;
+      width: number;
+      height: number;
+      timeSec: number | null;
+      backendKind: ViewportBackendPreference | null;
+      parityGeometry: FilmLabCanvasExportParityGeometry | null;
+    }
+  | {
+      ok: true;
+      format: "rgba8";
+      data: Uint8Array;
+      width: number;
+      height: number;
+      timeSec: number | null;
+      backendKind: ViewportBackendPreference | null;
+      parityGeometry: FilmLabCanvasExportParityGeometry | null;
+    }
+  | {
+      ok: false;
+      reason: string;
+    };
+
 /**
  * @description 背景で swap する対象ステージです。
  */
@@ -244,6 +291,10 @@ export interface FilmLabCanvasProps {
    * Progressive loading の最初の見せ方を返します。null を返した場合はそのまま MediaLoader に渡します。
    */
   preprocessVideoFile?: (file: File) => Promise<FilmLabCanvasPreprocessResult | null>;
+  /**
+   * @description Desktop export parity preview 用。CSS 表示サイズとは独立に renderer 解像度を export geometry に固定します。
+   */
+  exportParityGeometry?: FilmLabCanvasExportParityGeometry | null;
 }
 
 /**
@@ -330,6 +381,9 @@ export type FilmLabCanvasRef = {
    */
   reloadCurrentSource: () => Promise<boolean>;
   recoverPreview: () => Promise<{ ok: boolean; reason?: string }>;
+  capturePreviewFrame: (
+    options?: FilmLabCanvasPreviewFrameCaptureOptions,
+  ) => Promise<FilmLabCanvasPreviewFrameCaptureResult>;
 };
 
 /** ファイルピッカー用: HEIC を選びにくくしつつ、一般的な形式はそのまま選べる */
@@ -365,6 +419,60 @@ function resolveDefaultSampleAssetUrl(defaultSampleAssetUrl?: string): string {
   }
 
   return publicAssetUrlFromWebPublic(FILM_LAB_DEFAULT_SAMPLE_ASSET_PATH);
+}
+
+function getActiveExportParityGeometry(
+  geometry: FilmLabCanvasExportParityGeometry | null | undefined,
+): FilmLabCanvasExportParityGeometry | null {
+  if (!geometry?.enabled) {
+    return null;
+  }
+  const values = [
+    geometry.renderWidth,
+    geometry.renderHeight,
+    geometry.sourceDisplayWidth,
+    geometry.sourceDisplayHeight,
+  ];
+  if (
+    values.some(
+      (value) =>
+        typeof value !== "number" ||
+        !Number.isFinite(value) ||
+        value <= 0,
+    )
+  ) {
+    return null;
+  }
+  return {
+    ...geometry,
+    renderWidth: Math.max(1, Math.round(geometry.renderWidth)),
+    renderHeight: Math.max(1, Math.round(geometry.renderHeight)),
+    sourceWidth: Math.max(1, Math.round(geometry.sourceWidth)),
+    sourceHeight: Math.max(1, Math.round(geometry.sourceHeight)),
+    sourceDisplayWidth: Math.max(1, Math.round(geometry.sourceDisplayWidth)),
+    sourceDisplayHeight: Math.max(1, Math.round(geometry.sourceDisplayHeight)),
+  };
+}
+
+function stripDataUrlPrefix(dataUrl: string): string {
+  const comma = dataUrl.indexOf(",");
+  return comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
+}
+
+function waitAnimationFrames(count: number): Promise<void> {
+  const frames = Math.max(1, Math.min(10, Math.round(count)));
+  return new Promise<void>((resolve) => {
+    const step = (remaining: number) => {
+      requestAnimationFrame(() => {
+        if (remaining <= 1) {
+          resolve();
+          return;
+        }
+        step(remaining - 1);
+      });
+    };
+    step(frames);
+  });
 }
 
 function isRendererContextLost(
@@ -434,6 +542,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       onInteractiveSourceChange,
       getFileAbsolutePath,
       preprocessVideoFile,
+      exportParityGeometry = null,
       compareHud = null,
       chromeLayout = "overlay",
     },
@@ -452,6 +561,11 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
   useEffect(() => {
     preprocessVideoFileRef.current = preprocessVideoFile;
   });
+  const exportParityGeometryRef =
+    useRef<FilmLabCanvasExportParityGeometry | null>(exportParityGeometry);
+  useEffect(() => {
+    exportParityGeometryRef.current = exportParityGeometry;
+  }, [exportParityGeometry]);
   const onViewportReadyRef = useRef(onViewportReady);
   useEffect(() => {
     onViewportReadyRef.current = onViewportReady;
@@ -557,6 +671,53 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     resolveDefaultSampleAssetUrl(defaultSampleAssetUrl),
   );
   const [canvasRuntimeNonce, setCanvasRuntimeNonce] = useState(0);
+
+  const applyExportParityGeometryToViewport = useCallback(
+    (targetViewport: Viewport | null = viewportRef.current): void => {
+      if (!targetViewport) {
+        return;
+      }
+      const geometry = getActiveExportParityGeometry(
+        exportParityGeometryRef.current,
+      );
+      if (!geometry) {
+        return;
+      }
+      targetViewport.setImageResolution(
+        geometry.sourceDisplayWidth,
+        geometry.sourceDisplayHeight,
+      );
+      targetViewport.setFitMode(geometry.fitMode);
+    },
+    [],
+  );
+
+  const syncViewportResolutionNow = useCallback((): void => {
+    const container = containerRef.current;
+    const targetViewport = viewportRef.current;
+    if (!container || !targetViewport) {
+      return;
+    }
+    const geometry = getActiveExportParityGeometry(
+      exportParityGeometryRef.current,
+    );
+    const width = geometry
+      ? geometry.renderWidth
+      : Math.max(1, container.clientWidth);
+    const height = geometry
+      ? geometry.renderHeight
+      : Math.max(1, container.clientHeight);
+    const renderer = rendererRef.current;
+    if (renderer) {
+      renderer.setSize(width, height, false);
+    }
+    targetViewport.setResolution(width, height);
+    applyExportParityGeometryToViewport(targetViewport);
+  }, [applyExportParityGeometryToViewport]);
+
+  useEffect(() => {
+    syncViewportResolutionNow();
+  }, [exportParityGeometry, syncViewportResolutionNow]);
 
   const publishPreviewStatus = useCallback((status: FilmLabCanvasPreviewStatus) => {
     previewStatusRef.current = status;
@@ -821,9 +982,20 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       previewVideoPausedByBusyRef.current = false;
       previewVideoUserPausedIntentRef.current = false;
       viewport.setTexture(result.texture);
-      viewport.setImageResolution(result.width, result.height);
-      // Portrait (height > width) → contain with glass bg; landscape/square → cover
-      viewport.setFitMode(result.height > result.width ? "contain" : "cover");
+      const parityGeometry = getActiveExportParityGeometry(
+        exportParityGeometryRef.current,
+      );
+      if (parityGeometry) {
+        viewport.setImageResolution(
+          parityGeometry.sourceDisplayWidth,
+          parityGeometry.sourceDisplayHeight,
+        );
+        viewport.setFitMode(parityGeometry.fitMode);
+      } else {
+        viewport.setImageResolution(result.width, result.height);
+        // Portrait (height > width) → contain with glass bg; landscape/square → cover
+        viewport.setFitMode(result.height > result.width ? "contain" : "cover");
+      }
       syncPreviewVideoBusyState(nextPreviewVideo);
       window.setTimeout(() => {
         if (previousTexture && previousTexture !== activeTextureRef.current) {
@@ -1146,8 +1318,15 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       return;
     }
 
-    let width = Math.max(1, container.clientWidth);
-    let height = Math.max(1, container.clientHeight);
+    const initialParityGeometry = getActiveExportParityGeometry(
+      exportParityGeometryRef.current,
+    );
+    let width = initialParityGeometry
+      ? initialParityGeometry.renderWidth
+      : Math.max(1, container.clientWidth);
+    let height = initialParityGeometry
+      ? initialParityGeometry.renderHeight
+      : Math.max(1, container.clientHeight);
 
     // Fresh canvas — NOT attached to any rendering context yet. WebGPU
     // requires `canvas.getContext('webgpu')` on a canvas that has never held
@@ -1178,17 +1357,26 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
 
     const syncViewportSize = () => {
       if (!viewport) return;
-      const nextWidth = Math.max(1, container.clientWidth);
-      const nextHeight = Math.max(1, container.clientHeight);
+      const parityGeometry = getActiveExportParityGeometry(
+        exportParityGeometryRef.current,
+      );
+      const nextWidth = parityGeometry
+        ? parityGeometry.renderWidth
+        : Math.max(1, container.clientWidth);
+      const nextHeight = parityGeometry
+        ? parityGeometry.renderHeight
+        : Math.max(1, container.clientHeight);
       if (nextWidth === width && nextHeight === height) {
+        applyExportParityGeometryToViewport(viewport);
         return;
       }
       width = nextWidth;
       height = nextHeight;
       if (renderer) {
-        renderer.setSize(width, height);
+        renderer.setSize(width, height, false);
       }
       viewport.setResolution(width, height);
+      applyExportParityGeometryToViewport(viewport);
     };
     window.addEventListener("resize", syncViewportSize);
 
@@ -1245,7 +1433,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
           alpha: false,
           preserveDrawingBuffer: true,
         });
-        renderer.setSize(width, height);
+        renderer.setSize(width, height, false);
         renderer.setPixelRatio(getOptimalPixelRatio(1.5));
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         rendererRef.current = renderer;
@@ -1414,6 +1602,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     };
   }, [
     applyLoadedTextureResult,
+    applyExportParityGeometryToViewport,
     disposePreviewVideoElement,
     markPreviewLost,
     publishPreviewStatus,
@@ -1795,13 +1984,145 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
         setCanvasRuntimeNonce((value) => value + 1);
         return recovery;
       },
+      capturePreviewFrame: async (
+        options: FilmLabCanvasPreviewFrameCaptureOptions = {},
+      ): Promise<FilmLabCanvasPreviewFrameCaptureResult> => {
+        const targetViewport = viewportRef.current;
+        const canvas = canvasRef.current;
+        if (!targetViewport || !canvas || supported !== "ok") {
+          return { ok: false, reason: "preview-unavailable" };
+        }
+        if (
+          previewContextLostRef.current ||
+          targetViewport.isContextLost()
+        ) {
+          return { ok: false, reason: "context-lost" };
+        }
+        syncViewportResolutionNow();
+
+        const fps =
+          typeof options.fps === "number" &&
+          Number.isFinite(options.fps) &&
+          options.fps > 0
+            ? options.fps
+            : null;
+        const requestedTimeSec =
+          typeof options.timeSec === "number" && Number.isFinite(options.timeSec)
+            ? Math.max(0, options.timeSec)
+            : typeof options.frameIndex === "number" &&
+                Number.isFinite(options.frameIndex) &&
+                fps
+              ? Math.max(0, options.frameIndex) / fps
+              : null;
+        const video = previewVideoElementRef.current;
+        if (video && requestedTimeSec !== null) {
+          try {
+            video.pause();
+            await seekLoadedVideoElement(video, requestedTimeSec);
+          } catch (err) {
+            return {
+              ok: false,
+              reason:
+                err instanceof Error
+                  ? `seek-failed: ${err.message}`
+                  : "seek-failed",
+            };
+          }
+        }
+
+        await waitAnimationFrames(options.settleFrames ?? 2);
+        const captureTimeSec =
+          requestedTimeSec ??
+          (video && Number.isFinite(video.currentTime)
+            ? video.currentTime
+            : null);
+        if (captureTimeSec !== null) {
+          targetViewport.setTime(captureTimeSec);
+        }
+        applyExportParityGeometryToViewport(targetViewport);
+        const renderer = rendererRef.current;
+        const scene = sceneRef.current;
+        const camera = cameraRef.current;
+        try {
+          if (renderer && scene && camera) {
+            targetViewport.render(renderer, scene, camera);
+          } else {
+            targetViewport.render();
+          }
+        } catch (err) {
+          return {
+            ok: false,
+            reason:
+              err instanceof Error
+                ? `render-failed: ${err.message}`
+                : "render-failed",
+          };
+        }
+
+        const parityGeometry = getActiveExportParityGeometry(
+          exportParityGeometryRef.current,
+        );
+        const backendKind = targetViewport.backendKind ?? null;
+        const format = options.format ?? "png";
+        if (format === "rgba8") {
+          if (targetViewport.backendKind !== "webgpu") {
+            return { ok: false, reason: "rgba8-readback-requires-webgpu" };
+          }
+          try {
+            targetViewport.setReadbackEnabled(true);
+            const data = await targetViewport.readbackRgba8();
+            return {
+              ok: true,
+              format: "rgba8",
+              data,
+              width: canvas.width,
+              height: canvas.height,
+              timeSec: captureTimeSec,
+              backendKind,
+              parityGeometry,
+            };
+          } catch (err) {
+            return {
+              ok: false,
+              reason:
+                err instanceof Error
+                  ? `readback-failed: ${err.message}`
+                  : "readback-failed",
+            };
+          }
+        }
+
+        try {
+          const dataUrl = canvas.toDataURL("image/png");
+          return {
+            ok: true,
+            format: "png",
+            pngBase64Body: stripDataUrlPrefix(dataUrl),
+            width: canvas.width,
+            height: canvas.height,
+            timeSec: captureTimeSec,
+            backendKind,
+            parityGeometry,
+          };
+        } catch (err) {
+          return {
+            ok: false,
+            reason:
+              err instanceof Error
+                ? `png-capture-failed: ${err.message}`
+                : "png-capture-failed",
+          };
+        }
+      },
     }),
     [
+      applyExportParityGeometryToViewport,
       applyLoadedTextureResult,
       handleDownload,
       handleFileClick,
       publishPreviewStatus,
       seekLoadedVideoElement,
+      syncViewportResolutionNow,
       supported,
     ],
   );

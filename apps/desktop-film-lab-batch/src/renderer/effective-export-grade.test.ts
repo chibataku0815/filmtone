@@ -91,6 +91,7 @@ describe("buildEffectiveExportGradeSnapshot", () => {
       displayName: "print.cube",
       absolutePath: null,
     });
+    expect(snapshot.exportRenderGeometry).toBeNull();
   });
 
   it("falls back to the current batch grade when preview params are unavailable", () => {
@@ -113,6 +114,36 @@ describe("buildEffectiveExportGradeSnapshot", () => {
     expect(snapshot.lookSource).toBe("preset");
     expect(snapshot.lutRefs).toBe(fallbackLutRefs);
     expect(snapshot.captureError).toBe("lost context");
+    expect(snapshot.exportRenderGeometry).toBeNull();
+  });
+
+  it("carries video export render geometry with the effective snapshot", () => {
+    const currentBatchGrade = createDefaultBatchGradeState();
+    const exportRenderGeometry = {
+      renderWidth: 1920,
+      renderHeight: 1080,
+      sourceWidth: 1920,
+      sourceHeight: 1080,
+      sourceDisplayWidth: 1920,
+      sourceDisplayHeight: 1080,
+      fitMode: "cover" as const,
+      fps: 25,
+    };
+    const snapshot = buildEffectiveExportGradeSnapshot({
+      viewportParams: PRESETS.reset as unknown as Record<string, number | string>,
+      currentBatchGrade,
+      editLut: { lut1: null, lut2: null },
+      canvasPreset: "reset",
+      fallbackBatchPresetChoice: "reset",
+      fallbackLookSource: "preset",
+      fallbackLutRefs: createEmptyMetadataLutRefs(),
+      exportRenderGeometry,
+    });
+
+    expect(snapshot.exportRenderGeometry).toBe(exportRenderGeometry);
+    expect(formatEffectiveExportGradeSummary(snapshot)).toContain(
+      "renderGeometry=1920x1080/cover",
+    );
   });
 
   it("summarizes effect values and emits actionable export warnings", () => {

@@ -7,11 +7,13 @@ import {
 } from "./phase0-schema";
 import { buildFilmtoneIosSwiftPayload } from "./ios-swift-payload";
 import {
+  IOS_PHASE0_OUTPUT_CODEC,
   IOS_PHASE0_RGB_SHIFT_MAX,
   IOS_PHASE0_SOURCE_DURATION_CAP_SEC,
   createIosPhase0SerializableLut,
   getIosPhase0SourceCapViolations,
   iosPhase0ExportPayloadSchema,
+  iosPhase0SourceInfoSchema,
 } from "./ios-phase0";
 
 test("createIosPhase0SerializableLut converts cube data to JSON-safe RGBA values", () => {
@@ -205,14 +207,55 @@ test("iosPhase0ExportPayloadSchema rejects halationHue outside the slider range"
 
 test("getIosPhase0SourceCapViolations reports cap breaches", () => {
   const violations = getIosPhase0SourceCapViolations({
-    width: 4096,
+    width: 4097,
     height: 2160,
     durationSec: IOS_PHASE0_SOURCE_DURATION_CAP_SEC + 1,
     fileSizeBytes: 9 * 1024 * 1024 * 1024,
   });
 
   expect(violations).toContain("duration>300s");
-  expect(violations).toContain("long-edge>3840");
+  expect(violations).toContain("long-edge>4096");
+  expect(violations.some((violation) => violation.startsWith("file-size>")))
+    .toBe(false);
+});
+
+test("iosPhase0SourceInfoSchema accepts ProRes Apple Log source fields", () => {
+  const source = iosPhase0SourceInfoSchema.parse({
+    uri: "file:///apple-log.mov",
+    displayName: "apple-log.mov",
+    kind: "video",
+    width: 1920,
+    height: 1080,
+    durationSec: 30,
+    videoCodec: "ap4h",
+    codecFamily: "prores-4444",
+    logTransferFunction: "apple-log",
+    inputTransformPolicy: {
+      strategy: "apple-log-to-rec709",
+      reason: "source-is-apple-log",
+      requiresFixtureValidation: true,
+      warning: null,
+    },
+    frameRate: 30,
+    hasAudio: true,
+  });
+
+  expect(source.codecFamily).toBe("prores-4444");
+  expect(source.logTransferFunction).toBe("apple-log");
+  expect(source.inputTransformPolicy?.strategy).toBe("apple-log-to-rec709");
+});
+
+test("iosPhase0SourceInfoSchema accepts legacy source info without new fields", () => {
+  const source = iosPhase0SourceInfoSchema.parse({
+    uri: "file:///legacy.mp4",
+    displayName: "legacy.mp4",
+    kind: "video",
+    videoCodec: "h264",
+  });
+
+  expect(source.codecFamily).toBeUndefined();
+  expect(source.logTransferFunction).toBeUndefined();
+  expect(source.inputTransformPolicy).toBeUndefined();
 });
 
 const DUAL_LUT_CUBE_TEXT = `
@@ -310,6 +353,16 @@ test("iosPhase0ExportPayloadSchema accepts both LUT slots null", () => {
 
   expect(payload.inputLut).toBeNull();
   expect(payload.creativeLut).toBeNull();
+});
+
+test("iosPhase0ExportPayloadSchema keeps output fixed to H.264 MP4 defaults", () => {
+  const payload = iosPhase0ExportPayloadSchema.parse({
+    ...DUAL_LUT_BASE_PAYLOAD,
+  });
+
+  expect(payload.exportSettings.codec).toBe(IOS_PHASE0_OUTPUT_CODEC);
+  expect(payload.exportSettings.outputFps).toBe(30);
+  expect(payload.exportSettings.outputLongEdge).toBe(1920);
 });
 
 test("swift payload generation exposes the shared rgbShift max", () => {

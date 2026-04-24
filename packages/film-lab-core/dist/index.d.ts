@@ -222,7 +222,7 @@ declare const PHASE0_PARAM_KEYS: readonly ["exposure", "contrast", "saturation",
 type Phase0ParamKey = (typeof PHASE0_PARAM_KEYS)[number];
 type Phase0Params = Pick<Params, Phase0ParamKey>;
 declare const PHASE0_MAX_SOURCE_DURATION_SEC: number;
-declare const PHASE0_APPROX_SOURCE_LONG_EDGE_MAX = 3840;
+declare const PHASE0_APPROX_SOURCE_LONG_EDGE_MAX = 4096;
 declare const PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES: number;
 declare const PHASE0_OUTPUT_PROFILE: {
     readonly longEdge: 1920;
@@ -507,6 +507,15 @@ interface SourceInfo {
     kind: SourceKind;
     mimeType?: string;
 }
+type SourceCodecFamily = "h264" | "hevc" | "prores-422" | "prores-4444" | "prores-raw" | "other" | "unknown";
+type SourceLogTransferFunction = "apple-log" | "apple-log2";
+type SourceInputTransformStrategy = "none" | "apple-log-to-rec709" | "apple-log2-to-rec709" | "core-image-tone-map-sdr" | "defer-visible-warning" | "unsupported";
+interface SourceInputTransformPolicy {
+    strategy: SourceInputTransformStrategy;
+    reason: string;
+    requiresFixtureValidation: boolean;
+    warning: string | null;
+}
 type CameraOpticsSource = "metadata" | "assumed" | "manual";
 interface CameraOptics {
     source: CameraOpticsSource;
@@ -527,11 +536,14 @@ interface SourceProbe extends SourceInfo {
     durationSec?: number;
     fileSizeBytes?: number;
     codec?: string;
+    codecFamily?: SourceCodecFamily;
+    logTransferFunction?: SourceLogTransferFunction;
+    inputTransformPolicy?: SourceInputTransformPolicy;
     frameRate?: number;
     cameraOptics?: CameraOptics;
     sourceVideoMetadata?: SourceVideoMetadata;
 }
-type SourceColorClass = "sdr-bt709" | "hdr-pq" | "hdr-hlg" | "wide-gamut-unknown" | "unknown";
+type SourceColorClass = "sdr-bt709" | "hdr-pq" | "hdr-hlg" | "apple-log" | "apple-log2" | "wide-gamut-unknown" | "unsupported" | "unknown";
 type IosHdrPreparationStrategy = "none" | "core-image-tone-map-sdr" | "defer-visible-warning";
 interface IosHdrPreparationPolicy {
     strategy: IosHdrPreparationStrategy;
@@ -544,6 +556,7 @@ interface SourceColorMetadata {
     colorSpace: string | null;
     colorTransfer: string | null;
     colorPrimaries: string | null;
+    logTransferFunction?: SourceLogTransferFunction | null;
     hasMasteringDisplayMetadata: boolean;
     hasContentLightMetadata: boolean;
 }
@@ -567,6 +580,9 @@ interface SourceVideoMetadata {
     colorClass: SourceColorClass;
     hdrPreparationPolicy?: IosHdrPreparationPolicy;
     timing?: SourceVideoTimingMetadata;
+    codecFamily?: SourceCodecFamily;
+    logTransferFunction?: SourceLogTransferFunction | null;
+    inputTransformPolicy?: SourceInputTransformPolicy;
 }
 interface ParsedCubeLut {
     title: string;
@@ -1102,11 +1118,11 @@ declare const IOS_PHASE0_OUTPUT_CODEC: "h264-mp4";
 declare const IOS_PHASE0_OUTPUT_LONG_EDGE: 1920;
 declare const IOS_PHASE0_OUTPUT_FPS: 30;
 declare const IOS_PHASE0_SOURCE_DURATION_CAP_SEC: number;
-declare const IOS_PHASE0_SOURCE_LONG_EDGE_CAP = 3840;
+declare const IOS_PHASE0_SOURCE_LONG_EDGE_CAP = 4096;
 declare const IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES: number;
 declare const IOS_PHASE0_SOURCE_CAPS: {
     readonly durationSec: number;
-    readonly longEdge: 3840;
+    readonly longEdge: 4096;
     readonly fileSizeBytes: number;
 };
 declare const IOS_PHASE0_BENCHMARK_SLOTS: readonly ["bench-short", "bench-mid", "bench-long"];
@@ -1158,6 +1174,32 @@ declare const iosPhase0SourceInfoSchema: z.ZodObject<{
     durationSec: z.ZodOptional<z.ZodNumber>;
     fileSizeBytes: z.ZodOptional<z.ZodNumber>;
     videoCodec: z.ZodOptional<z.ZodString>;
+    codecFamily: z.ZodOptional<z.ZodEnum<{
+        unknown: "unknown";
+        h264: "h264";
+        hevc: "hevc";
+        "prores-422": "prores-422";
+        "prores-4444": "prores-4444";
+        "prores-raw": "prores-raw";
+        other: "other";
+    }>>;
+    logTransferFunction: z.ZodOptional<z.ZodEnum<{
+        "apple-log": "apple-log";
+        "apple-log2": "apple-log2";
+    }>>;
+    inputTransformPolicy: z.ZodOptional<z.ZodObject<{
+        strategy: z.ZodEnum<{
+            none: "none";
+            "apple-log-to-rec709": "apple-log-to-rec709";
+            "apple-log2-to-rec709": "apple-log2-to-rec709";
+            "core-image-tone-map-sdr": "core-image-tone-map-sdr";
+            "defer-visible-warning": "defer-visible-warning";
+            unsupported: "unsupported";
+        }>;
+        reason: z.ZodString;
+        requiresFixtureValidation: z.ZodBoolean;
+        warning: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    }, z.core.$strip>>;
     audioCodec: z.ZodOptional<z.ZodString>;
     frameRate: z.ZodOptional<z.ZodNumber>;
     hasAudio: z.ZodOptional<z.ZodBoolean>;
@@ -1308,6 +1350,32 @@ declare const iosPhase0BenchmarkRecordSchema: z.ZodObject<{
         durationSec: z.ZodOptional<z.ZodNumber>;
         fileSizeBytes: z.ZodOptional<z.ZodNumber>;
         videoCodec: z.ZodOptional<z.ZodString>;
+        codecFamily: z.ZodOptional<z.ZodEnum<{
+            unknown: "unknown";
+            h264: "h264";
+            hevc: "hevc";
+            "prores-422": "prores-422";
+            "prores-4444": "prores-4444";
+            "prores-raw": "prores-raw";
+            other: "other";
+        }>>;
+        logTransferFunction: z.ZodOptional<z.ZodEnum<{
+            "apple-log": "apple-log";
+            "apple-log2": "apple-log2";
+        }>>;
+        inputTransformPolicy: z.ZodOptional<z.ZodObject<{
+            strategy: z.ZodEnum<{
+                none: "none";
+                "apple-log-to-rec709": "apple-log-to-rec709";
+                "apple-log2-to-rec709": "apple-log2-to-rec709";
+                "core-image-tone-map-sdr": "core-image-tone-map-sdr";
+                "defer-visible-warning": "defer-visible-warning";
+                unsupported: "unsupported";
+            }>;
+            reason: z.ZodString;
+            requiresFixtureValidation: z.ZodBoolean;
+            warning: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+        }, z.core.$strip>>;
         audioCodec: z.ZodOptional<z.ZodString>;
         frameRate: z.ZodOptional<z.ZodNumber>;
         hasAudio: z.ZodOptional<z.ZodBoolean>;
@@ -1446,6 +1514,32 @@ declare const iosPhase0LocalProjectSchema: z.ZodObject<{
         durationSec: z.ZodOptional<z.ZodNumber>;
         fileSizeBytes: z.ZodOptional<z.ZodNumber>;
         videoCodec: z.ZodOptional<z.ZodString>;
+        codecFamily: z.ZodOptional<z.ZodEnum<{
+            unknown: "unknown";
+            h264: "h264";
+            hevc: "hevc";
+            "prores-422": "prores-422";
+            "prores-4444": "prores-4444";
+            "prores-raw": "prores-raw";
+            other: "other";
+        }>>;
+        logTransferFunction: z.ZodOptional<z.ZodEnum<{
+            "apple-log": "apple-log";
+            "apple-log2": "apple-log2";
+        }>>;
+        inputTransformPolicy: z.ZodOptional<z.ZodObject<{
+            strategy: z.ZodEnum<{
+                none: "none";
+                "apple-log-to-rec709": "apple-log-to-rec709";
+                "apple-log2-to-rec709": "apple-log2-to-rec709";
+                "core-image-tone-map-sdr": "core-image-tone-map-sdr";
+                "defer-visible-warning": "defer-visible-warning";
+                unsupported: "unsupported";
+            }>;
+            reason: z.ZodString;
+            requiresFixtureValidation: z.ZodBoolean;
+            warning: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+        }, z.core.$strip>>;
         audioCodec: z.ZodOptional<z.ZodString>;
         frameRate: z.ZodOptional<z.ZodNumber>;
         hasAudio: z.ZodOptional<z.ZodBoolean>;

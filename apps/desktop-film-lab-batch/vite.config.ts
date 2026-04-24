@@ -102,11 +102,12 @@ export default defineConfig(({ mode }) => {
     process.env.FILM_LAB_VERBOSE_VIDEO_EXPORT === "true"
       ? "true"
       : "false";
-  const enableWebCodecsExportTruth =
-    process.env.FILM_LAB_ENABLE_WEBCODECS_EXPORT === "1" ||
-    process.env.FILM_LAB_ENABLE_WEBCODECS_EXPORT === "true"
-      ? "true"
-      : "false";
+  const webCodecsExportDisabled =
+    process.env.FILM_LAB_DISABLE_WEBCODECS_EXPORT === "1" ||
+    process.env.FILM_LAB_DISABLE_WEBCODECS_EXPORT === "true" ||
+    process.env.FILM_LAB_ENABLE_WEBCODECS_EXPORT === "0" ||
+    process.env.FILM_LAB_ENABLE_WEBCODECS_EXPORT === "false";
+  const enableWebCodecsExportTruth = webCodecsExportDisabled ? "false" : "true";
 
   return {
     root: path.resolve(__dirname, "src/renderer"),

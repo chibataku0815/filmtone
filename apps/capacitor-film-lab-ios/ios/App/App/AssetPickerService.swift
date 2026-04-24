@@ -41,6 +41,10 @@ final class AssetPickerService: NSObject {
         case lut
     }
 
+    private static let proResSizedCopyThresholdBytes: Int64 = 512 * 1024 * 1024
+    private static let minimumProResSizedCopyBufferBytes: Int64 = 64 * 1024 * 1024
+    private static let maximumProResSizedCopyBufferBytes: Int64 = 512 * 1024 * 1024
+
     private let cacheStore: CacheStore
     private let mezzanineService: MezzanineService
     private var sourceContinuation: CheckedContinuation<SourceInfoDTO?, Error>?
@@ -267,15 +271,9 @@ final class AssetPickerService: NSObject {
                 options: requestOptions
             ) { error in
                 if let error {
-                    _ = error
+                    try? FileManager.default.removeItem(at: destinationURL)
                     continuation.resume(
-                        throwing: FilmtoneMediaError.cacheFailed(
-                            filmtoneLocalized(
-                                "filmtone.error.generic.pick_source",
-                                defaultValue: "Media selection couldn't be completed.",
-                                comment: "Fallback error for source picking."
-                            )
-                        )
+                        throwing: self.photoResourceWriteError(for: error)
                     )
                 } else {
                     continuation.resume(returning: ())
@@ -302,6 +300,7 @@ final class AssetPickerService: NSObject {
 
         let type = try sourceType(for: url)
         let kind: FilmtoneSourceKind = type.conforms(to: .image) ? .image : .video
+        try preflightDocumentSourceCopy(from: url)
         let importedURL = try cacheStore.importItem(
             from: url,
             suggestedName: url.lastPathComponent,
@@ -342,6 +341,120 @@ final class AssetPickerService: NSObject {
 
     private func isSupportedSourceType(_ type: UTType) -> Bool {
         type.conforms(to: .image) || type.conforms(to: .movie) || type.conforms(to: .video)
+    }
+
+    private func preflightDocumentSourceCopy(from sourceURL: URL) throws {
+        guard let sourceSizeBytes = try sourceFileSizeBytes(for: sourceURL),
+              sourceSizeBytes > 0,
+              let availableBytes = try availableImportCapacityBytes() else {
+            return
+        }
+
+        let requiredBytes = requiredCapacityForDocumentCopy(sourceSizeBytes)
+        guard availableBytes >= requiredBytes else {
+            throw FilmtoneMediaError.cacheFailed(
+                filmtoneLocalizedFormat(
+                    "filmtone.error.asset_picker.files_copy_insufficient_space",
+                    defaultValue: "Not enough free space to import this file. It needs about %1$@ free, but only %2$@ is available.",
+                    arguments: [
+                        formatByteCount(requiredBytes),
+                        formatByteCount(availableBytes),
+                    ],
+                    comment: "Error shown when a file selected from Files is larger than available app storage."
+                )
+            )
+        }
+    }
+
+    private func sourceFileSizeBytes(for sourceURL: URL) throws -> Int64? {
+        let values = try sourceURL.resourceValues(
+            forKeys: [.fileSizeKey, .totalFileAllocatedSizeKey]
+        )
+
+        if let fileSize = values.fileSize {
+            return Int64(fileSize)
+        }
+
+        if let allocatedSize = values.totalFileAllocatedSize {
+            return Int64(allocatedSize)
+        }
+
+        return nil
+    }
+
+    private func availableImportCapacityBytes() throws -> Int64? {
+        let sourceDirectoryURL = try cacheStore.directory(for: .sources)
+        let values = try sourceDirectoryURL.resourceValues(
+            forKeys: [
+                .volumeAvailableCapacityForImportantUsageKey,
+                .volumeAvailableCapacityKey,
+            ]
+        )
+
+        if let importantUsageCapacity = values.volumeAvailableCapacityForImportantUsage {
+            return importantUsageCapacity
+        }
+
+        if let availableCapacity = values.volumeAvailableCapacity {
+            return Int64(availableCapacity)
+        }
+
+        return nil
+    }
+
+    private func requiredCapacityForDocumentCopy(_ sourceSizeBytes: Int64) -> Int64 {
+        guard sourceSizeBytes >= Self.proResSizedCopyThresholdBytes else {
+            return sourceSizeBytes
+        }
+
+        let dynamicBufferBytes = min(
+            Self.maximumProResSizedCopyBufferBytes,
+            max(Self.minimumProResSizedCopyBufferBytes, sourceSizeBytes / 20)
+        )
+        return sourceSizeBytes + dynamicBufferBytes
+    }
+
+    private func photoResourceWriteError(for error: Error) -> FilmtoneMediaError {
+        if isOutOfSpaceError(error) {
+            return .cacheFailed(
+                filmtoneLocalized(
+                    "filmtone.error.asset_picker.photos_resource_write_insufficient_space",
+                    defaultValue: "Not enough free space to import the original video from Photos. Free up storage, then try again.",
+                    comment: "Error shown when Photos cannot write the original selected video because storage is full."
+                )
+            )
+        }
+
+        return .cacheFailed(
+            filmtoneLocalized(
+                "filmtone.error.asset_picker.photos_resource_write_failed",
+                defaultValue: "Photos couldn't prepare the original video for import. Keep Filmtone open and try again, or choose the file from Files.",
+                comment: "Error shown when Photos fails to write the original selected video resource."
+            )
+        )
+    }
+
+    private func isOutOfSpaceError(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        if nsError.domain == NSCocoaErrorDomain,
+           nsError.code == NSFileWriteOutOfSpaceError {
+            return true
+        }
+
+        if nsError.domain == NSPOSIXErrorDomain,
+           nsError.code == 28 {
+            return true
+        }
+
+        if let underlyingError = nsError.userInfo[NSUnderlyingErrorKey] as? Error {
+            return isOutOfSpaceError(underlyingError)
+        }
+
+        return false
+    }
+
+    private func formatByteCount(_ bytes: Int64) -> String {
+        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
     }
 
     private func importLut(from url: URL) throws -> PickedLutFileDTO {

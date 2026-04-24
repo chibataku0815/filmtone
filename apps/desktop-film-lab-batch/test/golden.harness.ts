@@ -137,6 +137,68 @@ export async function captureParamsPngBuffer(
   return Buffer.from(stripDataUrlPrefix(ok.dataUrl as string), "base64");
 }
 
+export async function captureParityPreviewPngBuffer(
+  page: Page,
+  imagePath: string,
+  params: Record<string, number | string>,
+  geometry: {
+    renderWidth: number;
+    renderHeight: number;
+    sourceWidth: number;
+    sourceHeight: number;
+    sourceDisplayWidth: number;
+    sourceDisplayHeight: number;
+    fitMode: "cover" | "contain";
+    fps?: number | null;
+  },
+  containerSize: { width: number; height: number },
+): Promise<Buffer> {
+  const imageBuf = await fs.readFile(imagePath);
+  const imageBase64 = imageBuf.toString("base64");
+  const result = await page.evaluate(
+    async (args: {
+      base64: string;
+      params: Record<string, number | string>;
+      geometry: typeof geometry;
+      containerWidth: number;
+      containerHeight: number;
+    }) => {
+      const h = (window as any).__filmtoneTest;
+      if (!h) return { ok: false, reason: "harness-missing" };
+      h.setExportParityGeometry({
+        enabled: true,
+        ...args.geometry,
+        stage: "mezzanine",
+      });
+      await h.waitTwoFrames();
+      const loaded = await h.loadImage(args.base64);
+      if (!loaded) return { ok: false, reason: "loadImage-failed" };
+      await h.waitTwoFrames();
+      h.setCanvasSize(args.containerWidth, args.containerHeight);
+      h.setParams(args.params);
+      await h.waitTwoFrames();
+      const capture = await h.capturePreviewFrame({ format: "png" });
+      h.setExportParityGeometry(null);
+      if (!capture.ok) return capture;
+      return capture;
+    },
+    {
+      base64: imageBase64,
+      params,
+      geometry,
+      containerWidth: containerSize.width,
+      containerHeight: containerSize.height,
+    },
+  );
+
+  if (!result.ok || result.format !== "png") {
+    throw new Error(
+      `captureParityPreviewPngBuffer failed: ${result.reason ?? "unknown"}`,
+    );
+  }
+  return Buffer.from(result.pngBase64Body as string, "base64");
+}
+
 export function diffPngBuffers(
   aBuffer: Buffer,
   bBuffer: Buffer,

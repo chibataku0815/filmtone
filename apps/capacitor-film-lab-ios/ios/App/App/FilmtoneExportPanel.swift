@@ -56,7 +56,7 @@ struct FilmtoneExportPanel: View {
             if store.source != nil {
                 HStack(spacing: 12) {
                     MetricCard(label: store.strings.strengthLabel, value: percentLabel(store.project.strength))
-                    MetricCard(label: store.strings.cameraLabel, value: store.project.inputLut?.title ?? store.strings.cameraAuto)
+                    MetricCard(label: store.strings.cameraLabel, value: store.cameraProfileLabel)
                 }
 
                 if let opticsLabel = store.cameraOpticsLabel {
@@ -169,7 +169,7 @@ struct FilmtoneExportPanel: View {
                     )
                 )
                 MetricCard(label: store.strings.metricsFileSize, value: store.strings.byteLabel(result.fileSizeBytes))
-                MetricCard(label: store.strings.cameraLabel, value: store.project.inputLut?.title ?? store.strings.cameraAuto)
+                    MetricCard(label: store.strings.cameraLabel, value: store.cameraProfileLabel)
                 MetricCard(label: store.strings.metricsSaveToPhotos, value: store.strings.saveStateLabel(store.saveToPhotosState))
                 if let opticsLabel = store.cameraOpticsLabel {
                     MetricCard(label: store.strings.opticsMetricLabel, value: opticsLabel)

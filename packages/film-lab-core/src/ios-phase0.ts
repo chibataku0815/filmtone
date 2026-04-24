@@ -49,6 +49,54 @@ export type IosPhase0BenchmarkSlot =
 export const iosPhase0SourceKindSchema = z.enum(["image", "video"]);
 export type IosPhase0SourceKind = z.infer<typeof iosPhase0SourceKindSchema>;
 
+export const IOS_PHASE0_CODEC_FAMILIES = [
+  "h264",
+  "hevc",
+  "prores-422",
+  "prores-4444",
+  "prores-raw",
+  "other",
+  "unknown",
+] as const;
+
+export const IOS_PHASE0_LOG_TRANSFER_FUNCTIONS = [
+  "apple-log",
+  "apple-log2",
+] as const;
+
+export const IOS_PHASE0_INPUT_TRANSFORM_STRATEGIES = [
+  "none",
+  "apple-log-to-rec709",
+  "apple-log2-to-rec709",
+  "core-image-tone-map-sdr",
+  "defer-visible-warning",
+  "unsupported",
+] as const;
+
+export const iosPhase0CodecFamilySchema = z.enum(IOS_PHASE0_CODEC_FAMILIES);
+export const iosPhase0LogTransferFunctionSchema = z.enum(
+  IOS_PHASE0_LOG_TRANSFER_FUNCTIONS,
+);
+export const iosPhase0InputTransformStrategySchema = z.enum(
+  IOS_PHASE0_INPUT_TRANSFORM_STRATEGIES,
+);
+export const iosPhase0InputTransformPolicySchema = z.object({
+  strategy: iosPhase0InputTransformStrategySchema,
+  reason: z.string().min(1),
+  requiresFixtureValidation: z.boolean(),
+  warning: z.string().nullable().optional(),
+});
+
+export type IosPhase0CodecFamily = z.infer<
+  typeof iosPhase0CodecFamilySchema
+>;
+export type IosPhase0LogTransferFunction = z.infer<
+  typeof iosPhase0LogTransferFunctionSchema
+>;
+export type IosPhase0InputTransformPolicy = z.infer<
+  typeof iosPhase0InputTransformPolicySchema
+>;
+
 const iosPhase0Tuple3Schema = z.tuple([
   z.number().finite(),
   z.number().finite(),
@@ -120,6 +168,9 @@ export const iosPhase0SourceInfoSchema = z.object({
   durationSec: z.number().positive().optional(),
   fileSizeBytes: z.number().int().nonnegative().optional(),
   videoCodec: z.string().min(1).optional(),
+  codecFamily: iosPhase0CodecFamilySchema.optional(),
+  logTransferFunction: iosPhase0LogTransferFunctionSchema.optional(),
+  inputTransformPolicy: iosPhase0InputTransformPolicySchema.optional(),
   audioCodec: z.string().min(1).optional(),
   frameRate: z.number().positive().optional(),
   hasAudio: z.boolean().optional(),
@@ -303,15 +354,6 @@ export function getIosPhase0SourceCapViolations(
     longEdge > IOS_PHASE0_SOURCE_LONG_EDGE_CAP
   ) {
     violations.push(`long-edge>${IOS_PHASE0_SOURCE_LONG_EDGE_CAP}`);
-  }
-
-  if (
-    typeof source.fileSizeBytes === "number" &&
-    source.fileSizeBytes > IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES
-  ) {
-    violations.push(
-      `file-size>${IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES}`,
-    );
   }
 
   return violations;

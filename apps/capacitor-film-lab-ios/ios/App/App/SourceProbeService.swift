@@ -99,6 +99,7 @@ final class SourceProbeService {
         let durationSec = CMTimeGetSeconds(asset.duration)
         let frameRate = track.nominalFrameRate > 0 ? Double(track.nominalFrameRate) : nil
         let codec = codecLabel(for: track)
+        let codecFamily = codecFamily(for: codec)
         let cameraOptics = cameraOptics(
             for: track,
             asset: asset,
@@ -107,6 +108,8 @@ final class SourceProbeService {
         )
         let sourceVideoMetadata = sourceVideoMetadata(
             for: track,
+            asset: asset,
+            codecFamily: codecFamily,
             rawWidth: rawWidth,
             rawHeight: rawHeight,
             displayWidth: width,
@@ -123,7 +126,10 @@ final class SourceProbeService {
             durationSec: durationSec.isFinite ? durationSec : nil,
             fileSizeBytes: fileSizeBytes,
             codec: codec,
+            codecFamily: codecFamily,
             frameRate: frameRate,
+            logTransferFunction: sourceVideoMetadata.logTransferFunction,
+            inputTransformPolicy: sourceVideoMetadata.inputTransformPolicy,
             cameraOptics: cameraOptics,
             sourceVideoMetadata: sourceVideoMetadata
         )
@@ -133,14 +139,23 @@ final class SourceProbeService {
 
     private func sourceVideoMetadata(
         for track: AVAssetTrack,
+        asset: AVAsset,
+        codecFamily: SourceCodecFamilyDTO,
         rawWidth: Int,
         rawHeight: Int,
         displayWidth: Int,
         displayHeight: Int
     ) -> SourceVideoMetadataDTO {
-        let colorMetadata = colorMetadataDTO(for: track)
-        let colorClass = SourceColorClassifier.classify(colorMetadata)
+        let colorMetadata = colorMetadataDTO(for: track, asset: asset)
+        let colorClass = codecFamily == .proresRaw
+            ? SourceColorClassDTO.unsupported
+            : SourceColorClassifier.classify(colorMetadata)
         let hdrPolicy = HdrPreparationPolicyDeriver.derive(colorClass: colorClass)
+        let inputTransformPolicy = SourceInputTransformPolicyDeriver.derive(
+            colorClass: colorClass,
+            codecFamily: codecFamily,
+            logTransferFunction: colorMetadata.logTransferFunction
+        )
         let displayGeometry = displayGeometryDTO(
             for: track,
             rawWidth: rawWidth,
@@ -154,11 +169,14 @@ final class SourceProbeService {
             color: colorMetadata,
             colorClass: colorClass,
             hdrPreparationPolicy: hdrPolicy,
-            timing: timing
+            timing: timing,
+            codecFamily: codecFamily,
+            logTransferFunction: colorMetadata.logTransferFunction,
+            inputTransformPolicy: inputTransformPolicy
         )
     }
 
-    private func colorMetadataDTO(for track: AVAssetTrack) -> SourceColorMetadataDTO {
+    private func colorMetadataDTO(for track: AVAssetTrack, asset: AVAsset) -> SourceColorMetadataDTO {
         let extensions: [CFString: Any] = {
             guard let description = track.formatDescriptions.first else { return [:] }
             let cmDescription = description as! CMFormatDescription
@@ -180,6 +198,20 @@ final class SourceProbeService {
             cfKey: kCMFormatDescriptionExtension_YCbCrMatrix,
             stringKey: "YCbCrMatrix"
         )
+        let rawLogTransfer = {
+            if #available(iOS 17.2, *) {
+                return FormatExtensionReader.string(
+                    in: extensions,
+                    cfKey: kCMFormatDescriptionExtension_LogTransferFunction,
+                    stringKey: "LogTransferFunction"
+                )
+            }
+            return FormatExtensionReader.string(
+                in: extensions,
+                cfKey: nil,
+                stringKey: "LogTransferFunction"
+            )
+        }()
         // Mastering display and content light CFString constants are not reliably
         // exported by every SDK. Always pass nil for cfKey and rely on the String
         // lookup. Presence alone is enough; payload is not inspected in v1.1.
@@ -197,6 +229,8 @@ final class SourceProbeService {
         let normalizedTransfer = SourceColorMetadataNormalizer.normalizeTransfer(rawTransfer)
         let normalizedPrimaries = SourceColorMetadataNormalizer.normalizePrimaries(rawPrimaries)
         let normalizedMatrix = SourceColorMetadataNormalizer.normalizeMatrix(rawMatrix)
+        let normalizedLogTransfer = SourceColorMetadataNormalizer.normalizeLogTransferFunction(rawLogTransfer)
+            ?? firstSampleLogTransferFunction(asset: asset, track: track)
 
         return SourceColorMetadataDTO(
             colorRange: nil,
@@ -204,11 +238,53 @@ final class SourceProbeService {
             // the YCbCr matrix is the closest analog. The classifier accepts bt2020nc/c
             // from this slot to keep wide-gamut detection working for iPhone HLG clips.
             colorSpace: normalizedMatrix,
-            colorTransfer: normalizedTransfer,
+            colorTransfer: normalizedTransfer ?? normalizedLogTransfer?.rawValue,
             colorPrimaries: normalizedPrimaries,
+            logTransferFunction: normalizedLogTransfer,
             hasMasteringDisplayMetadata: hasMasteringDisplay,
             hasContentLightMetadata: hasContentLight
         )
+    }
+
+    private func firstSampleLogTransferFunction(asset: AVAsset, track: AVAssetTrack) -> SourceLogTransferFunctionDTO? {
+        guard #available(iOS 17.2, *) else {
+            return nil
+        }
+
+        do {
+            let reader = try AVAssetReader(asset: asset)
+            let output = AVAssetReaderTrackOutput(
+                track: track,
+                outputSettings: [
+                    kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA),
+                    AVVideoAllowWideColorKey: true,
+                ]
+            )
+            output.alwaysCopiesSampleData = false
+            guard reader.canAdd(output) else {
+                return nil
+            }
+            reader.add(output)
+            guard reader.startReading() else {
+                return nil
+            }
+            defer {
+                if reader.status == .reading {
+                    reader.cancelReading()
+                }
+            }
+            guard
+                let sampleBuffer = output.copyNextSampleBuffer(),
+                let imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer),
+                let raw = CVBufferGetAttachment(imageBuffer, kCVImageBufferLogTransferFunctionKey, nil)?
+                    .takeUnretainedValue()
+            else {
+                return nil
+            }
+            return SourceColorMetadataNormalizer.normalizeLogTransferFunction(String(describing: raw))
+        } catch {
+            return nil
+        }
     }
 
     private func displayGeometryDTO(
@@ -422,6 +498,23 @@ final class SourceProbeService {
         }
         let mediaSubType = CMFormatDescriptionGetMediaSubType(description as! CMFormatDescription)
         return fourCCString(mediaSubType)
+    }
+
+    private func codecFamily(for codec: String?) -> SourceCodecFamilyDTO {
+        switch codec?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "avc1", "avc3", "h264":
+            return .h264
+        case "hvc1", "hev1", "hevc":
+            return .hevc
+        case "apco", "apcs", "apcn", "apch":
+            return .prores422
+        case "ap4h", "ap4x":
+            return .prores4444
+        case "aprn", "aprh":
+            return .proresRaw
+        default:
+            return .other
+        }
     }
 
     private func fourCCString(_ value: FourCharCode) -> String {

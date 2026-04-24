@@ -7,6 +7,16 @@ import Foundation
 /// Apple CoreMedia identifier を直接渡すと PQ/HLG 判定が外れるので注意.
 enum SourceColorClassifier {
     static func classify(_ metadata: SourceColorMetadataDTO) -> SourceColorClassDTO {
+        if metadata.logTransferFunction == .appleLog2 ||
+            metadata.colorTransfer == "apple-log2" ||
+            metadata.colorTransfer == "apple-log-2"
+        {
+            return .appleLog2
+        }
+        if metadata.logTransferFunction == .appleLog || metadata.colorTransfer == "apple-log" {
+            return .appleLog
+        }
+
         if metadata.colorTransfer == "smpte2084" {
             return .hdrPq
         }
