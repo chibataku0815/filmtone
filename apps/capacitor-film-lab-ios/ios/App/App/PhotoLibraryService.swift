@@ -2,6 +2,9 @@ import Foundation
 import Photos
 
 final class PhotoLibraryService {
+    // Photos saves media only; sidecar stays in app container because Photos assets
+    // don't support adjacent arbitrary files. Use share sheet / Files to move
+    // the sidecar alongside the exported media.
     func saveToPhotos(fileURL: URL) async throws -> String? {
         let authorization = await requestAuthorizationIfNeeded()
         guard authorization == .authorized || authorization == .limited else {

@@ -4,7 +4,7 @@ import {
   FILM_LAB_DEFAULT_SHADOW_HUE,
 } from "./split-tone-default-hues";
 
-type ContractDefaultKey =
+export type ContractDefaultKey =
   | "depthMistGain"
   | "depthGlowGain"
   | "depthRayAngleGamma"
@@ -27,7 +27,7 @@ type ContractDefaultKey =
 
 type BasePresetParams = Omit<Params, ContractDefaultKey>;
 
-const CONTRACT_DEFAULTS: Pick<Params, ContractDefaultKey> = {
+export const CONTRACT_DEFAULTS: Readonly<Pick<Params, ContractDefaultKey>> = {
   depthMistGain: 0,
   depthGlowGain: 0,
   depthRayAngleGamma: 1.4,

@@ -48,6 +48,14 @@
 		E20000010000000000000001 /* FilmtoneSnapshotsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000010000000000000002 /* FilmtoneSnapshotsUITests.swift */; };
 		E20000010000000000000002 /* SnapshotHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000010000000000000003 /* SnapshotHelper.swift */; };
 		E20000010000000000000003 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F20000010000000000000004 /* XCTest.framework */; };
+		D20000010000000000000001 /* FormatExtensionReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000001 /* FormatExtensionReader.swift */; };
+		D20000010000000000000002 /* SourceColorMetadataNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000002 /* SourceColorMetadataNormalizer.swift */; };
+		D20000010000000000000003 /* SourceColorClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000003 /* SourceColorClassifier.swift */; };
+		D20000010000000000000004 /* HdrPreparationPolicyDeriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000004 /* HdrPreparationPolicyDeriver.swift */; };
+		D20000010000000000000005 /* FilmtoneRayAngleOptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000005 /* FilmtoneRayAngleOptics.swift */; };
+		D20000010000000000000006 /* FilmtoneHdrPolicyNotice.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000006 /* FilmtoneHdrPolicyNotice.swift */; };
+		D20000010000000000000007 /* FilmtoneCameraOpticsFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000007 /* FilmtoneCameraOpticsFormatter.swift */; };
+		D20000010000000000000008 /* FilmtoneExportSidecarBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000008 /* FilmtoneExportSidecarBuilder.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -87,6 +95,14 @@
 		B10000010000000000000009 /* SourceProbeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceProbeService.swift; sourceTree = "<group>"; };
 		B10000010000000000000011 /* FilmtoneMediaRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneMediaRuntime.swift; sourceTree = "<group>"; };
 		B10000010000000000000012 /* MezzanineService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MezzanineService.swift; sourceTree = "<group>"; };
+		C20000010000000000000001 /* FormatExtensionReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormatExtensionReader.swift; sourceTree = "<group>"; };
+		C20000010000000000000002 /* SourceColorMetadataNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceColorMetadataNormalizer.swift; sourceTree = "<group>"; };
+		C20000010000000000000003 /* SourceColorClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceColorClassifier.swift; sourceTree = "<group>"; };
+		C20000010000000000000004 /* HdrPreparationPolicyDeriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HdrPreparationPolicyDeriver.swift; sourceTree = "<group>"; };
+		C20000010000000000000005 /* FilmtoneRayAngleOptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneRayAngleOptics.swift; sourceTree = "<group>"; };
+		C20000010000000000000006 /* FilmtoneHdrPolicyNotice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneHdrPolicyNotice.swift; sourceTree = "<group>"; };
+		C20000010000000000000007 /* FilmtoneCameraOpticsFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCameraOpticsFormatter.swift; sourceTree = "<group>"; };
+		C20000010000000000000008 /* FilmtoneExportSidecarBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneExportSidecarBuilder.swift; sourceTree = "<group>"; };
 		C10000010000000000000001 /* FilmtoneRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneRootView.swift; sourceTree = "<group>"; };
 		C10000010000000000000002 /* FilmtoneEditorStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneEditorStore.swift; sourceTree = "<group>"; };
 		C10000010000000000000003 /* FilmtoneEditorFacade.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneEditorFacade.swift; sourceTree = "<group>"; };
@@ -189,6 +205,14 @@
 					C1000001000000000000000B /* FilmtoneStrings.swift */,
 				C1000001000000000000000C /* FilmtoneCubeParser.swift */,
 				C1000001000000000000000F /* FilmtoneSnapshotSupport.swift */,
+				C20000010000000000000001 /* FormatExtensionReader.swift */,
+				C20000010000000000000002 /* SourceColorMetadataNormalizer.swift */,
+				C20000010000000000000003 /* SourceColorClassifier.swift */,
+				C20000010000000000000004 /* HdrPreparationPolicyDeriver.swift */,
+				C20000010000000000000005 /* FilmtoneRayAngleOptics.swift */,
+				C20000010000000000000006 /* FilmtoneHdrPolicyNotice.swift */,
+				C20000010000000000000007 /* FilmtoneCameraOpticsFormatter.swift */,
+				C20000010000000000000008 /* FilmtoneExportSidecarBuilder.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -396,6 +420,14 @@
 					D1000001000000000000000B /* FilmtoneStrings.swift in Sources */,
 				D1000001000000000000000C /* FilmtoneCubeParser.swift in Sources */,
 				D1000001000000000000000F /* FilmtoneSnapshotSupport.swift in Sources */,
+				D20000010000000000000001 /* FormatExtensionReader.swift in Sources */,
+				D20000010000000000000002 /* SourceColorMetadataNormalizer.swift in Sources */,
+				D20000010000000000000003 /* SourceColorClassifier.swift in Sources */,
+				D20000010000000000000004 /* HdrPreparationPolicyDeriver.swift in Sources */,
+				D20000010000000000000005 /* FilmtoneRayAngleOptics.swift in Sources */,
+				D20000010000000000000006 /* FilmtoneHdrPolicyNotice.swift in Sources */,
+				D20000010000000000000007 /* FilmtoneCameraOpticsFormatter.swift in Sources */,
+				D20000010000000000000008 /* FilmtoneExportSidecarBuilder.swift in Sources */,
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

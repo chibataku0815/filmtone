@@ -2,6 +2,7 @@ import AVFoundation
 import CoreImage
 import CoreImage.CIFilterBuiltins
 import Foundation
+import UIKit
 
 final class FilmtoneExportSession {
     private let request: Phase0ExportRequestDTO
@@ -111,6 +112,17 @@ final class FilmtoneExportSession {
 
         progress(.init(stage: .completed, progress: 1.0, currentFrame: result.frameCount, totalFrames: result.frameCount, message: "Export complete"))
 
+        // T2 (v1.1): write the filmtone-ios-export-session-v1 sidecar next to the
+        // export output. Failure here must NOT fail the export itself — missing
+        // sidecar just surfaces as `sidecarUri = nil` downstream.
+        let sidecarUri = writeExportSidecar(
+            outputSize: result.outputSize,
+            fileSizeBytes: fileSizeBytes,
+            elapsedMs: elapsedMs,
+            realtimeRatio: realtimeRatio,
+            audioPreserved: result.audioPreserved
+        )
+
         return Phase0ExportResultDTO(
             outputUri: outputURL.absoluteString,
             elapsedMs: elapsedMs,
@@ -120,8 +132,54 @@ final class FilmtoneExportSession {
             fileSizeBytes: fileSizeBytes,
             realtimeRatio: realtimeRatio,
             audioPreserved: result.audioPreserved,
-            benchmarkRecord: nil
+            benchmarkRecord: nil,
+            sidecarUri: sidecarUri
         )
+    }
+
+    /// Assemble and atomically write the filmtone-ios-export-session-v1 sidecar.
+    /// Returns the sidecar absolute URL string on success, `nil` on any failure.
+    private func writeExportSidecar(
+        outputSize: CGSize,
+        fileSizeBytes: Int?,
+        elapsedMs: Int,
+        realtimeRatio: Double?,
+        audioPreserved: Bool?
+    ) -> String? {
+        let identity = SidecarDeviceIdentity(
+            appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "",
+            buildNumber: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "",
+            deviceModel: UIDevice.current.filmtoneModelIdentifier,
+            iosVersion: UIDevice.current.systemVersion,
+            exportedAtIso: ISO8601DateFormatter.filmtoneSidecar.string(from: Date())
+        )
+
+        let hdrPolicy = request.sourceProbe?.sourceVideoMetadata?.hdrPreparationPolicy
+
+        let inputs = SidecarBuildInputs(
+            request: request,
+            sourceProbe: request.sourceProbe,
+            hdrPolicy: hdrPolicy,
+            outputURL: outputURL,
+            outputSize: outputSize,
+            fileSizeBytes: fileSizeBytes,
+            elapsedMs: elapsedMs,
+            realtimeRatio: realtimeRatio,
+            audioPreserved: audioPreserved,
+            identity: identity
+        )
+
+        let sidecarURL = FilmtoneExportSidecarBuilder.sidecarURL(for: outputURL)
+        do {
+            let payload = try FilmtoneExportSidecarBuilder.build(inputs)
+            try payload.write(to: sidecarURL, options: [.atomic])
+            return sidecarURL.absoluteString
+        } catch {
+            filmtonePreviewCompositionDebugLog(
+                "sidecar write failed at \(sidecarURL.path): \(error.localizedDescription)"
+            )
+            return nil
+        }
     }
 
     private func exportVideo(
@@ -900,11 +958,36 @@ final class FilmtoneExportSession {
         guard let kernel = OpticalKernels.vignette else {
             return image
         }
+
+        let optics = request.sourceProbe?.cameraOptics
+        let resolved = FilmtoneRayAngleOptics.resolve(
+            optics: optics,
+            imageWidth: Double(image.extent.width),
+            imageHeight: Double(image.extent.height)
+        )
+        let opticsPack = FilmtoneRayAngleOptics.kernelArgs(
+            resolved: resolved,
+            imageWidth: Double(image.extent.width),
+            imageHeight: Double(image.extent.height)
+        )
+        // Mask only activates on trustworthy lens metadata — `"assumed"` /
+        // nil / `"fallback65"` sources keep vignette byte-identical with
+        // pre-Stream-2 output. Gamma / inner come from the shared contract
+        // defaults so the ray-angle math stays locked to SSOT rather than
+        // Swift-side constants.
+        let applyMask: Double = (optics?.source == "metadata") ? 1.0 : 0.0
+        let gamma = FilmtonePhase0Generated.hiddenDefaults.depthRayAngleGamma
+        let innerThreshold = FilmtonePhase0Generated.hiddenDefaults.depthRayAngleInnerThreshold
+
         return kernel.apply(extent: image.extent, arguments: [
             image,
             params.vignette,
             Self.extentOriginVector(for: image.extent),
             Self.extentSizeVector(for: image.extent),
+            gamma,
+            innerThreshold,
+            opticsPack,
+            applyMask,
         ]) ?? image
     }
 
@@ -1628,6 +1711,16 @@ private func filmtonePreviewCompositionDebugLog(_ message: @autoclosure () -> St
     #endif
 }
 
+extension ISO8601DateFormatter {
+    /// Shared formatter used by the export sidecar writer. Configured to emit
+    /// millisecond-precision UTC stamps (e.g. `2026-04-24T12:00:00.000Z`).
+    static let filmtoneSidecar: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+}
+
 private struct PreparedLut {
     let size: Int
     let intensity: Double
@@ -1730,12 +1823,41 @@ kernel vec4 glowComposite(__sample base, __sample bloom, __sample halation, __sa
 }
 """)
 
+    // Vignette kernel with optional ray-angle field mask (T3, Stream 2, v1.1).
+    //
+    // `opticsPack` = vec3(tanHalfFovX, tanHalfFovY, referenceIncidence).
+    // `applyMask` is 1.0 only when `cameraOptics.source == "metadata"`;
+    // for `"assumed"` / nil / fallback65 sources it stays 0.0.
+    //
+    // Math note: the mask must modulate the *darkening amount*, not the final
+    // pixel multiplier. At the center `mask = 0` (no edge falloff); applying
+    // that as a final multiplier would drive the center to black. Instead we
+    // fold the mask into `intensity * dist^2` so the center always stays
+    // untouched (`vig = 1.0`) and only the edge falloff is scaled by
+    // optics-aware weight. When `applyMask = 0`, `effectiveMask = 1.0` and
+    // the formula collapses to the original `1 - intensity * dist^2`,
+    // byte-identical with pre-Stream-2 output.
     static let vignette = CIColorKernel(source: """
-kernel vec4 vignette(__sample image, float intensity, vec2 extentOrigin, vec2 extentSize) {
+kernel vec4 vignette(__sample image, float intensity, vec2 extentOrigin, vec2 extentSize, float rayAngleGamma, float rayAngleInner, vec3 opticsPack, float applyMask) {
     vec4 color = image;
     vec2 uv = (destCoord() - extentOrigin) / extentSize;
     float dist = length(uv - vec2(0.5, 0.5)) * 1.414;
-    float vig = 1.0 - intensity * dist * dist;
+
+    vec2 sensor = (uv - vec2(0.5, 0.5)) * 2.0;
+    float rayX = sensor.x * opticsPack.x;
+    float rayY = sensor.y * opticsPack.y;
+    float viewZ = 1.0 / sqrt(rayX * rayX + rayY * rayY + 1.0);
+    float incidence = 1.0 - viewZ;
+    float refIncidence = max(opticsPack.z, 1.0e-5);
+    float normalized = clamp(incidence / refIncidence, 0.0, 1.0);
+    float gammaSafe = max(rayAngleGamma, 0.001);
+    float innerSafe = clamp(rayAngleInner, 0.0, 0.8);
+    float shaped = pow(normalized, gammaSafe);
+    float t = clamp((shaped - innerSafe) / max(1.0 - innerSafe, 1.0e-6), 0.0, 1.0);
+    float mask = t * t * (3.0 - 2.0 * t);
+    float effectiveMask = mix(1.0, mask, clamp(applyMask, 0.0, 1.0));
+
+    float vig = 1.0 - intensity * dist * dist * effectiveMask;
     color.rgb *= clamp(vig, 0.0, 1.0);
     return color;
 }

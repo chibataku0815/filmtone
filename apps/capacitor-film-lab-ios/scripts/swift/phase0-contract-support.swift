@@ -26,6 +26,62 @@ struct CameraOpticsDTO: Codable {
     let cameraModel: String?
 }
 
+// MARK: - Source video metadata (T1 HDR + T4 display/timing)
+
+enum SourceColorClassDTO: String, Codable {
+    case sdrBt709         = "sdr-bt709"
+    case hdrPq            = "hdr-pq"
+    case hdrHlg           = "hdr-hlg"
+    case wideGamutUnknown = "wide-gamut-unknown"
+    case unknown          = "unknown"
+}
+
+enum HdrPreparationStrategyDTO: String, Codable {
+    case none                = "none"
+    case coreImageToneMapSdr = "core-image-tone-map-sdr"
+    case deferVisibleWarning = "defer-visible-warning"
+}
+
+struct HdrPreparationPolicyDTO: Codable {
+    let strategy: HdrPreparationStrategyDTO
+    let reason: String
+    let requiresFixtureValidation: Bool
+    let warning: String?
+}
+
+struct SourceColorMetadataDTO: Codable {
+    let colorRange: String?
+    let colorSpace: String?
+    let colorTransfer: String?
+    let colorPrimaries: String?
+    let hasMasteringDisplayMetadata: Bool
+    let hasContentLightMetadata: Bool
+}
+
+struct SourceDisplayGeometryDTO: Codable {
+    let rawWidth: Int
+    let rawHeight: Int
+    let displayWidth: Int
+    let displayHeight: Int
+    let rotationDeg: Int?
+    let source: String
+}
+
+struct SourceVideoTimingMetadataDTO: Codable {
+    let nominalFrameRate: Double?
+    let estimatedFrameRate: Double?
+    let sourceFrameRateTrusted: Bool
+    let trustReason: String
+}
+
+struct SourceVideoMetadataDTO: Codable {
+    let display: SourceDisplayGeometryDTO
+    let color: SourceColorMetadataDTO
+    let colorClass: SourceColorClassDTO
+    let hdrPreparationPolicy: HdrPreparationPolicyDTO?
+    let timing: SourceVideoTimingMetadataDTO?
+}
+
 struct SourceProbeDTO: Codable {
     let uri: String
     let filename: String
@@ -38,6 +94,7 @@ struct SourceProbeDTO: Codable {
     let codec: String?
     let frameRate: Double?
     let cameraOptics: CameraOpticsDTO?
+    let sourceVideoMetadata: SourceVideoMetadataDTO?
 }
 
 struct Phase0OutputProfileDTO: Codable, Equatable {

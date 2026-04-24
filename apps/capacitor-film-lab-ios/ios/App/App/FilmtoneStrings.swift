@@ -116,6 +116,19 @@ struct FilmtoneStrings {
     let genericSaveToPhotosError: String
     let genericShareError: String
     let genericPreviewError: String
+    // MARK: - HDR policy notice (T1 v1.1)
+    let hdrNoticeTitle: String
+    let hdrNoticeBodyPq: String
+    let hdrNoticeBodyHlg: String
+    let hdrNoticeBodyWideGamutUnknown: String
+    // MARK: - Camera optics label (T5 v1.1)
+    let opticsSourceMetadata: String
+    let opticsSourceAssumed: String
+    let opticsSourceAccessibilityMetadata: String
+    let opticsSourceAccessibilityAssumed: String
+    let opticsHfovFormat: String
+    let opticsSeparator: String
+    let opticsMetricLabel: String
 }
 
 extension FilmtoneStrings {
@@ -537,6 +550,69 @@ extension FilmtoneStrings {
             "filmtone.error.generic.preview",
             defaultValue: "Preview couldn't be generated.",
             comment: "Fallback error for preview rendering."
+        )
+        // MARK: HDR policy notice (v1.1)
+        hdrNoticeTitle = filmtoneLocalized(
+            "filmtone.hdr.notice.title",
+            defaultValue: prefersJapanese ? "HDR ソースの取り扱い" : "HDR source handling",
+            comment: "Title for the inline HDR preparation policy notice."
+        )
+        hdrNoticeBodyPq = filmtoneLocalized(
+            "filmtone.hdr.notice.body.pq",
+            defaultValue: prefersJapanese
+                ? "HDR (PQ) ソースを検出しました。iOS 書き出し時に SDR に変換される場合があります。ダイナミックレンジが圧縮される可能性があります。"
+                : "HDR (PQ) source detected. It may be converted to SDR when exporting on iOS, and dynamic range could be compressed.",
+            comment: "Body text shown when a PQ HDR source is loaded."
+        )
+        hdrNoticeBodyHlg = filmtoneLocalized(
+            "filmtone.hdr.notice.body.hlg",
+            defaultValue: prefersJapanese
+                ? "HDR (HLG) ソースを検出しました。iOS 書き出し時に SDR に変換される場合があります。"
+                : "HDR (HLG) source detected. It may be converted to SDR when exporting on iOS.",
+            comment: "Body text shown when an HLG HDR source is loaded."
+        )
+        hdrNoticeBodyWideGamutUnknown = filmtoneLocalized(
+            "filmtone.hdr.notice.body.wideGamutUnknown",
+            defaultValue: prefersJapanese
+                ? "広色域ソースですが HDR transfer を判定できません。SDR として書き出しますが、色の扱いは要確認です。"
+                : "Wide-gamut source, but the HDR transfer function could not be identified. Export will proceed as SDR — please verify colour handling.",
+            comment: "Body text shown when the source is wide-gamut but transfer is unknown."
+        )
+        // MARK: Camera optics label (v1.1)
+        opticsSourceMetadata = filmtoneLocalized(
+            "filmtone.optics.source.metadata",
+            defaultValue: prefersJapanese ? "メタデータ" : "metadata",
+            comment: "Trailing tag shown on camera optics label when values came from source metadata."
+        )
+        opticsSourceAssumed = filmtoneLocalized(
+            "filmtone.optics.source.assumed",
+            defaultValue: prefersJapanese ? "推定" : "assumed",
+            comment: "Trailing tag shown on camera optics label when values were inferred from defaults."
+        )
+        opticsSourceAccessibilityMetadata = filmtoneLocalized(
+            "filmtone.optics.source.accessibility.metadata",
+            defaultValue: prefersJapanese ? "メタデータから取得" : "from camera metadata",
+            comment: "VoiceOver phrasing for metadata-sourced optics."
+        )
+        opticsSourceAccessibilityAssumed = filmtoneLocalized(
+            "filmtone.optics.source.accessibility.assumed",
+            defaultValue: prefersJapanese ? "既定値で推定" : "assumed defaults",
+            comment: "VoiceOver phrasing for assumed optics."
+        )
+        opticsHfovFormat = filmtoneLocalized(
+            "filmtone.optics.label.hfov",
+            defaultValue: "HFOV %@°",
+            comment: "Format string for horizontal field of view (degree sign literal)."
+        )
+        opticsSeparator = filmtoneLocalized(
+            "filmtone.optics.label.separator",
+            defaultValue: "・",
+            comment: "Separator used between metadata segments in the optics label."
+        )
+        opticsMetricLabel = filmtoneLocalized(
+            "filmtone.metric.optics",
+            defaultValue: prefersJapanese ? "光学系" : "Optics",
+            comment: "Metric card label shown above the camera optics detail in the export panel."
         )
     }
 

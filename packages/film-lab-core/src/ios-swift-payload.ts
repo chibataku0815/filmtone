@@ -16,7 +16,13 @@ import {
   type Phase0Params,
 } from "./phase0-schema";
 import { FILMTONE_IOS_PRESET_OVERRIDES } from "./ios-preset-overrides";
-import { PRESETS, type PresetName } from "./presets";
+import {
+  CONTRACT_DEFAULTS,
+  PRESETS,
+  type ContractDefaultKey,
+  type PresetName,
+} from "./presets";
+import type { Params } from "./params";
 import {
   DEFAULT_QUICK_STATE,
   QUICK_AXIS_DEFAULT_RANGE,
@@ -45,6 +51,18 @@ export interface FilmtoneIosSwiftPayload {
   resetParams: Phase0Params;
   presets: Record<PresetName, Phase0Params>;
   quickWeights: Record<QuickAxisId, Partial<Record<keyof Phase0Params, number>>>;
+  /**
+   * Hidden default values that are not user-tunable in iOS Phase 0 but must
+   * match Desktop / WebGPU CONTRACT_DEFAULTS exactly so that drift between
+   * platforms is impossible. The source of truth is
+   * `packages/film-lab-core/src/presets.ts::CONTRACT_DEFAULTS`.
+   *
+   * The iOS renderer emits these into `FilmtonePhase0Generated.hiddenDefaults`
+   * (struct `FilmtonePhase0HiddenDefaults`). Field order follows the
+   * declaration order of ContractDefaultKey so the generated Swift diff is
+   * stable across generator runs.
+   */
+  hiddenDefaults: Readonly<Pick<Params, ContractDefaultKey>>;
 }
 
 export function buildFilmtoneIosPresetMap(
@@ -88,8 +106,39 @@ export function buildFilmtoneIosSwiftPayload(): FilmtoneIosSwiftPayload {
       QuickAxisId,
       Partial<Record<keyof Phase0Params, number>>
     >,
+    hiddenDefaults: CONTRACT_DEFAULTS,
   };
 }
+
+/**
+ * Declaration-order list of ContractDefaultKey. Kept in sync by hand with
+ * `presets.ts`; the ios-swift-payload test asserts this ordering against
+ * `Object.keys(CONTRACT_DEFAULTS)` so a divergence fails CI before drift
+ * reaches the generated Swift file.
+ */
+const CONTRACT_DEFAULT_KEY_ORDER: readonly ContractDefaultKey[] = [
+  "depthMistGain",
+  "depthGlowGain",
+  "depthRayAngleGamma",
+  "depthRayAngleInnerThreshold",
+  "depthMistRayAngleGain",
+  "depthBloomRayAngleGain",
+  "depthHalationRayAngleGain",
+  "depthMistFieldPsfGain",
+  "depthBloomFieldPsfGain",
+  "depthHalationFieldPsfGain",
+  "depthMistFieldPsfRadiusPx",
+  "depthBloomFieldPsfRadiusPx",
+  "depthHalationFieldPsfRadiusPx",
+  "crossFilterDepthGain",
+  "crossFilterAngleGain",
+  "crossFilterAngleGamma",
+  "crossFilterAngleInnerThreshold",
+  "crossFilterEdgeLengthGain",
+  "crossFilterEdgeStrengthGain",
+];
+
+export { CONTRACT_DEFAULT_KEY_ORDER };
 
 function renderSwiftString(value: string): string {
   return JSON.stringify(value);
@@ -149,6 +198,20 @@ function renderQuickWeights(
   ].join("\n");
 }
 
+function renderHiddenDefaults(
+  hiddenDefaults: Readonly<Pick<Params, ContractDefaultKey>>,
+): string {
+  const lines = CONTRACT_DEFAULT_KEY_ORDER.map((key, index) => {
+    const suffix = index === CONTRACT_DEFAULT_KEY_ORDER.length - 1 ? "" : ",";
+    return `        ${key}: ${renderSwiftNumber(hiddenDefaults[key])}${suffix}`;
+  });
+  return [
+    "FilmtonePhase0HiddenDefaults(",
+    lines.join("\n"),
+    "    )",
+  ].join("\n");
+}
+
 export function renderFilmtoneIosSwiftPayload(payload = buildFilmtoneIosSwiftPayload()): string {
   const resetParams = renderPhase0ParamsInit(payload.resetParams, "        ").replace(/^/gm, "    ");
   return `import Foundation
@@ -183,6 +246,7 @@ enum FilmtonePhase0Generated {
     static let resetParams: FilmtonePhase0Params =
 ${resetParams}
     static let paramsByName: [String: FilmtonePhase0Params] = ${renderPresetMap(payload.presets)}
+    static let hiddenDefaults = ${renderHiddenDefaults(payload.hiddenDefaults)}
     static let quickWeights: [String: [String: Double]] = ${renderQuickWeights(payload.quickWeights)}
 }
 `;

@@ -58,6 +58,12 @@ struct FilmtoneExportPanel: View {
                     MetricCard(label: store.strings.strengthLabel, value: percentLabel(store.project.strength))
                     MetricCard(label: store.strings.cameraLabel, value: store.project.inputLut?.title ?? store.strings.cameraAuto)
                 }
+
+                if let opticsLabel = store.cameraOpticsLabel {
+                    MetricCard(label: store.strings.opticsMetricLabel, value: opticsLabel)
+                        .accessibilityLabel(store.cameraOpticsAccessibilityLabel ?? opticsLabel)
+                        .accessibilityIdentifier("filmtone.metric.optics.ready")
+                }
             }
         }
         .padding(.vertical, 16)
@@ -165,6 +171,11 @@ struct FilmtoneExportPanel: View {
                 MetricCard(label: store.strings.metricsFileSize, value: store.strings.byteLabel(result.fileSizeBytes))
                 MetricCard(label: store.strings.cameraLabel, value: store.project.inputLut?.title ?? store.strings.cameraAuto)
                 MetricCard(label: store.strings.metricsSaveToPhotos, value: store.strings.saveStateLabel(store.saveToPhotosState))
+                if let opticsLabel = store.cameraOpticsLabel {
+                    MetricCard(label: store.strings.opticsMetricLabel, value: opticsLabel)
+                        .accessibilityLabel(store.cameraOpticsAccessibilityLabel ?? opticsLabel)
+                        .accessibilityIdentifier("filmtone.metric.optics.finished")
+                }
             }
 
             HStack(spacing: 12) {

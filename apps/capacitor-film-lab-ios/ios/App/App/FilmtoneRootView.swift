@@ -33,6 +33,12 @@ struct FilmtoneRootView: View {
                 if let sourceLoadState = store.sourceLoadState {
                     sourceLoadBanner(sourceLoadState)
                 }
+                if store.source != nil, FilmtoneHdrPolicyNotice.shouldSurface(store.hdrPolicy) {
+                    FilmtoneHdrPolicyNotice(
+                        policy: store.hdrPolicy,
+                        strings: store.strings
+                    )
+                }
             }
         }
         .sheet(isPresented: $strengthSheetPresented) {
