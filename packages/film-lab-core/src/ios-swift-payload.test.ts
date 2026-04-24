@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { FILMTONE_IOS_PRESET_OVERRIDES } from "./ios-preset-overrides";
 import {
+  CONTRACT_DEFAULT_KEY_ORDER,
   buildFilmtoneIosPresetMap,
   buildFilmtoneIosSwiftPayload,
   renderFilmtoneIosSwiftPayload,
@@ -12,7 +13,7 @@ import {
   phase0ParamsSchema,
   pickPhase0Params,
 } from "./phase0-schema";
-import { PRESETS, type PresetName } from "./presets";
+import { CONTRACT_DEFAULTS, PRESETS, type PresetName } from "./presets";
 
 const EXPECTED_CINEMATIC_IOS_ENVELOPE = {
   contrast: 1.24,
@@ -88,4 +89,70 @@ test("iOS override leaves shared PRESETS byte-identical for all presets", () => 
   for (const name of presetNames) {
     expect(() => phase0ParamsSchema.parse(presetMap[name])).not.toThrow();
   }
+});
+
+test("iOS swift payload exposes hiddenDefaults that deep-equal CONTRACT_DEFAULTS", () => {
+  const payload = buildFilmtoneIosSwiftPayload();
+
+  expect(payload.hiddenDefaults).toEqual(CONTRACT_DEFAULTS);
+  expect(Object.keys(payload.hiddenDefaults)).toHaveLength(19);
+  // Spot-check a few canonical values (T3 Stream 2 consumes depthRayAngle*)
+  expect(payload.hiddenDefaults.depthRayAngleGamma).toBe(1.4);
+  expect(payload.hiddenDefaults.depthRayAngleInnerThreshold).toBe(0.1);
+  expect(payload.hiddenDefaults.crossFilterEdgeLengthGain).toBe(0.45);
+  expect(payload.hiddenDefaults.depthMistFieldPsfRadiusPx).toBe(18);
+});
+
+test("iOS swift payload rendering emits static let hiddenDefaults block", () => {
+  const rendered = renderFilmtoneIosSwiftPayload();
+
+  expect(rendered).toContain(
+    "static let hiddenDefaults = FilmtonePhase0HiddenDefaults(",
+  );
+  // Distant key sanity check — catches a half-emitted block that would
+  // compile-fail against FilmtonePhase0HiddenDefaults(19 fields).
+  expect(rendered).toContain("crossFilterEdgeStrengthGain: 0.25");
+  expect(rendered).toContain("depthRayAngleGamma: 1.4");
+});
+
+test("CONTRACT_DEFAULT_KEY_ORDER matches CONTRACT_DEFAULTS declaration order", () => {
+  // Guard against the ordered list in ios-swift-payload.ts drifting away
+  // from the actual CONTRACT_DEFAULTS object in presets.ts. Object literal
+  // key order in TS is preserved at runtime, so Object.keys() reflects
+  // declaration order.
+  expect(CONTRACT_DEFAULT_KEY_ORDER).toEqual(Object.keys(CONTRACT_DEFAULTS));
+});
+
+test("rendered hiddenDefaults block emits fields in ContractDefaultKey declaration order", () => {
+  const rendered = renderFilmtoneIosSwiftPayload();
+  const blockStart = rendered.indexOf("static let hiddenDefaults = FilmtonePhase0HiddenDefaults(");
+  expect(blockStart).toBeGreaterThan(-1);
+  const blockEnd = rendered.indexOf("\n    )", blockStart);
+  expect(blockEnd).toBeGreaterThan(blockStart);
+  const block = rendered.slice(blockStart, blockEnd);
+
+  const observedOrder: string[] = [];
+  for (const key of CONTRACT_DEFAULT_KEY_ORDER) {
+    const offset = block.indexOf(`${key}:`);
+    expect(offset).toBeGreaterThan(-1);
+    observedOrder.push(key);
+    // strip everything up to and including this hit so later indexOf calls
+    // only find fields that appear AFTER the current one
+  }
+
+  // Ensure each expected key's offset is strictly monotonically increasing
+  const offsets = CONTRACT_DEFAULT_KEY_ORDER.map((key) => block.indexOf(`${key}:`));
+  for (let i = 1; i < offsets.length; i++) {
+    expect(offsets[i]).toBeGreaterThan(offsets[i - 1]);
+  }
+  expect(observedOrder).toEqual([...CONTRACT_DEFAULT_KEY_ORDER]);
+});
+
+test("iOS preset overrides never mutate hiddenDefaults values", () => {
+  const payload = buildFilmtoneIosSwiftPayload();
+  // iOS preset overrides are applied to Phase0 params (subset of Params),
+  // and none of the CONTRACT_DEFAULT_KEYs are in the Phase0 param subset,
+  // so hiddenDefaults MUST remain byte-identical to CONTRACT_DEFAULTS even
+  // after the overrides run.
+  expect(payload.hiddenDefaults).toEqual(CONTRACT_DEFAULTS);
 });

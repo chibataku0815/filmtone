@@ -370,6 +370,27 @@ enum FilmtonePhase0Generated {
             grainIntensity: 0.01
         )
     ]
+    static let hiddenDefaults = FilmtonePhase0HiddenDefaults(
+        depthMistGain: 0.0,
+        depthGlowGain: 0.0,
+        depthRayAngleGamma: 1.4,
+        depthRayAngleInnerThreshold: 0.1,
+        depthMistRayAngleGain: 0.35,
+        depthBloomRayAngleGain: 0.25,
+        depthHalationRayAngleGain: 0.18,
+        depthMistFieldPsfGain: 1.0,
+        depthBloomFieldPsfGain: 1.0,
+        depthHalationFieldPsfGain: 1.0,
+        depthMistFieldPsfRadiusPx: 18.0,
+        depthBloomFieldPsfRadiusPx: 9.0,
+        depthHalationFieldPsfRadiusPx: 12.0,
+        crossFilterDepthGain: 0.25,
+        crossFilterAngleGain: 0.35,
+        crossFilterAngleGamma: 1.4,
+        crossFilterAngleInnerThreshold: 0.1,
+        crossFilterEdgeLengthGain: 0.45,
+        crossFilterEdgeStrengthGain: 0.25
+    )
     static let quickWeights: [String: [String: Double]] = [
         "filmCharacter": [
             "saturation": 0.24,
