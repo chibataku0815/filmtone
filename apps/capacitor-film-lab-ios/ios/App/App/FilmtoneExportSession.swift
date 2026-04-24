@@ -972,12 +972,12 @@ final class FilmtoneExportSession {
         )
         // Mask only activates on trustworthy lens metadata — `"assumed"` /
         // nil / `"fallback65"` sources keep vignette byte-identical with
-        // pre-Stream-2 output. Stream 4 will route gamma / inner through
-        // `FilmtonePhase0Generated.hiddenDefaults`; the constants below are
-        // the same values (1.4 / 0.1).
+        // pre-Stream-2 output. Gamma / inner come from the shared contract
+        // defaults so the ray-angle math stays locked to SSOT rather than
+        // Swift-side constants.
         let applyMask: Double = (optics?.source == "metadata") ? 1.0 : 0.0
-        let gamma = FilmtoneRayAngleOptics.defaultGamma
-        let innerThreshold = FilmtoneRayAngleOptics.defaultInnerThreshold
+        let gamma = FilmtonePhase0Generated.hiddenDefaults.depthRayAngleGamma
+        let innerThreshold = FilmtonePhase0Generated.hiddenDefaults.depthRayAngleInnerThreshold
 
         return kernel.apply(extent: image.extent, arguments: [
             image,
