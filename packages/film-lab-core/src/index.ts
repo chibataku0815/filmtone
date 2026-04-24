@@ -21,6 +21,7 @@ export {
 export {
   filmLabDepthTrackSchema,
   filmLabParamsSchema,
+  cameraOpticsSchema,
   filmLookGradeInputSchema,
   filmLookSpikeInputSchema,
   gradeMatchesPreset,

@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => {
     setTexture: vi.fn(),
     setParams: vi.fn(),
     setDepthFromBitmap: vi.fn(),
+    setCameraOptics: vi.fn(),
     setLUT1: vi.fn(),
     setLUT1Intensity: vi.fn(),
     clearLUT1: vi.fn(),
@@ -143,6 +144,7 @@ describe("createWebGPUOffscreenRenderSession", () => {
     });
     session.setRenderSize(1920, 1080);
     session.setGrade(makeGrade());
+    session.setCameraOptics({ source: "metadata", fovXDeg: 63 });
     session.setTime(1.25);
     session.resetMotionBlurHistory();
     session.render();
@@ -158,6 +160,10 @@ describe("createWebGPUOffscreenRenderSession", () => {
     expect(uploadedBitmap).toBeTruthy();
     expect(mocks.viewport.setResolution).toHaveBeenCalledWith(1920, 1080);
     expect(mocks.viewport.setParams).toHaveBeenCalledTimes(1);
+    expect(mocks.viewport.setCameraOptics).toHaveBeenCalledWith({
+      source: "metadata",
+      fovXDeg: 63,
+    });
     expect(mocks.viewport.setLUT1).toHaveBeenCalledTimes(1);
     expect(mocks.viewport.setLUT2).toHaveBeenCalledTimes(1);
     expect(mocks.viewport.setTime).toHaveBeenCalledWith(1.25);

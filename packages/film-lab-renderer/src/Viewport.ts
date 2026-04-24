@@ -32,6 +32,7 @@
  */
 
 import type * as THREE from "three";
+import type { CameraOptics } from "film-lab-core";
 import { WebGLBackend, type ViewportOptions } from "./webgl/WebGLBackend";
 import { filmlabVertexShader } from "./webgl/shaders/filmlab.vert";
 import { filmlabFragmentShader } from "./webgl/shaders/filmlab.frag";
@@ -191,6 +192,14 @@ export class Viewport {
    */
   setDepthFromBitmap(bitmap: ImageBitmap): void {
     this.webgpuBackend?.setDepthFromBitmap(bitmap);
+  }
+
+  /**
+   * Camera optics are consumed by the WebGPU ray-angle model. WebGL keeps
+   * legacy behavior and ignores the value.
+   */
+  setCameraOptics(optics: CameraOptics | null): void {
+    this.webgpuBackend?.setCameraOptics(optics);
   }
 
   setImageResolution(width: number, height: number): void {

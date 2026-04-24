@@ -1,4 +1,5 @@
 import type * as THREE from "three";
+import type { CameraOptics } from "film-lab-core";
 import type { BatchGradeState } from "../batch-pipeline";
 import type { BatchDepthTrack } from "../depth-track";
 
@@ -28,6 +29,7 @@ export interface OffscreenRenderSession {
   setRenderSize(width: number, height: number): void;
   setSource(source: OffscreenRenderSource): void | Promise<void>;
   setGrade(grade: BatchGradeState): void;
+  setCameraOptics(cameraOptics: CameraOptics | null): void;
   setDepthTrack(depthTrack: BatchDepthTrack | null): void | Promise<void>;
   setTime(timeSeconds: number): void;
   resetMotionBlurHistory(): void;

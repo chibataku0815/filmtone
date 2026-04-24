@@ -232,6 +232,7 @@ describe("filmLabParamsSchema", () => {
       crossFilterDepthGain: _omitDepth,
       crossFilterAngleGain: _omitAngle,
       crossFilterAngleGamma: _omitGamma,
+      crossFilterAngleInnerThreshold: _omitInner,
       crossFilterEdgeLengthGain: _omitLength,
       crossFilterEdgeStrengthGain: _omitStrength,
       ...rest
@@ -242,8 +243,41 @@ describe("filmLabParamsSchema", () => {
       expect(r.data.crossFilterDepthGain).toBe(0.25);
       expect(r.data.crossFilterAngleGain).toBe(0.35);
       expect(r.data.crossFilterAngleGamma).toBe(1.4);
+      expect(r.data.crossFilterAngleInnerThreshold).toBe(0.1);
       expect(r.data.crossFilterEdgeLengthGain).toBe(0.45);
       expect(r.data.crossFilterEdgeStrengthGain).toBe(0.25);
+    }
+  });
+
+  test("depth ray-angle / field PSF hidden controls 省略時は推奨既定値", () => {
+    const {
+      depthRayAngleGamma: _omitGamma,
+      depthRayAngleInnerThreshold: _omitInner,
+      depthMistRayAngleGain: _omitMistAngle,
+      depthBloomRayAngleGain: _omitBloomAngle,
+      depthHalationRayAngleGain: _omitHalationAngle,
+      depthMistFieldPsfGain: _omitMistPsfGain,
+      depthBloomFieldPsfGain: _omitBloomPsfGain,
+      depthHalationFieldPsfGain: _omitHalationPsfGain,
+      depthMistFieldPsfRadiusPx: _omitMistPsfRadius,
+      depthBloomFieldPsfRadiusPx: _omitBloomPsfRadius,
+      depthHalationFieldPsfRadiusPx: _omitHalationPsfRadius,
+      ...rest
+    } = PRESETS.cinematic;
+    const r = filmLabParamsSchema.safeParse(rest);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.depthRayAngleGamma).toBe(1.4);
+      expect(r.data.depthRayAngleInnerThreshold).toBe(0.1);
+      expect(r.data.depthMistRayAngleGain).toBe(0.35);
+      expect(r.data.depthBloomRayAngleGain).toBe(0.25);
+      expect(r.data.depthHalationRayAngleGain).toBe(0.18);
+      expect(r.data.depthMistFieldPsfGain).toBe(1);
+      expect(r.data.depthBloomFieldPsfGain).toBe(1);
+      expect(r.data.depthHalationFieldPsfGain).toBe(1);
+      expect(r.data.depthMistFieldPsfRadiusPx).toBe(18);
+      expect(r.data.depthBloomFieldPsfRadiusPx).toBe(9);
+      expect(r.data.depthHalationFieldPsfRadiusPx).toBe(12);
     }
   });
 
@@ -316,20 +350,93 @@ describe("filmLabParamsSchema", () => {
     }
   });
 
-  test("crossFilterAngleGamma は 0.1–4 の範囲だけ受理する", () => {
-    for (const val of [0.1, 1.4, 4]) {
-      const r = filmLabParamsSchema.safeParse({
-        ...PRESETS.cinematic,
-        crossFilterAngleGamma: val,
-      });
-      expect(r.success).toBe(true);
+  test("depth ray-angle / field PSF gains が 0–1 の境界値を受理する", () => {
+    for (const key of [
+      "depthMistRayAngleGain",
+      "depthBloomRayAngleGain",
+      "depthHalationRayAngleGain",
+      "depthMistFieldPsfGain",
+      "depthBloomFieldPsfGain",
+      "depthHalationFieldPsfGain",
+    ] as const) {
+      for (const val of [0, 1]) {
+        const r = filmLabParamsSchema.safeParse({
+          ...PRESETS.cinematic,
+          [key]: val,
+        });
+        expect(r.success).toBe(true);
+      }
+      for (const val of [-0.1, 1.1]) {
+        const r = filmLabParamsSchema.safeParse({
+          ...PRESETS.cinematic,
+          [key]: val,
+        });
+        expect(r.success).toBe(false);
+      }
     }
-    for (const val of [0.09, 4.1]) {
-      const r = filmLabParamsSchema.safeParse({
-        ...PRESETS.cinematic,
-        crossFilterAngleGamma: val,
-      });
-      expect(r.success).toBe(false);
+  });
+
+  test("ray-angle gamma は 0.1–4 の範囲だけ受理する", () => {
+    for (const key of ["depthRayAngleGamma", "crossFilterAngleGamma"] as const) {
+      for (const val of [0.1, 1.4, 4]) {
+        const r = filmLabParamsSchema.safeParse({
+          ...PRESETS.cinematic,
+          [key]: val,
+        });
+        expect(r.success).toBe(true);
+      }
+      for (const val of [0.09, 4.1]) {
+        const r = filmLabParamsSchema.safeParse({
+          ...PRESETS.cinematic,
+          [key]: val,
+        });
+        expect(r.success).toBe(false);
+      }
+    }
+  });
+
+  test("ray-angle inner threshold は 0–0.8 の範囲だけ受理する", () => {
+    for (const key of [
+      "depthRayAngleInnerThreshold",
+      "crossFilterAngleInnerThreshold",
+    ] as const) {
+      for (const val of [0, 0.1, 0.8]) {
+        const r = filmLabParamsSchema.safeParse({
+          ...PRESETS.cinematic,
+          [key]: val,
+        });
+        expect(r.success).toBe(true);
+      }
+      for (const val of [-0.1, 0.81]) {
+        const r = filmLabParamsSchema.safeParse({
+          ...PRESETS.cinematic,
+          [key]: val,
+        });
+        expect(r.success).toBe(false);
+      }
+    }
+  });
+
+  test("field PSF radius は 0–64px の範囲だけ受理する", () => {
+    for (const key of [
+      "depthMistFieldPsfRadiusPx",
+      "depthBloomFieldPsfRadiusPx",
+      "depthHalationFieldPsfRadiusPx",
+    ] as const) {
+      for (const val of [0, 12, 64]) {
+        const r = filmLabParamsSchema.safeParse({
+          ...PRESETS.cinematic,
+          [key]: val,
+        });
+        expect(r.success).toBe(true);
+      }
+      for (const val of [-0.1, 64.1]) {
+        const r = filmLabParamsSchema.safeParse({
+          ...PRESETS.cinematic,
+          [key]: val,
+        });
+        expect(r.success).toBe(false);
+      }
     }
   });
 });
@@ -398,5 +505,35 @@ describe("filmLookGradeInputSchema", () => {
       },
     });
     expect(r.success).toBe(true);
+  });
+
+  test("cameraOptics を付けて受理する", () => {
+    const r = filmLookGradeInputSchema.safeParse({
+      lookPresetId: LOOK_ID_BY_PRESET.portra,
+      presetVersion: PRESET_VERSION,
+      grade: PRESETS.portra,
+      cameraOptics: {
+        source: "metadata",
+        fovXDeg: 54.4,
+        fovYDeg: 32.3,
+        fxPx: 2400,
+        fyPx: 2400,
+        lensModel: "35mm FF equiv",
+      },
+    });
+    expect(r.success).toBe(true);
+  });
+
+  test("cameraOptics の FOV 範囲外を拒否する", () => {
+    const r = filmLookGradeInputSchema.safeParse({
+      lookPresetId: LOOK_ID_BY_PRESET.portra,
+      presetVersion: PRESET_VERSION,
+      grade: PRESETS.portra,
+      cameraOptics: {
+        source: "manual",
+        fovXDeg: 179,
+      },
+    });
+    expect(r.success).toBe(false);
   });
 });

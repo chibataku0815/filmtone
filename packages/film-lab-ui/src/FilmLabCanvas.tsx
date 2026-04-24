@@ -10,7 +10,14 @@ import {
 } from "react";
 import { useTranslations } from "next-intl";
 import * as THREE from "three";
-import { parseCube, PRESETS, halationHueToHex, type PresetName } from "film-lab-core";
+import {
+  parseCube,
+  PRESETS,
+  halationHueToHex,
+  type CameraOptics,
+  type Params,
+  type PresetName,
+} from "film-lab-core";
 import {
   isWebGL2Supported,
   isWebGPUSupported,
@@ -25,7 +32,6 @@ import {
   type ViewportContextLossInfo,
   type ViewportContextLossReason,
 } from "film-lab-renderer";
-import type { Params } from "film-lab-core";
 import { FILM_LAB_NEXT_INTL_NAMESPACE } from "./filmLabUiContract";
 import type { VideoPlaybackRate, VideoPlaybackState } from "./videoPlaybackContract";
 import {
@@ -61,6 +67,35 @@ function readDepthProbeGain(): number {
 
 function readDepthProbeFlag(): boolean {
   return readDepthProbeGain() > 0;
+}
+
+function readRayAngleProbeFlag(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return new URL(window.location.href).searchParams.get("rayAngleProbe") === "1";
+  } catch {
+    return false;
+  }
+}
+
+function rayAngleProbeOpticsLabel(
+  optics: CameraOptics | null | undefined,
+): CameraOptics["source"] | "fallback65" {
+  if (!optics) {
+    return "fallback65";
+  }
+  const hasFov = [optics.fovXDeg, optics.fovYDeg].some(
+    (value) =>
+      typeof value === "number" &&
+      Number.isFinite(value) &&
+      value >= 1 &&
+      value <= 178,
+  );
+  const hasFocalPixels = [optics.fxPx, optics.fyPx].some(
+    (value) => typeof value === "number" && Number.isFinite(value) && value > 0,
+  );
+  const hasFiniteOptics = hasFov || hasFocalPixels;
+  return hasFiniteOptics ? optics.source : "fallback65";
 }
 
 const DEPTH_TEXTURE_WIDTH = 512;
@@ -161,6 +196,7 @@ export interface FilmLabCanvasProps {
   className?: string;
   fullScreen?: boolean;
   depthTrack?: FilmLabCanvasDepthTrack | null;
+  cameraOptics?: CameraOptics | null;
   onViewportReady?: (viewport: Viewport | null) => void;
   onViewportCapabilitiesChange?: (capabilities: ViewportCapabilities | null) => void;
   onPreviewStatusChange?: (status: FilmLabCanvasPreviewStatus) => void;
@@ -355,10 +391,12 @@ function isRendererContextLost(
 function buildViewportParams(
   source: Params,
   legacyDepthProbeGain = 0,
+  rayAngleProbe = false,
 ): Record<string, number | string> {
   return {
     ...source,
     halationColor: halationHueToHex(source.halationHue),
+    ...(rayAngleProbe ? { rayAngleProbe: 1 } : {}),
     ...(legacyDepthProbeGain > 0
       ? {
           depthMistGain: legacyDepthProbeGain,
@@ -384,6 +422,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       className,
       fullScreen,
       depthTrack = null,
+      cameraOptics = null,
       onViewportReady,
       onViewportCapabilitiesChange,
       onPreviewStatusChange,
@@ -425,6 +464,13 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
   useEffect(() => {
     onPreviewStatusChangeRef.current = onPreviewStatusChange;
   }, [onPreviewStatusChange]);
+  const cameraOpticsRef = useRef<CameraOptics | null>(cameraOptics);
+  useEffect(() => {
+    cameraOpticsRef.current = cameraOptics;
+    viewportRef.current?.setCameraOptics(cameraOptics);
+  }, [cameraOptics]);
+  const rayAngleProbeEnabled = readRayAngleProbeFlag();
+  const rayAngleProbeSourceLabel = rayAngleProbeOpticsLabel(cameraOptics);
   const containerRef = useRef<HTMLDivElement>(null);
   const [viewportCapabilities, setViewportCapabilities] =
     useState<ViewportCapabilities | null>(null);
@@ -681,7 +727,9 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     const source = initialGradeParams ?? PRESETS[preset];
     const legacyDepthProbeGain =
       runtimeDepthTrackRef.current == null ? readDepthProbeGain() : 0;
-    viewport.setParams(buildViewportParams(source, legacyDepthProbeGain));
+    viewport.setParams(
+      buildViewportParams(source, legacyDepthProbeGain, readRayAngleProbeFlag()),
+    );
   }, [initialGradeParams, preset]);
 
   /**
@@ -1185,6 +1233,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       const capabilities = vp.getCapabilities();
       setViewportCapabilities(capabilities);
       onViewportCapabilitiesChangeRef.current?.(capabilities);
+      vp.setCameraOptics(cameraOpticsRef.current);
 
       if (vp.backendKind === "webgl") {
         // WebGL path: wire THREE.js renderer/scene/camera to the same canvas
@@ -1243,7 +1292,11 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       const legacyDepthProbeGain =
         runtimeDepthTrackRef.current == null ? readDepthProbeGain() : 0;
       viewport.setParams(
-        buildViewportParams(initialResolvedGradeRef.current, legacyDepthProbeGain),
+        buildViewportParams(
+          initialResolvedGradeRef.current,
+          legacyDepthProbeGain,
+          readRayAngleProbeFlag(),
+        ),
       );
       void restoreCurrentSource();
 
@@ -1837,6 +1890,12 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
   const viewportBody = (
     <>
       {chromeLayout === "overlay" ? toolbar : null}
+
+      {rayAngleProbeEnabled && (
+        <div className="pointer-events-none absolute right-3 top-3 z-[7] rounded-md bg-black/65 px-2.5 py-1 text-[10px] font-medium text-white/80 ring-1 ring-white/15 backdrop-blur-sm">
+          rayAngle {rayAngleProbeSourceLabel}
+        </div>
+      )}
 
       {compareInteractionActive && (
         <>

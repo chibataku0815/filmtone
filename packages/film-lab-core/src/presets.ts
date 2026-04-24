@@ -7,9 +7,21 @@ import {
 type ContractDefaultKey =
   | "depthMistGain"
   | "depthGlowGain"
+  | "depthRayAngleGamma"
+  | "depthRayAngleInnerThreshold"
+  | "depthMistRayAngleGain"
+  | "depthBloomRayAngleGain"
+  | "depthHalationRayAngleGain"
+  | "depthMistFieldPsfGain"
+  | "depthBloomFieldPsfGain"
+  | "depthHalationFieldPsfGain"
+  | "depthMistFieldPsfRadiusPx"
+  | "depthBloomFieldPsfRadiusPx"
+  | "depthHalationFieldPsfRadiusPx"
   | "crossFilterDepthGain"
   | "crossFilterAngleGain"
   | "crossFilterAngleGamma"
+  | "crossFilterAngleInnerThreshold"
   | "crossFilterEdgeLengthGain"
   | "crossFilterEdgeStrengthGain";
 
@@ -18,9 +30,21 @@ type BasePresetParams = Omit<Params, ContractDefaultKey>;
 const CONTRACT_DEFAULTS: Pick<Params, ContractDefaultKey> = {
   depthMistGain: 0,
   depthGlowGain: 0,
+  depthRayAngleGamma: 1.4,
+  depthRayAngleInnerThreshold: 0.1,
+  depthMistRayAngleGain: 0.35,
+  depthBloomRayAngleGain: 0.25,
+  depthHalationRayAngleGain: 0.18,
+  depthMistFieldPsfGain: 1,
+  depthBloomFieldPsfGain: 1,
+  depthHalationFieldPsfGain: 1,
+  depthMistFieldPsfRadiusPx: 18,
+  depthBloomFieldPsfRadiusPx: 9,
+  depthHalationFieldPsfRadiusPx: 12,
   crossFilterDepthGain: 0.25,
   crossFilterAngleGain: 0.35,
   crossFilterAngleGamma: 1.4,
+  crossFilterAngleInnerThreshold: 0.1,
   crossFilterEdgeLengthGain: 0.45,
   crossFilterEdgeStrengthGain: 0.25,
 } as const;

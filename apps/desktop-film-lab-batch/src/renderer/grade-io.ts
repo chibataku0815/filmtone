@@ -7,6 +7,7 @@ import {
   FILMTONE_DEFAULT_BASE_PRESET,
   lookIdForPreset,
   PRESET_VERSION,
+  type CameraOptics,
   type FilmLookGradeInputProps,
   type Params,
   type PresetName,
@@ -16,6 +17,7 @@ import type { BatchDepthTrackSource } from "./depth-track";
 
 type GradeJsonPayload = FilmLookGradeInputProps & {
   depthTrack?: BatchDepthTrackSource;
+  cameraOptics?: CameraOptics | null;
 };
 
 /**
@@ -25,6 +27,7 @@ type GradeJsonPayload = FilmLookGradeInputProps & {
 export function buildGradeJsonPayload(
   params: Params,
   depthTrack: BatchDepthTrackSource | null = null,
+  cameraOptics: CameraOptics | null = null,
 ): GradeJsonPayload {
   const preset: PresetName =
     findMatchingPreset(params) ?? FILMTONE_DEFAULT_BASE_PRESET;
@@ -33,6 +36,7 @@ export function buildGradeJsonPayload(
     presetVersion: PRESET_VERSION,
     grade: params,
     ...(depthTrack ? { depthTrack } : {}),
+    ...(cameraOptics ? { cameraOptics } : {}),
   };
 }
 
@@ -43,7 +47,8 @@ export function buildGradeJsonPayload(
 export function exportGradeJsonText(
   params: Params,
   depthTrack: BatchDepthTrackSource | null = null,
+  cameraOptics: CameraOptics | null = null,
 ): string {
-  const payload = buildGradeJsonPayload(params, depthTrack);
+  const payload = buildGradeJsonPayload(params, depthTrack, cameraOptics);
   return `${JSON.stringify(payload, null, 2)}\n`;
 }

@@ -72,3 +72,14 @@ export {
   shouldResetCrossFilterHistory,
   type CrossFilterHistorySnapshot,
 } from "./webgpu/crossFilterState";
+export {
+  DEFAULT_RAY_ANGLE_INNER_THRESHOLD,
+  RAY_ANGLE_FALLBACK_HFOV_DEG,
+  RAY_ANGLE_FOV_MAX_DEG,
+  RAY_ANGLE_FOV_MIN_DEG,
+  RAY_ANGLE_REFERENCE_TAN_HALF_HFOV,
+  rayAngleMaskValue,
+  resolveRayAngleOptics,
+  type RayAngleOpticsSource,
+  type ResolvedRayAngleOptics,
+} from "./webgpu/rayAngleOptics";

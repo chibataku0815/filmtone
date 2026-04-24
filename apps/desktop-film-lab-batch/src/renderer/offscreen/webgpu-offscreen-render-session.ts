@@ -1,4 +1,5 @@
 import { Viewport } from "film-lab-renderer";
+import type { CameraOptics } from "film-lab-core";
 import type { BatchGradeState } from "../batch-pipeline";
 import type { BatchDepthTrack } from "../depth-track";
 import { applyBatchGradeToViewport } from "./apply-batch-grade-to-viewport";
@@ -118,6 +119,10 @@ class WebGPUOffscreenRenderSessionImpl implements OffscreenRenderSession {
 
   setGrade(grade: BatchGradeState): void {
     applyBatchGradeToViewport(this.viewport, grade);
+  }
+
+  setCameraOptics(cameraOptics: CameraOptics | null): void {
+    this.viewport.setCameraOptics(cameraOptics);
   }
 
   async setDepthTrack(depthTrack: BatchDepthTrack | null): Promise<void> {

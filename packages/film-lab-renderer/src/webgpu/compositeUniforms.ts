@@ -1,22 +1,24 @@
 /**
  * compositeUniforms — TS packer for the composite.wgsl `Composite` struct.
  *
- * Phase 2 T2-3 + v1.0 parity (2026-04-19). Mirrors the 4-vec4 layout defined
+ * Phase 2 T2-3 + v1.0 parity (2026-04-19). Mirrors the 6-vec4 layout defined
  * in `shaders/composite.frag.wgsl.ts`. Numeric params fall back to neutral
  * defaults so a partial params record still yields a valid upload.
  *
- * Layout (4 vec4 × 4 floats = 16 floats = 64 bytes):
+ * Layout (6 vec4 × 4 floats = 24 floats = 96 bytes):
  *   0: (resolutionX, resolutionY, imageResX, imageResY)
  *   1: (bloomStrength, halationIntensity, vignette, grainIntensity)
  *   2: (grainSize, grainRadialMix, fitMode, time)
  *   3: (lensSoftness, aberrationEdgeSoften, diffusion, depthMistGain)
+ *   4: (tanHalfFovX, tanHalfFovY, innerThreshold, fallbackFlag)
+ *   5: (rayAngleProbe, _, _, _)
  *
  * `depthMistGain` is the shared depth-aware Mist gain (0 = uniform mist,
  * 1 = full depth modulation). Values >= 1.5 stay reserved for the internal
  * raw-depth debug view. See `composite.frag.wgsl.ts` binding(7) uDepth.
  */
 
-export const COMPOSITE_UNIFORM_FLOATS = 16;
+export const COMPOSITE_UNIFORM_FLOATS = 24;
 export const COMPOSITE_UNIFORM_BYTES = COMPOSITE_UNIFORM_FLOATS * 4;
 const ABERRATION_EDGE_SOFTEN_SCALE = 32;
 
@@ -62,6 +64,14 @@ export function packCompositeUniforms(
   // depthMistGain: 0..1 = shared depth-aware Mist modulation.
   // Values >= 1.5 are reserved for the internal raw-depth debug view.
   out[15] = Math.min(2, Math.max(0, n("depthMistGain", 0)));
+  out[16] = 0;
+  out[17] = 0;
+  out[18] = 0;
+  out[19] = 0;
+  out[20] = n("rayAngleProbe", 0);
+  out[21] = 0;
+  out[22] = 0;
+  out[23] = 0;
   return out;
 }
 

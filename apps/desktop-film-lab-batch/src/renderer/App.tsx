@@ -261,7 +261,7 @@ async function resolveBatchGradeSnapshot(
       syncedAtMs: null,
       importedFilePath: null,
       appliedOpticalRecommendation: null,
-      cameraOptics: null,
+      cameraOptics: g.cameraOptics,
     };
   }
   return {
@@ -1669,6 +1669,7 @@ export default function App() {
         exportGradeJsonText(
           batchGrade.params,
           batchGrade.depthTrack?.source ?? null,
+          sourceCameraOptics,
         ),
       ],
       {
@@ -1978,6 +1979,7 @@ export default function App() {
         : exportGradeJsonText(
             batchGrade.params,
             batchGrade.depthTrack?.source ?? null,
+            sourceCameraOptics,
           ),
       outputFilenameSuffix: sanitizeBatchFilenameSuffix(batchOutputSuffix),
     };
@@ -2420,6 +2422,7 @@ export default function App() {
                 stackedToolbarVisible={false}
                 preset={canvasPreset}
                 depthTrack={batchGrade.depthTrack}
+                cameraOptics={sourceCameraOptics}
                 initialGradeParams={canvasInitialGradeParams}
                 className="h-full min-h-0 w-full"
                 fullScreen

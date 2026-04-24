@@ -3,7 +3,7 @@ import { z } from 'zod';
 /**
  * Film Lab のグレード数値パラメータ定義（ブラウザ・Remotion 共通の単一の真実）
  */
-declare const PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "grainIntensity", "grainRadialMix", "grainSize", "vignette", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "depthMistGain", "depthGlowGain", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "fade", "highlights", "shadows", "shadowTone", "highlightTone", "shadowHue", "highlightHue", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "motionBlurAmount", "shutterAngle", "trailIntensity", "dustAmount", "scratchAmount", "shaftIntensity", "shaftDecay", "shaftOriginX", "shaftOriginY", "crossFilterStrength", "crossFilterSpikes", "crossFilterAngle", "crossFilterLength", "crossFilterThreshold", "crossFilterChromatic", "crossFilterSizeLimit", "crossFilterRandomness", "crossFilterHardMode", "crossFilterMinSpacing", "crossFilterDepthGain", "crossFilterAngleGain", "crossFilterAngleGamma", "crossFilterEdgeLengthGain", "crossFilterEdgeStrengthGain"];
+declare const PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "grainIntensity", "grainRadialMix", "grainSize", "vignette", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "depthMistGain", "depthGlowGain", "depthRayAngleGamma", "depthRayAngleInnerThreshold", "depthMistRayAngleGain", "depthBloomRayAngleGain", "depthHalationRayAngleGain", "depthMistFieldPsfGain", "depthBloomFieldPsfGain", "depthHalationFieldPsfGain", "depthMistFieldPsfRadiusPx", "depthBloomFieldPsfRadiusPx", "depthHalationFieldPsfRadiusPx", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "fade", "highlights", "shadows", "shadowTone", "highlightTone", "shadowHue", "highlightHue", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "motionBlurAmount", "shutterAngle", "trailIntensity", "dustAmount", "scratchAmount", "shaftIntensity", "shaftDecay", "shaftOriginX", "shaftOriginY", "crossFilterStrength", "crossFilterSpikes", "crossFilterAngle", "crossFilterLength", "crossFilterThreshold", "crossFilterChromatic", "crossFilterSizeLimit", "crossFilterRandomness", "crossFilterHardMode", "crossFilterMinSpacing", "crossFilterDepthGain", "crossFilterAngleGain", "crossFilterAngleGamma", "crossFilterAngleInnerThreshold", "crossFilterEdgeLengthGain", "crossFilterEdgeStrengthGain"];
 type ParamKey = (typeof PARAM_KEYS)[number];
 interface Params {
     exposure: number;
@@ -29,6 +29,28 @@ interface Params {
     depthMistGain: number;
     /** Depth-aware Glow weighting（0=uniform、1=full depth weighting）。Bloom + Halation に適用。 */
     depthGlowGain: number;
+    /** Depth ray-angle mask gamma。 */
+    depthRayAngleGamma: number;
+    /** Depth ray-angle mask の中心保護しきい値。 */
+    depthRayAngleInnerThreshold: number;
+    /** Mist source ray-angle weighting（0=off、1=max edge source boost）。 */
+    depthMistRayAngleGain: number;
+    /** Bloom source ray-angle weighting（0=off、1=max edge source boost）。 */
+    depthBloomRayAngleGain: number;
+    /** Halation source ray-angle weighting（0=off、1=max edge source boost）。 */
+    depthHalationRayAngleGain: number;
+    /** Mist field PSF gain（0=off、1=max field blur mix）。 */
+    depthMistFieldPsfGain: number;
+    /** Bloom field PSF gain（0=off、1=max field blur mix）。 */
+    depthBloomFieldPsfGain: number;
+    /** Halation field PSF gain（0=off、1=max field blur mix）。 */
+    depthHalationFieldPsfGain: number;
+    /** Mist field PSF radius in pixels。 */
+    depthMistFieldPsfRadiusPx: number;
+    /** Bloom field PSF radius in pixels。 */
+    depthBloomFieldPsfRadiusPx: number;
+    /** Halation field PSF radius in pixels。 */
+    depthHalationFieldPsfRadiusPx: number;
     halationIntensity: number;
     halationSpread: number;
     halationHue: number;
@@ -97,6 +119,8 @@ interface Params {
     crossFilterAngleGain: number;
     /** Cross filter ray-angle mask gamma。65deg hfov の斜入射近似に適用。 */
     crossFilterAngleGamma: number;
+    /** Cross filter ray-angle mask の中心保護しきい値。 */
+    crossFilterAngleInnerThreshold: number;
     /** Cross filter streak length field modulation（0=uniform、1=max edge length boost）。 */
     crossFilterEdgeLengthGain: number;
     /** Cross filter streak strength field modulation（0=uniform、1=max edge strength boost）。 */
@@ -175,186 +199,6 @@ declare function lookIdForPreset(name: PresetName): string;
 declare const LOOK_ID_BY_PRESET: Record<PresetName, string>;
 
 /**
- * 単体のグレードパラメータ（Film Lab の Params と同一形）
- */
-declare const filmLabParamsSchema: z.ZodObject<{
-    exposure: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    contrast: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    saturation: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    temperature: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    tint: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    rgbShift: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    lensSoftness: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    grainIntensity: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    grainRadialMix: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    grainSize: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    vignette: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    bloomThreshold: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    bloomStrength: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    bloomRadius: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    diffusion: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    depthMistGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    depthGlowGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    halationIntensity: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    halationSpread: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    halationHue: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    halationThreshold: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    halationRadius: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    bloomSoftKnee: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    halationSoftKnee: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    fade: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    highlights: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    shadows: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    shadowTone: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    highlightTone: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    shadowHue: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    highlightHue: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    compressionAmount: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    compressionRange: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    printContrast: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    cyan: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    magenta: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    yellow: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    motionBlurAmount: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    shutterAngle: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    trailIntensity: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    dustAmount: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    scratchAmount: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    shaftIntensity: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    shaftDecay: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    shaftOriginX: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    shaftOriginY: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    crossFilterStrength: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    crossFilterSpikes: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    crossFilterAngle: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    crossFilterLength: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    crossFilterThreshold: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    crossFilterChromatic: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    crossFilterSizeLimit: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    crossFilterRandomness: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    crossFilterHardMode: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    crossFilterMinSpacing: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    crossFilterDepthGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    crossFilterAngleGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    crossFilterAngleGamma: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    crossFilterEdgeLengthGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    crossFilterEdgeStrengthGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-}, z.core.$strip>;
-type FilmLabParamsValidated = z.infer<typeof filmLabParamsSchema>;
-/**
- * Shared depth-track contract.
- *
- * `frameRelPaths` are resolved relative to the imported grade JSON so the
- * same look can round-trip through preview, export, and saved-session
- * surfaces without falling back to renderer-only state.
- */
-declare const filmLabDepthTrackSchema: z.ZodObject<{
-    kind: z.ZodLiteral<"frameSequence">;
-    fps: z.ZodDefault<z.ZodNumber>;
-    frameRelPaths: z.ZodArray<z.ZodString>;
-}, z.core.$strip>;
-type FilmLabDepthTrackInput = z.infer<typeof filmLabDepthTrackSchema>;
-/**
- * Remotion Composition 向け: ルック ID + バージョン + 数値グレード
- */
-declare const filmLookGradeInputSchema: z.ZodObject<{
-    lookPresetId: z.ZodString;
-    presetVersion: z.ZodLiteral<"v1">;
-    grade: z.ZodObject<{
-        exposure: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        contrast: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        saturation: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        temperature: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        tint: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        rgbShift: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        lensSoftness: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        grainIntensity: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        grainRadialMix: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        grainSize: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        vignette: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        bloomThreshold: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        bloomStrength: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        bloomRadius: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        diffusion: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        depthMistGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        depthGlowGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        halationIntensity: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        halationSpread: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        halationHue: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        halationThreshold: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        halationRadius: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        bloomSoftKnee: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        halationSoftKnee: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        fade: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        highlights: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        shadows: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        shadowTone: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        highlightTone: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        shadowHue: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        highlightHue: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        compressionAmount: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        compressionRange: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        printContrast: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        cyan: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        magenta: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        yellow: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        motionBlurAmount: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        shutterAngle: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        trailIntensity: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        dustAmount: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        scratchAmount: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        shaftIntensity: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        shaftDecay: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        shaftOriginX: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        shaftOriginY: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        crossFilterStrength: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        crossFilterSpikes: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        crossFilterAngle: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        crossFilterLength: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        crossFilterThreshold: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        crossFilterChromatic: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        crossFilterSizeLimit: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        crossFilterRandomness: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        crossFilterHardMode: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        crossFilterMinSpacing: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        crossFilterDepthGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        crossFilterAngleGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        crossFilterAngleGamma: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        crossFilterEdgeLengthGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-        crossFilterEdgeStrengthGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
-    }, z.core.$strip>;
-    depthTrack: z.ZodOptional<z.ZodObject<{
-        kind: z.ZodLiteral<"frameSequence">;
-        fps: z.ZodDefault<z.ZodNumber>;
-        frameRelPaths: z.ZodArray<z.ZodString>;
-    }, z.core.$strip>>;
-    lut1CubeRelPath: z.ZodOptional<z.ZodString>;
-    lut1Enabled: z.ZodOptional<z.ZodBoolean>;
-    lut1Intensity: z.ZodOptional<z.ZodNumber>;
-    lutCubeRelPath: z.ZodOptional<z.ZodString>;
-    lutEnabled: z.ZodOptional<z.ZodBoolean>;
-    lutIntensity: z.ZodOptional<z.ZodNumber>;
-    gradeSourceVideoRelPath: z.ZodOptional<z.ZodString>;
-    gradeSourceVideoWidth: z.ZodOptional<z.ZodNumber>;
-    gradeSourceVideoHeight: z.ZodOptional<z.ZodNumber>;
-}, z.core.$strip>;
-/** z.object(ZodRawShape) 経由だと grade が Record に寛容になるため、Params で上書き */
-type FilmLookGradeInputProps = Omit<z.infer<typeof filmLookGradeInputSchema>, "grade"> & {
-    grade: Params;
-};
-/**
- * Phase 0 スパイク用（ルックと無関係なテキストのみ）
- */
-declare const filmLookSpikeInputSchema: z.ZodObject<{
-    title: z.ZodString;
-}, z.core.$strip>;
-type FilmLookSpikeInputProps = z.infer<typeof filmLookSpikeInputSchema>;
-/**
- * プリセット名と grade が PRESETS と一致するか（厳密一致）
- */
-declare function gradeMatchesPreset(presetName: PresetName, grade: Params): boolean;
-
-/**
  * .cube LUT パーサ — Film Lab / Remotion で共有（テキスト → Float32Array）
  * 元: apps/web の cube-parser と同一仕様
  */
@@ -366,88 +210,6 @@ interface CubeLUT {
     data: Float32Array;
 }
 declare function parseCube(text: string): CubeLUT;
-
-/**
- * @fileoverview .cube（3D LUT）を WebGL1 / GLSL100 向けの **2D テクスチャ**に並べ替える。
- *
- * 主な仕様:
- * - `parseCube` が返す `data` は「赤が最も速く動く」標準 .cube 順（index = r + N·g + N²·b）とみなす。
- * - 出力は幅 N²・高さ N のグリッド。ピクセル (x,y) = (r + g·N, b) に lut(r,g,b) を置く。
- * - Remotion のヘッドレス環境では `sampler3D` が使えないことが多いため、このパック＋シェーダ側トリリニアで代替する。
- *
- * 制限事項:
- * - DOMAIN_MIN / DOMAIN_MAX が 0〜1 以外の .cube は、シェーダ側で別途リマップが必要（現状は 0〜1 前提）。
- */
-
-/**
- * 2D テクスチャ用の RGBA Float32 グリッド（Three.js `DataTexture` にそのまま渡せる）。
- */
-interface PackedCubeLut2D {
-    /** テクスチャ幅（= N²） */
-    width: number;
-    /** テクスチャ高さ（= N） */
-    height: number;
-    /** 1 次元 LUT サイズ N（例: 17） */
-    size: number;
-    /** 長さ width·height·4 の RGBA 浮動小数点データ */
-    data: Float32Array;
-}
-/**
- * 3D LUT を 2D にパックする（WebGL1 互換の LUT サンプリング用）。
- *
- * @param {CubeLUT} lut - `parseCube` の結果
- * @returns {PackedCubeLut2D} RGBAFloat のグリッド
- */
-declare function packCubeLutToFloatRgbaGrid(lut: CubeLUT): PackedCubeLut2D;
-
-/** Remotion FilmLookSpike の defaultProps */
-declare const filmLookSpikeDefaultProps: FilmLookSpikeInputProps;
-/** Remotion FilmLookGrade の defaultProps（cinematic 基準） */
-declare function createDefaultFilmLookGradeProps(): FilmLookGradeInputProps;
-declare const filmLookGradeDefaultProps: FilmLookGradeInputProps;
-
-declare const QUICK_AXIS_IDS: readonly ["filmCharacter", "era", "dynamics"];
-type QuickAxisId = (typeof QUICK_AXIS_IDS)[number];
-type QuickState = Record<QuickAxisId, number>;
-interface Phase0QuickTarget {
-    exposure: number;
-    contrast: number;
-    saturation: number;
-    temperature: number;
-    tint: number;
-    rgbShift: number;
-    lensSoftness: number;
-    fade: number;
-    vignette: number;
-    grainIntensity: number;
-    grainRadialMix: number;
-    grainSize: number;
-    bloomThreshold: number;
-    bloomStrength: number;
-    bloomRadius: number;
-    diffusion: number;
-    halationIntensity: number;
-    halationSpread: number;
-    halationHue: number;
-    halationThreshold: number;
-    halationRadius: number;
-    bloomSoftKnee: number;
-    halationSoftKnee: number;
-    compressionAmount: number;
-    compressionRange: number;
-}
-declare const QUICK_AXIS_DEFAULT_RANGE: {
-    readonly min: -1;
-    readonly max: 1;
-    readonly step: 0.01;
-};
-declare const DEFAULT_QUICK_STATE: QuickState;
-declare const quickStateSchema: z.ZodObject<{
-    [x: string]: z.core.$ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>>;
-}, z.core.$strip>;
-declare function coerceQuickState(input: Partial<Record<QuickAxisId, number>> | null | undefined): QuickState;
-declare function applyQuickStateToParams(base: Params, state: QuickState): Params;
-declare function applyQuickStateToPhase0Params<T extends Phase0QuickTarget>(base: T, state: QuickState): T;
 
 declare const PHASE0_RGB_SHIFT_MAX = 0.005;
 
@@ -693,6 +455,49 @@ declare function interpolatePhase0PresetParams(presetName: PresetName, strength:
 declare function mergePhase0Params(base: Phase0Params, patch: Partial<Phase0Params>): Phase0Params;
 declare function createPhase0ProjectState(presetName?: PresetName): Phase0ProjectState;
 
+declare const QUICK_AXIS_IDS: readonly ["filmCharacter", "era", "dynamics"];
+type QuickAxisId = (typeof QUICK_AXIS_IDS)[number];
+type QuickState = Record<QuickAxisId, number>;
+interface Phase0QuickTarget {
+    exposure: number;
+    contrast: number;
+    saturation: number;
+    temperature: number;
+    tint: number;
+    rgbShift: number;
+    lensSoftness: number;
+    fade: number;
+    vignette: number;
+    grainIntensity: number;
+    grainRadialMix: number;
+    grainSize: number;
+    bloomThreshold: number;
+    bloomStrength: number;
+    bloomRadius: number;
+    diffusion: number;
+    halationIntensity: number;
+    halationSpread: number;
+    halationHue: number;
+    halationThreshold: number;
+    halationRadius: number;
+    bloomSoftKnee: number;
+    halationSoftKnee: number;
+    compressionAmount: number;
+    compressionRange: number;
+}
+declare const QUICK_AXIS_DEFAULT_RANGE: {
+    readonly min: -1;
+    readonly max: 1;
+    readonly step: 0.01;
+};
+declare const DEFAULT_QUICK_STATE: QuickState;
+declare const quickStateSchema: z.ZodObject<{
+    [x: string]: z.core.$ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>>;
+}, z.core.$strip>;
+declare function coerceQuickState(input: Partial<Record<QuickAxisId, number>> | null | undefined): QuickState;
+declare function applyQuickStateToParams(base: Params, state: QuickState): Params;
+declare function applyQuickStateToPhase0Params<T extends Phase0QuickTarget>(base: T, state: QuickState): T;
+
 type SourceKind = "image" | "video";
 interface SourceInfo {
     uri: string;
@@ -805,6 +610,284 @@ declare function buildPhase0ExportRequest(options: {
     project: Pick<Phase0ProjectState, "presetName" | "quickState" | "params" | "inputLut" | "creativeLut">;
     output?: Partial<Phase0OutputProfile>;
 }): Phase0ExportRequest;
+
+/**
+ * 単体のグレードパラメータ（Film Lab の Params と同一形）
+ */
+declare const filmLabParamsSchema: z.ZodObject<{
+    exposure: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    contrast: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    saturation: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    temperature: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    tint: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    rgbShift: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    lensSoftness: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    grainIntensity: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    grainRadialMix: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    grainSize: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    vignette: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    bloomThreshold: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    bloomStrength: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    bloomRadius: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    diffusion: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    depthMistGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    depthGlowGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    depthRayAngleGamma: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    depthRayAngleInnerThreshold: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    depthMistRayAngleGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    depthBloomRayAngleGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    depthHalationRayAngleGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    depthMistFieldPsfGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    depthBloomFieldPsfGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    depthHalationFieldPsfGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    depthMistFieldPsfRadiusPx: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    depthBloomFieldPsfRadiusPx: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    depthHalationFieldPsfRadiusPx: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    halationIntensity: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    halationSpread: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    halationHue: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    halationThreshold: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    halationRadius: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    bloomSoftKnee: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    halationSoftKnee: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    fade: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    highlights: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    shadows: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    shadowTone: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    highlightTone: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    shadowHue: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    highlightHue: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    compressionAmount: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    compressionRange: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    printContrast: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    cyan: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    magenta: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    yellow: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    motionBlurAmount: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    shutterAngle: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    trailIntensity: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    dustAmount: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    scratchAmount: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    shaftIntensity: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    shaftDecay: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    shaftOriginX: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    shaftOriginY: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    crossFilterStrength: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    crossFilterSpikes: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    crossFilterAngle: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    crossFilterLength: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    crossFilterThreshold: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    crossFilterChromatic: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    crossFilterSizeLimit: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    crossFilterRandomness: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    crossFilterHardMode: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    crossFilterMinSpacing: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    crossFilterDepthGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    crossFilterAngleGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    crossFilterAngleGamma: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    crossFilterAngleInnerThreshold: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    crossFilterEdgeLengthGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    crossFilterEdgeStrengthGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+}, z.core.$strip>;
+type FilmLabParamsValidated = z.infer<typeof filmLabParamsSchema>;
+/**
+ * Shared depth-track contract.
+ *
+ * `frameRelPaths` are resolved relative to the imported grade JSON so the
+ * same look can round-trip through preview, export, and saved-session
+ * surfaces without falling back to renderer-only state.
+ */
+declare const filmLabDepthTrackSchema: z.ZodObject<{
+    kind: z.ZodLiteral<"frameSequence">;
+    fps: z.ZodDefault<z.ZodNumber>;
+    frameRelPaths: z.ZodArray<z.ZodString>;
+}, z.core.$strip>;
+type FilmLabDepthTrackInput = z.infer<typeof filmLabDepthTrackSchema>;
+declare const cameraOpticsSchema: z.ZodObject<{
+    source: z.ZodEnum<{
+        metadata: "metadata";
+        assumed: "assumed";
+        manual: "manual";
+    }>;
+    fxPx: z.ZodOptional<z.ZodNumber>;
+    fyPx: z.ZodOptional<z.ZodNumber>;
+    cxPx: z.ZodOptional<z.ZodNumber>;
+    cyPx: z.ZodOptional<z.ZodNumber>;
+    fovXDeg: z.ZodOptional<z.ZodNumber>;
+    fovYDeg: z.ZodOptional<z.ZodNumber>;
+    focalLength35mm: z.ZodOptional<z.ZodNumber>;
+    lensModel: z.ZodOptional<z.ZodString>;
+    cameraMake: z.ZodOptional<z.ZodString>;
+    cameraModel: z.ZodOptional<z.ZodString>;
+}, z.core.$strip>;
+/**
+ * Remotion Composition 向け: ルック ID + バージョン + 数値グレード
+ */
+declare const filmLookGradeInputSchema: z.ZodObject<{
+    lookPresetId: z.ZodString;
+    presetVersion: z.ZodLiteral<"v1">;
+    grade: z.ZodObject<{
+        exposure: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        contrast: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        saturation: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        temperature: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        tint: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        rgbShift: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        lensSoftness: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        grainIntensity: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        grainRadialMix: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        grainSize: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        vignette: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        bloomThreshold: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        bloomStrength: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        bloomRadius: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        diffusion: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        depthMistGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        depthGlowGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        depthRayAngleGamma: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        depthRayAngleInnerThreshold: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        depthMistRayAngleGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        depthBloomRayAngleGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        depthHalationRayAngleGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        depthMistFieldPsfGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        depthBloomFieldPsfGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        depthHalationFieldPsfGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        depthMistFieldPsfRadiusPx: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        depthBloomFieldPsfRadiusPx: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        depthHalationFieldPsfRadiusPx: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        halationIntensity: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        halationSpread: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        halationHue: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        halationThreshold: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        halationRadius: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        bloomSoftKnee: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        halationSoftKnee: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        fade: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        highlights: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        shadows: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        shadowTone: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        highlightTone: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        shadowHue: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        highlightHue: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        compressionAmount: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        compressionRange: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        printContrast: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        cyan: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        magenta: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        yellow: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        motionBlurAmount: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        shutterAngle: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        trailIntensity: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        dustAmount: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        scratchAmount: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        shaftIntensity: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        shaftDecay: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        shaftOriginX: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        shaftOriginY: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        crossFilterStrength: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        crossFilterSpikes: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        crossFilterAngle: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        crossFilterLength: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        crossFilterThreshold: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        crossFilterChromatic: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        crossFilterSizeLimit: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        crossFilterRandomness: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        crossFilterHardMode: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        crossFilterMinSpacing: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        crossFilterDepthGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        crossFilterAngleGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        crossFilterAngleGamma: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        crossFilterAngleInnerThreshold: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        crossFilterEdgeLengthGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        crossFilterEdgeStrengthGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    }, z.core.$strip>;
+    depthTrack: z.ZodOptional<z.ZodObject<{
+        kind: z.ZodLiteral<"frameSequence">;
+        fps: z.ZodDefault<z.ZodNumber>;
+        frameRelPaths: z.ZodArray<z.ZodString>;
+    }, z.core.$strip>>;
+    cameraOptics: z.ZodOptional<z.ZodNullable<z.ZodObject<{
+        source: z.ZodEnum<{
+            metadata: "metadata";
+            assumed: "assumed";
+            manual: "manual";
+        }>;
+        fxPx: z.ZodOptional<z.ZodNumber>;
+        fyPx: z.ZodOptional<z.ZodNumber>;
+        cxPx: z.ZodOptional<z.ZodNumber>;
+        cyPx: z.ZodOptional<z.ZodNumber>;
+        fovXDeg: z.ZodOptional<z.ZodNumber>;
+        fovYDeg: z.ZodOptional<z.ZodNumber>;
+        focalLength35mm: z.ZodOptional<z.ZodNumber>;
+        lensModel: z.ZodOptional<z.ZodString>;
+        cameraMake: z.ZodOptional<z.ZodString>;
+        cameraModel: z.ZodOptional<z.ZodString>;
+    }, z.core.$strip>>>;
+    lut1CubeRelPath: z.ZodOptional<z.ZodString>;
+    lut1Enabled: z.ZodOptional<z.ZodBoolean>;
+    lut1Intensity: z.ZodOptional<z.ZodNumber>;
+    lutCubeRelPath: z.ZodOptional<z.ZodString>;
+    lutEnabled: z.ZodOptional<z.ZodBoolean>;
+    lutIntensity: z.ZodOptional<z.ZodNumber>;
+    gradeSourceVideoRelPath: z.ZodOptional<z.ZodString>;
+    gradeSourceVideoWidth: z.ZodOptional<z.ZodNumber>;
+    gradeSourceVideoHeight: z.ZodOptional<z.ZodNumber>;
+}, z.core.$strip>;
+/** z.object(ZodRawShape) 経由だと grade が Record に寛容になるため、Params で上書き */
+type FilmLookGradeInputProps = Omit<z.infer<typeof filmLookGradeInputSchema>, "grade"> & {
+    grade: Params;
+    cameraOptics?: CameraOptics | null;
+};
+/**
+ * Phase 0 スパイク用（ルックと無関係なテキストのみ）
+ */
+declare const filmLookSpikeInputSchema: z.ZodObject<{
+    title: z.ZodString;
+}, z.core.$strip>;
+type FilmLookSpikeInputProps = z.infer<typeof filmLookSpikeInputSchema>;
+/**
+ * プリセット名と grade が PRESETS と一致するか（厳密一致）
+ */
+declare function gradeMatchesPreset(presetName: PresetName, grade: Params): boolean;
+
+/**
+ * @fileoverview .cube（3D LUT）を WebGL1 / GLSL100 向けの **2D テクスチャ**に並べ替える。
+ *
+ * 主な仕様:
+ * - `parseCube` が返す `data` は「赤が最も速く動く」標準 .cube 順（index = r + N·g + N²·b）とみなす。
+ * - 出力は幅 N²・高さ N のグリッド。ピクセル (x,y) = (r + g·N, b) に lut(r,g,b) を置く。
+ * - Remotion のヘッドレス環境では `sampler3D` が使えないことが多いため、このパック＋シェーダ側トリリニアで代替する。
+ *
+ * 制限事項:
+ * - DOMAIN_MIN / DOMAIN_MAX が 0〜1 以外の .cube は、シェーダ側で別途リマップが必要（現状は 0〜1 前提）。
+ */
+
+/**
+ * 2D テクスチャ用の RGBA Float32 グリッド（Three.js `DataTexture` にそのまま渡せる）。
+ */
+interface PackedCubeLut2D {
+    /** テクスチャ幅（= N²） */
+    width: number;
+    /** テクスチャ高さ（= N） */
+    height: number;
+    /** 1 次元 LUT サイズ N（例: 17） */
+    size: number;
+    /** 長さ width·height·4 の RGBA 浮動小数点データ */
+    data: Float32Array;
+}
+/**
+ * 3D LUT を 2D にパックする（WebGL1 互換の LUT サンプリング用）。
+ *
+ * @param {CubeLUT} lut - `parseCube` の結果
+ * @returns {PackedCubeLut2D} RGBAFloat のグリッド
+ */
+declare function packCubeLutToFloatRgbaGrid(lut: CubeLUT): PackedCubeLut2D;
+
+/** Remotion FilmLookSpike の defaultProps */
+declare const filmLookSpikeDefaultProps: FilmLookSpikeInputProps;
+/** Remotion FilmLookGrade の defaultProps（cinematic 基準） */
+declare function createDefaultFilmLookGradeProps(): FilmLookGradeInputProps;
+declare const filmLookGradeDefaultProps: FilmLookGradeInputProps;
 
 type BenchmarkVisualFloor = "pass" | "fail" | "not-checked";
 type BenchmarkSaveResult = "ok" | "fail" | "not-run";
@@ -1402,4 +1485,4 @@ type IosPhase0LocalProject = z.infer<typeof iosPhase0LocalProjectSchema>;
 declare function pickIosPhase0Params(params: IosPhase0Params): IosPhase0Params;
 declare function getIosPhase0SourceCapViolations(source: Pick<IosPhase0SourceInfo, "width" | "height" | "durationSec" | "fileSizeBytes">): string[];
 
-export { type BehaviorProfile, type BenchmarkRow, type BenchmarkRowInput, type BenchmarkSaveResult, type BenchmarkVisualFloor, type CameraOptics, type CameraOpticsSource, type CubeLUT, DEFAULT_QUICK_STATE, FILMTONE_DEFAULT_BASE_PRESET, FILMTONE_SOFT_FINISH_PATCH, FILM_LAB_DEFAULT_HIGHLIGHT_HUE, FILM_LAB_DEFAULT_SHADOW_HUE, type FilmLabDepthTrackInput, type FilmLabParamsValidated, type FilmLookGradeInputProps, type FilmLookSpikeInputProps, IOS_PHASE0_BENCHMARK_SLOTS, IOS_PHASE0_OUTPUT_CODEC, IOS_PHASE0_OUTPUT_FPS, IOS_PHASE0_OUTPUT_LONG_EDGE, IOS_PHASE0_PARAM_KEYS, IOS_PHASE0_SCHEMA_VERSION, IOS_PHASE0_SOURCE_CAPS, IOS_PHASE0_SOURCE_DURATION_CAP_SEC, IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES, IOS_PHASE0_SOURCE_LONG_EDGE_CAP, type IosPhase0AssetRef, type IosPhase0BenchmarkRecord, type IosPhase0BenchmarkSlot, type IosPhase0ExportPayload, type IosPhase0ExportResult, type IosPhase0ExportSettings, type IosPhase0LocalProject, type IosPhase0ParamKey, type IosPhase0Params, type IosPhase0PickedLutFile, type IosPhase0PickedSource, type IosPhase0SerializableLut, type IosPhase0SourceInfo, type IosPhase0SourceKind, LEGACY_HIGHLIGHT_TONE_MAGNITUDE, LEGACY_SHADOW_TONE_MAGNITUDE, LOOK_ID_BY_PRESET, type OpticalAnalyzerProvider, type OpticalFamily, type OpticalRecipeId, type OpticalRecommendationV1, PARAM_KEYS, PHASE0_APPROX_SOURCE_LONG_EDGE_MAX, PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES, PHASE0_BENCHMARK_GATES, PHASE0_MAX_SOURCE_DURATION_SEC, PHASE0_OUTPUT_PROFILE, PHASE0_PARAM_KEYS, PHASE0_PRESET_DEFAULT, PHASE0_PRESET_STRENGTH_DEFAULT, PHASE0_RGB_SHIFT_MAX, PHASE0_SCHEMA_VERSION, PRESETS, PRESET_BUTTONS, PRESET_VERSION, type PackedCubeLut2D, type ParamKey, type Params, type ParsedBenchmarkRow, type ParsedCubeLut, type Phase0ExportBenchmarkRecord, type Phase0ExportProgress, type Phase0ExportRequest, type Phase0ExportResult, type Phase0ExportStage, type Phase0OutputProfile, type Phase0ParamKey, type Phase0Params, type Phase0PreviewRenderResult, type Phase0ProjectLut, type Phase0ProjectState, type Phase0QuickTarget, type PickedLutFile, type PresetName, QUICK_AXIS_DEFAULT_RANGE, QUICK_AXIS_IDS, type QuickAxisId, type QuickState, type SceneAnalysisState, type SceneDescriptorV1, type SourceInfo, type SourceKind, type SourceProbe, applyQuickStateToParams, applyQuickStateToPhase0Params, assertPhase0SourceProbeWithinCaps, benchmarkMarkdownTableHeader, buildBenchmarkRow, buildOpticalParamPatch, buildPhase0ExportRequest, chromaUnitFromHueDegrees, cloneParams, coerceQuickState, createDefaultFilmLookGradeProps, createDefaultPhase0Params, createFilmtoneDefaultParams, createFilmtoneDefaultPhase0Params, createIosPhase0SerializableLut, createPhase0ProjectState, deserializeCubeLutData, filmLabDepthTrackSchema, filmLabParamsSchema, filmLookGradeDefaultProps, filmLookGradeInputSchema, filmLookSpikeDefaultProps, filmLookSpikeInputSchema, findMatchingPreset, formatBenchmarkRow, getIosPhase0SourceCapViolations, getPhase0SourceCapViolations, gradeMatchesPreset, halationHueToHex, hslToRgb01, interpolatePhase0PresetParams, iosPhase0AssetRefSchema, iosPhase0BenchmarkRecordSchema, iosPhase0ExportPayloadSchema, iosPhase0ExportResultSchema, iosPhase0ExportSettingsSchema, iosPhase0LocalProjectSchema, iosPhase0ParamsSchema, iosPhase0PickedLutFileSchema, iosPhase0PickedSourceSchema, iosPhase0PresetIdSchema, iosPhase0SerializableLutSchema, iosPhase0SourceInfoSchema, iosPhase0SourceKindSchema, iosPhase0ThermalStateSchema, lookIdForPreset, mergePhase0Params, nearestHueDegreesToDirection, packCubeLutToFloatRgbaGrid, parseBenchmarkRow, parseCube, phase0ParamsSchema, phase0ProjectLutSchema, phase0ProjectSchema, phase0QuickStateSchema, pickIosPhase0Params, pickPhase0Params, quickStateSchema, recommendOpticalFinish, serializeCubeLut };
+export { type BehaviorProfile, type BenchmarkRow, type BenchmarkRowInput, type BenchmarkSaveResult, type BenchmarkVisualFloor, type CameraOptics, type CameraOpticsSource, type CubeLUT, DEFAULT_QUICK_STATE, FILMTONE_DEFAULT_BASE_PRESET, FILMTONE_SOFT_FINISH_PATCH, FILM_LAB_DEFAULT_HIGHLIGHT_HUE, FILM_LAB_DEFAULT_SHADOW_HUE, type FilmLabDepthTrackInput, type FilmLabParamsValidated, type FilmLookGradeInputProps, type FilmLookSpikeInputProps, IOS_PHASE0_BENCHMARK_SLOTS, IOS_PHASE0_OUTPUT_CODEC, IOS_PHASE0_OUTPUT_FPS, IOS_PHASE0_OUTPUT_LONG_EDGE, IOS_PHASE0_PARAM_KEYS, IOS_PHASE0_SCHEMA_VERSION, IOS_PHASE0_SOURCE_CAPS, IOS_PHASE0_SOURCE_DURATION_CAP_SEC, IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES, IOS_PHASE0_SOURCE_LONG_EDGE_CAP, type IosPhase0AssetRef, type IosPhase0BenchmarkRecord, type IosPhase0BenchmarkSlot, type IosPhase0ExportPayload, type IosPhase0ExportResult, type IosPhase0ExportSettings, type IosPhase0LocalProject, type IosPhase0ParamKey, type IosPhase0Params, type IosPhase0PickedLutFile, type IosPhase0PickedSource, type IosPhase0SerializableLut, type IosPhase0SourceInfo, type IosPhase0SourceKind, LEGACY_HIGHLIGHT_TONE_MAGNITUDE, LEGACY_SHADOW_TONE_MAGNITUDE, LOOK_ID_BY_PRESET, type OpticalAnalyzerProvider, type OpticalFamily, type OpticalRecipeId, type OpticalRecommendationV1, PARAM_KEYS, PHASE0_APPROX_SOURCE_LONG_EDGE_MAX, PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES, PHASE0_BENCHMARK_GATES, PHASE0_MAX_SOURCE_DURATION_SEC, PHASE0_OUTPUT_PROFILE, PHASE0_PARAM_KEYS, PHASE0_PRESET_DEFAULT, PHASE0_PRESET_STRENGTH_DEFAULT, PHASE0_RGB_SHIFT_MAX, PHASE0_SCHEMA_VERSION, PRESETS, PRESET_BUTTONS, PRESET_VERSION, type PackedCubeLut2D, type ParamKey, type Params, type ParsedBenchmarkRow, type ParsedCubeLut, type Phase0ExportBenchmarkRecord, type Phase0ExportProgress, type Phase0ExportRequest, type Phase0ExportResult, type Phase0ExportStage, type Phase0OutputProfile, type Phase0ParamKey, type Phase0Params, type Phase0PreviewRenderResult, type Phase0ProjectLut, type Phase0ProjectState, type Phase0QuickTarget, type PickedLutFile, type PresetName, QUICK_AXIS_DEFAULT_RANGE, QUICK_AXIS_IDS, type QuickAxisId, type QuickState, type SceneAnalysisState, type SceneDescriptorV1, type SourceInfo, type SourceKind, type SourceProbe, applyQuickStateToParams, applyQuickStateToPhase0Params, assertPhase0SourceProbeWithinCaps, benchmarkMarkdownTableHeader, buildBenchmarkRow, buildOpticalParamPatch, buildPhase0ExportRequest, cameraOpticsSchema, chromaUnitFromHueDegrees, cloneParams, coerceQuickState, createDefaultFilmLookGradeProps, createDefaultPhase0Params, createFilmtoneDefaultParams, createFilmtoneDefaultPhase0Params, createIosPhase0SerializableLut, createPhase0ProjectState, deserializeCubeLutData, filmLabDepthTrackSchema, filmLabParamsSchema, filmLookGradeDefaultProps, filmLookGradeInputSchema, filmLookSpikeDefaultProps, filmLookSpikeInputSchema, findMatchingPreset, formatBenchmarkRow, getIosPhase0SourceCapViolations, getPhase0SourceCapViolations, gradeMatchesPreset, halationHueToHex, hslToRgb01, interpolatePhase0PresetParams, iosPhase0AssetRefSchema, iosPhase0BenchmarkRecordSchema, iosPhase0ExportPayloadSchema, iosPhase0ExportResultSchema, iosPhase0ExportSettingsSchema, iosPhase0LocalProjectSchema, iosPhase0ParamsSchema, iosPhase0PickedLutFileSchema, iosPhase0PickedSourceSchema, iosPhase0PresetIdSchema, iosPhase0SerializableLutSchema, iosPhase0SourceInfoSchema, iosPhase0SourceKindSchema, iosPhase0ThermalStateSchema, lookIdForPreset, mergePhase0Params, nearestHueDegreesToDirection, packCubeLutToFloatRgbaGrid, parseBenchmarkRow, parseCube, phase0ParamsSchema, phase0ProjectLutSchema, phase0ProjectSchema, phase0QuickStateSchema, pickIosPhase0Params, pickPhase0Params, quickStateSchema, recommendOpticalFinish, serializeCubeLut };

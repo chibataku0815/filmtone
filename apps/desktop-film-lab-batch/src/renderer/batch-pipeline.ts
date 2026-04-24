@@ -16,6 +16,7 @@ import {
   PRESETS,
   LOOK_ID_BY_PRESET,
   parseCube,
+  type CameraOptics,
   type Params,
   type PresetName,
 } from "film-lab-core";
@@ -152,6 +153,7 @@ export async function resolveGradeFromJsonText(
   lutIntensity: number;
   lutData: Float32Array | null;
   lutSize: number;
+  cameraOptics: CameraOptics | null;
 }> {
   let raw: unknown;
   try {
@@ -230,6 +232,7 @@ export async function resolveGradeFromJsonText(
       lutIntensity: g.lutIntensity ?? 1,
       lutData,
       lutSize,
+      cameraOptics: g.cameraOptics ?? null,
     };
   }
 
@@ -244,6 +247,7 @@ export async function resolveGradeFromJsonText(
       lutIntensity: 1,
       lutData: null,
       lutSize: 0,
+      cameraOptics: null,
     };
   }
 
@@ -257,6 +261,7 @@ export async function resolveGradeFromJsonText(
       lutIntensity: 1,
       lutData: null,
       lutSize: 0,
+      cameraOptics: null,
     };
   }
 
@@ -272,6 +277,7 @@ export async function resolveGradeFromJsonText(
         lutIntensity: 1,
         lutData: null,
         lutSize: 0,
+        cameraOptics: null,
       };
     }
   }

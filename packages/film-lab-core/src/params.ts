@@ -25,6 +25,28 @@ export const PARAM_KEYS = [
   "depthMistGain",
   /** Depth-aware Glow weighting（0=uniform、1=full depth weighting）。Bloom + Halation に適用。 */
   "depthGlowGain",
+  /** Depth ray-angle mask gamma。renderer-only fallback を避ける共有契約。 */
+  "depthRayAngleGamma",
+  /** Depth ray-angle mask の中心保護しきい値。 */
+  "depthRayAngleInnerThreshold",
+  /** Mist source ray-angle weighting（0=off、1=max edge source boost）。 */
+  "depthMistRayAngleGain",
+  /** Bloom source ray-angle weighting（0=off、1=max edge source boost）。 */
+  "depthBloomRayAngleGain",
+  /** Halation source ray-angle weighting（0=off、1=max edge source boost）。 */
+  "depthHalationRayAngleGain",
+  /** Mist field PSF gain（0=off、1=max field blur mix）。 */
+  "depthMistFieldPsfGain",
+  /** Bloom field PSF gain（0=off、1=max field blur mix）。 */
+  "depthBloomFieldPsfGain",
+  /** Halation field PSF gain（0=off、1=max field blur mix）。 */
+  "depthHalationFieldPsfGain",
+  /** Mist field PSF radius in pixels。 */
+  "depthMistFieldPsfRadiusPx",
+  /** Bloom field PSF radius in pixels。 */
+  "depthBloomFieldPsfRadiusPx",
+  /** Halation field PSF radius in pixels。 */
+  "depthHalationFieldPsfRadiusPx",
   "halationIntensity",
   "halationSpread",
   "halationHue",
@@ -92,6 +114,8 @@ export const PARAM_KEYS = [
   "crossFilterAngleGain",
   /** Cross filter ray-angle mask gamma。65deg hfov の斜入射近似に適用。 */
   "crossFilterAngleGamma",
+  /** Cross filter ray-angle mask の中心保護しきい値。 */
+  "crossFilterAngleInnerThreshold",
   /** Cross filter streak length field modulation（0=uniform、1=max edge length boost）。 */
   "crossFilterEdgeLengthGain",
   /** Cross filter streak strength field modulation（0=uniform、1=max edge strength boost）。 */
@@ -124,6 +148,28 @@ export interface Params {
   depthMistGain: number;
   /** Depth-aware Glow weighting（0=uniform、1=full depth weighting）。Bloom + Halation に適用。 */
   depthGlowGain: number;
+  /** Depth ray-angle mask gamma。 */
+  depthRayAngleGamma: number;
+  /** Depth ray-angle mask の中心保護しきい値。 */
+  depthRayAngleInnerThreshold: number;
+  /** Mist source ray-angle weighting（0=off、1=max edge source boost）。 */
+  depthMistRayAngleGain: number;
+  /** Bloom source ray-angle weighting（0=off、1=max edge source boost）。 */
+  depthBloomRayAngleGain: number;
+  /** Halation source ray-angle weighting（0=off、1=max edge source boost）。 */
+  depthHalationRayAngleGain: number;
+  /** Mist field PSF gain（0=off、1=max field blur mix）。 */
+  depthMistFieldPsfGain: number;
+  /** Bloom field PSF gain（0=off、1=max field blur mix）。 */
+  depthBloomFieldPsfGain: number;
+  /** Halation field PSF gain（0=off、1=max field blur mix）。 */
+  depthHalationFieldPsfGain: number;
+  /** Mist field PSF radius in pixels。 */
+  depthMistFieldPsfRadiusPx: number;
+  /** Bloom field PSF radius in pixels。 */
+  depthBloomFieldPsfRadiusPx: number;
+  /** Halation field PSF radius in pixels。 */
+  depthHalationFieldPsfRadiusPx: number;
   halationIntensity: number;
   halationSpread: number;
   halationHue: number;
@@ -193,6 +239,8 @@ export interface Params {
   crossFilterAngleGain: number;
   /** Cross filter ray-angle mask gamma。65deg hfov の斜入射近似に適用。 */
   crossFilterAngleGamma: number;
+  /** Cross filter ray-angle mask の中心保護しきい値。 */
+  crossFilterAngleInnerThreshold: number;
   /** Cross filter streak length field modulation（0=uniform、1=max edge length boost）。 */
   crossFilterEdgeLengthGain: number;
   /** Cross filter streak strength field modulation（0=uniform、1=max edge strength boost）。 */

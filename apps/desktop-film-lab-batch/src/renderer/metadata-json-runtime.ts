@@ -168,7 +168,7 @@ export async function resolveImportedMetadataJson(
     importedFilePath: filePath,
     syncedAtMs: null,
     appliedOpticalRecommendation: null,
-    cameraOptics: null,
+    cameraOptics: resolvedGrade.cameraOptics,
     sidecar: null,
     warnings: [],
   };

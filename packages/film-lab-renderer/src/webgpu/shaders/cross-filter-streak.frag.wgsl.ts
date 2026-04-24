@@ -29,6 +29,8 @@ struct Params {
   edgeAndFit: vec4f,
   // (resolutionX, resolutionY, imageResX, imageResY)
   size: vec4f,
+  // (tanHalfFovX, tanHalfFovY, innerThreshold, fallbackFlag)
+  optics: vec4f,
 };
 
 @group(1) @binding(0) var<uniform> uParams: Params;
@@ -45,7 +47,7 @@ const PEAK_THRESHOLD_SOFT: f32 = 0.01;
 const PEAK_THRESHOLD_HARD: f32 = 0.005;
 const CHROMA_HARD_FLOOR: f32 = 0.7;
 const LUMA_709: vec3f = vec3f(0.2126, 0.7152, 0.0722);
-const RAY_ANGLE_TAN_HALF_HFOV: f32 = 0.6370702608; // tan(65deg / 2)
+const RAY_ANGLE_REFERENCE_TAN_HALF_HFOV: f32 = 0.6370702608; // tan(65deg / 2)
 
 fn fitUv(uv: vec2f, resolution: vec2f, imageResolution: vec2f, fitMode: f32) -> vec2f {
   let screenAspect = resolution.x / max(resolution.y, 1.0);
@@ -67,19 +69,29 @@ fn fitUv(uv: vec2f, resolution: vec2f, imageResolution: vec2f, fitMode: f32) -> 
   return result;
 }
 
-fn rayAngleMask(imageUv: vec2f, imageResolution: vec2f, gamma: f32) -> f32 {
-  let aspectY = imageResolution.y / max(imageResolution.x, 1.0);
+fn rayAngleMask(
+  imageUv: vec2f,
+  imageResolution: vec2f,
+  tanHalfFov: vec2f,
+  innerThreshold: f32,
+  gamma: f32,
+) -> f32 {
   let sensor = (imageUv - vec2f(0.5)) * 2.0;
-  let ray = vec2f(
-    sensor.x * RAY_ANGLE_TAN_HALF_HFOV,
-    sensor.y * RAY_ANGLE_TAN_HALF_HFOV * aspectY,
-  );
+  let ray = sensor * max(tanHalfFov, vec2f(1e-4));
   let viewZ = 1.0 / sqrt(dot(ray, ray) + 1.0);
   let incidence = 1.0 - viewZ;
-  let cornerRay = vec2f(RAY_ANGLE_TAN_HALF_HFOV, RAY_ANGLE_TAN_HALF_HFOV * aspectY);
+  let aspectY = imageResolution.y / max(imageResolution.x, 1.0);
+  let cornerRay = vec2f(
+    RAY_ANGLE_REFERENCE_TAN_HALF_HFOV,
+    RAY_ANGLE_REFERENCE_TAN_HALF_HFOV * aspectY,
+  );
   let maxIncidence = 1.0 - (1.0 / sqrt(dot(cornerRay, cornerRay) + 1.0));
   let normalized = clamp(incidence / max(maxIncidence, 1e-5), 0.0, 1.0);
-  return smoothstep(0.15, 1.0, pow(normalized, max(gamma, 0.001)));
+  return smoothstep(
+    clamp(innerThreshold, 0.0, 0.8),
+    1.0,
+    pow(normalized, max(gamma, 0.001)),
+  );
 }
 
 fn sourceWeight(
@@ -90,11 +102,16 @@ fn sourceWeight(
   depthGain: f32,
   angleGain: f32,
   angleGamma: f32,
+  tanHalfFov: vec2f,
+  innerThreshold: f32,
 ) -> f32 {
   let depthUv = fitUv(sourceUv, resolution, imageResolution, fitMode);
-  let depthVal = textureSampleLevel(uDepth, uSampler, depthUv, 0.0).r;
-  let depthMult = clamp(1.0 + clamp(depthGain, 0.0, 1.0) * (depthVal - 0.5), 0.75, 1.25);
-  let angleMult = 1.0 + max(angleGain, 0.0) * rayAngleMask(depthUv, imageResolution, angleGamma);
+  var depthMult = 1.0;
+  if (depthGain > 0.0) {
+    let depthVal = textureSampleLevel(uDepth, uSampler, depthUv, 0.0).r;
+    depthMult = mix(1.0 - depthGain * 0.3, 1.0 + depthGain * 0.8, depthVal);
+  }
+  let angleMult = 1.0 + max(angleGain, 0.0) * rayAngleMask(depthUv, imageResolution, tanHalfFov, innerThreshold, angleGamma);
   return depthMult * angleMult;
 }
 
@@ -124,8 +141,10 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
   let fitMode = uParams.edgeAndFit.z;
   let resolution = uParams.size.xy;
   let imageResolution = uParams.size.zw;
+  let tanHalfFov = max(uParams.optics.xy, vec2f(1e-4));
+  let innerThreshold = uParams.optics.z;
   let currentImageUv = fitUv(uv, resolution, imageResolution, fitMode);
-  let currentFieldMask = rayAngleMask(currentImageUv, imageResolution, angleGamma);
+  let currentFieldMask = rayAngleMask(currentImageUv, imageResolution, tanHalfFov, innerThreshold, angleGamma);
   let effectiveLength = lengthParam * (1.0 + edgeLengthGain * currentFieldMask);
   let effectiveBrightnessMul = brightnessMul * (1.0 + edgeStrengthGain * currentFieldMask);
 
@@ -142,7 +161,7 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
     if (i > maxSteps) { break; }
     let sampleUV = uv - direction * texelSize * f32(i);
     let peakLuma = dot(textureSampleLevel(uSource, uSampler, sampleUV, 0.0).rgb, LUMA_709)
-      * sourceWeight(sampleUV, resolution, imageResolution, fitMode, depthGain, angleGain, angleGamma);
+      * sourceWeight(sampleUV, resolution, imageResolution, fitMode, depthGain, angleGain, angleGamma, tanHalfFov, innerThreshold);
     if (peakLuma > peakThresh) {
       let cell = floor(sampleUV / texelSize);
       let peakHash = fract(sin(dot(cell, vec2f(127.1, 311.7))) * 43758.5453);
@@ -160,7 +179,7 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
     if (i > maxSteps) { break; }
     let sampleUV = uv + direction * texelSize * f32(i);
     let peakLuma = dot(textureSampleLevel(uSource, uSampler, sampleUV, 0.0).rgb, LUMA_709)
-      * sourceWeight(sampleUV, resolution, imageResolution, fitMode, depthGain, angleGain, angleGamma);
+      * sourceWeight(sampleUV, resolution, imageResolution, fitMode, depthGain, angleGain, angleGamma, tanHalfFov, innerThreshold);
     if (peakLuma > peakThresh) {
       let cell = floor(sampleUV / texelSize);
       let peakHash = fract(sin(dot(cell, vec2f(127.1, 311.7))) * 43758.5453);

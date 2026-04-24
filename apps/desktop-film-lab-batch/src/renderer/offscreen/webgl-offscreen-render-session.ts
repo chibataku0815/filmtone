@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { Viewport } from "film-lab-renderer";
+import type { CameraOptics } from "film-lab-core";
 import type { BatchGradeState } from "../batch-pipeline";
 import type { BatchDepthTrack } from "../depth-track";
 import { applyBatchGradeToViewport } from "./apply-batch-grade-to-viewport";
@@ -41,6 +42,10 @@ class WebGLOffscreenRenderSessionImpl implements WebGLOffscreenRenderSession {
 
   setGrade(grade: BatchGradeState): void {
     applyBatchGradeToViewport(this.viewport, grade);
+  }
+
+  setCameraOptics(_cameraOptics: CameraOptics | null): void {
+    // WebGL does not consume ray-angle camera optics; keep the session contract aligned.
   }
 
   setDepthTrack(_depthTrack: BatchDepthTrack | null): void {

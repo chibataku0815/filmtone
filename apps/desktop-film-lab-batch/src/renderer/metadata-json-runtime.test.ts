@@ -9,6 +9,7 @@ import {
 } from "./export-metadata-session";
 import { resolveImportedMetadataJson } from "./metadata-json-runtime";
 import type { FilmLabBatchBridge } from "./desktop-api";
+import { exportGradeJsonText } from "./grade-io";
 
 describe("metadata-json-runtime", () => {
   it("preserves sidecar camera optics through import and re-export build", async () => {
@@ -74,5 +75,24 @@ describe("metadata-json-runtime", () => {
     const parsed = parseFilmtoneExportSessionV1(reExportedSession);
     expect(parsed?.version).toBe(1);
     expect(parsed?.input.cameraOptics).toEqual(cameraOptics);
+  });
+
+  it("preserves core grade JSON camera optics on restore", async () => {
+    const grade = batchGradeStateFromPreset("cinematic");
+    const cameraOptics = {
+      source: "metadata" as const,
+      fovXDeg: 54.4,
+      fovYDeg: 32.3,
+      fxPx: 2400,
+      fyPx: 2400,
+    };
+
+    const resolved = await resolveImportedMetadataJson(
+      {} as FilmLabBatchBridge,
+      "/Users/tester/output/film-lab-grade.json",
+      exportGradeJsonText(grade.params, null, cameraOptics),
+    );
+
+    expect(resolved.cameraOptics).toEqual(cameraOptics);
   });
 });

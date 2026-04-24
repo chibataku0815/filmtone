@@ -64,6 +64,7 @@ import {
   type GpuContextLossInfo,
   type GpuContextLossReason,
 } from "./GpuContext";
+import type { CameraOptics } from "film-lab-core";
 import { MediaTexture } from "./MediaTexture";
 import { OffscreenTargetPool } from "./OffscreenTargetPool";
 import { Lut3DTexture } from "./Lut3DTexture";
@@ -114,6 +115,11 @@ import {
   isCrossFilterHardModeActive,
   shouldResetCrossFilterHistory,
 } from "./crossFilterState";
+import {
+  DEFAULT_RAY_ANGLE_INNER_THRESHOLD,
+  resolveRayAngleOptics,
+  type ResolvedRayAngleOptics,
+} from "./rayAngleOptics";
 import type { RenderBackend, RenderBackendParams } from "./Backend";
 import type { ViewportCapabilities } from "../RendererRuntime";
 
@@ -130,7 +136,7 @@ const MOTIONBLUR_BLEND_UNIFORM_BYTES = 48;
 const MOTIONBLUR_BLEND_UNIFORM_FLOATS = MOTIONBLUR_BLEND_UNIFORM_BYTES / 4;
 const CROSS_FILTER_PARAMS_BYTES = 16;
 const CROSS_FILTER_SPACING_MAX_BYTES = 32;
-const CROSS_FILTER_STREAK_BYTES = 80;
+const CROSS_FILTER_STREAK_BYTES = 96;
 const CROSS_FILTER_MAX_STREAKS = 4;
 const CROSS_FILTER_SPACING_RADIUS_MAX_PX = 48.0;
 const CROSS_FILTER_SPACING_RADIUS_STEP_PX = 24.0;
@@ -406,6 +412,7 @@ export class WebGPUBackend implements RenderBackend {
   private readbackBufferSize = 0;
   private hasReadableFrame = false;
   private frameState: GradeFrameState;
+  private cameraOptics: CameraOptics | null = null;
   /**
    * Preserved temporal-hold bookkeeping.
    *
@@ -526,6 +533,7 @@ export class WebGPUBackend implements RenderBackend {
     //   misc: (depthMistGain, fitMode, rayAngleGain, rayAngleGamma)
     //   size: (resolutionX, resolutionY, imageResX, imageResY)
     //   psf:  (fieldPsfGain, fieldPsfRadiusPx, _, _)
+    //   optics: (tanHalfFovX, tanHalfFovY, innerThreshold, fallbackFlag)
     this.diffusionDepthPrefilterBuffer = ctx.device.createBuffer({
       label: "diffusion-depth-prefilter.params",
       size: 64,
@@ -1505,6 +1513,11 @@ export class WebGPUBackend implements RenderBackend {
     this.gradeDirty = true;
   }
 
+  setCameraOptics(optics: CameraOptics | null): void {
+    this.cameraOptics = optics;
+    this.gradeDirty = true;
+  }
+
   setFitMode(mode: "cover" | "contain"): void {
     this.frameState.fitMode = mode === "contain" ? 1 : 0;
     this.gradeDirty = true;
@@ -1753,6 +1766,26 @@ export class WebGPUBackend implements RenderBackend {
     return typeof v === "string" ? v : fallback;
   }
 
+  private resolveCurrentRayAngleOptics(): ResolvedRayAngleOptics {
+    return resolveRayAngleOptics(
+      this.cameraOptics,
+      this.frameState.imgResX,
+      this.frameState.imgResY,
+    );
+  }
+
+  private packRayAngleOptics(
+    target: Float32Array,
+    offset: number,
+    optics: ResolvedRayAngleOptics,
+    innerThreshold: number,
+  ): void {
+    target[offset] = optics.tanHalfFovX;
+    target[offset + 1] = optics.tanHalfFovY;
+    target[offset + 2] = Math.min(0.8, Math.max(0, innerThreshold));
+    target[offset + 3] = optics.source === "fallback65" ? 1 : 0;
+  }
+
   private uploadFrameUniforms(suppressDiffusion: boolean): void {
     const { device } = this.ctx;
 
@@ -1789,6 +1822,16 @@ export class WebGPUBackend implements RenderBackend {
     if (suppressDiffusion) {
       this.compositeScratch[14] = 0;
     }
+    this.packRayAngleOptics(
+      this.compositeScratch,
+      16,
+      this.resolveCurrentRayAngleOptics(),
+      this.paramNumber(
+        "depthRayAngleInnerThreshold",
+        DEFAULT_RAY_ANGLE_INNER_THRESHOLD,
+      ),
+    );
+    this.compositeScratch[20] = this.paramNumber("rayAngleProbe", 0);
     device.queue.writeBuffer(
       this.compositeBuffer,
       0,
@@ -2021,8 +2064,10 @@ export class WebGPUBackend implements RenderBackend {
     depthMistGain: number,
     rayAngleGain: number,
     rayAngleGamma: number,
+    rayAngleInnerThreshold: number,
     fieldPsfGain: number,
     fieldPsfRadiusPx: number,
+    optics: ResolvedRayAngleOptics,
   ): GPUTextureView {
     const { device } = this.ctx;
     const scratchRT = this.pool.get("rt.diffusion.prefiltered", {
@@ -2045,10 +2090,7 @@ export class WebGPUBackend implements RenderBackend {
     s[9] = fieldPsfRadiusPx;
     s[10] = 0;
     s[11] = 0;
-    s[12] = 0;
-    s[13] = 0;
-    s[14] = 0;
-    s[15] = 0;
+    this.packRayAngleOptics(s, 12, optics, rayAngleInnerThreshold);
     device.queue.writeBuffer(
       this.diffusionDepthPrefilterBuffer,
       0,
@@ -2102,8 +2144,10 @@ export class WebGPUBackend implements RenderBackend {
     gain: number,
     rayAngleGain: number,
     rayAngleGamma: number,
+    rayAngleInnerThreshold: number,
     fieldPsfGain: number,
     fieldPsfRadiusPx: number,
+    optics: ResolvedRayAngleOptics,
   ): GPUTextureView {
     const { device } = this.ctx;
     const scratchRT = this.pool.get("rt.bloom.depth-prefiltered", {
@@ -2126,10 +2170,7 @@ export class WebGPUBackend implements RenderBackend {
     s[9] = fieldPsfRadiusPx;
     s[10] = 0;
     s[11] = 0;
-    s[12] = 0;
-    s[13] = 0;
-    s[14] = 0;
-    s[15] = 0;
+    this.packRayAngleOptics(s, 12, optics, rayAngleInnerThreshold);
     device.queue.writeBuffer(
       this.bloomDepthPrefilterBuffer,
       0,
@@ -2181,8 +2222,10 @@ export class WebGPUBackend implements RenderBackend {
     gain: number,
     rayAngleGain: number,
     rayAngleGamma: number,
+    rayAngleInnerThreshold: number,
     fieldPsfGain: number,
     fieldPsfRadiusPx: number,
+    optics: ResolvedRayAngleOptics,
   ): GPUTextureView {
     const { device } = this.ctx;
     const scratchRT = this.pool.get("rt.halation.depth-prefiltered", {
@@ -2205,10 +2248,7 @@ export class WebGPUBackend implements RenderBackend {
     s[9] = fieldPsfRadiusPx;
     s[10] = 0;
     s[11] = 0;
-    s[12] = 0;
-    s[13] = 0;
-    s[14] = 0;
-    s[15] = 0;
+    this.packRayAngleOptics(s, 12, optics, rayAngleInnerThreshold);
     device.queue.writeBuffer(
       this.halationDepthPrefilterBuffer,
       0,
@@ -2797,6 +2837,16 @@ export class WebGPUBackend implements RenderBackend {
       0.001,
       this.paramNumber("crossFilterAngleGamma", DEFAULT_DEPTH_RAY_ANGLE_GAMMA),
     );
+    const crossFilterAngleInnerThreshold = Math.min(
+      0.8,
+      Math.max(
+        0,
+        this.paramNumber(
+          "crossFilterAngleInnerThreshold",
+          DEFAULT_RAY_ANGLE_INNER_THRESHOLD,
+        ),
+      ),
+    );
     const crossFilterEdgeLengthGain = Math.min(
       1,
       Math.max(
@@ -2831,6 +2881,7 @@ export class WebGPUBackend implements RenderBackend {
     );
     const effectiveSizeLimit = hardModeActive ? 1.0 : sizeLimit;
     const effectiveRandomness = hardModeActive ? 1.0 : randomness;
+    const rayAngleOptics = this.resolveCurrentRayAngleOptics();
 
     const sourceView = sourceTexture.createView();
     const depthView = this.depthTexture.createView();
@@ -3176,6 +3227,12 @@ export class WebGPUBackend implements RenderBackend {
       streakScratch[17] = this._height;
       streakScratch[18] = this.frameState.imgResX;
       streakScratch[19] = this.frameState.imgResY;
+      this.packRayAngleOptics(
+        streakScratch,
+        20,
+        rayAngleOptics,
+        crossFilterAngleInnerThreshold,
+      );
       device.queue.writeBuffer(
         this.crossFilter.streakBuffers[i]!,
         0,
@@ -3423,6 +3480,17 @@ export class WebGPUBackend implements RenderBackend {
       0.001,
       this.paramNumber("depthRayAngleGamma", DEFAULT_DEPTH_RAY_ANGLE_GAMMA),
     );
+    const depthRayAngleInnerThreshold = Math.min(
+      0.8,
+      Math.max(
+        0,
+        this.paramNumber(
+          "depthRayAngleInnerThreshold",
+          DEFAULT_RAY_ANGLE_INNER_THRESHOLD,
+        ),
+      ),
+    );
+    const rayAngleOptics = this.resolveCurrentRayAngleOptics();
     const depthMistRayAngleGain = Math.max(
       0,
       this.paramNumber("depthMistRayAngleGain", DEFAULT_DEPTH_MIST_RAY_ANGLE_GAIN),
@@ -3478,8 +3546,10 @@ export class WebGPUBackend implements RenderBackend {
           depthGlowGain,
           depthBloomRayAngleGain,
           depthRayAngleGamma,
+          depthRayAngleInnerThreshold,
           depthBloomFieldPsfGain,
           depthBloomFieldPsfRadiusPx,
+          rayAngleOptics,
         )
       : colorGradedView;
     const bloomTop = this.renderPyramidChain(
@@ -3502,8 +3572,10 @@ export class WebGPUBackend implements RenderBackend {
           depthGlowGain,
           depthHalationRayAngleGain,
           depthRayAngleGamma,
+          depthRayAngleInnerThreshold,
           depthHalationFieldPsfGain,
           depthHalationFieldPsfRadiusPx,
+          rayAngleOptics,
         )
       : colorGradedView;
     const halationTop = this.renderPyramidChain(
@@ -3534,8 +3606,10 @@ export class WebGPUBackend implements RenderBackend {
             depthMistGain,
             depthMistRayAngleGain,
             depthRayAngleGamma,
+            depthRayAngleInnerThreshold,
             depthMistFieldPsfGain,
             depthMistFieldPsfRadiusPx,
+            rayAngleOptics,
           )
         : colorGradedView;
       diffusionView = this.renderDiffusionPyramid(

@@ -64,6 +64,10 @@ struct Composite {
   grainFit: vec4f,
   // (lensSoftness, aberrationEdgeSoften, diffusion, _)
   lens: vec4f,
+  // (tanHalfFovX, tanHalfFovY, innerThreshold, fallbackFlag)
+  optics: vec4f,
+  // (rayAngleProbe, _, _, _)
+  debug: vec4f,
 };
 
 @group(1) @binding(0) var<uniform> uComposite: Composite;
@@ -76,6 +80,7 @@ struct Composite {
 @group(1) @binding(7) var uDepth: texture_2d<f32>;
 
 const LUMA_R709 = vec3f(0.2126, 0.7152, 0.0722);
+const RAY_ANGLE_REFERENCE_TAN_HALF_HFOV: f32 = 0.6370702608; // tan(65deg / 2)
 
 fn fitUv(uv: vec2f, resolution: vec2f, imageResolution: vec2f, fitMode: f32) -> vec2f {
   let screenAspect = resolution.x / max(resolution.y, 1.0);
@@ -100,6 +105,26 @@ fn fitUv(uv: vec2f, resolution: vec2f, imageResolution: vec2f, fitMode: f32) -> 
 fn insideUv(uv: vec2f) -> f32 {
   let s = step(vec2f(0.0), uv) * step(uv, vec2f(1.0));
   return s.x * s.y;
+}
+
+fn rayAngleMask(
+  imageUv: vec2f,
+  imageResolution: vec2f,
+  tanHalfFov: vec2f,
+  innerThreshold: f32,
+) -> f32 {
+  let sensor = (imageUv - vec2f(0.5)) * 2.0;
+  let ray = sensor * max(tanHalfFov, vec2f(1e-4));
+  let viewZ = 1.0 / sqrt(dot(ray, ray) + 1.0);
+  let incidence = 1.0 - viewZ;
+  let aspectY = imageResolution.y / max(imageResolution.x, 1.0);
+  let cornerRay = vec2f(
+    RAY_ANGLE_REFERENCE_TAN_HALF_HFOV,
+    RAY_ANGLE_REFERENCE_TAN_HALF_HFOV * aspectY,
+  );
+  let maxIncidence = 1.0 - (1.0 / sqrt(dot(cornerRay, cornerRay) + 1.0));
+  let normalized = clamp(incidence / max(maxIncidence, 1e-5), 0.0, 1.0);
+  return smoothstep(clamp(innerThreshold, 0.0, 0.8), 1.0, pow(normalized, 1.4));
 }
 
 // Soft shoulder: map HDR glow energy into a [0,1] screen-blend opacity so
@@ -179,6 +204,17 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
   //   >= 1.5   = internal debug view: render raw depth texture as grayscale
   //              (bypasses all subsequent stages — for alignment check only).
   let depthMistGain = clamp(uComposite.lens.w, 0.0, 2.0);
+
+  if (uComposite.debug.x >= 0.5) {
+    let imageUv = fitUv(uv, resolution, imageResolution, fitMode);
+    let m = rayAngleMask(
+      imageUv,
+      imageResolution,
+      uComposite.optics.xy,
+      uComposite.optics.z,
+    ) * insideUv(imageUv);
+    return vec4f(m, m, m, 1.0);
+  }
 
   // Debug view: show the depth texture directly over the image-space UV
   // so we can confirm the AI depth map is uploaded and aligned before

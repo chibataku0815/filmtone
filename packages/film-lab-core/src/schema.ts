@@ -2,6 +2,7 @@ import { z } from "zod";
 import { PARAM_KEYS, type ParamKey, type Params } from "./params";
 import { PRESETS, type PresetName } from "./presets";
 import { PRESET_VERSION } from "./look-ids";
+import type { CameraOptics } from "./native-bridge";
 
 type ParamSchemaShape = {
   [K in ParamKey]: z.ZodType<Params[K]>;
@@ -16,6 +17,26 @@ function schemaForParamKey(key: ParamKey): z.ZodType<number> {
         ? z.number().min(0).max(1).default(0)
         : key === "depthMistGain" || key === "depthGlowGain"
           ? z.number().min(0).max(1).default(0)
+        : key === "depthRayAngleGamma"
+          ? z.number().min(0.1).max(4).default(1.4)
+        : key === "depthRayAngleInnerThreshold"
+          ? z.number().min(0).max(0.8).default(0.1)
+        : key === "depthMistRayAngleGain"
+          ? z.number().min(0).max(1).default(0.35)
+        : key === "depthBloomRayAngleGain"
+          ? z.number().min(0).max(1).default(0.25)
+        : key === "depthHalationRayAngleGain"
+          ? z.number().min(0).max(1).default(0.18)
+        : key === "depthMistFieldPsfGain" ||
+            key === "depthBloomFieldPsfGain" ||
+            key === "depthHalationFieldPsfGain"
+          ? z.number().min(0).max(1).default(1)
+        : key === "depthMistFieldPsfRadiusPx"
+          ? z.number().min(0).max(64).default(18)
+        : key === "depthBloomFieldPsfRadiusPx"
+          ? z.number().min(0).max(64).default(9)
+        : key === "depthHalationFieldPsfRadiusPx"
+          ? z.number().min(0).max(64).default(12)
         : key === "lensSoftness"
           ? z.number().min(0).max(1).default(0)
           : key === "compressionRange"
@@ -64,6 +85,8 @@ function schemaForParamKey(key: ParamKey): z.ZodType<number> {
                                                       ? z.number().min(0).max(1).default(0.35)
                                                       : key === "crossFilterAngleGamma"
                                                         ? z.number().min(0.1).max(4).default(1.4)
+                                                        : key === "crossFilterAngleInnerThreshold"
+                                                          ? z.number().min(0).max(0.8).default(0.1)
                                                         : key === "crossFilterEdgeLengthGain"
                                                           ? z.number().min(0).max(1).default(0.45)
                                                           : key === "crossFilterEdgeStrengthGain"
@@ -104,6 +127,20 @@ export const filmLabDepthTrackSchema = z.object({
 
 export type FilmLabDepthTrackInput = z.infer<typeof filmLabDepthTrackSchema>;
 
+export const cameraOpticsSchema = z.object({
+  source: z.enum(["metadata", "assumed", "manual"]),
+  fxPx: z.number().positive().optional(),
+  fyPx: z.number().positive().optional(),
+  cxPx: z.number().optional(),
+  cyPx: z.number().optional(),
+  fovXDeg: z.number().min(1).max(178).optional(),
+  fovYDeg: z.number().min(1).max(178).optional(),
+  focalLength35mm: z.number().positive().optional(),
+  lensModel: z.string().min(1).optional(),
+  cameraMake: z.string().min(1).optional(),
+  cameraModel: z.string().min(1).optional(),
+}) satisfies z.ZodType<CameraOptics>;
+
 /**
  * Remotion Composition 向け: ルック ID + バージョン + 数値グレード
  */
@@ -113,6 +150,8 @@ export const filmLookGradeInputSchema = z.object({
   grade: filmLabParamsSchema,
   /** Optional depth track that drives depth-aware Mist / Glow across preview and export. */
   depthTrack: filmLabDepthTrackSchema.optional(),
+  /** Optional source camera optics for ray-angle masks. */
+  cameraOptics: cameraOpticsSchema.nullable().optional(),
   /**
    * Input Transform LUT（グレーディング前 — Log→Rec709 等）。
    * 未指定のときは Input Transform をかけない。
@@ -149,6 +188,7 @@ export type FilmLookGradeInputProps = Omit<
   "grade"
 > & {
   grade: Params;
+  cameraOptics?: CameraOptics | null;
 };
 
 /**
