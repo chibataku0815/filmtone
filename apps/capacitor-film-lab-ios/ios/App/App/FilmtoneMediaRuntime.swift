@@ -277,13 +277,17 @@ final class FilmtoneMediaRuntime {
     @MainActor
     func shareOutput(
         uri: String,
+        sidecarUri: String? = nil,
         title: String? = nil,
         text: String? = nil,
         presenting: UIViewController
     ) async throws {
-        let fileURL = try resolveFileURL(uri)
+        var urls: [URL] = [try resolveFileURL(uri)]
+        if let sidecarUri, let sidecarURL = try? resolveFileURL(sidecarUri) {
+            urls.append(sidecarURL)
+        }
         try await shareOutput(
-            fileURL: fileURL,
+            fileURLs: urls,
             title: title,
             text: text,
             presenting: presenting
@@ -292,14 +296,14 @@ final class FilmtoneMediaRuntime {
 
     @MainActor
     func shareOutput(
-        fileURL: URL,
+        fileURLs: [URL],
         title: String? = nil,
         text: String? = nil,
         presenting: UIViewController
     ) async throws {
         let shareSheetService = ShareSheetService()
         _ = try await shareSheetService.share(
-            fileURL: fileURL,
+            fileURLs: fileURLs,
             title: title,
             text: text,
             presenting: presenting
@@ -330,7 +334,10 @@ final class FilmtoneMediaRuntime {
             fileSizeBytes: result.fileSizeBytes,
             realtimeRatio: result.realtimeRatio,
             audioPreserved: result.audioPreserved,
-            benchmarkRecord: benchmarkRecord
+            benchmarkRecord: benchmarkRecord,
+            // T2 (v1.1): carry the sidecar URI through benchmark reconstruction —
+            // without this rebuild preserving it, the UI share chain would lose the JSON URL.
+            sidecarUri: result.sidecarUri
         )
         return result
     }

@@ -763,7 +763,10 @@ final class FilmtoneEditorStore: ObservableObject {
         }
 
         do {
-            try await facade.shareOutput(uri: exportResult.outputUri)
+            try await facade.shareOutput(
+                mediaURI: exportResult.outputUri,
+                sidecarURI: exportResult.sidecarUri
+            )
         } catch {
             self.error = strings.userMessage(for: error, context: .share)
         }
