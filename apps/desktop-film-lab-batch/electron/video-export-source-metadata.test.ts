@@ -3,7 +3,11 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { deriveVideoDisplayGeometryFromFfprobeStream } from "./video-export-source-metadata";
+import {
+  classifySourceColorForExport,
+  deriveSourceColorMetadataFromFfprobeStream,
+  deriveVideoDisplayGeometryFromFfprobeStream,
+} from "./video-export-source-metadata";
 
 describe("video-export-source-metadata", () => {
   it("keeps raw dimensions when no rotation metadata is present", () => {
@@ -123,3 +127,97 @@ describe("video-export-source-metadata", () => {
   });
 });
 
+describe("source color metadata", () => {
+  it("classifies explicit BT.709 metadata as SDR BT.709", () => {
+    const color = deriveSourceColorMetadataFromFfprobeStream({
+      color_range: "tv",
+      color_space: "bt709",
+      color_transfer: "bt709",
+      color_primaries: "bt709",
+    });
+
+    expect(color).toEqual({
+      colorRange: "tv",
+      colorSpace: "bt709",
+      colorTransfer: "bt709",
+      colorPrimaries: "bt709",
+      hasMasteringDisplayMetadata: false,
+      hasContentLightMetadata: false,
+    });
+    expect(classifySourceColorForExport(color)).toBe("sdr-bt709");
+  });
+
+  it("classifies SMPTE 2084 transfer as HDR PQ", () => {
+    const color = deriveSourceColorMetadataFromFfprobeStream({
+      color_range: "tv",
+      color_space: "bt2020nc",
+      color_transfer: "smpte2084",
+      color_primaries: "bt2020",
+      side_data_list: [
+        {
+          side_data_type: "Mastering display metadata",
+        },
+        {
+          side_data_type: "Content light level metadata",
+        },
+      ],
+    });
+
+    expect(color.hasMasteringDisplayMetadata).toBe(true);
+    expect(color.hasContentLightMetadata).toBe(true);
+    expect(classifySourceColorForExport(color)).toBe("hdr-pq");
+  });
+
+  it("classifies ARIB STD-B67 transfer as HDR HLG", () => {
+    const color = deriveSourceColorMetadataFromFfprobeStream({
+      color_space: "bt2020nc",
+      color_transfer: "arib-std-b67",
+      color_primaries: "bt2020",
+    });
+
+    expect(classifySourceColorForExport(color)).toBe("hdr-hlg");
+  });
+
+  it("classifies BT.2020 without transfer metadata as wide-gamut unknown", () => {
+    const color = deriveSourceColorMetadataFromFfprobeStream({
+      color_space: "bt2020nc",
+      color_primaries: "bt2020",
+    });
+
+    expect(classifySourceColorForExport(color)).toBe("wide-gamut-unknown");
+  });
+
+  it("classifies HDR side data without explicit transfer as wide-gamut unknown", () => {
+    const color = deriveSourceColorMetadataFromFfprobeStream({
+      color_space: "bt709",
+      color_transfer: "bt709",
+      color_primaries: "bt709",
+      side_data_list: [
+        {
+          side_data_type: "Mastering display metadata",
+        },
+      ],
+    });
+
+    expect(classifySourceColorForExport(color)).toBe("wide-gamut-unknown");
+  });
+
+  it("normalizes missing or unspecified color metadata to unknown", () => {
+    const color = deriveSourceColorMetadataFromFfprobeStream({
+      color_range: "unknown",
+      color_space: "unspecified",
+      color_transfer: "",
+      color_primaries: "reserved",
+    });
+
+    expect(color).toEqual({
+      colorRange: null,
+      colorSpace: null,
+      colorTransfer: null,
+      colorPrimaries: null,
+      hasMasteringDisplayMetadata: false,
+      hasContentLightMetadata: false,
+    });
+    expect(classifySourceColorForExport(color)).toBe("unknown");
+  });
+});

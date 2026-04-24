@@ -801,6 +801,8 @@ export async function runVideoExportPipeline(options: {
   const sourceRawWidth = sourceDisplayGeometry?.rawWidth ?? probe.width;
   const sourceRawHeight = sourceDisplayGeometry?.rawHeight ?? probe.height;
   const sourceRotationDeg = sourceDisplayGeometry?.rotationDeg ?? null;
+  const sourceColorMetadata = probe.sourceVideoMetadata?.color;
+  const sourceColorClass = probe.sourceVideoMetadata?.colorClass ?? null;
 
   try {
     assertVideoImportWithinCaps(
@@ -838,6 +840,15 @@ export async function runVideoExportPipeline(options: {
         ? `, ソースFPS信頼 ~${probe.sourceFrameRate.toFixed(4)}（同一ソースフレームはシーク省略）`
         : `, ソースFPS不信任（ソースフレーム索引の再利用なし）`),
   );
+  if (sourceColorMetadata && sourceColorClass) {
+    onLog(
+      `[動画] 色メタデータ ${sourceColorClass}: range=${sourceColorMetadata.colorRange ?? "unknown"}, space=${sourceColorMetadata.colorSpace ?? "unknown"}, transfer=${sourceColorMetadata.colorTransfer ?? "unknown"}, primaries=${sourceColorMetadata.colorPrimaries ?? "unknown"}` +
+        (sourceColorMetadata.hasMasteringDisplayMetadata
+          ? ", mastering-display"
+          : "") +
+        (sourceColorMetadata.hasContentLightMetadata ? ", content-light" : ""),
+    );
+  }
 
   // --- Mezzanine transcode (ProRes 422) for heavy codecs ---
   let mezzaninePath: string | null = null;

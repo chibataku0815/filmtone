@@ -49,8 +49,26 @@ export type SourceDisplayGeometry = {
   source: "ffprobe-side-data" | "ffprobe-tags" | "raw";
 };
 
+export type SourceColorMetadata = {
+  colorRange: string | null;
+  colorSpace: string | null;
+  colorTransfer: string | null;
+  colorPrimaries: string | null;
+  hasMasteringDisplayMetadata: boolean;
+  hasContentLightMetadata: boolean;
+};
+
+export type SourceColorClass =
+  | "sdr-bt709"
+  | "hdr-pq"
+  | "hdr-hlg"
+  | "wide-gamut-unknown"
+  | "unknown";
+
 export type SourceVideoMetadata = {
   display: SourceDisplayGeometry;
+  color: SourceColorMetadata;
+  colorClass: SourceColorClass;
 };
 
 /**

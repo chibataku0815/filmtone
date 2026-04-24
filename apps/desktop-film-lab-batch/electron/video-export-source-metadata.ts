@@ -15,7 +15,25 @@ export type SourceDisplayGeometry = {
 
 export type SourceVideoMetadata = {
   display: SourceDisplayGeometry;
+  color: SourceColorMetadata;
+  colorClass: SourceColorClass;
 };
+
+export type SourceColorMetadata = {
+  colorRange: string | null;
+  colorSpace: string | null;
+  colorTransfer: string | null;
+  colorPrimaries: string | null;
+  hasMasteringDisplayMetadata: boolean;
+  hasContentLightMetadata: boolean;
+};
+
+export type SourceColorClass =
+  | "sdr-bt709"
+  | "hdr-pq"
+  | "hdr-hlg"
+  | "wide-gamut-unknown"
+  | "unknown";
 
 export type FfprobeDisplayGeometryInput = {
   rawWidth: number;
@@ -77,6 +95,20 @@ function tagsFrom(container: FfprobeRecord | undefined): FfprobeRecord {
   return isRecord(container?.tags) ? container.tags : {};
 }
 
+function normalizedString(value: unknown): string | null {
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  const text = String(value).trim().toLowerCase();
+  if (
+    text.length === 0 ||
+    text === "unknown" ||
+    text === "unspecified" ||
+    text === "reserved"
+  ) {
+    return null;
+  }
+  return text;
+}
+
 function displayDimensions(
   rawWidth: number,
   rawHeight: number,
@@ -101,6 +133,24 @@ function rotationFromSideData(
     if (rotation !== null) return rotation;
   }
   return null;
+}
+
+function hasSideDataType(
+  stream: FfprobeRecord | undefined,
+  sideDataTypes: readonly string[],
+): boolean {
+  const wanted = new Set(sideDataTypes.map((value) => value.toLowerCase()));
+  const sideData = Array.isArray(stream?.side_data_list)
+    ? stream.side_data_list
+    : [];
+  for (const item of sideData) {
+    if (!isRecord(item)) continue;
+    const sideDataType = normalizedString(item.side_data_type);
+    if (sideDataType !== null && wanted.has(sideDataType)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function rotationFromTags(
@@ -144,3 +194,53 @@ export function deriveVideoDisplayGeometryFromFfprobeStream(
   };
 }
 
+export function deriveSourceColorMetadataFromFfprobeStream(
+  stream: FfprobeRecord | undefined,
+): SourceColorMetadata {
+  return {
+    colorRange: normalizedString(stream?.color_range),
+    colorSpace: normalizedString(stream?.color_space),
+    colorTransfer: normalizedString(stream?.color_transfer),
+    colorPrimaries: normalizedString(stream?.color_primaries),
+    hasMasteringDisplayMetadata: hasSideDataType(stream, [
+      "Mastering display metadata",
+    ]),
+    hasContentLightMetadata: hasSideDataType(stream, [
+      "Content light level metadata",
+    ]),
+  };
+}
+
+export function classifySourceColorForExport(
+  metadata: SourceColorMetadata,
+): SourceColorClass {
+  if (metadata.colorTransfer === "smpte2084") {
+    return "hdr-pq";
+  }
+  if (metadata.colorTransfer === "arib-std-b67") {
+    return "hdr-hlg";
+  }
+
+  const hasBt2020 =
+    metadata.colorPrimaries === "bt2020" ||
+    metadata.colorSpace === "bt2020" ||
+    metadata.colorSpace === "bt2020nc" ||
+    metadata.colorSpace === "bt2020c";
+  if (
+    hasBt2020 ||
+    metadata.hasMasteringDisplayMetadata ||
+    metadata.hasContentLightMetadata
+  ) {
+    return "wide-gamut-unknown";
+  }
+
+  const isBt709 =
+    metadata.colorPrimaries === "bt709" &&
+    (metadata.colorSpace === "bt709" || metadata.colorSpace === null) &&
+    (metadata.colorTransfer === "bt709" || metadata.colorTransfer === null);
+  if (isBt709) {
+    return "sdr-bt709";
+  }
+
+  return "unknown";
+}
