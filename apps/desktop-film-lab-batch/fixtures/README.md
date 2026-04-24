@@ -1,12 +1,12 @@
 # Filmtone Desktop Test Fixtures
 
 Last updated: 2026-04-24
-Status: **skeleton — video files not yet provided**
+Status: **policy synthetic fixtures present — real camera fixtures still needed for pixel validation**
 
 ## 1. Purpose
 
 Integration-grade video fixtures for Filmtone Desktop export policy tests.
-First use case is verifying the HDR preparation policy (`apps/desktop-film-lab-batch/electron/video-export-source-metadata.ts`) against real PQ / HLG / SDR BT.709 sources without committing large or privacy-sensitive footage.
+First use case is verifying the HDR preparation policy (`apps/desktop-film-lab-batch/electron/video-export-source-metadata.ts`) against PQ / HLG / SDR BT.709 metadata without committing large or privacy-sensitive footage.
 
 Synthetic ffprobe JSON tests still live next to the source modules. This tree is for cases that need a real container / real stream metadata.
 
@@ -16,10 +16,13 @@ Synthetic ffprobe JSON tests still live next to the source modules. This tree is
 fixtures/
   video/
     hdr/
-      iphone-hlg-1s-<hash>.mov       # iPhone HDR Video trim (HLG, bt2020, arib-std-b67)
-      generic-pq-1s-<hash>.mp4       # HDR10 / PQ trim (smpte2084, bt2020nc)
+      synthetic-hlg-1s-20260424.mp4  # synthetic metadata fixture (HLG, bt2020, arib-std-b67)
+      synthetic-pq-1s-20260424.mp4   # synthetic metadata fixture (PQ, bt2020, smpte2084)
+      iphone-hlg-1s-<hash>.mov       # future real iPhone HDR Video trim
+      generic-pq-1s-<hash>.mp4       # future real HDR10 / PQ trim
     sdr/
-      s1ii-bt709-1s-<hash>.mp4       # SDR BT.709 regression
+      synthetic-bt709-1s-20260424.mp4 # synthetic metadata fixture (BT.709)
+      s1ii-bt709-1s-<hash>.mp4        # future real SDR BT.709 regression
   README.md                           # this file
 ```
 
@@ -29,6 +32,8 @@ fixtures/
 - **Size**: < 5 MB each. Avoid git-lfs for now.
 - **Content**: static / landscape / non-identifiable. No people, no GPS-identifying landmarks, no audio with speech.
 - **Rotation**: prefer sources without Display Matrix rotation (separate fixtures later if needed).
+
+The committed `synthetic-*` fixtures are small generated clips used to keep the metadata policy harness live in CI. They are sufficient for ffprobe classification and capability-branch regression. They are **not** sufficient for visual HDR tone-mapping acceptance; real camera PQ / HLG trims are still required before wiring pixel-changing filters.
 
 ## 4. Per-fixture oracle (`<basename>.ffprobe.json`)
 

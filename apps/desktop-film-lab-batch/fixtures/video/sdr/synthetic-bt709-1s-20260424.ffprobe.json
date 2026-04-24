@@ -1,0 +1,37 @@
+{
+  "expected": {
+    "colorClass": "sdr-bt709",
+    "policyByCapability": {
+      "missingHdrFilters": {
+        "strategy": "none",
+        "reason": "source-is-sdr-bt709"
+      },
+      "zscaleOnly": {
+        "strategy": "none",
+        "reason": "source-is-sdr-bt709"
+      },
+      "libplaceboOnly": {
+        "strategy": "none",
+        "reason": "source-is-sdr-bt709"
+      },
+      "zscaleAndLibplacebo": {
+        "strategy": "none",
+        "reason": "source-is-sdr-bt709"
+      }
+    }
+  },
+  "ffprobe": {
+    "streams": [
+      {
+        "codec_type": "video",
+        "width": 320,
+        "height": 180,
+        "pix_fmt": "yuv420p",
+        "color_range": "tv",
+        "color_space": "bt709",
+        "color_transfer": "bt709",
+        "color_primaries": "bt709"
+      }
+    ]
+  }
+}

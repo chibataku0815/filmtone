@@ -1,0 +1,37 @@
+{
+  "expected": {
+    "colorClass": "hdr-hlg",
+    "policyByCapability": {
+      "missingHdrFilters": {
+        "strategy": "defer-unknown",
+        "reason": "ffmpeg-missing-hdr-filters"
+      },
+      "zscaleOnly": {
+        "strategy": "prepare-sdr-mezzanine",
+        "reason": "source-is-hdr-hlg"
+      },
+      "libplaceboOnly": {
+        "strategy": "prepare-sdr-mezzanine",
+        "reason": "source-is-hdr-hlg"
+      },
+      "zscaleAndLibplacebo": {
+        "strategy": "prepare-sdr-mezzanine",
+        "reason": "source-is-hdr-hlg"
+      }
+    }
+  },
+  "ffprobe": {
+    "streams": [
+      {
+        "codec_type": "video",
+        "width": 320,
+        "height": 180,
+        "pix_fmt": "yuv420p",
+        "color_range": "tv",
+        "color_space": "bt2020nc",
+        "color_transfer": "arib-std-b67",
+        "color_primaries": "bt2020"
+      }
+    ]
+  }
+}
