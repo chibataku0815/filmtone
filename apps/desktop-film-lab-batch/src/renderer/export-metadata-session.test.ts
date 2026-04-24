@@ -213,6 +213,69 @@ describe("export metadata session", () => {
     expect(parseFilmtoneExportSessionV1(session)?.input.cameraOptics).toBeUndefined();
   });
 
+  it("round-trips normalized source video metadata on video sidecars", () => {
+    const cinematic = batchGradeStateFromPreset("cinematic");
+    const session = buildFilmtoneExportSession({
+      exportedAtIso: "2026-04-24T12:34:56.000Z",
+      appVersion: "1.2.3",
+      job: "video",
+      inputDir: null,
+      videoInputPath: "/Users/tester/input/hdr-portrait.mov",
+      outputDir: "/Users/tester/output",
+      imageFormat: null,
+      outputFilenameSuffix: null,
+      outputFileName: "hdr-portrait-graded.mp4",
+      batchPresetChoice: "cinematic",
+      lookSource: "preset",
+      gradeParams: cinematic.params,
+      depthTrack: null,
+      lutRefs: createEmptyMetadataLutRefs(),
+      sourceVideoMetadata: {
+        display: {
+          rawWidth: 3840,
+          rawHeight: 2160,
+          displayWidth: 2160,
+          displayHeight: 3840,
+          rotationDeg: 90,
+          source: "ffprobe-side-data",
+        },
+        color: {
+          colorRange: "tv",
+          colorSpace: "bt2020nc",
+          colorTransfer: "arib-std-b67",
+          colorPrimaries: "bt2020",
+          hasMasteringDisplayMetadata: false,
+          hasContentLightMetadata: false,
+        },
+        colorClass: "hdr-hlg",
+      },
+    });
+
+    const parsed = parseFilmtoneExportSessionV1(
+      JSON.parse(exportFilmtoneExportSessionJsonText(session)) as unknown,
+    );
+
+    expect(parsed?.input.sourceVideoMetadata).toEqual({
+      display: {
+        rawWidth: 3840,
+        rawHeight: 2160,
+        displayWidth: 2160,
+        displayHeight: 3840,
+        rotationDeg: 90,
+        source: "ffprobe-side-data",
+      },
+      color: {
+        colorRange: "tv",
+        colorSpace: "bt2020nc",
+        colorTransfer: "arib-std-b67",
+        colorPrimaries: "bt2020",
+        hasMasteringDisplayMetadata: false,
+        hasContentLightMetadata: false,
+      },
+      colorClass: "hdr-hlg",
+    });
+  });
+
   it("serializes depth-track metadata in both wrapper and sidecar roots", () => {
     const cinematic = batchGradeStateFromPreset("cinematic");
     const depthTrack = {

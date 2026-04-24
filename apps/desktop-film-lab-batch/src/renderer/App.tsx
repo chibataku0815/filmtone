@@ -47,6 +47,7 @@ import {
 import { FilmLabControlPanelCore } from "film-lab-ui";
 import { Histogram } from "film-lab-ui";
 import { HelpHint } from "./batch-tab/HelpHint";
+import type { SourceVideoMetadata } from "./desktop-api";
 import { GradeSyncToast, type GradeSyncToastPayload } from "./GradeSyncToast";
 import {
   OpticalFinishRecommendationPanel,
@@ -1685,6 +1686,7 @@ export default function App() {
       lutRefs?: MetadataLutRefs;
       opticalRecommendation?: AppliedOpticalRecommendationMetadata | null;
       cameraOptics?: CameraOptics | null;
+      sourceVideoMetadata?: SourceVideoMetadata | null;
     }) => {
       const exportedAtIso = new Date().toISOString();
       const cameraOptics =
@@ -1707,6 +1709,7 @@ export default function App() {
         opticalRecommendation:
           payload.opticalRecommendation ?? appliedOpticalRecommendation,
         cameraOptics,
+        sourceVideoMetadata: payload.sourceVideoMetadata ?? null,
       });
       return {
         exportedAtIso,
@@ -2096,9 +2099,11 @@ export default function App() {
 
     let estimateFrames = 1;
     let videoCameraOptics: CameraOptics | null = null;
+    let videoSourceMetadata: SourceVideoMetadata | null = null;
     try {
       const meta = await window.filmLabBatch.videoExportProbe(videoInputPath);
       videoCameraOptics = sourceCameraOptics ?? meta.cameraOptics;
+      videoSourceMetadata = meta.sourceVideoMetadata ?? null;
       setSourceCameraOptics(videoCameraOptics);
       assertVideoImportWithinCaps(meta.width, meta.height, meta.durationSec);
       estimateFrames = computeExportFrameCount(meta.durationSec);
@@ -2121,6 +2126,7 @@ export default function App() {
       outputFilenameSuffix: null,
       outputFileName: outName,
       cameraOptics: videoCameraOptics,
+      sourceVideoMetadata: videoSourceMetadata,
     });
     const videoSidecarPath = buildVideoMetadataSidecarPath(
       effectiveOutputDir,

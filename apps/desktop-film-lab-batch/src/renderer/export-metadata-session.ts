@@ -14,6 +14,7 @@ import {
 } from "film-lab-core";
 import type { BatchFormat } from "./batch-pipeline";
 import type { BatchDepthTrack } from "./depth-track";
+import type { SourceVideoMetadata } from "./desktop-api";
 import { buildGradeJsonPayload } from "./grade-io";
 
 export const METADATA_LOOK_SOURCES = [
@@ -84,6 +85,38 @@ const cameraOpticsSchema = z.object({
   cameraMake: z.string().min(1).optional(),
   cameraModel: z.string().min(1).optional(),
 });
+const sourceDisplayGeometrySchema = z.object({
+  rawWidth: z.number().positive(),
+  rawHeight: z.number().positive(),
+  displayWidth: z.number().positive(),
+  displayHeight: z.number().positive(),
+  rotationDeg: z.union([
+    z.literal(0),
+    z.literal(90),
+    z.literal(180),
+    z.literal(270),
+  ]).nullable(),
+  source: z.enum(["ffprobe-side-data", "ffprobe-tags", "raw"]),
+});
+const sourceColorMetadataSchema = z.object({
+  colorRange: z.string().min(1).nullable(),
+  colorSpace: z.string().min(1).nullable(),
+  colorTransfer: z.string().min(1).nullable(),
+  colorPrimaries: z.string().min(1).nullable(),
+  hasMasteringDisplayMetadata: z.boolean(),
+  hasContentLightMetadata: z.boolean(),
+});
+const sourceVideoMetadataSchema = z.object({
+  display: sourceDisplayGeometrySchema,
+  color: sourceColorMetadataSchema,
+  colorClass: z.enum([
+    "sdr-bt709",
+    "hdr-pq",
+    "hdr-hlg",
+    "wide-gamut-unknown",
+    "unknown",
+  ]),
+});
 
 const opticalFamilySchema = z.enum(["mist", "glow", "cross", "lens"]);
 const behaviorProfileSchema = z.enum([
@@ -121,6 +154,7 @@ const filmtoneExportSessionSchema = z.object({
     inputDir: z.string().min(1).nullable(),
     videoInputPath: z.string().min(1).nullable(),
     cameraOptics: cameraOpticsSchema.optional(),
+    sourceVideoMetadata: sourceVideoMetadataSchema.optional(),
   }),
   output: z.object({
     outputDir: z.string().min(1),
@@ -297,6 +331,7 @@ export function buildFilmtoneExportSession(params: {
   lutRefs: MetadataLutRefs;
   opticalRecommendation?: AppliedOpticalRecommendationMetadata | null;
   cameraOptics?: CameraOptics | null;
+  sourceVideoMetadata?: SourceVideoMetadata | null;
 }): FilmtoneExportSessionV1 {
   const normalizedInputDir = params.job === "images" ? params.inputDir : null;
   const normalizedVideoInputPath =
@@ -312,6 +347,9 @@ export function buildFilmtoneExportSession(params: {
       inputDir: normalizedInputDir,
       videoInputPath: normalizedVideoInputPath,
       ...(params.cameraOptics ? { cameraOptics: params.cameraOptics } : {}),
+      ...(params.job === "video" && params.sourceVideoMetadata
+        ? { sourceVideoMetadata: params.sourceVideoMetadata }
+        : {}),
     },
     output: {
       outputDir: params.outputDir,
