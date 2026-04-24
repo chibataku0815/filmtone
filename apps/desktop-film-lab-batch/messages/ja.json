@@ -621,7 +621,7 @@
         "sessionRestoreFailed": "セッションのルック復元に失敗: {msg}",
         "sessionDiscarded": "保存していた「まとめて書き出し」の途中記録を消しました。",
         "proxyCachePurged": "プロキシキャッシュを消去しました（{entries} 件 / {bytes} bytes）。",
-        "videoMetaLine": "{w}×{h}, {sec}秒 · {codec} · 出力 {ow}×{oh} · {fps}fps · {frames} フレーム（読込上限 4K / {maxSec}秒）",
+        "videoMetaLine": "{w}×{h}, {sec}秒 · {codec} · 出力 {ow}×{oh} · {fps}fps · {frames} フレーム · {camera}（読込上限 4K / {maxSec}秒）",
         "videoMetaLogPrefix": "動画メタデータ: {msg}",
         "videoPickFirst": "動画: 先に動画ファイルを選んでください。",
         "videoOutputUnset": "動画: 出力フォルダが未設定です。保存先フォルダを選ぶダイアログを開きます。",

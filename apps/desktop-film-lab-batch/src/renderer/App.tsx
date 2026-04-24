@@ -127,6 +127,7 @@ import {
   useProgressiveLoad,
   type ProgressiveTextureSwapPayload,
 } from "./use-progressive-load";
+import { formatCameraOpticsForProbeLabel } from "./video-probe-label";
 
 /** @description 右上ツールバーとホットキー Mod+1/2/3 の対象となるトップ面 */
 type TabId = "edit" | "photoExport" | "videoExport";
@@ -916,9 +917,11 @@ export default function App() {
   const applyPickedVideoPath = useCallback(
     async (p: string, preferredCameraOptics: CameraOptics | null = null) => {
       setVideoInputPath(p);
+      setSourceCameraOptics(preferredCameraOptics);
       try {
         const meta = await window.filmLabBatch.videoExportProbe(p);
-        setSourceCameraOptics(preferredCameraOptics ?? meta.cameraOptics);
+        const displayCameraOptics = preferredCameraOptics ?? meta.cameraOptics;
+        setSourceCameraOptics(displayCameraOptics);
         assertVideoImportWithinCaps(meta.width, meta.height, meta.durationSec);
         const { outW, outH } = computeVideoExportDimensions(
           meta.width,
@@ -936,6 +939,7 @@ export default function App() {
             fps: String(VIDEO_EXPORT_FPS),
             frames: String(frames),
             maxSec: String(VIDEO_IMPORT_MAX_DURATION_SEC),
+            camera: formatCameraOpticsForProbeLabel(displayCameraOptics),
           }),
         );
       } catch (e) {
@@ -2094,8 +2098,8 @@ export default function App() {
     let videoCameraOptics: CameraOptics | null = null;
     try {
       const meta = await window.filmLabBatch.videoExportProbe(videoInputPath);
-      videoCameraOptics = meta.cameraOptics;
-      setSourceCameraOptics(meta.cameraOptics);
+      videoCameraOptics = sourceCameraOptics ?? meta.cameraOptics;
+      setSourceCameraOptics(videoCameraOptics);
       assertVideoImportWithinCaps(meta.width, meta.height, meta.durationSec);
       estimateFrames = computeExportFrameCount(meta.durationSec);
     } catch (e) {
@@ -2158,6 +2162,7 @@ export default function App() {
           outputDir: effectiveOutputDir,
           outputFileName: outName,
           grade: batchGrade,
+          cameraOptics: videoCameraOptics,
           signal: abortController.signal,
           onProgress: (pr) => {
             scheduleVideoProgress(pr);

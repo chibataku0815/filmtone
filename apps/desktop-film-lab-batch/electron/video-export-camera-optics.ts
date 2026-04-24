@@ -106,6 +106,18 @@ function firstTagString(
   return stringFromTagValue(tagValue(streamTags, formatTags, keys));
 }
 
+function firstTagOpticsSource(
+  streamTags: FfprobeRecord,
+  formatTags: FfprobeRecord,
+): CameraOptics["source"] | null {
+  const value = firstTagString(streamTags, formatTags, [
+    "filmtone.camera_optics.source",
+  ]);
+  return value === "metadata" || value === "assumed" || value === "manual"
+    ? value
+    : null;
+}
+
 function degToRad(deg: number): number {
   return (deg * Math.PI) / 180;
 }
@@ -213,6 +225,7 @@ export function deriveCameraOpticsFromFfprobeMeta(
   const formatTags = tagsFrom(input.format);
   const rotationDeg = rotationFromSideData(input.stream);
   const display = displayDimensions(rawWidth, rawHeight, rotationDeg);
+  const taggedOpticsSource = firstTagOpticsSource(streamTags, formatTags);
   const cameraMake = firstTagString(streamTags, formatTags, [
     "camera.make",
     "com.apple.quicktime.camera.make",
@@ -261,7 +274,7 @@ export function deriveCameraOpticsFromFfprobeMeta(
   if (fovXDeg !== null && fovXDeg > 0 && fovXDeg < 179) {
     const focalPx = focalPxFromFov(display.width, fovXDeg);
     return compactOptics({
-      source: "metadata",
+      source: taggedOpticsSource ?? "metadata",
       fxPx: focalPx,
       fyPx: focalPx,
       cxPx: display.width / 2,
@@ -275,7 +288,7 @@ export function deriveCameraOpticsFromFfprobeMeta(
   if (focalLength35mm !== null) {
     return compactOptics(
       opticsFromDiagonalFov(
-        "metadata",
+        taggedOpticsSource ?? "metadata",
         display.width,
         display.height,
         diagonalFovFrom35mmFocal(focalLength35mm),

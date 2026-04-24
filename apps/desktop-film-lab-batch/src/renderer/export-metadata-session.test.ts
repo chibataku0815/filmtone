@@ -158,13 +158,17 @@ describe("export metadata session", () => {
       depthTrack: null,
       lutRefs: createEmptyMetadataLutRefs(),
       cameraOptics: {
-        source: "assumed",
+        source: "manual",
         fxPx: 1566.7,
         fyPx: 1566.7,
         cxPx: 960,
         cyPx: 540,
         fovXDeg: 63,
         fovYDeg: 38,
+        focalLength35mm: 28,
+        lensModel: "Wide Camera",
+        cameraMake: "Filmtone",
+        cameraModel: "RoundTrip",
       },
     });
 
@@ -173,13 +177,17 @@ describe("export metadata session", () => {
     );
 
     expect(parsed?.input.cameraOptics).toEqual({
-      source: "assumed",
+      source: "manual",
       fxPx: 1566.7,
       fyPx: 1566.7,
       cxPx: 960,
       cyPx: 540,
       fovXDeg: 63,
       fovYDeg: 38,
+      focalLength35mm: 28,
+      lensModel: "Wide Camera",
+      cameraMake: "Filmtone",
+      cameraModel: "RoundTrip",
     });
   });
 

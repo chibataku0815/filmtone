@@ -621,7 +621,7 @@
         "sessionRestoreFailed": "Could not restore look from session: {msg}",
         "sessionDiscarded": "Cleared saved batch progress.",
         "proxyCachePurged": "Cleared proxy cache ({entries} entries / {bytes} bytes).",
-        "videoMetaLine": "{w}×{h}, {sec}s · {codec} · output {ow}×{oh} · {fps}fps · {frames} frames (max 4K / {maxSec}s)",
+        "videoMetaLine": "{w}×{h}, {sec}s · {codec} · output {ow}×{oh} · {fps}fps · {frames} frames · {camera} (max 4K / {maxSec}s)",
         "videoMetaLogPrefix": "Video metadata: {msg}",
         "videoPickFirst": "Video: choose a video file first.",
         "videoOutputUnset": "Video: output folder not set — opening folder picker.",

@@ -9,6 +9,7 @@ import * as THREE from "three";
 import {
   isWebGPUSupported,
 } from "film-lab-renderer";
+import type { CameraOptics } from "film-lab-core";
 import type { FilmLabBatchBridge } from "./desktop-api";
 import {
   assertVideoImportWithinCaps,
@@ -746,6 +747,7 @@ export async function runVideoExportPipeline(options: {
   outputDir: string;
   outputFileName: string;
   grade: BatchGradeState;
+  cameraOptics?: CameraOptics | null;
   signal?: AbortSignal;
   onProgress?: (p: VideoExportProgress) => void;
   onLog: (line: string) => void;
@@ -763,6 +765,7 @@ export async function runVideoExportPipeline(options: {
     outputDir,
     outputFileName,
     grade,
+    cameraOptics,
     signal,
     onProgress,
     onLog,
@@ -1101,6 +1104,7 @@ export async function runVideoExportPipeline(options: {
             fps: VIDEO_EXPORT_FPS,
             hasAudio: probe.hasAudio,
             dropFirstFrame: renderSession.backendKind === "webgl",
+            cameraOptics: cameraOptics ?? probe.cameraOptics,
           });
           resolvedOutPath = startRes.outputVideoPath;
           exportSessionId = startRes.sessionId;

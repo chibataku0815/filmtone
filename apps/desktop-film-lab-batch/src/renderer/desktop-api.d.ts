@@ -168,6 +168,7 @@ export type FilmLabBatchBridge = {
     fps: number;
     hasAudio: boolean;
     dropFirstFrame: boolean;
+    cameraOptics?: CameraOptics | null;
   }) => Promise<{ outputVideoPath: string; sessionId: string }>;
   videoExportWriteFrame: (payload: {
     sessionId: string;

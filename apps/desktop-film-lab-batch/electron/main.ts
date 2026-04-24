@@ -51,6 +51,10 @@ import {
   type VideoExportPipeController,
 } from "./video-export-stdin";
 import {
+  buildFfmpegRawvideoExportArgs,
+  normalizeCameraOptics,
+} from "./video-export-ffmpeg-args";
+import {
   PROXY_CACHE_PROFILE_VERSION,
   buildProxyCacheKey,
   ensureProxyCacheRoot,
@@ -533,16 +537,6 @@ async function ffprobeVideoMeta(absPath: string): Promise<{
 }
 
 /**
- * @description プラットフォーム別のビデオコーデック引数（スループット優先）
- */
-function ffmpegVideoCodecArgs(): string[] {
-  if (process.platform === "darwin") {
-    return ["-c:v", "h264_videotoolbox", "-b:v", "12M", "-allow_sw", "1"];
-  }
-  return ["-c:v", "libx264", "-preset", "veryfast", "-crf", "21"];
-}
-
-/**
  * @description Progressive loading の 1280px 系ステージに合わせた偶数解像度を計算します。
  * ffmpeg の `scale=1280:-2` と同じ考え方で、高さだけ偶数へそろえます。
  * @param sourceWidth 元動画の横幅
@@ -713,85 +707,6 @@ function buildFfmpegMezzanineArgs(
   args.push("-vf", `colorspace=iall=bt709:all=bt709,scale=${outW}:-2,format=yuv420p`);
   args.push("-c:a", "copy", "-y", outputPath);
   return args;
-}
-
-function buildFfmpegRawvideoExportArgs(opts: {
-  width: number;
-  height: number;
-  fps: number;
-  hasAudio: boolean;
-  inputVideoPath: string;
-  outputVideoPath: string;
-  dropFirstFrame: boolean;
-}): string[] {
-  const {
-    width,
-    height,
-    fps,
-    hasAudio,
-    inputVideoPath,
-    outputVideoPath,
-    dropFirstFrame,
-  } = opts;
-  const videoCodec = ffmpegVideoCodecArgs();
-  const head: string[] = [
-    "-hide_banner",
-    "-loglevel",
-    "error",
-    "-y",
-    "-f",
-    "rawvideo",
-    "-pix_fmt",
-    "rgba",
-    "-s",
-    `${width}x${height}`,
-    "-r",
-    String(fps),
-    "-i",
-    "pipe:0",
-  ];
-  if (hasAudio) {
-    head.push(
-      "-i",
-      inputVideoPath,
-      "-map",
-      "0:v:0",
-      "-map",
-      "1:a:0",
-      "-shortest",
-    );
-  } else {
-    head.push("-an");
-  }
-  // Color management: WebGL readPixels emits full-range sRGB (0-255) in bottom-up row order.
-  // vflip restores top-down order (zero-copy row pointer swap in ffmpeg).
-  // scale converts full range to limited range (16-235) for H.264 standard compliance,
-  // and BT.709 color metadata tags ensure correct player interpretation.
-  // See: .claude/knowledge/patterns/2026-03-03-ffmpeg-encoder-pitfalls-pattern.md §4
-  //
-  // WebGL raw readback can emit a stale frame 0 on some Metal / ANGLE paths.
-  // Keep the drop only for that backend; WebGPU exports should preserve frame 0.
-  const colorFilterChain = dropFirstFrame
-    ? "vflip,scale=in_range=full:out_range=limited,select=gte(n\\,1),setpts=N/FRAME_RATE/TB"
-    : "vflip,scale=in_range=full:out_range=limited";
-  head.push(
-    "-vf",
-    colorFilterChain,
-    "-color_range",
-    "tv",
-    "-colorspace",
-    "bt709",
-    "-color_trc",
-    "bt709",
-    "-color_primaries",
-    "bt709",
-  );
-  head.push(...videoCodec);
-  if (hasAudio) {
-    head.push("-c:a", "copy");
-  }
-  head.push(outputVideoPath);
-  return head;
 }
 
 async function listImagePathsInDir(dir: string): Promise<string[]> {
@@ -1477,6 +1392,7 @@ ipcMain.handle("video-export-start", async (_evt, payload: unknown) => {
   const fps = typeof o.fps === "number" ? o.fps : 0;
   const hasAudio = Boolean(o.hasAudio);
   const dropFirstFrame = o.dropFirstFrame === true;
+  const cameraOptics = normalizeCameraOptics(o.cameraOptics);
 
   if (
     !inputVideoPath ||
@@ -1504,6 +1420,7 @@ ipcMain.handle("video-export-start", async (_evt, payload: unknown) => {
     inputVideoPath: inAbs,
     outputVideoPath,
     dropFirstFrame,
+    cameraOptics,
   });
 
   const ffmpeg = (() => {
