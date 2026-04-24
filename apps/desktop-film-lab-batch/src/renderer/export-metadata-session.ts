@@ -106,6 +106,20 @@ const sourceColorMetadataSchema = z.object({
   hasMasteringDisplayMetadata: z.boolean(),
   hasContentLightMetadata: z.boolean(),
 });
+const sourceVideoTimingMetadataSchema = z.object({
+  avgFrameRate: z.string().min(1).nullable(),
+  rFrameRate: z.string().min(1).nullable(),
+  avgFrameRateParsed: z.number().positive().nullable(),
+  rFrameRateParsed: z.number().positive().nullable(),
+  sourceFrameRate: z.number().positive().nullable(),
+  sourceFrameRateTrusted: z.boolean(),
+  trustReason: z.enum([
+    "missing-or-invalid-rate",
+    "rates-diverged",
+    "within-absolute-tolerance",
+    "within-relative-tolerance",
+  ]),
+});
 const sourceVideoMetadataSchema = z.object({
   display: sourceDisplayGeometrySchema,
   color: sourceColorMetadataSchema,
@@ -116,6 +130,7 @@ const sourceVideoMetadataSchema = z.object({
     "wide-gamut-unknown",
     "unknown",
   ]),
+  timing: sourceVideoTimingMetadataSchema.optional(),
 });
 
 const opticalFamilySchema = z.enum(["mist", "glow", "cross", "lens"]);

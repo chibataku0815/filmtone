@@ -521,8 +521,10 @@ async function ffprobeVideoMeta(absPath: string): Promise<{
     throw new Error("ffprobe: duration が不正です");
   }
 
-  const { sourceFrameRate, sourceFrameRateTrusted } =
-    deriveSourceFrameRateTrust(avgFrameRate, rFrameRate);
+  const sourceFrameRateInfo = deriveSourceFrameRateTrust(
+    avgFrameRate,
+    rFrameRate,
+  );
   const sourceColorMetadata = deriveSourceColorMetadataFromFfprobeStream(
     videoStream,
   );
@@ -534,6 +536,7 @@ async function ffprobeVideoMeta(absPath: string): Promise<{
     }),
     color: sourceColorMetadata,
     colorClass: classifySourceColorForExport(sourceColorMetadata),
+    timing: sourceFrameRateInfo,
   };
   const cameraOptics = deriveCameraOpticsFromFfprobeMeta({
     rawWidth: width,
@@ -548,8 +551,8 @@ async function ffprobeVideoMeta(absPath: string): Promise<{
     durationSec,
     hasAudio,
     videoCodec,
-    sourceFrameRate,
-    sourceFrameRateTrusted,
+    sourceFrameRate: sourceFrameRateInfo.sourceFrameRate,
+    sourceFrameRateTrusted: sourceFrameRateInfo.sourceFrameRateTrusted,
     fileSizeBytes,
     cameraOptics,
     sourceVideoMetadata,

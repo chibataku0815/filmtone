@@ -248,6 +248,15 @@ describe("export metadata session", () => {
           hasContentLightMetadata: false,
         },
         colorClass: "hdr-hlg",
+        timing: {
+          avgFrameRate: "30000/1001",
+          rFrameRate: "30000/1001",
+          avgFrameRateParsed: 30000 / 1001,
+          rFrameRateParsed: 30000 / 1001,
+          sourceFrameRate: 30000 / 1001,
+          sourceFrameRateTrusted: true,
+          trustReason: "within-absolute-tolerance",
+        },
       },
     });
 
@@ -273,6 +282,15 @@ describe("export metadata session", () => {
         hasContentLightMetadata: false,
       },
       colorClass: "hdr-hlg",
+      timing: {
+        avgFrameRate: "30000/1001",
+        rFrameRate: "30000/1001",
+        avgFrameRateParsed: 30000 / 1001,
+        rFrameRateParsed: 30000 / 1001,
+        sourceFrameRate: 30000 / 1001,
+        sourceFrameRateTrusted: true,
+        trustReason: "within-absolute-tolerance",
+      },
     });
   });
 

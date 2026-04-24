@@ -803,6 +803,7 @@ export async function runVideoExportPipeline(options: {
   const sourceRotationDeg = sourceDisplayGeometry?.rotationDeg ?? null;
   const sourceColorMetadata = probe.sourceVideoMetadata?.color;
   const sourceColorClass = probe.sourceVideoMetadata?.colorClass ?? null;
+  const sourceTimingMetadata = probe.sourceVideoMetadata?.timing;
 
   try {
     assertVideoImportWithinCaps(
@@ -847,6 +848,11 @@ export async function runVideoExportPipeline(options: {
           ? ", mastering-display"
           : "") +
         (sourceColorMetadata.hasContentLightMetadata ? ", content-light" : ""),
+    );
+  }
+  if (sourceTimingMetadata) {
+    onLog(
+      `[動画] フレームレート判定 avg=${sourceTimingMetadata.avgFrameRate ?? "unknown"} (${sourceTimingMetadata.avgFrameRateParsed?.toFixed(4) ?? "invalid"}), r=${sourceTimingMetadata.rFrameRate ?? "unknown"} (${sourceTimingMetadata.rFrameRateParsed?.toFixed(4) ?? "invalid"}), reason=${sourceTimingMetadata.trustReason}`,
     );
   }
 

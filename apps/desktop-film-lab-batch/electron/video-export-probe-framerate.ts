@@ -31,6 +31,28 @@ export function parseFfprobeFrameRateRate(rate: unknown): number | null {
   return null;
 }
 
+export type SourceFrameRateTrustReason =
+  | "missing-or-invalid-rate"
+  | "rates-diverged"
+  | "within-absolute-tolerance"
+  | "within-relative-tolerance";
+
+export type SourceFrameRateTrustResult = {
+  avgFrameRate: string | null;
+  rFrameRate: string | null;
+  avgFrameRateParsed: number | null;
+  rFrameRateParsed: number | null;
+  sourceFrameRate: number | null;
+  sourceFrameRateTrusted: boolean;
+  trustReason: SourceFrameRateTrustReason;
+};
+
+function frameRateText(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0
+    ? value.trim()
+    : null;
+}
+
 /**
  * @description 両方パースでき、差が相対 0.5% 以内または絶対 0.01 fps 以内なら trusted
  * @param avgFrameRate - ffprobe stream.avg_frame_rate
@@ -39,21 +61,41 @@ export function parseFfprobeFrameRateRate(rate: unknown): number | null {
 export function deriveSourceFrameRateTrust(
   avgFrameRate: unknown,
   rFrameRate: unknown,
-): { sourceFrameRate: number | null; sourceFrameRateTrusted: boolean } {
+): SourceFrameRateTrustResult {
   const a = parseFfprobeFrameRateRate(avgFrameRate);
   const r = parseFfprobeFrameRateRate(rFrameRate);
+  const base = {
+    avgFrameRate: frameRateText(avgFrameRate),
+    rFrameRate: frameRateText(rFrameRate),
+    avgFrameRateParsed: a,
+    rFrameRateParsed: r,
+  };
   if (a === null || r === null) {
-    return { sourceFrameRate: null, sourceFrameRateTrusted: false };
+    return {
+      ...base,
+      sourceFrameRate: null,
+      sourceFrameRateTrusted: false,
+      trustReason: "missing-or-invalid-rate",
+    };
   }
   const diff = Math.abs(a - r);
   const hi = Math.max(a, r);
   const relOk = hi > 0 && diff / hi <= 0.005;
   const absOk = diff <= 0.01;
   if (!relOk && !absOk) {
-    return { sourceFrameRate: null, sourceFrameRateTrusted: false };
+    return {
+      ...base,
+      sourceFrameRate: null,
+      sourceFrameRateTrusted: false,
+      trustReason: "rates-diverged",
+    };
   }
   return {
+    ...base,
     sourceFrameRate: (a + r) / 2,
     sourceFrameRateTrusted: true,
+    trustReason: absOk
+      ? "within-absolute-tolerance"
+      : "within-relative-tolerance",
   };
 }

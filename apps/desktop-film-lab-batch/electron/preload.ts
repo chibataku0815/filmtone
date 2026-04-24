@@ -65,10 +65,25 @@ export type SourceColorClass =
   | "wide-gamut-unknown"
   | "unknown";
 
+export type SourceVideoTimingMetadata = {
+  avgFrameRate: string | null;
+  rFrameRate: string | null;
+  avgFrameRateParsed: number | null;
+  rFrameRateParsed: number | null;
+  sourceFrameRate: number | null;
+  sourceFrameRateTrusted: boolean;
+  trustReason:
+    | "missing-or-invalid-rate"
+    | "rates-diverged"
+    | "within-absolute-tolerance"
+    | "within-relative-tolerance";
+};
+
 export type SourceVideoMetadata = {
   display: SourceDisplayGeometry;
   color: SourceColorMetadata;
   colorClass: SourceColorClass;
+  timing?: SourceVideoTimingMetadata;
 };
 
 /**
