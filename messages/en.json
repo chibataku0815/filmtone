@@ -1352,5 +1352,34 @@
     "pricingBody": "Filmtone Signature Pack — $39",
     "buyOnceLine": "Buy once. No subscription.",
     "refundLine": "If Filmtone Signature Pack does not fit your footage or workflow, contact us within 14 days of purchase and we will process a simple refund."
+  },
+  "works": {
+    "photography": {
+      "title": "Photography",
+      "description": "Event, community, and commercial photography case studies. Same-day previews, full delivery within 72 hours."
+    },
+    "commercial": {
+      "title": "Commercial",
+      "description": "Client work case studies across brand, product, and campaign assignments."
+    },
+    "installation": {
+      "title": "Installation",
+      "description": "Spatial and experiential installations — editing motion and light in physical space."
+    }
+  },
+  "craft": {
+    "title": "Craft",
+    "description": "Where technique meets expression — code, shaders, capture gear, color grading. Tools and methodology behind the work."
+  },
+  "about": {
+    "title": "About",
+    "description": "Takumi Chiba — full-stack engineer, creative director, photographer, marketing strategist, bilingual communicator. Five practices, one studio."
+  },
+  "journal": {
+    "title": "Journal",
+    "description": "Notes on works, technical writing, and motion-study archives.",
+    "motionStudies": {
+      "title": "Motion Studies"
+    }
   }
 }

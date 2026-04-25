@@ -1354,5 +1354,34 @@
     "pricingBody": "Filmtone Signature Pack — $39",
     "buyOnceLine": "買い切り。サブスクリプションではありません。",
     "refundLine": "Filmtone Signature Pack が素材やワークフローに合わなかった場合、購入後 14 日以内にご連絡いただければ簡易返金いたします。"
+  },
+  "works": {
+    "photography": {
+      "title": "Photography",
+      "description": "イベント・コミュニティ・コマーシャル撮影の事例集。当日プレビューと72時間以内の全データ納品。"
+    },
+    "commercial": {
+      "title": "Commercial",
+      "description": "クライアントワークのケーススタディ。ブランド、プロダクト、キャンペーン領域の制作実績。"
+    },
+    "installation": {
+      "title": "Installation",
+      "description": "空間・体験型のインスタレーション作品。物理空間における映像と光の編集。"
+    }
+  },
+  "craft": {
+    "title": "Craft",
+    "description": "技術と表現の交差点。コード、シェーダ、撮影機材、カラーグレーディング — 制作の道具立てと方法論。"
+  },
+  "about": {
+    "title": "About",
+    "description": "千葉拓巳のプロフィール。フルスタックエンジニア、クリエイティブディレクター、フォトグラファー、マーケティング戦略家、バイリンガルコミュニケーターの5つの顔。"
+  },
+  "journal": {
+    "title": "Journal",
+    "description": "作品メモ、技術ノート、モーション研究のアーカイブ。",
+    "motionStudies": {
+      "title": "Motion Studies"
+    }
   }
 }

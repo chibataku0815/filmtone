@@ -117,6 +117,7 @@
       "name": "nextjs-setup-1764680813",
       "version": "0.1.0",
       "dependencies": {
+        "@chibatakumi/design-system": "workspace:*",
         "@chibatakumi/motion-core": "workspace:*",
         "@chibatakumi/motion-dot": "workspace:*",
         "@chibatakumi/motion-flow": "workspace:*",
@@ -147,6 +148,7 @@
         "sharp": "^0.34.5",
         "stripe": "^17.5.0",
         "three": "^0.181.2",
+        "webgpu-motion-audio": "workspace:*",
         "webm-muxer": "5.1.4",
       },
       "devDependencies": {
@@ -167,7 +169,20 @@
     },
     "packages/design-system": {
       "name": "@chibatakumi/design-system",
-      "version": "0.0.0",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@types/react": "^19.0.0",
+        "@types/react-dom": "^19.0.0",
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0",
+        "tailwindcss": "^4.0.0",
+        "typescript": "^5.0.0",
+      },
+      "peerDependencies": {
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0",
+        "tailwindcss": "^4.0.0",
+      },
     },
     "packages/film-lab-core": {
       "name": "film-lab-core",
