@@ -158,26 +158,48 @@ enum FilmtoneRayAngleOptics {
         gamma: Double = defaultGamma,
         innerThreshold: Double = defaultInnerThreshold
     ) -> Double {
+        _ = imageWidth
+        _ = imageHeight
         let sensorX = (uvX - 0.5) * 2
         let sensorY = (uvY - 0.5) * 2
         let rayX = sensorX * resolved.tanHalfFovX
         let rayY = sensorY * resolved.tanHalfFovY
         let viewZ = 1 / (rayX * rayX + rayY * rayY + 1).squareRoot()
         let incidence = 1 - viewZ
-        let refIncidence = referenceIncidence(imageWidth: imageWidth, imageHeight: imageHeight)
+        let refIncidence = referenceIncidence(resolved: resolved)
         let normalized = clamp01(incidence / max(refIncidence, 1e-5))
         let safeGamma = max(gamma, 0.001)
         let safeInner = min(0.8, max(0, innerThreshold))
         return smoothstep(edge0: safeInner, edge1: 1, value: pow(normalized, safeGamma))
     }
 
-    /// Reference incidence used to normalize the mask so that a 65° hfov
-    /// source with 16:9 aspect lands at mask ≈ 1 at the corner.
-    static func referenceIncidence(imageWidth: Double, imageHeight: Double) -> Double {
-        let aspectY = sourceAspectY(imageWidth: imageWidth, imageHeight: imageHeight)
-        let refX = referenceTanHalfHfov
-        let refY = referenceTanHalfHfov * aspectY
+    /// Actual-corner reference incidence (M1 / v1.1.1, 2026-04-25).
+    ///
+    /// Normalizes the smoothstep mask so that the resolved image corner
+    /// itself lands at mask = 1.0, regardless of aspect or FOV. This
+    /// replaces the legacy 65° HFOV reference geometry which left
+    /// portrait corners stranded at normalized ≈ 0.49 and never let the
+    /// mask saturate. Center invariance is preserved by construction
+    /// (uv=0.5 ⇒ sensor=0 ⇒ ray=0 ⇒ incidence=0 ⇒ normalized=0).
+    static func referenceIncidence(resolved: Resolved) -> Double {
+        let refX = resolved.tanHalfFovX
+        let refY = resolved.tanHalfFovY
         return 1 - 1 / (refX * refX + refY * refY + 1).squareRoot()
+    }
+
+    /// Legacy fallback65 reference incidence retained for backward
+    /// compatibility. Routes through `referenceIncidence(resolved:)`
+    /// after resolving with no optics, which yields
+    /// `tanHalfFovX = referenceTanHalfHfov` and
+    /// `tanHalfFovY = referenceTanHalfHfov * aspectY` — byte-equivalent
+    /// to the previous inline implementation.
+    static func referenceIncidence(imageWidth: Double, imageHeight: Double) -> Double {
+        let resolved = resolve(
+            optics: nil,
+            imageWidth: imageWidth,
+            imageHeight: imageHeight
+        )
+        return referenceIncidence(resolved: resolved)
     }
 
     // MARK: - Kernel arg packing
@@ -191,7 +213,9 @@ enum FilmtoneRayAngleOptics {
         imageWidth: Double,
         imageHeight: Double
     ) -> CIVector {
-        let refIncidence = referenceIncidence(imageWidth: imageWidth, imageHeight: imageHeight)
+        _ = imageWidth
+        _ = imageHeight
+        let refIncidence = referenceIncidence(resolved: resolved)
         return CIVector(
             x: CGFloat(resolved.tanHalfFovX),
             y: CGFloat(resolved.tanHalfFovY),

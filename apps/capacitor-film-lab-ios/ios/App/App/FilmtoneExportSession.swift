@@ -2089,7 +2089,9 @@ kernel vec4 glowComposite(__sample base, __sample bloom, __sample halation, __sa
 kernel vec4 vignette(__sample image, float intensity, vec2 extentOrigin, vec2 extentSize, float rayAngleGamma, float rayAngleInner, vec3 opticsPack, float applyMask) {
     vec4 color = image;
     vec2 uv = (destCoord() - extentOrigin) / extentSize;
-    float dist = length(uv - vec2(0.5, 0.5)) * 1.414;
+    vec2 distPx = (uv - vec2(0.5, 0.5)) * extentSize;
+    float halfDiag = length(extentSize * 0.5);
+    float dist = length(distPx) / max(halfDiag, 1.0);
 
     vec2 sensor = (uv - vec2(0.5, 0.5)) * 2.0;
     float rayX = sensor.x * opticsPack.x;
@@ -2294,11 +2296,11 @@ kernel vec4 tentUpsample(sampler image, vec2 sourceOrigin, vec2 sourceSize, vec2
 kernel vec4 edgeSoftnessBlend(sampler sharp, sampler blurred, float aberrationSoften, float lensSoftness, vec2 extentOrigin, vec2 extentSize) {
     vec2 coord = destCoord();
     vec2 uv = (coord - extentOrigin) / extentSize;
-    vec2 edgeDelta = uv - vec2(0.5, 0.5);
-    edgeDelta.x *= extentSize.x / max(extentSize.y, 1.0);
-    float edgeR = clamp(length(edgeDelta) * 1.414, 0.0, 1.0);
+    vec2 edgePx = (uv - vec2(0.5, 0.5)) * extentSize;
+    float halfDiag = length(extentSize * 0.5);
+    float edgeR = clamp(length(edgePx) / max(halfDiag, 1.0), 0.0, 1.0);
     float edgeMask = smoothstep(0.25, 1.0, edgeR);
-    float lensR = clamp(length(edgeDelta) * 2.0, 0.0, 1.0);
+    float lensR = clamp(length(edgePx) / max(halfDiag, 1.0), 0.0, 1.0);
     float lensW = pow(lensR, 1.52);
     float lensDrive = pow(clamp(lensSoftness, 0.0, 1.0), 0.78);
     float lensWeight = clamp(lensDrive * lensW, 0.0, 1.0);
