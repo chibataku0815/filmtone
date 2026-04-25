@@ -257,10 +257,13 @@
         "@chibatakumi/motion-core": "workspace:*",
         "gpu-2.5d-presets": "workspace:*",
         "gpu-fx-presets": "workspace:*",
+        "opentype.js": "^1.3.4",
+        "webgpu-motion-art": "workspace:*",
         "webgpu-motion-audio": "workspace:*",
         "webgpu-motion-dom": "workspace:*",
         "webgpu-motion-input": "workspace:*",
         "webgpu-motion-post": "workspace:*",
+        "webgpu-motion-scene": "workspace:*",
         "webgpu-motion-shell": "workspace:*",
       },
       "devDependencies": {
