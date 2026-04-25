@@ -132,6 +132,10 @@ struct FilmtoneStrings {
     let opticsHfovFormat: String
     let opticsSeparator: String
     let opticsMetricLabel: String
+    // MARK: - Toast UX (T1 v1.1 portrait optics + toast fix)
+    let toastSaveSuccess: String
+    let toastExportComplete: String
+    let toastShareFailed: String
 }
 
 extension FilmtoneStrings {
@@ -631,6 +635,21 @@ extension FilmtoneStrings {
             "filmtone.metric.optics",
             defaultValue: prefersJapanese ? "光学系" : "Optics",
             comment: "Metric card label shown above the camera optics detail in the export panel."
+        )
+        toastSaveSuccess = filmtoneLocalized(
+            "filmtone.toast.save.success",
+            defaultValue: prefersJapanese ? "写真に保存しました" : "Saved to Photos",
+            comment: "Toast shown when Save to Photos succeeds. Auto-dismisses after a short delay."
+        )
+        toastExportComplete = filmtoneLocalized(
+            "filmtone.toast.export.complete",
+            defaultValue: prefersJapanese ? "書き出し完了" : "Export complete",
+            comment: "Toast shown when an export run finishes successfully."
+        )
+        toastShareFailed = filmtoneLocalized(
+            "filmtone.toast.share.failed",
+            defaultValue: prefersJapanese ? "共有に失敗しました" : "Share failed — try again",
+            comment: "Toast shown when sharing the exported file fails."
         )
     }
 

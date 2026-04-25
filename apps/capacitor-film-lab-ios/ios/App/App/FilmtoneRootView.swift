@@ -27,6 +27,16 @@ struct FilmtoneRootView: View {
             }
             .accessibilityIdentifier("filmtone.root.scroll")
         }
+        .overlay(alignment: .bottom) {
+            if let toast = store.toast {
+                FilmtoneToastView(toast: toast)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 24)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(1000)
+            }
+        }
+        .animation(.spring(response: 0.34, dampingFraction: 0.86), value: store.toast?.id)
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
                 topChrome
@@ -488,4 +498,75 @@ extension Color {
     static let filmtoneAmber = Color(red: 1.0, green: 0.72, blue: 0.25)
     static let filmtoneSky = Color(red: 0.45, green: 0.66, blue: 1.0)
     static let filmtoneBackground = Color(red: 0.02, green: 0.02, blue: 0.02)
+}
+
+/// Viewport-level toast view rendered as an overlay on the root `ZStack`.
+///
+/// Visual language is intentionally restrained: a compact rounded
+/// rectangle with a thin `.ultraThinMaterial` fill tinted dark, an icon
+/// matched to the `FilmtoneToast.Kind`, and text in the existing
+/// `white.opacity(0.84)` body color. No new accent colors are introduced
+/// (success uses `Color.filmtoneAmber`, info uses `Color.filmtoneSky`,
+/// error uses the shared red).
+struct FilmtoneToastView: View {
+    let toast: FilmtoneToast
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: iconName)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(iconColor)
+                .frame(width: 24, height: 24)
+                .accessibilityHidden(true)
+
+            Text(toast.message)
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.92))
+                .lineLimit(3)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(.ultraThinMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.black.opacity(0.32))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(iconColor.opacity(0.18), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .shadow(color: Color.black.opacity(0.32), radius: 12, x: 0, y: 6)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text(toast.message))
+        .accessibilityAddTraits(.isStaticText)
+        .accessibilityIdentifier("filmtone.toast")
+    }
+
+    private var iconName: String {
+        switch toast.kind {
+        case .success:
+            return "checkmark.circle.fill"
+        case .error:
+            return "exclamationmark.triangle.fill"
+        case .info:
+            return "info.circle.fill"
+        }
+    }
+
+    private var iconColor: Color {
+        switch toast.kind {
+        case .success:
+            return Color.filmtoneAmber
+        case .error:
+            return .red
+        case .info:
+            return Color.filmtoneSky
+        }
+    }
 }

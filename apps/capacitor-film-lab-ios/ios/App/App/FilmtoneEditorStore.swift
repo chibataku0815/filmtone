@@ -155,6 +155,36 @@ enum FilmtoneSaveToPhotosState: String {
     case failed
 }
 
+/// Lightweight, viewport-level transient notification model.
+///
+/// Lives next to `notice` / `error` (which are inline ScrollView panels) but is
+/// rendered as a root-overlay toast in `FilmtoneRootView` so users notice
+/// save / export / share feedback regardless of scroll position.
+struct FilmtoneToast: Identifiable, Equatable {
+    enum Kind: Equatable {
+        case success
+        case info
+        case error
+    }
+
+    let id: UUID
+    let kind: Kind
+    let message: String
+    let durationMs: Int
+
+    init(
+        id: UUID = UUID(),
+        kind: Kind,
+        message: String,
+        durationMs: Int = 2500
+    ) {
+        self.id = id
+        self.kind = kind
+        self.message = message
+        self.durationMs = durationMs
+    }
+}
+
 struct FilmtoneSourceLoadState {
     enum Stage {
         case importing
@@ -397,11 +427,17 @@ final class FilmtoneEditorStore: ObservableObject {
     @Published var isBusy = false
     @Published var notice: String?
     @Published var error: String?
+    /// Viewport-level transient toast. Coexists with `notice` / `error`
+    /// (inline panels) so neither path is broken; toast surfaces save /
+    /// export / share feedback above the ScrollView. Never set directly by
+    /// callers — use ``presentToast(_:kind:durationMs:)`` instead.
+    @Published var toast: FilmtoneToast?
 
     let strings: FilmtoneStrings
     private let facade: FilmtoneEditorFacade
     private var previewTask: Task<Void, Never>?
     private var videoPreviewSession: FilmtoneVideoPreviewSession?
+    private var toastDismissTask: Task<Void, Never>?
 
     init(facade: FilmtoneEditorFacade, strings: FilmtoneStrings = FilmtoneStringsCatalog.current) {
         self.facade = facade
@@ -430,6 +466,7 @@ final class FilmtoneEditorStore: ObservableObject {
 
     deinit {
         previewTask?.cancel()
+        toastDismissTask?.cancel()
     }
 
     var sourceLabel: String? {
@@ -609,6 +646,9 @@ final class FilmtoneEditorStore: ObservableObject {
         isBusy = false
         notice = nil
         error = nil
+        toastDismissTask?.cancel()
+        toastDismissTask = nil
+        toast = nil
     }
 
     func pickSource(route: FilmtoneSourcePickerRoute = .photoLibrary) async {
@@ -749,6 +789,7 @@ final class FilmtoneEditorStore: ObservableObject {
             isBusy = false
             exportProgress = nil
             exportResult = result
+            presentToast(strings.toastExportComplete, kind: .success)
         } catch {
             isBusy = false
             exportProgress = nil
@@ -766,6 +807,7 @@ final class FilmtoneEditorStore: ObservableObject {
             saveToPhotosState = .saved
             notice = strings.saveToPhotosDone
             error = nil
+            presentToast(strings.toastSaveSuccess, kind: .success)
         } catch {
             saveToPhotosState = .failed
             self.error = strings.userMessage(for: error, context: .saveToPhotos)
@@ -784,7 +826,56 @@ final class FilmtoneEditorStore: ObservableObject {
             )
         } catch {
             self.error = strings.userMessage(for: error, context: .share)
+            presentToast(strings.toastShareFailed, kind: .error)
         }
+    }
+
+    /// Show a viewport-level toast.
+    ///
+    /// - Cancels any pending auto-dismiss task so the latest toast wins.
+    /// - If the same message is already on screen, behaves as a no-op so
+    ///   rapid repeated calls (e.g. double-tap save) don't flicker.
+    /// - Posts a VoiceOver announcement so the message is accessible.
+    /// - Schedules an auto-dismiss after `durationMs` milliseconds; UI may
+    ///   also call ``dismissToast()`` to dismiss earlier.
+    func presentToast(
+        _ message: String,
+        kind: FilmtoneToast.Kind = .info,
+        durationMs: Int = 2500
+    ) {
+        toastDismissTask?.cancel()
+
+        if let current = toast,
+           current.message == message,
+           current.kind == kind {
+            // Same message already presented; do not flicker.
+            return
+        }
+
+        let next = FilmtoneToast(kind: kind, message: message, durationMs: durationMs)
+        toast = next
+
+        UIAccessibility.post(notification: .announcement, argument: message)
+
+        let nanoseconds = UInt64(max(0, durationMs)) * 1_000_000
+        let targetId = next.id
+        toastDismissTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: nanoseconds)
+            await MainActor.run {
+                guard let self else { return }
+                if self.toast?.id == targetId {
+                    self.toast = nil
+                }
+            }
+        }
+    }
+
+    /// Immediately dismiss the current toast (if any) and cancel its
+    /// pending auto-dismiss task. Safe to call from UI gestures.
+    func dismissToast() {
+        toastDismissTask?.cancel()
+        toastDismissTask = nil
+        toast = nil
     }
 
     private func recomputeProjectParams() {
