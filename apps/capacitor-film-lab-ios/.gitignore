@@ -5,3 +5,4 @@ screenshots/
 build/fastlane/
 fastlane/report.xml
 fastlane/.generated/
+.claude/notes/
