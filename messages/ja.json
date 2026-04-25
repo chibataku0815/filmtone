@@ -1383,5 +1383,25 @@
     "motionStudies": {
       "title": "Motion Studies"
     }
+  },
+  "audio": {
+    "_comment": "Wave 2 Agent β (D5.4 + D5.5) — sound toggle + mic gate. Append-only namespace, last in file by convention.",
+    "toggle": {
+      "ariaSilent": "サウンドを有効にする",
+      "ariaPlaying": "再生中。クリックでミュート",
+      "ariaMuted": "ミュート中。クリックで再生"
+    },
+    "mic": {
+      "loading": "読み込み中…",
+      "unsupported": "Mic 非対応",
+      "requesting": "許可を確認中…",
+      "enable": "Mic を有効にする",
+      "on": "Mic ON",
+      "blocked": "Mic はブロック中",
+      "helperEnable": "音に反応するモーションを試す。許可はブラウザに保存されます。",
+      "helperOn": "Mic 入力中。クリックで停止。",
+      "helperUnsupported": "このブラウザは Mic 入力に対応していません。",
+      "helperBlocked": "ブラウザのサイト設定から Mic を許可し直してください。"
+    }
   }
 }
