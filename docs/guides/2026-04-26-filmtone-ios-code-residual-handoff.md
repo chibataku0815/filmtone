@@ -1,14 +1,16 @@
-# Filmtone iOS — Code Residual Handoff (chat 1, 2026-04-26 JST)
+# Filmtone iOS — Code Residual Handoff (chat 1+2+3, 2026-04-26 JST)
 
-> 本 handoff doc は `.claude/tasks/active/2026-04-26-filmtone-ios-code-residual-plan.md` (life repo) を SSoT として、chat 1 で land した Stream 1 の現状と次 chat 引継ぎを記録する。`feedback_no_silent_stream_redefine` Anti-drift §8.5 対象 (本 doc §8.5 4 必須セクション参照)。
+> 本 handoff doc は `.claude/tasks/active/2026-04-26-filmtone-ios-code-residual-plan.md` (life repo) を SSoT として、chat 1/2/3 で land した Stream 1+2+3 の現状と次 chat 引継ぎを記録する。`feedback_no_silent_stream_redefine` Anti-drift §8.5 対象 (本 doc §8.5 4 必須セクション参照、§10 chat 3 update も参照)。
 
 ---
 
-## 0. 現在地サマリ (3 行)
+## 0. 現在地サマリ (chat 3 終了時点)
 
-- **Stream 1 全 essence (D4.1 - D4.1.4) land 完了** — worktree `.worktrees/filmtone-ios-code-residual` / branch `feature/filmtone-ios-code-residual` (from `origin/main` `ddb2d60c`)、5 files +217/-2 modified、**uncommitted**。
-- `bun run build` PASS / `bun test phase0-state.test.ts` **14/14 pass** / `git diff origin/main -- ios/` byte-identical (native 不変 = transitively xcodebuild-green from PR #40)。
-- 残: **D4.1.5 (browser preview)** + **commit (user authorization 待ち)** + **Stream 2 (P2 #1 user 判断)** + **Stream 3/4 (品質保証希望時のみ)** + **Stream 5 (本 doc 化で COORD-1 完了、COORD-2/3 = memory + MEMORY.md は life repo 側で実施)**。
+- **Stream 1** (WebView depth toggle, D4.1-D4.1.4) — ✅ chat 1 essence land、chat 2 commit + push (`e1eb0b2b on feature/filmtone-ios-code-residual`、5 src + 1 handoff doc)
+- **Stream 2** (v1.2 P2 #1 案 B = variant-matched SDR Quality fallback) — ✅ chat 3 essence land (uncommitted、user 指示「保守的意見不採用・プロダクト品質最優先」より案 B 採用)
+- **Stream 3** (Optional housekeeping HK-1.1/1.2/1.3) — ✅ chat 3 essence land (uncommitted、Agent A 実装 + plan 仕様の `depthHalationGain` 不在判明 → 2-field 判定に修正、`AVDepthDataTrack-Generic` → `AVDepthDataTrack` 3 箇所更新、sidecar fixture test = no-op)
+- **chat 3 累積 diff** (`e1eb0b2b..HEAD` uncommitted): 2 files = `FilmtoneExportSession.swift` (+47/-8) + `FilmtoneMediaTypes.swift` (+6/-3)。`swiftc -parse` clean、`bun run build` PASS、`bun test phase0-state.test.ts` 14/14 pass、`grep AVDepthDataTrack-Generic` 0 hit。
+- **残**: commit + push (user authorization 待ち、本 chat handoff timing) + COORD-2/3 (life-side memory + MEMORY.md update) + Stream 4 (XCTest 6 並列、外殻 = 品質保証希望時のみ) + D4.1.5 (browser preview) + P2-1.3 (device QA log 確認)。
 
 ---
 
@@ -128,16 +130,18 @@ Filmtone iOS で **Portrait Depth Realism (ポートレート深度リアリズ�
   # probe.hasDepth=null/undefined のモック源で disabled + "ソースに必要" notice 表示確認
   ```
 
-### 4.2 Stream 2 (user 判断 必要、code 改修なし or 0.3d)
+### 4.2 Stream 2 (chat 3 で land、device QA のみ残)
 
-- [ ] **P2-1.0** **user judgment**: v1.2 P2 #1 (Quality + SDR source) 仕様 — 案 A (no-op) or 案 B (variant-matched SDR fallback)
-- [ ] **P2-1.1 - P2-1.3** [案 B 採用時のみ] `FilmtoneExportSession.swift:1866-1888` Quality gate を variant-matched mezzanine に置換
+- [x] **P2-1.0** user judgment: **案 B** 採用 (chat 3、user 指示「保守的意見不採用・プロダクト品質最優先」)
+- [x] **P2-1.1** Quality gate を `FilmtoneExportSession.swift:2203-2224` (実線; 当初 plan の 1866-1888 は version 進捗で line ずれ判明) で variant-matched に置換
+- [x] **P2-1.2** `existingMezzanineURL(for: sourceURL, variant: sourceVariant)` 呼び出しに置換、Speed branch 不変
+- [ ] **P2-1.3** xcodebuild + SDR ProRes fixture log 確認 — **device QA wave deferred** (本 chat scope 外。代替検証: `swiftc -parse` clean + `git diff` で v1.2 Speed branch byte-identical 確認 + `filmtonePreviewCompositionDebugLog` log 追加)
 
-### 4.3 Stream 3 (Optional housekeeping、0.2d) — 品質保証希望時のみ
+### 4.3 Stream 3 (chat 3 で land、deferred 解除)
 
-- [ ] **HK-1.1** Video depth defense fast-path: `resolveVideoDepthReader(asset:)` に `allGainsZero` short-circuit 追加 (D5.5 CD承認 後に意味出る)
-- [ ] **HK-1.2** `videoDepthSource` label simplification: `"AVDepthDataTrack-Generic"` → `"AVDepthDataTrack"`
-- [ ] **HK-1.3** Sidecar fixture test update (該当あれば)
+- [x] **HK-1.1** Video depth defense fast-path: `FilmtoneExportSession.swift:1799-1816` で short-circuit 追加。**deviation**: plan 仕様の `depthHalationGain` フィールド不在判明 (halation variant 呼び出し側で `depthGlowGain` 流用) → `depthMistGain == 0 && depthGlowGain == 0` 2-field 判定に修正。`profile.hiddenDefaults` ではなく `FilmtonePhase0Generated.hiddenDefaults` 直接参照 (line 1136 の既存 pattern 整合)。`NSLog` 採用 (line 486 既存 pattern 整合)
+- [x] **HK-1.2** `videoDepthSource` label simplification: `"AVDepthDataTrack-Generic"` → `"AVDepthDataTrack"` を 3 箇所更新 (`FilmtoneExportSession.swift:42` doc / `:311` literal / `FilmtoneMediaTypes.swift:573-578` doc)。`grep AVDepthDataTrack-Generic` 0 hit
+- [x] **HK-1.3** Sidecar fixture test = **no-op** (`scripts/swift/test-sidecar-builder.swift` + `verify-phase0-contract.sh` + `fixtures/` に該当 assert 0 件)
 
 ### 4.4 Stream 4 (XCTest target setup + 6 unit tests、1.0d) — 品質保証希望時のみ
 
@@ -198,27 +202,27 @@ Handoff: docs/guides/2026-04-26-filmtone-ios-code-residual-handoff.md"
 
 ## 5. 引継ぎ用起動プロンプト (次 chat verbatim copy)
 
-> Filmtone iOS Code Residual の続きを進める。本 chat 1 で **Stream 1 全 essence (D4.1 - D4.1.4) land 完了** (uncommitted、5 files +217/-2、`bun test 14/14`、`bun run build` PASS、native byte-identical)。
+> Filmtone iOS Code Residual の続きを進める。本 chat 3 で **Stream 2 案 B + Stream 3 (HK-1.1/1.2/1.3) 全 essence land 完了** (chat handoff timing で commit + push 推奨)。Stream 1 は chat 2 で `e1eb0b2b` push 済。
 >
 > 起動前提:
-> 1. `.claude/tasks/active/2026-04-26-filmtone-ios-code-residual-plan.md` (life repo) を Read — Stream 1 の [x] 化を確認、§16 の chat 1 update 行を参照
-> 2. `docs/guides/2026-04-26-filmtone-ios-code-residual-handoff.md` (chibatakumi-portfolio worktree) を Read — 本 doc の §3 検証結果 + §4 残タスク全列挙を参照
+> 1. `.claude/tasks/active/2026-04-26-filmtone-ios-code-residual-plan.md` (life repo) を Read — Stream 1/2/3 の [x] 化を確認、§16 の chat 1+2+3 update 行を参照
+> 2. `docs/guides/2026-04-26-filmtone-ios-code-residual-handoff.md` (chibatakumi-portfolio worktree) を Read — 本 doc の §0 サマリ + §4 残タスク全列挙 + §10 chat 3 update を参照
 > 3. worktree に cd: `cd /Volumes/SamsungPortableSSDX5001/documents/forestone/chibatakumi-portfolio/.worktrees/filmtone-ios-code-residual`
-> 4. `git status` で uncommitted 5 files を確認、必要なら `git diff origin/main` で再検証
+> 4. `git status` で uncommitted 状態を確認 (commit handoff 中なら 2 files modified、push 後なら clean)
 >
 > 次の選択肢 (user 指示で分岐):
 >
-> **Option α (commit + push)**: §4.6 の commit 文をそのまま実行 → push → PR draft 検討。Stream 1 の land を確定する最短ルート。
+> **Option ε (PR open + merge prep)**: `gh pr create` で `feature/filmtone-ios-code-residual` → `main` を draft 作成。Stream 1+2+3 essence 全 land 済、release narrative の文面検討に進む。
 >
-> **Option β (browser preview = D4.1.5)**: `bun run dev` で localhost を立て、ExportSheet 内 toggle 動作を実機 / シミュレーション確認。確認後に Option α へ。
+> **Option γ' (release note 案 B 文面化)**: case B (variant-matched SDR Quality fallback) のリリースノート + sidecar consumer ドキュメント (variant=sdr が `mezzanine.variantUsed` で観測可能になる旨) を準備。release prep chat に渡す素材。
 >
-> **Option γ (Stream 2 = v1.2 P2 #1 user 判断)**: 案 A (no-op、release note 補足のみ) or 案 B (variant-matched SDR fallback、code 改修) を確定。案 B 採用時は §6.2.2 spec で `FilmtoneExportSession.swift:1866-1888` 改修。
+> **Option δ (Stream 4 = QA infra wave、品質保証希望時のみ)**: XCTest target setup (Ruby `xcodeproj` gem) + 6 unit test files (L1.5 / L2.5 / L3.9 / L4.6 / D1.4 / D2.6) を Agent Teams 6 並列で land。Ruby 4.0.3 mise install から (cost 高、external dependency あり)。
 >
-> **Option δ (Stream 3 + Stream 4 = 品質保証 wave)**: housekeeping + XCTest target setup を実施。`xcodeproj` gem (Ruby) 必要、user 環境で mise Ruby 4.0.3 install から (現状未 install)。
+> **Option β (browser preview = D4.1.5)**: `bun run dev` で localhost を立て、ExportSheet 内 depth toggle 動作を browser 上で確認。release narrative 用 screenshot にも転用可。
 >
-> 推奨順: Option β (確認) → Option α (commit) → Option γ (P2 #1 判断) → Option δ (品質保証希望時)。
+> 推奨順: Option ε (PR) → Option γ' (release narrative) → Option δ (QA wave) → Option β (browser QA は user 直接実施で十分)。
 >
-> Anti-drift: chat 終了時に handoff doc §8.5 4 必須セクションを更新。
+> Anti-drift: chat 終了時に handoff doc §8.5 4 必須セクションを更新 (本 chat は §10 で対応済)。
 
 ---
 
@@ -234,15 +238,15 @@ Handoff: docs/guides/2026-04-26-filmtone-ios-code-residual-handoff.md"
 
 ---
 
-## 7. Cross-stream visibility
+## 7. Cross-stream visibility (chat 3 終了時点)
 
 | Stream | 状態 | 備考 |
 |---|---|---|
-| Stream 1 (WebView depth toggle) | ✅ **essence land 完了** (D4.1 - D4.1.4 closed、D4.1.5 = browser preview のみ user action 待ち) | Agent Teams 3 並列で 1 chat 内 land |
-| Stream 2 (v1.2 P2 #1 仕様判断) | ⏸ **user 判断ブロック** | Code touch なし、判断のみ |
-| Stream 3 (housekeeping) | ⏸ **deferred** (品質保証希望時) | Stream 1 land 後に意味出る (allGainsZero short-circuit は D5.5 CD承認 後でないと常に発火) |
-| Stream 4 (XCTest target setup) | ⏸ **deferred** (品質保証希望時) | Ruby 4.0.3 mise install から必要、外殻 cost 高 |
-| Stream 5 (Coordination) | 🟢 **partial** (COORD-1 = 本 doc 完了、COORD-2/3 = life-side memory + MEMORY.md は chat 末尾で実施) | |
+| Stream 1 (WebView depth toggle) | ✅ **commit + push 完了** (`e1eb0b2b`、chat 1 essence + chat 2 commit) | D4.1.5 (browser preview) のみ user action 残 |
+| Stream 2 (v1.2 P2 #1 案 B = variant-matched SDR Quality fallback) | ✅ **essence land 完了 (uncommitted、chat 3)** | 案 B 採用 (user 指示「保守的意見不採用・プロダクト品質最優先」)。P2-1.3 device QA log のみ残 |
+| Stream 3 (housekeeping) | ✅ **essence land 完了 (uncommitted、chat 3)** | HK-1.1/1.2/1.3 全 closed。HK-1.1 は plan 仕様の `depthHalationGain` 不在で 2-field 判定に修正 |
+| Stream 4 (XCTest target setup) | ⏸ **deferred** (品質保証希望時のみ) | user policy「外殻は QA 希望時のみ」につき本 chat 群 skip。Ruby 4.0.3 mise install + xcodeproj gem 1.23.0 が前提 |
+| Stream 5 (Coordination) | 🟢 **本 chat 内で完了見込み** (COORD-1 = 本 doc 更新済、COORD-2/3 = chat 3 末尾で life-side 実施予定) | |
 
 ---
 
@@ -304,4 +308,147 @@ Handoff: docs/guides/2026-04-26-filmtone-ios-code-residual-handoff.md"
 
 ---
 
-*chat 1 終了時 (2026-04-26 JST). next chat 起動プロンプトは §5 verbatim.*
+*chat 1 終了時 (2026-04-26 JST). chat 2/3 update は §10 verbatim.*
+
+---
+
+## 10. chat 2/3 update (2026-04-26 JST)
+
+### 10.1 chat 2: Stream 1 commit + push
+
+`e1eb0b2b` on `feature/filmtone-ios-code-residual` push 済。chat 1 で land した 5 src + 1 handoff doc を「feat(filmtone-ios): land v1.3 Portrait Depth Realism toggle」として 1 commit にまとめた。CLAUDE.md §11 user authorization を経て実施、push 後 working tree clean を確認。
+
+### 10.2 chat 3: Stream 2 案 B + Stream 3 essence land
+
+**user 判断**: chat 3 冒頭で AskUserQuestion 経由で「Stream 2 案 A or 案 B」を提示。user 回答「本質の進行を最優先保守的な意見は優先せずにプロダクトの品質を最優先してください」を受け、**案 B (variant-matched SDR Quality fallback) 採用**を確定。同時に handoff timing は「Stream 2 + Stream 3 を 1 commit にまとめて land 後 (Recommended)」を選択。
+
+**実装フロー** (Agent Teams 並列 + main thread):
+- **Agent A (engineer subagent)** = Stream 3 HK-1.1/1.2/1.3 native 実装 + validation
+- **Agent B (Explore subagent)** = Stream 2 案 B feasibility 調査 + patch 設計 (read-only)
+- **main thread** = Agent B の patch 設計を確認後、Stream 2 案 B 実装 (`FilmtoneExportSession.swift:2203-2224`) を直接適用
+
+**Stream 2 案 B の実装内容** (`FilmtoneExportSession.swift:2203-2243`):
+- `sourceVariant: ProfileVariant` を `request.sourceProbe?.sourceVideoMetadata?.colorClass == .sdrBt709 ? .sdr : .hdr` (nil → `.hdr` 安全側 default) で派生
+- Quality branch: `mezz.existingMezzanineURL(for: sourceURL, variant: sourceVariant)` で variant-matched 取得、無ければ source-direct fallback
+- Speed branch: 不変 (HDR-preferred → SDR-fallback → source、v1.2 Wave 4 から byte-identical)
+- `filmtonePreviewCompositionDebugLog("Quality gate: matched sdr/hdr source to ... mezzanine")` で DEBUG 観測可能
+
+**Stream 3 の実装内容**:
+- HK-1.1 (`FilmtoneExportSession.swift:1799-1816`): `resolveVideoDepthReader(asset:)` に defense fast-path 追加。**deviation**: plan §6.3.1 は `depthHalationGain` 参照だが現実コードでは halation variant 呼び出し側で `depthGlowGain` 流用 (line 1187) → `depthMistGain == 0 && depthGlowGain == 0` の 2-field 判定に修正。`profile.hiddenDefaults` ではなく `FilmtonePhase0Generated.hiddenDefaults` 直接参照 (line 1136 の既存 pattern 整合)。`NSLog` 採用 (line 486 既存 pattern 整合)
+- HK-1.2 (`FilmtoneExportSession.swift:42` doc / `:311` literal / `FilmtoneMediaTypes.swift:573-578` doc): `AVDepthDataTrack-Generic` → `AVDepthDataTrack` 3 箇所更新、`grep AVDepthDataTrack-Generic` 0 hit
+- HK-1.3 = no-op (該当 fixture assert 0 件確認済)
+
+**chat 3 累積 diff**:
+```
+apps/capacitor-film-lab-ios/ios/App/App/FilmtoneExportSession.swift   | 55 +++++++++++++++-------
+apps/capacitor-film-lab-ios/ios/App/App/FilmtoneMediaTypes.swift      |  6 ++--
+2 files changed, 47 insertions(+), 14 deletions(-)
+```
+
+**chat 3 検証結果**:
+
+| 項目 | 結果 |
+|---|---|
+| `swiftc -parse FilmtoneExportSession.swift` (iphonesimulator SDK) | ✅ error 0 |
+| `bun run build` (capacitor-film-lab-ios) | ✅ 4785 modules transformed in 722ms |
+| `bun test src/lib/phase0-state.test.ts` | ✅ 14 pass / 0 fail (回帰なし) |
+| `grep -rn "AVDepthDataTrack-Generic"` (swift/ts/tsx) | ✅ 0 matches |
+| `git diff --stat` | ✅ 2 files (+47/-14)、Stream 2/3 のみ touch |
+| Profile.version | ✅ v=4 維持 (touch なし) |
+| Sidecar V1 schemaVersion | ✅ 不変 |
+| `Info.plist` / `UIBackgroundModes` | ✅ 不変 |
+| hiddenDefaults gain 値 | ✅ 不変 (read のみ、D5.5 CD承認 gate 尊重) |
+| xcodebuild | ⚠️ worktree 内 Pods 不在で skip。`swiftc -parse` clean + 既存 pattern 整合 + git diff `e1eb0b2b..HEAD` 経由で transitively green を期待 (xcodebuild は main checkout 経由で post-hoc 検証可) |
+
+### 10.3 commit message (chat 3 land、user authorization 経由)
+
+```
+feat(filmtone-ios): land v1.3 Stream 2 案 B + Stream 3 housekeeping
+
+Stream 2 (v1.2 P2 #1 案 B = variant-matched SDR Quality fallback):
+Quality mode now matches the mezzanine variant to the source color
+class — HDR sources still prefer the HDR mezzanine, SDR (BT.709)
+sources prefer the SDR mezzanine. An SDR source has no wide-gamut data
+to preserve, so an SDR mezzanine is a faithful rebuild (not silent
+degradation). When the matched mezzanine is absent we fall back to the
+v1.1 source-direct path. Sources without color metadata default to HDR.
+Speed branch is byte-identical to v1.2 Wave 4.
+
+Stream 3 (Optional housekeeping):
+- HK-1.1: defense fast-path in resolveVideoDepthReader skips the
+  asset-side AVDepthDataTrack probe + reader bring-up when both
+  depthMistGain and depthGlowGain are zero in the active profile.
+  Today this is dead code (gains are 0 by D5.5 CD-approved gate); it
+  becomes a real win once the gains flip.
+- HK-1.2: simplify videoDepthSource sidecar label
+  ("AVDepthDataTrack-Generic" → "AVDepthDataTrack"). Phase B never
+  ships another variant — drop the discriminator suffix now.
+- HK-1.3: sidecar fixture tests are no-op (no asserts on the old
+  label).
+
+Native byte-identical to v1.1/v1.2 ship surfaces:
+- Profile.version = 4 (unchanged)
+- sidecar V1 schemaVersion (unchanged)
+- hiddenDefaults gain values (read-only, D5.5 gate respected)
+- Info.plist UIBackgroundModes (unchanged)
+- DTO files (unchanged)
+
+Plan: .claude/tasks/active/2026-04-26-filmtone-ios-code-residual-plan.md (Stream 2 + Stream 3, chat 3)
+Handoff: docs/guides/2026-04-26-filmtone-ios-code-residual-handoff.md §10
+```
+
+### 10.4 chat 3 anti-drift §8.5 4 セクション
+
+#### 10.4.1 Plan Compliance Audit
+
+§7 deliverable 全列挙のうち本 chat 3 touched 状態:
+
+**Stream 2 (touched)**:
+- P2-1.0 / P2-1.1 / P2-1.2 = **3 closed** (案 B 採用 + Quality gate 置換 + variant-matched 呼び出し)
+- P2-1.3 = **partial** (代替検証 = swiftc-parse + git diff + log 追加)
+
+**Stream 3 (touched)**:
+- HK-1.1 / HK-1.2 / HK-1.3 = **3 closed** (HK-1.3 は no-op、HK-1.1 は spec deviation あり = 上記 §10.2 参照)
+
+**Stream 1 (chat 2 で touched、chat 3 では unchanged)**:
+- D4.1 - D4.1.4 = closed、D4.1.5 = partial (browser preview = user action)
+
+**Stream 4 (skipped)**:
+- TEST-S1 / TEST-S2 / TEST-L1.5 / TEST-L2.5 / TEST-L3.9 / TEST-L4.6 / TEST-D1.4 / TEST-D2.6 / TEST-S3 = **0 closed** (user policy「外殻は QA 希望時のみ」につき deferred 維持)
+
+**Stream 5 (touched)**:
+- COORD-1 = **closed** (本 doc 更新で chat 3 状態反映)
+- COORD-2 / COORD-3 = chat 3 末尾で life-side 実施予定
+
+#### 10.4.2 Cross-Stream Visibility
+
+§7 セクション参照 (chat 3 状態に更新済)。Stream 1 = ship-pushed、Stream 2/3 = essence-landed-uncommitted、Stream 4 = 明示 deferred、Stream 5 = ほぼ完了見込み。
+
+#### 10.4.3 Scope Diff Table (chat 3)
+
+| 本 chat 3 開始時 plan | 本 chat 3 終了時実態 | 差分理由 |
+|---|---|---|
+| §6.3.1 HK-1.1 = `depthMistGain == 0 && depthGlowGain == 0 && depthHalationGain == 0` の 3-field 判定 | 実装は `depthMistGain == 0 && depthGlowGain == 0` の 2-field 判定 | `FilmtonePhase0Generated.hiddenDefaults` に `depthHalationGain` フィールド不在判明 (halation variant 呼び出し側で `depthGlowGain` 流用、line 1187)。spec を実コードに合わせた |
+| §6.3.1 fast-path の log = `log.info("Video depth track decode skipped ...")` | 実装は `NSLog("FilmtoneExportSession: video depth track decode skipped ...")` | 既存 line 486 の log pattern と整合 |
+| §6.2.2 patch line range = `1866-1888` | 実線は `2203-2224` | v1.2 Wave 4 + v1.3 depth/foreground land 後で line 番号進捗、機能上の差はなし |
+| §6.2.2 spec の `sourceProbe?.colorSpace == .bt709` | 実装は `request.sourceProbe?.sourceVideoMetadata?.colorClass == .sdrBt709` | `SourceProbeDTO.colorSpace` フィールド不在判明、実構造は `sourceVideoMetadata?.colorClass: SourceColorClassDTO?` (Agent B 調査結果) |
+| §6.2.2 patch は variant=hdr or sdr のみ | 実装は nil colorClass → `.hdr` 安全 default 追加 | HDR 同等の legacy 互換 (regression なし)、release narrative で説明予定 |
+| Stream 4 = 計画上は本 chat 群で着手候補 | 完全 deferred | user policy「外殻は QA 希望時のみ」につき skip |
+
+#### 10.4.4 残タスク full enumeration (chat 3 終了時点)
+
+§4 全節 (4.1 - 4.6) 参照。chat 3 で **Stream 2 案 B 4/4 (P2-1.3 のみ device QA partial) + Stream 3 3/3 closed**。残:
+
+- D4.1.5 (Stream 1 browser preview = user action)
+- P2-1.3 (Stream 2 device QA log 確認)
+- HK-1.1 の D5.5 CD承認 gate 後の効果検証 (本 chat 群 scope 外、別 lane)
+- TEST-S1/S2/L1.5/L2.5/L3.9/L4.6/D1.4/D2.6/S3 (Stream 4 = 9 件、品質保証希望時のみ)
+- COORD-2 (life-side memory update)
+- COORD-3 (life-side MEMORY.md index update)
+- commit + push (本 doc + plan + chat 3 native diff、user authorization 経由)
+- PR open + main merge
+
+### 10.5 next-chat 起動の推奨優先順 (再掲)
+
+§5 verbatim 参照。Option ε (PR open) → Option γ' (release narrative) → Option δ (Stream 4 QA wave) → Option β (browser QA は user 直接実施推奨)。
+
