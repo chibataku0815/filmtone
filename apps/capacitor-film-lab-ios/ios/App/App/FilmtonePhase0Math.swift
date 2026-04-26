@@ -592,7 +592,13 @@ enum FilmtonePhase0Math {
             lut: nil,
             inputLut: transportLut(project.inputLut),
             creativeLut: transportLut(project.creativeLut),
-            renderMode: nil
+            renderMode: nil,
+            // v1.3 (D3.1): depth opt-in defaults to nil here; the WebView feature
+            // flag (Stream 4, deferred) is the only path that surfaces depthEnabled
+            // = true. Native callers that pre-date Stream 4 stay on the v1.2-
+            // identical depth-off path.
+            depthEnabled: nil,
+            depthRenderer: nil
         )
     }
 

@@ -20,13 +20,25 @@ struct SourceInfoDTO: Codable {
     let kind: FilmtoneSourceKind
     let mimeType: String?
     let mezzanineStatus: String?
+    /// Whether the source carries usable depth/disparity aux data
+    /// (HEIC Portrait / LiDAR). Optional so legacy emit paths default to nil
+    /// = "unknown / absent". Plumbed end-to-end in v1.3 (plan §6.1, D1.3).
+    let hasDepth: Bool?
 
-    init(uri: String, filename: String, kind: FilmtoneSourceKind, mimeType: String?, mezzanineStatus: String? = nil) {
+    init(
+        uri: String,
+        filename: String,
+        kind: FilmtoneSourceKind,
+        mimeType: String?,
+        mezzanineStatus: String? = nil,
+        hasDepth: Bool? = nil
+    ) {
         self.uri = uri
         self.filename = filename
         self.kind = kind
         self.mimeType = mimeType
         self.mezzanineStatus = mezzanineStatus
+        self.hasDepth = hasDepth
     }
 }
 
@@ -316,6 +328,15 @@ enum Phase0RenderMode: String, Codable {
     case speed
 }
 
+/// v1.3: depth prefilter renderer selector. Wire stays a `String` on
+/// `Phase0ExportRequestDTO.depthRenderer` for forward-compat (Phase B may add
+/// `metal` only on a subset of devices); this enum is an internal convenience
+/// for native call-sites that prefer compile-time matching.
+enum DepthRenderer: String, Codable {
+    case ci
+    case metal
+}
+
 struct Phase0ExportRequestDTO: Codable {
     let sourceUri: String
     let sourceKind: FilmtoneSourceKind
@@ -328,6 +349,16 @@ struct Phase0ExportRequestDTO: Codable {
     /// v1.2: optional opt-in to Speed mode. nil / absent / "quality" all behave as Quality default.
     /// Quality auto-routes to HDR mezzanine when source is wide-gamut; Speed reuses any mezzanine.
     let renderMode: Phase0RenderMode?
+    /// v1.3 (D3.1): opt-in flag for the AVDepthData × ray-angle prefilter on the
+    /// glow trio (mist/bloom/halation). Optional for backwards compatibility —
+    /// nil / false → byte-identical to v1.2 output. Only meaningful for still
+    /// HEIC sources with depth aux data; video sources MUST be rejected when
+    /// this is true (`feedback_no_fallback_bug_hotbed`).
+    let depthEnabled: Bool?
+    /// v1.3 (D3.1): depth prefilter renderer selector. Encoded as a plain string
+    /// ("ci" | "metal") for forward-compat — see `DepthRenderer`. Defaults to
+    /// "ci" on the native side when nil/absent.
+    let depthRenderer: String?
 }
 
 struct Phase0ExportProgressDTO: Encodable {
@@ -361,6 +392,22 @@ struct Phase0ExportBenchmarkRecordDTO: Encodable {
     let renderMode: String?
     /// v1.2: mezzanine profile variant the export consumed ("sdr" | "hdr"), nil if no mezzanine used.
     let mezzanineProfileVariant: String?
+    /// v1.3 (D3.4): whether the depth × ray-angle prefilter ran for this export.
+    let depthUsed: Bool?
+    /// v1.3 (D3.4): depth aux source ("avDepthData"), nil when depth not used.
+    let depthSource: String?
+    /// v1.3 (D3.4): renderer that executed the prefilter ("ci" | "metal"),
+    /// nil when depth not used.
+    let depthRenderer: String?
+    /// v1.3 (D3.4): wall-clock ms spent on the depth prefilter pass (sum across
+    /// the three glow stages). nil when depth not used.
+    let depthPrefilterMs: Double?
+    /// v1.3 Phase B: count of video frames where depth was applied. nil for
+    /// still-image exports or when no depth track was opened.
+    let depthFramesProcessed: Int?
+    /// v1.3 Phase B: total ms spent decoding depth track frames during a video
+    /// export. nil for stills.
+    let videoDepthDecodeMs: Double?
 }
 
 struct Phase0ExportResultDTO: Encodable {
@@ -423,6 +470,15 @@ enum FilmtoneMediaError: LocalizedError {
     case saveFailed(String)
     case shareFailed(String)
     case cacheFailed(String)
+    /// v1.3 (D3.6): depthEnabled=true was sent with a video source. Phase A only
+    /// supports still HEIC + AVDepthData; we throw rather than silently disabling
+    /// (`feedback_no_fallback_bug_hotbed`) so callers see the contract violation.
+    case depthUnsupportedForVideoSource
+    /// v1.3 Phase B: a video depth track exists but its pixel format is neither
+    /// DisparityFloat16 nor DepthFloat32, or the asset reader refused to wire
+    /// the track output. Thrown by `VideoDepthSourceService` rather than
+    /// silently dropping depth (`feedback_no_fallback_bug_hotbed`).
+    case depthUnsupportedFormat
 
     var code: String {
         switch self {
@@ -450,6 +506,10 @@ enum FilmtoneMediaError: LocalizedError {
             return "SHARE_FAILED"
         case .cacheFailed:
             return "CACHE_FAILED"
+        case .depthUnsupportedForVideoSource:
+            return "DEPTH_UNSUPPORTED_FOR_VIDEO_SOURCE"
+        case .depthUnsupportedFormat:
+            return "DEPTH_UNSUPPORTED_FORMAT"
         }
     }
 
@@ -483,7 +543,64 @@ enum FilmtoneMediaError: LocalizedError {
                 defaultValue: "The export was cancelled.",
                 comment: "Error shown when export is cancelled."
             )
+        case .depthUnsupportedForVideoSource:
+            return filmtoneLocalized(
+                "filmtone.error.depth_unsupported_for_video",
+                defaultValue: "Depth-aware glow is not available for video sources in this version.",
+                comment: "Error shown when depthEnabled=true is requested with a video source."
+            )
+        case .depthUnsupportedFormat:
+            return filmtoneLocalized(
+                "filmtone.error.depth_unsupported_format",
+                defaultValue: "The depth data format in this video is not supported.",
+                comment: "Error shown when a video's depth track uses an unrecognized pixel format."
+            )
         }
+    }
+}
+
+// MARK: - v1.3 sidecar depth block (D3.5)
+
+/// Records whether (and how) AVDepthData was consumed for this export.
+/// Mirrors the `mezzanine` block convention: `used == false` is meaningful — it
+/// signals an explicit "no-depth-prefilter" path rather than an absent field.
+/// `source` is "avDepthData" when used; nil when not (Phase B will add CoreML
+/// depth-anything-v2 to the vocabulary). `renderer` is "ci" | "metal".
+///
+/// Phase B (Stream D) additive fields — both default `nil` so still-export
+/// call-sites stay byte-identical and v1.2 sidecar consumers ignore them as
+/// unknown keys (sidecar `schemaVersion` stays at 1).
+///   - `framesWithDepth`: count of video frames the prefilter actually ran on
+///     (nil for stills; 0 is meaningful = video had a depth track but every
+///     frame degraded to depth-off).
+///   - `videoDepthSource`: vocab "AVDepthDataTrack-Generic" (nil for stills).
+///     The `-Generic` suffix is the only emitted variant. Distinct from
+///     `source` above so still vs. video paths can coexist in one importer.
+struct SidecarDepthInfo: Codable, Equatable {
+    let used: Bool
+    let source: String?
+    let resolutionWidth: Int?
+    let resolutionHeight: Int?
+    let renderer: String?
+    let framesWithDepth: Int?
+    let videoDepthSource: String?
+
+    init(
+        used: Bool,
+        source: String? = nil,
+        resolutionWidth: Int? = nil,
+        resolutionHeight: Int? = nil,
+        renderer: String? = nil,
+        framesWithDepth: Int? = nil,
+        videoDepthSource: String? = nil
+    ) {
+        self.used = used
+        self.source = source
+        self.resolutionWidth = resolutionWidth
+        self.resolutionHeight = resolutionHeight
+        self.renderer = renderer
+        self.framesWithDepth = framesWithDepth
+        self.videoDepthSource = videoDepthSource
     }
 }
 

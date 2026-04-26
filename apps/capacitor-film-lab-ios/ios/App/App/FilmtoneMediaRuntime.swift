@@ -331,6 +331,24 @@ final class FilmtoneMediaRuntime {
             used: session.didUseMezzanineVariant != nil,
             variant: session.didUseMezzanineVariant
         )
+        // v1.3 (D3.4): mirror depth prefilter usage into the bench record.
+        // session.depthResolution is non-nil iff the depth payload loaded AND
+        // applyGlowFamilyStage actually invoked the prefilter — that's the same
+        // truth surface the sidecar reads, keeping bench/sidecar consistent.
+        let depthDidRun = session.depthResolution != nil
+        collector.recordDepthUsage(
+            used: depthDidRun,
+            source: depthDidRun ? "avDepthData" : nil,
+            renderer: depthDidRun
+                ? (session.requestSnapshot.depthRenderer ?? DepthRenderer.ci.rawValue)
+                : nil
+        )
+        collector.recordDepthPrefilterMs(session.depthPrefilterMs)
+        // v1.3 Phase B: forward video depth-track totals (nil for stills).
+        collector.recordVideoDepthTotals(
+            frames: session.videoDepthFramesProcessed,
+            decodeMs: session.videoDepthDecodeMs
+        )
         let benchmarkRecord = collector.makeSuccessRecord(result: result)
         result = Phase0ExportResultDTO(
             outputUri: result.outputUri,

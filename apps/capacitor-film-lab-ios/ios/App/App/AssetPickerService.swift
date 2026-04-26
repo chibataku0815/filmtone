@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import Photos
 import PhotosUI
@@ -184,11 +185,24 @@ final class AssetPickerService: NSObject {
             kickOffMezzanine(for: importedURL)
         }
 
+        // v1.3 D1.3 (Phase A) + Phase B Stream D: probe still-image HEIC aux depth
+        // OR video AVDepthData track presence so the WebView can decide whether to
+        // surface the depth-coupled UI before we pay the cost of decoding the
+        // depth plane. ADDITIVE — set hasDepth=true if EITHER path detects depth.
+        let hasDepth: Bool
+        switch kind {
+        case .image:
+            hasDepth = DepthSourceService.probeHasDepth(url: importedURL)
+        case .video:
+            hasDepth = await Self.probeVideoHasDepth(url: importedURL)
+        }
+
         return SourceInfoDTO(
             uri: importedURL.absoluteString,
             filename: provider.suggestedName ?? importedURL.lastPathComponent,
             kind: kind,
-            mimeType: type?.preferredMIMEType
+            mimeType: type?.preferredMIMEType,
+            hasDepth: hasDepth
         )
     }
 
@@ -295,7 +309,7 @@ final class AssetPickerService: NSObject {
         return current
     }
 
-    private func importDocumentSource(from url: URL) throws -> SourceInfoDTO {
+    private func importDocumentSource(from url: URL) async throws -> SourceInfoDTO {
         let scoped = url.startAccessingSecurityScopedResource()
         defer {
             if scoped {
@@ -316,12 +330,35 @@ final class AssetPickerService: NSObject {
             kickOffMezzanine(for: importedURL)
         }
 
+        // v1.3 D1.3 (Phase A) + Phase B Stream D: image → HEIC aux sniff,
+        // video → AVDepthData track sniff. See importSource(from:) for the
+        // matching PHPicker path.
+        let hasDepth: Bool
+        switch kind {
+        case .image:
+            hasDepth = DepthSourceService.probeHasDepth(url: importedURL)
+        case .video:
+            hasDepth = await Self.probeVideoHasDepth(url: importedURL)
+        }
+
         return SourceInfoDTO(
             uri: importedURL.absoluteString,
             filename: url.lastPathComponent,
             kind: kind,
-            mimeType: type.preferredMIMEType
+            mimeType: type.preferredMIMEType,
+            hasDepth: hasDepth
         )
+    }
+
+    /// Probe an AVAsset for an `AVDepthData` track (any depth-bearing video).
+    /// Uses the modern async `loadTracks(withMediaType:)`
+    /// API to avoid the macOS-13 deprecation warning that v1.2 inherited from
+    /// the sync `tracks(withMediaType:)` accessor. Failures return `false` so a
+    /// transient AVAsset error never fabricates a "has depth" claim.
+    private static func probeVideoHasDepth(url: URL) async -> Bool {
+        let asset = AVURLAsset(url: url)
+        let depthTracks = (try? await asset.loadTracks(withMediaType: .depthData)) ?? []
+        return !depthTracks.isEmpty
     }
 
     private func sourceType(for url: URL) throws -> UTType {
@@ -648,9 +685,9 @@ extension AssetPickerService: UIDocumentPickerDelegate {
             }
 
             reportSourceImportProgress(.importing())
-            DispatchQueue.global(qos: .userInitiated).async {
+            Task.detached(priority: .userInitiated) {
                 do {
-                    let picked = try self.importDocumentSource(from: url)
+                    let picked = try await self.importDocumentSource(from: url)
                     self.clearSourceImportProgressHandler()
                     continuation.resume(returning: picked)
                 } catch {
