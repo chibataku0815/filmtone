@@ -23,6 +23,7 @@ import {
 } from "@/lib/phase0-storage";
 import {
   applyCompareHeld,
+  applyDepthEnabled,
   applyInputLutSelection,
   applyPresetSelection,
   applyPreviewRenderFailure,
@@ -261,6 +262,10 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
 
   function handleRenderModeChange(mode: Phase0RenderMode) {
     setState((current) => applyRenderMode(current, mode));
+  }
+
+  function handleDepthEnabledChange(enabled: boolean) {
+    setState((current) => applyDepthEnabled(current, enabled));
   }
 
   function handleCameraProfileSelect(profile: CameraProfile) {
@@ -569,8 +574,11 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
           isSaveBusy={isSaveBusy}
           error={surfacedError}
           renderMode={state.renderMode}
+          depthEnabled={state.depthEnabled}
+          depthAvailable={state.probe?.hasDepth === true}
           strings={strings}
           onRenderModeChange={handleRenderModeChange}
+          onDepthEnabledChange={handleDepthEnabledChange}
           onExport={handleExport}
           onSave={handleSave}
           onShare={handleShare}

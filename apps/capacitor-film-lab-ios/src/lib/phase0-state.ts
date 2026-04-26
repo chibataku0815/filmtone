@@ -29,6 +29,14 @@ import {
  */
 export const PHASE0_RENDER_MODE_DEFAULT: Phase0RenderMode = "quality";
 
+/**
+ * v1.3 depth — UI activation flag for portrait depth realism.
+ * Default OFF (wire absent) preserves v1.1/v1.2 behavior. ON emits
+ * `request.depthEnabled = true`; native gate reads `request.depthEnabled ?? false`.
+ * Resets to `false` on app reload (session-only, like renderMode).
+ */
+export const PHASE0_DEPTH_ENABLED_DEFAULT: boolean = false;
+
 export interface Phase0EditorState {
   project: Phase0ProjectState;
   source: SourceInfo | null;
@@ -55,6 +63,13 @@ export interface Phase0EditorState {
    * Resets to "quality" on app reload.
    */
   renderMode: Phase0RenderMode;
+  /**
+   * v1.3 depth — when true, export request emits `depthEnabled: true`,
+   * activating still+video depth-coupled effects (mist / glow / halation).
+   * Visual effect is still gated by hidden depth-gain values, currently 0
+   * (will be flipped on CD approval, see plan §2).
+   */
+  depthEnabled: boolean;
 }
 
 function createEmptyPreviewState(): Phase0EditorState["preview"] {
@@ -91,6 +106,7 @@ export function createInitialEditorState(
     notice: null,
     error: null,
     renderMode: PHASE0_RENDER_MODE_DEFAULT,
+    depthEnabled: PHASE0_DEPTH_ENABLED_DEFAULT,
   };
 }
 
@@ -109,6 +125,22 @@ export function applyRenderMode(
   return {
     ...state,
     renderMode: mode,
+  };
+}
+
+/**
+ * v1.3 depth — UI activation reducer. Identity-preserving when value unchanged.
+ */
+export function applyDepthEnabled(
+  state: Phase0EditorState,
+  enabled: boolean,
+): Phase0EditorState {
+  if (state.depthEnabled === enabled) {
+    return state;
+  }
+  return {
+    ...state,
+    depthEnabled: enabled,
   };
 }
 
@@ -241,10 +273,16 @@ export function buildEditorExportRequest(
   // with v1.1 (which has no renderMode field). v1.2 native gate reads
   // `request.renderMode ?? .quality`, so absent ≡ "quality" semantically.
   // Only emit `renderMode` when Speed (Postcard) is selected.
+  let request: Phase0ExportRequest = base;
   if (state.renderMode === "speed") {
-    return { ...base, renderMode: "speed" };
+    request = { ...request, renderMode: "speed" };
   }
-  return base;
+  // v1.3 depth — emit `depthEnabled: true` only when ON. Native gate
+  // reads `request.depthEnabled ?? false`, so absent ≡ false.
+  if (state.depthEnabled) {
+    request = { ...request, depthEnabled: true };
+  }
+  return request;
 }
 
 export function applyProjectPatch(

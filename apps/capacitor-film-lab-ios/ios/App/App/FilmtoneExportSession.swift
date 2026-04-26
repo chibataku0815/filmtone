@@ -39,7 +39,7 @@ final class FilmtoneExportSession {
     /// `videoDepthFramesProcessed`.
     private(set) var videoDepthDecodeMs: Double?
     /// v1.3 Phase B: the `videoDepthSource` vocabulary value emitted into the
-    /// sidecar (`AVDepthDataTrack-Generic` is the only emitted variant; no
+    /// sidecar (`AVDepthDataTrack` is the only emitted variant; no
     /// discriminator planned). nil when no depth reader opened.
     private(set) var videoDepthSourceLabel: String?
 
@@ -308,7 +308,7 @@ final class FilmtoneExportSession {
         let depthReader = try resolveVideoDepthReader(asset: asset)
         defer { depthReader?.cancel() }
         if depthReader != nil {
-            videoDepthSourceLabel = "AVDepthDataTrack-Generic"
+            videoDepthSourceLabel = "AVDepthDataTrack"
             videoDepthFramesProcessed = 0
             videoDepthDecodeMs = 0
         }
@@ -1800,6 +1800,20 @@ final class FilmtoneExportSession {
         guard request.depthEnabled ?? false else {
             return nil
         }
+        // Defense-in-depth fast-path: skip the asset-side depth track probe and
+        // reader bring-up when every depth gain in the active profile is zero.
+        // Mirrors `FilmtoneDepthPrefilter.apply`'s own short-circuit at lines
+        // 74-80 (`depthGain <= 0 && rayAngleGain <= 0` → input unchanged) and
+        // the still-image gating comment at lines 1127-1133 (current contract
+        // `hiddenDefaults.depthMistGain == depthGlowGain == 0`). Becomes a
+        // meaningful win once D5.5 (CD承認) flips those gains; today it just
+        // makes the dark-code path explicit instead of relying on the per-stage
+        // prefilter early return.
+        let hidden = FilmtonePhase0Generated.hiddenDefaults
+        if hidden.depthMistGain == 0 && hidden.depthGlowGain == 0 {
+            NSLog("FilmtoneExportSession: video depth track decode skipped (all profile depth gains zero)")
+            return nil
+        }
         let service = VideoDepthSourceService()
         let semaphore = DispatchSemaphore(value: 0)
         var hasTrack = false
@@ -2187,21 +2201,40 @@ final class FilmtoneExportSession {
     }
 
     private func resolvedVideoSourceURL() -> URL {
-        // v1.2 HDR-aware mezzanine + Speed/Quality toggle (plan §6.3).
+        // v1.2 HDR-aware mezzanine + Speed/Quality toggle, with v1.3 case B
+        // variant-matched Quality fallback for SDR sources.
         //
-        // - .quality (default): only HDR mezzanine is allowed as a faster path because it
-        //   preserves wide-gamut color fidelity. SDR mezzanine is intentionally NOT a
-        //   fallback — silent SDR substitution would degrade Quality output. SDR sources
-        //   stay on source-direct read so the cinematic-100 path is byte-identical to v1.1.
+        // - .quality (default): match the mezzanine variant to the source. HDR sources
+        //   prefer the HDR mezzanine, SDR (BT.709) sources prefer the SDR mezzanine.
+        //   This is NOT silent degradation — an SDR source has no wide-gamut data to
+        //   preserve, so an SDR mezzanine of the same source is a faithful rebuild.
+        //   When the matched mezzanine is absent we fall back to source-direct (the
+        //   v1.1 cinematic-100 path), preserving the "no silent substitution" rule.
+        //   Sources without color metadata are treated as HDR (safest legacy default).
         // - .speed: explicit user opt-in. Any cached mezzanine is acceptable; HDR is
-        //   preferred when both exist.
-        // - In all cases, when no acceptable mezzanine exists we fall back to the source
-        //   URL as the single explicit alternative (no silent degradation).
+        //   preferred when both exist. Unchanged from v1.2 Wave 4.
+        // - In all cases, when no acceptable mezzanine exists we fall back to the
+        //   source URL as the single explicit alternative.
         let mode = request.renderMode ?? .quality
         guard let mezz = mezzanineService else { return sourceURL }
+        let sourceVariant: ProfileVariant = {
+            guard let colorClass = request.sourceProbe?.sourceVideoMetadata?.colorClass else {
+                return .hdr
+            }
+            return colorClass == .sdrBt709 ? .sdr : .hdr
+        }()
         switch mode {
         case .quality:
-            return mezz.existingMezzanineURL(for: sourceURL, variant: .hdr) ?? sourceURL
+            if let mezzURL = mezz.existingMezzanineURL(for: sourceURL, variant: sourceVariant) {
+                filmtonePreviewCompositionDebugLog(
+                    "Quality gate: matched \(sourceVariant.rawValue) source to \(sourceVariant.rawValue) mezzanine"
+                )
+                return mezzURL
+            }
+            filmtonePreviewCompositionDebugLog(
+                "Quality gate: no \(sourceVariant.rawValue) mezzanine, source-direct fallback"
+            )
+            return sourceURL
         case .speed:
             return mezz.existingMezzanineURL(for: sourceURL, variant: .hdr)
                 ?? mezz.existingMezzanineURL(for: sourceURL, variant: .sdr)
