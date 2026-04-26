@@ -573,9 +573,9 @@ enum FilmtoneMediaError: LocalizedError {
 ///   - `framesWithDepth`: count of video frames the prefilter actually ran on
 ///     (nil for stills; 0 is meaningful = video had a depth track but every
 ///     frame degraded to depth-off).
-///   - `videoDepthSource`: vocab "AVDepthDataTrack-Cinematic" |
-///     "AVDepthDataTrack-Generic" (nil for stills). Distinct from `source`
-///     above so still vs. video paths can coexist in one importer.
+///   - `videoDepthSource`: vocab "AVDepthDataTrack-Generic" (nil for stills).
+///     The `-Generic` suffix is the only emitted variant. Distinct from
+///     `source` above so still vs. video paths can coexist in one importer.
 struct SidecarDepthInfo: Codable, Equatable {
     let used: Bool
     let source: String?

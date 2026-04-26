@@ -509,8 +509,7 @@ interface SourceInfo {
     /**
      * True if asset has a depth source (HEIC aux depth OR AVDepthDataTrack on
      * video). Phase A (v1.3) covered HEIC stills; Phase B (v1.3, Stream D)
-     * extended detection to video AVAssets so the WebView can surface the
-     * depth-coupled UI for Cinematic Mode .mov inputs too.
+     * extended detection to video AVAssets carrying an AVDepthDataTrack.
      */
     hasDepth?: boolean;
 }

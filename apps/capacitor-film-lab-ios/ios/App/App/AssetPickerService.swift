@@ -350,8 +350,8 @@ final class AssetPickerService: NSObject {
         )
     }
 
-    /// Probe an AVAsset for an `AVDepthData` track (Cinematic Mode .mov or any
-    /// depth-bearing video). Uses the modern async `loadTracks(withMediaType:)`
+    /// Probe an AVAsset for an `AVDepthData` track (any depth-bearing video).
+    /// Uses the modern async `loadTracks(withMediaType:)`
     /// API to avoid the macOS-13 deprecation warning that v1.2 inherited from
     /// the sync `tracks(withMediaType:)` accessor. Failures return `false` so a
     /// transient AVAsset error never fabricates a "has depth" claim.

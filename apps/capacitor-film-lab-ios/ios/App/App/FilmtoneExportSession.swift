@@ -39,8 +39,8 @@ final class FilmtoneExportSession {
     /// `videoDepthFramesProcessed`.
     private(set) var videoDepthDecodeMs: Double?
     /// v1.3 Phase B: the `videoDepthSource` vocabulary value emitted into the
-    /// sidecar (`AVDepthDataTrack-Generic` is the only Phase B variant; future
-    /// detection can promote to `-Cinematic`). nil when no depth reader opened.
+    /// sidecar (`AVDepthDataTrack-Generic` is the only emitted variant; no
+    /// discriminator planned). nil when no depth reader opened.
     private(set) var videoDepthSourceLabel: String?
 
     /// v1.3 (D3.4): read-only accessor for the originating request. Used by
@@ -121,8 +121,8 @@ final class FilmtoneExportSession {
             ciContext.clearCaches()
         }
 
-        // v1.3 Phase B: video sources with depth tracks (cinematic-mode .mov)
-        // now flow into `exportVideo`, which probes the asset and either wires
+        // v1.3 Phase B: video sources with `AVDepthDataTrack` now flow into
+        // `exportVideo`, which probes the asset and either wires
         // up the per-frame depth pull or throws `depthUnsupportedForVideoSource`
         // when the requested depth-on path has no underlying track. The throw
         // moved one layer down because reliable detection is async and
