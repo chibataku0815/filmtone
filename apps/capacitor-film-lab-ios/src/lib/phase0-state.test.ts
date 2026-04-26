@@ -8,6 +8,7 @@ import {
 } from "film-lab-core";
 import { parseCube } from "film-lab-core";
 import {
+  applyDepthEnabled,
   applyInputLutSelection,
   applyPresetSelection,
   applyProbe,
@@ -16,6 +17,7 @@ import {
   applyStrength,
   buildEditorExportRequest,
   createInitialEditorState,
+  PHASE0_DEPTH_ENABLED_DEFAULT,
   PHASE0_RENDER_MODE_DEFAULT,
 } from "./phase0-state";
 
@@ -148,5 +150,57 @@ describe("phase0 state", () => {
     const request = buildEditorExportRequest(state);
     expect(request).not.toBeNull();
     expect(request!.renderMode).toBe("speed");
+  });
+
+  // v1.3 depth — Portrait Depth Realism toggle (wire: depthEnabled boolean).
+  test("initial state defaults depthEnabled to false (Off, wire-absent)", () => {
+    const initial = createInitialEditorState();
+
+    expect(initial.depthEnabled).toBe(false);
+    expect(PHASE0_DEPTH_ENABLED_DEFAULT).toBe(false);
+  });
+
+  test("applyDepthEnabled flips between ON and OFF without touching project", () => {
+    const initial = createInitialEditorState();
+    const initialUpdatedAt = initial.project.updatedAt;
+
+    const on = applyDepthEnabled(initial, true);
+    expect(on.depthEnabled).toBe(true);
+    expect(on.project).toBe(initial.project);
+    expect(on.project.updatedAt).toBe(initialUpdatedAt);
+
+    const off = applyDepthEnabled(on, false);
+    expect(off.depthEnabled).toBe(false);
+    expect(off.project).toBe(initial.project);
+  });
+
+  test("applyDepthEnabled is a no-op when value is unchanged (preserves identity)", () => {
+    const initial = createInitialEditorState();
+    const same = applyDepthEnabled(initial, false);
+
+    expect(same).toBe(initial);
+  });
+
+  test("buildEditorExportRequest omits depthEnabled when OFF (default, v1.1/v1.2 wire-compat)", () => {
+    const state = {
+      ...createInitialEditorState(),
+      source: sourceMock,
+      probe: probeMock,
+    };
+    const request = buildEditorExportRequest(state);
+    expect(request).not.toBeNull();
+    expect(request!.depthEnabled).toBeUndefined();
+  });
+
+  test("buildEditorExportRequest emits depthEnabled=true when toggle ON", () => {
+    const initial = {
+      ...createInitialEditorState(),
+      source: sourceMock,
+      probe: probeMock,
+    };
+    const state = applyDepthEnabled(initial, true);
+    const request = buildEditorExportRequest(state);
+    expect(request).not.toBeNull();
+    expect(request!.depthEnabled).toBe(true);
   });
 });

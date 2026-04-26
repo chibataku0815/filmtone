@@ -100,6 +100,11 @@ const appCopy = {
     renderModeMasterTooltip: "Full film quality (cinematic-100)",
     renderModePostcardTooltip: "Field reference (color is more subdued)",
     renderModePostcardBanner: "Postcard is for field reference. Color will be more subdued than standard.",
+    // v1.3 depth — Portrait Depth Realism toggle (wire: depthEnabled boolean).
+    depthRealismSectionLabel: "REALISM",
+    depthRealismToggleLabel: "Portrait Depth Realism",
+    depthRealismTooltip: "Separates mist, glow, and halation intensity between subject and background using portrait depth.",
+    depthRealismUnavailable: "Source needs portrait depth data.",
   },
   ja: {
     appName: "Filmtone",
@@ -188,6 +193,12 @@ const appCopy = {
     renderModeMasterTooltip: "完全フィルム品質（cinematic-100）",
     renderModePostcardTooltip: "現場速報用（色は標準より控えめ）",
     renderModePostcardBanner: "Postcardは現場速報用です。色は標準より控えめになります。",
+    // v1.3 depth — ポートレート深度リアリズム切替 (wire: depthEnabled boolean)。
+    // CD 指定: JP は翻訳する (renderMode の "Master/Postcard" untranslated 方針とは別判断)。
+    depthRealismSectionLabel: "リアリズム",
+    depthRealismToggleLabel: "ポートレート深度リアリズム",
+    depthRealismTooltip: "ポートレート深度を使い、被写体と背景で霞・グロウ・ハレーションの強度を分離します。",
+    depthRealismUnavailable: "ソースにポートレート深度データが必要です。",
   },
 } as const;
 

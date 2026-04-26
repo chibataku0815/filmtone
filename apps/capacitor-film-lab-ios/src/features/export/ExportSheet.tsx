@@ -25,6 +25,10 @@ interface ExportSheetProps {
   error: string | null;
   /** v1.3 Stream A — wire-level enum (UI label: Master / Postcard). */
   renderMode: Phase0RenderMode;
+  /** v1.3 depth — Portrait Depth Realism toggle (wire: depthEnabled boolean). */
+  depthEnabled: boolean;
+  /** v1.3 depth — derived from probe?.hasDepth === true; gates the toggle. */
+  depthAvailable: boolean;
   strings: {
     exportSectionTitle: string;
     exportIdle: string;
@@ -49,9 +53,16 @@ interface ExportSheetProps {
     renderModeMasterTooltip: string;
     renderModePostcardTooltip: string;
     renderModePostcardBanner: string;
+    // v1.3 depth — Portrait Depth Realism toggle.
+    depthRealismSectionLabel: string;
+    depthRealismToggleLabel: string;
+    depthRealismTooltip: string;
+    depthRealismUnavailable: string;
   };
   /** v1.3 Stream A — UI mode change handler. */
   onRenderModeChange: (mode: Phase0RenderMode) => void;
+  /** v1.3 depth — toggle change handler. */
+  onDepthEnabledChange: (enabled: boolean) => void;
   onExport: () => void;
   onSave: () => void;
   onShare: () => void;
@@ -110,8 +121,11 @@ export function ExportSheet({
   isBusy,
   isSaveBusy,
   renderMode,
+  depthEnabled,
+  depthAvailable,
   strings,
   onRenderModeChange,
+  onDepthEnabledChange,
   onExport,
   onSave,
   onShare,
@@ -169,6 +183,19 @@ export function ExportSheet({
             postcardBanner: strings.renderModePostcardBanner,
           }}
           onChange={onRenderModeChange}
+        />
+
+        <DepthRealismToggle
+          enabled={depthEnabled}
+          available={depthAvailable}
+          disabled={isBusy || isSaveBusy}
+          strings={{
+            sectionLabel: strings.depthRealismSectionLabel,
+            toggleLabel: strings.depthRealismToggleLabel,
+            tooltip: strings.depthRealismTooltip,
+            unavailableNotice: strings.depthRealismUnavailable,
+          }}
+          onChange={onDepthEnabledChange}
         />
 
         {probe && violations.length > 0 ? (
@@ -339,6 +366,83 @@ function RenderModeToggle({
       {mode === "speed" ? (
         <p className="text-xs leading-5 text-amber-100/80">
           {strings.postcardBanner}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * v1.3 depth — Portrait Depth Realism toggle (boolean wire flag).
+ *
+ * Wire-level: emits `request.depthEnabled = true` only when ON, native gate
+ * reads `request.depthEnabled ?? false`. Visual effect is gated by hidden
+ * depth-gain hiddenDefaults (currently 0; CD-approval flip pending).
+ *
+ * `available` is derived from `probe?.hasDepth === true` — disables the
+ * switch when the source carries no portrait depth data.
+ */
+interface DepthRealismToggleStrings {
+  sectionLabel: string;
+  toggleLabel: string;
+  tooltip: string;
+  unavailableNotice: string;
+}
+
+interface DepthRealismToggleProps {
+  enabled: boolean;
+  available: boolean;
+  disabled: boolean;
+  strings: DepthRealismToggleStrings;
+  onChange: (enabled: boolean) => void;
+}
+
+function DepthRealismToggle({
+  enabled,
+  available,
+  disabled,
+  strings,
+  onChange,
+}: DepthRealismToggleProps) {
+  const isDisabled = disabled || !available;
+  const effectiveEnabled = available && enabled;
+
+  return (
+    <div role="group" aria-label={strings.sectionLabel} className="space-y-2">
+      <p className="editor-kicker">{strings.sectionLabel}</p>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={effectiveEnabled}
+        aria-label={strings.toggleLabel}
+        title={strings.tooltip}
+        disabled={isDisabled}
+        onClick={() => onChange(!enabled)}
+        className={`flex w-full max-w-xs items-center justify-between squircle-pill px-4 py-2.5 text-xs font-semibold transition active:brightness-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${
+          effectiveEnabled
+            ? "bg-[var(--accent-amber1)] text-black"
+            : "bg-white/[0.04] text-[var(--text-base-70)] hover:text-white"
+        }`}
+      >
+        <span>{strings.toggleLabel}</span>
+        <span
+          aria-hidden="true"
+          className={`ml-3 inline-flex h-5 w-9 items-center squircle-pill p-0.5 transition ${
+            effectiveEnabled ? "bg-black/20" : "bg-white/[0.08]"
+          }`}
+        >
+          <span
+            className={`inline-block h-4 w-4 squircle-pill transition-transform ${
+              effectiveEnabled
+                ? "translate-x-4 bg-black"
+                : "translate-x-0 bg-white/70"
+            }`}
+          />
+        </span>
+      </button>
+      {!available ? (
+        <p className="text-xs leading-5 text-white/54">
+          {strings.unavailableNotice}
         </p>
       ) : null}
     </div>
