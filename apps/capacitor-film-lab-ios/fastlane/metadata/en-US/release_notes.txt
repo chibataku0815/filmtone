@@ -1,3 +1,1 @@
-v1.1 brings source transparency to iPhone clips. HDR and wide-gamut sources now show an in-app notice so you can see how iOS will handle them. Camera and optics metadata flow into the vignette model for more physically accurate corner falloff on supported clips.
-
-Exports now include a sidecar JSON alongside the media, so the grade, preset, and camera context round-trip cleanly with the desktop app. ProRes and Apple Log import handling is clearer, and unsupported conversion paths are recorded in the sidecar.
+v1.1.1 polishes the wording in the advanced controls and the HDR source notice. Effect names now match the desktop app, and the HDR notice reads more clearly without technical jargon. No functional changes — every effect, preset, and export path behaves the same as v1.1.
