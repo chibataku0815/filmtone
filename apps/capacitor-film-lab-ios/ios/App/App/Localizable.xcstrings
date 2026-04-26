@@ -7,6 +7,40 @@
     "• %@" : {
 
     },
+    "export_complete_body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved to Photos"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos に納品しました"
+          }
+        }
+      }
+    },
+    "export_complete_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Print complete"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プリント完了"
+          }
+        }
+      }
+    },
     "filmtone.action.done" : {
       "extractionState" : "stale",
       "localizations" : {

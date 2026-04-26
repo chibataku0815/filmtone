@@ -23,6 +23,8 @@ interface ExportSheetProps {
   isBusy: boolean;
   isSaveBusy: boolean;
   error: string | null;
+  /** v1.3 Stream A — wire-level enum (UI label: Master / Postcard). */
+  renderMode: Phase0RenderMode;
   strings: {
     exportSectionTitle: string;
     exportIdle: string;
@@ -40,8 +42,15 @@ interface ExportSheetProps {
     metricsOutput: string;
     metricsFileSize: string;
     metricsSaveToPhotos: string;
+    // v1.3 Stream A — Master / Postcard toggle.
+    renderModeSectionLabel: string;
+    renderModeMasterLabel: string;
+    renderModePostcardLabel: string;
+    renderModeMasterTooltip: string;
+    renderModePostcardTooltip: string;
+    renderModePostcardBanner: string;
   };
-  renderMode: Phase0RenderMode;
+  /** v1.3 Stream A — UI mode change handler. */
   onRenderModeChange: (mode: Phase0RenderMode) => void;
   onExport: () => void;
   onSave: () => void;
@@ -100,8 +109,8 @@ export function ExportSheet({
   saveToPhotosState,
   isBusy,
   isSaveBusy,
-  strings,
   renderMode,
+  strings,
   onRenderModeChange,
   onExport,
   onSave,
@@ -129,11 +138,6 @@ export function ExportSheet({
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2">
-          <RenderModeToggle
-            value={renderMode}
-            disabled={isBusy || isSaveBusy}
-            onChange={onRenderModeChange}
-          />
           <button
             type="button"
             onClick={onExport}
@@ -152,6 +156,20 @@ export function ExportSheet({
             {violations.length === 0 ? "✓" : "!"} {sourceDetails.join(" · ")}
           </p>
         ) : null}
+
+        <RenderModeToggle
+          mode={renderMode}
+          disabled={isBusy || isSaveBusy}
+          strings={{
+            sectionLabel: strings.renderModeSectionLabel,
+            masterLabel: strings.renderModeMasterLabel,
+            postcardLabel: strings.renderModePostcardLabel,
+            masterTooltip: strings.renderModeMasterTooltip,
+            postcardTooltip: strings.renderModePostcardTooltip,
+            postcardBanner: strings.renderModePostcardBanner,
+          }}
+          onChange={onRenderModeChange}
+        />
 
         {probe && violations.length > 0 ? (
           <div className="squircle-md bg-amber-500/8 px-4 py-3 text-sm text-amber-50/95">
@@ -245,40 +263,84 @@ function MetricTile({ label, value }: { label: string; value: string }) {
   );
 }
 
+/**
+ * v1.3 Stream A — Master / Postcard render-mode toggle (UI-only rename).
+ *
+ * Wire-level enum stays "quality" | "speed" for the v1.2 native gate
+ * (FilmtoneExportSession reads `request.renderMode == "speed"` to bypass
+ * HDR mezzanine). UI labels expose the user-facing names per CD direction.
+ */
+interface RenderModeToggleStrings {
+  sectionLabel: string;
+  masterLabel: string;
+  postcardLabel: string;
+  masterTooltip: string;
+  postcardTooltip: string;
+  postcardBanner: string;
+}
+
 interface RenderModeToggleProps {
-  value: Phase0RenderMode;
+  mode: Phase0RenderMode;
   disabled: boolean;
+  strings: RenderModeToggleStrings;
   onChange: (mode: Phase0RenderMode) => void;
 }
 
-function RenderModeToggle({ value, disabled, onChange }: RenderModeToggleProps) {
+function RenderModeToggle({
+  mode,
+  disabled,
+  strings,
+  onChange,
+}: RenderModeToggleProps) {
+  const options: ReadonlyArray<{
+    value: Phase0RenderMode;
+    label: string;
+    tooltip: string;
+  }> = [
+    {
+      value: "quality",
+      label: strings.masterLabel,
+      tooltip: strings.masterTooltip,
+    },
+    {
+      value: "speed",
+      label: strings.postcardLabel,
+      tooltip: strings.postcardTooltip,
+    },
+  ];
+
   return (
-    <div
-      role="radiogroup"
-      aria-label="Render mode"
-      className="inline-flex items-center rounded-full bg-white/[0.05] p-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-white/70"
-    >
-      {(["quality", "speed"] as const).map((mode) => {
-        const isActive = mode === value;
-        return (
-          <button
-            key={mode}
-            type="button"
-            role="radio"
-            aria-checked={isActive}
-            disabled={disabled}
-            onClick={() => onChange(mode)}
-            className={
-              "min-h-[28px] rounded-full px-3 py-1 transition disabled:cursor-not-allowed disabled:opacity-50 " +
-              (isActive
-                ? "bg-white/[0.16] text-white"
-                : "text-white/60 hover:text-white/85")
-            }
-          >
-            {mode === "quality" ? "Quality" : "Speed"}
-          </button>
-        );
-      })}
+    <div role="group" aria-label={strings.sectionLabel} className="space-y-2">
+      <p className="editor-kicker">{strings.sectionLabel}</p>
+      <div className="inline-flex w-full max-w-xs squircle-pill bg-white/[0.04] p-1">
+        {options.map((option) => {
+          const isActive = mode === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              role="radio"
+              aria-checked={isActive}
+              aria-label={option.label}
+              title={option.tooltip}
+              disabled={disabled}
+              onClick={() => onChange(option.value)}
+              className={`flex-1 squircle-pill px-4 py-2 text-xs font-semibold transition active:brightness-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${
+                isActive
+                  ? "bg-[var(--accent-amber1)] text-black"
+                  : "bg-transparent text-[var(--text-base-70)] hover:text-white"
+              }`}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+      {mode === "speed" ? (
+        <p className="text-xs leading-5 text-amber-100/80">
+          {strings.postcardBanner}
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -93,6 +93,13 @@ const appCopy = {
     lutManagerRename: "Rename",
     lutManagerDelete: "Delete",
     lutManagerClose: "Done",
+    // v1.3 Stream A — Master / Postcard toggle (wire: "quality" / "speed").
+    renderModeSectionLabel: "Render mode",
+    renderModeMasterLabel: "Master",
+    renderModePostcardLabel: "Postcard",
+    renderModeMasterTooltip: "Full film quality (cinematic-100)",
+    renderModePostcardTooltip: "Field reference (color is more subdued)",
+    renderModePostcardBanner: "Postcard is for field reference. Color will be more subdued than standard.",
   },
   ja: {
     appName: "Filmtone",
@@ -173,6 +180,14 @@ const appCopy = {
     lutManagerRename: "名前を変更",
     lutManagerDelete: "削除",
     lutManagerClose: "完了",
+    // v1.3 Stream A — Master / Postcard 切替 (wire: "quality" / "speed")。
+    // ローマ字表記を維持し JP も "Master" / "Postcard" のまま (CD 指定)。
+    renderModeSectionLabel: "出力モード",
+    renderModeMasterLabel: "Master",
+    renderModePostcardLabel: "Postcard",
+    renderModeMasterTooltip: "完全フィルム品質（cinematic-100）",
+    renderModePostcardTooltip: "現場速報用（色は標準より控えめ）",
+    renderModePostcardBanner: "Postcardは現場速報用です。色は標準より控えめになります。",
   },
 } as const;
 

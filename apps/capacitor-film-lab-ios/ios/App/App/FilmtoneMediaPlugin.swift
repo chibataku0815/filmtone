@@ -300,10 +300,19 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func cancelExport(_ call: CAPPluginCall) {
-        currentExportSession?.cancel()
-        currentExportTask?.cancel()
+        let session = currentExportSession
+        let task = currentExportTask
         currentExportSession = nil
         currentExportTask = nil
+        Task.detached(priority: .userInitiated) {
+            await ExportCancelController.shared.cancel(reason: .userViaUI)
+            // Defensive mirror: the controller already propagates cancel via
+            // its weak ref to the attached session. Calling here as well is
+            // idempotent and guards the (rare) timing window where this
+            // plugin path is hit before the runtime has called attach().
+            session?.cancel()
+            task?.cancel()
+        }
         call.resolve()
     }
 

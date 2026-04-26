@@ -6,6 +6,7 @@ import {
   parseCube,
   serializeCubeLut,
   type ParsedCubeLut,
+  type Phase0RenderMode,
   type QuickAxisId,
   type PresetName,
 } from "film-lab-core";
@@ -34,7 +35,6 @@ import {
   buildEditorExportRequest,
   createInitialEditorState,
 } from "@/lib/phase0-state";
-import type { Phase0RenderMode } from "film-lab-core";
 import { filmtoneMedia } from "@/native/filmtoneMedia";
 import { ExportSheet } from "@/features/export/ExportSheet";
 import { TopChrome } from "./TopChrome";
@@ -568,8 +568,8 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
           isBusy={state.isBusy}
           isSaveBusy={isSaveBusy}
           error={surfacedError}
-          strings={strings}
           renderMode={state.renderMode}
+          strings={strings}
           onRenderModeChange={handleRenderModeChange}
           onExport={handleExport}
           onSave={handleSave}

@@ -234,6 +234,116 @@ final class FilmtoneMediaRuntime {
         let benchmarkCollector = collector ?? makeBenchmarkCollector(request: request)
 
         await beginForegroundExportActivity()
+        await ExportCancelController.shared.attach(exportSession)
+
+        // Wave 2 / Stream B (W2-B) §6.6 — request notification permission
+        // lazily on the first export. Subsequent exports short-circuit
+        // inside the controller. Never throws; user denial leaves the
+        // pipeline intact (no completion ping, but export still succeeds).
+        await FilmtoneExportNotification.shared.requestPermissionIfNeeded()
+
+        // Wave 2 / Stream B — pre-allocate a unique notification identifier
+        // tied to this export run. Computed once so the success-path
+        // `scheduleCompletionNotification` and any future telemetry can
+        // correlate against a single ID family.
+        let exportNotificationID = UUID().uuidString
+
+        // Stream 3 (W1-C) — Live Activity start. Attributes carry the source
+        // file name and started-at timestamp; ContentState updates flow via
+        // FilmtoneExportLiveActivityController.shared.receive (throttled).
+        // §6.5: the Live Activity surfaces the user-facing label
+        // ("Master" / "Postcard") even though the WebView label rename is
+        // deferred to Stream 4.
+        let liveActivityModeLabel = Self.liveActivityModeLabel(
+            for: request.renderMode
+        )
+        let liveActivityStartedAt = Date()
+        if #available(iOS 16.2, *) {
+            let attributes = FilmtoneExportAttributes(
+                sourceFileName: Self.liveActivitySourceFileName(
+                    for: request.sourceUri
+                ),
+                startedAt: liveActivityStartedAt
+            )
+            let initialState = FilmtoneExportAttributes.ContentState(
+                stage: "preflight",
+                progress: 0,
+                currentFrame: nil,
+                totalFrames: nil,
+                mode: liveActivityModeLabel,
+                elapsedSeconds: 0,
+                estimatedRemainingSeconds: nil
+            )
+            await FilmtoneExportLiveActivityController.shared.start(
+                attributes: attributes,
+                initialState: initialState
+            )
+        }
+
+        // Stream 2 — writing-tail protection: `beginBackgroundTask` is
+        // acquired only when the writer enters the .writing stage so the
+        // mp4 finalization (`AVAssetWriter.finishWriting`) gets ~25-30 s
+        // of background-execution headroom even if the user backgrounds
+        // the app at 95 %. iOS forbids declaring `UIBackgroundModes` for
+        // this use; `beginBackgroundTask` alone gives the headroom under
+        // App Review 2.5.4 without an entitlement.
+        var bgTaskID = UIBackgroundTaskIdentifier.invalid
+        defer {
+            if bgTaskID != .invalid {
+                UIApplication.shared.endBackgroundTask(bgTaskID)
+                bgTaskID = .invalid
+            }
+        }
+        // Stream 3 (W1-C) — capture last observed progress for the final
+        // ContentState on success / cancel / error. Updated inside the
+        // wrapped progress closure; read in the post-run end calls.
+        var lastProgress: Double = 0
+        var lastCurrentFrame: Int? = nil
+        var lastTotalFrames: Int? = nil
+        let wrappedOnProgress: (Phase0ExportProgressDTO) -> Void = { dto in
+            if dto.stage == .writing && bgTaskID == .invalid {
+                let id = UIApplication.shared.beginBackgroundTask(
+                    withName: "filmtone.export.finalize"
+                ) {
+                    Task {
+                        await ExportCancelController.shared.cancel(
+                            reason: .backgroundTaskExpiration
+                        )
+                    }
+                }
+                bgTaskID = id
+            }
+            // Stream 3 (W1-C) — forward progress to the Live Activity
+            // throttle layer. The closure stays sync (`onProgress` consumers
+            // expect sync); the async update is dispatched via Task.
+            lastProgress = dto.progress
+            lastCurrentFrame = dto.currentFrame
+            lastTotalFrames = dto.totalFrames
+            if #available(iOS 16.2, *) {
+                let elapsed = Date().timeIntervalSince(liveActivityStartedAt)
+                let remaining: TimeInterval?
+                if dto.progress > 0.05 && elapsed > 1.0 {
+                    remaining = elapsed * (1.0 - dto.progress) / dto.progress
+                } else {
+                    remaining = nil
+                }
+                let state = FilmtoneExportAttributes.ContentState(
+                    stage: dto.stage.rawValue,
+                    progress: dto.progress,
+                    currentFrame: dto.currentFrame,
+                    totalFrames: dto.totalFrames,
+                    mode: liveActivityModeLabel,
+                    elapsedSeconds: elapsed,
+                    estimatedRemainingSeconds: remaining
+                )
+                Task {
+                    await FilmtoneExportLiveActivityController.shared.receive(
+                        progress: state
+                    )
+                }
+            }
+            onProgress(dto)
+        }
 
         do {
             let result = try await withCheckedThrowingContinuation { continuation in
@@ -242,7 +352,7 @@ final class FilmtoneMediaRuntime {
                         let exportResult = try self.runExportSession(
                             exportSession,
                             collector: benchmarkCollector,
-                            onProgress: onProgress
+                            onProgress: wrappedOnProgress
                         )
                         continuation.resume(returning: exportResult)
                     } catch {
@@ -250,12 +360,87 @@ final class FilmtoneMediaRuntime {
                     }
                 }
             }
+            await ExportCancelController.shared.detach()
+            // Stream 3 (W1-C) — success end. dismissalPolicy: .default keeps
+            // the activity visible briefly so the user sees the "Completed"
+            // state on the lock screen.
+            if #available(iOS 16.2, *) {
+                let elapsed = Date().timeIntervalSince(liveActivityStartedAt)
+                let finalState = FilmtoneExportAttributes.ContentState(
+                    stage: "completed",
+                    progress: 1.0,
+                    currentFrame: lastCurrentFrame,
+                    totalFrames: lastTotalFrames,
+                    mode: liveActivityModeLabel,
+                    elapsedSeconds: elapsed,
+                    estimatedRemainingSeconds: 0
+                )
+                await FilmtoneExportLiveActivityController.shared.end(
+                    success: true,
+                    finalState: finalState
+                )
+            }
+            // Wave 2 / Stream B (W2-B) §6.6 — completion Local Notification
+            // + success haptic. Both fire only on the success path; cancel
+            // and error paths intentionally skip them (the Live Activity's
+            // `.immediate` dismissal already conveys failure, and a
+            // notification on cancel would feel like a buggy double-confirm).
+            await FilmtoneExportNotification.shared.scheduleCompletionNotification(
+                exportID: exportNotificationID
+            )
+            await FilmtoneExportNotification.shared.triggerSuccessHaptic()
             await endForegroundExportActivity()
             return result
         } catch {
+            await ExportCancelController.shared.detach()
+            // Stream 3 (W1-C) — failure / cancel end. dismissalPolicy:
+            // .immediate so a cancelled or failed export does not linger
+            // on the lock screen claiming "in progress".
+            if #available(iOS 16.2, *) {
+                let elapsed = Date().timeIntervalSince(liveActivityStartedAt)
+                let finalState = FilmtoneExportAttributes.ContentState(
+                    stage: "failed",
+                    progress: lastProgress,
+                    currentFrame: lastCurrentFrame,
+                    totalFrames: lastTotalFrames,
+                    mode: liveActivityModeLabel,
+                    elapsedSeconds: elapsed,
+                    estimatedRemainingSeconds: nil
+                )
+                await FilmtoneExportLiveActivityController.shared.end(
+                    success: false,
+                    finalState: finalState
+                )
+            }
             await endForegroundExportActivity()
             throw error
         }
+    }
+
+    /// Stream 3 (W1-C) §6.5 — UI label for renderMode in the Live Activity.
+    /// Mirrors the planned WebView rename (Stream 4): `.quality` → "Master",
+    /// `.speed` → "Postcard". Defaults to "Master" when absent (matches the
+    /// runtime default behaviour of `request.renderMode ?? .quality`).
+    private static func liveActivityModeLabel(
+        for renderMode: Phase0RenderMode?
+    ) -> String {
+        switch renderMode ?? .quality {
+        case .quality: return "Master"
+        case .speed:   return "Postcard"
+        }
+    }
+
+    /// Stream 3 (W1-C) — derive a friendly source file name for the
+    /// Live Activity title from the request's source URI. Strips the
+    /// `file://` prefix and falls back to the raw URI if URL parsing fails.
+    private static func liveActivitySourceFileName(for sourceUri: String) -> String {
+        if let url = URL(string: sourceUri), !url.lastPathComponent.isEmpty {
+            return url.lastPathComponent
+        }
+        if let lastSlash = sourceUri.lastIndex(of: "/") {
+            return String(sourceUri[sourceUri.index(after: lastSlash)...])
+        }
+        return sourceUri
     }
 
     func makeFailureBenchmarkRecord(

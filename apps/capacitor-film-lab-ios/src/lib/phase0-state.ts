@@ -19,6 +19,16 @@ import {
   type SourceProbe,
 } from "film-lab-core";
 
+/**
+ * v1.3 Stream A — UI render mode is tracked separately from the persisted
+ * Phase0ProjectState because the wire-level enum ("quality" | "speed") is the
+ * v1.2 native gate contract; the new "Master / Postcard" naming is UI-only.
+ *
+ * Default is "quality" (Master) — matches the native runtime default of
+ * `request.renderMode ?? .quality` in FilmtoneMediaRuntime / FilmtoneExportSession.
+ */
+export const PHASE0_RENDER_MODE_DEFAULT: Phase0RenderMode = "quality";
+
 export interface Phase0EditorState {
   project: Phase0ProjectState;
   source: SourceInfo | null;
@@ -39,7 +49,11 @@ export interface Phase0EditorState {
   isBusy: boolean;
   notice: string | null;
   error: string | null;
-  /** v1.2 (iOS): export render mode. Session-only; resets to "quality" on app reload. */
+  /**
+   * v1.2/v1.3 — wire-level enum, persisted only in editor session memory.
+   * UI surfaces this as "Master" ("quality") / "Postcard" ("speed").
+   * Resets to "quality" on app reload.
+   */
   renderMode: Phase0RenderMode;
 }
 
@@ -76,20 +90,25 @@ export function createInitialEditorState(
     isBusy: false,
     notice: null,
     error: null,
-    renderMode: "quality",
+    renderMode: PHASE0_RENDER_MODE_DEFAULT,
   };
 }
 
+/**
+ * v1.2/v1.3 — UI render-mode reducer.
+ * Wire-level enum stays "quality" | "speed" (v1.2 native gate contract).
+ * UI label mapping: "quality" -> "Master", "speed" -> "Postcard".
+ */
 export function applyRenderMode(
   state: Phase0EditorState,
-  renderMode: Phase0RenderMode,
+  mode: Phase0RenderMode,
 ): Phase0EditorState {
-  if (state.renderMode === renderMode) {
+  if (state.renderMode === mode) {
     return state;
   }
   return {
     ...state,
-    renderMode,
+    renderMode: mode,
   };
 }
 
@@ -217,8 +236,11 @@ export function buildEditorExportRequest(
     probe: state.probe,
     project: state.project,
   });
-  // v1.2 (iOS): thread session render mode. The Quality default is encoded as
-  // an absent field on the wire; only emit `renderMode` when Speed is selected.
+  // v1.2/v1.3 — thread session render mode. Quality (Master) is the default
+  // and is encoded as an absent field on the wire to preserve compatibility
+  // with v1.1 (which has no renderMode field). v1.2 native gate reads
+  // `request.renderMode ?? .quality`, so absent ≡ "quality" semantically.
+  // Only emit `renderMode` when Speed (Postcard) is selected.
   if (state.renderMode === "speed") {
     return { ...base, renderMode: "speed" };
   }
