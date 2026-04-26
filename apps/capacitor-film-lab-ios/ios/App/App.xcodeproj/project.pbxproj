@@ -36,6 +36,10 @@
 		A10000010000000000000011 /* FilmtoneMediaRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000011 /* FilmtoneMediaRuntime.swift */; };
 		A10000010000000000000012 /* MezzanineService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000012 /* MezzanineService.swift */; };
 		A20000010000000000000001 /* MezzanineColorProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000001 /* MezzanineColorProbe.swift */; };
+		A20000010000000000000020 /* DepthSourceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000020 /* DepthSourceService.swift */; };
+		A20000010000000000000021 /* FilmtoneDepthMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000021 /* FilmtoneDepthMap.swift */; };
+		A20000010000000000000022 /* FilmtoneDepthPrefilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000022 /* FilmtoneDepthPrefilter.swift */; };
+		A20000010000000000000023 /* VideoDepthSourceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000023 /* VideoDepthSourceService.swift */; };
 		A20000010000000000000030 /* ExportCancelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000030 /* ExportCancelController.swift */; };
 		A20000010000000000000050 /* FilmtoneExportNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000050 /* FilmtoneExportNotification.swift */; };
 		A9C09CB4FBA0A528C5478E81 /* FilmtoneExportActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27AC4B71358558416D8A1808 /* FilmtoneExportActivity.swift */; };
@@ -135,6 +139,10 @@
 		B10000010000000000000012 /* MezzanineService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MezzanineService.swift; sourceTree = "<group>"; };
 		B14DB40995D16C85F10AC9F5 /* CancelExportIntent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CancelExportIntent.swift; sourceTree = "<group>"; };
 		B20000010000000000000001 /* MezzanineColorProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MezzanineColorProbe.swift; sourceTree = "<group>"; };
+		B20000010000000000000020 /* DepthSourceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthSourceService.swift; sourceTree = "<group>"; };
+		B20000010000000000000021 /* FilmtoneDepthMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneDepthMap.swift; sourceTree = "<group>"; };
+		B20000010000000000000022 /* FilmtoneDepthPrefilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneDepthPrefilter.swift; sourceTree = "<group>"; };
+		B20000010000000000000023 /* VideoDepthSourceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoDepthSourceService.swift; sourceTree = "<group>"; };
 		B20000010000000000000030 /* ExportCancelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportCancelController.swift; sourceTree = "<group>"; };
 		B20000010000000000000050 /* FilmtoneExportNotification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneExportNotification.swift; sourceTree = "<group>"; };
 		C10000010000000000000001 /* FilmtoneRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneRootView.swift; sourceTree = "<group>"; };
@@ -245,6 +253,10 @@
 				B10000010000000000000011 /* FilmtoneMediaRuntime.swift */,
 				B10000010000000000000012 /* MezzanineService.swift */,
 				B20000010000000000000001 /* MezzanineColorProbe.swift */,
+				B20000010000000000000020 /* DepthSourceService.swift */,
+				B20000010000000000000021 /* FilmtoneDepthMap.swift */,
+				B20000010000000000000022 /* FilmtoneDepthPrefilter.swift */,
+				B20000010000000000000023 /* VideoDepthSourceService.swift */,
 				B20000010000000000000030 /* ExportCancelController.swift */,
 				B20000010000000000000050 /* FilmtoneExportNotification.swift */,
 				B10000010000000000000010 /* BenchmarkCollector.swift */,
@@ -505,6 +517,10 @@
 				A10000010000000000000011 /* FilmtoneMediaRuntime.swift in Sources */,
 				A10000010000000000000012 /* MezzanineService.swift in Sources */,
 				A20000010000000000000001 /* MezzanineColorProbe.swift in Sources */,
+				A20000010000000000000020 /* DepthSourceService.swift in Sources */,
+				A20000010000000000000021 /* FilmtoneDepthMap.swift in Sources */,
+				A20000010000000000000022 /* FilmtoneDepthPrefilter.swift in Sources */,
+				A20000010000000000000023 /* VideoDepthSourceService.swift in Sources */,
 				A20000010000000000000030 /* ExportCancelController.swift in Sources */,
 				A20000010000000000000050 /* FilmtoneExportNotification.swift in Sources */,
 				A10000010000000000000010 /* BenchmarkCollector.swift in Sources */,
@@ -740,12 +756,12 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = C3G77H8NM6;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.2;
 				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
 				PRODUCT_BUNDLE_IDENTIFIER = com.chibatakumi.film.lab.ios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -761,12 +777,12 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = C3G77H8NM6;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.chibatakumi.film.lab.ios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
@@ -802,12 +818,16 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = C3G77H8NM6;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
-				MARKETING_VERSION = 1.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.chibatakumi.film.lab.iosUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
@@ -821,12 +841,16 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = C3G77H8NM6;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
-				MARKETING_VERSION = 1.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.chibatakumi.film.lab.iosUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;

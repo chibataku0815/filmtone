@@ -259,14 +259,14 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
     setState((current) => applyCompareHeld(current, false));
   }
 
+  function handleRenderModeChange(mode: Phase0RenderMode) {
+    setState((current) => applyRenderMode(current, mode));
+  }
+
   function handleCameraProfileSelect(profile: CameraProfile) {
     if (profile === "auto") {
       setState((current) => applyInputLutSelection(current, null));
     }
-  }
-
-  function handleRenderModeChange(mode: Phase0RenderMode) {
-    setState((current) => applyRenderMode(current, mode));
   }
 
   function handleActivateImportedLut(id: string) {
@@ -570,10 +570,10 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
           error={surfacedError}
           renderMode={state.renderMode}
           strings={strings}
+          onRenderModeChange={handleRenderModeChange}
           onExport={handleExport}
           onSave={handleSave}
           onShare={handleShare}
-          onRenderModeChange={handleRenderModeChange}
         />
 
         {state.notice ? (

@@ -3,6 +3,8 @@ import {
   createFilmtoneDefaultPhase0Params,
   serializeCubeLut,
   type ParsedCubeLut,
+  type SourceInfo,
+  type SourceProbe,
 } from "film-lab-core";
 import { parseCube } from "film-lab-core";
 import {
@@ -16,6 +18,19 @@ import {
   createInitialEditorState,
   PHASE0_RENDER_MODE_DEFAULT,
 } from "./phase0-state";
+
+const sourceMock: SourceInfo = {
+  uri: "file:///test.mov",
+  filename: "test.mov",
+  kind: "video",
+};
+
+const probeMock: SourceProbe = {
+  ...sourceMock,
+  width: 1920,
+  height: 1080,
+  durationSec: 30,
+};
 
 function makeTestLut(title: string): ParsedCubeLut {
   const cube = parseCube(`
@@ -112,32 +127,26 @@ describe("phase0 state", () => {
     expect(same).toBe(initial);
   });
 
-  test("buildEditorExportRequest forwards UI render mode to the wire request", () => {
-    const initial = createInitialEditorState();
-    const probed = applyProbe(
-      initial,
-      {
-        uri: "file:///tmp/clip.mov",
-        filename: "clip.mov",
-        kind: "video",
-      },
-      {
-        uri: "file:///tmp/clip.mov",
-        filename: "clip.mov",
-        kind: "video",
-        width: 1920,
-        height: 1080,
-        durationSec: 5,
-        codecFamily: "hevc",
-      },
-    );
+  test("buildEditorExportRequest omits renderMode when Master/Quality (default, v1.1 wire-compat)", () => {
+    const state = {
+      ...createInitialEditorState(),
+      source: sourceMock,
+      probe: probeMock,
+    };
+    const request = buildEditorExportRequest(state);
+    expect(request).not.toBeNull();
+    expect(request!.renderMode).toBeUndefined();
+  });
 
-    const masterReq = buildEditorExportRequest(probed);
-    expect(masterReq).not.toBeNull();
-    expect(masterReq?.renderMode).toBe("quality");
-
-    const postcardReq = buildEditorExportRequest(applyRenderMode(probed, "speed"));
-    expect(postcardReq).not.toBeNull();
-    expect(postcardReq?.renderMode).toBe("speed");
+  test("buildEditorExportRequest emits renderMode='speed' when Speed selected", () => {
+    const initial = {
+      ...createInitialEditorState(),
+      source: sourceMock,
+      probe: probeMock,
+    };
+    const state = applyRenderMode(initial, "speed");
+    const request = buildEditorExportRequest(state);
+    expect(request).not.toBeNull();
+    expect(request!.renderMode).toBe("speed");
   });
 });

@@ -50,8 +50,9 @@ export interface Phase0EditorState {
   notice: string | null;
   error: string | null;
   /**
-   * v1.3 Stream A — wire-level enum, persisted only in editor session memory.
+   * v1.2/v1.3 — wire-level enum, persisted only in editor session memory.
    * UI surfaces this as "Master" ("quality") / "Postcard" ("speed").
+   * Resets to "quality" on app reload.
    */
   renderMode: Phase0RenderMode;
 }
@@ -94,7 +95,7 @@ export function createInitialEditorState(
 }
 
 /**
- * v1.3 Stream A — UI render-mode reducer.
+ * v1.2/v1.3 — UI render-mode reducer.
  * Wire-level enum stays "quality" | "speed" (v1.2 native gate contract).
  * UI label mapping: "quality" -> "Master", "speed" -> "Postcard".
  */
@@ -230,18 +231,20 @@ export function buildEditorExportRequest(
   if (!state.source) {
     return null;
   }
-  const request = buildPhase0ExportRequest({
+  const base = buildPhase0ExportRequest({
     source: state.source,
     probe: state.probe,
     project: state.project,
   });
-  // v1.3 Stream A — attach UI-selected render mode. Native runtime defaults
-  // to .quality when the field is absent, so emitting "quality" is also a
-  // safe explicit no-op against the v1.2 native gate.
-  return {
-    ...request,
-    renderMode: state.renderMode,
-  };
+  // v1.2/v1.3 — thread session render mode. Quality (Master) is the default
+  // and is encoded as an absent field on the wire to preserve compatibility
+  // with v1.1 (which has no renderMode field). v1.2 native gate reads
+  // `request.renderMode ?? .quality`, so absent ≡ "quality" semantically.
+  // Only emit `renderMode` when Speed (Postcard) is selected.
+  if (state.renderMode === "speed") {
+    return { ...base, renderMode: "speed" };
+  }
+  return base;
 }
 
 export function applyProjectPatch(

@@ -29,6 +29,14 @@ final class BenchmarkCollector {
     private(set) var mezzanineGenerationMs: Int?
     private(set) var renderMode: String?
     private(set) var mezzanineProfileVariant: String?
+    // v1.3 (D3.4): depth prefilter telemetry.
+    private(set) var depthUsed: Bool?
+    private(set) var depthSource: String?
+    private(set) var depthRenderer: String?
+    private(set) var depthPrefilterMs: Double?
+    // v1.3 Phase B: video depth-track telemetry.
+    private(set) var depthFramesProcessed: Int?
+    private(set) var videoDepthDecodeMs: Double?
 
     func recordMezzanineUsage(
         used: Bool,
@@ -46,6 +54,41 @@ final class BenchmarkCollector {
 
     func recordRenderMode(_ mode: Phase0RenderMode) {
         renderMode = mode.rawValue
+    }
+
+    /// v1.3 (D3.4): record depth prefilter usage. `used: false` is a meaningful
+    /// signal — the export ran without depth on purpose (no aux data, depth
+    /// disabled, or unsupported source). Source/renderer are nil when not used.
+    func recordDepthUsage(
+        used: Bool,
+        source: String? = nil,
+        renderer: String? = nil
+    ) {
+        depthUsed = used
+        depthSource = used ? source : nil
+        depthRenderer = used ? renderer : nil
+    }
+
+    /// v1.3 (D3.4): accumulator for depth prefilter wall-clock cost (sum across
+    /// the three glow stages). Pass nil to clear.
+    func recordDepthPrefilterMs(_ ms: Double?) {
+        depthPrefilterMs = ms
+    }
+
+    /// v1.3 Phase B: per-frame depth telemetry for video export. Increments
+    /// `depthFramesProcessed` and adds the supplied decode wall-clock to
+    /// `videoDepthDecodeMs`. Both fields stay nil for still-image exports.
+    func recordVideoDepthFrame(decodeMs: Double) {
+        depthFramesProcessed = (depthFramesProcessed ?? 0) + 1
+        videoDepthDecodeMs = (videoDepthDecodeMs ?? 0) + decodeMs
+    }
+
+    /// v1.3 Phase B: bulk-set the totals after the export session has aggregated
+    /// them per-frame internally (FilmtoneMediaRuntime calls this once at the
+    /// end of a video export). Either value may be nil — passing nil clears.
+    func recordVideoDepthTotals(frames: Int?, decodeMs: Double?) {
+        depthFramesProcessed = frames
+        videoDepthDecodeMs = decodeMs
     }
 
     func makeSuccessRecord(
@@ -72,7 +115,13 @@ final class BenchmarkCollector {
             exportUsedMezzanine: exportUsedMezzanine,
             mezzanineGenerationMs: mezzanineGenerationMs,
             renderMode: renderMode,
-            mezzanineProfileVariant: mezzanineProfileVariant
+            mezzanineProfileVariant: mezzanineProfileVariant,
+            depthUsed: depthUsed,
+            depthSource: depthSource,
+            depthRenderer: depthRenderer,
+            depthPrefilterMs: depthPrefilterMs,
+            depthFramesProcessed: depthFramesProcessed,
+            videoDepthDecodeMs: videoDepthDecodeMs
         )
     }
 
@@ -99,7 +148,13 @@ final class BenchmarkCollector {
             exportUsedMezzanine: exportUsedMezzanine,
             mezzanineGenerationMs: mezzanineGenerationMs,
             renderMode: renderMode,
-            mezzanineProfileVariant: mezzanineProfileVariant
+            mezzanineProfileVariant: mezzanineProfileVariant,
+            depthUsed: depthUsed,
+            depthSource: depthSource,
+            depthRenderer: depthRenderer,
+            depthPrefilterMs: depthPrefilterMs,
+            depthFramesProcessed: depthFramesProcessed,
+            videoDepthDecodeMs: videoDepthDecodeMs
         )
     }
 

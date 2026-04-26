@@ -1600,7 +1600,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ブルーム半径"
+            "value" : "光のにじみ・半径"
           }
         }
       }
@@ -1617,7 +1617,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ブルームソフトニー"
+            "value" : "光のにじみ・ソフトニー"
           }
         }
       }
@@ -1634,7 +1634,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ブルーム量"
+            "value" : "光のにじみ・強さ"
           }
         }
       }
@@ -1651,7 +1651,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ブルームしきい値"
+            "value" : "光のにじみ・しきい値"
           }
         }
       }
@@ -1662,13 +1662,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Compression Amount"
+            "value" : "Highlight softness"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "圧縮量"
+            "value" : "ハイライトの柔らかさ"
           }
         }
       }
@@ -1679,13 +1679,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Compression Range"
+            "value" : "Tone span"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "圧縮レンジ"
+            "value" : "階調の広がり"
           }
         }
       }
@@ -1719,7 +1719,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ディフュージョン"
+            "value" : "光の拡散"
           }
         }
       }
@@ -1764,13 +1764,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Grain Intensity"
+            "value" : "Grain Strength"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "グレイン量"
+            "value" : "フィルムグレイン・強さ"
           }
         }
       }
@@ -1781,13 +1781,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Grain Radial Mix"
+            "value" : "Grain edge emphasis"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "グレイン周辺ミックス"
+            "value" : "グレインの周辺の強さ"
           }
         }
       }
@@ -1804,7 +1804,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "グレイン粒径"
+            "value" : "粒子の粗さ"
           }
         }
       }
@@ -1838,7 +1838,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ハレーション量"
+            "value" : "ハレーション強度"
           }
         }
       }
@@ -1917,13 +1917,30 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lens Softness"
+            "value" : "Lens softness"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "レンズソフト"
+            "value" : "レンズの柔らかさ"
+          }
+        }
+      }
+    },
+    "filmtone.param.print_contrast" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Print Contrast"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仕上げのコントラスト"
           }
         }
       }
@@ -1934,13 +1951,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "RGB Shift"
+            "value" : "Color fringing"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "RGB シフト"
+            "value" : "周辺の色ずれ"
           }
         }
       }
@@ -2008,7 +2025,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "周辺減光"
+            "value" : "ビネット"
           }
         }
       }
@@ -2579,61 +2596,64 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "HDR source handling"
+            "value" : "HDR video loaded"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "HDR ソースの取り扱い"
+            "value" : "HDR動画を読み込みました"
           }
         }
       }
     },
     "filmtone.hdr.notice.body.pq" : {
+      "comment" : "v1.2 candidate: collapse to single body. Generic SSoT §5.2 text used for all three variants (pq / hlg / wideGamutUnknown) per terminology SSoT.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "HDR (PQ) source detected. It may be converted to SDR when exporting on iOS, and dynamic range could be compressed."
+            "value" : "This environment may not be able to convert HDR video into a standard SDR video accurately. You can continue exporting, but brightness or color may look different in other apps. For color-critical exports, convert the clip to SDR in your camera app or editor before importing it."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "HDR (PQ) ソースを検出しました。iOS 書き出し時に SDR に変換される場合があります。ダイナミックレンジが圧縮される可能性があります。"
+            "value" : "この環境では、HDR動画を標準のSDR動画として正確に変換できない場合があります。書き出しは続行できますが、他のアプリで見ると明るさや色が元動画と違って見えることがあります。正確な色で書き出したい場合は、カメラアプリや編集アプリでSDR動画に変換してから読み込んでください。"
           }
         }
       }
     },
     "filmtone.hdr.notice.body.hlg" : {
+      "comment" : "v1.2 candidate: collapse to single body. Generic SSoT §5.2 text used for all three variants (pq / hlg / wideGamutUnknown) per terminology SSoT.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "HDR (HLG) source detected. It may be converted to SDR when exporting on iOS."
+            "value" : "This environment may not be able to convert HDR video into a standard SDR video accurately. You can continue exporting, but brightness or color may look different in other apps. For color-critical exports, convert the clip to SDR in your camera app or editor before importing it."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "HDR (HLG) ソースを検出しました。iOS 書き出し時に SDR に変換される場合があります。"
+            "value" : "この環境では、HDR動画を標準のSDR動画として正確に変換できない場合があります。書き出しは続行できますが、他のアプリで見ると明るさや色が元動画と違って見えることがあります。正確な色で書き出したい場合は、カメラアプリや編集アプリでSDR動画に変換してから読み込んでください。"
           }
         }
       }
     },
     "filmtone.hdr.notice.body.wideGamutUnknown" : {
+      "comment" : "v1.2 candidate: collapse to single body. Generic SSoT §5.2 text used for all three variants (pq / hlg / wideGamutUnknown) per terminology SSoT.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Wide-gamut source, but the HDR transfer function could not be identified. Export will proceed as SDR — please verify colour handling."
+            "value" : "This environment may not be able to convert HDR video into a standard SDR video accurately. You can continue exporting, but brightness or color may look different in other apps. For color-critical exports, convert the clip to SDR in your camera app or editor before importing it."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "広色域ソースですが HDR transfer を判定できません。SDR として書き出しますが、色の扱いは要確認です。"
+            "value" : "この環境では、HDR動画を標準のSDR動画として正確に変換できない場合があります。書き出しは続行できますが、他のアプリで見ると明るさや色が元動画と違って見えることがあります。正確な色で書き出したい場合は、カメラアプリや編集アプリでSDR動画に変換してから読み込んでください。"
           }
         }
       }

@@ -50,11 +50,11 @@ interface ExportSheetProps {
     renderModePostcardTooltip: string;
     renderModePostcardBanner: string;
   };
+  /** v1.3 Stream A — UI mode change handler. */
+  onRenderModeChange: (mode: Phase0RenderMode) => void;
   onExport: () => void;
   onSave: () => void;
   onShare: () => void;
-  /** v1.3 Stream A — UI mode change handler. */
-  onRenderModeChange: (mode: Phase0RenderMode) => void;
 }
 
 function formatBytes(value?: number): string {
@@ -111,10 +111,10 @@ export function ExportSheet({
   isSaveBusy,
   renderMode,
   strings,
+  onRenderModeChange,
   onExport,
   onSave,
   onShare,
-  onRenderModeChange,
 }: ExportSheetProps) {
   const violations = probe ? getPhase0SourceCapViolations(probe) : [];
   const canExport = probe != null && violations.length === 0 && !isBusy && !isSaveBusy;
@@ -137,15 +137,17 @@ export function ExportSheet({
             {isBusy ? strings.exportRunning : strings.exportIdle}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onExport}
-          disabled={!canExport}
-          className="inline-flex min-h-[44px] shrink-0 items-center gap-2 squircle-pill bg-[var(--accent-amber1)] px-5 py-2.5 text-xs font-semibold text-black transition active:brightness-[0.98] disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/40"
-        >
-          <ExportIcon className="h-4 w-4" />
-          {strings.exportStart}
-        </button>
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <button
+            type="button"
+            onClick={onExport}
+            disabled={!canExport}
+            className="inline-flex min-h-[44px] shrink-0 items-center gap-2 squircle-pill bg-[var(--accent-amber1)] px-5 py-2.5 text-xs font-semibold text-black transition active:brightness-[0.98] disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/40"
+          >
+            <ExportIcon className="h-4 w-4" />
+            {strings.exportStart}
+          </button>
+        </div>
       </div>
 
       <div className="mt-5 space-y-4">

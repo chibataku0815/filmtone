@@ -1461,8 +1461,8 @@ function buildPhase0ExportRequest(options) {
 }
 
 // src/benchmark-row.ts
-var ROW_HEADER = "| date | device | iOS | clip_id | input_resolution | output_resolution | realtime_ratio | file_size_mb | thermal | memory_warnings | save | visual | error | duration_sec |";
-var ROW_DIVIDER = "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |";
+var ROW_HEADER = "| date | device | iOS | clip_id | input_resolution | output_resolution | realtime_ratio | file_size_mb | thermal | memory_warnings | save | visual | error | duration_sec | mode | mezz_variant |";
+var ROW_DIVIDER = "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |";
 function buildBenchmarkRow(input) {
   const { result, benchmark, probe, clipId, visualFloor, saveResult } = input;
   const date = (input.date ?? /* @__PURE__ */ new Date()).toISOString().slice(0, 10);
@@ -1484,7 +1484,9 @@ function buildBenchmarkRow(input) {
     visualFloor,
     errorDomain: benchmark.errorDomain ?? null,
     errorCode: benchmark.errorCode ?? null,
-    durationSec: typeof benchmark.sourceDurationSec === "number" ? benchmark.sourceDurationSec : null
+    durationSec: typeof benchmark.sourceDurationSec === "number" ? benchmark.sourceDurationSec : null,
+    renderMode: benchmark.renderMode ?? "quality",
+    mezzanineProfileVariant: benchmark.mezzanineProfileVariant ?? null
   };
 }
 function formatBenchmarkRow(row) {
@@ -1508,6 +1510,8 @@ function formatBenchmarkRow(row) {
     `visual=${row.visualFloor}`,
     `err=${errorCell}`,
     durationCell,
+    `mode=${row.renderMode}`,
+    `mezz=${row.mezzanineProfileVariant ?? "\u2014"}`,
     ""
   ].join(" | ").trim();
 }
@@ -1515,7 +1519,7 @@ function benchmarkMarkdownTableHeader() {
   return `${ROW_HEADER}
 ${ROW_DIVIDER}`;
 }
-var ROW_PATTERN = /^\|\s*(?<date>[^|]+?)\s*\|\s*(?<device>[^|]+?)\s*\|\s*(?<iosVersion>[^|]+?)\s*\|\s*(?<clipId>[^|]+?)\s*\|\s*(?<inputRes>[^|]+?)\s*\|\s*(?<outputRes>[^|]+?)\s*\|\s*(?<realtime>[^|]+?)\s*\|\s*(?<fileSize>[^|]+?)\s*\|\s*thermal=(?<thermal>[^|]+?)\s*\|\s*mem_warn=(?<mem>[^|]+?)\s*\|\s*save=(?<save>[^|]+?)\s*\|\s*visual=(?<visual>[^|]+?)\s*\|\s*err=(?<err>[^|]+?)\s*\|\s*(?<durationSec>[^|]+?)\s*\|\s*$/;
+var ROW_PATTERN = /^\|\s*(?<date>[^|]+?)\s*\|\s*(?<device>[^|]+?)\s*\|\s*(?<iosVersion>[^|]+?)\s*\|\s*(?<clipId>[^|]+?)\s*\|\s*(?<inputRes>[^|]+?)\s*\|\s*(?<outputRes>[^|]+?)\s*\|\s*(?<realtime>[^|]+?)\s*\|\s*(?<fileSize>[^|]+?)\s*\|\s*thermal=(?<thermal>[^|]+?)\s*\|\s*mem_warn=(?<mem>[^|]+?)\s*\|\s*save=(?<save>[^|]+?)\s*\|\s*visual=(?<visual>[^|]+?)\s*\|\s*err=(?<err>[^|]+?)\s*\|\s*(?<durationSec>[^|]+?)\s*\|\s*mode=(?<mode>[^|]+?)\s*\|\s*mezz=(?<mezz>[^|]+?)\s*\|\s*$/;
 function parseBenchmarkRow(line) {
   const trimmed = line.trim();
   if (!trimmed.startsWith("|")) return null;
@@ -1537,6 +1541,10 @@ function parseBenchmarkRow(line) {
   }
   const durationRaw = g.durationSec.trim();
   const durationSec = durationRaw === "\u2014" ? null : Number.parseFloat(durationRaw);
+  const modeRaw = g.mode.trim();
+  const renderMode = modeRaw === "speed" ? "speed" : "quality";
+  const mezzRaw = g.mezz.trim();
+  const mezzanineProfileVariant = mezzRaw === "hdr" ? "hdr" : mezzRaw === "sdr" ? "sdr" : null;
   return {
     raw: trimmed,
     date: g.date.trim(),
@@ -1553,7 +1561,9 @@ function parseBenchmarkRow(line) {
     visualFloor: g.visual.trim() ?? "not-checked",
     errorDomain,
     errorCode,
-    durationSec: durationSec != null && Number.isFinite(durationSec) ? durationSec : null
+    durationSec: durationSec != null && Number.isFinite(durationSec) ? durationSec : null,
+    renderMode,
+    mezzanineProfileVariant
   };
 }
 

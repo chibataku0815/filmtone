@@ -137,7 +137,10 @@ import {
   useProgressiveLoad,
   type ProgressiveTextureSwapPayload,
 } from "./use-progressive-load";
-import { formatCameraOpticsForProbeLabel } from "./video-probe-label";
+import {
+  type CameraOpticsSourceLabels,
+  formatCameraOpticsForProbeLabel,
+} from "./video-probe-label";
 
 /** @description 右上ツールバーとホットキー Mod+1/2/3 の対象となるトップ面 */
 type TabId = "edit" | "photoExport" | "videoExport";
@@ -355,6 +358,15 @@ export default function App() {
         }),
     }),
     [tLogs],
+  );
+
+  const cameraOpticsSourceLabels = useMemo(
+    (): CameraOpticsSourceLabels => ({
+      metadata: tFilmLab("controls.opticsSourceMetadata"),
+      assumed: tFilmLab("controls.opticsSourceAssumed"),
+      manual: tFilmLab("controls.opticsSourceManual"),
+    }),
+    [tFilmLab],
   );
 
   /**
@@ -1026,7 +1038,10 @@ export default function App() {
             fps: formatVideoExportFps(exportFps),
             frames: String(frames),
             maxSec: String(VIDEO_IMPORT_MAX_DURATION_SEC),
-            camera: formatCameraOpticsForProbeLabel(displayCameraOptics),
+            camera: formatCameraOpticsForProbeLabel(
+              displayCameraOptics,
+              cameraOpticsSourceLabels,
+            ),
           }),
         );
         setVideoHdrPolicy(
@@ -1041,7 +1056,7 @@ export default function App() {
         appendLog(tLogs("videoMetaLogPrefix", { msg }));
       }
     },
-    [appendLog, tLogs],
+    [appendLog, cameraOpticsSourceLabels, tLogs],
   );
 
   const restoreImportedMetadataFromPath = useCallback(
