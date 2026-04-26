@@ -34,6 +34,9 @@ final class BenchmarkCollector {
     private(set) var depthSource: String?
     private(set) var depthRenderer: String?
     private(set) var depthPrefilterMs: Double?
+    // v1.3 Phase B: video depth-track telemetry.
+    private(set) var depthFramesProcessed: Int?
+    private(set) var videoDepthDecodeMs: Double?
 
     func recordMezzanineUsage(
         used: Bool,
@@ -72,6 +75,22 @@ final class BenchmarkCollector {
         depthPrefilterMs = ms
     }
 
+    /// v1.3 Phase B: per-frame depth telemetry for video export. Increments
+    /// `depthFramesProcessed` and adds the supplied decode wall-clock to
+    /// `videoDepthDecodeMs`. Both fields stay nil for still-image exports.
+    func recordVideoDepthFrame(decodeMs: Double) {
+        depthFramesProcessed = (depthFramesProcessed ?? 0) + 1
+        videoDepthDecodeMs = (videoDepthDecodeMs ?? 0) + decodeMs
+    }
+
+    /// v1.3 Phase B: bulk-set the totals after the export session has aggregated
+    /// them per-frame internally (FilmtoneMediaRuntime calls this once at the
+    /// end of a video export). Either value may be nil — passing nil clears.
+    func recordVideoDepthTotals(frames: Int?, decodeMs: Double?) {
+        depthFramesProcessed = frames
+        videoDepthDecodeMs = decodeMs
+    }
+
     func makeSuccessRecord(
         result: Phase0ExportResultDTO,
         saveToPhotosOk: Bool? = nil
@@ -100,7 +119,9 @@ final class BenchmarkCollector {
             depthUsed: depthUsed,
             depthSource: depthSource,
             depthRenderer: depthRenderer,
-            depthPrefilterMs: depthPrefilterMs
+            depthPrefilterMs: depthPrefilterMs,
+            depthFramesProcessed: depthFramesProcessed,
+            videoDepthDecodeMs: videoDepthDecodeMs
         )
     }
 
@@ -131,7 +152,9 @@ final class BenchmarkCollector {
             depthUsed: depthUsed,
             depthSource: depthSource,
             depthRenderer: depthRenderer,
-            depthPrefilterMs: depthPrefilterMs
+            depthPrefilterMs: depthPrefilterMs,
+            depthFramesProcessed: depthFramesProcessed,
+            videoDepthDecodeMs: videoDepthDecodeMs
         )
     }
 

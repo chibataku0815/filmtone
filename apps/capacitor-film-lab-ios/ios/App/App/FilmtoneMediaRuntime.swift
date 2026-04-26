@@ -344,6 +344,11 @@ final class FilmtoneMediaRuntime {
                 : nil
         )
         collector.recordDepthPrefilterMs(session.depthPrefilterMs)
+        // v1.3 Phase B: forward video depth-track totals (nil for stills).
+        collector.recordVideoDepthTotals(
+            frames: session.videoDepthFramesProcessed,
+            decodeMs: session.videoDepthDecodeMs
+        )
         let benchmarkRecord = collector.makeSuccessRecord(result: result)
         result = Phase0ExportResultDTO(
             outputUri: result.outputUri,

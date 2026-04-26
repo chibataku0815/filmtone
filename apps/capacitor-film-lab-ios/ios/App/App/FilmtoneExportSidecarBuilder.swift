@@ -216,16 +216,14 @@ enum FilmtoneExportSidecarBuilder {
             profileVersion: inputs.mezzanineProfileVersion
         )
 
-        // v1.3 (D3.5): always emit the depth block. When the caller passed nil
-        // (legacy / pre-v1.3 site) we materialize a `used: false` placeholder so
+        // v1.3 (D3.5 Phase A + Stream D Phase B): always emit the depth block.
+        // When the caller passed nil (legacy / pre-v1.3 site, or video-export
+        // path with no depth track) we materialize a `used: false` placeholder so
         // importers see a stable shape — same convention as the mezzanine block.
-        let depth = inputs.depth ?? SidecarDepthInfo(
-            used: false,
-            source: nil,
-            resolutionWidth: nil,
-            resolutionHeight: nil,
-            renderer: nil
-        )
+        // Phase B's `framesWithDepth` / `videoDepthSource` default to nil here;
+        // video-export call-sites construct a fully-populated SidecarDepthInfo
+        // upstream and pass it via `inputs.depth`.
+        let depth = inputs.depth ?? SidecarDepthInfo(used: false)
 
         return FilmtoneExportSidecarV1(
             kind: kind,

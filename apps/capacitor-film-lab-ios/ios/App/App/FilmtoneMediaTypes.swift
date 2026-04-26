@@ -402,6 +402,12 @@ struct Phase0ExportBenchmarkRecordDTO: Encodable {
     /// v1.3 (D3.4): wall-clock ms spent on the depth prefilter pass (sum across
     /// the three glow stages). nil when depth not used.
     let depthPrefilterMs: Double?
+    /// v1.3 Phase B: count of video frames where depth was applied. nil for
+    /// still-image exports or when no depth track was opened.
+    let depthFramesProcessed: Int?
+    /// v1.3 Phase B: total ms spent decoding depth track frames during a video
+    /// export. nil for stills.
+    let videoDepthDecodeMs: Double?
 }
 
 struct Phase0ExportResultDTO: Encodable {
@@ -468,6 +474,11 @@ enum FilmtoneMediaError: LocalizedError {
     /// supports still HEIC + AVDepthData; we throw rather than silently disabling
     /// (`feedback_no_fallback_bug_hotbed`) so callers see the contract violation.
     case depthUnsupportedForVideoSource
+    /// v1.3 Phase B: a video depth track exists but its pixel format is neither
+    /// DisparityFloat16 nor DepthFloat32, or the asset reader refused to wire
+    /// the track output. Thrown by `VideoDepthSourceService` rather than
+    /// silently dropping depth (`feedback_no_fallback_bug_hotbed`).
+    case depthUnsupportedFormat
 
     var code: String {
         switch self {
@@ -497,6 +508,8 @@ enum FilmtoneMediaError: LocalizedError {
             return "CACHE_FAILED"
         case .depthUnsupportedForVideoSource:
             return "DEPTH_UNSUPPORTED_FOR_VIDEO_SOURCE"
+        case .depthUnsupportedFormat:
+            return "DEPTH_UNSUPPORTED_FORMAT"
         }
     }
 
@@ -536,6 +549,12 @@ enum FilmtoneMediaError: LocalizedError {
                 defaultValue: "Depth-aware glow is not available for video sources in this version.",
                 comment: "Error shown when depthEnabled=true is requested with a video source."
             )
+        case .depthUnsupportedFormat:
+            return filmtoneLocalized(
+                "filmtone.error.depth_unsupported_format",
+                defaultValue: "The depth data format in this video is not supported.",
+                comment: "Error shown when a video's depth track uses an unrecognized pixel format."
+            )
         }
     }
 }
@@ -547,12 +566,42 @@ enum FilmtoneMediaError: LocalizedError {
 /// signals an explicit "no-depth-prefilter" path rather than an absent field.
 /// `source` is "avDepthData" when used; nil when not (Phase B will add CoreML
 /// depth-anything-v2 to the vocabulary). `renderer` is "ci" | "metal".
+///
+/// Phase B (Stream D) additive fields — both default `nil` so still-export
+/// call-sites stay byte-identical and v1.2 sidecar consumers ignore them as
+/// unknown keys (sidecar `schemaVersion` stays at 1).
+///   - `framesWithDepth`: count of video frames the prefilter actually ran on
+///     (nil for stills; 0 is meaningful = video had a depth track but every
+///     frame degraded to depth-off).
+///   - `videoDepthSource`: vocab "AVDepthDataTrack-Cinematic" |
+///     "AVDepthDataTrack-Generic" (nil for stills). Distinct from `source`
+///     above so still vs. video paths can coexist in one importer.
 struct SidecarDepthInfo: Codable, Equatable {
     let used: Bool
     let source: String?
     let resolutionWidth: Int?
     let resolutionHeight: Int?
     let renderer: String?
+    let framesWithDepth: Int?
+    let videoDepthSource: String?
+
+    init(
+        used: Bool,
+        source: String? = nil,
+        resolutionWidth: Int? = nil,
+        resolutionHeight: Int? = nil,
+        renderer: String? = nil,
+        framesWithDepth: Int? = nil,
+        videoDepthSource: String? = nil
+    ) {
+        self.used = used
+        self.source = source
+        self.resolutionWidth = resolutionWidth
+        self.resolutionHeight = resolutionHeight
+        self.renderer = renderer
+        self.framesWithDepth = framesWithDepth
+        self.videoDepthSource = videoDepthSource
+    }
 }
 
 extension ProcessInfo.ThermalState {

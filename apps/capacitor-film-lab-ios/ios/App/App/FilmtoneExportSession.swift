@@ -29,6 +29,19 @@ final class FilmtoneExportSession {
     /// v1.3 (D3.5): mirror of the depth payload's pixel dimensions (post
     /// orientation), used by the sidecar callsite. nil when no depth was used.
     private(set) var depthResolution: (width: Int, height: Int)?
+    /// v1.3 Phase B: count of video frames for which a depth sample was matched
+    /// and forwarded to the prefilter. nil for still-image exports; 0 means the
+    /// asset had a depth track but no frame matched (e.g. video began before
+    /// the first depth pts, or every pull failed mid-stream).
+    private(set) var videoDepthFramesProcessed: Int?
+    /// v1.3 Phase B: cumulative wall-clock cost (ms) of `nextFrame` pulls during
+    /// video export. nil for stills; the matching counter is
+    /// `videoDepthFramesProcessed`.
+    private(set) var videoDepthDecodeMs: Double?
+    /// v1.3 Phase B: the `videoDepthSource` vocabulary value emitted into the
+    /// sidecar (`AVDepthDataTrack-Generic` is the only Phase B variant; future
+    /// detection can promote to `-Cinematic`). nil when no depth reader opened.
+    private(set) var videoDepthSourceLabel: String?
 
     /// v1.3 (D3.4): read-only accessor for the originating request. Used by
     /// FilmtoneMediaRuntime to pull `depthRenderer` for bench telemetry without
@@ -108,14 +121,16 @@ final class FilmtoneExportSession {
             ciContext.clearCaches()
         }
 
-        // v1.3 (D3.6): Phase A only supports still HEIC + AVDepthData. A video
-        // source with depthEnabled=true is a contract violation — we throw an
-        // explicit error rather than silently disabling depth, per
-        // `feedback_no_fallback_bug_hotbed`. Fires before any preflight progress
-        // emission so the WebView sees a clean failure path.
-        if (request.depthEnabled ?? false), request.sourceKind == .video {
-            throw FilmtoneMediaError.depthUnsupportedForVideoSource
-        }
+        // v1.3 Phase B: video sources with depth tracks (cinematic-mode .mov)
+        // now flow into `exportVideo`, which probes the asset and either wires
+        // up the per-frame depth pull or throws `depthUnsupportedForVideoSource`
+        // when the requested depth-on path has no underlying track. The throw
+        // moved one layer down because reliable detection is async and
+        // `Phase0ExportRequestDTO` does not carry the picker's
+        // `SourceInfoDTO.hasDepth`; trusting an asset-side probe over a
+        // client-supplied flag also matches `feedback_no_fallback_bug_hotbed`
+        // (no silent fallback — explicit throw when depth was requested but
+        // the source can't supply it).
 
         let startedAt = Date()
         progress(.init(stage: .preflight, progress: 0.03, currentFrame: nil, totalFrames: nil, message: "Preparing export"))
@@ -195,15 +210,24 @@ final class FilmtoneExportSession {
                 source: "avDepthData",
                 resolutionWidth: res.width,
                 resolutionHeight: res.height,
-                renderer: request.depthRenderer ?? DepthRenderer.ci.rawValue
+                renderer: request.depthRenderer ?? DepthRenderer.ci.rawValue,
+                framesWithDepth: videoDepthFramesProcessed,
+                videoDepthSource: videoDepthSourceLabel
             )
         } else {
+            // Video that opened a depth reader but never matched a frame
+            // (asset began before first depth pts, or every pull failed) still
+            // owes the importer `used: false` plus the diagnostic block —
+            // `framesWithDepth: 0` distinguishes "asset had a track" from "no
+            // track at all" (still / no-opt-in path keeps both nil).
             depthSidecar = SidecarDepthInfo(
                 used: false,
                 source: nil,
                 resolutionWidth: nil,
                 resolutionHeight: nil,
-                renderer: nil
+                renderer: nil,
+                framesWithDepth: videoDepthSourceLabel != nil ? (videoDepthFramesProcessed ?? 0) : nil,
+                videoDepthSource: videoDepthSourceLabel
             )
         }
 
@@ -264,6 +288,22 @@ final class FilmtoneExportSession {
         let asset = AVURLAsset(url: effectiveSourceURL)
         guard let videoTrack = asset.tracks(withMediaType: .video).first else {
             throw FilmtoneMediaError.unsupportedSource("No video track was found in the selected source.")
+        }
+
+        // v1.3 Phase B: open a depth-track reader when the caller opted into
+        // the depth pipeline. The probe lives here (not in `run()`) because
+        // detection is async and `Phase0ExportRequestDTO` does not surface the
+        // picker's `SourceInfoDTO.hasDepth`. Asset-side truth beats client
+        // claims and avoids `feedback_no_fallback_bug_hotbed` (no silent
+        // disable). When depth was requested but the asset has no track, we
+        // throw `depthUnsupportedForVideoSource` so the WebView sees the same
+        // contract violation it saw in Phase A.
+        let depthReader = try resolveVideoDepthReader(asset: asset)
+        defer { depthReader?.cancel() }
+        if depthReader != nil {
+            videoDepthSourceLabel = "AVDepthDataTrack-Generic"
+            videoDepthFramesProcessed = 0
+            videoDepthDecodeMs = 0
         }
 
         let sourceDurationSec = CMTimeGetSeconds(asset.duration)
@@ -388,6 +428,16 @@ final class FilmtoneExportSession {
 
         progress(.init(stage: .reading, progress: 0.08, currentFrame: 0, totalFrames: estimatedFrameCount, message: "Reading source"))
 
+        // v1.3 Phase B: depth-track frames seldom share the video track's
+        // cadence (depth tracks are often ~half-rate). We hold the most-recent
+        // depth frame whose pts <= current video pts in `lastDepthFrame`, and
+        // peek one ahead in `pendingDepthFrame`. After a mid-stream pull
+        // failure we keep `lastDepthFrame` (graceful degrade with `last-known
+        // depth`) and stop pulling.
+        var lastDepthFrame: (presentationTime: CMTime, depthMap: FilmtoneDepthMap)? = nil
+        var pendingDepthFrame: (presentationTime: CMTime, depthMap: FilmtoneDepthMap)? = nil
+        var depthReaderExhausted = depthReader == nil
+
         dispatchGroup.enter()
         videoInput.requestMediaDataWhenReady(on: videoQueue) { [self] in
             while videoInput.isReadyForMoreMediaData {
@@ -407,6 +457,45 @@ final class FilmtoneExportSession {
                     }
 
                     let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+
+                    if let reader = depthReader {
+                        let decodeStart = Date()
+                        // Advance until pendingDepthFrame.pts > current video pts (or EOS).
+                        // Promote pending → last so the chosen depth is the latest sample
+                        // whose pts <= videoPts.
+                        while !depthReaderExhausted,
+                              pendingDepthFrame == nil
+                                || pendingDepthFrame!.presentationTime <= presentationTime {
+                            if let pf = pendingDepthFrame {
+                                lastDepthFrame = pf
+                            }
+                            switch pullNextVideoDepthFrame(reader: reader) {
+                            case .frame(let next):
+                                pendingDepthFrame = next
+                            case .endOfStream:
+                                pendingDepthFrame = nil
+                                depthReaderExhausted = true
+                            case .failure(let error):
+                                NSLog("FilmtoneExportSession: video depth frame pull failed: \(error). Continuing without depth for remaining frames.")
+                                pendingDepthFrame = nil
+                                depthReaderExhausted = true
+                            }
+                        }
+                        let depthMapForThisFrame = lastDepthFrame?.depthMap
+                        let decodeMs = Date().timeIntervalSince(decodeStart) * 1000.0
+                        videoDepthDecodeMs = (videoDepthDecodeMs ?? 0) + decodeMs
+                        loadedDepthMap = depthMapForThisFrame
+                        if let depthMapForThisFrame {
+                            videoDepthFramesProcessed = (videoDepthFramesProcessed ?? 0) + 1
+                            // depthResolution is the "did the prefilter run?" signal that
+                            // both the sidecar and runtime read; setting it on the first
+                            // matched frame keeps still / video paths telemetry-aligned.
+                            if depthResolution == nil {
+                                depthResolution = (depthMapForThisFrame.width, depthMapForThisFrame.height)
+                            }
+                        }
+                    }
+
                     let appendedFrame = try appendVideoSample(
                         sampleBuffer,
                         videoInput: videoInput,
@@ -1690,6 +1779,79 @@ final class FilmtoneExportSession {
                 throw FilmtoneMediaError.exportFailed(writer.error?.localizedDescription ?? "Audio samples could not be appended.")
             }
         }
+    }
+
+    // MARK: - v1.3 Phase B video depth helpers
+
+    /// Sync-bridges `VideoDepthSourceService` for the (sync) video export
+    /// pipeline. Returns nil when the caller didn't opt in OR the asset has no
+    /// depth track AND depth wasn't requested. Throws
+    /// `depthUnsupportedForVideoSource` when depth WAS requested but no track
+    /// exists, and `depthUnsupportedFormat` when a track exists but the reader
+    /// can't be wired (propagated from `VideoDepthSourceService`).
+    private func resolveVideoDepthReader(asset: AVAsset) throws -> VideoDepthFrameReader? {
+        guard request.depthEnabled ?? false else {
+            return nil
+        }
+        let service = VideoDepthSourceService()
+        let semaphore = DispatchSemaphore(value: 0)
+        var hasTrack = false
+        var probeError: Error?
+        Task.detached(priority: .userInitiated) {
+            defer { semaphore.signal() }
+            hasTrack = await service.hasDepthTrack(in: asset)
+        }
+        semaphore.wait()
+        guard hasTrack else {
+            throw FilmtoneMediaError.depthUnsupportedForVideoSource
+        }
+        var reader: VideoDepthFrameReader?
+        let openSemaphore = DispatchSemaphore(value: 0)
+        Task.detached(priority: .userInitiated) {
+            defer { openSemaphore.signal() }
+            do {
+                reader = try await service.makeReader(for: asset)
+            } catch {
+                probeError = error
+            }
+        }
+        openSemaphore.wait()
+        if let probeError {
+            throw probeError
+        }
+        return reader
+    }
+
+    /// Sync-bridges `VideoDepthFrameReader.nextFrame` for the per-frame loop on
+    /// `videoQueue`. The result is a tri-state instead of `throws` because
+    /// callers want to distinguish "stream ended" from "transient failure" so
+    /// they can apply the per-source recovery contract from Phase A.
+    private enum VideoDepthFramePullResult {
+        case frame((presentationTime: CMTime, depthMap: FilmtoneDepthMap))
+        case endOfStream
+        case failure(Error)
+    }
+
+    private func pullNextVideoDepthFrame(reader: VideoDepthFrameReader) -> VideoDepthFramePullResult {
+        let semaphore = DispatchSemaphore(value: 0)
+        var pulled: (presentationTime: CMTime, depthMap: FilmtoneDepthMap)?
+        var pullError: Error?
+        Task.detached(priority: .userInitiated) {
+            defer { semaphore.signal() }
+            do {
+                pulled = try await reader.nextFrame()
+            } catch {
+                pullError = error
+            }
+        }
+        semaphore.wait()
+        if let pullError {
+            return .failure(pullError)
+        }
+        guard let pulled else {
+            return .endOfStream
+        }
+        return .frame(pulled)
     }
 
     private func finish(writer: AVAssetWriter) throws {
