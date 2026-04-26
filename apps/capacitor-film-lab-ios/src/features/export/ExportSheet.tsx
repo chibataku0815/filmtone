@@ -3,6 +3,7 @@ import {
   type Phase0ExportProgress,
   type Phase0ExportResult,
   type Phase0ProjectState,
+  type Phase0RenderMode,
   type SourceInfo,
   type SourceProbe,
 } from "film-lab-core";
@@ -40,6 +41,8 @@ interface ExportSheetProps {
     metricsFileSize: string;
     metricsSaveToPhotos: string;
   };
+  renderMode: Phase0RenderMode;
+  onRenderModeChange: (mode: Phase0RenderMode) => void;
   onExport: () => void;
   onSave: () => void;
   onShare: () => void;
@@ -98,6 +101,8 @@ export function ExportSheet({
   isBusy,
   isSaveBusy,
   strings,
+  renderMode,
+  onRenderModeChange,
   onExport,
   onSave,
   onShare,
@@ -123,15 +128,22 @@ export function ExportSheet({
             {isBusy ? strings.exportRunning : strings.exportIdle}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onExport}
-          disabled={!canExport}
-          className="inline-flex min-h-[44px] shrink-0 items-center gap-2 squircle-pill bg-[var(--accent-amber1)] px-5 py-2.5 text-xs font-semibold text-black transition active:brightness-[0.98] disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/40"
-        >
-          <ExportIcon className="h-4 w-4" />
-          {strings.exportStart}
-        </button>
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <RenderModeToggle
+            value={renderMode}
+            disabled={isBusy || isSaveBusy}
+            onChange={onRenderModeChange}
+          />
+          <button
+            type="button"
+            onClick={onExport}
+            disabled={!canExport}
+            className="inline-flex min-h-[44px] shrink-0 items-center gap-2 squircle-pill bg-[var(--accent-amber1)] px-5 py-2.5 text-xs font-semibold text-black transition active:brightness-[0.98] disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/40"
+          >
+            <ExportIcon className="h-4 w-4" />
+            {strings.exportStart}
+          </button>
+        </div>
       </div>
 
       <div className="mt-5 space-y-4">
@@ -229,6 +241,44 @@ function MetricTile({ label, value }: { label: string; value: string }) {
     <div className="squircle-sm bg-white/[0.03] p-3">
       <p className="editor-kicker">{label}</p>
       <p className="mt-2 text-[15px] leading-6 text-white/92">{value}</p>
+    </div>
+  );
+}
+
+interface RenderModeToggleProps {
+  value: Phase0RenderMode;
+  disabled: boolean;
+  onChange: (mode: Phase0RenderMode) => void;
+}
+
+function RenderModeToggle({ value, disabled, onChange }: RenderModeToggleProps) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Render mode"
+      className="inline-flex items-center rounded-full bg-white/[0.05] p-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-white/70"
+    >
+      {(["quality", "speed"] as const).map((mode) => {
+        const isActive = mode === value;
+        return (
+          <button
+            key={mode}
+            type="button"
+            role="radio"
+            aria-checked={isActive}
+            disabled={disabled}
+            onClick={() => onChange(mode)}
+            className={
+              "min-h-[28px] rounded-full px-3 py-1 transition disabled:cursor-not-allowed disabled:opacity-50 " +
+              (isActive
+                ? "bg-white/[0.16] text-white"
+                : "text-white/60 hover:text-white/85")
+            }
+          >
+            {mode === "quality" ? "Quality" : "Speed"}
+          </button>
+        );
+      })}
     </div>
   );
 }

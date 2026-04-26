@@ -250,4 +250,5 @@ struct Phase0ExportRequestDTO: Codable {
     let lut: ParsedCubeLutDTO?
     let inputLut: SerializableLutDTO?
     let creativeLut: SerializableLutDTO?
+    let renderMode: String?
 }

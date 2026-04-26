@@ -19,6 +19,10 @@ export interface BenchmarkRow {
   errorDomain: string | null;
   errorCode: string | null;
   durationSec: number | null;
+  /** v1.2: render mode the export ran under. Absent native field → "quality" default. */
+  renderMode: "quality" | "speed";
+  /** v1.2: mezzanine variant the export consumed, null when source-direct. */
+  mezzanineProfileVariant: "sdr" | "hdr" | null;
 }
 
 export interface BenchmarkRowInput {
@@ -32,10 +36,10 @@ export interface BenchmarkRowInput {
 }
 
 const ROW_HEADER =
-  "| date | device | iOS | clip_id | input_resolution | output_resolution | realtime_ratio | file_size_mb | thermal | memory_warnings | save | visual | error | duration_sec |";
+  "| date | device | iOS | clip_id | input_resolution | output_resolution | realtime_ratio | file_size_mb | thermal | memory_warnings | save | visual | error | duration_sec | mode | mezz_variant |";
 
 const ROW_DIVIDER =
-  "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |";
+  "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |";
 
 export function buildBenchmarkRow(input: BenchmarkRowInput): BenchmarkRow {
   const { result, benchmark, probe, clipId, visualFloor, saveResult } = input;
@@ -71,6 +75,8 @@ export function buildBenchmarkRow(input: BenchmarkRowInput): BenchmarkRow {
     errorCode: benchmark.errorCode ?? null,
     durationSec:
       typeof benchmark.sourceDurationSec === "number" ? benchmark.sourceDurationSec : null,
+    renderMode: benchmark.renderMode ?? "quality",
+    mezzanineProfileVariant: benchmark.mezzanineProfileVariant ?? null,
   };
 }
 
@@ -97,6 +103,8 @@ export function formatBenchmarkRow(row: BenchmarkRow): string {
     `visual=${row.visualFloor}`,
     `err=${errorCell}`,
     durationCell,
+    `mode=${row.renderMode}`,
+    `mezz=${row.mezzanineProfileVariant ?? "—"}`,
     "",
   ].join(" | ").trim();
 }
@@ -110,7 +118,7 @@ export interface ParsedBenchmarkRow extends BenchmarkRow {
 }
 
 const ROW_PATTERN =
-  /^\|\s*(?<date>[^|]+?)\s*\|\s*(?<device>[^|]+?)\s*\|\s*(?<iosVersion>[^|]+?)\s*\|\s*(?<clipId>[^|]+?)\s*\|\s*(?<inputRes>[^|]+?)\s*\|\s*(?<outputRes>[^|]+?)\s*\|\s*(?<realtime>[^|]+?)\s*\|\s*(?<fileSize>[^|]+?)\s*\|\s*thermal=(?<thermal>[^|]+?)\s*\|\s*mem_warn=(?<mem>[^|]+?)\s*\|\s*save=(?<save>[^|]+?)\s*\|\s*visual=(?<visual>[^|]+?)\s*\|\s*err=(?<err>[^|]+?)\s*\|\s*(?<durationSec>[^|]+?)\s*\|\s*$/;
+  /^\|\s*(?<date>[^|]+?)\s*\|\s*(?<device>[^|]+?)\s*\|\s*(?<iosVersion>[^|]+?)\s*\|\s*(?<clipId>[^|]+?)\s*\|\s*(?<inputRes>[^|]+?)\s*\|\s*(?<outputRes>[^|]+?)\s*\|\s*(?<realtime>[^|]+?)\s*\|\s*(?<fileSize>[^|]+?)\s*\|\s*thermal=(?<thermal>[^|]+?)\s*\|\s*mem_warn=(?<mem>[^|]+?)\s*\|\s*save=(?<save>[^|]+?)\s*\|\s*visual=(?<visual>[^|]+?)\s*\|\s*err=(?<err>[^|]+?)\s*\|\s*(?<durationSec>[^|]+?)\s*\|\s*mode=(?<mode>[^|]+?)\s*\|\s*mezz=(?<mezz>[^|]+?)\s*\|\s*$/;
 
 export function parseBenchmarkRow(line: string): ParsedBenchmarkRow | null {
   const trimmed = line.trim();
@@ -137,6 +145,12 @@ export function parseBenchmarkRow(line: string): ParsedBenchmarkRow | null {
   const durationRaw = g.durationSec.trim();
   const durationSec = durationRaw === "—" ? null : Number.parseFloat(durationRaw);
 
+  const modeRaw = g.mode.trim();
+  const renderMode: "quality" | "speed" = modeRaw === "speed" ? "speed" : "quality";
+  const mezzRaw = g.mezz.trim();
+  const mezzanineProfileVariant: "sdr" | "hdr" | null =
+    mezzRaw === "hdr" ? "hdr" : mezzRaw === "sdr" ? "sdr" : null;
+
   return {
     raw: trimmed,
     date: g.date.trim(),
@@ -154,5 +168,7 @@ export function parseBenchmarkRow(line: string): ParsedBenchmarkRow | null {
     errorDomain,
     errorCode,
     durationSec: durationSec != null && Number.isFinite(durationSec) ? durationSec : null,
+    renderMode,
+    mezzanineProfileVariant,
   };
 }

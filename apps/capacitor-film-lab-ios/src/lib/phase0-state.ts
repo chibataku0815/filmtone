@@ -12,6 +12,7 @@ import {
   type Phase0Params,
   type Phase0PreviewRenderResult,
   type Phase0ProjectState,
+  type Phase0RenderMode,
   type PresetName,
   type QuickState,
   type SourceInfo,
@@ -38,6 +39,8 @@ export interface Phase0EditorState {
   isBusy: boolean;
   notice: string | null;
   error: string | null;
+  /** v1.2 (iOS): export render mode. Session-only; resets to "quality" on app reload. */
+  renderMode: Phase0RenderMode;
 }
 
 function createEmptyPreviewState(): Phase0EditorState["preview"] {
@@ -73,6 +76,20 @@ export function createInitialEditorState(
     isBusy: false,
     notice: null,
     error: null,
+    renderMode: "quality",
+  };
+}
+
+export function applyRenderMode(
+  state: Phase0EditorState,
+  renderMode: Phase0RenderMode,
+): Phase0EditorState {
+  if (state.renderMode === renderMode) {
+    return state;
+  }
+  return {
+    ...state,
+    renderMode,
   };
 }
 
@@ -195,11 +212,17 @@ export function buildEditorExportRequest(
   if (!state.source) {
     return null;
   }
-  return buildPhase0ExportRequest({
+  const base = buildPhase0ExportRequest({
     source: state.source,
     probe: state.probe,
     project: state.project,
   });
+  // v1.2 (iOS): thread session render mode. The Quality default is encoded as
+  // an absent field on the wire; only emit `renderMode` when Speed is selected.
+  if (state.renderMode === "speed") {
+    return { ...base, renderMode: "speed" };
+  }
+  return base;
 }
 
 export function applyProjectPatch(
