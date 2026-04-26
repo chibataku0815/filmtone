@@ -12,11 +12,22 @@ import {
   type Phase0Params,
   type Phase0PreviewRenderResult,
   type Phase0ProjectState,
+  type Phase0RenderMode,
   type PresetName,
   type QuickState,
   type SourceInfo,
   type SourceProbe,
 } from "film-lab-core";
+
+/**
+ * v1.3 Stream A — UI render mode is tracked separately from the persisted
+ * Phase0ProjectState because the wire-level enum ("quality" | "speed") is the
+ * v1.2 native gate contract; the new "Master / Postcard" naming is UI-only.
+ *
+ * Default is "quality" (Master) — matches the native runtime default of
+ * `request.renderMode ?? .quality` in FilmtoneMediaRuntime / FilmtoneExportSession.
+ */
+export const PHASE0_RENDER_MODE_DEFAULT: Phase0RenderMode = "quality";
 
 export interface Phase0EditorState {
   project: Phase0ProjectState;
@@ -38,6 +49,11 @@ export interface Phase0EditorState {
   isBusy: boolean;
   notice: string | null;
   error: string | null;
+  /**
+   * v1.3 Stream A — wire-level enum, persisted only in editor session memory.
+   * UI surfaces this as "Master" ("quality") / "Postcard" ("speed").
+   */
+  renderMode: Phase0RenderMode;
 }
 
 function createEmptyPreviewState(): Phase0EditorState["preview"] {
@@ -73,6 +89,25 @@ export function createInitialEditorState(
     isBusy: false,
     notice: null,
     error: null,
+    renderMode: PHASE0_RENDER_MODE_DEFAULT,
+  };
+}
+
+/**
+ * v1.3 Stream A — UI render-mode reducer.
+ * Wire-level enum stays "quality" | "speed" (v1.2 native gate contract).
+ * UI label mapping: "quality" -> "Master", "speed" -> "Postcard".
+ */
+export function applyRenderMode(
+  state: Phase0EditorState,
+  mode: Phase0RenderMode,
+): Phase0EditorState {
+  if (state.renderMode === mode) {
+    return state;
+  }
+  return {
+    ...state,
+    renderMode: mode,
   };
 }
 
@@ -195,11 +230,18 @@ export function buildEditorExportRequest(
   if (!state.source) {
     return null;
   }
-  return buildPhase0ExportRequest({
+  const request = buildPhase0ExportRequest({
     source: state.source,
     probe: state.probe,
     project: state.project,
   });
+  // v1.3 Stream A — attach UI-selected render mode. Native runtime defaults
+  // to .quality when the field is absent, so emitting "quality" is also a
+  // safe explicit no-op against the v1.2 native gate.
+  return {
+    ...request,
+    renderMode: state.renderMode,
+  };
 }
 
 export function applyProjectPatch(

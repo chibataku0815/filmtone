@@ -8,9 +8,13 @@ import { parseCube } from "film-lab-core";
 import {
   applyInputLutSelection,
   applyPresetSelection,
+  applyProbe,
   applyQuickState,
+  applyRenderMode,
   applyStrength,
+  buildEditorExportRequest,
   createInitialEditorState,
+  PHASE0_RENDER_MODE_DEFAULT,
 } from "./phase0-state";
 
 function makeTestLut(title: string): ParsedCubeLut {
@@ -75,5 +79,65 @@ describe("phase0 state", () => {
     expect(next.project.quickState.filmCharacter).toBeCloseTo(0.4, 5);
     expect(next.project.params.exposure).toBeGreaterThan(strengthened.project.params.exposure);
     expect(next.project.params.saturation).toBeGreaterThan(strengthened.project.params.saturation);
+  });
+
+  // v1.3 Stream A — Master / Postcard render mode (UI label rename only;
+  // wire-level enum stays "quality" | "speed" for the v1.2 native gate).
+  test("initial state defaults render mode to Master (wire: 'quality')", () => {
+    const initial = createInitialEditorState();
+
+    expect(initial.renderMode).toBe("quality");
+    expect(PHASE0_RENDER_MODE_DEFAULT).toBe("quality");
+  });
+
+  test("applyRenderMode flips between Postcard and Master without touching project", () => {
+    const initial = createInitialEditorState();
+    const initialUpdatedAt = initial.project.updatedAt;
+
+    const postcard = applyRenderMode(initial, "speed");
+    expect(postcard.renderMode).toBe("speed");
+    // Project should be reference-equal — render mode is editor-only state.
+    expect(postcard.project).toBe(initial.project);
+    expect(postcard.project.updatedAt).toBe(initialUpdatedAt);
+
+    const master = applyRenderMode(postcard, "quality");
+    expect(master.renderMode).toBe("quality");
+    expect(master.project).toBe(initial.project);
+  });
+
+  test("applyRenderMode is a no-op when value is unchanged (preserves identity)", () => {
+    const initial = createInitialEditorState();
+    const same = applyRenderMode(initial, "quality");
+
+    expect(same).toBe(initial);
+  });
+
+  test("buildEditorExportRequest forwards UI render mode to the wire request", () => {
+    const initial = createInitialEditorState();
+    const probed = applyProbe(
+      initial,
+      {
+        uri: "file:///tmp/clip.mov",
+        filename: "clip.mov",
+        kind: "video",
+      },
+      {
+        uri: "file:///tmp/clip.mov",
+        filename: "clip.mov",
+        kind: "video",
+        width: 1920,
+        height: 1080,
+        durationSec: 5,
+        codecFamily: "hevc",
+      },
+    );
+
+    const masterReq = buildEditorExportRequest(probed);
+    expect(masterReq).not.toBeNull();
+    expect(masterReq?.renderMode).toBe("quality");
+
+    const postcardReq = buildEditorExportRequest(applyRenderMode(probed, "speed"));
+    expect(postcardReq).not.toBeNull();
+    expect(postcardReq?.renderMode).toBe("speed");
   });
 });

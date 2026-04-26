@@ -6,6 +6,7 @@ import {
   parseCube,
   serializeCubeLut,
   type ParsedCubeLut,
+  type Phase0RenderMode,
   type QuickAxisId,
   type PresetName,
 } from "film-lab-core";
@@ -29,6 +30,7 @@ import {
   applyPreviewRenderStart,
   applyProbe,
   applyQuickState,
+  applyRenderMode,
   applyStrength,
   buildEditorExportRequest,
   createInitialEditorState,
@@ -261,6 +263,10 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
     if (profile === "auto") {
       setState((current) => applyInputLutSelection(current, null));
     }
+  }
+
+  function handleRenderModeChange(mode: Phase0RenderMode) {
+    setState((current) => applyRenderMode(current, mode));
   }
 
   function handleActivateImportedLut(id: string) {
@@ -562,10 +568,12 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
           isBusy={state.isBusy}
           isSaveBusy={isSaveBusy}
           error={surfacedError}
+          renderMode={state.renderMode}
           strings={strings}
           onExport={handleExport}
           onSave={handleSave}
           onShare={handleShare}
+          onRenderModeChange={handleRenderModeChange}
         />
 
         {state.notice ? (
