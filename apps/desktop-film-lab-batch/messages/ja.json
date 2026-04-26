@@ -192,7 +192,7 @@
       "temperature": "色温度",
       "highlights": "ハイライト",
       "shadows": "シャドウ",
-      "filmGrain": "フィルムグレイン",
+      "grainIntensity": "フィルムグレイン",
       "grainSize": "粒子の粗さ",
       "vignette": "ビネット",
       "bloom": "光のにじみ",
@@ -286,7 +286,7 @@
       "sourceTint": "ティント（緑〜マゼンタ）",
       "highlightsTrim": "ハイライト（素材）",
       "shadowsTrim": "シャドウ（素材）",
-      "compression": "ハイライトの柔らかさ",
+      "compressionAmount": "ハイライトの柔らかさ",
       "compressionToggleHint": "ハイライト圧縮のオン/オフ。強くしすぎると破綻しやすいので、必要なときだけ使います。",
       "compressionHint": "明るい部分を、フィルムに近いカーブでやわらかくします。強くしすぎると眠くなりやすいので、安全域で微調整します。",
       "compressionRange": "階調の広がり",
@@ -344,7 +344,10 @@
       "shutterAngle": "シャッターアングル",
       "shutterAngleHint": "カメラのシャッター角度をシミュレート（0\u00b0=オフ、180\u00b0=シネマ標準）",
       "trailIntensity": "残像の長さ",
-      "trailIntensityHint": "シャッター窓を超えて残像を延長します。値が高いほど長い残像になります。"
+      "trailIntensityHint": "シャッター窓を超えて残像を延長します。値が高いほど長い残像になります。",
+      "opticsSourceMetadata": "メタデータ",
+      "opticsSourceAssumed": "推定",
+      "opticsSourceManual": "手動"
     },
     "desktop": {
       "app": {

@@ -325,8 +325,8 @@ extension FilmtoneStrings {
             "temperature": filmtoneLocalized("filmtone.param.temperature", defaultValue: "Temperature", comment: "Advanced parameter label."),
             "tint": filmtoneLocalized("filmtone.param.tint", defaultValue: "Tint", comment: "Advanced parameter label."),
             "fade": filmtoneLocalized("filmtone.param.fade", defaultValue: "Fade", comment: "Advanced parameter label."),
-            "rgbShift": filmtoneLocalized("filmtone.param.rgb_shift", defaultValue: "RGB Shift", comment: "Advanced parameter label."),
-            "lensSoftness": filmtoneLocalized("filmtone.param.lens_softness", defaultValue: "Lens Softness", comment: "Advanced parameter label."),
+            "rgbShift": filmtoneLocalized("filmtone.param.rgb_shift", defaultValue: "Color fringing", comment: "Advanced parameter label."),
+            "lensSoftness": filmtoneLocalized("filmtone.param.lens_softness", defaultValue: "Lens softness", comment: "Advanced parameter label."),
             "vignette": filmtoneLocalized("filmtone.param.vignette", defaultValue: "Vignette", comment: "Advanced parameter label."),
             "bloomThreshold": filmtoneLocalized("filmtone.param.bloom_threshold", defaultValue: "Bloom Threshold", comment: "Advanced parameter label."),
             "bloomStrength": filmtoneLocalized("filmtone.param.bloom_strength", defaultValue: "Bloom Strength", comment: "Advanced parameter label."),
@@ -339,11 +339,11 @@ extension FilmtoneStrings {
             "halationRadius": filmtoneLocalized("filmtone.param.halation_radius", defaultValue: "Halation Radius", comment: "Advanced parameter label."),
             "halationSoftKnee": filmtoneLocalized("filmtone.param.halation_soft_knee", defaultValue: "Halation Soft Knee", comment: "Advanced parameter label."),
             "diffusion": filmtoneLocalized("filmtone.param.diffusion", defaultValue: "Diffusion", comment: "Advanced parameter label."),
-            "grainIntensity": filmtoneLocalized("filmtone.param.grain_intensity", defaultValue: "Grain Intensity", comment: "Advanced parameter label."),
+            "grainIntensity": filmtoneLocalized("filmtone.param.grain_intensity", defaultValue: "Grain Strength", comment: "Advanced parameter label."),
             "grainSize": filmtoneLocalized("filmtone.param.grain_size", defaultValue: "Grain Size", comment: "Advanced parameter label."),
-            "grainRadialMix": filmtoneLocalized("filmtone.param.grain_radial_mix", defaultValue: "Grain Radial Mix", comment: "Advanced parameter label."),
-            "compressionAmount": filmtoneLocalized("filmtone.param.compression_amount", defaultValue: "Compression Amount", comment: "Advanced parameter label."),
-            "compressionRange": filmtoneLocalized("filmtone.param.compression_range", defaultValue: "Compression Range", comment: "Advanced parameter label."),
+            "grainRadialMix": filmtoneLocalized("filmtone.param.grain_radial_mix", defaultValue: "Grain edge emphasis", comment: "Advanced parameter label."),
+            "compressionAmount": filmtoneLocalized("filmtone.param.compression_amount", defaultValue: "Highlight softness", comment: "Advanced parameter label."),
+            "compressionRange": filmtoneLocalized("filmtone.param.compression_range", defaultValue: "Tone span", comment: "Advanced parameter label."),
             "printContrast": filmtoneLocalized("filmtone.param.print_contrast", defaultValue: "Print Contrast", comment: "Advanced parameter label."),
             "cyan": filmtoneLocalized("filmtone.param.cyan", defaultValue: "Cyan", comment: "Advanced parameter label."),
             "magenta": filmtoneLocalized("filmtone.param.magenta", defaultValue: "Magenta", comment: "Advanced parameter label."),
@@ -570,30 +570,29 @@ extension FilmtoneStrings {
             comment: "Fallback error for preview rendering."
         )
         // MARK: HDR policy notice (v1.1)
+        // Per terminology SSoT §5.1 / §5.2, all three body variants share the same
+        // generic end-user copy. v1.2 candidate: collapse to single body key.
+        let hdrGenericBody = prefersJapanese
+            ? "この環境では、HDR動画を標準のSDR動画として正確に変換できない場合があります。書き出しは続行できますが、他のアプリで見ると明るさや色が元動画と違って見えることがあります。正確な色で書き出したい場合は、カメラアプリや編集アプリでSDR動画に変換してから読み込んでください。"
+            : "This environment may not be able to convert HDR video into a standard SDR video accurately. You can continue exporting, but brightness or color may look different in other apps. For color-critical exports, convert the clip to SDR in your camera app or editor before importing it."
         hdrNoticeTitle = filmtoneLocalized(
             "filmtone.hdr.notice.title",
-            defaultValue: prefersJapanese ? "HDR ソースの取り扱い" : "HDR source handling",
+            defaultValue: prefersJapanese ? "HDR動画を読み込みました" : "HDR video loaded",
             comment: "Title for the inline HDR preparation policy notice."
         )
         hdrNoticeBodyPq = filmtoneLocalized(
             "filmtone.hdr.notice.body.pq",
-            defaultValue: prefersJapanese
-                ? "HDR (PQ) ソースを検出しました。iOS 書き出し時に SDR に変換される場合があります。ダイナミックレンジが圧縮される可能性があります。"
-                : "HDR (PQ) source detected. It may be converted to SDR when exporting on iOS, and dynamic range could be compressed.",
+            defaultValue: hdrGenericBody,
             comment: "Body text shown when a PQ HDR source is loaded."
         )
         hdrNoticeBodyHlg = filmtoneLocalized(
             "filmtone.hdr.notice.body.hlg",
-            defaultValue: prefersJapanese
-                ? "HDR (HLG) ソースを検出しました。iOS 書き出し時に SDR に変換される場合があります。"
-                : "HDR (HLG) source detected. It may be converted to SDR when exporting on iOS.",
+            defaultValue: hdrGenericBody,
             comment: "Body text shown when an HLG HDR source is loaded."
         )
         hdrNoticeBodyWideGamutUnknown = filmtoneLocalized(
             "filmtone.hdr.notice.body.wideGamutUnknown",
-            defaultValue: prefersJapanese
-                ? "広色域ソースですが HDR transfer を判定できません。SDR として書き出しますが、色の扱いは要確認です。"
-                : "Wide-gamut source, but the HDR transfer function could not be identified. Export will proceed as SDR — please verify colour handling.",
+            defaultValue: hdrGenericBody,
             comment: "Body text shown when the source is wide-gamut but transfer is unknown."
         )
         // MARK: Camera optics label (v1.1)

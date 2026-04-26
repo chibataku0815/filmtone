@@ -1,7 +1,20 @@
 import type { CameraOptics } from "film-lab-core";
 
+export interface CameraOpticsSourceLabels {
+  metadata: string;
+  assumed: string;
+  manual: string;
+}
+
+const DEFAULT_SOURCE_LABELS: CameraOpticsSourceLabels = {
+  metadata: "metadata",
+  assumed: "assumed",
+  manual: "manual",
+};
+
 export function formatCameraOpticsForProbeLabel(
   optics: CameraOptics | null | undefined,
+  sourceLabels: CameraOpticsSourceLabels = DEFAULT_SOURCE_LABELS,
 ): string {
   if (!optics) {
     return "camera ?";
@@ -25,6 +38,6 @@ export function formatCameraOpticsForProbeLabel(
   if (typeof optics.fovXDeg === "number" && Number.isFinite(optics.fovXDeg)) {
     parts.push(`HFOV ${Number(optics.fovXDeg.toFixed(1))}deg`);
   }
-  parts.push(optics.source);
+  parts.push(sourceLabels[optics.source] ?? optics.source);
   return parts.join(" · ");
 }
