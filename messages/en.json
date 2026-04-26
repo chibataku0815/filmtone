@@ -1378,8 +1378,76 @@
   "journal": {
     "title": "Journal",
     "description": "Notes on works, technical writing, and motion-study archives.",
+    "eyebrow": "Notes & Studies",
+    "intro": "Notes from behind the work — production thinking, technical writing, and motion-study archives held under one craft bar across code, motion, film, and photography.",
     "motionStudies": {
-      "title": "Motion Studies"
+      "title": "Motion Studies",
+      "eyebrow": "Reference Works",
+      "intro": "Named techniques pulled into narrow reference works, each held against its own runtime truth and a specific benchmark.",
+      "openLabel": "Open",
+      "entries": {
+        "signalStrokeRelay": {
+          "title": "Signal Stroke Relay",
+          "context": "Reference Work 01 · Theatre.js + Motion + SVG",
+          "summary": "Lead line, icon, title, and underline relayed through trim paths, staggered offsets, and a deliberate match cut."
+        },
+        "anchoredProgressResolve": {
+          "title": "Anchored Progress Resolve",
+          "context": "Phase 1 · Work 03 · SVG + DOM",
+          "summary": "A progress bar held as a state machine — anchored fill, blink channel, and a deliberate resolve state in browser SVG + DOM."
+        },
+        "boilingPosterAperture": {
+          "title": "Boiling Poster Aperture",
+          "context": "Phase 1 · PixiJS Library-Fit",
+          "summary": "Boiling edges, mask gates, and displacement-led reveals on a single PixiJS poster — built so the reveal stays the main event."
+        },
+        "motifLoopBackground": {
+          "title": "Motif Loop Background",
+          "context": "PixiJS · Loop Phasing",
+          "summary": "A motif-driven looping background that breathes without competing with the foreground — loop phasing held inside a safety clamp."
+        },
+        "stagedEmphasisPayoff": {
+          "title": "Staged Emphasis Payoff",
+          "context": "Phase 3 · Work 05 · SVG + DOM",
+          "summary": "A title sequence broken into graphemes that stack, hand off emphasis, and release on a deliberate hold — built on browser SVG + DOM."
+        },
+        "temporalEchoResidue": {
+          "title": "Temporal Echo Residue",
+          "context": "Phase 3 · Work 06 · PixiJS",
+          "summary": "Lyric and glyph residue stacked from time-offset samples, gated by alpha decay — a PixiJS reference for trail and echo grammar."
+        }
+      }
+    }
+  },
+  "experiments": {
+    "title": "Experiments",
+    "description": "Motion works built from WebGPU and sound — prototypes that hold visual, tactile, and temporal grip in code.",
+    "eyebrow": "Motion Works",
+    "intro": "A working studio for sensing texture, time, and sound through code — sitting upstream of Filmtone and Journal.",
+    "stateLabel": {
+      "active": "Active",
+      "preview": "Preview"
+    },
+    "openLabel": "Open",
+    "works": {
+      "dot": {
+        "title": "Motion Dot",
+        "concept": "A dot field that finds form through accumulation. WebGPU plus audio input — a study in handling density and time."
+      },
+      "grid": {
+        "title": "Motion Grid",
+        "concept": "A grid of cells, breathing and breaking under audio and gesture — rhythm carved by structure itself."
+      },
+      "flow": {
+        "title": "Motion Flow",
+        "concept": "Fluid lines that read time as a continuous gesture — flow as a way of seeing."
+      }
+    },
+    "unsupported": {
+      "headline": "This page renders a live WebGPU experience.",
+      "reasonUnavailable": "WebGPU is not available in this browser.",
+      "reasonInitFailed": "WebGPU initialization failed: {message}",
+      "browserHint": "Please open in Chrome / Edge / Arc on macOS, Windows, or Android (latest). iOS Safari does not yet support WebGPU."
     }
   },
   "audio": {
@@ -1400,6 +1468,37 @@
       "helperOn": "Mic input live. Click to stop.",
       "helperUnsupported": "This browser does not support mic input.",
       "helperBlocked": "Re-enable the mic in your browser's site settings."
+    }
+  },
+  "contact": {
+    "_comment": "Contact namespace — Renewal 2026 reset (parent plan §4.1 / §5.4): localized minimal contact surface.",
+    "title": "Contact",
+    "description": "Get in touch — even at an early, exploratory stage.\nEmail works, or use the form below.",
+    "channelLabel": "Email",
+    "formDivider": "Send a message",
+    "responseNote": "Replies usually arrive within 2 business days.",
+    "metadata": {
+      "title": "Contact",
+      "description": "Reach Takumi Chiba by email or a short message."
+    },
+    "form": {
+      "name": "Your name",
+      "email": "Email address",
+      "message": "Message",
+      "submit": "Send",
+      "submitting": "Sending…",
+      "errors": {
+        "name": "Please enter your name.",
+        "email": "Please enter a valid email address.",
+        "message": "Please enter a message of at least 10 characters.",
+        "send": "Couldn't send. Please try again in a moment.",
+        "config": "The form isn't available right now. Please reach out by email."
+      }
+    },
+    "success": {
+      "heading": "Sent",
+      "body": "Thanks for reaching out.\nI'll get back to you within 2 days.",
+      "back": "Back to home"
     }
   }
 }

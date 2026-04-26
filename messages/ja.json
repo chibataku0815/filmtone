@@ -1379,9 +1379,77 @@
   },
   "journal": {
     "title": "Journal",
-    "description": "作品メモ、技術ノート、モーション研究のアーカイブ。",
+    "description": "制作のメモ、技術的な記録、そしてモーション習作のアーカイブ。",
+    "eyebrow": "Notes & Studies",
+    "intro": "作品の背景にある考えと、制作中の技術的な記録、そしてモーションの習作。コード・モーション・映像・写真をひとつの基準で扱おうとする試みです。",
     "motionStudies": {
-      "title": "Motion Studies"
+      "title": "Motion Studies",
+      "eyebrow": "Reference Works",
+      "intro": "特定の技法をひとつずつ取り出して、独立した小さな習作として作り直したシリーズ。",
+      "openLabel": "開く",
+      "entries": {
+        "signalStrokeRelay": {
+          "title": "Signal Stroke Relay",
+          "context": "Reference Work 01 · Theatre.js + Motion + SVG",
+          "summary": "リード線 → アイコン → タイトル → 下線へ、線が線へと信号を渡していくタイトルアニメーションの習作。"
+        },
+        "anchoredProgressResolve": {
+          "title": "Anchored Progress Resolve",
+          "context": "Phase 1 · Work 03 · SVG + DOM",
+          "summary": "進捗バーを「進む」「点滅で待つ」「確定する」の三つの状態として捉え、ブラウザ標準の SVG と DOM だけで組み立てた習作。"
+        },
+        "boilingPosterAperture": {
+          "title": "Boiling Poster Aperture",
+          "context": "Phase 1 · PixiJS Library-Fit",
+          "summary": "ふつふつと揺らぐ輪郭、マスクの開閉、画面のゆがみで「見せる瞬間」を主役に据えた、一枚絵ポスターのモーション習作。"
+        },
+        "motifLoopBackground": {
+          "title": "Motif Loop Background",
+          "context": "PixiJS · Loop Phasing",
+          "summary": "前景の邪魔をせず、静かに呼吸し続ける背景ループ。モチーフの動きが背景の役割を超えない範囲に収まるよう制御する。"
+        },
+        "stagedEmphasisPayoff": {
+          "title": "Staged Emphasis Payoff",
+          "context": "Phase 3 · Work 05 · SVG + DOM",
+          "summary": "タイトル文字を一字ずつ積み上げ、強調を受け渡し、最後に余韻を残しながら解く——文字の出し方そのものを設計したタイトルシーケンス。"
+        },
+        "temporalEchoResidue": {
+          "title": "Temporal Echo Residue",
+          "context": "Phase 3 · Work 06 · PixiJS",
+          "summary": "歌詞や文字の残像を時間差で重ね、徐々に薄れていく——残像と余韻のつくり方を試した PixiJS の習作。"
+        }
+      }
+    }
+  },
+  "experiments": {
+    "title": "Experiments",
+    "description": "WebGPU と音響を素材に編んだモーション作品。視覚・触覚・時間の握り方をプロトタイプとして公開しています。",
+    "eyebrow": "Motion Works",
+    "intro": "コードを通じて握る視覚・時間・音の感覚。Filmtone と Journal の手前にある実験場。",
+    "stateLabel": {
+      "active": "Active",
+      "preview": "Preview"
+    },
+    "openLabel": "Open",
+    "works": {
+      "dot": {
+        "title": "Motion Dot",
+        "concept": "粒の集合で形を成す、構造的なドット系のモーション。WebGPU と音入力を組み合わせて、密度と時間の握り方を試している。"
+      },
+      "grid": {
+        "title": "Motion Grid",
+        "concept": "音と動きで呼吸する格子。構造そのものが描くリズム。"
+      },
+      "flow": {
+        "title": "Motion Flow",
+        "concept": "時間を連続したジェスチャとして読む流体の線。流れそのものが視覚言語になる。"
+      }
+    },
+    "unsupported": {
+      "headline": "このページは WebGPU でリアルタイム描画を行います。",
+      "reasonUnavailable": "このブラウザでは WebGPU を利用できません。",
+      "reasonInitFailed": "WebGPU の初期化に失敗しました: {message}",
+      "browserHint": "macOS / Windows / Android の最新版 Chrome / Edge / Arc で開いてください。iOS Safari は現時点で WebGPU 非対応です。"
     }
   },
   "audio": {
@@ -1402,6 +1470,37 @@
       "helperOn": "Mic 入力中。クリックで停止。",
       "helperUnsupported": "このブラウザは Mic 入力に対応していません。",
       "helperBlocked": "ブラウザのサイト設定から Mic を許可し直してください。"
+    }
+  },
+  "contact": {
+    "_comment": "Contact namespace — Renewal 2026 reset (parent plan §4.1 / §5.4): localized minimal contact surface.",
+    "title": "お問い合わせ",
+    "description": "気になることがあれば、気軽にご連絡ください。\nメールでも、下のフォームでも構いません。",
+    "channelLabel": "Email",
+    "formDivider": "フォームから送る",
+    "responseNote": "返信は2営業日以内を目安にしています。",
+    "metadata": {
+      "title": "お問い合わせ",
+      "description": "千葉拓未への連絡先。メールまたはメッセージから。"
+    },
+    "form": {
+      "name": "お名前",
+      "email": "メールアドレス",
+      "message": "メッセージ",
+      "submit": "送信する",
+      "submitting": "送信中…",
+      "errors": {
+        "name": "お名前を入力してください。",
+        "email": "メールアドレスをご確認ください。",
+        "message": "10文字以上でメッセージを入力してください。",
+        "send": "送信できませんでした。少し時間をおいてから、もう一度お試しください。",
+        "config": "現在フォームから送信できません。メールから直接ご連絡ください。"
+      }
+    },
+    "success": {
+      "heading": "送信しました",
+      "body": "ご連絡ありがとうございます。\n2日以内に返信します。",
+      "back": "ホームへ戻る"
     }
   }
 }
