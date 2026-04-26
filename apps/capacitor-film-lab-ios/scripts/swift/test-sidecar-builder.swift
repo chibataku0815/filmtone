@@ -55,7 +55,10 @@ struct TestSidecarBuilder {
             elapsedMs: 4_200,
             realtimeRatio: 0.35,
             audioPreserved: true,
-            identity: identity
+            identity: identity,
+            renderMode: nil,
+            mezzanineUsedVariant: nil,
+            mezzanineProfileVersion: nil
         )
 
         let data = try FilmtoneExportSidecarBuilder.build(inputs)
@@ -186,7 +189,8 @@ struct TestSidecarBuilder {
             ),
             lut: nil,
             inputLut: nil,
-            creativeLut: nil
+            creativeLut: nil,
+            renderMode: nil
         )
         let identity = SidecarDeviceIdentity(
             appVersion: "1.1.0",
@@ -206,7 +210,10 @@ struct TestSidecarBuilder {
             elapsedMs: 150,
             realtimeRatio: nil,
             audioPreserved: nil,
-            identity: identity
+            identity: identity,
+            renderMode: nil,
+            mezzanineUsedVariant: nil,
+            mezzanineProfileVersion: nil
         )
         let data = try FilmtoneExportSidecarBuilder.build(inputs)
         let parsed = try JSONDecoder().decode(ParsedSidecar.self, from: data)

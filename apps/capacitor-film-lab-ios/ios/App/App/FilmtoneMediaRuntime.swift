@@ -311,10 +311,14 @@ final class FilmtoneMediaRuntime {
     }
 
     func makeBenchmarkCollector(request: Phase0ExportRequestDTO) -> BenchmarkCollector {
-        BenchmarkCollector(
+        let collector = BenchmarkCollector(
             request: request,
             memoryWarningCounter: memoryWarningCounter
         )
+        // v1.2: capture render mode at construction so the bench record reflects
+        // the user-requested mode regardless of whether mezzanine resolution succeeds.
+        collector.recordRenderMode(request.renderMode ?? .quality)
+        return collector
     }
 
     private func runExportSession(
@@ -323,7 +327,28 @@ final class FilmtoneMediaRuntime {
         onProgress: @escaping (Phase0ExportProgressDTO) -> Void
     ) throws -> Phase0ExportResultDTO {
         var result = try session.run(progress: onProgress)
-        collector.recordMezzanineUsage(used: session.didUseMezzanine)
+        collector.recordMezzanineUsage(
+            used: session.didUseMezzanineVariant != nil,
+            variant: session.didUseMezzanineVariant
+        )
+        // v1.3 (D3.4): mirror depth prefilter usage into the bench record.
+        // session.depthResolution is non-nil iff the depth payload loaded AND
+        // applyGlowFamilyStage actually invoked the prefilter — that's the same
+        // truth surface the sidecar reads, keeping bench/sidecar consistent.
+        let depthDidRun = session.depthResolution != nil
+        collector.recordDepthUsage(
+            used: depthDidRun,
+            source: depthDidRun ? "avDepthData" : nil,
+            renderer: depthDidRun
+                ? (session.requestSnapshot.depthRenderer ?? DepthRenderer.ci.rawValue)
+                : nil
+        )
+        collector.recordDepthPrefilterMs(session.depthPrefilterMs)
+        // v1.3 Phase B: forward video depth-track totals (nil for stills).
+        collector.recordVideoDepthTotals(
+            frames: session.videoDepthFramesProcessed,
+            decodeMs: session.videoDepthDecodeMs
+        )
         let benchmarkRecord = collector.makeSuccessRecord(result: result)
         result = Phase0ExportResultDTO(
             outputUri: result.outputUri,

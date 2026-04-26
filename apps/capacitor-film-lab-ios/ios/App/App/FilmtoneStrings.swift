@@ -800,7 +800,9 @@ extension FilmtoneMediaError {
         switch self {
         case .bridgeUnavailable,
              .exportBusy,
-             .exportCancelled:
+             .exportCancelled,
+             .depthUnsupportedForVideoSource,
+             .depthUnsupportedFormat:
             return localizedDescription
         case .invalidURL(let message),
              .missingSource(let message),

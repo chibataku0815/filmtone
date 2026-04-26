@@ -29,10 +29,12 @@ import {
   applyPreviewRenderStart,
   applyProbe,
   applyQuickState,
+  applyRenderMode,
   applyStrength,
   buildEditorExportRequest,
   createInitialEditorState,
 } from "@/lib/phase0-state";
+import type { Phase0RenderMode } from "film-lab-core";
 import { filmtoneMedia } from "@/native/filmtoneMedia";
 import { ExportSheet } from "@/features/export/ExportSheet";
 import { TopChrome } from "./TopChrome";
@@ -255,6 +257,10 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
 
   function handleCompareHoldEnd() {
     setState((current) => applyCompareHeld(current, false));
+  }
+
+  function handleRenderModeChange(mode: Phase0RenderMode) {
+    setState((current) => applyRenderMode(current, mode));
   }
 
   function handleCameraProfileSelect(profile: CameraProfile) {
@@ -563,6 +569,8 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
           isSaveBusy={isSaveBusy}
           error={surfacedError}
           strings={strings}
+          renderMode={state.renderMode}
+          onRenderModeChange={handleRenderModeChange}
           onExport={handleExport}
           onSave={handleSave}
           onShare={handleShare}
