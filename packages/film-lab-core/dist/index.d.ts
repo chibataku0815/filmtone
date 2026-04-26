@@ -596,6 +596,7 @@ interface PickedLutFile {
     uri?: string;
 }
 type Phase0ExportStage = "preflight" | "reading" | "rendering" | "writing" | "completed";
+type Phase0RenderMode = "quality" | "speed";
 interface Phase0ExportRequest {
     sourceUri: string;
     sourceKind: SourceKind;
@@ -609,6 +610,8 @@ interface Phase0ExportRequest {
     };
     inputLut: ParsedCubeLut | null;
     creativeLut: ParsedCubeLut | null;
+    /** v1.2 (iOS): opt-in to Speed mode. Absent or "quality" behaves as Quality default. */
+    renderMode?: Phase0RenderMode;
 }
 interface Phase0PreviewRenderResult {
     originalUri: string;
@@ -653,6 +656,14 @@ interface Phase0ExportBenchmarkRecord {
     saveToPhotosOk?: boolean;
     errorDomain?: string;
     errorCode?: string;
+    /** v1.1: whether this export consumed an existing mezzanine instead of decoding from source. */
+    exportUsedMezzanine?: boolean;
+    /** v1.1: ms spent generating a fresh mezzanine ahead of this export, if any. */
+    mezzanineGenerationMs?: number;
+    /** v1.2: render mode actually used ("quality" | "speed"). */
+    renderMode?: Phase0RenderMode;
+    /** v1.2: mezzanine variant the export consumed ("sdr" | "hdr"), absent if no mezzanine used. */
+    mezzanineProfileVariant?: "sdr" | "hdr";
 }
 declare function serializeCubeLut(lut: CubeLUT, options?: {
     title?: string;

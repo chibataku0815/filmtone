@@ -184,11 +184,19 @@ final class AssetPickerService: NSObject {
             kickOffMezzanine(for: importedURL)
         }
 
+        // v1.3 D1.3: probe HEIC depth/disparity aux data presence so the
+        // WebView can decide whether to surface the depth-coupled UI before
+        // we pay the cost of decoding the depth plane.
+        let hasDepth = kind == .image
+            ? DepthSourceService.probeHasDepth(url: importedURL)
+            : false
+
         return SourceInfoDTO(
             uri: importedURL.absoluteString,
             filename: provider.suggestedName ?? importedURL.lastPathComponent,
             kind: kind,
-            mimeType: type?.preferredMIMEType
+            mimeType: type?.preferredMIMEType,
+            hasDepth: hasDepth
         )
     }
 
@@ -316,11 +324,18 @@ final class AssetPickerService: NSObject {
             kickOffMezzanine(for: importedURL)
         }
 
+        // v1.3 D1.3: HEIC depth aux sniff (image-only). See importSource(from:)
+        // for the matching PHPicker path.
+        let hasDepth = kind == .image
+            ? DepthSourceService.probeHasDepth(url: importedURL)
+            : false
+
         return SourceInfoDTO(
             uri: importedURL.absoluteString,
             filename: url.lastPathComponent,
             kind: kind,
-            mimeType: type.preferredMIMEType
+            mimeType: type.preferredMIMEType,
+            hasDepth: hasDepth
         )
     }
 

@@ -13,7 +13,11 @@ enum ProfileVariant: String {
 
 final class MezzanineService {
     struct Profile {
-        static let version = 3
+        // v=3: HDR mezzanine (v1.2). v=4: depth flag participation (v1.3) — every
+        // prior cache entry naturally invalidates on the bump. The `depthEnabled`
+        // discriminator added to the signature payload below means a depth-on
+        // export does not collide with a depth-off export from the same source.
+        static let version = 4
 
         let variant: ProfileVariant
         let codec: AVVideoCodecType
@@ -84,7 +88,9 @@ final class MezzanineService {
     /// SHA-256 cache key over (source identity, profile variant + version + codec settings).
     /// Variant is in the payload so SDR and HDR cache files for the same source never collide.
     /// Bumping `Profile.version` invalidates every prior entry on next lookup.
-    func signature(for sourceURL: URL, profile: Profile) throws -> String {
+    /// v1.3: `depthEnabled` participates in the payload so depth-on / depth-off exports
+    /// from the same source live in different cache slots without poisoning one another.
+    func signature(for sourceURL: URL, profile: Profile, depthEnabled: Bool = false) throws -> String {
         let attrs = try fileManager.attributesOfItem(atPath: sourceURL.path)
         let size = (attrs[.size] as? NSNumber)?.int64Value ?? 0
         let mtimeMs: Int64 = {
@@ -105,6 +111,7 @@ final class MezzanineService {
                 "longEdge": profile.longEdge,
                 "bitrate": profile.bitrate,
             ],
+            "depthEnabled": depthEnabled,
         ]
 
         let data = try JSONSerialization.data(
@@ -119,9 +126,14 @@ final class MezzanineService {
 
     /// Returns mezzanine URL if a valid cache file already exists for `sourceURL` at `variant`.
     /// Touches contentAccessDate for LRU recency. Does not trigger generation.
-    func existingMezzanineURL(for sourceURL: URL, variant: ProfileVariant) -> URL? {
+    /// `depthEnabled` participates in the cache key (see `signature(for:profile:depthEnabled:)`).
+    func existingMezzanineURL(
+        for sourceURL: URL,
+        variant: ProfileVariant,
+        depthEnabled: Bool = false
+    ) -> URL? {
         let profile = Profile.profile(for: variant)
-        guard let sig = try? signature(for: sourceURL, profile: profile),
+        guard let sig = try? signature(for: sourceURL, profile: profile, depthEnabled: depthEnabled),
               let url = try? cacheStore.mezzanineFileURL(signature: sig),
               fileManager.fileExists(atPath: url.path) else {
             return nil
@@ -135,10 +147,15 @@ final class MezzanineService {
     /// Multiple concurrent calls for the same (source, variant) coalesce to a single task.
     /// Generation is atomic: writes to a `.partial` sibling and renames on success
     /// so a crash mid-transcode never leaves a readable-but-corrupt `.mp4` behind.
+    /// `depthEnabled` participates in the cache key (see `signature(for:profile:depthEnabled:)`).
     @discardableResult
-    func ensureMezzanine(sourceURL: URL, variant: ProfileVariant = .sdr) async throws -> URL {
+    func ensureMezzanine(
+        sourceURL: URL,
+        variant: ProfileVariant = .sdr,
+        depthEnabled: Bool = false
+    ) async throws -> URL {
         let profile = Profile.profile(for: variant)
-        let sig = try signature(for: sourceURL, profile: profile)
+        let sig = try signature(for: sourceURL, profile: profile, depthEnabled: depthEnabled)
         let destURL = try cacheStore.mezzanineFileURL(signature: sig)
 
         if fileManager.fileExists(atPath: destURL.path) {

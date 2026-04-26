@@ -32,6 +32,11 @@ struct SidecarBuildInputs {
     let mezzanineUsedVariant: String?
     /// `MezzanineService.Profile.version` of the consumed mezzanine; nil when no mezzanine used.
     let mezzanineProfileVersion: Int?
+    /// v1.3 (D3.5): depth × ray-angle prefilter block. Pass nil only on legacy
+    /// call-sites that pre-date the v1.3 wave; v1.3+ call-sites should always
+    /// supply a `SidecarDepthInfo` (with `used: false` when depth was not
+    /// applied, mirroring the mezzanine block convention).
+    let depth: SidecarDepthInfo?
 }
 
 // MARK: - Sidecar schema (filmtone-ios-export-session-v1)
@@ -61,6 +66,11 @@ struct FilmtoneExportSidecarV1: Encodable {
     /// Mezzanine usage block (always emitted in v1.2+, even when used=false, to signal an
     /// explicit "no-mezzanine" path rather than absence of the field).
     let mezzanine: SidecarMezzanine?
+    /// v1.3 (D3.5): depth × ray-angle prefilter block. Always emitted in v1.3+ even when
+    /// `used == false` so importers can distinguish "no-depth (explicit)" from
+    /// "v1.2 sidecar (field absent)". schemaVersion stays 1 — additive optional fields
+    /// remain backwards-compatible.
+    let depth: SidecarDepthInfo?
 }
 
 struct SidecarDevice: Encodable {
@@ -206,6 +216,17 @@ enum FilmtoneExportSidecarBuilder {
             profileVersion: inputs.mezzanineProfileVersion
         )
 
+        // v1.3 (D3.5): always emit the depth block. When the caller passed nil
+        // (legacy / pre-v1.3 site) we materialize a `used: false` placeholder so
+        // importers see a stable shape — same convention as the mezzanine block.
+        let depth = inputs.depth ?? SidecarDepthInfo(
+            used: false,
+            source: nil,
+            resolutionWidth: nil,
+            resolutionHeight: nil,
+            renderer: nil
+        )
+
         return FilmtoneExportSidecarV1(
             kind: kind,
             schema: schemaID,
@@ -224,7 +245,8 @@ enum FilmtoneExportSidecarBuilder {
             lutRefs: lutRefs,
             output: output,
             renderMode: inputs.renderMode,
-            mezzanine: mezzanine
+            mezzanine: mezzanine,
+            depth: depth
         )
     }
 

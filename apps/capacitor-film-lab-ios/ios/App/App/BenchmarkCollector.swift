@@ -29,6 +29,11 @@ final class BenchmarkCollector {
     private(set) var mezzanineGenerationMs: Int?
     private(set) var renderMode: String?
     private(set) var mezzanineProfileVariant: String?
+    // v1.3 (D3.4): depth prefilter telemetry.
+    private(set) var depthUsed: Bool?
+    private(set) var depthSource: String?
+    private(set) var depthRenderer: String?
+    private(set) var depthPrefilterMs: Double?
 
     func recordMezzanineUsage(
         used: Bool,
@@ -46,6 +51,25 @@ final class BenchmarkCollector {
 
     func recordRenderMode(_ mode: Phase0RenderMode) {
         renderMode = mode.rawValue
+    }
+
+    /// v1.3 (D3.4): record depth prefilter usage. `used: false` is a meaningful
+    /// signal — the export ran without depth on purpose (no aux data, depth
+    /// disabled, or unsupported source). Source/renderer are nil when not used.
+    func recordDepthUsage(
+        used: Bool,
+        source: String? = nil,
+        renderer: String? = nil
+    ) {
+        depthUsed = used
+        depthSource = used ? source : nil
+        depthRenderer = used ? renderer : nil
+    }
+
+    /// v1.3 (D3.4): accumulator for depth prefilter wall-clock cost (sum across
+    /// the three glow stages). Pass nil to clear.
+    func recordDepthPrefilterMs(_ ms: Double?) {
+        depthPrefilterMs = ms
     }
 
     func makeSuccessRecord(
@@ -72,7 +96,11 @@ final class BenchmarkCollector {
             exportUsedMezzanine: exportUsedMezzanine,
             mezzanineGenerationMs: mezzanineGenerationMs,
             renderMode: renderMode,
-            mezzanineProfileVariant: mezzanineProfileVariant
+            mezzanineProfileVariant: mezzanineProfileVariant,
+            depthUsed: depthUsed,
+            depthSource: depthSource,
+            depthRenderer: depthRenderer,
+            depthPrefilterMs: depthPrefilterMs
         )
     }
 
@@ -99,7 +127,11 @@ final class BenchmarkCollector {
             exportUsedMezzanine: exportUsedMezzanine,
             mezzanineGenerationMs: mezzanineGenerationMs,
             renderMode: renderMode,
-            mezzanineProfileVariant: mezzanineProfileVariant
+            mezzanineProfileVariant: mezzanineProfileVariant,
+            depthUsed: depthUsed,
+            depthSource: depthSource,
+            depthRenderer: depthRenderer,
+            depthPrefilterMs: depthPrefilterMs
         )
     }
 

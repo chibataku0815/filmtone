@@ -18,6 +18,22 @@ final class FilmtoneExportSession {
     private let outputColorSpace: CGColorSpace
     private var degradedDecodePath = false
     private var cancelled = false
+    /// v1.3 (D3.2): depth payload loaded by `exportStillImage` before grading;
+    /// consumed by `applyGlowFamilyStage` to drive the depth prefilter on the
+    /// glow trio. Remains nil for video exports and for still HEICs that lack
+    /// AVDepthData or for which `request.depthEnabled` is false/nil.
+    private var loadedDepthMap: FilmtoneDepthMap?
+    /// v1.3 (D3.4): wall-clock cost accumulator for the three depth prefilter
+    /// stages, surfaced through BenchmarkCollector via FilmtoneMediaRuntime.
+    private(set) var depthPrefilterMs: Double?
+    /// v1.3 (D3.5): mirror of the depth payload's pixel dimensions (post
+    /// orientation), used by the sidecar callsite. nil when no depth was used.
+    private(set) var depthResolution: (width: Int, height: Int)?
+
+    /// v1.3 (D3.4): read-only accessor for the originating request. Used by
+    /// FilmtoneMediaRuntime to pull `depthRenderer` for bench telemetry without
+    /// exposing the full DTO via a stored property leak.
+    var requestSnapshot: Phase0ExportRequestDTO { request }
     private static let aberrationEdgeSoftenScale = 32.0
     private static let aberrationEdgeSoftenMax = 0.52
     private static let aberrationEdgeSoftenCurve = 1.55
@@ -92,6 +108,15 @@ final class FilmtoneExportSession {
             ciContext.clearCaches()
         }
 
+        // v1.3 (D3.6): Phase A only supports still HEIC + AVDepthData. A video
+        // source with depthEnabled=true is a contract violation — we throw an
+        // explicit error rather than silently disabling depth, per
+        // `feedback_no_fallback_bug_hotbed`. Fires before any preflight progress
+        // emission so the WebView sees a clean failure path.
+        if (request.depthEnabled ?? false), request.sourceKind == .video {
+            throw FilmtoneMediaError.depthUnsupportedForVideoSource
+        }
+
         let startedAt = Date()
         progress(.init(stage: .preflight, progress: 0.03, currentFrame: nil, totalFrames: nil, message: "Preparing export"))
 
@@ -158,6 +183,30 @@ final class FilmtoneExportSession {
 
         let hdrPolicy = request.sourceProbe?.sourceVideoMetadata?.hdrPreparationPolicy
 
+        // v1.3 (D3.5): depth block. Always emitted — `used: false` is the
+        // explicit signal that depth was not consumed (vs. absent field which
+        // would mean "v1.2 sidecar / unknown"). Renderer is "ci" by default
+        // (Phase A ships only the Core Image kernel; the contract reserves
+        // "metal" for Phase B).
+        let depthSidecar: SidecarDepthInfo
+        if let res = depthResolution {
+            depthSidecar = SidecarDepthInfo(
+                used: true,
+                source: "avDepthData",
+                resolutionWidth: res.width,
+                resolutionHeight: res.height,
+                renderer: request.depthRenderer ?? DepthRenderer.ci.rawValue
+            )
+        } else {
+            depthSidecar = SidecarDepthInfo(
+                used: false,
+                source: nil,
+                resolutionWidth: nil,
+                resolutionHeight: nil,
+                renderer: nil
+            )
+        }
+
         let inputs = SidecarBuildInputs(
             request: request,
             sourceProbe: request.sourceProbe,
@@ -175,7 +224,8 @@ final class FilmtoneExportSession {
             // populates them per the cross-stream contract.
             renderMode: (request.renderMode ?? .quality).rawValue,
             mezzanineUsedVariant: didUseMezzanineVariant?.rawValue,
-            mezzanineProfileVersion: didUseMezzanineVariant != nil ? MezzanineService.Profile.version : nil
+            mezzanineProfileVersion: didUseMezzanineVariant != nil ? MezzanineService.Profile.version : nil,
+            depth: depthSidecar
         )
 
         let sidecarURL = FilmtoneExportSidecarBuilder.sidecarURL(for: outputURL)
@@ -452,6 +502,40 @@ final class FilmtoneExportSession {
     ) throws -> CompletedExport {
         guard let image = loadedSourceImage(at: sourceURL) else {
             throw FilmtoneMediaError.unsupportedSource("The selected image could not be loaded.")
+        }
+
+        // v1.3 (D3.2): load AVDepthData payload before the grade pipeline so
+        // applyGlowFamilyStage can pass it into the depth prefilter. Gated on
+        // (a) explicit opt-in via Phase0ExportRequestDTO.depthEnabled, (b) the
+        // SourceInfoDTO.hasDepth signal Stream A wired through AssetPickerService,
+        // and (c) the source actually being a HEIC on disk. Anything else
+        // produces depthMap=nil → glow trio runs byte-identical to v1.2
+        // (`feedback_no_fallback_bug_hotbed`: no silent fallback inside the
+        // depth path, only a clean off-state).
+        if (request.depthEnabled ?? false),
+           sourceURL.pathExtension.lowercased() == "heic"
+              || sourceURL.pathExtension.lowercased() == "heif" {
+            let semaphore = DispatchSemaphore(value: 0)
+            var loaded: FilmtoneDepthMap?
+            Task.detached(priority: .userInitiated) {
+                defer { semaphore.signal() }
+                do {
+                    loaded = try await DepthSourceService().loadDepthMap(from: self.sourceURL)
+                } catch {
+                    // Tech failure (corrupt aux dict / allocation) — degrade to
+                    // depth-off rather than failing the export. Phase A users
+                    // expect "no depth available" UX, not a hard stop.
+                    filmtonePreviewCompositionDebugLog(
+                        "DepthSourceService.loadDepthMap failed: \(error.localizedDescription)"
+                    )
+                    loaded = nil
+                }
+            }
+            semaphore.wait()
+            self.loadedDepthMap = loaded
+            if let loaded {
+                self.depthResolution = (loaded.width, loaded.height)
+            }
         }
 
         let outputSize = Self.scaledSize(for: image.extent.size, longEdge: request.output.longEdge)
@@ -941,10 +1025,43 @@ final class FilmtoneExportSession {
         let extent = image.extent
         let black = Self.blackImage(for: extent)
 
+        // v1.3 (D3.2): depth × ray-angle prefilter on the glow trio.
+        // Gated on `loadedDepthMap != nil`, which is only set in
+        // `exportStillImage` when (depthEnabled && HEIC && hasDepth). With the
+        // current contract `hiddenDefaults.depthMistGain == depthGlowGain == 0`
+        // and the per-variant rayAngleGain/gamma/innerThreshold defaults, the
+        // FilmtoneDepthPrefilter.apply short-circuits to `image` unchanged
+        // (its first guard returns input when both gains are 0). UI inject of
+        // non-zero gains is deferred to Stream 4 (a later wave); Phase A
+        // landing is byte-identical to v1.2 unless a future call-site supplies
+        // non-zero gains.
+        let depthCI: CIImage? = self.loadedDepthMap?.ciImage
+        let cameraOpticsDTO = self.request.sourceProbe?.cameraOptics
+        let hidden = FilmtonePhase0Generated.hiddenDefaults
+        let depthStart = (depthCI != nil) ? Date() : nil
+
         let bloomImage: CIImage
         if params.bloomStrength > 0.0001 {
+            let bloomInput: CIImage
+            if let depthCI {
+                bloomInput = FilmtoneDepthPrefilter.apply(
+                    to: image,
+                    depth: depthCI,
+                    imageExtent: extent,
+                    optics: cameraOpticsDTO,
+                    params: .init(
+                        variant: .bloom,
+                        depthGain: hidden.depthGlowGain,
+                        rayAngleGain: hidden.depthBloomRayAngleGain,
+                        rayAngleGamma: hidden.depthRayAngleGamma,
+                        rayAngleInnerThreshold: hidden.depthRayAngleInnerThreshold
+                    )
+                )
+            } else {
+                bloomInput = image
+            }
             let bloomPlate = extractHighlightPlate(
-                from: image,
+                from: bloomInput,
                 threshold: params.bloomThreshold,
                 knee: params.bloomSoftKnee,
                 tintColor: CIColor(red: 1, green: 1, blue: 1, alpha: 1)
@@ -962,8 +1079,26 @@ final class FilmtoneExportSession {
 
         let halationImage: CIImage
         if params.halationIntensity > 0.0001 {
+            let halationInput: CIImage
+            if let depthCI {
+                halationInput = FilmtoneDepthPrefilter.apply(
+                    to: image,
+                    depth: depthCI,
+                    imageExtent: extent,
+                    optics: cameraOpticsDTO,
+                    params: .init(
+                        variant: .halation,
+                        depthGain: hidden.depthGlowGain,
+                        rayAngleGain: hidden.depthHalationRayAngleGain,
+                        rayAngleGamma: hidden.depthRayAngleGamma,
+                        rayAngleInnerThreshold: hidden.depthRayAngleInnerThreshold
+                    )
+                )
+            } else {
+                halationInput = image
+            }
             let halationPlate = extractHighlightPlate(
-                from: image,
+                from: halationInput,
                 threshold: params.halationThreshold,
                 knee: params.halationSoftKnee,
                 tintColor: Self.halationColor(for: params.halationHue)
@@ -981,8 +1116,26 @@ final class FilmtoneExportSession {
 
         let diffusionImage: CIImage
         if params.diffusion > 0.0001 {
+            let diffusionInput: CIImage
+            if let depthCI {
+                diffusionInput = FilmtoneDepthPrefilter.apply(
+                    to: image,
+                    depth: depthCI,
+                    imageExtent: extent,
+                    optics: cameraOpticsDTO,
+                    params: .init(
+                        variant: .mist,
+                        depthGain: hidden.depthMistGain,
+                        rayAngleGain: hidden.depthMistRayAngleGain,
+                        rayAngleGamma: hidden.depthRayAngleGamma,
+                        rayAngleInnerThreshold: hidden.depthRayAngleInnerThreshold
+                    )
+                )
+            } else {
+                diffusionInput = image
+            }
             diffusionImage = buildMipBlurComposite(
-                from: image,
+                from: diffusionInput,
                 radius: 0.9,
                 levelCount: Self.diffusionMipLevels,
                 spreadMultiplier: 1.15,
@@ -990,6 +1143,11 @@ final class FilmtoneExportSession {
             )
         } else {
             diffusionImage = black
+        }
+
+        if let depthStart {
+            let elapsed = Date().timeIntervalSince(depthStart) * 1000.0
+            self.depthPrefilterMs = (self.depthPrefilterMs ?? 0) + elapsed
         }
 
         guard

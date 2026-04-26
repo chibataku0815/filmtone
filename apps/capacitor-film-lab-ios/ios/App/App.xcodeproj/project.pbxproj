@@ -31,6 +31,9 @@
 		A10000010000000000000011 /* FilmtoneMediaRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000011 /* FilmtoneMediaRuntime.swift */; };
 		A10000010000000000000012 /* MezzanineService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000012 /* MezzanineService.swift */; };
 		A20000010000000000000001 /* MezzanineColorProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000001 /* MezzanineColorProbe.swift */; };
+		A20000010000000000000020 /* DepthSourceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000020 /* DepthSourceService.swift */; };
+		A20000010000000000000021 /* FilmtoneDepthMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000021 /* FilmtoneDepthMap.swift */; };
+		A20000010000000000000022 /* FilmtoneDepthPrefilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000022 /* FilmtoneDepthPrefilter.swift */; };
 		D10000010000000000000001 /* FilmtoneRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000001 /* FilmtoneRootView.swift */; };
 		D10000010000000000000002 /* FilmtoneEditorStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000002 /* FilmtoneEditorStore.swift */; };
 		D10000010000000000000003 /* FilmtoneEditorFacade.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000003 /* FilmtoneEditorFacade.swift */; };
@@ -97,6 +100,9 @@
 		B10000010000000000000011 /* FilmtoneMediaRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneMediaRuntime.swift; sourceTree = "<group>"; };
 		B10000010000000000000012 /* MezzanineService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MezzanineService.swift; sourceTree = "<group>"; };
 		B20000010000000000000001 /* MezzanineColorProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MezzanineColorProbe.swift; sourceTree = "<group>"; };
+		B20000010000000000000020 /* DepthSourceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthSourceService.swift; sourceTree = "<group>"; };
+		B20000010000000000000021 /* FilmtoneDepthMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneDepthMap.swift; sourceTree = "<group>"; };
+		B20000010000000000000022 /* FilmtoneDepthPrefilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneDepthPrefilter.swift; sourceTree = "<group>"; };
 		C20000010000000000000001 /* FormatExtensionReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormatExtensionReader.swift; sourceTree = "<group>"; };
 		C20000010000000000000002 /* SourceColorMetadataNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceColorMetadataNormalizer.swift; sourceTree = "<group>"; };
 		C20000010000000000000003 /* SourceColorClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceColorClassifier.swift; sourceTree = "<group>"; };
@@ -192,6 +198,9 @@
 				B10000010000000000000011 /* FilmtoneMediaRuntime.swift */,
 				B10000010000000000000012 /* MezzanineService.swift */,
 				B20000010000000000000001 /* MezzanineColorProbe.swift */,
+				B20000010000000000000020 /* DepthSourceService.swift */,
+				B20000010000000000000021 /* FilmtoneDepthMap.swift */,
+				B20000010000000000000022 /* FilmtoneDepthPrefilter.swift */,
 				B10000010000000000000010 /* BenchmarkCollector.swift */,
 				C10000010000000000000001 /* FilmtoneRootView.swift */,
 				C10000010000000000000002 /* FilmtoneEditorStore.swift */,
@@ -408,6 +417,9 @@
 				A10000010000000000000011 /* FilmtoneMediaRuntime.swift in Sources */,
 				A10000010000000000000012 /* MezzanineService.swift in Sources */,
 				A20000010000000000000001 /* MezzanineColorProbe.swift in Sources */,
+				A20000010000000000000020 /* DepthSourceService.swift in Sources */,
+				A20000010000000000000021 /* FilmtoneDepthMap.swift in Sources */,
+				A20000010000000000000022 /* FilmtoneDepthPrefilter.swift in Sources */,
 				A10000010000000000000010 /* BenchmarkCollector.swift in Sources */,
 				D10000010000000000000001 /* FilmtoneRootView.swift in Sources */,
 				D10000010000000000000002 /* FilmtoneEditorStore.swift in Sources */,

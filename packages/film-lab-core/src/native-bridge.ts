@@ -172,6 +172,13 @@ export type Phase0ExportStage =
 
 export type Phase0RenderMode = "quality" | "speed";
 
+/**
+ * v1.3 (iOS, D3.1): depth prefilter renderer selector. Encoded as a plain
+ * string on the wire for forward-compat — Phase B may add `metal` only on a
+ * subset of devices. Native side defaults to `"ci"` when nil/absent.
+ */
+export type Phase0DepthRenderer = "ci" | "metal";
+
 export interface Phase0ExportRequest {
   sourceUri: string;
   sourceKind: SourceKind;
@@ -187,6 +194,19 @@ export interface Phase0ExportRequest {
   creativeLut: ParsedCubeLut | null;
   /** v1.2 (iOS): opt-in to Speed mode. Absent or "quality" behaves as Quality default. */
   renderMode?: Phase0RenderMode;
+  /**
+   * v1.3 (iOS, D3.1): opt-in flag for the AVDepthData × ray-angle prefilter on
+   * the glow trio (mist/bloom/halation). Absent / false → byte-identical to
+   * v1.2 output. Only honored for still HEIC sources with depth aux data;
+   * video sources are rejected on the native side
+   * (`feedback_no_fallback_bug_hotbed`).
+   */
+  depthEnabled?: boolean;
+  /**
+   * v1.3 (iOS, D3.1): depth prefilter renderer selector. Phase A ships only
+   * `"ci"` (Core Image multi-image kernel); `"metal"` is reserved for Phase B.
+   */
+  depthRenderer?: Phase0DepthRenderer;
 }
 
 export interface Phase0PreviewRenderResult {
@@ -245,6 +265,14 @@ export interface Phase0ExportBenchmarkRecord {
   renderMode?: Phase0RenderMode;
   /** v1.2: mezzanine variant the export consumed ("sdr" | "hdr"), absent if no mezzanine used. */
   mezzanineProfileVariant?: "sdr" | "hdr";
+  /** v1.3 (D3.4): whether the depth × ray-angle prefilter ran for this export. */
+  depthUsed?: boolean;
+  /** v1.3 (D3.4): depth aux source ("avDepthData"), absent when depth not used. */
+  depthSource?: string;
+  /** v1.3 (D3.4): renderer that executed the prefilter ("ci" | "metal"), absent when depth not used. */
+  depthRenderer?: Phase0DepthRenderer;
+  /** v1.3 (D3.4): wall-clock ms across the three depth prefilter stages, absent when depth not used. */
+  depthPrefilterMs?: number;
 }
 
 export function serializeCubeLut(
