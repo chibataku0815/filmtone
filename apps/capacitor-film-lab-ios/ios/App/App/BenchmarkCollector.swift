@@ -27,12 +27,25 @@ final class BenchmarkCollector {
 
     private(set) var exportUsedMezzanine: Bool?
     private(set) var mezzanineGenerationMs: Int?
+    private(set) var renderMode: String?
+    private(set) var mezzanineProfileVariant: String?
 
-    func recordMezzanineUsage(used: Bool, generationMs: Int? = nil) {
+    func recordMezzanineUsage(
+        used: Bool,
+        generationMs: Int? = nil,
+        variant: ProfileVariant? = nil
+    ) {
         exportUsedMezzanine = used
         if let generationMs {
             mezzanineGenerationMs = generationMs
         }
+        if let variant {
+            mezzanineProfileVariant = variant.rawValue
+        }
+    }
+
+    func recordRenderMode(_ mode: Phase0RenderMode) {
+        renderMode = mode.rawValue
     }
 
     func makeSuccessRecord(
@@ -57,7 +70,9 @@ final class BenchmarkCollector {
             errorDomain: nil,
             errorCode: nil,
             exportUsedMezzanine: exportUsedMezzanine,
-            mezzanineGenerationMs: mezzanineGenerationMs
+            mezzanineGenerationMs: mezzanineGenerationMs,
+            renderMode: renderMode,
+            mezzanineProfileVariant: mezzanineProfileVariant
         )
     }
 
@@ -82,7 +97,9 @@ final class BenchmarkCollector {
             errorDomain: nsError.domain,
             errorCode: mediaError?.code ?? "FILMTONE_NATIVE_ERROR",
             exportUsedMezzanine: exportUsedMezzanine,
-            mezzanineGenerationMs: mezzanineGenerationMs
+            mezzanineGenerationMs: mezzanineGenerationMs,
+            renderMode: renderMode,
+            mezzanineProfileVariant: mezzanineProfileVariant
         )
     }
 

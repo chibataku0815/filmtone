@@ -591,7 +591,8 @@ enum FilmtonePhase0Math {
             ),
             lut: nil,
             inputLut: transportLut(project.inputLut),
-            creativeLut: transportLut(project.creativeLut)
+            creativeLut: transportLut(project.creativeLut),
+            renderMode: nil
         )
     }
 

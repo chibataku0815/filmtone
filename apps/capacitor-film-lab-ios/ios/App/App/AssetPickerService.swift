@@ -60,8 +60,13 @@ final class AssetPickerService: NSObject {
 
     private func kickOffMezzanine(for sourceURL: URL) {
         let service = mezzanineService
+        // Probe color metadata up front (synchronous, ~ms) so HDR sources auto-prep
+        // an HDR mezzanine and SDR sources prep an SDR mezzanine. Misclassified or
+        // metadata-less sources fall back to .sdr per MezzanineColorProbe's
+        // conservative default; Quality-mode export then uses source-direct read.
+        let variant = MezzanineColorProbe.classify(sourceURL: sourceURL)
         Task.detached(priority: .utility) {
-            _ = try? await service.ensureMezzanine(sourceURL: sourceURL)
+            _ = try? await service.ensureMezzanine(sourceURL: sourceURL, variant: variant)
         }
     }
 

@@ -10,7 +10,7 @@ final class FilmtoneExportSession {
     private let cacheStore: CacheStore
     private let mezzanineService: MezzanineService?
     private let outputURL: URL
-    private(set) var didUseMezzanine: Bool = false
+    private(set) var didUseMezzanineVariant: ProfileVariant?
     private let ciContext: CIContext
     private let preparedInputLut: PreparedLut?
     private let preparedCreativeLut: PreparedLut?
@@ -169,7 +169,13 @@ final class FilmtoneExportSession {
             elapsedMs: elapsedMs,
             realtimeRatio: realtimeRatio,
             audioPreserved: audioPreserved,
-            identity: identity
+            identity: identity,
+            // v1.2: render-mode + mezzanine variant + profile-version for sidecar truth.
+            // Stream D owns the field declarations on SidecarBuildInputs; this call site
+            // populates them per the cross-stream contract.
+            renderMode: (request.renderMode ?? .quality).rawValue,
+            mezzanineUsedVariant: didUseMezzanineVariant?.rawValue,
+            mezzanineProfileVersion: didUseMezzanineVariant != nil ? MezzanineService.Profile.version : nil
         )
 
         let sidecarURL = FilmtoneExportSidecarBuilder.sidecarURL(for: outputURL)
@@ -189,7 +195,22 @@ final class FilmtoneExportSession {
         progress: @escaping (Phase0ExportProgressDTO) -> Void
     ) throws -> CompletedExport {
         let effectiveSourceURL = resolvedVideoSourceURL()
-        didUseMezzanine = (effectiveSourceURL != sourceURL)
+        // Re-probe the matched variant so downstream telemetry / sidecar can record
+        // which mezzanine variant was actually used (HDR-preferred for Quality, any-
+        // available for Speed). When mezzanine was bypassed the variant stays nil.
+        if effectiveSourceURL == sourceURL {
+            didUseMezzanineVariant = nil
+        } else if let mezz = mezzanineService,
+                  effectiveSourceURL == mezz.existingMezzanineURL(for: sourceURL, variant: .hdr) {
+            didUseMezzanineVariant = .hdr
+        } else if let mezz = mezzanineService,
+                  effectiveSourceURL == mezz.existingMezzanineURL(for: sourceURL, variant: .sdr) {
+            didUseMezzanineVariant = .sdr
+        } else {
+            // Unreachable in practice (resolvedVideoSourceURL only returns a mezzanine
+            // URL or sourceURL), but keep nil to stay on the safe explicit path.
+            didUseMezzanineVariant = nil
+        }
         let asset = AVURLAsset(url: effectiveSourceURL)
         guard let videoTrack = asset.tracks(withMediaType: .video).first else {
             throw FilmtoneMediaError.unsupportedSource("No video track was found in the selected source.")
@@ -1839,10 +1860,26 @@ final class FilmtoneExportSession {
     }
 
     private func resolvedVideoSourceURL() -> URL {
-        // Standard-quality preview/export must grade the original capture.
-        // Mezzanine reuse stays available for a later speed-focused lane.
-        _ = mezzanineService
-        return sourceURL
+        // v1.2 HDR-aware mezzanine + Speed/Quality toggle (plan §6.3).
+        //
+        // - .quality (default): only HDR mezzanine is allowed as a faster path because it
+        //   preserves wide-gamut color fidelity. SDR mezzanine is intentionally NOT a
+        //   fallback — silent SDR substitution would degrade Quality output. SDR sources
+        //   stay on source-direct read so the cinematic-100 path is byte-identical to v1.1.
+        // - .speed: explicit user opt-in. Any cached mezzanine is acceptable; HDR is
+        //   preferred when both exist.
+        // - In all cases, when no acceptable mezzanine exists we fall back to the source
+        //   URL as the single explicit alternative (no silent degradation).
+        let mode = request.renderMode ?? .quality
+        guard let mezz = mezzanineService else { return sourceURL }
+        switch mode {
+        case .quality:
+            return mezz.existingMezzanineURL(for: sourceURL, variant: .hdr) ?? sourceURL
+        case .speed:
+            return mezz.existingMezzanineURL(for: sourceURL, variant: .hdr)
+                ?? mezz.existingMezzanineURL(for: sourceURL, variant: .sdr)
+                ?? sourceURL
+        }
     }
 
     static func scaledSize(for track: AVAssetTrack, longEdge: Int) -> CGSize {

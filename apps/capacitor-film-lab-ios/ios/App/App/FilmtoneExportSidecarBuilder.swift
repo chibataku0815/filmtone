@@ -26,6 +26,12 @@ struct SidecarBuildInputs {
     let realtimeRatio: Double?
     let audioPreserved: Bool?
     let identity: SidecarDeviceIdentity
+    /// Render mode selected for this export ("quality" | "speed"), nil if not surfaced by caller.
+    let renderMode: String?
+    /// Mezzanine variant actually consumed during export ("sdr" | "hdr"), nil if mezzanine not used.
+    let mezzanineUsedVariant: String?
+    /// `MezzanineService.Profile.version` of the consumed mezzanine; nil when no mezzanine used.
+    let mezzanineProfileVersion: Int?
 }
 
 // MARK: - Sidecar schema (filmtone-ios-export-session-v1)
@@ -49,6 +55,12 @@ struct FilmtoneExportSidecarV1: Encodable {
     let look: SidecarLook
     let lutRefs: SidecarLutRefs
     let output: SidecarOutput
+    /// Render mode for this export ("quality" | "speed"). Optional for backwards compatibility
+    /// with v1.1 sidecars; older importers ignore unknown keys (schemaVersion stays 1).
+    let renderMode: String?
+    /// Mezzanine usage block (always emitted in v1.2+, even when used=false, to signal an
+    /// explicit "no-mezzanine" path rather than absence of the field).
+    let mezzanine: SidecarMezzanine?
 }
 
 struct SidecarDevice: Encodable {
@@ -98,6 +110,17 @@ struct SidecarOutput: Encodable {
     let fileSizeBytes: Int?
     let elapsedMs: Int
     let realtimeRatio: Double?
+}
+
+/// Records whether (and which variant of) a mezzanine asset was consumed for this export.
+/// `used == false` is a meaningful signal: the export ran via the source-direct path on
+/// purpose (renderMode=quality on SDR source, or mezzanine missing/corrupt). `variant` is
+/// "sdr" | "hdr" when used; nil when not. `profileVersion` mirrors
+/// `MezzanineService.Profile.version` (currently 3) so importers can detect schema drift.
+struct SidecarMezzanine: Encodable {
+    let used: Bool
+    let variant: String?
+    let profileVersion: Int?
 }
 
 // MARK: - Builder
@@ -174,6 +197,15 @@ enum FilmtoneExportSidecarBuilder {
 
         _ = inputs.audioPreserved // currently not surfaced in schema; runtime uses output.preserveAudio
 
+        // Mezzanine block is always emitted in v1.2+: used=false carries explicit "no-mezzanine"
+        // semantics (vs. absent field which would mean "v1.1 sidecar / unknown"). variant is nil
+        // when not used; profileVersion follows the same nullity to keep the pair consistent.
+        let mezzanine = SidecarMezzanine(
+            used: inputs.mezzanineUsedVariant != nil,
+            variant: inputs.mezzanineUsedVariant,
+            profileVersion: inputs.mezzanineProfileVersion
+        )
+
         return FilmtoneExportSidecarV1(
             kind: kind,
             schema: schemaID,
@@ -190,7 +222,9 @@ enum FilmtoneExportSidecarBuilder {
             hdrPolicy: inputs.hdrPolicy,
             look: look,
             lutRefs: lutRefs,
-            output: output
+            output: output,
+            renderMode: inputs.renderMode,
+            mezzanine: mezzanine
         )
     }
 

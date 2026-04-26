@@ -311,6 +311,11 @@ struct Phase0GradeDTO: Codable {
     let params: Phase0ParamsDTO
 }
 
+enum Phase0RenderMode: String, Codable {
+    case quality
+    case speed
+}
+
 struct Phase0ExportRequestDTO: Codable {
     let sourceUri: String
     let sourceKind: FilmtoneSourceKind
@@ -320,6 +325,9 @@ struct Phase0ExportRequestDTO: Codable {
     let lut: ParsedCubeLutDTO?
     let inputLut: SerializableLutDTO?
     let creativeLut: SerializableLutDTO?
+    /// v1.2: optional opt-in to Speed mode. nil / absent / "quality" all behave as Quality default.
+    /// Quality auto-routes to HDR mezzanine when source is wide-gamut; Speed reuses any mezzanine.
+    let renderMode: Phase0RenderMode?
 }
 
 struct Phase0ExportProgressDTO: Encodable {
@@ -349,6 +357,10 @@ struct Phase0ExportBenchmarkRecordDTO: Encodable {
     let errorCode: String?
     let exportUsedMezzanine: Bool?
     let mezzanineGenerationMs: Int?
+    /// v1.2: render mode actually used for this export ("quality" | "speed").
+    let renderMode: String?
+    /// v1.2: mezzanine profile variant the export consumed ("sdr" | "hdr"), nil if no mezzanine used.
+    let mezzanineProfileVariant: String?
 }
 
 struct Phase0ExportResultDTO: Encodable {

@@ -311,10 +311,14 @@ final class FilmtoneMediaRuntime {
     }
 
     func makeBenchmarkCollector(request: Phase0ExportRequestDTO) -> BenchmarkCollector {
-        BenchmarkCollector(
+        let collector = BenchmarkCollector(
             request: request,
             memoryWarningCounter: memoryWarningCounter
         )
+        // v1.2: capture render mode at construction so the bench record reflects
+        // the user-requested mode regardless of whether mezzanine resolution succeeds.
+        collector.recordRenderMode(request.renderMode ?? .quality)
+        return collector
     }
 
     private func runExportSession(
@@ -323,7 +327,10 @@ final class FilmtoneMediaRuntime {
         onProgress: @escaping (Phase0ExportProgressDTO) -> Void
     ) throws -> Phase0ExportResultDTO {
         var result = try session.run(progress: onProgress)
-        collector.recordMezzanineUsage(used: session.didUseMezzanine)
+        collector.recordMezzanineUsage(
+            used: session.didUseMezzanineVariant != nil,
+            variant: session.didUseMezzanineVariant
+        )
         let benchmarkRecord = collector.makeSuccessRecord(result: result)
         result = Phase0ExportResultDTO(
             outputUri: result.outputUri,

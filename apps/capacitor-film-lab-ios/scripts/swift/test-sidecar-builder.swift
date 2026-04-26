@@ -55,7 +55,10 @@ struct TestSidecarBuilder {
             elapsedMs: 4_200,
             realtimeRatio: 0.35,
             audioPreserved: true,
-            identity: identity
+            identity: identity,
+            renderMode: nil,
+            mezzanineUsedVariant: nil,
+            mezzanineProfileVersion: nil
         )
 
         let data = try FilmtoneExportSidecarBuilder.build(inputs)
