@@ -238,6 +238,33 @@
         "typescript": "^5.7.2",
       },
     },
+    "packages/gpu-2.5d-presets": {
+      "name": "gpu-2.5d-presets",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@webgpu/types": "^0.1.69",
+        "typescript": "~6.0.2",
+        "vite": "~8.0.8",
+      },
+    },
+    "packages/gpu-film-post": {
+      "name": "gpu-film-post",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@webgpu/types": "^0.1.69",
+        "typescript": "~6.0.2",
+        "vite": "~8.0.8",
+      },
+    },
+    "packages/gpu-fx-presets": {
+      "name": "gpu-fx-presets",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@webgpu/types": "^0.1.69",
+        "typescript": "~6.0.2",
+        "vite": "~8.0.8",
+      },
+    },
     "packages/motion-core": {
       "name": "@chibatakumi/motion-core",
       "version": "0.0.0",
@@ -304,53 +331,26 @@
         "@webgpu/types": "^0.1.52",
       },
     },
-    "vendor/webgpu-motion-libs/packages/gpu-2.5d-presets": {
-      "name": "gpu-2.5d-presets",
-      "version": "0.1.0",
-      "devDependencies": {
-        "@webgpu/types": "^0.1.69",
-        "typescript": "~6.0.2",
-        "vite": "~8.0.8",
-      },
-    },
-    "vendor/webgpu-motion-libs/packages/gpu-film-post": {
-      "name": "gpu-film-post",
-      "version": "0.1.0",
-      "devDependencies": {
-        "@webgpu/types": "^0.1.69",
-        "typescript": "~6.0.2",
-        "vite": "~8.0.8",
-      },
-    },
-    "vendor/webgpu-motion-libs/packages/gpu-fx-presets": {
-      "name": "gpu-fx-presets",
-      "version": "0.1.0",
-      "devDependencies": {
-        "@webgpu/types": "^0.1.69",
-        "typescript": "~6.0.2",
-        "vite": "~8.0.8",
-      },
-    },
-    "vendor/webgpu-motion-libs/packages/webgpu-motion-art": {
+    "packages/webgpu-motion-art": {
       "name": "webgpu-motion-art",
       "version": "0.1.0",
       "devDependencies": {
         "@webgpu/types": "^0.1.55",
       },
     },
-    "vendor/webgpu-motion-libs/packages/webgpu-motion-audio": {
+    "packages/webgpu-motion-audio": {
       "name": "webgpu-motion-audio",
       "version": "0.1.0",
     },
-    "vendor/webgpu-motion-libs/packages/webgpu-motion-dom": {
+    "packages/webgpu-motion-dom": {
       "name": "webgpu-motion-dom",
       "version": "0.1.0",
     },
-    "vendor/webgpu-motion-libs/packages/webgpu-motion-input": {
+    "packages/webgpu-motion-input": {
       "name": "webgpu-motion-input",
       "version": "0.1.0",
     },
-    "vendor/webgpu-motion-libs/packages/webgpu-motion-post": {
+    "packages/webgpu-motion-post": {
       "name": "webgpu-motion-post",
       "version": "0.1.0",
       "dependencies": {
@@ -360,21 +360,21 @@
         "@webgpu/types": "^0.1.55",
       },
     },
-    "vendor/webgpu-motion-libs/packages/webgpu-motion-scene": {
+    "packages/webgpu-motion-scene": {
       "name": "webgpu-motion-scene",
       "version": "0.1.0",
       "devDependencies": {
         "@webgpu/types": "^0.1.55",
       },
     },
-    "vendor/webgpu-motion-libs/packages/webgpu-motion-shell": {
+    "packages/webgpu-motion-shell": {
       "name": "webgpu-motion-shell",
       "version": "0.1.0",
       "devDependencies": {
         "@webgpu/types": "^0.1.55",
       },
     },
-    "vendor/webgpu-motion-libs/packages/webgpu-motion-ui": {
+    "packages/webgpu-motion-ui": {
       "name": "webgpu-motion-ui",
       "version": "0.1.0",
       "dependencies": {
@@ -1764,11 +1764,11 @@
 
     "got": ["got@11.8.6", "", { "dependencies": { "@sindresorhus/is": "^4.0.0", "@szmarczak/http-timer": "^4.0.5", "@types/cacheable-request": "^6.0.1", "@types/responselike": "^1.0.0", "cacheable-lookup": "^5.0.3", "cacheable-request": "^7.0.2", "decompress-response": "^6.0.0", "http2-wrapper": "^1.0.0-beta.5.2", "lowercase-keys": "^2.0.0", "p-cancelable": "^2.0.0", "responselike": "^2.0.0" } }, "sha512-6tfZ91bOr7bOXnK7PRDCGBLa1H4U080YHNaAQ2KsMGlLEzRbk44nsZF2E1IeRc3vtJHPVbKCYgdFbaGO2ljd8g=="],
 
-    "gpu-2.5d-presets": ["gpu-2.5d-presets@workspace:vendor/webgpu-motion-libs/packages/gpu-2.5d-presets"],
+    "gpu-2.5d-presets": ["gpu-2.5d-presets@workspace:packages/gpu-2.5d-presets"],
 
-    "gpu-film-post": ["gpu-film-post@workspace:vendor/webgpu-motion-libs/packages/gpu-film-post"],
+    "gpu-film-post": ["gpu-film-post@workspace:packages/gpu-film-post"],
 
-    "gpu-fx-presets": ["gpu-fx-presets@workspace:vendor/webgpu-motion-libs/packages/gpu-fx-presets"],
+    "gpu-fx-presets": ["gpu-fx-presets@workspace:packages/gpu-fx-presets"],
 
     "graceful-fs": ["graceful-fs@4.2.11", "", {}, "sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ=="],
 
@@ -2610,21 +2610,21 @@
 
     "webgl-sdf-generator": ["webgl-sdf-generator@1.1.1", "", {}, "sha512-9Z0JcMTFxeE+b2x1LJTdnaT8rT8aEp7MVxkNwoycNmJWwPdzoXzMh0BjJSh/AEFP+KPYZUli814h8bJZFIZ2jA=="],
 
-    "webgpu-motion-art": ["webgpu-motion-art@workspace:vendor/webgpu-motion-libs/packages/webgpu-motion-art"],
+    "webgpu-motion-art": ["webgpu-motion-art@workspace:packages/webgpu-motion-art"],
 
-    "webgpu-motion-audio": ["webgpu-motion-audio@workspace:vendor/webgpu-motion-libs/packages/webgpu-motion-audio"],
+    "webgpu-motion-audio": ["webgpu-motion-audio@workspace:packages/webgpu-motion-audio"],
 
-    "webgpu-motion-dom": ["webgpu-motion-dom@workspace:vendor/webgpu-motion-libs/packages/webgpu-motion-dom"],
+    "webgpu-motion-dom": ["webgpu-motion-dom@workspace:packages/webgpu-motion-dom"],
 
-    "webgpu-motion-input": ["webgpu-motion-input@workspace:vendor/webgpu-motion-libs/packages/webgpu-motion-input"],
+    "webgpu-motion-input": ["webgpu-motion-input@workspace:packages/webgpu-motion-input"],
 
-    "webgpu-motion-post": ["webgpu-motion-post@workspace:vendor/webgpu-motion-libs/packages/webgpu-motion-post"],
+    "webgpu-motion-post": ["webgpu-motion-post@workspace:packages/webgpu-motion-post"],
 
-    "webgpu-motion-scene": ["webgpu-motion-scene@workspace:vendor/webgpu-motion-libs/packages/webgpu-motion-scene"],
+    "webgpu-motion-scene": ["webgpu-motion-scene@workspace:packages/webgpu-motion-scene"],
 
-    "webgpu-motion-shell": ["webgpu-motion-shell@workspace:vendor/webgpu-motion-libs/packages/webgpu-motion-shell"],
+    "webgpu-motion-shell": ["webgpu-motion-shell@workspace:packages/webgpu-motion-shell"],
 
-    "webgpu-motion-ui": ["webgpu-motion-ui@workspace:vendor/webgpu-motion-libs/packages/webgpu-motion-ui"],
+    "webgpu-motion-ui": ["webgpu-motion-ui@workspace:packages/webgpu-motion-ui"],
 
     "webidl-conversions": ["webidl-conversions@4.0.2", "", {}, "sha512-YQ+BmxuTgd6UXZW3+ICGfyqRyHXVlD5GtQr5+qjiNW7bF0cqrzX500HVXPBOvgXb5YnzDd+h0zqyv61KUD7+Sg=="],
 

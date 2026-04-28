@@ -1377,9 +1377,42 @@
   },
   "journal": {
     "title": "Journal",
-    "description": "A quiet editorial surface for production notes and technical records.",
+    "description": "Notes on works, technical writing, and motion-study archives.",
     "eyebrow": "Notes & Studies",
-    "intro": "Notes from behind the work: production thinking and technical records held under one craft bar across code, motion, film, and photography. Only records that meet the public bar stay visible here."
+    "intro": "Notes from behind the work — production thinking, technical writing, and motion-study archives held under one craft bar across code, motion, film, and photography.",
+    "motionStudies": {
+      "title": "Motion Studies",
+      "eyebrow": "Reference Works",
+      "intro": "Named techniques pulled into narrow reference works, each held against its own runtime truth and a specific benchmark.",
+      "openLabel": "Open",
+      "backLabel": "← Journal",
+      "entries": {
+        "signalStrokeRelay": {
+          "title": "Signal Stroke Relay",
+          "context": "Theatre.js + SVG · Trim Relay",
+          "summary": "Lead line, icon, title, and underline relayed through trim paths, staggered offsets, and a deliberate match cut.",
+          "heroProse": "Lead line into icon, icon into title, title into underline — a study where Trim Paths frame the relay window so each stroke hands a signal forward, narrowed to the grammar of staged title cues."
+        },
+        "stagedEmphasisPayoff": {
+          "title": "Staged Emphasis Payoff",
+          "context": "DOM · Grapheme Stagger",
+          "summary": "A title sequence broken into graphemes that stack, hand off emphasis, and release on a deliberate hold — built on browser SVG + DOM.",
+          "heroProse": "Glyphs stack one by one, hand off emphasis, then release on a held breath — a station-title build, payoff hold, and delayed disappearance reproduced grapheme by grapheme as a reference for how letters arrive."
+        },
+        "boilingPosterAperture": {
+          "title": "Boiling Poster Aperture",
+          "context": "PixiJS · Aperture Reveal",
+          "summary": "Boiling edges, mask gates, and displacement-led reveals on a single PixiJS poster — built so the reveal stays the main event.",
+          "heroProse": "A still poster narrowed to the instant of being seen — controlled aperture reveal held as the only event, with edge boil and frame warp pulled close enough to make that loosening visible."
+        },
+        "temporalEchoResidue": {
+          "title": "Temporal Echo Residue",
+          "context": "PixiJS · Echo Trail",
+          "summary": "Lyric and glyph residue stacked from time-offset samples, gated by alpha decay — a PixiJS reference for trail and echo grammar.",
+          "heroProse": "Lyric and glyph residue stacked from time-offset samples, faded by an alpha residue gate — a benchmark-grade narrow reproduction of trail-and-echo grammar for the moment after a stroke ends."
+        }
+      }
+    }
   },
   "experiments": {
     "title": "Experiments",
