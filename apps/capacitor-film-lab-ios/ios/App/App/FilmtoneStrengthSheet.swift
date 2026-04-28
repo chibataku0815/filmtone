@@ -43,15 +43,6 @@ struct FilmtoneStrengthSheet: View {
             if !advancedParamsExpanded {
                 advancedParamsExpanded = store.hasAdvancedAdjustments
             }
-            if expandedAdvancedGroupIds.isEmpty {
-                expandedAdvancedGroupIds = Set(
-                    advancedParamGroups
-                        .filter { group in
-                            group.keys.contains { store.isParamOverridden($0) }
-                        }
-                        .map(\.id)
-                )
-            }
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.hidden)
@@ -192,13 +183,19 @@ struct FilmtoneStrengthSheet: View {
 
     private func advancedGroupSection(_ group: FilmtoneAdvancedParamGroup) -> some View {
         let base = store.baseParamsForCurrentAdjustments()
+        let defaultValues = group.defaultValues(base)
         let strongValues = group.strongValues(base)
-        let selection = store.paramPresetSelection(for: group.keys, strongValues: strongValues)
+        let selection = store.paramPresetSelection(
+            for: group.keys,
+            defaultValues: defaultValues,
+            strongValues: strongValues
+        )
 
         return FilmtoneAdvancedParamGroupSection(
             id: group.id,
             title: group.title,
             selection: selection,
+            noneLabel: store.strings.advancedPresetNoneLabel,
             defaultLabel: store.strings.advancedPresetDefaultLabel,
             strongLabel: store.strings.advancedPresetStrongLabel,
             customLabel: store.strings.advancedPresetCustomLabel,
@@ -212,8 +209,11 @@ struct FilmtoneStrengthSheet: View {
                     }
                 }
             ),
-            onDefault: {
+            onNone: {
                 store.clearParamOverrides(for: group.keys)
+            },
+            onDefault: {
+                store.applyParamPreset(values: defaultValues, for: group.keys)
             },
             onStrong: {
                 store.applyParamPreset(values: strongValues, for: group.keys)
@@ -255,14 +255,24 @@ struct FilmtoneStrengthSheet: View {
             .init(
                 id: "process",
                 title: store.strings.advancedProcessLabel,
+                defaultValues: { base in
+                    [
+                        "cyan": max(base.cyan - 0.08, -1.0),
+                        "magenta": min(base.magenta + 0.06, 1.0),
+                        "yellow": min(base.yellow + 0.14, 1.0),
+                        "printContrast": max(base.printContrast, 0.38),
+                        "compressionAmount": max(base.compressionAmount, 0.42),
+                        "compressionRange": max(base.compressionRange, 0.76),
+                    ]
+                },
                 strongValues: { base in
                     [
-                        "cyan": max(base.cyan - 0.06, -1.0),
-                        "magenta": min(base.magenta + 0.04, 1.0),
-                        "yellow": min(base.yellow + 0.10, 1.0),
-                        "printContrast": max(base.printContrast, 0.30),
-                        "compressionAmount": max(base.compressionAmount, 0.34),
-                        "compressionRange": max(base.compressionRange, 0.70),
+                        "cyan": max(base.cyan - 0.14, -1.0),
+                        "magenta": min(base.magenta + 0.10, 1.0),
+                        "yellow": min(base.yellow + 0.22, 1.0),
+                        "printContrast": max(base.printContrast, 0.58),
+                        "compressionAmount": max(base.compressionAmount, 0.62),
+                        "compressionRange": max(base.compressionRange, 0.88),
                     ]
                 },
                 controls: [
@@ -277,11 +287,18 @@ struct FilmtoneStrengthSheet: View {
             .init(
                 id: "optics",
                 title: store.strings.advancedOpticsLabel,
+                defaultValues: { base in
+                    [
+                        "rgbShift": max(base.rgbShift, 0.0035),
+                        "lensSoftness": max(base.lensSoftness, 0.24),
+                        "vignette": max(base.vignette, 0.64),
+                    ]
+                },
                 strongValues: { base in
                     [
-                        "rgbShift": max(base.rgbShift, 0.0032),
-                        "lensSoftness": max(base.lensSoftness, 0.18),
-                        "vignette": max(base.vignette, 0.58),
+                        "rgbShift": max(base.rgbShift, 0.0048),
+                        "lensSoftness": max(base.lensSoftness, 0.38),
+                        "vignette": max(base.vignette, 0.82),
                     ]
                 },
                 controls: [
@@ -293,19 +310,34 @@ struct FilmtoneStrengthSheet: View {
             .init(
                 id: "glow",
                 title: store.strings.advancedGlowLabel,
+                defaultValues: { base in
+                    [
+                        "bloomThreshold": min(base.bloomThreshold, 0.56),
+                        "bloomStrength": max(base.bloomStrength, 0.52),
+                        "bloomRadius": max(base.bloomRadius, 0.76),
+                        "bloomSoftKnee": max(base.bloomSoftKnee, 0.76),
+                        "halationIntensity": max(base.halationIntensity, 0.28),
+                        "halationSpread": max(base.halationSpread, 34),
+                        "halationHue": abs(base.halationHue) < FilmtonePhase0Math.paramEqualityTolerance ? 22 : base.halationHue,
+                        "halationThreshold": min(base.halationThreshold, 0.46),
+                        "halationRadius": max(base.halationRadius, 0.66),
+                        "halationSoftKnee": max(base.halationSoftKnee, 0.58),
+                        "diffusion": max(base.diffusion, 0.26),
+                    ]
+                },
                 strongValues: { base in
                     [
-                        "bloomThreshold": min(base.bloomThreshold, 0.62),
-                        "bloomStrength": max(base.bloomStrength, 0.42),
-                        "bloomRadius": max(base.bloomRadius, 0.68),
-                        "bloomSoftKnee": max(base.bloomSoftKnee, 0.70),
-                        "halationIntensity": max(base.halationIntensity, 0.22),
-                        "halationSpread": max(base.halationSpread, 30),
+                        "bloomThreshold": min(base.bloomThreshold, 0.48),
+                        "bloomStrength": max(base.bloomStrength, 0.72),
+                        "bloomRadius": max(base.bloomRadius, 0.90),
+                        "bloomSoftKnee": max(base.bloomSoftKnee, 0.86),
+                        "halationIntensity": max(base.halationIntensity, 0.42),
+                        "halationSpread": max(base.halationSpread, 38),
                         "halationHue": abs(base.halationHue) < FilmtonePhase0Math.paramEqualityTolerance ? 22 : base.halationHue,
-                        "halationThreshold": min(base.halationThreshold, 0.50),
-                        "halationRadius": max(base.halationRadius, 0.58),
-                        "halationSoftKnee": max(base.halationSoftKnee, 0.50),
-                        "diffusion": max(base.diffusion, 0.20),
+                        "halationThreshold": min(base.halationThreshold, 0.38),
+                        "halationRadius": max(base.halationRadius, 0.80),
+                        "halationSoftKnee": max(base.halationSoftKnee, 0.70),
+                        "diffusion": max(base.diffusion, 0.38),
                     ]
                 },
                 controls: [
@@ -325,10 +357,17 @@ struct FilmtoneStrengthSheet: View {
             .init(
                 id: "grain",
                 title: store.strings.advancedGrainLabel,
+                defaultValues: { base in
+                    [
+                        "grainIntensity": max(base.grainIntensity, 0.095),
+                        "grainSize": max(base.grainSize, 0.74),
+                        "grainRadialMix": 1.0,
+                    ]
+                },
                 strongValues: { base in
                     [
                         "grainIntensity": max(base.grainIntensity, 0.10),
-                        "grainSize": max(base.grainSize, 0.68),
+                        "grainSize": max(base.grainSize, 0.94),
                         "grainRadialMix": 1.0,
                     ]
                 },
@@ -341,10 +380,16 @@ struct FilmtoneStrengthSheet: View {
             .init(
                 id: "tone",
                 title: store.strings.advancedToneLabel,
+                defaultValues: { base in
+                    [
+                        "contrast": min(base.contrast + 0.30, 2.0),
+                        "saturation": base.saturation <= 0.05 ? base.saturation : min(base.saturation + 0.24, 2.0),
+                    ]
+                },
                 strongValues: { base in
                     [
-                        "contrast": min(base.contrast + 0.22, 2.0),
-                        "saturation": base.saturation <= 0.05 ? base.saturation : min(base.saturation + 0.16, 2.0),
+                        "contrast": min(base.contrast + 0.46, 2.0),
+                        "saturation": base.saturation <= 0.05 ? base.saturation : min(base.saturation + 0.36, 2.0),
                     ]
                 },
                 controls: [
@@ -400,6 +445,9 @@ private struct FilmtoneSheetPreview: View {
     let isRendering: Bool
 
     var body: some View {
+        let stillImage = displayURI.flatMap(previewImage(from:))
+        let hasVisiblePreview = compareFrame != nil || videoPreview != nil || stillImage != nil
+
         ZStack(alignment: .topLeading) {
             Rectangle()
                 .fill(Color.black)
@@ -413,7 +461,7 @@ private struct FilmtoneSheetPreview: View {
             } else if let videoPreview {
                 FilmtonePreviewPlayerView(player: videoPreview.player)
                     .accessibilityIdentifier("filmtone.sheet.preview.video")
-            } else if let displayURI, let image = previewImage(from: displayURI) {
+            } else if let image = stillImage {
                 GeometryReader { geometry in
                     Image(uiImage: image)
                         .resizable()
@@ -450,28 +498,11 @@ private struct FilmtoneSheetPreview: View {
             }
 
             if isRendering {
-                VStack {
-                    Spacer()
-                    HStack(spacing: 10) {
-                        ProgressView()
-                            .progressViewStyle(.circular)
-                            .tint(Color.filmtoneAmber)
-
-                        Text(loadingMessage)
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.white.opacity(0.82))
-
-                        Spacer()
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(Color.black.opacity(0.6))
-                    )
+                if hasVisiblePreview {
+                    refreshIndicator
+                } else {
+                    loadingPanel
                 }
-                .padding(12)
-                .accessibilityIdentifier("filmtone.sheet.preview.loading")
             }
         }
         .frame(height: 210)
@@ -487,6 +518,58 @@ private struct FilmtoneSheetPreview: View {
             return nil
         }
         return UIImage(contentsOfFile: url.path)
+    }
+
+    private var refreshIndicator: some View {
+        VStack {
+            HStack {
+                Spacer()
+
+                ProgressView()
+                    .progressViewStyle(.circular)
+                    .tint(Color.filmtoneAmber)
+                    .scaleEffect(0.72)
+                    .frame(width: 28, height: 28)
+                    .background(
+                        Circle()
+                            .fill(Color.black.opacity(0.46))
+                    )
+                    .overlay(
+                        Circle()
+                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                    )
+                    .padding(12)
+            }
+
+            Spacer()
+        }
+        .accessibilityIdentifier("filmtone.sheet.preview.refreshing")
+        .accessibilityLabel(loadingMessage)
+    }
+
+    private var loadingPanel: some View {
+        VStack {
+            Spacer()
+            HStack(spacing: 10) {
+                ProgressView()
+                    .progressViewStyle(.circular)
+                    .tint(Color.filmtoneAmber)
+
+                Text(loadingMessage)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.82))
+
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.black.opacity(0.6))
+            )
+        }
+        .padding(12)
+        .accessibilityIdentifier("filmtone.sheet.preview.loading")
     }
 }
 
@@ -612,6 +695,7 @@ private struct FilmtoneCompareRevealPreview: View {
 private struct FilmtoneAdvancedParamGroup: Identifiable {
     let id: String
     let title: String
+    let defaultValues: (FilmtonePhase0Params) -> [String: Double]
     let strongValues: (FilmtonePhase0Params) -> [String: Double]
     let controls: [FilmtoneAdvancedParamControl]
 
@@ -633,10 +717,12 @@ private struct FilmtoneAdvancedParamGroupSection<Content: View>: View {
     let id: String
     let title: String
     let selection: FilmtoneParamGroupPresetSelection
+    let noneLabel: String
     let defaultLabel: String
     let strongLabel: String
     let customLabel: String
     @Binding var isExpanded: Bool
+    let onNone: () -> Void
     let onDefault: () -> Void
     let onStrong: () -> Void
     let content: Content
@@ -649,10 +735,12 @@ private struct FilmtoneAdvancedParamGroupSection<Content: View>: View {
         id: String,
         title: String,
         selection: FilmtoneParamGroupPresetSelection,
+        noneLabel: String,
         defaultLabel: String,
         strongLabel: String,
         customLabel: String,
         isExpanded: Binding<Bool>,
+        onNone: @escaping () -> Void,
         onDefault: @escaping () -> Void,
         onStrong: @escaping () -> Void,
         @ViewBuilder content: () -> Content
@@ -660,10 +748,12 @@ private struct FilmtoneAdvancedParamGroupSection<Content: View>: View {
         self.id = id
         self.title = title
         self.selection = selection
+        self.noneLabel = noneLabel
         self.defaultLabel = defaultLabel
         self.strongLabel = strongLabel
         self.customLabel = customLabel
         self._isExpanded = isExpanded
+        self.onNone = onNone
         self.onDefault = onDefault
         self.onStrong = onStrong
         self.content = content()
@@ -715,6 +805,13 @@ private struct FilmtoneAdvancedParamGroupSection<Content: View>: View {
 
                 HStack(spacing: 8) {
                     FilmtoneParamPresetChip(
+                        label: noneLabel,
+                        isSelected: selection == .nonePreset,
+                        accessibilityIdentifier: "filmtone.sheet.advanced.group.\(id).none",
+                        action: onNone
+                    )
+
+                    FilmtoneParamPresetChip(
                         label: defaultLabel,
                         isSelected: selection == .defaultPreset,
                         accessibilityIdentifier: "filmtone.sheet.advanced.group.\(id).default",
@@ -762,6 +859,8 @@ private struct FilmtoneAdvancedParamGroupSection<Content: View>: View {
 
     private var statusText: String {
         switch selection {
+        case .nonePreset:
+            return noneLabel
         case .defaultPreset:
             return defaultLabel
         case .strongPreset:
@@ -773,9 +872,9 @@ private struct FilmtoneAdvancedParamGroupSection<Content: View>: View {
 
     private var statusColor: Color {
         switch selection {
-        case .defaultPreset:
+        case .nonePreset:
             return .white.opacity(0.74)
-        case .strongPreset, .custom(_):
+        case .defaultPreset, .strongPreset, .custom(_):
             return Color.filmtoneAmber.opacity(0.88)
         }
     }

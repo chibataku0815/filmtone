@@ -156,6 +156,7 @@ enum FilmtoneSaveToPhotosState: String {
 }
 
 enum FilmtoneParamGroupPresetSelection: Equatable {
+    case nonePreset
     case defaultPreset
     case strongPreset
     case custom(activeCount: Int)
@@ -639,14 +640,24 @@ final class FilmtoneEditorStore: ObservableObject {
 
     func paramPresetSelection(
         for keys: [String],
+        defaultValues: [String: Double],
         strongValues: [String: Double]
     ) -> FilmtoneParamGroupPresetSelection {
         let activeCount = keys.filter { project.paramOverrides.values[$0] != nil }.count
         if activeCount == 0 {
-            return .defaultPreset
+            return .nonePreset
         }
 
         let base = baseParamsForCurrentAdjustments()
+        let matchesDefault = keys.allSatisfy { key in
+            let expected = defaultValues[key] ?? base.value(for: key)
+            let clampedExpected = FilmtonePhase0Math.clampParam(key, expected)
+            return abs(project.params.value(for: key) - clampedExpected) < FilmtonePhase0Math.paramEqualityTolerance
+        }
+        if matchesDefault {
+            return .defaultPreset
+        }
+
         let matchesStrong = keys.allSatisfy { key in
             let expected = strongValues[key] ?? base.value(for: key)
             let clampedExpected = FilmtonePhase0Math.clampParam(key, expected)
@@ -998,7 +1009,6 @@ final class FilmtoneEditorStore: ObservableObject {
 
         previewTask = Task { @MainActor [weak self] in
             guard let self else { return }
-            self.comparePreviewFrame = nil
 
             let violations = FilmtonePhase0Math.sourceCapViolations(for: self.probe)
             if !violations.isEmpty {
@@ -1012,6 +1022,7 @@ final class FilmtoneEditorStore: ObservableObject {
                     isRendering: false,
                     error: violations.joined(separator: "\n")
                 ))
+                self.comparePreviewFrame = nil
                 return
             }
 
@@ -1028,7 +1039,7 @@ final class FilmtoneEditorStore: ObservableObject {
                 switch source.kind {
                 case .image:
                     self.videoPreviewSession = nil
-                    self.preview = .still(.init(isRendering: true))
+                    self.markStillPreviewRendering()
                     let result = try await self.facade.renderPreview(request: request)
                     try Task.checkCancellation()
                     self.preview = .still(.init(
@@ -1061,17 +1072,7 @@ final class FilmtoneEditorStore: ObservableObject {
             } catch is CancellationError {
                 return
             } catch {
-                self.videoPreviewSession = nil
-                self.preview = .still(.init(
-                    originalPosterURI: nil,
-                    gradedPosterURI: nil,
-                    width: nil,
-                    height: nil,
-                    posterTimeSec: nil,
-                    isRendering: false,
-                    error: strings.userMessage(for: error, context: .preview)
-                ))
-                self.comparePreviewFrame = nil
+                self.applyPreviewError(self.strings.userMessage(for: error, context: .preview))
             }
         }
     }
@@ -1134,12 +1135,16 @@ final class FilmtoneEditorStore: ObservableObject {
         request: Phase0ExportRequestDTO,
         errorMessage: String
     ) async throws {
-        videoPreviewSession = nil
-        preview = .still(.init(isRendering: true))
+        let hadDisplayablePreview = hasDisplayablePreviewContent
+        if !hadDisplayablePreview {
+            videoPreviewSession = nil
+            markStillPreviewRendering()
+        }
 
         do {
             let result = try await facade.renderPreview(request: request)
             try Task.checkCancellation()
+            videoPreviewSession = nil
             preview = .still(.init(
                 originalPosterURI: result.originalUri,
                 gradedPosterURI: result.gradedUri,
@@ -1153,16 +1158,7 @@ final class FilmtoneEditorStore: ObservableObject {
         } catch is CancellationError {
             throw CancellationError()
         } catch {
-            preview = .still(.init(
-                originalPosterURI: nil,
-                gradedPosterURI: nil,
-                width: nil,
-                height: nil,
-                posterTimeSec: nil,
-                isRendering: false,
-                error: errorMessage
-            ))
-            comparePreviewFrame = nil
+            applyPreviewError(errorMessage)
         }
     }
 
@@ -1177,7 +1173,6 @@ final class FilmtoneEditorStore: ObservableObject {
             FilmtonePreviewRefreshDebug.log(
                 "compare preview frame failed: \(error.localizedDescription)"
             )
-            comparePreviewFrame = nil
         }
     }
 
@@ -1199,6 +1194,75 @@ final class FilmtoneEditorStore: ObservableObject {
         } else if case .video = preview {
             preview = .empty
         }
+    }
+
+    private var hasDisplayablePreviewContent: Bool {
+        if comparePreviewFrame != nil {
+            return true
+        }
+
+        switch preview {
+        case .empty:
+            return false
+        case .still(let preview):
+            return preview.originalPosterURI != nil || preview.gradedPosterURI != nil
+        case .video:
+            return true
+        }
+    }
+
+    private func markStillPreviewRendering() {
+        guard case .still(let current) = preview else {
+            preview = .still(.init(isRendering: true))
+            return
+        }
+
+        preview = .still(.init(
+            originalPosterURI: current.originalPosterURI,
+            gradedPosterURI: current.gradedPosterURI,
+            width: current.width,
+            height: current.height,
+            posterTimeSec: current.posterTimeSec,
+            isRendering: true,
+            error: current.error
+        ))
+    }
+
+    private func applyPreviewError(_ message: String) {
+        guard hasDisplayablePreviewContent else {
+            videoPreviewSession = nil
+            preview = .still(.init(
+                originalPosterURI: nil,
+                gradedPosterURI: nil,
+                width: nil,
+                height: nil,
+                posterTimeSec: nil,
+                isRendering: false,
+                error: message
+            ))
+            comparePreviewFrame = nil
+            return
+        }
+
+        if let videoPreviewSession {
+            videoPreviewSession.setError(message)
+            syncPreviewFromVideoSession()
+            return
+        }
+
+        guard case .still(let current) = preview else {
+            return
+        }
+
+        preview = .still(.init(
+            originalPosterURI: current.originalPosterURI,
+            gradedPosterURI: current.gradedPosterURI,
+            width: current.width,
+            height: current.height,
+            posterTimeSec: current.posterTimeSec,
+            isRendering: false,
+            error: message
+        ))
     }
 
     private func persist() {

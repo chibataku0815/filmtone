@@ -1,3 +1,4 @@
+import CoreGraphics
 import XCTest
 
 private enum SnapshotScene: String {
@@ -49,30 +50,57 @@ final class FilmtoneSnapshotsUITests: XCTestCase {
         reveal(processStrongButton, in: app, maxSwipes: 2)
         XCTAssertTrue(processStrongButton.waitForExistence(timeout: 5))
         processStrongButton.tap()
-        waitForSheetCompareReady(in: app)
+        let compareSlider = waitForSheetCompareReady(in: app)
+        dragCompareSlider(compareSlider, to: 0.74)
+        let retainedCompareValue = compareSliderValue(compareSlider)
+        XCTAssertNotEqual(retainedCompareValue, "58%")
+        assertSheetPreviewRetained(in: app, expectedCompareValue: retainedCompareValue)
 
         let processGroupButton = app.buttons["filmtone.sheet.advanced.group.process"]
         reveal(processGroupButton, in: app, maxSwipes: 2)
         XCTAssertTrue(processGroupButton.waitForExistence(timeout: 5))
         processGroupButton.tap()
         pauseForLayout()
+        assertSheetPreviewRetained(in: app, expectedCompareValue: retainedCompareValue)
 
         let processSlider = app.sliders["filmtone.sheet.slider.param.compressionAmount"]
         reveal(processSlider, in: app, maxSwipes: 2)
         XCTAssertTrue(processSlider.waitForExistence(timeout: 5))
 
         processSlider.adjust(toNormalizedSliderPosition: 0.82)
+        assertSheetPreviewRetained(in: app, expectedCompareValue: retainedCompareValue)
+        pauseForLayout(0.25)
+        assertSheetPreviewRetained(in: app, expectedCompareValue: retainedCompareValue)
         waitForSheetCompareReady(in: app)
+        assertSheetPreviewRetained(in: app, expectedCompareValue: retainedCompareValue)
 
         reveal(processSlider, in: app, maxSwipes: 3)
         processSlider.adjust(toNormalizedSliderPosition: 0.28)
+        assertSheetPreviewRetained(in: app, expectedCompareValue: retainedCompareValue)
+        pauseForLayout(0.25)
+        assertSheetPreviewRetained(in: app, expectedCompareValue: retainedCompareValue)
         waitForSheetCompareReady(in: app)
+        assertSheetPreviewRetained(in: app, expectedCompareValue: retainedCompareValue)
 
         let processDefaultButton = app.buttons["filmtone.sheet.advanced.group.process.default"]
         reveal(processDefaultButton, in: app, maxSwipes: 3)
         XCTAssertTrue(processDefaultButton.waitForExistence(timeout: 5))
         processDefaultButton.tap()
+        assertSheetPreviewRetained(in: app, expectedCompareValue: retainedCompareValue)
+        pauseForLayout(0.25)
+        assertSheetPreviewRetained(in: app, expectedCompareValue: retainedCompareValue)
         waitForSheetCompareReady(in: app)
+        assertSheetPreviewRetained(in: app, expectedCompareValue: retainedCompareValue)
+
+        let processNoneButton = app.buttons["filmtone.sheet.advanced.group.process.none"]
+        reveal(processNoneButton, in: app, maxSwipes: 3)
+        XCTAssertTrue(processNoneButton.waitForExistence(timeout: 5))
+        processNoneButton.tap()
+        assertSheetPreviewRetained(in: app, expectedCompareValue: retainedCompareValue)
+        pauseForLayout(0.25)
+        assertSheetPreviewRetained(in: app, expectedCompareValue: retainedCompareValue)
+        waitForSheetCompareReady(in: app)
+        assertSheetPreviewRetained(in: app, expectedCompareValue: retainedCompareValue)
 
         pauseForLayout(0.6)
         snapshot("06_live_video_process_refresh", timeWaitingForIdle: 0)
@@ -149,18 +177,24 @@ final class FilmtoneSnapshotsUITests: XCTestCase {
         pauseForLayout(1.0)
     }
 
-    private func waitForSheetCompareReady(in app: XCUIApplication) {
+    @discardableResult
+    private func waitForSheetCompareReady(in app: XCUIApplication) -> XCUIElement {
         let compareSlider = app.descendants(matching: .any)["filmtone.sheet.preview.compare.slider"]
 
-        revealAbove(compareSlider, in: app, maxSwipes: 4)
         XCTAssertTrue(compareSlider.waitForExistence(timeout: 20))
+        revealAbove(compareSlider, in: app, maxSwipes: 4)
         waitForRefreshToSettle(in: app)
+        XCTAssertTrue(compareSlider.exists)
+        return compareSlider
     }
 
     private func waitForRefreshToSettle(in app: XCUIApplication) {
         let loadingIndicator = app.otherElements["filmtone.sheet.preview.loading"]
-        if loadingIndicator.waitForExistence(timeout: 2) {
-            XCTAssertTrue(waitForElementToDisappear(loadingIndicator, timeout: 20))
+        XCTAssertFalse(loadingIndicator.waitForExistence(timeout: 0.5))
+
+        let refreshIndicator = app.otherElements["filmtone.sheet.preview.refreshing"]
+        if refreshIndicator.waitForExistence(timeout: 1) {
+            XCTAssertTrue(waitForElementToDisappear(refreshIndicator, timeout: 20))
         } else {
             pauseForLayout(1.2)
         }
@@ -190,6 +224,43 @@ final class FilmtoneSnapshotsUITests: XCTestCase {
         let predicate = NSPredicate(format: "exists == false")
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
         return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    private func assertSheetPreviewRetained(
+        in app: XCUIApplication,
+        expectedCompareValue: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let compareSlider = app.descendants(matching: .any)["filmtone.sheet.preview.compare.slider"]
+        let loadingIndicator = app.otherElements["filmtone.sheet.preview.loading"]
+
+        XCTAssertTrue(compareSlider.exists, "Compare preview disappeared during refresh.", file: file, line: line)
+        XCTAssertEqual(
+            compareSliderValue(compareSlider),
+            expectedCompareValue,
+            "Compare reveal position reset, which indicates the preview was remounted.",
+            file: file,
+            line: line
+        )
+        XCTAssertFalse(
+            loadingIndicator.exists,
+            "Large sheet preview loading indicator appeared during retained-preview refresh.",
+            file: file,
+            line: line
+        )
+    }
+
+    private func dragCompareSlider(_ compareSlider: XCUIElement, to normalizedPosition: CGFloat) {
+        let position = min(max(normalizedPosition, 0.05), 0.95)
+        let start = compareSlider.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let end = compareSlider.coordinate(withNormalizedOffset: CGVector(dx: position, dy: 0.5))
+        start.press(forDuration: 0.1, thenDragTo: end)
+        pauseForLayout(0.2)
+    }
+
+    private func compareSliderValue(_ compareSlider: XCUIElement) -> String {
+        compareSlider.value as? String ?? ""
     }
 
     private func reveal(
