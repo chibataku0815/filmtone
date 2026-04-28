@@ -17,7 +17,7 @@ enum FilmtonePhase0Generated {
     )
     static let outputProfile = Phase0OutputProfileDTO(
         longEdge: 1920,
-        fps: 30,
+        fps: 24,
         codec: "h264",
         container: "mp4",
         preserveAudio: true

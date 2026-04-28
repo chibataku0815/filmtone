@@ -80,7 +80,7 @@ test("iosPhase0ExportPayloadSchema accepts widened optical params and export def
     },
   });
 
-  expect(payload.exportSettings.outputFps).toBe(30);
+  expect(payload.exportSettings.outputFps).toBe(24);
   expect(payload.params.rgbShift).toBe(PHASE0_RGB_SHIFT_MAX);
   expect(payload.params.bloomStrength).toBe(0.24);
   expect(payload.params.compressionAmount).toBe(0.12);
@@ -361,7 +361,7 @@ test("iosPhase0ExportPayloadSchema keeps output fixed to H.264 MP4 defaults", ()
   });
 
   expect(payload.exportSettings.codec).toBe(IOS_PHASE0_OUTPUT_CODEC);
-  expect(payload.exportSettings.outputFps).toBe(30);
+  expect(payload.exportSettings.outputFps).toBe(24);
   expect(payload.exportSettings.outputLongEdge).toBe(1920);
 });
 

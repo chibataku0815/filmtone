@@ -241,6 +241,34 @@ struct Phase0GradeDTO: Codable {
     let params: Phase0ParamsDTO
 }
 
+struct SidecarDepthInfo: Codable, Equatable {
+    let used: Bool
+    let source: String?
+    let resolutionWidth: Int?
+    let resolutionHeight: Int?
+    let renderer: String?
+    let framesWithDepth: Int?
+    let videoDepthSource: String?
+
+    init(
+        used: Bool,
+        source: String? = nil,
+        resolutionWidth: Int? = nil,
+        resolutionHeight: Int? = nil,
+        renderer: String? = nil,
+        framesWithDepth: Int? = nil,
+        videoDepthSource: String? = nil
+    ) {
+        self.used = used
+        self.source = source
+        self.resolutionWidth = resolutionWidth
+        self.resolutionHeight = resolutionHeight
+        self.renderer = renderer
+        self.framesWithDepth = framesWithDepth
+        self.videoDepthSource = videoDepthSource
+    }
+}
+
 struct Phase0ExportRequestDTO: Codable {
     let sourceUri: String
     let sourceKind: FilmtoneSourceKind
@@ -251,4 +279,6 @@ struct Phase0ExportRequestDTO: Codable {
     let inputLut: SerializableLutDTO?
     let creativeLut: SerializableLutDTO?
     let renderMode: String?
+    let depthEnabled: Bool?
+    let depthRenderer: String?
 }

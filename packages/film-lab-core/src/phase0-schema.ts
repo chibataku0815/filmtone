@@ -64,7 +64,7 @@ export const PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES = 8 * 1024 * 1024 * 1024;
 
 export const PHASE0_OUTPUT_PROFILE = {
   longEdge: 1920,
-  fps: 30,
+  fps: 24,
   codec: "h264",
   container: "mp4",
   preserveAudio: true,

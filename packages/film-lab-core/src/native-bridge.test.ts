@@ -76,7 +76,7 @@ LUT_3D_SIZE 2
     });
     expect(request.output.codec).toBe("h264");
     expect(request.output.container).toBe("mp4");
-    expect(request.output.fps).toBe(30);
+    expect(request.output.fps).toBe(24);
     expect(request.grade.presetName).toBe(project.presetName);
   });
 

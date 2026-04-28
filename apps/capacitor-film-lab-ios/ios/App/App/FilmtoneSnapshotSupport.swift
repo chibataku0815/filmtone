@@ -138,7 +138,7 @@ struct FilmtoneSnapshotFixture {
                     elapsedMs: 1180,
                     outputWidth: 1170,
                     outputHeight: 2532,
-                    outputFps: 30,
+                    outputFps: 24,
                     fileSizeBytes: 18_400_000,
                     realtimeRatio: 1.9,
                     audioPreserved: true,
