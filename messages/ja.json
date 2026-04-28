@@ -1354,5 +1354,11 @@
     "pricingBody": "Filmtone Signature Pack — $39",
     "buyOnceLine": "買い切り。サブスクリプションではありません。",
     "refundLine": "Filmtone Signature Pack が素材やワークフローに合わなかった場合、購入後 14 日以内にご連絡いただければ簡易返金いたします。"
+  },
+  "journal": {
+    "title": "Journal",
+    "description": "制作のメモと技術的な記録をまとめるための静かな編集面。",
+    "eyebrow": "Notes & Studies",
+    "intro": "作品の背景にある考えと、制作中の技術的な記録を置くための場所。コード・モーション・映像・写真をひとつの基準で扱うために、公開できる品質に達した記録だけを残します。"
   }
 }

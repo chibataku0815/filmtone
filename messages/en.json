@@ -1352,5 +1352,11 @@
     "pricingBody": "Filmtone Signature Pack — $39",
     "buyOnceLine": "Buy once. No subscription.",
     "refundLine": "If Filmtone Signature Pack does not fit your footage or workflow, contact us within 14 days of purchase and we will process a simple refund."
+  },
+  "journal": {
+    "title": "Journal",
+    "description": "A quiet editorial surface for production notes and technical records.",
+    "eyebrow": "Notes & Studies",
+    "intro": "Notes from behind the work: production thinking and technical records held under one craft bar across code, motion, film, and photography. Only records that meet the public bar stay visible here."
   }
 }
