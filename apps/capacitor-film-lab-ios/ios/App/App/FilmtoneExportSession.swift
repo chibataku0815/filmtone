@@ -371,9 +371,9 @@ final class FilmtoneExportSession {
         }
         writer.startSession(atSourceTime: .zero)
 
-        let estimatedFrameCount = max(
+        let outputFrameCount = max(
             1,
-            Int(ceil((sourceDurationSec.isFinite ? sourceDurationSec : 0) * estimatedVideoFrameRate(for: videoTrack)))
+            Int(floor((sourceDurationSec.isFinite ? sourceDurationSec : 0) * Double(request.output.fps) + 1e-6))
         )
         var renderedFrames = 0
         let completionLock = NSLock()
@@ -433,7 +433,7 @@ final class FilmtoneExportSession {
             finishAudioInput(markAsFinished: true)
         }
 
-        progress(.init(stage: .reading, progress: 0.08, currentFrame: 0, totalFrames: estimatedFrameCount, message: "Reading source"))
+        progress(.init(stage: .reading, progress: 0.08, currentFrame: 0, totalFrames: outputFrameCount, message: "Reading source"))
 
         // v1.3 Phase B: depth-track frames seldom share the video track's
         // cadence (depth tracks are often ~half-rate). We hold the most-recent
@@ -444,6 +444,110 @@ final class FilmtoneExportSession {
         var lastDepthFrame: (presentationTime: CMTime, depthMap: FilmtoneDepthMap)? = nil
         var pendingDepthFrame: (presentationTime: CMTime, depthMap: FilmtoneDepthMap)? = nil
         var depthReaderExhausted = depthReader == nil
+        typealias TimedVideoSample = (buffer: CMSampleBuffer, rawTime: CMTime, timelineTime: CMTime)
+        var sourceTimeOffset: CMTime?
+        var previousVideoSample: TimedVideoSample?
+        var lookaheadVideoSample: TimedVideoSample?
+        var sourceReaderExhausted = false
+        var nextOutputFrameIndex = 0
+
+        func outputPresentationTime(for frameIndex: Int) -> CMTime {
+            CMTime(value: CMTimeValue(frameIndex), timescale: CMTimeScale(max(1, request.output.fps)))
+        }
+
+        func makeTimedVideoSample(_ sampleBuffer: CMSampleBuffer) -> TimedVideoSample {
+            let rawTime = Self.validPresentationTime(for: sampleBuffer)
+            if sourceTimeOffset == nil {
+                sourceTimeOffset = rawTime
+            }
+            let timelineTime = Self.nonNegativeTime(
+                CMTimeSubtract(rawTime, sourceTimeOffset ?? .zero)
+            )
+            return (sampleBuffer, rawTime, timelineTime)
+        }
+
+        func prepareDepthForOutputFrame(at outputPresentationTime: CMTime) {
+            guard let reader = depthReader else {
+                loadedDepthMap = nil
+                return
+            }
+            let lookupTime = CMTimeAdd(outputPresentationTime, sourceTimeOffset ?? .zero)
+            let decodeStart = Date()
+            // Advance until pendingDepthFrame.pts > current output pts (or EOS).
+            // The rendered video sample is resampled to the 24 fps output
+            // timeline, so depth follows that same output timeline rather than
+            // the original source-frame cadence.
+            while !depthReaderExhausted,
+                  pendingDepthFrame == nil
+                    || CMTimeCompare(pendingDepthFrame!.presentationTime, lookupTime) <= 0 {
+                if let pf = pendingDepthFrame {
+                    lastDepthFrame = pf
+                }
+                switch pullNextVideoDepthFrame(reader: reader) {
+                case .frame(let next):
+                    pendingDepthFrame = next
+                case .endOfStream:
+                    pendingDepthFrame = nil
+                    depthReaderExhausted = true
+                case .failure(let error):
+                    NSLog("FilmtoneExportSession: video depth frame pull failed: \(error). Continuing without depth for remaining frames.")
+                    pendingDepthFrame = nil
+                    depthReaderExhausted = true
+                }
+            }
+            let depthMapForThisFrame = lastDepthFrame?.depthMap
+            let decodeMs = Date().timeIntervalSince(decodeStart) * 1000.0
+            videoDepthDecodeMs = (videoDepthDecodeMs ?? 0) + decodeMs
+            loadedDepthMap = depthMapForThisFrame
+            if let depthMapForThisFrame {
+                videoDepthFramesProcessed = (videoDepthFramesProcessed ?? 0) + 1
+                // depthResolution is the "did the prefilter run?" signal that
+                // both the sidecar and runtime read; setting it on the first
+                // matched frame keeps still / video paths telemetry-aligned.
+                if depthResolution == nil {
+                    depthResolution = (depthMapForThisFrame.width, depthMapForThisFrame.height)
+                }
+            }
+        }
+
+        func appendOutputFrame(
+            using sample: TimedVideoSample,
+            at outputPresentationTime: CMTime
+        ) throws {
+            prepareDepthForOutputFrame(at: outputPresentationTime)
+            let outputTimeSec = CMTimeGetSeconds(outputPresentationTime)
+            let appendedFrame = try appendVideoSample(
+                sample.buffer,
+                videoInput: videoInput,
+                writer: writer,
+                reader: reader,
+                adaptor: adaptor,
+                videoTrack: videoTrack,
+                outputSize: outputSize,
+                outputPresentationTime: outputPresentationTime,
+                renderTimeSeconds: outputTimeSec.isFinite ? outputTimeSec : 0,
+                waitForReady: false
+            )
+            guard appendedFrame else {
+                throw FilmtoneMediaError.exportFailed("The decoded video sample did not contain an image buffer.")
+            }
+
+            renderedFrames += 1
+            nextOutputFrameIndex += 1
+            if renderedFrames == 1 || renderedFrames % 12 == 0 {
+                let normalizedProgress = renderingProgress(
+                    presentationTime: outputPresentationTime,
+                    sourceDurationSec: sourceDurationSec
+                )
+                progress(.init(
+                    stage: .rendering,
+                    progress: min(0.9, normalizedProgress),
+                    currentFrame: renderedFrames,
+                    totalFrames: outputFrameCount,
+                    message: "Rendering frames"
+                ))
+            }
+        }
 
         dispatchGroup.enter()
         videoInput.requestMediaDataWhenReady(on: videoQueue) { [self] in
@@ -455,81 +559,64 @@ final class FilmtoneExportSession {
 
                 do {
                     try checkCancelled()
-                    guard let sampleBuffer = videoOutput.copyNextSampleBuffer() else {
-                        if reader.status == .failed {
-                            throw FilmtoneMediaError.exportFailed(reader.error?.localizedDescription ?? "Video read failed.")
-                        }
+                    guard nextOutputFrameIndex < outputFrameCount else {
                         finishVideoInput(markAsFinished: true)
                         return
                     }
 
-                    let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-
-                    if let reader = depthReader {
-                        let decodeStart = Date()
-                        // Advance until pendingDepthFrame.pts > current video pts (or EOS).
-                        // Promote pending → last so the chosen depth is the latest sample
-                        // whose pts <= videoPts.
-                        while !depthReaderExhausted,
-                              pendingDepthFrame == nil
-                                || pendingDepthFrame!.presentationTime <= presentationTime {
-                            if let pf = pendingDepthFrame {
-                                lastDepthFrame = pf
+                    if previousVideoSample == nil {
+                        guard let sampleBuffer = videoOutput.copyNextSampleBuffer() else {
+                            if reader.status == .failed {
+                                throw FilmtoneMediaError.exportFailed(reader.error?.localizedDescription ?? "Video read failed.")
                             }
-                            switch pullNextVideoDepthFrame(reader: reader) {
-                            case .frame(let next):
-                                pendingDepthFrame = next
-                            case .endOfStream:
-                                pendingDepthFrame = nil
-                                depthReaderExhausted = true
-                            case .failure(let error):
-                                NSLog("FilmtoneExportSession: video depth frame pull failed: \(error). Continuing without depth for remaining frames.")
-                                pendingDepthFrame = nil
-                                depthReaderExhausted = true
-                            }
+                            finishVideoInput(markAsFinished: true)
+                            return
                         }
-                        let depthMapForThisFrame = lastDepthFrame?.depthMap
-                        let decodeMs = Date().timeIntervalSince(decodeStart) * 1000.0
-                        videoDepthDecodeMs = (videoDepthDecodeMs ?? 0) + decodeMs
-                        loadedDepthMap = depthMapForThisFrame
-                        if let depthMapForThisFrame {
-                            videoDepthFramesProcessed = (videoDepthFramesProcessed ?? 0) + 1
-                            // depthResolution is the "did the prefilter run?" signal that
-                            // both the sidecar and runtime read; setting it on the first
-                            // matched frame keeps still / video paths telemetry-aligned.
-                            if depthResolution == nil {
-                                depthResolution = (depthMapForThisFrame.width, depthMapForThisFrame.height)
-                            }
-                        }
-                    }
-
-                    let appendedFrame = try appendVideoSample(
-                        sampleBuffer,
-                        videoInput: videoInput,
-                        writer: writer,
-                        reader: reader,
-                        adaptor: adaptor,
-                        videoTrack: videoTrack,
-                        outputSize: outputSize,
-                        waitForReady: false
-                    )
-                    guard appendedFrame else {
+                        previousVideoSample = makeTimedVideoSample(sampleBuffer)
                         continue
                     }
 
-                    renderedFrames += 1
-                    if renderedFrames == 1 || renderedFrames % 12 == 0 {
-                        let normalizedProgress = renderingProgress(
-                            presentationTime: presentationTime,
-                            sourceDurationSec: sourceDurationSec
+                    if !sourceReaderExhausted && lookaheadVideoSample == nil {
+                        guard let sampleBuffer = videoOutput.copyNextSampleBuffer() else {
+                            if reader.status == .failed {
+                                throw FilmtoneMediaError.exportFailed(reader.error?.localizedDescription ?? "Video read failed.")
+                            }
+                            sourceReaderExhausted = true
+                            continue
+                        }
+                        lookaheadVideoSample = makeTimedVideoSample(sampleBuffer)
+                        continue
+                    }
+
+                    if let lookahead = lookaheadVideoSample {
+                        let outputTime = outputPresentationTime(for: nextOutputFrameIndex)
+                        if CMTimeCompare(outputTime, lookahead.timelineTime) < 0 {
+                            guard let previous = previousVideoSample else {
+                                throw FilmtoneMediaError.exportFailed("The first decoded video frame was unavailable.")
+                            }
+                            let previousDelta = Self.absoluteSecondsBetween(
+                                previous.timelineTime,
+                                outputTime
+                            )
+                            let lookaheadDelta = Self.absoluteSecondsBetween(
+                                lookahead.timelineTime,
+                                outputTime
+                            )
+                            let selectedSample = previousDelta <= lookaheadDelta ? previous : lookahead
+                            try appendOutputFrame(using: selectedSample, at: outputTime)
+                        } else {
+                            previousVideoSample = lookahead
+                            lookaheadVideoSample = nil
+                        }
+                        continue
+                    }
+
+                    if sourceReaderExhausted, let previous = previousVideoSample {
+                        try appendOutputFrame(
+                            using: previous,
+                            at: outputPresentationTime(for: nextOutputFrameIndex)
                         )
-                        progress(.init(
-                            stage: .rendering,
-                            progress: min(0.9, normalizedProgress),
-                            currentFrame: renderedFrames,
-                            totalFrames: estimatedFrameCount,
-                            message: "Rendering frames"
-                        ))
+                        continue
                     }
                 } catch {
                     failExport(error)
@@ -582,7 +669,7 @@ final class FilmtoneExportSession {
             throw FilmtoneMediaError.exportFailed(reader.error?.localizedDescription ?? "Video read failed.")
         }
 
-        progress(.init(stage: .writing, progress: 0.92, currentFrame: renderedFrames, totalFrames: estimatedFrameCount, message: "Writing output"))
+        progress(.init(stage: .writing, progress: 0.92, currentFrame: renderedFrames, totalFrames: outputFrameCount, message: "Writing output"))
         try finish(writer: writer)
 
         return CompletedExport(
@@ -1725,6 +1812,8 @@ final class FilmtoneExportSession {
         adaptor: AVAssetWriterInputPixelBufferAdaptor,
         videoTrack: AVAssetTrack,
         outputSize: CGSize,
+        outputPresentationTime: CMTime? = nil,
+        renderTimeSeconds: Double? = nil,
         waitForReady: Bool = true
     ) throws -> Bool {
         try autoreleasepool { () throws -> Bool in
@@ -1739,8 +1828,9 @@ final class FilmtoneExportSession {
                 throw FilmtoneMediaError.exportFailed("Pixel buffer pool is unavailable.")
             }
 
-            let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-            let presentationTimeSec = CMTimeGetSeconds(presentationTime)
+            let sourcePresentationTime = Self.validPresentationTime(for: sampleBuffer)
+            let outputTime = outputPresentationTime ?? sourcePresentationTime
+            let presentationTimeSec = renderTimeSeconds ?? CMTimeGetSeconds(sourcePresentationTime)
             let frameImage = renderableImage(
                 from: imageBuffer,
                 transform: videoTrack.preferredTransform,
@@ -1762,7 +1852,7 @@ final class FilmtoneExportSession {
             )
             attachRec709Metadata(to: renderedBuffer)
 
-            if !adaptor.append(renderedBuffer, withPresentationTime: presentationTime) {
+            if !adaptor.append(renderedBuffer, withPresentationTime: outputTime) {
                 throw FilmtoneMediaError.exportFailed(writer.error?.localizedDescription ?? "The frame could not be appended.")
             }
 
@@ -1893,6 +1983,26 @@ final class FilmtoneExportSession {
         guard writer.status == .completed else {
             throw FilmtoneMediaError.exportFailed(writer.error?.localizedDescription ?? "The export did not complete.")
         }
+    }
+
+    private static func validPresentationTime(for sampleBuffer: CMSampleBuffer) -> CMTime {
+        let time = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+        guard time.isValid, time.isNumeric else {
+            return .zero
+        }
+        return time
+    }
+
+    private static func nonNegativeTime(_ time: CMTime) -> CMTime {
+        guard time.isValid, time.isNumeric else {
+            return .zero
+        }
+        return CMTimeCompare(time, .zero) < 0 ? .zero : time
+    }
+
+    private static func absoluteSecondsBetween(_ lhs: CMTime, _ rhs: CMTime) -> Double {
+        let seconds = abs(CMTimeGetSeconds(CMTimeSubtract(lhs, rhs)))
+        return seconds.isFinite ? seconds : Double.greatestFiniteMagnitude
     }
 
     private func estimatedVideoFrameRate(for track: AVAssetTrack) -> Double {

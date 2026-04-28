@@ -58,7 +58,8 @@ struct TestSidecarBuilder {
             identity: identity,
             renderMode: nil,
             mezzanineUsedVariant: nil,
-            mezzanineProfileVersion: nil
+            mezzanineProfileVersion: nil,
+            depth: nil
         )
 
         let data = try FilmtoneExportSidecarBuilder.build(inputs)
@@ -138,7 +139,7 @@ struct TestSidecarBuilder {
         )
 
         try expect(parsed.output.longEdge == 1920, "output.longEdge mismatch")
-        try expect(parsed.output.fps == 30, "output.fps mismatch")
+        try expect(parsed.output.fps == 24, "output.fps mismatch")
         try expect(parsed.output.codec == "h264", "output.codec mismatch")
         try expect(parsed.output.container == "mp4", "output.container mismatch")
         try expect(parsed.output.preserveAudio == true, "output.preserveAudio mismatch")
@@ -190,7 +191,9 @@ struct TestSidecarBuilder {
             lut: nil,
             inputLut: nil,
             creativeLut: nil,
-            renderMode: nil
+            renderMode: nil,
+            depthEnabled: nil,
+            depthRenderer: nil
         )
         let identity = SidecarDeviceIdentity(
             appVersion: "1.1.0",
@@ -213,7 +216,8 @@ struct TestSidecarBuilder {
             identity: identity,
             renderMode: nil,
             mezzanineUsedVariant: nil,
-            mezzanineProfileVersion: nil
+            mezzanineProfileVersion: nil,
+            depth: nil
         )
         let data = try FilmtoneExportSidecarBuilder.build(inputs)
         let parsed = try JSONDecoder().decode(ParsedSidecar.self, from: data)

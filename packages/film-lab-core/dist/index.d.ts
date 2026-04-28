@@ -226,7 +226,7 @@ declare const PHASE0_APPROX_SOURCE_LONG_EDGE_MAX = 4096;
 declare const PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES: number;
 declare const PHASE0_OUTPUT_PROFILE: {
     readonly longEdge: 1920;
-    readonly fps: 30;
+    readonly fps: 24;
     readonly codec: "h264";
     readonly container: "mp4";
     readonly preserveAudio: true;
@@ -342,7 +342,7 @@ declare const phase0ProjectSchema: z.ZodPipe<z.ZodObject<{
     }, z.core.$strip>>>;
     output: z.ZodObject<{
         longEdge: z.ZodLiteral<1920>;
-        fps: z.ZodLiteral<30>;
+        fps: z.ZodLiteral<24>;
         codec: z.ZodLiteral<"h264">;
         container: z.ZodLiteral<"mp4">;
         preserveAudio: z.ZodDefault<z.ZodBoolean>;
@@ -374,7 +374,7 @@ declare const phase0ProjectSchema: z.ZodPipe<z.ZodObject<{
     };
     output: {
         longEdge: 1920;
-        fps: 30;
+        fps: 24;
         codec: "h264";
         container: "mp4";
         preserveAudio: boolean;
@@ -424,7 +424,7 @@ declare const phase0ProjectSchema: z.ZodPipe<z.ZodObject<{
     };
     output: {
         longEdge: 1920;
-        fps: 30;
+        fps: 24;
         codec: "h264";
         container: "mp4";
         preserveAudio: boolean;
@@ -1164,7 +1164,7 @@ declare const iosPhase0ParamsSchema: z.ZodObject<{
 }, z.core.$strip>;
 declare const IOS_PHASE0_OUTPUT_CODEC: "h264-mp4";
 declare const IOS_PHASE0_OUTPUT_LONG_EDGE: 1920;
-declare const IOS_PHASE0_OUTPUT_FPS: 30;
+declare const IOS_PHASE0_OUTPUT_FPS: 24;
 declare const IOS_PHASE0_SOURCE_DURATION_CAP_SEC: number;
 declare const IOS_PHASE0_SOURCE_LONG_EDGE_CAP = 4096;
 declare const IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES: number;
@@ -1268,7 +1268,7 @@ declare const iosPhase0PresetIdSchema: z.ZodEnum<{
 declare const iosPhase0ExportSettingsSchema: z.ZodObject<{
     codec: z.ZodDefault<z.ZodLiteral<"h264-mp4">>;
     outputLongEdge: z.ZodDefault<z.ZodNumber>;
-    outputFps: z.ZodDefault<z.ZodLiteral<30>>;
+    outputFps: z.ZodDefault<z.ZodLiteral<24>>;
 }, z.core.$strip>;
 type IosPhase0ExportSettings = z.infer<typeof iosPhase0ExportSettingsSchema>;
 declare const iosPhase0ExportPayloadSchema: z.ZodObject<{
@@ -1350,7 +1350,7 @@ declare const iosPhase0ExportPayloadSchema: z.ZodObject<{
     exportSettings: z.ZodDefault<z.ZodObject<{
         codec: z.ZodDefault<z.ZodLiteral<"h264-mp4">>;
         outputLongEdge: z.ZodDefault<z.ZodNumber>;
-        outputFps: z.ZodDefault<z.ZodLiteral<30>>;
+        outputFps: z.ZodDefault<z.ZodLiteral<24>>;
     }, z.core.$strip>>;
 }, z.core.$strip>;
 type IosPhase0ExportPayload = z.infer<typeof iosPhase0ExportPayloadSchema>;
@@ -1619,7 +1619,7 @@ declare const iosPhase0LocalProjectSchema: z.ZodObject<{
     exportSettings: z.ZodObject<{
         codec: z.ZodDefault<z.ZodLiteral<"h264-mp4">>;
         outputLongEdge: z.ZodDefault<z.ZodNumber>;
-        outputFps: z.ZodDefault<z.ZodLiteral<30>>;
+        outputFps: z.ZodDefault<z.ZodLiteral<24>>;
     }, z.core.$strip>;
     derivedData: z.ZodObject<{
         lastOutput: z.ZodDefault<z.ZodNullable<z.ZodObject<{
