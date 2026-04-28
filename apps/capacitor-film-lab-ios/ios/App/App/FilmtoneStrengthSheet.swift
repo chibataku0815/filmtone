@@ -257,9 +257,12 @@ struct FilmtoneStrengthSheet: View {
                 title: store.strings.advancedProcessLabel,
                 strongValues: { base in
                     [
-                        "printContrast": max(base.printContrast, 0.16),
-                        "compressionAmount": max(base.compressionAmount, 0.18),
-                        "compressionRange": max(base.compressionRange, 0.58),
+                        "cyan": max(base.cyan - 0.06, -1.0),
+                        "magenta": min(base.magenta + 0.04, 1.0),
+                        "yellow": min(base.yellow + 0.10, 1.0),
+                        "printContrast": max(base.printContrast, 0.30),
+                        "compressionAmount": max(base.compressionAmount, 0.34),
+                        "compressionRange": max(base.compressionRange, 0.70),
                     ]
                 },
                 controls: [
@@ -276,9 +279,9 @@ struct FilmtoneStrengthSheet: View {
                 title: store.strings.advancedOpticsLabel,
                 strongValues: { base in
                     [
-                        "rgbShift": max(base.rgbShift, 0.0015),
-                        "lensSoftness": max(base.lensSoftness, 0.08),
-                        "vignette": max(base.vignette, 0.34),
+                        "rgbShift": max(base.rgbShift, 0.0032),
+                        "lensSoftness": max(base.lensSoftness, 0.18),
+                        "vignette": max(base.vignette, 0.58),
                     ]
                 },
                 controls: [
@@ -292,17 +295,17 @@ struct FilmtoneStrengthSheet: View {
                 title: store.strings.advancedGlowLabel,
                 strongValues: { base in
                     [
-                        "bloomThreshold": min(base.bloomThreshold, 0.74),
-                        "bloomStrength": max(base.bloomStrength, 0.24),
-                        "bloomRadius": max(base.bloomRadius, 0.52),
-                        "bloomSoftKnee": max(base.bloomSoftKnee, 0.56),
-                        "halationIntensity": max(base.halationIntensity, 0.10),
-                        "halationSpread": max(base.halationSpread, 22),
+                        "bloomThreshold": min(base.bloomThreshold, 0.62),
+                        "bloomStrength": max(base.bloomStrength, 0.42),
+                        "bloomRadius": max(base.bloomRadius, 0.68),
+                        "bloomSoftKnee": max(base.bloomSoftKnee, 0.70),
+                        "halationIntensity": max(base.halationIntensity, 0.22),
+                        "halationSpread": max(base.halationSpread, 30),
                         "halationHue": abs(base.halationHue) < FilmtonePhase0Math.paramEqualityTolerance ? 22 : base.halationHue,
-                        "halationThreshold": min(base.halationThreshold, 0.58),
-                        "halationRadius": max(base.halationRadius, 0.46),
-                        "halationSoftKnee": max(base.halationSoftKnee, 0.36),
-                        "diffusion": max(base.diffusion, 0.10),
+                        "halationThreshold": min(base.halationThreshold, 0.50),
+                        "halationRadius": max(base.halationRadius, 0.58),
+                        "halationSoftKnee": max(base.halationSoftKnee, 0.50),
+                        "diffusion": max(base.diffusion, 0.20),
                     ]
                 },
                 controls: [
@@ -324,8 +327,8 @@ struct FilmtoneStrengthSheet: View {
                 title: store.strings.advancedGrainLabel,
                 strongValues: { base in
                     [
-                        "grainIntensity": max(base.grainIntensity, 0.085),
-                        "grainSize": max(base.grainSize, 0.40),
+                        "grainIntensity": max(base.grainIntensity, 0.10),
+                        "grainSize": max(base.grainSize, 0.68),
                         "grainRadialMix": 1.0,
                     ]
                 },
@@ -340,8 +343,8 @@ struct FilmtoneStrengthSheet: View {
                 title: store.strings.advancedToneLabel,
                 strongValues: { base in
                     [
-                        "contrast": min(base.contrast + 0.12, 2.0),
-                        "saturation": base.saturation <= 0.05 ? base.saturation : min(base.saturation + 0.08, 2.0),
+                        "contrast": min(base.contrast + 0.22, 2.0),
+                        "saturation": base.saturation <= 0.05 ? base.saturation : min(base.saturation + 0.16, 2.0),
                     ]
                 },
                 controls: [
