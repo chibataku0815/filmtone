@@ -2644,26 +2644,33 @@ float grainClumpNoise(vec2 p) {
 kernel vec4 grain(__sample image, float intensity, float radialMix, float grainSize, float timeSeconds, float sourceSeed, vec2 extentOrigin, vec2 extentSize) {
     vec4 color = image;
     vec2 uv = (destCoord() - extentOrigin) / extentSize;
+    float size = clamp(grainSize, 0.0, 1.0);
     vec2 grainDelta = uv - vec2(0.5, 0.5);
     grainDelta.x *= extentSize.x / max(extentSize.y, 1.0);
     float grainRadial = clamp(length(grainDelta) * 2.0, 0.0, 1.0);
-    float grainRadialWeight = pow(grainRadial, 1.65);
+    float grainRadialWeight = mix(0.76, 1.42, pow(grainRadial, 1.35));
     float grainRadialEffective = mix(1.0, grainRadialWeight, clamp(radialMix, 0.0, 1.0));
 
     float grainFrame = floor(max(timeSeconds, 0.0) * 3.0);
     vec2 pixelCoord = uv * extentSize;
-    float lumaGrain = grainPixelHash(pixelCoord, grainFrame * 1.7 + sourceSeed * 13.0);
-    float chromaR = grainPixelHash(pixelCoord, grainFrame * 2.3 + 500.0 + sourceSeed * 7.0) * 0.3;
-    float chromaB = grainPixelHash(pixelCoord, grainFrame * 3.1 + 1000.0 + sourceSeed * 5.0) * 0.3;
+    float grainDiameter = mix(1.6, 5.6, pow(size, 0.72));
+    vec2 grainCell = floor(pixelCoord / grainDiameter);
+    float fineLuma = grainPixelHash(pixelCoord, grainFrame * 1.7 + sourceSeed * 13.0);
+    float cellLuma = grainPixelHash(grainCell, grainFrame * 1.7 + sourceSeed * 13.0);
+    float lumaGrain = mix(fineLuma, cellLuma, mix(0.28, 0.76, size));
+    float chromaR = grainPixelHash(grainCell, grainFrame * 2.3 + 500.0 + sourceSeed * 7.0) * 0.22;
+    float chromaB = grainPixelHash(grainCell, grainFrame * 3.1 + 1000.0 + sourceSeed * 5.0) * 0.22;
 
-    float clumpScale = mix(80.0, 20.0, clamp(grainSize, 0.0, 1.0));
+    float clumpScale = mix(80.0, 20.0, size);
     float clump = grainClumpNoise((uv * extentSize / clumpScale) + vec2(grainFrame * 0.5 + sourceSeed * 0.1, sourceSeed * 0.07));
-    float densityMod = mix(1.0, 0.3 + clump * 1.4, clamp(grainSize, 0.0, 1.0) * 0.7);
+    float densityMod = mix(1.0, 0.3 + clump * 1.4, size * 0.7);
+    float luma = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+    float lumaVisibility = mix(1.12, 0.78, smoothstep(0.18, 0.92, luma));
 
-    float weight = intensity * 0.5 * grainRadialEffective;
-    color.r += (lumaGrain + chromaR) * weight * densityMod;
-    color.g += lumaGrain * weight * densityMod;
-    color.b += (lumaGrain + chromaB) * weight * densityMod;
+    float weight = intensity * 1.08 * grainRadialEffective * densityMod * lumaVisibility;
+    color.r += (lumaGrain + chromaR) * weight;
+    color.g += lumaGrain * weight;
+    color.b += (lumaGrain + chromaB) * weight;
     color.rgb = clamp(color.rgb, 0.0, 1.0);
     return color;
 }
