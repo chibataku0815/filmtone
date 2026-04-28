@@ -1379,42 +1379,9 @@
   },
   "journal": {
     "title": "Journal",
-    "description": "制作のメモ、技術的な記録、そしてモーション習作のアーカイブ。",
+    "description": "制作のメモと技術的な記録のアーカイブ。",
     "eyebrow": "Notes & Studies",
-    "intro": "作品の背景にある考えと、制作中の技術的な記録、そしてモーションの習作。コード・モーション・映像・写真をひとつの基準で扱おうとする試みです。",
-    "motionStudies": {
-      "title": "Motion Studies",
-      "eyebrow": "Reference Works",
-      "intro": "特定の技法をひとつずつ取り出して、独立した小さな習作として作り直したシリーズ。",
-      "openLabel": "開く",
-      "backLabel": "← Journal",
-      "entries": {
-        "signalStrokeRelay": {
-          "title": "Signal Stroke Relay",
-          "context": "Theatre.js + SVG · Trim Relay",
-          "summary": "リード線 → アイコン → タイトル → 下線へ、線が線へと信号を渡していくタイトルアニメーションの習作。",
-          "heroProse": "リード線が icon に、icon が title に、title が下線へ。Trim Path の窓を主役に据え、線が信号として relay されていくタイトルシーケンスの grammar を狭く検証した一篇。"
-        },
-        "stagedEmphasisPayoff": {
-          "title": "Staged Emphasis Payoff",
-          "context": "DOM · Grapheme Stagger",
-          "summary": "タイトル文字を一字ずつ積み上げ、強調を受け渡し、最後に余韻を残しながら解く——文字の出し方そのものを設計したタイトルシーケンス。",
-          "heroProse": "タイトル文字を一字ずつ積み上げ、強調を受け渡し、最後に余韻を残しながら解く。駅名標 build / payoff hold / delayed disappearance を grapheme 単位で再現した、文字の出し方そのもののリファレンス。"
-        },
-        "boilingPosterAperture": {
-          "title": "Boiling Poster Aperture",
-          "context": "PixiJS · Aperture Reveal",
-          "summary": "ふつふつと揺らぐ輪郭、マスクの開閉、画面のゆがみで「見せる瞬間」を主役に据えた、一枚絵ポスターのモーション習作。",
-          "heroProse": "静止した poster が「見られる瞬間」へ開く——そのほどける一拍を主役に据え、輪郭の揺らぎと画面の歪みだけを controlled aperture reveal として残した一篇。"
-        },
-        "temporalEchoResidue": {
-          "title": "Temporal Echo Residue",
-          "context": "PixiJS · Echo Trail",
-          "summary": "歌詞や文字の残像を時間差で重ね、徐々に薄れていく——残像と余韻のつくり方を試した PixiJS の習作。",
-          "heroProse": "歌詞や文字の残像を時間差で重ね、徐々に薄れていく。time-offset echo sample と residue gate で benchmark の lyric / stroke residue grammar を narrow に再現した、残像と余韻のためのリファレンス。"
-        }
-      }
-    }
+    "intro": "作品の背景にある考えと、制作中の技術的な記録。コード・モーション・映像・写真をひとつの基準で扱おうとする試みです。"
   },
   "experiments": {
     "title": "Experiments",
