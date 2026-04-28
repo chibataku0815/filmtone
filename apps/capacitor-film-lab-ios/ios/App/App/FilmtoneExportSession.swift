@@ -2440,11 +2440,55 @@ kernel vec4 glowComposite(__sample base, __sample bloom, __sample halation, __sa
     // optics-aware weight. When `applyMask = 0`, `effectiveMask = 1.0` and
     // the formula collapses to the original `1 - intensity * dist^2`,
     // byte-identical with pre-Stream-2 output.
+    //
+    // ── v1.1.1 (Portrait Optics 物理化 / 2026-04-25) ─────────────────────────
+    //
+    // Planned physicalization (M1 owns the math change; T3 left this comment
+    // ahead of the code edit). Three coordinated moves:
+    //
+    //   1. `dist` becomes pixel-circular instead of UV-isotropic.
+    //      Before: `length(uv - 0.5) * 1.414`  (UV circle → pixel ellipse,
+    //              portrait gets a vertically stretched falloff).
+    //      After:  `length((uv - 0.5) * extentSize) / halfDiag`,
+    //              where `halfDiag = length(extentSize * 0.5)`.
+    //      Result: corner = 1.0 regardless of aspect, true circular falloff
+    //              in pixel space, aspect自動追従.
+    //
+    //   2. Ray-angle reference incidence becomes **actual-corner reference**.
+    //      `opticsPack.z` is currently derived from the fixed 65° HFOV
+    //      reference geometry, so portrait input only reaches normalized
+    //      ≈ 0.49 at the corner. M1 will have the call site (kernelArgs in
+    //      FilmtoneRayAngleOptics) compute `refIncidence` directly from the
+    //      *resolved* `tanHalfFovX/Y` so the actual image corner saturates
+    //      at mask = 1.0 for any aspect / FOV combination.
+    //
+    //   3. Center invariance (the v1.1 ray-angle requirement: "image center
+    //      must not be darkened") is preserved by construction:
+    //          uv = (0.5, 0.5)  ⇒  sensor = 0  ⇒  ray = 0  ⇒  incidence = 0
+    //      so `normalized = 0` and `mask = 0` at the center, independent of
+    //      the new reference. Edge-only falloff scaling is unchanged.
+    //
+    // Moving Postcard 哲学的根拠: vignette は「光学中心からの実 pixel 距離」
+    // 基準であるべき (UV 比例ではない)。aspect 不依存の真円グラデーションこそ
+    // フィルム的真実性に整合し、portrait / landscape どちらでもレンズ収差の
+    // 体感が一致する。
+    //
+    // Desktop divergence (Risks 2): `packages/film-lab-renderer/src/webgpu/
+    // shaders/composite.frag.wgsl.ts` および `rayAngleOptics.ts` は Desktop
+    // v1.0.x として **frozen**。本物理化は iOS 単独で先行し、Desktop reconcile
+    // は別 PR / follow-up issue (life ラベル `creative` `tech`) で扱う。
+    // sidecar JSON / DTO (fxPx, fyPx, fovXDeg, fovYDeg) は無変更のため
+    // contract verifier は通過する。
+    //
+    // Implementation owner: **M1 (Phase 2)**. T3 はコメント先行のみで、
+    // この時点では数式 (vec2/vec3/float 計算) は一切変更しない。
     static let vignette = CIColorKernel(source: """
 kernel vec4 vignette(__sample image, float intensity, vec2 extentOrigin, vec2 extentSize, float rayAngleGamma, float rayAngleInner, vec3 opticsPack, float applyMask) {
     vec4 color = image;
     vec2 uv = (destCoord() - extentOrigin) / extentSize;
-    float dist = length(uv - vec2(0.5, 0.5)) * 1.414;
+    vec2 distPx = (uv - vec2(0.5, 0.5)) * extentSize;
+    float halfDiag = length(extentSize * 0.5);
+    float dist = length(distPx) / max(halfDiag, 1.0);
 
     vec2 sensor = (uv - vec2(0.5, 0.5)) * 2.0;
     float rayX = sensor.x * opticsPack.x;
@@ -2466,6 +2510,7 @@ kernel vec4 vignette(__sample image, float intensity, vec2 extentOrigin, vec2 ex
 }
 """)
 
+    // NOTE: aspect 補正は v1.1.1 では vignette / edgeSoftnessBlend のみ pixel-physical 化。grain と radialRGBSplit は v1.2 follow-up（intensity / hue で見た目 dominate しており優先度低い）。
     static let grain = CIColorKernel(source: """
 float grainPixelHash(vec2 p, float seed) {
     return fract(sin(dot(p + vec2(seed, seed * 0.73), vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
@@ -2514,6 +2559,7 @@ kernel vec4 grain(__sample image, float intensity, float radialMix, float grainS
 }
 """)
 
+    // NOTE: aspect 補正は v1.1.1 では vignette / edgeSoftnessBlend のみ pixel-physical 化。grain と radialRGBSplit は v1.2 follow-up（intensity / hue で見た目 dominate しており優先度低い）。
     static let radialRGBSplit = CIKernel(source: """
 kernel vec4 radialRGBSplit(sampler image, float amount, vec2 extentOrigin, vec2 extentSize) {
     vec2 coord = destCoord();
@@ -2608,15 +2654,50 @@ kernel vec4 tentUpsample(sampler image, vec2 sourceOrigin, vec2 sourceSize, vec2
 }
 """)
 
+    // ── edgeSoftnessBlend (v1.1.1 Portrait Optics 物理化 / 2026-04-25) ─────
+    //
+    // Known bug (現行 line 内 `edgeDelta.x *= extentSize.x / max(extentSize.y, 1.0)`):
+    // 横長前提の aspect 補正により、portrait 入力では左右エッジの edgeR が
+    // ~0.397 までしか達しない (landscape 左右では 1.0 saturate)。
+    // smoothstep(0.25, 1.0, edgeR) のため左右エッジでレンズソフトが
+    // 視認困難なレベルまで弱まる。
+    //
+    // Planned replacement (M1 owner / Phase 2):
+    //
+    //     vec2 edgePx = (uv - vec2(0.5)) * extentSize;
+    //     float halfDiag = length(extentSize * 0.5);
+    //     float edgeR = clamp(length(edgePx) / max(halfDiag, 1.0), 0.0, 1.0);
+    //
+    // Effect:
+    //   - corner で常に edgeR = 1.0 (aspect 不依存)
+    //   - エッジ中点は短軸 ~0.49 / 長軸 ~0.872、aspect 自動追従
+    //   - portrait 左右 / landscape 左右が同等の lensSoft 強度に到達
+    //
+    // `lensR` (現行 `length(edgeDelta) * 2.0`) も同基準で再導出される予定:
+    //
+    //     float lensR = clamp(length(edgePx) / max(halfDiag, 1.0), 0.0, 1.0);
+    //
+    // (スケール係数は M1 で QA 結果を見て微調整。0.5×halfDiag normalize や
+    // 元の 2.0 ゲインに相当する別係数になる可能性あり。)
+    //
+    // Moving Postcard 哲学: 物理的に「光学中心からの実 pixel 距離」基準で
+    // レンズ収差 (edge softness, aberration soften, lensSoftness) を
+    // 再現する。UV 比例の楕円落ち込みは光学的に意味がない。
+    //
+    // Desktop divergence: Desktop renderer (composite.frag.wgsl.ts) は
+    // v1.0.x frozen。iOS 単独で物理化、reconcile は follow-up issue。
+    //
+    // Implementation owner: **M1 (Phase 2)**. T3 はコメント先行のみ、
+    // 数式に一切手を入れない。
     static let edgeSoftnessBlend = CIKernel(source: """
 kernel vec4 edgeSoftnessBlend(sampler sharp, sampler blurred, float aberrationSoften, float lensSoftness, vec2 extentOrigin, vec2 extentSize) {
     vec2 coord = destCoord();
     vec2 uv = (coord - extentOrigin) / extentSize;
-    vec2 edgeDelta = uv - vec2(0.5, 0.5);
-    edgeDelta.x *= extentSize.x / max(extentSize.y, 1.0);
-    float edgeR = clamp(length(edgeDelta) * 1.414, 0.0, 1.0);
+    vec2 edgePx = (uv - vec2(0.5, 0.5)) * extentSize;
+    float halfDiag = length(extentSize * 0.5);
+    float edgeR = clamp(length(edgePx) / max(halfDiag, 1.0), 0.0, 1.0);
     float edgeMask = smoothstep(0.25, 1.0, edgeR);
-    float lensR = clamp(length(edgeDelta) * 2.0, 0.0, 1.0);
+    float lensR = clamp(length(edgePx) / max(halfDiag, 1.0), 0.0, 1.0);
     float lensW = pow(lensR, 1.52);
     float lensDrive = pow(clamp(lensSoftness, 0.0, 1.0), 0.78);
     float lensWeight = clamp(lensDrive * lensW, 0.0, 1.0);

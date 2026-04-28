@@ -1355,10 +1355,114 @@
     "buyOnceLine": "買い切り。サブスクリプションではありません。",
     "refundLine": "Filmtone Signature Pack が素材やワークフローに合わなかった場合、購入後 14 日以内にご連絡いただければ簡易返金いたします。"
   },
+  "works": {
+    "photography": {
+      "title": "Photography",
+      "description": "イベント・コミュニティ・コマーシャル撮影の事例集。当日プレビューと72時間以内の全データ納品。"
+    },
+    "commercial": {
+      "title": "Commercial",
+      "description": "クライアントワークのケーススタディ。ブランド、プロダクト、キャンペーン領域の制作実績。"
+    },
+    "installation": {
+      "title": "Installation",
+      "description": "空間・体験型のインスタレーション作品。物理空間における映像と光の編集。"
+    }
+  },
+  "craft": {
+    "title": "Craft",
+    "description": "技術と表現の交差点。コード、シェーダ、撮影機材、カラーグレーディング — 制作の道具立てと方法論。"
+  },
+  "about": {
+    "title": "About",
+    "description": "千葉拓巳のプロフィール。フルスタックエンジニア、クリエイティブディレクター、フォトグラファー、マーケティング戦略家、バイリンガルコミュニケーターの5つの顔。"
+  },
   "journal": {
     "title": "Journal",
     "description": "制作のメモと技術的な記録をまとめるための静かな編集面。",
     "eyebrow": "Notes & Studies",
     "intro": "作品の背景にある考えと、制作中の技術的な記録を置くための場所。コード・モーション・映像・写真をひとつの基準で扱うために、公開できる品質に達した記録だけを残します。"
+  },
+  "experiments": {
+    "title": "Experiments",
+    "description": "WebGPU と音響を素材に編んだモーション作品。視覚・触覚・時間の握り方をプロトタイプとして公開しています。",
+    "eyebrow": "Motion Works",
+    "intro": "コードを通じて握る視覚・時間・音の感覚。Filmtone と Journal の手前にある実験場。",
+    "stateLabel": {
+      "active": "Active",
+      "preview": "Preview"
+    },
+    "openLabel": "Open",
+    "works": {
+      "dot": {
+        "title": "Motion Dot",
+        "concept": "粒の集合で形を成す、構造的なドット系のモーション。WebGPU と音入力を組み合わせて、密度と時間の握り方を試している。"
+      },
+      "grid": {
+        "title": "Motion Grid",
+        "concept": "音と動きで呼吸する格子。構造そのものが描くリズム。"
+      },
+      "flow": {
+        "title": "Motion Flow",
+        "concept": "時間を連続したジェスチャとして読む流体の線。流れそのものが視覚言語になる。"
+      }
+    },
+    "unsupported": {
+      "headline": "このページは WebGPU でリアルタイム描画を行います。",
+      "reasonUnavailable": "このブラウザでは WebGPU を利用できません。",
+      "reasonInitFailed": "WebGPU の初期化に失敗しました: {message}",
+      "browserHint": "macOS / Windows / Android の最新版 Chrome / Edge / Arc で開いてください。iOS Safari は現時点で WebGPU 非対応です。"
+    }
+  },
+  "audio": {
+    "_comment": "Wave 2 Agent β (D5.4 + D5.5) — sound toggle + mic gate. Append-only namespace, last in file by convention.",
+    "toggle": {
+      "ariaSilent": "サウンドを有効にする",
+      "ariaPlaying": "再生中。クリックでミュート",
+      "ariaMuted": "ミュート中。クリックで再生"
+    },
+    "mic": {
+      "loading": "読み込み中…",
+      "unsupported": "Mic 非対応",
+      "requesting": "許可を確認中…",
+      "enable": "Mic を有効にする",
+      "on": "Mic ON",
+      "blocked": "Mic はブロック中",
+      "helperEnable": "音に反応するモーションを試す。許可はブラウザに保存されます。",
+      "helperOn": "Mic 入力中。クリックで停止。",
+      "helperUnsupported": "このブラウザは Mic 入力に対応していません。",
+      "helperBlocked": "ブラウザのサイト設定から Mic を許可し直してください。"
+    }
+  },
+  "contact": {
+    "_comment": "Contact namespace — Renewal 2026 reset (parent plan §4.1 / §5.4): localized minimal contact surface.",
+    "title": "お問い合わせ",
+    "description": "気になることがあれば、気軽にご連絡ください。\nメールでも、下のフォームでも構いません。",
+    "channelLabel": "Email",
+    "formDivider": "フォームから送る",
+    "responseNote": "返信は2営業日以内を目安にしています。",
+    "metadata": {
+      "title": "お問い合わせ",
+      "description": "千葉拓未への連絡先。メールまたはメッセージから。"
+    },
+    "form": {
+      "name": "お名前",
+      "email": "メールアドレス",
+      "message": "メッセージ",
+      "submit": "送信する",
+      "submitting": "送信中…",
+      "errors": {
+        "name": "お名前を入力してください。",
+        "email": "メールアドレスをご確認ください。",
+        "message": "10文字以上でメッセージを入力してください。",
+        "send": "送信できませんでした。少し時間をおいてから、もう一度お試しください。",
+        "config": "現在フォームから送信できません。メールから直接ご連絡ください。"
+      }
+    },
+    "success": {
+      "heading": "送信しました",
+      "body": "ご連絡ありがとうございます。\n2日以内に返信します。",
+      "back": "ホームへ戻る"
+    }
   }
 }

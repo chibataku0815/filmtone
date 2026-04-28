@@ -2769,6 +2769,54 @@
           }
         }
       }
+    },
+    "filmtone.toast.export.complete" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export complete"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "書き出し完了"
+          }
+        }
+      }
+    },
+    "filmtone.toast.save.success" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved to Photos"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真に保存しました"
+          }
+        }
+      }
+    },
+    "filmtone.toast.share.failed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share failed — try again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共有に失敗しました"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

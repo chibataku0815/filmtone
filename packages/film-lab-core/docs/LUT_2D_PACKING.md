@@ -18,4 +18,4 @@
 ## 制限
 
 - `DOMAIN_MIN` / `DOMAIN_MAX` が 0〜1 以外のときは、シェーダで入力色のリマップが必要（現状の Remotion シェーダは 0〜1 前提）。
-- ブラウザ Film Lab の **8-pass や Bloom** とは別パイプのため、G2 の許容差は `docs/remotion-film-lab-g2-golden.md` に従う。
+- ブラウザ Film Lab の **8-pass や Bloom** とは別パイプのため、G2 の許容差は `docs/remotion/remotion-film-lab-g2-golden.md` に従う。
