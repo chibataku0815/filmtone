@@ -155,6 +155,12 @@ enum FilmtoneSaveToPhotosState: String {
     case failed
 }
 
+enum FilmtoneParamGroupPresetSelection: Equatable {
+    case defaultPreset
+    case strongPreset
+    case custom(activeCount: Int)
+}
+
 /// Lightweight, viewport-level transient notification model.
 ///
 /// Lives next to `notice` / `error` (which are inline ScrollView panels) but is
@@ -619,8 +625,35 @@ final class FilmtoneEditorStore: ObservableObject {
         project.params.value(for: key)
     }
 
+    func baseParamsForCurrentAdjustments() -> FilmtonePhase0Params {
+        FilmtonePhase0Math.deriveParams(
+            presetName: project.presetName,
+            strength: project.strength,
+            quickState: project.quickState
+        )
+    }
+
     func isParamOverridden(_ key: String) -> Bool {
         project.paramOverrides.values[key] != nil
+    }
+
+    func paramPresetSelection(
+        for keys: [String],
+        strongValues: [String: Double]
+    ) -> FilmtoneParamGroupPresetSelection {
+        let activeCount = keys.filter { project.paramOverrides.values[$0] != nil }.count
+        if activeCount == 0 {
+            return .defaultPreset
+        }
+
+        let base = baseParamsForCurrentAdjustments()
+        let matchesStrong = keys.allSatisfy { key in
+            let expected = strongValues[key] ?? base.value(for: key)
+            let clampedExpected = FilmtonePhase0Math.clampParam(key, expected)
+            return abs(project.params.value(for: key) - clampedExpected) < FilmtonePhase0Math.paramEqualityTolerance
+        }
+
+        return matchesStrong ? .strongPreset : .custom(activeCount: activeCount)
     }
 
     func attachPresenter(_ presenter: UIViewController) {
@@ -710,12 +743,37 @@ final class FilmtoneEditorStore: ObservableObject {
         if FilmtonePreviewRefreshDebug.isProcessParam(key), source?.kind == .video {
             FilmtonePreviewRefreshDebug.log("process param override changed: \(key)=\(value)")
         }
-        let base = FilmtonePhase0Math.deriveParams(
-            presetName: project.presetName,
-            strength: project.strength,
-            quickState: project.quickState
-        )
+        let base = baseParamsForCurrentAdjustments()
         project.paramOverrides = project.paramOverrides.settingValue(value, for: key, over: base)
+        recomputeProjectParams()
+    }
+
+    func clearParamOverrides(for keys: [String]) {
+        var next = project.paramOverrides
+        for key in keys {
+            next = next.removingValue(for: key)
+        }
+        guard next != project.paramOverrides else {
+            return
+        }
+        project.paramOverrides = next
+        recomputeProjectParams()
+    }
+
+    func applyParamPreset(values: [String: Double], for keys: [String]) {
+        let base = baseParamsForCurrentAdjustments()
+        var next = project.paramOverrides
+        for key in keys {
+            if let value = values[key] {
+                next = next.settingValue(value, for: key, over: base)
+            } else {
+                next = next.removingValue(for: key)
+            }
+        }
+        guard next != project.paramOverrides else {
+            return
+        }
+        project.paramOverrides = next
         recomputeProjectParams()
     }
 

@@ -74,6 +74,9 @@ struct FilmtoneStrings {
     let advancedGlowLabel: String
     let advancedGrainLabel: String
     let advancedToneLabel: String
+    let advancedPresetDefaultLabel: String
+    let advancedPresetStrongLabel: String
+    let advancedPresetCustomLabel: String
     let paramLabels: [String: String]
     let resetLabel: String
     let exportSectionTitle: String
@@ -321,6 +324,21 @@ extension FilmtoneStrings {
             "filmtone.advanced.group.tone_only",
             defaultValue: prefersJapanese ? "階調" : "Tone",
             comment: "Group title for tone advanced params."
+        )
+        advancedPresetDefaultLabel = filmtoneLocalized(
+            "filmtone.advanced.preset.default",
+            defaultValue: "Default",
+            comment: "Compact preset chip that resets an advanced parameter group to its derived default."
+        )
+        advancedPresetStrongLabel = filmtoneLocalized(
+            "filmtone.advanced.preset.strong",
+            defaultValue: "Strong",
+            comment: "Compact preset chip that applies a stronger advanced parameter group recipe."
+        )
+        advancedPresetCustomLabel = filmtoneLocalized(
+            "filmtone.advanced.preset.custom",
+            defaultValue: "Custom",
+            comment: "Compact status label shown when an advanced parameter group has manual overrides."
         )
         paramLabels = [
             "exposure": filmtoneLocalized("filmtone.param.exposure", defaultValue: "Exposure", comment: "Advanced parameter label."),

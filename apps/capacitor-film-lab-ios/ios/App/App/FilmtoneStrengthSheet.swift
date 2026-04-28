@@ -8,6 +8,7 @@ struct FilmtoneStrengthSheet: View {
 
     @State private var adjustmentsExpanded = false
     @State private var advancedParamsExpanded = false
+    @State private var expandedAdvancedGroupIds: Set<String> = []
 
     var body: some View {
         ZStack {
@@ -41,6 +42,15 @@ struct FilmtoneStrengthSheet: View {
             }
             if !advancedParamsExpanded {
                 advancedParamsExpanded = store.hasAdvancedAdjustments
+            }
+            if expandedAdvancedGroupIds.isEmpty {
+                expandedAdvancedGroupIds = Set(
+                    advancedParamGroups
+                        .filter { group in
+                            group.keys.contains { store.isParamOverridden($0) }
+                        }
+                        .map(\.id)
+                )
             }
         }
         .presentationDetents([.medium, .large])
@@ -172,25 +182,54 @@ struct FilmtoneStrengthSheet: View {
             isExpanded: $advancedParamsExpanded,
             contentSpacing: 20
         ) {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 12) {
                 ForEach(advancedParamGroups) { group in
-                    VStack(alignment: .leading, spacing: 14) {
-                        Text(group.title)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.white.opacity(0.52))
+                    advancedGroupSection(group)
+                }
+            }
+        }
+    }
 
-                            ForEach(group.controls) { control in
-                                FilmtoneSliderRow(
-                                    label: control.label,
-                                    value: store.effectiveParamValue(for: control.key),
-                                    range: control.range,
-                                    format: control.format,
-                                    isActive: store.isParamOverridden(control.key),
-                                    accessibilityIdentifier: "filmtone.sheet.slider.param.\(control.key)"
-                                ) { value in
-                                    store.setParamOverride(value, for: control.key)
-                                }
-                            }
+    private func advancedGroupSection(_ group: FilmtoneAdvancedParamGroup) -> some View {
+        let base = store.baseParamsForCurrentAdjustments()
+        let strongValues = group.strongValues(base)
+        let selection = store.paramPresetSelection(for: group.keys, strongValues: strongValues)
+
+        return FilmtoneAdvancedParamGroupSection(
+            id: group.id,
+            title: group.title,
+            selection: selection,
+            defaultLabel: store.strings.advancedPresetDefaultLabel,
+            strongLabel: store.strings.advancedPresetStrongLabel,
+            customLabel: store.strings.advancedPresetCustomLabel,
+            isExpanded: Binding(
+                get: { expandedAdvancedGroupIds.contains(group.id) },
+                set: { isExpanded in
+                    if isExpanded {
+                        expandedAdvancedGroupIds.insert(group.id)
+                    } else {
+                        expandedAdvancedGroupIds.remove(group.id)
+                    }
+                }
+            ),
+            onDefault: {
+                store.clearParamOverrides(for: group.keys)
+            },
+            onStrong: {
+                store.applyParamPreset(values: strongValues, for: group.keys)
+            }
+        ) {
+            VStack(alignment: .leading, spacing: 16) {
+                ForEach(group.controls) { control in
+                    FilmtoneSliderRow(
+                        label: control.label,
+                        value: store.effectiveParamValue(for: control.key),
+                        range: control.range,
+                        format: control.format,
+                        isActive: store.isParamOverridden(control.key),
+                        accessibilityIdentifier: "filmtone.sheet.slider.param.\(control.key)"
+                    ) { value in
+                        store.setParamOverride(value, for: control.key)
                     }
                 }
             }
@@ -216,6 +255,13 @@ struct FilmtoneStrengthSheet: View {
             .init(
                 id: "process",
                 title: store.strings.advancedProcessLabel,
+                strongValues: { base in
+                    [
+                        "printContrast": max(base.printContrast, 0.16),
+                        "compressionAmount": max(base.compressionAmount, 0.18),
+                        "compressionRange": max(base.compressionRange, 0.58),
+                    ]
+                },
                 controls: [
                     control("cyan", range: -1...1),
                     control("magenta", range: -1...1),
@@ -228,6 +274,13 @@ struct FilmtoneStrengthSheet: View {
             .init(
                 id: "optics",
                 title: store.strings.advancedOpticsLabel,
+                strongValues: { base in
+                    [
+                        "rgbShift": max(base.rgbShift, 0.0015),
+                        "lensSoftness": max(base.lensSoftness, 0.08),
+                        "vignette": max(base.vignette, 0.34),
+                    ]
+                },
                 controls: [
                     control("rgbShift", range: 0...FilmtonePhase0Math.rgbShiftMax, digits: 3),
                     control("lensSoftness", range: 0...1),
@@ -237,6 +290,21 @@ struct FilmtoneStrengthSheet: View {
             .init(
                 id: "glow",
                 title: store.strings.advancedGlowLabel,
+                strongValues: { base in
+                    [
+                        "bloomThreshold": min(base.bloomThreshold, 0.74),
+                        "bloomStrength": max(base.bloomStrength, 0.24),
+                        "bloomRadius": max(base.bloomRadius, 0.52),
+                        "bloomSoftKnee": max(base.bloomSoftKnee, 0.56),
+                        "halationIntensity": max(base.halationIntensity, 0.10),
+                        "halationSpread": max(base.halationSpread, 22),
+                        "halationHue": abs(base.halationHue) < FilmtonePhase0Math.paramEqualityTolerance ? 22 : base.halationHue,
+                        "halationThreshold": min(base.halationThreshold, 0.58),
+                        "halationRadius": max(base.halationRadius, 0.46),
+                        "halationSoftKnee": max(base.halationSoftKnee, 0.36),
+                        "diffusion": max(base.diffusion, 0.10),
+                    ]
+                },
                 controls: [
                     control("bloomThreshold", range: 0...1),
                     control("bloomStrength", range: 0...1),
@@ -254,6 +322,13 @@ struct FilmtoneStrengthSheet: View {
             .init(
                 id: "grain",
                 title: store.strings.advancedGrainLabel,
+                strongValues: { base in
+                    [
+                        "grainIntensity": max(base.grainIntensity, 0.085),
+                        "grainSize": max(base.grainSize, 0.40),
+                        "grainRadialMix": 1.0,
+                    ]
+                },
                 controls: [
                     control("grainIntensity", range: 0...FilmtonePhase0Generated.grainIntensityMax),
                     control("grainSize", range: 0...1),
@@ -263,6 +338,12 @@ struct FilmtoneStrengthSheet: View {
             .init(
                 id: "tone",
                 title: store.strings.advancedToneLabel,
+                strongValues: { base in
+                    [
+                        "contrast": min(base.contrast + 0.12, 2.0),
+                        "saturation": base.saturation <= 0.05 ? base.saturation : min(base.saturation + 0.08, 2.0),
+                    ]
+                },
                 controls: [
                     control("exposure", range: -2...2),
                     control("contrast", range: 0...2),
@@ -528,7 +609,12 @@ private struct FilmtoneCompareRevealPreview: View {
 private struct FilmtoneAdvancedParamGroup: Identifiable {
     let id: String
     let title: String
+    let strongValues: (FilmtonePhase0Params) -> [String: Double]
     let controls: [FilmtoneAdvancedParamControl]
+
+    var keys: [String] {
+        controls.map(\.key)
+    }
 }
 
 private struct FilmtoneAdvancedParamControl: Identifiable {
@@ -538,6 +624,185 @@ private struct FilmtoneAdvancedParamControl: Identifiable {
     let format: (Double) -> String
 
     var id: String { key }
+}
+
+private struct FilmtoneAdvancedParamGroupSection<Content: View>: View {
+    let id: String
+    let title: String
+    let selection: FilmtoneParamGroupPresetSelection
+    let defaultLabel: String
+    let strongLabel: String
+    let customLabel: String
+    @Binding var isExpanded: Bool
+    let onDefault: () -> Void
+    let onStrong: () -> Void
+    let content: Content
+
+    private var disclosureAnimation: Animation {
+        .smooth(duration: 0.22, extraBounce: 0)
+    }
+
+    init(
+        id: String,
+        title: String,
+        selection: FilmtoneParamGroupPresetSelection,
+        defaultLabel: String,
+        strongLabel: String,
+        customLabel: String,
+        isExpanded: Binding<Bool>,
+        onDefault: @escaping () -> Void,
+        onStrong: @escaping () -> Void,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.id = id
+        self.title = title
+        self.selection = selection
+        self.defaultLabel = defaultLabel
+        self.strongLabel = strongLabel
+        self.customLabel = customLabel
+        self._isExpanded = isExpanded
+        self.onDefault = onDefault
+        self.onStrong = onStrong
+        self.content = content()
+    }
+
+    var body: some View {
+        let groupShape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 12) {
+                Button {
+                    withAnimation(disclosureAnimation) {
+                        isExpanded.toggle()
+                    }
+                } label: {
+                    HStack(alignment: .center, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(title)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.white.opacity(0.58))
+
+                            Text(statusText)
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(statusColor)
+                                .lineLimit(1)
+                        }
+
+                        Spacer(minLength: 12)
+
+                        Image(systemName: "chevron.down")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white.opacity(isExpanded ? 0.88 : 0.62))
+                            .frame(width: 28, height: 28)
+                            .background(
+                                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                    .fill(Color.white.opacity(isExpanded ? 0.08 : 0.035))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                    .stroke(Color.white.opacity(isExpanded ? 0.10 : 0.06), lineWidth: 1)
+                            )
+                            .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("filmtone.sheet.advanced.group.\(id)")
+
+                HStack(spacing: 8) {
+                    FilmtoneParamPresetChip(
+                        label: defaultLabel,
+                        isSelected: selection == .defaultPreset,
+                        accessibilityIdentifier: "filmtone.sheet.advanced.group.\(id).default",
+                        action: onDefault
+                    )
+
+                    FilmtoneParamPresetChip(
+                        label: strongLabel,
+                        isSelected: selection == .strongPreset,
+                        accessibilityIdentifier: "filmtone.sheet.advanced.group.\(id).strong",
+                        action: onStrong
+                    )
+
+                    Spacer(minLength: 0)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 14)
+
+            if isExpanded {
+                Rectangle()
+                    .fill(Color.white.opacity(0.08))
+                    .frame(height: 1)
+                    .padding(.horizontal, 14)
+
+                content
+                    .padding(.horizontal, 14)
+                    .padding(.top, 14)
+                    .padding(.bottom, 16)
+                    .transition(.opacity)
+            }
+        }
+        .background(
+            groupShape
+                .fill(Color.white.opacity(isExpanded ? 0.045 : 0.028))
+        )
+        .overlay(
+            groupShape
+                .stroke(Color.white.opacity(isExpanded ? 0.10 : 0.06), lineWidth: 1)
+        )
+        .clipShape(groupShape)
+        .animation(disclosureAnimation, value: isExpanded)
+        .animation(disclosureAnimation, value: selection)
+    }
+
+    private var statusText: String {
+        switch selection {
+        case .defaultPreset:
+            return defaultLabel
+        case .strongPreset:
+            return strongLabel
+        case .custom(let activeCount):
+            return "\(customLabel) · \(activeCount) active"
+        }
+    }
+
+    private var statusColor: Color {
+        switch selection {
+        case .defaultPreset:
+            return .white.opacity(0.74)
+        case .strongPreset, .custom(_):
+            return Color.filmtoneAmber.opacity(0.88)
+        }
+    }
+}
+
+private struct FilmtoneParamPresetChip: View {
+    let label: String
+    let isSelected: Bool
+    let accessibilityIdentifier: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(label)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(isSelected ? .black.opacity(0.88) : .white.opacity(0.78))
+                .padding(.horizontal, 11)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule()
+                        .fill(isSelected ? Color.filmtoneAmber : Color.white.opacity(0.045))
+                )
+                .overlay(
+                    Capsule()
+                        .stroke(isSelected ? Color.clear : Color.white.opacity(0.08), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(accessibilityIdentifier)
+    }
 }
 
 private struct FilmtoneDisclosureSection<Content: View>: View {

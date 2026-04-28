@@ -45,6 +45,18 @@ final class FilmtoneSnapshotsUITests: XCTestCase {
         advancedButton.tap()
         pauseForLayout()
 
+        let processStrongButton = app.buttons["filmtone.sheet.advanced.group.process.strong"]
+        reveal(processStrongButton, in: app, maxSwipes: 2)
+        XCTAssertTrue(processStrongButton.waitForExistence(timeout: 5))
+        processStrongButton.tap()
+        waitForSheetCompareReady(in: app)
+
+        let processGroupButton = app.buttons["filmtone.sheet.advanced.group.process"]
+        reveal(processGroupButton, in: app, maxSwipes: 2)
+        XCTAssertTrue(processGroupButton.waitForExistence(timeout: 5))
+        processGroupButton.tap()
+        pauseForLayout()
+
         let processSlider = app.sliders["filmtone.sheet.slider.param.compressionAmount"]
         reveal(processSlider, in: app, maxSwipes: 2)
         XCTAssertTrue(processSlider.waitForExistence(timeout: 5))
@@ -54,6 +66,12 @@ final class FilmtoneSnapshotsUITests: XCTestCase {
 
         reveal(processSlider, in: app, maxSwipes: 3)
         processSlider.adjust(toNormalizedSliderPosition: 0.28)
+        waitForSheetCompareReady(in: app)
+
+        let processDefaultButton = app.buttons["filmtone.sheet.advanced.group.process.default"]
+        reveal(processDefaultButton, in: app, maxSwipes: 3)
+        XCTAssertTrue(processDefaultButton.waitForExistence(timeout: 5))
+        processDefaultButton.tap()
         waitForSheetCompareReady(in: app)
 
         pauseForLayout(0.6)
