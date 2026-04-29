@@ -116,10 +116,12 @@ struct FilmtoneStrings {
     let cameraAutoAppleLog2Detected: String
     let cameraCustom: String
     let cameraImport: String
+    let inputLutAmountLabel: String
     let lookLabel: String
     let lookFilmtone: String
     let lookCustom: String
     let lookImport: String
+    let lookLutAmountLabel: String
     let clearLut: String
     let lutImportError: String
     let lutParseError: String
@@ -582,6 +584,11 @@ extension FilmtoneStrings {
             defaultValue: "Import .cube",
             comment: "Action label to import a camera .cube."
         )
+        inputLutAmountLabel = filmtoneLocalized(
+            "filmtone.camera.input_lut_amount",
+            defaultValue: "Input LUT Amount",
+            comment: "Label for the input LUT amount slider."
+        )
         lookLabel = filmtoneLocalized(
             "filmtone.look.title",
             defaultValue: prefersJapanese ? "ルック" : "Look",
@@ -601,6 +608,11 @@ extension FilmtoneStrings {
             "filmtone.look.import",
             defaultValue: "Import .cube",
             comment: "Action label to import a creative look .cube."
+        )
+        lookLutAmountLabel = filmtoneLocalized(
+            "filmtone.look.lut_amount",
+            defaultValue: "Look LUT Amount",
+            comment: "Label for the creative LUT amount slider."
         )
         clearLut = filmtoneLocalized(
             "filmtone.camera.clear",

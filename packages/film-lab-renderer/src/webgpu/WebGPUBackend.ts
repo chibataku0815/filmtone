@@ -20,7 +20,7 @@
  *      Composite's diffusion uniform is forced to 0 when Hard-mode
  *      cross-filter is active, independently of user's `diffusion` field.
  *   6. Post-chain (active when `crossFilterStrength > 0` or
- *      `shutterAngle > 0`):
+ *      `shutterAngle > 180`):
  *      - Cross-filter: compact source gate → peak → optional spacing gate →
  *        (Hard-mode only) active WebGPU intentionally bypasses the
  *        legacy temporal hold so the 4-level central-bloom chain and
@@ -29,7 +29,7 @@
  *        tuning → blend with center-protection.
  *      - Light Shafts (when `shaftIntensity > 0` and post chain active):
  *        radial 64-tap occlusion at ¼ res → additive full-res blend.
- *      - Motion blur (`shutterAngle > 0`): feedback copy into the ring
+ *      - Motion blur (`shutterAngle > 180`): feedback copy into the ring
  *        (`depthOrArrayLayers=8`, DIRECTION §4) → weighted blend of the
  *        last N slots → swap.
  *      - Motion blur OFF: blit the post-composite source → swap.
@@ -70,6 +70,11 @@ import { OffscreenTargetPool } from "./OffscreenTargetPool";
 import { Lut3DTexture } from "./Lut3DTexture";
 import { BlueNoiseTile } from "./BlueNoiseTile";
 import { RingBuffer, MOTION_BLUR_RING_SLOTS } from "./RingBuffer";
+import {
+  activeMotionBlurFramesForShutter,
+  computeMotionBlurWeights,
+  isShutterMotionActive,
+} from "../motionBlurMath";
 import {
   fullscreenVertexWgsl,
   filmlabFragmentWgsl,
@@ -1645,8 +1650,19 @@ export class WebGPUBackend implements RenderBackend {
   }
 
   setParams(params: RenderBackendParams): void {
+    const prevShutterAngle = this.paramNumber("shutterAngle", 0);
+    const hasShutterAngle = Object.prototype.hasOwnProperty.call(
+      params,
+      "shutterAngle",
+    );
     this.frameState.params = { ...this.frameState.params, ...params };
     this.gradeDirty = true;
+    if (hasShutterAngle) {
+      const nextShutterAngle = this.paramNumber("shutterAngle", 0);
+      const wasActive = isShutterMotionActive(prevShutterAngle);
+      const isActive = isShutterMotionActive(nextShutterAngle);
+      if (wasActive !== isActive || !isActive) this.resetMotionBlurHistory();
+    }
   }
 
   setFlipY(flip: boolean): void {
@@ -3355,15 +3371,14 @@ export class WebGPUBackend implements RenderBackend {
   }
 
   /**
-   * `shutterAngle` (degrees, 0..720) → active slot count. Matches WebGL
-   * `getActiveFrameCount`: 720° uses the full 8-slot ring, 360° = 4
-   * slots, 180° = 2 slots.
+   * `shutterAngle` (degrees, 0..720) → active slot count. Matches WebGL:
+   * 180° is the no-added-blur baseline, 360° = 2 slots, 720° = 6 slots.
    */
   private activeMotionBlurFrames(shutterAngle: number): number {
-    if (shutterAngle <= 0) return 0;
-    const normalized = Math.min(shutterAngle, 720) / 360;
-    const raw = Math.round(normalized * (MOTION_BLUR_RING_SLOTS / 2));
-    return Math.max(1, Math.min(MOTION_BLUR_RING_SLOTS, raw));
+    return activeMotionBlurFramesForShutter(
+      shutterAngle,
+      MOTION_BLUR_RING_SLOTS,
+    );
   }
 
   /**
@@ -3376,25 +3391,12 @@ export class WebGPUBackend implements RenderBackend {
     activeFrames: number,
     validSlots: number,
   ): Float32Array {
-    const out = new Float32Array(MOTION_BLUR_RING_SLOTS);
-    const effective = Math.min(activeFrames, validSlots);
-    if (effective <= 0) return out;
-    if (effective === 1) {
-      out[0] = 1;
-      return out;
-    }
-    const flatness = Math.min(1, Math.max(0, (shutterAngle - 360) / 360));
-    let sum = 0;
-    for (let i = 0; i < effective; i++) {
-      const triangleW = effective - i;
-      const boxW = 1;
-      out[i] = triangleW * (1 - flatness) + boxW * flatness;
-      sum += out[i]!;
-    }
-    if (sum > 0) {
-      for (let i = 0; i < effective; i++) out[i]! /= sum;
-    }
-    return out;
+    return computeMotionBlurWeights(
+      shutterAngle,
+      activeFrames,
+      validSlots,
+      MOTION_BLUR_RING_SLOTS,
+    );
   }
 
   render(): void {
@@ -3704,7 +3706,7 @@ export class WebGPUBackend implements RenderBackend {
           .createView()
       : null;
     const shutterAngle = this.paramNumber("shutterAngle", 0);
-    const motionBlurOn = shutterAngle > 0;
+    const motionBlurOn = isShutterMotionActive(shutterAngle);
 
     // Light shafts (WebGL parity): run after cross-filter, before motion
     // blur. Activation matches WebGL: the post chain must be active via
@@ -3790,6 +3792,7 @@ export class WebGPUBackend implements RenderBackend {
       pass.draw(3, 1, 0, 0);
       pass.end();
     } else if (!motionBlurOn) {
+      this.resetMotionBlurHistory();
       const blitBg = device.createBindGroup({
         label: "blit.bg",
         layout: this.layouts.blit,
@@ -4001,6 +4004,10 @@ export class WebGPUBackend implements RenderBackend {
     this.crossFilterPeakHistoryWriteIndex = 0;
     this.crossFilterPeakHistoryFilledFrames = 0;
     this.lastCrossFilterHistoryTime = null;
+  }
+
+  resetMotionBlurHistory(): void {
+    this.ringBuffer.reset();
   }
 
   destroy(): void {

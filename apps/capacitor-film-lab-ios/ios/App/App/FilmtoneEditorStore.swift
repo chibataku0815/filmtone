@@ -834,6 +834,32 @@ final class FilmtoneEditorStore: ObservableObject {
         }
     }
 
+    func setInputLutIntensity(_ intensity: Double) {
+        let clampedIntensity = FilmtonePhase0Math.clampLutIntensity(intensity)
+        guard let currentLut = project.inputLut, currentLut.intensity != clampedIntensity else {
+            return
+        }
+        applyLutMutation {
+            guard let lut = $0.inputLut else {
+                return
+            }
+            $0.inputLut = lut.withIntensity(clampedIntensity)
+        }
+    }
+
+    func setCreativeLutIntensity(_ intensity: Double) {
+        let clampedIntensity = FilmtonePhase0Math.clampLutIntensity(intensity)
+        guard let currentLut = project.creativeLut, currentLut.intensity != clampedIntensity else {
+            return
+        }
+        applyLutMutation {
+            guard let lut = $0.creativeLut else {
+                return
+            }
+            $0.creativeLut = lut.withIntensity(clampedIntensity)
+        }
+    }
+
     func export() async {
         guard !isBusy && !isSavingToPhotos else {
             return
@@ -1345,6 +1371,17 @@ final class FilmtoneEditorStore: ObservableObject {
     private static func signedPercentLabel(for value: Double) -> String {
         let sign = value > 0 ? "+" : ""
         return "\(sign)\(Int((value * 100).rounded()))%"
+    }
+}
+
+private extension ParsedCubeLutDTO {
+    func withIntensity(_ intensity: Double) -> ParsedCubeLutDTO {
+        ParsedCubeLutDTO(
+            title: title,
+            size: size,
+            data: data,
+            intensity: FilmtonePhase0Math.clampLutIntensity(intensity)
+        )
     }
 }
 

@@ -63,6 +63,11 @@ export class RingBuffer {
     this._validSlots = 0;
   }
 
+  reset(): void {
+    this.writeIndex = 0;
+    this._validSlots = 0;
+  }
+
   /** Advance the write pointer. Returns the layer index to render into. */
   nextSlot(): number {
     const slot = this.writeIndex;

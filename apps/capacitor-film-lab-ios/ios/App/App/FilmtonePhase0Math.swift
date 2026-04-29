@@ -461,6 +461,10 @@ enum FilmtonePhase0Math {
         max(0, min(1, value))
     }
 
+    static func clampLutIntensity(_ value: Double) -> Double {
+        max(0, min(1, value))
+    }
+
     static func deriveParams(
         presetName: String,
         strength: Double,

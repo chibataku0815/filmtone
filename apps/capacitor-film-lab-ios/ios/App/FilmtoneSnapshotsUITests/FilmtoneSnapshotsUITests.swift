@@ -189,9 +189,13 @@ final class FilmtoneSnapshotsUITests: XCTestCase {
     private func assertDualLutMenus(in app: XCUIApplication) {
         let inputLutMenu = app.descendants(matching: .any)["filmtone.lut.input.menu"]
         let creativeLutMenu = app.descendants(matching: .any)["filmtone.lut.creative.menu"]
+        let inputIntensitySlider = app.descendants(matching: .any)["filmtone.lut.input.intensity.slider"]
+        let creativeIntensitySlider = app.descendants(matching: .any)["filmtone.lut.creative.intensity.slider"]
         reveal(inputLutMenu, in: app, maxSwipes: 2)
         XCTAssertTrue(inputLutMenu.waitForExistence(timeout: 5))
         XCTAssertTrue(creativeLutMenu.waitForExistence(timeout: 5))
+        XCTAssertTrue(inputIntensitySlider.waitForExistence(timeout: 5))
+        XCTAssertTrue(creativeIntensitySlider.waitForExistence(timeout: 5))
     }
 
     private func captureExportFlow() {

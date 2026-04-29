@@ -287,10 +287,18 @@ final class FilmtoneExportSession {
         if effectiveSourceURL == sourceURL {
             didUseMezzanineVariant = nil
         } else if let mezz = mezzanineService,
-                  effectiveSourceURL == mezz.existingMezzanineURL(for: sourceURL, variant: .hdr) {
+                  effectiveSourceURL == mezz.existingMezzanineURL(
+                    for: sourceURL,
+                    variant: .hdr,
+                    depthEnabled: request.depthEnabled ?? false
+                  ) {
             didUseMezzanineVariant = .hdr
         } else if let mezz = mezzanineService,
-                  effectiveSourceURL == mezz.existingMezzanineURL(for: sourceURL, variant: .sdr) {
+                  effectiveSourceURL == mezz.existingMezzanineURL(
+                    for: sourceURL,
+                    variant: .sdr,
+                    depthEnabled: request.depthEnabled ?? false
+                  ) {
             didUseMezzanineVariant = .sdr
         } else {
             // Unreachable in practice (resolvedVideoSourceURL only returns a mezzanine
@@ -2354,44 +2362,52 @@ final class FilmtoneExportSession {
     }
 
     private func resolvedVideoSourceURL() -> URL {
-        // v1.2 HDR-aware mezzanine + Speed/Quality toggle, with v1.3 case B
-        // variant-matched Quality fallback for SDR sources.
-        //
-        // - .quality (default): match the mezzanine variant to the source. HDR sources
-        //   prefer the HDR mezzanine, SDR (BT.709) sources prefer the SDR mezzanine.
-        //   This is NOT silent degradation — an SDR source has no wide-gamut data to
-        //   preserve, so an SDR mezzanine of the same source is a faithful rebuild.
-        //   When the matched mezzanine is absent we fall back to source-direct (the
-        //   v1.1 cinematic-100 path), preserving the "no silent substitution" rule.
-        //   Sources without color metadata are treated as HDR (safest legacy default).
-        // - .speed: explicit user opt-in. Any cached mezzanine is acceptable; HDR is
-        //   preferred when both exist. Unchanged from v1.2 Wave 4.
-        // - In all cases, when no acceptable mezzanine exists we fall back to the
-        //   source URL as the single explicit alternative.
-        let mode = request.renderMode ?? .quality
-        guard let mezz = mezzanineService else { return sourceURL }
-        let sourceVariant: ProfileVariant = {
-            guard let colorClass = request.sourceProbe?.sourceVideoMetadata?.colorClass else {
-                return .hdr
-            }
-            return colorClass == .sdrBt709 ? .sdr : .hdr
-        }()
-        switch mode {
-        case .quality:
-            if let mezzURL = mezz.existingMezzanineURL(for: sourceURL, variant: sourceVariant) {
-                filmtonePreviewCompositionDebugLog(
-                    "Quality gate: matched \(sourceVariant.rawValue) source to \(sourceVariant.rawValue) mezzanine"
-                )
-                return mezzURL
-            }
+        // Quality/Master is the product-truth export path and must match the
+        // live preview source. Mezzanine is now an explicit Speed-only shortcut.
+        guard request.renderMode == .speed else {
             filmtonePreviewCompositionDebugLog(
-                "Quality gate: no \(sourceVariant.rawValue) mezzanine, source-direct fallback"
+                "Quality gate: source-direct export route"
             )
             return sourceURL
-        case .speed:
-            return mezz.existingMezzanineURL(for: sourceURL, variant: .hdr)
-                ?? mezz.existingMezzanineURL(for: sourceURL, variant: .sdr)
-                ?? sourceURL
+        }
+        guard let mezz = mezzanineService else {
+            filmtonePreviewCompositionDebugLog(
+                "Speed gate: no mezzanine service, source-direct fallback"
+            )
+            return sourceURL
+        }
+
+        let depthEnabled = request.depthEnabled ?? false
+        let hdrURL = mezz.existingMezzanineURL(
+            for: sourceURL,
+            variant: .hdr,
+            depthEnabled: depthEnabled
+        )
+        let sdrURL = mezz.existingMezzanineURL(
+            for: sourceURL,
+            variant: .sdr,
+            depthEnabled: depthEnabled
+        )
+        let colorClass = request.sourceProbe?.sourceVideoMetadata?.colorClass
+        let selectedVariant = FilmtoneMezzanineRoutePolicy.selectedVariant(
+            renderMode: request.renderMode?.rawValue,
+            colorClass: colorClass,
+            hasHDRMezzanine: hdrURL != nil,
+            hasSDRMezzanine: sdrURL != nil
+        )
+
+        switch selectedVariant {
+        case .hdr:
+            filmtonePreviewCompositionDebugLog("Speed gate: using hdr mezzanine")
+            return hdrURL ?? sourceURL
+        case .sdr:
+            filmtonePreviewCompositionDebugLog("Speed gate: using sdr mezzanine")
+            return sdrURL ?? sourceURL
+        case nil:
+            filmtonePreviewCompositionDebugLog(
+                "Speed gate: no acceptable mezzanine for \(colorClass?.rawValue ?? "unknown"), source-direct fallback"
+            )
+            return sourceURL
         }
     }
 
@@ -2530,8 +2546,8 @@ fileprivate final class FilmtoneMotionBlurAccumulator {
         lock.lock()
         defer { lock.unlock() }
 
-        let shutterAngle = Self.clamp(params.shutterAngle, min: 0, max: 720)
-        guard shutterAngle > 0 else {
+        let shutterAngle = FilmtoneMotionBlurMath.clampShutterAngle(params.shutterAngle)
+        guard FilmtoneMotionBlurMath.isActive(shutterAngle: shutterAngle) else {
             resetUnlocked()
             return image
         }
@@ -2576,11 +2592,18 @@ fileprivate final class FilmtoneMotionBlurAccumulator {
         validSlots = min(validSlots + 1, Self.slotCount)
         lastTimeSeconds = normalizedTime
 
-        let activeFrames = min(Self.activeFrameCount(shutterAngle: shutterAngle), validSlots)
-        let weights = Self.blendWeights(
+        let activeFrames = min(
+            FilmtoneMotionBlurMath.activeFrameCount(
+                shutterAngle: shutterAngle,
+                slotCount: Self.slotCount
+            ),
+            validSlots
+        )
+        let weights = FilmtoneMotionBlurMath.blendWeights(
             shutterAngle: shutterAngle,
             activeFrames: activeFrames,
-            validSlots: validSlots
+            validSlots: validSlots,
+            slotCount: Self.slotCount
         )
         guard activeFrames > 1, let kernel = OpticalKernels.motionBlend else {
             return ringImages[(writeIndex - 1 + Self.slotCount) % Self.slotCount] ?? current
@@ -2631,47 +2654,6 @@ fileprivate final class FilmtoneMotionBlurAccumulator {
             return true
         }
         return false
-    }
-
-    private static func activeFrameCount(shutterAngle: Double) -> Int {
-        guard shutterAngle > 0 else {
-            return 0
-        }
-        let normalized = min(shutterAngle, 720) / 360
-        let raw = Int((normalized * (Double(slotCount) / 2.0)).rounded())
-        return max(1, min(slotCount, raw))
-    }
-
-    private static func blendWeights(
-        shutterAngle: Double,
-        activeFrames: Int,
-        validSlots: Int
-    ) -> [Double] {
-        var weights = Array(repeating: 0.0, count: slotCount)
-        let effective = min(activeFrames, validSlots)
-        guard effective > 0 else {
-            return weights
-        }
-        if effective == 1 {
-            weights[0] = 1
-            return weights
-        }
-
-        let flatness = clamp((shutterAngle - 360) / 360, min: 0, max: 1)
-        var sum = 0.0
-        for index in 0..<effective {
-            let triangle = Double(effective - index)
-            let box = 1.0
-            let weight = triangle * (1 - flatness) + box * flatness
-            weights[index] = weight
-            sum += weight
-        }
-        if sum > 0 {
-            for index in 0..<effective {
-                weights[index] /= sum
-            }
-        }
-        return weights
     }
 
     private static func makePixelBuffer(width: Int, height: Int) -> CVPixelBuffer? {

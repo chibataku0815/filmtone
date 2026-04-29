@@ -155,6 +155,7 @@ describe("buildEffectiveExportGradeSnapshot", () => {
         diffusion: 0.25,
         depthMistGain: 0.4,
         shaftIntensity: 0.3,
+        shutterAngle: 180,
         dustAmount: 0.2,
         scratchAmount: 0.1,
       },

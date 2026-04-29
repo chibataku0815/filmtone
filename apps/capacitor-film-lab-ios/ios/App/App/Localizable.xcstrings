@@ -398,6 +398,23 @@
         }
       }
     },
+    "filmtone.camera.input_lut_amount" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Input LUT Amount"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入力LUTの量"
+          }
+        }
+      }
+    },
     "filmtone.camera.title" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1655,6 +1672,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : ".cube を読み込む"
+          }
+        }
+      }
+    },
+    "filmtone.look.lut_amount" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Look LUT Amount"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ルックLUTの量"
           }
         }
       }

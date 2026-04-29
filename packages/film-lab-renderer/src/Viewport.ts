@@ -340,8 +340,7 @@ export class Viewport {
 
   resetMotionBlurHistory(): void {
     this.webglBackend?.resetMotionBlurHistory();
-    // WebGPU ring resets on setResolution; no explicit reset API in v1.0.
-    // Phase 3 T3-2 GpuRenderer extract will expose one if needed.
+    this.webgpuBackend?.resetMotionBlurHistory();
   }
 
   // === Compare ===

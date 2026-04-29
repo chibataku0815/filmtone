@@ -114,7 +114,8 @@ struct FilmtoneSnapshotFixture {
                     presetName: "iphone",
                     strength: 0.88,
                     quickState: .init(filmCharacter: 0.08, era: -0.14, dynamics: -0.04),
-                    inputLut: sampleInputLut
+                    inputLut: sampleInputLut,
+                    creativeLut: sampleCreativeLut
                 ),
                 source: source,
                 probe: probe,
@@ -257,7 +258,8 @@ struct FilmtoneSnapshotFixture {
         presetName: String,
         strength: Double,
         quickState: FilmtoneQuickState,
-        inputLut: ParsedCubeLutDTO? = nil
+        inputLut: ParsedCubeLutDTO? = nil,
+        creativeLut: ParsedCubeLutDTO? = nil
     ) -> FilmtoneProjectState {
         var project = FilmtonePhase0Math.createProjectState(presetName: presetName)
         project.strength = FilmtonePhase0Math.clampStrength(strength)
@@ -272,6 +274,7 @@ struct FilmtoneSnapshotFixture {
         project.paramOverrides = resolved.overrides
         project.params = resolved.effective
         project.inputLut = inputLut
+        project.creativeLut = creativeLut
         project.updatedAt = FilmtonePhase0Math.isoTimestamp()
         return project
     }
@@ -290,6 +293,22 @@ struct FilmtoneSnapshotFixture {
             1, 1, 1,
         ],
         intensity: 1
+    )
+
+    private static let sampleCreativeLut = ParsedCubeLutDTO(
+        title: "Kodak 2383 Print",
+        size: 2,
+        data: [
+            0, 0, 0,
+            1, 0, 0,
+            0, 1, 0,
+            1, 1, 0,
+            0, 0, 1,
+            1, 0, 1,
+            0, 1, 1,
+            1, 1, 1,
+        ],
+        intensity: 0.72
     )
 }
 

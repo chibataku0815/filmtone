@@ -104,6 +104,7 @@ struct VerifyPhase0Contract {
             "re-encoded legacy state still contains lut"
         )
         try runLutClearRequestContracts(decoder: decoder, encoder: encoder)
+        try runLutIntensityContracts()
 
         // --- Hidden defaults SSOT (CONTRACT_DEFAULTS 19 keys) ---
         // Confirms that the generated Swift block matches the TS source of
@@ -211,6 +212,44 @@ struct VerifyPhase0Contract {
         try expect(decodedClearedRequest.lut == nil, "decoded cleared request should not emit legacy lut")
         try expect(decodedClearedRequest.inputLut == nil, "decoded cleared request should keep inputLut nil")
         try expect(decodedClearedRequest.creativeLut == nil, "decoded cleared request should keep creativeLut nil")
+    }
+
+    static func runLutIntensityContracts() throws {
+        try expect(FilmtonePhase0Math.clampLutIntensity(-0.25) == 0, "LUT intensity should clamp below zero")
+        try expect(FilmtonePhase0Math.clampLutIntensity(1.25) == 1, "LUT intensity should clamp above one")
+
+        let originalInput = makeLut(title: "Input LUT", intensity: 0.8)
+        let originalCreative = makeLut(title: "Creative LUT", intensity: 0.6)
+
+        var inputChanged = FilmtonePhase0Math.createProjectState()
+        inputChanged.inputLut = makeLut(title: originalInput.title, intensity: 0.37)
+        inputChanged.creativeLut = originalCreative
+
+        let inputChangedRequest = try makeRequest(project: inputChanged)
+        try expect(inputChangedRequest.lut == nil, "input intensity request should not emit legacy lut")
+        try expect(
+            abs((inputChangedRequest.inputLut?.intensity ?? -1) - 0.37) < 0.0001,
+            "input intensity should transport to request.inputLut"
+        )
+        try expect(
+            abs((inputChangedRequest.creativeLut?.intensity ?? -1) - originalCreative.intensity) < 0.0001,
+            "input intensity change should preserve creativeLut"
+        )
+
+        var creativeChanged = FilmtonePhase0Math.createProjectState()
+        creativeChanged.inputLut = originalInput
+        creativeChanged.creativeLut = makeLut(title: originalCreative.title, intensity: 0.42)
+
+        let creativeChangedRequest = try makeRequest(project: creativeChanged)
+        try expect(creativeChangedRequest.lut == nil, "creative intensity request should not emit legacy lut")
+        try expect(
+            abs((creativeChangedRequest.inputLut?.intensity ?? -1) - originalInput.intensity) < 0.0001,
+            "creative intensity change should preserve inputLut"
+        )
+        try expect(
+            abs((creativeChangedRequest.creativeLut?.intensity ?? -1) - 0.42) < 0.0001,
+            "creative intensity should transport to request.creativeLut"
+        )
     }
 
     static func makeRequest(project: FilmtoneProjectState) throws -> Phase0ExportRequestDTO {

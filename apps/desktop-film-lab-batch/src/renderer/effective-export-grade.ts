@@ -142,7 +142,7 @@ export function collectEffectiveExportGradeWarnings(
       "depth-aware Mist/Glow requested, but no depth frames are attached; export will use neutral depth",
     );
   }
-  if (p.shaftIntensity > 0 && p.crossFilterStrength <= 0 && p.shutterAngle <= 0) {
+  if (p.shaftIntensity > 0 && p.crossFilterStrength <= 0 && p.shutterAngle <= 180) {
     warnings.push(
       "light shafts requested, but WebGPU only runs shafts when cross filter or motion blur is active",
     );

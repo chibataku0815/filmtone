@@ -8,6 +8,7 @@ SWIFT_SUPPORT="$SCRIPT_DIR/swift/phase0-contract-support.swift"
 SWIFT_CHECK="$SCRIPT_DIR/swift/verify-phase0-contract.swift"
 PHASE0_GENERATED="$APP_DIR/ios/App/App/FilmtonePhase0Generated.swift"
 PHASE0_MATH="$APP_DIR/ios/App/App/FilmtonePhase0Math.swift"
+MOTION_MATH="$APP_DIR/ios/App/App/FilmtoneMotionBlurMath.swift"
 CANONICAL_FIXTURE="$FIXTURE_DIR/canonical-export-request.json"
 LEGACY_FIXTURE="$FIXTURE_DIR/legacy-project-state.json"
 HLG_FIXTURE="$FIXTURE_DIR/hlg-export-request.json"
@@ -25,6 +26,7 @@ xcrun --sdk iphonesimulator swiftc \
   "$SWIFT_SUPPORT" \
   "$PHASE0_GENERATED" \
   "$PHASE0_MATH" \
+  "$MOTION_MATH" \
   "$SWIFT_CHECK"
 
 xcrun swiftc \
@@ -32,9 +34,23 @@ xcrun swiftc \
   "$SWIFT_SUPPORT" \
   "$PHASE0_GENERATED" \
   "$PHASE0_MATH" \
+  "$MOTION_MATH" \
   "$SWIFT_CHECK"
 
 "$HOST_BINARY" "$CANONICAL_FIXTURE" "$LEGACY_FIXTURE" "$HLG_FIXTURE"
+
+# --- Motion blur 180° baseline math parity ---
+MOTION_MATH_SCRIPT="$SCRIPT_DIR/swift/test-motion-blur-math.swift"
+if [ -f "$MOTION_MATH_SCRIPT" ] && [ -f "$MOTION_MATH" ]; then
+  echo "==> motion blur math test"
+  MOTION_MATH_BIN=$(mktemp "${TMPDIR:-/tmp}/phase0-motion-blur-math-check.XXXXXX")
+  CLEANUP_FILES="$CLEANUP_FILES $MOTION_MATH_BIN"
+  xcrun swiftc \
+    -o "$MOTION_MATH_BIN" \
+    "$MOTION_MATH" \
+    "$MOTION_MATH_SCRIPT"
+  "$MOTION_MATH_BIN"
+fi
 
 # --- Stream C: .cube parser DOMAIN_MIN / DOMAIN_MAX test ---
 CUBE_PARSER_SCRIPT="$SCRIPT_DIR/swift/test-cube-parser.swift"

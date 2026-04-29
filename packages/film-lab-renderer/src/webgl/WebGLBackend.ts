@@ -38,6 +38,12 @@ import { crossFilterPeakSpacingFragmentShader } from "./shaders/cross-filter-pea
 import { crossFilterPeakSpacingMaxFragmentShader } from "./shaders/cross-filter-peak-spacing-max.frag";
 import { crossFilterTemporalFragmentShader } from "./shaders/cross-filter-temporal.frag";
 import type { RenderBackend, RenderBackendParams } from "../webgpu/Backend";
+import {
+  activeMotionBlurFramesForShutter,
+  clampMotionShutterAngle,
+  computeMotionBlurWeights,
+  isShutterMotionActive,
+} from "../motionBlurMath";
 
 export interface ViewportOptions {
   vertexShader: string;
@@ -538,7 +544,7 @@ export class WebGLBackend implements RenderBackend {
 
   /**
    * Motion blur 用の ShaderMaterial と N-frame ring buffer RT を遅延生成する。
-   * shutterAngle > 0 になるまで GPU リソースを消費しない。
+   * shutterAngle > 180 になるまで GPU リソースを消費しない。
    */
   private ensureMotionBlurResources(): void {
     if (this.ringCopyMaterial) return;
@@ -595,13 +601,13 @@ export class WebGLBackend implements RenderBackend {
 
   /**
    * shutterAngle から有効フレーム数を算出する。
-   * 0 のときは motion blur 無効を示す 0 を返す。
+   * 180° 以下は通常素材の基準として temporal blend なし。
    */
   private getActiveFrameCount(): number {
-    if (this.shutterAngle <= 0) return 0;
-    // 720° → normalized=2.0 → all 8 frames active
-    const normalized = Math.min(this.shutterAngle, 720) / 360;
-    return Math.max(1, Math.min(WebGLBackend.MOTION_BLUR_RING_SIZE, Math.round(normalized * (WebGLBackend.MOTION_BLUR_RING_SIZE / 2))));
+    return activeMotionBlurFramesForShutter(
+      this.shutterAngle,
+      WebGLBackend.MOTION_BLUR_RING_SIZE,
+    );
   }
 
   /**
@@ -611,28 +617,13 @@ export class WebGLBackend implements RenderBackend {
    * より長いモーショントレイルを実現する。
    */
   private computeBlendWeights(activeFrames: number): Float32Array {
-    const N = WebGLBackend.MOTION_BLUR_RING_SIZE;
-    const weights = new Float32Array(N);
-    const effective = Math.min(activeFrames, this.ringFilledFrames);
-    if (effective <= 0 || effective === 1) { weights[0] = 1.0; return weights; }
-
-    // 360° 超では triangle → box へ滑らかに遷移
-    // flatness: 0.0 (pure triangle at ≤360°) → 1.0 (pure box at 720°)
-    const flatness = Math.min(1, Math.max(0, (this.shutterAngle - 360) / 360));
-
-    let sum = 0;
-    for (let i = 0; i < effective; i++) {
-      const triangleW = effective - i;
-      const boxW = 1.0;
-      switch (this.weightCurve) {
-        case 'triangle': weights[i] = triangleW * (1 - flatness) + boxW * flatness; break;
-        case 'box': weights[i] = 1.0; break;
-        case 'exponential': weights[i] = Math.exp(-1.5 * i) * (1 - flatness) + boxW * flatness; break;
-      }
-      sum += weights[i]!;
-    }
-    if (sum > 0) for (let i = 0; i < effective; i++) weights[i]! /= sum;
-    return weights;
+    return computeMotionBlurWeights(
+      this.shutterAngle,
+      activeFrames,
+      this.ringFilledFrames,
+      WebGLBackend.MOTION_BLUR_RING_SIZE,
+      this.weightCurve,
+    );
   }
 
   /**
@@ -938,7 +929,7 @@ export class WebGLBackend implements RenderBackend {
    */
   private hasPostCompositeChain(): boolean {
     if (this.abCompareEnabled) return false;
-    return this.shutterAngle > 0 || this.crossFilterStrength > 0;
+    return isShutterMotionActive(this.shutterAngle) || this.crossFilterStrength > 0;
   }
 
   /**
@@ -1481,7 +1472,10 @@ export class WebGLBackend implements RenderBackend {
     const crossFilterOn = this.crossFilterStrength > 0;
     const shaftOn = this.shaftIntensity > 0;
     const dustOn = this.dustAmount > 0 || this.scratchAmount > 0;
-    const motionBlurOn = this.shutterAngle > 0;
+    const motionBlurOn = isShutterMotionActive(this.shutterAngle);
+    if (!motionBlurOn && this.ringFilledFrames > 0) {
+      this.resetMotionBlurHistory();
+    }
 
     type Pass = "crossFilter" | "shaft" | "dust" | "motionBlur";
     const passes: Pass[] = [];
@@ -1975,9 +1969,10 @@ export class WebGLBackend implements RenderBackend {
   // ===== Motion Blur =====
 
   setShutterAngle(degrees: number): void {
-    const prev = this.shutterAngle;
-    this.shutterAngle = Math.min(720, Math.max(0, degrees));
-    if (prev === 0 && this.shutterAngle > 0) this.resetMotionBlurHistory();
+    const wasActive = isShutterMotionActive(this.shutterAngle);
+    this.shutterAngle = clampMotionShutterAngle(degrees);
+    const isActive = isShutterMotionActive(this.shutterAngle);
+    if (wasActive !== isActive || !isActive) this.resetMotionBlurHistory();
   }
 
   setMotionBlurAmount(value: number): void {
@@ -2430,7 +2425,7 @@ export class WebGLBackend implements RenderBackend {
       this.material.uniforms.uPrintContrast!.value = params.printContrast as number;
     // shutterAngle takes precedence; motionBlurAmount is a Ghost Param (backward compat only).
     // If both are present, only shutterAngle is applied to prevent the ghost param from overwriting.
-    if (params.shutterAngle !== undefined && (params.shutterAngle as number) > 0) {
+    if (params.shutterAngle !== undefined) {
       this.setShutterAngle(params.shutterAngle as number);
     } else if (params.motionBlurAmount !== undefined) {
       this.setMotionBlurAmount(params.motionBlurAmount as number);

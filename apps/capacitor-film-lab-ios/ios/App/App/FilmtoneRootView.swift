@@ -336,6 +336,17 @@ struct FilmtoneRootView: View {
                 }
             }
 
+            if let inputLut = store.project.inputLut {
+                lutIntensityControl(
+                    title: store.strings.inputLutAmountLabel,
+                    value: inputLut.intensity,
+                    valueIdentifier: "filmtone.lut.input.intensity.value",
+                    sliderIdentifier: "filmtone.lut.input.intensity.slider"
+                ) { nextValue in
+                    store.setInputLutIntensity(nextValue)
+                }
+            }
+
             Divider()
                 .overlay(Color.white.opacity(0.08))
 
@@ -356,6 +367,17 @@ struct FilmtoneRootView: View {
                     Button(store.strings.clearLut, role: .destructive) {
                         store.clearCreativeLut()
                     }
+                }
+            }
+
+            if let creativeLut = store.project.creativeLut {
+                lutIntensityControl(
+                    title: store.strings.lookLutAmountLabel,
+                    value: creativeLut.intensity,
+                    valueIdentifier: "filmtone.lut.creative.intensity.value",
+                    sliderIdentifier: "filmtone.lut.creative.intensity.slider"
+                ) { nextValue in
+                    store.setCreativeLutIntensity(nextValue)
                 }
             }
         }
@@ -412,6 +434,48 @@ struct FilmtoneRootView: View {
             }
             .accessibilityIdentifier(menuIdentifier)
         }
+    }
+
+    private func lutIntensityControl(
+        title: String,
+        value: Double,
+        valueIdentifier: String,
+        sliderIdentifier: String,
+        onChange: @escaping (Double) -> Void
+    ) -> some View {
+        let clampedValue = FilmtonePhase0Math.clampLutIntensity(value)
+        let percentLabel = lutIntensityPercentLabel(clampedValue)
+
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.58))
+
+                Spacer()
+
+                Text(percentLabel)
+                    .font(.caption.monospacedDigit().weight(.semibold))
+                    .foregroundStyle(Color.filmtoneAmber.opacity(0.86))
+                    .accessibilityIdentifier(valueIdentifier)
+            }
+
+            Slider(
+                value: Binding(
+                    get: { clampedValue },
+                    set: { onChange($0) }
+                ),
+                in: 0...1
+            )
+            .tint(Color.filmtoneAmber)
+            .accessibilityIdentifier(sliderIdentifier)
+            .accessibilityLabel(title)
+            .accessibilityValue(percentLabel)
+        }
+    }
+
+    private func lutIntensityPercentLabel(_ value: Double) -> String {
+        "\(Int((FilmtonePhase0Math.clampLutIntensity(value) * 100).rounded()))%"
     }
 
     @ViewBuilder

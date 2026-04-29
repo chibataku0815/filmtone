@@ -386,16 +386,16 @@ struct FilmtoneStrengthSheet: View {
                     id: "motion",
                     title: store.strings.advancedMotionLabel,
                     recipes: standardAdvancedRecipes(
-                        defaultValues: { base in
+                        defaultValues: { _ in
                             [
-                                "shutterAngle": max(base.shutterAngle, 180),
-                                "trailIntensity": base.trailIntensity,
+                                "shutterAngle": 360,
+                                "trailIntensity": 0,
                             ]
                         },
-                        strongValues: { base in
+                        strongValues: { _ in
                             [
-                                "shutterAngle": max(base.shutterAngle, 360),
-                                "trailIntensity": max(base.trailIntensity, 0.35),
+                                "shutterAngle": 720,
+                                "trailIntensity": 0.35,
                             ]
                         }
                     ),

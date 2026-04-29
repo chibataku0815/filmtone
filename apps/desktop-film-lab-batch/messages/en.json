@@ -342,9 +342,9 @@
       "scratchAmount": "Film Scratches",
       "scratchAmountHint": "Adds vertical film scratches that drift across the frame.",
       "shutterAngle": "Shutter Angle",
-      "shutterAngleHint": "Simulates camera shutter angle (0\u00b0=off, 180\u00b0=cinema standard)",
+      "shutterAngleHint": "180\u00b0 is the normal-source baseline with no added blur; above 180\u00b0 adds a slow-shutter extension.",
       "trailIntensity": "Trail Length",
-      "trailIntensityHint": "Extends the motion trail beyond the shutter window. Higher values create longer afterimages.",
+      "trailIntensityHint": "Extends afterimages beyond the shutter window; it only affects active slow-shutter motion.",
       "opticsSourceMetadata": "metadata",
       "opticsSourceAssumed": "assumed",
       "opticsSourceManual": "manual"
