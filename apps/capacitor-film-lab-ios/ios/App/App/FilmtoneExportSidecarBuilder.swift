@@ -32,6 +32,8 @@ struct SidecarBuildInputs {
     let mezzanineUsedVariant: String?
     /// `MezzanineService.Profile.version` of the consumed mezzanine; nil when no mezzanine used.
     let mezzanineProfileVersion: Int?
+    /// Color-managed render contract used by both preview and export for this output.
+    let colorPipeline: FilmtoneColorPipelineContract
     /// v1.3 (D3.5): depth × ray-angle prefilter block. Pass nil only on legacy
     /// call-sites that pre-date the v1.3 wave; v1.3+ call-sites should always
     /// supply a `SidecarDepthInfo` (with `used: false` when depth was not
@@ -120,6 +122,10 @@ struct SidecarOutput: Encodable {
     let fileSizeBytes: Int?
     let elapsedMs: Int
     let realtimeRatio: Double?
+    let outputColorProfile: String
+    let colorPrimaries: String
+    let colorTransfer: String
+    let colorSpace: String
 }
 
 /// Records whether (and which variant of) a mezzanine asset was consumed for this export.
@@ -202,7 +208,11 @@ enum FilmtoneExportSidecarBuilder {
             outputHeight: Int(inputs.outputSize.height.rounded()),
             fileSizeBytes: inputs.fileSizeBytes,
             elapsedMs: inputs.elapsedMs,
-            realtimeRatio: inputs.realtimeRatio
+            realtimeRatio: inputs.realtimeRatio,
+            outputColorProfile: inputs.colorPipeline.outputProfileID,
+            colorPrimaries: inputs.colorPipeline.outputColorPrimariesID,
+            colorTransfer: inputs.colorPipeline.outputColorTransferID,
+            colorSpace: inputs.colorPipeline.outputColorSpaceID
         )
 
         _ = inputs.audioPreserved // currently not surfaced in schema; runtime uses output.preserveAudio

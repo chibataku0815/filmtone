@@ -67,6 +67,7 @@
 		D20000010000000000000007 /* FilmtoneCameraOpticsFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000007 /* FilmtoneCameraOpticsFormatter.swift */; };
 		D20000010000000000000008 /* FilmtoneExportSidecarBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000008 /* FilmtoneExportSidecarBuilder.swift */; };
 		D20000010000000000000009 /* FilmtoneMotionBlurMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000009 /* FilmtoneMotionBlurMath.swift */; };
+		D20000010000000000000010 /* FilmtoneColorPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000010 /* FilmtoneColorPipeline.swift */; };
 		D588A95BF7748786256BD9E2 /* CancelExportIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B14DB40995D16C85F10AC9F5 /* CancelExportIntent.swift */; };
 		E10000010000000000000001 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = F10000010000000000000001 /* Localizable.xcstrings */; };
 		E10000010000000000000002 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = F10000010000000000000003 /* InfoPlist.strings */; };
@@ -170,6 +171,7 @@
 		C20000010000000000000007 /* FilmtoneCameraOpticsFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCameraOpticsFormatter.swift; sourceTree = "<group>"; };
 		C20000010000000000000008 /* FilmtoneExportSidecarBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneExportSidecarBuilder.swift; sourceTree = "<group>"; };
 		C20000010000000000000009 /* FilmtoneMotionBlurMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneMotionBlurMath.swift; sourceTree = "<group>"; };
+		C20000010000000000000010 /* FilmtoneColorPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneColorPipeline.swift; sourceTree = "<group>"; };
 		E92BBC4019AD97D40A52D6E1 /* FilmtoneExportAttributes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtoneExportAttributes.swift; sourceTree = "<group>"; };
 		F10000010000000000000001 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		F10000010000000000000002 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/InfoPlist.strings; sourceTree = "<group>"; };
@@ -280,6 +282,7 @@
 				C20000010000000000000001 /* FormatExtensionReader.swift */,
 				C20000010000000000000002 /* SourceColorMetadataNormalizer.swift */,
 				C20000010000000000000003 /* SourceColorClassifier.swift */,
+				C20000010000000000000010 /* FilmtoneColorPipeline.swift */,
 				C20000010000000000000004 /* HdrPreparationPolicyDeriver.swift */,
 				C20000010000000000000005 /* FilmtoneRayAngleOptics.swift */,
 				C20000010000000000000006 /* FilmtoneHdrPolicyNotice.swift */,
@@ -545,6 +548,7 @@
 				D20000010000000000000001 /* FormatExtensionReader.swift in Sources */,
 				D20000010000000000000002 /* SourceColorMetadataNormalizer.swift in Sources */,
 				D20000010000000000000003 /* SourceColorClassifier.swift in Sources */,
+				D20000010000000000000010 /* FilmtoneColorPipeline.swift in Sources */,
 				D20000010000000000000004 /* HdrPreparationPolicyDeriver.swift in Sources */,
 				D20000010000000000000005 /* FilmtoneRayAngleOptics.swift in Sources */,
 				D20000010000000000000006 /* FilmtoneHdrPolicyNotice.swift in Sources */,

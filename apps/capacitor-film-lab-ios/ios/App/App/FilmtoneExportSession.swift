@@ -11,7 +11,8 @@ final class FilmtoneExportSession {
     private let mezzanineService: MezzanineService?
     private let outputURL: URL
     private(set) var didUseMezzanineVariant: ProfileVariant?
-    private let ciContext: CIContext
+    fileprivate let ciContext: CIContext
+    fileprivate let colorPipeline: FilmtoneColorPipelineContract
     private let preparedInputLut: PreparedLut?
     private let preparedCreativeLut: PreparedLut?
     private let sourceSeed: Double
@@ -79,8 +80,13 @@ final class FilmtoneExportSession {
         self.cacheStore = cacheStore
         self.mezzanineService = mezzanineService
         self.outputURL = try cacheStore.temporaryExportURL(pathExtension: request.output.container)
-        let workingColorSpace = CGColorSpace(name: CGColorSpace.linearSRGB) ?? CGColorSpaceCreateDeviceRGB()
-        let outputColorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+        let colorPipeline = FilmtoneColorPipeline.defaultOutputContract(
+            sourceMetadata: request.sourceProbe?.sourceVideoMetadata?.color,
+            sourceColorClass: request.sourceProbe?.sourceVideoMetadata?.colorClass
+        )
+        self.colorPipeline = colorPipeline
+        let workingColorSpace = colorPipeline.workingColorSpace
+        let outputColorSpace = colorPipeline.destinationColorSpace
         self.outputColorSpace = outputColorSpace
         self.ciContext = CIContext(options: [
             .cacheIntermediates: false,
@@ -261,6 +267,7 @@ final class FilmtoneExportSession {
             renderMode: (request.renderMode ?? .quality).rawValue,
             mezzanineUsedVariant: didUseMezzanineVariant?.rawValue,
             mezzanineProfileVersion: didUseMezzanineVariant != nil ? MezzanineService.Profile.version : nil,
+            colorPipeline: colorPipeline,
             depth: depthSidecar
         )
 
@@ -779,7 +786,7 @@ final class FilmtoneExportSession {
                     bounds: CGRect(origin: .zero, size: outputSize),
                     colorSpace: outputColorSpace
                 )
-                attachRec709Metadata(to: renderedBuffer)
+                attachOutputColorMetadata(to: renderedBuffer)
 
                 let presentationTime = CMTime(value: CMTimeValue(frameIndex), timescale: CMTimeScale(request.output.fps))
                 if !adaptor.append(renderedBuffer, withPresentationTime: presentationTime) {
@@ -898,11 +905,7 @@ final class FilmtoneExportSession {
                 AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
                 AVVideoAllowFrameReorderingKey: false,
             ],
-            AVVideoColorPropertiesKey: [
-                AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
-                AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
-                AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2,
-            ],
+            AVVideoColorPropertiesKey: colorPipeline.writerColorProperties,
         ]
         let input = AVAssetWriterInput(mediaType: .video, outputSettings: settings)
         input.expectsMediaDataInRealTime = false
@@ -931,10 +934,7 @@ final class FilmtoneExportSession {
         for candidate in candidates {
             let output = AVAssetReaderTrackOutput(
                 track: track,
-                outputSettings: [
-                    kCVPixelBufferPixelFormatTypeKey as String: Int(candidate.pixelFormat),
-                    AVVideoAllowWideColorKey: true,
-                ]
+                outputSettings: colorPipeline.videoReaderOutputSettings(pixelFormat: candidate.pixelFormat)
             )
             output.alwaysCopiesSampleData = false
             if reader.canAdd(output) {
@@ -1901,7 +1901,7 @@ final class FilmtoneExportSession {
                 bounds: CGRect(origin: .zero, size: outputSize),
                 colorSpace: outputColorSpace
             )
-            attachRec709Metadata(to: renderedBuffer)
+            attachOutputColorMetadata(to: renderedBuffer)
 
             if !adaptor.append(renderedBuffer, withPresentationTime: outputTime) {
                 throw FilmtoneMediaError.exportFailed(writer.error?.localizedDescription ?? "The frame could not be appended.")
@@ -2150,16 +2150,14 @@ final class FilmtoneExportSession {
     }
 
     private func loadedSourceImage(at url: URL) -> CIImage? {
-        CIImage(contentsOf: url, options: [
-            .applyOrientationProperty: true,
-            .toneMapHDRtoSDR: true,
-        ])
+        CIImage(contentsOf: url, options: colorPipeline.stillImageOptions())
     }
 
     private func sourceVideoImage(from imageBuffer: CVPixelBuffer) -> CIImage {
-        let options: [CIImageOption: Any] = shouldToneMapHDRToSDR(imageBuffer)
-            ? [.toneMapHDRtoSDR: true]
-            : [:]
+        let options = colorPipeline.sourceImageOptions(
+            for: imageBuffer,
+            toneMapHDRToSDR: shouldToneMapHDRToSDR(imageBuffer)
+        )
         return CIImage(cvPixelBuffer: imageBuffer, options: options)
     }
 
@@ -2183,25 +2181,8 @@ final class FilmtoneExportSession {
             CFEqual(transferFunction, kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ)
     }
 
-    private func attachRec709Metadata(to imageBuffer: CVPixelBuffer) {
-        CVBufferSetAttachment(
-            imageBuffer,
-            kCVImageBufferColorPrimariesKey,
-            kCVImageBufferColorPrimaries_ITU_R_709_2,
-            .shouldPropagate
-        )
-        CVBufferSetAttachment(
-            imageBuffer,
-            kCVImageBufferTransferFunctionKey,
-            kCVImageBufferTransferFunction_ITU_R_709_2,
-            .shouldPropagate
-        )
-        CVBufferSetAttachment(
-            imageBuffer,
-            kCVImageBufferYCbCrMatrixKey,
-            kCVImageBufferYCbCrMatrix_ITU_R_709_2,
-            .shouldPropagate
-        )
+    private func attachOutputColorMetadata(to imageBuffer: CVPixelBuffer) {
+        colorPipeline.applyOutputMetadata(to: imageBuffer)
     }
 
     private static func makePreparedLut(from lut: SerializableLutDTO?) -> PreparedLut? {
@@ -2461,7 +2442,7 @@ final class FilmtoneSharedGradeProcessor {
                         timeSeconds: timeSeconds.isFinite ? timeSeconds : 0,
                         motionAccumulator: self.motionBlurAccumulator
                     )
-                    request.finish(with: processed, context: nil)
+                    request.finish(with: processed, context: session.ciContext)
                 } catch {
                     filmtonePreviewCompositionDebugLog(
                         "live composition frame failed at \(CMTimeGetSeconds(request.compositionTime))s: \(error.localizedDescription)"
@@ -2475,6 +2456,7 @@ final class FilmtoneSharedGradeProcessor {
             value: 1,
             timescale: CMTimeScale(max(1, session.outputFrameRate))
         )
+        session.colorPipeline.applyOutputMetadata(to: composition)
         return composition
     }
 }

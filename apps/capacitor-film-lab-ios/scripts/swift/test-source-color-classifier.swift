@@ -1,3 +1,5 @@
+import AVFoundation
+import CoreVideo
 import Foundation
 
 struct ClassifierCheckError: LocalizedError {
@@ -20,6 +22,7 @@ struct TestSourceColorClassifier {
         try runNormalizerMatrixTests()
         try runClassifierBranchTests()
         try runMezzanineRoutePolicyTests()
+        try runColorPipelineContractTests()
         try runPolicyDeriverTests()
         try runHlgFixtureRoundTrip()
         try runAppleLogFixtureRoundTrips()
@@ -272,7 +275,74 @@ struct TestSourceColorClassifier {
         )
     }
 
+    // MARK: - Shared color pipeline
+
+    static func runColorPipelineContractTests() throws {
+        let p3Metadata = metadata(
+            transfer: "bt709",
+            primaries: "smpte432",
+            space: "bt709"
+        )
+        let p3Class = SourceColorClassifier.classify(p3Metadata)
+        try expect(
+            p3Class != .sdrBt709,
+            "color pipeline precondition: Display P3 SDR must not classify as strict BT.709"
+        )
+
+        let p3Contract = FilmtoneColorPipeline.defaultOutputContract(
+            sourceMetadata: p3Metadata,
+            sourceColorClass: p3Class
+        )
+        try expect(
+            p3Contract.outputProfileID == "rec709-sdr-mp4",
+            "color pipeline: Display P3 SDR should map to Rec.709 SDR MP4 output"
+        )
+        try expect(
+            p3Contract.sourceInterpretationID == "display-p3-sdr",
+            "color pipeline: source interpretation should retain Display P3 SDR truth"
+        )
+        try expect(p3Contract.outputColorPrimariesID == "bt709", "color pipeline: primaries id")
+        try expect(p3Contract.outputColorTransferID == "bt709", "color pipeline: transfer id")
+        try expect(p3Contract.outputColorSpaceID == "bt709", "color pipeline: matrix/space id")
+
+        try expect(
+            p3Contract.writerColorProperties[AVVideoColorPrimariesKey] as? String == AVVideoColorPrimaries_ITU_R_709_2,
+            "color pipeline: writer primaries tag"
+        )
+        try expect(
+            p3Contract.writerColorProperties[AVVideoTransferFunctionKey] as? String == AVVideoTransferFunction_ITU_R_709_2,
+            "color pipeline: writer transfer tag"
+        )
+        try expect(
+            p3Contract.writerColorProperties[AVVideoYCbCrMatrixKey] as? String == AVVideoYCbCrMatrix_ITU_R_709_2,
+            "color pipeline: writer matrix tag"
+        )
+        try expect(
+            CFEqual(p3Contract.pixelBufferColorPrimariesTag, kCVImageBufferColorPrimaries_ITU_R_709_2),
+            "color pipeline: CV primaries tag"
+        )
+        try expect(
+            CFEqual(p3Contract.pixelBufferTransferFunctionTag, kCVImageBufferTransferFunction_ITU_R_709_2),
+            "color pipeline: CV transfer tag"
+        )
+        try expect(
+            CFEqual(p3Contract.pixelBufferYCbCrMatrixTag, kCVImageBufferYCbCrMatrix_ITU_R_709_2),
+            "color pipeline: CV matrix tag"
+        )
+
+        let readerSettings = p3Contract.videoReaderOutputSettings(pixelFormat: kCVPixelFormatType_32BGRA)
+        try expect(
+            readerSettings[AVVideoAllowWideColorKey] as? Bool == true,
+            "color pipeline: reader must allow wide color before mapping to Rec.709 output"
+        )
+        try expect(
+            readerSettings[kCVPixelBufferPixelFormatTypeKey as String] as? Int == Int(kCVPixelFormatType_32BGRA),
+            "color pipeline: reader pixel format should be preserved"
+        )
+    }
+
     // MARK: - HDR policy deriver
+
 
     static func runPolicyDeriverTests() throws {
         let sdr = HdrPreparationPolicyDeriver.derive(colorClass: .sdrBt709)

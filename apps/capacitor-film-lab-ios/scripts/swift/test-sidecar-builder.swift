@@ -59,6 +59,10 @@ struct TestSidecarBuilder {
             renderMode: nil,
             mezzanineUsedVariant: nil,
             mezzanineProfileVersion: nil,
+            colorPipeline: FilmtoneColorPipeline.defaultOutputContract(
+                sourceMetadata: request.sourceProbe?.sourceVideoMetadata?.color,
+                sourceColorClass: request.sourceProbe?.sourceVideoMetadata?.colorClass
+            ),
             depth: nil
         )
 
@@ -155,6 +159,13 @@ struct TestSidecarBuilder {
             abs((parsed.output.realtimeRatio ?? 0) - 0.35) < 1e-9,
             "output.realtimeRatio mismatch"
         )
+        try expect(
+            parsed.output.outputColorProfile == "rec709-sdr-mp4",
+            "output.outputColorProfile mismatch"
+        )
+        try expect(parsed.output.colorPrimaries == "bt709", "output.colorPrimaries mismatch")
+        try expect(parsed.output.colorTransfer == "bt709", "output.colorTransfer mismatch")
+        try expect(parsed.output.colorSpace == "bt709", "output.colorSpace mismatch")
     }
 
     // MARK: - Sidecar filename derivation
@@ -217,6 +228,10 @@ struct TestSidecarBuilder {
             renderMode: nil,
             mezzanineUsedVariant: nil,
             mezzanineProfileVersion: nil,
+            colorPipeline: FilmtoneColorPipeline.defaultOutputContract(
+                sourceMetadata: nil,
+                sourceColorClass: nil
+            ),
             depth: nil
         )
         let data = try FilmtoneExportSidecarBuilder.build(inputs)
@@ -306,4 +321,8 @@ private struct ParsedOutput: Decodable {
     let fileSizeBytes: Int?
     let elapsedMs: Int
     let realtimeRatio: Double?
+    let outputColorProfile: String
+    let colorPrimaries: String
+    let colorTransfer: String
+    let colorSpace: String
 }

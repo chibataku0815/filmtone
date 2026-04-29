@@ -77,6 +77,7 @@ if [ -f "$CLASSIFIER_SCRIPT" ]; then
     "$SWIFT_SUPPORT" \
     "$APP_DIR/ios/App/App/SourceColorMetadataNormalizer.swift" \
     "$APP_DIR/ios/App/App/SourceColorClassifier.swift" \
+    "$APP_DIR/ios/App/App/FilmtoneColorPipeline.swift" \
     "$APP_DIR/ios/App/App/HdrPreparationPolicyDeriver.swift" \
     "$CLASSIFIER_SCRIPT"
   "$CLASSIFIER_BIN" "$HLG_FIXTURE"
@@ -107,6 +108,7 @@ if [ -f "$SIDECAR_SCRIPT" ] && [ -f "$SIDECAR_SRC" ]; then
   xcrun swiftc \
     -o "$SIDECAR_BIN" \
     "$SWIFT_SUPPORT" \
+    "$APP_DIR/ios/App/App/FilmtoneColorPipeline.swift" \
     "$SIDECAR_SRC" \
     "$SIDECAR_SCRIPT"
   "$SIDECAR_BIN" "$HLG_FIXTURE"
