@@ -4,6 +4,7 @@ import UIKit
 
 @MainActor
 final class FilmtoneEditorFacade {
+    private let cacheStore: CacheStore
     private let assetPickerService: AssetPickerService
     private let runtime: FilmtoneMediaRuntime
     private let memoryWarningState = FilmtoneMemoryWarningState()
@@ -13,6 +14,7 @@ final class FilmtoneEditorFacade {
 
     init() throws {
         let cacheStore = try CacheStore()
+        self.cacheStore = cacheStore
         let mezzanineService = MezzanineService(cacheStore: cacheStore)
         self.assetPickerService = AssetPickerService(
             cacheStore: cacheStore,
@@ -55,6 +57,7 @@ final class FilmtoneEditorFacade {
 
     func pickSource(
         route: FilmtoneSourcePickerRoute = .photoLibrary,
+        protectedCacheURIs: [String] = [],
         onImportProgress: (@MainActor (FilmtoneSourceImportProgress) -> Void)? = nil
     ) async throws -> SourceInfoDTO? {
         guard let presenter else {
@@ -63,6 +66,7 @@ final class FilmtoneEditorFacade {
         return try await assetPickerService.pickSource(
             presenting: presenter,
             route: route,
+            protectedCacheURLs: protectedCacheURIs.compactMap { try? runtime.resolveFileURL($0) },
             onImportProgress: onImportProgress
         )
     }
@@ -115,9 +119,14 @@ final class FilmtoneEditorFacade {
 
     func runExport(
         request: Phase0ExportRequestDTO,
+        protectedCacheURIs: [String] = [],
         onProgress: @escaping @MainActor (Phase0ExportProgressDTO) -> Void
     ) async throws -> Phase0ExportResultDTO {
-        try await runtime.runExport(request: request) { progress in
+        let protectedCacheURLs = protectedCacheURIs.compactMap { try? runtime.resolveFileURL($0) }
+        return try await runtime.runExport(
+            request: request,
+            protectedCacheURLs: protectedCacheURLs
+        ) { progress in
             DispatchQueue.main.async {
                 Task { @MainActor in
                     onProgress(progress)
@@ -133,11 +142,12 @@ final class FilmtoneEditorFacade {
     /// Share the exported media and, when present, the v1 sidecar JSON as a
     /// second item. Single-item share targets still receive the primary media
     /// because it's the first entry in `fileURLs`.
-    func shareOutput(mediaURI: String, sidecarURI: String? = nil) async throws {
+    @discardableResult
+    func shareOutput(mediaURI: String, sidecarURI: String? = nil) async throws -> Bool {
         guard let presenter else {
             throw FilmtoneMediaError.bridgeUnavailable
         }
-        try await runtime.shareOutput(
+        return try await runtime.shareOutput(
             uri: mediaURI,
             sidecarUri: sidecarURI,
             presenting: presenter
@@ -146,6 +156,21 @@ final class FilmtoneEditorFacade {
 
     func fileExists(uri: String) -> Bool {
         runtime.fileExists(uri: uri)
+    }
+
+    func reclaimCache(protecting uris: [String]) {
+        let urls = uris.compactMap { try? runtime.resolveFileURL($0) }
+        _ = try? cacheStore.pruneStandard(protecting: urls)
+    }
+
+    @discardableResult
+    func removeLocalFiles(uris: [String]) -> Bool {
+        let urls = uris.compactMap { try? runtime.resolveFileURL($0) }
+        guard !urls.isEmpty else {
+            return false
+        }
+        let result = try? cacheStore.removeGeneratedFiles(urls)
+        return (result?.removedCount ?? 0) > 0
     }
 }
 

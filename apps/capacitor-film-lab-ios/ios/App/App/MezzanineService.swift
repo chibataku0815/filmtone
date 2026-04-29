@@ -47,8 +47,8 @@ final class MezzanineService {
     }
 
     struct Limits {
-        static let maxBytes: Int64 = 2_147_483_648  // 2 GB (HDR mezzanines are larger)
-        static let maxEntries: Int = 8
+        static let maxBytes: Int64 = 1_073_741_824
+        static let maxEntries: Int = 4
     }
 
     enum GenerationError: Error {
@@ -125,7 +125,7 @@ final class MezzanineService {
     // MARK: - Public API
 
     /// Returns mezzanine URL if a valid cache file already exists for `sourceURL` at `variant`.
-    /// Touches contentAccessDate for LRU recency. Does not trigger generation.
+    /// Touches contentModificationDate for LRU recency. Does not trigger generation.
     /// `depthEnabled` participates in the cache key (see `signature(for:profile:depthEnabled:)`).
     func existingMezzanineURL(
         for sourceURL: URL,
@@ -138,8 +138,7 @@ final class MezzanineService {
               fileManager.fileExists(atPath: url.path) else {
             return nil
         }
-        // Touch access date; ignore failure.
-        try? fileManager.setAttributes([.modificationDate: Date()], ofItemAtPath: url.path)
+        try? cacheStore.touch(url)
         return url
     }
 
@@ -184,6 +183,7 @@ final class MezzanineService {
                     try? self.fileManager.removeItem(at: destURL)
                 }
                 try self.fileManager.moveItem(at: tempURL, to: destURL)
+                try? self.cacheStore.touch(destURL)
                 try? self.cacheStore.pruneMezzanine(
                     maxBytes: Limits.maxBytes,
                     maxEntries: Limits.maxEntries

@@ -494,7 +494,7 @@ struct FilmtoneRootView: View {
     }
 
     private var shouldShowUnsavedExportPrompt: Bool {
-        store.exportResult != nil && store.saveToPhotosState != .saved && !store.isBusy
+        store.canUseLocalExport && store.saveToPhotosState != .saved && !store.isBusy
     }
 
     private var bottomOverlay: some View {

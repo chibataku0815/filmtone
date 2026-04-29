@@ -164,12 +164,13 @@ struct FilmtoneExportPanel: View {
                     Task { await store.saveToPhotos() }
                 }
                 .buttonStyle(FilmtonePrimaryButtonStyle())
-                .disabled(store.isSavingToPhotos || store.saveToPhotosState == .saved)
+                .disabled(store.isSavingToPhotos || store.saveToPhotosState == .saved || !store.canUseLocalExport)
 
                 Button(store.strings.shareOutput) {
                     Task { await store.shareOutput() }
                 }
                 .buttonStyle(FilmtoneSecondaryButtonStyle())
+                .disabled(!store.canUseLocalExport)
             }
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {

@@ -147,12 +147,30 @@ enum FilmtonePreviewState {
         }
         return preview.gradedPosterURI ?? preview.originalPosterURI
     }
+
+    var cacheURIs: [String] {
+        switch self {
+        case .empty, .video:
+            return []
+        case .still(let preview):
+            return [
+                preview.originalPosterURI,
+                preview.gradedPosterURI,
+            ].compactMap { $0 }
+        }
+    }
 }
 
 enum FilmtoneSaveToPhotosState: String {
     case notRun = "not-run"
     case saved
     case failed
+}
+
+enum FilmtoneExportLocalAvailability {
+    case none
+    case available
+    case removed
 }
 
 /// Lightweight, viewport-level transient notification model.
@@ -422,6 +440,7 @@ final class FilmtoneEditorStore: ObservableObject {
     @Published var isCompareHeld = false
     @Published var exportProgress: Phase0ExportProgressDTO?
     @Published var exportResult: Phase0ExportResultDTO?
+    @Published var exportLocalAvailability: FilmtoneExportLocalAvailability = .none
     @Published var saveToPhotosState: FilmtoneSaveToPhotosState = .notRun
     @Published var isSavingToPhotos = false
     @Published var sourceLoadState: FilmtoneSourceLoadState?
@@ -460,6 +479,8 @@ final class FilmtoneEditorStore: ObservableObject {
             persist()
         }
 
+        reclaimCacheForCurrentState()
+
         if self.source != nil {
             schedulePreviewRender()
         }
@@ -472,6 +493,10 @@ final class FilmtoneEditorStore: ObservableObject {
 
     var sourceLabel: String? {
         source?.filename
+    }
+
+    var canUseLocalExport: Bool {
+        exportResult != nil && exportLocalAvailability == .available
     }
 
     var activePresetLabel: String {
@@ -660,6 +685,7 @@ final class FilmtoneEditorStore: ObservableObject {
         isCompareHeld = false
         exportProgress = nil
         exportResult = fixture.exportResult
+        exportLocalAvailability = fixture.exportResult == nil ? .none : .available
         saveToPhotosState = fixture.saveToPhotosState
         isSavingToPhotos = false
         sourceLoadState = fixture.sourceLoadState
@@ -680,6 +706,7 @@ final class FilmtoneEditorStore: ObservableObject {
 
             guard let source = try await facade.pickSource(
                 route: route,
+                protectedCacheURIs: protectedCacheURIs,
                 onImportProgress: { [weak self] progress in
                     self?.applySourceImportProgress(progress, route: route)
                 }
@@ -701,6 +728,7 @@ final class FilmtoneEditorStore: ObservableObject {
             isBusy = false
             sourceLoadState = nil
             persist()
+            reclaimCacheForCurrentState()
             schedulePreviewRender()
         } catch {
             isBusy = false
@@ -877,15 +905,22 @@ final class FilmtoneEditorStore: ObservableObject {
             notice = nil
             exportResult = nil
             exportProgress = nil
+            exportLocalAvailability = .none
             saveToPhotosState = .notRun
 
-            let result = try await facade.runExport(request: request) { [weak self] progress in
+            let cacheProtection = protectedCacheURIs
+            let result = try await facade.runExport(
+                request: request,
+                protectedCacheURIs: cacheProtection
+            ) { [weak self] progress in
                 self?.exportProgress = progress
             }
 
             isBusy = false
             exportProgress = nil
             exportResult = result
+            exportLocalAvailability = .available
+            reclaimCacheForCurrentState()
             presentToast(strings.toastExportComplete, kind: .success)
         } catch {
             isBusy = false
@@ -913,15 +948,22 @@ final class FilmtoneEditorStore: ObservableObject {
             notice = nil
             exportResult = nil
             exportProgress = nil
+            exportLocalAvailability = .none
             saveToPhotosState = .notRun
 
-            let result = try await facade.runExport(request: request) { [weak self] progress in
+            let cacheProtection = protectedCacheURIs
+            let result = try await facade.runExport(
+                request: request,
+                protectedCacheURIs: cacheProtection
+            ) { [weak self] progress in
                 self?.exportProgress = progress
             }
 
             isBusy = false
             exportProgress = nil
             exportResult = result
+            exportLocalAvailability = .available
+            reclaimCacheForCurrentState()
             await saveExportResultToPhotos(result)
         } catch {
             isBusy = false
@@ -932,7 +974,10 @@ final class FilmtoneEditorStore: ObservableObject {
     }
 
     func saveToPhotos() async {
-        guard let exportResult, saveToPhotosState != .saved, !isSavingToPhotos else {
+        guard let exportResult,
+              canUseLocalExport,
+              saveToPhotosState != .saved,
+              !isSavingToPhotos else {
             return
         }
 
@@ -952,6 +997,7 @@ final class FilmtoneEditorStore: ObservableObject {
         do {
             try await facade.saveToPhotos(uri: result.outputUri)
             saveToPhotosState = .saved
+            discardLocalExportFiles(result)
             notice = strings.saveToPhotosDone
             error = nil
             presentToast(strings.toastSaveSuccess, kind: .success)
@@ -962,15 +1008,18 @@ final class FilmtoneEditorStore: ObservableObject {
     }
 
     func shareOutput() async {
-        guard let exportResult else {
+        guard let exportResult, canUseLocalExport else {
             return
         }
 
         do {
-            try await facade.shareOutput(
+            let completed = try await facade.shareOutput(
                 mediaURI: exportResult.outputUri,
                 sidecarURI: exportResult.sidecarUri
             )
+            if completed {
+                discardLocalExportFiles(exportResult)
+            }
         } catch {
             self.error = strings.userMessage(for: error, context: .share)
             presentToast(strings.toastShareFailed, kind: .error)
@@ -1025,6 +1074,59 @@ final class FilmtoneEditorStore: ObservableObject {
         toast = nil
     }
 
+    func reclaimCacheForBackground() {
+        guard !isBusy && !isSavingToPhotos else {
+            return
+        }
+        reclaimCacheForCurrentState()
+    }
+
+    private var protectedCacheURIs: [String] {
+        var uris: [String] = []
+        if let source {
+            uris.append(source.uri)
+        }
+        if canUseLocalExport, let exportResult {
+            uris.append(contentsOf: localExportURIs(for: exportResult))
+        }
+        uris.append(contentsOf: preview.cacheURIs)
+        if let comparePreviewFrame {
+            uris.append(comparePreviewFrame.originalURI)
+            uris.append(comparePreviewFrame.gradedURI)
+        }
+        return uniqueURIs(uris)
+    }
+
+    private func reclaimCacheForCurrentState() {
+        facade.reclaimCache(protecting: protectedCacheURIs)
+    }
+
+    private func discardLocalExportFiles(_ result: Phase0ExportResultDTO) {
+        exportLocalAvailability = .removed
+        _ = facade.removeLocalFiles(uris: localExportURIs(for: result))
+        reclaimCacheForCurrentState()
+    }
+
+    private func localExportURIs(for result: Phase0ExportResultDTO) -> [String] {
+        [
+            result.outputUri,
+            result.sidecarUri,
+        ].compactMap { $0 }
+    }
+
+    private func uniqueURIs(_ uris: [String]) -> [String] {
+        var seen: Set<String> = []
+        var unique: [String] = []
+        for uri in uris where !uri.isEmpty {
+            guard !seen.contains(uri) else {
+                continue
+            }
+            seen.insert(uri)
+            unique.append(uri)
+        }
+        return unique
+    }
+
     private func recomputeProjectParams() {
         project.quickState = project.quickState.clamped()
         let resolved = FilmtonePhase0Math.resolveParams(
@@ -1060,6 +1162,7 @@ final class FilmtoneEditorStore: ObservableObject {
         self.notice = nil
         self.exportResult = nil
         self.exportProgress = nil
+        self.exportLocalAvailability = .none
         self.sourceLoadState = nil
     }
 
@@ -1080,6 +1183,7 @@ final class FilmtoneEditorStore: ObservableObject {
         isCompareHeld = false
         exportResult = nil
         exportProgress = nil
+        exportLocalAvailability = .none
         saveToPhotosState = .notRun
     }
 
@@ -1151,6 +1255,7 @@ final class FilmtoneEditorStore: ObservableObject {
                         error: nil
                     ))
                     self.comparePreviewFrame = self.makeCompareFrame(from: result)
+                    self.reclaimCacheForCurrentState()
 
                 case .video:
                     do {
@@ -1254,6 +1359,7 @@ final class FilmtoneEditorStore: ObservableObject {
                 error: errorMessage
             ))
             comparePreviewFrame = makeCompareFrame(from: result)
+            reclaimCacheForCurrentState()
         } catch is CancellationError {
             throw CancellationError()
         } catch {
@@ -1266,6 +1372,7 @@ final class FilmtoneEditorStore: ObservableObject {
             let result = try await facade.renderPreview(request: request)
             try Task.checkCancellation()
             comparePreviewFrame = makeCompareFrame(from: result)
+            reclaimCacheForCurrentState()
         } catch is CancellationError {
             throw CancellationError()
         } catch {

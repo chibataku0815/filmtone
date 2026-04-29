@@ -66,6 +66,20 @@ if [ -f "$CUBE_PARSER_SCRIPT" ] && [ -f "$CUBE_PARSER_SRC" ]; then
   "$CUBE_PARSER_BIN"
 fi
 
+# --- Cache store retention / cleanup policy test ---
+CACHE_STORE_SCRIPT="$SCRIPT_DIR/swift/test-cache-store.swift"
+CACHE_STORE_SRC="$APP_DIR/ios/App/App/CacheStore.swift"
+if [ -f "$CACHE_STORE_SCRIPT" ] && [ -f "$CACHE_STORE_SRC" ]; then
+  echo "==> cache store test"
+  CACHE_STORE_BIN=$(mktemp "${TMPDIR:-/tmp}/phase0-cache-store-check.XXXXXX")
+  CLEANUP_FILES="$CLEANUP_FILES $CACHE_STORE_BIN"
+  xcrun swiftc \
+    -o "$CACHE_STORE_BIN" \
+    "$CACHE_STORE_SRC" \
+    "$CACHE_STORE_SCRIPT"
+  "$CACHE_STORE_BIN"
+fi
+
 # --- Stream 1: source-color-classifier test (landed in foundation branch) ---
 CLASSIFIER_SCRIPT="$SCRIPT_DIR/swift/test-source-color-classifier.swift"
 if [ -f "$CLASSIFIER_SCRIPT" ]; then

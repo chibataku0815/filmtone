@@ -52,6 +52,7 @@ final class AssetPickerService: NSObject {
     private var lutContinuation: CheckedContinuation<PickedLutFileDTO?, Error>?
     private var activeDocumentPickerPurpose: DocumentPickerPurpose?
     private var sourceImportProgressHandler: (@MainActor (FilmtoneSourceImportProgress) -> Void)?
+    private var protectedCacheURLsDuringImport: [URL] = []
 
     init(cacheStore: CacheStore, mezzanineService: MezzanineService) {
         self.cacheStore = cacheStore
@@ -76,6 +77,7 @@ final class AssetPickerService: NSObject {
     func pickSource(
         presenting viewController: UIViewController,
         route: FilmtoneSourcePickerRoute = .photoLibrary,
+        protectedCacheURLs: [URL] = [],
         onImportProgress: (@MainActor (FilmtoneSourceImportProgress) -> Void)? = nil
     ) async throws -> SourceInfoDTO? {
         guard sourceContinuation == nil, lutContinuation == nil else {
@@ -86,6 +88,11 @@ final class AssetPickerService: NSObject {
                     comment: "Error shown when a second source picker is opened while one is already active."
                 )
             )
+        }
+
+        protectedCacheURLsDuringImport = protectedCacheURLs
+        defer {
+            protectedCacheURLsDuringImport = []
         }
 
         return try await withCheckedThrowingContinuation { continuation in
@@ -239,6 +246,7 @@ final class AssetPickerService: NSObject {
                 .nonEmpty
                 ?? UTType(fallbackTypeIdentifier)?.preferredFilenameExtension
                 ?? "mov"
+        reclaimBeforeSourceImport()
         let destinationURL = try cacheStore.stagedItemURL(
             suggestedName: suggestedName ?? resource.originalFilename,
             fallbackExtension: fallbackExtension,
@@ -387,6 +395,7 @@ final class AssetPickerService: NSObject {
     }
 
     private func preflightDocumentSourceCopy(from sourceURL: URL) throws {
+        reclaimBeforeSourceImport()
         guard let sourceSizeBytes = try sourceFileSizeBytes(for: sourceURL),
               sourceSizeBytes > 0,
               let availableBytes = try availableImportCapacityBytes() else {
@@ -530,6 +539,9 @@ final class AssetPickerService: NSObject {
         let cacheMessage = genericCacheMessage(for: bucket)
         let cacheStore = self.cacheStore
         return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
+            if bucket == .sources {
+                self.reclaimBeforeSourceImport()
+            }
             self.reportSourceImportProgress(.importing())
 
             var progressObservation: NSKeyValueObservation?
@@ -614,6 +626,10 @@ final class AssetPickerService: NSObject {
 
     private func clearSourceImportProgressHandler() {
         sourceImportProgressHandler = nil
+    }
+
+    private func reclaimBeforeSourceImport() {
+        _ = try? cacheStore.pruneStandard(protecting: protectedCacheURLsDuringImport)
     }
 }
 

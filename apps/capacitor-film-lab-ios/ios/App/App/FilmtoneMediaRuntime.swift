@@ -225,11 +225,14 @@ final class FilmtoneMediaRuntime {
         sourceURL: URL? = nil,
         session: FilmtoneExportSession? = nil,
         collector: BenchmarkCollector? = nil,
+        protectedCacheURLs: [URL] = [],
         onProgress: @escaping (Phase0ExportProgressDTO) -> Void
     ) async throws -> Phase0ExportResultDTO {
+        let resolvedSourceURL = try sourceURL ?? resolveFileURL(request.sourceUri)
+        _ = try? cacheStore.pruneStandard(protecting: [resolvedSourceURL] + protectedCacheURLs)
         let exportSession = try session ?? makeExportSession(
             request: request,
-            sourceURL: sourceURL
+            sourceURL: resolvedSourceURL
         )
         let benchmarkCollector = collector ?? makeBenchmarkCollector(request: request)
 
@@ -460,18 +463,19 @@ final class FilmtoneMediaRuntime {
     }
 
     @MainActor
+    @discardableResult
     func shareOutput(
         uri: String,
         sidecarUri: String? = nil,
         title: String? = nil,
         text: String? = nil,
         presenting: UIViewController
-    ) async throws {
+    ) async throws -> Bool {
         var urls: [URL] = [try resolveFileURL(uri)]
         if let sidecarUri, let sidecarURL = try? resolveFileURL(sidecarUri) {
             urls.append(sidecarURL)
         }
-        try await shareOutput(
+        return try await shareOutput(
             fileURLs: urls,
             title: title,
             text: text,
@@ -480,14 +484,15 @@ final class FilmtoneMediaRuntime {
     }
 
     @MainActor
+    @discardableResult
     func shareOutput(
         fileURLs: [URL],
         title: String? = nil,
         text: String? = nil,
         presenting: UIViewController
-    ) async throws {
+    ) async throws -> Bool {
         let shareSheetService = ShareSheetService()
-        _ = try await shareSheetService.share(
+        return try await shareSheetService.share(
             fileURLs: fileURLs,
             title: title,
             text: text,
