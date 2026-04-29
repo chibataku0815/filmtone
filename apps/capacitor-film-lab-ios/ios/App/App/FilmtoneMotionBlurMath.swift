@@ -4,6 +4,7 @@ enum FilmtoneMotionBlurMath {
     static let baselineShutterAngle = 180.0
     static let maxShutterAngle = 720.0
     static let defaultSlotCount = 8
+    static let baselineExposureFrames = baselineShutterAngle / 360.0
 
     static func clampShutterAngle(_ shutterAngle: Double) -> Double {
         guard shutterAngle.isFinite else {
@@ -16,20 +17,28 @@ enum FilmtoneMotionBlurMath {
         clampShutterAngle(shutterAngle) - baselineShutterAngle
     }
 
+    static func targetExposureFrames(shutterAngle: Double) -> Double {
+        clampShutterAngle(shutterAngle) / 360.0
+    }
+
+    static func additionalExposureFrames(shutterAngle: Double) -> Double {
+        max(0, targetExposureFrames(shutterAngle: shutterAngle) - baselineExposureFrames)
+    }
+
     static func isActive(shutterAngle: Double) -> Bool {
-        additionalAngle(shutterAngle: shutterAngle) > 0
+        additionalExposureFrames(shutterAngle: shutterAngle) > 0
     }
 
     static func activeFrameCount(
         shutterAngle: Double,
         slotCount: Int = defaultSlotCount
     ) -> Int {
-        let additionalAngle = additionalAngle(shutterAngle: shutterAngle)
-        guard additionalAngle > 0 else {
+        let additionalExposureFrames = additionalExposureFrames(shutterAngle: shutterAngle)
+        guard additionalExposureFrames > 0 else {
             return 1
         }
         let slots = max(1, slotCount)
-        let raw = Int(((additionalAngle / 360.0) * (Double(slots) / 2.0)).rounded())
+        let raw = 1 + Int(ceil(additionalExposureFrames))
         return max(2, min(slots, raw))
     }
 

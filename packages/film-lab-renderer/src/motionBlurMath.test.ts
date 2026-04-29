@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import {
+  additionalMotionExposureFrames,
   activeMotionBlurFramesForShutter,
   computeMotionBlurWeights,
   isShutterMotionActive,
@@ -23,6 +24,14 @@ test("0 and 180 degrees are the no-added-blur baseline", () => {
   }
 });
 
+test("shutter angle maps to target exposure above the 180 degree source baseline", () => {
+  expect(additionalMotionExposureFrames(0)).toBe(0);
+  expect(additionalMotionExposureFrames(180)).toBe(0);
+  expect(additionalMotionExposureFrames(360)).toBeCloseTo(0.5, 6);
+  expect(additionalMotionExposureFrames(540)).toBeCloseTo(1, 6);
+  expect(additionalMotionExposureFrames(720)).toBeCloseTo(1.5, 6);
+});
+
 test("360 degrees adds a two-frame triangle blend", () => {
   const activeFrames = activeMotionBlurFramesForShutter(360);
   expect(isShutterMotionActive(360)).toBe(true);
@@ -33,12 +42,17 @@ test("360 degrees adds a two-frame triangle blend", () => {
   );
 });
 
+test("540 degrees keeps the short two-frame exposure window", () => {
+  expect(isShutterMotionActive(540)).toBe(true);
+  expect(activeMotionBlurFramesForShutter(540)).toBe(2);
+});
+
 test("720 degrees uses the slow-shutter extension with flattened weights", () => {
   const activeFrames = activeMotionBlurFramesForShutter(720);
   expect(isShutterMotionActive(720)).toBe(true);
-  expect(activeFrames).toBe(6);
+  expect(activeFrames).toBe(3);
   expectCloseArray(
     computeMotionBlurWeights(720, activeFrames, 8),
-    [1 / 6, 1 / 6, 1 / 6, 1 / 6, 1 / 6, 1 / 6, 0, 0],
+    [1 / 3, 1 / 3, 1 / 3, 0, 0, 0, 0, 0],
   );
 });

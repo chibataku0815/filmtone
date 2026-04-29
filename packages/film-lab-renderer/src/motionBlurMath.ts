@@ -1,6 +1,8 @@
 export const MOTION_BLUR_BASELINE_SHUTTER_ANGLE = 180;
 export const MOTION_BLUR_MAX_SHUTTER_ANGLE = 720;
 export const MOTION_BLUR_DEFAULT_RING_SLOTS = 8;
+export const MOTION_BLUR_BASELINE_EXPOSURE_FRAMES =
+  MOTION_BLUR_BASELINE_SHUTTER_ANGLE / 360;
 
 export type MotionBlurWeightCurve = "triangle" | "box" | "exponential";
 
@@ -16,18 +18,30 @@ export function additionalMotionShutterAngle(shutterAngle: number): number {
   return clampMotionShutterAngle(shutterAngle) - MOTION_BLUR_BASELINE_SHUTTER_ANGLE;
 }
 
+export function targetMotionExposureFrames(shutterAngle: number): number {
+  return clampMotionShutterAngle(shutterAngle) / 360;
+}
+
+export function additionalMotionExposureFrames(shutterAngle: number): number {
+  return Math.max(
+    0,
+    targetMotionExposureFrames(shutterAngle) -
+      MOTION_BLUR_BASELINE_EXPOSURE_FRAMES,
+  );
+}
+
 export function isShutterMotionActive(shutterAngle: number): boolean {
-  return additionalMotionShutterAngle(shutterAngle) > 0;
+  return additionalMotionExposureFrames(shutterAngle) > 0;
 }
 
 export function activeMotionBlurFramesForShutter(
   shutterAngle: number,
   ringSlots: number = MOTION_BLUR_DEFAULT_RING_SLOTS,
 ): number {
-  const additionalAngle = additionalMotionShutterAngle(shutterAngle);
-  if (additionalAngle <= 0) return 1;
+  const additionalExposureFrames = additionalMotionExposureFrames(shutterAngle);
+  if (additionalExposureFrames <= 0) return 1;
   const slots = Math.max(1, Math.round(ringSlots));
-  const raw = Math.round((additionalAngle / 360) * (slots / 2));
+  const raw = 1 + Math.ceil(additionalExposureFrames);
   return Math.max(2, Math.min(slots, raw));
 }
 

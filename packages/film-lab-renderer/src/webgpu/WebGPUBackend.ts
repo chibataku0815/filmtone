@@ -3372,7 +3372,7 @@ export class WebGPUBackend implements RenderBackend {
 
   /**
    * `shutterAngle` (degrees, 0..720) → active slot count. Matches WebGL:
-   * 180° is the no-added-blur baseline, 360° = 2 slots, 720° = 6 slots.
+   * 180° is the no-added-blur baseline, 360° = 2 slots, 720° = 3 slots.
    */
   private activeMotionBlurFrames(shutterAngle: number): number {
     return activeMotionBlurFramesForShutter(

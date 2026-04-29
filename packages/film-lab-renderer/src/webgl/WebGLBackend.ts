@@ -613,8 +613,8 @@ export class WebGLBackend implements RenderBackend {
   /**
    * weightCurve に応じた正規化済みブレンドウェイトを計算する。
    * index 0 = newest, index N-1 = oldest。
-   * shutterAngle > 360° では triangle → box へ自動的にフラット化し、
-   * より長いモーショントレイルを実現する。
+   * shutterAngle は短い追加露光窓を決め、長い残像は trailIntensity が担当する。
+   * shutterAngle > 360° では triangle → box へ自動的にフラット化する。
    */
   private computeBlendWeights(activeFrames: number): Float32Array {
     return computeMotionBlurWeights(

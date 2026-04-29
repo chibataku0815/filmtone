@@ -19,7 +19,9 @@ private func approx(_ a: Double, _ b: Double, _ eps: Double = 1e-9) -> Bool {
 struct MotionBlurMathTests {
     static func main() throws {
         try baselineDoesNotActivate()
+        try shutterAngleMapsToExposureAboveBaseline()
         try threeSixtyUsesTwoFrameTriangle()
+        try fiveFortyKeepsShortExposureWindow()
         try sevenTwentyUsesSlowShutterExtension()
         print("motion blur math tests passed")
     }
@@ -44,6 +46,14 @@ struct MotionBlurMathTests {
         }
     }
 
+    private static func shutterAngleMapsToExposureAboveBaseline() throws {
+        try expect(approx(FilmtoneMotionBlurMath.additionalExposureFrames(shutterAngle: 0), 0), "0 should add no exposure")
+        try expect(approx(FilmtoneMotionBlurMath.additionalExposureFrames(shutterAngle: 180), 0), "180 should add no exposure")
+        try expect(approx(FilmtoneMotionBlurMath.additionalExposureFrames(shutterAngle: 360), 0.5), "360 should add 0.5 frames")
+        try expect(approx(FilmtoneMotionBlurMath.additionalExposureFrames(shutterAngle: 540), 1.0), "540 should add 1 frame")
+        try expect(approx(FilmtoneMotionBlurMath.additionalExposureFrames(shutterAngle: 720), 1.5), "720 should add 1.5 frames")
+    }
+
     private static func threeSixtyUsesTwoFrameTriangle() throws {
         let activeFrames = FilmtoneMotionBlurMath.activeFrameCount(shutterAngle: 360)
         try expect(FilmtoneMotionBlurMath.isActive(shutterAngle: 360), "360 should activate motion blur")
@@ -58,18 +68,24 @@ struct MotionBlurMathTests {
         try expect(weights.dropFirst(2).allSatisfy { $0 == 0 }, "360 should not read older slots")
     }
 
+    private static func fiveFortyKeepsShortExposureWindow() throws {
+        let activeFrames = FilmtoneMotionBlurMath.activeFrameCount(shutterAngle: 540)
+        try expect(FilmtoneMotionBlurMath.isActive(shutterAngle: 540), "540 should activate motion blur")
+        try expect(activeFrames == 2, "540 should use 2 frames")
+    }
+
     private static func sevenTwentyUsesSlowShutterExtension() throws {
         let activeFrames = FilmtoneMotionBlurMath.activeFrameCount(shutterAngle: 720)
         try expect(FilmtoneMotionBlurMath.isActive(shutterAngle: 720), "720 should activate motion blur")
-        try expect(activeFrames == 6, "720 should use 6 frames")
+        try expect(activeFrames == 3, "720 should use 3 frames")
         let weights = FilmtoneMotionBlurMath.blendWeights(
             shutterAngle: 720,
             activeFrames: activeFrames,
             validSlots: 8
         )
-        for index in 0..<6 {
-            try expect(approx(weights[index], 1.0 / 6.0), "720 weight \(index) should be 1/6")
+        for index in 0..<3 {
+            try expect(approx(weights[index], 1.0 / 3.0), "720 weight \(index) should be 1/3")
         }
-        try expect(weights.dropFirst(6).allSatisfy { $0 == 0 }, "720 should not read slots 6 and 7")
+        try expect(weights.dropFirst(3).allSatisfy { $0 == 0 }, "720 should not read slots 3 through 7")
     }
 }
