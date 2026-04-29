@@ -1843,6 +1843,16 @@ function buildOpticalParamPatch(recommendation) {
 
 // src/ios-phase0.ts
 import { z as z4 } from "zod";
+
+// src/ios-preset-overrides.ts
+var FILMTONE_IOS_PRESET_NAMES = [
+  "reset",
+  "iphone",
+  "softBlue",
+  "amberGlow"
+];
+
+// src/ios-phase0.ts
 var IOS_PHASE0_SCHEMA_VERSION = 2;
 var IOS_PHASE0_PARAM_KEYS = PHASE0_PARAM_KEYS;
 var iosPhase0ParamsSchema = phase0ParamsSchema;
@@ -1951,7 +1961,7 @@ var iosPhase0SourceInfoSchema = z4.object({
   frameRate: z4.number().positive().optional(),
   hasAudio: z4.boolean().optional()
 });
-var IOS_PHASE0_PRESET_IDS = Object.keys(PRESETS);
+var IOS_PHASE0_PRESET_IDS = FILMTONE_IOS_PRESET_NAMES;
 var iosPhase0PresetIdSchema = z4.enum(IOS_PHASE0_PRESET_IDS);
 var iosPhase0ExportSettingsSchema = z4.object({
   codec: z4.literal(IOS_PHASE0_OUTPUT_CODEC).default(IOS_PHASE0_OUTPUT_CODEC),
@@ -2088,6 +2098,7 @@ export {
   IOS_PHASE0_OUTPUT_FPS,
   IOS_PHASE0_OUTPUT_LONG_EDGE,
   IOS_PHASE0_PARAM_KEYS,
+  IOS_PHASE0_PRESET_IDS,
   IOS_PHASE0_SCHEMA_VERSION,
   IOS_PHASE0_SOURCE_CAPS,
   IOS_PHASE0_SOURCE_DURATION_CAP_SEC,

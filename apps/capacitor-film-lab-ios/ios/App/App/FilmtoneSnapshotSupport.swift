@@ -83,7 +83,7 @@ struct FilmtoneSnapshotFixture {
         case .presets:
             return .init(
                 project: makeProject(
-                    presetName: "gold200",
+                    presetName: "amberGlow",
                     strength: 0.92,
                     quickState: .init(filmCharacter: 0.12, era: 0.18, dynamics: -0.08)
                 ),
@@ -97,7 +97,7 @@ struct FilmtoneSnapshotFixture {
         case .quick:
             return .init(
                 project: makeProject(
-                    presetName: "portra",
+                    presetName: "iphone",
                     strength: 0.76,
                     quickState: .init(filmCharacter: 0.42, era: -0.24, dynamics: 0.22)
                 ),
@@ -111,7 +111,7 @@ struct FilmtoneSnapshotFixture {
         case .camera:
             return .init(
                 project: makeProject(
-                    presetName: "pro400h",
+                    presetName: "iphone",
                     strength: 0.88,
                     quickState: .init(filmCharacter: 0.08, era: -0.14, dynamics: -0.04),
                     inputLut: sampleInputLut
@@ -126,7 +126,7 @@ struct FilmtoneSnapshotFixture {
         case .export:
             return .init(
                 project: makeProject(
-                    presetName: "cinematic",
+                    presetName: "softBlue",
                     strength: 0.9,
                     quickState: .init(filmCharacter: 0.18, era: -0.12, dynamics: 0.12)
                 ),
@@ -157,7 +157,7 @@ struct FilmtoneSnapshotFixture {
     private static func makeSourceImportLoadingFixture() -> FilmtoneSnapshotFixture {
         .init(
             project: makeProject(
-                presetName: "cinematic",
+                presetName: "amberGlow",
                 strength: 0.84,
                 quickState: .init(filmCharacter: 0.28, era: -0.18, dynamics: 0.16)
             ),
@@ -203,7 +203,7 @@ struct FilmtoneSnapshotFixture {
 
         return .init(
             project: makeProject(
-                presetName: "cinematic",
+                presetName: "amberGlow",
                 strength: 0.84,
                 quickState: .init(filmCharacter: 0.28, era: -0.18, dynamics: 0.16)
             ),
@@ -240,7 +240,7 @@ struct FilmtoneSnapshotFixture {
 
         return .init(
             project: makeProject(
-                presetName: "cinematic",
+                presetName: "softBlue",
                 strength: 0.82,
                 quickState: .init(filmCharacter: 0.14, era: -0.10, dynamics: 0.08)
             ),

@@ -51,6 +51,7 @@ struct FilmtonePresetRow: View {
                         .shadow(color: Color.black.opacity(isActive ? 0.14 : 0.08), radius: isActive ? 8 : 4, x: 0, y: isActive ? 5 : 2)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("filmtone.preset.card.\(preset.name)")
                 }
             }
             .padding(.horizontal, 2)

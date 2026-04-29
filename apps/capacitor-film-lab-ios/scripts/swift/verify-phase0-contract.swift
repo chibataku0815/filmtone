@@ -71,7 +71,7 @@ struct VerifyPhase0Contract {
             abs((legacy.creativeLut?.intensity ?? 0) - 0.8) < 0.0001,
             "legacy creativeLut intensity drift"
         )
-        try expect(legacy.presetName == "cinematic", "legacy presetName drift")
+        try expect(legacy.presetName == "iphone", "legacy presetName migration drift")
         try expect(
             legacy.output == FilmtonePhase0Math.outputProfile,
             "legacy output profile drift"
@@ -108,8 +108,8 @@ struct VerifyPhase0Contract {
 
         // --- Preset count sanity ---
         try expect(
-            FilmtonePhase0Generated.paramsByName.count == 10,
-            "preset count should be 10 (got \(FilmtonePhase0Generated.paramsByName.count))"
+            FilmtonePhase0Generated.paramsByName.count == 4,
+            "preset count should be 4 (got \(FilmtonePhase0Generated.paramsByName.count))"
         )
 
         // --- Optional HLG fixture decode (Stream 1 produced fixture) ---

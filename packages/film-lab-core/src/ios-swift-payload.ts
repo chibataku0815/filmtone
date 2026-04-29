@@ -15,12 +15,15 @@ import {
   pickPhase0Params,
   type Phase0Params,
 } from "./phase0-schema";
-import { FILMTONE_IOS_PRESET_OVERRIDES } from "./ios-preset-overrides";
+import {
+  FILMTONE_IOS_PRESET_NAMES,
+  FILMTONE_IOS_PRESET_PATCHES,
+  type FilmtoneIosPresetName,
+} from "./ios-preset-overrides";
 import {
   CONTRACT_DEFAULTS,
   PRESETS,
   type ContractDefaultKey,
-  type PresetName,
 } from "./presets";
 import type { Params } from "./params";
 import {
@@ -34,7 +37,7 @@ import {
 export interface FilmtoneIosSwiftPayload {
   schemaVersion: number;
   presetVersion: string;
-  presetDefault: PresetName;
+  presetDefault: FilmtoneIosPresetName;
   presetStrengthDefault: number;
   paramKeys: readonly string[];
   quickAxisIds: readonly string[];
@@ -49,7 +52,7 @@ export interface FilmtoneIosSwiftPayload {
     fileSizeBytes: number;
   };
   resetParams: Phase0Params;
-  presets: Record<PresetName, Phase0Params>;
+  presets: Record<FilmtoneIosPresetName, Phase0Params>;
   quickWeights: Record<QuickAxisId, Partial<Record<keyof Phase0Params, number>>>;
   /**
    * Hidden default values that are not user-tunable in iOS Phase 0 but must
@@ -66,18 +69,15 @@ export interface FilmtoneIosSwiftPayload {
 }
 
 export function buildFilmtoneIosPresetMap(
-  presetOverrides: Partial<Record<PresetName, Partial<Phase0Params>>> = FILMTONE_IOS_PRESET_OVERRIDES,
-): Record<PresetName, Phase0Params> {
-  const presetNames = Object.keys(PRESETS) as PresetName[];
+  presetPatches: Partial<Record<FilmtoneIosPresetName, Partial<Phase0Params>>> = FILMTONE_IOS_PRESET_PATCHES,
+): Record<FilmtoneIosPresetName, Phase0Params> {
   return Object.fromEntries(
-    presetNames.map((name) => {
-      const base = name === PHASE0_PRESET_DEFAULT
-        ? createFilmtoneDefaultPhase0Params()
-        : pickPhase0Params(PRESETS[name]);
-      const patch = presetOverrides[name];
+    FILMTONE_IOS_PRESET_NAMES.map((name) => {
+      const base = createFilmtoneDefaultPhase0Params();
+      const patch = presetPatches[name];
       return [name, patch ? mergePhase0Params(base, patch) : base];
     }),
-  ) as Record<PresetName, Phase0Params>;
+  ) as Record<FilmtoneIosPresetName, Phase0Params>;
 }
 
 export function buildFilmtoneIosSwiftPayload(): FilmtoneIosSwiftPayload {
@@ -166,8 +166,8 @@ function renderPhase0ParamsInit(params: Phase0Params, indent = "        "): stri
   ].join("\n");
 }
 
-function renderPresetMap(presets: Record<PresetName, Phase0Params>): string {
-  const presetNames = Object.keys(presets) as PresetName[];
+function renderPresetMap(presets: Record<FilmtoneIosPresetName, Phase0Params>): string {
+  const presetNames = Object.keys(presets) as FilmtoneIosPresetName[];
   return [
     "[",
     presetNames

@@ -77,6 +77,10 @@ struct FilmtoneStrings {
     let advancedPresetNoneLabel: String
     let advancedPresetDefaultLabel: String
     let advancedPresetStrongLabel: String
+    let advancedPresetPrintLabel: String
+    let advancedPresetPushLabel: String
+    let advancedPresetVividLabel: String
+    let advancedPresetPunchLabel: String
     let advancedPresetCustomLabel: String
     let paramLabels: [String: String]
     let resetLabel: String
@@ -114,9 +118,9 @@ struct FilmtoneStrings {
     let exportStageCompleted: String
     let saveStateSaved: String
     let saveStateFailed: String
-    let presetCategoryFilmStock: String
+    let presetCategoryBase: String
+    let presetCategoryCamera: String
     let presetCategoryLook: String
-    let presetCategoryUtility: String
     let genericPickSourceError: String
     let genericImportLutError: String
     let genericExportError: String
@@ -341,6 +345,26 @@ extension FilmtoneStrings {
             defaultValue: "Strong",
             comment: "Compact preset chip that applies a stronger advanced parameter group recipe."
         )
+        advancedPresetPrintLabel = filmtoneLocalized(
+            "filmtone.advanced.preset.print",
+            defaultValue: "Print",
+            comment: "Compact preset chip that applies the print-process advanced parameter recipe."
+        )
+        advancedPresetPushLabel = filmtoneLocalized(
+            "filmtone.advanced.preset.push",
+            defaultValue: "Push",
+            comment: "Compact preset chip that applies the pushed-process advanced parameter recipe."
+        )
+        advancedPresetVividLabel = filmtoneLocalized(
+            "filmtone.advanced.preset.vivid",
+            defaultValue: "Vivid",
+            comment: "Compact preset chip that applies the vivid tone advanced parameter recipe."
+        )
+        advancedPresetPunchLabel = filmtoneLocalized(
+            "filmtone.advanced.preset.punch",
+            defaultValue: "Punch",
+            comment: "Compact preset chip that applies the punchy tone advanced parameter recipe."
+        )
         advancedPresetCustomLabel = filmtoneLocalized(
             "filmtone.advanced.preset.custom",
             defaultValue: "Custom",
@@ -552,20 +576,20 @@ extension FilmtoneStrings {
             defaultValue: "Failed",
             comment: "State badge shown after Save to Photos fails."
         )
-        presetCategoryFilmStock = filmtoneLocalized(
-            "filmtone.preset.category.film_stock",
-            defaultValue: "Film",
-            comment: "Preset category label for film stock presets."
+        presetCategoryBase = filmtoneLocalized(
+            "filmtone.preset.category.base",
+            defaultValue: "Base",
+            comment: "Preset category label for the neutral base preset."
+        )
+        presetCategoryCamera = filmtoneLocalized(
+            "filmtone.preset.category.camera",
+            defaultValue: "Camera",
+            comment: "Preset category label for camera-origin finishing presets."
         )
         presetCategoryLook = filmtoneLocalized(
             "filmtone.preset.category.look",
             defaultValue: "Look",
             comment: "Preset category label for look presets."
-        )
-        presetCategoryUtility = filmtoneLocalized(
-            "filmtone.preset.category.utility",
-            defaultValue: "Utility",
-            comment: "Preset category label for utility presets."
         )
         genericPickSourceError = filmtoneLocalized(
             "filmtone.error.generic.pick_source",
@@ -738,12 +762,12 @@ extension FilmtoneStrings {
 
     func categoryLabel(for category: FilmtonePresetCategory) -> String {
         switch category {
-        case .filmStock:
-            return presetCategoryFilmStock
+        case .base:
+            return presetCategoryBase
+        case .camera:
+            return presetCategoryCamera
         case .look:
             return presetCategoryLook
-        case .utility:
-            return presetCategoryUtility
         }
     }
 

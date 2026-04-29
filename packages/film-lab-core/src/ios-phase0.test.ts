@@ -46,7 +46,7 @@ test("iosPhase0ExportPayloadSchema accepts widened optical params and export def
     sourceUri: "file:///clip.mov",
     sourceDisplayName: "clip.mov",
     sourceKind: "video",
-    presetId: "cinematic",
+    presetId: "iphone",
     params: {
       exposure: 0.1,
       contrast: 1.1,
@@ -97,7 +97,7 @@ test("iosPhase0ExportPayloadSchema rejects rgbShift above the shared phase0 max"
       sourceUri: "file:///clip.mov",
       sourceDisplayName: "clip.mov",
       sourceKind: "video",
-      presetId: "cinematic",
+      presetId: "iphone",
       params: {
         exposure: 0.1,
         contrast: 1.1,
@@ -136,7 +136,7 @@ test("iosPhase0ExportPayloadSchema rejects halationHue outside the slider range"
       sourceUri: "file:///clip.mov",
       sourceDisplayName: "clip.mov",
       sourceKind: "video",
-      presetId: "cinematic",
+      presetId: "iphone",
       params: {
         exposure: 0.1,
         contrast: 1.1,
@@ -173,7 +173,7 @@ test("iosPhase0ExportPayloadSchema rejects halationHue outside the slider range"
       sourceUri: "file:///clip.mov",
       sourceDisplayName: "clip.mov",
       sourceKind: "video",
-      presetId: "cinematic",
+      presetId: "iphone",
       params: {
         exposure: 0.1,
         contrast: 1.1,
@@ -276,7 +276,7 @@ const DUAL_LUT_BASE_PAYLOAD = {
   sourceUri: "file:///clip.mov",
   sourceDisplayName: "clip.mov",
   sourceKind: "video" as const,
-  presetId: "cinematic" as const,
+  presetId: "iphone" as const,
   params: {
     exposure: 0,
     contrast: 1,

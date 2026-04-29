@@ -1,6 +1,9 @@
 import { z } from "zod";
 import type { CubeLUT } from "./cube-parser";
-import { PRESETS, type PresetName } from "./presets";
+import {
+  FILMTONE_IOS_PRESET_NAMES,
+  type FilmtoneIosPresetName,
+} from "./ios-preset-overrides";
 import {
   PHASE0_APPROX_SOURCE_LONG_EDGE_MAX,
   PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES,
@@ -178,9 +181,9 @@ export const iosPhase0SourceInfoSchema = z.object({
 
 export type IosPhase0SourceInfo = z.infer<typeof iosPhase0SourceInfoSchema>;
 
-const IOS_PHASE0_PRESET_IDS = Object.keys(PRESETS) as [
-  PresetName,
-  ...PresetName[],
+export const IOS_PHASE0_PRESET_IDS = FILMTONE_IOS_PRESET_NAMES as readonly [
+  FilmtoneIosPresetName,
+  ...FilmtoneIosPresetName[],
 ];
 
 export const iosPhase0PresetIdSchema = z.enum(IOS_PHASE0_PRESET_IDS);

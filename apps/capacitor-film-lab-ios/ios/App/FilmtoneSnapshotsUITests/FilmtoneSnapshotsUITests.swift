@@ -28,6 +28,26 @@ final class FilmtoneSnapshotsUITests: XCTestCase {
         captureSourceProbeLoading()
     }
 
+    func testPresetCatalogDisplaysFourIosPresets() throws {
+        let app = launch(scene: .presets)
+        waitForAppToSettle(app)
+
+        let presetCards = app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "filmtone.preset.card.")
+        )
+        XCTAssertEqual(presetCards.count, 4)
+
+        for presetName in ["reset", "iphone", "softBlue", "amberGlow"] {
+            XCTAssertTrue(app.buttons["filmtone.preset.card.\(presetName)"].exists)
+        }
+
+        for legacyPresetName in ["portra", "pro400h", "superia400", "gold200", "cinestill800t", "velvia50", "ektar100", "cinematic", "bw"] {
+            XCTAssertFalse(app.buttons["filmtone.preset.card.\(legacyPresetName)"].exists)
+        }
+
+        app.terminate()
+    }
+
     func testCaptureProcessVideoRefreshRegression() throws {
         let app = launch(scene: .processVideo)
         waitForAppToSettle(app)

@@ -411,7 +411,22 @@ enum FilmtonePhase0Math {
     static let outputProfile = FilmtonePhase0Generated.outputProfile
 
     static func safePresetName(_ presetName: String) -> String {
-        FilmtonePhase0Generated.paramsByName[presetName] == nil ? FilmtonePhase0Generated.presetDefault : presetName
+        if FilmtonePhase0Generated.paramsByName[presetName] != nil {
+            return presetName
+        }
+
+        switch presetName {
+        case "pro400h", "superia400":
+            return "softBlue"
+        case "gold200", "cinestill800t", "velvia50":
+            return "amberGlow"
+        case "portra", "ektar100", "cinematic":
+            return "iphone"
+        case "bw":
+            return FilmtonePhase0Generated.presetDefault
+        default:
+            return FilmtonePhase0Generated.presetDefault
+        }
     }
 
     static func createProjectState(presetName: String = FilmtonePhase0Generated.presetDefault) -> FilmtoneProjectState {

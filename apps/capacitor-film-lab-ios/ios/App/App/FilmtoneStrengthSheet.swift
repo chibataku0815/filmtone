@@ -195,9 +195,9 @@ struct FilmtoneStrengthSheet: View {
             id: group.id,
             title: group.title,
             selection: selection,
-            noneLabel: store.strings.advancedPresetNoneLabel,
-            defaultLabel: store.strings.advancedPresetDefaultLabel,
-            strongLabel: store.strings.advancedPresetStrongLabel,
+            noneLabel: group.presetLabels.none,
+            defaultLabel: group.presetLabels.standard,
+            strongLabel: group.presetLabels.strong,
             customLabel: store.strings.advancedPresetCustomLabel,
             isExpanded: Binding(
                 get: { expandedAdvancedGroupIds.contains(group.id) },
@@ -255,6 +255,7 @@ struct FilmtoneStrengthSheet: View {
             .init(
                 id: "process",
                 title: store.strings.advancedProcessLabel,
+                presetLabels: processAdvancedPresetLabels,
                 defaultValues: { base in
                     [
                         "cyan": max(base.cyan - 0.08, -1.0),
@@ -287,6 +288,7 @@ struct FilmtoneStrengthSheet: View {
             .init(
                 id: "optics",
                 title: store.strings.advancedOpticsLabel,
+                presetLabels: defaultAdvancedPresetLabels,
                 defaultValues: { base in
                     [
                         "rgbShift": max(base.rgbShift, 0.0035),
@@ -310,6 +312,7 @@ struct FilmtoneStrengthSheet: View {
             .init(
                 id: "glow",
                 title: store.strings.advancedGlowLabel,
+                presetLabels: defaultAdvancedPresetLabels,
                 defaultValues: { base in
                     [
                         "bloomThreshold": min(base.bloomThreshold, 0.56),
@@ -357,17 +360,18 @@ struct FilmtoneStrengthSheet: View {
             .init(
                 id: "grain",
                 title: store.strings.advancedGrainLabel,
+                presetLabels: defaultAdvancedPresetLabels,
                 defaultValues: { base in
                     [
-                        "grainIntensity": max(base.grainIntensity, 0.095),
-                        "grainSize": max(base.grainSize, 0.74),
+                        "grainIntensity": max(base.grainIntensity, 0.025),
+                        "grainSize": max(base.grainSize, 0.30),
                         "grainRadialMix": 1.0,
                     ]
                 },
                 strongValues: { base in
                     [
-                        "grainIntensity": max(base.grainIntensity, 0.10),
-                        "grainSize": max(base.grainSize, 0.94),
+                        "grainIntensity": max(base.grainIntensity, 0.045),
+                        "grainSize": max(base.grainSize, 0.38),
                         "grainRadialMix": 1.0,
                     ]
                 },
@@ -380,6 +384,7 @@ struct FilmtoneStrengthSheet: View {
             .init(
                 id: "tone",
                 title: store.strings.advancedToneLabel,
+                presetLabels: toneAdvancedPresetLabels,
                 defaultValues: { base in
                     [
                         "contrast": min(base.contrast + 0.30, 2.0),
@@ -402,6 +407,30 @@ struct FilmtoneStrengthSheet: View {
                 ]
             ),
         ]
+    }
+
+    private var defaultAdvancedPresetLabels: FilmtoneAdvancedPresetLabels {
+        .init(
+            none: store.strings.advancedPresetNoneLabel,
+            standard: store.strings.advancedPresetDefaultLabel,
+            strong: store.strings.advancedPresetStrongLabel
+        )
+    }
+
+    private var processAdvancedPresetLabels: FilmtoneAdvancedPresetLabels {
+        .init(
+            none: store.strings.advancedPresetNoneLabel,
+            standard: store.strings.advancedPresetPrintLabel,
+            strong: store.strings.advancedPresetPushLabel
+        )
+    }
+
+    private var toneAdvancedPresetLabels: FilmtoneAdvancedPresetLabels {
+        .init(
+            none: store.strings.advancedPresetNoneLabel,
+            standard: store.strings.advancedPresetVividLabel,
+            strong: store.strings.advancedPresetPunchLabel
+        )
     }
 
     private func control(
@@ -695,6 +724,7 @@ private struct FilmtoneCompareRevealPreview: View {
 private struct FilmtoneAdvancedParamGroup: Identifiable {
     let id: String
     let title: String
+    let presetLabels: FilmtoneAdvancedPresetLabels
     let defaultValues: (FilmtonePhase0Params) -> [String: Double]
     let strongValues: (FilmtonePhase0Params) -> [String: Double]
     let controls: [FilmtoneAdvancedParamControl]
@@ -702,6 +732,12 @@ private struct FilmtoneAdvancedParamGroup: Identifiable {
     var keys: [String] {
         controls.map(\.key)
     }
+}
+
+private struct FilmtoneAdvancedPresetLabels {
+    let none: String
+    let standard: String
+    let strong: String
 }
 
 private struct FilmtoneAdvancedParamControl: Identifiable {

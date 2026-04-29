@@ -1,7 +1,10 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { FILMTONE_IOS_PRESET_OVERRIDES } from "./ios-preset-overrides";
+import {
+  FILMTONE_IOS_PRESET_NAMES,
+  FILMTONE_IOS_PRESET_PATCHES,
+} from "./ios-preset-overrides";
 import {
   CONTRACT_DEFAULT_KEY_ORDER,
   buildFilmtoneIosPresetMap,
@@ -13,22 +16,34 @@ import {
   phase0ParamsSchema,
   pickPhase0Params,
 } from "./phase0-schema";
-import { CONTRACT_DEFAULTS, PRESETS, type PresetName } from "./presets";
+import { CONTRACT_DEFAULTS, PRESETS } from "./presets";
 
-const EXPECTED_CINEMATIC_IOS_ENVELOPE = {
-  contrast: 1.24,
-  saturation: 0.87,
-  rgbShift: 0.001,
-  bloomThreshold: 0.78,
+const EXPECTED_IPHONE_IOS_ENVELOPE = {
+  contrast: 1.08,
+  saturation: 0.94,
+  compressionAmount: 0.18,
   bloomStrength: 0.18,
-  bloomRadius: 0.42,
-  diffusion: 0.05,
-  halationIntensity: 0.02,
-  halationSpread: 18,
-  halationRadius: 0.36,
-  compressionAmount: 0.08,
-  printContrast: 0.08,
-  vignette: 0.32,
+  lensSoftness: 0.035,
+} as const;
+
+const EXPECTED_SOFT_BLUE_IOS_ENVELOPE = {
+  contrast: 0.94,
+  saturation: 1.08,
+  temperature: -0.18,
+  bloomStrength: 0.36,
+  diffusion: 0.24,
+  compressionAmount: 0.32,
+  cyan: 0.05,
+} as const;
+
+const EXPECTED_AMBER_GLOW_IOS_ENVELOPE = {
+  contrast: 1.12,
+  saturation: 1.12,
+  temperature: 0.26,
+  bloomStrength: 0.24,
+  diffusion: 0.12,
+  halationIntensity: 0.14,
+  yellow: 0.12,
 } as const;
 
 test("generated Swift payload stays in sync with current iOS phase0 payload truth", () => {
@@ -44,30 +59,28 @@ test("generated Swift payload stays in sync with current iOS phase0 payload trut
   expect(actual).toBe(expected);
 });
 
-test("iOS preset map applies mobile-only overrides without mutating shared presets", () => {
-  const presetMap = buildFilmtoneIosPresetMap();
+test("iOS preset map exposes the four mobile looks without mutating shared presets", () => {
   const sharedCinematic = pickPhase0Params(PRESETS.cinematic);
+  const presetMap = buildFilmtoneIosPresetMap();
   const pureReset = pickPhase0Params(PRESETS.reset);
 
+  expect(Object.keys(presetMap)).toEqual([...FILMTONE_IOS_PRESET_NAMES]);
   expect(presetMap.reset).toEqual(createFilmtoneDefaultPhase0Params());
   expect(presetMap.reset).not.toEqual(pureReset);
-  expect(sharedCinematic).toEqual(pickPhase0Params(PRESETS.cinematic));
+  expect((presetMap as Record<string, unknown>).cinematic).toBeUndefined();
+  expect((presetMap as Record<string, unknown>).portra).toBeUndefined();
+  expect(pickPhase0Params(PRESETS.cinematic)).toEqual(sharedCinematic);
   expect(PRESETS.cinematic.contrast).toBe(1.24);
   expect(PRESETS.cinematic.printContrast).toBe(0);
 
-  expect(presetMap.cinematic).toMatchObject(FILMTONE_IOS_PRESET_OVERRIDES.cinematic ?? {});
-  expect(presetMap.cinematic).toMatchObject(EXPECTED_CINEMATIC_IOS_ENVELOPE);
-  expect(presetMap.cinematic).not.toEqual(sharedCinematic);
-  expect(presetMap.cinematic.contrast).toBe(1.24);
-  expect(presetMap.cinematic.rgbShift).toBe(0.001);
-  expect(presetMap.cinematic.bloomStrength).toBe(0.18);
-  expect(presetMap.cinematic.halationIntensity).toBe(0.02);
-  expect(presetMap.cinematic.compressionAmount).toBe(0.08);
-  expect(presetMap.cinematic.printContrast).toBe(0.08);
-  expect(presetMap.cinestill800t.bloomStrength).toBe(0.24);
-  expect(presetMap.velvia50.printContrast).toBe(0.16);
+  expect(presetMap.iphone).toMatchObject(FILMTONE_IOS_PRESET_PATCHES.iphone ?? {});
+  expect(presetMap.iphone).toMatchObject(EXPECTED_IPHONE_IOS_ENVELOPE);
+  expect(presetMap.softBlue).toMatchObject(EXPECTED_SOFT_BLUE_IOS_ENVELOPE);
+  expect(presetMap.amberGlow).toMatchObject(EXPECTED_AMBER_GLOW_IOS_ENVELOPE);
   expect(renderFilmtoneIosSwiftPayload()).toContain('static let schemaVersion = 2');
   expect(renderFilmtoneIosSwiftPayload()).toContain('static let rgbShiftMax = 0.005');
+  expect(renderFilmtoneIosSwiftPayload()).toContain('"iphone": .init(');
+  expect(renderFilmtoneIosSwiftPayload()).not.toContain('"cinematic": .init(');
 });
 
 test("iOS Swift payload keeps pure reset separate from the default reset target", () => {
@@ -85,7 +98,7 @@ test("iOS override leaves shared PRESETS byte-identical for all presets", () => 
   const presetMap = buildFilmtoneIosPresetMap();
   expect(PRESETS).toEqual(snapshot);
 
-  const presetNames = Object.keys(presetMap) as PresetName[];
+  const presetNames = Object.keys(presetMap) as Array<keyof typeof presetMap>;
   for (const name of presetNames) {
     expect(() => phase0ParamsSchema.parse(presetMap[name])).not.toThrow();
   }

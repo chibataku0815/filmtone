@@ -2237,6 +2237,57 @@
         }
       }
     },
+    "filmtone.preset.amber_glow.subtitle" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Warm Flare"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あたたかいフレア"
+          }
+        }
+      }
+    },
+    "filmtone.preset.category.base" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Base"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "基準"
+          }
+        }
+      }
+    },
+    "filmtone.preset.category.camera" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Camera"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カメラ"
+          }
+        }
+      }
+    },
     "filmtone.preset.category.film_stock" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -2356,6 +2407,23 @@
         }
       }
     },
+    "filmtone.preset.iphone.subtitle" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Camera Finish"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カメラ仕上げ"
+          }
+        }
+      }
+    },
     "filmtone.preset.portra.subtitle" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -2396,13 +2464,30 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Clean Base"
+            "value" : "Gentle Base"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "クリーンベース"
+            "value" : "やさしい基準"
+          }
+        }
+      }
+    },
+    "filmtone.preset.soft_blue.subtitle" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Airy Glow"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "澄んだ光"
           }
         }
       }
@@ -2430,13 +2515,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Film Presets"
+            "value" : "Presets"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "フィルムプリセット"
+            "value" : "プリセット"
           }
         }
       }
