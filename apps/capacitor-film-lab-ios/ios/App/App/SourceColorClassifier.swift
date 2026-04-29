@@ -36,25 +36,88 @@ enum SourceColorClassifier {
             return .wideGamutUnknown
         }
 
-        if isSdrDisplayColor(metadata) {
+        if isStrictSdrBt709(metadata) {
             return .sdrBt709
         }
 
         return .unknown
     }
 
-    private static func isSdrDisplayColor(_ metadata: SourceColorMetadataDTO) -> Bool {
-        let hasDisplayPrimaries =
-            metadata.colorPrimaries == "bt709" ||
-            metadata.colorPrimaries == "smpte431" ||
-            metadata.colorPrimaries == "smpte432"
+    private static func isStrictSdrBt709(_ metadata: SourceColorMetadataDTO) -> Bool {
+        let hasBt709Primaries = metadata.colorPrimaries == "bt709"
         let hasSdrTransfer =
             metadata.colorTransfer == "bt709" ||
-            metadata.colorTransfer == "iec61966-2-1" ||
             metadata.colorTransfer == nil
         let hasVideoMatrix =
             metadata.colorSpace == "bt709" ||
             metadata.colorSpace == nil
-        return hasDisplayPrimaries && hasSdrTransfer && hasVideoMatrix
+        return hasBt709Primaries && hasSdrTransfer && hasVideoMatrix
+    }
+}
+
+enum FilmtoneMezzanineRoutePolicy {
+    enum Variant: String, Equatable {
+        case sdr
+        case hdr
+    }
+
+    static func prewarmVariant(for colorClass: SourceColorClassDTO?) -> Variant? {
+        guard let colorClass else {
+            return nil
+        }
+
+        switch colorClass {
+        case .sdrBt709:
+            return .sdr
+        case .hdrPq, .hdrHlg, .appleLog, .appleLog2, .wideGamutUnknown:
+            return .hdr
+        case .unsupported, .unknown:
+            return nil
+        }
+    }
+
+    static func selectedVariant(
+        renderMode: String?,
+        colorClass: SourceColorClassDTO?,
+        hasHDRMezzanine: Bool,
+        hasSDRMezzanine: Bool
+    ) -> Variant? {
+        guard normalizedRenderMode(renderMode) == "speed" else {
+            return nil
+        }
+
+        for variant in speedVariantPreference(for: colorClass) {
+            switch variant {
+            case .hdr where hasHDRMezzanine:
+                return .hdr
+            case .sdr where hasSDRMezzanine:
+                return .sdr
+            default:
+                continue
+            }
+        }
+
+        return nil
+    }
+
+    private static func speedVariantPreference(for colorClass: SourceColorClassDTO?) -> [Variant] {
+        guard let colorClass else {
+            return []
+        }
+
+        switch colorClass {
+        case .sdrBt709:
+            return [.sdr]
+        case .hdrPq, .hdrHlg, .appleLog, .appleLog2, .wideGamutUnknown:
+            return [.hdr]
+        case .unsupported, .unknown:
+            return []
+        }
+    }
+
+    private static func normalizedRenderMode(_ renderMode: String?) -> String {
+        renderMode?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased() ?? "quality"
     }
 }

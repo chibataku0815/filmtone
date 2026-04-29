@@ -19,6 +19,7 @@ struct TestSourceColorClassifier {
         try runNormalizerPrimariesTests()
         try runNormalizerMatrixTests()
         try runClassifierBranchTests()
+        try runMezzanineRoutePolicyTests()
         try runPolicyDeriverTests()
         try runHlgFixtureRoundTrip()
         try runAppleLogFixtureRoundTrips()
@@ -179,18 +180,18 @@ struct TestSourceColorClassifier {
             )) == .sdrBt709,
             "classifier: bt709 primaries+transfer, nil space -> sdrBt709"
         )
-        // Branch 4: iPhone SDR Display P3 / DCI P3 should stay on the SDR path.
+        // Branch 5: iPhone SDR Display P3 / DCI P3 must not be labeled BT.709.
         try expect(
             SourceColorClassifier.classify(metadata(
                 transfer: "bt709", primaries: "smpte432", space: "bt709"
-            )) == .sdrBt709,
-            "classifier: Display P3 SDR -> sdrBt709"
+            )) == .unknown,
+            "classifier: Display P3 SDR -> unknown"
         )
         try expect(
             SourceColorClassifier.classify(metadata(
                 transfer: "iec61966-2-1", primaries: "smpte431", space: nil
-            )) == .sdrBt709,
-            "classifier: DCI P3 SDR transfer -> sdrBt709"
+            )) == .unknown,
+            "classifier: DCI P3 SDR transfer -> unknown"
         )
         // Branch 5: unknown (everything nil)
         try expect(
@@ -201,6 +202,73 @@ struct TestSourceColorClassifier {
         try expect(
             SourceColorClassifier.classify(metadata(transfer: "smpte170m", primaries: "smpte170m")) == .unknown,
             "classifier: smpte170m -> unknown"
+        )
+    }
+
+    // MARK: - Mezzanine route policy
+
+    static func runMezzanineRoutePolicyTests() throws {
+        try expect(
+            FilmtoneMezzanineRoutePolicy.selectedVariant(
+                renderMode: nil,
+                colorClass: .sdrBt709,
+                hasHDRMezzanine: true,
+                hasSDRMezzanine: true
+            ) == nil,
+            "route: default quality must stay source-direct even with cached mezzanines"
+        )
+        try expect(
+            FilmtoneMezzanineRoutePolicy.selectedVariant(
+                renderMode: "quality",
+                colorClass: .hdrHlg,
+                hasHDRMezzanine: true,
+                hasSDRMezzanine: true
+            ) == nil,
+            "route: explicit quality must stay source-direct"
+        )
+        try expect(
+            FilmtoneMezzanineRoutePolicy.selectedVariant(
+                renderMode: "speed",
+                colorClass: .sdrBt709,
+                hasHDRMezzanine: true,
+                hasSDRMezzanine: true
+            ) == .sdr,
+            "route: speed may use SDR mezzanine only for strict BT.709"
+        )
+        try expect(
+            FilmtoneMezzanineRoutePolicy.selectedVariant(
+                renderMode: "speed",
+                colorClass: .hdrHlg,
+                hasHDRMezzanine: true,
+                hasSDRMezzanine: true
+            ) == .hdr,
+            "route: speed prefers HDR mezzanine for HDR classes"
+        )
+        try expect(
+            FilmtoneMezzanineRoutePolicy.selectedVariant(
+                renderMode: "speed",
+                colorClass: .unknown,
+                hasHDRMezzanine: true,
+                hasSDRMezzanine: true
+            ) == nil,
+            "route: stale unknown/P3 mezzanine cache must not be selected"
+        )
+        try expect(
+            FilmtoneMezzanineRoutePolicy.selectedVariant(
+                renderMode: "speed",
+                colorClass: .wideGamutUnknown,
+                hasHDRMezzanine: false,
+                hasSDRMezzanine: true
+            ) == nil,
+            "route: wide-gamut unknown must not fall back to SDR mezzanine"
+        )
+        try expect(
+            FilmtoneMezzanineRoutePolicy.prewarmVariant(for: .sdrBt709) == .sdr,
+            "route: prewarm strict BT.709 as SDR"
+        )
+        try expect(
+            FilmtoneMezzanineRoutePolicy.prewarmVariant(for: .unknown) == nil,
+            "route: skip prewarm for unknown/P3 sources"
         )
     }
 

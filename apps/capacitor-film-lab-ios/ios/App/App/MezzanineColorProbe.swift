@@ -2,63 +2,99 @@ import AVFoundation
 import CoreMedia
 import Foundation
 
-/// Classifies a video source as SDR or HDR by inspecting its CMFormatDescription
-/// extensions for color primaries and transfer function.
+/// Resolves whether a selected source is safe to prewarm as an SDR or HDR
+/// mezzanine by inspecting its CMFormatDescription extensions.
 ///
 /// Decision rule (plan §6.2):
 /// - BT.2020 / Rec.2020 primaries → `.hdr` (covers HLG, PQ, Apple Log)
 /// - HLG, PQ, or Apple Log transfer (with any primaries) → `.hdr`
-/// - P3 D65 primaries alone stay `.sdr`; common iPhone Display P3 SDR is not HDR.
-/// - Anything else, or missing metadata → `.sdr` (conservative)
-///
-/// Conservative default keeps Quality-mode color science intact when metadata is unknown:
-/// a misclassified HDR source falls through to source-direct read in `resolvedVideoSourceURL`.
+/// - Strict BT.709 SDR → `.sdr`
+/// - Display P3 SDR, unknown, and missing metadata → no prewarm.
 enum MezzanineColorProbe {
-    static func classify(track: AVAssetTrack) -> ProfileVariant {
-        guard let firstDescription = track.formatDescriptions.first else {
-            return .sdr
+    static func prewarmVariant(track: AVAssetTrack) -> ProfileVariant? {
+        guard let colorClass = sourceColorClass(track: track),
+              let routeVariant = FilmtoneMezzanineRoutePolicy.prewarmVariant(for: colorClass)
+        else {
+            return nil
         }
-        let cmDescription = firstDescription as! CMFormatDescription
 
-        let primaries = CMFormatDescriptionGetExtension(
-            cmDescription,
-            extensionKey: kCMFormatDescriptionExtension_ColorPrimaries
-        ) as? String
-        let transfer = CMFormatDescriptionGetExtension(
-            cmDescription,
-            extensionKey: kCMFormatDescriptionExtension_TransferFunction
-        ) as? String
-
-        if let primaries, isWideGamutPrimaries(primaries) {
-            return .hdr
-        }
-        if let transfer, isHdrTransfer(transfer) {
-            return .hdr
-        }
-        return .sdr
+        return profileVariant(for: routeVariant)
     }
 
     /// Convenience: probe the first video track of an asset URL.
-    static func classify(sourceURL: URL) -> ProfileVariant {
+    static func prewarmVariant(sourceURL: URL) -> ProfileVariant? {
         let asset = AVURLAsset(url: sourceURL)
         guard let track = asset.tracks(withMediaType: .video).first else {
+            return nil
+        }
+        return prewarmVariant(track: track)
+    }
+
+    private static func sourceColorClass(track: AVAssetTrack) -> SourceColorClassDTO? {
+        guard let firstDescription = track.formatDescriptions.first else {
+            return nil
+        }
+        let cmDescription = firstDescription as! CMFormatDescription
+        let extensions = (CMFormatDescriptionGetExtensions(cmDescription) as? [CFString: Any]) ?? [:]
+
+        let rawTransfer = FormatExtensionReader.string(
+            in: extensions,
+            cfKey: kCMFormatDescriptionExtension_TransferFunction,
+            stringKey: "TransferFunction"
+        )
+        let rawPrimaries = FormatExtensionReader.string(
+            in: extensions,
+            cfKey: kCMFormatDescriptionExtension_ColorPrimaries,
+            stringKey: "ColorPrimaries"
+        )
+        let rawMatrix = FormatExtensionReader.string(
+            in: extensions,
+            cfKey: kCMFormatDescriptionExtension_YCbCrMatrix,
+            stringKey: "YCbCrMatrix"
+        )
+        let rawLogTransfer: String? = {
+            if #available(iOS 17.2, *) {
+                return FormatExtensionReader.string(
+                    in: extensions,
+                    cfKey: kCMFormatDescriptionExtension_LogTransferFunction,
+                    stringKey: "LogTransferFunction"
+                )
+            }
+            return FormatExtensionReader.string(
+                in: extensions,
+                cfKey: nil,
+                stringKey: "LogTransferFunction"
+            )
+        }()
+        let normalizedLogTransfer = SourceColorMetadataNormalizer.normalizeLogTransferFunction(rawLogTransfer)
+
+        let metadata = SourceColorMetadataDTO(
+            colorRange: nil,
+            colorSpace: SourceColorMetadataNormalizer.normalizeMatrix(rawMatrix),
+            colorTransfer: SourceColorMetadataNormalizer.normalizeTransfer(rawTransfer)
+                ?? normalizedLogTransfer?.rawValue,
+            colorPrimaries: SourceColorMetadataNormalizer.normalizePrimaries(rawPrimaries),
+            logTransferFunction: normalizedLogTransfer,
+            hasMasteringDisplayMetadata: FormatExtensionReader.hasKey(
+                in: extensions,
+                cfKey: nil,
+                stringKey: "MasteringDisplayColorVolume"
+            ),
+            hasContentLightMetadata: FormatExtensionReader.hasKey(
+                in: extensions,
+                cfKey: nil,
+                stringKey: "ContentLightLevelInfo"
+            )
+        )
+        return SourceColorClassifier.classify(metadata)
+    }
+
+    private static func profileVariant(for routeVariant: FilmtoneMezzanineRoutePolicy.Variant) -> ProfileVariant {
+        switch routeVariant {
+        case .sdr:
             return .sdr
+        case .hdr:
+            return .hdr
         }
-        return classify(track: track)
-    }
-
-    private static func isWideGamutPrimaries(_ primaries: String) -> Bool {
-        // CFString constants compare by value when bridged to Swift String.
-        primaries == (kCMFormatDescriptionColorPrimaries_ITU_R_2020 as String)
-    }
-
-    private static func isHdrTransfer(_ transfer: String) -> Bool {
-        if transfer == (kCMFormatDescriptionTransferFunction_ITU_R_2100_HLG as String) ||
-            transfer == (kCMFormatDescriptionTransferFunction_SMPTE_ST_2084_PQ as String) {
-            return true
-        }
-
-        let token = transfer.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return token.contains("apple") && token.contains("log")
     }
 }
