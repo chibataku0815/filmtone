@@ -255,82 +255,54 @@
     "closeParamsPanelAria": "Close parameters panel",
     "lp": {
       "heroEyebrow": "Filmtone",
-      "heroTitle": "Make your videos feel finished fast.",
-      "heroBody": "Filmtone is a desktop-first finisher for video. Try the look on your own media in the browser, then finish and export on macOS with dependable playback, compare, and signature character. Keep stills in the same world when you need matching covers or supporting frames.",
-      "heroPrimaryCta": "Download for macOS",
-      "heroSecondaryLine": "Apple Silicon · macOS {minMacos}+ — full requirements on the download page.",
-      "proofTeaserLine": "Play it, compare it, finish it.",
-      "heroProofTitle": "Actual motion proof",
-      "heroProofBody": "A proof cut from a real graded clip. Let the finished feel land in motion before the page asks you to think about controls or release details.",
-      "surfaceSplitEyebrow": "Workflow split",
-      "surfaceSplitTitle": "Try the look on web. Finish on Desktop.",
-      "surfaceSplitWebTitle": "Web is the audition surface.",
-      "surfaceSplitWebBody": "Open your own frame or video, compare in motion, and decide whether the tone is heading in the right direction.",
-      "surfaceSplitDesktopTitle": "Desktop is the production surface.",
-      "surfaceSplitDesktopBody": "Finish and export on macOS when you need dependable playback, compare, Cross Filter, and a workflow you can trust on real footage.",
+      "heroTitle": "Movie color,\nfilm snapshots.",
+      "heroBody": "Turn iPhone photos and short clips into cinematic color, or a disposable-camera snapshot. Shape it on the device you shot with, then save and share.",
+      "heroSubtitle": "Finish what you shot — on iPhone, on Mac, in the browser.",
+      "heroPrimaryCta": "Finish on Mac",
+      "heroPrimaryCtaSubLine": "macOS {minMacos}+ · Apple Silicon · DMG",
+      "heroIosCta": "Get Filmtone on the App Store",
+      "heroIosCtaSubLine": "iOS {minIos}+ · App Store",
+      "proofTeaserLine": "Play it. Compare it. Finish it.",
+      "heroProofTitle": "See it land in motion.",
+      "heroProofBody": "Real graded footage from Filmtone. Watch how color and light bloom settle while everything keeps moving.",
+      "surfaceSplitEyebrow": "One look, three surfaces",
+      "surfaceSplitTitle": "Same Filmtone — start on web, on Mac, or on iPhone.",
+      "surfaceSplitWebTitle": "Web",
+      "surfaceSplitWebBody": "Open your own media in the browser and audition the look.",
+      "surfaceSplitDesktopTitle": "macOS",
+      "surfaceSplitDesktopBody": "Play, compare, and finish deeper on Mac.",
+      "surfaceSplitIosTitle": "iPhone",
+      "surfaceSplitIosBody": "Stay on the iPhone you shot with. Save and share from there.",
       "expandAuxiliaryPanelsTitle": "Show more: fine controls, LUT, compare, histogram, save…",
       "expandAuxiliaryPanelsHint": "Skip this if presets and the Quick sliders are enough.",
-      "valueTitle": "Why macOS helps you keep tone consistent",
-      "valueBullet1": "Carry one look across many stills with the same feel.",
-      "valueBullet2": "Process a folder of photos into another folder with a cohesive finish—and nudge one video to match when you need it.",
-      "valueBullet3": "Try the vibe here first, then finish and deliver from the macOS app.",
-      "workflowTitle": "Bring the same world into stills.",
-      "workflowLead": "Stills matter here as a companion surface, not a separate product identity.",
-      "workflowBullet1": "Use stills for covers, thumbnails, gallery frames, and supporting images around the clip.",
-      "workflowBullet2": "Keep the mood consistent instead of rebuilding it in a separate photo-first workflow.",
-      "workflowBullet3": "Treat the clip as the center of gravity, then extend that same world outward when you need it.",
-      "demoEyebrow": "Try your own media on web",
-      "demoTitle": "Audition a look in the browser",
-      "demoBody": "Open a frame or video, start from the core controls, and compare in motion. When you want dependable finishing and export, move to the macOS app.",
-      "demoSourceEyebrow": "Source",
-      "demoSourceSample": "Sample image",
-      "demoPreviewEyebrow": "Preview",
-      "demoStatusAria": "Current media source and split preview state",
-      "trustHeading": "Release details & support",
-      "faqTitle": "FAQ",
+      "demoEyebrow": "Try with your own media",
+      "demoTitle": "Right here, in your browser.",
+      "demoBody": "Open a photo or short clip and feel the look. When you want to go deeper, move to the Mac app.",
+      "trustHeading": "Download and requirements.",
+      "faqTitle": "About Filmtone.",
       "faqQfree": "Is Filmtone free?",
       "faqAfree": "Yes. Both the browser and desktop versions are free. There is an optional support mechanism, but it does not unlock extra features.",
-      "faqQformats": "What kind of media can I try here?",
-      "faqAformats": "In the browser, open a photo or video to audition the look. On Desktop, move to the stronger production path when you need finishing and export on macOS.",
-      "faqQwhichVersion": "Should I use the browser or the desktop app?",
-      "faqAwhichVersion": "Use the browser to try the look on your own media and compare quickly. Use the macOS app when you're ready to finish, export, and trust the result on real footage.",
-      "faqQpresets": "Is Filmtone just a preset pack?",
-      "faqApresets": "No. Presets are only the starting point. Filmtone is about getting to a finished feel quickly through playback judgment, trust, and signature finish.",
-      "faqQvideo": "Do stills still matter?",
-      "faqAvideo": "Yes. Stills matter as a same-world extension for covers, thumbnails, gallery frames, and supporting images around the clip.",
+      "faqQwhichVersion": "Which Filmtone surface should I use first?",
+      "faqAwhichVersion": "Use the browser to try the look, the iPhone app when you want a local edit from the capture device, and the macOS app when you need the strongest finishing and export workflow.",
       "faqQwindows": "Is there a Windows version?",
       "faqAwindows": "The desktop app is macOS-only (Apple Silicon). The browser version works on any OS.",
       "roadmapLink": "Roadmap",
       "releaseNotesLink": "Release Notes",
-      "premiumHeroBadgeNew": "Desktop",
-      "premiumHeroBadgeLine": "v1.0.0 now live on macOS",
-      "premiumCapabilitiesEyebrow": "Motion proof",
-      "premiumCapabilitiesTitle": "See the finish land in motion.",
-      "premiumFeature1Title": "Low-light finish, fast.",
-      "premiumFeature1Body": "This is a real graded low-light clip. Colored lights bloom, the frame stops feeling raw, and the finished feel shows up before any product UI has to explain itself.",
-      "premiumFeature2Title": "Point lights with signature character.",
-      "premiumFeature2Body": "A second real graded clip in a different lighting setup. The point is not one hero shot, but that the current shipped finish already carries recognizable character across motion.",
-      "premiumGridEyebrow": "Trust on real footage",
-      "premiumGridTitle": "The shipped surface is getting safer to judge.",
-      "premiumCard1Title": "Playback you can trust",
-      "premiumCard1Body": "Play, scrub, compare, and review quickly. Playback judgment is part of the product, not a side note.",
-      "premiumCard2Title": "Heavy footage, faster return",
-      "premiumCard2Body": "Progressive preview and reusable proxies keep real camera files workable instead of blocking the finish.",
-      "premiumCard3Title": "Cross Filter, live in preview",
-      "premiumCard3Body": "In v1.0, Cross Filter runs live on the WebGPU preview path, with inline threshold, chromatic, and spacing controls.",
-      "premiumCard4Title": "Same world, wider delivery",
-      "premiumCard4Body": "Desktop is built to finish video first, then carry that mood into stills, covers, and supporting frames.",
-      "premiumCompareTitle": "Show the shipped surface on a real compare pass.",
-      "premiumCompareBody": "These silent macOS captures are product proof, not mood reels. They show playback, compare, and finish judgment on actual footage.",
+      "copyrightLink": "© Takumi Chiba Portfolio",
+      "premiumHeroBadgeNew": "Public",
+      "heroPublicRailAria": "Public Filmtone surfaces: macOS {desktopVersion}, iPhone {iosVersion}, and web demo",
+      "premiumHeroBadgeDesktop": "macOS v{version}",
+      "premiumHeroBadgeIos": "iPhone v{version}",
+      "premiumHeroBadgeWeb": "Web demo",
+      "premiumCompareTitle": "Filmtone in motion.",
+      "premiumCompareBody": "Color, shadow, and air — verified while everything keeps moving.",
       "premiumCompareCard1Title": "Night scene compare.",
       "premiumCompareCard1Body": "A current desktop capture showing before/after judgment on a real night clip while the footage keeps moving.",
       "premiumCompareCard2Title": "Bright scene compare.",
       "premiumCompareCard2Body": "A brighter shot where compare remains readable in motion and Cross Filter decisions can be checked before export.",
       "premiumCompareCard3Title": "Dark scene compare.",
       "premiumCompareCard3Body": "A moodier low-light clip to reinforce trust before export, even when the footage is less forgiving than a hero shot.",
-      "premiumCtaTryDemo": "Try in the browser",
-      "premiumMediaProofNote": "Actual silent graded proof clip.",
-      "premiumMediaPlaceholder": "Product screenshot placeholder until real captures land."
+      "premiumCtaTryDemo": "Audition the look in this browser"
     },
     "toolbar": {
       "open": "Open media",
@@ -377,13 +349,12 @@
       "logMix": "Conversion mix",
       "logMixDisabledHint": "Load a log conversion .cube first"
     },
-    "back": "← Back to Interactive",
     "metadata": {
       "title": "Filmtone",
-      "description": "Desktop-first finisher for video. Try the look in the browser on your own frame or clip, then finish and export on macOS.",
+      "description": "Filmtone brings one film-look workflow to web, macOS, and iPhone: try in the browser, finish on Mac, or edit locally from the App Store version.",
       "ogTitle": "Filmtone — make your videos feel finished fast",
-      "ogDescription": "Try the look in your browser. Finish and export on macOS with dependable playback, compare, and signature character.",
-      "ogImageAlt": "Filmtone — desktop-first finisher for video"
+      "ogDescription": "Try the look in your browser, finish on macOS, or grade locally on iPhone with the public App Store version.",
+      "ogImageAlt": "Filmtone — web, macOS, and iPhone film-look workflow"
     },
     "share": {
       "sectionTitle": "Share",
@@ -645,7 +616,7 @@
     },
     "desktopRelease": {
       "eyebrow": "Desktop",
-      "title": "Filmtone Desktop (macOS)",
+      "title": "Filmtone Desktop v1.0.3 (macOS)",
       "body": "Finish video on macOS, then carry the same world into stills when you need matching covers or supporting frames. The download is a notarized DMG for Apple Silicon.",
       "essentials": {
         "environmentLabel": "Requirements",
@@ -653,7 +624,7 @@
         "distributionLabel": "Download & updates",
         "distributionBody": "Signed, notarized DMG. The app does not auto-install updates in the background. Download a new DMG from the download page to update. The app may notify you when a newer build is available (requires a network connection)."
       },
-      "downloadCta": "Download DMG",
+      "downloadCta": "Get macOS app (DMG)",
       "supportCtaPrefix": "Contact:",
       "downloadPage": {
         "eyebrow": "Download",
@@ -705,6 +676,19 @@
           "contactPrefix": "Questions?"
         }
       }
+    },
+    "iosRelease": {
+      "eyebrow": "iPhone",
+      "title": "Filmtone for iPhone v{version}",
+      "body": "The public App Store build is the local-first path for grading photos and videos directly on iPhone. It keeps the workflow on the device, with presets, Quick controls, LUTs, export, save, and share.",
+      "essentials": {
+        "environmentLabel": "Requirements",
+        "environmentBody": "{deviceFamily} with iOS {minIos} or later.",
+        "distributionLabel": "Distribution",
+        "distributionBody": "Distributed through the App Store. Public release notes follow the App Store build, while unreleased candidate notes stay in the iOS release rail."
+      },
+      "appStoreCta": "Get on the App Store",
+      "supportCtaPrefix": "Contact:"
     },
     "desktop": {
       "app": {
@@ -895,7 +879,9 @@
       "webDemoName": "Filmtone (try in browser)",
       "webDemoDescription": "Browser try-first experience for opening your own frame or video and auditioning the look before moving to Filmtone Desktop.",
       "webDemoOperatingSystem": "Common desktop browser with interactive graphics support",
-      "webDemoBrowserRequirements": "Modern browser with WebGL2 available"
+      "webDemoBrowserRequirements": "Modern browser with WebGL2 available",
+      "iosName": "Filmtone for iPhone",
+      "iosDescription": "Local-first iPhone grading app for photos and videos, with presets, Quick controls, LUTs, export, save, and share."
     },
     "roadmap": {
       "title": "Roadmap — Filmtone",
@@ -1036,16 +1022,39 @@
     },
     "releaseNotes": {
       "title": "Release Notes — Filmtone",
-      "description": "Filmtone Desktop release history — see what's new, fixed, and improved in each version.",
+      "description": "Filmtone public release history for Desktop and iPhone — see what's new, fixed, and improved in each public version.",
       "eyebrow": "RELEASE NOTES",
-      "heroTitle": "Filmtone Desktop release notes",
-      "heroBody": "Every Filmtone Desktop release, from the very first build to today. Each entry covers what was added, what was improved, and what was fixed.",
+      "heroTitle": "Filmtone public release notes",
+      "heroBody": "Desktop and iPhone ship on separate rails. This page shows only public releases; unreleased iPhone candidates stay in App Store Connect and fastlane metadata until they are live.",
+      "platformTabsLabel": "Release platform",
+      "platforms": {
+        "desktop": "Desktop",
+        "ios": "iPhone"
+      },
+      "platformIntro": {
+        "desktop": "macOS public releases distributed as signed and notarized DMGs.",
+        "ios": "Public App Store releases for the iPhone app. Unreleased local candidates are intentionally not listed here."
+      },
       "tocTitle": "On this page",
       "latestBadge": "Latest",
       "typeAdded": "Added",
       "typeFixed": "Fixed",
       "typeChanged": "Changed",
       "entries": {
+        "v103Title": "Filmtone Desktop v1.0.3 — export quality and HDR source handling",
+        "v103HdrHandling": "HDR PQ, HLG, and wide-gamut source detection is clearer during import and export, with user-facing messages that explain practical brightness or color risk without developer jargon.",
+        "v103BundledVideoTools": "Desktop now bundles the video toolchain needed for normal exports, reducing dependency on separate developer or Homebrew setup for HDR-to-SDR preparation paths.",
+        "v103PreviewExportTrust": "Video export starts closer to the visible preview grade, keeps trusted source frame rate and geometry, and writes full-range BT.709 output so mist, bloom, halation, and highlight rolloff shift less at encode time.",
+        "v103DefaultLook": "New sessions and old grade imports without preset identity now start from Neutral / Clean Base with the shared soft-finish baseline.",
+        "v102Title": "Filmtone Desktop v1.0.2 — safer video export recovery",
+        "v102FfmpegPipeRecovery": "Broken ffmpeg pipe failures are caught and surfaced through the normal export failure path instead of leaving the renderer waiting on stale writes.",
+        "v102ExportSessionIsolation": "Each video export now has its own session id, so stale start, frame, finish, or abort messages from older exports cannot affect the active job.",
+        "v102PreviewExportTrust": "The current WebGPU preview/export contract stays aligned while export hardening continues, including low-end grain and offscreen render refinements.",
+        "v101Title": "Filmtone Desktop v1.0.1 — preview trust and cleaner write-out",
+        "v101HighlightPreview": "Bright footage is steadier in preview, with highlights that hold their shape more naturally while you judge the finished mood.",
+        "v101CrossFilterPreview": "Cross Filter is easier to tune live, with more reliable brightness onset, chromatic split, and spacing behavior on moving footage.",
+        "v101ExportSidecar": "Desktop exports can write a .filmtone-session.json sidecar so the finishing setup can be inspected, saved, and reopened later.",
+        "v101WriteOutSurface": "The write-out tab uses a cleaner glass surface with clearer controls, fields, preset tiles, and dividers.",
         "v100Title": "Filmtone Desktop v1.0 — the first public release",
         "v100WebgpuPreview": "Preview has been reworked end-to-end. Bright highlights now hold their shape more naturally, so it is easier to judge the finished look right on screen.",
         "v100CrossFilterPreviewControls": "Cross Filter now responds live while you preview your image. Fine-tune the brightness that triggers the streaks, how much they split into color, and how close they sit, and the result updates immediately.",
@@ -1126,9 +1135,19 @@
         "v011FfmpegPath": "Fixed an issue where the Desktop app (DMG) could fail to process video after installation.",
         "v010Title": "First release",
         "v010BatchExport": "Apply any preset to an entire folder of photos and export them all at once as JPEG or PNG.",
-        "v010VideoExport": "Export a video with your chosen grade baked in.",
+        "v010VideoExport": "Export a video clip with your chosen grade baked in.",
         "v010FourPresets": "Four film stock looks to start: Kodak Portra 400, Fuji Pro 400H, Kodak Ektar 100, and Ilford HP5 Plus.",
-        "v010BrowserDemo": "Try any preset on your own photos in the browser before downloading the Desktop app."
+        "v010BrowserDemo": "Try any preset on your own photos in the browser before downloading the Desktop app.",
+        "iosV11Title": "Filmtone for iPhone v1.1 — source transparency",
+        "iosV11HdrNotice": "HDR and wide-gamut clips now show an in-app notice so you can see how iOS will handle the source before export.",
+        "iosV11OpticsMetadata": "Camera and optics metadata can feed the vignette model for more physically accurate corner falloff on supported clips.",
+        "iosV11SidecarJson": "Exports include a sidecar JSON alongside the media with grade, preset, and camera context for cleaner round trips with Desktop.",
+        "iosV11ProresAppleLog": "ProRes and Apple Log import handling is clearer, and unsupported conversion paths are recorded in the sidecar instead of being hidden.",
+        "iosV10Title": "Filmtone for iPhone v1.0 — first App Store release",
+        "iosV10Presets": "Film-stock presets are available on iPhone as the starting point for quick local grading.",
+        "iosV10QuickControls": "Quick controls cover exposure, contrast, and saturation for fast adjustment on the device.",
+        "iosV10DualLut": "Camera Profile and Film Look LUT slots support more precise source and creative workflows.",
+        "iosV10ExportShare": "Export, save to Photos, and share are available from the iPhone workflow."
       },
       "backToFilmLab": "← Back to Filmtone"
     },
@@ -1391,21 +1410,21 @@
     "entries": {
       "portfolio-renewal-2026": {
         "eyebrow": "Renewal 2026 / Case Study",
-        "title": "One light substrate — what Renewal 2026 implemented and what it cut",
-        "summary": "We chose a single light substrate, with the WebGPU motion-dot field as the ground itself. Dual dark/light themes were dropped, CSS scrims were dropped, and readability moved into the data-readability shader pipeline. A record of the decisions and the things removed.",
-        "metaDescription": "Portfolio Renewal 2026 case study: WebGPU motion-dot, single light substrate, data-readability shader pipeline, Liquid Glass chrome, and the things deliberately cut."
+        "title": "Giving up dark/light dual-mode — how a WebGPU shader's hardcoded value chose the entire site's palette",
+        "summary": "Unifying the portfolio's background to a single sheet was, in fact, decided by the technology from the start. A WebGPU-driven motion-dot shader bakes its clear color as `[0.82, 0.82, 0.82, 1.0]`, so any divergence from that value flickers the background on every scroll. The dual-mode path was already closed. This is a record of accepting that constraint as a method — and what we cut to make it work (CSS scrims, theme toggles, full-surface Liquid Glass).",
+        "metaDescription": "An editorial record of dropping dark/light dual-mode in favor of a single light substrate. Starting from a WebGPU shader's hardcoded constraint, readability moved into the shader pipeline itself, with cut features and preserved exceptions made explicit."
       },
       "mobile-safari-touch-controller": {
         "eyebrow": "Engineering Note",
-        "title": "Lowering iOS Safari's visual viewport into CSS variables",
-        "summary": "iOS Safari collapses its URL bar mid-scroll, breaking `100vh`. We publish the `visualViewport` API as a single set of CSS variables (`--vvh`, `--vvw`, `--vv-offset-*`) so motion-dot canvas and Liquid Glass chrome share one source of truth.",
-        "metaDescription": "Engineering note on lowering iOS Safari's visualViewport into CSS variables — the plumbing that lets motion-dot and Liquid Glass chrome share layout."
+        "title": "Solving iOS Safari's 100vh problem with a single CSS variable — why we lower visualViewport into :root",
+        "summary": "iOS Safari's URL bar collapse breaks `100vh`, opening gaps in the background during scroll. Distributing the value through React context or props collapsed early in an environment where SSR, client, and shaders coexist. Instead, a small client component subscribed to `window.visualViewport` writes to `:root` CSS variables (`--vvh` / `--vvw` / `--vv-offset-*`), and CSS, JSX, and shaders all read from the same source. A record of a quiet, single-source-of-truth pattern that simply does not break.",
+        "metaDescription": "How to solve iOS Safari's 100vh breakage with the `visualViewport` API published to `:root` CSS variables — a robust pattern derived from the failure of distributing the same value through React context across SSR, client, and shaders."
       },
       "journal-typography-wordmark-system": {
         "eyebrow": "Typography / R&D",
-        "title": "Carving Geist into a wordmark — extract → modify → build",
-        "summary": "Identity needed a carved wordmark, not a font. We took Geist Sans Medium as a base and re-cut A, K, C, T, H, B, M letterforms into SVG paths. An ongoing R&D piece — Jost still co-exists in the build, and we say so.",
-        "metaDescription": "Wordmark pipeline (extract-glyphs / modify-glyphs / build-wordmark). Carving Geist Sans into the studio's identity wordmark — an R&D record."
+        "title": "Why our wordmark lives as SVG paths, not a font — a pipeline that re-carves only the glyphs we need from Geist Sans",
+        "summary": "Identity needed a carved wordmark, not a font. Off-the-shelf display faces couldn't reach the flat-top A, the K junction gap, or the C terminal cuts at the Bezier-control-point level. We built an extract → modify → build pipeline: it takes Geist Sans Medium 500, isolates A, K, C, T, H, B, M, modifies their letterforms, and freezes them as SVG paths. The coexistence with Jost is still unresolved — leaving that visible is part of the record.",
+        "metaDescription": "Why a portfolio wordmark lives as SVG paths rather than a font, plus the pipeline that carves only the needed glyphs out of Geist Sans. A typographic editorial choice — giving up reversibility to gain identity."
       }
     },
     "motionStudies": {
@@ -1416,172 +1435,456 @@
       "entries": {
         "signal-stroke-relay": {
           "eyebrow": "Theatre / Cascade",
-          "title": "Signal Stroke Relay — relaying one stroke across multiple layers",
-          "summary": "A single stroke driven by a Theatre.js keyframe playback is referenced across multiple layers — not duplicated as separate animations. The shared timeline carries the same gesture from layer to layer, with phase offsets producing the relay.",
-          "metaDescription": "Signal Stroke Relay — a Theatre.js cascade stroke motion study."
+          "title": "The relay sensation cannot be built from separate animations — a Theatre.js timeline referenced by multiple layers with phase offsets",
+          "summary": "The feeling of \"a single motion traveling across layers\" disappears the moment you write separate animations per layer. It only emerges when multiple layers reference the same motion with different offsets and eases. We held a single Theatre.js timeline as the \"stem\" of the gesture, with each layer reading it as its own \"dialect\" — a record of that structure.",
+          "metaDescription": "A motion study on building the relay sensation — multiple layers referencing one Theatre.js timeline with phase-offset eases — and why separate animations cannot reach it."
         },
         "staged-emphasis-payoff": {
           "eyebrow": "Pacing / Family",
-          "title": "Staged Emphasis Payoff — staged emphasis with the payoff held to the last beat",
-          "summary": "Three lines on the same ease arrive together. Three lines on three different eases lose readability. We treat them as a family, give them stages (early / mid / late), and reserve a separate ease for the payoff on the final stage.",
-          "metaDescription": "Staged Emphasis Payoff — a motion study on pacing and emphasis families."
+          "title": "How to keep a payoff in a three-line headline reveal — give the last stage a different ease",
+          "summary": "Three lines on the same ease arrive together and the meaning scatters. Three lines on three different eases overwhelm and the weight becomes unreadable. Bind them as a family, assign them to early / mid / late stages, and reserve a different ease for the final stage — the payoff. We cap the number of stages at three. A pacing study with that constraint as the design.",
+          "metaDescription": "A motion study on pacing three-line headline reveals — using the family / stage / payoff vocabulary, with a separate ease reserved for the final stage."
         },
         "boiling-poster-aperture": {
           "eyebrow": "Boil Field / Reveal",
-          "title": "Boiling Poster Aperture — reveals through a boiled aperture and edge displacement",
-          "summary": "CSS clip-path gives a hard edge. To get a paper-like reveal we run a boil field (time-evolving noise) inside WebGL and use it to displace just the aperture's edge. The interior of the artwork stays still — only the rim boils.",
-          "metaDescription": "Boiling Poster Aperture — a motion study on boil fields and alpha-mask-gate reveals."
+          "title": "A poster reveal that feels like wet paper — a boil noise that displaces only the rim (touch the interior and the paper-feel collapses)",
+          "summary": "A CSS `clip-path` reveals a poster with mechanical, hard edges. For a paper-like bleed, we hold a time-evolving boil field as low-frequency noise in WebGL and use it to displace only the mask's rim. The interior moves zero pixels. The counterintuitive rule: displace the interior even slightly, and paper turns to jelly.",
+          "metaDescription": "A motion study on revealing a poster with paper-like bleed using a boil noise field and displacement — confined to the rim only, with the interior held completely still as a counterintuitive rule."
         },
         "temporal-echo-residue": {
           "eyebrow": "Echo / Decay",
-          "title": "Temporal Echo Residue — keeping motion alive after the motion has stopped",
-          "summary": "When motion stops, we keep a residue of the previous frames. It decays exponentially, and if a new motion begins before the residue dies, the two interfere. The screen looks still, but something has not finished moving yet.",
-          "metaDescription": "Temporal Echo Residue — a motion study on echo families and residue decay."
+          "title": "Keeping a stopped motion's echo alive at 5–10% opacity — designing residue without collapsing into VFX",
+          "summary": "We write the subjective feeling of \"the screen has stopped, but something is still moving\" as a mechanism. The last N frames are held in a buffer and decay exponentially, contributing 5–10% to the shader output. Push it to 20% and the editorial frame collapses into VFX, drawing attention away from the lead motion. Hold the echo internally; restrain how much of it is visible.",
+          "metaDescription": "A motion study on designing residue — keeping the echo of a stopped motion alive in the shader output at 5–10% mix, with a hard cap to prevent collapse into VFX."
         }
       }
     },
     "articles": {
       "portfolio-renewal-2026": {
         "sections": [
-          { "type": "heading", "level": 2, "text": "Why we collapsed to a single light substrate" },
-          { "type": "paragraph", "text": "The first decision in Renewal 2026 was to make the background one. Not a dark/light pair, not a per-section theme. A single light substrate sits underneath, and reading, work, and motion all have to live on top of it." },
-          { "type": "paragraph", "text": "The reason starts on the technical side. The motion-dot background runs WebGPU and writes its own clear color every frame to hold 60fps. That clear color is float-typed and hard-coded to `[0.82, 0.82, 0.82, 1.0]`. If the site disagreed with that color, the screen would flicker between two stages on every scroll." },
-          { "type": "code", "lang": "ts", "text": "// packages/motion-dot/src/main.ts\nbgColor: [0.82, 0.82, 0.82, 1.0]" },
-          { "type": "paragraph", "text": "Which means a dark site is not on the table — not without rewriting the shader pipeline. Whether you call that a constraint or a stance is a matter of attitude. I chose the second. Holding every category on a single light surface was a stronger editorial position than producing a dark mode would have been." },
-          { "type": "heading", "level": 2, "text": "Readability lives in a shader, not in a CSS scrim" },
-          { "type": "paragraph", "text": "Light text on a moving dot field gets noisy. The first attempt was the obvious one — drop a translucent panel under each block via `::before`. Readable, but lethal as an editorial surface. Every section gained a visible rectangle." },
-          { "type": "paragraph", "text": "The fix lived in the shader. Sections opt-in via `data-readability`. `useReadabilityRegions` watches them through IntersectionObserver, weights by visible area, and lerps the dominant scalar into a CSS variable `--motion-dot-readability`. The motion-dot fragment pipeline reads that scalar and dims itself. CSS covers nothing." },
-          { "type": "code", "lang": "tsx", "text": "<header data-readability=\"focus\">…</header>\n<section data-readability=\"reading\">…</section>" },
-          { "type": "paragraph", "text": "After that, the rectangles were gone. The text and the background sit on the same plane — the background just gets quieter where reading is happening." },
-          { "type": "heading", "level": 2, "text": "Liquid Glass stays, but only on the chrome" },
-          { "type": "paragraph", "text": "We banned `backdrop-filter` from body content as a rule. The navigation chrome, on the other hand, kept its Liquid Glass — it reads visualViewport and refracts. Glass belongs to the moving subject, not to the page. It never lands on top of reading." },
-          { "type": "callout", "tone": "note", "text": "Body uses the data-readability shader pipeline. Chrome uses Liquid Glass. Splitting them physically meant their responsibilities stopped colliding." },
-          { "type": "heading", "level": 2, "text": "What was cut" },
-          { "type": "list", "items": [
-            "The dark/light dual mode toggle (lost its meaning the moment substrate became one)",
-            "Section-level glass scrims (readability moved to the shader scalar)",
-            "Decorative panels and gradient overlays in body content",
-            "Per-section route-accent variations (only the chrome accent remains)"
-          ]},
-          { "type": "heading", "level": 2, "text": "Exceptions kept on purpose" },
-          { "type": "paragraph", "text": "Filmtone and Photography stay on their own systems. Filmtone is, as a product, a dark-UI app — it scopes itself with `.dark`. Photography would be eaten by its own imagery on a light substrate, so we flip the surface locally with `body:has(.photography-page)`. These are explicit exceptions, not omissions." },
-          { "type": "heading", "level": 2, "text": "What is still open" },
-          { "type": "paragraph", "text": "motion-dot is WebGPU-first; the WebGL2 fallback gives up density. Whether a thinner background on lower-end devices reads as 'natural' or as 'weak' isn't fully decided yet." },
-          { "type": "paragraph", "text": "The other open question is what happens the day a 'night chapter' has to enter the site. Today there is no such plan, but partitioning the substrate later would be a major rebuild. I'm leaving this here as acknowledged debt." }
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Why we collapsed to a single light substrate"
+          },
+          {
+            "type": "paragraph",
+            "text": "The first decision in Renewal 2026 was to make the background one. Not a dark/light pair, not a per-section theme. A single light substrate sits underneath, and reading, work, and motion all have to live on top of it."
+          },
+          {
+            "type": "paragraph",
+            "text": "The reason starts on the technical side. The motion-dot background runs WebGPU and writes its own clear color every frame to hold 60fps. That clear color is float-typed and hard-coded to `[0.82, 0.82, 0.82, 1.0]`. If the site disagreed with that color, the screen would flicker between two stages on every scroll."
+          },
+          {
+            "type": "code",
+            "lang": "ts",
+            "text": "// packages/motion-dot/src/main.ts\nbgColor: [0.82, 0.82, 0.82, 1.0]"
+          },
+          {
+            "type": "paragraph",
+            "text": "Which means a dark site is not on the table — not without rewriting the shader pipeline. Whether you call that a constraint or a stance is a matter of attitude. I chose the second. Holding every category on a single light surface was a stronger editorial position than producing a dark mode would have been."
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Readability lives in a shader, not in a CSS scrim"
+          },
+          {
+            "type": "paragraph",
+            "text": "Light text on a moving dot field gets noisy. The first attempt was the obvious one — drop a translucent panel under each block via `::before`. Readable, but lethal as an editorial surface. Every section gained a visible rectangle."
+          },
+          {
+            "type": "paragraph",
+            "text": "The fix lived in the shader. Sections opt-in via `data-readability`. `useReadabilityRegions` watches them through IntersectionObserver, weights by visible area, and lerps the dominant scalar into a CSS variable `--motion-dot-readability`. The motion-dot fragment pipeline reads that scalar and dims itself. CSS covers nothing."
+          },
+          {
+            "type": "code",
+            "lang": "tsx",
+            "text": "<header data-readability=\"focus\">…</header>\n<section data-readability=\"reading\">…</section>"
+          },
+          {
+            "type": "paragraph",
+            "text": "After that, the rectangles were gone. The text and the background sit on the same plane — the background just gets quieter where reading is happening."
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Liquid Glass stays, but only on the chrome"
+          },
+          {
+            "type": "paragraph",
+            "text": "We banned `backdrop-filter` from body content as a rule. The navigation chrome, on the other hand, kept its Liquid Glass — it reads visualViewport and refracts. Glass belongs to the moving subject, not to the page. It never lands on top of reading."
+          },
+          {
+            "type": "callout",
+            "tone": "note",
+            "text": "Body uses the data-readability shader pipeline. Chrome uses Liquid Glass. Splitting them physically meant their responsibilities stopped colliding."
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "What was cut"
+          },
+          {
+            "type": "list",
+            "items": [
+              "The dark/light dual mode toggle (lost its meaning the moment substrate became one)",
+              "Section-level glass scrims (readability moved to the shader scalar)",
+              "Decorative panels and gradient overlays in body content",
+              "Per-section route-accent variations (only the chrome accent remains)"
+            ]
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Exceptions kept on purpose"
+          },
+          {
+            "type": "paragraph",
+            "text": "Filmtone and Photography stay on their own systems. Filmtone is, as a product, a dark-UI app — it scopes itself with `.dark`. Photography would be eaten by its own imagery on a light substrate, so we flip the surface locally with `body:has(.photography-page)`. These are explicit exceptions, not omissions."
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "What is still open"
+          },
+          {
+            "type": "paragraph",
+            "text": "motion-dot is WebGPU-first; the WebGL2 fallback gives up density. Whether a thinner background on lower-end devices reads as 'natural' or as 'weak' isn't fully decided yet."
+          },
+          {
+            "type": "paragraph",
+            "text": "The other open question is what happens the day a 'night chapter' has to enter the site. Today there is no such plan, but partitioning the substrate later would be a major rebuild. I'm leaving this here as acknowledged debt."
+          }
         ]
       },
       "mobile-safari-touch-controller": {
         "sections": [
-          { "type": "heading", "level": 2, "text": "The problem" },
-          { "type": "paragraph", "text": "iOS Safari grows and shrinks its URL bar with scroll. `100vh` resolves to the expanded height and freezes there. By itself that's tolerable; in practice the body height, the motion-dot canvas full-bleed, and the Liquid Glass chrome's fixed position all start moving on different bases." },
-          { "type": "paragraph", "text": "The visible failure is that, the moment the URL bar collapses, the motion-dot leaves a 64-px strip of empty space at the bottom. A background that doesn't reach the bottom of the page is editorially fatal." },
-          { "type": "heading", "level": 2, "text": "The fix — publish once, consume from CSS variables" },
-          { "type": "paragraph", "text": "The implementation is intentionally small. A single client component, `VisualViewportVars`, subscribes to `window.visualViewport` and writes the values straight onto `:root` as CSS variables." },
-          { "type": "code", "lang": "tsx", "text": "// apps/web/src/features/viewport/VisualViewportVars.tsx (concept)\nconst vv = window.visualViewport;\nroot.style.setProperty('--vvh', `${vv.height}px`);\nroot.style.setProperty('--vvw', `${vv.width}px`);\nroot.style.setProperty('--vv-offset-top', `${vv.offsetTop}px`);" },
-          { "type": "paragraph", "text": "The motion-dot canvas reads `height: var(--vvh)` directly. The Liquid Glass chrome's fixed top becomes `top: calc(var(--vv-offset-top, 0px) + 1rem)`. Neither knows about the other; both fall from the same source of truth." },
-          { "type": "heading", "level": 2, "text": "Where safe-area meets it" },
-          { "type": "paragraph", "text": "Notch and home-indicator insets come from `env(safe-area-inset-*)` — a separate axis from visualViewport. Only header and footer padding consume it; the motion-dot canvas explicitly extends past safe-area to fill the screen. The two systems are kept apart on purpose." },
-          { "type": "code", "lang": "css", "text": ".chrome-nav {\n  top: max(env(safe-area-inset-top, 0px), 1rem);\n  height: calc(var(--vvh, 100vh) - env(safe-area-inset-top, 0px));\n}" },
-          { "type": "heading", "level": 2, "text": "What this note does not cover" },
-          { "type": "callout", "tone": "warn", "text": "This piece covers visual-viewport delivery and the safe-area boundary only. A 44-pixel touch target audit and the touch-version of the keyboard-only HUDs are separate R&D and are not yet in source. They will be written up in the next wave." },
-          { "type": "list", "items": [
-            "Comprehensive 44-pixel touch target audit (audit tool not yet built)",
-            "Touch versions of keyboard-only HUDs in Filmtone and the experiments",
-            "Cross-checking visualViewport behavior on Android Chrome"
-          ]},
-          { "type": "heading", "level": 2, "text": "What we learned" },
-          { "type": "paragraph", "text": "Putting one global source of truth on `:root` as CSS variables is unsexy and durable. Shaders read it, JSX reads it, layouts read it. As more layers were added, nothing fell out of sync. Distributing the same values via React context or props broke far more often." }
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "The problem"
+          },
+          {
+            "type": "paragraph",
+            "text": "iOS Safari grows and shrinks its URL bar with scroll. `100vh` resolves to the expanded height and freezes there. By itself that's tolerable; in practice the body height, the motion-dot canvas full-bleed, and the Liquid Glass chrome's fixed position all start moving on different bases."
+          },
+          {
+            "type": "paragraph",
+            "text": "The visible failure is that, the moment the URL bar collapses, the motion-dot leaves a 64-px strip of empty space at the bottom. A background that doesn't reach the bottom of the page is editorially fatal."
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "The fix — publish once, consume from CSS variables"
+          },
+          {
+            "type": "paragraph",
+            "text": "The implementation is intentionally small. A single client component, `VisualViewportVars`, subscribes to `window.visualViewport` and writes the values straight onto `:root` as CSS variables."
+          },
+          {
+            "type": "code",
+            "lang": "tsx",
+            "text": "// apps/web/src/features/viewport/VisualViewportVars.tsx (concept)\nconst vv = window.visualViewport;\nroot.style.setProperty('--vvh', `${vv.height}px`);\nroot.style.setProperty('--vvw', `${vv.width}px`);\nroot.style.setProperty('--vv-offset-top', `${vv.offsetTop}px`);"
+          },
+          {
+            "type": "paragraph",
+            "text": "The motion-dot canvas reads `height: var(--vvh)` directly. The Liquid Glass chrome's fixed top becomes `top: calc(var(--vv-offset-top, 0px) + 1rem)`. Neither knows about the other; both fall from the same source of truth."
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Where safe-area meets it"
+          },
+          {
+            "type": "paragraph",
+            "text": "Notch and home-indicator insets come from `env(safe-area-inset-*)` — a separate axis from visualViewport. Only header and footer padding consume it; the motion-dot canvas explicitly extends past safe-area to fill the screen. The two systems are kept apart on purpose."
+          },
+          {
+            "type": "code",
+            "lang": "css",
+            "text": ".chrome-nav {\n  top: max(env(safe-area-inset-top, 0px), 1rem);\n  height: calc(var(--vvh, 100vh) - env(safe-area-inset-top, 0px));\n}"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "What this note does not cover"
+          },
+          {
+            "type": "callout",
+            "tone": "warn",
+            "text": "This piece covers visual-viewport delivery and the safe-area boundary only. A 44-pixel touch target audit and the touch-version of the keyboard-only HUDs are separate R&D and are not yet in source. They will be written up in the next wave."
+          },
+          {
+            "type": "list",
+            "items": [
+              "Comprehensive 44-pixel touch target audit (audit tool not yet built)",
+              "Touch versions of keyboard-only HUDs in Filmtone and the experiments",
+              "Cross-checking visualViewport behavior on Android Chrome"
+            ]
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "What we learned"
+          },
+          {
+            "type": "paragraph",
+            "text": "Putting one global source of truth on `:root` as CSS variables is unsexy and durable. Shaders read it, JSX reads it, layouts read it. As more layers were added, nothing fell out of sync. Distributing the same values via React context or props broke far more often."
+          }
         ]
       },
       "journal-typography-wordmark-system": {
         "sections": [
-          { "type": "heading", "level": 2, "text": "Why a wordmark at all" },
-          { "type": "paragraph", "text": "The C-arc + 工 logomark was designed as a modern personal kamon and works at small to medium sizes. It loses force when an editorial hero needs to fill a hero band and announce whose site this is. That role belongs to a different typographic device." },
-          { "type": "paragraph", "text": "Two paths: (1) drop in an off-the-shelf display face, or (2) take a base typeface and carve it into a wordmark of our own. The first is fast but anonymous. We chose the second." },
-          { "type": "heading", "level": 2, "text": "The pipeline — extract, modify, build" },
-          { "type": "list", "ordered": true, "items": [
-            "extract-glyphs.ts — extracts only the glyphs needed for CHIBA / TAKUMI from Geist Sans Medium 500 (.otf) as SVG paths",
-            "modify-glyphs.ts — applies hand-picked carvings: A flat-top, K junction gap, C terminal cuts, T extension, H optical center, B ink trap, M thinning",
-            "build-wordmark.ts — composes the modified paths into CHIBA / TAKUMI and writes them into `branding.wordmark.{primaryPaths,secondaryPaths}` in `portfolio.ts`"
-          ]},
-          { "type": "paragraph", "text": "At runtime, `BrandWordmark` renders the path arrays as fill-based SVG. Color is `currentColor`; weight and color stay in CSS." },
-          { "type": "code", "lang": "ts", "text": "// apps/web/src/shared/data/portfolio.ts (excerpt)\nbranding: {\n  wordmark: {\n    viewBox: '0 0 7079 750',\n    primaryPaths: [/* CHIBA */],\n    secondaryPaths: [/* TAKUMI */],\n  }\n}" },
-          { "type": "heading", "level": 2, "text": "Why path-baked, not font-subset" },
-          { "type": "paragraph", "text": "A subsetted web font is still a font — moving a single vertex isn't an option. SVG paths give you a flat A top, a junction gap on K, terminal cuts on C, all as ordinary math on Bezier control points. Reversibility is lost; uniqueness is the trade." },
-          { "type": "heading", "level": 2, "text": "Honesty about the in-progress part" },
-          { "type": "callout", "tone": "warn", "text": "As of Renewal 2026, Jost is not fully removed. `apps/web/src/app/fonts.ts` still exports Jost 800, referenced inside `--font-family-display`. `font-mono` usages also remain. The full migration to a single display family is queued for the next wave." },
-          { "type": "paragraph", "text": "The wordmark is therefore a first step. The logotype layer was rebuilt in isolation, ahead of the broader typography clean-up that has yet to land. Writing it down while it is still in motion is the point of this study." },
-          { "type": "heading", "level": 2, "text": "What it taught us" },
-          { "type": "list", "items": [
-            "The base face shapes how much carving room you get. Geist's neutrality made it pleasant to modify",
-            "Carvings should be intentional and few — A and K were touched, O and U were left alone, fixed at the start",
-            "Persist outputs in a form the site can actually draw. Not .otf, not .woff2 — SVG path data inside the data layer"
-          ]}
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Why a wordmark at all"
+          },
+          {
+            "type": "paragraph",
+            "text": "The C-arc + 工 logomark was designed as a modern personal kamon and works at small to medium sizes. It loses force when an editorial hero needs to fill a hero band and announce whose site this is. That role belongs to a different typographic device."
+          },
+          {
+            "type": "paragraph",
+            "text": "Two paths: (1) drop in an off-the-shelf display face, or (2) take a base typeface and carve it into a wordmark of our own. The first is fast but anonymous. We chose the second."
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "The pipeline — extract, modify, build"
+          },
+          {
+            "type": "list",
+            "ordered": true,
+            "items": [
+              "extract-glyphs.ts — extracts only the glyphs needed for CHIBA / TAKUMI from Geist Sans Medium 500 (.otf) as SVG paths",
+              "modify-glyphs.ts — applies hand-picked carvings: A flat-top, K junction gap, C terminal cuts, T extension, H optical center, B ink trap, M thinning",
+              "build-wordmark.ts — composes the modified paths into CHIBA / TAKUMI and writes them into `branding.wordmark.{primaryPaths,secondaryPaths}` in `portfolio.ts`"
+            ]
+          },
+          {
+            "type": "paragraph",
+            "text": "At runtime, `BrandWordmark` renders the path arrays as fill-based SVG. Color is `currentColor`; weight and color stay in CSS."
+          },
+          {
+            "type": "code",
+            "lang": "ts",
+            "text": "// apps/web/src/shared/data/portfolio.ts (excerpt)\nbranding: {\n  wordmark: {\n    viewBox: '0 0 7079 750',\n    primaryPaths: [/* CHIBA */],\n    secondaryPaths: [/* TAKUMI */],\n  }\n}"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Why path-baked, not font-subset"
+          },
+          {
+            "type": "paragraph",
+            "text": "A subsetted web font is still a font — moving a single vertex isn't an option. SVG paths give you a flat A top, a junction gap on K, terminal cuts on C, all as ordinary math on Bezier control points. Reversibility is lost; uniqueness is the trade."
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Honesty about the in-progress part"
+          },
+          {
+            "type": "callout",
+            "tone": "warn",
+            "text": "As of Renewal 2026, Jost is not fully removed. `apps/web/src/app/fonts.ts` still exports Jost 800, referenced inside `--font-family-display`. `font-mono` usages also remain. The full migration to a single display family is queued for the next wave."
+          },
+          {
+            "type": "paragraph",
+            "text": "The wordmark is therefore a first step. The logotype layer was rebuilt in isolation, ahead of the broader typography clean-up that has yet to land. Writing it down while it is still in motion is the point of this study."
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "What it taught us"
+          },
+          {
+            "type": "list",
+            "items": [
+              "The base face shapes how much carving room you get. Geist's neutrality made it pleasant to modify",
+              "Carvings should be intentional and few — A and K were touched, O and U were left alone, fixed at the start",
+              "Persist outputs in a form the site can actually draw. Not .otf, not .woff2 — SVG path data inside the data layer"
+            ]
+          }
         ]
       },
       "motion-studies": {
         "signal-stroke-relay": {
           "sections": [
-            { "type": "heading", "level": 2, "text": "What we tried to make" },
-            { "type": "paragraph", "text": "The feeling of a single stroke that gets relayed across spaces — not as duplicated animations, but as multiple layers referencing one Theatre.js timeline. The same gesture, picked up by other layers with different eases, produces the relay." },
-            { "type": "heading", "level": 2, "text": "The technical key" },
-            { "type": "list", "items": [
-              "One Theatre.js keyframe playback as the master",
-              "Each relay layer reads the same timeline time with its own offset and ease",
-              "The phase difference between layers is what reads as 'the relay'"
-            ]},
-            { "type": "heading", "level": 2, "text": "What we cut" },
-            { "type": "paragraph", "text": "Early versions wrote a separate animation for each layer. The relay never appeared — the layers just looked unrelated. Same vocabulary across layers is the whole point, and a shared timeline is what guarantees it." },
-            { "type": "heading", "level": 2, "text": "Where it could land" },
-            { "type": "paragraph", "text": "Hero stroke transitions, line elements during section changes. Whether it actually ships in the body is a separate decision; here it lives as documented vocabulary." }
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "What we tried to make"
+            },
+            {
+              "type": "paragraph",
+              "text": "The feeling of a single stroke that gets relayed across spaces — not as duplicated animations, but as multiple layers referencing one Theatre.js timeline. The same gesture, picked up by other layers with different eases, produces the relay."
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "The technical key"
+            },
+            {
+              "type": "list",
+              "items": [
+                "One Theatre.js keyframe playback as the master",
+                "Each relay layer reads the same timeline time with its own offset and ease",
+                "The phase difference between layers is what reads as 'the relay'"
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "What we cut"
+            },
+            {
+              "type": "paragraph",
+              "text": "Early versions wrote a separate animation for each layer. The relay never appeared — the layers just looked unrelated. Same vocabulary across layers is the whole point, and a shared timeline is what guarantees it."
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "Where it could land"
+            },
+            {
+              "type": "paragraph",
+              "text": "Hero stroke transitions, line elements during section changes. Whether it actually ships in the body is a separate decision; here it lives as documented vocabulary."
+            }
           ]
         },
         "staged-emphasis-payoff": {
           "sections": [
-            { "type": "heading", "level": 2, "text": "What we tried to make" },
-            { "type": "paragraph", "text": "Three headline lines on the same ease arrive together. Three lines on three different eases lose meaning. The aim is for the final line to carry a payoff — a small but distinct landing — without making the others noisy." },
-            { "type": "heading", "level": 2, "text": "Vocabulary" },
-            { "type": "list", "items": [
-              "family — share a common ease across the group",
-              "stage — assign positions (early / mid / late) within the family",
-              "payoff — give the final stage a different ease (light overshoot, soft residue)"
-            ]},
-            { "type": "heading", "level": 2, "text": "What we cut" },
-            { "type": "paragraph", "text": "Giving each line a slightly different ease was abandoned — too much information, no readable weight. The harder constraint was 'never use more than three stages.' That kept the payoff legible." },
-            { "type": "heading", "level": 2, "text": "Where it could land" },
-            { "type": "paragraph", "text": "Hero title stagger, Filmtone step reveals, photography caption sequencing. Anywhere the same ease stretches across multiple beats." }
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "What we tried to make"
+            },
+            {
+              "type": "paragraph",
+              "text": "Three headline lines on the same ease arrive together. Three lines on three different eases lose meaning. The aim is for the final line to carry a payoff — a small but distinct landing — without making the others noisy."
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "Vocabulary"
+            },
+            {
+              "type": "list",
+              "items": [
+                "family — share a common ease across the group",
+                "stage — assign positions (early / mid / late) within the family",
+                "payoff — give the final stage a different ease (light overshoot, soft residue)"
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "What we cut"
+            },
+            {
+              "type": "paragraph",
+              "text": "Giving each line a slightly different ease was abandoned — too much information, no readable weight. The harder constraint was 'never use more than three stages.' That kept the payoff legible."
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "Where it could land"
+            },
+            {
+              "type": "paragraph",
+              "text": "Hero title stagger, Filmtone step reveals, photography caption sequencing. Anywhere the same ease stretches across multiple beats."
+            }
           ]
         },
         "boiling-poster-aperture": {
           "sections": [
-            { "type": "heading", "level": 2, "text": "What we tried to make" },
-            { "type": "paragraph", "text": "A poster reveal that opens the way paper bleeds through paper. CSS clip-path delivers only hard edges; a paper-like 'boil' isn't reachable. WebGL holds a boil field — a low-frequency noise field running on its own time — and the aperture's edge is displaced by it." },
-            { "type": "heading", "level": 2, "text": "Structure" },
-            { "type": "list", "items": [
-              "boil field — low-frequency noise plus a time phase, the 'simmering' surface",
-              "alpha-mask-gate — the reveal progress (0..1) for the poster",
-              "edge displacement — only the gate's rim is perturbed by the boil field"
-            ]},
-            { "type": "heading", "level": 2, "text": "What we cut" },
-            { "type": "paragraph", "text": "Pushing the boil amplitude high made the surface look like jelly, not paper. We confined the displacement to the rim and forbade modulating the interior. The moment the inside wobbles, the paper character is gone." },
-            { "type": "heading", "level": 2, "text": "Where it could land" },
-            { "type": "paragraph", "text": "First-time poster-style reveals, Filmtone sample swaps, journal cover transitions." }
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "What we tried to make"
+            },
+            {
+              "type": "paragraph",
+              "text": "A poster reveal that opens the way paper bleeds through paper. CSS clip-path delivers only hard edges; a paper-like 'boil' isn't reachable. WebGL holds a boil field — a low-frequency noise field running on its own time — and the aperture's edge is displaced by it."
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "Structure"
+            },
+            {
+              "type": "list",
+              "items": [
+                "boil field — low-frequency noise plus a time phase, the 'simmering' surface",
+                "alpha-mask-gate — the reveal progress (0..1) for the poster",
+                "edge displacement — only the gate's rim is perturbed by the boil field"
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "What we cut"
+            },
+            {
+              "type": "paragraph",
+              "text": "Pushing the boil amplitude high made the surface look like jelly, not paper. We confined the displacement to the rim and forbade modulating the interior. The moment the inside wobbles, the paper character is gone."
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "Where it could land"
+            },
+            {
+              "type": "paragraph",
+              "text": "First-time poster-style reveals, Filmtone sample swaps, journal cover transitions."
+            }
           ]
         },
         "temporal-echo-residue": {
           "sections": [
-            { "type": "heading", "level": 2, "text": "What we tried to make" },
-            { "type": "paragraph", "text": "Carry the residue of motion past the moment it ends. The previous frames don't disappear instantly; they decay, and if new motion enters before the decay is over, the residue interferes with it. The screen is still — but something hasn't finished moving." },
-            { "type": "heading", "level": 2, "text": "Structure" },
-            { "type": "list", "items": [
-              "echo family — a buffer of N frames captured after the primary motion ends",
-              "decay — each captured frame loses energy exponentially over time",
-              "residue — if new motion arrives before decay completes, the remaining residue is added back into it"
-            ]},
-            { "type": "heading", "level": 2, "text": "What we cut" },
-            { "type": "paragraph", "text": "Visualizing echoes as ghost trails was abandoned. Visible ghosts read as VFX and pull the page out of the editorial register. The echo is kept numerically but contributes only a thin 5–10% of opacity to the shader output." },
-            { "type": "heading", "level": 2, "text": "Where it could land" },
-            { "type": "paragraph", "text": "Section transitions, the trailing edge of scrolljack, the response after a Filmtone slider release. Not as VFX — as an underlayer that supports the feel of input." }
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "What we tried to make"
+            },
+            {
+              "type": "paragraph",
+              "text": "Carry the residue of motion past the moment it ends. The previous frames don't disappear instantly; they decay, and if new motion enters before the decay is over, the residue interferes with it. The screen is still — but something hasn't finished moving."
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "Structure"
+            },
+            {
+              "type": "list",
+              "items": [
+                "echo family — a buffer of N frames captured after the primary motion ends",
+                "decay — each captured frame loses energy exponentially over time",
+                "residue — if new motion arrives before decay completes, the remaining residue is added back into it"
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "What we cut"
+            },
+            {
+              "type": "paragraph",
+              "text": "Visualizing echoes as ghost trails was abandoned. Visible ghosts read as VFX and pull the page out of the editorial register. The echo is kept numerically but contributes only a thin 5–10% of opacity to the shader output."
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "Where it could land"
+            },
+            {
+              "type": "paragraph",
+              "text": "Section transitions, the trailing edge of scrolljack, the response after a Filmtone slider release. Not as VFX — as an underlayer that supports the feel of input."
+            }
           ]
         }
       }

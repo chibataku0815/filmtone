@@ -255,82 +255,54 @@
     "closeParamsPanelAria": "パラメータパネルを閉じる",
     "lp": {
       "heroEyebrow": "Filmtone",
-      "heroTitle": "日常に、映画のムードを。",
-      "heroBody": "Filmtone は、動画をすばやく雰囲気よく仕上げるためのアプリです。まずはブラウザで自分の素材を試し、仕上げや書き出しは macOS アプリで進められます。カバー画像やサムネイルも、同じ雰囲気のまま揃えられます。",
-      "heroPrimaryCta": "macOS 版をダウンロード",
-      "heroSecondaryLine": "Apple Silicon 搭載 Mac ・ macOS {minMacos} 以降。詳しくはダウンロードページへ。",
-      "proofTeaserLine": "再生して、比べて、仕上げる。",
-      "heroProofTitle": "動画の仕上がり例",
-      "heroProofBody": "Filmtoneで仕上げた動画です。仕上がりの雰囲気を動画で確認できます。",
-      "surfaceSplitEyebrow": "役割分担",
-      "surfaceSplitTitle": "ブラウザで試して、macOS で仕上げる。",
-      "surfaceSplitWebTitle": "ブラウザ版",
-      "surfaceSplitWebBody": "自分の写真や動画を開いて、色や雰囲気を気軽に試せます。",
-      "surfaceSplitDesktopTitle": "macOS版",
-      "surfaceSplitDesktopBody": "再生しながら見比べて、細かく調整し、そのまま書き出せます。",
+      "heroTitle": "映画の色から、\n使い捨てカメラまで。",
+      "heroBody": "iPhoneで撮った写真や短い動画を、映画みたいな色にも、使い捨てカメラのフィルム感にも。撮った端末の中で仕上げて、そのまま保存・共有できます。",
+      "heroSubtitle": "撮った後の仕上げを、iPhoneと、Macと、ブラウザで。",
+      "heroPrimaryCta": "Macで深く仕上げる",
+      "heroPrimaryCtaSubLine": "macOS {minMacos} 以上 ・ Apple Silicon ・ DMG",
+      "heroIosCta": "App Storeで Filmtone を入手",
+      "heroIosCtaSubLine": "iOS {minIos} 以上 ・ App Store",
+      "proofTeaserLine": "再生して、見比べて、書き出す。",
+      "heroProofTitle": "仕上がりは、動画で確かめる。",
+      "heroProofBody": "Filmtoneで仕上げた実映像です。色のまとまりや光のにじみが、動きの中でどう落ち着くか確認できます。",
+      "surfaceSplitEyebrow": "3つの面で、ひとつの世界観",
+      "surfaceSplitTitle": "Web、Mac、iPhone — どこから始めても、同じ Filmtone。",
+      "surfaceSplitWebTitle": "Web",
+      "surfaceSplitWebBody": "ブラウザで自分の素材を開いて、雰囲気を試す。",
+      "surfaceSplitDesktopTitle": "macOS",
+      "surfaceSplitDesktopBody": "再生しながら見比べて、深く仕上げる。",
+      "surfaceSplitIosTitle": "iPhone",
+      "surfaceSplitIosBody": "撮った端末の中で完結。保存も共有もそのまま。",
       "expandAuxiliaryPanelsTitle": "さらに表示: 細かい調整・LUT・比較・ヒストグラム・保存など",
       "expandAuxiliaryPanelsHint": "プリセットとかんたんスライダーだけで足りる場合は、開かなくて大丈夫です。",
-      "valueTitle": "macOS でトーンを揃えやすい理由",
-      "valueBullet1": "決めたルックを、たくさんの写真へ同じ空気感で広げやすくなっています。",
-      "valueBullet2": "フォルダに入った写真をまとめて処理し、別フォルダに揃えて保存できます。動画 1 本も、同じ見え方に寄せられます。",
-      "valueBullet3": "このページでまず雰囲気を試し、納品前の仕上げ作業は macOS アプリで。",
-      "workflowTitle": "写真やサムネイルにも、同じ雰囲気を。",
-      "workflowLead": "写真は主役ではありませんが、動画と同じ雰囲気で揃えたい場面があります。",
-      "workflowBullet1": "カバー画像やサムネイルを、動画と同じ雰囲気で揃えられます。",
-      "workflowBullet2": "写真だけ別のアプリで作り直さず、同じ流れの中でまとめられます。",
-      "workflowBullet3": "まずは動画を仕上げて、その雰囲気を周辺の画像にも広げる考え方です。",
-      "demoEyebrow": "自分の素材を Web で試す",
-      "demoTitle": "ブラウザで自分の素材を試す",
-      "demoBody": "写真や動画を開いて、色や雰囲気を試せます。しっかり仕上げて書き出したいときは、macOS アプリへ進んでください。",
-      "demoSourceEyebrow": "ソース",
-      "demoSourceSample": "サンプル画像",
-      "demoPreviewEyebrow": "プレビュー",
-      "demoStatusAria": "現在のメディアソースと分割プレビューの状態",
-      "trustHeading": "ダウンロード・サポート",
-      "faqTitle": "よくある質問",
+      "demoEyebrow": "自分の素材で試す",
+      "demoTitle": "ブラウザで、すぐ。",
+      "demoBody": "写真や短い動画を開いて、雰囲気を確かめてください。深く仕上げたくなったら、Mac版へ。",
+      "trustHeading": "ダウンロードと、動作環境。",
+      "faqTitle": "Filmtone について。",
       "faqQfree": "無料で使えますか？",
       "faqAfree": "はい。ブラウザ版もデスクトップ版も無料でお使いいただけます。任意でご支援いただける仕組みはありますが、機能に違いはありません。",
-      "faqQformats": "ここではどんな素材を試せますか？",
-      "faqAformats": "ブラウザでは写真や動画で試せます。仕上げや書き出しまで進めたいときは macOS 版を使ってください。",
-      "faqQwhichVersion": "ブラウザ版とデスクトップ版、どちらを使えばいい？",
-      "faqAwhichVersion": "まずはブラウザで気軽に試し、仕上げや書き出しが必要になったら macOS 版を使うのがおすすめです。",
-      "faqQpresets": "Filmtone はプリセット集ですか？",
-      "faqApresets": "いいえ。プリセットは出発点です。Filmtone は、動画を見ながら調整し、そのまま仕上げまで進められることが強みです。",
-      "faqQvideo": "写真も使えますか？",
-      "faqAvideo": "はい。写真にも使えます。特に動画と同じ雰囲気のカバー画像やサムネイルを作りたいときに向いています。",
+      "faqQwhichVersion": "どのFilmtoneから使えばいい？",
+      "faqAwhichVersion": "雰囲気を試すならブラウザ、撮影端末のままローカルに編集するならiPhone版、深く仕上げて書き出すならmacOS版が向いています。",
       "faqQwindows": "Windows版はありますか？",
       "faqAwindows": "デスクトップ版は macOS（Apple Silicon）専用です。ブラウザ版はどの OS からでもお使いいただけます。",
       "roadmapLink": "ロードマップ",
       "releaseNotesLink": "リリースノート",
-      "premiumHeroBadgeNew": "Desktop",
-      "premiumHeroBadgeLine": "v1.0.0 を macOS で公開中",
-      "premiumCapabilitiesEyebrow": "仕上がり例",
-      "premiumCapabilitiesTitle": "動画で見る、Filmtone の仕上がり。",
-      "premiumFeature1Title": "光のにじみや空気感まで変わる。",
-      "premiumFeature1Body": "実際に Filmtone で仕上げた動画です。光のにじみ方や色のまとまりが、動きの中でも自然に変わることがわかります。",
-      "premiumFeature2Title": "何気ない場面にも、雰囲気が出る。",
-      "premiumFeature2Body": "別の場面でも、色味や空気感がまとまり、動画全体の印象が整って見えることを確かめられます。",
-      "premiumGridEyebrow": "使いやすさ",
-      "premiumGridTitle": "見比べながら、安心して仕上げられる。",
-      "premiumCard1Title": "再生しながら確認できる",
-      "premiumCard1Body": "止めたり、送ったり、見比べたりしながら調整できます。",
-      "premiumCard2Title": "重い動画でも作業しやすい",
-      "premiumCard2Body": "プレビューやプロキシを使いながら、長い待ち時間を減らして作業できます。",
-      "premiumCard3Title": "Cross Filter をリアルタイムで追い込める",
-      "premiumCard3Body": "v1.0 では Cross Filter が WebGPU プレビュー上でリアルタイムに反映され、threshold・chromatic・spacing をインラインで調整できます。",
-      "premiumCard4Title": "写真にも同じ雰囲気を広げられる",
-      "premiumCard4Body": "動画を仕上げたあと、その雰囲気をカバー画像やサムネイルにもつなげられます。",
-      "premiumCompareTitle": "見比べながら仕上がりを確認できる。",
-      "premiumCompareBody": "こちらは macOS 版の画面です。再生しながら before / after を見比べて、仕上がりを判断できます。",
+      "copyrightLink": "© Takumi Chiba Portfolio",
+      "premiumHeroBadgeNew": "公開中",
+      "heroPublicRailAria": "公開中のFilmtone: macOS {desktopVersion}、iPhone {iosVersion}、Web demo",
+      "premiumHeroBadgeDesktop": "macOS v{version}",
+      "premiumHeroBadgeIos": "iPhone v{version}",
+      "premiumHeroBadgeWeb": "Web demo",
+      "premiumCompareTitle": "動画で見る、Filmtone の仕上がり。",
+      "premiumCompareBody": "光、影、空気感 — 止まらないままで確認できます。",
       "premiumCompareCard1Title": "夜景の見比べ",
       "premiumCompareCard1Body": "暗い場面でも、光の見え方の違いを確認しながら調整できます。",
       "premiumCompareCard2Title": "明るい場面の見比べ",
       "premiumCompareCard2Body": "明るい場面でも、色や空気感の変化を見ながら仕上げられます。",
       "premiumCompareCard3Title": "暗い室内の見比べ",
       "premiumCompareCard3Body": "暗い室内でも、つぶれすぎないかを見ながら調整できます。",
-      "premiumCtaTryDemo": "ブラウザで試す",
-      "premiumMediaProofNote": "Filmtone で仕上げた動画です。",
-      "premiumMediaPlaceholder": "実画面キャプチャ — 差し替え前のプレースホルダです。"
+      "premiumCtaTryDemo": "このページでブラウザデモを試す"
     },
     "toolbar": {
       "open": "メディアを開く",
@@ -377,13 +349,12 @@
       "logMix": "変換の適用量",
       "logMixDisabledHint": "ログ用の .cube を読み込んでください"
     },
-    "back": "← Interactive に戻る",
     "metadata": {
       "title": "Filmtone",
-      "description": "動画のための desktop-first finisher。ブラウザでルックを試し、macOS で再生・比較・仕上げ・書き出しまで進められます。",
+      "description": "Filmtone は Web・macOS・iPhone で使えるフィルムルック作成ワークフローです。ブラウザで試し、Macで仕上げ、iPhoneではローカルに編集できます。",
       "ogTitle": "Filmtone — 動画を、すぐ作品っぽい完成感へ",
-      "ogDescription": "ブラウザでルックを試し、macOS で再生・比較・仕上げ・書き出しへ。",
-      "ogImageAlt": "Filmtone — 動画のための desktop-first finisher"
+      "ogDescription": "ブラウザで試し、macOSで仕上げ、App Store公開中のiPhone版でローカルに編集できます。",
+      "ogImageAlt": "Filmtone — Web・macOS・iPhone のフィルムルックワークフロー"
     },
     "share": {
       "sectionTitle": "共有",
@@ -647,7 +618,7 @@
     },
     "desktopRelease": {
       "eyebrow": "Desktop",
-      "title": "Filmtone Desktop（macOS）",
+      "title": "Filmtone Desktop v1.0.3（macOS）",
       "body": "動画を macOS で仕上げ、必要に応じて stills へ同じ世界観を広げられます。ダウンロードは公証済みの DMG（Apple Silicon 向け）です。",
       "essentials": {
         "environmentLabel": "動作環境",
@@ -655,7 +626,7 @@
         "distributionLabel": "配布・更新",
         "distributionBody": "署名・公証済み DMG。バックグラウンドでの自動インストールはありません。新しい版はダウンロードページから DMG を取得して差し替えてください。アプリが新しい版を知らせることがあります（接続が必要です）。"
       },
-      "downloadCta": "ダウンロード（DMG）",
+      "downloadCta": "macOS版を入手（DMG）",
       "supportCtaPrefix": "お問い合わせ:",
       "downloadPage": {
         "eyebrow": "ダウンロード",
@@ -707,6 +678,19 @@
           "contactPrefix": "ご質問は"
         }
       }
+    },
+    "iosRelease": {
+      "eyebrow": "iPhone",
+      "title": "Filmtone iPhone版 v{version}",
+      "body": "App Storeで公開中のiPhone版は、写真や動画を端末上でローカルに仕上げるための導線です。プリセット、Quick調整、LUT、書き出し、写真への保存、共有までをiPhone上で扱えます。",
+      "essentials": {
+        "environmentLabel": "動作環境",
+        "environmentBody": "{deviceFamily} ・ iOS {minIos} 以降。",
+        "distributionLabel": "配布",
+        "distributionBody": "App Storeで配布しています。公開リリースノートはApp Store公開版に合わせ、未公開候補の内容はiOSリリース運用側に留めます。"
+      },
+      "appStoreCta": "App Storeで入手",
+      "supportCtaPrefix": "お問い合わせ:"
     },
     "desktop": {
       "app": {
@@ -897,7 +881,9 @@
       "webDemoName": "Filmtone（ブラウザで試す）",
       "webDemoDescription": "自分のフレームや動画を開き、ルックを audition してから Filmtone Desktop へつなぐ browser try-first 体験です。",
       "webDemoOperatingSystem": "インタラクティブ表示に対応した一般的なブラウザ",
-      "webDemoBrowserRequirements": "一般的なブラウザで利用可能（WebGL2 が有効な環境）"
+      "webDemoBrowserRequirements": "一般的なブラウザで利用可能（WebGL2 が有効な環境）",
+      "iosName": "Filmtone iPhone版",
+      "iosDescription": "写真や動画をiPhone上でローカルに調整できるFilmtone。プリセット、Quick調整、LUT、書き出し、保存、共有に対応しています。"
     },
     "roadmap": {
       "title": "ロードマップ — Filmtone",
@@ -1038,16 +1024,39 @@
     },
     "releaseNotes": {
       "title": "リリースノート — Filmtone",
-      "description": "Filmtone Desktop のリリース履歴 — 各バージョンの追加・修正・変更を確認できます。",
+      "description": "Filmtone Desktop と iPhone 版の公開リリース履歴 — 各バージョンの追加・修正・変更を確認できます。",
       "eyebrow": "リリースノート",
-      "heroTitle": "Filmtone Desktop の更新履歴",
-      "heroBody": "Filmtone Desktop の初回リリースから現在までの変更履歴です。バージョンごとに、新しく加わった機能、使い勝手の改善、修正した不具合をまとめています。",
+      "heroTitle": "Filmtone 公開リリースノート",
+      "heroBody": "Desktop と iPhone は別々のリリースレールで進みます。このページには公開済みの版だけを載せ、未公開の iPhone 候補版は App Store Connect と fastlane metadata 側に留めます。",
+      "platformTabsLabel": "リリース対象",
+      "platforms": {
+        "desktop": "Desktop",
+        "ios": "iPhone"
+      },
+      "platformIntro": {
+        "desktop": "署名・公証済みDMGとして配布しているmacOS公開版です。",
+        "ios": "App Storeで公開済みのiPhone版です。未公開のローカル候補は、公開されるまでここには載せません。"
+      },
       "tocTitle": "目次",
       "latestBadge": "最新",
       "typeAdded": "追加",
       "typeFixed": "修正",
       "typeChanged": "変更",
       "entries": {
+        "v103Title": "Filmtone Desktop v1.0.3 — 書き出し品質とHDR素材対応",
+        "v103HdrHandling": "HDR PQ / HLG / 広色域素材の検出を、読み込み・書き出しの両方で分かりやすくしました。必要なときだけ明るさや色のリスクを説明します。",
+        "v103BundledVideoTools": "通常の書き出しに必要な動画ツールをDesktopに同梱し、HDR-to-SDR準備で開発者向け環境に依存しにくくしました。",
+        "v103PreviewExportTrust": "動画書き出しは見えているプレビューのグレードに近い状態から始まり、FPS、描画ジオメトリ、full-range BT.709出力を揃えて、エンコード時の見え方のズレを減らしました。",
+        "v103DefaultLook": "新規セッションとプリセット情報のない古いグレードは、Neutral / Clean Base の落ち着いた初期状態から始まります。",
+        "v102Title": "Filmtone Desktop v1.0.2 — 動画書き出しの復旧性を改善",
+        "v102FfmpegPipeRecovery": "ffmpegのpipeが途中で閉じた場合も通常の書き出し失敗として扱い、古い書き込み待ちで止まりにくくしました。",
+        "v102ExportSessionIsolation": "動画書き出しごとに専用のsession idを持たせ、古い書き出しからの開始・フレーム・終了・中断メッセージが現在の処理へ混ざらないようにしました。",
+        "v102PreviewExportTrust": "WebGPUプレビューと書き出しの契約を保ちながら、低域グレインやオフスクリーン描画の調整も含めて仕上げの信頼性を上げました。",
+        "v101Title": "Filmtone Desktop v1.0.1 — プレビュー信頼性と書き出し面の整理",
+        "v101HighlightPreview": "明るい素材のプレビューが安定し、ハイライトの形を保ちながら仕上がりの雰囲気を判断しやすくなりました。",
+        "v101CrossFilterPreview": "Cross Filterの効き始め、色分散、間隔をプレビュー上でより判断しやすくし、動く素材でも安定して調整できるようにしました。",
+        "v101ExportSidecar": "Desktopの書き出しで .filmtone-session.json sidecar を保存できるようになり、仕上げ設定を後から確認・再開しやすくなりました。",
+        "v101WriteOutSurface": "書き出しタブを整理し、ボタン、フィールド、プリセットタイル、区切りの見え方をアプリ全体の質感へ合わせました。",
         "v100Title": "Filmtone Desktop v1.0 — 初の正式リリース",
         "v100WebgpuPreview": "プレビューの色処理を一新しました。明るい部分の階調の粘りがより自然になり、最終的な仕上がりを画面上で判断しやすくなっています。",
         "v100CrossFilterPreviewControls": "Cross Filter（光の筋）を、プレビューを見ながらその場で調整できるようになりました。効き始める明るさ、色のばらけ具合、光と光の間隔を動かすと、結果がそのまま画面に反映されます。",
@@ -1130,7 +1139,17 @@
         "v010BatchExport": "フォルダ内の写真にまとめてプリセットを適用し、JPEG / PNG で一括書き出し。",
         "v010VideoExport": "動画にルックを焼き込んで書き出せます。",
         "v010FourPresets": "フィルム風プリセット 4 種を収録: Kodak Portra 400、Fuji Pro 400H、Kodak Ektar 100、Ilford HP5 Plus。",
-        "v010BrowserDemo": "ブラウザから自分の写真でプリセットを試せます。ダウンロード前に仕上がりを確認できます。"
+        "v010BrowserDemo": "ブラウザから自分の写真でプリセットを試せます。ダウンロード前に仕上がりを確認できます。",
+        "iosV11Title": "Filmtone iPhone版 v1.1 — iPhone素材の透明性を強化",
+        "iosV11HdrNotice": "HDRや広色域のクリップを読み込んだとき、iOSの書き出し処理の扱いを画面上で確認できるようになりました。",
+        "iosV11OpticsMetadata": "カメラと光学メタデータを取り込み、対応クリップではビネット表現をより光学的に正確化しました。",
+        "iosV11SidecarJson": "書き出しに grade / preset / カメラ情報を含む sidecar JSON を同梱し、Desktopとの往復をしやすくしました。",
+        "iosV11ProresAppleLog": "ProRes / Apple Log系の読み込みと変換方針を整理し、対応できない条件はsidecarに記録されます。",
+        "iosV10Title": "Filmtone iPhone版 v1.0 — 初回App Store公開",
+        "iosV10Presets": "iPhone上でフィルムストック系プリセットを出発点にできます。",
+        "iosV10QuickControls": "露出・コントラスト・彩度のQuick調整で、端末上ですばやく雰囲気を整えられます。",
+        "iosV10DualLut": "Camera Profile と Film Look のLUTスロットで、素材変換とクリエイティブルックを扱えます。",
+        "iosV10ExportShare": "iPhone上で書き出し、写真への保存、共有まで進められます。"
       },
       "backToFilmLab": "← Filmtone に戻る"
     },
@@ -1381,7 +1400,7 @@
     "title": "Journal",
     "description": "制作のメモと技術的な記録のアーカイブ。",
     "eyebrow": "Notes & Studies",
-    "intro": "作品の背景にある考えと、制作中の技術的な記録。コード・モーション・映像・写真をひとつの基準で扱おうとする試みです。",
+    "intro": "作品の背景にある思考と、制作中の技術的な記録。コード、モーション、映像、写真を、同じクラフトの基準のもとで並べて扱おうとする試み。",
     "indexLabels": {
       "flagship": "Renewal Case Study",
       "engineeringNotes": "Engineering Notes",
@@ -1393,197 +1412,481 @@
     "entries": {
       "portfolio-renewal-2026": {
         "eyebrow": "Renewal 2026 / Case Study",
-        "title": "ライト・サブストレートに統一する — Renewal 2026 の実装と削ったもの",
-        "summary": "WebGPU の motion-dot を背景の前提に据え、サイト全体を単一のライト面に再統合した。dark/light の二重モードを捨て、CSS の scrim を捨て、可読性は data-readability シェーダー・パイプラインに移した記録。",
-        "metaDescription": "Portfolio renewal 2026 の判断記録。WebGPU motion-dot、ライト・サブストレート統合、data-readability シェーダー、Liquid Glass chrome、削ったものを含めた実装ノート。"
+        "title": "dark/light の二重対応を諦めた判断 — WebGPU シェーダーのハードコード値が決めた、サイト全体の配色",
+        "summary": "ポートフォリオの背景を1枚にまとめるという選択は、実は最初から技術側で決まっていた。WebGPU で動く motion-dot シェーダーがクリアカラーを `[0.82, 0.82, 0.82, 1.0]` に焼き込んでいるため、サイト側がその値と食い違うとスクロールごとに背景が点滅する。dark/light 二重対応の道は閉じていた。本記事はその制約を「方針」として引き受けた判断と、そのために削ったもの (CSS scrim、テーマ切替、Liquid Glass の全面適用) の記録。",
+        "metaDescription": "ポートフォリオの dark/light 二重対応を捨てて、明るい背景1枚に統合した編集判断の記録。WebGPU シェーダーの制約から始まり、可読性をシェーダーパイプライン側に移した経緯を、削った機能と残した例外まで含めて書く。"
       },
       "mobile-safari-touch-controller": {
         "eyebrow": "Engineering Note",
-        "title": "iOS Safari の Visual Viewport を CSS 変数に降ろす",
-        "summary": "URL バー伸縮で `100vh` が壊れる iOS Safari に対して、`visualViewport` API を CSS 変数（`--vvh` / `--vvw` / `--vv-offset-*`）として一箇所だけで配信し、motion-dot canvas と liquid glass chrome に同じ source of truth を共有させた。",
-        "metaDescription": "iOS Safari の visualViewport を CSS 変数として配信する R&D ノート。motion-dot と liquid glass chrome がレイアウトを共有するためのプラミング。"
+        "title": "iOS Safari の `100vh` 問題を CSS 変数1箇所で片付ける — `visualViewport` を `:root` に降ろす理由",
+        "summary": "iOS Safari は URL バーの伸縮で `100vh` が壊れ、スクロール中に背景に隙間が出る。React の context や props で値を引き回す実装は、SSR / Client / シェーダーが同居する環境で早晩破綻した。代わりに `window.visualViewport` を購読する小さな client component が `:root` の CSS 変数 (`--vvh` / `--vvw` / `--vv-offset-*`) に値を書き、CSS も JSX もシェーダーも同じ変数を読む。地味だが壊れない、単一参照源パターンの実装記録。",
+        "metaDescription": "iOS Safari の URL バー伸縮で `100vh` が壊れる問題を、`visualViewport` API を `:root` の CSS 変数 1 箇所に集約することで解いた実装パターン。React context での値配布が SSR / シェーダー混在で破綻した経験をふまえた、地味で堅牢な解。"
       },
       "journal-typography-wordmark-system": {
         "eyebrow": "Typography / R&D",
-        "title": "Geist を彫り直して Wordmark にする — extract → modify → build パイプライン",
-        "summary": "個人の identity に必要だったのはフォントではなく彫られた wordmark だった。Geist Sans Medium をベースに、A・K・C・T・H・B・M を段ごとに改変して SVG パスに固める。Jost との共存を抱えたまま走らせている進行中の R&D。",
-        "metaDescription": "Wordmark pipeline (extract-glyphs / modify-glyphs / build-wordmark) の構築記録。Geist Sans を彫り直して identity 化する studio の R&D。"
+        "title": "ロゴタイプをフォントではなく SVG パスとして持つ理由 — Geist Sans の必要グリフだけを彫り直すパイプライン",
+        "summary": "アイデンティティに必要だったのは「フォント」ではなく「彫られた wordmark」だった。市販ディスプレイ書体のままでは届かない A のフラットトップ、K の junction gap、C の terminal cuts などを、ベジェ制御点レベルで触れる形にしたい。Geist Sans Medium 500 をベースに、A・K・C・T・H・B・M の7字を抽出 → 改変 → SVG path に固定する extract → modify → build パイプラインを組んだ。Jost との共存は今も解いていないが、未完のまま残すのも記事の役目とした。",
+        "metaDescription": "ポートフォリオのロゴタイプを市販フォントではなく SVG パスとして保つ意図と、Geist Sans の必要グリフだけを彫り直すパイプラインの記録。可逆性を捨てて固有性を取る、というタイポグラフィ寄りの編集判断。"
       }
     },
     "motionStudies": {
       "indexEyebrow": "Motion Studies",
       "indexTitle": "Motion Studies — 単機能のモーション原語を 1 本ずつ書く",
-      "indexSummary": "ポートフォリオの本体に出すべきかどうかとは別軸で、モーション語彙を単機能ずつ切り出して書き残している場所。判断・捨てたもの・実装上の制約を、実装そのものより先に書く。",
+      "indexSummary": "ポートフォリオの本体に乗るかどうかは別軸として、モーションの原語を単機能ずつ切り出し、書き残しておく場所。判断、捨てたもの、実装の制約を、実装そのものより先に固定する。",
       "metaDescription": "Motion Studies index — Renewal 2026 のモーション語彙を単機能ずつ分解した R&D アーカイブ。",
       "entries": {
         "signal-stroke-relay": {
           "eyebrow": "Theatre / Cascade",
-          "title": "Signal Stroke Relay — 一本のストロークを複数のレイヤーで relay する",
-          "summary": "シングル・ストロークを theatre の keyframe playback に乗せて、レイヤー間で relay させる試み。「同じ動きが場所を変えていく」感覚を、別アニメーションのコピーではなく、同じタイムラインの参照で作る。",
-          "metaDescription": "Signal Stroke Relay — Theatre.js を使った cascade ストロークの motion study。"
+          "title": "同じ動きが場所を変えながら伝わる感覚は、別アニメーションの集合では作れない — Theatre.js のタイムラインを複数レイヤーが位相差で参照する設計",
+          "summary": "「ひとつの動きが場所を変えながら relay されていく」感覚は、各レイヤーに別アニメーションを書いた瞬間に消える。同じ動きを、複数のレイヤーが異なる offset と ease で参照することで初めて成立する。Theatre.js の単一タイムラインを「動きの語幹」として持ち、レイヤー側はそれを「方言」として読む構造を組んだ実装の記録。",
+          "metaDescription": "「同じ動きが場所を変えながら伝わる」relay 感覚を、Theatre.js のタイムラインを複数レイヤーが位相差で参照する形で実装した motion study。"
         },
         "staged-emphasis-payoff": {
           "eyebrow": "Pacing / Family",
-          "title": "Staged Emphasis Payoff — 強調を段階で組んで、最後に payoff を渡す",
-          "summary": "複数の要素に同じ ease を当てるのではなく、family（同系統）として段階を組み、最後の 1 つに payoff を集中させる。「見出しが 3 行とも同時に来る」現象を避けるための pacing の study。",
-          "metaDescription": "Staged Emphasis Payoff — pacing と emphasis family の motion study。"
+          "title": "3行のタイトル演出に「落ち」を残す方法 — 最終 stage だけ別 ease を渡す pacing 設計",
+          "summary": "3行のヘッドラインに同じ ease を当てると同時着で意味が散る。違う ease を行ごとに当てると情報量が増えすぎて重みが読めない。3行を family として束ね、early / mid / late の stage を割り振り、最後の stage にだけ別系統の ease を渡すと「落ち」が残る。stage は3段階以内に絞る、という制約条件まで含めた pacing 設計の記録。",
+          "metaDescription": "3行のタイトル演出に「落ち」を残す pacing 設計 — family / stage / payoff の3つの語彙で、最終 stage にだけ別 ease を渡すアプローチの motion study。"
         },
         "boiling-poster-aperture": {
           "eyebrow": "Boil Field / Reveal",
-          "title": "Boiling Poster Aperture — boil 場と displacement で reveal を作る",
-          "summary": "ポスター面を boil 場（ノイズで揺らす場）に置き、aperture（マスク）の縁を displacement で乱して reveal する。CSS の clip-path では出せない、紙のようなにじみを WebGL 側で持つための study。",
-          "metaDescription": "Boiling Poster Aperture — boil field と alpha-mask-gate の motion study。"
+          "title": "ポスターが紙のようににじむ reveal — 縁だけを揺らす boil ノイズの設計（中身を揺らすと紙の質感は消える）",
+          "summary": "CSS の `clip-path` で抜くポスターの reveal は、エッジが硬くて機械的になる。紙のような滲みを出すには、WebGL の低周波ノイズで時間発展する boil 場を持ち、マスクの縁だけを displacement で乱す。内側の絵柄は1ピクセルも動かさない。中身を揺らした瞬間に紙ではなくゼリーになる、という直感に反するルールの記録。",
+          "metaDescription": "ポスターの reveal を「紙が滲むように」見せるための boil ノイズと displacement の設計。揺らすのは縁だけ、内側は完全に静止させる、という反直感的なルールの motion study。"
         },
         "temporal-echo-residue": {
           "eyebrow": "Echo / Decay",
-          "title": "Temporal Echo Residue — 動きが止まった後の残響を decay で持つ",
-          "summary": "止まった瞬間の前にあった動きを、echo として残す。完全には消えず、減衰しながら次の動きに干渉する residue を作る。「画面が静止しているのに、まだ何かが動いていた感じが残る」状態を意図的に設計する。",
-          "metaDescription": "Temporal Echo Residue — echo family と residue decay の motion study。"
+          "title": "動きが止まったあとの「余韻」を5–10%の不透明度で仕込む — VFXに倒れない残響の設計",
+          "summary": "動きが止まった瞬間に画面はまだ動いていた、という主観的体験を仕組みとして書く。直前のNフレームを buffer として持ち、指数減衰させながらシェーダー出力に5–10%だけ寄与させる。これを20%にした瞬間に編集物が VFX に化けて、主役のモーションから注意が浮く。echo は内部値としては保持するが、見せる量で抑える、という編集判断。",
+          "metaDescription": "動きが止まったあとの「余韻」を、見えるゴーストではなくシェーダー出力への5–10%混合として実装する残響設計の motion study。VFX に倒さないための量の制約も含めて書く。"
         }
       }
     },
     "articles": {
       "portfolio-renewal-2026": {
         "sections": [
-          { "type": "heading", "level": 2, "text": "なぜライトに統一したのか" },
-          { "type": "paragraph", "text": "Renewal 2026 で最初に決めたのは、サイトの背景を 1 枚にすることだった。dark / light の二重モードでも、章ごとにテーマを切り替える運用でもない。単一のライト・サブストレートを土台に置き、その上で読み物・作品・モーションをすべて成立させる。" },
-          { "type": "paragraph", "text": "理由は技術側にある。背景の motion-dot は WebGPU で 60fps を切らないために、毎フレーム自前のクリアカラーを書き込む。そのクリアカラーは float 値で `[0.82, 0.82, 0.82, 1.0]` に直書きしている。サイト側がこれと食い違うと、スクロールの瞬間ごとに背景が二段階で点滅してしまう。" },
-          { "type": "code", "lang": "ts", "text": "// packages/motion-dot/src/main.ts\nbgColor: [0.82, 0.82, 0.82, 1.0]" },
-          { "type": "paragraph", "text": "つまり、サイトを暗く出すという選択肢は、シェーダー側を書き直さない限り存在しない。これを「制約」と呼ぶか「方針」と呼ぶかは姿勢の問題で、自分は後者を選んだ。dark を出す価値より、ライトの 1 枚で全カテゴリを成立させるほうが、編集物として強かった。" },
-          { "type": "heading", "level": 2, "text": "可読性は CSS scrim ではなくシェーダーで持つ" },
-          { "type": "paragraph", "text": "ライトの背景に文字を載せると、motion-dot のドット密度がそのまま文字の上に来る。最初は `::before` で半透明のパネルを敷くやり方で逃げていた。読みやすくはなるが、読み物として致命的に弱い。セクションの境目が必ず四角で見えてしまう。" },
-          { "type": "paragraph", "text": "解はシェーダー側にあった。`data-readability` 属性をセクションに振っておくと、`useReadabilityRegions` が IntersectionObserver で観測し、可視面積で重みづけして「いま読まれているセクション」のスカラーを `--motion-dot-readability` に lerp で書き込む。motion-dot 側はそのスカラーで自分の不透明度を絞る。CSS では何も覆わない。" },
-          { "type": "code", "lang": "tsx", "text": "<header data-readability=\"focus\">…</header>\n<section data-readability=\"reading\">…</section>" },
-          { "type": "paragraph", "text": "この方針にしてから、セクション境界の四角は完全に消えた。文字は背景と同じ平面にあるが、読まれているところだけ背景が静かになる。" },
-          { "type": "heading", "level": 2, "text": "Liquid Glass はナビにだけ残した" },
-          { "type": "paragraph", "text": "本文に backdrop-filter は出さない、というルールを最初に立てた。代わりにナビゲーションは Liquid Glass の chrome を維持していて、これは visualViewport を読みながら屈折する。ガラスは「移動している主体」にのみ与えられて、本文の上には絶対に降りてこない。" },
-          { "type": "callout", "tone": "note", "text": "本文側は data-readability の shader pipeline、chrome 側は Liquid Glass。役割を物理的に分離したことで、両者の責務がぶつからなくなった。" },
-          { "type": "heading", "level": 2, "text": "削ったもの" },
-          { "type": "list", "items": [
-            "dark/light の二重モード切替（substrate を 1 枚にした時点で意味を失った）",
-            "セクション背景の glass scrim（読みやすさは shader scalar に移行）",
-            "decorative panel / 装飾的なグラデーション・オーバーレイ",
-            "セクションごとに別アクセントを当てる route accent の細分化（chrome の 1 色だけが残った）"
-          ]},
-          { "type": "heading", "level": 2, "text": "残した例外" },
-          { "type": "paragraph", "text": "Filmtone と Photography だけは別系統で生きている。Filmtone はプロダクトとしての正体が「ダーク UI のアプリ」であり、`.dark` スコープで自閉している。Photography は写真の自重で背景を侵食すると見るに堪えないので、`body:has(.photography-page)` で局所的にテーマを切る。これらは exception として明示的に残している。" },
-          { "type": "heading", "level": 2, "text": "解いていない問題" },
-          { "type": "paragraph", "text": "motion-dot は WebGPU 前提で書いていて、フォールバック WebGL2 パスは画質を諦めている。低スペック端末で背景密度が落ちるのを「自然」と取るか「弱い」と取るかは、まだ自分のなかで決まっていない。" },
-          { "type": "paragraph", "text": "もうひとつは、ライト 1 枚の前提が、将来「夜の章」を入れたくなったときにどう壊れるか。今のところ予定はないが、その時点で substrate を分割するのは大改修になる。背負った負債として明示しておく。" }
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "なぜ 1 枚のライト・サブストレートに統一したのか"
+          },
+          {
+            "type": "paragraph",
+            "text": "Renewal 2026 でまず決めたのは、サイトの背景を 1 枚にすることだった。`dark`/`light` の二重モードでもなく、章ごとにテーマを切り替える運用でもない。単一のライト・サブストレートをサイトの土台に置き、その上で読み物、作品、モーションをすべて成立させる、という方針だ。"
+          },
+          {
+            "type": "paragraph",
+            "text": "理由は技術側にある。背景の `motion-dot` は `WebGPU` で動き、60fps を維持するために毎フレーム独自のクリアカラーを書き込む。値は `[0.82, 0.82, 0.82, 1.0]` の `float` で直書きされている。サイトの背景がこれと食い違うと、スクロールのたびに背景が二段階で点滅する。"
+          },
+          {
+            "type": "code",
+            "lang": "ts",
+            "text": "// packages/motion-dot/src/main.ts\nbgColor: [0.82, 0.82, 0.82, 1.0]"
+          },
+          {
+            "type": "paragraph",
+            "text": "サイトを暗く出すという選択肢は、シェーダー側を書き直さない限り存在しない。これを「制約」と呼ぶか「方針」と呼ぶかは姿勢の問題で、後者を採用した。`dark` を実装する価値より、1 枚のライト・サブストレートで全カテゴリを成立させるほうが、編集物としての密度が高い。"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "可読性は CSS の `scrim` ではなく、シェーダーで持つ"
+          },
+          {
+            "type": "paragraph",
+            "text": "ライトの背景に文字を載せると、`motion-dot` のドット密度が文字面に重なる。最初の試みは `::before` に半透明のパネルを敷く方法だった。読みやすさは確保できるが、編集面では破綻する。セクションごとに必ず四角い枠が見えてしまうからだ。"
+          },
+          {
+            "type": "paragraph",
+            "text": "解はシェーダー側にあった。各セクションに `data-readability` 属性を振っておくと、`useReadabilityRegions` が `IntersectionObserver` で観測し、可視面積で重みづけして 「いま読まれているセクション」のスカラーを `--motion-dot-readability` に lerp する。`motion-dot` のフラグメントパイプラインはそのスカラーを読んで自分の不透明度を絞る。CSS で覆うものは何もない。"
+          },
+          {
+            "type": "code",
+            "lang": "tsx",
+            "text": "<header data-readability=\"focus\">…</header>\n<section data-readability=\"reading\">…</section>"
+          },
+          {
+            "type": "paragraph",
+            "text": "この方針に切り替えてから、セクション境界の四角は完全に消えた。文字と背景は同じ平面に乗ったままだが、読まれているところだけ背景が静かになる。"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "`Liquid Glass` はナビの chrome にだけ残した"
+          },
+          {
+            "type": "paragraph",
+            "text": "本文では `backdrop-filter` を使わない、というルールを先に決めた。代わりにナビゲーションは `Liquid Glass` の chrome を保ち、`visualViewport` を読みながら屈折する。ガラスは「移動している主体」にだけ与えるもので、本文の上には降りてこない。"
+          },
+          {
+            "type": "callout",
+            "tone": "note",
+            "text": "本文は `data-readability` シェーダー・パイプライン、chrome は `Liquid Glass`。担当を物理的に分けたことで、両者の責務がぶつからなくなった。"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "削ったもの"
+          },
+          {
+            "type": "list",
+            "items": [
+              "`dark`/`light` の二重モード切替（substrate が 1 枚になった時点で意味を失った）",
+              "セクション背景の glass scrim（可読性は shader scalar に移行）",
+              "装飾的なパネルと、本文に重ねるグラデーション・オーバーレイ",
+              "セクションごとに別アクセントを当てる route accent の細分化（chrome の 1 色だけが残った）"
+            ]
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "残した例外"
+          },
+          {
+            "type": "paragraph",
+            "text": "Filmtone と Photography だけは別系統で動いている。Filmtone はプロダクトの正体が「ダーク UI のアプリ」であり、`.dark` スコープで完結する。Photography は写真自身の濃度がライト・サブストレートに侵食すると視認性が著しく落ちるため、`body:has(.photography-page)` で局所的にテーマを反転させる。この 2 つは例外として、明示的に残している。"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "解いていない問題"
+          },
+          {
+            "type": "paragraph",
+            "text": "`motion-dot` は `WebGPU` を前提に書いており、フォールバックの `WebGL2` パスは画質を諦めている。低スペック端末で背景密度が落ちることを「自然」と読むか「弱さ」と読むかは、評価がまだ固まっていない。"
+          },
+          {
+            "type": "paragraph",
+            "text": "もうひとつは、ライト・サブストレート 1 枚という前提が、将来「夜の章」を入れたくなったときにどう壊れるかだ。今のところ予定はないが、その時点で substrate を分割するなら大改修になる。背負った負債として、ここで明示しておく。"
+          }
         ]
       },
       "mobile-safari-touch-controller": {
         "sections": [
-          { "type": "heading", "level": 2, "text": "問題" },
-          { "type": "paragraph", "text": "iOS Safari は URL バーがスクロールに応じて伸縮する。`100vh` は伸びきった状態で固まる。これだけならまだいいが、実際には body 高さと、motion-dot canvas のフルブリード、liquid glass chrome の固定位置が、ぜんぶ違う基準で動こうとする。" },
-          { "type": "paragraph", "text": "結果として、URL バーが折りたたまれた瞬間に背景の motion-dot が下に 64px だけ余白を残す、というような破綻が出る。画面に対して背景が「足りない」のは、編集物として致命的だった。" },
-          { "type": "heading", "level": 2, "text": "解 — 1 箇所で配信して、消費側は CSS 変数だけ読む" },
-          { "type": "paragraph", "text": "実装はシンプルにした。`VisualViewportVars` という小さなクライアント・コンポーネントだけが `window.visualViewport` を購読する。読んだ値はそのまま `:root` 上の CSS 変数に書き出す。" },
-          { "type": "code", "lang": "tsx", "text": "// apps/web/src/features/viewport/VisualViewportVars.tsx (concept)\nconst vv = window.visualViewport;\nroot.style.setProperty('--vvh', `${vv.height}px`);\nroot.style.setProperty('--vvw', `${vv.width}px`);\nroot.style.setProperty('--vv-offset-top', `${vv.offsetTop}px`);" },
-          { "type": "paragraph", "text": "motion-dot canvas は `height: var(--vvh)` を直接読む。Liquid Glass chrome の固定位置は `top: calc(var(--vv-offset-top, 0px) + 1rem)` で吸収する。両者は互いを知らないが、同じ source of truth から落ちている。" },
-          { "type": "heading", "level": 2, "text": "safe-area の合流" },
-          { "type": "paragraph", "text": "iPhone のノッチ・ホームインジケータは `env(safe-area-inset-*)` で取れる。これは visualViewport とは別の系列で、layout に入れるべきは header / footer の padding 側だけ。motion-dot はあくまで safe-area を踏み越える前提で全画面に出す。両者を混ぜないことだけ守った。" },
-          { "type": "code", "lang": "css", "text": ".chrome-nav {\n  top: max(env(safe-area-inset-top, 0px), 1rem);\n  height: calc(var(--vvh, 100vh) - env(safe-area-inset-top, 0px));\n}" },
-          { "type": "heading", "level": 2, "text": "解いていない範囲" },
-          { "type": "callout", "tone": "warn", "text": "本記事は visual viewport の配信と safe-area の境界処理だけを対象にしている。44px ターゲット監査・キーボード専用 HUD のタッチ化は別軸の R&D で、現時点でソースには入っていない。次の波で書く。" },
-          { "type": "list", "items": [
-            "Touch target 44px の網羅監査（オーディト用ツールが未実装）",
-            "Keyboard-only な HUD のタッチ化（Filmtone / experiments の操作系）",
-            "Android Chrome の visualViewport ふるまい差異の検証"
-          ]},
-          { "type": "heading", "level": 2, "text": "学び" },
-          { "type": "paragraph", "text": "「グローバルな単一の source of truth を、CSS 変数として `:root` に置く」という素朴なやり方が、結局いちばん壊れにくい。シェーダーも JSX も同じ変数を読むので、レイヤーがどれだけ増えても整合する。R/JS 側の context や props で配るのは早晩破綻した。" }
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "問題"
+          },
+          {
+            "type": "paragraph",
+            "text": "iOS Safari は URL バーがスクロールに応じて伸縮する。`100vh` は伸びきった状態で固まる。それ単体は許容できるが、実際には body の高さ、`motion-dot` の canvas フルブリード、`Liquid Glass` の chrome の固定位置が、それぞれ別の基準で動こうとする。"
+          },
+          {
+            "type": "paragraph",
+            "text": "結果として、URL バーが折りたたまれた瞬間に、背景の `motion-dot` が下端に 64px の余白を残す、という破綻が出る。画面に対して背景が「足りていない」状態は、編集面で破綻する。"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "解 — 1 箇所で配信して、消費側は CSS 変数だけ読む"
+          },
+          {
+            "type": "paragraph",
+            "text": "実装は意図的に小さくした。`VisualViewportVars` という小さなクライアント・コンポーネント 1 つだけが `window.visualViewport` を購読し、読み取った値をそのまま `:root` の CSS 変数に書き出す。"
+          },
+          {
+            "type": "code",
+            "lang": "tsx",
+            "text": "// apps/web/src/features/viewport/VisualViewportVars.tsx (concept)\nconst vv = window.visualViewport;\nroot.style.setProperty('--vvh', `${vv.height}px`);\nroot.style.setProperty('--vvw', `${vv.width}px`);\nroot.style.setProperty('--vv-offset-top', `${vv.offsetTop}px`);"
+          },
+          {
+            "type": "paragraph",
+            "text": "`motion-dot` の canvas は `height: var(--vvh)` を直接読む。`Liquid Glass` の chrome の固定位置は `top: calc(var(--vv-offset-top, 0px) + 1rem)` で吸収する。両者は互いを知らないが、同じ単一参照源から落ちている。"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "`safe-area` との合流"
+          },
+          {
+            "type": "paragraph",
+            "text": "iPhone のノッチとホームインジケータは `env(safe-area-inset-*)` から取れる。これは `visualViewport` とは別軸で、レイアウトに入れる先は header と footer の padding 側だけ。`motion-dot` の canvas は `safe-area` を踏み越えて全画面を埋める前提にしている。2 つの系列を混ぜないことだけが守るべき制約だった。"
+          },
+          {
+            "type": "code",
+            "lang": "css",
+            "text": ".chrome-nav {\n  top: max(env(safe-area-inset-top, 0px), 1rem);\n  height: calc(var(--vvh, 100vh) - env(safe-area-inset-top, 0px));\n}"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "解いていない範囲"
+          },
+          {
+            "type": "callout",
+            "tone": "warn",
+            "text": "本記事は `visualViewport` の配信と `safe-area` の境界処理だけを扱う。44px のタッチターゲット監査と、キーボード専用 HUD のタッチ対応は別軸の R&D で、現時点でソースに入っていない。次の wave で書く。"
+          },
+          {
+            "type": "list",
+            "items": [
+              "44px のタッチターゲット網羅監査（監査ツールが未実装）",
+              "キーボード専用 HUD のタッチ対応（Filmtone と experiments の操作系）",
+              "Android Chrome 上の `visualViewport` 挙動差の検証"
+            ]
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "学び"
+          },
+          {
+            "type": "paragraph",
+            "text": "「グローバルな単一参照源を CSS 変数として `:root` に置く」という素朴なやり方が、経験上もっとも破綻しにくい。シェーダーも JSX も同じ変数を読むので、レイヤーがどれだけ増えても整合する。React の context や props で同じ値を配ろうとした初期構成は、早晩破綻した。"
+          }
         ]
       },
       "journal-typography-wordmark-system": {
         "sections": [
-          { "type": "heading", "level": 2, "text": "なぜ wordmark を作ったか" },
-          { "type": "paragraph", "text": "C 弧フレーム + 「工」の logomark は、現代の個人紋として意図して作った。ただし small / medium のスペースには強いが、editorial の見出しに置くと弱い。Hero の幅を埋め、編集物として「これは誰のサイトか」を立てる役は、別の typographic 装置に任せる必要があった。" },
-          { "type": "paragraph", "text": "選択肢は 2 つ。1) 既製のディスプレイ書体をそのまま使う、2) ベース書体を彫り直して固有の wordmark にする。前者は早いが、誰のサイトかが弱い。後者を選んだ。" },
-          { "type": "heading", "level": 2, "text": "パイプライン — 抽出・改変・固定の 3 段" },
-          { "type": "list", "ordered": true, "items": [
-            "extract-glyphs.ts — Geist Sans Medium 500 (.otf) から CHIBA / TAKUMI に必要なグリフだけを SVG path として抽出する",
-            "modify-glyphs.ts — A の頂点をフラットに、K の交点に微小な間を、C のターミナルにカットを、T を縦にわずかに延長、H のオプティカル中心、B のインクトラップ、M の縦画を細らせる、といった彫り直しを適用する",
-            "build-wordmark.ts — 改変後の path を CHIBA / TAKUMI に組成し、portfolio.ts の `branding.wordmark.{primaryPaths,secondaryPaths}` に書き出す"
-          ]},
-          { "type": "paragraph", "text": "出力は SVG path 文字列の配列で、ランタイムでは `BrandWordmark` がそれを fill ベースに描画する。色は `currentColor`、ウェイト・色は CSS で持つ。" },
-          { "type": "code", "lang": "ts", "text": "// apps/web/src/shared/data/portfolio.ts (excerpt)\nbranding: {\n  wordmark: {\n    viewBox: '0 0 7079 750',\n    primaryPaths: [/* CHIBA */],\n    secondaryPaths: [/* TAKUMI */],\n  }\n}" },
-          { "type": "heading", "level": 2, "text": "なぜフォント subsetting ではなく path 化か" },
-          { "type": "paragraph", "text": "Web font をサブセット化して持つと「フォント」のままなので、頂点を 1 つだけ動かす、といった改変ができない。SVG path にしてしまえば、A のフラット・トップも、K の junction gap も、生のベジェに対する数学的な操作で済む。可逆性は失うが、固有性は手に入る。" },
-          { "type": "heading", "level": 2, "text": "進行中であることの honesty" },
-          { "type": "callout", "tone": "warn", "text": "Renewal 2026 時点で Jost は完全には消えていない。`apps/web/src/app/fonts.ts` には Jost 800 が残り、`--font-family-display` の中で参照されている。`font-mono` の利用箇所も残っている。完全な monochrome / single-display への移行は次の波で書く。" },
-          { "type": "paragraph", "text": "つまりこの wordmark は完成品ではなく、ロゴタイプ層を個別に立て直した上で、サイト全体のタイポグラフィ系を整理する 1 段目に当たる。書き残すこと自体が目的の R&D。" },
-          { "type": "heading", "level": 2, "text": "学んだこと" },
-          { "type": "list", "items": [
-            "ベース書体の選定は彫り直しの自由度に効く。Geist は中立度が高くて改変が効きやすかった",
-            "改変は意図のあるものだけに留める — A と K を触ったが、O と U は触らない、という判断を最初に固めた",
-            "出力は『サイトに描ける形式』で持つ。.otf でも .woff2 でもなく、SVG path として data-source に固定した"
-          ]}
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "なぜ wordmark を作ったか"
+          },
+          {
+            "type": "paragraph",
+            "text": "C 弧フレーム + 「工」の logomark は、現代の個人紋として設計したものだ。小〜中サイズでは十分に効くが、editorial 級の hero band に置くと存在感が足りない。hero の幅を埋め、「これは誰のサイトか」を立てる役は、別のタイポグラフィ装置に持たせる必要があった。"
+          },
+          {
+            "type": "paragraph",
+            "text": "選択肢は 2 つあった。1) 既製のディスプレイ書体をそのまま採用する、2) ベース書体を彫り直して固有の wordmark にする。前者は早いが匿名性が高い。後者を採用した。"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "パイプライン — 抽出・改変・固定の 3 段"
+          },
+          {
+            "type": "list",
+            "ordered": true,
+            "items": [
+              "`extract-glyphs.ts` — Geist Sans Medium 500（`.otf`）から CHIBA / TAKUMI に必要なグリフだけを SVG path として抽出する",
+              "`modify-glyphs.ts` — A の頂点をフラットに、K の交点に微小な隙間を、C のターミナルにカットを、T を縦にわずかに延長、H のオプティカル中心調整、B のインクトラップ、M の縦画を細らせる、といった改変を適用する",
+              "`build-wordmark.ts` — 改変後の path を CHIBA と TAKUMI に組成し、`portfolio.ts` の `branding.wordmark.{primaryPaths,secondaryPaths}` に書き出す"
+            ]
+          },
+          {
+            "type": "paragraph",
+            "text": "出力は SVG path 文字列の配列で、ランタイムでは `BrandWordmark` が `fill` ベースで描画する。色は `currentColor` を使い、太さと色は CSS 側に持たせる。"
+          },
+          {
+            "type": "code",
+            "lang": "ts",
+            "text": "// apps/web/src/shared/data/portfolio.ts (excerpt)\nbranding: {\n  wordmark: {\n    viewBox: '0 0 7079 750',\n    primaryPaths: [/* CHIBA */],\n    secondaryPaths: [/* TAKUMI */],\n  }\n}"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "なぜフォントの subsetting ではなく path 化を選んだか"
+          },
+          {
+            "type": "paragraph",
+            "text": "Web font をサブセット化して持っても、それは「フォント」のままで、頂点を 1 つだけ動かすような改変は許されない。SVG path に落としてしまえば、A のフラットトップも、K の junction gap も、ベジェ制御点に対する数学的な操作として記述できる。可逆性は失うが、固有性が手に入る。"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "進行中であることを書き残す"
+          },
+          {
+            "type": "callout",
+            "tone": "warn",
+            "text": "Renewal 2026 時点で Jost は完全には消えていない。`apps/web/src/app/fonts.ts` には Jost 800 が残り、`--font-family-display` の内側で参照されている。`font-mono` の利用箇所もまだある。完全な single-display への移行は次の wave で書く。"
+          },
+          {
+            "type": "paragraph",
+            "text": "つまりこの wordmark は完成品ではなく、ロゴタイプ層を独立して立て直したうえで、サイト全体のタイポグラフィ系を整理していく 1 段目に当たる。書き残すこと自体が目的の R&D だ。"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "学んだこと"
+          },
+          {
+            "type": "list",
+            "items": [
+              "ベース書体の選定が彫り直しの自由度を決める。Geist は中立度が高く、改変が効かせやすかった",
+              "改変は意図のあるものに絞る。A と K は触ったが、O と U は触らない、という判断を最初に固定した",
+              "出力は「サイトに描ける形式」で持つ。`.otf` でも `.woff2` でもなく、SVG path として data 層に固定した"
+            ]
+          }
         ]
       },
       "motion-studies": {
         "signal-stroke-relay": {
           "sections": [
-            { "type": "heading", "level": 2, "text": "やろうとしたこと" },
-            { "type": "paragraph", "text": "「同じストロークが場所を変えながら relay されていく」感覚を、別アニメーションの複製ではなく、単一の theatre タイムラインに対する複数レイヤーの参照で作る。1 本のストロークの動きに、ずれた ease で他のレイヤーが追従する。" },
-            { "type": "heading", "level": 2, "text": "技術側のキー" },
-            { "type": "list", "items": [
-              "Theatre.js の keyframe playback を 1 つだけ持つ",
-              "各 relay レイヤーは playback の同じ time に対して、自分の offset と ease を持つ",
-              "結果としてレイヤー間の位相差が、relay の『遅れ』として知覚される"
-            ]},
-            { "type": "heading", "level": 2, "text": "捨てたもの" },
-            { "type": "paragraph", "text": "最初は各レイヤーごとに別々のアニメーションを書いていたが、relay の感覚が出なかった。「別々に動いている」と「relay されている」は違う。原語が同じであることが本質で、それを担保するのが共通タイムラインだった。" },
-            { "type": "heading", "level": 2, "text": "適用先" },
-            { "type": "paragraph", "text": "Hero のストローク・トランジションや、セクション切り替え時のラインに乗る可能性がある。ただし本体に出すかどうかは別判断で、ここでは原語として書き残すだけにとどめている。" }
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "狙い"
+            },
+            {
+              "type": "paragraph",
+              "text": "「同じストロークが場所を変えながら relay されていく」感覚を、別アニメーションの複製ではなく、`Theatre.js` の単一タイムラインへの複数レイヤーからの参照として組み立てる。1 本のストロークが、ずれた ease のまま他のレイヤーへ伝わる。"
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "実装の核心"
+            },
+            {
+              "type": "list",
+              "items": [
+                "`Theatre.js` の keyframe playback を 1 つだけ持つ",
+                "各 relay レイヤーは同じ playback の time に対して、自分の offset と ease を持つ",
+                "レイヤー間の位相差が、relay の「遅れ」として知覚される"
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "捨てたもの"
+            },
+            {
+              "type": "paragraph",
+              "text": "初期はレイヤーごとに別々のアニメーションを書いていたが、relay の感覚は一度も出なかった。「別々に動いている」と「同じ動きが relay されている」は別の知覚だ。原語が同じであることが本質で、それを担保できるのが共通タイムラインだった。"
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "適用先"
+            },
+            {
+              "type": "paragraph",
+              "text": "hero のストローク・トランジションや、セクション切り替えのラインに乗る可能性がある。ただしポートフォリオ本体に出すかは別判断で、ここでは原語として書き残すだけにとどめる。"
+            }
           ]
         },
         "staged-emphasis-payoff": {
           "sections": [
-            { "type": "heading", "level": 2, "text": "やろうとしたこと" },
-            { "type": "paragraph", "text": "見出しが 3 行あるとして、3 行とも同じ ease を当てると、3 行が同時に来てしまう。1 行ずつをずらすだけでは、ただの delay の積み重ねになる。求めているのは、最後の 1 行に payoff（落ち）が残ること。" },
-            { "type": "heading", "level": 2, "text": "原語" },
-            { "type": "list", "items": [
-              "family — 同系統の ease を共有させる",
-              "stage — family 内で段階（先・中・後）を割り振る",
-              "payoff — 最終 stage にだけ別系統の ease を入れる（軽い overshoot や残響）"
-            ]},
-            { "type": "heading", "level": 2, "text": "捨てたもの" },
-            { "type": "paragraph", "text": "全行に微妙に違う ease を当てる方向はやめた。情報量が増えすぎて『なぜここで重みがあるのか』が読み取れなくなる。stage は 3 段階以上にしないという制約のほうが重要だった。" },
-            { "type": "heading", "level": 2, "text": "適用先" },
-            { "type": "paragraph", "text": "Hero タイトルの stagger、Filmtone のステップ・リビール、Photography のキャプション 3 段の出し分けなど。長く同じ ease を続ける場面でこそ効く。" }
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "狙い"
+            },
+            {
+              "type": "paragraph",
+              "text": "見出しが 3 行あるとき、すべて同じ ease を当てると 3 行が同時に到達してしまう。一方、各行をただ時間でずらすと delay の積み重ねにしかならない。狙いは、最後の 1 行に payoff（落ち）を残すことだ。"
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "原語の構造"
+            },
+            {
+              "type": "list",
+              "items": [
+                "family — 同系統の ease をグループに共有させる",
+                "stage — family 内で段階（先・中・後）を割り振る",
+                "payoff — 最終 stage にだけ別系統の ease を当てる（軽い overshoot、または残響）"
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "捨てたもの"
+            },
+            {
+              "type": "paragraph",
+              "text": "全行に微妙に違う ease を当てる方向は捨てた。情報量が増え、どこに重みがあるのかが読めなくなる。stage は 3 段階以内に収めるという制約のほうが効いた。"
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "適用先"
+            },
+            {
+              "type": "paragraph",
+              "text": "hero タイトルの stagger、Filmtone のステップ・リビール、Photography のキャプションの段階出しなど。同じ ease で複数の要素を時間にわたって並べる場面で機能する。"
+            }
           ]
         },
         "boiling-poster-aperture": {
           "sections": [
-            { "type": "heading", "level": 2, "text": "やろうとしたこと" },
-            { "type": "paragraph", "text": "ポスター面が紙のようににじみながら開く reveal。CSS の clip-path で出せるのは硬いエッジだけで、紙のような『boil』には届かない。WebGL 側に boil 場（時間で動くノイズ場）を持って、aperture（マスク）の縁を displacement で乱す。" },
-            { "type": "heading", "level": 2, "text": "構造" },
-            { "type": "list", "items": [
-              "boil field — 低周波 noise + 時間 phase で『煮立っている場』を作る",
-              "alpha-mask-gate — ポスター面の reveal 進行度（0..1）を渡す",
-              "edge displacement — gate の縁だけを boil field の値で乱す"
-            ]},
-            { "type": "heading", "level": 2, "text": "捨てたもの" },
-            { "type": "paragraph", "text": "boil の振幅を大きく取ると『ぐにゃぐにゃ』に見えて、紙ではなくゼリーになる。振幅は出口の縁だけに限定し、内側の絵は揺らさない、という制約を入れた。中身を揺らした瞬間に紙性が消える。" },
-            { "type": "heading", "level": 2, "text": "適用先" },
-            { "type": "paragraph", "text": "ポスター・ビジュアルの初出時、Filmtone のサンプル画像の差し替え、journal の cover などに乗る可能性がある。" }
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "狙い"
+            },
+            {
+              "type": "paragraph",
+              "text": "ポスター面が紙のようににじみながら開く reveal を作る。CSS の `clip-path` で出せるのは硬いエッジだけで、紙のような boil の質感には届かない。`WebGL` 側に boil 場（時間で動くノイズ場）を持ち、aperture（マスク）の縁を displacement で乱す構成にする。"
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "構造"
+            },
+            {
+              "type": "list",
+              "items": [
+                "boil field — 低周波 noise と時間 phase で「煮立っている場」を作る",
+                "alpha-mask-gate — ポスター面の reveal 進行度（0..1）を渡す",
+                "edge displacement — gate の縁だけを boil field の値で乱す"
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "捨てたもの"
+            },
+            {
+              "type": "paragraph",
+              "text": "boil の振幅を大きく取ると、紙ではなくゼリーのように見えてしまう。振幅は gate の縁だけに限定し、内側の絵は揺らさない、という制約を入れた。中身を揺らした瞬間に紙の質感が消える。"
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "適用先"
+            },
+            {
+              "type": "paragraph",
+              "text": "ポスター・ビジュアルが初めて姿を現す瞬間、Filmtone のサンプル画像の差し替え、journal の cover トランジションなどに乗る可能性がある。"
+            }
           ]
         },
         "temporal-echo-residue": {
           "sections": [
-            { "type": "heading", "level": 2, "text": "やろうとしたこと" },
-            { "type": "paragraph", "text": "動きが止まったあとの『残響』を意図的に持つ。直前の動きが完全には消えず、減衰しながら次の動きに干渉する。画面が静止しているのに、まだ何かが動いていた感じが残る、という主観的体験を仕組みとして書く。" },
-            { "type": "heading", "level": 2, "text": "構造" },
-            { "type": "list", "items": [
-              "echo family — 主モーションが終わった後の N フレーム分を保持するバッファ",
-              "decay — 各フレームを時間で指数的に減衰させる",
-              "residue — 減衰しきる前に次のモーションが入ると、その residue が新モーションに加算される"
-            ]},
-            { "type": "heading", "level": 2, "text": "捨てたもの" },
-            { "type": "paragraph", "text": "echo の表現を可視のゴーストに寄せる方向は捨てた。可視にすると一気に『派手な VFX』になり、編集物の文脈から浮く。echo は数値としては残すが、可視性は薄く、シェーダー側のアウトプットには 5–10% 程度しか乗せない。" },
-            { "type": "heading", "level": 2, "text": "適用先" },
-            { "type": "paragraph", "text": "セクション間トランジション、scrolljack の終端、Filmtone のスライダー操作後の反応。明示的な VFX ではなく、操作の手触りを支える層として効く。" }
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "狙い"
+            },
+            {
+              "type": "paragraph",
+              "text": "動きが止まったあとの「残響」を意図して残す。直前の動きが瞬時には消えず、減衰しながら次の動きに干渉する。画面は静止しているのに、まだ何かが動いていた感じが残る、という主観的体験を、仕組みとして書き起こす。"
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "構造"
+            },
+            {
+              "type": "list",
+              "items": [
+                "echo family — 主モーション終了後の N フレームを保持するバッファ",
+                "decay — 保持された各フレームを時間で指数的に減衰させる",
+                "residue — 減衰しきる前に次のモーションが入ると、そのとき残っていた residue が加算される"
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "捨てたもの"
+            },
+            {
+              "type": "paragraph",
+              "text": "echo を可視のゴーストとして見せる方向は捨てた。可視化した瞬間に「派手な VFX」の語彙に倒れ、編集の文脈から浮く。echo は内部値としては残すが、シェーダー出力への寄与は 5–10% 程度に抑える。"
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "text": "適用先"
+            },
+            {
+              "type": "paragraph",
+              "text": "セクション間のトランジション、scrolljack の終端、Filmtone のスライダーを離した直後の反応など。明示的な VFX ではなく、操作の手触りを下支えする層として効く。"
+            }
           ]
         }
       }
