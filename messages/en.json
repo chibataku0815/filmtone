@@ -1379,7 +1379,213 @@
     "title": "Journal",
     "description": "Notes on works and technical writing.",
     "eyebrow": "Notes & Studies",
-    "intro": "Notes from behind the work: production thinking and technical writing held under one craft bar across code, motion, film, and photography."
+    "intro": "Notes from behind the work: production thinking and technical writing held under one craft bar across code, motion, film, and photography.",
+    "indexLabels": {
+      "flagship": "Renewal Case Study",
+      "engineeringNotes": "Engineering Notes",
+      "studies": "Studies",
+      "motionStudies": "Motion Studies",
+      "readMore": "Read",
+      "viewAll": "View all"
+    },
+    "entries": {
+      "portfolio-renewal-2026": {
+        "eyebrow": "Renewal 2026 / Case Study",
+        "title": "One light substrate — what Renewal 2026 implemented and what it cut",
+        "summary": "We chose a single light substrate, with the WebGPU motion-dot field as the ground itself. Dual dark/light themes were dropped, CSS scrims were dropped, and readability moved into the data-readability shader pipeline. A record of the decisions and the things removed.",
+        "metaDescription": "Portfolio Renewal 2026 case study: WebGPU motion-dot, single light substrate, data-readability shader pipeline, Liquid Glass chrome, and the things deliberately cut."
+      },
+      "mobile-safari-touch-controller": {
+        "eyebrow": "Engineering Note",
+        "title": "Lowering iOS Safari's visual viewport into CSS variables",
+        "summary": "iOS Safari collapses its URL bar mid-scroll, breaking `100vh`. We publish the `visualViewport` API as a single set of CSS variables (`--vvh`, `--vvw`, `--vv-offset-*`) so motion-dot canvas and Liquid Glass chrome share one source of truth.",
+        "metaDescription": "Engineering note on lowering iOS Safari's visualViewport into CSS variables — the plumbing that lets motion-dot and Liquid Glass chrome share layout."
+      },
+      "journal-typography-wordmark-system": {
+        "eyebrow": "Typography / R&D",
+        "title": "Carving Geist into a wordmark — extract → modify → build",
+        "summary": "Identity needed a carved wordmark, not a font. We took Geist Sans Medium as a base and re-cut A, K, C, T, H, B, M letterforms into SVG paths. An ongoing R&D piece — Jost still co-exists in the build, and we say so.",
+        "metaDescription": "Wordmark pipeline (extract-glyphs / modify-glyphs / build-wordmark). Carving Geist Sans into the studio's identity wordmark — an R&D record."
+      }
+    },
+    "motionStudies": {
+      "indexEyebrow": "Motion Studies",
+      "indexTitle": "Motion Studies — single-purpose motion vocabulary, written one at a time",
+      "indexSummary": "Independent of whether each one ships into the portfolio body, here is where motion vocabulary is isolated and written down — one technique per study, with the judgements, what was cut, and the technical constraints documented before the implementation.",
+      "metaDescription": "Motion Studies index — Renewal 2026 motion vocabulary broken down into single-purpose R&D pieces.",
+      "entries": {
+        "signal-stroke-relay": {
+          "eyebrow": "Theatre / Cascade",
+          "title": "Signal Stroke Relay — relaying one stroke across multiple layers",
+          "summary": "A single stroke driven by a Theatre.js keyframe playback is referenced across multiple layers — not duplicated as separate animations. The shared timeline carries the same gesture from layer to layer, with phase offsets producing the relay.",
+          "metaDescription": "Signal Stroke Relay — a Theatre.js cascade stroke motion study."
+        },
+        "staged-emphasis-payoff": {
+          "eyebrow": "Pacing / Family",
+          "title": "Staged Emphasis Payoff — staged emphasis with the payoff held to the last beat",
+          "summary": "Three lines on the same ease arrive together. Three lines on three different eases lose readability. We treat them as a family, give them stages (early / mid / late), and reserve a separate ease for the payoff on the final stage.",
+          "metaDescription": "Staged Emphasis Payoff — a motion study on pacing and emphasis families."
+        },
+        "boiling-poster-aperture": {
+          "eyebrow": "Boil Field / Reveal",
+          "title": "Boiling Poster Aperture — reveals through a boiled aperture and edge displacement",
+          "summary": "CSS clip-path gives a hard edge. To get a paper-like reveal we run a boil field (time-evolving noise) inside WebGL and use it to displace just the aperture's edge. The interior of the artwork stays still — only the rim boils.",
+          "metaDescription": "Boiling Poster Aperture — a motion study on boil fields and alpha-mask-gate reveals."
+        },
+        "temporal-echo-residue": {
+          "eyebrow": "Echo / Decay",
+          "title": "Temporal Echo Residue — keeping motion alive after the motion has stopped",
+          "summary": "When motion stops, we keep a residue of the previous frames. It decays exponentially, and if a new motion begins before the residue dies, the two interfere. The screen looks still, but something has not finished moving yet.",
+          "metaDescription": "Temporal Echo Residue — a motion study on echo families and residue decay."
+        }
+      }
+    },
+    "articles": {
+      "portfolio-renewal-2026": {
+        "sections": [
+          { "type": "heading", "level": 2, "text": "Why we collapsed to a single light substrate" },
+          { "type": "paragraph", "text": "The first decision in Renewal 2026 was to make the background one. Not a dark/light pair, not a per-section theme. A single light substrate sits underneath, and reading, work, and motion all have to live on top of it." },
+          { "type": "paragraph", "text": "The reason starts on the technical side. The motion-dot background runs WebGPU and writes its own clear color every frame to hold 60fps. That clear color is float-typed and hard-coded to `[0.82, 0.82, 0.82, 1.0]`. If the site disagreed with that color, the screen would flicker between two stages on every scroll." },
+          { "type": "code", "lang": "ts", "text": "// packages/motion-dot/src/main.ts\nbgColor: [0.82, 0.82, 0.82, 1.0]" },
+          { "type": "paragraph", "text": "Which means a dark site is not on the table — not without rewriting the shader pipeline. Whether you call that a constraint or a stance is a matter of attitude. I chose the second. Holding every category on a single light surface was a stronger editorial position than producing a dark mode would have been." },
+          { "type": "heading", "level": 2, "text": "Readability lives in a shader, not in a CSS scrim" },
+          { "type": "paragraph", "text": "Light text on a moving dot field gets noisy. The first attempt was the obvious one — drop a translucent panel under each block via `::before`. Readable, but lethal as an editorial surface. Every section gained a visible rectangle." },
+          { "type": "paragraph", "text": "The fix lived in the shader. Sections opt-in via `data-readability`. `useReadabilityRegions` watches them through IntersectionObserver, weights by visible area, and lerps the dominant scalar into a CSS variable `--motion-dot-readability`. The motion-dot fragment pipeline reads that scalar and dims itself. CSS covers nothing." },
+          { "type": "code", "lang": "tsx", "text": "<header data-readability=\"focus\">…</header>\n<section data-readability=\"reading\">…</section>" },
+          { "type": "paragraph", "text": "After that, the rectangles were gone. The text and the background sit on the same plane — the background just gets quieter where reading is happening." },
+          { "type": "heading", "level": 2, "text": "Liquid Glass stays, but only on the chrome" },
+          { "type": "paragraph", "text": "We banned `backdrop-filter` from body content as a rule. The navigation chrome, on the other hand, kept its Liquid Glass — it reads visualViewport and refracts. Glass belongs to the moving subject, not to the page. It never lands on top of reading." },
+          { "type": "callout", "tone": "note", "text": "Body uses the data-readability shader pipeline. Chrome uses Liquid Glass. Splitting them physically meant their responsibilities stopped colliding." },
+          { "type": "heading", "level": 2, "text": "What was cut" },
+          { "type": "list", "items": [
+            "The dark/light dual mode toggle (lost its meaning the moment substrate became one)",
+            "Section-level glass scrims (readability moved to the shader scalar)",
+            "Decorative panels and gradient overlays in body content",
+            "Per-section route-accent variations (only the chrome accent remains)"
+          ]},
+          { "type": "heading", "level": 2, "text": "Exceptions kept on purpose" },
+          { "type": "paragraph", "text": "Filmtone and Photography stay on their own systems. Filmtone is, as a product, a dark-UI app — it scopes itself with `.dark`. Photography would be eaten by its own imagery on a light substrate, so we flip the surface locally with `body:has(.photography-page)`. These are explicit exceptions, not omissions." },
+          { "type": "heading", "level": 2, "text": "What is still open" },
+          { "type": "paragraph", "text": "motion-dot is WebGPU-first; the WebGL2 fallback gives up density. Whether a thinner background on lower-end devices reads as 'natural' or as 'weak' isn't fully decided yet." },
+          { "type": "paragraph", "text": "The other open question is what happens the day a 'night chapter' has to enter the site. Today there is no such plan, but partitioning the substrate later would be a major rebuild. I'm leaving this here as acknowledged debt." }
+        ]
+      },
+      "mobile-safari-touch-controller": {
+        "sections": [
+          { "type": "heading", "level": 2, "text": "The problem" },
+          { "type": "paragraph", "text": "iOS Safari grows and shrinks its URL bar with scroll. `100vh` resolves to the expanded height and freezes there. By itself that's tolerable; in practice the body height, the motion-dot canvas full-bleed, and the Liquid Glass chrome's fixed position all start moving on different bases." },
+          { "type": "paragraph", "text": "The visible failure is that, the moment the URL bar collapses, the motion-dot leaves a 64-px strip of empty space at the bottom. A background that doesn't reach the bottom of the page is editorially fatal." },
+          { "type": "heading", "level": 2, "text": "The fix — publish once, consume from CSS variables" },
+          { "type": "paragraph", "text": "The implementation is intentionally small. A single client component, `VisualViewportVars`, subscribes to `window.visualViewport` and writes the values straight onto `:root` as CSS variables." },
+          { "type": "code", "lang": "tsx", "text": "// apps/web/src/features/viewport/VisualViewportVars.tsx (concept)\nconst vv = window.visualViewport;\nroot.style.setProperty('--vvh', `${vv.height}px`);\nroot.style.setProperty('--vvw', `${vv.width}px`);\nroot.style.setProperty('--vv-offset-top', `${vv.offsetTop}px`);" },
+          { "type": "paragraph", "text": "The motion-dot canvas reads `height: var(--vvh)` directly. The Liquid Glass chrome's fixed top becomes `top: calc(var(--vv-offset-top, 0px) + 1rem)`. Neither knows about the other; both fall from the same source of truth." },
+          { "type": "heading", "level": 2, "text": "Where safe-area meets it" },
+          { "type": "paragraph", "text": "Notch and home-indicator insets come from `env(safe-area-inset-*)` — a separate axis from visualViewport. Only header and footer padding consume it; the motion-dot canvas explicitly extends past safe-area to fill the screen. The two systems are kept apart on purpose." },
+          { "type": "code", "lang": "css", "text": ".chrome-nav {\n  top: max(env(safe-area-inset-top, 0px), 1rem);\n  height: calc(var(--vvh, 100vh) - env(safe-area-inset-top, 0px));\n}" },
+          { "type": "heading", "level": 2, "text": "What this note does not cover" },
+          { "type": "callout", "tone": "warn", "text": "This piece covers visual-viewport delivery and the safe-area boundary only. A 44-pixel touch target audit and the touch-version of the keyboard-only HUDs are separate R&D and are not yet in source. They will be written up in the next wave." },
+          { "type": "list", "items": [
+            "Comprehensive 44-pixel touch target audit (audit tool not yet built)",
+            "Touch versions of keyboard-only HUDs in Filmtone and the experiments",
+            "Cross-checking visualViewport behavior on Android Chrome"
+          ]},
+          { "type": "heading", "level": 2, "text": "What we learned" },
+          { "type": "paragraph", "text": "Putting one global source of truth on `:root` as CSS variables is unsexy and durable. Shaders read it, JSX reads it, layouts read it. As more layers were added, nothing fell out of sync. Distributing the same values via React context or props broke far more often." }
+        ]
+      },
+      "journal-typography-wordmark-system": {
+        "sections": [
+          { "type": "heading", "level": 2, "text": "Why a wordmark at all" },
+          { "type": "paragraph", "text": "The C-arc + 工 logomark was designed as a modern personal kamon and works at small to medium sizes. It loses force when an editorial hero needs to fill a hero band and announce whose site this is. That role belongs to a different typographic device." },
+          { "type": "paragraph", "text": "Two paths: (1) drop in an off-the-shelf display face, or (2) take a base typeface and carve it into a wordmark of our own. The first is fast but anonymous. We chose the second." },
+          { "type": "heading", "level": 2, "text": "The pipeline — extract, modify, build" },
+          { "type": "list", "ordered": true, "items": [
+            "extract-glyphs.ts — extracts only the glyphs needed for CHIBA / TAKUMI from Geist Sans Medium 500 (.otf) as SVG paths",
+            "modify-glyphs.ts — applies hand-picked carvings: A flat-top, K junction gap, C terminal cuts, T extension, H optical center, B ink trap, M thinning",
+            "build-wordmark.ts — composes the modified paths into CHIBA / TAKUMI and writes them into `branding.wordmark.{primaryPaths,secondaryPaths}` in `portfolio.ts`"
+          ]},
+          { "type": "paragraph", "text": "At runtime, `BrandWordmark` renders the path arrays as fill-based SVG. Color is `currentColor`; weight and color stay in CSS." },
+          { "type": "code", "lang": "ts", "text": "// apps/web/src/shared/data/portfolio.ts (excerpt)\nbranding: {\n  wordmark: {\n    viewBox: '0 0 7079 750',\n    primaryPaths: [/* CHIBA */],\n    secondaryPaths: [/* TAKUMI */],\n  }\n}" },
+          { "type": "heading", "level": 2, "text": "Why path-baked, not font-subset" },
+          { "type": "paragraph", "text": "A subsetted web font is still a font — moving a single vertex isn't an option. SVG paths give you a flat A top, a junction gap on K, terminal cuts on C, all as ordinary math on Bezier control points. Reversibility is lost; uniqueness is the trade." },
+          { "type": "heading", "level": 2, "text": "Honesty about the in-progress part" },
+          { "type": "callout", "tone": "warn", "text": "As of Renewal 2026, Jost is not fully removed. `apps/web/src/app/fonts.ts` still exports Jost 800, referenced inside `--font-family-display`. `font-mono` usages also remain. The full migration to a single display family is queued for the next wave." },
+          { "type": "paragraph", "text": "The wordmark is therefore a first step. The logotype layer was rebuilt in isolation, ahead of the broader typography clean-up that has yet to land. Writing it down while it is still in motion is the point of this study." },
+          { "type": "heading", "level": 2, "text": "What it taught us" },
+          { "type": "list", "items": [
+            "The base face shapes how much carving room you get. Geist's neutrality made it pleasant to modify",
+            "Carvings should be intentional and few — A and K were touched, O and U were left alone, fixed at the start",
+            "Persist outputs in a form the site can actually draw. Not .otf, not .woff2 — SVG path data inside the data layer"
+          ]}
+        ]
+      },
+      "motion-studies": {
+        "signal-stroke-relay": {
+          "sections": [
+            { "type": "heading", "level": 2, "text": "What we tried to make" },
+            { "type": "paragraph", "text": "The feeling of a single stroke that gets relayed across spaces — not as duplicated animations, but as multiple layers referencing one Theatre.js timeline. The same gesture, picked up by other layers with different eases, produces the relay." },
+            { "type": "heading", "level": 2, "text": "The technical key" },
+            { "type": "list", "items": [
+              "One Theatre.js keyframe playback as the master",
+              "Each relay layer reads the same timeline time with its own offset and ease",
+              "The phase difference between layers is what reads as 'the relay'"
+            ]},
+            { "type": "heading", "level": 2, "text": "What we cut" },
+            { "type": "paragraph", "text": "Early versions wrote a separate animation for each layer. The relay never appeared — the layers just looked unrelated. Same vocabulary across layers is the whole point, and a shared timeline is what guarantees it." },
+            { "type": "heading", "level": 2, "text": "Where it could land" },
+            { "type": "paragraph", "text": "Hero stroke transitions, line elements during section changes. Whether it actually ships in the body is a separate decision; here it lives as documented vocabulary." }
+          ]
+        },
+        "staged-emphasis-payoff": {
+          "sections": [
+            { "type": "heading", "level": 2, "text": "What we tried to make" },
+            { "type": "paragraph", "text": "Three headline lines on the same ease arrive together. Three lines on three different eases lose meaning. The aim is for the final line to carry a payoff — a small but distinct landing — without making the others noisy." },
+            { "type": "heading", "level": 2, "text": "Vocabulary" },
+            { "type": "list", "items": [
+              "family — share a common ease across the group",
+              "stage — assign positions (early / mid / late) within the family",
+              "payoff — give the final stage a different ease (light overshoot, soft residue)"
+            ]},
+            { "type": "heading", "level": 2, "text": "What we cut" },
+            { "type": "paragraph", "text": "Giving each line a slightly different ease was abandoned — too much information, no readable weight. The harder constraint was 'never use more than three stages.' That kept the payoff legible." },
+            { "type": "heading", "level": 2, "text": "Where it could land" },
+            { "type": "paragraph", "text": "Hero title stagger, Filmtone step reveals, photography caption sequencing. Anywhere the same ease stretches across multiple beats." }
+          ]
+        },
+        "boiling-poster-aperture": {
+          "sections": [
+            { "type": "heading", "level": 2, "text": "What we tried to make" },
+            { "type": "paragraph", "text": "A poster reveal that opens the way paper bleeds through paper. CSS clip-path delivers only hard edges; a paper-like 'boil' isn't reachable. WebGL holds a boil field — a low-frequency noise field running on its own time — and the aperture's edge is displaced by it." },
+            { "type": "heading", "level": 2, "text": "Structure" },
+            { "type": "list", "items": [
+              "boil field — low-frequency noise plus a time phase, the 'simmering' surface",
+              "alpha-mask-gate — the reveal progress (0..1) for the poster",
+              "edge displacement — only the gate's rim is perturbed by the boil field"
+            ]},
+            { "type": "heading", "level": 2, "text": "What we cut" },
+            { "type": "paragraph", "text": "Pushing the boil amplitude high made the surface look like jelly, not paper. We confined the displacement to the rim and forbade modulating the interior. The moment the inside wobbles, the paper character is gone." },
+            { "type": "heading", "level": 2, "text": "Where it could land" },
+            { "type": "paragraph", "text": "First-time poster-style reveals, Filmtone sample swaps, journal cover transitions." }
+          ]
+        },
+        "temporal-echo-residue": {
+          "sections": [
+            { "type": "heading", "level": 2, "text": "What we tried to make" },
+            { "type": "paragraph", "text": "Carry the residue of motion past the moment it ends. The previous frames don't disappear instantly; they decay, and if new motion enters before the decay is over, the residue interferes with it. The screen is still — but something hasn't finished moving." },
+            { "type": "heading", "level": 2, "text": "Structure" },
+            { "type": "list", "items": [
+              "echo family — a buffer of N frames captured after the primary motion ends",
+              "decay — each captured frame loses energy exponentially over time",
+              "residue — if new motion arrives before decay completes, the remaining residue is added back into it"
+            ]},
+            { "type": "heading", "level": 2, "text": "What we cut" },
+            { "type": "paragraph", "text": "Visualizing echoes as ghost trails was abandoned. Visible ghosts read as VFX and pull the page out of the editorial register. The echo is kept numerically but contributes only a thin 5–10% of opacity to the shader output." },
+            { "type": "heading", "level": 2, "text": "Where it could land" },
+            { "type": "paragraph", "text": "Section transitions, the trailing edge of scrolljack, the response after a Filmtone slider release. Not as VFX — as an underlayer that supports the feel of input." }
+          ]
+        }
+      }
+    }
   },
   "experiments": {
     "title": "Experiments",
