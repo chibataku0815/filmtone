@@ -1485,34 +1485,34 @@
         "metaDescription": "Why a portfolio wordmark lives as SVG paths rather than a font, plus the pipeline that carves only the needed glyphs out of Geist Sans. A typographic editorial choice — giving up reversibility to gain identity."
       },
       "filmtone-motion-180-shutter-baseline": {
-        "eyebrow": "Filmtone / Case Study",
-        "title": "Making 180° the no-op baseline — rewriting Filmtone's motion blur to the industry standard",
-        "summary": "Footage shot on iPhones or cinema cameras already carries roughly 180° of shutter blur. Adding another 180° pass on top double-blurs the image. So we rebuilt the math: 180° is now the no-op baseline, and only angles above 180° act as a shutter-window extension. We checked RED, Foundry Nuke, Blender, Houdini, and After Effects, and aligned with the industry-standard exposure-as-fraction definition. A record of that judgment and its implementation.",
-        "metaDescription": "How Filmtone's motion-blur math was rewritten so that 180° is the no-op baseline. Researching RED, Nuke, Blender, Houdini, and AE, we aligned shutter angle with the industry standard of exposure duration — and threaded the same math through WebGL, WebGPU, and Swift."
+        "eyebrow": "Filmtone / Motion Blur",
+        "title": "From shutter angle to exposure frame count — Filmtone's motion blur math, aligned with industry conventions",
+        "summary": "Treating shutter angle as exposure duration. `exposureFrames = clamp(angle, 0, 720) / 360`, with 180° as the baseline (`0.5 frame`). Only `additionalExposureFrames = max(0, target - 0.5)` reaches the ring buffer. The mapping is `360° → 2 frames (triangle weights [2/3, 1/3])` and `720° → 3 frames (flat weights [1/3, 1/3, 1/3])`. The same math is shared across a WebGL fragment shader, a WebGPU compute shader, and an iOS Swift export session — and validated against RED, Foundry Nuke, Blender, Houdini, and After Effects.",
+        "metaDescription": "Filmtone's motion blur implementation: shutter angle normalized to exposure duration, with a 180° baseline plus ring-buffer additional exposure across WebGL/WebGPU/Swift. Walks through `exposureFrames = angle/360` and the concrete weight arrays."
       },
       "filmtone-dual-lut-pipeline": {
-        "eyebrow": "Filmtone / Case Study",
-        "title": "Splitting Source LUT from Look LUT — Filmtone's two-lane color processing architecture",
-        "summary": "\"One LUT for everything\" broke quickly. A camera transform (Apple Log → Rec.709) and a creative look (a film treatment) play different roles. When you swap source footage, the Source LUT should clear, but the Look should stay. So Filmtone splits them: `inputLut` (Source) and `creativeLut` (Look) live in separate slots. The export order goes input → grade → tone compression → glow → grain → creative. Each LUT has its own intensity slider. A record of that two-lane color pipeline.",
-        "metaDescription": "Why Filmtone separates inputLut (Source Profile/Camera) from creativeLut (Look) in two slots. Covers the source-replacement logic, the export order, and the independent intensity sliders that came with the architecture."
+        "eyebrow": "Filmtone / Color Pipeline",
+        "title": "Filmtone's two-lane LUT pipeline implementation — the inputLut/creativeLut data model and intensity blending via CIColorMatrix",
+        "summary": "Filmtone holds `.cube` LUTs in two slots: `inputLut` (Source Profile / Camera) and `creativeLut` (Look). The data model is `ParsedCubeLutDTO { title, size, data, intensity }` and `SerializableLutDTO { size, data, intensity }`. The export order is fixed: `input LUT → base grade → tone compression → edge optics → glow → vignette → grain → creative LUT → print`. When `intensity < 0.999`, results blend linearly via `CIColorMatrix` (source) over `CISourceOverCompositing` (LUT output); above that, the LUT output passes through. On source replacement, `inputLut` clears but `creativeLut` is preserved.",
+        "metaDescription": "Implementation of Filmtone's two-lane LUT pipeline — inputLut/creativeLut data model, the fixed export order, CIColorMatrix + CISourceOverCompositing intensity blending, and the source-replacement preservation rule."
       },
       "filmtone-cross-platform-color-parity": {
-        "eyebrow": "Filmtone / Engineering Note",
-        "title": "Sharing one math layer across WebGL/WebGPU preview and Swift export to keep colors identical",
-        "summary": "Filmtone's preview runs in browsers (WebGL/WebGPU); the export runs in iOS Swift. The naive approach — implement the same math three times — breaks somewhere every time. Instead, we keep color transforms, motion blur, and exposure math in TypeScript inside `packages/film-lab-renderer`, and the Swift side mechanically picks them up via `bun run generate:filmtone-ios-swift`. A record of holding cross-platform color parity through structure, not discipline.",
-        "metaDescription": "How Filmtone keeps colors identical across WebGL, WebGPU, and Swift export — color transforms, motion blur, and exposure math live in TypeScript, with Swift code generated from it. A cross-platform single-source-of-truth pattern."
+        "eyebrow": "Filmtone / Code Generation",
+        "title": "Generating Swift from TypeScript math — Filmtone's cross-platform color parity pipeline",
+        "summary": "Color transforms, motion blur, and exposure math live in TypeScript inside `packages/film-lab-renderer/src/`. `bun run generate:filmtone-ios-swift` mechanically produces `FilmtonePhase0Generated.swift`; hand-editing the generated module is prohibited. The Phase 0 contract test (`verify:swift-contract`) confirms the generated math matches the TypeScript output. WebGL fragment shaders read the math as GLSL constants, WebGPU compute shaders as WGSL, and the iOS Swift export session as the generated module. Color parity is held by structure, not discipline.",
+        "metaDescription": "How Filmtone keeps colors identical across WebGL/WebGPU preview and iOS Swift export — TypeScript as the single source of math, generated to Swift via `generate:filmtone-ios-swift` and validated through `verify:swift-contract`."
       },
       "filmtone-capacitor-native-bridge": {
-        "eyebrow": "Filmtone / Engineering Note",
-        "title": "Capacitor as a creative-tool host — nine native plugin methods that make Filmtone iOS work",
-        "summary": "Filmtone iOS is a Capacitor hybrid app, but a creative tool needs more than HTML5 affords. Through `FilmtoneMediaPlugin`, nine native methods cover photo-library picking, LUT loading, native rendering, Live Activity, cancellation, and memory pressure response. The app reaches into PhotoLibrary, Core Image, and ActivityKit directly. A record of where we drew the web/native boundary.",
-        "metaDescription": "How Filmtone iOS uses Capacitor as a host for a creative tool — nine native plugin methods (pickSource / pickLutFile / probeSource / runExport / Live Activity / cancelExport / and more) that bridge web and iOS without drowning in HTML5 limits."
+        "eyebrow": "Filmtone / iOS Bridge",
+        "title": "Reaching iOS PhotoLibrary, Core Image, and ActivityKit through a Capacitor native plugin — implementing FilmtoneMediaPlugin's nine methods",
+        "summary": "Filmtone iOS is a Capacitor 7.4 hybrid app, but `FilmtoneMediaPlugin` exposes nine native methods to the TypeScript side: `pickSource` (PhotoLibrary), `pickLutFile` (DocumentPicker), `probeSource` (AVAsset metadata), `renderPreviewFrame` (Core Image), `runExport` (Core Video write), `saveToPhotos` (PHPhotoLibrary), `shareOutput` (UIActivityViewController), `cancelExport`, `handleMemoryWarning`. Each is published via Swift `@objc`, with a TypeScript proxy in `src/native/filmtoneMedia.ts`. Bridge changes ship in dual-side PRs (single-side updates are the most common runtime breakage).",
+        "metaDescription": "How Filmtone iOS reaches iOS PhotoLibrary, Core Image, and ActivityKit through a Capacitor native plugin — the nine methods of `FilmtoneMediaPlugin` (pickSource / runExport / Live Activity / cancelExport, etc.) and the TS-Swift dual-PR pattern."
       },
       "filmtone-app-store-v12-shipping": {
         "eyebrow": "Filmtone / Release Engineering",
-        "title": "Shipping Filmtone v1.2 to the App Store as a solo dev — fastlane, gym, and ASC traps that I had to fix",
-        "summary": "Filmtone v1.2's App Store submission didn't go through on the first pass. fastlane 2.233's gym was passing authentication args into both `xcargs` and `export_xcargs`, breaking IPA export with `Exit status: 64`. Then deliver didn't include `release_notes`, so ASC rejected the review submission for missing `whatsNew`. I fixed the Fastfile each time and ended up factoring a `submit_review` lane that resubmits the existing build alone. A record of where the release pipeline broke and how a solo dev patched it.",
-        "metaDescription": "How shipping Filmtone v1.2 to the App Store hit two fastlane bugs (gym double-passing auth args, deliver missing whatsNew) and how a solo dev patched the Fastfile to recover. A real-world record of indie iOS release engineering."
+        "title": "Splitting an iOS release into six fastlane lanes — Filmtone's archive / screenshots / metadata / beta / release / submit_review design",
+        "summary": "Fastlane is split into six lanes by responsibility: `archive` (IPA build), `screenshots` (UI test snapshots), `metadata` (ASC localized metadata + review info), `beta` (TestFlight upload), `release` (binary + metadata + screenshots upload), `submit_review` (resubmits an existing build for review). The record covers two production traps and their fixes: gym 2.233 passing auth args into both `xcargs` and `export_xcargs` (causing `Exit status: 64` on IPA export), and deliver missing `release_notes` in upload options (causing ASC to reject the review submission for missing `whatsNew`). Each is patched with minimum-viable Fastfile edits.",
+        "metaDescription": "Implementation record of Filmtone's fastlane lane design — archive / screenshots / metadata / beta / release / submit_review responsibilities, with patches for the gym xcargs duplication and the deliver release_notes omission traps."
       }
     },
     "motionStudies": {

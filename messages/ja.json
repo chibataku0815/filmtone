@@ -1487,34 +1487,34 @@
         "metaDescription": "ポートフォリオのロゴタイプを市販フォントではなく SVG パスとして保つ意図と、Geist Sans の必要グリフだけを彫り直すパイプラインの記録。可逆性を捨てて固有性を取る、というタイポグラフィ寄りの編集判断。"
       },
       "filmtone-motion-180-shutter-baseline": {
-        "eyebrow": "Filmtone / Case Study",
-        "title": "180°シャッター角を「足さないベースライン」にした判断 — Filmtoneのモーションブラーを業界基準で書き直す",
-        "summary": "iPhoneやシネマカメラで撮られた動画には、すでに約180度のシャッターブラーが焼き込まれている。そこにFilmtoneがさらに180度のブラーを足すと、像が二重ブラーで崩れる。だから180度を「足さない」ベースラインに置き、180度超だけが「シャッター窓の延長」として作用する設計に書き直した。RED / Foundry Nuke / Blender / Houdini / After Effectsの実装を読み、業界標準のexposure-as-fractionの数式に揃える判断とその実装の記録。",
-        "metaDescription": "Filmtoneのモーションブラー数式を「180度=何もしない」ベースラインに書き直した経緯。RED/Nuke/Blender/Houdini/AEを参照し、シャッター角度をexposure durationとして定義する業界標準と整合させた、WebGL/WebGPU/Swiftに同じ数学を流す実装記録。"
+        "eyebrow": "Filmtone / Motion Blur",
+        "title": "シャッター角度から露光フレーム数への変換 — Filmtone のモーションブラー数式と業界標準への準拠",
+        "summary": "シャッター角度を露光時間として扱う実装。`exposureFrames = clamp(angle, 0, 720) / 360` で露光時間に正規化し、180度を「ベースライン (0.5 frame)」として扱う。リングバッファに渡されるのは `additionalExposureFrames = max(0, target - 0.5)` のみ。マッピングは `360度 → 2フレーム (triangle weights `[2/3, 1/3]`)`、`720度 → 3フレーム (flat weights `[1/3, 1/3, 1/3]`)`。同じ数式が WebGL fragment shader / WebGPU compute / iOS Swift export session に共有され、RED / Foundry Nuke / Blender / Houdini / After Effects の実装と整合する。",
+        "metaDescription": "Filmtone のモーションブラー実装。シャッター角度を露光時間として正規化し、180度ベースライン + 追加露光のリングバッファ加重で WebGL/WebGPU/Swift 3 実装を共有させる数式。`exposureFrames = angle/360` から weights 配列まで具体的に解説。"
       },
       "filmtone-dual-lut-pipeline": {
-        "eyebrow": "Filmtone / Case Study",
-        "title": "Source LUTとLook LUTを別系統に分けた判断 — Filmtoneの2レーン色処理アーキテクチャ",
-        "summary": "「LUT 1枚で全部やる」という最初の設計はすぐ破綻した。Camera transform(Apple Log → Rec.709)とcreative look(フィルム表現)は役割が違う。素材を差し替えたとき、Source側は捨てたいがLook側は残したい。だからFilmtoneは `inputLut`(Source)と `creativeLut`(Look)を別系統に分けた。書き出し順は input → grade → tone compression → glow → grain → creative。各LUTの強度を独立スライダーで操作する、二段構造の色処理アーキテクチャの記録。",
-        "metaDescription": "Filmtone の色処理を inputLut(Source Profile/Camera) と creativeLut(Look) の2系統に分けた設計判断。素材差し替え時の保持/破棄、書き出し順序、各LUTの独立intensity sliderまで含めた色パイプライン・アーキテクチャの記録。"
+        "eyebrow": "Filmtone / Color Pipeline",
+        "title": "Filmtone の2系統 LUT パイプライン実装 — `inputLut` / `creativeLut` のデータモデルと CIColorMatrix による intensity ブレンド",
+        "summary": "Filmtone は `.cube` LUT を `inputLut` (Source Profile / Camera) と `creativeLut` (Look) の 2 スロットで保持する。データモデルは `ParsedCubeLutDTO { title, size, data, intensity }` と `SerializableLutDTO { size, data, intensity }`。書き出し順は `input LUT → base grade → tone compression → edge optics → glow → vignette → grain → creative LUT → print` で固定。`intensity < 0.999` の時は `CIColorMatrix` (元画像) と `CISourceOverCompositing` (LUT 結果) で線形ブレンドし、`>= 0.999` なら LUT 結果をそのまま返す。素材差し替え時は `inputLut` だけ消し、`creativeLut` は保持する。",
+        "metaDescription": "Filmtone の 2 系統 LUT パイプライン実装。`inputLut` / `creativeLut` のデータモデル、書き出し順序、CIColorMatrix + CISourceOverCompositing による intensity 線形ブレンドの仕組み、素材差し替え時の保持/破棄ルール。"
       },
       "filmtone-cross-platform-color-parity": {
-        "eyebrow": "Filmtone / Engineering Note",
-        "title": "プレビュー(WebGL/WebGPU)と書き出し(iOS Swift)で同じ色を出すために、数学を1箇所に置く",
-        "summary": "Filmtoneのプレビューはブラウザ(WebGL/WebGPU)で走り、書き出しはiOS Swiftで走る。3つの実行環境で同じ色を出すには、3つに同じ数式を実装すればよい — というのは罠で、必ずどこかでズレる。Filmtoneは色変換・モーションブラー・露出計算を `packages/film-lab-renderer` のTypeScriptに集約し、Swift側は `bun run generate:filmtone-ios-swift` で機械生成して取り込む。プラットフォーム間の色一致を「規律」ではなく「構造」で守った実装記録。",
-        "metaDescription": "Filmtoneのプレビュー(WebGL/WebGPU)と書き出し(iOS Swift)で完全に同じ色を出すための単一参照源パターン。色変換・モーションブラー・露出計算をTypeScriptに集約し、Swiftへ機械生成で取り込むクロスプラットフォーム実装記録。"
+        "eyebrow": "Filmtone / Code Generation",
+        "title": "TypeScript の色変換数学から Swift コードを機械生成する — Filmtone のクロスプラットフォーム色一致パイプライン",
+        "summary": "色変換・モーションブラー・露出計算を `packages/film-lab-renderer/src/` の TypeScript に集約し、`bun run generate:filmtone-ios-swift` で `FilmtonePhase0Generated.swift` を機械生成する。Swift 側は手書き禁止。Phase 0 contract test (`verify:swift-contract`) が生成された数式と TypeScript 出力の一致を検証する。WebGL fragment shader は GLSL 定数として、WebGPU compute は WGSL として、iOS Swift export は生成モジュールとして同じ数式を読む。色一致を「規律」ではなく「構造」で守る実装。",
+        "metaDescription": "Filmtone がプレビュー (WebGL/WebGPU) と iOS Swift 書き出しで完全に同じ色を出すための単一参照源パターン。色変換・モーションブラー・露出計算を TypeScript に集約し、`generate:filmtone-ios-swift` で Swift モジュールを機械生成、`verify:swift-contract` で一致を検証。"
       },
       "filmtone-capacitor-native-bridge": {
-        "eyebrow": "Filmtone / Engineering Note",
-        "title": "Capacitorをクリエイティブツールのホストにする — Filmtone iOSの9つのnativeプラグインメソッド",
-        "summary": "Filmtone iOSはCapacitorで動くハイブリッドアプリだが、ファイル選択・LUT読み込み・ネイティブ描画・Live Activity・キャンセル・メモリ警告対応など、クリエイティブツールに必要な9つのnativeメソッドを `FilmtoneMediaPlugin` で公開している。HTML5の制約に縛られず、PhotoLibrary・Core Image・ActivityKitに直接アクセスする。Webとnativeの境界をどう設計したかの実装記録。",
-        "metaDescription": "Filmtone iOS の Capacitor 構成で、ハイブリッドアプリにクリエイティブツールの厚みを持たせるための9つの native plugin メソッド。pickSource / pickLutFile / probeSource / runExport / Live Activity / cancelExport まで、Web と native の境界設計の記録。"
+        "eyebrow": "Filmtone / iOS Bridge",
+        "title": "Capacitor native plugin で iOS PhotoLibrary / Core Image / ActivityKit に届く — `FilmtoneMediaPlugin` 9 メソッドの実装パターン",
+        "summary": "Filmtone iOS は Capacitor 7.4 のハイブリッドアプリだが、`FilmtoneMediaPlugin` で 9 つの native メソッドを TypeScript 側に露出する: `pickSource` (PhotoLibrary)、`pickLutFile` (DocumentPicker)、`probeSource` (AVAsset metadata)、`renderPreviewFrame` (Core Image)、`runExport` (Core Video write)、`saveToPhotos` (PHPhotoLibrary)、`shareOutput` (UIActivityViewController)、`cancelExport`、`handleMemoryWarning`。各メソッドは Swift `@objc` で公開され、TypeScript 側 `src/native/filmtoneMedia.ts` がプロキシを定義する。bridge 変更は両側を同時 PR で出す (片肺更新が runtime 事故の最頻原因)。",
+        "metaDescription": "Filmtone iOS が Capacitor native plugin 経由で iOS PhotoLibrary / Core Image / ActivityKit にアクセスする実装。`FilmtoneMediaPlugin` の 9 メソッド (pickSource / runExport / Live Activity / cancelExport 等) の責務分担と、TS↔Swift 両側同時更新パターン。"
       },
       "filmtone-app-store-v12-shipping": {
         "eyebrow": "Filmtone / Release Engineering",
-        "title": "個人開発でiOSアプリを App Store に出した話 — Filmtone v1.2 で踏んだ fastlane / gym / ASC の罠",
-        "summary": "Filmtone v1.2のApp Store提出は1発で通らなかった。fastlane 2.233のgymが認証引数を `xcargs` と `export_xcargs` に二重に渡してIPA exportが `Exit status: 64`、deliverが `release_notes` を明示しなかったため `whatsNew` 未設定でreviewが弾かれた。その都度Fastfileを直し、最終的に `submit_review` laneを切り出して既存buildだけを再提出する形に整えた。個人開発者が踏んだリリース工程の罠と、最小限のFastfile修正で通した記録。",
-        "metaDescription": "Filmtone v1.2のApp Store提出を一回で通せなかった話。fastlane 2.233のgym認証引数二重渡し問題、deliverのrelease_notes未明示でwhatsNew欠落、Fastfileの最小修正で再提出に通した個人開発者のリリース実録。"
+        "title": "fastlane で iOS リリース工程を 6 lane に分ける — Filmtone の archive / screenshots / metadata / beta / release / submit_review 設計",
+        "summary": "fastlane を 6 lane に責務分割する: `archive` (IPA ビルド)、`screenshots` (UI test snapshots)、`metadata` (ASC localized metadata + review info)、`beta` (TestFlight upload)、`release` (binary + metadata + screenshots upload)、`submit_review` (既存 build だけで審査提出)。実運用で踏んだ罠 2 つの修正も含む: gym 2.233 が認証引数を `xcargs` と `export_xcargs` の両方に渡し IPA export が `Exit status: 64`、`deliver` が `release_notes` を upload options に明示せず ASC が `whatsNew` 不在で review を弾く。それぞれの最小修正と再提出フローの記録。",
+        "metaDescription": "Filmtone iOS の fastlane lane 設計実装。archive / screenshots / metadata / beta / release / submit_review の 6 lane 責務分担と、gym xcargs 二重渡しおよび deliver release_notes 未明示で踏んだ罠の最小修正方法。"
       }
     },
     "motionStudies": {
