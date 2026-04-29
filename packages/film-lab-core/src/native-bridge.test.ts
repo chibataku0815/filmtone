@@ -219,5 +219,25 @@ LUT_3D_SIZE 2
     expect(request.inputLut?.intensity).toBe(0.8);
     expect(request.creativeLut?.title).toBe("Creative");
     expect(request.creativeLut?.intensity).toBe(0.45);
+    expect("lut" in request).toBe(false);
+  });
+
+  test("does not emit legacy LUT field for cleared current projects", () => {
+    const request = buildPhase0ExportRequest({
+      source: {
+        uri: "file:///clip.mov",
+        filename: "clip.mov",
+        kind: "video",
+      },
+      project: {
+        ...createPhase0ProjectState(),
+        inputLut: null,
+        creativeLut: null,
+      },
+    });
+
+    expect(request.inputLut).toBeNull();
+    expect(request.creativeLut).toBeNull();
+    expect("lut" in request).toBe(false);
   });
 });

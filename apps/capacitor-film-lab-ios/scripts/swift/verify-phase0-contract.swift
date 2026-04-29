@@ -103,6 +103,7 @@ struct VerifyPhase0Contract {
             !reencodedString.contains("\"lut\""),
             "re-encoded legacy state still contains lut"
         )
+        try runLutClearRequestContracts(decoder: decoder, encoder: encoder)
 
         // --- Hidden defaults SSOT (CONTRACT_DEFAULTS 19 keys) ---
         // Confirms that the generated Swift block matches the TS source of
@@ -163,5 +164,83 @@ struct VerifyPhase0Contract {
         }
 
         print("Phase0 contract fixtures verified")
+    }
+
+    static func runLutClearRequestContracts(
+        decoder: JSONDecoder,
+        encoder: JSONEncoder
+    ) throws {
+        let inputLut = makeLut(title: "Input LUT", intensity: 0.8)
+        let creativeLut = makeLut(title: "Creative LUT", intensity: 0.6)
+
+        var inputCleared = FilmtonePhase0Math.createProjectState()
+        inputCleared.inputLut = inputLut
+        inputCleared.creativeLut = creativeLut
+        inputCleared.inputLut = nil
+
+        let inputClearedRequest = try makeRequest(project: inputCleared)
+        try expect(inputClearedRequest.lut == nil, "input clear request should not emit legacy lut")
+        try expect(inputClearedRequest.inputLut == nil, "input clear request should clear inputLut")
+        try expect(
+            inputClearedRequest.creativeLut?.intensity == creativeLut.intensity,
+            "input clear request should preserve creativeLut"
+        )
+
+        var creativeCleared = FilmtonePhase0Math.createProjectState()
+        creativeCleared.inputLut = inputLut
+        creativeCleared.creativeLut = creativeLut
+        creativeCleared.creativeLut = nil
+
+        let creativeClearedRequest = try makeRequest(project: creativeCleared)
+        try expect(creativeClearedRequest.lut == nil, "creative clear request should not emit legacy lut")
+        try expect(
+            creativeClearedRequest.inputLut?.intensity == inputLut.intensity,
+            "creative clear request should preserve inputLut"
+        )
+        try expect(creativeClearedRequest.creativeLut == nil, "creative clear request should clear creativeLut")
+
+        let clearedData = try encoder.encode(FilmtonePhase0Math.createProjectState())
+        let clearedString = String(decoding: clearedData, as: UTF8.self)
+        try expect(!clearedString.contains("\"lut\""), "cleared project should not encode legacy lut")
+
+        let decodedCleared = try decoder.decode(FilmtoneProjectState.self, from: clearedData)
+        try expect(decodedCleared.inputLut == nil, "decoded cleared project should keep inputLut nil")
+        try expect(decodedCleared.creativeLut == nil, "decoded cleared project should keep creativeLut nil")
+
+        let decodedClearedRequest = try makeRequest(project: decodedCleared)
+        try expect(decodedClearedRequest.lut == nil, "decoded cleared request should not emit legacy lut")
+        try expect(decodedClearedRequest.inputLut == nil, "decoded cleared request should keep inputLut nil")
+        try expect(decodedClearedRequest.creativeLut == nil, "decoded cleared request should keep creativeLut nil")
+    }
+
+    static func makeRequest(project: FilmtoneProjectState) throws -> Phase0ExportRequestDTO {
+        try FilmtonePhase0Math.buildExportRequest(
+            source: SourceInfoDTO(
+                uri: "file:///tmp/lut-clear-contract.mov",
+                filename: "lut-clear-contract.mov",
+                kind: .video,
+                mimeType: "video/quicktime"
+            ),
+            probe: nil,
+            project: project
+        )
+    }
+
+    static func makeLut(title: String, intensity: Double) -> ParsedCubeLutDTO {
+        ParsedCubeLutDTO(
+            title: title,
+            size: 2,
+            data: [
+                0, 0, 0,
+                1, 0, 0,
+                0, 1, 0,
+                1, 1, 0,
+                0, 0, 1,
+                1, 0, 1,
+                0, 1, 1,
+                1, 1, 1,
+            ],
+            intensity: intensity
+        )
     }
 }

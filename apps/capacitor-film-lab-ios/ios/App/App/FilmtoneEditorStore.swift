@@ -791,10 +791,9 @@ final class FilmtoneEditorStore: ObservableObject {
             guard let lut = try await facade.pickCubeLut() else {
                 return
             }
-            project.inputLut = lut
-            project.updatedAt = FilmtonePhase0Math.isoTimestamp()
-            persist()
-            schedulePreviewRender()
+            applyLutMutation {
+                $0.inputLut = lut
+            }
         } catch {
             if let mediaError = error as? FilmtoneMediaError,
                mediaError.code == "UNSUPPORTED_SOURCE" {
@@ -810,10 +809,9 @@ final class FilmtoneEditorStore: ObservableObject {
             guard let lut = try await facade.pickCubeLut() else {
                 return
             }
-            project.creativeLut = lut
-            project.updatedAt = FilmtonePhase0Math.isoTimestamp()
-            persist()
-            schedulePreviewRender()
+            applyLutMutation {
+                $0.creativeLut = lut
+            }
         } catch {
             if let mediaError = error as? FilmtoneMediaError,
                mediaError.code == "UNSUPPORTED_SOURCE" {
@@ -825,17 +823,15 @@ final class FilmtoneEditorStore: ObservableObject {
     }
 
     func clearInputLut() {
-        project.inputLut = nil
-        project.updatedAt = FilmtonePhase0Math.isoTimestamp()
-        persist()
-        schedulePreviewRender()
+        applyLutMutation {
+            $0.inputLut = nil
+        }
     }
 
     func clearCreativeLut() {
-        project.creativeLut = nil
-        project.updatedAt = FilmtonePhase0Math.isoTimestamp()
-        persist()
-        schedulePreviewRender()
+        applyLutMutation {
+            $0.creativeLut = nil
+        }
     }
 
     func export() async {
@@ -1039,6 +1035,26 @@ final class FilmtoneEditorStore: ObservableObject {
         self.exportResult = nil
         self.exportProgress = nil
         self.sourceLoadState = nil
+    }
+
+    private func applyLutMutation(_ mutate: (inout FilmtoneProjectState) -> Void) {
+        mutate(&project)
+        project.updatedAt = FilmtonePhase0Math.isoTimestamp()
+        invalidateRenderedOutputState()
+        persist()
+        schedulePreviewRender()
+    }
+
+    private func invalidateRenderedOutputState() {
+        previewTask?.cancel()
+        previewTask = nil
+        preview = .empty
+        comparePreviewFrame = nil
+        videoPreviewSession = nil
+        isCompareHeld = false
+        exportResult = nil
+        exportProgress = nil
+        saveToPhotosState = .notRun
     }
 
     private func applySourceImportProgress(
