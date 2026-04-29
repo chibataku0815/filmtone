@@ -54,10 +54,18 @@ struct FilmtoneStrings {
     let onboardingShapeBody: String
     let onboardingFinishTitle: String
     let onboardingFinishBody: String
+    /// 4th onboarding slide added in v1.3 (Item 3 follow-up): teaches the
+    /// reuse loop — Saved LUTs / Saved Looks / source-swap survival.
+    let onboardingReuseTitle: String
+    let onboardingReuseBody: String
     let helpLutTitle: String
     let helpLutBody: String
     let helpLutCameraLut: String
     let helpLutLookLut: String
+    /// Tertiary help-sheet section (v1.3): explains that imported LUTs and
+    /// saved Looks live in the local library and survive source swaps. Sits
+    /// alongside the camera-LUT / look-LUT explanations on the same ⓘ sheet.
+    let helpLutSavedLibrary: String
     let helpLutAccessibilityLabel: String
     let helpDismiss: String
     let probePending: String
@@ -284,6 +292,20 @@ extension FilmtoneStrings {
             defaultValue: prefersJapanese ? "色の方向をLUTで決めて、そのままiPhoneだけで書き出します。" : "Pick a color direction with a LUT, then export right on iPhone.",
             comment: "Onboarding page body for LUT and export workflow."
         )
+        onboardingReuseTitle = filmtoneLocalized(
+            "filmtone.onboarding.reuse.title",
+            defaultValue: prefersJapanese
+                ? "保存して、次の素材でも再利用"
+                : "Save it. Reuse it on the next clip.",
+            comment: "4th onboarding slide title (v1.3 Item 3): introduces the Saved LUTs / Saved Looks reuse loop."
+        )
+        onboardingReuseBody = filmtoneLocalized(
+            "filmtone.onboarding.reuse.body",
+            defaultValue: prefersJapanese
+                ? "読み込んだLUTや作った Look は自動でライブラリに残ります。次の素材でもタップひとつで同じトーンを呼び出せます。"
+                : "Imported LUTs and saved Looks stay in your library. Tap once to bring the same tone into your next clip.",
+            comment: "4th onboarding slide body (v1.3 Item 3): explains saved-library reuse."
+        )
         helpLutTitle = filmtoneLocalized(
             "filmtone.help.lut.title",
             defaultValue: prefersJapanese ? "LUTとは" : "What is a LUT?",
@@ -309,6 +331,13 @@ extension FilmtoneStrings {
                 ? "ルックLUT — 仕上げの色や雰囲気を重ねます。作品のトーンを決める最後の一手です。"
                 : "Look LUT — Layers the final mood and color palette onto your piece.",
             comment: "Sub-explanation of the look-side LUT in the help sheet."
+        )
+        helpLutSavedLibrary = filmtoneLocalized(
+            "filmtone.help.lut.saved_library",
+            defaultValue: prefersJapanese
+                ? "保存したLUT / 保存したルック — 一度読み込んだLUTや調整した Look は自動でライブラリに残り、次の素材でも下のストリップからタップで再利用できます。"
+                : "Saved LUTs / Saved Looks — Imported LUTs and adjusted Looks stay in your library. Tap a chip below to reapply them to the next clip.",
+            comment: "Tertiary explanation introduced in v1.3 (Item 3): describes the saved-LUT / saved-Look library reuse loop."
         )
         helpLutAccessibilityLabel = filmtoneLocalized(
             "filmtone.help.lut.a11y",

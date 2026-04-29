@@ -8,8 +8,30 @@ struct FilmtoneTermHelpSheet: View {
     let bodyText: String
     let primarySubExplanation: String?
     let secondarySubExplanation: String?
+    /// Tertiary block (Item 3, v1.3): used to surface the Saved LUTs /
+    /// Saved Looks library so users learn that reuse is part of the model.
+    /// Optional with a `nil` default to keep older callers source-compatible.
+    let tertiarySubExplanation: String?
     let dismissLabel: String
     let onDismiss: () -> Void
+
+    init(
+        title: String,
+        bodyText: String,
+        primarySubExplanation: String?,
+        secondarySubExplanation: String?,
+        tertiarySubExplanation: String? = nil,
+        dismissLabel: String,
+        onDismiss: @escaping () -> Void
+    ) {
+        self.title = title
+        self.bodyText = bodyText
+        self.primarySubExplanation = primarySubExplanation
+        self.secondarySubExplanation = secondarySubExplanation
+        self.tertiarySubExplanation = tertiarySubExplanation
+        self.dismissLabel = dismissLabel
+        self.onDismiss = onDismiss
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -42,7 +64,9 @@ struct FilmtoneTermHelpSheet: View {
                 .padding(.horizontal, 20)
                 .accessibilityIdentifier("filmtone.help.sheet.body")
 
-            if primarySubExplanation != nil || secondarySubExplanation != nil {
+            if primarySubExplanation != nil
+                || secondarySubExplanation != nil
+                || tertiarySubExplanation != nil {
                 VStack(alignment: .leading, spacing: 12) {
                     if let primarySubExplanation {
                         Text(primarySubExplanation)
@@ -60,6 +84,15 @@ struct FilmtoneTermHelpSheet: View {
                             .fixedSize(horizontal: false, vertical: true)
                             .multilineTextAlignment(.leading)
                             .accessibilityIdentifier("filmtone.help.sheet.subB")
+                    }
+
+                    if let tertiarySubExplanation {
+                        Text(tertiarySubExplanation)
+                            .font(.subheadline)
+                            .foregroundStyle(Color.white.opacity(0.68))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .multilineTextAlignment(.leading)
+                            .accessibilityIdentifier("filmtone.help.sheet.subC")
                     }
                 }
                 .padding(.top, 18)

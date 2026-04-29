@@ -62,6 +62,7 @@ struct FilmtoneRootView: View {
                 bodyText: store.strings.helpLutBody,
                 primarySubExplanation: store.strings.helpLutCameraLut,
                 secondarySubExplanation: store.strings.helpLutLookLut,
+                tertiarySubExplanation: store.strings.helpLutSavedLibrary,
                 dismissLabel: store.strings.helpDismiss
             ) {
                 lutTermHelpPresented = false
@@ -826,6 +827,17 @@ struct FilmtoneOnboardingView: View {
                 title: strings.onboardingFinishTitle,
                 body: strings.onboardingFinishBody,
                 symbolName: "square.and.arrow.up"
+            ),
+            // v1.3 Item 3 follow-up: 4th slide pitches the reuse loop. Sits
+            // after the export slide because the narrative beat is "you've
+            // shipped your first piece — and now the same look survives to
+            // the next one." Symbol is `square.stack.fill` for the library
+            // metaphor (saved LUTs + saved Looks stack together).
+            .init(
+                id: 3,
+                title: strings.onboardingReuseTitle,
+                body: strings.onboardingReuseBody,
+                symbolName: "square.stack.fill"
             ),
         ]
     }
