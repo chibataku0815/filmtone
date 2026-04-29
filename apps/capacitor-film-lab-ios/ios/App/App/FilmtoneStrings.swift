@@ -45,6 +45,15 @@ struct FilmtoneStrings {
     let sourcePickerTitle: String
     let pickFromPhotoLibrary: String
     let pickFromFiles: String
+    let onboardingNext: String
+    let onboardingSkip: String
+    let onboardingPickMedia: String
+    let onboardingChooseTitle: String
+    let onboardingChooseBody: String
+    let onboardingShapeTitle: String
+    let onboardingShapeBody: String
+    let onboardingFinishTitle: String
+    let onboardingFinishBody: String
     let probePending: String
     let sourceLoadImportingTitle: String
     let sourceLoadProbingTitle: String
@@ -200,6 +209,51 @@ extension FilmtoneStrings {
             "filmtone.source.files",
             defaultValue: "Files",
             comment: "Source picker option for the Files app."
+        )
+        onboardingNext = filmtoneLocalized(
+            "filmtone.onboarding.next",
+            defaultValue: prefersJapanese ? "次へ" : "Next",
+            comment: "Primary onboarding action that advances to the next page."
+        )
+        onboardingSkip = filmtoneLocalized(
+            "filmtone.onboarding.skip",
+            defaultValue: prefersJapanese ? "スキップ" : "Skip",
+            comment: "Secondary onboarding action that closes onboarding."
+        )
+        onboardingPickMedia = filmtoneLocalized(
+            "filmtone.onboarding.pick_media",
+            defaultValue: prefersJapanese ? "素材を選ぶ" : "Pick media",
+            comment: "Final onboarding action that opens the existing source picker."
+        )
+        onboardingChooseTitle = filmtoneLocalized(
+            "filmtone.onboarding.choose.title",
+            defaultValue: prefersJapanese ? "写真や動画を選んで、すぐ映画調に" : "Choose a photo or video",
+            comment: "Onboarding page title for choosing media."
+        )
+        onboardingChooseBody = filmtoneLocalized(
+            "filmtone.onboarding.choose.body",
+            defaultValue: prefersJapanese ? "自分の素材を読み込むと、映画調ルックのプレビューがすぐ始まります。" : "Load your own media and Filmtone starts a cinematic preview right away.",
+            comment: "Onboarding page body for choosing media."
+        )
+        onboardingShapeTitle = filmtoneLocalized(
+            "filmtone.onboarding.shape.title",
+            defaultValue: prefersJapanese ? "質感まで作品に合わせて整える" : "Shape the film character",
+            comment: "Onboarding page title for film character controls."
+        )
+        onboardingShapeBody = filmtoneLocalized(
+            "filmtone.onboarding.shape.body",
+            defaultValue: prefersJapanese ? "粒状感、グロー、トーン、動きの質感まで、作品に合わせて追い込めます。" : "Tune grain, glow, tone, and motion feel so the look fits the piece.",
+            comment: "Onboarding page body for film character controls."
+        )
+        onboardingFinishTitle = filmtoneLocalized(
+            "filmtone.onboarding.finish.title",
+            defaultValue: prefersJapanese ? "LUTから書き出しまで完結" : "Finish with LUTs and export",
+            comment: "Onboarding page title for LUT and export workflow."
+        )
+        onboardingFinishBody = filmtoneLocalized(
+            "filmtone.onboarding.finish.body",
+            defaultValue: prefersJapanese ? "入力LUTとLook LUTを使い、iPhone上で書き出しまで完結できます。" : "Apply input and Look LUTs, then finish the export on iPhone.",
+            comment: "Onboarding page body for LUT and export workflow."
         )
         probePending = filmtoneLocalized(
             "filmtone.source.inspecting",

@@ -68,6 +68,87 @@ final class FilmtoneSnapshotsUITests: XCTestCase {
         app.terminate()
     }
 
+    func testOnboardingAppearsOnFirstLaunch() throws {
+        let app = launch(extraArguments: ["-filmtoneResetOnboarding"])
+        waitForAppToSettle(app)
+
+        XCTAssertTrue(onboardingFirstPage(in: app).waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["filmtone.onboarding.next"].exists)
+
+        app.terminate()
+    }
+
+    func testOnboardingSkipDoesNotShowAgain() throws {
+        let app = launch(extraArguments: ["-filmtoneResetOnboarding"])
+        waitForAppToSettle(app)
+
+        let onboarding = onboardingFirstPage(in: app)
+        XCTAssertTrue(onboarding.waitForExistence(timeout: 5))
+        app.buttons["filmtone.onboarding.skip"].tap()
+        XCTAssertTrue(waitForElementToDisappear(onboarding, timeout: 5))
+        app.terminate()
+
+        let relaunched = launch()
+        waitForAppToSettle(relaunched)
+        XCTAssertFalse(onboardingFirstPage(in: relaunched).waitForExistence(timeout: 2))
+        relaunched.terminate()
+    }
+
+    func testOnboardingPickMediaOpensSourcePickerDialog() throws {
+        let app = launch(extraArguments: ["-filmtoneResetOnboarding"])
+        waitForAppToSettle(app)
+
+        XCTAssertTrue(onboardingFirstPage(in: app).waitForExistence(timeout: 5))
+        tapOnboardingNext(in: app)
+        tapOnboardingNext(in: app)
+
+        let pickMedia = app.buttons["filmtone.onboarding.pickMedia"]
+        XCTAssertTrue(pickMedia.waitForExistence(timeout: 5))
+        pickMedia.tap()
+
+        XCTAssertTrue(waitForAnyElement([
+            app.buttons["filmtone.source.photoLibrary"],
+            app.buttons["Photo Library"],
+            app.buttons["フォトライブラリ"],
+        ], timeout: 5))
+        XCTAssertTrue(waitForAnyElement([
+            app.buttons["filmtone.source.files"],
+            app.buttons["Files"],
+            app.buttons["ファイル"],
+        ], timeout: 2))
+
+        app.terminate()
+    }
+
+    func testOnboardingDoesNotAppearForSnapshotScene() throws {
+        let app = launch(
+            scene: .hero,
+            extraArguments: ["-filmtoneResetOnboarding", "-filmtoneForceOnboarding"]
+        )
+        waitForAppToSettle(app)
+
+        XCTAssertFalse(onboardingFirstPage(in: app).waitForExistence(timeout: 2))
+        XCTAssertTrue(app.descendants(matching: .any)["filmtone.root.scroll"].exists)
+
+        app.terminate()
+    }
+
+    func testOnboardingDoesNotAppearWhenSourceIsAlreadyRestored() throws {
+        let app = launch(
+            extraArguments: [
+                "-filmtoneResetOnboarding",
+                "-filmtoneForceOnboarding",
+                "-filmtoneSeedRestoredSource",
+            ]
+        )
+        waitForAppToSettle(app)
+
+        XCTAssertFalse(onboardingFirstPage(in: app).waitForExistence(timeout: 2))
+        XCTAssertTrue(app.descendants(matching: .any)["filmtone.root.scroll"].exists)
+
+        app.terminate()
+    }
+
     func testCaptureProcessVideoRefreshRegression() throws {
         let app = launch(scene: .processVideo)
         waitForAppToSettle(app)
@@ -224,12 +305,25 @@ final class FilmtoneSnapshotsUITests: XCTestCase {
         app.terminate()
     }
 
-    private func launch(scene: SnapshotScene) -> XCUIApplication {
+    private func launch(scene: SnapshotScene, extraArguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
         setupSnapshot(app, waitForAnimations: false)
         app.launchArguments += ["-filmtoneSnapshot", scene.rawValue]
+        app.launchArguments += extraArguments
         app.launch()
         return app
+    }
+
+    private func launch(extraArguments: [String] = []) -> XCUIApplication {
+        let app = XCUIApplication()
+        setupSnapshot(app, waitForAnimations: false)
+        app.launchArguments += extraArguments
+        app.launch()
+        return app
+    }
+
+    private func onboardingFirstPage(in app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any)["filmtone.onboarding.page.0"]
     }
 
     private func waitForAppToSettle(_ app: XCUIApplication) {
@@ -284,6 +378,27 @@ final class FilmtoneSnapshotsUITests: XCTestCase {
         let predicate = NSPredicate(format: "exists == false")
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
         return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    private func waitForAnyElement(
+        _ elements: [XCUIElement],
+        timeout: TimeInterval
+    ) -> Bool {
+        let deadline = Date(timeIntervalSinceNow: timeout)
+        while Date() < deadline {
+            if elements.contains(where: { $0.exists }) {
+                return true
+            }
+            pauseForLayout(0.1)
+        }
+        return elements.contains(where: { $0.exists })
+    }
+
+    private func tapOnboardingNext(in app: XCUIApplication) {
+        let next = app.buttons["filmtone.onboarding.next"]
+        XCTAssertTrue(next.waitForExistence(timeout: 5))
+        next.tap()
+        pauseForLayout(0.35)
     }
 
     private func assertSheetPreviewRetained(

@@ -12,11 +12,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             if snapshotScene != nil {
                 FilmtonePersistence.clear()
                 UIView.setAnimationsEnabled(false)
+            } else if ProcessInfo.processInfo.arguments.contains(FilmtoneOnboardingLaunchArguments.reset) {
+                FilmtonePersistence.clear()
             }
             let facade = try FilmtoneEditorFacade()
             let store = FilmtoneEditorStore(facade: facade)
             if let snapshotScene {
                 store.applySnapshotScene(snapshotScene)
+            } else if ProcessInfo.processInfo.arguments.contains(FilmtoneOnboardingLaunchArguments.seedRestoredSource) {
+                store.applySnapshotScene(.hero)
             }
             let window = UIWindow(frame: UIScreen.main.bounds)
             window.rootViewController = FilmtoneRootHostingController(store: store)
