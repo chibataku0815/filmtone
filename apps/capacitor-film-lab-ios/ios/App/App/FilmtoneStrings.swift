@@ -54,6 +54,12 @@ struct FilmtoneStrings {
     let onboardingShapeBody: String
     let onboardingFinishTitle: String
     let onboardingFinishBody: String
+    let helpLutTitle: String
+    let helpLutBody: String
+    let helpLutCameraLut: String
+    let helpLutLookLut: String
+    let helpLutAccessibilityLabel: String
+    let helpDismiss: String
     let probePending: String
     let sourceLoadImportingTitle: String
     let sourceLoadProbingTitle: String
@@ -252,8 +258,44 @@ extension FilmtoneStrings {
         )
         onboardingFinishBody = filmtoneLocalized(
             "filmtone.onboarding.finish.body",
-            defaultValue: prefersJapanese ? "入力LUTとLook LUTを使い、iPhone上で書き出しまで完結できます。" : "Apply input and Look LUTs, then finish the export on iPhone.",
+            defaultValue: prefersJapanese ? "色の方向をLUTで決めて、そのままiPhoneだけで書き出します。" : "Pick a color direction with a LUT, then export right on iPhone.",
             comment: "Onboarding page body for LUT and export workflow."
+        )
+        helpLutTitle = filmtoneLocalized(
+            "filmtone.help.lut.title",
+            defaultValue: prefersJapanese ? "LUTとは" : "What is a LUT?",
+            comment: "Title shown in the LUT term help sheet."
+        )
+        helpLutBody = filmtoneLocalized(
+            "filmtone.help.lut.body",
+            defaultValue: prefersJapanese
+                ? "色の雰囲気を一括で整えるデータです。カメラ素材の下準備や、仕上げの色づくりに使います。"
+                : "A recipe that shapes colors at once. Use it to prepare footage or apply a finished look.",
+            comment: "Body shown in the LUT term help sheet, explaining the umbrella concept."
+        )
+        helpLutCameraLut = filmtoneLocalized(
+            "filmtone.help.lut.camera_lut",
+            defaultValue: prefersJapanese
+                ? "カメラLUT — カメラが記録した色を、Filmtoneが扱いやすい状態に整えます。"
+                : "Camera LUT — Prepares the colors your camera recorded so Filmtone can work with them.",
+            comment: "Sub-explanation of the camera-side LUT in the help sheet."
+        )
+        helpLutLookLut = filmtoneLocalized(
+            "filmtone.help.lut.look_lut",
+            defaultValue: prefersJapanese
+                ? "ルックLUT — 仕上げの色や雰囲気を重ねます。作品のトーンを決める最後の一手です。"
+                : "Look LUT — Layers the final mood and color palette onto your piece.",
+            comment: "Sub-explanation of the look-side LUT in the help sheet."
+        )
+        helpLutAccessibilityLabel = filmtoneLocalized(
+            "filmtone.help.lut.a11y",
+            defaultValue: prefersJapanese ? "LUTの説明" : "About LUT",
+            comment: "Accessibility label for the LUT term help button."
+        )
+        helpDismiss = filmtoneLocalized(
+            "filmtone.help.dismiss",
+            defaultValue: prefersJapanese ? "閉じる" : "Close",
+            comment: "Action label that dismisses the term help sheet."
         )
         probePending = filmtoneLocalized(
             "filmtone.source.inspecting",
@@ -640,8 +682,8 @@ extension FilmtoneStrings {
         )
         inputLutAmountLabel = filmtoneLocalized(
             "filmtone.camera.input_lut_amount",
-            defaultValue: "Input LUT Amount",
-            comment: "Label for the input LUT amount slider."
+            defaultValue: prefersJapanese ? "カメラLUTの量" : "Camera LUT Amount",
+            comment: "Label for the camera LUT amount slider (formerly Input LUT Amount)."
         )
         lookLabel = filmtoneLocalized(
             "filmtone.look.title",

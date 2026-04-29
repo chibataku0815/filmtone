@@ -8,6 +8,7 @@ struct FilmtoneRootView: View {
     @State private var onboardingPresented = false
     @State private var onboardingCompletedThisSession = false
     @State private var shouldOpenSourcePickerAfterOnboarding = false
+    @State private var lutTermHelpPresented = false
 
     var body: some View {
         ZStack {
@@ -50,6 +51,17 @@ struct FilmtoneRootView: View {
         .sheet(isPresented: $strengthSheetPresented) {
             FilmtoneStrengthSheet(store: store) {
                 strengthSheetPresented = false
+            }
+        }
+        .sheet(isPresented: $lutTermHelpPresented) {
+            FilmtoneTermHelpSheet(
+                title: store.strings.helpLutTitle,
+                bodyText: store.strings.helpLutBody,
+                primarySubExplanation: store.strings.helpLutCameraLut,
+                secondarySubExplanation: store.strings.helpLutLookLut,
+                dismissLabel: store.strings.helpDismiss
+            ) {
+                lutTermHelpPresented = false
             }
         }
         .fullScreenCover(isPresented: $onboardingPresented, onDismiss: openSourcePickerIfNeeded) {
@@ -342,7 +354,10 @@ struct FilmtoneRootView: View {
                 value: store.cameraProfileLabel,
                 menuTitle: store.strings.cameraImport,
                 systemImage: "camera.filters",
-                menuIdentifier: "filmtone.lut.input.menu"
+                menuIdentifier: "filmtone.lut.input.menu",
+                helpAction: { lutTermHelpPresented = true },
+                helpAccessibilityLabel: store.strings.helpLutAccessibilityLabel,
+                helpButtonIdentifier: "filmtone.help.lut.button"
             ) {
                 Button(store.strings.cameraAuto) {
                     store.clearInputLut()
@@ -402,7 +417,6 @@ struct FilmtoneRootView: View {
                 }
             }
         }
-        .accessibilityIdentifier("filmtone.card.cameraProfile")
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: filmtoneSurfaceCornerRadius, style: .continuous)
@@ -420,13 +434,34 @@ struct FilmtoneRootView: View {
         menuTitle: String,
         systemImage: String,
         menuIdentifier: String,
+        helpAction: (() -> Void)? = nil,
+        helpAccessibilityLabel: String? = nil,
+        helpButtonIdentifier: String? = nil,
         @ViewBuilder menuContent: () -> MenuContent
     ) -> some View {
         HStack(alignment: .center, spacing: 16) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(title)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.52))
+                HStack(spacing: 8) {
+                    Text(title)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.52))
+
+                    if let helpAction, let helpAccessibilityLabel {
+                        Button {
+                            helpAction()
+                        } label: {
+                            Label(helpAccessibilityLabel, systemImage: "info.circle")
+                                .labelStyle(.iconOnly)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Color.filmtoneAmber.opacity(0.82))
+                                .frame(width: 28, height: 28)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(Text(helpAccessibilityLabel))
+                        .accessibilityIdentifier(helpButtonIdentifier ?? "filmtone.help.button")
+                    }
+                }
 
                 Text(value)
                     .font(.title3.weight(.semibold))

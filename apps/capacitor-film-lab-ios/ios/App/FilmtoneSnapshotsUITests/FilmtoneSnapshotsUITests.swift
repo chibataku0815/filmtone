@@ -149,6 +149,33 @@ final class FilmtoneSnapshotsUITests: XCTestCase {
         app.terminate()
     }
 
+    func testCameraProfileLutHelpOpensAndDismisses() throws {
+        let app = launch(scene: .camera)
+        waitForAppToSettle(app)
+        app.swipeUp()
+        pauseForLayout()
+
+        let helpButton = app.descendants(matching: .any)["filmtone.help.lut.button"]
+        reveal(helpButton, in: app, maxSwipes: 4)
+        XCTAssertTrue(helpButton.waitForExistence(timeout: 5))
+        helpButton.tap()
+        pauseForLayout()
+
+        let helpTitle = app.descendants(matching: .any)["filmtone.help.sheet.title"]
+        XCTAssertTrue(helpTitle.waitForExistence(timeout: 5))
+
+        let helpBody = app.descendants(matching: .any)["filmtone.help.sheet.body"]
+        XCTAssertTrue(helpBody.waitForExistence(timeout: 2))
+
+        let dismissButton = app.descendants(matching: .any)["filmtone.help.sheet.dismiss"]
+        XCTAssertTrue(dismissButton.waitForExistence(timeout: 2))
+        dismissButton.tap()
+
+        XCTAssertTrue(waitForElementToDisappear(helpTitle, timeout: 5))
+
+        app.terminate()
+    }
+
     func testCaptureProcessVideoRefreshRegression() throws {
         let app = launch(scene: .processVideo)
         waitForAppToSettle(app)

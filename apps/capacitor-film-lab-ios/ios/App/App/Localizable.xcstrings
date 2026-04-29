@@ -314,18 +314,17 @@
       }
     },
     "filmtone.onboarding.finish.body" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apply input and Look LUTs, then finish the export on iPhone."
+            "value" : "Pick a color direction with a LUT, then export right on iPhone."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "入力LUTとLook LUTを使い、iPhone上で書き出しまで完結できます。"
+            "value" : "色の方向をLUTで決めて、そのままiPhoneだけで書き出します。"
           }
         }
       }
@@ -557,13 +556,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Input LUT Amount"
+            "value" : "Camera LUT Amount"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "入力LUTの量"
+            "value" : "カメラLUTの量"
           }
         }
       }
@@ -1740,6 +1739,102 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "HDR動画を読み込みました"
+          }
+        }
+      }
+    },
+    "filmtone.help.dismiss" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "閉じる"
+          }
+        }
+      }
+    },
+    "filmtone.help.lut.a11y" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About LUT"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LUTの説明"
+          }
+        }
+      }
+    },
+    "filmtone.help.lut.body" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A recipe that shapes colors at once. Use it to prepare footage or apply a finished look."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "色の雰囲気を一括で整えるデータです。カメラ素材の下準備や、仕上げの色づくりに使います。"
+          }
+        }
+      }
+    },
+    "filmtone.help.lut.camera_lut" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Camera LUT — Prepares the colors your camera recorded so Filmtone can work with them."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カメラLUT — カメラが記録した色を、Filmtoneが扱いやすい状態に整えます。"
+          }
+        }
+      }
+    },
+    "filmtone.help.lut.look_lut" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Look LUT — Layers the final mood and color palette onto your piece."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ルックLUT — 仕上げの色や雰囲気を重ねます。作品のトーンを決める最後の一手です。"
+          }
+        }
+      }
+    },
+    "filmtone.help.lut.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What is a LUT?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LUTとは"
           }
         }
       }
