@@ -238,7 +238,7 @@ def app_review_information!
     demo_user: normalized_env("REVIEW_DEMO_USER"),
     demo_password: normalized_env("REVIEW_DEMO_PASSWORD"),
     notes: normalized_env("REVIEW_NOTES") ||
-      "Filmtone is local-first. Review the flow by importing a photo or short clip, choosing a preset, adjusting Quick controls, optionally applying Camera Profile and Film Look LUTs, then exporting and saving to Photos. No login, subscription, AI generation, or cloud sync is required.",
+      "Filmtone is local-first. Review the flow by importing a photo or video, choosing a preset, adjusting Quick controls, optionally applying Camera Profile and Film Look LUTs, then exporting and saving to Photos. No login, subscription, AI generation, or cloud sync is required.",
   }.compact
 end
 

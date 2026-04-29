@@ -1,4 +1,4 @@
-Filmtone is a local-first grading app for iPhone that lets you apply film looks to photos and short clips, then export right away.
+Filmtone is a local-first grading app for iPhone that lets you apply film looks to photos and videos, then export right away.
 
 Pick your source, choose a film stock preset, shape the look with the Quick 3 controls for exposure, contrast, and saturation, and add Camera Profile plus Film Look LUTs when you need a more precise setup. Check the compare preview, export, then save to Photos or share.
 

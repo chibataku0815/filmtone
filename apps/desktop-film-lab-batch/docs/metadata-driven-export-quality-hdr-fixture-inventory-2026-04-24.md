@@ -192,7 +192,7 @@ Filmtone HDR fixture preparation を続けてください。
 
 user action 待ち:
 - HDR-capable ffmpeg の導入（§6 runbook）
-- iPhone HLG / PQ trim, S1II SDR trim の privacy-safe な短尺録画
+- iPhone HLG / PQ trim, S1II SDR trim の privacy-safe な確認用録画
 
 次の作業:
 1. fixtures/video/{hdr,sdr}/ を作成し、受領した 3 本を配置。

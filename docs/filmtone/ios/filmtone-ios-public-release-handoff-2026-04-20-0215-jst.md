@@ -501,7 +501,7 @@ Defaults baked into the Fastfile:
 - `REVIEW_FIRST_NAME = "Takumi"`
 - `REVIEW_LAST_NAME = "Chiba"`
 - `REVIEW_EMAIL = "chiba@fores-tone.co.jp"`
-- `REVIEW_NOTES = "Filmtone is local-first. Review the flow by importing a photo or short clip, choosing a preset, adjusting Quick controls, optionally applying Camera Profile and Film Look LUTs, then exporting and saving to Photos. No login, subscription, AI generation, or cloud sync is required."`
+- `REVIEW_NOTES = "Filmtone is local-first. Review the flow by importing a photo or video, choosing a preset, adjusting Quick controls, optionally applying Camera Profile and Film Look LUTs, then exporting and saving to Photos. No login, subscription, AI generation, or cloud sync is required."`
 - URL bases default to `https://www.chibatakumi.studio/{film-lab, en/film-lab, film-lab/support, en/film-lab/support, film-lab/privacy, en/film-lab/privacy}`.
 
 ### 8.2 Confirm rail is still green before running anything new

@@ -240,7 +240,7 @@
     },
     "film-lab": {
       "title": "Filmtone",
-      "description": "Filmtone のブラウザ体験です。自分のフレームや短いクリップでルックを試し、再生・比較・仕上げは macOS の Filmtone で続けられます。",
+      "description": "Filmtone のブラウザ体験です。自分のフレームや動画でルックを試し、再生・比較・仕上げは macOS の Filmtone で続けられます。",
       "sampleHint": "表示中はデモ用のサンプルです。お手持ちの写真や動画をドロップすると、その素材でそのまま試せます。",
       "openFullApp": "フルアプリを開く",
       "openParamsPanelAria": "パラメータパネルを開く",
@@ -256,7 +256,7 @@
     "lp": {
       "heroEyebrow": "Filmtone",
       "heroTitle": "日常に、映画のムードを。",
-      "heroBody": "Filmtone は、短い動画をすばやく雰囲気よく仕上げるためのアプリです。まずはブラウザで自分の素材を試し、仕上げや書き出しは macOS アプリで進められます。カバー画像やサムネイルも、同じ雰囲気のまま揃えられます。",
+      "heroBody": "Filmtone は、動画をすばやく雰囲気よく仕上げるためのアプリです。まずはブラウザで自分の素材を試し、仕上げや書き出しは macOS アプリで進められます。カバー画像やサムネイルも、同じ雰囲気のまま揃えられます。",
       "heroPrimaryCta": "macOS 版をダウンロード",
       "heroSecondaryLine": "Apple Silicon 搭載 Mac ・ macOS {minMacos} 以降。詳しくはダウンロードページへ。",
       "proofTeaserLine": "再生して、比べて、仕上げる。",
@@ -265,14 +265,14 @@
       "surfaceSplitEyebrow": "役割分担",
       "surfaceSplitTitle": "ブラウザで試して、macOS で仕上げる。",
       "surfaceSplitWebTitle": "ブラウザ版",
-      "surfaceSplitWebBody": "自分の写真や短い動画を開いて、色や雰囲気を気軽に試せます。",
+      "surfaceSplitWebBody": "自分の写真や動画を開いて、色や雰囲気を気軽に試せます。",
       "surfaceSplitDesktopTitle": "macOS版",
       "surfaceSplitDesktopBody": "再生しながら見比べて、細かく調整し、そのまま書き出せます。",
       "expandAuxiliaryPanelsTitle": "さらに表示: 細かい調整・LUT・比較・ヒストグラム・保存など",
       "expandAuxiliaryPanelsHint": "プリセットとかんたんスライダーだけで足りる場合は、開かなくて大丈夫です。",
       "valueTitle": "macOS でトーンを揃えやすい理由",
       "valueBullet1": "決めたルックを、たくさんの写真へ同じ空気感で広げやすくなっています。",
-      "valueBullet2": "フォルダに入った写真をまとめて処理し、別フォルダに揃えて保存できます。短い動画 1 本も、同じ見え方に寄せられます。",
+      "valueBullet2": "フォルダに入った写真をまとめて処理し、別フォルダに揃えて保存できます。動画 1 本も、同じ見え方に寄せられます。",
       "valueBullet3": "このページでまず雰囲気を試し、納品前の仕上げ作業は macOS アプリで。",
       "workflowTitle": "写真やサムネイルにも、同じ雰囲気を。",
       "workflowLead": "写真は主役ではありませんが、動画と同じ雰囲気で揃えたい場面があります。",
@@ -281,7 +281,7 @@
       "workflowBullet3": "まずは動画を仕上げて、その雰囲気を周辺の画像にも広げる考え方です。",
       "demoEyebrow": "自分の素材を Web で試す",
       "demoTitle": "ブラウザで自分の素材を試す",
-      "demoBody": "写真や短い動画を開いて、色や雰囲気を試せます。しっかり仕上げて書き出したいときは、macOS アプリへ進んでください。",
+      "demoBody": "写真や動画を開いて、色や雰囲気を試せます。しっかり仕上げて書き出したいときは、macOS アプリへ進んでください。",
       "demoSourceEyebrow": "ソース",
       "demoSourceSample": "サンプル画像",
       "demoPreviewEyebrow": "プレビュー",
@@ -291,7 +291,7 @@
       "faqQfree": "無料で使えますか？",
       "faqAfree": "はい。ブラウザ版もデスクトップ版も無料でお使いいただけます。任意でご支援いただける仕組みはありますが、機能に違いはありません。",
       "faqQformats": "ここではどんな素材を試せますか？",
-      "faqAformats": "ブラウザでは写真や短い動画で試せます。仕上げや書き出しまで進めたいときは macOS 版を使ってください。",
+      "faqAformats": "ブラウザでは写真や動画で試せます。仕上げや書き出しまで進めたいときは macOS 版を使ってください。",
       "faqQwhichVersion": "ブラウザ版とデスクトップ版、どちらを使えばいい？",
       "faqAwhichVersion": "まずはブラウザで気軽に試し、仕上げや書き出しが必要になったら macOS 版を使うのがおすすめです。",
       "faqQpresets": "Filmtone はプリセット集ですか？",
@@ -380,10 +380,10 @@
     "back": "← Interactive に戻る",
     "metadata": {
       "title": "Filmtone",
-      "description": "short-form video のための desktop-first finisher。ブラウザでルックを試し、macOS で再生・比較・仕上げ・書き出しまで進められます。",
-      "ogTitle": "Filmtone — 短尺動画を、すぐ作品っぽい完成感へ",
+      "description": "動画のための desktop-first finisher。ブラウザでルックを試し、macOS で再生・比較・仕上げ・書き出しまで進められます。",
+      "ogTitle": "Filmtone — 動画を、すぐ作品っぽい完成感へ",
       "ogDescription": "ブラウザでルックを試し、macOS で再生・比較・仕上げ・書き出しへ。",
-      "ogImageAlt": "Filmtone — short-form video のための desktop-first finisher"
+      "ogImageAlt": "Filmtone — 動画のための desktop-first finisher"
     },
     "share": {
       "sectionTitle": "共有",
@@ -648,7 +648,7 @@
     "desktopRelease": {
       "eyebrow": "Desktop",
       "title": "Filmtone Desktop（macOS）",
-      "body": "short-form video を macOS で仕上げ、必要に応じて stills へ同じ世界観を広げられます。ダウンロードは公証済みの DMG（Apple Silicon 向け）です。",
+      "body": "動画を macOS で仕上げ、必要に応じて stills へ同じ世界観を広げられます。ダウンロードは公証済みの DMG（Apple Silicon 向け）です。",
       "essentials": {
         "environmentLabel": "動作環境",
         "environmentBody": "macOS {minMacos} 以降。{arch} のみ。Intel Mac は非対応です。",
@@ -672,9 +672,9 @@
         },
         "metadata": {
           "title": "Filmtone macOS 版をダウンロード",
-          "description": "Filmtone macOS アプリのダウンロード — short-form video のための desktop-first finisher。Web で試し、macOS で仕上げと書き出しへ。",
+          "description": "Filmtone macOS アプリのダウンロード — 動画のための desktop-first finisher。Web で試し、macOS で仕上げと書き出しへ。",
           "ogTitle": "Filmtone macOS 版をダウンロード",
-          "ogDescription": "short-form video のための macOS finisher。無料でダウンロードできます。"
+          "ogDescription": "動画のための macOS finisher。無料でダウンロードできます。"
         }
       },
       "downloadComplete": {
@@ -892,10 +892,10 @@
     },
     "jsonLd": {
       "desktopName": "Filmtone Desktop",
-      "desktopDescription": "short-form video のための desktop-first macOS finisher。再生・比較・signature finish・書き出しまで進め、必要なときだけ stills へ同じ世界観を広げられます。",
+      "desktopDescription": "動画のための desktop-first macOS finisher。再生・比較・signature finish・書き出しまで進め、必要なときだけ stills へ同じ世界観を広げられます。",
       "desktopOperatingSystem": "macOS 11.0 以降（Apple Silicon / arm64）",
       "webDemoName": "Filmtone（ブラウザで試す）",
-      "webDemoDescription": "自分のフレームや短いクリップを開き、ルックを audition してから Filmtone Desktop へつなぐ browser try-first 体験です。",
+      "webDemoDescription": "自分のフレームや動画を開き、ルックを audition してから Filmtone Desktop へつなぐ browser try-first 体験です。",
       "webDemoOperatingSystem": "インタラクティブ表示に対応した一般的なブラウザ",
       "webDemoBrowserRequirements": "一般的なブラウザで利用可能（WebGL2 が有効な環境）"
     },
@@ -1102,7 +1102,7 @@
         "v040PanelStability": "Desktop でタブを切り替えても設定パネルの内容が消えにくくなりました。",
         "v040ShareCompat": "共有 URL の互換性を保ちながら、新しい調整項目もリンクで渡せるようにしました。",
         "v031Title": "ブラウザでの動画書き出し（ベータ）と安定性の改善",
-        "v031WebVideoExportBeta": "グレーディング済みの短い動画をブラウザから書き出すベータ機能を追加しました。",
+        "v031WebVideoExportBeta": "グレーディング済みの動画をブラウザから書き出すベータ機能を追加しました。",
         "v031WebBrowserReliability": "ブラウザ書き出しの安定性を高め、対応状況をより分かりやすく案内するようにしました。Safari では制限がある場合に Chrome・Edge または Filmtone Desktop を案内します。",
         "v031FinderThumb": "書き出した動画が Finder や Quick Look でサムネイルが真っ黒に見える問題を修正しました。",
         "v031MovHandling": "拡張子が MOV の動画の読み込みが不安定だった問題を改善しました。",
@@ -1128,7 +1128,7 @@
         "v011FfmpegPath": "DMG からインストールした際に動画の書き出しが動かないことがあった問題を修正しました。",
         "v010Title": "初回リリース",
         "v010BatchExport": "フォルダ内の写真にまとめてプリセットを適用し、JPEG / PNG で一括書き出し。",
-        "v010VideoExport": "短い動画にルックを焼き込んで書き出せます。",
+        "v010VideoExport": "動画にルックを焼き込んで書き出せます。",
         "v010FourPresets": "フィルム風プリセット 4 種を収録: Kodak Portra 400、Fuji Pro 400H、Kodak Ektar 100、Ilford HP5 Plus。",
         "v010BrowserDemo": "ブラウザから自分の写真でプリセットを試せます。ダウンロード前に仕上がりを確認できます。"
       },
@@ -1329,14 +1329,14 @@
   "filmtone-signature": {
     "metadata": {
       "title": "Filmtone Signature Pack — ウェイトリスト",
-      "description": "短尺動画のための買い切り look / finish システム。早期アクセスをウェイトリストで。",
+      "description": "動画のための買い切り look / finish システム。早期アクセスをウェイトリストで。",
       "ogTitle": "Filmtone Signature Pack",
-      "ogDescription": "短尺クリップを、速く finished に。ウェイトリスト受付中。",
+      "ogDescription": "動画を、速く finished に。ウェイトリスト受付中。",
       "ogImageAlt": "Filmtone Signature Pack プレビュー"
     },
     "eyebrow": "近日公開",
-    "headline": "短尺クリップを、速く finished に。",
-    "subheadline": "Filmtone Signature Pack は、Base Looks、finish recipe、signature tool を一式で揃えた買い切りの look / finish システムです。フルのグレーディングセッションをせずに、短尺素材を repeatable に仕上げられます。",
+    "headline": "動画を、速く finished に。",
+    "subheadline": "Filmtone Signature Pack は、Base Looks、finish recipe、signature tool を一式で揃えた買い切りの look / finish システムです。フルのグレーディングセッションをせずに、動画素材を repeatable に仕上げられます。",
     "waitlistTitle": "早期アクセスウェイトリスト",
     "waitlistBenefit": "先着 100 名は $10 OFF、101-300 名にはボーナス recipe 2 本を付与。ウェイトリスト会員は公開 24 時間前に先行アクセス可能。",
     "emailPlaceholder": "your@email.com",

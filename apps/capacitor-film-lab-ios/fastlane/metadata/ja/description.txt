@@ -1,4 +1,4 @@
-Filmtone は、iPhone 上で写真や短尺動画にフィルムルックを重ね、そのまま書き出せる local-first のグレーディングアプリです。
+Filmtone は、iPhone 上で写真や動画にフィルムルックを重ね、そのまま書き出せる local-first のグレーディングアプリです。
 
 素材を選び、フィルム stock preset を決め、Quick 3 軸で明るさ・コントラスト・彩度を整え、必要なら Camera Profile と Film Look の 2 つの LUT を重ねて仕上げます。比較 preview で確認したあと、そのまま書き出して写真に保存したり共有できます。
 

@@ -240,7 +240,7 @@
     },
     "film-lab": {
       "title": "Filmtone",
-      "description": "Try Filmtone in the browser on your own frame or short clip, then finish and export on macOS when you need dependable playback, compare, and signature character.",
+      "description": "Try Filmtone in the browser on your own frame or video, then finish and export on macOS when you need dependable playback, compare, and signature character.",
       "sampleHint": "You're viewing a sample image—drop your own photo or video to grade your own footage.",
       "openFullApp": "Open full app",
       "openParamsPanelAria": "Open parameters panel",
@@ -255,8 +255,8 @@
     "closeParamsPanelAria": "Close parameters panel",
     "lp": {
       "heroEyebrow": "Filmtone",
-      "heroTitle": "Make short clips feel finished fast.",
-      "heroBody": "Filmtone is a desktop-first finisher for short-form video. Try the look on your own media in the browser, then finish and export on macOS with dependable playback, compare, and signature character. Keep stills in the same world when you need matching covers or supporting frames.",
+      "heroTitle": "Make your videos feel finished fast.",
+      "heroBody": "Filmtone is a desktop-first finisher for video. Try the look on your own media in the browser, then finish and export on macOS with dependable playback, compare, and signature character. Keep stills in the same world when you need matching covers or supporting frames.",
       "heroPrimaryCta": "Download for macOS",
       "heroSecondaryLine": "Apple Silicon · macOS {minMacos}+ — full requirements on the download page.",
       "proofTeaserLine": "Play it, compare it, finish it.",
@@ -265,14 +265,14 @@
       "surfaceSplitEyebrow": "Workflow split",
       "surfaceSplitTitle": "Try the look on web. Finish on Desktop.",
       "surfaceSplitWebTitle": "Web is the audition surface.",
-      "surfaceSplitWebBody": "Open your own frame or short clip, compare in motion, and decide whether the tone is heading in the right direction.",
+      "surfaceSplitWebBody": "Open your own frame or video, compare in motion, and decide whether the tone is heading in the right direction.",
       "surfaceSplitDesktopTitle": "Desktop is the production surface.",
       "surfaceSplitDesktopBody": "Finish and export on macOS when you need dependable playback, compare, Cross Filter, and a workflow you can trust on real footage.",
       "expandAuxiliaryPanelsTitle": "Show more: fine controls, LUT, compare, histogram, save…",
       "expandAuxiliaryPanelsHint": "Skip this if presets and the Quick sliders are enough.",
       "valueTitle": "Why macOS helps you keep tone consistent",
       "valueBullet1": "Carry one look across many stills with the same feel.",
-      "valueBullet2": "Process a folder of photos into another folder with a cohesive finish—and nudge one short clip to match when you need it.",
+      "valueBullet2": "Process a folder of photos into another folder with a cohesive finish—and nudge one video to match when you need it.",
       "valueBullet3": "Try the vibe here first, then finish and deliver from the macOS app.",
       "workflowTitle": "Bring the same world into stills.",
       "workflowLead": "Stills matter here as a companion surface, not a separate product identity.",
@@ -281,7 +281,7 @@
       "workflowBullet3": "Treat the clip as the center of gravity, then extend that same world outward when you need it.",
       "demoEyebrow": "Try your own media on web",
       "demoTitle": "Audition a look in the browser",
-      "demoBody": "Open a frame or short clip, start from the core controls, and compare in motion. When you want dependable finishing and export, move to the macOS app.",
+      "demoBody": "Open a frame or video, start from the core controls, and compare in motion. When you want dependable finishing and export, move to the macOS app.",
       "demoSourceEyebrow": "Source",
       "demoSourceSample": "Sample image",
       "demoPreviewEyebrow": "Preview",
@@ -291,7 +291,7 @@
       "faqQfree": "Is Filmtone free?",
       "faqAfree": "Yes. Both the browser and desktop versions are free. There is an optional support mechanism, but it does not unlock extra features.",
       "faqQformats": "What kind of media can I try here?",
-      "faqAformats": "In the browser, open a photo or short video clip to audition the look. On Desktop, move to the stronger production path when you need finishing and export on macOS.",
+      "faqAformats": "In the browser, open a photo or video to audition the look. On Desktop, move to the stronger production path when you need finishing and export on macOS.",
       "faqQwhichVersion": "Should I use the browser or the desktop app?",
       "faqAwhichVersion": "Use the browser to try the look on your own media and compare quickly. Use the macOS app when you're ready to finish, export, and trust the result on real footage.",
       "faqQpresets": "Is Filmtone just a preset pack?",
@@ -319,7 +319,7 @@
       "premiumCard3Title": "Cross Filter, live in preview",
       "premiumCard3Body": "In v1.0, Cross Filter runs live on the WebGPU preview path, with inline threshold, chromatic, and spacing controls.",
       "premiumCard4Title": "Same world, wider delivery",
-      "premiumCard4Body": "Desktop is built to finish short-form video first, then carry that mood into stills, covers, and supporting frames.",
+      "premiumCard4Body": "Desktop is built to finish video first, then carry that mood into stills, covers, and supporting frames.",
       "premiumCompareTitle": "Show the shipped surface on a real compare pass.",
       "premiumCompareBody": "These silent macOS captures are product proof, not mood reels. They show playback, compare, and finish judgment on actual footage.",
       "premiumCompareCard1Title": "Night scene compare.",
@@ -380,10 +380,10 @@
     "back": "← Back to Interactive",
     "metadata": {
       "title": "Filmtone",
-      "description": "Desktop-first finisher for short-form video. Try the look in the browser on your own frame or clip, then finish and export on macOS.",
-      "ogTitle": "Filmtone — make short clips feel finished fast",
+      "description": "Desktop-first finisher for video. Try the look in the browser on your own frame or clip, then finish and export on macOS.",
+      "ogTitle": "Filmtone — make your videos feel finished fast",
       "ogDescription": "Try the look in your browser. Finish and export on macOS with dependable playback, compare, and signature character.",
-      "ogImageAlt": "Filmtone — desktop-first finisher for short-form video"
+      "ogImageAlt": "Filmtone — desktop-first finisher for video"
     },
     "share": {
       "sectionTitle": "Share",
@@ -646,7 +646,7 @@
     "desktopRelease": {
       "eyebrow": "Desktop",
       "title": "Filmtone Desktop (macOS)",
-      "body": "Finish short-form video on macOS, then carry the same world into stills when you need matching covers or supporting frames. The download is a notarized DMG for Apple Silicon.",
+      "body": "Finish video on macOS, then carry the same world into stills when you need matching covers or supporting frames. The download is a notarized DMG for Apple Silicon.",
       "essentials": {
         "environmentLabel": "Requirements",
         "environmentBody": "macOS {minMacos} or later. {arch} only — not for Intel Macs.",
@@ -670,9 +670,9 @@
         },
         "metadata": {
           "title": "Download Filmtone for macOS",
-          "description": "Download the Filmtone macOS app — a desktop-first finisher for short-form video. Try the look on web, then finish and export on macOS.",
+          "description": "Download the Filmtone macOS app — a desktop-first finisher for video. Try the look on web, then finish and export on macOS.",
           "ogTitle": "Download Filmtone for macOS",
-          "ogDescription": "Desktop-first finishing for short-form video on macOS, free."
+          "ogDescription": "Desktop-first finishing for video on macOS, free."
         }
       },
       "downloadComplete": {
@@ -890,10 +890,10 @@
     },
     "jsonLd": {
       "desktopName": "Filmtone Desktop",
-      "desktopDescription": "Desktop-first macOS finisher for short-form video. Play, compare, add signature character, and export with confidence. Use stills as a same-world extension when you need matching covers or supporting frames.",
+      "desktopDescription": "Desktop-first macOS finisher for video. Play, compare, add signature character, and export with confidence. Use stills as a same-world extension when you need matching covers or supporting frames.",
       "desktopOperatingSystem": "macOS 11.0 or later (Apple Silicon / arm64)",
       "webDemoName": "Filmtone (try in browser)",
-      "webDemoDescription": "Browser try-first experience for opening your own frame or short clip and auditioning the look before moving to Filmtone Desktop.",
+      "webDemoDescription": "Browser try-first experience for opening your own frame or video and auditioning the look before moving to Filmtone Desktop.",
       "webDemoOperatingSystem": "Common desktop browser with interactive graphics support",
       "webDemoBrowserRequirements": "Modern browser with WebGL2 available"
     },
@@ -1126,7 +1126,7 @@
         "v011FfmpegPath": "Fixed an issue where the Desktop app (DMG) could fail to process video after installation.",
         "v010Title": "First release",
         "v010BatchExport": "Apply any preset to an entire folder of photos and export them all at once as JPEG or PNG.",
-        "v010VideoExport": "Export a short video clip with your chosen grade baked in.",
+        "v010VideoExport": "Export a video with your chosen grade baked in.",
         "v010FourPresets": "Four film stock looks to start: Kodak Portra 400, Fuji Pro 400H, Kodak Ektar 100, and Ilford HP5 Plus.",
         "v010BrowserDemo": "Try any preset on your own photos in the browser before downloading the Desktop app."
       },
@@ -1327,14 +1327,14 @@
   "filmtone-signature": {
     "metadata": {
       "title": "Filmtone Signature Pack — Waitlist",
-      "description": "Buy-once look & finish system for short-form creators. Join the waitlist for early access.",
+      "description": "Buy-once look & finish system for video creators. Join the waitlist for early access.",
       "ogTitle": "Filmtone Signature Pack",
-      "ogDescription": "Make short clips feel finished fast. Waitlist now open.",
+      "ogDescription": "Make your videos feel finished fast. Waitlist now open.",
       "ogImageAlt": "Filmtone Signature Pack preview"
     },
     "eyebrow": "Coming soon",
-    "headline": "Make short clips feel finished fast",
-    "subheadline": "Filmtone Signature Pack gives you the Base Looks, finish recipes, and signature tools that turn rough short-form footage into a repeatable finished feel without a full grading session.",
+    "headline": "Make your videos feel finished fast",
+    "subheadline": "Filmtone Signature Pack gives you the Base Looks, finish recipes, and signature tools that turn rough footage into a repeatable finished feel without a full grading session.",
     "waitlistTitle": "Early access waitlist",
     "waitlistBenefit": "First 100 members get $10 off. Members 101–300 get two bonus recipes. Waitlist members see launch 24 hours before public release.",
     "emailPlaceholder": "your@email.com",
