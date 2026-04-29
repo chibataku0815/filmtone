@@ -1798,6 +1798,533 @@
           }
         ]
       },
+      "filmtone-motion-180-shutter-baseline": {
+        "sections": [
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Treating shutter angle as exposure duration"
+          },
+          {
+            "type": "paragraph",
+            "text": "Normal iPhone and cinema footage is captured with roughly 180° of shutter motion blur already baked in. Filmtone Motion is an additive post process; piling another 180° pass on top of that produces visible double-blur ghosting. So Filmtone treats 180° as the no-op baseline, and only opens the target shutter window past that."
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Exposure-frame normalization"
+          },
+          {
+            "type": "paragraph",
+            "text": "Shutter angle is normalized to exposure duration per frame. `MOTION_BLUR_BASELINE_SHUTTER_ANGLE = 180` is fixed at 0.5 frame, and `MOTION_BLUR_MAX_SHUTTER_ANGLE = 720` caps the input at 2.0 frames. Only the additional exposure relative to the source is fed into the ring buffer: `additionalExposureFrames = max(0, target - 0.5)`. For `shutterAngle <= 180` this is always `0`, so preview, desktop export, and iOS export all return the spatial grade output as-is."
+          },
+          {
+            "type": "code",
+            "lang": "ts",
+            "text": "// packages/film-lab-renderer/src/motionBlurMath.ts\nexport const MOTION_BLUR_BASELINE_SHUTTER_ANGLE = 180;\nexport const MOTION_BLUR_MAX_SHUTTER_ANGLE = 720;\nexport const MOTION_BLUR_DEFAULT_RING_SLOTS = 8;\nexport const MOTION_BLUR_BASELINE_EXPOSURE_FRAMES =\n  MOTION_BLUR_BASELINE_SHUTTER_ANGLE / 360;\n\nexport function targetMotionExposureFrames(shutterAngle: number): number {\n  return clampMotionShutterAngle(shutterAngle) / 360;\n}\n\nexport function additionalMotionExposureFrames(shutterAngle: number): number {\n  return Math.max(\n    0,\n    targetMotionExposureFrames(shutterAngle) -\n      MOTION_BLUR_BASELINE_EXPOSURE_FRAMES,\n  );\n}\n\nexport function isShutterMotionActive(shutterAngle: number): boolean {\n  return additionalMotionExposureFrames(shutterAngle) > 0;\n}"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Active frame count — held to a short history window"
+          },
+          {
+            "type": "paragraph",
+            "text": "The active frame count for the ring-buffer approximation is `1 + ceil(additionalExposureFrames)`, clamped to `[2, slots]`. With the default 8 slots: `360°→2 frames`, `540°→3 frames`, `720°→3 frames`. The substantive change relative to the previous `(additionalAngle / 360) * (slots / 2)` formula was replacing the `720°→6 frames` mapping; the old version became a long-tail echo rather than a shutter-window extension. Long stylistic tails are the job of `trailIntensity`, not `shutterAngle`."
+          },
+          {
+            "type": "code",
+            "lang": "ts",
+            "text": "export function activeMotionBlurFramesForShutter(\n  shutterAngle: number,\n  ringSlots: number = MOTION_BLUR_DEFAULT_RING_SLOTS,\n): number {\n  const additionalExposureFrames = additionalMotionExposureFrames(shutterAngle);\n  if (additionalExposureFrames <= 0) return 1;\n  const slots = Math.max(1, Math.round(ringSlots));\n  const raw = 1 + Math.ceil(additionalExposureFrames);\n  return Math.max(2, Math.min(slots, raw));\n}"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Weight curves — triangle / box blended by flatness"
+          },
+          {
+            "type": "paragraph",
+            "text": "Weights interpolate between triangle and box via `flatness = clamp((shutterAngle - 360) / 360, 0, 1)`. At `shutterAngle = 360°`, flatness is 0 and the weights are pure triangle; at `720°`, flatness is 1 and the weights are flat. Three curves are available — triangle, box, exponential — but triangle is the default, drifting naturally toward flat as `shutterAngle` grows. The final weight array is normalized by the sum, so total energy stays conserved regardless of window size."
+          },
+          {
+            "type": "code",
+            "lang": "ts",
+            "text": "export function computeMotionBlurWeights(\n  shutterAngle: number,\n  activeFrames: number,\n  validSlots: number,\n  ringSlots: number = MOTION_BLUR_DEFAULT_RING_SLOTS,\n  weightCurve: MotionBlurWeightCurve = \"triangle\",\n): Float32Array {\n  const slots = Math.max(1, Math.round(ringSlots));\n  const weights = new Float32Array(slots);\n  const effective = Math.min(\n    Math.max(0, Math.round(activeFrames)),\n    Math.max(0, Math.round(validSlots)),\n    slots,\n  );\n  if (effective <= 0) return weights;\n  if (effective === 1) { weights[0] = 1; return weights; }\n\n  const clampedShutterAngle = clampMotionShutterAngle(shutterAngle);\n  const flatness = Math.min(1, Math.max(0, (clampedShutterAngle - 360) / 360));\n  let sum = 0;\n  for (let i = 0; i < effective; i++) {\n    const triangleW = effective - i;\n    const boxW = 1;\n    switch (weightCurve) {\n      case \"box\": weights[i] = boxW; break;\n      case \"exponential\": weights[i] = Math.exp(-1.5 * i) * (1 - flatness) + boxW * flatness; break;\n      case \"triangle\":\n      default: weights[i] = triangleW * (1 - flatness) + boxW * flatness; break;\n    }\n    sum += weights[i]!;\n  }\n  if (sum > 0) for (let i = 0; i < effective; i++) weights[i]! /= sum;\n  return weights;\n}"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Swift mirror — `FilmtoneMotionBlurMath`"
+          },
+          {
+            "type": "paragraph",
+            "text": "If iOS export ran a different formula, preview and export would diverge in color. The Swift side is hand-mirrored, and `scripts/swift/test-motion-blur-math.swift` runs as part of `verify:swift-contract` to confirm boundary values (0° / 180° / 360° / 540° / 720°) match the TS output. The check is wired into `bun run --cwd apps/capacitor-film-lab-ios verify:swift-contract`."
+          },
+          {
+            "type": "code",
+            "lang": "swift",
+            "text": "// apps/capacitor-film-lab-ios/ios/App/App/FilmtoneMotionBlurMath.swift\nenum FilmtoneMotionBlurMath {\n    static let baselineShutterAngle = 180.0\n    static let maxShutterAngle = 720.0\n    static let defaultSlotCount = 8\n    static let baselineExposureFrames = baselineShutterAngle / 360.0\n\n    static func additionalExposureFrames(shutterAngle: Double) -> Double {\n        max(0, targetExposureFrames(shutterAngle: shutterAngle) - baselineExposureFrames)\n    }\n\n    static func activeFrameCount(\n        shutterAngle: Double,\n        slotCount: Int = defaultSlotCount\n    ) -> Int {\n        let additional = additionalExposureFrames(shutterAngle: shutterAngle)\n        guard additional > 0 else { return 1 }\n        let slots = max(1, slotCount)\n        let raw = 1 + Int(ceil(additional))\n        return max(2, min(slots, raw))\n    }\n}"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Boundary behavior at default 8 slots"
+          },
+          {
+            "type": "list",
+            "items": [
+              "`0°` / `180°` — inactive, pass-through (1 frame)",
+              "`360°` — active, 2 frames, weights `[2/3, 1/3]` (triangle, flatness=0)",
+              "`540°` — active, 3 frames, weights between triangle and box at flatness ≈ 0.5",
+              "`720°` — active, 3 frames, weights `[1/3, 1/3, 1/3]` (flatness=1, fully flat)"
+            ]
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Aligned with industry conventions"
+          },
+          {
+            "type": "paragraph",
+            "text": "Treating shutter angle as exposure duration matches how the rest of the industry models it. RED's Shutter Angle docs use `180° = 0.5 frame`. Foundry Nuke (Kronos and the render motion blur node) separates Shutter Time from Shutter Samples. Blender Cycles and EEVEE, plus Houdini Mantra, all expose shutter time, shutter offset, and motion samples as independent axes. Adobe AE Pixel Motion Blur generates intermediate samples from optical flow and integrates them along a shutter curve. Filmtone is a ring-buffer approximation rather than a physically accurate shutter simulator, but the meaning of `shutterAngle` is intentionally aligned with all of these."
+          },
+          {
+            "type": "callout",
+            "tone": "note",
+            "text": "`shutterAngle` controls only the target shutter-window extension; `trailIntensity` carries the expressive afterimage outside that window. Mixing the two blurs the meaning of `shutterAngle`, so UI copy and math both keep them apart. Want a long echo? Push `trailIntensity`. Want a different shutter feel? Move `shutterAngle`."
+          }
+        ]
+      },
+      "filmtone-dual-lut-pipeline": {
+        "sections": [
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Splitting Source Profile and Look into two slots"
+          },
+          {
+            "type": "paragraph",
+            "text": "Filmtone holds `.cube` LUTs in two slots. `inputLut` is source-specific: camera transforms, Apple Log to Rec.709, anything tied to the material. `creativeLut` is look-specific: the creative / stylistic LUT layered on top of a Filmtone preset. With one slot, swapping cameras either wipes the look or forces you to give up the camera transform to keep the look. Two slots let both responsibilities coexist."
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Data model"
+          },
+          {
+            "type": "code",
+            "lang": "swift",
+            "text": "// apps/capacitor-film-lab-ios/ios/App/App/FilmtoneMediaTypes.swift\nstruct ParsedCubeLutDTO: Codable {\n    let title: String\n    let size: Int\n    let data: [Double]\n    let intensity: Double\n}\n\nstruct SerializableLutDTO: Codable {\n    let size: Int\n    let data: [Double]\n    let intensity: Double\n}\n\nstruct Phase0ExportRequestDTO: Codable {\n    let sourceUri: String\n    // ...\n    let lut: ParsedCubeLutDTO?           // legacy, decode-only\n    let inputLut: SerializableLutDTO?    // Source Profile / Camera\n    let creativeLut: SerializableLutDTO? // Look\n    // ...\n}"
+          },
+          {
+            "type": "paragraph",
+            "text": "The legacy `lut` field stays for decode compatibility only. Current export-request builds set `lut: nil` and transport `inputLut` and `creativeLut` independently. `FilmtonePhase0Math.buildExportRequest` enforces this, and `verify:swift-contract`'s Phase0 fixtures verify it on every gate."
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Export order is fixed"
+          },
+          {
+            "type": "list",
+            "ordered": true,
+            "items": [
+              "input LUT — Source Profile / Camera transform",
+              "base grade — the Filmtone preset core (params)",
+              "tone compression",
+              "edge optics — lens softness, RGB shift",
+              "glow family — bloom, halation, diffusion",
+              "vignette",
+              "grain",
+              "creative LUT — the look's final pass",
+              "print — the last touch of paper-print character"
+            ]
+          },
+          {
+            "type": "paragraph",
+            "text": "Input lands first (the source enters Filmtone's working space) and creative lands last (the look sits on top as the final layer). The ordering is fixed and the same in preview and export; `verify:swift-contract` keeps them in lockstep."
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Replacement preserves look, not source profile"
+          },
+          {
+            "type": "paragraph",
+            "text": "When the source is replaced (a different video, a different camera), `inputLut` is dropped — the new material likely needs a different transform. `creativeLut` is preserved because look should be independent of material. `clearInputLut()` and `clearCreativeLut()` are completely independent APIs; neither pulls the other along."
+          },
+          {
+            "type": "code",
+            "lang": "swift",
+            "text": "// apps/capacitor-film-lab-ios/ios/App/App/FilmtoneEditorStore.swift\nfunc clearInputLut() {\n    applyLutMutation { $0.inputLut = nil }\n}\n\nfunc clearCreativeLut() {\n    applyLutMutation { $0.creativeLut = nil }\n}"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Funneling all LUT mutation through one helper"
+          },
+          {
+            "type": "paragraph",
+            "text": "Every LUT change goes through `applyLutMutation`. It updates `updatedAt`, invalidates the rendered output state (preview task, compare frame, export result, export progress) in one shot, persists, and reschedules a preview render. Setters (`setInputLutIntensity`, `setCreativeLutIntensity`) call the same helper, so callers don't have to track the side-effect cascade themselves."
+          },
+          {
+            "type": "code",
+            "lang": "swift",
+            "text": "private func applyLutMutation(_ mutate: (inout FilmtoneProjectState) -> Void) {\n    mutate(&project)\n    project.updatedAt = FilmtonePhase0Math.isoTimestamp()\n    invalidateRenderedOutputState()\n    persist()\n    schedulePreviewRender()\n}\n\nfunc setInputLutIntensity(_ intensity: Double) {\n    let clamped = FilmtonePhase0Math.clampLutIntensity(intensity)\n    guard let current = project.inputLut, current.intensity != clamped else { return }\n    applyLutMutation {\n        guard let lut = $0.inputLut else { return }\n        $0.inputLut = lut.withIntensity(clamped)\n    }\n}"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Linear intensity blending in Core Image"
+          },
+          {
+            "type": "paragraph",
+            "text": "`FilmtoneExportSession.applyLut` returns the LUT result directly when `PreparedLut.intensity >= 0.999`. Below that, it scales alpha to `intensity` via `CIColorMatrix`, then composites the alpha-scaled LUT image over the source via `CISourceOverCompositing`. The result is `lut * intensity + original * (1 - intensity)`. The `>= 0.999` early return keeps the common 100% path off the compositing cost."
+          },
+          {
+            "type": "code",
+            "lang": "swift",
+            "text": "// apps/capacitor-film-lab-ios/ios/App/App/FilmtoneExportSession.swift\nprivate func applyLut(_ lut: PreparedLut, to image: CIImage) -> CIImage {\n    let lutImage = image.applyingFilter(\"CIColorCubeWithColorSpace\", parameters: [\n        \"inputCubeDimension\": lut.size,\n        \"inputCubeData\": lut.cubeData,\n        \"inputColorSpace\": outputColorSpace,\n    ])\n\n    guard lut.intensity < 0.999 else { return lutImage }\n\n    let alphaAdjusted = lutImage.applyingFilter(\"CIColorMatrix\", parameters: [\n        \"inputAVector\": CIVector(x: 0, y: 0, z: 0, w: lut.intensity),\n    ])\n    return alphaAdjusted\n        .applyingFilter(\"CISourceOverCompositing\", parameters: [\n            kCIInputBackgroundImageKey: image,\n        ])\n        .cropped(to: image.extent)\n}"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "How intensity travels from UI to rendering"
+          },
+          {
+            "type": "paragraph",
+            "text": "SwiftUI Slider → `setInputLutIntensity(value)` → `clampLutIntensity(0...1)` → `ParsedCubeLutDTO.withIntensity(clamped)` → `applyLutMutation` → `schedulePreviewRender` → preview rebuild. Export request reads the same project state, and `makePreparedLut(from: SerializableLutDTO?)` carries `PreparedLut.intensity` straight into `applyLut`. Nobody can override intensity midstream — there's no second source of truth."
+          },
+          {
+            "type": "callout",
+            "tone": "note",
+            "text": "Auto input transforms (Apple Log → Rec.709 etc.) are not custom LUTs and are out of scope for the intensity slider. `makeAutomaticInputLut(for:)` builds them from `request.sourceProbe?.inputTransformPolicy` along a separate path. Custom and Auto share the same `inputLut` slot mutually exclusively: when Custom is loaded, Auto is suppressed; clearing Custom with `Auto` puts the automatic transform back."
+          }
+        ]
+      },
+      "filmtone-cross-platform-color-parity": {
+        "sections": [
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Putting TypeScript at the center"
+          },
+          {
+            "type": "paragraph",
+            "text": "Filmtone runs preview (web / WebGL / WebGPU) and export (Desktop / iOS Swift) on separate runtimes. Keeping color identical across them depends on a single source of truth for the math. Color transforms, motion blur, exposure, LUT constraints, and preset definitions all live in TypeScript under `packages/film-lab-renderer/src/`. Swift isn't hand-written; it's generated from TS. GLSL fragment shaders and WGSL compute shaders read constants from the same TS module."
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "generate:filmtone-ios-swift"
+          },
+          {
+            "type": "paragraph",
+            "text": "The root `bun run generate:filmtone-ios-swift` runs `scripts/generate-filmtone-ios-swift.ts`, which writes `apps/capacitor-film-lab-ios/ios/App/App/FilmtonePhase0Generated.swift`. It's chained into `dev:ios` and `build:ios`, so any TS change reaches the next Capacitor sync / sim build automatically."
+          },
+          {
+            "type": "code",
+            "lang": "json",
+            "text": "// package.json (root, scripts excerpt)\n{\n  \"scripts\": {\n    \"build:core\": \"...\",\n    \"build:renderer\": \"...\",\n    \"generate:filmtone-ios-swift\": \"bun run scripts/generate-filmtone-ios-swift.ts\",\n    \"dev:ios\": \"bun run build:core && bun run generate:filmtone-ios-swift && bun run --cwd apps/capacitor-film-lab-ios dev\",\n    \"build:ios\": \"bun run build:core && bun run generate:filmtone-ios-swift && bun run --cwd apps/capacitor-film-lab-ios build && bun run --cwd apps/capacitor-film-lab-ios cap:sync:ios\"\n  }\n}"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Shape of the generated Swift module"
+          },
+          {
+            "type": "paragraph",
+            "text": "The output is a single `enum FilmtonePhase0Generated` of static lets. `schemaVersion`, `paramKeys`, `quickAxisIds`, `defaultQuickState`, `outputProfile`, `resetParams`, and the preset definitions are copied verbatim from TS values into Swift constants. The file is marked do-not-edit; any manual change is overwritten by the next generation. Swift call-sites only read it: `FilmtonePhase0Generated.resetParams`, etc."
+          },
+          {
+            "type": "code",
+            "lang": "swift",
+            "text": "// apps/capacitor-film-lab-ios/ios/App/App/FilmtonePhase0Generated.swift\nenum FilmtonePhase0Generated {\n    static let schemaVersion = 2\n    static let presetVersion = \"v1\"\n    static let presetDefault = \"reset\"\n    static let presetStrengthDefault = 1.0\n    static let paramKeys: [String] = [\n        \"exposure\", \"contrast\", \"saturation\", \"temperature\", \"tint\",\n        \"rgbShift\", \"lensSoftness\", \"grainRadialMix\", \"grainSize\",\n        \"bloomThreshold\", \"bloomStrength\", \"bloomRadius\", \"diffusion\",\n        \"halationIntensity\", \"halationSpread\", \"halationHue\",\n        \"halationThreshold\", \"halationRadius\", \"bloomSoftKnee\",\n        \"halationSoftKnee\", \"compressionAmount\", \"compressionRange\",\n        \"printContrast\", \"cyan\", \"magenta\", \"yellow\",\n        \"shutterAngle\", \"trailIntensity\", \"fade\", \"vignette\", \"grainIntensity\",\n    ]\n    static let outputProfile = Phase0OutputProfileDTO(\n        longEdge: 1920, fps: 24, codec: \"h264\", container: \"mp4\", preserveAudio: true\n    )\n    static let resetParams: FilmtonePhase0Params = .init(\n        exposure: 0.0, contrast: 1.0, saturation: 1.0,\n        // ... 27 more fields\n    )\n}"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Contract test — `verify-phase0-contract.sh`"
+          },
+          {
+            "type": "paragraph",
+            "text": "What proves the generated Swift agrees with TS is `apps/capacitor-film-lab-ios/scripts/verify-phase0-contract.sh`. It runs `xcrun --sdk iphonesimulator swiftc -typecheck` against the simulator target first, then compiles a native binary with `xcrun swiftc` and runs it against frozen fixtures (`canonical-export-request.json`, `legacy-project-state.json`, `hlg-export-request.json`). Triggered by `bun run --cwd apps/capacitor-film-lab-ios verify:swift-contract`."
+          },
+          {
+            "type": "code",
+            "lang": "sh",
+            "text": "# apps/capacitor-film-lab-ios/scripts/verify-phase0-contract.sh (excerpt)\nxcrun --sdk iphonesimulator swiftc \\\n  -target \"$SIMULATOR_TARGET\" \\\n  -typecheck \\\n  \"$SWIFT_SUPPORT\" \\\n  \"$PHASE0_GENERATED\" \\\n  \"$PHASE0_MATH\" \\\n  \"$MOTION_MATH\" \\\n  \"$SWIFT_CHECK\"\n\nxcrun swiftc \\\n  -o \"$HOST_BINARY\" \\\n  \"$SWIFT_SUPPORT\" \\\n  \"$PHASE0_GENERATED\" \\\n  \"$PHASE0_MATH\" \\\n  \"$MOTION_MATH\" \\\n  \"$SWIFT_CHECK\"\n\n\"$HOST_BINARY\" \"$CANONICAL_FIXTURE\" \"$LEGACY_FIXTURE\" \"$HLG_FIXTURE\""
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Seven verification layers"
+          },
+          {
+            "type": "paragraph",
+            "text": "verify-phase0-contract.sh isn't one test — it's seven independent ones, run sequentially through one shell. Any single failure stops the commit gate."
+          },
+          {
+            "type": "list",
+            "items": [
+              "Phase 0 contract — DTO schema and preset constants verified against canonical, legacy, and HLG fixtures",
+              "Motion blur math — `FilmtoneMotionBlurMath` active frames and weights at boundary values",
+              "Cube parser — `.cube` DOMAIN_MIN / DOMAIN_MAX semantics and LUT size constraints",
+              "Cache store — retention and cleanup policy",
+              "Source-color-classifier — SDR / HDR PQ / HDR HLG / Apple Log / Apple Log 2 classification and HDR preparation policy",
+              "Ray-angle optics — depth × ray-angle math in `FilmtoneRayAngleOptics`",
+              "Sidecar builder — `FilmtoneExportSidecarBuilder` against the HLG fixture"
+            ]
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Why the math doesn't drift between WebGL/WebGPU and iOS"
+          },
+          {
+            "type": "paragraph",
+            "text": "TypeScript fans out into three downstream paths: the WebGL Backend assembles GLSL strings from TS constants under `packages/film-lab-renderer/src/webgl/`, the WebGPU Backend emits WGSL constants from `packages/film-lab-renderer/src/webgpu/`, and iOS Swift gets `FilmtonePhase0Generated.swift` from `bun run generate:filmtone-ios-swift`. All three converge on the same TypeScript functions at their entry. There is no place where someone could quietly substitute a slightly different number — the path doesn't exist."
+          },
+          {
+            "type": "callout",
+            "tone": "note",
+            "text": "Trying to hold color parity through discipline alone means PR reviewers spending forever spotting `Math.abs(0.18) === 0.18`-class mirror drift. Filmtone holds it through structure: TS is truth, Swift is generated, shaders import constants. If nothing is hand-mirrored, hand-mirror typos can't happen."
+          }
+        ]
+      },
+      "filmtone-capacitor-native-bridge": {
+        "sections": [
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Capacitor 7.4 hybrid layout"
+          },
+          {
+            "type": "paragraph",
+            "text": "Filmtone iOS is a hybrid app on top of Capacitor 7.4.3. It hosts the web shell (`packages/film-lab-ui` + React 19.2) inside a `WKWebView`, and exposes iOS-only APIs (PhotoLibrary, Core Image, AVFoundation, ActivityKit) to TypeScript through the `FilmtoneMediaPlugin` bridge. Only the things the web layer can't reach become native; UI and editor logic stay in the web side."
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Eight bridge methods"
+          },
+          {
+            "type": "code",
+            "lang": "swift",
+            "text": "// apps/capacitor-film-lab-ios/ios/App/App/FilmtoneMediaPlugin.swift\n@objc(FilmtoneMediaPlugin)\nfinal class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {\n    let identifier = \"FilmtoneMediaPlugin\"\n    let jsName = \"FilmtoneMedia\"\n    let pluginMethods: [CAPPluginMethod] = [\n        CAPPluginMethod(name: \"pickSource\", returnType: CAPPluginReturnPromise),\n        CAPPluginMethod(name: \"pickLutFile\", returnType: CAPPluginReturnPromise),\n        CAPPluginMethod(name: \"probeSource\", returnType: CAPPluginReturnPromise),\n        CAPPluginMethod(name: \"renderPreviewFrame\", returnType: CAPPluginReturnPromise),\n        CAPPluginMethod(name: \"runExport\", returnType: CAPPluginReturnPromise),\n        CAPPluginMethod(name: \"saveToPhotos\", returnType: CAPPluginReturnPromise),\n        CAPPluginMethod(name: \"shareOutput\", returnType: CAPPluginReturnPromise),\n        CAPPluginMethod(name: \"cancelExport\", returnType: CAPPluginReturnPromise),\n    ]\n    // ...\n}"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "What each method owns"
+          },
+          {
+            "type": "list",
+            "items": [
+              "`pickSource` — picks a photo or video via `PHPickerViewController`",
+              "`pickLutFile` — picks a `.cube` file via `UIDocumentPickerViewController` (accepts `{ slot?: \"inputLut\" | \"creativeLut\" }`)",
+              "`probeSource` — extracts codec, color, resolution, duration, and input-transform policy from `AVAsset`",
+              "`renderPreviewFrame` — renders one Core Image preview frame for the current project state",
+              "`runExport` — full export (mezzanine, depth, sidecar). Streams progress to TS via the `exportProgress` notify event",
+              "`saveToPhotos` — writes the output to PhotoLibrary via `PHPhotoLibrary`",
+              "`shareOutput` — presents `UIActivityViewController`",
+              "`cancelExport` — stops an in-flight export through `ExportCancelController`"
+            ]
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "TypeScript proxy"
+          },
+          {
+            "type": "paragraph",
+            "text": "The TS side calls `registerPlugin<FilmtoneMediaPlugin>(\"FilmtoneMedia\", { web: ... })` and pins the contract in the interface type. The web fallback (`filmtoneMedia.web.ts`) only runs in dev when the web shell is exercised standalone. Export progress is consumed via `addListener(\"exportProgress\", ...)`."
+          },
+          {
+            "type": "code",
+            "lang": "ts",
+            "text": "// apps/capacitor-film-lab-ios/src/native/filmtoneMedia.ts\nexport interface FilmtoneMediaPlugin {\n  pickSource(): Promise<SourceInfo | null>;\n  pickLutFile(options?: { slot?: \"inputLut\" | \"creativeLut\" }): Promise<PickedLutFile | null>;\n  probeSource(options: { uri: string }): Promise<SourceProbe>;\n  renderPreviewFrame(request: Phase0ExportRequest): Promise<Phase0PreviewRenderResult>;\n  runExport(request: Phase0ExportRequest): Promise<Phase0ExportResult>;\n  saveToPhotos(options: { uri: string }): Promise<void>;\n  shareOutput(options: { uri: string }): Promise<void>;\n  cancelExport(): Promise<void>;\n  addListener(\n    eventName: \"exportProgress\",\n    listenerFunc: (progress: Phase0ExportProgress) => void,\n  ): Promise<PluginListenerHandle>;\n}\n\nexport const filmtoneMedia = registerPlugin<FilmtoneMediaPlugin>(\n  \"FilmtoneMedia\",\n  { web: () => import(\"./filmtoneMedia.web\").then((mod) => new mod.FilmtoneMediaWeb()) },\n);"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "runExport — detached Task plus a progress stream"
+          },
+          {
+            "type": "paragraph",
+            "text": "`runExport` decodes a `Phase0ExportRequestDTO`, builds a session via `FilmtoneMediaRuntime.makeExportSession`, then launches `runtime.runExport` inside a `Task.detached(priority: .userInitiated)`. Progress comes back through a closure and goes to TS as `notifyListeners(\"exportProgress\", ...)`. Concurrent exports are rejected with `FilmtoneMediaError.exportBusy` if `currentExportTask` is non-nil — there's no silent fallback."
+          },
+          {
+            "type": "code",
+            "lang": "swift",
+            "text": "@objc func runExport(_ call: CAPPluginCall) {\n    guard currentExportTask == nil else {\n        reject(call, with: FilmtoneMediaError.exportBusy)\n        return\n    }\n    // ...\n    currentExportTask = Task.detached(priority: .userInitiated) { [weak self] in\n        guard let self else { return }\n        do {\n            let exportResult = try await runtime.runExport(\n                request: request,\n                sourceURL: sourceURL,\n                session: exportSession,\n                collector: benchmarkCollector\n            ) { progress in\n                let payload: [String: Any] = [\n                    \"stage\": progress.stage.rawValue,\n                    \"progress\": progress.progress,\n                    \"currentFrame\": progress.currentFrame as Any,\n                    \"totalFrames\": progress.totalFrames as Any,\n                ]\n                DispatchQueue.main.async {\n                    self.notifyListeners(\"exportProgress\", data: payload)\n                }\n            }\n            // resolve on main actor...\n        } catch { /* reject + benchmark */ }\n    }\n}"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "cancelExport and Live Activity share one stop point"
+          },
+          {
+            "type": "paragraph",
+            "text": "`cancelExport` calls `ExportCancelController.shared.cancel(reason: .userViaUI)` and idempotently nudges `currentExportSession?.cancel()` and `task?.cancel()`. The Live Activity side (Lock Screen and Dynamic Island) routes through `CancelExportIntent`, which calls the same controller. UI, Lock Screen, and Dynamic Island all funnel into one cancel point with a unified reason vocabulary that ends up in the benchmark record."
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Memory warning observer (not exposed to TS)"
+          },
+          {
+            "type": "paragraph",
+            "text": "The plugin subscribes to `UIApplication.didReceiveMemoryWarningNotification` in `load()` and increments a counter from `@objc private func handleMemoryWarning()`. It's deliberately not registered as a `pluginMethod` (TS shouldn't call it). The current value lands in `Phase0ExportBenchmarkRecordDTO.memoryWarningCount` for post-export analysis."
+          },
+          {
+            "type": "code",
+            "lang": "swift",
+            "text": "override func load() {\n    super.load()\n    // ... cache / mezzanine / runtime init ...\n\n    NotificationCenter.default.addObserver(\n        self,\n        selector: #selector(handleMemoryWarning),\n        name: UIApplication.didReceiveMemoryWarningNotification,\n        object: nil\n    )\n}\n\ndeinit {\n    NotificationCenter.default.removeObserver(self)\n}\n\n@objc private func handleMemoryWarning() {\n    memoryWarningCount += 1\n}"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Double-save guard for saveToPhotos"
+          },
+          {
+            "type": "paragraph",
+            "text": "`saveToPhotos` keeps `inFlightPhotoSaveURI` and `lastSavedPhotoURI` behind an `NSLock`, rejecting concurrent saves of the same URI and any second save with `FilmtoneMediaError.saveFailed`. The app's invariant — never write the same export to Photos twice — is enforced physically at the plugin entry."
+          },
+          {
+            "type": "callout",
+            "tone": "note",
+            "text": "When extending the bridge, ship the TS proxy (`src/native/filmtoneMedia.ts`) and the Swift plugin (`FilmtoneMediaPlugin.swift`) in the same PR. Updating one side alone leaves a method name unresolved at runtime; preview, export, or save can fail silently. This is the most common failure mode in any project that touches a Capacitor bridge."
+          }
+        ]
+      },
+      "filmtone-app-store-v12-shipping": {
+        "sections": [
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Splitting fastlane into six lanes by responsibility"
+          },
+          {
+            "type": "paragraph",
+            "text": "Filmtone iOS's `fastlane/Fastfile` is split into six lanes. Each lane owns a single stage of the pipeline — build the IPA, stage review assets, submit for review — with no spillover side effects (no implicit re-archive, no surprise screenshot regeneration, no quiet metadata overwrite). The same Fastfile drives both CI and a laptop without surprises."
+          },
+          {
+            "type": "list",
+            "items": [
+              "`archive` — builds the IPA at `build/fastlane/Filmtone.ipa` with Xcode automatic signing",
+              "`screenshots` — runs the UI test rail on iPhone 17 Pro Max (hard-coded UDID), then stages output for `ja` and `en-US`",
+              "`metadata` — uploads localized metadata, review info, and release notes to App Store Connect. Never touches binary or screenshots",
+              "`beta` — uploads an existing IPA to TestFlight. Always requires explicit `IPA_PATH`",
+              "`release` — uploads IPA + metadata + screenshots to ASC. `SUBMIT_FOR_REVIEW=1` submits for review; `AUTOMATIC_RELEASE=1` auto-releases on approval",
+              "`submit_review` — re-submits an already-uploaded build for review without touching binary or screenshots, given `APP_VERSION` and `BUILD_NUMBER`"
+            ]
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Fail-fast when no IPA is provided"
+          },
+          {
+            "type": "paragraph",
+            "text": "`beta`, `release`, and `submit_review` all funnel through `explicit_ipa_path!(options, lane:)`. Skip `ipa:` and the lane bails immediately with `UI.user_error!`. Without this, CI quietly reuses a stale archive, or running release locally with no archive triggers a surprise 30-minute build."
+          },
+          {
+            "type": "code",
+            "lang": "ruby",
+            "text": "def explicit_ipa_path!(options, lane:)\n  explicit_path = options[:ipa] || options[\"ipa\"]\n  UI.user_error!(\n    \"Pass ipa:... to `fastlane ios #{lane}`. Implicit archive fallback is disabled.\"\n  ) if explicit_path.nil?\n\n  ipa_path = File.expand_path(explicit_path, APP_ROOT)\n  UI.user_error!(\"IPA not found at #{ipa_path}\") unless File.exist?(ipa_path)\n  ipa_path\nend"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Trap 1 — gym 2.233 passes auth args twice"
+          },
+          {
+            "type": "paragraph",
+            "text": "Fastlane 2.233.0's gym (`build_app`) forwards both `export_xcargs` and `xcargs` to `xcodebuild -exportArchive` during the export step. If the Fastfile sets the same App Store Connect auth args (`-authenticationKeyIssuerID` / `-authenticationKeyID` / `-authenticationKeyPath`) in both `xcargs` and `export_xcargs`, `xcodebuild -exportArchive` receives them twice and dies with `Exit status: 64`. The Xcode archive itself succeeds, only IPA export fails."
+          },
+          {
+            "type": "paragraph",
+            "text": "Minimum-viable fix: keep auth args in `xcargs` and don't set `export_xcargs`. Fastlane internally reuses `xcargs` during export, so the args reach `xcodebuild -exportArchive` once."
+          },
+          {
+            "type": "code",
+            "lang": "ruby",
+            "text": "lane :archive do\n  xcargs_parts = [\"-allowProvisioningUpdates\"]\n  if asc_api_key_configured?\n    key_file_path = temp_key_path || File.expand_path(env!(\"ASC_KEY_PATH\"), APP_ROOT)\n    xcargs_parts.concat([\n      \"-authenticationKeyIssuerID\", env!(\"ASC_ISSUER_ID\"),\n      \"-authenticationKeyID\", env!(\"ASC_KEY_ID\"),\n      \"-authenticationKeyPath\", key_file_path,\n    ])\n  end\n  xcargs = xcargs_parts.map(&:shellescape).join(\" \")\n\n  build_app(\n    workspace: IOS_WORKSPACE,\n    scheme: \"App\",\n    clean: true,\n    export_method: \"app-store\",\n    output_directory: BUILD_OUTPUT_DIR,\n    output_name: \"Filmtone\",\n    build_path: BUILD_OUTPUT_DIR,\n    xcargs: xcargs,\n    export_options: {\n      method: \"app-store\",\n      signingStyle: \"automatic\",\n      teamID: DEVELOPMENT_TEAM_ID,\n    }\n  )\nend"
+          },
+          {
+            "type": "callout",
+            "tone": "note",
+            "text": "Xcode 26.4's `xcodebuild -help` lists `app-store` as deprecated; the current name is `app-store-connect`. But fastlane 2.233.0's gym still validates against the old method names, so `export_method: \"app-store\"` stays. Manual `xcodebuild -exportArchive` prints a deprecation warning but still exports successfully."
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Trap 2 — release_notes silently dropped means `whatsNew` is missing"
+          },
+          {
+            "type": "paragraph",
+            "text": "Even when `fastlane/metadata/{ja,en-US}/release_notes.txt` exists on disk, calling `upload_to_app_store` without explicitly passing `release_notes:` makes the ASC API treat `whatsNew` as unset. Binary upload, screenshot upload, precheck, and build selection all succeed — then `submit_for_review: true` fails with:"
+          },
+          {
+            "type": "code",
+            "lang": "text",
+            "text": "appStoreVersions ... is not in valid state.\nThe provided entity is missing a required attribute - You must provide a value for the attribute 'whatsNew' with this request"
+          },
+          {
+            "type": "paragraph",
+            "text": "Fix: pass `release_notes:` explicitly. The same payload is needed in `metadata`, `release`, and `submit_review`, so factor it into a helper and reference it from each lane. TestFlight (`beta` lane) wants `localized_build_info` shaped as `{ locale => { whats_new: text } }`, so a second helper re-shapes the same source."
+          },
+          {
+            "type": "code",
+            "lang": "ruby",
+            "text": "def localized_release_note_texts\n  {\n    \"ja\" => read_text_if_present(File.join(METADATA_TEMPLATE_PATH, \"ja\", \"release_notes.txt\")),\n    \"en-US\" => read_text_if_present(File.join(METADATA_TEMPLATE_PATH, \"en-US\", \"release_notes.txt\")),\n  }.compact\nend\n\ndef localized_build_release_notes\n  localized_release_note_texts.each_with_object({}) do |(locale, notes), memo|\n    memo[locale] = { whats_new: notes }\n  end\nend"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "submit_review — re-submit an existing build without touching the binary"
+          },
+          {
+            "type": "paragraph",
+            "text": "When `release` failed at `submit_for_review` due to missing `whatsNew`, the binary was already at ASC. No need to re-archive — only metadata and the review submission need to land. That's exactly what `submit_review` does. It pulls `APP_VERSION` and `BUILD_NUMBER` from env or lane options, then runs `upload_to_app_store` with `skip_binary_upload: true`, `skip_screenshots: true`, `skip_metadata: false`."
+          },
+          {
+            "type": "code",
+            "lang": "ruby",
+            "text": "lane :submit_review do |options|\n  app_version = normalized_env(\"APP_VERSION\") || options[:app_version]\n  build_number = normalized_env(\"BUILD_NUMBER\") || options[:build_number]\n\n  UI.user_error!(\"Set APP_VERSION or pass app_version:\") unless app_version\n  UI.user_error!(\"Set BUILD_NUMBER or pass build_number:\") unless build_number\n\n  upload_to_app_store(\n    api_key: load_asc_api_key!,\n    app_identifier: APP_IDENTIFIER,\n    app_version: app_version,\n    build_number: build_number,\n    platform: \"ios\",\n    metadata_path: stage_metadata!,\n    skip_binary_upload: true,\n    skip_screenshots: true,\n    skip_metadata: false,\n    submit_for_review: true,\n    automatic_release: truthy_env?(\"AUTOMATIC_RELEASE\"),\n    release_notes: localized_release_note_texts,\n    # ...\n  )\nend"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Closing the screenshot-asymmetry door upstream"
+          },
+          {
+            "type": "paragraph",
+            "text": "Because `release` will overwrite ASC screenshots, mismatched per-locale counts or filenames corrupt the App Store screenshot panel. The Fastfile runs `validate_release_screenshots!` before any upload: both `ja` and `en-US` must have 1–10 screenshots, with identical filename order across locales. Anything else fails fast via `UI.user_error!`."
+          },
+          {
+            "type": "code",
+            "lang": "ruby",
+            "text": "def validate_release_screenshots!\n  screenshot_paths = staged_release_screenshot_paths\n  missing_locales = screenshot_paths.select { |_, paths| paths.empty? }.keys\n  unless missing_locales.empty?\n    UI.user_error!(\"Missing staged screenshots for locales: #{missing_locales.join(', ')}\")\n  end\n\n  counts = screenshot_paths.transform_values(&:count)\n  unless counts.values.all? { |count| count.between?(1, 10) }\n    UI.user_error!(\"Each locale must have between 1 and 10 screenshots.\")\n  end\n  unless counts.values.uniq.one?\n    UI.user_error!(\"Screenshot counts differ by locale.\")\n  end\n\n  expected_basenames = nil\n  screenshot_paths.each do |locale, paths|\n    basenames = paths.map { |path| File.basename(path) }\n    expected_basenames ||= basenames\n    next if basenames == expected_basenames\n    UI.user_error!(\"Screenshot filenames must match across locales.\")\n  end\nend"
+          },
+          {
+            "type": "heading",
+            "level": 2,
+            "text": "Final v1.2 submission flow"
+          },
+          {
+            "type": "code",
+            "lang": "sh",
+            "text": "# 1. archive once\nbun run release:archive   # → build/fastlane/Filmtone.ipa\n\n# 2. upload metadata and binary (does not submit for review yet)\nIPA_PATH=build/fastlane/Filmtone.ipa \\\n  bun run release:appstore\n\n# 3. when whatsNew rejects review submission, re-send metadata only and submit\nset -a; . ./.env.local; set +a\nAPP_VERSION=1.2 BUILD_NUMBER=1 AUTOMATIC_RELEASE=1 \\\n  ./scripts/bundle.sh exec fastlane ios submit_review"
+          },
+          {
+            "type": "callout",
+            "tone": "warn",
+            "text": "It's easy to regenerate screenshots by accident during ASO work. The `release` lane only overwrites ASC screenshots when `OVERWRITE_SCREENSHOTS=1`, but for ASO-only metadata edits, prefer `metadata` or `submit_review` and don't run `release:screenshots` unless explicitly requested. The v1.1 screenshot set is the canonical state."
+          }
+        ]
+      },
       "motion-studies": {
         "signal-stroke-relay": {
           "sections": [
