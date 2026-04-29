@@ -1334,7 +1334,8 @@ final class FilmtoneEditorStore: ObservableObject {
         do {
             let completed = try await facade.shareOutput(
                 mediaURI: exportResult.outputUri,
-                sidecarURI: exportResult.sidecarUri
+                sidecarURI: exportResult.sidecarUri,
+                packageFileURIs: exportResult.packageFileUris
             )
             if completed {
                 discardLocalExportFiles(exportResult)
@@ -1427,7 +1428,10 @@ final class FilmtoneEditorStore: ObservableObject {
     }
 
     private func localExportURIs(for result: Phase0ExportResultDTO) -> [String] {
-        [
+        if let packageFileUris = result.packageFileUris, !packageFileUris.isEmpty {
+            return uniqueURIs(packageFileUris)
+        }
+        return [
             result.outputUri,
             result.sidecarUri,
         ].compactMap { $0 }
