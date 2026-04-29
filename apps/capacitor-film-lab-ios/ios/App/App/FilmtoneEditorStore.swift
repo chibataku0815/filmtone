@@ -452,16 +452,35 @@ final class FilmtoneEditorStore: ObservableObject {
     /// export / share feedback above the ScrollView. Never set directly by
     /// callers — use ``presentToast(_:kind:durationMs:)`` instead.
     @Published var toast: FilmtoneToast?
+    /// Mirror of the LUT library + Saved Looks. Refreshed after every actor
+    /// mutation so SwiftUI redraws the Recent strip / Saved Looks chips
+    /// without per-render disk reads.
+    @Published var library: LibrarySnapshot = .empty
+    /// Set when an `applySavedLook` mutation lands; cleared by every other
+    /// project mutation. Read by the export pipeline so the sidecar can
+    /// record which Saved Look produced the export. (Sidecar field-set is
+    /// MVP-deferred — see Item 3 plan §"Sidecar V1 Additions".)
+    private(set) var appliedSavedLookId: UUID?
 
     let strings: FilmtoneStrings
     private let facade: FilmtoneEditorFacade
+    private let libraryStore: LibraryStoreActor?
     private var previewTask: Task<Void, Never>?
     private var videoPreviewSession: FilmtoneVideoPreviewSession?
     private var toastDismissTask: Task<Void, Never>?
+    private var libraryBootstrapTask: Task<Void, Never>?
 
-    init(facade: FilmtoneEditorFacade, strings: FilmtoneStrings = FilmtoneStringsCatalog.current) {
+    init(
+        facade: FilmtoneEditorFacade,
+        strings: FilmtoneStrings = FilmtoneStringsCatalog.current,
+        libraryStore: LibraryStoreActor? = nil
+    ) {
         self.facade = facade
         self.strings = strings
+        // Fall back to a library-disabled mode if Application Support is not
+        // reachable — the editor still works, the Recent / Saved-Looks UI
+        // simply stays empty. We do not hard-fail bootstrap.
+        self.libraryStore = libraryStore ?? (try? LibraryStoreActor())
 
         if let snapshot = FilmtonePersistence.load() {
             self.project = snapshot.project
@@ -484,11 +503,40 @@ final class FilmtoneEditorStore: ObservableObject {
         if self.source != nil {
             schedulePreviewRender()
         }
+
+        bootstrapLibraryAsync()
     }
 
     deinit {
         previewTask?.cancel()
         toastDismissTask?.cancel()
+        libraryBootstrapTask?.cancel()
+    }
+
+    private func bootstrapLibraryAsync() {
+        guard let libraryStore else {
+            return
+        }
+        libraryBootstrapTask?.cancel()
+        libraryBootstrapTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                let snapshot = try await libraryStore.loadOrRebuild()
+                self.library = snapshot
+            } catch {
+                // Library is non-load-bearing for editor function — keep the
+                // empty snapshot rather than surfacing a setup error.
+                self.library = .empty
+            }
+        }
+    }
+
+    private func refreshLibrarySnapshot() async {
+        guard let libraryStore else {
+            return
+        }
+        let snapshot = await libraryStore.snapshot()
+        self.library = snapshot
     }
 
     var sourceLabel: String? {
@@ -695,6 +743,11 @@ final class FilmtoneEditorStore: ObservableObject {
         toastDismissTask?.cancel()
         toastDismissTask = nil
         toast = nil
+        appliedSavedLookId = nil
+        // Library subtree is wiped by AppDelegate on snapshot bootstrap; this
+        // mirrors that on the in-memory side so the snapshot fixture starts
+        // with an empty Recent / Saved Looks state.
+        library = .empty
     }
 
     func pickSource(route: FilmtoneSourcePickerRoute = .photoLibrary) async {
@@ -738,6 +791,7 @@ final class FilmtoneEditorStore: ObservableObject {
     }
 
     func selectPreset(_ presetName: String) {
+        appliedSavedLookId = nil
         project.presetName = presetName
         project.strength = FilmtonePhase0Math.presetStrengthDefault
         project.quickState = .zero
@@ -745,11 +799,13 @@ final class FilmtoneEditorStore: ObservableObject {
     }
 
     func setStrength(_ strength: Double) {
+        appliedSavedLookId = nil
         project.strength = FilmtonePhase0Math.clampStrength(strength)
         recomputeProjectParams()
     }
 
     func setQuickValue(_ value: Double, for axis: WritableKeyPath<FilmtoneQuickState, Double>) {
+        appliedSavedLookId = nil
         project.quickState[keyPath: axis] = max(-1, min(1, value))
         recomputeProjectParams()
     }
@@ -758,6 +814,7 @@ final class FilmtoneEditorStore: ObservableObject {
         if FilmtonePreviewRefreshDebug.isProcessParam(key), source?.kind == .video {
             FilmtonePreviewRefreshDebug.log("process param override changed: \(key)=\(value)")
         }
+        appliedSavedLookId = nil
         let base = baseParamsForCurrentAdjustments()
         project.paramOverrides = project.paramOverrides.settingValue(value, for: key, over: base)
         recomputeProjectParams()
@@ -771,6 +828,7 @@ final class FilmtoneEditorStore: ObservableObject {
         guard next != project.paramOverrides else {
             return
         }
+        appliedSavedLookId = nil
         project.paramOverrides = next
         recomputeProjectParams()
     }
@@ -788,11 +846,13 @@ final class FilmtoneEditorStore: ObservableObject {
         guard next != project.paramOverrides else {
             return
         }
+        appliedSavedLookId = nil
         project.paramOverrides = next
         recomputeProjectParams()
     }
 
     func resetAdjustments() {
+        appliedSavedLookId = nil
         project.quickState = .zero
         project.strength = FilmtonePhase0Math.presetStrengthDefault
         project.paramOverrides = .empty
@@ -819,6 +879,8 @@ final class FilmtoneEditorStore: ObservableObject {
             guard let lut = try await facade.pickCubeLut() else {
                 return
             }
+            await persistImportedLutToLibrary(lut, slot: .input)
+            appliedSavedLookId = nil
             applyLutMutation {
                 $0.inputLut = lut
             }
@@ -837,6 +899,8 @@ final class FilmtoneEditorStore: ObservableObject {
             guard let lut = try await facade.pickCubeLut() else {
                 return
             }
+            await persistImportedLutToLibrary(lut, slot: .creative)
+            appliedSavedLookId = nil
             applyLutMutation {
                 $0.creativeLut = lut
             }
@@ -850,13 +914,266 @@ final class FilmtoneEditorStore: ObservableObject {
         }
     }
 
+    /// Persist a freshly-picked LUT into the library so it shows up in
+    /// Recent. Quota / dedup logic lives in the actor; if persistence fails
+    /// we still apply the LUT to the project — library-disabled mode is a
+    /// degraded but acceptable state, never a hard editor failure.
+    private func persistImportedLutToLibrary(
+        _ lut: ParsedCubeLutDTO,
+        slot: SlotHint
+    ) async {
+        guard let libraryStore else {
+            return
+        }
+        do {
+            _ = try await libraryStore.importLut(
+                parsedLut: lut,
+                originalFilename: nil,
+                preferredSlot: slot
+            )
+            await refreshLibrarySnapshot()
+        } catch let storeError as LibraryStoreActor.StoreError {
+            // Surface quota errors but never block the in-memory LUT apply —
+            // the user can keep working, they just won't see the entry in
+            // Recent until they free up space and re-import.
+            if case .quotaExceeded = storeError {
+                self.error = strings.libraryQuotaExceeded
+            }
+        } catch {
+            // Swallow other library errors (disk write failure etc.); they
+            // are non-load-bearing for the in-memory editor.
+        }
+    }
+
+    /// Apply a LUT from the library to the named slot. Tap-to-apply path on
+    /// the Recent strip routes through here so we (a) reuse the existing
+    /// `applyLutMutation` invalidate/persist path, (b) bump the entry's
+    /// `lastUsedAt`, and (c) touch the slot's intensity according to the
+    /// entry's `defaultIntensity`.
+    func applyLibraryLut(libraryId: UUID, slot: SlotHint) async {
+        guard let libraryStore else {
+            return
+        }
+        do {
+            let parsed = try await libraryStore.loadLut(id: libraryId)
+            await libraryStore.touchLutLastUsed(id: libraryId)
+            await refreshLibrarySnapshot()
+            appliedSavedLookId = nil
+            applyLutMutation { state in
+                switch slot {
+                case .input:
+                    state.inputLut = parsed
+                case .creative, .any:
+                    state.creativeLut = parsed
+                }
+            }
+        } catch {
+            self.error = strings.libraryLutMissingOnApply
+        }
+    }
+
+    /// Snapshot the current creative state into a Saved Look. Source-side
+    /// (input LUT / source URI / source probe) is intentionally **not**
+    /// captured — those are source-locally re-derived per `applyProbe`.
+    @discardableResult
+    func saveCurrentLook(name: String) async -> SavedLookEntry? {
+        guard let libraryStore else {
+            return nil
+        }
+        let creativeBinding = await currentCreativeLutBinding()
+        do {
+            let entry = try await libraryStore.saveLook(
+                name: name,
+                presetName: project.presetName,
+                presetVersion: FilmtonePhase0Math.presetVersion,
+                strength: project.strength,
+                quickState: project.quickState,
+                paramOverrides: project.paramOverrides,
+                creativeLut: creativeBinding
+            )
+            await refreshLibrarySnapshot()
+            appliedSavedLookId = entry.id
+            presentToast(
+                String(format: strings.lookSavedToastFormat, entry.name),
+                kind: .success
+            )
+            return entry
+        } catch {
+            self.error = strings.userMessage(for: error, context: .importLut)
+            return nil
+        }
+    }
+
+    /// Find or create the `CreativeLutBinding` that represents the current
+    /// `project.creativeLut`. We prefer a `libraryRef` when the LUT's content
+    /// hash matches an existing library entry; otherwise we register the LUT
+    /// as a new library entry so the look survives delete-from-library.
+    private func currentCreativeLutBinding() async -> CreativeLutBinding? {
+        guard let creativeLut = project.creativeLut else {
+            return nil
+        }
+        guard let libraryStore else {
+            return nil
+        }
+        do {
+            let result = try await libraryStore.importLut(
+                parsedLut: creativeLut,
+                originalFilename: nil,
+                preferredSlot: .creative
+            )
+            // result.entry.id always represents the canonical library entry
+            // for this hash — dedup hit reuses the existing one, miss creates.
+            if !result.deduped {
+                await refreshLibrarySnapshot()
+            }
+            return .libraryRef(id: result.entry.id, intensity: creativeLut.intensity)
+        } catch {
+            // If the import itself failed (quota etc.), embed the data
+            // inline so the look still saves and stays applicable.
+            let hash = (try? FilmtoneLutBlobCodec.sourceHash(
+                data: creativeLut.data,
+                size: creativeLut.size
+            )) ?? ""
+            let embedded = SavedLookEmbeddedLut(
+                title: creativeLut.title,
+                size: creativeLut.size,
+                data: creativeLut.data,
+                sourceHash: hash
+            )
+            return .embedded(lut: embedded, intensity: creativeLut.intensity)
+        }
+    }
+
+    /// Apply a saved Look's creative state to the project.
+    ///
+    /// Per the Item 3 plan §"Apply-Saved-Look Semantics":
+    /// - Overwrites: `presetName`, `strength`, `quickState`, `paramOverrides`
+    ///   (and the resolved `params` derived from them), `creativeLut`,
+    ///   creative-LUT intensity.
+    /// - Does NOT touch: `project.inputLut`, source URI, source probe.
+    ///   The source-side normalization is deliberately source-local — the
+    ///   look survives source swaps, the camera profile does not.
+    func applySavedLook(id: UUID) async {
+        guard let libraryStore else {
+            return
+        }
+        do {
+            let entry = try await libraryStore.loadLook(id: id)
+            var resolvedCreativeLut: ParsedCubeLutDTO?
+            var lutMissingForApply = false
+
+            switch entry.creativeLut {
+            case .libraryRef(let lutId, let intensity):
+                if let _ = library.lutEntry(id: lutId) {
+                    do {
+                        resolvedCreativeLut = try await libraryStore.loadLut(
+                            id: lutId,
+                            intensity: intensity
+                        )
+                        await libraryStore.touchLutLastUsed(id: lutId)
+                    } catch {
+                        lutMissingForApply = true
+                    }
+                } else {
+                    lutMissingForApply = true
+                }
+            case .embedded(let lut, let intensity):
+                resolvedCreativeLut = ParsedCubeLutDTO(
+                    title: lut.title,
+                    size: lut.size,
+                    data: lut.data,
+                    intensity: FilmtonePhase0Math.clampLutIntensity(intensity)
+                )
+            case .none:
+                resolvedCreativeLut = nil
+            }
+
+            applyLutMutation { state in
+                state.presetName = FilmtonePhase0Math.safePresetName(entry.presetName)
+                state.strength = FilmtonePhase0Math.clampStrength(entry.strength)
+                state.quickState = entry.quickState.clamped()
+                state.paramOverrides = entry.paramOverrides
+                state.creativeLut = resolvedCreativeLut
+                // Note: state.inputLut is intentionally untouched — the look
+                // is source-independent. See applySavedLook docs above.
+            }
+            recomputeProjectParams()
+            appliedSavedLookId = entry.id
+            await refreshLibrarySnapshot()
+
+            if lutMissingForApply {
+                self.error = strings.libraryLutMissingOnApply
+            } else {
+                presentToast(
+                    String(format: strings.lookAppliedToastFormat, entry.name),
+                    kind: .info
+                )
+            }
+        } catch {
+            self.error = strings.userMessage(for: error, context: .importCreativeLut)
+        }
+    }
+
+    func renameSavedLook(id: UUID, name: String) async {
+        guard let libraryStore else {
+            return
+        }
+        try? await libraryStore.renameLook(id: id, name: name)
+        await refreshLibrarySnapshot()
+    }
+
+    func deleteSavedLook(id: UUID) async {
+        guard let libraryStore else {
+            return
+        }
+        _ = try? await libraryStore.deleteLook(id: id)
+        if appliedSavedLookId == id {
+            appliedSavedLookId = nil
+        }
+        await refreshLibrarySnapshot()
+    }
+
+    func toggleFavoriteSavedLook(id: UUID) async {
+        guard let libraryStore else {
+            return
+        }
+        try? await libraryStore.toggleFavoriteLook(id: id)
+        await refreshLibrarySnapshot()
+    }
+
+    func renameLibraryLut(id: UUID, title: String) async {
+        guard let libraryStore else {
+            return
+        }
+        try? await libraryStore.renameLut(id: id, title: title)
+        await refreshLibrarySnapshot()
+    }
+
+    func deleteLibraryLut(id: UUID) async {
+        guard let libraryStore else {
+            return
+        }
+        _ = try? await libraryStore.deleteLut(id: id)
+        await refreshLibrarySnapshot()
+    }
+
+    func toggleFavoriteLibraryLut(id: UUID) async {
+        guard let libraryStore else {
+            return
+        }
+        try? await libraryStore.toggleFavoriteLut(id: id)
+        await refreshLibrarySnapshot()
+    }
+
     func clearInputLut() {
+        appliedSavedLookId = nil
         applyLutMutation {
             $0.inputLut = nil
         }
     }
 
     func clearCreativeLut() {
+        appliedSavedLookId = nil
         applyLutMutation {
             $0.creativeLut = nil
         }
@@ -867,6 +1184,7 @@ final class FilmtoneEditorStore: ObservableObject {
         guard let currentLut = project.inputLut, currentLut.intensity != clampedIntensity else {
             return
         }
+        appliedSavedLookId = nil
         applyLutMutation {
             guard let lut = $0.inputLut else {
                 return
@@ -880,6 +1198,7 @@ final class FilmtoneEditorStore: ObservableObject {
         guard let currentLut = project.creativeLut, currentLut.intensity != clampedIntensity else {
             return
         }
+        appliedSavedLookId = nil
         applyLutMutation {
             guard let lut = $0.creativeLut else {
                 return

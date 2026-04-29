@@ -115,14 +115,20 @@ fi
 # --- Stream 5: sidecar builder test (may not exist yet at Wave 2 branch time) ---
 SIDECAR_SCRIPT="$SCRIPT_DIR/swift/test-sidecar-builder.swift"
 SIDECAR_SRC="$APP_DIR/ios/App/App/FilmtoneExportSidecarBuilder.swift"
+LUT_BLOB_CODEC_SRC="$APP_DIR/ios/App/App/FilmtoneLutBlobCodec.swift"
 if [ -f "$SIDECAR_SCRIPT" ] && [ -f "$SIDECAR_SRC" ]; then
   echo "==> sidecar builder test"
   SIDECAR_BIN=$(mktemp "${TMPDIR:-/tmp}/phase0-sidecar-check.XXXXXX")
   CLEANUP_FILES="$CLEANUP_FILES $SIDECAR_BIN"
+  # Item 3 (v1.3): the sidecar builder now hashes LUT data via
+  # FilmtoneLutBlobCodec to populate the optional `sourceHash` field on
+  # `SidecarLutRef`. Compile the codec alongside so the contract gate stays
+  # self-contained — both files come from the App target.
   xcrun swiftc \
     -o "$SIDECAR_BIN" \
     "$SWIFT_SUPPORT" \
     "$APP_DIR/ios/App/App/FilmtoneColorPipeline.swift" \
+    "$LUT_BLOB_CODEC_SRC" \
     "$SIDECAR_SRC" \
     "$SIDECAR_SCRIPT"
   "$SIDECAR_BIN" "$HLG_FIXTURE"

@@ -175,6 +175,29 @@ struct FilmtoneStrings {
     let toastSaveSuccess: String
     let toastExportComplete: String
     let toastShareFailed: String
+    // MARK: - LUT library + Saved Looks (Item 3, v1.3 candidate)
+    let librarySavedLutsTitle: String
+    let librarySavedLooksTitle: String
+    let librarySavedLooksEmpty: String
+    let libraryApplyAction: String
+    let libraryRenameAction: String
+    let libraryDeleteAction: String
+    let libraryFavoriteAction: String
+    let libraryUnfavoriteAction: String
+    let libraryQuotaExceeded: String
+    let libraryLutMissingOnApply: String
+    let lookSaveCurrentMenu: String
+    let lookSavedToastFormat: String
+    let lookAppliedToastFormat: String
+    let savedLookSheetCreateTitle: String
+    let savedLookSheetRenameTitle: String
+    let savedLookSheetCreateHeadline: String
+    let savedLookSheetRenameHeadline: String
+    let savedLookSheetBody: String
+    let savedLookNamePlaceholder: String
+    let savedLookSheetSave: String
+    let savedLookSheetRename: String
+    let savedLookSheetCancel: String
 }
 
 extension FilmtoneStrings {
@@ -891,6 +914,124 @@ extension FilmtoneStrings {
             "filmtone.toast.share.failed",
             defaultValue: prefersJapanese ? "共有に失敗しました" : "Share failed — try again",
             comment: "Toast shown when sharing the exported file fails."
+        )
+        librarySavedLutsTitle = filmtoneLocalized(
+            "filmtone.library.saved_luts.title",
+            defaultValue: prefersJapanese ? "保存したLUT" : "Saved LUTs",
+            comment: "Section header above the horizontal imported-LUTs strip in the LUT card. Mirrors `Saved Looks` so the two reusable bins read symmetrically; sorted by lastUsedAt internally but the title does not surface the temporal frame because the v1.3 MVP has no `All` view to contrast against."
+        )
+        librarySavedLooksTitle = filmtoneLocalized(
+            "filmtone.library.saved_looks.title",
+            defaultValue: prefersJapanese ? "保存したルック" : "Saved Looks",
+            comment: "Section header above the horizontal Saved Looks strip in the LUT card."
+        )
+        librarySavedLooksEmpty = filmtoneLocalized(
+            "filmtone.library.saved_looks.empty",
+            defaultValue: prefersJapanese
+                ? "現在のグレードを Look として保存し、次のクリップでも同じトーンを再現できます。"
+                : "Save your current grade as a Look to reuse the same tone on your next clip.",
+            comment: "Empty-state copy shown under the Saved Looks header before the user has saved any looks."
+        )
+        libraryApplyAction = filmtoneLocalized(
+            "filmtone.library.action.apply",
+            defaultValue: prefersJapanese ? "適用" : "Apply",
+            comment: "Context-menu action that applies a library entry to the current project."
+        )
+        libraryRenameAction = filmtoneLocalized(
+            "filmtone.library.action.rename",
+            defaultValue: prefersJapanese ? "名前を変更" : "Rename",
+            comment: "Context-menu action that renames a library entry."
+        )
+        libraryDeleteAction = filmtoneLocalized(
+            "filmtone.library.action.delete",
+            defaultValue: prefersJapanese ? "削除" : "Delete",
+            comment: "Context-menu action that deletes a library entry."
+        )
+        libraryFavoriteAction = filmtoneLocalized(
+            "filmtone.library.action.favorite",
+            defaultValue: prefersJapanese ? "お気に入りに追加" : "Mark Favorite",
+            comment: "Context-menu action that flags a library entry as a favorite."
+        )
+        libraryUnfavoriteAction = filmtoneLocalized(
+            "filmtone.library.action.unfavorite",
+            defaultValue: prefersJapanese ? "お気に入り解除" : "Remove Favorite",
+            comment: "Context-menu action that clears a library entry's favorite flag."
+        )
+        libraryQuotaExceeded = filmtoneLocalized(
+            "filmtone.library.error.quota_exceeded",
+            defaultValue: prefersJapanese
+                ? "LUTライブラリが保存上限に達しました。古いLUTを削除してから読み込み直してください。"
+                : "The LUT library is full. Delete some entries and try importing again.",
+            comment: "User-facing message shown when an import would exceed the library subtree quota."
+        )
+        libraryLutMissingOnApply = filmtoneLocalized(
+            "filmtone.library.error.lut_missing_on_apply",
+            defaultValue: prefersJapanese
+                ? "このLookに紐づくLUTが見つかりませんでした。LUTを再度読み込んでください。"
+                : "The LUT linked to this Look is no longer in the library. Re-import it to restore the look.",
+            comment: "Inline error shown when applying a Saved Look whose libraryRef points at a deleted LUT."
+        )
+        lookSaveCurrentMenu = filmtoneLocalized(
+            "filmtone.look.menu.save_current",
+            defaultValue: prefersJapanese ? "現在のLookを保存…" : "Save current Look…",
+            comment: "Menu item under the Look row that opens the Save-current-Look sheet."
+        )
+        lookSavedToastFormat = filmtoneLocalized(
+            "filmtone.look.toast.saved_format",
+            defaultValue: prefersJapanese ? "Lookを保存しました：%@" : "Saved Look: %@",
+            comment: "Toast format string shown after a Saved Look is created."
+        )
+        lookAppliedToastFormat = filmtoneLocalized(
+            "filmtone.look.toast.applied_format",
+            defaultValue: prefersJapanese ? "Lookを適用しました：%@" : "Applied Look: %@",
+            comment: "Toast format string shown after a Saved Look is applied."
+        )
+        savedLookSheetCreateTitle = filmtoneLocalized(
+            "filmtone.savedlook.sheet.create_title",
+            defaultValue: prefersJapanese ? "Lookを保存" : "Save Look",
+            comment: "Navigation title for the Save-current-Look sheet on the create path."
+        )
+        savedLookSheetRenameTitle = filmtoneLocalized(
+            "filmtone.savedlook.sheet.rename_title",
+            defaultValue: prefersJapanese ? "Lookの名前を変更" : "Rename Look",
+            comment: "Navigation title for the Save-current-Look sheet on the rename path."
+        )
+        savedLookSheetCreateHeadline = filmtoneLocalized(
+            "filmtone.savedlook.sheet.create_headline",
+            defaultValue: prefersJapanese ? "現在のグレードを保存" : "Save the current grade",
+            comment: "Headline shown above the name field on the create path."
+        )
+        savedLookSheetRenameHeadline = filmtoneLocalized(
+            "filmtone.savedlook.sheet.rename_headline",
+            defaultValue: prefersJapanese ? "新しい名前を入力" : "Enter a new name",
+            comment: "Headline shown above the name field on the rename path."
+        )
+        savedLookSheetBody = filmtoneLocalized(
+            "filmtone.savedlook.sheet.body",
+            defaultValue: prefersJapanese
+                ? "Lookには色味・調整・ルックLUTが含まれます。素材ごとのカメラLUTは別管理されます。"
+                : "A Look bundles your tone, adjustments, and creative LUT. Source-side camera LUTs stay separate.",
+            comment: "Supporting body shown above the name field on the Save-current-Look sheet."
+        )
+        savedLookNamePlaceholder = filmtoneLocalized(
+            "filmtone.savedlook.sheet.placeholder",
+            defaultValue: prefersJapanese ? "Look 名" : "Look name",
+            comment: "Placeholder text inside the Saved-Look name field."
+        )
+        savedLookSheetSave = filmtoneLocalized(
+            "filmtone.savedlook.sheet.save",
+            defaultValue: prefersJapanese ? "保存" : "Save",
+            comment: "Toolbar action that confirms creating a new Saved Look."
+        )
+        savedLookSheetRename = filmtoneLocalized(
+            "filmtone.savedlook.sheet.rename",
+            defaultValue: prefersJapanese ? "変更" : "Rename",
+            comment: "Toolbar action that confirms renaming a Saved Look."
+        )
+        savedLookSheetCancel = filmtoneLocalized(
+            "filmtone.savedlook.sheet.cancel",
+            defaultValue: prefersJapanese ? "キャンセル" : "Cancel",
+            comment: "Toolbar action that dismisses the Saved-Look sheet without saving."
         )
     }
 

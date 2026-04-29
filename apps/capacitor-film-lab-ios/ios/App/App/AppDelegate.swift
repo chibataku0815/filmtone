@@ -9,14 +9,25 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         do {
             let snapshotScene = FilmtoneSnapshotScene.current
+            // Snapshot mode and onboarding-reset both want a clean library so
+            // fixtures stay deterministic. We construct the actor first so we
+            // can call `clear()` synchronously on the scratch state before
+            // the editor store attempts a load.
+            let libraryStore = try? LibraryStoreActor()
             if snapshotScene != nil {
                 FilmtonePersistence.clear()
                 UIView.setAnimationsEnabled(false)
+                if let libraryStore {
+                    Task { await libraryStore.clear() }
+                }
             } else if ProcessInfo.processInfo.arguments.contains(FilmtoneOnboardingLaunchArguments.reset) {
                 FilmtonePersistence.clear()
+                if let libraryStore {
+                    Task { await libraryStore.clear() }
+                }
             }
             let facade = try FilmtoneEditorFacade()
-            let store = FilmtoneEditorStore(facade: facade)
+            let store = FilmtoneEditorStore(facade: facade, libraryStore: libraryStore)
             if let snapshotScene {
                 store.applySnapshotScene(snapshotScene)
             } else if ProcessInfo.processInfo.arguments.contains(FilmtoneOnboardingLaunchArguments.seedRestoredSource) {

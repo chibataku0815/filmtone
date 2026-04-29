@@ -9,6 +9,9 @@ struct FilmtoneRootView: View {
     @State private var onboardingCompletedThisSession = false
     @State private var shouldOpenSourcePickerAfterOnboarding = false
     @State private var lutTermHelpPresented = false
+    @State private var savedLookSheet: SavedLookSheetMode?
+    @State private var lutDeleteConfirmation: LutLibraryEntry?
+    @State private var lookDeleteConfirmation: SavedLookEntry?
 
     var body: some View {
         ZStack {
@@ -99,6 +102,60 @@ struct FilmtoneRootView: View {
                 Task { await store.pickSource(route: .files) }
             }
             .accessibilityIdentifier("filmtone.source.files")
+        }
+        .sheet(item: $savedLookSheet) { mode in
+            FilmtoneSavedLookSheet(
+                mode: mode.sheetMode,
+                strings: store.strings,
+                initialName: mode.initialName(defaultIndex: store.library.looks.count + 1),
+                onCancel: { savedLookSheet = nil },
+                onSubmit: { name in
+                    let dispatched = mode
+                    savedLookSheet = nil
+                    Task {
+                        switch dispatched {
+                        case .createCurrentLook:
+                            _ = await store.saveCurrentLook(name: name)
+                        case .renameLook(let entry):
+                            await store.renameSavedLook(id: entry.id, name: name)
+                        case .renameLut(let entry):
+                            await store.renameLibraryLut(id: entry.id, title: name)
+                        }
+                    }
+                }
+            )
+        }
+        .confirmationDialog(
+            lutDeleteConfirmation?.title ?? "",
+            isPresented: Binding(
+                get: { lutDeleteConfirmation != nil },
+                set: { if !$0 { lutDeleteConfirmation = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let entry = lutDeleteConfirmation {
+                Button(store.strings.libraryDeleteAction, role: .destructive) {
+                    Task { await store.deleteLibraryLut(id: entry.id) }
+                }
+                .accessibilityIdentifier("filmtone.library.lut.delete.confirm")
+            }
+            Button(store.strings.savedLookSheetCancel, role: .cancel) {}
+        }
+        .confirmationDialog(
+            lookDeleteConfirmation?.name ?? "",
+            isPresented: Binding(
+                get: { lookDeleteConfirmation != nil },
+                set: { if !$0 { lookDeleteConfirmation = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let entry = lookDeleteConfirmation {
+                Button(store.strings.libraryDeleteAction, role: .destructive) {
+                    Task { await store.deleteSavedLook(id: entry.id) }
+                }
+                .accessibilityIdentifier("filmtone.library.look.delete.confirm")
+            }
+            Button(store.strings.savedLookSheetCancel, role: .cancel) {}
         }
     }
 
@@ -383,6 +440,31 @@ struct FilmtoneRootView: View {
                 }
             }
 
+            // Saved LUTs strip — only renders when there is at least one
+            // entry, so the LUT card stays the same height as v1.2 for users
+            // who have never imported a LUT. Bound to `library.luts` (the
+            // full list, lastUsedAt-desc sorted by the actor) rather than
+            // the 6-cap `recentLuts` projection so the "保存したLUT" header
+            // stays honest — every imported LUT is reachable via horizontal
+            // scroll. v1.4 may reintroduce a Recent / All split when the
+            // dedicated management screen ships.
+            FilmtoneSavedLutsStrip(
+                entries: store.library.luts,
+                strings: store.strings,
+                onApply: { entry in
+                    Task { await store.applyLibraryLut(libraryId: entry.id, slot: .input) }
+                },
+                onRename: { entry in
+                    savedLookSheet = .renameLut(entry)
+                },
+                onDelete: { entry in
+                    lutDeleteConfirmation = entry
+                },
+                onToggleFavorite: { entry in
+                    Task { await store.toggleFavoriteLibraryLut(id: entry.id) }
+                }
+            )
+
             Divider()
                 .overlay(Color.white.opacity(0.08))
 
@@ -399,6 +481,10 @@ struct FilmtoneRootView: View {
                 Button(store.strings.lookImport) {
                     Task { await store.importCreativeLut() }
                 }
+                Button(store.strings.lookSaveCurrentMenu) {
+                    savedLookSheet = .createCurrentLook
+                }
+                .disabled(!canSaveCurrentLook)
                 if store.project.creativeLut != nil {
                     Button(store.strings.clearLut, role: .destructive) {
                         store.clearCreativeLut()
@@ -416,6 +502,26 @@ struct FilmtoneRootView: View {
                     store.setCreativeLutIntensity(nextValue)
                 }
             }
+
+            // Saved Looks strip — always visible (with empty-state copy when
+            // no looks exist) so first-time users see the pitch for the
+            // reuse loop without needing to scroll or hunt through menus.
+            FilmtoneSavedLooksStrip(
+                entries: store.library.looks,
+                strings: store.strings,
+                onApply: { entry in
+                    Task { await store.applySavedLook(id: entry.id) }
+                },
+                onRename: { entry in
+                    savedLookSheet = .renameLook(entry)
+                },
+                onDelete: { entry in
+                    lookDeleteConfirmation = entry
+                },
+                onToggleFavorite: { entry in
+                    Task { await store.toggleFavoriteSavedLook(id: entry.id) }
+                }
+            )
         }
         .padding(16)
         .background(
@@ -426,6 +532,25 @@ struct FilmtoneRootView: View {
             RoundedRectangle(cornerRadius: filmtoneSurfaceCornerRadius, style: .continuous)
                 .stroke(Color.white.opacity(0.06), lineWidth: 1)
         )
+    }
+
+    /// "Save current Look…" is gated to states where there is something
+    /// meaningful to save: any preset different from `reset` defaults, OR
+    /// any quick / advanced adjustment, OR a creative LUT applied.
+    private var canSaveCurrentLook: Bool {
+        if store.project.creativeLut != nil {
+            return true
+        }
+        if store.hasAnyAdjustments {
+            return true
+        }
+        // Save is allowed even when only a preset is selected; the editor
+        // bootstraps with a default preset, so we additionally require
+        // strength != default to avoid the "Save what?" no-op.
+        if abs(store.project.strength - FilmtonePhase0Math.presetStrengthDefault) > 0.01 {
+            return true
+        }
+        return false
     }
 
     private func lutProfileRow<MenuContent: View>(
@@ -922,6 +1047,45 @@ private struct FilmtoneOnboardingPreviewCard: View {
             return 0.46
         default:
             return 0.86
+        }
+    }
+}
+
+/// Stateful identifier for the Saved-Look modal so we can reuse a single
+/// `.sheet(item:)` for create / rename-look / rename-LUT.
+enum SavedLookSheetMode: Identifiable {
+    case createCurrentLook
+    case renameLook(SavedLookEntry)
+    case renameLut(LutLibraryEntry)
+
+    var id: String {
+        switch self {
+        case .createCurrentLook:
+            return "create"
+        case .renameLook(let entry):
+            return "renameLook-\(entry.id.uuidString)"
+        case .renameLut(let entry):
+            return "renameLut-\(entry.id.uuidString)"
+        }
+    }
+
+    var sheetMode: FilmtoneSavedLookSheet.Mode {
+        switch self {
+        case .createCurrentLook:
+            return .create
+        case .renameLook, .renameLut:
+            return .rename
+        }
+    }
+
+    func initialName(defaultIndex: Int) -> String {
+        switch self {
+        case .createCurrentLook:
+            return "Look \(defaultIndex)"
+        case .renameLook(let entry):
+            return entry.name
+        case .renameLut(let entry):
+            return entry.title
         }
     }
 }

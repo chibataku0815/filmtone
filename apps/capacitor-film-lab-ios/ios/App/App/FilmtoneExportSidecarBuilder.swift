@@ -99,9 +99,16 @@ struct SidecarLook: Encodable {
 /// Intentionally omits the full `data` array — only the shape summary
 /// (size + intensity) travels with the sidecar so the payload stays small
 /// and the LUT itself remains the SSOT in the source project file.
+///
+/// `sourceHash` is the SHA-256 of the canonical Float32 byte stream used by
+/// `FilmtoneLibraryStore`. It lets desktop importers correlate two exports
+/// that used the same imported `.cube` even when the user renamed it
+/// between sessions. v1.3 (Item 3): additive optional field — pre-v1.3
+/// readers ignore unknown keys per the V1 contract (CLAUDE.md §5).
 struct SidecarLutRef: Encodable {
     let size: Int
     let intensity: Double
+    let sourceHash: String?
 }
 
 struct SidecarLutRefs: Encodable {
@@ -192,7 +199,13 @@ enum FilmtoneExportSidecarBuilder {
         )
 
         let lutRefs = SidecarLutRefs(
-            inputLut: request.inputLut.map { SidecarLutRef(size: $0.size, intensity: $0.intensity) },
+            inputLut: request.inputLut.map { lut in
+                SidecarLutRef(
+                    size: lut.size,
+                    intensity: lut.intensity,
+                    sourceHash: try? FilmtoneLutBlobCodec.sourceHash(data: lut.data, size: lut.size)
+                )
+            },
             creativeLut: resolveCreativeLutRef(request)
         )
 
@@ -271,10 +284,24 @@ enum FilmtoneExportSidecarBuilder {
     /// `creativeLut` wins when both are present (mirrors `FilmtoneExportSession`).
     private static func resolveCreativeLutRef(_ request: Phase0ExportRequestDTO) -> SidecarLutRef? {
         if let creative = request.creativeLut {
-            return SidecarLutRef(size: creative.size, intensity: creative.intensity)
+            return SidecarLutRef(
+                size: creative.size,
+                intensity: creative.intensity,
+                sourceHash: try? FilmtoneLutBlobCodec.sourceHash(
+                    data: creative.data,
+                    size: creative.size
+                )
+            )
         }
         if let legacy = request.lut {
-            return SidecarLutRef(size: legacy.size, intensity: legacy.intensity)
+            return SidecarLutRef(
+                size: legacy.size,
+                intensity: legacy.intensity,
+                sourceHash: try? FilmtoneLutBlobCodec.sourceHash(
+                    data: legacy.data,
+                    size: legacy.size
+                )
+            )
         }
         return nil
     }
