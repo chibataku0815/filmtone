@@ -108,41 +108,13 @@ struct FilmtoneRootView: View {
     }
 
     private var topChrome: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 14) {
-                Text(store.sourceLabel ?? store.strings.appName)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.white.opacity(0.90))
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-
-                Spacer(minLength: 12)
-
-                Button(store.source == nil ? store.strings.pickSource : store.strings.repickSource) {
-                    sourcePickerDialogPresented = true
-                }
-                .buttonStyle(FilmtoneTopBarActionStyle())
-                .disabled(store.isBusy || store.isSavingToPhotos)
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 12)
-
-            Rectangle()
-                .fill(Color.white.opacity(0.06))
-                .frame(height: 1)
+        FilmtoneTopChrome(
+            title: store.sourceLabel ?? store.strings.appName,
+            actionLabel: store.source == nil ? store.strings.pickSource : store.strings.repickSource,
+            isActionDisabled: store.isBusy || store.isSavingToPhotos
+        ) {
+            sourcePickerDialogPresented = true
         }
-        .background(
-            LinearGradient(
-                colors: [
-                    Color.black.opacity(0.32),
-                    Color.black.opacity(0.12),
-                    .clear,
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
     }
 
     private func sourceLoadBanner(_ state: FilmtoneSourceLoadState) -> some View {
@@ -593,6 +565,120 @@ struct FilmtoneSectionHeader: View {
     }
 }
 
+private struct FilmtoneTopChrome: View {
+    let title: String
+    let actionLabel: String
+    let isActionDisabled: Bool
+    let onAction: () -> Void
+
+    var body: some View {
+        Group {
+            if #available(iOS 26.0, *) {
+                FilmtoneLiquidGlassTopChrome(
+                    title: title,
+                    actionLabel: actionLabel,
+                    isActionDisabled: isActionDisabled,
+                    onAction: onAction
+                )
+            } else {
+                FilmtoneFallbackTopChrome(
+                    title: title,
+                    actionLabel: actionLabel,
+                    isActionDisabled: isActionDisabled,
+                    onAction: onAction
+                )
+            }
+        }
+        .accessibilityIdentifier("filmtone.topChrome")
+    }
+}
+
+@available(iOS 26.0, *)
+private struct FilmtoneLiquidGlassTopChrome: View {
+    let title: String
+    let actionLabel: String
+    let isActionDisabled: Bool
+    let onAction: () -> Void
+
+    var body: some View {
+        GlassEffectContainer(spacing: 10) {
+            HStack(spacing: 10) {
+                FilmtoneTopChromeTitle(title: title)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 11)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .glassEffect(
+                        .regular.tint(Color.black.opacity(0.10)),
+                        in: .rect(cornerRadius: 18.0)
+                    )
+
+                Button(action: onAction) {
+                    Text(actionLabel)
+                        .font(.caption.weight(.semibold))
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+                .buttonStyle(.glass)
+                .tint(Color.filmtoneAmber)
+                .disabled(isActionDisabled)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 10)
+        }
+    }
+}
+
+private struct FilmtoneFallbackTopChrome: View {
+    let title: String
+    let actionLabel: String
+    let isActionDisabled: Bool
+    let onAction: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            FilmtoneTopChromeTitle(title: title)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 11)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(Color.black.opacity(0.22))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .shadow(color: Color.black.opacity(0.28), radius: 18, x: 0, y: 10)
+
+            Button(actionLabel, action: onAction)
+                .buttonStyle(FilmtoneTopBarActionStyle())
+                .disabled(isActionDisabled)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 10)
+    }
+}
+
+private struct FilmtoneTopChromeTitle: View {
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(.white.opacity(0.92))
+            .lineLimit(2)
+            .multilineTextAlignment(.leading)
+            .shadow(color: Color.black.opacity(0.26), radius: 4, x: 0, y: 1)
+    }
+}
+
 struct FilmtoneChromeActionStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -617,12 +703,17 @@ struct FilmtoneTopBarActionStyle: ButtonStyle {
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
-                    .fill(Color.white.opacity(configuration.isPressed ? 0.08 : 0.05))
+                    .fill(.ultraThinMaterial)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
-                    .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                    .fill(Color.black.opacity(configuration.isPressed ? 0.26 : 0.18))
             )
+            .overlay(
+                RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
+                    .stroke(Color.filmtoneAmber.opacity(configuration.isPressed ? 0.26 : 0.16), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.22), radius: 12, x: 0, y: 8)
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
     }
 }
