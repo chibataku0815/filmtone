@@ -55,6 +55,14 @@ Upload an archive to TestFlight
 
 Upload the app-store build, metadata, and screenshots to App Store Connect
 
+### ios submit_review
+
+```sh
+[bundle exec] fastlane ios submit_review
+```
+
+Submit an already uploaded App Store Connect build without touching screenshots or binary
+
 ----
 
 This README.md is auto-generated and will be re-generated every time [_fastlane_](https://fastlane.tools) is run.

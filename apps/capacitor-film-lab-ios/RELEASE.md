@@ -68,6 +68,7 @@ bun run release:screenshots
 bun run release:metadata
 bun run release:beta
 bun run release:appstore
+bun run release:submit-review
 ```
 
 ## Typical Local Flow
@@ -122,6 +123,12 @@ To auto-release after approval:
 IPA_PATH=build/fastlane/Filmtone.ipa AUTOMATIC_RELEASE=1 SUBMIT_FOR_REVIEW=1 REVIEW_PHONE='+81-90-0000-0000' bun run release:appstore
 ```
 
+To submit an already uploaded build without touching the binary or screenshots:
+
+```sh
+APP_VERSION=1.2 BUILD_NUMBER=1 REVIEW_PHONE='+81-90-0000-0000' bun run release:submit-review
+```
+
 ## Notes
 
 - `archive` uses `ios/App/App.xcworkspace`, scheme `App`, `export_method: app-store`, and passes `-allowProvisioningUpdates` on both the build and export phases. The lane sets `signingStyle: automatic` and `teamID: C3G77H8NM6` in the export options so Xcode can resolve distribution signing assets without a manual selection step.
@@ -132,6 +139,6 @@ IPA_PATH=build/fastlane/Filmtone.ipa AUTOMATIC_RELEASE=1 SUBMIT_FOR_REVIEW=1 REV
 - `release` is also fail-fast on screenshots: each locale in `fastlane/screenshots/{ja,en-US}` must have 1-10 files, counts must match across locales, and filenames must line up. Missing screenshots are treated as an error, not as a skip path.
 - Override the capture locale with `SNAPSHOT_BASE_LOCALE` (defaults to `ja`).
 - Metadata is staged from `fastlane/metadata` into `fastlane/.generated/metadata` so URL values can be injected from env vars without mutating the checked-in copy.
-- Support and privacy URLs default to the dedicated `/film-lab/support` and `/film-lab/privacy` pages on `www.chibatakumi.studio`.
+- Support and privacy URLs default to the dedicated `/filmtone/support` and `/filmtone/privacy` pages on `www.chibatakumi.studio`.
 - The checked-in metadata keeps Filmtone positioned as a local-first iPhone grading tool and deliberately avoids AI, subscription, or cloud-sync promises.
 - `beta` requires ASC API key auth. Apple-ID + app-specific password fallback is no longer supported; TestFlight upload goes through the same API key material as `metadata` and `release`.

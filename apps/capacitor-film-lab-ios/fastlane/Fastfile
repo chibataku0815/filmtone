@@ -9,6 +9,7 @@ FASTLANE_DIR = __dir__
 IOS_WORKSPACE = File.join(APP_ROOT, "ios", "App", "App.xcworkspace")
 BUILD_OUTPUT_DIR = File.join(APP_ROOT, "build", "fastlane")
 DEVELOPMENT_TEAM_ID = "C3G77H8NM6"
+APP_IDENTIFIER = "com.chibatakumi.film.lab.ios"
 SCREENSHOTS_PATH = File.join(FASTLANE_DIR, "screenshots")
 METADATA_TEMPLATE_PATH = File.join(FASTLANE_DIR, "metadata")
 GENERATED_PATH = File.join(FASTLANE_DIR, ".generated")
@@ -98,19 +99,19 @@ end
 
 def marketing_url_for(locale)
   base_url = normalized_env("FILMTONE_CANONICAL_BASE_URL") || DEFAULT_CANONICAL_BASE_URL
-  default_path = locale == "ja" ? "/film-lab" : "/en/film-lab"
+  default_path = locale == "ja" ? "/filmtone" : "/en/filmtone"
   localized_url("FILMTONE_MARKETING_URL", locale, "#{base_url}#{default_path}")
 end
 
 def support_url_for(locale)
   base_url = normalized_env("FILMTONE_CANONICAL_BASE_URL") || DEFAULT_CANONICAL_BASE_URL
-  default_path = locale == "ja" ? "/film-lab/support" : "/en/film-lab/support"
+  default_path = locale == "ja" ? "/filmtone/support" : "/en/filmtone/support"
   localized_url("FILMTONE_SUPPORT_URL", locale, "#{base_url}#{default_path}")
 end
 
 def privacy_url_for(locale)
   base_url = normalized_env("FILMTONE_CANONICAL_BASE_URL") || DEFAULT_CANONICAL_BASE_URL
-  default_path = locale == "ja" ? "/film-lab/privacy" : "/en/film-lab/privacy"
+  default_path = locale == "ja" ? "/filmtone/privacy" : "/en/filmtone/privacy"
   localized_url("FILMTONE_PRIVACY_URL", locale, "#{base_url}#{default_path}")
 end
 
@@ -121,12 +122,16 @@ def read_text_if_present(path)
   value.empty? ? nil : value
 end
 
-def localized_release_notes
+def localized_release_note_texts
   {
     "ja" => read_text_if_present(File.join(METADATA_TEMPLATE_PATH, "ja", "release_notes.txt")),
     "en-US" => read_text_if_present(File.join(METADATA_TEMPLATE_PATH, "en-US", "release_notes.txt")),
-  }.each_with_object({}) do |(locale, notes), memo|
-    memo[locale] = { whats_new: notes } if notes
+  }.compact
+end
+
+def localized_build_release_notes
+  localized_release_note_texts.each_with_object({}) do |(locale, notes), memo|
+    memo[locale] = { whats_new: notes }
   end
 end
 
@@ -326,7 +331,6 @@ platform :ios do
         output_name: "Filmtone",
         build_path: BUILD_OUTPUT_DIR,
         xcargs: xcargs,
-        export_xcargs: xcargs,
         export_options: {
           method: "app-store",
           signingStyle: "automatic",
@@ -373,7 +377,8 @@ platform :ios do
       app_review_information: app_review_information!,
       submission_information: {
         export_compliance_uses_encryption: false,
-      }
+      },
+      release_notes: localized_release_note_texts
     )
   end
 
@@ -388,7 +393,8 @@ platform :ios do
       distribute_external: false,
       notify_external_testers: false,
     }
-    upload_options[:localized_build_info] = localized_release_notes unless localized_release_notes.empty?
+    build_release_notes = localized_build_release_notes
+    upload_options[:localized_build_info] = build_release_notes unless build_release_notes.empty?
 
     upload_to_testflight(**upload_options)
   end
@@ -424,11 +430,55 @@ platform :ios do
       submission_information: {
         export_compliance_uses_encryption: false,
       },
+      release_notes: localized_release_note_texts,
       screenshots_path: SCREENSHOTS_PATH,
       skip_screenshots: false,
       overwrite_screenshots: truthy_env?("OVERWRITE_SCREENSHOTS"),
     }
 
     upload_to_app_store(**upload_options)
+  end
+
+  desc "Submit an already uploaded App Store Connect build without touching screenshots or binary"
+  lane :submit_review do |options|
+    app_version = normalized_env("APP_VERSION") || options[:app_version]
+    build_number = normalized_env("BUILD_NUMBER") || options[:build_number]
+
+    UI.user_error!("Set APP_VERSION or pass app_version:") unless app_version
+    UI.user_error!("Set BUILD_NUMBER or pass build_number:") unless build_number
+
+    upload_to_app_store(
+      api_key: load_asc_api_key!,
+      app_identifier: APP_IDENTIFIER,
+      app_version: app_version,
+      build_number: build_number,
+      platform: "ios",
+      metadata_path: stage_metadata!,
+      skip_binary_upload: true,
+      skip_screenshots: true,
+      skip_metadata: false,
+      submit_for_review: true,
+      automatic_release: truthy_env?("AUTOMATIC_RELEASE"),
+      force: true,
+      precheck_include_in_app_purchases: false,
+      copyright: File.read(File.join(METADATA_TEMPLATE_PATH, "copyright.txt")).strip,
+      support_url: {
+        "ja" => support_url_for("ja"),
+        "en-US" => support_url_for("en-US"),
+      },
+      marketing_url: {
+        "ja" => marketing_url_for("ja"),
+        "en-US" => marketing_url_for("en-US"),
+      },
+      privacy_url: {
+        "ja" => privacy_url_for("ja"),
+        "en-US" => privacy_url_for("en-US"),
+      },
+      app_review_information: app_review_information!,
+      submission_information: {
+        export_compliance_uses_encryption: false,
+      },
+      release_notes: localized_release_note_texts
+    )
   end
 end
