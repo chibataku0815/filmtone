@@ -279,158 +279,6 @@
         }
       }
     },
-    "filmtone.onboarding.choose.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Load your own media and Filmtone starts a cinematic preview right away."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "自分の素材を読み込むと、映画調ルックのプレビューがすぐ始まります。"
-          }
-        }
-      }
-    },
-    "filmtone.onboarding.choose.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Choose a photo or video"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "写真や動画を選んで、すぐ映画調に"
-          }
-        }
-      }
-    },
-    "filmtone.onboarding.finish.body" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pick a color direction with a LUT, then export right on iPhone."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "色の方向をLUTで決めて、そのままiPhoneだけで書き出します。"
-          }
-        }
-      }
-    },
-    "filmtone.onboarding.finish.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Finish with LUTs and export"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "LUTから書き出しまで完結"
-          }
-        }
-      }
-    },
-    "filmtone.onboarding.next" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Next"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "次へ"
-          }
-        }
-      }
-    },
-    "filmtone.onboarding.pick_media" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pick media"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "素材を選ぶ"
-          }
-        }
-      }
-    },
-    "filmtone.onboarding.shape.body" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tune grain, glow, tone, and motion feel so the look fits the piece."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "粒状感、グロー、トーン、動きの質感まで、作品に合わせて追い込めます。"
-          }
-        }
-      }
-    },
-    "filmtone.onboarding.shape.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Shape the film character"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "質感まで作品に合わせて整える"
-          }
-        }
-      }
-    },
-    "filmtone.onboarding.skip" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Skip"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "スキップ"
-          }
-        }
-      }
-    },
     "filmtone.camera.auto" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -890,23 +738,6 @@
         }
       }
     },
-    "filmtone.error.generic.import_lut" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The camera profile couldn't be imported."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "カメラプロファイルを読み込めませんでした。"
-          }
-        }
-      }
-    },
     "filmtone.error.generic.import_look_lut" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -920,6 +751,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ルックを読み込めませんでした。"
+          }
+        }
+      }
+    },
+    "filmtone.error.generic.import_lut" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The camera profile couldn't be imported."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カメラプロファイルを読み込めませんでした。"
           }
         }
       }
@@ -1247,6 +1095,23 @@
         }
       }
     },
+    "filmtone.export.export_and_save" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export & Save"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "書き出して保存"
+          }
+        }
+      }
+    },
     "filmtone.export.last_result" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1468,6 +1333,23 @@
         }
       }
     },
+    "filmtone.export.saving_to_photos" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saving to Photos…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真へ保存中…"
+          }
+        }
+      }
+    },
     "filmtone.export.share" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1587,36 +1469,19 @@
         }
       }
     },
-    "filmtone.export.export_and_save" : {
-      "extractionState" : "manual",
+    "filmtone.export.title" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Export & Save"
+            "value" : "Export"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "書き出して保存"
-          }
-        }
-      }
-    },
-    "filmtone.export.saving_to_photos" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Saving to Photos…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "写真へ保存中…"
+            "value" : "書き出し"
           }
         }
       }
@@ -1634,23 +1499,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "書き出し完了。まだ写真には保存されていません。"
-          }
-        }
-      }
-    },
-    "filmtone.export.title" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Export"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "書き出し"
           }
         }
       }
@@ -1744,6 +1592,7 @@
       }
     },
     "filmtone.help.dismiss" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1760,6 +1609,7 @@
       }
     },
     "filmtone.help.lut.a11y" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1776,6 +1626,7 @@
       }
     },
     "filmtone.help.lut.body" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1792,6 +1643,7 @@
       }
     },
     "filmtone.help.lut.camera_lut" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1808,6 +1660,7 @@
       }
     },
     "filmtone.help.lut.look_lut" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1824,6 +1677,7 @@
       }
     },
     "filmtone.help.lut.title" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1835,40 +1689,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "LUTとは"
-          }
-        }
-      }
-    },
-    "filmtone.lut.import_error" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Camera profile import failed"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "カメラプロファイルの読み込みに失敗しました"
-          }
-        }
-      }
-    },
-    "filmtone.lut.parse_error" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Camera profile .cube could not be parsed"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "カメラプロファイルの .cube を解釈できませんでした"
           }
         }
       }
@@ -1971,6 +1791,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ルック"
+          }
+        }
+      }
+    },
+    "filmtone.lut.import_error" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Camera profile import failed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カメラプロファイルの読み込みに失敗しました"
+          }
+        }
+      }
+    },
+    "filmtone.lut.parse_error" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Camera profile .cube could not be parsed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カメラプロファイルの .cube を解釈できませんでした"
           }
         }
       }
@@ -2107,6 +1961,159 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "写真への保存"
+          }
+        }
+      }
+    },
+    "filmtone.onboarding.choose.body" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Load your own media and Filmtone starts a cinematic preview right away."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自分の素材を読み込むと、映画調ルックのプレビューがすぐ始まります。"
+          }
+        }
+      }
+    },
+    "filmtone.onboarding.choose.title" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a photo or video"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真や動画を選んで、すぐ映画調に"
+          }
+        }
+      }
+    },
+    "filmtone.onboarding.finish.body" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pick a color direction with a LUT, then export right on iPhone."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "色の方向をLUTで決めて、そのままiPhoneだけで書き出します。"
+          }
+        }
+      }
+    },
+    "filmtone.onboarding.finish.title" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finish with LUTs and export"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LUTから書き出しまで完結"
+          }
+        }
+      }
+    },
+    "filmtone.onboarding.next" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "次へ"
+          }
+        }
+      }
+    },
+    "filmtone.onboarding.pick_media" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pick media"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "素材を選ぶ"
+          }
+        }
+      }
+    },
+    "filmtone.onboarding.shape.body" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tune grain, glow, tone, and motion feel so the look fits the piece."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "粒状感、グロー、トーン、動きの質感まで、作品に合わせて追い込めます。"
+          }
+        }
+      }
+    },
+    "filmtone.onboarding.shape.title" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shape the film character"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "質感まで作品に合わせて整える"
+          }
+        }
+      }
+    },
+    "filmtone.onboarding.skip" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skip"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スキップ"
           }
         }
       }
@@ -2655,23 +2662,6 @@
         }
       }
     },
-    "filmtone.preset.bw.subtitle" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Classic Mono"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "クラシックモノクロ"
-          }
-        }
-      }
-    },
     "filmtone.preset.amber_glow.subtitle" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -2685,6 +2675,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "あたたかいフレア"
+          }
+        }
+      }
+    },
+    "filmtone.preset.bw.subtitle" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Classic Mono"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クラシックモノクロ"
           }
         }
       }
