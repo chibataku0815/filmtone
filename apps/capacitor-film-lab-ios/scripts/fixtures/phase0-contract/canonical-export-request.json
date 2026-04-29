@@ -95,6 +95,8 @@
       "cyan": -0.02,
       "magenta": 0.01,
       "yellow": 0.03,
+      "shutterAngle": 0,
+      "trailIntensity": 0,
       "fade": 0.04,
       "vignette": 0.15,
       "grainIntensity": 0.1

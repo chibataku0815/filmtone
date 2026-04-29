@@ -30,6 +30,8 @@ describe("phase0 schema", () => {
     expect(phase0.cyan).toBe(PRESETS.cinematic.cyan);
     expect(phase0.magenta).toBe(PRESETS.cinematic.magenta);
     expect(phase0.yellow).toBe(PRESETS.cinematic.yellow);
+    expect(phase0.shutterAngle).toBe(PRESETS.cinematic.shutterAngle);
+    expect(phase0.trailIntensity).toBe(PRESETS.cinematic.trailIntensity);
     expect(phase0.grainIntensity).toBe(PRESETS.cinematic.grainIntensity);
   });
 
@@ -73,6 +75,25 @@ describe("phase0 schema", () => {
     ).toBe(PHASE0_RGB_SHIFT_MAX);
   });
 
+  test("accepts motion slider boundary values", () => {
+    const reset = pickPhase0Params(PRESETS.reset);
+
+    expect(
+      phase0ParamsSchema.parse({
+        ...reset,
+        shutterAngle: 720,
+        trailIntensity: 0.95,
+      }).shutterAngle,
+    ).toBe(720);
+    expect(
+      phase0ParamsSchema.parse({
+        ...reset,
+        shutterAngle: 0,
+        trailIntensity: 0,
+      }).trailIntensity,
+    ).toBe(0);
+  });
+
   test("rejects out-of-range reduced params", () => {
     const result = phase0ParamsSchema.safeParse({
       ...pickPhase0Params(PRESETS.reset),
@@ -109,6 +130,21 @@ describe("phase0 schema", () => {
       phase0ParamsSchema.safeParse({
         ...pickPhase0Params(PRESETS.reset),
         rgbShift: PHASE0_RGB_SHIFT_MAX + 0.0001,
+      }).success,
+    ).toBe(false);
+  });
+
+  test("rejects out-of-range motion slider values", () => {
+    expect(
+      phase0ParamsSchema.safeParse({
+        ...pickPhase0Params(PRESETS.reset),
+        shutterAngle: 721,
+      }).success,
+    ).toBe(false);
+    expect(
+      phase0ParamsSchema.safeParse({
+        ...pickPhase0Params(PRESETS.reset),
+        trailIntensity: 0.951,
       }).success,
     ).toBe(false);
   });

@@ -144,7 +144,7 @@ struct FilmtoneSnapshotFixture {
                     audioPreserved: true,
                     benchmarkRecord: nil
                 ),
-                saveToPhotosState: .saved,
+                saveToPhotosState: .notRun,
                 sourceLoadState: nil
             )
         case .processVideo:

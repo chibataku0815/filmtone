@@ -155,13 +155,6 @@ enum FilmtoneSaveToPhotosState: String {
     case failed
 }
 
-enum FilmtoneParamGroupPresetSelection: Equatable {
-    case nonePreset
-    case defaultPreset
-    case strongPreset
-    case custom(activeCount: Int)
-}
-
 /// Lightweight, viewport-level transient notification model.
 ///
 /// Lives next to `notice` / `error` (which are inline ScrollView panels) but is
@@ -430,6 +423,7 @@ final class FilmtoneEditorStore: ObservableObject {
     @Published var exportProgress: Phase0ExportProgressDTO?
     @Published var exportResult: Phase0ExportResultDTO?
     @Published var saveToPhotosState: FilmtoneSaveToPhotosState = .notRun
+    @Published var isSavingToPhotos = false
     @Published var sourceLoadState: FilmtoneSourceLoadState?
     @Published var isBusy = false
     @Published var notice: String?
@@ -589,6 +583,16 @@ final class FilmtoneEditorStore: ObservableObject {
         }
     }
 
+    var lookProfileLabel: String {
+        guard let creativeLut = project.creativeLut else {
+            return strings.lookFilmtone
+        }
+
+        return creativeLut.title
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nilIfEmpty ?? strings.lookCustom
+    }
+
     /// Current HDR preparation policy derived from the active source probe.
     ///
     /// Field path: `probe?.sourceVideoMetadata?.hdrPreparationPolicy`.
@@ -638,35 +642,6 @@ final class FilmtoneEditorStore: ObservableObject {
         project.paramOverrides.values[key] != nil
     }
 
-    func paramPresetSelection(
-        for keys: [String],
-        defaultValues: [String: Double],
-        strongValues: [String: Double]
-    ) -> FilmtoneParamGroupPresetSelection {
-        let activeCount = keys.filter { project.paramOverrides.values[$0] != nil }.count
-        if activeCount == 0 {
-            return .nonePreset
-        }
-
-        let base = baseParamsForCurrentAdjustments()
-        let matchesDefault = keys.allSatisfy { key in
-            let expected = defaultValues[key] ?? base.value(for: key)
-            let clampedExpected = FilmtonePhase0Math.clampParam(key, expected)
-            return abs(project.params.value(for: key) - clampedExpected) < FilmtonePhase0Math.paramEqualityTolerance
-        }
-        if matchesDefault {
-            return .defaultPreset
-        }
-
-        let matchesStrong = keys.allSatisfy { key in
-            let expected = strongValues[key] ?? base.value(for: key)
-            let clampedExpected = FilmtonePhase0Math.clampParam(key, expected)
-            return abs(project.params.value(for: key) - clampedExpected) < FilmtonePhase0Math.paramEqualityTolerance
-        }
-
-        return matchesStrong ? .strongPreset : .custom(activeCount: activeCount)
-    }
-
     func attachPresenter(_ presenter: UIViewController) {
         facade.attachPresenter(presenter)
     }
@@ -686,6 +661,7 @@ final class FilmtoneEditorStore: ObservableObject {
         exportProgress = nil
         exportResult = fixture.exportResult
         saveToPhotosState = fixture.saveToPhotosState
+        isSavingToPhotos = false
         sourceLoadState = fixture.sourceLoadState
         isBusy = false
         notice = nil
@@ -812,7 +788,7 @@ final class FilmtoneEditorStore: ObservableObject {
 
     func importInputLut() async {
         do {
-            guard let lut = try await facade.pickInputLut() else {
+            guard let lut = try await facade.pickCubeLut() else {
                 return
             }
             project.inputLut = lut
@@ -829,6 +805,25 @@ final class FilmtoneEditorStore: ObservableObject {
         }
     }
 
+    func importCreativeLut() async {
+        do {
+            guard let lut = try await facade.pickCubeLut() else {
+                return
+            }
+            project.creativeLut = lut
+            project.updatedAt = FilmtonePhase0Math.isoTimestamp()
+            persist()
+            schedulePreviewRender()
+        } catch {
+            if let mediaError = error as? FilmtoneMediaError,
+               mediaError.code == "UNSUPPORTED_SOURCE" {
+                self.error = strings.lookLutParseError
+            } else {
+                self.error = strings.userMessage(for: error, context: .importCreativeLut)
+            }
+        }
+    }
+
     func clearInputLut() {
         project.inputLut = nil
         project.updatedAt = FilmtonePhase0Math.isoTimestamp()
@@ -836,7 +831,18 @@ final class FilmtoneEditorStore: ObservableObject {
         schedulePreviewRender()
     }
 
+    func clearCreativeLut() {
+        project.creativeLut = nil
+        project.updatedAt = FilmtonePhase0Math.isoTimestamp()
+        persist()
+        schedulePreviewRender()
+    }
+
     func export() async {
+        guard !isBusy && !isSavingToPhotos else {
+            return
+        }
+
         do {
             let request = try FilmtonePhase0Math.buildExportRequest(
                 source: source,
@@ -862,17 +868,67 @@ final class FilmtoneEditorStore: ObservableObject {
         } catch {
             isBusy = false
             exportProgress = nil
+            isSavingToPhotos = false
+            self.error = strings.userMessage(for: error, context: .export)
+        }
+    }
+
+    func exportAndSave() async {
+        guard !isBusy && !isSavingToPhotos else {
+            return
+        }
+
+        do {
+            let request = try FilmtonePhase0Math.buildExportRequest(
+                source: source,
+                probe: probe,
+                project: project
+            )
+
+            isBusy = true
+            isSavingToPhotos = false
+            error = nil
+            notice = nil
+            exportResult = nil
+            exportProgress = nil
+            saveToPhotosState = .notRun
+
+            let result = try await facade.runExport(request: request) { [weak self] progress in
+                self?.exportProgress = progress
+            }
+
+            isBusy = false
+            exportProgress = nil
+            exportResult = result
+            await saveExportResultToPhotos(result)
+        } catch {
+            isBusy = false
+            exportProgress = nil
+            isSavingToPhotos = false
             self.error = strings.userMessage(for: error, context: .export)
         }
     }
 
     func saveToPhotos() async {
-        guard let exportResult, saveToPhotosState != .saved else {
+        guard let exportResult, saveToPhotosState != .saved, !isSavingToPhotos else {
             return
         }
 
+        await saveExportResultToPhotos(exportResult)
+    }
+
+    private func saveExportResultToPhotos(_ result: Phase0ExportResultDTO) async {
+        guard !isSavingToPhotos else {
+            return
+        }
+
+        isSavingToPhotos = true
+        defer {
+            isSavingToPhotos = false
+        }
+
         do {
-            try await facade.saveToPhotos(uri: exportResult.outputUri)
+            try await facade.saveToPhotos(uri: result.outputUri)
             saveToPhotosState = .saved
             notice = strings.saveToPhotosDone
             error = nil
@@ -977,6 +1033,7 @@ final class FilmtoneEditorStore: ObservableObject {
         self.videoPreviewSession = nil
         self.isCompareHeld = false
         self.saveToPhotosState = .notRun
+        self.isSavingToPhotos = false
         self.error = nil
         self.notice = nil
         self.exportResult = nil

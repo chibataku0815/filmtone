@@ -23,7 +23,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Filmtone saves exported photo and video media to your photo library when you choose Save to Photos.</string>
+	<string>Filmtone saves exported photo and video media to your photo library when you choose Export &amp; Save or Save to Photos.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Filmtone reads the selected photo or video from your photo library so exports keep the original source resolution.</string>
 	<key>UILaunchStoryboardName</key>

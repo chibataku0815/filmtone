@@ -60,6 +60,14 @@ struct VerifyPhase0Contract {
             abs(canonical.grade.params.grainIntensity - 0.1) < 0.0001,
             "canonical grainIntensity drift"
         )
+        try expect(
+            abs(canonical.grade.params.shutterAngle) < 0.0001,
+            "canonical shutterAngle drift"
+        )
+        try expect(
+            abs(canonical.grade.params.trailIntensity) < 0.0001,
+            "canonical trailIntensity drift"
+        )
 
         let legacy = try decoder.decode(
             FilmtoneProjectState.self,
@@ -75,6 +83,14 @@ struct VerifyPhase0Contract {
         try expect(
             legacy.output == FilmtonePhase0Math.outputProfile,
             "legacy output profile drift"
+        )
+        try expect(
+            abs(legacy.params.shutterAngle) < 0.0001,
+            "legacy shutterAngle should default to zero"
+        )
+        try expect(
+            abs(legacy.params.trailIntensity) < 0.0001,
+            "legacy trailIntensity should default to zero"
         )
 
         let reencoded = try encoder.encode(legacy)
@@ -111,6 +127,21 @@ struct VerifyPhase0Contract {
             FilmtonePhase0Generated.paramsByName.count == 4,
             "preset count should be 4 (got \(FilmtonePhase0Generated.paramsByName.count))"
         )
+        let expectedHalationByPreset = [
+            "reset": 0.0,
+            "iphone": 0.018,
+            "softBlue": 0.02,
+            "amberGlow": 0.04,
+        ]
+        for (presetName, expectedHalation) in expectedHalationByPreset {
+            guard let params = FilmtonePhase0Generated.paramsByName[presetName] else {
+                throw ContractCheckError(message: "missing iOS preset \(presetName)")
+            }
+            try expect(
+                abs(params.halationIntensity - expectedHalation) < 1e-6,
+                "iOS preset \(presetName) halation drift"
+            )
+        }
 
         // --- Optional HLG fixture decode (Stream 1 produced fixture) ---
         if args.count == 3 {

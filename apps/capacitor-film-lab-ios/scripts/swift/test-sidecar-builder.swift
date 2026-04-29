@@ -239,7 +239,8 @@ struct TestSidecarBuilder {
             halationHue: 0, halationThreshold: 0, halationRadius: 0,
             bloomSoftKnee: 0, halationSoftKnee: 0, compressionAmount: 0,
             compressionRange: 0, printContrast: 0, cyan: 0, magenta: 0,
-            yellow: 0, fade: 0, vignette: 0, grainIntensity: 0
+            yellow: 0, shutterAngle: 0, trailIntensity: 0,
+            fade: 0, vignette: 0, grainIntensity: 0
         )
     }
 }

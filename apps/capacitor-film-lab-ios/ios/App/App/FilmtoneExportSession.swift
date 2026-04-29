@@ -42,6 +42,11 @@ final class FilmtoneExportSession {
     /// sidecar (`AVDepthDataTrack` is the only emitted variant; no
     /// discriminator planned). nil when no depth reader opened.
     private(set) var videoDepthSourceLabel: String?
+    private lazy var exportMotionBlurAccumulator = FilmtoneMotionBlurAccumulator(
+        ciContext: ciContext,
+        colorSpace: outputColorSpace,
+        outputFrameRate: request.output.fps
+    )
 
     /// v1.3 (D3.4): read-only accessor for the originating request. Used by
     /// FilmtoneMediaRuntime to pull `depthRenderer` for bench telemetry without
@@ -970,7 +975,13 @@ final class FilmtoneExportSession {
             outputSize: outputSize
         )
         let graded = applyGrade(to: base, timeSeconds: timeSeconds)
-        return graded.cropped(to: CGRect(origin: .zero, size: outputSize))
+            .cropped(to: CGRect(origin: .zero, size: outputSize))
+        return applyVideoMotionStage(
+            to: graded,
+            timeSeconds: timeSeconds,
+            outputSize: outputSize,
+            accumulator: exportMotionBlurAccumulator
+        )
     }
 
     private func renderableStillImage(
@@ -986,7 +997,8 @@ final class FilmtoneExportSession {
     fileprivate func renderablePreviewVideoImage(
         from image: CIImage,
         outputSize: CGSize,
-        timeSeconds: Double
+        timeSeconds: Double,
+        motionAccumulator: FilmtoneMotionBlurAccumulator? = nil
     ) throws -> CIImage {
         let base = scaledPreviewVideoSourceImage(
             sourcePreviewVideoImage(from: image),
@@ -994,8 +1006,14 @@ final class FilmtoneExportSession {
         )
         let graded = applyGrade(to: base, timeSeconds: timeSeconds)
         let cropped = graded.cropped(to: CGRect(origin: .zero, size: outputSize))
-        try validatePreviewVideoImage(cropped, outputSize: outputSize)
-        return cropped
+        let motionApplied = applyVideoMotionStage(
+            to: cropped,
+            timeSeconds: timeSeconds,
+            outputSize: outputSize,
+            accumulator: motionAccumulator
+        )
+        try validatePreviewVideoImage(motionApplied, outputSize: outputSize)
+        return motionApplied
     }
 
     private func scaledVideoFrameImage(
@@ -1131,6 +1149,31 @@ final class FilmtoneExportSession {
 
     fileprivate var outputFrameRate: Int {
         request.output.fps
+    }
+
+    fileprivate func makeMotionBlurAccumulator() -> FilmtoneMotionBlurAccumulator {
+        FilmtoneMotionBlurAccumulator(
+            ciContext: ciContext,
+            colorSpace: outputColorSpace,
+            outputFrameRate: request.output.fps
+        )
+    }
+
+    private func applyVideoMotionStage(
+        to image: CIImage,
+        timeSeconds: Double,
+        outputSize: CGSize,
+        accumulator: FilmtoneMotionBlurAccumulator?
+    ) -> CIImage {
+        guard let accumulator else {
+            return image
+        }
+        return accumulator.apply(
+            to: image,
+            params: request.grade.params,
+            timeSeconds: timeSeconds,
+            outputSize: outputSize
+        )
     }
 
     private func applyInputLutStage(to image: CIImage) -> CIImage {
@@ -2380,6 +2423,7 @@ private struct CompletedExport {
 
 final class FilmtoneSharedGradeProcessor {
     private let session: FilmtoneExportSession
+    private lazy var motionBlurAccumulator = session.makeMotionBlurAccumulator()
 
     init(session: FilmtoneExportSession) {
         self.session = session
@@ -2398,7 +2442,8 @@ final class FilmtoneSharedGradeProcessor {
                     let processed = try session.renderablePreviewVideoImage(
                         from: request.sourceImage,
                         outputSize: outputSize,
-                        timeSeconds: timeSeconds.isFinite ? timeSeconds : 0
+                        timeSeconds: timeSeconds.isFinite ? timeSeconds : 0,
+                        motionAccumulator: self.motionBlurAccumulator
                     )
                     request.finish(with: processed, context: nil)
                 } catch {
@@ -2438,6 +2483,224 @@ private struct PreparedLut {
     let size: Int
     let intensity: Double
     let cubeData: Data
+}
+
+fileprivate final class FilmtoneMotionBlurAccumulator {
+    private static let slotCount = 8
+
+    private let ciContext: CIContext
+    private let colorSpace: CGColorSpace
+    private let outputFrameRate: Int
+    private let lock = NSLock()
+    private var ringBuffers = Array<CVPixelBuffer?>(repeating: nil, count: slotCount)
+    private var ringImages = Array<CIImage?>(repeating: nil, count: slotCount)
+    private var writeIndex = 0
+    private var validSlots = 0
+    private var storageWidth = 0
+    private var storageHeight = 0
+    private var lastTimeSeconds: Double?
+
+    init(ciContext: CIContext, colorSpace: CGColorSpace, outputFrameRate: Int) {
+        self.ciContext = ciContext
+        self.colorSpace = colorSpace
+        self.outputFrameRate = max(1, outputFrameRate)
+    }
+
+    func reset() {
+        lock.lock()
+        defer { lock.unlock() }
+        resetUnlocked()
+    }
+
+    private func resetUnlocked() {
+        for index in 0..<Self.slotCount {
+            ringImages[index] = nil
+        }
+        writeIndex = 0
+        validSlots = 0
+        lastTimeSeconds = nil
+    }
+
+    func apply(
+        to image: CIImage,
+        params: Phase0ParamsDTO,
+        timeSeconds: Double,
+        outputSize: CGSize
+    ) -> CIImage {
+        lock.lock()
+        defer { lock.unlock() }
+
+        let shutterAngle = Self.clamp(params.shutterAngle, min: 0, max: 720)
+        guard shutterAngle > 0 else {
+            resetUnlocked()
+            return image
+        }
+        guard ensureStorage(for: outputSize) else {
+            resetUnlocked()
+            return image
+        }
+
+        let normalizedTime = timeSeconds.isFinite ? max(0, timeSeconds) : 0
+        if shouldResetBeforeAppending(timeSeconds: normalizedTime) {
+            resetUnlocked()
+        }
+
+        let extent = CGRect(origin: .zero, size: CGSize(width: storageWidth, height: storageHeight))
+        let current = image.cropped(to: extent)
+        let previousSlot = (writeIndex - 1 + Self.slotCount) % Self.slotCount
+        let previous = validSlots > 0 ? (ringImages[previousSlot] ?? current) : current
+        let hasPrevious = validSlots > 0 ? 1.0 : 0.0
+        let feedback = OpticalKernels.motionFeedback?.apply(extent: extent, arguments: [
+            current,
+            previous,
+            Self.clamp(params.trailIntensity, min: 0, max: 0.95),
+            hasPrevious,
+        ]) ?? current
+
+        guard let targetBuffer = ringBuffers[writeIndex] else {
+            resetUnlocked()
+            return current
+        }
+        ciContext.render(
+            feedback,
+            to: targetBuffer,
+            bounds: extent,
+            colorSpace: colorSpace
+        )
+
+        ringImages[writeIndex] = CIImage(
+            cvPixelBuffer: targetBuffer,
+            options: [.colorSpace: colorSpace]
+        ).cropped(to: extent)
+        writeIndex = (writeIndex + 1) % Self.slotCount
+        validSlots = min(validSlots + 1, Self.slotCount)
+        lastTimeSeconds = normalizedTime
+
+        let activeFrames = min(Self.activeFrameCount(shutterAngle: shutterAngle), validSlots)
+        let weights = Self.blendWeights(
+            shutterAngle: shutterAngle,
+            activeFrames: activeFrames,
+            validSlots: validSlots
+        )
+        guard activeFrames > 1, let kernel = OpticalKernels.motionBlend else {
+            return ringImages[(writeIndex - 1 + Self.slotCount) % Self.slotCount] ?? current
+        }
+
+        let black = CIImage(color: CIColor(red: 0, green: 0, blue: 0, alpha: 1)).cropped(to: extent)
+        var args: [Any] = []
+        for offset in 0..<Self.slotCount {
+            let slot = (writeIndex - 1 - offset + (Self.slotCount * 2)) % Self.slotCount
+            args.append(ringImages[slot] ?? black)
+        }
+        for weight in weights {
+            args.append(weight)
+        }
+
+        return kernel.apply(extent: extent, arguments: args)?.cropped(to: extent) ?? current
+    }
+
+    private func ensureStorage(for outputSize: CGSize) -> Bool {
+        let width = max(1, Int(outputSize.width.rounded()))
+        let height = max(1, Int(outputSize.height.rounded()))
+        if width != storageWidth || height != storageHeight {
+            storageWidth = width
+            storageHeight = height
+            ringBuffers = Array<CVPixelBuffer?>(repeating: nil, count: Self.slotCount)
+            resetUnlocked()
+        }
+
+        for index in 0..<Self.slotCount where ringBuffers[index] == nil {
+            guard let buffer = Self.makePixelBuffer(width: width, height: height) else {
+                return false
+            }
+            ringBuffers[index] = buffer
+        }
+        return true
+    }
+
+    private func shouldResetBeforeAppending(timeSeconds: Double) -> Bool {
+        guard let previous = lastTimeSeconds else {
+            return false
+        }
+        let frameInterval = 1.0 / Double(outputFrameRate)
+        let delta = timeSeconds - previous
+        if delta < frameInterval * 0.25 {
+            return true
+        }
+        if delta > max(frameInterval * 3.5, 0.16) {
+            return true
+        }
+        return false
+    }
+
+    private static func activeFrameCount(shutterAngle: Double) -> Int {
+        guard shutterAngle > 0 else {
+            return 0
+        }
+        let normalized = min(shutterAngle, 720) / 360
+        let raw = Int((normalized * (Double(slotCount) / 2.0)).rounded())
+        return max(1, min(slotCount, raw))
+    }
+
+    private static func blendWeights(
+        shutterAngle: Double,
+        activeFrames: Int,
+        validSlots: Int
+    ) -> [Double] {
+        var weights = Array(repeating: 0.0, count: slotCount)
+        let effective = min(activeFrames, validSlots)
+        guard effective > 0 else {
+            return weights
+        }
+        if effective == 1 {
+            weights[0] = 1
+            return weights
+        }
+
+        let flatness = clamp((shutterAngle - 360) / 360, min: 0, max: 1)
+        var sum = 0.0
+        for index in 0..<effective {
+            let triangle = Double(effective - index)
+            let box = 1.0
+            let weight = triangle * (1 - flatness) + box * flatness
+            weights[index] = weight
+            sum += weight
+        }
+        if sum > 0 {
+            for index in 0..<effective {
+                weights[index] /= sum
+            }
+        }
+        return weights
+    }
+
+    private static func makePixelBuffer(width: Int, height: Int) -> CVPixelBuffer? {
+        let attrs: [CFString: Any] = [
+            kCVPixelBufferPixelFormatTypeKey: Int(kCVPixelFormatType_32BGRA),
+            kCVPixelBufferWidthKey: width,
+            kCVPixelBufferHeightKey: height,
+            kCVPixelBufferCGImageCompatibilityKey: true,
+            kCVPixelBufferCGBitmapContextCompatibilityKey: true,
+            kCVPixelBufferIOSurfacePropertiesKey: [:],
+        ]
+        var buffer: CVPixelBuffer?
+        let status = CVPixelBufferCreate(
+            kCFAllocatorDefault,
+            width,
+            height,
+            kCVPixelFormatType_32BGRA,
+            attrs as CFDictionary,
+            &buffer
+        )
+        guard status == kCVReturnSuccess else {
+            return nil
+        }
+        return buffer
+    }
+
+    private static func clamp(_ value: Double, min minValue: Double, max maxValue: Double) -> Double {
+        min(max(value, minValue), maxValue)
+    }
 }
 
 private enum OpticalKernels {
@@ -2495,6 +2758,45 @@ kernel vec4 printStage(__sample image, float printContrast, float cyan, float ma
     color.b -= yellow * cmyScale;
     color.rgb = applyPrintContrast(color.rgb, printContrast);
     return vec4(clamp(color.rgb, 0.0, 1.0), image.a);
+    }
+""")
+
+    static let motionFeedback = CIColorKernel(source: """
+kernel vec4 motionFeedback(__sample currentFrame, __sample previousFrame, float trailIntensity, float hasPrevious) {
+    float trail = clamp(trailIntensity, 0.0, 0.95) * clamp(hasPrevious, 0.0, 1.0);
+    vec3 rgb = mix(currentFrame.rgb, previousFrame.rgb, trail);
+    return vec4(clamp(rgb, 0.0, 1.0), currentFrame.a);
+}
+""")
+
+    static let motionBlend = CIColorKernel(source: """
+kernel vec4 motionBlend(
+    __sample frame0,
+    __sample frame1,
+    __sample frame2,
+    __sample frame3,
+    __sample frame4,
+    __sample frame5,
+    __sample frame6,
+    __sample frame7,
+    float weight0,
+    float weight1,
+    float weight2,
+    float weight3,
+    float weight4,
+    float weight5,
+    float weight6,
+    float weight7
+) {
+    vec4 color = frame0 * weight0
+        + frame1 * weight1
+        + frame2 * weight2
+        + frame3 * weight3
+        + frame4 * weight4
+        + frame5 * weight5
+        + frame6 * weight6
+        + frame7 * weight7;
+    return vec4(clamp(color.rgb, 0.0, 1.0), clamp(color.a, 0.0, 1.0));
 }
 """)
 

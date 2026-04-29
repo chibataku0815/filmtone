@@ -95,8 +95,6 @@ export const QUICK_FULL_AXIS_WEIGHTS: Record<QuickAxisId, QuickFullPatch> = {
     fade: 0.18,
     saturation: -0.14,
     contrast: -0.08,
-    halationIntensity: 0.16,
-    halationSpread: 6,
   },
   dynamics: {
     exposure: 0.24,
@@ -119,8 +117,6 @@ export const QUICK_PHASE0_AXIS_WEIGHTS: Record<QuickAxisId, QuickPhase0Patch> = 
     fade: 0.18,
     saturation: -0.14,
     contrast: -0.08,
-    halationIntensity: 0.16,
-    halationSpread: 6,
   },
   dynamics: {
     exposure: 0.24,

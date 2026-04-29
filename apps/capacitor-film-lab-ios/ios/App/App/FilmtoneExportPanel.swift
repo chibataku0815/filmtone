@@ -26,8 +26,8 @@ struct FilmtoneExportPanel: View {
 
             Spacer(minLength: 12)
 
-            Button(store.strings.exportStart) {
-                Task { await store.export() }
+            Button(store.strings.exportAndSave) {
+                Task { await store.exportAndSave() }
             }
             .buttonStyle(FilmtonePrimaryButtonStyle())
             .disabled(!canExport)
@@ -159,6 +159,19 @@ struct FilmtoneExportPanel: View {
                     )
             }
 
+            HStack(spacing: 12) {
+                Button(store.strings.saveToPhotos) {
+                    Task { await store.saveToPhotos() }
+                }
+                .buttonStyle(FilmtonePrimaryButtonStyle())
+                .disabled(store.isSavingToPhotos || store.saveToPhotosState == .saved)
+
+                Button(store.strings.shareOutput) {
+                    Task { await store.shareOutput() }
+                }
+                .buttonStyle(FilmtoneSecondaryButtonStyle())
+            }
+
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                 MetricCard(
                     label: store.strings.metricsOutput,
@@ -177,31 +190,21 @@ struct FilmtoneExportPanel: View {
                         .accessibilityIdentifier("filmtone.metric.optics.finished")
                 }
             }
-
-            HStack(spacing: 12) {
-                Button(store.strings.saveToPhotos) {
-                    Task { await store.saveToPhotos() }
-                }
-                .buttonStyle(FilmtonePrimaryButtonStyle())
-                .disabled(store.saveToPhotosState == .saved)
-
-                Button(store.strings.shareOutput) {
-                    Task { await store.shareOutput() }
-                }
-                .buttonStyle(FilmtoneSecondaryButtonStyle())
-            }
         }
         .padding(.vertical, 16)
         .overlay(alignment: .top) { divider }
     }
 
     private var canExport: Bool {
-        store.source != nil && store.sourceViolations.isEmpty && !store.isBusy
+        store.source != nil && store.sourceViolations.isEmpty && !store.isBusy && !store.isSavingToPhotos
     }
 
     private var statusLine: String {
         if store.exportProgress != nil {
             return store.strings.exportRunning
+        }
+        if store.isSavingToPhotos {
+            return store.strings.exportSavingToPhotos
         }
         if store.exportResult != nil {
             return store.strings.resultTitle

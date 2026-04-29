@@ -91,6 +91,8 @@ struct FilmtonePhase0Params: Codable, Equatable {
     var cyan: Double
     var magenta: Double
     var yellow: Double
+    var shutterAngle: Double
+    var trailIntensity: Double
     var fade: Double
     var vignette: Double
     var grainIntensity: Double
@@ -124,6 +126,8 @@ struct FilmtonePhase0Params: Codable, Equatable {
         "cyan": \.cyan,
         "magenta": \.magenta,
         "yellow": \.yellow,
+        "shutterAngle": \.shutterAngle,
+        "trailIntensity": \.trailIntensity,
         "fade": \.fade,
         "vignette": \.vignette,
         "grainIntensity": \.grainIntensity,
@@ -182,6 +186,8 @@ struct FilmtonePhase0Params: Codable, Equatable {
             cyan: cyan,
             magenta: magenta,
             yellow: yellow,
+            shutterAngle: shutterAngle,
+            trailIntensity: trailIntensity,
             fade: fade,
             vignette: vignette,
             grainIntensity: grainIntensity
@@ -642,6 +648,11 @@ enum FilmtonePhase0Math {
             return max(0, min(40, value))
         case "halationHue":
             return max(0, min(100, value))
+        case "shutterAngle":
+            let clamped = max(0, min(720, value))
+            return clamped < 90 ? 0 : max(180, clamped)
+        case "trailIntensity":
+            return max(0, min(0.95, value))
         case "rgbShift":
             return max(0, min(rgbShiftMax, value))
         case "grainIntensity":

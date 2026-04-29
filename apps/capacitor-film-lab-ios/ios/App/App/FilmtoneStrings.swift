@@ -73,6 +73,7 @@ struct FilmtoneStrings {
     let advancedOpticsLabel: String
     let advancedGlowLabel: String
     let advancedGrainLabel: String
+    let advancedMotionLabel: String
     let advancedToneLabel: String
     let advancedPresetNoneLabel: String
     let advancedPresetDefaultLabel: String
@@ -82,6 +83,10 @@ struct FilmtoneStrings {
     let advancedPresetVividLabel: String
     let advancedPresetPunchLabel: String
     let advancedPresetCustomLabel: String
+    let advancedToneStandardLabel: String
+    let advancedToneAiryLabel: String
+    let advancedToneSunsetLabel: String
+    let advancedToneDepthLabel: String
     let paramLabels: [String: String]
     let resetLabel: String
     let exportSectionTitle: String
@@ -89,9 +94,12 @@ struct FilmtoneStrings {
     let exportRunning: String
     let exportWritingHint: String
     let exportStart: String
+    let exportAndSave: String
+    let exportSavingToPhotos: String
     let exportDisabled: String
     let saveToPhotos: String
     let saveToPhotosDone: String
+    let unsavedExportPrompt: String
     let shareOutput: String
     let resultTitle: String
     let metricsElapsed: String
@@ -108,9 +116,14 @@ struct FilmtoneStrings {
     let cameraAutoAppleLog2Detected: String
     let cameraCustom: String
     let cameraImport: String
+    let lookLabel: String
+    let lookFilmtone: String
+    let lookCustom: String
+    let lookImport: String
     let clearLut: String
     let lutImportError: String
     let lutParseError: String
+    let lookLutParseError: String
     let exportStagePreflight: String
     let exportStageReading: String
     let exportStageRendering: String
@@ -123,6 +136,7 @@ struct FilmtoneStrings {
     let presetCategoryLook: String
     let genericPickSourceError: String
     let genericImportLutError: String
+    let genericImportLookLutError: String
     let genericExportError: String
     let genericSaveToPhotosError: String
     let genericShareError: String
@@ -307,8 +321,8 @@ extension FilmtoneStrings {
         )
         advancedProcessLabel = filmtoneLocalized(
             "filmtone.advanced.group.process",
-            defaultValue: prefersJapanese ? "プロセス" : "Process",
-            comment: "Group title for process advanced params."
+            defaultValue: prefersJapanese ? "階調" : "Tone",
+            comment: "Group title for tone/process advanced params."
         )
         advancedOpticsLabel = filmtoneLocalized(
             "filmtone.advanced.group.optics",
@@ -325,6 +339,11 @@ extension FilmtoneStrings {
             defaultValue: "Grain",
             comment: "Group title for grain advanced params."
         )
+        advancedMotionLabel = filmtoneLocalized(
+            "filmtone.advanced.group.motion",
+            defaultValue: "Motion",
+            comment: "Group title for motion advanced params."
+        )
         advancedToneLabel = filmtoneLocalized(
             "filmtone.advanced.group.tone_only",
             defaultValue: prefersJapanese ? "階調" : "Tone",
@@ -332,23 +351,23 @@ extension FilmtoneStrings {
         )
         advancedPresetNoneLabel = filmtoneLocalized(
             "filmtone.advanced.preset.none",
-            defaultValue: "None",
+            defaultValue: prefersJapanese ? "なし" : "None",
             comment: "Compact preset chip that clears an advanced parameter group effect."
         )
         advancedPresetDefaultLabel = filmtoneLocalized(
             "filmtone.advanced.preset.default",
-            defaultValue: "Default",
+            defaultValue: prefersJapanese ? "標準" : "Default",
             comment: "Compact preset chip that applies the standard advanced parameter group recipe."
         )
         advancedPresetStrongLabel = filmtoneLocalized(
             "filmtone.advanced.preset.strong",
-            defaultValue: "Strong",
+            defaultValue: prefersJapanese ? "強め" : "Strong",
             comment: "Compact preset chip that applies a stronger advanced parameter group recipe."
         )
         advancedPresetPrintLabel = filmtoneLocalized(
             "filmtone.advanced.preset.print",
-            defaultValue: "Print",
-            comment: "Compact preset chip that applies the print-process advanced parameter recipe."
+            defaultValue: prefersJapanese ? "階調" : "Tone",
+            comment: "Compact preset chip that applies the tone/process advanced parameter recipe."
         )
         advancedPresetPushLabel = filmtoneLocalized(
             "filmtone.advanced.preset.push",
@@ -367,8 +386,28 @@ extension FilmtoneStrings {
         )
         advancedPresetCustomLabel = filmtoneLocalized(
             "filmtone.advanced.preset.custom",
-            defaultValue: "Custom",
+            defaultValue: prefersJapanese ? "カスタム" : "Custom",
             comment: "Compact status label shown when an advanced parameter group has manual overrides."
+        )
+        advancedToneStandardLabel = filmtoneLocalized(
+            "filmtone.advanced.tone.standard",
+            defaultValue: prefersJapanese ? "標準" : "Standard",
+            comment: "Tone recipe chip that clears tone overrides."
+        )
+        advancedToneAiryLabel = filmtoneLocalized(
+            "filmtone.advanced.tone.airy",
+            defaultValue: prefersJapanese ? "爽やか" : "Airy",
+            comment: "Tone recipe chip for a cool airy tone."
+        )
+        advancedToneSunsetLabel = filmtoneLocalized(
+            "filmtone.advanced.tone.sunset",
+            defaultValue: prefersJapanese ? "夕景" : "Sunset",
+            comment: "Tone recipe chip for a warm sunset tone."
+        )
+        advancedToneDepthLabel = filmtoneLocalized(
+            "filmtone.advanced.tone.depth",
+            defaultValue: prefersJapanese ? "深み" : "Depth",
+            comment: "Tone recipe chip for neutral density and contrast."
         )
         paramLabels = [
             "exposure": filmtoneLocalized("filmtone.param.exposure", defaultValue: "Exposure", comment: "Advanced parameter label."),
@@ -400,6 +439,8 @@ extension FilmtoneStrings {
             "cyan": filmtoneLocalized("filmtone.param.cyan", defaultValue: "Cyan", comment: "Advanced parameter label."),
             "magenta": filmtoneLocalized("filmtone.param.magenta", defaultValue: "Magenta", comment: "Advanced parameter label."),
             "yellow": filmtoneLocalized("filmtone.param.yellow", defaultValue: "Yellow", comment: "Advanced parameter label."),
+            "shutterAngle": filmtoneLocalized("filmtone.param.shutter_angle", defaultValue: prefersJapanese ? "シャッターアングル" : "Shutter Angle", comment: "Advanced parameter label."),
+            "trailIntensity": filmtoneLocalized("filmtone.param.trail_intensity", defaultValue: prefersJapanese ? "残像の長さ" : "Trail Length", comment: "Advanced parameter label."),
         ]
         resetLabel = filmtoneLocalized(
             "filmtone.action.reset",
@@ -431,6 +472,16 @@ extension FilmtoneStrings {
             defaultValue: "Export",
             comment: "Primary export action."
         )
+        exportAndSave = filmtoneLocalized(
+            "filmtone.export.export_and_save",
+            defaultValue: prefersJapanese ? "書き出して保存" : "Export & Save",
+            comment: "Primary action that exports media and saves the result to Photos."
+        )
+        exportSavingToPhotos = filmtoneLocalized(
+            "filmtone.export.saving_to_photos",
+            defaultValue: prefersJapanese ? "写真へ保存中…" : "Saving to Photos…",
+            comment: "Status shown after export finishes while the app is saving the output to Photos."
+        )
         exportDisabled = filmtoneLocalized(
             "filmtone.export.disabled",
             defaultValue: "This source can't be exported. See the source notes above.",
@@ -445,6 +496,11 @@ extension FilmtoneStrings {
             "filmtone.export.save_to_photos_done",
             defaultValue: "Saved to Photos.",
             comment: "Notice shown when saving to Photos succeeds."
+        )
+        unsavedExportPrompt = filmtoneLocalized(
+            "filmtone.export.unsaved_prompt",
+            defaultValue: prefersJapanese ? "書き出し完了。まだ写真には保存されていません。" : "Export complete. It has not been saved to Photos yet.",
+            comment: "Bottom prompt shown when an exported result exists but has not been saved to Photos."
         )
         shareOutput = filmtoneLocalized(
             "filmtone.export.share",
@@ -498,7 +554,7 @@ extension FilmtoneStrings {
         )
         cameraDescription = filmtoneLocalized(
             "filmtone.camera.description",
-            defaultValue: "Normalize log source media before the look. Phase 1 supports Auto or one imported .cube.",
+            defaultValue: "Normalize source media before the look. Creative LUTs stay separate.",
             comment: "Description shown for camera profile behavior."
         )
         cameraAuto = filmtoneLocalized(
@@ -526,6 +582,26 @@ extension FilmtoneStrings {
             defaultValue: "Import .cube",
             comment: "Action label to import a camera .cube."
         )
+        lookLabel = filmtoneLocalized(
+            "filmtone.look.title",
+            defaultValue: prefersJapanese ? "ルック" : "Look",
+            comment: "Label for the creative look LUT control."
+        )
+        lookFilmtone = filmtoneLocalized(
+            "filmtone.look.filmtone",
+            defaultValue: "Filmtone",
+            comment: "Default creative look state."
+        )
+        lookCustom = filmtoneLocalized(
+            "filmtone.look.custom",
+            defaultValue: prefersJapanese ? "カスタム" : "Custom",
+            comment: "Creative look state when a custom LUT is selected."
+        )
+        lookImport = filmtoneLocalized(
+            "filmtone.look.import",
+            defaultValue: "Import .cube",
+            comment: "Action label to import a creative look .cube."
+        )
         clearLut = filmtoneLocalized(
             "filmtone.camera.clear",
             defaultValue: "Clear",
@@ -540,6 +616,11 @@ extension FilmtoneStrings {
             "filmtone.lut.parse_error",
             defaultValue: "Camera profile .cube could not be parsed",
             comment: "Error shown when parsing a LUT file fails."
+        )
+        lookLutParseError = filmtoneLocalized(
+            "filmtone.look.parse_error",
+            defaultValue: "Look .cube could not be parsed",
+            comment: "Error shown when parsing a creative look LUT file fails."
         )
         exportStagePreflight = filmtoneLocalized(
             "filmtone.export.stage.preflight",
@@ -600,6 +681,11 @@ extension FilmtoneStrings {
             "filmtone.error.generic.import_lut",
             defaultValue: "The camera profile couldn't be imported.",
             comment: "Fallback error for LUT import."
+        )
+        genericImportLookLutError = filmtoneLocalized(
+            "filmtone.error.generic.import_look_lut",
+            defaultValue: "The look couldn't be imported.",
+            comment: "Fallback error for creative look LUT import."
         )
         genericExportError = filmtoneLocalized(
             "filmtone.error.generic.export",
@@ -835,6 +921,8 @@ extension FilmtoneStrings {
             return genericPickSourceError
         case .importLut:
             return genericImportLutError
+        case .importCreativeLut:
+            return genericImportLookLutError
         case .export:
             return genericExportError
         case .saveToPhotos:
@@ -856,6 +944,7 @@ enum FilmtoneStringsCatalog {
 enum FilmtoneUserErrorContext {
     case pickSource
     case importLut
+    case importCreativeLut
     case export
     case saveToPhotos
     case share
@@ -894,6 +983,8 @@ extension FilmtoneMediaError {
                 return strings.genericPickSourceError
             case .importLut:
                 return strings.genericImportLutError
+            case .importCreativeLut:
+                return strings.genericImportLookLutError
             case .export:
                 return strings.genericExportError
             case .saveToPhotos:

@@ -23,20 +23,13 @@ struct FilmtoneRootView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 28)
-                .padding(.bottom, 32)
+                .padding(.bottom, contentBottomPadding)
             }
             .accessibilityIdentifier("filmtone.root.scroll")
         }
-        .overlay(alignment: .bottom) {
-            if let toast = store.toast {
-                FilmtoneToastView(toast: toast)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 24)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .zIndex(1000)
-            }
-        }
+        .overlay(alignment: .bottom) { bottomOverlay }
         .animation(.spring(response: 0.34, dampingFraction: 0.86), value: store.toast?.id)
+        .animation(.spring(response: 0.34, dampingFraction: 0.86), value: shouldShowUnsavedExportPrompt)
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
                 topChrome
@@ -129,7 +122,7 @@ struct FilmtoneRootView: View {
                     sourcePickerDialogPresented = true
                 }
                 .buttonStyle(FilmtoneTopBarActionStyle())
-                .disabled(store.isBusy)
+                .disabled(store.isBusy || store.isSavingToPhotos)
             }
             .padding(.horizontal, 20)
             .padding(.top, 8)
@@ -322,21 +315,14 @@ struct FilmtoneRootView: View {
     }
 
     private var cameraProfileCard: some View {
-        HStack(alignment: .center, spacing: 16) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(store.strings.cameraLabel)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.52))
-
-                Text(store.cameraProfileLabel)
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(2)
-            }
-
-            Spacer(minLength: 12)
-
-            Menu {
+        VStack(spacing: 14) {
+            lutProfileRow(
+                title: store.strings.cameraLabel,
+                value: store.cameraProfileLabel,
+                menuTitle: store.strings.cameraImport,
+                systemImage: "camera.filters",
+                menuIdentifier: "filmtone.lut.input.menu"
+            ) {
                 Button(store.strings.cameraAuto) {
                     store.clearInputLut()
                 }
@@ -348,20 +334,29 @@ struct FilmtoneRootView: View {
                         store.clearInputLut()
                     }
                 }
-            } label: {
-                Label(store.strings.cameraImport, systemImage: "camera.filters")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.white.opacity(0.86))
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 11)
-                    .background(
-                        RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
-                            .fill(Color.white.opacity(0.05))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
-                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                    )
+            }
+
+            Divider()
+                .overlay(Color.white.opacity(0.08))
+
+            lutProfileRow(
+                title: store.strings.lookLabel,
+                value: store.lookProfileLabel,
+                menuTitle: store.strings.lookImport,
+                systemImage: "camera.aperture",
+                menuIdentifier: "filmtone.lut.creative.menu"
+            ) {
+                Button(store.strings.lookFilmtone) {
+                    store.clearCreativeLut()
+                }
+                Button(store.strings.lookImport) {
+                    Task { await store.importCreativeLut() }
+                }
+                if store.project.creativeLut != nil {
+                    Button(store.strings.clearLut, role: .destructive) {
+                        store.clearCreativeLut()
+                    }
+                }
             }
         }
         .accessibilityIdentifier("filmtone.card.cameraProfile")
@@ -376,6 +371,49 @@ struct FilmtoneRootView: View {
         )
     }
 
+    private func lutProfileRow<MenuContent: View>(
+        title: String,
+        value: String,
+        menuTitle: String,
+        systemImage: String,
+        menuIdentifier: String,
+        @ViewBuilder menuContent: () -> MenuContent
+    ) -> some View {
+        HStack(alignment: .center, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.52))
+
+                Text(value)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 12)
+
+            Menu(content: menuContent) {
+                Label(menuTitle, systemImage: systemImage)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.86))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 11)
+                    .background(
+                        RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
+                            .fill(Color.white.opacity(0.05))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
+                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                    )
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier(menuIdentifier)
+            }
+            .accessibilityIdentifier(menuIdentifier)
+        }
+    }
+
     @ViewBuilder
     private var messageStack: some View {
         if let notice = store.notice {
@@ -385,6 +423,41 @@ struct FilmtoneRootView: View {
         if let error = store.bannerError {
             messagePanel(title: store.strings.errorPrefix, message: error, tint: .red)
         }
+    }
+
+    private var contentBottomPadding: CGFloat {
+        shouldShowUnsavedExportPrompt ? 172 : 32
+    }
+
+    private var shouldShowUnsavedExportPrompt: Bool {
+        store.exportResult != nil && store.saveToPhotosState != .saved && !store.isBusy
+    }
+
+    private var bottomOverlay: some View {
+        VStack(spacing: 10) {
+            if let toast = store.toast {
+                FilmtoneToastView(toast: toast)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(1000)
+            }
+
+            if shouldShowUnsavedExportPrompt {
+                UnsavedExportPrompt(
+                    message: store.strings.unsavedExportPrompt,
+                    saveLabel: store.strings.saveToPhotos,
+                    shareLabel: store.strings.shareOutput,
+                    isSaving: store.isSavingToPhotos
+                ) {
+                    Task { await store.saveToPhotos() }
+                } onShare: {
+                    Task { await store.shareOutput() }
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .zIndex(900)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 24)
     }
 
     private var previewEmptyMessage: String {
@@ -487,6 +560,62 @@ struct FilmtoneTopBarActionStyle: ButtonStyle {
                     .stroke(Color.white.opacity(0.06), lineWidth: 1)
             )
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
+    }
+}
+
+struct UnsavedExportPrompt: View {
+    let message: String
+    let saveLabel: String
+    let shareLabel: String
+    let isSaving: Bool
+    let onSave: () -> Void
+    let onShare: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "square.and.arrow.down")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.filmtoneAmber)
+                    .frame(width: 24, height: 24)
+                    .accessibilityHidden(true)
+
+                Text(message)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.92))
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack(spacing: 10) {
+                Button(saveLabel, action: onSave)
+                    .buttonStyle(FilmtonePrimaryButtonStyle())
+                    .disabled(isSaving)
+                    .accessibilityIdentifier("filmtone.export.unsavedPrompt.save")
+
+                Button(shareLabel, action: onShare)
+                    .buttonStyle(FilmtoneSecondaryButtonStyle())
+                    .accessibilityIdentifier("filmtone.export.unsavedPrompt.share")
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(.ultraThinMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.black.opacity(0.34))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.filmtoneAmber.opacity(0.18), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: Color.black.opacity(0.34), radius: 16, x: 0, y: 8)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("filmtone.export.unsavedPrompt")
     }
 }
 

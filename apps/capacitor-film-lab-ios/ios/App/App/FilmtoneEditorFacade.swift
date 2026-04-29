@@ -67,7 +67,7 @@ final class FilmtoneEditorFacade {
         )
     }
 
-    func pickInputLut() async throws -> ParsedCubeLutDTO? {
+    func pickCubeLut() async throws -> ParsedCubeLutDTO? {
         guard let presenter else {
             throw FilmtoneMediaError.bridgeUnavailable
         }
@@ -75,6 +75,10 @@ final class FilmtoneEditorFacade {
             return nil
         }
         return try FilmtoneCubeParser.parse(text: picked.text, defaultTitle: picked.filename)
+    }
+
+    func pickInputLut() async throws -> ParsedCubeLutDTO? {
+        try await pickCubeLut()
     }
 
     func probeSource(_ source: SourceInfoDTO) throws -> SourceProbeDTO {

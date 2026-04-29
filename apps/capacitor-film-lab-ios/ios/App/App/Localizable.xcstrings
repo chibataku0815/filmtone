@@ -370,13 +370,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Normalize log source media before the look. Phase 1 supports Auto or one imported .cube."
+            "value" : "Normalize source media before the look. Creative LUTs stay separate."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ルック適用前に log 素材を補正します。Phase 1 はオートまたは 1 本の .cube 読み込みに絞ります。"
+            "value" : "ルック適用前に素材を正規化します。クリエイティブ LUT は別に保持します。"
           }
         }
       }
@@ -734,6 +734,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "カメラプロファイルを読み込めませんでした。"
+          }
+        }
+      }
+    },
+    "filmtone.error.generic.import_look_lut" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The look couldn't be imported."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ルックを読み込めませんでした。"
           }
         }
       }
@@ -1401,6 +1418,57 @@
         }
       }
     },
+    "filmtone.export.export_and_save" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export & Save"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "書き出して保存"
+          }
+        }
+      }
+    },
+    "filmtone.export.saving_to_photos" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saving to Photos…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真へ保存中…"
+          }
+        }
+      }
+    },
+    "filmtone.export.unsaved_prompt" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export complete. It has not been saved to Photos yet."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "書き出し完了。まだ写真には保存されていません。"
+          }
+        }
+      }
+    },
     "filmtone.export.title" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1536,6 +1604,91 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "カメラプロファイルの .cube を解釈できませんでした"
+          }
+        }
+      }
+    },
+    "filmtone.look.custom" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Custom"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カスタム"
+          }
+        }
+      }
+    },
+    "filmtone.look.filmtone" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filmtone"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filmtone"
+          }
+        }
+      }
+    },
+    "filmtone.look.import" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import .cube"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : ".cube を読み込む"
+          }
+        }
+      }
+    },
+    "filmtone.look.parse_error" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Look .cube could not be parsed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ルックの .cube を解釈できませんでした"
+          }
+        }
+      }
+    },
+    "filmtone.look.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Look"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ルック"
           }
         }
       }

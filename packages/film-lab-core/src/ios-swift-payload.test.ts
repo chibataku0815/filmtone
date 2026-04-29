@@ -19,31 +19,57 @@ import {
 import { CONTRACT_DEFAULTS, PRESETS } from "./presets";
 
 const EXPECTED_IPHONE_IOS_ENVELOPE = {
-  contrast: 1.08,
-  saturation: 0.94,
-  compressionAmount: 0.18,
-  bloomStrength: 0.18,
-  lensSoftness: 0.035,
+  exposure: 0.02,
+  contrast: 1.03,
+  saturation: 0.98,
+  compressionAmount: 0,
+  compressionRange: 0.5,
+  printContrast: 0,
+  rgbShift: 0.0012,
+  lensSoftness: 0.14,
+  bloomThreshold: 0.74,
+  bloomStrength: 0.16,
+  diffusion: 0.05,
+  halationIntensity: 0.018,
+  grainIntensity: 0.012,
 } as const;
 
 const EXPECTED_SOFT_BLUE_IOS_ENVELOPE = {
-  contrast: 0.94,
-  saturation: 1.08,
-  temperature: -0.18,
-  bloomStrength: 0.36,
-  diffusion: 0.24,
-  compressionAmount: 0.32,
-  cyan: 0.05,
+  exposure: 0.04,
+  contrast: 0.99,
+  saturation: 1.02,
+  temperature: -0.08,
+  rgbShift: 0.0016,
+  lensSoftness: 0.22,
+  bloomThreshold: 0.66,
+  bloomStrength: 0.18,
+  diffusion: 0.075,
+  halationIntensity: 0.02,
+  compressionAmount: 0,
+  compressionRange: 0.5,
+  printContrast: 0,
+  cyan: 0.015,
+  yellow: -0.025,
+  grainIntensity: 0.014,
 } as const;
 
 const EXPECTED_AMBER_GLOW_IOS_ENVELOPE = {
-  contrast: 1.12,
-  saturation: 1.12,
-  temperature: 0.26,
-  bloomStrength: 0.24,
-  diffusion: 0.12,
-  halationIntensity: 0.14,
-  yellow: 0.12,
+  exposure: 0.01,
+  contrast: 1.03,
+  saturation: 1.03,
+  temperature: 0.1,
+  rgbShift: 0.0015,
+  lensSoftness: 0.16,
+  bloomThreshold: 0.64,
+  bloomStrength: 0.20,
+  diffusion: 0.10,
+  halationIntensity: 0.04,
+  compressionAmount: 0,
+  compressionRange: 0.5,
+  printContrast: 0,
+  cyan: -0.025,
+  yellow: 0.045,
+  grainIntensity: 0.016,
 } as const;
 
 test("generated Swift payload stays in sync with current iOS phase0 payload truth", () => {
@@ -65,7 +91,10 @@ test("iOS preset map exposes the four mobile looks without mutating shared prese
   const pureReset = pickPhase0Params(PRESETS.reset);
 
   expect(Object.keys(presetMap)).toEqual([...FILMTONE_IOS_PRESET_NAMES]);
-  expect(presetMap.reset).toEqual(createFilmtoneDefaultPhase0Params());
+  expect(presetMap.reset).toEqual({
+    ...createFilmtoneDefaultPhase0Params(),
+    halationIntensity: 0,
+  });
   expect(presetMap.reset).not.toEqual(pureReset);
   expect((presetMap as Record<string, unknown>).cinematic).toBeUndefined();
   expect((presetMap as Record<string, unknown>).portra).toBeUndefined();
@@ -74,11 +103,16 @@ test("iOS preset map exposes the four mobile looks without mutating shared prese
   expect(PRESETS.cinematic.printContrast).toBe(0);
 
   expect(presetMap.iphone).toMatchObject(FILMTONE_IOS_PRESET_PATCHES.iphone ?? {});
+  expect(presetMap.softBlue).toMatchObject(FILMTONE_IOS_PRESET_PATCHES.softBlue ?? {});
+  expect(presetMap.amberGlow).toMatchObject(FILMTONE_IOS_PRESET_PATCHES.amberGlow ?? {});
   expect(presetMap.iphone).toMatchObject(EXPECTED_IPHONE_IOS_ENVELOPE);
   expect(presetMap.softBlue).toMatchObject(EXPECTED_SOFT_BLUE_IOS_ENVELOPE);
   expect(presetMap.amberGlow).toMatchObject(EXPECTED_AMBER_GLOW_IOS_ENVELOPE);
+  expect(presetMap.reset.halationIntensity).toBe(0);
   expect(renderFilmtoneIosSwiftPayload()).toContain('static let schemaVersion = 2');
   expect(renderFilmtoneIosSwiftPayload()).toContain('static let rgbShiftMax = 0.005');
+  expect(renderFilmtoneIosSwiftPayload()).toContain('"shutterAngle"');
+  expect(renderFilmtoneIosSwiftPayload()).toContain("trailIntensity: 0.0");
   expect(renderFilmtoneIosSwiftPayload()).toContain('"iphone": .init(');
   expect(renderFilmtoneIosSwiftPayload()).not.toContain('"cinematic": .init(');
 });
@@ -88,7 +122,11 @@ test("iOS Swift payload keeps pure reset separate from the default reset target"
 
   expect(payload.presetDefault).toBe("reset");
   expect(payload.resetParams).toEqual(pickPhase0Params(PRESETS.reset));
-  expect(payload.presets.reset).toEqual(createFilmtoneDefaultPhase0Params());
+  expect(payload.presets.reset).toEqual({
+    ...createFilmtoneDefaultPhase0Params(),
+    halationIntensity: 0,
+  });
+  expect(payload.presets.reset.halationIntensity).toBe(0);
   expect(payload.presets.reset.bloomStrength).toBeGreaterThan(payload.resetParams.bloomStrength);
   expect(renderFilmtoneIosSwiftPayload()).toContain('static let presetDefault = "reset"');
 });

@@ -36,14 +36,25 @@ enum SourceColorClassifier {
             return .wideGamutUnknown
         }
 
-        let isBt709 =
-            metadata.colorPrimaries == "bt709" &&
-            (metadata.colorSpace == "bt709" || metadata.colorSpace == nil) &&
-            (metadata.colorTransfer == "bt709" || metadata.colorTransfer == nil)
-        if isBt709 {
+        if isSdrDisplayColor(metadata) {
             return .sdrBt709
         }
 
         return .unknown
+    }
+
+    private static func isSdrDisplayColor(_ metadata: SourceColorMetadataDTO) -> Bool {
+        let hasDisplayPrimaries =
+            metadata.colorPrimaries == "bt709" ||
+            metadata.colorPrimaries == "smpte431" ||
+            metadata.colorPrimaries == "smpte432"
+        let hasSdrTransfer =
+            metadata.colorTransfer == "bt709" ||
+            metadata.colorTransfer == "iec61966-2-1" ||
+            metadata.colorTransfer == nil
+        let hasVideoMatrix =
+            metadata.colorSpace == "bt709" ||
+            metadata.colorSpace == nil
+        return hasDisplayPrimaries && hasSdrTransfer && hasVideoMatrix
     }
 }

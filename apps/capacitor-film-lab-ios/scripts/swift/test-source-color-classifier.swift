@@ -179,6 +179,19 @@ struct TestSourceColorClassifier {
             )) == .sdrBt709,
             "classifier: bt709 primaries+transfer, nil space -> sdrBt709"
         )
+        // Branch 4: iPhone SDR Display P3 / DCI P3 should stay on the SDR path.
+        try expect(
+            SourceColorClassifier.classify(metadata(
+                transfer: "bt709", primaries: "smpte432", space: "bt709"
+            )) == .sdrBt709,
+            "classifier: Display P3 SDR -> sdrBt709"
+        )
+        try expect(
+            SourceColorClassifier.classify(metadata(
+                transfer: "iec61966-2-1", primaries: "smpte431", space: nil
+            )) == .sdrBt709,
+            "classifier: DCI P3 SDR transfer -> sdrBt709"
+        )
         // Branch 5: unknown (everything nil)
         try expect(
             SourceColorClassifier.classify(metadata(transfer: nil, primaries: nil, space: nil)) == .unknown,

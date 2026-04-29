@@ -183,21 +183,13 @@ struct FilmtoneStrengthSheet: View {
 
     private func advancedGroupSection(_ group: FilmtoneAdvancedParamGroup) -> some View {
         let base = store.baseParamsForCurrentAdjustments()
-        let defaultValues = group.defaultValues(base)
-        let strongValues = group.strongValues(base)
-        let selection = store.paramPresetSelection(
-            for: group.keys,
-            defaultValues: defaultValues,
-            strongValues: strongValues
-        )
+        let selection = recipeSelection(for: group, base: base)
 
         return FilmtoneAdvancedParamGroupSection(
             id: group.id,
             title: group.title,
             selection: selection,
-            noneLabel: group.presetLabels.none,
-            defaultLabel: group.presetLabels.standard,
-            strongLabel: group.presetLabels.strong,
+            recipes: group.recipes,
             customLabel: store.strings.advancedPresetCustomLabel,
             isExpanded: Binding(
                 get: { expandedAdvancedGroupIds.contains(group.id) },
@@ -209,14 +201,8 @@ struct FilmtoneStrengthSheet: View {
                     }
                 }
             ),
-            onNone: {
-                store.clearParamOverrides(for: group.keys)
-            },
-            onDefault: {
-                store.applyParamPreset(values: defaultValues, for: group.keys)
-            },
-            onStrong: {
-                store.applyParamPreset(values: strongValues, for: group.keys)
+            onSelectRecipe: { recipe in
+                store.applyParamPreset(values: recipe.values(base), for: group.keys)
             }
         ) {
             VStack(alignment: .leading, spacing: 16) {
@@ -236,6 +222,34 @@ struct FilmtoneStrengthSheet: View {
         }
     }
 
+    private func recipeSelection(
+        for group: FilmtoneAdvancedParamGroup,
+        base: FilmtonePhase0Params
+    ) -> FilmtoneAdvancedRecipeSelection {
+        let activeCount = group.keys.filter { store.project.paramOverrides.values[$0] != nil }.count
+        if activeCount == 0, let standardRecipe = group.recipes.first(where: { $0.values(base).isEmpty }) {
+            return .recipe(standardRecipe.id)
+        }
+
+        for recipe in group.recipes {
+            let values = recipe.values(base)
+            guard !values.isEmpty else {
+                continue
+            }
+
+            let matchesRecipe = group.keys.allSatisfy { key in
+                let expected = values[key] ?? base.value(for: key)
+                let clampedExpected = FilmtonePhase0Math.clampParam(key, expected)
+                return abs(store.project.params.value(for: key) - clampedExpected) < FilmtonePhase0Math.paramEqualityTolerance
+            }
+            if matchesRecipe {
+                return .recipe(recipe.id)
+            }
+        }
+
+        return .custom(activeCount: activeCount)
+    }
+
     private var quickSummaryText: String {
         store.hasQuickAdjustments ? store.quickSummaryText : ""
     }
@@ -251,31 +265,11 @@ struct FilmtoneStrengthSheet: View {
     }
 
     private var advancedParamGroups: [FilmtoneAdvancedParamGroup] {
-        [
+        var groups: [FilmtoneAdvancedParamGroup] = [
             .init(
                 id: "process",
                 title: store.strings.advancedProcessLabel,
-                presetLabels: processAdvancedPresetLabels,
-                defaultValues: { base in
-                    [
-                        "cyan": max(base.cyan - 0.08, -1.0),
-                        "magenta": min(base.magenta + 0.06, 1.0),
-                        "yellow": min(base.yellow + 0.14, 1.0),
-                        "printContrast": max(base.printContrast, 0.38),
-                        "compressionAmount": max(base.compressionAmount, 0.42),
-                        "compressionRange": max(base.compressionRange, 0.76),
-                    ]
-                },
-                strongValues: { base in
-                    [
-                        "cyan": max(base.cyan - 0.14, -1.0),
-                        "magenta": min(base.magenta + 0.10, 1.0),
-                        "yellow": min(base.yellow + 0.22, 1.0),
-                        "printContrast": max(base.printContrast, 0.58),
-                        "compressionAmount": max(base.compressionAmount, 0.62),
-                        "compressionRange": max(base.compressionRange, 0.88),
-                    ]
-                },
+                recipes: toneAdvancedRecipes,
                 controls: [
                     control("cyan", range: -1...1),
                     control("magenta", range: -1...1),
@@ -288,21 +282,22 @@ struct FilmtoneStrengthSheet: View {
             .init(
                 id: "optics",
                 title: store.strings.advancedOpticsLabel,
-                presetLabels: defaultAdvancedPresetLabels,
-                defaultValues: { base in
-                    [
-                        "rgbShift": max(base.rgbShift, 0.0035),
-                        "lensSoftness": max(base.lensSoftness, 0.24),
-                        "vignette": max(base.vignette, 0.64),
-                    ]
-                },
-                strongValues: { base in
-                    [
-                        "rgbShift": max(base.rgbShift, 0.0048),
-                        "lensSoftness": max(base.lensSoftness, 0.38),
-                        "vignette": max(base.vignette, 0.82),
-                    ]
-                },
+                recipes: standardAdvancedRecipes(
+                    defaultValues: { base in
+                        [
+                            "rgbShift": max(base.rgbShift, 0.0038),
+                            "lensSoftness": max(base.lensSoftness, 0.30),
+                            "vignette": max(base.vignette, 0.46),
+                        ]
+                    },
+                    strongValues: { base in
+                        [
+                            "rgbShift": max(base.rgbShift, FilmtonePhase0Math.rgbShiftMax),
+                            "lensSoftness": max(base.lensSoftness, 0.44),
+                            "vignette": max(base.vignette, 0.62),
+                        ]
+                    }
+                ),
                 controls: [
                     control("rgbShift", range: 0...FilmtonePhase0Math.rgbShiftMax, digits: 3),
                     control("lensSoftness", range: 0...1),
@@ -312,37 +307,38 @@ struct FilmtoneStrengthSheet: View {
             .init(
                 id: "glow",
                 title: store.strings.advancedGlowLabel,
-                presetLabels: defaultAdvancedPresetLabels,
-                defaultValues: { base in
-                    [
-                        "bloomThreshold": min(base.bloomThreshold, 0.56),
-                        "bloomStrength": max(base.bloomStrength, 0.52),
-                        "bloomRadius": max(base.bloomRadius, 0.76),
-                        "bloomSoftKnee": max(base.bloomSoftKnee, 0.76),
-                        "halationIntensity": max(base.halationIntensity, 0.28),
-                        "halationSpread": max(base.halationSpread, 34),
-                        "halationHue": abs(base.halationHue) < FilmtonePhase0Math.paramEqualityTolerance ? 22 : base.halationHue,
-                        "halationThreshold": min(base.halationThreshold, 0.46),
-                        "halationRadius": max(base.halationRadius, 0.66),
-                        "halationSoftKnee": max(base.halationSoftKnee, 0.58),
-                        "diffusion": max(base.diffusion, 0.26),
-                    ]
-                },
-                strongValues: { base in
-                    [
-                        "bloomThreshold": min(base.bloomThreshold, 0.48),
-                        "bloomStrength": max(base.bloomStrength, 0.72),
-                        "bloomRadius": max(base.bloomRadius, 0.90),
-                        "bloomSoftKnee": max(base.bloomSoftKnee, 0.86),
-                        "halationIntensity": max(base.halationIntensity, 0.42),
-                        "halationSpread": max(base.halationSpread, 38),
-                        "halationHue": abs(base.halationHue) < FilmtonePhase0Math.paramEqualityTolerance ? 22 : base.halationHue,
-                        "halationThreshold": min(base.halationThreshold, 0.38),
-                        "halationRadius": max(base.halationRadius, 0.80),
-                        "halationSoftKnee": max(base.halationSoftKnee, 0.70),
-                        "diffusion": max(base.diffusion, 0.38),
-                    ]
-                },
+                recipes: standardAdvancedRecipes(
+                    defaultValues: { base in
+                        [
+                            "bloomThreshold": min(base.bloomThreshold, 0.64),
+                            "bloomStrength": max(base.bloomStrength, 0.24),
+                            "bloomRadius": max(base.bloomRadius, 0.68),
+                            "bloomSoftKnee": max(base.bloomSoftKnee, 0.76),
+                            "halationIntensity": max(base.halationIntensity, 0.06),
+                            "halationSpread": max(base.halationSpread, 34),
+                            "halationHue": abs(base.halationHue) < FilmtonePhase0Math.paramEqualityTolerance ? 22 : base.halationHue,
+                            "halationThreshold": min(base.halationThreshold, 0.56),
+                            "halationRadius": max(base.halationRadius, 0.66),
+                            "halationSoftKnee": max(base.halationSoftKnee, 0.58),
+                            "diffusion": max(base.diffusion, 0.09),
+                        ]
+                    },
+                    strongValues: { base in
+                        [
+                            "bloomThreshold": min(base.bloomThreshold, 0.58),
+                            "bloomStrength": max(base.bloomStrength, 0.34),
+                            "bloomRadius": max(base.bloomRadius, 0.78),
+                            "bloomSoftKnee": max(base.bloomSoftKnee, 0.86),
+                            "halationIntensity": max(base.halationIntensity, 0.10),
+                            "halationSpread": max(base.halationSpread, 38),
+                            "halationHue": abs(base.halationHue) < FilmtonePhase0Math.paramEqualityTolerance ? 22 : base.halationHue,
+                            "halationThreshold": min(base.halationThreshold, 0.50),
+                            "halationRadius": max(base.halationRadius, 0.80),
+                            "halationSoftKnee": max(base.halationSoftKnee, 0.70),
+                            "diffusion": max(base.diffusion, 0.14),
+                        ]
+                    }
+                ),
                 controls: [
                     control("bloomThreshold", range: 0...1),
                     control("bloomStrength", range: 0...1),
@@ -360,77 +356,117 @@ struct FilmtoneStrengthSheet: View {
             .init(
                 id: "grain",
                 title: store.strings.advancedGrainLabel,
-                presetLabels: defaultAdvancedPresetLabels,
-                defaultValues: { base in
-                    [
-                        "grainIntensity": max(base.grainIntensity, 0.025),
-                        "grainSize": max(base.grainSize, 0.30),
-                        "grainRadialMix": 1.0,
-                    ]
-                },
-                strongValues: { base in
-                    [
-                        "grainIntensity": max(base.grainIntensity, 0.045),
-                        "grainSize": max(base.grainSize, 0.38),
-                        "grainRadialMix": 1.0,
-                    ]
-                },
+                recipes: standardAdvancedRecipes(
+                    defaultValues: { base in
+                        [
+                            "grainIntensity": max(base.grainIntensity, 0.025),
+                            "grainSize": max(base.grainSize, 0.30),
+                            "grainRadialMix": 1.0,
+                        ]
+                    },
+                    strongValues: { base in
+                        [
+                            "grainIntensity": max(base.grainIntensity, 0.045),
+                            "grainSize": max(base.grainSize, 0.38),
+                            "grainRadialMix": 1.0,
+                        ]
+                    }
+                ),
                 controls: [
                     control("grainIntensity", range: 0...FilmtonePhase0Generated.grainIntensityMax),
                     control("grainSize", range: 0...1),
                     control("grainRadialMix", range: 0...1),
                 ]
             ),
-            .init(
-                id: "tone",
-                title: store.strings.advancedToneLabel,
-                presetLabels: toneAdvancedPresetLabels,
-                defaultValues: { base in
-                    [
-                        "contrast": min(base.contrast + 0.30, 2.0),
-                        "saturation": base.saturation <= 0.05 ? base.saturation : min(base.saturation + 0.24, 2.0),
+        ]
+
+        if store.source?.kind == .video {
+            groups.append(
+                .init(
+                    id: "motion",
+                    title: store.strings.advancedMotionLabel,
+                    recipes: standardAdvancedRecipes(
+                        defaultValues: { base in
+                            [
+                                "shutterAngle": max(base.shutterAngle, 180),
+                                "trailIntensity": base.trailIntensity,
+                            ]
+                        },
+                        strongValues: { base in
+                            [
+                                "shutterAngle": max(base.shutterAngle, 360),
+                                "trailIntensity": max(base.trailIntensity, 0.35),
+                            ]
+                        }
+                    ),
+                    controls: [
+                        control("shutterAngle", range: 0...720, digits: 0),
+                        control("trailIntensity", range: 0...0.95),
                     ]
-                },
-                strongValues: { base in
-                    [
-                        "contrast": min(base.contrast + 0.46, 2.0),
-                        "saturation": base.saturation <= 0.05 ? base.saturation : min(base.saturation + 0.36, 2.0),
-                    ]
-                },
-                controls: [
-                    control("exposure", range: -2...2),
-                    control("contrast", range: 0...2),
-                    control("saturation", range: 0...2),
-                    control("temperature", range: -1...1),
-                    control("tint", range: -1...1),
-                    control("fade", range: 0...1),
+                )
+            )
+        }
+
+        return groups
+    }
+
+    private var toneAdvancedRecipes: [FilmtoneAdvancedParamRecipe] {
+        [
+            recipe("standard", store.strings.advancedToneStandardLabel) { _ in
+                [:]
+            },
+            recipe("airy", store.strings.advancedToneAiryLabel) { _ in
+                [
+                    "cyan": 0.018,
+                    "magenta": -0.025,
+                    "yellow": -0.030,
+                    "printContrast": 0.04,
+                    "compressionAmount": 0.04,
+                    "compressionRange": 0.54,
                 ]
-            ),
+            },
+            recipe("sunset", store.strings.advancedToneSunsetLabel) { _ in
+                [
+                    "cyan": -0.026,
+                    "magenta": 0.028,
+                    "yellow": 0.045,
+                    "printContrast": 0.04,
+                    "compressionAmount": 0.05,
+                    "compressionRange": 0.56,
+                ]
+            },
+            recipe("depth", store.strings.advancedToneDepthLabel) { _ in
+                [
+                    "cyan": 0,
+                    "magenta": 0,
+                    "yellow": 0.010,
+                    "printContrast": 0.09,
+                    "compressionAmount": 0.08,
+                    "compressionRange": 0.58,
+                ]
+            },
         ]
     }
 
-    private var defaultAdvancedPresetLabels: FilmtoneAdvancedPresetLabels {
-        .init(
-            none: store.strings.advancedPresetNoneLabel,
-            standard: store.strings.advancedPresetDefaultLabel,
-            strong: store.strings.advancedPresetStrongLabel
-        )
+    private func standardAdvancedRecipes(
+        defaultValues: @escaping (FilmtonePhase0Params) -> [String: Double],
+        strongValues: @escaping (FilmtonePhase0Params) -> [String: Double]
+    ) -> [FilmtoneAdvancedParamRecipe] {
+        [
+            recipe("none", store.strings.advancedPresetNoneLabel) { _ in
+                [:]
+            },
+            recipe("default", store.strings.advancedPresetDefaultLabel, values: defaultValues),
+            recipe("strong", store.strings.advancedPresetStrongLabel, values: strongValues),
+        ]
     }
 
-    private var processAdvancedPresetLabels: FilmtoneAdvancedPresetLabels {
-        .init(
-            none: store.strings.advancedPresetNoneLabel,
-            standard: store.strings.advancedPresetPrintLabel,
-            strong: store.strings.advancedPresetPushLabel
-        )
-    }
-
-    private var toneAdvancedPresetLabels: FilmtoneAdvancedPresetLabels {
-        .init(
-            none: store.strings.advancedPresetNoneLabel,
-            standard: store.strings.advancedPresetVividLabel,
-            strong: store.strings.advancedPresetPunchLabel
-        )
+    private func recipe(
+        _ id: String,
+        _ label: String,
+        values: @escaping (FilmtonePhase0Params) -> [String: Double]
+    ) -> FilmtoneAdvancedParamRecipe {
+        .init(id: id, label: label, values: values)
     }
 
     private func control(
@@ -724,9 +760,7 @@ private struct FilmtoneCompareRevealPreview: View {
 private struct FilmtoneAdvancedParamGroup: Identifiable {
     let id: String
     let title: String
-    let presetLabels: FilmtoneAdvancedPresetLabels
-    let defaultValues: (FilmtonePhase0Params) -> [String: Double]
-    let strongValues: (FilmtonePhase0Params) -> [String: Double]
+    let recipes: [FilmtoneAdvancedParamRecipe]
     let controls: [FilmtoneAdvancedParamControl]
 
     var keys: [String] {
@@ -734,10 +768,15 @@ private struct FilmtoneAdvancedParamGroup: Identifiable {
     }
 }
 
-private struct FilmtoneAdvancedPresetLabels {
-    let none: String
-    let standard: String
-    let strong: String
+private struct FilmtoneAdvancedParamRecipe: Identifiable {
+    let id: String
+    let label: String
+    let values: (FilmtonePhase0Params) -> [String: Double]
+}
+
+private enum FilmtoneAdvancedRecipeSelection: Equatable {
+    case recipe(String)
+    case custom(activeCount: Int)
 }
 
 private struct FilmtoneAdvancedParamControl: Identifiable {
@@ -752,15 +791,11 @@ private struct FilmtoneAdvancedParamControl: Identifiable {
 private struct FilmtoneAdvancedParamGroupSection<Content: View>: View {
     let id: String
     let title: String
-    let selection: FilmtoneParamGroupPresetSelection
-    let noneLabel: String
-    let defaultLabel: String
-    let strongLabel: String
+    let selection: FilmtoneAdvancedRecipeSelection
+    let recipes: [FilmtoneAdvancedParamRecipe]
     let customLabel: String
     @Binding var isExpanded: Bool
-    let onNone: () -> Void
-    let onDefault: () -> Void
-    let onStrong: () -> Void
+    let onSelectRecipe: (FilmtoneAdvancedParamRecipe) -> Void
     let content: Content
 
     private var disclosureAnimation: Animation {
@@ -770,28 +805,20 @@ private struct FilmtoneAdvancedParamGroupSection<Content: View>: View {
     init(
         id: String,
         title: String,
-        selection: FilmtoneParamGroupPresetSelection,
-        noneLabel: String,
-        defaultLabel: String,
-        strongLabel: String,
+        selection: FilmtoneAdvancedRecipeSelection,
+        recipes: [FilmtoneAdvancedParamRecipe],
         customLabel: String,
         isExpanded: Binding<Bool>,
-        onNone: @escaping () -> Void,
-        onDefault: @escaping () -> Void,
-        onStrong: @escaping () -> Void,
+        onSelectRecipe: @escaping (FilmtoneAdvancedParamRecipe) -> Void,
         @ViewBuilder content: () -> Content
     ) {
         self.id = id
         self.title = title
         self.selection = selection
-        self.noneLabel = noneLabel
-        self.defaultLabel = defaultLabel
-        self.strongLabel = strongLabel
+        self.recipes = recipes
         self.customLabel = customLabel
         self._isExpanded = isExpanded
-        self.onNone = onNone
-        self.onDefault = onDefault
-        self.onStrong = onStrong
+        self.onSelectRecipe = onSelectRecipe
         self.content = content()
     }
 
@@ -840,26 +867,16 @@ private struct FilmtoneAdvancedParamGroupSection<Content: View>: View {
                 .accessibilityIdentifier("filmtone.sheet.advanced.group.\(id)")
 
                 HStack(spacing: 8) {
-                    FilmtoneParamPresetChip(
-                        label: noneLabel,
-                        isSelected: selection == .nonePreset,
-                        accessibilityIdentifier: "filmtone.sheet.advanced.group.\(id).none",
-                        action: onNone
-                    )
-
-                    FilmtoneParamPresetChip(
-                        label: defaultLabel,
-                        isSelected: selection == .defaultPreset,
-                        accessibilityIdentifier: "filmtone.sheet.advanced.group.\(id).default",
-                        action: onDefault
-                    )
-
-                    FilmtoneParamPresetChip(
-                        label: strongLabel,
-                        isSelected: selection == .strongPreset,
-                        accessibilityIdentifier: "filmtone.sheet.advanced.group.\(id).strong",
-                        action: onStrong
-                    )
+                    ForEach(recipes) { recipe in
+                        FilmtoneParamPresetChip(
+                            label: recipe.label,
+                            isSelected: selection == .recipe(recipe.id),
+                            accessibilityIdentifier: "filmtone.sheet.advanced.group.\(id).\(recipe.id)",
+                            action: {
+                                onSelectRecipe(recipe)
+                            }
+                        )
+                    }
 
                     Spacer(minLength: 0)
                 }
@@ -895,22 +912,18 @@ private struct FilmtoneAdvancedParamGroupSection<Content: View>: View {
 
     private var statusText: String {
         switch selection {
-        case .nonePreset:
-            return noneLabel
-        case .defaultPreset:
-            return defaultLabel
-        case .strongPreset:
-            return strongLabel
-        case .custom(let activeCount):
-            return "\(customLabel) · \(activeCount) active"
+        case .recipe(let id):
+            return recipes.first(where: { $0.id == id })?.label ?? customLabel
+        case .custom:
+            return customLabel
         }
     }
 
     private var statusColor: Color {
         switch selection {
-        case .nonePreset:
+        case .recipe(let id) where recipes.first?.id == id:
             return .white.opacity(0.74)
-        case .defaultPreset, .strongPreset, .custom(_):
+        case .recipe, .custom(_):
             return Color.filmtoneAmber.opacity(0.88)
         }
     }

@@ -298,6 +298,8 @@ struct Phase0ParamsDTO: Codable {
     let cyan: Double
     let magenta: Double
     let yellow: Double
+    let shutterAngle: Double
+    let trailIntensity: Double
     let fade: Double
     let vignette: Double
     let grainIntensity: Double

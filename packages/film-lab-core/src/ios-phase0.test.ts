@@ -74,6 +74,8 @@ test("iosPhase0ExportPayloadSchema accepts widened optical params and export def
       cyan: -0.2,
       magenta: 0.1,
       yellow: -0.05,
+      shutterAngle: 360,
+      trailIntensity: 0.4,
       fade: 0.02,
       vignette: 0.2,
       grainIntensity: 0.1,
@@ -88,6 +90,8 @@ test("iosPhase0ExportPayloadSchema accepts widened optical params and export def
   expect(payload.params.cyan).toBe(-0.2);
   expect(payload.params.magenta).toBe(0.1);
   expect(payload.params.yellow).toBe(-0.05);
+  expect(payload.params.shutterAngle).toBe(360);
+  expect(payload.params.trailIntensity).toBe(0.4);
 });
 
 test("iosPhase0ExportPayloadSchema rejects rgbShift above the shared phase0 max", () => {

@@ -6,9 +6,9 @@ import Foundation
 /// extensions for color primaries and transfer function.
 ///
 /// Decision rule (plan §6.2):
-/// - BT.2020 / Rec.2020 primaries → `.hdr` (covers HLG, PQ, Apple Log, wide-gamut SDR)
-/// - P3 D65 primaries → `.hdr` (Display P3 wide gamut)
-/// - HLG or PQ transfer (with any primaries) → `.hdr`
+/// - BT.2020 / Rec.2020 primaries → `.hdr` (covers HLG, PQ, Apple Log)
+/// - HLG, PQ, or Apple Log transfer (with any primaries) → `.hdr`
+/// - P3 D65 primaries alone stay `.sdr`; common iPhone Display P3 SDR is not HDR.
 /// - Anything else, or missing metadata → `.sdr` (conservative)
 ///
 /// Conservative default keeps Quality-mode color science intact when metadata is unknown:
@@ -50,11 +50,15 @@ enum MezzanineColorProbe {
     private static func isWideGamutPrimaries(_ primaries: String) -> Bool {
         // CFString constants compare by value when bridged to Swift String.
         primaries == (kCMFormatDescriptionColorPrimaries_ITU_R_2020 as String)
-            || primaries == (kCMFormatDescriptionColorPrimaries_P3_D65 as String)
     }
 
     private static func isHdrTransfer(_ transfer: String) -> Bool {
-        transfer == (kCMFormatDescriptionTransferFunction_ITU_R_2100_HLG as String)
-            || transfer == (kCMFormatDescriptionTransferFunction_SMPTE_ST_2084_PQ as String)
+        if transfer == (kCMFormatDescriptionTransferFunction_ITU_R_2100_HLG as String) ||
+            transfer == (kCMFormatDescriptionTransferFunction_SMPTE_ST_2084_PQ as String) {
+            return true
+        }
+
+        let token = transfer.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return token.contains("apple") && token.contains("log")
     }
 }

@@ -1062,9 +1062,7 @@ var QUICK_FULL_AXIS_WEIGHTS = {
   era: {
     fade: 0.18,
     saturation: -0.14,
-    contrast: -0.08,
-    halationIntensity: 0.16,
-    halationSpread: 6
+    contrast: -0.08
   },
   dynamics: {
     exposure: 0.24,
@@ -1085,9 +1083,7 @@ var QUICK_PHASE0_AXIS_WEIGHTS = {
   era: {
     fade: 0.18,
     saturation: -0.14,
-    contrast: -0.08,
-    halationIntensity: 0.16,
-    halationSpread: 6
+    contrast: -0.08
   },
   dynamics: {
     exposure: 0.24,
@@ -1207,6 +1203,8 @@ var PHASE0_PARAM_KEYS = [
   "cyan",
   "magenta",
   "yellow",
+  "shutterAngle",
+  "trailIntensity",
   "fade",
   "vignette",
   "grainIntensity"
@@ -1255,6 +1253,8 @@ var phase0ParamsSchema = z3.object({
   cyan: z3.number().min(-1).max(1).default(PRESETS.reset.cyan),
   magenta: z3.number().min(-1).max(1).default(PRESETS.reset.magenta),
   yellow: z3.number().min(-1).max(1).default(PRESETS.reset.yellow),
+  shutterAngle: z3.number().min(0).max(720).default(PRESETS.reset.shutterAngle),
+  trailIntensity: z3.number().min(0).max(0.95).default(PRESETS.reset.trailIntensity),
   fade: z3.number().min(0).max(1).default(PRESETS.reset.fade),
   vignette: z3.number().min(0).max(1).default(PRESETS.reset.vignette),
   grainIntensity: z3.number().min(0).transform(clampGrainIntensity).default(PRESETS.reset.grainIntensity)
@@ -1286,6 +1286,8 @@ var phase0ParamsPatchSchema = z3.object({
   cyan: z3.number().min(-1).max(1).optional(),
   magenta: z3.number().min(-1).max(1).optional(),
   yellow: z3.number().min(-1).max(1).optional(),
+  shutterAngle: z3.number().min(0).max(720).optional(),
+  trailIntensity: z3.number().min(0).max(0.95).optional(),
   fade: z3.number().min(0).max(1).optional(),
   vignette: z3.number().min(0).max(1).optional(),
   grainIntensity: z3.number().min(0).transform(clampGrainIntensity).optional()

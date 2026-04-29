@@ -48,6 +48,26 @@ final class FilmtoneSnapshotsUITests: XCTestCase {
         app.terminate()
     }
 
+    func testCameraProfileShowsInputAndCreativeLutControls() throws {
+        let app = launch(scene: .camera)
+        waitForAppToSettle(app)
+        app.swipeUp()
+        pauseForLayout()
+        assertDualLutMenus(in: app)
+        app.terminate()
+    }
+
+    func testExportSaveCtaVisibleWithoutScrolling() throws {
+        let app = launch(scene: .export)
+        waitForAppToSettle(app)
+
+        let prompt = app.descendants(matching: .any)["filmtone.export.unsavedPrompt"]
+        XCTAssertTrue(prompt.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["filmtone.export.unsavedPrompt.save"].exists)
+
+        app.terminate()
+    }
+
     func testCaptureProcessVideoRefreshRegression() throws {
         let app = launch(scene: .processVideo)
         waitForAppToSettle(app)
@@ -66,10 +86,19 @@ final class FilmtoneSnapshotsUITests: XCTestCase {
         advancedButton.tap()
         pauseForLayout()
 
-        let processStrongButton = app.buttons["filmtone.sheet.advanced.group.process.strong"]
-        reveal(processStrongButton, in: app, maxSwipes: 2)
-        XCTAssertTrue(processStrongButton.waitForExistence(timeout: 5))
-        processStrongButton.tap()
+        let toneStandardButton = app.buttons["filmtone.sheet.advanced.group.process.standard"]
+        let toneAiryButton = app.buttons["filmtone.sheet.advanced.group.process.airy"]
+        let toneSunsetButton = app.buttons["filmtone.sheet.advanced.group.process.sunset"]
+        let toneDepthButton = app.buttons["filmtone.sheet.advanced.group.process.depth"]
+        reveal(toneSunsetButton, in: app, maxSwipes: 2)
+        XCTAssertTrue(toneStandardButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(toneAiryButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(toneSunsetButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(toneDepthButton.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["filmtone.sheet.advanced.group.process.none"].exists)
+        XCTAssertFalse(app.buttons["filmtone.sheet.advanced.group.process.default"].exists)
+        XCTAssertFalse(app.buttons["filmtone.sheet.advanced.group.process.strong"].exists)
+        toneSunsetButton.tap()
         let compareSlider = waitForSheetCompareReady(in: app)
         dragCompareSlider(compareSlider, to: 0.74)
         let retainedCompareValue = compareSliderValue(compareSlider)
@@ -102,20 +131,18 @@ final class FilmtoneSnapshotsUITests: XCTestCase {
         waitForSheetCompareReady(in: app)
         assertSheetPreviewRetained(in: app, expectedCompareValue: retainedCompareValue)
 
-        let processDefaultButton = app.buttons["filmtone.sheet.advanced.group.process.default"]
-        reveal(processDefaultButton, in: app, maxSwipes: 3)
-        XCTAssertTrue(processDefaultButton.waitForExistence(timeout: 5))
-        processDefaultButton.tap()
+        reveal(toneAiryButton, in: app, maxSwipes: 3)
+        XCTAssertTrue(toneAiryButton.waitForExistence(timeout: 5))
+        toneAiryButton.tap()
         assertSheetPreviewRetained(in: app, expectedCompareValue: retainedCompareValue)
         pauseForLayout(0.25)
         assertSheetPreviewRetained(in: app, expectedCompareValue: retainedCompareValue)
         waitForSheetCompareReady(in: app)
         assertSheetPreviewRetained(in: app, expectedCompareValue: retainedCompareValue)
 
-        let processNoneButton = app.buttons["filmtone.sheet.advanced.group.process.none"]
-        reveal(processNoneButton, in: app, maxSwipes: 3)
-        XCTAssertTrue(processNoneButton.waitForExistence(timeout: 5))
-        processNoneButton.tap()
+        reveal(toneStandardButton, in: app, maxSwipes: 3)
+        XCTAssertTrue(toneStandardButton.waitForExistence(timeout: 5))
+        toneStandardButton.tap()
         assertSheetPreviewRetained(in: app, expectedCompareValue: retainedCompareValue)
         pauseForLayout(0.25)
         assertSheetPreviewRetained(in: app, expectedCompareValue: retainedCompareValue)
@@ -154,8 +181,17 @@ final class FilmtoneSnapshotsUITests: XCTestCase {
         waitForAppToSettle(app)
         app.swipeUp()
         pauseForLayout()
+        assertDualLutMenus(in: app)
         snapshot("04_camera_profile_route", timeWaitingForIdle: 0)
         app.terminate()
+    }
+
+    private func assertDualLutMenus(in app: XCUIApplication) {
+        let inputLutMenu = app.descendants(matching: .any)["filmtone.lut.input.menu"]
+        let creativeLutMenu = app.descendants(matching: .any)["filmtone.lut.creative.menu"]
+        reveal(inputLutMenu, in: app, maxSwipes: 2)
+        XCTAssertTrue(inputLutMenu.waitForExistence(timeout: 5))
+        XCTAssertTrue(creativeLutMenu.waitForExistence(timeout: 5))
     }
 
     private func captureExportFlow() {
