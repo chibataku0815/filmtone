@@ -9,7 +9,7 @@
  *
  * @limitations
  * - 実 DOM／クラス名のすべてを列挙しません。変更時は `FilmLabControlPanelCore.tsx` と併読してください。
- * - `next-intl` のキー全文は `apps/web/messages/{en,ja}.json` の `film-lab` ツリーを正とします（Desktop も同 JSON を読み込みます）。
+ * - `next-intl` のキー全文は repo root `messages/{en,ja}.json` の `film-lab` ツリーを正とします。
  */
 
 /**
@@ -74,4 +74,4 @@ export type FilmLabWrapperSlotId = (typeof FILM_LAB_WRAPPER_SLOT_IDS)[number];
  * メッセージ JSON のパス（モノレポからの参照用）。実ファイルはビルド対象アプリ側にあります。
  */
 export const FILM_LAB_MESSAGES_MANIFEST_PATH =
-  "apps/web/messages/{en,ja}.json#film-lab" as const;
+  "messages/{en,ja}.json#film-lab" as const;

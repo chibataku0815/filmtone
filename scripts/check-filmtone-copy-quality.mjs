@@ -5,8 +5,8 @@ import path from "node:path";
 const repoRoot = process.cwd();
 
 const webMessagePaths = [
-  "apps/web/messages/ja.json",
-  "apps/web/messages/en.json",
+  "messages/ja.json",
+  "messages/en.json",
 ];
 
 const metadataFields = [

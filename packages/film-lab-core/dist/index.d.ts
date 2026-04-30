@@ -218,7 +218,7 @@ declare const PHASE0_RGB_SHIFT_MAX = 0.005;
 declare const PHASE0_SCHEMA_VERSION: 2;
 declare const PHASE0_PRESET_DEFAULT = "reset";
 declare const PHASE0_PRESET_STRENGTH_DEFAULT = 1;
-declare const PHASE0_PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "grainRadialMix", "grainSize", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "shutterAngle", "trailIntensity", "fade", "vignette", "grainIntensity"];
+declare const PHASE0_PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "grainRadialMix", "grainSize", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "shutterAngle", "trailIntensity", "fade", "shadowTone", "highlightTone", "shadowHue", "highlightHue", "vignette", "grainIntensity"];
 type Phase0ParamKey = (typeof PHASE0_PARAM_KEYS)[number];
 type Phase0Params = Pick<Params, Phase0ParamKey>;
 declare const PHASE0_MAX_SOURCE_DURATION_SEC: number;
@@ -267,6 +267,10 @@ declare const phase0ParamsSchema: z.ZodObject<{
     shutterAngle: z.ZodDefault<z.ZodNumber>;
     trailIntensity: z.ZodDefault<z.ZodNumber>;
     fade: z.ZodDefault<z.ZodNumber>;
+    shadowTone: z.ZodDefault<z.ZodNumber>;
+    highlightTone: z.ZodDefault<z.ZodNumber>;
+    shadowHue: z.ZodDefault<z.ZodNumber>;
+    highlightHue: z.ZodDefault<z.ZodNumber>;
     vignette: z.ZodDefault<z.ZodNumber>;
     grainIntensity: z.ZodDefault<z.ZodPipe<z.ZodNumber, z.ZodTransform<number, number>>>;
 }, z.core.$strip>;
@@ -323,6 +327,10 @@ declare const phase0ProjectSchema: z.ZodPipe<z.ZodObject<{
         shutterAngle: z.ZodOptional<z.ZodNumber>;
         trailIntensity: z.ZodOptional<z.ZodNumber>;
         fade: z.ZodOptional<z.ZodNumber>;
+        shadowTone: z.ZodOptional<z.ZodNumber>;
+        highlightTone: z.ZodOptional<z.ZodNumber>;
+        shadowHue: z.ZodOptional<z.ZodNumber>;
+        highlightHue: z.ZodOptional<z.ZodNumber>;
         vignette: z.ZodOptional<z.ZodNumber>;
         grainIntensity: z.ZodOptional<z.ZodPipe<z.ZodNumber, z.ZodTransform<number, number>>>;
     }, z.core.$strip>;
@@ -425,6 +433,10 @@ declare const phase0ProjectSchema: z.ZodPipe<z.ZodObject<{
         shutterAngle?: number | undefined;
         trailIntensity?: number | undefined;
         fade?: number | undefined;
+        shadowTone?: number | undefined;
+        highlightTone?: number | undefined;
+        shadowHue?: number | undefined;
+        highlightHue?: number | undefined;
         vignette?: number | undefined;
         grainIntensity?: number | undefined;
     };
@@ -1140,12 +1152,22 @@ declare function buildOpticalParamPatch(recommendation: OpticalRecommendationV1)
  * Shared PRESETS remain the canonical Desktop/Web defaults. iOS uses these
  * mobile-specific patches over Filmtone's soft default base so the phone app
  * has fewer, clearer choices without changing other product surfaces.
+ *
+ * v1.4 Look V2 — values re-derived against CD reference frames:
+ *   - Filmtone Signature ↔ warmglow-4s/6.5s (warm cozy candle, portra-like)
+ *   - Soft Blue        ↔ guasha-1s/3s/5s (cool window highlight + warm
+ *                         interior shadow — split-tone via new shadowHue/
+ *                         highlightHue/shadowTone/highlightTone fields)
+ *   - Amber Glow       ↔ warmglow-1.5s (dramatic warm flame, gold200-like)
+ *
+ * Each value carries a reason (which reference / which desktop stock pulled
+ * it). handoff §3.7 — no arbitrary bumps.
  */
 declare const FILMTONE_IOS_PRESET_NAMES: readonly ["reset", "iphone", "softBlue", "amberGlow"];
 type FilmtoneIosPresetName = (typeof FILMTONE_IOS_PRESET_NAMES)[number];
 
 declare const IOS_PHASE0_SCHEMA_VERSION: 2;
-declare const IOS_PHASE0_PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "grainRadialMix", "grainSize", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "shutterAngle", "trailIntensity", "fade", "vignette", "grainIntensity"];
+declare const IOS_PHASE0_PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "grainRadialMix", "grainSize", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "shutterAngle", "trailIntensity", "fade", "shadowTone", "highlightTone", "shadowHue", "highlightHue", "vignette", "grainIntensity"];
 type IosPhase0ParamKey = Phase0ParamKey;
 type IosPhase0Params = Phase0Params;
 declare const iosPhase0ParamsSchema: z.ZodObject<{
@@ -1178,6 +1200,10 @@ declare const iosPhase0ParamsSchema: z.ZodObject<{
     shutterAngle: z.ZodDefault<z.ZodNumber>;
     trailIntensity: z.ZodDefault<z.ZodNumber>;
     fade: z.ZodDefault<z.ZodNumber>;
+    shadowTone: z.ZodDefault<z.ZodNumber>;
+    highlightTone: z.ZodDefault<z.ZodNumber>;
+    shadowHue: z.ZodDefault<z.ZodNumber>;
+    highlightHue: z.ZodDefault<z.ZodNumber>;
     vignette: z.ZodDefault<z.ZodNumber>;
     grainIntensity: z.ZodDefault<z.ZodPipe<z.ZodNumber, z.ZodTransform<number, number>>>;
 }, z.core.$strip>;
@@ -1329,6 +1355,10 @@ declare const iosPhase0ExportPayloadSchema: z.ZodObject<{
         shutterAngle: z.ZodDefault<z.ZodNumber>;
         trailIntensity: z.ZodDefault<z.ZodNumber>;
         fade: z.ZodDefault<z.ZodNumber>;
+        shadowTone: z.ZodDefault<z.ZodNumber>;
+        highlightTone: z.ZodDefault<z.ZodNumber>;
+        shadowHue: z.ZodDefault<z.ZodNumber>;
+        highlightHue: z.ZodDefault<z.ZodNumber>;
         vignette: z.ZodDefault<z.ZodNumber>;
         grainIntensity: z.ZodDefault<z.ZodPipe<z.ZodNumber, z.ZodTransform<number, number>>>;
     }, z.core.$strip>;
@@ -1553,6 +1583,10 @@ declare const iosPhase0LocalProjectSchema: z.ZodObject<{
         shutterAngle: z.ZodDefault<z.ZodNumber>;
         trailIntensity: z.ZodDefault<z.ZodNumber>;
         fade: z.ZodDefault<z.ZodNumber>;
+        shadowTone: z.ZodDefault<z.ZodNumber>;
+        highlightTone: z.ZodDefault<z.ZodNumber>;
+        shadowHue: z.ZodDefault<z.ZodNumber>;
+        highlightHue: z.ZodDefault<z.ZodNumber>;
         vignette: z.ZodDefault<z.ZodNumber>;
         grainIntensity: z.ZodDefault<z.ZodPipe<z.ZodNumber, z.ZodTransform<number, number>>>;
     }, z.core.$strip>;

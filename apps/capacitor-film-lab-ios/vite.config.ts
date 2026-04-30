@@ -4,10 +4,11 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(__dirname, "../..");
 
 export default defineConfig({
   plugins: [react()],
-  publicDir: path.resolve(__dirname, "../web/public"),
+  publicDir: path.resolve(repoRoot, "public"),
   build: {
     outDir: "dist",
     emptyOutDir: true,
@@ -25,8 +26,9 @@ export default defineConfig({
     fs: {
       allow: [
         path.resolve(__dirname, "."),
-        path.resolve(__dirname, "../web"),
-        path.resolve(__dirname, "../../packages"),
+        path.resolve(repoRoot, "messages"),
+        path.resolve(repoRoot, "packages"),
+        path.resolve(repoRoot, "public"),
       ],
     },
   },

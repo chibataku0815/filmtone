@@ -1,5 +1,5 @@
-import enMessages from "../../../web/messages/en.json";
-import jaMessages from "../../../web/messages/ja.json";
+import enMessages from "../../../../messages/en.json";
+import jaMessages from "../../../../messages/ja.json";
 
 export type AppLocale = "en" | "ja";
 

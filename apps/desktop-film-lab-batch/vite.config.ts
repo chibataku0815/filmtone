@@ -12,7 +12,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv } from "vite";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const webRoot = path.resolve(__dirname, "../web");
+const repoRoot = path.resolve(__dirname, "../..");
 const desktopPackageJson = JSON.parse(
   fs.readFileSync(path.resolve(__dirname, "package.json"), "utf-8"),
 ) as {
@@ -112,7 +112,7 @@ export default defineConfig(({ mode }) => {
   return {
     root: path.resolve(__dirname, "src/renderer"),
     base: "./",
-    publicDir: path.resolve(webRoot, "public"),
+    publicDir: path.resolve(repoRoot, "public"),
     define: {
       "import.meta.env.VITE_FILM_LAB_API_ORIGIN": JSON.stringify(apiOrigin),
       "import.meta.env.VITE_FILM_LAB_ASSUME_SUPPORTER":
@@ -155,7 +155,7 @@ export default defineConfig(({ mode }) => {
       /** @description 5173 占有時に勝手に別ポートへ逃げると Electron の URL とずれるので固定する */
       strictPort: true,
       fs: {
-        allow: [webRoot, path.resolve(__dirname, "..")],
+        allow: [repoRoot],
       },
     },
     resolve: {

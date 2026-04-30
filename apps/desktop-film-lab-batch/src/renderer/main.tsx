@@ -7,8 +7,8 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { NextIntlClientProvider } from "next-intl";
 import App from "./App";
-import en from "../../messages/en.json";
-import ja from "../../messages/ja.json";
+import en from "../../../../messages/en.json";
+import ja from "../../../../messages/ja.json";
 
 /**
  * @description OS／ブラウザの優先言語リストから、サポートするロケール（ja / en）を選ぶ

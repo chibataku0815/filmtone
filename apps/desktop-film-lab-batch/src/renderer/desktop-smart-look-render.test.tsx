@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { NextIntlClientProvider } from "next-intl";
 
-import en from "../../messages/en.json";
+import en from "../../../../messages/en.json";
 
 describe("Desktop control panel core render", () => {
   it("renders the searchable preset select without Web-only controls", async () => {

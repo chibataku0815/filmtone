@@ -393,9 +393,9 @@ const FILM_LAB_FILE_ACCEPT =
 const FILM_LAB_DEFAULT_SAMPLE_ASSET_PATH = "images/film-lab/default.jpg";
 
 /**
- * @description `apps/web/public` 直下からの相対パス（先頭スラッシュなし推奨）を、Vite の `base` に合わせた URL にする。
+ * @description repo root `public` 直下からの相対パス（先頭スラッシュなし推奨）を、Vite の `base` に合わせた URL にする。
  */
-function publicAssetUrlFromWebPublic(pathFromPublicRoot: string): string {
+function publicAssetUrlFromPublic(pathFromPublicRoot: string): string {
   const rawBase =
     typeof import.meta.env?.BASE_URL === "string"
       ? import.meta.env.BASE_URL
@@ -418,7 +418,7 @@ function resolveDefaultSampleAssetUrl(defaultSampleAssetUrl?: string): string {
     return defaultSampleAssetUrl.trim();
   }
 
-  return publicAssetUrlFromWebPublic(FILM_LAB_DEFAULT_SAMPLE_ASSET_PATH);
+  return publicAssetUrlFromPublic(FILM_LAB_DEFAULT_SAMPLE_ASSET_PATH);
 }
 
 function getActiveExportParityGeometry(

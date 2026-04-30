@@ -56,30 +56,12 @@ Desktop の **配布ファイル名** と **更新通知の版数** は、どち
 
 ローカルの unsigned build では、`FILM_LAB_DESKTOP_SKIP_NOTARIZE=true` と `CSC_IDENTITY_AUTO_DISCOVERY=false` を使います。
 
-## 開発用のスマートルック注記
-
-公開版には含めませんが、開発中の検証として `desktop:with-bff` は残しています。これは `apps/web` のローカル BFF と一緒に Desktop を立ち上げるための **開発専用** 経路です。
-
 ## 「dev」という言葉について
 
-- `bff:local` は **自分の Mac 上で BFF を一時起動する**ための一般的な名前です。Web を優先する意味ではありません。
 - Filmtone Desktop の入口は **`bun run desktop`** です。ローカルでは Vite がレンダラ更新用 URL を立て、Electron の環境変数 `FILM_LAB_DESKTOP_RENDERER_URL` でその URL を開きます。
 - `dev` はスクリプト互換のために **`desktop` のエイリアス**として残しています。
 
-## いちばん手短（開発用 BFF も一緒に起動）
-
-`apps/desktop-film-lab-batch` で:
-
-```bash
-bun run desktop:with-bff
-```
-
-1. `apps/web` で `bff:local`（ポート 3000 前後）
-2. 3000 が応答したら `desktop`（Vite 5173 + Electron）
-
-**前提:** `apps/web/.env.local` に BFF 用の秘密情報（寄付署名・スマートルック検証用キーなど）が入っていること。
-
-## Desktop だけ（BFF は既に動いているとき）
+## Desktop 起動
 
 ```bash
 bun run desktop

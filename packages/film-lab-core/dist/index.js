@@ -1206,6 +1206,10 @@ var PHASE0_PARAM_KEYS = [
   "shutterAngle",
   "trailIntensity",
   "fade",
+  "shadowTone",
+  "highlightTone",
+  "shadowHue",
+  "highlightHue",
   "vignette",
   "grainIntensity"
 ];
@@ -1256,6 +1260,10 @@ var phase0ParamsSchema = z3.object({
   shutterAngle: z3.number().min(0).max(720).default(PRESETS.reset.shutterAngle),
   trailIntensity: z3.number().min(0).max(0.95).default(PRESETS.reset.trailIntensity),
   fade: z3.number().min(0).max(1).default(PRESETS.reset.fade),
+  shadowTone: z3.number().min(0).max(1).default(PRESETS.reset.shadowTone),
+  highlightTone: z3.number().min(0).max(1).default(PRESETS.reset.highlightTone),
+  shadowHue: z3.number().min(0).max(360).default(PRESETS.reset.shadowHue),
+  highlightHue: z3.number().min(0).max(360).default(PRESETS.reset.highlightHue),
   vignette: z3.number().min(0).max(1).default(PRESETS.reset.vignette),
   grainIntensity: z3.number().min(0).transform(clampGrainIntensity).default(PRESETS.reset.grainIntensity)
 });
@@ -1289,6 +1297,10 @@ var phase0ParamsPatchSchema = z3.object({
   shutterAngle: z3.number().min(0).max(720).optional(),
   trailIntensity: z3.number().min(0).max(0.95).optional(),
   fade: z3.number().min(0).max(1).optional(),
+  shadowTone: z3.number().min(0).max(1).optional(),
+  highlightTone: z3.number().min(0).max(1).optional(),
+  shadowHue: z3.number().min(0).max(360).optional(),
+  highlightHue: z3.number().min(0).max(360).optional(),
   vignette: z3.number().min(0).max(1).optional(),
   grainIntensity: z3.number().min(0).transform(clampGrainIntensity).optional()
 });

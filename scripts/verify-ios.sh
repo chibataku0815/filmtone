@@ -10,7 +10,7 @@ if [ -d "/opt/homebrew/opt/ruby/bin" ]; then
 fi
 
 echo "==> generated swift contract (drift check)"
-bun run generate:filmtone-ios-swift --check
+bun run generate:ios-swift --check
 
 echo "==> ios build"
 bun run --cwd "$APP_DIR" build

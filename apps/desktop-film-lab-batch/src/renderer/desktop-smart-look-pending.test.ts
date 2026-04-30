@@ -9,7 +9,7 @@ async function renderDesktopControlPanelCoreHtml(): Promise<string> {
     const { renderToStaticMarkup } = await import("react-dom/server");
     const { NextIntlClientProvider } = await import("next-intl");
     const { FilmLabControlPanelCore } = await import("film-lab-ui");
-    const messages = (await import("../../messages/ja.json")).default;
+    const messages = (await import("../../../../messages/ja.json")).default;
     const core = React.createElement(FilmLabControlPanelCore, {
       viewport: null,
       histogramVisible: true,

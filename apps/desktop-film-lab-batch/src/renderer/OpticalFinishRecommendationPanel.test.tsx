@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { NextIntlClientProvider } from "next-intl";
 
-import jaMessages from "../../messages/ja.json";
+import jaMessages from "../../../../messages/ja.json";
 import { OpticalFinishRecommendationPanel } from "./OpticalFinishRecommendationPanel";
 
 function renderPanel(ui: ReactElement) {

@@ -19,7 +19,6 @@
     "test:golden:baseline-a": "FILMTONE_GOLDEN_BASELINE=A playwright test --config=test/playwright.config.ts",
     "test:golden:baseline-b": "bun run test/generate-baseline-b.ts",
     "desktop": "bun run build:workspace-deps && bun run build:electron && concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && cross-env FILM_LAB_DESKTOP_RENDERER_URL=http://127.0.0.1:5173 electron dist-electron/main.cjs\"",
-    "desktop:with-bff": "concurrently -k -n bff,film-lab \"cd ../web && bun run bff:local\" \"wait-on -t 120000 http://127.0.0.1:3000 && bun run desktop\"",
     "dev": "bun run desktop",
     "start": "bun run build && electron dist-electron/main.cjs",
     "pack:mac:unsigned": "bun run build && FILM_LAB_DESKTOP_SKIP_NOTARIZE=true CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --dir --arm64",
