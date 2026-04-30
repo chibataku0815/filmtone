@@ -9,6 +9,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "verify:swift-contract": "./scripts/verify-phase0-contract.sh",
+    "gen:fixtures:vlog": "uv run --with colour-science --with numpy --with pillow python Tests/Fixtures/source-profile/panasonic-vlog/encode-ramp.py",
+    "gen:fixtures:slog3": "uv run --with colour-science --with numpy --with pillow python Tests/Fixtures/source-profile/sony-slog3/encode-ramp.py",
     "cap:add:ios": "cap add ios",
     "cap:sync:ios": "cap sync ios",
     "ios:open": "cap open ios",

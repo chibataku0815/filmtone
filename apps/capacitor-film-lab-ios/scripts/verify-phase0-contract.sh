@@ -120,6 +120,21 @@ if [ -f "$RAYANGLE_SCRIPT" ] && [ -f "$RAYANGLE_SRC" ]; then
   "$RAYANGLE_BIN"
 fi
 
+# --- v1.3 Camera Profiles Phase B-3 / C: source-profile math accuracy gate ---
+SOURCE_PROFILE_MATH_SCRIPT="$SCRIPT_DIR/swift/test-source-profile-math.swift"
+SOURCE_PROFILE_MATH_SRC="$APP_DIR/ios/App/App/FilmtoneSourceProfileMath.swift"
+SOURCE_PROFILE_FIXTURES="$APP_DIR/Tests/Fixtures/source-profile"
+if [ -f "$SOURCE_PROFILE_MATH_SCRIPT" ] && [ -f "$SOURCE_PROFILE_MATH_SRC" ] && [ -d "$SOURCE_PROFILE_FIXTURES" ]; then
+  echo "==> source profile math test"
+  SOURCE_PROFILE_MATH_BIN=$(mktemp "${TMPDIR:-/tmp}/phase0-source-profile-math-check.XXXXXX")
+  CLEANUP_FILES="$CLEANUP_FILES $SOURCE_PROFILE_MATH_BIN"
+  xcrun swiftc \
+    -o "$SOURCE_PROFILE_MATH_BIN" \
+    "$SOURCE_PROFILE_MATH_SRC" \
+    "$SOURCE_PROFILE_MATH_SCRIPT"
+  "$SOURCE_PROFILE_MATH_BIN" "$SOURCE_PROFILE_FIXTURES"
+fi
+
 # --- Stream 5: sidecar builder test (may not exist yet at Wave 2 branch time) ---
 SIDECAR_SCRIPT="$SCRIPT_DIR/swift/test-sidecar-builder.swift"
 SIDECAR_SRC="$APP_DIR/ios/App/App/FilmtoneExportSidecarBuilder.swift"

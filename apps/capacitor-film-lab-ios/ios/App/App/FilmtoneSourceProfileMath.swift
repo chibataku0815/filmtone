@@ -78,6 +78,94 @@ enum FilmtoneSourceProfileMath {
         return r0
     }
 
+    // MARK: - Panasonic V-Log
+
+    /// V-Log → linear scene-referred decoder. Constants from Panasonic
+    /// *V-Log/V-Gamut REFERENCE MANUAL* (2014-11-28). Verified mirror:
+    /// https://antlerpost.com/colour-spaces/VGamut.html
+    @inline(__always)
+    static func vlogDecode(_ encoded: Double) -> Double {
+        let cut2 = 0.181
+        let b = 0.00873
+        let c = 0.241514
+        let d = 0.598206
+
+        if encoded < cut2 {
+            return (encoded - 0.125) / 5.6
+        }
+        return pow(10.0, (encoded - d) / c) - b
+    }
+
+    /// V-Gamut → Rec.709 (D65 → D65, no chromatic adaptation). The matrix
+    /// is the precomputed product of (V-Gamut → XYZ) · (XYZ → Rec.709).
+    /// Values reproduced from the V-Log/V-Gamut Reference Manual via the
+    /// Antler Post mirror; see `docs/source-profile-math/panasonic-vlog.md`.
+    @inline(__always)
+    static func vgamutToRec709(
+        red: Double,
+        green: Double,
+        blue: Double
+    ) -> (red: Double, green: Double, blue: Double) {
+        (
+            red:    1.7398 * red - 0.6727 * green - 0.0671 * blue,
+            green: -0.1956 * red + 1.2473 * green - 0.0518 * blue,
+            blue:  -0.0114 * red - 0.0440 * green + 1.0554 * blue
+        )
+    }
+
+    /// End-to-end V-Log → Rec.709 SDR pixel pipeline:
+    /// linearize → V-Gamut→Rec.709 matrix → Filmtone shoulder → Rec.709 OETF.
+    @inline(__always)
+    static func vlogPixelToRec709(
+        red: Double,
+        green: Double,
+        blue: Double
+    ) -> (red: Double, green: Double, blue: Double) {
+        let linearRed = vlogDecode(red)
+        let linearGreen = vlogDecode(green)
+        let linearBlue = vlogDecode(blue)
+        let mapped = vgamutToRec709(
+            red: linearRed,
+            green: linearGreen,
+            blue: linearBlue
+        )
+        return (
+            rec709Encode(filmtoneSdrShoulder(mapped.red)),
+            rec709Encode(filmtoneSdrShoulder(mapped.green)),
+            rec709Encode(filmtoneSdrShoulder(mapped.blue))
+        )
+    }
+
+    /// Build a 33³ V-Log → Rec.709 cube, sample-major (R fastest, then G,
+    /// then B), packed RGB Float32 for `CIColorCubeWithColorSpace`. Mirrors
+    /// `FilmtoneExportSession.makeAppleLogToRec709Lut` so callers can
+    /// substitute curves without changing their cube-consumption side.
+    static func makeVlogToRec709Cube(size: Int = 33) -> [Float] {
+        precondition(size >= 2, "cube size must be ≥ 2")
+        let denom = Double(size - 1)
+        var cube = [Float](repeating: 0, count: size * size * size * 3)
+        var index = 0
+        for b in 0..<size {
+            let blueIn = Double(b) / denom
+            for g in 0..<size {
+                let greenIn = Double(g) / denom
+                for r in 0..<size {
+                    let redIn = Double(r) / denom
+                    let converted = vlogPixelToRec709(
+                        red: redIn,
+                        green: greenIn,
+                        blue: blueIn
+                    )
+                    cube[index]     = Float(converted.red)
+                    cube[index + 1] = Float(converted.green)
+                    cube[index + 2] = Float(converted.blue)
+                    index += 3
+                }
+            }
+        }
+        return cube
+    }
+
     // MARK: - Gamut matrices
 
     /// Rec.2020 → Rec.709 conversion matrix (D65 → D65, no chromatic
