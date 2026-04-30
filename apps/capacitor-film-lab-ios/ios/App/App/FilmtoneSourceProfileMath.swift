@@ -166,6 +166,88 @@ enum FilmtoneSourceProfileMath {
         return cube
     }
 
+    // MARK: - Sony S-Log3
+
+    /// S-Log3 → linear scene-referred decoder. Constants from Sony's
+    /// *Technical Summary for S-Gamut3.Cine/S-Log3 and S-Gamut3/S-Log3*.
+    /// Verified mirror: https://antlerpost.com/colour-spaces/SLog3.html
+    /// The threshold `171.2102946929 / 1023.0` is the breakpoint between
+    /// the linear-tail toe and the log-curve body.
+    @inline(__always)
+    static func slog3Decode(_ encoded: Double) -> Double {
+        let threshold = 171.2102946929 / 1023.0
+        if encoded < threshold {
+            return ((encoded * 1023.0 - 95.0) * 0.01125) / (171.2102946929 - 95.0)
+        }
+        return pow(10.0, (encoded * 1023.0 - 420.0) / 261.5) * (0.18 + 0.01) - 0.01
+    }
+
+    /// S-Gamut3.Cine → Rec.709 matrix (precomputed, D65 → D65, no
+    /// chromatic adaptation). Values reproduced from Sony's technical
+    /// summary; see `docs/source-profile-math/sony-slog3.md`.
+    @inline(__always)
+    static func sgamut3CineToRec709(
+        red: Double,
+        green: Double,
+        blue: Double
+    ) -> (red: Double, green: Double, blue: Double) {
+        (
+            red:    1.6269 * red - 0.5365 * green - 0.0904 * blue,
+            green: -0.1078 * red + 1.1628 * green - 0.0550 * blue,
+            blue:  -0.0140 * red - 0.0240 * green + 1.0379 * blue
+        )
+    }
+
+    /// End-to-end S-Log3 → Rec.709 SDR pixel pipeline. Mirrors the V-Log
+    /// path so cross-curve consistency stays trivial to audit.
+    @inline(__always)
+    static func slog3PixelToRec709(
+        red: Double,
+        green: Double,
+        blue: Double
+    ) -> (red: Double, green: Double, blue: Double) {
+        let linearRed = slog3Decode(red)
+        let linearGreen = slog3Decode(green)
+        let linearBlue = slog3Decode(blue)
+        let mapped = sgamut3CineToRec709(
+            red: linearRed,
+            green: linearGreen,
+            blue: linearBlue
+        )
+        return (
+            rec709Encode(filmtoneSdrShoulder(mapped.red)),
+            rec709Encode(filmtoneSdrShoulder(mapped.green)),
+            rec709Encode(filmtoneSdrShoulder(mapped.blue))
+        )
+    }
+
+    /// Build a 33³ S-Log3 → Rec.709 cube for `CIColorCubeWithColorSpace`.
+    static func makeSlog3ToRec709Cube(size: Int = 33) -> [Float] {
+        precondition(size >= 2, "cube size must be ≥ 2")
+        let denom = Double(size - 1)
+        var cube = [Float](repeating: 0, count: size * size * size * 3)
+        var index = 0
+        for b in 0..<size {
+            let blueIn = Double(b) / denom
+            for g in 0..<size {
+                let greenIn = Double(g) / denom
+                for r in 0..<size {
+                    let redIn = Double(r) / denom
+                    let converted = slog3PixelToRec709(
+                        red: redIn,
+                        green: greenIn,
+                        blue: blueIn
+                    )
+                    cube[index]     = Float(converted.red)
+                    cube[index + 1] = Float(converted.green)
+                    cube[index + 2] = Float(converted.blue)
+                    index += 3
+                }
+            }
+        }
+        return cube
+    }
+
     // MARK: - Gamut matrices
 
     /// Rec.2020 → Rec.709 conversion matrix (D65 → D65, no chromatic

@@ -34,6 +34,13 @@ private struct MacbethPatch: Decodable {
     let rec709LinearReference: [Double]
 }
 
+private struct Slog3MacbethPatch: Decodable {
+    let index: Int
+    let slog3Encoded: [Double]
+    let rec709EncodedExpected: [Double]
+    let rec709LinearReference: [Double]
+}
+
 private func loadJSON<T: Decodable>(_ url: URL, as type: T.Type = T.self) throws -> T {
     let data = try Data(contentsOf: url)
     return try JSONDecoder().decode(T.self, from: data)
@@ -253,6 +260,92 @@ private func rec709InverseEncode(_ encoded: Double) -> Double {
     return pow((encoded + 0.099) / 1.099, 1.0 / 0.45)
 }
 
+// MARK: - S-Log3 accuracy gate (Phase C)
+
+private func runSlog3LinearizationCheck(fixtureURL: URL) throws {
+    let samples: [LinearizationSample] = try loadJSON(fixtureURL.appendingPathComponent("linearization-ramp.json"))
+    try expect(samples.count == 4096, "S-Log3 linearization ramp expected 4096 samples, got \(samples.count)")
+    var maxDelta = 0.0
+    for sample in samples {
+        let computed = FilmtoneSourceProfileMath.slog3Decode(sample.vEncoded)
+        maxDelta = max(maxDelta, abs(computed - sample.lLinear))
+    }
+    try expect(
+        maxDelta <= 1e-3,
+        "S-Log3 linearization drift max |Δ| = \(maxDelta) exceeds tolerance 1e-3"
+    )
+    print(String(format: "    S-Log3 linearization max |Δ| = %.6f (budget 1e-3)", maxDelta))
+}
+
+private func runSlog3MacbethCheck(fixtureURL: URL) throws {
+    let patches: [Slog3MacbethPatch] = try loadJSON(fixtureURL.appendingPathComponent("macbeth-patches.json"))
+    try expect(patches.count == 24, "S-Log3 Macbeth fixture expected 24 patches, got \(patches.count)")
+
+    var maxDeltaE = 0.0
+    var sumDeltaE = 0.0
+    var maxFullFrame = 0.0
+    var sumFullFrame = 0.0
+    var fullFrameCount = 0
+
+    for patch in patches {
+        let computed = FilmtoneSourceProfileMath.slog3PixelToRec709(
+            red: patch.slog3Encoded[0],
+            green: patch.slog3Encoded[1],
+            blue: patch.slog3Encoded[2]
+        )
+
+        let computedLinear = (
+            r: rec709InverseEncode(computed.red),
+            g: rec709InverseEncode(computed.green),
+            b: rec709InverseEncode(computed.blue)
+        )
+        let expectedLinear = (
+            r: rec709InverseEncode(patch.rec709EncodedExpected[0]),
+            g: rec709InverseEncode(patch.rec709EncodedExpected[1]),
+            b: rec709InverseEncode(patch.rec709EncodedExpected[2])
+        )
+        let lab1 = xyzToLab(rec709LinearToXYZ(computedLinear))
+        let lab2 = xyzToLab(rec709LinearToXYZ(expectedLinear))
+        let dE = deltaE2000(lab1, lab2)
+        maxDeltaE = max(maxDeltaE, dE)
+        sumDeltaE += dE
+
+        for ch in 0..<3 {
+            let drift = abs(channel(computed, ch) - patch.rec709EncodedExpected[ch]) * 255.0
+            maxFullFrame = max(maxFullFrame, drift)
+            sumFullFrame += drift
+            fullFrameCount += 1
+        }
+    }
+    let meanDeltaE = sumDeltaE / Double(patches.count)
+    let meanFullFrame = sumFullFrame / Double(fullFrameCount)
+
+    try expect(
+        maxDeltaE <= 2.0,
+        "S-Log3 Macbeth ΔE2000 max = \(maxDeltaE) exceeds budget 2.0"
+    )
+    try expect(
+        meanDeltaE <= 1.0,
+        "S-Log3 Macbeth ΔE2000 mean = \(meanDeltaE) exceeds budget 1.0"
+    )
+    try expect(
+        maxFullFrame <= 2.0,
+        "S-Log3 full-frame max = \(maxFullFrame)/255 exceeds budget 2/255"
+    )
+    try expect(
+        meanFullFrame <= 0.5,
+        "S-Log3 full-frame mean = \(meanFullFrame)/255 exceeds budget 0.5/255"
+    )
+    print(String(
+        format: "    S-Log3 Macbeth ΔE2000 max = %.3f mean = %.3f (budget 2.0/1.0)",
+        maxDeltaE, meanDeltaE
+    ))
+    print(String(
+        format: "    S-Log3 Macbeth full-frame max = %.3f mean = %.3f /255 (budget 2.0/0.5)",
+        maxFullFrame, meanFullFrame
+    ))
+}
+
 // Channel access helper for the (red, green, blue) tuple returned by
 // `vlogPixelToRec709`. Tuple extensions are still experimental in Swift, so
 // the test uses a free function instead.
@@ -279,6 +372,12 @@ struct TestSourceProfileMath {
             print("==> V-Log accuracy gate")
             try runVlogLinearizationCheck(fixtureURL: vlogFixture)
             try runVlogMacbethCheck(fixtureURL: vlogFixture)
+        }
+        let slog3Fixture = fixturesRoot.appendingPathComponent("sony-slog3")
+        if FileManager.default.fileExists(atPath: slog3Fixture.path) {
+            print("==> S-Log3 accuracy gate")
+            try runSlog3LinearizationCheck(fixtureURL: slog3Fixture)
+            try runSlog3MacbethCheck(fixtureURL: slog3Fixture)
         }
         print("Source profile math tests passed")
     }
