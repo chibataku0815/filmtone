@@ -142,10 +142,34 @@ final class FilmtoneEditorFacade {
     /// Share the exported media and, when present, the v1 sidecar JSON as a
     /// second item. Single-item share targets still receive the primary media
     /// because it's the first entry in `fileURLs`.
+    ///
+    /// When `packageFileURIs` is non-empty (DaVinci Connect package export
+    /// path), every URI in the package is offered for sharing so the user can
+    /// hand off the bundle as a single unit.
     @discardableResult
-    func shareOutput(mediaURI: String, sidecarURI: String? = nil) async throws -> Bool {
+    func shareOutput(
+        mediaURI: String,
+        sidecarURI: String? = nil,
+        packageFileURIs: [String]? = nil
+    ) async throws -> Bool {
         guard let presenter else {
             throw FilmtoneMediaError.bridgeUnavailable
+        }
+        if let packageFileURIs, !packageFileURIs.isEmpty {
+            let urls = packageFileURIs.compactMap { try? runtime.resolveFileURL($0) }
+            guard !urls.isEmpty else {
+                throw FilmtoneMediaError.invalidURL(
+                    filmtoneLocalized(
+                        "filmtone.error.share.empty_package",
+                        defaultValue: "No package files available to share.",
+                        comment: "Error shown when DaVinci package share has no resolvable URIs."
+                    )
+                )
+            }
+            return try await runtime.shareOutput(
+                fileURLs: urls,
+                presenting: presenter
+            )
         }
         return try await runtime.shareOutput(
             uri: mediaURI,

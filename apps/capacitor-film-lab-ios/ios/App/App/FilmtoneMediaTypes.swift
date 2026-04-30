@@ -425,6 +425,10 @@ struct Phase0ExportResultDTO: Encodable {
     // v1.1: filmtone-ios-export-session-v1 sidecar JSON URI (app container temp URL).
     //       nil when sidecar write failed or disabled.
     let sidecarUri: String?
+    // v1.3 DaVinci spike: optional list of package file URIs when the export
+    // produced a multi-file package (e.g. Filmtone Connect for DaVinci).
+    // nil for normal single-file exports.
+    let packageFileUris: [String]?
 
     init(
         outputUri: String,
@@ -436,7 +440,8 @@ struct Phase0ExportResultDTO: Encodable {
         realtimeRatio: Double?,
         audioPreserved: Bool?,
         benchmarkRecord: Phase0ExportBenchmarkRecordDTO?,
-        sidecarUri: String? = nil
+        sidecarUri: String? = nil,
+        packageFileUris: [String]? = nil
     ) {
         self.outputUri = outputUri
         self.elapsedMs = elapsedMs
@@ -448,6 +453,7 @@ struct Phase0ExportResultDTO: Encodable {
         self.audioPreserved = audioPreserved
         self.benchmarkRecord = benchmarkRecord
         self.sidecarUri = sidecarUri
+        self.packageFileUris = packageFileUris
     }
 }
 
