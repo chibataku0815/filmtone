@@ -244,6 +244,9 @@ export interface Phase0ExportResult {
   // v1.1: filmtone-ios-export-session-v1 sidecar JSON URI (app container temp URL).
   //       Absent when sidecar write failed or the caller disabled sidecar output.
   sidecarUri?: string;
+  // Filmtone Connect package companions ordered for sharing:
+  // media, sidecar, combined-color.cube, reference-after.jpg.
+  packageFileUris?: string[];
 }
 
 export interface Phase0ExportBenchmarkRecord {

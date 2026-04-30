@@ -467,13 +467,20 @@ final class FilmtoneMediaRuntime {
     func shareOutput(
         uri: String,
         sidecarUri: String? = nil,
+        packageFileUris: [String]? = nil,
         title: String? = nil,
         text: String? = nil,
         presenting: UIViewController
     ) async throws -> Bool {
-        var urls: [URL] = [try resolveFileURL(uri)]
-        if let sidecarUri, let sidecarURL = try? resolveFileURL(sidecarUri) {
-            urls.append(sidecarURL)
+        let urls: [URL]
+        if let packageFileUris, !packageFileUris.isEmpty {
+            urls = try packageFileUris.map { try resolveFileURL($0) }
+        } else {
+            var fallbackURLs: [URL] = [try resolveFileURL(uri)]
+            if let sidecarUri, let sidecarURL = try? resolveFileURL(sidecarUri) {
+                fallbackURLs.append(sidecarURL)
+            }
+            urls = fallbackURLs
         }
         return try await shareOutput(
             fileURLs: urls,
@@ -552,7 +559,8 @@ final class FilmtoneMediaRuntime {
             benchmarkRecord: benchmarkRecord,
             // T2 (v1.1): carry the sidecar URI through benchmark reconstruction —
             // without this rebuild preserving it, the UI share chain would lose the JSON URL.
-            sidecarUri: result.sidecarUri
+            sidecarUri: result.sidecarUri,
+            packageFileUris: result.packageFileUris
         )
         return result
     }

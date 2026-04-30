@@ -139,17 +139,22 @@ final class FilmtoneEditorFacade {
         try await runtime.saveToPhotos(uri: uri)
     }
 
-    /// Share the exported media and, when present, the v1 sidecar JSON as a
-    /// second item. Single-item share targets still receive the primary media
+    /// Share the exported media and, when present, the full Filmtone Connect
+    /// companion set. Single-item share targets still receive the primary media
     /// because it's the first entry in `fileURLs`.
     @discardableResult
-    func shareOutput(mediaURI: String, sidecarURI: String? = nil) async throws -> Bool {
+    func shareOutput(
+        mediaURI: String,
+        sidecarURI: String? = nil,
+        packageFileURIs: [String]? = nil
+    ) async throws -> Bool {
         guard let presenter else {
             throw FilmtoneMediaError.bridgeUnavailable
         }
         return try await runtime.shareOutput(
             uri: mediaURI,
             sidecarUri: sidecarURI,
+            packageFileUris: packageFileURIs,
             presenting: presenter
         )
     }

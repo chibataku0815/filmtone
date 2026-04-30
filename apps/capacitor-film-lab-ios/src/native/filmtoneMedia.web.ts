@@ -240,7 +240,11 @@ export class FilmtoneMediaWeb extends WebPlugin implements FilmtoneMediaPlugin {
     anchor.click();
   }
 
-  async shareOutput(options: { uri: string }): Promise<void> {
+  async shareOutput(options: {
+    uri: string;
+    sidecarUri?: string;
+    packageFileUris?: string[];
+  }): Promise<void> {
     if (navigator.share && this.canShareUri(options.uri)) {
       try {
         await navigator.share({ url: options.uri });

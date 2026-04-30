@@ -18,6 +18,7 @@ struct TestSidecarBuilder {
         try runHlgFixtureBuild()
         try runSidecarURLDerivation()
         try runImageJobDerivation()
+        try runConnectCubeWriter()
         print("Sidecar builder tests passed")
     }
 
@@ -63,6 +64,11 @@ struct TestSidecarBuilder {
                 sourceMetadata: request.sourceProbe?.sourceVideoMetadata?.color,
                 sourceColorClass: request.sourceProbe?.sourceVideoMetadata?.colorClass
             ),
+            package: SidecarPackage(
+                mediaFilename: "phase0-export.mp4",
+                referenceAfterFilename: "reference-after.jpg",
+                combinedColorFilename: "combined-color.cube"
+            ),
             depth: nil
         )
 
@@ -104,6 +110,10 @@ struct TestSidecarBuilder {
         try expect(parsed.job == "video", "job mismatch for HLG video fixture")
         try expect(parsed.device.model == "iPhone16,2", "device.model mismatch")
         try expect(parsed.device.iosVersion == "17.5", "device.iosVersion mismatch")
+        try expect(parsed.package?.layout == "filmtone-connect-package-v1", "package.layout mismatch")
+        try expect(parsed.package?.mediaFilename == "phase0-export.mp4", "package.mediaFilename mismatch")
+        try expect(parsed.package?.referenceAfterFilename == "reference-after.jpg", "package.referenceAfterFilename mismatch")
+        try expect(parsed.package?.luts.combinedColor == "combined-color.cube", "package.luts.combinedColor mismatch")
 
         try expect(
             parsed.input.kind == "video",
@@ -232,6 +242,7 @@ struct TestSidecarBuilder {
                 sourceMetadata: nil,
                 sourceColorClass: nil
             ),
+            package: nil,
             depth: nil
         )
         let data = try FilmtoneExportSidecarBuilder.build(inputs)
@@ -241,6 +252,61 @@ struct TestSidecarBuilder {
         try expect(parsed.input.kind == "image", "input.kind should be 'image'")
         try expect(parsed.lutRefs.inputLut == nil, "no inputLut expected")
         try expect(parsed.lutRefs.creativeLut == nil, "no creativeLut expected")
+        try expect(parsed.package == nil, "package should be nil when not supplied")
+    }
+
+    // MARK: - Connect cube writer
+
+    static func runConnectCubeWriter() throws {
+        let request = Phase0ExportRequestDTO(
+            sourceUri: "file:///tmp/phase0-source.jpg",
+            sourceKind: .image,
+            sourceProbe: nil,
+            output: Phase0OutputProfileDTO(
+                longEdge: 2048,
+                fps: 24,
+                codec: "h264",
+                container: "mp4",
+                preserveAudio: false
+            ),
+            grade: Phase0GradeDTO(
+                presetName: "cinematic",
+                presetVersion: "v1",
+                quickState: Phase0QuickStateDTO(filmCharacter: 0, era: 0, dynamics: 0),
+                params: zeroParams()
+            ),
+            lut: nil,
+            inputLut: nil,
+            creativeLut: nil,
+            renderMode: nil,
+            depthEnabled: nil,
+            depthRenderer: nil
+        )
+
+        let text = FilmtoneConnectCubeWriter.makeCombinedColorCubeText(for: request, size: 2)
+        try expect(text.contains("TITLE \"Filmtone Combined Color\""), "cube title missing")
+        try expect(text.contains("LUT_3D_SIZE 2"), "cube size header missing")
+        try expect(text.contains("DOMAIN_MIN 0.0 0.0 0.0"), "cube DOMAIN_MIN missing")
+        try expect(text.contains("DOMAIN_MAX 1.0 1.0 1.0"), "cube DOMAIN_MAX missing")
+
+        let dataLines = text
+            .split(separator: "\n")
+            .filter { line in
+                line.first?.isNumber == true || line.first == "-"
+            }
+        try expect(dataLines.count == 8, "size 2 cube should emit 8 RGB rows, got \(dataLines.count)")
+        try expect(
+            dataLines.allSatisfy { $0.split(separator: " ").count == 3 },
+            "cube rows should contain RGB triples only"
+        )
+        try expect(dataLines.first == "0.0000000 0.0000000 0.0000000", "identity cube first RGB row mismatch")
+        try expect(dataLines.last == "1.0000000 1.0000000 1.0000000", "identity cube last RGB row mismatch")
+
+        let tempURL = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("filmtone-connect-test-\(UUID().uuidString).cube")
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+        try FilmtoneConnectCubeWriter.writeCombinedColorCube(for: request, to: tempURL, size: 2)
+        try expect(FileManager.default.fileExists(atPath: tempURL.path), "cube writer did not create a file")
     }
 
     // MARK: - Helpers
@@ -276,6 +342,7 @@ private struct ParsedSidecar: Decodable {
     let look: ParsedLook
     let lutRefs: ParsedLutRefs
     let output: ParsedOutput
+    let package: ParsedPackage?
 }
 
 private struct ParsedDevice: Decodable {
@@ -325,4 +392,15 @@ private struct ParsedOutput: Decodable {
     let colorPrimaries: String
     let colorTransfer: String
     let colorSpace: String
+}
+
+private struct ParsedPackage: Decodable {
+    let layout: String
+    let mediaFilename: String
+    let referenceAfterFilename: String
+    let luts: ParsedPackageLuts
+}
+
+private struct ParsedPackageLuts: Decodable {
+    let combinedColor: String
 }

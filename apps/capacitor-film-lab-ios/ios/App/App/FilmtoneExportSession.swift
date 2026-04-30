@@ -68,6 +68,14 @@ final class FilmtoneExportSession {
     private static let halationMipLevels = 6
     private static let diffusionMipLevels = 4
     private static let glowUpsampleBlurRadius = 1.0
+    private static let connectCubeFilename = "combined-color.cube"
+    private static let connectReferenceAfterFilename = "reference-after.jpg"
+
+    private struct ConnectPackageCompanions {
+        let cubeURL: URL
+        let referenceAfterURL: URL
+        let sidecarPackage: SidecarPackage
+    }
 
     init(
         request: Phase0ExportRequestDTO,
@@ -170,7 +178,7 @@ final class FilmtoneExportSession {
             realtimeRatio = nil
         }
 
-        progress(.init(stage: .completed, progress: 1.0, currentFrame: result.frameCount, totalFrames: result.frameCount, message: "Export complete"))
+        let packageCompanions = makeConnectPackageCompanions(result: result)
 
         // T2 (v1.1): write the filmtone-ios-export-session-v1 sidecar next to the
         // export output. Failure here must NOT fail the export itself — missing
@@ -180,8 +188,15 @@ final class FilmtoneExportSession {
             fileSizeBytes: fileSizeBytes,
             elapsedMs: elapsedMs,
             realtimeRatio: realtimeRatio,
-            audioPreserved: result.audioPreserved
+            audioPreserved: result.audioPreserved,
+            package: packageCompanions?.sidecarPackage
         )
+        let packageFileUris = makePackageFileUris(
+            sidecarUri: sidecarUri,
+            companions: packageCompanions
+        )
+
+        progress(.init(stage: .completed, progress: 1.0, currentFrame: result.frameCount, totalFrames: result.frameCount, message: "Export complete"))
 
         return Phase0ExportResultDTO(
             outputUri: outputURL.absoluteString,
@@ -193,7 +208,8 @@ final class FilmtoneExportSession {
             realtimeRatio: realtimeRatio,
             audioPreserved: result.audioPreserved,
             benchmarkRecord: nil,
-            sidecarUri: sidecarUri
+            sidecarUri: sidecarUri,
+            packageFileUris: packageFileUris
         )
     }
 
@@ -204,7 +220,8 @@ final class FilmtoneExportSession {
         fileSizeBytes: Int?,
         elapsedMs: Int,
         realtimeRatio: Double?,
-        audioPreserved: Bool?
+        audioPreserved: Bool?,
+        package: SidecarPackage?
     ) -> String? {
         let identity = SidecarDeviceIdentity(
             appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "",
@@ -268,6 +285,7 @@ final class FilmtoneExportSession {
             mezzanineUsedVariant: didUseMezzanineVariant?.rawValue,
             mezzanineProfileVersion: didUseMezzanineVariant != nil ? MezzanineService.Profile.version : nil,
             colorPipeline: colorPipeline,
+            package: package,
             depth: depthSidecar
         )
 
@@ -282,6 +300,54 @@ final class FilmtoneExportSession {
             )
             return nil
         }
+    }
+
+    private func makeConnectPackageCompanions(
+        result: CompletedExport
+    ) -> ConnectPackageCompanions? {
+        let directoryURL = outputURL.deletingLastPathComponent()
+        let cubeURL = directoryURL.appendingPathComponent(Self.connectCubeFilename)
+        let referenceURL = directoryURL.appendingPathComponent(Self.connectReferenceAfterFilename)
+
+        do {
+            try FilmtoneConnectCubeWriter.writeCombinedColorCube(
+                for: request,
+                to: cubeURL
+            )
+            try writeReferenceAfterImage(
+                to: referenceURL,
+                sourceDurationSec: result.sourceDurationSec
+            )
+            return ConnectPackageCompanions(
+                cubeURL: cubeURL,
+                referenceAfterURL: referenceURL,
+                sidecarPackage: SidecarPackage(
+                    mediaFilename: outputURL.lastPathComponent,
+                    referenceAfterFilename: referenceURL.lastPathComponent,
+                    combinedColorFilename: cubeURL.lastPathComponent
+                )
+            )
+        } catch {
+            filmtonePreviewCompositionDebugLog(
+                "Filmtone Connect package companion write failed: \(error.localizedDescription)"
+            )
+            return nil
+        }
+    }
+
+    private func makePackageFileUris(
+        sidecarUri: String?,
+        companions: ConnectPackageCompanions?
+    ) -> [String]? {
+        guard let sidecarUri, let companions else {
+            return nil
+        }
+        return [
+            outputURL.absoluteString,
+            sidecarUri,
+            companions.cubeURL.absoluteString,
+            companions.referenceAfterURL.absoluteString,
+        ]
     }
 
     private func exportVideo(
@@ -2138,15 +2204,36 @@ final class FilmtoneExportSession {
 
     private func writePreviewImage(_ image: CIImage, preferredName: String) throws -> URL {
         let url = try cacheStore.temporaryPreviewURL(preferredName: preferredName, pathExtension: "jpg")
+        try writeJPEGImage(image, to: url)
+        return url
+    }
+
+    private func writeReferenceAfterImage(
+        to url: URL,
+        sourceDurationSec: Double?
+    ) throws {
+        let asset = AVURLAsset(url: outputURL)
+        let assetDuration = CMTimeGetSeconds(asset.duration)
+        let duration = assetDuration.isFinite && assetDuration > 0
+            ? assetDuration
+            : (sourceDurationSec ?? 0)
+        let posterTime = CMTime(
+            seconds: makePreviewPosterTime(sourceDurationSec: duration),
+            preferredTimescale: 600
+        )
+        let cgImage = try copyPreviewCGImage(for: asset, at: posterTime)
+        try writeJPEGImage(CIImage(cgImage: cgImage), to: url)
+    }
+
+    private func writeJPEGImage(_ image: CIImage, to url: URL) throws {
         guard let data = ciContext.jpegRepresentation(
             of: image,
             colorSpace: outputColorSpace,
             options: [:]
         ) else {
-            throw FilmtoneMediaError.exportFailed("Preview JPEG data could not be created.")
+            throw FilmtoneMediaError.exportFailed("JPEG data could not be created.")
         }
         try data.write(to: url, options: .atomic)
-        return url
     }
 
     private func loadedSourceImage(at url: URL) -> CIImage? {

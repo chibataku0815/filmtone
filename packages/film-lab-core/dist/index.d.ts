@@ -669,6 +669,7 @@ interface Phase0ExportResult {
     audioPreserved?: boolean;
     benchmarkRecord?: Phase0ExportBenchmarkRecord;
     sidecarUri?: string;
+    packageFileUris?: string[];
 }
 interface Phase0ExportBenchmarkRecord {
     appVersion: string;

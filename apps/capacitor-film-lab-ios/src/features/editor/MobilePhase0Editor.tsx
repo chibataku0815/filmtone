@@ -398,7 +398,11 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
   async function handleShare() {
     if (!state.exportResult) return;
     try {
-      await filmtoneMedia.shareOutput({ uri: state.exportResult.outputUri });
+      await filmtoneMedia.shareOutput({
+        uri: state.exportResult.outputUri,
+        sidecarUri: state.exportResult.sidecarUri,
+        packageFileUris: state.exportResult.packageFileUris,
+      });
     } catch (error) {
       setState((current) => ({
         ...current,
