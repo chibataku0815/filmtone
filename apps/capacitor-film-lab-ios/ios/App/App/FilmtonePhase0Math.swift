@@ -301,6 +301,11 @@ struct FilmtoneProjectState: Codable {
     var inputLut: ParsedCubeLutDTO?
     var creativeLut: ParsedCubeLutDTO?
     var output: Phase0OutputProfileDTO
+    /// v1.3 Camera Profiles Phase A — selected source profile. Defaults to
+    /// `.auto` for v1.2 saves (decoded via `decodeIfPresent ?? .auto`) and
+    /// for fresh projects so existing behavior is byte-identical until the
+    /// user picks a Camera Profile from the new picker (Phase F).
+    var cameraProfile: CameraProfileSelection
 
     init(
         schemaVersion: Int = FilmtonePhase0Math.projectSchemaVersion,
@@ -314,7 +319,8 @@ struct FilmtoneProjectState: Codable {
         params: FilmtonePhase0Params,
         inputLut: ParsedCubeLutDTO?,
         creativeLut: ParsedCubeLutDTO?,
-        output: Phase0OutputProfileDTO
+        output: Phase0OutputProfileDTO,
+        cameraProfile: CameraProfileSelection = .auto
     ) {
         self.schemaVersion = schemaVersion
         self.projectId = projectId
@@ -328,6 +334,7 @@ struct FilmtoneProjectState: Codable {
         self.inputLut = inputLut
         self.creativeLut = creativeLut
         self.output = output
+        self.cameraProfile = cameraProfile
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -343,6 +350,7 @@ struct FilmtoneProjectState: Codable {
         case inputLut
         case creativeLut
         case output
+        case cameraProfile
     }
 
     init(from decoder: Decoder) throws {
@@ -371,6 +379,9 @@ struct FilmtoneProjectState: Codable {
         let legacyLut = try container.decodeIfPresent(ParsedCubeLutDTO.self, forKey: .lut)
         creativeLut = try container.decodeIfPresent(ParsedCubeLutDTO.self, forKey: .creativeLut) ?? legacyLut
         output = try container.decodeIfPresent(Phase0OutputProfileDTO.self, forKey: .output) ?? FilmtonePhase0Math.outputProfile
+        // v1.3 Camera Profiles Phase A — additive optional. v1.2 saves
+        // (without this key) decode as `.auto`, preserving prior behavior.
+        cameraProfile = try container.decodeIfPresent(CameraProfileSelection.self, forKey: .cameraProfile) ?? .auto
     }
 
     func encode(to encoder: Encoder) throws {
@@ -386,6 +397,7 @@ struct FilmtoneProjectState: Codable {
         try container.encodeIfPresent(inputLut, forKey: .inputLut)
         try container.encodeIfPresent(creativeLut, forKey: .creativeLut)
         try container.encode(output, forKey: .output)
+        try container.encode(cameraProfile, forKey: .cameraProfile)
     }
 }
 
