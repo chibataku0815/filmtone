@@ -2325,48 +2325,35 @@ final class FilmtoneExportSession {
         )
     }
 
-    private static func appleLogDecode(_ encoded: Double) -> Double {
-        let r0 = -0.05641088
-        let rt = 0.01
-        let sigma = 47.28711236
-        let beta = 0.00964052
-        let gamma = 0.08550479
-        let delta = 0.69336945
-        let pt = sigma * pow(rt - r0, 2)
+    // v1.3 Camera Profiles Phase B-1: the four primitives below moved to
+    // `FilmtoneSourceProfileMath` so V-Log / S-Log3 (and any future curve)
+    // share the identical Filmtone SDR shoulder + Rec.709 encode pair.
+    // The thin wrappers here keep call sites in this file (e.g.
+    // `appleLogPixelToRec709`) source-stable; the math is byte-identical
+    // to the pre-Phase-B-1 implementation.
 
-        if encoded >= pt {
-            return pow(2, (encoded - delta) / gamma) - beta
-        }
-        if encoded >= 0 {
-            return sqrt(max(encoded / sigma, 0)) + r0
-        }
-        return r0
+    @inline(__always)
+    private static func appleLogDecode(_ encoded: Double) -> Double {
+        FilmtoneSourceProfileMath.appleLogDecode(encoded)
     }
 
+    @inline(__always)
     private static func rec2020ToRec709(
         red: Double,
         green: Double,
         blue: Double
     ) -> (red: Double, green: Double, blue: Double) {
-        (
-            red: 1.6605 * red - 0.5876 * green - 0.0728 * blue,
-            green: -0.1246 * red + 1.1329 * green - 0.0083 * blue,
-            blue: -0.0182 * red - 0.1006 * green + 1.1187 * blue
-        )
+        FilmtoneSourceProfileMath.rec2020ToRec709(red: red, green: green, blue: blue)
     }
 
+    @inline(__always)
     private static func filmtoneSdrShoulder(_ linear: Double) -> Double {
-        let exposed = max(0, linear * 1.18)
-        let shoulder = exposed / (1 + max(exposed - 0.18, 0) * 0.42)
-        return clamp(shoulder, min: 0, max: 1)
+        FilmtoneSourceProfileMath.filmtoneSdrShoulder(linear)
     }
 
+    @inline(__always)
     private static func rec709Encode(_ linear: Double) -> Double {
-        let value = clamp(linear, min: 0, max: 1)
-        if value < 0.018 {
-            return value * 4.5
-        }
-        return 1.099 * pow(value, 0.45) - 0.099
+        FilmtoneSourceProfileMath.rec709Encode(linear)
     }
 
     private func resolvedVideoSourceURL() -> URL {
