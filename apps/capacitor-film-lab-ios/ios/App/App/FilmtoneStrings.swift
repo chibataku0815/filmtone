@@ -137,6 +137,12 @@ struct FilmtoneStrings {
     let cameraAuto: String
     let cameraAutoAppleLogDetected: String
     let cameraAutoAppleLog2Detected: String
+    /// v1.3 Camera Profiles Phase D — built-in source profile catalog labels.
+    let cameraAppleLog: String
+    let cameraAppleLog2: String
+    let cameraVLog: String
+    let cameraSLog3: String
+    let cameraRec709: String
     let cameraCustom: String
     let cameraImport: String
     let inputLutAmountLabel: String
@@ -244,6 +250,28 @@ extension FilmtoneStrings {
             return localized
         }
         return look.name
+    }
+
+    /// v1.3 Camera Profiles Phase D — resolves a built-in source-profile
+    /// catalog id (e.g. "built-in:source-profile.panasonic-vlog") or its
+    /// short slug suffix to the localized display name. Returns nil when
+    /// the input is neither a known catalog id nor a known slug.
+    func builtInSourceProfileName(for catalogIdOrSlug: String) -> String? {
+        let prefix = "built-in:source-profile."
+        let slug: String
+        if catalogIdOrSlug.hasPrefix(prefix) {
+            slug = String(catalogIdOrSlug.dropFirst(prefix.count))
+        } else {
+            slug = catalogIdOrSlug
+        }
+        switch slug {
+        case "apple-log":      return cameraAppleLog
+        case "apple-log-2":    return cameraAppleLog2
+        case "panasonic-vlog": return cameraVLog
+        case "sony-slog3":     return cameraSLog3
+        case "rec709":         return cameraRec709
+        default:               return nil
+        }
     }
 }
 
@@ -760,6 +788,31 @@ extension FilmtoneStrings {
             "filmtone.camera.auto_apple_log2_detected",
             defaultValue: "Auto -> Apple Log 2 detected",
             comment: "Camera profile state when Apple Log 2 is automatically detected."
+        )
+        cameraAppleLog = filmtoneLocalized(
+            "filmtone.camera.apple_log",
+            defaultValue: "Apple Log",
+            comment: "Built-in camera source profile name (Apple Log)."
+        )
+        cameraAppleLog2 = filmtoneLocalized(
+            "filmtone.camera.apple_log2",
+            defaultValue: "Apple Log 2",
+            comment: "Built-in camera source profile name (Apple Log 2)."
+        )
+        cameraVLog = filmtoneLocalized(
+            "filmtone.camera.vlog",
+            defaultValue: "V-Log",
+            comment: "Built-in camera source profile name (Panasonic V-Log)."
+        )
+        cameraSLog3 = filmtoneLocalized(
+            "filmtone.camera.slog3",
+            defaultValue: "S-Log3",
+            comment: "Built-in camera source profile name (Sony S-Log3)."
+        )
+        cameraRec709 = filmtoneLocalized(
+            "filmtone.camera.rec709",
+            defaultValue: "Rec.709",
+            comment: "Built-in camera source profile name (Rec.709 passthrough)."
         )
         cameraCustom = filmtoneLocalized(
             "filmtone.camera.custom",

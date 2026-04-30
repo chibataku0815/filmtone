@@ -77,6 +77,7 @@
 		D20000010000000000000017 /* FilmtoneBuiltInCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000017 /* FilmtoneBuiltInCatalog.swift */; };
 		D20000010000000000000018 /* FilmtoneSourceProfileSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000018 /* FilmtoneSourceProfileSchema.swift */; };
 		D20000010000000000000019 /* FilmtoneSourceProfileMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000019 /* FilmtoneSourceProfileMath.swift */; };
+		D2000001000000000000001A /* FilmtoneSourceProfileCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000001A /* FilmtoneSourceProfileCatalog.swift */; };
 		D588A95BF7748786256BD9E2 /* CancelExportIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B14DB40995D16C85F10AC9F5 /* CancelExportIntent.swift */; };
 		E10000010000000000000001 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = F10000010000000000000001 /* Localizable.xcstrings */; };
 		E10000010000000000000002 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = F10000010000000000000003 /* InfoPlist.strings */; };
@@ -190,6 +191,7 @@
 		C20000010000000000000017 /* FilmtoneBuiltInCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneBuiltInCatalog.swift; sourceTree = "<group>"; };
 		C20000010000000000000018 /* FilmtoneSourceProfileSchema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneSourceProfileSchema.swift; sourceTree = "<group>"; };
 		C20000010000000000000019 /* FilmtoneSourceProfileMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneSourceProfileMath.swift; sourceTree = "<group>"; };
+		C2000001000000000000001A /* FilmtoneSourceProfileCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneSourceProfileCatalog.swift; sourceTree = "<group>"; };
 		E92BBC4019AD97D40A52D6E1 /* FilmtoneExportAttributes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtoneExportAttributes.swift; sourceTree = "<group>"; };
 		F10000010000000000000001 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		F10000010000000000000002 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/InfoPlist.strings; sourceTree = "<group>"; };
@@ -316,6 +318,7 @@
 				C20000010000000000000017 /* FilmtoneBuiltInCatalog.swift */,
 				C20000010000000000000018 /* FilmtoneSourceProfileSchema.swift */,
 				C20000010000000000000019 /* FilmtoneSourceProfileMath.swift */,
+				C2000001000000000000001A /* FilmtoneSourceProfileCatalog.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -591,6 +594,7 @@
 				D20000010000000000000017 /* FilmtoneBuiltInCatalog.swift in Sources */,
 				D20000010000000000000018 /* FilmtoneSourceProfileSchema.swift in Sources */,
 				D20000010000000000000019 /* FilmtoneSourceProfileMath.swift in Sources */,
+				D2000001000000000000001A /* FilmtoneSourceProfileCatalog.swift in Sources */,
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				94B98E313D898089A3F2D764 /* FilmtoneExportAttributes.swift in Sources */,
 				D588A95BF7748786256BD9E2 /* CancelExportIntent.swift in Sources */,
