@@ -140,10 +140,28 @@ def localized_release_note_texts
   }.compact
 end
 
+def localized_metadata_texts(filename)
+  SCREENSHOT_LOCALES.each_with_object({}) do |locale, memo|
+    text = read_text_if_present(File.join(METADATA_TEMPLATE_PATH, locale, filename))
+    memo[locale] = text if text
+  end
+end
+
 def localized_build_release_notes
   localized_release_note_texts.each_with_object({}) do |(locale, notes), memo|
     memo[locale] = { whats_new: notes }
   end
+end
+
+def localized_store_metadata_options
+  {
+    name: localized_metadata_texts("name.txt"),
+    subtitle: localized_metadata_texts("subtitle.txt"),
+    keywords: localized_metadata_texts("keywords.txt"),
+    promotional_text: localized_metadata_texts("promotional_text.txt"),
+    description: localized_metadata_texts("description.txt"),
+    release_notes: localized_release_note_texts,
+  }.reject { |_, value| value.empty? }
 end
 
 def stage_metadata!
@@ -390,7 +408,7 @@ platform :ios do
       submission_information: {
         export_compliance_uses_encryption: false,
       },
-      release_notes: localized_release_note_texts
+      **localized_store_metadata_options
     )
   end
 
@@ -443,10 +461,10 @@ platform :ios do
       submission_information: {
         export_compliance_uses_encryption: false,
       },
-      release_notes: localized_release_note_texts,
       screenshots_path: SCREENSHOTS_PATH,
       skip_screenshots: false,
       overwrite_screenshots: truthy_env?("OVERWRITE_SCREENSHOTS"),
+      **localized_store_metadata_options
     }
 
     upload_to_app_store(**upload_options)
@@ -491,7 +509,7 @@ platform :ios do
       submission_information: {
         export_compliance_uses_encryption: false,
       },
-      release_notes: localized_release_note_texts
+      **localized_store_metadata_options
     )
   end
 end
