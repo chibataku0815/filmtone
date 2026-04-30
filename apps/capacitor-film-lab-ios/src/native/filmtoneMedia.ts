@@ -21,7 +21,11 @@ export interface FilmtoneMediaPlugin {
   renderPreviewFrame(request: Phase0ExportRequest): Promise<Phase0PreviewRenderResult>;
   runExport(request: Phase0ExportRequest): Promise<Phase0ExportResult>;
   saveToPhotos(options: { uri: string }): Promise<void>;
-  shareOutput(options: { uri: string }): Promise<void>;
+  shareOutput(options: {
+    uri: string;
+    sidecarUri?: string;
+    packageFileUris?: string[];
+  }): Promise<void>;
   cancelExport(): Promise<void>;
   addListener(
     eventName: "exportProgress",

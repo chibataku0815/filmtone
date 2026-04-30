@@ -1419,7 +1419,8 @@ final class FilmtoneEditorStore: ObservableObject {
         do {
             try await facade.saveToPhotos(uri: result.outputUri)
             saveToPhotosState = .saved
-            discardLocalExportFiles(result)
+            // Keep the local export package available after Photos save so the
+            // same result can still be shared or inspected from the app cache.
             notice = strings.saveToPhotosDone
             error = nil
             presentToast(strings.toastSaveSuccess, kind: .success)
@@ -1441,7 +1442,8 @@ final class FilmtoneEditorStore: ObservableObject {
                 packageFileURIs: exportResult.packageFileUris
             )
             if completed {
-                discardLocalExportFiles(exportResult)
+                notice = nil
+                error = nil
             }
         } catch {
             self.error = strings.userMessage(for: error, context: .share)

@@ -429,9 +429,11 @@ struct Phase0ExportResultDTO: Encodable {
     // v1.1: filmtone-ios-export-session-v1 sidecar JSON URI (app container temp URL).
     //       nil when sidecar write failed or disabled.
     let sidecarUri: String?
-    // v1.3 DaVinci spike: optional list of package file URIs when the export
-    // produced a multi-file package (e.g. Filmtone Connect for DaVinci).
-    // nil for normal single-file exports.
+    // Filmtone Connect package companions ordered for sharing:
+    // rendered media, sidecar, source media copy, combined-color.cube,
+    // optional DCTL bridge, reference-after.jpg.
+    // (v1.3 DaVinci spike → v1.4 retained as the canonical Connect package
+    // surface alongside savedLook / cameraProfile sidecar provenance.)
     let packageFileUris: [String]?
 
     init(

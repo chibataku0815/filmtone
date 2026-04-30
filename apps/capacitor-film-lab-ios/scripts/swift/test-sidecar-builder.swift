@@ -20,6 +20,9 @@ struct TestSidecarBuilder {
         try runImageJobDerivation()
         try runSavedLookProvenance()
         try runCameraProfileProvenance()
+        try runConnectPackageUriOrdering()
+        try runConnectCubeWriter()
+        try runConnectDctlWriter()
         print("Sidecar builder tests passed")
     }
 
@@ -65,6 +68,16 @@ struct TestSidecarBuilder {
                 sourceMetadata: request.sourceProbe?.sourceVideoMetadata?.color,
                 sourceColorClass: request.sourceProbe?.sourceVideoMetadata?.colorClass
             ),
+            package: SidecarPackage(
+                sourceMediaFilename: "phase0-source.mov",
+                renderedMediaFilename: "phase0-export.mp4",
+                referenceAfterFilename: "reference-after.jpg",
+                referenceAfterTimeSec: 1.05,
+                combinedColorFilename: "combined-color.cube",
+                preOpticalColorFilename: "pre-optical-color.cube",
+                postOpticalColorFilename: "post-optical-color.cube",
+                effectsDctlFilename: "filmtone-bridge.dctl"
+            ),
             depth: nil,
             appliedSavedLook: nil,
             cameraProfile: nil
@@ -108,6 +121,19 @@ struct TestSidecarBuilder {
         try expect(parsed.job == "video", "job mismatch for HLG video fixture")
         try expect(parsed.device.model == "iPhone16,2", "device.model mismatch")
         try expect(parsed.device.iosVersion == "17.5", "device.iosVersion mismatch")
+        try expect(parsed.package?.layout == "filmtone-connect-package-v2", "package.layout mismatch")
+        try expect(parsed.package?.mediaFilename == "phase0-source.mov", "package.mediaFilename should alias source media")
+        try expect(parsed.package?.sourceMediaFilename == "phase0-source.mov", "package.sourceMediaFilename mismatch")
+        try expect(parsed.package?.renderedMediaFilename == "phase0-export.mp4", "package.renderedMediaFilename mismatch")
+        try expect(parsed.package?.referenceAfterFilename == "reference-after.jpg", "package.referenceAfterFilename mismatch")
+        try expect(
+            abs((parsed.package?.referenceAfterTimeSec ?? 0) - 1.05) < 1e-9,
+            "package.referenceAfterTimeSec mismatch"
+        )
+        try expect(parsed.package?.luts.combinedColor == "combined-color.cube", "package.luts.combinedColor mismatch")
+        try expect(parsed.package?.luts.preOpticalColor == "pre-optical-color.cube", "package.luts.preOpticalColor mismatch")
+        try expect(parsed.package?.luts.postOpticalColor == "post-optical-color.cube", "package.luts.postOpticalColor mismatch")
+        try expect(parsed.package?.effects?.dctl == "filmtone-bridge.dctl", "package.effects.dctl mismatch")
 
         try expect(
             parsed.input.kind == "video",
@@ -236,6 +262,7 @@ struct TestSidecarBuilder {
                 sourceMetadata: nil,
                 sourceColorClass: nil
             ),
+            package: nil,
             depth: nil,
             appliedSavedLook: nil,
             cameraProfile: nil
@@ -247,6 +274,325 @@ struct TestSidecarBuilder {
         try expect(parsed.input.kind == "image", "input.kind should be 'image'")
         try expect(parsed.lutRefs.inputLut == nil, "no inputLut expected")
         try expect(parsed.lutRefs.creativeLut == nil, "no creativeLut expected")
+        try expect(parsed.package == nil, "package should be nil when not supplied")
+    }
+
+    static func runConnectPackageUriOrdering() throws {
+        let uris = FilmtoneConnectPackageFiles.orderedPackageFileUris(
+            renderedUri: "file:///tmp/rendered.mp4",
+            sidecarUri: "file:///tmp/rendered.mp4.filmtone-ios-export-session-v1.json",
+            sourceMediaUri: "file:///tmp/source.mov",
+            preOpticalCubeUri: "file:///tmp/pre-optical-color.cube",
+            postOpticalCubeUri: "file:///tmp/post-optical-color.cube",
+            cubeUri: "file:///tmp/combined-color.cube",
+            dctlUri: "file:///tmp/filmtone-bridge.dctl",
+            referenceAfterUri: "file:///tmp/reference-after.jpg"
+        )
+        try expect(
+            uris == [
+                "file:///tmp/rendered.mp4",
+                "file:///tmp/rendered.mp4.filmtone-ios-export-session-v1.json",
+                "file:///tmp/source.mov",
+                "file:///tmp/pre-optical-color.cube",
+                "file:///tmp/post-optical-color.cube",
+                "file:///tmp/combined-color.cube",
+                "file:///tmp/filmtone-bridge.dctl",
+                "file:///tmp/reference-after.jpg",
+            ],
+            "connect package URI ordering changed"
+        )
+    }
+
+    // MARK: - Connect cube writer
+
+    static func runConnectCubeWriter() throws {
+        let request = Phase0ExportRequestDTO(
+            sourceUri: "file:///tmp/phase0-source.jpg",
+            sourceKind: .image,
+            sourceProbe: nil,
+            output: Phase0OutputProfileDTO(
+                longEdge: 2048,
+                fps: 24,
+                codec: "h264",
+                container: "mp4",
+                preserveAudio: false
+            ),
+            grade: Phase0GradeDTO(
+                presetName: "cinematic",
+                presetVersion: "v1",
+                quickState: Phase0QuickStateDTO(filmCharacter: 0, era: 0, dynamics: 0),
+                params: zeroParams()
+            ),
+            lut: nil,
+            inputLut: nil,
+            creativeLut: nil,
+            renderMode: nil,
+            depthEnabled: nil,
+            depthRenderer: nil
+        )
+
+        let text = FilmtoneConnectCubeWriter.makeCombinedColorCubeText(for: request, size: 2)
+        try expect(text.contains("TITLE \"Filmtone Combined Color\""), "cube title missing")
+        try expect(text.contains("LUT_3D_SIZE 2"), "cube size header missing")
+        try expect(text.contains("DOMAIN_MIN 0.0 0.0 0.0"), "cube DOMAIN_MIN missing")
+        try expect(text.contains("DOMAIN_MAX 1.0 1.0 1.0"), "cube DOMAIN_MAX missing")
+
+        let dataLines = text
+            .split(separator: "\n")
+            .filter { line in
+                line.first?.isNumber == true || line.first == "-"
+            }
+        try expect(dataLines.count == 8, "size 2 cube should emit 8 RGB rows, got \(dataLines.count)")
+        try expect(
+            dataLines.allSatisfy { $0.split(separator: " ").count == 3 },
+            "cube rows should contain RGB triples only"
+        )
+        try expect(dataLines.first == "0.0000000 0.0000000 0.0000000", "identity cube first RGB row mismatch")
+        try expect(dataLines.last == "1.0000000 1.0000000 1.0000000", "identity cube last RGB row mismatch")
+
+        let tempURL = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("filmtone-connect-test-\(UUID().uuidString).cube")
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+        try FilmtoneConnectCubeWriter.writeCombinedColorCube(for: request, to: tempURL, size: 2)
+        try expect(FileManager.default.fileExists(atPath: tempURL.path), "cube writer did not create a file")
+    }
+
+    static func runConnectDctlWriter() throws {
+        let request = Phase0ExportRequestDTO(
+            sourceUri: "file:///tmp/phase0-source.mov",
+            sourceKind: .video,
+            sourceProbe: nil,
+            output: Phase0OutputProfileDTO(
+                longEdge: 2048,
+                fps: 24,
+                codec: "h264",
+                container: "mp4",
+                preserveAudio: true
+            ),
+            grade: Phase0GradeDTO(
+                presetName: "cinematic",
+                presetVersion: "v1",
+                quickState: Phase0QuickStateDTO(filmCharacter: 0, era: 0, dynamics: 0),
+                params: Phase0ParamsDTO(
+                    exposure: 0, contrast: 1, saturation: 1, temperature: 0, tint: 0,
+                    rgbShift: 0.002, lensSoftness: 0, grainRadialMix: 0.4, grainSize: 0.3,
+                    bloomThreshold: 0, bloomStrength: 0, bloomRadius: 0,
+                    diffusion: 0.09, halationIntensity: 0, halationSpread: 0,
+                    halationHue: 0, halationThreshold: 0, halationRadius: 0,
+                    bloomSoftKnee: 0, halationSoftKnee: 0, compressionAmount: 0,
+                    compressionRange: 0, printContrast: 0, cyan: 0, magenta: 0,
+                    yellow: 0, shutterAngle: 0, trailIntensity: 0,
+                    fade: 0,
+                    shadowTone: 0, highlightTone: 0,
+                    shadowHue: 225, highlightHue: 30,
+                    vignette: 0.2, grainIntensity: 0.12
+                )
+            ),
+            lut: nil,
+            inputLut: nil,
+            creativeLut: nil,
+            renderMode: nil,
+            depthEnabled: nil,
+            depthRenderer: nil
+        )
+
+        let text = FilmtoneConnectDctlWriter.makeBridgeDctlText(
+            for: request,
+            cubeFilename: "combined-color.cube",
+            preOpticalColorFilename: "pre-optical-color.cube",
+            postOpticalColorFilename: "post-optical-color.cube",
+            outputFps: 24,
+            sourceSeed: 123.4
+        )
+        try expect(text.contains("DEFINE_LUT(FilmtonePreOpticalColor, pre-optical-color.cube)"), "DCTL should reference pre-optical cube")
+        try expect(text.contains("DEFINE_LUT(FilmtonePostOpticalColor, post-optical-color.cube)"), "DCTL should reference post-optical cube")
+        try expect(text.contains("APPLY_LUT"), "DCTL should apply the color bridge LUT")
+        try expect(text.contains("__TEXTURE__ p_TexR"), "DCTL should use Resolve texture sampling")
+        try expect(text.contains("explicit visual equivalence blockers"), "DCTL should declare unresolved effect coverage")
+        try expect(text.contains("Resolve texture color"), "DCTL should document Resolve texture color compensation")
+        let hlgFixtureURL = URL(fileURLWithPath: CommandLine.arguments[1])
+        let hlgRequest = try JSONDecoder().decode(
+            Phase0ExportRequestDTO.self,
+            from: Data(contentsOf: hlgFixtureURL)
+        )
+        let hlgText = FilmtoneConnectDctlWriter.makeBridgeDctlText(
+            for: hlgRequest,
+            cubeFilename: "combined-color.cube",
+            preOpticalColorFilename: "pre-optical-color.cube",
+            postOpticalColorFilename: "post-optical-color.cube",
+            outputFps: 24,
+            sourceSeed: 123.4
+        )
+        try expect(
+            hlgText.contains("rgb.x * 0.920000000f")
+                && hlgText.contains("rgb.y * 0.883000000f")
+                && hlgText.contains("rgb.z * 0.924000000f"),
+            "HLG DCTL should carry Resolve texture compensation gains"
+        )
+        let appleLogRequest = Phase0ExportRequestDTO(
+            sourceUri: "file:///tmp/apple-log-source.mov",
+            sourceKind: .video,
+            sourceProbe: SourceProbeDTO(
+                uri: "file:///tmp/apple-log-source.mov",
+                filename: "apple-log-source",
+                kind: .video,
+                mimeType: "video/quicktime",
+                width: 2160,
+                height: 3840,
+                durationSec: 23.5,
+                fileSizeBytes: 1_000_000,
+                codec: "apcs",
+                codecFamily: .prores422,
+                frameRate: 24,
+                logTransferFunction: .appleLog,
+                inputTransformPolicy: SourceInputTransformPolicyDTO(
+                    strategy: .appleLogToRec709,
+                    reason: "source-is-apple-log",
+                    requiresFixtureValidation: true,
+                    warning: nil
+                ),
+                cameraOptics: nil,
+                sourceVideoMetadata: SourceVideoMetadataDTO(
+                    display: SourceDisplayGeometryDTO(
+                        rawWidth: 3840,
+                        rawHeight: 2160,
+                        displayWidth: 2160,
+                        displayHeight: 3840,
+                        rotationDeg: 90,
+                        source: "preferred-transform"
+                    ),
+                    color: SourceColorMetadataDTO(
+                        colorRange: nil,
+                        colorSpace: "bt2020nc",
+                        colorTransfer: "apple-log",
+                        colorPrimaries: "bt2020",
+                        logTransferFunction: .appleLog,
+                        hasMasteringDisplayMetadata: false,
+                        hasContentLightMetadata: false
+                    ),
+                    colorClass: .appleLog,
+                    hdrPreparationPolicy: nil,
+                    timing: nil,
+                    codecFamily: .prores422,
+                    logTransferFunction: .appleLog,
+                    inputTransformPolicy: SourceInputTransformPolicyDTO(
+                        strategy: .appleLogToRec709,
+                        reason: "source-is-apple-log",
+                        requiresFixtureValidation: true,
+                        warning: nil
+                    )
+                )
+            ),
+            output: Phase0OutputProfileDTO(
+                longEdge: 2048,
+                fps: 24,
+                codec: "h264",
+                container: "mp4",
+                preserveAudio: true
+            ),
+            grade: Phase0GradeDTO(
+                presetName: "reset",
+                presetVersion: "v1",
+                quickState: Phase0QuickStateDTO(filmCharacter: 0, era: 0, dynamics: 0),
+                params: zeroParams()
+            ),
+            lut: nil,
+            inputLut: nil,
+            creativeLut: nil,
+            renderMode: nil,
+            depthEnabled: nil,
+            depthRenderer: nil
+        )
+        let appleLogText = FilmtoneConnectDctlWriter.makeBridgeDctlText(
+            for: appleLogRequest,
+            cubeFilename: "combined-color.cube",
+            preOpticalColorFilename: "pre-optical-color.cube",
+            postOpticalColorFilename: "post-optical-color.cube",
+            outputFps: 24,
+            sourceSeed: 123.4
+        )
+        try expect(
+            appleLogText.contains("rgb.x * 0.499989650f + 0.469398630f")
+                && appleLogText.contains("rgb.y * 0.528461180f + 0.388497540f")
+                && appleLogText.contains("rgb.z * 0.514997770f + 0.368480300f"),
+            "Apple Log DCTL should carry C052 affine Resolve texture calibration"
+        )
+        try expect(text.contains("filmtone_clamp_int"), "DCTL should include scalar-safe RGB shift sampling bounds")
+        try expect(text.contains("filmtone_smoothstep"), "DCTL should include scalar-safe edge softness mask")
+        try expect(text.contains("edge-masked softness"), "DCTL should document edge-masked softness coverage")
+        try expect(text.contains("softenRadius"), "DCTL should sample edge softness taps")
+        try expect(text.contains("float edgeMask = filmtone_smoothstep(0.25f, 1.0f, edgeR);"), "DCTL should use the iOS edge mask ramp")
+        try expect(text.contains("float blurR = r * 0.400000000f"), "DCTL should blur with scalar channel taps")
+        try expect(text.contains("float outR = r * (1.0f - softenAmt) + blurR * softenAmt;"), "DCTL should blend softness before the post LUT")
+        try expect(text.contains("multi-radius mip-like diffusion"), "DCTL should document multi-radius diffusion coverage")
+        try expect(text.contains("filmtone_glow_shoulder"), "DCTL should include scalar-safe diffusion shoulder")
+        try expect(text.contains("int md0Radius = 3;"), "DCTL should sample near mip-like diffusion taps")
+        try expect(text.contains("int md3Radius = 31;"), "DCTL should sample wide mip-like diffusion taps")
+        try expect(text.contains("float diffR = (outR * 0.120000000f)"), "DCTL should build a scalar multi-radius diffusion plate")
+        try expect(text.contains("float diffSpatial = 1.0f - filmtone_smoothstep(0.250000000f, 0.800000000f, edgeR);"), "DCTL should gate diffusion away from already-bright edges")
+        try expect(text.contains("float diffGlowR = filmtone_glow_shoulder(diffR * 0.053000000f * diffSpatial) * diffHeadroom;"), "DCTL should scale diffusion from the request amount")
+        try expect(text.contains("redSample = APPLY_LUT"), "DCTL should pre-LUT the red RGB shift sample")
+        try expect(
+            text.contains("float r = center.x * 0.712000000f + redSample.x * 0.288000000f;"),
+            "DCTL should scale RGB shift mix from the request amount"
+        )
+        try expect(!text.contains("filmtone_apply_vignette"), "DCTL should not include unverified vignette approximation")
+        try expect(!text.contains("filmtone_clamp3"), "DCTL should avoid custom float3 helpers that Resolve rejects")
+        try expect(!text.contains("__DEVICE__ float3 filmtone"), "DCTL should avoid custom float3 helpers that Resolve rejects")
+        try expect(!text.contains("filmtone_grain"), "DCTL should not include unverified grain approximation")
+
+        let zeroOpticsRequest = Phase0ExportRequestDTO(
+            sourceUri: "file:///tmp/phase0-source.mov",
+            sourceKind: .video,
+            sourceProbe: nil,
+            output: Phase0OutputProfileDTO(
+                longEdge: 2048,
+                fps: 24,
+                codec: "h264",
+                container: "mp4",
+                preserveAudio: true
+            ),
+            grade: Phase0GradeDTO(
+                presetName: "reset",
+                presetVersion: "v1",
+                quickState: Phase0QuickStateDTO(filmCharacter: 0, era: 0, dynamics: 0),
+                params: zeroParams()
+            ),
+            lut: nil,
+            inputLut: nil,
+            creativeLut: nil,
+            renderMode: nil,
+            depthEnabled: nil,
+            depthRenderer: nil
+        )
+        let zeroOpticsText = FilmtoneConnectDctlWriter.makeBridgeDctlText(
+            for: zeroOpticsRequest,
+            cubeFilename: "combined-color.cube",
+            preOpticalColorFilename: "pre-optical-color.cube",
+            postOpticalColorFilename: "post-optical-color.cube",
+            outputFps: 24,
+            sourceSeed: 123.4
+        )
+        try expect(zeroOpticsText.contains("rgb = APPLY_LUT(rgb.x, rgb.y, rgb.z, FilmtonePreOpticalColor);"), "zero-optics DCTL should keep the compact split color path")
+        try expect(!zeroOpticsText.contains("filmtone_clamp_int"), "zero-optics DCTL should not include texture tap bounds")
+        try expect(!zeroOpticsText.contains("filmtone_smoothstep"), "zero-optics DCTL should not include edge softness helpers")
+        try expect(!zeroOpticsText.contains("filmtone_glow_shoulder"), "zero-optics DCTL should not include diffusion helpers")
+        try expect(!zeroOpticsText.contains("softenRadius"), "zero-optics DCTL should not sample softness taps")
+        try expect(!zeroOpticsText.contains("diffusionRadius"), "zero-optics DCTL should not sample diffusion taps")
+
+        let tempURL = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("filmtone-connect-test-\(UUID().uuidString).dctl")
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+        try FilmtoneConnectDctlWriter.writeBridgeDctl(
+            for: request,
+            cubeFilename: "combined-color.cube",
+            preOpticalColorFilename: "pre-optical-color.cube",
+            postOpticalColorFilename: "post-optical-color.cube",
+            outputFps: 24,
+            sourceSeed: 123.4,
+            to: tempURL
+        )
+        try expect(FileManager.default.fileExists(atPath: tempURL.path), "DCTL writer did not create a file")
     }
 
     // MARK: - v1.3 Item 2 Phase E: Saved Look provenance
@@ -318,6 +664,7 @@ struct TestSidecarBuilder {
             mezzanineUsedVariant: nil,
             mezzanineProfileVersion: nil,
             colorPipeline: colorPipeline,
+            package: nil,
             depth: nil,
             appliedSavedLook: builtInRef,
             cameraProfile: nil
@@ -379,6 +726,7 @@ struct TestSidecarBuilder {
             mezzanineUsedVariant: nil,
             mezzanineProfileVersion: nil,
             colorPipeline: colorPipeline,
+            package: nil,
             depth: nil,
             appliedSavedLook: userRef,
             cameraProfile: nil
@@ -432,6 +780,7 @@ struct TestSidecarBuilder {
             mezzanineUsedVariant: nil,
             mezzanineProfileVersion: nil,
             colorPipeline: colorPipeline,
+            package: nil,
             depth: nil,
             appliedSavedLook: nil,
             cameraProfile: nil
@@ -514,6 +863,7 @@ struct TestSidecarBuilder {
             mezzanineUsedVariant: nil,
             mezzanineProfileVersion: nil,
             colorPipeline: colorPipeline,
+            package: nil,
             depth: nil,
             appliedSavedLook: nil,
             cameraProfile: vlogProfile
@@ -566,6 +916,7 @@ struct TestSidecarBuilder {
             mezzanineUsedVariant: nil,
             mezzanineProfileVersion: nil,
             colorPipeline: colorPipeline,
+            package: nil,
             depth: nil,
             appliedSavedLook: nil,
             cameraProfile: autoProfile
@@ -598,6 +949,7 @@ struct TestSidecarBuilder {
             mezzanineUsedVariant: nil,
             mezzanineProfileVersion: nil,
             colorPipeline: colorPipeline,
+            package: nil,
             depth: nil,
             appliedSavedLook: nil,
             cameraProfile: nil
@@ -648,6 +1000,7 @@ private struct ParsedSidecar: Decodable {
     let look: ParsedLook
     let lutRefs: ParsedLutRefs
     let output: ParsedOutput
+    let package: ParsedPackage?
 }
 
 private struct ParsedDevice: Decodable {
@@ -727,4 +1080,27 @@ private struct ParsedCameraProfile: Decodable {
     let curve: String?
     let impl: String?
     let resolvedFromAutoVia: String?
+}
+
+// v1.3 DaVinci spike: Decodable surface for the Filmtone Connect package
+// assertions (URI ordering / cube writer / DCTL writer tests).
+private struct ParsedPackage: Decodable {
+    let layout: String
+    let mediaFilename: String
+    let sourceMediaFilename: String
+    let renderedMediaFilename: String
+    let referenceAfterFilename: String
+    let referenceAfterTimeSec: Double
+    let luts: ParsedPackageLuts
+    let effects: ParsedPackageEffects?
+}
+
+private struct ParsedPackageLuts: Decodable {
+    let combinedColor: String
+    let preOpticalColor: String?
+    let postOpticalColor: String?
+}
+
+private struct ParsedPackageEffects: Decodable {
+    let dctl: String?
 }

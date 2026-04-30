@@ -285,9 +285,19 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
         Task { @MainActor in
             do {
                 let options = try call.decode(ShareOptions.self)
-                let fileURL = try resolveFileURL(options.uri)
+                let fileURLs: [URL]
+                if let packageFileUris = options.packageFileUris, !packageFileUris.isEmpty {
+                    fileURLs = try packageFileUris.map { try resolveFileURL($0) }
+                } else {
+                    var fallbackURLs = [try resolveFileURL(options.uri)]
+                    if let sidecarUri = options.sidecarUri,
+                       let sidecarURL = try? resolveFileURL(sidecarUri) {
+                        fallbackURLs.append(sidecarURL)
+                    }
+                    fileURLs = fallbackURLs
+                }
                 try await runtime.shareOutput(
-                    fileURLs: [fileURL],
+                    fileURLs: fileURLs,
                     title: options.title,
                     text: options.text,
                     presenting: viewController
@@ -383,6 +393,8 @@ private struct UriOptions: Decodable {
 
 private struct ShareOptions: Decodable {
     let uri: String
+    let sidecarUri: String?
+    let packageFileUris: [String]?
     let title: String?
     let text: String?
 }

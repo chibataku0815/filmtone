@@ -143,8 +143,8 @@ final class FilmtoneEditorFacade {
         try await runtime.saveToPhotos(uri: uri)
     }
 
-    /// Share the exported media and, when present, the v1 sidecar JSON as a
-    /// second item. Single-item share targets still receive the primary media
+    /// Share the exported media and, when present, the full Filmtone Connect
+    /// companion set. Single-item share targets still receive the primary media
     /// because it's the first entry in `fileURLs`.
     ///
     /// When `packageFileURIs` is non-empty (DaVinci Connect package export
@@ -178,6 +178,7 @@ final class FilmtoneEditorFacade {
         return try await runtime.shareOutput(
             uri: mediaURI,
             sidecarUri: sidecarURI,
+            packageFileUris: packageFileURIs,
             presenting: presenter
         )
     }
