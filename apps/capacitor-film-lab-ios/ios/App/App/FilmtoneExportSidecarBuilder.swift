@@ -48,6 +48,12 @@ struct SidecarBuildInputs {
     /// into this builder-local struct so the sidecar contract test stays free
     /// of `FilmtoneLibrarySchema` dependencies.
     let appliedSavedLook: SidecarSavedLookRef?
+    /// v1.3 Camera Profiles Phase G: source-profile provenance. Identifies
+    /// which Camera Profile drove the input normalization, plus the
+    /// auto-resolution probe class when applicable. nil for legacy callers
+    /// (preserves byte-identical sidecar output for paths that haven't
+    /// adopted Phase G yet).
+    let cameraProfile: SidecarCameraProfile?
 }
 
 // MARK: - Sidecar schema (filmtone-ios-export-session-v1)
@@ -86,6 +92,10 @@ struct FilmtoneExportSidecarV1: Encodable {
     /// applied to this export at run time. nil when no Saved Look was active.
     /// Additive optional field — V1 readers ignore unknown keys (CLAUDE.md §5).
     let savedLook: SidecarSavedLookRef?
+    /// v1.3 Camera Profiles Phase G: which Camera Profile drove the input
+    /// normalization for this export. Additive optional V1 field; nil
+    /// preserves the v1.2-shaped sidecar.
+    let cameraProfile: SidecarCameraProfile?
 }
 
 struct SidecarDevice: Encodable {
@@ -146,6 +156,37 @@ struct SidecarOutput: Encodable {
     let colorPrimaries: String
     let colorTransfer: String
     let colorSpace: String
+}
+
+/// v1.3 Camera Profiles Phase G: provenance for the Camera Profile that
+/// drove input normalization for this export. Builder-local struct (the
+/// standalone sidecar contract test can't compile FilmtoneSourceProfileSchema
+/// without dragging in the wider media types graph) — `FilmtoneExportSession`
+/// flattens `CameraProfileSelection` + the resolved catalog entry into
+/// these stringly-typed fields.
+///
+/// Field semantics:
+///
+/// - `selectionKind`: which `CameraProfileSelection` case applied
+///   (`"auto" | "built-in" | "user-import"`).
+/// - `catalogId`: the namespaced catalog id, only set when `selectionKind`
+///   is `"built-in"` or when `.auto` resolved through the catalog at
+///   export time.
+/// - `curve`: the `SourceProfileCurve` raw value (`"apple-log"` /
+///   `"apple-log-2"` / `"panasonic-vlog"` / `"sony-slog3"`), nil for
+///   `nilProfile` / `userImport`.
+/// - `impl`: the `SourceProfileImpl` discriminator (`"native-policy"` /
+///   `"synthesized"` / `"nil-profile"` / `"bundled-cube"`), nil only when
+///   the export ran without a recognized profile (auto with no probe).
+/// - `resolvedFromAutoVia`: when `selectionKind == "auto"`, records which
+///   probe `colorClass` selected the catalog entry (e.g. `"apple-log"`).
+///   nil when the user explicitly picked the profile.
+struct SidecarCameraProfile: Encodable {
+    let selectionKind: String
+    let catalogId: String?
+    let curve: String?
+    let impl: String?
+    let resolvedFromAutoVia: String?
 }
 
 /// v1.3 Item 2 Phase E: provenance entry for a Saved Look applied to the
@@ -299,7 +340,8 @@ enum FilmtoneExportSidecarBuilder {
             renderMode: inputs.renderMode,
             mezzanine: mezzanine,
             depth: depth,
-            savedLook: inputs.appliedSavedLook
+            savedLook: inputs.appliedSavedLook,
+            cameraProfile: inputs.cameraProfile
         )
     }
 

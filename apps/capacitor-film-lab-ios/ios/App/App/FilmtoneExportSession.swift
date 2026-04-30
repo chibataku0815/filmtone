@@ -293,6 +293,16 @@ final class FilmtoneExportSession {
             )
         }
 
+        // v1.3 Camera Profiles Phase G: flatten the active CameraProfileSelection
+        // (+ resolved catalog entry if any) into stringly-typed sidecar
+        // fields. Auto + no probe match → selectionKind="auto", no catalog
+        // entry. Auto + match → catalog id and resolvedFromAutoVia set so
+        // downstream readers can tell user-explicit picks from auto picks.
+        let cameraProfileBlock: SidecarCameraProfile? = Self.makeCameraProfileSidecar(
+            for: cameraProfileSelection,
+            probeColorClass: request.sourceProbe?.sourceVideoMetadata?.colorClass
+        )
+
         let inputs = SidecarBuildInputs(
             request: request,
             sourceProbe: request.sourceProbe,
@@ -313,7 +323,8 @@ final class FilmtoneExportSession {
             mezzanineProfileVersion: didUseMezzanineVariant != nil ? MezzanineService.Profile.version : nil,
             colorPipeline: colorPipeline,
             depth: depthSidecar,
-            appliedSavedLook: savedLookRef
+            appliedSavedLook: savedLookRef,
+            cameraProfile: cameraProfileBlock
         )
 
         let sidecarURL = FilmtoneExportSidecarBuilder.sidecarURL(for: outputURL)
@@ -2245,6 +2256,73 @@ final class FilmtoneExportSession {
             intensity: lut.intensity,
             cubeData: cubeData
         )
+    }
+
+    /// v1.3 Camera Profiles Phase G: build the sidecar provenance block
+    /// for the active selection. Returns nil when the selection is `.auto`
+    /// AND the probe doesn't resolve to any catalog entry — the legacy
+    /// "auto, no source profile" case stays byte-identical to v1.2.
+    private static func makeCameraProfileSidecar(
+        for selection: CameraProfileSelection?,
+        probeColorClass: SourceColorClassDTO?
+    ) -> SidecarCameraProfile? {
+        switch selection ?? .auto {
+        case .auto:
+            // Auto with a probe that maps to a catalog entry — record the
+            // resolution. Auto without a match returns nil so the v1.2
+            // "no profile applied" path keeps producing an empty
+            // cameraProfile block.
+            guard let entry = FilmtoneSourceProfileCatalog.entry(forColorClass: probeColorClass) else {
+                return SidecarCameraProfile(
+                    selectionKind: "auto",
+                    catalogId: nil,
+                    curve: nil,
+                    impl: nil,
+                    resolvedFromAutoVia: probeColorClass?.rawValue
+                )
+            }
+            return SidecarCameraProfile(
+                selectionKind: "auto",
+                catalogId: entry.id,
+                curve: entry.curve?.rawValue,
+                impl: implTag(entry.impl),
+                resolvedFromAutoVia: probeColorClass?.rawValue
+            )
+        case .builtIn(let catalogId):
+            guard let entry = FilmtoneSourceProfileCatalog.entry(forCatalogId: catalogId) else {
+                return SidecarCameraProfile(
+                    selectionKind: "built-in",
+                    catalogId: catalogId,
+                    curve: nil,
+                    impl: nil,
+                    resolvedFromAutoVia: nil
+                )
+            }
+            return SidecarCameraProfile(
+                selectionKind: "built-in",
+                catalogId: entry.id,
+                curve: entry.curve?.rawValue,
+                impl: implTag(entry.impl),
+                resolvedFromAutoVia: nil
+            )
+        case .userImport:
+            return SidecarCameraProfile(
+                selectionKind: "user-import",
+                catalogId: nil,
+                curve: nil,
+                impl: nil,
+                resolvedFromAutoVia: nil
+            )
+        }
+    }
+
+    private static func implTag(_ impl: SourceProfileImpl) -> String {
+        switch impl {
+        case .nilProfile:    return "nil-profile"
+        case .nativePolicy:  return "native-policy"
+        case .synthesized:   return "synthesized"
+        case .bundledCube:   return "bundled-cube"
+        }
     }
 
     private static func makeAutomaticInputLut(for policy: SourceInputTransformPolicyDTO?) -> PreparedLut? {

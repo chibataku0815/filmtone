@@ -19,6 +19,7 @@ struct TestSidecarBuilder {
         try runSidecarURLDerivation()
         try runImageJobDerivation()
         try runSavedLookProvenance()
+        try runCameraProfileProvenance()
         print("Sidecar builder tests passed")
     }
 
@@ -65,7 +66,8 @@ struct TestSidecarBuilder {
                 sourceColorClass: request.sourceProbe?.sourceVideoMetadata?.colorClass
             ),
             depth: nil,
-            appliedSavedLook: nil
+            appliedSavedLook: nil,
+            cameraProfile: nil
         )
 
         let data = try FilmtoneExportSidecarBuilder.build(inputs)
@@ -235,7 +237,8 @@ struct TestSidecarBuilder {
                 sourceColorClass: nil
             ),
             depth: nil,
-            appliedSavedLook: nil
+            appliedSavedLook: nil,
+            cameraProfile: nil
         )
         let data = try FilmtoneExportSidecarBuilder.build(inputs)
         let parsed = try JSONDecoder().decode(ParsedSidecar.self, from: data)
@@ -316,7 +319,8 @@ struct TestSidecarBuilder {
             mezzanineProfileVersion: nil,
             colorPipeline: colorPipeline,
             depth: nil,
-            appliedSavedLook: builtInRef
+            appliedSavedLook: builtInRef,
+            cameraProfile: nil
         )
         let builtInData = try FilmtoneExportSidecarBuilder.build(builtInInputs)
         guard let builtInJson = String(data: builtInData, encoding: .utf8) else {
@@ -376,7 +380,8 @@ struct TestSidecarBuilder {
             mezzanineProfileVersion: nil,
             colorPipeline: colorPipeline,
             depth: nil,
-            appliedSavedLook: userRef
+            appliedSavedLook: userRef,
+            cameraProfile: nil
         )
         let userData = try FilmtoneExportSidecarBuilder.build(userInputs)
         guard let userJson = String(data: userData, encoding: .utf8) else {
@@ -428,7 +433,8 @@ struct TestSidecarBuilder {
             mezzanineProfileVersion: nil,
             colorPipeline: colorPipeline,
             depth: nil,
-            appliedSavedLook: nil
+            appliedSavedLook: nil,
+            cameraProfile: nil
         )
         let absentData = try FilmtoneExportSidecarBuilder.build(absentInputs)
         guard let absentJson = String(data: absentData, encoding: .utf8) else {
@@ -437,6 +443,172 @@ struct TestSidecarBuilder {
         try expect(
             !absentJson.contains("\"savedLook\""),
             "no-savedLook export unexpectedly emitted savedLook key"
+        )
+    }
+
+    // MARK: - v1.3 Camera Profiles Phase G: cameraProfile provenance
+
+    /// Verifies that the sidecar's `cameraProfile` block round-trips for
+    /// each `selectionKind` (built-in, auto, user-import). Auto without a
+    /// resolved catalog row still emits a block (selectionKind="auto",
+    /// curve/impl/catalogId nil); the absent-block path is exercised by
+    /// the existing HLG fixture test which leaves `cameraProfile: nil`.
+    static func runCameraProfileProvenance() throws {
+        let identity = SidecarDeviceIdentity(
+            appVersion: "1.3.0",
+            buildNumber: "1",
+            deviceModel: "iPhone16,2",
+            iosVersion: "17.5",
+            exportedAtIso: "2026-04-30T03:00:00Z"
+        )
+        let request = Phase0ExportRequestDTO(
+            sourceUri: "file:///tmp/phase0-source.mp4",
+            sourceKind: .video,
+            sourceProbe: nil,
+            output: Phase0OutputProfileDTO(
+                longEdge: 1920,
+                fps: 24,
+                codec: "h264",
+                container: "mp4",
+                preserveAudio: true
+            ),
+            grade: Phase0GradeDTO(
+                presetName: "iphone",
+                presetVersion: "v1",
+                quickState: Phase0QuickStateDTO(filmCharacter: 0, era: 0, dynamics: 0),
+                params: zeroParams()
+            ),
+            lut: nil,
+            inputLut: nil,
+            creativeLut: nil,
+            renderMode: nil,
+            depthEnabled: nil,
+            depthRenderer: nil
+        )
+        let colorPipeline = FilmtoneColorPipeline.defaultOutputContract(
+            sourceMetadata: nil,
+            sourceColorClass: nil
+        )
+
+        // Case 1: V-Log selected — built-in synthesized path.
+        let vlogProfile = SidecarCameraProfile(
+            selectionKind: "built-in",
+            catalogId: "built-in:source-profile.panasonic-vlog",
+            curve: "panasonic-vlog",
+            impl: "synthesized",
+            resolvedFromAutoVia: nil
+        )
+        let vlogInputs = SidecarBuildInputs(
+            request: request,
+            sourceProbe: nil,
+            hdrPolicy: nil,
+            degradedDecodePath: false,
+            outputURL: URL(fileURLWithPath: "/tmp/phase0-export.mp4"),
+            outputSize: CGSize(width: 1920, height: 1080),
+            fileSizeBytes: nil,
+            elapsedMs: 1000,
+            realtimeRatio: nil,
+            audioPreserved: true,
+            identity: identity,
+            renderMode: nil,
+            mezzanineUsedVariant: nil,
+            mezzanineProfileVersion: nil,
+            colorPipeline: colorPipeline,
+            depth: nil,
+            appliedSavedLook: nil,
+            cameraProfile: vlogProfile
+        )
+        let vlogData = try FilmtoneExportSidecarBuilder.build(vlogInputs)
+        try expect(
+            vlogData.count < 8_192,
+            "V-Log cameraProfile sidecar exceeds 8KB cap: \(vlogData.count) bytes"
+        )
+        let vlogParsed = try JSONDecoder().decode(CameraProfileProbeSidecar.self, from: vlogData)
+        try expect(vlogParsed.cameraProfile != nil, "V-Log cameraProfile block missing")
+        try expect(
+            vlogParsed.cameraProfile?.selectionKind == "built-in",
+            "V-Log selectionKind should be built-in"
+        )
+        try expect(
+            vlogParsed.cameraProfile?.catalogId == "built-in:source-profile.panasonic-vlog",
+            "V-Log catalogId mismatch"
+        )
+        try expect(
+            vlogParsed.cameraProfile?.curve == "panasonic-vlog",
+            "V-Log curve mismatch"
+        )
+        try expect(
+            vlogParsed.cameraProfile?.impl == "synthesized",
+            "V-Log impl mismatch"
+        )
+
+        // Case 2: Auto resolved through Apple Log probe.
+        let autoProfile = SidecarCameraProfile(
+            selectionKind: "auto",
+            catalogId: "built-in:source-profile.apple-log",
+            curve: "apple-log",
+            impl: "native-policy",
+            resolvedFromAutoVia: "apple-log"
+        )
+        let autoInputs = SidecarBuildInputs(
+            request: request,
+            sourceProbe: nil,
+            hdrPolicy: nil,
+            degradedDecodePath: false,
+            outputURL: URL(fileURLWithPath: "/tmp/phase0-export.mp4"),
+            outputSize: CGSize(width: 1920, height: 1080),
+            fileSizeBytes: nil,
+            elapsedMs: 1000,
+            realtimeRatio: nil,
+            audioPreserved: true,
+            identity: identity,
+            renderMode: nil,
+            mezzanineUsedVariant: nil,
+            mezzanineProfileVersion: nil,
+            colorPipeline: colorPipeline,
+            depth: nil,
+            appliedSavedLook: nil,
+            cameraProfile: autoProfile
+        )
+        let autoData = try FilmtoneExportSidecarBuilder.build(autoInputs)
+        let autoParsed = try JSONDecoder().decode(CameraProfileProbeSidecar.self, from: autoData)
+        try expect(
+            autoParsed.cameraProfile?.selectionKind == "auto",
+            "Auto selectionKind should be auto"
+        )
+        try expect(
+            autoParsed.cameraProfile?.resolvedFromAutoVia == "apple-log",
+            "Auto resolvedFromAutoVia mismatch"
+        )
+
+        // Case 3: nil cameraProfile (legacy path) — block omitted entirely.
+        let nilInputs = SidecarBuildInputs(
+            request: request,
+            sourceProbe: nil,
+            hdrPolicy: nil,
+            degradedDecodePath: false,
+            outputURL: URL(fileURLWithPath: "/tmp/phase0-export.mp4"),
+            outputSize: CGSize(width: 1920, height: 1080),
+            fileSizeBytes: nil,
+            elapsedMs: 1000,
+            realtimeRatio: nil,
+            audioPreserved: true,
+            identity: identity,
+            renderMode: nil,
+            mezzanineUsedVariant: nil,
+            mezzanineProfileVersion: nil,
+            colorPipeline: colorPipeline,
+            depth: nil,
+            appliedSavedLook: nil,
+            cameraProfile: nil
+        )
+        let nilData = try FilmtoneExportSidecarBuilder.build(nilInputs)
+        guard let nilJson = String(data: nilData, encoding: .utf8) else {
+            throw SidecarCheckError(message: "nil cameraProfile sidecar payload is not UTF-8")
+        }
+        try expect(
+            !nilJson.contains("\"cameraProfile\""),
+            "nil-cameraProfile export unexpectedly emitted cameraProfile key"
         )
     }
 
@@ -538,4 +710,18 @@ private struct ParsedSavedLookRef: Decodable {
     let updatedAtIso: String
     let bundled: Bool?
     let bundledSlug: String?
+}
+
+// v1.3 Camera Profiles Phase G: minimal Decodable surface for the
+// cameraProfile assertions.
+private struct CameraProfileProbeSidecar: Decodable {
+    let cameraProfile: ParsedCameraProfile?
+}
+
+private struct ParsedCameraProfile: Decodable {
+    let selectionKind: String
+    let catalogId: String?
+    let curve: String?
+    let impl: String?
+    let resolvedFromAutoVia: String?
 }

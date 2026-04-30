@@ -147,9 +147,13 @@ if [ -f "$SIDECAR_SCRIPT" ] && [ -f "$SIDECAR_SRC" ]; then
   # FilmtoneLutBlobCodec to populate the optional `sourceHash` field on
   # `SidecarLutRef`. Compile the codec alongside so the contract gate stays
   # self-contained — both files come from the App target.
+  # v1.3 Camera Profiles Phase E: phase0-contract-support's
+  # `Phase0ExportRequestDTO` mirror now carries `cameraProfile`, so the
+  # sidecar test compile must pull the schema in too.
   xcrun swiftc \
     -o "$SIDECAR_BIN" \
     "$SWIFT_SUPPORT" \
+    "$SOURCE_PROFILE_SCHEMA" \
     "$APP_DIR/ios/App/App/FilmtoneColorPipeline.swift" \
     "$LUT_BLOB_CODEC_SRC" \
     "$SIDECAR_SRC" \
