@@ -1,25 +1,15 @@
 # Bundled LUT slot for the Filmtone iOS signature preset
 
-The signature preset (`SIGNATURE_PRESET_NAME` in `../signature.ts`) plans to ship two `.cube` LUTs at first launch:
+`SIGNATURE_PRESET_NAME` (`../signature.ts`) used to plan two `.cube` LUTs at first launch — those slots are intentionally empty in v1.3.
 
-| Slot | Intended file | Role |
-|---|---|---|
-| `inputLut` | `vlog-to-rec709.cube` | Camera Profile (Log -> Rec.709 input transform) |
-| `creativeLut` | `filmtone-signature.cube` | Film Look (Filmtone signature creative grade) |
+## v1.3 ships zero bundled `.cube`
 
-## Current state (2026-04-18)
+Camera profiles are handled three ways:
 
-No `.cube` assets ship in the worktree yet. `SIGNATURE_LUT_PLAN[*].bundledRelPath` is `null` for both slots.
+1. **Apple Log / Apple Log 2** — native detection via `HdrPreparationPolicyDeriver` from AVFoundation metadata.
+2. **V-Log / S-Log3** — synthesized math (Log decoder + gamut matrix + 33³ cube) in `FilmtoneSourceProfileMath` / `FilmtoneSourceProfileCatalog`. Accuracy fixtures (24-patch ΔE2000 + 8-bit drift) gate at `max = 0.000`.
+3. **Rec.709** — passthrough default.
 
-The dual-LUT pipeline still works — the user picks Camera Profile / Film Look manually until bundled assets land here.
+Built-in Looks are params-only via `FilmtoneBuiltInCatalog.swift` (5 entries). `SIGNATURE_LUT_PLAN[*].bundledRelPath` stays `null`.
 
-## How to bundle
-
-1. Drop the two `.cube` files into this directory using the names listed above.
-2. Update `bundledRelPath` for each slot in `../signature.ts` to the relative path (e.g. `"luts/vlog-to-rec709.cube"`).
-3. Wire a one-time loader in the mobile editor that, on mount when `state.project.lut` is `null`, fetches the bundled `.cube` via `import.meta.url` (or Capacitor `Filesystem.readFile`), parses with `parseCube()` from `film-lab-core`, and applies via `applyLutSelection`.
-4. Add a parallel loader for `inputLut` (local `useState` lives in the mobile editor, not in `state.project`).
-
-## Why this is not blocking iOS
-
-The iOS app already has export viability with dual-LUT support. The signature preset starts from Neutral / Clean Base with the shared soft finish, so it already produces a representative Filmtone look without LUTs. Bundled LUTs only sharpen the first-launch impression for non-technical testers.
+v1.4 may revisit bundled `.cube` paths once licensing for non-Apple/non-synthesized curves (Nikon N-Log, Canon Log 3, ARRI LogC4, BMD Film Gen 5) is settled. The pipeline for adding new synthesized curves is documented in `.claude/knowledge/patterns/2026-04-30-source-profile-fixture-pipeline.md`.

@@ -1,1 +1,1 @@
-v1.2 では、iPhone でのルック作りと書き出しの安定性を強化しました。Source Profile と Look の2系統で .cube LUT を扱えるようになり、それぞれの適用量を 0% から 100% まで調整できます。プレビューと書き出しの色処理をそろえ、P3/HDR 系素材で不適切な mezzanine 経路を避けるようにしました。キャッシュ管理も見直し、未保存の書き出しや作業中の素材を守りながら古い一時ファイルを整理します。プリセット一覧には inner glow、画面上部には liquid glass chrome を追加し、編集画面の質感も整えています。
+v1.3 では、起動直後から Filmtone のトーンを選べるようにしました。Look には Filmtone Signature を含む 5 種類の組み込みフィルムルックを追加し、各 Look は強さ 0–100% で調整できます。インポートした .cube LUT はライブラリで再利用でき、現在のグレードを Look として保存して、別の素材に同じトーンを当てられます。Camera Profile では Apple Log / Apple Log 2 の自動検出に加えて、Panasonic V-Log と Sony S-Log3 を選択できるようになりました。

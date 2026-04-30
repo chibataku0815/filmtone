@@ -192,3 +192,31 @@ CLAUDE.md には書かない（陳腐化が早すぎる）。以下を見る：
 - 5 ロールパネル / Agent Teams 起動: `/Volumes/SamsungPortableSSDX5001/documents/life/.cursor/rules/life-planning-invocation.mdc`
 - 直近 lane handoff の入口: `/Volumes/SamsungPortableSSDX5001/documents/life/docs/guides/`（`grep -l filmtone-ios` で抽出）
 - パターン正本: `/Volumes/SamsungPortableSSDX5001/documents/life/.claude/knowledge/patterns/`（fastlane 初回、ASC 譲渡、Capacitor 周り 等）
+
+---
+
+## 13. Built-in Catalog (v1.3+)
+
+| 領域 | エントリ | 主要ファイル |
+|------|---------|--------------|
+| Built-in Looks | 5 件（Filmtone Signature / Clean Base / Amber Glow / Soft Blue / Night Soft） | `FilmtoneBuiltInCatalog.swift` |
+| Source Profiles | 5 件（Apple Log / Apple Log 2 / V-Log / S-Log3 / Rec.709） | `FilmtoneSourceProfileCatalog.swift` |
+
+### 不変条件
+
+- Built-in Look の canonical UUID = `FB1A...` namespace（dedup key、library merge で参照）
+- Built-in Look は `immutable: true`。ユーザー編集は新規 user look として保存され、built-in は不変
+- Camera Profile catalog id 形式: `built-in:source-profile.<slug>`（例: `built-in:source-profile.v-log`）— sidecar `cameraProfile.catalogId` で書き出される
+- Synthesized math (V-Log / S-Log3) は accuracy fixture (`max = 0.000`) が hard gate。spec 改訂時は fixture 再生成して PR 同梱
+
+### UserDefaults
+
+- お気に入り: key = `filmtone.builtinLookFavorites`（`Set<UUID>` シリアライズ）
+
+### v1.4 候補 curve 追加
+
+`.claude/knowledge/patterns/2026-04-30-source-profile-fixture-pipeline.md` 参照。Nikon N-Log / Canon Log 3 / BMD Film Gen 5 / ARRI LogC4 + bundled `.cube` 経路。
+
+### Apple Log 2 known limitation
+
+Rec.2020-matrix-as-approximation で動く（CD signed off via AskUserQuestion 2026-04-30）。v1.4 で AVFoundation native gamut info に refine 予定。
