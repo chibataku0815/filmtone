@@ -645,14 +645,88 @@ final class FilmtoneEditorStore: ObservableObject {
         if project.inputLut != nil {
             return strings.cameraCustom
         }
-
-        switch probe?.inputTransformPolicy?.strategy ?? probe?.sourceVideoMetadata?.inputTransformPolicy?.strategy {
-        case .appleLogToRec709:
-            return strings.cameraAutoAppleLogDetected
-        case .appleLog2ToRec709:
-            return strings.cameraAutoAppleLog2Detected
-        default:
+        // v1.3 Camera Profiles Phase F — when the user explicitly picked a
+        // built-in source profile, surface that name. `.auto` falls through
+        // to the existing detection-suffix logic so iPhone Apple Log /
+        // Apple Log 2 sources still surface "Auto -> ... detected".
+        switch project.cameraProfile {
+        case .builtIn(let catalogId):
+            if let name = strings.builtInSourceProfileName(for: catalogId) {
+                return name
+            }
             return strings.cameraAuto
+        case .userImport:
+            return strings.cameraCustom
+        case .auto:
+            switch probe?.inputTransformPolicy?.strategy ?? probe?.sourceVideoMetadata?.inputTransformPolicy?.strategy {
+            case .appleLogToRec709:
+                return strings.cameraAutoAppleLogDetected
+            case .appleLog2ToRec709:
+                return strings.cameraAutoAppleLog2Detected
+            default:
+                return strings.cameraAuto
+            }
+        }
+    }
+
+    // MARK: - v1.3 Camera Profiles Phase F (D-CP4 retention rule)
+
+    /// Apply a Camera Profile selection from the picker. Marks the project
+    /// state dirty + reschedules preview / persists. Mirrors the surface
+    /// of `clearInputLut()` so SwiftUI's Menu callbacks compose cleanly.
+    func applyCameraProfile(_ selection: CameraProfileSelection) {
+        guard project.cameraProfile != selection else { return }
+        project.cameraProfile = selection
+        // The Camera Profile changes how the source is normalized; any
+        // user-imported `.cube` was implicitly chosen against the prior
+        // profile, so swapping profiles clears it (mirrors source-change
+        // rule below). The Saved Look stays applied — looks are
+        // source-independent (see Item 3 contract).
+        project.inputLut = nil
+        project.updatedAt = FilmtonePhase0Math.isoTimestamp()
+        persist()
+        schedulePreviewRender()
+    }
+
+    /// D-CP4 retention rule on source change. Called from `applyProbe`.
+    ///
+    /// - `.auto`: always re-derives at export time, no state change here.
+    /// - `.builtIn(.appleLog | .appleLog2)`: if the new probe's color class
+    ///   doesn't match the selection, fall back to `.auto` and surface a
+    ///   toast — the user picked a profile that the new clip can't honor.
+    /// - `.builtIn(.panasonicVLog | .sonySLog3 | .rec709)`: persist (cannot
+    ///   be auto-detected from container metadata, so the user's prior
+    ///   pick stays sticky across source swaps).
+    /// - `.userImport`: the existing inputLut clear rule above already
+    ///   wipes the user-imported `.cube`; we reset to `.auto` here for
+    ///   consistency.
+    private func applyCameraProfileSourceChangeRule(probe: SourceProbeDTO) {
+        switch project.cameraProfile {
+        case .auto:
+            return
+        case .builtIn(let catalogId):
+            guard let entry = FilmtoneSourceProfileCatalog.entry(forCatalogId: catalogId) else {
+                project.cameraProfile = .auto
+                return
+            }
+            // Sticky cases first — V-Log, S-Log3, Rec.709 cannot be
+            // auto-detected, so persist them across swaps.
+            if entry.detectionHint == nil {
+                return
+            }
+            // Apple Log / Apple Log 2 — verify the new probe matches the
+            // selection. If it doesn't, fall back to .auto so the new clip
+            // is normalized correctly.
+            if probe.sourceVideoMetadata?.colorClass == entry.detectionHint {
+                return
+            }
+            project.cameraProfile = .auto
+            presentToast(strings.cameraAuto, kind: .info)
+        case .userImport:
+            // The matching `inputLut` clear rule below resets the import
+            // anyway; reset the selection so the picker doesn't keep the
+            // user-import label after the .cube is gone.
+            project.cameraProfile = .auto
         }
     }
 
@@ -1514,6 +1588,12 @@ final class FilmtoneEditorStore: ObservableObject {
         if isSourceReplacement, project.inputLut != nil {
             project.inputLut = nil
             project.updatedAt = FilmtonePhase0Math.isoTimestamp()
+        }
+        // v1.3 Camera Profiles Phase F (D-CP4) — apply the retention rule
+        // for the selected Camera Profile against the new probe. Sticky
+        // for V-Log / S-Log3 / Rec.709, reset for Apple Log mismatches.
+        if isSourceReplacement {
+            applyCameraProfileSourceChangeRule(probe: probe)
         }
         self.preview = .empty
         self.comparePreviewFrame = nil
