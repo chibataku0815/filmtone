@@ -15,6 +15,10 @@ actor LibraryStoreActor {
         case lutNotFound(UUID)
         case lookNotFound(UUID)
         case malformed(String)
+        /// Mutation refused on a built-in catalog entry (Item 2 Look pack /
+        /// v1.4+ Camera Profile bundled fallback). The associated value is
+        /// the catalog slug, surfaced for UI messaging and telemetry.
+        case immutableEntry(slug: String)
 
         var errorDescription: String? {
             switch self {
@@ -32,6 +36,8 @@ actor LibraryStoreActor {
                 return "Saved Look not found in library: \(id.uuidString)."
             case .malformed(let detail):
                 return "Library data is malformed: \(detail)."
+            case .immutableEntry(let slug):
+                return "Built-in entry \"\(slug)\" cannot be renamed or deleted."
             }
         }
     }

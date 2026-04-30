@@ -7,7 +7,11 @@ import Foundation
 /// directory scan if it is missing or version-mismatched.
 enum FilmtoneLibraryConstants {
     /// Bumped when `LutLibraryEntry` / `SavedLookEntry` shape changes.
-    static let entrySchemaVersion = 1
+    /// v2 (v1.3): adds `bundled`, `immutable`, `bundledSlug` for built-in catalog
+    /// entries (Item 2 Look pack and the v1.4 Camera Profile (B) bundled-cube case).
+    /// v1 entries decode unchanged via Codable backward-compat in the schema's
+    /// extension `init(from decoder:)`.
+    static let entrySchemaVersion = 2
     /// Bumped when `LibraryIndex` shape changes.
     static let indexSchemaVersion = 1
     /// `dataFormat` payload for `.lutbin` blobs — little-endian Float32 RGB triples,
@@ -53,6 +57,68 @@ struct LutLibraryEntry: Codable, Equatable, Sendable {
     let originalFilename: String?
     var defaultIntensity: Double
     var preferredSlot: SlotHint
+    /// True when this entry ships with the app bundle as part of
+    /// `FilmtoneBuiltInCatalog`. v1.3 user-imported entries always have
+    /// `bundled == false`. v1.2 saves decode this as `false` via the
+    /// extension `init(from decoder:)` fallback.
+    var bundled: Bool = false
+    /// True when the entry refuses rename / delete via `LibraryStoreActor`.
+    /// All bundled entries are immutable; user-imported entries are mutable.
+    var immutable: Bool = false
+    /// Stable namespace slug for built-in entries (e.g. "vlog-rec709"). nil
+    /// for user-imported entries. Sidecar emits this for downstream
+    /// identification when bundled-by-app entries flow through library refs.
+    var bundledSlug: String? = nil
+}
+
+extension LutLibraryEntry {
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion, id, title, sourceHash, size, createdAt
+        case lastUsedAt, favorite, dataRef, dataFormat, originalFilename
+        case defaultIntensity, preferredSlot, bundled, immutable, bundledSlug
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.schemaVersion = try c.decode(Int.self, forKey: .schemaVersion)
+        self.id = try c.decode(UUID.self, forKey: .id)
+        self.title = try c.decode(String.self, forKey: .title)
+        self.sourceHash = try c.decode(String.self, forKey: .sourceHash)
+        self.size = try c.decode(Int.self, forKey: .size)
+        self.createdAt = try c.decode(Date.self, forKey: .createdAt)
+        self.lastUsedAt = try c.decodeIfPresent(Date.self, forKey: .lastUsedAt)
+        self.favorite = try c.decode(Bool.self, forKey: .favorite)
+        self.dataRef = try c.decode(String.self, forKey: .dataRef)
+        self.dataFormat = try c.decode(String.self, forKey: .dataFormat)
+        self.originalFilename = try c.decodeIfPresent(String.self, forKey: .originalFilename)
+        self.defaultIntensity = try c.decode(Double.self, forKey: .defaultIntensity)
+        self.preferredSlot = try c.decode(SlotHint.self, forKey: .preferredSlot)
+        // v1.3 additive fields — decode-with-default so v1.2 saves (schemaVersion 1)
+        // round-trip cleanly without migration code.
+        self.bundled = try c.decodeIfPresent(Bool.self, forKey: .bundled) ?? false
+        self.immutable = try c.decodeIfPresent(Bool.self, forKey: .immutable) ?? false
+        self.bundledSlug = try c.decodeIfPresent(String.self, forKey: .bundledSlug)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(schemaVersion, forKey: .schemaVersion)
+        try c.encode(id, forKey: .id)
+        try c.encode(title, forKey: .title)
+        try c.encode(sourceHash, forKey: .sourceHash)
+        try c.encode(size, forKey: .size)
+        try c.encode(createdAt, forKey: .createdAt)
+        try c.encodeIfPresent(lastUsedAt, forKey: .lastUsedAt)
+        try c.encode(favorite, forKey: .favorite)
+        try c.encode(dataRef, forKey: .dataRef)
+        try c.encode(dataFormat, forKey: .dataFormat)
+        try c.encodeIfPresent(originalFilename, forKey: .originalFilename)
+        try c.encode(defaultIntensity, forKey: .defaultIntensity)
+        try c.encode(preferredSlot, forKey: .preferredSlot)
+        try c.encode(bundled, forKey: .bundled)
+        try c.encode(immutable, forKey: .immutable)
+        try c.encodeIfPresent(bundledSlug, forKey: .bundledSlug)
+    }
 }
 
 /// A Saved Look — a creative-state snapshot that travels with the user across
@@ -80,6 +146,67 @@ struct SavedLookEntry: Codable, Equatable, Sendable {
     var favorite: Bool
     /// `<uuid>.jpg` in `Caches/Filmtone/library/thumbs/`. Deferred to Polish.
     var thumbnailRef: String?
+    /// True when this look ships with the app bundle as part of
+    /// `FilmtoneBuiltInCatalog`. User-saved looks always have
+    /// `bundled == false`. v1.2 saves decode this as `false`.
+    var bundled: Bool = false
+    /// True when the look refuses rename / delete via `LibraryStoreActor`.
+    /// All bundled looks are immutable; user-saved looks are mutable.
+    var immutable: Bool = false
+    /// Stable namespace slug for built-in looks (e.g. "filmtone-signature").
+    /// nil for user-saved looks. Sidecar emits this so downstream importers
+    /// can recognize built-in looks across renames / app updates.
+    var bundledSlug: String? = nil
+}
+
+extension SavedLookEntry {
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion, id, name, createdAt, updatedAt
+        case presetName, presetVersion, strength, quickState, paramOverrides
+        case creativeLut, favorite, thumbnailRef
+        case bundled, immutable, bundledSlug
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.schemaVersion = try c.decode(Int.self, forKey: .schemaVersion)
+        self.id = try c.decode(UUID.self, forKey: .id)
+        self.name = try c.decode(String.self, forKey: .name)
+        self.createdAt = try c.decode(Date.self, forKey: .createdAt)
+        self.updatedAt = try c.decode(Date.self, forKey: .updatedAt)
+        self.presetName = try c.decode(String.self, forKey: .presetName)
+        self.presetVersion = try c.decode(String.self, forKey: .presetVersion)
+        self.strength = try c.decode(Double.self, forKey: .strength)
+        self.quickState = try c.decode(FilmtoneQuickState.self, forKey: .quickState)
+        self.paramOverrides = try c.decode(FilmtonePhase0ParamsPatch.self, forKey: .paramOverrides)
+        self.creativeLut = try c.decodeIfPresent(CreativeLutBinding.self, forKey: .creativeLut)
+        self.favorite = try c.decode(Bool.self, forKey: .favorite)
+        self.thumbnailRef = try c.decodeIfPresent(String.self, forKey: .thumbnailRef)
+        // v1.3 additive fields — decode-with-default for v1.2 saves.
+        self.bundled = try c.decodeIfPresent(Bool.self, forKey: .bundled) ?? false
+        self.immutable = try c.decodeIfPresent(Bool.self, forKey: .immutable) ?? false
+        self.bundledSlug = try c.decodeIfPresent(String.self, forKey: .bundledSlug)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(schemaVersion, forKey: .schemaVersion)
+        try c.encode(id, forKey: .id)
+        try c.encode(name, forKey: .name)
+        try c.encode(createdAt, forKey: .createdAt)
+        try c.encode(updatedAt, forKey: .updatedAt)
+        try c.encode(presetName, forKey: .presetName)
+        try c.encode(presetVersion, forKey: .presetVersion)
+        try c.encode(strength, forKey: .strength)
+        try c.encode(quickState, forKey: .quickState)
+        try c.encode(paramOverrides, forKey: .paramOverrides)
+        try c.encodeIfPresent(creativeLut, forKey: .creativeLut)
+        try c.encode(favorite, forKey: .favorite)
+        try c.encodeIfPresent(thumbnailRef, forKey: .thumbnailRef)
+        try c.encode(bundled, forKey: .bundled)
+        try c.encode(immutable, forKey: .immutable)
+        try c.encodeIfPresent(bundledSlug, forKey: .bundledSlug)
+    }
 }
 
 /// Two flavors of creative-LUT reference inside a Saved Look:
