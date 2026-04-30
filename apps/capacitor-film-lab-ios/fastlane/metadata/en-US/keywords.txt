@@ -1,1 +1,1 @@
-photo editor,video editor,filter,cinematic,disposable camera,film,lut,grading,prores,hdr,p3,local
+video,photo,filter,prores,hdr,p3,log,cube,preset,bloom,grain,halation,look

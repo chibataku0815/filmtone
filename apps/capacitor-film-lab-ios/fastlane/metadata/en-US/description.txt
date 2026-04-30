@@ -1,17 +1,16 @@
-Filmtone helps you turn iPhone photos and short videos into movie-like color or disposable-camera style film snapshots. Pick a photo or clip, choose a film preset, adjust brightness, contrast, and saturation with Quick controls, compare before/after, then save to Photos or share.
+Filmtone helps you choose a film look, tune color with LUTs, add soft bloom, compare before/after, and export locally from iPhone to save or share.
 
-Use it when the built-in editor feels too plain, but opening a full video editor feels too heavy. Filmtone keeps the color work on the iPhone where your media already lives.
+Use it when the built-in editor feels too plain, but opening a full video editor feels too heavy. Filmtone keeps the color work local on iPhone.
 
 What you can do:
-- Edit photos and short videos
-- Start from cinematic or film-snapshot presets
+- Pick media from the library
+- Start from film-inspired presets and Filmtone Looks
 - Adjust brightness, contrast, and saturation quickly
 - Compare before and after
-- Save to Photos or share
-- Export locally on iPhone
+- Export on iPhone, then save to Photos or share
 
-When you want more control, Filmtone also supports dual .cube LUT slots for Source Profile and Film Look. You can shape H.264, HEVC, ProRes, Log, and P3 / HDR-aware workflows while keeping the path local.
+For more control, Filmtone supports two .cube LUT slots: Source Profile and Film Look. Use them for input transforms and creative looks while keeping the workflow local on iPhone.
 
-Filmtone is not a capture camera. It is for finishing the photo or video after you shoot it: daily clips, travel footage, social posts, covers, thumbnails, and any moment where you want iPhone media to share the same film tone.
+Filmtone is not a capture camera. It is for finishing existing media: daily footage, travel footage, social posts, covers, thumbnails, and any set that should share the same color direction.
 
 No account or cloud sync is required for the main workflow. Pick media, shape the color, export, save, and share from your iPhone.
