@@ -153,26 +153,81 @@ struct SidecarMezzanine: Encodable {
 
 struct SidecarPackageLuts: Encodable {
     let combinedColor: String
+    let preOpticalColor: String?
+    let postOpticalColor: String?
+}
+
+struct SidecarPackageEffects: Encodable {
+    let dctl: String?
 }
 
 struct SidecarPackage: Encodable {
-    static let layoutID = "filmtone-connect-package-v1"
+    static let layoutID = "filmtone-connect-package-v2"
 
     let layout: String
+    /// Deprecated v1 compatibility alias. In v2 this intentionally points to
+    /// the original source media so older importers do not double-process the
+    /// baked iOS render.
     let mediaFilename: String
+    let sourceMediaFilename: String
+    let renderedMediaFilename: String
     let referenceAfterFilename: String
+    let referenceAfterTimeSec: Double
     let luts: SidecarPackageLuts
+    let effects: SidecarPackageEffects?
 
     init(
-        mediaFilename: String,
+        sourceMediaFilename: String,
+        renderedMediaFilename: String,
         referenceAfterFilename: String,
+        referenceAfterTimeSec: Double,
         combinedColorFilename: String,
+        preOpticalColorFilename: String? = nil,
+        postOpticalColorFilename: String? = nil,
+        effectsDctlFilename: String? = nil,
         layout: String = layoutID
     ) {
         self.layout = layout
-        self.mediaFilename = mediaFilename
+        self.mediaFilename = sourceMediaFilename
+        self.sourceMediaFilename = sourceMediaFilename
+        self.renderedMediaFilename = renderedMediaFilename
         self.referenceAfterFilename = referenceAfterFilename
-        self.luts = SidecarPackageLuts(combinedColor: combinedColorFilename)
+        self.referenceAfterTimeSec = referenceAfterTimeSec
+        self.luts = SidecarPackageLuts(
+            combinedColor: combinedColorFilename,
+            preOpticalColor: preOpticalColorFilename,
+            postOpticalColor: postOpticalColorFilename
+        )
+        self.effects = effectsDctlFilename.map { SidecarPackageEffects(dctl: $0) }
+    }
+}
+
+enum FilmtoneConnectPackageFiles {
+    static func orderedPackageFileUris(
+        renderedUri: String,
+        sidecarUri: String,
+        sourceMediaUri: String,
+        preOpticalCubeUri: String? = nil,
+        postOpticalCubeUri: String? = nil,
+        cubeUri: String,
+        dctlUri: String,
+        referenceAfterUri: String
+    ) -> [String] {
+        var uris = [
+            renderedUri,
+            sidecarUri,
+            sourceMediaUri,
+        ]
+        if let preOpticalCubeUri {
+            uris.append(preOpticalCubeUri)
+        }
+        if let postOpticalCubeUri {
+            uris.append(postOpticalCubeUri)
+        }
+        uris.append(cubeUri)
+        uris.append(dctlUri)
+        uris.append(referenceAfterUri)
+        return uris
     }
 }
 
@@ -341,6 +396,11 @@ enum FilmtoneExportSidecarBuilder {
 enum FilmtoneConnectCubeWriter {
     static let defaultCubeSize = 33
     static let defaultTitle = "Filmtone Combined Color"
+    private enum ColorBridgeSection {
+        case combined
+        case preOptical
+        case postOptical
+    }
 
     static func writeCombinedColorCube(
         for request: Phase0ExportRequestDTO,
@@ -351,15 +411,75 @@ enum FilmtoneConnectCubeWriter {
         try text.write(to: url, atomically: true, encoding: .utf8)
     }
 
+    static func writePreOpticalColorCube(
+        for request: Phase0ExportRequestDTO,
+        to url: URL,
+        size: Int = defaultCubeSize
+    ) throws {
+        let text = makePreOpticalColorCubeText(for: request, size: size)
+        try text.write(to: url, atomically: true, encoding: .utf8)
+    }
+
+    static func writePostOpticalColorCube(
+        for request: Phase0ExportRequestDTO,
+        to url: URL,
+        size: Int = defaultCubeSize
+    ) throws {
+        let text = makePostOpticalColorCubeText(for: request, size: size)
+        try text.write(to: url, atomically: true, encoding: .utf8)
+    }
+
     static func makeCombinedColorCubeText(
         for request: Phase0ExportRequestDTO,
         size: Int = defaultCubeSize
     ) -> String {
+        makeColorCubeText(
+            for: request,
+            size: size,
+            title: defaultTitle,
+            comment: "# Full scalar compatibility bridge. Split color LUTs are preferred by package v2 DCTL.",
+            section: .combined
+        )
+    }
+
+    static func makePreOpticalColorCubeText(
+        for request: Phase0ExportRequestDTO,
+        size: Int = defaultCubeSize
+    ) -> String {
+        makeColorCubeText(
+            for: request,
+            size: size,
+            title: "Filmtone Pre Optical Color",
+            comment: "# Input/base/compression color before the Resolve texture bridge.",
+            section: .preOptical
+        )
+    }
+
+    static func makePostOpticalColorCubeText(
+        for request: Phase0ExportRequestDTO,
+        size: Int = defaultCubeSize
+    ) -> String {
+        makeColorCubeText(
+            for: request,
+            size: size,
+            title: "Filmtone Post Optical Color",
+            comment: "# Creative/print color after the Resolve texture bridge.",
+            section: .postOptical
+        )
+    }
+
+    private static func makeColorCubeText(
+        for request: Phase0ExportRequestDTO,
+        size: Int,
+        title: String,
+        comment: String,
+        section: ColorBridgeSection
+    ) -> String {
         let resolvedSize = max(2, size)
         var lines: [String] = [
-            "TITLE \"\(defaultTitle)\"",
+            "TITLE \"\(title)\"",
             "# Generated by Filmtone Connect for DaVinci.",
-            "# Color transform bridge only; baked optics/grain/depth travel in media + reference still.",
+            comment,
             "LUT_3D_SIZE \(resolvedSize)",
             "DOMAIN_MIN 0.0 0.0 0.0",
             "DOMAIN_MAX 1.0 1.0 1.0",
@@ -376,7 +496,8 @@ enum FilmtoneConnectCubeWriter {
                         red: red,
                         green: green,
                         blue: blue,
-                        request: request
+                        request: request,
+                        section: section
                     )
                     lines.append(formatRGBLine(rgb))
                 }
@@ -391,11 +512,28 @@ enum FilmtoneConnectCubeWriter {
         red: Double,
         green: Double,
         blue: Double,
-        request: Phase0ExportRequestDTO
+        request: Phase0ExportRequestDTO,
+        section: ColorBridgeSection
     ) -> RGB {
         let params = request.grade.params
         var current = RGB(red, green, blue)
 
+        if section == .combined || section == .preOptical {
+            current = applyPreOpticalColorBridge(current, request: request, params: params)
+        }
+
+        if section == .combined || section == .postOptical {
+            current = applyPostOpticalColorBridge(current, request: request, params: params)
+        }
+        return current.clamped()
+    }
+
+    private static func applyPreOpticalColorBridge(
+        _ rgb: RGB,
+        request: Phase0ExportRequestDTO,
+        params: Phase0ParamsDTO
+    ) -> RGB {
+        var current = rgb
         if let inputLut = request.inputLut {
             current = applyLut(inputLut, to: current)
         } else if let policy = request.sourceProbe?.inputTransformPolicy {
@@ -404,7 +542,15 @@ enum FilmtoneConnectCubeWriter {
 
         current = applyBaseGrade(current, params: params)
         current = applyFilmCompression(current, params: params)
+        return current
+    }
 
+    private static func applyPostOpticalColorBridge(
+        _ rgb: RGB,
+        request: Phase0ExportRequestDTO,
+        params: Phase0ParamsDTO
+    ) -> RGB {
+        var current = rgb
         if let creativeLut = request.creativeLut {
             current = applyLut(creativeLut, to: current)
         } else if let legacyLut = request.lut {
@@ -419,7 +565,7 @@ enum FilmtoneConnectCubeWriter {
         }
 
         current = applyPrintStage(current, params: params)
-        return current.clamped()
+        return current
     }
 
     private static func applyBaseGrade(_ rgb: RGB, params: Phase0ParamsDTO) -> RGB {
@@ -702,5 +848,636 @@ enum FilmtoneConnectCubeWriter {
                 FilmtoneConnectCubeWriter.clamp(b)
             )
         }
+    }
+}
+
+enum FilmtoneConnectDctlWriter {
+    static let defaultTitle = "Filmtone Connect Bridge"
+    private static let dctlRgbShiftThreshold = 0.0001
+    private static let dctlRgbShiftReferenceMax = 0.005
+    private static let dctlRgbShiftProbeMixAtMax = 0.72
+    private static let dctlRgbShiftPixelOffset = 2
+    private static let dctlEdgeSoftnessThreshold = 0.0001
+    private static let dctlAberrationEdgeSoftenScale = 32.0
+    private static let dctlAberrationEdgeSoftenMax = 0.52
+    private static let dctlAberrationEdgeSoftenCurve = 1.55
+    private static let dctlAberrationBlurRadiusMin = 1.6
+    private static let dctlAberrationBlurRadiusMax = 6.2
+    private static let dctlAberrationBlurRadiusCap = 7.8
+    private static let dctlLensSoftnessBlurBoost = 1.85
+    private static let dctlDiffusionThreshold = 0.0001
+    private static let dctlDiffusionAmountScale = 0.67688378
+    private static let dctlDiffusionCompositeBase = 0.87
+    private static let dctlDiffusionMipTapRadii = [3, 7, 15, 31]
+    private static let dctlDiffusionMipGroupWeights = [0.22, 0.26, 0.25, 0.15]
+    private static let dctlDiffusionCenterWeight = 0.12
+    private static let dctlDiffusionCenterMaskStart = 0.25
+    private static let dctlDiffusionCenterMaskEnd = 0.80
+
+    private struct DctlEdgeSoftnessParams {
+        let aberrationSoften: Double
+        let lensDrive: Double
+        let tapRadius: Int
+    }
+
+    private struct DctlDiffusionParams {
+        let amount: Double
+        let tapRadii: [Int]
+        let groupWeights: [Double]
+        let centerWeight: Double
+        let maskStart: Double
+        let maskEnd: Double
+    }
+
+    private struct DctlColorCalibration {
+        let redGain: Double
+        let greenGain: Double
+        let blueGain: Double
+        let redOffset: Double
+        let greenOffset: Double
+        let blueOffset: Double
+    }
+
+    static func writeBridgeDctl(
+        for request: Phase0ExportRequestDTO,
+        cubeFilename: String,
+        preOpticalColorFilename: String? = nil,
+        postOpticalColorFilename: String? = nil,
+        outputFps: Int,
+        sourceSeed: Double,
+        to url: URL
+    ) throws {
+        let text = makeBridgeDctlText(
+            for: request,
+            cubeFilename: cubeFilename,
+            preOpticalColorFilename: preOpticalColorFilename,
+            postOpticalColorFilename: postOpticalColorFilename,
+            outputFps: outputFps,
+            sourceSeed: sourceSeed
+        )
+        try text.write(to: url, atomically: true, encoding: .utf8)
+    }
+
+    static func makeBridgeDctlText(
+        for request: Phase0ExportRequestDTO,
+        cubeFilename: String,
+        preOpticalColorFilename: String? = nil,
+        postOpticalColorFilename: String? = nil,
+        outputFps: Int,
+        sourceSeed: Double
+    ) -> String {
+        guard let preOpticalColorFilename, let postOpticalColorFilename else {
+            return makeLegacyColorOnlyBridgeDctlText(cubeFilename: cubeFilename)
+        }
+
+        let calibration = dctlResolveTextureCalibration(for: request)
+        let textureOpticsBlock = makeDctlTextureOpticsBlock(for: request)
+
+        return """
+// \(defaultTitle)
+// Generated by Filmtone iOS. Apply through Filmtone Connect package v2.
+// Split bridge order: pre-optical color LUT, Resolve-verified RGB shift, edge-masked softness, and multi-radius mip-like diffusion,
+// post-optical creative/print LUT, then Resolve texture color compensation.
+// Bloom, halation, exact diffusion parity, vignette, grain, and time effects remain explicit visual equivalence blockers until ported and verified in Resolve.
+DEFINE_LUT(FilmtonePreOpticalColor, \(preOpticalColorFilename))
+DEFINE_LUT(FilmtonePostOpticalColor, \(postOpticalColorFilename))
+
+__DEVICE__ float filmtone_clamp(float v, float lo, float hi)
+{
+    return _fminf(_fmaxf(v, lo), hi);
+}
+\(textureOpticsBlock.helpers)
+
+__DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTURE__ p_TexR, __TEXTURE__ p_TexG, __TEXTURE__ p_TexB)
+{
+\(textureOpticsBlock.transform)
+    return make_float3(
+        filmtone_clamp(rgb.x * \(dctlFloat(calibration.redGain)) + \(dctlFloat(calibration.redOffset)), 0.0f, 1.0f),
+        filmtone_clamp(rgb.y * \(dctlFloat(calibration.greenGain)) + \(dctlFloat(calibration.greenOffset)), 0.0f, 1.0f),
+        filmtone_clamp(rgb.z * \(dctlFloat(calibration.blueGain)) + \(dctlFloat(calibration.blueOffset)), 0.0f, 1.0f)
+    );
+}
+"""
+    }
+
+    private static func makeDctlTextureOpticsBlock(
+        for request: Phase0ExportRequestDTO
+    ) -> (helpers: String, transform: String) {
+        let rgbShiftMix = dctlRgbShiftMix(for: request)
+        let edgeSoftness = dctlEdgeSoftnessParams(for: request)
+        let diffusion = dctlDiffusionParams(for: request)
+
+        guard rgbShiftMix > 0 || edgeSoftness != nil || diffusion != nil else {
+            return (
+                helpers: "",
+                transform: """
+                    float3 rgb = make_float3(_tex2D(p_TexR, p_X, p_Y), _tex2D(p_TexG, p_X, p_Y), _tex2D(p_TexB, p_X, p_Y));
+                    rgb = APPLY_LUT(rgb.x, rgb.y, rgb.z, FilmtonePreOpticalColor);
+                    rgb = APPLY_LUT(rgb.x, rgb.y, rgb.z, FilmtonePostOpticalColor);
+                """
+            )
+        }
+
+        let helpers = makeDctlTextureOpticsHelpers(
+            includeSmoothstep: edgeSoftness != nil || diffusion != nil,
+            includeGlow: diffusion != nil
+        )
+        guard edgeSoftness != nil || diffusion != nil else {
+            let centerSample = makeDctlPreOpticalRgbShiftSample(
+                xExpr: "p_X",
+                yExpr: "p_Y",
+                rgbShiftMix: rgbShiftMix,
+                sxVar: "sx",
+                syVar: "sy",
+                rxVar: "rx",
+                ryVar: "ry",
+                bxVar: "bx",
+                byVar: "by",
+                centerVar: "center",
+                redVar: "redSample",
+                blueVar: "blueSample",
+                outRVar: "r",
+                outGVar: "g",
+                outBVar: "b"
+            )
+            return (
+                helpers: helpers,
+                transform: """
+                    int cx = p_Width / 2;
+                    int cy = p_Height / 2;
+                """ + "\n" + centerSample + "\n" + """
+                    float3 rgb = APPLY_LUT(r, g, b, FilmtonePostOpticalColor);
+                """
+            )
+        }
+
+        guard let edgeSoftness else {
+            let centerSample = makeDctlPreOpticalRgbShiftSample(
+                xExpr: "p_X",
+                yExpr: "p_Y",
+                rgbShiftMix: rgbShiftMix,
+                sxVar: "sx",
+                syVar: "sy",
+                rxVar: "rx",
+                ryVar: "ry",
+                bxVar: "bx",
+                byVar: "by",
+                centerVar: "center",
+                redVar: "redSample",
+                blueVar: "blueSample",
+                outRVar: "outR",
+                outGVar: "outG",
+                outBVar: "outB"
+            )
+            let diffusionBlock = diffusion.map(makeDctlDiffusionBlock) ?? ""
+            return (
+                helpers: helpers,
+                transform: """
+                    int cx = p_Width / 2;
+                    int cy = p_Height / 2;
+                """ + "\n" + centerSample + "\n" + makeDctlEdgeRadiusBlock() + "\n" + diffusionBlock + "\n" + """
+                    float3 rgb = APPLY_LUT(outR, outG, outB, FilmtonePostOpticalColor);
+                """
+            )
+        }
+
+        let radius = edgeSoftness.tapRadius
+        let centerSample = makeDctlPreOpticalRgbShiftSample(
+            xExpr: "p_X",
+            yExpr: "p_Y",
+            rgbShiftMix: rgbShiftMix,
+            sxVar: "sx",
+            syVar: "sy",
+            rxVar: "rx",
+            ryVar: "ry",
+            bxVar: "bx",
+            byVar: "by",
+            centerVar: "center",
+            redVar: "redSample",
+            blueVar: "blueSample",
+            outRVar: "r",
+            outGVar: "g",
+            outBVar: "b"
+        )
+        let leftSample = makeDctlPreOpticalRgbShiftSample(
+            xExpr: "lx",
+            yExpr: "p_Y",
+            rgbShiftMix: rgbShiftMix,
+            sxVar: "lSx",
+            syVar: "lSy",
+            rxVar: "lRx",
+            ryVar: "lRy",
+            bxVar: "lBx",
+            byVar: "lBy",
+            centerVar: "lCenter",
+            redVar: "lRedSample",
+            blueVar: "lBlueSample",
+            outRVar: "lR",
+            outGVar: "lG",
+            outBVar: "lB"
+        )
+        let rightSample = makeDctlPreOpticalRgbShiftSample(
+            xExpr: "rxTap",
+            yExpr: "p_Y",
+            rgbShiftMix: rgbShiftMix,
+            sxVar: "rSx",
+            syVar: "rSy",
+            rxVar: "rRx",
+            ryVar: "rRy",
+            bxVar: "rBx",
+            byVar: "rBy",
+            centerVar: "rCenter",
+            redVar: "rRedSample",
+            blueVar: "rBlueSample",
+            outRVar: "rR",
+            outGVar: "rG",
+            outBVar: "rB"
+        )
+        let upSample = makeDctlPreOpticalRgbShiftSample(
+            xExpr: "p_X",
+            yExpr: "uy",
+            rgbShiftMix: rgbShiftMix,
+            sxVar: "uSx",
+            syVar: "uSy",
+            rxVar: "uRx",
+            ryVar: "uRy",
+            bxVar: "uBx",
+            byVar: "uBy",
+            centerVar: "uCenter",
+            redVar: "uRedSample",
+            blueVar: "uBlueSample",
+            outRVar: "uR",
+            outGVar: "uG",
+            outBVar: "uB"
+        )
+        let downSample = makeDctlPreOpticalRgbShiftSample(
+            xExpr: "p_X",
+            yExpr: "dy",
+            rgbShiftMix: rgbShiftMix,
+            sxVar: "dSx",
+            syVar: "dSy",
+            rxVar: "dRx",
+            ryVar: "dRy",
+            bxVar: "dBx",
+            byVar: "dBy",
+            centerVar: "dCenter",
+            redVar: "dRedSample",
+            blueVar: "dBlueSample",
+            outRVar: "dR",
+            outGVar: "dG",
+            outBVar: "dB"
+        )
+        let transform = """
+            int cx = p_Width / 2;
+            int cy = p_Height / 2;
+            int softenRadius = \(radius);
+            int lx = filmtone_clamp_int(p_X - softenRadius, 0, p_Width - 1);
+            int rxTap = filmtone_clamp_int(p_X + softenRadius, 0, p_Width - 1);
+            int uy = filmtone_clamp_int(p_Y - softenRadius, 0, p_Height - 1);
+            int dy = filmtone_clamp_int(p_Y + softenRadius, 0, p_Height - 1);
+        """ + "\n" + centerSample + "\n" + leftSample + "\n" + rightSample + "\n" + upSample + "\n" + downSample + "\n" + makeDctlEdgeRadiusBlock() + "\n" + """
+            float edgeMask = filmtone_smoothstep(0.25f, 1.0f, edgeR);
+            float lensW = _powf(edgeR, 1.52f);
+            float lensWeight = filmtone_clamp(\(dctlFloat(edgeSoftness.lensDrive)) * lensW, 0.0f, 1.0f);
+            float lensMix = lensWeight * 0.720000000f;
+            float softenAmt = filmtone_clamp((\(dctlFloat(edgeSoftness.aberrationSoften)) * edgeMask) + (lensMix * edgeMask), 0.0f, 1.0f);
+            float blurR = r * 0.400000000f + lR * 0.150000000f + rR * 0.150000000f + uR * 0.150000000f + dR * 0.150000000f;
+            float blurG = g * 0.400000000f + lG * 0.150000000f + rG * 0.150000000f + uG * 0.150000000f + dG * 0.150000000f;
+            float blurB = b * 0.400000000f + lB * 0.150000000f + rB * 0.150000000f + uB * 0.150000000f + dB * 0.150000000f;
+            float outR = r * (1.0f - softenAmt) + blurR * softenAmt;
+            float outG = g * (1.0f - softenAmt) + blurG * softenAmt;
+            float outB = b * (1.0f - softenAmt) + blurB * softenAmt;
+        """ + "\n" + (diffusion.map(makeDctlDiffusionBlock) ?? "") + "\n" + """
+            float3 rgb = APPLY_LUT(outR, outG, outB, FilmtonePostOpticalColor);
+        """
+        return (helpers: helpers, transform: transform)
+    }
+
+    private static func makeDctlTextureOpticsHelpers(includeSmoothstep: Bool, includeGlow: Bool) -> String {
+        var helpers = """
+
+__DEVICE__ int filmtone_clamp_int(int v, int lo, int hi)
+{
+    if (v < lo) {
+        return lo;
+    }
+    if (v > hi) {
+        return hi;
+    }
+    return v;
+}
+"""
+        if includeSmoothstep {
+            helpers += """
+
+__DEVICE__ float filmtone_smoothstep(float edge0, float edge1, float x)
+{
+    float t = filmtone_clamp((x - edge0) / (edge1 - edge0), 0.0f, 1.0f);
+    return t * t * (3.0f - 2.0f * t);
+}
+"""
+        }
+        if includeGlow {
+            helpers += """
+
+__DEVICE__ float filmtone_luma(float r, float g, float b)
+{
+    return r * 0.2126f + g * 0.7152f + b * 0.0722f;
+}
+
+__DEVICE__ float filmtone_glow_shoulder(float energy)
+{
+    return 1.0f - _expf(-_fmaxf(energy, 0.0f));
+}
+
+__DEVICE__ float filmtone_glow_headroom(float r, float g, float b, float floorValue)
+{
+    float luma = filmtone_luma(r, g, b);
+    float root = _sqrtf(filmtone_clamp(1.0f - luma, 0.0f, 1.0f));
+    return floorValue * (1.0f - root) + root;
+}
+"""
+        }
+        return helpers
+    }
+
+    private static func makeDctlEdgeRadiusBlock() -> String {
+        """
+            float edgeX = ((float)p_X + 0.5f) - ((float)p_Width * 0.5f);
+            float edgeY = ((float)p_Y + 0.5f) - ((float)p_Height * 0.5f);
+            float halfWidth = (float)p_Width * 0.5f;
+            float halfHeight = (float)p_Height * 0.5f;
+            float halfDiag = _fmaxf(_sqrtf((halfWidth * halfWidth) + (halfHeight * halfHeight)), 1.0f);
+            float edgeR = filmtone_clamp(_sqrtf((edgeX * edgeX) + (edgeY * edgeY)) / halfDiag, 0.0f, 1.0f);
+        """
+    }
+
+    private static func makeDctlDiffusionBlock(_ diffusion: DctlDiffusionParams) -> String {
+        var lines: [String] = []
+        var redTerms = ["(outR * \(dctlFloat(diffusion.centerWeight)))"]
+        var greenTerms = ["(outG * \(dctlFloat(diffusion.centerWeight)))"]
+        var blueTerms = ["(outB * \(dctlFloat(diffusion.centerWeight)))"]
+
+        for (index, tapRadius) in diffusion.tapRadii.enumerated() {
+            let groupWeight = diffusion.groupWeights[index]
+            let axisWeight = groupWeight * 0.55 / 4
+            let diagonalWeight = groupWeight * 0.45 / 4
+            let prefix = "md\(index)"
+            lines.append("""
+            int \(prefix)Radius = \(tapRadius);
+            int \(prefix)Lx = filmtone_clamp_int(p_X - \(prefix)Radius, 0, p_Width - 1);
+            int \(prefix)Rx = filmtone_clamp_int(p_X + \(prefix)Radius, 0, p_Width - 1);
+            int \(prefix)Uy = filmtone_clamp_int(p_Y - \(prefix)Radius, 0, p_Height - 1);
+            int \(prefix)Dy = filmtone_clamp_int(p_Y + \(prefix)Radius, 0, p_Height - 1);
+            float3 \(prefix)L = make_float3(_tex2D(p_TexR, \(prefix)Lx, p_Y), _tex2D(p_TexG, \(prefix)Lx, p_Y), _tex2D(p_TexB, \(prefix)Lx, p_Y));
+            float3 \(prefix)R = make_float3(_tex2D(p_TexR, \(prefix)Rx, p_Y), _tex2D(p_TexG, \(prefix)Rx, p_Y), _tex2D(p_TexB, \(prefix)Rx, p_Y));
+            float3 \(prefix)U = make_float3(_tex2D(p_TexR, p_X, \(prefix)Uy), _tex2D(p_TexG, p_X, \(prefix)Uy), _tex2D(p_TexB, p_X, \(prefix)Uy));
+            float3 \(prefix)D = make_float3(_tex2D(p_TexR, p_X, \(prefix)Dy), _tex2D(p_TexG, p_X, \(prefix)Dy), _tex2D(p_TexB, p_X, \(prefix)Dy));
+            float3 \(prefix)LU = make_float3(_tex2D(p_TexR, \(prefix)Lx, \(prefix)Uy), _tex2D(p_TexG, \(prefix)Lx, \(prefix)Uy), _tex2D(p_TexB, \(prefix)Lx, \(prefix)Uy));
+            float3 \(prefix)RU = make_float3(_tex2D(p_TexR, \(prefix)Rx, \(prefix)Uy), _tex2D(p_TexG, \(prefix)Rx, \(prefix)Uy), _tex2D(p_TexB, \(prefix)Rx, \(prefix)Uy));
+            float3 \(prefix)LD = make_float3(_tex2D(p_TexR, \(prefix)Lx, \(prefix)Dy), _tex2D(p_TexG, \(prefix)Lx, \(prefix)Dy), _tex2D(p_TexB, \(prefix)Lx, \(prefix)Dy));
+            float3 \(prefix)RD = make_float3(_tex2D(p_TexR, \(prefix)Rx, \(prefix)Dy), _tex2D(p_TexG, \(prefix)Rx, \(prefix)Dy), _tex2D(p_TexB, \(prefix)Rx, \(prefix)Dy));
+            \(prefix)L = APPLY_LUT(\(prefix)L.x, \(prefix)L.y, \(prefix)L.z, FilmtonePreOpticalColor);
+            \(prefix)R = APPLY_LUT(\(prefix)R.x, \(prefix)R.y, \(prefix)R.z, FilmtonePreOpticalColor);
+            \(prefix)U = APPLY_LUT(\(prefix)U.x, \(prefix)U.y, \(prefix)U.z, FilmtonePreOpticalColor);
+            \(prefix)D = APPLY_LUT(\(prefix)D.x, \(prefix)D.y, \(prefix)D.z, FilmtonePreOpticalColor);
+            \(prefix)LU = APPLY_LUT(\(prefix)LU.x, \(prefix)LU.y, \(prefix)LU.z, FilmtonePreOpticalColor);
+            \(prefix)RU = APPLY_LUT(\(prefix)RU.x, \(prefix)RU.y, \(prefix)RU.z, FilmtonePreOpticalColor);
+            \(prefix)LD = APPLY_LUT(\(prefix)LD.x, \(prefix)LD.y, \(prefix)LD.z, FilmtonePreOpticalColor);
+            \(prefix)RD = APPLY_LUT(\(prefix)RD.x, \(prefix)RD.y, \(prefix)RD.z, FilmtonePreOpticalColor);
+            """)
+            redTerms.append(diffusionTerm(prefix: prefix, axisWeight: axisWeight, diagonalWeight: diagonalWeight, channel: "x"))
+            greenTerms.append(diffusionTerm(prefix: prefix, axisWeight: axisWeight, diagonalWeight: diagonalWeight, channel: "y"))
+            blueTerms.append(diffusionTerm(prefix: prefix, axisWeight: axisWeight, diagonalWeight: diagonalWeight, channel: "z"))
+        }
+
+        lines.append("""
+            float diffR = \(redTerms.joined(separator: " + "));
+            float diffG = \(greenTerms.joined(separator: " + "));
+            float diffB = \(blueTerms.joined(separator: " + "));
+            float diffSpatial = 1.0f - filmtone_smoothstep(\(dctlFloat(diffusion.maskStart)), \(dctlFloat(diffusion.maskEnd)), edgeR);
+            float diffHeadroom = filmtone_glow_headroom(outR, outG, outB, 0.880000000f);
+            float diffGlowR = filmtone_glow_shoulder(diffR * \(dctlFloat(diffusion.amount)) * diffSpatial) * diffHeadroom;
+            float diffGlowG = filmtone_glow_shoulder(diffG * \(dctlFloat(diffusion.amount)) * diffSpatial) * diffHeadroom;
+            float diffGlowB = filmtone_glow_shoulder(diffB * \(dctlFloat(diffusion.amount)) * diffSpatial) * diffHeadroom;
+            outR = outR + _fminf(diffGlowR, _fmaxf(0.0f, 1.0f - outR));
+            outG = outG + _fminf(diffGlowG, _fmaxf(0.0f, 1.0f - outG));
+            outB = outB + _fminf(diffGlowB, _fmaxf(0.0f, 1.0f - outB));
+        """)
+        return lines.joined(separator: "\n")
+    }
+
+    private static func diffusionTerm(
+        prefix: String,
+        axisWeight: Double,
+        diagonalWeight: Double,
+        channel: String
+    ) -> String {
+        "(\(prefix)L.\(channel) * \(dctlFloat(axisWeight))) + (\(prefix)R.\(channel) * \(dctlFloat(axisWeight))) + (\(prefix)U.\(channel) * \(dctlFloat(axisWeight))) + (\(prefix)D.\(channel) * \(dctlFloat(axisWeight))) + (\(prefix)LU.\(channel) * \(dctlFloat(diagonalWeight))) + (\(prefix)RU.\(channel) * \(dctlFloat(diagonalWeight))) + (\(prefix)LD.\(channel) * \(dctlFloat(diagonalWeight))) + (\(prefix)RD.\(channel) * \(dctlFloat(diagonalWeight)))"
+    }
+
+    private static func makeDctlPreOpticalRgbShiftSample(
+        xExpr: String,
+        yExpr: String,
+        rgbShiftMix: Double,
+        sxVar: String,
+        syVar: String,
+        rxVar: String,
+        ryVar: String,
+        bxVar: String,
+        byVar: String,
+        centerVar: String,
+        redVar: String,
+        blueVar: String,
+        outRVar: String,
+        outGVar: String,
+        outBVar: String
+    ) -> String {
+        let offset = dctlRgbShiftPixelOffset
+        let shiftedMix = dctlFloat(rgbShiftMix)
+        let centerMix = dctlFloat(1 - rgbShiftMix)
+        return """
+            int \(sxVar) = 0;
+            int \(syVar) = 0;
+            if (\(xExpr) > cx) { \(sxVar) = 1; }
+            if (\(xExpr) < cx) { \(sxVar) = -1; }
+            if (\(yExpr) > cy) { \(syVar) = 1; }
+            if (\(yExpr) < cy) { \(syVar) = -1; }
+            int \(rxVar) = filmtone_clamp_int(\(xExpr) + \(sxVar) * \(offset), 0, p_Width - 1);
+            int \(ryVar) = filmtone_clamp_int(\(yExpr) + \(syVar) * \(offset), 0, p_Height - 1);
+            int \(bxVar) = filmtone_clamp_int(\(xExpr) - \(sxVar) * \(offset), 0, p_Width - 1);
+            int \(byVar) = filmtone_clamp_int(\(yExpr) - \(syVar) * \(offset), 0, p_Height - 1);
+            float3 \(centerVar) = make_float3(_tex2D(p_TexR, \(xExpr), \(yExpr)), _tex2D(p_TexG, \(xExpr), \(yExpr)), _tex2D(p_TexB, \(xExpr), \(yExpr)));
+            float3 \(redVar) = make_float3(_tex2D(p_TexR, \(rxVar), \(ryVar)), _tex2D(p_TexG, \(rxVar), \(ryVar)), _tex2D(p_TexB, \(rxVar), \(ryVar)));
+            float3 \(blueVar) = make_float3(_tex2D(p_TexR, \(bxVar), \(byVar)), _tex2D(p_TexG, \(bxVar), \(byVar)), _tex2D(p_TexB, \(bxVar), \(byVar)));
+            \(centerVar) = APPLY_LUT(\(centerVar).x, \(centerVar).y, \(centerVar).z, FilmtonePreOpticalColor);
+            \(redVar) = APPLY_LUT(\(redVar).x, \(redVar).y, \(redVar).z, FilmtonePreOpticalColor);
+            \(blueVar) = APPLY_LUT(\(blueVar).x, \(blueVar).y, \(blueVar).z, FilmtonePreOpticalColor);
+            float \(outRVar) = \(centerVar).x * \(centerMix) + \(redVar).x * \(shiftedMix);
+            float \(outGVar) = \(centerVar).y;
+            float \(outBVar) = \(centerVar).z * \(centerMix) + \(blueVar).z * \(shiftedMix);
+        """
+    }
+
+    private static func makeLegacyColorOnlyBridgeDctlText(cubeFilename: String) -> String {
+        """
+// \(defaultTitle)
+// Generated by Filmtone iOS. Apply through Filmtone Connect package v2.
+// This DCTL applies the package combined-color cube inside Resolve's documented
+// LUT graph path. Non-cube optical/time effects remain explicit equivalence
+// blockers until they are ported byte-for-byte from the iOS render pipeline.
+DEFINE_LUT(FilmtoneCombinedColor, \(cubeFilename))
+
+__DEVICE__ float filmtone_clamp(float v, float lo, float hi)
+{
+    return _fminf(_fmaxf(v, lo), hi);
+}
+
+__DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, float p_R, float p_G, float p_B)
+{
+    float3 rgb = make_float3(p_R, p_G, p_B);
+    rgb = APPLY_LUT(rgb.x, rgb.y, rgb.z, FilmtoneCombinedColor);
+    return make_float3(
+        filmtone_clamp(rgb.x, 0.0f, 1.0f),
+        filmtone_clamp(rgb.y, 0.0f, 1.0f),
+        filmtone_clamp(rgb.z, 0.0f, 1.0f)
+    );
+}
+"""
+    }
+
+    private static func dctlFloat(_ value: Double) -> String {
+        let finite = value.isFinite ? value : 0
+        return String(
+            format: "%.9ff",
+            locale: Locale(identifier: "en_US_POSIX"),
+            finite
+        )
+    }
+
+    private static func dctlRgbShiftMix(for request: Phase0ExportRequestDTO) -> Double {
+        let normalized = clamp(
+            request.grade.params.rgbShift / dctlRgbShiftReferenceMax,
+            min: 0,
+            max: 1
+        )
+        let mix = normalized * dctlRgbShiftProbeMixAtMax
+        return mix > dctlRgbShiftThreshold ? mix : 0
+    }
+
+    private static func dctlEdgeSoftnessParams(
+        for request: Phase0ExportRequestDTO
+    ) -> DctlEdgeSoftnessParams? {
+        let params = request.grade.params
+        let normalizedRgbShift = clamp(
+            params.rgbShift / dctlRgbShiftReferenceMax,
+            min: 0,
+            max: 1
+        )
+        let aberrationSoften = dctlAberrationEdgeSoften(for: normalizedRgbShift)
+        let lensSoftness = clamp(params.lensSoftness)
+        guard aberrationSoften > dctlEdgeSoftnessThreshold || lensSoftness > dctlEdgeSoftnessThreshold else {
+            return nil
+        }
+
+        let lensDrive = pow(lensSoftness, 0.78)
+        let aberrationDrive = pow(
+            clamp(aberrationSoften / dctlAberrationEdgeSoftenMax),
+            0.82
+        )
+        let blurRadius = min(
+            lerp(
+                dctlAberrationBlurRadiusMin,
+                dctlAberrationBlurRadiusMax,
+                aberrationDrive
+            ) + (lensDrive * dctlLensSoftnessBlurBoost),
+            dctlAberrationBlurRadiusCap
+        )
+        let tapRadius = max(1, min(7, Int(blurRadius.rounded())))
+        return DctlEdgeSoftnessParams(
+            aberrationSoften: aberrationSoften,
+            lensDrive: lensDrive,
+            tapRadius: tapRadius
+        )
+    }
+
+    private static func dctlAberrationEdgeSoften(for normalizedRgbShift: Double) -> Double {
+        let normalized = clamp(normalizedRgbShift)
+        guard normalized > dctlEdgeSoftnessThreshold else {
+            return 0
+        }
+
+        let linear = normalized * (dctlAberrationEdgeSoftenScale * dctlRgbShiftReferenceMax)
+        let boosted = pow(normalized, dctlAberrationEdgeSoftenCurve) * dctlAberrationEdgeSoftenMax
+        return min(dctlAberrationEdgeSoftenMax, max(linear, boosted))
+    }
+
+    private static func dctlDiffusionParams(
+        for request: Phase0ExportRequestDTO
+    ) -> DctlDiffusionParams? {
+        let diffusion = clamp(request.grade.params.diffusion)
+        guard diffusion > dctlDiffusionThreshold else {
+            return nil
+        }
+
+        return DctlDiffusionParams(
+            amount: diffusion * dctlDiffusionAmountScale * dctlDiffusionCompositeBase,
+            tapRadii: dctlDiffusionMipTapRadii,
+            groupWeights: dctlDiffusionMipGroupWeights,
+            centerWeight: dctlDiffusionCenterWeight,
+            maskStart: dctlDiffusionCenterMaskStart,
+            maskEnd: dctlDiffusionCenterMaskEnd
+        )
+    }
+
+    private static func dctlResolveTextureCalibration(
+        for request: Phase0ExportRequestDTO
+    ) -> DctlColorCalibration {
+        if request.sourceProbe?.sourceVideoMetadata?.colorClass == .hdrHlg {
+            // Resolve's HLG texture decode lands warmer/brighter than the
+            // Core Image tone-map path. These channel gains are verified
+            // against the C0061 HLG package probe and are scoped to HLG only.
+            return DctlColorCalibration(
+                redGain: 0.92000000,
+                greenGain: 0.88300000,
+                blueGain: 0.92400000,
+                redOffset: 0,
+                greenOffset: 0,
+                blueOffset: 0
+            )
+        }
+
+        switch request.sourceProbe?.inputTransformPolicy?.strategy {
+        case .appleLogToRec709, .appleLog2ToRec709:
+            // Resolve's DCTL texture path does not exactly match the Core Image
+            // sample path used by the iOS export for Apple Log sources. The
+            // affine calibration is intentionally scoped to the Apple Log bridge
+            // and is measured against the real C052 package reference frame.
+            return DctlColorCalibration(
+                redGain: 0.49998965,
+                greenGain: 0.52846118,
+                blueGain: 0.51499777,
+                redOffset: 0.46939863,
+                greenOffset: 0.38849754,
+                blueOffset: 0.36848030
+            )
+        default:
+            return DctlColorCalibration(
+                redGain: 1,
+                greenGain: 1,
+                blueGain: 1,
+                redOffset: 0,
+                greenOffset: 0,
+                blueOffset: 0
+            )
+        }
+    }
+
+    private static func clamp(_ value: Double, min minValue: Double = 0, max maxValue: Double = 1) -> Double {
+        min(max(value, minValue), maxValue)
+    }
+
+    private static func lerp(_ start: Double, _ end: Double, _ amount: Double) -> Double {
+        start + ((end - start) * amount)
     }
 }

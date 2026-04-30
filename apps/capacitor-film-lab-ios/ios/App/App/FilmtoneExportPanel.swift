@@ -26,11 +26,12 @@ struct FilmtoneExportPanel: View {
 
             Spacer(minLength: 12)
 
-            Button(store.strings.exportAndSave) {
-                Task { await store.exportAndSave() }
+            Button(store.strings.exportStart) {
+                Task { await store.export() }
             }
             .buttonStyle(FilmtonePrimaryButtonStyle())
             .disabled(!canExport)
+            .accessibilityIdentifier("filmtone.export.primary")
         }
     }
 
@@ -160,17 +161,19 @@ struct FilmtoneExportPanel: View {
             }
 
             HStack(spacing: 12) {
-                Button(store.strings.saveToPhotos) {
+                Button(saveToPhotosButtonLabel) {
                     Task { await store.saveToPhotos() }
                 }
                 .buttonStyle(FilmtonePrimaryButtonStyle())
                 .disabled(store.isSavingToPhotos || store.saveToPhotosState == .saved || !store.canUseLocalExport)
+                .accessibilityIdentifier("filmtone.export.finished.saveToPhotos")
 
                 Button(store.strings.shareOutput) {
                     Task { await store.shareOutput() }
                 }
                 .buttonStyle(FilmtoneSecondaryButtonStyle())
-                .disabled(!store.canUseLocalExport)
+                .disabled(store.isSavingToPhotos || !store.canUseLocalExport)
+                .accessibilityIdentifier("filmtone.export.finished.share")
             }
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
@@ -224,6 +227,12 @@ struct FilmtoneExportPanel: View {
         }
     }
 
+    private var saveToPhotosButtonLabel: String {
+        store.saveToPhotosState == .saved
+            ? store.strings.saveStateLabel(.saved)
+            : store.strings.saveToPhotos
+    }
+
     private func progressLabel(progress: Phase0ExportProgressDTO) -> String {
         let percent = Int((progress.progress * 100).rounded())
         if let currentFrame = progress.currentFrame, let totalFrames = progress.totalFrames {
@@ -264,15 +273,20 @@ private struct MetricCard: View {
 }
 
 struct FilmtonePrimaryButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.black)
+            .foregroundStyle(isEnabled ? .black : .white.opacity(0.42))
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .background(
                 RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
-                    .fill(Color.filmtoneAmber.opacity(configuration.isPressed ? 0.84 : 1))
+                    .fill(isEnabled
+                        ? Color.filmtoneAmber.opacity(configuration.isPressed ? 0.84 : 1)
+                        : Color.white.opacity(0.08)
+                    )
             )
             .opacity(configuration.role == .destructive ? 0.8 : 1)
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
@@ -280,19 +294,21 @@ struct FilmtonePrimaryButtonStyle: ButtonStyle {
 }
 
 struct FilmtoneSecondaryButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.subheadline.weight(.medium))
-            .foregroundStyle(.white.opacity(0.84))
+            .foregroundStyle(isEnabled ? .white.opacity(0.84) : .white.opacity(0.38))
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .background(
                 RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
-                    .fill(Color.white.opacity(configuration.isPressed ? 0.08 : 0.04))
+                    .fill(Color.white.opacity(isEnabled ? (configuration.isPressed ? 0.08 : 0.04) : 0.025))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                    .stroke(Color.white.opacity(isEnabled ? 0.08 : 0.04), lineWidth: 1)
             )
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
     }

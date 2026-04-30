@@ -683,6 +683,7 @@ struct FilmtoneRootView: View {
         VStack(spacing: 10) {
             if let toast = store.toast {
                 FilmtoneToastView(toast: toast)
+                    .allowsHitTesting(false)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .zIndex(1000)
             }
@@ -1312,6 +1313,7 @@ struct UnsavedExportPrompt: View {
 
                 Button(shareLabel, action: onShare)
                     .buttonStyle(FilmtoneSecondaryButtonStyle())
+                    .disabled(isSaving)
                     .accessibilityIdentifier("filmtone.export.unsavedPrompt.share")
             }
         }
@@ -1324,10 +1326,12 @@ struct UnsavedExportPrompt: View {
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(Color.black.opacity(0.34))
+                .allowsHitTesting(false)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(Color.filmtoneAmber.opacity(0.18), lineWidth: 1)
+                .allowsHitTesting(false)
         )
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .shadow(color: Color.black.opacity(0.34), radius: 16, x: 0, y: 8)

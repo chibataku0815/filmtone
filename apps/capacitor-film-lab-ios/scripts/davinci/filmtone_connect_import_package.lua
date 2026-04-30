@@ -17,7 +17,9 @@ local DEFAULT_PACKAGE_DIR = nil
 local CONNECT_VERSION = "filmtone-connect-davinci-v0"
 local SIDECAR_SUFFIX = ".filmtone-ios-export-session-v1.json"
 local DEFAULT_LUT_FILENAME = "combined-color.cube"
+local DEFAULT_DCTL_FILENAME = "filmtone-bridge.dctl"
 local DEFAULT_REFERENCE_FILENAME = "reference-after.jpg"
+local CONNECT_PACKAGE_V2 = "filmtone-connect-package-v2"
 
 local function log(message)
     print("[Filmtone Connect] " .. tostring(message))
@@ -424,11 +426,17 @@ local function discover_package(package_dir)
 
     local package_block = sidecar.package or {}
     local package_luts = package_block.luts or {}
-    local media_path = find_file_by_name(package_dir, package_block.mediaFilename)
+    local package_effects = package_block.effects or {}
+    local layout = package_block.layout
+    local source_path = find_file_by_name(package_dir, package_block.sourceMediaFilename)
+        or find_file_by_name(package_dir, package_block.mediaFilename)
+    local rendered_path = find_file_by_name(package_dir, package_block.renderedMediaFilename)
         or find_file_by_name(package_dir, sidecar_uri_basename(sidecar.output and sidecar.output.outputUri))
+    local media_path = source_path
+        or rendered_path
         or find_first_matching(files, function(_, name)
             local lower = name:lower()
-            if ends_with(lower, ".json") or ends_with(lower, ".cube") then
+            if ends_with(lower, ".json") or ends_with(lower, ".cube") or ends_with(lower, ".dctl") then
                 return false
             end
             if lower:match("^reference%-after%.") or lower:match("^reference%-before%.") then
@@ -450,6 +458,25 @@ local function discover_package(package_dir)
         or find_first_matching(files, function(_, name)
             return name:lower():match("%.cube$")
         end)
+    local pre_optical_lut_path = find_file_by_name(package_dir, package_luts.preOpticalColor)
+    local post_optical_lut_path = find_file_by_name(package_dir, package_luts.postOpticalColor)
+
+    local dctl_declared = package_effects.dctl ~= nil and tostring(package_effects.dctl) ~= ""
+    local dctl_path = find_file_by_name(package_dir, package_effects.dctl)
+        or find_file_by_name(package_dir, DEFAULT_DCTL_FILENAME)
+        or find_first_matching(files, function(_, name)
+            return name:lower():match("%.dctl$")
+        end)
+
+    if dctl_declared and not dctl_path then
+        fatal("package declared effects.dctl but the file is missing: " .. tostring(package_effects.dctl))
+    end
+    if layout == CONNECT_PACKAGE_V2 and not source_path then
+        fatal("package v2 missing original source media; refusing to import rendered media as source")
+    end
+    if layout == CONNECT_PACKAGE_V2 and not dctl_path then
+        fatal("package v2 missing effects.dctl; refusing to claim source equivalence with cube-only bridge")
+    end
 
     local reference_path = find_file_by_name(package_dir, package_block.referenceAfterFilename)
         or find_file_by_name(package_dir, DEFAULT_REFERENCE_FILENAME)
@@ -472,9 +499,16 @@ local function discover_package(package_dir)
         files = files,
         sidecar_path = sidecar_path,
         sidecar = sidecar,
+        layout = layout,
         media_path = media_path,
+        source_path = source_path or media_path,
+        rendered_path = rendered_path,
         lut_path = lut_path,
+        pre_optical_lut_path = pre_optical_lut_path,
+        post_optical_lut_path = post_optical_lut_path,
+        dctl_path = dctl_path,
         reference_path = reference_path,
+        reference_after_time_sec = package_block.referenceAfterTimeSec,
     }
 end
 
@@ -525,6 +559,13 @@ local function build_effect_summary(sidecar)
     return table.concat(effects, ", ")
 end
 
+local function build_bridge_coverage_summary(package)
+    if package.pre_optical_lut_path and package.post_optical_lut_path then
+        return "Bridge coverage: split color LUTs plus Resolve texture color compensation. Spatial optical stages, grain, motion, depth, and true mip-pyramid glow remain explicit visual equivalence blockers until verified."
+    end
+    return "Bridge coverage: combined-color cube through DCTL; optical/time effects remain explicit visual equivalence blockers until ported."
+end
+
 local function lut_ref_summary(name, ref)
     if type(ref) ~= "table" then
         return name .. "=none"
@@ -543,8 +584,11 @@ local function build_note(package)
     local lines = {
         "Filmtone Connect for DaVinci v0",
         "Package: " .. package.dir,
+        "Layout: " .. fmt_value(package.layout, "unknown"),
         "Sidecar: " .. basename(package.sidecar_path),
         "Preset: " .. fmt_value(look.presetName) .. " (" .. fmt_value(look.presetVersion) .. ")",
+        "Source media: " .. fmt_value(package.source_path, "missing"),
+        "Rendered iOS media: " .. fmt_value(package.rendered_path, "missing"),
         "Output: " .. fmt_value(output.outputColorProfile)
             .. " / " .. fmt_value(output.colorPrimaries)
             .. "/" .. fmt_value(output.colorTransfer)
@@ -553,10 +597,14 @@ local function build_note(package)
             .. " " .. fmt_value(output.fps) .. "fps"
             .. " " .. fmt_value(output.codec) .. "." .. fmt_value(output.container),
         "LUT: " .. basename(package.lut_path)
+            .. "; preOptical=" .. fmt_value(package.pre_optical_lut_path and basename(package.pre_optical_lut_path), "none")
+            .. "; postOptical=" .. fmt_value(package.post_optical_lut_path and basename(package.post_optical_lut_path), "none")
             .. " -> node 1; "
             .. lut_ref_summary("inputLut", lut_refs.inputLut)
             .. "; "
             .. lut_ref_summary("creativeLut", lut_refs.creativeLut),
+        "DCTL: " .. fmt_value(package.dctl_path, "none"),
+        build_bridge_coverage_summary(package),
         "Baked effects: " .. build_effect_summary(sidecar),
         "Depth: used=" .. fmt_value(depth.used, "unknown")
             .. ", source=" .. fmt_value(depth.source, "none")
@@ -565,8 +613,9 @@ local function build_note(package)
         "Mezzanine: used=" .. fmt_value(mezzanine.used, "unknown")
             .. ", variant=" .. fmt_value(mezzanine.variant, "none")
             .. ", profileVersion=" .. fmt_value(mezzanine.profileVersion, "none"),
-        "Reference: " .. fmt_value(package.reference_path, "none"),
-        "Non-claim: LUT does not recreate depth, ray-angle optics, grain, motion blur, or halation spread; those are baked/reference provenance.",
+        "Reference: " .. fmt_value(package.reference_path, "none")
+            .. " at " .. fmt_value(package.reference_after_time_sec, "unknown") .. "s",
+        "Equivalence gate: source media plus Filmtone bridge must match the iOS rendered/reference output; package existence alone is not a claim.",
     }
     return table.concat(lines, "\n")
 end
@@ -683,6 +732,68 @@ local function apply_lut_to_item(project, timeline_item, lut_path)
     fatal("LUT was not discovered by Resolve. Tried package path and staged LUT path for " .. lut_path)
 end
 
+local function apply_package_bridge(project, timeline_item, package)
+    if package.dctl_path then
+        -- The generated DCTL references the adjacent cube by filename. Stage
+        -- all declared LUT companions into the same Resolve LUT folder before
+        -- applying the DCTL.
+        stage_lut({ lut_path = package.lut_path }, project)
+        if package.pre_optical_lut_path then
+            stage_lut({ lut_path = package.pre_optical_lut_path }, project)
+        end
+        if package.post_optical_lut_path then
+            stage_lut({ lut_path = package.post_optical_lut_path }, project)
+        end
+        for _, path in ipairs(package.files or {}) do
+            if path:lower():match("%.cube$") then
+                stage_lut({ lut_path = path }, project)
+            end
+        end
+        apply_lut_to_item(project, timeline_item, package.dctl_path)
+        log("applied Filmtone DCTL bridge; DCTL references package color LUTs")
+        return true
+    end
+
+    if package.layout == CONNECT_PACKAGE_V2 then
+        fatal("package v2 has no DCTL bridge; refusing missing declared Resolve bridge")
+    end
+
+    apply_lut_to_item(project, timeline_item, package.lut_path)
+    log("legacy package: applied cube-only color bridge")
+    return true
+end
+
+local function set_setting_if_present(target, key, value)
+    if value == nil or value == "" then
+        return false
+    end
+    if target and target.SetSetting and target:SetSetting(key, tostring(value)) then
+        return true
+    end
+    return false
+end
+
+local function configure_project_for_package(project, package)
+    local output = package.sidecar.output or {}
+    set_setting_if_present(project, "timelineFrameRate", output.fps)
+    set_setting_if_present(project, "timelinePlaybackFrameRate", output.fps)
+    set_setting_if_present(project, "timelineResolutionWidth", output.outputWidth)
+    set_setting_if_present(project, "timelineResolutionHeight", output.outputHeight)
+    set_setting_if_present(project, "timelineOutputResolutionWidth", output.outputWidth)
+    set_setting_if_present(project, "timelineOutputResolutionHeight", output.outputHeight)
+    log("requested timeline settings: " .. fmt_value(output.outputWidth, "?")
+        .. "x" .. fmt_value(output.outputHeight, "?")
+        .. " " .. fmt_value(output.fps, "?") .. "fps")
+end
+
+local function configure_timeline_for_package(timeline, package)
+    local output = package.sidecar.output or {}
+    set_setting_if_present(timeline, "timelineResolutionWidth", output.outputWidth)
+    set_setting_if_present(timeline, "timelineResolutionHeight", output.outputHeight)
+    set_setting_if_present(timeline, "timelineOutputResolutionWidth", output.outputWidth)
+    set_setting_if_present(timeline, "timelineOutputResolutionHeight", output.outputHeight)
+end
+
 local function run_resolve_import(package)
     local resolve = Resolve()
     if not resolve then
@@ -698,24 +809,28 @@ local function run_resolve_import(package)
         fatal("could not access Media Pool")
     end
 
+    configure_project_for_package(project, package)
     resolve:OpenPage("media")
     local imported = media_pool:ImportMedia({ package.media_path })
     local media_pool_item = first_table_value(imported)
     if not media_pool_item then
         fatal("media import failed: " .. package.media_path)
     end
-    log("imported media: " .. package.media_path)
+    log("imported source media: " .. package.media_path)
 
     local timeline = project:GetCurrentTimeline()
     local timeline_item = nil
-    if timeline then
+    if timeline and package.layout ~= CONNECT_PACKAGE_V2 then
         local appended = media_pool:AppendToTimeline({ media_pool_item })
         timeline_item = first_table_value(appended)
         if not timeline_item then
             fatal("failed to append imported media to current timeline")
         end
     else
-        local timeline_name = "Filmtone Connect - " .. without_extension(basename(package.media_path))
+        local timeline_name = "Filmtone Connect Source - "
+            .. without_extension(basename(package.media_path))
+            .. " - "
+            .. tostring(os.time())
         timeline = media_pool:CreateTimelineFromClips(timeline_name, { media_pool_item })
         if not timeline then
             fatal("failed to create timeline for imported media")
@@ -727,10 +842,11 @@ local function run_resolve_import(package)
             fatal("created timeline but could not find imported timeline item")
         end
     end
+    configure_timeline_for_package(timeline, package)
     log("timeline item ready")
 
     resolve:OpenPage("color")
-    apply_lut_to_item(project, timeline_item, package.lut_path)
+    apply_package_bridge(project, timeline_item, package)
 
     local note = build_note(package)
     add_filmtone_marker(timeline_item, media_pool_item, note, package.sidecar)
@@ -746,8 +862,11 @@ end
 local function print_package_summary(package)
     log("package: " .. package.dir)
     log("sidecar: " .. package.sidecar_path)
-    log("media: " .. package.media_path)
+    log("layout: " .. fmt_value(package.layout, "unknown"))
+    log("source media: " .. package.media_path)
+    log("rendered media: " .. fmt_value(package.rendered_path, "none"))
     log("lut: " .. package.lut_path)
+    log("dctl: " .. fmt_value(package.dctl_path, "none"))
     log("reference: " .. fmt_value(package.reference_path, "none"))
     log("marker note:\n" .. build_note(package))
 end

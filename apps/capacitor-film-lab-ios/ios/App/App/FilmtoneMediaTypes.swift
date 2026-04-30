@@ -426,7 +426,8 @@ struct Phase0ExportResultDTO: Encodable {
     //       nil when sidecar write failed or disabled.
     let sidecarUri: String?
     // Filmtone Connect package companions ordered for sharing:
-    // media, sidecar, combined-color.cube, reference-after.jpg.
+    // rendered media, sidecar, source media copy, combined-color.cube,
+    // optional DCTL bridge, reference-after.jpg.
     let packageFileUris: [String]?
 
     init(
