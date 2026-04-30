@@ -10,6 +10,15 @@ final class FilmtoneExportSession {
     private let cacheStore: CacheStore
     private let mezzanineService: MezzanineService?
     private let outputURL: URL
+    /// v1.3 Item 2 Phase E: the Saved Look that was applied to the editor at
+    /// export time, resolved by the caller (typically `FilmtoneEditorStore`)
+    /// from `LibraryStoreActor.loadLook(id:)`. The session itself does not
+    /// look this up — keeping the dependency injection edge here means
+    /// `FilmtoneExportSession` stays free of the `LibraryStoreActor` actor
+    /// reference and remains constructible from non-MainActor contexts.
+    /// Pass nil when no Saved Look was active (or after dirtying the project
+    /// state since apply); the sidecar's `savedLook` block is then omitted.
+    private let appliedSavedLook: SavedLookEntry?
     private(set) var didUseMezzanineVariant: ProfileVariant?
     fileprivate let ciContext: CIContext
     fileprivate let colorPipeline: FilmtoneColorPipelineContract
@@ -73,12 +82,14 @@ final class FilmtoneExportSession {
         request: Phase0ExportRequestDTO,
         sourceURL: URL,
         cacheStore: CacheStore,
-        mezzanineService: MezzanineService? = nil
+        mezzanineService: MezzanineService? = nil,
+        appliedSavedLook: SavedLookEntry? = nil
     ) throws {
         self.request = request
         self.sourceURL = sourceURL
         self.cacheStore = cacheStore
         self.mezzanineService = mezzanineService
+        self.appliedSavedLook = appliedSavedLook
         self.outputURL = try cacheStore.temporaryExportURL(pathExtension: request.output.container)
         let colorPipeline = FilmtoneColorPipeline.defaultOutputContract(
             sourceMetadata: request.sourceProbe?.sourceVideoMetadata?.color,
@@ -249,6 +260,21 @@ final class FilmtoneExportSession {
             )
         }
 
+        // v1.3 Item 2 Phase E: convert the resolved Saved Look entry (if any)
+        // into the builder-local `SidecarSavedLookRef`. Built-in entries
+        // surface `bundled: true` + `bundledSlug`; user-saved entries omit
+        // both via `encodeIfPresent`. The sidecar block itself is `nil` when
+        // no Saved Look was applied at export time.
+        let savedLookRef: SidecarSavedLookRef? = appliedSavedLook.map { entry in
+            SidecarSavedLookRef(
+                id: entry.id.uuidString,
+                name: entry.name,
+                updatedAtIso: ISO8601DateFormatter.filmtoneSidecar.string(from: entry.updatedAt),
+                bundled: entry.bundled ? true : nil,
+                bundledSlug: entry.bundledSlug
+            )
+        }
+
         let inputs = SidecarBuildInputs(
             request: request,
             sourceProbe: request.sourceProbe,
@@ -268,7 +294,8 @@ final class FilmtoneExportSession {
             mezzanineUsedVariant: didUseMezzanineVariant?.rawValue,
             mezzanineProfileVersion: didUseMezzanineVariant != nil ? MezzanineService.Profile.version : nil,
             colorPipeline: colorPipeline,
-            depth: depthSidecar
+            depth: depthSidecar,
+            appliedSavedLook: savedLookRef
         )
 
         let sidecarURL = FilmtoneExportSidecarBuilder.sidecarURL(for: outputURL)

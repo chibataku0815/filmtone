@@ -1219,6 +1219,18 @@ final class FilmtoneEditorStore: ObservableObject {
                 project: project
             )
 
+            // v1.3 Item 2 Phase E: resolve the active Saved Look (if any) so
+            // the sidecar can record provenance. Built-in catalog entries
+            // materialize from `FilmtoneBuiltInCatalog` without disk I/O;
+            // user-saved entries are read from the in-memory actor state.
+            // Resolution failures surface as "no provenance" — never block
+            // the export — because the look might have been deleted between
+            // apply and export, and a missing block is preferable to a hard
+            // export failure (CLAUDE.md §11 `feedback_no_fallback_bug_hotbed`
+            // permits this: provenance absence is explicit, not silent
+            // success-with-degraded-output).
+            let resolvedSavedLook = await resolveAppliedSavedLookForExport()
+
             isBusy = true
             error = nil
             notice = nil
@@ -1230,7 +1242,8 @@ final class FilmtoneEditorStore: ObservableObject {
             let cacheProtection = protectedCacheURIs
             let result = try await facade.runExport(
                 request: request,
-                protectedCacheURIs: cacheProtection
+                protectedCacheURIs: cacheProtection,
+                appliedSavedLook: resolvedSavedLook
             ) { [weak self] progress in
                 self?.exportProgress = progress
             }
@@ -1261,6 +1274,9 @@ final class FilmtoneEditorStore: ObservableObject {
                 project: project
             )
 
+            // v1.3 Item 2 Phase E: see `export()` above for the rationale.
+            let resolvedSavedLook = await resolveAppliedSavedLookForExport()
+
             isBusy = true
             isSavingToPhotos = false
             error = nil
@@ -1273,7 +1289,8 @@ final class FilmtoneEditorStore: ObservableObject {
             let cacheProtection = protectedCacheURIs
             let result = try await facade.runExport(
                 request: request,
-                protectedCacheURIs: cacheProtection
+                protectedCacheURIs: cacheProtection,
+                appliedSavedLook: resolvedSavedLook
             ) { [weak self] progress in
                 self?.exportProgress = progress
             }
@@ -1419,6 +1436,21 @@ final class FilmtoneEditorStore: ObservableObject {
 
     private func reclaimCacheForCurrentState() {
         facade.reclaimCache(protecting: protectedCacheURIs)
+    }
+
+    /// v1.3 Item 2 Phase E: resolve `appliedSavedLookId` to a full
+    /// `SavedLookEntry` for sidecar provenance. Returns nil when the project
+    /// has been dirtied since `applySavedLook` (the apply path nils
+    /// `appliedSavedLookId` on every mutation), when no Saved Look was
+    /// applied, when the library actor is unavailable, or when the entry
+    /// fails to load (e.g. user-saved entry deleted between apply and
+    /// export). Built-in catalog entries materialize without disk I/O via
+    /// `FilmtoneBuiltInCatalog`, so the read is cheap.
+    private func resolveAppliedSavedLookForExport() async -> SavedLookEntry? {
+        guard let lookId = appliedSavedLookId, let store = libraryStore else {
+            return nil
+        }
+        return try? await store.loadLook(id: lookId)
     }
 
     private func discardLocalExportFiles(_ result: Phase0ExportResultDTO) {

@@ -39,6 +39,15 @@ struct SidecarBuildInputs {
     /// supply a `SidecarDepthInfo` (with `used: false` when depth was not
     /// applied, mirroring the mezzanine block convention).
     let depth: SidecarDepthInfo?
+    /// v1.3 Item 2 Phase E: provenance for the Saved Look that was applied to
+    /// the export at run time. nil when the user exported without applying a
+    /// Saved Look (or after dirtying the project state since apply). Built-in
+    /// catalog entries surface `bundled: true` + `bundledSlug` for downstream
+    /// importers (Filmtone Connect for DaVinci); user-saved entries omit both.
+    /// `FilmtoneExportSession.writeExportSidecar` converts a `SavedLookEntry`
+    /// into this builder-local struct so the sidecar contract test stays free
+    /// of `FilmtoneLibrarySchema` dependencies.
+    let appliedSavedLook: SidecarSavedLookRef?
 }
 
 // MARK: - Sidecar schema (filmtone-ios-export-session-v1)
@@ -73,6 +82,10 @@ struct FilmtoneExportSidecarV1: Encodable {
     /// "v1.2 sidecar (field absent)". schemaVersion stays 1 — additive optional fields
     /// remain backwards-compatible.
     let depth: SidecarDepthInfo?
+    /// v1.3 Item 2 Phase E: which Saved Look (built-in or user-created) was
+    /// applied to this export at run time. nil when no Saved Look was active.
+    /// Additive optional field — V1 readers ignore unknown keys (CLAUDE.md §5).
+    let savedLook: SidecarSavedLookRef?
 }
 
 struct SidecarDevice: Encodable {
@@ -133,6 +146,24 @@ struct SidecarOutput: Encodable {
     let colorPrimaries: String
     let colorTransfer: String
     let colorSpace: String
+}
+
+/// v1.3 Item 2 Phase E: provenance entry for a Saved Look applied to the
+/// export. Mirrors the durable `SavedLookEntry` schema (in
+/// `FilmtoneLibrarySchema.swift`) but stays builder-local so the sidecar
+/// contract test compiles without pulling the entire library schema graph.
+///
+/// `bundled` and `bundledSlug` are `Optional` so user-saved looks omit them
+/// from the JSON via `encodeIfPresent`. Built-in catalog entries set
+/// `bundled = true` plus the catalog `bundledSlug` (e.g.
+/// `"filmtone-signature"`) so Filmtone Connect for DaVinci and other
+/// downstream readers can recognize built-ins across renames or app updates.
+struct SidecarSavedLookRef: Encodable {
+    let id: String
+    let name: String
+    let updatedAtIso: String
+    let bundled: Bool?
+    let bundledSlug: String?
 }
 
 /// Records whether (and which variant of) a mezzanine asset was consumed for this export.
@@ -267,7 +298,8 @@ enum FilmtoneExportSidecarBuilder {
             output: output,
             renderMode: inputs.renderMode,
             mezzanine: mezzanine,
-            depth: depth
+            depth: depth,
+            savedLook: inputs.appliedSavedLook
         )
     }
 
