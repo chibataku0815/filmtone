@@ -91,11 +91,27 @@ enum FilmtoneBuiltInCatalog {
             presetName: "softBlue",
             strength: 1.0,
             quickState: .zero,
+            // v1.4 Night Soft — flipped from "cool low-light" to "warm
+            // intimate candlelight" per CD reference (Mourning Mirror frames:
+            // 93% pure black + warm amber rembrandt key light). Pulls down to
+            // softBlue base then overrides nearly every tonal/spatial field
+            // because Mourning is the inverse of Cinestill — same low-light
+            // class, opposite color temperature. shadowTone=0 so blacks stay
+            // pure black (no shadow lift / no shadow color injection — the
+            // dramatic chiaroscuro reads as such).
             paramOverrides: FilmtonePhase0ParamsPatch(values: [
-                "halationIntensity": 0.04,
-                "bloomStrength": 0.24,
-                "exposure": 0.05,
-                "saturation": 0.93,
+                "exposure": 0.06,
+                "contrast": 1.18,
+                "saturation": 0.94,
+                "temperature": 0.10,
+                "halationIntensity": 0.18,
+                "halationHue": 35,
+                "bloomStrength": 0.36,
+                "fade": 0.02,
+                "shadowTone": 0,
+                "highlightTone": 0.22,
+                "highlightHue": 30,
+                "compressionAmount": 0.55,
             ]),
             creativeLut: nil
         ),

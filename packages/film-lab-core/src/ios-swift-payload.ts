@@ -1,4 +1,4 @@
-import { PRESET_VERSION } from "./look-ids";
+import { IOS_PRESET_VERSION } from "./look-ids";
 import { FILM_GRAIN_INTENSITY_MAX } from "./params";
 import {
   PHASE0_APPROX_SOURCE_LONG_EDGE_MAX,
@@ -85,7 +85,7 @@ export function buildFilmtoneIosSwiftPayload(): FilmtoneIosSwiftPayload {
 
   return {
     schemaVersion: PHASE0_SCHEMA_VERSION,
-    presetVersion: PRESET_VERSION,
+    presetVersion: IOS_PRESET_VERSION,
     presetDefault: PHASE0_PRESET_DEFAULT,
     presetStrengthDefault: PHASE0_PRESET_STRENGTH_DEFAULT,
     paramKeys: PHASE0_PARAM_KEYS,

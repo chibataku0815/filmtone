@@ -82,7 +82,7 @@
   },
   "grade": {
     "presetName": "cinematic",
-    "presetVersion": "v1",
+    "presetVersion": "v2",
     "quickState": {
       "filmCharacter": 0.15,
       "era": -0.05,
@@ -118,6 +118,10 @@
       "shutterAngle": 0,
       "trailIntensity": 0,
       "fade": 0.04,
+      "shadowTone": 0,
+      "highlightTone": 0,
+      "shadowHue": 225,
+      "highlightHue": 30,
       "vignette": 0.15,
       "grainIntensity": 0.12
     }

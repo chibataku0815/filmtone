@@ -7,6 +7,19 @@ import type { PresetName } from "./presets";
 export const PRESET_VERSION = "v1" as const;
 
 /**
+ * iOS-only preset / kernel version, decoupled from shared `PRESET_VERSION` so
+ * iOS can bump kernel math (`OpticalKernels.baseGradeV2` /
+ * `filmCompressionV2`) without invalidating desktop / web / Remotion Look IDs.
+ *
+ * Stamped onto `SavedLookEntry.presetVersion` at save time and consulted by
+ * `FilmtoneExportSession.applyBaseGradeStage` /
+ * `FilmtoneExportSession.applyToneCompressionStage` to dispatch v1 vs v2
+ * kernels. v1 saved Looks continue to render through v1 kernels; new
+ * built-ins and new user-saved Looks render through v2.
+ */
+export const IOS_PRESET_VERSION = "v2" as const;
+
+/**
  * 機械可読 Look ID（CD ストリームの命名規則）
  */
 export function lookIdForPreset(name: PresetName): string {

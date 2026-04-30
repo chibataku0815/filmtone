@@ -1164,6 +1164,10 @@ final class FilmtoneEditorStore: ObservableObject {
 
             applyLutMutation { state in
                 state.presetName = FilmtonePhase0Math.safePresetName(entry.presetName)
+                // v1.4 backward compat — stamp the saved Look's preset version
+                // onto the project so the export pipeline dispatches v1 kernel
+                // for v1 saves and v2 kernel for v2 saves. handoff §10 guard.
+                state.presetVersion = entry.presetVersion
                 state.strength = FilmtonePhase0Math.clampStrength(entry.strength)
                 state.quickState = entry.quickState.clamped()
                 state.paramOverrides = entry.paramOverrides

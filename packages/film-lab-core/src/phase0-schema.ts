@@ -51,6 +51,10 @@ export const PHASE0_PARAM_KEYS = [
   "shutterAngle",
   "trailIntensity",
   "fade",
+  "shadowTone",
+  "highlightTone",
+  "shadowHue",
+  "highlightHue",
   "vignette",
   "grainIntensity",
 ] as const;
@@ -116,6 +120,10 @@ export const phase0ParamsSchema = z.object({
   shutterAngle: z.number().min(0).max(720).default(PRESETS.reset.shutterAngle),
   trailIntensity: z.number().min(0).max(0.95).default(PRESETS.reset.trailIntensity),
   fade: z.number().min(0).max(1).default(PRESETS.reset.fade),
+  shadowTone: z.number().min(0).max(1).default(PRESETS.reset.shadowTone),
+  highlightTone: z.number().min(0).max(1).default(PRESETS.reset.highlightTone),
+  shadowHue: z.number().min(0).max(360).default(PRESETS.reset.shadowHue),
+  highlightHue: z.number().min(0).max(360).default(PRESETS.reset.highlightHue),
   vignette: z.number().min(0).max(1).default(PRESETS.reset.vignette),
   grainIntensity: z.number().min(0).transform(clampGrainIntensity).default(PRESETS.reset.grainIntensity),
 });
@@ -150,6 +158,10 @@ const phase0ParamsPatchSchema = z.object({
   shutterAngle: z.number().min(0).max(720).optional(),
   trailIntensity: z.number().min(0).max(0.95).optional(),
   fade: z.number().min(0).max(1).optional(),
+  shadowTone: z.number().min(0).max(1).optional(),
+  highlightTone: z.number().min(0).max(1).optional(),
+  shadowHue: z.number().min(0).max(360).optional(),
+  highlightHue: z.number().min(0).max(360).optional(),
   vignette: z.number().min(0).max(1).optional(),
   grainIntensity: z.number().min(0).transform(clampGrainIntensity).optional(),
 });

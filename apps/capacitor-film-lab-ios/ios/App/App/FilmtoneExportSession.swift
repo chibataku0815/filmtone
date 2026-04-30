@@ -1196,11 +1196,12 @@ final class FilmtoneExportSession {
 
     fileprivate func applyGrade(to image: CIImage, timeSeconds: Double) -> CIImage {
         let params = request.grade.params
+        let presetVersion = request.grade.presetVersion
         var current = image
 
         current = applyInputLutStage(to: current)
-        current = applyBaseGradeStage(to: current, params: params)
-        current = applyToneCompressionStage(to: current, params: params)
+        current = applyBaseGradeStage(to: current, params: params, presetVersion: presetVersion)
+        current = applyToneCompressionStage(to: current, params: params, presetVersion: presetVersion)
         current = applyEdgeOpticsStage(to: current, params: params)
         current = applyGlowFamilyStage(to: current, params: params)
         current = applyVignetteStage(to: current, params: params)
@@ -1247,7 +1248,7 @@ final class FilmtoneExportSession {
         return applyLut(preparedInputLut, to: image)
     }
 
-    private func applyBaseGradeStage(to image: CIImage, params: Phase0ParamsDTO) -> CIImage {
+    private func applyBaseGradeStage(to image: CIImage, params: Phase0ParamsDTO, presetVersion: String) -> CIImage {
         let epsilon = 0.0001
         guard
             abs(params.exposure) > epsilon ||
@@ -1255,31 +1256,75 @@ final class FilmtoneExportSession {
             abs(params.saturation - 1.0) > epsilon ||
             abs(params.temperature) > epsilon ||
             abs(params.tint) > epsilon ||
-            abs(params.fade) > epsilon
+            abs(params.fade) > epsilon ||
+            abs(params.shadowTone) > epsilon ||
+            abs(params.highlightTone) > epsilon
         else {
             return image
         }
 
-        guard let kernel = OpticalKernels.baseGrade else {
+        let kernel: CIColorKernel?
+        switch presetVersion {
+        case "v2":
+            kernel = OpticalKernels.baseGradeV2
+        case "v1":
+            kernel = OpticalKernels.baseGrade
+        default:
+            assertionFailure("Unknown presetVersion: \(presetVersion)")
+            kernel = OpticalKernels.baseGradeV2
+        }
+        guard let kernel else {
             return image
         }
 
-        return kernel.apply(extent: image.extent, arguments: [
-            image,
-            params.exposure,
-            params.contrast,
-            params.saturation,
-            params.temperature,
-            params.tint,
-            params.fade,
-        ]) ?? image
+        // v1 kernel takes the original 7 args; v2 takes 11 (adds shadowTone /
+        // highlightTone / shadowHue / highlightHue for density-dependent
+        // split-tone).
+        let args: [Any]
+        switch presetVersion {
+        case "v1":
+            args = [
+                image,
+                params.exposure,
+                params.contrast,
+                params.saturation,
+                params.temperature,
+                params.tint,
+                params.fade,
+            ]
+        default:
+            args = [
+                image,
+                params.exposure,
+                params.contrast,
+                params.saturation,
+                params.temperature,
+                params.tint,
+                params.fade,
+                params.shadowTone,
+                params.highlightTone,
+                params.shadowHue,
+                params.highlightHue,
+            ]
+        }
+        return kernel.apply(extent: image.extent, arguments: args) ?? image
     }
 
-    private func applyToneCompressionStage(to image: CIImage, params: Phase0ParamsDTO) -> CIImage {
+    private func applyToneCompressionStage(to image: CIImage, params: Phase0ParamsDTO, presetVersion: String) -> CIImage {
         guard params.compressionAmount > 0.0001 else {
             return image
         }
-        guard let kernel = OpticalKernels.filmCompression else {
+        let kernel: CIColorKernel?
+        switch presetVersion {
+        case "v2":
+            kernel = OpticalKernels.filmCompressionV2
+        case "v1":
+            kernel = OpticalKernels.filmCompression
+        default:
+            assertionFailure("Unknown presetVersion: \(presetVersion)")
+            kernel = OpticalKernels.filmCompressionV2
+        }
+        guard let kernel else {
             return image
         }
         return kernel.apply(extent: image.extent, arguments: [
@@ -2887,6 +2932,72 @@ kernel vec4 baseGrade(__sample image, float exposure, float contrast, float satu
 }
 """)
 
+    // v2 (presetVersion="v2"): film-aware tonal grade.
+    //   1) Contrast: 3-piece curve (toe smoothstep / linear mid / shoulder
+    //      smoothstep) — film density-style separation, no Reinhard mush.
+    //   2) Saturation: chroma-scale (luma + chroma * sat) — per-channel hue
+    //      preserved, no Reinhard hue drift.
+    //   3) Temperature/tint: unchanged from v1.
+    //   4) Crosstalk: density-dependent split-tone via shadowHue/shadowTone +
+    //      highlightHue/highlightTone — gives shadow/highlight real *color*
+    //      (cyan/magenta/amber) instead of muddy white-lift.
+    //   5) Fade: shadow-only mask (no highlight bleed) — strong fade only
+    //      lifts the bottom of the curve, keeps highlight punch.
+    static let baseGradeV2 = CIColorKernel(source: """
+kernel vec4 baseGradeV2(__sample image, float exposure, float contrast, float saturation, float temperature, float tint, float fade, float shadowTone, float highlightTone, float shadowHue, float highlightHue) {
+    vec4 color = image;
+
+    // 1. Exposure
+    color.rgb *= pow(2.0, exposure);
+
+    // 2. Contrast — 3-piece film density curve
+    float c = contrast - 1.0;
+    vec3 toeMask = vec3(1.0) - smoothstep(vec3(0.0), vec3(0.18), color.rgb);
+    vec3 shoulderMask = smoothstep(vec3(0.85), vec3(1.0), color.rgb);
+    vec3 linearPart = (color.rgb - vec3(0.5)) * contrast + vec3(0.5);
+    vec3 toePart = color.rgb * (1.0 - 0.35 * c);
+    vec3 shoulderPart = vec3(1.0) - (vec3(1.0) - color.rgb) * (1.0 - 0.35 * c);
+    color.rgb = mix(linearPart, toePart, toeMask);
+    color.rgb = mix(color.rgb, shoulderPart, shoulderMask);
+
+    // 3. Saturation — chroma scale (hue-preserving)
+    float lumaSat = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+    vec3 chroma = color.rgb - vec3(lumaSat);
+    color.rgb = vec3(lumaSat) + chroma * saturation;
+
+    // 4. Temperature / Tint
+    color.r += temperature * 0.1;
+    color.b -= temperature * 0.1;
+    color.r += tint * 0.05;
+    color.g -= tint * 0.08;
+    color.b += tint * 0.05;
+
+    // 5. Crosstalk — density-dependent split-tone with hue/tone fields
+    float lumaCT = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+    float shadowMaskCT = 1.0 - smoothstep(0.0, 0.5, lumaCT);
+    float highlightMaskCT = smoothstep(0.5, 1.0, lumaCT);
+    vec3 shadowChroma = vec3(
+        cos(radians(shadowHue)),
+        cos(radians(shadowHue - 120.0)),
+        cos(radians(shadowHue - 240.0))
+    ) * 0.3;
+    vec3 highlightChroma = vec3(
+        cos(radians(highlightHue)),
+        cos(radians(highlightHue - 120.0)),
+        cos(radians(highlightHue - 240.0))
+    ) * 0.3;
+    color.rgb += shadowMaskCT * shadowTone * shadowChroma;
+    color.rgb += highlightMaskCT * highlightTone * highlightChroma;
+
+    // 6. Fade — shadow-only (no highlight bleed)
+    float lumaFade = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+    float shadowFadeMask = 1.0 - smoothstep(0.0, 0.4, lumaFade);
+    color.rgb = color.rgb + shadowFadeMask * fade * (vec3(1.0) - color.rgb) * 0.6;
+
+    return color;
+}
+""")
+
     static let filmCompression = CIColorKernel(source: """
 kernel vec4 filmCompression(__sample image, float amount, float range) {
     vec4 color = image;
@@ -2902,6 +3013,35 @@ kernel vec4 filmCompression(__sample image, float amount, float range) {
     float s = 1.0 / (1.0 + exp(-x));
     float scale = luma > 0.001 ? mix(luma, s, amt) / luma : 1.0;
     color.rgb = clamp(color.rgb * scale, 0.0, 1.0);
+    return color;
+}
+""")
+
+    // v2 (presetVersion="v2"): luma-only film latitude compression.
+    //   - Same v1 sigmoid knee at 0.82 (the wider 0.65 knee in the original
+    //     v2 attempt under-compressed mid-range; reverted to 0.82).
+    //   - Highlight squeeze above luma=0.7 is luma-only (single scalar applied
+    //     uniformly to RGB) — preserves hue. The original v2 used per-channel
+    //     `compressed * compressed` quadratic which destroyed hue at strong
+    //     contrast. Squeeze magnitude reduced to 0.10 to avoid micro-banding.
+    static let filmCompressionV2 = CIColorKernel(source: """
+kernel vec4 filmCompressionV2(__sample image, float amount, float range) {
+    vec4 color = image;
+    if (amount < 0.001) {
+        return color;
+    }
+    float r = clamp(range, 0.0, 1.0);
+    float k = mix(5.15, 2.85, r);
+    float rangeSoft = smoothstep(0.82, 1.0, r);
+    float amt = amount * (1.0 - 0.18 * rangeSoft);
+    float luma = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+    float x = clamp(k * (luma - 0.5), -5.5, 5.5);
+    float sigm = 1.0 / (1.0 + exp(-x));
+    float scale = luma > 0.001 ? mix(luma, sigm, amt) / luma : 1.0;
+    vec3 compressed = color.rgb * scale;
+    float hiMask = smoothstep(0.7, 1.0, luma);
+    float squeezeFactor = 1.0 - hiMask * amt * 0.10;
+    color.rgb = clamp(compressed * squeezeFactor, 0.0, 1.0);
     return color;
 }
 """)

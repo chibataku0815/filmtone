@@ -94,6 +94,10 @@ struct FilmtonePhase0Params: Codable, Equatable {
     var shutterAngle: Double
     var trailIntensity: Double
     var fade: Double
+    var shadowTone: Double
+    var highlightTone: Double
+    var shadowHue: Double
+    var highlightHue: Double
     var vignette: Double
     var grainIntensity: Double
 
@@ -129,6 +133,10 @@ struct FilmtonePhase0Params: Codable, Equatable {
         "shutterAngle": \.shutterAngle,
         "trailIntensity": \.trailIntensity,
         "fade": \.fade,
+        "shadowTone": \.shadowTone,
+        "highlightTone": \.highlightTone,
+        "shadowHue": \.shadowHue,
+        "highlightHue": \.highlightHue,
         "vignette": \.vignette,
         "grainIntensity": \.grainIntensity,
     ]
@@ -189,6 +197,10 @@ struct FilmtonePhase0Params: Codable, Equatable {
             shutterAngle: shutterAngle,
             trailIntensity: trailIntensity,
             fade: fade,
+            shadowTone: shadowTone,
+            highlightTone: highlightTone,
+            shadowHue: shadowHue,
+            highlightHue: highlightHue,
             vignette: vignette,
             grainIntensity: grainIntensity
         )
@@ -294,6 +306,12 @@ struct FilmtoneProjectState: Codable {
     var createdAt: String
     var updatedAt: String
     var presetName: String
+    /// v1.4 Look V2 — kernel preset version that the export pipeline must use
+    /// for THIS project (NOT the global `FilmtonePhase0Math.presetVersion`).
+    /// Apply path: a v1 saved Look stamps "v1" here so it keeps rendering
+    /// through the v1 kernel even after the iOS preset bumps to v2 globally.
+    /// Fresh projects default to the current `FilmtonePhase0Math.presetVersion`.
+    var presetVersion: String
     var strength: Double
     var quickState: FilmtoneQuickState
     var paramOverrides: FilmtonePhase0ParamsPatch
@@ -313,6 +331,7 @@ struct FilmtoneProjectState: Codable {
         createdAt: String,
         updatedAt: String,
         presetName: String,
+        presetVersion: String = FilmtonePhase0Math.presetVersion,
         strength: Double,
         quickState: FilmtoneQuickState,
         paramOverrides: FilmtonePhase0ParamsPatch = .empty,
@@ -327,6 +346,7 @@ struct FilmtoneProjectState: Codable {
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.presetName = presetName
+        self.presetVersion = presetVersion
         self.strength = strength
         self.quickState = quickState
         self.paramOverrides = paramOverrides
@@ -343,6 +363,7 @@ struct FilmtoneProjectState: Codable {
         case createdAt
         case updatedAt
         case presetName
+        case presetVersion
         case strength
         case quickState
         case params
@@ -363,6 +384,11 @@ struct FilmtoneProjectState: Codable {
 
         let decodedPresetName = try container.decode(String.self, forKey: .presetName)
         presetName = FilmtonePhase0Math.safePresetName(decodedPresetName)
+        // v1.4 — v1.3 saves (without `presetVersion`) decode as the current
+        // global IOS_PRESET_VERSION ("v2"). v1.x saved Looks that round-trip
+        // through `applySavedLook` will overwrite this from the SavedLookEntry.
+        presetVersion = try container.decodeIfPresent(String.self, forKey: .presetVersion)
+            ?? FilmtonePhase0Math.presetVersion
         strength = try container.decodeIfPresent(Double.self, forKey: .strength) ?? FilmtonePhase0Math.presetStrengthDefault
         quickState = (try container.decodeIfPresent(FilmtoneQuickState.self, forKey: .quickState) ?? .zero).clamped()
 
@@ -391,6 +417,7 @@ struct FilmtoneProjectState: Codable {
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(updatedAt, forKey: .updatedAt)
         try container.encode(presetName, forKey: .presetName)
+        try container.encode(presetVersion, forKey: .presetVersion)
         try container.encode(strength, forKey: .strength)
         try container.encode(quickState, forKey: .quickState)
         try container.encode(paramOverrides, forKey: .params)
@@ -618,7 +645,7 @@ enum FilmtonePhase0Math {
             output: project.output,
             grade: Phase0GradeDTO(
                 presetName: project.presetName,
-                presetVersion: presetVersion,
+                presetVersion: project.presetVersion,
                 quickState: .init(
                     filmCharacter: project.quickState.filmCharacter,
                     era: project.quickState.era,

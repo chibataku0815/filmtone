@@ -133,7 +133,7 @@ struct TestSidecarBuilder {
             "look.presetName mismatch"
         )
         try expect(
-            parsed.look.presetVersion == "v1",
+            parsed.look.presetVersion == "v2",
             "look.presetVersion mismatch"
         )
 
@@ -624,7 +624,10 @@ struct TestSidecarBuilder {
             bloomSoftKnee: 0, halationSoftKnee: 0, compressionAmount: 0,
             compressionRange: 0, printContrast: 0, cyan: 0, magenta: 0,
             yellow: 0, shutterAngle: 0, trailIntensity: 0,
-            fade: 0, vignette: 0, grainIntensity: 0
+            fade: 0,
+            shadowTone: 0, highlightTone: 0,
+            shadowHue: 225, highlightHue: 30,
+            vignette: 0, grainIntensity: 0
         )
     }
 }

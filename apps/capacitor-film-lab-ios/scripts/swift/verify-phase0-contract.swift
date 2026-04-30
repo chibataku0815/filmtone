@@ -129,11 +129,16 @@ struct VerifyPhase0Contract {
             FilmtonePhase0Generated.paramsByName.count == 4,
             "preset count should be 4 (got \(FilmtonePhase0Generated.paramsByName.count))"
         )
+        // v1.4 Look V2 — re-derived from CD reference frames (warmglow /
+        // guasha / mourning). handoff §3.6 reversal: Filmtone Signature
+        // (iphone) is no longer the spatial-weakest; halation rises toward
+        // portra reference (0.18). Soft Blue gets subtle warm window halo;
+        // Amber Glow gets dramatic gold200-class warm halation.
         let expectedHalationByPreset = [
             "reset": 0.0,
-            "iphone": 0.018,
-            "softBlue": 0.02,
-            "amberGlow": 0.04,
+            "iphone": 0.10,
+            "softBlue": 0.06,
+            "amberGlow": 0.16,
         ]
         for (presetName, expectedHalation) in expectedHalationByPreset {
             guard let params = FilmtonePhase0Generated.paramsByName[presetName] else {
