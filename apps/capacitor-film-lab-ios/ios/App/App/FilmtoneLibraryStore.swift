@@ -15,6 +15,10 @@ actor LibraryStoreActor {
         case lutNotFound(UUID)
         case lookNotFound(UUID)
         case malformed(String)
+        /// Mutation refused on a built-in catalog entry (Item 2 Look pack /
+        /// v1.4+ Camera Profile bundled fallback). The associated value is
+        /// the catalog slug, surfaced for UI messaging and telemetry.
+        case immutableEntry(slug: String)
 
         var errorDescription: String? {
             switch self {
@@ -32,6 +36,8 @@ actor LibraryStoreActor {
                 return "Saved Look not found in library: \(id.uuidString)."
             case .malformed(let detail):
                 return "Library data is malformed: \(detail)."
+            case .immutableEntry(let slug):
+                return "Built-in entry \"\(slug)\" cannot be renamed or deleted."
             }
         }
     }
@@ -393,6 +399,9 @@ actor LibraryStoreActor {
     }
 
     func renameLook(id: UUID, name: String) throws {
+        if let slug = FilmtoneBuiltInCatalog.slug(for: id) {
+            throw StoreError.immutableEntry(slug: slug)
+        }
         guard var entry = looks[id] else {
             throw StoreError.lookNotFound(id)
         }
@@ -407,7 +416,15 @@ actor LibraryStoreActor {
         try? saveIndex()
     }
 
+    /// Toggle favorite state for a Saved Look. Built-in catalog entries
+    /// route through the UserDefaults-backed favorites map (Item 2);
+    /// user-saved looks update the on-disk JSON entry.
     func toggleFavoriteLook(id: UUID) throws {
+        if let slug = FilmtoneBuiltInCatalog.slug(for: id) {
+            let current = loadBuiltInLookFavorites()[slug] ?? false
+            writeBuiltInLookFavorite(slug: slug, favorite: !current)
+            return
+        }
         guard var entry = looks[id] else {
             throw StoreError.lookNotFound(id)
         }
@@ -420,6 +437,9 @@ actor LibraryStoreActor {
 
     @discardableResult
     func deleteLook(id: UUID) throws -> LibrarySnapshot {
+        if let slug = FilmtoneBuiltInCatalog.slug(for: id) {
+            throw StoreError.immutableEntry(slug: slug)
+        }
         guard looks[id] != nil else {
             throw StoreError.lookNotFound(id)
         }
@@ -429,7 +449,18 @@ actor LibraryStoreActor {
         return currentSnapshot()
     }
 
+    /// Resolve a Saved Look by id. Built-in catalog ids materialize from
+    /// `FilmtoneBuiltInCatalog` (no disk I/O); user-saved ids return the
+    /// in-memory entry.
     func loadLook(id: UUID) throws -> SavedLookEntry {
+        if let builtIn = FilmtoneBuiltInCatalog.look(matching: id) {
+            let favorites = loadBuiltInLookFavorites()
+            return FilmtoneBuiltInCatalog.materializeAsSavedLookEntry(
+                builtIn,
+                favoriteOverride: favorites[builtIn.slug] ?? false,
+                asOf: Self.builtInLookAsOfDate
+            )
+        }
         guard let entry = looks[id] else {
             throw StoreError.lookNotFound(id)
         }
@@ -447,7 +478,7 @@ actor LibraryStoreActor {
             }
             return lhsDate > rhsDate
         }
-        let sortedLooks = looks.values.sorted { lhs, rhs in
+        let sortedUserLooks = looks.values.sorted { lhs, rhs in
             if lhs.favorite != rhs.favorite {
                 return lhs.favorite && !rhs.favorite
             }
@@ -456,11 +487,55 @@ actor LibraryStoreActor {
             }
             return lhs.updatedAt > rhs.updatedAt
         }
+        // v1.3 Item 2: prepend built-in catalog Looks (Filmtone Signature,
+        // Clean Base, Amber Glow, Soft Blue, Night Soft) so the chip strip
+        // always shows them ahead of user-saved looks. Order follows
+        // FilmtoneBuiltInCatalog.allLooks; favorite state lives in a
+        // UserDefaults map and is reapplied at materialization.
+        let favorites = loadBuiltInLookFavorites()
+        let builtInLooks = FilmtoneBuiltInCatalog.allLooks.map { built in
+            FilmtoneBuiltInCatalog.materializeAsSavedLookEntry(
+                built,
+                favoriteOverride: favorites[built.slug] ?? false,
+                asOf: Self.builtInLookAsOfDate
+            )
+        }
         return LibrarySnapshot(
             luts: sortedLuts,
-            looks: sortedLooks,
+            looks: builtInLooks + sortedUserLooks,
             recentLutIds: recentLutIds
         )
+    }
+
+    // MARK: - Built-in Look favorites (Item 2)
+
+    /// UserDefaults key for the built-in Look favorites map. Format:
+    /// `[String: Bool]` where the key is the catalog slug
+    /// (e.g. "filmtone-signature") and the value is the favorite flag.
+    private static let builtInLookFavoritesKey = "filmtone.builtin.favorites.v1"
+
+    /// Stable as-of date stamped onto materialized built-in `SavedLookEntry`
+    /// values. Built-ins are pinned ahead of user looks by their position
+    /// in `FilmtoneBuiltInCatalog.allLooks`, so this date is purely
+    /// cosmetic — using the v1.3 catalog freeze date keeps sidecar /
+    /// telemetry timestamps stable across re-launches.
+    private static let builtInLookAsOfDate: Date = {
+        var components = DateComponents()
+        components.year = 2026
+        components.month = 4
+        components.day = 30
+        components.timeZone = TimeZone(identifier: "Asia/Tokyo")
+        return Calendar(identifier: .gregorian).date(from: components) ?? Date(timeIntervalSince1970: 0)
+    }()
+
+    private func loadBuiltInLookFavorites() -> [String: Bool] {
+        UserDefaults.standard.dictionary(forKey: Self.builtInLookFavoritesKey) as? [String: Bool] ?? [:]
+    }
+
+    private func writeBuiltInLookFavorite(slug: String, favorite: Bool) {
+        var map = loadBuiltInLookFavorites()
+        map[slug] = favorite
+        UserDefaults.standard.set(map, forKey: Self.builtInLookFavoritesKey)
     }
 
     private func rebuildRecentLuts() {

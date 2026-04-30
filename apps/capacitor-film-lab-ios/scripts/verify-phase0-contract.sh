@@ -9,6 +9,12 @@ SWIFT_CHECK="$SCRIPT_DIR/swift/verify-phase0-contract.swift"
 PHASE0_GENERATED="$APP_DIR/ios/App/App/FilmtonePhase0Generated.swift"
 PHASE0_MATH="$APP_DIR/ios/App/App/FilmtonePhase0Math.swift"
 MOTION_MATH="$APP_DIR/ios/App/App/FilmtoneMotionBlurMath.swift"
+# v1.3 Camera Profiles Phase A — `FilmtoneProjectState.cameraProfile` references
+# `CameraProfileSelection` from this schema file, so the standalone Phase 0
+# compile must pull it in alongside Math/Motion. The schema's dependencies
+# (`SourceInputTransformStrategyDTO`, `SourceColorClassDTO`) are stubbed in
+# `phase0-contract-support.swift` so this stays target-free.
+SOURCE_PROFILE_SCHEMA="$APP_DIR/ios/App/App/FilmtoneSourceProfileSchema.swift"
 CANONICAL_FIXTURE="$FIXTURE_DIR/canonical-export-request.json"
 LEGACY_FIXTURE="$FIXTURE_DIR/legacy-project-state.json"
 HLG_FIXTURE="$FIXTURE_DIR/hlg-export-request.json"
@@ -24,6 +30,7 @@ xcrun --sdk iphonesimulator swiftc \
   -target "$SIMULATOR_TARGET" \
   -typecheck \
   "$SWIFT_SUPPORT" \
+  "$SOURCE_PROFILE_SCHEMA" \
   "$PHASE0_GENERATED" \
   "$PHASE0_MATH" \
   "$MOTION_MATH" \
@@ -32,6 +39,7 @@ xcrun --sdk iphonesimulator swiftc \
 xcrun swiftc \
   -o "$HOST_BINARY" \
   "$SWIFT_SUPPORT" \
+  "$SOURCE_PROFILE_SCHEMA" \
   "$PHASE0_GENERATED" \
   "$PHASE0_MATH" \
   "$MOTION_MATH" \
@@ -112,6 +120,21 @@ if [ -f "$RAYANGLE_SCRIPT" ] && [ -f "$RAYANGLE_SRC" ]; then
   "$RAYANGLE_BIN"
 fi
 
+# --- v1.3 Camera Profiles Phase B-3 / C: source-profile math accuracy gate ---
+SOURCE_PROFILE_MATH_SCRIPT="$SCRIPT_DIR/swift/test-source-profile-math.swift"
+SOURCE_PROFILE_MATH_SRC="$APP_DIR/ios/App/App/FilmtoneSourceProfileMath.swift"
+SOURCE_PROFILE_FIXTURES="$APP_DIR/Tests/Fixtures/source-profile"
+if [ -f "$SOURCE_PROFILE_MATH_SCRIPT" ] && [ -f "$SOURCE_PROFILE_MATH_SRC" ] && [ -d "$SOURCE_PROFILE_FIXTURES" ]; then
+  echo "==> source profile math test"
+  SOURCE_PROFILE_MATH_BIN=$(mktemp "${TMPDIR:-/tmp}/phase0-source-profile-math-check.XXXXXX")
+  CLEANUP_FILES="$CLEANUP_FILES $SOURCE_PROFILE_MATH_BIN"
+  xcrun swiftc \
+    -o "$SOURCE_PROFILE_MATH_BIN" \
+    "$SOURCE_PROFILE_MATH_SRC" \
+    "$SOURCE_PROFILE_MATH_SCRIPT"
+  "$SOURCE_PROFILE_MATH_BIN" "$SOURCE_PROFILE_FIXTURES"
+fi
+
 # --- Stream 5: sidecar builder test (may not exist yet at Wave 2 branch time) ---
 SIDECAR_SCRIPT="$SCRIPT_DIR/swift/test-sidecar-builder.swift"
 SIDECAR_SRC="$APP_DIR/ios/App/App/FilmtoneExportSidecarBuilder.swift"
@@ -124,9 +147,13 @@ if [ -f "$SIDECAR_SCRIPT" ] && [ -f "$SIDECAR_SRC" ]; then
   # FilmtoneLutBlobCodec to populate the optional `sourceHash` field on
   # `SidecarLutRef`. Compile the codec alongside so the contract gate stays
   # self-contained — both files come from the App target.
+  # v1.3 Camera Profiles Phase E: phase0-contract-support's
+  # `Phase0ExportRequestDTO` mirror now carries `cameraProfile`, so the
+  # sidecar test compile must pull the schema in too.
   xcrun swiftc \
     -o "$SIDECAR_BIN" \
     "$SWIFT_SUPPORT" \
+    "$SOURCE_PROFILE_SCHEMA" \
     "$APP_DIR/ios/App/App/FilmtoneColorPipeline.swift" \
     "$LUT_BLOB_CODEC_SRC" \
     "$SIDECAR_SRC" \

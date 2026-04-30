@@ -417,9 +417,21 @@ struct FilmtoneRootView: View {
                 helpAccessibilityLabel: store.strings.helpLutAccessibilityLabel,
                 helpButtonIdentifier: "filmtone.help.lut.button"
             ) {
+                // v1.3 Camera Profiles Phase F — built-in source profile
+                // catalog rendered ahead of Auto / Import so users see the
+                // primary explicit choices first. Order mirrors
+                // FilmtoneSourceProfileCatalog.allProfiles. Auto stays as
+                // a separate top-level item so it reads as "let Filmtone
+                // decide" rather than "another preset".
                 Button(store.strings.cameraAuto) {
-                    store.clearInputLut()
+                    store.applyCameraProfile(.auto)
                 }
+                ForEach(FilmtoneSourceProfileCatalog.allProfiles, id: \.id) { entry in
+                    Button(store.strings.builtInSourceProfileName(for: entry.id) ?? entry.englishName) {
+                        store.applyCameraProfile(.builtIn(catalogId: entry.id))
+                    }
+                }
+                Divider()
                 Button(store.strings.cameraImport) {
                     Task { await store.importInputLut() }
                 }

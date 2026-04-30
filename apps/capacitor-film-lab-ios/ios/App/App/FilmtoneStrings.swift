@@ -137,6 +137,12 @@ struct FilmtoneStrings {
     let cameraAuto: String
     let cameraAutoAppleLogDetected: String
     let cameraAutoAppleLog2Detected: String
+    /// v1.3 Camera Profiles Phase D — built-in source profile catalog labels.
+    let cameraAppleLog: String
+    let cameraAppleLog2: String
+    let cameraVLog: String
+    let cameraSLog3: String
+    let cameraRec709: String
     let cameraCustom: String
     let cameraImport: String
     let inputLutAmountLabel: String
@@ -206,6 +212,67 @@ struct FilmtoneStrings {
     let savedLookSheetSave: String
     let savedLookSheetRename: String
     let savedLookSheetCancel: String
+
+    // MARK: - Built-in Filmtone Looks (Item 2, v1.3 candidate)
+    let builtInLookFilmtoneSignature: String
+    let builtInLookCleanBase: String
+    let builtInLookAmberGlow: String
+    let builtInLookSoftBlue: String
+    let builtInLookNightSoft: String
+    /// Caption-style badge that marks a chip as a built-in catalog
+    /// entry. Same text in ja and en since "FILMTONE" is the brand
+    /// glyph rather than a translatable label.
+    let builtInBadgeLabel: String
+}
+
+extension FilmtoneStrings {
+    /// Resolves a built-in Look's localized display name from its
+    /// catalog slug. Returns nil for non-built-in slugs so callers can
+    /// fall back to `entry.name` directly.
+    func builtInLookName(for slug: String) -> String? {
+        switch slug {
+        case "filmtone-signature": return builtInLookFilmtoneSignature
+        case "clean-base":         return builtInLookCleanBase
+        case "amber-glow":         return builtInLookAmberGlow
+        case "soft-blue":          return builtInLookSoftBlue
+        case "night-soft":         return builtInLookNightSoft
+        default:                   return nil
+        }
+    }
+
+    /// Returns the display name for a Saved Look, picking the localized
+    /// built-in name when the look is bundled and a slug match exists,
+    /// or falling through to the user-stored `name`.
+    func displayName(for look: SavedLookEntry) -> String {
+        if look.bundled,
+           let slug = look.bundledSlug,
+           let localized = builtInLookName(for: slug) {
+            return localized
+        }
+        return look.name
+    }
+
+    /// v1.3 Camera Profiles Phase D — resolves a built-in source-profile
+    /// catalog id (e.g. "built-in:source-profile.panasonic-vlog") or its
+    /// short slug suffix to the localized display name. Returns nil when
+    /// the input is neither a known catalog id nor a known slug.
+    func builtInSourceProfileName(for catalogIdOrSlug: String) -> String? {
+        let prefix = "built-in:source-profile."
+        let slug: String
+        if catalogIdOrSlug.hasPrefix(prefix) {
+            slug = String(catalogIdOrSlug.dropFirst(prefix.count))
+        } else {
+            slug = catalogIdOrSlug
+        }
+        switch slug {
+        case "apple-log":      return cameraAppleLog
+        case "apple-log-2":    return cameraAppleLog2
+        case "panasonic-vlog": return cameraVLog
+        case "sony-slog3":     return cameraSLog3
+        case "rec709":         return cameraRec709
+        default:               return nil
+        }
+    }
 }
 
 extension FilmtoneStrings {
@@ -722,6 +789,31 @@ extension FilmtoneStrings {
             defaultValue: "Auto -> Apple Log 2 detected",
             comment: "Camera profile state when Apple Log 2 is automatically detected."
         )
+        cameraAppleLog = filmtoneLocalized(
+            "filmtone.camera.apple_log",
+            defaultValue: "Apple Log",
+            comment: "Built-in camera source profile name (Apple Log)."
+        )
+        cameraAppleLog2 = filmtoneLocalized(
+            "filmtone.camera.apple_log2",
+            defaultValue: "Apple Log 2",
+            comment: "Built-in camera source profile name (Apple Log 2)."
+        )
+        cameraVLog = filmtoneLocalized(
+            "filmtone.camera.vlog",
+            defaultValue: "V-Log",
+            comment: "Built-in camera source profile name (Panasonic V-Log)."
+        )
+        cameraSLog3 = filmtoneLocalized(
+            "filmtone.camera.slog3",
+            defaultValue: "S-Log3",
+            comment: "Built-in camera source profile name (Sony S-Log3)."
+        )
+        cameraRec709 = filmtoneLocalized(
+            "filmtone.camera.rec709",
+            defaultValue: "Rec.709",
+            comment: "Built-in camera source profile name (Rec.709 passthrough)."
+        )
         cameraCustom = filmtoneLocalized(
             "filmtone.camera.custom",
             defaultValue: "Custom",
@@ -1061,6 +1153,39 @@ extension FilmtoneStrings {
             "filmtone.savedlook.sheet.cancel",
             defaultValue: prefersJapanese ? "キャンセル" : "Cancel",
             comment: "Toolbar action that dismisses the Saved-Look sheet without saving."
+        )
+        // v1.3 Item 2: built-in Filmtone Look catalog (5 looks pinned at
+        // the head of the chip strip). CD-signed-off names; refining
+        // Night Soft's params on real low-light footage scheduled.
+        builtInLookFilmtoneSignature = filmtoneLocalized(
+            "filmtone.builtin_look.filmtone_signature",
+            defaultValue: prefersJapanese ? "フィルムトーン" : "Filmtone Signature",
+            comment: "Built-in Look name: the canonical Filmtone tone (iphone preset baseline)."
+        )
+        builtInLookCleanBase = filmtoneLocalized(
+            "filmtone.builtin_look.clean_base",
+            defaultValue: prefersJapanese ? "クリーンベース" : "Clean Base",
+            comment: "Built-in Look name: minimal-tinting baseline (reset preset)."
+        )
+        builtInLookAmberGlow = filmtoneLocalized(
+            "filmtone.builtin_look.amber_glow",
+            defaultValue: prefersJapanese ? "アンバーグロー" : "Amber Glow",
+            comment: "Built-in Look name: warm afternoon film-print mood (amberGlow preset)."
+        )
+        builtInLookSoftBlue = filmtoneLocalized(
+            "filmtone.builtin_look.soft_blue",
+            defaultValue: prefersJapanese ? "ソフトブルー" : "Soft Blue",
+            comment: "Built-in Look name: airy desaturated cool tone (softBlue preset)."
+        )
+        builtInLookNightSoft = filmtoneLocalized(
+            "filmtone.builtin_look.night_soft",
+            defaultValue: prefersJapanese ? "ナイトソフト" : "Night Soft",
+            comment: "Built-in Look name: low-light glow (softBlue + halation/bloom boost)."
+        )
+        builtInBadgeLabel = filmtoneLocalized(
+            "filmtone.builtin_look.badge",
+            defaultValue: "FILMTONE",
+            comment: "Caption-style badge shown on built-in Filmtone Look chips. Same in ja/en."
         )
     }
 

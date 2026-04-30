@@ -109,9 +109,10 @@ struct FilmtoneSavedLooksStrip: View {
                     HStack(spacing: 10) {
                         ForEach(entries) { entry in
                             FilmtoneLibraryChip(
-                                title: entry.name,
+                                title: strings.displayName(for: entry),
                                 systemImage: "camera.aperture",
-                                isFavorite: entry.favorite
+                                isFavorite: entry.favorite,
+                                badgeText: entry.bundled ? strings.builtInBadgeLabel : nil
                             )
                             .onTapGesture { onApply(entry) }
                             .contextMenu {
@@ -120,10 +121,12 @@ struct FilmtoneSavedLooksStrip: View {
                                 } label: {
                                     Label(strings.libraryApplyAction, systemImage: "checkmark.circle")
                                 }
-                                Button {
-                                    onRename(entry)
-                                } label: {
-                                    Label(strings.libraryRenameAction, systemImage: "pencil")
+                                if !entry.immutable {
+                                    Button {
+                                        onRename(entry)
+                                    } label: {
+                                        Label(strings.libraryRenameAction, systemImage: "pencil")
+                                    }
                                 }
                                 Button {
                                     onToggleFavorite(entry)
@@ -135,10 +138,12 @@ struct FilmtoneSavedLooksStrip: View {
                                         systemImage: entry.favorite ? "star.slash" : "star"
                                     )
                                 }
-                                Button(role: .destructive) {
-                                    onDelete(entry)
-                                } label: {
-                                    Label(strings.libraryDeleteAction, systemImage: "trash")
+                                if !entry.immutable {
+                                    Button(role: .destructive) {
+                                        onDelete(entry)
+                                    } label: {
+                                        Label(strings.libraryDeleteAction, systemImage: "trash")
+                                    }
                                 }
                             }
                             .accessibilityIdentifier("filmtone.library.savedLooks.chip.\(entry.id.uuidString.lowercased())")
@@ -157,10 +162,17 @@ extension SavedLookEntry: Identifiable {}
 /// Compact pill used for both Recent LUT and Saved Look entries. Favorite
 /// items get a subtle amber star to match the existing `Color.filmtoneAmber`
 /// accent system — no new colors introduced.
+///
+/// `badgeText` (Item 2) marks built-in catalog entries with a caption-style
+/// "FILMTONE" pill in the top-right corner and tints the chip background
+/// with the existing amber accent at low alpha. nil for user entries.
 struct FilmtoneLibraryChip: View {
     let title: String
     let systemImage: String
     let isFavorite: Bool
+    var badgeText: String? = nil
+
+    private var isBundled: Bool { badgeText != nil }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -187,15 +199,47 @@ struct FilmtoneLibraryChip: View {
         .padding(.vertical, 9)
         .background(
             RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
-                .fill(Color.white.opacity(0.05))
+                .fill(isBundled ? Color.filmtoneAmber.opacity(0.18) : Color.white.opacity(0.05))
         )
         .overlay(
             RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                .stroke(
+                    isBundled ? Color.filmtoneAmber.opacity(0.32) : Color.white.opacity(0.08),
+                    lineWidth: 1
+                )
         )
+        .overlay(alignment: .topTrailing) {
+            if let badgeText {
+                Text(badgeText)
+                    .font(.caption2.weight(.bold))
+                    .tracking(0.4)
+                    .foregroundStyle(Color.filmtoneAmber.opacity(0.95))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(Color.black.opacity(0.42))
+                    )
+                    .padding(.top, 4)
+                    .padding(.trailing, 5)
+                    .accessibilityHidden(true)
+            }
+        }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
-        .accessibilityLabel(Text(isFavorite ? "\(title), favorite" : title))
+        .accessibilityLabel(Text(accessibilityLabel))
+    }
+
+    private var accessibilityLabel: String {
+        var parts: [String] = []
+        if isBundled, let badgeText {
+            parts.append(badgeText)
+        }
+        parts.append(title)
+        if isFavorite {
+            parts.append("favorite")
+        }
+        return parts.joined(separator: ", ")
     }
 }

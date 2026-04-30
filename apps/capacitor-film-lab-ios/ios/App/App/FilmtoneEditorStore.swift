@@ -645,14 +645,88 @@ final class FilmtoneEditorStore: ObservableObject {
         if project.inputLut != nil {
             return strings.cameraCustom
         }
-
-        switch probe?.inputTransformPolicy?.strategy ?? probe?.sourceVideoMetadata?.inputTransformPolicy?.strategy {
-        case .appleLogToRec709:
-            return strings.cameraAutoAppleLogDetected
-        case .appleLog2ToRec709:
-            return strings.cameraAutoAppleLog2Detected
-        default:
+        // v1.3 Camera Profiles Phase F — when the user explicitly picked a
+        // built-in source profile, surface that name. `.auto` falls through
+        // to the existing detection-suffix logic so iPhone Apple Log /
+        // Apple Log 2 sources still surface "Auto -> ... detected".
+        switch project.cameraProfile {
+        case .builtIn(let catalogId):
+            if let name = strings.builtInSourceProfileName(for: catalogId) {
+                return name
+            }
             return strings.cameraAuto
+        case .userImport:
+            return strings.cameraCustom
+        case .auto:
+            switch probe?.inputTransformPolicy?.strategy ?? probe?.sourceVideoMetadata?.inputTransformPolicy?.strategy {
+            case .appleLogToRec709:
+                return strings.cameraAutoAppleLogDetected
+            case .appleLog2ToRec709:
+                return strings.cameraAutoAppleLog2Detected
+            default:
+                return strings.cameraAuto
+            }
+        }
+    }
+
+    // MARK: - v1.3 Camera Profiles Phase F (D-CP4 retention rule)
+
+    /// Apply a Camera Profile selection from the picker. Marks the project
+    /// state dirty + reschedules preview / persists. Mirrors the surface
+    /// of `clearInputLut()` so SwiftUI's Menu callbacks compose cleanly.
+    func applyCameraProfile(_ selection: CameraProfileSelection) {
+        guard project.cameraProfile != selection else { return }
+        project.cameraProfile = selection
+        // The Camera Profile changes how the source is normalized; any
+        // user-imported `.cube` was implicitly chosen against the prior
+        // profile, so swapping profiles clears it (mirrors source-change
+        // rule below). The Saved Look stays applied — looks are
+        // source-independent (see Item 3 contract).
+        project.inputLut = nil
+        project.updatedAt = FilmtonePhase0Math.isoTimestamp()
+        persist()
+        schedulePreviewRender()
+    }
+
+    /// D-CP4 retention rule on source change. Called from `applyProbe`.
+    ///
+    /// - `.auto`: always re-derives at export time, no state change here.
+    /// - `.builtIn(.appleLog | .appleLog2)`: if the new probe's color class
+    ///   doesn't match the selection, fall back to `.auto` and surface a
+    ///   toast — the user picked a profile that the new clip can't honor.
+    /// - `.builtIn(.panasonicVLog | .sonySLog3 | .rec709)`: persist (cannot
+    ///   be auto-detected from container metadata, so the user's prior
+    ///   pick stays sticky across source swaps).
+    /// - `.userImport`: the existing inputLut clear rule above already
+    ///   wipes the user-imported `.cube`; we reset to `.auto` here for
+    ///   consistency.
+    private func applyCameraProfileSourceChangeRule(probe: SourceProbeDTO) {
+        switch project.cameraProfile {
+        case .auto:
+            return
+        case .builtIn(let catalogId):
+            guard let entry = FilmtoneSourceProfileCatalog.entry(forCatalogId: catalogId) else {
+                project.cameraProfile = .auto
+                return
+            }
+            // Sticky cases first — V-Log, S-Log3, Rec.709 cannot be
+            // auto-detected, so persist them across swaps.
+            if entry.detectionHint == nil {
+                return
+            }
+            // Apple Log / Apple Log 2 — verify the new probe matches the
+            // selection. If it doesn't, fall back to .auto so the new clip
+            // is normalized correctly.
+            if probe.sourceVideoMetadata?.colorClass == entry.detectionHint {
+                return
+            }
+            project.cameraProfile = .auto
+            presentToast(strings.cameraAuto, kind: .info)
+        case .userImport:
+            // The matching `inputLut` clear rule below resets the import
+            // anyway; reset the selection so the picker doesn't keep the
+            // user-import label after the .cube is gone.
+            project.cameraProfile = .auto
         }
     }
 
@@ -1219,6 +1293,22 @@ final class FilmtoneEditorStore: ObservableObject {
                 project: project
             )
 
+            // v1.3 Item 2 Phase E: resolve the active Saved Look (if any) so
+            // the sidecar can record provenance. Built-in catalog entries
+            // materialize from `FilmtoneBuiltInCatalog` without disk I/O;
+            // user-saved entries are read from the in-memory actor state.
+            // Resolution failures surface as "no provenance" — never block
+            // the export — because the look might have been deleted between
+            // apply and export, and a missing block is preferable to a hard
+            // export failure (CLAUDE.md §11 `feedback_no_fallback_bug_hotbed`
+            // permits this: provenance absence is explicit, not silent
+            // success-with-degraded-output).
+            let resolvedSavedLook = await resolveAppliedSavedLookForExport()
+            // v1.3 Camera Profiles Phase E: thread the project's selected
+            // Camera Profile through facade.runExport. Stored OFF the wire
+            // DTO because it's iOS-side state, not bridge data.
+            let cameraProfileSelection = project.cameraProfile
+
             isBusy = true
             error = nil
             notice = nil
@@ -1230,7 +1320,9 @@ final class FilmtoneEditorStore: ObservableObject {
             let cacheProtection = protectedCacheURIs
             let result = try await facade.runExport(
                 request: request,
-                protectedCacheURIs: cacheProtection
+                protectedCacheURIs: cacheProtection,
+                appliedSavedLook: resolvedSavedLook,
+                cameraProfile: cameraProfileSelection
             ) { [weak self] progress in
                 self?.exportProgress = progress
             }
@@ -1261,6 +1353,11 @@ final class FilmtoneEditorStore: ObservableObject {
                 project: project
             )
 
+            // v1.3 Item 2 Phase E + Camera Profiles Phase E: see `export()`
+            // above for the resolveAppliedSavedLook + cameraProfile rationale.
+            let resolvedSavedLook = await resolveAppliedSavedLookForExport()
+            let cameraProfileSelection = project.cameraProfile
+
             isBusy = true
             isSavingToPhotos = false
             error = nil
@@ -1273,7 +1370,9 @@ final class FilmtoneEditorStore: ObservableObject {
             let cacheProtection = protectedCacheURIs
             let result = try await facade.runExport(
                 request: request,
-                protectedCacheURIs: cacheProtection
+                protectedCacheURIs: cacheProtection,
+                appliedSavedLook: resolvedSavedLook,
+                cameraProfile: cameraProfileSelection
             ) { [weak self] progress in
                 self?.exportProgress = progress
             }
@@ -1421,6 +1520,21 @@ final class FilmtoneEditorStore: ObservableObject {
         facade.reclaimCache(protecting: protectedCacheURIs)
     }
 
+    /// v1.3 Item 2 Phase E: resolve `appliedSavedLookId` to a full
+    /// `SavedLookEntry` for sidecar provenance. Returns nil when the project
+    /// has been dirtied since `applySavedLook` (the apply path nils
+    /// `appliedSavedLookId` on every mutation), when no Saved Look was
+    /// applied, when the library actor is unavailable, or when the entry
+    /// fails to load (e.g. user-saved entry deleted between apply and
+    /// export). Built-in catalog entries materialize without disk I/O via
+    /// `FilmtoneBuiltInCatalog`, so the read is cheap.
+    private func resolveAppliedSavedLookForExport() async -> SavedLookEntry? {
+        guard let lookId = appliedSavedLookId, let store = libraryStore else {
+            return nil
+        }
+        return try? await store.loadLook(id: lookId)
+    }
+
     private func discardLocalExportFiles(_ result: Phase0ExportResultDTO) {
         exportLocalAvailability = .removed
         _ = facade.removeLocalFiles(uris: localExportURIs(for: result))
@@ -1474,6 +1588,12 @@ final class FilmtoneEditorStore: ObservableObject {
         if isSourceReplacement, project.inputLut != nil {
             project.inputLut = nil
             project.updatedAt = FilmtonePhase0Math.isoTimestamp()
+        }
+        // v1.3 Camera Profiles Phase F (D-CP4) — apply the retention rule
+        // for the selected Camera Profile against the new probe. Sticky
+        // for V-Log / S-Log3 / Rec.709, reset for Apple Log mismatches.
+        if isSourceReplacement {
+            applyCameraProfileSourceChangeRule(probe: probe)
         }
         self.preview = .empty
         self.comparePreviewFrame = nil

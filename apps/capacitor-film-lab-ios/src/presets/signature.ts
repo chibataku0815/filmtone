@@ -35,7 +35,7 @@ export const SIGNATURE_LUT_PLAN: readonly SignatureLutSlotPlan[] = [
 
 export const SIGNATURE_PRESET_BUNDLE_NOTE = [
   "Signature preset = the canonical Filmtone iOS default look.",
-  "It is wired through the shared default preset so the app already selects Neutral / Clean Base with the soft finish on first launch and after Reset.",
-  "LUT slots default to empty until .cube assets are dropped into apps/capacitor-film-lab-ios/src/presets/luts/ and SIGNATURE_LUT_PLAN.bundledRelPath is filled in.",
-  "Until then, the user picks Camera Profile / Film Look manually. The dual-LUT pipeline behaves the same.",
+  "v1.3 ships 5 built-in Looks (incl. Filmtone Signature) via FilmtoneBuiltInCatalog.swift — params-only, no bundled .cube.",
+  "Source profiles are handled native (Apple Log / Apple Log 2) + synthesized (V-Log / S-Log3 via FilmtoneSourceProfileMath) + Rec.709 default. Imported .cube remains as a user-side option.",
+  "SIGNATURE_LUT_PLAN slots stay empty (bundledRelPath: null). v1.4 may revisit pending licensing.",
 ].join(" ");
