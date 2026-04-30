@@ -1230,6 +1230,10 @@ final class FilmtoneEditorStore: ObservableObject {
             // permits this: provenance absence is explicit, not silent
             // success-with-degraded-output).
             let resolvedSavedLook = await resolveAppliedSavedLookForExport()
+            // v1.3 Camera Profiles Phase E: thread the project's selected
+            // Camera Profile through facade.runExport. Stored OFF the wire
+            // DTO because it's iOS-side state, not bridge data.
+            let cameraProfileSelection = project.cameraProfile
 
             isBusy = true
             error = nil
@@ -1243,7 +1247,8 @@ final class FilmtoneEditorStore: ObservableObject {
             let result = try await facade.runExport(
                 request: request,
                 protectedCacheURIs: cacheProtection,
-                appliedSavedLook: resolvedSavedLook
+                appliedSavedLook: resolvedSavedLook,
+                cameraProfile: cameraProfileSelection
             ) { [weak self] progress in
                 self?.exportProgress = progress
             }
@@ -1274,8 +1279,10 @@ final class FilmtoneEditorStore: ObservableObject {
                 project: project
             )
 
-            // v1.3 Item 2 Phase E: see `export()` above for the rationale.
+            // v1.3 Item 2 Phase E + Camera Profiles Phase E: see `export()`
+            // above for the resolveAppliedSavedLook + cameraProfile rationale.
             let resolvedSavedLook = await resolveAppliedSavedLookForExport()
+            let cameraProfileSelection = project.cameraProfile
 
             isBusy = true
             isSavingToPhotos = false
@@ -1290,7 +1297,8 @@ final class FilmtoneEditorStore: ObservableObject {
             let result = try await facade.runExport(
                 request: request,
                 protectedCacheURIs: cacheProtection,
-                appliedSavedLook: resolvedSavedLook
+                appliedSavedLook: resolvedSavedLook,
+                cameraProfile: cameraProfileSelection
             ) { [weak self] progress in
                 self?.exportProgress = progress
             }

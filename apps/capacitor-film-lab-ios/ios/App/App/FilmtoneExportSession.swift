@@ -19,6 +19,13 @@ final class FilmtoneExportSession {
     /// Pass nil when no Saved Look was active (or after dirtying the project
     /// state since apply); the sidecar's `savedLook` block is then omitted.
     private let appliedSavedLook: SavedLookEntry?
+    /// v1.3 Camera Profiles Phase E — explicit Camera Profile selection
+    /// passed in by the caller (typically `FilmtoneEditorStore.export` →
+    /// `FilmtoneEditorFacade.runExport`). nil falls through to `.auto`
+    /// inside `makeActiveInputLut`, preserving the pre-Phase-E behavior.
+    /// Kept off `Phase0ExportRequestDTO` because it's iOS-side state, not
+    /// a value the JS bridge needs to round-trip.
+    private let cameraProfileSelection: CameraProfileSelection?
     private(set) var didUseMezzanineVariant: ProfileVariant?
     fileprivate let ciContext: CIContext
     fileprivate let colorPipeline: FilmtoneColorPipelineContract
@@ -83,13 +90,15 @@ final class FilmtoneExportSession {
         sourceURL: URL,
         cacheStore: CacheStore,
         mezzanineService: MezzanineService? = nil,
-        appliedSavedLook: SavedLookEntry? = nil
+        appliedSavedLook: SavedLookEntry? = nil,
+        cameraProfile: CameraProfileSelection? = nil
     ) throws {
         self.request = request
         self.sourceURL = sourceURL
         self.cacheStore = cacheStore
         self.mezzanineService = mezzanineService
         self.appliedSavedLook = appliedSavedLook
+        self.cameraProfileSelection = cameraProfile
         self.outputURL = try cacheStore.temporaryExportURL(pathExtension: request.output.container)
         let colorPipeline = FilmtoneColorPipeline.defaultOutputContract(
             sourceMetadata: request.sourceProbe?.sourceVideoMetadata?.color,
@@ -106,8 +115,17 @@ final class FilmtoneExportSession {
             .workingFormat: NSNumber(value: CIFormat.RGBAh.rawValue),
             .outputColorSpace: outputColorSpace,
         ])
+        // v1.3 Camera Profiles Phase E: dispatch through `makeActiveInputLut`
+        // when the caller passed an explicit `cameraProfile`; legacy (nil)
+        // callers fall through to `.auto` inside `makeActiveInputLut`, so
+        // v1.2 behavior stays byte-identical when no profile was selected.
+        // A user-imported `request.inputLut` always wins (existing
+        // precedence).
         self.preparedInputLut = Self.makePreparedLut(from: request.inputLut)
-            ?? Self.makeAutomaticInputLut(for: request.sourceProbe?.inputTransformPolicy)
+            ?? Self.makeActiveInputLut(
+                for: cameraProfile,
+                probe: request.sourceProbe
+            )
         let legacyCreativeLut = request.creativeLut ?? request.lut.map {
             SerializableLutDTO(size: $0.size, data: $0.data, intensity: $0.intensity)
         }
@@ -2238,6 +2256,98 @@ final class FilmtoneExportSession {
         default:
             return nil
         }
+    }
+
+    // v1.3 Camera Profiles Phase E: synthesized 33³ cubes (V-Log, S-Log3)
+    // are recomputed once per app run and reused across exports. Keyed by
+    // a curve identity string so the cache survives multiple exports of
+    // the same source profile without rebuilding ~575 KB of cube data.
+    private static let synthesizedInputLutCache = NSCache<NSString, NSData>()
+
+    /// v1.3 Camera Profiles Phase E entry point. When `selection` is nil
+    /// (legacy callers) or `.auto`, falls back to the existing
+    /// `makeAutomaticInputLut` detection path. Otherwise dispatches
+    /// through `FilmtoneSourceProfileCatalog`.
+    private static func makeActiveInputLut(
+        for selection: CameraProfileSelection?,
+        probe: SourceProbeDTO?
+    ) -> PreparedLut? {
+        switch selection ?? .auto {
+        case .auto:
+            return makeAutomaticInputLut(for: probe?.inputTransformPolicy)
+        case .builtIn(let catalogId):
+            guard let entry = FilmtoneSourceProfileCatalog.entry(forCatalogId: catalogId) else {
+                return nil
+            }
+            return makeInputLut(forImpl: entry.impl)
+        case .userImport:
+            // v1.3: a user-imported `.cube` is carried by `request.inputLut`
+            // and is consumed by the caller's `makePreparedLut(from:)` path
+            // ahead of `makeActiveInputLut`. The `.userImport` selection
+            // therefore short-circuits to nil here so the export pipeline
+            // does not double-apply.
+            return nil
+        }
+    }
+
+    private static func makeInputLut(forImpl impl: SourceProfileImpl) -> PreparedLut? {
+        switch impl {
+        case .nilProfile:
+            return nil
+        case .nativePolicy(let strategy):
+            switch strategy {
+            case .appleLogToRec709, .appleLog2ToRec709:
+                return makeAppleLogToRec709Lut(size: 33, rec2020GamutMap: true)
+            default:
+                return nil
+            }
+        case .synthesized(let curve):
+            return makeSynthesizedInputLut(curve: curve)
+        case .bundledCube:
+            // Reserved for v1.4 (e.g. ARRI LogC4 once licensed). v1.3
+            // catalog never selects this case; if it ever shows up in v1.3
+            // we explicitly fall through to nil rather than silently
+            // returning the wrong cube.
+            return nil
+        }
+    }
+
+    private static func makeSynthesizedInputLut(curve: SourceProfileCurve) -> PreparedLut? {
+        let cubeSize = 33
+        let cacheKey = "synthesized.\(curve.rawValue).\(cubeSize)" as NSString
+        if let cached = synthesizedInputLutCache.object(forKey: cacheKey) {
+            return PreparedLut(size: cubeSize, intensity: 1, cubeData: cached as Data)
+        }
+        let rgb: [Float]
+        switch curve {
+        case .panasonicVLog:
+            rgb = FilmtoneSourceProfileMath.makeVlogToRec709Cube(size: cubeSize)
+        case .sonySLog3:
+            rgb = FilmtoneSourceProfileMath.makeSlog3ToRec709Cube(size: cubeSize)
+        case .appleLog, .appleLog2:
+            // Apple Log curves ride the native path, not synthesized —
+            // FilmtoneSourceProfileCatalog ensures `.appleLog*` always
+            // arrives here through `nativePolicy`. If the catalog ever
+            // mismatches (test fixture mistake), fall through to the
+            // existing Apple Log Lut so the pipeline degrades safely.
+            return makeAppleLogToRec709Lut(size: cubeSize, rec2020GamutMap: true)
+        }
+        let cubeData = packRgbToRgbaCubeData(rgb: rgb, size: cubeSize)
+        synthesizedInputLutCache.setObject(cubeData as NSData, forKey: cacheKey)
+        return PreparedLut(size: cubeSize, intensity: 1, cubeData: cubeData)
+    }
+
+    private static func packRgbToRgbaCubeData(rgb: [Float], size: Int) -> Data {
+        let count = size * size * size
+        precondition(rgb.count == count * 3, "RGB cube data is malformed")
+        var rgba = [Float](repeating: 0, count: count * 4)
+        for i in 0..<count {
+            rgba[i * 4 + 0] = rgb[i * 3 + 0]
+            rgba[i * 4 + 1] = rgb[i * 3 + 1]
+            rgba[i * 4 + 2] = rgb[i * 3 + 2]
+            rgba[i * 4 + 3] = 1
+        }
+        return rgba.withUnsafeBufferPointer { Data(buffer: $0) }
     }
 
     private static func rgbaCubeData(from data: [Double], size: Int) -> [Float] {

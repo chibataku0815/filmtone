@@ -89,7 +89,8 @@ final class FilmtoneMediaRuntime {
     func makeExportSession(
         request: Phase0ExportRequestDTO,
         sourceURL: URL? = nil,
-        appliedSavedLook: SavedLookEntry? = nil
+        appliedSavedLook: SavedLookEntry? = nil,
+        cameraProfile: CameraProfileSelection? = nil
     ) throws -> FilmtoneExportSession {
         let resolvedSourceURL = try sourceURL ?? resolveFileURL(request.sourceUri)
         return try FilmtoneExportSession(
@@ -97,7 +98,8 @@ final class FilmtoneMediaRuntime {
             sourceURL: resolvedSourceURL,
             cacheStore: cacheStore,
             mezzanineService: mezzanineService,
-            appliedSavedLook: appliedSavedLook
+            appliedSavedLook: appliedSavedLook,
+            cameraProfile: cameraProfile
         )
     }
 
@@ -229,6 +231,7 @@ final class FilmtoneMediaRuntime {
         collector: BenchmarkCollector? = nil,
         protectedCacheURLs: [URL] = [],
         appliedSavedLook: SavedLookEntry? = nil,
+        cameraProfile: CameraProfileSelection? = nil,
         onProgress: @escaping (Phase0ExportProgressDTO) -> Void
     ) async throws -> Phase0ExportResultDTO {
         let resolvedSourceURL = try sourceURL ?? resolveFileURL(request.sourceUri)
@@ -236,7 +239,8 @@ final class FilmtoneMediaRuntime {
         let exportSession = try session ?? makeExportSession(
             request: request,
             sourceURL: resolvedSourceURL,
-            appliedSavedLook: appliedSavedLook
+            appliedSavedLook: appliedSavedLook,
+            cameraProfile: cameraProfile
         )
         let benchmarkCollector = collector ?? makeBenchmarkCollector(request: request)
 

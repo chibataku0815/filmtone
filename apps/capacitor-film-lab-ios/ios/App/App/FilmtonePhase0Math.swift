@@ -636,6 +636,12 @@ enum FilmtonePhase0Math {
             // identical depth-off path.
             depthEnabled: nil,
             depthRenderer: nil
+            // v1.3 Camera Profiles Phase E: cameraProfile travels OUTSIDE
+            // the wire DTO (separate parameter on facade.runExport(...))
+            // because it's iOS-internal state — not a value the JS bridge
+            // needs to round-trip. Keeping it off the Codable DTO sidesteps
+            // a Swift Codable synthesis edge case across the standalone
+            // contract-test stub graph.
         )
     }
 

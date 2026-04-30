@@ -121,13 +121,15 @@ final class FilmtoneEditorFacade {
         request: Phase0ExportRequestDTO,
         protectedCacheURIs: [String] = [],
         appliedSavedLook: SavedLookEntry? = nil,
+        cameraProfile: CameraProfileSelection? = nil,
         onProgress: @escaping @MainActor (Phase0ExportProgressDTO) -> Void
     ) async throws -> Phase0ExportResultDTO {
         let protectedCacheURLs = protectedCacheURIs.compactMap { try? runtime.resolveFileURL($0) }
         return try await runtime.runExport(
             request: request,
             protectedCacheURLs: protectedCacheURLs,
-            appliedSavedLook: appliedSavedLook
+            appliedSavedLook: appliedSavedLook,
+            cameraProfile: cameraProfile
         ) { progress in
             DispatchQueue.main.async {
                 Task { @MainActor in
