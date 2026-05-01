@@ -146,20 +146,17 @@ private extension View {
 
 private struct GlassActionButton<Label: View>: View {
     let isProminent: Bool
-    let useTint: Bool
     let controlSize: ControlSize
     let label: () -> Label
     let action: () -> Void
 
     init(
         isProminent: Bool,
-        useTint: Bool,
         controlSize: ControlSize = .large,
         @ViewBuilder label: @escaping () -> Label,
         action: @escaping () -> Void
     ) {
         self.isProminent = isProminent
-        self.useTint = useTint
         self.controlSize = controlSize
         self.label = label
         self.action = action
@@ -177,18 +174,11 @@ private struct GlassActionButton<Label: View>: View {
     private var modernButton: some View {
         let raw = Button(action: action, label: label)
             .controlSize(controlSize)
-        let styled = Group {
+        return Group {
             if isProminent {
                 raw.buttonStyle(.glassProminent)
             } else {
                 raw.buttonStyle(.glass)
-            }
-        }
-        return Group {
-            if useTint {
-                styled.tint(Color.filmtoneAmber)
-            } else {
-                styled
             }
         }
     }
@@ -196,18 +186,11 @@ private struct GlassActionButton<Label: View>: View {
     private var legacyButton: some View {
         let raw = Button(action: action, label: label)
             .controlSize(controlSize)
-        let styled = Group {
+        return Group {
             if isProminent {
                 raw.buttonStyle(.borderedProminent)
             } else {
                 raw.buttonStyle(.bordered)
-            }
-        }
-        return Group {
-            if useTint {
-                styled.tint(Color.filmtoneAmber)
-            } else {
-                styled
             }
         }
     }
@@ -369,7 +352,6 @@ struct FilmtoneFullscreenLutEditor: View {
             HStack(spacing: 12) {
                 GlassActionButton(
                     isProminent: false,
-                    useTint: false,
                     controlSize: .large
                 ) {
                     Image(systemName: "xmark")
@@ -391,7 +373,6 @@ struct FilmtoneFullscreenLutEditor: View {
 
                 GlassActionButton(
                     isProminent: false,
-                    useTint: false,
                     controlSize: .large
                 ) {
                     Image(systemName: controlsHidden ? "eye" : "eye.slash")
@@ -413,7 +394,6 @@ struct FilmtoneFullscreenLutEditor: View {
             HStack(spacing: 6) {
                 GlassActionButton(
                     isProminent: videoPreview.compareMode == .graded,
-                    useTint: videoPreview.compareMode == .graded,
                     controlSize: .regular
                 ) {
                     Text(store.strings.previewGradedLabel)
@@ -424,7 +404,6 @@ struct FilmtoneFullscreenLutEditor: View {
 
                 GlassActionButton(
                     isProminent: videoPreview.compareMode == .original,
-                    useTint: videoPreview.compareMode == .original,
                     controlSize: .regular
                 ) {
                     Text(store.strings.compareLabel)
@@ -443,7 +422,6 @@ struct FilmtoneFullscreenLutEditor: View {
         // symbol color automatically against the underlying preview.
         GlassActionButton(
             isProminent: false,
-            useTint: false,
             controlSize: .extraLarge
         ) {
             Image(systemName: videoController.isPlaying ? "pause.fill" : "play.fill")
@@ -548,30 +526,38 @@ struct FilmtoneFullscreenLutEditor: View {
         }
     }
 
+    /// Strength interpolates `reset → activePreset` linearly. When the
+    /// active preset IS `reset` itself the interpolation collapses to
+    /// zero — moving the slider has no visible effect. Skip the row in
+    /// that case so the user does not see a non-functional control.
+    /// Mirrors the `intensityRow` conditional pattern.
+    @ViewBuilder
     private var strengthRow: some View {
-        let clamped = FilmtonePhase0Math.clampStrength(store.project.strength)
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
-                Text(store.strings.fullscreenStrengthLabel)
-                    .font(.caption.weight(.semibold))
+        if store.project.presetName != FilmtonePhase0Generated.presetDefault {
+            let clamped = FilmtonePhase0Math.clampStrength(store.project.strength)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 12) {
+                    Text(store.strings.fullscreenStrengthLabel)
+                        .font(.caption.weight(.semibold))
 
-                Spacer()
+                    Spacer()
 
-                Text(percentLabel(clamped))
-                    .font(.caption.monospacedDigit().weight(.semibold))
-                    .accessibilityIdentifier("filmtone.fullscreen.strength.value")
+                    Text(percentLabel(clamped))
+                        .font(.caption.monospacedDigit().weight(.semibold))
+                        .accessibilityIdentifier("filmtone.fullscreen.strength.value")
+                }
+
+                Slider(
+                    value: Binding(
+                        get: { clamped },
+                        set: { store.setStrength($0) }
+                    ),
+                    in: 0...1
+                )
+                .accessibilityIdentifier("filmtone.fullscreen.strength.slider")
+                .accessibilityLabel(store.strings.fullscreenStrengthLabel)
+                .accessibilityValue(percentLabel(clamped))
             }
-
-            Slider(
-                value: Binding(
-                    get: { clamped },
-                    set: { store.setStrength($0) }
-                ),
-                in: 0...1
-            )
-            .accessibilityIdentifier("filmtone.fullscreen.strength.slider")
-            .accessibilityLabel(store.strings.fullscreenStrengthLabel)
-            .accessibilityValue(percentLabel(clamped))
         }
     }
 
@@ -615,7 +601,6 @@ private struct FullscreenLookCarousel: View {
                 HStack(spacing: 10) {
                     GlassActionButton(
                         isProminent: !hasCreativeLut,
-                        useTint: !hasCreativeLut,
                         controlSize: .regular
                     ) {
                         Label(strings.fullscreenNoLookLabel, systemImage: "circle.dashed")
@@ -629,7 +614,6 @@ private struct FullscreenLookCarousel: View {
                     ForEach(entries) { entry in
                         GlassActionButton(
                             isProminent: activeLookId == entry.id,
-                            useTint: activeLookId == entry.id,
                             controlSize: .regular
                         ) {
                             Label(
