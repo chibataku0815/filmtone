@@ -10,6 +10,20 @@ From this app directory:
 ./scripts/bundle.sh install
 ```
 
+Release commands load app-local env files before invoking Fastlane:
+
+1. `.env`
+2. `.env.local`
+3. `fastlane/.env`
+4. `fastlane/.env.local`
+5. `FILMTONE_RELEASE_ENV_FILE`, when set
+
+Explicit shell env values still win over local files, so one-off overrides such as `IPA_PATH=... bun run release:beta` remain safe. Check the effective release env without printing secret values:
+
+```sh
+bun run release:env:check
+```
+
 ## Required Environment
 
 App Store Connect API key authentication is required for `archive`, `metadata`, `beta`, and `release`:
@@ -63,6 +77,7 @@ Optional screenshot-locale override:
 
 ```sh
 bun run release:bundle:install
+bun run release:env:check
 bun run release:archive
 bun run release:screenshots
 bun run release:metadata
@@ -99,13 +114,13 @@ bun run release:screenshots
 REVIEW_PHONE='+81-90-0000-0000' bun run release:metadata
 ```
 
-5. Upload a TestFlight build. Pass the archived `.ipa` explicitly:
+5. Upload a TestFlight build. `IPA_PATH` can come from `.env.local`, an exported shell variable, or the command line:
 
 ```sh
 IPA_PATH=build/fastlane/Filmtone.ipa bun run release:beta
 ```
 
-6. Upload the release candidate to App Store Connect. The `release` lane requires both an explicit `.ipa` path and staged screenshots under `fastlane/screenshots/{ja,en-US}`:
+6. Upload the release candidate to App Store Connect. The `release` lane requires `IPA_PATH` and staged screenshots under `fastlane/screenshots/{ja,en-US}`:
 
 ```sh
 IPA_PATH=build/fastlane/Filmtone.ipa REVIEW_PHONE='+81-90-0000-0000' bun run release:appstore
@@ -133,7 +148,7 @@ APP_VERSION=1.2 BUILD_NUMBER=1 REVIEW_PHONE='+81-90-0000-0000' bun run release:s
 
 - `archive` uses `ios/App/App.xcworkspace`, scheme `App`, `export_method: app-store`, and passes `-allowProvisioningUpdates` on both the build and export phases. The lane sets `signingStyle: automatic` and `teamID: C3G77H8NM6` in the export options so Xcode can resolve distribution signing assets without a manual selection step.
 - When ASC API key env vars are present, the same key material is forwarded to `xcodebuild` via `-authenticationKeyID`, `-authenticationKeyIssuerID`, and `-authenticationKeyPath`, so provisioning assets can be fetched headlessly. If only `ASC_KEY_CONTENT` is set, the lane writes it to a temporary `.p8` file for the duration of the run and removes it on exit.
-- `scripts/bundle.sh` prefers Homebrew Ruby (`brew --prefix ruby`) so `bundle exec fastlane ...` does not accidentally run against macOS system Ruby.
+- `scripts/bundle.sh` loads app-local release env files, then prefers Homebrew Ruby (`brew --prefix ruby`) so `bundle exec fastlane ...` does not accidentally run against macOS system Ruby.
 - `screenshots` is deterministic: it targets one simulator (`iPhone 17 Pro Max` / iOS 26.2 / UDID `D3011FE4-52CA-4B7F-B181-A55D9998E192`), runs the dedicated UI test once, and stages the resulting asset set into both `ja` and `en-US`. There is no simulator discovery, no runtime iteration, and no retry loop.
 - `beta` and `release` are fail-fast: they require `IPA_PATH`, verify that the file exists, and will not re-run `archive` implicitly.
 - `release` is also fail-fast on screenshots: each locale in `fastlane/screenshots/{ja,en-US}` must have 1-10 files, counts must match across locales, and filenames must line up. Missing screenshots are treated as an error, not as a skip path.

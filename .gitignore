@@ -26,6 +26,11 @@ packages/**/node_modules/
 # misc
 .DS_Store
 *.pem
+*.p8
+*.p12
+*.cer
+*.key
+*.provisionprofile
 
 # Local agent / browser tooling (never commit)
 .playwright-cli/

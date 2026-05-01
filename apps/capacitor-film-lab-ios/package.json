@@ -16,11 +16,12 @@
     "cap:sync:ios": "cap sync ios",
     "ios:open": "cap open ios",
     "release:bundle:install": "./scripts/bundle.sh install",
+    "release:env:check": "./scripts/release-env-status.sh",
     "release:archive": "./scripts/bundle.sh exec fastlane ios archive",
     "release:screenshots": "./scripts/bundle.sh exec fastlane ios screenshots",
     "release:metadata": "./scripts/bundle.sh exec fastlane ios metadata",
-    "release:beta": "./scripts/bundle.sh exec fastlane ios beta \"ipa:${IPA_PATH:?Set IPA_PATH=build/fastlane/Filmtone.ipa}\"",
-    "release:appstore": "./scripts/bundle.sh exec fastlane ios release \"ipa:${IPA_PATH:?Set IPA_PATH=build/fastlane/Filmtone.ipa}\"",
+    "release:beta": "./scripts/bundle.sh exec fastlane ios beta",
+    "release:appstore": "./scripts/bundle.sh exec fastlane ios release",
     "release:submit-review": "./scripts/bundle.sh exec fastlane ios submit_review"
   },
   "dependencies": {

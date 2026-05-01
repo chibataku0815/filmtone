@@ -277,9 +277,9 @@ def app_review_information!
 end
 
 def explicit_ipa_path!(options, lane:)
-  explicit_path = options[:ipa] || options["ipa"]
+  explicit_path = options[:ipa] || options["ipa"] || normalized_env("IPA_PATH")
   UI.user_error!(
-    "Pass ipa:... to `fastlane ios #{lane}`. Implicit archive fallback is disabled."
+    "Set IPA_PATH or pass ipa:... to `fastlane ios #{lane}`. Implicit archive fallback is disabled."
   ) if explicit_path.nil?
 
   ipa_path = File.expand_path(explicit_path, APP_ROOT)
