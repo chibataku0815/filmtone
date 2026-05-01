@@ -34,8 +34,8 @@ export const SIGNATURE_LUT_PLAN: readonly SignatureLutSlotPlan[] = [
 ] as const;
 
 export const SIGNATURE_PRESET_BUNDLE_NOTE = [
-  "Signature preset = the canonical Filmtone iOS default look.",
-  "v1.3 ships 5 built-in Looks (incl. Filmtone Signature) via FilmtoneBuiltInCatalog.swift — params-only, no bundled .cube.",
+  "Signature preset = the canonical Filmtone iOS default look (params-only).",
+  "SIGNATURE_LUT_PLAN slots stay empty (bundledRelPath: null) — the signature preset is params-only across v1.3 / v1.4.",
   "Source profiles are handled native (Apple Log / Apple Log 2) + synthesized (V-Log / S-Log3 via FilmtoneSourceProfileMath) + Rec.709 default. Imported .cube remains as a user-side option.",
-  "SIGNATURE_LUT_PLAN slots stay empty (bundledRelPath: null). v1.4 may revisit pending licensing.",
+  "v1.4 Built-in Look catalog (FilmtoneBuiltInCatalog.swift) is separate from this plan: it ships Creative Pack 01 (Stone, Urban) with bundled .cube; v1.3 preset-wrapper Looks are removed. v1.5+ may revisit SIGNATURE_LUT_PLAN pending licensing.",
 ].join(" ");
