@@ -55,16 +55,29 @@ final class FilmtoneEditorFacade {
         self.presenter = presenter
     }
 
+    /// Walk `presentedViewController` from the attached root hosting controller
+    /// down to the topmost live controller. UIKit refuses to `present()` on a
+    /// controller that already has a `presentedViewController`, so when a
+    /// picker is invoked from inside a sheet (Source Profile sheet, etc.) we
+    /// must hand UIKit the sheet's host instead of the root.
+    private var topPresentingViewController: UIViewController? {
+        var top: UIViewController? = presenter
+        while let next = top?.presentedViewController, !next.isBeingDismissed {
+            top = next
+        }
+        return top
+    }
+
     func pickSource(
         route: FilmtoneSourcePickerRoute = .photoLibrary,
         protectedCacheURIs: [String] = [],
         onImportProgress: (@MainActor (FilmtoneSourceImportProgress) -> Void)? = nil
     ) async throws -> SourceInfoDTO? {
-        guard let presenter else {
+        guard let host = topPresentingViewController else {
             throw FilmtoneMediaError.bridgeUnavailable
         }
         return try await assetPickerService.pickSource(
-            presenting: presenter,
+            presenting: host,
             route: route,
             protectedCacheURLs: protectedCacheURIs.compactMap { try? runtime.resolveFileURL($0) },
             onImportProgress: onImportProgress
@@ -72,10 +85,10 @@ final class FilmtoneEditorFacade {
     }
 
     func pickCubeLut() async throws -> ParsedCubeLutDTO? {
-        guard let presenter else {
+        guard let host = topPresentingViewController else {
             throw FilmtoneMediaError.bridgeUnavailable
         }
-        guard let picked = try await assetPickerService.pickLutFile(presenting: presenter) else {
+        guard let picked = try await assetPickerService.pickLutFile(presenting: host) else {
             return nil
         }
         return try FilmtoneCubeParser.parse(text: picked.text, defaultTitle: picked.filename)
@@ -156,7 +169,7 @@ final class FilmtoneEditorFacade {
         sidecarURI: String? = nil,
         packageFileURIs: [String]? = nil
     ) async throws -> Bool {
-        guard let presenter else {
+        guard let host = topPresentingViewController else {
             throw FilmtoneMediaError.bridgeUnavailable
         }
         if let packageFileURIs, !packageFileURIs.isEmpty {
@@ -172,14 +185,14 @@ final class FilmtoneEditorFacade {
             }
             return try await runtime.shareOutput(
                 fileURLs: urls,
-                presenting: presenter
+                presenting: host
             )
         }
         return try await runtime.shareOutput(
             uri: mediaURI,
             sidecarUri: sidecarURI,
             packageFileUris: packageFileURIs,
-            presenting: presenter
+            presenting: host
         )
     }
 
