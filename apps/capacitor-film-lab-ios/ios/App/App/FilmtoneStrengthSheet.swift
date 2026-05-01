@@ -137,8 +137,44 @@ struct FilmtoneStrengthSheet: View {
                     comparisonStyle: .strength
                 )
             }
+
+            if let creativeLut = store.project.creativeLut {
+                lookLutAmountControl(creativeLut.intensity)
+            }
         }
         .sectionDivider()
+    }
+
+    private func lookLutAmountControl(_ value: Double) -> some View {
+        let clampedValue = FilmtonePhase0Math.clampLutIntensity(value)
+        let percentLabel = Self.percentLabel(clampedValue)
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                Text(store.strings.lookLutAmountLabel)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(Color.filmtoneAmber.opacity(0.92))
+
+                Spacer()
+
+                Text(percentLabel)
+                    .font(.caption.monospacedDigit().weight(.medium))
+                    .foregroundStyle(Color.filmtoneAmber.opacity(0.82))
+                    .accessibilityIdentifier("filmtone.sheet.slider.creativeLutIntensity.value")
+            }
+
+            Slider(
+                value: Binding(
+                    get: { clampedValue },
+                    set: { store.setCreativeLutIntensity($0) }
+                ),
+                in: 0...1
+            )
+            .tint(Color.filmtoneAmber)
+            .accessibilityIdentifier("filmtone.sheet.slider.creativeLutIntensity")
+            .accessibilityLabel(store.strings.lookLutAmountLabel)
+            .accessibilityValue(percentLabel)
+        }
     }
 
     private var adjustmentsSection: some View {
@@ -158,13 +194,13 @@ struct FilmtoneStrengthSheet: View {
 
                     FilmtoneSliderRow(
                         label: store.strings.quickFilmCharacter,
-                        value: store.project.quickState.filmCharacter,
+                        value: store.project.quickState.dynamics,
                         range: -1...1,
                         format: { Self.signedPercentLabel($0) },
                         helpAccessibilityLabel: store.strings.adjustmentHelpAccessibilityLabel(for: store.strings.quickFilmCharacter),
                         accessibilityIdentifier: "filmtone.sheet.slider.quick.filmCharacter"
                     ) { value in
-                        store.setQuickValue(value, for: \.filmCharacter)
+                        store.setQuickValue(value, for: \.dynamics)
                     } helpAction: {
                         activeHelpTopic = makeHelpTopic(
                             id: "quick.filmCharacter",
@@ -175,13 +211,13 @@ struct FilmtoneStrengthSheet: View {
 
                     FilmtoneSliderRow(
                         label: store.strings.quickEra,
-                        value: store.project.quickState.era,
+                        value: -store.project.quickState.era,
                         range: -1...1,
                         format: { Self.signedPercentLabel($0) },
                         helpAccessibilityLabel: store.strings.adjustmentHelpAccessibilityLabel(for: store.strings.quickEra),
                         accessibilityIdentifier: "filmtone.sheet.slider.quick.era"
                     ) { value in
-                        store.setQuickValue(value, for: \.era)
+                        store.setQuickValue(-value, for: \.era)
                     } helpAction: {
                         activeHelpTopic = makeHelpTopic(
                             id: "quick.era",
@@ -192,13 +228,13 @@ struct FilmtoneStrengthSheet: View {
 
                     FilmtoneSliderRow(
                         label: store.strings.quickDynamics,
-                        value: store.project.quickState.dynamics,
+                        value: store.project.quickState.filmCharacter,
                         range: -1...1,
                         format: { Self.signedPercentLabel($0) },
                         helpAccessibilityLabel: store.strings.adjustmentHelpAccessibilityLabel(for: store.strings.quickDynamics),
                         accessibilityIdentifier: "filmtone.sheet.slider.quick.dynamics"
                     ) { value in
-                        store.setQuickValue(value, for: \.dynamics)
+                        store.setQuickValue(value, for: \.filmCharacter)
                     } helpAction: {
                         activeHelpTopic = makeHelpTopic(
                             id: "quick.dynamics",
@@ -333,6 +369,8 @@ struct FilmtoneStrengthSheet: View {
 
     private func comparisonStyleForGroup(_ id: String) -> FilmtoneAdjustmentComparisonStyle {
         switch id {
+        case "basic":
+            return .exposure
         case "process":
             return .tone
         case "optics":
@@ -350,6 +388,14 @@ struct FilmtoneStrengthSheet: View {
 
     private func comparisonStyleForParam(_ key: String) -> FilmtoneAdjustmentComparisonStyle {
         switch key {
+        case "exposure":
+            return .exposure
+        case "contrast":
+            return .contrast
+        case "saturation":
+            return .saturation
+        case "temperature", "tint", "fade":
+            return .tone
         case "cyan", "magenta", "yellow":
             return .colorBalance
         case "printContrast":
@@ -393,6 +439,19 @@ struct FilmtoneStrengthSheet: View {
 
     private var advancedParamGroups: [FilmtoneAdvancedParamGroup] {
         var groups: [FilmtoneAdvancedParamGroup] = [
+            .init(
+                id: "basic",
+                title: store.strings.advancedBasicLabel,
+                recipes: [],
+                controls: [
+                    control("exposure", range: -2...2),
+                    control("contrast", range: 0...2),
+                    control("saturation", range: 0...2),
+                    control("temperature", range: -1...1),
+                    control("tint", range: -1...1),
+                    control("fade", range: 0...1),
+                ]
+            ),
             .init(
                 id: "process",
                 title: store.strings.advancedProcessLabel,
@@ -912,6 +971,70 @@ private enum FilmtoneAdjustmentComparisonStyle: Equatable {
     case motion
 }
 
+private extension FilmtoneAdjustmentComparisonStyle {
+    enum Family: String {
+        case strength
+        case exposure
+        case contrast
+        case saturation
+        case tone
+        case optics
+        case glow
+        case halation
+        case grain
+        case motion
+
+        var beforeAssetName: String {
+            switch self {
+            case .strength, .optics, .glow, .halation:
+                return "HelpCompareSceneGlow"
+            case .exposure, .contrast, .saturation, .tone, .grain, .motion:
+                return "HelpCompareSceneSkin"
+            }
+        }
+
+        var afterAssetName: String {
+            switch self {
+            case .strength: return "HelpCompareStrengthAfter"
+            case .exposure: return "HelpCompareExposureAfter"
+            case .contrast: return "HelpCompareContrastAfter"
+            case .saturation: return "HelpCompareSaturationAfter"
+            case .tone: return "HelpCompareToneAfter"
+            case .optics: return "HelpCompareOpticsAfter"
+            case .glow: return "HelpCompareGlowAfter"
+            case .halation: return "HelpCompareHalationAfter"
+            case .grain: return "HelpCompareGrainAfter"
+            case .motion: return "HelpCompareMotionAfter"
+            }
+        }
+    }
+
+    var family: Family {
+        switch self {
+        case .strength, .quick, .advanced:
+            return .strength
+        case .exposure:
+            return .exposure
+        case .contrast:
+            return .contrast
+        case .saturation, .colorBalance:
+            return .saturation
+        case .tone, .highlight:
+            return .tone
+        case .optics, .softness, .vignette, .colorFringe, .diffusion:
+            return .optics
+        case .glow, .bloom:
+            return .glow
+        case .halation:
+            return .halation
+        case .grain:
+            return .grain
+        case .motion:
+            return .motion
+        }
+    }
+}
+
 private struct FilmtoneAdjustmentHelpSheet: View {
     let topic: FilmtoneAdjustmentHelpTopic
     let beforeLabel: String
@@ -1062,255 +1185,9 @@ private struct FilmtoneHelpSampleFrame: View {
     let isAfter: Bool
 
     var body: some View {
-        ZStack {
-            baseScene
-
-            if isAfter {
-                effectOverlay
-            }
-
-            if isAfter && (style == .grain) {
-                grainOverlay
-            }
-
-            if isAfter && (style == .motion) {
-                motionOverlay
-            }
-        }
-        .brightness(isAfter ? brightnessDelta : 0)
-        .contrast(isAfter ? contrastValue : 1)
-        .saturation(isAfter ? saturationValue : 1)
-        .blur(radius: isAfter ? blurRadius : 0)
-        .overlay {
-            if isAfter && (style == .vignette || style == .optics) {
-                vignetteOverlay
-            }
-        }
-    }
-
-    private var baseScene: some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.16, green: 0.20, blue: 0.24),
-                    Color(red: 0.31, green: 0.35, blue: 0.34),
-                    Color(red: 0.12, green: 0.12, blue: 0.11),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-
-            VStack(spacing: 0) {
-                Color.clear
-                Rectangle()
-                    .fill(Color.black.opacity(0.22))
-                    .frame(height: 48)
-            }
-
-            Circle()
-                .fill(Color.white.opacity(0.88))
-                .frame(width: 26, height: 26)
-                .offset(x: 40, y: -44)
-
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.66, green: 0.57, blue: 0.47),
-                            Color(red: 0.31, green: 0.27, blue: 0.24),
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .frame(width: 48, height: 78)
-                .offset(x: -26, y: 24)
-
-            RoundedRectangle(cornerRadius: 3, style: .continuous)
-                .fill(Color.black.opacity(0.42))
-                .frame(width: 74, height: 10)
-                .offset(x: -20, y: 70)
-        }
-    }
-
-    @ViewBuilder
-    private var effectOverlay: some View {
-        switch style {
-        case .strength, .quick, .advanced:
-            Color.filmtoneAmber.opacity(0.13)
-        case .exposure:
-            Color.white.opacity(0.13)
-        case .contrast:
-            LinearGradient(
-                colors: [Color.black.opacity(0.22), Color.clear, Color.white.opacity(0.10)],
-                startPoint: .bottom,
-                endPoint: .top
-            )
-        case .saturation:
-            LinearGradient(
-                colors: [Color.orange.opacity(0.18), Color.filmtoneSky.opacity(0.14)],
-                startPoint: .bottomLeading,
-                endPoint: .topTrailing
-            )
-        case .tone:
-            LinearGradient(
-                colors: [Color.filmtoneAmber.opacity(0.16), Color.blue.opacity(0.08)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        case .colorBalance:
-            LinearGradient(
-                colors: [
-                    Color(red: 0.30, green: 0.86, blue: 0.92).opacity(0.18),
-                    Color(red: 0.92, green: 0.30, blue: 0.78).opacity(0.12),
-                    Color.yellow.opacity(0.14),
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-        case .highlight:
-            LinearGradient(
-                colors: [Color.white.opacity(0.06), Color.filmtoneAmber.opacity(0.10), Color.black.opacity(0.04)],
-                startPoint: .topTrailing,
-                endPoint: .bottom
-            )
-        case .optics, .softness, .diffusion:
-            Color.white.opacity(0.08)
-        case .colorFringe:
-            colorFringeOverlay
-        case .vignette:
-            Color.clear
-        case .glow, .bloom:
-            glowOverlay(tint: Color.filmtoneAmber.opacity(0.44))
-        case .halation:
-            glowOverlay(tint: Color.red.opacity(0.34))
-        case .grain:
-            Color.black.opacity(0.02)
-        case .motion:
-            Color.filmtoneSky.opacity(0.08)
-        }
-    }
-
-    private var brightnessDelta: Double {
-        switch style {
-        case .exposure:
-            return 0.10
-        case .highlight:
-            return 0.04
-        default:
-            return 0
-        }
-    }
-
-    private var contrastValue: Double {
-        switch style {
-        case .contrast, .tone:
-            return 1.22
-        case .highlight:
-            return 0.92
-        default:
-            return 1
-        }
-    }
-
-    private var saturationValue: Double {
-        switch style {
-        case .saturation:
-            return 1.36
-        case .tone, .colorBalance:
-            return 1.12
-        case .highlight, .softness, .diffusion:
-            return 0.92
-        default:
-            return 1
-        }
-    }
-
-    private var blurRadius: CGFloat {
-        switch style {
-        case .softness, .diffusion:
-            return 0.85
-        default:
-            return 0
-        }
-    }
-
-    private func glowOverlay(tint: Color) -> some View {
-        ZStack {
-            Circle()
-                .fill(tint)
-                .frame(width: 78, height: 78)
-                .blur(radius: 18)
-                .offset(x: 40, y: -44)
-
-            Circle()
-                .stroke(tint.opacity(0.9), lineWidth: 7)
-                .frame(width: 34, height: 34)
-                .blur(radius: 4)
-                .offset(x: 40, y: -44)
-        }
-    }
-
-    private var colorFringeOverlay: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .stroke(Color.red.opacity(0.48), lineWidth: 2)
-                .frame(width: 50, height: 80)
-                .offset(x: -30, y: 24)
-
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .stroke(Color.cyan.opacity(0.48), lineWidth: 2)
-                .frame(width: 50, height: 80)
-                .offset(x: -22, y: 24)
-        }
-    }
-
-    private var vignetteOverlay: some View {
-        RadialGradient(
-            colors: [
-                Color.clear,
-                Color.clear,
-                Color.black.opacity(0.46),
-            ],
-            center: .center,
-            startRadius: 34,
-            endRadius: 132
-        )
-    }
-
-    private var grainOverlay: some View {
-        GeometryReader { geometry in
-            ZStack {
-                ForEach(0..<34, id: \.self) { index in
-                    Circle()
-                        .fill(index.isMultiple(of: 3) ? Color.white.opacity(0.18) : Color.black.opacity(0.22))
-                        .frame(width: index.isMultiple(of: 4) ? 2.5 : 1.4, height: index.isMultiple(of: 4) ? 2.5 : 1.4)
-                        .position(
-                            x: geometry.size.width * CGFloat((index * 37) % 97) / 97,
-                            y: geometry.size.height * CGFloat((index * 53) % 89) / 89
-                        )
-                }
-            }
-        }
-    }
-
-    private var motionOverlay: some View {
-        ZStack {
-            ForEach(1..<4, id: \.self) { index in
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(Color.filmtoneSky.opacity(0.10 / Double(index)))
-                    .frame(width: 48, height: 78)
-                    .offset(x: -26 - CGFloat(index * 12), y: 24)
-            }
-
-            LinearGradient(
-                colors: [Color.clear, Color.filmtoneSky.opacity(0.18), Color.clear],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-            .frame(height: 34)
-            .offset(y: 28)
-        }
+        Image(isAfter ? style.family.afterAssetName : style.family.beforeAssetName)
+            .resizable()
+            .aspectRatio(contentMode: .fill)
     }
 }
 
@@ -1437,19 +1314,21 @@ private struct FilmtoneAdvancedParamGroupSection<Content: View>: View {
                     )
                     }
 
-                HStack(spacing: 8) {
-                    ForEach(recipes) { recipe in
-                        FilmtoneParamPresetChip(
-                            label: recipe.label,
-                            isSelected: selection == .recipe(recipe.id),
-                            accessibilityIdentifier: "filmtone.sheet.advanced.group.\(id).\(recipe.id)",
-                            action: {
-                                onSelectRecipe(recipe)
-                            }
-                        )
-                    }
+                if !recipes.isEmpty {
+                    HStack(spacing: 8) {
+                        ForEach(recipes) { recipe in
+                            FilmtoneParamPresetChip(
+                                label: recipe.label,
+                                isSelected: selection == .recipe(recipe.id),
+                                accessibilityIdentifier: "filmtone.sheet.advanced.group.\(id).\(recipe.id)",
+                                action: {
+                                    onSelectRecipe(recipe)
+                                }
+                            )
+                        }
 
-                    Spacer(minLength: 0)
+                        Spacer(minLength: 0)
+                    }
                 }
             }
             .padding(.horizontal, 14)

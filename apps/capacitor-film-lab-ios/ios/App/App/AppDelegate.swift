@@ -8,6 +8,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         do {
+            if try FilmtoneHelpAssetGenerator.runIfRequested() {
+                exit(0)
+            }
             let snapshotScene = FilmtoneSnapshotScene.current
             // Snapshot mode and onboarding-reset both want a clean library so
             // fixtures stay deterministic. We construct the actor first so we
