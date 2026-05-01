@@ -82,6 +82,18 @@ export interface SourceProbe extends SourceInfo {
   frameRate?: number;
   cameraOptics?: CameraOptics;
   sourceVideoMetadata?: SourceVideoMetadata;
+  sourceToneDescriptor?: SourceToneDescriptor;
+}
+
+export interface SourceToneDescriptor {
+  lumaP05: number;
+  lumaP50: number;
+  lumaP95: number;
+  lumaRangeP05P95: number;
+  shadowCoverage: number;
+  highlightCoverage: number;
+  lowMidCoverage: number;
+  saturationMean: number;
 }
 
 // --- iOS v1.1 source video metadata (T1 HDR policy + T4 display/timing) ---

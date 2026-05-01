@@ -185,3 +185,31 @@ export {
   type IosPhase0SourceInfo,
   type IosPhase0SourceKind,
 } from "./ios-phase0";
+export {
+  bakeColorOnly,
+  BAKE_COLOR_IDENTITY,
+  BAKE_COLOR_PARAM_KEYS,
+  pickBakeColorParams,
+  type BakeColorParams,
+  type RGB,
+} from "./bake-color-only";
+export {
+  CREATIVE_CUBE_DEFAULT_SIZE,
+  diagonalMaxDelta,
+  makeCreativeCube,
+  makeIdentityCube,
+  type CreativeCube,
+} from "./creative-cube";
+export {
+  serializeCreativeCubeToText,
+  type SerializeCubeOptions,
+} from "./creative-cube-serialize";
+export {
+  CREATIVE_PACK_01_BAKER_VERSION,
+  CREATIVE_PACK_01_CUBE_SIZE,
+  CREATIVE_PACK_01_ID,
+  CREATIVE_PACK_01_LOOKS,
+  buildLookParamOverrides,
+  findCreativePack01Look,
+  type CreativePackLook,
+} from "./creative-pack-01";

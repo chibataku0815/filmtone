@@ -117,7 +117,23 @@ var PARAM_KEYS = [
   /** Cross filter streak length field modulation（0=uniform、1=max edge length boost）。 */
   "crossFilterEdgeLengthGain",
   /** Cross filter streak strength field modulation（0=uniform、1=max edge strength boost）。 */
-  "crossFilterEdgeStrengthGain"
+  "crossFilterEdgeStrengthGain",
+  /** Halo Prism strength（0=off、1=max）。 */
+  "haloPrismStrength",
+  /** Halo Prism ring radius（0=small、1=large）。 */
+  "haloPrismRadius",
+  /** Halo Prism ring width（0=narrow、1=wide）。 */
+  "haloPrismWidth",
+  /** Halo Prism chromatic edge separation（0=white、1=strong spectral edges）。 */
+  "haloPrismChromatic",
+  /** Halo Prism compact-source threshold（0=easy trigger、1=bright points only）。 */
+  "haloPrismThreshold",
+  /** Halo Prism partial-arc split amount（0=full ring、1=split/lower arcs）。 */
+  "haloPrismSplit",
+  /** Halo Prism arc orientation in degrees。 */
+  "haloPrismAngle",
+  /** Halo Prism source coupling（0=mostly procedural、1=source-reactive）。 */
+  "haloPrismSourceReactivity"
 ];
 var FILM_GRAIN_INTENSITY_MAX = 0.1;
 function clampGrainIntensity(value) {
@@ -219,7 +235,15 @@ var CONTRACT_DEFAULTS = {
   crossFilterAngleGamma: 1.4,
   crossFilterAngleInnerThreshold: 0.1,
   crossFilterEdgeLengthGain: 0.45,
-  crossFilterEdgeStrengthGain: 0.25
+  crossFilterEdgeStrengthGain: 0.25,
+  haloPrismStrength: 0,
+  haloPrismRadius: 0.62,
+  haloPrismWidth: 0.22,
+  haloPrismChromatic: 0.65,
+  haloPrismThreshold: 0.9,
+  haloPrismSplit: 0.7,
+  haloPrismAngle: 0,
+  haloPrismSourceReactivity: 0.85
 };
 function withContractDefaults(presets) {
   return Object.fromEntries(
@@ -863,7 +887,7 @@ var LOOK_ID_BY_PRESET = {
 // src/schema.ts
 import { z } from "zod";
 function schemaForParamKey(key) {
-  return key === "grainIntensity" ? z.number().min(0).transform(clampGrainIntensity) : key === "grainRadialMix" ? z.number().min(0).max(1).default(1) : key === "grainSize" ? z.number().min(0).max(1).default(0.3) : key === "diffusion" ? z.number().min(0).max(1).default(0) : key === "depthMistGain" || key === "depthGlowGain" ? z.number().min(0).max(1).default(0) : key === "depthRayAngleGamma" ? z.number().min(0.1).max(4).default(1.4) : key === "depthRayAngleInnerThreshold" ? z.number().min(0).max(0.8).default(0.1) : key === "depthMistRayAngleGain" ? z.number().min(0).max(1).default(0.35) : key === "depthBloomRayAngleGain" ? z.number().min(0).max(1).default(0.25) : key === "depthHalationRayAngleGain" ? z.number().min(0).max(1).default(0.18) : key === "depthMistFieldPsfGain" || key === "depthBloomFieldPsfGain" || key === "depthHalationFieldPsfGain" ? z.number().min(0).max(1).default(1) : key === "depthMistFieldPsfRadiusPx" ? z.number().min(0).max(64).default(18) : key === "depthBloomFieldPsfRadiusPx" ? z.number().min(0).max(64).default(9) : key === "depthHalationFieldPsfRadiusPx" ? z.number().min(0).max(64).default(12) : key === "lensSoftness" ? z.number().min(0).max(1).default(0) : key === "compressionRange" ? z.number().min(0).max(1).default(0.5) : key === "compressionAmount" || key === "printContrast" ? z.number().min(0).max(1).default(0) : key === "cyan" || key === "magenta" || key === "yellow" ? z.number().min(-1).max(1).default(0) : key === "shutterAngle" ? z.number().min(0).max(720).default(0) : key === "trailIntensity" ? z.number().min(0).max(0.95).default(0) : key === "motionBlurAmount" || key === "dustAmount" || key === "scratchAmount" ? z.number().min(0).max(1).default(0) : key === "shaftIntensity" ? z.number().min(0).max(1).default(0) : key === "shaftDecay" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginX" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginY" ? z.number().min(0).max(1).default(0.15) : key === "crossFilterStrength" ? z.number().min(0).max(1).default(0) : key === "crossFilterSpikes" ? z.number().min(4).max(8).default(4) : key === "crossFilterAngle" ? z.number().min(0).max(360).default(0) : key === "crossFilterLength" ? z.number().min(0).max(1).default(0.4) : key === "crossFilterThreshold" ? z.number().min(0).max(1).default(0.92) : key === "crossFilterChromatic" ? z.number().min(0).max(1).default(0.3) : key === "crossFilterSizeLimit" ? z.number().min(0).max(1).default(0) : key === "crossFilterRandomness" ? z.number().min(0).max(1).default(1) : key === "crossFilterHardMode" ? z.number().min(0).max(1).default(1) : key === "crossFilterMinSpacing" ? z.number().min(0).max(2).default(1) : key === "crossFilterDepthGain" ? z.number().min(0).max(1).default(0.25) : key === "crossFilterAngleGain" ? z.number().min(0).max(1).default(0.35) : key === "crossFilterAngleGamma" ? z.number().min(0.1).max(4).default(1.4) : key === "crossFilterAngleInnerThreshold" ? z.number().min(0).max(0.8).default(0.1) : key === "crossFilterEdgeLengthGain" ? z.number().min(0).max(1).default(0.45) : key === "crossFilterEdgeStrengthGain" ? z.number().min(0).max(1).default(0.25) : z.number();
+  return key === "grainIntensity" ? z.number().min(0).transform(clampGrainIntensity) : key === "grainRadialMix" ? z.number().min(0).max(1).default(1) : key === "grainSize" ? z.number().min(0).max(1).default(0.3) : key === "diffusion" ? z.number().min(0).max(1).default(0) : key === "depthMistGain" || key === "depthGlowGain" ? z.number().min(0).max(1).default(0) : key === "depthRayAngleGamma" ? z.number().min(0.1).max(4).default(1.4) : key === "depthRayAngleInnerThreshold" ? z.number().min(0).max(0.8).default(0.1) : key === "depthMistRayAngleGain" ? z.number().min(0).max(1).default(0.35) : key === "depthBloomRayAngleGain" ? z.number().min(0).max(1).default(0.25) : key === "depthHalationRayAngleGain" ? z.number().min(0).max(1).default(0.18) : key === "depthMistFieldPsfGain" || key === "depthBloomFieldPsfGain" || key === "depthHalationFieldPsfGain" ? z.number().min(0).max(1).default(1) : key === "depthMistFieldPsfRadiusPx" ? z.number().min(0).max(64).default(18) : key === "depthBloomFieldPsfRadiusPx" ? z.number().min(0).max(64).default(9) : key === "depthHalationFieldPsfRadiusPx" ? z.number().min(0).max(64).default(12) : key === "lensSoftness" ? z.number().min(0).max(1).default(0) : key === "compressionRange" ? z.number().min(0).max(1).default(0.5) : key === "compressionAmount" || key === "printContrast" ? z.number().min(0).max(1).default(0) : key === "cyan" || key === "magenta" || key === "yellow" ? z.number().min(-1).max(1).default(0) : key === "shutterAngle" ? z.number().min(0).max(720).default(0) : key === "trailIntensity" ? z.number().min(0).max(0.95).default(0) : key === "motionBlurAmount" || key === "dustAmount" || key === "scratchAmount" ? z.number().min(0).max(1).default(0) : key === "shaftIntensity" ? z.number().min(0).max(1).default(0) : key === "shaftDecay" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginX" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginY" ? z.number().min(0).max(1).default(0.15) : key === "crossFilterStrength" ? z.number().min(0).max(1).default(0) : key === "crossFilterSpikes" ? z.number().min(4).max(8).default(4) : key === "crossFilterAngle" ? z.number().min(0).max(360).default(0) : key === "crossFilterLength" ? z.number().min(0).max(1).default(0.4) : key === "crossFilterThreshold" ? z.number().min(0).max(1).default(0.92) : key === "crossFilterChromatic" ? z.number().min(0).max(1).default(0.3) : key === "crossFilterSizeLimit" ? z.number().min(0).max(1).default(0) : key === "crossFilterRandomness" ? z.number().min(0).max(1).default(1) : key === "crossFilterHardMode" ? z.number().min(0).max(1).default(1) : key === "crossFilterMinSpacing" ? z.number().min(0).max(2).default(1) : key === "crossFilterDepthGain" ? z.number().min(0).max(1).default(0.25) : key === "crossFilterAngleGain" ? z.number().min(0).max(1).default(0.35) : key === "crossFilterAngleGamma" ? z.number().min(0.1).max(4).default(1.4) : key === "crossFilterAngleInnerThreshold" ? z.number().min(0).max(0.8).default(0.1) : key === "crossFilterEdgeLengthGain" ? z.number().min(0).max(1).default(0.45) : key === "crossFilterEdgeStrengthGain" ? z.number().min(0).max(1).default(0.25) : key === "haloPrismStrength" ? z.number().min(0).max(1).default(0) : key === "haloPrismRadius" ? z.number().min(0).max(1).default(0.62) : key === "haloPrismWidth" ? z.number().min(0).max(1).default(0.22) : key === "haloPrismChromatic" ? z.number().min(0).max(1).default(0.65) : key === "haloPrismThreshold" ? z.number().min(0).max(1).default(0.9) : key === "haloPrismSplit" ? z.number().min(0).max(1).default(0.7) : key === "haloPrismAngle" ? z.number().min(0).max(360).default(0) : key === "haloPrismSourceReactivity" ? z.number().min(0).max(1).default(0.85) : z.number();
 }
 var paramShape = Object.fromEntries(
   PARAM_KEYS.map((key) => [key, schemaForParamKey(key)])
@@ -1626,6 +1650,14 @@ var OPTICAL_PARAM_KEYS = [
   "crossFilterAngleGamma",
   "crossFilterEdgeLengthGain",
   "crossFilterEdgeStrengthGain",
+  "haloPrismStrength",
+  "haloPrismRadius",
+  "haloPrismWidth",
+  "haloPrismChromatic",
+  "haloPrismThreshold",
+  "haloPrismSplit",
+  "haloPrismAngle",
+  "haloPrismSourceReactivity",
   "rgbShift",
   "lensSoftness"
 ];
@@ -2124,7 +2156,322 @@ function getIosPhase0SourceCapViolations(source) {
   }
   return violations;
 }
+
+// src/bake-color-only.ts
+function mix(a, b, t) {
+  return a + (b - a) * t;
+}
+function clamp012(x) {
+  if (x < 0) return 0;
+  if (x > 1) return 1;
+  return x;
+}
+function clampRange(x, lo, hi) {
+  if (x < lo) return lo;
+  if (x > hi) return hi;
+  return x;
+}
+function smoothstep(edge0, edge1, x) {
+  const t = clamp012((x - edge0) / (edge1 - edge0));
+  return t * t * (3 - 2 * t);
+}
+function luma(rgb) {
+  return 0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b;
+}
+function clampedRGB(rgb) {
+  return { r: clamp012(rgb.r), g: clamp012(rgb.g), b: clamp012(rgb.b) };
+}
+var BAKE_COLOR_PARAM_KEYS = [
+  "exposure",
+  "contrast",
+  "saturation",
+  "temperature",
+  "tint",
+  "fade",
+  "compressionAmount",
+  "compressionRange",
+  "printContrast",
+  "cyan",
+  "magenta",
+  "yellow"
+];
+var BAKE_COLOR_IDENTITY = {
+  exposure: 0,
+  contrast: 1,
+  saturation: 1,
+  temperature: 0,
+  tint: 0,
+  fade: 0,
+  compressionAmount: 0,
+  compressionRange: 0.5,
+  printContrast: 0,
+  cyan: 0,
+  magenta: 0,
+  yellow: 0
+};
+function pickBakeColorParams(params) {
+  return {
+    exposure: params.exposure,
+    contrast: params.contrast,
+    saturation: params.saturation,
+    temperature: params.temperature,
+    tint: params.tint,
+    fade: params.fade,
+    compressionAmount: params.compressionAmount,
+    compressionRange: params.compressionRange,
+    printContrast: params.printContrast,
+    cyan: params.cyan,
+    magenta: params.magenta,
+    yellow: params.yellow
+  };
+}
+function applyBaseGrade(rgb, params) {
+  let r = rgb.r;
+  let g = rgb.g;
+  let b = rgb.b;
+  const exposureScale = Math.pow(2, params.exposure);
+  r *= exposureScale;
+  g *= exposureScale;
+  b *= exposureScale;
+  r = (r - 0.5) * params.contrast + 0.5;
+  g = (g - 0.5) * params.contrast + 0.5;
+  b = (b - 0.5) * params.contrast + 0.5;
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  r = mix(lum, r, params.saturation);
+  g = mix(lum, g, params.saturation);
+  b = mix(lum, b, params.saturation);
+  r += params.temperature * 0.1;
+  b -= params.temperature * 0.1;
+  r += params.tint * 0.05;
+  g -= params.tint * 0.08;
+  b += params.tint * 0.05;
+  r = r + params.fade * (1 - r);
+  g = g + params.fade * (1 - g);
+  b = b + params.fade * (1 - b);
+  return { r, g, b };
+}
+function applyFilmCompression(rgb, params) {
+  if (params.compressionAmount <= 1e-4) {
+    return rgb;
+  }
+  const range = clamp012(params.compressionRange);
+  const k = mix(5.15, 2.85, range);
+  const rangeSoft = smoothstep(0.82, 1, range);
+  const amount = params.compressionAmount * (1 - 0.18 * rangeSoft);
+  const lum = luma(rgb);
+  const x = clampRange(k * (lum - 0.5), -5.5, 5.5);
+  const s = 1 / (1 + Math.exp(-x));
+  const scale = lum > 1e-3 ? mix(lum, s, amount) / lum : 1;
+  return {
+    r: clamp012(rgb.r * scale),
+    g: clamp012(rgb.g * scale),
+    b: clamp012(rgb.b * scale)
+  };
+}
+function applyPrintStage(rgb, params) {
+  let r = rgb.r;
+  let g = rgb.g;
+  let b = rgb.b;
+  const cmyScale = 0.15;
+  r -= params.cyan * cmyScale;
+  g -= params.magenta * cmyScale;
+  b -= params.yellow * cmyScale;
+  if (params.printContrast >= 1e-3) {
+    const k = mix(1, 5, params.printContrast);
+    const sR = 1 / (1 + Math.exp(-k * (r - 0.5)));
+    const sG = 1 / (1 + Math.exp(-k * (g - 0.5)));
+    const sB = 1 / (1 + Math.exp(-k * (b - 0.5)));
+    r = mix(r, sR, params.printContrast);
+    g = mix(g, sG, params.printContrast);
+    b = mix(b, sB, params.printContrast);
+  }
+  return clampedRGB({ r, g, b });
+}
+function bakeColorOnly(rgb, params) {
+  const stage2 = applyBaseGrade(rgb, params);
+  const stage3 = applyFilmCompression(stage2, params);
+  const stage9 = applyPrintStage(stage3, params);
+  return stage9;
+}
+
+// src/creative-cube.ts
+var CREATIVE_CUBE_DEFAULT_SIZE = 33;
+function makeCreativeCube(input) {
+  const size = input.size ?? CREATIVE_CUBE_DEFAULT_SIZE;
+  if (!Number.isInteger(size) || size < 2) {
+    throw new RangeError(`Cube size must be an integer \u2265 2, got ${size}`);
+  }
+  const transform = input.transform ?? bakeColorOnly;
+  const data = new Float32Array(size * size * size * 3);
+  const denom = size - 1;
+  for (let bi = 0; bi < size; bi++) {
+    const b = bi / denom;
+    for (let gi = 0; gi < size; gi++) {
+      const g = gi / denom;
+      for (let ri = 0; ri < size; ri++) {
+        const r = ri / denom;
+        const out = transform({ r, g, b }, input.params);
+        const idx = (bi * size * size + gi * size + ri) * 3;
+        data[idx + 0] = out.r;
+        data[idx + 1] = out.g;
+        data[idx + 2] = out.b;
+      }
+    }
+  }
+  return { size, data };
+}
+function makeIdentityCube(size = CREATIVE_CUBE_DEFAULT_SIZE) {
+  return makeCreativeCube({ params: BAKE_COLOR_IDENTITY, size });
+}
+function diagonalMaxDelta(cube) {
+  const { size, data } = cube;
+  const denom = size - 1;
+  let max = 0;
+  for (let i = 0; i < size; i++) {
+    const t = i / denom;
+    const idx = (i * size * size + i * size + i) * 3;
+    const dr = Math.abs(data[idx + 0] - t);
+    const dg = Math.abs(data[idx + 1] - t);
+    const db = Math.abs(data[idx + 2] - t);
+    if (dr > max) max = dr;
+    if (dg > max) max = dg;
+    if (db > max) max = db;
+  }
+  return max;
+}
+
+// src/creative-cube-serialize.ts
+var DEFAULT_PRECISION = 6;
+function formatFloat(value, precision) {
+  const cleaned = Object.is(value, -0) ? 0 : value;
+  return cleaned.toFixed(precision);
+}
+function serializeCreativeCubeToText(cube, options) {
+  const precision = options.precision ?? DEFAULT_PRECISION;
+  const lines = [];
+  lines.push(`TITLE "${options.title.replace(/"/g, "")}"`);
+  if (options.comments && options.comments.length > 0) {
+    for (const comment of options.comments) {
+      lines.push(`# ${comment}`);
+    }
+  }
+  lines.push(`LUT_3D_SIZE ${cube.size}`);
+  lines.push("DOMAIN_MIN 0.0 0.0 0.0");
+  lines.push("DOMAIN_MAX 1.0 1.0 1.0");
+  lines.push("");
+  const total = cube.size * cube.size * cube.size;
+  for (let i = 0; i < total; i++) {
+    const idx = i * 3;
+    const r = formatFloat(cube.data[idx + 0], precision);
+    const g = formatFloat(cube.data[idx + 1], precision);
+    const b = formatFloat(cube.data[idx + 2], precision);
+    lines.push(`${r} ${g} ${b}`);
+  }
+  lines.push("");
+  return lines.join("\n");
+}
+
+// src/creative-pack-01.ts
+var CREATIVE_PACK_01_ID = "creative-pack-01";
+var CREATIVE_PACK_01_BAKER_VERSION = "1.1.0-palermo-reference";
+var CREATIVE_PACK_01_CUBE_SIZE = 65;
+var CREATIVE_PACK_01_PALERMO_REFERENCE_SOURCE = "/Volumes/SamsungPortableSSDX5001/filmtone/Palermo_Powergrade & LUTs/Palermo Standalone LUTs/DJI_DLOG-M-Palermo.cube";
+var CREATIVE_PACK_01_PALERMO_GREEN_DENSITY_SOURCE = "/Volumes/SamsungPortableSSDX5001/filmtone/Palermo_Powergrade & LUTs/Palermo Standalone LUTs/LUT + Extras/Palermo + Colour Density + Green Density.cube";
+function buildLookParamOverrides(spatial) {
+  const out = { ...spatial };
+  for (const key of BAKE_COLOR_PARAM_KEYS) {
+    out[key] = BAKE_COLOR_IDENTITY[key];
+  }
+  out.shadowTone = 0;
+  out.highlightTone = 0;
+  return out;
+}
+var CREATIVE_PACK_01_LOOKS = [
+  {
+    slug: "filmtone-creative-pack-01-palermo-reference",
+    englishName: "Palermo Reference",
+    canonicalUUID: "FB1A0001-0000-4000-8000-000000000006",
+    basePreset: "reset",
+    colorParams: {
+      exposure: 0,
+      contrast: 1,
+      saturation: 1,
+      temperature: 0,
+      tint: 0,
+      fade: 0,
+      compressionAmount: 0,
+      compressionRange: 0.5,
+      printContrast: 0,
+      cyan: 0,
+      magenta: 0,
+      yellow: 0
+    },
+    paramOverrides: buildLookParamOverrides({
+      // First optical baseline: enough Filmtone lens behavior to judge the
+      // product direction, without hiding the Palermo color transform.
+      bloomThreshold: 0.62,
+      bloomStrength: 0.22,
+      bloomRadius: 0.58,
+      halationIntensity: 0.08,
+      halationHue: 24,
+      diffusion: 0.045,
+      lensSoftness: 0.08,
+      grainIntensity: 6e-3,
+      grainSize: 0.16,
+      vignette: 0.06
+    }),
+    strength: 1,
+    sourceCubePath: CREATIVE_PACK_01_PALERMO_REFERENCE_SOURCE
+  },
+  {
+    slug: "filmtone-creative-pack-01-palermo-green-density",
+    englishName: "Palermo Green Density",
+    canonicalUUID: "FB1A0001-0000-4000-8000-000000000007",
+    basePreset: "reset",
+    colorParams: {
+      exposure: 0,
+      contrast: 1,
+      saturation: 1,
+      temperature: 0,
+      tint: 0,
+      fade: 0,
+      compressionAmount: 0,
+      compressionRange: 0.5,
+      printContrast: 0,
+      cyan: 0,
+      magenta: 0,
+      yellow: 0
+    },
+    paramOverrides: buildLookParamOverrides({
+      // Green-density companion baseline: keep warmth from optics restrained so
+      // the source cube can carry the cool cyan-green density.
+      bloomThreshold: 0.66,
+      bloomStrength: 0.18,
+      bloomRadius: 0.54,
+      halationIntensity: 0.045,
+      halationHue: 18,
+      diffusion: 0.07,
+      lensSoftness: 0.1,
+      grainIntensity: 5e-3,
+      grainSize: 0.14,
+      vignette: 0.07
+    }),
+    strength: 1,
+    sourceCubePath: CREATIVE_PACK_01_PALERMO_GREEN_DENSITY_SOURCE,
+    sourceCubeTransform: "cold-green-density-v1"
+  }
+];
+function findCreativePack01Look(slug) {
+  return CREATIVE_PACK_01_LOOKS.find((look) => look.slug === slug);
+}
 export {
+  BAKE_COLOR_IDENTITY,
+  BAKE_COLOR_PARAM_KEYS,
+  CREATIVE_CUBE_DEFAULT_SIZE,
+  CREATIVE_PACK_01_BAKER_VERSION,
+  CREATIVE_PACK_01_CUBE_SIZE,
+  CREATIVE_PACK_01_ID,
+  CREATIVE_PACK_01_LOOKS,
   DEFAULT_QUICK_STATE,
   FILMTONE_DEFAULT_BASE_PRESET,
   FILMTONE_SOFT_FINISH_PATCH,
@@ -2164,8 +2511,10 @@ export {
   applyQuickStateToParams,
   applyQuickStateToPhase0Params,
   assertPhase0SourceProbeWithinCaps,
+  bakeColorOnly,
   benchmarkMarkdownTableHeader,
   buildBenchmarkRow,
+  buildLookParamOverrides,
   buildOpticalParamPatch,
   buildPhase0ExportRequest,
   cameraOpticsSchema,
@@ -2180,12 +2529,14 @@ export {
   createIosPhase0SerializableLut,
   createPhase0ProjectState,
   deserializeCubeLutData,
+  diagonalMaxDelta,
   filmLabDepthTrackSchema,
   filmLabParamsSchema,
   filmLookGradeDefaultProps,
   filmLookGradeInputSchema,
   filmLookSpikeDefaultProps,
   filmLookSpikeInputSchema,
+  findCreativePack01Look,
   findMatchingPreset,
   formatBenchmarkRow,
   getIosPhase0SourceCapViolations,
@@ -2209,6 +2560,8 @@ export {
   iosPhase0SourceKindSchema,
   iosPhase0ThermalStateSchema,
   lookIdForPreset,
+  makeCreativeCube,
+  makeIdentityCube,
   mergePhase0Params,
   nearestHueDegreesToDirection,
   packCubeLutToFloatRgbaGrid,
@@ -2218,9 +2571,11 @@ export {
   phase0ProjectLutSchema,
   phase0ProjectSchema,
   phase0QuickStateSchema,
+  pickBakeColorParams,
   pickIosPhase0Params,
   pickPhase0Params,
   quickStateSchema,
   recommendOpticalFinish,
+  serializeCreativeCubeToText,
   serializeCubeLut
 };

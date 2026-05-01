@@ -1,10 +1,12 @@
 import AVFoundation
+import CoreGraphics
 import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
 final class SourceProbeService {
     private let assumedDiagonalFovDeg = 70.0
+    private static let toneProbeLongEdge = 96
 
     func probeSource(at url: URL, fallback: SourceInfoDTO?) throws -> SourceProbeDTO {
         let filename = fallback?.filename ?? url.lastPathComponent
@@ -59,6 +61,7 @@ final class SourceProbeService {
 
         let width = properties[kCGImagePropertyPixelWidth] as? Int
         let height = properties[kCGImagePropertyPixelHeight] as? Int
+        let sourceToneDescriptor = Self.imageToneDescriptor(at: url)
 
         return SourceProbeDTO(
             uri: url.absoluteString,
@@ -70,7 +73,8 @@ final class SourceProbeService {
             durationSec: nil,
             fileSizeBytes: fileSizeBytes,
             codec: nil,
-            frameRate: nil
+            frameRate: nil,
+            sourceToneDescriptor: sourceToneDescriptor
         )
     }
 
@@ -115,6 +119,10 @@ final class SourceProbeService {
             displayWidth: width,
             displayHeight: height
         )
+        let sourceToneDescriptor = Self.videoToneDescriptor(
+            asset: asset,
+            durationSec: durationSec
+        )
 
         return SourceProbeDTO(
             uri: url.absoluteString,
@@ -131,8 +139,164 @@ final class SourceProbeService {
             logTransferFunction: sourceVideoMetadata.logTransferFunction,
             inputTransformPolicy: sourceVideoMetadata.inputTransformPolicy,
             cameraOptics: cameraOptics,
-            sourceVideoMetadata: sourceVideoMetadata
+            sourceVideoMetadata: sourceVideoMetadata,
+            sourceToneDescriptor: sourceToneDescriptor
         )
+    }
+
+    // MARK: - Lightweight source tone descriptor
+
+    private static func imageToneDescriptor(at url: URL) -> FilmtoneSourceToneDescriptor? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
+            return nil
+        }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: toneProbeLongEdge,
+        ]
+        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+            return nil
+        }
+        return toneDescriptor(from: image)
+    }
+
+    private static func videoToneDescriptor(
+        asset: AVAsset,
+        durationSec: Double
+    ) -> FilmtoneSourceToneDescriptor? {
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: toneProbeLongEdge, height: toneProbeLongEdge)
+        generator.requestedTimeToleranceBefore = .positiveInfinity
+        generator.requestedTimeToleranceAfter = .positiveInfinity
+
+        let sampleSecond: Double
+        if durationSec.isFinite && durationSec > 0 {
+            sampleSecond = min(max(durationSec * 0.5, 0), durationSec)
+        } else {
+            sampleSecond = 0
+        }
+
+        guard let image = try? generator.copyCGImage(
+            at: CMTime(seconds: sampleSecond, preferredTimescale: 600),
+            actualTime: nil
+        ) else {
+            return nil
+        }
+        return toneDescriptor(from: image)
+    }
+
+    private static func toneDescriptor(from image: CGImage) -> FilmtoneSourceToneDescriptor? {
+        let width = image.width
+        let height = image.height
+        guard width > 0, height > 0 else {
+            return nil
+        }
+
+        let bytesPerPixel = 4
+        let bytesPerRow = width * bytesPerPixel
+        var pixels = [UInt8](repeating: 0, count: height * bytesPerRow)
+        let bitmapInfo = CGBitmapInfo(rawValue:
+            CGImageAlphaInfo.premultipliedLast.rawValue |
+            CGBitmapInfo.byteOrder32Big.rawValue
+        )
+
+        let didDraw = pixels.withUnsafeMutableBytes { rawBuffer -> Bool in
+            guard
+                let baseAddress = rawBuffer.baseAddress,
+                let context = CGContext(
+                    data: baseAddress,
+                    width: width,
+                    height: height,
+                    bitsPerComponent: 8,
+                    bytesPerRow: bytesPerRow,
+                    space: CGColorSpaceCreateDeviceRGB(),
+                    bitmapInfo: bitmapInfo.rawValue
+                )
+            else {
+                return false
+            }
+            context.interpolationQuality = .low
+            context.setBlendMode(.copy)
+            context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+            return true
+        }
+
+        guard didDraw else {
+            return nil
+        }
+
+        var lumas: [Double] = []
+        lumas.reserveCapacity(width * height)
+        var shadowCount = 0
+        var highlightCount = 0
+        var lowMidCount = 0
+        var saturationSum = 0.0
+
+        for offset in stride(from: 0, to: pixels.count, by: bytesPerPixel) {
+            let alpha = Double(pixels[offset + 3]) / 255.0
+            guard alpha > 0.001 else {
+                continue
+            }
+
+            let premultiplyScale = alpha < 1 ? 1.0 / alpha : 1.0
+            let red = min(1.0, Double(pixels[offset]) / 255.0 * premultiplyScale)
+            let green = min(1.0, Double(pixels[offset + 1]) / 255.0 * premultiplyScale)
+            let blue = min(1.0, Double(pixels[offset + 2]) / 255.0 * premultiplyScale)
+            let luma = 0.2126 * red + 0.7152 * green + 0.0722 * blue
+            let maxChannel = max(red, green, blue)
+            let minChannel = min(red, green, blue)
+            let saturation = maxChannel > 0 ? (maxChannel - minChannel) / maxChannel : 0
+
+            lumas.append(luma)
+            saturationSum += saturation
+            if luma < 0.12 {
+                shadowCount += 1
+            }
+            if luma > 0.78 {
+                highlightCount += 1
+            }
+            if luma < 0.28 {
+                lowMidCount += 1
+            }
+        }
+
+        guard !lumas.isEmpty else {
+            return nil
+        }
+
+        lumas.sort()
+        let sampleCount = Double(lumas.count)
+        let lumaP05 = percentile(lumas, 0.05)
+        let lumaP50 = percentile(lumas, 0.50)
+        let lumaP95 = percentile(lumas, 0.95)
+
+        return FilmtoneSourceToneDescriptor(
+            lumaP05: lumaP05,
+            lumaP50: lumaP50,
+            lumaP95: lumaP95,
+            lumaRangeP05P95: max(0, lumaP95 - lumaP05),
+            shadowCoverage: Double(shadowCount) / sampleCount,
+            highlightCoverage: Double(highlightCount) / sampleCount,
+            lowMidCoverage: Double(lowMidCount) / sampleCount,
+            saturationMean: saturationSum / sampleCount
+        )
+    }
+
+    private static func percentile(_ sortedValues: [Double], _ fraction: Double) -> Double {
+        guard !sortedValues.isEmpty else {
+            return 0
+        }
+        let clampedFraction = max(0, min(1, fraction))
+        let position = clampedFraction * Double(sortedValues.count - 1)
+        let lowerIndex = Int(floor(position))
+        let upperIndex = Int(ceil(position))
+        if lowerIndex == upperIndex {
+            return sortedValues[lowerIndex]
+        }
+        let blend = position - Double(lowerIndex)
+        return sortedValues[lowerIndex] * (1 - blend) + sortedValues[upperIndex] * blend
     }
 
     // MARK: - Source video metadata (T1 HDR + T4 display/timing)

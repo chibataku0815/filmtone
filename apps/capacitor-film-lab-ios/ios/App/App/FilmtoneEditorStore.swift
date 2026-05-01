@@ -1,4 +1,5 @@
 import AVFoundation
+import CryptoKit
 import Foundation
 import SwiftUI
 import UIKit
@@ -565,9 +566,9 @@ final class FilmtoneEditorStore: ObservableObject {
 
     var quickSummaryText: String {
         let entries: [(String, Double)] = [
-            (strings.quickFilmCharacter, project.quickState.filmCharacter),
-            (strings.quickEra, project.quickState.era),
-            (strings.quickDynamics, project.quickState.dynamics),
+            (strings.quickFilmCharacter, project.quickState.dynamics),
+            (strings.quickEra, -project.quickState.era),
+            (strings.quickDynamics, project.quickState.filmCharacter),
         ]
         .filter { abs($0.1) >= 0.01 }
 
@@ -1146,6 +1147,7 @@ final class FilmtoneEditorStore: ObservableObject {
         do {
             let entry = try await libraryStore.loadLook(id: id)
             var resolvedCreativeLut: ParsedCubeLutDTO?
+            var creativePack01Adaptation: FilmtoneCreativePack01Adaptation.Resolved?
             var lutMissingForApply = false
 
             switch entry.creativeLut {
@@ -1170,6 +1172,28 @@ final class FilmtoneEditorStore: ObservableObject {
                     data: lut.data,
                     intensity: FilmtonePhase0Math.clampLutIntensity(intensity)
                 )
+            case .bundled(let slug, let filename, let pinnedSha256, let intensity):
+                // v1.4 Creative LUT Pack 01: resolve from Bundle.main under
+                // `Resources/CreativeLuts/`. fail-closed — if the resource is
+                // missing or its SHA-256 does not match the pinned value, we
+                // surface the same `lutMissingForApply` toast as for a deleted
+                // library entry rather than silently degrading
+                // (`feedback_no_fallback_bug_hotbed`).
+                if let resolved = FilmtoneEditorStore.loadBundledCreativeLut(
+                    slug: slug,
+                    filename: filename,
+                    pinnedSha256: pinnedSha256,
+                    intensity: intensity,
+                    packId: FilmtoneBuiltInCatalog.creativePack01Id
+                ) {
+                    resolvedCreativeLut = resolved
+                    creativePack01Adaptation = FilmtoneCreativePack01Adaptation.resolve(
+                        slug: slug,
+                        descriptor: probe?.sourceToneDescriptor
+                    )
+                } else {
+                    lutMissingForApply = true
+                }
             case .none:
                 resolvedCreativeLut = nil
             }
@@ -1182,8 +1206,18 @@ final class FilmtoneEditorStore: ObservableObject {
                 state.presetVersion = entry.presetVersion
                 state.strength = FilmtonePhase0Math.clampStrength(entry.strength)
                 state.quickState = entry.quickState.clamped()
-                state.paramOverrides = entry.paramOverrides
-                state.creativeLut = resolvedCreativeLut
+                var paramOverrides = entry.paramOverrides
+                if let creativePack01Adaptation {
+                    for (key, value) in creativePack01Adaptation.paramOverrides.values {
+                        paramOverrides.values[key] = value
+                    }
+                }
+                state.paramOverrides = paramOverrides
+                if let creativePack01Adaptation, let resolvedCreativeLut {
+                    state.creativeLut = resolvedCreativeLut.withIntensity(creativePack01Adaptation.intensity)
+                } else {
+                    state.creativeLut = resolvedCreativeLut
+                }
                 // Note: state.inputLut is intentionally untouched — the look
                 // is source-independent. See applySavedLook docs above.
             }
@@ -1202,6 +1236,54 @@ final class FilmtoneEditorStore: ObservableObject {
         } catch {
             self.error = strings.userMessage(for: error, context: .importCreativeLut)
         }
+    }
+
+    /// Resolve a `CreativeLutBinding.bundled` payload from the app bundle
+    /// under `Resources/CreativeLuts/`. The bundled cube's pinned SHA-256
+    /// (over the raw `.cube` file bytes — see
+    /// `scripts/build-creative-luts.ts`) is verified against the catalog
+    /// entry; mismatch returns nil (caller surfaces `lutMissingForApply`).
+    /// Returns a `ParsedCubeLutDTO` carrying the slug + packId provenance
+    /// so downstream `transportLut` can stamp the sidecar.
+    static func loadBundledCreativeLut(
+        slug: String,
+        filename: String,
+        pinnedSha256: String,
+        intensity: Double,
+        packId: String
+    ) -> ParsedCubeLutDTO? {
+        guard let url = Bundle.main.url(
+            forResource: filename,
+            withExtension: nil,
+            subdirectory: "CreativeLuts"
+        ) else {
+            return nil
+        }
+        guard let fileData = try? Data(contentsOf: url) else {
+            return nil
+        }
+        let digest = SHA256.hash(data: fileData)
+        let actualHex = digest.map { String(format: "%02x", $0) }.joined()
+        guard actualHex == pinnedSha256.lowercased() else {
+            return nil
+        }
+        guard let text = String(data: fileData, encoding: .utf8) else {
+            return nil
+        }
+        let parsed: ParsedCubeLutDTO
+        do {
+            parsed = try FilmtoneCubeParser.parse(text: text, defaultTitle: filename)
+        } catch {
+            return nil
+        }
+        return ParsedCubeLutDTO(
+            title: parsed.title,
+            size: parsed.size,
+            data: parsed.data,
+            intensity: FilmtonePhase0Math.clampLutIntensity(intensity),
+            bundledSlug: slug,
+            bundledPackId: packId
+        )
     }
 
     func renameSavedLook(id: UUID, name: String) async {
@@ -1948,7 +2030,9 @@ private extension ParsedCubeLutDTO {
             title: title,
             size: size,
             data: data,
-            intensity: FilmtonePhase0Math.clampLutIntensity(intensity)
+            intensity: FilmtonePhase0Math.clampLutIntensity(intensity),
+            bundledSlug: bundledSlug,
+            bundledPackId: bundledPackId
         )
     }
 }

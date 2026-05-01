@@ -3,7 +3,7 @@ import { z } from 'zod';
 /**
  * Film Lab のグレード数値パラメータ定義（ブラウザ・Remotion 共通の単一の真実）
  */
-declare const PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "grainIntensity", "grainRadialMix", "grainSize", "vignette", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "depthMistGain", "depthGlowGain", "depthRayAngleGamma", "depthRayAngleInnerThreshold", "depthMistRayAngleGain", "depthBloomRayAngleGain", "depthHalationRayAngleGain", "depthMistFieldPsfGain", "depthBloomFieldPsfGain", "depthHalationFieldPsfGain", "depthMistFieldPsfRadiusPx", "depthBloomFieldPsfRadiusPx", "depthHalationFieldPsfRadiusPx", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "fade", "highlights", "shadows", "shadowTone", "highlightTone", "shadowHue", "highlightHue", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "motionBlurAmount", "shutterAngle", "trailIntensity", "dustAmount", "scratchAmount", "shaftIntensity", "shaftDecay", "shaftOriginX", "shaftOriginY", "crossFilterStrength", "crossFilterSpikes", "crossFilterAngle", "crossFilterLength", "crossFilterThreshold", "crossFilterChromatic", "crossFilterSizeLimit", "crossFilterRandomness", "crossFilterHardMode", "crossFilterMinSpacing", "crossFilterDepthGain", "crossFilterAngleGain", "crossFilterAngleGamma", "crossFilterAngleInnerThreshold", "crossFilterEdgeLengthGain", "crossFilterEdgeStrengthGain"];
+declare const PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "grainIntensity", "grainRadialMix", "grainSize", "vignette", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "depthMistGain", "depthGlowGain", "depthRayAngleGamma", "depthRayAngleInnerThreshold", "depthMistRayAngleGain", "depthBloomRayAngleGain", "depthHalationRayAngleGain", "depthMistFieldPsfGain", "depthBloomFieldPsfGain", "depthHalationFieldPsfGain", "depthMistFieldPsfRadiusPx", "depthBloomFieldPsfRadiusPx", "depthHalationFieldPsfRadiusPx", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "fade", "highlights", "shadows", "shadowTone", "highlightTone", "shadowHue", "highlightHue", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "motionBlurAmount", "shutterAngle", "trailIntensity", "dustAmount", "scratchAmount", "shaftIntensity", "shaftDecay", "shaftOriginX", "shaftOriginY", "crossFilterStrength", "crossFilterSpikes", "crossFilterAngle", "crossFilterLength", "crossFilterThreshold", "crossFilterChromatic", "crossFilterSizeLimit", "crossFilterRandomness", "crossFilterHardMode", "crossFilterMinSpacing", "crossFilterDepthGain", "crossFilterAngleGain", "crossFilterAngleGamma", "crossFilterAngleInnerThreshold", "crossFilterEdgeLengthGain", "crossFilterEdgeStrengthGain", "haloPrismStrength", "haloPrismRadius", "haloPrismWidth", "haloPrismChromatic", "haloPrismThreshold", "haloPrismSplit", "haloPrismAngle", "haloPrismSourceReactivity"];
 type ParamKey = (typeof PARAM_KEYS)[number];
 declare const FILM_GRAIN_INTENSITY_MAX = 0.1;
 declare function clampGrainIntensity(value: number): number;
@@ -127,6 +127,22 @@ interface Params {
     crossFilterEdgeLengthGain: number;
     /** Cross filter streak strength field modulation（0=uniform、1=max edge strength boost）。 */
     crossFilterEdgeStrengthGain: number;
+    /** Halo Prism strength（0=off、1=max）。 */
+    haloPrismStrength: number;
+    /** Halo Prism ring radius（0=small、1=large）。 */
+    haloPrismRadius: number;
+    /** Halo Prism ring width（0=narrow、1=wide）。 */
+    haloPrismWidth: number;
+    /** Halo Prism chromatic edge separation（0=white、1=strong spectral edges）。 */
+    haloPrismChromatic: number;
+    /** Halo Prism compact-source threshold（0=easy trigger、1=bright points only）。 */
+    haloPrismThreshold: number;
+    /** Halo Prism partial-arc split amount（0=full ring、1=split/lower arcs）。 */
+    haloPrismSplit: number;
+    /** Halo Prism arc orientation in degrees。 */
+    haloPrismAngle: number;
+    /** Halo Prism source coupling（0=mostly procedural、1=source-reactive）。 */
+    haloPrismSourceReactivity: number;
 }
 declare function cloneParams(params: Params): Params;
 
@@ -566,6 +582,17 @@ interface SourceProbe extends SourceInfo {
     frameRate?: number;
     cameraOptics?: CameraOptics;
     sourceVideoMetadata?: SourceVideoMetadata;
+    sourceToneDescriptor?: SourceToneDescriptor;
+}
+interface SourceToneDescriptor {
+    lumaP05: number;
+    lumaP50: number;
+    lumaP95: number;
+    lumaRangeP05P95: number;
+    shadowCoverage: number;
+    highlightCoverage: number;
+    lowMidCoverage: number;
+    saturationMean: number;
 }
 type SourceColorClass = "sdr-bt709" | "hdr-pq" | "hdr-hlg" | "apple-log" | "apple-log2" | "wide-gamut-unknown" | "unsupported" | "unknown";
 type IosHdrPreparationStrategy = "none" | "core-image-tone-map-sdr" | "defer-visible-warning";
@@ -824,6 +851,14 @@ declare const filmLabParamsSchema: z.ZodObject<{
     crossFilterAngleInnerThreshold: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
     crossFilterEdgeLengthGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
     crossFilterEdgeStrengthGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    haloPrismStrength: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    haloPrismRadius: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    haloPrismWidth: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    haloPrismChromatic: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    haloPrismThreshold: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    haloPrismSplit: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    haloPrismAngle: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    haloPrismSourceReactivity: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
 }, z.core.$strip>;
 type FilmLabParamsValidated = z.infer<typeof filmLabParamsSchema>;
 /**
@@ -936,6 +971,14 @@ declare const filmLookGradeInputSchema: z.ZodObject<{
         crossFilterAngleInnerThreshold: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         crossFilterEdgeLengthGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         crossFilterEdgeStrengthGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        haloPrismStrength: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        haloPrismRadius: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        haloPrismWidth: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        haloPrismChromatic: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        haloPrismThreshold: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        haloPrismSplit: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        haloPrismAngle: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        haloPrismSourceReactivity: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
     }, z.core.$strip>;
     depthTrack: z.ZodOptional<z.ZodObject<{
         kind: z.ZodLiteral<"frameSequence">;
@@ -1732,4 +1775,198 @@ type IosPhase0LocalProject = z.infer<typeof iosPhase0LocalProjectSchema>;
 declare function pickIosPhase0Params(params: IosPhase0Params): IosPhase0Params;
 declare function getIosPhase0SourceCapViolations(source: Pick<IosPhase0SourceInfo, "width" | "height" | "durationSec" | "fileSizeBytes">): string[];
 
-export { type BehaviorProfile, type BenchmarkRow, type BenchmarkRowInput, type BenchmarkSaveResult, type BenchmarkVisualFloor, type CameraOptics, type CameraOpticsSource, type CubeLUT, DEFAULT_QUICK_STATE, FILMTONE_DEFAULT_BASE_PRESET, FILMTONE_SOFT_FINISH_PATCH, FILM_GRAIN_INTENSITY_MAX, FILM_LAB_DEFAULT_HIGHLIGHT_HUE, FILM_LAB_DEFAULT_SHADOW_HUE, type FilmLabDepthTrackInput, type FilmLabParamsValidated, type FilmLookGradeInputProps, type FilmLookSpikeInputProps, IOS_PHASE0_BENCHMARK_SLOTS, IOS_PHASE0_OUTPUT_CODEC, IOS_PHASE0_OUTPUT_FPS, IOS_PHASE0_OUTPUT_LONG_EDGE, IOS_PHASE0_PARAM_KEYS, IOS_PHASE0_PRESET_IDS, IOS_PHASE0_SCHEMA_VERSION, IOS_PHASE0_SOURCE_CAPS, IOS_PHASE0_SOURCE_DURATION_CAP_SEC, IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES, IOS_PHASE0_SOURCE_LONG_EDGE_CAP, type IosHdrPreparationPolicy, type IosHdrPreparationStrategy, type IosPhase0AssetRef, type IosPhase0BenchmarkRecord, type IosPhase0BenchmarkSlot, type IosPhase0ExportPayload, type IosPhase0ExportResult, type IosPhase0ExportSettings, type IosPhase0LocalProject, type IosPhase0ParamKey, type IosPhase0Params, type IosPhase0PickedLutFile, type IosPhase0PickedSource, type IosPhase0SerializableLut, type IosPhase0SourceInfo, type IosPhase0SourceKind, LEGACY_HIGHLIGHT_TONE_MAGNITUDE, LEGACY_SHADOW_TONE_MAGNITUDE, LOOK_ID_BY_PRESET, type OpticalAnalyzerProvider, type OpticalFamily, type OpticalRecipeId, type OpticalRecommendationV1, PARAM_KEYS, PHASE0_APPROX_SOURCE_LONG_EDGE_MAX, PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES, PHASE0_BENCHMARK_GATES, PHASE0_MAX_SOURCE_DURATION_SEC, PHASE0_OUTPUT_PROFILE, PHASE0_PARAM_KEYS, PHASE0_PRESET_DEFAULT, PHASE0_PRESET_STRENGTH_DEFAULT, PHASE0_RGB_SHIFT_MAX, PHASE0_SCHEMA_VERSION, PRESETS, PRESET_BUTTONS, PRESET_VERSION, type PackedCubeLut2D, type ParamKey, type Params, type ParsedBenchmarkRow, type ParsedCubeLut, type Phase0ExportBenchmarkRecord, type Phase0ExportProgress, type Phase0ExportRequest, type Phase0ExportResult, type Phase0ExportStage, type Phase0OutputProfile, type Phase0ParamKey, type Phase0Params, type Phase0PreviewRenderResult, type Phase0ProjectLut, type Phase0ProjectState, type Phase0QuickTarget, type Phase0RenderMode, type PickedLutFile, type PresetName, QUICK_AXIS_DEFAULT_RANGE, QUICK_AXIS_IDS, type QuickAxisId, type QuickState, type SceneAnalysisState, type SceneDescriptorV1, type SourceColorClass, type SourceColorMetadata, type SourceDisplayGeometry, type SourceInfo, type SourceKind, type SourceProbe, type SourceVideoMetadata, type SourceVideoTimingMetadata, applyQuickStateToParams, applyQuickStateToPhase0Params, assertPhase0SourceProbeWithinCaps, benchmarkMarkdownTableHeader, buildBenchmarkRow, buildOpticalParamPatch, buildPhase0ExportRequest, cameraOpticsSchema, chromaUnitFromHueDegrees, clampGrainIntensity, cloneParams, coerceQuickState, createDefaultFilmLookGradeProps, createDefaultPhase0Params, createFilmtoneDefaultParams, createFilmtoneDefaultPhase0Params, createIosPhase0SerializableLut, createPhase0ProjectState, deserializeCubeLutData, filmLabDepthTrackSchema, filmLabParamsSchema, filmLookGradeDefaultProps, filmLookGradeInputSchema, filmLookSpikeDefaultProps, filmLookSpikeInputSchema, findMatchingPreset, formatBenchmarkRow, getIosPhase0SourceCapViolations, getPhase0SourceCapViolations, gradeMatchesPreset, halationHueToHex, hslToRgb01, interpolatePhase0PresetParams, iosPhase0AssetRefSchema, iosPhase0BenchmarkRecordSchema, iosPhase0ExportPayloadSchema, iosPhase0ExportResultSchema, iosPhase0ExportSettingsSchema, iosPhase0LocalProjectSchema, iosPhase0ParamsSchema, iosPhase0PickedLutFileSchema, iosPhase0PickedSourceSchema, iosPhase0PresetIdSchema, iosPhase0SerializableLutSchema, iosPhase0SourceInfoSchema, iosPhase0SourceKindSchema, iosPhase0ThermalStateSchema, lookIdForPreset, mergePhase0Params, nearestHueDegreesToDirection, packCubeLutToFloatRgbaGrid, parseBenchmarkRow, parseCube, phase0ParamsSchema, phase0ProjectLutSchema, phase0ProjectSchema, phase0QuickStateSchema, pickIosPhase0Params, pickPhase0Params, quickStateSchema, recommendOpticalFinish, serializeCubeLut };
+/**
+ * Color-only baker for Filmtone iOS Creative LUT Pack v1.4.
+ *
+ * Implements Stages 2 (baseGrade), 3 (filmCompression), and 9 (printStage) of
+ * the Filmtone iOS export pipeline as a pure function on a single Rec.709 RGB
+ * triple. 12 color-only ops total: exposure / contrast / saturation /
+ * temperature / tint / fade / compressionAmount / compressionRange /
+ * printContrast / cyan / magenta / yellow.
+ *
+ * This TS implementation is the canonical reference for the Swift port shipped
+ * via the v1.4 in-app "Look → .cube export" lane. Both must produce
+ * byte-identical output at Float32 precision; that contract is enforced by
+ * Tier 1 fixtures in Phase 2 PR.
+ *
+ * Direct float64 port of:
+ *   apps/capacitor-film-lab-ios/ios/App/App/FilmtoneExportSidecarBuilder.swift
+ *     applyBaseGrade / applyFilmCompression / applyPrintStage
+ * which is itself the CPU equivalent of the GPU stages in
+ * `FilmtoneExportSession.swift`. Keeping this file aligned with the Swift
+ * sidecar baker is the SSOT contract.
+ */
+
+/** RGB triple. All channels in linear-display Rec.709 [0, 1] domain. */
+interface RGB {
+    r: number;
+    g: number;
+    b: number;
+}
+/**
+ * Pull only the 12 color-only fields from a full `Phase0Params`. Used to make
+ * the baker contract independent from spatial fields (halation / bloom /
+ * grain / vignette) that cannot be expressed in a 3D color cube.
+ */
+interface BakeColorParams {
+    exposure: number;
+    contrast: number;
+    saturation: number;
+    temperature: number;
+    tint: number;
+    fade: number;
+    compressionAmount: number;
+    compressionRange: number;
+    printContrast: number;
+    cyan: number;
+    magenta: number;
+    yellow: number;
+}
+declare const BAKE_COLOR_PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "fade", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow"];
+/**
+ * Neutral (identity) color params. Baking with these yields the identity cube
+ * within float64 precision. Used by Phase 1 placeholder cubes and as the test
+ * baseline.
+ */
+declare const BAKE_COLOR_IDENTITY: BakeColorParams;
+declare function pickBakeColorParams(params: Pick<Phase0Params, keyof BakeColorParams>): BakeColorParams;
+/**
+ * Compose Stages 2 → 3 → 9 on a single Rec.709 RGB triple. Output stays in
+ * Rec.709 [0, 1].
+ *
+ * Note: the iOS pipeline runs Stage 9 (printStage) AFTER the creative LUT
+ * stage at runtime. To represent the entire color expression in a single
+ * cube, the baker composes all three stages here. When a baked cube is
+ * applied as a creative LUT at runtime, the host preset's 12 color params
+ * MUST be neutralized via paramOverrides so the look does not double-apply.
+ * That neutralization contract is enforced by `creative-pack-01.ts` per Look
+ * (and validated by Phase 2 fixture comparisons).
+ */
+declare function bakeColorOnly(rgb: RGB, params: BakeColorParams): RGB;
+
+/**
+ * 3D LUT cube grid walker. Generates a `size³` cube by sampling the input
+ * domain `[0, 1]³` on a uniform grid and running each sample through a
+ * pure transform function (typically `bakeColorOnly`).
+ *
+ * Layout matches the Adobe `.cube` standard and `cube-parser.ts`:
+ *   index `i = b * size² + g * size + r` for grid coordinate `(r, g, b)`,
+ *   i.e. R varies fastest, then G, then B.
+ */
+
+declare const CREATIVE_CUBE_DEFAULT_SIZE: 33;
+interface CreativeCube {
+    size: number;
+    /** RGB triples packed `[r0, g0, b0, r1, g1, b1, ...]`, length = `size³ × 3`. */
+    data: Float32Array;
+}
+/**
+ * Run the baker over a `size × size × size` grid in Rec.709 [0, 1] and
+ * return the resulting cube. R varies fastest in the output index.
+ *
+ * `transform` defaults to `bakeColorOnly` so the baker is the conventional
+ * call-site; pass an alternate function only for tests / experiments.
+ */
+declare function makeCreativeCube(input: {
+    params: BakeColorParams;
+    size?: number;
+    transform?: (rgb: RGB, params: BakeColorParams) => RGB;
+}): CreativeCube;
+/** Convenience: identity cube (no transform). Used for Phase 1 placeholders. */
+declare function makeIdentityCube(size?: number): CreativeCube;
+/**
+ * Maximum |output - input| along the grid diagonal (R = G = B). Cheap
+ * pre-screen for "is this cube near identity?" used by tests and the
+ * orchestrator's Lipschitz pre-check.
+ */
+declare function diagonalMaxDelta(cube: CreativeCube): number;
+
+/**
+ * Adobe `.cube` text serializer. Produces output that round-trips through
+ * `cube-parser.ts` byte-identically (modulo float text precision). Used by
+ * the v1.4 Creative LUT Pack baker to emit bundled cube assets.
+ *
+ * Format reference: Adobe Cube LUT Specification 1.0 (2013).
+ */
+
+interface SerializeCubeOptions {
+    /** Single-line title comment emitted as `TITLE "<value>"`. */
+    title: string;
+    /** Decimal places per channel value. Default 6 (matches IWLTBAP / Lattice). */
+    precision?: number;
+    /** Trailing comment lines emitted before the data (each prefixed by `# `). */
+    comments?: string[];
+}
+/**
+ * Serialize a `CreativeCube` to Adobe `.cube` text. Emits the header
+ * (TITLE / LUT_3D_SIZE / DOMAIN_MIN / DOMAIN_MAX) followed by R-fastest
+ * RGB triples, one per line. Trailing newline included.
+ */
+declare function serializeCreativeCubeToText(cube: CreativeCube, options: SerializeCubeOptions): string;
+
+/**
+ * Filmtone iOS Creative LUT Pack 01 — definitions.
+ *
+ * Each Look in this pack consists of:
+ *   - `slug`: stable filename slug (kebab-case). Used as both the bundled
+ *     resource filename stem and the `bundledSlug` in sidecar provenance.
+ *   - `englishName`: catalog default; iOS localizes via `FilmtoneStrings`.
+ *   - `canonicalUUID`: stable UUID v4 in the `FB1A0001-0000-4000-8000-...`
+ *     namespace. Mirrors the Swift `BuiltInLookUUID` enum so a single id is
+ *     shared across TS / Swift / sidecar.
+ *   - `basePreset`: one of the 4 locked iOS preset names. The Look chip's
+ *     non-color expression (halation / bloom / grain / vignette / glow trio)
+ *     comes from this preset's spatial fields at runtime. Locked to the iOS
+ *     preset whitelist so this pack does not require regenerating
+ *     `FilmtonePhase0Generated.swift`.
+ *   - `colorParams`: 12-op color parameters baked INTO the cube at build
+ *     time. These are intentionally NOT applied at runtime — `paramOverrides`
+ *     neutralizes them plus the runtime v2 split-tone fields so the cube
+ *     carries the entire color expression. (See `bake-color-only.ts` doc on
+ *     the non-double-apply contract.)
+ *   - `paramOverrides`: spatial / glow overrides applied AT RUNTIME on top
+ *     of `basePreset`. The 12 color-op fields and v2 split-tone strengths
+ *     here are pinned to neutral so the runtime path leaves color to the cube.
+ *   - `strength`: default LUT intensity for `applyCreativeLutStage` — the
+ *     user can still adjust via the existing strength slider.
+ *
+ * The bundled cubes carry color expression; runtime `paramOverrides` carry
+ * Filmtone's optical expression while keeping the color-only fields neutral.
+ */
+
+declare const CREATIVE_PACK_01_ID: "creative-pack-01";
+declare const CREATIVE_PACK_01_BAKER_VERSION: "1.1.0-palermo-reference";
+declare const CREATIVE_PACK_01_CUBE_SIZE: 65;
+interface CreativePackLook {
+    readonly slug: string;
+    readonly englishName: string;
+    readonly canonicalUUID: string;
+    readonly basePreset: FilmtoneIosPresetName;
+    readonly colorParams: BakeColorParams;
+    readonly paramOverrides: Partial<Record<Phase0ParamKey, number>>;
+    readonly strength: number;
+    readonly sourceCubePath?: string;
+    readonly sourceCubeTransform?: "cold-green-density-v1";
+}
+/**
+ * Build the runtime `paramOverrides` patch for a Look. Pins all 12 baked
+ * color-op fields plus the v2 split-tone strengths to neutral to honor the
+ * non-double-apply contract; merges any spatial overrides (halation / bloom /
+ * grain / etc) the Look declares.
+ */
+declare function buildLookParamOverrides(spatial: Partial<Record<Phase0ParamKey, number>>): Partial<Record<Phase0ParamKey, number>>;
+/**
+ * Pack 01 Look catalog. Current CD direction is a small set of strong
+ * Palermo-derived baselines, not a weak multi-look sampler. Entries bundle
+ * Palermo 65³ cubes directly so iteration starts from measured LUT behavior
+ * instead of small param nudges.
+ *
+ * `colorParams` remains identity because source-cube entries do not bake from
+ * Filmtone's 12-op baker. Runtime `paramOverrides` still neutralizes the host
+ * color ops so the bundled cube is the sole color expression, while Filmtone's
+ * optical controls stay available for the next tuning pass.
+ */
+declare const CREATIVE_PACK_01_LOOKS: readonly CreativePackLook[];
+declare function findCreativePack01Look(slug: string): CreativePackLook | undefined;
+
+export { BAKE_COLOR_IDENTITY, BAKE_COLOR_PARAM_KEYS, type BakeColorParams, type BehaviorProfile, type BenchmarkRow, type BenchmarkRowInput, type BenchmarkSaveResult, type BenchmarkVisualFloor, CREATIVE_CUBE_DEFAULT_SIZE, CREATIVE_PACK_01_BAKER_VERSION, CREATIVE_PACK_01_CUBE_SIZE, CREATIVE_PACK_01_ID, CREATIVE_PACK_01_LOOKS, type CameraOptics, type CameraOpticsSource, type CreativeCube, type CreativePackLook, type CubeLUT, DEFAULT_QUICK_STATE, FILMTONE_DEFAULT_BASE_PRESET, FILMTONE_SOFT_FINISH_PATCH, FILM_GRAIN_INTENSITY_MAX, FILM_LAB_DEFAULT_HIGHLIGHT_HUE, FILM_LAB_DEFAULT_SHADOW_HUE, type FilmLabDepthTrackInput, type FilmLabParamsValidated, type FilmLookGradeInputProps, type FilmLookSpikeInputProps, IOS_PHASE0_BENCHMARK_SLOTS, IOS_PHASE0_OUTPUT_CODEC, IOS_PHASE0_OUTPUT_FPS, IOS_PHASE0_OUTPUT_LONG_EDGE, IOS_PHASE0_PARAM_KEYS, IOS_PHASE0_PRESET_IDS, IOS_PHASE0_SCHEMA_VERSION, IOS_PHASE0_SOURCE_CAPS, IOS_PHASE0_SOURCE_DURATION_CAP_SEC, IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES, IOS_PHASE0_SOURCE_LONG_EDGE_CAP, type IosHdrPreparationPolicy, type IosHdrPreparationStrategy, type IosPhase0AssetRef, type IosPhase0BenchmarkRecord, type IosPhase0BenchmarkSlot, type IosPhase0ExportPayload, type IosPhase0ExportResult, type IosPhase0ExportSettings, type IosPhase0LocalProject, type IosPhase0ParamKey, type IosPhase0Params, type IosPhase0PickedLutFile, type IosPhase0PickedSource, type IosPhase0SerializableLut, type IosPhase0SourceInfo, type IosPhase0SourceKind, LEGACY_HIGHLIGHT_TONE_MAGNITUDE, LEGACY_SHADOW_TONE_MAGNITUDE, LOOK_ID_BY_PRESET, type OpticalAnalyzerProvider, type OpticalFamily, type OpticalRecipeId, type OpticalRecommendationV1, PARAM_KEYS, PHASE0_APPROX_SOURCE_LONG_EDGE_MAX, PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES, PHASE0_BENCHMARK_GATES, PHASE0_MAX_SOURCE_DURATION_SEC, PHASE0_OUTPUT_PROFILE, PHASE0_PARAM_KEYS, PHASE0_PRESET_DEFAULT, PHASE0_PRESET_STRENGTH_DEFAULT, PHASE0_RGB_SHIFT_MAX, PHASE0_SCHEMA_VERSION, PRESETS, PRESET_BUTTONS, PRESET_VERSION, type PackedCubeLut2D, type ParamKey, type Params, type ParsedBenchmarkRow, type ParsedCubeLut, type Phase0ExportBenchmarkRecord, type Phase0ExportProgress, type Phase0ExportRequest, type Phase0ExportResult, type Phase0ExportStage, type Phase0OutputProfile, type Phase0ParamKey, type Phase0Params, type Phase0PreviewRenderResult, type Phase0ProjectLut, type Phase0ProjectState, type Phase0QuickTarget, type Phase0RenderMode, type PickedLutFile, type PresetName, QUICK_AXIS_DEFAULT_RANGE, QUICK_AXIS_IDS, type QuickAxisId, type QuickState, type RGB, type SceneAnalysisState, type SceneDescriptorV1, type SerializeCubeOptions, type SourceColorClass, type SourceColorMetadata, type SourceDisplayGeometry, type SourceInfo, type SourceKind, type SourceProbe, type SourceVideoMetadata, type SourceVideoTimingMetadata, applyQuickStateToParams, applyQuickStateToPhase0Params, assertPhase0SourceProbeWithinCaps, bakeColorOnly, benchmarkMarkdownTableHeader, buildBenchmarkRow, buildLookParamOverrides, buildOpticalParamPatch, buildPhase0ExportRequest, cameraOpticsSchema, chromaUnitFromHueDegrees, clampGrainIntensity, cloneParams, coerceQuickState, createDefaultFilmLookGradeProps, createDefaultPhase0Params, createFilmtoneDefaultParams, createFilmtoneDefaultPhase0Params, createIosPhase0SerializableLut, createPhase0ProjectState, deserializeCubeLutData, diagonalMaxDelta, filmLabDepthTrackSchema, filmLabParamsSchema, filmLookGradeDefaultProps, filmLookGradeInputSchema, filmLookSpikeDefaultProps, filmLookSpikeInputSchema, findCreativePack01Look, findMatchingPreset, formatBenchmarkRow, getIosPhase0SourceCapViolations, getPhase0SourceCapViolations, gradeMatchesPreset, halationHueToHex, hslToRgb01, interpolatePhase0PresetParams, iosPhase0AssetRefSchema, iosPhase0BenchmarkRecordSchema, iosPhase0ExportPayloadSchema, iosPhase0ExportResultSchema, iosPhase0ExportSettingsSchema, iosPhase0LocalProjectSchema, iosPhase0ParamsSchema, iosPhase0PickedLutFileSchema, iosPhase0PickedSourceSchema, iosPhase0PresetIdSchema, iosPhase0SerializableLutSchema, iosPhase0SourceInfoSchema, iosPhase0SourceKindSchema, iosPhase0ThermalStateSchema, lookIdForPreset, makeCreativeCube, makeIdentityCube, mergePhase0Params, nearestHueDegreesToDirection, packCubeLutToFloatRgbaGrid, parseBenchmarkRow, parseCube, phase0ParamsSchema, phase0ProjectLutSchema, phase0ProjectSchema, phase0QuickStateSchema, pickBakeColorParams, pickIosPhase0Params, pickPhase0Params, quickStateSchema, recommendOpticalFinish, serializeCreativeCubeToText, serializeCubeLut };

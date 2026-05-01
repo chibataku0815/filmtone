@@ -205,6 +205,17 @@ struct SourceVideoMetadataDTO: Codable {
     }
 }
 
+struct FilmtoneSourceToneDescriptor: Codable, Equatable {
+    let lumaP05: Double
+    let lumaP50: Double
+    let lumaP95: Double
+    let lumaRangeP05P95: Double
+    let shadowCoverage: Double
+    let highlightCoverage: Double
+    let lowMidCoverage: Double
+    let saturationMean: Double
+}
+
 struct SourceProbeDTO: Codable {
     let uri: String
     let filename: String
@@ -221,6 +232,7 @@ struct SourceProbeDTO: Codable {
     let inputTransformPolicy: SourceInputTransformPolicyDTO?
     let cameraOptics: CameraOpticsDTO?
     let sourceVideoMetadata: SourceVideoMetadataDTO?
+    let sourceToneDescriptor: FilmtoneSourceToneDescriptor?
 
     init(
         uri: String,
@@ -237,7 +249,8 @@ struct SourceProbeDTO: Codable {
         logTransferFunction: SourceLogTransferFunctionDTO? = nil,
         inputTransformPolicy: SourceInputTransformPolicyDTO? = nil,
         cameraOptics: CameraOpticsDTO? = nil,
-        sourceVideoMetadata: SourceVideoMetadataDTO? = nil
+        sourceVideoMetadata: SourceVideoMetadataDTO? = nil,
+        sourceToneDescriptor: FilmtoneSourceToneDescriptor? = nil
     ) {
         self.uri = uri
         self.filename = filename
@@ -254,6 +267,7 @@ struct SourceProbeDTO: Codable {
         self.inputTransformPolicy = inputTransformPolicy
         self.cameraOptics = cameraOptics
         self.sourceVideoMetadata = sourceVideoMetadata
+        self.sourceToneDescriptor = sourceToneDescriptor
     }
 }
 
@@ -314,12 +328,101 @@ struct ParsedCubeLutDTO: Codable {
     let size: Int
     let data: [Double]
     let intensity: Double
+    /// v1.4 Creative LUT Pack 01 provenance — set when this LUT was
+    /// resolved from a `CreativeLutBinding.bundled` entry. nil for
+    /// user-imported / library-loaded LUTs. Optional so legacy
+    /// callsites (and the wire bridge from pre-v1.4 web payloads)
+    /// stay decode-compatible.
+    let bundledSlug: String?
+    let bundledPackId: String?
+
+    init(
+        title: String,
+        size: Int,
+        data: [Double],
+        intensity: Double,
+        bundledSlug: String? = nil,
+        bundledPackId: String? = nil
+    ) {
+        self.title = title
+        self.size = size
+        self.data = data
+        self.intensity = intensity
+        self.bundledSlug = bundledSlug
+        self.bundledPackId = bundledPackId
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case title, size, data, intensity
+        case bundledSlug, bundledPackId
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.title = try c.decode(String.self, forKey: .title)
+        self.size = try c.decode(Int.self, forKey: .size)
+        self.data = try c.decode([Double].self, forKey: .data)
+        self.intensity = try c.decode(Double.self, forKey: .intensity)
+        self.bundledSlug = try c.decodeIfPresent(String.self, forKey: .bundledSlug)
+        self.bundledPackId = try c.decodeIfPresent(String.self, forKey: .bundledPackId)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(title, forKey: .title)
+        try c.encode(size, forKey: .size)
+        try c.encode(data, forKey: .data)
+        try c.encode(intensity, forKey: .intensity)
+        try c.encodeIfPresent(bundledSlug, forKey: .bundledSlug)
+        try c.encodeIfPresent(bundledPackId, forKey: .bundledPackId)
+    }
 }
 
 struct SerializableLutDTO: Codable {
     let size: Int
     let data: [Double]
     let intensity: Double
+    /// v1.4 Creative LUT Pack 01 provenance, mirrored from the source
+    /// `ParsedCubeLutDTO` via `transportLut`. Carried into the export
+    /// request and stamped onto the sidecar `creativeLut` ref.
+    let bundledSlug: String?
+    let bundledPackId: String?
+
+    init(
+        size: Int,
+        data: [Double],
+        intensity: Double,
+        bundledSlug: String? = nil,
+        bundledPackId: String? = nil
+    ) {
+        self.size = size
+        self.data = data
+        self.intensity = intensity
+        self.bundledSlug = bundledSlug
+        self.bundledPackId = bundledPackId
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case size, data, intensity, bundledSlug, bundledPackId
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.size = try c.decode(Int.self, forKey: .size)
+        self.data = try c.decode([Double].self, forKey: .data)
+        self.intensity = try c.decode(Double.self, forKey: .intensity)
+        self.bundledSlug = try c.decodeIfPresent(String.self, forKey: .bundledSlug)
+        self.bundledPackId = try c.decodeIfPresent(String.self, forKey: .bundledPackId)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(size, forKey: .size)
+        try c.encode(data, forKey: .data)
+        try c.encode(intensity, forKey: .intensity)
+        try c.encodeIfPresent(bundledSlug, forKey: .bundledSlug)
+        try c.encodeIfPresent(bundledPackId, forKey: .bundledPackId)
+    }
 }
 
 struct Phase0GradeDTO: Codable {
