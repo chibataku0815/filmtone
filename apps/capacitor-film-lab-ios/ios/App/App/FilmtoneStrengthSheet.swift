@@ -100,7 +100,8 @@ struct FilmtoneStrengthSheet: View {
                 Button(store.strings.doneLabel) {
                     onClose()
                 }
-                .buttonStyle(FilmtoneSheetPrimaryActionStyle())
+                .buttonStyle(.glassProminent)
+                .controlSize(.regular)
             }
         }
     }
@@ -1639,21 +1640,6 @@ private struct FilmtoneSliderRow: View {
                 .tint(Color.filmtoneAmber)
                 .accessibilityIdentifier(accessibilityIdentifier)
         }
-    }
-}
-
-struct FilmtoneSheetPrimaryActionStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.black)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
-                    .fill(Color.filmtoneAmber.opacity(configuration.isPressed ? 0.84 : 1))
-            )
-            .scaleEffect(configuration.isPressed ? 0.99 : 1)
     }
 }
 

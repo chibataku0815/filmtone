@@ -197,28 +197,6 @@ struct FilmtoneRootView: View {
         ZStack {
             Color.filmtoneBackground
 
-            RadialGradient(
-                colors: [
-                    Color.filmtoneAmber.opacity(0.20),
-                    Color.filmtoneAmber.opacity(0.05),
-                    .clear,
-                ],
-                center: .topLeading,
-                startRadius: 18,
-                endRadius: 360
-            )
-
-            RadialGradient(
-                colors: [
-                    Color.filmtoneAmber.opacity(0.10),
-                    Color.filmtoneAmber.opacity(0.02),
-                    .clear,
-                ],
-                center: .topTrailing,
-                startRadius: 24,
-                endRadius: 280
-            )
-
             LinearGradient(
                 colors: [
                     .clear,
@@ -1204,8 +1182,7 @@ private struct FilmtoneTopChrome: View {
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
                 }
-                .buttonStyle(.glass)
-                .tint(Color.filmtoneAmber)
+                .buttonStyle(.glassProminent)
                 .disabled(isActionDisabled)
             }
             .padding(.horizontal, 16)
@@ -1229,45 +1206,6 @@ private struct FilmtoneTopChromeTitle: View {
     }
 }
 
-struct FilmtoneChromeActionStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.black)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(
-                RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
-                    .fill(Color.filmtoneAmber.opacity(configuration.isPressed ? 0.84 : 1))
-            )
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-    }
-}
-
-struct FilmtoneTopBarActionStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(Color.filmtoneAmber)
-            .padding(.horizontal, 13)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
-                    .fill(.ultraThinMaterial)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
-                    .fill(Color.black.opacity(configuration.isPressed ? 0.26 : 0.18))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
-                    .stroke(Color.filmtoneAmber.opacity(configuration.isPressed ? 0.26 : 0.16), lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(0.22), radius: 12, x: 0, y: 8)
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-    }
-}
-
 struct UnsavedExportPrompt: View {
     let message: String
     let saveLabel: String
@@ -1281,7 +1219,7 @@ struct UnsavedExportPrompt: View {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "square.and.arrow.down")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.filmtoneAmber)
+                    .foregroundStyle(.white.opacity(0.92))
                     .frame(width: 24, height: 24)
                     .accessibilityHidden(true)
 
@@ -1317,7 +1255,7 @@ struct UnsavedExportPrompt: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.filmtoneAmber.opacity(0.18), lineWidth: 1)
+                .stroke(Color.white.opacity(0.10), lineWidth: 1)
                 .allowsHitTesting(false)
         )
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
