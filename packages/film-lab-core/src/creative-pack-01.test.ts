@@ -12,14 +12,18 @@ import { parseCube, type CubeLUT } from "./cube-parser";
 type SamplePoint = readonly [number, number, number];
 
 const REPO_ROOT = resolve(import.meta.dir, "../../..");
-const URBAN_DENSITY_CUBE_PATH = resolve(
+const STONE_CUBE_PATH = resolve(
   REPO_ROOT,
-  "apps/capacitor-film-lab-ios/ios/App/App/Resources/CreativeLuts/filmtone-creative-pack-01-urban-density.cube",
+  "apps/capacitor-film-lab-ios/ios/App/App/Resources/CreativeLuts/filmtone-creative-pack-01-stone.cube",
 );
-const URBAN_DENSITY_ANALYSIS_SOURCE =
-  "/Volumes/SamsungPortableSSDX5001/filmtone/Palermo_Powergrade & LUTs/Palermo Standalone LUTs/LUT + Extras/Palermo + Colour Density + Green Density.cube";
+const URBAN_CUBE_PATH = resolve(
+  REPO_ROOT,
+  "apps/capacitor-film-lab-ios/ios/App/App/Resources/CreativeLuts/filmtone-creative-pack-01-urban.cube",
+);
 const PALERMO_REFERENCE_SOURCE =
   "/Volumes/SamsungPortableSSDX5001/filmtone/Palermo_Powergrade & LUTs/Palermo Standalone LUTs/DJI_DLOG-M-Palermo.cube";
+const PALERMO_GREEN_DENSITY_SOURCE =
+  "/Volumes/SamsungPortableSSDX5001/filmtone/Palermo_Powergrade & LUTs/Palermo Standalone LUTs/LUT + Extras/Palermo + Colour Density + Green Density.cube";
 
 function sha256Hex(bytes: Uint8Array): string {
   const hash = createHash("sha256");
@@ -61,20 +65,20 @@ function luma(rgb: SamplePoint): number {
 }
 
 describe("Creative LUT Pack 01 — runtime color neutralization", () => {
-  test("ships one flagship urban-density Look", () => {
-    expect(CREATIVE_PACK_01_LOOKS).toHaveLength(1);
-    expect(CREATIVE_PACK_01_LOOKS[0].slug).toBe(
-      "filmtone-creative-pack-01-urban-density",
-    );
-    expect(CREATIVE_PACK_01_LOOKS[0].englishName).toBe("Filmtone Urban Density");
-    expect(CREATIVE_PACK_01_LOOKS[0].canonicalUUID).toBe(
+  test("ships Stone base and Urban green-density Looks", () => {
+    expect(CREATIVE_PACK_01_LOOKS).toHaveLength(2);
+    expect(CREATIVE_PACK_01_LOOKS.map((look) => look.slug)).toEqual([
+      "filmtone-creative-pack-01-stone",
+      "filmtone-creative-pack-01-urban",
+    ]);
+    expect(CREATIVE_PACK_01_LOOKS.map((look) => look.englishName)).toEqual([
+      "Stone",
+      "Urban",
+    ]);
+    expect(CREATIVE_PACK_01_LOOKS.map((look) => look.canonicalUUID)).toEqual([
       "FB1A0001-0000-4000-8000-000000000006",
-    );
-    expect(
-      CREATIVE_PACK_01_LOOKS.some((look) =>
-        look.canonicalUUID.endsWith("000000000007"),
-      ),
-    ).toBe(false);
+      "FB1A0001-0000-4000-8000-000000000007",
+    ]);
   });
 
   test("every Look neutralizes baked color ops and v2 split-tone strengths", () => {
@@ -88,70 +92,64 @@ describe("Creative LUT Pack 01 — runtime color neutralization", () => {
   });
 });
 
-describe("Creative LUT Pack 01 — Urban Density cube", () => {
+describe("Creative LUT Pack 01 — generated cubes", () => {
   test("generated cube is originalized, not a Palermo byte copy", () => {
-    const generated = readFileSync(URBAN_DENSITY_CUBE_PATH);
-    const generatedText = generated.toString("utf8");
-    expect(generatedText).toContain("generator=filmtone-urban-density-v1");
-    expect(generatedText).not.toContain("Palermo");
+    const cases = [
+      {
+        cubePath: STONE_CUBE_PATH,
+        sourcePath: PALERMO_REFERENCE_SOURCE,
+        generator: "generator=filmtone-stone-palermo-reference-v1",
+      },
+      {
+        cubePath: URBAN_CUBE_PATH,
+        sourcePath: PALERMO_GREEN_DENSITY_SOURCE,
+        generator: "generator=filmtone-urban-palermo-green-density-v1",
+      },
+    ] as const;
 
-    for (const sourcePath of [
-      URBAN_DENSITY_ANALYSIS_SOURCE,
-      PALERMO_REFERENCE_SOURCE,
-    ]) {
+    for (const { cubePath, sourcePath, generator } of cases) {
+      const generated = readFileSync(cubePath);
+      const generatedText = generated.toString("utf8");
+      expect(generatedText).toContain(generator);
+      expect(generatedText).not.toContain("Palermo");
       if (!existsSync(sourcePath)) continue;
       expect(sha256Hex(generated)).not.toBe(sha256Hex(readFileSync(sourcePath)));
     }
   });
 
-  test("sample points keep the intended urban-density behavior", () => {
-    const cube = parseCube(readFileSync(URBAN_DENSITY_CUBE_PATH, "utf8"));
+  test("sample points stay tightly aligned to their Palermo source", () => {
+    const cases = [
+      {
+        cubePath: STONE_CUBE_PATH,
+        sourcePath: PALERMO_REFERENCE_SOURCE,
+      },
+      {
+        cubePath: URBAN_CUBE_PATH,
+        sourcePath: PALERMO_GREEN_DENSITY_SOURCE,
+      },
+    ] as const;
+    const points: readonly SamplePoint[] = [
+      [0.18, 0.18, 0.18],
+      [0.5, 0.5, 0.5],
+      [0.32, 0.34, 0.3],
+      [0.78, 0.08, 0.05],
+      [0.78, 0.54, 0.4],
+      [0.18, 0.42, 0.16],
+      [0.35, 0.58, 0.82],
+      [0.72, 0.62, 0.38],
+    ];
 
-    const gray18 = sampleCube(cube, [0.18, 0.18, 0.18]);
-    expect(luma(gray18)).toBeGreaterThan(0.09);
-    expect(luma(gray18)).toBeLessThan(0.12);
-
-    const gray50 = sampleCube(cube, [0.5, 0.5, 0.5]);
-    expect(gray50[1]).toBeGreaterThan(gray50[0] + 0.04);
-    expect(gray50[2]).toBeGreaterThan(gray50[0] + 0.06);
-    expect(luma(gray50)).toBeGreaterThan(0.4);
-    expect(luma(gray50)).toBeLessThan(0.45);
-
-    const road = sampleCube(cube, [0.32, 0.34, 0.3]);
-    expect(road[1]).toBeGreaterThan(road[0] + 0.04);
-    expect(road[2]).toBeGreaterThan(road[0]);
-    expect(luma(road)).toBeGreaterThan(0.18);
-    expect(luma(road)).toBeLessThan(0.24);
-
-    const redSign = sampleCube(cube, [0.78, 0.08, 0.05]);
-    expect(redSign[0]).toBeGreaterThan(0.58);
-    expect(redSign[0]).toBeGreaterThan(redSign[1] + 0.5);
-    expect(redSign[1]).toBeGreaterThan(0.01);
-    expect(redSign[2]).toBeGreaterThan(0.008);
-
-    const skin = sampleCube(cube, [0.78, 0.54, 0.4]);
-    expect(skin[0]).toBeGreaterThan(skin[1]);
-    expect(skin[1]).toBeGreaterThan(skin[2]);
-    expect(skin[2]).toBeGreaterThan(0.1);
-    expect(luma(skin)).toBeGreaterThan(0.42);
-
-    const foliage = sampleCube(cube, [0.18, 0.42, 0.16]);
-    expect(foliage[1]).toBeGreaterThan(foliage[0] + 0.15);
-    expect(foliage[1]).toBeGreaterThan(foliage[2] + 0.12);
-    expect(luma(foliage)).toBeGreaterThan(0.17);
-    expect(luma(foliage)).toBeLessThan(0.23);
-
-    const sky = sampleCube(cube, [0.35, 0.58, 0.82]);
-    expect(sky[2]).toBeGreaterThan(sky[1] + 0.25);
-    expect(sky[1]).toBeGreaterThan(sky[0] + 0.25);
-    expect(luma(sky)).toBeGreaterThan(0.33);
-    expect(luma(sky)).toBeLessThan(0.4);
-
-    const yellowStone = sampleCube(cube, [0.72, 0.62, 0.38]);
-    expect(yellowStone[0]).toBeGreaterThan(yellowStone[1]);
-    expect(yellowStone[1]).toBeGreaterThan(yellowStone[2]);
-    expect(yellowStone[2]).toBeGreaterThan(0.1);
-    expect(luma(yellowStone)).toBeGreaterThan(0.5);
-    expect(luma(yellowStone)).toBeLessThan(0.56);
+    for (const { cubePath, sourcePath } of cases) {
+      const cube = parseCube(readFileSync(cubePath, "utf8"));
+      const reference = parseCube(readFileSync(sourcePath, "utf8"));
+      for (const point of points) {
+        const actual = sampleCube(cube, point);
+        const expected = sampleCube(reference, point);
+        for (let i = 0; i < 3; i++) {
+          expect(Math.abs(actual[i] - expected[i])).toBeLessThanOrEqual(0.006);
+        }
+        expect(Math.abs(luma(actual) - luma(expected))).toBeLessThanOrEqual(0.004);
+      }
+    }
   });
 });

@@ -58,13 +58,13 @@ enum FilmtoneBuiltInCatalog {
     /// `...000001` – `...000004` are deprecated and intentionally not reused
     /// (see `BuiltInLookUUID`).
     ///
-    /// Active catalog: one flagship Creative LUT. Weak multi-look sampling
-    /// stays disabled until this base Look reaches product quality.
+    /// Active catalog: two Creative LUTs. Stone is the Palermo Reference
+    /// base; Urban is the Palermo Green Density derivative.
     static let allLooks: [BuiltInLook] = [
-        // MARK: - Creative LUT Pack 01 flagship entry
+        // MARK: - Creative LUT Pack 01
         //
-        // This entry bundles the generated 65³ Filmtone Urban Density cube
-        // under `Resources/CreativeLuts/`. `paramOverrides` carries TWO things:
+        // These entries bundle generated 65³ cubes under
+        // `Resources/CreativeLuts/`. `paramOverrides` carries TWO things:
         //   1. The 12 color-only ops plus v2 split-tone strengths are pinned
         //      to neutral so the runtime kernel does not double-apply them on
         //      top of the cube — the cube is the SSOT for color expression.
@@ -76,17 +76,33 @@ enum FilmtoneBuiltInCatalog {
         // --regenerate` and mirrored in
         // `Tests/Fixtures/creative-pack-01/manifest.json`.
         BuiltInLook(
-            slug: "filmtone-creative-pack-01-urban-density",
-            canonicalUUID: BuiltInLookUUID.creativePack01UrbanDensity,
-            englishName: "Filmtone Urban Density",
+            slug: "filmtone-creative-pack-01-stone",
+            canonicalUUID: BuiltInLookUUID.creativePack01Stone,
+            englishName: "Stone",
             presetName: "reset",
             strength: 1.0,
             quickState: .zero,
-            paramOverrides: FilmtoneBuiltInCatalog.creativePack01UrbanDensityPatch,
+            paramOverrides: FilmtoneBuiltInCatalog.creativePack01StonePatch,
             creativeLut: .bundled(
-                slug: "filmtone-creative-pack-01-urban-density",
-                filename: "filmtone-creative-pack-01-urban-density.cube",
-                sha256: "cc64e905c0643a7342333a0235760ed3970a87f71987f2efc8f84fd4032752d7",
+                slug: "filmtone-creative-pack-01-stone",
+                filename: "filmtone-creative-pack-01-stone.cube",
+                sha256: "005972db2dd07ff181e6256d11034ab76c8ef94782d1f2739e6c73971072bf45",
+                intensity: 1.0
+            ),
+            packId: FilmtoneBuiltInCatalog.creativePack01Id
+        ),
+        BuiltInLook(
+            slug: "filmtone-creative-pack-01-urban",
+            canonicalUUID: BuiltInLookUUID.creativePack01Urban,
+            englishName: "Urban",
+            presetName: "reset",
+            strength: 1.0,
+            quickState: .zero,
+            paramOverrides: FilmtoneBuiltInCatalog.creativePack01UrbanPatch,
+            creativeLut: .bundled(
+                slug: "filmtone-creative-pack-01-urban",
+                filename: "filmtone-creative-pack-01-urban.cube",
+                sha256: "9620492bf766675466da212f123289851d40f2420b2f51f56d4baf96f2dfb1ea",
                 intensity: 1.0
             ),
             packId: FilmtoneBuiltInCatalog.creativePack01Id
@@ -115,20 +131,37 @@ enum FilmtoneBuiltInCatalog {
         "highlightTone": 0,
     ]
 
-    /// Filmtone Urban Density — generated 65³ cube plus a restrained optical
+    /// Stone — generated 65³ cube plus a restrained optical
     /// baseline. Color stays in the cube; these values carry lens behavior.
-    static let creativePack01UrbanDensityPatch: FilmtonePhase0ParamsPatch = {
+    static let creativePack01StonePatch: FilmtonePhase0ParamsPatch = {
         var values = creativePack01ColorOpNeutralEntries
         values["bloomThreshold"] = 0.64
-        values["bloomStrength"] = 0.23
-        values["bloomRadius"] = 0.58
-        values["halationIntensity"] = 0.065
-        values["halationHue"] = 22
-        values["diffusion"] = 0.065
-        values["lensSoftness"] = 0.10
+        values["bloomStrength"] = 0.20
+        values["bloomRadius"] = 0.62
+        values["halationIntensity"] = 0.07
+        values["halationHue"] = 24
+        values["diffusion"] = 0.06
+        values["lensSoftness"] = 0.095
         values["grainIntensity"] = 0.0045
-        values["grainSize"] = 0.14
-        values["vignette"] = 0.065
+        values["grainSize"] = 0.13
+        values["vignette"] = 0.055
+        return FilmtonePhase0ParamsPatch(values: values)
+    }()
+
+    /// Urban — generated 65³ cube plus a restrained optical baseline.
+    /// Color stays in the cube; these values carry lens behavior.
+    static let creativePack01UrbanPatch: FilmtonePhase0ParamsPatch = {
+        var values = creativePack01ColorOpNeutralEntries
+        values["bloomThreshold"] = 0.66
+        values["bloomStrength"] = 0.18
+        values["bloomRadius"] = 0.58
+        values["halationIntensity"] = 0.055
+        values["halationHue"] = 20
+        values["diffusion"] = 0.065
+        values["lensSoftness"] = 0.095
+        values["grainIntensity"] = 0.0045
+        values["grainSize"] = 0.13
+        values["vignette"] = 0.06
         return FilmtonePhase0ParamsPatch(values: values)
     }()
 
@@ -216,9 +249,8 @@ private enum BuiltInLookUUID {
     // v1.4 Creative LUT Pack 01 reservations (active entries mirrored in
     // `packages/film-lab-core/src/creative-pack-01.ts` so TS / Swift / sidecar
     // share a single canonical id per Look).
-    //   FB1A0001-0000-4000-8000-000000000007 — reserved by the retired
-    //   Palermo Green Density companion slot.
     // `...000008` and `...000009` are intentionally not reused after CD
     // removal of the weak sampler entries.
-    static let creativePack01UrbanDensity = UUID(uuidString: "FB1A0001-0000-4000-8000-000000000006")!
+    static let creativePack01Stone = UUID(uuidString: "FB1A0001-0000-4000-8000-000000000006")!
+    static let creativePack01Urban = UUID(uuidString: "FB1A0001-0000-4000-8000-000000000007")!
 }

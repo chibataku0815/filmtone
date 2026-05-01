@@ -34,14 +34,15 @@ import {
   type BakeColorParams,
 } from "./bake-color-only";
 import {
-  CREATIVE_PACK_01_URBAN_DENSITY_TRANSFORM,
+  CREATIVE_PACK_01_STONE_TRANSFORM,
+  CREATIVE_PACK_01_URBAN_TRANSFORM,
   type CreativePack01SourceTransform,
 } from "./creative-pack-01-generator";
 import type { FilmtoneIosPresetName } from "./ios-preset-overrides";
 import type { Phase0ParamKey } from "./phase0-schema";
 
 export const CREATIVE_PACK_01_ID = "creative-pack-01" as const;
-export const CREATIVE_PACK_01_BAKER_VERSION = "1.2.0-filmtone-urban-density" as const;
+export const CREATIVE_PACK_01_BAKER_VERSION = "1.3.0-filmtone-stone-urban" as const;
 export const CREATIVE_PACK_01_CUBE_SIZE = 65 as const;
 
 export interface CreativePackLook {
@@ -74,10 +75,10 @@ export function buildLookParamOverrides(
 }
 
 /**
- * Pack 01 Look catalog. Current CD direction is one flagship urban-density
- * Look. External reference cubes are build-only inputs; the exported product
- * catalog carries the generated Filmtone recipe and never direct reference
- * cube paths.
+ * Pack 01 Look catalog. Stone is the Palermo Reference base; Urban is the
+ * Palermo Green Density derivative. External reference cubes are build-only
+ * inputs; the exported product catalog carries the generated Filmtone recipe
+ * and never direct reference cube paths.
  *
  * `colorParams` remains identity because the color expression is carried by
  * the generated 65³ cube. Runtime `paramOverrides` still neutralizes the host
@@ -86,8 +87,8 @@ export function buildLookParamOverrides(
  */
 export const CREATIVE_PACK_01_LOOKS: readonly CreativePackLook[] = [
   {
-    slug: "filmtone-creative-pack-01-urban-density",
-    englishName: "Filmtone Urban Density",
+    slug: "filmtone-creative-pack-01-stone",
+    englishName: "Stone",
     canonicalUUID: "FB1A0001-0000-4000-8000-000000000006",
     basePreset: "reset",
     colorParams: {
@@ -105,21 +106,53 @@ export const CREATIVE_PACK_01_LOOKS: readonly CreativePackLook[] = [
       yellow: 0,
     },
     paramOverrides: buildLookParamOverrides({
-      // Flagship optical baseline: restrained grain, visible lens softness,
-      // and enough glow to make the urban-density cube feel like Filmtone.
       bloomThreshold: 0.64,
-      bloomStrength: 0.23,
-      bloomRadius: 0.58,
-      halationIntensity: 0.065,
-      halationHue: 22,
-      diffusion: 0.065,
-      lensSoftness: 0.1,
+      bloomStrength: 0.2,
+      bloomRadius: 0.62,
+      halationIntensity: 0.07,
+      halationHue: 24,
+      diffusion: 0.06,
+      lensSoftness: 0.095,
       grainIntensity: 0.0045,
-      grainSize: 0.14,
-      vignette: 0.065,
+      grainSize: 0.13,
+      vignette: 0.055,
     }),
     strength: 1.0,
-    sourceCubeTransform: CREATIVE_PACK_01_URBAN_DENSITY_TRANSFORM,
+    sourceCubeTransform: CREATIVE_PACK_01_STONE_TRANSFORM,
+  },
+  {
+    slug: "filmtone-creative-pack-01-urban",
+    englishName: "Urban",
+    canonicalUUID: "FB1A0001-0000-4000-8000-000000000007",
+    basePreset: "reset",
+    colorParams: {
+      exposure: 0,
+      contrast: 1,
+      saturation: 1,
+      temperature: 0,
+      tint: 0,
+      fade: 0,
+      compressionAmount: 0,
+      compressionRange: 0.5,
+      printContrast: 0,
+      cyan: 0,
+      magenta: 0,
+      yellow: 0,
+    },
+    paramOverrides: buildLookParamOverrides({
+      bloomThreshold: 0.66,
+      bloomStrength: 0.18,
+      bloomRadius: 0.58,
+      halationIntensity: 0.055,
+      halationHue: 20,
+      diffusion: 0.065,
+      lensSoftness: 0.095,
+      grainIntensity: 0.0045,
+      grainSize: 0.13,
+      vignette: 0.06,
+    }),
+    strength: 1.0,
+    sourceCubeTransform: CREATIVE_PACK_01_URBAN_TRANSFORM,
   },
 ] as const;
 

@@ -49,10 +49,13 @@ const FIXTURES_DIR = resolve(
 );
 const MANIFEST_PATH = resolve(FIXTURES_DIR, "manifest.json");
 const MANIFEST_SCHEMA_VERSION = 1 as const;
-const CREATIVE_PACK_01_URBAN_DENSITY_ANALYSIS_SOURCE =
+const CREATIVE_PACK_01_STONE_SOURCE =
+  "/Volumes/SamsungPortableSSDX5001/filmtone/Palermo_Powergrade & LUTs/Palermo Standalone LUTs/DJI_DLOG-M-Palermo.cube" as const;
+const CREATIVE_PACK_01_URBAN_SOURCE =
   "/Volumes/SamsungPortableSSDX5001/filmtone/Palermo_Powergrade & LUTs/Palermo Standalone LUTs/LUT + Extras/Palermo + Colour Density + Green Density.cube" as const;
 const CREATIVE_PACK_01_SOURCE_CUBE_BY_SLUG: Record<string, string> = {
-  "filmtone-creative-pack-01-urban-density": CREATIVE_PACK_01_URBAN_DENSITY_ANALYSIS_SOURCE,
+  "filmtone-creative-pack-01-stone": CREATIVE_PACK_01_STONE_SOURCE,
+  "filmtone-creative-pack-01-urban": CREATIVE_PACK_01_URBAN_SOURCE,
 };
 
 interface ManifestLookEntry {

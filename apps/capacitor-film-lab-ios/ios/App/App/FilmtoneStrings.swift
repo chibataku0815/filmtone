@@ -242,8 +242,9 @@ struct FilmtoneStrings {
 
     // MARK: - Built-in Filmtone Looks
     //
-    // Current catalog exposes one flagship Creative LUT.
-    let builtInLookCreativePack01UrbanDensity: String
+    // Current catalog exposes Creative LUT Pack 01.
+    let builtInLookCreativePack01Stone: String
+    let builtInLookCreativePack01Urban: String
 }
 
 extension FilmtoneStrings {
@@ -252,8 +253,10 @@ extension FilmtoneStrings {
     /// fall back to `entry.name` directly.
     func builtInLookName(for slug: String) -> String? {
         switch slug {
-        case "filmtone-creative-pack-01-urban-density":
-            return builtInLookCreativePack01UrbanDensity
+        case "filmtone-creative-pack-01-stone":
+            return builtInLookCreativePack01Stone
+        case "filmtone-creative-pack-01-urban":
+            return builtInLookCreativePack01Urban
         default:                   return nil
         }
     }
@@ -1503,10 +1506,15 @@ extension FilmtoneStrings {
             comment: "Toolbar action that dismisses the Saved-Look sheet without saving."
         )
         // Built-in Filmtone Look catalog.
-        builtInLookCreativePack01UrbanDensity = filmtoneLocalized(
-            "filmtone.builtin_look.creative_pack_01.urban_density",
-            defaultValue: prefersJapanese ? "Filmtone Urban Density" : "Filmtone Urban Density",
-            comment: "Built-in Look name: Pack 01 flagship urban-density creative LUT."
+        builtInLookCreativePack01Stone = filmtoneLocalized(
+            "filmtone.builtin_look.creative_pack_01.stone",
+            defaultValue: "Stone",
+            comment: "Built-in Look name: Pack 01 Palermo Reference base creative LUT."
+        )
+        builtInLookCreativePack01Urban = filmtoneLocalized(
+            "filmtone.builtin_look.creative_pack_01.urban",
+            defaultValue: "Urban",
+            comment: "Built-in Look name: Pack 01 Palermo Green Density derivative creative LUT."
         )
         fullscreenTitle = filmtoneLocalized(
             "filmtone.fullscreen.title",
