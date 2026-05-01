@@ -297,6 +297,7 @@ struct FilmtoneRootView: View {
                         .font(.system(size: 34, weight: .semibold))
                         .foregroundStyle(.white)
                         .lineLimit(2)
+                        .accessibilityIdentifier("filmtone.activePreset.label")
 
                     if store.hasAnyAdjustments {
                         Text(store.adjustmentSummaryText)
@@ -330,7 +331,38 @@ struct FilmtoneRootView: View {
 
     private var presetSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            FilmtoneSectionHeader(title: store.strings.presetTitle)
+            HStack(alignment: .center, spacing: 12) {
+                FilmtoneSectionHeader(title: store.strings.presetTitle)
+
+                Spacer(minLength: 12)
+
+                if store.hasPresetCustomValues {
+                    Button {
+                        store.restoreActivePresetDefaults()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.counterclockwise")
+                                .font(.caption.weight(.semibold))
+
+                            Text(store.strings.presetDefaultLabel)
+                                .font(.caption.weight(.semibold))
+                        }
+                        .foregroundStyle(Color.filmtoneAmber.opacity(0.92))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(
+                            Capsule()
+                                .fill(Color.white.opacity(0.045))
+                        )
+                        .overlay(
+                            Capsule()
+                                .stroke(Color.filmtoneAmber.opacity(0.16), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("filmtone.preset.default")
+                }
+            }
 
             FilmtonePresetRow(
                 presets: FilmtonePresetCatalog.all,

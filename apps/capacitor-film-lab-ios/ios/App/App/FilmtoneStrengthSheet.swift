@@ -9,6 +9,7 @@ struct FilmtoneStrengthSheet: View {
     @State private var adjustmentsExpanded = false
     @State private var advancedParamsExpanded = false
     @State private var expandedAdvancedGroupIds: Set<String> = []
+    @State private var activeHelpTopic: FilmtoneAdjustmentHelpTopic?
 
     var body: some View {
         ZStack {
@@ -46,6 +47,18 @@ struct FilmtoneStrengthSheet: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.hidden)
+        .sheet(item: $activeHelpTopic) { topic in
+            FilmtoneAdjustmentHelpSheet(
+                topic: topic,
+                beforeLabel: store.strings.adjustmentHelpBeforeLabel,
+                afterLabel: store.strings.adjustmentHelpAfterLabel,
+                effectLabel: store.strings.adjustmentHelpEffectLabel,
+                guidanceLabel: store.strings.adjustmentHelpGuidanceLabel,
+                dismissLabel: store.strings.helpDismiss
+            ) {
+                activeHelpTopic = nil
+            }
+        }
     }
 
     private var handle: some View {
@@ -76,10 +89,13 @@ struct FilmtoneStrengthSheet: View {
             Spacer(minLength: 12)
 
             HStack(spacing: 8) {
-                Button(store.strings.resetLabel) {
-                    store.resetAdjustments()
+                Button(store.strings.presetDefaultLabel) {
+                    store.restoreActivePresetDefaults()
                 }
                 .buttonStyle(FilmtoneSheetSecondaryActionStyle())
+                .disabled(!store.hasPresetCustomValues)
+                .opacity(store.hasPresetCustomValues ? 1 : 0.42)
+                .accessibilityIdentifier("filmtone.sheet.default")
 
                 Button(store.strings.doneLabel) {
                     onClose()
@@ -110,9 +126,16 @@ struct FilmtoneStrengthSheet: View {
                 value: store.project.strength,
                 range: 0...1,
                 format: { Self.percentLabel($0) },
+                helpAccessibilityLabel: store.strings.adjustmentHelpAccessibilityLabel(for: store.strings.strengthLabel),
                 accessibilityIdentifier: "filmtone.sheet.slider.strength"
             ) { value in
                 store.setStrength(value)
+            } helpAction: {
+                activeHelpTopic = makeHelpTopic(
+                    id: "strength",
+                    copy: store.strings.strengthHelpCopy(),
+                    comparisonStyle: .strength
+                )
             }
         }
         .sectionDivider()
@@ -123,7 +146,8 @@ struct FilmtoneStrengthSheet: View {
             title: store.strings.adjustLabel,
             summary: quickSummaryText,
             accessibilityIdentifier: "filmtone.sheet.adjustments",
-            isExpanded: $adjustmentsExpanded
+            isExpanded: $adjustmentsExpanded,
+            helpAccessibilityLabel: store.strings.adjustmentHelpAccessibilityLabel(for: store.strings.adjustLabel)
         ) {
             VStack(alignment: .leading, spacing: 16) {
                 if store.hasQuickAdjustments {
@@ -137,9 +161,16 @@ struct FilmtoneStrengthSheet: View {
                         value: store.project.quickState.filmCharacter,
                         range: -1...1,
                         format: { Self.signedPercentLabel($0) },
+                        helpAccessibilityLabel: store.strings.adjustmentHelpAccessibilityLabel(for: store.strings.quickFilmCharacter),
                         accessibilityIdentifier: "filmtone.sheet.slider.quick.filmCharacter"
                     ) { value in
                         store.setQuickValue(value, for: \.filmCharacter)
+                    } helpAction: {
+                        activeHelpTopic = makeHelpTopic(
+                            id: "quick.filmCharacter",
+                            copy: store.strings.quickFilmCharacterHelpCopy(),
+                            comparisonStyle: .exposure
+                        )
                     }
 
                     FilmtoneSliderRow(
@@ -147,9 +178,16 @@ struct FilmtoneStrengthSheet: View {
                         value: store.project.quickState.era,
                         range: -1...1,
                         format: { Self.signedPercentLabel($0) },
+                        helpAccessibilityLabel: store.strings.adjustmentHelpAccessibilityLabel(for: store.strings.quickEra),
                         accessibilityIdentifier: "filmtone.sheet.slider.quick.era"
                     ) { value in
                         store.setQuickValue(value, for: \.era)
+                    } helpAction: {
+                        activeHelpTopic = makeHelpTopic(
+                            id: "quick.era",
+                            copy: store.strings.quickEraHelpCopy(),
+                            comparisonStyle: .contrast
+                        )
                     }
 
                     FilmtoneSliderRow(
@@ -157,11 +195,24 @@ struct FilmtoneStrengthSheet: View {
                         value: store.project.quickState.dynamics,
                         range: -1...1,
                         format: { Self.signedPercentLabel($0) },
+                        helpAccessibilityLabel: store.strings.adjustmentHelpAccessibilityLabel(for: store.strings.quickDynamics),
                         accessibilityIdentifier: "filmtone.sheet.slider.quick.dynamics"
                     ) { value in
                         store.setQuickValue(value, for: \.dynamics)
+                    } helpAction: {
+                        activeHelpTopic = makeHelpTopic(
+                            id: "quick.dynamics",
+                            copy: store.strings.quickDynamicsHelpCopy(),
+                            comparisonStyle: .saturation
+                        )
                     }
             }
+        } helpAction: {
+            activeHelpTopic = makeHelpTopic(
+                id: "section.adjustments",
+                copy: store.strings.quickAdjustmentSectionHelpCopy(),
+                comparisonStyle: .quick
+            )
         }
     }
 
@@ -171,13 +222,20 @@ struct FilmtoneStrengthSheet: View {
             summary: store.advancedSummaryText,
             accessibilityIdentifier: "filmtone.sheet.advanced",
             isExpanded: $advancedParamsExpanded,
-            contentSpacing: 20
+            contentSpacing: 20,
+            helpAccessibilityLabel: store.strings.adjustmentHelpAccessibilityLabel(for: store.strings.advancedParamsLabel)
         ) {
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(advancedParamGroups) { group in
                     advancedGroupSection(group)
                 }
             }
+        } helpAction: {
+            activeHelpTopic = makeHelpTopic(
+                id: "section.advanced",
+                copy: store.strings.advancedParamsSectionHelpCopy(),
+                comparisonStyle: .advanced
+            )
         }
     }
 
@@ -191,6 +249,7 @@ struct FilmtoneStrengthSheet: View {
             selection: selection,
             recipes: group.recipes,
             customLabel: store.strings.advancedPresetCustomLabel,
+            helpAccessibilityLabel: store.strings.adjustmentHelpAccessibilityLabel(for: group.title),
             isExpanded: Binding(
                 get: { expandedAdvancedGroupIds.contains(group.id) },
                 set: { isExpanded in
@@ -203,6 +262,13 @@ struct FilmtoneStrengthSheet: View {
             ),
             onSelectRecipe: { recipe in
                 store.applyParamPreset(values: recipe.values(base), for: group.keys)
+            },
+            onHelp: {
+                activeHelpTopic = makeHelpTopic(
+                    id: "group.\(group.id)",
+                    copy: store.strings.advancedGroupHelpCopy(for: group.id, title: group.title),
+                    comparisonStyle: comparisonStyleForGroup(group.id)
+                )
             }
         ) {
             VStack(alignment: .leading, spacing: 16) {
@@ -213,9 +279,16 @@ struct FilmtoneStrengthSheet: View {
                         range: control.range,
                         format: control.format,
                         isActive: store.isParamOverridden(control.key),
+                        helpAccessibilityLabel: store.strings.adjustmentHelpAccessibilityLabel(for: control.label),
                         accessibilityIdentifier: "filmtone.sheet.slider.param.\(control.key)"
                     ) { value in
                         store.setParamOverride(value, for: control.key)
+                    } helpAction: {
+                        activeHelpTopic = makeHelpTopic(
+                            id: "param.\(control.key)",
+                            copy: store.strings.paramHelpCopy(for: control.key, label: control.label),
+                            comparisonStyle: comparisonStyleForParam(control.key)
+                        )
                     }
                 }
             }
@@ -248,6 +321,60 @@ struct FilmtoneStrengthSheet: View {
         }
 
         return .custom(activeCount: activeCount)
+    }
+
+    private func makeHelpTopic(
+        id: String,
+        copy: FilmtoneAdjustmentHelpCopy,
+        comparisonStyle: FilmtoneAdjustmentComparisonStyle
+    ) -> FilmtoneAdjustmentHelpTopic {
+        FilmtoneAdjustmentHelpTopic(id: id, copy: copy, comparisonStyle: comparisonStyle)
+    }
+
+    private func comparisonStyleForGroup(_ id: String) -> FilmtoneAdjustmentComparisonStyle {
+        switch id {
+        case "process":
+            return .tone
+        case "optics":
+            return .optics
+        case "glow":
+            return .glow
+        case "grain":
+            return .grain
+        case "motion":
+            return .motion
+        default:
+            return .advanced
+        }
+    }
+
+    private func comparisonStyleForParam(_ key: String) -> FilmtoneAdjustmentComparisonStyle {
+        switch key {
+        case "cyan", "magenta", "yellow":
+            return .colorBalance
+        case "printContrast":
+            return .contrast
+        case "compressionAmount", "compressionRange":
+            return .highlight
+        case "rgbShift":
+            return .colorFringe
+        case "lensSoftness":
+            return .softness
+        case "vignette":
+            return .vignette
+        case "bloomThreshold", "bloomStrength", "bloomRadius", "bloomSoftKnee":
+            return .bloom
+        case "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "halationSoftKnee":
+            return .halation
+        case "diffusion":
+            return .diffusion
+        case "grainIntensity", "grainSize", "grainRadialMix":
+            return .grain
+        case "shutterAngle", "trailIntensity":
+            return .motion
+        default:
+            return .advanced
+        }
     }
 
     private var quickSummaryText: String {
@@ -757,6 +884,436 @@ private struct FilmtoneCompareRevealPreview: View {
     }
 }
 
+private struct FilmtoneAdjustmentHelpTopic: Identifiable {
+    let id: String
+    let copy: FilmtoneAdjustmentHelpCopy
+    let comparisonStyle: FilmtoneAdjustmentComparisonStyle
+}
+
+private enum FilmtoneAdjustmentComparisonStyle: Equatable {
+    case strength
+    case quick
+    case exposure
+    case contrast
+    case saturation
+    case advanced
+    case tone
+    case colorBalance
+    case highlight
+    case optics
+    case colorFringe
+    case softness
+    case vignette
+    case glow
+    case bloom
+    case halation
+    case diffusion
+    case grain
+    case motion
+}
+
+private struct FilmtoneAdjustmentHelpSheet: View {
+    let topic: FilmtoneAdjustmentHelpTopic
+    let beforeLabel: String
+    let afterLabel: String
+    let effectLabel: String
+    let guidanceLabel: String
+    let dismissLabel: String
+    let onDismiss: () -> Void
+
+    var body: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 20) {
+                header
+
+                FilmtoneHelpComparisonImage(
+                    style: topic.comparisonStyle,
+                    beforeLabel: beforeLabel,
+                    afterLabel: afterLabel
+                )
+                .accessibilityIdentifier("filmtone.help.adjustment.compare")
+
+                Text(topic.copy.body)
+                    .font(.body)
+                    .foregroundStyle(.white.opacity(0.78))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.leading)
+                    .accessibilityIdentifier("filmtone.help.adjustment.body")
+
+                VStack(alignment: .leading, spacing: 12) {
+                    helpBlock(title: effectLabel, text: topic.copy.effect)
+                    if let guidance = topic.copy.guidance {
+                        helpBlock(title: guidanceLabel, text: guidance)
+                    }
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 24)
+            .padding(.bottom, 32)
+        }
+        .background(Color.filmtoneBackground.ignoresSafeArea())
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(topic.copy.title)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(Color.filmtoneAmber)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("filmtone.help.adjustment.title")
+
+            Spacer(minLength: 12)
+
+            Button(action: onDismiss) {
+                Text(dismissLabel)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(Color.white.opacity(0.78))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("filmtone.help.adjustment.dismiss")
+        }
+    }
+
+    private func helpBlock(title: String, text: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.54))
+
+            Text(text)
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.72))
+                .fixedSize(horizontal: false, vertical: true)
+                .multilineTextAlignment(.leading)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.white.opacity(0.04))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.white.opacity(0.07), lineWidth: 1)
+        )
+    }
+}
+
+private struct FilmtoneHelpComparisonImage: View {
+    let style: FilmtoneAdjustmentComparisonStyle
+    let beforeLabel: String
+    let afterLabel: String
+
+    var body: some View {
+        HStack(spacing: 0) {
+            sample(isAfter: false)
+                .overlay(alignment: .topLeading) {
+                    comparisonLabel(beforeLabel, isPrimary: false)
+                        .padding(10)
+                }
+
+            sample(isAfter: true)
+                .overlay(alignment: .topLeading) {
+                    comparisonLabel(afterLabel, isPrimary: true)
+                        .padding(10)
+                }
+        }
+        .frame(height: 184)
+        .clipShape(RoundedRectangle(cornerRadius: filmtoneSurfaceCornerRadius, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: filmtoneSurfaceCornerRadius, style: .continuous)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
+        .overlay(alignment: .center) {
+            Rectangle()
+                .fill(Color.white.opacity(0.16))
+                .frame(width: 1)
+        }
+    }
+
+    private func sample(isAfter: Bool) -> some View {
+        FilmtoneHelpSampleFrame(style: style, isAfter: isAfter)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipped()
+    }
+
+    private func comparisonLabel(_ label: String, isPrimary: Bool) -> some View {
+        Text(label)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(isPrimary ? .black.opacity(0.88) : .white.opacity(0.82))
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(isPrimary ? Color.filmtoneAmber : Color.black.opacity(0.52))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .stroke(isPrimary ? Color.clear : Color.white.opacity(0.10), lineWidth: 1)
+            )
+    }
+}
+
+private struct FilmtoneHelpSampleFrame: View {
+    let style: FilmtoneAdjustmentComparisonStyle
+    let isAfter: Bool
+
+    var body: some View {
+        ZStack {
+            baseScene
+
+            if isAfter {
+                effectOverlay
+            }
+
+            if isAfter && (style == .grain) {
+                grainOverlay
+            }
+
+            if isAfter && (style == .motion) {
+                motionOverlay
+            }
+        }
+        .brightness(isAfter ? brightnessDelta : 0)
+        .contrast(isAfter ? contrastValue : 1)
+        .saturation(isAfter ? saturationValue : 1)
+        .blur(radius: isAfter ? blurRadius : 0)
+        .overlay {
+            if isAfter && (style == .vignette || style == .optics) {
+                vignetteOverlay
+            }
+        }
+    }
+
+    private var baseScene: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color(red: 0.16, green: 0.20, blue: 0.24),
+                    Color(red: 0.31, green: 0.35, blue: 0.34),
+                    Color(red: 0.12, green: 0.12, blue: 0.11),
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            VStack(spacing: 0) {
+                Color.clear
+                Rectangle()
+                    .fill(Color.black.opacity(0.22))
+                    .frame(height: 48)
+            }
+
+            Circle()
+                .fill(Color.white.opacity(0.88))
+                .frame(width: 26, height: 26)
+                .offset(x: 40, y: -44)
+
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.66, green: 0.57, blue: 0.47),
+                            Color(red: 0.31, green: 0.27, blue: 0.24),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 48, height: 78)
+                .offset(x: -26, y: 24)
+
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .fill(Color.black.opacity(0.42))
+                .frame(width: 74, height: 10)
+                .offset(x: -20, y: 70)
+        }
+    }
+
+    @ViewBuilder
+    private var effectOverlay: some View {
+        switch style {
+        case .strength, .quick, .advanced:
+            Color.filmtoneAmber.opacity(0.13)
+        case .exposure:
+            Color.white.opacity(0.13)
+        case .contrast:
+            LinearGradient(
+                colors: [Color.black.opacity(0.22), Color.clear, Color.white.opacity(0.10)],
+                startPoint: .bottom,
+                endPoint: .top
+            )
+        case .saturation:
+            LinearGradient(
+                colors: [Color.orange.opacity(0.18), Color.filmtoneSky.opacity(0.14)],
+                startPoint: .bottomLeading,
+                endPoint: .topTrailing
+            )
+        case .tone:
+            LinearGradient(
+                colors: [Color.filmtoneAmber.opacity(0.16), Color.blue.opacity(0.08)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        case .colorBalance:
+            LinearGradient(
+                colors: [
+                    Color(red: 0.30, green: 0.86, blue: 0.92).opacity(0.18),
+                    Color(red: 0.92, green: 0.30, blue: 0.78).opacity(0.12),
+                    Color.yellow.opacity(0.14),
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        case .highlight:
+            LinearGradient(
+                colors: [Color.white.opacity(0.06), Color.filmtoneAmber.opacity(0.10), Color.black.opacity(0.04)],
+                startPoint: .topTrailing,
+                endPoint: .bottom
+            )
+        case .optics, .softness, .diffusion:
+            Color.white.opacity(0.08)
+        case .colorFringe:
+            colorFringeOverlay
+        case .vignette:
+            Color.clear
+        case .glow, .bloom:
+            glowOverlay(tint: Color.filmtoneAmber.opacity(0.44))
+        case .halation:
+            glowOverlay(tint: Color.red.opacity(0.34))
+        case .grain:
+            Color.black.opacity(0.02)
+        case .motion:
+            Color.filmtoneSky.opacity(0.08)
+        }
+    }
+
+    private var brightnessDelta: Double {
+        switch style {
+        case .exposure:
+            return 0.10
+        case .highlight:
+            return 0.04
+        default:
+            return 0
+        }
+    }
+
+    private var contrastValue: Double {
+        switch style {
+        case .contrast, .tone:
+            return 1.22
+        case .highlight:
+            return 0.92
+        default:
+            return 1
+        }
+    }
+
+    private var saturationValue: Double {
+        switch style {
+        case .saturation:
+            return 1.36
+        case .tone, .colorBalance:
+            return 1.12
+        case .highlight, .softness, .diffusion:
+            return 0.92
+        default:
+            return 1
+        }
+    }
+
+    private var blurRadius: CGFloat {
+        switch style {
+        case .softness, .diffusion:
+            return 0.85
+        default:
+            return 0
+        }
+    }
+
+    private func glowOverlay(tint: Color) -> some View {
+        ZStack {
+            Circle()
+                .fill(tint)
+                .frame(width: 78, height: 78)
+                .blur(radius: 18)
+                .offset(x: 40, y: -44)
+
+            Circle()
+                .stroke(tint.opacity(0.9), lineWidth: 7)
+                .frame(width: 34, height: 34)
+                .blur(radius: 4)
+                .offset(x: 40, y: -44)
+        }
+    }
+
+    private var colorFringeOverlay: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .stroke(Color.red.opacity(0.48), lineWidth: 2)
+                .frame(width: 50, height: 80)
+                .offset(x: -30, y: 24)
+
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .stroke(Color.cyan.opacity(0.48), lineWidth: 2)
+                .frame(width: 50, height: 80)
+                .offset(x: -22, y: 24)
+        }
+    }
+
+    private var vignetteOverlay: some View {
+        RadialGradient(
+            colors: [
+                Color.clear,
+                Color.clear,
+                Color.black.opacity(0.46),
+            ],
+            center: .center,
+            startRadius: 34,
+            endRadius: 132
+        )
+    }
+
+    private var grainOverlay: some View {
+        GeometryReader { geometry in
+            ZStack {
+                ForEach(0..<34, id: \.self) { index in
+                    Circle()
+                        .fill(index.isMultiple(of: 3) ? Color.white.opacity(0.18) : Color.black.opacity(0.22))
+                        .frame(width: index.isMultiple(of: 4) ? 2.5 : 1.4, height: index.isMultiple(of: 4) ? 2.5 : 1.4)
+                        .position(
+                            x: geometry.size.width * CGFloat((index * 37) % 97) / 97,
+                            y: geometry.size.height * CGFloat((index * 53) % 89) / 89
+                        )
+                }
+            }
+        }
+    }
+
+    private var motionOverlay: some View {
+        ZStack {
+            ForEach(1..<4, id: \.self) { index in
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(Color.filmtoneSky.opacity(0.10 / Double(index)))
+                    .frame(width: 48, height: 78)
+                    .offset(x: -26 - CGFloat(index * 12), y: 24)
+            }
+
+            LinearGradient(
+                colors: [Color.clear, Color.filmtoneSky.opacity(0.18), Color.clear],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(height: 34)
+            .offset(y: 28)
+        }
+    }
+}
+
 private struct FilmtoneAdvancedParamGroup: Identifiable {
     let id: String
     let title: String
@@ -794,8 +1351,10 @@ private struct FilmtoneAdvancedParamGroupSection<Content: View>: View {
     let selection: FilmtoneAdvancedRecipeSelection
     let recipes: [FilmtoneAdvancedParamRecipe]
     let customLabel: String
+    let helpAccessibilityLabel: String
     @Binding var isExpanded: Bool
     let onSelectRecipe: (FilmtoneAdvancedParamRecipe) -> Void
+    let onHelp: () -> Void
     let content: Content
 
     private var disclosureAnimation: Animation {
@@ -808,8 +1367,10 @@ private struct FilmtoneAdvancedParamGroupSection<Content: View>: View {
         selection: FilmtoneAdvancedRecipeSelection,
         recipes: [FilmtoneAdvancedParamRecipe],
         customLabel: String,
+        helpAccessibilityLabel: String,
         isExpanded: Binding<Bool>,
         onSelectRecipe: @escaping (FilmtoneAdvancedParamRecipe) -> Void,
+        onHelp: @escaping () -> Void,
         @ViewBuilder content: () -> Content
     ) {
         self.id = id
@@ -817,8 +1378,10 @@ private struct FilmtoneAdvancedParamGroupSection<Content: View>: View {
         self.selection = selection
         self.recipes = recipes
         self.customLabel = customLabel
+        self.helpAccessibilityLabel = helpAccessibilityLabel
         self._isExpanded = isExpanded
         self.onSelectRecipe = onSelectRecipe
+        self.onHelp = onHelp
         self.content = content()
     }
 
@@ -827,44 +1390,52 @@ private struct FilmtoneAdvancedParamGroupSection<Content: View>: View {
 
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
-                Button {
-                    withAnimation(disclosureAnimation) {
-                        isExpanded.toggle()
-                    }
-                } label: {
-                    HStack(alignment: .center, spacing: 12) {
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(title)
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.white.opacity(0.58))
-
-                            Text(statusText)
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(statusColor)
-                                .lineLimit(1)
+                HStack(alignment: .center, spacing: 8) {
+                    Button {
+                        withAnimation(disclosureAnimation) {
+                            isExpanded.toggle()
                         }
+                    } label: {
+                        HStack(alignment: .center, spacing: 12) {
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(title)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.white.opacity(0.58))
 
-                        Spacer(minLength: 12)
+                                Text(statusText)
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(statusColor)
+                                    .lineLimit(1)
+                            }
 
-                        Image(systemName: "chevron.down")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.white.opacity(isExpanded ? 0.88 : 0.62))
-                            .frame(width: 28, height: 28)
-                            .background(
-                                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                    .fill(Color.white.opacity(isExpanded ? 0.08 : 0.035))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                    .stroke(Color.white.opacity(isExpanded ? 0.10 : 0.06), lineWidth: 1)
-                            )
-                            .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                            Spacer(minLength: 12)
+
+                            Image(systemName: "chevron.down")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.white.opacity(isExpanded ? 0.88 : 0.62))
+                                .frame(width: 28, height: 28)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                        .fill(Color.white.opacity(isExpanded ? 0.08 : 0.035))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                        .stroke(Color.white.opacity(isExpanded ? 0.10 : 0.06), lineWidth: 1)
+                                )
+                                .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("filmtone.sheet.advanced.group.\(id)")
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("filmtone.sheet.advanced.group.\(id)")
+
+                    FilmtoneHelpIconButton(
+                        accessibilityLabel: helpAccessibilityLabel,
+                        accessibilityIdentifier: "filmtone.help.advanced.group.\(id)",
+                        action: onHelp
+                    )
+                    }
 
                 HStack(spacing: 8) {
                     ForEach(recipes) { recipe in
@@ -956,12 +1527,33 @@ private struct FilmtoneParamPresetChip: View {
     }
 }
 
+private struct FilmtoneHelpIconButton: View {
+    let accessibilityLabel: String
+    let accessibilityIdentifier: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "info.circle")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.filmtoneAmber.opacity(0.84))
+                .frame(width: 30, height: 30)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(accessibilityLabel))
+        .accessibilityIdentifier(accessibilityIdentifier)
+    }
+}
+
 private struct FilmtoneDisclosureSection<Content: View>: View {
     let title: String
     let summary: String
     let accessibilityIdentifier: String
     let contentSpacing: CGFloat
+    let helpAccessibilityLabel: String?
     @Binding var isExpanded: Bool
+    let helpAction: (() -> Void)?
     let content: Content
 
     private var disclosureAnimation: Animation {
@@ -974,6 +1566,49 @@ private struct FilmtoneDisclosureSection<Content: View>: View {
         accessibilityIdentifier: String,
         isExpanded: Binding<Bool>,
         contentSpacing: CGFloat = 16,
+        helpAccessibilityLabel: String? = nil,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.init(
+            title: title,
+            summary: summary,
+            accessibilityIdentifier: accessibilityIdentifier,
+            isExpanded: isExpanded,
+            contentSpacing: contentSpacing,
+            helpAccessibilityLabel: helpAccessibilityLabel,
+            helpAction: nil,
+            content: content
+        )
+    }
+
+    init(
+        title: String,
+        summary: String,
+        accessibilityIdentifier: String,
+        isExpanded: Binding<Bool>,
+        contentSpacing: CGFloat = 16,
+        helpAccessibilityLabel: String? = nil,
+        @ViewBuilder content: () -> Content,
+        helpAction: @escaping () -> Void
+    ) {
+        self.title = title
+        self.summary = summary
+        self.accessibilityIdentifier = accessibilityIdentifier
+        self._isExpanded = isExpanded
+        self.contentSpacing = contentSpacing
+        self.helpAccessibilityLabel = helpAccessibilityLabel
+        self.helpAction = helpAction
+        self.content = content()
+    }
+
+    private init(
+        title: String,
+        summary: String,
+        accessibilityIdentifier: String,
+        isExpanded: Binding<Bool>,
+        contentSpacing: CGFloat,
+        helpAccessibilityLabel: String?,
+        helpAction: (() -> Void)?,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
@@ -981,6 +1616,8 @@ private struct FilmtoneDisclosureSection<Content: View>: View {
         self.accessibilityIdentifier = accessibilityIdentifier
         self._isExpanded = isExpanded
         self.contentSpacing = contentSpacing
+        self.helpAccessibilityLabel = helpAccessibilityLabel
+        self.helpAction = helpAction
         self.content = content()
     }
 
@@ -991,50 +1628,61 @@ private struct FilmtoneDisclosureSection<Content: View>: View {
         )
 
         VStack(alignment: .leading, spacing: 0) {
-            Button {
-                withAnimation(disclosureAnimation) {
-                    isExpanded.toggle()
-                }
-            } label: {
-                HStack(alignment: .top, spacing: 14) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(title)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.white.opacity(isExpanded ? 0.64 : 0.52))
-
-                        if !summary.isEmpty {
-                            Text(summary)
-                                .font(.subheadline)
-                                .foregroundStyle(.white.opacity(isExpanded ? 0.84 : 0.76))
-                                .multilineTextAlignment(.leading)
-                                .lineLimit(2)
-                        }
+            HStack(alignment: .top, spacing: 8) {
+                Button {
+                    withAnimation(disclosureAnimation) {
+                        isExpanded.toggle()
                     }
+                } label: {
+                    HStack(alignment: .top, spacing: 14) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(title)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.white.opacity(isExpanded ? 0.64 : 0.52))
 
-                    Spacer(minLength: 12)
+                            if !summary.isEmpty {
+                                Text(summary)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.white.opacity(isExpanded ? 0.84 : 0.76))
+                                    .multilineTextAlignment(.leading)
+                                    .lineLimit(2)
+                            }
+                        }
 
-                    Image(systemName: "chevron.down")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.white.opacity(isExpanded ? 0.88 : 0.62))
-                        .frame(width: 28, height: 28)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(Color.white.opacity(isExpanded ? 0.08 : 0.035))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .stroke(Color.white.opacity(isExpanded ? 0.10 : 0.06), lineWidth: 1)
-                        )
-                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
-                        .padding(.top, 2)
+                        Spacer(minLength: 12)
+
+                        Image(systemName: "chevron.down")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white.opacity(isExpanded ? 0.88 : 0.62))
+                            .frame(width: 28, height: 28)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(Color.white.opacity(isExpanded ? 0.08 : 0.035))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .stroke(Color.white.opacity(isExpanded ? 0.10 : 0.06), lineWidth: 1)
+                            )
+                            .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                            .padding(.top, 2)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
-                .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 16)
-                .contentShape(Rectangle())
+                .buttonStyle(.plain)
+                .accessibilityIdentifier(accessibilityIdentifier)
+
+                if let helpAction, let helpAccessibilityLabel {
+                    FilmtoneHelpIconButton(
+                        accessibilityLabel: helpAccessibilityLabel,
+                        accessibilityIdentifier: "\(accessibilityIdentifier).help",
+                        action: helpAction
+                    )
+                    .padding(.top, 2)
+                }
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier(accessibilityIdentifier)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 16)
 
             Rectangle()
                 .fill(Color.white.opacity(0.08))
@@ -1083,8 +1731,10 @@ private struct FilmtoneSliderRow: View {
     let range: ClosedRange<Double>
     let format: (Double) -> String
     var isActive = false
+    let helpAccessibilityLabel: String
     let accessibilityIdentifier: String
     let onChange: (Double) -> Void
+    let helpAction: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -1092,6 +1742,12 @@ private struct FilmtoneSliderRow: View {
                 Text(label)
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(isActive ? Color.filmtoneAmber.opacity(0.92) : .white.opacity(0.92))
+
+                FilmtoneHelpIconButton(
+                    accessibilityLabel: helpAccessibilityLabel,
+                    accessibilityIdentifier: "\(accessibilityIdentifier).help",
+                    action: helpAction
+                )
 
                 Spacer()
 

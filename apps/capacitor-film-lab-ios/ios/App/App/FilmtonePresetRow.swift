@@ -46,6 +46,8 @@ struct FilmtonePresetRow: View {
                         )
                     }
                     .buttonStyle(.plain)
+                    .accessibilityValue(isActive ? "Selected" : "")
+                    .accessibilityAddTraits(isActive ? .isSelected : [])
                     .accessibilityIdentifier("filmtone.preset.card.\(preset.name)")
                 }
             }

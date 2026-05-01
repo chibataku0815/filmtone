@@ -594,6 +594,14 @@ final class FilmtoneEditorStore: ObservableObject {
         hasQuickAdjustments || hasAdvancedAdjustments
     }
 
+    var hasPresetCustomValues: Bool {
+        abs(project.strength - FilmtonePhase0Math.presetStrengthDefault) >= FilmtonePhase0Math.paramEqualityTolerance ||
+            abs(project.quickState.filmCharacter) >= FilmtonePhase0Math.paramEqualityTolerance ||
+            abs(project.quickState.era) >= FilmtonePhase0Math.paramEqualityTolerance ||
+            abs(project.quickState.dynamics) >= FilmtonePhase0Math.paramEqualityTolerance ||
+            hasAdvancedAdjustments
+    }
+
     var advancedSummaryText: String {
         hasAdvancedAdjustments ? strings.advancedAdjustmentsActive : strings.advancedParamsHint
     }
@@ -925,12 +933,16 @@ final class FilmtoneEditorStore: ObservableObject {
         recomputeProjectParams()
     }
 
-    func resetAdjustments() {
+    func restoreActivePresetDefaults() {
         appliedSavedLookId = nil
         project.quickState = .zero
         project.strength = FilmtonePhase0Math.presetStrengthDefault
         project.paramOverrides = .empty
         recomputeProjectParams()
+    }
+
+    func resetAdjustments() {
+        restoreActivePresetDefaults()
     }
 
     func setCompareHeld(_ isHeld: Bool) {

@@ -36,6 +36,13 @@ func filmtoneLocalizedNumber(
     return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
 }
 
+struct FilmtoneAdjustmentHelpCopy {
+    let title: String
+    let body: String
+    let effect: String
+    let guidance: String?
+}
+
 struct FilmtoneStrings {
     let locale: Locale
     let appName: String
@@ -82,6 +89,7 @@ struct FilmtoneStrings {
     let previewGradedLabel: String
     let previewExpandLabel: String
     let presetTitle: String
+    let presetDefaultLabel: String
     let strengthLabel: String
     let adjustLabel: String
     let adjustOpenLabel: String
@@ -272,6 +280,331 @@ extension FilmtoneStrings {
         case "rec709":         return cameraRec709
         default:               return nil
         }
+    }
+}
+
+extension FilmtoneStrings {
+    var adjustmentHelpBeforeLabel: String {
+        filmtoneLocalized(
+            "filmtone.help.adjustment.compare.before",
+            defaultValue: usesJapaneseTypography ? "調整前" : "Before",
+            comment: "Label for the before side of an adjustment help comparison image."
+        )
+    }
+
+    var adjustmentHelpAfterLabel: String {
+        filmtoneLocalized(
+            "filmtone.help.adjustment.compare.after",
+            defaultValue: usesJapaneseTypography ? "効果" : "Effect",
+            comment: "Label for the after side of an adjustment help comparison image."
+        )
+    }
+
+    var adjustmentHelpEffectLabel: String {
+        filmtoneLocalized(
+            "filmtone.help.adjustment.effect_label",
+            defaultValue: usesJapaneseTypography ? "見た目の変化" : "Visual effect",
+            comment: "Section label inside adjustment help sheets."
+        )
+    }
+
+    var adjustmentHelpGuidanceLabel: String {
+        filmtoneLocalized(
+            "filmtone.help.adjustment.guidance_label",
+            defaultValue: usesJapaneseTypography ? "使いどころ" : "Use when",
+            comment: "Section label inside adjustment help sheets."
+        )
+    }
+
+    func adjustmentHelpAccessibilityLabel(for title: String) -> String {
+        let format = filmtoneLocalized(
+            "filmtone.help.adjustment.a11y_format",
+            defaultValue: usesJapaneseTypography ? "%@の説明" : "About %@",
+            comment: "Accessibility label format for adjustment help buttons."
+        )
+        return String(format: format, locale: locale, title)
+    }
+
+    func strengthHelpCopy() -> FilmtoneAdjustmentHelpCopy {
+        localizedHelpCopy(
+            id: "strength",
+            title: strengthLabel,
+            body: usesJapaneseTypography
+                ? "選んだ Look 全体のかかり具合です。0%に近いほど元素材に戻り、100%で Look の色、階調、光学効果をそのまま反映します。"
+                : "Controls how much of the selected Look is applied. Near 0% stays close to the source; 100% keeps the Look's color, tone, and optical effects intact.",
+            effect: usesJapaneseTypography
+                ? "色味、コントラスト、グロー、粒状感をまとめて薄めたり濃くしたりします。"
+                : "Fades or intensifies color, contrast, glow, and grain together.",
+            guidance: usesJapaneseTypography
+                ? "Look の方向は合っているが、効きが強すぎる／弱すぎる時に最初に調整します。"
+                : "Start here when the Look direction is right but the grade feels too strong or too light."
+        )
+    }
+
+    func quickAdjustmentSectionHelpCopy() -> FilmtoneAdjustmentHelpCopy {
+        localizedHelpCopy(
+            id: "quick.section",
+            title: adjustLabel,
+            body: usesJapaneseTypography
+                ? "明るさ、コントラスト、彩度を大きい軸で整える場所です。細かい光学効果に入る前に、素材全体の読みやすさを決めます。"
+                : "Broad controls for brightness, contrast, and saturation. Set the readable base of the image before moving into detailed optical controls.",
+            effect: usesJapaneseTypography
+                ? "画面全体の明るさ、濃さ、色の密度が変わります。"
+                : "Changes the overall brightness, density, and color presence of the frame.",
+            guidance: usesJapaneseTypography
+                ? "まずここで素材の基準を作り、必要な時だけ Advanced Params で質感を追い込みます。"
+                : "Use these first to set the base, then refine texture in Advanced Params only when needed."
+        )
+    }
+
+    func advancedParamsSectionHelpCopy() -> FilmtoneAdjustmentHelpCopy {
+        localizedHelpCopy(
+            id: "advanced.section",
+            title: advancedParamsLabel,
+            body: usesJapaneseTypography
+                ? "フィルム処理、レンズ、グロー、粒状感、動画の動きまで直接触る詳細調整です。プリセットチップで方向を選び、必要なパラメーターだけ細かく動かせます。"
+                : "Direct controls for film process, lens behavior, glow, grain, and video motion. Pick a recipe chip, then adjust only the parameters that need detail.",
+            effect: usesJapaneseTypography
+                ? "Look の質感や空気感を、通常の明るさ・彩度より深い層で変えます。"
+                : "Shapes texture and atmosphere deeper than ordinary brightness or saturation controls.",
+            guidance: usesJapaneseTypography
+                ? "クイック調整で足りない時、または作品の質感を明確に作り込みたい時に使います。"
+                : "Use when quick adjustments are not enough or when the piece needs a specific tactile finish."
+        )
+    }
+
+    func quickFilmCharacterHelpCopy() -> FilmtoneAdjustmentHelpCopy {
+        localizedHelpCopy(
+            id: "quick.exposure",
+            title: quickFilmCharacter,
+            body: usesJapaneseTypography
+                ? "素材全体の明るさを動かします。白飛びを増やすためではなく、主役の見え方を整えるための軸です。"
+                : "Moves the overall brightness of the source. It is for placing the subject, not for forcing clipped highlights.",
+            effect: usesJapaneseTypography
+                ? "上げると軽く明るい印象に、下げると落ち着いた密度のある印象になります。"
+                : "Raise it for a lighter read; lower it for a denser, calmer image.",
+            guidance: usesJapaneseTypography
+                ? "顔や主役が暗い時、または明るすぎて画が軽く見える時に調整します。"
+                : "Use when faces or subjects sit too dark, or when the frame feels too light."
+        )
+    }
+
+    func quickEraHelpCopy() -> FilmtoneAdjustmentHelpCopy {
+        localizedHelpCopy(
+            id: "quick.contrast",
+            title: quickEra,
+            body: usesJapaneseTypography
+                ? "暗部と明部の差を調整します。画の締まり、フィルムプリントの濃さ、柔らかさを決めます。"
+                : "Controls the distance between shadows and highlights, setting image snap, print density, and softness.",
+            effect: usesJapaneseTypography
+                ? "上げると締まった印象に、下げると柔らかく淡い印象になります。"
+                : "Raise it for a tighter image; lower it for a softer, more open grade.",
+            guidance: usesJapaneseTypography
+                ? "眠い画を締めたい時、または影が硬すぎる時に使います。"
+                : "Use when the image feels flat, or when the shadows are becoming too hard."
+        )
+    }
+
+    func quickDynamicsHelpCopy() -> FilmtoneAdjustmentHelpCopy {
+        localizedHelpCopy(
+            id: "quick.saturation",
+            title: quickDynamics,
+            body: usesJapaneseTypography
+                ? "色の密度を調整します。肌、空、照明色の主張をまとめて強めたり抑えたりします。"
+                : "Controls color density across skin, sky, practical lights, and the overall palette.",
+            effect: usesJapaneseTypography
+                ? "上げると色が前に出て、下げると落ち着いた映画調に寄ります。"
+                : "Raise it to bring colors forward; lower it for a quieter cinematic palette.",
+            guidance: usesJapaneseTypography
+                ? "スマホらしい派手さを抑えたい時、または色が足りず弱く見える時に触ります。"
+                : "Use when phone footage feels too loud, or when the color feels underpowered."
+        )
+    }
+
+    func advancedGroupHelpCopy(for id: String, title: String) -> FilmtoneAdjustmentHelpCopy {
+        switch id {
+        case "process":
+            return localizedHelpCopy(
+                id: "group.process",
+                title: title,
+                body: usesJapaneseTypography
+                    ? "フィルムプリントの階調と色の偏りを作るグループです。CMY とコントラスト、ハイライトの丸まりをまとめて扱います。"
+                    : "Builds film-print tone and color bias through CMY balance, print contrast, and highlight rolloff.",
+                effect: usesJapaneseTypography
+                    ? "画全体の色の傾き、黒の締まり、ハイライトの柔らかさが変わります。"
+                    : "Changes global color bias, black density, and how gently highlights roll off.",
+                guidance: usesJapaneseTypography
+                    ? "Look の色方向や階調の芯を決めたい時に最初に開きます。"
+                    : "Open this first when the Look needs a clearer color direction or tonal core."
+            )
+        case "optics":
+            return localizedHelpCopy(
+                id: "group.optics",
+                title: title,
+                body: usesJapaneseTypography
+                    ? "レンズ由来の柔らかさ、周辺落ち、色収差を作るグループです。デジタルの硬さを減らし、画面端までの質感を整えます。"
+                    : "Shapes lens softness, edge falloff, and color fringing to reduce digital harshness and tune the frame edges.",
+                effect: usesJapaneseTypography
+                    ? "中心は見せつつ、端の光や輪郭にレンズらしい癖が出ます。"
+                    : "Keeps the center readable while giving edges and highlights a lens character.",
+                guidance: usesJapaneseTypography
+                    ? "素材がシャープすぎる時、または視線を中心に集めたい時に使います。"
+                    : "Use when footage feels too clinical or when attention should sit nearer the center."
+            )
+        case "glow":
+            return localizedHelpCopy(
+                id: "group.glow",
+                title: title,
+                body: usesJapaneseTypography
+                    ? "明るい部分のにじみ、ハレーション、拡散を作るグループです。光源や白い反射の質感を映画的に整えます。"
+                    : "Controls bloom, halation, and diffusion around bright areas so light sources and white reflections feel more cinematic.",
+                effect: usesJapaneseTypography
+                    ? "光が少し広がり、赤みや柔らかい膜感が加わります。"
+                    : "Light spreads outward, with optional red warmth and a soft veil.",
+                guidance: usesJapaneseTypography
+                    ? "夜景、逆光、窓、照明が主役になる素材で特に効きます。"
+                    : "Most useful for night scenes, backlight, windows, and practical lights."
+            )
+        case "grain":
+            return localizedHelpCopy(
+                id: "group.grain",
+                title: title,
+                body: usesJapaneseTypography
+                    ? "粒状感の強さ、大きさ、周辺での出方を調整します。平坦なデジタル面に細かい密度を足します。"
+                    : "Controls grain strength, size, and edge emphasis, adding fine density to otherwise flat digital surfaces.",
+                effect: usesJapaneseTypography
+                    ? "均一な面に細かい揺らぎが入り、画が少し有機的になります。"
+                    : "Adds fine texture to smooth areas so the frame feels more organic.",
+                guidance: usesJapaneseTypography
+                    ? "空、壁、暗部がのっぺり見える時に少量から足します。"
+                    : "Add lightly when skies, walls, or shadows look too clean."
+            )
+        case "motion":
+            return localizedHelpCopy(
+                id: "group.motion",
+                title: title,
+                body: usesJapaneseTypography
+                    ? "動画の動きの残り方を調整します。シャッター感と残像で、動きの硬さや滑らかさを整えます。"
+                    : "Tunes how motion carries through video frames, using shutter feel and trails to soften or emphasize movement.",
+                effect: usesJapaneseTypography
+                    ? "動く被写体に残像や流れが出て、動画の硬いパラパラ感を抑えられます。"
+                    : "Moving subjects gain trails or flow, reducing a harsh staccato feel.",
+                guidance: usesJapaneseTypography
+                    ? "歩き撮り、車窓、手持ちの動きが硬く見える動画で使います。"
+                    : "Use on walking shots, vehicles, or handheld video that feels too crisp."
+            )
+        default:
+            return advancedParamsSectionHelpCopy()
+        }
+    }
+
+    func paramHelpCopy(for key: String, label: String) -> FilmtoneAdjustmentHelpCopy {
+        switch key {
+        case "cyan":
+            return paramHelpCopy(id: key, title: label, jaBody: "赤とシアンのバランスを動かします。肌や影の赤みを抑えたり、クールな方向へ寄せられます。", enBody: "Moves the red/cyan print balance, cooling shadows or reducing excess red in skin.", jaEffect: "上げるとシアン寄り、下げると赤寄りになります。", enEffect: "Higher values lean cyan; lower values lean red.")
+        case "magenta":
+            return paramHelpCopy(id: key, title: label, jaBody: "緑とマゼンタのバランスを動かします。蛍光灯っぽい緑かぶりや、肌の血色感を調整します。", enBody: "Moves the green/magenta balance to correct green cast or shape skin warmth.", jaEffect: "上げるとマゼンタ寄り、下げると緑寄りになります。", enEffect: "Higher values lean magenta; lower values lean green.")
+        case "yellow":
+            return paramHelpCopy(id: key, title: label, jaBody: "青と黄のバランスを動かします。夕景の温度感や、青みの強い素材の中和に効きます。", enBody: "Moves the blue/yellow balance for sunset warmth or neutralizing overly blue footage.", jaEffect: "上げると黄色寄り、下げると青寄りになります。", enEffect: "Higher values lean yellow; lower values lean blue.")
+        case "printContrast":
+            return paramHelpCopy(id: key, title: label, jaBody: "フィルムプリントの濃さを足すコントラストです。普通の Contrast より、Look の芯を締める目的で使います。", enBody: "Adds film-print density. It tightens the core of the Look more than a plain contrast slider.", jaEffect: "上げると黒が締まり、明暗差がはっきりします。", enEffect: "Higher values deepen blacks and make tonal separation clearer.")
+        case "compressionAmount":
+            return paramHelpCopy(id: key, title: label, jaBody: "明るい部分の硬さを丸める量です。白い反射や空の抜けを少し柔らかくします。", enBody: "Controls how much bright detail is rounded off, softening white reflections and open skies.", jaEffect: "上げるとハイライトが穏やかに転びます。", enEffect: "Higher values make highlights roll off more gently.")
+        case "compressionRange":
+            return paramHelpCopy(id: key, title: label, jaBody: "ハイライトの丸まりがどの範囲まで入るかを決めます。狭いと白に近い部分だけ、広いと中間調にも影響します。", enBody: "Sets how far highlight compression reaches. Narrow affects only near-white tones; wide reaches into midtones.", jaEffect: "上げると柔らかくなる範囲が広がります。", enEffect: "Higher values spread the soft rolloff across more tones.")
+        case "rgbShift":
+            return paramHelpCopy(id: key, title: label, jaBody: "輪郭の端にわずかな色ズレを加えます。古いレンズやフィルムスキャンの癖に近い効果です。", enBody: "Adds slight color separation on edges, closer to old lens or scanned-film character.", jaEffect: "上げると輪郭に赤やシアンのにじみが出ます。", enEffect: "Higher values add red/cyan fringing around edges.")
+        case "lensSoftness":
+            return paramHelpCopy(id: key, title: label, jaBody: "解像の硬さを少し落として、レンズ越しの柔らかさを作ります。", enBody: "Reduces hard digital sharpness and adds a softer lens feel.", jaEffect: "上げると細部がやわらぎ、肌や光がなめらかに見えます。", enEffect: "Higher values soften fine detail, skin, and light transitions.")
+        case "vignette":
+            return paramHelpCopy(id: key, title: label, jaBody: "画面の周辺を少し落として、視線を中央へ集めます。", enBody: "Darkens frame edges slightly to pull attention toward the center.", jaEffect: "上げると四隅が暗くなり、中心が立ちます。", enEffect: "Higher values darken corners and emphasize the center.")
+        case "bloomThreshold":
+            return paramHelpCopy(id: key, title: label, jaBody: "どの明るさから Bloom が反応するかを決めます。", enBody: "Sets which bright tones are allowed to trigger bloom.", jaEffect: "下げるほど、より多くの明るい面がにじみます。", enEffect: "Lower values let more bright areas glow.")
+        case "bloomStrength":
+            return paramHelpCopy(id: key, title: label, jaBody: "白い光や反射のにじみの強さです。", enBody: "Controls the strength of glow around white light and reflections.", jaEffect: "上げると光がより前に出ます。", enEffect: "Higher values make bright glow more visible.")
+        case "bloomRadius":
+            return paramHelpCopy(id: key, title: label, jaBody: "Bloom がどれくらい広がるかを決めます。", enBody: "Sets how far bloom spreads from the bright source.", jaEffect: "上げると光の広がりが大きくなります。", enEffect: "Higher values create a wider glow.")
+        case "bloomSoftKnee":
+            return paramHelpCopy(id: key, title: label, jaBody: "Bloom の入り方を柔らかくします。急に光る感じを抑えます。", enBody: "Softens how bloom enters, avoiding a sudden glow cutoff.", jaEffect: "上げると自然にじわっと光ります。", enEffect: "Higher values make bloom ease in more naturally.")
+        case "halationIntensity":
+            return paramHelpCopy(id: key, title: label, jaBody: "強い光の周りに赤みのあるハレーションを加えます。", enBody: "Adds reddish halation around strong light sources.", jaEffect: "上げると光の周辺に赤い熱が出ます。", enEffect: "Higher values add more red warmth around highlights.")
+        case "halationSpread":
+            return paramHelpCopy(id: key, title: label, jaBody: "ハレーションが横方向にどれくらい広がるかを決めます。", enBody: "Controls how far halation spreads outward.", jaEffect: "上げると赤みの輪が広がります。", enEffect: "Higher values widen the red halo.")
+        case "halationHue":
+            return paramHelpCopy(id: key, title: label, jaBody: "ハレーションの色相を動かします。赤、橙、黄寄りのどこに置くかを調整します。", enBody: "Moves halation hue between red, orange, and yellow warmth.", jaEffect: "値を変えると光の熱っぽさの色が変わります。", enEffect: "Changing the value shifts the color of the highlight warmth.")
+        case "halationThreshold":
+            return paramHelpCopy(id: key, title: label, jaBody: "どの明るさからハレーションを出すかを決めます。", enBody: "Sets which bright tones trigger halation.", jaEffect: "下げるほど、多くのハイライトに赤みが乗ります。", enEffect: "Lower values apply red warmth to more highlights.")
+        case "halationRadius":
+            return paramHelpCopy(id: key, title: label, jaBody: "ハレーションのぼかし半径です。光の輪郭の柔らかさを決めます。", enBody: "Controls halation blur radius and edge softness.", jaEffect: "上げると赤いにじみが大きく柔らかくなります。", enEffect: "Higher values make the red bloom larger and softer.")
+        case "halationSoftKnee":
+            return paramHelpCopy(id: key, title: label, jaBody: "ハレーションの出始めを滑らかにします。", enBody: "Smooths the point where halation starts appearing.", jaEffect: "上げると不自然な境目が減ります。", enEffect: "Higher values reduce hard transitions in the red glow.")
+        case "diffusion":
+            return paramHelpCopy(id: key, title: label, jaBody: "画全体に薄い拡散を加えます。肌や光の硬さをやわらげます。", enBody: "Adds a subtle diffusion veil across the image, softening skin and light.", jaEffect: "上げると少し膜のある柔らかい画になります。", enEffect: "Higher values create a softer, slightly veiled image.")
+        case "grainIntensity":
+            return paramHelpCopy(id: key, title: label, jaBody: "粒状感の量を決めます。", enBody: "Controls how much grain is added.", jaEffect: "上げると粒が見えやすくなります。", enEffect: "Higher values make grain more visible.")
+        case "grainSize":
+            return paramHelpCopy(id: key, title: label, jaBody: "粒の大きさを調整します。", enBody: "Controls the size of the grain pattern.", jaEffect: "上げると粒が大きく荒く見えます。", enEffect: "Higher values make grain larger and rougher.")
+        case "grainRadialMix":
+            return paramHelpCopy(id: key, title: label, jaBody: "画面の周辺で粒を少し強く見せる量です。", enBody: "Controls how much grain is emphasized toward the frame edges.", jaEffect: "上げると端の質感が少し濃くなります。", enEffect: "Higher values make edge texture denser.")
+        case "shutterAngle":
+            return paramHelpCopy(id: key, title: label, jaBody: "動画のシャッター感を調整します。大きいほど動きにブラーが残りやすくなります。", enBody: "Controls video shutter feel. Larger values let motion blur carry farther.", jaEffect: "上げると動きが滑らかに流れます。", enEffect: "Higher values make motion flow more smoothly.")
+        case "trailIntensity":
+            return paramHelpCopy(id: key, title: label, jaBody: "動く被写体に残る軌跡の強さです。", enBody: "Controls how strongly moving subjects leave a trail.", jaEffect: "上げると残像がはっきり出ます。", enEffect: "Higher values make trails more apparent.")
+        default:
+            return paramHelpCopy(id: key, title: label, jaBody: "このパラメーターは Look の細部を直接調整します。少しずつ動かして、プレビューで変化を確認してください。", enBody: "This parameter directly adjusts a detail of the Look. Move it gradually and judge it in the preview.", jaEffect: "値に応じて現在の Look の質感が変わります。", enEffect: "The current Look's texture changes as the value moves.")
+        }
+    }
+
+    private func paramHelpCopy(
+        id: String,
+        title: String,
+        jaBody: String,
+        enBody: String,
+        jaEffect: String,
+        enEffect: String
+    ) -> FilmtoneAdjustmentHelpCopy {
+        localizedHelpCopy(
+            id: "param.\(id)",
+            title: title,
+            body: usesJapaneseTypography ? jaBody : enBody,
+            effect: usesJapaneseTypography ? jaEffect : enEffect,
+            guidance: usesJapaneseTypography
+                ? "変化が強く見えやすいので、必要な部分だけ少量ずつ足します。"
+                : "These changes can become visible quickly, so add only the amount the shot needs."
+        )
+    }
+
+    private func localizedHelpCopy(
+        id: String,
+        title: String,
+        body: String,
+        effect: String,
+        guidance: String?
+    ) -> FilmtoneAdjustmentHelpCopy {
+        FilmtoneAdjustmentHelpCopy(
+            title: filmtoneLocalized(
+                "filmtone.help.adjustment.\(id).title",
+                defaultValue: title,
+                comment: "Title for adjustment help sheet."
+            ),
+            body: filmtoneLocalized(
+                "filmtone.help.adjustment.\(id).body",
+                defaultValue: body,
+                comment: "Body copy for adjustment help sheet."
+            ),
+            effect: filmtoneLocalized(
+                "filmtone.help.adjustment.\(id).effect",
+                defaultValue: effect,
+                comment: "Effect explanation for adjustment help sheet."
+            ),
+            guidance: guidance.map { defaultGuidance in
+                filmtoneLocalized(
+                    "filmtone.help.adjustment.\(id).guidance",
+                    defaultValue: defaultGuidance,
+                    comment: "Usage guidance for adjustment help sheet."
+                )
+            }
+        )
     }
 }
 
@@ -485,6 +818,11 @@ extension FilmtoneStrings {
             "filmtone.preset.title",
             defaultValue: "Film Presets",
             comment: "Section title for presets."
+        )
+        presetDefaultLabel = filmtoneLocalized(
+            "filmtone.preset.default",
+            defaultValue: prefersJapanese ? "デフォルト" : "Default",
+            comment: "Action label to restore the active preset to its default values."
         )
         strengthLabel = filmtoneLocalized(
             "filmtone.adjustment.strength",

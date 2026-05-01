@@ -48,6 +48,26 @@ final class FilmtoneSnapshotsUITests: XCTestCase {
         app.terminate()
     }
 
+    func testPresetDefaultRestoresCustomizedActivePreset() throws {
+        let app = launch(scene: .presets)
+        waitForAppToSettle(app)
+
+        let activePresetCard = app.buttons["filmtone.preset.card.amberGlow"]
+        XCTAssertTrue(activePresetCard.waitForExistence(timeout: 5))
+        XCTAssertEqual(activePresetCard.value as? String, "Selected")
+
+        let defaultButton = app.descendants(matching: .any)["filmtone.preset.default"]
+        XCTAssertTrue(defaultButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(defaultButton.isEnabled)
+        defaultButton.tap()
+
+        XCTAssertTrue(activePresetCard.waitForExistence(timeout: 5))
+        XCTAssertEqual(activePresetCard.value as? String, "Selected")
+        XCTAssertTrue(waitForElementToDisappear(defaultButton, timeout: 5))
+
+        app.terminate()
+    }
+
     func testCameraProfileShowsInputAndCreativeLutControls() throws {
         let app = launch(scene: .camera)
         waitForAppToSettle(app)
