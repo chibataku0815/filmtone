@@ -232,12 +232,48 @@ struct ParsedCubeLutDTO: Codable, Equatable {
     let size: Int
     let data: [Double]
     let intensity: Double
+    /// v1.4 Creative LUT Pack 01 provenance — additive, defaults nil.
+    let bundledSlug: String?
+    let bundledPackId: String?
+
+    init(
+        title: String,
+        size: Int,
+        data: [Double],
+        intensity: Double,
+        bundledSlug: String? = nil,
+        bundledPackId: String? = nil
+    ) {
+        self.title = title
+        self.size = size
+        self.data = data
+        self.intensity = intensity
+        self.bundledSlug = bundledSlug
+        self.bundledPackId = bundledPackId
+    }
 }
 
 struct SerializableLutDTO: Codable, Equatable {
     let size: Int
     let data: [Double]
     let intensity: Double
+    /// v1.4 Creative LUT Pack 01 provenance — mirrored from `ParsedCubeLutDTO`.
+    let bundledSlug: String?
+    let bundledPackId: String?
+
+    init(
+        size: Int,
+        data: [Double],
+        intensity: Double,
+        bundledSlug: String? = nil,
+        bundledPackId: String? = nil
+    ) {
+        self.size = size
+        self.data = data
+        self.intensity = intensity
+        self.bundledSlug = bundledSlug
+        self.bundledPackId = bundledPackId
+    }
 }
 
 struct Phase0GradeDTO: Codable {

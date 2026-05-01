@@ -209,26 +209,38 @@ extension SavedLookEntry {
     }
 }
 
-/// Two flavors of creative-LUT reference inside a Saved Look:
+/// Three flavors of creative-LUT reference inside a Saved Look:
 /// - `.libraryRef` is the normal path — the look refers to a library entry
 ///   by id, with a per-look intensity. The library is SSOT for the LUT data.
 /// - `.embedded` is the self-healing path — when a library LUT is deleted,
 ///   we inline the data into every look that referenced it. The look stays
 ///   playable even after the user wipes their library.
+/// - `.bundled` (v1.4 Creative LUT Pack 01) is the read-only path — the
+///   look refers to a `.cube` shipped in `Bundle.main` under
+///   `Resources/CreativeLuts/`. Resolution is deterministic from
+///   `(filename, sha256)`, so the binding is downgrade-safe by construction:
+///   built-in catalog Looks never persist to disk (they materialize at read
+///   time via `FilmtoneBuiltInCatalog.materializeAsSavedLookEntry`), so a
+///   v1.3 client never decodes a `.bundled` payload from JSON.
 enum CreativeLutBinding: Codable, Equatable, Sendable {
     case libraryRef(id: UUID, intensity: Double)
     case embedded(lut: SavedLookEmbeddedLut, intensity: Double)
+    case bundled(slug: String, filename: String, sha256: String, intensity: Double)
 
     private enum CodingKeys: String, CodingKey {
         case kind
         case libraryId
         case lut
         case intensity
+        case slug
+        case filename
+        case sha256
     }
 
     private enum Kind: String, Codable {
         case libraryRef
         case embedded
+        case bundled
     }
 
     init(from decoder: Decoder) throws {
@@ -242,6 +254,11 @@ enum CreativeLutBinding: Codable, Equatable, Sendable {
         case .embedded:
             let lut = try container.decode(SavedLookEmbeddedLut.self, forKey: .lut)
             self = .embedded(lut: lut, intensity: intensity)
+        case .bundled:
+            let slug = try container.decode(String.self, forKey: .slug)
+            let filename = try container.decode(String.self, forKey: .filename)
+            let sha256 = try container.decode(String.self, forKey: .sha256)
+            self = .bundled(slug: slug, filename: filename, sha256: sha256, intensity: intensity)
         }
     }
 
@@ -256,12 +273,20 @@ enum CreativeLutBinding: Codable, Equatable, Sendable {
             try container.encode(Kind.embedded, forKey: .kind)
             try container.encode(lut, forKey: .lut)
             try container.encode(intensity, forKey: .intensity)
+        case .bundled(let slug, let filename, let sha256, let intensity):
+            try container.encode(Kind.bundled, forKey: .kind)
+            try container.encode(slug, forKey: .slug)
+            try container.encode(filename, forKey: .filename)
+            try container.encode(sha256, forKey: .sha256)
+            try container.encode(intensity, forKey: .intensity)
         }
     }
 
     var intensity: Double {
         switch self {
-        case .libraryRef(_, let intensity), .embedded(_, let intensity):
+        case .libraryRef(_, let intensity),
+             .embedded(_, let intensity),
+             .bundled(_, _, _, let intensity):
             return intensity
         }
     }
@@ -269,6 +294,17 @@ enum CreativeLutBinding: Codable, Equatable, Sendable {
     var libraryId: UUID? {
         if case .libraryRef(let id, _) = self {
             return id
+        }
+        return nil
+    }
+
+    /// v1.4: `bundledSlug` for sidecar provenance. nil for `.libraryRef` /
+    /// `.embedded`. Built-in catalog readers thread this through to the
+    /// outgoing export DTO so `FilmtoneExportSidecarBuilder` can stamp it
+    /// onto `SidecarLutRef.bundledSlug`.
+    var bundledSlug: String? {
+        if case .bundled(let slug, _, _, _) = self {
+            return slug
         }
         return nil
     }

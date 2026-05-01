@@ -137,6 +137,40 @@ struct SidecarLutRef: Encodable {
     let size: Int
     let intensity: Double
     let sourceHash: String?
+    /// v1.4 Creative LUT Pack 01 provenance — emitted only when the LUT
+    /// originated from a `CreativeLutBinding.bundled` catalog entry. nil
+    /// for user-imported LUTs and library-resolved LUTs. Encoded with
+    /// `encodeIfPresent` so pre-v1.4 sidecar consumers that ignore unknown
+    /// keys remain compatible (V1 schema additive).
+    let bundledSlug: String?
+    let bundledPackId: String?
+
+    init(
+        size: Int,
+        intensity: Double,
+        sourceHash: String?,
+        bundledSlug: String? = nil,
+        bundledPackId: String? = nil
+    ) {
+        self.size = size
+        self.intensity = intensity
+        self.sourceHash = sourceHash
+        self.bundledSlug = bundledSlug
+        self.bundledPackId = bundledPackId
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case size, intensity, sourceHash, bundledSlug, bundledPackId
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(size, forKey: .size)
+        try c.encode(intensity, forKey: .intensity)
+        try c.encodeIfPresent(sourceHash, forKey: .sourceHash)
+        try c.encodeIfPresent(bundledSlug, forKey: .bundledSlug)
+        try c.encodeIfPresent(bundledPackId, forKey: .bundledPackId)
+    }
 }
 
 struct SidecarLutRefs: Encodable {
@@ -450,7 +484,9 @@ enum FilmtoneExportSidecarBuilder {
                 sourceHash: try? FilmtoneLutBlobCodec.sourceHash(
                     data: creative.data,
                     size: creative.size
-                )
+                ),
+                bundledSlug: creative.bundledSlug,
+                bundledPackId: creative.bundledPackId
             )
         }
         if let legacy = request.lut {
@@ -460,7 +496,9 @@ enum FilmtoneExportSidecarBuilder {
                 sourceHash: try? FilmtoneLutBlobCodec.sourceHash(
                     data: legacy.data,
                     size: legacy.size
-                )
+                ),
+                bundledSlug: legacy.bundledSlug,
+                bundledPackId: legacy.bundledPackId
             )
         }
         return nil

@@ -112,7 +112,7 @@ struct FilmtoneSavedLooksStrip: View {
                                 title: strings.displayName(for: entry),
                                 systemImage: "camera.aperture",
                                 isFavorite: entry.favorite,
-                                badgeText: entry.bundled ? strings.builtInBadgeLabel : nil
+                                isBundled: entry.bundled
                             )
                             .onTapGesture { onApply(entry) }
                             .contextMenu {
@@ -163,16 +163,16 @@ extension SavedLookEntry: Identifiable {}
 /// items get a subtle amber star to match the existing `Color.filmtoneAmber`
 /// accent system — no new colors introduced.
 ///
-/// `badgeText` (Item 2) marks built-in catalog entries with a caption-style
-/// "FILMTONE" pill in the top-right corner and tints the chip background
-/// with the existing amber accent at low alpha. nil for user entries.
+/// `isBundled` (v1.4) tints the chip background with the existing amber
+/// accent at low alpha to mark built-in catalog entries. v1.3 also drew a
+/// "FILMTONE" caption pill in the top-right; that was dropped in v1.4
+/// because it overlapped the chip title at common widths and was visually
+/// redundant with the amber tint + amber stroke.
 struct FilmtoneLibraryChip: View {
     let title: String
     let systemImage: String
     let isFavorite: Bool
-    var badgeText: String? = nil
-
-    private var isBundled: Bool { badgeText != nil }
+    var isBundled: Bool = false
 
     var body: some View {
         HStack(spacing: 8) {
@@ -208,23 +208,6 @@ struct FilmtoneLibraryChip: View {
                     lineWidth: 1
                 )
         )
-        .overlay(alignment: .topTrailing) {
-            if let badgeText {
-                Text(badgeText)
-                    .font(.caption2.weight(.bold))
-                    .tracking(0.4)
-                    .foregroundStyle(Color.filmtoneAmber.opacity(0.95))
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(Color.black.opacity(0.42))
-                    )
-                    .padding(.top, 4)
-                    .padding(.trailing, 5)
-                    .accessibilityHidden(true)
-            }
-        }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
@@ -233,8 +216,8 @@ struct FilmtoneLibraryChip: View {
 
     private var accessibilityLabel: String {
         var parts: [String] = []
-        if isBundled, let badgeText {
-            parts.append(badgeText)
+        if isBundled {
+            parts.append("Filmtone")
         }
         parts.append(title)
         if isFavorite {

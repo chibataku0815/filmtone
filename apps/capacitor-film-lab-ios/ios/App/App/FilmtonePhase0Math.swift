@@ -680,7 +680,13 @@ enum FilmtonePhase0Math {
         guard let lut else {
             return nil
         }
-        return .init(size: lut.size, data: lut.data, intensity: lut.intensity)
+        return .init(
+            size: lut.size,
+            data: lut.data,
+            intensity: lut.intensity,
+            bundledSlug: lut.bundledSlug,
+            bundledPackId: lut.bundledPackId
+        )
     }
 
     static func clampParam(_ key: String, _ value: Double) -> Double {
