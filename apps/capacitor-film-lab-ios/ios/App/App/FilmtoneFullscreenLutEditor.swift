@@ -97,28 +97,18 @@ private func fullscreenFormatRemaining(_ current: Double, _ duration: Double) ->
 
 // MARK: - Liquid Glass surface helper
 //
-// On iOS 26+ uses Apple's Liquid Glass material via `.glassEffect()`, which
-// renders real-time refraction, specular highlights, motion-reactive
-// shimmer, and adaptive tint. On older iOS we degrade to `.ultraThinMaterial`
-// (frosted blur) — explicitly NOT pretending to be Liquid Glass.
+// Apple's Liquid Glass material via `.glassEffect()` — real-time refraction,
+// specular highlights, motion-reactive shimmer, and adaptive tint.
 
 private struct LiquidGlassSurface<S: InsettableShape>: ViewModifier {
     let shape: S
     let tint: Color?
     let interactive: Bool
 
-    @ViewBuilder
     func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
-            content.glassEffect(glassConfig, in: shape)
-        } else {
-            content
-                .background(shape.fill(.ultraThinMaterial))
-                .overlay(shape.strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5))
-        }
+        content.glassEffect(glassConfig, in: shape)
     }
 
-    @available(iOS 26.0, *)
     private var glassConfig: Glass {
         var g: Glass = .regular
         if let tint { g = g.tint(tint) }
@@ -137,12 +127,10 @@ private extension View {
     }
 }
 
-// MARK: - Glass-styled buttons (OS-branched)
+// MARK: - Glass-styled buttons
 //
-// `.buttonStyle(.glass)` and `.buttonStyle(.glassProminent)` ship in iOS 26
-// only. For older iOS we fall back to bordered styles. Tint is **only**
-// applied when this represents an active / primary state per Apple HIG —
-// decorative tinting is forbidden.
+// Tint is **only** applied when this represents an active / primary state per
+// Apple HIG — decorative tinting is forbidden.
 
 private struct GlassActionButton<Label: View>: View {
     let isProminent: Bool
@@ -163,18 +151,9 @@ private struct GlassActionButton<Label: View>: View {
     }
 
     var body: some View {
-        if #available(iOS 26.0, *) {
-            modernButton
-        } else {
-            legacyButton
-        }
-    }
-
-    @available(iOS 26.0, *)
-    private var modernButton: some View {
         let raw = Button(action: action, label: label)
             .controlSize(controlSize)
-        return Group {
+        Group {
             if isProminent {
                 raw.buttonStyle(.glassProminent)
             } else {
@@ -182,21 +161,9 @@ private struct GlassActionButton<Label: View>: View {
             }
         }
     }
-
-    private var legacyButton: some View {
-        let raw = Button(action: action, label: label)
-            .controlSize(controlSize)
-        return Group {
-            if isProminent {
-                raw.buttonStyle(.borderedProminent)
-            } else {
-                raw.buttonStyle(.bordered)
-            }
-        }
-    }
 }
 
-// MARK: - GlassEffectContainer wrapper (OS-branched)
+// MARK: - GlassEffectContainer wrapper
 
 private struct GlassGroup<Content: View>: View {
     let spacing: CGFloat
@@ -208,11 +175,7 @@ private struct GlassGroup<Content: View>: View {
     }
 
     var body: some View {
-        if #available(iOS 26.0, *) {
-            GlassEffectContainer(spacing: spacing, content: content)
-        } else {
-            content()
-        }
+        GlassEffectContainer(spacing: spacing, content: content)
     }
 }
 
