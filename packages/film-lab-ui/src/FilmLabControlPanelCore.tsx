@@ -281,6 +281,37 @@ const GLOW_STARTER_STATES: readonly FinishToolStarterState[] = [
   },
 ] as const;
 
+const HALO_PRISM_STARTER_STATES: readonly FinishToolStarterState[] = [
+  {
+    id: "subtle",
+    labelKey: "controls.finishToolsStarterSubtle",
+    patch: {
+      haloPrismStrength: 0.28,
+      haloPrismRadius: 0.58,
+      haloPrismWidth: 0.18,
+      haloPrismChromatic: 0.55,
+      haloPrismThreshold: 0.92,
+      haloPrismSplit: 0.62,
+      haloPrismAngle: 0,
+      haloPrismSourceReactivity: 0.75,
+    },
+  },
+  {
+    id: "signature",
+    labelKey: "controls.finishToolsStarterSignature",
+    patch: {
+      haloPrismStrength: 0.62,
+      haloPrismRadius: 0.66,
+      haloPrismWidth: 0.28,
+      haloPrismChromatic: 0.85,
+      haloPrismThreshold: 0.88,
+      haloPrismSplit: 0.78,
+      haloPrismAngle: 0,
+      haloPrismSourceReactivity: 0.95,
+    },
+  },
+] as const;
+
 export const FilmLabControlPanelCore = forwardRef<
   FilmLabCoreRef,
   FilmLabControlPanelCoreProps
@@ -336,8 +367,10 @@ export const FilmLabControlPanelCore = forwardRef<
   const [savedHalationIntensity, setSavedHalationIntensity] = useState(0.25);
   const [savedShaftIntensity, setSavedShaftIntensity] = useState(0.4);
   const [savedCrossFilterStrength, setSavedCrossFilterStrength] = useState(0.5);
+  const [savedHaloPrismStrength, setSavedHaloPrismStrength] = useState(0.45);
   const [artifactsOpen, setArtifactsOpen] = useState(true);
   const [glowAdvancedOpen, setGlowAdvancedOpen] = useState(false);
+  const [haloPrismAdvancedOpen, setHaloPrismAdvancedOpen] = useState(false);
   // v0.5.0: postEffectsOpen removed — motionBlur moved to ARTIFACTS, section eliminated
   const [showHelp, setShowHelp] = useState(false);
   const [sourceTrimOpen, setSourceTrimOpen] = useState(false);
@@ -522,6 +555,7 @@ export const FilmLabControlPanelCore = forwardRef<
   const rgbShiftEnabled = params.rgbShift > 0;
   const shaftEnabled = params.shaftIntensity > 0;
   const crossFilterEnabled = params.crossFilterStrength > 0;
+  const haloPrismEnabled = params.haloPrismStrength > 0;
   const canToggleHistogram =
     supportsHistogram && typeof onHistogramToggle === "function";
 
@@ -547,6 +581,9 @@ export const FilmLabControlPanelCore = forwardRef<
     if (typeof patch.crossFilterStrength === "number" && patch.crossFilterStrength > 0) {
       setSavedCrossFilterStrength(patch.crossFilterStrength);
     }
+    if (typeof patch.haloPrismStrength === "number" && patch.haloPrismStrength > 0) {
+      setSavedHaloPrismStrength(patch.haloPrismStrength);
+    }
 
     setActivePreset("reset");
   }, []);
@@ -557,6 +594,11 @@ export const FilmLabControlPanelCore = forwardRef<
 
   const applyGlowStarterState = useCallback((patch: Partial<Params>) => {
     setGlowAdvancedOpen(true);
+    applyParamPatch(patch);
+  }, [applyParamPatch]);
+
+  const applyHaloPrismStarterState = useCallback((patch: Partial<Params>) => {
+    setHaloPrismAdvancedOpen(true);
     applyParamPatch(patch);
   }, [applyParamPatch]);
 
@@ -619,6 +661,20 @@ export const FilmLabControlPanelCore = forwardRef<
       setActivePreset("reset");
     },
     [params.crossFilterStrength, savedCrossFilterStrength],
+  );
+
+  const toggleHaloPrism = useCallback(
+    (on: boolean) => {
+      if (on) {
+        dispatch({ type: "SET_PARAM", key: "haloPrismStrength", value: savedHaloPrismStrength || 0.45 });
+      } else {
+        if (params.haloPrismStrength > 0) setSavedHaloPrismStrength(params.haloPrismStrength);
+        dispatch({ type: "SET_PARAM", key: "haloPrismStrength", value: 0 });
+      }
+      dispatch({ type: "COMMIT" });
+      setActivePreset("reset");
+    },
+    [params.haloPrismStrength, savedHaloPrismStrength],
   );
 
   /**
@@ -1097,6 +1153,137 @@ export const FilmLabControlPanelCore = forwardRef<
                             onCommit={commit}
                           />
                         </div>
+                      </div>
+                    ) : null}
+                  </FinishToolFamilyCard>
+
+                  <FinishToolFamilyCard
+                    title={tFilmLab("controls.finishToolsHaloPrism")}
+                    headerAccessory={(
+                      <StarterStateButtonRow
+                        states={HALO_PRISM_STARTER_STATES}
+                        params={params}
+                        onApply={applyHaloPrismStarterState}
+                        tFilmLab={tFilmLab}
+                      />
+                    )}
+                  >
+                    <ToggleHeader
+                      title={tFilmLab("controls.haloPrism")}
+                      titleHint={tFilmLab("controls.haloPrismToggleHint")}
+                      enabled={haloPrismEnabled}
+                      onToggle={toggleHaloPrism}
+                    />
+                    <div className={`flex flex-col gap-2.5 ${!haloPrismEnabled ? "pointer-events-none opacity-30" : ""}`}>
+                      <PanelControlSlider
+                        sliderLabelResetHint={sliderLabelResetHint}
+                        label={tFilmLab("controls.strength")}
+                        value={params.haloPrismStrength}
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        defaultValue={0}
+                        onChange={(v) => updateParam("haloPrismStrength", v)}
+                        onCommit={commit}
+                      />
+                      <PanelControlSlider
+                        sliderLabelResetHint={sliderLabelResetHint}
+                        label={tFilmLab("controls.radius")}
+                        hint={tFilmLab("controls.haloPrismRadiusHint")}
+                        value={params.haloPrismRadius}
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        defaultValue={0.62}
+                        onChange={(v) => updateParam("haloPrismRadius", v)}
+                        onCommit={commit}
+                      />
+                      <PanelControlSlider
+                        sliderLabelResetHint={sliderLabelResetHint}
+                        label={tFilmLab("controls.haloPrismWidth")}
+                        hint={tFilmLab("controls.haloPrismWidthHint")}
+                        value={params.haloPrismWidth}
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        defaultValue={0.22}
+                        onChange={(v) => updateParam("haloPrismWidth", v)}
+                        onCommit={commit}
+                      />
+                      <PanelControlSlider
+                        sliderLabelResetHint={sliderLabelResetHint}
+                        label={tFilmLab("controls.haloPrismChromatic")}
+                        hint={tFilmLab("controls.haloPrismChromaticHint")}
+                        value={params.haloPrismChromatic}
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        defaultValue={0.65}
+                        onChange={(v) => updateParam("haloPrismChromatic", v)}
+                        onCommit={commit}
+                      />
+                      <PanelControlSlider
+                        sliderLabelResetHint={sliderLabelResetHint}
+                        label={tFilmLab("controls.threshold")}
+                        hint={tFilmLab("controls.haloPrismThresholdHint")}
+                        value={params.haloPrismThreshold}
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        defaultValue={0.9}
+                        onChange={(v) => updateParam("haloPrismThreshold", v)}
+                        onCommit={commit}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setHaloPrismAdvancedOpen(!haloPrismAdvancedOpen)}
+                      className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[10px] font-medium tracking-[0.08em] text-white/68 transition-colors hover:bg-white/[0.06] hover:text-white/84"
+                    >
+                      {haloPrismAdvancedOpen
+                        ? tFilmLab("controls.finishToolsAdvancedHide")
+                        : tFilmLab("controls.finishToolsAdvancedShow")}
+                    </button>
+
+                    {haloPrismAdvancedOpen ? (
+                      <div className={`mt-3 flex flex-col gap-2.5 border-t border-white/[0.08] pt-3 ${!haloPrismEnabled ? "pointer-events-none opacity-30" : ""}`}>
+                        <PanelControlSlider
+                          sliderLabelResetHint={sliderLabelResetHint}
+                          label={tFilmLab("controls.haloPrismSplit")}
+                          hint={tFilmLab("controls.haloPrismSplitHint")}
+                          value={params.haloPrismSplit}
+                          min={0}
+                          max={1}
+                          step={0.01}
+                          defaultValue={0.7}
+                          onChange={(v) => updateParam("haloPrismSplit", v)}
+                          onCommit={commit}
+                        />
+                        <PanelControlSlider
+                          sliderLabelResetHint={sliderLabelResetHint}
+                          label={tFilmLab("controls.haloPrismAngle")}
+                          hint={tFilmLab("controls.haloPrismAngleHint")}
+                          value={params.haloPrismAngle}
+                          min={0}
+                          max={360}
+                          step={1}
+                          defaultValue={0}
+                          onChange={(v) => updateParam("haloPrismAngle", v)}
+                          onCommit={commit}
+                          formatValue={(v) => `${Math.round(v)}°`}
+                        />
+                        <PanelControlSlider
+                          sliderLabelResetHint={sliderLabelResetHint}
+                          label={tFilmLab("controls.haloPrismSourceReactivity")}
+                          hint={tFilmLab("controls.haloPrismSourceReactivityHint")}
+                          value={params.haloPrismSourceReactivity}
+                          min={0}
+                          max={1}
+                          step={0.01}
+                          defaultValue={0.85}
+                          onChange={(v) => updateParam("haloPrismSourceReactivity", v)}
+                          onCommit={commit}
+                        />
                       </div>
                     ) : null}
                   </FinishToolFamilyCard>

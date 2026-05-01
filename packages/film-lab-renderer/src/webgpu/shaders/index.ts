@@ -16,6 +16,7 @@ export { downsampleFragmentWgsl } from "./downsample.frag.wgsl";
 export { upsampleFragmentWgsl } from "./upsample.frag.wgsl";
 export { lightshaftsFragmentWgsl } from "./lightshafts.frag.wgsl";
 export { lightshaftsBlendFragmentWgsl } from "./lightshafts-blend.frag.wgsl";
+export { haloPrismFragmentWgsl } from "./halo-prism.frag.wgsl";
 export { dustFragmentWgsl } from "./dust.frag.wgsl";
 export { filmlabFragmentWgsl } from "./filmlab.frag.wgsl";
 export { blitFragmentWgsl } from "./blit.frag.wgsl";

@@ -120,6 +120,22 @@ export const PARAM_KEYS = [
   "crossFilterEdgeLengthGain",
   /** Cross filter streak strength field modulation（0=uniform、1=max edge strength boost）。 */
   "crossFilterEdgeStrengthGain",
+  /** Halo Prism strength（0=off、1=max）。 */
+  "haloPrismStrength",
+  /** Halo Prism ring radius（0=small、1=large）。 */
+  "haloPrismRadius",
+  /** Halo Prism ring width（0=narrow、1=wide）。 */
+  "haloPrismWidth",
+  /** Halo Prism chromatic edge separation（0=white、1=strong spectral edges）。 */
+  "haloPrismChromatic",
+  /** Halo Prism compact-source threshold（0=easy trigger、1=bright points only）。 */
+  "haloPrismThreshold",
+  /** Halo Prism partial-arc split amount（0=full ring、1=split/lower arcs）。 */
+  "haloPrismSplit",
+  /** Halo Prism arc orientation in degrees。 */
+  "haloPrismAngle",
+  /** Halo Prism source coupling（0=mostly procedural、1=source-reactive）。 */
+  "haloPrismSourceReactivity",
 ] as const;
 
 export type ParamKey = (typeof PARAM_KEYS)[number];
@@ -254,6 +270,22 @@ export interface Params {
   crossFilterEdgeLengthGain: number;
   /** Cross filter streak strength field modulation（0=uniform、1=max edge strength boost）。 */
   crossFilterEdgeStrengthGain: number;
+  /** Halo Prism strength（0=off、1=max）。 */
+  haloPrismStrength: number;
+  /** Halo Prism ring radius（0=small、1=large）。 */
+  haloPrismRadius: number;
+  /** Halo Prism ring width（0=narrow、1=wide）。 */
+  haloPrismWidth: number;
+  /** Halo Prism chromatic edge separation（0=white、1=strong spectral edges）。 */
+  haloPrismChromatic: number;
+  /** Halo Prism compact-source threshold（0=easy trigger、1=bright points only）。 */
+  haloPrismThreshold: number;
+  /** Halo Prism partial-arc split amount（0=full ring、1=split/lower arcs）。 */
+  haloPrismSplit: number;
+  /** Halo Prism arc orientation in degrees。 */
+  haloPrismAngle: number;
+  /** Halo Prism source coupling（0=mostly procedural、1=source-reactive）。 */
+  haloPrismSourceReactivity: number;
 }
 
 export function cloneParams(params: Params): Params {

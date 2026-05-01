@@ -98,6 +98,22 @@ function schemaForParamKey(key: ParamKey): z.ZodType<number> {
                                                           ? z.number().min(0).max(1).default(0.45)
                                                           : key === "crossFilterEdgeStrengthGain"
                                                             ? z.number().min(0).max(1).default(0.25)
+                                                            : key === "haloPrismStrength"
+                                                              ? z.number().min(0).max(1).default(0)
+                                                            : key === "haloPrismRadius"
+                                                              ? z.number().min(0).max(1).default(0.62)
+                                                            : key === "haloPrismWidth"
+                                                              ? z.number().min(0).max(1).default(0.22)
+                                                            : key === "haloPrismChromatic"
+                                                              ? z.number().min(0).max(1).default(0.65)
+                                                            : key === "haloPrismThreshold"
+                                                              ? z.number().min(0).max(1).default(0.9)
+                                                            : key === "haloPrismSplit"
+                                                              ? z.number().min(0).max(1).default(0.7)
+                                                            : key === "haloPrismAngle"
+                                                              ? z.number().min(0).max(360).default(0)
+                                                            : key === "haloPrismSourceReactivity"
+                                                              ? z.number().min(0).max(1).default(0.85)
                                                   : z.number();
 }
 

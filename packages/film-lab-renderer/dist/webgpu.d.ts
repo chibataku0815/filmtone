@@ -228,14 +228,16 @@ declare class BlueNoiseTile {
  *      shoulder, vignette, hybrid fine/coarse grain.
  *      Composite's diffusion uniform is forced to 0 when Hard-mode
  *      cross-filter is active, independently of user's `diffusion` field.
- *   6. Post-chain (active when `crossFilterStrength > 0` or
- *      `shutterAngle > 180`):
+ *   6. Post-chain (active when `crossFilterStrength > 0`,
+ *      `haloPrismStrength > 0`, or `shutterAngle > 180`):
  *      - Cross-filter: compact source gate → peak → optional spacing gate →
  *        (Hard-mode only) active WebGPU intentionally bypasses the
  *        legacy temporal hold so the 4-level central-bloom chain and
  *        directional streaks read current peaks directly, while the
  *        preserved temporal infrastructure remains available for future
  *        tuning → blend with center-protection.
+ *      - Halo Prism (when `haloPrismStrength > 0`): compact source gate
+ *        from the pre-Halo composite → chromatic annular arcs.
  *      - Light Shafts (when `shaftIntensity > 0` and post chain active):
  *        radial 64-tap occlusion at ¼ res → additive full-res blend.
  *      - Motion blur (`shutterAngle > 180`): feedback copy into the ring
@@ -243,7 +245,7 @@ declare class BlueNoiseTile {
  *        last N slots → swap.
  *      - Motion blur OFF: blit the post-composite source → swap.
  *
- *   Active WebGPU post tail: `CrossFilter → Shafts → MotionBlur`.
+ *   Active WebGPU post tail: `CrossFilter → HaloPrism → Shafts → MotionBlur`.
  *
  *   The swap pass output is always `rgba8unorm-srgb` so the hardware OETF
  *   handles the final linear → sRGB transform.
@@ -255,7 +257,8 @@ declare class BlueNoiseTile {
  *     vignette). Bloom + halation shaping params (threshold, knee, radius,
  *     color), motion blur (`shutterAngle`, `trailIntensity`,
  *     `motionThreshold`), cross-filter (Hard Mode / temporal / spacing
- *     state), and light shafts (`shaftIntensity`, `shaftDecay`,
+ *     state), Halo Prism (`haloPrismStrength`, radius / width / chroma /
+ *     source coupling), and light shafts (`shaftIntensity`, `shaftDecay`,
  *     `shaftOriginX`, `shaftOriginY`) are consumed directly by the
  *     post-chain bookkeeping via `paramNumber(...)`.
  *   - `setLUT1` / `setLUT2` upload 3D LUTs (identity pre-uploaded at
@@ -302,6 +305,7 @@ declare class WebGPUBackend implements RenderBackend {
     private readonly motionblurBlendBuffer;
     private readonly crossFilter;
     private readonly lightShafts;
+    private readonly haloPrism;
     private readonly sampler;
     private readonly grainSampler;
     private readonly grainTexture;
@@ -484,6 +488,7 @@ declare class WebGPUBackend implements RenderBackend {
      * motionBlur) active` gate.
      */
     private renderLightShafts;
+    private renderHaloPrism;
     private renderCrossFilter;
     /**
      * `shutterAngle` (degrees, 0..720) → active slot count. Matches WebGL:

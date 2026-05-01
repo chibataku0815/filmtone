@@ -19,14 +19,16 @@
  *      shoulder, vignette, hybrid fine/coarse grain.
  *      Composite's diffusion uniform is forced to 0 when Hard-mode
  *      cross-filter is active, independently of user's `diffusion` field.
- *   6. Post-chain (active when `crossFilterStrength > 0` or
- *      `shutterAngle > 180`):
+ *   6. Post-chain (active when `crossFilterStrength > 0`,
+ *      `haloPrismStrength > 0`, or `shutterAngle > 180`):
  *      - Cross-filter: compact source gate → peak → optional spacing gate →
  *        (Hard-mode only) active WebGPU intentionally bypasses the
  *        legacy temporal hold so the 4-level central-bloom chain and
  *        directional streaks read current peaks directly, while the
  *        preserved temporal infrastructure remains available for future
  *        tuning → blend with center-protection.
+ *      - Halo Prism (when `haloPrismStrength > 0`): compact source gate
+ *        from the pre-Halo composite → chromatic annular arcs.
  *      - Light Shafts (when `shaftIntensity > 0` and post chain active):
  *        radial 64-tap occlusion at ¼ res → additive full-res blend.
  *      - Motion blur (`shutterAngle > 180`): feedback copy into the ring
@@ -34,7 +36,7 @@
  *        last N slots → swap.
  *      - Motion blur OFF: blit the post-composite source → swap.
  *
- *   Active WebGPU post tail: `CrossFilter → Shafts → MotionBlur`.
+ *   Active WebGPU post tail: `CrossFilter → HaloPrism → Shafts → MotionBlur`.
  *
  *   The swap pass output is always `rgba8unorm-srgb` so the hardware OETF
  *   handles the final linear → sRGB transform.
@@ -46,7 +48,8 @@
  *     vignette). Bloom + halation shaping params (threshold, knee, radius,
  *     color), motion blur (`shutterAngle`, `trailIntensity`,
  *     `motionThreshold`), cross-filter (Hard Mode / temporal / spacing
- *     state), and light shafts (`shaftIntensity`, `shaftDecay`,
+ *     state), Halo Prism (`haloPrismStrength`, radius / width / chroma /
+ *     source coupling), and light shafts (`shaftIntensity`, `shaftDecay`,
  *     `shaftOriginX`, `shaftOriginY`) are consumed directly by the
  *     post-chain bookkeeping via `paramNumber(...)`.
  *   - `setLUT1` / `setLUT2` upload 3D LUTs (identity pre-uploaded at
@@ -90,6 +93,7 @@ import {
   upsampleFragmentWgsl,
   lightshaftsFragmentWgsl,
   lightshaftsBlendFragmentWgsl,
+  haloPrismFragmentWgsl,
   dustFragmentWgsl,
   motionblurFeedbackFragmentWgsl,
   motionblurBlendFragmentWgsl,
@@ -171,6 +175,9 @@ const LIGHTSHAFTS_EXPOSURE = 0.38;
 /** Light shafts uniform layouts. */
 const LIGHTSHAFTS_PARAMS_BYTES = 32;
 const LIGHTSHAFTS_BLEND_PARAMS_BYTES = 16;
+/** Halo Prism uniforms: 5 vec4 = 80 bytes. */
+const HALO_PRISM_PARAMS_BYTES = 80;
+const HALO_PRISM_PARAMS_FLOATS = HALO_PRISM_PARAMS_BYTES / 4;
 
 function smoothstep01(value: number): number {
   const clamped = Math.min(1, Math.max(0, value));
@@ -249,6 +256,7 @@ interface ShaderModules {
   upsample: GPUShaderModule;
   lightshafts: GPUShaderModule;
   lightshaftsBlend: GPUShaderModule;
+  haloPrism: GPUShaderModule;
   dust: GPUShaderModule;
   motionblurFeedback: GPUShaderModule;
   motionblurBlend: GPUShaderModule;
@@ -297,6 +305,7 @@ interface Pipelines {
   /** Hard-mode central bloom reuses the generic `downsample` / `upsampleAdd` pipelines. */
   lightshafts: GPURenderPipeline;
   lightshaftsBlend: GPURenderPipeline;
+  haloPrism: GPURenderPipeline;
 }
 
 interface PrefilterGroupLayouts {
@@ -315,6 +324,7 @@ interface PrefilterGroupLayouts {
   crossFilterBlend: GPUBindGroupLayout;
   lightshafts: GPUBindGroupLayout;
   lightshaftsBlend: GPUBindGroupLayout;
+  haloPrism: GPUBindGroupLayout;
 }
 
 /**
@@ -355,6 +365,13 @@ interface LightShaftsResources {
   readonly blendParamsScratch: Float32Array;
 }
 
+interface HaloPrismResources {
+  readonly sourceParamsBuffer: GPUBuffer;
+  readonly paramsBuffer: GPUBuffer;
+  readonly sourceParamsScratch: Float32Array;
+  readonly paramsScratch: Float32Array;
+}
+
 export class WebGPUBackend implements RenderBackend {
   private readonly ctx: GpuContext;
   readonly capabilities: ViewportCapabilities;
@@ -386,6 +403,7 @@ export class WebGPUBackend implements RenderBackend {
   private readonly motionblurBlendBuffer: GPUBuffer;
   private readonly crossFilter: CrossFilterResources;
   private readonly lightShafts: LightShaftsResources;
+  private readonly haloPrism: HaloPrismResources;
   private readonly sampler: GPUSampler;
   private readonly grainSampler: GPUSampler;
   private readonly grainTexture: GPUTexture;
@@ -466,6 +484,7 @@ export class WebGPUBackend implements RenderBackend {
     motionblurBlendBuffer: GPUBuffer,
     crossFilter: CrossFilterResources,
     lightShafts: LightShaftsResources,
+    haloPrism: HaloPrismResources,
     sampler: GPUSampler,
     grainSampler: GPUSampler,
     grainTexture: GPUTexture,
@@ -498,6 +517,7 @@ export class WebGPUBackend implements RenderBackend {
     this.motionblurBlendBuffer = motionblurBlendBuffer;
     this.crossFilter = crossFilter;
     this.lightShafts = lightShafts;
+    this.haloPrism = haloPrism;
     this.sampler = sampler;
     this.grainSampler = grainSampler;
     this.grainTexture = grainTexture;
@@ -616,6 +636,7 @@ export class WebGPUBackend implements RenderBackend {
       upsample: await make("upsample.frag", upsampleFragmentWgsl),
       lightshafts: await make("lightshafts.frag", lightshaftsFragmentWgsl),
       lightshaftsBlend: await make("lightshafts-blend.frag", lightshaftsBlendFragmentWgsl),
+      haloPrism: await make("halo-prism.frag", haloPrismFragmentWgsl),
       dust: await make("dust.frag", dustFragmentWgsl),
       motionblurFeedback: await make("motionblur-feedback.frag", motionblurFeedbackFragmentWgsl),
       motionblurBlend: await make("motionblur-blend.frag", motionblurBlendFragmentWgsl),
@@ -814,6 +835,18 @@ export class WebGPUBackend implements RenderBackend {
         { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
         { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
         { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: { type: "filtering" } },
+      ],
+    });
+
+    // Halo Prism: `(uniform, uScene, uCompactSource, uDepth, uSampler)`.
+    const haloPrismGroupLayout = device.createBindGroupLayout({
+      label: "halo-prism.group1",
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: "uniform" } },
+        { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
+        { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
+        { binding: 3, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float" } },
+        { binding: 4, visibility: GPUShaderStage.FRAGMENT, sampler: { type: "filtering" } },
       ],
     });
 
@@ -1177,6 +1210,22 @@ export class WebGPUBackend implements RenderBackend {
       }),
     );
 
+    const haloPrismPipeline = await ctx.withValidationScope(() =>
+      device.createRenderPipeline({
+        label: "halo-prism.blend",
+        layout: device.createPipelineLayout({
+          bindGroupLayouts: [flagsLayout, haloPrismGroupLayout],
+        }),
+        vertex: { module: modules.vert, entryPoint: "vs_main" },
+        fragment: {
+          module: modules.haloPrism,
+          entryPoint: "fs_main",
+          targets: [{ format: "rgba16float" }],
+        },
+        primitive: { topology: "triangle-list" },
+      }),
+    );
+
     const displayFlagsBuffer = device.createBuffer({
       label: "frame.flags.display",
       size: 16,
@@ -1341,6 +1390,18 @@ export class WebGPUBackend implements RenderBackend {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
+    const haloPrismSourceParamsBuffer = device.createBuffer({
+      label: "halo-prism.source.params",
+      size: CROSS_FILTER_PARAMS_BYTES,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+
+    const haloPrismParamsBuffer = device.createBuffer({
+      label: "halo-prism.params",
+      size: HALO_PRISM_PARAMS_BYTES,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+
     // Compare present uniform: 2 vec4 = 8 floats = 32 B.
     const compareSourceBuffer = device.createBuffer({
       label: "compare-source.params",
@@ -1429,6 +1490,7 @@ export class WebGPUBackend implements RenderBackend {
         crossFilterBlend: crossFilterBlendPipeline,
         lightshafts: lightshaftsPipeline,
         lightshaftsBlend: lightshaftsBlendPipeline,
+        haloPrism: haloPrismPipeline,
       },
       {
         bloom: pyramidGroupLayout,
@@ -1446,6 +1508,7 @@ export class WebGPUBackend implements RenderBackend {
         crossFilterBlend: crossFilterBlendGroupLayout,
         lightshafts: lightshaftsGroupLayout,
         lightshaftsBlend: lightshaftsBlendGroupLayout,
+        haloPrism: haloPrismGroupLayout,
       },
       displayFlagsBuffer,
       offscreenFlagsBuffer,
@@ -1491,6 +1554,12 @@ export class WebGPUBackend implements RenderBackend {
         blendParamsBuffer: lightshaftsBlendBuffer,
         paramsScratch: new Float32Array(LIGHTSHAFTS_PARAMS_BYTES / 4),
         blendParamsScratch: new Float32Array(LIGHTSHAFTS_BLEND_PARAMS_BYTES / 4),
+      },
+      {
+        sourceParamsBuffer: haloPrismSourceParamsBuffer,
+        paramsBuffer: haloPrismParamsBuffer,
+        sourceParamsScratch: new Float32Array(CROSS_FILTER_PARAMS_BYTES / 4),
+        paramsScratch: new Float32Array(HALO_PRISM_PARAMS_FLOATS),
       },
       sampler,
       grainSampler,
@@ -2819,6 +2888,145 @@ export class WebGPUBackend implements RenderBackend {
     return blendOutput;
   }
 
+  private renderHaloPrism(
+    encoder: GPUCommandEncoder,
+    sceneTexture: GPUTexture,
+    sourceSeedTexture: GPUTexture,
+  ): GPUTexture {
+    const { device } = this.ctx;
+    const strength = Math.min(1, Math.max(0, this.paramNumber("haloPrismStrength", 0)));
+    if (strength <= 0) {
+      return sceneTexture;
+    }
+
+    const halfWidth = Math.max(1, Math.floor(this._width / 2));
+    const halfHeight = Math.max(1, Math.floor(this._height / 2));
+    const sourceGateTexture = this.pool.get("rt.halo-prism.source-gate", {
+      width: halfWidth,
+      height: halfHeight,
+      format: "rgba16float",
+    });
+    const outputTexture = this.pool.get("rt.halo-prism.output", {
+      width: this._width,
+      height: this._height,
+      format: "rgba16float",
+    });
+
+    const threshold = Math.min(
+      1,
+      Math.max(0, this.paramNumber("haloPrismThreshold", 0.9)),
+    );
+    const sourceParamsScratch = this.haloPrism.sourceParamsScratch;
+    sourceParamsScratch[0] = threshold;
+    sourceParamsScratch[1] = 0.18;
+    // Halo Prism needs a stable lens-space trigger, not a binary peak switch.
+    // Keep the compact-source shape extraction, but use its softer threshold
+    // curve so video highlights do not pop frame-to-frame at the gate.
+    sourceParamsScratch[2] = 0;
+    sourceParamsScratch[3] = 0;
+    device.queue.writeBuffer(
+      this.haloPrism.sourceParamsBuffer,
+      0,
+      sourceParamsScratch.buffer,
+      sourceParamsScratch.byteOffset,
+      sourceParamsScratch.byteLength,
+    );
+
+    {
+      const bg = device.createBindGroup({
+        label: "halo-prism.source.bg",
+        layout: this.layouts.pyramid,
+        entries: [
+          { binding: 0, resource: { buffer: this.haloPrism.sourceParamsBuffer } },
+          { binding: 1, resource: sourceSeedTexture.createView() },
+          { binding: 2, resource: this.sampler },
+        ],
+      });
+      const pass = encoder.beginRenderPass({
+        label: "halo-prism.source",
+        colorAttachments: [
+          {
+            view: sourceGateTexture.createView(),
+            loadOp: "clear",
+            storeOp: "store",
+            clearValue: { r: 0, g: 0, b: 0, a: 1 },
+          },
+        ],
+      });
+      pass.setPipeline(this.pipelines.crossFilterSource);
+      pass.setBindGroup(0, this.offscreenFlagsBindGroup);
+      pass.setBindGroup(1, bg);
+      pass.draw(3, 1, 0, 0);
+      pass.end();
+    }
+
+    const paramsScratch = this.haloPrism.paramsScratch;
+    paramsScratch[0] = strength;
+    paramsScratch[1] = Math.min(1, Math.max(0, this.paramNumber("haloPrismRadius", 0.62)));
+    paramsScratch[2] = Math.min(1, Math.max(0, this.paramNumber("haloPrismWidth", 0.22)));
+    paramsScratch[3] = Math.min(1, Math.max(0, this.paramNumber("haloPrismChromatic", 0.65)));
+    paramsScratch[4] = Math.min(
+      1,
+      Math.max(0, this.paramNumber("haloPrismSourceReactivity", 0.85)),
+    );
+    paramsScratch[5] = Math.min(1, Math.max(0, this.paramNumber("haloPrismSplit", 0.7)));
+    paramsScratch[6] = (this.paramNumber("haloPrismAngle", 0) * Math.PI) / 180;
+    paramsScratch[7] = 0;
+    paramsScratch[8] = this._width;
+    paramsScratch[9] = this._height;
+    paramsScratch[10] = this.frameState.imgResX;
+    paramsScratch[11] = this.frameState.imgResY;
+    paramsScratch[12] = this.frameState.fitMode;
+    paramsScratch[13] = threshold;
+    paramsScratch[14] = 0;
+    paramsScratch[15] = 0;
+    this.packRayAngleOptics(
+      paramsScratch,
+      16,
+      this.resolveCurrentRayAngleOptics(),
+      DEFAULT_RAY_ANGLE_INNER_THRESHOLD,
+    );
+    device.queue.writeBuffer(
+      this.haloPrism.paramsBuffer,
+      0,
+      paramsScratch.buffer,
+      paramsScratch.byteOffset,
+      paramsScratch.byteLength,
+    );
+
+    {
+      const bg = device.createBindGroup({
+        label: "halo-prism.blend.bg",
+        layout: this.layouts.haloPrism,
+        entries: [
+          { binding: 0, resource: { buffer: this.haloPrism.paramsBuffer } },
+          { binding: 1, resource: sceneTexture.createView() },
+          { binding: 2, resource: sourceGateTexture.createView() },
+          { binding: 3, resource: this.depthTexture.createView() },
+          { binding: 4, resource: this.sampler },
+        ],
+      });
+      const pass = encoder.beginRenderPass({
+        label: "halo-prism.blend",
+        colorAttachments: [
+          {
+            view: outputTexture.createView(),
+            loadOp: "clear",
+            storeOp: "store",
+            clearValue: { r: 0, g: 0, b: 0, a: 1 },
+          },
+        ],
+      });
+      pass.setPipeline(this.pipelines.haloPrism);
+      pass.setBindGroup(0, this.crossFilterFlagsBindGroup);
+      pass.setBindGroup(1, bg);
+      pass.draw(3, 1, 0, 0);
+      pass.end();
+    }
+
+    return outputTexture;
+  }
+
   private renderCrossFilter(
     encoder: GPUCommandEncoder,
     sourceTexture: GPUTexture,
@@ -3692,6 +3900,7 @@ export class WebGPUBackend implements RenderBackend {
     }
 
     let postCompositeTexture = this.renderCrossFilter(encoder, rtComposited);
+    postCompositeTexture = this.renderHaloPrism(encoder, postCompositeTexture, rtComposited);
 
     // Pass 6 — post-chain → swap.
     const swapView = this.ctx.getCurrentTextureView();
@@ -3707,6 +3916,10 @@ export class WebGPUBackend implements RenderBackend {
       : null;
     const shutterAngle = this.paramNumber("shutterAngle", 0);
     const motionBlurOn = isShutterMotionActive(shutterAngle);
+    const haloPrismStrength = Math.min(
+      1,
+      Math.max(0, this.paramNumber("haloPrismStrength", 0)),
+    );
 
     // Light shafts (WebGL parity): run after cross-filter, before motion
     // blur. Activation matches WebGL: the post chain must be active via
@@ -3716,7 +3929,7 @@ export class WebGPUBackend implements RenderBackend {
       1,
       Math.max(0, this.paramNumber("shaftIntensity", 0)),
     );
-    const postChainActive = crossFilterStrength > 0 || motionBlurOn;
+    const postChainActive = crossFilterStrength > 0 || haloPrismStrength > 0 || motionBlurOn;
     if (shaftIntensity > 0 && postChainActive) {
       postCompositeTexture = this.renderLightShafts(
         encoder,
@@ -4038,6 +4251,8 @@ export class WebGPUBackend implements RenderBackend {
     this.crossFilter.blackTexture.destroy();
     this.lightShafts.paramsBuffer.destroy();
     this.lightShafts.blendParamsBuffer.destroy();
+    this.haloPrism.sourceParamsBuffer.destroy();
+    this.haloPrism.paramsBuffer.destroy();
     this.readbackBuffer?.destroy();
     for (const buf of this.bloomPyramid.downsample) buf.destroy();
     for (const buf of this.bloomPyramid.upsample) buf.destroy();

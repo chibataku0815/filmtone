@@ -23,7 +23,15 @@ export type ContractDefaultKey =
   | "crossFilterAngleGamma"
   | "crossFilterAngleInnerThreshold"
   | "crossFilterEdgeLengthGain"
-  | "crossFilterEdgeStrengthGain";
+  | "crossFilterEdgeStrengthGain"
+  | "haloPrismStrength"
+  | "haloPrismRadius"
+  | "haloPrismWidth"
+  | "haloPrismChromatic"
+  | "haloPrismThreshold"
+  | "haloPrismSplit"
+  | "haloPrismAngle"
+  | "haloPrismSourceReactivity";
 
 type BasePresetParams = Omit<Params, ContractDefaultKey>;
 
@@ -47,6 +55,14 @@ export const CONTRACT_DEFAULTS: Readonly<Pick<Params, ContractDefaultKey>> = {
   crossFilterAngleInnerThreshold: 0.1,
   crossFilterEdgeLengthGain: 0.45,
   crossFilterEdgeStrengthGain: 0.25,
+  haloPrismStrength: 0,
+  haloPrismRadius: 0.62,
+  haloPrismWidth: 0.22,
+  haloPrismChromatic: 0.65,
+  haloPrismThreshold: 0.9,
+  haloPrismSplit: 0.7,
+  haloPrismAngle: 0,
+  haloPrismSourceReactivity: 0.85,
 } as const;
 
 function withContractDefaults<T extends Record<string, BasePresetParams>>(
