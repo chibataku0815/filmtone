@@ -285,6 +285,31 @@ struct FilmtonePhase0ParamsPatch: Codable, Equatable {
         next.removeValue(forKey: key)
         return .init(values: next)
     }
+
+    /// Optical + glow parameter keys that every Look should carry as part of
+    /// its identity. Built-in Looks (Stone / Urban) hardcode these; user-saved
+    /// Looks pin them via `densifyingOpticsGlow(from:)` at save time so the
+    /// Look's optical signature is preserved regardless of which preset it
+    /// later lands on.
+    static let opticsGlowKeys: [String] = [
+        "rgbShift", "lensSoftness", "vignette",
+        "bloomThreshold", "bloomStrength", "bloomRadius", "bloomSoftKnee",
+        "halationIntensity", "halationSpread", "halationHue",
+        "halationThreshold", "halationRadius", "halationSoftKnee",
+        "diffusion",
+    ]
+
+    /// Returns a patch with every optics + glow key explicitly pinned. Existing
+    /// patch entries win; missing keys are filled from `resolved`. Used at Look
+    /// save time so a Look stamps its optical signature into `paramOverrides`,
+    /// not relying on the apply-time preset baseline to supply those values.
+    func densifyingOpticsGlow(from resolved: FilmtonePhase0Params) -> FilmtonePhase0ParamsPatch {
+        var next = values
+        for key in Self.opticsGlowKeys where next[key] == nil {
+            next[key] = resolved.value(for: key)
+        }
+        return .init(values: next)
+    }
 }
 
 private struct FilmtoneDynamicCodingKey: CodingKey {

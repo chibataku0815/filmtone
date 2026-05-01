@@ -1068,6 +1068,12 @@ final class FilmtoneEditorStore: ObservableObject {
             return nil
         }
         let creativeBinding = await currentCreativeLutBinding()
+        // Stamp optics + glow into the Look's identity. Built-in Looks
+        // (Stone / Urban) hardcode these; user-saved Looks would otherwise
+        // omit any key the user did not personally tune, leaving the Look's
+        // optical signature dependent on whichever preset baseline applies it.
+        let densifiedOverrides = project.paramOverrides
+            .densifyingOpticsGlow(from: project.params)
         do {
             let entry = try await libraryStore.saveLook(
                 name: name,
@@ -1075,7 +1081,7 @@ final class FilmtoneEditorStore: ObservableObject {
                 presetVersion: FilmtonePhase0Math.presetVersion,
                 strength: project.strength,
                 quickState: project.quickState,
-                paramOverrides: project.paramOverrides,
+                paramOverrides: densifiedOverrides,
                 creativeLut: creativeBinding
             )
             await refreshLibrarySnapshot()
