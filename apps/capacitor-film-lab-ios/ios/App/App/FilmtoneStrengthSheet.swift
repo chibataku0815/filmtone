@@ -4,12 +4,12 @@ import UIKit
 
 struct FilmtoneStrengthSheet: View {
     @ObservedObject var store: FilmtoneEditorStore
+    @Binding var activeHelpTopic: FilmtoneAdjustmentHelpTopic?
     let onClose: () -> Void
 
     @State private var adjustmentsExpanded = false
     @State private var advancedParamsExpanded = false
     @State private var expandedAdvancedGroupIds: Set<String> = []
-    @State private var activeHelpTopic: FilmtoneAdjustmentHelpTopic?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -39,17 +39,12 @@ struct FilmtoneStrengthSheet: View {
         }
         .presentationDetents([.medium])
         .presentationDragIndicator(.hidden)
-        .sheet(item: $activeHelpTopic) { topic in
-            FilmtoneAdjustmentHelpSheet(
-                topic: topic,
-                beforeLabel: store.strings.adjustmentHelpBeforeLabel,
-                afterLabel: store.strings.adjustmentHelpAfterLabel,
-                effectLabel: store.strings.adjustmentHelpEffectLabel,
-                guidanceLabel: store.strings.adjustmentHelpGuidanceLabel,
-                dismissLabel: store.strings.helpDismiss
-            ) {
-                activeHelpTopic = nil
-            }
+    }
+
+    private func openHelp(_ topic: FilmtoneAdjustmentHelpTopic) {
+        onClose()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            activeHelpTopic = topic
         }
     }
 
@@ -65,7 +60,7 @@ struct FilmtoneStrengthSheet: View {
     private var header: some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(store.activePresetLabel)
+                Text(store.lookProfileLabel)
                     .font(.system(size: 28, weight: .semibold))
                     .foregroundStyle(.white)
                     .accessibilityIdentifier("filmtone.sheet.strength")
@@ -114,11 +109,11 @@ struct FilmtoneStrengthSheet: View {
             ) { value in
                 store.setStrength(value)
             } helpAction: {
-                activeHelpTopic = makeHelpTopic(
+                openHelp(makeHelpTopic(
                     id: "strength",
                     copy: store.strings.strengthHelpCopy(),
                     comparisonStyle: .strength
-                )
+                ))
             }
 
             if let creativeLut = store.project.creativeLut {
@@ -177,61 +172,64 @@ struct FilmtoneStrengthSheet: View {
 
                     FilmtoneSliderRow(
                         label: store.strings.quickFilmCharacter,
-                        value: store.project.quickState.dynamics,
+                        value: max(-1, min(1, store.effectiveParamValue(for: "exposure"))),
                         range: -1...1,
                         format: { Self.signedPercentLabel($0) },
+                        isActive: store.isParamOverridden("exposure"),
                         helpAccessibilityLabel: store.strings.adjustmentHelpAccessibilityLabel(for: store.strings.quickFilmCharacter),
-                        accessibilityIdentifier: "filmtone.sheet.slider.quick.filmCharacter"
+                        accessibilityIdentifier: "filmtone.sheet.slider.quick.exposure"
                     ) { value in
-                        store.setQuickValue(value, for: \.dynamics)
+                        store.setParamOverride(value, for: "exposure")
                     } helpAction: {
-                        activeHelpTopic = makeHelpTopic(
-                            id: "quick.filmCharacter",
+                        openHelp(makeHelpTopic(
+                            id: "quick.exposure",
                             copy: store.strings.quickFilmCharacterHelpCopy(),
                             comparisonStyle: .exposure
-                        )
+                        ))
                     }
 
                     FilmtoneSliderRow(
                         label: store.strings.quickEra,
-                        value: -store.project.quickState.era,
+                        value: max(-1, min(1, store.effectiveParamValue(for: "contrast") - 1.0)),
                         range: -1...1,
                         format: { Self.signedPercentLabel($0) },
+                        isActive: store.isParamOverridden("contrast"),
                         helpAccessibilityLabel: store.strings.adjustmentHelpAccessibilityLabel(for: store.strings.quickEra),
-                        accessibilityIdentifier: "filmtone.sheet.slider.quick.era"
+                        accessibilityIdentifier: "filmtone.sheet.slider.quick.contrast"
                     ) { value in
-                        store.setQuickValue(-value, for: \.era)
+                        store.setParamOverride(1.0 + value, for: "contrast")
                     } helpAction: {
-                        activeHelpTopic = makeHelpTopic(
-                            id: "quick.era",
+                        openHelp(makeHelpTopic(
+                            id: "quick.contrast",
                             copy: store.strings.quickEraHelpCopy(),
                             comparisonStyle: .contrast
-                        )
+                        ))
                     }
 
                     FilmtoneSliderRow(
                         label: store.strings.quickDynamics,
-                        value: store.project.quickState.filmCharacter,
+                        value: max(-1, min(1, store.effectiveParamValue(for: "saturation") - 1.0)),
                         range: -1...1,
                         format: { Self.signedPercentLabel($0) },
+                        isActive: store.isParamOverridden("saturation"),
                         helpAccessibilityLabel: store.strings.adjustmentHelpAccessibilityLabel(for: store.strings.quickDynamics),
-                        accessibilityIdentifier: "filmtone.sheet.slider.quick.dynamics"
+                        accessibilityIdentifier: "filmtone.sheet.slider.quick.saturation"
                     ) { value in
-                        store.setQuickValue(value, for: \.filmCharacter)
+                        store.setParamOverride(1.0 + value, for: "saturation")
                     } helpAction: {
-                        activeHelpTopic = makeHelpTopic(
-                            id: "quick.dynamics",
+                        openHelp(makeHelpTopic(
+                            id: "quick.saturation",
                             copy: store.strings.quickDynamicsHelpCopy(),
                             comparisonStyle: .saturation
-                        )
+                        ))
                     }
             }
         } helpAction: {
-            activeHelpTopic = makeHelpTopic(
+            openHelp(makeHelpTopic(
                 id: "section.adjustments",
                 copy: store.strings.quickAdjustmentSectionHelpCopy(),
                 comparisonStyle: .quick
-            )
+            ))
         }
     }
 
@@ -250,11 +248,11 @@ struct FilmtoneStrengthSheet: View {
                 }
             }
         } helpAction: {
-            activeHelpTopic = makeHelpTopic(
+            openHelp(makeHelpTopic(
                 id: "section.advanced",
                 copy: store.strings.advancedParamsSectionHelpCopy(),
                 comparisonStyle: .advanced
-            )
+            ))
         }
     }
 
@@ -283,11 +281,11 @@ struct FilmtoneStrengthSheet: View {
                 store.applyParamPreset(values: recipe.values(base), for: group.keys)
             },
             onHelp: {
-                activeHelpTopic = makeHelpTopic(
+                openHelp(makeHelpTopic(
                     id: "group.\(group.id)",
                     copy: store.strings.advancedGroupHelpCopy(for: group.id, title: group.title),
                     comparisonStyle: comparisonStyleForGroup(group.id)
-                )
+                ))
             }
         ) {
             VStack(alignment: .leading, spacing: 16) {
@@ -303,11 +301,11 @@ struct FilmtoneStrengthSheet: View {
                     ) { value in
                         store.setParamOverride(value, for: control.key)
                     } helpAction: {
-                        activeHelpTopic = makeHelpTopic(
+                        openHelp(makeHelpTopic(
                             id: "param.\(control.key)",
                             copy: store.strings.paramHelpCopy(for: control.key, label: control.label),
                             comparisonStyle: comparisonStyleForParam(control.key)
-                        )
+                        ))
                     }
                 }
             }
