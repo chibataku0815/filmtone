@@ -63,6 +63,10 @@
 		D2000001000000000000001B /* FilmtoneHelpAssetGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000001B /* FilmtoneHelpAssetGenerator.swift */; };
 		D2000001000000000000001C /* FilmtoneSliderRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000001C /* FilmtoneSliderRow.swift */; };
 		D2000001000000000000001D /* FilmtoneLutControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000001D /* FilmtoneLutControls.swift */; };
+		D2000001000000000000001E /* FilmtoneHeroSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000001E /* FilmtoneHeroSection.swift */; };
+		D2000001000000000000001F /* FilmtonePresetSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000001F /* FilmtonePresetSection.swift */; };
+		D20000010000000000000020 /* FilmtoneTuningSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000020 /* FilmtoneTuningSection.swift */; };
+		D20000010000000000000021 /* FilmtoneCameraProfileCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000021 /* FilmtoneCameraProfileCard.swift */; };
 		D20000010000000000000001 /* FormatExtensionReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000001 /* FormatExtensionReader.swift */; };
 		D20000010000000000000002 /* SourceColorMetadataNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000002 /* SourceColorMetadataNormalizer.swift */; };
 		D20000010000000000000003 /* SourceColorClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000003 /* SourceColorClassifier.swift */; };
@@ -182,6 +186,10 @@
 		C2000001000000000000001B /* FilmtoneHelpAssetGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneHelpAssetGenerator.swift; sourceTree = "<group>"; };
 		C2000001000000000000001C /* FilmtoneSliderRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneSliderRow.swift; sourceTree = "<group>"; };
 		C2000001000000000000001D /* FilmtoneLutControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneLutControls.swift; sourceTree = "<group>"; };
+		C2000001000000000000001E /* FilmtoneHeroSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneHeroSection.swift; sourceTree = "<group>"; };
+		C2000001000000000000001F /* FilmtonePresetSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtonePresetSection.swift; sourceTree = "<group>"; };
+		C20000010000000000000020 /* FilmtoneTuningSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneTuningSection.swift; sourceTree = "<group>"; };
+		C20000010000000000000021 /* FilmtoneCameraProfileCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCameraProfileCard.swift; sourceTree = "<group>"; };
 		C20000010000000000000001 /* FormatExtensionReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormatExtensionReader.swift; sourceTree = "<group>"; };
 		C20000010000000000000002 /* SourceColorMetadataNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceColorMetadataNormalizer.swift; sourceTree = "<group>"; };
 		C20000010000000000000003 /* SourceColorClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceColorClassifier.swift; sourceTree = "<group>"; };
@@ -313,6 +321,10 @@
 				C2000001000000000000001B /* FilmtoneHelpAssetGenerator.swift */,
 				C2000001000000000000001C /* FilmtoneSliderRow.swift */,
 				C2000001000000000000001D /* FilmtoneLutControls.swift */,
+				C2000001000000000000001E /* FilmtoneHeroSection.swift */,
+				C2000001000000000000001F /* FilmtonePresetSection.swift */,
+				C20000010000000000000020 /* FilmtoneTuningSection.swift */,
+				C20000010000000000000021 /* FilmtoneCameraProfileCard.swift */,
 				C20000010000000000000001 /* FormatExtensionReader.swift */,
 				C20000010000000000000002 /* SourceColorMetadataNormalizer.swift */,
 				C20000010000000000000003 /* SourceColorClassifier.swift */,
@@ -595,6 +607,10 @@
 				D2000001000000000000001B /* FilmtoneHelpAssetGenerator.swift in Sources */,
 				D2000001000000000000001C /* FilmtoneSliderRow.swift in Sources */,
 				D2000001000000000000001D /* FilmtoneLutControls.swift in Sources */,
+				D2000001000000000000001E /* FilmtoneHeroSection.swift in Sources */,
+				D2000001000000000000001F /* FilmtonePresetSection.swift in Sources */,
+				D20000010000000000000020 /* FilmtoneTuningSection.swift in Sources */,
+				D20000010000000000000021 /* FilmtoneCameraProfileCard.swift in Sources */,
 				D20000010000000000000001 /* FormatExtensionReader.swift in Sources */,
 				D20000010000000000000002 /* SourceColorMetadataNormalizer.swift in Sources */,
 				D20000010000000000000003 /* SourceColorClassifier.swift in Sources */,

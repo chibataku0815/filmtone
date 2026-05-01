@@ -21,10 +21,26 @@ struct FilmtoneRootView: View {
 
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 24) {
-                    heroSection
-                        .accessibilityIdentifier("filmtone.section.hero")
-                    presetSection
-                    tuningSection
+                    FilmtoneHeroSection(
+                        store: store,
+                        fullscreenLutEditorPresented: $fullscreenLutEditorPresented
+                    )
+                    .accessibilityIdentifier("filmtone.section.hero")
+
+                    FilmtonePresetSection(
+                        store: store,
+                        strengthSheetPresented: $strengthSheetPresented
+                    )
+
+                    FilmtoneTuningSection(
+                        store: store,
+                        strengthSheetPresented: $strengthSheetPresented,
+                        savedLookSheet: $savedLookSheet,
+                        lutTermHelpPresented: $lutTermHelpPresented,
+                        lutDeleteConfirmation: $lutDeleteConfirmation,
+                        lookDeleteConfirmation: $lookDeleteConfirmation
+                    )
+
                     FilmtoneExportPanel(store: store)
                     messageStack
                 }
@@ -272,318 +288,6 @@ struct FilmtoneRootView: View {
         .accessibilityIdentifier("filmtone.banner.sourceLoad")
     }
 
-    private var heroSection: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            if store.source != nil {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(store.activePresetLabel)
-                        .font(.system(size: 34, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-
-                    if store.hasAnyAdjustments {
-                        Text(store.adjustmentSummaryText)
-                            .font(.subheadline)
-                            .foregroundStyle(.white.opacity(0.66))
-                            .lineLimit(2)
-                    }
-                }
-            }
-
-            FilmtonePreviewView(
-                source: store.source,
-                displayURI: store.selectedPreviewURI,
-                videoPreview: store.videoPreviewState,
-                emptyMessage: previewEmptyMessage,
-                emptyEyebrow: store.strings.previewEmptyEyebrow,
-                emptyHint: store.strings.previewEmptyHint,
-                loadingMessage: store.strings.previewRendering,
-                originalLabel: store.strings.compareLabel,
-                gradedLabel: store.strings.previewGradedLabel,
-                expandLabel: store.strings.previewExpandLabel,
-                isRendering: store.preview.isRendering,
-                metaLabel: store.previewMetaLabel,
-                isStillComparing: store.isCompareHeld,
-                onStillCompareHeld: store.setCompareHeld,
-                onOpenFullscreen: {
-                    fullscreenLutEditorPresented = true
-                }
-            ) { mode in
-                Task { await store.setVideoCompareMode(mode) }
-            }
-        }
-    }
-
-    private var presetSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center, spacing: 12) {
-                FilmtoneSectionHeader(title: store.strings.presetTitle)
-                    .accessibilityIdentifier("filmtone.section.presets")
-
-                Spacer(minLength: 12)
-
-                if store.hasPresetCustomValues {
-                    Button {
-                        store.restoreActivePresetDefaults()
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "arrow.counterclockwise")
-                                .font(.caption.weight(.semibold))
-
-                            Text(store.strings.presetDefaultLabel)
-                                .font(.caption.weight(.semibold))
-                        }
-                        .foregroundStyle(Color.filmtoneAmber.opacity(0.92))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 7)
-                        .background(
-                            Capsule()
-                                .fill(Color.white.opacity(0.045))
-                        )
-                        .overlay(
-                            Capsule()
-                                .stroke(Color.filmtoneAmber.opacity(0.16), lineWidth: 1)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("filmtone.preset.default")
-                }
-            }
-
-            FilmtonePresetRow(
-                presets: FilmtonePresetCatalog.all,
-                activePresetName: store.project.presetName
-            ) { preset, isActive in
-                if isActive {
-                    strengthSheetPresented = true
-                } else {
-                    store.selectPreset(preset.name)
-                }
-            }
-        }
-    }
-
-    private var tuningSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            FilmtoneSectionHeader(title: store.strings.adjustLabel)
-                .accessibilityIdentifier("filmtone.section.tuning")
-
-            Button {
-                strengthSheetPresented = true
-            } label: {
-                HStack(alignment: .center, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(store.strings.adjustOpenLabel)
-                            .font(.title3.weight(.semibold))
-                            .foregroundStyle(.white)
-                            .lineLimit(2)
-
-                        if let summary = adjustSummaryText {
-                            Text(summary)
-                                .font(.subheadline)
-                                .foregroundStyle(.white.opacity(0.72))
-                                .multilineTextAlignment(.leading)
-                                .lineLimit(2)
-                        }
-                    }
-
-                    Spacer(minLength: 12)
-
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(Color.filmtoneAmber.opacity(0.92))
-                        .frame(width: 38, height: 38)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(Color.white.opacity(0.05))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                        )
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(16)
-                .background(
-                    RoundedRectangle(cornerRadius: filmtoneSurfaceCornerRadius, style: .continuous)
-                        .fill(Color.white.opacity(0.03))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: filmtoneSurfaceCornerRadius, style: .continuous)
-                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
-                )
-                .accessibilityElement(children: .combine)
-                .accessibilityAddTraits(.isButton)
-                .accessibilityIdentifier("filmtone.adjust.open")
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("filmtone.adjust.open")
-
-            cameraProfileCard
-        }
-    }
-
-    private var cameraProfileCard: some View {
-        VStack(spacing: 14) {
-            FilmtoneLutControls.profileRow(
-                title: store.strings.cameraLabel,
-                value: store.cameraProfileLabel,
-                menuTitle: store.strings.cameraImport,
-                systemImage: "camera.filters",
-                menuIdentifier: "filmtone.lut.input.menu",
-                helpAction: { lutTermHelpPresented = true },
-                helpAccessibilityLabel: store.strings.helpLutAccessibilityLabel,
-                helpButtonIdentifier: "filmtone.help.lut.button"
-            ) {
-                // v1.3 Camera Profiles Phase F — built-in source profile
-                // catalog rendered ahead of Auto / Import so users see the
-                // primary explicit choices first. Order mirrors
-                // FilmtoneSourceProfileCatalog.allProfiles. Auto stays as
-                // a separate top-level item so it reads as "let Filmtone
-                // decide" rather than "another preset".
-                Button(store.strings.cameraAuto) {
-                    store.applyCameraProfile(.auto)
-                }
-                ForEach(FilmtoneSourceProfileCatalog.allProfiles, id: \.id) { entry in
-                    Button(store.strings.builtInSourceProfileName(for: entry.id) ?? entry.englishName) {
-                        store.applyCameraProfile(.builtIn(catalogId: entry.id))
-                    }
-                }
-                Divider()
-                Button(store.strings.cameraImport) {
-                    Task { await store.importInputLut() }
-                }
-                if store.project.inputLut != nil {
-                    Button(store.strings.clearLut, role: .destructive) {
-                        store.clearInputLut()
-                    }
-                }
-            }
-
-            if let inputLut = store.project.inputLut {
-                FilmtoneLutControls.intensityControl(
-                    title: store.strings.inputLutAmountLabel,
-                    value: inputLut.intensity,
-                    valueIdentifier: "filmtone.lut.input.intensity.value",
-                    sliderIdentifier: "filmtone.lut.input.intensity.slider"
-                ) { nextValue in
-                    store.setInputLutIntensity(nextValue)
-                }
-            }
-
-            // Saved LUTs strip — only renders when there is at least one
-            // entry, so the LUT card stays the same height as v1.2 for users
-            // who have never imported a LUT. Bound to `library.luts` (the
-            // full list, lastUsedAt-desc sorted by the actor) rather than
-            // the 6-cap `recentLuts` projection so the "保存したLUT" header
-            // stays honest — every imported LUT is reachable via horizontal
-            // scroll. v1.4 may reintroduce a Recent / All split when the
-            // dedicated management screen ships.
-            FilmtoneSavedLutsStrip(
-                entries: store.library.luts,
-                strings: store.strings,
-                onApply: { entry in
-                    Task { await store.applyLibraryLut(libraryId: entry.id, slot: .input) }
-                },
-                onRename: { entry in
-                    savedLookSheet = .renameLut(entry)
-                },
-                onDelete: { entry in
-                    lutDeleteConfirmation = entry
-                },
-                onToggleFavorite: { entry in
-                    Task { await store.toggleFavoriteLibraryLut(id: entry.id) }
-                }
-            )
-
-            Divider()
-                .overlay(Color.white.opacity(0.08))
-
-            FilmtoneLutControls.profileRow(
-                title: store.strings.lookLabel,
-                value: store.lookProfileLabel,
-                menuTitle: store.strings.lookImport,
-                systemImage: "camera.aperture",
-                menuIdentifier: "filmtone.lut.creative.menu"
-            ) {
-                Button(store.strings.lookFilmtone) {
-                    store.clearCreativeLut()
-                }
-                Button(store.strings.lookImport) {
-                    Task { await store.importCreativeLut() }
-                }
-                Button(store.strings.lookSaveCurrentMenu) {
-                    savedLookSheet = .createCurrentLook
-                }
-                .disabled(!canSaveCurrentLook)
-                if store.project.creativeLut != nil {
-                    Button(store.strings.clearLut, role: .destructive) {
-                        store.clearCreativeLut()
-                    }
-                }
-            }
-
-            if let creativeLut = store.project.creativeLut {
-                FilmtoneLutControls.intensityControl(
-                    title: store.strings.lookLutAmountLabel,
-                    value: creativeLut.intensity,
-                    valueIdentifier: "filmtone.lut.creative.intensity.value",
-                    sliderIdentifier: "filmtone.lut.creative.intensity.slider"
-                ) { nextValue in
-                    store.setCreativeLutIntensity(nextValue)
-                }
-            }
-
-            // Saved Looks strip — always visible (with empty-state copy when
-            // no looks exist) so first-time users see the pitch for the
-            // reuse loop without needing to scroll or hunt through menus.
-            FilmtoneSavedLooksStrip(
-                entries: store.library.looks,
-                strings: store.strings,
-                onApply: { entry in
-                    Task { await store.applySavedLook(id: entry.id) }
-                },
-                onRename: { entry in
-                    savedLookSheet = .renameLook(entry)
-                },
-                onDelete: { entry in
-                    lookDeleteConfirmation = entry
-                },
-                onToggleFavorite: { entry in
-                    Task { await store.toggleFavoriteSavedLook(id: entry.id) }
-                }
-            )
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: filmtoneSurfaceCornerRadius, style: .continuous)
-                .fill(Color.white.opacity(0.03))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: filmtoneSurfaceCornerRadius, style: .continuous)
-                .stroke(Color.white.opacity(0.06), lineWidth: 1)
-        )
-    }
-
-    /// "Save current Look…" is gated to states where there is something
-    /// meaningful to save: any preset different from `reset` defaults, OR
-    /// any quick / advanced adjustment, OR a creative LUT applied.
-    private var canSaveCurrentLook: Bool {
-        if store.project.creativeLut != nil {
-            return true
-        }
-        if store.hasAnyAdjustments {
-            return true
-        }
-        // Save is allowed even when only a preset is selected; the editor
-        // bootstraps with a default preset, so we additionally require
-        // strength != default to avoid the "Save what?" no-op.
-        if abs(store.project.strength - FilmtonePhase0Math.presetStrengthDefault) > 0.01 {
-            return true
-        }
-        return false
-    }
-
     @ViewBuilder
     private var messageStack: some View {
         if let notice = store.notice {
@@ -631,16 +335,6 @@ struct FilmtoneRootView: View {
         .padding(.bottom, 24)
     }
 
-    private var previewEmptyMessage: String {
-        if store.source == nil {
-            return store.strings.sourceEmpty
-        }
-        if let error = store.previewError {
-            return error
-        }
-        return store.strings.previewRendering
-    }
-
     private func messagePanel(title: String, message: String, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
@@ -665,13 +359,6 @@ struct FilmtoneRootView: View {
 
     private func percentLabel(_ value: Double) -> String {
         "\(Int((value * 100).rounded()))%"
-    }
-
-    private var adjustSummaryText: String? {
-        guard store.hasAnyAdjustments else {
-            return nil
-        }
-        return store.adjustmentSummaryText
     }
 }
 
