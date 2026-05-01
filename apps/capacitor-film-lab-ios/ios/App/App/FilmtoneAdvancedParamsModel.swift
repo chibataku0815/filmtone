@@ -101,14 +101,6 @@ struct FilmtoneAdvancedParamGroupSection<Content: View>: View {
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(.white.opacity(isExpanded ? 0.88 : 0.62))
                                 .frame(width: 28, height: 28)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                        .fill(Color.white.opacity(isExpanded ? 0.08 : 0.035))
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                        .stroke(Color.white.opacity(isExpanded ? 0.10 : 0.06), lineWidth: 1)
-                                )
                                 .rotationEffect(.degrees(isExpanded ? 180 : 0))
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -125,19 +117,21 @@ struct FilmtoneAdvancedParamGroupSection<Content: View>: View {
                     }
 
                 if !recipes.isEmpty {
-                    HStack(spacing: 8) {
-                        ForEach(recipes) { recipe in
-                            FilmtoneParamPresetChip(
-                                label: recipe.label,
-                                isSelected: selection == .recipe(recipe.id),
-                                accessibilityIdentifier: "filmtone.sheet.advanced.group.\(id).\(recipe.id)",
-                                action: {
-                                    onSelectRecipe(recipe)
-                                }
-                            )
-                        }
+                    GlassEffectContainer(spacing: 8) {
+                        HStack(spacing: 8) {
+                            ForEach(recipes) { recipe in
+                                FilmtoneParamPresetChip(
+                                    label: recipe.label,
+                                    isSelected: selection == .recipe(recipe.id),
+                                    accessibilityIdentifier: "filmtone.sheet.advanced.group.\(id).\(recipe.id)",
+                                    action: {
+                                        onSelectRecipe(recipe)
+                                    }
+                                )
+                            }
 
-                        Spacer(minLength: 0)
+                            Spacer(minLength: 0)
+                        }
                     }
                 }
             }
@@ -157,15 +151,12 @@ struct FilmtoneAdvancedParamGroupSection<Content: View>: View {
                     .transition(.opacity)
             }
         }
-        .background(
-            groupShape
-                .fill(Color.white.opacity(isExpanded ? 0.045 : 0.028))
-        )
-        .overlay(
-            groupShape
-                .stroke(Color.white.opacity(isExpanded ? 0.10 : 0.06), lineWidth: 1)
-        )
         .clipShape(groupShape)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Color.white.opacity(0.08))
+                .frame(height: 1)
+        }
         .animation(disclosureAnimation, value: isExpanded)
         .animation(disclosureAnimation, value: selection)
     }
@@ -202,13 +193,9 @@ private struct FilmtoneParamPresetChip: View {
                 .foregroundStyle(isSelected ? .black.opacity(0.88) : .white.opacity(0.78))
                 .padding(.horizontal, 11)
                 .padding(.vertical, 8)
-                .background(
-                    Capsule()
-                        .fill(isSelected ? Color.filmtoneAmber : Color.white.opacity(0.045))
-                )
-                .overlay(
-                    Capsule()
-                        .stroke(isSelected ? Color.clear : Color.white.opacity(0.08), lineWidth: 1)
+                .glassEffect(
+                    isSelected ? .regular.tint(Color.filmtoneAmber) : .regular,
+                    in: Capsule()
                 )
         }
         .buttonStyle(.plain)

@@ -129,14 +129,6 @@ struct FilmtoneDisclosureSection<Content: View>: View {
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.white.opacity(isExpanded ? 0.88 : 0.62))
                             .frame(width: 28, height: 28)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(Color.white.opacity(isExpanded ? 0.08 : 0.035))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .stroke(Color.white.opacity(isExpanded ? 0.10 : 0.06), lineWidth: 1)
-                            )
                             .rotationEffect(.degrees(isExpanded ? 180 : 0))
                             .padding(.top, 2)
                     }
@@ -174,26 +166,7 @@ struct FilmtoneDisclosureSection<Content: View>: View {
                 .transition(.opacity)
             }
         }
-        .background(
-            sectionShape
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(isExpanded ? 0.06 : 0.045),
-                            Color.white.opacity(isExpanded ? 0.028 : 0.02),
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-        )
-        .overlay(
-            sectionShape
-                .stroke(
-                    Color.white.opacity(isExpanded ? 0.10 : 0.07),
-                    lineWidth: 1
-                )
-        )
+        .glassEffect(.regular, in: sectionShape)
         .clipShape(sectionShape)
         .animation(disclosureAnimation, value: isExpanded)
     }

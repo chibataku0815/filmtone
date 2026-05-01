@@ -151,6 +151,12 @@ describe("buildOpticalParamPatch", () => {
       "haloPrismThreshold",
       "haloPrismWidth",
       "lensSoftness",
+      "opticalBlackRetention",
+      "opticalDirectTransmission",
+      "opticalHighlightReactivity",
+      "opticalScatterStrength",
+      "opticalSpectralTail",
+      "opticalWarmScatter",
       "rgbShift",
     ]);
   });

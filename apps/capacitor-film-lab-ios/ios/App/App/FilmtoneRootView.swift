@@ -1,87 +1,78 @@
 import SwiftUI
-import UIKit
 
+/// Root router. Source-less = empty picker view, source-loaded = fullscreen
+/// Liquid Glass editor. The legacy scroll-based main flow (Hero / Preset /
+/// Tuning / CameraProfileCard / Library cards) was deleted as part of the
+/// IA pivot to fullscreen-first. UnsavedExportPrompt / Toast / HdrPolicyNotice
+/// now live inside `FilmtoneFullscreenLutEditor` as overlays.
 struct FilmtoneRootView: View {
     @ObservedObject var store: FilmtoneEditorStore
-    @State private var strengthSheetPresented = false
     @State private var sourcePickerDialogPresented = false
     @State private var onboardingPresented = false
     @State private var onboardingCompletedThisSession = false
     @State private var shouldOpenSourcePickerAfterOnboarding = false
-    @State private var lutTermHelpPresented = false
     @State private var savedLookSheet: SavedLookSheetMode?
     @State private var lutDeleteConfirmation: LutLibraryEntry?
     @State private var lookDeleteConfirmation: SavedLookEntry?
-    @State private var fullscreenLutEditorPresented = false
+    @State private var sourceSheetPresented = false
+    @State private var advancedSheetPresented = false
+    @State private var exportSheetPresented = false
+    @State private var pendingLookOnPickComplete: SavedLookEntry?
 
     var body: some View {
         ZStack {
-            backgroundLayer
-                .ignoresSafeArea()
-
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 24) {
-                    FilmtoneHeroSection(
-                        store: store,
-                        fullscreenLutEditorPresented: $fullscreenLutEditorPresented
-                    )
-                    .accessibilityIdentifier("filmtone.section.hero")
-
-                    FilmtonePresetSection(
-                        store: store,
-                        strengthSheetPresented: $strengthSheetPresented
-                    )
-
-                    FilmtoneTuningSection(
-                        store: store,
-                        strengthSheetPresented: $strengthSheetPresented,
-                        savedLookSheet: $savedLookSheet,
-                        lutTermHelpPresented: $lutTermHelpPresented,
-                        lutDeleteConfirmation: $lutDeleteConfirmation,
-                        lookDeleteConfirmation: $lookDeleteConfirmation
-                    )
-
-                    FilmtoneExportPanel(store: store)
-                    messageStack
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 28)
-                .padding(.bottom, contentBottomPadding)
+            if store.source == nil {
+                FilmtoneEmptyView(
+                    store: store,
+                    onPickPhotoLibrary: { Task { await store.pickSource(route: .photoLibrary) } },
+                    onPickFiles: { Task { await store.pickSource(route: .files) } },
+                    onPickWithLook: { entry in
+                        pendingLookOnPickComplete = entry
+                        Task { await store.pickSource(route: .photoLibrary) }
+                    }
+                )
+            } else {
+                FilmtoneFullscreenLutEditor(
+                    store: store,
+                    onClose: { sourcePickerDialogPresented = true },
+                    onSaveLook: { savedLookSheet = .createCurrentLook },
+                    onExport: { exportSheetPresented = true },
+                    onSourceTap: { sourceSheetPresented = true },
+                    onAdvancedTap: { advancedSheetPresented = true }
+                )
             }
-            .accessibilityIdentifier("filmtone.root.scroll")
-        }
-        .overlay(alignment: .bottom) { bottomOverlay }
-        .animation(.spring(response: 0.34, dampingFraction: 0.86), value: store.toast?.id)
-        .animation(.spring(response: 0.34, dampingFraction: 0.86), value: shouldShowUnsavedExportPrompt)
-        .safeAreaInset(edge: .top, spacing: 0) {
-            VStack(spacing: 0) {
-                topChrome
-                if let sourceLoadState = store.sourceLoadState {
+
+            if let sourceLoadState = store.sourceLoadState {
+                VStack(spacing: 0) {
                     sourceLoadBanner(sourceLoadState)
+                    Spacer(minLength: 0)
                 }
-                if store.source != nil, FilmtoneHdrPolicyNotice.shouldSurface(store.hdrPolicy) {
-                    FilmtoneHdrPolicyNotice(
-                        policy: store.hdrPolicy,
-                        strings: store.strings
-                    )
-                }
+                .ignoresSafeArea(edges: .bottom)
+                .allowsHitTesting(false)
             }
         }
-        .sheet(isPresented: $strengthSheetPresented) {
-            FilmtoneStrengthSheet(store: store) {
-                strengthSheetPresented = false
-            }
-        }
-        .sheet(isPresented: $lutTermHelpPresented) {
-            FilmtoneTermHelpSheet(
-                title: store.strings.helpLutTitle,
-                bodyText: store.strings.helpLutBody,
-                primarySubExplanation: store.strings.helpLutCameraLut,
-                secondarySubExplanation: store.strings.helpLutLookLut,
-                tertiarySubExplanation: store.strings.helpLutSavedLibrary,
-                dismissLabel: store.strings.helpDismiss
+        // Backward-compat alias for XCUITest snapshot suite which uses
+        // `filmtone.root.scroll` as a "main app loaded" sentinel. The legacy
+        // ScrollView is gone, but the sentinel is harmless on the router root.
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("filmtone.root.scroll")
+        .sheet(isPresented: $sourceSheetPresented) {
+            FilmtoneSourceProfileSheet(
+                store: store,
+                savedLookSheet: $savedLookSheet,
+                lutDeleteConfirmation: $lutDeleteConfirmation
             ) {
-                lutTermHelpPresented = false
+                sourceSheetPresented = false
+            }
+        }
+        .sheet(isPresented: $advancedSheetPresented) {
+            FilmtoneStrengthSheet(store: store) {
+                advancedSheetPresented = false
+            }
+        }
+        .sheet(isPresented: $exportSheetPresented) {
+            FilmtoneExportPanel(store: store) {
+                exportSheetPresented = false
             }
         }
         .fullScreenCover(isPresented: $onboardingPresented, onDismiss: openSourcePickerIfNeeded) {
@@ -93,14 +84,15 @@ struct FilmtoneRootView: View {
         }
         .onAppear {
             FilmtoneOnboardingState.applyLaunchArgumentsIfNeeded()
-            if FilmtoneSnapshotScene.current == .quick {
-                strengthSheetPresented = true
-            }
             presentOnboardingIfNeeded()
         }
         .onChange(of: store.source?.uri) { _ in
             if store.source != nil {
                 onboardingPresented = false
+                if let pending = pendingLookOnPickComplete {
+                    pendingLookOnPickComplete = nil
+                    Task { await store.applySavedLook(id: pending.id) }
+                }
             } else {
                 presentOnboardingIfNeeded()
             }
@@ -174,66 +166,9 @@ struct FilmtoneRootView: View {
             }
             Button(store.strings.savedLookSheetCancel, role: .cancel) {}
         }
-        .fullScreenCover(isPresented: $fullscreenLutEditorPresented) {
-            FilmtoneFullscreenLutEditor(store: store) {
-                fullscreenLutEditorPresented = false
-            }
-        }
     }
 
-    private func presentOnboardingIfNeeded() {
-        guard !onboardingCompletedThisSession else {
-            return
-        }
-        onboardingPresented = FilmtoneOnboardingState.shouldPresent(source: store.source)
-    }
-
-    private func dismissOnboarding() {
-        FilmtoneOnboardingState.markSeen()
-        onboardingCompletedThisSession = true
-        onboardingPresented = false
-    }
-
-    private func finishOnboardingAndPickMedia() {
-        FilmtoneOnboardingState.markSeen()
-        onboardingCompletedThisSession = true
-        shouldOpenSourcePickerAfterOnboarding = true
-        onboardingPresented = false
-    }
-
-    private func openSourcePickerIfNeeded() {
-        guard shouldOpenSourcePickerAfterOnboarding else {
-            return
-        }
-        shouldOpenSourcePickerAfterOnboarding = false
-        sourcePickerDialogPresented = true
-    }
-
-    private var backgroundLayer: some View {
-        ZStack {
-            Color.filmtoneBackground
-
-            LinearGradient(
-                colors: [
-                    .clear,
-                    Color.black.opacity(0.36),
-                    Color.black.opacity(0.72),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        }
-    }
-
-    private var topChrome: some View {
-        FilmtoneTopChrome(
-            title: store.sourceLabel ?? store.strings.appName,
-            actionLabel: store.source == nil ? store.strings.pickSource : store.strings.repickSource,
-            isActionDisabled: store.isBusy || store.isSavingToPhotos
-        ) {
-            sourcePickerDialogPresented = true
-        }
-    }
+    // MARK: Source load banner (overlay during pick → loaded transition)
 
     private func sourceLoadBanner(_ state: FilmtoneSourceLoadState) -> some View {
         VStack(spacing: 0) {
@@ -288,80 +223,37 @@ struct FilmtoneRootView: View {
         .accessibilityIdentifier("filmtone.banner.sourceLoad")
     }
 
-    @ViewBuilder
-    private var messageStack: some View {
-        if let notice = store.notice {
-            messagePanel(title: store.strings.noticePrefix, message: notice, tint: Color.filmtoneAmber)
-        }
+    // MARK: Onboarding helpers
 
-        if let error = store.bannerError {
-            messagePanel(title: store.strings.errorPrefix, message: error, tint: .red)
+    private func presentOnboardingIfNeeded() {
+        guard !onboardingCompletedThisSession else {
+            return
         }
+        onboardingPresented = FilmtoneOnboardingState.shouldPresent(source: store.source)
     }
 
-    private var contentBottomPadding: CGFloat {
-        shouldShowUnsavedExportPrompt ? 172 : 32
+    private func dismissOnboarding() {
+        FilmtoneOnboardingState.markSeen()
+        onboardingCompletedThisSession = true
+        onboardingPresented = false
     }
 
-    private var shouldShowUnsavedExportPrompt: Bool {
-        store.canUseLocalExport && store.saveToPhotosState != .saved && !store.isBusy
+    private func finishOnboardingAndPickMedia() {
+        FilmtoneOnboardingState.markSeen()
+        onboardingCompletedThisSession = true
+        shouldOpenSourcePickerAfterOnboarding = true
+        onboardingPresented = false
     }
 
-    private var bottomOverlay: some View {
-        VStack(spacing: 10) {
-            if let toast = store.toast {
-                FilmtoneToastView(toast: toast)
-                    .allowsHitTesting(false)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .zIndex(1000)
-            }
-
-            if shouldShowUnsavedExportPrompt {
-                UnsavedExportPrompt(
-                    message: store.strings.unsavedExportPrompt,
-                    saveLabel: store.strings.saveToPhotos,
-                    shareLabel: store.strings.shareOutput,
-                    isSaving: store.isSavingToPhotos
-                ) {
-                    Task { await store.saveToPhotos() }
-                } onShare: {
-                    Task { await store.shareOutput() }
-                }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .zIndex(900)
-            }
+    private func openSourcePickerIfNeeded() {
+        guard shouldOpenSourcePickerAfterOnboarding else {
+            return
         }
-        .padding(.horizontal, 20)
-        .padding(.bottom, 24)
-    }
-
-    private func messagePanel(title: String, message: String, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(tint.opacity(0.92))
-
-            Text(message)
-                .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.84))
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: filmtoneSurfaceCornerRadius, style: .continuous)
-                .fill(tint.opacity(0.06))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: filmtoneSurfaceCornerRadius, style: .continuous)
-                .stroke(tint.opacity(0.12), lineWidth: 1)
-        )
+        shouldOpenSourcePickerAfterOnboarding = false
+        sourcePickerDialogPresented = true
     }
 
     private func percentLabel(_ value: Double) -> String {
         "\(Int((value * 100).rounded()))%"
     }
 }
-
-
-/// Stateful identifier for the Saved-Look modal so we can reuse a single
-/// `.sheet(item:)` for create / rename-look / rename-LUT.

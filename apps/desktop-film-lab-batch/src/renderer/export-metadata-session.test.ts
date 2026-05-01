@@ -129,6 +129,13 @@ describe("export metadata session", () => {
         analyzerVersion: "scene-aware-v1",
         appliedAtIso: "2026-04-20T12:00:00.000Z",
       },
+      opticalFilterProfile: {
+        id: "warmMist-1-4",
+        family: "warmMist",
+        density: "1/4",
+        displayName: "Warm Mist 1/4",
+        appliedAtIso: "2026-04-20T12:00:00.000Z",
+      },
     });
 
     expect(session.look.opticalRecommendation).toEqual({
@@ -136,6 +143,13 @@ describe("export metadata session", () => {
       profile: "warm",
       recipe: "warmIndoor",
       analyzerVersion: "scene-aware-v1",
+      appliedAtIso: "2026-04-20T12:00:00.000Z",
+    });
+    expect(session.look.opticalFilterProfile).toEqual({
+      id: "warmMist-1-4",
+      family: "warmMist",
+      density: "1/4",
+      displayName: "Warm Mist 1/4",
       appliedAtIso: "2026-04-20T12:00:00.000Z",
     });
   });

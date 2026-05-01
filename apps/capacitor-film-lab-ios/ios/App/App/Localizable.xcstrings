@@ -7,6 +7,12 @@
     "• %@" : {
 
     },
+    "2×" : {
+
+    },
+    "Export" : {
+
+    },
     "export_complete_body" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2815,6 +2821,23 @@
         }
       }
     },
+    "filmtone.preset.default" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "デフォルト"
+          }
+        }
+      }
+    },
     "filmtone.preset.ektar100.subtitle" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -2947,23 +2970,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "涼しいグリーン"
-          }
-        }
-      }
-    },
-    "filmtone.preset.default" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Default"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "デフォルト"
           }
         }
       }
@@ -3375,6 +3381,9 @@
           }
         }
       }
+    },
+    "Save" : {
+
     }
   },
   "version" : "1.0"

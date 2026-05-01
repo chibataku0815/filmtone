@@ -614,6 +614,8 @@
       "finishToolsStarterSignature": "Strong",
       "finishToolsAdvancedShow": "詳細を開く",
       "finishToolsAdvancedHide": "詳細を閉じる",
+      "lensFilter": "Lens Filter",
+      "lensFilterDisclaimer": "一般的な拡散フィルターの系統に着想を得た表現です。メーカー認定の再現ではありません。",
       "finishToolsMist": "Mist",
       "finishToolsMistOutcome": "画全体をやわらかくして、完成感のある薄い霞を足します。",
       "finishToolsGlow": "Glow",

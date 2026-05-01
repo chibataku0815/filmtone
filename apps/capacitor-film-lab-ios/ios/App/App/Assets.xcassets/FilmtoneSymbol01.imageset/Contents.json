@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "filmtone-symbol01.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

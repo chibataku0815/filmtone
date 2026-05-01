@@ -46,6 +46,15 @@ function schemaForParamKey(key: ParamKey): z.ZodType<number> {
           ? z.number().min(0).max(64).default(12)
         : key === "lensSoftness"
           ? z.number().min(0).max(1).default(0)
+          : key === "opticalDirectTransmission"
+            ? z.number().min(0).max(1).default(1)
+          : key === "opticalBlackRetention"
+            ? z.number().min(0).max(1).default(1)
+          : key === "opticalScatterStrength" ||
+              key === "opticalHighlightReactivity" ||
+              key === "opticalWarmScatter" ||
+              key === "opticalSpectralTail"
+            ? z.number().min(0).max(1).default(0)
           : key === "compressionRange"
             ? z.number().min(0).max(1).default(0.5)
             : key === "compressionAmount" || key === "printContrast"

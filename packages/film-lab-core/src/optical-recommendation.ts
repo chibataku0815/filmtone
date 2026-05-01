@@ -116,6 +116,12 @@ const OPTICAL_PARAM_KEYS = [
   "haloPrismSourceReactivity",
   "rgbShift",
   "lensSoftness",
+  "opticalDirectTransmission",
+  "opticalBlackRetention",
+  "opticalScatterStrength",
+  "opticalHighlightReactivity",
+  "opticalWarmScatter",
+  "opticalSpectralTail",
 ] as const;
 
 type OpticalParamKey = (typeof OPTICAL_PARAM_KEYS)[number];

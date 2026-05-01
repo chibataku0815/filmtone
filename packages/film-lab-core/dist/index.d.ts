@@ -3,7 +3,7 @@ import { z } from 'zod';
 /**
  * Film Lab のグレード数値パラメータ定義（ブラウザ・Remotion 共通の単一の真実）
  */
-declare const PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "grainIntensity", "grainRadialMix", "grainSize", "vignette", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "depthMistGain", "depthGlowGain", "depthRayAngleGamma", "depthRayAngleInnerThreshold", "depthMistRayAngleGain", "depthBloomRayAngleGain", "depthHalationRayAngleGain", "depthMistFieldPsfGain", "depthBloomFieldPsfGain", "depthHalationFieldPsfGain", "depthMistFieldPsfRadiusPx", "depthBloomFieldPsfRadiusPx", "depthHalationFieldPsfRadiusPx", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "fade", "highlights", "shadows", "shadowTone", "highlightTone", "shadowHue", "highlightHue", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "motionBlurAmount", "shutterAngle", "trailIntensity", "dustAmount", "scratchAmount", "shaftIntensity", "shaftDecay", "shaftOriginX", "shaftOriginY", "crossFilterStrength", "crossFilterSpikes", "crossFilterAngle", "crossFilterLength", "crossFilterThreshold", "crossFilterChromatic", "crossFilterSizeLimit", "crossFilterRandomness", "crossFilterHardMode", "crossFilterMinSpacing", "crossFilterDepthGain", "crossFilterAngleGain", "crossFilterAngleGamma", "crossFilterAngleInnerThreshold", "crossFilterEdgeLengthGain", "crossFilterEdgeStrengthGain", "haloPrismStrength", "haloPrismRadius", "haloPrismWidth", "haloPrismChromatic", "haloPrismThreshold", "haloPrismSplit", "haloPrismAngle", "haloPrismSourceReactivity"];
+declare const PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "grainIntensity", "grainRadialMix", "grainSize", "vignette", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "depthMistGain", "depthGlowGain", "depthRayAngleGamma", "depthRayAngleInnerThreshold", "depthMistRayAngleGain", "depthBloomRayAngleGain", "depthHalationRayAngleGain", "depthMistFieldPsfGain", "depthBloomFieldPsfGain", "depthHalationFieldPsfGain", "depthMistFieldPsfRadiusPx", "depthBloomFieldPsfRadiusPx", "depthHalationFieldPsfRadiusPx", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "opticalDirectTransmission", "opticalBlackRetention", "opticalScatterStrength", "opticalHighlightReactivity", "opticalWarmScatter", "opticalSpectralTail", "fade", "highlights", "shadows", "shadowTone", "highlightTone", "shadowHue", "highlightHue", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "motionBlurAmount", "shutterAngle", "trailIntensity", "dustAmount", "scratchAmount", "shaftIntensity", "shaftDecay", "shaftOriginX", "shaftOriginY", "crossFilterStrength", "crossFilterSpikes", "crossFilterAngle", "crossFilterLength", "crossFilterThreshold", "crossFilterChromatic", "crossFilterSizeLimit", "crossFilterRandomness", "crossFilterHardMode", "crossFilterMinSpacing", "crossFilterDepthGain", "crossFilterAngleGain", "crossFilterAngleGamma", "crossFilterAngleInnerThreshold", "crossFilterEdgeLengthGain", "crossFilterEdgeStrengthGain", "haloPrismStrength", "haloPrismRadius", "haloPrismWidth", "haloPrismChromatic", "haloPrismThreshold", "haloPrismSplit", "haloPrismAngle", "haloPrismSourceReactivity"];
 type ParamKey = (typeof PARAM_KEYS)[number];
 declare const FILM_GRAIN_INTENSITY_MAX = 0.1;
 declare function clampGrainIntensity(value: number): number;
@@ -64,6 +64,18 @@ interface Params {
     bloomSoftKnee: number;
     /** ハレーション閾値のソフトニー幅（0〜1） */
     halationSoftKnee: number;
+    /** Optical filter direct-light transmission（1=neutral）。 */
+    opticalDirectTransmission: number;
+    /** Optical filter black retention（1=preserve blacks）。 */
+    opticalBlackRetention: number;
+    /** Optical filter direct/scatter mix strength（0=legacy screen glow）。 */
+    opticalScatterStrength: number;
+    /** Optical filter highlight-reactive scatter emphasis（0=linear）。 */
+    opticalHighlightReactivity: number;
+    /** Optical filter warm scatter bias（0=neutral）。 */
+    opticalWarmScatter: number;
+    /** Optical filter RGB spectral tail split（0=neutral）。 */
+    opticalSpectralTail: number;
     fade: number;
     highlights: number;
     shadows: number;
@@ -813,6 +825,12 @@ declare const filmLabParamsSchema: z.ZodObject<{
     halationRadius: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
     bloomSoftKnee: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
     halationSoftKnee: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    opticalDirectTransmission: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    opticalBlackRetention: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    opticalScatterStrength: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    opticalHighlightReactivity: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    opticalWarmScatter: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    opticalSpectralTail: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
     fade: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
     highlights: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
     shadows: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
@@ -933,6 +951,12 @@ declare const filmLookGradeInputSchema: z.ZodObject<{
         halationRadius: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         bloomSoftKnee: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         halationSoftKnee: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        opticalDirectTransmission: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        opticalBlackRetention: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        opticalScatterStrength: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        opticalHighlightReactivity: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        opticalWarmScatter: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        opticalSpectralTail: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         fade: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         highlights: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         shadows: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
@@ -1204,6 +1228,303 @@ interface OpticalAnalyzerProvider {
 }
 declare function recommendOpticalFinish(descriptor: SceneDescriptorV1): OpticalRecommendationV1;
 declare function buildOpticalParamPatch(recommendation: OpticalRecommendationV1): Partial<Params>;
+
+type OpticalFilterFamily = "blackMist" | "cineBloom" | "pearlGlow" | "warmMist" | "cleanSoft" | "streak" | "prismHalo";
+type OpticalFilterDensity = "subtle" | "1/8" | "1/4" | "1/2" | "5%" | "10%" | "20%" | "heavy";
+type OpticalFilterParamKey = "bloomThreshold" | "bloomStrength" | "bloomRadius" | "diffusion" | "depthMistGain" | "depthGlowGain" | "depthRayAngleGamma" | "depthRayAngleInnerThreshold" | "depthMistRayAngleGain" | "depthBloomRayAngleGain" | "depthHalationRayAngleGain" | "depthMistFieldPsfGain" | "depthBloomFieldPsfGain" | "depthHalationFieldPsfGain" | "depthMistFieldPsfRadiusPx" | "depthBloomFieldPsfRadiusPx" | "depthHalationFieldPsfRadiusPx" | "halationIntensity" | "halationSpread" | "halationHue" | "halationThreshold" | "halationRadius" | "bloomSoftKnee" | "halationSoftKnee" | "rgbShift" | "lensSoftness" | "crossFilterStrength" | "crossFilterSpikes" | "crossFilterAngle" | "crossFilterLength" | "crossFilterThreshold" | "crossFilterChromatic" | "crossFilterSizeLimit" | "crossFilterRandomness" | "crossFilterHardMode" | "crossFilterMinSpacing" | "crossFilterDepthGain" | "crossFilterAngleGain" | "crossFilterAngleGamma" | "crossFilterAngleInnerThreshold" | "crossFilterEdgeLengthGain" | "crossFilterEdgeStrengthGain" | "haloPrismStrength" | "haloPrismRadius" | "haloPrismWidth" | "haloPrismChromatic" | "haloPrismThreshold" | "haloPrismSplit" | "haloPrismAngle" | "haloPrismSourceReactivity" | "opticalDirectTransmission" | "opticalBlackRetention" | "opticalScatterStrength" | "opticalHighlightReactivity" | "opticalWarmScatter" | "opticalSpectralTail";
+type OpticalFilterParamPatch = Pick<Params, OpticalFilterParamKey>;
+interface OpticalFilterBehavior {
+    readonly blackRetention: number;
+    readonly directTransmission: number;
+    readonly scatterStrength: number;
+    readonly scatterCore: number;
+    readonly scatterTail: number;
+    readonly highlightReactivity: number;
+    readonly warmth: number;
+    readonly spectralTail: number;
+    readonly depthResponse: number;
+    readonly rayAngleResponse: number;
+    readonly fieldPsfScale: number;
+}
+interface OpticalFilterProfile {
+    readonly id: string;
+    readonly family: OpticalFilterFamily;
+    readonly density: OpticalFilterDensity;
+    readonly displayName: string;
+    readonly shortLabel: string;
+    readonly description: string;
+    readonly params: Partial<OpticalFilterParamPatch>;
+    readonly behavior: OpticalFilterBehavior;
+}
+declare const OPTICAL_FILTER_PARAM_KEYS: readonly ["bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "depthMistGain", "depthGlowGain", "depthRayAngleGamma", "depthRayAngleInnerThreshold", "depthMistRayAngleGain", "depthBloomRayAngleGain", "depthHalationRayAngleGain", "depthMistFieldPsfGain", "depthBloomFieldPsfGain", "depthHalationFieldPsfGain", "depthMistFieldPsfRadiusPx", "depthBloomFieldPsfRadiusPx", "depthHalationFieldPsfRadiusPx", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "rgbShift", "lensSoftness", "crossFilterStrength", "crossFilterSpikes", "crossFilterAngle", "crossFilterLength", "crossFilterThreshold", "crossFilterChromatic", "crossFilterSizeLimit", "crossFilterRandomness", "crossFilterHardMode", "crossFilterMinSpacing", "crossFilterDepthGain", "crossFilterAngleGain", "crossFilterAngleGamma", "crossFilterAngleInnerThreshold", "crossFilterEdgeLengthGain", "crossFilterEdgeStrengthGain", "haloPrismStrength", "haloPrismRadius", "haloPrismWidth", "haloPrismChromatic", "haloPrismThreshold", "haloPrismSplit", "haloPrismAngle", "haloPrismSourceReactivity", "opticalDirectTransmission", "opticalBlackRetention", "opticalScatterStrength", "opticalHighlightReactivity", "opticalWarmScatter", "opticalSpectralTail"];
+declare const OPTICAL_FILTER_DISCLAIMER = "Inspired by common diffusion-filter families. Not a manufacturer-certified emulation.";
+declare const OPTICAL_FILTER_PROFILES: readonly [{
+    readonly id: "blackMist-1-8";
+    readonly family: "blackMist";
+    readonly density: "1/8";
+    readonly displayName: "Black Mist 1/8";
+    readonly shortLabel: "1/8";
+    readonly description: "Controlled highlight bloom with strong black retention.";
+    readonly params: {
+        readonly bloomThreshold: 0.8;
+        readonly bloomStrength: 0.1;
+        readonly bloomRadius: 0.42;
+        readonly diffusion: 0.06;
+        readonly halationIntensity: 0.035;
+        readonly halationSpread: 16;
+        readonly halationHue: 18;
+        readonly halationThreshold: 0.66;
+        readonly halationRadius: 0.34;
+        readonly bloomSoftKnee: 0.58;
+        readonly halationSoftKnee: 0.34;
+        readonly lensSoftness: 0.035;
+        readonly opticalDirectTransmission: 0.965;
+        readonly opticalBlackRetention: 0.92;
+        readonly opticalScatterStrength: 0.18;
+        readonly opticalHighlightReactivity: 0.42;
+        readonly opticalWarmScatter: 0.08;
+        readonly opticalSpectralTail: 0.04;
+    };
+    readonly behavior: OpticalFilterBehavior;
+}, {
+    readonly id: "blackMist-1-4";
+    readonly family: "blackMist";
+    readonly density: "1/4";
+    readonly displayName: "Black Mist 1/4";
+    readonly shortLabel: "1/4";
+    readonly description: "Visible halation and highlight roll with protected shadows.";
+    readonly params: {
+        readonly bloomThreshold: 0.76;
+        readonly bloomStrength: 0.18;
+        readonly bloomRadius: 0.52;
+        readonly diffusion: 0.1;
+        readonly depthMistGain: 0.22;
+        readonly depthGlowGain: 0.18;
+        readonly depthMistRayAngleGain: 0.42;
+        readonly depthBloomRayAngleGain: 0.32;
+        readonly depthHalationRayAngleGain: 0.24;
+        readonly halationIntensity: 0.07;
+        readonly halationSpread: 20;
+        readonly halationHue: 20;
+        readonly halationThreshold: 0.62;
+        readonly halationRadius: 0.42;
+        readonly bloomSoftKnee: 0.64;
+        readonly halationSoftKnee: 0.42;
+        readonly lensSoftness: 0.055;
+        readonly opticalDirectTransmission: 0.93;
+        readonly opticalBlackRetention: 0.86;
+        readonly opticalScatterStrength: 0.34;
+        readonly opticalHighlightReactivity: 0.58;
+        readonly opticalWarmScatter: 0.12;
+        readonly opticalSpectralTail: 0.06;
+    };
+    readonly behavior: OpticalFilterBehavior;
+}, {
+    readonly id: "blackMist-1-2";
+    readonly family: "blackMist";
+    readonly density: "1/2";
+    readonly displayName: "Black Mist 1/2";
+    readonly shortLabel: "1/2";
+    readonly description: "Dense highlight bloom with a broad low-frequency tail.";
+    readonly params: {
+        readonly bloomThreshold: 0.7;
+        readonly bloomStrength: 0.28;
+        readonly bloomRadius: 0.64;
+        readonly diffusion: 0.16;
+        readonly depthMistGain: 0.32;
+        readonly depthGlowGain: 0.28;
+        readonly depthMistRayAngleGain: 0.48;
+        readonly depthBloomRayAngleGain: 0.38;
+        readonly depthHalationRayAngleGain: 0.28;
+        readonly depthMistFieldPsfRadiusPx: 22;
+        readonly depthBloomFieldPsfRadiusPx: 12;
+        readonly depthHalationFieldPsfRadiusPx: 15;
+        readonly halationIntensity: 0.12;
+        readonly halationSpread: 26;
+        readonly halationHue: 21;
+        readonly halationThreshold: 0.58;
+        readonly halationRadius: 0.54;
+        readonly bloomSoftKnee: 0.72;
+        readonly halationSoftKnee: 0.5;
+        readonly lensSoftness: 0.08;
+        readonly opticalDirectTransmission: 0.88;
+        readonly opticalBlackRetention: 0.78;
+        readonly opticalScatterStrength: 0.52;
+        readonly opticalHighlightReactivity: 0.72;
+        readonly opticalWarmScatter: 0.16;
+        readonly opticalSpectralTail: 0.08;
+    };
+    readonly behavior: OpticalFilterBehavior;
+}, {
+    readonly id: "cineBloom-5";
+    readonly family: "cineBloom";
+    readonly density: "5%";
+    readonly displayName: "Cine Bloom 5%";
+    readonly shortLabel: "5%";
+    readonly description: "Soft digital-edge bloom with a clean haze floor.";
+    readonly params: {
+        readonly bloomThreshold: 0.78;
+        readonly bloomStrength: 0.14;
+        readonly bloomRadius: 0.5;
+        readonly diffusion: 0.08;
+        readonly halationIntensity: 0.03;
+        readonly halationSpread: 16;
+        readonly halationHue: 16;
+        readonly halationRadius: 0.34;
+        readonly bloomSoftKnee: 0.62;
+        readonly lensSoftness: 0.045;
+    };
+    readonly behavior: OpticalFilterBehavior;
+}, {
+    readonly id: "cineBloom-10";
+    readonly family: "cineBloom";
+    readonly density: "10%";
+    readonly displayName: "Cine Bloom 10%";
+    readonly shortLabel: "10%";
+    readonly description: "Dreamier broad bloom for practicals and skin.";
+    readonly params: {
+        readonly bloomThreshold: 0.72;
+        readonly bloomStrength: 0.24;
+        readonly bloomRadius: 0.62;
+        readonly diffusion: 0.13;
+        readonly halationIntensity: 0.06;
+        readonly halationSpread: 22;
+        readonly halationHue: 18;
+        readonly halationRadius: 0.46;
+        readonly bloomSoftKnee: 0.7;
+        readonly halationSoftKnee: 0.4;
+        readonly lensSoftness: 0.065;
+    };
+    readonly behavior: OpticalFilterBehavior;
+}, {
+    readonly id: "cineBloom-20";
+    readonly family: "cineBloom";
+    readonly density: "20%";
+    readonly displayName: "Cine Bloom 20%";
+    readonly shortLabel: "20%";
+    readonly description: "Heavy broad glow for an intentionally dreamy finish.";
+    readonly params: {
+        readonly bloomThreshold: 0.64;
+        readonly bloomStrength: 0.42;
+        readonly bloomRadius: 0.74;
+        readonly diffusion: 0.22;
+        readonly halationIntensity: 0.1;
+        readonly halationSpread: 28;
+        readonly halationHue: 18;
+        readonly halationRadius: 0.6;
+        readonly bloomSoftKnee: 0.78;
+        readonly halationSoftKnee: 0.48;
+        readonly lensSoftness: 0.1;
+    };
+    readonly behavior: OpticalFilterBehavior;
+}, {
+    readonly id: "warmMist-1-8";
+    readonly family: "warmMist";
+    readonly density: "1/8";
+    readonly displayName: "Warm Mist 1/8";
+    readonly shortLabel: "1/8";
+    readonly description: "Warm practical-light bloom with restrained softness.";
+    readonly params: {
+        readonly bloomThreshold: 0.76;
+        readonly bloomStrength: 0.16;
+        readonly bloomRadius: 0.48;
+        readonly diffusion: 0.07;
+        readonly halationIntensity: 0.08;
+        readonly halationSpread: 20;
+        readonly halationHue: 28;
+        readonly halationThreshold: 0.6;
+        readonly halationRadius: 0.4;
+        readonly bloomSoftKnee: 0.62;
+        readonly halationSoftKnee: 0.42;
+        readonly lensSoftness: 0.04;
+        readonly opticalWarmScatter: 0.18;
+        readonly opticalSpectralTail: 0.04;
+    };
+    readonly behavior: OpticalFilterBehavior;
+}, {
+    readonly id: "warmMist-1-4";
+    readonly family: "warmMist";
+    readonly density: "1/4";
+    readonly displayName: "Warm Mist 1/4";
+    readonly shortLabel: "1/4";
+    readonly description: "Tasteful amber halation for night ambience.";
+    readonly params: {
+        readonly bloomThreshold: 0.7;
+        readonly bloomStrength: 0.24;
+        readonly bloomRadius: 0.58;
+        readonly diffusion: 0.11;
+        readonly depthGlowGain: 0.16;
+        readonly halationIntensity: 0.14;
+        readonly halationSpread: 26;
+        readonly halationHue: 30;
+        readonly halationThreshold: 0.56;
+        readonly halationRadius: 0.5;
+        readonly bloomSoftKnee: 0.68;
+        readonly halationSoftKnee: 0.5;
+        readonly lensSoftness: 0.06;
+        readonly opticalWarmScatter: 0.28;
+        readonly opticalSpectralTail: 0.06;
+    };
+    readonly behavior: OpticalFilterBehavior;
+}, {
+    readonly id: "pearlGlow-subtle";
+    readonly family: "pearlGlow";
+    readonly density: "subtle";
+    readonly displayName: "Pearl Glow Subtle";
+    readonly shortLabel: "Subtle";
+    readonly description: "Polished skin softness with minimal halo.";
+    readonly params: {
+        readonly bloomThreshold: 0.84;
+        readonly bloomStrength: 0.06;
+        readonly bloomRadius: 0.34;
+        readonly diffusion: 0.045;
+        readonly halationIntensity: 0.015;
+        readonly halationSpread: 14;
+        readonly halationRadius: 0.26;
+        readonly bloomSoftKnee: 0.58;
+        readonly lensSoftness: 0.055;
+    };
+    readonly behavior: OpticalFilterBehavior;
+}, {
+    readonly id: "pearlGlow-1-4";
+    readonly family: "pearlGlow";
+    readonly density: "1/4";
+    readonly displayName: "Pearl Glow 1/4";
+    readonly shortLabel: "1/4";
+    readonly description: "Beauty-forward diffusion with clean highlights.";
+    readonly params: {
+        readonly bloomThreshold: 0.8;
+        readonly bloomStrength: 0.1;
+        readonly bloomRadius: 0.42;
+        readonly diffusion: 0.085;
+        readonly halationIntensity: 0.025;
+        readonly halationSpread: 16;
+        readonly halationRadius: 0.3;
+        readonly bloomSoftKnee: 0.64;
+        readonly lensSoftness: 0.08;
+    };
+    readonly behavior: OpticalFilterBehavior;
+}, {
+    readonly id: "cleanSoft-subtle";
+    readonly family: "cleanSoft";
+    readonly density: "subtle";
+    readonly displayName: "Clean Soft Subtle";
+    readonly shortLabel: "Subtle";
+    readonly description: "Less clinical sharpness without obvious filter glow.";
+    readonly params: {
+        readonly bloomThreshold: 0.9;
+        readonly bloomStrength: 0.035;
+        readonly bloomRadius: 0.28;
+        readonly diffusion: 0.02;
+        readonly halationIntensity: 0;
+        readonly lensSoftness: 0.075;
+        readonly rgbShift: 0.0006;
+    };
+    readonly behavior: OpticalFilterBehavior;
+}];
+type OpticalFilterProfileId = (typeof OPTICAL_FILTER_PROFILES)[number]["id"];
+declare function getOpticalFilterProfile(id: OpticalFilterProfileId | string): OpticalFilterProfile | null;
+declare function buildOpticalFilterParamPatch(id: OpticalFilterProfileId | string): Partial<Params>;
 
 /**
  * iOS Phase 0 ships with a deliberately small preset set.
@@ -1974,4 +2295,4 @@ declare function buildLookParamOverrides(spatial: Partial<Record<Phase0ParamKey,
 declare const CREATIVE_PACK_01_LOOKS: readonly CreativePackLook[];
 declare function findCreativePack01Look(slug: string): CreativePackLook | undefined;
 
-export { BAKE_COLOR_IDENTITY, BAKE_COLOR_PARAM_KEYS, type BakeColorParams, type BehaviorProfile, type BenchmarkRow, type BenchmarkRowInput, type BenchmarkSaveResult, type BenchmarkVisualFloor, CREATIVE_CUBE_DEFAULT_SIZE, CREATIVE_PACK_01_BAKER_VERSION, CREATIVE_PACK_01_CUBE_SIZE, CREATIVE_PACK_01_ID, CREATIVE_PACK_01_LOOKS, CREATIVE_PACK_01_STONE_TRANSFORM, CREATIVE_PACK_01_URBAN_TRANSFORM, type CameraOptics, type CameraOpticsSource, type CreativeCube, type CreativePack01SourceTransform, type CreativePackLook, type CubeLUT, DEFAULT_QUICK_STATE, FILMTONE_DEFAULT_BASE_PRESET, FILMTONE_SOFT_FINISH_PATCH, FILM_GRAIN_INTENSITY_MAX, FILM_LAB_DEFAULT_HIGHLIGHT_HUE, FILM_LAB_DEFAULT_SHADOW_HUE, type FilmLabDepthTrackInput, type FilmLabParamsValidated, type FilmLookGradeInputProps, type FilmLookSpikeInputProps, IOS_PHASE0_BENCHMARK_SLOTS, IOS_PHASE0_OUTPUT_CODEC, IOS_PHASE0_OUTPUT_FPS, IOS_PHASE0_OUTPUT_LONG_EDGE, IOS_PHASE0_PARAM_KEYS, IOS_PHASE0_PRESET_IDS, IOS_PHASE0_SCHEMA_VERSION, IOS_PHASE0_SOURCE_CAPS, IOS_PHASE0_SOURCE_DURATION_CAP_SEC, IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES, IOS_PHASE0_SOURCE_LONG_EDGE_CAP, type IosHdrPreparationPolicy, type IosHdrPreparationStrategy, type IosPhase0AssetRef, type IosPhase0BenchmarkRecord, type IosPhase0BenchmarkSlot, type IosPhase0ExportPayload, type IosPhase0ExportResult, type IosPhase0ExportSettings, type IosPhase0LocalProject, type IosPhase0ParamKey, type IosPhase0Params, type IosPhase0PickedLutFile, type IosPhase0PickedSource, type IosPhase0SerializableLut, type IosPhase0SourceInfo, type IosPhase0SourceKind, LEGACY_HIGHLIGHT_TONE_MAGNITUDE, LEGACY_SHADOW_TONE_MAGNITUDE, LOOK_ID_BY_PRESET, type OpticalAnalyzerProvider, type OpticalFamily, type OpticalRecipeId, type OpticalRecommendationV1, PARAM_KEYS, PHASE0_APPROX_SOURCE_LONG_EDGE_MAX, PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES, PHASE0_BENCHMARK_GATES, PHASE0_MAX_SOURCE_DURATION_SEC, PHASE0_OUTPUT_PROFILE, PHASE0_PARAM_KEYS, PHASE0_PRESET_DEFAULT, PHASE0_PRESET_STRENGTH_DEFAULT, PHASE0_RGB_SHIFT_MAX, PHASE0_SCHEMA_VERSION, PRESETS, PRESET_BUTTONS, PRESET_VERSION, type PackedCubeLut2D, type ParamKey, type Params, type ParsedBenchmarkRow, type ParsedCubeLut, type Phase0ExportBenchmarkRecord, type Phase0ExportProgress, type Phase0ExportRequest, type Phase0ExportResult, type Phase0ExportStage, type Phase0OutputProfile, type Phase0ParamKey, type Phase0Params, type Phase0PreviewRenderResult, type Phase0ProjectLut, type Phase0ProjectState, type Phase0QuickTarget, type Phase0RenderMode, type PickedLutFile, type PresetName, QUICK_AXIS_DEFAULT_RANGE, QUICK_AXIS_IDS, type QuickAxisId, type QuickState, type RGB, type SceneAnalysisState, type SceneDescriptorV1, type SerializeCubeOptions, type SourceColorClass, type SourceColorMetadata, type SourceDisplayGeometry, type SourceInfo, type SourceKind, type SourceProbe, type SourceVideoMetadata, type SourceVideoTimingMetadata, applyCreativePack01SourceTransform, applyFilmtoneReferenceFingerprintTransform, applyQuickStateToParams, applyQuickStateToPhase0Params, assertPhase0SourceProbeWithinCaps, bakeColorOnly, benchmarkMarkdownTableHeader, buildBenchmarkRow, buildLookParamOverrides, buildOpticalParamPatch, buildPhase0ExportRequest, cameraOpticsSchema, chromaUnitFromHueDegrees, clampGrainIntensity, cloneParams, coerceQuickState, createDefaultFilmLookGradeProps, createDefaultPhase0Params, createFilmtoneDefaultParams, createFilmtoneDefaultPhase0Params, createIosPhase0SerializableLut, createPhase0ProjectState, deserializeCubeLutData, diagonalMaxDelta, filmLabDepthTrackSchema, filmLabParamsSchema, filmLookGradeDefaultProps, filmLookGradeInputSchema, filmLookSpikeDefaultProps, filmLookSpikeInputSchema, findCreativePack01Look, findMatchingPreset, formatBenchmarkRow, getIosPhase0SourceCapViolations, getPhase0SourceCapViolations, gradeMatchesPreset, halationHueToHex, hslToRgb01, interpolatePhase0PresetParams, iosPhase0AssetRefSchema, iosPhase0BenchmarkRecordSchema, iosPhase0ExportPayloadSchema, iosPhase0ExportResultSchema, iosPhase0ExportSettingsSchema, iosPhase0LocalProjectSchema, iosPhase0ParamsSchema, iosPhase0PickedLutFileSchema, iosPhase0PickedSourceSchema, iosPhase0PresetIdSchema, iosPhase0SerializableLutSchema, iosPhase0SourceInfoSchema, iosPhase0SourceKindSchema, iosPhase0ThermalStateSchema, lookIdForPreset, makeCreativeCube, makeIdentityCube, mergePhase0Params, nearestHueDegreesToDirection, packCubeLutToFloatRgbaGrid, parseBenchmarkRow, parseCube, phase0ParamsSchema, phase0ProjectLutSchema, phase0ProjectSchema, phase0QuickStateSchema, pickBakeColorParams, pickIosPhase0Params, pickPhase0Params, quickStateSchema, recommendOpticalFinish, serializeCreativeCubeToText, serializeCubeLut };
+export { BAKE_COLOR_IDENTITY, BAKE_COLOR_PARAM_KEYS, type BakeColorParams, type BehaviorProfile, type BenchmarkRow, type BenchmarkRowInput, type BenchmarkSaveResult, type BenchmarkVisualFloor, CREATIVE_CUBE_DEFAULT_SIZE, CREATIVE_PACK_01_BAKER_VERSION, CREATIVE_PACK_01_CUBE_SIZE, CREATIVE_PACK_01_ID, CREATIVE_PACK_01_LOOKS, CREATIVE_PACK_01_STONE_TRANSFORM, CREATIVE_PACK_01_URBAN_TRANSFORM, type CameraOptics, type CameraOpticsSource, type CreativeCube, type CreativePack01SourceTransform, type CreativePackLook, type CubeLUT, DEFAULT_QUICK_STATE, FILMTONE_DEFAULT_BASE_PRESET, FILMTONE_SOFT_FINISH_PATCH, FILM_GRAIN_INTENSITY_MAX, FILM_LAB_DEFAULT_HIGHLIGHT_HUE, FILM_LAB_DEFAULT_SHADOW_HUE, type FilmLabDepthTrackInput, type FilmLabParamsValidated, type FilmLookGradeInputProps, type FilmLookSpikeInputProps, IOS_PHASE0_BENCHMARK_SLOTS, IOS_PHASE0_OUTPUT_CODEC, IOS_PHASE0_OUTPUT_FPS, IOS_PHASE0_OUTPUT_LONG_EDGE, IOS_PHASE0_PARAM_KEYS, IOS_PHASE0_PRESET_IDS, IOS_PHASE0_SCHEMA_VERSION, IOS_PHASE0_SOURCE_CAPS, IOS_PHASE0_SOURCE_DURATION_CAP_SEC, IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES, IOS_PHASE0_SOURCE_LONG_EDGE_CAP, type IosHdrPreparationPolicy, type IosHdrPreparationStrategy, type IosPhase0AssetRef, type IosPhase0BenchmarkRecord, type IosPhase0BenchmarkSlot, type IosPhase0ExportPayload, type IosPhase0ExportResult, type IosPhase0ExportSettings, type IosPhase0LocalProject, type IosPhase0ParamKey, type IosPhase0Params, type IosPhase0PickedLutFile, type IosPhase0PickedSource, type IosPhase0SerializableLut, type IosPhase0SourceInfo, type IosPhase0SourceKind, LEGACY_HIGHLIGHT_TONE_MAGNITUDE, LEGACY_SHADOW_TONE_MAGNITUDE, LOOK_ID_BY_PRESET, OPTICAL_FILTER_DISCLAIMER, OPTICAL_FILTER_PARAM_KEYS, OPTICAL_FILTER_PROFILES, type OpticalAnalyzerProvider, type OpticalFamily, type OpticalFilterBehavior, type OpticalFilterDensity, type OpticalFilterFamily, type OpticalFilterParamKey, type OpticalFilterParamPatch, type OpticalFilterProfile, type OpticalFilterProfileId, type OpticalRecipeId, type OpticalRecommendationV1, PARAM_KEYS, PHASE0_APPROX_SOURCE_LONG_EDGE_MAX, PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES, PHASE0_BENCHMARK_GATES, PHASE0_MAX_SOURCE_DURATION_SEC, PHASE0_OUTPUT_PROFILE, PHASE0_PARAM_KEYS, PHASE0_PRESET_DEFAULT, PHASE0_PRESET_STRENGTH_DEFAULT, PHASE0_RGB_SHIFT_MAX, PHASE0_SCHEMA_VERSION, PRESETS, PRESET_BUTTONS, PRESET_VERSION, type PackedCubeLut2D, type ParamKey, type Params, type ParsedBenchmarkRow, type ParsedCubeLut, type Phase0ExportBenchmarkRecord, type Phase0ExportProgress, type Phase0ExportRequest, type Phase0ExportResult, type Phase0ExportStage, type Phase0OutputProfile, type Phase0ParamKey, type Phase0Params, type Phase0PreviewRenderResult, type Phase0ProjectLut, type Phase0ProjectState, type Phase0QuickTarget, type Phase0RenderMode, type PickedLutFile, type PresetName, QUICK_AXIS_DEFAULT_RANGE, QUICK_AXIS_IDS, type QuickAxisId, type QuickState, type RGB, type SceneAnalysisState, type SceneDescriptorV1, type SerializeCubeOptions, type SourceColorClass, type SourceColorMetadata, type SourceDisplayGeometry, type SourceInfo, type SourceKind, type SourceProbe, type SourceVideoMetadata, type SourceVideoTimingMetadata, applyCreativePack01SourceTransform, applyFilmtoneReferenceFingerprintTransform, applyQuickStateToParams, applyQuickStateToPhase0Params, assertPhase0SourceProbeWithinCaps, bakeColorOnly, benchmarkMarkdownTableHeader, buildBenchmarkRow, buildLookParamOverrides, buildOpticalFilterParamPatch, buildOpticalParamPatch, buildPhase0ExportRequest, cameraOpticsSchema, chromaUnitFromHueDegrees, clampGrainIntensity, cloneParams, coerceQuickState, createDefaultFilmLookGradeProps, createDefaultPhase0Params, createFilmtoneDefaultParams, createFilmtoneDefaultPhase0Params, createIosPhase0SerializableLut, createPhase0ProjectState, deserializeCubeLutData, diagonalMaxDelta, filmLabDepthTrackSchema, filmLabParamsSchema, filmLookGradeDefaultProps, filmLookGradeInputSchema, filmLookSpikeDefaultProps, filmLookSpikeInputSchema, findCreativePack01Look, findMatchingPreset, formatBenchmarkRow, getIosPhase0SourceCapViolations, getOpticalFilterProfile, getPhase0SourceCapViolations, gradeMatchesPreset, halationHueToHex, hslToRgb01, interpolatePhase0PresetParams, iosPhase0AssetRefSchema, iosPhase0BenchmarkRecordSchema, iosPhase0ExportPayloadSchema, iosPhase0ExportResultSchema, iosPhase0ExportSettingsSchema, iosPhase0LocalProjectSchema, iosPhase0ParamsSchema, iosPhase0PickedLutFileSchema, iosPhase0PickedSourceSchema, iosPhase0PresetIdSchema, iosPhase0SerializableLutSchema, iosPhase0SourceInfoSchema, iosPhase0SourceKindSchema, iosPhase0ThermalStateSchema, lookIdForPreset, makeCreativeCube, makeIdentityCube, mergePhase0Params, nearestHueDegreesToDirection, packCubeLutToFloatRgbaGrid, parseBenchmarkRow, parseCube, phase0ParamsSchema, phase0ProjectLutSchema, phase0ProjectSchema, phase0QuickStateSchema, pickBakeColorParams, pickIosPhase0Params, pickPhase0Params, quickStateSchema, recommendOpticalFinish, serializeCreativeCubeToText, serializeCubeLut };

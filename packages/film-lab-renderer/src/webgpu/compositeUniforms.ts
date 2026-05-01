@@ -1,17 +1,20 @@
 /**
  * compositeUniforms — TS packer for the composite.wgsl `Composite` struct.
  *
- * Phase 2 T2-3 + v1.0 parity (2026-04-19). Mirrors the 6-vec4 layout defined
+ * Phase 2 T2-3 + v1.0 parity (2026-04-19). Mirrors the 8-vec4 layout defined
  * in `shaders/composite.frag.wgsl.ts`. Numeric params fall back to neutral
  * defaults so a partial params record still yields a valid upload.
  *
- * Layout (6 vec4 × 4 floats = 24 floats = 96 bytes):
+ * Layout (8 vec4 × 4 floats = 32 floats = 128 bytes):
  *   0: (resolutionX, resolutionY, imageResX, imageResY)
  *   1: (bloomStrength, halationIntensity, vignette, grainIntensity)
  *   2: (grainSize, grainRadialMix, fitMode, time)
  *   3: (lensSoftness, aberrationEdgeSoften, diffusion, depthMistGain)
  *   4: (tanHalfFovX, tanHalfFovY, innerThreshold, fallbackFlag)
  *   5: (rayAngleProbe, _, _, _)
+ *   6: (opticalDirectTransmission, opticalBlackRetention,
+ *       opticalScatterStrength, opticalHighlightReactivity)
+ *   7: (opticalWarmScatter, opticalSpectralTail, _, _)
  *
  * `depthMistGain` is the shared depth-aware Mist gain (0 = uniform mist,
  * 1 = full depth modulation). Values >= 1.5 stay reserved for the internal
@@ -20,7 +23,7 @@
 
 import { clampGrainIntensity } from "film-lab-core";
 
-export const COMPOSITE_UNIFORM_FLOATS = 24;
+export const COMPOSITE_UNIFORM_FLOATS = 32;
 export const COMPOSITE_UNIFORM_BYTES = COMPOSITE_UNIFORM_FLOATS * 4;
 const ABERRATION_EDGE_SOFTEN_SCALE = 32;
 
@@ -74,6 +77,14 @@ export function packCompositeUniforms(
   out[21] = 0;
   out[22] = 0;
   out[23] = 0;
+  out[24] = clamp01(n("opticalDirectTransmission", 1));
+  out[25] = clamp01(n("opticalBlackRetention", 1));
+  out[26] = clamp01(n("opticalScatterStrength", 0));
+  out[27] = clamp01(n("opticalHighlightReactivity", 0));
+  out[28] = clamp01(n("opticalWarmScatter", 0));
+  out[29] = clamp01(n("opticalSpectralTail", 0));
+  out[30] = 0;
+  out[31] = 0;
   return out;
 }
 

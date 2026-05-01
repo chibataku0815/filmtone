@@ -58,6 +58,18 @@ export const PARAM_KEYS = [
   "bloomSoftKnee",
   /** ハレーション閾値のソフトニー幅（0=ハード、1=最大ソフト） */
   "halationSoftKnee",
+  /** Optical filter direct-light transmission（1=neutral, lower values redistribute light into scatter）。 */
+  "opticalDirectTransmission",
+  /** Optical filter black retention（1=preserve blacks, 0=mist floor lifts shadows）。 */
+  "opticalBlackRetention",
+  /** Optical filter direct/scatter mix strength（0=legacy screen glow, 1=full direct+scatter model）。 */
+  "opticalScatterStrength",
+  /** Optical filter highlight-reactive scatter emphasis（0=linear, 1=strong highlight response）。 */
+  "opticalHighlightReactivity",
+  /** Optical filter warm scatter bias（0=neutral, 1=warm practical glow）。 */
+  "opticalWarmScatter",
+  /** Optical filter RGB spectral tail split（0=neutral, 1=strong red-tail / blue-core separation）。 */
+  "opticalSpectralTail",
   "fade",
   "highlights",
   "shadows",
@@ -206,6 +218,18 @@ export interface Params {
   bloomSoftKnee: number;
   /** ハレーション閾値のソフトニー幅（0〜1） */
   halationSoftKnee: number;
+  /** Optical filter direct-light transmission（1=neutral）。 */
+  opticalDirectTransmission: number;
+  /** Optical filter black retention（1=preserve blacks）。 */
+  opticalBlackRetention: number;
+  /** Optical filter direct/scatter mix strength（0=legacy screen glow）。 */
+  opticalScatterStrength: number;
+  /** Optical filter highlight-reactive scatter emphasis（0=linear）。 */
+  opticalHighlightReactivity: number;
+  /** Optical filter warm scatter bias（0=neutral）。 */
+  opticalWarmScatter: number;
+  /** Optical filter RGB spectral tail split（0=neutral）。 */
+  opticalSpectralTail: number;
   fade: number;
   highlights: number;
   shadows: number;

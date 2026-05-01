@@ -612,6 +612,8 @@
       "finishToolsStarterSignature": "Strong",
       "finishToolsAdvancedShow": "Show advanced",
       "finishToolsAdvancedHide": "Hide advanced",
+      "lensFilter": "Lens Filter",
+      "lensFilterDisclaimer": "Inspired by common diffusion-filter families. Not a manufacturer-certified emulation.",
       "finishToolsMist": "Mist",
       "finishToolsMistOutcome": "Soften the whole image with a finished haze.",
       "finishToolsGlow": "Glow",

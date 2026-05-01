@@ -39,47 +39,44 @@ struct FilmtoneSavedLookSheet: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color.filmtoneBackground.ignoresSafeArea()
+            VStack(alignment: .leading, spacing: 18) {
+                Text(headlineText)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+                    .accessibilityIdentifier("filmtone.savedLookSheet.headline")
 
-                VStack(alignment: .leading, spacing: 18) {
-                    Text(headlineText)
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                        .accessibilityIdentifier("filmtone.savedLookSheet.headline")
+                Text(bodyText)
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.66))
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
 
-                    Text(bodyText)
-                        .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.66))
-                        .lineLimit(3)
-                        .fixedSize(horizontal: false, vertical: true)
+                TextField(strings.savedLookNamePlaceholder, text: $name)
+                    .focused($nameFocused)
+                    .textFieldStyle(.plain)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
+                            .fill(Color.white.opacity(0.05))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
+                            .stroke(Color.white.opacity(0.10), lineWidth: 1)
+                    )
+                    .submitLabel(.done)
+                    .onSubmit(submitIfValid)
+                    .accessibilityIdentifier("filmtone.savedLookSheet.name")
 
-                    TextField(strings.savedLookNamePlaceholder, text: $name)
-                        .focused($nameFocused)
-                        .textFieldStyle(.plain)
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 12)
-                        .background(
-                            RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
-                                .fill(Color.white.opacity(0.05))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
-                                .stroke(Color.white.opacity(0.10), lineWidth: 1)
-                        )
-                        .submitLabel(.done)
-                        .onSubmit(submitIfValid)
-                        .accessibilityIdentifier("filmtone.savedLookSheet.name")
-
-                    Spacer(minLength: 0)
-                }
-                .padding(.horizontal, 24)
-                .padding(.top, 24)
-                .padding(.bottom, 16)
+                Spacer(minLength: 0)
             }
+            .padding(.horizontal, 24)
+            .padding(.top, 24)
+            .padding(.bottom, 16)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .navigationTitle(navigationTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

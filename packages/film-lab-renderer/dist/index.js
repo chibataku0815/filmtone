@@ -3520,7 +3520,7 @@ var Viewport = class _Viewport {
           "[Viewport] WebGPU is required but not supported in this environment"
         );
       }
-      const { WebGPUBackend } = await import("./WebGPUBackend-BYFT4OIK.js");
+      const { WebGPUBackend } = await import("./WebGPUBackend-M2BXSFLX.js");
       const backend = await WebGPUBackend.create(canvas);
       backend.setResolution(width, height);
       return new _Viewport(null, backend);

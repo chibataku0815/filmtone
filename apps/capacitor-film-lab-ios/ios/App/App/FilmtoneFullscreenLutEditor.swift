@@ -23,10 +23,24 @@ private func fullscreenPreviewImage(from uri: String) -> UIImage? {
 /// controls that compose cleanly with the LUT carousel.
 @MainActor
 final class FullscreenVideoController: ObservableObject {
+    /// TikTok-style boost state machine. The view owns the gesture and tells
+    /// the controller which transition to take; the controller owns the
+    /// AVPlayer rate / defaultRate side effects.
+    enum BoostState: Equatable {
+        case idle
+        case pressing
+        case boosting
+        case locked
+    }
+
     @Published var currentTime: Double = 0
     @Published var duration: Double = 0
     @Published var isPlaying: Bool = false
     @Published var isScrubbing: Bool = false
+    @Published var boostState: BoostState = .idle
+
+    static let boostRate: Float = 2.0
+    static let normalRate: Float = 1.0
 
     private weak var attachedPlayer: AVPlayer?
     private var timeObserverToken: Any?
@@ -55,11 +69,22 @@ final class FullscreenVideoController: ObservableObject {
     }
 
     func detach() {
+        // Always restore a sane rate before letting the player go — the same
+        // AVPlayer instance is shared with FilmtonePreviewView (inline) via
+        // FilmtoneVideoPreviewSession, so a stale 2x would carry over to
+        // inline preview after the fullscreen editor closes.
+        if let player = attachedPlayer {
+            player.defaultRate = Self.normalRate
+            if player.rate > Self.normalRate {
+                player.rate = Self.normalRate
+            }
+        }
         if let token = timeObserverToken, let attachedPlayer {
             attachedPlayer.removeTimeObserver(token)
         }
         timeObserverToken = nil
         attachedPlayer = nil
+        boostState = .idle
     }
 
     func togglePlayPause() {
@@ -79,6 +104,54 @@ final class FullscreenVideoController: ObservableObject {
             toleranceBefore: .zero,
             toleranceAfter: .zero
         )
+    }
+
+    // MARK: - Boost (TikTok-style 2x)
+
+    func setPressing() {
+        // Only enter .pressing from .idle. .locked presses are tracked by the
+        // view (pressStartedWhileLocked) so a tap can unlock without dropping
+        // out of .locked prematurely.
+        if boostState == .idle {
+            boostState = .pressing
+        }
+    }
+
+    func cancelPress() {
+        // Press cancelled before the long-press timer fired (user dragged far
+        // enough to count as a swipe, not a hold). No rate to restore yet.
+        if boostState == .pressing {
+            boostState = .idle
+        }
+    }
+
+    func engageBoost() {
+        guard let player = attachedPlayer else { return }
+        // Set BOTH rate and defaultRate. FilmtoneVideoPreviewSession.swap
+        // does pause → replaceCurrentItem → play() during graded↔original
+        // compare, and play() resumes at defaultRate — without setting it,
+        // a compare swap mid-2x would silently drop back to 1x.
+        player.defaultRate = Self.boostRate
+        player.rate = Self.boostRate
+        boostState = .boosting
+    }
+
+    func engageLock() {
+        if boostState == .boosting {
+            boostState = .locked
+        }
+    }
+
+    func resetToIdle() {
+        guard let player = attachedPlayer else {
+            boostState = .idle
+            return
+        }
+        player.defaultRate = Self.normalRate
+        if player.rate > Self.normalRate {
+            player.rate = Self.normalRate
+        }
+        boostState = .idle
     }
 }
 
@@ -184,9 +257,22 @@ private struct GlassGroup<Content: View>: View {
 struct FilmtoneFullscreenLutEditor: View {
     @ObservedObject var store: FilmtoneEditorStore
     let onClose: () -> Void
+    var onSaveLook: () -> Void = {}
+    var onExport: () -> Void = {}
+    var onSourceTap: () -> Void = {}
+    var onAdvancedTap: () -> Void = {}
 
     @State private var controlsHidden = false
     @StateObject private var videoController = FullscreenVideoController()
+
+    /// Press-and-hold gesture state — see `handleDragChanged` /
+    /// `handleDragEnded`. We use a single `DragGesture(minimumDistance: 0)`
+    /// rather than `LongPressGesture` + `DragGesture` simultaneously so the
+    /// touch-down → boost → swipe-lock transitions stay in one place.
+    @State private var pressStartTime: Date?
+    @State private var pressInitialLocation: CGPoint?
+    @State private var boostTask: Task<Void, Never>?
+    @State private var pressStartedWhileLocked: Bool = false
 
     var body: some View {
         ZStack {
@@ -202,6 +288,18 @@ struct FilmtoneFullscreenLutEditor: View {
                 .opacity(controlsHidden ? 0 : 1)
                 .allowsHitTesting(!controlsHidden)
                 .animation(.easeInOut(duration: 0.25), value: controlsHidden)
+        }
+        .overlay(alignment: .top) { topOverlays }
+        .overlay(alignment: .bottom) { bottomFloatingOverlays }
+        .animation(.spring(response: 0.34, dampingFraction: 0.86), value: store.toast?.id)
+        .animation(.spring(response: 0.34, dampingFraction: 0.86), value: shouldShowUnsavedExportPrompt)
+        .animation(.easeInOut(duration: 0.2), value: videoController.boostState)
+        .sensoryFeedback(trigger: videoController.boostState) { old, new in
+            switch (old, new) {
+            case (.pressing, .boosting): return .impact(weight: .light)
+            case (.boosting, .locked):   return .impact(weight: .medium)
+            default:                     return nil
+            }
         }
         .statusBarHidden(controlsHidden)
         .preferredColorScheme(.dark)
@@ -231,19 +329,135 @@ struct FilmtoneFullscreenLutEditor: View {
             previewMedia
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            // Tap surface: anywhere on the preview toggles the chrome
-            // (Apple Photos / TV / standard video player idiom). For video,
-            // play/pause goes through the on-screen button — single-tap is
-            // reserved for chrome reveal so the user can always recover the
-            // UI after hiding it.
+            // Touch surface: TikTok-style press-and-hold for 2x, swipe to
+            // lock 2x, tap to toggle chrome (also used to unlock from .locked).
+            // Implemented as a single DragGesture with a state machine — see
+            // FullscreenVideoController.BoostState.
             Color.clear
                 .contentShape(Rectangle())
-                .onTapGesture {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        controlsHidden.toggle()
-                    }
-                }
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            handleDragChanged(value)
+                        }
+                        .onEnded { value in
+                            handleDragEnded(value)
+                        }
+                )
                 .accessibilityHidden(true)
+        }
+    }
+
+    // MARK: Boost gesture handlers
+    //
+    // Tuning constants — kept inline rather than file-private statics because
+    // they belong to the FilmtoneFullscreenLutEditor surface and aren't
+    // reused. 0.18s threshold matches FilmtonePreviewView still-compare
+    // long-press for codebase consistency.
+    private static let pressBoostDelayNs: UInt64 = 180_000_000  // 0.18s — matches FilmtonePreviewView still-compare long-press
+    private static let cancelDistanceThreshold: CGFloat = 24
+    private static let lockDistanceThreshold: CGFloat = 30
+    private static let unlockTapMaxDuration: TimeInterval = 0.4
+
+    private func handleDragChanged(_ value: DragGesture.Value) {
+        if pressStartTime == nil {
+            pressStartTime = Date()
+            pressInitialLocation = value.location
+
+            // Press while locked: don't disturb the locked state — a short
+            // tap will unlock in handleDragEnded.
+            if videoController.boostState == .locked {
+                pressStartedWhileLocked = true
+                return
+            }
+            pressStartedWhileLocked = false
+
+            // Boost is video-only. Stills fall through to plain tap-toggle.
+            guard store.videoPreviewState != nil else { return }
+
+            videoController.setPressing()
+            boostTask?.cancel()
+            boostTask = Task { @MainActor in
+                try? await Task.sleep(nanoseconds: Self.pressBoostDelayNs)
+                guard !Task.isCancelled else { return }
+                if videoController.boostState == .pressing {
+                    videoController.engageBoost()
+                }
+            }
+            return
+        }
+
+        guard let initial = pressInitialLocation else { return }
+        let dx = value.location.x - initial.x
+        let dy = value.location.y - initial.y
+        let distanceSq = dx * dx + dy * dy
+
+        switch videoController.boostState {
+        case .pressing:
+            // Significant movement before boost timer fires → user is
+            // swiping, not pressing. Cancel boost intent so release acts
+            // as a no-op (not a chrome toggle).
+            if distanceSq > Self.cancelDistanceThreshold * Self.cancelDistanceThreshold {
+                boostTask?.cancel()
+                videoController.cancelPress()
+            }
+        case .boosting:
+            // Drag past lock threshold during boost → lock 2x.
+            if distanceSq > Self.lockDistanceThreshold * Self.lockDistanceThreshold {
+                videoController.engageLock()
+            }
+        case .locked, .idle:
+            break
+        }
+    }
+
+    private func handleDragEnded(_ value: DragGesture.Value) {
+        boostTask?.cancel()
+        boostTask = nil
+
+        let elapsed = pressStartTime.map { Date().timeIntervalSince($0) } ?? 0
+        let translation = value.translation
+        let translationMag = sqrt(
+            translation.width * translation.width + translation.height * translation.height
+        )
+        let startedWhileLocked = pressStartedWhileLocked
+        let priorState = videoController.boostState
+        pressStartTime = nil
+        pressInitialLocation = nil
+        pressStartedWhileLocked = false
+
+        // Tap on locked surface → unlock (back to 1x).
+        if startedWhileLocked {
+            if elapsed < Self.unlockTapMaxDuration && translationMag < Self.cancelDistanceThreshold {
+                videoController.resetToIdle()
+            }
+            return
+        }
+
+        switch priorState {
+        case .locked:
+            // Already locked via mid-press swipe — release stays locked.
+            break
+        case .boosting:
+            // Held for boost without swipe-lock → release returns to 1x.
+            videoController.resetToIdle()
+        case .pressing:
+            // Released before boost timer fired. Treat as tap iff stationary.
+            if translationMag < Self.cancelDistanceThreshold {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    controlsHidden.toggle()
+                }
+            }
+            videoController.cancelPress()
+        case .idle:
+            // .idle here means cancelPress already fired (drag during
+            // .pressing) — or the preview is a still (no boost was ever
+            // armed). For stills, surface tap-to-toggle-chrome.
+            if translationMag < Self.cancelDistanceThreshold {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    controlsHidden.toggle()
+                }
+            }
         }
     }
 
@@ -270,22 +484,25 @@ struct FilmtoneFullscreenLutEditor: View {
         }
     }
 
-    // MARK: Chrome (top + scrubber + dock)
+    // MARK: Chrome (upper + lower + scrubber + dock)
+    //
+    // Two-segment top chrome (CD-confirmed IA): upperChrome holds back +
+    // compare segment (video only) + active preset title + hide + save +
+    // export. lowerChrome holds the two sheet triggers (Source / Adjust)
+    // — Recipe was removed when preset chips were folded into the bottom
+    // Look carousel. Each segment is its own GlassEffectContainer so glass
+    // cohesion stays within a row — `glass cannot sample glass`, so we
+    // never nest GlassEffectContainer.
 
     private var chromeLayer: some View {
         ZStack {
-            // Top + bottom chrome stack — fills the screen so the bottom
-            // dock anchors to the safe area while the top bar anchors to
-            // the top.
-            VStack(spacing: 0) {
-                topRow
+            VStack(spacing: 8) {
+                upperChrome
                     .padding(.horizontal, 16)
                     .padding(.top, 4)
 
-                if let videoPreview = store.videoPreviewState {
-                    compareSegment(videoPreview)
-                        .padding(.top, 12)
-                }
+                lowerChrome
+                    .padding(.horizontal, 16)
 
                 Spacer(minLength: 0)
 
@@ -308,74 +525,226 @@ struct FilmtoneFullscreenLutEditor: View {
         }
     }
 
-    // MARK: Top row (close / title / hide-controls)
+    // MARK: Upper chrome (back / compare / title / hide / save / export)
 
-    private var topRow: some View {
-        GlassGroup(spacing: 24) {
-            HStack(spacing: 12) {
+    private var upperChrome: some View {
+        GlassGroup(spacing: 12) {
+            HStack(spacing: 10) {
                 GlassActionButton(
                     isProminent: false,
-                    controlSize: .large
+                    controlSize: .regular
                 ) {
-                    Image(systemName: "xmark")
+                    Image(systemName: "chevron.backward")
                 } action: {
                     onClose()
                 }
                 .accessibilityLabel(Text(store.strings.fullscreenCloseAccessibility))
                 .accessibilityIdentifier("filmtone.fullscreen.close")
 
-                Spacer(minLength: 0)
+                Spacer(minLength: 6)
 
-                Text(store.strings.fullscreenTitle)
-                    .font(.subheadline.weight(.semibold))
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .liquidGlassSurface(in: Capsule())
+                if let activeLookTitle = activeAppliedLookTitle {
+                    Text(activeLookTitle)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .liquidGlassSurface(in: Capsule())
+                        .accessibilityIdentifier("filmtone.fullscreen.title")
+                }
 
-                Spacer(minLength: 0)
+                Spacer(minLength: 6)
+
+                // Inline 2× boost indicator — sits next to playback-related
+                // chrome (compare/save/export) so it reads as part of the
+                // playback state, never obstructing the preview area.
+                boostChip
+
+                if let videoPreview = store.videoPreviewState {
+                    GlassActionButton(
+                        isProminent: videoPreview.compareMode == .original,
+                        controlSize: .regular
+                    ) {
+                        Image(systemName: "arrow.left.arrow.right.square")
+                    } action: {
+                        let next: FilmtoneVideoCompareMode =
+                            videoPreview.compareMode == .graded ? .original : .graded
+                        Task { await store.setVideoCompareMode(next) }
+                    }
+                    .accessibilityLabel(Text(store.strings.compareLabel))
+                    .accessibilityIdentifier("filmtone.fullscreen.compare")
+                }
 
                 GlassActionButton(
                     isProminent: false,
-                    controlSize: .large
+                    controlSize: .regular
                 ) {
-                    Image(systemName: controlsHidden ? "eye" : "eye.slash")
+                    Image(systemName: "square.and.arrow.down")
                 } action: {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        controlsHidden.toggle()
-                    }
+                    onSaveLook()
                 }
-                .accessibilityLabel(Text(store.strings.fullscreenToggleControlsAccessibility))
-                .accessibilityIdentifier("filmtone.fullscreen.toggleControls")
+                .accessibilityLabel(Text("Save"))
+                .accessibilityIdentifier("filmtone.fullscreen.action.save")
+
+                GlassActionButton(
+                    isProminent: true,
+                    controlSize: .regular
+                ) {
+                    Image(systemName: "square.and.arrow.up")
+                } action: {
+                    onExport()
+                }
+                .accessibilityLabel(Text("Export"))
+                .accessibilityIdentifier("filmtone.fullscreen.action.export")
             }
+        }
+        .accessibilityIdentifier("filmtone.fullscreen.upperChrome")
+    }
+
+    /// Resolves the currently applied saved-Look's display name. When no Look
+    /// is applied (`appliedSavedLookId == nil`) returns nil so the title pill
+    /// hides entirely — we deliberately do NOT show the app section name
+    /// ("LUT Browser") because the user is already inside the LUT browser.
+    private var activeAppliedLookTitle: String? {
+        guard let id = store.appliedSavedLookId,
+              let entry = store.library.looks.first(where: { $0.id == id })
+        else { return nil }
+        return store.strings.displayName(for: entry)
+    }
+
+    // MARK: Lower chrome (Source / Advanced sheet triggers)
+    //
+    // Recipe trigger was removed when the Recipe concept was absorbed into
+    // Look. The preset catalog still exists at the data layer (each Look
+    // serializes a preset name) but is no longer surfaced as a UI picker —
+    // Looks (built-in + saved) are the single vibe-selection surface.
+
+    private var lowerChrome: some View {
+        let ja = store.strings.usesJapaneseTypography
+        return GlassGroup(spacing: 6) {
+            HStack(spacing: 6) {
+                triggerButton(
+                    label: ja ? "素材" : "Source",
+                    systemImage: "film",
+                    identifier: "filmtone.fullscreen.trigger.source"
+                ) {
+                    onSourceTap()
+                }
+
+                triggerButton(
+                    label: ja ? "調整" : "Adjust",
+                    systemImage: "slider.horizontal.3",
+                    identifier: "filmtone.fullscreen.trigger.advanced"
+                ) {
+                    onAdvancedTap()
+                }
+            }
+        }
+        .accessibilityIdentifier("filmtone.fullscreen.lowerChrome")
+    }
+
+    private func triggerButton(
+        label: String,
+        systemImage: String,
+        identifier: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        GlassActionButton(
+            isProminent: false,
+            controlSize: .regular
+        ) {
+            Label(label, systemImage: systemImage)
+                .labelStyle(.titleAndIcon)
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .frame(maxWidth: .infinity)
+        } action: {
+            action()
+        }
+        .accessibilityIdentifier(identifier)
+    }
+
+    // MARK: Top + bottom floating overlays
+    //
+    // These were previously hosted by FilmtoneRootView's safeAreaInset /
+    // bottomOverlay. After the IA pivot they belong inside the fullscreen
+    // editor so they overlay the live preview directly. Toast + unsaved
+    // export prompt animate from bottom; HDR policy notice sits at top.
+
+    @ViewBuilder
+    private var topOverlays: some View {
+        if FilmtoneHdrPolicyNotice.shouldSurface(store.hdrPolicy) {
+            FilmtoneHdrPolicyNotice(
+                policy: store.hdrPolicy,
+                strings: store.strings
+            )
+            .padding(.horizontal, 16)
+            .padding(.top, 4)
+            .opacity(controlsHidden ? 0 : 1)
+            .allowsHitTesting(!controlsHidden)
+            .animation(.easeInOut(duration: 0.25), value: controlsHidden)
         }
     }
 
-    // MARK: Compare segment (video only)
-
-    private func compareSegment(_ videoPreview: FilmtoneVideoPreviewState) -> some View {
-        GlassGroup(spacing: 6) {
-            HStack(spacing: 6) {
-                GlassActionButton(
-                    isProminent: videoPreview.compareMode == .graded,
-                    controlSize: .regular
-                ) {
-                    Text(store.strings.previewGradedLabel)
-                        .font(.caption.weight(.semibold))
-                } action: {
-                    Task { await store.setVideoCompareMode(.graded) }
+    /// Inline 2× chip rendered inside `upperChrome`. Lives in chrome space
+    /// (not over the preview) so it never obstructs preview confirmation.
+    /// Pure Liquid Glass — no tint, no foregroundStyle override. Locked
+    /// state is signalled by the `lock.fill` glyph alone.
+    @ViewBuilder
+    private var boostChip: some View {
+        if videoController.boostState == .boosting || videoController.boostState == .locked {
+            let isLocked = videoController.boostState == .locked
+            HStack(spacing: 4) {
+                if isLocked {
+                    Image(systemName: "lock.fill")
+                        .font(.caption2.weight(.bold))
                 }
+                Text("2×")
+                    .font(.subheadline.monospacedDigit().weight(.bold))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .liquidGlassSurface(in: Capsule())
+            .transition(.opacity.combined(with: .scale(scale: 0.85)))
+            .accessibilityIdentifier("filmtone.fullscreen.video.speedIndicator")
+        }
+    }
 
-                GlassActionButton(
-                    isProminent: videoPreview.compareMode == .original,
-                    controlSize: .regular
+    private var shouldShowUnsavedExportPrompt: Bool {
+        store.canUseLocalExport && store.saveToPhotosState != .saved && !store.isBusy
+    }
+
+    private var bottomFloatingOverlays: some View {
+        VStack(spacing: 10) {
+            if let toast = store.toast {
+                FilmtoneToastView(toast: toast)
+                    .allowsHitTesting(false)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(1000)
+            }
+
+            if shouldShowUnsavedExportPrompt {
+                UnsavedExportPrompt(
+                    message: store.strings.unsavedExportPrompt,
+                    saveLabel: store.strings.saveToPhotos,
+                    shareLabel: store.strings.shareOutput,
+                    isSaving: store.isSavingToPhotos
                 ) {
-                    Text(store.strings.compareLabel)
-                        .font(.caption.weight(.semibold))
-                } action: {
-                    Task { await store.setVideoCompareMode(.original) }
+                    Task { await store.saveToPhotos() }
+                } onShare: {
+                    Task { await store.shareOutput() }
                 }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .zIndex(900)
             }
         }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 24)
+        .opacity(controlsHidden ? 0 : 1)
+        .allowsHitTesting(!controlsHidden)
+        .animation(.easeInOut(duration: 0.25), value: controlsHidden)
     }
 
     // MARK: Center play/pause (video only)
@@ -563,7 +932,7 @@ private struct FullscreenLookCarousel: View {
             GlassGroup(spacing: 10) {
                 HStack(spacing: 10) {
                     GlassActionButton(
-                        isProminent: !hasCreativeLut,
+                        isProminent: !hasCreativeLut && activeLookId == nil,
                         controlSize: .regular
                     ) {
                         Label(strings.fullscreenNoLookLabel, systemImage: "circle.dashed")

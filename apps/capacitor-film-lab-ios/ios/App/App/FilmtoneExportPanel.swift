@@ -2,18 +2,25 @@ import SwiftUI
 
 struct FilmtoneExportPanel: View {
     @ObservedObject var store: FilmtoneEditorStore
+    var onDismiss: (() -> Void)? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            header
-            statePanel
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 18) {
+                header
+                statePanel
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 14)
+            .padding(.bottom, 28)
         }
-        .padding(.top, 8)
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
         .accessibilityIdentifier("filmtone.section.export")
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: 16) {
+        HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(store.exportResult == nil ? store.strings.exportSectionTitle : store.strings.resultTitle)
                     .font(.title3.weight(.semibold))
@@ -23,15 +30,32 @@ struct FilmtoneExportPanel: View {
                     .font(.subheadline)
                     .foregroundStyle(.white.opacity(0.66))
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(1)
 
-            Spacer(minLength: 12)
+            HStack(spacing: 8) {
+                Button(store.strings.exportStart) {
+                    Task { await store.export() }
+                }
+                .buttonStyle(.glassProminent)
+                .controlSize(.regular)
+                .lineLimit(1)
+                .disabled(!canExport)
+                .accessibilityIdentifier("filmtone.export.primary")
 
-            Button(store.strings.exportStart) {
-                Task { await store.export() }
+                if let onDismiss {
+                    Button {
+                        onDismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                    }
+                    .buttonStyle(.glass)
+                    .controlSize(.regular)
+                    .accessibilityLabel(Text(store.strings.helpDismiss))
+                    .accessibilityIdentifier("filmtone.export.dismiss")
+                }
             }
-            .buttonStyle(FilmtonePrimaryButtonStyle())
-            .disabled(!canExport)
-            .accessibilityIdentifier("filmtone.export.primary")
+            .fixedSize()
         }
     }
 
@@ -50,9 +74,11 @@ struct FilmtoneExportPanel: View {
 
     private var readyState: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(store.source == nil ? store.strings.sourceEmpty : store.strings.exportIdle)
-                .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.82))
+            if store.source == nil {
+                Text(store.strings.sourceEmpty)
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.82))
+            }
 
             if store.source != nil {
                 HStack(spacing: 12) {

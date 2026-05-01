@@ -7,6 +7,9 @@ import {
   lookIdForPreset,
   type BehaviorProfile,
   type CameraOptics,
+  type OpticalFilterDensity,
+  type OpticalFilterFamily,
+  type OpticalFilterProfileId,
   type OpticalFamily,
   type OpticalRecipeId,
   type PresetName,
@@ -49,6 +52,14 @@ export type AppliedOpticalRecommendationMetadata = {
   profile: BehaviorProfile;
   recipe: OpticalRecipeId | null;
   analyzerVersion: string;
+  appliedAtIso: string;
+};
+
+export type AppliedOpticalFilterProfileMetadata = {
+  id: OpticalFilterProfileId | string;
+  family: OpticalFilterFamily;
+  density: OpticalFilterDensity;
+  displayName: string;
   appliedAtIso: string;
 };
 
@@ -197,6 +208,32 @@ const opticalRecommendationMetadataSchema = z.object({
   analyzerVersion: z.string().min(1),
   appliedAtIso: z.string().min(1),
 });
+const opticalFilterFamilySchema = z.enum([
+  "blackMist",
+  "cineBloom",
+  "pearlGlow",
+  "warmMist",
+  "cleanSoft",
+  "streak",
+  "prismHalo",
+]);
+const opticalFilterDensitySchema = z.enum([
+  "subtle",
+  "1/8",
+  "1/4",
+  "1/2",
+  "5%",
+  "10%",
+  "20%",
+  "heavy",
+]);
+const opticalFilterProfileMetadataSchema = z.object({
+  id: z.string().min(1),
+  family: opticalFilterFamilySchema,
+  density: opticalFilterDensitySchema,
+  displayName: z.string().min(1),
+  appliedAtIso: z.string().min(1),
+});
 
 const filmtoneExportSessionSchema = z.object({
   kind: z.literal("filmtone-export-session"),
@@ -221,6 +258,7 @@ const filmtoneExportSessionSchema = z.object({
     source: metadataLookSourceSchema,
     grade: filmLookGradeInputSchema,
     opticalRecommendation: opticalRecommendationMetadataSchema.optional(),
+    opticalFilterProfile: opticalFilterProfileMetadataSchema.optional(),
   }),
   lutRefs: z.object({
     lut1: metadataLutRefSchema,
@@ -384,6 +422,7 @@ export function buildFilmtoneExportSession(params: {
   depthTrack: BatchDepthTrack | null;
   lutRefs: MetadataLutRefs;
   opticalRecommendation?: AppliedOpticalRecommendationMetadata | null;
+  opticalFilterProfile?: AppliedOpticalFilterProfileMetadata | null;
   cameraOptics?: CameraOptics | null;
   sourceVideoMetadata?: SourceVideoMetadata | null;
 }): FilmtoneExportSessionV1 {
@@ -421,6 +460,9 @@ export function buildFilmtoneExportSession(params: {
         ) as unknown as FilmtoneExportSessionV1["look"]["grade"],
       ...(params.opticalRecommendation
         ? { opticalRecommendation: params.opticalRecommendation }
+        : {}),
+      ...(params.opticalFilterProfile
+        ? { opticalFilterProfile: params.opticalFilterProfile }
         : {}),
     },
     lutRefs: params.lutRefs,

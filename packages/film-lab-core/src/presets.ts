@@ -31,7 +31,13 @@ export type ContractDefaultKey =
   | "haloPrismThreshold"
   | "haloPrismSplit"
   | "haloPrismAngle"
-  | "haloPrismSourceReactivity";
+  | "haloPrismSourceReactivity"
+  | "opticalDirectTransmission"
+  | "opticalBlackRetention"
+  | "opticalScatterStrength"
+  | "opticalHighlightReactivity"
+  | "opticalWarmScatter"
+  | "opticalSpectralTail";
 
 type BasePresetParams = Omit<Params, ContractDefaultKey>;
 
@@ -63,6 +69,12 @@ export const CONTRACT_DEFAULTS: Readonly<Pick<Params, ContractDefaultKey>> = {
   haloPrismSplit: 0.7,
   haloPrismAngle: 0,
   haloPrismSourceReactivity: 0.85,
+  opticalDirectTransmission: 1,
+  opticalBlackRetention: 1,
+  opticalScatterStrength: 0,
+  opticalHighlightReactivity: 0,
+  opticalWarmScatter: 0,
+  opticalSpectralTail: 0,
 } as const;
 
 function withContractDefaults<T extends Record<string, BasePresetParams>>(

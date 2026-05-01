@@ -12,29 +12,21 @@ struct FilmtoneStrengthSheet: View {
     @State private var activeHelpTopic: FilmtoneAdjustmentHelpTopic?
 
     var body: some View {
-        ZStack {
-            Color.filmtoneBackground
-                .ignoresSafeArea()
+        VStack(spacing: 0) {
+            handle
 
-            VStack(spacing: 0) {
-                handle
-
-                VStack(alignment: .leading, spacing: 14) {
-                    header
-                    sheetPreview
-                }
+            header
                 .padding(.horizontal, 20)
                 .padding(.bottom, 14)
 
-                ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 18) {
-                        strengthSection
-                        adjustmentsSection
-                        advancedParamsSection
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 28)
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 18) {
+                    strengthSection
+                    adjustmentsSection
+                    advancedParamsSection
                 }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 28)
             }
         }
         .onAppear {
@@ -45,7 +37,7 @@ struct FilmtoneStrengthSheet: View {
                 advancedParamsExpanded = store.hasAdvancedAdjustments
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.medium])
         .presentationDragIndicator(.hidden)
         .sheet(item: $activeHelpTopic) { topic in
             FilmtoneAdjustmentHelpSheet(
@@ -71,7 +63,7 @@ struct FilmtoneStrengthSheet: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: 14) {
+        HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(store.activePresetLabel)
                     .font(.system(size: 28, weight: .semibold))
@@ -85,14 +77,16 @@ struct FilmtoneStrengthSheet: View {
                         .lineLimit(2)
                 }
             }
-
-            Spacer(minLength: 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(1)
 
             HStack(spacing: 8) {
                 Button(store.strings.presetDefaultLabel) {
                     store.restoreActivePresetDefaults()
                 }
-                .buttonStyle(FilmtoneSheetSecondaryActionStyle())
+                .buttonStyle(.glass)
+                .controlSize(.regular)
+                .lineLimit(1)
                 .disabled(!store.hasPresetCustomValues)
                 .opacity(store.hasPresetCustomValues ? 1 : 0.42)
                 .accessibilityIdentifier("filmtone.sheet.default")
@@ -102,22 +96,10 @@ struct FilmtoneStrengthSheet: View {
                 }
                 .buttonStyle(.glassProminent)
                 .controlSize(.regular)
+                .lineLimit(1)
             }
+            .fixedSize()
         }
-    }
-
-    private var sheetPreview: some View {
-        FilmtoneSheetPreview(
-            displayURI: store.selectedPreviewURI,
-            compareFrame: store.comparePreviewFrame,
-            videoPreview: store.videoPreviewState,
-            emptyMessage: previewEmptyMessage,
-            loadingMessage: store.strings.previewRendering,
-            originalLabel: store.strings.compareLabel,
-            gradedLabel: store.strings.previewGradedLabel,
-            metaLabel: store.previewMetaLabel,
-            isRendering: store.preview.isRendering
-        )
     }
 
     private var strengthSection: some View {
@@ -256,7 +238,7 @@ struct FilmtoneStrengthSheet: View {
     private var advancedParamsSection: some View {
         FilmtoneDisclosureSection(
             title: store.strings.advancedParamsLabel,
-            summary: store.advancedSummaryText,
+            summary: store.strings.advancedParamsHint,
             accessibilityIdentifier: "filmtone.sheet.advanced",
             isExpanded: $advancedParamsExpanded,
             contentSpacing: 20,
@@ -364,13 +346,4 @@ struct FilmtoneStrengthSheet: View {
         store.hasQuickAdjustments ? store.quickSummaryText : ""
     }
 
-    private var previewEmptyMessage: String {
-        if let error = store.previewError {
-            return error
-        }
-        if store.source == nil {
-            return store.strings.sourceEmpty
-        }
-        return store.strings.previewRendering
-    }
 }

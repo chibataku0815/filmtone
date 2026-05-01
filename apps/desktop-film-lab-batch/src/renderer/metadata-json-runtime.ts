@@ -6,6 +6,7 @@ import {
 } from "film-lab-core";
 import type { FilmLabBatchBridge } from "./desktop-api";
 import {
+  type AppliedOpticalFilterProfileMetadata,
   type AppliedOpticalRecommendationMetadata,
   createEmptyMetadataLutRefs,
   extractMetadataLutRefsFromGradeJsonText,
@@ -28,6 +29,7 @@ export type ResolvedImportedMetadataJson = {
   importedFilePath: string;
   syncedAtMs: number | null;
   appliedOpticalRecommendation: AppliedOpticalRecommendationMetadata | null;
+  appliedOpticalFilterProfile: AppliedOpticalFilterProfileMetadata | null;
   cameraOptics: CameraOptics | null;
   sidecar: FilmtoneExportSessionV1 | null;
   warnings: string[];
@@ -141,6 +143,7 @@ export async function resolveImportedMetadataJson(
           ? parsedSyncTime
           : null,
       appliedOpticalRecommendation: sidecar.look.opticalRecommendation ?? null,
+      appliedOpticalFilterProfile: sidecar.look.opticalFilterProfile ?? null,
       cameraOptics: sidecar.input.cameraOptics ?? null,
       sidecar,
       warnings: loaded.warnings,
@@ -168,6 +171,7 @@ export async function resolveImportedMetadataJson(
     importedFilePath: filePath,
     syncedAtMs: null,
     appliedOpticalRecommendation: null,
+    appliedOpticalFilterProfile: null,
     cameraOptics: resolvedGrade.cameraOptics,
     sidecar: null,
     warnings: [],
@@ -192,6 +196,7 @@ export function emptyResolvedMetadataJson(filePath: string): ResolvedImportedMet
     importedFilePath: filePath,
     syncedAtMs: null,
     appliedOpticalRecommendation: null,
+    appliedOpticalFilterProfile: null,
     cameraOptics: null,
     sidecar: null,
     warnings: [],

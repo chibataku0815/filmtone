@@ -102,7 +102,6 @@ struct FilmtoneTermHelpSheet: View {
             Spacer(minLength: 24)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.filmtoneBackground.ignoresSafeArea())
         .presentationDetents([.fraction(0.42), .medium])
         .presentationDragIndicator(.visible)
     }

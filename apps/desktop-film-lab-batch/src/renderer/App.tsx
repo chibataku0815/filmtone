@@ -28,9 +28,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import {
   FILMTONE_DEFAULT_BASE_PRESET,
+  buildOpticalFilterParamPatch,
   buildOpticalParamPatch,
   createFilmtoneDefaultParams,
+  getOpticalFilterProfile,
   type CameraOptics,
+  type OpticalFilterProfile,
   type OpticalRecommendationV1,
   type Params,
   type PresetName,
@@ -95,6 +98,7 @@ import {
 } from "./export-render-geometry";
 import { exportGradeJsonText } from "./grade-io";
 import {
+  type AppliedOpticalFilterProfileMetadata,
   type AppliedOpticalRecommendationMetadata,
   buildFilmtoneExportSession,
   buildPhotoMetadataSidecarPath,
@@ -228,6 +232,7 @@ async function resolveBatchGradeSnapshot(
   syncedAtMs: number | null;
   importedFilePath: string | null;
   appliedOpticalRecommendation: AppliedOpticalRecommendationMetadata | null;
+  appliedOpticalFilterProfile: AppliedOpticalFilterProfileMetadata | null;
   cameraOptics: CameraOptics | null;
 }> {
   if (s.importedGradePath) {
@@ -245,6 +250,7 @@ async function resolveBatchGradeSnapshot(
       syncedAtMs: restored.syncedAtMs,
       importedFilePath: restored.importedFilePath,
       appliedOpticalRecommendation: restored.appliedOpticalRecommendation,
+      appliedOpticalFilterProfile: restored.appliedOpticalFilterProfile,
       cameraOptics: restored.cameraOptics,
     };
   }
@@ -273,6 +279,7 @@ async function resolveBatchGradeSnapshot(
       syncedAtMs: null,
       importedFilePath: null,
       appliedOpticalRecommendation: null,
+      appliedOpticalFilterProfile: null,
       cameraOptics: g.cameraOptics,
     };
   }
@@ -284,6 +291,7 @@ async function resolveBatchGradeSnapshot(
     syncedAtMs: null,
     importedFilePath: null,
     appliedOpticalRecommendation: null,
+    appliedOpticalFilterProfile: null,
     cameraOptics: null,
   };
 }
@@ -299,6 +307,60 @@ function isTextInputTarget(target: EventTarget | null): boolean {
   }
   if (target.isContentEditable) return true;
   return false;
+}
+
+function createAppliedOpticalFilterProfileMetadata(
+  profile: OpticalFilterProfile,
+): AppliedOpticalFilterProfileMetadata {
+  return {
+    id: profile.id,
+    family: profile.family,
+    density: profile.density,
+    displayName: profile.displayName,
+    appliedAtIso: new Date().toISOString(),
+  };
+}
+
+function opticalFilterProfileIdForRecommendation(
+  selection: OpticalRecommendationV1["primary"],
+): string | null {
+  if (selection.family === "mist") {
+    return selection.recipe === "skinCloseUp"
+      ? "pearlGlow-1-4"
+      : "blackMist-1-8";
+  }
+  if (selection.family === "glow") {
+    if (selection.recipe === "warmIndoor") return "warmMist-1-4";
+    return "cineBloom-10";
+  }
+  if (selection.family === "lens") {
+    return "cleanSoft-subtle";
+  }
+  return null;
+}
+
+function buildOpticalRecommendationApplication(
+  recommendation: OpticalRecommendationV1,
+  selection: OpticalRecommendationV1["primary"],
+): {
+  patch: Partial<Params>;
+  profile: OpticalFilterProfile | null;
+} {
+  const profileId = opticalFilterProfileIdForRecommendation(selection);
+  const profile = profileId ? getOpticalFilterProfile(profileId) : null;
+  if (profile) {
+    return {
+      patch: buildOpticalFilterParamPatch(profile.id),
+      profile,
+    };
+  }
+  return {
+    patch: buildOpticalParamPatch({
+      ...recommendation,
+      primary: selection,
+    }),
+    profile: null,
+  };
 }
 
 /**
@@ -422,6 +484,8 @@ export default function App() {
   );
   const [appliedOpticalRecommendation, setAppliedOpticalRecommendation] =
     useState<AppliedOpticalRecommendationMetadata | null>(null);
+  const [appliedOpticalFilterProfile, setAppliedOpticalFilterProfile] =
+    useState<AppliedOpticalFilterProfileMetadata | null>(null);
   const [sourceCameraOptics, setSourceCameraOptics] =
     useState<CameraOptics | null>(null);
   /** @description 最後に import した JSON ファイル。session 復元にも使うため、表示上の look source とは分離する。 */
@@ -854,6 +918,7 @@ export default function App() {
         setBatchLookSource("preset");
         setBatchLutRefs(createEmptyMetadataLutRefs());
         setAppliedOpticalRecommendation(null);
+        setAppliedOpticalFilterProfile(null);
         setSourceCameraOptics(null);
         setEditToExportSyncedAtMs(null);
         try {
@@ -863,6 +928,7 @@ export default function App() {
           setBatchLookSource(snap.lookSource);
           setBatchLutRefs(snap.lutRefs);
           setAppliedOpticalRecommendation(snap.appliedOpticalRecommendation);
+          setAppliedOpticalFilterProfile(snap.appliedOpticalFilterProfile);
           setSourceCameraOptics(snap.cameraOptics);
           setImportedGradeLabel(snap.importedFilePath);
           setEditToExportSyncedAtMs(snap.syncedAtMs);
@@ -871,6 +937,7 @@ export default function App() {
           setBatchLookSource("preset");
           setBatchLutRefs(createEmptyMetadataLutRefs());
           setAppliedOpticalRecommendation(null);
+          setAppliedOpticalFilterProfile(null);
           setSourceCameraOptics(null);
           setImportedGradeLabel(null);
         }
@@ -1076,6 +1143,7 @@ export default function App() {
       setBatchLookSource(restored.lookSource);
       setBatchLutRefs(restored.lutRefs);
       setAppliedOpticalRecommendation(restored.appliedOpticalRecommendation);
+      setAppliedOpticalFilterProfile(restored.appliedOpticalFilterProfile);
       setSourceCameraOptics(restored.cameraOptics);
       setImportedGradeLabel(restored.importedFilePath);
       setEditToExportSyncedAtMs(restored.syncedAtMs);
@@ -1651,20 +1719,25 @@ export default function App() {
         return;
       }
 
-      const patch = buildOpticalParamPatch({
-        ...recommendation,
-        primary: selected,
-      });
+      const application = buildOpticalRecommendationApplication(
+        recommendation,
+        selected,
+      );
       setBatchGrade((current) => ({
         ...current,
         params: {
           ...current.params,
-          ...patch,
+          ...application.patch,
         },
       }));
       setBatchLookSource("analysisRecommendation");
       setImportedGradeLabel(null);
       setEditToExportSyncedAtMs(null);
+      setAppliedOpticalFilterProfile(
+        application.profile
+          ? createAppliedOpticalFilterProfileMetadata(application.profile)
+          : null,
+      );
       setAppliedOpticalRecommendation({
         family: selected.family,
         profile: selected.profile,
@@ -1772,6 +1845,7 @@ export default function App() {
     setBatchLookSource("preset");
     setBatchLutRefs(createEmptyMetadataLutRefs());
     setAppliedOpticalRecommendation(null);
+    setAppliedOpticalFilterProfile(null);
     setImportedGradeLabel(null);
     setEditToExportSyncedAtMs(null);
   };
@@ -1780,6 +1854,18 @@ export default function App() {
     setCanvasInitialGradeParams(null);
     setCanvasPreset(name);
   }, []);
+
+  const handleOpticalFilterProfileApply = useCallback(
+    (profile: OpticalFilterProfile | null) => {
+      setAppliedOpticalFilterProfile(
+        profile ? createAppliedOpticalFilterProfileMetadata(profile) : null,
+      );
+      if (profile) {
+        setAppliedOpticalRecommendation(null);
+      }
+    },
+    [],
+  );
 
   const importGradeJson = async () => {
     const p = await window.filmLabBatch.pickMetadataJson();
@@ -1830,6 +1916,7 @@ export default function App() {
       lookSource?: MetadataLookSource;
       lutRefs?: MetadataLutRefs;
       opticalRecommendation?: AppliedOpticalRecommendationMetadata | null;
+      opticalFilterProfile?: AppliedOpticalFilterProfileMetadata | null;
       cameraOptics?: CameraOptics | null;
       sourceVideoMetadata?: SourceVideoMetadata | null;
     }) => {
@@ -1853,6 +1940,8 @@ export default function App() {
         lutRefs: payload.lutRefs ?? batchLutRefs,
         opticalRecommendation:
           payload.opticalRecommendation ?? appliedOpticalRecommendation,
+        opticalFilterProfile:
+          payload.opticalFilterProfile ?? appliedOpticalFilterProfile,
         cameraOptics,
         sourceVideoMetadata: payload.sourceVideoMetadata ?? null,
       });
@@ -1863,6 +1952,7 @@ export default function App() {
     },
     [
       appVersion,
+      appliedOpticalFilterProfile,
       appliedOpticalRecommendation,
       batchGrade,
       batchLookSource,
@@ -1904,6 +1994,7 @@ export default function App() {
         lookSource?: MetadataLookSource;
         lutRefs?: MetadataLutRefs;
         opticalRecommendation?: AppliedOpticalRecommendationMetadata | null;
+        opticalFilterProfile?: AppliedOpticalFilterProfileMetadata | null;
         importedGradePath?: string | null;
       },
     ) => {
@@ -1926,6 +2017,8 @@ export default function App() {
         (effectiveLookSource === "analysisRecommendation"
           ? appliedOpticalRecommendation
           : null);
+      const effectiveOpticalFilterProfile =
+        pathContext?.opticalFilterProfile ?? appliedOpticalFilterProfile;
       const effectiveImportedGradePath =
         pathContext?.importedGradePath ??
         (capturedSnapshot?.source === "preview" ? null : importedGradeLabel);
@@ -1999,6 +2092,7 @@ export default function App() {
         lookSource: effectiveLookSource,
         lutRefs: effectiveLutRefs,
         opticalRecommendation: effectiveOpticalRecommendation,
+        opticalFilterProfile: effectiveOpticalFilterProfile,
       });
       const photoSidecarPath = buildPhotoMetadataSidecarPath(
         effectiveOutput,
@@ -2095,6 +2189,7 @@ export default function App() {
     [
       appendLog,
       appendEffectiveExportGradeLog,
+      appliedOpticalFilterProfile,
       appliedOpticalRecommendation,
       batchLookSource,
       batchLutRefs,
@@ -2154,6 +2249,7 @@ export default function App() {
         exportSnapshot.lookSource === "analysisRecommendation"
           ? appliedOpticalRecommendation
           : null,
+      opticalFilterProfile: appliedOpticalFilterProfile,
       importedGradePath: sessionImportedGradePath,
     });
   };
@@ -2180,6 +2276,7 @@ export default function App() {
         syncedAtMs: null,
         importedFilePath: s.importedGradePath,
         appliedOpticalRecommendation: null,
+        appliedOpticalFilterProfile: null,
         cameraOptics: null,
       };
     }
@@ -2188,6 +2285,7 @@ export default function App() {
     setBatchLookSource(gradeSnap.lookSource);
     setBatchLutRefs(gradeSnap.lutRefs);
     setAppliedOpticalRecommendation(gradeSnap.appliedOpticalRecommendation);
+    setAppliedOpticalFilterProfile(gradeSnap.appliedOpticalFilterProfile);
     setSourceCameraOptics(gradeSnap.cameraOptics);
     setImportedGradeLabel(gradeSnap.importedFilePath);
     setEditToExportSyncedAtMs(gradeSnap.syncedAtMs);
@@ -2201,6 +2299,7 @@ export default function App() {
       lookSource: gradeSnap.lookSource,
       lutRefs: gradeSnap.lutRefs,
       opticalRecommendation: gradeSnap.appliedOpticalRecommendation,
+      opticalFilterProfile: gradeSnap.appliedOpticalFilterProfile,
       importedGradePath: gradeSnap.importedFilePath,
     });
   };
@@ -2224,6 +2323,7 @@ export default function App() {
         exportSnapshot.lookSource === "analysisRecommendation"
           ? appliedOpticalRecommendation
           : null,
+      opticalFilterProfile: appliedOpticalFilterProfile,
       importedGradePath:
         exportSnapshot.source === "preview" ? null : importedGradeLabel,
     });
@@ -2337,6 +2437,7 @@ export default function App() {
         videoExportSnapshot.lookSource === "analysisRecommendation"
           ? appliedOpticalRecommendation
           : null,
+      opticalFilterProfile: appliedOpticalFilterProfile,
       cameraOptics: videoCameraOptics,
       sourceVideoMetadata: videoSourceMetadata,
     });
@@ -2824,6 +2925,7 @@ export default function App() {
                       onPresetChange={handleControlPanelPresetChange}
                       onLutChange={handleEditLutChange}
                       onParamsChange={handleEditParamsChange}
+                      onOpticalFilterProfileApply={handleOpticalFilterProfileApply}
                       onCompareUiChange={setCompareUi}
                       deferSpaceKeyToVideoTransportWhenNoCompare={canvasHasUserVideo}
                       slots={{
@@ -2853,10 +2955,10 @@ export default function App() {
                               if (!selected) {
                                 return;
                               }
-                              const patch = buildOpticalParamPatch({
-                                ...recommendation,
-                                primary: selected,
-                              });
+                              const { patch } = buildOpticalRecommendationApplication(
+                                recommendation,
+                                selected,
+                              );
                               coreRenderContext.dispatch({
                                 type: "MERGE_PARAMS",
                                 patch,
@@ -2913,8 +3015,9 @@ export default function App() {
                                   );
                                   return;
                                 }
-                                const patch = buildOpticalParamPatch(
+                                const { patch } = buildOpticalRecommendationApplication(
                                   aiRecommendation,
+                                  aiRecommendation.primary,
                                 );
                                 const patchKeys = Object.keys(patch);
                                 appendOpticalAnalysisEvent(

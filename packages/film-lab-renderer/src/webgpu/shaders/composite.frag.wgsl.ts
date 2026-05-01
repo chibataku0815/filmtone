@@ -68,6 +68,10 @@ struct Composite {
   optics: vec4f,
   // (rayAngleProbe, _, _, _)
   debug: vec4f,
+  // (directTransmission, blackRetention, scatterStrength, highlightReactivity)
+  optical: vec4f,
+  // (warmScatter, spectralTail, _, _)
+  opticalColor: vec4f,
 };
 
 @group(1) @binding(0) var<uniform> uComposite: Composite;
@@ -198,6 +202,12 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
   let lensSoftness = clamp(uComposite.lens.x, 0.0, 1.0);
   let aberrationEdgeSoften = clamp(uComposite.lens.y, 0.0, 1.0);
   let diffusion = clamp(uComposite.lens.z, 0.0, 1.0);
+  let opticalDirectTransmission = clamp(uComposite.optical.x, 0.0, 1.0);
+  let opticalBlackRetention = clamp(uComposite.optical.y, 0.0, 1.0);
+  let opticalScatterStrength = clamp(uComposite.optical.z, 0.0, 1.0);
+  let opticalHighlightReactivity = clamp(uComposite.optical.w, 0.0, 1.0);
+  let opticalWarmScatter = clamp(uComposite.opticalColor.x, 0.0, 1.0);
+  let opticalSpectralTail = clamp(uComposite.opticalColor.y, 0.0, 1.0);
   // Shared depth-aware Mist control:
   //   0.0      = no depth modulation (uniform mist, WebGL parity)
   //   0.0..1.0 = depth-modulated mist (near = 0x, far = (1 + 4*gain)x)
@@ -270,10 +280,45 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
   let glowUv = vec2f(uv.x, 1.0 - uv.y);
   let bloom = textureSampleLevel(uBloom, uSampler, glowUv, 0.0).rgb * bloomStrength;
   let halation = textureSampleLevel(uHalation, uSampler, glowUv, 0.0).rgb * halationIntensity;
-  let glow = glowShoulder(bloom + halation) * glowHeadroom(baseRgb, 0.82);
-  color = vec4f(vec3f(1.0) - (vec3f(1.0) - color.rgb) * (vec3f(1.0) - glow), color.a);
-
+  var diffused = vec3f(0.0);
   if (diffusion > 0.0) {
+    diffused = textureSampleLevel(uDiffusion, uSampler, glowUv, 0.0).rgb;
+  }
+
+  if (opticalScatterStrength > 0.0) {
+    let baseLuma = dot(baseRgb, LUMA_R709);
+    let shadowHold = 1.0 - smoothstep(0.02, 0.34, baseLuma);
+    let directLoss =
+      (1.0 - opticalDirectTransmission)
+      * opticalScatterStrength
+      * (1.0 - shadowHold * opticalBlackRetention * 0.75);
+    let direct = color.rgb * (1.0 - directLoss);
+
+    let highlightMask = smoothstep(0.42, 1.28, dot(max(baseRgb, vec3f(0.0)), LUMA_R709));
+    let highlightDrive = mix(1.0, 1.0 + highlightMask * 1.65, opticalHighlightReactivity);
+    let blackProtect = mix(1.0, smoothstep(0.04, 0.48, baseLuma), opticalBlackRetention);
+    let warmBias = vec3f(
+      1.0 + opticalWarmScatter * 0.18 + opticalSpectralTail * 0.12,
+      1.0 + opticalWarmScatter * 0.05,
+      1.0 - opticalWarmScatter * 0.10 - opticalSpectralTail * 0.08,
+    );
+    let scatterEnergy =
+      bloom * 0.82
+      + halation * 1.08
+      + diffused * diffusion * 0.24;
+    let scatter = glowShoulder(
+      scatterEnergy
+      * warmBias
+      * opticalScatterStrength
+      * highlightDrive
+      * blackProtect,
+    );
+    color = vec4f(direct + scatter, color.a);
+  } else {
+    let glow = glowShoulder(bloom + halation) * glowHeadroom(baseRgb, 0.82);
+    color = vec4f(vec3f(1.0) - (vec3f(1.0) - color.rgb) * (vec3f(1.0) - glow), color.a);
+
+    if (diffusion > 0.0) {
     // Shared depth-aware Mist path: depth shaping is now applied UPSTREAM, in
     // diffusion-depth-prefilter.frag, so the diffusion pyramid input is
     // already depth-weighted at the source before any blur. Composite
@@ -282,12 +327,12 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
     // sharp depth cut was applied after the pyramid had bled across
     // silhouettes. WebGL parity is preserved: when depthMistGain = 0 the
     // prefilter is skipped and the pyramid receives raw colorGraded.
-    let diffused = textureSampleLevel(uDiffusion, uSampler, glowUv, 0.0).rgb;
-    let diffOpacity = glowShoulder(diffused * diffusion * 0.29) * glowHeadroom(baseRgb, 0.88);
-    color = vec4f(
-      vec3f(1.0) - (vec3f(1.0) - color.rgb) * (vec3f(1.0) - diffOpacity),
-      color.a,
-    );
+      let diffOpacity = glowShoulder(diffused * diffusion * 0.29) * glowHeadroom(baseRgb, 0.88);
+      color = vec4f(
+        vec3f(1.0) - (vec3f(1.0) - color.rgb) * (vec3f(1.0) - diffOpacity),
+        color.a,
+      );
+    }
   }
 
   // Vignette in image space (follows image frame).

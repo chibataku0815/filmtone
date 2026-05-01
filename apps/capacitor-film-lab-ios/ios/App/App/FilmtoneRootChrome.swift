@@ -97,22 +97,10 @@ struct UnsavedExportPrompt: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(.ultraThinMaterial)
+        .glassEffect(
+            .regular.tint(Color.black.opacity(0.18)),
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.black.opacity(0.34))
-                .allowsHitTesting(false)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.white.opacity(0.10), lineWidth: 1)
-                .allowsHitTesting(false)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(color: Color.black.opacity(0.34), radius: 16, x: 0, y: 8)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("filmtone.export.unsavedPrompt")
     }
@@ -156,20 +144,10 @@ struct FilmtoneToastView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(.ultraThinMaterial)
+        .glassEffect(
+            .regular.tint(iconColor.opacity(0.14)),
+            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.black.opacity(0.32))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(iconColor.opacity(0.18), lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .shadow(color: Color.black.opacity(0.32), radius: 12, x: 0, y: 6)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(Text(toast.message))
         .accessibilityAddTraits(.isStaticText)

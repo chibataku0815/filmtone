@@ -142,6 +142,20 @@ export {
   type SceneDescriptorV1,
 } from "./optical-recommendation";
 export {
+  OPTICAL_FILTER_DISCLAIMER,
+  OPTICAL_FILTER_PARAM_KEYS,
+  OPTICAL_FILTER_PROFILES,
+  buildOpticalFilterParamPatch,
+  getOpticalFilterProfile,
+  type OpticalFilterBehavior,
+  type OpticalFilterDensity,
+  type OpticalFilterFamily,
+  type OpticalFilterParamKey,
+  type OpticalFilterParamPatch,
+  type OpticalFilterProfile,
+  type OpticalFilterProfileId,
+} from "./optical-filter-profiles";
+export {
   IOS_PHASE0_BENCHMARK_SLOTS,
   IOS_PHASE0_OUTPUT_CODEC,
   IOS_PHASE0_OUTPUT_FPS,
