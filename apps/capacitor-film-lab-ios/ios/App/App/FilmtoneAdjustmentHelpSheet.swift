@@ -103,48 +103,75 @@ struct FilmtoneAdjustmentHelpSheet: View {
     let onDismiss: () -> Void
 
     var body: some View {
-        NavigationStack {
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 20) {
-                    FilmtoneHelpComparisonImage(
-                        style: topic.comparisonStyle,
-                        beforeLabel: beforeLabel,
-                        afterLabel: afterLabel
-                    )
-                    .padding(.horizontal, 20)
-                    .accessibilityIdentifier("filmtone.help.adjustment.compare")
+        GeometryReader { proxy in
+            VStack(spacing: 0) {
+                handle
 
-                    Text(topic.copy.body)
-                        .font(.body)
-                        .foregroundStyle(.white.opacity(0.78))
-                        .fixedSize(horizontal: false, vertical: true)
-                        .multilineTextAlignment(.leading)
-                        .padding(.horizontal, 20)
-                        .accessibilityIdentifier("filmtone.help.adjustment.body")
+                header
+                    .padding(.top, 4)
+                    .padding(.bottom, 14)
 
-                    VStack(alignment: .leading, spacing: 12) {
-                        helpBlock(title: effectLabel, text: topic.copy.effect)
-                        if let guidance = topic.copy.guidance {
-                            helpBlock(title: guidanceLabel, text: guidance)
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 20) {
+                        FilmtoneHelpComparisonImage(
+                            style: topic.comparisonStyle,
+                            beforeLabel: beforeLabel,
+                            afterLabel: afterLabel
+                        )
+                        .accessibilityIdentifier("filmtone.help.adjustment.compare")
+
+                        Text(topic.copy.body)
+                            .font(.body)
+                            .foregroundStyle(.white.opacity(0.78))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .multilineTextAlignment(.leading)
+                            .accessibilityIdentifier("filmtone.help.adjustment.body")
+
+                        VStack(alignment: .leading, spacing: 12) {
+                            helpBlock(title: effectLabel, text: topic.copy.effect)
+                            if let guidance = topic.copy.guidance {
+                                helpBlock(title: guidanceLabel, text: guidance)
+                            }
                         }
                     }
-                    .padding(.horizontal, 20)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 20)
-            }
-            .navigationTitle(topic.copy.title)
-            .navigationBarTitleDisplayMode(.inline)
-            .containerBackground(.clear, for: .navigation)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(dismissLabel, action: onDismiss)
-                        .accessibilityIdentifier("filmtone.help.adjustment.dismiss")
+                    .padding(.bottom, 28)
                 }
             }
+            .frame(width: max(0, proxy.size.width - 40), alignment: .top)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .presentationDetents([.medium])
-        .presentationDragIndicator(.visible)
+        .presentationDragIndicator(.hidden)
+    }
+
+    private var handle: some View {
+        Rectangle()
+            .fill(Color.white.opacity(0.22))
+            .frame(width: 44, height: 3)
+            .frame(maxWidth: .infinity)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
+    }
+
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(topic.copy.title)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(Color.filmtoneAmber)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("filmtone.help.adjustment.title")
+
+            Spacer(minLength: 12)
+
+            Button(action: onDismiss) {
+                Text(dismissLabel)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(Color.white.opacity(0.78))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("filmtone.help.adjustment.dismiss")
+        }
     }
 
     private func helpBlock(title: String, text: String) -> some View {
