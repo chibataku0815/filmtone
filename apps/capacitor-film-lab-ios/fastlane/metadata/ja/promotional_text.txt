@@ -1,1 +1,1 @@
-LUTで色を整え、フィルムルックで書き出す。光のにじみまで調整し、Before/Afterで見比べて保存・共有できます。
+LUTで色を整え、フィルムルックで書き出す。光のにじみまで調整し、Before/Afterで見比べて保存・共有できます。Creative Pack（Stone / Urban）と全画面 Liquid Glass UI に対応。
