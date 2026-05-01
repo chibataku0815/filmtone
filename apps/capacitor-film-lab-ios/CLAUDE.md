@@ -1,6 +1,6 @@
 # Filmtone iOS — Claude Code 協業ガイド
 
-このファイルは `apps/capacitor-film-lab-ios/` 専用。リポジトリ全体ルール (`/CLAUDE.md` および `.ai/GLOBAL.md`) と life 側の方針 (`/Volumes/SamsungPortableSSDX5001/documents/life/CLAUDE.md`) はそのまま適用される。ここでは **このサブツリーでしか必要にならないこと** だけを書く。
+このファイルは `apps/capacitor-film-lab-ios/` 専用。リポジトリ全体ルール（standalone リポ root の `/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone/CLAUDE.md`）と life 側の方針 (`/Volumes/SamsungPortableSSDX5001/documents/life/CLAUDE.md`) はそのまま適用される。ここでは **このサブツリーでしか必要にならないこと** だけを書く。
 
 ---
 
@@ -153,7 +153,7 @@ CLAUDE.md には書かない（陳腐化が早すぎる）。以下を見る：
 | 何を知りたい？ | どこを見る |
 |---------------|-----------|
 | 公開バージョン / 進行中 lane / ASC submit 状況 | `/Volumes/SamsungPortableSSDX5001/documents/life/.claude/projects/.../memory/MEMORY.md` の "Active work" セクション |
-| 進行中ブランチ | `git -C /Volumes/SamsungPortableSSDX5001/documents/forestone/chibatakumi-portfolio branch -a \| grep filmtone-ios` |
+| 進行中ブランチ | `git -C /Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone branch -a \| grep filmtone-ios` |
 | 直近 iOS タッチ commit | `git log --oneline -20 -- apps/capacitor-film-lab-ios/` |
 | この PR の意図 | 該当 PR description + life `docs/guides/<date>-filmtone-ios-<topic>-handoff.md` |
 
@@ -163,8 +163,8 @@ CLAUDE.md には書かない（陳腐化が早すぎる）。以下を見る：
 
 | repo | パス | 用途 |
 |------|------|------|
-| chibatakumi-portfolio | `docs/filmtone/ios/<topic>-handoff-<date>-jst.md` | 直近 chat 引き継ぎ（feature 単位） |
-| chibatakumi-portfolio | `docs/guides/<date>-filmtone-ios-<topic>-handoff.md` | 大きい lane 単位（PR 跨ぎ） |
+| filmtone (standalone) | `docs/filmtone/ios/<topic>-handoff-<date>-jst.md` | 直近 chat 引き継ぎ（feature 単位） |
+| filmtone (standalone) | `docs/guides/<date>-filmtone-ios-<topic>-handoff.md` | 大きい lane 単位（PR 跨ぎ） |
 | life | `docs/guides/<date>-filmtone-ios-<topic>-handoff.md` | 5 ロール俯瞰の master plan / cross-repo 引き継ぎ |
 | life | `.claude/knowledge/patterns/<date>-<pattern>.md` | 再利用可能な手順（fastlane 初回、ASC 譲渡、Capacitor cap sync 連携 等） |
 
@@ -187,7 +187,7 @@ CLAUDE.md には書かない（陳腐化が早すぎる）。以下を見る：
 
 - リリース手順詳細: `RELEASE.md`（このディレクトリ）
 - v1.0 出荷時のデバイスチェック手順: `IOS-DEVICE-CHECKLIST.md`
-- リポジトリ全体ルール: `/Volumes/SamsungPortableSSDX5001/documents/forestone/chibatakumi-portfolio/CLAUDE.md` と `.ai/GLOBAL.md`
+- リポジトリ全体ルール: `/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone/CLAUDE.md`（standalone リポ root、2026-05-01 migration 後の正本）
 - life 側方針: `/Volumes/SamsungPortableSSDX5001/documents/life/CLAUDE.md`
 - 5 ロールパネル / Agent Teams 起動: `/Volumes/SamsungPortableSSDX5001/documents/life/.cursor/rules/life-planning-invocation.mdc`
 - 直近 lane handoff の入口: `/Volumes/SamsungPortableSSDX5001/documents/life/docs/guides/`（`grep -l filmtone-ios` で抽出）
