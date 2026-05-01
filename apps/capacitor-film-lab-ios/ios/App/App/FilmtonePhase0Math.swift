@@ -310,6 +310,25 @@ struct FilmtonePhase0ParamsPatch: Codable, Equatable {
         }
         return .init(values: next)
     }
+
+    /// Like `normalized(over:)` but preserves optics + glow keys verbatim
+    /// even when their value matches the baseline. Used at Look apply time
+    /// so a Look's optical signature stays explicit in `paramOverrides`,
+    /// surfacing it through Adjust-sheet UI signals (`hasAdvancedAdjustments`,
+    /// disclosure auto-expand, per-group "Custom" status).
+    func normalizedPreservingOpticsGlow(over base: FilmtonePhase0Params) -> FilmtonePhase0ParamsPatch {
+        let opticsGlow = Set(Self.opticsGlowKeys)
+        var next: [String: Double] = [:]
+        for key in FilmtonePhase0Generated.paramKeys {
+            guard let value = values[key] else { continue }
+            let clampedValue = FilmtonePhase0Math.clampParam(key, value)
+            let differsFromBase = abs(clampedValue - base.value(for: key)) >= FilmtonePhase0Math.paramEqualityTolerance
+            if opticsGlow.contains(key) || differsFromBase {
+                next[key] = clampedValue
+            }
+        }
+        return .init(values: next)
+    }
 }
 
 private struct FilmtoneDynamicCodingKey: CodingKey {

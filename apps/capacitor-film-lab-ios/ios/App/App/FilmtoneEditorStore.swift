@@ -1227,7 +1227,7 @@ final class FilmtoneEditorStore: ObservableObject {
                 // Note: state.inputLut is intentionally untouched — the look
                 // is source-independent. See applySavedLook docs above.
             }
-            recomputeProjectParams()
+            recomputeProjectParamsPreservingOpticsGlow()
             appliedSavedLookId = entry.id
             await refreshLibrarySnapshot()
 
@@ -1680,6 +1680,28 @@ final class FilmtoneEditorStore: ObservableObject {
         )
         project.paramOverrides = resolved.overrides
         project.params = resolved.effective
+        project.updatedAt = FilmtonePhase0Math.isoTimestamp()
+        persist()
+        schedulePreviewRender()
+    }
+
+    /// Variant of `recomputeProjectParams` that keeps optics + glow keys
+    /// explicit in `paramOverrides` even if their value matches the resolved
+    /// baseline. Used by `applySavedLook` so the Look's optical signature
+    /// surfaces in Adjust-sheet UI signals — without it, a Look whose optics
+    /// happen to align with the active preset's defaults would normalize away
+    /// into an empty patch and the user would see "no adjustments" UI even
+    /// though the kernel is rendering with the Look's chosen optics values.
+    private func recomputeProjectParamsPreservingOpticsGlow() {
+        project.quickState = project.quickState.clamped()
+        let base = FilmtonePhase0Math.deriveParams(
+            presetName: project.presetName,
+            strength: project.strength,
+            quickState: project.quickState
+        )
+        project.paramOverrides = project.paramOverrides
+            .normalizedPreservingOpticsGlow(over: base)
+        project.params = base.applyingPatch(project.paramOverrides)
         project.updatedAt = FilmtonePhase0Math.isoTimestamp()
         persist()
         schedulePreviewRender()
