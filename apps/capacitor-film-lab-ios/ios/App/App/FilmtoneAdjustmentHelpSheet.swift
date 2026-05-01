@@ -111,6 +111,7 @@ struct FilmtoneAdjustmentHelpSheet: View {
                         beforeLabel: beforeLabel,
                         afterLabel: afterLabel
                     )
+                    .padding(.horizontal, 20)
                     .accessibilityIdentifier("filmtone.help.adjustment.compare")
 
                     Text(topic.copy.body)
@@ -118,6 +119,7 @@ struct FilmtoneAdjustmentHelpSheet: View {
                         .foregroundStyle(.white.opacity(0.78))
                         .fixedSize(horizontal: false, vertical: true)
                         .multilineTextAlignment(.leading)
+                        .padding(.horizontal, 20)
                         .accessibilityIdentifier("filmtone.help.adjustment.body")
 
                     VStack(alignment: .leading, spacing: 12) {
@@ -126,11 +128,11 @@ struct FilmtoneAdjustmentHelpSheet: View {
                             helpBlock(title: guidanceLabel, text: guidance)
                         }
                     }
+                    .padding(.horizontal, 20)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.vertical, 20)
             }
-            .padding(.horizontal, 20)
             .navigationTitle(topic.copy.title)
             .navigationBarTitleDisplayMode(.inline)
             .containerBackground(.clear, for: .navigation)
