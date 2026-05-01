@@ -75,6 +75,7 @@
 		D20000010000000000000027 /* FilmtoneAdvancedParamsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000027 /* FilmtoneAdvancedParamsModel.swift */; };
 		D20000010000000000000028 /* FilmtoneDisclosureSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000028 /* FilmtoneDisclosureSection.swift */; };
 		D20000010000000000000029 /* FilmtoneStrengthSheetStyles.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000029 /* FilmtoneStrengthSheetStyles.swift */; };
+		D2000001000000000000002A /* FilmtoneStrengthSheetData.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000002A /* FilmtoneStrengthSheetData.swift */; };
 		D20000010000000000000001 /* FormatExtensionReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000001 /* FormatExtensionReader.swift */; };
 		D20000010000000000000002 /* SourceColorMetadataNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000002 /* SourceColorMetadataNormalizer.swift */; };
 		D20000010000000000000003 /* SourceColorClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000003 /* SourceColorClassifier.swift */; };
@@ -206,6 +207,7 @@
 		C20000010000000000000027 /* FilmtoneAdvancedParamsModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneAdvancedParamsModel.swift; sourceTree = "<group>"; };
 		C20000010000000000000028 /* FilmtoneDisclosureSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneDisclosureSection.swift; sourceTree = "<group>"; };
 		C20000010000000000000029 /* FilmtoneStrengthSheetStyles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneStrengthSheetStyles.swift; sourceTree = "<group>"; };
+		C2000001000000000000002A /* FilmtoneStrengthSheetData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneStrengthSheetData.swift; sourceTree = "<group>"; };
 		C20000010000000000000001 /* FormatExtensionReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormatExtensionReader.swift; sourceTree = "<group>"; };
 		C20000010000000000000002 /* SourceColorMetadataNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceColorMetadataNormalizer.swift; sourceTree = "<group>"; };
 		C20000010000000000000003 /* SourceColorClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceColorClassifier.swift; sourceTree = "<group>"; };
@@ -349,6 +351,7 @@
 				C20000010000000000000027 /* FilmtoneAdvancedParamsModel.swift */,
 				C20000010000000000000028 /* FilmtoneDisclosureSection.swift */,
 				C20000010000000000000029 /* FilmtoneStrengthSheetStyles.swift */,
+				C2000001000000000000002A /* FilmtoneStrengthSheetData.swift */,
 				C20000010000000000000001 /* FormatExtensionReader.swift */,
 				C20000010000000000000002 /* SourceColorMetadataNormalizer.swift */,
 				C20000010000000000000003 /* SourceColorClassifier.swift */,
@@ -643,6 +646,7 @@
 				D20000010000000000000027 /* FilmtoneAdvancedParamsModel.swift in Sources */,
 				D20000010000000000000028 /* FilmtoneDisclosureSection.swift in Sources */,
 				D20000010000000000000029 /* FilmtoneStrengthSheetStyles.swift in Sources */,
+				D2000001000000000000002A /* FilmtoneStrengthSheetData.swift in Sources */,
 				D20000010000000000000001 /* FormatExtensionReader.swift in Sources */,
 				D20000010000000000000002 /* SourceColorMetadataNormalizer.swift in Sources */,
 				D20000010000000000000003 /* SourceColorClassifier.swift in Sources */,
