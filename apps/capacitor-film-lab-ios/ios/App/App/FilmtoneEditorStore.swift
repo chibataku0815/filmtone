@@ -564,43 +564,53 @@ final class FilmtoneEditorStore: ObservableObject {
         preview.error
     }
 
+    /// Param keys surfaced through the Adjust ("調整") quick section. Slider
+    /// edits there write these directly into `paramOverrides`; the Advanced
+    /// section's "基本" group exposes the same keys plus extras at full kernel
+    /// range. Splitting them lets the two disclosure sections each report
+    /// their own activity state without double-counting.
+    private static let quickParamKeys: Set<String> = ["exposure", "contrast", "saturation"]
+
+    private func quickDelta(for key: String) -> Double {
+        let raw = project.params.value(for: key)
+        return key == "exposure" ? raw : raw - 1.0
+    }
+
     var quickSummaryText: String {
-        let entries: [(String, Double)] = [
-            (strings.quickFilmCharacter, project.quickState.dynamics),
-            (strings.quickEra, -project.quickState.era),
-            (strings.quickDynamics, project.quickState.filmCharacter),
+        let entries: [(label: String, key: String)] = [
+            (strings.quickFilmCharacter, "exposure"),
+            (strings.quickEra, "contrast"),
+            (strings.quickDynamics, "saturation"),
         ]
-        .filter { abs($0.1) >= 0.01 }
+        .filter { project.paramOverrides.values[$0.key] != nil }
 
         if entries.isEmpty {
             return ""
         }
 
         return entries
-            .map { "\($0.0) \(Self.signedPercentLabel(for: $0.1))" }
+            .map { "\($0.label) \(Self.signedPercentLabel(for: quickDelta(for: $0.key)))" }
             .joined(separator: " · ")
     }
 
     var hasQuickAdjustments: Bool {
-        abs(project.quickState.filmCharacter) >= 0.01 ||
-            abs(project.quickState.era) >= 0.01 ||
-            abs(project.quickState.dynamics) >= 0.01
+        Self.quickParamKeys.contains { project.paramOverrides.values[$0] != nil }
     }
 
     var hasAdvancedAdjustments: Bool {
-        !project.paramOverrides.isEmpty
+        project.paramOverrides.values.contains { !Self.quickParamKeys.contains($0.key) }
     }
 
     var hasAnyAdjustments: Bool {
-        hasQuickAdjustments || hasAdvancedAdjustments
+        !project.paramOverrides.isEmpty
     }
 
     var hasPresetCustomValues: Bool {
         abs(project.strength - FilmtonePhase0Math.presetStrengthDefault) >= FilmtonePhase0Math.paramEqualityTolerance ||
+            !project.paramOverrides.isEmpty ||
             abs(project.quickState.filmCharacter) >= FilmtonePhase0Math.paramEqualityTolerance ||
             abs(project.quickState.era) >= FilmtonePhase0Math.paramEqualityTolerance ||
-            abs(project.quickState.dynamics) >= FilmtonePhase0Math.paramEqualityTolerance ||
-            hasAdvancedAdjustments
+            abs(project.quickState.dynamics) >= FilmtonePhase0Math.paramEqualityTolerance
     }
 
     var advancedSummaryText: String {
