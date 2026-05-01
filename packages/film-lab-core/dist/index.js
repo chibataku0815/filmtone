@@ -1413,12 +1413,19 @@ function createPhase0ProjectState(presetName = PHASE0_PRESET_DEFAULT) {
 
 // src/native-bridge.ts
 function serializeCubeLut(lut, options) {
-  return {
+  const out = {
     title: options?.title ?? lut.title ?? "Custom LUT",
     size: lut.size,
     data: Array.from(lut.data),
     intensity: options?.intensity ?? 1
   };
+  if (options?.bundledSlug !== void 0) {
+    out.bundledSlug = options.bundledSlug;
+  }
+  if (options?.bundledPackId !== void 0) {
+    out.bundledPackId = options.bundledPackId;
+  }
+  return out;
 }
 function deserializeCubeLutData(lut) {
   return Float32Array.from(lut.data);
@@ -1449,12 +1456,22 @@ function buildPhase0ExportRequest(options) {
   if (probe) {
     assertPhase0SourceProbeWithinCaps(probe);
   }
-  const toTransportLut = (lut) => lut ? {
-    title: lut.title,
-    size: lut.size,
-    data: lut.data,
-    intensity: lut.intensity
-  } : null;
+  const toTransportLut = (lut) => {
+    if (!lut) return null;
+    const out = {
+      title: lut.title,
+      size: lut.size,
+      data: lut.data,
+      intensity: lut.intensity
+    };
+    if (lut.bundledSlug !== void 0) {
+      out.bundledSlug = lut.bundledSlug;
+    }
+    if (lut.bundledPackId !== void 0) {
+      out.bundledPackId = lut.bundledPackId;
+    }
+    return out;
+  };
   return {
     sourceUri: options.source.uri,
     sourceKind: options.source.kind,
@@ -1935,10 +1952,15 @@ var iosPhase0SerializableLutSchema = z4.object({
   domainMax: iosPhase0Tuple3Schema.optional(),
   rgbaData: z4.array(z4.number().finite()).min(4).refine((data) => data.length % 4 === 0, {
     message: "LUT rgbaData must contain RGBA quads"
-  })
+  }),
+  // v1.4 Creative LUT Pack 01: optional provenance fields. Pre-v1.4
+  // payloads omit them; the V1 bridge contract treats unknown keys as
+  // ignored, so adding optional fields stays back-compat.
+  bundledSlug: z4.string().min(1).optional(),
+  bundledPackId: z4.string().min(1).optional()
 });
 function createIosPhase0SerializableLut(input) {
-  const { cube, name, intensity = 1 } = input;
+  const { cube, name, intensity = 1, bundledSlug, bundledPackId } = input;
   return iosPhase0SerializableLutSchema.parse({
     name,
     title: cube.title || void 0,
@@ -1946,7 +1968,9 @@ function createIosPhase0SerializableLut(input) {
     intensity,
     domainMin: cube.domainMin,
     domainMax: cube.domainMax,
-    rgbaData: Array.from(cube.data)
+    rgbaData: Array.from(cube.data),
+    bundledSlug,
+    bundledPackId
   });
 }
 var iosPhase0PickedSourceSchema = z4.object({

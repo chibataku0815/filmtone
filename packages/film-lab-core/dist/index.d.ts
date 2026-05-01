@@ -613,6 +613,20 @@ interface ParsedCubeLut {
     size: number;
     data: number[];
     intensity: number;
+    /**
+     * v1.4 Creative LUT Pack: stable namespace slug for built-in cubes shipped
+     * with the app bundle (e.g. `"filmtone-creative-pack-01-warm-print"`). nil
+     * for user-imported / library-resolved cubes. Sidecar emits this so
+     * downstream readers (Filmtone Connect for DaVinci) can recognize bundled
+     * Looks across renames and app updates.
+     */
+    bundledSlug?: string;
+    /**
+     * v1.4 Creative LUT Pack: pack identifier for the bundled cube (e.g.
+     * `"creative-pack-01"`). Companions `bundledSlug` so a single pack rev
+     * is identifiable end-to-end.
+     */
+    bundledPackId?: string;
 }
 interface PickedLutFile {
     filename: string;
@@ -720,6 +734,8 @@ interface Phase0ExportBenchmarkRecord {
 declare function serializeCubeLut(lut: CubeLUT, options?: {
     title?: string;
     intensity?: number;
+    bundledSlug?: string;
+    bundledPackId?: string;
 }): ParsedCubeLut;
 declare function deserializeCubeLutData(lut: ParsedCubeLut): Float32Array;
 declare function getPhase0SourceCapViolations(probe: SourceProbe): string[];
@@ -1233,12 +1249,16 @@ declare const iosPhase0SerializableLutSchema: z.ZodObject<{
     domainMin: z.ZodOptional<z.ZodTuple<[z.ZodNumber, z.ZodNumber, z.ZodNumber], null>>;
     domainMax: z.ZodOptional<z.ZodTuple<[z.ZodNumber, z.ZodNumber, z.ZodNumber], null>>;
     rgbaData: z.ZodArray<z.ZodNumber>;
+    bundledSlug: z.ZodOptional<z.ZodString>;
+    bundledPackId: z.ZodOptional<z.ZodString>;
 }, z.core.$strip>;
 type IosPhase0SerializableLut = z.infer<typeof iosPhase0SerializableLutSchema>;
 declare function createIosPhase0SerializableLut(input: {
     cube: CubeLUT;
     name: string;
     intensity?: number;
+    bundledSlug?: string;
+    bundledPackId?: string;
 }): IosPhase0SerializableLut;
 declare const iosPhase0PickedSourceSchema: z.ZodObject<{
     uri: z.ZodString;
@@ -1370,6 +1390,8 @@ declare const iosPhase0ExportPayloadSchema: z.ZodObject<{
         domainMin: z.ZodOptional<z.ZodTuple<[z.ZodNumber, z.ZodNumber, z.ZodNumber], null>>;
         domainMax: z.ZodOptional<z.ZodTuple<[z.ZodNumber, z.ZodNumber, z.ZodNumber], null>>;
         rgbaData: z.ZodArray<z.ZodNumber>;
+        bundledSlug: z.ZodOptional<z.ZodString>;
+        bundledPackId: z.ZodOptional<z.ZodString>;
     }, z.core.$strip>>>;
     creativeLut: z.ZodOptional<z.ZodNullable<z.ZodObject<{
         name: z.ZodString;
@@ -1379,6 +1401,8 @@ declare const iosPhase0ExportPayloadSchema: z.ZodObject<{
         domainMin: z.ZodOptional<z.ZodTuple<[z.ZodNumber, z.ZodNumber, z.ZodNumber], null>>;
         domainMax: z.ZodOptional<z.ZodTuple<[z.ZodNumber, z.ZodNumber, z.ZodNumber], null>>;
         rgbaData: z.ZodArray<z.ZodNumber>;
+        bundledSlug: z.ZodOptional<z.ZodString>;
+        bundledPackId: z.ZodOptional<z.ZodString>;
     }, z.core.$strip>>>;
     benchmarkSlot: z.ZodOptional<z.ZodEnum<{
         "bench-short": "bench-short";

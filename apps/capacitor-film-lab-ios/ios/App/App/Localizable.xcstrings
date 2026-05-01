@@ -2951,6 +2951,23 @@
         }
       }
     },
+    "filmtone.preset.default" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "デフォルト"
+          }
+        }
+      }
+    },
     "filmtone.preset.title" : {
       "extractionState" : "stale",
       "localizations" : {

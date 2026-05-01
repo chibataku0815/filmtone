@@ -161,6 +161,20 @@ export interface ParsedCubeLut {
   size: number;
   data: number[];
   intensity: number;
+  /**
+   * v1.4 Creative LUT Pack: stable namespace slug for built-in cubes shipped
+   * with the app bundle (e.g. `"filmtone-creative-pack-01-warm-print"`). nil
+   * for user-imported / library-resolved cubes. Sidecar emits this so
+   * downstream readers (Filmtone Connect for DaVinci) can recognize bundled
+   * Looks across renames and app updates.
+   */
+  bundledSlug?: string;
+  /**
+   * v1.4 Creative LUT Pack: pack identifier for the bundled cube (e.g.
+   * `"creative-pack-01"`). Companions `bundledSlug` so a single pack rev
+   * is identifiable end-to-end.
+   */
+  bundledPackId?: string;
 }
 
 export interface PickedLutFile {
@@ -289,14 +303,23 @@ export function serializeCubeLut(
   options?: {
     title?: string;
     intensity?: number;
+    bundledSlug?: string;
+    bundledPackId?: string;
   },
 ): ParsedCubeLut {
-  return {
+  const out: ParsedCubeLut = {
     title: options?.title ?? lut.title ?? "Custom LUT",
     size: lut.size,
     data: Array.from(lut.data),
     intensity: options?.intensity ?? 1,
   };
+  if (options?.bundledSlug !== undefined) {
+    out.bundledSlug = options.bundledSlug;
+  }
+  if (options?.bundledPackId !== undefined) {
+    out.bundledPackId = options.bundledPackId;
+  }
+  return out;
 }
 
 export function deserializeCubeLutData(lut: ParsedCubeLut): Float32Array {
@@ -353,15 +376,24 @@ export function buildPhase0ExportRequest(options: {
     assertPhase0SourceProbeWithinCaps(probe);
   }
 
-  const toTransportLut = (lut: Phase0ProjectState["inputLut"] | null) =>
-    lut
-      ? {
-          title: lut.title,
-          size: lut.size,
-          data: lut.data,
-          intensity: lut.intensity,
-        }
-      : null;
+  const toTransportLut = (
+    lut: Phase0ProjectState["inputLut"] | null,
+  ): ParsedCubeLut | null => {
+    if (!lut) return null;
+    const out: ParsedCubeLut = {
+      title: lut.title,
+      size: lut.size,
+      data: lut.data,
+      intensity: lut.intensity,
+    };
+    if ((lut as ParsedCubeLut).bundledSlug !== undefined) {
+      out.bundledSlug = (lut as ParsedCubeLut).bundledSlug;
+    }
+    if ((lut as ParsedCubeLut).bundledPackId !== undefined) {
+      out.bundledPackId = (lut as ParsedCubeLut).bundledPackId;
+    }
+    return out;
+  };
 
   return {
     sourceUri: options.source.uri,

@@ -119,6 +119,11 @@ export const iosPhase0SerializableLutSchema = z.object({
     .refine((data) => data.length % 4 === 0, {
       message: "LUT rgbaData must contain RGBA quads",
     }),
+  // v1.4 Creative LUT Pack 01: optional provenance fields. Pre-v1.4
+  // payloads omit them; the V1 bridge contract treats unknown keys as
+  // ignored, so adding optional fields stays back-compat.
+  bundledSlug: z.string().min(1).optional(),
+  bundledPackId: z.string().min(1).optional(),
 });
 
 export type IosPhase0SerializableLut = z.infer<
@@ -129,8 +134,10 @@ export function createIosPhase0SerializableLut(input: {
   cube: CubeLUT;
   name: string;
   intensity?: number;
+  bundledSlug?: string;
+  bundledPackId?: string;
 }): IosPhase0SerializableLut {
-  const { cube, name, intensity = 1 } = input;
+  const { cube, name, intensity = 1, bundledSlug, bundledPackId } = input;
   return iosPhase0SerializableLutSchema.parse({
     name,
     title: cube.title || undefined,
@@ -139,6 +146,8 @@ export function createIosPhase0SerializableLut(input: {
     domainMin: cube.domainMin,
     domainMax: cube.domainMax,
     rgbaData: Array.from(cube.data),
+    bundledSlug,
+    bundledPackId,
   });
 }
 

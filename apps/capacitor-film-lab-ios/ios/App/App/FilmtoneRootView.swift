@@ -23,7 +23,6 @@ struct FilmtoneRootView: View {
                     heroSection
                         .accessibilityIdentifier("filmtone.section.hero")
                     presetSection
-                        .accessibilityIdentifier("filmtone.section.presets")
                     tuningSection
                     FilmtoneExportPanel(store: store)
                     messageStack
@@ -297,7 +296,6 @@ struct FilmtoneRootView: View {
                         .font(.system(size: 34, weight: .semibold))
                         .foregroundStyle(.white)
                         .lineLimit(2)
-                        .accessibilityIdentifier("filmtone.activePreset.label")
 
                     if store.hasAnyAdjustments {
                         Text(store.adjustmentSummaryText)
@@ -333,6 +331,7 @@ struct FilmtoneRootView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .center, spacing: 12) {
                 FilmtoneSectionHeader(title: store.strings.presetTitle)
+                    .accessibilityIdentifier("filmtone.section.presets")
 
                 Spacer(minLength: 12)
 
