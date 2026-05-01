@@ -18,6 +18,7 @@ struct FilmtoneRootView: View {
     @State private var advancedSheetPresented = false
     @State private var exportSheetPresented = false
     @State private var pendingLookOnPickComplete: SavedLookEntry?
+    @State private var activeHelpTopic: FilmtoneAdjustmentHelpTopic?
 
     var body: some View {
         ZStack {
@@ -50,12 +51,15 @@ struct FilmtoneRootView: View {
                 .ignoresSafeArea(edges: .bottom)
                 .allowsHitTesting(false)
             }
+
+            adjustmentHelpOverlay
         }
         // Backward-compat alias for XCUITest snapshot suite which uses
         // `filmtone.root.scroll` as a "main app loaded" sentinel. The legacy
         // ScrollView is gone, but the sentinel is harmless on the router root.
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("filmtone.root.scroll")
+        .animation(.spring(response: 0.36, dampingFraction: 0.88), value: activeHelpTopic?.id)
         .sheet(isPresented: $sourceSheetPresented) {
             FilmtoneSourceProfileSheet(
                 store: store,
@@ -66,7 +70,10 @@ struct FilmtoneRootView: View {
             }
         }
         .sheet(isPresented: $advancedSheetPresented) {
-            FilmtoneStrengthSheet(store: store) {
+            FilmtoneStrengthSheet(
+                store: store,
+                activeHelpTopic: $activeHelpTopic
+            ) {
                 advancedSheetPresented = false
             }
         }
@@ -169,6 +176,52 @@ struct FilmtoneRootView: View {
     }
 
     // MARK: Source load banner (overlay during pick → loaded transition)
+
+    @ViewBuilder
+    private var adjustmentHelpOverlay: some View {
+        if let topic = activeHelpTopic {
+            GeometryReader { proxy in
+                ZStack(alignment: .bottom) {
+                    Color.black.opacity(0.34)
+                        .ignoresSafeArea()
+                        .onTapGesture(perform: dismissAdjustmentHelp)
+
+                    FilmtoneAdjustmentHelpSheet(
+                        topic: topic,
+                        beforeLabel: store.strings.adjustmentHelpBeforeLabel,
+                        afterLabel: store.strings.adjustmentHelpAfterLabel,
+                        effectLabel: store.strings.adjustmentHelpEffectLabel,
+                        guidanceLabel: store.strings.adjustmentHelpGuidanceLabel,
+                        dismissLabel: store.strings.helpDismiss,
+                        onDismiss: dismissAdjustmentHelp
+                    )
+                    .frame(
+                        width: max(0, proxy.size.width - 16),
+                        height: min(proxy.size.height * 0.58, 520),
+                        alignment: .top
+                    )
+                    .glassEffect(
+                        .regular.tint(Color.black.opacity(0.10)),
+                        in: RoundedRectangle(cornerRadius: 32, style: .continuous)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+                    .padding(.bottom, 8)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .accessibilityIdentifier("filmtone.help.adjustment.overlay")
+                }
+            }
+            .ignoresSafeArea()
+            .transition(.opacity)
+            .zIndex(20)
+        }
+    }
+
+    private func dismissAdjustmentHelp() {
+        activeHelpTopic = nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            advancedSheetPresented = true
+        }
+    }
 
     private func sourceLoadBanner(_ state: FilmtoneSourceLoadState) -> some View {
         VStack(spacing: 0) {

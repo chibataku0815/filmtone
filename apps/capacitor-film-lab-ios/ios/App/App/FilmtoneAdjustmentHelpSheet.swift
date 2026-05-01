@@ -103,45 +103,22 @@ struct FilmtoneAdjustmentHelpSheet: View {
     let onDismiss: () -> Void
 
     var body: some View {
-        GeometryReader { proxy in
-            VStack(spacing: 0) {
-                handle
+        VStack(spacing: 0) {
+            handle
 
-                header
-                    .padding(.top, 4)
-                    .padding(.bottom, 14)
+            header
+                .padding(.horizontal, 20)
+                .padding(.top, 4)
+                .padding(.bottom, 14)
 
+            GeometryReader { proxy in
                 ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 20) {
-                        FilmtoneHelpComparisonImage(
-                            style: topic.comparisonStyle,
-                            beforeLabel: beforeLabel,
-                            afterLabel: afterLabel
-                        )
-                        .accessibilityIdentifier("filmtone.help.adjustment.compare")
-
-                        Text(topic.copy.body)
-                            .font(.body)
-                            .foregroundStyle(.white.opacity(0.78))
-                            .fixedSize(horizontal: false, vertical: true)
-                            .multilineTextAlignment(.leading)
-                            .accessibilityIdentifier("filmtone.help.adjustment.body")
-
-                        VStack(alignment: .leading, spacing: 12) {
-                            helpBlock(title: effectLabel, text: topic.copy.effect)
-                            if let guidance = topic.copy.guidance {
-                                helpBlock(title: guidanceLabel, text: guidance)
-                            }
-                        }
-                    }
-                    .padding(.bottom, 28)
+                    scrollContent(width: max(0, proxy.size.width - 40))
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 28)
                 }
             }
-            .frame(width: max(0, proxy.size.width - 40), alignment: .top)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
-        .presentationDetents([.medium])
-        .presentationDragIndicator(.hidden)
     }
 
     private var handle: some View {
@@ -172,6 +149,35 @@ struct FilmtoneAdjustmentHelpSheet: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("filmtone.help.adjustment.dismiss")
         }
+    }
+
+    private func scrollContent(width: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 20) {
+            FilmtoneHelpComparisonImage(
+                style: topic.comparisonStyle,
+                beforeLabel: beforeLabel,
+                afterLabel: afterLabel
+            )
+            .frame(width: width)
+            .accessibilityIdentifier("filmtone.help.adjustment.compare")
+
+            Text(topic.copy.body)
+                .font(.body)
+                .foregroundStyle(.white.opacity(0.78))
+                .fixedSize(horizontal: false, vertical: true)
+                .multilineTextAlignment(.leading)
+                .frame(width: width, alignment: .leading)
+                .accessibilityIdentifier("filmtone.help.adjustment.body")
+
+            VStack(alignment: .leading, spacing: 12) {
+                helpBlock(title: effectLabel, text: topic.copy.effect)
+                if let guidance = topic.copy.guidance {
+                    helpBlock(title: guidanceLabel, text: guidance)
+                }
+            }
+            .frame(width: width, alignment: .leading)
+        }
+        .frame(width: width, alignment: .leading)
     }
 
     private func helpBlock(title: String, text: String) -> some View {
