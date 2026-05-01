@@ -106,6 +106,7 @@ export const CREATIVE_PACK_01_LOOKS: readonly CreativePackLook[] = [
       yellow: 0,
     },
     paramOverrides: buildLookParamOverrides({
+      rgbShift: 0.0032,
       bloomThreshold: 0.64,
       bloomStrength: 0.2,
       bloomRadius: 0.62,
@@ -140,6 +141,7 @@ export const CREATIVE_PACK_01_LOOKS: readonly CreativePackLook[] = [
       yellow: 0,
     },
     paramOverrides: buildLookParamOverrides({
+      rgbShift: 0.0028,
       bloomThreshold: 0.66,
       bloomStrength: 0.18,
       bloomRadius: 0.58,

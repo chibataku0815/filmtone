@@ -68,9 +68,12 @@ enum FilmtoneBuiltInCatalog {
         //   1. The 12 color-only ops plus v2 split-tone strengths are pinned
         //      to neutral so the runtime kernel does not double-apply them on
         //      top of the cube — the cube is the SSOT for color expression.
-        //   2. Lens-filter spatial overrides (halation / bloom / diffusion /
-        //      lensSoftness / grain / vignette) provide the Filmtone optical
-        //      signature around the cube.
+        //   2. Lens-filter spatial overrides (rgbShift / halation / bloom /
+        //      diffusion / lensSoftness / grain / vignette) provide the
+        //      Filmtone optical signature around the cube. rgbShift (chromatic
+        //      aberration) is a Filmtone signature effect — both built-in
+        //      Looks pin a restrained value so the lens character is visible
+        //      without crossing into novelty fringing.
         //
         // SHA-256 is pinned from `bun run scripts/build-creative-luts.ts
         // --regenerate` and mirrored in
@@ -135,6 +138,7 @@ enum FilmtoneBuiltInCatalog {
     /// baseline. Color stays in the cube; these values carry lens behavior.
     static let creativePack01StonePatch: FilmtonePhase0ParamsPatch = {
         var values = creativePack01ColorOpNeutralEntries
+        values["rgbShift"] = 0.0032
         values["bloomThreshold"] = 0.64
         values["bloomStrength"] = 0.20
         values["bloomRadius"] = 0.62
@@ -152,6 +156,7 @@ enum FilmtoneBuiltInCatalog {
     /// Color stays in the cube; these values carry lens behavior.
     static let creativePack01UrbanPatch: FilmtonePhase0ParamsPatch = {
         var values = creativePack01ColorOpNeutralEntries
+        values["rgbShift"] = 0.0028
         values["bloomThreshold"] = 0.66
         values["bloomStrength"] = 0.18
         values["bloomRadius"] = 0.58
