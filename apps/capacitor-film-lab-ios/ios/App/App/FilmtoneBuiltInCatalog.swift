@@ -89,7 +89,7 @@ enum FilmtoneBuiltInCatalog {
             creativeLut: .bundled(
                 slug: "filmtone-creative-pack-01-stone",
                 filename: "filmtone-creative-pack-01-stone.cube",
-                sha256: "005972db2dd07ff181e6256d11034ab76c8ef94782d1f2739e6c73971072bf45",
+                sha256: "2f9e0240450b1b5fe1e78ca88017509eb1c50a050c4a02723a36ac651c9393c4",
                 intensity: 1.0
             ),
             packId: FilmtoneBuiltInCatalog.creativePack01Id
@@ -105,7 +105,7 @@ enum FilmtoneBuiltInCatalog {
             creativeLut: .bundled(
                 slug: "filmtone-creative-pack-01-urban",
                 filename: "filmtone-creative-pack-01-urban.cube",
-                sha256: "9620492bf766675466da212f123289851d40f2420b2f51f56d4baf96f2dfb1ea",
+                sha256: "fefd48a796ff724fb23b2741ac14ed0c4453b24215ca7535680ad4ca043aaa44",
                 intensity: 1.0
             ),
             packId: FilmtoneBuiltInCatalog.creativePack01Id

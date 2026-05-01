@@ -231,6 +231,7 @@ export {
   CREATIVE_PACK_01_STONE_TRANSFORM,
   CREATIVE_PACK_01_URBAN_TRANSFORM,
   applyCreativePack01SourceTransform,
-  applyFilmtoneReferenceFingerprintTransform,
+  applyStoneFingerprintTransform,
+  applyUrbanCoolDensityTransform,
   type CreativePack01SourceTransform,
 } from "./creative-pack-01-generator";

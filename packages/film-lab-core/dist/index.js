@@ -2814,7 +2814,7 @@ function smoothstep2(edge0, edge1, x) {
   const t = clamp013((x - edge0) / (edge1 - edge0));
   return t * t * (3 - 2 * t);
 }
-function applyFilmtoneReferenceFingerprintTransform(sourceCube) {
+function applyStoneFingerprintTransform(sourceCube) {
   const { size } = sourceCube;
   const data = new Float32Array(sourceCube.data.length);
   const denom = size - 1;
@@ -2843,17 +2843,53 @@ function applyFilmtoneReferenceFingerprintTransform(sourceCube) {
   }
   return { size, data };
 }
+function applyUrbanCoolDensityTransform(sourceCube) {
+  const { size } = sourceCube;
+  const data = new Float32Array(sourceCube.data.length);
+  const denom = size - 1;
+  for (let bi = 0; bi < size; bi++) {
+    const b = bi / denom;
+    for (let gi = 0; gi < size; gi++) {
+      const g = gi / denom;
+      for (let ri = 0; ri < size; ri++) {
+        const r = ri / denom;
+        const idx = (bi * size * size + gi * size + ri) * 3;
+        const sourceR = sourceCube.data[idx + 0];
+        const sourceG = sourceCube.data[idx + 1];
+        const sourceB = sourceCube.data[idx + 2];
+        const inputLuma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        const inputChroma = Math.max(r, g, b) - Math.min(r, g, b);
+        const shadowWeight = 1 - smoothstep2(0.05, 0.45, inputLuma);
+        const midWeight = smoothstep2(0.18, 0.5, inputLuma) * (1 - smoothstep2(0.65, 0.92, inputLuma));
+        const highlightWeight = smoothstep2(0.78, 0.96, inputLuma);
+        const neutralMask = 1 - smoothstep2(0.02, 0.22, inputChroma);
+        const coolStrength = shadowWeight * 0.12 + midWeight * neutralMask * 0.075;
+        const greenCastStrength = midWeight * neutralMask * 0.035;
+        const shadowLift = shadowWeight * 0.028;
+        const highlightCool = highlightWeight * neutralMask * 8e-3;
+        const newR = sourceR * (1 - coolStrength * 1.05 - highlightCool) + shadowLift * 0.7;
+        const newG = sourceG * (1 + greenCastStrength) + shadowLift;
+        const newB = sourceB * (1 + coolStrength * 1.3 + highlightCool * 0.5) + shadowLift * 1.1;
+        data[idx + 0] = clamp013(newR);
+        data[idx + 1] = clamp013(newG);
+        data[idx + 2] = clamp013(newB);
+      }
+    }
+  }
+  return { size, data };
+}
 function applyCreativePack01SourceTransform(sourceCube, transformName) {
   switch (transformName) {
     case CREATIVE_PACK_01_STONE_TRANSFORM:
+      return applyStoneFingerprintTransform(sourceCube);
     case CREATIVE_PACK_01_URBAN_TRANSFORM:
-      return applyFilmtoneReferenceFingerprintTransform(sourceCube);
+      return applyUrbanCoolDensityTransform(sourceCube);
   }
 }
 
 // src/creative-pack-01.ts
 var CREATIVE_PACK_01_ID = "creative-pack-01";
-var CREATIVE_PACK_01_BAKER_VERSION = "1.3.0-filmtone-stone-urban";
+var CREATIVE_PACK_01_BAKER_VERSION = "1.4.0-stone-urban-distinct";
 var CREATIVE_PACK_01_CUBE_SIZE = 65;
 function buildLookParamOverrides(spatial) {
   const out = { ...spatial };
@@ -2885,6 +2921,7 @@ var CREATIVE_PACK_01_LOOKS = [
       yellow: 0
     },
     paramOverrides: buildLookParamOverrides({
+      rgbShift: 32e-4,
       bloomThreshold: 0.64,
       bloomStrength: 0.2,
       bloomRadius: 0.62,
@@ -2919,6 +2956,7 @@ var CREATIVE_PACK_01_LOOKS = [
       yellow: 0
     },
     paramOverrides: buildLookParamOverrides({
+      rgbShift: 28e-4,
       bloomThreshold: 0.66,
       bloomStrength: 0.18,
       bloomRadius: 0.58,
@@ -2987,9 +3025,10 @@ export {
   QUICK_AXIS_DEFAULT_RANGE,
   QUICK_AXIS_IDS,
   applyCreativePack01SourceTransform,
-  applyFilmtoneReferenceFingerprintTransform,
   applyQuickStateToParams,
   applyQuickStateToPhase0Params,
+  applyStoneFingerprintTransform,
+  applyUrbanCoolDensityTransform,
   assertPhase0SourceProbeWithinCaps,
   bakeColorOnly,
   benchmarkMarkdownTableHeader,

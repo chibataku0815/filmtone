@@ -42,7 +42,7 @@ import type { FilmtoneIosPresetName } from "./ios-preset-overrides";
 import type { Phase0ParamKey } from "./phase0-schema";
 
 export const CREATIVE_PACK_01_ID = "creative-pack-01" as const;
-export const CREATIVE_PACK_01_BAKER_VERSION = "1.3.0-filmtone-stone-urban" as const;
+export const CREATIVE_PACK_01_BAKER_VERSION = "1.4.0-stone-urban-distinct" as const;
 export const CREATIVE_PACK_01_CUBE_SIZE = 65 as const;
 
 export interface CreativePackLook {

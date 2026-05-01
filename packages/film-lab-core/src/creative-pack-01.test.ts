@@ -117,15 +117,24 @@ describe("Creative LUT Pack 01 — generated cubes", () => {
     }
   });
 
-  test("sample points stay tightly aligned to their Palermo source", () => {
+  test("sample points stay aligned to their Palermo source within per-Look tolerance", () => {
+    // Stone is the faithful Palermo Reference base — fingerprint-only.
+    // Urban layers Filmtone's "cool urban density" character on top of
+    // the Green Density source, so its delta envelope is intentionally
+    // larger but still bounded so highlights / saturated reds remain
+    // readable (no crushed signage, no muddy skin).
     const cases = [
       {
         cubePath: STONE_CUBE_PATH,
         sourcePath: PALERMO_REFERENCE_SOURCE,
+        channelTol: 0.006,
+        lumaTol: 0.004,
       },
       {
         cubePath: URBAN_CUBE_PATH,
         sourcePath: PALERMO_GREEN_DENSITY_SOURCE,
+        channelTol: 0.05,
+        lumaTol: 0.04,
       },
     ] as const;
     const points: readonly SamplePoint[] = [
@@ -139,17 +148,47 @@ describe("Creative LUT Pack 01 — generated cubes", () => {
       [0.72, 0.62, 0.38],
     ];
 
-    for (const { cubePath, sourcePath } of cases) {
+    for (const { cubePath, sourcePath, channelTol, lumaTol } of cases) {
       const cube = parseCube(readFileSync(cubePath, "utf8"));
       const reference = parseCube(readFileSync(sourcePath, "utf8"));
       for (const point of points) {
         const actual = sampleCube(cube, point);
         const expected = sampleCube(reference, point);
         for (let i = 0; i < 3; i++) {
-          expect(Math.abs(actual[i] - expected[i])).toBeLessThanOrEqual(0.006);
+          expect(Math.abs(actual[i] - expected[i])).toBeLessThanOrEqual(channelTol);
         }
-        expect(Math.abs(luma(actual) - luma(expected))).toBeLessThanOrEqual(0.004);
+        expect(Math.abs(luma(actual) - luma(expected))).toBeLessThanOrEqual(lumaTol);
       }
     }
+  });
+
+  test("Stone and Urban are clearly visually distinct", () => {
+    const stone = parseCube(readFileSync(STONE_CUBE_PATH, "utf8"));
+    const urban = parseCube(readFileSync(URBAN_CUBE_PATH, "utf8"));
+    // Mix of neutral, skin, sky, foliage, signage — the everyday photo
+    // distribution where the previous build read as "ほぼ同じ".
+    const points: readonly SamplePoint[] = [
+      [0.18, 0.18, 0.18],
+      [0.45, 0.45, 0.45],
+      [0.62, 0.45, 0.36],
+      [0.30, 0.45, 0.70],
+      [0.25, 0.50, 0.20],
+      [0.85, 0.65, 0.40],
+      [0.20, 0.25, 0.32],
+    ];
+    let totalAbs = 0;
+    let maxDelta = 0;
+    for (const point of points) {
+      const a = sampleCube(stone, point);
+      const b = sampleCube(urban, point);
+      for (let i = 0; i < 3; i++) {
+        const d = Math.abs(a[i] - b[i]);
+        totalAbs += d;
+        if (d > maxDelta) maxDelta = d;
+      }
+    }
+    const meanAbs = totalAbs / (points.length * 3);
+    expect(meanAbs).toBeGreaterThan(0.025);
+    expect(maxDelta).toBeGreaterThan(0.05);
   });
 });
