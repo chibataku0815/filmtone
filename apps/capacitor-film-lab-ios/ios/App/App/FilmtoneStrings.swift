@@ -242,9 +242,8 @@ struct FilmtoneStrings {
 
     // MARK: - Built-in Filmtone Looks
     //
-    // Current internal development catalog exposes focused Creative LUT baselines.
-    let builtInLookCreativePack01PalermoReference: String
-    let builtInLookCreativePack01PalermoGreenDensity: String
+    // Current catalog exposes one flagship Creative LUT.
+    let builtInLookCreativePack01UrbanDensity: String
 }
 
 extension FilmtoneStrings {
@@ -253,10 +252,8 @@ extension FilmtoneStrings {
     /// fall back to `entry.name` directly.
     func builtInLookName(for slug: String) -> String? {
         switch slug {
-        case "filmtone-creative-pack-01-palermo-reference":
-            return builtInLookCreativePack01PalermoReference
-        case "filmtone-creative-pack-01-palermo-green-density":
-            return builtInLookCreativePack01PalermoGreenDensity
+        case "filmtone-creative-pack-01-urban-density":
+            return builtInLookCreativePack01UrbanDensity
         default:                   return nil
         }
     }
@@ -1505,17 +1502,11 @@ extension FilmtoneStrings {
             defaultValue: prefersJapanese ? "キャンセル" : "Cancel",
             comment: "Toolbar action that dismisses the Saved-Look sheet without saving."
         )
-        // Built-in Filmtone Look catalog. Weak sampler entries are disabled
-        // while the base Creative LUT is rebuilt from the Palermo reference.
-        builtInLookCreativePack01PalermoReference = filmtoneLocalized(
-            "filmtone.builtin_look.creative_pack_01.palermo_reference",
-            defaultValue: prefersJapanese ? "Palermo Reference" : "Palermo Reference",
-            comment: "Built-in Look name: internal Pack 01 reference LUT based on the Palermo cube."
-        )
-        builtInLookCreativePack01PalermoGreenDensity = filmtoneLocalized(
-            "filmtone.builtin_look.creative_pack_01.palermo_green_density",
-            defaultValue: prefersJapanese ? "Palermo Green Density" : "Palermo Green Density",
-            comment: "Built-in Look name: internal Pack 01 reference LUT based on the Palermo Green Density cube."
+        // Built-in Filmtone Look catalog.
+        builtInLookCreativePack01UrbanDensity = filmtoneLocalized(
+            "filmtone.builtin_look.creative_pack_01.urban_density",
+            defaultValue: prefersJapanese ? "Filmtone Urban Density" : "Filmtone Urban Density",
+            comment: "Built-in Look name: Pack 01 flagship urban-density creative LUT."
         )
         fullscreenTitle = filmtoneLocalized(
             "filmtone.fullscreen.title",

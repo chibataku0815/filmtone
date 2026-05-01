@@ -58,52 +58,35 @@ enum FilmtoneBuiltInCatalog {
     /// `...000001` – `...000004` are deprecated and intentionally not reused
     /// (see `BuiltInLookUUID`).
     ///
-    /// Active catalog: focused Palermo-derived reference entries. Weak
-    /// multi-look sampling stays disabled until these baselines reach product
-    /// quality.
+    /// Active catalog: one flagship Creative LUT. Weak multi-look sampling
+    /// stays disabled until this base Look reaches product quality.
     static let allLooks: [BuiltInLook] = [
-        // MARK: - Creative LUT Pack 01 reference entry
+        // MARK: - Creative LUT Pack 01 flagship entry
         //
-        // This entry bundles the 65³ Palermo reference cube directly under
-        // `Resources/CreativeLuts/`. `paramOverrides` carries TWO things:
+        // This entry bundles the generated 65³ Filmtone Urban Density cube
+        // under `Resources/CreativeLuts/`. `paramOverrides` carries TWO things:
         //   1. The 12 color-only ops plus v2 split-tone strengths are pinned
         //      to neutral so the runtime kernel does not double-apply them on
         //      top of the cube — the cube is the SSOT for color expression.
         //   2. Lens-filter spatial overrides (halation / bloom / diffusion /
-        //      lensSoftness / grain / vignette) provide a first Filmtone optical
-        //      baseline without hiding the Palermo color transform.
+        //      lensSoftness / grain / vignette) provide the Filmtone optical
+        //      signature around the cube.
         //
         // SHA-256 is pinned from `bun run scripts/build-creative-luts.ts
         // --regenerate` and mirrored in
         // `Tests/Fixtures/creative-pack-01/manifest.json`.
         BuiltInLook(
-            slug: "filmtone-creative-pack-01-palermo-reference",
-            canonicalUUID: BuiltInLookUUID.creativePack01PalermoReference,
-            englishName: "Palermo Reference",
+            slug: "filmtone-creative-pack-01-urban-density",
+            canonicalUUID: BuiltInLookUUID.creativePack01UrbanDensity,
+            englishName: "Filmtone Urban Density",
             presetName: "reset",
             strength: 1.0,
             quickState: .zero,
-            paramOverrides: FilmtoneBuiltInCatalog.creativePack01PalermoReferencePatch,
+            paramOverrides: FilmtoneBuiltInCatalog.creativePack01UrbanDensityPatch,
             creativeLut: .bundled(
-                slug: "filmtone-creative-pack-01-palermo-reference",
-                filename: "filmtone-creative-pack-01-palermo-reference.cube",
-                sha256: "3a6ba8427daac679990112d1fa244c0c1397d8f47125d0837e35f9fa1ab2fc4c",
-                intensity: 1.0
-            ),
-            packId: FilmtoneBuiltInCatalog.creativePack01Id
-        ),
-        BuiltInLook(
-            slug: "filmtone-creative-pack-01-palermo-green-density",
-            canonicalUUID: BuiltInLookUUID.creativePack01PalermoGreenDensity,
-            englishName: "Palermo Green Density",
-            presetName: "reset",
-            strength: 1.0,
-            quickState: .zero,
-            paramOverrides: FilmtoneBuiltInCatalog.creativePack01PalermoGreenDensityPatch,
-            creativeLut: .bundled(
-                slug: "filmtone-creative-pack-01-palermo-green-density",
-                filename: "filmtone-creative-pack-01-palermo-green-density.cube",
-                sha256: "ffb9b1600108ebafcd0d60519d4fccd01262916c9519894b805d5264bb45d3c6",
+                slug: "filmtone-creative-pack-01-urban-density",
+                filename: "filmtone-creative-pack-01-urban-density.cube",
+                sha256: "cc64e905c0643a7342333a0235760ed3970a87f71987f2efc8f84fd4032752d7",
                 intensity: 1.0
             ),
             packId: FilmtoneBuiltInCatalog.creativePack01Id
@@ -132,38 +115,20 @@ enum FilmtoneBuiltInCatalog {
         "highlightTone": 0,
     ]
 
-    /// Palermo Reference — direct 65³ Palermo cube with a restrained first
-    /// optical baseline. Color stays in the cube; these values are tuned on
-    /// device in the next pass.
-    static let creativePack01PalermoReferencePatch: FilmtonePhase0ParamsPatch = {
+    /// Filmtone Urban Density — generated 65³ cube plus a restrained optical
+    /// baseline. Color stays in the cube; these values carry lens behavior.
+    static let creativePack01UrbanDensityPatch: FilmtonePhase0ParamsPatch = {
         var values = creativePack01ColorOpNeutralEntries
-        values["bloomThreshold"] = 0.62
-        values["bloomStrength"] = 0.22
+        values["bloomThreshold"] = 0.64
+        values["bloomStrength"] = 0.23
         values["bloomRadius"] = 0.58
-        values["halationIntensity"] = 0.08
-        values["halationHue"] = 24
-        values["diffusion"] = 0.045
-        values["lensSoftness"] = 0.08
-        values["grainIntensity"] = 0.006
-        values["grainSize"] = 0.16
-        values["vignette"] = 0.06
-        return FilmtonePhase0ParamsPatch(values: values)
-    }()
-
-    /// Palermo Green Density — direct 65³ Palermo Green Density cube with
-    /// warmer optics pulled back so the cyan-green density remains dominant.
-    static let creativePack01PalermoGreenDensityPatch: FilmtonePhase0ParamsPatch = {
-        var values = creativePack01ColorOpNeutralEntries
-        values["bloomThreshold"] = 0.66
-        values["bloomStrength"] = 0.18
-        values["bloomRadius"] = 0.54
-        values["halationIntensity"] = 0.045
-        values["halationHue"] = 18
-        values["diffusion"] = 0.07
+        values["halationIntensity"] = 0.065
+        values["halationHue"] = 22
+        values["diffusion"] = 0.065
         values["lensSoftness"] = 0.10
-        values["grainIntensity"] = 0.005
+        values["grainIntensity"] = 0.0045
         values["grainSize"] = 0.14
-        values["vignette"] = 0.07
+        values["vignette"] = 0.065
         return FilmtonePhase0ParamsPatch(values: values)
     }()
 
@@ -223,9 +188,8 @@ enum FilmtoneCreativePack01Adaptation {
         slug: String,
         descriptor: FilmtoneSourceToneDescriptor?
     ) -> Resolved? {
-        // The Palermo reference should remain a stable measured baseline.
-        // Material-adaptive adjustments resume only after the base LUT is
-        // visually signed off on device.
+        // Material-adaptive adjustments stay disabled until the flagship LUT
+        // is visually signed off on device.
         return nil
     }
 }
@@ -251,8 +215,10 @@ private enum BuiltInLookUUID {
     //
     // v1.4 Creative LUT Pack 01 reservations (active entries mirrored in
     // `packages/film-lab-core/src/creative-pack-01.ts` so TS / Swift / sidecar
-    // share a single canonical id per Look). `...000008` and `...000009` are
-    // intentionally not reused after CD removal of the weak sampler entries.
-    static let creativePack01PalermoReference = UUID(uuidString: "FB1A0001-0000-4000-8000-000000000006")!
-    static let creativePack01PalermoGreenDensity = UUID(uuidString: "FB1A0001-0000-4000-8000-000000000007")!
+    // share a single canonical id per Look).
+    //   FB1A0001-0000-4000-8000-000000000007 — reserved by the retired
+    //   Palermo Green Density companion slot.
+    // `...000008` and `...000009` are intentionally not reused after CD
+    // removal of the weak sampler entries.
+    static let creativePack01UrbanDensity = UUID(uuidString: "FB1A0001-0000-4000-8000-000000000006")!
 }

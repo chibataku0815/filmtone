@@ -170,8 +170,8 @@ function hslToRgb01(hDegrees, s, l) {
   const b = hue2rgb(p, q, hNorm - 1 / 3);
   return { r, g, b };
 }
-function chromaUnitFromHueDegrees(hueDegrees) {
-  const { r, g, b } = hslToRgb01(hueDegrees, 1, 0.5);
+function chromaUnitFromHueDegrees(hueDegrees2) {
+  const { r, g, b } = hslToRgb01(hueDegrees2, 1, 0.5);
   let x = r - 0.5;
   let y = g - 0.5;
   let z5 = b - 0.5;
@@ -2371,12 +2371,197 @@ function serializeCreativeCubeToText(cube, options) {
   return lines.join("\n");
 }
 
+// src/creative-pack-01-generator.ts
+var CREATIVE_PACK_01_URBAN_DENSITY_TRANSFORM = "filmtone-urban-density-v1";
+function clamp013(x) {
+  if (x < 0) return 0;
+  if (x > 1) return 1;
+  return x;
+}
+function mix2(a, b, t) {
+  return a + (b - a) * t;
+}
+function smoothstep2(edge0, edge1, x) {
+  const t = clamp013((x - edge0) / (edge1 - edge0));
+  return t * t * (3 - 2 * t);
+}
+function luma2(rgb) {
+  return 0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b;
+}
+function hueDegrees(rgb) {
+  const maxChannel = Math.max(rgb.r, rgb.g, rgb.b);
+  const minChannel = Math.min(rgb.r, rgb.g, rgb.b);
+  const chroma = maxChannel - minChannel;
+  if (chroma < 1e-6) return 0;
+  let hue;
+  if (maxChannel === rgb.r) {
+    hue = (rgb.g - rgb.b) / chroma % 6;
+  } else if (maxChannel === rgb.g) {
+    hue = (rgb.b - rgb.r) / chroma + 2;
+  } else {
+    hue = (rgb.r - rgb.g) / chroma + 4;
+  }
+  const degrees = hue * 60;
+  return degrees < 0 ? degrees + 360 : degrees;
+}
+function hueWeight(hue, center, width) {
+  const delta = Math.abs((hue - center + 540) % 360 - 180);
+  return 1 - smoothstep2(width * 0.35, width, delta);
+}
+function scaleToLuma(rgb, targetLuma) {
+  const currentLuma = luma2(rgb);
+  if (currentLuma < 1e-5) {
+    return { r: targetLuma, g: targetLuma, b: targetLuma };
+  }
+  const scale = targetLuma / currentLuma;
+  return {
+    r: rgb.r * scale,
+    g: rgb.g * scale,
+    b: rgb.b * scale
+  };
+}
+function blendRgb(a, b, t) {
+  return {
+    r: mix2(a.r, b.r, t),
+    g: mix2(a.g, b.g, t),
+    b: mix2(a.b, b.b, t)
+  };
+}
+function clampRgb(rgb) {
+  return {
+    r: clamp013(rgb.r),
+    g: clamp013(rgb.g),
+    b: clamp013(rgb.b)
+  };
+}
+function transformUrbanDensitySample(input, source) {
+  const inputLuma = luma2(input);
+  const sourceLuma = luma2(source);
+  const maxInput = Math.max(input.r, input.g, input.b);
+  const minInput = Math.min(input.r, input.g, input.b);
+  const inputChroma = maxInput - minInput;
+  const hue = hueDegrees(input);
+  const saturatedWeight = smoothstep2(0.05, 0.22, inputChroma);
+  const neutralWeight = 1 - smoothstep2(0.025, 0.16, inputChroma);
+  const authoredLuma = clamp013(0.01 + 0.982 * Math.pow(inputLuma, 1.32));
+  let targetLuma = mix2(sourceLuma, authoredLuma, 0.56);
+  targetLuma += 8e-3 * smoothstep2(0.015, 0.08, inputLuma) * (1 - smoothstep2(0.12, 0.23, inputLuma));
+  targetLuma = clamp013(targetLuma);
+  let out = scaleToLuma(source, targetLuma);
+  const highlightProtect = 1 - smoothstep2(0.76, 0.98, inputLuma);
+  const neutralCool = neutralWeight * highlightProtect * (0.45 + 0.55 * smoothstep2(0.1, 0.72, inputLuma));
+  out = {
+    r: out.r * (1 - 0.125 * neutralCool),
+    g: out.g * (1 + 0.025 * neutralCool),
+    b: out.b * (1 + 0.18 * neutralCool)
+  };
+  const redWeight = Math.max(hueWeight(hue, 0, 34), hueWeight(hue, 360, 34)) * saturatedWeight;
+  const skinWeight = hueWeight(hue, 31, 35) * saturatedWeight * smoothstep2(0.24, 0.72, inputLuma);
+  const yellowWeight = hueWeight(hue, 55, 42) * saturatedWeight;
+  const foliageWeight = hueWeight(hue, 122, 52) * saturatedWeight;
+  const skyWeight = Math.max(hueWeight(hue, 202, 62), hueWeight(hue, 225, 50)) * saturatedWeight;
+  if (redWeight > 0) {
+    out = blendRgb(
+      out,
+      {
+        r: clamp013(Math.max(out.r, targetLuma * 3.95)),
+        g: clamp013(Math.max(out.g, targetLuma * 0.24 + 8e-3)),
+        b: clamp013(Math.max(out.b, targetLuma * 0.16 + 6e-3))
+      },
+      0.42 * redWeight
+    );
+  }
+  if (skinWeight > 0) {
+    out = blendRgb(
+      out,
+      {
+        r: clamp013(targetLuma * 1.62 + 0.035),
+        g: clamp013(targetLuma * 0.94 + 0.015),
+        b: clamp013(targetLuma * 0.5 + 0.045)
+      },
+      0.34 * skinWeight
+    );
+  }
+  if (yellowWeight > 0) {
+    out = blendRgb(
+      out,
+      {
+        r: clamp013(targetLuma * 1.42 + 0.03),
+        g: clamp013(targetLuma * 1.05 + 0.015),
+        b: clamp013(targetLuma * 0.34 + 0.035)
+      },
+      0.34 * yellowWeight
+    );
+  }
+  if (foliageWeight > 0) {
+    out = blendRgb(
+      out,
+      {
+        r: clamp013(targetLuma * 0.58 + 0.018),
+        g: clamp013(targetLuma * 1.2 + 0.02),
+        b: clamp013(targetLuma * 0.55 + 0.018)
+      },
+      0.32 * foliageWeight
+    );
+  }
+  if (skyWeight > 0) {
+    out = blendRgb(
+      out,
+      {
+        r: clamp013(targetLuma * 0.2 + 0.018),
+        g: clamp013(targetLuma * 1.02 + 0.018),
+        b: clamp013(targetLuma * 1.82 + 0.025)
+      },
+      0.28 * skyWeight
+    );
+  }
+  const outputLuma = luma2(out);
+  const outputChroma = Math.max(out.r, out.g, out.b) - Math.min(out.r, out.g, out.b);
+  const chromaLimiter = smoothstep2(0.48, 0.82, outputChroma) * smoothstep2(0.06, 0.38, outputLuma) * 0.1;
+  return clampRgb({
+    r: mix2(out.r, outputLuma, chromaLimiter),
+    g: mix2(out.g, outputLuma, chromaLimiter),
+    b: mix2(out.b, outputLuma, chromaLimiter)
+  });
+}
+function applyFilmtoneUrbanDensityTransform(sourceCube) {
+  const { size } = sourceCube;
+  const data = new Float32Array(sourceCube.data.length);
+  const denom = size - 1;
+  for (let bi = 0; bi < size; bi++) {
+    const b = bi / denom;
+    for (let gi = 0; gi < size; gi++) {
+      const g = gi / denom;
+      for (let ri = 0; ri < size; ri++) {
+        const r = ri / denom;
+        const idx = (bi * size * size + gi * size + ri) * 3;
+        const out = transformUrbanDensitySample(
+          { r, g, b },
+          {
+            r: sourceCube.data[idx + 0],
+            g: sourceCube.data[idx + 1],
+            b: sourceCube.data[idx + 2]
+          }
+        );
+        data[idx + 0] = out.r;
+        data[idx + 1] = out.g;
+        data[idx + 2] = out.b;
+      }
+    }
+  }
+  return { size, data };
+}
+function applyCreativePack01SourceTransform(sourceCube, transformName) {
+  switch (transformName) {
+    case CREATIVE_PACK_01_URBAN_DENSITY_TRANSFORM:
+      return applyFilmtoneUrbanDensityTransform(sourceCube);
+  }
+}
+
 // src/creative-pack-01.ts
 var CREATIVE_PACK_01_ID = "creative-pack-01";
-var CREATIVE_PACK_01_BAKER_VERSION = "1.1.0-palermo-reference";
+var CREATIVE_PACK_01_BAKER_VERSION = "1.2.0-filmtone-urban-density";
 var CREATIVE_PACK_01_CUBE_SIZE = 65;
-var CREATIVE_PACK_01_PALERMO_REFERENCE_SOURCE = "/Volumes/SamsungPortableSSDX5001/filmtone/Palermo_Powergrade & LUTs/Palermo Standalone LUTs/DJI_DLOG-M-Palermo.cube";
-var CREATIVE_PACK_01_PALERMO_GREEN_DENSITY_SOURCE = "/Volumes/SamsungPortableSSDX5001/filmtone/Palermo_Powergrade & LUTs/Palermo Standalone LUTs/LUT + Extras/Palermo + Colour Density + Green Density.cube";
 function buildLookParamOverrides(spatial) {
   const out = { ...spatial };
   for (const key of BAKE_COLOR_PARAM_KEYS) {
@@ -2388,8 +2573,8 @@ function buildLookParamOverrides(spatial) {
 }
 var CREATIVE_PACK_01_LOOKS = [
   {
-    slug: "filmtone-creative-pack-01-palermo-reference",
-    englishName: "Palermo Reference",
+    slug: "filmtone-creative-pack-01-urban-density",
+    englishName: "Filmtone Urban Density",
     canonicalUUID: "FB1A0001-0000-4000-8000-000000000006",
     basePreset: "reset",
     colorParams: {
@@ -2407,58 +2592,21 @@ var CREATIVE_PACK_01_LOOKS = [
       yellow: 0
     },
     paramOverrides: buildLookParamOverrides({
-      // First optical baseline: enough Filmtone lens behavior to judge the
-      // product direction, without hiding the Palermo color transform.
-      bloomThreshold: 0.62,
-      bloomStrength: 0.22,
+      // Flagship optical baseline: restrained grain, visible lens softness,
+      // and enough glow to make the urban-density cube feel like Filmtone.
+      bloomThreshold: 0.64,
+      bloomStrength: 0.23,
       bloomRadius: 0.58,
-      halationIntensity: 0.08,
-      halationHue: 24,
-      diffusion: 0.045,
-      lensSoftness: 0.08,
-      grainIntensity: 6e-3,
-      grainSize: 0.16,
-      vignette: 0.06
-    }),
-    strength: 1,
-    sourceCubePath: CREATIVE_PACK_01_PALERMO_REFERENCE_SOURCE
-  },
-  {
-    slug: "filmtone-creative-pack-01-palermo-green-density",
-    englishName: "Palermo Green Density",
-    canonicalUUID: "FB1A0001-0000-4000-8000-000000000007",
-    basePreset: "reset",
-    colorParams: {
-      exposure: 0,
-      contrast: 1,
-      saturation: 1,
-      temperature: 0,
-      tint: 0,
-      fade: 0,
-      compressionAmount: 0,
-      compressionRange: 0.5,
-      printContrast: 0,
-      cyan: 0,
-      magenta: 0,
-      yellow: 0
-    },
-    paramOverrides: buildLookParamOverrides({
-      // Green-density companion baseline: keep warmth from optics restrained so
-      // the source cube can carry the cool cyan-green density.
-      bloomThreshold: 0.66,
-      bloomStrength: 0.18,
-      bloomRadius: 0.54,
-      halationIntensity: 0.045,
-      halationHue: 18,
-      diffusion: 0.07,
+      halationIntensity: 0.065,
+      halationHue: 22,
+      diffusion: 0.065,
       lensSoftness: 0.1,
-      grainIntensity: 5e-3,
+      grainIntensity: 45e-4,
       grainSize: 0.14,
-      vignette: 0.07
+      vignette: 0.065
     }),
     strength: 1,
-    sourceCubePath: CREATIVE_PACK_01_PALERMO_GREEN_DENSITY_SOURCE,
-    sourceCubeTransform: "cold-green-density-v1"
+    sourceCubeTransform: CREATIVE_PACK_01_URBAN_DENSITY_TRANSFORM
   }
 ];
 function findCreativePack01Look(slug) {
@@ -2472,6 +2620,7 @@ export {
   CREATIVE_PACK_01_CUBE_SIZE,
   CREATIVE_PACK_01_ID,
   CREATIVE_PACK_01_LOOKS,
+  CREATIVE_PACK_01_URBAN_DENSITY_TRANSFORM,
   DEFAULT_QUICK_STATE,
   FILMTONE_DEFAULT_BASE_PRESET,
   FILMTONE_SOFT_FINISH_PATCH,
@@ -2508,6 +2657,8 @@ export {
   PRESET_VERSION,
   QUICK_AXIS_DEFAULT_RANGE,
   QUICK_AXIS_IDS,
+  applyCreativePack01SourceTransform,
+  applyFilmtoneUrbanDensityTransform,
   applyQuickStateToParams,
   applyQuickStateToPhase0Params,
   assertPhase0SourceProbeWithinCaps,

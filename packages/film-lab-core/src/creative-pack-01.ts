@@ -33,16 +33,16 @@ import {
   BAKE_COLOR_PARAM_KEYS,
   type BakeColorParams,
 } from "./bake-color-only";
+import {
+  CREATIVE_PACK_01_URBAN_DENSITY_TRANSFORM,
+  type CreativePack01SourceTransform,
+} from "./creative-pack-01-generator";
 import type { FilmtoneIosPresetName } from "./ios-preset-overrides";
 import type { Phase0ParamKey } from "./phase0-schema";
 
 export const CREATIVE_PACK_01_ID = "creative-pack-01" as const;
-export const CREATIVE_PACK_01_BAKER_VERSION = "1.1.0-palermo-reference" as const;
+export const CREATIVE_PACK_01_BAKER_VERSION = "1.2.0-filmtone-urban-density" as const;
 export const CREATIVE_PACK_01_CUBE_SIZE = 65 as const;
-export const CREATIVE_PACK_01_PALERMO_REFERENCE_SOURCE =
-  "/Volumes/SamsungPortableSSDX5001/filmtone/Palermo_Powergrade & LUTs/Palermo Standalone LUTs/DJI_DLOG-M-Palermo.cube" as const;
-export const CREATIVE_PACK_01_PALERMO_GREEN_DENSITY_SOURCE =
-  "/Volumes/SamsungPortableSSDX5001/filmtone/Palermo_Powergrade & LUTs/Palermo Standalone LUTs/LUT + Extras/Palermo + Colour Density + Green Density.cube" as const;
 
 export interface CreativePackLook {
   readonly slug: string;
@@ -52,8 +52,7 @@ export interface CreativePackLook {
   readonly colorParams: BakeColorParams;
   readonly paramOverrides: Partial<Record<Phase0ParamKey, number>>;
   readonly strength: number;
-  readonly sourceCubePath?: string;
-  readonly sourceCubeTransform?: "cold-green-density-v1";
+  readonly sourceCubeTransform?: CreativePack01SourceTransform;
 }
 
 /**
@@ -75,20 +74,20 @@ export function buildLookParamOverrides(
 }
 
 /**
- * Pack 01 Look catalog. Current CD direction is a small set of strong
- * Palermo-derived baselines, not a weak multi-look sampler. Entries bundle
- * Palermo 65³ cubes directly so iteration starts from measured LUT behavior
- * instead of small param nudges.
+ * Pack 01 Look catalog. Current CD direction is one flagship urban-density
+ * Look. External reference cubes are build-only inputs; the exported product
+ * catalog carries the generated Filmtone recipe and never direct reference
+ * cube paths.
  *
- * `colorParams` remains identity because source-cube entries do not bake from
- * Filmtone's 12-op baker. Runtime `paramOverrides` still neutralizes the host
+ * `colorParams` remains identity because the color expression is carried by
+ * the generated 65³ cube. Runtime `paramOverrides` still neutralizes the host
  * color ops so the bundled cube is the sole color expression, while Filmtone's
- * optical controls stay available for the next tuning pass.
+ * optical controls carry the product signature.
  */
 export const CREATIVE_PACK_01_LOOKS: readonly CreativePackLook[] = [
   {
-    slug: "filmtone-creative-pack-01-palermo-reference",
-    englishName: "Palermo Reference",
+    slug: "filmtone-creative-pack-01-urban-density",
+    englishName: "Filmtone Urban Density",
     canonicalUUID: "FB1A0001-0000-4000-8000-000000000006",
     basePreset: "reset",
     colorParams: {
@@ -106,58 +105,21 @@ export const CREATIVE_PACK_01_LOOKS: readonly CreativePackLook[] = [
       yellow: 0,
     },
     paramOverrides: buildLookParamOverrides({
-      // First optical baseline: enough Filmtone lens behavior to judge the
-      // product direction, without hiding the Palermo color transform.
-      bloomThreshold: 0.62,
-      bloomStrength: 0.22,
+      // Flagship optical baseline: restrained grain, visible lens softness,
+      // and enough glow to make the urban-density cube feel like Filmtone.
+      bloomThreshold: 0.64,
+      bloomStrength: 0.23,
       bloomRadius: 0.58,
-      halationIntensity: 0.08,
-      halationHue: 24,
-      diffusion: 0.045,
-      lensSoftness: 0.08,
-      grainIntensity: 0.006,
-      grainSize: 0.16,
-      vignette: 0.06,
-    }),
-    strength: 1.0,
-    sourceCubePath: CREATIVE_PACK_01_PALERMO_REFERENCE_SOURCE,
-  },
-  {
-    slug: "filmtone-creative-pack-01-palermo-green-density",
-    englishName: "Palermo Green Density",
-    canonicalUUID: "FB1A0001-0000-4000-8000-000000000007",
-    basePreset: "reset",
-    colorParams: {
-      exposure: 0,
-      contrast: 1,
-      saturation: 1,
-      temperature: 0,
-      tint: 0,
-      fade: 0,
-      compressionAmount: 0,
-      compressionRange: 0.5,
-      printContrast: 0,
-      cyan: 0,
-      magenta: 0,
-      yellow: 0,
-    },
-    paramOverrides: buildLookParamOverrides({
-      // Green-density companion baseline: keep warmth from optics restrained so
-      // the source cube can carry the cool cyan-green density.
-      bloomThreshold: 0.66,
-      bloomStrength: 0.18,
-      bloomRadius: 0.54,
-      halationIntensity: 0.045,
-      halationHue: 18,
-      diffusion: 0.07,
-      lensSoftness: 0.10,
-      grainIntensity: 0.005,
+      halationIntensity: 0.065,
+      halationHue: 22,
+      diffusion: 0.065,
+      lensSoftness: 0.1,
+      grainIntensity: 0.0045,
       grainSize: 0.14,
-      vignette: 0.07,
+      vignette: 0.065,
     }),
     strength: 1.0,
-    sourceCubePath: CREATIVE_PACK_01_PALERMO_GREEN_DENSITY_SOURCE,
-    sourceCubeTransform: "cold-green-density-v1",
+    sourceCubeTransform: CREATIVE_PACK_01_URBAN_DENSITY_TRANSFORM,
   },
 ] as const;
 

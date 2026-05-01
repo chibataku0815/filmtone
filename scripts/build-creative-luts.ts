@@ -28,6 +28,7 @@ import {
   CREATIVE_PACK_01_LOOKS,
   type CreativePackLook,
 } from "../packages/film-lab-core/src/creative-pack-01";
+import { applyCreativePack01SourceTransform } from "../packages/film-lab-core/src/creative-pack-01-generator";
 import {
   diagonalMaxDelta,
   makeCreativeCube,
@@ -48,6 +49,11 @@ const FIXTURES_DIR = resolve(
 );
 const MANIFEST_PATH = resolve(FIXTURES_DIR, "manifest.json");
 const MANIFEST_SCHEMA_VERSION = 1 as const;
+const CREATIVE_PACK_01_URBAN_DENSITY_ANALYSIS_SOURCE =
+  "/Volumes/SamsungPortableSSDX5001/filmtone/Palermo_Powergrade & LUTs/Palermo Standalone LUTs/LUT + Extras/Palermo + Colour Density + Green Density.cube" as const;
+const CREATIVE_PACK_01_SOURCE_CUBE_BY_SLUG: Record<string, string> = {
+  "filmtone-creative-pack-01-urban-density": CREATIVE_PACK_01_URBAN_DENSITY_ANALYSIS_SOURCE,
+};
 
 interface ManifestLookEntry {
   slug: string;
@@ -128,60 +134,6 @@ function parseCreativeCubeText(text: string, sourceLabel: string): CreativeCube 
   return { size, data: Float32Array.from(values) };
 }
 
-function clamp01(x: number): number {
-  if (x < 0) return 0;
-  if (x > 1) return 1;
-  return x;
-}
-
-function smoothstep(edge0: number, edge1: number, x: number): number {
-  const t = clamp01((x - edge0) / (edge1 - edge0));
-  return t * t * (3 - 2 * t);
-}
-
-function luma(r: number, g: number, b: number): number {
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-
-function applyColdGreenDensityTransform(cube: CreativeCube): CreativeCube {
-  const data = new Float32Array(cube.data.length);
-
-  for (let i = 0; i < cube.data.length; i += 3) {
-    const r = cube.data[i + 0];
-    const g = cube.data[i + 1];
-    const b = cube.data[i + 2];
-    const lum = luma(r, g, b);
-    const maxChannel = Math.max(r, g, b);
-    const minChannel = Math.min(r, g, b);
-    const chroma = maxChannel - minChannel;
-
-    // The raw Green Density cube mostly differs on chromatic colors; neutral
-    // urban grays stay almost identical to Palermo Reference. This deliberate
-    // cold pass makes gray concrete, asphalt, and white signage visibly diverge
-    // while protecting saturated reds from turning muddy.
-    const neutralWeight = 1 - smoothstep(0.04, 0.22, chroma);
-    const highlightProtect = 1 - smoothstep(0.72, 0.98, lum);
-    const shadowPresence = 0.65 + 0.35 * smoothstep(0.02, 0.18, lum);
-    const cold = 0.58 * highlightProtect * shadowPresence * (0.35 + 0.65 * neutralWeight);
-    const shadowBias = 1 - lum;
-
-    data[i + 0] = clamp01(r * (1 - 0.23 * cold) - 0.010 * cold * shadowBias);
-    data[i + 1] = clamp01(g * (1 + 0.035 * cold) + 0.010 * cold * shadowBias);
-    data[i + 2] = clamp01(b * (1 + 0.34 * cold) + 0.030 * cold * shadowBias);
-  }
-
-  return { size: cube.size, data };
-}
-
-function applySourceCubeTransform(cube: CreativeCube, transformName: string): CreativeCube {
-  switch (transformName) {
-    case "cold-green-density-v1":
-      return applyColdGreenDensityTransform(cube);
-    default:
-      throw new Error(`[creative-luts] unknown source cube transform: ${transformName}`);
-  }
-}
-
 function gitHeadCommit(): string | null {
   try {
     const headPath = resolve(REPO_ROOT, ".git/HEAD");
@@ -208,22 +160,22 @@ function bakeLook(look: CreativePackLook, mode: Mode): {
   sourceCubePath?: string;
   sourceCubeTransform?: string;
 } {
-  if (mode === "regenerate" && look.sourceCubePath) {
-    const bytes = readFileSync(look.sourceCubePath);
+  const sourceCubePath = CREATIVE_PACK_01_SOURCE_CUBE_BY_SLUG[look.slug];
+  if (mode === "regenerate" && sourceCubePath) {
+    const bytes = readFileSync(sourceCubePath);
     const text = bytes.toString("utf8");
-    const sourceCube = parseCreativeCubeText(text, look.sourceCubePath);
+    const sourceCube = parseCreativeCubeText(text, sourceCubePath);
     const cube = look.sourceCubeTransform
-      ? applySourceCubeTransform(sourceCube, look.sourceCubeTransform)
+      ? applyCreativePack01SourceTransform(sourceCube, look.sourceCubeTransform)
       : sourceCube;
     if (look.sourceCubeTransform) {
       const transformedText = serializeCreativeCubeToText(cube, {
-        title: `Filmtone ${look.englishName}`,
+        title: cubeTitle(look),
         comments: [
           `pack=${CREATIVE_PACK_01_ID}`,
           `slug=${look.slug}`,
           `bakerVersion=${CREATIVE_PACK_01_BAKER_VERSION}`,
-          `sourceCube=${look.sourceCubePath}`,
-          `sourceCubeTransform=${look.sourceCubeTransform}`,
+          `generator=${look.sourceCubeTransform}`,
         ],
       });
       const transformedBytes = new TextEncoder().encode(transformedText);
@@ -235,7 +187,7 @@ function bakeLook(look: CreativePackLook, mode: Mode): {
         paramsUsed: look.colorParams,
         bakeMode: "real",
         cubeSize: cube.size,
-        sourceCubePath: look.sourceCubePath,
+        sourceCubePath,
         sourceCubeTransform: look.sourceCubeTransform,
       };
     }
@@ -248,7 +200,7 @@ function bakeLook(look: CreativePackLook, mode: Mode): {
       paramsUsed: look.colorParams,
       bakeMode: "real",
       cubeSize: cube.size,
-      sourceCubePath: look.sourceCubePath,
+      sourceCubePath,
       sourceCubeTransform: look.sourceCubeTransform,
     };
   }
@@ -262,7 +214,7 @@ function bakeLook(look: CreativePackLook, mode: Mode): {
     size: CREATIVE_PACK_01_CUBE_SIZE,
   });
   const text = serializeCreativeCubeToText(cube, {
-    title: `Filmtone ${look.englishName}`,
+    title: cubeTitle(look),
     comments: [
       `pack=${CREATIVE_PACK_01_ID}`,
       `slug=${look.slug}`,
@@ -288,6 +240,12 @@ function ensureDir(path: string): void {
 
 function relPath(absPath: string): string {
   return relative(REPO_ROOT, absPath);
+}
+
+function cubeTitle(look: CreativePackLook): string {
+  return look.englishName.startsWith("Filmtone ")
+    ? look.englishName
+    : `Filmtone ${look.englishName}`;
 }
 
 function removeStalePackCubes(): void {
