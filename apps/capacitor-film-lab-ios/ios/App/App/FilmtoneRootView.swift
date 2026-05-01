@@ -12,6 +12,7 @@ struct FilmtoneRootView: View {
     @State private var savedLookSheet: SavedLookSheetMode?
     @State private var lutDeleteConfirmation: LutLibraryEntry?
     @State private var lookDeleteConfirmation: SavedLookEntry?
+    @State private var fullscreenLutEditorPresented = false
 
     var body: some View {
         ZStack {
@@ -156,6 +157,11 @@ struct FilmtoneRootView: View {
                 .accessibilityIdentifier("filmtone.library.look.delete.confirm")
             }
             Button(store.strings.savedLookSheetCancel, role: .cancel) {}
+        }
+        .fullScreenCover(isPresented: $fullscreenLutEditorPresented) {
+            FilmtoneFullscreenLutEditor(store: store) {
+                fullscreenLutEditorPresented = false
+            }
         }
     }
 
@@ -320,7 +326,10 @@ struct FilmtoneRootView: View {
                 isRendering: store.preview.isRendering,
                 metaLabel: store.previewMetaLabel,
                 isStillComparing: store.isCompareHeld,
-                onStillCompareHeld: store.setCompareHeld
+                onStillCompareHeld: store.setCompareHeld,
+                onOpenFullscreen: {
+                    fullscreenLutEditorPresented = true
+                }
             ) { mode in
                 Task { await store.setVideoCompareMode(mode) }
             }

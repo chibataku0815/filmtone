@@ -221,16 +221,30 @@ struct FilmtoneStrings {
     let savedLookSheetRename: String
     let savedLookSheetCancel: String
 
-    // MARK: - Built-in Filmtone Looks (Item 2, v1.3 candidate)
-    let builtInLookFilmtoneSignature: String
-    let builtInLookCleanBase: String
-    let builtInLookAmberGlow: String
-    let builtInLookSoftBlue: String
-    let builtInLookNightSoft: String
-    /// Caption-style badge that marks a chip as a built-in catalog
-    /// entry. Same text in ja and en since "FILMTONE" is the brand
-    /// glyph rather than a translatable label.
-    let builtInBadgeLabel: String
+    // MARK: - Fullscreen LUT editor (v1.x UX fix)
+    //
+    // Added when the inline `cameraProfileCard` LUT picker (bottom of the
+    // ScrollView) was supplemented with a hero-overlay entry into a
+    // fullscreen Look browser. These strings are SwiftUI-native — the web
+    // shell `messages/*.json` does not surface this view.
+    let fullscreenTitle: String
+    let fullscreenEntryAccessibility: String
+    let fullscreenCloseAccessibility: String
+    let fullscreenToggleControlsAccessibility: String
+    let fullscreenLookIntensityLabel: String
+    /// Fullscreen-only label for the global preset strength slider.
+    /// Disambiguates from `fullscreenLookIntensityLabel` so the two sliders
+    /// can sit side-by-side without colliding (the global `strengthLabel`
+    /// "強さ" reads too similarly to "Look 強度" in Japanese — the
+    /// fullscreen variant uses "プリセット強度" / "Preset Strength").
+    let fullscreenStrengthLabel: String
+    let fullscreenNoLookLabel: String
+
+    // MARK: - Built-in Filmtone Looks
+    //
+    // Current internal development catalog exposes focused Creative LUT baselines.
+    let builtInLookCreativePack01PalermoReference: String
+    let builtInLookCreativePack01PalermoGreenDensity: String
 }
 
 extension FilmtoneStrings {
@@ -239,11 +253,10 @@ extension FilmtoneStrings {
     /// fall back to `entry.name` directly.
     func builtInLookName(for slug: String) -> String? {
         switch slug {
-        case "filmtone-signature": return builtInLookFilmtoneSignature
-        case "clean-base":         return builtInLookCleanBase
-        case "amber-glow":         return builtInLookAmberGlow
-        case "soft-blue":          return builtInLookSoftBlue
-        case "night-soft":         return builtInLookNightSoft
+        case "filmtone-creative-pack-01-palermo-reference":
+            return builtInLookCreativePack01PalermoReference
+        case "filmtone-creative-pack-01-palermo-green-density":
+            return builtInLookCreativePack01PalermoGreenDensity
         default:                   return nil
         }
     }
@@ -1189,7 +1202,7 @@ extension FilmtoneStrings {
         )
         lookLutAmountLabel = filmtoneLocalized(
             "filmtone.look.lut_amount",
-            defaultValue: "Look LUT Amount",
+            defaultValue: prefersJapanese ? "ルックLUTの量" : "Look LUT Amount",
             comment: "Label for the creative LUT amount slider."
         )
         clearLut = filmtoneLocalized(
@@ -1492,38 +1505,52 @@ extension FilmtoneStrings {
             defaultValue: prefersJapanese ? "キャンセル" : "Cancel",
             comment: "Toolbar action that dismisses the Saved-Look sheet without saving."
         )
-        // v1.3 Item 2: built-in Filmtone Look catalog (5 looks pinned at
-        // the head of the chip strip). CD-signed-off names; refining
-        // Night Soft's params on real low-light footage scheduled.
-        builtInLookFilmtoneSignature = filmtoneLocalized(
-            "filmtone.builtin_look.filmtone_signature",
-            defaultValue: prefersJapanese ? "フィルムトーン" : "Filmtone Signature",
-            comment: "Built-in Look name: the canonical Filmtone tone (iphone preset baseline)."
+        // Built-in Filmtone Look catalog. Weak sampler entries are disabled
+        // while the base Creative LUT is rebuilt from the Palermo reference.
+        builtInLookCreativePack01PalermoReference = filmtoneLocalized(
+            "filmtone.builtin_look.creative_pack_01.palermo_reference",
+            defaultValue: prefersJapanese ? "Palermo Reference" : "Palermo Reference",
+            comment: "Built-in Look name: internal Pack 01 reference LUT based on the Palermo cube."
         )
-        builtInLookCleanBase = filmtoneLocalized(
-            "filmtone.builtin_look.clean_base",
-            defaultValue: prefersJapanese ? "クリーンベース" : "Clean Base",
-            comment: "Built-in Look name: minimal-tinting baseline (reset preset)."
+        builtInLookCreativePack01PalermoGreenDensity = filmtoneLocalized(
+            "filmtone.builtin_look.creative_pack_01.palermo_green_density",
+            defaultValue: prefersJapanese ? "Palermo Green Density" : "Palermo Green Density",
+            comment: "Built-in Look name: internal Pack 01 reference LUT based on the Palermo Green Density cube."
         )
-        builtInLookAmberGlow = filmtoneLocalized(
-            "filmtone.builtin_look.amber_glow",
-            defaultValue: prefersJapanese ? "アンバーグロー" : "Amber Glow",
-            comment: "Built-in Look name: warm afternoon film-print mood (amberGlow preset)."
+        fullscreenTitle = filmtoneLocalized(
+            "filmtone.fullscreen.title",
+            defaultValue: prefersJapanese ? "LUT ブラウザ" : "LUT Browser",
+            comment: "Title chip shown at the top of the fullscreen LUT editor."
         )
-        builtInLookSoftBlue = filmtoneLocalized(
-            "filmtone.builtin_look.soft_blue",
-            defaultValue: prefersJapanese ? "ソフトブルー" : "Soft Blue",
-            comment: "Built-in Look name: airy desaturated cool tone (softBlue preset)."
+        fullscreenEntryAccessibility = filmtoneLocalized(
+            "filmtone.fullscreen.entry.a11y",
+            defaultValue: prefersJapanese ? "全画面で Look を比較" : "Compare looks fullscreen",
+            comment: "Accessibility label for the hero-overlay button that opens the fullscreen LUT editor."
         )
-        builtInLookNightSoft = filmtoneLocalized(
-            "filmtone.builtin_look.night_soft",
-            defaultValue: prefersJapanese ? "ナイトソフト" : "Night Soft",
-            comment: "Built-in Look name: low-light glow (softBlue + halation/bloom boost)."
+        fullscreenCloseAccessibility = filmtoneLocalized(
+            "filmtone.fullscreen.close.a11y",
+            defaultValue: prefersJapanese ? "全画面エディタを閉じる" : "Close fullscreen editor",
+            comment: "Accessibility label for the close (×) button in the fullscreen LUT editor."
         )
-        builtInBadgeLabel = filmtoneLocalized(
-            "filmtone.builtin_look.badge",
-            defaultValue: "FILMTONE",
-            comment: "Caption-style badge shown on built-in Filmtone Look chips. Same in ja/en."
+        fullscreenToggleControlsAccessibility = filmtoneLocalized(
+            "filmtone.fullscreen.toggle_controls.a11y",
+            defaultValue: prefersJapanese ? "コントロールを表示・非表示" : "Toggle controls",
+            comment: "Accessibility label for the eye / eye.slash toggle that hides controls in the fullscreen editor."
+        )
+        fullscreenLookIntensityLabel = filmtoneLocalized(
+            "filmtone.fullscreen.look_intensity",
+            defaultValue: prefersJapanese ? "Look ミックス" : "Look Intensity",
+            comment: "Always-visible Look intensity slider label inside the fullscreen LUT editor. Japanese intentionally avoids 強 to disambiguate from the Strength slider that sits directly below."
+        )
+        fullscreenStrengthLabel = filmtoneLocalized(
+            "filmtone.fullscreen.strength",
+            defaultValue: prefersJapanese ? "プリセット強度" : "Preset Strength",
+            comment: "Fullscreen-only label for the global preset strength slider. Adds the プリセット / Preset prefix to disambiguate from the Look Mix / Look Intensity slider above."
+        )
+        fullscreenNoLookLabel = filmtoneLocalized(
+            "filmtone.fullscreen.no_look",
+            defaultValue: prefersJapanese ? "なし" : "None",
+            comment: "Carousel chip label that clears the active creative LUT (Filmtone-only)."
         )
     }
 

@@ -17,9 +17,12 @@ struct FilmtonePreviewView: View {
     let metaLabel: String?
     let isStillComparing: Bool
     let onStillCompareHeld: (Bool) -> Void
+    /// Open the parent-owned fullscreen LUT editor. Replaces the local
+    /// `fullScreenCover` (which was video-only via `videoChrome`) so the
+    /// expand affordance is available for stills as well — see
+    /// `FilmtoneFullscreenLutEditor`.
+    let onOpenFullscreen: () -> Void
     let onVideoCompareModeSelected: (FilmtoneVideoCompareMode) -> Void
-
-    @State private var fullscreenPresented = false
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -41,7 +44,12 @@ struct FilmtonePreviewView: View {
             if let videoPreview {
                 videoChrome(videoPreview)
                     .padding(16)
-            } else if isStillComparing {
+            } else if source != nil {
+                stillChrome
+                    .padding(16)
+            }
+
+            if isStillComparing {
                 Text(originalLabel)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.black)
@@ -105,17 +113,22 @@ struct FilmtonePreviewView: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: filmtonePreviewCornerRadius, style: .continuous))
         .shadow(color: Color.black.opacity(0.24), radius: 24, x: 0, y: 18)
-        .fullScreenCover(isPresented: $fullscreenPresented) {
-            FilmtoneFullscreenPreviewView(
-                videoPreview: videoPreview,
-                displayURI: displayURI,
-                emptyMessage: emptyMessage,
-                loadingMessage: loadingMessage,
-                isRendering: isRendering,
-                originalLabel: originalLabel,
-                gradedLabel: gradedLabel,
-                onVideoCompareModeSelected: onVideoCompareModeSelected
-            )
+    }
+
+    /// Static-image variant of the chrome. Only the "Full Screen" button
+    /// — stills don't have Graded / Original toggles (the long-press
+    /// gesture handles still compare). Right-aligned via HStack so it sits
+    /// in the same visual slot as the video Full Screen button.
+    private var stillChrome: some View {
+        HStack(spacing: 12) {
+            Spacer(minLength: 0)
+            Button {
+                onOpenFullscreen()
+            } label: {
+                Label(expandLabel, systemImage: "arrow.up.left.and.arrow.down.right")
+            }
+            .buttonStyle(FilmtonePreviewControlButtonStyle())
+            .accessibilityIdentifier("filmtone.preview.fullscreen.still")
         }
     }
 
@@ -192,102 +205,20 @@ struct FilmtonePreviewView: View {
             Spacer(minLength: 12)
 
             Button {
-                fullscreenPresented = true
+                onOpenFullscreen()
             } label: {
                 Label(expandLabel, systemImage: "arrow.up.left.and.arrow.down.right")
             }
             .buttonStyle(FilmtonePreviewControlButtonStyle())
+            .accessibilityIdentifier("filmtone.preview.fullscreen.video")
         }
     }
 }
 
-private struct FilmtoneFullscreenPreviewView: View {
-    let videoPreview: FilmtoneVideoPreviewState?
-    let displayURI: String?
-    let emptyMessage: String
-    let loadingMessage: String
-    let isRendering: Bool
-    let originalLabel: String
-    let gradedLabel: String
-    let onVideoCompareModeSelected: (FilmtoneVideoCompareMode) -> Void
-
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        ZStack(alignment: .top) {
-            Color.black.ignoresSafeArea()
-
-            Group {
-                if let videoPreview {
-                    FilmtonePreviewPlayerView(player: videoPreview.player)
-                } else if let displayURI, let image = filmtonePreviewImage(from: displayURI) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    Text(emptyMessage)
-                        .font(.title3.weight(.medium))
-                        .foregroundStyle(.white.opacity(0.82))
-                        .padding(32)
-                }
-            }
-            .ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                if let videoPreview {
-                    HStack {
-                        Spacer(minLength: 0)
-                        HStack(spacing: 6) {
-                            FilmtonePreviewToggleButton(
-                                label: gradedLabel,
-                                isActive: videoPreview.compareMode == .graded
-                            ) {
-                                onVideoCompareModeSelected(.graded)
-                            }
-
-                            FilmtonePreviewToggleButton(
-                                label: originalLabel,
-                                isActive: videoPreview.compareMode == .original
-                            ) {
-                                onVideoCompareModeSelected(.original)
-                            }
-                        }
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.top, 92)
-                    .padding(.horizontal, 20)
-                }
-                Spacer()
-            }
-
-            if isRendering {
-                VStack {
-                    Spacer()
-                    HStack {
-                        HStack(spacing: 10) {
-                            ProgressView()
-                                .progressViewStyle(.circular)
-                                .tint(Color.filmtoneAmber)
-                            Text(loadingMessage)
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(.white.opacity(0.8))
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(Color.black.opacity(0.28))
-                        )
-
-                        Spacer()
-                    }
-                    .padding(20)
-                }
-            }
-        }
-    }
-}
+// FilmtoneFullscreenPreviewView (the previous video-only fullscreen) was
+// removed when the surface migrated to `FilmtoneFullscreenLutEditor`
+// (parent-owned via `onOpenFullscreen`). The Full Screen button is now
+// available for both still + video and routes to the LUT editor.
 
 private func filmtonePreviewImage(from uri: String) -> UIImage? {
     guard let url = URL(string: uri), url.isFileURL else {
