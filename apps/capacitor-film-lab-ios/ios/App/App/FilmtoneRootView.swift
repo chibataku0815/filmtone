@@ -1187,35 +1187,6 @@ private struct FilmtoneTopChrome: View {
     let onAction: () -> Void
 
     var body: some View {
-        Group {
-            if #available(iOS 26.0, *) {
-                FilmtoneLiquidGlassTopChrome(
-                    title: title,
-                    actionLabel: actionLabel,
-                    isActionDisabled: isActionDisabled,
-                    onAction: onAction
-                )
-            } else {
-                FilmtoneFallbackTopChrome(
-                    title: title,
-                    actionLabel: actionLabel,
-                    isActionDisabled: isActionDisabled,
-                    onAction: onAction
-                )
-            }
-        }
-        .accessibilityIdentifier("filmtone.topChrome")
-    }
-}
-
-@available(iOS 26.0, *)
-private struct FilmtoneLiquidGlassTopChrome: View {
-    let title: String
-    let actionLabel: String
-    let isActionDisabled: Bool
-    let onAction: () -> Void
-
-    var body: some View {
         GlassEffectContainer(spacing: 10) {
             HStack(spacing: 10) {
                 FilmtoneTopChromeTitle(title: title)
@@ -1241,43 +1212,7 @@ private struct FilmtoneLiquidGlassTopChrome: View {
             .padding(.top, 8)
             .padding(.bottom, 10)
         }
-    }
-}
-
-private struct FilmtoneFallbackTopChrome: View {
-    let title: String
-    let actionLabel: String
-    let isActionDisabled: Bool
-    let onAction: () -> Void
-
-    var body: some View {
-        HStack(spacing: 10) {
-            FilmtoneTopChromeTitle(title: title)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 11)
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(Color.black.opacity(0.22))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(Color.white.opacity(0.12), lineWidth: 1)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .shadow(color: Color.black.opacity(0.28), radius: 18, x: 0, y: 10)
-
-            Button(actionLabel, action: onAction)
-                .buttonStyle(FilmtoneTopBarActionStyle())
-                .disabled(isActionDisabled)
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .padding(.bottom, 10)
+        .accessibilityIdentifier("filmtone.topChrome")
     }
 }
 
