@@ -501,4 +501,75 @@ describe("export metadata session", () => {
 
     expect(inferred).toBe(FILMTONE_DEFAULT_BASE_PRESET);
   });
+
+  it("round-trips an applied built-in source profile under input.sourceProfile", () => {
+    const cinematic = batchGradeStateFromPreset("cinematic");
+    const session = buildFilmtoneExportSession({
+      exportedAtIso: "2026-05-02T12:34:56.000Z",
+      appVersion: "1.4.0",
+      job: "images",
+      inputDir: "/Users/tester/input",
+      videoInputPath: null,
+      outputDir: "/Users/tester/output",
+      imageFormat: "jpeg",
+      outputFilenameSuffix: "-graded",
+      outputFileName: null,
+      batchPresetChoice: "cinematic",
+      lookSource: "editSync",
+      gradeParams: cinematic.params,
+      depthTrack: null,
+      lutRefs: {
+        lut1: {
+          enabled: true,
+          intensity: 1,
+          displayName: "S-Log3",
+          absolutePath: null,
+        },
+        lut2: createEmptyMetadataLutRefs().lut2,
+      },
+      sourceProfile: {
+        selectionKind: "built-in",
+        catalogId: "built-in:source-profile.sony-slog3",
+        curve: "sony-slog3",
+        impl: "synthesized",
+        displayName: "S-Log3",
+        appliedAtIso: "2026-05-02T12:34:55.000Z",
+      },
+    });
+
+    const parsed = parseFilmtoneExportSessionV1(
+      JSON.parse(exportFilmtoneExportSessionJsonText(session)) as unknown,
+    );
+
+    expect(parsed?.input.sourceProfile).toEqual({
+      selectionKind: "built-in",
+      catalogId: "built-in:source-profile.sony-slog3",
+      curve: "sony-slog3",
+      impl: "synthesized",
+      displayName: "S-Log3",
+      appliedAtIso: "2026-05-02T12:34:55.000Z",
+    });
+  });
+
+  it("omits input.sourceProfile when no selection was made (back-compat)", () => {
+    const cinematic = batchGradeStateFromPreset("cinematic");
+    const session = buildFilmtoneExportSession({
+      exportedAtIso: "2026-05-02T12:34:56.000Z",
+      appVersion: "1.4.0",
+      job: "images",
+      inputDir: "/Users/tester/input",
+      videoInputPath: null,
+      outputDir: "/Users/tester/output",
+      imageFormat: "jpeg",
+      outputFilenameSuffix: "-graded",
+      outputFileName: null,
+      batchPresetChoice: "cinematic",
+      lookSource: "preset",
+      gradeParams: cinematic.params,
+      depthTrack: null,
+      lutRefs: createEmptyMetadataLutRefs(),
+    });
+
+    expect(session.input.sourceProfile).toBeUndefined();
+  });
 });

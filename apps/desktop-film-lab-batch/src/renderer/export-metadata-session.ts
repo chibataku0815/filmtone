@@ -14,6 +14,8 @@ import {
   type OpticalRecipeId,
   type PresetName,
   type Params,
+  type SourceProfileCurve,
+  type SourceProfileImplKind,
 } from "film-lab-core";
 import type { BatchFormat } from "./batch-pipeline";
 import type { BatchDepthTrack } from "./depth-track";
@@ -59,6 +61,17 @@ export type AppliedOpticalFilterProfileMetadata = {
   id: OpticalFilterProfileId | string;
   family: OpticalFilterFamily;
   density: OpticalFilterDensity;
+  displayName: string;
+  appliedAtIso: string;
+};
+
+export type SourceProfileSelectionKind = "built-in" | "custom" | "none";
+
+export type AppliedSourceProfileMetadata = {
+  selectionKind: SourceProfileSelectionKind;
+  catalogId: string | null;
+  curve: SourceProfileCurve | null;
+  impl: SourceProfileImplKind | null;
   displayName: string;
   appliedAtIso: string;
 };
@@ -235,6 +248,33 @@ const opticalFilterProfileMetadataSchema = z.object({
   appliedAtIso: z.string().min(1),
 });
 
+const sourceProfileCurveSchema = z.enum([
+  "apple-log",
+  "apple-log-2",
+  "dji-dlog",
+  "canon-clog",
+  "panasonic-vlog",
+  "sony-slog3",
+]);
+const sourceProfileImplKindSchema = z.enum([
+  "nil-profile",
+  "native-policy",
+  "synthesized",
+]);
+const sourceProfileSelectionKindSchema = z.enum([
+  "built-in",
+  "custom",
+  "none",
+]);
+const appliedSourceProfileMetadataSchema = z.object({
+  selectionKind: sourceProfileSelectionKindSchema,
+  catalogId: z.string().min(1).nullable(),
+  curve: sourceProfileCurveSchema.nullable(),
+  impl: sourceProfileImplKindSchema.nullable(),
+  displayName: z.string().min(1),
+  appliedAtIso: z.string().min(1),
+});
+
 const filmtoneExportSessionSchema = z.object({
   kind: z.literal("filmtone-export-session"),
   version: z.literal(1),
@@ -246,6 +286,7 @@ const filmtoneExportSessionSchema = z.object({
     videoInputPath: z.string().min(1).nullable(),
     cameraOptics: cameraOpticsSchema.optional(),
     sourceVideoMetadata: sourceVideoMetadataSchema.optional(),
+    sourceProfile: appliedSourceProfileMetadataSchema.optional(),
   }),
   output: z.object({
     outputDir: z.string().min(1),
@@ -423,6 +464,7 @@ export function buildFilmtoneExportSession(params: {
   lutRefs: MetadataLutRefs;
   opticalRecommendation?: AppliedOpticalRecommendationMetadata | null;
   opticalFilterProfile?: AppliedOpticalFilterProfileMetadata | null;
+  sourceProfile?: AppliedSourceProfileMetadata | null;
   cameraOptics?: CameraOptics | null;
   sourceVideoMetadata?: SourceVideoMetadata | null;
 }): FilmtoneExportSessionV1 {
@@ -443,6 +485,7 @@ export function buildFilmtoneExportSession(params: {
       ...(params.job === "video" && params.sourceVideoMetadata
         ? { sourceVideoMetadata: params.sourceVideoMetadata }
         : {}),
+      ...(params.sourceProfile ? { sourceProfile: params.sourceProfile } : {}),
     },
     output: {
       outputDir: params.outputDir,

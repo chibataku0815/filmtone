@@ -423,7 +423,10 @@
       "creativeMix": "Mix",
       "creativeMixDisabledHint": "Load a .cube file first",
       "logMix": "Conversion mix",
-      "logMixDisabledHint": "Load a log conversion .cube first"
+      "logMixDisabledHint": "Load a log conversion .cube first",
+      "cameraProfileHelp": "Choose a camera profile before the look.",
+      "cameraProfileNone": "None",
+      "cameraProfileCustom": "Custom .cube"
     },
     "metadata": {
       "title": "Filmtone",

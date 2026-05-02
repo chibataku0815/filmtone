@@ -2975,6 +2975,313 @@ var CREATIVE_PACK_01_LOOKS = [
 function findCreativePack01Look(slug) {
   return CREATIVE_PACK_01_LOOKS.find((look) => look.slug === slug);
 }
+
+// src/source-profile-conversion.ts
+var SOURCE_PROFILE_CATALOG = [
+  {
+    id: "built-in:source-profile.rec709",
+    displayName: "Rec.709",
+    curve: null,
+    impl: "nil-profile",
+    builtIn: true,
+    immutable: true
+  },
+  {
+    id: "built-in:source-profile.apple-log",
+    displayName: "Apple Log",
+    curve: "apple-log",
+    impl: "native-policy",
+    builtIn: true,
+    immutable: true
+  },
+  {
+    id: "built-in:source-profile.apple-log-2",
+    displayName: "Apple Log 2",
+    curve: "apple-log-2",
+    impl: "native-policy",
+    builtIn: true,
+    immutable: true
+  },
+  {
+    id: "built-in:source-profile.dji-dlog",
+    displayName: "DJI D-Log",
+    curve: "dji-dlog",
+    impl: "synthesized",
+    builtIn: true,
+    immutable: true
+  },
+  {
+    id: "built-in:source-profile.canon-clog",
+    displayName: "Canon C-Log",
+    curve: "canon-clog",
+    impl: "synthesized",
+    builtIn: true,
+    immutable: true
+  },
+  {
+    id: "built-in:source-profile.panasonic-vlog",
+    displayName: "V-Log",
+    curve: "panasonic-vlog",
+    impl: "synthesized",
+    builtIn: true,
+    immutable: true
+  },
+  {
+    id: "built-in:source-profile.sony-slog3",
+    displayName: "S-Log3",
+    curve: "sony-slog3",
+    impl: "synthesized",
+    builtIn: true,
+    immutable: true
+  }
+];
+var CATALOG_BY_ID = new Map(
+  SOURCE_PROFILE_CATALOG.map((entry) => [entry.id, entry])
+);
+function getSourceProfile(id) {
+  return CATALOG_BY_ID.get(id) ?? null;
+}
+var LUT_CACHE = /* @__PURE__ */ new Map();
+function buildSourceProfileLut(id, size = 33) {
+  const entry = getSourceProfile(id);
+  if (!entry) return null;
+  if (entry.impl === "nil-profile") return null;
+  if (size < 2 || !Number.isInteger(size)) {
+    throw new Error(`source-profile cube size must be an integer \u2265 2 (got ${size})`);
+  }
+  const cacheKey = `${entry.id}|${size}`;
+  const cached = LUT_CACHE.get(cacheKey);
+  if (cached) {
+    return {
+      id: entry.id,
+      displayName: entry.displayName,
+      data: cached,
+      size
+    };
+  }
+  const data = generateCubeForEntry(entry, size);
+  LUT_CACHE.set(cacheKey, data);
+  return {
+    id: entry.id,
+    displayName: entry.displayName,
+    data,
+    size
+  };
+}
+function generateCubeForEntry(entry, size) {
+  switch (entry.curve) {
+    case "apple-log":
+      return makeAppleLogToRec709Cube(size, false);
+    case "apple-log-2":
+      return makeAppleLogToRec709Cube(size, true);
+    case "dji-dlog":
+      return makeDlogToRec709Cube(size);
+    case "canon-clog":
+      return makeCanonClogToRec709Cube(size);
+    case "panasonic-vlog":
+      return makeVlogToRec709Cube(size);
+    case "sony-slog3":
+      return makeSlog3ToRec709Cube(size);
+    case null:
+      throw new Error(`source-profile ${entry.id} has no curve; cannot build a cube`);
+    default: {
+      const exhaustive = entry.curve;
+      throw new Error(`Unhandled source-profile curve: ${String(exhaustive)}`);
+    }
+  }
+}
+function clamp014(v) {
+  return Math.min(Math.max(v, 0), 1);
+}
+function filmtoneSdrShoulder(linear) {
+  const exposed = Math.max(0, linear * 1.18);
+  const shoulder = exposed / (1 + Math.max(exposed - 0.18, 0) * 0.42);
+  return clamp014(shoulder);
+}
+function rec709Encode(linear) {
+  const value = clamp014(linear);
+  if (value < 0.018) {
+    return value * 4.5;
+  }
+  return 1.099 * Math.pow(value, 0.45) - 0.099;
+}
+function appleLogDecode(encoded) {
+  const r0 = -0.05641088;
+  const rt = 0.01;
+  const sigma = 47.28711236;
+  const beta = 964052e-8;
+  const gamma = 0.08550479;
+  const delta = 0.69336945;
+  const pt = sigma * Math.pow(rt - r0, 2);
+  if (encoded >= pt) {
+    return Math.pow(2, (encoded - delta) / gamma) - beta;
+  }
+  if (encoded >= 0) {
+    return Math.sqrt(Math.max(encoded / sigma, 0)) + r0;
+  }
+  return r0;
+}
+function appleLogPixelToRec709(red, green, blue, rec2020GamutMap) {
+  let lr = appleLogDecode(red);
+  let lg = appleLogDecode(green);
+  let lb = appleLogDecode(blue);
+  if (rec2020GamutMap) {
+    const mapped = rec2020ToRec709(lr, lg, lb);
+    lr = mapped[0];
+    lg = mapped[1];
+    lb = mapped[2];
+  }
+  return [
+    rec709Encode(filmtoneSdrShoulder(lr)),
+    rec709Encode(filmtoneSdrShoulder(lg)),
+    rec709Encode(filmtoneSdrShoulder(lb))
+  ];
+}
+function dlogDecode(encoded) {
+  if (encoded <= 0.14) {
+    return (encoded - 0.0929) / 6.025;
+  }
+  return (Math.pow(10, 3.89616 * encoded - 2.27752) - 0.0108) / 0.9892;
+}
+function dgamutToRec709(red, green, blue) {
+  return [
+    1.6746 * red - 0.5797 * green - 0.0949 * blue,
+    -0.0981 * red + 1.334 * green - 0.2359 * blue,
+    -0.041 * red - 0.243 * green + 1.284 * blue
+  ];
+}
+function dlogPixelToRec709(red, green, blue) {
+  const lr = dlogDecode(red);
+  const lg = dlogDecode(green);
+  const lb = dlogDecode(blue);
+  const m = dgamutToRec709(lr, lg, lb);
+  return [
+    rec709Encode(filmtoneSdrShoulder(m[0])),
+    rec709Encode(filmtoneSdrShoulder(m[1])),
+    rec709Encode(filmtoneSdrShoulder(m[2]))
+  ];
+}
+function canonLogDecode(encoded) {
+  const pivot = 0.0730597;
+  const scale = 0.529136;
+  const gain = 10.1596;
+  let linear;
+  if (encoded < pivot) {
+    linear = -(Math.pow(10, (pivot - encoded) / scale) - 1) / gain;
+  } else {
+    linear = (Math.pow(10, (encoded - pivot) / scale) - 1) / gain;
+  }
+  return linear * 0.9;
+}
+function canonClogPixelToRec709(red, green, blue) {
+  const lr = canonLogDecode(red);
+  const lg = canonLogDecode(green);
+  const lb = canonLogDecode(blue);
+  return [
+    rec709Encode(filmtoneSdrShoulder(lr)),
+    rec709Encode(filmtoneSdrShoulder(lg)),
+    rec709Encode(filmtoneSdrShoulder(lb))
+  ];
+}
+function vlogDecode(encoded) {
+  const cut2 = 0.181;
+  const b = 873e-5;
+  const c = 0.241514;
+  const d = 0.598206;
+  if (encoded < cut2) {
+    return (encoded - 0.125) / 5.6;
+  }
+  return Math.pow(10, (encoded - d) / c) - b;
+}
+function vgamutToRec709(red, green, blue) {
+  return [
+    1.7398 * red - 0.6727 * green - 0.0671 * blue,
+    -0.1956 * red + 1.2473 * green - 0.0518 * blue,
+    -0.0114 * red - 0.044 * green + 1.0554 * blue
+  ];
+}
+function vlogPixelToRec709(red, green, blue) {
+  const lr = vlogDecode(red);
+  const lg = vlogDecode(green);
+  const lb = vlogDecode(blue);
+  const m = vgamutToRec709(lr, lg, lb);
+  return [
+    rec709Encode(filmtoneSdrShoulder(m[0])),
+    rec709Encode(filmtoneSdrShoulder(m[1])),
+    rec709Encode(filmtoneSdrShoulder(m[2]))
+  ];
+}
+function slog3Decode(encoded) {
+  const threshold = 171.2102946929 / 1023;
+  if (encoded < threshold) {
+    return (encoded * 1023 - 95) * 0.01125 / (171.2102946929 - 95);
+  }
+  return Math.pow(10, (encoded * 1023 - 420) / 261.5) * (0.18 + 0.01) - 0.01;
+}
+function sgamut3CineToRec709(red, green, blue) {
+  return [
+    1.6269 * red - 0.5365 * green - 0.0904 * blue,
+    -0.1078 * red + 1.1628 * green - 0.055 * blue,
+    -0.014 * red - 0.024 * green + 1.0379 * blue
+  ];
+}
+function slog3PixelToRec709(red, green, blue) {
+  const lr = slog3Decode(red);
+  const lg = slog3Decode(green);
+  const lb = slog3Decode(blue);
+  const m = sgamut3CineToRec709(lr, lg, lb);
+  return [
+    rec709Encode(filmtoneSdrShoulder(m[0])),
+    rec709Encode(filmtoneSdrShoulder(m[1])),
+    rec709Encode(filmtoneSdrShoulder(m[2]))
+  ];
+}
+function rec2020ToRec709(red, green, blue) {
+  return [
+    1.6605 * red - 0.5876 * green - 0.0728 * blue,
+    -0.1246 * red + 1.1329 * green - 83e-4 * blue,
+    -0.0182 * red - 0.1006 * green + 1.1187 * blue
+  ];
+}
+function buildCubeRgba(size, pixel) {
+  const denom = size - 1;
+  const data = new Float32Array(size * size * size * 4);
+  let i = 0;
+  for (let bIdx = 0; bIdx < size; bIdx++) {
+    const blueIn = bIdx / denom;
+    for (let gIdx = 0; gIdx < size; gIdx++) {
+      const greenIn = gIdx / denom;
+      for (let rIdx = 0; rIdx < size; rIdx++) {
+        const redIn = rIdx / denom;
+        const out = pixel(redIn, greenIn, blueIn);
+        data[i] = out[0];
+        data[i + 1] = out[1];
+        data[i + 2] = out[2];
+        data[i + 3] = 1;
+        i += 4;
+      }
+    }
+  }
+  return data;
+}
+function makeAppleLogToRec709Cube(size = 33, rec2020GamutMap = false) {
+  return buildCubeRgba(
+    size,
+    (r, g, b) => appleLogPixelToRec709(r, g, b, rec2020GamutMap)
+  );
+}
+function makeDlogToRec709Cube(size = 33) {
+  return buildCubeRgba(size, dlogPixelToRec709);
+}
+function makeCanonClogToRec709Cube(size = 33) {
+  return buildCubeRgba(size, canonClogPixelToRec709);
+}
+function makeVlogToRec709Cube(size = 33) {
+  return buildCubeRgba(size, vlogPixelToRec709);
+}
+function makeSlog3ToRec709Cube(size = 33) {
+  return buildCubeRgba(size, slog3PixelToRec709);
+}
 export {
   BAKE_COLOR_IDENTITY,
   BAKE_COLOR_PARAM_KEYS,
@@ -3024,6 +3331,7 @@ export {
   PRESET_VERSION,
   QUICK_AXIS_DEFAULT_RANGE,
   QUICK_AXIS_IDS,
+  SOURCE_PROFILE_CATALOG,
   applyCreativePack01SourceTransform,
   applyQuickStateToParams,
   applyQuickStateToPhase0Params,
@@ -3037,6 +3345,7 @@ export {
   buildOpticalFilterParamPatch,
   buildOpticalParamPatch,
   buildPhase0ExportRequest,
+  buildSourceProfileLut,
   cameraOpticsSchema,
   chromaUnitFromHueDegrees,
   clampGrainIntensity,
@@ -3062,6 +3371,7 @@ export {
   getIosPhase0SourceCapViolations,
   getOpticalFilterProfile,
   getPhase0SourceCapViolations,
+  getSourceProfile,
   gradeMatchesPreset,
   halationHueToHex,
   hslToRgb01,

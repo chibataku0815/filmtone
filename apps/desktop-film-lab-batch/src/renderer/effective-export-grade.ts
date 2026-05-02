@@ -1,6 +1,8 @@
 import type { PresetName } from "film-lab-core";
+import { getSourceProfile } from "film-lab-core";
 import type { BatchGradeState } from "./batch-pipeline";
 import type {
+  AppliedSourceProfileMetadata,
   MetadataLookSource,
   MetadataLutRefs,
 } from "./export-metadata-session";
@@ -13,6 +15,11 @@ export type ExportGradeLutSlot = {
   data: Float32Array;
   size: number;
   intensity: number;
+  /**
+   * Built-in source-profile catalog id when this slot was filled from a
+   * Camera Profile (lut1 only). null/undefined for custom `.cube` or lut2.
+   */
+  sourceProfileId?: string | null;
 } | null;
 
 export type ExportGradeLutState = {
@@ -27,6 +34,7 @@ export type EffectiveExportGradeSnapshot = {
   batchPresetChoice: PresetName;
   lookSource: MetadataLookSource;
   lutRefs: MetadataLutRefs;
+  appliedSourceProfile: AppliedSourceProfileMetadata | null;
   source: EffectiveExportGradeSource;
   captureError: string | null;
   exportRenderGeometry: ExportRenderGeometry | null;
@@ -40,9 +48,62 @@ export type BuildEffectiveExportGradeSnapshotInput = {
   fallbackBatchPresetChoice: PresetName;
   fallbackLookSource: MetadataLookSource;
   fallbackLutRefs: MetadataLutRefs;
+  fallbackAppliedSourceProfile?: AppliedSourceProfileMetadata | null;
   captureError?: string | null;
   exportRenderGeometry?: ExportRenderGeometry | null;
+  /**
+   * Caller-supplied ISO timestamp for the source-profile metadata
+   * `appliedAtIso` field. Defaults to the current wall-clock time when
+   * omitted; tests should pass a fixed value for round-trip determinism.
+   */
+  appliedAtIso?: string;
 };
+
+/**
+ * Build the `input.sourceProfile` metadata payload from a runtime
+ * `EditLutSlot`. Returns null when the user has not made an explicit
+ * source-profile selection — the sidecar should omit the field entirely
+ * in that case so existing v1 round-trip semantics are preserved.
+ */
+export function buildAppliedSourceProfileMetadata(
+  slot: ExportGradeLutSlot,
+  appliedAtIso: string,
+): AppliedSourceProfileMetadata | null {
+  if (!slot) return null;
+  const sourceProfileId = slot.sourceProfileId ?? null;
+  if (sourceProfileId) {
+    const entry = getSourceProfile(sourceProfileId);
+    if (entry) {
+      return {
+        selectionKind: "built-in",
+        catalogId: entry.id,
+        curve: entry.curve,
+        impl: entry.impl,
+        displayName: entry.displayName,
+        appliedAtIso,
+      };
+    }
+    // Unknown id (older/newer sidecar) — record literally so round-trips
+    // do not silently lose the user's intent.
+    return {
+      selectionKind: "built-in",
+      catalogId: sourceProfileId,
+      curve: null,
+      impl: null,
+      displayName: slot.name || sourceProfileId,
+      appliedAtIso,
+    };
+  }
+  // Custom .cube path — slot is populated but no catalog id.
+  return {
+    selectionKind: "custom",
+    catalogId: null,
+    curve: null,
+    impl: null,
+    displayName: slot.name || "custom .cube",
+    appliedAtIso,
+  };
+}
 
 export function buildEffectiveExportGradeSnapshot({
   viewportParams,
@@ -52,8 +113,10 @@ export function buildEffectiveExportGradeSnapshot({
   fallbackBatchPresetChoice,
   fallbackLookSource,
   fallbackLutRefs,
+  fallbackAppliedSourceProfile = null,
   captureError = null,
   exportRenderGeometry = null,
+  appliedAtIso,
 }: BuildEffectiveExportGradeSnapshotInput): EffectiveExportGradeSnapshot {
   if (!viewportParams) {
     return {
@@ -61,11 +124,14 @@ export function buildEffectiveExportGradeSnapshot({
       batchPresetChoice: fallbackBatchPresetChoice,
       lookSource: fallbackLookSource,
       lutRefs: fallbackLutRefs,
+      appliedSourceProfile: fallbackAppliedSourceProfile,
       source: "batch",
       captureError,
       exportRenderGeometry,
     };
   }
+
+  const nowIso = appliedAtIso ?? new Date().toISOString();
 
   return {
     grade: {
@@ -77,6 +143,7 @@ export function buildEffectiveExportGradeSnapshot({
       lut1Intensity: editLut.lut1?.intensity ?? 1,
       lut1Data: editLut.lut1?.data ?? null,
       lut1Size: editLut.lut1?.size ?? 0,
+      lut1SourceProfileId: editLut.lut1?.sourceProfileId ?? null,
       lutIntensity: editLut.lut2?.intensity ?? 1,
       lutData: editLut.lut2?.data ?? null,
       lutSize: editLut.lut2?.size ?? 0,
@@ -87,6 +154,10 @@ export function buildEffectiveExportGradeSnapshot({
       lut1: createMetadataLutRefFromRuntime(editLut.lut1),
       lut2: createMetadataLutRefFromRuntime(editLut.lut2),
     },
+    appliedSourceProfile: buildAppliedSourceProfileMetadata(
+      editLut.lut1,
+      nowIso,
+    ),
     source: "preview",
     captureError,
     exportRenderGeometry,

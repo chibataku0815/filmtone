@@ -1,5 +1,7 @@
 import {
   FILMTONE_DEFAULT_BASE_PRESET,
+  buildSourceProfileLut,
+  getSourceProfile,
   parseCube,
   type CameraOptics,
   type PresetName,
@@ -8,6 +10,7 @@ import type { FilmLabBatchBridge } from "./desktop-api";
 import {
   type AppliedOpticalFilterProfileMetadata,
   type AppliedOpticalRecommendationMetadata,
+  type AppliedSourceProfileMetadata,
   createEmptyMetadataLutRefs,
   extractMetadataLutRefsFromGradeJsonText,
   inferPresetChoiceFromImportedJson,
@@ -40,6 +43,7 @@ async function loadBatchGradeFromLutRefs(
   params: BatchGradeState["params"],
   lutRefs: MetadataLutRefs,
   depthTrackRef: MetadataDepthTrackRef,
+  sourceProfileMetadata?: AppliedSourceProfileMetadata,
 ): Promise<{
   batchGrade: BatchGradeState;
   resolvedLutRefs: MetadataLutRefs;
@@ -56,14 +60,60 @@ async function loadBatchGradeFromLutRefs(
     lut1Intensity: lutRefs.lut1.intensity,
     lut1Data: null,
     lut1Size: 0,
+    lut1SourceProfileId: null,
     lutIntensity: lutRefs.lut2.intensity,
     lutData: null,
     lutSize: 0,
   };
 
+  // Built-in source profile takes precedence over absolutePath for lut1.
+  // Sidecars produced after v1.4 carry `input.sourceProfile` so the LUT
+  // can be regenerated locally without an absolute `.cube` path.
+  let lut1HandledByBuiltIn = false;
+  if (
+    sourceProfileMetadata &&
+    sourceProfileMetadata.selectionKind === "built-in" &&
+    sourceProfileMetadata.catalogId
+  ) {
+    const catalogId = sourceProfileMetadata.catalogId;
+    const entry = getSourceProfile(catalogId);
+    if (entry) {
+      const built = buildSourceProfileLut(catalogId);
+      if (built) {
+        batchGrade.lut1Data = built.data;
+        batchGrade.lut1Size = built.size;
+        batchGrade.lut1SourceProfileId = catalogId;
+        resolvedLutRefs.lut1 = {
+          enabled: true,
+          intensity: lutRefs.lut1.intensity,
+          displayName: built.displayName,
+          absolutePath: null,
+        };
+        lut1HandledByBuiltIn = true;
+      } else {
+        // nil-profile (Rec.709 passthrough) — record selection but apply nothing.
+        batchGrade.lut1SourceProfileId = catalogId;
+        resolvedLutRefs.lut1 = {
+          enabled: false,
+          intensity: lutRefs.lut1.intensity,
+          displayName: entry.displayName,
+          absolutePath: null,
+        };
+        lut1HandledByBuiltIn = true;
+      }
+    } else {
+      warnings.push(
+        `lut1: unknown source-profile catalogId "${catalogId}", falling back to absolutePath`,
+      );
+    }
+  }
+
   const loadSlot = async (
     slotKey: "lut1" | "lut2",
   ): Promise<void> => {
+    if (slotKey === "lut1" && lut1HandledByBuiltIn) {
+      return;
+    }
     const slot = resolvedLutRefs[slotKey];
     if (!slot.enabled) {
       return;
@@ -130,6 +180,7 @@ export async function resolveImportedMetadataJson(
       sidecar.look.grade.grade as unknown as BatchGradeState["params"],
       sidecar.lutRefs,
       sidecar.depthTrack,
+      sidecar.input.sourceProfile,
     );
     const parsedSyncTime = Date.parse(sidecar.exportedAtIso);
     return {
@@ -158,6 +209,7 @@ export async function resolveImportedMetadataJson(
       lut1Intensity: resolvedGrade.lut1Intensity,
       lut1Data: resolvedGrade.lut1Data,
       lut1Size: resolvedGrade.lut1Size,
+      lut1SourceProfileId: resolvedGrade.lut1SourceProfileId,
       lutIntensity: resolvedGrade.lutIntensity,
       lutData: resolvedGrade.lutData,
       lutSize: resolvedGrade.lutSize,
@@ -186,6 +238,7 @@ export function emptyResolvedMetadataJson(filePath: string): ResolvedImportedMet
       lut1Intensity: 1,
       lut1Data: null,
       lut1Size: 0,
+      lut1SourceProfileId: null,
       lutIntensity: 1,
       lutData: null,
       lutSize: 0,

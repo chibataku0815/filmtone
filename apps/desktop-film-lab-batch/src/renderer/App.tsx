@@ -100,6 +100,7 @@ import { exportGradeJsonText } from "./grade-io";
 import {
   type AppliedOpticalFilterProfileMetadata,
   type AppliedOpticalRecommendationMetadata,
+  type AppliedSourceProfileMetadata,
   buildFilmtoneExportSession,
   buildPhotoMetadataSidecarPath,
   buildVideoMetadataSidecarPath,
@@ -121,6 +122,7 @@ import {
 } from "./ai-scene-pick";
 import { buildAiRecommendation } from "./ai-recommendation-builder";
 import {
+  buildAppliedSourceProfileMetadata,
   buildEffectiveExportGradeSnapshot,
   collectEffectiveExportGradeWarnings,
   formatEffectiveExportGradeSummary,
@@ -188,9 +190,21 @@ function isVideoExportFileName(fileName: string): boolean {
   return /\.(mp4|webm|m4v|mov)$/i.test(fileName);
 }
 
+type EditLutSlot = {
+  name: string;
+  data: Float32Array;
+  size: number;
+  intensity: number;
+  /**
+   * Built-in source-profile catalog id when this slot holds a Camera
+   * Profile (lut1 only). null/undefined for custom `.cube` or lut2.
+   */
+  sourceProfileId?: string | null;
+};
+
 type EditLutState = {
-  lut1: { name: string; data: Float32Array; size: number; intensity: number } | null;
-  lut2: { name: string; data: Float32Array; size: number; intensity: number } | null;
+  lut1: EditLutSlot | null;
+  lut2: EditLutSlot | null;
 };
 
 function buildEditLutStateFromBatchGrade(
@@ -205,6 +219,7 @@ function buildEditLutStateFromBatchGrade(
             data: grade.lut1Data,
             size: grade.lut1Size,
             intensity: grade.lut1Intensity,
+            sourceProfileId: grade.lut1SourceProfileId ?? null,
           }
         : null,
     lut2:
@@ -269,6 +284,7 @@ async function resolveBatchGradeSnapshot(
         lut1Intensity: g.lut1Intensity,
         lut1Data: g.lut1Data,
         lut1Size: g.lut1Size,
+        lut1SourceProfileId: g.lut1SourceProfileId,
         lutIntensity: g.lutIntensity,
         lutData: g.lutData,
         lutSize: g.lutSize,
@@ -1157,6 +1173,7 @@ export default function App() {
         lut1Intensity: restored.batchGrade.lut1Intensity,
         lut1Data: restored.batchGrade.lut1Data,
         lut1Size: restored.batchGrade.lut1Size,
+        lut1SourceProfileId: restored.batchGrade.lut1SourceProfileId,
         lutIntensity: restored.batchGrade.lutIntensity,
         lutData: restored.batchGrade.lutData,
         lutSize: restored.batchGrade.lutSize,
@@ -1917,12 +1934,17 @@ export default function App() {
       lutRefs?: MetadataLutRefs;
       opticalRecommendation?: AppliedOpticalRecommendationMetadata | null;
       opticalFilterProfile?: AppliedOpticalFilterProfileMetadata | null;
+      sourceProfile?: AppliedSourceProfileMetadata | null;
       cameraOptics?: CameraOptics | null;
       sourceVideoMetadata?: SourceVideoMetadata | null;
     }) => {
       const exportedAtIso = new Date().toISOString();
       const cameraOptics =
         payload.cameraOptics ?? (payload.job === "video" ? sourceCameraOptics : null);
+      const sourceProfile =
+        payload.sourceProfile !== undefined
+          ? payload.sourceProfile
+          : buildAppliedSourceProfileMetadata(editLut.lut1, exportedAtIso);
       const session = buildFilmtoneExportSession({
         exportedAtIso,
         appVersion,
@@ -1942,6 +1964,7 @@ export default function App() {
           payload.opticalRecommendation ?? appliedOpticalRecommendation,
         opticalFilterProfile:
           payload.opticalFilterProfile ?? appliedOpticalFilterProfile,
+        sourceProfile,
         cameraOptics,
         sourceVideoMetadata: payload.sourceVideoMetadata ?? null,
       });
@@ -1958,6 +1981,7 @@ export default function App() {
       batchLookSource,
       batchLutRefs,
       batchPresetChoice,
+      editLut,
       sourceCameraOptics,
     ],
   );
@@ -2027,6 +2051,12 @@ export default function App() {
         batchPresetChoice: effectiveBatchPresetChoice,
         lookSource: effectiveLookSource,
         lutRefs: effectiveLutRefs,
+        appliedSourceProfile:
+          capturedSnapshot?.appliedSourceProfile ??
+          buildAppliedSourceProfileMetadata(
+            editLut.lut1,
+            new Date().toISOString(),
+          ),
         source: capturedSnapshot?.source ?? "batch",
         captureError: capturedSnapshot?.captureError ?? null,
         exportRenderGeometry: capturedSnapshot?.exportRenderGeometry ?? null,

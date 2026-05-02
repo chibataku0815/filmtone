@@ -235,3 +235,13 @@ export {
   applyUrbanCoolDensityTransform,
   type CreativePack01SourceTransform,
 } from "./creative-pack-01-generator";
+export {
+  SOURCE_PROFILE_CATALOG,
+  buildSourceProfileLut,
+  getSourceProfile,
+  type BuiltSourceProfileLut,
+  type SourceProfileCatalogEntry,
+  type SourceProfileCurve,
+  type SourceProfileId,
+  type SourceProfileImplKind,
+} from "./source-profile-conversion";

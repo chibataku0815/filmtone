@@ -95,4 +95,111 @@ describe("metadata-json-runtime", () => {
 
     expect(resolved.cameraOptics).toEqual(cameraOptics);
   });
+
+  it("regenerates lut1 from a built-in source-profile catalog id without reading any .cube file", async () => {
+    const grade = batchGradeStateFromPreset("cinematic");
+    const session = buildFilmtoneExportSession({
+      exportedAtIso: "2026-05-02T13:00:00.000Z",
+      appVersion: "1.4.0",
+      job: "images",
+      inputDir: "/Users/tester/input",
+      videoInputPath: null,
+      outputDir: "/Users/tester/output",
+      imageFormat: "jpeg",
+      outputFilenameSuffix: "-graded",
+      outputFileName: null,
+      batchPresetChoice: "cinematic",
+      lookSource: "editSync",
+      gradeParams: grade.params,
+      depthTrack: null,
+      lutRefs: {
+        lut1: {
+          enabled: true,
+          intensity: 1,
+          displayName: "V-Log",
+          absolutePath: null,
+        },
+        lut2: createEmptyMetadataLutRefs().lut2,
+      },
+      sourceProfile: {
+        selectionKind: "built-in",
+        catalogId: "built-in:source-profile.panasonic-vlog",
+        curve: "panasonic-vlog",
+        impl: "synthesized",
+        displayName: "V-Log",
+        appliedAtIso: "2026-05-02T13:00:00.000Z",
+      },
+    });
+
+    let readFileCalls = 0;
+    const bridge = {
+      readFileUtf8: async () => {
+        readFileCalls += 1;
+        return "";
+      },
+    } as unknown as FilmLabBatchBridge;
+
+    const resolved = await resolveImportedMetadataJson(
+      bridge,
+      "/Users/tester/output/photo.filmtone-session.json",
+      exportFilmtoneExportSessionJsonText(session),
+    );
+
+    expect(readFileCalls).toBe(0);
+    expect(resolved.batchGrade.lut1Data).not.toBeNull();
+    expect(resolved.batchGrade.lut1Size).toBe(33);
+    expect(resolved.batchGrade.lut1Data?.length).toBe(33 * 33 * 33 * 4);
+    expect(resolved.batchGrade.lut1SourceProfileId).toBe(
+      "built-in:source-profile.panasonic-vlog",
+    );
+    expect(resolved.lutRefs.lut1).toEqual({
+      enabled: true,
+      intensity: 1,
+      displayName: "V-Log",
+      absolutePath: null,
+    });
+    expect(resolved.warnings).toEqual([]);
+  });
+
+  it("treats a built-in Rec.709 nilProfile as 'no LUT to apply' but records the selection", async () => {
+    const grade = batchGradeStateFromPreset("cinematic");
+    const session = buildFilmtoneExportSession({
+      exportedAtIso: "2026-05-02T13:00:00.000Z",
+      appVersion: "1.4.0",
+      job: "images",
+      inputDir: "/Users/tester/input",
+      videoInputPath: null,
+      outputDir: "/Users/tester/output",
+      imageFormat: "jpeg",
+      outputFilenameSuffix: "-graded",
+      outputFileName: null,
+      batchPresetChoice: "cinematic",
+      lookSource: "editSync",
+      gradeParams: grade.params,
+      depthTrack: null,
+      lutRefs: createEmptyMetadataLutRefs(),
+      sourceProfile: {
+        selectionKind: "built-in",
+        catalogId: "built-in:source-profile.rec709",
+        curve: null,
+        impl: "nil-profile",
+        displayName: "Rec.709",
+        appliedAtIso: "2026-05-02T13:00:00.000Z",
+      },
+    });
+
+    const resolved = await resolveImportedMetadataJson(
+      {} as FilmLabBatchBridge,
+      "/Users/tester/output/photo.filmtone-session.json",
+      exportFilmtoneExportSessionJsonText(session),
+    );
+
+    expect(resolved.batchGrade.lut1Data).toBeNull();
+    expect(resolved.batchGrade.lut1Size).toBe(0);
+    expect(resolved.batchGrade.lut1SourceProfileId).toBe(
+      "built-in:source-profile.rec709",
+    );
+    expect(resolved.lutRefs.lut1.enabled).toBe(false);
+    expect(resolved.lutRefs.lut1.displayName).toBe("Rec.709");
+  });
 });
