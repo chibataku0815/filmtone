@@ -83,12 +83,13 @@ enum CameraProfileSelection: Equatable, Sendable, Codable {
 /// Apple Log / Apple Log 2 are present here so the catalog entry can name
 /// the curve uniformly even though their pipeline is `(P) nativePolicy`.
 enum SourceProfileCurve: String, Codable, CaseIterable, Sendable {
-    case appleLog       = "apple-log"
-    case appleLog2      = "apple-log-2"
-    case djiDLog        = "dji-dlog"
-    case canonCLog      = "canon-clog"
-    case panasonicVLog  = "panasonic-vlog"
-    case sonySLog3      = "sony-slog3"
+    case appleLog              = "apple-log"
+    case appleLog2             = "apple-log-2"
+    case djiDLog               = "dji-dlog"
+    case canonCLog             = "canon-clog"
+    case canonLog3CinemaGamut  = "canon-log3-cinema-gamut"
+    case panasonicVLog         = "panasonic-vlog"
+    case sonySLog3             = "sony-slog3"
 }
 
 // MARK: - Source Profile implementation strategy

@@ -84,7 +84,7 @@ IPA_PATH=build/fastlane/Filmtone.ipa REVIEW_PHONE='+81-...' bun run release:apps
 
 | 項目 | 現行値 | 触る条件 |
 |------|--------|----------|
-| `Profile.version` | `4` | スキーマ追加 = bump、フィールド名 rename も bump。bump は CD と sidecar reader 両側を同一 commit で更新 |
+| `Profile.version` | `5` | スキーマ追加 = bump、フィールド名 rename も bump。bump は CD と sidecar reader 両側を同一 commit で更新。v=5 (v1.4) は qualitySDR/qualityHDR variants を追加（Quality export での重い source 流用、ProRes / DNxHD / >=100 Mbps gate） |
 | Sidecar | `V1` schema | フィールド追加は OK（reader が ignore する形に）／ 型変更は V2 化が必要 |
 | `hiddenDefaults` (例: `depthRayAngleGamma=1.4` / `innerThreshold=0.1`) | 既存値固定 | CD（クリエイティブディレクター = ユーザー）承認 gate を通過した時だけ。toggle ON でも視覚上 inert は許容 |
 | `Info.plist` の `NSPhotoLibrary*UsageDescription` / `NSSupportsLiveActivities` / `ITSAppUsesNonExemptEncryption` | 現行通り | App Store 審査リジェクト直結。変更時は `RELEASE.md` と一緒に PR 説明に明記 |
@@ -200,7 +200,7 @@ CLAUDE.md には書かない（陳腐化が早すぎる）。以下を見る：
 | 領域 | エントリ | 主要ファイル |
 |------|---------|--------------|
 | Built-in Looks | 2 件（Creative Pack 01: Stone / Urban、各 bundled `.cube`） | `FilmtoneBuiltInCatalog.swift` |
-| Source Profiles | 7 件（Apple Log / Apple Log 2 / DJI D-Log / Canon C-Log / V-Log / S-Log3 / Rec.709） | `FilmtoneSourceProfileCatalog.swift` |
+| Source Profiles | 8 件（Apple Log / Apple Log 2 / DJI D-Log / Canon C-Log / Canon Log 3 + Cinema Gamut / V-Log / S-Log3 / Rec.709） | `FilmtoneSourceProfileCatalog.swift` |
 
 ### 不変条件
 

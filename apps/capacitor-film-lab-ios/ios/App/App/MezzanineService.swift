@@ -4,11 +4,16 @@ import CryptoKit
 import Foundation
 import VideoToolbox
 
-/// Mezzanine profile variant. SDR uses H.264 / BT.709, HDR uses HEVC 10-bit Main10 / BT.2020.
-/// The variant is part of the cache key, so SDR and HDR mezzanines for the same source coexist.
+/// Mezzanine profile variant. SDR/HDR are preview-grade (1920 long edge, modest
+/// bitrate, used by Speed export). qualitySDR/qualityHDR are master-grade
+/// (source resolution preserved, near-lossless bitrate, used by Quality export
+/// for heavy external sources — ProRes, DNxHD, >100Mbps HEVC). The variant is
+/// part of the cache key so all four mezzanines for the same source coexist.
 enum ProfileVariant: String {
     case sdr
     case hdr
+    case qualitySDR
+    case qualityHDR
 }
 
 final class MezzanineService {
@@ -17,11 +22,18 @@ final class MezzanineService {
         // prior cache entry naturally invalidates on the bump. The `depthEnabled`
         // discriminator added to the signature payload below means a depth-on
         // export does not collide with a depth-off export from the same source.
-        static let version = 4
+        // v=5: qualitySDR/qualityHDR variants (v1.4) — adds source-resolution
+        // master-grade mezzanine for heavy external sources so Quality export
+        // can skip raw decode.
+        static let version = 5
 
         let variant: ProfileVariant
         let codec: AVVideoCodecType
+        /// Long-edge target for downscale variants (sdr/hdr). Quality variants
+        /// ignore this and preserve source resolution via `outputSize(forTrack:)`.
         let longEdge: Int
+        /// Fixed bitrate for sdr/hdr; base 4K bitrate for quality* (scales by
+        /// output area via `effectiveBitrate(forOutputSize:)`, floor 2 Mbps).
         let bitrate: Int
 
         static let sdr = Profile(
@@ -38,17 +50,75 @@ final class MezzanineService {
             bitrate: 25_000_000
         )
 
+        static let qualitySDR = Profile(
+            variant: .qualitySDR,
+            codec: .hevc,
+            longEdge: 0,
+            bitrate: 80_000_000
+        )
+
+        static let qualityHDR = Profile(
+            variant: .qualityHDR,
+            codec: .hevc,
+            longEdge: 0,
+            bitrate: 120_000_000
+        )
+
         static func profile(for variant: ProfileVariant) -> Profile {
             switch variant {
             case .sdr: return .sdr
             case .hdr: return .hdr
+            case .qualitySDR: return .qualitySDR
+            case .qualityHDR: return .qualityHDR
             }
+        }
+
+        /// True if this variant emits 10-bit BT.2020/HLG-tagged output.
+        var isHDR: Bool {
+            switch variant {
+            case .hdr, .qualityHDR: return true
+            case .sdr, .qualitySDR: return false
+            }
+        }
+
+        /// True if this variant skips downscale and emits at the source's
+        /// native resolution (quality variants).
+        var preservesSourceResolution: Bool {
+            switch variant {
+            case .qualitySDR, .qualityHDR: return true
+            case .sdr, .hdr: return false
+            }
+        }
+
+        func outputSize(forTrack track: AVAssetTrack) -> CGSize {
+            if preservesSourceResolution {
+                let transformed = track.naturalSize.applying(track.preferredTransform)
+                let w = max(2, Int(abs(transformed.width).rounded()) / 2 * 2)
+                let h = max(2, Int(abs(transformed.height).rounded()) / 2 * 2)
+                return CGSize(width: w, height: h)
+            }
+            return FilmtoneExportSession.scaledSize(for: track, longEdge: longEdge)
+        }
+
+        /// Quality variants scale base bitrate by output area (4K = 1.0).
+        /// FHD ends up around 25%, 2K around 50%. Floor at 2 Mbps so very small
+        /// outputs still get a reasonable encode.
+        func effectiveBitrate(forOutputSize size: CGSize) -> Int {
+            guard preservesSourceResolution else { return bitrate }
+            let area = size.width * size.height
+            let fourKArea: CGFloat = 3840 * 2160
+            let scale = min(1.0, max(0.0, area / fourKArea))
+            return max(2_000_000, Int(CGFloat(bitrate) * scale))
         }
     }
 
     struct Limits {
-        static let maxBytes: Int64 = 1_073_741_824
-        static let maxEntries: Int = 4
+        // v1.4: expanded from 1 GB / 4 entries to fit qualitySDR + qualityHDR
+        // alongside preview-grade variants for several heavy sources. Sits in
+        // Library/Caches/FilmtonePhase0/mezzanine/ so the OS can purge under
+        // disk pressure; user data is unaffected.
+        static let maxBytes: Int64 = 4_294_967_296
+        static let maxEntries: Int = 16
     }
 
     enum GenerationError: Error {
@@ -224,10 +294,7 @@ final class MezzanineService {
             throw GenerationError.unsupportedSource("No video track found.")
         }
 
-        let outputSize = FilmtoneExportSession.scaledSize(
-            for: videoTrack,
-            longEdge: profile.longEdge
-        )
+        let outputSize = profile.outputSize(forTrack: videoTrack)
 
         if fileManager.fileExists(atPath: destinationURL.path) {
             try fileManager.removeItem(at: destinationURL)
@@ -238,19 +305,29 @@ final class MezzanineService {
 
         let width = Int(outputSize.width.rounded())
         let height = Int(outputSize.height.rounded())
-        // D2.2: profile.variant drives codec, profile level, color metadata, and pixel format.
-        // SDR  → H.264 High AutoLevel, 32BGRA, deviceRGB working/render space (byte-identical to v=2).
-        // HDR  → HEVC Main10 AutoLevel, 420YpCbCr10BiPlanarVideoRange, BT.2020 / HLG metadata,
-        //        per-call CIContext on Rec.2020 working space + ITU-R 2100 HLG render colorSpace.
-        // Per plan §6.3 silent-fallback ban: .hdr is invoked only by callers that already
-        // probed the source as wide-gamut/HLG/PQ; misclassified inputs fall through to
-        // source-direct read in FilmtoneExportSession.resolvedVideoSourceURL().
-        let isHDR = profile.variant == .hdr
+        // D2.2 / v1.4: profile.variant drives codec, profile level, color metadata, pixel format.
+        // sdr         → H.264 High AutoLevel, 32BGRA, deviceRGB (byte-identical to v=2 preview path).
+        // hdr         → HEVC Main10 AutoLevel, 420YpCbCr10BiPlanarVideoRange, BT.2020 / HLG metadata.
+        // qualitySDR  → HEVC Main AutoLevel at source resolution, 32BGRA, deviceRGB.
+        // qualityHDR  → HEVC Main10 AutoLevel at source resolution, 420YpCbCr10BiPlanarVideoRange,
+        //               BT.2020 / HLG metadata.
+        // Quality variants are gated by FilmtoneMezzanineRoutePolicy.qualityPrewarmVariant —
+        // only invoked for ProRes / DNxHD / >100 Mbps sources where re-encode is a net UX win.
+        let isHDR = profile.isHDR
+        let bitrate = profile.effectiveBitrate(forOutputSize: outputSize)
+        let profileLevel: String = {
+            switch profile.codec {
+            case .hevc:
+                return isHDR
+                    ? (kVTProfileLevel_HEVC_Main10_AutoLevel as String)
+                    : (kVTProfileLevel_HEVC_Main_AutoLevel as String)
+            default:
+                return AVVideoProfileLevelH264HighAutoLevel
+            }
+        }()
         let compressionProperties: [String: Any] = [
-            AVVideoAverageBitRateKey: profile.bitrate,
-            AVVideoProfileLevelKey: isHDR
-                ? (kVTProfileLevel_HEVC_Main10_AutoLevel as String)
-                : AVVideoProfileLevelH264HighAutoLevel,
+            AVVideoAverageBitRateKey: bitrate,
+            AVVideoProfileLevelKey: profileLevel,
             AVVideoAllowFrameReorderingKey: false,
         ]
         var videoSettings: [String: Any] = [

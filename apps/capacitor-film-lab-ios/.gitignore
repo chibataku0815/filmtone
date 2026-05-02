@@ -1,8 +1,9 @@
 build/
 dist/
 node_modules/
-screenshots/
 build/fastlane/
 fastlane/report.xml
 fastlane/.generated/
+fastlane/screenshots/Snapshots/
+fastlane/screenshots/.generated/
 .claude/notes/

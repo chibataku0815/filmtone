@@ -459,6 +459,7 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
     "apple-log": strings.cameraProfileAppleLog,
     "dji-dlog": strings.cameraProfileDlog,
     "canon-clog": strings.cameraProfileClog,
+    "canon-log3-cinema-gamut": strings.cameraProfileClog3CineGamut,
     slog3: strings.cameraProfileSlog3,
     vlog: strings.cameraProfileVlog,
     custom: strings.cameraProfileCustom,

@@ -150,6 +150,7 @@ struct FilmtoneStrings {
     let cameraAppleLog2: String
     let cameraDLog: String
     let cameraCLog: String
+    let cameraCLog3CineGamut: String
     let cameraVLog: String
     let cameraSLog3: String
     let cameraRec709: String
@@ -290,9 +291,10 @@ extension FilmtoneStrings {
         switch slug {
         case "apple-log":      return cameraAppleLog
         case "apple-log-2":    return cameraAppleLog2
-        case "dji-dlog":       return cameraDLog
-        case "canon-clog":     return cameraCLog
-        case "panasonic-vlog": return cameraVLog
+        case "dji-dlog":                return cameraDLog
+        case "canon-clog":              return cameraCLog
+        case "canon-log3-cinema-gamut": return cameraCLog3CineGamut
+        case "panasonic-vlog":          return cameraVLog
         case "sony-slog3":     return cameraSLog3
         case "rec709":         return cameraRec709
         default:               return nil
@@ -1163,6 +1165,11 @@ extension FilmtoneStrings {
             "filmtone.camera.canon_clog",
             defaultValue: "Canon C-Log",
             comment: "Built-in camera source profile name (Canon C-Log)."
+        )
+        cameraCLog3CineGamut = filmtoneLocalized(
+            "filmtone.camera.canon_log3_cine_gamut",
+            defaultValue: "Canon Log 3 / Cinema Gamut",
+            comment: "Built-in camera source profile name (Canon Log 3 + Cinema Gamut). Proper-noun preserved across locales."
         )
         cameraVLog = filmtoneLocalized(
             "filmtone.camera.vlog",

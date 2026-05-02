@@ -713,9 +713,9 @@ final class FilmtoneEditorStore: ObservableObject {
     /// - `.builtIn(.appleLog | .appleLog2)`: if the new probe's color class
     ///   doesn't match the selection, fall back to `.auto` and surface a
     ///   toast — the user picked a profile that the new clip can't honor.
-    /// - `.builtIn(.djiDLog | .canonCLog | .panasonicVLog | .sonySLog3 | .rec709)`: persist
-    ///   (cannot be auto-detected from container metadata, so the user's prior
-    ///   pick stays sticky across source swaps).
+    /// - `.builtIn(.djiDLog | .canonCLog | .canonLog3CinemaGamut | .panasonicVLog | .sonySLog3 | .rec709)`:
+    ///   persist (cannot be auto-detected from container metadata, so the
+    ///   user's prior pick stays sticky across source swaps).
     /// - `.userImport`: the existing inputLut clear rule above already
     ///   wipes the user-imported `.cube`; we reset to `.auto` here for
     ///   consistency.
@@ -728,8 +728,8 @@ final class FilmtoneEditorStore: ObservableObject {
                 project.cameraProfile = .auto
                 return
             }
-            // Sticky cases first — D-Log, C-Log, V-Log, S-Log3, Rec.709 cannot be
-            // auto-detected, so persist them across swaps.
+            // Sticky cases first — D-Log, C-Log, C-Log 3 + Cinema Gamut, V-Log, S-Log3,
+            // Rec.709 cannot be auto-detected, so persist them across swaps.
             if entry.detectionHint == nil {
                 return
             }

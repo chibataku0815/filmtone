@@ -466,29 +466,24 @@ final class FilmtoneExportSession {
         progress: @escaping (Phase0ExportProgressDTO) -> Void
     ) throws -> CompletedExport {
         let effectiveSourceURL = resolvedVideoSourceURL()
-        // Re-probe the matched variant so downstream telemetry / sidecar can record
-        // which mezzanine variant was actually used (HDR-preferred for Quality, any-
-        // available for Speed). When mezzanine was bypassed the variant stays nil.
-        if effectiveSourceURL == sourceURL {
-            didUseMezzanineVariant = nil
-        } else if let mezz = mezzanineService,
-                  effectiveSourceURL == mezz.existingMezzanineURL(
+        // v1.4: telemetry/sidecar records which mezzanine variant the export
+        // actually consumed. resolvedVideoSourceURL only returns a mezzanine
+        // URL or the original source, so we probe each known variant in
+        // preference order (quality > preview-grade) until we find a match.
+        didUseMezzanineVariant = nil
+        if effectiveSourceURL != sourceURL, let mezz = mezzanineService {
+            let depthEnabled = request.depthEnabled ?? false
+            let candidates: [ProfileVariant] = [.qualityHDR, .qualitySDR, .hdr, .sdr]
+            for variant in candidates {
+                if effectiveSourceURL == mezz.existingMezzanineURL(
                     for: sourceURL,
-                    variant: .hdr,
-                    depthEnabled: request.depthEnabled ?? false
-                  ) {
-            didUseMezzanineVariant = .hdr
-        } else if let mezz = mezzanineService,
-                  effectiveSourceURL == mezz.existingMezzanineURL(
-                    for: sourceURL,
-                    variant: .sdr,
-                    depthEnabled: request.depthEnabled ?? false
-                  ) {
-            didUseMezzanineVariant = .sdr
-        } else {
-            // Unreachable in practice (resolvedVideoSourceURL only returns a mezzanine
-            // URL or sourceURL), but keep nil to stay on the safe explicit path.
-            didUseMezzanineVariant = nil
+                    variant: variant,
+                    depthEnabled: depthEnabled
+                ) {
+                    didUseMezzanineVariant = variant
+                    break
+                }
+            }
         }
         let asset = AVURLAsset(url: effectiveSourceURL)
         guard let videoTrack = asset.tracks(withMediaType: .video).first else {
@@ -1018,7 +1013,12 @@ final class FilmtoneExportSession {
     }
 
     private func renderVideoPreview() throws -> Phase0PreviewRenderResultDTO {
-        let asset = AVURLAsset(url: sourceURL)
+        // v1.4: read from the same effective URL the export will consume so
+        // preview ↔ export bytes stay symmetric within each renderMode. When
+        // the relevant mezzanine variant is missing (still being generated, or
+        // policy declined), this transparently falls back to source.
+        let effectiveSourceURL = resolvedVideoSourceURL()
+        let asset = AVURLAsset(url: effectiveSourceURL)
         guard let videoTrack = asset.tracks(withMediaType: .video).first else {
             throw FilmtoneMediaError.unsupportedSource("No video track was found in the selected source.")
         }
@@ -2592,6 +2592,8 @@ final class FilmtoneExportSession {
             rgb = FilmtoneSourceProfileMath.makeDlogToRec709Cube(size: cubeSize)
         case .canonCLog:
             rgb = FilmtoneSourceProfileMath.makeCanonClogToRec709Cube(size: cubeSize)
+        case .canonLog3CinemaGamut:
+            rgb = FilmtoneSourceProfileMath.makeCanonLog3CineGamutToRec709Cube(size: cubeSize)
         case .panasonicVLog:
             rgb = FilmtoneSourceProfileMath.makeVlogToRec709Cube(size: cubeSize)
         case .sonySLog3:
@@ -2739,17 +2741,16 @@ final class FilmtoneExportSession {
     }
 
     private func resolvedVideoSourceURL() -> URL {
-        // Quality/Master is the product-truth export path and must match the
-        // live preview source. Mezzanine is now an explicit Speed-only shortcut.
-        guard request.renderMode == .speed else {
-            filmtonePreviewCompositionDebugLog(
-                "Quality gate: source-direct export route"
-            )
-            return sourceURL
-        }
+        // v1.4: routing covers both Speed (preview-grade mezzanine) and Quality
+        // (quality-grade mezzanine, only generated for heavy sources via
+        // FilmtoneMezzanineRoutePolicy.qualityPrewarmVariant). Quality + light
+        // source returns nil from the policy → source-direct (the previous
+        // "source-of-truth" path is preserved as a transparent fallback).
+        // Preview reads via this same function so preview ↔ export bytes
+        // remain symmetric within each renderMode.
         guard let mezz = mezzanineService else {
             filmtonePreviewCompositionDebugLog(
-                "Speed gate: no mezzanine service, source-direct fallback"
+                "Mezzanine routing: service unavailable, source-direct"
             )
             return sourceURL
         }
@@ -2765,24 +2766,42 @@ final class FilmtoneExportSession {
             variant: .sdr,
             depthEnabled: depthEnabled
         )
+        let qualityHDRURL = mezz.existingMezzanineURL(
+            for: sourceURL,
+            variant: .qualityHDR,
+            depthEnabled: depthEnabled
+        )
+        let qualitySDRURL = mezz.existingMezzanineURL(
+            for: sourceURL,
+            variant: .qualitySDR,
+            depthEnabled: depthEnabled
+        )
         let colorClass = request.sourceProbe?.sourceVideoMetadata?.colorClass
         let selectedVariant = FilmtoneMezzanineRoutePolicy.selectedVariant(
             renderMode: request.renderMode?.rawValue,
             colorClass: colorClass,
             hasHDRMezzanine: hdrURL != nil,
-            hasSDRMezzanine: sdrURL != nil
+            hasSDRMezzanine: sdrURL != nil,
+            hasQualityHDRMezzanine: qualityHDRURL != nil,
+            hasQualitySDRMezzanine: qualitySDRURL != nil
         )
 
         switch selectedVariant {
         case .hdr:
-            filmtonePreviewCompositionDebugLog("Speed gate: using hdr mezzanine")
+            filmtonePreviewCompositionDebugLog("Mezzanine routing: hdr (Speed)")
             return hdrURL ?? sourceURL
         case .sdr:
-            filmtonePreviewCompositionDebugLog("Speed gate: using sdr mezzanine")
+            filmtonePreviewCompositionDebugLog("Mezzanine routing: sdr (Speed)")
             return sdrURL ?? sourceURL
+        case .qualityHDR:
+            filmtonePreviewCompositionDebugLog("Mezzanine routing: qualityHDR")
+            return qualityHDRURL ?? sourceURL
+        case .qualitySDR:
+            filmtonePreviewCompositionDebugLog("Mezzanine routing: qualitySDR")
+            return qualitySDRURL ?? sourceURL
         case nil:
             filmtonePreviewCompositionDebugLog(
-                "Speed gate: no acceptable mezzanine for \(colorClass?.rawValue ?? "unknown"), source-direct fallback"
+                "Mezzanine routing: policy declined for \(colorClass?.rawValue ?? "unknown") at \(request.renderMode?.rawValue ?? "unknown"), source-direct"
             )
             return sourceURL
         }

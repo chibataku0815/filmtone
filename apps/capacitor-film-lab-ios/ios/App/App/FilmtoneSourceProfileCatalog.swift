@@ -71,6 +71,20 @@ enum FilmtoneSourceProfileCatalog {
             immutable: true
         ),
         CameraProfileCatalogEntry(
+            id: "built-in:source-profile.canon-log3-cinema-gamut",
+            englishName: "Canon Log 3 / Cinema Gamut",
+            curve: .canonLog3CinemaGamut,
+            impl: .synthesized(.canonLog3CinemaGamut),
+            // Canon Log 3 + Cinema Gamut cannot be reliably auto-detected
+            // from container metadata (Cinema EOS / R5C / R5 / R6 expose
+            // the curve through Camera Settings rather than a probe-visible
+            // colorPrimaries+transferFunction pair). detectionHint nil keeps
+            // it as a sticky manual pick (D-CP4 retention rule).
+            detectionHint: nil,
+            bundled: true,
+            immutable: true
+        ),
+        CameraProfileCatalogEntry(
             id: "built-in:source-profile.panasonic-vlog",
             englishName: "V-Log",
             curve: .panasonicVLog,

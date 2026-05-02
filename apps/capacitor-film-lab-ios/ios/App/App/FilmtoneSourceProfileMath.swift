@@ -222,6 +222,104 @@ enum FilmtoneSourceProfileMath {
         return cube
     }
 
+    // MARK: - Canon Log 3 + Cinema Gamut
+
+    /// Canon Log 3 → linear scene-referred decoder. Constants from Canon
+    /// (2020) Canon Log 3 v1.2 spec via the Colour Science library
+    /// (`colour.models.log_decoding_CanonLog3`, v1.2 method). Reflection
+    /// scale `* 0.9` matches the spec's reference convention so 18% gray
+    /// maps to encoded ≈ 0.343389 and decodes back to 0.18 linear.
+    @inline(__always)
+    static func canonLog3Decode(_ encoded: Double) -> Double {
+        let lowBreak = 0.097465473
+        let highBreak = 0.15277891
+        let logScale = 0.36726845
+        let logGain = 14.98325
+        let linearSlope = 1.9754798
+        let linearOffset = 0.12512219
+        let lowOffset = 0.12783901
+        let highOffset = 0.12240537
+        let scene: Double
+        if encoded < lowBreak {
+            scene = -(pow(10.0, (lowOffset - encoded) / logScale) - 1.0) / logGain
+        } else if encoded <= highBreak {
+            scene = (encoded - linearOffset) / linearSlope
+        } else {
+            scene = (pow(10.0, (encoded - highOffset) / logScale) - 1.0) / logGain
+        }
+        return scene * 0.9
+    }
+
+    /// Cinema Gamut → Rec.709 matrix. Precomputed product of (Cinema Gamut
+    /// RGB → CIE XYZ, D65) from the Antler Post Cinema Gamut reference and
+    /// the standard ITU-R BT.709-6 (XYZ → Rec.709, D65). No chromatic
+    /// adaptation is needed because both spaces share D65 white. See
+    /// `docs/source-profile-math/canon-log3-cinema-gamut.md` for the full
+    /// derivation.
+    @inline(__always)
+    static func cineGamutToRec709(
+        red: Double,
+        green: Double,
+        blue: Double
+    ) -> (red: Double, green: Double, blue: Double) {
+        (
+            red:    1.92355517 * red - 0.79863353 * green - 0.12508072 * blue,
+            green: -0.20431556 * red + 1.49593305 * green - 0.29159440 * blue,
+            blue:  -0.02369073 * red - 0.42022784 * green + 1.44415855 * blue
+        )
+    }
+
+    /// End-to-end Canon Log 3 + Cinema Gamut → Rec.709 SDR pixel pipeline:
+    /// linearize → Cinema Gamut→Rec.709 matrix → Filmtone shoulder → Rec.709 OETF.
+    @inline(__always)
+    static func canonLog3CineGamutPixelToRec709(
+        red: Double,
+        green: Double,
+        blue: Double
+    ) -> (red: Double, green: Double, blue: Double) {
+        let linearRed = canonLog3Decode(red)
+        let linearGreen = canonLog3Decode(green)
+        let linearBlue = canonLog3Decode(blue)
+        let mapped = cineGamutToRec709(
+            red: linearRed,
+            green: linearGreen,
+            blue: linearBlue
+        )
+        return (
+            rec709Encode(filmtoneSdrShoulder(mapped.red)),
+            rec709Encode(filmtoneSdrShoulder(mapped.green)),
+            rec709Encode(filmtoneSdrShoulder(mapped.blue))
+        )
+    }
+
+    /// Build a 33³ Canon Log 3 + Cinema Gamut → Rec.709 cube for
+    /// `CIColorCubeWithColorSpace`.
+    static func makeCanonLog3CineGamutToRec709Cube(size: Int = 33) -> [Float] {
+        precondition(size >= 2, "cube size must be ≥ 2")
+        let denom = Double(size - 1)
+        var cube = [Float](repeating: 0, count: size * size * size * 3)
+        var index = 0
+        for b in 0..<size {
+            let blueIn = Double(b) / denom
+            for g in 0..<size {
+                let greenIn = Double(g) / denom
+                for r in 0..<size {
+                    let redIn = Double(r) / denom
+                    let converted = canonLog3CineGamutPixelToRec709(
+                        red: redIn,
+                        green: greenIn,
+                        blue: blueIn
+                    )
+                    cube[index]     = Float(converted.red)
+                    cube[index + 1] = Float(converted.green)
+                    cube[index + 2] = Float(converted.blue)
+                    index += 3
+                }
+            }
+        }
+        return cube
+    }
+
     // MARK: - Panasonic V-Log
 
     /// V-Log → linear scene-referred decoder. Constants from Panasonic

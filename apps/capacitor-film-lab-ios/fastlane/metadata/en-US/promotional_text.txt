@@ -1,1 +1,1 @@
-Tune color with LUTs and export a film look. Add soft bloom, compare before/after, then save or share locally from iPhone. Now ships Creative Pack and Liquid Glass UI.
+Creative Pack 01 adds Stone and Urban Looks. Tune strength, glow, grain, Source Profile, and .cube LUTs in Liquid Glass, then compare, save, or share from iPhone locally.

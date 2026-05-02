@@ -213,8 +213,8 @@ struct SidecarOutput: Encodable {
 ///   export time.
 /// - `curve`: the `SourceProfileCurve` raw value (`"apple-log"` /
 ///   `"apple-log-2"` / `"dji-dlog"` / `"canon-clog"` /
-///   `"panasonic-vlog"` / `"sony-slog3"`), nil for
-///   `nilProfile` / `userImport`.
+///   `"canon-log3-cinema-gamut"` / `"panasonic-vlog"` / `"sony-slog3"`),
+///   nil for `nilProfile` / `userImport`.
 /// - `impl`: the `SourceProfileImpl` discriminator (`"native-policy"` /
 ///   `"synthesized"` / `"nil-profile"` / `"bundled-cube"`), nil only when
 ///   the export ran without a recognized profile (auto with no probe).
