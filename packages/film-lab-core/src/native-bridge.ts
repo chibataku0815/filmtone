@@ -245,6 +245,16 @@ export interface Phase0ExportRequest {
    * `"ci"` (Core Image multi-image kernel); `"metal"` is reserved for Phase B.
    */
   depthRenderer?: Phase0DepthRenderer;
+  /**
+   * v1.4 (iOS): opt-in to writing the Filmtone Connect package companions
+   * (sidecar + cubes + DCTL + reference-after.jpg + a copy of the source
+   * media) next to the rendered output. Absent / false → only the rendered
+   * mp4 + sidecar are emitted, avoiding the multi-GB source-media copy on
+   * normal save-to-Photos / share-sheet flows. The user-facing
+   * "Share as Connect package" entry point is the only caller that should
+   * pass `true`.
+   */
+  connectPackage?: boolean;
 }
 
 export interface Phase0PreviewRenderResult {

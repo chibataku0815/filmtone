@@ -63,13 +63,6 @@ enum FilmtoneMezzanineRoutePolicy {
         case qualityHDR
     }
 
-    /// v1.4: explicit eligibility threshold for quality-grade prewarm. Sources
-    /// below this bitrate (typical iPhone HEVC ~50 Mbps) are already
-    /// efficiently encoded — re-encoding to a quality mezzanine costs disk
-    /// without a meaningful UX win, so Quality export stays source-direct.
-    /// 100 Mbps catches most external-camera HEVC + all ProRes/DNxHD.
-    static let qualityBitrateThreshold: Double = 100_000_000
-
     static func prewarmVariant(for colorClass: SourceColorClassDTO?) -> Variant? {
         guard let colorClass else {
             return nil
@@ -87,33 +80,31 @@ enum FilmtoneMezzanineRoutePolicy {
 
     /// Returns the quality-grade variant to prewarm if the source is heavy
     /// enough that re-encoding gains decode-time UX at Quality export.
-    /// Codec strong condition (ProRes / DNxHD): always generate.
-    /// Bitrate condition (>= qualityBitrateThreshold): generate.
-    /// Otherwise: nil (Quality export reads source directly).
+    ///
+    /// v1.4 (2026-05-02): **always returns nil on iOS**. Empirical measurement
+    /// on iPhone 17 Pro / A18 Pro showed the qualityHDR HEVC Main10 4K
+    /// 120 Mbps mezzanine pre-encode pass costs more than the decode-time
+    /// saving recovers (174 s source-direct vs 243 s qualityHDR route on a
+    /// 156 s ProRes 422 Apple Log clip — a +69 s net loss matching the ~67 s
+    /// HEVC encode of 4680 frames at ~70 fps). On Apple Silicon iOS, ProRes
+    /// and HEVC both decode in hardware fast enough that re-encoding to a
+    /// different intermediate is pure overhead.
+    ///
+    /// Quality export therefore stays source-direct on every source class.
+    /// `Profile.qualitySDR` / `Profile.qualityHDR` and the `selectedVariant`
+    /// dispatch remain in code (with `hasQualitySDRMezzanine` / `…HDR` always
+    /// false at the call site) so v1.5+ can re-enable selectively once a
+    /// faster intermediate strategy (e.g. 1080p output-oriented cache) is
+    /// proven. Speed export's preview-grade `prewarmVariant` (sdr/hdr at
+    /// 1920 long edge) is unaffected — it serves a different shape of work.
     static func qualityPrewarmVariant(
         for colorClass: SourceColorClassDTO?,
         codecFamily: SourceCodecFamilyDTO?,
         estimatedDataRate: Double?
     ) -> Variant? {
-        guard let colorClass else {
-            return nil
-        }
-
-        let baseVariant: Variant?
-        switch colorClass {
-        case .sdrBt709:
-            baseVariant = .qualitySDR
-        case .hdrPq, .hdrHlg, .appleLog, .appleLog2, .wideGamutUnknown:
-            baseVariant = .qualityHDR
-        case .unsupported, .unknown:
-            baseVariant = nil
-        }
-        guard let variant = baseVariant else { return nil }
-
-        if isHeavyCodec(codecFamily) { return variant }
-        if let rate = estimatedDataRate, rate >= qualityBitrateThreshold {
-            return variant
-        }
+        _ = colorClass
+        _ = codecFamily
+        _ = estimatedDataRate
         return nil
     }
 
@@ -185,16 +176,6 @@ enum FilmtoneMezzanineRoutePolicy {
             return [.qualityHDR]
         case .unsupported, .unknown:
             return []
-        }
-    }
-
-    private static func isHeavyCodec(_ family: SourceCodecFamilyDTO?) -> Bool {
-        guard let family else { return false }
-        switch family {
-        case .prores422, .prores4444, .proresRaw:
-            return true
-        case .h264, .hevc, .other:
-            return false
         }
     }
 

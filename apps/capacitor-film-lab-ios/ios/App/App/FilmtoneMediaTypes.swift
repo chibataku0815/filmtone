@@ -468,6 +468,18 @@ struct Phase0ExportRequestDTO: Codable {
     /// ("ci" | "metal") for forward-compat — see `DepthRenderer`. Defaults to
     /// "ci" on the native side when nil/absent.
     let depthRenderer: String?
+    /// v1.4 (iOS): opt-in to writing Filmtone Connect package companions
+    /// (sidecar + cubes + DCTL + reference-after.jpg + a copy of the source
+    /// media) next to the rendered output. nil / false → only the rendered
+    /// mp4 + sidecar are emitted, avoiding the multi-GB source-media copy on
+    /// normal save-to-Photos / share-sheet flows. The user-facing
+    /// "Share as Connect package" entry point is the only caller that should
+    /// pass `true`. Stored as `var` with a `nil` default so (a) the
+    /// synthesized Codable decoder can populate it from JSON, and (b) the
+    /// synthesized memberwise init keeps a default so existing callers
+    /// (`FilmtonePhase0Math.swift`, `FilmtoneHelpAssetGenerator.swift`,
+    /// `scripts/swift/test-sidecar-builder.swift`) don't need updates.
+    var connectPackage: Bool? = nil
 }
 
 struct Phase0ExportProgressDTO: Encodable {

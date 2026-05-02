@@ -32,6 +32,21 @@ struct SidecarBuildInputs {
     let mezzanineUsedVariant: String?
     /// `MezzanineService.Profile.version` of the consumed mezzanine; nil when no mezzanine used.
     let mezzanineProfileVersion: Int?
+    /// v1.4 additive truth fields. Stored as `var` with `nil` default so
+    /// the synthesized memberwise init exposes them with defaults; existing
+    /// test fixtures (`scripts/swift/test-sidecar-builder.swift`) keep their
+    /// memberwise-init shape, and the production call site populates them
+    /// from the FilmtoneExportSession route-time snapshot. See
+    /// `SidecarMezzanine` doc-comment for semantics.
+    var mezzanineUrlLastPathComponent: String? = nil
+    var mezzanineFileSizeBytes: Int64? = nil
+    var mezzanineDurationSec: Double? = nil
+    var mezzanineWidth: Int? = nil
+    var mezzanineHeight: Int? = nil
+    var mezzanineCodec: String? = nil
+    var mezzaninePrewarmHit: Bool? = nil
+    var mezzanineGeneratedDuringExport: Bool? = nil
+    var mezzanineValidationStatus: String? = nil
     /// Color-managed render contract used by both preview and export for this output.
     let colorPipeline: FilmtoneColorPipelineContract
     /// Filmtone Connect package manifest. nil keeps legacy sidecar-only exports
@@ -252,10 +267,41 @@ struct SidecarSavedLookRef: Encodable {
 /// purpose (policy declined, or the requested mezzanine is still missing). `variant` is one
 /// of the ProfileVariant raw values when used; nil when not. `profileVersion` mirrors
 /// `MezzanineService.Profile.version` so importers can detect schema drift.
+///
+/// v1.4 (additive — V1 schema reader still ignores unknown keys, so no schemaVersion
+/// bump): when `used == true`, also record the routed file's identity, metrics, and
+/// validation outcome so the four observable surfaces (sidecar / output mp4 / on-device
+/// cache file / device file listing) can be cross-checked from the sidecar alone. This
+/// closes the prior class of bugs where the sidecar said "qualityHDR used" while the
+/// device-side cache was actually a 5.88 s truncated stub. Every v1.4 field is optional
+/// so V1 readers stay byte-compatible.
 struct SidecarMezzanine: Encodable {
     let used: Bool
     let variant: String?
     let profileVersion: Int?
+    /// Last path component of the cached mezzanine file actually consumed
+    /// (the SHA-256-named mp4 inside Library/Caches/FilmtonePhase0/mezzanine).
+    let urlLastPathComponent: String?
+    let fileSizeBytes: Int64?
+    let durationSec: Double?
+    let width: Int?
+    let height: Int?
+    /// FourCC media-subtype string from the cache file's first video track
+    /// (e.g. "hvc1", "avc1"). Lower-cased.
+    let codec: String?
+    /// True when this export found the cache already populated (a prewarm
+    /// from import time hit). False when this export had to call
+    /// `ensureMezzanineBlocking` synchronously and wait for generation.
+    /// nil when no quality variant was even requested for this export.
+    let prewarmHit: Bool?
+    /// Convenience inverse of `prewarmHit` for diagnostic clarity. When
+    /// `prewarmHit == false`, generatedDuringExport is true. nil otherwise.
+    let generatedDuringExport: Bool?
+    /// One of: "valid" (passed the route-time race guard), "invalidated-before-open"
+    /// (an evicted/raced cache file was caught by the race guard and the export
+    /// fell back to source-direct), "disabled-on-ios" (route policy returned nil
+    /// for this source class — used in conjunction with `used: false`).
+    let validationStatus: String?
 }
 
 struct SidecarPackageLuts: Encodable {
@@ -425,10 +471,21 @@ enum FilmtoneExportSidecarBuilder {
         // Mezzanine block is always emitted in v1.2+: used=false carries explicit "no-mezzanine"
         // semantics (vs. absent field which would mean "v1.1 sidecar / unknown"). variant is nil
         // when not used; profileVersion follows the same nullity to keep the pair consistent.
+        // v1.4 additive truth fields populated when used=true OR when the caller surfaced
+        // a route-level validationStatus (e.g. "disabled-on-ios" with used=false).
         let mezzanine = SidecarMezzanine(
             used: inputs.mezzanineUsedVariant != nil,
             variant: inputs.mezzanineUsedVariant,
-            profileVersion: inputs.mezzanineProfileVersion
+            profileVersion: inputs.mezzanineProfileVersion,
+            urlLastPathComponent: inputs.mezzanineUrlLastPathComponent,
+            fileSizeBytes: inputs.mezzanineFileSizeBytes,
+            durationSec: inputs.mezzanineDurationSec,
+            width: inputs.mezzanineWidth,
+            height: inputs.mezzanineHeight,
+            codec: inputs.mezzanineCodec,
+            prewarmHit: inputs.mezzaninePrewarmHit,
+            generatedDuringExport: inputs.mezzanineGeneratedDuringExport,
+            validationStatus: inputs.mezzanineValidationStatus
         )
 
         // v1.3 (D3.5 Phase A + Stream D Phase B): always emit the depth block.

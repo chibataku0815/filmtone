@@ -27,6 +27,26 @@ final class FilmtoneExportSession {
     /// a value the JS bridge needs to round-trip.
     private let cameraProfileSelection: CameraProfileSelection?
     private(set) var didUseMezzanineVariant: ProfileVariant?
+    /// v1.4 sidecar telemetry: route validation outcome for the consumed
+    /// mezzanine. "valid" when the routed-to URL passed isValidMezzanine right
+    /// before AVURLAsset open; "invalidated-before-open" when a race (eviction
+    /// or overwrite) made us fall back to source-direct after attribution.
+    /// nil when no mezzanine was even routed (source-direct from the start).
+    private(set) var mezzanineValidationStatus: String?
+    /// v1.4 sidecar telemetry: whether this export synchronously generated the
+    /// quality mezzanine via `ensureMezzanineBlocking` (true) vs picking up an
+    /// already-prewarmed cache (false). nil when no quality variant was
+    /// requested at all (the v1.4 default on iOS).
+    private(set) var mezzanineGeneratedDuringExport: Bool?
+    /// v1.4 sidecar telemetry: snapshot of the consumed cache file's metrics,
+    /// captured at routing time so an OS Library/Caches eviction between
+    /// AVURLAsset open and sidecar write does not silently drop the truth
+    /// fields. Stays nil when no mezzanine was consumed.
+    private(set) var mezzanineConsumedMetrics: MezzanineService.MezzanineMetrics?
+    /// v1.4 sidecar telemetry: filename of the consumed cache (the SHA-256
+    /// hex from `signature(...)`). Captured alongside metrics. Stays nil
+    /// when no mezzanine was consumed.
+    private(set) var mezzanineConsumedURLLastPathComponent: String?
     fileprivate let ciContext: CIContext
     fileprivate let colorPipeline: FilmtoneColorPipelineContract
     private let preparedInputLut: PreparedLut?
@@ -215,7 +235,18 @@ final class FilmtoneExportSession {
             realtimeRatio = nil
         }
 
-        let packageCompanions = makeConnectPackageCompanions(result: result)
+        // v1.4: only build the multi-GB Filmtone Connect package companion set
+        // when the caller explicitly requested it via `connectPackage: true`.
+        // Save-to-Photos / share-sheet flows leave the flag absent, which used
+        // to write a full-size source.mov copy + cubes + DCTL on every export
+        // and chewed through Library/Caches headroom (a contributor to the
+        // mezzanine-cache eviction story).
+        let packageCompanions: ConnectPackageCompanions?
+        if request.connectPackage == true {
+            packageCompanions = makeConnectPackageCompanions(result: result)
+        } else {
+            packageCompanions = nil
+        }
 
         // T2 (v1.1): write the filmtone-ios-export-session-v1 sidecar next to the
         // export output. Failure here must NOT fail the export itself — missing
@@ -346,6 +377,18 @@ final class FilmtoneExportSession {
             renderMode: (request.renderMode ?? .quality).rawValue,
             mezzanineUsedVariant: didUseMezzanineVariant?.rawValue,
             mezzanineProfileVersion: didUseMezzanineVariant != nil ? MezzanineService.Profile.version : nil,
+            // v1.4 truth fields. All nil when no mezzanine was consumed; populated
+            // from the snapshot we captured in exportVideo (so an eviction between
+            // routing and sidecar write cannot strip them).
+            mezzanineUrlLastPathComponent: mezzanineConsumedURLLastPathComponent,
+            mezzanineFileSizeBytes: mezzanineConsumedMetrics?.fileSizeBytes,
+            mezzanineDurationSec: mezzanineConsumedMetrics?.durationSec,
+            mezzanineWidth: mezzanineConsumedMetrics?.width,
+            mezzanineHeight: mezzanineConsumedMetrics?.height,
+            mezzanineCodec: mezzanineConsumedMetrics?.codec,
+            mezzaninePrewarmHit: mezzanineGeneratedDuringExport.map { !$0 },
+            mezzanineGeneratedDuringExport: mezzanineGeneratedDuringExport,
+            mezzanineValidationStatus: mezzanineValidationStatus,
             colorPipeline: colorPipeline,
             package: package,
             depth: depthSidecar,
@@ -466,12 +509,13 @@ final class FilmtoneExportSession {
         progress: @escaping (Phase0ExportProgressDTO) -> Void
     ) throws -> CompletedExport {
         try prepareQualityMezzanineForExport(progress: progress)
-        let effectiveSourceURL = resolvedVideoSourceURL()
+        var effectiveSourceURL = resolvedVideoSourceURL()
         // v1.4: telemetry/sidecar records which mezzanine variant the export
         // actually consumed. resolvedVideoSourceURL only returns a mezzanine
         // URL or the original source, so we probe each known variant in
         // preference order (quality > preview-grade) until we find a match.
         didUseMezzanineVariant = nil
+        mezzanineValidationStatus = nil
         if effectiveSourceURL != sourceURL, let mezz = mezzanineService {
             let depthEnabled = request.depthEnabled ?? false
             let candidates: [ProfileVariant] = [.qualityHDR, .qualitySDR, .hdr, .sdr]
@@ -485,6 +529,40 @@ final class FilmtoneExportSession {
                     break
                 }
             }
+            // Final race guard: between routing and AVURLAsset(url:) open, the
+            // file could have been invalidated (OS Library/Caches eviction
+            // under disk pressure, a racing prewarm overwrite, or a manual
+            // delete). Re-validate the picked URL; if it's no longer valid,
+            // fall back to source-direct AND clear the variant so the sidecar
+            // never claims a mezzanine was used when it wasn't.
+            if let v = didUseMezzanineVariant,
+               !mezz.isValidMezzaninePublic(
+                   at: effectiveSourceURL,
+                   sourceURL: sourceURL,
+                   variant: v
+               ) {
+                filmtonePreviewCompositionDebugLog(
+                    "Mezzanine race: routed-to URL invalidated before AVURLAsset open, falling back to source-direct"
+                )
+                didUseMezzanineVariant = nil
+                effectiveSourceURL = sourceURL
+                mezzanineValidationStatus = "invalidated-before-open"
+            } else if didUseMezzanineVariant != nil {
+                mezzanineValidationStatus = "valid"
+                // Snapshot the cache file's identity & metrics now, so a
+                // post-export eviction can't strip the truth fields out of
+                // the sidecar.
+                mezzanineConsumedURLLastPathComponent = effectiveSourceURL.lastPathComponent
+                mezzanineConsumedMetrics = mezz.mezzanineMetrics(at: effectiveSourceURL)
+            }
+        }
+        // v1.4: when render mode is .quality and we still have no mezzanine,
+        // record an explicit signal that the route policy declined ("disabled
+        // on iOS") rather than leaving sidecar `validationStatus` ambiguous.
+        if mezzanineValidationStatus == nil,
+           (request.renderMode ?? .quality) == .quality,
+           didUseMezzanineVariant == nil {
+            mezzanineValidationStatus = "disabled-on-ios"
         }
         let asset = AVURLAsset(url: effectiveSourceURL)
         guard let videoTrack = asset.tracks(withMediaType: .video).first else {
@@ -2816,6 +2894,10 @@ final class FilmtoneExportSession {
         guard (request.renderMode ?? .quality) == .quality,
               let variant = qualityMezzanineVariantForExport()
         else {
+            // v1.4: on iOS, FilmtoneMezzanineRoutePolicy.qualityPrewarmVariant
+            // returns nil for every source class (HEVC re-encode pre-cost is
+            // not recovered by decode-time savings on Apple Silicon). Quality
+            // export reads source-direct in this branch.
             return
         }
         guard let mezz = mezzanineService else {
@@ -2827,6 +2909,7 @@ final class FilmtoneExportSession {
         let depthEnabled = request.depthEnabled ?? false
         if mezz.existingMezzanineURL(for: sourceURL, variant: variant, depthEnabled: depthEnabled) != nil {
             filmtonePreviewCompositionDebugLog("Quality mezzanine ready before export: \(variant.rawValue)")
+            mezzanineGeneratedDuringExport = false
             return
         }
 
@@ -2853,6 +2936,7 @@ final class FilmtoneExportSession {
                 ))
             }
             filmtonePreviewCompositionDebugLog("Quality mezzanine generated for export: \(variant.rawValue)")
+            mezzanineGeneratedDuringExport = true
         } catch {
             throw FilmtoneMediaError.exportFailed(
                 "Quality mezzanine generation failed for this heavy source (\(variant.rawValue)): \(error.localizedDescription)"
