@@ -113,7 +113,7 @@ final class AssetPickerService: NSObject {
                 self.activeDocumentPickerPurpose = .source
                 let picker = UIDocumentPickerViewController(
                     forOpeningContentTypes: [.image, .movie, .video],
-                    asCopy: true
+                    asCopy: false
                 )
                 picker.delegate = self
                 picker.allowsMultipleSelection = false
@@ -329,7 +329,7 @@ final class AssetPickerService: NSObject {
         let type = try sourceType(for: url)
         let kind: FilmtoneSourceKind = type.conforms(to: .image) ? .image : .video
         try preflightDocumentSourceCopy(from: url)
-        let importedURL = try cacheStore.importItem(
+        let importedURL = try cacheStore.importExternalItem(
             from: url,
             suggestedName: url.lastPathComponent,
             bucket: .sources

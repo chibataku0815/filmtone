@@ -51,6 +51,40 @@ final class CacheStore {
         return destinationURL
     }
 
+    func importExternalItem(from sourceURL: URL, suggestedName: String?, bucket: Bucket) throws -> URL {
+        let destinationURL = try stagedItemURL(
+            suggestedName: suggestedName ?? sourceURL.lastPathComponent,
+            fallbackExtension: sourceURL.pathExtension,
+            bucket: bucket
+        )
+        if fileManager.fileExists(atPath: destinationURL.path) {
+            try fileManager.removeItem(at: destinationURL)
+        }
+
+        let coordinator = NSFileCoordinator(filePresenter: nil)
+        var coordinationError: NSError?
+        var copyError: Error?
+        coordinator.coordinate(readingItemAt: sourceURL, options: [], error: &coordinationError) { readableURL in
+            do {
+                try fileManager.copyItem(at: readableURL, to: destinationURL)
+            } catch {
+                copyError = error
+            }
+        }
+
+        if let coordinationError {
+            try? fileManager.removeItem(at: destinationURL)
+            throw coordinationError
+        }
+        if let copyError {
+            try? fileManager.removeItem(at: destinationURL)
+            throw copyError
+        }
+
+        try touch(destinationURL)
+        return destinationURL
+    }
+
     func stagedItemURL(
         suggestedName: String?,
         fallbackExtension: String,
