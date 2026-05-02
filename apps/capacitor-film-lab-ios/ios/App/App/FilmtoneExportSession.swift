@@ -465,6 +465,7 @@ final class FilmtoneExportSession {
     private func exportVideo(
         progress: @escaping (Phase0ExportProgressDTO) -> Void
     ) throws -> CompletedExport {
+        try prepareQualityMezzanineForExport(progress: progress)
         let effectiveSourceURL = resolvedVideoSourceURL()
         // v1.4: telemetry/sidecar records which mezzanine variant the export
         // actually consumed. resolvedVideoSourceURL only returns a mezzanine
@@ -626,7 +627,7 @@ final class FilmtoneExportSession {
             finishAudioInput(markAsFinished: true)
         }
 
-        progress(.init(stage: .reading, progress: 0.08, currentFrame: 0, totalFrames: outputFrameCount, message: "Reading source"))
+        progress(.init(stage: .reading, progress: 0.11, currentFrame: 0, totalFrames: outputFrameCount, message: "Reading source"))
 
         // v1.3 Phase B: depth-track frames seldom share the video track's
         // cadence (depth tracks are often ~half-rate). We hold the most-recent
@@ -2590,6 +2591,8 @@ final class FilmtoneExportSession {
         switch curve {
         case .djiDLog:
             rgb = FilmtoneSourceProfileMath.makeDlogToRec709Cube(size: cubeSize)
+        case .djiDLogM:
+            rgb = FilmtoneSourceProfileMath.makeDlogMToRec709Cube(size: cubeSize)
         case .canonCLog:
             rgb = FilmtoneSourceProfileMath.makeCanonClogToRec709Cube(size: cubeSize)
         case .canonLog3CinemaGamut:
@@ -2743,9 +2746,9 @@ final class FilmtoneExportSession {
     private func resolvedVideoSourceURL() -> URL {
         // v1.4: routing covers both Speed (preview-grade mezzanine) and Quality
         // (quality-grade mezzanine, only generated for heavy sources via
-        // FilmtoneMezzanineRoutePolicy.qualityPrewarmVariant). Quality + light
-        // source returns nil from the policy → source-direct (the previous
-        // "source-of-truth" path is preserved as a transparent fallback).
+        // FilmtoneMezzanineRoutePolicy.qualityPrewarmVariant). Quality export
+        // prepares eligible heavy-source mezzanines before reaching this
+        // routing point; policy-declined light sources remain source-direct.
         // Preview reads via this same function so preview ↔ export bytes
         // remain symmetric within each renderMode.
         guard let mezz = mezzanineService else {
@@ -2805,6 +2808,93 @@ final class FilmtoneExportSession {
             )
             return sourceURL
         }
+    }
+
+    private func prepareQualityMezzanineForExport(
+        progress: @escaping (Phase0ExportProgressDTO) -> Void
+    ) throws {
+        guard (request.renderMode ?? .quality) == .quality,
+              let variant = qualityMezzanineVariantForExport()
+        else {
+            return
+        }
+        guard let mezz = mezzanineService else {
+            throw FilmtoneMediaError.exportFailed(
+                "Quality mezzanine is required for this heavy source, but the cache service is unavailable."
+            )
+        }
+
+        let depthEnabled = request.depthEnabled ?? false
+        if mezz.existingMezzanineURL(for: sourceURL, variant: variant, depthEnabled: depthEnabled) != nil {
+            filmtonePreviewCompositionDebugLog("Quality mezzanine ready before export: \(variant.rawValue)")
+            return
+        }
+
+        progress(.init(
+            stage: .preflight,
+            progress: 0.06,
+            currentFrame: nil,
+            totalFrames: nil,
+            message: "Preparing quality cache"
+        ))
+
+        do {
+            _ = try mezz.ensureMezzanineBlocking(
+                sourceURL: sourceURL,
+                variant: variant,
+                depthEnabled: depthEnabled
+            ) { fraction in
+                progress(.init(
+                    stage: .preflight,
+                    progress: 0.06 + min(0.049, max(0.0, fraction) * 0.049),
+                    currentFrame: nil,
+                    totalFrames: nil,
+                    message: "Preparing quality cache"
+                ))
+            }
+            filmtonePreviewCompositionDebugLog("Quality mezzanine generated for export: \(variant.rawValue)")
+        } catch {
+            throw FilmtoneMediaError.exportFailed(
+                "Quality mezzanine generation failed for this heavy source (\(variant.rawValue)): \(error.localizedDescription)"
+            )
+        }
+    }
+
+    private func qualityMezzanineVariantForExport() -> ProfileVariant? {
+        guard let probe = request.sourceProbe else {
+            return MezzanineColorProbe.qualityPrewarmVariant(sourceURL: sourceURL)
+        }
+
+        let colorClass = probe.sourceVideoMetadata?.colorClass
+        let codecFamily = probe.sourceVideoMetadata?.codecFamily ?? probe.codecFamily
+        let estimatedDataRate = estimatedDataRate(from: probe)
+        guard let routeVariant = FilmtoneMezzanineRoutePolicy.qualityPrewarmVariant(
+            for: colorClass,
+            codecFamily: codecFamily,
+            estimatedDataRate: estimatedDataRate
+        ) else {
+            return nil
+        }
+
+        switch routeVariant {
+        case .qualitySDR:
+            return .qualitySDR
+        case .qualityHDR:
+            return .qualityHDR
+        case .sdr, .hdr:
+            return nil
+        }
+    }
+
+    private func estimatedDataRate(from probe: SourceProbeDTO) -> Double? {
+        guard let fileSizeBytes = probe.fileSizeBytes,
+              let durationSec = probe.durationSec,
+              fileSizeBytes > 0,
+              durationSec > 0
+        else {
+            return nil
+        }
+        return Double(fileSizeBytes) * 8.0 / durationSec
     }
 
     static func scaledSize(for track: AVAssetTrack, longEdge: Int) -> CGSize {

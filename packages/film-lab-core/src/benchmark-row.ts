@@ -1,4 +1,9 @@
-import type { Phase0ExportBenchmarkRecord, Phase0ExportResult, SourceProbe } from "./native-bridge";
+import type {
+  Phase0ExportBenchmarkRecord,
+  Phase0ExportResult,
+  Phase0MezzanineProfileVariant,
+  SourceProbe,
+} from "./native-bridge";
 
 export type BenchmarkVisualFloor = "pass" | "fail" | "not-checked";
 export type BenchmarkSaveResult = "ok" | "fail" | "not-run";
@@ -21,9 +26,16 @@ export interface BenchmarkRow {
   durationSec: number | null;
   /** v1.2: render mode the export ran under. Absent native field → "quality" default. */
   renderMode: "quality" | "speed";
-  /** v1.2: mezzanine variant the export consumed, null when source-direct. */
-  mezzanineProfileVariant: "sdr" | "hdr" | null;
+  /** v1.2+: mezzanine variant the export consumed, null when source-direct. */
+  mezzanineProfileVariant: Phase0MezzanineProfileVariant | null;
 }
+
+const MEZZANINE_PROFILE_VARIANTS = new Set<Phase0MezzanineProfileVariant>([
+  "sdr",
+  "hdr",
+  "qualitySDR",
+  "qualityHDR",
+]);
 
 export interface BenchmarkRowInput {
   result: Phase0ExportResult;
@@ -148,8 +160,11 @@ export function parseBenchmarkRow(line: string): ParsedBenchmarkRow | null {
   const modeRaw = g.mode.trim();
   const renderMode: "quality" | "speed" = modeRaw === "speed" ? "speed" : "quality";
   const mezzRaw = g.mezz.trim();
-  const mezzanineProfileVariant: "sdr" | "hdr" | null =
-    mezzRaw === "hdr" ? "hdr" : mezzRaw === "sdr" ? "sdr" : null;
+  const mezzanineProfileVariant = MEZZANINE_PROFILE_VARIANTS.has(
+    mezzRaw as Phase0MezzanineProfileVariant,
+  )
+    ? (mezzRaw as Phase0MezzanineProfileVariant)
+    : null;
 
   return {
     raw: trimmed,

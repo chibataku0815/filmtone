@@ -61,26 +61,7 @@ final class AssetPickerService: NSObject {
     }
 
     private func kickOffMezzanine(for sourceURL: URL) {
-        let service = mezzanineService
-
-        // Preview-grade prewarm (Speed export). Skips Display P3 SDR / unknown
-        // so stale SDR mezzanines cannot diverge from the live preview.
-        if let previewVariant = MezzanineColorProbe.prewarmVariant(sourceURL: sourceURL) {
-            Task.detached(priority: .utility) {
-                _ = try? await service.ensureMezzanine(sourceURL: sourceURL, variant: previewVariant)
-            }
-        }
-
-        // v1.4: quality-grade prewarm (Quality export). Eligibility gate
-        // (FilmtoneMezzanineRoutePolicy.qualityPrewarmVariant) only fires for
-        // ProRes / DNxHD / >=100 Mbps sources where re-encode pays off.
-        // Typical iPhone HEVC sources skip this entirely so Quality export
-        // stays source-direct without a disk-cost penalty.
-        if let qualityVariant = MezzanineColorProbe.qualityPrewarmVariant(sourceURL: sourceURL) {
-            Task.detached(priority: .utility) {
-                _ = try? await service.ensureMezzanine(sourceURL: sourceURL, variant: qualityVariant)
-            }
-        }
+        mezzanineService.prewarmEligibleMezzanines(for: sourceURL)
     }
 
     @MainActor

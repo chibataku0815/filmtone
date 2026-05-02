@@ -48,6 +48,13 @@ private struct Clog3CineGamutMacbethPatch: Decodable {
     let rec709LinearReference: [Double]
 }
 
+private struct DlogMMacbethPatch: Decodable {
+    let index: Int
+    let dlogMEncoded: [Double]
+    let rec709EncodedExpected: [Double]
+    let rec709LinearReference: [Double]
+}
+
 private struct MacbethPatch: Decodable {
     let index: Int
     let vlogEncoded: [Double]
@@ -244,6 +251,74 @@ private func runDlogMacbethCheck(fixtureURL: URL) throws {
     try expect(meanFullFrame <= 0.5, "D-Log full-frame mean = \(meanFullFrame)/255 exceeds budget 0.5/255")
     print(String(format: "    D-Log Macbeth ΔE2000 max = %.3f mean = %.3f (budget 2.0/1.0)", maxDeltaE, meanDeltaE))
     print(String(format: "    D-Log Macbeth full-frame max = %.3f mean = %.3f /255 (budget 2.0/0.5)", maxFullFrame, meanFullFrame))
+}
+
+// MARK: - DJI D-Log M accuracy gate
+
+private func runDlogMLinearizationCheck(fixtureURL: URL) throws {
+    let samples: [LinearizationSample] = try loadJSON(fixtureURL.appendingPathComponent("linearization-ramp.json"))
+    try expect(samples.count == 4096, "D-Log M linearization ramp expected 4096 samples, got \(samples.count)")
+    var maxDelta = 0.0
+    for sample in samples {
+        let computed = FilmtoneSourceProfileMath.dlogMDecode(sample.vEncoded)
+        maxDelta = max(maxDelta, abs(computed - sample.lLinear))
+    }
+    try expect(
+        maxDelta <= 1e-3,
+        "D-Log M linearization drift max |Δ| = \(maxDelta) exceeds tolerance 1e-3"
+    )
+    print(String(format: "    D-Log M linearization max |Δ| = %.6f (budget 1e-3)", maxDelta))
+}
+
+private func runDlogMMacbethCheck(fixtureURL: URL) throws {
+    let patches: [DlogMMacbethPatch] = try loadJSON(fixtureURL.appendingPathComponent("macbeth-patches.json"))
+    try expect(patches.count == 24, "D-Log M Macbeth fixture expected 24 patches, got \(patches.count)")
+
+    var maxDeltaE = 0.0
+    var sumDeltaE = 0.0
+    var maxFullFrame = 0.0
+    var sumFullFrame = 0.0
+    var fullFrameCount = 0
+
+    for patch in patches {
+        let computed = FilmtoneSourceProfileMath.dlogMPixelToRec709(
+            red: patch.dlogMEncoded[0],
+            green: patch.dlogMEncoded[1],
+            blue: patch.dlogMEncoded[2]
+        )
+
+        let computedLinear = (
+            r: rec709InverseEncode(computed.red),
+            g: rec709InverseEncode(computed.green),
+            b: rec709InverseEncode(computed.blue)
+        )
+        let expectedLinear = (
+            r: rec709InverseEncode(patch.rec709EncodedExpected[0]),
+            g: rec709InverseEncode(patch.rec709EncodedExpected[1]),
+            b: rec709InverseEncode(patch.rec709EncodedExpected[2])
+        )
+        let lab1 = xyzToLab(rec709LinearToXYZ(computedLinear))
+        let lab2 = xyzToLab(rec709LinearToXYZ(expectedLinear))
+        let dE = deltaE2000(lab1, lab2)
+        maxDeltaE = max(maxDeltaE, dE)
+        sumDeltaE += dE
+
+        for ch in 0..<3 {
+            let drift = abs(channel(computed, ch) - patch.rec709EncodedExpected[ch]) * 255.0
+            maxFullFrame = max(maxFullFrame, drift)
+            sumFullFrame += drift
+            fullFrameCount += 1
+        }
+    }
+    let meanDeltaE = sumDeltaE / Double(patches.count)
+    let meanFullFrame = sumFullFrame / Double(fullFrameCount)
+
+    try expect(maxDeltaE <= 2.0, "D-Log M Macbeth ΔE2000 max = \(maxDeltaE) exceeds budget 2.0")
+    try expect(meanDeltaE <= 1.0, "D-Log M Macbeth ΔE2000 mean = \(meanDeltaE) exceeds budget 1.0")
+    try expect(maxFullFrame <= 2.0, "D-Log M full-frame max = \(maxFullFrame)/255 exceeds budget 2/255")
+    try expect(meanFullFrame <= 0.5, "D-Log M full-frame mean = \(meanFullFrame)/255 exceeds budget 0.5/255")
+    print(String(format: "    D-Log M Macbeth ΔE2000 max = %.3f mean = %.3f (budget 2.0/1.0)", maxDeltaE, meanDeltaE))
+    print(String(format: "    D-Log M Macbeth full-frame max = %.3f mean = %.3f /255 (budget 2.0/0.5)", maxFullFrame, meanFullFrame))
 }
 
 // MARK: - Canon C-Log accuracy gate
@@ -597,6 +672,12 @@ struct TestSourceProfileMath {
             print("==> D-Log accuracy gate")
             try runDlogLinearizationCheck(fixtureURL: dlogFixture)
             try runDlogMacbethCheck(fixtureURL: dlogFixture)
+        }
+        let dlogmFixture = fixturesRoot.appendingPathComponent("dji-dlog-m")
+        if FileManager.default.fileExists(atPath: dlogmFixture.path) {
+            print("==> D-Log M + D-Gamut M accuracy gate")
+            try runDlogMLinearizationCheck(fixtureURL: dlogmFixture)
+            try runDlogMMacbethCheck(fixtureURL: dlogmFixture)
         }
         let clogFixture = fixturesRoot.appendingPathComponent("canon-clog")
         if FileManager.default.fileExists(atPath: clogFixture.path) {

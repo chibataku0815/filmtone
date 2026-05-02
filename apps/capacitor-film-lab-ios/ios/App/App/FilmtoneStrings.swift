@@ -149,6 +149,7 @@ struct FilmtoneStrings {
     let cameraAppleLog: String
     let cameraAppleLog2: String
     let cameraDLog: String
+    let cameraDLogM: String
     let cameraCLog: String
     let cameraCLog3CineGamut: String
     let cameraVLog: String
@@ -292,6 +293,7 @@ extension FilmtoneStrings {
         case "apple-log":      return cameraAppleLog
         case "apple-log-2":    return cameraAppleLog2
         case "dji-dlog":                return cameraDLog
+        case "dji-dlog-m":              return cameraDLogM
         case "canon-clog":              return cameraCLog
         case "canon-log3-cinema-gamut": return cameraCLog3CineGamut
         case "panasonic-vlog":          return cameraVLog
@@ -1160,6 +1162,11 @@ extension FilmtoneStrings {
             "filmtone.camera.dji_dlog",
             defaultValue: "DJI D-Log",
             comment: "Built-in camera source profile name (DJI D-Log)."
+        )
+        cameraDLogM = filmtoneLocalized(
+            "filmtone.camera.dji_dlog_m",
+            defaultValue: "DJI D-Log M",
+            comment: "Built-in camera source profile name (DJI D-Log M -- consumer-camera D-Gamut M curve, shared across Mavic 3 Pro / Osmo Pocket 3 / Osmo 360). Proper-noun preserved across locales."
         )
         cameraCLog = filmtoneLocalized(
             "filmtone.camera.canon_clog",

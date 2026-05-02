@@ -17,6 +17,62 @@ enum ProfileVariant: String {
 }
 
 final class MezzanineService {
+    private final class GenerationState {
+        private let condition = NSCondition()
+        private var result: Result<URL, Error>?
+        private var progress: Double = 0
+        private var progressObservers: [UUID: (Double) -> Void] = [:]
+
+        func complete(_ result: Result<URL, Error>) {
+            condition.lock()
+            self.result = result
+            condition.broadcast()
+            condition.unlock()
+        }
+
+        func wait() throws -> URL {
+            condition.lock()
+            while result == nil {
+                condition.wait()
+            }
+            let completed = result!
+            condition.unlock()
+            return try completed.get()
+        }
+
+        func updateProgress(_ value: Double) {
+            let clamped = min(1.0, max(0.0, value))
+            let observers: [(Double) -> Void]
+            condition.lock()
+            progress = clamped
+            observers = Array(progressObservers.values)
+            condition.unlock()
+            observers.forEach { $0(clamped) }
+        }
+
+        func addProgressObserver(_ observer: @escaping (Double) -> Void) -> UUID {
+            let token = UUID()
+            let current: Double
+            condition.lock()
+            progressObservers[token] = observer
+            current = progress
+            condition.unlock()
+            observer(current)
+            return token
+        }
+
+        func removeProgressObserver(_ token: UUID) {
+            condition.lock()
+            progressObservers[token] = nil
+            condition.unlock()
+        }
+    }
+
+    private struct GenerationLease {
+        let state: GenerationState
+        let shouldStart: Bool
+    }
+
     struct Profile {
         // v=3: HDR mezzanine (v1.2). v=4: depth flag participation (v1.3) — every
         // prior cache entry naturally invalidates on the bump. The `depthEnabled`
@@ -133,7 +189,7 @@ final class MezzanineService {
     private let ciContext: CIContext
     private let colorSpace = CGColorSpaceCreateDeviceRGB()
     private let inFlightQueue = DispatchQueue(label: "MezzanineService.inflight")
-    private var inFlight: [String: Task<URL, Error>] = [:]
+    private var inFlight: [String: GenerationState] = [:]
 
     init(
         cacheStore: CacheStore,
@@ -194,6 +250,24 @@ final class MezzanineService {
 
     // MARK: - Public API
 
+    func prewarmEligibleMezzanines(for sourceURL: URL) {
+        // Preview-grade prewarm (Speed export). Skips Display P3 SDR / unknown
+        // so stale SDR mezzanines cannot diverge from the live preview.
+        if let previewVariant = MezzanineColorProbe.prewarmVariant(sourceURL: sourceURL) {
+            Task.detached(priority: .utility) { [weak self] in
+                _ = try? await self?.ensureMezzanine(sourceURL: sourceURL, variant: previewVariant)
+            }
+        }
+
+        // Quality-grade prewarm (Quality export). Eligibility gate only fires
+        // for ProRes / DNxHD / >=100 Mbps sources where re-encode pays off.
+        if let qualityVariant = MezzanineColorProbe.qualityPrewarmVariant(sourceURL: sourceURL) {
+            Task.detached(priority: .utility) { [weak self] in
+                _ = try? await self?.ensureMezzanine(sourceURL: sourceURL, variant: qualityVariant)
+            }
+        }
+    }
+
     /// Returns mezzanine URL if a valid cache file already exists for `sourceURL` at `variant`.
     /// Touches contentModificationDate for LRU recency. Does not trigger generation.
     /// `depthEnabled` participates in the cache key (see `signature(for:profile:depthEnabled:)`).
@@ -213,7 +287,7 @@ final class MezzanineService {
     }
 
     /// Ensures a mezzanine file for `sourceURL` exists at `variant`, generating if missing.
-    /// Multiple concurrent calls for the same (source, variant) coalesce to a single task.
+    /// Multiple concurrent calls for the same (source, variant) coalesce to one in-flight generation.
     /// Generation is atomic: writes to a `.partial` sibling and renames on success
     /// so a crash mid-transcode never leaves a readable-but-corrupt `.mp4` behind.
     /// `depthEnabled` participates in the cache key (see `signature(for:profile:depthEnabled:)`).
@@ -231,40 +305,185 @@ final class MezzanineService {
             return destURL
         }
 
-        let task: Task<URL, Error> = inFlightQueue.sync {
-            if let existing = inFlight[sig] { return existing }
-            let tempURL = destURL.appendingPathExtension("partial")
-            let newTask = Task<URL, Error> { [weak self] in
-                guard let self else { throw GenerationError.cancelled }
-                defer {
-                    self.inFlightQueue.sync { self.inFlight[sig] = nil }
-                }
-                // Clean any stale partial from a prior crashed run.
-                try? self.fileManager.removeItem(at: tempURL)
-                try Task.checkCancellation()
-                try await self.generate(
-                    sourceURL: sourceURL,
-                    destinationURL: tempURL,
-                    profile: profile
-                )
-                try Task.checkCancellation()
-                // Atomic promote so existingMezzanineURL only ever sees complete files.
-                if self.fileManager.fileExists(atPath: destURL.path) {
-                    try? self.fileManager.removeItem(at: destURL)
-                }
-                try self.fileManager.moveItem(at: tempURL, to: destURL)
-                try? self.cacheStore.touch(destURL)
-                try? self.cacheStore.pruneMezzanine(
-                    maxBytes: Limits.maxBytes,
-                    maxEntries: Limits.maxEntries
-                )
-                return destURL
-            }
-            inFlight[sig] = newTask
-            return newTask
+        let lease = generationLease(signature: sig)
+        if lease.shouldStart {
+            startAsyncGeneration(
+                signature: sig,
+                state: lease.state,
+                sourceURL: sourceURL,
+                destinationURL: destURL,
+                temporaryURL: destURL.appendingPathExtension("partial"),
+                profile: profile
+            )
         }
 
-        return try await task.value
+        return try await waitForGeneration(lease.state)
+    }
+
+    /// Synchronous export-time quality mezzanine preparation.
+    /// Export is already a blocking native job, so this participates in the
+    /// same in-flight state as import prewarm instead of starting duplicate
+    /// work when the user exports before prewarm finishes.
+    @discardableResult
+    func ensureMezzanineBlocking(
+        sourceURL: URL,
+        variant: ProfileVariant = .sdr,
+        depthEnabled: Bool = false,
+        progress: ((Double) -> Void)? = nil
+    ) throws -> URL {
+        let profile = Profile.profile(for: variant)
+        let sig = try signature(for: sourceURL, profile: profile, depthEnabled: depthEnabled)
+        let destURL = try cacheStore.mezzanineFileURL(signature: sig)
+
+        if fileManager.fileExists(atPath: destURL.path) {
+            return destURL
+        }
+
+        let lease = generationLease(signature: sig)
+        if lease.shouldStart {
+            let tempURL = destURL
+                .appendingPathExtension("export-\(UUID().uuidString)")
+                .appendingPathExtension("partial")
+            do {
+                let url = try generateAndPromoteSync(
+                    sourceURL: sourceURL,
+                    destinationURL: destURL,
+                    temporaryURL: tempURL,
+                    profile: profile
+                ) { fraction in
+                    lease.state.updateProgress(fraction)
+                    progress?(fraction)
+                }
+                completeGeneration(signature: sig, state: lease.state, result: .success(url))
+                return url
+            } catch {
+                completeGeneration(signature: sig, state: lease.state, result: .failure(error))
+                throw error
+            }
+        }
+
+        let observerToken = progress.map { lease.state.addProgressObserver($0) }
+        defer {
+            if let observerToken {
+                lease.state.removeProgressObserver(observerToken)
+            }
+        }
+        return try lease.state.wait()
+    }
+
+    private func generationLease(signature sig: String) -> GenerationLease {
+        inFlightQueue.sync {
+            if let existing = inFlight[sig] {
+                return GenerationLease(state: existing, shouldStart: false)
+            }
+            let state = GenerationState()
+            inFlight[sig] = state
+            return GenerationLease(state: state, shouldStart: true)
+        }
+    }
+
+    private func startAsyncGeneration(
+        signature sig: String,
+        state: GenerationState,
+        sourceURL: URL,
+        destinationURL destURL: URL,
+        temporaryURL tempURL: URL,
+        profile: Profile
+    ) {
+        DispatchQueue.global(qos: .utility).async { [self] in
+            do {
+                let url = try generateAndPromoteSync(
+                    sourceURL: sourceURL,
+                    destinationURL: destURL,
+                    temporaryURL: tempURL,
+                    profile: profile,
+                    progress: { state.updateProgress($0) }
+                )
+                completeGeneration(signature: sig, state: state, result: .success(url))
+            } catch {
+                completeGeneration(signature: sig, state: state, result: .failure(error))
+            }
+        }
+    }
+
+    private func completeGeneration(
+        signature sig: String,
+        state: GenerationState,
+        result: Result<URL, Error>
+    ) {
+        state.complete(result)
+        inFlightQueue.sync {
+            if inFlight[sig] === state {
+                inFlight[sig] = nil
+            }
+        }
+    }
+
+    private func waitForGeneration(_ state: GenerationState) async throws -> URL {
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async {
+                do {
+                    continuation.resume(returning: try state.wait())
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    private func generateAndPromoteSync(
+        sourceURL: URL,
+        destinationURL destURL: URL,
+        temporaryURL tempURL: URL,
+        profile: Profile,
+        progress: ((Double) -> Void)? = nil
+    ) throws -> URL {
+        do {
+            // Clean any stale partial from a prior crashed or cancelled run.
+            try? fileManager.removeItem(at: tempURL)
+            try generateSync(
+                sourceURL: sourceURL,
+                destinationURL: tempURL,
+                profile: profile,
+                progress: progress
+            )
+            return try promoteGeneratedMezzanine(
+                temporaryURL: tempURL,
+                destinationURL: destURL
+            )
+        } catch {
+            try? fileManager.removeItem(at: tempURL)
+            throw error
+        }
+    }
+
+    private func promoteGeneratedMezzanine(
+        temporaryURL tempURL: URL,
+        destinationURL destURL: URL
+    ) throws -> URL {
+        if fileManager.fileExists(atPath: destURL.path) {
+            try? fileManager.removeItem(at: tempURL)
+            try? cacheStore.touch(destURL)
+            return destURL
+        }
+
+        do {
+            try fileManager.moveItem(at: tempURL, to: destURL)
+        } catch {
+            if fileManager.fileExists(atPath: destURL.path) {
+                try? fileManager.removeItem(at: tempURL)
+                try? cacheStore.touch(destURL)
+                return destURL
+            }
+            throw error
+        }
+
+        try? cacheStore.touch(destURL)
+        try? cacheStore.pruneMezzanine(
+            maxBytes: Limits.maxBytes,
+            maxEntries: Limits.maxEntries
+        )
+        return destURL
     }
 
     // MARK: - Generation
@@ -288,13 +507,19 @@ final class MezzanineService {
         }
     }
 
-    private func generateSync(sourceURL: URL, destinationURL: URL, profile: Profile) throws {
+    private func generateSync(
+        sourceURL: URL,
+        destinationURL: URL,
+        profile: Profile,
+        progress: ((Double) -> Void)? = nil
+    ) throws {
         let asset = AVURLAsset(url: sourceURL)
         guard let videoTrack = asset.tracks(withMediaType: .video).first else {
             throw GenerationError.unsupportedSource("No video track found.")
         }
 
         let outputSize = profile.outputSize(forTrack: videoTrack)
+        let durationSec = CMTimeGetSeconds(asset.duration)
 
         if fileManager.fileExists(atPath: destinationURL.path) {
             try fileManager.removeItem(at: destinationURL)
@@ -460,6 +685,23 @@ final class MezzanineService {
         var capturedError: Error?
 
         let preferredTransform = videoTrack.preferredTransform
+        let progressLock = NSLock()
+        var lastProgressEmit = Date.distantPast
+
+        func emitProgress(_ fraction: Double) {
+            guard let progress else { return }
+            let clamped = min(1.0, max(0.0, fraction))
+            let now = Date()
+            progressLock.lock()
+            let shouldEmit = now.timeIntervalSince(lastProgressEmit) >= 0.5 || clamped >= 1.0
+            if shouldEmit {
+                lastProgressEmit = now
+            }
+            progressLock.unlock()
+            if shouldEmit {
+                progress(clamped)
+            }
+        }
 
         func finishVideo(markAsFinished: Bool) {
             completionLock.lock()
@@ -492,6 +734,7 @@ final class MezzanineService {
             finishAudio(markAsFinished: true)
         }
 
+        emitProgress(0)
         group.enter()
         videoInput.requestMediaDataWhenReady(on: videoQueue) {
             while videoInput.isReadyForMoreMediaData {
@@ -541,6 +784,13 @@ final class MezzanineService {
                         fail(GenerationError.writerFailed(writer.error?.localizedDescription ?? "Append failed."))
                         return
                     }
+
+                    if durationSec.isFinite, durationSec > 0 {
+                        let presentationSec = CMTimeGetSeconds(presentationTime)
+                        if presentationSec.isFinite {
+                            emitProgress(presentationSec / durationSec)
+                        }
+                    }
                 }
             }
         }
@@ -589,6 +839,7 @@ final class MezzanineService {
         if writer.status != .completed {
             throw GenerationError.writerFailed(writer.error?.localizedDescription ?? "Writer did not complete.")
         }
+        emitProgress(1)
     }
 
     private func orientAndScale(

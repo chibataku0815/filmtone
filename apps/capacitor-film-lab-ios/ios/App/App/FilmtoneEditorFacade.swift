@@ -102,6 +102,10 @@ final class FilmtoneEditorFacade {
         try runtime.probeSource(source)
     }
 
+    func prewarmMezzanines(for source: SourceInfoDTO) {
+        runtime.prewarmMezzanines(for: source)
+    }
+
     func renderPreview(
         request: Phase0ExportRequestDTO
     ) async throws -> Phase0PreviewRenderResultDTO {

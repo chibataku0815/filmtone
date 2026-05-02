@@ -1534,6 +1534,12 @@ function buildPhase0ExportRequest(options) {
 }
 
 // src/benchmark-row.ts
+var MEZZANINE_PROFILE_VARIANTS = /* @__PURE__ */ new Set([
+  "sdr",
+  "hdr",
+  "qualitySDR",
+  "qualityHDR"
+]);
 var ROW_HEADER = "| date | device | iOS | clip_id | input_resolution | output_resolution | realtime_ratio | file_size_mb | thermal | memory_warnings | save | visual | error | duration_sec | mode | mezz_variant |";
 var ROW_DIVIDER = "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |";
 function buildBenchmarkRow(input) {
@@ -1617,7 +1623,9 @@ function parseBenchmarkRow(line) {
   const modeRaw = g.mode.trim();
   const renderMode = modeRaw === "speed" ? "speed" : "quality";
   const mezzRaw = g.mezz.trim();
-  const mezzanineProfileVariant = mezzRaw === "hdr" ? "hdr" : mezzRaw === "sdr" ? "sdr" : null;
+  const mezzanineProfileVariant = MEZZANINE_PROFILE_VARIANTS.has(
+    mezzRaw
+  ) ? mezzRaw : null;
   return {
     raw: trimmed,
     date: g.date.trim(),

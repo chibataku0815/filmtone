@@ -204,6 +204,12 @@ export type Phase0ExportStage =
 
 export type Phase0RenderMode = "quality" | "speed";
 
+export type Phase0MezzanineProfileVariant =
+  | "sdr"
+  | "hdr"
+  | "qualitySDR"
+  | "qualityHDR";
+
 /**
  * v1.3 (iOS, D3.1): depth prefilter renderer selector. Encoded as a plain
  * string on the wire for forward-compat — Phase B may add `metal` only on a
@@ -298,8 +304,8 @@ export interface Phase0ExportBenchmarkRecord {
   mezzanineGenerationMs?: number;
   /** v1.2: render mode actually used ("quality" | "speed"). */
   renderMode?: Phase0RenderMode;
-  /** v1.2: mezzanine variant the export consumed ("sdr" | "hdr"), absent if no mezzanine used. */
-  mezzanineProfileVariant?: "sdr" | "hdr";
+  /** v1.2+: mezzanine variant the export consumed, absent if no mezzanine used. */
+  mezzanineProfileVariant?: Phase0MezzanineProfileVariant;
   /** v1.3 (D3.4): whether the depth × ray-angle prefilter ran for this export. */
   depthUsed?: boolean;
   /** v1.3 (D3.4): depth aux source ("avDepthData"), absent when depth not used. */

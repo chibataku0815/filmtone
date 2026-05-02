@@ -86,6 +86,7 @@ enum SourceProfileCurve: String, Codable, CaseIterable, Sendable {
     case appleLog              = "apple-log"
     case appleLog2             = "apple-log-2"
     case djiDLog               = "dji-dlog"
+    case djiDLogM              = "dji-dlog-m"
     case canonCLog             = "canon-clog"
     case canonLog3CinemaGamut  = "canon-log3-cinema-gamut"
     case panasonicVLog         = "panasonic-vlog"

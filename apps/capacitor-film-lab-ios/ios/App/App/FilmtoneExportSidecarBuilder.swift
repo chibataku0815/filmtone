@@ -28,7 +28,7 @@ struct SidecarBuildInputs {
     let identity: SidecarDeviceIdentity
     /// Render mode selected for this export ("quality" | "speed"), nil if not surfaced by caller.
     let renderMode: String?
-    /// Mezzanine variant actually consumed during export ("sdr" | "hdr"), nil if mezzanine not used.
+    /// Mezzanine variant actually consumed during export, nil if mezzanine not used.
     let mezzanineUsedVariant: String?
     /// `MezzanineService.Profile.version` of the consumed mezzanine; nil when no mezzanine used.
     let mezzanineProfileVersion: Int?
@@ -212,7 +212,7 @@ struct SidecarOutput: Encodable {
 ///   is `"built-in"` or when `.auto` resolved through the catalog at
 ///   export time.
 /// - `curve`: the `SourceProfileCurve` raw value (`"apple-log"` /
-///   `"apple-log-2"` / `"dji-dlog"` / `"canon-clog"` /
+///   `"apple-log-2"` / `"dji-dlog"` / `"dji-dlog-m"` / `"canon-clog"` /
 ///   `"canon-log3-cinema-gamut"` / `"panasonic-vlog"` / `"sony-slog3"`),
 ///   nil for `nilProfile` / `userImport`.
 /// - `impl`: the `SourceProfileImpl` discriminator (`"native-policy"` /
@@ -249,9 +249,9 @@ struct SidecarSavedLookRef: Encodable {
 
 /// Records whether (and which variant of) a mezzanine asset was consumed for this export.
 /// `used == false` is a meaningful signal: the export ran via the source-direct path on
-/// purpose (renderMode=quality on SDR source, or mezzanine missing/corrupt). `variant` is
-/// "sdr" | "hdr" when used; nil when not. `profileVersion` mirrors
-/// `MezzanineService.Profile.version` (currently 3) so importers can detect schema drift.
+/// purpose (policy declined, or the requested mezzanine is still missing). `variant` is one
+/// of the ProfileVariant raw values when used; nil when not. `profileVersion` mirrors
+/// `MezzanineService.Profile.version` so importers can detect schema drift.
 struct SidecarMezzanine: Encodable {
     let used: Bool
     let variant: String?

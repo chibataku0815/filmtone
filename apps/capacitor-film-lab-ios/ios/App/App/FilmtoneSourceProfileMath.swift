@@ -157,6 +157,104 @@ enum FilmtoneSourceProfileMath {
         return cube
     }
 
+    // MARK: - DJI D-Log M
+
+    /// D-Log M → linear scene-referred decoder. DJI has not published a
+    /// formal D-Log M transfer specification. The 6 piecewise-log
+    /// coefficients below are FITTED from the DJI consumer-camera
+    /// `D-Log M to Rec.709 V1.cube` (SHA-256 b18162854ab47702...) which
+    /// DJI ships byte-identically for Mavic 3 Pro, Osmo Pocket 3, and
+    /// Osmo 360. The fit pre-compensates the Filmtone SDR shoulder so
+    /// that `filmtoneSdrShoulder(decode_M(V))` reproduces the cube's
+    /// gray-axis output. The 7th coefficient (`d`) is derived from
+    /// continuity at the breakpoint.
+    ///
+    /// SSOT: `Tests/Fixtures/source-profile/dji-dlog-m/encode-ramp.py`.
+    /// Re-running that script reproduces these literals; see
+    /// `docs/source-profile-math/dji-dlog-m.md` for the full provenance.
+    @inline(__always)
+    static func dlogMDecode(_ encoded: Double) -> Double {
+        let cut: Double           = 0.1113510236
+        let linearOffset: Double  = 0.0000000120
+        let linearSlope: Double   = 7.5547639793
+        let logA: Double          = 1.5389476580
+        let logB: Double          = -1.8459129538
+        let logC: Double          = 0.0165823994
+        let logD: Double          = 0.3103580873  // derived from continuity at cut
+        if encoded <= cut {
+            return (encoded - linearOffset) / linearSlope
+        }
+        return (pow(10.0, logA * encoded + logB) - logC) / logD
+    }
+
+    /// D-Gamut M → Rec.709 matrix, fitted from the DJI cube via joint
+    /// refinement under the row-sum = 1 (gray-axis preserving) constraint.
+    /// Less aggressive negative coefficients than D-Gamut original — D-Log M
+    /// targets a slightly narrower gamut closer to Rec.709, which matches
+    /// DJI's positioning of D-Log M as the consumer-camera log curve.
+    @inline(__always)
+    static func dgamutMToRec709(
+        red: Double,
+        green: Double,
+        blue: Double
+    ) -> (red: Double, green: Double, blue: Double) {
+        (
+            red:    1.4312693292 * red - 0.4338679939 * green + 0.0025986647 * blue,
+            green: -0.0747311522 * red + 1.1578502353 * green - 0.0831190830 * blue,
+            blue:  -0.0570111279 * red - 0.2731296886 * green + 1.3301408164 * blue
+        )
+    }
+
+    /// End-to-end DJI D-Log M → Rec.709 SDR pixel pipeline:
+    /// linearize → D-Gamut M→Rec.709 matrix → Filmtone shoulder → Rec.709 OETF.
+    @inline(__always)
+    static func dlogMPixelToRec709(
+        red: Double,
+        green: Double,
+        blue: Double
+    ) -> (red: Double, green: Double, blue: Double) {
+        let linearRed = dlogMDecode(red)
+        let linearGreen = dlogMDecode(green)
+        let linearBlue = dlogMDecode(blue)
+        let mapped = dgamutMToRec709(
+            red: linearRed,
+            green: linearGreen,
+            blue: linearBlue
+        )
+        return (
+            rec709Encode(filmtoneSdrShoulder(mapped.red)),
+            rec709Encode(filmtoneSdrShoulder(mapped.green)),
+            rec709Encode(filmtoneSdrShoulder(mapped.blue))
+        )
+    }
+
+    /// Build a 33³ DJI D-Log M → Rec.709 cube for `CIColorCubeWithColorSpace`.
+    static func makeDlogMToRec709Cube(size: Int = 33) -> [Float] {
+        precondition(size >= 2, "cube size must be ≥ 2")
+        let denom = Double(size - 1)
+        var cube = [Float](repeating: 0, count: size * size * size * 3)
+        var index = 0
+        for b in 0..<size {
+            let blueIn = Double(b) / denom
+            for g in 0..<size {
+                let greenIn = Double(g) / denom
+                for r in 0..<size {
+                    let redIn = Double(r) / denom
+                    let converted = dlogMPixelToRec709(
+                        red: redIn,
+                        green: greenIn,
+                        blue: blueIn
+                    )
+                    cube[index]     = Float(converted.red)
+                    cube[index + 1] = Float(converted.green)
+                    cube[index + 2] = Float(converted.blue)
+                    index += 3
+                }
+            }
+        }
+        return cube
+    }
+
     // MARK: - Canon C-Log
 
     /// Canon Log original → linear scene-referred decoder. Constants follow

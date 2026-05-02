@@ -65,6 +65,15 @@ final class FilmtoneMediaRuntime {
         return try sourceProbeService.probeSource(at: resolvedSourceURL, fallback: source)
     }
 
+    func prewarmMezzanines(for source: SourceInfoDTO) {
+        guard source.kind == .video,
+              let sourceURL = try? resolveFileURL(source.uri)
+        else {
+            return
+        }
+        mezzanineService.prewarmEligibleMezzanines(for: sourceURL)
+    }
+
     func renderPreview(
         request: Phase0ExportRequestDTO,
         sourceURL: URL? = nil

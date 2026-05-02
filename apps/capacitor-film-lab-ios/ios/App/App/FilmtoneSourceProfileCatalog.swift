@@ -17,6 +17,11 @@ import Foundation
 ///   AVFoundation native gamut info.
 /// - `(S)` D-Log → `synthesized(.djiDLog)` — DJI D-Gamut → Rec.709.
 ///   Verified against `Tests/Fixtures/source-profile/dji-dlog/`.
+/// - `(S)` D-Log M → `synthesized(.djiDLogM)` — DJI D-Gamut M → Rec.709.
+///   Coefficients fitted from the DJI Mavic 3 Pro / Osmo Pocket 3 / Osmo
+///   360 D-Log M to Rec.709 V1 cube (DJI ships byte-identical LUT for all
+///   three consumer bodies). Verified against
+///   `Tests/Fixtures/source-profile/dji-dlog-m/`.
 /// - `(S)` C-Log → `synthesized(.canonCLog)` — Canon Log original,
 ///   BT.709 gamut. Verified against `Tests/Fixtures/source-profile/canon-clog/`.
 /// - `(S)` V-Log → `synthesized(.panasonicVLog)` — Filmtone implements
@@ -57,6 +62,20 @@ enum FilmtoneSourceProfileCatalog {
             englishName: "DJI D-Log",
             curve: .djiDLog,
             impl: .synthesized(.djiDLog),
+            detectionHint: nil,
+            bundled: true,
+            immutable: true
+        ),
+        CameraProfileCatalogEntry(
+            id: "built-in:source-profile.dji-dlog-m",
+            englishName: "DJI D-Log M",
+            curve: .djiDLogM,
+            impl: .synthesized(.djiDLogM),
+            // D-Log M cannot be reliably distinguished from D-Log
+            // original via container metadata (DJI exposes the curve
+            // through the Mimo / Fly camera settings rather than a
+            // probe-visible colorPrimaries+transferFunction pair).
+            // detectionHint nil keeps this as a sticky manual pick.
             detectionHint: nil,
             bundled: true,
             immutable: true

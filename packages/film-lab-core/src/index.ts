@@ -106,6 +106,7 @@ export {
   type Phase0ExportResult,
   type Phase0ExportStage,
   type Phase0ExportBenchmarkRecord,
+  type Phase0MezzanineProfileVariant,
   type Phase0PreviewRenderResult,
   type Phase0RenderMode,
 } from "./native-bridge";

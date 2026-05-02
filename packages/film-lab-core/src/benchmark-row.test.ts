@@ -4,7 +4,11 @@ import {
   formatBenchmarkRow,
   parseBenchmarkRow,
 } from "./benchmark-row";
-import type { Phase0ExportBenchmarkRecord, Phase0ExportResult } from "./native-bridge";
+import type {
+  Phase0ExportBenchmarkRecord,
+  Phase0ExportResult,
+  Phase0MezzanineProfileVariant,
+} from "./native-bridge";
 
 const baseBenchmark: Phase0ExportBenchmarkRecord = {
   appVersion: "0.1.0",
@@ -95,5 +99,43 @@ describe("benchmark row roundtrip", () => {
     expect(parsed?.errorCode).toBe("EXPORT_FAILED");
     expect(parsed?.visualFloor).toBe("fail");
     expect(parsed?.saveResult).toBe("fail");
+  });
+
+  test("roundtrips all mezzanine profile variants", () => {
+    const variants: Phase0MezzanineProfileVariant[] = [
+      "sdr",
+      "hdr",
+      "qualitySDR",
+      "qualityHDR",
+    ];
+
+    for (const variant of variants) {
+      const benchmark: Phase0ExportBenchmarkRecord = {
+        ...baseBenchmark,
+        renderMode: variant.startsWith("quality") ? "quality" : "speed",
+        exportUsedMezzanine: true,
+        mezzanineProfileVariant: variant,
+      };
+      const row = buildBenchmarkRow({
+        result: { ...baseResult, benchmarkRecord: benchmark },
+        benchmark,
+        probe: null,
+        clipId: `${variant}.mov`,
+        visualFloor: "pass",
+        saveResult: "ok",
+        date: new Date("2026-05-02T08:00:00.000Z"),
+      });
+      const formatted = formatBenchmarkRow(row);
+
+      expect(formatted).toContain(`mezz=${variant}`);
+      expect(parseBenchmarkRow(formatted)?.mezzanineProfileVariant).toBe(variant);
+    }
+  });
+
+  test("parses unknown mezzanine profile variants as null", () => {
+    const row =
+      "| 2026-05-02 | iPhone15,3 | 18.1 | future.mov | 3840x2160 | 3840x2160@30 | 1.2x | 100MB | thermal=nominal | mem_warn=0 | save=ok | visual=pass | err=none | 60.0 | mode=quality | mezz=futureVariant |";
+
+    expect(parseBenchmarkRow(row)?.mezzanineProfileVariant).toBeNull();
   });
 });

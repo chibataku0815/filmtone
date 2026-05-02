@@ -499,7 +499,7 @@ struct Phase0ExportBenchmarkRecordDTO: Encodable {
     let mezzanineGenerationMs: Int?
     /// v1.2: render mode actually used for this export ("quality" | "speed").
     let renderMode: String?
-    /// v1.2: mezzanine profile variant the export consumed ("sdr" | "hdr"), nil if no mezzanine used.
+    /// v1.2+: mezzanine profile variant the export consumed, nil if no mezzanine used.
     let mezzanineProfileVariant: String?
     /// v1.3 (D3.4): whether the depth × ray-angle prefilter ran for this export.
     let depthUsed: Bool?

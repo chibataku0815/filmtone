@@ -218,7 +218,7 @@ struct TestSourceColorClassifier {
                 hasHDRMezzanine: true,
                 hasSDRMezzanine: true
             ) == nil,
-            "route: default quality must stay source-direct even with cached mezzanines"
+            "route: default quality must stay source-direct without quality mezzanines"
         )
         try expect(
             FilmtoneMezzanineRoutePolicy.selectedVariant(
@@ -227,7 +227,29 @@ struct TestSourceColorClassifier {
                 hasHDRMezzanine: true,
                 hasSDRMezzanine: true
             ) == nil,
-            "route: explicit quality must stay source-direct"
+            "route: explicit quality must stay source-direct without quality mezzanines"
+        )
+        try expect(
+            FilmtoneMezzanineRoutePolicy.selectedVariant(
+                renderMode: "quality",
+                colorClass: .appleLog,
+                hasHDRMezzanine: false,
+                hasSDRMezzanine: false,
+                hasQualityHDRMezzanine: true,
+                hasQualitySDRMezzanine: false
+            ) == .qualityHDR,
+            "route: quality must use qualityHDR when the heavy-source cache exists"
+        )
+        try expect(
+            FilmtoneMezzanineRoutePolicy.selectedVariant(
+                renderMode: "quality",
+                colorClass: .sdrBt709,
+                hasHDRMezzanine: false,
+                hasSDRMezzanine: false,
+                hasQualityHDRMezzanine: false,
+                hasQualitySDRMezzanine: true
+            ) == .qualitySDR,
+            "route: quality must use qualitySDR when the heavy-source cache exists"
         )
         try expect(
             FilmtoneMezzanineRoutePolicy.selectedVariant(
@@ -272,6 +294,30 @@ struct TestSourceColorClassifier {
         try expect(
             FilmtoneMezzanineRoutePolicy.prewarmVariant(for: .unknown) == nil,
             "route: skip prewarm for unknown/P3 sources"
+        )
+        try expect(
+            FilmtoneMezzanineRoutePolicy.qualityPrewarmVariant(
+                for: .appleLog,
+                codecFamily: .prores422,
+                estimatedDataRate: nil
+            ) == .qualityHDR,
+            "route: ProRes Apple Log must generate qualityHDR"
+        )
+        try expect(
+            FilmtoneMezzanineRoutePolicy.qualityPrewarmVariant(
+                for: .sdrBt709,
+                codecFamily: .hevc,
+                estimatedDataRate: 150_000_000
+            ) == .qualitySDR,
+            "route: >=100Mbps SDR HEVC must generate qualitySDR"
+        )
+        try expect(
+            FilmtoneMezzanineRoutePolicy.qualityPrewarmVariant(
+                for: .sdrBt709,
+                codecFamily: .hevc,
+                estimatedDataRate: 50_000_000
+            ) == nil,
+            "route: typical iPhone HEVC must stay source-direct in Quality"
         )
     }
 
