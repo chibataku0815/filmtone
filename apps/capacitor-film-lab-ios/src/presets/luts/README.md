@@ -7,7 +7,7 @@
 Camera profiles are handled three ways (unchanged from v1.3):
 
 1. **Apple Log / Apple Log 2** — native detection via `HdrPreparationPolicyDeriver` from AVFoundation metadata.
-2. **V-Log / S-Log3** — synthesized math (Log decoder + gamut matrix + 33³ cube) in `FilmtoneSourceProfileMath` / `FilmtoneSourceProfileCatalog`. Accuracy fixtures (24-patch ΔE2000 + 8-bit drift) gate at `max = 0.000`.
+2. **D-Log / C-Log / V-Log / S-Log3** — synthesized math (Log decoder + gamut matrix where needed + 33³ cube) in `FilmtoneSourceProfileMath` / `FilmtoneSourceProfileCatalog`. Accuracy fixtures (24-patch ΔE2000 + 8-bit drift) gate at `max = 0.000`.
 3. **Rec.709** — passthrough default.
 
 `SIGNATURE_LUT_PLAN[*].bundledRelPath` stays `null`; the canonical Filmtone Signature preset is params-only.

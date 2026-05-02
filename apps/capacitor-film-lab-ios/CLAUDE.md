@@ -200,7 +200,7 @@ CLAUDE.md には書かない（陳腐化が早すぎる）。以下を見る：
 | 領域 | エントリ | 主要ファイル |
 |------|---------|--------------|
 | Built-in Looks | 2 件（Creative Pack 01: Stone / Urban、各 bundled `.cube`） | `FilmtoneBuiltInCatalog.swift` |
-| Source Profiles | 5 件（Apple Log / Apple Log 2 / V-Log / S-Log3 / Rec.709） | `FilmtoneSourceProfileCatalog.swift` |
+| Source Profiles | 7 件（Apple Log / Apple Log 2 / DJI D-Log / Canon C-Log / V-Log / S-Log3 / Rec.709） | `FilmtoneSourceProfileCatalog.swift` |
 
 ### 不変条件
 
@@ -209,8 +209,8 @@ CLAUDE.md には書かない（陳腐化が早すぎる）。以下を見る：
 - Creative Pack 01 の `.cube` SHA-256 は `Tests/Fixtures/creative-pack-01/manifest.json` に pin。`bun run scripts/build-creative-luts.ts --regenerate` 後は manifest 更新が PR に含まれること
 - Built-in Look の `paramOverrides` は color-only ops を neutral pin（cube が SSOT）+ lens-filter optics（rgbShift / bloom / halation / diffusion / lensSoftness / grain / vignette）の構造。rgbShift は Filmtone signature optical effect で、Stone=0.0032 / Urban=0.0028 は Adjust-sheet "Default"=0.0038 より小さい（Default を上から押しても visible step up になる）
 - 保存した Look は save 時に 14 個の optics+glow keys を densify する（`FilmtonePhase0ParamsPatch.densifyingOpticsGlow`）。schema は `[String: Double]` のまま、bump 不要
-- Camera Profile catalog id 形式: `built-in:source-profile.<slug>`（例: `built-in:source-profile.v-log`）— sidecar `cameraProfile.catalogId` で書き出される
-- Synthesized math (V-Log / S-Log3) は accuracy fixture (`max = 0.000`) が hard gate。spec 改訂時は fixture 再生成して PR 同梱
+- Camera Profile catalog id 形式: `built-in:source-profile.<slug>`（例: `built-in:source-profile.panasonic-vlog`）— sidecar `cameraProfile.catalogId` で書き出される
+- Synthesized math (DJI D-Log / Canon C-Log / V-Log / S-Log3) は accuracy fixture (`max = 0.000`) が hard gate。spec 改訂時は fixture 再生成して PR 同梱
 
 ### UserDefaults
 

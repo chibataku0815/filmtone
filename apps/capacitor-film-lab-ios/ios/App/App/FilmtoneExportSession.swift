@@ -2588,6 +2588,10 @@ final class FilmtoneExportSession {
         }
         let rgb: [Float]
         switch curve {
+        case .djiDLog:
+            rgb = FilmtoneSourceProfileMath.makeDlogToRec709Cube(size: cubeSize)
+        case .canonCLog:
+            rgb = FilmtoneSourceProfileMath.makeCanonClogToRec709Cube(size: cubeSize)
         case .panasonicVLog:
             rgb = FilmtoneSourceProfileMath.makeVlogToRec709Cube(size: cubeSize)
         case .sonySLog3:

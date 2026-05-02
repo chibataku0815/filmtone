@@ -85,6 +85,8 @@ enum CameraProfileSelection: Equatable, Sendable, Codable {
 enum SourceProfileCurve: String, Codable, CaseIterable, Sendable {
     case appleLog       = "apple-log"
     case appleLog2      = "apple-log-2"
+    case djiDLog        = "dji-dlog"
+    case canonCLog      = "canon-clog"
     case panasonicVLog  = "panasonic-vlog"
     case sonySLog3      = "sony-slog3"
 }
@@ -100,7 +102,7 @@ enum SourceProfileCurve: String, Codable, CaseIterable, Sendable {
 ///   path. Apple Log / Apple Log 2 ride this lane, sharing
 ///   `makeAppleLogToRec709Lut` from `FilmtoneExportSession`.
 /// - `.synthesized` — Filmtone-implemented decoder + gamut matrix +
-///   `filmtoneSdrShoulder` + Rec.709 encode. V-Log and S-Log3 ride this
+///   `filmtoneSdrShoulder` + Rec.709 encode. D-Log, C-Log, V-Log, and S-Log3 ride this
 ///   lane (Camera Profiles Phases B and C). Each (S) curve must ship with
 ///   a math doc + accuracy fixture + accuracy test in the same PR.
 /// - `.bundledCube` — bundled `.cube` resolved from the LUT library by id.

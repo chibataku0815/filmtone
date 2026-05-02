@@ -15,6 +15,10 @@ import Foundation
 ///   under `rec2020GamutMap: true`. Apple Log 2 v1.3 ships with the
 ///   Rec.2020 matrix as a known limitation (D-CP6); v1.4 refines via
 ///   AVFoundation native gamut info.
+/// - `(S)` D-Log → `synthesized(.djiDLog)` — DJI D-Gamut → Rec.709.
+///   Verified against `Tests/Fixtures/source-profile/dji-dlog/`.
+/// - `(S)` C-Log → `synthesized(.canonCLog)` — Canon Log original,
+///   BT.709 gamut. Verified against `Tests/Fixtures/source-profile/canon-clog/`.
 /// - `(S)` V-Log → `synthesized(.panasonicVLog)` — Filmtone implements
 ///   the decoder + V-Gamut→Rec.709 matrix in `FilmtoneSourceProfileMath`.
 ///   Verified against `Tests/Fixtures/source-profile/panasonic-vlog/`.
@@ -45,6 +49,24 @@ enum FilmtoneSourceProfileCatalog {
             curve: .appleLog2,
             impl: .nativePolicy(.appleLog2ToRec709),
             detectionHint: .appleLog2,
+            bundled: true,
+            immutable: true
+        ),
+        CameraProfileCatalogEntry(
+            id: "built-in:source-profile.dji-dlog",
+            englishName: "DJI D-Log",
+            curve: .djiDLog,
+            impl: .synthesized(.djiDLog),
+            detectionHint: nil,
+            bundled: true,
+            immutable: true
+        ),
+        CameraProfileCatalogEntry(
+            id: "built-in:source-profile.canon-clog",
+            englishName: "Canon C-Log",
+            curve: .canonCLog,
+            impl: .synthesized(.canonCLog),
+            detectionHint: nil,
             bundled: true,
             immutable: true
         ),

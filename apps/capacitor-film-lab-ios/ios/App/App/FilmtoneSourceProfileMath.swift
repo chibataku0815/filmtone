@@ -25,8 +25,9 @@ enum FilmtoneSourceProfileMath {
 
     /// Filmtone identity SDR shoulder. Applied to linearized + gamut-mapped
     /// scene-referred RGB on its way out to Rec.709 SDR. Identical math
-    /// across every Camera Profile (Apple Log, Apple Log 2, V-Log, S-Log3,
-    /// Rec.709 passthrough) so cross-source exports share one display look.
+    /// across every Camera Profile (Apple Log, Apple Log 2, D-Log, C-Log,
+    /// V-Log, S-Log3, Rec.709 passthrough) so cross-source exports share
+    /// one display look.
     ///
     /// Anchors `0.18` linear ≈ middle gray and rolls highlights via a
     /// soft-knee Reinhard-style curve. Output is clamped to [0, 1].
@@ -76,6 +77,149 @@ enum FilmtoneSourceProfileMath {
             return sqrt(max(encoded / sigma, 0)) + r0
         }
         return r0
+    }
+
+    // MARK: - DJI D-Log
+
+    /// D-Log → linear scene-referred decoder. Constants from DJI's
+    /// *White Paper on D-Log and D-Gamut of DJI Cinema Color System*
+    /// (Zenmuse X9 6K & 8K, Rev.1.0). This is the documented D-Log /
+    /// D-Gamut curve, not D-Log M.
+    @inline(__always)
+    static func dlogDecode(_ encoded: Double) -> Double {
+        if encoded <= 0.14 {
+            return (encoded - 0.0929) / 6.025
+        }
+        return (pow(10.0, 3.89616 * encoded - 2.27752) - 0.0108) / 0.9892
+    }
+
+    /// D-Gamut → Rec.709 matrix from DJI's D-Gamut colorimetric section.
+    @inline(__always)
+    static func dgamutToRec709(
+        red: Double,
+        green: Double,
+        blue: Double
+    ) -> (red: Double, green: Double, blue: Double) {
+        (
+            red:    1.6746 * red - 0.5797 * green - 0.0949 * blue,
+            green: -0.0981 * red + 1.3340 * green - 0.2359 * blue,
+            blue:  -0.0410 * red - 0.2430 * green + 1.2840 * blue
+        )
+    }
+
+    /// End-to-end DJI D-Log → Rec.709 SDR pixel pipeline:
+    /// linearize → D-Gamut→Rec.709 matrix → Filmtone shoulder → Rec.709 OETF.
+    @inline(__always)
+    static func dlogPixelToRec709(
+        red: Double,
+        green: Double,
+        blue: Double
+    ) -> (red: Double, green: Double, blue: Double) {
+        let linearRed = dlogDecode(red)
+        let linearGreen = dlogDecode(green)
+        let linearBlue = dlogDecode(blue)
+        let mapped = dgamutToRec709(
+            red: linearRed,
+            green: linearGreen,
+            blue: linearBlue
+        )
+        return (
+            rec709Encode(filmtoneSdrShoulder(mapped.red)),
+            rec709Encode(filmtoneSdrShoulder(mapped.green)),
+            rec709Encode(filmtoneSdrShoulder(mapped.blue))
+        )
+    }
+
+    /// Build a 33³ DJI D-Log → Rec.709 cube for `CIColorCubeWithColorSpace`.
+    static func makeDlogToRec709Cube(size: Int = 33) -> [Float] {
+        precondition(size >= 2, "cube size must be ≥ 2")
+        let denom = Double(size - 1)
+        var cube = [Float](repeating: 0, count: size * size * size * 3)
+        var index = 0
+        for b in 0..<size {
+            let blueIn = Double(b) / denom
+            for g in 0..<size {
+                let greenIn = Double(g) / denom
+                for r in 0..<size {
+                    let redIn = Double(r) / denom
+                    let converted = dlogPixelToRec709(
+                        red: redIn,
+                        green: greenIn,
+                        blue: blueIn
+                    )
+                    cube[index]     = Float(converted.red)
+                    cube[index + 1] = Float(converted.green)
+                    cube[index + 2] = Float(converted.blue)
+                    index += 3
+                }
+            }
+        }
+        return cube
+    }
+
+    // MARK: - Canon C-Log
+
+    /// Canon Log original → linear scene-referred decoder. Constants follow
+    /// Canon's 2012 Canon-Log transfer characteristic via the Colour Science
+    /// implementation. This profile assumes original Canon Log in BT.709
+    /// gamut; Canon Log 2/3 + Cinema Gamut should be separate profiles.
+    @inline(__always)
+    static func canonLogDecode(_ encoded: Double) -> Double {
+        let pivot = 0.0730597
+        let scale = 0.529136
+        let gain = 10.1596
+        let linear: Double
+        if encoded < pivot {
+            linear = -(pow(10.0, (pivot - encoded) / scale) - 1.0) / gain
+        } else {
+            linear = (pow(10.0, (encoded - pivot) / scale) - 1.0) / gain
+        }
+        return linear * 0.9
+    }
+
+    /// End-to-end Canon C-Log → Rec.709 SDR pixel pipeline. Original C-Log
+    /// is treated as BT.709 gamut, so no chromaticity matrix is applied.
+    @inline(__always)
+    static func canonClogPixelToRec709(
+        red: Double,
+        green: Double,
+        blue: Double
+    ) -> (red: Double, green: Double, blue: Double) {
+        let linearRed = canonLogDecode(red)
+        let linearGreen = canonLogDecode(green)
+        let linearBlue = canonLogDecode(blue)
+        return (
+            rec709Encode(filmtoneSdrShoulder(linearRed)),
+            rec709Encode(filmtoneSdrShoulder(linearGreen)),
+            rec709Encode(filmtoneSdrShoulder(linearBlue))
+        )
+    }
+
+    /// Build a 33³ Canon C-Log → Rec.709 cube for `CIColorCubeWithColorSpace`.
+    static func makeCanonClogToRec709Cube(size: Int = 33) -> [Float] {
+        precondition(size >= 2, "cube size must be ≥ 2")
+        let denom = Double(size - 1)
+        var cube = [Float](repeating: 0, count: size * size * size * 3)
+        var index = 0
+        for b in 0..<size {
+            let blueIn = Double(b) / denom
+            for g in 0..<size {
+                let greenIn = Double(g) / denom
+                for r in 0..<size {
+                    let redIn = Double(r) / denom
+                    let converted = canonClogPixelToRec709(
+                        red: redIn,
+                        green: greenIn,
+                        blue: blueIn
+                    )
+                    cube[index]     = Float(converted.red)
+                    cube[index + 1] = Float(converted.green)
+                    cube[index + 2] = Float(converted.blue)
+                    index += 3
+                }
+            }
+        }
+        return cube
     }
 
     // MARK: - Panasonic V-Log

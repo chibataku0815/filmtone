@@ -148,6 +148,8 @@ struct FilmtoneStrings {
     /// v1.3 Camera Profiles Phase D — built-in source profile catalog labels.
     let cameraAppleLog: String
     let cameraAppleLog2: String
+    let cameraDLog: String
+    let cameraCLog: String
     let cameraVLog: String
     let cameraSLog3: String
     let cameraRec709: String
@@ -288,6 +290,8 @@ extension FilmtoneStrings {
         switch slug {
         case "apple-log":      return cameraAppleLog
         case "apple-log-2":    return cameraAppleLog2
+        case "dji-dlog":       return cameraDLog
+        case "canon-clog":     return cameraCLog
         case "panasonic-vlog": return cameraVLog
         case "sony-slog3":     return cameraSLog3
         case "rec709":         return cameraRec709
@@ -1149,6 +1153,16 @@ extension FilmtoneStrings {
             "filmtone.camera.apple_log2",
             defaultValue: "Apple Log 2",
             comment: "Built-in camera source profile name (Apple Log 2)."
+        )
+        cameraDLog = filmtoneLocalized(
+            "filmtone.camera.dji_dlog",
+            defaultValue: "DJI D-Log",
+            comment: "Built-in camera source profile name (DJI D-Log)."
+        )
+        cameraCLog = filmtoneLocalized(
+            "filmtone.camera.canon_clog",
+            defaultValue: "Canon C-Log",
+            comment: "Built-in camera source profile name (Canon C-Log)."
         )
         cameraVLog = filmtoneLocalized(
             "filmtone.camera.vlog",

@@ -8,6 +8,8 @@ export type CameraProfile =
   | "auto"
   | "rec709"
   | "apple-log"
+  | "dji-dlog"
+  | "canon-clog"
   | "slog3"
   | "vlog"
   | "custom";
@@ -29,6 +31,8 @@ const DEFAULT_PROFILE_ORDER: CameraProfile[] = [
   "auto",
   "rec709",
   "apple-log",
+  "dji-dlog",
+  "canon-clog",
   "slog3",
   "vlog",
   "custom",
