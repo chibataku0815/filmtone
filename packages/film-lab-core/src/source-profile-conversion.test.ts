@@ -4,8 +4,12 @@ import {
   SOURCE_PROFILE_CATALOG,
   buildSourceProfileLut,
   canonClogPixelToRec709,
+  canonLog3CineGamutPixelToRec709,
+  canonLog3Decode,
   canonLogDecode,
   dlogDecode,
+  dlogMDecode,
+  dlogMPixelToRec709,
   dlogPixelToRec709,
   getSourceProfile,
   makeAppleLogToRec709Cube,
@@ -46,13 +50,15 @@ async function loadJson<T>(path: string): Promise<T> {
 }
 
 describe("source profile catalog", () => {
-  test("exposes the v1.3 built-in catalog (Rec.709 + 6 curves)", () => {
+  test("exposes the v1.4 built-in catalog (Rec.709 + 8 curves)", () => {
     expect(SOURCE_PROFILE_CATALOG.map((entry) => entry.id)).toEqual([
       "built-in:source-profile.rec709",
       "built-in:source-profile.apple-log",
       "built-in:source-profile.apple-log-2",
       "built-in:source-profile.dji-dlog",
+      "built-in:source-profile.dji-dlog-m",
       "built-in:source-profile.canon-clog",
+      "built-in:source-profile.canon-log3-cinema-gamut",
       "built-in:source-profile.panasonic-vlog",
       "built-in:source-profile.sony-slog3",
     ]);
@@ -75,9 +81,15 @@ describe("source profile catalog", () => {
     expect(getSourceProfile("built-in:source-profile.dji-dlog")?.impl).toBe(
       "synthesized",
     );
+    expect(getSourceProfile("built-in:source-profile.dji-dlog-m")?.impl).toBe(
+      "synthesized",
+    );
     expect(getSourceProfile("built-in:source-profile.canon-clog")?.impl).toBe(
       "synthesized",
     );
+    expect(
+      getSourceProfile("built-in:source-profile.canon-log3-cinema-gamut")?.impl,
+    ).toBe("synthesized");
     expect(
       getSourceProfile("built-in:source-profile.panasonic-vlog")?.impl,
     ).toBe("synthesized");
@@ -140,6 +152,17 @@ describe("buildSourceProfileLut", () => {
     expect(small?.data.length).toBe(8 * 8 * 8 * 4);
     expect(small?.size).toBe(8);
   });
+
+  test("builds the v1.4 D-Log M and Canon Log 3 source-profile cubes", () => {
+    const dlogM = buildSourceProfileLut("built-in:source-profile.dji-dlog-m");
+    const clog3 = buildSourceProfileLut(
+      "built-in:source-profile.canon-log3-cinema-gamut",
+    );
+    expect(dlogM?.displayName).toBe("DJI D-Log M");
+    expect(clog3?.displayName).toBe("Canon Log 3 / Cinema Gamut");
+    expect(dlogM?.data.length).toBe(33 * 33 * 33 * 4);
+    expect(clog3?.data.length).toBe(33 * 33 * 33 * 4);
+  });
 });
 
 // =====================================================================
@@ -165,11 +188,25 @@ const CURVE_FIXTURES: Array<{
     pixel: dlogPixelToRec709,
   },
   {
+    curve: "dji-dlog-m",
+    dirName: "dji-dlog-m",
+    encodedKey: "dlogMEncoded",
+    decode: dlogMDecode,
+    pixel: dlogMPixelToRec709,
+  },
+  {
     curve: "canon-clog",
     dirName: "canon-clog",
     encodedKey: "clogEncoded",
     decode: canonLogDecode,
     pixel: canonClogPixelToRec709,
+  },
+  {
+    curve: "canon-log3-cinema-gamut",
+    dirName: "canon-log3-cinema-gamut",
+    encodedKey: "clog3Encoded",
+    decode: canonLog3Decode,
+    pixel: canonLog3CineGamutPixelToRec709,
   },
   {
     curve: "panasonic-vlog",
@@ -268,5 +305,6 @@ describe("source profile math — iOS fixture parity", () => {
 // Small type-only assertion so the SourceProfileId union stays in sync with
 // the catalog at compile time. (No runtime expect — TS would fail compile
 // if a known id became unknown.)
-const _ID_GUARD: SourceProfileId = "built-in:source-profile.sony-slog3";
+const _ID_GUARD: SourceProfileId =
+  "built-in:source-profile.canon-log3-cinema-gamut";
 void _ID_GUARD;

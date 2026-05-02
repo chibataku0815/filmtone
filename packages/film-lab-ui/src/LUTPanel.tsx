@@ -48,7 +48,9 @@ const SOURCE_PROFILE_CHIP_ORDER = [
   "built-in:source-profile.apple-log",
   "built-in:source-profile.apple-log-2",
   "built-in:source-profile.dji-dlog",
+  "built-in:source-profile.dji-dlog-m",
   "built-in:source-profile.canon-clog",
+  "built-in:source-profile.canon-log3-cinema-gamut",
   "built-in:source-profile.panasonic-vlog",
   "built-in:source-profile.sony-slog3",
 ] as const;

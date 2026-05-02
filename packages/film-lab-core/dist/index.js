@@ -3019,9 +3019,25 @@ var SOURCE_PROFILE_CATALOG = [
     immutable: true
   },
   {
+    id: "built-in:source-profile.dji-dlog-m",
+    displayName: "DJI D-Log M",
+    curve: "dji-dlog-m",
+    impl: "synthesized",
+    builtIn: true,
+    immutable: true
+  },
+  {
     id: "built-in:source-profile.canon-clog",
     displayName: "Canon C-Log",
     curve: "canon-clog",
+    impl: "synthesized",
+    builtIn: true,
+    immutable: true
+  },
+  {
+    id: "built-in:source-profile.canon-log3-cinema-gamut",
+    displayName: "Canon Log 3 / Cinema Gamut",
+    curve: "canon-log3-cinema-gamut",
     impl: "synthesized",
     builtIn: true,
     immutable: true
@@ -3084,8 +3100,12 @@ function generateCubeForEntry(entry, size) {
       return makeAppleLogToRec709Cube(size, true);
     case "dji-dlog":
       return makeDlogToRec709Cube(size);
+    case "dji-dlog-m":
+      return makeDlogMToRec709Cube(size);
     case "canon-clog":
       return makeCanonClogToRec709Cube(size);
+    case "canon-log3-cinema-gamut":
+      return makeCanonLog3CineGamutToRec709Cube(size);
     case "panasonic-vlog":
       return makeVlogToRec709Cube(size);
     case "sony-slog3":
@@ -3169,6 +3189,37 @@ function dlogPixelToRec709(red, green, blue) {
     rec709Encode(filmtoneSdrShoulder(m[2]))
   ];
 }
+function dlogMDecode(encoded) {
+  const cut = 0.1113510236;
+  const linearOffset = 12e-9;
+  const linearSlope = 7.5547639793;
+  const logA = 1.538947658;
+  const logB = -1.8459129538;
+  const logC = 0.0165823994;
+  const logD = 0.3103580873;
+  if (encoded <= cut) {
+    return (encoded - linearOffset) / linearSlope;
+  }
+  return (Math.pow(10, logA * encoded + logB) - logC) / logD;
+}
+function dgamutMToRec709(red, green, blue) {
+  return [
+    1.4312693292 * red - 0.4338679939 * green + 0.0025986647 * blue,
+    -0.0747311522 * red + 1.1578502353 * green - 0.083119083 * blue,
+    -0.0570111279 * red - 0.2731296886 * green + 1.3301408164 * blue
+  ];
+}
+function dlogMPixelToRec709(red, green, blue) {
+  const lr = dlogMDecode(red);
+  const lg = dlogMDecode(green);
+  const lb = dlogMDecode(blue);
+  const m = dgamutMToRec709(lr, lg, lb);
+  return [
+    rec709Encode(filmtoneSdrShoulder(m[0])),
+    rec709Encode(filmtoneSdrShoulder(m[1])),
+    rec709Encode(filmtoneSdrShoulder(m[2]))
+  ];
+}
 function canonLogDecode(encoded) {
   const pivot = 0.0730597;
   const scale = 0.529136;
@@ -3189,6 +3240,43 @@ function canonClogPixelToRec709(red, green, blue) {
     rec709Encode(filmtoneSdrShoulder(lr)),
     rec709Encode(filmtoneSdrShoulder(lg)),
     rec709Encode(filmtoneSdrShoulder(lb))
+  ];
+}
+function canonLog3Decode(encoded) {
+  const lowBreak = 0.097465473;
+  const highBreak = 0.15277891;
+  const logScale = 0.36726845;
+  const logGain = 14.98325;
+  const linearSlope = 1.9754798;
+  const linearOffset = 0.12512219;
+  const lowOffset = 0.12783901;
+  const highOffset = 0.12240537;
+  let scene;
+  if (encoded < lowBreak) {
+    scene = -(Math.pow(10, (lowOffset - encoded) / logScale) - 1) / logGain;
+  } else if (encoded <= highBreak) {
+    scene = (encoded - linearOffset) / linearSlope;
+  } else {
+    scene = (Math.pow(10, (encoded - highOffset) / logScale) - 1) / logGain;
+  }
+  return scene * 0.9;
+}
+function cineGamutToRec709(red, green, blue) {
+  return [
+    1.92355517 * red - 0.79863353 * green - 0.12508072 * blue,
+    -0.20431556 * red + 1.49593305 * green - 0.2915944 * blue,
+    -0.02369073 * red - 0.42022784 * green + 1.44415855 * blue
+  ];
+}
+function canonLog3CineGamutPixelToRec709(red, green, blue) {
+  const lr = canonLog3Decode(red);
+  const lg = canonLog3Decode(green);
+  const lb = canonLog3Decode(blue);
+  const m = cineGamutToRec709(lr, lg, lb);
+  return [
+    rec709Encode(filmtoneSdrShoulder(m[0])),
+    rec709Encode(filmtoneSdrShoulder(m[1])),
+    rec709Encode(filmtoneSdrShoulder(m[2]))
   ];
 }
 function vlogDecode(encoded) {
@@ -3281,8 +3369,14 @@ function makeAppleLogToRec709Cube(size = 33, rec2020GamutMap = false) {
 function makeDlogToRec709Cube(size = 33) {
   return buildCubeRgba(size, dlogPixelToRec709);
 }
+function makeDlogMToRec709Cube(size = 33) {
+  return buildCubeRgba(size, dlogMPixelToRec709);
+}
 function makeCanonClogToRec709Cube(size = 33) {
   return buildCubeRgba(size, canonClogPixelToRec709);
+}
+function makeCanonLog3CineGamutToRec709Cube(size = 33) {
+  return buildCubeRgba(size, canonLog3CineGamutPixelToRec709);
 }
 function makeVlogToRec709Cube(size = 33) {
   return buildCubeRgba(size, vlogPixelToRec709);

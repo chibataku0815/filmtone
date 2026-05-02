@@ -252,7 +252,9 @@ const sourceProfileCurveSchema = z.enum([
   "apple-log",
   "apple-log-2",
   "dji-dlog",
+  "dji-dlog-m",
   "canon-clog",
+  "canon-log3-cinema-gamut",
   "panasonic-vlog",
   "sony-slog3",
 ]);

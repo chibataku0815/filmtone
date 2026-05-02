@@ -161,6 +161,77 @@ describe("metadata-json-runtime", () => {
     expect(resolved.warnings).toEqual([]);
   });
 
+  it("regenerates lut1 for the v1.4 D-Log M and Canon Log 3 source profiles", async () => {
+    for (const profile of [
+      {
+        catalogId: "built-in:source-profile.dji-dlog-m",
+        curve: "dji-dlog-m",
+        displayName: "DJI D-Log M",
+      },
+      {
+        catalogId: "built-in:source-profile.canon-log3-cinema-gamut",
+        curve: "canon-log3-cinema-gamut",
+        displayName: "Canon Log 3 / Cinema Gamut",
+      },
+    ] as const) {
+      const grade = batchGradeStateFromPreset("cinematic");
+      const session = buildFilmtoneExportSession({
+        exportedAtIso: "2026-05-02T13:00:00.000Z",
+        appVersion: "1.4.0",
+        job: "images",
+        inputDir: "/Users/tester/input",
+        videoInputPath: null,
+        outputDir: "/Users/tester/output",
+        imageFormat: "jpeg",
+        outputFilenameSuffix: "-graded",
+        outputFileName: null,
+        batchPresetChoice: "cinematic",
+        lookSource: "editSync",
+        gradeParams: grade.params,
+        depthTrack: null,
+        lutRefs: {
+          lut1: {
+            enabled: true,
+            intensity: 1,
+            displayName: profile.displayName,
+            absolutePath: null,
+          },
+          lut2: createEmptyMetadataLutRefs().lut2,
+        },
+        sourceProfile: {
+          selectionKind: "built-in",
+          catalogId: profile.catalogId,
+          curve: profile.curve,
+          impl: "synthesized",
+          displayName: profile.displayName,
+          appliedAtIso: "2026-05-02T13:00:00.000Z",
+        },
+      });
+
+      let readFileCalls = 0;
+      const bridge = {
+        readFileUtf8: async () => {
+          readFileCalls += 1;
+          return "";
+        },
+      } as unknown as FilmLabBatchBridge;
+
+      const resolved = await resolveImportedMetadataJson(
+        bridge,
+        "/Users/tester/output/photo.filmtone-session.json",
+        exportFilmtoneExportSessionJsonText(session),
+      );
+
+      expect(readFileCalls).toBe(0);
+      expect(resolved.batchGrade.lut1Data).not.toBeNull();
+      expect(resolved.batchGrade.lut1Size).toBe(33);
+      expect(resolved.batchGrade.lut1Data?.length).toBe(33 * 33 * 33 * 4);
+      expect(resolved.batchGrade.lut1SourceProfileId).toBe(profile.catalogId);
+      expect(resolved.lutRefs.lut1.displayName).toBe(profile.displayName);
+      expect(resolved.warnings).toEqual([]);
+    }
+  });
+
   it("treats a built-in Rec.709 nilProfile as 'no LUT to apply' but records the selection", async () => {
     const grade = batchGradeStateFromPreset("cinematic");
     const session = buildFilmtoneExportSession({

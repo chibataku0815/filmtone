@@ -2324,9 +2324,10 @@ declare function findCreativePack01Look(slug: string): CreativePackLook | undefi
  *
  * Catalog + math ported from `FilmtoneSourceProfileMath.swift` /
  * `FilmtoneSourceProfileCatalog.swift` so Filmtone Desktop's Log Conversion
- * lane (lut1) gets the same built-in input transforms iOS ships in v1.3:
- * Apple Log / Apple Log 2 / DJI D-Log / Canon C-Log / Panasonic V-Log /
- * Sony S-Log3, plus Rec.709 passthrough.
+ * lane (lut1) gets the same built-in input transforms iOS ships in v1.4:
+ * Apple Log / Apple Log 2 / DJI D-Log / DJI D-Log M / Canon C-Log /
+ * Canon Log 3 + Cinema Gamut / Panasonic V-Log / Sony S-Log3, plus
+ * Rec.709 passthrough.
  *
  * Math constants are copied verbatim from the Swift SSOT. Drift between
  * Swift and TS is a hard product-quality bug — fixture parity tests in
@@ -2339,9 +2340,9 @@ declare function findCreativePack01Look(slug: string): CreativePackLook | undefi
  * fastest), so `viewport.setLUT1` / WebGPU `Lut3DTexture.upload` accept
  * built-in and custom `.cube` data interchangeably.
  */
-type SourceProfileCurve = "apple-log" | "apple-log-2" | "dji-dlog" | "canon-clog" | "panasonic-vlog" | "sony-slog3";
+type SourceProfileCurve = "apple-log" | "apple-log-2" | "dji-dlog" | "dji-dlog-m" | "canon-clog" | "canon-log3-cinema-gamut" | "panasonic-vlog" | "sony-slog3";
 type SourceProfileImplKind = "nil-profile" | "native-policy" | "synthesized";
-type SourceProfileId = "built-in:source-profile.rec709" | "built-in:source-profile.apple-log" | "built-in:source-profile.apple-log-2" | "built-in:source-profile.dji-dlog" | "built-in:source-profile.canon-clog" | "built-in:source-profile.panasonic-vlog" | "built-in:source-profile.sony-slog3";
+type SourceProfileId = "built-in:source-profile.rec709" | "built-in:source-profile.apple-log" | "built-in:source-profile.apple-log-2" | "built-in:source-profile.dji-dlog" | "built-in:source-profile.dji-dlog-m" | "built-in:source-profile.canon-clog" | "built-in:source-profile.canon-log3-cinema-gamut" | "built-in:source-profile.panasonic-vlog" | "built-in:source-profile.sony-slog3";
 interface SourceProfileCatalogEntry {
     readonly id: SourceProfileId;
     readonly displayName: string;

@@ -551,6 +551,68 @@ describe("export metadata session", () => {
     });
   });
 
+  for (const profile of [
+    {
+      catalogId: "built-in:source-profile.dji-dlog-m",
+      curve: "dji-dlog-m",
+      displayName: "DJI D-Log M",
+    },
+    {
+      catalogId: "built-in:source-profile.canon-log3-cinema-gamut",
+      curve: "canon-log3-cinema-gamut",
+      displayName: "Canon Log 3 / Cinema Gamut",
+    },
+  ] as const) {
+    it(`round-trips ${profile.displayName} source profile metadata`, () => {
+      const cinematic = batchGradeStateFromPreset("cinematic");
+      const session = buildFilmtoneExportSession({
+        exportedAtIso: "2026-05-02T12:34:56.000Z",
+        appVersion: "1.4.0",
+        job: "images",
+        inputDir: "/Users/tester/input",
+        videoInputPath: null,
+        outputDir: "/Users/tester/output",
+        imageFormat: "jpeg",
+        outputFilenameSuffix: "-graded",
+        outputFileName: null,
+        batchPresetChoice: "cinematic",
+        lookSource: "editSync",
+        gradeParams: cinematic.params,
+        depthTrack: null,
+        lutRefs: {
+          lut1: {
+            enabled: true,
+            intensity: 1,
+            displayName: profile.displayName,
+            absolutePath: null,
+          },
+          lut2: createEmptyMetadataLutRefs().lut2,
+        },
+        sourceProfile: {
+          selectionKind: "built-in",
+          catalogId: profile.catalogId,
+          curve: profile.curve,
+          impl: "synthesized",
+          displayName: profile.displayName,
+          appliedAtIso: "2026-05-02T12:34:55.000Z",
+        },
+      });
+
+      const parsed = parseFilmtoneExportSessionV1(
+        JSON.parse(exportFilmtoneExportSessionJsonText(session)) as unknown,
+      );
+
+      expect(parsed?.input.sourceProfile).toEqual({
+        selectionKind: "built-in",
+        catalogId: profile.catalogId,
+        curve: profile.curve,
+        impl: "synthesized",
+        displayName: profile.displayName,
+        appliedAtIso: "2026-05-02T12:34:55.000Z",
+      });
+    });
+  }
+
   it("omits input.sourceProfile when no selection was made (back-compat)", () => {
     const cinematic = batchGradeStateFromPreset("cinematic");
     const session = buildFilmtoneExportSession({

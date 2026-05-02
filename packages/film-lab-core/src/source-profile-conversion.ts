@@ -3,9 +3,10 @@
  *
  * Catalog + math ported from `FilmtoneSourceProfileMath.swift` /
  * `FilmtoneSourceProfileCatalog.swift` so Filmtone Desktop's Log Conversion
- * lane (lut1) gets the same built-in input transforms iOS ships in v1.3:
- * Apple Log / Apple Log 2 / DJI D-Log / Canon C-Log / Panasonic V-Log /
- * Sony S-Log3, plus Rec.709 passthrough.
+ * lane (lut1) gets the same built-in input transforms iOS ships in v1.4:
+ * Apple Log / Apple Log 2 / DJI D-Log / DJI D-Log M / Canon C-Log /
+ * Canon Log 3 + Cinema Gamut / Panasonic V-Log / Sony S-Log3, plus
+ * Rec.709 passthrough.
  *
  * Math constants are copied verbatim from the Swift SSOT. Drift between
  * Swift and TS is a hard product-quality bug — fixture parity tests in
@@ -23,7 +24,9 @@ export type SourceProfileCurve =
   | "apple-log"
   | "apple-log-2"
   | "dji-dlog"
+  | "dji-dlog-m"
   | "canon-clog"
+  | "canon-log3-cinema-gamut"
   | "panasonic-vlog"
   | "sony-slog3";
 
@@ -37,7 +40,9 @@ export type SourceProfileId =
   | "built-in:source-profile.apple-log"
   | "built-in:source-profile.apple-log-2"
   | "built-in:source-profile.dji-dlog"
+  | "built-in:source-profile.dji-dlog-m"
   | "built-in:source-profile.canon-clog"
+  | "built-in:source-profile.canon-log3-cinema-gamut"
   | "built-in:source-profile.panasonic-vlog"
   | "built-in:source-profile.sony-slog3";
 
@@ -84,9 +89,25 @@ export const SOURCE_PROFILE_CATALOG: readonly SourceProfileCatalogEntry[] = [
     immutable: true,
   },
   {
+    id: "built-in:source-profile.dji-dlog-m",
+    displayName: "DJI D-Log M",
+    curve: "dji-dlog-m",
+    impl: "synthesized",
+    builtIn: true,
+    immutable: true,
+  },
+  {
     id: "built-in:source-profile.canon-clog",
     displayName: "Canon C-Log",
     curve: "canon-clog",
+    impl: "synthesized",
+    builtIn: true,
+    immutable: true,
+  },
+  {
+    id: "built-in:source-profile.canon-log3-cinema-gamut",
+    displayName: "Canon Log 3 / Cinema Gamut",
+    curve: "canon-log3-cinema-gamut",
     impl: "synthesized",
     builtIn: true,
     immutable: true,
@@ -178,8 +199,12 @@ function generateCubeForEntry(
       return makeAppleLogToRec709Cube(size, true);
     case "dji-dlog":
       return makeDlogToRec709Cube(size);
+    case "dji-dlog-m":
+      return makeDlogMToRec709Cube(size);
     case "canon-clog":
       return makeCanonClogToRec709Cube(size);
+    case "canon-log3-cinema-gamut":
+      return makeCanonLog3CineGamutToRec709Cube(size);
     case "panasonic-vlog":
       return makeVlogToRec709Cube(size);
     case "sony-slog3":
@@ -311,6 +336,57 @@ export function dlogPixelToRec709(
   ];
 }
 
+// ---------- DJI D-Log M ----------
+
+/**
+ * D-Log M → linear scene-referred decoder. DJI has not published a
+ * formal D-Log M transfer specification. These constants are fitted from
+ * DJI's consumer-camera `D-Log M to Rec.709 V1.cube` and copied from the
+ * Swift SSOT.
+ */
+export function dlogMDecode(encoded: number): number {
+  const cut = 0.1113510236;
+  const linearOffset = 0.000000012;
+  const linearSlope = 7.5547639793;
+  const logA = 1.538947658;
+  const logB = -1.8459129538;
+  const logC = 0.0165823994;
+  const logD = 0.3103580873;
+  if (encoded <= cut) {
+    return (encoded - linearOffset) / linearSlope;
+  }
+  return (Math.pow(10.0, logA * encoded + logB) - logC) / logD;
+}
+
+/** D-Gamut M → Rec.709 matrix fitted from DJI's D-Log M cube. */
+function dgamutMToRec709(
+  red: number,
+  green: number,
+  blue: number,
+): [number, number, number] {
+  return [
+    1.4312693292 * red - 0.4338679939 * green + 0.0025986647 * blue,
+    -0.0747311522 * red + 1.1578502353 * green - 0.083119083 * blue,
+    -0.0570111279 * red - 0.2731296886 * green + 1.3301408164 * blue,
+  ];
+}
+
+export function dlogMPixelToRec709(
+  red: number,
+  green: number,
+  blue: number,
+): [number, number, number] {
+  const lr = dlogMDecode(red);
+  const lg = dlogMDecode(green);
+  const lb = dlogMDecode(blue);
+  const m = dgamutMToRec709(lr, lg, lb);
+  return [
+    rec709Encode(filmtoneSdrShoulder(m[0])),
+    rec709Encode(filmtoneSdrShoulder(m[1])),
+    rec709Encode(filmtoneSdrShoulder(m[2])),
+  ];
+}
+
 // ---------- Canon C-Log (original) ----------
 
 /**
@@ -344,6 +420,61 @@ export function canonClogPixelToRec709(
     rec709Encode(filmtoneSdrShoulder(lr)),
     rec709Encode(filmtoneSdrShoulder(lg)),
     rec709Encode(filmtoneSdrShoulder(lb)),
+  ];
+}
+
+// ---------- Canon Log 3 + Cinema Gamut ----------
+
+/**
+ * Canon Log 3 → linear scene-referred decoder. Constants from Canon
+ * Log 3 v1.2 via the Colour Science reference, copied from the Swift SSOT.
+ */
+export function canonLog3Decode(encoded: number): number {
+  const lowBreak = 0.097465473;
+  const highBreak = 0.15277891;
+  const logScale = 0.36726845;
+  const logGain = 14.98325;
+  const linearSlope = 1.9754798;
+  const linearOffset = 0.12512219;
+  const lowOffset = 0.12783901;
+  const highOffset = 0.12240537;
+  let scene: number;
+  if (encoded < lowBreak) {
+    scene = -(Math.pow(10.0, (lowOffset - encoded) / logScale) - 1.0) / logGain;
+  } else if (encoded <= highBreak) {
+    scene = (encoded - linearOffset) / linearSlope;
+  } else {
+    scene = (Math.pow(10.0, (encoded - highOffset) / logScale) - 1.0) / logGain;
+  }
+  return scene * 0.9;
+}
+
+/** Cinema Gamut → Rec.709 (D65 → D65, no chromatic adaptation). */
+function cineGamutToRec709(
+  red: number,
+  green: number,
+  blue: number,
+): [number, number, number] {
+  return [
+    1.92355517 * red - 0.79863353 * green - 0.12508072 * blue,
+    -0.20431556 * red + 1.49593305 * green - 0.2915944 * blue,
+    -0.02369073 * red - 0.42022784 * green + 1.44415855 * blue,
+  ];
+}
+
+export function canonLog3CineGamutPixelToRec709(
+  red: number,
+  green: number,
+  blue: number,
+): [number, number, number] {
+  const lr = canonLog3Decode(red);
+  const lg = canonLog3Decode(green);
+  const lb = canonLog3Decode(blue);
+  const m = cineGamutToRec709(lr, lg, lb);
+  return [
+    rec709Encode(filmtoneSdrShoulder(m[0])),
+    rec709Encode(filmtoneSdrShoulder(m[1])),
+    rec709Encode(filmtoneSdrShoulder(m[2])),
   ];
 }
 
@@ -501,8 +632,18 @@ export function makeDlogToRec709Cube(size: number = 33): Float32Array {
   return buildCubeRgba(size, dlogPixelToRec709);
 }
 
+export function makeDlogMToRec709Cube(size: number = 33): Float32Array {
+  return buildCubeRgba(size, dlogMPixelToRec709);
+}
+
 export function makeCanonClogToRec709Cube(size: number = 33): Float32Array {
   return buildCubeRgba(size, canonClogPixelToRec709);
+}
+
+export function makeCanonLog3CineGamutToRec709Cube(
+  size: number = 33,
+): Float32Array {
+  return buildCubeRgba(size, canonLog3CineGamutPixelToRec709);
 }
 
 export function makeVlogToRec709Cube(size: number = 33): Float32Array {
