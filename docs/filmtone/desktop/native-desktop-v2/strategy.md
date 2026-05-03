@@ -35,17 +35,18 @@ shipping Electron rail.
 | M2 | Still And Video Vertical Slice | M1 | Complete | Still and video open, preview, export, and sidecar paths work through the native app. |
 | M3 | Native Color And Optics Parity | M2 | In progress | Built-in Looks use the iOS-canonical color and optics stages; performance is acceptable at 4K; remaining parity gaps are explicit. |
 | M4 | Shared Contract Consolidation | M3 | Deferred | Shared Swift contract ownership is clear, generated Swift remains generated-only, and iOS/macOS consume the same canonical contract without destabilizing the iOS lane. |
-| M5 | Native Editing UI | M3 | Not started | Core Desktop workflows are usable in native UI: look selection, preview navigation, export controls, progress/cancel, and Finder integration. |
+| M5 | Native Editing UI | M3 | In progress | Core Desktop workflows are usable in native UI: look selection, preview navigation, export controls, progress/cancel, and Finder integration. |
 | M6 | Release Cutover | M4, M5 | Not started | Signed/notarized app, release QA, public copy, portfolio/submodule updates, and Look vocabulary gate are complete. |
 
 ## Current Strategic State
 
 - M1 and M2 are complete.
-- M3 is the active milestone.
-- M3 has completed the source-color foundation, modern AVFoundation migration,
-  RayAngleOptics, initial optical stages, and 4K performance measurement.
-- The current active task is the M3 checkpoint for the C5b/C5d work already
-  present in the worktree.
+- M3 remains open for known parity hardening gaps, but its source-color
+  foundation, modern AVFoundation migration, RayAngleOptics, initial optical
+  stages, and 4K performance measurement are complete enough to unblock M5.
+- M5 is the current product milestone.
+- The current `active.md` is the M5-A.1 Visual Smoke manual acceptance gate for
+  the Look Strength Slider already present in the worktree.
 - Baseline-C population is intentionally treated as quality shell work unless
   formal parity proof is requested.
 - M4 SPM consolidation remains deferred until native behavior is stable enough
@@ -89,12 +90,23 @@ shipping Electron rail.
   LUT, printContrast abs, terminal `cropped`) tracked but no-op for built-in 4
   presets. Archived as `archive/2026-05-04-c5b-c5d-checkpoint.md`. Awaiting
   user-manual commit (INV-7) before next active task is created.
+- 2026-05-04: M5-A.1 Look Strength Slider landed — iOS-canonical parameter-space
+  interpolation (`reset → target` lerp, pivot = `resetParams`), Slider UI in
+  `GradeControls`, plumbed through preview / export / sidecar / CLI. Default
+  strength (=1.0) preserves C5b parity bytewise (reset 28.08 dB, iphone
+  09-skin-light 28.81 dB). Sidecar `batchLookChoice.strength` now records intent;
+  `gradeParams` records effective interpolated values. Archived as
+  `archive/2026-05-04-m5-a1-look-strength-slider.md`. Awaiting user-manual commit.
 
 ## Operating Rules
 
 - Read this file at session start and completion only.
 - Read `active.md` every implementation turn.
+- If `active.md` is missing, propose the next subtask and wait for review.
 - Do not implement without an `active.md`.
+- Keep only one `active.md` at a time.
+- For half-day-or-larger interrupts, move the incomplete active task to
+  `paused/` with a `Paused` section, then create an interrupt-only `active.md`.
 - Do not use old handoffs as current truth; they are historical references.
 - Archive completed active tasks into `archive/` and append only a short
   milestone note here.

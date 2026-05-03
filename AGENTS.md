@@ -13,6 +13,8 @@ then work on the product surface.
 3. Open only the current target entry:
    - repo-wide context: `README.md`, then `CLAUDE.md` if policy details matter
    - Desktop: `apps/desktop-film-lab-batch/` and `docs/filmtone/desktop/`
+   - Native Desktop v2: `docs/filmtone/desktop/native-desktop-v2/strategy.md`,
+     then `active.md` if present
    - iOS: `apps/capacitor-film-lab-ios/CLAUDE.md`, then the exact Swift/TS
      surface
    - shared packages: the specific package under `packages/`
@@ -28,6 +30,7 @@ there directly after this file.
 | Request mentions | Start here | Primary check |
 |---|---|---|
 | Desktop, macOS, release, update metadata | `apps/desktop-film-lab-batch/` and `docs/filmtone/desktop/` | `bun run verify:desktop` |
+| Native Desktop v2, SwiftUI Desktop, macOS native app | `docs/filmtone/desktop/native-desktop-v2/strategy.md` and `active.md` | `bun run verify:macos` |
 | iOS, App Store, Xcode, TestFlight, Swift, Capacitor | `apps/capacitor-film-lab-ios/CLAUDE.md` | `bun run verify:ios` |
 | color math, presets, LUT, schema, Swift payload | `packages/film-lab-core/` | `bun run build:core` and relevant package tests |
 | renderer, WebGL, WebGPU, shader parity | `packages/film-lab-renderer/` | `bun run build:renderer` |
@@ -43,6 +46,43 @@ Portfolio lives at:
 
 Portfolio is the public web window. It consumes this repo through
 `vendor/filmtone`. Do not edit Filmtone implementation in portfolio.
+
+## Long-Running Task Model
+
+Use the 2-layer model for long-running product lanes. For each project, propose
+the placement first. For Filmtone Native Desktop v2, the canonical placement is:
+
+```text
+docs/filmtone/desktop/native-desktop-v2/
+```
+
+Documents:
+
+- `strategy.md` is the long-term source of truth: goal, measurable Done
+  conditions, milestones, dependencies, constraints, open questions, and short
+  completion logs only.
+- `active.md` is the only current subtask. It must name the milestone, goal,
+  edit targets, read-only references, checklist, verification, Done conditions,
+  out-of-scope items, and unexpected blockers.
+- `archive/YYYY-MM-DD-{slug}.md` stores completed `active.md` logs.
+- `paused/YYYY-MM-DD-{slug}.md` stores interrupted, incomplete active tasks.
+
+Rules:
+
+- Start Native Desktop v2 sessions by reading `strategy.md`, then `active.md` if
+  present. If `active.md` is missing, propose the next subtask and wait.
+- Do not implement without an `active.md`, and do not mix multiple subtasks into
+  one `active.md`.
+- For half-day-or-larger interrupts, append a `Paused` section to the current
+  `active.md`, move it to `paused/`, and create a new interrupt-only
+  `active.md`. Restore the paused file after the interrupt is archived.
+- Work only inside the current `active.md` scope. If scope needs to change, stop
+  and record the issue before proposing the next step.
+- While implementing, update completed checklist items as they finish.
+- On completion, record verification in `active.md`, move it to `archive/`, and
+  append only a 1-3 line milestone note to `strategy.md`.
+- Existing handoffs and old plan docs are read-only evidence. Do not treat them
+  as current truth.
 
 ## Execution Bias
 
@@ -98,6 +138,7 @@ bun run build:core
 bun run build:renderer
 bun run build:smart-look
 bun run verify:desktop
+bun run verify:macos
 bun run verify:ios
 bun run check:filmtone-copy
 git diff --check
@@ -106,6 +147,7 @@ git diff --check
 Guidance:
 
 - Desktop behavior/export changes: `bun run verify:desktop`.
+- Native Desktop v2 behavior/export changes: `bun run verify:macos`.
 - iOS native/bridge/export changes: `bun run verify:ios`; if Swift build risk is
   material, run the `xcodebuild` command documented in
   `apps/capacitor-film-lab-ios/CLAUDE.md`.
@@ -132,6 +174,12 @@ Guidance:
   local `.env` files.
 - Copy vocabulary: use `動画`, not `短尺動画`; use `video`, `videos`, or
   `footage`, not active positioning such as `short-form video`.
+- Preset/Look vocabulary: `Preset` is the curve/grade foundation. `Look` is
+  reserved for the Stone/Urban Creative LUT Pack context. The old
+  Preset/Look rename premise from `feature/desktop-look-unification` is
+  withdrawn; do not add new references to alias artifacts such as
+  `BaseLookName`, `BASE_LOOKS`, `lookPresetId`, or `currentExportLookPreset`
+  unless the task explicitly removes or quarantines that legacy layer.
 
 ## Dirty Worktree Policy
 
@@ -150,6 +198,7 @@ future chat needs.
 Preferred locations:
 
 - Desktop: `docs/filmtone/desktop/`
+- Native Desktop v2: `docs/filmtone/desktop/native-desktop-v2/`
 - iOS: `docs/filmtone/ios/`
 - Cross-cutting Filmtone docs: `docs/filmtone/`
 - life-level strategy or route docs:

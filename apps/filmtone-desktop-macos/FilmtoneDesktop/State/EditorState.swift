@@ -8,6 +8,7 @@ final class EditorState {
     var sourceURL: URL?
     var sourceKind: FilmtoneSourceKind = .still
     var presetName: String = FilmtonePresetCatalog.defaultName
+    var presetStrength: Double = FilmtonePresetCatalog.presetStrengthDefault
     var isExporting: Bool = false
     var exportProgress: Double = 0
     var exportProgressMessage: String?
@@ -17,7 +18,7 @@ final class EditorState {
     var currentExportTask: Task<Void, Never>?
 
     var presetParams: FilmtonePhase0Params {
-        FilmtonePresetCatalog.params(for: presetName)
+        FilmtonePresetCatalog.params(for: presetName, strength: presetStrength)
     }
 
     var lookId: String {

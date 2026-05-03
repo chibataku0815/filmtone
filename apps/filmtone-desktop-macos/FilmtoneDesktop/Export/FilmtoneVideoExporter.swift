@@ -15,6 +15,7 @@ struct FilmtoneVideoExportRequest: FilmtoneSidecarRequest {
     let sourceURL: URL
     let outputURL: URL
     let presetName: String
+    let presetStrength: Double
     let codec: FilmtoneVideoCodec
     var sourceKind: FilmtoneSourceKind { .video }
 
@@ -22,11 +23,13 @@ struct FilmtoneVideoExportRequest: FilmtoneSidecarRequest {
         sourceURL: URL,
         outputURL: URL,
         presetName: String,
+        presetStrength: Double = FilmtonePresetCatalog.presetStrengthDefault,
         codec: FilmtoneVideoCodec = .h264
     ) {
         self.sourceURL = sourceURL
         self.outputURL = outputURL
         self.presetName = presetName
+        self.presetStrength = presetStrength
         self.codec = codec
     }
 }
@@ -86,7 +89,10 @@ enum FilmtoneVideoExporter {
         try writer.start()
         try reader.start()
 
-        let params = FilmtonePresetCatalog.params(for: request.presetName)
+        let params = FilmtonePresetCatalog.params(
+            for: request.presetName,
+            strength: request.presetStrength
+        )
         let sourceSeed = FilmtoneGradePipeline.makeStableSourceSeed(
             from: request.sourceURL.absoluteString
         )

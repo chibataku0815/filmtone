@@ -11,7 +11,8 @@ struct RootWindowView: View {
             PreviewSurface(
                 sourceURL: state.sourceURL,
                 sourceKind: state.sourceKind,
-                presetName: state.presetName
+                presetName: state.presetName,
+                presetStrength: state.presetStrength
             )
             VStack(alignment: .trailing, spacing: 12) {
                 GlassControlGroup()
@@ -108,6 +109,7 @@ struct RootWindowView: View {
             sourceURL: sourceURL,
             outputURL: outputURL,
             presetName: state.presetName,
+            presetStrength: state.presetStrength,
             format: format
         )
 
@@ -147,7 +149,8 @@ struct RootWindowView: View {
         let request = FilmtoneVideoExportRequest(
             sourceURL: sourceURL,
             outputURL: outputURL,
-            presetName: state.presetName
+            presetName: state.presetName,
+            presetStrength: state.presetStrength
         )
 
         state.isExporting = true

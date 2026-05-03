@@ -46,7 +46,11 @@ enum FilmtoneSidecarWriter {
         for request: any FilmtoneSidecarRequest,
         sourceInterpretation: String? = nil
     ) -> [String: Any] {
-        let params = FilmtonePresetCatalog.params(for: request.presetName)
+        let strength = FilmtonePresetCatalog.clampStrength(request.presetStrength)
+        let params = FilmtonePresetCatalog.params(
+            for: request.presetName,
+            strength: strength
+        )
         let lookId = FilmtonePresetCatalog.lookId(for: request.presetName)
         let lookVersion = FilmtonePresetCatalog.presetVersion
 
@@ -67,7 +71,7 @@ enum FilmtoneSidecarWriter {
                 "lookId": lookId,
                 "lookVersion": lookVersion,
                 "baseLookName": request.presetName,
-                "strength": 1.0,
+                "strength": strength,
             ],
             "lookId": lookId,
             "lookVersion": lookVersion,

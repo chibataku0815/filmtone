@@ -12,12 +12,14 @@ import SwiftUI
 //     --input <path/to/source.png> \
 //     --output <path/to/output.png> \
 //     --preset reset \
+//     [--strength 0.0..1.0] \
 //     [--format png|jpeg] [--no-sidecar]
 //
 //   FilmtoneDesktop --export-video \
 //     --input <path/to/source.mov> \
 //     --output <path/to/output.mp4> \
 //     --preset reset \
+//     [--strength 0.0..1.0] \
 //     [--no-sidecar]
 
 @main
@@ -70,6 +72,7 @@ enum FilmtoneDesktopCLI {
         let inputPath = try value(for: "--input", in: args)
         let outputPath = try value(for: "--output", in: args)
         let preset = (try? value(for: "--preset", in: args)) ?? FilmtonePresetCatalog.defaultName
+        let strength = parseStrength(args)
         let formatString = (try? value(for: "--format", in: args)) ?? "png"
         let format = StillExportFormat(rawValue: formatString) ?? .png
 
@@ -77,6 +80,7 @@ enum FilmtoneDesktopCLI {
             sourceURL: URL(fileURLWithPath: inputPath),
             outputURL: URL(fileURLWithPath: outputPath),
             presetName: preset,
+            presetStrength: strength,
             format: format
         )
     }
@@ -104,13 +108,24 @@ enum FilmtoneDesktopCLI {
         let inputPath = try value(for: "--input", in: args)
         let outputPath = try value(for: "--output", in: args)
         let preset = (try? value(for: "--preset", in: args)) ?? FilmtonePresetCatalog.defaultName
+        let strength = parseStrength(args)
 
         return FilmtoneVideoExportRequest(
             sourceURL: URL(fileURLWithPath: inputPath),
             outputURL: URL(fileURLWithPath: outputPath),
             presetName: preset,
+            presetStrength: strength,
             codec: .h264
         )
+    }
+
+    private static func parseStrength(_ args: [String]) -> Double {
+        guard let raw = try? value(for: "--strength", in: args),
+              let parsed = Double(raw)
+        else {
+            return FilmtonePresetCatalog.presetStrengthDefault
+        }
+        return FilmtonePresetCatalog.clampStrength(parsed)
     }
 
     // Bridges async export into the sync CLI entry by parking the calling

@@ -33,8 +33,23 @@ struct FilmtoneStillExportRequest: FilmtoneSidecarRequest {
     let sourceURL: URL
     let outputURL: URL
     let presetName: String
+    let presetStrength: Double
     let format: StillExportFormat
     var sourceKind: FilmtoneSourceKind { .still }
+
+    init(
+        sourceURL: URL,
+        outputURL: URL,
+        presetName: String,
+        presetStrength: Double = FilmtonePresetCatalog.presetStrengthDefault,
+        format: StillExportFormat
+    ) {
+        self.sourceURL = sourceURL
+        self.outputURL = outputURL
+        self.presetName = presetName
+        self.presetStrength = presetStrength
+        self.format = format
+    }
 }
 
 struct FilmtoneStillExportResult {
@@ -70,7 +85,10 @@ enum FilmtoneStillExporter {
             throw FilmtoneStillExportError.sourceUnreadable(request.sourceURL)
         }
 
-        let params = FilmtonePresetCatalog.params(for: request.presetName)
+        let params = FilmtonePresetCatalog.params(
+            for: request.presetName,
+            strength: request.presetStrength
+        )
         let sourceSeed = FilmtoneGradePipeline.makeStableSourceSeed(
             from: request.sourceURL.absoluteString
         )
