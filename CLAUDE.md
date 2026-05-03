@@ -15,7 +15,6 @@ Filmtone — 独立モノレポ Claude Code 協業ガイド
 |---|---|---|
 | **このリポ** (`/forestone/filmtone`) | apps + packages の **実装の正本** | — |
 | **portfolio** (`/forestone/chibatakumi-portfolio`) | 公開窓のみ(`apps/web`) | `vendor/filmtone` submodule 経由で packages を消費。**filmtone コードは portfolio で編集しない** — bump のみ |
-| **Native Desktop v2 lane** (`docs/filmtone/desktop/native-desktop-v2/`) | Native macOS app lane の作業場 | 現在状態は `strategy.md` → `active.md` が正本。旧 handoff / dated plan は参照専用 |
 | **life** (`/Volumes/SamsungPortableSSDX5001/documents/life/`) | docs/guides・truth scripts・knowledge hub・5 ロール憲法 | このリポの release/ios truth は life の `scripts/check-filmtone-*.sh` から問い合わせる |
 
 ## 3. 運用原則(life CLAUDE.md と整合、最優先)
@@ -44,10 +43,6 @@ Filmtone — 独立モノレポ Claude Code 協業ガイド
 | life `docs/guides/2026-05-01-filmtone-standalone-product-repo-migration-handoff.md` | 移行経緯の参照。現在状態の正本にはしない |
 | life `docs/guides/film-lab-current-index.md` | live エントリ doc(read order・active lanes) |
 
-Native Desktop v2 の作業では、`strategy.md` に実装詳細を書かない。
-実装前に `active.md` がなければ次の subtask 案を作って停止し、完了時は
-`active.md` を `archive/` へ移して `strategy.md` に短く追記する。
-
 ## 4.5 Native Desktop v2 2-layer 運用
 
 詳細なルールは `AGENTS.md` の "Long-Running Task Model" に置く。Claude
@@ -61,7 +56,11 @@ Native Desktop v2 の作業では、`strategy.md` に実装詳細を書かない
   追記する。長大な handoff は作らない。
 - 半日〜数日の差し込みは、現 `active.md` に `Paused` を追記して
   `paused/` へ退避し、差し込み専用の `active.md` に差し替える。軽微修正は
-  現 active の `Unexpected` / `Follow-up` で扱う。
+  現 active の `Unexpected` / `Follow-up` で扱う。差し込み完了後は archive し、
+  必要な場合だけ `strategy.md` に 1〜3 行追記してから退避中の active を戻す。
+- マイルストーンを変える差し込みは `strategy.md` の
+  `Interrupt / Decision Log` に短く追記してから `active.md` を作る。長期方針を
+  変える場合は実装前にレビューする。
 - 旧 handoff / transition plan は事実確認の参照専用。現在状態として引用する前
   に `strategy.md` / `active.md` / 現行 source を優先する。
 
