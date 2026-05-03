@@ -201,12 +201,13 @@ final class MezzanineService {
             .cacheIntermediates: false,
             .priorityRequestLow: true,
         ])
-        // Lazy cold-start prune: any files left past caps from a prior session
-        // or an unclean shutdown get evicted before we start writing new ones.
-        try? cacheStore.pruneMezzanine(
-            maxBytes: Limits.maxBytes,
-            maxEntries: Limits.maxEntries
-        )
+        // Cold-start cache maintenance must not block editor startup.
+        DispatchQueue.global(qos: .utility).async { [cacheStore] in
+            try? cacheStore.pruneMezzanine(
+                maxBytes: Limits.maxBytes,
+                maxEntries: Limits.maxEntries
+            )
+        }
     }
 
     // MARK: - Signature
@@ -385,6 +386,10 @@ final class MezzanineService {
     // MARK: - Public API
 
     func prewarmEligibleMezzanines(for sourceURL: URL) {
+        guard Self.automaticPrewarmEnabled else {
+            return
+        }
+
         // Preview-grade prewarm (Speed export). Skips Display P3 SDR / unknown
         // so stale SDR mezzanines cannot diverge from the live preview.
         if let previewVariant = MezzanineColorProbe.prewarmVariant(sourceURL: sourceURL) {
@@ -400,6 +405,13 @@ final class MezzanineService {
                 _ = try? await self?.ensureMezzanine(sourceURL: sourceURL, variant: qualityVariant)
             }
         }
+    }
+
+    private static var automaticPrewarmEnabled: Bool {
+        let value = ProcessInfo.processInfo.environment["FILMTONE_MEZZANINE_AUTO_PREWARM"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        return value == "1" || value == "true" || value == "yes" || value == "on"
     }
 
     /// Returns mezzanine URL if a valid cache file already exists for `sourceURL` at `variant`.

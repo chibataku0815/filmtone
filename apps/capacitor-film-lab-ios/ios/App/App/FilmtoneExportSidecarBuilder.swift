@@ -72,6 +72,9 @@ struct SidecarBuildInputs {
     /// (preserves byte-identical sidecar output for paths that haven't
     /// adopted Phase G yet).
     let cameraProfile: SidecarCameraProfile?
+    /// v1.5 additive export bottleneck telemetry. nil preserves the previous
+    /// sidecar shape for legacy/unit-test call sites.
+    var performance: SidecarPerformance? = nil
 }
 
 // MARK: - Sidecar schema (filmtone-ios-export-session-v1)
@@ -116,6 +119,8 @@ struct FilmtoneExportSidecarV1: Encodable {
     /// normalization for this export. Additive optional V1 field; nil
     /// preserves the v1.2-shaped sidecar.
     let cameraProfile: SidecarCameraProfile?
+    /// v1.5 additive wall-clock stage totals used to identify export bottlenecks.
+    let performance: SidecarPerformance?
 }
 
 struct SidecarDevice: Encodable {
@@ -210,6 +215,63 @@ struct SidecarOutput: Encodable {
     let colorPrimaries: String
     let colorTransfer: String
     let colorSpace: String
+}
+
+/// v1.5 export bottleneck telemetry. This is intentionally wall-clock based
+/// rather than Instruments-only so a normal real-device export leaves a usable
+/// profile in the sidecar JSON.
+struct SidecarPerformance: Encodable {
+    let exportElapsedMs: Int
+    let mediaPipelineMs: Double?
+    let decodeMs: Double
+    let decodeSamples: Int
+    let waitEncoderMs: Double
+    let buildGraphMs: Double
+    let renderMs: Double
+    let appendMs: Double
+    let writerFinishMs: Double
+    let mediaPipelineResidualMs: Double?
+    let renderedFrames: Int
+    let avgRenderMsPerFrame: Double?
+    let renderShareOfExport: Double?
+    let renderShareOfMediaPipeline: Double?
+    let thermalStateAtStart: String?
+    let thermalStateAtEnd: String?
+    let lowPowerModeEnabledAtStart: Bool?
+    let lowPowerModeEnabledAtEnd: Bool?
+    let processorCount: Int?
+    let activeProcessorCountAtStart: Int?
+    let activeProcessorCountAtEnd: Int?
+    let physicalMemoryBytes: UInt64?
+    let disabledRenderStages: [String]?
+    let acceleratedRenderStages: [String]?
+    let renderStageProfile: SidecarRenderStageProfile?
+}
+
+/// Temporary v1.5 profiler payload. Each stage is measured by forcing Core
+/// Image evaluation into a scratch pixel buffer after that stage boundary.
+/// Stage values are cumulative from the original input through that boundary;
+/// incremental values are derived by subtracting the previous boundary.
+struct SidecarRenderStageProfile: Encodable {
+    let mode: String
+    let source: String
+    let frameStride: Int
+    let sampledFrames: Int
+    let totalFrames: Int
+    let forcedRenderMs: Double
+    let stages: [SidecarRenderStageMetric]
+}
+
+struct SidecarRenderStageMetric: Encodable {
+    let stage: String
+    let samples: Int
+    let failures: Int
+    let cumulativeMs: Double
+    let cumulativeAvgMsPerSample: Double?
+    let estimatedCumulativeMs: Double?
+    let incrementalMsFromPreviousStage: Double?
+    let incrementalAvgMsPerSample: Double?
+    let estimatedIncrementalMs: Double?
 }
 
 /// v1.3 Camera Profiles Phase G: provenance for the Camera Profile that
@@ -519,7 +581,8 @@ enum FilmtoneExportSidecarBuilder {
             package: inputs.package,
             depth: depth,
             savedLook: inputs.appliedSavedLook,
-            cameraProfile: inputs.cameraProfile
+            cameraProfile: inputs.cameraProfile,
+            performance: inputs.performance
         )
     }
 
