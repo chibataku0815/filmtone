@@ -54,6 +54,10 @@ the placement first. For Filmtone Native Desktop v2, the canonical placement is:
 
 ```text
 docs/filmtone/desktop/native-desktop-v2/
+├── strategy.md
+├── active.md
+├── paused/
+└── archive/
 ```
 
 Documents:
@@ -73,9 +77,6 @@ Rules:
   present. If `active.md` is missing, propose the next subtask and wait.
 - Do not implement without an `active.md`, and do not mix multiple subtasks into
   one `active.md`.
-- For half-day-or-larger interrupts, append a `Paused` section to the current
-  `active.md`, move it to `paused/`, and create a new interrupt-only
-  `active.md`. Restore the paused file after the interrupt is archived.
 - Work only inside the current `active.md` scope. If scope needs to change, stop
   and record the issue before proposing the next step.
 - While implementing, update completed checklist items as they finish.
@@ -83,6 +84,24 @@ Rules:
   append only a 1-3 line milestone note to `strategy.md`.
 - Existing handoffs and old plan docs are read-only evidence. Do not treat them
   as current truth.
+
+Interrupts:
+
+- Keep exactly one current `active.md`. Do not merge parallel work into it.
+- 5-30 minute fixes stay in the current `active.md` under `Unexpected` or
+  `Follow-up` if they belong to the active scope.
+- Half-day to multi-day interrupts pause the current task: append a `Paused`
+  section to `active.md`, briefly list done vs. not done, move it to
+  `paused/YYYY-MM-DD-{slug}.md`, then create a new interrupt-only `active.md`.
+- The interrupt `active.md` must name its milestone, or say `Interrupt` when it
+  is outside the current milestone.
+- When the interrupt finishes, archive it to `archive/YYYY-MM-DD-{slug}.md`,
+  append 1-3 lines to `strategy.md` only if strategy state changed, then restore
+  the paused file back to `active.md`.
+- Milestone-changing interrupts require an `Interrupt / Decision Log` note in
+  `strategy.md` before creating the new `active.md`.
+- Long-term direction changes are milestone-structure changes. Stop and get
+  review before implementation.
 
 ## Execution Bias
 

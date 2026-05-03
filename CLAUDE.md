@@ -56,7 +56,11 @@ Filmtone — 独立モノレポ Claude Code 協業ガイド
   追記する。長大な handoff は作らない。
 - 半日〜数日の差し込みは、現 `active.md` に `Paused` を追記して
   `paused/` へ退避し、差し込み専用の `active.md` に差し替える。軽微修正は
-  現 active の `Unexpected` / `Follow-up` で扱う。
+  現 active の `Unexpected` / `Follow-up` で扱う。差し込み完了後は archive し、
+  必要な場合だけ `strategy.md` に 1〜3 行追記してから退避中の active を戻す。
+- マイルストーンを変える差し込みは `strategy.md` の
+  `Interrupt / Decision Log` に短く追記してから `active.md` を作る。長期方針を
+  変える場合は実装前にレビューする。
 - 旧 handoff / transition plan は事実確認の参照専用。現在状態として引用する前
   に `strategy.md` / `active.md` / 現行 source を優先する。
 
