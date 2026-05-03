@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 export const PROXY_CACHE_MANIFEST_VERSION = 1;
-export const PROXY_CACHE_PROFILE_VERSION = "proxy-cache-v1";
+export const PROXY_CACHE_PROFILE_VERSION = "proxy-cache-v2";
 export const PROXY_CACHE_MAX_ENTRIES = 8;
 export const PROXY_CACHE_MAX_TOTAL_BYTES = 2 * 1024 * 1024 * 1024;
 export const PROXY_CACHE_MAX_AGE_DAYS = 14;

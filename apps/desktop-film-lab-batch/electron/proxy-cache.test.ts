@@ -28,7 +28,7 @@ async function makeCacheRoot(): Promise<string> {
 
 function makeProfile(overrides?: Partial<ProxyCacheProfile>): ProxyCacheProfile {
   return {
-    version: "proxy-cache-v1",
+    version: "proxy-cache-v2",
     width: 1280,
     height: 720,
     encoderFlavor: "h264_videotoolbox-or-libx264",

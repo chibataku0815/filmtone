@@ -926,6 +926,15 @@ function buildFfmpegProxyArgs(
   }
   args.push("-i", inputPath);
   args.push(
+    "-map",
+    "0:v:0",
+    "-dn",
+    "-map_metadata",
+    "-1",
+    "-map_chapters",
+    "-1",
+  );
+  args.push(
     "-vf",
     "colorspace=iall=bt709:all=bt709,scale=1280:-2,format=yuv420p",
   );
@@ -952,7 +961,7 @@ function buildFfmpegProxyArgs(
       "1",
     );
   }
-  args.push("-an", "-y", outputPath);
+  args.push("-an", "-movflags", "+faststart", "-y", outputPath);
   return args;
 }
 

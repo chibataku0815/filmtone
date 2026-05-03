@@ -79,7 +79,7 @@ import {
   type BatchPipelineSummary,
 } from "./batch-pipeline";
 import {
-  needsMezzanineTranscode,
+  needsDesktopPreviewTranscode,
   runVideoExportPipeline,
   type VideoExportProgress,
   type VideoExportPipelineUserMessages,
@@ -187,7 +187,7 @@ function isRasterExportFileName(fileName: string): boolean {
 
 /** @description プレビューに載せたファイル名が動画書き出し向けか */
 function isVideoExportFileName(fileName: string): boolean {
-  return /\.(mp4|webm|m4v|mov)$/i.test(fileName);
+  return /\.(mp4|webm|m4v|mov|mkv)$/i.test(fileName);
 }
 
 type EditLutSlot = {
@@ -590,6 +590,7 @@ export default function App() {
   );
   const aiScenePickInflightRef = useRef<Set<string>>(new Set());
   const progressiveLoad = useProgressiveLoad();
+  const pendingProgressivePreviewSourcePathRef = useRef<string | null>(null);
   const canvasHasUserVideo = useMemo(
     () =>
       desktopPreviewShowsUserVideo(interactivePreviewSource) &&
@@ -1257,6 +1258,7 @@ export default function App() {
   const handleInteractiveSourceChange = useCallback(
     (info: FilmLabInteractiveSourceInfo) => {
       if (info.kind === "sample") {
+        pendingProgressivePreviewSourcePathRef.current = null;
         setInteractivePreviewSource({ kind: "sample" });
         return;
       }
@@ -1271,12 +1273,19 @@ export default function App() {
         absolutePath,
         smartLookDerived,
       });
-      if (smartLookDerived || !absolutePath) return;
+      if (smartLookDerived || !absolutePath) {
+        pendingProgressivePreviewSourcePathRef.current = null;
+        return;
+      }
       if (isVideoExportFileName(info.fileName)) {
+        if (pendingProgressivePreviewSourcePathRef.current === absolutePath) {
+          pendingProgressivePreviewSourcePathRef.current = null;
+        }
         void applyPickedVideoPath(absolutePath);
         return;
       }
       if (isRasterExportFileName(info.fileName)) {
+        pendingProgressivePreviewSourcePathRef.current = null;
         const sep = Math.max(
           absolutePath.lastIndexOf("/"),
           absolutePath.lastIndexOf("\\"),
@@ -1345,7 +1354,7 @@ export default function App() {
 
     const probe = await window.filmLabBatch.videoExportProbe(absPath);
 
-    if (!needsMezzanineTranscode({
+    if (!needsDesktopPreviewTranscode({
       videoCodec: probe.videoCodec,
       fileSizeBytes: probe.fileSizeBytes,
       absPath,
@@ -1354,6 +1363,7 @@ export default function App() {
       return null; // codec is supported, no transcode needed
     }
 
+    pendingProgressivePreviewSourcePathRef.current = absPath;
     const result = await progressiveLoad.startProgressiveLoad(
       absPath,
       file.name,
@@ -1361,6 +1371,9 @@ export default function App() {
       handleProgressiveTextureSwap,
     );
     if (!result) {
+      if (pendingProgressivePreviewSourcePathRef.current === absPath) {
+        pendingProgressivePreviewSourcePathRef.current = null;
+      }
       return null;
     }
     return {
@@ -1381,6 +1394,9 @@ export default function App() {
   useEffect(() => {
     const activeSourcePath = progressiveLoad.activeSourcePath;
     if (!activeSourcePath) {
+      return;
+    }
+    if (activeSourcePath === pendingProgressivePreviewSourcePathRef.current) {
       return;
     }
     if (
