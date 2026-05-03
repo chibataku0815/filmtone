@@ -154,6 +154,45 @@ describe("export metadata session", () => {
     });
   });
 
+  it("round-trips a backlightVeil optical filter profile through JSON", () => {
+    const cinematic = batchGradeStateFromPreset("cinematic");
+    const session = buildFilmtoneExportSession({
+      exportedAtIso: "2026-05-03T09:00:00.000Z",
+      appVersion: "1.2.3",
+      job: "video",
+      inputDir: null,
+      videoInputPath: "/Users/tester/input/window-backlight.mov",
+      outputDir: "/Users/tester/output",
+      imageFormat: null,
+      outputFilenameSuffix: null,
+      outputFileName: "window-backlight-graded.mp4",
+      batchPresetChoice: "cinematic",
+      lookSource: "preset",
+      gradeParams: cinematic.params,
+      depthTrack: null,
+      lutRefs: createEmptyMetadataLutRefs(),
+      opticalFilterProfile: {
+        id: "backlightVeil-1-4",
+        family: "backlightVeil",
+        density: "1/4",
+        displayName: "Backlight Veil 1/4",
+        appliedAtIso: "2026-05-03T08:55:00.000Z",
+      },
+    });
+
+    const parsed = parseFilmtoneExportSessionV1(
+      JSON.parse(exportFilmtoneExportSessionJsonText(session)) as unknown,
+    );
+
+    expect(parsed?.look.opticalFilterProfile).toEqual({
+      id: "backlightVeil-1-4",
+      family: "backlightVeil",
+      density: "1/4",
+      displayName: "Backlight Veil 1/4",
+      appliedAtIso: "2026-05-03T08:55:00.000Z",
+    });
+  });
+
   it("round-trips optional source camera optics on video sidecars", () => {
     const cinematic = batchGradeStateFromPreset("cinematic");
     const session = buildFilmtoneExportSession({

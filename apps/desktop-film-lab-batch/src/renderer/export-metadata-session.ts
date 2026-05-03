@@ -227,6 +227,7 @@ const opticalFilterFamilySchema = z.enum([
   "pearlGlow",
   "warmMist",
   "cleanSoft",
+  "backlightVeil",
   "streak",
   "prismHalo",
 ]);

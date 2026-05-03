@@ -324,6 +324,7 @@ const OPTICAL_FILTER_FAMILY_ORDER = [
   "blackMist",
   "cineBloom",
   "warmMist",
+  "backlightVeil",
   "pearlGlow",
   "cleanSoft",
 ] as const satisfies readonly OpticalFilterProfile["family"][];
@@ -332,6 +333,7 @@ const OPTICAL_FILTER_FAMILY_LABELS = {
   blackMist: "Black Mist",
   cineBloom: "Cine Bloom",
   warmMist: "Warm Mist",
+  backlightVeil: "Backlight Veil",
   pearlGlow: "Pearl Glow",
   cleanSoft: "Clean Soft",
 } as const satisfies Partial<Record<OpticalFilterProfile["family"], string>>;

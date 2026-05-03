@@ -89,6 +89,12 @@ declare const filmLabSmartLookRequestSchema: z.ZodObject<{
         halationRadius: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         bloomSoftKnee: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         halationSoftKnee: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        opticalDirectTransmission: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        opticalBlackRetention: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        opticalScatterStrength: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        opticalHighlightReactivity: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        opticalWarmScatter: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        opticalSpectralTail: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         fade: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         highlights: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         shadows: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
@@ -127,6 +133,14 @@ declare const filmLabSmartLookRequestSchema: z.ZodObject<{
         crossFilterAngleInnerThreshold: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         crossFilterEdgeLengthGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         crossFilterEdgeStrengthGain: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        haloPrismStrength: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        haloPrismRadius: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        haloPrismWidth: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        haloPrismChromatic: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        haloPrismThreshold: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        haloPrismSplit: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        haloPrismAngle: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        haloPrismSourceReactivity: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
     }, z.core.$strip>>;
     basePreset: z.ZodOptional<z.ZodNullable<z.ZodEnum<{
         reset: "reset";
