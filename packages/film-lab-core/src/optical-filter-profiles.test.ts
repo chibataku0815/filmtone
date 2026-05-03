@@ -20,6 +20,9 @@ describe("optical filter profiles", () => {
       "pearlGlow-subtle",
       "pearlGlow-1-4",
       "cleanSoft-subtle",
+      "backlightVeil-1-8",
+      "backlightVeil-1-4",
+      "backlightVeil-1-2",
     ]);
   });
 
