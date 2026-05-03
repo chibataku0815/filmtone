@@ -127,6 +127,7 @@ struct FilmtoneStrings {
     let exportStart: String
     let exportAndSave: String
     let exportSavingToPhotos: String
+    let exportFinishedHint: String
     let exportDisabled: String
     let saveToPhotos: String
     let saveToPhotosDone: String
@@ -1057,6 +1058,11 @@ extension FilmtoneStrings {
             "filmtone.export.saving_to_photos",
             defaultValue: prefersJapanese ? "写真へ保存中…" : "Saving to Photos…",
             comment: "Status shown after export finishes while the app is saving the output to Photos."
+        )
+        exportFinishedHint = filmtoneLocalized(
+            "filmtone.export.finished_hint",
+            defaultValue: prefersJapanese ? "書き出しが完了しました。" : "Export complete.",
+            comment: "Status line shown beneath the section title once an export has finished."
         )
         exportDisabled = filmtoneLocalized(
             "filmtone.export.disabled",

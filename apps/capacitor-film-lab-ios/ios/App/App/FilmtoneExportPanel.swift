@@ -237,7 +237,7 @@ struct FilmtoneExportPanel: View {
             return store.strings.exportSavingToPhotos
         }
         if store.exportResult != nil {
-            return store.strings.resultTitle
+            return store.strings.exportFinishedHint
         }
         return store.strings.exportIdle
     }
