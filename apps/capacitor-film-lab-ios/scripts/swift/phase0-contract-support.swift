@@ -323,4 +323,5 @@ struct Phase0ExportRequestDTO: Codable {
     let renderMode: String?
     let depthEnabled: Bool?
     let depthRenderer: String?
+    var connectPackage: Bool? = nil
 }

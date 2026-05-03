@@ -201,12 +201,13 @@ final class MezzanineService {
             .cacheIntermediates: false,
             .priorityRequestLow: true,
         ])
-        // Lazy cold-start prune: any files left past caps from a prior session
-        // or an unclean shutdown get evicted before we start writing new ones.
-        try? cacheStore.pruneMezzanine(
-            maxBytes: Limits.maxBytes,
-            maxEntries: Limits.maxEntries
-        )
+        // Cold-start cache maintenance must not block editor startup.
+        DispatchQueue.global(qos: .utility).async { [cacheStore] in
+            try? cacheStore.pruneMezzanine(
+                maxBytes: Limits.maxBytes,
+                maxEntries: Limits.maxEntries
+            )
+        }
     }
 
     // MARK: - Signature
@@ -248,9 +249,147 @@ final class MezzanineService {
         return digest.map { String(format: "%02x", $0) }.joined()
     }
 
+    // MARK: - Validation
+
+    struct MezzanineMetrics {
+        let durationSec: Double
+        let width: Int?
+        let height: Int?
+        let codec: String?
+        let fileSizeBytes: Int64?
+    }
+
+    /// Probe an existing mezzanine file's metrics by opening it as an
+    /// AVURLAsset. Returns nil if the file is missing, cannot be opened, has
+    /// no video track, or has a non-finite/zero duration. Used both for cache
+    /// validation and for telemetry truth in the export sidecar.
+    func mezzanineMetrics(at url: URL) -> MezzanineMetrics? {
+        guard fileManager.fileExists(atPath: url.path) else { return nil }
+        let asset = AVURLAsset(url: url)
+        guard let videoTrack = asset.tracks(withMediaType: .video).first else {
+            return nil
+        }
+        let duration = CMTimeGetSeconds(asset.duration)
+        guard duration.isFinite, duration > 0 else { return nil }
+
+        let transformed = videoTrack.naturalSize.applying(videoTrack.preferredTransform)
+        let width = Int(abs(transformed.width).rounded())
+        let height = Int(abs(transformed.height).rounded())
+
+        let codec: String?
+        if let description = videoTrack.formatDescriptions.first {
+            let cmDescription = description as! CMFormatDescription
+            let mediaSubType = CMFormatDescriptionGetMediaSubType(cmDescription)
+            codec = Self.fourCCString(mediaSubType)
+        } else {
+            codec = nil
+        }
+
+        let attrs = try? fileManager.attributesOfItem(atPath: url.path)
+        let size = (attrs?[.size] as? NSNumber)?.int64Value
+
+        return MezzanineMetrics(
+            durationSec: duration,
+            width: width > 0 ? width : nil,
+            height: height > 0 ? height : nil,
+            codec: codec,
+            fileSizeBytes: size
+        )
+    }
+
+    /// Validate a cached or freshly-generated mezzanine file against the
+    /// source URL and the profile we expected to write. Returns false (caller
+    /// should treat the file as poison and delete it) if any check fails:
+    /// - file cannot be opened or has no video track
+    /// - duration differs from source duration by more than 1.0s
+    ///   (catches `AVAssetReader.cancelled` truncation, e.g. app suspend)
+    /// - codec subtype does not match the profile's expected codec
+    /// - for source-resolution-preserving variants (qualitySDR/qualityHDR),
+    ///   width/height diverge from the source video track
+    private func isValidMezzanine(at url: URL, sourceURL: URL, profile: Profile) -> Bool {
+        guard let metrics = mezzanineMetrics(at: url) else { return false }
+
+        let sourceAsset = AVURLAsset(url: sourceURL)
+        let sourceDuration = CMTimeGetSeconds(sourceAsset.duration)
+        guard sourceDuration.isFinite, sourceDuration > 0 else {
+            return false
+        }
+        if abs(metrics.durationSec - sourceDuration) > 1.0 {
+            return false
+        }
+
+        if let got = metrics.codec {
+            let expected: String?
+            switch profile.codec {
+            case .h264: expected = "avc1"
+            case .hevc: expected = "hvc1"
+            default: expected = nil
+            }
+            if let expected {
+                let normalized: String
+                switch got {
+                case "avc1", "avc3", "h264": normalized = "avc1"
+                case "hvc1", "hev1", "hevc": normalized = "hvc1"
+                default: normalized = got
+                }
+                if normalized != expected { return false }
+            }
+        }
+
+        if profile.preservesSourceResolution {
+            guard let track = sourceAsset.tracks(withMediaType: .video).first else {
+                return false
+            }
+            let transformed = track.naturalSize.applying(track.preferredTransform)
+            let expectedW = Int(abs(transformed.width).rounded())
+            let expectedH = Int(abs(transformed.height).rounded())
+            guard let w = metrics.width, let h = metrics.height else {
+                return false
+            }
+            if abs(w - expectedW) > 2 || abs(h - expectedH) > 2 {
+                return false
+            }
+        }
+
+        return true
+    }
+
+    /// Public wrapper around `isValidMezzanine` for callers (e.g. the export
+    /// session) that need to re-validate a routed mezzanine URL just before
+    /// opening AVURLAsset, in case eviction or a racing prewarm invalidated
+    /// the file between routing and read.
+    func isValidMezzaninePublic(
+        at url: URL,
+        sourceURL: URL,
+        variant: ProfileVariant
+    ) -> Bool {
+        isValidMezzanine(
+            at: url,
+            sourceURL: sourceURL,
+            profile: Profile.profile(for: variant)
+        )
+    }
+
+    private static func fourCCString(_ value: FourCharCode) -> String {
+        let bytes: [CChar] = [
+            CChar((value >> 24) & 0xff),
+            CChar((value >> 16) & 0xff),
+            CChar((value >> 8) & 0xff),
+            CChar(value & 0xff),
+            0,
+        ]
+        return String(cString: bytes)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+    }
+
     // MARK: - Public API
 
     func prewarmEligibleMezzanines(for sourceURL: URL) {
+        guard Self.automaticPrewarmEnabled else {
+            return
+        }
+
         // Preview-grade prewarm (Speed export). Skips Display P3 SDR / unknown
         // so stale SDR mezzanines cannot diverge from the live preview.
         if let previewVariant = MezzanineColorProbe.prewarmVariant(sourceURL: sourceURL) {
@@ -268,9 +407,20 @@ final class MezzanineService {
         }
     }
 
+    private static var automaticPrewarmEnabled: Bool {
+        let value = ProcessInfo.processInfo.environment["FILMTONE_MEZZANINE_AUTO_PREWARM"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        return value == "1" || value == "true" || value == "yes" || value == "on"
+    }
+
     /// Returns mezzanine URL if a valid cache file already exists for `sourceURL` at `variant`.
     /// Touches contentModificationDate for LRU recency. Does not trigger generation.
     /// `depthEnabled` participates in the cache key (see `signature(for:profile:depthEnabled:)`).
+    /// v1.4: also validates the file (duration/codec/dimensions). A truncated cache
+    /// (e.g. from an `AVAssetReader.cancelled` write that older code promoted
+    /// silently) is deleted on detection so the next `ensureMezzanine` regenerates
+    /// from scratch instead of silently shipping a 5-second stub.
     func existingMezzanineURL(
         for sourceURL: URL,
         variant: ProfileVariant,
@@ -280,6 +430,10 @@ final class MezzanineService {
         guard let sig = try? signature(for: sourceURL, profile: profile, depthEnabled: depthEnabled),
               let url = try? cacheStore.mezzanineFileURL(signature: sig),
               fileManager.fileExists(atPath: url.path) else {
+            return nil
+        }
+        guard isValidMezzanine(at: url, sourceURL: sourceURL, profile: profile) else {
+            try? fileManager.removeItem(at: url)
             return nil
         }
         try? cacheStore.touch(url)
@@ -447,6 +601,17 @@ final class MezzanineService {
                 profile: profile,
                 progress: progress
             )
+            // v1.4: validate the freshly written temp before promote.
+            // generateSync can return success when AVAssetReader transitions
+            // to .cancelled (app suspend etc) with truncated frames written;
+            // refusing to promote anything that fails the duration / codec /
+            // dimension check keeps the cache slot free for a real retry.
+            guard isValidMezzanine(at: tempURL, sourceURL: sourceURL, profile: profile) else {
+                try? fileManager.removeItem(at: tempURL)
+                throw GenerationError.writerFailed(
+                    "Generated mezzanine failed validation (truncated, wrong codec, or wrong dimensions)"
+                )
+            }
             return try promoteGeneratedMezzanine(
                 temporaryURL: tempURL,
                 destinationURL: destURL
@@ -744,8 +909,15 @@ final class MezzanineService {
                 }
                 autoreleasepool {
                     guard let sampleBuffer = videoOutput.copyNextSampleBuffer() else {
-                        if reader.status == .failed {
-                            fail(GenerationError.readerFailed(reader.error?.localizedDescription ?? "Video read failed."))
+                        // v1.4: treat .cancelled (app suspend / explicit cancel)
+                        // as failure too. Older code only failed on .failed,
+                        // which let truncated outputs flow into promote and
+                        // pollute the cache. Only .completed is a natural end.
+                        if reader.status == .failed || reader.status == .cancelled {
+                            fail(GenerationError.readerFailed(
+                                reader.error?.localizedDescription
+                                    ?? "Video read \(reader.status == .cancelled ? "cancelled" : "failed")."
+                            ))
                         } else {
                             finishVideo(markAsFinished: true)
                         }
@@ -804,8 +976,12 @@ final class MezzanineService {
                         return
                     }
                     guard let sampleBuffer = audioOutput.copyNextSampleBuffer() else {
-                        if reader.status == .failed {
-                            fail(GenerationError.readerFailed(reader.error?.localizedDescription ?? "Audio read failed."))
+                        // v1.4: see video-side note above — .cancelled must fail.
+                        if reader.status == .failed || reader.status == .cancelled {
+                            fail(GenerationError.readerFailed(
+                                reader.error?.localizedDescription
+                                    ?? "Audio read \(reader.status == .cancelled ? "cancelled" : "failed")."
+                            ))
                         } else {
                             finishAudio(markAsFinished: true)
                         }

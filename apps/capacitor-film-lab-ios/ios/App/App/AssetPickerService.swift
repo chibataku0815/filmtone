@@ -237,14 +237,28 @@ final class AssetPickerService: NSObject {
                 .nonEmpty
                 ?? UTType(fallbackTypeIdentifier)?.preferredFilenameExtension
                 ?? "mov"
-        reclaimBeforeSourceImport()
-        let destinationURL = try cacheStore.stagedItemURL(
+        let sourceIdentity = photoSourceIdentity(
+            asset: asset,
+            resource: resource,
+            fallbackTypeIdentifier: fallbackTypeIdentifier
+        )
+        if let existingURL = try cacheStore.existingReusableSourceURL(
+            identity: sourceIdentity,
             suggestedName: suggestedName ?? resource.originalFilename,
-            fallbackExtension: fallbackExtension,
-            bucket: .sources
+            fallbackExtension: fallbackExtension
+        ) {
+            return existingURL
+        }
+
+        reclaimBeforeSourceImport()
+        let destinationURL = try cacheStore.reusableSourceURL(
+            identity: sourceIdentity,
+            suggestedName: suggestedName ?? resource.originalFilename,
+            fallbackExtension: fallbackExtension
         )
 
         try await writeAssetResource(resource, to: destinationURL)
+        try cacheStore.touch(destinationURL)
         return destinationURL
     }
 
@@ -319,12 +333,24 @@ final class AssetPickerService: NSObject {
 
         let type = try sourceType(for: url)
         let kind: FilmtoneSourceKind = type.conforms(to: .image) ? .image : .video
-        try preflightDocumentSourceCopy(from: url)
-        let importedURL = try cacheStore.importExternalItem(
-            from: url,
+        let sourceIdentity = try documentSourceIdentity(for: url, type: type)
+        let fallbackExtension = url.pathExtension.nonEmpty ?? type.preferredFilenameExtension ?? "dat"
+        let importedURL: URL
+        if let existingURL = try cacheStore.existingReusableSourceURL(
+            identity: sourceIdentity,
             suggestedName: url.lastPathComponent,
-            bucket: .sources
-        )
+            fallbackExtension: fallbackExtension
+        ) {
+            importedURL = existingURL
+        } else {
+            try preflightDocumentSourceCopy(from: url)
+            importedURL = try cacheStore.importExternalItem(
+                from: url,
+                suggestedName: url.lastPathComponent,
+                bucket: .sources,
+                reusableSourceIdentity: sourceIdentity
+            )
+        }
 
         if kind == .video {
             kickOffMezzanine(for: importedURL)
@@ -379,6 +405,55 @@ final class AssetPickerService: NSObject {
                 comment: "Error shown when an unsupported file is selected from Files."
             )
         )
+    }
+
+    private func photoSourceIdentity(
+        asset: PHAsset,
+        resource: PHAssetResource,
+        fallbackTypeIdentifier: String
+    ) -> String {
+        [
+            "photos-v1",
+            asset.localIdentifier,
+            resource.originalFilename,
+            resource.uniformTypeIdentifier,
+            String(resource.type.rawValue),
+            fallbackTypeIdentifier,
+            millisecondsSince1970(asset.creationDate),
+            millisecondsSince1970(asset.modificationDate),
+            String(asset.pixelWidth),
+            String(asset.pixelHeight),
+            String(format: "%.6f", asset.duration),
+        ].joined(separator: "\n")
+    }
+
+    private func documentSourceIdentity(for url: URL, type: UTType) throws -> String {
+        let values = try url.resourceValues(forKeys: [
+            .contentModificationDateKey,
+            .contentTypeKey,
+            .fileResourceIdentifierKey,
+            .fileSizeKey,
+            .totalFileAllocatedSizeKey,
+        ])
+        let resourceIdentifier = values.fileResourceIdentifier.map { String(describing: $0) } ?? "unknown-resource"
+        let sizeBytes = values.fileSize ?? values.totalFileAllocatedSize ?? 0
+        return [
+            "files-v1",
+            url.standardizedFileURL.path,
+            resourceIdentifier,
+            String(sizeBytes),
+            millisecondsSince1970(values.contentModificationDate),
+            values.contentType?.identifier ?? type.identifier,
+            type.identifier,
+            url.pathExtension,
+        ].joined(separator: "\n")
+    }
+
+    private func millisecondsSince1970(_ date: Date?) -> String {
+        guard let date else {
+            return "nil"
+        }
+        return String(Int64((date.timeIntervalSince1970 * 1000).rounded()))
     }
 
     private func isSupportedSourceType(_ type: UTType) -> Bool {
@@ -620,7 +695,7 @@ final class AssetPickerService: NSObject {
     }
 
     private func reclaimBeforeSourceImport() {
-        _ = try? cacheStore.pruneStandard(protecting: protectedCacheURLsDuringImport)
+        _ = try? cacheStore.pruneBeforeSourceImport(protecting: protectedCacheURLsDuringImport)
     }
 }
 

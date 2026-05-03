@@ -16,6 +16,8 @@ struct TestCacheStore {
     static func main() throws {
         try runLRUAndProtectedFileTest()
         try runStandardBucketPolicyTest()
+        try runSourceImportPruneTest()
+        try runReusableSourceImportTest()
         try runGeneratedExportRemovalTest()
         print("CacheStore tests passed")
     }
@@ -77,13 +79,71 @@ struct TestCacheStore {
             now: fixture.now
         )
 
-        try expect(result.removedCount == 3, "standard policy should remove stale source, stale preview, and stale partial")
+        try expect(result.removedCount == 2, "standard policy should remove stale preview and stale partial")
         try expect(FileManager.default.fileExists(atPath: activeSource.path), "active source should be retained")
-        try expect(!FileManager.default.fileExists(atPath: staleSource.path), "inactive source should be removed")
+        try expect(FileManager.default.fileExists(atPath: staleSource.path), "recent inactive source should be retained for reuse")
         try expect(FileManager.default.fileExists(atPath: activePreview.path), "active preview should be retained")
         try expect(!FileManager.default.fileExists(atPath: oldPreview.path), "expired preview should be removed")
         try expect(!FileManager.default.fileExists(atPath: stalePartial.path), "stale partial should be removed")
         try expect(FileManager.default.fileExists(atPath: protectedPartial.path), "protected partial should be retained")
+    }
+
+    static func runSourceImportPruneTest() throws {
+        let fixture = try CacheStoreFixture()
+        defer { fixture.cleanup() }
+
+        let activeSource = try fixture.write(bucket: .sources, name: "active.mov", modifiedAt: fixture.date(secondsAgo: 60))
+        let inactiveSource = try fixture.write(bucket: .sources, name: "inactive.mov", modifiedAt: fixture.date(secondsAgo: 30))
+
+        let result = try fixture.store.pruneBeforeSourceImport(
+            protecting: [activeSource],
+            now: fixture.now
+        )
+
+        try expect(result.removedCount == 1, "source import prune should remove inactive sources")
+        try expect(FileManager.default.fileExists(atPath: activeSource.path), "active source should be retained")
+        try expect(!FileManager.default.fileExists(atPath: inactiveSource.path), "inactive source should be removed before a new copy")
+    }
+
+    static func runReusableSourceImportTest() throws {
+        let fixture = try CacheStoreFixture()
+        defer { fixture.cleanup() }
+
+        let external = fixture.rootURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("external-source.mov")
+        try Data(repeating: 3, count: 32).write(to: external)
+
+        let firstURL = try fixture.store.importExternalItem(
+            from: external,
+            suggestedName: "Camera Source.mov",
+            bucket: .sources,
+            reusableSourceIdentity: "source-identity"
+        )
+        let secondURL = try fixture.store.importExternalItem(
+            from: external,
+            suggestedName: "Different Display Name.mov",
+            bucket: .sources,
+            reusableSourceIdentity: "source-identity"
+        )
+
+        try expect(firstURL == secondURL, "same reusable source identity should return the same cache URL")
+        try expect(firstURL.lastPathComponent.hasPrefix("filmtone-source-"), "reusable source should use a deterministic filename")
+
+        let zeroURL = try fixture.store.reusableSourceURL(
+            identity: "zero-byte-source",
+            suggestedName: "Zero.mov",
+            fallbackExtension: "mov"
+        )
+        try Data().write(to: zeroURL)
+        let zeroExistingURL = try fixture.store.existingReusableSourceURL(
+            identity: "zero-byte-source",
+            suggestedName: "Zero.mov",
+            fallbackExtension: "mov"
+        )
+
+        try expect(zeroExistingURL == nil, "zero-byte reusable source should not be reused")
+        try expect(!FileManager.default.fileExists(atPath: zeroURL.path), "zero-byte reusable source should be removed")
     }
 
     static func runGeneratedExportRemovalTest() throws {
@@ -122,6 +182,7 @@ final class CacheStoreFixture {
     func cleanup() {
         try? FileManager.default.removeItem(at: rootURL)
         try? FileManager.default.removeItem(at: rootURL.deletingLastPathComponent().appendingPathComponent("outside.mp4"))
+        try? FileManager.default.removeItem(at: rootURL.deletingLastPathComponent().appendingPathComponent("external-source.mov"))
     }
 
     func date(secondsAgo: TimeInterval) -> Date {
