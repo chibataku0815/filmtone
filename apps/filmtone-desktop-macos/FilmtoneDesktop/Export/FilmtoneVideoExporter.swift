@@ -132,8 +132,16 @@ enum FilmtoneVideoExporter {
                     let scaleY = outputSize.height / max(normalized.extent.height, 1)
                     let scaled = normalized.transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
 
-                    let graded = FilmtoneGradePipeline.apply(to: scaled, params: params)
-                        .cropped(to: renderBounds)
+                    // Phase 2 C5a: forward CMTime presentation seconds to the
+                    // grain kernel so each frame draws a fresh grain pattern
+                    // (kernel does floor(t*3) → 3 refresh per source-second).
+                    let secondsRaw = CMTimeGetSeconds(validTime)
+                    let frameTimeSeconds = secondsRaw.isFinite ? max(secondsRaw, 0) : 0
+                    let graded = FilmtoneGradePipeline.apply(
+                        to: scaled,
+                        params: params,
+                        frameTimeSeconds: frameTimeSeconds
+                    ).cropped(to: renderBounds)
 
                     context.render(
                         graded,

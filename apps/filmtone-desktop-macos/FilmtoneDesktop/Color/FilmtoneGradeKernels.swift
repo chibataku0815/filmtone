@@ -3,9 +3,15 @@ import CoreImage
 // CIColorKernel sources lifted verbatim from the iOS implementation
 // (apps/capacitor-film-lab-ios/ios/App/App/FilmtoneExportSession.swift,
 // `OpticalKernels`). Phase 0 generator targets `presetVersion = "v2"` for all
-// 4 built-in presets, so only the v2 kernels are wired here. v1 / motion /
-// optics / grain / vignette kernels are deferred to Phase 1c / Phase 2 with
-// the rest of the export session lift.
+// 4 built-in presets, so only the v2 kernels are wired here.
+//
+// Phase 2 C5a (per-pixel optical extension): vignette + grain added — both
+// CIColorKernel single-pass, byte-identical with iOS for sources without
+// `cameraOptics.source == "metadata"` (applyMask=0 collapses ray-angle math
+// to the simple radial form). Multi-pass blur (bloom / halation / diffusion
+// via tentDownsample/tentUpsample/glowComposite + softKneeHighlight helper)
+// and CIKernel-based stages (radialRGBSplit / edgeSoftnessBlend) remain
+// deferred until C5b.
 //
 // Kernel sources are CI Kernel Language (CIKL) strings; they have no UIKit
 // dependency and run identically on macOS.
@@ -100,6 +106,100 @@ kernel vec4 printStage(__sample image, float printContrast, float cyan, float ma
     color.b -= yellow * cmyScale;
     color.rgb = applyPrintContrast(color.rgb, printContrast);
     return vec4(clamp(color.rgb, 0.0, 1.0), image.a);
+}
+""")
+
+    // Vignette kernel verbatim from iOS OpticalKernels (FilmtoneExportSession
+    // line 4321-4347). With `applyMask = 0` (no source camera-optics metadata
+    // path), ray-angle math collapses to the byte-identical pre-Stream-2
+    // radial form `1 - intensity * dist^2`. macOS Native call site passes
+    // applyMask=0 + identity opticsPack until FilmtoneRayAngleOptics is
+    // ported in C5b/C7.
+    static let vignette: CIColorKernel? = CIColorKernel(source: """
+kernel vec4 vignette(__sample image, float intensity, vec2 extentOrigin, vec2 extentSize, float rayAngleGamma, float rayAngleInner, vec3 opticsPack, float applyMask) {
+    vec4 color = image;
+    vec2 uv = (destCoord() - extentOrigin) / extentSize;
+    vec2 distPx = (uv - vec2(0.5, 0.5)) * extentSize;
+    float halfDiag = length(extentSize * 0.5);
+    float dist = length(distPx) / max(halfDiag, 1.0);
+
+    vec2 sensor = (uv - vec2(0.5, 0.5)) * 2.0;
+    float rayX = sensor.x * opticsPack.x;
+    float rayY = sensor.y * opticsPack.y;
+    float viewZ = 1.0 / sqrt(rayX * rayX + rayY * rayY + 1.0);
+    float incidence = 1.0 - viewZ;
+    float refIncidence = max(opticsPack.z, 1.0e-5);
+    float normalized = clamp(incidence / refIncidence, 0.0, 1.0);
+    float gammaSafe = max(rayAngleGamma, 0.001);
+    float innerSafe = clamp(rayAngleInner, 0.0, 0.8);
+    float shaped = pow(normalized, gammaSafe);
+    float t = clamp((shaped - innerSafe) / max(1.0 - innerSafe, 1.0e-6), 0.0, 1.0);
+    float mask = t * t * (3.0 - 2.0 * t);
+    float effectiveMask = mix(1.0, mask, clamp(applyMask, 0.0, 1.0));
+
+    float vig = 1.0 - intensity * dist * dist * effectiveMask;
+    color.rgb *= clamp(vig, 0.0, 1.0);
+    return color;
+}
+""")
+
+    // Grain kernel verbatim from iOS OpticalKernels (FilmtoneExportSession
+    // line 4350-4403). `timeSeconds` advances grain frame stochastically
+    // (floor(t * 3.0) → 3 grain refresh per second of source); for still
+    // export pass 0. `sourceSeed` is a per-export salt; macOS Native uses 0
+    // as a stable default until per-export seed wiring is added.
+    static let grain: CIColorKernel? = CIColorKernel(source: """
+float grainPixelHash(vec2 p, float seed) {
+    return fract(sin(dot(p + vec2(seed, seed * 0.73), vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
+}
+
+float grainClumpHash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+float grainClumpNoise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float a = grainClumpHash(i);
+    float b = grainClumpHash(i + vec2(1.0, 0.0));
+    float c = grainClumpHash(i + vec2(0.0, 1.0));
+    float d = grainClumpHash(i + vec2(1.0, 1.0));
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+kernel vec4 grain(__sample image, float intensity, float radialMix, float grainSize, float timeSeconds, float sourceSeed, vec2 extentOrigin, vec2 extentSize) {
+    vec4 color = image;
+    vec2 uv = (destCoord() - extentOrigin) / extentSize;
+    float size = clamp(grainSize, 0.0, 1.0);
+    vec2 grainDelta = uv - vec2(0.5, 0.5);
+    grainDelta.x *= extentSize.x / max(extentSize.y, 1.0);
+    float grainRadial = clamp(length(grainDelta) * 2.0, 0.0, 1.0);
+    float grainRadialWeight = mix(0.76, 1.42, pow(grainRadial, 1.35));
+    float grainRadialEffective = mix(1.0, grainRadialWeight, clamp(radialMix, 0.0, 1.0));
+
+    float grainFrame = floor(max(timeSeconds, 0.0) * 3.0);
+    vec2 pixelCoord = uv * extentSize;
+    float grainDiameter = mix(1.6, 5.6, pow(size, 0.72));
+    vec2 grainCell = floor(pixelCoord / grainDiameter);
+    float fineLuma = grainPixelHash(pixelCoord, grainFrame * 1.7 + sourceSeed * 13.0);
+    float cellLuma = grainPixelHash(grainCell, grainFrame * 1.7 + sourceSeed * 13.0);
+    float lumaGrain = mix(fineLuma, cellLuma, mix(0.28, 0.76, size));
+    float chromaR = grainPixelHash(grainCell, grainFrame * 2.3 + 500.0 + sourceSeed * 7.0) * 0.22;
+    float chromaB = grainPixelHash(grainCell, grainFrame * 3.1 + 1000.0 + sourceSeed * 5.0) * 0.22;
+
+    float clumpScale = mix(80.0, 20.0, size);
+    float clump = grainClumpNoise((uv * extentSize / clumpScale) + vec2(grainFrame * 0.5 + sourceSeed * 0.1, sourceSeed * 0.07));
+    float densityMod = mix(1.0, 0.3 + clump * 1.4, size * 0.7);
+    float luma = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+    float lumaVisibility = mix(1.12, 0.78, smoothstep(0.18, 0.92, luma));
+
+    float weight = intensity * 1.08 * grainRadialEffective * densityMod * lumaVisibility;
+    color.r += (lumaGrain + chromaR) * weight;
+    color.g += lumaGrain * weight;
+    color.b += (lumaGrain + chromaB) * weight;
+    color.rgb = clamp(color.rgb, 0.0, 1.0);
+    return color;
 }
 """)
 }
