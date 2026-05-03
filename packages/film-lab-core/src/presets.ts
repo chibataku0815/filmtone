@@ -39,7 +39,7 @@ export type ContractDefaultKey =
   | "opticalWarmScatter"
   | "opticalSpectralTail";
 
-type BasePresetParams = Omit<Params, ContractDefaultKey>;
+type BaseLookSchemaParams = Omit<Params, ContractDefaultKey>;
 
 export const CONTRACT_DEFAULTS: Readonly<Pick<Params, ContractDefaultKey>> = {
   depthMistGain: 0,
@@ -77,14 +77,14 @@ export const CONTRACT_DEFAULTS: Readonly<Pick<Params, ContractDefaultKey>> = {
   opticalSpectralTail: 0,
 } as const;
 
-function withContractDefaults<T extends Record<string, BasePresetParams>>(
-  presets: T,
+function withContractDefaults<T extends Record<string, BaseLookSchemaParams>>(
+  looks: T,
 ): { [K in keyof T]: Params } {
   return Object.fromEntries(
-    Object.entries(presets).map(([name, preset]) => [
+    Object.entries(looks).map(([name, look]) => [
       name,
       {
-        ...preset,
+        ...look,
         ...CONTRACT_DEFAULTS,
       },
     ]),
@@ -92,13 +92,13 @@ function withContractDefaults<T extends Record<string, BasePresetParams>>(
 }
 
 /**
- * 組み込みプリセット（Next Film Lab と同一数値）
+ * 組み込み Base Look（Next Film Lab と同一数値）
  *
  * grainIntensity は 0.10 を安全上限とし、0.10 超えの旧値は schema/runtime で丸める。
- * grainRadialMix は Pro で 0〜1 調整可。プリセット既定は 1（周辺比重オン）。
+ * grainRadialMix は Pro で 0〜1 調整可。Look 既定は 1（周辺比重オン）。
  * grainSize は 2026-04-22 low-end uplift 以降、低域で actual fine grain が見える前提で調整する。
  */
-const RAW_PRESETS = {
+const RAW_BASE_LOOKS = {
   reset: {
     exposure: 0,
     contrast: 1,
@@ -156,7 +156,7 @@ const RAW_PRESETS = {
     crossFilterMinSpacing: 1,
   },
   /**
-   * cinematic プリセット（v2・2026-03-31）
+   * cinematic Base Look（v2・2026-03-31）
    * @description 初見のフィルター感とシアン肌を抑えつつ Teal & Orange の意図は維持。変更理由はリポ外ドキュメントに記載可。
    */
   cinematic: {
@@ -608,7 +608,7 @@ const RAW_PRESETS = {
     crossFilterMinSpacing: 1,
   },
   /**
-   * Velvia 50 プリセット（v1・2026-04-02）
+   * Velvia 50 Base Look（v1・2026-04-02）
    * @description Fujifilm Velvia 50 スライドポジフィルム。高彩度・高コントラスト・極細粒・ハレーションなし。
    * fade=0 でポジらしい黒沈みを表現。saturation/contrast は Velvia の代名詞の鮮烈さに合わせた。
    */
@@ -668,13 +668,17 @@ const RAW_PRESETS = {
     crossFilterHardMode: 1,
     crossFilterMinSpacing: 1,
   },
-} satisfies Record<string, BasePresetParams>;
+} satisfies Record<string, BaseLookSchemaParams>;
 
-export const PRESETS = withContractDefaults(RAW_PRESETS);
+/**
+ * 組み込み Base Look の primary 定義。
+ * Look Unification (life vocabulary spec 2026-04-07) で確定した canonical 名。
+ */
+export const BASE_LOOKS = withContractDefaults(RAW_BASE_LOOKS);
 
-export type PresetName = keyof typeof PRESETS;
+export type BaseLookName = keyof typeof BASE_LOOKS;
 
-export const FILMTONE_DEFAULT_BASE_PRESET = "reset" satisfies PresetName;
+export const FILMTONE_DEFAULT_BASE_LOOK = "reset" satisfies BaseLookName;
 
 export const FILMTONE_SOFT_FINISH_PATCH = {
   bloomStrength: 0.22,
@@ -689,23 +693,23 @@ export const FILMTONE_SOFT_FINISH_PATCH = {
 
 export function createFilmtoneDefaultParams(): Params {
   return Object.assign(
-    cloneParams(PRESETS[FILMTONE_DEFAULT_BASE_PRESET]),
+    cloneParams(BASE_LOOKS[FILMTONE_DEFAULT_BASE_LOOK]),
     FILMTONE_SOFT_FINISH_PATCH,
   );
 }
 
 /**
- * プリセットの数値が、今の Params と**全部同じ**かを調べる。
+ * Base Look の数値が、今の Params と**全部同じ**かを調べる。
  *
- * 概要: URL 共有や保存データの Params から、どの組み込みプリセットに一致するかを逆引きする。
- * 仕様: `PARAM_KEYS` に並ぶキーを順番に比較し、完全一致した最初のプリセット名を返す。
+ * 概要: URL 共有や保存データの Params から、どの組み込み Base Look に一致するかを逆引きする。
+ * 仕様: `PARAM_KEYS` に並ぶキーを順番に比較し、完全一致した最初の Base Look 名を返す。
  * 制限: 少しでも数値が違うと一致扱いにしない。近い値を「だいたい同じ」とは判定しない。
  *
  * @param params - 照合したい Film Lab のパラメータ
  */
-export function findMatchingPreset(params: Params): PresetName | null {
-  for (const [name, preset] of Object.entries(PRESETS) as [PresetName, Params][]) {
-    if (PARAM_KEYS.every((key) => preset[key] === params[key])) {
+export function findMatchingBaseLook(params: Params): BaseLookName | null {
+  for (const [name, look] of Object.entries(BASE_LOOKS) as [BaseLookName, Params][]) {
+    if (PARAM_KEYS.every((key) => look[key] === params[key])) {
       return name;
     }
   }
@@ -713,12 +717,12 @@ export function findMatchingPreset(params: Params): PresetName | null {
 }
 
 /**
- * プリセットバーに並べる表示用メタ情報。
+ * Base Look バーに並べる表示用メタ情報。
  *
  * 概要: ボタンの見出し・短い説明文・カテゴリ分類・Print Medium ドキュメントをまとめ、
  *       Web / Desktop で同じ順番・同じ文言を使えるようにする。
- * 仕様: `name` は `PRESETS` のキーと一致し、UI はこの配列順で表示できる。
- * 制限: 見た目用の文言とメタ情報のみ。数値パラメータ自体は `PRESETS` を参照する。
+ * 仕様: `name` は `BASE_LOOKS` のキーと一致し、UI はこの配列順で表示できる。
+ * 制限: 見た目用の文言とメタ情報のみ。数値パラメータ自体は `BASE_LOOKS` を参照する。
  *
  * category:
  *   - "filmStock"  : 実フィルムのエミュレーション。Film Stock セレクターに表示する。
@@ -726,10 +730,10 @@ export function findMatchingPreset(params: Params): PresetName | null {
  *   - "utility"    : reset など。セレクターの外側に配置する。
  *
  * printMedium (ドキュメント用・シリアライズしない):
- *   各プリセットが暗黙的に想定している印画媒体。UI に出さず、将来の Print Medium 独立 UI への橋渡し用。
+ *   各 Base Look が暗黙的に想定している印画媒体。UI に出さず、将来の Print Medium 独立 UI への橋渡し用。
  */
-export const PRESET_BUTTONS: {
-  name: PresetName;
+export const BASE_LOOK_BUTTONS: {
+  name: BaseLookName;
   label: string;
   subtitle: string;
   category: "filmStock" | "look" | "utility";
@@ -747,13 +751,18 @@ export const PRESET_BUTTONS: {
   { name: "cinematic", label: "Cinematic", subtitle: "Teal & Orange", category: "look" },
 ];
 
-// === Look-first canonical aliases ===
-// Look Unification (vocabulary spec life docs/guides/2026-04-07-filmtone-tool-vocabulary-ia-spec.md)
-// で確定した user-facing 語彙 `Base Look` を core / schema 層の canonical 名として加算する。
-// 既存の `PresetName` / `PRESETS` / 等は引き続き primary export として残るため、現行 consumer
-// (Electron renderer / film-lab-ui / iOS TS / Remotion) は無風。
-export type BaseLookName = PresetName;
-export const BASE_LOOKS = PRESETS;
-export const BASE_LOOK_BUTTONS = PRESET_BUTTONS;
-export const FILMTONE_DEFAULT_BASE_LOOK: BaseLookName = FILMTONE_DEFAULT_BASE_PRESET;
-export const findMatchingBaseLook = findMatchingPreset;
+// === Deprecated Preset-named aliases (kept for legacy consumers) ===
+// 概念統合 (Preset → Look canonical) の direction 反転に伴い、`Preset` 名は
+// すべて `BaseLook` 名の deprecated alias として残す。新規 caller は `BASE_LOOKS` /
+// `BaseLookName` / `BASE_LOOK_BUTTONS` / `FILMTONE_DEFAULT_BASE_LOOK` /
+// `findMatchingBaseLook` を直接使うこと。
+/** @deprecated Use {@link BASE_LOOKS}. */
+export const PRESETS = BASE_LOOKS;
+/** @deprecated Use {@link BaseLookName}. */
+export type PresetName = BaseLookName;
+/** @deprecated Use {@link FILMTONE_DEFAULT_BASE_LOOK}. */
+export const FILMTONE_DEFAULT_BASE_PRESET: BaseLookName = FILMTONE_DEFAULT_BASE_LOOK;
+/** @deprecated Use {@link findMatchingBaseLook}. */
+export const findMatchingPreset = findMatchingBaseLook;
+/** @deprecated Use {@link BASE_LOOK_BUTTONS}. */
+export const PRESET_BUTTONS = BASE_LOOK_BUTTONS;

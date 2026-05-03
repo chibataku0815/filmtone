@@ -7,28 +7,31 @@ export {
   cloneParams,
 } from "./params";
 export {
-  PRESETS,
-  PRESET_BUTTONS,
-  FILMTONE_DEFAULT_BASE_PRESET,
-  FILMTONE_SOFT_FINISH_PATCH,
-  createFilmtoneDefaultParams,
-  findMatchingPreset,
-  type PresetName,
-  // Look-first canonical aliases (Look Unification)
+  // Base Look canonical (Preset → Look direction inversion 2026-05-04)
   BASE_LOOKS,
   BASE_LOOK_BUTTONS,
   FILMTONE_DEFAULT_BASE_LOOK,
   findMatchingBaseLook,
   type BaseLookName,
+  FILMTONE_SOFT_FINISH_PATCH,
+  createFilmtoneDefaultParams,
+  // Deprecated Preset-named aliases (legacy)
+  PRESETS,
+  PRESET_BUTTONS,
+  FILMTONE_DEFAULT_BASE_PRESET,
+  findMatchingPreset,
+  type PresetName,
 } from "./presets";
 export {
-  PRESET_VERSION,
-  lookIdForPreset,
-  LOOK_ID_BY_PRESET,
-  // Look-first canonical aliases (Look Unification)
+  // Base Look canonical
   LOOK_RECIPE_VERSION,
   lookIdForBaseLook,
   LOOK_ID_BY_BASE_LOOK,
+  IOS_PRESET_VERSION,
+  // Deprecated Preset-named aliases (legacy)
+  PRESET_VERSION,
+  lookIdForPreset,
+  LOOK_ID_BY_PRESET,
 } from "./look-ids";
 export {
   filmLabDepthTrackSchema,
@@ -36,10 +39,11 @@ export {
   cameraOpticsSchema,
   filmLookGradeInputSchema,
   filmLookSpikeInputSchema,
-  gradeMatchesPreset,
-  // Look-first canonical aliases (Look Unification)
+  // Base Look canonical
   gradeMatchesBaseLook,
   normalizeFilmLookGradeInputIdentity,
+  // Deprecated Preset-named alias (legacy)
+  gradeMatchesPreset,
   type FilmLabDepthTrackInput,
   type FilmLabParamsValidated,
   type FilmLookGradeInputProps,
@@ -70,8 +74,14 @@ export {
 export {
   PHASE0_SCHEMA_VERSION,
   PHASE0_PARAM_KEYS,
+  // Base Look canonical
+  PHASE0_BASE_LOOK_DEFAULT,
+  PHASE0_BASE_LOOK_STRENGTH_DEFAULT,
+  interpolatePhase0BaseLookParams,
+  // Deprecated Preset-named aliases (legacy)
   PHASE0_PRESET_DEFAULT,
   PHASE0_PRESET_STRENGTH_DEFAULT,
+  interpolatePhase0PresetParams,
   PHASE0_RGB_SHIFT_MAX,
   PHASE0_MAX_SOURCE_DURATION_SEC,
   PHASE0_APPROX_SOURCE_LONG_EDGE_MAX,
@@ -85,7 +95,6 @@ export {
   pickPhase0Params,
   createFilmtoneDefaultPhase0Params,
   createDefaultPhase0Params,
-  interpolatePhase0PresetParams,
   createPhase0ProjectState,
   mergePhase0Params,
   type Phase0ParamKey,

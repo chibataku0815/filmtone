@@ -3,9 +3,9 @@ import type { Params } from "./params";
 import { clampGrainIntensity } from "./params";
 import { PHASE0_RGB_SHIFT_MAX } from "./phase0-constants";
 import {
-  PRESETS,
+  BASE_LOOKS,
   createFilmtoneDefaultParams,
-  type PresetName,
+  type BaseLookName,
 } from "./presets";
 import {
   DEFAULT_QUICK_STATE,
@@ -16,8 +16,12 @@ import {
 export { PHASE0_RGB_SHIFT_MAX } from "./phase0-constants";
 
 export const PHASE0_SCHEMA_VERSION = 2 as const;
-export const PHASE0_PRESET_DEFAULT = "reset" satisfies PresetName;
-export const PHASE0_PRESET_STRENGTH_DEFAULT = 1;
+export const PHASE0_BASE_LOOK_DEFAULT = "reset" satisfies BaseLookName;
+/** @deprecated Use {@link PHASE0_BASE_LOOK_DEFAULT}. */
+export const PHASE0_PRESET_DEFAULT = PHASE0_BASE_LOOK_DEFAULT;
+export const PHASE0_BASE_LOOK_STRENGTH_DEFAULT = 1;
+/** @deprecated Use {@link PHASE0_BASE_LOOK_STRENGTH_DEFAULT}. */
+export const PHASE0_PRESET_STRENGTH_DEFAULT = PHASE0_BASE_LOOK_STRENGTH_DEFAULT;
 export const PHASE0_HALATION_HUE_MIN = 0;
 export const PHASE0_HALATION_HUE_MAX = 100;
 
@@ -91,41 +95,41 @@ const phase0HalationHueSchema = z
 const phase0RgbShiftSchema = z.number().min(0).max(PHASE0_RGB_SHIFT_MAX);
 
 export const phase0ParamsSchema = z.object({
-  exposure: z.number().min(-2).max(2).default(PRESETS.reset.exposure),
-  contrast: z.number().min(0).max(2).default(PRESETS.reset.contrast),
-  saturation: z.number().min(0).max(2).default(PRESETS.reset.saturation),
-  temperature: z.number().min(-1).max(1).default(PRESETS.reset.temperature),
-  tint: z.number().min(-1).max(1).default(PRESETS.reset.tint),
-  rgbShift: phase0RgbShiftSchema.default(PRESETS.reset.rgbShift),
-  lensSoftness: z.number().min(0).max(1).default(PRESETS.reset.lensSoftness),
-  grainRadialMix: z.number().min(0).max(1).default(PRESETS.reset.grainRadialMix),
-  grainSize: z.number().min(0).max(1).default(PRESETS.reset.grainSize),
-  bloomThreshold: z.number().min(0).max(1).default(PRESETS.reset.bloomThreshold),
-  bloomStrength: z.number().min(0).max(1).default(PRESETS.reset.bloomStrength),
-  bloomRadius: z.number().min(0).max(1).default(PRESETS.reset.bloomRadius),
-  diffusion: z.number().min(0).max(1).default(PRESETS.reset.diffusion),
-  halationIntensity: z.number().min(0).max(1).default(PRESETS.reset.halationIntensity),
-  halationSpread: z.number().min(0).max(40).default(PRESETS.reset.halationSpread),
-  halationHue: phase0HalationHueSchema.default(PRESETS.reset.halationHue),
-  halationThreshold: z.number().min(0).max(1).default(PRESETS.reset.halationThreshold),
-  halationRadius: z.number().min(0).max(1).default(PRESETS.reset.halationRadius),
-  bloomSoftKnee: z.number().min(0).max(1).default(PRESETS.reset.bloomSoftKnee),
-  halationSoftKnee: z.number().min(0).max(1).default(PRESETS.reset.halationSoftKnee),
-  compressionAmount: z.number().min(0).max(1).default(PRESETS.reset.compressionAmount),
-  compressionRange: z.number().min(0).max(1).default(PRESETS.reset.compressionRange),
-  printContrast: z.number().min(0).max(1).default(PRESETS.reset.printContrast),
-  cyan: z.number().min(-1).max(1).default(PRESETS.reset.cyan),
-  magenta: z.number().min(-1).max(1).default(PRESETS.reset.magenta),
-  yellow: z.number().min(-1).max(1).default(PRESETS.reset.yellow),
-  shutterAngle: z.number().min(0).max(720).default(PRESETS.reset.shutterAngle),
-  trailIntensity: z.number().min(0).max(0.95).default(PRESETS.reset.trailIntensity),
-  fade: z.number().min(0).max(1).default(PRESETS.reset.fade),
-  shadowTone: z.number().min(0).max(1).default(PRESETS.reset.shadowTone),
-  highlightTone: z.number().min(0).max(1).default(PRESETS.reset.highlightTone),
-  shadowHue: z.number().min(0).max(360).default(PRESETS.reset.shadowHue),
-  highlightHue: z.number().min(0).max(360).default(PRESETS.reset.highlightHue),
-  vignette: z.number().min(0).max(1).default(PRESETS.reset.vignette),
-  grainIntensity: z.number().min(0).transform(clampGrainIntensity).default(PRESETS.reset.grainIntensity),
+  exposure: z.number().min(-2).max(2).default(BASE_LOOKS.reset.exposure),
+  contrast: z.number().min(0).max(2).default(BASE_LOOKS.reset.contrast),
+  saturation: z.number().min(0).max(2).default(BASE_LOOKS.reset.saturation),
+  temperature: z.number().min(-1).max(1).default(BASE_LOOKS.reset.temperature),
+  tint: z.number().min(-1).max(1).default(BASE_LOOKS.reset.tint),
+  rgbShift: phase0RgbShiftSchema.default(BASE_LOOKS.reset.rgbShift),
+  lensSoftness: z.number().min(0).max(1).default(BASE_LOOKS.reset.lensSoftness),
+  grainRadialMix: z.number().min(0).max(1).default(BASE_LOOKS.reset.grainRadialMix),
+  grainSize: z.number().min(0).max(1).default(BASE_LOOKS.reset.grainSize),
+  bloomThreshold: z.number().min(0).max(1).default(BASE_LOOKS.reset.bloomThreshold),
+  bloomStrength: z.number().min(0).max(1).default(BASE_LOOKS.reset.bloomStrength),
+  bloomRadius: z.number().min(0).max(1).default(BASE_LOOKS.reset.bloomRadius),
+  diffusion: z.number().min(0).max(1).default(BASE_LOOKS.reset.diffusion),
+  halationIntensity: z.number().min(0).max(1).default(BASE_LOOKS.reset.halationIntensity),
+  halationSpread: z.number().min(0).max(40).default(BASE_LOOKS.reset.halationSpread),
+  halationHue: phase0HalationHueSchema.default(BASE_LOOKS.reset.halationHue),
+  halationThreshold: z.number().min(0).max(1).default(BASE_LOOKS.reset.halationThreshold),
+  halationRadius: z.number().min(0).max(1).default(BASE_LOOKS.reset.halationRadius),
+  bloomSoftKnee: z.number().min(0).max(1).default(BASE_LOOKS.reset.bloomSoftKnee),
+  halationSoftKnee: z.number().min(0).max(1).default(BASE_LOOKS.reset.halationSoftKnee),
+  compressionAmount: z.number().min(0).max(1).default(BASE_LOOKS.reset.compressionAmount),
+  compressionRange: z.number().min(0).max(1).default(BASE_LOOKS.reset.compressionRange),
+  printContrast: z.number().min(0).max(1).default(BASE_LOOKS.reset.printContrast),
+  cyan: z.number().min(-1).max(1).default(BASE_LOOKS.reset.cyan),
+  magenta: z.number().min(-1).max(1).default(BASE_LOOKS.reset.magenta),
+  yellow: z.number().min(-1).max(1).default(BASE_LOOKS.reset.yellow),
+  shutterAngle: z.number().min(0).max(720).default(BASE_LOOKS.reset.shutterAngle),
+  trailIntensity: z.number().min(0).max(0.95).default(BASE_LOOKS.reset.trailIntensity),
+  fade: z.number().min(0).max(1).default(BASE_LOOKS.reset.fade),
+  shadowTone: z.number().min(0).max(1).default(BASE_LOOKS.reset.shadowTone),
+  highlightTone: z.number().min(0).max(1).default(BASE_LOOKS.reset.highlightTone),
+  shadowHue: z.number().min(0).max(360).default(BASE_LOOKS.reset.shadowHue),
+  highlightHue: z.number().min(0).max(360).default(BASE_LOOKS.reset.highlightHue),
+  vignette: z.number().min(0).max(1).default(BASE_LOOKS.reset.vignette),
+  grainIntensity: z.number().min(0).transform(clampGrainIntensity).default(BASE_LOOKS.reset.grainIntensity),
 });
 
 const phase0ParamsPatchSchema = z.object({
@@ -187,7 +191,7 @@ const phase0ProjectSchemaInput = z.object({
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
   presetName: z.string().min(1),
-  strength: z.number().min(0).max(1).default(PHASE0_PRESET_STRENGTH_DEFAULT),
+  strength: z.number().min(0).max(1).default(PHASE0_BASE_LOOK_STRENGTH_DEFAULT),
   quickState: phase0QuickStateSchema.default(DEFAULT_QUICK_STATE),
   params: phase0ParamsPatchSchema,
   // Legacy creative LUT slot. Keep parse-compatible so older saved projects
@@ -206,17 +210,19 @@ const phase0ProjectSchemaInput = z.object({
 
 export const phase0ProjectSchema = phase0ProjectSchemaInput.transform(
   ({ lut, inputLut, creativeLut, ...project }) => {
-    const safePresetName = Object.prototype.hasOwnProperty.call(PRESETS, project.presetName)
-      ? (project.presetName as PresetName)
-      : PHASE0_PRESET_DEFAULT;
+    // Phase0 schema field `presetName` は iOS Swift と shared field 名のため
+    // direction 反転対象外。値の型は `BaseLookName` を canonical として扱う。
+    const safeBaseLookName = Object.prototype.hasOwnProperty.call(BASE_LOOKS, project.presetName)
+      ? (project.presetName as BaseLookName)
+      : PHASE0_BASE_LOOK_DEFAULT;
     const derivedParams = applyQuickStateToPhase0Params(
-      interpolatePhase0PresetParams(safePresetName, project.strength),
+      interpolatePhase0BaseLookParams(safeBaseLookName, project.strength),
       project.quickState,
     );
 
     return {
       ...project,
-      presetName: safePresetName,
+      presetName: safeBaseLookName,
       params: mergePhase0Params(derivedParams, project.params),
       inputLut: inputLut ?? null,
       creativeLut: creativeLut ?? lut ?? null,
@@ -241,27 +247,27 @@ export function createFilmtoneDefaultPhase0Params(): Phase0Params {
   return pickPhase0Params(createFilmtoneDefaultParams());
 }
 
-function phase0PresetTargetParams(presetName: PresetName): Phase0Params {
-  if (presetName === PHASE0_PRESET_DEFAULT) {
+function phase0BaseLookTargetParams(baseLookName: BaseLookName): Phase0Params {
+  if (baseLookName === PHASE0_BASE_LOOK_DEFAULT) {
     return createFilmtoneDefaultPhase0Params();
   }
 
-  return pickPhase0Params(PRESETS[presetName]);
+  return pickPhase0Params(BASE_LOOKS[baseLookName]);
 }
 
 export function createDefaultPhase0Params(
-  presetName: PresetName = PHASE0_PRESET_DEFAULT,
+  baseLookName: BaseLookName = PHASE0_BASE_LOOK_DEFAULT,
 ): Phase0Params {
-  return phase0PresetTargetParams(presetName);
+  return phase0BaseLookTargetParams(baseLookName);
 }
 
-export function interpolatePhase0PresetParams(
-  presetName: PresetName,
+export function interpolatePhase0BaseLookParams(
+  baseLookName: BaseLookName,
   strength: number,
 ): Phase0Params {
   const clamped = Math.max(0, Math.min(1, strength));
-  const reset = pickPhase0Params(PRESETS.reset);
-  const target = phase0PresetTargetParams(presetName);
+  const reset = pickPhase0Params(BASE_LOOKS.reset);
+  const target = phase0BaseLookTargetParams(baseLookName);
   const params = { ...reset };
 
   for (const key of PHASE0_PARAM_KEYS) {
@@ -270,6 +276,9 @@ export function interpolatePhase0PresetParams(
 
   return phase0ParamsSchema.parse(params);
 }
+
+/** @deprecated Use {@link interpolatePhase0BaseLookParams}. */
+export const interpolatePhase0PresetParams = interpolatePhase0BaseLookParams;
 
 export function mergePhase0Params(
   base: Phase0Params,
@@ -287,7 +296,7 @@ function makeProjectId(): string {
 }
 
 export function createPhase0ProjectState(
-  presetName: PresetName = PHASE0_PRESET_DEFAULT,
+  baseLookName: BaseLookName = PHASE0_BASE_LOOK_DEFAULT,
 ): Phase0ProjectState {
   const now = new Date().toISOString();
   return phase0ProjectSchema.parse({
@@ -295,10 +304,11 @@ export function createPhase0ProjectState(
     projectId: makeProjectId(),
     createdAt: now,
     updatedAt: now,
-    presetName,
-    strength: PHASE0_PRESET_STRENGTH_DEFAULT,
+    // `presetName` は iOS Swift と shared な Phase0 schema field 名 (rename しない)
+    presetName: baseLookName,
+    strength: PHASE0_BASE_LOOK_STRENGTH_DEFAULT,
     quickState: DEFAULT_QUICK_STATE,
-    params: createDefaultPhase0Params(presetName),
+    params: createDefaultPhase0Params(baseLookName),
     inputLut: null,
     creativeLut: null,
     output: PHASE0_OUTPUT_PROFILE,

@@ -158,65 +158,10 @@ interface Params {
 }
 declare function cloneParams(params: Params): Params;
 
-declare const PRESETS: {
-    reset: Params;
-    cinematic: Params;
-    portra: Params;
-    gold200: Params;
-    pro400h: Params;
-    bw: Params;
-    ektar100: Params;
-    superia400: Params;
-    cinestill800t: Params;
-    velvia50: Params;
-};
-type PresetName = keyof typeof PRESETS;
-declare const FILMTONE_DEFAULT_BASE_PRESET = "reset";
-declare const FILMTONE_SOFT_FINISH_PATCH: {
-    bloomStrength: number;
-    bloomThreshold: number;
-    bloomRadius: number;
-    diffusion: number;
-    halationIntensity: number;
-    halationSpread: number;
-    halationRadius: number;
-    halationHue: number;
-};
-declare function createFilmtoneDefaultParams(): Params;
 /**
- * プリセットの数値が、今の Params と**全部同じ**かを調べる。
- *
- * 概要: URL 共有や保存データの Params から、どの組み込みプリセットに一致するかを逆引きする。
- * 仕様: `PARAM_KEYS` に並ぶキーを順番に比較し、完全一致した最初のプリセット名を返す。
- * 制限: 少しでも数値が違うと一致扱いにしない。近い値を「だいたい同じ」とは判定しない。
- *
- * @param params - 照合したい Film Lab のパラメータ
+ * 組み込み Base Look の primary 定義。
+ * Look Unification (life vocabulary spec 2026-04-07) で確定した canonical 名。
  */
-declare function findMatchingPreset(params: Params): PresetName | null;
-/**
- * プリセットバーに並べる表示用メタ情報。
- *
- * 概要: ボタンの見出し・短い説明文・カテゴリ分類・Print Medium ドキュメントをまとめ、
- *       Web / Desktop で同じ順番・同じ文言を使えるようにする。
- * 仕様: `name` は `PRESETS` のキーと一致し、UI はこの配列順で表示できる。
- * 制限: 見た目用の文言とメタ情報のみ。数値パラメータ自体は `PRESETS` を参照する。
- *
- * category:
- *   - "filmStock"  : 実フィルムのエミュレーション。Film Stock セレクターに表示する。
- *   - "look"       : フィルムではないスタイル（Teal & Orange 等）。Film Stock とは別枠。
- *   - "utility"    : reset など。セレクターの外側に配置する。
- *
- * printMedium (ドキュメント用・シリアライズしない):
- *   各プリセットが暗黙的に想定している印画媒体。UI に出さず、将来の Print Medium 独立 UI への橋渡し用。
- */
-declare const PRESET_BUTTONS: {
-    name: PresetName;
-    label: string;
-    subtitle: string;
-    category: "filmStock" | "look" | "utility";
-    printMedium?: "color_negative" | "silver_gelatin" | "tungsten_cinema" | "slide_positive";
-}[];
-type BaseLookName = PresetName;
 declare const BASE_LOOKS: {
     reset: Params;
     cinematic: Params;
@@ -229,29 +174,108 @@ declare const BASE_LOOKS: {
     cinestill800t: Params;
     velvia50: Params;
 };
+type BaseLookName = keyof typeof BASE_LOOKS;
+declare const FILMTONE_DEFAULT_BASE_LOOK = "reset";
+declare const FILMTONE_SOFT_FINISH_PATCH: {
+    bloomStrength: number;
+    bloomThreshold: number;
+    bloomRadius: number;
+    diffusion: number;
+    halationIntensity: number;
+    halationSpread: number;
+    halationRadius: number;
+    halationHue: number;
+};
+declare function createFilmtoneDefaultParams(): Params;
+/**
+ * Base Look の数値が、今の Params と**全部同じ**かを調べる。
+ *
+ * 概要: URL 共有や保存データの Params から、どの組み込み Base Look に一致するかを逆引きする。
+ * 仕様: `PARAM_KEYS` に並ぶキーを順番に比較し、完全一致した最初の Base Look 名を返す。
+ * 制限: 少しでも数値が違うと一致扱いにしない。近い値を「だいたい同じ」とは判定しない。
+ *
+ * @param params - 照合したい Film Lab のパラメータ
+ */
+declare function findMatchingBaseLook(params: Params): BaseLookName | null;
+/**
+ * Base Look バーに並べる表示用メタ情報。
+ *
+ * 概要: ボタンの見出し・短い説明文・カテゴリ分類・Print Medium ドキュメントをまとめ、
+ *       Web / Desktop で同じ順番・同じ文言を使えるようにする。
+ * 仕様: `name` は `BASE_LOOKS` のキーと一致し、UI はこの配列順で表示できる。
+ * 制限: 見た目用の文言とメタ情報のみ。数値パラメータ自体は `BASE_LOOKS` を参照する。
+ *
+ * category:
+ *   - "filmStock"  : 実フィルムのエミュレーション。Film Stock セレクターに表示する。
+ *   - "look"       : フィルムではないスタイル（Teal & Orange 等）。Film Stock とは別枠。
+ *   - "utility"    : reset など。セレクターの外側に配置する。
+ *
+ * printMedium (ドキュメント用・シリアライズしない):
+ *   各 Base Look が暗黙的に想定している印画媒体。UI に出さず、将来の Print Medium 独立 UI への橋渡し用。
+ */
 declare const BASE_LOOK_BUTTONS: {
-    name: PresetName;
+    name: BaseLookName;
     label: string;
     subtitle: string;
     category: "filmStock" | "look" | "utility";
     printMedium?: "color_negative" | "silver_gelatin" | "tungsten_cinema" | "slide_positive";
 }[];
-declare const FILMTONE_DEFAULT_BASE_LOOK: BaseLookName;
-declare const findMatchingBaseLook: typeof findMatchingPreset;
+/** @deprecated Use {@link BASE_LOOKS}. */
+declare const PRESETS: {
+    reset: Params;
+    cinematic: Params;
+    portra: Params;
+    gold200: Params;
+    pro400h: Params;
+    bw: Params;
+    ektar100: Params;
+    superia400: Params;
+    cinestill800t: Params;
+    velvia50: Params;
+};
+/** @deprecated Use {@link BaseLookName}. */
+type PresetName = BaseLookName;
+/** @deprecated Use {@link FILMTONE_DEFAULT_BASE_LOOK}. */
+declare const FILMTONE_DEFAULT_BASE_PRESET: BaseLookName;
+/** @deprecated Use {@link findMatchingBaseLook}. */
+declare const findMatchingPreset: typeof findMatchingBaseLook;
+/** @deprecated Use {@link BASE_LOOK_BUTTONS}. */
+declare const PRESET_BUTTONS: {
+    name: BaseLookName;
+    label: string;
+    subtitle: string;
+    category: "filmStock" | "look" | "utility";
+    printMedium?: "color_negative" | "silver_gelatin" | "tungsten_cinema" | "slide_positive";
+}[];
 
 /**
- * スキーマと JSON（共有 URL・Remotion）で使うプリセット定義のバージョンタグ。
+ * スキーマと JSON（共有 URL・Remotion）で使う Base Look レシピのバージョンタグ。
  * 値を変えると Look ID が変わり互換に影響する。手順は `docs/PRESET_VERSIONING.md`。
  */
-declare const PRESET_VERSION: "v1";
+declare const LOOK_RECIPE_VERSION: "v1";
+/**
+ * iOS-only kernel version, decoupled from shared `LOOK_RECIPE_VERSION` so
+ * iOS can bump kernel math (`OpticalKernels.baseGradeV2` /
+ * `filmCompressionV2`) without invalidating desktop / web / Remotion Look IDs.
+ *
+ * Stamped onto `SavedLookEntry.presetVersion` (Swift と shared field 名は不変) at
+ * save time and consulted by `FilmtoneExportSession.applyBaseGradeStage` /
+ * `FilmtoneExportSession.applyToneCompressionStage` to dispatch v1 vs v2
+ * kernels. v1 saved Looks continue to render through v1 kernels; new
+ * built-ins and new user-saved Looks render through v2.
+ */
+declare const IOS_PRESET_VERSION: "v2";
 /**
  * 機械可読 Look ID（CD ストリームの命名規則）
  */
-declare function lookIdForPreset(name: PresetName): string;
-declare const LOOK_ID_BY_PRESET: Record<PresetName, string>;
-declare const LOOK_RECIPE_VERSION: "v1";
-declare const lookIdForBaseLook: typeof lookIdForPreset;
-declare const LOOK_ID_BY_BASE_LOOK: Record<"reset" | "cinematic" | "portra" | "gold200" | "pro400h" | "bw" | "ektar100" | "superia400" | "cinestill800t" | "velvia50", string>;
+declare function lookIdForBaseLook(name: BaseLookName): string;
+declare const LOOK_ID_BY_BASE_LOOK: Record<BaseLookName, string>;
+/** @deprecated Use {@link LOOK_RECIPE_VERSION}. */
+declare const PRESET_VERSION: "v1";
+/** @deprecated Use {@link lookIdForBaseLook}. */
+declare const lookIdForPreset: typeof lookIdForBaseLook;
+/** @deprecated Use {@link LOOK_ID_BY_BASE_LOOK}. */
+declare const LOOK_ID_BY_PRESET: Record<"reset" | "cinematic" | "portra" | "gold200" | "pro400h" | "bw" | "ektar100" | "superia400" | "cinestill800t" | "velvia50", string>;
 
 /**
  * .cube LUT パーサ — Film Lab / Remotion で共有（テキスト → Float32Array）
@@ -269,7 +293,11 @@ declare function parseCube(text: string): CubeLUT;
 declare const PHASE0_RGB_SHIFT_MAX = 0.005;
 
 declare const PHASE0_SCHEMA_VERSION: 2;
+declare const PHASE0_BASE_LOOK_DEFAULT = "reset";
+/** @deprecated Use {@link PHASE0_BASE_LOOK_DEFAULT}. */
 declare const PHASE0_PRESET_DEFAULT = "reset";
+declare const PHASE0_BASE_LOOK_STRENGTH_DEFAULT = 1;
+/** @deprecated Use {@link PHASE0_BASE_LOOK_STRENGTH_DEFAULT}. */
 declare const PHASE0_PRESET_STRENGTH_DEFAULT = 1;
 declare const PHASE0_PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "grainRadialMix", "grainSize", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "shutterAngle", "trailIntensity", "fade", "shadowTone", "highlightTone", "shadowHue", "highlightHue", "vignette", "grainIntensity"];
 type Phase0ParamKey = (typeof PHASE0_PARAM_KEYS)[number];
@@ -523,10 +551,12 @@ type Phase0ProjectLut = z.infer<typeof phase0ProjectLutSchema>;
 type Phase0ProjectState = z.infer<typeof phase0ProjectSchema>;
 declare function pickPhase0Params(params: Pick<Params, Phase0ParamKey>): Phase0Params;
 declare function createFilmtoneDefaultPhase0Params(): Phase0Params;
-declare function createDefaultPhase0Params(presetName?: PresetName): Phase0Params;
-declare function interpolatePhase0PresetParams(presetName: PresetName, strength: number): Phase0Params;
+declare function createDefaultPhase0Params(baseLookName?: BaseLookName): Phase0Params;
+declare function interpolatePhase0BaseLookParams(baseLookName: BaseLookName, strength: number): Phase0Params;
+/** @deprecated Use {@link interpolatePhase0BaseLookParams}. */
+declare const interpolatePhase0PresetParams: typeof interpolatePhase0BaseLookParams;
 declare function mergePhase0Params(base: Phase0Params, patch: Partial<Phase0Params>): Phase0Params;
-declare function createPhase0ProjectState(presetName?: PresetName): Phase0ProjectState;
+declare function createPhase0ProjectState(baseLookName?: BaseLookName): Phase0ProjectState;
 
 declare const QUICK_AXIS_IDS: readonly ["filmCharacter", "era", "dynamics"];
 type QuickAxisId = (typeof QUICK_AXIS_IDS)[number];
@@ -712,8 +742,8 @@ interface Phase0ExportRequest {
     sourceProbe?: SourceProbe;
     output: Phase0OutputProfile;
     grade: {
-        presetName: PresetName | string;
-        presetVersion: typeof PRESET_VERSION;
+        presetName: BaseLookName | string;
+        presetVersion: typeof LOOK_RECIPE_VERSION;
         quickState: QuickState;
         params: Phase0Params;
     };
@@ -1093,16 +1123,16 @@ declare const filmLookSpikeInputSchema: z.ZodObject<{
 }, z.core.$strip>;
 type FilmLookSpikeInputProps = z.infer<typeof filmLookSpikeInputSchema>;
 /**
- * プリセット名と grade が PRESETS と一致するか（厳密一致）
+ * Base Look 名と grade が BASE_LOOKS と一致するか（厳密一致）
  */
-declare function gradeMatchesPreset(presetName: PresetName, grade: Params): boolean;
+declare function gradeMatchesBaseLook(baseLookName: BaseLookName, grade: Params): boolean;
 /**
- * Look-first canonical alias of `gradeMatchesPreset`.
+ * @deprecated Use {@link gradeMatchesBaseLook}.
  *
- * Look Unification (life vocabulary spec 2026-04-07) で確定した user-facing
- * 語彙 `Base Look` を core / schema 層の canonical 名として加算する。
+ * 概念統合 (Preset → Look canonical) の direction 反転に伴い、`gradeMatchesPreset`
+ * は `gradeMatchesBaseLook` の deprecated alias として残す。
  */
-declare const gradeMatchesBaseLook: typeof gradeMatchesPreset;
+declare const gradeMatchesPreset: typeof gradeMatchesBaseLook;
 /**
  * Reconcile legacy (`lookPresetId` / `presetVersion`) と Look-first
  * (`lookId` / `lookVersion`) の identity を strict equality で揃える。
@@ -2546,4 +2576,4 @@ interface BuiltSourceProfileLut {
  */
 declare function buildSourceProfileLut(id: string, size?: number): BuiltSourceProfileLut | null;
 
-export { BAKE_COLOR_IDENTITY, BAKE_COLOR_PARAM_KEYS, BASE_LOOKS, BASE_LOOK_BUTTONS, type BakeColorParams, type BaseLookName, type BehaviorProfile, type BenchmarkRow, type BenchmarkRowInput, type BenchmarkSaveResult, type BenchmarkVisualFloor, type BuiltSourceProfileLut, CREATIVE_CUBE_DEFAULT_SIZE, CREATIVE_PACK_01_BAKER_VERSION, CREATIVE_PACK_01_CUBE_SIZE, CREATIVE_PACK_01_ID, CREATIVE_PACK_01_LOOKS, CREATIVE_PACK_01_STONE_TRANSFORM, CREATIVE_PACK_01_URBAN_TRANSFORM, type CameraOptics, type CameraOpticsSource, type CreativeCube, type CreativePack01SourceTransform, type CreativePackLook, type CubeLUT, DEFAULT_QUICK_STATE, FILMTONE_DEFAULT_BASE_LOOK, FILMTONE_DEFAULT_BASE_PRESET, FILMTONE_SOFT_FINISH_PATCH, FILM_GRAIN_INTENSITY_MAX, FILM_LAB_DEFAULT_HIGHLIGHT_HUE, FILM_LAB_DEFAULT_SHADOW_HUE, type FilmLabDepthTrackInput, type FilmLabParamsValidated, type FilmLookGradeInputProps, type FilmLookSpikeInputProps, IOS_PHASE0_BENCHMARK_SLOTS, IOS_PHASE0_OUTPUT_CODEC, IOS_PHASE0_OUTPUT_FPS, IOS_PHASE0_OUTPUT_LONG_EDGE, IOS_PHASE0_PARAM_KEYS, IOS_PHASE0_PRESET_IDS, IOS_PHASE0_SCHEMA_VERSION, IOS_PHASE0_SOURCE_CAPS, IOS_PHASE0_SOURCE_DURATION_CAP_SEC, IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES, IOS_PHASE0_SOURCE_LONG_EDGE_CAP, type IosHdrPreparationPolicy, type IosHdrPreparationStrategy, type IosPhase0AssetRef, type IosPhase0BenchmarkRecord, type IosPhase0BenchmarkSlot, type IosPhase0ExportPayload, type IosPhase0ExportResult, type IosPhase0ExportSettings, type IosPhase0LocalProject, type IosPhase0ParamKey, type IosPhase0Params, type IosPhase0PickedLutFile, type IosPhase0PickedSource, type IosPhase0SerializableLut, type IosPhase0SourceInfo, type IosPhase0SourceKind, LEGACY_HIGHLIGHT_TONE_MAGNITUDE, LEGACY_SHADOW_TONE_MAGNITUDE, LOOK_ID_BY_BASE_LOOK, LOOK_ID_BY_PRESET, LOOK_RECIPE_VERSION, OPTICAL_FILTER_DISCLAIMER, OPTICAL_FILTER_PARAM_KEYS, OPTICAL_FILTER_PROFILES, type OpticalAnalyzerProvider, type OpticalFamily, type OpticalFilterBehavior, type OpticalFilterDensity, type OpticalFilterFamily, type OpticalFilterParamKey, type OpticalFilterParamPatch, type OpticalFilterProfile, type OpticalFilterProfileId, type OpticalRecipeId, type OpticalRecommendationV1, PARAM_KEYS, PHASE0_APPROX_SOURCE_LONG_EDGE_MAX, PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES, PHASE0_BENCHMARK_GATES, PHASE0_MAX_SOURCE_DURATION_SEC, PHASE0_OUTPUT_PROFILE, PHASE0_PARAM_KEYS, PHASE0_PRESET_DEFAULT, PHASE0_PRESET_STRENGTH_DEFAULT, PHASE0_RGB_SHIFT_MAX, PHASE0_SCHEMA_VERSION, PRESETS, PRESET_BUTTONS, PRESET_VERSION, type PackedCubeLut2D, type ParamKey, type Params, type ParsedBenchmarkRow, type ParsedCubeLut, type Phase0ExportBenchmarkRecord, type Phase0ExportProgress, type Phase0ExportRequest, type Phase0ExportResult, type Phase0ExportStage, type Phase0MezzanineProfileVariant, type Phase0OutputProfile, type Phase0ParamKey, type Phase0Params, type Phase0PreviewRenderResult, type Phase0ProjectLut, type Phase0ProjectState, type Phase0QuickTarget, type Phase0RenderMode, type PickedLutFile, type PresetName, QUICK_AXIS_DEFAULT_RANGE, QUICK_AXIS_IDS, type QuickAxisId, type QuickState, type RGB, SOURCE_PROFILE_CATALOG, type SceneAnalysisState, type SceneDescriptorV1, type SerializeCubeOptions, type SourceColorClass, type SourceColorMetadata, type SourceDisplayGeometry, type SourceInfo, type SourceKind, type SourceProbe, type SourceProfileCatalogEntry, type SourceProfileCurve, type SourceProfileId, type SourceProfileImplKind, type SourceVideoMetadata, type SourceVideoTimingMetadata, applyCreativePack01SourceTransform, applyQuickStateToParams, applyQuickStateToPhase0Params, applyStoneFingerprintTransform, applyUrbanCoolDensityTransform, assertPhase0SourceProbeWithinCaps, bakeColorOnly, benchmarkMarkdownTableHeader, buildBenchmarkRow, buildLookParamOverrides, buildOpticalFilterParamPatch, buildOpticalParamPatch, buildPhase0ExportRequest, buildSourceProfileLut, cameraOpticsSchema, chromaUnitFromHueDegrees, clampGrainIntensity, cloneParams, coerceQuickState, createDefaultFilmLookGradeProps, createDefaultPhase0Params, createFilmtoneDefaultParams, createFilmtoneDefaultPhase0Params, createIosPhase0SerializableLut, createPhase0ProjectState, deserializeCubeLutData, diagonalMaxDelta, filmLabDepthTrackSchema, filmLabParamsSchema, filmLookGradeDefaultProps, filmLookGradeInputSchema, filmLookSpikeDefaultProps, filmLookSpikeInputSchema, findCreativePack01Look, findMatchingBaseLook, findMatchingPreset, formatBenchmarkRow, getIosPhase0SourceCapViolations, getOpticalFilterProfile, getPhase0SourceCapViolations, getSourceProfile, gradeMatchesBaseLook, gradeMatchesPreset, halationHueToHex, hslToRgb01, interpolatePhase0PresetParams, iosPhase0AssetRefSchema, iosPhase0BenchmarkRecordSchema, iosPhase0ExportPayloadSchema, iosPhase0ExportResultSchema, iosPhase0ExportSettingsSchema, iosPhase0LocalProjectSchema, iosPhase0ParamsSchema, iosPhase0PickedLutFileSchema, iosPhase0PickedSourceSchema, iosPhase0PresetIdSchema, iosPhase0SerializableLutSchema, iosPhase0SourceInfoSchema, iosPhase0SourceKindSchema, iosPhase0ThermalStateSchema, lookIdForBaseLook, lookIdForPreset, makeCreativeCube, makeIdentityCube, mergePhase0Params, nearestHueDegreesToDirection, normalizeFilmLookGradeInputIdentity, packCubeLutToFloatRgbaGrid, parseBenchmarkRow, parseCube, phase0ParamsSchema, phase0ProjectLutSchema, phase0ProjectSchema, phase0QuickStateSchema, pickBakeColorParams, pickIosPhase0Params, pickPhase0Params, quickStateSchema, recommendOpticalFinish, serializeCreativeCubeToText, serializeCubeLut };
+export { BAKE_COLOR_IDENTITY, BAKE_COLOR_PARAM_KEYS, BASE_LOOKS, BASE_LOOK_BUTTONS, type BakeColorParams, type BaseLookName, type BehaviorProfile, type BenchmarkRow, type BenchmarkRowInput, type BenchmarkSaveResult, type BenchmarkVisualFloor, type BuiltSourceProfileLut, CREATIVE_CUBE_DEFAULT_SIZE, CREATIVE_PACK_01_BAKER_VERSION, CREATIVE_PACK_01_CUBE_SIZE, CREATIVE_PACK_01_ID, CREATIVE_PACK_01_LOOKS, CREATIVE_PACK_01_STONE_TRANSFORM, CREATIVE_PACK_01_URBAN_TRANSFORM, type CameraOptics, type CameraOpticsSource, type CreativeCube, type CreativePack01SourceTransform, type CreativePackLook, type CubeLUT, DEFAULT_QUICK_STATE, FILMTONE_DEFAULT_BASE_LOOK, FILMTONE_DEFAULT_BASE_PRESET, FILMTONE_SOFT_FINISH_PATCH, FILM_GRAIN_INTENSITY_MAX, FILM_LAB_DEFAULT_HIGHLIGHT_HUE, FILM_LAB_DEFAULT_SHADOW_HUE, type FilmLabDepthTrackInput, type FilmLabParamsValidated, type FilmLookGradeInputProps, type FilmLookSpikeInputProps, IOS_PHASE0_BENCHMARK_SLOTS, IOS_PHASE0_OUTPUT_CODEC, IOS_PHASE0_OUTPUT_FPS, IOS_PHASE0_OUTPUT_LONG_EDGE, IOS_PHASE0_PARAM_KEYS, IOS_PHASE0_PRESET_IDS, IOS_PHASE0_SCHEMA_VERSION, IOS_PHASE0_SOURCE_CAPS, IOS_PHASE0_SOURCE_DURATION_CAP_SEC, IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES, IOS_PHASE0_SOURCE_LONG_EDGE_CAP, IOS_PRESET_VERSION, type IosHdrPreparationPolicy, type IosHdrPreparationStrategy, type IosPhase0AssetRef, type IosPhase0BenchmarkRecord, type IosPhase0BenchmarkSlot, type IosPhase0ExportPayload, type IosPhase0ExportResult, type IosPhase0ExportSettings, type IosPhase0LocalProject, type IosPhase0ParamKey, type IosPhase0Params, type IosPhase0PickedLutFile, type IosPhase0PickedSource, type IosPhase0SerializableLut, type IosPhase0SourceInfo, type IosPhase0SourceKind, LEGACY_HIGHLIGHT_TONE_MAGNITUDE, LEGACY_SHADOW_TONE_MAGNITUDE, LOOK_ID_BY_BASE_LOOK, LOOK_ID_BY_PRESET, LOOK_RECIPE_VERSION, OPTICAL_FILTER_DISCLAIMER, OPTICAL_FILTER_PARAM_KEYS, OPTICAL_FILTER_PROFILES, type OpticalAnalyzerProvider, type OpticalFamily, type OpticalFilterBehavior, type OpticalFilterDensity, type OpticalFilterFamily, type OpticalFilterParamKey, type OpticalFilterParamPatch, type OpticalFilterProfile, type OpticalFilterProfileId, type OpticalRecipeId, type OpticalRecommendationV1, PARAM_KEYS, PHASE0_APPROX_SOURCE_LONG_EDGE_MAX, PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES, PHASE0_BASE_LOOK_DEFAULT, PHASE0_BASE_LOOK_STRENGTH_DEFAULT, PHASE0_BENCHMARK_GATES, PHASE0_MAX_SOURCE_DURATION_SEC, PHASE0_OUTPUT_PROFILE, PHASE0_PARAM_KEYS, PHASE0_PRESET_DEFAULT, PHASE0_PRESET_STRENGTH_DEFAULT, PHASE0_RGB_SHIFT_MAX, PHASE0_SCHEMA_VERSION, PRESETS, PRESET_BUTTONS, PRESET_VERSION, type PackedCubeLut2D, type ParamKey, type Params, type ParsedBenchmarkRow, type ParsedCubeLut, type Phase0ExportBenchmarkRecord, type Phase0ExportProgress, type Phase0ExportRequest, type Phase0ExportResult, type Phase0ExportStage, type Phase0MezzanineProfileVariant, type Phase0OutputProfile, type Phase0ParamKey, type Phase0Params, type Phase0PreviewRenderResult, type Phase0ProjectLut, type Phase0ProjectState, type Phase0QuickTarget, type Phase0RenderMode, type PickedLutFile, type PresetName, QUICK_AXIS_DEFAULT_RANGE, QUICK_AXIS_IDS, type QuickAxisId, type QuickState, type RGB, SOURCE_PROFILE_CATALOG, type SceneAnalysisState, type SceneDescriptorV1, type SerializeCubeOptions, type SourceColorClass, type SourceColorMetadata, type SourceDisplayGeometry, type SourceInfo, type SourceKind, type SourceProbe, type SourceProfileCatalogEntry, type SourceProfileCurve, type SourceProfileId, type SourceProfileImplKind, type SourceVideoMetadata, type SourceVideoTimingMetadata, applyCreativePack01SourceTransform, applyQuickStateToParams, applyQuickStateToPhase0Params, applyStoneFingerprintTransform, applyUrbanCoolDensityTransform, assertPhase0SourceProbeWithinCaps, bakeColorOnly, benchmarkMarkdownTableHeader, buildBenchmarkRow, buildLookParamOverrides, buildOpticalFilterParamPatch, buildOpticalParamPatch, buildPhase0ExportRequest, buildSourceProfileLut, cameraOpticsSchema, chromaUnitFromHueDegrees, clampGrainIntensity, cloneParams, coerceQuickState, createDefaultFilmLookGradeProps, createDefaultPhase0Params, createFilmtoneDefaultParams, createFilmtoneDefaultPhase0Params, createIosPhase0SerializableLut, createPhase0ProjectState, deserializeCubeLutData, diagonalMaxDelta, filmLabDepthTrackSchema, filmLabParamsSchema, filmLookGradeDefaultProps, filmLookGradeInputSchema, filmLookSpikeDefaultProps, filmLookSpikeInputSchema, findCreativePack01Look, findMatchingBaseLook, findMatchingPreset, formatBenchmarkRow, getIosPhase0SourceCapViolations, getOpticalFilterProfile, getPhase0SourceCapViolations, getSourceProfile, gradeMatchesBaseLook, gradeMatchesPreset, halationHueToHex, hslToRgb01, interpolatePhase0BaseLookParams, interpolatePhase0PresetParams, iosPhase0AssetRefSchema, iosPhase0BenchmarkRecordSchema, iosPhase0ExportPayloadSchema, iosPhase0ExportResultSchema, iosPhase0ExportSettingsSchema, iosPhase0LocalProjectSchema, iosPhase0ParamsSchema, iosPhase0PickedLutFileSchema, iosPhase0PickedSourceSchema, iosPhase0PresetIdSchema, iosPhase0SerializableLutSchema, iosPhase0SourceInfoSchema, iosPhase0SourceKindSchema, iosPhase0ThermalStateSchema, lookIdForBaseLook, lookIdForPreset, makeCreativeCube, makeIdentityCube, mergePhase0Params, nearestHueDegreesToDirection, normalizeFilmLookGradeInputIdentity, packCubeLutToFloatRgbaGrid, parseBenchmarkRow, parseCube, phase0ParamsSchema, phase0ProjectLutSchema, phase0ProjectSchema, phase0QuickStateSchema, pickBakeColorParams, pickIosPhase0Params, pickPhase0Params, quickStateSchema, recommendOpticalFinish, serializeCreativeCubeToText, serializeCubeLut };

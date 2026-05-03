@@ -1,5 +1,5 @@
 import {
-  PRESETS,
+  BASE_LOOKS,
   type BaseLookName,
   PARAM_KEYS,
   cloneParams,
@@ -190,11 +190,11 @@ function pushHistory(state: State): State {
 
 function interpolateBaseLook(lookName: BaseLookName, intensity: number): Params {
   const clamped = Math.max(0, Math.min(1, intensity));
-  const params = normalizeParamsWithProcessDefaults(PRESETS.reset);
-  const target = PRESETS[lookName];
+  const params = normalizeParamsWithProcessDefaults(BASE_LOOKS.reset);
+  const target = BASE_LOOKS[lookName];
 
   for (const key of PARAM_KEYS) {
-    params[key] = PRESETS.reset[key] + (target[key] - PRESETS.reset[key]) * clamped;
+    params[key] = BASE_LOOKS.reset[key] + (target[key] - BASE_LOOKS.reset[key]) * clamped;
   }
 
   return params;
@@ -329,7 +329,7 @@ export function filmLabReducer(state: State, action: Action): State {
 
       const key = activeSlotKey(state.activeSlot);
       const resetSlot: GradeSlotState = {
-        params: normalizeParamsWithProcessDefaults(cloneParams(PRESETS.reset)),
+        params: normalizeParamsWithProcessDefaults(cloneParams(BASE_LOOKS.reset)),
         baseLook: "reset",
         intensity: 1,
       };

@@ -5,8 +5,8 @@ import {
   type ParamKey,
   type Params,
 } from "./params";
-import { PRESETS, type PresetName } from "./presets";
-import { PRESET_VERSION } from "./look-ids";
+import { BASE_LOOKS, type BaseLookName } from "./presets";
+import { LOOK_RECIPE_VERSION } from "./look-ids";
 import type { CameraOptics } from "./native-bridge";
 
 type ParamSchemaShape = {
@@ -184,9 +184,9 @@ export const cameraOpticsSchema = z.object({
  */
 export const filmLookGradeInputSchema = z.object({
   lookPresetId: z.string().min(1),
-  presetVersion: z.literal(PRESET_VERSION),
+  presetVersion: z.literal(LOOK_RECIPE_VERSION),
   lookId: z.string().min(1).optional(),
-  lookVersion: z.literal(PRESET_VERSION).optional(),
+  lookVersion: z.literal(LOOK_RECIPE_VERSION).optional(),
   grade: filmLabParamsSchema,
   /** Optional depth track that drives depth-aware Mist / Glow across preview and export. */
   depthTrack: filmLabDepthTrackSchema.optional(),
@@ -241,23 +241,23 @@ export const filmLookSpikeInputSchema = z.object({
 export type FilmLookSpikeInputProps = z.infer<typeof filmLookSpikeInputSchema>;
 
 /**
- * プリセット名と grade が PRESETS と一致するか（厳密一致）
+ * Base Look 名と grade が BASE_LOOKS と一致するか（厳密一致）
  */
-export function gradeMatchesPreset(
-  presetName: PresetName,
+export function gradeMatchesBaseLook(
+  baseLookName: BaseLookName,
   grade: Params,
 ): boolean {
-  const expected = PRESETS[presetName];
+  const expected = BASE_LOOKS[baseLookName];
   return PARAM_KEYS.every((key) => grade[key] === expected[key]);
 }
 
 /**
- * Look-first canonical alias of `gradeMatchesPreset`.
+ * @deprecated Use {@link gradeMatchesBaseLook}.
  *
- * Look Unification (life vocabulary spec 2026-04-07) で確定した user-facing
- * 語彙 `Base Look` を core / schema 層の canonical 名として加算する。
+ * 概念統合 (Preset → Look canonical) の direction 反転に伴い、`gradeMatchesPreset`
+ * は `gradeMatchesBaseLook` の deprecated alias として残す。
  */
-export const gradeMatchesBaseLook = gradeMatchesPreset;
+export const gradeMatchesPreset = gradeMatchesBaseLook;
 
 /**
  * Reconcile legacy (`lookPresetId` / `presetVersion`) と Look-first
@@ -294,6 +294,6 @@ export function normalizeFilmLookGradeInputIdentity(
   return {
     ...input,
     lookPresetId: lookId as string,
-    presetVersion: lookVersion as typeof PRESET_VERSION,
+    presetVersion: lookVersion as typeof LOOK_RECIPE_VERSION,
   };
 }

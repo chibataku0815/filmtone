@@ -12,11 +12,11 @@ import { useTranslations } from "next-intl";
 import * as THREE from "three";
 import {
   parseCube,
-  PRESETS,
+  BASE_LOOKS,
   halationHueToHex,
   type CameraOptics,
   type Params,
-  type PresetName,
+  type BaseLookName,
 } from "film-lab-core";
 import {
   isWebGL2Supported,
@@ -240,7 +240,7 @@ export type FilmLabCanvasPreviewFrameCaptureResult =
 export type ProgressiveTextureStage = "proxy" | "mezzanine";
 
 export interface FilmLabCanvasProps {
-  preset: PresetName;
+  preset: BaseLookName;
   className?: string;
   fullScreen?: boolean;
   depthTrack?: FilmLabCanvasDepthTrack | null;
@@ -686,7 +686,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
   }, [mediaOverlay]);
   const initialPresetRef = useRef(preset);
   const initialResolvedGradeRef = useRef<Params>(
-    initialGradeParams ?? PRESETS[preset],
+    initialGradeParams ?? BASE_LOOKS[preset],
   );
   const defaultSampleAssetUrlRef = useRef(
     resolveDefaultSampleAssetUrl(defaultSampleAssetUrl),
@@ -935,7 +935,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       return;
     }
 
-    const source = initialGradeParams ?? PRESETS[preset];
+    const source = initialGradeParams ?? BASE_LOOKS[preset];
     const legacyDepthProbeGain =
       runtimeDepthTrackRef.current == null ? readDepthProbeGain() : 0;
     viewport.setParams(

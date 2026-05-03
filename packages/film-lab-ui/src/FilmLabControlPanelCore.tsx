@@ -17,7 +17,7 @@ import {
   FILMTONE_SOFT_FINISH_PATCH,
   OPTICAL_FILTER_PROFILES,
   PHASE0_RGB_SHIFT_MAX,
-  PRESETS,
+  BASE_LOOKS,
   buildOpticalFilterParamPatch,
   createFilmtoneDefaultParams,
   findMatchingBaseLook,
@@ -459,7 +459,7 @@ export const FilmLabControlPanelCore = forwardRef<
    * @description 色収差の最後の非ゼロ値を覚える。いったん 0 にしても、次にオンへ戻すと前の強さを使う。
    */
   const rgbShiftLastNonZeroRef = useRef<number>(
-    initialSharedParams?.rgbShift ?? PRESETS.cinematic.rgbShift,
+    initialSharedParams?.rgbShift ?? BASE_LOOKS.cinematic.rgbShift,
   );
 
   /**
@@ -770,7 +770,7 @@ export const FilmLabControlPanelCore = forwardRef<
         const nextRgbShift =
           rgbShiftLastNonZeroRef.current > 0
             ? rgbShiftLastNonZeroRef.current
-            : PRESETS.cinematic.rgbShift;
+            : BASE_LOOKS.cinematic.rgbShift;
         dispatch({ type: "SET_PARAM", key: "rgbShift", value: nextRgbShift });
       } else {
         if (params.rgbShift > 0) {
@@ -787,7 +787,7 @@ export const FilmLabControlPanelCore = forwardRef<
 
   const applyBaseLook = useCallback((name: BaseLookName) => {
     clearOpticalFilterProfileSelection();
-    const baseLookParams = PRESETS[name];
+    const baseLookParams = BASE_LOOKS[name];
     dispatch({ type: "APPLY_BASE_LOOK", lookName: name, params: { ...baseLookParams } as Params });
     setActiveBaseLook(name);
     onBaseLookChange?.(name);

@@ -263,18 +263,18 @@ var CONTRACT_DEFAULTS = {
   opticalWarmScatter: 0,
   opticalSpectralTail: 0
 };
-function withContractDefaults(presets) {
+function withContractDefaults(looks) {
   return Object.fromEntries(
-    Object.entries(presets).map(([name, preset]) => [
+    Object.entries(looks).map(([name, look]) => [
       name,
       {
-        ...preset,
+        ...look,
         ...CONTRACT_DEFAULTS
       }
     ])
   );
 }
-var RAW_PRESETS = {
+var RAW_BASE_LOOKS = {
   reset: {
     exposure: 0,
     contrast: 1,
@@ -332,7 +332,7 @@ var RAW_PRESETS = {
     crossFilterMinSpacing: 1
   },
   /**
-   * cinematic プリセット（v2・2026-03-31）
+   * cinematic Base Look（v2・2026-03-31）
    * @description 初見のフィルター感とシアン肌を抑えつつ Teal & Orange の意図は維持。変更理由はリポ外ドキュメントに記載可。
    */
   cinematic: {
@@ -784,7 +784,7 @@ var RAW_PRESETS = {
     crossFilterMinSpacing: 1
   },
   /**
-   * Velvia 50 プリセット（v1・2026-04-02）
+   * Velvia 50 Base Look（v1・2026-04-02）
    * @description Fujifilm Velvia 50 スライドポジフィルム。高彩度・高コントラスト・極細粒・ハレーションなし。
    * fade=0 でポジらしい黒沈みを表現。saturation/contrast は Velvia の代名詞の鮮烈さに合わせた。
    */
@@ -845,8 +845,8 @@ var RAW_PRESETS = {
     crossFilterMinSpacing: 1
   }
 };
-var PRESETS = withContractDefaults(RAW_PRESETS);
-var FILMTONE_DEFAULT_BASE_PRESET = "reset";
+var BASE_LOOKS = withContractDefaults(RAW_BASE_LOOKS);
+var FILMTONE_DEFAULT_BASE_LOOK = "reset";
 var FILMTONE_SOFT_FINISH_PATCH = {
   bloomStrength: 0.22,
   bloomThreshold: 0.72,
@@ -859,19 +859,19 @@ var FILMTONE_SOFT_FINISH_PATCH = {
 };
 function createFilmtoneDefaultParams() {
   return Object.assign(
-    cloneParams(PRESETS[FILMTONE_DEFAULT_BASE_PRESET]),
+    cloneParams(BASE_LOOKS[FILMTONE_DEFAULT_BASE_LOOK]),
     FILMTONE_SOFT_FINISH_PATCH
   );
 }
-function findMatchingPreset(params) {
-  for (const [name, preset] of Object.entries(PRESETS)) {
-    if (PARAM_KEYS.every((key) => preset[key] === params[key])) {
+function findMatchingBaseLook(params) {
+  for (const [name, look] of Object.entries(BASE_LOOKS)) {
+    if (PARAM_KEYS.every((key) => look[key] === params[key])) {
       return name;
     }
   }
   return null;
 }
-var PRESET_BUTTONS = [
+var BASE_LOOK_BUTTONS = [
   { name: "reset", label: "Neutral", subtitle: "Clean Base", category: "utility" },
   { name: "portra", label: "Portra 400", subtitle: "Warm Pastel", category: "filmStock", printMedium: "color_negative" },
   { name: "gold200", label: "Gold 200", subtitle: "Saturated Warm", category: "filmStock", printMedium: "color_negative" },
@@ -883,31 +883,32 @@ var PRESET_BUTTONS = [
   { name: "velvia50", label: "Velvia 50", subtitle: "Vivid Slide", category: "filmStock", printMedium: "slide_positive" },
   { name: "cinematic", label: "Cinematic", subtitle: "Teal & Orange", category: "look" }
 ];
-var BASE_LOOKS = PRESETS;
-var BASE_LOOK_BUTTONS = PRESET_BUTTONS;
-var FILMTONE_DEFAULT_BASE_LOOK = FILMTONE_DEFAULT_BASE_PRESET;
-var findMatchingBaseLook = findMatchingPreset;
+var PRESETS = BASE_LOOKS;
+var FILMTONE_DEFAULT_BASE_PRESET = FILMTONE_DEFAULT_BASE_LOOK;
+var findMatchingPreset = findMatchingBaseLook;
+var PRESET_BUTTONS = BASE_LOOK_BUTTONS;
 
 // src/look-ids.ts
-var PRESET_VERSION = "v1";
-function lookIdForPreset(name) {
-  return `look:mp:${String(name)}:${PRESET_VERSION}`;
+var LOOK_RECIPE_VERSION = "v1";
+var IOS_PRESET_VERSION = "v2";
+function lookIdForBaseLook(name) {
+  return `look:mp:${String(name)}:${LOOK_RECIPE_VERSION}`;
 }
-var LOOK_ID_BY_PRESET = {
-  reset: lookIdForPreset("reset"),
-  cinematic: lookIdForPreset("cinematic"),
-  portra: lookIdForPreset("portra"),
-  gold200: lookIdForPreset("gold200"),
-  pro400h: lookIdForPreset("pro400h"),
-  bw: lookIdForPreset("bw"),
-  ektar100: lookIdForPreset("ektar100"),
-  superia400: lookIdForPreset("superia400"),
-  cinestill800t: lookIdForPreset("cinestill800t"),
-  velvia50: lookIdForPreset("velvia50")
+var LOOK_ID_BY_BASE_LOOK = {
+  reset: lookIdForBaseLook("reset"),
+  cinematic: lookIdForBaseLook("cinematic"),
+  portra: lookIdForBaseLook("portra"),
+  gold200: lookIdForBaseLook("gold200"),
+  pro400h: lookIdForBaseLook("pro400h"),
+  bw: lookIdForBaseLook("bw"),
+  ektar100: lookIdForBaseLook("ektar100"),
+  superia400: lookIdForBaseLook("superia400"),
+  cinestill800t: lookIdForBaseLook("cinestill800t"),
+  velvia50: lookIdForBaseLook("velvia50")
 };
-var LOOK_RECIPE_VERSION = PRESET_VERSION;
-var lookIdForBaseLook = lookIdForPreset;
-var LOOK_ID_BY_BASE_LOOK = LOOK_ID_BY_PRESET;
+var PRESET_VERSION = LOOK_RECIPE_VERSION;
+var lookIdForPreset = lookIdForBaseLook;
+var LOOK_ID_BY_PRESET = LOOK_ID_BY_BASE_LOOK;
 
 // src/schema.ts
 import { z } from "zod";
@@ -938,9 +939,9 @@ var cameraOpticsSchema = z.object({
 });
 var filmLookGradeInputSchema = z.object({
   lookPresetId: z.string().min(1),
-  presetVersion: z.literal(PRESET_VERSION),
+  presetVersion: z.literal(LOOK_RECIPE_VERSION),
   lookId: z.string().min(1).optional(),
-  lookVersion: z.literal(PRESET_VERSION).optional(),
+  lookVersion: z.literal(LOOK_RECIPE_VERSION).optional(),
   grade: filmLabParamsSchema,
   /** Optional depth track that drives depth-aware Mist / Glow across preview and export. */
   depthTrack: filmLabDepthTrackSchema.optional(),
@@ -978,11 +979,11 @@ var filmLookGradeInputSchema = z.object({
 var filmLookSpikeInputSchema = z.object({
   title: z.string().min(1)
 });
-function gradeMatchesPreset(presetName, grade) {
-  const expected = PRESETS[presetName];
+function gradeMatchesBaseLook(baseLookName, grade) {
+  const expected = BASE_LOOKS[baseLookName];
   return PARAM_KEYS.every((key) => grade[key] === expected[key]);
 }
-var gradeMatchesBaseLook = gradeMatchesPreset;
+var gradeMatchesPreset = gradeMatchesBaseLook;
 function normalizeFilmLookGradeInputIdentity(input) {
   const { lookId, lookVersion, lookPresetId, presetVersion } = input;
   const hasLook = lookId !== void 0 || lookVersion !== void 0;
@@ -1248,8 +1249,10 @@ function applyQuickStateToPhase0Params(base, state) {
 // src/phase0-schema.ts
 import { z as z3 } from "zod";
 var PHASE0_SCHEMA_VERSION = 2;
-var PHASE0_PRESET_DEFAULT = "reset";
-var PHASE0_PRESET_STRENGTH_DEFAULT = 1;
+var PHASE0_BASE_LOOK_DEFAULT = "reset";
+var PHASE0_PRESET_DEFAULT = PHASE0_BASE_LOOK_DEFAULT;
+var PHASE0_BASE_LOOK_STRENGTH_DEFAULT = 1;
+var PHASE0_PRESET_STRENGTH_DEFAULT = PHASE0_BASE_LOOK_STRENGTH_DEFAULT;
 var PHASE0_HALATION_HUE_MIN = 0;
 var PHASE0_HALATION_HUE_MAX = 100;
 var PHASE0_PARAM_KEYS = [
@@ -1307,41 +1310,41 @@ var PHASE0_BENCHMARK_GATES = {
 var phase0HalationHueSchema = z3.number().min(PHASE0_HALATION_HUE_MIN).max(PHASE0_HALATION_HUE_MAX);
 var phase0RgbShiftSchema = z3.number().min(0).max(PHASE0_RGB_SHIFT_MAX);
 var phase0ParamsSchema = z3.object({
-  exposure: z3.number().min(-2).max(2).default(PRESETS.reset.exposure),
-  contrast: z3.number().min(0).max(2).default(PRESETS.reset.contrast),
-  saturation: z3.number().min(0).max(2).default(PRESETS.reset.saturation),
-  temperature: z3.number().min(-1).max(1).default(PRESETS.reset.temperature),
-  tint: z3.number().min(-1).max(1).default(PRESETS.reset.tint),
-  rgbShift: phase0RgbShiftSchema.default(PRESETS.reset.rgbShift),
-  lensSoftness: z3.number().min(0).max(1).default(PRESETS.reset.lensSoftness),
-  grainRadialMix: z3.number().min(0).max(1).default(PRESETS.reset.grainRadialMix),
-  grainSize: z3.number().min(0).max(1).default(PRESETS.reset.grainSize),
-  bloomThreshold: z3.number().min(0).max(1).default(PRESETS.reset.bloomThreshold),
-  bloomStrength: z3.number().min(0).max(1).default(PRESETS.reset.bloomStrength),
-  bloomRadius: z3.number().min(0).max(1).default(PRESETS.reset.bloomRadius),
-  diffusion: z3.number().min(0).max(1).default(PRESETS.reset.diffusion),
-  halationIntensity: z3.number().min(0).max(1).default(PRESETS.reset.halationIntensity),
-  halationSpread: z3.number().min(0).max(40).default(PRESETS.reset.halationSpread),
-  halationHue: phase0HalationHueSchema.default(PRESETS.reset.halationHue),
-  halationThreshold: z3.number().min(0).max(1).default(PRESETS.reset.halationThreshold),
-  halationRadius: z3.number().min(0).max(1).default(PRESETS.reset.halationRadius),
-  bloomSoftKnee: z3.number().min(0).max(1).default(PRESETS.reset.bloomSoftKnee),
-  halationSoftKnee: z3.number().min(0).max(1).default(PRESETS.reset.halationSoftKnee),
-  compressionAmount: z3.number().min(0).max(1).default(PRESETS.reset.compressionAmount),
-  compressionRange: z3.number().min(0).max(1).default(PRESETS.reset.compressionRange),
-  printContrast: z3.number().min(0).max(1).default(PRESETS.reset.printContrast),
-  cyan: z3.number().min(-1).max(1).default(PRESETS.reset.cyan),
-  magenta: z3.number().min(-1).max(1).default(PRESETS.reset.magenta),
-  yellow: z3.number().min(-1).max(1).default(PRESETS.reset.yellow),
-  shutterAngle: z3.number().min(0).max(720).default(PRESETS.reset.shutterAngle),
-  trailIntensity: z3.number().min(0).max(0.95).default(PRESETS.reset.trailIntensity),
-  fade: z3.number().min(0).max(1).default(PRESETS.reset.fade),
-  shadowTone: z3.number().min(0).max(1).default(PRESETS.reset.shadowTone),
-  highlightTone: z3.number().min(0).max(1).default(PRESETS.reset.highlightTone),
-  shadowHue: z3.number().min(0).max(360).default(PRESETS.reset.shadowHue),
-  highlightHue: z3.number().min(0).max(360).default(PRESETS.reset.highlightHue),
-  vignette: z3.number().min(0).max(1).default(PRESETS.reset.vignette),
-  grainIntensity: z3.number().min(0).transform(clampGrainIntensity).default(PRESETS.reset.grainIntensity)
+  exposure: z3.number().min(-2).max(2).default(BASE_LOOKS.reset.exposure),
+  contrast: z3.number().min(0).max(2).default(BASE_LOOKS.reset.contrast),
+  saturation: z3.number().min(0).max(2).default(BASE_LOOKS.reset.saturation),
+  temperature: z3.number().min(-1).max(1).default(BASE_LOOKS.reset.temperature),
+  tint: z3.number().min(-1).max(1).default(BASE_LOOKS.reset.tint),
+  rgbShift: phase0RgbShiftSchema.default(BASE_LOOKS.reset.rgbShift),
+  lensSoftness: z3.number().min(0).max(1).default(BASE_LOOKS.reset.lensSoftness),
+  grainRadialMix: z3.number().min(0).max(1).default(BASE_LOOKS.reset.grainRadialMix),
+  grainSize: z3.number().min(0).max(1).default(BASE_LOOKS.reset.grainSize),
+  bloomThreshold: z3.number().min(0).max(1).default(BASE_LOOKS.reset.bloomThreshold),
+  bloomStrength: z3.number().min(0).max(1).default(BASE_LOOKS.reset.bloomStrength),
+  bloomRadius: z3.number().min(0).max(1).default(BASE_LOOKS.reset.bloomRadius),
+  diffusion: z3.number().min(0).max(1).default(BASE_LOOKS.reset.diffusion),
+  halationIntensity: z3.number().min(0).max(1).default(BASE_LOOKS.reset.halationIntensity),
+  halationSpread: z3.number().min(0).max(40).default(BASE_LOOKS.reset.halationSpread),
+  halationHue: phase0HalationHueSchema.default(BASE_LOOKS.reset.halationHue),
+  halationThreshold: z3.number().min(0).max(1).default(BASE_LOOKS.reset.halationThreshold),
+  halationRadius: z3.number().min(0).max(1).default(BASE_LOOKS.reset.halationRadius),
+  bloomSoftKnee: z3.number().min(0).max(1).default(BASE_LOOKS.reset.bloomSoftKnee),
+  halationSoftKnee: z3.number().min(0).max(1).default(BASE_LOOKS.reset.halationSoftKnee),
+  compressionAmount: z3.number().min(0).max(1).default(BASE_LOOKS.reset.compressionAmount),
+  compressionRange: z3.number().min(0).max(1).default(BASE_LOOKS.reset.compressionRange),
+  printContrast: z3.number().min(0).max(1).default(BASE_LOOKS.reset.printContrast),
+  cyan: z3.number().min(-1).max(1).default(BASE_LOOKS.reset.cyan),
+  magenta: z3.number().min(-1).max(1).default(BASE_LOOKS.reset.magenta),
+  yellow: z3.number().min(-1).max(1).default(BASE_LOOKS.reset.yellow),
+  shutterAngle: z3.number().min(0).max(720).default(BASE_LOOKS.reset.shutterAngle),
+  trailIntensity: z3.number().min(0).max(0.95).default(BASE_LOOKS.reset.trailIntensity),
+  fade: z3.number().min(0).max(1).default(BASE_LOOKS.reset.fade),
+  shadowTone: z3.number().min(0).max(1).default(BASE_LOOKS.reset.shadowTone),
+  highlightTone: z3.number().min(0).max(1).default(BASE_LOOKS.reset.highlightTone),
+  shadowHue: z3.number().min(0).max(360).default(BASE_LOOKS.reset.shadowHue),
+  highlightHue: z3.number().min(0).max(360).default(BASE_LOOKS.reset.highlightHue),
+  vignette: z3.number().min(0).max(1).default(BASE_LOOKS.reset.vignette),
+  grainIntensity: z3.number().min(0).transform(clampGrainIntensity).default(BASE_LOOKS.reset.grainIntensity)
 });
 var phase0ParamsPatchSchema = z3.object({
   exposure: z3.number().min(-2).max(2).optional(),
@@ -1399,7 +1402,7 @@ var phase0ProjectSchemaInput = z3.object({
   createdAt: z3.string().min(1),
   updatedAt: z3.string().min(1),
   presetName: z3.string().min(1),
-  strength: z3.number().min(0).max(1).default(PHASE0_PRESET_STRENGTH_DEFAULT),
+  strength: z3.number().min(0).max(1).default(PHASE0_BASE_LOOK_STRENGTH_DEFAULT),
   quickState: phase0QuickStateSchema.default(DEFAULT_QUICK_STATE),
   params: phase0ParamsPatchSchema,
   // Legacy creative LUT slot. Keep parse-compatible so older saved projects
@@ -1417,14 +1420,14 @@ var phase0ProjectSchemaInput = z3.object({
 });
 var phase0ProjectSchema = phase0ProjectSchemaInput.transform(
   ({ lut, inputLut, creativeLut, ...project }) => {
-    const safePresetName = Object.prototype.hasOwnProperty.call(PRESETS, project.presetName) ? project.presetName : PHASE0_PRESET_DEFAULT;
+    const safeBaseLookName = Object.prototype.hasOwnProperty.call(BASE_LOOKS, project.presetName) ? project.presetName : PHASE0_BASE_LOOK_DEFAULT;
     const derivedParams = applyQuickStateToPhase0Params(
-      interpolatePhase0PresetParams(safePresetName, project.strength),
+      interpolatePhase0BaseLookParams(safeBaseLookName, project.strength),
       project.quickState
     );
     return {
       ...project,
-      presetName: safePresetName,
+      presetName: safeBaseLookName,
       params: mergePhase0Params(derivedParams, project.params),
       inputLut: inputLut ?? null,
       creativeLut: creativeLut ?? lut ?? null
@@ -1441,25 +1444,26 @@ function pickPhase0Params(params) {
 function createFilmtoneDefaultPhase0Params() {
   return pickPhase0Params(createFilmtoneDefaultParams());
 }
-function phase0PresetTargetParams(presetName) {
-  if (presetName === PHASE0_PRESET_DEFAULT) {
+function phase0BaseLookTargetParams(baseLookName) {
+  if (baseLookName === PHASE0_BASE_LOOK_DEFAULT) {
     return createFilmtoneDefaultPhase0Params();
   }
-  return pickPhase0Params(PRESETS[presetName]);
+  return pickPhase0Params(BASE_LOOKS[baseLookName]);
 }
-function createDefaultPhase0Params(presetName = PHASE0_PRESET_DEFAULT) {
-  return phase0PresetTargetParams(presetName);
+function createDefaultPhase0Params(baseLookName = PHASE0_BASE_LOOK_DEFAULT) {
+  return phase0BaseLookTargetParams(baseLookName);
 }
-function interpolatePhase0PresetParams(presetName, strength) {
+function interpolatePhase0BaseLookParams(baseLookName, strength) {
   const clamped = Math.max(0, Math.min(1, strength));
-  const reset = pickPhase0Params(PRESETS.reset);
-  const target = phase0PresetTargetParams(presetName);
+  const reset = pickPhase0Params(BASE_LOOKS.reset);
+  const target = phase0BaseLookTargetParams(baseLookName);
   const params = { ...reset };
   for (const key of PHASE0_PARAM_KEYS) {
     params[key] = reset[key] + (target[key] - reset[key]) * clamped;
   }
   return phase0ParamsSchema.parse(params);
 }
+var interpolatePhase0PresetParams = interpolatePhase0BaseLookParams;
 function mergePhase0Params(base, patch) {
   return phase0ParamsSchema.parse({ ...base, ...patch });
 }
@@ -1470,17 +1474,18 @@ function makeProjectId() {
   }
   return `phase0-${Date.now().toString(36)}`;
 }
-function createPhase0ProjectState(presetName = PHASE0_PRESET_DEFAULT) {
+function createPhase0ProjectState(baseLookName = PHASE0_BASE_LOOK_DEFAULT) {
   const now = (/* @__PURE__ */ new Date()).toISOString();
   return phase0ProjectSchema.parse({
     schemaVersion: PHASE0_SCHEMA_VERSION,
     projectId: makeProjectId(),
     createdAt: now,
     updatedAt: now,
-    presetName,
-    strength: PHASE0_PRESET_STRENGTH_DEFAULT,
+    // `presetName` は iOS Swift と shared な Phase0 schema field 名 (rename しない)
+    presetName: baseLookName,
+    strength: PHASE0_BASE_LOOK_STRENGTH_DEFAULT,
     quickState: DEFAULT_QUICK_STATE,
-    params: createDefaultPhase0Params(presetName),
+    params: createDefaultPhase0Params(baseLookName),
     inputLut: null,
     creativeLut: null,
     output: PHASE0_OUTPUT_PROFILE
@@ -1558,7 +1563,7 @@ function buildPhase0ExportRequest(options) {
     },
     grade: {
       presetName: options.project.presetName,
-      presetVersion: PRESET_VERSION,
+      presetVersion: LOOK_RECIPE_VERSION,
       quickState: options.project.quickState,
       params: options.project.params
     },
@@ -3604,6 +3609,7 @@ export {
   IOS_PHASE0_SOURCE_DURATION_CAP_SEC,
   IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES,
   IOS_PHASE0_SOURCE_LONG_EDGE_CAP,
+  IOS_PRESET_VERSION,
   LEGACY_HIGHLIGHT_TONE_MAGNITUDE,
   LEGACY_SHADOW_TONE_MAGNITUDE,
   LOOK_ID_BY_BASE_LOOK,
@@ -3615,6 +3621,8 @@ export {
   PARAM_KEYS,
   PHASE0_APPROX_SOURCE_LONG_EDGE_MAX,
   PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES,
+  PHASE0_BASE_LOOK_DEFAULT,
+  PHASE0_BASE_LOOK_STRENGTH_DEFAULT,
   PHASE0_BENCHMARK_GATES,
   PHASE0_MAX_SOURCE_DURATION_SEC,
   PHASE0_OUTPUT_PROFILE,
@@ -3674,6 +3682,7 @@ export {
   gradeMatchesPreset,
   halationHueToHex,
   hslToRgb01,
+  interpolatePhase0BaseLookParams,
   interpolatePhase0PresetParams,
   iosPhase0AssetRefSchema,
   iosPhase0BenchmarkRecordSchema,

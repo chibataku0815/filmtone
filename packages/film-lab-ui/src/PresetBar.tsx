@@ -1,9 +1,9 @@
 /**
- * @file Film Lab のプリセット選択行。
+ * @file Film Lab の Base Look 選択行。
  * @description
- * 概要: 右パネル幅に合わせて均等グリッドで並べるプリセット行です。
+ * 概要: 右パネル幅に合わせて均等グリッドで並べる Base Look 行です。
  * 主な仕様:
- * - `film-lab-core` の `PRESET_BUTTONS` を **カテゴリ順**（Film Stock → Look → Utility）で並べます。
+ * - `film-lab-core` の `BASE_LOOK_BUTTONS` を **カテゴリ順**（Film Stock → Look → Utility）で並べます。
  * - カテゴリが変わるところにだけ、横いっぱいの薄い区切り線を入れます（大きな見出しは付けません）。
  * 制限事項:
  * - 狭い幅では 2 列、広い幅では列数を増やして整列します。
@@ -12,17 +12,17 @@
 "use client";
 
 import { Fragment, useMemo } from "react";
-import { PRESET_BUTTONS, type PresetName } from "film-lab-core";
+import { BASE_LOOK_BUTTONS, type BaseLookName } from "film-lab-core";
 import { orderPresetButtonsForSurface } from "./presetSurfaceOrdering";
 
 /**
- * グリッド内のプリセットボタン行に渡す props です。
+ * グリッド内の Base Look ボタン行に渡す props です。
  */
 interface PresetBarProps {
-  /** いま選ばれているプリセット名です。 */
-  activePreset: PresetName | null;
+  /** いま選ばれている Base Look 名です。 */
+  activePreset: BaseLookName | null;
   /** 候補が押されたときに親へ返します。 */
-  onPreset: (name: PresetName) => void;
+  onPreset: (name: BaseLookName) => void;
 }
 
 /**
@@ -55,7 +55,7 @@ function chunkPresetRowsByCategory(
  */
 export function PresetBar({ activePreset, onPreset }: PresetBarProps) {
   const presetCategoryChunks = useMemo(() => {
-    const orderedRows = orderPresetButtonsForSurface(PRESET_BUTTONS);
+    const orderedRows = orderPresetButtonsForSurface(BASE_LOOK_BUTTONS);
     return chunkPresetRowsByCategory(orderedRows);
   }, []);
 

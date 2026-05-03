@@ -1,5 +1,5 @@
-import { PRESET_VERSION } from "./look-ids";
-import type { PresetName } from "./presets";
+import { LOOK_RECIPE_VERSION } from "./look-ids";
+import type { BaseLookName } from "./presets";
 import type { CubeLUT } from "./cube-parser";
 import {
   PHASE0_APPROX_SOURCE_LONG_EDGE_MAX,
@@ -223,8 +223,8 @@ export interface Phase0ExportRequest {
   sourceProbe?: SourceProbe;
   output: Phase0OutputProfile;
   grade: {
-    presetName: PresetName | string;
-    presetVersion: typeof PRESET_VERSION;
+    presetName: BaseLookName | string;
+    presetVersion: typeof LOOK_RECIPE_VERSION;
     quickState: QuickState;
     params: Phase0Params;
   };
@@ -433,7 +433,7 @@ export function buildPhase0ExportRequest(options: {
     },
     grade: {
       presetName: options.project.presetName,
-      presetVersion: PRESET_VERSION,
+      presetVersion: LOOK_RECIPE_VERSION,
       quickState: options.project.quickState as QuickState,
       params: options.project.params,
     },
