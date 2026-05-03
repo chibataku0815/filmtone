@@ -18,8 +18,10 @@ apps/filmtone-desktop-macos/
   FilmtoneDesktop.xcodeproj
   FilmtoneDesktop/
     App/
+    Domain/
+    State/
     UI/
-    Preview/
+    Color/
     Export/
     Media/
     SharedGenerated/
@@ -27,7 +29,7 @@ apps/filmtone-desktop-macos/
   Tests/
 ```
 
-Use SwiftUI for primary UI and AppKit where macOS behavior requires it:
+Use SwiftUI for primary UI and AppKit only where macOS behavior requires it:
 
 - `App` / `Scene` / `Commands`
 - native menu commands
@@ -36,6 +38,11 @@ Use SwiftUI for primary UI and AppKit where macOS behavior requires it:
 - `NSToolbar` / AppKit window configuration when SwiftUI window APIs are
   insufficient
 - `NSOpenPanel`, `NSSavePanel`, Finder reveal, drag and drop
+
+This is not an AppKit-first app. AppKit is a macOS interop layer for behavior
+SwiftUI should not own. iOS UI remains SwiftUI / UIKit; cross-platform sharing
+should happen through render/domain contracts first, and only through shared
+SwiftUI views when that does not weaken either platform.
 
 Liquid Glass target surfaces:
 
@@ -47,6 +54,56 @@ Liquid Glass target surfaces:
 
 Do not apply heavy glass to the image/video preview itself. The preview is a
 color judgment surface; glass belongs to the control layer above and around it.
+
+## Responsibility Boundaries
+
+Native Desktop v2 should use feature-oriented vertical slices while keeping
+shared responsibilities explicit.
+
+Product features:
+
+- Open / source selection
+- Preview / compare
+- Grade / look controls
+- Still export / sidecar
+- Video export
+- Batch / session restore
+- Future Continuity recipe handoff
+
+Shared responsibilities:
+
+- `App`: app entry, scenes, commands, dependency composition.
+- `UI`: SwiftUI views and AppKit wrappers only. No render math, file encoding,
+  sidecar schema construction, or long-running export work.
+- `State`: editor state and user flow orchestration. It calls services but does
+  not implement color math or file formats.
+- `Domain`: platform-neutral product types and generated contract glue.
+- `Color`: color pipeline, LUT packing, source profile math, preview/export
+  grade stages. No SwiftUI/AppKit dependencies.
+- `Export`: still/video encoding and sidecar emission. No UI ownership.
+- `Media`: source probing, file identity, picker adapters, and future asset
+  bookmark handling.
+- `SharedGenerated`: generated Swift only. Never hand-edit.
+
+Dependency direction:
+
+```text
+UI -> State -> Domain
+UI -> State -> Color / Export / Media services
+Export -> Color / Domain
+Color -> Domain / SharedGenerated
+App -> composition only
+```
+
+Rules:
+
+- A feature may add UI, state, services, and tests in one vertical slice, but it
+  must preserve these dependency directions.
+- Preview and export must share color stages or prove equivalence.
+- AppKit access stays in UI/Media adapters; it must not leak into Color,
+  Export, Domain, or SharedGenerated.
+- Cross-platform sharing with iOS should happen through Domain / Color /
+  generated contracts before shared UI.
 
 ## Media / Render Core
 

@@ -38,12 +38,56 @@ Batch session を `Look` 起点に統一する。本質はユーザーが見え�
 vocabulary canonical:
 `life docs/guides/2026-04-07-filmtone-tool-vocabulary-ia-spec.md`
 
-**Status (2026-05-03 JST)**: branch + worktree が一度喪失。再開用 handoff:
-`docs/filmtone/desktop/filmtone-desktop-look-unification-handoff-2026-05-03-jst.md`
-(main checkout 側 — このリポは Native Desktop worktree で見えていない場合は
-main の `/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone/` 側を
-参照)。Phase A (core/schema 加算) は完了して verify 通過、Phase B (Electron
-renderer + film-lab-ui sweep) が部分完了で worktree 喪失。
+**Status (2026-05-03 JST late evening 更新)**: 一度 worktree 喪失 → 再開 chat B
+起動 → **branch 上で Phase A + Phase B 両方 landed (main 未 merge)**。Native
+Desktop v2 Phase 1c (chat A、worktree `filmtone-native-desktop-plan`) は
+**Case B 継続** (sidecar emitter は Look canonical only)。
+
+- handoff (canonical):
+  `/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone/docs/filmtone/desktop/filmtone-desktop-look-unification-handoff-2026-05-03-jst.md`
+  (main checkout 側、§0 Resolution に landing 詳細)
+- 元 plan: `~/.claude/plans/desktop-look-unification-bright-dusk.md`
+- chat B worktree path:
+  `/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-look-unification`
+- chat B branch: `feature/desktop-look-unification` (新規作成、main `732a273` から)
+- **Phase A** (core/schema 加算): commit `1f99d68`、13 files +424/-9。
+  `BaseLookName` / `BASE_LOOKS` / `BASE_LOOK_BUTTONS` /
+  `FILMTONE_DEFAULT_BASE_LOOK` / `findMatchingBaseLook` aliases、
+  `LOOK_RECIPE_VERSION` / `lookIdForBaseLook` / `LOOK_ID_BY_BASE_LOOK`、
+  `filmLookGradeInputSchema` に `lookId` / `lookVersion` optional 追加、
+  `normalizeFilmLookGradeInputIdentity()`、`createDefaultFilmLookGradeProps`
+  / `buildGradeJsonPayload` を dual emit、`batch-pipeline` discriminator 拡張
+  + normalize 適用、20 新規 tests。
+- **Phase B** (renderer + UI sweep): commit `fd9ddd2`、23 files +534/-415。
+  i18n 8 keys 値書き換え + 7 new keys、`filmLabUiContract` /
+  `filmLabPanelTokens` / `LookSearchSelect` canonical + deprecated alias /
+  `film-lab-reducer` (state.baseLook + APPLY_BASE_LOOK / preserveBaseLook) /
+  `FilmLabControlPanelCore` 全 ref / `index.ts` re-export、Desktop
+  App.tsx canonical rename、`batch-session.ts` parser fallback +
+  writer single emit、`export-metadata-session.ts` `METADATA_LOOK_SOURCES` 拡張
+  + `parseFilmtoneExportSessionV1` で `look.source` 正規化 + legacy 昇格、8 test
+  files fixture 更新。
+- **main へは未 merge** (2026-05-03 JST late evening 時点)。Native Desktop v2
+  Phase 1b / 1c chat A は main 上の状態を見るため、現在は **Case B (Look
+  canonical only) 継続**。main merge 完了後に user 経由で chat A に「Case A
+  切替可」を伝達 → emitter dual emit に変更 (chat 中観測時は同 chat 内対応)。
+- **Native Desktop ユーザー配布 (Phase 5 release rail 切替) 前には dual emit
+  (Case A) 化が必須**。Look Unification main merge + emitter dual emit 切替
+  + Electron reader catch-up が release blocker (Phase 5 acceptance gate)。
+  vocabulary 不統一のまま public release しない方針 (06 risk row、Phase 5
+  release gate)。
+
+### chat B 着手時に確定した方針 (本 PR スコープ)
+
+| # | 領域 | 方針 |
+|---|---|---|
+| 1 | `filmLabUiContract.ts` slot 名 (`beforePresets` → `beforeLooks` 等) | **alias 残さず一気に rename**。consumer (`FilmLabControlPanelCore.tsx` + Desktop `App.tsx` 経由 props) は本 PR で全て更新、TS 型エラーで漏れ即検出 |
+| 2 | `batch-session` writer | **`batchLookChoice` 単独 emit**。Electron 専用 userData なので dual emit 不要。parser fallback (`o.batchLookChoice ?? o.batchPresetChoice`) で旧 session 読み込みは引き続き可能 |
+| 3 | テスト fixture | 既存 `lookSource: "preset"` fixture は **parser fallback regression** 用に残す。新規 fixture は `"builtInLook"` canonical。dual coverage |
+| 4 | iOS messages.ts 参照書き換え | **本 PR では実施しない (別 PR)**。i18n 値書き換え (`controls.presets` 値 = "Look") で iOS が見る文字列は自動 Look 化されるが、`messages.ts:75 presetRowAriaLabel` / `messages.ts:227-230` の **キー名参照** 書き換えは別 PR |
+
+これらは Look Unification handoff §4 の方針と整合 (本 doc は Native Desktop 側
+からの参照用 summary)。
 
 **Native Desktop v2 が依存する成果物** (Look Unification が main へ landed
 した時点で利用可):

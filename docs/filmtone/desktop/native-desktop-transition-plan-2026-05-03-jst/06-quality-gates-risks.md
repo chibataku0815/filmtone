@@ -56,8 +56,16 @@ Fail when:
 These require direct implementation proof, not discussion:
 
 - Whether the best preview path is CoreImage-only, Metal-only, or a hybrid.
+  *(Phase 1b 取り敢えず CoreImage CIColorKernel chain で landing。Phase 2 で
+  Metal CIKernel/MTKView 検証。)*
 - Whether iOS `FilmtoneExportSession` should be shared as-is, split into a
   platform-neutral Swift module, or ported selectively.
+  *(Phase 1b は CIColorKernel kernel sources のみ verbatim lift。Phase 1c で
+  video core flow (`makeWriter` / `makeVideoInput` / `makeVideoReaderOutput`
+  / per-frame loop) の structure のみ port、telemetry (UIKit/UIDevice 依存
+  2 行) は **削減**。本体 4554 行のうち macOS-relevant は限定的 →
+  **selectively ported** が答え。Phase 2 で SPM `film-lab-swift-core` への
+  集約と一緒に shared 化。)*
 - Whether Native Desktop v2 should keep ffmpeg for edge video formats or move
   fully to AVFoundation. Product quality decides this; silent fallback is not
   acceptable.
@@ -88,6 +96,12 @@ These require direct implementation proof, not discussion:
 | Performance architecture discussion delays the vertical slice | Phase 1 accepts a minimal CoreImage/native path if it proves parity. IOSurface / Metal compute optimization belongs to Phase 2. |
 | iOS handoff work starts before Mac export is reliable | Continuity Export On Mac starts only after native export can honor a recipe without changing output quality. |
 | Resolve / OFX ambitions pull the product toward a pro plugin before Desktop parity | `.cube` export is the first NLE step. DCTL / OFX remain future lanes until the native render core is stable. |
+| baseline-B fixtures derive from legacy WebGL render path; Phase 1b iOS-canonical CIColorKernel lift cannot satisfy "PSNR > 35dB vs baseline-B" gate | **Phase 2 C3 で scaffold landed (uncommitted)**: `apps/desktop-film-lab-batch/test/golden/baseline-C/` 4 preset subdir + provenance README + `scripts/golden-parity-ios-vs-macos.ts` PENDING-aware harness。**baseline-C content 自体は PENDING** (user iOS Simulator workflow で 4×10=40 cell populate 待ち)。populate 後、(1) 案 C で macOS↔baseline-C 直接 PSNR 確認 → (2) 失敗セルあれば 案 C step (3) WGSL→Metal port を不足 effect path に対して実施 → (3) 確定 baseline-C で macOS 内 regression 完結。reset preset は ∞ dB (params identity) 期待値、non-reset は >> 35dB 期待 (kernel sources verbatim lift)。 |
+| AVFoundation sync API (`asset.tracks(withMediaType:)` / `track.naturalSize` / `track.preferredTransform` / `AVAssetImageGenerator.copyCGImage(at:)` 等) は macOS 13+ で deprecated | **RESOLVED in Phase 2 C2** (uncommitted)。6 sites 全解消: FramePreview の `tracks` / `duration` / `copyCGImage` を `loadTracks` / `load(.duration)` / `generator.image(at:)` async + variadic `track.load(_:_:)` へ migrate。Reader は `FilmtoneVideoTrackProbe` 受領 init に rebuild、deprecated path 撤去。`bun run verify:macos` で AVFoundation deprecation 0 (残 warning は既存 `CIColorKernel(source:)` 3 箇所のみ — Metal CIKernel 移行 lane 別 chunk または C7 と合流)。 |
+| Phase 1c per-frame CIImage chain は 1-sec synthetic で 0.366s (proof scale)、4K/6K の実 throughput 未測定 | Phase 2 **C7** scope。IOSurface-backed `CVPixelBuffer` / Metal compute / per-frame allocation 抑制 = Performance Render Spine。C3 結果 + OpticalFilters main 着地 timing が確定後に着手判断 (chunk 着手時 user 確定: C5/C6/C7 順序固定しない)。 |
+| Phase 1c で `FilmtoneVideoReader` / `FilmtoneVideoWriter` を `@unchecked Sendable` で vouch、Phase 2 C1 で `FilmtoneVideoTrackProbe` を non-Sendable に明示 | exporter の単一 Task 内のみで使用 (concurrent reentry なし)。Phase 2 C1 で `track.load(_:_:_:_:)` variadic version を採用 (`async let` × non-Sendable AVAssetTrack の data race を回避)。actor-isolated queue / IOSurface-backed Metal compute は C7 refactor 時に再評価。 |
+| Swift 6 strict concurrency が AVFoundation non-Sendable types (AVAssetTrack / AVURLAsset) を捕捉、`async let` × multi-key load が data race として弾かれる | **RESOLVED in Phase 2 C1+C2** (uncommitted)。variadic `AVAsynchronousKeyValueLoading.load(_:_:_:_:)` を採用 (single underlying request、track ownership split なし)。Probe 構造体 (`FilmtoneVideoTrackProbe`) は Sendable 不要 (single-Task consumer 限定)。 |
+| Native Desktop ユーザー配布 (Phase 5 release rail 切替) 前に Look Unification main merge + sidecar dual emit 切替が必須、現在は Case B (Look canonical only) 継続 | release blocker (Phase 5 acceptance gate で確認)。Look Unification chat B 側で main merge 待ち (`feature/desktop-look-unification` branch に Phase A `1f99d68` + Phase B `fd9ddd2` landed、main 未 merge)。Phase 1c 開始時 + Phase 2 C1 開始時の grep で main 状態確認済 (BASE_LOOKS export 不在 = 未着地)。merge 観測時に macOS sidecar emitter を dual emit へ切替 (Case A)。 |
 
 ## Definition Of Done For This Plan
 

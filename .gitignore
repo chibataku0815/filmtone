@@ -29,6 +29,9 @@ apps/filmtone-desktop-macos/build/
 **/*.xcuserstate
 **/DerivedData/
 
+# macOS Phase 1b parity outputs
+/test-out/
+
 # misc
 .DS_Store
 *.pem

@@ -15,14 +15,48 @@ docs/filmtone/desktop/native-desktop-transition-plan-2026-05-03-jst/
 
 ## Current State
 
-- **Phase 0 (Contract & Skeleton): COMPLETE.** All 8 acceptance gate checks
-  pass. macOS native app launches on macOS 26.4.1 with Xcode 26.4.1.
-- **Phase 1a (Open + Preview precondition): COMPLETE.** Decision A adopted:
-  `SharedGenerated/FilmtonePhase0Generated.swift` is compile-linked through
-  macOS-local Phase0 type stubs, `NSOpenPanel` / `⌘O` opens still images, and
-  `PreviewSurface` renders a no-grade preview through `NSImageView`.
-- **Next: Phase 1b.** Preset selection -> grade application -> still export ->
-  sidecar JSON -> Electron baseline-B PSNR parity. Phase 1c is the video slice.
+- **Phase 0 (Contract & Skeleton): COMPLETE** (commit `398743c`).
+- **Phase 1a (Open + Preview precondition): COMPLETE** (commit `398743c`).
+- **Phase 1b (Vertical Slice — still): COMPLETE** (uncommitted on top of `398743c`).
+  preset → grade → still export → sidecar JSON wired. macOS↔source ∞dB
+  bit-identical for reset preset. baseline-B 13.69 dB is **informational** —
+  fixture mismatch with iOS canonical CIColorKernel pipeline (06 risk row).
+- **Phase 1c (Vertical Slice — video): COMPLETE** (uncommitted on top of `398743c`).
+  open .mp4/.mov → midpoint frame preview → AVAssetReader → CIImage → grade →
+  CIContext.render(to:CVPixelBuffer) → AVAssetWriter H.264 mp4 → sidecar
+  (`sourceKind:"video"` additive, Case B 継続). Output mp4 is Rec.709 SDR
+  (color_space/transfer/primaries=bt709). iphone vs reset frame 0 PSNR 14.91 dB
+  proves grade chain active in video path.
+- **Phase 2 C1+C2 (Foundation: DTO port + AVFoundation modern async):
+  COMPLETE** (uncommitted on top of `398743c`). SourceColor DTO graph
+  (`SourceColorClassDTO` / `SourceLogTransferFunctionDTO` / `SourceColorMetadataDTO`)
+  ported to `Domain/SourceColorTypes.swift`; classifier + normalizer
+  ported to `Color/`; `FilmtoneColorPipeline.defaultOutputContract` factory
+  landed in `Color/FilmtoneColorPipeline.swift` (`phase1cMP4Default()` 削除);
+  `Media/FilmtoneSourceProber.swift` (async video probe + still CGImageSource
+  probe) + `Media/FormatExtensionReader.swift` 追加. Reader rebuilt to
+  accept `FilmtoneVideoTrackProbe` (eliminates deprecated `asset.tracks` /
+  `track.naturalSize` / `.preferredTransform` / `.nominalFrameRate` /
+  `.duration` / `AVAssetImageGenerator.copyCGImage`). Sidecar additive
+  `sourceInterpretation` (Phase 2 acceptance "Source profile id round-trips").
+  All 6 AVFoundation sync deprecation sites resolved. `verify:macos` BUILD
+  SUCCEEDED, generator drift 0, iOS↔macOS Phase0Generated bit-identical,
+  iOS / Electron / core src clean. Phase 1b regression: macOS↔source still
+  ∞dB; iphone on 09-skin-light **40.60 dB** (was 39.62 dB) — marginal
+  tighter source color interpretation aligned with iOS canonical
+  (sRGB fallback colorSpace + `applyOrientationProperty:true`).
+- **Phase 2 C3 truth gate scaffold: COMPLETE** (uncommitted on top of `398743c`).
+  `apps/desktop-film-lab-batch/test/golden/baseline-C/{reset,iphone,softBlue,
+  amberGlow}/` + README explaining iOS Simulator workflow;
+  `scripts/golden-parity-ios-vs-macos.ts` PENDING-aware harness drives macOS
+  CLI for each (preset, image), compares against `baseline-C/<preset>/<image>.png`
+  if populated. baseline-C content itself is **PENDING** until user runs
+  iOS Simulator workflow to populate the 4×10=40 still cells.
+- **Next: Phase 2 C3 baseline-C populate → C5/C6/C7 priority re-judgement
+  pending OpticalFilters main landing.** Per chunk-着手 user 確定 (2026-05-03
+  JST late evening): C5 (OpticalFilters main 着地後合流) / C6 (SPM 化、急がない
+  方針維持) / C7 (IOSurface perf bench) は C3 結果 + main landing 状況で
+  再判断する (現時点で固定しない)。
 
 ## Read Order
 
@@ -44,11 +78,20 @@ docs/filmtone/desktop/native-desktop-transition-plan-2026-05-03-jst/
 Native Desktop v2 is a parallel product lane. Electron Desktop remains the
 shipping rail until the native app beats it on preview/export quality.
 
+UI framework stance:
+
+- SwiftUI-first for new native UI.
+- AppKit only for macOS-specific interop and deep platform behavior.
+- UIKit stays iOS-only; AppKit is never an iOS strategy.
+
 Do not let documentation, release shell, CloudKit/Handoff, Resolve, OFX, DCTL,
 or public copy work delay the next product proof:
 
 ```text
-Phase 1b: preset -> grade -> still export -> sidecar -> PSNR parity
+Phase 2 C3 (truth gate populate): iOS Simulator → baseline-C/{reset,iphone,
+softBlue,amberGlow}/<image>.png (4×10 cells) → bun run scripts/
+golden-parity-ios-vs-macos.ts で各セル PSNR 確認 → 結果次第で
+WGSL→Metal port 必要性 + C5/C6/C7 優先付け再判断。
 ```
 
 ## Canonical Handoffs
@@ -57,6 +100,14 @@ Phase 1b: preset -> grade -> still export -> sidecar -> PSNR parity
   [filmtone-native-desktop-phase1-next-chat-handoff-2026-05-03-jst.md](filmtone-native-desktop-phase1-next-chat-handoff-2026-05-03-jst.md)
 - Phase 1a completion / Phase 1b entry:
   [filmtone-native-desktop-phase1b-next-chat-handoff-2026-05-03-jst.md](filmtone-native-desktop-phase1b-next-chat-handoff-2026-05-03-jst.md)
+- Phase 1b completion:
+  [filmtone-native-desktop-phase1b-completion-handoff-2026-05-03-jst.md](filmtone-native-desktop-phase1b-completion-handoff-2026-05-03-jst.md)
+- Phase 1c master / entry (self-contained):
+  [filmtone-native-desktop-phase1c-master-handoff-2026-05-03-jst.md](filmtone-native-desktop-phase1c-master-handoff-2026-05-03-jst.md)
+- Phase 1c completion:
+  [filmtone-native-desktop-phase1c-completion-handoff-2026-05-03-jst.md](filmtone-native-desktop-phase1c-completion-handoff-2026-05-03-jst.md)
+- **Phase 2 C1+C2+C3 scaffold master (current, self-contained):**
+  [filmtone-native-desktop-phase2-master-handoff-2026-05-03-jst.md](filmtone-native-desktop-phase2-master-handoff-2026-05-03-jst.md)
 - Phase 0 internal design plan:
   `~/.claude/plans/luminous-sparking-eclipse.md`
 

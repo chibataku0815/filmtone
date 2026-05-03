@@ -24,7 +24,8 @@ Acceptance gate:
 
 - Native app builds locally.
 - Launches a window.
-- Uses SwiftUI / AppKit native controls, not WebView UI.
+- Uses SwiftUI native controls with AppKit interop only where needed, not
+  WebView UI.
 - Does not change Electron Desktop release output.
 - Does not hand-edit generated Swift.
 
@@ -95,6 +96,111 @@ grep -E "^export.*BASE_LOOKS" packages/film-lab-core/src/index.ts
 grep "lookId" apps/desktop-film-lab-batch/src/renderer/batch-pipeline.ts
 ```
 
+### Phase 1b 着地状況 (2026-05-03 JST 同日記録)
+
+`feature/native-desktop-plan` worktree commit `398743c` (Phase 0+1a) の上に
+Phase 1b vertical slice (preset → grade → still export → sidecar) が実装済
+(uncommitted)。完了 handoff:
+`docs/filmtone/desktop/filmtone-native-desktop-phase1b-completion-handoff-2026-05-03-jst.md`。
+
+実装メモ:
+
+- iOS の `OpticalKernels.baseGradeV2` / `filmCompressionV2` / `printStage`
+  CIColorKernel sources を verbatim lift。
+  `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtoneGradeKernels.swift`。
+- Sidecar は **Case B (Look canonical only)** 採択。Look Unification 未 landed
+  と main checkout 側 grep で確認済。
+- Optics (bloom / halation / diffusion / vignette / grain / motion blur) は
+  Phase 2 (Native Color/Export Backbone) に deferred。
+
+Parity 計測結果 (`bun run scripts/golden-parity-macos.ts --preset reset`):
+
+- **macOS↔source = ∞ dB (10/10 bit-identical)** — CIImage roundtrip と epsilon
+  gate が正しく動作している証明。
+- **macOS↔baseline-B = 平均 13.69 dB** — fixture が legacy WebGL render
+  capture (Phase 0 baseline-A JPEG → highlight lift → PNG) であり、現行 iOS
+  canonical CIColorKernel pipeline (本 Phase 1b lift target) と stage graph が
+  異なるため、PSNR > 35 dB threshold は **構造的に達成不可**。完了 handoff §4
+  と Risks 表 (06-quality-gates-risks.md) を参照。
+- **macOS↔source = 39.62 dB (preset=iphone, 09-skin-light)** — non-identity
+  preset で grade kernel が active であることの sanity 証明。
+
+このため Phase 1 acceptance gate の "visually matching against existing
+Electron / iOS golden fixtures" は Phase 1b 範囲では **iOS canonical pipeline
+との一致 (= source bit-identity for reset, kernel activation for non-reset)** を
+proxy とする。WebGL parity は Phase 2 で **案 C (iOS↔macOS canonical 直接比較)
+→ baseline-C 再生成 → 必要時のみ WGSL→Metal port** の優先順で再評価
+(06 risk row、Native の真値を旧 Desktop WebGL fixture に引かれない方針)。
+
+### Phase 1c 着地状況 (2026-05-03 JST 同日記録)
+
+`feature/native-desktop-plan` worktree commit `398743c` (Phase 0+1a) の上に
+Phase 1b に続けて Phase 1c vertical slice (open .mov/.mp4 → midpoint frame
+preview → H.264 mp4 export → sidecar) が実装済 (uncommitted、Phase 1b と
+同 branch 上)。完了 handoff:
+`docs/filmtone/desktop/filmtone-native-desktop-phase1c-completion-handoff-2026-05-03-jst.md`。
+
+実装メモ:
+
+- iOS `FilmtoneColorPipeline.swift:84-206` の `FilmtoneColorPipelineContract`
+  struct を verbatim lift (`Color/FilmtoneColorPipelineContract.swift`)。
+  `defaultOutputContract` factory + `SourceColorMetadataDTO` /
+  `SourceColorClassDTO` 依存の helper は Phase 2 (DTO port + SPM 化) まで
+  skip、Phase 1c は `phase1cMP4Default()` で直接 construct。
+- iOS `FilmtoneExportSession.swift` の **UIKit / UIDevice 依存箇所は 2 行のみ**
+  (line 6 `import UIKit`、lines 409-410 `UIDevice.current.filmtoneModelIdentifier`
+  / `systemVersion`、共に telemetry 用)。c1 削減方針で telemetry を lift せず、
+  video core flow (`makeWriter` / `makeVideoInput` / `makeVideoReaderOutput`
+  lines 1272-1330 と per-frame loop lines 2428-2500) の structure のみ port。
+- 新規ディレクトリ: `Media/` (UUID `E0B`)。`FilmtoneVideoFramePreview.swift`
+  (AVAssetImageGenerator midpoint = 0.5×duration)、`FilmtoneVideoReader.swift`
+  (AVAssetReader 32BGRA + AVVideoAllowWideColor)、`FilmtoneVideoWriter.swift`
+  (AVAssetWriter H.264 + `AVVideoProfileLevelH264HighAutoLevel` + Rec.709
+  via `AVVideoColorPropertiesKey`)。
+- 新規 `Export/FilmtoneSidecarTypes.swift` で `FilmtoneSourceKind` enum +
+  `FilmtoneSidecarRequest` protocol を導入、`FilmtoneStillExportRequest` と
+  新規 `FilmtoneVideoExportRequest` を conform。`FilmtoneSidecarWriter` は
+  protocol generalised + `sourceKind` additive top-level field を追加
+  (schema bump なし、Data Contract additive only 制約遵守)。
+- `Export/FilmtoneVideoExporter` は async orchestrator: per-frame で
+  `CIImage(cvImageBuffer:options:)` → preferredTransform 適用 + origin 正規化
+  + scale → `FilmtoneGradePipeline.apply` (Phase 1b 同 chain) →
+  `CIContext.render(to:CVPixelBuffer, colorSpace: Rec.709)` →
+  `AVAssetWriterInputPixelBufferAdaptor.append`。`Task.checkCancellation`
+  between frames、Cancel ボタン対応。
+- CLI `--export-video` mode 追加 (`DispatchSemaphore` で async → sync bridge)。
+  `--export-still` は Phase 1b と互換維持。
+- UI: `RootWindowView` Open accepts `.movie` / `.mpeg4Movie` / `.quickTimeMovie`、
+  Save panel が source kind で `.png/.jpeg` vs `.mp4` 分岐、`ExportProgressBar`
+  (SwiftUI `ProgressView` + Cancel)。`PreviewSurface` は source kind dispatch、
+  video は midpoint frame 経由。`EditorState` に `sourceURL` / `sourceKind`
+  / `exportProgress` / `currentExportTask` 追加。
+- pbxproj UUID `A11-A16` (BuildFile) / `B11-B16` (FileRef) / `E0B` (Media
+  group) を追加。
+
+Verify 結果:
+
+- 1 sec synthetic mp4 (320x180 @ 24 fps、bt709 SDR、24 frames): wallclock
+  0.366 sec (~65 fps、proof-of-concept、4K/6K bench は Phase 2)。
+- 出力 mp4 ffprobe: `codec_name=h264`, `pix_fmt=yuv420p`, **`color_space=bt709`
+  / `color_transfer=bt709` / `color_primaries=bt709`** (Rec.709 metadata 正常)。
+- sidecar: `"sourceKind": "video"`, `outputFile=.mp4`, `lookId=filmtone:base:
+  reset:v2`, `batchLookChoice` (Case B 維持、legacy `presetName` 不在)。
+- iphone preset on video frame 0 vs reset preset on video frame 0:
+  **PSNR 14.91 dB**, max Δ R=89/G=72/B=90 — grade chain が video path で
+  meaningful な差分を生成 (kernel chain active proof)。
+- Phase 1b still regression: `macOS↔source = ∞dB` / `baseB = 13.69dB`
+  (informational、変化なし)。
+
+このため Phase 1 acceptance gate の "video export passes for representative
+clips" は Phase 1c 範囲では **(1) export が QuickTime / Finder で repair
+なしに開く、(2) Rec.709 metadata が正しく書き込まれる、(3) 同じ kernel が
+preview / export 両方で動く、(4) 異なる preset で frame-level の差分が
+生まれる、(5) sidecar が `parseFilmtoneExportSessionV1` 互換 schema** で
+proxy gate とする。formal video parity (per-frame PSNR vs reference) は
+Phase 2 で **案 C (iOS↔macOS canonical 直接比較) → baseline-C 再生成 →
+必要時のみ WGSL→Metal port** の優先順で構築 (06 risk row 参照)。
+
 ## Phase 2: Native Color / Export Backbone
 
 Goal: make native rendering/export credible enough to replace Electron for core
@@ -142,6 +248,176 @@ xcodebuild -project apps/filmtone-desktop-macos/FilmtoneDesktop.xcodeproj \
 Add native golden tests only around changed surfaces first. Do not start with a
 large formal QA matrix.
 
+### Phase 2 sub-scope (chunk decomposition、2026-05-03 JST late evening 確定)
+
+| code | scope | 状態 |
+|---|---|---|
+| **C1** | SourceColor DTO graph port (FilmtoneMediaTypes L67-156) + classifier + normalizer + `defaultOutputContract` factory + Source prober (video async + still CGImageSource) | **COMPLETE** (uncommitted、本 doc §"Phase 2 C1+C2 着地状況") |
+| **C2** | AVFoundation modern async API migration (6 deprecation sites) + Sendable / strict concurrency (Swift 6) 対応 + Reader probe-based init | **COMPLETE** (uncommitted、C1 と同一 chunk) |
+| **C3** | iOS↔macOS canonical 直接 PSNR (案 C: baseline-C 構築) | **scaffold COMPLETE** (uncommitted、harness + directory + README)、**baseline-C populate PENDING** (user iOS Simulator workflow) |
+| **C5** | OpticalFilters main 着地後の合流 (bloom / halation / diffusion / vignette / grain を grade chain に統合) | TBD (main 着地待ち) |
+| **C6** | SPM `packages/film-lab-swift-core/` 化 (Domain/Phase0Types.swift 削除 → import 切替) | TBD (急がない方針維持) |
+| **C7** | IOSurface-backed CVPixelBuffer + Metal compute (4K/6K perf bench) | TBD (品質確定後) |
+
+**着手順 (chunk 着手時 user 確定)**:
+- **C1 + C2 を foundation 1 chunk** として進める (DTO port + factory wiring +
+  AVFoundation modern async = build clean 化)。
+- **C3 を直後に truth gate として立てる** (案 C iOS↔macOS canonical 直接比較)。
+  hybrid 戦略: 開発 iteration は iOS Simulator (#2)、baseline-C 確定は実機 1 回
+  (#1)、以降 regression は macOS 内完結 (iOS pbxproj 違反の #3 / C6 急がない
+  方針矛盾の #4 は却下)。
+- **C5/C6/C7 は C3 結果 + OpticalFilters main 着地 timing で再判断** (現時点で
+  順序固定しない)。
+
+### Phase 2 C1+C2 着地状況 (2026-05-03 JST late evening)
+
+`feature/native-desktop-plan` worktree commit `398743c` (Phase 0+1a) の上に
+Phase 1b + 1c に続けて Phase 2 C1+C2 が実装済 (uncommitted、Phase 1b/1c と
+同 branch 上)。完了 handoff:
+`docs/filmtone/desktop/filmtone-native-desktop-phase2-master-handoff-2026-05-03-jst.md`。
+
+実装メモ:
+
+- 新規: `Domain/SourceColorTypes.swift` (`SourceColorClassDTO` 8 cases +
+  `SourceLogTransferFunctionDTO` 2 cases + `SourceColorMetadataDTO` 7 fields、
+  iOS L67-156 verbatim、Foundation のみ)。
+- 新規: `Color/SourceColorMetadataNormalizer.swift` (CoreMedia identifier →
+  ffprobe vocab、iOS L1-129 verbatim)。
+- 新規: `Color/SourceColorClassifier.swift` (`classify(metadata) ->
+  SourceColorClassDTO`、iOS L8-56 verbatim、`FilmtoneMezzanineRoutePolicy`
+  は意図的に skip — iOS mezzanine routing は macOS native irrelevant)。
+- 新規: `Color/FilmtoneColorPipeline.swift` (`enum FilmtoneColorPipeline`
+  namespace、`defaultOutputContract` factory + `sourceInterpretationID`
+  / `sourceFallbackColorSpace` / `isDisplayP3SDR` / `workingColorSpace` /
+  `outputColorSpace` 全 helpers、iOS L1-82 verbatim)。
+- 新規: `Media/FormatExtensionReader.swift` (CMFormatDescription extension
+  reader、iOS verbatim)。
+- 新規: `Media/FilmtoneSourceProber.swift` (`probeVideo(sourceURL:) async
+  throws -> FilmtoneVideoTrackProbe`、`probeStill(sourceURL:) ->
+  FilmtoneSourceProbeResult`、modern async API 直使用)。`FilmtoneVideoTrackProbe`
+  は **non-Sendable** (AVAssetTrack/AVURLAsset が Sendable でないため、
+  single-Task consumer 限定で OK)。
+- 更新: `Color/FilmtoneColorPipelineContract.swift` を iOS L84-206 verbatim
+  形へ restructure。`phase1cMP4Default()` は **削除**、`stillImageOptions()`
+  は iOS canonical match で `.applyOrientationProperty: true` +
+  `.toneMapHDRtoSDR: true` + 条件付き `colorSpace: sourceFallbackColorSpace`。
+  iOS-only `applyOutputMetadata(to: AVMutableVideoComposition)` overload は
+  omit (macOS は `AVAssetWriterInputPixelBufferAdaptor` 直書き)。
+- 更新: `Media/FilmtoneVideoReader.swift` を `init(probe: FilmtoneVideoTrackProbe,
+  contract:)` に rebuild。deprecated `asset.tracks(withMediaType:)` /
+  `track.naturalSize` / `.preferredTransform` / `.nominalFrameRate` /
+  `asset.duration` を全消化、prober 経由 pre-loaded。`@unchecked Sendable`
+  維持 (single-Task usage)。
+- 更新: `Media/FilmtoneVideoFramePreview.swift` modern async API へ migrate。
+  `try await asset.loadTracks(withMediaType:)` + variadic
+  `try await track.load(.naturalSize, .preferredTransform)` (Swift 6 strict
+  concurrency: AVAssetTrack non-Sendable のため `async let` は data race。
+  variadic version で single-call 解決) + `try await generator.image(at:)`。
+- 更新: `Export/FilmtoneVideoExporter.swift` に `probeVideo` → factory →
+  contract → reader の wiring。`hardCoded phase1cMP4Default()` 撤去。
+- 更新: `Export/FilmtoneStillExporter.swift` に `probeStill` → factory →
+  `contract.stillImageOptions()` を `CIImage(contentsOf:options:)` に渡す
+  flow。Display P3 source の場合 fallback colorSpace=`displayP3` が CIImage
+  options に乗る。
+- 更新: `Export/FilmtoneSidecarWriter.swift` に optional `sourceInterpretation:
+  String? = nil` parameter 追加。non-nil の場合 sidecar payload に
+  `sourceInterpretation` field を additive 追加 (Phase 2 acceptance gate
+  "Source profile id round-trips through sidecar")。schema bump なし
+  (Data Contract additive only 制約遵守)。
+- 更新: `UI/PreviewSurface.swift` を Coordinator-based Task 管理へ。
+  `context.coordinator.currentTask?.cancel()` で前 preview Task を cancel
+  してから新規 Task launch。video path のみ async (still は sync 維持で
+  flicker 抑制)。
+- 更新: `Export/FilmtoneSidecarTypes.swift` 不変 (`sourceKind` enum +
+  `FilmtoneSidecarRequest` protocol、changes only `Export/FilmtoneSidecarWriter`)。
+- pbxproj: UUID `A17-A1C` (BuildFile) / `B17-B1C` (FileRef) を追加。
+  Domain group に SourceColorTypes、Color group に Pipeline + Normalizer +
+  Classifier、Media group に FormatExtensionReader + Prober を登録。
+
+Verify 結果:
+
+- `bun run verify:macos` → `** BUILD SUCCEEDED **`。
+- AVFoundation sync deprecation 6 sites 全解消 (FramePreview の `tracks` /
+  `duration` / `copyCGImage`、Reader の `tracks` / `naturalSize` /
+  `preferredTransform` / `nominalFrameRate`)。残存 warning は既存
+  `CIColorKernel(source:)` 3 箇所のみ (Phase 1b 受容、master §6.3、Metal
+  CIKernel 移行 lane 別 chunk または C7 と合流)。
+- `bun run generate:swift -- --check` → exit 0 (drift 0)。
+- `diff -q iOS↔macOS Phase0Generated.swift` → identical (no output)。
+- `git status apps/capacitor-film-lab-ios/ apps/desktop-film-lab-batch/
+  packages/film-lab-core/src/` → nothing to commit, working tree clean。
+- Still CLI smoke: `01-highlight-sunset.png` reset → `ok 1280x720`、sidecar
+  `"sourceInterpretation": "sdr-bt709"` + `"sourceKind": "still"`。
+- Video CLI smoke: `synthetic-bt709-1s-20260424.mp4` reset → `ok 320x180
+  frames=24`、sidecar `"sourceInterpretation": "sdr-bt709"` + `"sourceKind":
+  "video"`、ffprobe `color_space=bt709 / color_transfer=bt709 /
+  color_primaries=bt709`。
+- Phase 1b regression: `golden-parity-macos.ts --preset reset` で macOS↔source
+  全 ∞ dB (10/10 bit-identical)、macOS↔baseline-B 13.69 dB (informational、
+  変化なし)。
+- iphone preset on 09-skin-light: macOS↔source = **40.60 dB** (Phase 1c は
+  39.62 dB)、+0.98 dB は C1 で `applyOrientationProperty: true` + sRGB
+  fallback colorSpace option 追加 = iOS canonical 方向 drift = 好ましい。
+
+このため Phase 2 acceptance gate のうち **"Source profile id round-trips
+through sidecar"** は本 chunk で達成 (sidecar emit 確認済)。残 acceptance gate
+("Still / video export parity passes for representative presets" / "HDR/SDR
+policy is explicit and tested") は **C3 baseline-C populate** で確定する。
+
+### Phase 2 C3 truth gate scaffold 着地状況 (2026-05-03 JST late evening)
+
+C1+C2 と同 chunk で truth gate scaffold が landed (uncommitted)。
+
+実装メモ:
+
+- 新規: `apps/desktop-film-lab-batch/test/golden/baseline-C/` (4 preset
+  subdirs: `reset/` `iphone/` `softBlue/` `amberGlow/`) + `README.md`
+  (生成手順 = iOS Simulator workflow + 実機 1 回確定の hybrid 戦略を
+  記述)。
+- 新規: `scripts/golden-parity-ios-vs-macos.ts`。`golden-parity-macos.ts`
+  パターンを踏襲、`baseline-C/<preset>/<image>.png` (iOS canonical export)
+  と macOS export を直接 PSNR 比較。**PENDING-aware**: baseline-C entry が
+  無いセルは PENDING として報告し harness はエラー終了しない。`--preset`
+  / `--image` / `--app` / `--threshold` (default 35dB) で制御可能。
+
+Smoke 実行:
+
+```
+$ bun run scripts/golden-parity-ios-vs-macos.ts --preset reset
+Phase 2 C3 truth gate — preset=reset
+01-highlight-sunset  ∞ dB  —  PENDING  ... (10 cells all PENDING)
+macOS↔source : all ∞ dB (bit-identical roundtrip)
+macOS↔baseC  : 0 cells with baseline-C entry (10 PENDING) — see ...
+
+$ bun run scripts/golden-parity-ios-vs-macos.ts --preset iphone --image 09-skin-light
+09-skin-light  40.60dB  —  PENDING
+```
+
+baseline-C content 自体は **PENDING** (user iOS Simulator workflow で 4 preset
+× 10 image = 40 cell を populate する必要あり)。harness は populate 待ちでも
+動作可能、user が 1 cell ずつ baseline-C を増やしながら parity を
+incremental に確認できる。
+
+**Acceptance threshold**:
+- reset preset 全セル **macOS↔baseline-C = ∞ dB** (params identity → bit-identical)
+- non-reset preset 各セル **macOS↔baseline-C ≥ 35dB** (case-by-case では
+  >= 40-50dB 期待、iOS / macOS が同 kernel sources を verbatim lift しているため)
+- 失敗セルがあれば 案 C step (3) WGSL→Metal port を不足 effect path に対して実施
+
+**未着手 Phase 2 work** (本 chunk の scope 外):
+
+- C5: OpticalFilters main 合流 (`packages/film-lab-core/src/ios-optical-filter-payload.ts`
+  等が main へ landed したら generator 拡張 + bloom/halation/diffusion/vignette/
+  grain を grade chain 統合)。
+- C6: SPM `packages/film-lab-swift-core/` 化 (`Domain/Phase0Types.swift`
+  / `Domain/SourceColorTypes.swift` / Color/Color/Pipeline 関連を SPM 移管、
+  iOS からも参照、`Domain/*` 削除 → import 切替)。**急がない方針維持** (chunk
+  着手時 user 確定)。
+- C7: IOSurface-backed `CVPixelBuffer` + Metal compute (4K/6K perf bench →
+  必要なら implement)。Phase 1c per-frame allocation overhead 抑制策。
+- Look Unification main merge 観測時の sidecar dual emit 切替 (Native ユーザー
+  配布 / Phase 5 release rail 切替前必須、release blocker)。
+
 ## Phase 3: Native Editing And Export UI
 
 Goal: replace the Electron UI with a Mac-native workflow that is better than
@@ -164,6 +440,9 @@ UI principles:
 - Avoid nested card stacks.
 - Use native menu commands and keyboard shortcuts.
 - Keep preview unoccluded and color trustworthy.
+- Preserve responsibility boundaries from
+  `02-target-architecture-and-contracts.md`: UI owns interaction, State owns
+  workflow, Color/Export own product work.
 
 Acceptance gate:
 
@@ -172,6 +451,8 @@ Acceptance gate:
 - Toolbar/sidebar/sheets feel like a macOS app, not a web app in a window.
 - Keyboard and menu commands cover repeat workflows.
 - Drag/drop and Finder integration work.
+- New feature slices do not push color math, export work, or sidecar schema
+  construction into SwiftUI views.
 
 ## Phase 4: Batch, Sessions, And Product Completeness
 

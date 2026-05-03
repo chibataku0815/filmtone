@@ -609,21 +609,43 @@ open apps/filmtone-desktop-macos/build/Build/Products/Debug/FilmtoneDesktop.app
 
 ## 6.5. Concurrent Lane: Desktop Look Unification (sidecar contract 依存)
 
-**Native Desktop v2 と並行して main checkout 側で進行する lane**。Phase 1b の
-sidecar 出力契約に直接影響するので **必ず status を確認してから sidecar
-emitter を書く**。
+**Native Desktop v2 と並行して進行する lane**。Phase 1b の sidecar 出力契約に
+直接影響するので **必ず status を確認してから sidecar emitter を書く**。
 
 ### Lane 概要
 
 - branch: `feature/desktop-look-unification`
-- worktree: 一度喪失 (recovery 未確認)、main checkout で再開予定
+- chat B worktree (確定、2026-05-03 JST 起動):
+  `/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-look-unification`
+  (Native Desktop worktree `filmtone-native-desktop-plan` とは **完全分離**)
 - 元 plan: `~/.claude/plans/desktop-look-unification-bright-dusk.md`
 - 再開 handoff (canonical):
   `/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone/docs/filmtone/desktop/filmtone-desktop-look-unification-handoff-2026-05-03-jst.md`
-  (このリポは Native Desktop worktree なので main checkout 側を読む)
-- 状態 (2026-05-03 JST 時点): Phase A (core/schema 加算) は完了して verify
-  通過、Phase B (Electron renderer + film-lab-ui sweep) が部分完了で worktree
-  喪失 → 再開待ち
+- 状態 (2026-05-03 JST 同日更新): 一度 worktree 喪失 → chat B 起動済 (Phase 1b
+  chat A と並列)。Phase A (core/schema 加算) は喪失前に完了 verify 通過、
+  chat B は **main への Phase A 着地状況 grep verify から再開** → Phase B
+  (Electron renderer + film-lab-ui sweep) を完成させる方針
+
+### chat 間 coordination protocol
+
+- chat 間の直接通信はない、user が橋渡し
+- chat A (Phase 1b、本 doc 利用側) は **chat B の worktree
+  `filmtone-look-unification` を絶対に触らない**
+- chat B は **本 worktree `filmtone-native-desktop-plan` を絶対に触らない**
+- chat B が main へ Phase A + B を merged したら user が chat A に通知 →
+  chat A は sidecar emitter を Case B (Look canonical only) → Case A
+  (dual emit) に切り替え可能になる
+- merged 前に chat A が sidecar 着手する場合は Case B で書いて先送り、
+  後で Case A 化する選択もアリ (本 doc §10 参照)
+
+### chat B 着手時に確定済の本 PR スコープ方針
+
+| # | 領域 | 方針 |
+|---|---|---|
+| 1 | `filmLabUiContract.ts` slot 名 (`beforePresets` → `beforeLooks` 等) | alias 残さず一気に rename |
+| 2 | `batch-session` writer | `batchLookChoice` 単独 emit (Electron 専用 userData、dual 不要) |
+| 3 | テスト fixture | 既存 `"preset"` 残置 (parser fallback regression) + 新規 `"builtInLook"` canonical |
+| 4 | iOS messages.ts キー名参照書き換え | **本 PR では実施しない (別 PR)**。i18n 値書き換えで iOS 文字列は自動 Look 化、specific reference rewrite は別 |
 
 ### 本質
 

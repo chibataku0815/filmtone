@@ -41,7 +41,9 @@ and SDK surface is too heavy for the first buy-once Desktop lane.
 
 Architecture implication:
 
-- Keep SwiftUI/AppKit responsible for UI, file access, and Apple ecosystem
-  features.
+- Keep SwiftUI responsible for primary UI.
+- Use AppKit for macOS-specific file access, windowing, menus, Finder
+  integration, and Apple ecosystem hooks that SwiftUI cannot express cleanly.
+- Use UIKit only on the iOS side when SwiftUI needs platform-specific support.
 - Keep render stages separable enough that an Objective-C++ / C++ / Metal core
   can be introduced later without rewriting product UI.
