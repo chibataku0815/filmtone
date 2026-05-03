@@ -1,5 +1,10 @@
 # Active Task: M5-A.1 Visual Smoke
 
+> Reference-only mirror in this checkout. The current Native Desktop v2
+> `active.md` lives in
+> `/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-native-desktop-plan/docs/filmtone/desktop/native-desktop-v2/active.md`.
+> Do not archive, pause, restore, or implement from this copy.
+
 Date opened: 2026-05-04 JST
 Milestone: M5 (Native Editing UI), slice A.1 — manual acceptance gate
 Worktree: `/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-native-desktop-plan`
