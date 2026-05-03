@@ -45,9 +45,10 @@ shipping Electron rail.
   foundation, modern AVFoundation migration, RayAngleOptics, initial optical
   stages, and 4K performance measurement are complete enough to unblock M5.
 - M5 is the current product milestone.
-- The current `active.md` is the M5-A.2 Look Canonical Parity slice (Stone /
-  Urban Creative LUT Pack 01 port from iOS), opened as a mid-size Interrupt
-  after Visual Smoke passed.
+- M5-A.2 Look Canonical Parity (Stone / Urban Creative LUT Pack 01 port from
+  iOS) landed 2026-05-04 across 3 commits and is archived. `active.md` is
+  vacant — next subtask is the deferred original Tier 1 #2 (動画スクラブ) or
+  another M5 surface item, to be opened on review.
 - Baseline-C population is intentionally treated as quality shell work unless
   formal parity proof is requested.
 - M4 SPM consolidation remains deferred until native behavior is stable enough
@@ -101,6 +102,17 @@ shipping Electron rail.
 - 2026-05-04: M5-A.1 Visual Smoke passed — Slider 0↔1 drag preview live, Reset
   disable visible, Soft Blue / Amber Glow same sweep behaviour confirmed.
   Archived as `archive/2026-05-04-m5-a1-visual-smoke.md`.
+- 2026-05-04: M5-A.2 Look Canonical Parity landed — Stone / Urban Creative LUT
+  Pack 01 ported from iOS (FilmtonePhase0ParamsPatch + CubeParser + Pack
+  catalog + Loader + GradePipeline integration + 2-tier Look/Preset UI +
+  sidecar additive `creativeLut` block + `--look` CLI). 3 commits
+  (b8b3bd4 / 29d287f / 430c5a0). CLI smoke green: distinct PNG hashes per
+  Look + per strength, D4-ii bareline at strength=0, exit 64 on unknown
+  slug. Visual app smoke deferred to user. Archived as
+  `archive/2026-05-04-m5-a2-look-canonical-parity.md`. Surprise logged:
+  yellow-folder PBXGroup flattens cubes into `Contents/Resources/`, so the
+  Loader resolves by name + extension (no `subdirectory:`) — revisit the
+  blue-vs-yellow note when iOS / Desktop pbxproj patterns are unified.
 
 ## Interrupt / Decision Log
 
