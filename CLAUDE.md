@@ -37,8 +37,7 @@ Filmtone — 独立モノレポ Claude Code 協業ガイド
 | `README.md` | workspaces + scripts(`bun run build:core` / `verify:desktop` / `verify:ios` 等) |
 | `.ai/GLOBAL.md` | AI ツール共通グローバルルール(Cursor / Codex CLI 横断) |
 | `.ai/parallel-work.md` | 並列 stream / Agent Teams 協調プロトコル |
-| `docs/filmtone/desktop/native-desktop-v2/strategy.md` | Native Desktop v2 の長期戦略・マイルストーン正本 |
-| `docs/filmtone/desktop/native-desktop-v2/active.md` | Native Desktop v2 の現在進行中サブタスク。存在しなければ次タスク案を作り、実装せずレビュー待ち |
+| Native Desktop v2 `strategy.md` / `active.md` | `/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-native-desktop-plan/docs/filmtone/desktop/native-desktop-v2/`。Native v2 作業はここを正本にする |
 | `apps/capacitor-film-lab-ios/CLAUDE.md` | iOS 専用 223 行(Swift / fastlane / pbxproj 不変条件・lane 番号・antipattern) |
 | life `docs/guides/2026-05-01-filmtone-standalone-product-repo-migration-handoff.md` | 移行経緯の参照。現在状態の正本にはしない |
 | life `docs/guides/film-lab-current-index.md` | live エントリ doc(read order・active lanes) |
@@ -108,7 +107,7 @@ vercel deploy は portfolio 側の `apps/web` build に依存するので submod
 |---|---|
 | `apps/capacitor-film-lab-ios/CLAUDE.md` | **既存**(223 行)。iOS の不変条件はここから引く |
 | `apps/desktop-film-lab-batch/CLAUDE.md` | **未作成**。Desktop 専用の不変条件が顕在化した時に user 指示で追加(現状は README + このファイルで足りる) |
-| `docs/filmtone/desktop/native-desktop-v2/strategy.md` + `active.md` | **既存**。Native Desktop v2 はこの 2-layer docs を正本にする |
+| Native Desktop v2 task docs | `/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-native-desktop-plan/docs/filmtone/desktop/native-desktop-v2/strategy.md` / `active.md` |
 
 ## 9. 出力ルール(life CLAUDE.md §11 と整合)
 
