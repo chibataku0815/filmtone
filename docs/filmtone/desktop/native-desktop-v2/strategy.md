@@ -1,9 +1,14 @@
 # Filmtone Native Desktop v2 Strategy
 
+> Reference-only mirror in this checkout. The current Native Desktop v2 source
+> of truth lives in
+> `/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-native-desktop-plan/docs/filmtone/desktop/native-desktop-v2/strategy.md`
+> and then `active.md` in that dedicated worktree. Do not use this copy as the
+> current task state.
+
 Date: 2026-05-04 JST
 
-This file is the strategic source of truth for the Native Desktop v2 lane.
-Keep it short. Do not put implementation steps or file-level details here.
+This file is retained as historical reference only in this checkout.
 
 ## Goal
 
