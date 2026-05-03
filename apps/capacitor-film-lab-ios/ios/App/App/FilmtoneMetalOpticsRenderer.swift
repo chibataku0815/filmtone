@@ -51,6 +51,7 @@ final class FilmtoneMetalOpticsRenderer {
     private let tentDownsamplePS: MTLComputePipelineState
     private let tentUpsamplePS: MTLComputePipelineState
     private let copyTexturePS: MTLComputePipelineState
+    private let clearTexturePS: MTLComputePipelineState
     private let upsampleAccumulatePS: MTLComputePipelineState
     private let glowCompositePS: MTLComputePipelineState
 
@@ -108,6 +109,7 @@ final class FilmtoneMetalOpticsRenderer {
             let downFn = library.makeFunction(name: "filmtoneTentDownsample"),
             let upFn = library.makeFunction(name: "filmtoneTentUpsample"),
             let copyFn = library.makeFunction(name: "filmtoneCopyTexture"),
+            let clearFn = library.makeFunction(name: "filmtoneClearTexture"),
             let accFn = library.makeFunction(name: "filmtoneTentUpsampleAccumulate"),
             let compFn = library.makeFunction(name: "filmtoneGlowComposite")
         else {
@@ -120,6 +122,7 @@ final class FilmtoneMetalOpticsRenderer {
             self.tentDownsamplePS = try device.makeComputePipelineState(function: downFn)
             self.tentUpsamplePS = try device.makeComputePipelineState(function: upFn)
             self.copyTexturePS = try device.makeComputePipelineState(function: copyFn)
+            self.clearTexturePS = try device.makeComputePipelineState(function: clearFn)
             self.upsampleAccumulatePS = try device.makeComputePipelineState(function: accFn)
             self.glowCompositePS = try device.makeComputePipelineState(function: compFn)
         } catch {
@@ -342,19 +345,15 @@ final class FilmtoneMetalOpticsRenderer {
     }
 
     private func encodeClear(enc: MTLComputeCommandEncoder, target: MTLTexture) {
-        // Reuse the highlight extract kernel with threshold=10 (above any
-        // possible luma) to write zero-energy output. This is simpler than
-        // adding a dedicated clear kernel and is rare in practice.
-        enc.setComputePipelineState(highlightExtractPS)
+        // Dedicated write-only clear. Earlier prototype reused
+        // `filmtoneSoftKneeHighlight` with the same texture bound as both
+        // read and write; that's undefined behavior in Metal even though
+        // the test material happened never to exercise this path (all
+        // bloom/halation/diffusion components were active). A separate
+        // write-only kernel removes the alias before Phase 2 expansion.
+        enc.setComputePipelineState(clearTexturePS)
         enc.setTexture(target, index: 0)
-        enc.setTexture(target, index: 1)
-        var t: Float = 10.0
-        var k: Float = 0.001
-        var tnt = SIMD3<Float>(0, 0, 0)
-        enc.setBytes(&t, length: MemoryLayout<Float>.size, index: 0)
-        enc.setBytes(&k, length: MemoryLayout<Float>.size, index: 1)
-        enc.setBytes(&tnt, length: MemoryLayout<SIMD3<Float>>.size, index: 2)
-        dispatch(enc: enc, pipeline: highlightExtractPS, width: target.width, height: target.height)
+        dispatch(enc: enc, pipeline: clearTexturePS, width: target.width, height: target.height)
     }
 
     private func encodeMipPyramid(
@@ -699,6 +698,18 @@ final class FilmtoneMetalOpticsRenderer {
         if (gid.x >= outTex.get_width() || gid.y >= outTex.get_height()) return;
         // Same dimensions only — caller guarantees src.size == dst.size.
         outTex.write(inTex.read(gid), gid);
+    }
+
+    // Write-only clear. Used when an inactive glow component still needs its
+    // contribution texture zeroed out before the composite kernel reads it.
+    // Must not be merged with `filmtoneSoftKneeHighlight` to avoid an
+    // undefined read+write alias on a single texture.
+    kernel void filmtoneClearTexture(
+        texture2d<half, access::write> outTex [[ texture(0) ]],
+        uint2 gid [[ thread_position_in_grid ]]
+    ) {
+        if (gid.x >= outTex.get_width() || gid.y >= outTex.get_height()) return;
+        outTex.write(half4(half3(0.0), half(1.0)), gid);
     }
 
     // 13-tap COD:AW dual-filter tent downsample. Source is sampled in pixel
