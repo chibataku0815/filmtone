@@ -263,6 +263,10 @@ real DaVinci repeated-import readback under
 - What source relink/content identity should v2 add beyond filename/duration/fps
   for cross-device SSD moves?
 
+## Interrupt / Decision Log
+
+- No interrupt decisions recorded yet.
+
 ## Operating Rules
 
 - Read this file at Native Desktop v2 session start.
@@ -270,6 +274,22 @@ real DaVinci repeated-import readback under
 - If `active.md` is missing, propose or create exactly one scoped task before
   editing.
 - Keep only one `active.md` at a time.
+- For 5-30 minute small fixes, record them in the current `active.md` under
+  `Unexpected` or `Follow-up`, and handle them there only when they belong to
+  the active scope.
+- For half-day-to-multi-day interrupts, append a `Paused` section to the current
+  `active.md`, briefly list done vs. not done, move it to
+  `paused/YYYY-MM-DD-{slug}.md`, then create one interrupt-only `active.md`.
+- The interrupt `active.md` must name its milestone, or say `Interrupt` when it
+  is outside the current milestone.
+- After the interrupt finishes, archive it to `archive/YYYY-MM-DD-{slug}.md`,
+  append 1-3 lines here only if strategy state changed, then restore the paused
+  file back to `active.md`.
+- For milestone-changing interrupts, append a short note to
+  `Interrupt / Decision Log` before creating the interrupt `active.md`.
+- Treat long-term direction changes as milestone-structure changes and get
+  review before implementation.
+- Do not use old handoffs as current truth; they are historical references.
 - Archive completed active tasks into `archive/`.
 - Append only short strategy notes here; detailed logs belong in archive files.
 - Product code changes require the smallest verification that proves the changed
