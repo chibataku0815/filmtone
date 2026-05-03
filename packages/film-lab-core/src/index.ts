@@ -14,11 +14,21 @@ export {
   createFilmtoneDefaultParams,
   findMatchingPreset,
   type PresetName,
+  // Look-first canonical aliases (Look Unification)
+  BASE_LOOKS,
+  BASE_LOOK_BUTTONS,
+  FILMTONE_DEFAULT_BASE_LOOK,
+  findMatchingBaseLook,
+  type BaseLookName,
 } from "./presets";
 export {
   PRESET_VERSION,
   lookIdForPreset,
   LOOK_ID_BY_PRESET,
+  // Look-first canonical aliases (Look Unification)
+  LOOK_RECIPE_VERSION,
+  lookIdForBaseLook,
+  LOOK_ID_BY_BASE_LOOK,
 } from "./look-ids";
 export {
   filmLabDepthTrackSchema,
@@ -27,6 +37,9 @@ export {
   filmLookGradeInputSchema,
   filmLookSpikeInputSchema,
   gradeMatchesPreset,
+  // Look-first canonical aliases (Look Unification)
+  gradeMatchesBaseLook,
+  normalizeFilmLookGradeInputIdentity,
   type FilmLabDepthTrackInput,
   type FilmLabParamsValidated,
   type FilmLookGradeInputProps,

@@ -175,10 +175,18 @@ export const cameraOpticsSchema = z.object({
 
 /**
  * Remotion Composition 向け: ルック ID + バージョン + 数値グレード
+ *
+ * `lookId` / `lookVersion` は Look Unification (life vocabulary spec
+ * 2026-04-07) 由来の Look-first canonical 名。当面 `lookPresetId` /
+ * `presetVersion` を required のまま残し、`lookId` / `lookVersion` を
+ * optional 加算する。dual emit したペイロードは
+ * `normalizeFilmLookGradeInputIdentity()` で identity 一致を strict 検証する。
  */
 export const filmLookGradeInputSchema = z.object({
   lookPresetId: z.string().min(1),
   presetVersion: z.literal(PRESET_VERSION),
+  lookId: z.string().min(1).optional(),
+  lookVersion: z.literal(PRESET_VERSION).optional(),
   grade: filmLabParamsSchema,
   /** Optional depth track that drives depth-aware Mist / Glow across preview and export. */
   depthTrack: filmLabDepthTrackSchema.optional(),
@@ -241,4 +249,51 @@ export function gradeMatchesPreset(
 ): boolean {
   const expected = PRESETS[presetName];
   return PARAM_KEYS.every((key) => grade[key] === expected[key]);
+}
+
+/**
+ * Look-first canonical alias of `gradeMatchesPreset`.
+ *
+ * Look Unification (life vocabulary spec 2026-04-07) で確定した user-facing
+ * 語彙 `Base Look` を core / schema 層の canonical 名として加算する。
+ */
+export const gradeMatchesBaseLook = gradeMatchesPreset;
+
+/**
+ * Reconcile legacy (`lookPresetId` / `presetVersion`) と Look-first
+ * (`lookId` / `lookVersion`) の identity を strict equality で揃える。
+ *
+ * - 両方ある: identity 不一致は throw。一致なら入力をそのまま返す。
+ * - legacy のみ: `lookId = lookPresetId`, `lookVersion = presetVersion` を補う。
+ * - Look-first のみ: schema 上 unreachable (legacy は required) だが、将来
+ *   schema 緩和した時のために `lookPresetId = lookId`, `presetVersion =
+ *   lookVersion` で legacy 補完して返す設計を残す。
+ */
+export function normalizeFilmLookGradeInputIdentity(
+  input: FilmLookGradeInputProps,
+): FilmLookGradeInputProps {
+  const { lookId, lookVersion, lookPresetId, presetVersion } = input;
+  const hasLook = lookId !== undefined || lookVersion !== undefined;
+  const hasLegacy = lookPresetId !== undefined && presetVersion !== undefined;
+
+  if (hasLook && hasLegacy) {
+    if (lookId !== lookPresetId || lookVersion !== presetVersion) {
+      throw new Error(
+        `filmLookGradeInput: lookId/lookPresetId mismatch ` +
+          `(lookId=${String(lookId)} lookPresetId=${String(lookPresetId)} ` +
+          `lookVersion=${String(lookVersion)} presetVersion=${String(presetVersion)})`,
+      );
+    }
+    return input;
+  }
+
+  if (hasLegacy) {
+    return { ...input, lookId: lookPresetId, lookVersion: presetVersion };
+  }
+
+  return {
+    ...input,
+    lookPresetId: lookId as string,
+    presetVersion: lookVersion as typeof PRESET_VERSION,
+  };
 }

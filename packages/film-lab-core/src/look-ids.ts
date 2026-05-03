@@ -38,3 +38,11 @@ export const LOOK_ID_BY_PRESET: Record<PresetName, string> = {
   cinestill800t: lookIdForPreset("cinestill800t"),
   velvia50: lookIdForPreset("velvia50"),
 };
+
+// === Look-first canonical aliases ===
+// `IOS_PRESET_VERSION` は kernel dispatch tag なので alias 対象外。
+// `gradeMatchesBaseLook` は `schema.ts` 側の export とする (look-ids → schema → look-ids
+// の循環依存を避けるため、ここからは re-export しない)。
+export const LOOK_RECIPE_VERSION = PRESET_VERSION;
+export const lookIdForBaseLook = lookIdForPreset;
+export const LOOK_ID_BY_BASE_LOOK = LOOK_ID_BY_PRESET;

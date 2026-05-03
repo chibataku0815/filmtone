@@ -12,6 +12,7 @@ import type { FilmLabBatchBridge } from "./desktop-api";
 import {
   filmLabParamsSchema,
   filmLookGradeInputSchema,
+  normalizeFilmLookGradeInputIdentity,
   createFilmtoneDefaultParams,
   PRESETS,
   LOOK_ID_BY_PRESET,
@@ -178,8 +179,12 @@ export async function resolveGradeFromJsonText(
 
   const o = raw as Record<string, unknown>;
 
+  // Look Unification: legacy / dual / Look-first wrapper をすべて認識する。
+  // 当面 schema は `lookPresetId` / `presetVersion` を required のまま残すため
+  // Look-first only payload は schema 緩和後に到達する path だが、discriminator
+  // 側で先に弾くのは設計意図に反するので含めておく。
   const looksLikeWrapper =
-    "grade" in o && "lookPresetId" in o && "presetVersion" in o;
+    "grade" in o && ("lookPresetId" in o || "lookId" in o);
   if (looksLikeWrapper) {
     const parsed = filmLookGradeInputSchema.safeParse(raw);
     if (!parsed.success) {
@@ -187,7 +192,7 @@ export async function resolveGradeFromJsonText(
         `filmLookGradeInputSchema: ${parsed.error.message}`,
       );
     }
-    const g = parsed.data;
+    const g = normalizeFilmLookGradeInputIdentity(parsed.data);
     const depthTrackSource = (g as { depthTrack?: BatchDepthTrackSource }).depthTrack;
     const depthTrack = depthTrackSource
       ? await loadBatchDepthTrackFromGrade(api, gradeJsonPath, depthTrackSource)

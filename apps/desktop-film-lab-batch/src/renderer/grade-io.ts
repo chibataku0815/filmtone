@@ -23,6 +23,9 @@ type GradeJsonPayload = FilmLookGradeInputProps & {
 /**
  * @param params - 現在のグレード
  * @returns grade JSON の構造化 payload
+ *
+ * Look Unification dual emit: legacy (`lookPresetId` / `presetVersion`) と
+ * Look-first canonical (`lookId` / `lookVersion`) の両方を含めて出力する。
  */
 export function buildGradeJsonPayload(
   params: Params,
@@ -31,9 +34,12 @@ export function buildGradeJsonPayload(
 ): GradeJsonPayload {
   const preset: PresetName =
     findMatchingPreset(params) ?? FILMTONE_DEFAULT_BASE_PRESET;
+  const id = lookIdForPreset(preset);
   return {
-    lookPresetId: lookIdForPreset(preset),
+    lookPresetId: id,
     presetVersion: PRESET_VERSION,
+    lookId: id,
+    lookVersion: PRESET_VERSION,
     grade: params,
     ...(depthTrack ? { depthTrack } : {}),
     ...(cameraOptics ? { cameraOptics } : {}),

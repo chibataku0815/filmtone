@@ -883,6 +883,10 @@ var PRESET_BUTTONS = [
   { name: "velvia50", label: "Velvia 50", subtitle: "Vivid Slide", category: "filmStock", printMedium: "slide_positive" },
   { name: "cinematic", label: "Cinematic", subtitle: "Teal & Orange", category: "look" }
 ];
+var BASE_LOOKS = PRESETS;
+var BASE_LOOK_BUTTONS = PRESET_BUTTONS;
+var FILMTONE_DEFAULT_BASE_LOOK = FILMTONE_DEFAULT_BASE_PRESET;
+var findMatchingBaseLook = findMatchingPreset;
 
 // src/look-ids.ts
 var PRESET_VERSION = "v1";
@@ -901,6 +905,9 @@ var LOOK_ID_BY_PRESET = {
   cinestill800t: lookIdForPreset("cinestill800t"),
   velvia50: lookIdForPreset("velvia50")
 };
+var LOOK_RECIPE_VERSION = PRESET_VERSION;
+var lookIdForBaseLook = lookIdForPreset;
+var LOOK_ID_BY_BASE_LOOK = LOOK_ID_BY_PRESET;
 
 // src/schema.ts
 import { z } from "zod";
@@ -932,6 +939,8 @@ var cameraOpticsSchema = z.object({
 var filmLookGradeInputSchema = z.object({
   lookPresetId: z.string().min(1),
   presetVersion: z.literal(PRESET_VERSION),
+  lookId: z.string().min(1).optional(),
+  lookVersion: z.literal(PRESET_VERSION).optional(),
   grade: filmLabParamsSchema,
   /** Optional depth track that drives depth-aware Mist / Glow across preview and export. */
   depthTrack: filmLabDepthTrackSchema.optional(),
@@ -972,6 +981,28 @@ var filmLookSpikeInputSchema = z.object({
 function gradeMatchesPreset(presetName, grade) {
   const expected = PRESETS[presetName];
   return PARAM_KEYS.every((key) => grade[key] === expected[key]);
+}
+var gradeMatchesBaseLook = gradeMatchesPreset;
+function normalizeFilmLookGradeInputIdentity(input) {
+  const { lookId, lookVersion, lookPresetId, presetVersion } = input;
+  const hasLook = lookId !== void 0 || lookVersion !== void 0;
+  const hasLegacy = lookPresetId !== void 0 && presetVersion !== void 0;
+  if (hasLook && hasLegacy) {
+    if (lookId !== lookPresetId || lookVersion !== presetVersion) {
+      throw new Error(
+        `filmLookGradeInput: lookId/lookPresetId mismatch (lookId=${String(lookId)} lookPresetId=${String(lookPresetId)} lookVersion=${String(lookVersion)} presetVersion=${String(presetVersion)})`
+      );
+    }
+    return input;
+  }
+  if (hasLegacy) {
+    return { ...input, lookId: lookPresetId, lookVersion: presetVersion };
+  }
+  return {
+    ...input,
+    lookPresetId: lookId,
+    presetVersion: lookVersion
+  };
 }
 
 // src/cube-parser.ts
@@ -1056,9 +1087,12 @@ var filmLookSpikeDefaultProps = {
 };
 function createDefaultFilmLookGradeProps() {
   const grade = cloneParams(PRESETS.cinematic);
+  const id = LOOK_ID_BY_PRESET.cinematic;
   return {
-    lookPresetId: LOOK_ID_BY_PRESET.cinematic,
+    lookPresetId: id,
     presetVersion: PRESET_VERSION,
+    lookId: id,
+    lookVersion: PRESET_VERSION,
     grade
   };
 }
@@ -3543,6 +3577,8 @@ function makeSlog3ToRec709Cube(size = 33) {
 export {
   BAKE_COLOR_IDENTITY,
   BAKE_COLOR_PARAM_KEYS,
+  BASE_LOOKS,
+  BASE_LOOK_BUTTONS,
   CREATIVE_CUBE_DEFAULT_SIZE,
   CREATIVE_PACK_01_BAKER_VERSION,
   CREATIVE_PACK_01_CUBE_SIZE,
@@ -3551,6 +3587,7 @@ export {
   CREATIVE_PACK_01_STONE_TRANSFORM,
   CREATIVE_PACK_01_URBAN_TRANSFORM,
   DEFAULT_QUICK_STATE,
+  FILMTONE_DEFAULT_BASE_LOOK,
   FILMTONE_DEFAULT_BASE_PRESET,
   FILMTONE_SOFT_FINISH_PATCH,
   FILM_GRAIN_INTENSITY_MAX,
@@ -3569,7 +3606,9 @@ export {
   IOS_PHASE0_SOURCE_LONG_EDGE_CAP,
   LEGACY_HIGHLIGHT_TONE_MAGNITUDE,
   LEGACY_SHADOW_TONE_MAGNITUDE,
+  LOOK_ID_BY_BASE_LOOK,
   LOOK_ID_BY_PRESET,
+  LOOK_RECIPE_VERSION,
   OPTICAL_FILTER_DISCLAIMER,
   OPTICAL_FILTER_PARAM_KEYS,
   OPTICAL_FILTER_PROFILES,
@@ -3624,12 +3663,14 @@ export {
   filmLookSpikeDefaultProps,
   filmLookSpikeInputSchema,
   findCreativePack01Look,
+  findMatchingBaseLook,
   findMatchingPreset,
   formatBenchmarkRow,
   getIosPhase0SourceCapViolations,
   getOpticalFilterProfile,
   getPhase0SourceCapViolations,
   getSourceProfile,
+  gradeMatchesBaseLook,
   gradeMatchesPreset,
   halationHueToHex,
   hslToRgb01,
@@ -3648,11 +3689,13 @@ export {
   iosPhase0SourceInfoSchema,
   iosPhase0SourceKindSchema,
   iosPhase0ThermalStateSchema,
+  lookIdForBaseLook,
   lookIdForPreset,
   makeCreativeCube,
   makeIdentityCube,
   mergePhase0Params,
   nearestHueDegreesToDirection,
+  normalizeFilmLookGradeInputIdentity,
   packCubeLutToFloatRgbaGrid,
   parseBenchmarkRow,
   parseCube,
