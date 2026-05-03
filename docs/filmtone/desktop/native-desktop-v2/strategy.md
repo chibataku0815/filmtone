@@ -45,8 +45,9 @@ shipping Electron rail.
   foundation, modern AVFoundation migration, RayAngleOptics, initial optical
   stages, and 4K performance measurement are complete enough to unblock M5.
 - M5 is the current product milestone.
-- The current `active.md` is the M5-A.1 Visual Smoke manual acceptance gate for
-  the Look Strength Slider already present in the worktree.
+- The current `active.md` is the M5-A.2 Look Canonical Parity slice (Stone /
+  Urban Creative LUT Pack 01 port from iOS), opened as a mid-size Interrupt
+  after Visual Smoke passed.
 - Baseline-C population is intentionally treated as quality shell work unless
   formal parity proof is requested.
 - M4 SPM consolidation remains deferred until native behavior is stable enough
@@ -97,10 +98,19 @@ shipping Electron rail.
   09-skin-light 28.81 dB). Sidecar `batchLookChoice.strength` now records intent;
   `gradeParams` records effective interpolated values. Archived as
   `archive/2026-05-04-m5-a1-look-strength-slider.md`. Awaiting user-manual commit.
+- 2026-05-04: M5-A.1 Visual Smoke passed — Slider 0↔1 drag preview live, Reset
+  disable visible, Soft Blue / Amber Glow same sweep behaviour confirmed.
+  Archived as `archive/2026-05-04-m5-a1-visual-smoke.md`.
 
 ## Interrupt / Decision Log
 
-- No interrupt decisions recorded yet.
+- 2026-05-04: M5-A.2 Look Canonical Parity inserted as mid-size Interrupt.
+  Visual Smoke surfaced that the Desktop Look picker (Reset / iPhone / Soft Blue
+  / Amber Glow) corresponds to the iOS Preset layer, not the Look layer.
+  iOS-canonical Looks (Creative LUT Pack 01: Stone / Urban) are missing from
+  Desktop. Original Tier 1 #2 (video scrubbing) is deferred behind M5-A.2 so
+  the 2-tier Look/Preset structure is established before further UI work.
+  No milestone-table change; M5 still owns this slice.
 
 ## Operating Rules
 

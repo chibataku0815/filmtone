@@ -1,93 +1,246 @@
-# Active Task: M5-A.1 Visual Smoke
+# Active Task: M5-A.2 Look Canonical Parity (Interrupt — mid-size)
 
 Date opened: 2026-05-04 JST
-Milestone: M5 (Native Editing UI), slice A.1 — manual acceptance gate
+Milestone: M5 (Native Editing UI), slice A.2
 Worktree: `/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-native-desktop-plan`
 Branch: `feature/native-desktop-plan`
+Classification: Interrupt — mid-size (Tier 1 #2 動画スクラブ を後回し)
 
 ## Goal
 
-Confirm by direct observation that the Look Strength Slider (M5-A.1, archived
-2026-05-04) behaves as designed in the running native macOS app. This is the
-only checklist item from `archive/2026-05-04-m5-a1-look-strength-slider.md`
-that was not closed automatically — it is a user-driven manual gate.
+iOS v1.4 Creative LUT Pack 01 (Stone / Urban) を Desktop に移植し、Look (高層、cube +
+override) と Preset (低層、4 entries) の 2-tier 構造を canonical 化する。Look 選択時は
+`basePreset = "reset"` + `paramOverrides` + `.cube` が iOS と等価に作用する。
 
-## Pre-conditions
+## Scope reference
 
-- The app already builds: `xcodebuild ... -scheme FilmtoneDesktop` → BUILD
-  SUCCEEDED (verified 2026-05-04).
-- A test still image is available, e.g.
-  `apps/desktop-film-lab-batch/test/golden/source-images/09-skin-light.png`.
+`strategy.md` Milestones M5 (Native Editing UI) → slice A.2。Visual Smoke 完了後の
+Interrupt として差し込み。原 Tier 1 #2 (動画スクラブ) は M5-A.2 完了後に再開予定。
 
-## Procedure
+## Design decisions (canonical for Desktop)
 
-1. Open `apps/filmtone-desktop-macos/FilmtoneDesktop.xcodeproj` in Xcode.
-2. Run the `FilmtoneDesktop` scheme on the local Mac (▶).
-3. ⌘O → choose `09-skin-light.png` (or any still).
-4. In the right-hand control group:
-   - Confirm the Look Picker shows: Reset / iPhone / Soft Blue / Amber Glow.
-   - Confirm a "Strength" row appears below the picker with a slider and a
-     `100%` readout by default.
-5. Pick **Reset**. Confirm the Strength slider visibly disables and dims (~50%
-   opacity), since the slider has no effect on the bareline pivot.
-6. Pick **iPhone**. Confirm the slider re-enables at 100%.
-7. Drag the Strength slider slowly from 100% → 0%. Confirm the preview
-   continuously interpolates: at 100% it matches the iPhone look; at 0% it
-   matches the bareline (resetParams pivot, NOT the "Reset" preset tone).
-8. Drag back to ~50%. Confirm an intermediate look (subtle iPhone tint).
-9. Switch to **Soft Blue** at strength 100%, then 0% — verify the same
-   pivot-to-target sweep behaviour is preset-agnostic.
-10. (Optional) ⌘E export at strength 0.3, open the resulting `.filmtone.json`
-    and confirm `batchLookChoice.strength == 0.3` and `gradeParams` reflects
-    interpolated values (not the full target preset).
+- **D1 Cube source**: iOS Resources から **コピー** (sha256 pin 維持、disk 重複 ~14.8 MB
+  受容)
+- **D2 Catalog source**: **hand-port Swift struct** (TS-driven generator は別 followup)
+- **D3 Strength semantics**: **preset-blend (α)** — Strength slider は `params + override` を
+  `resetParams` に向けて lerp。Cube intensity は look pin の 1.0 固定 (M5-A.1 invariant 継続)
+- **D4 Strength=0 + Look**: **cube も gate off** (ii) — `strength == 0` で Look 選択中も
+  bareline
+- **D5 UI**: **2-tier picker** — Look (top, None / Stone / Urban) + Preset (below,
+  Look=None 時のみ enabled)
+- **D6 Slice scope**: A.2.3 substance-only — Quick state 3-axis UI / 形式 parity sweep は
+  除外
+- **Pipeline insertion**: iOS canonical (`FilmtoneExportSession.swift:1561`) と同位置、
+  grain と print の間
+- **Color space**: `CIColorCubeWithColorSpace` の `inputColorSpace` =
+  `FilmtoneCIContext.outputColorSpace` (sRGB)
 
-## Acceptance Gates
+## Edit Targets (sequenced; build green at each stage boundary)
 
-- Slider appears, is bound, and updates the preview live (no commit / no
-  shutter feel).
-- 100% looks identical to pre-M5-A.1 behaviour for a given preset.
-- 0% on a non-Reset preset looks like the bareline (more neutral than the
-  "Reset" preset, since the pivot is `resetParams`, not `paramsByName["reset"]`).
-- Slider disables on the "Reset" preset.
-- No crash, hang, or visible flicker during slider drag.
+### Stage 1 — Foundation primitives (additive, no callers)
 
-## Edit Targets
+- [ ] NEW `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtonePhase0ParamsPatch.swift`
+  - port `FilmtonePhase0ParamsPatch` struct from iOS `FilmtonePhase0Math.swift:210`
+  - port `FilmtonePhase0Params.applyingPatch(_:)` (iOS `:158`) + `setValue(_:for:)` (iOS
+    `:151`) + `keyPaths` dict (iOS `:104-141`) — full 35-key keypath table
+  - Codable は省略 (in-memory のみ)
+- [ ] NEW `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtoneCubeParser.swift`
+  - verbatim copy of iOS `FilmtoneCubeParser.swift` (~220 lines, self-contained)
+  - エラー型を local `FilmtoneCubeParseError` に置換、`filmtoneLocalized*` 削除、
+    `ParsedCubeLutDTO` → local `ParsedCubeLut`
+- [ ] NEW `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtoneCreativePackCatalog.swift`
+  - `BuiltInLook` struct (slug / canonicalUUID / englishName / bundledFilename /
+    pinnedSha256 / intensity: 1.0 / packId: "creative-pack-01" / paramOverridesPatch)
+  - Stone + Urban entries — UUIDs & sha256 from
+    `apps/capacitor-film-lab-ios/Tests/Fixtures/creative-pack-01/manifest.json`
+  - paramOverrides dict は iOS `FilmtoneBuiltInCatalog.swift:139-171` から 26 keys 移植
+  - `static let cubeSize = 65`、`static let all: [BuiltInLook]`、
+    `static func find(slug:) -> BuiltInLook?`
 
-(none — this is a verification active, not an implementation active)
+### Stage 2 — Cube loader (sha256 + parser glue)
 
-## Out of Scope
+- [ ] NEW `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtoneCreativeLutLoader.swift`
+  - `static func load(look: BuiltInLook) -> PreparedCreativeLut?`
+  - `Bundle.main.url(forResource:withExtension:subdirectory:"CreativeLuts")`
+  - `CryptoKit.SHA256.hash(data:)` で fail-closed verify
+  - Float64 RGB triples → packed `Float32` RGBA (alpha=1) `Data` (~7 MB / cube)
+  - `NSCache` keyed by slug (video export 用、frame ごと re-parse 防止)
 
-- Performance characterisation of slider drag at 4K (separate lane).
-- Changing the disable-on-Reset behaviour.
-- Any code edits — if a defect is found, append it to **Unexpected** and the
-  next active will fix it.
+### Stage 3 — Pipeline integration (still no UI, lookSlug=nil で no-op)
 
-## Operating Notes
+- [ ] EDIT `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtoneGradePipeline.swift`
+  - add `applyCreativeLutStage(to image: CIImage, lut: PreparedCreativeLut) -> CIImage`
+    (port iOS `FilmtoneExportSession.swift:2077-2095`、Stone/Urban は intensity=1.0 pin
+    なので simple path のみ — alpha-blend 分岐不要)
+  - `apply(...)` シグネチャに `creativeLut: PreparedCreativeLut? = nil` 追加
+  - **挿入位置**: 現 grain (L57-66) の直後、現 printStage (L67) の直前 (iOS canonical
+    一致)
+  - header コメントに `... → grain → creativeLut → printStage` 反映
 
-- This active is closed by the user reporting either "all gates pass" (→
-  archive + brief note in strategy.md) or specific defects (→ a fix active is
-  created next).
-- INV-7: no auto-commit; the M5-A.1 implementation commit is still pending
-  user-manual commit and may be combined with any visual-smoke fix into a
-  single bundled commit (`feedback_dont_overengineer_dirty_state_split`).
+### Stage 4 — State + presetCatalog merge
 
-## Checklist
+- [ ] EDIT `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtonePresetCatalog.swift`
+  - add `static func resolved(presetName: String, strength: Double, lookSlug: String?) ->
+    FilmtonePhase0Params`
+    - lookSlug 解決 →
+      `target = paramsByName["reset"].applyingPatch(look.paramOverridesPatch)`
+    - `lerp(resetParams, target, strength)` (D3-α)
+    - lookSlug == nil → 既存 `params(for:strength:)` 委譲
+  - add `static func lookId(forSlug slug: String) -> String` →
+    `"filmtone:builtin:\(slug):\(presetVersion)"`
+- [ ] EDIT `apps/filmtone-desktop-macos/FilmtoneDesktop/State/EditorState.swift`
+  - add `var lookSlug: String? = nil`
+  - update `presetParams` to use `FilmtonePresetCatalog.resolved(...)`
+  - add `var resolvedCreativeLut: PreparedCreativeLut?` computed
+    (`lookSlug != nil && presetStrength > 0` → load via Loader、それ以外は nil で
+    D4-ii 実現)
 
-- [ ] App launches from Xcode without errors
-- [ ] Look Picker shows 4 entries
-- [ ] Strength row visible with `100%` default readout
-- [ ] Strength slider disables on "Reset" preset
-- [ ] iPhone @ 100% matches pre-M5-A.1 behaviour
-- [ ] iPhone @ 0% looks neutral (bareline, not "Reset" preset)
-- [ ] iPhone @ ~50% shows continuous interpolation
-- [ ] Soft Blue / Amber Glow show same sweep behaviour
-- [ ] (Optional) Sidecar at strength 0.3 round-trips correctly
-- [ ] No crash / hang / flicker during drag
+### Stage 5 — UI 2-tier picker
+
+- [ ] EDIT `apps/filmtone-desktop-macos/FilmtoneDesktop/UI/GradeControls.swift`
+  - top に Look picker (`[("None", nil), ("Stone", "filmtone-creative-pack-01-stone"),
+    ("Urban", "filmtone-creative-pack-01-urban")]`) bound to `state.lookSlug`
+  - 既存 Preset picker は `state.lookSlug == nil` 時のみ enabled (Look 選択時は visually
+    disable + dim)
+  - Look 選択時は `state.presetName = "reset"` を強制 (Stone/Urban basePreset pin)
+  - Strength slider は Look or non-reset preset 時 enabled
+
+### Stage 6 — Preview + export plumbing
+
+- [ ] EDIT `apps/filmtone-desktop-macos/FilmtoneDesktop/UI/PreviewSurface.swift`
+  - `let lookSlug: String?` を view + `PreviewImageView` に追加
+  - `renderAndAssign` 内で `creativeLut` 解決 →
+    `FilmtoneGradePipeline.apply(... creativeLut:)`
+- [ ] EDIT `apps/filmtone-desktop-macos/FilmtoneDesktop/UI/RootWindowView.swift`
+  - `state.lookSlug` を `PreviewSurface` / `FilmtoneStillExportRequest` /
+    `FilmtoneVideoExportRequest` に thread
+- [ ] EDIT `apps/filmtone-desktop-macos/FilmtoneDesktop/Export/FilmtoneSidecarTypes.swift`
+  - `FilmtoneSidecarRequest` protocol に `var lookSlug: String? { get }` 追加
+- [ ] EDIT `apps/filmtone-desktop-macos/FilmtoneDesktop/Export/FilmtoneStillExporter.swift`
+  - `FilmtoneStillExportRequest.lookSlug: String?` 追加 (default nil for backward compat)
+  - render 前に `creativeLut` 1 回解決 → `FilmtoneGradePipeline.apply(... creativeLut:)`
+- [ ] EDIT `apps/filmtone-desktop-macos/FilmtoneDesktop/Export/FilmtoneVideoExporter.swift`
+  - 同様に `lookSlug` + frame loop **外**で `creativeLut` 1 回解決 (cache hit、per-frame
+    parse 禁止)
+
+### Stage 7 — Sidecar additive (no schema bump)
+
+- [ ] EDIT `apps/filmtone-desktop-macos/FilmtoneDesktop/Export/FilmtoneSidecarWriter.swift`
+  - `request.lookSlug != nil` 時:
+    - `lookId` / `batchLookChoice.lookId` を `FilmtonePresetCatalog.lookId(forSlug:)` に
+      置換
+    - `batchLookChoice.baseLookName = slug` (Look identity が preset identity を上書き)
+    - 新規 block `creativeLut: { size: 65, intensity: 1.0, sourceHash: <pinned sha256>,
+      bundledSlug: <slug>, bundledPackId: "creative-pack-01" }` 追加
+  - additive のみ、reader が unknown field を ignore する前提で schema bump 不要
+
+### Stage 8 — CLI
+
+- [ ] EDIT `apps/filmtone-desktop-macos/FilmtoneDesktop/App/FilmtoneDesktopApp.swift`
+  - `--look <slug>` parser 追加 (`parseLook(args:) -> String?`、
+    `FilmtoneCreativePackCatalog.find` で validate、unknown slug は exit 64)
+  - 両 export request に thread
+  - `--preset` と `--look` 同時指定時: Look 勝ち、preset = "reset" 強制、stderr warning
+  - header コメント usage block 更新
+
+### Stage 9 — Resources
+
+- [ ] COPY
+  `apps/capacitor-film-lab-ios/ios/App/App/Resources/CreativeLuts/filmtone-creative-pack-01-{stone,urban}.cube`
+  → `apps/filmtone-desktop-macos/FilmtoneDesktop/Resources/CreativeLuts/`
+  sha256 verify: `shasum -a 256` 後、`Tests/Fixtures/creative-pack-01/manifest.json` の値と
+  照合
+- [ ] EDIT `apps/filmtone-desktop-macos/FilmtoneDesktop.xcodeproj/project.pbxproj`
+  - `Resources` PBXGroup + `CreativeLuts` subgroup
+  - 2× PBXFileReference + 2× PBXBuildFile を既存 PBXResourcesBuildPhase の files array に
+    append
+  - **重要**: group reference (yellow folder) で追加 — folder reference (blue folder) は
+    `Bundle.main.url(forResource:subdirectory:"CreativeLuts")` 解決を壊す
+  - **推奨手段**: Xcode UI "Add Files" → "Copy items if needed" off、"Create folder
+    references" off
+
+## Verification (Step-by-step smoke)
+
+- [ ] 1. `xcodebuild -project apps/filmtone-desktop-macos/FilmtoneDesktop.xcodeproj -scheme
+       FilmtoneDesktop -configuration Debug build` → BUILD SUCCEEDED
+- [ ] 2. App launch → `09-skin-light.png` open
+- [ ] 3. Look picker = **Stone** → preview shift visible (Palermo Reference cast)
+- [ ] 4. Strength 1.0 → 0.0 drag → 0 で bareline (cube も gate off、D4-ii 確認)
+- [ ] 5. Look picker = **Urban** → Stone と異なる greener cast
+- [ ] 6. Look = None → Preset picker re-enabled、Stone/Urban 解除
+- [ ] 7. ⌘E export PNG @ Look=Stone, Strength=1.0 → sidecar JSON 検証:
+       - `lookId: "filmtone:builtin:filmtone-creative-pack-01-stone:v2"`
+       - `batchLookChoice.baseLookName: "filmtone-creative-pack-01-stone"`
+       - `creativeLut: { size: 65, intensity: 1.0, sourceHash: "2f9e0240...",
+         bundledSlug: ..., bundledPackId: "creative-pack-01" }`
+- [ ] 8. 短尺 video (~5s 1080p) export @ Look=Stone → MP4 + sidecar 同 shape、cube が
+       全 frame に適用
+- [ ] 9. CLI: `./FilmtoneDesktop --export-still --input <png> --output /tmp/out.png
+       --look filmtone-creative-pack-01-stone --strength 1.0` → stdout `ok WxH /tmp/out.png`、
+       sidecar 生成
+- [ ] 10. Negative path: bundle から cube 除去 → relaunch → Stone 選択 → cube stage
+        skipped (fail-closed)、grade は走る (preview = reset 状態)、no crash
+
+## Edge cases / Risks
+
+- **Cube SHA mismatch**: Loader nil → pipeline silently skip (fail-closed)。debug `print`
+  のみ、UI toast は M5-A.2-followup
+- **Color space**: cube は sRGB 空間 baked、`CIColorCubeWithColorSpace` の
+  `inputColorSpace` = `FilmtoneCIContext.outputColorSpace` (sRGB) を渡す。linearSRGB 渡し
+  禁止
+- **Strength=0 + Look**: D4-ii 実装 (`resolvedCreativeLut == nil` で gate)
+- **Missing cube resource**: SHA mismatch と同経路で silent skip
+- **Video export memory**: `PreparedCreativeLut.cubeData` ~7 MB、frame loop **外**で 1 回
+  resolve、NSCache hit
+- **`paramKeys` 確認済**: `FilmtonePhase0Generated.swift:8` に存在 (Desktop generated mirror
+  済)
+- **EditorState ↔ Look coupling**: Look 選択時は `presetName="reset"` 強制、UI で disable
+  表示
+- **CLI mutual exclusivity**: `--preset X --look Y` → Look 勝ち、stderr warn、exit 0
+- **pbxproj merge**: line-noise 多発、resource 追加コミットは Swift 編集と分けて auditable
+  に
+
+## Out of Scope (M5-A.2 では扱わない)
+
+- Quick state 3-axis UI (filmCharacter / era / dynamics) — sidecar は zeros 維持
+- iOS との bytewise parity sweep (formal QA、user 希望時のみ別 active)
+- TS-driven Swift generator extension (M5-A.2-followup)
+- LUT-intensity-as-second-axis UI (D3-β/γ 不採用)
+- User-imported `.cube` LUT — bundled built-in 限定
+- Cube SHA fail 時 toast/warning chip
+- Desktop test target 新設
+- Camera Profile (`FilmtoneSourceProfileCatalog`) — 別 lane
+
+## Open Questions
+
+- **OQ-1 ローカライズ**: Stone/Urban 表示英語そのまま v.s. Desktop 簡易 string table 新設
+  → 推奨: 英語そのまま (本 slice)
+- **OQ-2 lookId format**: `filmtone:builtin:<slug>:<presetVersion>` 採用 (本 plan で固定)。
+  film-lab-core canonical `look:mp:<name>:v1` (`look-ids.ts:25`) との乖離は
+  **pre-existing** (Desktop は既に `filmtone:base:` 採用)、status quo 維持
+- **OQ-3 Sidecar on cube load fail**: `creativeLut` block omit (本 plan 固定、
+  attempted-and-failed の signal 不要)
+
+## Estimated footprint
+
+- 新規 Swift: 4 files、~600 LOC
+- 編集 Swift: 9 files、~190 LOC 追加
+- Resources: 2 cube binary (~14.8 MB) + pbxproj diff ~30 lines
+- 計: ~13 source files / ~800 LOC / 2 binary / 1 pbxproj
+- 工数: codebase familiar で半日、pbxproj/keypath で詰まれば 1–2 日
+
+## INV-7 / commit (user-manual)
+
+- 自動 commit 禁止
+- Stage 1–3 (foundation, lookSlug=nil で no-op) を 1 commit
+- Stage 4–8 (state + UI + plumbing + sidecar + CLI) を 1 commit
+- Stage 9 (cube binary + pbxproj) を別 commit (auditable)
+- 計 3 commit 予定、user-manual で実行
 
 ## Unexpected
 
-(none yet — append observed defects here; if non-empty at close, file a fix active)
+(none yet — append observed defects / scope surprises here)
 
 ## Result
 
-(left blank for the user to fill in: "all gates pass" / specific defects)
+(left blank — fill on close)
