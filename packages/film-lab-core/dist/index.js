@@ -883,6 +883,10 @@ var PRESET_BUTTONS = [
   { name: "velvia50", label: "Velvia 50", subtitle: "Vivid Slide", category: "filmStock", printMedium: "slide_positive" },
   { name: "cinematic", label: "Cinematic", subtitle: "Teal & Orange", category: "look" }
 ];
+var BASE_LOOKS = PRESETS;
+var BASE_LOOK_BUTTONS = PRESET_BUTTONS;
+var FILMTONE_DEFAULT_BASE_LOOK = FILMTONE_DEFAULT_BASE_PRESET;
+var findMatchingBaseLook = findMatchingPreset;
 
 // src/look-ids.ts
 var PRESET_VERSION = "v1";
@@ -901,6 +905,9 @@ var LOOK_ID_BY_PRESET = {
   cinestill800t: lookIdForPreset("cinestill800t"),
   velvia50: lookIdForPreset("velvia50")
 };
+var LOOK_RECIPE_VERSION = PRESET_VERSION;
+var lookIdForBaseLook = lookIdForPreset;
+var LOOK_ID_BY_BASE_LOOK = LOOK_ID_BY_PRESET;
 
 // src/schema.ts
 import { z } from "zod";
@@ -932,6 +939,8 @@ var cameraOpticsSchema = z.object({
 var filmLookGradeInputSchema = z.object({
   lookPresetId: z.string().min(1),
   presetVersion: z.literal(PRESET_VERSION),
+  lookId: z.string().min(1).optional(),
+  lookVersion: z.literal(PRESET_VERSION).optional(),
   grade: filmLabParamsSchema,
   /** Optional depth track that drives depth-aware Mist / Glow across preview and export. */
   depthTrack: filmLabDepthTrackSchema.optional(),
@@ -972,6 +981,28 @@ var filmLookSpikeInputSchema = z.object({
 function gradeMatchesPreset(presetName, grade) {
   const expected = PRESETS[presetName];
   return PARAM_KEYS.every((key) => grade[key] === expected[key]);
+}
+var gradeMatchesBaseLook = gradeMatchesPreset;
+function normalizeFilmLookGradeInputIdentity(input) {
+  const { lookId, lookVersion, lookPresetId, presetVersion } = input;
+  const hasLook = lookId !== void 0 || lookVersion !== void 0;
+  const hasLegacy = lookPresetId !== void 0 && presetVersion !== void 0;
+  if (hasLook && hasLegacy) {
+    if (lookId !== lookPresetId || lookVersion !== presetVersion) {
+      throw new Error(
+        `filmLookGradeInput: lookId/lookPresetId mismatch (lookId=${String(lookId)} lookPresetId=${String(lookPresetId)} lookVersion=${String(lookVersion)} presetVersion=${String(presetVersion)})`
+      );
+    }
+    return input;
+  }
+  if (hasLegacy) {
+    return { ...input, lookId: lookPresetId, lookVersion: presetVersion };
+  }
+  return {
+    ...input,
+    lookPresetId: lookId,
+    presetVersion: lookVersion
+  };
 }
 
 // src/cube-parser.ts
@@ -1056,9 +1087,12 @@ var filmLookSpikeDefaultProps = {
 };
 function createDefaultFilmLookGradeProps() {
   const grade = cloneParams(PRESETS.cinematic);
+  const id = LOOK_ID_BY_PRESET.cinematic;
   return {
-    lookPresetId: LOOK_ID_BY_PRESET.cinematic,
+    lookPresetId: id,
     presetVersion: PRESET_VERSION,
+    lookId: id,
+    lookVersion: PRESET_VERSION,
     grade
   };
 }
@@ -1534,6 +1568,12 @@ function buildPhase0ExportRequest(options) {
 }
 
 // src/benchmark-row.ts
+var MEZZANINE_PROFILE_VARIANTS = /* @__PURE__ */ new Set([
+  "sdr",
+  "hdr",
+  "qualitySDR",
+  "qualityHDR"
+]);
 var ROW_HEADER = "| date | device | iOS | clip_id | input_resolution | output_resolution | realtime_ratio | file_size_mb | thermal | memory_warnings | save | visual | error | duration_sec | mode | mezz_variant |";
 var ROW_DIVIDER = "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |";
 function buildBenchmarkRow(input) {
@@ -1617,7 +1657,9 @@ function parseBenchmarkRow(line) {
   const modeRaw = g.mode.trim();
   const renderMode = modeRaw === "speed" ? "speed" : "quality";
   const mezzRaw = g.mezz.trim();
-  const mezzanineProfileVariant = mezzRaw === "hdr" ? "hdr" : mezzRaw === "sdr" ? "sdr" : null;
+  const mezzanineProfileVariant = MEZZANINE_PROFILE_VARIANTS.has(
+    mezzRaw
+  ) ? mezzRaw : null;
   return {
     raw: trimmed,
     date: g.date.trim(),
@@ -2319,6 +2361,162 @@ var OPTICAL_FILTER_PROFILES = [
       rgbShift: 6e-4
     },
     behavior: behavior({ scatterCore: 0.32, scatterTail: 0.16 })
+  },
+  {
+    id: "backlightVeil-1-8",
+    family: "backlightVeil",
+    density: "1/8",
+    displayName: "Backlight Veil 1/8",
+    shortLabel: "1/8",
+    description: "Subtle source-reactive haze for outdoor backlight while protecting shadows.",
+    params: {
+      bloomThreshold: 0.66,
+      bloomStrength: 0.2,
+      bloomRadius: 0.7,
+      bloomSoftKnee: 0.7,
+      diffusion: 0.12,
+      depthMistGain: 0.2,
+      depthGlowGain: 0.16,
+      depthMistRayAngleGain: 0.34,
+      depthBloomRayAngleGain: 0.24,
+      depthHalationRayAngleGain: 0.2,
+      depthMistFieldPsfGain: 1,
+      depthBloomFieldPsfGain: 1,
+      depthHalationFieldPsfGain: 1,
+      depthMistFieldPsfRadiusPx: 18,
+      depthBloomFieldPsfRadiusPx: 10,
+      depthHalationFieldPsfRadiusPx: 14,
+      halationIntensity: 0.07,
+      halationThreshold: 0.58,
+      halationRadius: 0.52,
+      halationHue: 22,
+      halationSoftKnee: 0.48,
+      lensSoftness: 0.06,
+      rgbShift: 5e-4,
+      opticalDirectTransmission: 0.92,
+      opticalBlackRetention: 0.78,
+      opticalScatterStrength: 0.42,
+      opticalHighlightReactivity: 0.62,
+      opticalWarmScatter: 0.1,
+      opticalSpectralTail: 0.04
+    },
+    behavior: behavior({
+      blackRetention: 0.78,
+      directTransmission: 0.92,
+      scatterStrength: 0.42,
+      scatterCore: 0.42,
+      scatterTail: 0.5,
+      highlightReactivity: 0.62,
+      warmth: 0.1,
+      spectralTail: 0.04,
+      depthResponse: 0.32,
+      rayAngleResponse: 0.32,
+      fieldPsfScale: 1
+    })
+  },
+  {
+    id: "backlightVeil-1-4",
+    family: "backlightVeil",
+    density: "1/4",
+    displayName: "Backlight Veil 1/4",
+    shortLabel: "1/4",
+    description: "Mid-strength veil for window and sun backlight with stable shadow retention.",
+    params: {
+      bloomThreshold: 0.56,
+      bloomStrength: 0.38,
+      bloomRadius: 0.8,
+      bloomSoftKnee: 0.76,
+      diffusion: 0.24,
+      depthMistGain: 0.34,
+      depthGlowGain: 0.27,
+      depthMistRayAngleGain: 0.5,
+      depthBloomRayAngleGain: 0.38,
+      depthHalationRayAngleGain: 0.3,
+      depthMistFieldPsfGain: 1.06,
+      depthBloomFieldPsfGain: 1.04,
+      depthHalationFieldPsfGain: 1.03,
+      depthMistFieldPsfRadiusPx: 25,
+      depthBloomFieldPsfRadiusPx: 14,
+      depthHalationFieldPsfRadiusPx: 18,
+      halationIntensity: 0.14,
+      halationThreshold: 0.52,
+      halationRadius: 0.62,
+      halationHue: 22,
+      halationSoftKnee: 0.56,
+      lensSoftness: 0.08,
+      rgbShift: 7e-4,
+      opticalDirectTransmission: 0.81,
+      opticalBlackRetention: 0.56,
+      opticalScatterStrength: 0.66,
+      opticalHighlightReactivity: 0.78,
+      opticalWarmScatter: 0.17,
+      opticalSpectralTail: 0.07
+    },
+    behavior: behavior({
+      blackRetention: 0.56,
+      directTransmission: 0.81,
+      scatterStrength: 0.66,
+      scatterCore: 0.56,
+      scatterTail: 0.68,
+      highlightReactivity: 0.78,
+      warmth: 0.17,
+      spectralTail: 0.07,
+      depthResponse: 0.5,
+      rayAngleResponse: 0.5,
+      fieldPsfScale: 1.05
+    })
+  },
+  {
+    id: "backlightVeil-1-2",
+    family: "backlightVeil",
+    density: "1/2",
+    displayName: "Backlight Veil 1/2",
+    shortLabel: "1/2",
+    description: "Strong but stable veiling glare for window and sun backlight.",
+    params: {
+      bloomThreshold: 0.5,
+      bloomStrength: 0.6,
+      bloomRadius: 0.88,
+      bloomSoftKnee: 0.82,
+      diffusion: 0.38,
+      depthMistGain: 0.5,
+      depthGlowGain: 0.4,
+      depthMistRayAngleGain: 0.66,
+      depthBloomRayAngleGain: 0.52,
+      depthHalationRayAngleGain: 0.4,
+      depthMistFieldPsfGain: 1.12,
+      depthBloomFieldPsfGain: 1.08,
+      depthHalationFieldPsfGain: 1.06,
+      depthMistFieldPsfRadiusPx: 32,
+      depthBloomFieldPsfRadiusPx: 18,
+      depthHalationFieldPsfRadiusPx: 22,
+      halationIntensity: 0.22,
+      halationThreshold: 0.46,
+      halationRadius: 0.74,
+      halationHue: 22,
+      halationSoftKnee: 0.64,
+      lensSoftness: 0.1,
+      rgbShift: 9e-4,
+      opticalDirectTransmission: 0.7,
+      opticalBlackRetention: 0.36,
+      opticalScatterStrength: 0.9,
+      opticalHighlightReactivity: 0.95,
+      opticalWarmScatter: 0.24,
+      opticalSpectralTail: 0.1
+    },
+    behavior: behavior({
+      blackRetention: 0.36,
+      directTransmission: 0.7,
+      scatterStrength: 0.9,
+      scatterCore: 0.7,
+      scatterTail: 0.86,
+      highlightReactivity: 0.95,
+      warmth: 0.24,
+      spectralTail: 0.1,
+      depthResponse: 0.66,
+      rayAngleResponse: 0.66,
+      fieldPsfScale: 1.1
+    })
   }
 ];
 function getOpticalFilterProfile(id) {
@@ -2975,9 +3173,412 @@ var CREATIVE_PACK_01_LOOKS = [
 function findCreativePack01Look(slug) {
   return CREATIVE_PACK_01_LOOKS.find((look) => look.slug === slug);
 }
+
+// src/source-profile-conversion.ts
+var SOURCE_PROFILE_CATALOG = [
+  {
+    id: "built-in:source-profile.rec709",
+    displayName: "Rec.709",
+    curve: null,
+    impl: "nil-profile",
+    builtIn: true,
+    immutable: true
+  },
+  {
+    id: "built-in:source-profile.apple-log",
+    displayName: "Apple Log",
+    curve: "apple-log",
+    impl: "native-policy",
+    builtIn: true,
+    immutable: true
+  },
+  {
+    id: "built-in:source-profile.apple-log-2",
+    displayName: "Apple Log 2",
+    curve: "apple-log-2",
+    impl: "native-policy",
+    builtIn: true,
+    immutable: true
+  },
+  {
+    id: "built-in:source-profile.dji-dlog",
+    displayName: "DJI D-Log",
+    curve: "dji-dlog",
+    impl: "synthesized",
+    builtIn: true,
+    immutable: true
+  },
+  {
+    id: "built-in:source-profile.dji-dlog-m",
+    displayName: "DJI D-Log M",
+    curve: "dji-dlog-m",
+    impl: "synthesized",
+    builtIn: true,
+    immutable: true
+  },
+  {
+    id: "built-in:source-profile.canon-clog",
+    displayName: "Canon C-Log",
+    curve: "canon-clog",
+    impl: "synthesized",
+    builtIn: true,
+    immutable: true
+  },
+  {
+    id: "built-in:source-profile.canon-log3-cinema-gamut",
+    displayName: "Canon Log 3 / Cinema Gamut",
+    curve: "canon-log3-cinema-gamut",
+    impl: "synthesized",
+    builtIn: true,
+    immutable: true
+  },
+  {
+    id: "built-in:source-profile.panasonic-vlog",
+    displayName: "V-Log",
+    curve: "panasonic-vlog",
+    impl: "synthesized",
+    builtIn: true,
+    immutable: true
+  },
+  {
+    id: "built-in:source-profile.sony-slog3",
+    displayName: "S-Log3",
+    curve: "sony-slog3",
+    impl: "synthesized",
+    builtIn: true,
+    immutable: true
+  }
+];
+var CATALOG_BY_ID = new Map(
+  SOURCE_PROFILE_CATALOG.map((entry) => [entry.id, entry])
+);
+function getSourceProfile(id) {
+  return CATALOG_BY_ID.get(id) ?? null;
+}
+var LUT_CACHE = /* @__PURE__ */ new Map();
+function buildSourceProfileLut(id, size = 33) {
+  const entry = getSourceProfile(id);
+  if (!entry) return null;
+  if (entry.impl === "nil-profile") return null;
+  if (size < 2 || !Number.isInteger(size)) {
+    throw new Error(`source-profile cube size must be an integer \u2265 2 (got ${size})`);
+  }
+  const cacheKey = `${entry.id}|${size}`;
+  const cached = LUT_CACHE.get(cacheKey);
+  if (cached) {
+    return {
+      id: entry.id,
+      displayName: entry.displayName,
+      data: cached,
+      size
+    };
+  }
+  const data = generateCubeForEntry(entry, size);
+  LUT_CACHE.set(cacheKey, data);
+  return {
+    id: entry.id,
+    displayName: entry.displayName,
+    data,
+    size
+  };
+}
+function generateCubeForEntry(entry, size) {
+  switch (entry.curve) {
+    case "apple-log":
+      return makeAppleLogToRec709Cube(size, false);
+    case "apple-log-2":
+      return makeAppleLogToRec709Cube(size, true);
+    case "dji-dlog":
+      return makeDlogToRec709Cube(size);
+    case "dji-dlog-m":
+      return makeDlogMToRec709Cube(size);
+    case "canon-clog":
+      return makeCanonClogToRec709Cube(size);
+    case "canon-log3-cinema-gamut":
+      return makeCanonLog3CineGamutToRec709Cube(size);
+    case "panasonic-vlog":
+      return makeVlogToRec709Cube(size);
+    case "sony-slog3":
+      return makeSlog3ToRec709Cube(size);
+    case null:
+      throw new Error(`source-profile ${entry.id} has no curve; cannot build a cube`);
+    default: {
+      const exhaustive = entry.curve;
+      throw new Error(`Unhandled source-profile curve: ${String(exhaustive)}`);
+    }
+  }
+}
+function clamp014(v) {
+  return Math.min(Math.max(v, 0), 1);
+}
+function filmtoneSdrShoulder(linear) {
+  const exposed = Math.max(0, linear * 1.18);
+  const shoulder = exposed / (1 + Math.max(exposed - 0.18, 0) * 0.42);
+  return clamp014(shoulder);
+}
+function rec709Encode(linear) {
+  const value = clamp014(linear);
+  if (value < 0.018) {
+    return value * 4.5;
+  }
+  return 1.099 * Math.pow(value, 0.45) - 0.099;
+}
+function appleLogDecode(encoded) {
+  const r0 = -0.05641088;
+  const rt = 0.01;
+  const sigma = 47.28711236;
+  const beta = 964052e-8;
+  const gamma = 0.08550479;
+  const delta = 0.69336945;
+  const pt = sigma * Math.pow(rt - r0, 2);
+  if (encoded >= pt) {
+    return Math.pow(2, (encoded - delta) / gamma) - beta;
+  }
+  if (encoded >= 0) {
+    return Math.sqrt(Math.max(encoded / sigma, 0)) + r0;
+  }
+  return r0;
+}
+function appleLogPixelToRec709(red, green, blue, rec2020GamutMap) {
+  let lr = appleLogDecode(red);
+  let lg = appleLogDecode(green);
+  let lb = appleLogDecode(blue);
+  if (rec2020GamutMap) {
+    const mapped = rec2020ToRec709(lr, lg, lb);
+    lr = mapped[0];
+    lg = mapped[1];
+    lb = mapped[2];
+  }
+  return [
+    rec709Encode(filmtoneSdrShoulder(lr)),
+    rec709Encode(filmtoneSdrShoulder(lg)),
+    rec709Encode(filmtoneSdrShoulder(lb))
+  ];
+}
+function dlogDecode(encoded) {
+  if (encoded <= 0.14) {
+    return (encoded - 0.0929) / 6.025;
+  }
+  return (Math.pow(10, 3.89616 * encoded - 2.27752) - 0.0108) / 0.9892;
+}
+function dgamutToRec709(red, green, blue) {
+  return [
+    1.6746 * red - 0.5797 * green - 0.0949 * blue,
+    -0.0981 * red + 1.334 * green - 0.2359 * blue,
+    -0.041 * red - 0.243 * green + 1.284 * blue
+  ];
+}
+function dlogPixelToRec709(red, green, blue) {
+  const lr = dlogDecode(red);
+  const lg = dlogDecode(green);
+  const lb = dlogDecode(blue);
+  const m = dgamutToRec709(lr, lg, lb);
+  return [
+    rec709Encode(filmtoneSdrShoulder(m[0])),
+    rec709Encode(filmtoneSdrShoulder(m[1])),
+    rec709Encode(filmtoneSdrShoulder(m[2]))
+  ];
+}
+function dlogMDecode(encoded) {
+  const cut = 0.1113510236;
+  const linearOffset = 12e-9;
+  const linearSlope = 7.5547639793;
+  const logA = 1.538947658;
+  const logB = -1.8459129538;
+  const logC = 0.0165823994;
+  const logD = 0.3103580873;
+  if (encoded <= cut) {
+    return (encoded - linearOffset) / linearSlope;
+  }
+  return (Math.pow(10, logA * encoded + logB) - logC) / logD;
+}
+function dgamutMToRec709(red, green, blue) {
+  return [
+    1.4312693292 * red - 0.4338679939 * green + 0.0025986647 * blue,
+    -0.0747311522 * red + 1.1578502353 * green - 0.083119083 * blue,
+    -0.0570111279 * red - 0.2731296886 * green + 1.3301408164 * blue
+  ];
+}
+function dlogMPixelToRec709(red, green, blue) {
+  const lr = dlogMDecode(red);
+  const lg = dlogMDecode(green);
+  const lb = dlogMDecode(blue);
+  const m = dgamutMToRec709(lr, lg, lb);
+  return [
+    rec709Encode(filmtoneSdrShoulder(m[0])),
+    rec709Encode(filmtoneSdrShoulder(m[1])),
+    rec709Encode(filmtoneSdrShoulder(m[2]))
+  ];
+}
+function canonLogDecode(encoded) {
+  const pivot = 0.0730597;
+  const scale = 0.529136;
+  const gain = 10.1596;
+  let linear;
+  if (encoded < pivot) {
+    linear = -(Math.pow(10, (pivot - encoded) / scale) - 1) / gain;
+  } else {
+    linear = (Math.pow(10, (encoded - pivot) / scale) - 1) / gain;
+  }
+  return linear * 0.9;
+}
+function canonClogPixelToRec709(red, green, blue) {
+  const lr = canonLogDecode(red);
+  const lg = canonLogDecode(green);
+  const lb = canonLogDecode(blue);
+  return [
+    rec709Encode(filmtoneSdrShoulder(lr)),
+    rec709Encode(filmtoneSdrShoulder(lg)),
+    rec709Encode(filmtoneSdrShoulder(lb))
+  ];
+}
+function canonLog3Decode(encoded) {
+  const lowBreak = 0.097465473;
+  const highBreak = 0.15277891;
+  const logScale = 0.36726845;
+  const logGain = 14.98325;
+  const linearSlope = 1.9754798;
+  const linearOffset = 0.12512219;
+  const lowOffset = 0.12783901;
+  const highOffset = 0.12240537;
+  let scene;
+  if (encoded < lowBreak) {
+    scene = -(Math.pow(10, (lowOffset - encoded) / logScale) - 1) / logGain;
+  } else if (encoded <= highBreak) {
+    scene = (encoded - linearOffset) / linearSlope;
+  } else {
+    scene = (Math.pow(10, (encoded - highOffset) / logScale) - 1) / logGain;
+  }
+  return scene * 0.9;
+}
+function cineGamutToRec709(red, green, blue) {
+  return [
+    1.92355517 * red - 0.79863353 * green - 0.12508072 * blue,
+    -0.20431556 * red + 1.49593305 * green - 0.2915944 * blue,
+    -0.02369073 * red - 0.42022784 * green + 1.44415855 * blue
+  ];
+}
+function canonLog3CineGamutPixelToRec709(red, green, blue) {
+  const lr = canonLog3Decode(red);
+  const lg = canonLog3Decode(green);
+  const lb = canonLog3Decode(blue);
+  const m = cineGamutToRec709(lr, lg, lb);
+  return [
+    rec709Encode(filmtoneSdrShoulder(m[0])),
+    rec709Encode(filmtoneSdrShoulder(m[1])),
+    rec709Encode(filmtoneSdrShoulder(m[2]))
+  ];
+}
+function vlogDecode(encoded) {
+  const cut2 = 0.181;
+  const b = 873e-5;
+  const c = 0.241514;
+  const d = 0.598206;
+  if (encoded < cut2) {
+    return (encoded - 0.125) / 5.6;
+  }
+  return Math.pow(10, (encoded - d) / c) - b;
+}
+function vgamutToRec709(red, green, blue) {
+  return [
+    1.7398 * red - 0.6727 * green - 0.0671 * blue,
+    -0.1956 * red + 1.2473 * green - 0.0518 * blue,
+    -0.0114 * red - 0.044 * green + 1.0554 * blue
+  ];
+}
+function vlogPixelToRec709(red, green, blue) {
+  const lr = vlogDecode(red);
+  const lg = vlogDecode(green);
+  const lb = vlogDecode(blue);
+  const m = vgamutToRec709(lr, lg, lb);
+  return [
+    rec709Encode(filmtoneSdrShoulder(m[0])),
+    rec709Encode(filmtoneSdrShoulder(m[1])),
+    rec709Encode(filmtoneSdrShoulder(m[2]))
+  ];
+}
+function slog3Decode(encoded) {
+  const threshold = 171.2102946929 / 1023;
+  if (encoded < threshold) {
+    return (encoded * 1023 - 95) * 0.01125 / (171.2102946929 - 95);
+  }
+  return Math.pow(10, (encoded * 1023 - 420) / 261.5) * (0.18 + 0.01) - 0.01;
+}
+function sgamut3CineToRec709(red, green, blue) {
+  return [
+    1.6269 * red - 0.5365 * green - 0.0904 * blue,
+    -0.1078 * red + 1.1628 * green - 0.055 * blue,
+    -0.014 * red - 0.024 * green + 1.0379 * blue
+  ];
+}
+function slog3PixelToRec709(red, green, blue) {
+  const lr = slog3Decode(red);
+  const lg = slog3Decode(green);
+  const lb = slog3Decode(blue);
+  const m = sgamut3CineToRec709(lr, lg, lb);
+  return [
+    rec709Encode(filmtoneSdrShoulder(m[0])),
+    rec709Encode(filmtoneSdrShoulder(m[1])),
+    rec709Encode(filmtoneSdrShoulder(m[2]))
+  ];
+}
+function rec2020ToRec709(red, green, blue) {
+  return [
+    1.6605 * red - 0.5876 * green - 0.0728 * blue,
+    -0.1246 * red + 1.1329 * green - 83e-4 * blue,
+    -0.0182 * red - 0.1006 * green + 1.1187 * blue
+  ];
+}
+function buildCubeRgba(size, pixel) {
+  const denom = size - 1;
+  const data = new Float32Array(size * size * size * 4);
+  let i = 0;
+  for (let bIdx = 0; bIdx < size; bIdx++) {
+    const blueIn = bIdx / denom;
+    for (let gIdx = 0; gIdx < size; gIdx++) {
+      const greenIn = gIdx / denom;
+      for (let rIdx = 0; rIdx < size; rIdx++) {
+        const redIn = rIdx / denom;
+        const out = pixel(redIn, greenIn, blueIn);
+        data[i] = out[0];
+        data[i + 1] = out[1];
+        data[i + 2] = out[2];
+        data[i + 3] = 1;
+        i += 4;
+      }
+    }
+  }
+  return data;
+}
+function makeAppleLogToRec709Cube(size = 33, rec2020GamutMap = false) {
+  return buildCubeRgba(
+    size,
+    (r, g, b) => appleLogPixelToRec709(r, g, b, rec2020GamutMap)
+  );
+}
+function makeDlogToRec709Cube(size = 33) {
+  return buildCubeRgba(size, dlogPixelToRec709);
+}
+function makeDlogMToRec709Cube(size = 33) {
+  return buildCubeRgba(size, dlogMPixelToRec709);
+}
+function makeCanonClogToRec709Cube(size = 33) {
+  return buildCubeRgba(size, canonClogPixelToRec709);
+}
+function makeCanonLog3CineGamutToRec709Cube(size = 33) {
+  return buildCubeRgba(size, canonLog3CineGamutPixelToRec709);
+}
+function makeVlogToRec709Cube(size = 33) {
+  return buildCubeRgba(size, vlogPixelToRec709);
+}
+function makeSlog3ToRec709Cube(size = 33) {
+  return buildCubeRgba(size, slog3PixelToRec709);
+}
 export {
   BAKE_COLOR_IDENTITY,
   BAKE_COLOR_PARAM_KEYS,
+  BASE_LOOKS,
+  BASE_LOOK_BUTTONS,
   CREATIVE_CUBE_DEFAULT_SIZE,
   CREATIVE_PACK_01_BAKER_VERSION,
   CREATIVE_PACK_01_CUBE_SIZE,
@@ -2986,6 +3587,7 @@ export {
   CREATIVE_PACK_01_STONE_TRANSFORM,
   CREATIVE_PACK_01_URBAN_TRANSFORM,
   DEFAULT_QUICK_STATE,
+  FILMTONE_DEFAULT_BASE_LOOK,
   FILMTONE_DEFAULT_BASE_PRESET,
   FILMTONE_SOFT_FINISH_PATCH,
   FILM_GRAIN_INTENSITY_MAX,
@@ -3004,7 +3606,9 @@ export {
   IOS_PHASE0_SOURCE_LONG_EDGE_CAP,
   LEGACY_HIGHLIGHT_TONE_MAGNITUDE,
   LEGACY_SHADOW_TONE_MAGNITUDE,
+  LOOK_ID_BY_BASE_LOOK,
   LOOK_ID_BY_PRESET,
+  LOOK_RECIPE_VERSION,
   OPTICAL_FILTER_DISCLAIMER,
   OPTICAL_FILTER_PARAM_KEYS,
   OPTICAL_FILTER_PROFILES,
@@ -3024,6 +3628,7 @@ export {
   PRESET_VERSION,
   QUICK_AXIS_DEFAULT_RANGE,
   QUICK_AXIS_IDS,
+  SOURCE_PROFILE_CATALOG,
   applyCreativePack01SourceTransform,
   applyQuickStateToParams,
   applyQuickStateToPhase0Params,
@@ -3037,6 +3642,7 @@ export {
   buildOpticalFilterParamPatch,
   buildOpticalParamPatch,
   buildPhase0ExportRequest,
+  buildSourceProfileLut,
   cameraOpticsSchema,
   chromaUnitFromHueDegrees,
   clampGrainIntensity,
@@ -3057,11 +3663,14 @@ export {
   filmLookSpikeDefaultProps,
   filmLookSpikeInputSchema,
   findCreativePack01Look,
+  findMatchingBaseLook,
   findMatchingPreset,
   formatBenchmarkRow,
   getIosPhase0SourceCapViolations,
   getOpticalFilterProfile,
   getPhase0SourceCapViolations,
+  getSourceProfile,
+  gradeMatchesBaseLook,
   gradeMatchesPreset,
   halationHueToHex,
   hslToRgb01,
@@ -3080,11 +3689,13 @@ export {
   iosPhase0SourceInfoSchema,
   iosPhase0SourceKindSchema,
   iosPhase0ThermalStateSchema,
+  lookIdForBaseLook,
   lookIdForPreset,
   makeCreativeCube,
   makeIdentityCube,
   mergePhase0Params,
   nearestHueDegreesToDirection,
+  normalizeFilmLookGradeInputIdentity,
   packCubeLutToFloatRgbaGrid,
   parseBenchmarkRow,
   parseCube,

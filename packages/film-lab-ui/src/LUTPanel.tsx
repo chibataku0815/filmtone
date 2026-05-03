@@ -2,10 +2,31 @@
 
 import { useState, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
-import { parseCube } from "film-lab-core";
+import {
+  buildSourceProfileLut,
+  parseCube,
+  SOURCE_PROFILE_CATALOG,
+  type SourceProfileCatalogEntry,
+} from "film-lab-core";
 import { FILM_LAB_NEXT_INTL_NAMESPACE } from "./filmLabUiContract";
 import { ControlSlider } from "./ui/ControlSlider";
 import type { Viewport } from "film-lab-renderer";
+
+interface Lut1ChangePayload {
+  name: string;
+  data: Float32Array;
+  size: number;
+  intensity: number;
+  /** Set when lut1 was filled from a built-in Camera Profile. */
+  sourceProfileId?: string | null;
+}
+
+interface Lut2ChangePayload {
+  name: string;
+  data: Float32Array;
+  size: number;
+  intensity: number;
+}
 
 interface LUTPanelProps {
   viewport: Viewport | null;
@@ -13,9 +34,31 @@ interface LUTPanelProps {
   onCubeLutLoaded?: () => void;
   /** LUT が変更されたとき（Creative / Log 両スロットの最新状態） */
   onLutChange?: (state: {
-    lut1: { name: string; data: Float32Array; size: number; intensity: number } | null;
-    lut2: { name: string; data: Float32Array; size: number; intensity: number } | null;
+    lut1: Lut1ChangePayload | null;
+    lut2: Lut2ChangePayload | null;
   }) => void;
+}
+
+/**
+ * Source-profile chip ordering for the compact built-in selector. iOS
+ * keeps Apple Log / Apple Log 2 at the head because they're the auto-detect
+ * pair; the rest are manual-select curves Desktop ships in v1.4 parity.
+ */
+const SOURCE_PROFILE_CHIP_ORDER = [
+  "built-in:source-profile.apple-log",
+  "built-in:source-profile.apple-log-2",
+  "built-in:source-profile.dji-dlog",
+  "built-in:source-profile.dji-dlog-m",
+  "built-in:source-profile.canon-clog",
+  "built-in:source-profile.canon-log3-cinema-gamut",
+  "built-in:source-profile.panasonic-vlog",
+  "built-in:source-profile.sony-slog3",
+] as const;
+
+const REC709_PROFILE_ID = "built-in:source-profile.rec709";
+
+function findCatalog(id: string): SourceProfileCatalogEntry | undefined {
+  return SOURCE_PROFILE_CATALOG.find((entry) => entry.id === id);
 }
 
 export function LUTPanel({ viewport, onCubeLutLoaded, onLutChange }: LUTPanelProps) {
@@ -34,6 +77,14 @@ export function LUTPanel({ viewport, onCubeLutLoaded, onLutChange }: LUTPanelPro
   const [logLutName, setLogLutName] = useState<string | null>(null);
   const [logIntensity, setLogIntensity] = useState(1.0);
   const [logError, setLogError] = useState<string | null>(null);
+  /**
+   * Tracks the active built-in source-profile catalog id (or "none" when
+   * Rec.709/cleared, "custom" when a user `.cube` is loaded). Drives chip
+   * `aria-pressed` styling and survives sidecar restore.
+   */
+  const [sourceProfileSelection, setSourceProfileSelection] = useState<
+    "none" | "custom" | string
+  >("none");
 
   const pickCubeFile = useCallback(
     (
@@ -75,18 +126,41 @@ export function LUTPanel({ viewport, onCubeLutLoaded, onLutChange }: LUTPanelPro
   /** 両スロットの最新状態を親へ通知 */
   const fireLutChange = useCallback(
     (patch: {
-      lut2?: { name: string; data: Float32Array; size: number; intensity: number } | null;
-      lut1?: { name: string; data: Float32Array; size: number; intensity: number } | null;
+      lut2?: Lut2ChangePayload | null;
+      lut1?: Lut1ChangePayload | null;
     }) => {
       if (!onLutChange) return;
       const c2 = lut2Ref.current;
       const c1 = lut1Ref.current;
+      const lut1Default: Lut1ChangePayload | null = c1
+        ? {
+            name: logLutName ?? "",
+            data: c1.data,
+            size: c1.size,
+            intensity: logIntensity,
+            sourceProfileId:
+              sourceProfileSelection !== "none" &&
+              sourceProfileSelection !== "custom"
+                ? sourceProfileSelection
+                : null,
+          }
+        : null;
+      const lut2Default: Lut2ChangePayload | null = c2
+        ? { name: lutName ?? "", data: c2.data, size: c2.size, intensity }
+        : null;
       onLutChange({
-        lut2: "lut2" in patch ? patch.lut2! : c2 ? { name: lutName ?? "", data: c2.data, size: c2.size, intensity } : null,
-        lut1: "lut1" in patch ? patch.lut1! : c1 ? { name: logLutName ?? "", data: c1.data, size: c1.size, intensity: logIntensity } : null,
+        lut2: "lut2" in patch ? patch.lut2! : lut2Default,
+        lut1: "lut1" in patch ? patch.lut1! : lut1Default,
       });
     },
-    [onLutChange, lutName, intensity, logLutName, logIntensity],
+    [
+      onLutChange,
+      lutName,
+      intensity,
+      logLutName,
+      logIntensity,
+      sourceProfileSelection,
+    ],
   );
 
   const handleLoad = useCallback(() => {
@@ -135,9 +209,18 @@ export function LUTPanel({ viewport, onCubeLutLoaded, onLutChange }: LUTPanelPro
         lut1Ref.current = { data: lut.data, size: lut.size };
         setLogLutName(name);
         setLogError(null);
+        setSourceProfileSelection("custom");
         onCubeLutLoaded?.();
         if (!logOpen) setLogOpen(true);
-        fireLutChange({ lut1: { name, data: lut.data, size: lut.size, intensity: logIntensity } });
+        fireLutChange({
+          lut1: {
+            name,
+            data: lut.data,
+            size: lut.size,
+            intensity: logIntensity,
+            sourceProfileId: null,
+          },
+        });
       },
       setLogError,
     );
@@ -149,6 +232,7 @@ export function LUTPanel({ viewport, onCubeLutLoaded, onLutChange }: LUTPanelPro
     setLogLutName(null);
     setLogIntensity(1.0);
     setLogError(null);
+    setSourceProfileSelection("none");
     fireLutChange({ lut1: null });
   }, [viewport, fireLutChange]);
 
@@ -157,10 +241,77 @@ export function LUTPanel({ viewport, onCubeLutLoaded, onLutChange }: LUTPanelPro
       setLogIntensity(value);
       viewport?.setLUT1Intensity(value);
       const d = lut1Ref.current;
-      if (d) fireLutChange({ lut1: { name: logLutName ?? "", data: d.data, size: d.size, intensity: value } });
+      if (d) {
+        const builtIn =
+          sourceProfileSelection !== "none" &&
+          sourceProfileSelection !== "custom"
+            ? sourceProfileSelection
+            : null;
+        fireLutChange({
+          lut1: {
+            name: logLutName ?? "",
+            data: d.data,
+            size: d.size,
+            intensity: value,
+            sourceProfileId: builtIn,
+          },
+        });
+      }
     },
-    [viewport, fireLutChange, logLutName],
+    [viewport, fireLutChange, logLutName, sourceProfileSelection],
   );
+
+  /**
+   * Apply a built-in Camera Profile selection. Rec.709 / "none" clears
+   * the renderer's lut1 (nilProfile) but still records the explicit
+   * selection so sidecar metadata round-trips. Other built-ins generate
+   * the cube via shared core math and upload it to the viewport.
+   */
+  const handleSourceProfileSelect = useCallback(
+    (catalogId: string | "none") => {
+      if (!viewport) {
+        setLogError("Viewport not ready");
+        return;
+      }
+      setLogError(null);
+      if (catalogId === "none" || catalogId === REC709_PROFILE_ID) {
+        viewport.clearLUT1();
+        lut1Ref.current = null;
+        setLogLutName(null);
+        setLogIntensity(1.0);
+        setSourceProfileSelection(
+          catalogId === "none" ? "none" : REC709_PROFILE_ID,
+        );
+        fireLutChange({ lut1: null });
+        return;
+      }
+      const built = buildSourceProfileLut(catalogId);
+      if (!built) {
+        setLogError(`Unknown camera profile: ${catalogId}`);
+        return;
+      }
+      viewport.setLUT1(built.data, built.size);
+      viewport.setLUT1Intensity(1.0);
+      lut1Ref.current = { data: built.data, size: built.size };
+      setLogLutName(built.displayName);
+      setLogIntensity(1.0);
+      setSourceProfileSelection(catalogId);
+      if (!logOpen) setLogOpen(true);
+      fireLutChange({
+        lut1: {
+          name: built.displayName,
+          data: built.data,
+          size: built.size,
+          intensity: 1.0,
+          sourceProfileId: catalogId,
+        },
+      });
+    },
+    [viewport, fireLutChange, logOpen],
+  );
+
+  const noneActive = sourceProfileSelection === "none";
+  const rec709Active = sourceProfileSelection === REC709_PROFILE_ID;
 
   return (
     <div className="mb-4">
@@ -244,10 +395,48 @@ export function LUTPanel({ viewport, onCubeLutLoaded, onLutChange }: LUTPanelPro
 
         {logOpen && (
           <div className="rounded-lg border border-white/[0.08] bg-white/[0.02] p-4">
-            <p className="mb-4 text-[10px] leading-relaxed text-white/35">
-              For Log footage (S-Log3, V-Log, Apple Log).
-              Applied before color grading.
+            <p className="mb-3 text-[10px] leading-relaxed text-white/35">
+              {tFilmLab("lutPanel.cameraProfileHelp")}
             </p>
+
+            {/* Built-in Camera Profile chip selector. None / Rec.709 + 6 curves. */}
+            <div className="mb-4 flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                aria-pressed={noneActive}
+                disabled={!viewport}
+                onClick={() => handleSourceProfileSelect("none")}
+                className={chipClass(noneActive)}
+              >
+                {tFilmLab("lutPanel.cameraProfileNone")}
+              </button>
+              <button
+                type="button"
+                aria-pressed={rec709Active}
+                disabled={!viewport}
+                onClick={() => handleSourceProfileSelect(REC709_PROFILE_ID)}
+                className={chipClass(rec709Active)}
+              >
+                Rec.709
+              </button>
+              {SOURCE_PROFILE_CHIP_ORDER.map((id) => {
+                const entry = findCatalog(id);
+                if (!entry) return null;
+                const active = sourceProfileSelection === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    aria-pressed={active}
+                    disabled={!viewport}
+                    onClick={() => handleSourceProfileSelect(id)}
+                    className={chipClass(active)}
+                  >
+                    {entry.displayName}
+                  </button>
+                );
+              })}
+            </div>
 
             <div className="flex min-h-10 items-center gap-3">
               <button
@@ -256,7 +445,7 @@ export function LUTPanel({ viewport, onCubeLutLoaded, onLutChange }: LUTPanelPro
                 disabled={!viewport}
                 className="shrink-0 rounded-md bg-white/5 px-3 py-2 text-[11px] leading-tight text-white/60 transition-colors hover:bg-white/10 hover:text-white/80 disabled:cursor-not-allowed disabled:opacity-30"
               >
-                Load .cube
+                {tFilmLab("lutPanel.cameraProfileCustom")}
               </button>
               {logLutName ? (
                 <>
@@ -301,4 +490,13 @@ export function LUTPanel({ viewport, onCubeLutLoaded, onLutChange }: LUTPanelPro
       </div>
     </div>
   );
+}
+
+function chipClass(active: boolean): string {
+  return [
+    "h-7 min-w-12 rounded-md border px-2 text-center text-[10px] font-semibold leading-none transition-colors disabled:cursor-not-allowed disabled:opacity-30",
+    active
+      ? "border-[var(--accent-amber1)]/70 bg-[var(--accent-amber1)]/16 text-[var(--accent-amber1)] shadow-[0_0_0_1px_rgba(255,200,69,0.18)]"
+      : "border-white/[0.09] bg-white/[0.03] text-white/68 hover:border-white/[0.16] hover:bg-white/[0.06] hover:text-white/88",
+  ].join(" ");
 }

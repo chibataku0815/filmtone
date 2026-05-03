@@ -34,6 +34,7 @@ import {
 } from "film-lab-renderer";
 import { FILM_LAB_NEXT_INTL_NAMESPACE } from "./filmLabUiContract";
 import type { VideoPlaybackRate, VideoPlaybackState } from "./videoPlaybackContract";
+import { computeContainedCanvasDisplaySize } from "./canvas-display-size";
 import {
   DEV_DEPTH_PROBE_DATA_URIS,
   DEV_DEPTH_PROBE_KEYFRAME_STRIDE,
@@ -454,6 +455,26 @@ function getActiveExportParityGeometry(
   };
 }
 
+function shouldAvoidDirectBrowserVideoLoad(file: File): boolean {
+  const lowerName = file.name.toLowerCase();
+  const lowerType = file.type.toLowerCase();
+  return (
+    /\.(mov|qt|mkv)$/.test(lowerName) ||
+    lowerType === "video/quicktime" ||
+    lowerType === "video/x-matroska"
+  );
+}
+
+function describePreprocessFailure(error: unknown): string {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+  if (typeof error === "string" && error.trim().length > 0) {
+    return error;
+  }
+  return "unknown error";
+}
+
 function stripDataUrlPrefix(dataUrl: string): string {
   const comma = dataUrl.indexOf(",");
   return comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
@@ -692,6 +713,34 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     [],
   );
 
+  const syncCanvasElementDisplaySize = useCallback((): void => {
+    const canvas = canvasRef.current;
+    const container = containerRef.current;
+    if (!canvas || !container) {
+      return;
+    }
+    const containerWidth = Math.max(1, container.clientWidth);
+    const containerHeight = Math.max(1, container.clientHeight);
+    const geometry = getActiveExportParityGeometry(
+      exportParityGeometryRef.current,
+    );
+    const contentWidth = geometry?.renderWidth ?? containerWidth;
+    const contentHeight = geometry?.renderHeight ?? containerHeight;
+    const display = computeContainedCanvasDisplaySize({
+      containerWidth,
+      containerHeight,
+      contentWidth,
+      contentHeight,
+    });
+
+    canvas.style.position = "absolute";
+    canvas.style.left = "50%";
+    canvas.style.top = "50%";
+    canvas.style.transform = "translate(-50%, -50%)";
+    canvas.style.width = `${display.width}px`;
+    canvas.style.height = `${display.height}px`;
+  }, []);
+
   const syncViewportResolutionNow = useCallback((): void => {
     const container = containerRef.current;
     const targetViewport = viewportRef.current;
@@ -713,7 +762,8 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     }
     targetViewport.setResolution(width, height);
     applyExportParityGeometryToViewport(targetViewport);
-  }, [applyExportParityGeometryToViewport]);
+    syncCanvasElementDisplaySize();
+  }, [applyExportParityGeometryToViewport, syncCanvasElementDisplaySize]);
 
   useEffect(() => {
     syncViewportResolutionNow();
@@ -1124,6 +1174,8 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
 
         // --- Desktop mezzanine pre-processing for unsupported codecs (ProRes etc.) ---
         const isVideo = file.type.startsWith("video/") || LIKELY_VIDEO_EXTENSION.test(file.name);
+        const avoidDirectBrowserVideoLoad =
+          isVideo && shouldAvoidDirectBrowserVideoLoad(file);
         if (isVideo && preprocessVideoFileRef.current) {
           try {
             const preprocessResult = await preprocessVideoFileRef.current(file);
@@ -1159,8 +1211,20 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
               return;
             }
           } catch (preprocessErr) {
+            if (avoidDirectBrowserVideoLoad) {
+              throw new MediaLoadError(
+                `Filmtone could not prepare "${file.name}" for preview. This video needs Desktop conversion before preview; direct browser playback was skipped. Detail: ${describePreprocessFailure(preprocessErr)}`,
+                "VIDEO_DECODE_FAILED",
+              );
+            }
             console.warn("FilmLabCanvas: preprocessVideoFile failed, falling through to direct load", preprocessErr);
             // Fall through to normal MediaLoader path
+          }
+          if (avoidDirectBrowserVideoLoad) {
+            throw new MediaLoadError(
+              `Filmtone could not prepare "${file.name}" for preview. This video needs Desktop conversion before preview; direct browser playback was skipped.`,
+              "VIDEO_DECODE_FAILED",
+            );
           }
         }
 
@@ -1336,10 +1400,15 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     // the `canvas:` option.
     const canvas = document.createElement("canvas");
     canvas.style.display = "block";
+    canvas.style.position = "absolute";
+    canvas.style.left = "50%";
+    canvas.style.top = "50%";
+    canvas.style.transform = "translate(-50%, -50%)";
     canvas.style.width = "100%";
     canvas.style.height = "100%";
     container.appendChild(canvas);
     canvasRef.current = canvas;
+    syncCanvasElementDisplaySize();
 
     const mediaLoader = new MediaLoader();
     mediaLoaderRef.current = mediaLoader;
@@ -1368,6 +1437,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
         : Math.max(1, container.clientHeight);
       if (nextWidth === width && nextHeight === height) {
         applyExportParityGeometryToViewport(viewport);
+        syncCanvasElementDisplaySize();
         return;
       }
       width = nextWidth;
@@ -1377,6 +1447,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
       }
       viewport.setResolution(width, height);
       applyExportParityGeometryToViewport(viewport);
+      syncCanvasElementDisplaySize();
     };
     window.addEventListener("resize", syncViewportSize);
 
@@ -1609,6 +1680,7 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
     restoreCurrentSource,
     canvasRuntimeNonce,
     setErrorPreviewStatus,
+    syncCanvasElementDisplaySize,
   ]);
 
   const previewSupportsCompare =

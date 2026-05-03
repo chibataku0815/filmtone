@@ -127,6 +127,7 @@ struct FilmtoneStrings {
     let exportStart: String
     let exportAndSave: String
     let exportSavingToPhotos: String
+    let exportFinishedHint: String
     let exportDisabled: String
     let saveToPhotos: String
     let saveToPhotosDone: String
@@ -148,6 +149,10 @@ struct FilmtoneStrings {
     /// v1.3 Camera Profiles Phase D — built-in source profile catalog labels.
     let cameraAppleLog: String
     let cameraAppleLog2: String
+    let cameraDLog: String
+    let cameraDLogM: String
+    let cameraCLog: String
+    let cameraCLog3CineGamut: String
     let cameraVLog: String
     let cameraSLog3: String
     let cameraRec709: String
@@ -288,7 +293,11 @@ extension FilmtoneStrings {
         switch slug {
         case "apple-log":      return cameraAppleLog
         case "apple-log-2":    return cameraAppleLog2
-        case "panasonic-vlog": return cameraVLog
+        case "dji-dlog":                return cameraDLog
+        case "dji-dlog-m":              return cameraDLogM
+        case "canon-clog":              return cameraCLog
+        case "canon-log3-cinema-gamut": return cameraCLog3CineGamut
+        case "panasonic-vlog":          return cameraVLog
         case "sony-slog3":     return cameraSLog3
         case "rec709":         return cameraRec709
         default:               return nil
@@ -1050,6 +1059,11 @@ extension FilmtoneStrings {
             defaultValue: prefersJapanese ? "写真へ保存中…" : "Saving to Photos…",
             comment: "Status shown after export finishes while the app is saving the output to Photos."
         )
+        exportFinishedHint = filmtoneLocalized(
+            "filmtone.export.finished_hint",
+            defaultValue: prefersJapanese ? "書き出しが完了しました。" : "Export complete.",
+            comment: "Status line shown beneath the section title once an export has finished."
+        )
         exportDisabled = filmtoneLocalized(
             "filmtone.export.disabled",
             defaultValue: "This source can't be exported. See the source notes above.",
@@ -1149,6 +1163,26 @@ extension FilmtoneStrings {
             "filmtone.camera.apple_log2",
             defaultValue: "Apple Log 2",
             comment: "Built-in camera source profile name (Apple Log 2)."
+        )
+        cameraDLog = filmtoneLocalized(
+            "filmtone.camera.dji_dlog",
+            defaultValue: "DJI D-Log",
+            comment: "Built-in camera source profile name (DJI D-Log)."
+        )
+        cameraDLogM = filmtoneLocalized(
+            "filmtone.camera.dji_dlog_m",
+            defaultValue: "DJI D-Log M",
+            comment: "Built-in camera source profile name (DJI D-Log M -- consumer-camera D-Gamut M curve, shared across Mavic 3 Pro / Osmo Pocket 3 / Osmo 360). Proper-noun preserved across locales."
+        )
+        cameraCLog = filmtoneLocalized(
+            "filmtone.camera.canon_clog",
+            defaultValue: "Canon C-Log",
+            comment: "Built-in camera source profile name (Canon C-Log)."
+        )
+        cameraCLog3CineGamut = filmtoneLocalized(
+            "filmtone.camera.canon_log3_cine_gamut",
+            defaultValue: "Canon Log 3 / Cinema Gamut",
+            comment: "Built-in camera source profile name (Canon Log 3 + Cinema Gamut). Proper-noun preserved across locales."
         )
         cameraVLog = filmtoneLocalized(
             "filmtone.camera.vlog",

@@ -746,3 +746,14 @@ export const PRESET_BUTTONS: {
   { name: "velvia50", label: "Velvia 50", subtitle: "Vivid Slide", category: "filmStock", printMedium: "slide_positive" },
   { name: "cinematic", label: "Cinematic", subtitle: "Teal & Orange", category: "look" },
 ];
+
+// === Look-first canonical aliases ===
+// Look Unification (vocabulary spec life docs/guides/2026-04-07-filmtone-tool-vocabulary-ia-spec.md)
+// で確定した user-facing 語彙 `Base Look` を core / schema 層の canonical 名として加算する。
+// 既存の `PresetName` / `PRESETS` / 等は引き続き primary export として残るため、現行 consumer
+// (Electron renderer / film-lab-ui / iOS TS / Remotion) は無風。
+export type BaseLookName = PresetName;
+export const BASE_LOOKS = PRESETS;
+export const BASE_LOOK_BUTTONS = PRESET_BUTTONS;
+export const FILMTONE_DEFAULT_BASE_LOOK: BaseLookName = FILMTONE_DEFAULT_BASE_PRESET;
+export const findMatchingBaseLook = findMatchingPreset;

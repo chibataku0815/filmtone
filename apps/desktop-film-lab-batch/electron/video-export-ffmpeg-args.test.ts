@@ -271,6 +271,21 @@ describe("video-export-ffmpeg-args", () => {
     expect(args).not.toContain("-hwaccel");
     expect(args).toContain("h264_videotoolbox");
     expect(args).not.toContain("libx264");
+    expect(args).toEqual(
+      expect.arrayContaining([
+        "-map",
+        "0:v:0",
+        "-map",
+        "0:a?",
+        "-dn",
+        "-map_metadata",
+        "-1",
+        "-map_chapters",
+        "-1",
+        "-movflags",
+        "+faststart",
+      ]),
+    );
     expect(args).toContain(
       "zscale=tin=smpte2084:pin=2020:min=2020_ncl:rin=tv:t=linear:npl=100,format=gbrpf32le,zscale=p=709,tonemap=tonemap=hable:desat=0,zscale=t=709:m=709:r=tv,scale=960:-2,format=yuv420p",
     );

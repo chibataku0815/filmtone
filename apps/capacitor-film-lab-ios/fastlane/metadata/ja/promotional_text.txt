@@ -1,1 +1,1 @@
-LUTで色を整え、フィルムルックで書き出す。光のにじみまで調整し、Before/Afterで見比べて保存・共有できます。Creative Pack（Stone / Urban）と全画面 Liquid Glass UI に対応。
+Creative Pack 01（Stone / Urban）を追加。全画面 Liquid Glass で Look を選び、強さ・光のにじみ・粒子感を調整。Apple Log/S-Log3/V-Log、HDR、ProRes、.cube LUTも考慮し、Before/After確認後にiPhoneからすぐ写真へローカル保存・共有できます。

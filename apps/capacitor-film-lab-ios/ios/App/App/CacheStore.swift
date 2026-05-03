@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 final class CacheStore {
@@ -37,12 +38,33 @@ final class CacheStore {
         return directoryURL
     }
 
-    func importItem(from sourceURL: URL, suggestedName: String?, bucket: Bucket) throws -> URL {
-        let destinationURL = try stagedItemURL(
-            suggestedName: suggestedName ?? sourceURL.lastPathComponent,
-            fallbackExtension: sourceURL.pathExtension,
-            bucket: bucket
-        )
+    func importItem(
+        from sourceURL: URL,
+        suggestedName: String?,
+        bucket: Bucket,
+        reusableSourceIdentity: String? = nil
+    ) throws -> URL {
+        let destinationURL: URL
+        if bucket == .sources, let reusableSourceIdentity {
+            if let existingURL = try existingReusableSourceURL(
+                identity: reusableSourceIdentity,
+                suggestedName: suggestedName ?? sourceURL.lastPathComponent,
+                fallbackExtension: sourceURL.pathExtension
+            ) {
+                return existingURL
+            }
+            destinationURL = try reusableSourceURL(
+                identity: reusableSourceIdentity,
+                suggestedName: suggestedName ?? sourceURL.lastPathComponent,
+                fallbackExtension: sourceURL.pathExtension
+            )
+        } else {
+            destinationURL = try stagedItemURL(
+                suggestedName: suggestedName ?? sourceURL.lastPathComponent,
+                fallbackExtension: sourceURL.pathExtension,
+                bucket: bucket
+            )
+        }
         if fileManager.fileExists(atPath: destinationURL.path) {
             try fileManager.removeItem(at: destinationURL)
         }
@@ -51,12 +73,33 @@ final class CacheStore {
         return destinationURL
     }
 
-    func importExternalItem(from sourceURL: URL, suggestedName: String?, bucket: Bucket) throws -> URL {
-        let destinationURL = try stagedItemURL(
-            suggestedName: suggestedName ?? sourceURL.lastPathComponent,
-            fallbackExtension: sourceURL.pathExtension,
-            bucket: bucket
-        )
+    func importExternalItem(
+        from sourceURL: URL,
+        suggestedName: String?,
+        bucket: Bucket,
+        reusableSourceIdentity: String? = nil
+    ) throws -> URL {
+        let destinationURL: URL
+        if bucket == .sources, let reusableSourceIdentity {
+            if let existingURL = try existingReusableSourceURL(
+                identity: reusableSourceIdentity,
+                suggestedName: suggestedName ?? sourceURL.lastPathComponent,
+                fallbackExtension: sourceURL.pathExtension
+            ) {
+                return existingURL
+            }
+            destinationURL = try reusableSourceURL(
+                identity: reusableSourceIdentity,
+                suggestedName: suggestedName ?? sourceURL.lastPathComponent,
+                fallbackExtension: sourceURL.pathExtension
+            )
+        } else {
+            destinationURL = try stagedItemURL(
+                suggestedName: suggestedName ?? sourceURL.lastPathComponent,
+                fallbackExtension: sourceURL.pathExtension,
+                bucket: bucket
+            )
+        }
         if fileManager.fileExists(atPath: destinationURL.path) {
             try fileManager.removeItem(at: destinationURL)
         }
@@ -83,6 +126,43 @@ final class CacheStore {
 
         try touch(destinationURL)
         return destinationURL
+    }
+
+    func reusableSourceURL(
+        identity: String,
+        suggestedName: String?,
+        fallbackExtension: String
+    ) throws -> URL {
+        let filename = sanitizedFilename(
+            suggestedName ?? "filmtone-source",
+            fallbackExtension: fallbackExtension
+        )
+        let ext = safePathExtension(filename.pathExtension)
+        let digest = SHA256.hash(data: Data(identity.utf8))
+        let hexDigest = digest.map { String(format: "%02x", $0) }.joined()
+        let directoryURL = try directory(for: .sources)
+        return directoryURL.appendingPathComponent("filmtone-source-\(hexDigest.prefix(20)).\(ext)")
+    }
+
+    func existingReusableSourceURL(
+        identity: String,
+        suggestedName: String?,
+        fallbackExtension: String
+    ) throws -> URL? {
+        let url = try reusableSourceURL(
+            identity: identity,
+            suggestedName: suggestedName,
+            fallbackExtension: fallbackExtension
+        )
+        guard fileManager.fileExists(atPath: url.path) else {
+            return nil
+        }
+        guard try isReusableCachedFile(at: url) else {
+            try? fileManager.removeItem(at: url)
+            return nil
+        }
+        try touch(url)
+        return url
     }
 
     func stagedItemURL(
@@ -219,6 +299,14 @@ final class CacheStore {
     }
 
     @discardableResult
+    func pruneBeforeSourceImport(
+        protecting protectedURLs: [URL] = [],
+        now: Date = Date()
+    ) throws -> CachePruneResult {
+        try prune(policy: .beforeSourceImport(protecting: protectedURLs, now: now))
+    }
+
+    @discardableResult
     func removeGeneratedFiles(_ urls: [URL]) throws -> CachePruneResult {
         var removedCount = 0
         var removedBytes: Int64 = 0
@@ -290,6 +378,23 @@ final class CacheStore {
         }
         let ext = fallbackExtension.isEmpty ? "dat" : fallbackExtension
         return "\(safeName).\(ext)"
+    }
+
+    private func safePathExtension(_ pathExtension: String) -> String {
+        let trimmed = pathExtension
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "/", with: "")
+            .replacingOccurrences(of: ":", with: "")
+        return trimmed.isEmpty ? "dat" : trimmed
+    }
+
+    private func isReusableCachedFile(at url: URL) throws -> Bool {
+        let values = try url.resourceValues(forKeys: [
+            .fileSizeKey,
+            .isRegularFileKey,
+        ])
+        let sizeBytes = values.fileSize ?? 0
+        return values.isRegularFile == true && sizeBytes > 0
     }
 
     private func entries(in bucket: Bucket) throws -> [CacheInventory.Entry] {
@@ -407,6 +512,10 @@ struct CacheRetentionPolicy {
     var protectedPaths: Set<String>
     var now: Date
 
+    private static let sourceReuseMaxBytes: Int64 = 8 * 1024 * 1024 * 1024
+    private static let sourceReuseMaxEntries = 2
+    private static let sourceReuseMaxAge: TimeInterval = 7 * 24 * 60 * 60
+
     init(
         bucketRules: [CacheStore.Bucket: BucketRule],
         protectedURLs: [URL] = [],
@@ -418,6 +527,27 @@ struct CacheRetentionPolicy {
     }
 
     static func standard(
+        protecting protectedURLs: [URL] = [],
+        now: Date = Date()
+    ) -> CacheRetentionPolicy {
+        CacheRetentionPolicy(
+            bucketRules: [
+                .sources: .init(
+                    maxBytes: sourceReuseMaxBytes,
+                    maxEntries: sourceReuseMaxEntries,
+                    maxAge: sourceReuseMaxAge
+                ),
+                .exports: .init(keepOnlyProtected: true),
+                .previews: .init(maxBytes: 64 * 1024 * 1024, maxAge: 24 * 60 * 60),
+                .mezzanine: .init(maxBytes: 1_073_741_824, maxEntries: 4),
+                .luts: .init(maxBytes: 20 * 1024 * 1024, maxAge: 30 * 24 * 60 * 60),
+            ],
+            protectedURLs: protectedURLs,
+            now: now
+        )
+    }
+
+    static func beforeSourceImport(
         protecting protectedURLs: [URL] = [],
         now: Date = Date()
     ) -> CacheRetentionPolicy {

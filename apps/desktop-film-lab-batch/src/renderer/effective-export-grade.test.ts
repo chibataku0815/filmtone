@@ -3,6 +3,7 @@ import { PRESETS } from "film-lab-core";
 import { createDefaultBatchGradeState } from "./batch-pipeline";
 import { createEmptyMetadataLutRefs } from "./export-metadata-session";
 import {
+  buildAppliedSourceProfileMetadata,
   buildEffectiveExportGradeSnapshot,
   collectEffectiveExportGradeWarnings,
   formatEffectiveExportGradeSummary,
@@ -54,15 +55,15 @@ describe("buildEffectiveExportGradeSnapshot", () => {
           intensity: 0.42,
         },
       },
-      canvasPreset: "cinematic",
-      fallbackBatchPresetChoice: "reset",
-      fallbackLookSource: "preset",
+      canvasLook: "cinematic",
+      fallbackBatchLookChoice: "reset",
+      fallbackLookSource: "builtInLook",
       fallbackLutRefs: createEmptyMetadataLutRefs(),
     });
 
     expect(snapshot.source).toBe("preview");
     expect(snapshot.lookSource).toBe("editSync");
-    expect(snapshot.batchPresetChoice).toBe("cinematic");
+    expect(snapshot.batchLookChoice).toBe("cinematic");
     expect(snapshot.grade.depthTrack).toBe(depthTrack);
     expect(snapshot.grade.params.bloomStrength).toBe(0.91);
     expect(snapshot.grade.params.halationIntensity).toBe(0.37);
@@ -101,17 +102,17 @@ describe("buildEffectiveExportGradeSnapshot", () => {
       viewportParams: null,
       currentBatchGrade,
       editLut: { lut1: null, lut2: null },
-      canvasPreset: "cinematic",
-      fallbackBatchPresetChoice: "reset",
-      fallbackLookSource: "preset",
+      canvasLook: "cinematic",
+      fallbackBatchLookChoice: "reset",
+      fallbackLookSource: "builtInLook",
       fallbackLutRefs,
       captureError: "lost context",
     });
 
     expect(snapshot.source).toBe("batch");
     expect(snapshot.grade).toBe(currentBatchGrade);
-    expect(snapshot.batchPresetChoice).toBe("reset");
-    expect(snapshot.lookSource).toBe("preset");
+    expect(snapshot.batchLookChoice).toBe("reset");
+    expect(snapshot.lookSource).toBe("builtInLook");
     expect(snapshot.lutRefs).toBe(fallbackLutRefs);
     expect(snapshot.captureError).toBe("lost context");
     expect(snapshot.exportRenderGeometry).toBeNull();
@@ -133,9 +134,9 @@ describe("buildEffectiveExportGradeSnapshot", () => {
       viewportParams: PRESETS.reset as unknown as Record<string, number | string>,
       currentBatchGrade,
       editLut: { lut1: null, lut2: null },
-      canvasPreset: "reset",
-      fallbackBatchPresetChoice: "reset",
-      fallbackLookSource: "preset",
+      canvasLook: "reset",
+      fallbackBatchLookChoice: "reset",
+      fallbackLookSource: "builtInLook",
       fallbackLutRefs: createEmptyMetadataLutRefs(),
       exportRenderGeometry,
     });
@@ -161,9 +162,9 @@ describe("buildEffectiveExportGradeSnapshot", () => {
       },
       currentBatchGrade,
       editLut: { lut1: null, lut2: null },
-      canvasPreset: "reset",
-      fallbackBatchPresetChoice: "reset",
-      fallbackLookSource: "preset",
+      canvasLook: "reset",
+      fallbackBatchLookChoice: "reset",
+      fallbackLookSource: "builtInLook",
       fallbackLutRefs: createEmptyMetadataLutRefs(),
     });
 
@@ -178,5 +179,125 @@ describe("buildEffectiveExportGradeSnapshot", () => {
       "light shafts requested, but WebGPU only runs shafts when cross filter or motion blur is active",
       "dust/scratches are requested, but the current WebGPU export path intentionally defers those passes",
     ]);
+  });
+
+  it("records a built-in source profile selection in the snapshot metadata", () => {
+    const currentBatchGrade = createDefaultBatchGradeState();
+    const lut1Data = new Float32Array([0, 0.5, 1]);
+    const snapshot = buildEffectiveExportGradeSnapshot({
+      viewportParams: PRESETS.reset as unknown as Record<string, number | string>,
+      currentBatchGrade,
+      editLut: {
+        lut1: {
+          name: "V-Log",
+          data: lut1Data,
+          size: 33,
+          intensity: 1,
+          sourceProfileId: "built-in:source-profile.panasonic-vlog",
+        },
+        lut2: null,
+      },
+      canvasLook: "reset",
+      fallbackBatchLookChoice: "reset",
+      fallbackLookSource: "builtInLook",
+      fallbackLutRefs: createEmptyMetadataLutRefs(),
+      appliedAtIso: "2026-05-02T13:00:00.000Z",
+    });
+
+    expect(snapshot.grade.lut1SourceProfileId).toBe(
+      "built-in:source-profile.panasonic-vlog",
+    );
+    expect(snapshot.appliedSourceProfile).toEqual({
+      selectionKind: "built-in",
+      catalogId: "built-in:source-profile.panasonic-vlog",
+      curve: "panasonic-vlog",
+      impl: "synthesized",
+      displayName: "V-Log",
+      appliedAtIso: "2026-05-02T13:00:00.000Z",
+    });
+    // Built-in selection still flows through MetadataLutRef as displayName-only
+    // (absolutePath stays null). Reader regenerates the cube at restore time.
+    expect(snapshot.lutRefs.lut1).toEqual({
+      enabled: true,
+      intensity: 1,
+      displayName: "V-Log",
+      absolutePath: null,
+    });
+  });
+
+  it("marks a custom .cube lut1 as selectionKind=custom in metadata", () => {
+    const currentBatchGrade = createDefaultBatchGradeState();
+    const snapshot = buildEffectiveExportGradeSnapshot({
+      viewportParams: PRESETS.reset as unknown as Record<string, number | string>,
+      currentBatchGrade,
+      editLut: {
+        lut1: {
+          name: "user.cube",
+          data: new Float32Array([0, 1, 0, 1, 1, 0, 0, 1]),
+          size: 2,
+          intensity: 0.8,
+        },
+        lut2: null,
+      },
+      canvasLook: "reset",
+      fallbackBatchLookChoice: "reset",
+      fallbackLookSource: "builtInLook",
+      fallbackLutRefs: createEmptyMetadataLutRefs(),
+      appliedAtIso: "2026-05-02T13:00:00.000Z",
+    });
+
+    expect(snapshot.appliedSourceProfile).toEqual({
+      selectionKind: "custom",
+      catalogId: null,
+      curve: null,
+      impl: null,
+      displayName: "user.cube",
+      appliedAtIso: "2026-05-02T13:00:00.000Z",
+    });
+  });
+
+  it("returns null appliedSourceProfile when lut1 is empty", () => {
+    const currentBatchGrade = createDefaultBatchGradeState();
+    const snapshot = buildEffectiveExportGradeSnapshot({
+      viewportParams: PRESETS.reset as unknown as Record<string, number | string>,
+      currentBatchGrade,
+      editLut: { lut1: null, lut2: null },
+      canvasLook: "reset",
+      fallbackBatchLookChoice: "reset",
+      fallbackLookSource: "builtInLook",
+      fallbackLutRefs: createEmptyMetadataLutRefs(),
+      appliedAtIso: "2026-05-02T13:00:00.000Z",
+    });
+
+    expect(snapshot.appliedSourceProfile).toBeNull();
+  });
+});
+
+describe("buildAppliedSourceProfileMetadata", () => {
+  it("returns null when slot is null", () => {
+    expect(
+      buildAppliedSourceProfileMetadata(null, "2026-05-02T13:00:00.000Z"),
+    ).toBeNull();
+  });
+
+  it("preserves an unknown catalog id literally so round-trips do not lose intent", () => {
+    const result = buildAppliedSourceProfileMetadata(
+      {
+        name: "Future Curve",
+        data: new Float32Array(),
+        size: 33,
+        intensity: 1,
+        sourceProfileId: "built-in:source-profile.future-camera",
+      },
+      "2026-05-02T13:00:00.000Z",
+    );
+    expect(result).toEqual({
+      selectionKind: "built-in",
+      catalogId: "built-in:source-profile.future-camera",
+      curve: null,
+      impl: null,
+      displayName: "Future Curve",
+      appliedAtIso: "2026-05-02T13:00:00.000Z",
+    });
   });
 });

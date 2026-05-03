@@ -1,10 +1,10 @@
 import { z } from "zod";
 import {
-  FILMTONE_DEFAULT_BASE_PRESET,
+  FILMTONE_DEFAULT_BASE_LOOK,
   PRESETS,
   filmLookGradeInputSchema,
-  findMatchingPreset,
-  lookIdForPreset,
+  findMatchingBaseLook,
+  lookIdForBaseLook,
   type BehaviorProfile,
   type CameraOptics,
   type OpticalFilterDensity,
@@ -12,15 +12,24 @@ import {
   type OpticalFilterProfileId,
   type OpticalFamily,
   type OpticalRecipeId,
-  type PresetName,
+  type BaseLookName,
   type Params,
+  type SourceProfileCurve,
+  type SourceProfileImplKind,
 } from "film-lab-core";
 import type { BatchFormat } from "./batch-pipeline";
 import type { BatchDepthTrack } from "./depth-track";
 import type { SourceVideoMetadata } from "./desktop-api";
 import { buildGradeJsonPayload } from "./grade-io";
 
+/**
+ * `builtInLook` is the Look Unification canonical (writer emits this).
+ * `preset` is the legacy alias kept in the schema so older sidecars still
+ * parse; the parser normalizes `preset` → `builtInLook` so downstream code
+ * only ever observes the canonical value.
+ */
 export const METADATA_LOOK_SOURCES = [
+  "builtInLook",
   "preset",
   "editSync",
   "importedJson",
@@ -28,6 +37,16 @@ export const METADATA_LOOK_SOURCES = [
 ] as const;
 
 export type MetadataLookSource = (typeof METADATA_LOOK_SOURCES)[number];
+
+/**
+ * Normalize legacy `preset` lookSource to the canonical `builtInLook`.
+ * Used at parse time so App-level state never holds the legacy value.
+ */
+export function canonicalizeMetadataLookSource(
+  source: MetadataLookSource,
+): Exclude<MetadataLookSource, "preset"> {
+  return source === "preset" ? "builtInLook" : source;
+}
 
 export type MetadataLutRef = {
   enabled: boolean;
@@ -63,12 +82,23 @@ export type AppliedOpticalFilterProfileMetadata = {
   appliedAtIso: string;
 };
 
-const [FIRST_PRESET_NAME, ...REST_PRESET_NAMES] = Object.keys(PRESETS) as [
-  PresetName,
-  ...PresetName[],
+export type SourceProfileSelectionKind = "built-in" | "custom" | "none";
+
+export type AppliedSourceProfileMetadata = {
+  selectionKind: SourceProfileSelectionKind;
+  catalogId: string | null;
+  curve: SourceProfileCurve | null;
+  impl: SourceProfileImplKind | null;
+  displayName: string;
+  appliedAtIso: string;
+};
+
+const [FIRST_BASE_LOOK_NAME, ...REST_BASE_LOOK_NAMES] = Object.keys(PRESETS) as [
+  BaseLookName,
+  ...BaseLookName[],
 ];
 
-const presetNameSchema = z.enum([FIRST_PRESET_NAME, ...REST_PRESET_NAMES]);
+const baseLookNameSchema = z.enum([FIRST_BASE_LOOK_NAME, ...REST_BASE_LOOK_NAMES]);
 
 const metadataLutRefSchema = z.object({
   enabled: z.boolean(),
@@ -214,6 +244,7 @@ const opticalFilterFamilySchema = z.enum([
   "pearlGlow",
   "warmMist",
   "cleanSoft",
+  "backlightVeil",
   "streak",
   "prismHalo",
 ]);
@@ -235,6 +266,35 @@ const opticalFilterProfileMetadataSchema = z.object({
   appliedAtIso: z.string().min(1),
 });
 
+const sourceProfileCurveSchema = z.enum([
+  "apple-log",
+  "apple-log-2",
+  "dji-dlog",
+  "dji-dlog-m",
+  "canon-clog",
+  "canon-log3-cinema-gamut",
+  "panasonic-vlog",
+  "sony-slog3",
+]);
+const sourceProfileImplKindSchema = z.enum([
+  "nil-profile",
+  "native-policy",
+  "synthesized",
+]);
+const sourceProfileSelectionKindSchema = z.enum([
+  "built-in",
+  "custom",
+  "none",
+]);
+const appliedSourceProfileMetadataSchema = z.object({
+  selectionKind: sourceProfileSelectionKindSchema,
+  catalogId: z.string().min(1).nullable(),
+  curve: sourceProfileCurveSchema.nullable(),
+  impl: sourceProfileImplKindSchema.nullable(),
+  displayName: z.string().min(1),
+  appliedAtIso: z.string().min(1),
+});
+
 const filmtoneExportSessionSchema = z.object({
   kind: z.literal("filmtone-export-session"),
   version: z.literal(1),
@@ -246,6 +306,7 @@ const filmtoneExportSessionSchema = z.object({
     videoInputPath: z.string().min(1).nullable(),
     cameraOptics: cameraOpticsSchema.optional(),
     sourceVideoMetadata: sourceVideoMetadataSchema.optional(),
+    sourceProfile: appliedSourceProfileMetadataSchema.optional(),
   }),
   output: z.object({
     outputDir: z.string().min(1),
@@ -254,7 +315,7 @@ const filmtoneExportSessionSchema = z.object({
     outputFileName: z.string().min(1).nullable(),
   }),
   look: z.object({
-    batchPresetChoice: presetNameSchema,
+    batchLookChoice: baseLookNameSchema,
     source: metadataLookSourceSchema,
     grade: filmLookGradeInputSchema,
     opticalRecommendation: opticalRecommendationMetadataSchema.optional(),
@@ -416,13 +477,14 @@ export function buildFilmtoneExportSession(params: {
   imageFormat: BatchFormat | null;
   outputFilenameSuffix: string | null;
   outputFileName: string | null;
-  batchPresetChoice: PresetName;
+  batchLookChoice: BaseLookName;
   lookSource: MetadataLookSource;
   gradeParams: Params;
   depthTrack: BatchDepthTrack | null;
   lutRefs: MetadataLutRefs;
   opticalRecommendation?: AppliedOpticalRecommendationMetadata | null;
   opticalFilterProfile?: AppliedOpticalFilterProfileMetadata | null;
+  sourceProfile?: AppliedSourceProfileMetadata | null;
   cameraOptics?: CameraOptics | null;
   sourceVideoMetadata?: SourceVideoMetadata | null;
 }): FilmtoneExportSessionV1 {
@@ -443,6 +505,7 @@ export function buildFilmtoneExportSession(params: {
       ...(params.job === "video" && params.sourceVideoMetadata
         ? { sourceVideoMetadata: params.sourceVideoMetadata }
         : {}),
+      ...(params.sourceProfile ? { sourceProfile: params.sourceProfile } : {}),
     },
     output: {
       outputDir: params.outputDir,
@@ -451,7 +514,7 @@ export function buildFilmtoneExportSession(params: {
       outputFileName: params.outputFileName,
     },
     look: {
-      batchPresetChoice: params.batchPresetChoice,
+      batchLookChoice: params.batchLookChoice,
       source: params.lookSource,
       grade:
         buildGradeJsonPayload(
@@ -479,8 +542,38 @@ export function exportFilmtoneExportSessionJsonText(
 export function parseFilmtoneExportSessionV1(
   raw: unknown,
 ): FilmtoneExportSessionV1 | null {
-  const parsed = filmtoneExportSessionSchema.safeParse(raw);
-  return parsed.success ? parsed.data : null;
+  // Look Unification: legacy sidecars may emit `look.batchPresetChoice` (the
+  // canonical name before the rename); promote it to `look.batchLookChoice`
+  // before schema validation so older files keep parsing.
+  const promoted = promoteLegacyLookSidecarFields(raw);
+  const parsed = filmtoneExportSessionSchema.safeParse(promoted);
+  if (!parsed.success) return null;
+  // Normalize legacy `look.source = "preset"` to canonical `"builtInLook"`
+  // so App-level state never holds the legacy value.
+  const data = parsed.data;
+  if (data.look.source === "preset") {
+    return {
+      ...data,
+      look: { ...data.look, source: "builtInLook" },
+    };
+  }
+  return data;
+}
+
+function promoteLegacyLookSidecarFields(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object") return raw;
+  const root = raw as Record<string, unknown>;
+  const look = root.look as Record<string, unknown> | undefined;
+  if (!look || typeof look !== "object") return raw;
+  if ("batchLookChoice" in look) return raw;
+  if (typeof look.batchPresetChoice !== "string") return raw;
+  return {
+    ...root,
+    look: {
+      ...look,
+      batchLookChoice: look.batchPresetChoice,
+    },
+  };
 }
 
 export function extractMetadataLutRefsFromGradeJsonText(
@@ -529,19 +622,19 @@ export function extractMetadataLutRefsFromGradeJsonText(
   };
 }
 
-export function inferPresetChoiceFromImportedJson(
+export function inferBaseLookChoiceFromImportedJson(
   jsonText: string,
   resolvedParams: Params,
-): PresetName {
+): BaseLookName {
   let raw: unknown;
   try {
     raw = JSON.parse(jsonText) as unknown;
   } catch {
-    return findMatchingPreset(resolvedParams) ?? FILMTONE_DEFAULT_BASE_PRESET;
+    return findMatchingBaseLook(resolvedParams) ?? FILMTONE_DEFAULT_BASE_LOOK;
   }
 
   if (!raw || typeof raw !== "object") {
-    return findMatchingPreset(resolvedParams) ?? FILMTONE_DEFAULT_BASE_PRESET;
+    return findMatchingBaseLook(resolvedParams) ?? FILMTONE_DEFAULT_BASE_LOOK;
   }
 
   const record = raw as Record<string, unknown>;
@@ -549,18 +642,18 @@ export function inferPresetChoiceFromImportedJson(
     typeof record.preset === "string" &&
     Object.prototype.hasOwnProperty.call(PRESETS, record.preset)
   ) {
-    return record.preset as PresetName;
+    return record.preset as BaseLookName;
   }
 
   if (typeof record.lookPresetId === "string") {
-    for (const presetName of Object.keys(PRESETS) as PresetName[]) {
-      if (lookIdForPreset(presetName) === record.lookPresetId) {
+    for (const presetName of Object.keys(PRESETS) as BaseLookName[]) {
+      if (lookIdForBaseLook(presetName) === record.lookPresetId) {
         return presetName;
       }
     }
   }
 
-  return findMatchingPreset(resolvedParams) ?? FILMTONE_DEFAULT_BASE_PRESET;
+  return findMatchingBaseLook(resolvedParams) ?? FILMTONE_DEFAULT_BASE_LOOK;
 }
 
 export function describeMetadataJsonPath(filePath: string): string {

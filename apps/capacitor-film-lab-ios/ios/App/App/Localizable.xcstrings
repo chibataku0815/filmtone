@@ -1356,6 +1356,23 @@
         }
       }
     },
+    "filmtone.export.finished_hint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export complete."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "書き出しが完了しました。"
+          }
+        }
+      }
+    },
     "filmtone.export.share" : {
       "extractionState" : "stale",
       "localizations" : {

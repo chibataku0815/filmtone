@@ -228,6 +228,17 @@ export function buildFfmpegMezzanineTranscodeArgs(
     args.push("-hwaccel", "videotoolbox");
   }
   args.push("-i", inputPath);
+  args.push(
+    "-map",
+    "0:v:0",
+    "-map",
+    "0:a?",
+    "-dn",
+    "-map_metadata",
+    "-1",
+    "-map_chapters",
+    "-1",
+  );
   if (useHwEncoder) {
     args.push(
       "-c:v",
@@ -267,7 +278,7 @@ export function buildFfmpegMezzanineTranscodeArgs(
       "bt709",
     );
   }
-  args.push("-c:a", "copy", "-y", outputPath);
+  args.push("-c:a", "copy", "-movflags", "+faststart", "-y", outputPath);
   return args;
 }
 

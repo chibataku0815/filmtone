@@ -2,6 +2,7 @@ import AVFoundation
 import CoreImage
 import CoreImage.CIFilterBuiltins
 import Foundation
+import os
 import UIKit
 
 final class FilmtoneExportSession {
@@ -27,8 +28,63 @@ final class FilmtoneExportSession {
     /// a value the JS bridge needs to round-trip.
     private let cameraProfileSelection: CameraProfileSelection?
     private(set) var didUseMezzanineVariant: ProfileVariant?
+    /// v1.4 sidecar telemetry: route validation outcome for the consumed
+    /// mezzanine. "valid" when the routed-to URL passed isValidMezzanine right
+    /// before AVURLAsset open; "invalidated-before-open" when a race (eviction
+    /// or overwrite) made us fall back to source-direct after attribution.
+    /// nil when no mezzanine was even routed (source-direct from the start).
+    private(set) var mezzanineValidationStatus: String?
+    /// v1.4 sidecar telemetry: whether this export synchronously generated the
+    /// quality mezzanine via `ensureMezzanineBlocking` (true) vs picking up an
+    /// already-prewarmed cache (false). nil when no quality variant was
+    /// requested at all (the v1.4 default on iOS).
+    private(set) var mezzanineGeneratedDuringExport: Bool?
+    /// v1.4 sidecar telemetry: snapshot of the consumed cache file's metrics,
+    /// captured at routing time so an OS Library/Caches eviction between
+    /// AVURLAsset open and sidecar write does not silently drop the truth
+    /// fields. Stays nil when no mezzanine was consumed.
+    private(set) var mezzanineConsumedMetrics: MezzanineService.MezzanineMetrics?
+    /// v1.4 sidecar telemetry: filename of the consumed cache (the SHA-256
+    /// hex from `signature(...)`). Captured alongside metrics. Stays nil
+    /// when no mezzanine was consumed.
+    private(set) var mezzanineConsumedURLLastPathComponent: String?
     fileprivate let ciContext: CIContext
     fileprivate let colorPipeline: FilmtoneColorPipelineContract
+    /// v1.5 export speed profile instrumentation. Five per-frame intervals
+    /// (`decode`, `wait-encoder`, `build-graph`, `render`, `append`) emitted
+    /// to Instruments via the `os_signpost` lane. Categories let us split
+    /// per-frame timings from one-shot setup work in the Instruments UI.
+    private let signposter = OSSignposter(
+        subsystem: "com.chibatakumi.film.lab.export",
+        category: "frame"
+    )
+    private let performanceMetrics = FilmtoneExportPerformanceMetrics()
+    private let disableGlowFamilyForExport: Bool
+    /// v1.5 Metal optics prototype: replaces `applyGlowFamilyStage` with a
+    /// custom MTLComputePipeline path. Read from `FILMTONE_EXPORT_METAL_OPTICS`
+    /// at init; runtime gating (Quality only / video / no-depth) is applied at
+    /// the call site. Production path is unchanged when this flag is off.
+    private let useMetalOpticsForExport: Bool
+    private lazy var metalOpticsRenderer: FilmtoneMetalOpticsRenderer? =
+        FilmtoneMetalOpticsRenderer(
+            workingColorSpace: colorPipeline.workingColorSpace,
+            ciContext: ciContext
+        )
+    private var metalOpticsActiveOnce = false
+    /// Phase 2 段階 1: true once a frame's vignette stage was applied inside
+    /// the Metal optics chain. Surfaced via sidecar `acceleratedRenderStages`
+    /// alongside `"GlowFamily/metal"`.
+    private var metalVignetteActiveOnce = false
+    /// Frame-scope flag set when the Metal optics chain applied vignette in
+    /// the same pass as glow. Read by `applyVignetteStage` to skip the CI
+    /// path. Reset at the top of each `applyGrade` call.
+    private var metalVignetteAppliedThisFrame = false
+    private lazy var renderStageProfiler: FilmtoneExportRenderStageProfiler? =
+        Self.makeRenderStageProfiler(
+            ciContext: ciContext,
+            colorSpace: outputColorSpace,
+            metrics: performanceMetrics
+        )
     private let preparedInputLut: PreparedLut?
     private let preparedCreativeLut: PreparedLut?
     private let sourceSeed: Double
@@ -90,6 +146,21 @@ final class FilmtoneExportSession {
     private static let connectReferenceAfterFilenameSuffix = "reference-after.jpg"
     private static let connectDctlFilenameSuffix = "filmtone-bridge.dctl"
 
+    private static func environmentFlagEnabled(
+        _ name: String,
+        processInfo: ProcessInfo = .processInfo
+    ) -> Bool {
+        guard let rawValue = processInfo.environment[name] else {
+            return false
+        }
+        switch rawValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "1", "true", "yes", "on":
+            return true
+        default:
+            return false
+        }
+    }
+
     private struct ConnectPackageCompanions {
         let sourceMediaURL: URL
         let cubeURL: URL
@@ -115,6 +186,8 @@ final class FilmtoneExportSession {
         self.mezzanineService = mezzanineService
         self.appliedSavedLook = appliedSavedLook
         self.cameraProfileSelection = cameraProfile
+        self.disableGlowFamilyForExport = Self.environmentFlagEnabled("FILMTONE_EXPORT_DISABLE_GLOW_FAMILY")
+        self.useMetalOpticsForExport = Self.environmentFlagEnabled("FILMTONE_EXPORT_METAL_OPTICS")
         self.outputURL = try cacheStore.temporaryExportURL(pathExtension: request.output.container)
         let colorPipeline = FilmtoneColorPipeline.defaultOutputContract(
             sourceMetadata: request.sourceProbe?.sourceVideoMetadata?.color,
@@ -147,6 +220,12 @@ final class FilmtoneExportSession {
         }
         self.preparedCreativeLut = Self.makePreparedLut(from: legacyCreativeLut)
         self.sourceSeed = Self.makeStableSourceSeed(from: sourceURL.absoluteString)
+        if disableGlowFamilyForExport {
+            NSLog("FilmtoneExportSession: GlowFamily disabled by FILMTONE_EXPORT_DISABLE_GLOW_FAMILY")
+        }
+        if useMetalOpticsForExport {
+            NSLog("FilmtoneExportSession: Metal optics prototype enabled by FILMTONE_EXPORT_METAL_OPTICS (Quality video only)")
+        }
     }
 
     /// Flips the internal cancellation flag. Should normally be reached via
@@ -207,6 +286,57 @@ final class FilmtoneExportSession {
         }
 
         let elapsedMs = Int(Date().timeIntervalSince(startedAt) * 1000.0)
+        let disabledRenderStages = disableGlowFamilyForExport
+            ? [FilmtoneExportRenderSubstage.glowFamily.rawValue]
+            : []
+        var acceleratedRenderStages: [String] = []
+        if metalOpticsActiveOnce {
+            acceleratedRenderStages.append(FilmtoneExportRenderSubstage.glowFamily.rawValue + "/metal")
+        }
+        if metalVignetteActiveOnce {
+            acceleratedRenderStages.append(FilmtoneExportRenderSubstage.vignette.rawValue + "/metal")
+        }
+        let performance = performanceMetrics.sidecarPerformance(
+            elapsedMs: elapsedMs,
+            disabledRenderStages: disabledRenderStages,
+            acceleratedRenderStages: acceleratedRenderStages
+        )
+        if let performance {
+            NSLog(
+                "Filmtone export profile: elapsed=%dms media=%@ decode=%.2fms waitEncoder=%.2fms build=%.2fms render=%.2fms append=%.2fms writerFinish=%.2fms residual=%@ frames=%d",
+                performance.exportElapsedMs,
+                performance.mediaPipelineMs.map { String(format: "%.2fms", $0) } ?? "nil",
+                performance.decodeMs,
+                performance.waitEncoderMs,
+                performance.buildGraphMs,
+                performance.renderMs,
+                performance.appendMs,
+                performance.writerFinishMs,
+                performance.mediaPipelineResidualMs.map { String(format: "%.2fms", $0) } ?? "nil",
+                performance.renderedFrames
+            )
+            if let stageProfile = performance.renderStageProfile {
+                let stageSummary = stageProfile.stages.map { stage in
+                    String(
+                        format: "%@ cumulative=%.2fms estIncremental=%@ samples=%d failures=%d",
+                        stage.stage,
+                        stage.cumulativeMs,
+                        stage.estimatedIncrementalMs.map { String(format: "%.2fms", $0) } ?? "nil",
+                        stage.samples,
+                        stage.failures
+                    )
+                }.joined(separator: " | ")
+                NSLog(
+                    "Filmtone export render stage profile: mode=%@ stride=%d sampledFrames=%d totalFrames=%d forcedRender=%.2fms %@",
+                    stageProfile.mode,
+                    stageProfile.frameStride,
+                    stageProfile.sampledFrames,
+                    stageProfile.totalFrames,
+                    stageProfile.forcedRenderMs,
+                    stageSummary
+                )
+            }
+        }
         let fileSizeBytes = try outputURL.resourceValues(forKeys: [.fileSizeKey]).fileSize
         let realtimeRatio: Double?
         if let duration = result.sourceDurationSec, duration > 0 {
@@ -215,7 +345,18 @@ final class FilmtoneExportSession {
             realtimeRatio = nil
         }
 
-        let packageCompanions = makeConnectPackageCompanions(result: result)
+        // v1.4: only build the multi-GB Filmtone Connect package companion set
+        // when the caller explicitly requested it via `connectPackage: true`.
+        // Save-to-Photos / share-sheet flows leave the flag absent, which used
+        // to write a full-size source.mov copy + cubes + DCTL on every export
+        // and chewed through Library/Caches headroom (a contributor to the
+        // mezzanine-cache eviction story).
+        let packageCompanions: ConnectPackageCompanions?
+        if request.connectPackage == true {
+            packageCompanions = makeConnectPackageCompanions(result: result)
+        } else {
+            packageCompanions = nil
+        }
 
         // T2 (v1.1): write the filmtone-ios-export-session-v1 sidecar next to the
         // export output. Failure here must NOT fail the export itself — missing
@@ -226,7 +367,8 @@ final class FilmtoneExportSession {
             elapsedMs: elapsedMs,
             realtimeRatio: realtimeRatio,
             audioPreserved: result.audioPreserved,
-            package: packageCompanions?.sidecarPackage
+            package: packageCompanions?.sidecarPackage,
+            performance: performance
         )
         let packageFileUris = makePackageFileUris(
             sidecarUri: sidecarUri,
@@ -258,7 +400,8 @@ final class FilmtoneExportSession {
         elapsedMs: Int,
         realtimeRatio: Double?,
         audioPreserved: Bool?,
-        package: SidecarPackage?
+        package: SidecarPackage?,
+        performance: SidecarPerformance?
     ) -> String? {
         let identity = SidecarDeviceIdentity(
             appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "",
@@ -346,11 +489,24 @@ final class FilmtoneExportSession {
             renderMode: (request.renderMode ?? .quality).rawValue,
             mezzanineUsedVariant: didUseMezzanineVariant?.rawValue,
             mezzanineProfileVersion: didUseMezzanineVariant != nil ? MezzanineService.Profile.version : nil,
+            // v1.4 truth fields. All nil when no mezzanine was consumed; populated
+            // from the snapshot we captured in exportVideo (so an eviction between
+            // routing and sidecar write cannot strip them).
+            mezzanineUrlLastPathComponent: mezzanineConsumedURLLastPathComponent,
+            mezzanineFileSizeBytes: mezzanineConsumedMetrics?.fileSizeBytes,
+            mezzanineDurationSec: mezzanineConsumedMetrics?.durationSec,
+            mezzanineWidth: mezzanineConsumedMetrics?.width,
+            mezzanineHeight: mezzanineConsumedMetrics?.height,
+            mezzanineCodec: mezzanineConsumedMetrics?.codec,
+            mezzaninePrewarmHit: mezzanineGeneratedDuringExport.map { !$0 },
+            mezzanineGeneratedDuringExport: mezzanineGeneratedDuringExport,
+            mezzanineValidationStatus: mezzanineValidationStatus,
             colorPipeline: colorPipeline,
             package: package,
             depth: depthSidecar,
             appliedSavedLook: savedLookRef,
-            cameraProfile: cameraProfileBlock
+            cameraProfile: cameraProfileBlock,
+            performance: performance
         )
 
         let sidecarURL = FilmtoneExportSidecarBuilder.sidecarURL(for: outputURL)
@@ -465,30 +621,61 @@ final class FilmtoneExportSession {
     private func exportVideo(
         progress: @escaping (Phase0ExportProgressDTO) -> Void
     ) throws -> CompletedExport {
-        let effectiveSourceURL = resolvedVideoSourceURL()
-        // Re-probe the matched variant so downstream telemetry / sidecar can record
-        // which mezzanine variant was actually used (HDR-preferred for Quality, any-
-        // available for Speed). When mezzanine was bypassed the variant stays nil.
-        if effectiveSourceURL == sourceURL {
-            didUseMezzanineVariant = nil
-        } else if let mezz = mezzanineService,
-                  effectiveSourceURL == mezz.existingMezzanineURL(
+        try prepareQualityMezzanineForExport(progress: progress)
+        var effectiveSourceURL = resolvedVideoSourceURL()
+        // v1.4: telemetry/sidecar records which mezzanine variant the export
+        // actually consumed. resolvedVideoSourceURL only returns a mezzanine
+        // URL or the original source, so we probe each known variant in
+        // preference order (quality > preview-grade) until we find a match.
+        didUseMezzanineVariant = nil
+        mezzanineValidationStatus = nil
+        if effectiveSourceURL != sourceURL, let mezz = mezzanineService {
+            let depthEnabled = request.depthEnabled ?? false
+            let candidates: [ProfileVariant] = [.qualityHDR, .qualitySDR, .hdr, .sdr]
+            for variant in candidates {
+                if effectiveSourceURL == mezz.existingMezzanineURL(
                     for: sourceURL,
-                    variant: .hdr,
-                    depthEnabled: request.depthEnabled ?? false
-                  ) {
-            didUseMezzanineVariant = .hdr
-        } else if let mezz = mezzanineService,
-                  effectiveSourceURL == mezz.existingMezzanineURL(
-                    for: sourceURL,
-                    variant: .sdr,
-                    depthEnabled: request.depthEnabled ?? false
-                  ) {
-            didUseMezzanineVariant = .sdr
-        } else {
-            // Unreachable in practice (resolvedVideoSourceURL only returns a mezzanine
-            // URL or sourceURL), but keep nil to stay on the safe explicit path.
-            didUseMezzanineVariant = nil
+                    variant: variant,
+                    depthEnabled: depthEnabled
+                ) {
+                    didUseMezzanineVariant = variant
+                    break
+                }
+            }
+            // Final race guard: between routing and AVURLAsset(url:) open, the
+            // file could have been invalidated (OS Library/Caches eviction
+            // under disk pressure, a racing prewarm overwrite, or a manual
+            // delete). Re-validate the picked URL; if it's no longer valid,
+            // fall back to source-direct AND clear the variant so the sidecar
+            // never claims a mezzanine was used when it wasn't.
+            if let v = didUseMezzanineVariant,
+               !mezz.isValidMezzaninePublic(
+                   at: effectiveSourceURL,
+                   sourceURL: sourceURL,
+                   variant: v
+               ) {
+                filmtonePreviewCompositionDebugLog(
+                    "Mezzanine race: routed-to URL invalidated before AVURLAsset open, falling back to source-direct"
+                )
+                didUseMezzanineVariant = nil
+                effectiveSourceURL = sourceURL
+                mezzanineValidationStatus = "invalidated-before-open"
+            } else if didUseMezzanineVariant != nil {
+                mezzanineValidationStatus = "valid"
+                // Snapshot the cache file's identity & metrics now, so a
+                // post-export eviction can't strip the truth fields out of
+                // the sidecar.
+                mezzanineConsumedURLLastPathComponent = effectiveSourceURL.lastPathComponent
+                mezzanineConsumedMetrics = mezz.mezzanineMetrics(at: effectiveSourceURL)
+            }
+        }
+        // v1.4: when render mode is .quality and we still have no mezzanine,
+        // record an explicit signal that the route policy declined ("disabled
+        // on iOS") rather than leaving sidecar `validationStatus` ambiguous.
+        if mezzanineValidationStatus == nil,
+           (request.renderMode ?? .quality) == .quality,
+           didUseMezzanineVariant == nil {
+            mezzanineValidationStatus = "disabled-on-ios"
         }
         let asset = AVURLAsset(url: effectiveSourceURL)
         guard let videoTrack = asset.tracks(withMediaType: .video).first else {
@@ -631,7 +818,7 @@ final class FilmtoneExportSession {
             finishAudioInput(markAsFinished: true)
         }
 
-        progress(.init(stage: .reading, progress: 0.08, currentFrame: 0, totalFrames: outputFrameCount, message: "Reading source"))
+        progress(.init(stage: .reading, progress: 0.11, currentFrame: 0, totalFrames: outputFrameCount, message: "Reading source"))
 
         // v1.3 Phase B: depth-track frames seldom share the video track's
         // cadence (depth tracks are often ~half-rate). We hold the most-recent
@@ -648,6 +835,7 @@ final class FilmtoneExportSession {
         var lookaheadVideoSample: TimedVideoSample?
         var sourceReaderExhausted = false
         var nextOutputFrameIndex = 0
+        let mediaPipelineStartedNs = DispatchTime.now().uptimeNanoseconds
 
         func outputPresentationTime(for frameIndex: Int) -> CMTime {
             CMTime(value: CMTimeValue(frameIndex), timescale: CMTimeScale(max(1, request.output.fps)))
@@ -763,7 +951,12 @@ final class FilmtoneExportSession {
                     }
 
                     if previousVideoSample == nil {
-                        guard let sampleBuffer = videoOutput.copyNextSampleBuffer() else {
+                        let decodedSample = performanceMetrics.measure(.decode) {
+                            signposter.withIntervalSignpost("decode") {
+                                videoOutput.copyNextSampleBuffer()
+                            }
+                        }
+                        guard let sampleBuffer = decodedSample else {
                             if reader.status == .failed {
                                 throw FilmtoneMediaError.exportFailed(reader.error?.localizedDescription ?? "Video read failed.")
                             }
@@ -775,7 +968,12 @@ final class FilmtoneExportSession {
                     }
 
                     if !sourceReaderExhausted && lookaheadVideoSample == nil {
-                        guard let sampleBuffer = videoOutput.copyNextSampleBuffer() else {
+                        let decodedSample = performanceMetrics.measure(.decode) {
+                            signposter.withIntervalSignpost("decode") {
+                                videoOutput.copyNextSampleBuffer()
+                            }
+                        }
+                        guard let sampleBuffer = decodedSample else {
                             if reader.status == .failed {
                                 throw FilmtoneMediaError.exportFailed(reader.error?.localizedDescription ?? "Video read failed.")
                             }
@@ -858,6 +1056,7 @@ final class FilmtoneExportSession {
         }
 
         dispatchGroup.wait()
+        performanceMetrics.recordMediaPipeline(elapsedSince: mediaPipelineStartedNs)
 
         if let capturedError {
             throw capturedError
@@ -868,7 +1067,9 @@ final class FilmtoneExportSession {
         }
 
         progress(.init(stage: .writing, progress: 0.92, currentFrame: renderedFrames, totalFrames: outputFrameCount, message: "Writing output"))
-        try finish(writer: writer)
+        try performanceMetrics.measure(.writerFinish) {
+            try finish(writer: writer)
+        }
 
         return CompletedExport(
             outputSize: outputSize,
@@ -1018,7 +1219,12 @@ final class FilmtoneExportSession {
     }
 
     private func renderVideoPreview() throws -> Phase0PreviewRenderResultDTO {
-        let asset = AVURLAsset(url: sourceURL)
+        // v1.4: read from the same effective URL the export will consume so
+        // preview ↔ export bytes stay symmetric within each renderMode. When
+        // the relevant mezzanine variant is missing (still being generated, or
+        // policy declined), this transparently falls back to source.
+        let effectiveSourceURL = resolvedVideoSourceURL()
+        let asset = AVURLAsset(url: effectiveSourceURL)
         guard let videoTrack = asset.tracks(withMediaType: .video).first else {
             throw FilmtoneMediaError.unsupportedSource("No video track was found in the selected source.")
         }
@@ -1160,14 +1366,21 @@ final class FilmtoneExportSession {
             transform: transform,
             outputSize: outputSize
         )
-        let graded = applyGrade(to: base, timeSeconds: timeSeconds)
+        renderStageProfiler?.beginFrame()
+        let graded = applyGrade(
+            to: base,
+            timeSeconds: timeSeconds,
+            stageProfilingOutputSize: outputSize
+        )
             .cropped(to: CGRect(origin: .zero, size: outputSize))
-        return applyVideoMotionStage(
+        let motionApplied = applyVideoMotionStage(
             to: graded,
             timeSeconds: timeSeconds,
             outputSize: outputSize,
             accumulator: exportMotionBlurAccumulator
         )
+        profileRenderSubstage(.motion, image: motionApplied, outputSize: outputSize)
+        return motionApplied
     }
 
     private func renderableStillImage(
@@ -1316,20 +1529,51 @@ final class FilmtoneExportSession {
             .concatenating(outputFlip)
     }
 
-    fileprivate func applyGrade(to image: CIImage, timeSeconds: Double) -> CIImage {
-        let params = request.grade.params
+    fileprivate func applyGrade(
+        to image: CIImage,
+        timeSeconds: Double,
+        stageProfilingOutputSize: CGSize? = nil
+    ) -> CIImage {
+        // Backlight Veil Phase 1c — when a Backlight Veil family is active,
+        // its 12 spatial keys (bloom / halation / diffusion / lensSoftness /
+        // rgbShift) override the user's optical signature so the scatter
+        // math has the canonical plate inputs. Color-grade params (exposure
+        // / contrast / LUT etc.) stay untouched, so the user's Look color
+        // is preserved and the Veil layers on top as a lens veil.
+        let baseParams = request.grade.params
+        let params: Phase0ParamsDTO
+        if let veilSpatial = currentBacklightVeilProfile()?.spatial {
+            params = applyBacklightVeilSpatialOverrides(baseParams, spatial: veilSpatial)
+        } else {
+            params = baseParams
+        }
         let presetVersion = request.grade.presetVersion
         var current = image
 
+        // Phase 2 段階 1: clear the per-frame Metal vignette flag before any
+        // stage runs. `applyGlowFamilyStage` sets it true when the Metal
+        // optics chain absorbs the vignette pass; `applyVignetteStage`
+        // consumes it to skip the CI path.
+        metalVignetteAppliedThisFrame = false
+
         current = applyInputLutStage(to: current)
+        profileRenderSubstage(.inputLut, image: current, outputSize: stageProfilingOutputSize)
         current = applyBaseGradeStage(to: current, params: params, presetVersion: presetVersion)
+        profileRenderSubstage(.baseGrade, image: current, outputSize: stageProfilingOutputSize)
         current = applyToneCompressionStage(to: current, params: params, presetVersion: presetVersion)
+        profileRenderSubstage(.toneCompression, image: current, outputSize: stageProfilingOutputSize)
         current = applyEdgeOpticsStage(to: current, params: params)
+        profileRenderSubstage(.edgeOptics, image: current, outputSize: stageProfilingOutputSize)
         current = applyGlowFamilyStage(to: current, params: params)
+        profileRenderSubstage(.glowFamily, image: current, outputSize: stageProfilingOutputSize)
         current = applyVignetteStage(to: current, params: params)
+        profileRenderSubstage(.vignette, image: current, outputSize: stageProfilingOutputSize)
         current = applyGrainStage(to: current, params: params, timeSeconds: timeSeconds)
+        profileRenderSubstage(.grain, image: current, outputSize: stageProfilingOutputSize)
         current = applyCreativeLutStage(to: current)
+        profileRenderSubstage(.creativeLut, image: current, outputSize: stageProfilingOutputSize)
         current = applyPrintStage(to: current, params: params)
+        profileRenderSubstage(.printStage, image: current, outputSize: stageProfilingOutputSize)
 
         return current.cropped(to: image.extent)
     }
@@ -1361,6 +1605,17 @@ final class FilmtoneExportSession {
             timeSeconds: timeSeconds,
             outputSize: outputSize
         )
+    }
+
+    private func profileRenderSubstage(
+        _ stage: FilmtoneExportRenderSubstage,
+        image: CIImage,
+        outputSize: CGSize?
+    ) {
+        guard let outputSize else {
+            return
+        }
+        renderStageProfiler?.forceRender(stage, image: image, outputSize: outputSize)
     }
 
     private func applyInputLutStage(to image: CIImage) -> CIImage {
@@ -1478,7 +1733,150 @@ final class FilmtoneExportSession {
         return current
     }
 
+    /// Backlight Veil Phase 1c — resolves the currently-selected profile
+    /// (6 optical + 12 spatial keys) from
+    /// `FilmtoneOpticalFilterSelectionStore.shared.currentId`. Returns nil
+    /// when OFF, in which case the legacy composite path runs unchanged.
+    /// In-memory singleton, not persisted.
+    private func currentBacklightVeilProfile()
+        -> FilmtoneOpticalFiltersGenerated.Profile? {
+        guard
+            let filterId = FilmtoneOpticalFilterSelectionStore.shared.currentId,
+            let profile = FilmtoneOpticalFiltersGenerated.backlightVeilProfiles
+                .first(where: { $0.id == filterId })
+        else {
+            return nil
+        }
+        return profile
+    }
+
+    /// Backlight Veil Phase 1c — produces a `Phase0ParamsDTO` whose
+    /// bloom / halation / diffusion plate keys (10 spatial values) are
+    /// replaced by the active Backlight Veil profile's canonical curve.
+    /// Mirrors the Desktop `buildOpticalFilterParamPatch` semantics
+    /// (`packages/film-lab-core/src/optical-filter-profiles.ts:677-689`)
+    /// where the optical filter family overrides the user's optical
+    /// signature so the scatter math has stable plate inputs regardless
+    /// of which Look / preset is active. Color-grade params (exposure /
+    /// contrast / saturation / LUT etc.) remain untouched — Look's color
+    /// stays, lens behavior is replaced.
+    private func applyBacklightVeilSpatialOverrides(
+        _ params: Phase0ParamsDTO,
+        spatial s: FilmtoneOpticalFiltersGenerated.SpatialKeys
+    ) -> Phase0ParamsDTO {
+        Phase0ParamsDTO(
+            exposure: params.exposure,
+            contrast: params.contrast,
+            saturation: params.saturation,
+            temperature: params.temperature,
+            tint: params.tint,
+            rgbShift: s.rgbShift,
+            lensSoftness: s.lensSoftness,
+            grainRadialMix: params.grainRadialMix,
+            grainSize: params.grainSize,
+            bloomThreshold: s.bloomThreshold,
+            bloomStrength: s.bloomStrength,
+            bloomRadius: s.bloomRadius,
+            diffusion: s.diffusion,
+            halationIntensity: s.halationIntensity,
+            halationSpread: params.halationSpread,
+            halationHue: s.halationHue,
+            halationThreshold: s.halationThreshold,
+            halationRadius: s.halationRadius,
+            bloomSoftKnee: s.bloomSoftKnee,
+            halationSoftKnee: s.halationSoftKnee,
+            compressionAmount: params.compressionAmount,
+            compressionRange: params.compressionRange,
+            printContrast: params.printContrast,
+            cyan: params.cyan,
+            magenta: params.magenta,
+            yellow: params.yellow,
+            shutterAngle: params.shutterAngle,
+            trailIntensity: params.trailIntensity,
+            fade: params.fade,
+            shadowTone: params.shadowTone,
+            highlightTone: params.highlightTone,
+            shadowHue: params.shadowHue,
+            highlightHue: params.highlightHue,
+            vignette: params.vignette,
+            grainIntensity: params.grainIntensity
+        )
+    }
+
     private func applyGlowFamilyStage(to image: CIImage, params: Phase0ParamsDTO) -> CIImage {
+        let backlightVeilOptical = currentBacklightVeilProfile()?.optical
+
+        // v1.5 Metal optics prototype gate. Quality video exports without
+        // depth payload may route the entire glow family chain to the custom
+        // MTLComputePipeline path. The renderer falls back internally on any
+        // allocation/encoding failure, but we also gate on call-site safety
+        // (depth requires the CI prefilter, still images use loadedDepthMap).
+        if useMetalOpticsForExport,
+           !disableGlowFamilyForExport,
+           request.sourceKind == .video,
+           (request.renderMode ?? .quality) == .quality,
+           loadedDepthMap == nil,
+           let renderer = metalOpticsRenderer
+        {
+            let opticalScatterParams: FilmtoneMetalOpticsRenderer.OpticalScatterParams? =
+                backlightVeilOptical.map { keys in
+                    FilmtoneMetalOpticsRenderer.OpticalScatterParams(
+                        directTransmission: keys.directTransmission,
+                        blackRetention: keys.blackRetention,
+                        scatterStrength: keys.scatterStrength,
+                        highlightReactivity: keys.highlightReactivity,
+                        warmScatter: keys.warmScatter,
+                        spectralTail: keys.spectralTail
+                    )
+                }
+            let glowParams = FilmtoneMetalOpticsRenderer.GlowFrameParams(
+                bloomStrength: params.bloomStrength,
+                bloomThreshold: params.bloomThreshold,
+                bloomSoftKnee: params.bloomSoftKnee,
+                bloomRadius: params.bloomRadius,
+                bloomMipLevels: Self.bloomMipLevels,
+                bloomSpreadBoost: Self.bloomSpreadBoost,
+                halationIntensity: params.halationIntensity,
+                halationThreshold: params.halationThreshold,
+                halationSoftKnee: params.halationSoftKnee,
+                halationRadius: params.halationRadius,
+                halationHue: params.halationHue,
+                halationMipLevels: Self.halationMipLevels,
+                halationSpread: params.halationSpread,
+                halationSpreadDivisor: Self.halationSpreadDivisor,
+                diffusion: params.diffusion,
+                diffusionMipLevels: Self.diffusionMipLevels,
+                diffusionCompositeBase: Self.diffusionCompositeBase,
+                glowBaseScale: Self.glowBaseScale,
+                opticalScatter: opticalScatterParams
+            )
+            // Phase 2 段階 1: fold the vignette stage into the same Metal
+            // pass when the params justify it. Vignette is only chained when
+            // intensity > epsilon; otherwise the chain runs glow-only and
+            // applyVignetteStage stays a no-op (CI path also no-ops).
+            let vignetteParams = vignetteFrameParams(image: image, params: params)
+            let chainParams = FilmtoneMetalOpticsRenderer.OpticsChainParams(
+                glow: glowParams,
+                vignette: vignetteParams
+            )
+            if let metalResult = renderer.renderOpticsChain(
+                input: image,
+                outputExtent: image.extent,
+                params: chainParams
+            ) {
+                metalOpticsActiveOnce = true
+                if vignetteParams != nil {
+                    metalVignetteActiveOnce = true
+                    metalVignetteAppliedThisFrame = true
+                }
+                return metalResult
+            }
+        }
+
+        guard !disableGlowFamilyForExport else {
+            return image
+        }
+
         let extent = image.extent
         let black = Self.blackImage(for: extent)
 
@@ -1615,6 +2013,31 @@ final class FilmtoneExportSession {
             return image
         }
 
+        if let backlightVeilOptical {
+            // Backlight Veil Phase 1c CI fallback — verbatim WGSL §4.4 port.
+            // 9 args (3 spatial floats + 6 optical floats); diffusionBase
+            // drops out because the new kernel multiplies diffused by the
+            // hardcoded 0.24 from WGSL.
+            guard let kernel = OpticalKernels.glowCompositeBacklightVeil else {
+                return image
+            }
+            return kernel.apply(extent: extent, arguments: [
+                image,
+                bloomImage,
+                halationImage,
+                diffusionImage,
+                params.bloomStrength,
+                params.halationIntensity,
+                params.diffusion,
+                backlightVeilOptical.directTransmission,
+                backlightVeilOptical.blackRetention,
+                backlightVeilOptical.scatterStrength,
+                backlightVeilOptical.highlightReactivity,
+                backlightVeilOptical.warmScatter,
+                backlightVeilOptical.spectralTail,
+            ]) ?? image
+        }
+
         guard let kernel = OpticalKernels.glowComposite else {
             return image
         }
@@ -1631,7 +2054,52 @@ final class FilmtoneExportSession {
         ]) ?? image
     }
 
+    /// Build the Metal vignette parameter struct from the same inputs
+    /// `applyVignetteStage` would consume. Returns nil when the CI path
+    /// would also no-op (intensity below threshold), so caller can decide
+    /// whether to chain the vignette pass at all.
+    private func vignetteFrameParams(
+        image: CIImage,
+        params: Phase0ParamsDTO
+    ) -> FilmtoneMetalOpticsRenderer.VignetteFrameParams? {
+        guard params.vignette > 0.0001 else {
+            return nil
+        }
+        let optics = request.sourceProbe?.cameraOptics
+        let resolved = FilmtoneRayAngleOptics.resolve(
+            optics: optics,
+            imageWidth: Double(image.extent.width),
+            imageHeight: Double(image.extent.height)
+        )
+        let opticsCIVector = FilmtoneRayAngleOptics.kernelArgs(
+            resolved: resolved,
+            imageWidth: Double(image.extent.width),
+            imageHeight: Double(image.extent.height)
+        )
+        let opticsPack = SIMD3<Float>(
+            Float(opticsCIVector.x),
+            Float(opticsCIVector.y),
+            Float(opticsCIVector.z)
+        )
+        let applyMask: Float = (optics?.source == "metadata") ? 1.0 : 0.0
+        let gamma = FilmtonePhase0Generated.hiddenDefaults.depthRayAngleGamma
+        let innerThreshold = FilmtonePhase0Generated.hiddenDefaults.depthRayAngleInnerThreshold
+        return FilmtoneMetalOpticsRenderer.VignetteFrameParams(
+            intensity: params.vignette,
+            opticsPack: opticsPack,
+            applyMask: applyMask,
+            gamma: gamma,
+            innerThreshold: innerThreshold
+        )
+    }
+
     private func applyVignetteStage(to image: CIImage, params: Phase0ParamsDTO) -> CIImage {
+        // Phase 2 段階 1: when the Metal optics chain absorbed the vignette
+        // pass for this frame, the CI vignette is already represented in
+        // `image` and re-applying would double the falloff.
+        if metalVignetteAppliedThisFrame {
+            return image
+        }
         guard params.vignette > 0.0001 else {
             return image
         }
@@ -1955,7 +2423,7 @@ final class FilmtoneExportSession {
                     y: sourceExtent.height / max(targetExtent.height, 1.0)
                 ),
             ]
-        )?.cropped(to: targetExtent) ?? downsampledImage(image, scale: scale)
+        ) ?? downsampledImage(image, scale: scale)
     }
 
     private static func tentUpsampledImage(_ image: CIImage, to extent: CGRect) -> CIImage {
@@ -1982,7 +2450,7 @@ final class FilmtoneExportSession {
                     y: sourceExtent.height / max(targetExtent.height, 1.0)
                 ),
             ]
-        )?.cropped(to: targetExtent) ?? upsampledImage(image, to: extent)
+        ) ?? upsampledImage(image, to: extent)
     }
 
     private static func scaledImage(_ image: CIImage, scale: Double) -> CIImage {
@@ -2092,7 +2560,11 @@ final class FilmtoneExportSession {
     ) throws -> Bool {
         try autoreleasepool { () throws -> Bool in
             if waitForReady {
-                try waitUntilReadyForMoreMediaData(videoInput, writer: writer, reader: reader, label: "video")
+                try performanceMetrics.measure(.waitEncoder) {
+                    try signposter.withIntervalSignpost("wait-encoder") {
+                        try waitUntilReadyForMoreMediaData(videoInput, writer: writer, reader: reader, label: "video")
+                    }
+                }
             }
 
             guard let imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
@@ -2105,12 +2577,16 @@ final class FilmtoneExportSession {
             let sourcePresentationTime = Self.validPresentationTime(for: sampleBuffer)
             let outputTime = outputPresentationTime ?? sourcePresentationTime
             let presentationTimeSec = renderTimeSeconds ?? CMTimeGetSeconds(sourcePresentationTime)
-            let frameImage = renderableImage(
-                from: imageBuffer,
-                transform: videoTrack.preferredTransform,
-                outputSize: outputSize,
-                timeSeconds: presentationTimeSec.isFinite ? presentationTimeSec : 0
-            )
+            let frameImage = performanceMetrics.measure(.buildGraph) {
+                signposter.withIntervalSignpost("build-graph") {
+                    renderableImage(
+                        from: imageBuffer,
+                        transform: videoTrack.preferredTransform,
+                        outputSize: outputSize,
+                        timeSeconds: presentationTimeSec.isFinite ? presentationTimeSec : 0
+                    )
+                }
+            }
 
             var renderedBuffer: CVPixelBuffer?
             let creationStatus = CVPixelBufferPoolCreatePixelBuffer(nil, pixelBufferPool, &renderedBuffer)
@@ -2118,17 +2594,27 @@ final class FilmtoneExportSession {
                 throw FilmtoneMediaError.exportFailed("A render pixel buffer could not be created.")
             }
 
-            ciContext.render(
-                frameImage,
-                to: renderedBuffer,
-                bounds: CGRect(origin: .zero, size: outputSize),
-                colorSpace: outputColorSpace
-            )
+            performanceMetrics.measure(.render) {
+                signposter.withIntervalSignpost("render") {
+                    ciContext.render(
+                        frameImage,
+                        to: renderedBuffer,
+                        bounds: CGRect(origin: .zero, size: outputSize),
+                        colorSpace: outputColorSpace
+                    )
+                }
+            }
             attachOutputColorMetadata(to: renderedBuffer)
 
-            if !adaptor.append(renderedBuffer, withPresentationTime: outputTime) {
+            let appended = performanceMetrics.measure(.append) {
+                signposter.withIntervalSignpost("append") {
+                    adaptor.append(renderedBuffer, withPresentationTime: outputTime)
+                }
+            }
+            if !appended {
                 throw FilmtoneMediaError.exportFailed(writer.error?.localizedDescription ?? "The frame could not be appended.")
             }
+            performanceMetrics.recordRenderedFrame()
 
             return true
         }
@@ -2588,6 +3074,14 @@ final class FilmtoneExportSession {
         }
         let rgb: [Float]
         switch curve {
+        case .djiDLog:
+            rgb = FilmtoneSourceProfileMath.makeDlogToRec709Cube(size: cubeSize)
+        case .djiDLogM:
+            rgb = FilmtoneSourceProfileMath.makeDlogMToRec709Cube(size: cubeSize)
+        case .canonCLog:
+            rgb = FilmtoneSourceProfileMath.makeCanonClogToRec709Cube(size: cubeSize)
+        case .canonLog3CinemaGamut:
+            rgb = FilmtoneSourceProfileMath.makeCanonLog3CineGamutToRec709Cube(size: cubeSize)
         case .panasonicVLog:
             rgb = FilmtoneSourceProfileMath.makeVlogToRec709Cube(size: cubeSize)
         case .sonySLog3:
@@ -2735,17 +3229,16 @@ final class FilmtoneExportSession {
     }
 
     private func resolvedVideoSourceURL() -> URL {
-        // Quality/Master is the product-truth export path and must match the
-        // live preview source. Mezzanine is now an explicit Speed-only shortcut.
-        guard request.renderMode == .speed else {
-            filmtonePreviewCompositionDebugLog(
-                "Quality gate: source-direct export route"
-            )
-            return sourceURL
-        }
+        // v1.4: routing covers both Speed (preview-grade mezzanine) and Quality
+        // (quality-grade mezzanine, only generated for heavy sources via
+        // FilmtoneMezzanineRoutePolicy.qualityPrewarmVariant). Quality export
+        // prepares eligible heavy-source mezzanines before reaching this
+        // routing point; policy-declined light sources remain source-direct.
+        // Preview reads via this same function so preview ↔ export bytes
+        // remain symmetric within each renderMode.
         guard let mezz = mezzanineService else {
             filmtonePreviewCompositionDebugLog(
-                "Speed gate: no mezzanine service, source-direct fallback"
+                "Mezzanine routing: service unavailable, source-direct"
             )
             return sourceURL
         }
@@ -2761,27 +3254,163 @@ final class FilmtoneExportSession {
             variant: .sdr,
             depthEnabled: depthEnabled
         )
+        let qualityHDRURL = mezz.existingMezzanineURL(
+            for: sourceURL,
+            variant: .qualityHDR,
+            depthEnabled: depthEnabled
+        )
+        let qualitySDRURL = mezz.existingMezzanineURL(
+            for: sourceURL,
+            variant: .qualitySDR,
+            depthEnabled: depthEnabled
+        )
         let colorClass = request.sourceProbe?.sourceVideoMetadata?.colorClass
         let selectedVariant = FilmtoneMezzanineRoutePolicy.selectedVariant(
             renderMode: request.renderMode?.rawValue,
             colorClass: colorClass,
             hasHDRMezzanine: hdrURL != nil,
-            hasSDRMezzanine: sdrURL != nil
+            hasSDRMezzanine: sdrURL != nil,
+            hasQualityHDRMezzanine: qualityHDRURL != nil,
+            hasQualitySDRMezzanine: qualitySDRURL != nil
         )
 
         switch selectedVariant {
         case .hdr:
-            filmtonePreviewCompositionDebugLog("Speed gate: using hdr mezzanine")
+            filmtonePreviewCompositionDebugLog("Mezzanine routing: hdr (Speed)")
             return hdrURL ?? sourceURL
         case .sdr:
-            filmtonePreviewCompositionDebugLog("Speed gate: using sdr mezzanine")
+            filmtonePreviewCompositionDebugLog("Mezzanine routing: sdr (Speed)")
             return sdrURL ?? sourceURL
+        case .qualityHDR:
+            filmtonePreviewCompositionDebugLog("Mezzanine routing: qualityHDR")
+            return qualityHDRURL ?? sourceURL
+        case .qualitySDR:
+            filmtonePreviewCompositionDebugLog("Mezzanine routing: qualitySDR")
+            return qualitySDRURL ?? sourceURL
         case nil:
             filmtonePreviewCompositionDebugLog(
-                "Speed gate: no acceptable mezzanine for \(colorClass?.rawValue ?? "unknown"), source-direct fallback"
+                "Mezzanine routing: policy declined for \(colorClass?.rawValue ?? "unknown") at \(request.renderMode?.rawValue ?? "unknown"), source-direct"
             )
             return sourceURL
         }
+    }
+
+    private func prepareQualityMezzanineForExport(
+        progress: @escaping (Phase0ExportProgressDTO) -> Void
+    ) throws {
+        guard (request.renderMode ?? .quality) == .quality,
+              let variant = qualityMezzanineVariantForExport()
+        else {
+            // v1.4: on iOS, FilmtoneMezzanineRoutePolicy.qualityPrewarmVariant
+            // returns nil for every source class (HEVC re-encode pre-cost is
+            // not recovered by decode-time savings on Apple Silicon). Quality
+            // export reads source-direct in this branch.
+            return
+        }
+        guard let mezz = mezzanineService else {
+            throw FilmtoneMediaError.exportFailed(
+                "Quality mezzanine is required for this heavy source, but the cache service is unavailable."
+            )
+        }
+
+        let depthEnabled = request.depthEnabled ?? false
+        if mezz.existingMezzanineURL(for: sourceURL, variant: variant, depthEnabled: depthEnabled) != nil {
+            filmtonePreviewCompositionDebugLog("Quality mezzanine ready before export: \(variant.rawValue)")
+            mezzanineGeneratedDuringExport = false
+            return
+        }
+
+        progress(.init(
+            stage: .preflight,
+            progress: 0.06,
+            currentFrame: nil,
+            totalFrames: nil,
+            message: "Preparing quality cache"
+        ))
+
+        do {
+            _ = try mezz.ensureMezzanineBlocking(
+                sourceURL: sourceURL,
+                variant: variant,
+                depthEnabled: depthEnabled
+            ) { fraction in
+                progress(.init(
+                    stage: .preflight,
+                    progress: 0.06 + min(0.049, max(0.0, fraction) * 0.049),
+                    currentFrame: nil,
+                    totalFrames: nil,
+                    message: "Preparing quality cache"
+                ))
+            }
+            filmtonePreviewCompositionDebugLog("Quality mezzanine generated for export: \(variant.rawValue)")
+            mezzanineGeneratedDuringExport = true
+        } catch {
+            throw FilmtoneMediaError.exportFailed(
+                "Quality mezzanine generation failed for this heavy source (\(variant.rawValue)): \(error.localizedDescription)"
+            )
+        }
+    }
+
+    private func qualityMezzanineVariantForExport() -> ProfileVariant? {
+        guard let probe = request.sourceProbe else {
+            return MezzanineColorProbe.qualityPrewarmVariant(sourceURL: sourceURL)
+        }
+
+        let colorClass = probe.sourceVideoMetadata?.colorClass
+        let codecFamily = probe.sourceVideoMetadata?.codecFamily ?? probe.codecFamily
+        let estimatedDataRate = estimatedDataRate(from: probe)
+        guard let routeVariant = FilmtoneMezzanineRoutePolicy.qualityPrewarmVariant(
+            for: colorClass,
+            codecFamily: codecFamily,
+            estimatedDataRate: estimatedDataRate
+        ) else {
+            return nil
+        }
+
+        switch routeVariant {
+        case .qualitySDR:
+            return .qualitySDR
+        case .qualityHDR:
+            return .qualityHDR
+        case .sdr, .hdr:
+            return nil
+        }
+    }
+
+    private func estimatedDataRate(from probe: SourceProbeDTO) -> Double? {
+        guard let fileSizeBytes = probe.fileSizeBytes,
+              let durationSec = probe.durationSec,
+              fileSizeBytes > 0,
+              durationSec > 0
+        else {
+            return nil
+        }
+        return Double(fileSizeBytes) * 8.0 / durationSec
+    }
+
+    private static func makeRenderStageProfiler(
+        ciContext: CIContext,
+        colorSpace: CGColorSpace,
+        metrics: FilmtoneExportPerformanceMetrics
+    ) -> FilmtoneExportRenderStageProfiler? {
+        guard let configuration = FilmtoneExportRenderStageProfiler.Configuration.current() else {
+            return nil
+        }
+        metrics.enableRenderStageProfiling(
+            frameStride: configuration.frameStride,
+            source: configuration.source
+        )
+        NSLog(
+            "Filmtone export render stage profiler enabled: mode=forced-boundary-render frameStride=%d source=%@",
+            configuration.frameStride,
+            configuration.source
+        )
+        return FilmtoneExportRenderStageProfiler(
+            configuration: configuration,
+            ciContext: ciContext,
+            colorSpace: colorSpace,
+            metrics: metrics
+        )
     }
 
     static func scaledSize(for track: AVAssetTrack, longEdge: Int) -> CGSize {
@@ -2808,6 +3437,471 @@ private struct CompletedExport {
     let frameCount: Int
     let sourceDurationSec: Double?
     let audioPreserved: Bool
+}
+
+private enum FilmtoneExportRenderSubstage: String, CaseIterable {
+    case inputLut = "InputLut"
+    case baseGrade = "BaseGrade"
+    case toneCompression = "ToneCompression"
+    case edgeOptics = "EdgeOptics"
+    case glowFamily = "GlowFamily"
+    case vignette = "Vignette"
+    case grain = "Grain"
+    case creativeLut = "CreativeLut"
+    case printStage = "PrintStage"
+    case motion = "Motion"
+}
+
+private final class FilmtoneExportRenderStageProfiler {
+    struct Configuration {
+        let frameStride: Int
+        let source: String
+
+        static func current(processInfo: ProcessInfo = .processInfo) -> Configuration? {
+            if let argumentConfiguration = fromArguments(processInfo.arguments) {
+                return argumentConfiguration
+            }
+            guard let environmentValue = processInfo.environment[environmentKey] else {
+                return nil
+            }
+            return make(value: environmentValue, source: "env:\(environmentKey)")
+        }
+
+        private static let environmentKey = "FILMTONE_EXPORT_RENDER_STAGE_PROFILE"
+        private static let argumentPrefix = "--filmtone-export-render-stage-profile"
+
+        private static func fromArguments(_ arguments: [String]) -> Configuration? {
+            for (index, argument) in arguments.enumerated() {
+                if argument == argumentPrefix {
+                    let nextValue = arguments.indices.contains(index + 1)
+                        && !arguments[index + 1].hasPrefix("--")
+                        ? arguments[index + 1]
+                        : nil
+                    return make(value: nextValue, source: "argument:\(argumentPrefix)")
+                }
+                let prefix = "\(argumentPrefix)="
+                if argument.hasPrefix(prefix) {
+                    let value = String(argument.dropFirst(prefix.count))
+                    return make(value: value, source: "argument:\(argumentPrefix)")
+                }
+            }
+            return nil
+        }
+
+        private static func make(value: String?, source: String) -> Configuration? {
+            let normalized = (value ?? "1")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            if normalized.isEmpty || normalized == "1" || normalized == "true" || normalized == "yes" || normalized == "on" {
+                return Configuration(frameStride: 1, source: source)
+            }
+            if normalized == "0" || normalized == "false" || normalized == "no" || normalized == "off" {
+                return nil
+            }
+            guard let parsedStride = Int(normalized), parsedStride > 0 else {
+                return Configuration(frameStride: 1, source: source)
+            }
+            return Configuration(frameStride: parsedStride, source: source)
+        }
+    }
+
+    private let configuration: Configuration
+    private let ciContext: CIContext
+    private let colorSpace: CGColorSpace
+    private let metrics: FilmtoneExportPerformanceMetrics
+    private var frameIndex = 0
+    private var shouldProfileCurrentFrame = false
+    private var scratchBuffer: CVPixelBuffer?
+    private var scratchWidth = 0
+    private var scratchHeight = 0
+
+    init(
+        configuration: Configuration,
+        ciContext: CIContext,
+        colorSpace: CGColorSpace,
+        metrics: FilmtoneExportPerformanceMetrics
+    ) {
+        self.configuration = configuration
+        self.ciContext = ciContext
+        self.colorSpace = colorSpace
+        self.metrics = metrics
+    }
+
+    func beginFrame() {
+        frameIndex += 1
+        shouldProfileCurrentFrame = (frameIndex - 1) % configuration.frameStride == 0
+        if shouldProfileCurrentFrame {
+            metrics.recordRenderStageProfiledFrame()
+        }
+    }
+
+    func forceRender(
+        _ stage: FilmtoneExportRenderSubstage,
+        image: CIImage,
+        outputSize: CGSize
+    ) {
+        guard shouldProfileCurrentFrame else {
+            return
+        }
+        let width = max(1, Int(outputSize.width.rounded()))
+        let height = max(1, Int(outputSize.height.rounded()))
+        guard let scratch = scratchPixelBuffer(width: width, height: height) else {
+            metrics.recordRenderSubstageFailure(stage)
+            return
+        }
+        let bounds = CGRect(origin: .zero, size: CGSize(width: width, height: height))
+        metrics.measureRenderSubstage(stage) {
+            ciContext.render(
+                image,
+                to: scratch,
+                bounds: bounds,
+                colorSpace: colorSpace
+            )
+        }
+    }
+
+    private func scratchPixelBuffer(width: Int, height: Int) -> CVPixelBuffer? {
+        if let scratchBuffer, scratchWidth == width, scratchHeight == height {
+            return scratchBuffer
+        }
+        let attrs: [CFString: Any] = [
+            kCVPixelBufferPixelFormatTypeKey: Int(kCVPixelFormatType_32BGRA),
+            kCVPixelBufferWidthKey: width,
+            kCVPixelBufferHeightKey: height,
+            kCVPixelBufferCGImageCompatibilityKey: true,
+            kCVPixelBufferCGBitmapContextCompatibilityKey: true,
+            kCVPixelBufferIOSurfacePropertiesKey: [:],
+        ]
+        var buffer: CVPixelBuffer?
+        let status = CVPixelBufferCreate(
+            kCFAllocatorDefault,
+            width,
+            height,
+            kCVPixelFormatType_32BGRA,
+            attrs as CFDictionary,
+            &buffer
+        )
+        guard status == kCVReturnSuccess, let buffer else {
+            return nil
+        }
+        scratchBuffer = buffer
+        scratchWidth = width
+        scratchHeight = height
+        return buffer
+    }
+}
+
+private final class FilmtoneExportPerformanceMetrics {
+    enum Stage {
+        case decode
+        case waitEncoder
+        case buildGraph
+        case render
+        case append
+        case writerFinish
+    }
+
+    private let devicePerformanceAtStart = DevicePerformanceSnapshot.current()
+    private let lock = NSLock()
+    private var decodeNs: UInt64 = 0
+    private var waitEncoderNs: UInt64 = 0
+    private var buildGraphNs: UInt64 = 0
+    private var renderNs: UInt64 = 0
+    private var appendNs: UInt64 = 0
+    private var writerFinishNs: UInt64 = 0
+    private var mediaPipelineNs: UInt64?
+    private var decodeSamples = 0
+    private var renderedFrames = 0
+    private var renderStageProfileFrameStride: Int?
+    private var renderStageProfileSource: String?
+    private var renderStageProfiledFrames = 0
+    private var renderSubstageNs = Dictionary(
+        uniqueKeysWithValues: FilmtoneExportRenderSubstage.allCases.map { ($0, UInt64(0)) }
+    )
+    private var renderSubstageSamples = Dictionary(
+        uniqueKeysWithValues: FilmtoneExportRenderSubstage.allCases.map { ($0, 0) }
+    )
+    private var renderSubstageFailures = Dictionary(
+        uniqueKeysWithValues: FilmtoneExportRenderSubstage.allCases.map { ($0, 0) }
+    )
+
+    func measure<T>(_ stage: Stage, _ work: () throws -> T) rethrows -> T {
+        let started = DispatchTime.now().uptimeNanoseconds
+        defer {
+            record(stage, elapsedNs: DispatchTime.now().uptimeNanoseconds - started)
+        }
+        return try work()
+    }
+
+    func recordRenderedFrame() {
+        lock.lock()
+        renderedFrames += 1
+        lock.unlock()
+    }
+
+    func enableRenderStageProfiling(frameStride: Int, source: String) {
+        lock.lock()
+        renderStageProfileFrameStride = frameStride
+        renderStageProfileSource = source
+        lock.unlock()
+    }
+
+    func recordRenderStageProfiledFrame() {
+        lock.lock()
+        renderStageProfiledFrames += 1
+        lock.unlock()
+    }
+
+    func measureRenderSubstage(_ stage: FilmtoneExportRenderSubstage, _ work: () -> Void) {
+        let started = DispatchTime.now().uptimeNanoseconds
+        work()
+        let elapsed = DispatchTime.now().uptimeNanoseconds - started
+        lock.lock()
+        renderSubstageNs[stage, default: 0] += elapsed
+        renderSubstageSamples[stage, default: 0] += 1
+        lock.unlock()
+    }
+
+    func recordRenderSubstageFailure(_ stage: FilmtoneExportRenderSubstage) {
+        lock.lock()
+        renderSubstageFailures[stage, default: 0] += 1
+        lock.unlock()
+    }
+
+    func recordMediaPipeline(elapsedSince started: UInt64) {
+        let now = DispatchTime.now().uptimeNanoseconds
+        lock.lock()
+        mediaPipelineNs = now >= started ? now - started : 0
+        lock.unlock()
+    }
+
+    func sidecarPerformance(
+        elapsedMs: Int,
+        disabledRenderStages: [String] = [],
+        acceleratedRenderStages: [String] = []
+    ) -> SidecarPerformance? {
+        let snapshot: (
+            decodeNs: UInt64,
+            waitEncoderNs: UInt64,
+            buildGraphNs: UInt64,
+            renderNs: UInt64,
+            appendNs: UInt64,
+            writerFinishNs: UInt64,
+            mediaPipelineNs: UInt64?,
+            decodeSamples: Int,
+            renderedFrames: Int,
+            renderStageProfileFrameStride: Int?,
+            renderStageProfileSource: String?,
+            renderStageProfiledFrames: Int,
+            renderSubstages: [RenderSubstageSnapshot]
+        )
+        lock.lock()
+        let renderSubstages = FilmtoneExportRenderSubstage.allCases.map {
+            RenderSubstageSnapshot(
+                stage: $0,
+                elapsedNs: renderSubstageNs[$0, default: 0],
+                samples: renderSubstageSamples[$0, default: 0],
+                failures: renderSubstageFailures[$0, default: 0]
+            )
+        }
+        snapshot = (
+            decodeNs,
+            waitEncoderNs,
+            buildGraphNs,
+            renderNs,
+            appendNs,
+            writerFinishNs,
+            mediaPipelineNs,
+            decodeSamples,
+            renderedFrames,
+            renderStageProfileFrameStride,
+            renderStageProfileSource,
+            renderStageProfiledFrames,
+            renderSubstages
+        )
+        lock.unlock()
+
+        let hasVideoMetrics = snapshot.renderedFrames > 0 || snapshot.decodeSamples > 0
+        guard hasVideoMetrics || snapshot.writerFinishNs > 0 else {
+            return nil
+        }
+
+        let decodeMs = Self.ms(snapshot.decodeNs)
+        let waitEncoderMs = Self.ms(snapshot.waitEncoderNs)
+        let buildGraphMs = Self.ms(snapshot.buildGraphNs)
+        let renderMs = Self.ms(snapshot.renderNs)
+        let appendMs = Self.ms(snapshot.appendNs)
+        let writerFinishMs = Self.ms(snapshot.writerFinishNs)
+        let mediaPipelineMs = snapshot.mediaPipelineNs.map(Self.ms)
+        let mediaPipelineResidualMs = mediaPipelineMs.map {
+            max(0, $0 - decodeMs - waitEncoderMs - buildGraphMs - renderMs - appendMs)
+        }
+        let avgRenderMsPerFrame = snapshot.renderedFrames > 0
+            ? renderMs / Double(snapshot.renderedFrames)
+            : nil
+        let renderShareOfExport = elapsedMs > 0
+            ? renderMs / Double(elapsedMs)
+            : nil
+        let renderShareOfMediaPipeline = mediaPipelineMs.flatMap { value in
+            value > 0 ? renderMs / value : nil
+        }
+        let renderStageProfile = Self.makeRenderStageProfile(
+            frameStride: snapshot.renderStageProfileFrameStride,
+            source: snapshot.renderStageProfileSource,
+            sampledFrames: snapshot.renderStageProfiledFrames,
+            totalFrames: snapshot.renderedFrames,
+            substages: snapshot.renderSubstages
+        )
+        let devicePerformanceAtEnd = DevicePerformanceSnapshot.current()
+
+        return SidecarPerformance(
+            exportElapsedMs: elapsedMs,
+            mediaPipelineMs: mediaPipelineMs,
+            decodeMs: decodeMs,
+            decodeSamples: snapshot.decodeSamples,
+            waitEncoderMs: waitEncoderMs,
+            buildGraphMs: buildGraphMs,
+            renderMs: renderMs,
+            appendMs: appendMs,
+            writerFinishMs: writerFinishMs,
+            mediaPipelineResidualMs: mediaPipelineResidualMs,
+            renderedFrames: snapshot.renderedFrames,
+            avgRenderMsPerFrame: avgRenderMsPerFrame,
+            renderShareOfExport: renderShareOfExport,
+            renderShareOfMediaPipeline: renderShareOfMediaPipeline,
+            thermalStateAtStart: devicePerformanceAtStart.thermalState,
+            thermalStateAtEnd: devicePerformanceAtEnd.thermalState,
+            lowPowerModeEnabledAtStart: devicePerformanceAtStart.lowPowerModeEnabled,
+            lowPowerModeEnabledAtEnd: devicePerformanceAtEnd.lowPowerModeEnabled,
+            processorCount: devicePerformanceAtStart.processorCount,
+            activeProcessorCountAtStart: devicePerformanceAtStart.activeProcessorCount,
+            activeProcessorCountAtEnd: devicePerformanceAtEnd.activeProcessorCount,
+            physicalMemoryBytes: devicePerformanceAtStart.physicalMemoryBytes,
+            disabledRenderStages: disabledRenderStages.isEmpty ? nil : disabledRenderStages,
+            acceleratedRenderStages: acceleratedRenderStages.isEmpty ? nil : acceleratedRenderStages,
+            renderStageProfile: renderStageProfile
+        )
+    }
+
+    private func record(_ stage: Stage, elapsedNs: UInt64) {
+        lock.lock()
+        switch stage {
+        case .decode:
+            decodeNs += elapsedNs
+            decodeSamples += 1
+        case .waitEncoder:
+            waitEncoderNs += elapsedNs
+        case .buildGraph:
+            buildGraphNs += elapsedNs
+        case .render:
+            renderNs += elapsedNs
+        case .append:
+            appendNs += elapsedNs
+        case .writerFinish:
+            writerFinishNs += elapsedNs
+        }
+        lock.unlock()
+    }
+
+    private struct RenderSubstageSnapshot {
+        let stage: FilmtoneExportRenderSubstage
+        let elapsedNs: UInt64
+        let samples: Int
+        let failures: Int
+    }
+
+    private struct DevicePerformanceSnapshot {
+        let thermalState: String
+        let lowPowerModeEnabled: Bool
+        let processorCount: Int
+        let activeProcessorCount: Int
+        let physicalMemoryBytes: UInt64
+
+        static func current(processInfo: ProcessInfo = .processInfo) -> DevicePerformanceSnapshot {
+            DevicePerformanceSnapshot(
+                thermalState: thermalStateLabel(processInfo.thermalState),
+                lowPowerModeEnabled: processInfo.isLowPowerModeEnabled,
+                processorCount: processInfo.processorCount,
+                activeProcessorCount: processInfo.activeProcessorCount,
+                physicalMemoryBytes: processInfo.physicalMemory
+            )
+        }
+
+        private static func thermalStateLabel(_ state: ProcessInfo.ThermalState) -> String {
+            switch state {
+            case .nominal:
+                return "nominal"
+            case .fair:
+                return "fair"
+            case .serious:
+                return "serious"
+            case .critical:
+                return "critical"
+            @unknown default:
+                return "unknown"
+            }
+        }
+    }
+
+    private static func makeRenderStageProfile(
+        frameStride: Int?,
+        source: String?,
+        sampledFrames: Int,
+        totalFrames: Int,
+        substages: [RenderSubstageSnapshot]
+    ) -> SidecarRenderStageProfile? {
+        guard let frameStride, let source else {
+            return nil
+        }
+
+        var previousCumulativeMs: Double?
+        var previousCumulativeAvgMs: Double?
+        var previousEstimatedCumulativeMs: Double?
+        let stages = substages.map { substage -> SidecarRenderStageMetric in
+            let cumulativeMs = ms(substage.elapsedNs)
+            let cumulativeAvgMs = substage.samples > 0
+                ? cumulativeMs / Double(substage.samples)
+                : nil
+            let estimatedCumulativeMs = cumulativeAvgMs.map { $0 * Double(totalFrames) }
+            let incrementalMs = previousCumulativeMs.map { cumulativeMs - $0 }
+            let incrementalAvgMs = cumulativeAvgMs.flatMap { currentAvg in
+                previousCumulativeAvgMs.map { currentAvg - $0 }
+            }
+            let estimatedIncrementalMs = estimatedCumulativeMs.flatMap { currentEstimated in
+                previousEstimatedCumulativeMs.map { currentEstimated - $0 }
+            }
+
+            previousCumulativeMs = cumulativeMs
+            previousCumulativeAvgMs = cumulativeAvgMs
+            previousEstimatedCumulativeMs = estimatedCumulativeMs
+
+            return SidecarRenderStageMetric(
+                stage: substage.stage.rawValue,
+                samples: substage.samples,
+                failures: substage.failures,
+                cumulativeMs: cumulativeMs,
+                cumulativeAvgMsPerSample: cumulativeAvgMs,
+                estimatedCumulativeMs: estimatedCumulativeMs,
+                incrementalMsFromPreviousStage: incrementalMs,
+                incrementalAvgMsPerSample: incrementalAvgMs,
+                estimatedIncrementalMs: estimatedIncrementalMs
+            )
+        }
+
+        return SidecarRenderStageProfile(
+            mode: "forced-boundary-render",
+            source: source,
+            frameStride: frameStride,
+            sampledFrames: sampledFrames,
+            totalFrames: totalFrames,
+            forcedRenderMs: substages.reduce(0) { $0 + ms($1.elapsedNs) },
+            stages: stages
+        )
+    }
+
+    private static func ms(_ ns: UInt64) -> Double {
+        Double(ns) / 1_000_000.0
+    }
 }
 
 final class FilmtoneSharedGradeProcessor {
@@ -3286,6 +4380,46 @@ kernel vec4 glowComposite(__sample base, __sample bloom, __sample halation, __sa
     }
 
     return vec4(clamp(result, 0.0, 1.0), base.a);
+}
+""")
+
+    /// Backlight Veil composite — verbatim CI port of the WGSL direct +
+    /// scatter branch at
+    /// `packages/film-lab-renderer/src/webgpu/shaders/composite.frag.wgsl.ts:288-316`.
+    /// Used only when the optical filter family selects Backlight Veil; the
+    /// legacy `glowComposite` kernel above remains the path for every other
+    /// look so existing exports are byte-equivalent. Output is intentionally
+    /// unclamped to mirror WGSL — downstream stages (vignette / final 8-bit
+    /// conversion) handle headroom.
+    static let glowCompositeBacklightVeil = CIColorKernel(source: """
+vec3 glowShoulder(vec3 energy) {
+    return 1.0 - exp(-max(energy, vec3(0.0)));
+}
+
+kernel vec4 glowCompositeBacklightVeil(__sample base, __sample bloom, __sample halation, __sample diffusionImage, float bloomStrength, float halationIntensity, float diffusionAmount, float directTransmission, float blackRetention, float scatterStrength, float highlightReactivity, float warmScatter, float spectralTail) {
+    vec3 luma709 = vec3(0.2126, 0.7152, 0.0722);
+    vec3 baseRgb = base.rgb;
+    vec3 bloomRgb = bloom.rgb * bloomStrength;
+    vec3 halationRgb = halation.rgb * halationIntensity;
+    vec3 diffusedRgb = diffusionImage.rgb;
+
+    float baseLuma = dot(baseRgb, luma709);
+    float shadowHold = 1.0 - smoothstep(0.02, 0.34, baseLuma);
+    float directLoss = (1.0 - directTransmission) * scatterStrength * (1.0 - shadowHold * blackRetention * 0.75);
+    vec3 direct = baseRgb * (1.0 - directLoss);
+
+    float highlightMask = smoothstep(0.42, 1.28, dot(max(baseRgb, vec3(0.0)), luma709));
+    float highlightDrive = mix(1.0, 1.0 + highlightMask * 1.65, highlightReactivity);
+    float blackProtect = mix(1.0, smoothstep(0.04, 0.48, baseLuma), blackRetention);
+    vec3 warmBias = vec3(
+        1.0 + warmScatter * 0.18 + spectralTail * 0.12,
+        1.0 + warmScatter * 0.05,
+        1.0 - warmScatter * 0.10 - spectralTail * 0.08
+    );
+    vec3 scatterEnergy = bloomRgb * 0.82 + halationRgb * 1.08 + diffusedRgb * diffusionAmount * 0.24;
+    vec3 scatter = glowShoulder(scatterEnergy * warmBias * scatterStrength * highlightDrive * blackProtect);
+
+    return vec4(direct + scatter, base.a);
 }
 """)
 

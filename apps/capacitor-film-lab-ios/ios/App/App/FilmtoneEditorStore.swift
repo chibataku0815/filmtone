@@ -463,6 +463,13 @@ final class FilmtoneEditorStore: ObservableObject {
     /// MVP-deferred — see Item 3 plan §"Sidecar V1 Additions".)
     private(set) var appliedSavedLookId: UUID?
 
+    /// Backlight Veil Phase 1c — currently selected optical filter family id
+    /// (e.g. `"backlightVeil-1-2"`) or nil = OFF. Mirrored to
+    /// `FilmtoneOpticalFilterSelectionStore.shared` so
+    /// `FilmtoneExportSession.currentBacklightVeilOptical()` can pick it up
+    /// at composite time. In-memory only — app restart resets to nil.
+    @Published private(set) var selectedOpticalFilterId: String?
+
     let strings: FilmtoneStrings
     private let facade: FilmtoneEditorFacade
     private let libraryStore: LibraryStoreActor?
@@ -497,6 +504,10 @@ final class FilmtoneEditorStore: ObservableObject {
             self.source = nil
             self.probe = nil
             persist()
+        }
+
+        if let source {
+            facade.prewarmMezzanines(for: source)
         }
 
         reclaimCacheForCurrentState()
@@ -713,9 +724,9 @@ final class FilmtoneEditorStore: ObservableObject {
     /// - `.builtIn(.appleLog | .appleLog2)`: if the new probe's color class
     ///   doesn't match the selection, fall back to `.auto` and surface a
     ///   toast — the user picked a profile that the new clip can't honor.
-    /// - `.builtIn(.panasonicVLog | .sonySLog3 | .rec709)`: persist (cannot
-    ///   be auto-detected from container metadata, so the user's prior
-    ///   pick stays sticky across source swaps).
+    /// - `.builtIn(.djiDLog | .djiDLogM | .canonCLog | .canonLog3CinemaGamut | .panasonicVLog | .sonySLog3 | .rec709)`:
+    ///   persist (cannot be auto-detected from container metadata, so the
+    ///   user's prior pick stays sticky across source swaps).
     /// - `.userImport`: the existing inputLut clear rule above already
     ///   wipes the user-imported `.cube`; we reset to `.auto` here for
     ///   consistency.
@@ -728,8 +739,8 @@ final class FilmtoneEditorStore: ObservableObject {
                 project.cameraProfile = .auto
                 return
             }
-            // Sticky cases first — V-Log, S-Log3, Rec.709 cannot be
-            // auto-detected, so persist them across swaps.
+            // Sticky cases first — D-Log, D-Log M, C-Log, C-Log 3 + Cinema Gamut, V-Log,
+            // S-Log3, Rec.709 cannot be auto-detected, so persist them across swaps.
             if entry.detectionHint == nil {
                 return
             }
@@ -900,6 +911,20 @@ final class FilmtoneEditorStore: ObservableObject {
     func setQuickValue(_ value: Double, for axis: WritableKeyPath<FilmtoneQuickState, Double>) {
         appliedSavedLookId = nil
         project.quickState[keyPath: axis] = max(-1, min(1, value))
+        recomputeProjectParams()
+    }
+
+    /// Backlight Veil Phase 1c — segmented Picker writes a profile id (or
+    /// nil = OFF). The runtime singleton is the SSOT consumed by the
+    /// composite kernel; `selectedOpticalFilterId` mirrors it for SwiftUI
+    /// observation. `recomputeProjectParams()` reschedules the preview so
+    /// the new kernel branch picks up on the next frame.
+    func setOpticalFilterId(_ id: String?) {
+        guard selectedOpticalFilterId != id else {
+            return
+        }
+        selectedOpticalFilterId = id
+        FilmtoneOpticalFilterSelectionStore.shared.setCurrentId(id)
         recomputeProjectParams()
     }
 
@@ -1745,6 +1770,7 @@ final class FilmtoneEditorStore: ObservableObject {
         self.exportProgress = nil
         self.exportLocalAvailability = .none
         self.sourceLoadState = nil
+        facade.prewarmMezzanines(for: source)
     }
 
     private func applyLutMutation(_ mutate: (inout FilmtoneProjectState) -> Void) {

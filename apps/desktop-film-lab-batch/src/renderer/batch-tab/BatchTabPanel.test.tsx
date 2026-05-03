@@ -36,10 +36,10 @@ const baseProps: BatchTabPanelProps = {
   },
   isPurgingProxyCache: false,
   onPurgeProxyCache: async () => {},
-  batchPresetChoice: "reset",
+  batchLookChoice: "reset",
   batchLookSource: "preset",
   appliedOpticalRecommendation: null,
-  onBatchPresetChoiceChange: () => {},
+  onBatchLookChoiceChange: () => {},
   importedGradeLabel: null,
   onImportGradeJson: async () => {},
   onExportGradeJson: () => {},
@@ -67,7 +67,7 @@ const baseProps: BatchTabPanelProps = {
   canApplyEditGradeToBatch: false,
   onApplyEditGradeToBatch: () => {},
   editToExportSyncedAtMs: null,
-  onReapplyBatchPresetBaseline: () => {},
+  onReapplyBatchBaseLookBaseline: () => {},
 };
 
 describe("BatchTabPanel glass-unified layout (2026-04-19)", () => {

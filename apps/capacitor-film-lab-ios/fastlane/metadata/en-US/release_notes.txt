@@ -1,1 +1,25 @@
-v1.4 reframes the entire editing surface as a fullscreen Liquid Glass canvas and unifies Recipe and Look into a single Look concept. The built-in Look library is rebuilt as Creative Pack 01—Stone and Urban—each carrying its own 3D LUT and Filmtone-signature rgbShift instead of plain preset wrappers. Saved Looks now capture their optics and glow so re-applying a Look on another shot reproduces the exact same tone. Quick and advanced adjustments are now distinct states, and the strength sheet shows the Look name with a refined divider rhythm.
+v1.4 refreshes the editor as a full-screen Liquid Glass workspace and makes Look the main starting point for color. Preview stays at the center, while the bottom rail lets you choose a Look, adjust its strength, and check the result without leaving the editing surface.
+
+Creative Pack 01 adds two built-in Looks: Stone and Urban. Each one has its own 3D LUT and carries Filmtone-style optics, including rgbShift, bloom, halation, diffusion, lens softness, grain, and vignette. These are not plain preset wrappers. The Look itself now carries a color and light direction.
+
+The old preset-centered presentation has been reorganized around Looks that can be reused as a finish. Built-in Looks, saved Looks, strength, Quick controls, and advanced adjustments now fit into one clearer editing path: choose the direction, tune how much it applies, then refine details only when needed.
+
+Stone and Urban are designed as real built-in Looks. Alongside the bundled .cube LUT, each Look stores small lens color separation, highlight glow, grain behavior, edge falloff, and softness. Look strength is adjustable, so you can pull the effect back when it is too much for a source or push it further when the source needs more shape.
+
+Saved Looks now keep more than color. They also preserve glow, grain, and optical details, so applying the same Look to another source can reproduce the same tone more reliably. This makes it easier to keep a small set of exports aligned without rebuilding the same adjustments from scratch.
+
+Built-in Looks can also act as starting points for your own saved Looks. Apply Stone or Urban, tune strength and adjustments for the source, then save the result when you want to reuse that direction later. The saved Look stays focused on the finishing state rather than the original input source, so it is easier to apply again on another source.
+
+Quick controls and advanced adjustments are now separate states. Start with broad brightness, contrast, and saturation changes, then go deeper only when the source needs it. Advanced adjustments remain available for glow, grain, lens softness, and the optical details that shape the final look.
+
+This separation is meant to keep quick finishing quick while still leaving room for detailed work. A light edit can stay in Look strength and Quick controls. A deeper edit can move into advanced adjustments for glow, grain, lens softness, and other optical choices without mixing those states into the broad correction controls.
+
+The strength sheet now shows the active Look name, so it is clearer which Look you are changing. Choosing a Look, adjusting its strength, refining details, and exporting should feel easier to follow. Divider spacing and sheet rhythm were also refined so the editing controls read more clearly while you work.
+
+The two .cube LUT slots, Source Profile and Film Look, remain available. Source Profile keeps input-side handling separate from the final Film Look, which helps when working with Apple Log, Apple Log 2, S-Log3, V-Log, Rec.709, and your own LUT choices.
+
+The export flow follows the same structure. Pick media, choose or save a Look, adjust strength, use Source Profile or Film Look when the source needs a .cube LUT path, compare before/after, then export from iPhone. The UI changes are designed to keep that path visible instead of scattering the work across unrelated controls.
+
+This update also cleans up sheet presentation, help display, and picker presentation paths around the full-screen editor. The result is a more direct flow from choosing media, picking or saving a Look, refining the finish, and exporting from iPhone.
+
+The goal of v1.4 is not just to add more controls. It is to make Filmtone start from a clear Look decision, then keep strength, Quick controls, advanced adjustments, Source Profile, Film Look, save, and export in one readable path. Creative Pack 01 provides the starting Looks, and saved Looks make the result reusable.

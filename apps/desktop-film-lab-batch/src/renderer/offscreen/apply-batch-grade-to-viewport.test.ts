@@ -16,6 +16,7 @@ function makeGrade(
     lut1Intensity: 0.7,
     lut1Data: new Float32Array([0, 0.5, 1]),
     lut1Size: 2,
+    lut1SourceProfileId: null,
     lutIntensity: 0.9,
     lutData: new Float32Array([1, 0.5, 0]),
     lutSize: 3,

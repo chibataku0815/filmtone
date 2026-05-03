@@ -8,12 +8,15 @@ export const filmLookSpikeDefaultProps: FilmLookSpikeInputProps = {
   title: "Filmtone × Remotion",
 };
 
-/** Remotion FilmLookGrade の defaultProps（cinematic 基準） */
+/** Remotion FilmLookGrade の defaultProps（cinematic 基準）— Look Unification dual emit */
 export function createDefaultFilmLookGradeProps(): FilmLookGradeInputProps {
   const grade: Params = cloneParams(PRESETS.cinematic);
+  const id = LOOK_ID_BY_PRESET.cinematic;
   return {
-    lookPresetId: LOOK_ID_BY_PRESET.cinematic,
+    lookPresetId: id,
     presetVersion: PRESET_VERSION,
+    lookId: id,
+    lookVersion: PRESET_VERSION,
     grade,
   };
 }

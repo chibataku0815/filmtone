@@ -204,6 +204,12 @@ export type Phase0ExportStage =
 
 export type Phase0RenderMode = "quality" | "speed";
 
+export type Phase0MezzanineProfileVariant =
+  | "sdr"
+  | "hdr"
+  | "qualitySDR"
+  | "qualityHDR";
+
 /**
  * v1.3 (iOS, D3.1): depth prefilter renderer selector. Encoded as a plain
  * string on the wire for forward-compat — Phase B may add `metal` only on a
@@ -239,6 +245,16 @@ export interface Phase0ExportRequest {
    * `"ci"` (Core Image multi-image kernel); `"metal"` is reserved for Phase B.
    */
   depthRenderer?: Phase0DepthRenderer;
+  /**
+   * v1.4 (iOS): opt-in to writing the Filmtone Connect package companions
+   * (sidecar + cubes + DCTL + reference-after.jpg + a copy of the source
+   * media) next to the rendered output. Absent / false → only the rendered
+   * mp4 + sidecar are emitted, avoiding the multi-GB source-media copy on
+   * normal save-to-Photos / share-sheet flows. The user-facing
+   * "Share as Connect package" entry point is the only caller that should
+   * pass `true`.
+   */
+  connectPackage?: boolean;
 }
 
 export interface Phase0PreviewRenderResult {
@@ -298,8 +314,8 @@ export interface Phase0ExportBenchmarkRecord {
   mezzanineGenerationMs?: number;
   /** v1.2: render mode actually used ("quality" | "speed"). */
   renderMode?: Phase0RenderMode;
-  /** v1.2: mezzanine variant the export consumed ("sdr" | "hdr"), absent if no mezzanine used. */
-  mezzanineProfileVariant?: "sdr" | "hdr";
+  /** v1.2+: mezzanine variant the export consumed, absent if no mezzanine used. */
+  mezzanineProfileVariant?: Phase0MezzanineProfileVariant;
   /** v1.3 (D3.4): whether the depth × ray-angle prefilter ran for this export. */
   depthUsed?: boolean;
   /** v1.3 (D3.4): depth aux source ("avDepthData"), absent when depth not used. */

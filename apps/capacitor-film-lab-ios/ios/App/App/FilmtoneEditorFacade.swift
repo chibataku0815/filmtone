@@ -7,6 +7,10 @@ final class FilmtoneEditorFacade {
     private let cacheStore: CacheStore
     private let assetPickerService: AssetPickerService
     private let runtime: FilmtoneMediaRuntime
+    private let cacheMaintenanceQueue = DispatchQueue(
+        label: "FilmtoneEditorFacade.cacheMaintenance",
+        qos: .utility
+    )
     private let memoryWarningState = FilmtoneMemoryWarningState()
     private var memoryWarningObserver: NSObjectProtocol?
 
@@ -100,6 +104,10 @@ final class FilmtoneEditorFacade {
 
     func probeSource(_ source: SourceInfoDTO) throws -> SourceProbeDTO {
         try runtime.probeSource(source)
+    }
+
+    func prewarmMezzanines(for source: SourceInfoDTO) {
+        runtime.prewarmMezzanines(for: source)
     }
 
     func renderPreview(
@@ -202,7 +210,9 @@ final class FilmtoneEditorFacade {
 
     func reclaimCache(protecting uris: [String]) {
         let urls = uris.compactMap { try? runtime.resolveFileURL($0) }
-        _ = try? cacheStore.pruneStandard(protecting: urls)
+        cacheMaintenanceQueue.async { [cacheStore] in
+            _ = try? cacheStore.pruneStandard(protecting: urls)
+        }
     }
 
     @discardableResult

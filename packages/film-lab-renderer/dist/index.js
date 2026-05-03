@@ -3794,7 +3794,7 @@ var MediaLoadError = class extends Error {
   }
 };
 var HEIC_MIME = /heic|heif/i;
-var LIKELY_VIDEO_EXTENSION = /\.(mp4|m4v|mov|webm|ogv)$/i;
+var LIKELY_VIDEO_EXTENSION = /\.(mp4|m4v|mov|webm|ogv|mkv)$/i;
 function isFilmLabMediaDebugEnabled() {
   if (typeof window === "undefined") return false;
   try {

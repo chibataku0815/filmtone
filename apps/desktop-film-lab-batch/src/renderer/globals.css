@@ -406,39 +406,39 @@ body {
  * @description 検索付きプリセット一覧専用。OS 既定バーの白い溝感を消し、ポップオーバーの中に
  * 薄いレールとして沈めます。
  */
-.film-lab-preset-search-scroll {
+.film-lab-look-search-scroll {
   color-scheme: dark;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.08) rgba(255, 255, 255, 0.015);
 }
 
-.film-lab-preset-search-scroll:hover {
+.film-lab-look-search-scroll:hover {
   scrollbar-color: rgba(255, 255, 255, 0.22) rgba(255, 255, 255, 0.028);
 }
 
-.film-lab-preset-search-scroll::-webkit-scrollbar {
+.film-lab-look-search-scroll::-webkit-scrollbar {
   -webkit-appearance: none;
   appearance: none;
   width: 6px;
   background: transparent;
 }
 
-.film-lab-preset-search-scroll::-webkit-scrollbar-track {
+.film-lab-look-search-scroll::-webkit-scrollbar-track {
   margin: 4px 0;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.015);
 }
 
-.film-lab-preset-search-scroll::-webkit-scrollbar-thumb {
+.film-lab-look-search-scroll::-webkit-scrollbar-thumb {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
 }
 
-.film-lab-preset-search-scroll:hover::-webkit-scrollbar-track {
+.film-lab-look-search-scroll:hover::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.028);
 }
 
-.film-lab-preset-search-scroll:hover::-webkit-scrollbar-thumb {
+.film-lab-look-search-scroll:hover::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.24);
 }
 

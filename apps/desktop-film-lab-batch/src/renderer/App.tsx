@@ -27,16 +27,16 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import {
-  FILMTONE_DEFAULT_BASE_PRESET,
+  FILMTONE_DEFAULT_BASE_LOOK,
   buildOpticalFilterParamPatch,
   buildOpticalParamPatch,
   createFilmtoneDefaultParams,
   getOpticalFilterProfile,
+  type BaseLookName,
   type CameraOptics,
   type OpticalFilterProfile,
   type OpticalRecommendationV1,
   type Params,
-  type PresetName,
 } from "film-lab-core";
 import {
   FilmLabCanvas,
@@ -68,7 +68,7 @@ import {
   type FilmLabBatchSessionV1,
 } from "./batch-session";
 import {
-  batchGradeStateFromPreset,
+  batchGradeStateFromBaseLook,
   createDefaultBatchGradeState,
   resolveGradeFromJsonText,
   runBatchPipeline,
@@ -79,7 +79,7 @@ import {
   type BatchPipelineSummary,
 } from "./batch-pipeline";
 import {
-  needsMezzanineTranscode,
+  needsDesktopPreviewTranscode,
   runVideoExportPipeline,
   type VideoExportProgress,
   type VideoExportPipelineUserMessages,
@@ -100,6 +100,7 @@ import { exportGradeJsonText } from "./grade-io";
 import {
   type AppliedOpticalFilterProfileMetadata,
   type AppliedOpticalRecommendationMetadata,
+  type AppliedSourceProfileMetadata,
   buildFilmtoneExportSession,
   buildPhotoMetadataSidecarPath,
   buildVideoMetadataSidecarPath,
@@ -121,6 +122,7 @@ import {
 } from "./ai-scene-pick";
 import { buildAiRecommendation } from "./ai-recommendation-builder";
 import {
+  buildAppliedSourceProfileMetadata,
   buildEffectiveExportGradeSnapshot,
   collectEffectiveExportGradeWarnings,
   formatEffectiveExportGradeSummary,
@@ -185,12 +187,24 @@ function isRasterExportFileName(fileName: string): boolean {
 
 /** @description プレビューに載せたファイル名が動画書き出し向けか */
 function isVideoExportFileName(fileName: string): boolean {
-  return /\.(mp4|webm|m4v|mov)$/i.test(fileName);
+  return /\.(mp4|webm|m4v|mov|mkv)$/i.test(fileName);
 }
 
+type EditLutSlot = {
+  name: string;
+  data: Float32Array;
+  size: number;
+  intensity: number;
+  /**
+   * Built-in source-profile catalog id when this slot holds a Camera
+   * Profile (lut1 only). null/undefined for custom `.cube` or lut2.
+   */
+  sourceProfileId?: string | null;
+};
+
 type EditLutState = {
-  lut1: { name: string; data: Float32Array; size: number; intensity: number } | null;
-  lut2: { name: string; data: Float32Array; size: number; intensity: number } | null;
+  lut1: EditLutSlot | null;
+  lut2: EditLutSlot | null;
 };
 
 function buildEditLutStateFromBatchGrade(
@@ -205,6 +219,7 @@ function buildEditLutStateFromBatchGrade(
             data: grade.lut1Data,
             size: grade.lut1Size,
             intensity: grade.lut1Intensity,
+            sourceProfileId: grade.lut1SourceProfileId ?? null,
           }
         : null,
     lut2:
@@ -226,7 +241,7 @@ async function resolveBatchGradeSnapshot(
   s: FilmLabBatchSessionV1,
 ): Promise<{
   grade: BatchGradeState;
-  batchPresetChoice: PresetName;
+  batchLookChoice: BaseLookName;
   lookSource: MetadataLookSource;
   lutRefs: MetadataLutRefs;
   syncedAtMs: number | null;
@@ -244,7 +259,7 @@ async function resolveBatchGradeSnapshot(
     );
     return {
       grade: restored.batchGrade,
-      batchPresetChoice: restored.batchPresetChoice,
+      batchLookChoice: restored.batchLookChoice,
       lookSource: restored.lookSource,
       lutRefs: restored.lutRefs,
       syncedAtMs: restored.syncedAtMs,
@@ -269,12 +284,13 @@ async function resolveBatchGradeSnapshot(
         lut1Intensity: g.lut1Intensity,
         lut1Data: g.lut1Data,
         lut1Size: g.lut1Size,
+        lut1SourceProfileId: g.lut1SourceProfileId,
         lutIntensity: g.lutIntensity,
         lutData: g.lutData,
         lutSize: g.lutSize,
       },
-      batchPresetChoice: s.batchPresetChoice,
-      lookSource: "preset",
+      batchLookChoice: s.batchLookChoice,
+      lookSource: "builtInLook",
       lutRefs: createEmptyMetadataLutRefs(),
       syncedAtMs: null,
       importedFilePath: null,
@@ -284,9 +300,9 @@ async function resolveBatchGradeSnapshot(
     };
   }
   return {
-    grade: batchGradeStateFromPreset(s.batchPresetChoice),
-    batchPresetChoice: s.batchPresetChoice,
-    lookSource: "preset",
+    grade: batchGradeStateFromBaseLook(s.batchLookChoice),
+    batchLookChoice: s.batchLookChoice,
+    lookSource: "builtInLook",
     lutRefs: createEmptyMetadataLutRefs(),
     syncedAtMs: null,
     importedFilePath: null,
@@ -466,8 +482,8 @@ export default function App() {
    * @description キャンバス・共有コントロール・書き出し同期が共通で参照する現在のプリセット名です。
    * 検索付きプリセットセレクトが更新し、キャンバスの既定ルックと書き出しタブの起点に使います。
    */
-  const [canvasPreset, setCanvasPreset] = useState<PresetName>(
-    FILMTONE_DEFAULT_BASE_PRESET,
+  const [canvasLook, setCanvasBaseLook] = useState<BaseLookName>(
+    FILMTONE_DEFAULT_BASE_LOOK,
   );
   const [canvasInitialGradeParams, setCanvasInitialGradeParams] =
     useState<Params | null>(() => createFilmtoneDefaultParams());
@@ -475,10 +491,10 @@ export default function App() {
   const [batchGrade, setBatchGrade] = useState<BatchGradeState>(() =>
     createDefaultBatchGradeState(),
   );
-  const [batchPresetChoice, setBatchPresetChoice] =
-    useState<PresetName>(FILMTONE_DEFAULT_BASE_PRESET);
+  const [batchLookChoice, setBatchPresetChoice] =
+    useState<BaseLookName>(FILMTONE_DEFAULT_BASE_LOOK);
   const [batchLookSource, setBatchLookSource] =
-    useState<MetadataLookSource>("preset");
+    useState<MetadataLookSource>("builtInLook");
   const [batchLutRefs, setBatchLutRefs] = useState<MetadataLutRefs>(
     createEmptyMetadataLutRefs,
   );
@@ -574,6 +590,7 @@ export default function App() {
   );
   const aiScenePickInflightRef = useRef<Set<string>>(new Set());
   const progressiveLoad = useProgressiveLoad();
+  const pendingProgressivePreviewSourcePathRef = useRef<string | null>(null);
   const canvasHasUserVideo = useMemo(
     () =>
       desktopPreviewShowsUserVideo(interactivePreviewSource) &&
@@ -914,8 +931,8 @@ export default function App() {
         setOutputDir(parsed.outputDir);
         setBatchFormat(parsed.format);
         setBatchOutputSuffix(parsed.outputFilenameSuffix);
-        setBatchPresetChoice(parsed.batchPresetChoice);
-        setBatchLookSource("preset");
+        setBatchPresetChoice(parsed.batchLookChoice);
+        setBatchLookSource("builtInLook");
         setBatchLutRefs(createEmptyMetadataLutRefs());
         setAppliedOpticalRecommendation(null);
         setAppliedOpticalFilterProfile(null);
@@ -924,7 +941,7 @@ export default function App() {
         try {
           const snap = await resolveBatchGradeSnapshot(parsed);
           setBatchGrade(snap.grade);
-          setBatchPresetChoice(snap.batchPresetChoice);
+          setBatchPresetChoice(snap.batchLookChoice);
           setBatchLookSource(snap.lookSource);
           setBatchLutRefs(snap.lutRefs);
           setAppliedOpticalRecommendation(snap.appliedOpticalRecommendation);
@@ -933,8 +950,8 @@ export default function App() {
           setImportedGradeLabel(snap.importedFilePath);
           setEditToExportSyncedAtMs(snap.syncedAtMs);
         } catch {
-          setBatchGrade(batchGradeStateFromPreset(parsed.batchPresetChoice));
-          setBatchLookSource("preset");
+          setBatchGrade(batchGradeStateFromBaseLook(parsed.batchLookChoice));
+          setBatchLookSource("builtInLook");
           setBatchLutRefs(createEmptyMetadataLutRefs());
           setAppliedOpticalRecommendation(null);
           setAppliedOpticalFilterProfile(null);
@@ -1139,7 +1156,7 @@ export default function App() {
         restored.lutRefs,
       );
       setBatchGrade(restored.batchGrade);
-      setBatchPresetChoice(restored.batchPresetChoice);
+      setBatchPresetChoice(restored.batchLookChoice);
       setBatchLookSource(restored.lookSource);
       setBatchLutRefs(restored.lutRefs);
       setAppliedOpticalRecommendation(restored.appliedOpticalRecommendation);
@@ -1148,7 +1165,7 @@ export default function App() {
       setImportedGradeLabel(restored.importedFilePath);
       setEditToExportSyncedAtMs(restored.syncedAtMs);
       setCanvasInitialGradeParams(null);
-      setCanvasPreset(restored.batchPresetChoice);
+      setCanvasBaseLook(restored.batchLookChoice);
       setEditLut(restoredEditLut);
       setImportedPreviewParams(restored.batchGrade.params);
       setImportedPreviewGrade({
@@ -1157,6 +1174,7 @@ export default function App() {
         lut1Intensity: restored.batchGrade.lut1Intensity,
         lut1Data: restored.batchGrade.lut1Data,
         lut1Size: restored.batchGrade.lut1Size,
+        lut1SourceProfileId: restored.batchGrade.lut1SourceProfileId,
         lutIntensity: restored.batchGrade.lutIntensity,
         lutData: restored.batchGrade.lutData,
         lutSize: restored.batchGrade.lutSize,
@@ -1240,6 +1258,7 @@ export default function App() {
   const handleInteractiveSourceChange = useCallback(
     (info: FilmLabInteractiveSourceInfo) => {
       if (info.kind === "sample") {
+        pendingProgressivePreviewSourcePathRef.current = null;
         setInteractivePreviewSource({ kind: "sample" });
         return;
       }
@@ -1254,12 +1273,19 @@ export default function App() {
         absolutePath,
         smartLookDerived,
       });
-      if (smartLookDerived || !absolutePath) return;
+      if (smartLookDerived || !absolutePath) {
+        pendingProgressivePreviewSourcePathRef.current = null;
+        return;
+      }
       if (isVideoExportFileName(info.fileName)) {
+        if (pendingProgressivePreviewSourcePathRef.current === absolutePath) {
+          pendingProgressivePreviewSourcePathRef.current = null;
+        }
         void applyPickedVideoPath(absolutePath);
         return;
       }
       if (isRasterExportFileName(info.fileName)) {
+        pendingProgressivePreviewSourcePathRef.current = null;
         const sep = Math.max(
           absolutePath.lastIndexOf("/"),
           absolutePath.lastIndexOf("\\"),
@@ -1328,7 +1354,7 @@ export default function App() {
 
     const probe = await window.filmLabBatch.videoExportProbe(absPath);
 
-    if (!needsMezzanineTranscode({
+    if (!needsDesktopPreviewTranscode({
       videoCodec: probe.videoCodec,
       fileSizeBytes: probe.fileSizeBytes,
       absPath,
@@ -1337,6 +1363,7 @@ export default function App() {
       return null; // codec is supported, no transcode needed
     }
 
+    pendingProgressivePreviewSourcePathRef.current = absPath;
     const result = await progressiveLoad.startProgressiveLoad(
       absPath,
       file.name,
@@ -1344,6 +1371,9 @@ export default function App() {
       handleProgressiveTextureSwap,
     );
     if (!result) {
+      if (pendingProgressivePreviewSourcePathRef.current === absPath) {
+        pendingProgressivePreviewSourcePathRef.current = null;
+      }
       return null;
     }
     return {
@@ -1364,6 +1394,9 @@ export default function App() {
   useEffect(() => {
     const activeSourcePath = progressiveLoad.activeSourcePath;
     if (!activeSourcePath) {
+      return;
+    }
+    if (activeSourcePath === pendingProgressivePreviewSourcePathRef.current) {
       return;
     }
     if (
@@ -1765,8 +1798,8 @@ export default function App() {
       viewportParams,
       currentBatchGrade: batchGrade,
       editLut,
-      canvasPreset,
-      fallbackBatchPresetChoice: batchPresetChoice,
+      canvasLook,
+      fallbackBatchLookChoice: batchLookChoice,
       fallbackLookSource: batchLookSource,
       fallbackLutRefs: batchLutRefs,
       captureError,
@@ -1776,8 +1809,8 @@ export default function App() {
     viewport,
     batchGrade,
     editLut,
-    canvasPreset,
-    batchPresetChoice,
+    canvasLook,
+    batchLookChoice,
     batchLookSource,
     batchLutRefs,
     batchJobMode,
@@ -1814,7 +1847,7 @@ export default function App() {
       setBatchLookSource(snapshot.lookSource);
       setBatchLutRefs(snapshot.lutRefs);
       setImportedGradeLabel(null);
-      setBatchPresetChoice(snapshot.batchPresetChoice);
+      setBatchPresetChoice(snapshot.batchLookChoice);
       setEditToExportSyncedAtMs(Date.now());
       setSyncedAtNonce(paramsChangeNonce);
       appendLog(tLogs("syncCopied"));
@@ -1839,10 +1872,10 @@ export default function App() {
     tApp,
   ]);
 
-  const applyBatchPreset = (name: PresetName) => {
+  const applyBatchBaseLook = (name: BaseLookName) => {
     setBatchPresetChoice(name);
-    setBatchGrade(batchGradeStateFromPreset(name));
-    setBatchLookSource("preset");
+    setBatchGrade(batchGradeStateFromBaseLook(name));
+    setBatchLookSource("builtInLook");
     setBatchLutRefs(createEmptyMetadataLutRefs());
     setAppliedOpticalRecommendation(null);
     setAppliedOpticalFilterProfile(null);
@@ -1850,9 +1883,9 @@ export default function App() {
     setEditToExportSyncedAtMs(null);
   };
 
-  const handleControlPanelPresetChange = useCallback((name: PresetName) => {
+  const handleControlPanelBaseLookChange = useCallback((name: BaseLookName) => {
     setCanvasInitialGradeParams(null);
-    setCanvasPreset(name);
+    setCanvasBaseLook(name);
   }, []);
 
   const handleOpticalFilterProfileApply = useCallback(
@@ -1912,17 +1945,22 @@ export default function App() {
       outputFilenameSuffix: string | null;
       outputFileName: string | null;
       grade?: BatchGradeState;
-      batchPresetChoice?: PresetName;
+      batchLookChoice?: BaseLookName;
       lookSource?: MetadataLookSource;
       lutRefs?: MetadataLutRefs;
       opticalRecommendation?: AppliedOpticalRecommendationMetadata | null;
       opticalFilterProfile?: AppliedOpticalFilterProfileMetadata | null;
+      sourceProfile?: AppliedSourceProfileMetadata | null;
       cameraOptics?: CameraOptics | null;
       sourceVideoMetadata?: SourceVideoMetadata | null;
     }) => {
       const exportedAtIso = new Date().toISOString();
       const cameraOptics =
         payload.cameraOptics ?? (payload.job === "video" ? sourceCameraOptics : null);
+      const sourceProfile =
+        payload.sourceProfile !== undefined
+          ? payload.sourceProfile
+          : buildAppliedSourceProfileMetadata(editLut.lut1, exportedAtIso);
       const session = buildFilmtoneExportSession({
         exportedAtIso,
         appVersion,
@@ -1933,7 +1971,7 @@ export default function App() {
         imageFormat: payload.imageFormat,
         outputFilenameSuffix: payload.outputFilenameSuffix,
         outputFileName: payload.outputFileName,
-        batchPresetChoice: payload.batchPresetChoice ?? batchPresetChoice,
+        batchLookChoice: payload.batchLookChoice ?? batchLookChoice,
         lookSource: payload.lookSource ?? batchLookSource,
         gradeParams: (payload.grade ?? batchGrade).params,
         depthTrack: (payload.grade ?? batchGrade).depthTrack,
@@ -1942,6 +1980,7 @@ export default function App() {
           payload.opticalRecommendation ?? appliedOpticalRecommendation,
         opticalFilterProfile:
           payload.opticalFilterProfile ?? appliedOpticalFilterProfile,
+        sourceProfile,
         cameraOptics,
         sourceVideoMetadata: payload.sourceVideoMetadata ?? null,
       });
@@ -1957,7 +1996,8 @@ export default function App() {
       batchGrade,
       batchLookSource,
       batchLutRefs,
-      batchPresetChoice,
+      batchLookChoice,
+      editLut,
       sourceCameraOptics,
     ],
   );
@@ -1990,7 +2030,7 @@ export default function App() {
         outputDir: string;
         /** @description 再開直後など、state よりこのスナップショットをパイプラインに渡す */
         grade?: BatchGradeState;
-        batchPresetChoice?: PresetName;
+        batchLookChoice?: BaseLookName;
         lookSource?: MetadataLookSource;
         lutRefs?: MetadataLutRefs;
         opticalRecommendation?: AppliedOpticalRecommendationMetadata | null;
@@ -2005,9 +2045,9 @@ export default function App() {
         : captureEffectiveExportGrade();
       const effectiveGrade = pathContext?.grade ?? capturedSnapshot!.grade;
       const effectiveBatchPresetChoice =
-        pathContext?.batchPresetChoice ??
-        capturedSnapshot?.batchPresetChoice ??
-        batchPresetChoice;
+        pathContext?.batchLookChoice ??
+        capturedSnapshot?.batchLookChoice ??
+        batchLookChoice;
       const effectiveLookSource =
         pathContext?.lookSource ?? capturedSnapshot?.lookSource ?? batchLookSource;
       const effectiveLutRefs =
@@ -2024,9 +2064,15 @@ export default function App() {
         (capturedSnapshot?.source === "preview" ? null : importedGradeLabel);
       const effectiveSnapshot: EffectiveExportGradeSnapshot = {
         grade: effectiveGrade,
-        batchPresetChoice: effectiveBatchPresetChoice,
+        batchLookChoice: effectiveBatchPresetChoice,
         lookSource: effectiveLookSource,
         lutRefs: effectiveLutRefs,
+        appliedSourceProfile:
+          capturedSnapshot?.appliedSourceProfile ??
+          buildAppliedSourceProfileMetadata(
+            editLut.lut1,
+            new Date().toISOString(),
+          ),
         source: capturedSnapshot?.source ?? "batch",
         captureError: capturedSnapshot?.captureError ?? null,
         exportRenderGeometry: capturedSnapshot?.exportRenderGeometry ?? null,
@@ -2088,7 +2134,7 @@ export default function App() {
         outputFilenameSuffix: sanitizedOutputSuffix,
         outputFileName: null,
         grade: effectiveGrade,
-        batchPresetChoice: effectiveBatchPresetChoice,
+        batchLookChoice: effectiveBatchPresetChoice,
         lookSource: effectiveLookSource,
         lutRefs: effectiveLutRefs,
         opticalRecommendation: effectiveOpticalRecommendation,
@@ -2193,7 +2239,7 @@ export default function App() {
       appliedOpticalRecommendation,
       batchLookSource,
       batchLutRefs,
-      batchPresetChoice,
+      batchLookChoice,
       captureEffectiveExportGrade,
       finalizeSessionAfterRun,
       buildMetadataSessionJsonText,
@@ -2231,7 +2277,7 @@ export default function App() {
       format: batchFormat,
       imagePaths: images,
       outcomes: initialOutcomes(images.length),
-      batchPresetChoice: exportSnapshot.batchPresetChoice,
+      batchLookChoice: exportSnapshot.batchLookChoice,
       importedGradePath: sessionImportedGradePath,
       gradeParamsJson: sessionGradeParamsJson,
       outputFilenameSuffix: sanitizeBatchFilenameSuffix(batchOutputSuffix),
@@ -2242,7 +2288,7 @@ export default function App() {
       inputDir,
       outputDir,
       grade: exportSnapshot.grade,
-      batchPresetChoice: exportSnapshot.batchPresetChoice,
+      batchLookChoice: exportSnapshot.batchLookChoice,
       lookSource: exportSnapshot.lookSource,
       lutRefs: exportSnapshot.lutRefs,
       opticalRecommendation:
@@ -2261,7 +2307,7 @@ export default function App() {
     setOutputDir(s.outputDir);
     setBatchFormat(s.format);
     setBatchOutputSuffix(s.outputFilenameSuffix);
-    setBatchPresetChoice(s.batchPresetChoice);
+    setBatchPresetChoice(s.batchLookChoice);
     let gradeSnap: Awaited<ReturnType<typeof resolveBatchGradeSnapshot>>;
     try {
       gradeSnap = await resolveBatchGradeSnapshot(s);
@@ -2269,9 +2315,9 @@ export default function App() {
       const msg = e instanceof Error ? e.message : String(e);
       appendLog(tLogs("sessionRestoreFailed", { msg }));
       gradeSnap = {
-        grade: batchGradeStateFromPreset(s.batchPresetChoice),
-        batchPresetChoice: s.batchPresetChoice,
-        lookSource: "preset",
+        grade: batchGradeStateFromBaseLook(s.batchLookChoice),
+        batchLookChoice: s.batchLookChoice,
+        lookSource: "builtInLook",
         lutRefs: createEmptyMetadataLutRefs(),
         syncedAtMs: null,
         importedFilePath: s.importedGradePath,
@@ -2281,7 +2327,7 @@ export default function App() {
       };
     }
     setBatchGrade(gradeSnap.grade);
-    setBatchPresetChoice(gradeSnap.batchPresetChoice);
+    setBatchPresetChoice(gradeSnap.batchLookChoice);
     setBatchLookSource(gradeSnap.lookSource);
     setBatchLutRefs(gradeSnap.lutRefs);
     setAppliedOpticalRecommendation(gradeSnap.appliedOpticalRecommendation);
@@ -2295,7 +2341,7 @@ export default function App() {
       inputDir: s.inputDir,
       outputDir: s.outputDir,
       grade: gradeSnap.grade,
-      batchPresetChoice: gradeSnap.batchPresetChoice,
+      batchLookChoice: gradeSnap.batchLookChoice,
       lookSource: gradeSnap.lookSource,
       lutRefs: gradeSnap.lutRefs,
       opticalRecommendation: gradeSnap.appliedOpticalRecommendation,
@@ -2316,7 +2362,7 @@ export default function App() {
       inputDir,
       outputDir,
       grade: exportSnapshot.grade,
-      batchPresetChoice: exportSnapshot.batchPresetChoice,
+      batchLookChoice: exportSnapshot.batchLookChoice,
       lookSource: exportSnapshot.lookSource,
       lutRefs: exportSnapshot.lutRefs,
       opticalRecommendation:
@@ -2430,7 +2476,7 @@ export default function App() {
       outputFilenameSuffix: null,
       outputFileName: outName,
       grade: videoExportSnapshot.grade,
-      batchPresetChoice: videoExportSnapshot.batchPresetChoice,
+      batchLookChoice: videoExportSnapshot.batchLookChoice,
       lookSource: videoExportSnapshot.lookSource,
       lutRefs: videoExportSnapshot.lutRefs,
       opticalRecommendation:
@@ -2718,7 +2764,7 @@ export default function App() {
                 ref={filmLabCanvasRef}
                 chromeLayout="stacked"
                 stackedToolbarVisible={false}
-                preset={canvasPreset}
+                preset={canvasLook}
                 depthTrack={batchGrade.depthTrack}
                 cameraOptics={sourceCameraOptics}
                 initialGradeParams={canvasInitialGradeParams}
@@ -2922,7 +2968,7 @@ export default function App() {
                       onHistogramToggle={
                         previewSupportsHistogram ? handleHistogramToggle : undefined
                       }
-                      onPresetChange={handleControlPanelPresetChange}
+                      onBaseLookChange={handleControlPanelBaseLookChange}
                       onLutChange={handleEditLutChange}
                       onParamsChange={handleEditParamsChange}
                       onOpticalFilterProfileApply={handleOpticalFilterProfileApply}
@@ -3167,10 +3213,10 @@ export default function App() {
                           proxyCacheInfo={proxyCacheInfo}
                           isPurgingProxyCache={purgingProxyCache}
                           onPurgeProxyCache={purgeProxyCache}
-                          batchPresetChoice={batchPresetChoice}
+                          batchLookChoice={batchLookChoice}
                           batchLookSource={batchLookSource}
                           appliedOpticalRecommendation={appliedOpticalRecommendation}
-                          onBatchPresetChoiceChange={applyBatchPreset}
+                          onBatchLookChoiceChange={applyBatchBaseLook}
                           importedGradeLabel={importedGradeLabel}
                           onImportGradeJson={importGradeJson}
                           onExportGradeJson={exportGrade}
@@ -3210,8 +3256,8 @@ export default function App() {
                           canApplyEditGradeToBatch={Boolean(viewport)}
                           onApplyEditGradeToBatch={syncPreviewToBatch}
                           editToExportSyncedAtMs={editToExportSyncedAtMs}
-                          onReapplyBatchPresetBaseline={() => {
-                            applyBatchPreset(batchPresetChoice);
+                          onReapplyBatchBaseLookBaseline={() => {
+                            applyBatchBaseLook(batchLookChoice);
                           }}
                           desktopInteractivePreview={interactivePreviewSource}
                         />
@@ -3227,10 +3273,10 @@ export default function App() {
                           proxyCacheInfo={proxyCacheInfo}
                           isPurgingProxyCache={purgingProxyCache}
                           onPurgeProxyCache={purgeProxyCache}
-                          batchPresetChoice={batchPresetChoice}
+                          batchLookChoice={batchLookChoice}
                           batchLookSource={batchLookSource}
                           appliedOpticalRecommendation={appliedOpticalRecommendation}
-                          onBatchPresetChoiceChange={applyBatchPreset}
+                          onBatchLookChoiceChange={applyBatchBaseLook}
                           importedGradeLabel={importedGradeLabel}
                           onImportGradeJson={importGradeJson}
                           onExportGradeJson={exportGrade}
@@ -3270,8 +3316,8 @@ export default function App() {
                           canApplyEditGradeToBatch={Boolean(viewport)}
                           onApplyEditGradeToBatch={syncPreviewToBatch}
                           editToExportSyncedAtMs={editToExportSyncedAtMs}
-                          onReapplyBatchPresetBaseline={() => {
-                            applyBatchPreset(batchPresetChoice);
+                          onReapplyBatchBaseLookBaseline={() => {
+                            applyBatchBaseLook(batchLookChoice);
                           }}
                           desktopInteractivePreview={interactivePreviewSource}
                         />

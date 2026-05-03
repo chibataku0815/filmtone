@@ -760,6 +760,22 @@ export function needsMezzanineTranscode(opts: {
 }
 
 /**
+ * @description Desktop preview は Chromium の `<video>` が読めるコンテナだけを直接読む。
+ *   H.264/AVC でも QuickTime / Matroska コンテナは環境差で失敗するため progressive load に回す。
+ */
+export function needsDesktopPreviewTranscode(opts: {
+  videoCodec: string;
+  fileSizeBytes: number;
+  absPath: string;
+}): boolean {
+  const lowerPath = opts.absPath.toLowerCase();
+  if (/\.(mov|qt|mkv)$/.test(lowerPath)) {
+    return true;
+  }
+  return needsMezzanineTranscode(opts);
+}
+
+/**
  * @description `<video>` を停止して `src` を外す。seek 経路への再試行時に古いデコーダを残しにくくする。
  */
 function disposeVideoElement(video: HTMLVideoElement | null): void {

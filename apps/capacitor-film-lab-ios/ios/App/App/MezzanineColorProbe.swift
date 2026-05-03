@@ -30,6 +30,70 @@ enum MezzanineColorProbe {
         return prewarmVariant(track: track)
     }
 
+    /// v1.4: quality-grade prewarm variant. Returns nil for typical iPhone
+    /// HEVC sources (already efficiently encoded) so no quality mezzanine is
+    /// generated — Quality export reads source directly. Returns
+    /// qualitySDR / qualityHDR for ProRes / DNxHD / >=100 Mbps sources where
+    /// re-encoding pays off in decode-time UX.
+    static func qualityPrewarmVariant(track: AVAssetTrack) -> ProfileVariant? {
+        guard let colorClass = sourceColorClass(track: track) else {
+            return nil
+        }
+        let codecFamily = codecFamily(for: track)
+        let dataRate = Double(track.estimatedDataRate)
+        guard let routeVariant = FilmtoneMezzanineRoutePolicy.qualityPrewarmVariant(
+            for: colorClass,
+            codecFamily: codecFamily,
+            estimatedDataRate: dataRate > 0 ? dataRate : nil
+        ) else {
+            return nil
+        }
+        return profileVariant(for: routeVariant)
+    }
+
+    static func qualityPrewarmVariant(sourceURL: URL) -> ProfileVariant? {
+        let asset = AVURLAsset(url: sourceURL)
+        guard let track = asset.tracks(withMediaType: .video).first else {
+            return nil
+        }
+        return qualityPrewarmVariant(track: track)
+    }
+
+    private static func codecFamily(for track: AVAssetTrack) -> SourceCodecFamilyDTO? {
+        guard let description = track.formatDescriptions.first else {
+            return nil
+        }
+        let mediaSubType = CMFormatDescriptionGetMediaSubType(description as! CMFormatDescription)
+        let codec = fourCCString(mediaSubType)
+        switch codec {
+        case "avc1", "avc3", "h264":
+            return .h264
+        case "hvc1", "hev1", "hevc":
+            return .hevc
+        case "apco", "apcs", "apcn", "apch":
+            return .prores422
+        case "ap4h", "ap4x":
+            return .prores4444
+        case "aprn", "aprh":
+            return .proresRaw
+        default:
+            return .other
+        }
+    }
+
+    private static func fourCCString(_ value: FourCharCode) -> String {
+        let bytes: [CChar] = [
+            CChar((value >> 24) & 0xff),
+            CChar((value >> 16) & 0xff),
+            CChar((value >> 8) & 0xff),
+            CChar(value & 0xff),
+            0,
+        ]
+        return String(cString: bytes)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+    }
+
     private static func sourceColorClass(track: AVAssetTrack) -> SourceColorClassDTO? {
         guard let firstDescription = track.formatDescriptions.first else {
             return nil
@@ -95,6 +159,10 @@ enum MezzanineColorProbe {
             return .sdr
         case .hdr:
             return .hdr
+        case .qualitySDR:
+            return .qualitySDR
+        case .qualityHDR:
+            return .qualityHDR
         }
     }
 }

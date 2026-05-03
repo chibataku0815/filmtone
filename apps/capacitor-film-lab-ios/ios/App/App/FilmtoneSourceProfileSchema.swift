@@ -83,10 +83,14 @@ enum CameraProfileSelection: Equatable, Sendable, Codable {
 /// Apple Log / Apple Log 2 are present here so the catalog entry can name
 /// the curve uniformly even though their pipeline is `(P) nativePolicy`.
 enum SourceProfileCurve: String, Codable, CaseIterable, Sendable {
-    case appleLog       = "apple-log"
-    case appleLog2      = "apple-log-2"
-    case panasonicVLog  = "panasonic-vlog"
-    case sonySLog3      = "sony-slog3"
+    case appleLog              = "apple-log"
+    case appleLog2             = "apple-log-2"
+    case djiDLog               = "dji-dlog"
+    case djiDLogM              = "dji-dlog-m"
+    case canonCLog             = "canon-clog"
+    case canonLog3CinemaGamut  = "canon-log3-cinema-gamut"
+    case panasonicVLog         = "panasonic-vlog"
+    case sonySLog3             = "sony-slog3"
 }
 
 // MARK: - Source Profile implementation strategy
@@ -100,7 +104,7 @@ enum SourceProfileCurve: String, Codable, CaseIterable, Sendable {
 ///   path. Apple Log / Apple Log 2 ride this lane, sharing
 ///   `makeAppleLogToRec709Lut` from `FilmtoneExportSession`.
 /// - `.synthesized` — Filmtone-implemented decoder + gamut matrix +
-///   `filmtoneSdrShoulder` + Rec.709 encode. V-Log and S-Log3 ride this
+///   `filmtoneSdrShoulder` + Rec.709 encode. D-Log, C-Log, V-Log, and S-Log3 ride this
 ///   lane (Camera Profiles Phases B and C). Each (S) curve must ship with
 ///   a math doc + accuracy fixture + accuracy test in the same PR.
 /// - `.bundledCube` — bundled `.cube` resolved from the LUT library by id.

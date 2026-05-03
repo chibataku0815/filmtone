@@ -423,7 +423,10 @@
       "creativeMix": "適用量",
       "creativeMixDisabledHint": "まず .cube を読み込んでください",
       "logMix": "変換の適用量",
-      "logMixDisabledHint": "ログ用の .cube を読み込んでください"
+      "logMixDisabledHint": "ログ用の .cube を読み込んでください",
+      "cameraProfileHelp": "ルックの前に適用するカメラプロファイルを選びます。",
+      "cameraProfileNone": "なし",
+      "cameraProfileCustom": "カスタム .cube"
     },
     "metadata": {
       "title": "Filmtone",
@@ -477,7 +480,7 @@
       "quick": "クイック",
       "pro": "プロ",
       "toggleGroupAria": "クイックとプロの表示切り替え",
-      "hint": "クイックはプリセットと3本のメタスライダー（フィルム調・新旧・ダイナミック）で粗く調整。プロは露出・彩度などを1本ずつ、トーン詳細・エフェクト・Bloom・Halation・LUT も表示します。",
+      "hint": "クイックはルックと3本のメタスライダー（フィルム調・新旧・ダイナミック）で粗く調整。プロは露出・彩度などを1本ずつ、トーン詳細・エフェクト・Bloom・Halation・LUT も表示します。",
       "hintInfoAria": "クイックとプロの違い"
     },
     "compare": {
@@ -564,11 +567,11 @@
     "shortcuts": {
       "title": "キーボードショートカット",
       "closeHint": "? または Esc で閉じます",
-      "presetSelect": "プリセットを選択",
+      "presetSelect": "ルックを選択",
       "reset": "リセット",
       "beforeAfter": "ビフォー / アフター（押し続ける）",
       "holdButton": "タッチ端末では長押しボタン",
-      "presetSlider": "プリセットとニュートラルのブレンド（プリセット選択時）",
+      "presetSlider": "ルックとニュートラルのブレンド（ルック選択時）",
       "undo": "元に戻す",
       "redo": "やり直す",
       "histogram": "ヒストグラムの表示切替",
@@ -578,11 +581,16 @@
       "switchSlot": "並べたとき、左／右どちらを編集するか切替"
     },
     "controls": {
-      "presets": "プリセット",
-      "presetSelectTriggerLabel": "プリセットを選ぶ",
+      "presets": "ルック",
+      "presetSelectTriggerLabel": "ルックを選ぶ",
       "presetSearchPlaceholder": "名前や雰囲気で絞り込む",
-      "presetSearchEmpty": "一致するプリセットがありません",
-      "presetIntensity": "フィルム量",
+      "presetSearchEmpty": "一致するルックがありません",
+      "presetIntensity": "ルックの強さ",
+      "looks": "ルック",
+      "lookSelectTriggerLabel": "ルックを選ぶ",
+      "lookSearchPlaceholder": "名前や雰囲気で絞り込む",
+      "lookSearchEmpty": "一致するルックがありません",
+      "lookStrength": "ルックの強さ",
       "exposure": "露出",
       "temperature": "色温度",
       "highlights": "ハイライト",
@@ -918,8 +926,10 @@
         "notSelected": "未選択",
         "videoOutputDirUnset": "未設定（実行時にダイアログ）",
         "lookSectionLead": "書き出しにかかるルック",
-        "presetQuickLabel": "プリセット（クイック）",
-        "presetSelectAria": "書き出しに使う Filmtone プリセット",
+        "presetQuickLabel": "ルック（クイック）",
+        "presetSelectAria": "書き出しに使う Filmtone ルック",
+        "lookQuickLabel": "ルック（クイック）",
+        "lookSelectAria": "書き出しに使う Filmtone ルック",
         "applyEditToExportBtn": "編集タブどおりにする",
         "applyEditWaitHint": "編集タブを開き、画像のプレビューが表示されるまでお待ちください",
         "applyEditHintAria": "編集の数値を書き出しにコピーする説明",

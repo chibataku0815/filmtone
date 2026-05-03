@@ -1,11 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import { PARAM_KEYS } from "./params";
 import {
+  BASE_LOOK_BUTTONS,
+  BASE_LOOKS,
+  FILMTONE_DEFAULT_BASE_LOOK,
   FILMTONE_DEFAULT_BASE_PRESET,
   FILMTONE_SOFT_FINISH_PATCH,
   PRESET_BUTTONS,
   PRESETS,
   createFilmtoneDefaultParams,
+  findMatchingBaseLook,
   findMatchingPreset,
 } from "./presets";
 
@@ -45,5 +49,14 @@ describe("Filmtone Web/Desktop default look", () => {
       subtitle: "Clean Base",
       category: "utility",
     });
+  });
+
+  // === Look Unification: Base Look canonical aliases ===
+
+  test("Base Look aliases share identity with the legacy Preset symbols", () => {
+    expect(BASE_LOOKS).toBe(PRESETS);
+    expect(BASE_LOOK_BUTTONS).toBe(PRESET_BUTTONS);
+    expect(FILMTONE_DEFAULT_BASE_LOOK).toBe(FILMTONE_DEFAULT_BASE_PRESET);
+    expect(findMatchingBaseLook).toBe(findMatchingPreset);
   });
 });

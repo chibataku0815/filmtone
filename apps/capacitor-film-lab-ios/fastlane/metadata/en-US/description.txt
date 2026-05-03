@@ -1,16 +1,33 @@
-Filmtone helps you choose a film look, tune color with LUTs, add soft bloom, compare before/after, and export locally from iPhone to save or share.
+Filmtone is an iPhone editor for choosing a film look, tuning color correction, shaping soft glow and grain, then exporting locally to save or share. Pick media, apply a Look, adjust brightness, contrast, and saturation with Quick controls, compare before/after, and finish without leaving your iPhone.
 
-Use it when the built-in editor feels too plain, but opening a full video editor feels too heavy. Filmtone keeps the color work local on iPhone.
+Use Filmtone when the built-in editor feels too plain, but opening a full timeline-based video editing app feels too heavy. It is made for deciding a look, checking the result, and exporting from iPhone without turning a simple finish into a large editing session.
 
-What you can do:
-- Pick media from the library
-- Start from film-inspired presets and Filmtone Looks
-- Adjust brightness, contrast, and saturation quickly
-- Compare before and after
-- Export on iPhone, then save to Photos or share
+The editor is a full-screen Liquid Glass workspace. Preview stays at the center, while the bottom rail gives you a Look-first flow: choose a Look, adjust how strongly it applies, and check the result right away. Presets, built-in Looks, and your saved Looks all live in the same direction, so the main decision is simple: what should this source look like when it is finished?
 
-For more control, Filmtone supports two .cube LUT slots: Source Profile and Film Look. Use them for input transforms and creative looks while keeping the workflow local on iPhone.
+Filmtone Look:
+- Includes Creative Pack 01: Stone / Urban
+- Each built-in Look uses its own 3D .cube LUT
+- Look data carries rgbShift, bloom, halation, diffusion, lens softness, grain, and vignette
+- Adjust Look strength to fit the source
+- Save your own Look and apply it again to another source
 
-Filmtone is not a capture camera. It is for finishing existing media: daily footage, travel footage, social posts, covers, thumbnails, and any set that should share the same color direction.
+Stone and Urban are not just preset names. They are built-in Looks with bundled 3D LUTs and Filmtone-style optical treatment. A Look can carry color direction, small lens color separation, highlight glow, grain behavior, edge falloff, and softness together. After choosing one, you can reduce or raise its strength so the effect fits the actual source instead of forcing every clip into the same amount.
 
-No account or cloud sync is required for the main workflow. Pick media, shape the color, export, save, and share from your iPhone.
+Quick controls are for broad color moves: brightness, contrast, and saturation. Start there when you only need a clean adjustment. When the source needs more work, advanced adjustments let you refine glow, bloom, halation, grain, lens softness, and the small optical details that shape the final look. Quick controls and advanced adjustments are separate states, so a light finish and a deeper grade can both happen in the same editor.
+
+Saved Looks keep more than the visible color direction. They also preserve glow and optical details, so reapplying a Look to another source can reproduce the same tone more reliably. Use this when daily footage, travel footage, social posts, covers, thumbnails, or a small set of exports should share the same color direction without rebuilding the look each time.
+
+For more control, Filmtone supports two .cube LUT slots: Source Profile and Film Look. Source Profile is for input-side handling such as Apple Log, Apple Log 2, S-Log3, V-Log, and Rec.709. Film Look is for the final color treatment. When you use camera-originated Log material or your own .cube LUT, you can keep the input transform and the finishing look separate.
+
+Filmtone considers H.264, HEVC, ProRes, Log, and P3 / HDR sources while keeping the workflow local on iPhone. First pick media, prepare the source if needed, choose a Look, tune color and optics, compare before/after, then export. The finished output can be saved to Photos or shared from the device.
+
+Use Filmtone for:
+- Daily footage and travel footage that should share the same color direction
+- Social posts, covers, and thumbnails that need a finished film look
+- Fast LUT-based color correction and color grading on iPhone
+- Apple Log, S-Log3, V-Log, HDR, ProRes, and .cube LUT workflows that still need to stay lightweight
+- Adjustments that go beyond brightness and saturation into glow, grain, and lens softness
+
+Filmtone is not a capture camera. It is a finishing editor for existing media. Use it when you want to decide the color direction before opening a larger project, when you need a quick export from iPhone, or when a small set of outputs should stay visually consistent.
+
+No account or cloud sync is required for the main workflow. Pick media, build the look, export locally, save to Photos, or share from your iPhone.

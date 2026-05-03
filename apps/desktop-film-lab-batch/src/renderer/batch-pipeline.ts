@@ -12,10 +12,12 @@ import type { FilmLabBatchBridge } from "./desktop-api";
 import {
   filmLabParamsSchema,
   filmLookGradeInputSchema,
+  normalizeFilmLookGradeInputIdentity,
   createFilmtoneDefaultParams,
   PRESETS,
   LOOK_ID_BY_PRESET,
   parseCube,
+  type BaseLookName,
   type CameraOptics,
   type Params,
   type PresetName,
@@ -62,6 +64,12 @@ export type BatchGradeState = {
   lut1Intensity: number;
   lut1Data: Float32Array | null;
   lut1Size: number;
+  /**
+   * Built-in source-profile catalog id when lut1 was generated from a
+   * Camera Profile (e.g. `built-in:source-profile.panasonic-vlog`). null
+   * when lut1 came from a custom `.cube` or no input transform is set.
+   */
+  lut1SourceProfileId: string | null;
   /** Creative LUT (after grading — film look) */
   lutIntensity: number;
   lutData: Float32Array | null;
@@ -69,15 +77,16 @@ export type BatchGradeState = {
 };
 
 /**
- * プリセット名から LUT なしのグレード状態を作る（P1 の既定ルック）
+ * Base Look 名から LUT なしのグレード状態を作る（P1 の既定ルック）
  */
-export function batchGradeStateFromPreset(preset: PresetName): BatchGradeState {
+export function batchGradeStateFromBaseLook(baseLook: BaseLookName): BatchGradeState {
   return {
-    params: PRESETS[preset],
+    params: PRESETS[baseLook],
     depthTrack: null,
     lut1Intensity: 1,
     lut1Data: null,
     lut1Size: 0,
+    lut1SourceProfileId: null,
     lutIntensity: 1,
     lutData: null,
     lutSize: 0,
@@ -91,6 +100,7 @@ export function createDefaultBatchGradeState(): BatchGradeState {
     lut1Intensity: 1,
     lut1Data: null,
     lut1Size: 0,
+    lut1SourceProfileId: null,
     lutIntensity: 1,
     lutData: null,
     lutSize: 0,
@@ -150,6 +160,7 @@ export async function resolveGradeFromJsonText(
   lut1Intensity: number;
   lut1Data: Float32Array | null;
   lut1Size: number;
+  lut1SourceProfileId: string | null;
   lutIntensity: number;
   lutData: Float32Array | null;
   lutSize: number;
@@ -169,8 +180,12 @@ export async function resolveGradeFromJsonText(
 
   const o = raw as Record<string, unknown>;
 
+  // Look Unification: legacy / dual / Look-first wrapper をすべて認識する。
+  // 当面 schema は `lookPresetId` / `presetVersion` を required のまま残すため
+  // Look-first only payload は schema 緩和後に到達する path だが、discriminator
+  // 側で先に弾くのは設計意図に反するので含めておく。
   const looksLikeWrapper =
-    "grade" in o && "lookPresetId" in o && "presetVersion" in o;
+    "grade" in o && ("lookPresetId" in o || "lookId" in o);
   if (looksLikeWrapper) {
     const parsed = filmLookGradeInputSchema.safeParse(raw);
     if (!parsed.success) {
@@ -178,7 +193,7 @@ export async function resolveGradeFromJsonText(
         `filmLookGradeInputSchema: ${parsed.error.message}`,
       );
     }
-    const g = parsed.data;
+    const g = normalizeFilmLookGradeInputIdentity(parsed.data);
     const depthTrackSource = (g as { depthTrack?: BatchDepthTrackSource }).depthTrack;
     const depthTrack = depthTrackSource
       ? await loadBatchDepthTrackFromGrade(api, gradeJsonPath, depthTrackSource)
@@ -229,6 +244,7 @@ export async function resolveGradeFromJsonText(
       lut1Intensity: g.lut1Intensity ?? 1,
       lut1Data,
       lut1Size,
+      lut1SourceProfileId: null,
       lutIntensity: g.lutIntensity ?? 1,
       lutData,
       lutSize,
@@ -244,6 +260,7 @@ export async function resolveGradeFromJsonText(
       lut1Intensity: 1,
       lut1Data: null,
       lut1Size: 0,
+      lut1SourceProfileId: null,
       lutIntensity: 1,
       lutData: null,
       lutSize: 0,
@@ -258,6 +275,7 @@ export async function resolveGradeFromJsonText(
       lut1Intensity: 1,
       lut1Data: null,
       lut1Size: 0,
+      lut1SourceProfileId: null,
       lutIntensity: 1,
       lutData: null,
       lutSize: 0,
@@ -274,6 +292,7 @@ export async function resolveGradeFromJsonText(
       lut1Intensity: 1,
         lut1Data: null,
         lut1Size: 0,
+        lut1SourceProfileId: null,
         lutIntensity: 1,
         lutData: null,
         lutSize: 0,

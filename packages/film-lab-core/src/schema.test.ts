@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { filmLabParamsSchema, filmLookGradeInputSchema } from "./schema";
+import {
+  filmLabParamsSchema,
+  filmLookGradeInputSchema,
+  gradeMatchesBaseLook,
+  gradeMatchesPreset,
+  normalizeFilmLookGradeInputIdentity,
+  type FilmLookGradeInputProps,
+} from "./schema";
 import { PRESETS } from "./presets";
 import { LOOK_ID_BY_PRESET, PRESET_VERSION } from "./look-ids";
 import { FILM_GRAIN_INTENSITY_MAX } from "./params";
@@ -561,5 +568,76 @@ describe("filmLookGradeInputSchema", () => {
       },
     });
     expect(r.success).toBe(false);
+  });
+
+  // === Look Unification: lookId / lookVersion optional + dual identity ===
+
+  test("legacy-only sidecar (lookPresetId / presetVersion のみ) を受理する", () => {
+    const r = filmLookGradeInputSchema.safeParse({
+      lookPresetId: LOOK_ID_BY_PRESET.portra,
+      presetVersion: PRESET_VERSION,
+      grade: PRESETS.portra,
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.lookId).toBeUndefined();
+      expect(r.data.lookVersion).toBeUndefined();
+    }
+  });
+
+  test("dual sidecar (lookPresetId と lookId が一致) を受理する", () => {
+    const r = filmLookGradeInputSchema.safeParse({
+      lookPresetId: LOOK_ID_BY_PRESET.portra,
+      presetVersion: PRESET_VERSION,
+      lookId: LOOK_ID_BY_PRESET.portra,
+      lookVersion: PRESET_VERSION,
+      grade: PRESETS.portra,
+    });
+    expect(r.success).toBe(true);
+  });
+
+  test("normalizeFilmLookGradeInputIdentity: dual identity 不一致は throw", () => {
+    const input: FilmLookGradeInputProps = {
+      lookPresetId: LOOK_ID_BY_PRESET.portra,
+      presetVersion: PRESET_VERSION,
+      lookId: LOOK_ID_BY_PRESET.gold200,
+      lookVersion: PRESET_VERSION,
+      grade: PRESETS.portra,
+    };
+    expect(() => normalizeFilmLookGradeInputIdentity(input)).toThrow(
+      /lookId\/lookPresetId mismatch/,
+    );
+  });
+
+  test("normalizeFilmLookGradeInputIdentity: legacy のみは Look-first 補完で round-trip", () => {
+    const input: FilmLookGradeInputProps = {
+      lookPresetId: LOOK_ID_BY_PRESET.portra,
+      presetVersion: PRESET_VERSION,
+      grade: PRESETS.portra,
+    };
+    const normalized = normalizeFilmLookGradeInputIdentity(input);
+    expect(normalized.lookId).toBe(LOOK_ID_BY_PRESET.portra);
+    expect(normalized.lookVersion).toBe(PRESET_VERSION);
+    expect(normalized.lookPresetId).toBe(LOOK_ID_BY_PRESET.portra);
+    expect(normalized.presetVersion).toBe(PRESET_VERSION);
+    expect(normalized.grade).toBe(input.grade);
+  });
+
+  test("normalizeFilmLookGradeInputIdentity: dual で identity 一致は入力をそのまま返す", () => {
+    const input: FilmLookGradeInputProps = {
+      lookPresetId: LOOK_ID_BY_PRESET.portra,
+      presetVersion: PRESET_VERSION,
+      lookId: LOOK_ID_BY_PRESET.portra,
+      lookVersion: PRESET_VERSION,
+      grade: PRESETS.portra,
+    };
+    const normalized = normalizeFilmLookGradeInputIdentity(input);
+    expect(normalized).toBe(input);
+  });
+
+  test("gradeMatchesBaseLook が gradeMatchesPreset と同じ判定を返す", () => {
+    expect(gradeMatchesBaseLook).toBe(gradeMatchesPreset);
+    expect(gradeMatchesBaseLook("portra", PRESETS.portra)).toBe(true);
+    expect(gradeMatchesBaseLook("portra", PRESETS.gold200)).toBe(false);
   });
 });

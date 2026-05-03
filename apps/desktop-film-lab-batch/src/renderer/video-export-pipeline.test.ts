@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   shouldRetryWithSeekAfterWebCodecsRuntimeFailure,
+  needsDesktopPreviewTranscode,
   needsMezzanineTranscode,
 } from "./video-export-pipeline";
 
@@ -65,5 +66,38 @@ describe("needsMezzanineTranscode", () => {
 
   it("unknown codec → true", () => {
     expect(needsMezzanineTranscode(opts("rawvideo"))).toBe(true);
+  });
+});
+
+describe("needsDesktopPreviewTranscode", () => {
+  const opts = (codec: string, absPath: string) => ({
+    videoCodec: codec,
+    fileSizeBytes: 200 * 1024 * 1024,
+    absPath,
+  });
+
+  it("H.264 MP4 はブラウザ直読みのままにする", () => {
+    expect(needsDesktopPreviewTranscode(opts("h264", "/tmp/test.mp4"))).toBe(
+      false,
+    );
+  });
+
+  it("H.264 MOV は Chromium preview の失敗を避けるため progressive load に回す", () => {
+    expect(needsDesktopPreviewTranscode(opts("h264", "/tmp/test.mov"))).toBe(
+      true,
+    );
+  });
+
+  it("AVC QuickTime と H.264 Matroska も progressive load に回す", () => {
+    expect(needsDesktopPreviewTranscode(opts("avc", "/tmp/test.qt"))).toBe(true);
+    expect(needsDesktopPreviewTranscode(opts("h264", "/tmp/test.mkv"))).toBe(
+      true,
+    );
+  });
+
+  it("非対応 codec は container に関係なく progressive load に回す", () => {
+    expect(needsDesktopPreviewTranscode(opts("hevc", "/tmp/test.mp4"))).toBe(
+      true,
+    );
   });
 });
