@@ -464,6 +464,13 @@ final class FilmtoneEditorStore: ObservableObject {
     /// MVP-deferred — see Item 3 plan §"Sidecar V1 Additions".)
     private(set) var appliedSavedLookId: UUID?
 
+    /// Backlight Veil Phase 1c — currently selected optical filter family id
+    /// (e.g. `"backlightVeil-1-2"`) or nil = OFF. Mirrored to
+    /// `FilmtoneOpticalFilterSelectionStore.shared` so
+    /// `FilmtoneExportSession.currentBacklightVeilOptical()` can pick it up
+    /// at composite time. In-memory only — app restart resets to nil.
+    @Published private(set) var selectedOpticalFilterId: String?
+
     let strings: FilmtoneStrings
     private let facade: FilmtoneEditorFacade
     private let libraryStore: LibraryStoreActor?
@@ -905,6 +912,20 @@ final class FilmtoneEditorStore: ObservableObject {
     func setQuickValue(_ value: Double, for axis: WritableKeyPath<FilmtoneQuickState, Double>) {
         appliedSavedLookId = nil
         project.quickState[keyPath: axis] = max(-1, min(1, value))
+        recomputeProjectParams()
+    }
+
+    /// Backlight Veil Phase 1c — segmented Picker writes a profile id (or
+    /// nil = OFF). The runtime singleton is the SSOT consumed by the
+    /// composite kernel; `selectedOpticalFilterId` mirrors it for SwiftUI
+    /// observation. `recomputeProjectParams()` reschedules the preview so
+    /// the new kernel branch picks up on the next frame.
+    func setOpticalFilterId(_ id: String?) {
+        guard selectedOpticalFilterId != id else {
+            return
+        }
+        selectedOpticalFilterId = id
+        FilmtoneOpticalFilterSelectionStore.shared.setCurrentId(id)
         recomputeProjectParams()
     }
 

@@ -57,6 +57,8 @@
 		D1000001000000000000000A /* FilmtonePhase0Math.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1000001000000000000000A /* FilmtonePhase0Math.swift */; };
 		D1000001000000000000000B /* FilmtoneStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1000001000000000000000B /* FilmtoneStrings.swift */; };
 		D1000001000000000000000C /* FilmtoneCubeParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1000001000000000000000C /* FilmtoneCubeParser.swift */; };
+		D10000010000000000000011 /* FilmtoneOpticalFiltersGenerated.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000011 /* FilmtoneOpticalFiltersGenerated.swift */; };
+		D10000010000000000000012 /* FilmtoneOpticalFilterSelectionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000012 /* FilmtoneOpticalFilterSelectionStore.swift */; };
 		D1000001000000000000000E /* FilmtonePreviewPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1000001000000000000000E /* FilmtonePreviewPlayerView.swift */; };
 		D1000001000000000000000F /* FilmtoneSnapshotSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1000001000000000000000F /* FilmtoneSnapshotSupport.swift */; };
 		D2000001000000000000001B /* FilmtoneHelpAssetGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000001B /* FilmtoneHelpAssetGenerator.swift */; };
@@ -185,6 +187,8 @@
 		C1000001000000000000000A /* FilmtonePhase0Math.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtonePhase0Math.swift; sourceTree = "<group>"; };
 		C1000001000000000000000B /* FilmtoneStrings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneStrings.swift; sourceTree = "<group>"; };
 		C1000001000000000000000C /* FilmtoneCubeParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCubeParser.swift; sourceTree = "<group>"; };
+		C10000010000000000000011 /* FilmtoneOpticalFiltersGenerated.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneOpticalFiltersGenerated.swift; sourceTree = "<group>"; };
+		C10000010000000000000012 /* FilmtoneOpticalFilterSelectionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneOpticalFilterSelectionStore.swift; sourceTree = "<group>"; };
 		C1000001000000000000000E /* FilmtonePreviewPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtonePreviewPlayerView.swift; sourceTree = "<group>"; };
 		C1000001000000000000000F /* FilmtoneSnapshotSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneSnapshotSupport.swift; sourceTree = "<group>"; };
 		C2000001000000000000001B /* FilmtoneHelpAssetGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneHelpAssetGenerator.swift; sourceTree = "<group>"; };
@@ -324,6 +328,8 @@
 				C10000010000000000000007 /* FilmtoneExportPanel.swift */,
 				C10000010000000000000008 /* FilmtonePersistence.swift */,
 				C10000010000000000000009 /* FilmtonePresetCatalog.swift */,
+				C10000010000000000000011 /* FilmtoneOpticalFiltersGenerated.swift */,
+				C10000010000000000000012 /* FilmtoneOpticalFilterSelectionStore.swift */,
 				C1000001000000000000000A /* FilmtonePhase0Math.swift */,
 				C1000001000000000000000B /* FilmtoneStrings.swift */,
 				C1000001000000000000000C /* FilmtoneCubeParser.swift */,
@@ -621,6 +627,8 @@
 				D10000010000000000000007 /* FilmtoneExportPanel.swift in Sources */,
 				D10000010000000000000008 /* FilmtonePersistence.swift in Sources */,
 				D10000010000000000000009 /* FilmtonePresetCatalog.swift in Sources */,
+				D10000010000000000000011 /* FilmtoneOpticalFiltersGenerated.swift in Sources */,
+				D10000010000000000000012 /* FilmtoneOpticalFilterSelectionStore.swift in Sources */,
 				D1000001000000000000000A /* FilmtonePhase0Math.swift in Sources */,
 				D1000001000000000000000B /* FilmtoneStrings.swift in Sources */,
 				D1000001000000000000000C /* FilmtoneCubeParser.swift in Sources */,

@@ -3,6 +3,9 @@ import { dirname, resolve } from "node:path";
 import {
   renderFilmtoneIosSwiftPayload,
 } from "../packages/film-lab-core/src/ios-swift-payload";
+import {
+  renderFilmtoneIosOpticalFiltersSwift,
+} from "../packages/film-lab-core/src/ios-optical-filters-swift";
 
 interface SwiftTarget {
   id: string;
@@ -30,6 +33,14 @@ const targets: SwiftTarget[] = [
       "packages/film-lab-swift-core/Sources/FilmLabSwiftCore/Generated/FilmtonePhase0Generated.swift",
     ),
     nextContent: publicContent,
+  },
+  {
+    id: "ios-optical-filters",
+    outputPath: resolve(
+      repoRoot,
+      "apps/capacitor-film-lab-ios/ios/App/App/FilmtoneOpticalFiltersGenerated.swift",
+    ),
+    nextContent: renderFilmtoneIosOpticalFiltersSwift(),
   },
 ];
 
