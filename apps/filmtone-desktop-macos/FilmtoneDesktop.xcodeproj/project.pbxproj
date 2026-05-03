@@ -41,6 +41,8 @@
 		FT0000000000000000000A20 /* FilmtoneCubeParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B20 /* FilmtoneCubeParser.swift */; };
 		FT0000000000000000000A21 /* FilmtoneCreativePackCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B21 /* FilmtoneCreativePackCatalog.swift */; };
 		FT0000000000000000000A22 /* FilmtoneCreativeLutLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B22 /* FilmtoneCreativeLutLoader.swift */; };
+		FT0000000000000000000A23 /* filmtone-creative-pack-01-stone.cube in Resources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B23 /* filmtone-creative-pack-01-stone.cube */; };
+		FT0000000000000000000A24 /* filmtone-creative-pack-01-urban.cube in Resources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B24 /* filmtone-creative-pack-01-urban.cube */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -78,6 +80,8 @@
 		FT0000000000000000000B20 /* FilmtoneCubeParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCubeParser.swift; sourceTree = "<group>"; };
 		FT0000000000000000000B21 /* FilmtoneCreativePackCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCreativePackCatalog.swift; sourceTree = "<group>"; };
 		FT0000000000000000000B22 /* FilmtoneCreativeLutLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCreativeLutLoader.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B23 /* filmtone-creative-pack-01-stone.cube */ = {isa = PBXFileReference; lastKnownFileType = text; path = "filmtone-creative-pack-01-stone.cube"; sourceTree = "<group>"; };
+		FT0000000000000000000B24 /* filmtone-creative-pack-01-urban.cube */ = {isa = PBXFileReference; lastKnownFileType = text; path = "filmtone-creative-pack-01-urban.cube"; sourceTree = "<group>"; };
 		FT0000000000000000000C01 /* FilmtoneDesktop.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FilmtoneDesktop.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -110,10 +114,28 @@
 				FT0000000000000000000E09 /* State */,
 				FT0000000000000000000E0A /* Export */,
 				FT0000000000000000000E0B /* Media */,
+				FT0000000000000000000E0C /* Resources */,
 				FT0000000000000000000E07 /* SharedGenerated */,
 				FT0000000000000000000B05 /* Assets.xcassets */,
 			);
 			path = FilmtoneDesktop;
+			sourceTree = "<group>";
+		};
+		FT0000000000000000000E0C /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				FT0000000000000000000E0D /* CreativeLuts */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		FT0000000000000000000E0D /* CreativeLuts */ = {
+			isa = PBXGroup;
+			children = (
+				FT0000000000000000000B23 /* filmtone-creative-pack-01-stone.cube */,
+				FT0000000000000000000B24 /* filmtone-creative-pack-01-urban.cube */,
+			);
+			path = CreativeLuts;
 			sourceTree = "<group>";
 		};
 		FT0000000000000000000E03 /* App */ = {
@@ -272,6 +294,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				FT0000000000000000000A05 /* Assets.xcassets in Resources */,
+				FT0000000000000000000A23 /* filmtone-creative-pack-01-stone.cube in Resources */,
+				FT0000000000000000000A24 /* filmtone-creative-pack-01-urban.cube in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

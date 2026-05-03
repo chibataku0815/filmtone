@@ -42,10 +42,15 @@ enum FilmtoneCreativeLutLoader {
             return cached.prepared
         }
 
+        // Pbxproj uses a yellow-folder PBXGroup for `Resources/CreativeLuts/`
+        // (per project CLAUDE.md / active.md design decision), which causes
+        // Xcode to flatten the bundled .cube files into `Contents/Resources/`
+        // at build time. Resolve by name + extension only — `subdirectory:`
+        // would return nil because the folder structure is not preserved
+        // inside the .app bundle.
         guard let url = Bundle.main.url(
             forResource: (look.bundledFilename as NSString).deletingPathExtension,
-            withExtension: "cube",
-            subdirectory: "CreativeLuts"
+            withExtension: "cube"
         ) else {
             print("[FilmtoneCreativeLutLoader] missing bundle resource for slug=\(look.slug)")
             return nil
