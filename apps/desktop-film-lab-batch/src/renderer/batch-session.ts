@@ -5,12 +5,18 @@
  * アプリ再起動後も「残りだけ再開」できるようにする。
  * @limitations LUT 付き Grade はファイルパス（importedGradePath）でしか復元しない。
  * 編集タブから同期しただけのルックは、セッションには params の JSON 文字列で残す。
+ *
+ * Look Unification: writer は `batchLookChoice` を canonical として書き、
+ * parser は legacy `batchPresetChoice` を fallback として読める。
+ * `FilmLabBatchSessionV1` の **on-disk shape は固定** (additive only、version bump しない)
+ * で、新フィールド `batchLookChoice` を追加するのみ。Electron 専用 userData なので
+ * writer は single emit (dual emit はしない、locked-in #3)。
  */
 import {
   sanitizeBatchFilenameSuffix,
   type BatchFormat,
 } from "./batch-pipeline";
-import { PRESETS, type PresetName } from "film-lab-core";
+import { PRESETS, type BaseLookName } from "film-lab-core";
 
 /**
  * @description 1 枚ごとの処理状態（_ok は成功）
@@ -31,7 +37,7 @@ export type FilmLabBatchSessionV1 = {
   imagePaths: string[];
   /** @description imagePaths と同じ長さ。未処理は pending */
   outcomes: BatchFileOutcome[];
-  batchPresetChoice: PresetName;
+  batchLookChoice: BaseLookName;
   /** @description Grade JSON を読み込んだときの絶対パス。無ければ null */
   importedGradePath: string | null;
   /**
@@ -74,7 +80,7 @@ const OUTCOME_SET = new Set<BatchFileOutcome>([
   "writeFail",
 ]);
 
-function isPresetName(value: string): value is PresetName {
+function isBaseLookName(value: string): value is BaseLookName {
   return Object.prototype.hasOwnProperty.call(PRESETS, value);
 }
 
@@ -102,7 +108,10 @@ export function parseFilmLabBatchSessionV1(
       return null;
     }
   }
-  if (typeof o.batchPresetChoice !== "string" || !isPresetName(o.batchPresetChoice)) {
+  // Look Unification parser fallback: prefer canonical `batchLookChoice`,
+  // fall back to legacy `batchPresetChoice` for older sessions.
+  const rawBaseLookChoice = o.batchLookChoice ?? o.batchPresetChoice;
+  if (typeof rawBaseLookChoice !== "string" || !isBaseLookName(rawBaseLookChoice)) {
     return null;
   }
   if (o.importedGradePath !== null && typeof o.importedGradePath !== "string") {
@@ -123,7 +132,7 @@ export function parseFilmLabBatchSessionV1(
     format: o.format,
     imagePaths: o.imagePaths as string[],
     outcomes: o.outcomes as BatchFileOutcome[],
-    batchPresetChoice: o.batchPresetChoice,
+    batchLookChoice: rawBaseLookChoice,
     importedGradePath: o.importedGradePath,
     gradeParamsJson: o.gradeParamsJson,
     outputFilenameSuffix,

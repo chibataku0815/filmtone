@@ -3,7 +3,7 @@ export {
   FILM_LAB_CONTROL_PANEL_SECTION_ORDER,
   FILM_LAB_MESSAGES_MANIFEST_PATH,
   FILM_LAB_NEXT_INTL_NAMESPACE,
-  FILM_LAB_PRESET_PRIMARY_SURFACE_ID,
+  FILM_LAB_LOOK_PRIMARY_SURFACE_ID,
   FILM_LAB_WRAPPER_SLOT_IDS,
   type FilmLabControlPanelSectionId,
   type FilmLabWrapperSlotId,
@@ -21,7 +21,7 @@ export {
   filmLabPanelRootClassName,
   filmLabPanelSurfaceBare,
   filmLabPanelSurfaceCard,
-  filmLabPresetSectionDividerBlock,
+  filmLabLookSectionDividerBlock,
   filmLabSectionHeaderTitle,
   filmLabToggleHeaderTitle,
   filmLabToggleHeaderTrackOff,
@@ -64,7 +64,14 @@ export { SectionHeader, type SectionHeaderProps } from "./ui/SectionHeader";
 export { ToggleHeader, type ToggleHeaderProps } from "./ui/ToggleHeader";
 export { LUTPanel } from "./LUTPanel";
 export { PresetBar } from "./PresetBar";
-export { PresetSearchSelect } from "./PresetSearchSelect";
+export {
+  LookSearchSelect,
+  type LookSearchSelectProps,
+  /** @deprecated Use `LookSearchSelect`. */
+  PresetSearchSelect,
+  /** @deprecated Use `LookSearchSelectProps`. */
+  type PresetSearchSelectProps,
+} from "./PresetSearchSelect";
 export { FilmLabInfoTip, type FilmLabInfoTipProps } from "./FilmLabInfoTip";
 
 // Source visibility contract (life#87 P3 docs + types)

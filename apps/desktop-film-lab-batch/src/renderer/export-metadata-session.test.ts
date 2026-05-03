@@ -5,7 +5,7 @@ import {
   createFilmtoneDefaultParams,
   type PresetName,
 } from "film-lab-core";
-import { batchGradeStateFromPreset } from "./batch-pipeline";
+import { batchGradeStateFromBaseLook } from "./batch-pipeline";
 import { buildGradeJsonPayload } from "./grade-io";
 import {
   buildFilmtoneExportSession,
@@ -14,7 +14,7 @@ import {
   createEmptyMetadataLutRefs,
   exportFilmtoneExportSessionJsonText,
   extractMetadataLutRefsFromGradeJsonText,
-  inferPresetChoiceFromImportedJson,
+  inferBaseLookChoiceFromImportedJson,
   parseFilmtoneExportSessionV1,
 } from "./export-metadata-session";
 
@@ -30,7 +30,7 @@ function anotherPreset(except: PresetName): PresetName {
 
 describe("export metadata session", () => {
   it("builds and parses a public sidecar round-trip", () => {
-    const cinematic = batchGradeStateFromPreset("cinematic");
+    const cinematic = batchGradeStateFromBaseLook("cinematic");
     const session = buildFilmtoneExportSession({
       exportedAtIso: "2026-04-19T12:34:56.000Z",
       appVersion: "1.2.3",
@@ -41,8 +41,8 @@ describe("export metadata session", () => {
       imageFormat: "jpeg",
       outputFilenameSuffix: "-graded",
       outputFileName: null,
-      batchPresetChoice: "cinematic",
-      lookSource: "preset",
+      batchLookChoice: "cinematic",
+      lookSource: "builtInLook",
       gradeParams: cinematic.params,
       depthTrack: null,
       lutRefs: createEmptyMetadataLutRefs(),
@@ -56,7 +56,7 @@ describe("export metadata session", () => {
   });
 
   it("forces video sidecars to omit image-batch inputDir state", () => {
-    const cinematic = batchGradeStateFromPreset("cinematic");
+    const cinematic = batchGradeStateFromBaseLook("cinematic");
     const session = buildFilmtoneExportSession({
       exportedAtIso: "2026-04-19T12:34:56.000Z",
       appVersion: "1.2.3",
@@ -67,7 +67,7 @@ describe("export metadata session", () => {
       imageFormat: null,
       outputFilenameSuffix: null,
       outputFileName: "clip-graded.mp4",
-      batchPresetChoice: "cinematic",
+      batchLookChoice: "cinematic",
       lookSource: "editSync",
       gradeParams: cinematic.params,
       depthTrack: null,
@@ -81,7 +81,7 @@ describe("export metadata session", () => {
   });
 
   it("forces image sidecars to omit video input state", () => {
-    const cinematic = batchGradeStateFromPreset("cinematic");
+    const cinematic = batchGradeStateFromBaseLook("cinematic");
     const session = buildFilmtoneExportSession({
       exportedAtIso: "2026-04-19T12:34:56.000Z",
       appVersion: "1.2.3",
@@ -92,8 +92,8 @@ describe("export metadata session", () => {
       imageFormat: "jpeg",
       outputFilenameSuffix: "-graded",
       outputFileName: null,
-      batchPresetChoice: "cinematic",
-      lookSource: "preset",
+      batchLookChoice: "cinematic",
+      lookSource: "builtInLook",
       gradeParams: cinematic.params,
       depthTrack: null,
       lutRefs: createEmptyMetadataLutRefs(),
@@ -106,7 +106,7 @@ describe("export metadata session", () => {
   });
 
   it("includes optional optical recommendation metadata only when provided", () => {
-    const cinematic = batchGradeStateFromPreset("cinematic");
+    const cinematic = batchGradeStateFromBaseLook("cinematic");
     const session = buildFilmtoneExportSession({
       exportedAtIso: "2026-04-20T12:34:56.000Z",
       appVersion: "1.2.3",
@@ -117,7 +117,7 @@ describe("export metadata session", () => {
       imageFormat: null,
       outputFilenameSuffix: null,
       outputFileName: "clip-graded.mp4",
-      batchPresetChoice: "cinematic",
+      batchLookChoice: "cinematic",
       lookSource: "analysisRecommendation",
       gradeParams: cinematic.params,
       depthTrack: null,
@@ -155,7 +155,7 @@ describe("export metadata session", () => {
   });
 
   it("round-trips a backlightVeil optical filter profile through JSON", () => {
-    const cinematic = batchGradeStateFromPreset("cinematic");
+    const cinematic = batchGradeStateFromBaseLook("cinematic");
     const session = buildFilmtoneExportSession({
       exportedAtIso: "2026-05-03T09:00:00.000Z",
       appVersion: "1.2.3",
@@ -166,8 +166,8 @@ describe("export metadata session", () => {
       imageFormat: null,
       outputFilenameSuffix: null,
       outputFileName: "window-backlight-graded.mp4",
-      batchPresetChoice: "cinematic",
-      lookSource: "preset",
+      batchLookChoice: "cinematic",
+      lookSource: "builtInLook",
       gradeParams: cinematic.params,
       depthTrack: null,
       lutRefs: createEmptyMetadataLutRefs(),
@@ -194,7 +194,7 @@ describe("export metadata session", () => {
   });
 
   it("round-trips optional source camera optics on video sidecars", () => {
-    const cinematic = batchGradeStateFromPreset("cinematic");
+    const cinematic = batchGradeStateFromBaseLook("cinematic");
     const session = buildFilmtoneExportSession({
       exportedAtIso: "2026-04-20T12:34:56.000Z",
       appVersion: "1.2.3",
@@ -205,8 +205,8 @@ describe("export metadata session", () => {
       imageFormat: null,
       outputFilenameSuffix: null,
       outputFileName: "clip-graded.mp4",
-      batchPresetChoice: "cinematic",
-      lookSource: "preset",
+      batchLookChoice: "cinematic",
+      lookSource: "builtInLook",
       gradeParams: cinematic.params,
       depthTrack: null,
       lutRefs: createEmptyMetadataLutRefs(),
@@ -245,7 +245,7 @@ describe("export metadata session", () => {
   });
 
   it("parses v1 sidecars without camera optics", () => {
-    const cinematic = batchGradeStateFromPreset("cinematic");
+    const cinematic = batchGradeStateFromBaseLook("cinematic");
     const session = buildFilmtoneExportSession({
       exportedAtIso: "2026-04-20T12:34:56.000Z",
       appVersion: "1.2.3",
@@ -256,8 +256,8 @@ describe("export metadata session", () => {
       imageFormat: null,
       outputFilenameSuffix: null,
       outputFileName: "clip-graded.mp4",
-      batchPresetChoice: "cinematic",
-      lookSource: "preset",
+      batchLookChoice: "cinematic",
+      lookSource: "builtInLook",
       gradeParams: cinematic.params,
       depthTrack: null,
       lutRefs: createEmptyMetadataLutRefs(),
@@ -267,7 +267,7 @@ describe("export metadata session", () => {
   });
 
   it("round-trips normalized source video metadata on video sidecars", () => {
-    const cinematic = batchGradeStateFromPreset("cinematic");
+    const cinematic = batchGradeStateFromBaseLook("cinematic");
     const session = buildFilmtoneExportSession({
       exportedAtIso: "2026-04-24T12:34:56.000Z",
       appVersion: "1.2.3",
@@ -278,8 +278,8 @@ describe("export metadata session", () => {
       imageFormat: null,
       outputFilenameSuffix: null,
       outputFileName: "hdr-portrait-graded.mp4",
-      batchPresetChoice: "cinematic",
-      lookSource: "preset",
+      batchLookChoice: "cinematic",
+      lookSource: "builtInLook",
       gradeParams: cinematic.params,
       depthTrack: null,
       lutRefs: createEmptyMetadataLutRefs(),
@@ -348,7 +348,7 @@ describe("export metadata session", () => {
   });
 
   it("round-trips optional HDR preparation policy on video sidecars", () => {
-    const cinematic = batchGradeStateFromPreset("cinematic");
+    const cinematic = batchGradeStateFromBaseLook("cinematic");
     const session = buildFilmtoneExportSession({
       exportedAtIso: "2026-04-24T12:34:56.000Z",
       appVersion: "1.2.3",
@@ -359,8 +359,8 @@ describe("export metadata session", () => {
       imageFormat: null,
       outputFilenameSuffix: null,
       outputFileName: "hdr-pq-graded.mp4",
-      batchPresetChoice: "cinematic",
-      lookSource: "preset",
+      batchLookChoice: "cinematic",
+      lookSource: "builtInLook",
       gradeParams: cinematic.params,
       depthTrack: null,
       lutRefs: createEmptyMetadataLutRefs(),
@@ -426,7 +426,7 @@ describe("export metadata session", () => {
   });
 
   it("serializes depth-track metadata in both wrapper and sidecar roots", () => {
-    const cinematic = batchGradeStateFromPreset("cinematic");
+    const cinematic = batchGradeStateFromBaseLook("cinematic");
     const depthTrack = {
       source: {
         kind: "frameSequence" as const,
@@ -449,7 +449,7 @@ describe("export metadata session", () => {
       imageFormat: "png",
       outputFilenameSuffix: "-graded",
       outputFileName: null,
-      batchPresetChoice: "cinematic",
+      batchLookChoice: "cinematic",
       lookSource: "importedJson",
       gradeParams: cinematic.params,
       depthTrack,
@@ -479,7 +479,7 @@ describe("export metadata session", () => {
   });
 
   it("extracts LUT path references from legacy grade JSON", () => {
-    const cinematic = batchGradeStateFromPreset("cinematic");
+    const cinematic = batchGradeStateFromBaseLook("cinematic");
     const gradeJson = {
       ...buildGradeJsonPayload(cinematic.params),
       lut1CubeRelPath: "../luts/print.cube",
@@ -515,12 +515,12 @@ describe("export metadata session", () => {
     const explicitPreset = "cinematic" as const;
     const fallbackPreset = anotherPreset(explicitPreset);
     const explicitJson = JSON.stringify(
-      buildGradeJsonPayload(batchGradeStateFromPreset(explicitPreset).params),
+      buildGradeJsonPayload(batchGradeStateFromBaseLook(explicitPreset).params),
     );
 
-    const inferred = inferPresetChoiceFromImportedJson(
+    const inferred = inferBaseLookChoiceFromImportedJson(
       explicitJson,
-      batchGradeStateFromPreset(fallbackPreset).params,
+      batchGradeStateFromBaseLook(fallbackPreset).params,
     );
 
     expect(inferred).toBe(explicitPreset);
@@ -533,7 +533,7 @@ describe("export metadata session", () => {
   });
 
   it("infers reset instead of cinematic for malformed unmatched imports", () => {
-    const inferred = inferPresetChoiceFromImportedJson(
+    const inferred = inferBaseLookChoiceFromImportedJson(
       "{not-json",
       createFilmtoneDefaultParams(),
     );
@@ -542,7 +542,7 @@ describe("export metadata session", () => {
   });
 
   it("round-trips an applied built-in source profile under input.sourceProfile", () => {
-    const cinematic = batchGradeStateFromPreset("cinematic");
+    const cinematic = batchGradeStateFromBaseLook("cinematic");
     const session = buildFilmtoneExportSession({
       exportedAtIso: "2026-05-02T12:34:56.000Z",
       appVersion: "1.4.0",
@@ -553,7 +553,7 @@ describe("export metadata session", () => {
       imageFormat: "jpeg",
       outputFilenameSuffix: "-graded",
       outputFileName: null,
-      batchPresetChoice: "cinematic",
+      batchLookChoice: "cinematic",
       lookSource: "editSync",
       gradeParams: cinematic.params,
       depthTrack: null,
@@ -603,7 +603,7 @@ describe("export metadata session", () => {
     },
   ] as const) {
     it(`round-trips ${profile.displayName} source profile metadata`, () => {
-      const cinematic = batchGradeStateFromPreset("cinematic");
+      const cinematic = batchGradeStateFromBaseLook("cinematic");
       const session = buildFilmtoneExportSession({
         exportedAtIso: "2026-05-02T12:34:56.000Z",
         appVersion: "1.4.0",
@@ -614,7 +614,7 @@ describe("export metadata session", () => {
         imageFormat: "jpeg",
         outputFilenameSuffix: "-graded",
         outputFileName: null,
-        batchPresetChoice: "cinematic",
+        batchLookChoice: "cinematic",
         lookSource: "editSync",
         gradeParams: cinematic.params,
         depthTrack: null,
@@ -653,7 +653,7 @@ describe("export metadata session", () => {
   }
 
   it("omits input.sourceProfile when no selection was made (back-compat)", () => {
-    const cinematic = batchGradeStateFromPreset("cinematic");
+    const cinematic = batchGradeStateFromBaseLook("cinematic");
     const session = buildFilmtoneExportSession({
       exportedAtIso: "2026-05-02T12:34:56.000Z",
       appVersion: "1.4.0",
@@ -664,8 +664,8 @@ describe("export metadata session", () => {
       imageFormat: "jpeg",
       outputFilenameSuffix: "-graded",
       outputFileName: null,
-      batchPresetChoice: "cinematic",
-      lookSource: "preset",
+      batchLookChoice: "cinematic",
+      lookSource: "builtInLook",
       gradeParams: cinematic.params,
       depthTrack: null,
       lutRefs: createEmptyMetadataLutRefs(),

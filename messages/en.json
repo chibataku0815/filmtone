@@ -479,7 +479,9 @@
     "mode": {
       "quick": "Quick",
       "pro": "Pro",
-      "toggleGroupAria": "Switch between Quick and Pro layouts"
+      "toggleGroupAria": "Switch between Quick and Pro layouts",
+      "hint": "Quick uses Looks plus three meta sliders (film character, era, dynamics) for rough adjustment. Pro shows exposure, saturation, and the rest one-by-one, plus tone detail, effects, Bloom, Halation, and LUT.",
+      "hintInfoAria": "Difference between Quick and Pro"
     },
     "compare": {
       "sectionTitle": "Compare on the preview",
@@ -565,11 +567,11 @@
     "shortcuts": {
       "title": "Keyboard Shortcuts",
       "closeHint": "Press ? or Esc to close",
-      "presetSelect": "Select preset",
+      "presetSelect": "Select Look",
       "reset": "Reset",
       "beforeAfter": "Before / After (hold)",
       "holdButton": "Before / After on touch devices",
-      "presetSlider": "Blend film preset vs neutral (when preset active)",
+      "presetSlider": "Blend Look vs neutral (when Look active)",
       "undo": "Undo",
       "redo": "Redo",
       "histogram": "Toggle histogram",
@@ -579,11 +581,16 @@
       "switchSlot": "Switch left/right edit target (while two-up)"
     },
     "controls": {
-      "presets": "Presets",
-      "presetSelectTriggerLabel": "Choose preset",
+      "presets": "Look",
+      "presetSelectTriggerLabel": "Choose Look",
       "presetSearchPlaceholder": "Filter by name or mood",
-      "presetSearchEmpty": "No presets match your search",
-      "presetIntensity": "Film Amount",
+      "presetSearchEmpty": "No Looks match your search",
+      "presetIntensity": "Look Strength",
+      "looks": "Look",
+      "lookSelectTriggerLabel": "Choose Look",
+      "lookSearchPlaceholder": "Filter by name or mood",
+      "lookSearchEmpty": "No Looks match your search",
+      "lookStrength": "Look Strength",
       "exposure": "Exposure",
       "temperature": "Temperature",
       "highlights": "Highlights",
@@ -919,8 +926,10 @@
         "notSelected": "Not selected",
         "videoOutputDirUnset": "Not set (choose when running)",
         "lookSectionLead": "Look for export",
-        "presetQuickLabel": "Preset (quick)",
-        "presetSelectAria": "Preset used for export",
+        "presetQuickLabel": "Look (quick)",
+        "presetSelectAria": "Look used for export",
+        "lookQuickLabel": "Look (quick)",
+        "lookSelectAria": "Look used for export",
         "applyEditToExportBtn": "Match Edit tab",
         "applyEditWaitHint": "Open Edit and wait until the preview is ready",
         "applyEditHintAria": "How copy from Edit works",

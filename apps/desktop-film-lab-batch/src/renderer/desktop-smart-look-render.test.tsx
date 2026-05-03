@@ -5,7 +5,7 @@ import { NextIntlClientProvider } from "next-intl";
 import en from "../../../../messages/en.json";
 
 describe("Desktop control panel core render", () => {
-  it("renders the searchable preset select without Web-only controls", async () => {
+  it("renders the searchable Look select without Web-only controls", async () => {
     await import("./process-polyfill");
     const { FilmLabControlPanelCore } = await import("film-lab-ui");
 
@@ -19,7 +19,7 @@ describe("Desktop control panel core render", () => {
       </NextIntlClientProvider>,
     );
 
-    expect(html).toContain('data-testid="film-lab-preset-select-trigger"');
+    expect(html).toContain('data-testid="film-lab-look-select-trigger"');
     expect(html).toContain("Neutral");
     expect(html).toContain("Clean Base");
     // Core does not include Smart Look, Share, or Browser Storage sections

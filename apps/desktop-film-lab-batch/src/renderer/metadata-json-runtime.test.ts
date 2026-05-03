@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { batchGradeStateFromPreset } from "./batch-pipeline";
+import { batchGradeStateFromBaseLook } from "./batch-pipeline";
 import {
   buildFilmtoneExportSession,
   createEmptyMetadataLutRefs,
@@ -13,7 +13,7 @@ import { exportGradeJsonText } from "./grade-io";
 
 describe("metadata-json-runtime", () => {
   it("preserves sidecar camera optics through import and re-export build", async () => {
-    const grade = batchGradeStateFromPreset("cinematic");
+    const grade = batchGradeStateFromBaseLook("cinematic");
     const cameraOptics = {
       source: "manual" as const,
       fxPx: 1566.7,
@@ -37,7 +37,7 @@ describe("metadata-json-runtime", () => {
       imageFormat: null,
       outputFilenameSuffix: null,
       outputFileName: "clip-graded.mp4",
-      batchPresetChoice: "cinematic",
+      batchLookChoice: "cinematic",
       lookSource: "editSync",
       gradeParams: grade.params,
       depthTrack: null,
@@ -63,7 +63,7 @@ describe("metadata-json-runtime", () => {
       imageFormat: null,
       outputFilenameSuffix: null,
       outputFileName: "clip-graded-graded.mp4",
-      batchPresetChoice: resolved.batchPresetChoice,
+      batchLookChoice: resolved.batchLookChoice,
       lookSource: resolved.lookSource,
       gradeParams: resolved.batchGrade.params,
       depthTrack: resolved.batchGrade.depthTrack,
@@ -78,7 +78,7 @@ describe("metadata-json-runtime", () => {
   });
 
   it("preserves core grade JSON camera optics on restore", async () => {
-    const grade = batchGradeStateFromPreset("cinematic");
+    const grade = batchGradeStateFromBaseLook("cinematic");
     const cameraOptics = {
       source: "metadata" as const,
       fovXDeg: 54.4,
@@ -97,7 +97,7 @@ describe("metadata-json-runtime", () => {
   });
 
   it("regenerates lut1 from a built-in source-profile catalog id without reading any .cube file", async () => {
-    const grade = batchGradeStateFromPreset("cinematic");
+    const grade = batchGradeStateFromBaseLook("cinematic");
     const session = buildFilmtoneExportSession({
       exportedAtIso: "2026-05-02T13:00:00.000Z",
       appVersion: "1.4.0",
@@ -108,7 +108,7 @@ describe("metadata-json-runtime", () => {
       imageFormat: "jpeg",
       outputFilenameSuffix: "-graded",
       outputFileName: null,
-      batchPresetChoice: "cinematic",
+      batchLookChoice: "cinematic",
       lookSource: "editSync",
       gradeParams: grade.params,
       depthTrack: null,
@@ -174,7 +174,7 @@ describe("metadata-json-runtime", () => {
         displayName: "Canon Log 3 / Cinema Gamut",
       },
     ] as const) {
-      const grade = batchGradeStateFromPreset("cinematic");
+      const grade = batchGradeStateFromBaseLook("cinematic");
       const session = buildFilmtoneExportSession({
         exportedAtIso: "2026-05-02T13:00:00.000Z",
         appVersion: "1.4.0",
@@ -185,7 +185,7 @@ describe("metadata-json-runtime", () => {
         imageFormat: "jpeg",
         outputFilenameSuffix: "-graded",
         outputFileName: null,
-        batchPresetChoice: "cinematic",
+        batchLookChoice: "cinematic",
         lookSource: "editSync",
         gradeParams: grade.params,
         depthTrack: null,
@@ -233,7 +233,7 @@ describe("metadata-json-runtime", () => {
   });
 
   it("treats a built-in Rec.709 nilProfile as 'no LUT to apply' but records the selection", async () => {
-    const grade = batchGradeStateFromPreset("cinematic");
+    const grade = batchGradeStateFromBaseLook("cinematic");
     const session = buildFilmtoneExportSession({
       exportedAtIso: "2026-05-02T13:00:00.000Z",
       appVersion: "1.4.0",
@@ -244,7 +244,7 @@ describe("metadata-json-runtime", () => {
       imageFormat: "jpeg",
       outputFilenameSuffix: "-graded",
       outputFileName: null,
-      batchPresetChoice: "cinematic",
+      batchLookChoice: "cinematic",
       lookSource: "editSync",
       gradeParams: grade.params,
       depthTrack: null,

@@ -1,10 +1,16 @@
-import { PRESETS, type PresetName, PARAM_KEYS, cloneParams, type Params } from "film-lab-core";
+import {
+  PRESETS,
+  type BaseLookName,
+  PARAM_KEYS,
+  cloneParams,
+  type Params,
+} from "film-lab-core";
 
 export type SlotId = "A" | "B";
 
 export interface GradeSlotState {
   params: Params;
-  basePreset: PresetName | null;
+  baseLook: BaseLookName | null;
   intensity: number;
 }
 
@@ -23,16 +29,16 @@ export interface State extends PresentState {
 }
 
 export type Action =
-  | { type: "SET_PARAM"; key: keyof Params; value: number; preserveBasePreset?: boolean }
+  | { type: "SET_PARAM"; key: keyof Params; value: number; preserveBaseLook?: boolean }
   /**
    * Quick モードのメタスライダー用: 指定キーだけをまとめて上書きし、履歴には COMMIT の 1 回だけ載せる。
-   * basePreset は手動編集と同様に外れる。
+   * baseLook は手動編集と同様に外れる。
    */
   | { type: "MERGE_PARAMS"; patch: Partial<Params> }
   | { type: "SET_INTENSITY"; value: number }
   | { type: "COMMIT" }
-  | { type: "APPLY_PRESET"; presetName: PresetName; preset: Params }
-  | { type: "APPLY_PARAMS"; params: Params; basePreset: PresetName | null; intensity?: number }
+  | { type: "APPLY_BASE_LOOK"; lookName: BaseLookName; params: Params }
+  | { type: "APPLY_PARAMS"; params: Params; baseLook: BaseLookName | null; intensity?: number }
   | { type: "UNDO" }
   | { type: "REDO" }
   | { type: "COMPARE_ON" }
@@ -140,7 +146,7 @@ export function normalizeParamsWithProcessDefaults(
 function cloneSlot(slot: GradeSlotState): GradeSlotState {
   return {
     params: normalizeParamsWithProcessDefaults(cloneParams(slot.params)),
-    basePreset: slot.basePreset,
+    baseLook: slot.baseLook,
     intensity: slot.intensity,
   };
 }
@@ -182,13 +188,13 @@ function pushHistory(state: State): State {
   };
 }
 
-function interpolatePreset(presetName: PresetName, intensity: number): Params {
+function interpolateBaseLook(lookName: BaseLookName, intensity: number): Params {
   const clamped = Math.max(0, Math.min(1, intensity));
   const params = normalizeParamsWithProcessDefaults(PRESETS.reset);
-  const preset = PRESETS[presetName];
+  const target = PRESETS[lookName];
 
   for (const key of PARAM_KEYS) {
-    params[key] = PRESETS.reset[key] + (preset[key] - PRESETS.reset[key]) * clamped;
+    params[key] = PRESETS.reset[key] + (target[key] - PRESETS.reset[key]) * clamped;
   }
 
   return params;
@@ -198,7 +204,7 @@ function slotsMatch(slotA: GradeSlotState, slotB: GradeSlotState): boolean {
   const slotAProcess = slotA.params as unknown as Record<ProcessParamKey, number>;
   const slotBProcess = slotB.params as unknown as Record<ProcessParamKey, number>;
   return (
-    slotA.basePreset === slotB.basePreset &&
+    slotA.baseLook === slotB.baseLook &&
     slotA.intensity === slotB.intensity &&
     PARAM_KEYS.every((key) => slotA.params[key] === slotB.params[key]) &&
     PROCESS_PARAM_KEYS.every((key) => slotAProcess[key] === slotBProcess[key])
@@ -221,8 +227,8 @@ export function filmLabReducer(state: State, action: Action): State {
       return withActiveSlot(state, (slot) => ({
         ...slot,
         params: { ...slot.params, [action.key]: action.value },
-        basePreset: action.preserveBasePreset ? slot.basePreset : null,
-        intensity: action.preserveBasePreset ? slot.intensity : 1,
+        baseLook: action.preserveBaseLook ? slot.baseLook : null,
+        intensity: action.preserveBaseLook ? slot.intensity : 1,
       }));
     }
 
@@ -230,18 +236,18 @@ export function filmLabReducer(state: State, action: Action): State {
       return withActiveSlot(state, (slot) => ({
         ...slot,
         params: { ...slot.params, ...action.patch },
-        basePreset: null,
+        baseLook: null,
         intensity: 1,
       }));
     }
 
     case "SET_INTENSITY": {
       return withActiveSlot(state, (slot) => {
-        if (!slot.basePreset || slot.basePreset === "reset") return slot;
+        if (!slot.baseLook || slot.baseLook === "reset") return slot;
         const nextIntensity = Math.max(0, Math.min(1, action.value));
         return {
           ...slot,
-          params: interpolatePreset(slot.basePreset, nextIntensity),
+          params: interpolateBaseLook(slot.baseLook, nextIntensity),
           intensity: nextIntensity,
         };
       });
@@ -250,10 +256,10 @@ export function filmLabReducer(state: State, action: Action): State {
     case "COMMIT":
       return pushHistory(state);
 
-    case "APPLY_PRESET": {
+    case "APPLY_BASE_LOOK": {
       const next = withActiveSlot(state, () => ({
-        params: normalizeParamsWithProcessDefaults(cloneParams(action.preset)),
-        basePreset: action.presetName,
+        params: normalizeParamsWithProcessDefaults(cloneParams(action.params)),
+        baseLook: action.lookName,
         intensity: 1,
       }));
       return pushHistory(next);
@@ -262,7 +268,7 @@ export function filmLabReducer(state: State, action: Action): State {
     case "APPLY_PARAMS": {
       const next = withActiveSlot(state, () => ({
         params: normalizeParamsWithProcessDefaults(cloneParams(action.params)),
-        basePreset: action.basePreset,
+        baseLook: action.baseLook,
         intensity: action.intensity ?? 1,
       }));
       return pushHistory(next);
@@ -324,7 +330,7 @@ export function filmLabReducer(state: State, action: Action): State {
       const key = activeSlotKey(state.activeSlot);
       const resetSlot: GradeSlotState = {
         params: normalizeParamsWithProcessDefaults(cloneParams(PRESETS.reset)),
-        basePreset: "reset",
+        baseLook: "reset",
         intensity: 1,
       };
 
@@ -373,12 +379,12 @@ export function toPresentSnapshot(state: State): PresentState {
 }
 
 /**
- * URL 共有など「数値パラメータのスナップショット」から初期化する（basePreset は無し＝手動ルック扱い）。
+ * URL 共有など「数値パラメータのスナップショット」から初期化する（baseLook は無し＝手動ルック扱い）。
  */
 export function createInitialStateFromSharedParams(shared: Params): State {
   const slot: GradeSlotState = {
     params: normalizeParamsWithProcessDefaults(cloneParams(shared)),
-    basePreset: null,
+    baseLook: null,
     intensity: 1,
   };
 
@@ -399,11 +405,11 @@ export function createInitialStateFromSharedParams(shared: Params): State {
 
 export function createInitialState(
   initialParams: Params,
-  initialPresetName: PresetName | null = null,
+  initialBaseLook: BaseLookName | null = null,
 ): State {
   const slot: GradeSlotState = {
     params: normalizeParamsWithProcessDefaults(cloneParams(initialParams)),
-    basePreset: initialPresetName,
+    baseLook: initialBaseLook,
     intensity: 1,
   };
 

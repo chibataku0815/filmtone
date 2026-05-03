@@ -67,10 +67,10 @@ describe("resolveDesktopFilmLabImportMeta", () => {
     expect(resolveDesktopFilmLabImportMeta("production", {}).smartLookRasterFlag).toBe("");
   });
 
-  it("renders the desktop control panel core with searchable preset select", async () => {
+  it("renders the desktop control panel core with searchable Look select", async () => {
     const html = await renderDesktopControlPanelCoreHtml();
 
-    expect(html).toContain("プリセット");
+    expect(html).toContain("ルック");
     expect(html).toContain("Neutral");
     expect(html).toContain("Clean Base");
     // Core does not include Smart Look or Browser Storage

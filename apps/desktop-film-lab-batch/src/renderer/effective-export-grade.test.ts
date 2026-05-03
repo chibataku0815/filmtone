@@ -55,15 +55,15 @@ describe("buildEffectiveExportGradeSnapshot", () => {
           intensity: 0.42,
         },
       },
-      canvasPreset: "cinematic",
-      fallbackBatchPresetChoice: "reset",
-      fallbackLookSource: "preset",
+      canvasLook: "cinematic",
+      fallbackBatchLookChoice: "reset",
+      fallbackLookSource: "builtInLook",
       fallbackLutRefs: createEmptyMetadataLutRefs(),
     });
 
     expect(snapshot.source).toBe("preview");
     expect(snapshot.lookSource).toBe("editSync");
-    expect(snapshot.batchPresetChoice).toBe("cinematic");
+    expect(snapshot.batchLookChoice).toBe("cinematic");
     expect(snapshot.grade.depthTrack).toBe(depthTrack);
     expect(snapshot.grade.params.bloomStrength).toBe(0.91);
     expect(snapshot.grade.params.halationIntensity).toBe(0.37);
@@ -102,17 +102,17 @@ describe("buildEffectiveExportGradeSnapshot", () => {
       viewportParams: null,
       currentBatchGrade,
       editLut: { lut1: null, lut2: null },
-      canvasPreset: "cinematic",
-      fallbackBatchPresetChoice: "reset",
-      fallbackLookSource: "preset",
+      canvasLook: "cinematic",
+      fallbackBatchLookChoice: "reset",
+      fallbackLookSource: "builtInLook",
       fallbackLutRefs,
       captureError: "lost context",
     });
 
     expect(snapshot.source).toBe("batch");
     expect(snapshot.grade).toBe(currentBatchGrade);
-    expect(snapshot.batchPresetChoice).toBe("reset");
-    expect(snapshot.lookSource).toBe("preset");
+    expect(snapshot.batchLookChoice).toBe("reset");
+    expect(snapshot.lookSource).toBe("builtInLook");
     expect(snapshot.lutRefs).toBe(fallbackLutRefs);
     expect(snapshot.captureError).toBe("lost context");
     expect(snapshot.exportRenderGeometry).toBeNull();
@@ -134,9 +134,9 @@ describe("buildEffectiveExportGradeSnapshot", () => {
       viewportParams: PRESETS.reset as unknown as Record<string, number | string>,
       currentBatchGrade,
       editLut: { lut1: null, lut2: null },
-      canvasPreset: "reset",
-      fallbackBatchPresetChoice: "reset",
-      fallbackLookSource: "preset",
+      canvasLook: "reset",
+      fallbackBatchLookChoice: "reset",
+      fallbackLookSource: "builtInLook",
       fallbackLutRefs: createEmptyMetadataLutRefs(),
       exportRenderGeometry,
     });
@@ -162,9 +162,9 @@ describe("buildEffectiveExportGradeSnapshot", () => {
       },
       currentBatchGrade,
       editLut: { lut1: null, lut2: null },
-      canvasPreset: "reset",
-      fallbackBatchPresetChoice: "reset",
-      fallbackLookSource: "preset",
+      canvasLook: "reset",
+      fallbackBatchLookChoice: "reset",
+      fallbackLookSource: "builtInLook",
       fallbackLutRefs: createEmptyMetadataLutRefs(),
     });
 
@@ -197,9 +197,9 @@ describe("buildEffectiveExportGradeSnapshot", () => {
         },
         lut2: null,
       },
-      canvasPreset: "reset",
-      fallbackBatchPresetChoice: "reset",
-      fallbackLookSource: "preset",
+      canvasLook: "reset",
+      fallbackBatchLookChoice: "reset",
+      fallbackLookSource: "builtInLook",
       fallbackLutRefs: createEmptyMetadataLutRefs(),
       appliedAtIso: "2026-05-02T13:00:00.000Z",
     });
@@ -239,9 +239,9 @@ describe("buildEffectiveExportGradeSnapshot", () => {
         },
         lut2: null,
       },
-      canvasPreset: "reset",
-      fallbackBatchPresetChoice: "reset",
-      fallbackLookSource: "preset",
+      canvasLook: "reset",
+      fallbackBatchLookChoice: "reset",
+      fallbackLookSource: "builtInLook",
       fallbackLutRefs: createEmptyMetadataLutRefs(),
       appliedAtIso: "2026-05-02T13:00:00.000Z",
     });
@@ -262,9 +262,9 @@ describe("buildEffectiveExportGradeSnapshot", () => {
       viewportParams: PRESETS.reset as unknown as Record<string, number | string>,
       currentBatchGrade,
       editLut: { lut1: null, lut2: null },
-      canvasPreset: "reset",
-      fallbackBatchPresetChoice: "reset",
-      fallbackLookSource: "preset",
+      canvasLook: "reset",
+      fallbackBatchLookChoice: "reset",
+      fallbackLookSource: "builtInLook",
       fallbackLutRefs: createEmptyMetadataLutRefs(),
       appliedAtIso: "2026-05-02T13:00:00.000Z",
     });

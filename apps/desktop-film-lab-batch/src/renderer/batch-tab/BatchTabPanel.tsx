@@ -23,7 +23,7 @@ import {
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { PRESETS, PRESET_BUTTONS, type PresetName } from "film-lab-core";
+import { PRESETS, PRESET_BUTTONS, type BaseLookName } from "film-lab-core";
 import {
   pathsNotSucceeded,
   sessionHasRemainingWork,
@@ -52,9 +52,9 @@ import {
 /** @description 書き出しタブで扱うジョブの大分類 */
 export type BatchJobMode = "images" | "video";
 
-const PRESET_NAMES = Object.keys(PRESETS) as PresetName[];
+const BASE_LOOK_NAMES = Object.keys(PRESETS) as BaseLookName[];
 
-function formatPresetChoiceLabel(presetName: PresetName): string {
+function formatBaseLookChoiceLabel(presetName: BaseLookName): string {
   const presetButton = PRESET_BUTTONS.find((row) => row.name === presetName);
   return presetButton
     ? `${presetButton.label} / ${presetButton.subtitle}`
@@ -195,10 +195,10 @@ export type BatchTabPanelProps = {
   isPurgingProxyCache: boolean;
   onPurgeProxyCache: () => void | Promise<void>;
 
-  batchPresetChoice: PresetName;
+  batchLookChoice: BaseLookName;
   batchLookSource: MetadataLookSource;
   appliedOpticalRecommendation?: AppliedOpticalRecommendationMetadata | null;
-  onBatchPresetChoiceChange: (name: PresetName) => void;
+  onBatchLookChoiceChange: (name: BaseLookName) => void;
   importedGradeLabel: string | null;
   onImportGradeJson: () => void | Promise<void>;
   onExportGradeJson: () => void;
@@ -248,7 +248,7 @@ export type BatchTabPanelProps = {
   canApplyEditGradeToBatch: boolean;
   onApplyEditGradeToBatch: () => void;
   editToExportSyncedAtMs: number | null;
-  onReapplyBatchPresetBaseline: () => void;
+  onReapplyBatchBaseLookBaseline: () => void;
   /** @description true when rendered inside the right slide panel (compact layout) */
   compact?: boolean;
 
@@ -436,10 +436,10 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     proxyCacheInfo,
     isPurgingProxyCache,
     onPurgeProxyCache,
-    batchPresetChoice,
+    batchLookChoice,
     batchLookSource,
     appliedOpticalRecommendation = null,
-    onBatchPresetChoiceChange,
+    onBatchLookChoiceChange,
     importedGradeLabel,
     onImportGradeJson,
     inputDir,
@@ -467,7 +467,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     canApplyEditGradeToBatch,
     onApplyEditGradeToBatch,
     editToExportSyncedAtMs,
-    onReapplyBatchPresetBaseline,
+    onReapplyBatchBaseLookBaseline,
     compact = false,
     exportSurface,
     desktopInteractivePreview,
@@ -583,7 +583,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
       Icon: Circle,
       iconWeight: "duotone" as const,
       title: t("lookStatusPresetTitle", {
-        preset: formatPresetChoiceLabel(batchPresetChoice),
+        preset: formatBaseLookChoiceLabel(batchLookChoice),
       }),
       body: t("lookStatusPresetBody"),
       iconClass: "text-[var(--fl-text-tertiary)]",
@@ -593,7 +593,7 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
     importedGradeLabel,
     appliedOpticalRecommendation,
     editToExportSyncedAtMs,
-    batchPresetChoice,
+    batchLookChoice,
     locale,
     recommendationFamilyLabel,
     recommendationRecipeLabel,
@@ -919,40 +919,40 @@ export function BatchTabPanel(props: BatchTabPanelProps) {
 
         {batchLookSource === "editSync" || batchLookSource === "analysisRecommendation" ? (
           <div className="flex max-w-md flex-col gap-2 border-t border-white/10 pt-3">
-            <span className="fl-label">{t("presetQuickLabel")}</span>
+            <span className="fl-label">{t("lookQuickLabel")}</span>
             <p className="fl-caption max-w-prose text-[var(--fl-text-secondary)]">
               {batchLookSource === "editSync"
                 ? t("lookPresetHiddenWhileSyncedBody", {
-                    preset: formatPresetChoiceLabel(batchPresetChoice),
+                    preset: formatBaseLookChoiceLabel(batchLookChoice),
                   })
                 : t("lookPresetHiddenWhileRecommendedBody", {
-                    preset: formatPresetChoiceLabel(batchPresetChoice),
+                    preset: formatBaseLookChoiceLabel(batchLookChoice),
                   })}
             </p>
             <button
               type="button"
               className="fl-btn-secondary self-start"
               disabled={running}
-              onClick={onReapplyBatchPresetBaseline}
+              onClick={onReapplyBatchBaseLookBaseline}
             >
               {t("lookRevertToPresetOnlyBtn")}
             </button>
           </div>
         ) : (
           <label className="flex max-w-md flex-col gap-1.5 border-t border-white/10 pt-3">
-            <span className="fl-label">{t("presetQuickLabel")}</span>
+            <span className="fl-label">{t("lookQuickLabel")}</span>
             <select
               data-testid="export-preset-select"
-              value={batchPresetChoice}
+              value={batchLookChoice}
               onChange={(e) =>
-                onBatchPresetChoiceChange(e.target.value as PresetName)
+                onBatchLookChoiceChange(e.target.value as BaseLookName)
               }
               className="w-full max-w-md"
-              aria-label={t("presetSelectAria")}
+              aria-label={t("lookSelectAria")}
             >
-              {PRESET_NAMES.map((n) => (
+              {BASE_LOOK_NAMES.map((n) => (
                 <option key={n} value={n}>
-                  {formatPresetChoiceLabel(n)}
+                  {formatBaseLookChoiceLabel(n)}
                 </option>
               ))}
             </select>

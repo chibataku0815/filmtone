@@ -42,9 +42,9 @@ export const filmLabModeToggleSegmentActive = "bg-[var(--accent-amber1)] text-bl
 export const filmLabModeToggleSegmentInactive = "text-white/55 hover:text-white/75";
 
 /**
- * Presets ブロック下の区切り（下ボーダー + 余白）。
+ * Look ブロック下の区切り（下ボーダー + 余白）。
  */
-export const filmLabPresetSectionDividerBlock = "mb-4 min-w-0 border-b border-white/[0.06] pb-4";
+export const filmLabLookSectionDividerBlock = "mb-4 min-w-0 border-b border-white/[0.06] pb-4";
 
 /**
  * セクションタイトル（ uppercase の小さな見出し）。`SectionHeader` と Web wrapper の見出しで共用。

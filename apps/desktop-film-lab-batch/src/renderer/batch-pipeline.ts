@@ -17,6 +17,7 @@ import {
   PRESETS,
   LOOK_ID_BY_PRESET,
   parseCube,
+  type BaseLookName,
   type CameraOptics,
   type Params,
   type PresetName,
@@ -76,11 +77,11 @@ export type BatchGradeState = {
 };
 
 /**
- * プリセット名から LUT なしのグレード状態を作る（P1 の既定ルック）
+ * Base Look 名から LUT なしのグレード状態を作る（P1 の既定ルック）
  */
-export function batchGradeStateFromPreset(preset: PresetName): BatchGradeState {
+export function batchGradeStateFromBaseLook(baseLook: BaseLookName): BatchGradeState {
   return {
-    params: PRESETS[preset],
+    params: PRESETS[baseLook],
     depthTrack: null,
     lut1Intensity: 1,
     lut1Data: null,

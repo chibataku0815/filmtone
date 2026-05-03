@@ -13,25 +13,25 @@ import {
 } from "react";
 import { useTranslations } from "next-intl";
 import {
-  FILMTONE_DEFAULT_BASE_PRESET,
+  FILMTONE_DEFAULT_BASE_LOOK,
   FILMTONE_SOFT_FINISH_PATCH,
   OPTICAL_FILTER_PROFILES,
   PHASE0_RGB_SHIFT_MAX,
   PRESETS,
   buildOpticalFilterParamPatch,
   createFilmtoneDefaultParams,
-  findMatchingPreset,
+  findMatchingBaseLook,
   halationHueToHex,
+  type BaseLookName,
   type OpticalFilterProfile,
   type OpticalFilterProfileId,
-  type PresetName,
 } from "film-lab-core";
 import { ControlSlider as BaseControlSlider } from "./ui/ControlSlider";
 import { SectionHeader } from "./ui/SectionHeader";
 import { SegmentedControl } from "./ui/SegmentedControl";
 import { ToggleHeader } from "./ui/ToggleHeader";
 import { LUTPanel } from "./LUTPanel";
-import { PresetSearchSelect } from "./PresetSearchSelect";
+import { LookSearchSelect } from "./PresetSearchSelect";
 import type { Viewport } from "film-lab-renderer";
 import type { Params } from "film-lab-core";
 import {
@@ -51,7 +51,7 @@ import {
   filmLabModeToggleButtonClassName,
   filmLabModeToggleGroupShell,
   filmLabPanelRootClassName,
-  filmLabPresetSectionDividerBlock,
+  filmLabLookSectionDividerBlock,
 } from "./filmLabPanelTokens";
 
 /** UI の見せ方だけを切り替える。グレードの数値（reducer）は Quick でも Pro でも同じ */
@@ -103,10 +103,10 @@ export type FilmLabDonationUiBinding = {
  * セクションを自前で描画する。
  */
 export interface FilmLabControlPanelCoreSlots {
-  /** Preset セクション内、プリセットバーの前に挿入するノード（Desktop の初期ルック等） */
-  beforePresets?: ReactNode;
-  /** Preset セクションの直後に挿入するノード（Desktop の smart look prominent 位置） */
-  afterPresets?: ReactNode;
+  /** Look セクション内、Look ピッカーの前に挿入するノード（Desktop の初期ルック等） */
+  beforeLooks?: ReactNode;
+  /** Look セクションの直後に挿入するノード（Desktop の smart look prominent 位置） */
+  afterLooks?: ReactNode;
   /** Finish Tools セクション先頭に挿入するノード（Desktop の clip recommendation 位置） */
   beforeFinishTools?: ReactNode;
   /** LUT の後に挿入するノード（browser storage, share, smart look non-prominent 等） */
@@ -117,8 +117,8 @@ export interface FilmLabControlPanelCoreSlots {
   lpExpandButton?: ReactNode;
   /** LP レイアウト時に LUT 以下の補助パネルを隠すフラグ */
   hideAuxPanels?: boolean;
-  /** Render-prop: Core state を受け取り Presets 直後に Web 専用セクションを挿入 */
-  renderAfterPresets?: (ctx: FilmLabCoreRenderContext) => ReactNode;
+  /** Render-prop: Core state を受け取り Looks 直後に Web 専用セクションを挿入 */
+  renderAfterLooks?: (ctx: FilmLabCoreRenderContext) => ReactNode;
   /** Render-prop: Core state を受け取り Finish Tools 先頭に platform 固有セクションを挿入 */
   renderBeforeFinishTools?: (ctx: FilmLabCoreRenderContext) => ReactNode;
   /** Render-prop: Core state を受け取り LUT 直後に Web 専用セクションを挿入 */
@@ -127,24 +127,24 @@ export interface FilmLabControlPanelCoreSlots {
 
 /**
  * Web wrapper 等が Core 内部の state / dispatch にアクセスするためのコンテキスト。
- * render-prop slots (`renderAfterPresets`, `renderAfterLut`) に渡される。
+ * render-prop slots (`renderAfterLooks`, `renderAfterLut`) に渡される。
  */
 export interface FilmLabCoreRenderContext {
   state: State;
   dispatch: React.Dispatch<Action>;
-  activePreset: PresetName;
+  activeBaseLook: BaseLookName;
   activeSlotState: GradeSlotState;
   savedBloomStrength: number;
   savedHalationIntensity: number;
   setSavedBloomStrength: (v: number) => void;
   setSavedHalationIntensity: (v: number) => void;
-  setActivePreset: (p: PresetName) => void;
+  setActiveBaseLook: (p: BaseLookName) => void;
   /** Dispatch RESTORE_PRESENT + 補助 state を一括復元 */
   restoreSession: (session: {
     present: PresentState;
     savedBloomStrength: number;
     savedHalationIntensity: number;
-    activePreset: PresetName;
+    activeBaseLook: BaseLookName;
   }) => void;
 }
 
@@ -170,8 +170,8 @@ interface FilmLabControlPanelCoreProps {
   onParamsChange?: () => void;
   /** Optical filter profile が適用または解除されたとき */
   onOpticalFilterProfileApply?: (profile: OpticalFilterProfile | null) => void;
-  /** プリセットが選ばれたとき */
-  onPresetChange?: (preset: PresetName) => void;
+  /** Base Look が選ばれたとき */
+  onBaseLookChange?: (baseLook: BaseLookName) => void;
   /** 初期 UI モード */
   defaultUiMode?: UiMode;
   /** UI モード変更通知（wrapper が LP 補助パネル開閉に利用） */
@@ -355,7 +355,7 @@ export const FilmLabControlPanelCore = forwardRef<
   onLutChange,
   onParamsChange,
   onOpticalFilterProfileApply,
-  onPresetChange,
+  onBaseLookChange,
   defaultUiMode = "pro",
   onUiModeChange,
   slots = {},
@@ -377,7 +377,7 @@ export const FilmLabControlPanelCore = forwardRef<
         ? createInitialStateFromSharedParams(initialSharedParams)
         : createInitialState(
             createFilmtoneDefaultParams(),
-            FILMTONE_DEFAULT_BASE_PRESET,
+            FILMTONE_DEFAULT_BASE_LOOK,
           ),
   );
 
@@ -385,10 +385,10 @@ export const FilmLabControlPanelCore = forwardRef<
     compareOff: () => dispatch({ type: "COMPARE_OFF" }),
   }), []);
 
-  const [activePreset, setActivePreset] = useState<PresetName>(() =>
+  const [activeBaseLook, setActiveBaseLook] = useState<BaseLookName>(() =>
     initialSharedParams
-      ? findMatchingPreset(initialSharedParams) ?? FILMTONE_DEFAULT_BASE_PRESET
-      : FILMTONE_DEFAULT_BASE_PRESET,
+      ? findMatchingBaseLook(initialSharedParams) ?? FILMTONE_DEFAULT_BASE_LOOK
+      : FILMTONE_DEFAULT_BASE_LOOK,
   );
   const [savedBloomStrength, setSavedBloomStrength] = useState(0.3);
   const [savedHalationIntensity, setSavedHalationIntensity] = useState(0.25);
@@ -477,12 +477,12 @@ export const FilmLabControlPanelCore = forwardRef<
       present: PresentState;
       savedBloomStrength: number;
       savedHalationIntensity: number;
-      activePreset: PresetName;
+      activeBaseLook: BaseLookName;
     }) => {
       dispatch({ type: "RESTORE_PRESENT", present: session.present });
       setSavedBloomStrength(session.savedBloomStrength);
       setSavedHalationIntensity(session.savedHalationIntensity);
-      setActivePreset(session.activePreset);
+      setActiveBaseLook(session.activeBaseLook);
     },
     [],
   );
@@ -490,23 +490,23 @@ export const FilmLabControlPanelCore = forwardRef<
   const coreRenderContext: FilmLabCoreRenderContext = {
     state,
     dispatch,
-    activePreset,
+    activeBaseLook,
     activeSlotState,
     savedBloomStrength,
     savedHalationIntensity,
     setSavedBloomStrength,
     setSavedHalationIntensity,
-    setActivePreset,
+    setActiveBaseLook,
     restoreSession,
   };
 
-  const presetIntensityAvailable =
-    activeSlotState.basePreset != null && activeSlotState.basePreset !== "reset";
+  const lookStrengthAvailable =
+    activeSlotState.baseLook != null && activeSlotState.baseLook !== "reset";
 
-  const presetSelectActive: PresetName =
-    presetIntensityAvailable && activeSlotState.basePreset
-      ? activeSlotState.basePreset
-      : activePreset;
+  const lookSelectActive: BaseLookName =
+    lookStrengthAvailable && activeSlotState.baseLook
+      ? activeSlotState.baseLook
+      : activeBaseLook;
 
   const gradeToViewportRecord = useCallback((slot: GradeSlotState) => {
     return {
@@ -596,7 +596,7 @@ export const FilmLabControlPanelCore = forwardRef<
   const updateParam = useCallback((key: keyof Params, value: number) => {
     clearOpticalFilterProfileSelection();
     dispatch({ type: "SET_PARAM", key, value });
-    setActivePreset("reset");
+    setActiveBaseLook("reset");
   }, [clearOpticalFilterProfileSelection]);
 
   const commit = useCallback(() => {
@@ -626,7 +626,7 @@ export const FilmLabControlPanelCore = forwardRef<
       setSavedHaloPrismStrength(patch.haloPrismStrength);
     }
 
-    setActivePreset("reset");
+    setActiveBaseLook("reset");
   }, [clearOpticalFilterProfileSelection]);
 
   const applyOpticalFilterProfile = useCallback((profile: OpticalFilterProfile) => {
@@ -653,7 +653,7 @@ export const FilmLabControlPanelCore = forwardRef<
   const updateHalationHue = useCallback((hue: number) => {
     clearOpticalFilterProfileSelection();
     dispatch({ type: "SET_PARAM", key: "halationHue", value: hue });
-    setActivePreset("reset");
+    setActiveBaseLook("reset");
   }, [clearOpticalFilterProfileSelection]);
 
   const toggleBloom = useCallback(
@@ -666,7 +666,7 @@ export const FilmLabControlPanelCore = forwardRef<
       }
       clearOpticalFilterProfileSelection();
       dispatch({ type: "COMMIT" });
-      setActivePreset("reset");
+      setActiveBaseLook("reset");
     },
     [clearOpticalFilterProfileSelection, params.bloomStrength, savedBloomStrength],
   );
@@ -681,7 +681,7 @@ export const FilmLabControlPanelCore = forwardRef<
       }
       clearOpticalFilterProfileSelection();
       dispatch({ type: "COMMIT" });
-      setActivePreset("reset");
+      setActiveBaseLook("reset");
     },
     [clearOpticalFilterProfileSelection, params.halationIntensity, savedHalationIntensity],
   );
@@ -696,7 +696,7 @@ export const FilmLabControlPanelCore = forwardRef<
       }
       clearOpticalFilterProfileSelection();
       dispatch({ type: "COMMIT" });
-      setActivePreset("reset");
+      setActiveBaseLook("reset");
     },
     [clearOpticalFilterProfileSelection, params.shaftIntensity, savedShaftIntensity],
   );
@@ -711,7 +711,7 @@ export const FilmLabControlPanelCore = forwardRef<
       }
       clearOpticalFilterProfileSelection();
       dispatch({ type: "COMMIT" });
-      setActivePreset("reset");
+      setActiveBaseLook("reset");
     },
     [clearOpticalFilterProfileSelection, params.crossFilterStrength, savedCrossFilterStrength],
   );
@@ -726,7 +726,7 @@ export const FilmLabControlPanelCore = forwardRef<
       }
       clearOpticalFilterProfileSelection();
       dispatch({ type: "COMMIT" });
-      setActivePreset("reset");
+      setActiveBaseLook("reset");
     },
     [clearOpticalFilterProfileSelection, params.haloPrismStrength, savedHaloPrismStrength],
   );
@@ -755,7 +755,7 @@ export const FilmLabControlPanelCore = forwardRef<
       }
       clearOpticalFilterProfileSelection();
       dispatch({ type: "COMMIT" });
-      setActivePreset("reset");
+      setActiveBaseLook("reset");
     },
     [clearOpticalFilterProfileSelection, params.compressionAmount],
   );
@@ -780,18 +780,18 @@ export const FilmLabControlPanelCore = forwardRef<
       }
       clearOpticalFilterProfileSelection();
       dispatch({ type: "COMMIT" });
-      setActivePreset("reset");
+      setActiveBaseLook("reset");
     },
     [clearOpticalFilterProfileSelection, params.rgbShift],
   );
 
-  const applyPreset = useCallback((name: PresetName) => {
+  const applyBaseLook = useCallback((name: BaseLookName) => {
     clearOpticalFilterProfileSelection();
-    const preset = PRESETS[name];
-    dispatch({ type: "APPLY_PRESET", presetName: name, preset: { ...preset } as Params });
-    setActivePreset(name);
-    onPresetChange?.(name);
-  }, [clearOpticalFilterProfileSelection, onPresetChange]);
+    const baseLookParams = PRESETS[name];
+    dispatch({ type: "APPLY_BASE_LOOK", lookName: name, params: { ...baseLookParams } as Params });
+    setActiveBaseLook(name);
+    onBaseLookChange?.(name);
+  }, [clearOpticalFilterProfileSelection, onBaseLookChange]);
 
   const handleBeforeAfterPointerDown = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -824,7 +824,7 @@ export const FilmLabControlPanelCore = forwardRef<
 
   // Keyboard shortcuts
   useEffect(() => {
-    const presetKeys: Record<string, PresetName> = {
+    const baseLookKeys: Record<string, BaseLookName> = {
       "1": "cinematic", "2": "portra", "3": "gold200", "4": "pro400h",
       "5": "ektar100", "6": "superia400", "7": "cinestill800t", "8": "bw", "0": "reset",
     };
@@ -841,13 +841,13 @@ export const FilmLabControlPanelCore = forwardRef<
       if (meta && e.shiftKey && e.key.toLowerCase() === "z") {
         e.preventDefault();
         dispatch({ type: "REDO" });
-        setActivePreset("reset");
+        setActiveBaseLook("reset");
         return;
       }
       if (meta && !e.shiftKey && e.key.toLowerCase() === "z") {
         e.preventDefault();
         dispatch({ type: "UNDO" });
-        setActivePreset("reset");
+        setActiveBaseLook("reset");
         return;
       }
 
@@ -868,9 +868,9 @@ export const FilmLabControlPanelCore = forwardRef<
 
       if (e.repeat) return;
 
-      const presetShortcutKey = e.code.match(/^Numpad([0-8])$/)?.[1] ?? e.key;
-      if (presetKeys[presetShortcutKey]) {
-        applyPreset(presetKeys[presetShortcutKey]);
+      const baseLookShortcutKey = e.code.match(/^Numpad([0-8])$/)?.[1] ?? e.key;
+      if (baseLookKeys[baseLookShortcutKey]) {
+        applyBaseLook(baseLookKeys[baseLookShortcutKey]);
         return;
       }
       if ((e.key === "h" || e.key === "H") && canToggleHistogram) {
@@ -929,7 +929,7 @@ export const FilmLabControlPanelCore = forwardRef<
       document.removeEventListener("keyup", handleKeyUp, { capture: true });
     };
   }, [
-    applyPreset,
+    applyBaseLook,
     canToggleHistogram,
     onHistogramToggle,
     state.compareMode,
@@ -992,21 +992,21 @@ export const FilmLabControlPanelCore = forwardRef<
           </label>
         ) : null}
 
-        <div className={filmLabPresetSectionDividerBlock}>
-          <SectionHeader title={tFilmLab("controls.presets")} />
-          {slots.beforePresets ? <div className="mb-3">{slots.beforePresets}</div> : null}
-          <PresetSearchSelect
-            activePreset={presetSelectActive}
-            onPreset={applyPreset}
-            triggerAriaLabel={tFilmLab("controls.presetSelectTriggerLabel")}
-            searchPlaceholder={tFilmLab("controls.presetSearchPlaceholder")}
-            emptyLabel={tFilmLab("controls.presetSearchEmpty")}
+        <div className={filmLabLookSectionDividerBlock}>
+          <SectionHeader title={tFilmLab("controls.looks")} />
+          {slots.beforeLooks ? <div className="mb-3">{slots.beforeLooks}</div> : null}
+          <LookSearchSelect
+            activeLook={lookSelectActive}
+            onLook={applyBaseLook}
+            triggerAriaLabel={tFilmLab("controls.lookSelectTriggerLabel")}
+            searchPlaceholder={tFilmLab("controls.lookSearchPlaceholder")}
+            emptyLabel={tFilmLab("controls.lookSearchEmpty")}
           />
-          {presetIntensityAvailable ? (
+          {lookStrengthAvailable ? (
             <div className="mt-3">
               <PanelControlSlider
                 sliderLabelResetHint={sliderLabelResetHint}
-                label={tFilmLab("controls.presetIntensity")}
+                label={tFilmLab("controls.lookStrength")}
                 value={activeSlotState.intensity}
                 min={0}
                 max={1}
@@ -1020,7 +1020,7 @@ export const FilmLabControlPanelCore = forwardRef<
           ) : null}
         </div>
 
-        {slots.renderAfterPresets ? slots.renderAfterPresets(coreRenderContext) : slots.afterPresets}
+        {slots.renderAfterLooks ? slots.renderAfterLooks(coreRenderContext) : slots.afterLooks}
 
         {/* === LUT — placed directly below presets (v0.5.0) === */}
         {isPro && !(slots.hideAuxPanels && slots.lpExpandButton) && (

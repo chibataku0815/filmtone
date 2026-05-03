@@ -1,4 +1,4 @@
-import type { PresetName } from "film-lab-core";
+import type { BaseLookName } from "film-lab-core";
 import { getSourceProfile } from "film-lab-core";
 import type { BatchGradeState } from "./batch-pipeline";
 import type {
@@ -31,7 +31,7 @@ export type EffectiveExportGradeSource = "preview" | "batch";
 
 export type EffectiveExportGradeSnapshot = {
   grade: BatchGradeState;
-  batchPresetChoice: PresetName;
+  batchLookChoice: BaseLookName;
   lookSource: MetadataLookSource;
   lutRefs: MetadataLutRefs;
   appliedSourceProfile: AppliedSourceProfileMetadata | null;
@@ -44,8 +44,8 @@ export type BuildEffectiveExportGradeSnapshotInput = {
   viewportParams: Record<string, number | string> | null;
   currentBatchGrade: BatchGradeState;
   editLut: ExportGradeLutState;
-  canvasPreset: PresetName;
-  fallbackBatchPresetChoice: PresetName;
+  canvasLook: BaseLookName;
+  fallbackBatchLookChoice: BaseLookName;
   fallbackLookSource: MetadataLookSource;
   fallbackLutRefs: MetadataLutRefs;
   fallbackAppliedSourceProfile?: AppliedSourceProfileMetadata | null;
@@ -109,8 +109,8 @@ export function buildEffectiveExportGradeSnapshot({
   viewportParams,
   currentBatchGrade,
   editLut,
-  canvasPreset,
-  fallbackBatchPresetChoice,
+  canvasLook,
+  fallbackBatchLookChoice,
   fallbackLookSource,
   fallbackLutRefs,
   fallbackAppliedSourceProfile = null,
@@ -121,7 +121,7 @@ export function buildEffectiveExportGradeSnapshot({
   if (!viewportParams) {
     return {
       grade: currentBatchGrade,
-      batchPresetChoice: fallbackBatchPresetChoice,
+      batchLookChoice: fallbackBatchLookChoice,
       lookSource: fallbackLookSource,
       lutRefs: fallbackLutRefs,
       appliedSourceProfile: fallbackAppliedSourceProfile,
@@ -148,7 +148,7 @@ export function buildEffectiveExportGradeSnapshot({
       lutData: editLut.lut2?.data ?? null,
       lutSize: editLut.lut2?.size ?? 0,
     },
-    batchPresetChoice: canvasPreset,
+    batchLookChoice: canvasLook,
     lookSource: "editSync",
     lutRefs: {
       lut1: createMetadataLutRefFromRuntime(editLut.lut1),
@@ -177,7 +177,7 @@ export function formatEffectiveExportGradeSummary(
   return [
     `source=${snapshot.source}`,
     `look.source=${snapshot.lookSource}`,
-    `preset=${snapshot.batchPresetChoice}`,
+    `baseLook=${snapshot.batchLookChoice}`,
     `bloomStrength=${formatNumber(p.bloomStrength)}`,
     `halationIntensity=${formatNumber(p.halationIntensity)}`,
     `diffusion=${formatNumber(p.diffusion)}`,

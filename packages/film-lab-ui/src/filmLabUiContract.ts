@@ -18,10 +18,10 @@
 export const FILM_LAB_NEXT_INTL_NAMESPACE = "film-lab" as const;
 
 /**
- * プリセット選択の **primary path**（life#86 完了後もここが唯一の入口）。
- * 別コンポーネントで二重にプリセット一覧を出さないこと。
+ * Look 選択の **primary path**（life#86 完了後もここが唯一の入口）。
+ * 別コンポーネントで二重に Look 一覧を出さないこと。
  */
-export const FILM_LAB_PRESET_PRIMARY_SURFACE_ID = "PresetSearchSelect" as const;
+export const FILM_LAB_LOOK_PRIMARY_SURFACE_ID = "LookSearchSelect" as const;
 
 /**
  * `FilmLabControlPanelCore` 内コンテンツの **論理ブロック順**（上から）。
@@ -32,12 +32,12 @@ export const FILM_LAB_CONTROL_PANEL_SECTION_ORDER = [
   "modeToggle",
   /** 寄付・プレゼンモード（Web の donationUi スロットがあるときだけ表示） */
   "donationPresentMode",
-  /** セクション見出し + beforePresets + PresetSearchSelect + preset intensity */
-  "presets",
+  /** セクション見出し + beforeLooks + LookSearchSelect + Look strength */
+  "looks",
   /**
-   * `slots.renderAfterPresets` / `afterPresets` — Web: Smart Look 等。Desktop: 未使用なら空。
+   * `slots.renderAfterLooks` / `afterLooks` — Web: Smart Look 等。Desktop: 未使用なら空。
    */
-  "wrapperAfterPresets",
+  "wrapperAfterLooks",
   /**
    * 2 カラムグリッド: Process / Color / Effects（Quick は子ブロック順が変わる）、Compare、LUT、Histogram 等。
    */
@@ -57,13 +57,13 @@ export type FilmLabControlPanelSectionId =
  * Platform 固有 UI はここに閉じ、Core 本体の並びは上記 section order を崩さないこと。
  */
 export const FILM_LAB_WRAPPER_SLOT_IDS = [
-  "beforePresets",
-  "afterPresets",
+  "beforeLooks",
+  "afterLooks",
   "beforeFinishTools",
   "afterLut",
   "donationUi",
   "lpExpandButton",
-  "renderAfterPresets",
+  "renderAfterLooks",
   "renderBeforeFinishTools",
   "renderAfterLut",
 ] as const;

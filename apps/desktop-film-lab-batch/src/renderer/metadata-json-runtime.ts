@@ -1,10 +1,10 @@
 import {
-  FILMTONE_DEFAULT_BASE_PRESET,
+  FILMTONE_DEFAULT_BASE_LOOK,
   buildSourceProfileLut,
   getSourceProfile,
   parseCube,
   type CameraOptics,
-  type PresetName,
+  type BaseLookName,
 } from "film-lab-core";
 import type { FilmLabBatchBridge } from "./desktop-api";
 import {
@@ -13,7 +13,7 @@ import {
   type AppliedSourceProfileMetadata,
   createEmptyMetadataLutRefs,
   extractMetadataLutRefsFromGradeJsonText,
-  inferPresetChoiceFromImportedJson,
+  inferBaseLookChoiceFromImportedJson,
   parseFilmtoneExportSessionV1,
   type FilmtoneExportSessionV1,
   type MetadataDepthTrackRef,
@@ -26,7 +26,7 @@ import { resolveGradeFromJsonText } from "./batch-pipeline";
 
 export type ResolvedImportedMetadataJson = {
   batchGrade: BatchGradeState;
-  batchPresetChoice: PresetName;
+  batchLookChoice: BaseLookName;
   lookSource: MetadataLookSource;
   lutRefs: MetadataLutRefs;
   importedFilePath: string;
@@ -185,7 +185,7 @@ export async function resolveImportedMetadataJson(
     const parsedSyncTime = Date.parse(sidecar.exportedAtIso);
     return {
       batchGrade: loaded.batchGrade,
-      batchPresetChoice: sidecar.look.batchPresetChoice,
+      batchLookChoice: sidecar.look.batchLookChoice,
       lookSource: sidecar.look.source,
       lutRefs: loaded.resolvedLutRefs,
       importedFilePath: filePath,
@@ -214,7 +214,7 @@ export async function resolveImportedMetadataJson(
       lutData: resolvedGrade.lutData,
       lutSize: resolvedGrade.lutSize,
     },
-    batchPresetChoice: inferPresetChoiceFromImportedJson(
+    batchLookChoice: inferBaseLookChoiceFromImportedJson(
       jsonText,
       resolvedGrade.params,
     ),
@@ -243,8 +243,8 @@ export function emptyResolvedMetadataJson(filePath: string): ResolvedImportedMet
       lutData: null,
       lutSize: 0,
     },
-    batchPresetChoice: FILMTONE_DEFAULT_BASE_PRESET,
-    lookSource: "preset",
+    batchLookChoice: FILMTONE_DEFAULT_BASE_LOOK,
+    lookSource: "builtInLook",
     lutRefs: createEmptyMetadataLutRefs(),
     importedFilePath: filePath,
     syncedAtMs: null,
