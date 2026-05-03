@@ -47,12 +47,27 @@ enum FilmtoneSidecarWriter {
         sourceInterpretation: String? = nil
     ) -> [String: Any] {
         let strength = FilmtonePresetCatalog.clampStrength(request.presetStrength)
-        let params = FilmtonePresetCatalog.params(
-            for: request.presetName,
-            strength: strength
+        let params = FilmtonePresetCatalog.resolved(
+            presetName: request.presetName,
+            strength: strength,
+            lookSlug: request.lookSlug
         )
-        let lookId = FilmtonePresetCatalog.lookId(for: request.presetName)
         let lookVersion = FilmtonePresetCatalog.presetVersion
+
+        // M5-A.2: when a Look is active, switch lookId to the
+        // `filmtone:builtin:<slug>:<v>` namespace and overwrite
+        // baseLookName with the slug so a sidecar consumer can route by
+        // identity. baseLookName intentionally hides the underlying preset
+        // ("reset") because the Look's overrides + cube are the SSOT.
+        let lookId: String
+        let baseLookName: String
+        if let lookSlug = request.lookSlug {
+            lookId = FilmtonePresetCatalog.lookId(forSlug: lookSlug)
+            baseLookName = lookSlug
+        } else {
+            lookId = FilmtonePresetCatalog.lookId(for: request.presetName)
+            baseLookName = request.presetName
+        }
 
         let isoFormatter = ISO8601DateFormatter()
         isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -70,7 +85,7 @@ enum FilmtoneSidecarWriter {
             "batchLookChoice": [
                 "lookId": lookId,
                 "lookVersion": lookVersion,
-                "baseLookName": request.presetName,
+                "baseLookName": baseLookName,
                 "strength": strength,
             ],
             "lookId": lookId,
@@ -83,6 +98,22 @@ enum FilmtoneSidecarWriter {
         ]
         if let sourceInterpretation {
             payload["sourceInterpretation"] = sourceInterpretation
+        }
+        // M5-A.2 additive: emit `creativeLut` provenance when a Look is
+        // active and its cube resolves. SHA mismatch / missing resource
+        // path returns nil from the loader → block is omitted (OQ-3:
+        // attempted-and-failed signal not surfaced in the sidecar).
+        if let lookSlug = request.lookSlug,
+           strength > 0,
+           let look = FilmtoneCreativePackCatalog.find(slug: lookSlug),
+           let prepared = FilmtoneCreativeLutLoader.load(look: look) {
+            payload["creativeLut"] = [
+                "size": prepared.size,
+                "intensity": prepared.intensity,
+                "sourceHash": prepared.sourceHash,
+                "bundledSlug": look.slug,
+                "bundledPackId": look.packId,
+            ]
         }
         return payload
     }

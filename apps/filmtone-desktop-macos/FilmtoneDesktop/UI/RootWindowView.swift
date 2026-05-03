@@ -12,7 +12,8 @@ struct RootWindowView: View {
                 sourceURL: state.sourceURL,
                 sourceKind: state.sourceKind,
                 presetName: state.presetName,
-                presetStrength: state.presetStrength
+                presetStrength: state.presetStrength,
+                lookSlug: state.lookSlug
             )
             VStack(alignment: .trailing, spacing: 12) {
                 GlassControlGroup()
@@ -110,6 +111,7 @@ struct RootWindowView: View {
             outputURL: outputURL,
             presetName: state.presetName,
             presetStrength: state.presetStrength,
+            lookSlug: state.lookSlug,
             format: format
         )
 
@@ -150,7 +152,8 @@ struct RootWindowView: View {
             sourceURL: sourceURL,
             outputURL: outputURL,
             presetName: state.presetName,
-            presetStrength: state.presetStrength
+            presetStrength: state.presetStrength,
+            lookSlug: state.lookSlug
         )
 
         state.isExporting = true

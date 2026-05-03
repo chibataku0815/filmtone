@@ -7,6 +7,7 @@ struct PreviewSurface: View {
     let sourceKind: FilmtoneSourceKind
     let presetName: String
     let presetStrength: Double
+    let lookSlug: String?
 
     var body: some View {
         Color.black
@@ -16,7 +17,8 @@ struct PreviewSurface: View {
                         sourceURL: sourceURL,
                         sourceKind: sourceKind,
                         presetName: presetName,
-                        presetStrength: presetStrength
+                        presetStrength: presetStrength,
+                        lookSlug: lookSlug
                     )
                 } else {
                     EmptyPreviewLabel()
@@ -30,6 +32,7 @@ private struct PreviewImageView: NSViewRepresentable {
     let sourceKind: FilmtoneSourceKind
     let presetName: String
     let presetStrength: Double
+    let lookSlug: String?
 
     final class Coordinator {
         var currentTask: Task<Void, Never>?
@@ -59,6 +62,7 @@ private struct PreviewImageView: NSViewRepresentable {
         let kind = sourceKind
         let preset = presetName
         let strength = presetStrength
+        let slug = lookSlug
 
         switch kind {
         case .still:
@@ -67,6 +71,7 @@ private struct PreviewImageView: NSViewRepresentable {
                 source: source,
                 presetName: preset,
                 presetStrength: strength,
+                lookSlug: slug,
                 sourceURL: url,
                 fallbackURL: url,
                 into: nsView
@@ -79,6 +84,7 @@ private struct PreviewImageView: NSViewRepresentable {
                     source: preview?.image,
                     presetName: preset,
                     presetStrength: strength,
+                    lookSlug: slug,
                     sourceURL: url,
                     fallbackURL: url,
                     into: nsView
@@ -92,6 +98,7 @@ private struct PreviewImageView: NSViewRepresentable {
         source: CIImage?,
         presetName: String,
         presetStrength: Double,
+        lookSlug: String?,
         sourceURL: URL,
         fallbackURL: URL,
         into nsView: NSImageView
@@ -100,14 +107,27 @@ private struct PreviewImageView: NSViewRepresentable {
             nsView.image = NSImage(contentsOf: fallbackURL)
             return
         }
-        let params = FilmtonePresetCatalog.params(for: presetName, strength: presetStrength)
+        let params = FilmtonePresetCatalog.resolved(
+            presetName: presetName,
+            strength: presetStrength,
+            lookSlug: lookSlug
+        )
         let sourceSeed = FilmtoneGradePipeline.makeStableSourceSeed(
             from: sourceURL.absoluteString
         )
+        let creativeLut: PreparedCreativeLut?
+        if let lookSlug,
+           presetStrength > 0,
+           let look = FilmtoneCreativePackCatalog.find(slug: lookSlug) {
+            creativeLut = FilmtoneCreativeLutLoader.load(look: look)
+        } else {
+            creativeLut = nil
+        }
         let graded = FilmtoneGradePipeline.apply(
             to: source,
             params: params,
-            sourceSeed: sourceSeed
+            sourceSeed: sourceSeed,
+            creativeLut: creativeLut
         )
         guard let cg = FilmtoneCIContext.shared.createCGImage(
             graded,
@@ -143,7 +163,8 @@ private struct EmptyPreviewLabel: View {
         sourceURL: nil,
         sourceKind: .still,
         presetName: "reset",
-        presetStrength: 1.0
+        presetStrength: 1.0,
+        lookSlug: nil
     )
     .frame(width: 600, height: 400)
 }

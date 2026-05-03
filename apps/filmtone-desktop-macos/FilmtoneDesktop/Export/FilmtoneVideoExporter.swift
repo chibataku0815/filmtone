@@ -16,6 +16,7 @@ struct FilmtoneVideoExportRequest: FilmtoneSidecarRequest {
     let outputURL: URL
     let presetName: String
     let presetStrength: Double
+    let lookSlug: String?
     let codec: FilmtoneVideoCodec
     var sourceKind: FilmtoneSourceKind { .video }
 
@@ -24,12 +25,14 @@ struct FilmtoneVideoExportRequest: FilmtoneSidecarRequest {
         outputURL: URL,
         presetName: String,
         presetStrength: Double = FilmtonePresetCatalog.presetStrengthDefault,
+        lookSlug: String? = nil,
         codec: FilmtoneVideoCodec = .h264
     ) {
         self.sourceURL = sourceURL
         self.outputURL = outputURL
         self.presetName = presetName
         self.presetStrength = presetStrength
+        self.lookSlug = lookSlug
         self.codec = codec
     }
 }
@@ -89,13 +92,25 @@ enum FilmtoneVideoExporter {
         try writer.start()
         try reader.start()
 
-        let params = FilmtonePresetCatalog.params(
-            for: request.presetName,
-            strength: request.presetStrength
+        let params = FilmtonePresetCatalog.resolved(
+            presetName: request.presetName,
+            strength: request.presetStrength,
+            lookSlug: request.lookSlug
         )
         let sourceSeed = FilmtoneGradePipeline.makeStableSourceSeed(
             from: request.sourceURL.absoluteString
         )
+        // M5-A.2: resolve the cube ONCE outside the frame loop. The NSCache
+        // hit guarantees a parsed cube survives this entire export. nil
+        // when no Look is selected or strength gate is closed (D4-ii).
+        let creativeLut: PreparedCreativeLut?
+        if let lookSlug = request.lookSlug,
+           request.presetStrength > 0,
+           let look = FilmtoneCreativePackCatalog.find(slug: lookSlug) {
+            creativeLut = FilmtoneCreativeLutLoader.load(look: look)
+        } else {
+            creativeLut = nil
+        }
         let context = FilmtoneCIContext.shared
         let outputColorSpace = contract.destinationColorSpace
         let renderBounds = CGRect(origin: .zero, size: outputSize)
@@ -151,7 +166,8 @@ enum FilmtoneVideoExporter {
                         params: params,
                         frameTimeSeconds: frameTimeSeconds,
                         sourceSeed: sourceSeed,
-                        cameraOptics: probe.cameraOptics
+                        cameraOptics: probe.cameraOptics,
+                        creativeLut: creativeLut
                     ).cropped(to: renderBounds)
 
                     context.render(

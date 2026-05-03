@@ -34,6 +34,7 @@ struct FilmtoneStillExportRequest: FilmtoneSidecarRequest {
     let outputURL: URL
     let presetName: String
     let presetStrength: Double
+    let lookSlug: String?
     let format: StillExportFormat
     var sourceKind: FilmtoneSourceKind { .still }
 
@@ -42,12 +43,14 @@ struct FilmtoneStillExportRequest: FilmtoneSidecarRequest {
         outputURL: URL,
         presetName: String,
         presetStrength: Double = FilmtonePresetCatalog.presetStrengthDefault,
+        lookSlug: String? = nil,
         format: StillExportFormat
     ) {
         self.sourceURL = sourceURL
         self.outputURL = outputURL
         self.presetName = presetName
         self.presetStrength = presetStrength
+        self.lookSlug = lookSlug
         self.format = format
     }
 }
@@ -85,18 +88,28 @@ enum FilmtoneStillExporter {
             throw FilmtoneStillExportError.sourceUnreadable(request.sourceURL)
         }
 
-        let params = FilmtonePresetCatalog.params(
-            for: request.presetName,
-            strength: request.presetStrength
+        let params = FilmtonePresetCatalog.resolved(
+            presetName: request.presetName,
+            strength: request.presetStrength,
+            lookSlug: request.lookSlug
         )
         let sourceSeed = FilmtoneGradePipeline.makeStableSourceSeed(
             from: request.sourceURL.absoluteString
         )
+        let creativeLut: PreparedCreativeLut?
+        if let lookSlug = request.lookSlug,
+           request.presetStrength > 0,
+           let look = FilmtoneCreativePackCatalog.find(slug: lookSlug) {
+            creativeLut = FilmtoneCreativeLutLoader.load(look: look)
+        } else {
+            creativeLut = nil
+        }
         let graded = FilmtoneGradePipeline.apply(
             to: source,
             params: params,
             sourceSeed: sourceSeed,
-            cameraOptics: probe.cameraOptics
+            cameraOptics: probe.cameraOptics,
+            creativeLut: creativeLut
         )
 
         try render(graded, request: request, contract: contract)

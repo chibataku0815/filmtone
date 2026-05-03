@@ -65,6 +65,42 @@ enum FilmtonePresetCatalog {
         "filmtone:base:\(name):\(presetVersion)"
     }
 
+    static func lookId(forSlug slug: String) -> String {
+        // M5-A.2: built-in Creative LUT Pack 01 slugs (Stone / Urban) get a
+        // dedicated namespace. Distinct from `filmtone:base:<preset>:<v>` so
+        // a sidecar consumer can route by `:builtin:` vs `:base:` without
+        // splitting on slug content.
+        "filmtone:builtin:\(slug):\(presetVersion)"
+    }
+
+    /// M5-A.2 — preset-blend (D3-α) resolution that combines a Look's
+    /// `paramOverrides` with a strength slider. When `lookSlug` is nil this
+    /// delegates to the existing preset path so the legacy 4-preset UI is
+    /// byte-identical.
+    ///
+    /// When a Look is selected, the high-layer is `target = reset +
+    /// paramOverridesPatch` and the low layer is forced to the bareline
+    /// `resetParams` pivot. The slider then lerps between bareline and
+    /// target — strength=0 collapses to bareline, strength=1 lands on the
+    /// Look's signature optics.
+    static func resolved(
+        presetName: String,
+        strength: Double,
+        lookSlug: String?
+    ) -> FilmtonePhase0Params {
+        guard let lookSlug,
+              let look = FilmtoneCreativePackCatalog.find(slug: lookSlug) else {
+            return params(for: presetName, strength: strength)
+        }
+
+        let reset = FilmtonePhase0Generated.resetParams
+        let target = reset.applyingPatch(look.paramOverridesPatch)
+        let t = clampStrength(strength)
+        if t >= 1.0 { return target }
+        if t <= 0.0 { return reset }
+        return lerp(reset: reset, target: target, t: t)
+    }
+
     private static func lerp(
         reset: FilmtonePhase0Params,
         target: FilmtonePhase0Params,
