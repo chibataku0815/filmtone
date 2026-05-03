@@ -22,6 +22,7 @@ struct FilmtoneStrengthSheet: View {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 18) {
                     strengthSection
+                    backlightVeilSection
                     adjustmentsSection
                     advancedParamsSection
                 }
@@ -152,6 +153,53 @@ struct FilmtoneStrengthSheet: View {
             .accessibilityIdentifier("filmtone.sheet.slider.creativeLutIntensity")
             .accessibilityLabel(store.strings.lookLutAmountLabel)
             .accessibilityValue(percentLabel)
+        }
+    }
+
+    /// Backlight Veil Phase 1c — segmented Picker for the optical filter
+    /// family. OFF / 1/8 / 1/4 / 1/2 (Desktop canonical curve, no
+    /// interpolation). Mutates `FilmtoneEditorStore.selectedOpticalFilterId`,
+    /// which mirrors to `FilmtoneOpticalFilterSelectionStore.shared` so the
+    /// composite kernel picks up the new branch on the next preview frame.
+    private var backlightVeilSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Text("Backlight Veil")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.92))
+                Spacer()
+                Text(backlightVeilDensityLabel)
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.64))
+                    .accessibilityIdentifier("filmtone.sheet.backlightVeil.value")
+            }
+
+            Picker(
+                "Backlight Veil",
+                selection: Binding(
+                    get: { store.selectedOpticalFilterId ?? "off" },
+                    set: { newValue in
+                        store.setOpticalFilterId(newValue == "off" ? nil : newValue)
+                    }
+                )
+            ) {
+                Text("Off").tag("off")
+                Text("1/8").tag("backlightVeil-1-8")
+                Text("1/4").tag("backlightVeil-1-4")
+                Text("1/2").tag("backlightVeil-1-2")
+            }
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier("filmtone.sheet.backlightVeil.picker")
+        }
+        .sectionDivider()
+    }
+
+    private var backlightVeilDensityLabel: String {
+        switch store.selectedOpticalFilterId {
+        case "backlightVeil-1-8": return "Subtle"
+        case "backlightVeil-1-4": return "Mid"
+        case "backlightVeil-1-2": return "Max"
+        default: return "Off"
         }
     }
 

@@ -46,6 +46,66 @@ final class FilmtoneMetalOpticsRenderer {
         let diffusionCompositeBase: Double
 
         let glowBaseScale: Double
+
+        /// Backlight Veil Phase 1b: when non-nil, the composite stage swaps
+        /// `filmtoneGlowComposite` for `filmtoneGlowCompositeBacklightVeil`
+        /// which runs the WGSL §4.4 direct + scatter math. Nil keeps every
+        /// pre-existing render path byte-equivalent.
+        let opticalScatter: OpticalScatterParams?
+
+        init(
+            bloomStrength: Double,
+            bloomThreshold: Double,
+            bloomSoftKnee: Double,
+            bloomRadius: Double,
+            bloomMipLevels: Int,
+            bloomSpreadBoost: Double,
+            halationIntensity: Double,
+            halationThreshold: Double,
+            halationSoftKnee: Double,
+            halationRadius: Double,
+            halationHue: Double,
+            halationMipLevels: Int,
+            halationSpread: Double,
+            halationSpreadDivisor: Double,
+            diffusion: Double,
+            diffusionMipLevels: Int,
+            diffusionCompositeBase: Double,
+            glowBaseScale: Double,
+            opticalScatter: OpticalScatterParams? = nil
+        ) {
+            self.bloomStrength = bloomStrength
+            self.bloomThreshold = bloomThreshold
+            self.bloomSoftKnee = bloomSoftKnee
+            self.bloomRadius = bloomRadius
+            self.bloomMipLevels = bloomMipLevels
+            self.bloomSpreadBoost = bloomSpreadBoost
+            self.halationIntensity = halationIntensity
+            self.halationThreshold = halationThreshold
+            self.halationSoftKnee = halationSoftKnee
+            self.halationRadius = halationRadius
+            self.halationHue = halationHue
+            self.halationMipLevels = halationMipLevels
+            self.halationSpread = halationSpread
+            self.halationSpreadDivisor = halationSpreadDivisor
+            self.diffusion = diffusion
+            self.diffusionMipLevels = diffusionMipLevels
+            self.diffusionCompositeBase = diffusionCompositeBase
+            self.glowBaseScale = glowBaseScale
+            self.opticalScatter = opticalScatter
+        }
+    }
+
+    /// Backlight Veil Phase 1b — six optical scatter coefficients sourced from
+    /// `optical-filter-profiles.ts` Backlight Veil entries (commit 2c8e15d).
+    /// Mirrors WGSL composite uniforms `optical*` (composite.frag.wgsl.ts:288-316).
+    struct OpticalScatterParams {
+        let directTransmission: Double
+        let blackRetention: Double
+        let scatterStrength: Double
+        let highlightReactivity: Double
+        let warmScatter: Double
+        let spectralTail: Double
     }
 
     /// Vignette parameters mirroring the CI `vignette` kernel arguments.
@@ -79,6 +139,7 @@ final class FilmtoneMetalOpticsRenderer {
     private let clearTexturePS: MTLComputePipelineState
     private let upsampleAccumulatePS: MTLComputePipelineState
     private let glowCompositePS: MTLComputePipelineState
+    private let glowCompositeBacklightVeilPS: MTLComputePipelineState
     private let vignettePS: MTLComputePipelineState
 
     // Texture pool — allocated lazily on first render call and reused across
@@ -142,6 +203,7 @@ final class FilmtoneMetalOpticsRenderer {
             let clearFn = library.makeFunction(name: "filmtoneClearTexture"),
             let accFn = library.makeFunction(name: "filmtoneTentUpsampleAccumulate"),
             let compFn = library.makeFunction(name: "filmtoneGlowComposite"),
+            let veilFn = library.makeFunction(name: "filmtoneGlowCompositeBacklightVeil"),
             let vignetteFn = library.makeFunction(name: "filmtoneVignette")
         else {
             NSLog("FilmtoneMetalOpticsRenderer: shader function lookup failed")
@@ -156,6 +218,7 @@ final class FilmtoneMetalOpticsRenderer {
             self.clearTexturePS = try device.makeComputePipelineState(function: clearFn)
             self.upsampleAccumulatePS = try device.makeComputePipelineState(function: accFn)
             self.glowCompositePS = try device.makeComputePipelineState(function: compFn)
+            self.glowCompositeBacklightVeilPS = try device.makeComputePipelineState(function: veilFn)
             self.vignettePS = try device.makeComputePipelineState(function: vignetteFn)
         } catch {
             NSLog("FilmtoneMetalOpticsRenderer: pipeline state creation failed: \(error)")
@@ -324,18 +387,33 @@ final class FilmtoneMetalOpticsRenderer {
                 encodeClear(enc: enc, target: diffusionFinal)
             }
 
-            encodeGlowComposite(
-                enc: enc,
-                base: inputTexture,
-                bloom: bloomFinal,
-                halation: halationFinal,
-                diffusion: diffusionFinal,
-                output: outputTexture,
-                bloomStrength: Float(glow.bloomStrength),
-                halationIntensity: Float(glow.halationIntensity),
-                diffusionAmount: Float(glow.diffusion),
-                diffusionBase: Float(glow.diffusionCompositeBase)
-            )
+            if let optical = glow.opticalScatter {
+                encodeGlowCompositeBacklightVeil(
+                    enc: enc,
+                    base: inputTexture,
+                    bloom: bloomFinal,
+                    halation: halationFinal,
+                    diffusion: diffusionFinal,
+                    output: outputTexture,
+                    bloomStrength: Float(glow.bloomStrength),
+                    halationIntensity: Float(glow.halationIntensity),
+                    diffusionAmount: Float(glow.diffusion),
+                    optical: optical
+                )
+            } else {
+                encodeGlowComposite(
+                    enc: enc,
+                    base: inputTexture,
+                    bloom: bloomFinal,
+                    halation: halationFinal,
+                    diffusion: diffusionFinal,
+                    output: outputTexture,
+                    bloomStrength: Float(glow.bloomStrength),
+                    halationIntensity: Float(glow.halationIntensity),
+                    diffusionAmount: Float(glow.diffusion),
+                    diffusionBase: Float(glow.diffusionCompositeBase)
+                )
+            }
         } else {
             // No glow contributions: passthrough into outputTexture so the
             // wrap-back path (and vignette stage, if any) is consistent.
@@ -547,6 +625,52 @@ final class FilmtoneMetalOpticsRenderer {
         enc.setBytes(&da, length: MemoryLayout<Float>.size, index: 2)
         enc.setBytes(&db, length: MemoryLayout<Float>.size, index: 3)
         dispatch(enc: enc, pipeline: glowCompositePS, width: output.width, height: output.height)
+    }
+
+    /// Backlight Veil Phase 1b dispatcher. Verbatim Swift companion to the
+    /// MSL kernel `filmtoneGlowCompositeBacklightVeil` (WGSL §4.4 port).
+    private func encodeGlowCompositeBacklightVeil(
+        enc: MTLComputeCommandEncoder,
+        base: MTLTexture,
+        bloom: MTLTexture,
+        halation: MTLTexture,
+        diffusion: MTLTexture,
+        output: MTLTexture,
+        bloomStrength: Float,
+        halationIntensity: Float,
+        diffusionAmount: Float,
+        optical: OpticalScatterParams
+    ) {
+        enc.setComputePipelineState(glowCompositeBacklightVeilPS)
+        enc.setTexture(base, index: 0)
+        enc.setTexture(bloom, index: 1)
+        enc.setTexture(halation, index: 2)
+        enc.setTexture(diffusion, index: 3)
+        enc.setTexture(output, index: 4)
+        var bs = bloomStrength
+        var hi = halationIntensity
+        var da = diffusionAmount
+        var dt = Float(optical.directTransmission)
+        var br = Float(optical.blackRetention)
+        var ss = Float(optical.scatterStrength)
+        var hr = Float(optical.highlightReactivity)
+        var ws = Float(optical.warmScatter)
+        var st = Float(optical.spectralTail)
+        enc.setBytes(&bs, length: MemoryLayout<Float>.size, index: 0)
+        enc.setBytes(&hi, length: MemoryLayout<Float>.size, index: 1)
+        enc.setBytes(&da, length: MemoryLayout<Float>.size, index: 2)
+        enc.setBytes(&dt, length: MemoryLayout<Float>.size, index: 3)
+        enc.setBytes(&br, length: MemoryLayout<Float>.size, index: 4)
+        enc.setBytes(&ss, length: MemoryLayout<Float>.size, index: 5)
+        enc.setBytes(&hr, length: MemoryLayout<Float>.size, index: 6)
+        enc.setBytes(&ws, length: MemoryLayout<Float>.size, index: 7)
+        enc.setBytes(&st, length: MemoryLayout<Float>.size, index: 8)
+        dispatch(
+            enc: enc,
+            pipeline: glowCompositeBacklightVeilPS,
+            width: output.width,
+            height: output.height
+        )
     }
 
     private func dispatch(
@@ -932,6 +1056,64 @@ final class FilmtoneMetalOpticsRenderer {
         }
 
         outTex.write(half4(half3(clamp(result, float3(0.0), float3(1.0))), base.a), gid);
+    }
+
+    // Backlight Veil composite — verbatim MSL port of WGSL §4.4
+    // (composite.frag.wgsl.ts:288-316). Same channel weights, smoothstep
+    // edges, and warm-bias coefficients as the iOS CI kernel
+    // `glowCompositeBacklightVeil` and the Swift CPU goldens
+    // (scripts/swift/test-backlight-veil-composite.swift). Only invoked when
+    // GlowFrameParams.opticalScatter is non-nil — the legacy
+    // `filmtoneGlowComposite` kernel above stays the path for every other
+    // render so existing exports remain byte-equivalent. Output is
+    // intentionally unclamped so HDR scatter survives into the vignette /
+    // final-encode stages, matching WGSL.
+    kernel void filmtoneGlowCompositeBacklightVeil(
+        texture2d<half, access::read>  baseTex      [[ texture(0) ]],
+        texture2d<half, access::read>  bloomTex     [[ texture(1) ]],
+        texture2d<half, access::read>  halationTex  [[ texture(2) ]],
+        texture2d<half, access::read>  diffusionTex [[ texture(3) ]],
+        texture2d<half, access::write> outTex       [[ texture(4) ]],
+        constant float &bloomStrength       [[ buffer(0) ]],
+        constant float &halationIntensity   [[ buffer(1) ]],
+        constant float &diffusionAmount     [[ buffer(2) ]],
+        constant float &directTransmission  [[ buffer(3) ]],
+        constant float &blackRetention      [[ buffer(4) ]],
+        constant float &scatterStrength     [[ buffer(5) ]],
+        constant float &highlightReactivity [[ buffer(6) ]],
+        constant float &warmScatter         [[ buffer(7) ]],
+        constant float &spectralTail        [[ buffer(8) ]],
+        uint2 gid [[ thread_position_in_grid ]]
+    ) {
+        if (gid.x >= outTex.get_width() || gid.y >= outTex.get_height()) return;
+        half4 base = baseTex.read(gid);
+        float3 baseRgb = float3(base.rgb);
+        float3 bloomRgb = float3(bloomTex.read(gid).rgb) * bloomStrength;
+        float3 halationRgb = float3(halationTex.read(gid).rgb) * halationIntensity;
+        float3 diffusedRgb = float3(diffusionTex.read(gid).rgb);
+
+        float baseLuma = dot(baseRgb, kFilmtoneLumaWeights);
+        float shadowHold = 1.0 - smoothstep(0.02, 0.34, baseLuma);
+        float directLoss = (1.0 - directTransmission)
+                         * scatterStrength
+                         * (1.0 - shadowHold * blackRetention * 0.75);
+        float3 direct = baseRgb * (1.0 - directLoss);
+
+        float highlightMask = smoothstep(0.42, 1.28, dot(max(baseRgb, float3(0.0)), kFilmtoneLumaWeights));
+        float highlightDrive = mix(1.0, 1.0 + highlightMask * 1.65, highlightReactivity);
+        float blackProtect = mix(1.0, smoothstep(0.04, 0.48, baseLuma), blackRetention);
+        float3 warmBias = float3(
+            1.0 + warmScatter * 0.18 + spectralTail * 0.12,
+            1.0 + warmScatter * 0.05,
+            1.0 - warmScatter * 0.10 - spectralTail * 0.08
+        );
+        float3 scatterEnergy = bloomRgb * 0.82
+                             + halationRgb * 1.08
+                             + diffusedRgb * diffusionAmount * 0.24;
+        float3 scatter = fmtGlowShoulder(scatterEnergy * warmBias * scatterStrength * highlightDrive * blackProtect);
+
+        float3 result = direct + scatter;
+        outTex.write(half4(half3(result), base.a), gid);
     }
 
     // Vignette with optional ray-angle field mask (CIColorKernel `vignette`
