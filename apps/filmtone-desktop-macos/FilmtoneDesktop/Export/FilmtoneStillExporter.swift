@@ -71,7 +71,11 @@ enum FilmtoneStillExporter {
         }
 
         let params = FilmtonePresetCatalog.params(for: request.presetName)
-        let graded = FilmtoneGradePipeline.apply(to: source, params: params)
+        let graded = FilmtoneGradePipeline.apply(
+            to: source,
+            params: params,
+            cameraOptics: probe.cameraOptics
+        )
 
         try render(graded, request: request, contract: contract)
 

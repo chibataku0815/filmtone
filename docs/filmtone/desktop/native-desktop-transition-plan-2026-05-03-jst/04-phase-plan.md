@@ -252,12 +252,14 @@ large formal QA matrix.
 
 | code | scope | 状態 |
 |---|---|---|
-| **C1** | SourceColor DTO graph port (FilmtoneMediaTypes L67-156) + classifier + normalizer + `defaultOutputContract` factory + Source prober (video async + still CGImageSource) | **COMPLETE** (uncommitted、本 doc §"Phase 2 C1+C2 着地状況") |
-| **C2** | AVFoundation modern async API migration (6 deprecation sites) + Sendable / strict concurrency (Swift 6) 対応 + Reader probe-based init | **COMPLETE** (uncommitted、C1 と同一 chunk) |
-| **C3** | iOS↔macOS canonical 直接 PSNR (案 C: baseline-C 構築) | **scaffold COMPLETE** (uncommitted、harness + directory + README)、**baseline-C populate PENDING** (user iOS Simulator workflow) |
-| **C5** | OpticalFilters main 着地後の合流 (bloom / halation / diffusion / vignette / grain を grade chain に統合) | TBD (main 着地待ち) |
+| **C1** | SourceColor DTO graph port (FilmtoneMediaTypes L67-156) + classifier + normalizer + `defaultOutputContract` factory + Source prober (video async + still CGImageSource) | **COMPLETE** (`aeb0c7c`) |
+| **C2** | AVFoundation modern async API migration (6 deprecation sites) + Sendable / strict concurrency (Swift 6) 対応 + Reader probe-based init | **COMPLETE** (`aeb0c7c`、C1 と同一 commit) |
+| **C3** | iOS↔macOS canonical 直接 PSNR (案 C: baseline-C 構築) | **scaffold COMPLETE** (`aeb0c7c`)、**baseline-C populate は外殻 (品質保証希望時) で defer** |
+| **C5a** | per-pixel optical (vignette + grain CIColorKernel) | **COMPLETE** (`cd170a6`) |
+| **C5c** | RayAngleOptics port (vignette canonical 化 + camera optics probe 拡張) | **COMPLETE** (uncommitted、chat A.5) |
+| **C5b** | multi-pass blur + CIKernel-based stages (bloom / halation / diffusion / radialRGBSplit / edgeSoftnessBlend) | TBD (次 chat 推奨) |
 | **C6** | SPM `packages/film-lab-swift-core/` 化 (Domain/Phase0Types.swift 削除 → import 切替) | TBD (急がない方針維持) |
-| **C7** | IOSurface-backed CVPixelBuffer + Metal compute (4K/6K perf bench) | TBD (品質確定後) |
+| **C7** | IOSurface-backed CVPixelBuffer + Metal compute (4K/6K perf bench) | **measurement COMPLETE** (refactor 不要判定、code 変更なし) |
 
 **着手順 (chunk 着手時 user 確定)**:
 - **C1 + C2 を foundation 1 chunk** として進める (DTO port + factory wiring +

@@ -26,6 +26,7 @@ enum FilmtoneSourceProberError: Error {
 struct FilmtoneSourceProbeResult: Sendable {
     let metadata: SourceColorMetadataDTO?
     let colorClass: SourceColorClassDTO?
+    let cameraOptics: CameraOpticsDTO?
 }
 
 // AVAssetTrack / AVURLAsset are not Sendable, so neither is this probe.
@@ -40,9 +41,10 @@ struct FilmtoneVideoTrackProbe {
     let nominalFrameRate: Float
     let metadata: SourceColorMetadataDTO?
     let colorClass: SourceColorClassDTO?
+    let cameraOptics: CameraOpticsDTO?
 
     var probeResult: FilmtoneSourceProbeResult {
-        FilmtoneSourceProbeResult(metadata: metadata, colorClass: colorClass)
+        FilmtoneSourceProbeResult(metadata: metadata, colorClass: colorClass, cameraOptics: cameraOptics)
     }
 }
 
@@ -70,6 +72,14 @@ enum FilmtoneSourceProber {
         let metadata = colorMetadata(from: descriptions)
         let colorClass = metadata.map(SourceColorClassifier.classify)
 
+        let optics = await cameraOptics(
+            from: descriptions,
+            asset: asset,
+            displayWidth: Int(size.width),
+            displayHeight: Int(size.height),
+            preferredTransform: transform
+        )
+
         return FilmtoneVideoTrackProbe(
             asset: asset,
             track: track,
@@ -78,7 +88,8 @@ enum FilmtoneSourceProber {
             preferredTransform: transform,
             nominalFrameRate: frameRate,
             metadata: metadata,
-            colorClass: colorClass
+            colorClass: colorClass,
+            cameraOptics: optics
         )
     }
 
@@ -87,7 +98,7 @@ enum FilmtoneSourceProber {
             let imageSource = CGImageSourceCreateWithURL(sourceURL as CFURL, nil),
             CGImageSourceGetCount(imageSource) > 0
         else {
-            return FilmtoneSourceProbeResult(metadata: nil, colorClass: nil)
+            return FilmtoneSourceProbeResult(metadata: nil, colorClass: nil, cameraOptics: nil)
         }
 
         let properties =
@@ -98,6 +109,9 @@ enum FilmtoneSourceProber {
     }
 
     static func probeStill(properties: [CFString: Any]) -> FilmtoneSourceProbeResult {
+        // Camera optics for stills: future work could extract EXIF focal
+        // length from kCGImagePropertyExifDictionary. PNG test fixtures
+        // carry no EXIF, so cameraOptics is nil → applyMask stays 0.
         let profileName =
             (properties[kCGImagePropertyProfileName] as? String)?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -108,7 +122,7 @@ enum FilmtoneSourceProber {
         let transfer = transfer(forProfileName: profileName)
 
         guard primaries != nil || transfer != nil else {
-            return FilmtoneSourceProbeResult(metadata: nil, colorClass: nil)
+            return FilmtoneSourceProbeResult(metadata: nil, colorClass: nil, cameraOptics: nil)
         }
 
         let metadata = SourceColorMetadataDTO(
@@ -121,7 +135,7 @@ enum FilmtoneSourceProber {
             hasContentLightMetadata: false
         )
         let colorClass = SourceColorClassifier.classify(metadata)
-        return FilmtoneSourceProbeResult(metadata: metadata, colorClass: colorClass)
+        return FilmtoneSourceProbeResult(metadata: metadata, colorClass: colorClass, cameraOptics: nil)
     }
 
     private static func colorMetadata(
@@ -231,5 +245,128 @@ enum FilmtoneSourceProber {
             return "bt709"
         }
         return nil
+    }
+
+    // MARK: - Camera optics (Phase 2 C5c)
+
+    private static let assumedDiagonalFovDeg = 70.0
+
+    private static func cameraOptics(
+        from descriptions: [CMFormatDescription],
+        asset: AVURLAsset,
+        displayWidth: Int,
+        displayHeight: Int,
+        preferredTransform: CGAffineTransform
+    ) async -> CameraOpticsDTO {
+        let width = safeDimension(displayWidth, fallback: 1920)
+        let height = safeDimension(displayHeight, fallback: 1080)
+
+        let make = await metadataString(in: asset, commonKeys: ["make"], identifierFragments: ["make"])
+        let model = await metadataString(in: asset, commonKeys: ["model"], identifierFragments: ["model"])
+        let lens = await metadataString(in: asset, commonKeys: [], identifierFragments: ["lens"])
+
+        if let horizontalFov = horizontalFieldOfViewDeg(from: descriptions),
+           horizontalFov > 0, horizontalFov < 179
+        {
+            let rotated = isRightAngleRotation(preferredTransform)
+            let focal = focalPxFromFov(sizePx: rotated ? height : width, fovDeg: horizontalFov)
+            return buildCameraOpticsDTO(
+                source: "metadata", width: width, height: height,
+                focalPx: focal, lensModel: lens, cameraMake: make, cameraModel: model
+            )
+        }
+
+        let diagonal = hypot(width, height)
+        let focal = focalPxFromFov(sizePx: diagonal, fovDeg: assumedDiagonalFovDeg)
+        return buildCameraOpticsDTO(
+            source: "assumed", width: width, height: height,
+            focalPx: focal, lensModel: lens, cameraMake: make, cameraModel: model
+        )
+    }
+
+    private static func buildCameraOpticsDTO(
+        source: String, width: Double, height: Double,
+        focalPx: Double, lensModel: String?, cameraMake: String?, cameraModel: String?
+    ) -> CameraOpticsDTO {
+        CameraOpticsDTO(
+            source: source,
+            fxPx: focalPx,
+            fyPx: focalPx,
+            cxPx: width / 2,
+            cyPx: height / 2,
+            fovXDeg: fovFromFocalPx(sizePx: width, focalPx: focalPx),
+            fovYDeg: fovFromFocalPx(sizePx: height, focalPx: focalPx),
+            focalLength35mm: nil,
+            lensModel: lensModel,
+            cameraMake: cameraMake,
+            cameraModel: cameraModel
+        )
+    }
+
+    private static func horizontalFieldOfViewDeg(
+        from descriptions: [CMFormatDescription]
+    ) -> Double? {
+        guard let cmDescription = descriptions.first else { return nil }
+        guard
+            let extensions = CMFormatDescriptionGetExtensions(cmDescription) as? [CFString: Any],
+            let raw = extensions[kCMFormatDescriptionExtension_HorizontalFieldOfView] as? NSNumber
+        else {
+            return nil
+        }
+        let deg = raw.doubleValue / 1000.0
+        return deg.isFinite ? deg : nil
+    }
+
+    private static func metadataString(
+        in asset: AVURLAsset,
+        commonKeys: [String],
+        identifierFragments: [String]
+    ) async -> String? {
+        let commonKeySet = Set(commonKeys.map { $0.lowercased() })
+        let fragments = identifierFragments.map { $0.lowercased() }
+        let common = (try? await asset.load(.commonMetadata)) ?? []
+        let all = (try? await asset.load(.metadata)) ?? []
+        for item in common + all {
+            if let key = item.commonKey {
+                let normalizedKey = String(describing: key).lowercased()
+                if commonKeySet.contains(where: { normalizedKey.contains($0) }) {
+                    let value = try? await item.load(.stringValue)
+                    return trimmedMetadataString(value)
+                }
+            }
+            if let identifier = item.identifier {
+                let normalized = String(describing: identifier).lowercased()
+                if fragments.contains(where: { normalized.contains($0) }) {
+                    let value = try? await item.load(.stringValue)
+                    return trimmedMetadataString(value)
+                }
+            }
+        }
+        return nil
+    }
+
+    private static func trimmedMetadataString(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmed.isEmpty
+        else {
+            return nil
+        }
+        return trimmed
+    }
+
+    private static func safeDimension(_ value: Int, fallback: Double) -> Double {
+        value > 0 ? Double(value) : fallback
+    }
+
+    private static func isRightAngleRotation(_ transform: CGAffineTransform) -> Bool {
+        abs(transform.b) > 0.5 && abs(transform.c) > 0.5
+    }
+
+    private static func focalPxFromFov(sizePx: Double, fovDeg: Double) -> Double {
+        sizePx / (2 * tan((fovDeg * .pi / 180) / 2))
+    }
+
+    private static func fovFromFocalPx(sizePx: Double, focalPx: Double) -> Double {
+        2 * atan(sizePx / (2 * focalPx)) * 180 / .pi
     }
 }

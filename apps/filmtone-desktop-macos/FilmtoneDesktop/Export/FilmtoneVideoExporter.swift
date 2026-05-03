@@ -140,7 +140,8 @@ enum FilmtoneVideoExporter {
                     let graded = FilmtoneGradePipeline.apply(
                         to: scaled,
                         params: params,
-                        frameTimeSeconds: frameTimeSeconds
+                        frameTimeSeconds: frameTimeSeconds,
+                        cameraOptics: probe.cameraOptics
                     ).cropped(to: renderBounds)
 
                     context.render(
