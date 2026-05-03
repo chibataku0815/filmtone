@@ -3,7 +3,7 @@
 Parent index:
 [filmtone-native-desktop-transition-plan-2026-05-03-jst.md](../filmtone-native-desktop-transition-plan-2026-05-03-jst.md)
 
-## Status (2026-05-03 JST)
+## Status (2026-05-04 JST 更新)
 
 - **Phase 0 (Contract & Skeleton): COMPLETE** (commit `398743c`、同日)。8 件の
   acceptance gate 全 pass。macOS native app は macOS 26.4.1 / Xcode 26.4.1 で起動。
@@ -83,6 +83,77 @@ Parent index:
   確認 → C3 結果 + OpticalFilters main 着地状況で C5 (OpticalFilters 合流) /
   C6 (SPM 化、急がない方針) / C7 (IOSurface perf bench) の優先付け再判断
   (chunk 着手時 user 確定: 現時点で C5/C6/C7 順序固定しない)。
+- **Phase 2 C5a (per-pixel optical: vignette + grain CIColorKernel): COMPLETE**
+  (commit `cd170a6`、2026-05-03 JST late evening 続き)。`Color/
+  FilmtoneGradeKernels.swift` に vignette / grain `CIColorKernel` を iOS
+  canonical から verbatim lift、`FilmtoneGradePipeline.swift` の post-base
+  stage に挿入。`bun run verify:macos` BUILD SUCCEEDED、iphone preset で
+  09-skin-light fixture macOS↔source PSNR が +5dB 程度向上 (per-pixel
+  optical chain の正方向 drift)。
+- **Phase 2 C5c (RayAngleOptics port: vignette canonical 化 + camera optics
+  probe 拡張): COMPLETE** (commit `cda0f9f`、2026-05-04 JST 早朝)。RayAngle
+  optics canonical params を iOS から port、camera optics probe を
+  `FilmtoneSourceProber` に additive 拡張。
+- **Phase 2 C5b A.1 (bloom mip pyramid: softKneeHighlight + tentDownsample/Up
+  + glowComposite、halation/diffusion plates black): COMPLETE** (commit
+  `ad23753`、2026-05-04 JST 早朝)。`FilmtoneGradeKernels.swift` に bloom
+  系 kernel 4 個 (softKneeHighlight / tentDownsample / tentUpsample /
+  glowComposite) verbatim lift、`FilmtoneGradePipeline.swift` に
+  `extractHighlightPlate` / `buildMipBlurComposite` / `applyGlowFamilyStage`
+  追加 (halation/diffusion は black プレースホルダ)。`bun run verify:macos`
+  BUILD SUCCEEDED、reset PSNR ~40dB / iphone PSNR 35.59dB (09-skin-light)。
+- **Phase 2 C5b A.2 (halation + diffusion plates: buildMipBlurComposite 再利用、
+  halationColor helper 追加): COMPLETE** (uncommitted、2026-05-04 JST、chat
+  A.7)。`FilmtoneGradePipeline.swift` の halation/diffusion black 行を
+  production block に置換 (iOS L1839-1905 verbatim)、`halationColor(for:)`
+  static helper 追加 (hue 0→100 で `#E81020`→`#C06010` 線形補間、iOS
+  L2392-2398 verbatim)。BUILD SUCCEEDED、reset PSNR 28.08dB (`paramsByName
+  ["reset"]` に diffusion=0.08 含むため期待値変動)、iphone PSNR 22.47dB
+  mean / 29.17dB (09-skin-light、halation+diffusion active)。
+- **Phase 2 C5b A.3 (edgeOptics: radialRGBSplit + edgeSoftnessBlend CIKernel
+  + applyEdgeOpticsStage): COMPLETE** (uncommitted、2026-05-04 JST、chat
+  A.8)。`FilmtoneGradeKernels.swift` に `radialRGBSplit` + `edgeSoftnessBlend`
+  CIKernel verbatim lift (iOS L4567-4583 / L4696-4715)。
+  `FilmtoneGradePipeline.swift` に 7 constants
+  (`aberrationEdgeSoftenScale=32.0` / `aberrationEdgeSoftenMax=0.52` /
+  `aberrationEdgeSoftenCurve=1.55` 他) + `applyEdgeOpticsStage` /
+  `applyRadialRGBShift` / `applyEdgeSoftness` / `aberrationEdgeSoften` /
+  `lerp` (iOS L1714-1722 / L2237-2298 / L2521-2545 verbatim)。pipeline 順序
+  を iOS canonical (`baseGradeV2 → filmCompressionV2 → edgeOptics →
+  glowFamily → vignette → grain → printStage`) に一致。BUILD SUCCEEDED、
+  reset PSNR 28.08dB (`rgbShift=0.0`/`lensSoftness=0.0` で full no-op、A.2
+  と byte-identical)、iphone PSNR mean 22.36dB / 29.17→28.81dB
+  (09-skin-light、`rgbShift=0.0012`/`lensSoftness=0.14` で edge softening
+  正常反映、A.2 比 -0.11dB mean / -0.36dB)。
+- **C5b 全段完了、macOS Native pipeline iOS canonical 一致達成**。残 C 系列
+  blocker: C3 baseline-C populate (外殻判定、user iOS Simulator workflow
+  待ち)、C6 SPM 化 (急がない方針維持)、C7 IOSurface perf bench (measurement
+  COMPLETE、refactor 不要判定)。
+- **Phase 2 C5d (iOS canonical pipeline driver line-by-line audit + sourceSeed
+  配線): COMPLETE** (uncommitted、2026-05-04 JST、chat A.9)。`applyGrade`
+  (iOS `FilmtoneExportSession.swift:1532-1567`) と macOS `FilmtoneGradePipeline.apply`
+  を line-by-line 突合、port deviation を **5 件** 検出。HIGH severity 1 件
+  (`sourceSeed=0` 全 caller で hardcode → grain pattern が iOS canonical と
+  divergent) を修正: `FilmtoneGradePipeline.makeStableSourceSeed(from:)` を
+  追加 (iOS L2411-2418 verbatim FNV-1a hash mod 8192)、`FilmtoneStillExporter`
+  / `FilmtoneVideoExporter` / `PreviewSurface` の 3 caller に配線。LOW
+  severity 4 件 (LUT 2 stage 欠落 / 最終 crop / printContrast abs gate) は
+  built-in 4 preset で no-op、将来 lane で対応。BUILD SUCCEEDED、reset PSNR
+  28.08dB (A.3 と byte-identical、grainIntensity=0 で no-op)、iphone PSNR
+  mean 22.36dB (sourceSeed は noise pattern のみ変更、intensity 不変なので
+  macOS↔source 数値も A.3 と一致)。真の効果は macOS↔baseline-C で観測される
+  が baseline-C populate 後に grain noise floor の上限制限が消えることを保証
+  (substance correctness)。
+- Phase 2 C5b A.2 master handoff (canonical、A.3 着手時の self-contained
+  prompt): `docs/filmtone/desktop/filmtone-native-desktop-phase2-c5b-a2-master-handoff-2026-05-04-jst.md`
+- **Next**: (a) C5b + C5d 合計 7 ファイル uncommitted の user 手動 commit
+  (`FilmtoneGradeKernels.swift` / `FilmtoneGradePipeline.swift` /
+  `FilmtoneStillExporter.swift` / `FilmtoneVideoExporter.swift` /
+  `PreviewSurface.swift` / 04 / 06 / 01)、(b) C3 baseline-C populate
+  (外殻、user iOS Simulator workflow) — populate 完了後に C5d の真の PSNR
+  改善が観測可能、(c) Look Unification main merge 観測時に macOS sidecar
+  emitter を Case A (dual emit) へ切替、(d) C6 SPM 化 / C7 IOSurface
+  (低優先)、(e) GLSL→MSL kernel 移行 (iOS と同期した大手術 lane)。
 
 ## Purpose
 

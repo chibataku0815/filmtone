@@ -5,11 +5,11 @@ import Foundation
 // Phase 2 C5a: vignette + grain inserted in iOS canonical order.
 // Phase 2 C5c: RayAngleOptics integrated — vignette computes opticsPack + applyMask.
 // Phase 2 C5b A.1: glowFamily inserted before vignette (iOS canonical order).
-//   bloom path active; halation + diffusion plates deferred to C5b A.2 (black).
+// Phase 2 C5b A.2: halation + diffusion plates activated (bloom + halation + diffusion all live).
+// Phase 2 C5b A.3: edgeOptics (radialRGBSplit + edgeSoftnessBlend) inserted between
+//   filmCompressionV2 and glowFamily (iOS canonical order, FilmtoneExportSession L1565).
 //
-//   baseGradeV2 → filmCompressionV2 → glowFamily → vignette → grain → printStage
-//
-// CIKernel-based stages (radialRGBSplit / edgeSoftnessBlend) deferred to C5b A.3.
+//   baseGradeV2 → filmCompressionV2 → edgeOptics → glowFamily → vignette → grain → printStage
 
 enum FilmtoneGradePipeline {
 
@@ -22,6 +22,15 @@ enum FilmtoneGradePipeline {
     private static let halationMipLevels = 6
     private static let diffusionMipLevels = 4
     private static let glowUpsampleBlurRadius = 1.0
+
+    // MARK: — Edge optics constants (verbatim from iOS FilmtoneExportSession L128-134)
+    private static let aberrationEdgeSoftenScale = 32.0
+    private static let aberrationEdgeSoftenMax = 0.52
+    private static let aberrationEdgeSoftenCurve = 1.55
+    private static let aberrationBlurRadiusMin = 1.6
+    private static let aberrationBlurRadiusMax = 6.2
+    private static let aberrationBlurRadiusCap = 7.8
+    private static let lensSoftnessBlurBoost = 1.85
 
     // MARK: — Primary pipeline
 
@@ -40,6 +49,7 @@ enum FilmtoneGradePipeline {
         if params.compressionAmount > 0.0001 {
             current = applyFilmCompressionV2(to: current, params: params)
         }
+        current = applyEdgeOpticsStage(to: current, params: params)
         current = applyGlowFamilyStage(to: current, params: params)
         if params.vignette > 0.0001 {
             current = applyVignette(to: current, params: params, cameraOptics: cameraOptics)
@@ -179,7 +189,109 @@ enum FilmtoneGradePipeline {
         ]) ?? image
     }
 
-    // MARK: — Glow family (C5b A.1 — bloom active; halation + diffusion plates deferred to A.2)
+    // MARK: — Edge optics (C5b A.3 — radialRGBSplit + edgeSoftnessBlend)
+
+    private static func applyEdgeOpticsStage(to image: CIImage, params: FilmtonePhase0Params) -> CIImage {
+        var current = image
+
+        if params.rgbShift > 0.0001 {
+            current = applyRadialRGBShift(params.rgbShift, to: current)
+        }
+
+        let rgbShiftNormalized = clampValue(
+            params.rgbShift / Swift.max(FilmtonePhase0Generated.rgbShiftMax, 0.0001)
+        )
+        let aberrationSoften = aberrationEdgeSoften(for: rgbShiftNormalized)
+        if aberrationSoften > 0.0001 || params.lensSoftness > 0.0001 {
+            current = applyEdgeSoftness(
+                to: current,
+                aberrationSoften: aberrationSoften,
+                lensSoftness: params.lensSoftness
+            )
+        }
+
+        return current
+    }
+
+    private static func applyRadialRGBShift(_ amount: Double, to image: CIImage) -> CIImage {
+        guard let kernel = FilmtoneGradeKernels.radialRGBSplit else {
+            return image
+        }
+
+        let padding = CGFloat(Swift.max(4.0, abs(amount) * Swift.max(image.extent.width, image.extent.height)))
+        return kernel.apply(
+            extent: image.extent,
+            roiCallback: { _, rect in
+                rect.insetBy(dx: -padding, dy: -padding)
+            },
+            arguments: [
+                image,
+                amount,
+                extentOriginVector(for: image.extent),
+                extentSizeVector(for: image.extent),
+            ]
+        ) ?? image
+    }
+
+    private static func applyEdgeSoftness(
+        to image: CIImage,
+        aberrationSoften: Double,
+        lensSoftness: Double
+    ) -> CIImage {
+        let lensDrive = pow(clampValue(lensSoftness), 0.78)
+        let aberrationDrive = pow(
+            clampValue(aberrationSoften / aberrationEdgeSoftenMax),
+            0.82
+        )
+        let blurRadius = Swift.min(
+            lerp(
+                aberrationBlurRadiusMin,
+                aberrationBlurRadiusMax,
+                aberrationDrive
+            ) + (lensDrive * lensSoftnessBlurBoost),
+            aberrationBlurRadiusCap
+        )
+        guard blurRadius > 0.0001, let kernel = FilmtoneGradeKernels.edgeSoftnessBlend else {
+            return image
+        }
+
+        let blurred = image
+            .clampedToExtent()
+            .applyingFilter("CIGaussianBlur", parameters: [
+                kCIInputRadiusKey: blurRadius,
+            ])
+            .cropped(to: image.extent)
+
+        return kernel.apply(
+            extent: image.extent,
+            roiCallback: { _, rect in rect },
+            arguments: [
+                image,
+                blurred,
+                clampValue(aberrationSoften),
+                clampValue(lensSoftness),
+                extentOriginVector(for: image.extent),
+                extentSizeVector(for: image.extent),
+            ]
+        ) ?? image
+    }
+
+    private static func aberrationEdgeSoften(for normalizedRgbShift: Double) -> Double {
+        let normalized = clampValue(normalizedRgbShift)
+        guard normalized > 0.0001 else {
+            return 0
+        }
+
+        let linear = normalized * (aberrationEdgeSoftenScale * FilmtonePhase0Generated.rgbShiftMax)
+        let boosted = pow(normalized, aberrationEdgeSoftenCurve) * aberrationEdgeSoftenMax
+        return Swift.min(aberrationEdgeSoftenMax, Swift.max(linear, boosted))
+    }
+
+    private static func lerp(_ start: Double, _ end: Double, _ t: Double) -> Double {
+        start + (end - start) * t
+    }
+
+    // MARK: — Glow family (C5b A.2 — bloom + halation + diffusion plates all active)
 
     private static func applyGlowFamilyStage(to image: CIImage, params: FilmtonePhase0Params) -> CIImage {
         guard
@@ -212,9 +324,37 @@ enum FilmtoneGradePipeline {
             bloomImage = black
         }
 
-        // C5b A.2: halation + diffusion plates (currently black)
-        let halationImage: CIImage = black
-        let diffusionImage: CIImage = black
+        let halationImage: CIImage
+        if params.halationIntensity > 0.0001 {
+            let halationPlate = extractHighlightPlate(
+                from: image,
+                threshold: params.halationThreshold,
+                knee: params.halationSoftKnee,
+                tintColor: halationColor(for: params.halationHue)
+            )
+            halationImage = buildMipBlurComposite(
+                from: halationPlate,
+                radius: params.halationRadius,
+                levelCount: halationMipLevels,
+                spreadMultiplier: 1.0 + Swift.max(params.halationSpread, 0) / halationSpreadDivisor,
+                useTentResampling: true
+            )
+        } else {
+            halationImage = black
+        }
+
+        let diffusionImage: CIImage
+        if params.diffusion > 0.0001 {
+            diffusionImage = buildMipBlurComposite(
+                from: image,
+                radius: 0.9,
+                levelCount: diffusionMipLevels,
+                spreadMultiplier: 1.15,
+                useTentResampling: true
+            )
+        } else {
+            diffusionImage = black
+        }
 
         guard let kernel = FilmtoneGradeKernels.glowComposite else { return image }
         return kernel.apply(extent: extent, arguments: [
@@ -431,7 +571,31 @@ enum FilmtoneGradePipeline {
         }
     }
 
+    private static func halationColor(for hue: Double) -> CIColor {
+        let t = clampValue(hue / 100.0)
+        let red   = (0xe8 + ((0xc8 - 0xe8) * t)) / 255.0
+        let green = (0x10 + ((0x60 - 0x10) * t)) / 255.0
+        let blue  = (0x20 + ((0x10 - 0x20) * t)) / 255.0
+        return CIColor(red: red, green: green, blue: blue, alpha: 1)
+    }
+
     private static func clampValue(_ value: Double, min minVal: Double = 0, max maxVal: Double = 1) -> Double {
         Swift.min(Swift.max(value, minVal), maxVal)
+    }
+
+    // MARK: — Per-source grain seed (verbatim from iOS FilmtoneExportSession L2411-2418)
+
+    /// Stable per-source salt for the grain kernel. Verbatim FNV-1a-style
+    /// hash mod 8192. iOS computes this from `sourceURL.absoluteString`; the
+    /// macOS exporters / preview pass through the same string so a given
+    /// source produces the same grain pattern across both platforms (and
+    /// across preview ↔ export on macOS).
+    static func makeStableSourceSeed(from string: String) -> Double {
+        var hash: UInt64 = 1_469_598_103_934_665_603
+        for byte in string.utf8 {
+            hash ^= UInt64(byte)
+            hash &*= 1_099_511_628_211
+        }
+        return Double(hash % 8_192)
     }
 }

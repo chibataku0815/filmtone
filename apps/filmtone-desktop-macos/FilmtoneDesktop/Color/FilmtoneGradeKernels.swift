@@ -9,8 +9,8 @@ import CoreImage
 // Phase 2 C5c: RayAngleOptics integrated — vignette applyMask aware.
 // Phase 2 C5b A.1: softKneeHighlight + glowComposite (CIColorKernel) and
 // tentDownsample + tentUpsample (CIKernel) added for bloom mip pyramid.
-// CIKernel-based stages (radialRGBSplit / edgeSoftnessBlend) remain deferred
-// until C5b A.3.
+// Phase 2 C5b A.3: radialRGBSplit + edgeSoftnessBlend (CIKernel) added for
+// edgeOptics stage (radial chromatic aberration + edge softness blend).
 //
 // Kernel sources are CI Kernel Language (CIKL) strings; they have no UIKit
 // dependency and run identically on macOS.
@@ -145,8 +145,10 @@ kernel vec4 vignette(__sample image, float intensity, vec2 extentOrigin, vec2 ex
     // Grain kernel verbatim from iOS OpticalKernels (FilmtoneExportSession
     // line 4350-4403). `timeSeconds` advances grain frame stochastically
     // (floor(t * 3.0) → 3 grain refresh per second of source); for still
-    // export pass 0. `sourceSeed` is a per-export salt; macOS Native uses 0
-    // as a stable default until per-export seed wiring is added.
+    // export pass 0. `sourceSeed` is a per-source salt; Phase 2 C5d wires
+    // `FilmtoneGradePipeline.makeStableSourceSeed(from: sourceURL.absoluteString)`
+    // verbatim from iOS L2411-2418 across still/video export + preview, so
+    // macOS and iOS produce the same grain pattern for a given source URL.
     static let grain: CIColorKernel? = CIColorKernel(source: """
 float grainPixelHash(vec2 p, float seed) {
     return fract(sin(dot(p + vec2(seed, seed * 0.73), vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
@@ -321,6 +323,49 @@ kernel vec4 tentUpsample(sampler image, vec2 sourceOrigin, vec2 sourceSize, vec2
                    + ((s1 + s3 + s4 + s6) * 2.0)
                    + (s0 + s2 + s5 + s7);
     return upsampled / 16.0;
+}
+""")
+
+    // radialRGBSplit: radial chromatic aberration via per-channel offset
+    // sampling (verbatim from iOS OpticalKernels line 4567–4583)
+    static let radialRGBSplit: CIKernel? = CIKernel(source: """
+kernel vec4 radialRGBSplit(sampler image, float amount, vec2 extentOrigin, vec2 extentSize) {
+    vec2 coord = destCoord();
+    vec2 uv = (coord - extentOrigin) / extentSize;
+    vec2 delta = uv - vec2(0.5, 0.5);
+    delta.x *= extentSize.x / max(extentSize.y, 1.0);
+    float radial = clamp(length(delta) * 2.0, 0.0, 1.0);
+    float weight = pow(radial, 1.65);
+    float amt = amount * weight;
+    vec2 dir = normalize(delta + vec2(1e-5, 1e-5));
+    vec2 offset = vec2(dir.x * amt * extentSize.x, dir.y * amt * extentSize.y);
+    vec4 center = sample(image, samplerTransform(image, coord));
+    float r = sample(image, samplerTransform(image, coord + offset)).r;
+    float b = sample(image, samplerTransform(image, coord - offset)).b;
+    return vec4(r, center.g, b, center.a);
+}
+""")
+
+    // edgeSoftnessBlend: radial mix of sharp/blurred plates driven by
+    // aberrationSoften (chromatic-aberration coupled) + lensSoftness
+    // (verbatim from iOS OpticalKernels line 4696–4715)
+    static let edgeSoftnessBlend: CIKernel? = CIKernel(source: """
+kernel vec4 edgeSoftnessBlend(sampler sharp, sampler blurred, float aberrationSoften, float lensSoftness, vec2 extentOrigin, vec2 extentSize) {
+    vec2 coord = destCoord();
+    vec2 uv = (coord - extentOrigin) / extentSize;
+    vec2 edgePx = (uv - vec2(0.5, 0.5)) * extentSize;
+    float halfDiag = length(extentSize * 0.5);
+    float edgeR = clamp(length(edgePx) / max(halfDiag, 1.0), 0.0, 1.0);
+    float edgeMask = smoothstep(0.25, 1.0, edgeR);
+    float lensR = clamp(length(edgePx) / max(halfDiag, 1.0), 0.0, 1.0);
+    float lensW = pow(lensR, 1.52);
+    float lensDrive = pow(clamp(lensSoftness, 0.0, 1.0), 0.78);
+    float lensWeight = clamp(lensDrive * lensW, 0.0, 1.0);
+    float lensMix = lensWeight * 0.72;
+    float softenAmt = clamp((aberrationSoften * edgeMask) + (lensMix * edgeMask), 0.0, 1.0);
+    vec4 sharpSample = sample(sharp, samplerTransform(sharp, coord));
+    vec4 blurSample = sample(blurred, samplerTransform(blurred, coord));
+    return mix(sharpSample, blurSample, softenAmt);
 }
 """)
 }

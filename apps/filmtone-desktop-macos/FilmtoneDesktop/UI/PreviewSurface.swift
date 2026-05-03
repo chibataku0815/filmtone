@@ -62,6 +62,7 @@ private struct PreviewImageView: NSViewRepresentable {
             renderAndAssign(
                 source: source,
                 presetName: preset,
+                sourceURL: url,
                 fallbackURL: url,
                 into: nsView
             )
@@ -72,6 +73,7 @@ private struct PreviewImageView: NSViewRepresentable {
                 renderAndAssign(
                     source: preview?.image,
                     presetName: preset,
+                    sourceURL: url,
                     fallbackURL: url,
                     into: nsView
                 )
@@ -83,6 +85,7 @@ private struct PreviewImageView: NSViewRepresentable {
     private func renderAndAssign(
         source: CIImage?,
         presetName: String,
+        sourceURL: URL,
         fallbackURL: URL,
         into nsView: NSImageView
     ) {
@@ -91,7 +94,14 @@ private struct PreviewImageView: NSViewRepresentable {
             return
         }
         let params = FilmtonePresetCatalog.params(for: presetName)
-        let graded = FilmtoneGradePipeline.apply(to: source, params: params)
+        let sourceSeed = FilmtoneGradePipeline.makeStableSourceSeed(
+            from: sourceURL.absoluteString
+        )
+        let graded = FilmtoneGradePipeline.apply(
+            to: source,
+            params: params,
+            sourceSeed: sourceSeed
+        )
         guard let cg = FilmtoneCIContext.shared.createCGImage(
             graded,
             from: graded.extent,

@@ -87,6 +87,9 @@ enum FilmtoneVideoExporter {
         try reader.start()
 
         let params = FilmtonePresetCatalog.params(for: request.presetName)
+        let sourceSeed = FilmtoneGradePipeline.makeStableSourceSeed(
+            from: request.sourceURL.absoluteString
+        )
         let context = FilmtoneCIContext.shared
         let outputColorSpace = contract.destinationColorSpace
         let renderBounds = CGRect(origin: .zero, size: outputSize)
@@ -141,6 +144,7 @@ enum FilmtoneVideoExporter {
                         to: scaled,
                         params: params,
                         frameTimeSeconds: frameTimeSeconds,
+                        sourceSeed: sourceSeed,
                         cameraOptics: probe.cameraOptics
                     ).cropped(to: renderBounds)
 

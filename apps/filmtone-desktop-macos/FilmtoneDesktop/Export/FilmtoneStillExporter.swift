@@ -71,9 +71,13 @@ enum FilmtoneStillExporter {
         }
 
         let params = FilmtonePresetCatalog.params(for: request.presetName)
+        let sourceSeed = FilmtoneGradePipeline.makeStableSourceSeed(
+            from: request.sourceURL.absoluteString
+        )
         let graded = FilmtoneGradePipeline.apply(
             to: source,
             params: params,
+            sourceSeed: sourceSeed,
             cameraOptics: probe.cameraOptics
         )
 

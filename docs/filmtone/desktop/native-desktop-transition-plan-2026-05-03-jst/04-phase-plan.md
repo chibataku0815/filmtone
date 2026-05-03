@@ -257,9 +257,10 @@ large formal QA matrix.
 | **C3** | iOS↔macOS canonical 直接 PSNR (案 C: baseline-C 構築) | **scaffold COMPLETE** (`aeb0c7c`)、**baseline-C populate は外殻 (品質保証希望時) で defer** |
 | **C5a** | per-pixel optical (vignette + grain CIColorKernel) | **COMPLETE** (`cd170a6`) |
 | **C5c** | RayAngleOptics port (vignette canonical 化 + camera optics probe 拡張) | **COMPLETE** (`cda0f9f`) |
-| **C5b A.1** | bloom mip pyramid (softKneeHighlight + tentDownsample/Up + glowComposite、halation/diffusion plates black) | **COMPLETE** (uncommitted、chat A.6) |
-| **C5b A.2** | halation + diffusion plates (buildMipBlurComposite 再利用、halationColor helper 追加) | TBD (次 chat 推奨) |
-| **C5b A.3** | radialRGBSplit + edgeSoftnessBlend (CIKernel) | TBD |
+| **C5b A.1** | bloom mip pyramid (softKneeHighlight + tentDownsample/Up + glowComposite、halation/diffusion plates black) | **COMPLETE** (`ad23753`) |
+| **C5b A.2** | halation + diffusion plates (buildMipBlurComposite 再利用、halationColor helper 追加) | **COMPLETE** (uncommitted、chat A.7) |
+| **C5b A.3** | radialRGBSplit + edgeSoftnessBlend (CIKernel) + applyEdgeOpticsStage | **COMPLETE** (uncommitted、chat A.8) |
+| **C5d** | iOS canonical pipeline driver line-by-line audit + `makeStableSourceSeed` 配線 (still/video export + preview) | **COMPLETE** (uncommitted、chat A.9) |
 | **C6** | SPM `packages/film-lab-swift-core/` 化 (Domain/Phase0Types.swift 削除 → import 切替) | TBD (急がない方針維持) |
 | **C7** | IOSurface-backed CVPixelBuffer + Metal compute (4K/6K perf bench) | **measurement COMPLETE** (refactor 不要判定、code 変更なし) |
 
@@ -481,6 +482,92 @@ Verify 結果 (C5b A.1 実装後):
 
 - C5b A.2: halation plate (`extractHighlightPlate` with `halationColor` tint) + diffusion image (full image → pyramid) → `applyGlowFamilyStage` 更新。
 - C5b A.3: `radialRGBSplit` + `edgeSoftnessBlend` CIKernel port + `applyEdgeOpticsStage` (iOS canonical 順: filmCompressionV2 の **前** ではなく glowFamily の **前**)。
+
+### Phase 2 C5b A.2 着地状況 (2026-05-04 JST、chat A.7)
+
+`feature/native-desktop-plan` worktree、C5b A.1 commit `ad23753` の上に C5b A.2 実装済 (**uncommitted**、chat A.7)。
+
+実装メモ:
+
+- 更新: `Color/FilmtoneGradePipeline.swift` (437 → 473 行) — `applyGlowFamilyStage` の halation/diffusion plate 黒プレースホルダ 2 行を production block に置換、`halationColor(for:)` private static helper を末尾 (`clampValue` の直前) に追加:
+  - **halation plate**: `params.halationIntensity > 0.0001` の時のみ active。`extractHighlightPlate(from: image, threshold: halationThreshold, knee: halationSoftKnee, tintColor: halationColor(for: halationHue))` → `buildMipBlurComposite(radius: halationRadius, levelCount: halationMipLevels = 6, spreadMultiplier: 1.0 + Swift.max(halationSpread, 0) / halationSpreadDivisor, useTentResampling: true)` (iOS L1839-1874 verbatim)。
+  - **diffusion plate**: `params.diffusion > 0.0001` の時のみ active。`buildMipBlurComposite(from: image, radius: 0.9, levelCount: diffusionMipLevels = 4, spreadMultiplier: 1.15, useTentResampling: true)` (iOS L1876-1905 verbatim、highlight plate 抽出なし、固定 radius/spread)。depth-map prefilter (iOS L1830-1838 / L1875) は macOS では canonical に skip (depth source なし)。
+  - **halationColor helper**: hue=0 → `#E81020` 赤、hue=100 → `#C06010` オレンジの線形補間 (iOS L2392-2398 verbatim、`clampValue` で hue/100 を 0-1 にクランプ)。
+- pipeline 構成変更なし: `baseGradeV2 → filmCompressionV2 → glowFamily → vignette → grain → printStage`、`glowComposite` kernel への引数 (image, bloomImage, halationImage, diffusionImage, bloomStrength, halationIntensity, diffusion, diffusionCompositeBase) も A.1 から不変。
+- 新規ファイルなし、pbxproj 変更なし、kernel 追加なし (A.1 で全 kernel 整備済)。
+
+Verify 結果 (C5b A.2 実装後):
+
+- `bun run verify:macos` → `** BUILD SUCCEEDED **`。
+- `golden-parity-macos.ts --preset reset` → macOS↔source **mean 28.08 dB (0/10 bit-identical)**、macOS↔baseB **mean 11.99 dB**。
+  - ⚠️ A.1 の ~40.05 dB から低下: `paramsByName["reset"]` が **`diffusion=0.08`** を持つため diffusion plate が有効化。`halationIntensity=0.0` のため halation plate は black 維持。期待通りの変化 (A.1 handoff §2 で言及された `paramsByName["reset"]` の named preset が optical effect を含む副作用)。
+  - identity 用の sanity gate は `resetParams` (top-level、bloomStrength=0.0 / diffusion=0.0 / halationIntensity=0.0) を使う test に移行済 (06-quality-gates-risks.md 参照)。
+- `golden-parity-macos.ts --preset iphone` → macOS↔source **mean 22.47 dB (0/10 bit-identical)**。
+  - A.1 の 35.59 dB (09-skin-light) から低下: iphone preset の **`halationIntensity=0.1` / `halationSpread=20.0` / `halationHue=28.0` / `halationRadius=0.42` / `diffusion=0.06`** がすべて active。期待通りの変化。
+- `CIColorKernel(source:)` / `CIKernel(source:)` deprecation 9 箇所 (Phase 1b 3 + C5a 2 + C5b A.1 4)、変化なし。
+
+**未着手 C5b work**:
+
+- C5b 全段 (A.1 / A.2 / A.3) **COMPLETE**。iOS canonical pipeline (`baseGradeV2 → filmCompressionV2 → edgeOptics → glowFamily → vignette → grain → printStage`) を macOS Native へ port 完了。
+
+### Phase 2 C5b A.3 着地状況 (2026-05-04 JST、chat A.8)
+
+`feature/native-desktop-plan` worktree、C5b A.2 (uncommitted) の上に C5b A.3 実装済 (**uncommitted**、chat A.8)。
+
+実装メモ:
+
+- 更新: `Color/FilmtoneGradeKernels.swift` (326 → 369 行) — 末尾に `radialRGBSplit` + `edgeSoftnessBlend` の 2 つの `CIKernel?` を追加 (iOS L4567-4583 / L4696-4715 verbatim)。GLSL 文字列はそのまま (reformat / whitespace 改変なし)。コメントヘッダーから「CIKernel deferred to A.3」記述を削除し A.3 完了マーカーへ更新。
+- 更新: `Color/FilmtoneGradePipeline.swift` (473 → 585 行) — pipeline 順序を iOS canonical (L1565) に合わせて `filmCompressionV2 → edgeOptics → glowFamily` へ変更:
+  - **constants 7 個追加** (iOS L128-134 verbatim): `aberrationEdgeSoftenScale=32.0` / `aberrationEdgeSoftenMax=0.52` / `aberrationEdgeSoftenCurve=1.55` / `aberrationBlurRadiusMin=1.6` / `aberrationBlurRadiusMax=6.2` / `aberrationBlurRadiusCap=7.8` / `lensSoftnessBlurBoost=1.85`。
+  - **`applyEdgeOpticsStage(to:params:)`** (iOS L1714-1722 verbatim): `rgbShift > 0.0001` で `applyRadialRGBShift`、`aberrationSoften > 0.0001 || lensSoftness > 0.0001` で `applyEdgeSoftness`。
+  - **`applyRadialRGBShift(_:to:)`** (iOS L2237-2255 verbatim): `radialRGBSplit` kernel apply with ROI padding `max(4.0, |amount| × max(width, height))`。
+  - **`applyEdgeSoftness(to:aberrationSoften:lensSoftness:)`** (iOS L2257-2298 verbatim): blurRadius 計算 (linear lerp + lensSoftness boost、cap)、`CIGaussianBlur` 経由で blurred plate 生成、`edgeSoftnessBlend` kernel で sharp/blurred を radial mix。
+  - **`aberrationEdgeSoften(for:)`** (iOS L2521-2530 verbatim): rgbShiftNormalized → linear/boosted の max を返す edge softness 駆動量。
+  - **`lerp(_:_:_:)`** private static helper (iOS L2545 相当): `start + (end - start) * t` 線形補間。macOS pipeline の既存 `clampValue(_:min:max:)` (default 0...1) を iOS の `Self.clamp` 代替として使用。
+- 新規ファイルなし、pbxproj 変更なし、codegen (`FilmtonePhase0Generated.swift`) 変更なし (rgbShift / lensSoftness / rgbShiftMax は既存 fields)。
+
+Verify 結果 (C5b A.3 実装後):
+
+- `bun run verify:macos` → `** BUILD SUCCEEDED **`。SourceKit cross-file false-positive (`Cannot find type 'FilmtonePhase0Params'` 等) は不変条件通り無視。
+- `golden-parity-macos.ts --preset reset` → macOS↔source **mean 28.08 dB (0/10 bit-identical)**、macOS↔baseB **mean 11.99 dB**。**A.2 と完全一致** — reset preset は `rgbShift=0.0` / `lensSoftness=0.0` で edgeOptics 全 path が early-return (no-op)、identity 動作確認。
+- `golden-parity-macos.ts --preset iphone` → macOS↔source **mean 22.36 dB (0/10 bit-identical)**、09-skin-light **28.81 dB**。
+  - A.2 (mean 22.47 dB / 09-skin-light 29.17 dB) から **mean -0.11 dB / 09-skin-light -0.36 dB** の小幅変動。iphone preset の `rgbShift=0.0012` / `lensSoftness=0.14` が edgeOptics で active 化、edge softness blend で小さな softening が乗った結果。期待通りの変化 (regression ではない)。
+- `CIColorKernel(source:)` / `CIKernel(source:)` deprecation 11 箇所 (Phase 1b 3 + C5a 2 + C5b A.1 4 + C5b A.3 2)、変化なし (Metal CIKernel 移行 lane 別 chunk または C7 と合流)。
+
+### Phase 2 C5d 着地状況 (2026-05-04 JST、chat A.9)
+
+`feature/native-desktop-plan` worktree、C5b A.3 (uncommitted) の上に C5d 実装済 (**uncommitted**、chat A.9)。本質: iOS canonical の pipeline driver `applyGrade` (`FilmtoneExportSession.swift:1532-1567`) と macOS Native の `FilmtoneGradePipeline.apply` を line-by-line audit し、port deviation を **5 件** 検出。HIGH severity 1 件を修正、LOW 4 件は built-in 4 preset で no-op (将来の port lane で扱う)。
+
+#### 発見された port deviation
+
+| # | 内容 | severity | scope |
+|---|---|---|---|
+| 1 | `sourceSeed=0` 全 caller で hardcode (still/video export + preview)。iOS canonical は `makeStableSourceSeed(from: sourceURL.absoluteString)` で per-URL FNV-1a hash を生成 (`FilmtoneExportSession.swift:222, 2411-2418`)。grain-active preset (iphone/softBlue/amberGlow) で macOS↔iOS canonical の grain noise pattern が divergent → vs baseline-C PSNR の noise floor となり parity 上限を制限 | **HIGH** | 修正対象 |
+| 2 | `applyInputLutStage` 欠落 (`FilmtoneExportSession.swift:1547`) | LOW | built-in 4 preset で input LUT 未設定 → no-op、将来 LUT-based look 導入時に port |
+| 3 | `applyCreativeLutStage` 欠落 (`FilmtoneExportSession.swift:1561`) | LOW | 同上 |
+| 4 | apply driver 末尾の `current.cropped(to: image.extent)` 欠落 (iOS L1566) | LOW | 各 stage が extent を保つので defense-in-depth、現 pipeline で no-op |
+| 5 | `applyPrintStage` gate: iOS は `printContrast > epsilon` (符号付)、macOS は `abs(printContrast) > epsilon` | LOW | built-in 4 preset で `printContrast` 全て非負 → no-op |
+
+#### 実装メモ (HIGH severity #1)
+
+- 追加: `Color/FilmtoneGradePipeline.swift` (585 → 601 行) — `static func makeStableSourceSeed(from string: String) -> Double` を末尾に追加 (iOS L2411-2418 verbatim、FNV-1a hash mod 8192、UTF-8 byte 列を walk)。`internal` ではなく `static` のまま 3 caller から `FilmtoneGradePipeline.makeStableSourceSeed(...)` で呼べるよう公開 (テスト容易性確保)。
+- 更新: `Export/FilmtoneStillExporter.swift` — `params` 取得直後に `let sourceSeed = FilmtoneGradePipeline.makeStableSourceSeed(from: request.sourceURL.absoluteString)` を計算、`apply` 呼び出しに `sourceSeed: sourceSeed` を追加。
+- 更新: `Export/FilmtoneVideoExporter.swift` — per-frame loop の **外** (params 計算直後) に sourceSeed を 1 度だけ計算、loop 内の `apply` 呼び出しに `sourceSeed: sourceSeed` を追加。per-frame は cheap だが冪等であるべき値なので外で計算。
+- 更新: `UI/PreviewSurface.swift` — `renderAndAssign` のシグネチャに `sourceURL: URL` を追加、内部で `FilmtoneGradePipeline.makeStableSourceSeed(from: sourceURL.absoluteString)` を計算して `apply` に渡す。preview ↔ export 間で grain pattern が一致するため、ユーザーが preview で見たものが export 結果と同一になる (substance 改善)。
+- 更新: `Color/FilmtoneGradeKernels.swift` — grain CIColorKernel header コメントから「macOS Native uses 0 as a stable default until per-export seed wiring is added」TODO を削除し、C5d で wired 完了の記述へ置換。
+
+#### Verify 結果 (C5d 実装後)
+
+- `bun run verify:macos` → `** BUILD SUCCEEDED **`。SourceKit cross-file false-positive (`Cannot find 'FilmtoneGradePipeline'` 等) は不変条件通り無視。CIColorKernel deprecation 警告 11 件は変化なし (port lane 別 chunk)。
+- `golden-parity-ios-vs-macos.ts --preset reset` → macOS↔source **mean 28.08 dB (0/10 bit-identical)** / range 20.73-39.49 dB。**A.3 と byte-identical** — `grainIntensity=0.0` で grain stage が early-return、sourceSeed 値は no-op。
+- `golden-parity-ios-vs-macos.ts --preset iphone` → macOS↔source **mean 22.36 dB (0/10 bit-identical)** / 09-skin-light **28.81 dB**。**A.3 と数値一致** — sourceSeed は noise *pattern* のみ変えて *intensity* は不変なので、`grainIntensity` が同じ限り macOS↔source PSNR は invariant (数学的に期待通り)。
+- 真の効果は **macOS↔baseline-C** で観測可能だが baseline-C は PENDING (iOS Simulator workflow 待ち)。本修正は code-level で iOS canonical との verbatim 整合を達成しており、baseline-C populate 後の PSNR 上限が grain noise floor で制限されないことを保証する (substance correctness)。
+
+#### LOW severity 4 件の方針
+
+- #2 / #3 (LUT stages) — 将来 LUT-based look (`.cube` import / preparedInputLut / preparedCreativeLut wiring) が必要になった時に独立 lane で port。Phase 2 scope 外。
+- #4 (final crop) — 各 stage の extent 保存が現 pipeline で成立しているので追加修正不要。defense-in-depth が必要になった時 (例: 将来の motion blur stage で extent が膨らむ等) に再評価。
+- #5 (print stage gate) — built-in 4 preset が全て `printContrast >= 0` なので no-op。負値が現実に来る運用 (custom preset) が出た時に iOS canonical 側へ揃える方が安全 (`printContrast > epsilon`、no abs)。
 
 ## Phase 3: Native Editing And Export UI
 
