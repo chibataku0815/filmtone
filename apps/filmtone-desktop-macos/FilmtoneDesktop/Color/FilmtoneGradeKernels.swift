@@ -5,13 +5,12 @@ import CoreImage
 // `OpticalKernels`). Phase 0 generator targets `presetVersion = "v2"` for all
 // 4 built-in presets, so only the v2 kernels are wired here.
 //
-// Phase 2 C5a (per-pixel optical extension): vignette + grain added — both
-// CIColorKernel single-pass, byte-identical with iOS for sources without
-// `cameraOptics.source == "metadata"` (applyMask=0 collapses ray-angle math
-// to the simple radial form). Multi-pass blur (bloom / halation / diffusion
-// via tentDownsample/tentUpsample/glowComposite + softKneeHighlight helper)
-// and CIKernel-based stages (radialRGBSplit / edgeSoftnessBlend) remain
-// deferred until C5b.
+// Phase 2 C5a (per-pixel optical extension): vignette + grain added.
+// Phase 2 C5c: RayAngleOptics integrated — vignette applyMask aware.
+// Phase 2 C5b A.1: softKneeHighlight + glowComposite (CIColorKernel) and
+// tentDownsample + tentUpsample (CIKernel) added for bloom mip pyramid.
+// CIKernel-based stages (radialRGBSplit / edgeSoftnessBlend) remain deferred
+// until C5b A.3.
 //
 // Kernel sources are CI Kernel Language (CIKL) strings; they have no UIKit
 // dependency and run identically on macOS.
@@ -200,6 +199,128 @@ kernel vec4 grain(__sample image, float intensity, float radialMix, float grainS
     color.b += (lumaGrain + chromaB) * weight;
     color.rgb = clamp(color.rgb, 0.0, 1.0);
     return color;
+}
+""")
+
+    // softKneeHighlight: highlight plate extraction for bloom/halation pyramid
+    // (verbatim from iOS OpticalKernels line 4227–4237)
+    static let softKneeHighlight: CIColorKernel? = CIColorKernel(source: """
+kernel vec4 softKneeHighlight(__sample image, float threshold, float knee, __color tintColor) {
+    float luma = dot(image.rgb, vec3(0.2126, 0.7152, 0.0722));
+    float safeThreshold = max(threshold, 1e-4);
+    float safeKnee = max(knee * safeThreshold, 1e-4);
+    float t = clamp((luma - threshold + safeKnee) / (2.0 * safeKnee), 0.0, 1.0);
+    float contribution = t * t * mix(safeKnee, 1.0, t);
+    contribution = max(contribution, max(0.0, luma - threshold));
+    return vec4(image.rgb * contribution * tintColor.rgb, image.a);
+}
+""")
+
+    // glowComposite: bloom + halation + diffusion energy compositing
+    // (verbatim from iOS OpticalKernels line 4239–4263)
+    static let glowComposite: CIColorKernel? = CIColorKernel(source: """
+vec3 glowShoulder(vec3 energy) {
+    return 1.0 - exp(-max(energy, vec3(0.0)));
+}
+
+float glowHeadroom(vec3 baseRgb, float floorValue) {
+    float luma = dot(baseRgb, vec3(0.2126, 0.7152, 0.0722));
+    return mix(floorValue, 1.0, sqrt(clamp(1.0 - luma, 0.0, 1.0)));
+}
+
+kernel vec4 glowComposite(__sample base, __sample bloom, __sample halation, __sample diffusionImage, float bloomStrength, float halationIntensity, float diffusionAmount, float diffusionBase) {
+    vec3 baseRgb = base.rgb;
+    vec3 result = baseRgb;
+    vec3 glowEnergy = bloom.rgb * bloomStrength + halation.rgb * halationIntensity;
+    vec3 glow = glowShoulder(glowEnergy) * glowHeadroom(baseRgb, 0.82);
+    result = result + min(glow, max(vec3(0.0), vec3(1.0) - result));
+
+    if (diffusionAmount > 0.0) {
+        vec3 diffOpacity = glowShoulder(diffusionImage.rgb * diffusionAmount * diffusionBase) * glowHeadroom(baseRgb, 0.88);
+        result = result + min(diffOpacity, max(vec3(0.0), vec3(1.0) - result));
+    }
+
+    return vec4(clamp(result, 0.0, 1.0), base.a);
+}
+""")
+
+    // tentDownsample: mirror-padded 13-tap tent downsample for mip pyramid
+    // (verbatim from iOS OpticalKernels line 4424–4464)
+    static let tentDownsample: CIKernel? = CIKernel(source: """
+vec2 mirrorCoord(vec2 coord, vec2 origin, vec2 size) {
+    vec2 safeSize = max(size, vec2(1.0, 1.0));
+    vec2 uv = (coord - origin) / safeSize;
+    vec2 tiled = mod(uv, 2.0);
+    vec2 mirroredUv = 1.0 - abs(tiled - 1.0);
+    return origin + (mirroredUv * safeSize);
+}
+
+vec4 sampleMirror(sampler image, vec2 coord, vec2 origin, vec2 size) {
+    return sample(image, samplerTransform(image, mirrorCoord(coord, origin, size)));
+}
+
+kernel vec4 tentDownsample(sampler image, vec2 sourceOrigin, vec2 sourceSize, vec2 targetOrigin, vec2 sourceStep) {
+    vec2 coord = destCoord();
+    vec2 sourceCoord = sourceOrigin + ((coord - targetOrigin) * sourceStep);
+
+    vec4 a = sampleMirror(image, sourceCoord + vec2(-2.0,  2.0), sourceOrigin, sourceSize);
+    vec4 b = sampleMirror(image, sourceCoord + vec2( 0.0,  2.0), sourceOrigin, sourceSize);
+    vec4 c = sampleMirror(image, sourceCoord + vec2( 2.0,  2.0), sourceOrigin, sourceSize);
+
+    vec4 dd = sampleMirror(image, sourceCoord + vec2(-1.0,  1.0), sourceOrigin, sourceSize);
+    vec4 e  = sampleMirror(image, sourceCoord + vec2( 1.0,  1.0), sourceOrigin, sourceSize);
+
+    vec4 f = sampleMirror(image, sourceCoord + vec2(-2.0, 0.0), sourceOrigin, sourceSize);
+    vec4 g = sampleMirror(image, sourceCoord, sourceOrigin, sourceSize);
+    vec4 h = sampleMirror(image, sourceCoord + vec2( 2.0, 0.0), sourceOrigin, sourceSize);
+
+    vec4 ii = sampleMirror(image, sourceCoord + vec2(-1.0, -1.0), sourceOrigin, sourceSize);
+    vec4 j  = sampleMirror(image, sourceCoord + vec2( 1.0, -1.0), sourceOrigin, sourceSize);
+
+    vec4 k = sampleMirror(image, sourceCoord + vec2(-2.0, -2.0), sourceOrigin, sourceSize);
+    vec4 l = sampleMirror(image, sourceCoord + vec2( 0.0, -2.0), sourceOrigin, sourceSize);
+    vec4 m = sampleMirror(image, sourceCoord + vec2( 2.0, -2.0), sourceOrigin, sourceSize);
+
+    return ((dd + e + ii + j) * 0.125)
+         + (g * 0.125)
+         + ((a + c + k + m) * 0.03125)
+         + ((b + f + h + l) * 0.0625);
+}
+""")
+
+    // tentUpsample: mirror-padded 9-tap tent upsample for mip pyramid
+    // (verbatim from iOS OpticalKernels line 4466–4498)
+    static let tentUpsample: CIKernel? = CIKernel(source: """
+vec2 mirrorCoord(vec2 coord, vec2 origin, vec2 size) {
+    vec2 safeSize = max(size, vec2(1.0, 1.0));
+    vec2 uv = (coord - origin) / safeSize;
+    vec2 tiled = mod(uv, 2.0);
+    vec2 mirroredUv = 1.0 - abs(tiled - 1.0);
+    return origin + (mirroredUv * safeSize);
+}
+
+vec4 sampleMirror(sampler image, vec2 coord, vec2 origin, vec2 size) {
+    return sample(image, samplerTransform(image, mirrorCoord(coord, origin, size)));
+}
+
+kernel vec4 tentUpsample(sampler image, vec2 sourceOrigin, vec2 sourceSize, vec2 targetOrigin, vec2 sourceStep) {
+    vec2 coord = destCoord();
+    vec2 sourceCoord = sourceOrigin + ((coord - targetOrigin) * sourceStep);
+
+    vec4 s  = sampleMirror(image, sourceCoord, sourceOrigin, sourceSize);
+    vec4 s0 = sampleMirror(image, sourceCoord + vec2(-1.0,  1.0), sourceOrigin, sourceSize);
+    vec4 s1 = sampleMirror(image, sourceCoord + vec2( 0.0,  1.0), sourceOrigin, sourceSize);
+    vec4 s2 = sampleMirror(image, sourceCoord + vec2( 1.0,  1.0), sourceOrigin, sourceSize);
+    vec4 s3 = sampleMirror(image, sourceCoord + vec2(-1.0,  0.0), sourceOrigin, sourceSize);
+    vec4 s4 = sampleMirror(image, sourceCoord + vec2( 1.0,  0.0), sourceOrigin, sourceSize);
+    vec4 s5 = sampleMirror(image, sourceCoord + vec2(-1.0, -1.0), sourceOrigin, sourceSize);
+    vec4 s6 = sampleMirror(image, sourceCoord + vec2( 0.0, -1.0), sourceOrigin, sourceSize);
+    vec4 s7 = sampleMirror(image, sourceCoord + vec2( 1.0, -1.0), sourceOrigin, sourceSize);
+
+    vec4 upsampled = (s * 4.0)
+                   + ((s1 + s3 + s4 + s6) * 2.0)
+                   + (s0 + s2 + s5 + s7);
+    return upsampled / 16.0;
 }
 """)
 }

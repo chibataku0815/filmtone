@@ -256,8 +256,10 @@ large formal QA matrix.
 | **C2** | AVFoundation modern async API migration (6 deprecation sites) + Sendable / strict concurrency (Swift 6) 対応 + Reader probe-based init | **COMPLETE** (`aeb0c7c`、C1 と同一 commit) |
 | **C3** | iOS↔macOS canonical 直接 PSNR (案 C: baseline-C 構築) | **scaffold COMPLETE** (`aeb0c7c`)、**baseline-C populate は外殻 (品質保証希望時) で defer** |
 | **C5a** | per-pixel optical (vignette + grain CIColorKernel) | **COMPLETE** (`cd170a6`) |
-| **C5c** | RayAngleOptics port (vignette canonical 化 + camera optics probe 拡張) | **COMPLETE** (uncommitted、chat A.5) |
-| **C5b** | multi-pass blur + CIKernel-based stages (bloom / halation / diffusion / radialRGBSplit / edgeSoftnessBlend) | TBD (次 chat 推奨) |
+| **C5c** | RayAngleOptics port (vignette canonical 化 + camera optics probe 拡張) | **COMPLETE** (`cda0f9f`) |
+| **C5b A.1** | bloom mip pyramid (softKneeHighlight + tentDownsample/Up + glowComposite、halation/diffusion plates black) | **COMPLETE** (uncommitted、chat A.6) |
+| **C5b A.2** | halation + diffusion plates (buildMipBlurComposite 再利用、halationColor helper 追加) | TBD (次 chat 推奨) |
+| **C5b A.3** | radialRGBSplit + edgeSoftnessBlend (CIKernel) | TBD |
 | **C6** | SPM `packages/film-lab-swift-core/` 化 (Domain/Phase0Types.swift 削除 → import 切替) | TBD (急がない方針維持) |
 | **C7** | IOSurface-backed CVPixelBuffer + Metal compute (4K/6K perf bench) | **measurement COMPLETE** (refactor 不要判定、code 変更なし) |
 
@@ -419,6 +421,66 @@ incremental に確認できる。
   必要なら implement)。Phase 1c per-frame allocation overhead 抑制策。
 - Look Unification main merge 観測時の sidecar dual emit 切替 (Native ユーザー
   配布 / Phase 5 release rail 切替前必須、release blocker)。
+
+### Phase 2 C5c 着地状況 (2026-05-04 JST、chat A.5)
+
+`feature/native-desktop-plan` worktree commit `cda0f9f` (C5c + master handoff)。
+
+実装メモ:
+
+- 新規: `Domain/CameraOpticsDTO.swift` (iOS `FilmtoneMediaTypes.swift:51-63` verbatim、Codable struct 11 fields)。
+- 新規: `Color/FilmtoneRayAngleOptics.swift` (iOS 同名 file 225 行 verbatim lift)。
+- 更新: `Color/FilmtoneGradePipeline.swift` — `applyVignette` を `FilmtoneRayAngleOptics.resolve()` / `kernelArgs()` 経由に書き換え。`apply` signature に `cameraOptics: CameraOpticsDTO? = nil` 追加。
+- 更新: `Export/FilmtoneStillExporter.swift` / `FilmtoneVideoExporter.swift` — `probe.cameraOptics` を `apply()` に通す。
+- 更新: `Media/FilmtoneSourceProber.swift` — `cameraOptics(from:asset:)` async method 追加 (CMFormatDescription `kCMFormatDescriptionExtension_HorizontalFieldOfView` → `source: "metadata"` / `"assumed"`)。AVMetadataItem deprecated API も modern async へ移行。
+- pbxproj: UUID A1D/B1D + A1E/B1E 4-section 登録。
+
+Verify 結果 (C5c commit 時点):
+
+- `bun run verify:macos` → `** BUILD SUCCEEDED **`。
+- `bun run generate:swift -- --check` → exit 0。
+- `diff -q iOS↔macOS Phase0Generated.swift` → identical。
+- `golden-parity-macos.ts --preset reset` → macOS↔source **∞ dB (10/10 bit-identical)**、macOS↔baseB **13.69 dB**。
+- CLI still iphone 09-skin-light → **PSNR 35.00 dB**。
+- CLI video iphone → ok 320x180 frames=24。
+
+PSNR が C5a と byte-identical な理由: PNG source fixture にカメラ optics metadata がない → `probeStill()` は `cameraOptics: nil` を返す → `applyMask=0` → math 上 byte-identical。実 camera 動画素材 (CMFormatDescription に HorizontalFieldOfView が含まれる) でのみ `source: "metadata"` → `applyMask=1` が有効化される。
+
+### Phase 2 C5b A.1 着地状況 (2026-05-04 JST、chat A.6)
+
+`feature/native-desktop-plan` worktree、C5c commit `cda0f9f` の上に C5b A.1 実装済 (**uncommitted**、chat A.6)。
+
+実装メモ:
+
+- 更新: `Color/FilmtoneGradeKernels.swift` — 4 kernel 追加:
+  - `softKneeHighlight` (CIColorKernel、iOS OpticalKernels L4227-4237 verbatim)
+  - `glowComposite` (CIColorKernel、iOS OpticalKernels L4239-4263 verbatim)
+  - `tentDownsample` (CIKernel、iOS OpticalKernels L4424-4464 verbatim)
+  - `tentUpsample` (CIKernel、iOS OpticalKernels L4466-4498 verbatim)
+- 更新: `Color/FilmtoneGradePipeline.swift` — 全面書き換え:
+  - glow pyramid constants: `glowBaseScale=0.5` / `bloomSpreadBoost=1.25` / `halationSpreadDivisor=12.0` / `diffusionCompositeBase=0.87` / `bloomMipLevels=6` / `halationMipLevels=6` / `diffusionMipLevels=4` / `glowUpsampleBlurRadius=1.0`
+  - `applyGlowFamilyStage` 追加 (iOS canonical 順: filmCompressionV2 → glowFamily → vignette)
+  - glow pyramid helper 全実装: `extractHighlightPlate` / `buildMipBlurComposite` / `buildMipPyramid` / `tentDownsampledImage` / `tentUpsampledImage` / `downsampledImage` / `upsampledImage` / `scaledImage` / `weightedImage` / `addImages` / `blackImage` / `extentOriginVector` / `extentSizeVector` / `computeMipWeights` / `clampValue`
+  - bloom path active (`bloomStrength > 0.0001` → extractHighlightPlate → buildMipBlurComposite → glowComposite)
+  - halation / diffusion plates は black (C5b A.2 で追加)
+
+新規ファイルなし (既存 2 ファイル更新のみ)。pbxproj 変更なし。
+
+Verify 結果 (C5b A.1 実装後):
+
+- `bun run verify:macos` → `** BUILD SUCCEEDED **`。
+- `bun run generate:swift -- --check` → exit 0。
+- `diff -q iOS↔macOS Phase0Generated.swift` → identical。
+- `golden-parity-macos.ts --preset reset` → macOS↔source **40.05 dB (3/10 bit-identical)**、macOS↔baseB **12.97 dB**。
+  - ⚠️ C5c の ∞ dB から変化: reset preset に `bloomStrength=0.22` が含まれるため bloom が有効化。期待通りの変化。
+- CLI still iphone 09-skin-light → **PSNR 35.59 dB** (C5c 35.00 dB から微増、bloom 寄与)。
+- CLI video iphone → ok 320x180 frames=24。
+- `CIColorKernel(source:)` / `CIKernel(source:)` deprecation 9 箇所 (Phase 1b 3 + C5a 2 + C5b A.1 4)。Metal CIKernel 移行は別 lane。
+
+**未着手 C5b work**:
+
+- C5b A.2: halation plate (`extractHighlightPlate` with `halationColor` tint) + diffusion image (full image → pyramid) → `applyGlowFamilyStage` 更新。
+- C5b A.3: `radialRGBSplit` + `edgeSoftnessBlend` CIKernel port + `applyEdgeOpticsStage` (iOS canonical 順: filmCompressionV2 の **前** ではなく glowFamily の **前**)。
 
 ## Phase 3: Native Editing And Export UI
 
