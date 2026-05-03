@@ -7,6 +7,8 @@ import type { SampledAnalyzerFrame } from "./optical-scene-analysis";
 
 const NO_DRAG_STYLE = { WebkitAppRegion: "no-drag" } as CSSProperties;
 
+const AI_SCENE_PICK_UI_VISIBLE = false;
+
 export type OpticalRecommendationDebugInfo = {
   effectState:
     | "idle"
@@ -421,7 +423,9 @@ export function OpticalFinishRecommendationPanel(
       className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3"
       style={NO_DRAG_STYLE}
     >
-      <AiDevToggle armedByModule={aiDevEnabled === true} />
+      {AI_SCENE_PICK_UI_VISIBLE ? (
+        <AiDevToggle armedByModule={aiDevEnabled === true} />
+      ) : null}
       <div className="flex items-start gap-2.5">
         <div className="mt-0.5 shrink-0 rounded-full border border-white/10 bg-white/[0.04] p-1.5">
           <Sparkle size={14} weight="duotone" className="text-white/72" />
@@ -503,7 +507,7 @@ export function OpticalFinishRecommendationPanel(
         </div>
       ) : null}
 
-      {aiDevEnabled && aiScenePick ? (
+      {AI_SCENE_PICK_UI_VISIBLE && aiDevEnabled && aiScenePick ? (
         <div className="mt-3">
           <AiScenePickCard
             state={aiScenePick}
