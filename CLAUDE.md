@@ -15,6 +15,7 @@ Filmtone — 独立モノレポ Claude Code 協業ガイド
 |---|---|---|
 | **このリポ** (`/forestone/filmtone`) | apps + packages の **実装の正本** | — |
 | **portfolio** (`/forestone/chibatakumi-portfolio`) | 公開窓のみ(`apps/web`) | `vendor/filmtone` submodule 経由で packages を消費。**filmtone コードは portfolio で編集しない** — bump のみ |
+| **Native Desktop v2 worktree** (`/forestone/filmtone-native-desktop-plan`) | Native macOS app lane の作業場 | 現在状態は `docs/filmtone/desktop/native-desktop-v2/strategy.md` → `active.md` が正本。旧 handoff / dated plan は参照専用 |
 | **life** (`/Volumes/SamsungPortableSSDX5001/documents/life/`) | docs/guides・truth scripts・knowledge hub・5 ロール憲法 | このリポの release/ios truth は life の `scripts/check-filmtone-*.sh` から問い合わせる |
 
 ## 3. 運用原則(life CLAUDE.md と整合、最優先)
@@ -39,6 +40,11 @@ Filmtone — 独立モノレポ Claude Code 協業ガイド
 | `apps/capacitor-film-lab-ios/CLAUDE.md` | iOS 専用 223 行(Swift / fastlane / pbxproj 不変条件・lane 番号・antipattern) |
 | life `docs/guides/2026-05-01-filmtone-standalone-product-repo-migration-handoff.md` | 移行記録の正本(canonical、781 行) |
 | life `docs/guides/film-lab-current-index.md` | live エントリ doc(read order・active lanes) |
+| Native Desktop v2 `strategy.md` / `active.md` | `/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-native-desktop-plan/docs/filmtone/desktop/native-desktop-v2/`。Native v2 作業はここを正本にする |
+
+Native Desktop v2 の作業では、`strategy.md` に実装詳細を書かない。
+実装前に `active.md` がなければ次の subtask 案を作って停止し、完了時は
+`active.md` を `archive/` へ移して `strategy.md` に短く追記する。
 
 ## 5. Truth Gates(life スクリプト)
 
@@ -56,8 +62,9 @@ doc とスクリプトが食い違ったら **スクリプトを信頼**(handoff
 1. **npm publishing を再導入しない** — packages は submodule 消費前提。`npm publish` は portfolio の build 経路を壊す
 2. **`packages/film-lab-renderer/dist/` `packages/film-lab-smart-look/dist/` を消さない** — submodule 即 import 用に **意図的に track**(root `.gitignore` に `dist` 除外規則は **書かない**、`.gitignore` 編集時に `dist` を ignore に追加しないこと)。再生成必要なら `bun run build:renderer` / `build:smart-look` で上書き
 3. **portfolio を実装の正本扱いしない** — 古い handoff (`2026-03-30-*`, `2026-04-09-*` 等)が `chibatakumi-portfolio/apps/desktop-film-lab-batch` を参照していても、それは pre-migration の記述。実装は **このリポ**
-4. **iOS public 版と local candidate を混ぜない** — public(App Store)= 1.2、local candidate = 1.3。release truth script で確認してから書く
+4. **iOS public 版と local candidate を混ぜない** — 固定値を書かない。毎回 release truth script で public App Store state / local Xcode candidate / upstream delta を確認してから書く
 5. **用語ロック** — `動画`(× `短尺動画`)/ `video`(× `short-form video`)。canonical spec は life `docs/guides/2026-04-07-filmtone-tool-vocabulary-ia-spec.md`、video vocabulary lock は life commit `5ce6d55`(2026-05-01)を起点
+   **Preset / Look の訂正** — `Preset` は curve / grade 土台、`Look` は Stone / Urban Creative LUT Pack 文脈専用。`feature/desktop-look-unification` の rename 前提は 2026-05-04 に撤回済み。`BaseLookName` / `BASE_LOOKS` / `lookPresetId` / `currentExportLookPreset` などの alias artifact は新規参照しない。既存 artifact は purge lane で扱う
 6. **JSX comment を return ( の直下に置かない** — `feedback_no_jsx_comment_outside_root_return` 既発火 2 回
 
 ## 7. Submodule update 手順(portfolio 側へのバンプ)
@@ -83,6 +90,12 @@ vercel deploy は portfolio 側の `apps/web` build に依存するので submod
 |---|---|
 | `apps/capacitor-film-lab-ios/CLAUDE.md` | **既存**(223 行)。iOS の不変条件はここから引く |
 | `apps/desktop-film-lab-batch/CLAUDE.md` | **未作成**。Desktop 専用の不変条件が顕在化した時に user 指示で追加(現状は README + このファイルで足りる) |
+| Native Desktop v2 task docs | `/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-native-desktop-plan/docs/filmtone/desktop/native-desktop-v2/strategy.md` / `active.md` |
+
+Native Desktop v2 の半日〜数日規模の差し込みは、現 `active.md` に
+`Paused` を追記して `paused/` へ退避し、差し込み専用の `active.md`
+に差し替える。軽微修正だけは現 active の `Unexpected` / `Follow-up`
+で扱う。
 
 ## 9. 出力ルール(life CLAUDE.md §11 と整合)
 

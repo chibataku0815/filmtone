@@ -13,6 +13,9 @@ then work on the product surface.
 3. Open only the current target entry:
    - repo-wide context: `README.md`, then `CLAUDE.md` if policy details matter
    - Desktop: `apps/desktop-film-lab-batch/` and `docs/filmtone/desktop/`
+   - Native Desktop v2:
+     `/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-native-desktop-plan/docs/filmtone/desktop/native-desktop-v2/strategy.md`,
+     then `active.md`
    - iOS: `apps/capacitor-film-lab-ios/CLAUDE.md`, then the exact Swift/TS
      surface
    - shared packages: the specific package under `packages/`
@@ -28,6 +31,7 @@ there directly after this file.
 | Request mentions | Start here | Primary check |
 |---|---|---|
 | Desktop, macOS, release, update metadata | `apps/desktop-film-lab-batch/` and `docs/filmtone/desktop/` | `bun run verify:desktop` |
+| Native Desktop v2, SwiftUI Desktop, macOS native app | `/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-native-desktop-plan/docs/filmtone/desktop/native-desktop-v2/strategy.md` and `active.md` | `bun run verify:macos` in the native worktree |
 | iOS, App Store, Xcode, TestFlight, Swift, Capacitor | `apps/capacitor-film-lab-ios/CLAUDE.md` | `bun run verify:ios` |
 | color math, presets, LUT, schema, Swift payload | `packages/film-lab-core/` | `bun run build:core` and relevant package tests |
 | renderer, WebGL, WebGPU, shader parity | `packages/film-lab-renderer/` | `bun run build:renderer` |
@@ -43,6 +47,17 @@ Portfolio lives at:
 
 Portfolio is the public web window. It consumes this repo through
 `vendor/filmtone`. Do not edit Filmtone implementation in portfolio.
+
+Native Desktop v2 is developed in the dedicated worktree:
+
+```text
+/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-native-desktop-plan
+```
+
+For that lane, live state is the 2-layer task model under
+`docs/filmtone/desktop/native-desktop-v2/` in that worktree: read
+`strategy.md`, then `active.md`. Old handoffs and dated plan docs are historical
+evidence only, not current truth.
 
 ## Execution Bias
 
@@ -132,6 +147,15 @@ Guidance:
   local `.env` files.
 - Copy vocabulary: use `動画`, not `短尺動画`; use `video`, `videos`, or
   `footage`, not active positioning such as `short-form video`.
+- Preset/Look vocabulary: `Preset` is the curve/grade foundation. `Look` is
+  reserved for the Stone/Urban Creative LUT Pack context. The old
+  Preset/Look rename premise from `feature/desktop-look-unification` is
+  withdrawn; do not add new references to alias artifacts such as
+  `BaseLookName`, `BASE_LOOKS`, `lookPresetId`, or `currentExportLookPreset`
+  unless the task explicitly removes or quarantines that legacy layer.
+- Interrupts: for Native Desktop v2 half-day-or-larger interrupt work, append a
+  `Paused` section to the current `active.md`, move it to `paused/`, and create
+  a new interrupt-only `active.md`. Keep exactly one current `active.md`.
 
 ## Dirty Worktree Policy
 
