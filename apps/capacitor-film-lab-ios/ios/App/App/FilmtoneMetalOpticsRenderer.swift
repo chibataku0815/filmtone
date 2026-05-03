@@ -1,14 +1,20 @@
-// v1.5 — Quality export Glow stage Metal prototype.
+// v1.5 — Quality export optics chain Metal renderer.
 //
-// Replaces `FilmtoneExportSession.applyGlowFamilyStage` (Core Image graph of
-// 3 mip pyramids × tent down/up + composite) with a single MTLCommandBuffer
-// pipeline. Activated by `FILMTONE_EXPORT_METAL_OPTICS=1` for video Quality
-// exports without depth payload. Production path is unchanged when the flag
-// is off or the renderer fails to initialize.
+// Replaces `FilmtoneExportSession.applyGlowFamilyStage` (and, when
+// vignette is supplied, also `applyVignetteStage`) with a single
+// MTLCommandBuffer pipeline. Activated by `FILMTONE_EXPORT_METAL_OPTICS=1`
+// for video Quality exports without depth payload. Production path is
+// unchanged when the flag is off or the renderer fails to initialize.
 //
 // Math is a direct port of the existing CI kernels — same tent weights, same
-// soft-knee shoulder, same composite formula — so visual output should be
-// equivalent modulo float precision.
+// soft-knee shoulder, same composite formula, same vignette ray-angle field
+// mask — so visual output should be equivalent modulo float precision.
+//
+// Phase 2 段階 1 (2026-05-03): Vignette を chain に追加。chain の同一
+// command buffer 内で Glow → Vignette を連続 dispatch し、CI handoff は
+// 入口 1 回のまま (Phase 2.b の方針)。EdgeOptics の Metal 化は段階 2 で
+// 試行されたが Metal pass init failure → CI fallback + flag overhead で
+// +45s 悪化が確認されたため revert (handoff doc 参照)。
 
 import CoreGraphics
 import CoreImage
@@ -42,6 +48,25 @@ final class FilmtoneMetalOpticsRenderer {
         let glowBaseScale: Double
     }
 
+    /// Vignette parameters mirroring the CI `vignette` kernel arguments.
+    /// `opticsPack` packs `(tanHalfFovX, tanHalfFovY, refIncidence)` from
+    /// `FilmtoneRayAngleOptics.kernelArgs`. `applyMask = 1.0` only when
+    /// `cameraOptics.source == "metadata"`; otherwise `0.0` keeps the
+    /// vignette byte-equivalent to the pre-Stream-2 path.
+    struct VignetteFrameParams {
+        let intensity: Double
+        let opticsPack: SIMD3<Float>
+        let applyMask: Float
+        let gamma: Double
+        let innerThreshold: Double
+    }
+
+    /// Composite parameter object for `renderOpticsChain`.
+    struct OpticsChainParams {
+        let glow: GlowFrameParams
+        let vignette: VignetteFrameParams?
+    }
+
     private let device: MTLDevice
     private let queue: MTLCommandQueue
     private let workingColorSpace: CGColorSpace
@@ -54,6 +79,7 @@ final class FilmtoneMetalOpticsRenderer {
     private let clearTexturePS: MTLComputePipelineState
     private let upsampleAccumulatePS: MTLComputePipelineState
     private let glowCompositePS: MTLComputePipelineState
+    private let vignettePS: MTLComputePipelineState
 
     // Texture pool — allocated lazily on first render call and reused across
     // frames within an export. Sizes only depend on outputExtent and mip
@@ -82,6 +108,10 @@ final class FilmtoneMetalOpticsRenderer {
     private var bloomFinal: MTLTexture?
     private var halationFinal: MTLTexture?
     private var diffusionFinal: MTLTexture?
+    /// Vignette is the next stage after Glow composite. Read+write alias is
+    /// disallowed in Metal compute, so vignette writes into a dedicated
+    /// texture rather than reusing `outputTexture`.
+    private var vignetteFinal: MTLTexture?
 
     init?(workingColorSpace: CGColorSpace, ciContext: CIContext) {
         guard
@@ -111,7 +141,8 @@ final class FilmtoneMetalOpticsRenderer {
             let copyFn = library.makeFunction(name: "filmtoneCopyTexture"),
             let clearFn = library.makeFunction(name: "filmtoneClearTexture"),
             let accFn = library.makeFunction(name: "filmtoneTentUpsampleAccumulate"),
-            let compFn = library.makeFunction(name: "filmtoneGlowComposite")
+            let compFn = library.makeFunction(name: "filmtoneGlowComposite"),
+            let vignetteFn = library.makeFunction(name: "filmtoneVignette")
         else {
             NSLog("FilmtoneMetalOpticsRenderer: shader function lookup failed")
             return nil
@@ -125,22 +156,30 @@ final class FilmtoneMetalOpticsRenderer {
             self.clearTexturePS = try device.makeComputePipelineState(function: clearFn)
             self.upsampleAccumulatePS = try device.makeComputePipelineState(function: accFn)
             self.glowCompositePS = try device.makeComputePipelineState(function: compFn)
+            self.vignettePS = try device.makeComputePipelineState(function: vignetteFn)
         } catch {
             NSLog("FilmtoneMetalOpticsRenderer: pipeline state creation failed: \(error)")
             return nil
         }
     }
 
-    /// Run the Glow family stage on `input` and return a CIImage whose backing
-    /// MTLTexture holds the composited result. Returns nil on any allocation /
-    /// encoding failure; caller falls back to the Core Image path.
+    /// Run the configured optics chain on `input` and return a CIImage whose
+    /// backing MTLTexture holds the final composited result. Returns nil on
+    /// any allocation / encoding failure; caller falls back to the Core Image
+    /// path.
     ///
     /// `outputExtent` must match the output frame size (origin .zero, integral
     /// width/height). `input` must already be at that extent.
-    func renderGlow(
+    ///
+    /// Phase 2 段階 1 chain order:
+    ///   inputTexture
+    ///     → (bloom/halation/diffusion plates + glowComposite) → outputTexture
+    ///     → (vignette, optional)                              → vignetteFinal
+    /// CI handoff occurs once at the entry `ciContext.render(input, to:)`.
+    func renderOpticsChain(
         input: CIImage,
         outputExtent: CGRect,
-        params: GlowFrameParams
+        params: OpticsChainParams
     ) -> CIImage? {
         guard outputExtent.width >= 1, outputExtent.height >= 1 else {
             return nil
@@ -150,13 +189,14 @@ final class FilmtoneMetalOpticsRenderer {
             height: max(1.0, outputExtent.height.rounded())
         )
 
-        let bloomLevels = max(params.bloomMipLevels, 1)
-        let halationLevels = max(params.halationMipLevels, 1)
-        let diffusionLevels = max(params.diffusionMipLevels, 1)
-        let bloomInitial = params.glowBaseScale / max(params.bloomSpreadBoost, 0.0001)
-        let halationSpreadMul = 1.0 + max(params.halationSpread, 0) / max(params.halationSpreadDivisor, 0.0001)
-        let halationInitial = params.glowBaseScale / max(halationSpreadMul, 0.0001)
-        let diffusionInitial = params.glowBaseScale / 1.15
+        let glow = params.glow
+        let bloomLevels = max(glow.bloomMipLevels, 1)
+        let halationLevels = max(glow.halationMipLevels, 1)
+        let diffusionLevels = max(glow.diffusionMipLevels, 1)
+        let bloomInitial = glow.glowBaseScale / max(glow.bloomSpreadBoost, 0.0001)
+        let halationSpreadMul = 1.0 + max(glow.halationSpread, 0) / max(glow.halationSpreadDivisor, 0.0001)
+        let halationInitial = glow.glowBaseScale / max(halationSpreadMul, 0.0001)
+        let diffusionInitial = glow.glowBaseScale / 1.15
 
         let needsRealloc =
             poolOutputSize != outSize ||
@@ -198,6 +238,7 @@ final class FilmtoneMetalOpticsRenderer {
             let bloomFinal,
             let halationFinal,
             let diffusionFinal,
+            let vignetteFinal,
             let cb = queue.makeCommandBuffer()
         else {
             return nil
@@ -217,98 +258,109 @@ final class FilmtoneMetalOpticsRenderer {
 
         guard let enc = cb.makeComputeCommandEncoder() else { return nil }
 
-        let bloomActive = params.bloomStrength > 0.0001
-        let halationActive = params.halationIntensity > 0.0001
-        let diffusionActive = params.diffusion > 0.0001
+        let bloomActive = glow.bloomStrength > 0.0001
+        let halationActive = glow.halationIntensity > 0.0001
+        let diffusionActive = glow.diffusion > 0.0001
         let glowActive = bloomActive || halationActive || diffusionActive
+        let vignetteActive = (params.vignette?.intensity ?? 0) > 0.0001
 
-        if !glowActive {
-            // Identity copy: input -> output. Caller still gets a CIImage
-            // backed by outputTexture, simplifying the call site.
+        // Stage 1: Glow family. Always writes into `outputTexture`. When all
+        // three components are inactive but vignette is active, fall back to
+        // an identity copy so the vignette pass has a consistent source.
+        if glowActive {
+            if bloomActive {
+                encodeHighlightExtract(
+                    enc: enc,
+                    input: inputTexture,
+                    output: bloomPlate,
+                    threshold: Float(glow.bloomThreshold),
+                    knee: Float(glow.bloomSoftKnee),
+                    tint: SIMD3<Float>(1, 1, 1)
+                )
+                encodeMipPyramid(
+                    enc: enc,
+                    source: bloomPlate,
+                    mipsDown: bloomMipsDown,
+                    mipsAccum: bloomMipsAccum,
+                    final: bloomFinal,
+                    radius: glow.bloomRadius
+                )
+            } else {
+                encodeClear(enc: enc, target: bloomFinal)
+            }
+
+            if halationActive {
+                let halationTint = halationColor(forHue: glow.halationHue)
+                encodeHighlightExtract(
+                    enc: enc,
+                    input: inputTexture,
+                    output: halationPlate,
+                    threshold: Float(glow.halationThreshold),
+                    knee: Float(glow.halationSoftKnee),
+                    tint: halationTint
+                )
+                encodeMipPyramid(
+                    enc: enc,
+                    source: halationPlate,
+                    mipsDown: halationMipsDown,
+                    mipsAccum: halationMipsAccum,
+                    final: halationFinal,
+                    radius: glow.halationRadius
+                )
+            } else {
+                encodeClear(enc: enc, target: halationFinal)
+            }
+
+            if diffusionActive {
+                encodeMipPyramid(
+                    enc: enc,
+                    source: inputTexture,
+                    mipsDown: diffusionMipsDown,
+                    mipsAccum: diffusionMipsAccum,
+                    final: diffusionFinal,
+                    radius: 0.9
+                )
+            } else {
+                encodeClear(enc: enc, target: diffusionFinal)
+            }
+
+            encodeGlowComposite(
+                enc: enc,
+                base: inputTexture,
+                bloom: bloomFinal,
+                halation: halationFinal,
+                diffusion: diffusionFinal,
+                output: outputTexture,
+                bloomStrength: Float(glow.bloomStrength),
+                halationIntensity: Float(glow.halationIntensity),
+                diffusionAmount: Float(glow.diffusion),
+                diffusionBase: Float(glow.diffusionCompositeBase)
+            )
+        } else {
+            // No glow contributions: passthrough into outputTexture so the
+            // wrap-back path (and vignette stage, if any) is consistent.
             encodeCopy(enc: enc, source: inputTexture, destination: outputTexture)
-            enc.endEncoding()
-            cb.commit()
-            return ciImage(from: outputTexture)
         }
 
-        // 1. Highlight plate extraction (bloom + halation).
-        if bloomActive {
-            encodeHighlightExtract(
+        // Stage 2 (optional): Vignette. Reads outputTexture, writes
+        // vignetteFinal to avoid a read+write alias on the same texture.
+        var lastTexture: MTLTexture = outputTexture
+        if vignetteActive, let vignetteParams = params.vignette {
+            encodeVignette(
                 enc: enc,
-                input: inputTexture,
-                output: bloomPlate,
-                threshold: Float(params.bloomThreshold),
-                knee: Float(params.bloomSoftKnee),
-                tint: SIMD3<Float>(1, 1, 1)
+                input: outputTexture,
+                output: vignetteFinal,
+                params: vignetteParams
             )
-            encodeMipPyramid(
-                enc: enc,
-                source: bloomPlate,
-                mipsDown: bloomMipsDown,
-                mipsAccum: bloomMipsAccum,
-                final: bloomFinal,
-                radius: params.bloomRadius
-            )
-        } else {
-            encodeClear(enc: enc, target: bloomFinal)
+            lastTexture = vignetteFinal
         }
-
-        if halationActive {
-            let halationTint = halationColor(forHue: params.halationHue)
-            encodeHighlightExtract(
-                enc: enc,
-                input: inputTexture,
-                output: halationPlate,
-                threshold: Float(params.halationThreshold),
-                knee: Float(params.halationSoftKnee),
-                tint: halationTint
-            )
-            encodeMipPyramid(
-                enc: enc,
-                source: halationPlate,
-                mipsDown: halationMipsDown,
-                mipsAccum: halationMipsAccum,
-                final: halationFinal,
-                radius: params.halationRadius
-            )
-        } else {
-            encodeClear(enc: enc, target: halationFinal)
-        }
-
-        if diffusionActive {
-            // Diffusion blurs the input directly (no plate extraction).
-            encodeMipPyramid(
-                enc: enc,
-                source: inputTexture,
-                mipsDown: diffusionMipsDown,
-                mipsAccum: diffusionMipsAccum,
-                final: diffusionFinal,
-                radius: 0.9
-            )
-        } else {
-            encodeClear(enc: enc, target: diffusionFinal)
-        }
-
-        // 2. Composite bloom + halation + diffusion onto base.
-        encodeGlowComposite(
-            enc: enc,
-            base: inputTexture,
-            bloom: bloomFinal,
-            halation: halationFinal,
-            diffusion: diffusionFinal,
-            output: outputTexture,
-            bloomStrength: Float(params.bloomStrength),
-            halationIntensity: Float(params.halationIntensity),
-            diffusionAmount: Float(params.diffusion),
-            diffusionBase: Float(params.diffusionCompositeBase)
-        )
 
         enc.endEncoding()
         cb.commit()
         // No wait: Metal will synchronize when downstream CI/render reads the
         // texture-backed CIImage on its own command queue.
 
-        return ciImage(from: outputTexture)
+        return ciImage(from: lastTexture)
     }
 
     // MARK: Encoders
@@ -444,6 +496,30 @@ final class FilmtoneMetalOpticsRenderer {
         dispatch(enc: enc, pipeline: upsampleAccumulatePS, width: output.width, height: output.height)
     }
 
+    private func encodeVignette(
+        enc: MTLComputeCommandEncoder,
+        input: MTLTexture,
+        output: MTLTexture,
+        params: VignetteFrameParams
+    ) {
+        enc.setComputePipelineState(vignettePS)
+        enc.setTexture(input, index: 0)
+        enc.setTexture(output, index: 1)
+        var intensity = Float(params.intensity)
+        var outSize = SIMD2<UInt32>(UInt32(output.width), UInt32(output.height))
+        var gamma = Float(params.gamma)
+        var innerThreshold = Float(params.innerThreshold)
+        var opticsPack = params.opticsPack
+        var applyMask = params.applyMask
+        enc.setBytes(&intensity, length: MemoryLayout<Float>.size, index: 0)
+        enc.setBytes(&outSize, length: MemoryLayout<SIMD2<UInt32>>.size, index: 1)
+        enc.setBytes(&gamma, length: MemoryLayout<Float>.size, index: 2)
+        enc.setBytes(&innerThreshold, length: MemoryLayout<Float>.size, index: 3)
+        enc.setBytes(&opticsPack, length: MemoryLayout<SIMD3<Float>>.size, index: 4)
+        enc.setBytes(&applyMask, length: MemoryLayout<Float>.size, index: 5)
+        dispatch(enc: enc, pipeline: vignettePS, width: output.width, height: output.height)
+    }
+
     private func encodeGlowComposite(
         enc: MTLComputeCommandEncoder,
         base: MTLTexture,
@@ -517,7 +593,8 @@ final class FilmtoneMetalOpticsRenderer {
             let halationP = makeTexture(width: w, height: h, label: "filmtone-glow-halation-plate"),
             let bloomF = makeTexture(width: w, height: h, label: "filmtone-glow-bloom-final"),
             let halationF = makeTexture(width: w, height: h, label: "filmtone-glow-halation-final"),
-            let diffusionF = makeTexture(width: w, height: h, label: "filmtone-glow-diffusion-final")
+            let diffusionF = makeTexture(width: w, height: h, label: "filmtone-glow-diffusion-final"),
+            let vignetteF = makeTexture(width: w, height: h, label: "filmtone-vignette-final")
         else {
             return false
         }
@@ -546,6 +623,7 @@ final class FilmtoneMetalOpticsRenderer {
         self.bloomFinal = bloomF
         self.halationFinal = halationF
         self.diffusionFinal = diffusionF
+        self.vignetteFinal = vignetteF
         self.bloomMipsDown = bloomDown
         self.bloomMipsAccum = bloomAcc
         self.halationMipsDown = halDown
@@ -854,6 +932,54 @@ final class FilmtoneMetalOpticsRenderer {
         }
 
         outTex.write(half4(half3(clamp(result, float3(0.0), float3(1.0))), base.a), gid);
+    }
+
+    // Vignette with optional ray-angle field mask (CIColorKernel `vignette`
+    // direct port). UV is derived from `(gid + 0.5) / outSize`, matching the
+    // CI kernel which uses `destCoord()` over an extent that always starts
+    // at origin (0, 0) for the export pipeline. opticsPack carries
+    // (tanHalfFovX, tanHalfFovY, refIncidence) from FilmtoneRayAngleOptics.
+    // applyMask is 1.0 only when `cameraOptics.source == "metadata"`; for
+    // "assumed" / nil / "fallback65" sources it is 0.0 so effectiveMask
+    // collapses to 1.0 and the formula reproduces the pre-Stream-2 vignette
+    // byte-equivalently.
+    kernel void filmtoneVignette(
+        texture2d<half, access::read>  inTex            [[ texture(0) ]],
+        texture2d<half, access::write> outTex           [[ texture(1) ]],
+        constant float  &intensity                      [[ buffer(0) ]],
+        constant uint2  &outSize                        [[ buffer(1) ]],
+        constant float  &gamma                          [[ buffer(2) ]],
+        constant float  &innerThreshold                 [[ buffer(3) ]],
+        constant float3 &opticsPack                     [[ buffer(4) ]],
+        constant float  &applyMask                      [[ buffer(5) ]],
+        uint2 gid [[ thread_position_in_grid ]]
+    ) {
+        if (gid.x >= outSize.x || gid.y >= outSize.y) return;
+        half4 src = inTex.read(gid);
+        float2 sz = float2(outSize);
+        float2 uv = (float2(gid) + 0.5) / sz;
+        float2 distPx = (uv - float2(0.5)) * sz;
+        float halfDiag = length(sz * 0.5);
+        float dist = length(distPx) / max(halfDiag, 1.0);
+
+        float2 sensor = (uv - float2(0.5)) * 2.0;
+        float rayX = sensor.x * opticsPack.x;
+        float rayY = sensor.y * opticsPack.y;
+        float viewZ = 1.0 / sqrt(rayX * rayX + rayY * rayY + 1.0);
+        float incidence = 1.0 - viewZ;
+        float refIncidence = max(opticsPack.z, 1.0e-5);
+        float normalized = clamp(incidence / refIncidence, 0.0, 1.0);
+        float gammaSafe = max(gamma, 0.001);
+        float innerSafe = clamp(innerThreshold, 0.0, 0.8);
+        float shaped = pow(normalized, gammaSafe);
+        float t = clamp((shaped - innerSafe) / max(1.0 - innerSafe, 1.0e-6), 0.0, 1.0);
+        float mask = t * t * (3.0 - 2.0 * t);
+        float effectiveMask = mix(1.0, mask, clamp(applyMask, 0.0, 1.0));
+
+        float vig = 1.0 - intensity * dist * dist * effectiveMask;
+        vig = clamp(vig, 0.0, 1.0);
+        float3 result = float3(src.rgb) * vig;
+        outTex.write(half4(half3(result), src.a), gid);
     }
     """
 }

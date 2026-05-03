@@ -71,6 +71,14 @@ final class FilmtoneExportSession {
             ciContext: ciContext
         )
     private var metalOpticsActiveOnce = false
+    /// Phase 2 段階 1: true once a frame's vignette stage was applied inside
+    /// the Metal optics chain. Surfaced via sidecar `acceleratedRenderStages`
+    /// alongside `"GlowFamily/metal"`.
+    private var metalVignetteActiveOnce = false
+    /// Frame-scope flag set when the Metal optics chain applied vignette in
+    /// the same pass as glow. Read by `applyVignetteStage` to skip the CI
+    /// path. Reset at the top of each `applyGrade` call.
+    private var metalVignetteAppliedThisFrame = false
     private lazy var renderStageProfiler: FilmtoneExportRenderStageProfiler? =
         Self.makeRenderStageProfiler(
             ciContext: ciContext,
@@ -281,9 +289,13 @@ final class FilmtoneExportSession {
         let disabledRenderStages = disableGlowFamilyForExport
             ? [FilmtoneExportRenderSubstage.glowFamily.rawValue]
             : []
-        let acceleratedRenderStages = metalOpticsActiveOnce
-            ? [FilmtoneExportRenderSubstage.glowFamily.rawValue + "/metal"]
-            : []
+        var acceleratedRenderStages: [String] = []
+        if metalOpticsActiveOnce {
+            acceleratedRenderStages.append(FilmtoneExportRenderSubstage.glowFamily.rawValue + "/metal")
+        }
+        if metalVignetteActiveOnce {
+            acceleratedRenderStages.append(FilmtoneExportRenderSubstage.vignette.rawValue + "/metal")
+        }
         let performance = performanceMetrics.sidecarPerformance(
             elapsedMs: elapsedMs,
             disabledRenderStages: disabledRenderStages,
@@ -1526,6 +1538,12 @@ final class FilmtoneExportSession {
         let presetVersion = request.grade.presetVersion
         var current = image
 
+        // Phase 2 段階 1: clear the per-frame Metal vignette flag before any
+        // stage runs. `applyGlowFamilyStage` sets it true when the Metal
+        // optics chain absorbs the vignette pass; `applyVignetteStage`
+        // consumes it to skip the CI path.
+        metalVignetteAppliedThisFrame = false
+
         current = applyInputLutStage(to: current)
         profileRenderSubstage(.inputLut, image: current, outputSize: stageProfilingOutputSize)
         current = applyBaseGradeStage(to: current, params: params, presetVersion: presetVersion)
@@ -1714,34 +1732,49 @@ final class FilmtoneExportSession {
            request.sourceKind == .video,
            (request.renderMode ?? .quality) == .quality,
            loadedDepthMap == nil,
-           let renderer = metalOpticsRenderer,
-           let metalResult = renderer.renderGlow(
-               input: image,
-               outputExtent: image.extent,
-               params: FilmtoneMetalOpticsRenderer.GlowFrameParams(
-                   bloomStrength: params.bloomStrength,
-                   bloomThreshold: params.bloomThreshold,
-                   bloomSoftKnee: params.bloomSoftKnee,
-                   bloomRadius: params.bloomRadius,
-                   bloomMipLevels: Self.bloomMipLevels,
-                   bloomSpreadBoost: Self.bloomSpreadBoost,
-                   halationIntensity: params.halationIntensity,
-                   halationThreshold: params.halationThreshold,
-                   halationSoftKnee: params.halationSoftKnee,
-                   halationRadius: params.halationRadius,
-                   halationHue: params.halationHue,
-                   halationMipLevels: Self.halationMipLevels,
-                   halationSpread: params.halationSpread,
-                   halationSpreadDivisor: Self.halationSpreadDivisor,
-                   diffusion: params.diffusion,
-                   diffusionMipLevels: Self.diffusionMipLevels,
-                   diffusionCompositeBase: Self.diffusionCompositeBase,
-                   glowBaseScale: Self.glowBaseScale
-               )
-           )
+           let renderer = metalOpticsRenderer
         {
-            metalOpticsActiveOnce = true
-            return metalResult
+            let glowParams = FilmtoneMetalOpticsRenderer.GlowFrameParams(
+                bloomStrength: params.bloomStrength,
+                bloomThreshold: params.bloomThreshold,
+                bloomSoftKnee: params.bloomSoftKnee,
+                bloomRadius: params.bloomRadius,
+                bloomMipLevels: Self.bloomMipLevels,
+                bloomSpreadBoost: Self.bloomSpreadBoost,
+                halationIntensity: params.halationIntensity,
+                halationThreshold: params.halationThreshold,
+                halationSoftKnee: params.halationSoftKnee,
+                halationRadius: params.halationRadius,
+                halationHue: params.halationHue,
+                halationMipLevels: Self.halationMipLevels,
+                halationSpread: params.halationSpread,
+                halationSpreadDivisor: Self.halationSpreadDivisor,
+                diffusion: params.diffusion,
+                diffusionMipLevels: Self.diffusionMipLevels,
+                diffusionCompositeBase: Self.diffusionCompositeBase,
+                glowBaseScale: Self.glowBaseScale
+            )
+            // Phase 2 段階 1: fold the vignette stage into the same Metal
+            // pass when the params justify it. Vignette is only chained when
+            // intensity > epsilon; otherwise the chain runs glow-only and
+            // applyVignetteStage stays a no-op (CI path also no-ops).
+            let vignetteParams = vignetteFrameParams(image: image, params: params)
+            let chainParams = FilmtoneMetalOpticsRenderer.OpticsChainParams(
+                glow: glowParams,
+                vignette: vignetteParams
+            )
+            if let metalResult = renderer.renderOpticsChain(
+                input: image,
+                outputExtent: image.extent,
+                params: chainParams
+            ) {
+                metalOpticsActiveOnce = true
+                if vignetteParams != nil {
+                    metalVignetteActiveOnce = true
+                    metalVignetteAppliedThisFrame = true
+                }
+                return metalResult
+            }
         }
 
         guard !disableGlowFamilyForExport else {
@@ -1900,7 +1933,52 @@ final class FilmtoneExportSession {
         ]) ?? image
     }
 
+    /// Build the Metal vignette parameter struct from the same inputs
+    /// `applyVignetteStage` would consume. Returns nil when the CI path
+    /// would also no-op (intensity below threshold), so caller can decide
+    /// whether to chain the vignette pass at all.
+    private func vignetteFrameParams(
+        image: CIImage,
+        params: Phase0ParamsDTO
+    ) -> FilmtoneMetalOpticsRenderer.VignetteFrameParams? {
+        guard params.vignette > 0.0001 else {
+            return nil
+        }
+        let optics = request.sourceProbe?.cameraOptics
+        let resolved = FilmtoneRayAngleOptics.resolve(
+            optics: optics,
+            imageWidth: Double(image.extent.width),
+            imageHeight: Double(image.extent.height)
+        )
+        let opticsCIVector = FilmtoneRayAngleOptics.kernelArgs(
+            resolved: resolved,
+            imageWidth: Double(image.extent.width),
+            imageHeight: Double(image.extent.height)
+        )
+        let opticsPack = SIMD3<Float>(
+            Float(opticsCIVector.x),
+            Float(opticsCIVector.y),
+            Float(opticsCIVector.z)
+        )
+        let applyMask: Float = (optics?.source == "metadata") ? 1.0 : 0.0
+        let gamma = FilmtonePhase0Generated.hiddenDefaults.depthRayAngleGamma
+        let innerThreshold = FilmtonePhase0Generated.hiddenDefaults.depthRayAngleInnerThreshold
+        return FilmtoneMetalOpticsRenderer.VignetteFrameParams(
+            intensity: params.vignette,
+            opticsPack: opticsPack,
+            applyMask: applyMask,
+            gamma: gamma,
+            innerThreshold: innerThreshold
+        )
+    }
+
     private func applyVignetteStage(to image: CIImage, params: Phase0ParamsDTO) -> CIImage {
+        // Phase 2 段階 1: when the Metal optics chain absorbed the vignette
+        // pass for this frame, the CI vignette is already represented in
+        // `image` and re-applying would double the falloff.
+        if metalVignetteAppliedThisFrame {
+            return image
+        }
         guard params.vignette > 0.0001 else {
             return image
         }
