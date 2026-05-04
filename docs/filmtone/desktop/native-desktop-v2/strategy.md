@@ -236,6 +236,44 @@ shipping Electron rail.
   missing on Desktop and silently changes export truth). Archived as
   `archive/2026-05-04-m5-c-ios-feature-parity-audit.md`; new
   `active.md` opens M5-C.1.
+- 2026-05-04: M5-C.1 Native Source Profile And Source Gate Parity landed —
+  iOS-canonical source profile catalog + math ported to Native Desktop.
+  Three new Color/ files (`FilmtoneSourceProfileMath.swift` lift verbatim
+  from iOS plus an Apple Log cube builder; `FilmtoneSourceProfileCatalog.swift`
+  with the 9 built-in entries — Apple Log / Apple Log 2 / DJI D-Log / D-Log M
+  / Canon C-Log / Canon Log 3 + Cinema Gamut / V-Log / S-Log3 / Rec.709 —
+  with iOS-identical slugs and englishName; `FilmtoneSourceInputTransform.swift`
+  with NSLock-cached cube builder + CIColorCubeWithColorSpace apply +
+  source-cap reasoning). One new UI file (`SourceProfileControls.swift`)
+  surfaces a Picker on the right rail above GradeControls (same Pass 4
+  `.clear.tint(.black.opacity(0.30))` glass + `.colorScheme(.dark)` posture
+  for AppKit-bridged label). EditorState gained `sourceProfileSelection`
+  (`.auto` default, sticky `.builtIn`) and `probedSourceColorClass`
+  (PreviewSurface writes it after probe so the source-cap gate / Auto
+  resolution caption stay live). PreviewSurface + Still + Video exporters
+  apply the input transform before the grade pipeline; sidecar adds an
+  additive `sourceProfile { selection, resolvedId, resolvedName,
+  resolvedCurve }` block. Toolbar Export disables with a tooltip reason
+  when Auto sees an HDR / wide-gamut source the Desktop pipeline can't
+  faithfully render. Build clean (Swift 6, xcodebuild Debug). Auto-path
+  byte identity is preserved by design: SDR Rec.709 / Display P3 / unknown
+  sources match the catalog Rec.709 entry whose `curve == nil`, so
+  `prepareCube(for: nil)` returns nil and `apply` is identity (no
+  CIFilter inserted). Visual smoke on a real log source deferred to user
+  (no Apple Log fixture in repo). Archive `active.md` once user opens the
+  next slice.
+- 2026-05-04: Release-cutover Phase 4 pre-flight readiness audit pass —
+  ASC env 不要範囲 (archive Step 1 + exportArchive Step 2) を本 chat で実行。
+  最近 M5 lane で着地した Pass 3 / Pass 4 / scrub bar / F-S6.1-2 toolbar +
+  preview Image refactor は Release build path を壊していない。
+  `codesign --verify --deep --strict` pass、`flags=0x10000(runtime)` +
+  Authority chain (Developer ID Application → Developer ID CA → Apple Root CA)
+  + secure timestamp 確認。生成 Info.plist の version=0.1.0 / build=1 /
+  category=photography / copyright=© 2026 Takumi Chiba / min-system=26.0
+  正常。spctl は notarize 前の expected `Unnotarized Developer ID` reject。
+  release-cutover lane の M6-6 は user の `ASC_ISSUER_ID` 設定で
+  `scripts/release-macos.sh` を流すだけの状態。Archived as
+  `archive/2026-05-04-release-phase-4-preflight-readiness.md`。
 
 ## Interrupt / Decision Log
 

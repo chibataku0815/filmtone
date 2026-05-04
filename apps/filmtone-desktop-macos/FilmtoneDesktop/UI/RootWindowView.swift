@@ -9,12 +9,14 @@ struct RootWindowView: View {
     var body: some View {
         ZStack(alignment: .topTrailing) {
             PreviewSurface(
+                state: state,
                 sourceURL: state.sourceURL,
                 sourceKind: state.sourceKind,
                 presetName: state.presetName,
                 presetStrength: state.presetStrength,
                 lookSlug: state.lookSlug,
-                videoPreviewSeconds: state.videoPreviewSeconds
+                videoPreviewSeconds: state.videoPreviewSeconds,
+                sourceProfileSelection: state.sourceProfileSelection
             )
             // M5-B Pass 3: user confirmed `.clear` posture is the correct
             // Apple Liquid Glass dramatic refraction; all panels and the
@@ -24,6 +26,17 @@ struct RootWindowView: View {
                 VStack(alignment: .trailing, spacing: 12) {
                     GlassControlGroup()
                     if state.sourceURL != nil {
+                        // M5-C.1: Source Profile Picker — sits above the Look
+                        // controls so the user picks the input transform
+                        // before the Look layer. Same Pass 4 dark-tinted
+                        // .clear glass posture for visual continuity.
+                        SourceProfileControls(state: state)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .glassEffect(
+                                .clear.tint(.black.opacity(0.30)),
+                                in: RoundedRectangle(cornerRadius: 12)
+                            )
                         // M5-B Pass 4: subtle dark tint on `.clear` Liquid
                         // Glass gives the operating panel a stable luminance
                         // baseline for white text + visible Slider track,
@@ -103,10 +116,32 @@ struct RootWindowView: View {
                     Label("Export", systemImage: "square.and.arrow.up")
                 }
                 .keyboardShortcut("e", modifiers: .command)
-                .disabled(state.sourceURL == nil || state.isExporting)
-                .help(state.sourceKind == .video ? "Export the current video" : "Export the current still")
+                .disabled(exportDisabled)
+                .help(exportHelpText)
             }
         }
+    }
+
+    private var sourceCapBlocked: Bool {
+        guard state.sourceURL != nil else { return false }
+        return FilmtoneSourceInputTransform.sourceExceedsCapacity(
+            selection: state.sourceProfileSelection,
+            probedColorClass: state.probedSourceColorClass
+        )
+    }
+
+    private var exportDisabled: Bool {
+        state.sourceURL == nil || state.isExporting || sourceCapBlocked
+    }
+
+    private var exportHelpText: String {
+        if sourceCapBlocked,
+           let reason = FilmtoneSourceInputTransform.sourceCapReason(
+            probedColorClass: state.probedSourceColorClass
+           ) {
+            return reason
+        }
+        return state.sourceKind == .video ? "Export the current video" : "Export the current still"
     }
 
     private func presentOpenPanel() {
@@ -161,7 +196,8 @@ struct RootWindowView: View {
             presetName: state.presetName,
             presetStrength: state.presetStrength,
             lookSlug: state.lookSlug,
-            format: format
+            format: format,
+            sourceProfileSelection: state.sourceProfileSelection
         )
 
         state.isExporting = true
@@ -202,7 +238,8 @@ struct RootWindowView: View {
             outputURL: outputURL,
             presetName: state.presetName,
             presetStrength: state.presetStrength,
-            lookSlug: state.lookSlug
+            lookSlug: state.lookSlug,
+            sourceProfileSelection: state.sourceProfileSelection
         )
 
         state.isExporting = true

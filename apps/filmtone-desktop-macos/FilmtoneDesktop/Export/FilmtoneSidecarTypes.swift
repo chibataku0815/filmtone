@@ -16,4 +16,12 @@ protocol FilmtoneSidecarRequest: Sendable {
     /// `lookId` namespace and emit the additive `creativeLut` block.
     var lookSlug: String? { get }
     var sourceKind: FilmtoneSourceKind { get }
+    /// M5-C.1: source profile selection — `.auto` (resolves at probe time)
+    /// or `.builtIn(catalogId:)`. Default = `.auto` for protocol-level
+    /// backward compatibility; existing callers see no behavior change.
+    var sourceProfileSelection: CameraProfileSelection { get }
+}
+
+extension FilmtoneSidecarRequest {
+    var sourceProfileSelection: CameraProfileSelection { .auto }
 }

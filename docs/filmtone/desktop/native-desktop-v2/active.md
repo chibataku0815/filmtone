@@ -132,4 +132,54 @@ Out-of-scope (this slice):
 
 ## Unexpected / Blockers
 
-- None yet.
+- iOS canonical math uses RGB-packed cubes (3 floats / voxel) but
+  macOS `CIColorCubeWithColorSpace` requires RGBA-packed (4 floats /
+  voxel, alpha = 1). Resolved with a single `packRGBA(from:size:)` pass
+  in `FilmtoneSourceInputTransform`; the math module stays bit-identical
+  to iOS source.
+- Active.md spoke of an "M5-A.2 Stone CLI hash" reference for Auto
+  byte-identity verification; in practice no standalone Native Desktop
+  CLI exists (M5-A.2 hashes were captured via the GUI export). Replaced
+  the runtime hash check with a design-level guarantee: SDR Rec.709 /
+  Display P3 / unknown sources resolve via Auto to the Rec.709 catalog
+  entry whose `curve == nil` → `prepareCube(for: nil)` returns nil →
+  `FilmtoneSourceInputTransform.apply` returns the image unchanged. So
+  no CIFilter is inserted, and the per-pixel pipeline is bytewise
+  identical to pre-M5-C.1. A runtime spot-check on the iPhone canonical
+  fixture is straightforward but requires a GUI export run on the user's
+  side. Logged here so the next chat can decide whether to capture a
+  hash post-merge.
+- No Apple Log / D-Log / V-Log / S-Log3 fixture is checked into the
+  repository, so the "log source visible smoke" Done condition is
+  deferred to user. The math is verbatim lift from iOS canonical
+  (`FilmtoneSourceProfileMath.swift` lines 22-614 as of 2026-05-04),
+  so cross-platform parity holds by construction modulo the
+  RGBA-packing wrapper.
+
+## Completion (this active is ready to archive)
+
+All other Done conditions met:
+
+- `xcodebuild -scheme FilmtoneDesktop -configuration Debug` succeeds
+  clean (Swift 6 strict concurrency, no warnings).
+- Source profile catalog ships the iOS-identical 9 built-in entries
+  (Apple Log, Apple Log 2, DJI D-Log, DJI D-Log M, Canon C-Log,
+  Canon Log 3 + Cinema Gamut, V-Log, S-Log3, Rec.709). Slugs and
+  englishName match iOS verbatim; `FilmtoneSourceProfileCatalog.entry
+  (forColorClass:)` is wired for Auto resolution.
+- EditorState exposes `sourceProfileSelection` (`.auto` default) and
+  `probedSourceColorClass` (live).
+- PreviewSurface + FilmtoneStillExporter + FilmtoneVideoExporter all
+  apply the transform before grade; PreviewSurface keys its render
+  task on `sourceProfileSelection` so Picker changes drive a re-grade.
+- Source-cap gate live: `FilmtoneSourceInputTransform.sourceExceedsCapacity
+  (...)` flags Auto on `.hdrPq` / `.hdrHlg` / `.wideGamutUnknown` /
+  `.unsupported`, RootWindowView's Export toolbar button reflects this
+  via `exportDisabled` + tooltip reason; SourceProfileControls surfaces
+  the same reason as the caption below the Picker.
+- Sidecar adds an additive `sourceProfile { selection, resolvedId,
+  resolvedName, resolvedCurve }` block — additive only, no schema bump.
+
+User to verify visually with their own log fixture, then this active.md
+moves to archive and the next slice (M5-C.2 Look library, M5-C.3
+Adjustments, or M5-C.4 Export panel — pick by the same audit) opens.

@@ -22,6 +22,16 @@ final class EditorState {
     /// M5-A.3: probed video duration in seconds. `nil` for stills or
     /// before the probe completes. Drives the scrub bar range.
     var videoDurationSeconds: Double?
+    /// M5-C.1: source profile selection. `.auto` resolves at probe time
+    /// (matches iOS canonical detection-hint catalog) — sticky on `.builtIn`
+    /// because container metadata cannot reliably distinguish the synthesized
+    /// log curves (D-CP4 retention rule).
+    var sourceProfileSelection: CameraProfileSelection = .auto
+    /// M5-C.1: latest probed source color class. Updated by PreviewSurface
+    /// after the source is opened so the right-rail Source Profile Picker
+    /// can mirror Auto's resolved choice and the source-cap gate can decide
+    /// whether to disable Export.
+    var probedSourceColorClass: SourceColorClassDTO?
     var isExporting: Bool = false
     var exportProgress: Double = 0
     var exportProgressMessage: String?
@@ -73,6 +83,10 @@ final class EditorState {
         currentDurationProbeTask = nil
         videoPreviewSeconds = nil
         videoDurationSeconds = nil
+        // M5-C.1: clear the previous probe's color class so the gate /
+        // Picker resolved-Auto label don't misreport stale state until the
+        // PreviewSurface re-probes the new source.
+        probedSourceColorClass = nil
 
         if let url, kind == .video {
             startVideoDurationProbe(for: url)

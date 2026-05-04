@@ -36,6 +36,7 @@ struct FilmtoneStillExportRequest: FilmtoneSidecarRequest {
     let presetStrength: Double
     let lookSlug: String?
     let format: StillExportFormat
+    let sourceProfileSelection: CameraProfileSelection
     var sourceKind: FilmtoneSourceKind { .still }
 
     init(
@@ -44,7 +45,8 @@ struct FilmtoneStillExportRequest: FilmtoneSidecarRequest {
         presetName: String,
         presetStrength: Double = FilmtonePresetCatalog.presetStrengthDefault,
         lookSlug: String? = nil,
-        format: StillExportFormat
+        format: StillExportFormat,
+        sourceProfileSelection: CameraProfileSelection = .auto
     ) {
         self.sourceURL = sourceURL
         self.outputURL = outputURL
@@ -52,6 +54,7 @@ struct FilmtoneStillExportRequest: FilmtoneSidecarRequest {
         self.presetStrength = presetStrength
         self.lookSlug = lookSlug
         self.format = format
+        self.sourceProfileSelection = sourceProfileSelection
     }
 }
 
@@ -88,6 +91,20 @@ enum FilmtoneStillExporter {
             throw FilmtoneStillExportError.sourceUnreadable(request.sourceURL)
         }
 
+        // M5-C.1: resolve source profile (Auto matches detection-hint
+        // catalog; .builtIn is sticky) and apply the cube before grade.
+        // For SDR Rec.709 / Display P3 / unknown sources Auto resolves to
+        // the Rec.709 nilCurve entry (or no entry) → no transform → bytewise
+        // identity preserved against pre-M5-C.1 output.
+        let resolvedProfile = FilmtoneSourceInputTransform.resolve(
+            selection: request.sourceProfileSelection,
+            probedColorClass: probe.colorClass
+        )
+        let normalizedSource = FilmtoneSourceInputTransform.apply(
+            to: source,
+            entry: resolvedProfile
+        )
+
         let params = FilmtonePresetCatalog.resolved(
             presetName: request.presetName,
             strength: request.presetStrength,
@@ -105,7 +122,7 @@ enum FilmtoneStillExporter {
             creativeLut = nil
         }
         let graded = FilmtoneGradePipeline.apply(
-            to: source,
+            to: normalizedSource,
             params: params,
             sourceSeed: sourceSeed,
             cameraOptics: probe.cameraOptics,
@@ -118,7 +135,8 @@ enum FilmtoneStillExporter {
         if writeSidecar {
             sidecarURL = try FilmtoneSidecarWriter.writeSidecar(
                 for: request,
-                sourceInterpretation: contract.sourceInterpretationID
+                sourceInterpretation: contract.sourceInterpretationID,
+                resolvedSourceProfile: resolvedProfile
             )
         }
 

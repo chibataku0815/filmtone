@@ -24,10 +24,15 @@ enum FilmtoneSidecarWriter {
 
     static func writeSidecar(
         for request: any FilmtoneSidecarRequest,
-        sourceInterpretation: String? = nil
+        sourceInterpretation: String? = nil,
+        resolvedSourceProfile: CameraProfileCatalogEntry? = nil
     ) throws -> URL {
         let sidecarURL = sidecarURL(for: request.outputURL)
-        let payload = sidecarPayload(for: request, sourceInterpretation: sourceInterpretation)
+        let payload = sidecarPayload(
+            for: request,
+            sourceInterpretation: sourceInterpretation,
+            resolvedSourceProfile: resolvedSourceProfile
+        )
         let json = try JSONSerialization.data(
             withJSONObject: payload,
             options: [.prettyPrinted, .sortedKeys]
@@ -44,7 +49,8 @@ enum FilmtoneSidecarWriter {
 
     static func sidecarPayload(
         for request: any FilmtoneSidecarRequest,
-        sourceInterpretation: String? = nil
+        sourceInterpretation: String? = nil,
+        resolvedSourceProfile: CameraProfileCatalogEntry? = nil
     ) -> [String: Any] {
         let strength = FilmtonePresetCatalog.clampStrength(request.presetStrength)
         let params = FilmtonePresetCatalog.resolved(
@@ -99,6 +105,23 @@ enum FilmtoneSidecarWriter {
         if let sourceInterpretation {
             payload["sourceInterpretation"] = sourceInterpretation
         }
+        // M5-C.1 additive: emit the user's source profile selection plus
+        // (when known) the catalog entry actually applied. `selection`
+        // captures intent (Auto vs sticky pick); `resolvedId` captures what
+        // the export actually applied — useful when Auto resolved to
+        // something like `apple-log` after probe. Existing readers ignore
+        // unknown fields → backward-compatible.
+        var sourceProfilePayload: [String: Any] = [
+            "selection": request.sourceProfileSelection.identifierString,
+        ]
+        if let resolvedSourceProfile {
+            sourceProfilePayload["resolvedId"] = resolvedSourceProfile.id
+            sourceProfilePayload["resolvedName"] = resolvedSourceProfile.englishName
+            if let curve = resolvedSourceProfile.curve {
+                sourceProfilePayload["resolvedCurve"] = curve.rawValue
+            }
+        }
+        payload["sourceProfile"] = sourceProfilePayload
         // M5-A.2 additive: emit `creativeLut` provenance when a Look is
         // active and its cube resolves. SHA mismatch / missing resource
         // path returns nil from the loader → block is omitted (OQ-3:
