@@ -108,7 +108,7 @@ enum FilmtoneGradePipeline {
 
     private static func shouldApplyPrintStage(_ p: FilmtonePhase0Params) -> Bool {
         let epsilon = 1e-4
-        return abs(p.printContrast) > epsilon
+        return p.printContrast > epsilon
             || abs(p.cyan) > epsilon
             || abs(p.magenta) > epsilon
             || abs(p.yellow) > epsilon
