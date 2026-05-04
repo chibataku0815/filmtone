@@ -22,13 +22,13 @@ struct RootWindowView: View {
                     GradeControls(state: state)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12))
                 }
                 if state.isExporting {
                     ExportProgressBar(state: state)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12))
                 }
             }
             .padding(20)
@@ -42,7 +42,7 @@ struct RootWindowView: View {
                     VideoScrubBar(state: state, duration: duration)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12))
                         .padding(20)
                 }
             }
