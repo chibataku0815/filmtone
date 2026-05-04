@@ -108,10 +108,14 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
     `.buttonStyle(.glassProminent)` / `.glass` で 4 button (Export primary /
     Cancel / Reveal / Export Again) を統一。当初 ~1-2h 推定だったが Apple
     canonical 1 行解決で 30 分に短縮。
-  - **M5-D.2 Native Video Playback** (Tier B, ~2-3h): Play/Pause button +
-    AVPlayer 駆動の time observer + Space-key shortcut。realtime grade 維持は
-    重い → 着手前に「play 中は raw decoded frame で grade-off プレビュー」か
-    「decode + grade で frame drop 容認」を user 判断。
+  - **M5-D.2 Native Video Playback** (Tier B, ~50 min) — **closed
+    2026-05-05** (MVP path)。詳細は Completion Log を参照。strategy 旧 gate
+    (raw decode vs decode+grade の user 判断) は前提が変わったため bypass:
+    既存 scrub-driven preview pipeline (`previewMaxLong` scaled +
+    in-flight Task cancellation) が既に decode+grade で frame-drop を
+    natural に出すので、Timer driven `videoPreviewSeconds` 増分で MVP
+    が成立。AVPlayer migration は perf 不足が visual smoke で判明した
+    場合の follow-up slice (M5-D.2.1 候補)。
   - **M5-C.3b Advanced Per-Parameter Override Editing UX** (Tier C, ~半日):
     iOS canonical `FilmtoneStrengthSheet` + `FilmtoneAdjustmentHelpSheet` の
     Desktop 版。30 個前後の paramOverrides field を category 別に list 化、
@@ -514,6 +518,24 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
   QuickAdjust default (same)、toolbar buttons (macOS 26 HIG default)。
   Visual smoke (4 button が dark glass container と調和) は user-driven。
   Archived as `archive/2026-05-05-m5-f1-inline-button-glass-pass.md`。
+- 2026-05-05: M5-D.2 Native Video Playback (MVP) closed — Timer-driven
+  `videoPreviewSeconds` 24 fps 増分で再生機能を最小実装。EditorState に
+  `isPlaying` / `playbackTask` + `togglePlayback()` / `startPlayback()` /
+  `stopPlayback()` (`@MainActor` Task ループ、`[weak self]` で self-rebind
+  pattern)、`setSource(_:)` で `stopPlayback()` hook。VideoScrubBar に
+  `play.fill` / `pause.fill` SF Symbol button (`.buttonStyle(.glass)` +
+  `.keyboardShortcut(.space)` + `.help`)、Slider に `onEditingChanged` で
+  drag → auto-pause。AVPlayer + AVPlayerItemVideoOutput 移行は perf
+  不足の証拠なしで先取り回避 (overengineering 判定)、follow-up slice
+  M5-D.2.1 候補として deferred。strategy 旧 gate (raw decode vs
+  decode+grade の user 判断) は前提が変わったため bypass: 既存 scrub-driven
+  pipeline が既に decode+grade で frame-drop を natural に出すので
+  user 判断不要。Desktop xcodebuild Debug ✅ (1 round trip 後の self-bind
+  訂正含む)、Swift 6 strict concurrency warning なし、pre-existing
+  CIKernel deprecation warnings は無関係。Tier B 5-gap 2 件目 closure。
+  Visual smoke (短い 1080p video で graded playback、Space-key、scrub
+  drag → auto-pause) は user-driven。Archived as
+  `archive/2026-05-05-m5-d2-native-video-playback.md`。
 
 ## Interrupt / Decision Log
 

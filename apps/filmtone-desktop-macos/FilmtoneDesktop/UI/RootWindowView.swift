@@ -373,6 +373,8 @@ struct RootWindowView: View {
 /// M5-A.3: scrub bar for video preview. Continuous binding to
 /// `state.videoPreviewSeconds`; coalescing of rapid drag events happens
 /// downstream in `PreviewSurface` via in-flight Task cancellation.
+/// M5-D.2: gains a Play/Pause button + Space-key shortcut. Manual scrub
+/// drag pauses playback via `onEditingChanged`.
 private struct VideoScrubBar: View {
     @Bindable var state: EditorState
     let duration: Double
@@ -386,11 +388,29 @@ private struct VideoScrubBar: View {
 
     var body: some View {
         HStack(spacing: 12) {
+            Button {
+                state.togglePlayback()
+            } label: {
+                Image(systemName: state.isPlaying ? "pause.fill" : "play.fill")
+                    .frame(width: 14, height: 14)
+            }
+            .buttonStyle(.glass)
+            .controlSize(.small)
+            .keyboardShortcut(.space, modifiers: [])
+            .help(state.isPlaying ? "Pause (Space)" : "Play (Space)")
             Text(format(seconds.wrappedValue))
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
                 .frame(minWidth: 64, alignment: .leading)
-            Slider(value: seconds, in: 0...max(duration, 0.001))
+            Slider(
+                value: seconds,
+                in: 0...max(duration, 0.001),
+                onEditingChanged: { editing in
+                    // Pause playback the moment the user grabs the scrub
+                    // thumb so the ticker doesn't fight the drag.
+                    if editing { state.stopPlayback() }
+                }
+            )
             Text(format(duration))
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)

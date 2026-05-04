@@ -23,6 +23,11 @@ final class EditorState {
     /// M5-A.3: probed video duration in seconds. `nil` for stills or
     /// before the probe completes. Drives the scrub bar range.
     var videoDurationSeconds: Double?
+    /// M5-D.2: true while the playback Task is incrementing
+    /// `videoPreviewSeconds` on a 24 fps tick. UI-side toggle via
+    /// `togglePlayback()` / Space-key. Manual scrub drag also flips this
+    /// off via the slider's onEditingChanged hook.
+    var isPlaying: Bool = false
     /// M5-C.1: source profile selection. `.auto` resolves at probe time
     /// (matches iOS canonical detection-hint catalog) — sticky on `.builtIn`
     /// because container metadata cannot reliably distinguish the synthesized
@@ -87,6 +92,11 @@ final class EditorState {
     var currentExportTask: Task<Void, Never>?
     @ObservationIgnored
     var currentDurationProbeTask: Task<Void, Never>?
+    /// M5-D.2: playback ticker driving `videoPreviewSeconds` forward at
+    /// 24 fps while `isPlaying`. Cancelled by `stopPlayback()` /
+    /// `setSource(_:)` / end-of-video.
+    @ObservationIgnored
+    var playbackTask: Task<Void, Never>?
 
     var presetParams: FilmtonePhase0Params {
         FilmtonePresetCatalog.resolved(
@@ -143,6 +153,11 @@ final class EditorState {
         // from the previous source.
         currentDurationProbeTask?.cancel()
         currentDurationProbeTask = nil
+        // M5-D.2: kill any in-flight playback ticker too — a new source
+        // means the old time axis is gone, so a residual Task would
+        // increment the new source's videoPreviewSeconds before duration
+        // probe completes.
+        stopPlayback()
         videoPreviewSeconds = nil
         videoDurationSeconds = nil
         // M5-C.1: clear the previous probe's color class so the gate /
@@ -187,6 +202,60 @@ final class EditorState {
 
     func cancelExport() {
         currentExportTask?.cancel()
+    }
+
+    // MARK: - M5-D.2 Playback ticker
+
+    /// Toggle 24 fps playback driving `videoPreviewSeconds` through the
+    /// existing scrub-driven preview pipeline. Frame drops emerge
+    /// naturally from the in-flight cancellation pattern in
+    /// `PreviewSurface` — the ticker requests frames faster than the
+    /// CIKernel grade pipeline can serve, and stale requests cancel.
+    /// AVPlayer migration is a follow-up slice if this MVP is too slow.
+    func togglePlayback() {
+        if isPlaying {
+            stopPlayback()
+        } else {
+            startPlayback()
+        }
+    }
+
+    func startPlayback() {
+        guard sourceKind == .video,
+              let duration = videoDurationSeconds,
+              duration > 0,
+              videoPreviewSeconds != nil else {
+            return
+        }
+        // Cancel any prior ticker before starting a new one.
+        playbackTask?.cancel()
+        isPlaying = true
+        playbackTask = Task { @MainActor [weak self] in
+            // Nominal 24 fps; real pipeline framerate is governed by the
+            // scrub-driven decode + grade pipeline behind PreviewSurface.
+            let dt = 1.0 / 24.0
+            let stepNanos = UInt64(dt * 1_000_000_000)
+            while true {
+                try? await Task.sleep(nanoseconds: stepNanos)
+                guard !Task.isCancelled,
+                      let s = self,
+                      s.isPlaying else { return }
+                let next = (s.videoPreviewSeconds ?? 0) + dt
+                if next >= duration {
+                    s.videoPreviewSeconds = duration
+                    s.isPlaying = false
+                    s.playbackTask = nil
+                    return
+                }
+                s.videoPreviewSeconds = next
+            }
+        }
+    }
+
+    func stopPlayback() {
+        playbackTask?.cancel()
+        playbackTask = nil
+        isPlaying = false
     }
 
     // MARK: - M5-C.4 Export inspector
