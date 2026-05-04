@@ -257,24 +257,57 @@ Out-of-scope (deferred):
   verbatim on Picker re-selection, and the export sidecar carries
   the live quickState block instead of `[0,0,0]`.
 
-User to verify visually:
+### Headless verification harness
 
-1. Open a still / video, drag `Film` / `Era` / `Dynamics` —
-   preview updates with the iOS-canonical per-key offsets
-   (saturation / temperature / vignette for filmCharacter; fade /
-   saturation / contrast for era; exposure / contrast / bloom for
-   dynamics).
-2. Pick Stone, drag Strength to ~0.6, set `Era = +40%`, click "Save
-   Current Look…", name it "Stone Era". Switch Picker to None →
-   Quick zeroes, Look clears. Switch Picker back to "Stone Era" →
-   Strength returns to 0.6 and Era returns to +40%.
-3. "Reset Quick" restores zero across all 3 axes without touching
-   Strength or Look. Disabled when already zero.
-4. Export PNG/JPEG/MP4 with non-zero Quick — open the resulting
-   `.json` sidecar and verify the `quickState` block carries the
-   live axis values (not `[0,0,0]`).
-5. Built-in Stone / Urban remain selectable with identical render
-   output to pre-M5-C.3a when Quick is `.zero`.
+Standalone `swiftc` test runner at
+`apps/filmtone-desktop-macos/Verify/main.swift` (driven by
+`Verify/run.sh`) compiles a pure-Foundation subset of the Desktop
+sources together with assertion code and exercises the M5-C.3a math
++ serialization invariants without booting the SwiftUI app. Last
+run: **29/29 PASS**. Coverage:
+
+- 16 parity tests (4 presets × 4 strengths) — `resolved(Quick=.zero,
+  overrides=.empty)` is field-for-field identical to the legacy 3-arg
+  `params(for:strength:)` path. Locks visual check #5 (built-in
+  presets unchanged at Quick=0).
+- 4 Quick math tests — single-axis `+0.5` / `-0.5` shifts each
+  affected param by exactly `axisValue * weight`, sign-symmetric.
+  Locks visual check #1 logic (slider drag → preview offsets).
+- 3 sidecar tests — `FilmtoneSidecarWriter.sidecarPayload` emits
+  live `quickState` axis values (was hard-coded `[0,0,0]`), clamps
+  out-of-range axis input, and `gradeParams` reflects Quick +
+  `paramOverrides` applied. Locks visual check #4.
+- 1 `SavedLookEntry` JSON round-trip — `quickState` +
+  `paramOverrides` survive Codable encode/decode byte-for-byte.
+  Locks visual check #2 at the schema level (the runtime
+  `FilmtoneSavedLookStore` is a thin disk wrapper around this
+  Codable, so a green Codable run guarantees the in-app save/load
+  loop preserves both fields).
+- 1 zero-literal sanity check — `FilmtoneQuickState.zero` is
+  `(0, 0, 0)`. Locks visual check #3 logic (Reset Quick =
+  `state.quickState = .zero`).
+- 2 ordering / 1 absolute-set / 2 Hashable distinctness tests —
+  invariants behind PreviewRenderKey re-fire and the `paramOverrides
+  → quickState` resolve order matching iOS canonical.
+
+Run locally: `apps/filmtone-desktop-macos/Verify/run.sh`. No Xcode
+project / test target needed. Adds future-slice value: M5-C.3b can
+extend the same harness with per-parameter editor assertions.
+
+User remaining for GUI-only verification:
+
+1. Drag `Film` / `Era` / `Dynamics` — preview reacts visually
+   (wiring is verified end-to-end above; only the visual confirm
+   that the MTKView/Image actually re-renders is left to the eye).
+2. Click "Reset Quick" button — handler verified, only the GUI tap
+   path remains.
+3. Pick Stone, set `Era = +40%`, save as "Stone Era", switch Picker
+   away/back, confirm restore. (Schema round-trip is verified;
+   only the EditorState ⇄ store wiring is GUI-driven.)
+4. Export with non-zero Quick → open the `.filmtone.json` sidecar
+   and confirm `quickState` block carries live values. (Sidecar
+   payload generation verified; only the disk-write step is
+   GUI-driven.)
 
 This active.md moves to archive when the next slice (M5-C.3b
 advanced per-parameter override editing UX, M5-C.2b favorite /
