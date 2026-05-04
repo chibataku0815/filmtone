@@ -293,6 +293,16 @@ shipping Electron rail.
   release-cutover lane の M6-6 は user の `ASC_ISSUER_ID` 設定で
   `scripts/release-macos.sh` を流すだけの状態。Archived as
   `archive/2026-05-04-release-phase-4-preflight-readiness.md`。
+- 2026-05-04: Release-cutover Phase 5 — M6-6 end-to-end release run pass。
+  `ASC_ISSUER_ID` を `apps/capacitor-film-lab-ios/.env.local` から流用
+  (iOS Fastfile parity)、`scripts/release-macos.sh` 6/6 step + `scripts/
+  package-dmg.sh` 6/6 step 全 pass。`FilmtoneDesktop.app` (notarized +
+  stapled、`Notarization Ticket=stapled`) と `FilmtoneDesktop-0.1.0.dmg`
+  (notarized + stapled、6.9 MB、Gatekeeper `accepted source=Notarized
+  Developer ID`) を `apps/filmtone-desktop-macos/build/release/0.1.0/` に
+  着地。M6 release-cutover lane 全タスク Done。残 = `git push` / `git tag
+  v0.1.0` / portfolio submodule bump / 配布チャネル決定 — 全て本 chat
+  scope 外 (CLAUDE.md §9 user 委任、§7 portfolio bump 手順)。
 
 ## Interrupt / Decision Log
 

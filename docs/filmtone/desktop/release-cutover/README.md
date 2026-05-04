@@ -200,3 +200,49 @@ Info.plist file 化 = infra refactor のため引き続き scope 外。
   /release-macos.sh` → `scripts/package-dmg.sh`)
 - 実 run の結果次第で raised issue 対応
 - Sparkle 等 auto-update は別 lane (本 lane 範囲外、外殻)
+
+## Phase 5 close summary
+
+実装変更なし、release pipeline 実行 deliverable のみ (2026-05-04):
+
+- `ASC_ISSUER_ID` を `apps/capacitor-film-lab-ios/.env.local` 既存 entry
+  (`bac140b6-7b35-44ca-b9e1-82b037e08e69`) から流用 — iOS Fastfile parity
+  (README L52-54) 通り。`ASC_KEY_ID=TM2BK9269B` / `ASC_KEY_PATH=~/.appstoreconnect
+  /private_keys/AuthKey_TM2BK9269B.p8` も同 file。
+- `scripts/release-macos.sh` 6/6 step 全 pass:
+  1. archive (Release, Developer ID) — `** ARCHIVE SUCCEEDED **`
+  2. exportArchive (developer-id) — `** EXPORT SUCCEEDED **`
+  3. ditto zip for notarytool
+  4. notarytool submit --wait — Apple 受理
+  5. stapler staple — `The staple and validate action worked!`
+  6. spctl --assess — `accepted source=Notarized Developer ID`
+- `scripts/package-dmg.sh 0.1.0 ...` 6/6 step 全 pass:
+  1. stage `.app` + Applications symlink
+  2. hdiutil create (UDZO)
+  3. codesign DMG
+  4. notarytool submit DMG --wait — Apple 受理
+  5. stapler staple DMG — `The staple and validate action worked!`
+  6. spctl --assess --type open — `accepted source=Notarized Developer ID`
+- 配布物 (`apps/filmtone-desktop-macos/build/release/0.1.0/`):
+  - `FilmtoneDesktop.app` (notarized + stapled、`Notarization Ticket=stapled` 確認)
+  - `FilmtoneDesktop-0.1.0.dmg` (notarized + stapled、6.9 MB、distribution-ready)
+  - sha256 (DMG) = `cc4a2666e4cc4524acb67bf3097da78b18de7806cea71c72acda7adf20cd3398`
+  - CDHash (.app) = `9f28ad58e075172222464a51505b29ed74ab4049`
+- codesign -dvvv (.app) 確定値:
+  `Identifier=co.fores-tone.filmtone.desktop` /
+  `Format=app bundle with Mach-O universal (x86_64 arm64)` /
+  `flags=0x10000(runtime)` ✓ Hardened Runtime /
+  Authority chain = Developer ID Application: takumi chiba (C3G77H8NM6) →
+  Developer ID Certification Authority → Apple Root CA /
+  `Timestamp=May 4, 2026 at 20:33:30` ✓ secure timestamp /
+  `Notarization Ticket=stapled` /
+  `TeamIdentifier=C3G77H8NM6` /
+  `Runtime Version=26.4.0`。
+
+→ M6-6 = **Done**。M6 release-cutover lane 全タスク Done。残作業は本 lane scope 外:
+
+- `git push` (CLAUDE.md §9 user 委任、本 lane override は commit までの解釈)
+- `git tag v0.1.0` (release tag、user)
+- portfolio submodule bump (`vendor/filmtone` → 本 commit、CLAUDE.md §7 手順、user)
+- 配布チャネル決定 (GitHub Releases / 直接配布 / web download など、外殻)
+- Sparkle auto-update は別 lane (本 lane 範囲外)
