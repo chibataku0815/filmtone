@@ -56,14 +56,17 @@ shipping Electron rail.
   preview-only, no CLI / export regression — Stone hash byte-identical to
   M5-A.2 archive record). Visual scrub UX smoke deferred to user. Archived
   immediately to make room for the user-requested M5-B interrupt slice.
-- M5-B Apple Liquid Glass Adoption Pass 1 landed and is archived.
-  All three floating control panels (`GradeControls`, `ExportProgressBar`,
-  `VideoScrubBar`) now use `.glassEffect(.regular, in: …)` matching the
-  existing `GlassControlGroup` posture; preview content layer remains
-  glass-free. No active slice is currently open — next active.md should
-  decide between Tier 1 #2 successor work, M5-B Pass 2
-  (`GlassEffectContainer` grouping / toolbar audit / tint exploration),
-  or another M5 surface, prioritizing 本質 product quality.
+- M5-B Apple Liquid Glass Adoption Pass 1 + Pass 2 both landed and
+  archived. All floating control panels use `.glassEffect(.regular, in: …)`,
+  the right-rail stack is wrapped in `GlassEffectContainer` for
+  coordinated refraction, and toolbar / window chrome runs on macOS 26
+  system-default Apple Liquid Glass without explicit opt-in. Preview
+  content layer remains glass-free per strategy. No active slice is
+  currently open — next active.md should decide between (a) user
+  visual smoke validating Pass 1 + Pass 2 on bright/dark preview
+  backdrops, then optional M5-B Pass 3 (tint / variant exploration),
+  or (b) advancing M5 product surface (Tier 1 #2 successor / Finder
+  integration / look selection UX). Prioritize 本質 product quality.
 - Baseline-C population is intentionally treated as quality shell work unless
   formal parity proof is requested.
 - M4 SPM consolidation remains deferred until native behavior is stable enough
@@ -149,6 +152,22 @@ shipping Electron rail.
   `archive/2026-05-04-m5-b-liquid-glass-pass-1.md`. Pass 2
   (`GlassEffectContainer` grouping, toolbar / chrome audit, tint
   exploration) tracked in archive Follow-up.
+- 2026-05-04: M5-B Apple Liquid Glass Adoption Pass 2 landed — single
+  commit e603067 wraps the right-rail VStack in `GlassEffectContainer`
+  so `GlassControlGroup` + `GradeControls` + `ExportProgressBar`
+  refract as one coordinated Apple Liquid Glass surface instead of
+  three independent lenses. Per-panel `.glassEffect(.regular, in: …)`
+  modifiers preserved verbatim. Bottom-center `VideoScrubBar` left
+  standalone (single-child container is a no-op). Toolbar / window
+  chrome audit: `FilmtoneDesktopApp` declares only `WindowGroup` +
+  `.windowResizability(.contentMinSize)` and no explicit
+  `windowToolbarStyle` / `toolbarBackground`, so macOS 26 default
+  Apple Liquid Glass chrome is in force without opt-in. Build clean
+  under Swift 6 strict concurrency. Visual coordination smoke
+  deferred to user. Archived as
+  `archive/2026-05-04-m5-b-liquid-glass-pass-2.md`. Pass 3
+  (tint / variant exploration) deferred until base-posture visual
+  smoke validates `.regular`.
 
 ## Interrupt / Decision Log
 
