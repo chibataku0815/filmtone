@@ -56,12 +56,14 @@ shipping Electron rail.
   preview-only, no CLI / export regression — Stone hash byte-identical to
   M5-A.2 archive record). Visual scrub UX smoke deferred to user. Archived
   immediately to make room for the user-requested M5-B interrupt slice.
-- M5-B (UI Material — Apple Liquid Glass) is the **current active slice**
-  within M5 (not a new milestone). Current implementation prior to M5-B is
-  a single `.glassEffect()` validation site in `GlassControlGroup.swift`;
-  the rest of the control panels (GradeControls / ExportProgressBar /
-  VideoScrubBar) still use legacy `.regularMaterial`. M5-B systematizes
-  the adoption.
+- M5-B Apple Liquid Glass Adoption Pass 1 landed and is archived.
+  All three floating control panels (`GradeControls`, `ExportProgressBar`,
+  `VideoScrubBar`) now use `.glassEffect(.regular, in: …)` matching the
+  existing `GlassControlGroup` posture; preview content layer remains
+  glass-free. No active slice is currently open — next active.md should
+  decide between Tier 1 #2 successor work, M5-B Pass 2
+  (`GlassEffectContainer` grouping / toolbar audit / tint exploration),
+  or another M5 surface, prioritizing 本質 product quality.
 - Baseline-C population is intentionally treated as quality shell work unless
   formal parity proof is requested.
 - M4 SPM consolidation remains deferred until native behavior is stable enough
@@ -135,6 +137,18 @@ shipping Electron rail.
   M5-A.2 archive record → preview-only changes did not perturb export
   paths. Visual scrub UX smoke deferred to user. Archived as
   `archive/2026-05-04-m5-a3-video-preview-scrub.md`.
+- 2026-05-04: M5-B Apple Liquid Glass Adoption Pass 1 landed — single
+  commit f7ee950 swaps `.background(.regularMaterial, in: …)` →
+  `.glassEffect(.regular, in: …)` on the three floating control panels
+  in `RootWindowView.swift` (`GradeControls`, `ExportProgressBar`,
+  `VideoScrubBar`), matching the existing `GlassControlGroup` posture.
+  Preview content layer remains glass-free per Apple HIG + color-judgment
+  integrity. Build clean under Swift 6 strict concurrency. CLI smoke
+  skipped (本質外: modifier swap has zero linkage to the Electron
+  CLI). Visual material smoke deferred to user. Archived as
+  `archive/2026-05-04-m5-b-liquid-glass-pass-1.md`. Pass 2
+  (`GlassEffectContainer` grouping, toolbar / chrome audit, tint
+  exploration) tracked in archive Follow-up.
 
 ## Interrupt / Decision Log
 
