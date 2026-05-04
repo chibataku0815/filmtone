@@ -47,6 +47,10 @@
 		FT0000000000000000000A26 /* FilmtoneSourceProfileCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B26 /* FilmtoneSourceProfileCatalog.swift */; };
 		FT0000000000000000000A27 /* FilmtoneSourceInputTransform.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B27 /* FilmtoneSourceInputTransform.swift */; };
 		FT0000000000000000000A28 /* SourceProfileControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B28 /* SourceProfileControls.swift */; };
+		FT0000000000000000000A29 /* FilmtoneSavedLookSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B29 /* FilmtoneSavedLookSchema.swift */; };
+		FT0000000000000000000A2A /* FilmtoneSavedLookStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B2A /* FilmtoneSavedLookStore.swift */; };
+		FT0000000000000000000A2B /* LibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B2B /* LibraryViewModel.swift */; };
+		FT0000000000000000000A2C /* LookLibraryControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B2C /* LookLibraryControls.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -90,6 +94,10 @@
 		FT0000000000000000000B26 /* FilmtoneSourceProfileCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneSourceProfileCatalog.swift; sourceTree = "<group>"; };
 		FT0000000000000000000B27 /* FilmtoneSourceInputTransform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneSourceInputTransform.swift; sourceTree = "<group>"; };
 		FT0000000000000000000B28 /* SourceProfileControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceProfileControls.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B29 /* FilmtoneSavedLookSchema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneSavedLookSchema.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B2A /* FilmtoneSavedLookStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneSavedLookStore.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B2B /* LibraryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryViewModel.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B2C /* LookLibraryControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LookLibraryControls.swift; sourceTree = "<group>"; };
 		FT0000000000000000000C01 /* FilmtoneDesktop.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FilmtoneDesktop.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -163,6 +171,7 @@
 				FT0000000000000000000B08 /* PreviewSurface.swift */,
 				FT0000000000000000000B0E /* GradeControls.swift */,
 				FT0000000000000000000B28 /* SourceProfileControls.swift */,
+				FT0000000000000000000B2C /* LookLibraryControls.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -204,6 +213,8 @@
 				FT0000000000000000000B25 /* FilmtoneSourceProfileMath.swift */,
 				FT0000000000000000000B26 /* FilmtoneSourceProfileCatalog.swift */,
 				FT0000000000000000000B27 /* FilmtoneSourceInputTransform.swift */,
+				FT0000000000000000000B29 /* FilmtoneSavedLookSchema.swift */,
+				FT0000000000000000000B2A /* FilmtoneSavedLookStore.swift */,
 			);
 			path = Color;
 			sourceTree = "<group>";
@@ -212,6 +223,7 @@
 			isa = PBXGroup;
 			children = (
 				FT0000000000000000000B0D /* EditorState.swift */,
+				FT0000000000000000000B2B /* LibraryViewModel.swift */,
 			);
 			path = State;
 			sourceTree = "<group>";
@@ -355,6 +367,10 @@
 				FT0000000000000000000A26 /* FilmtoneSourceProfileCatalog.swift in Sources */,
 				FT0000000000000000000A27 /* FilmtoneSourceInputTransform.swift in Sources */,
 				FT0000000000000000000A28 /* SourceProfileControls.swift in Sources */,
+				FT0000000000000000000A29 /* FilmtoneSavedLookSchema.swift in Sources */,
+				FT0000000000000000000A2A /* FilmtoneSavedLookStore.swift in Sources */,
+				FT0000000000000000000A2B /* LibraryViewModel.swift in Sources */,
+				FT0000000000000000000A2C /* LookLibraryControls.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

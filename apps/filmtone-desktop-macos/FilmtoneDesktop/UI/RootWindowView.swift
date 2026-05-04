@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 
 struct RootWindowView: View {
     @State private var state = EditorState()
+    @State private var library = LibraryViewModel()
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -31,6 +32,18 @@ struct RootWindowView: View {
                         // before the Look layer. Same Pass 4 dark-tinted
                         // .clear glass posture for visual continuity.
                         SourceProfileControls(state: state)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .glassEffect(
+                                .clear.tint(.black.opacity(0.30)),
+                                in: RoundedRectangle(cornerRadius: 12)
+                            )
+                        // M5-C.2a: snapshot-driven Look library Picker +
+                        // "Save Current Look…" button. Sits between the
+                        // source-side normalization and the strength slider
+                        // so the user picks input → Look → strength in
+                        // top-down reading order.
+                        LookLibraryControls(state: state, library: library)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 8)
                             .glassEffect(
@@ -87,6 +100,13 @@ struct RootWindowView: View {
             }
         }
         .frame(minWidth: 880, minHeight: 560)
+        // M5-C.2a: load the on-disk library so the Picker lists saved
+        // Looks at first paint. Built-in Stone / Urban appear immediately
+        // via the empty-snapshot prefix path; user-saved entries fade in
+        // once the actor returns.
+        .task {
+            await library.bootstrap()
+        }
         // The real reason the toolbar previously read as solid white was an
         // opaque AppKit toolbar background painted on top of the Liquid Glass
         // chrome. Hiding it lets the preview Image (which already extends via

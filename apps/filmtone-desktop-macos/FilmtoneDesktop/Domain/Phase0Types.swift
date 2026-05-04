@@ -6,10 +6,16 @@ import Foundation
 // and FilmtoneMediaTypes.swift. Phase 2 (SPM packages/film-lab-swift-core)
 // absorbs both copies; this file is deleted at that point.
 
-struct FilmtoneQuickState {
+struct FilmtoneQuickState: Codable, Equatable, Sendable {
     var filmCharacter: Double
     var era: Double
     var dynamics: Double
+
+    static let zero = FilmtoneQuickState(
+        filmCharacter: 0,
+        era: 0,
+        dynamics: 0
+    )
 }
 
 struct FilmtonePhase0Params {

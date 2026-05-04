@@ -114,4 +114,52 @@ enum FilmtoneCreativePackCatalog {
     static func find(slug: String) -> BuiltInLook? {
         all.first { $0.slug == slug }
     }
+
+    static func find(canonicalUUID id: UUID) -> BuiltInLook? {
+        all.first { $0.canonicalUUID == id }
+    }
+
+    /// Stable as-of date stamped onto materialized built-in
+    /// `SavedLookEntry` values so re-launching doesn't reshuffle the
+    /// chip strip ordering. Mirrors the iOS Pack 01 freeze date.
+    private static let pack01FreezeDate: Date = {
+        var components = DateComponents()
+        components.year = 2026
+        components.month = 4
+        components.day = 30
+        components.timeZone = TimeZone(identifier: "Asia/Tokyo")
+        return Calendar(identifier: .gregorian).date(from: components)
+            ?? Date(timeIntervalSince1970: 0)
+    }()
+
+    /// Materialize a built-in catalog entry as a `SavedLookEntry` so the
+    /// library snapshot can return a uniform list to the UI. Mirrors iOS
+    /// `FilmtoneBuiltInCatalog.materializeAsSavedLookEntry`. Built-ins
+    /// are never persisted to disk — they live in code; this adapter
+    /// exists only so the snapshot list shape is uniform.
+    static func materializeAsSavedLookEntry(_ builtIn: BuiltInLook) -> SavedLookEntry {
+        return SavedLookEntry(
+            schemaVersion: FilmtoneLibraryConstants.entrySchemaVersion,
+            id: builtIn.canonicalUUID,
+            name: builtIn.englishName,
+            createdAt: pack01FreezeDate,
+            updatedAt: pack01FreezeDate,
+            presetName: FilmtonePresetCatalog.defaultName,
+            presetVersion: FilmtonePresetCatalog.presetVersion,
+            strength: 1.0,
+            quickState: .zero,
+            paramOverrides: builtIn.paramOverridesPatch,
+            creativeLut: .bundled(
+                slug: builtIn.slug,
+                filename: builtIn.bundledFilename,
+                sha256: builtIn.pinnedSha256,
+                intensity: builtIn.intensity
+            ),
+            favorite: false,
+            thumbnailRef: nil,
+            bundled: true,
+            immutable: true,
+            bundledSlug: builtIn.slug
+        )
+    }
 }

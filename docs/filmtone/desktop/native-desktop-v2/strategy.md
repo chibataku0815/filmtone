@@ -262,6 +262,25 @@ shipping Electron rail.
   CIFilter inserted). Visual smoke on a real log source deferred to user
   (no Apple Log fixture in repo). Archive `active.md` once user opens the
   next slice.
+- 2026-05-04: M5-C.2a Saved Look Library Foundation And Save Current Look
+  landed — looks-only port of iOS `FilmtoneLibrarySchema` /
+  `LibraryStoreActor` to Native Desktop (`FilmtoneSavedLookSchema.swift`
+  + `FilmtoneSavedLookStore.swift` actor, atomic per-entry writes under
+  `~/Library/Application Support/Filmtone/library/looks/`, built-in
+  Stone / Urban materialized at read time via new
+  `FilmtoneCreativePackCatalog.materializeAsSavedLookEntry` adapter).
+  New `LibraryViewModel` (@MainActor @Observable) and
+  `LookLibraryControls` UI replace the hardcoded `lookOptions` Picker —
+  snapshot-driven Picker with Built-in / Saved sections plus a "Save
+  Current Look…" NSAlert prompt. EditorState gains `selectedSavedLookId`
+  + `applySavedLook` + `currentLookSavePayload`. `FilmtoneQuickState` /
+  `FilmtonePhase0ParamsPatch` widened to Codable + Equatable + Sendable
+  on the declaring struct (cross-file extension blocked Swift's Sendable
+  same-file requirement). Build clean (Swift 6, xcodebuild Debug). LUT
+  library import / quota / orphan GC remain deferred to M5-C.2c (P1);
+  favorite / rename / delete UX remains deferred to M5-C.2b. User to
+  verify visually: save a Look at strength 0.6, switch away, switch back
+  — preview should return to that saved state and survive relaunch.
 - 2026-05-04: Release-cutover Phase 4 pre-flight readiness audit pass —
   ASC env 不要範囲 (archive Step 1 + exportArchive Step 2) を本 chat で実行。
   最近 M5 lane で着地した Pass 3 / Pass 4 / scrub bar / F-S6.1-2 toolbar +

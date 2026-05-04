@@ -23,7 +23,7 @@ Completion Log に短く反映する (本 lane の archive 経由で参照)。
 | M6-3 | scripts/release-macos.sh (build/archive/notarize/staple) | **Done** (`8bd41b4`) |
 | M6-4 | DMG packaging (hdiutil 直、create-dmg 不要) | **Done** (`8bd41b4`) |
 | M6-5 | portfolio submodule bump 手順 (本 README 末尾参照) | **Done** |
-| M6-6 | end-to-end dry-run (v0.1.0-rc1) | **Partial** — archive + exportArchive 実機 verify 済 (Phase 4 で M5 最新 commit 群でも再確認 — `flags=0x10000(runtime)` + Authority chain + secure timestamp + 生成 Info.plist 全 key 健全)、notarize は user env 必要 |
+| M6-6 | end-to-end release run (v0.1.0) | **Done** (Phase 5 — notarized + stapled `.app` + DMG、Gatekeeper accepted、distribution-ready) |
 | polish | App Category 設定 (notarize blocker でない) | **Done** (Phase 2) |
 
 ## Out of scope (本 lane では扱わない)

@@ -14,7 +14,7 @@ grade / export / sidecar / parity は **Phase 1b 以降**、video slice は
 - `App/FilmtoneDesktopApp.swift` — `@main` SwiftUI App, `WindowGroup`
 - `App/AppCommands.swift` — Help menu link 1 個
 - `UI/RootWindowView.swift` — root window, `.toolbar` (macOS 26 SDK で自動
-  Liquid Glass), Open ボタン (`⌘O`) → `NSOpenPanel` → `@State imageURL`
+  Apple Liquid Glass), Open ボタン (`⌘O`) → `NSOpenPanel` → `@State imageURL`
 - `UI/PreviewSurface.swift` — `NSImageView` を `NSViewRepresentable` で
   ラップした静止画 preview。`Color.black` 背景。grade なし生表示
 - `UI/GlassControlGroup.swift` — `glassEffect(.regular, in: Capsule())` の
@@ -76,11 +76,18 @@ UUID は `FT0000...` prefix で reproducible に並べてあり、merge conflict
 起きにくい構造になっている。新規ファイル追加時は **既存最大値の次** を割り当てる
 (handoff doc §Xcode project の構造 参照)。
 
-## Liquid Glass
+## Apple Liquid Glass
 
-macOS 26 SDK で build すると標準 SwiftUI `.toolbar` が自動的に Liquid Glass を
-採用する。明示的に `glassEffect()` を呼ぶのは `GlassControlGroup.swift` の
-1 箇所のみで、これは API surface が確実にコンパイル通るかの検証目的。
+戦略上、本アプリの UI material 主軸は **Apple Liquid Glass** とする
+(`docs/filmtone/desktop/native-desktop-v2/strategy.md` Goal / M5 Done
+Conditions / M5-B slice 参照)。
 
-content layer (`PreviewSurface`) には glass を当てない (Apple HIG + 全体計画書
-§UI principles)。preview 背景は `Color.black` で color judgment を阻害しない。
+macOS 26 SDK で build すると標準 SwiftUI `.toolbar` は自動的に Apple Liquid
+Glass を採用する。現状、明示的に `glassEffect()` を呼ぶのは
+`GlassControlGroup.swift` の 1 箇所のみで、これは API surface が確実に
+コンパイル通るかの検証目的。**M5-B で sidebar / inspector / Look picker /
+control panels への系統適用を行う**(計画は active.md 化時に確定)。
+
+content layer (`PreviewSurface`) には Apple Liquid Glass を当てない
+(Apple HIG + 全体計画書 §UI principles)。preview 背景は `Color.black` で
+color judgment を阻害しない — この除外方針は M5-B でも維持する。

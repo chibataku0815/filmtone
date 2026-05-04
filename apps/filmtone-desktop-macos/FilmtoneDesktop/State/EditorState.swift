@@ -32,6 +32,15 @@ final class EditorState {
     /// can mirror Auto's resolved choice and the source-cap gate can decide
     /// whether to disable Export.
     var probedSourceColorClass: SourceColorClassDTO?
+    /// M5-C.2a: which library entry is shown selected in the Look picker.
+    /// nil = "None" (no Look). Built-in Stone / Urban appear here via
+    /// their canonical catalog UUIDs (`FilmtoneCreativePackCatalog.find
+    /// (canonicalUUID:)`). User-saved entries use the UUID minted by
+    /// `FilmtoneSavedLookStore.saveLook`. Live render state stays driven
+    /// by `lookSlug` / `presetName` / `presetStrength`; this property is
+    /// UI-tracking sugar so the Picker remains consistent across
+    /// re-selection of the same Look.
+    var selectedSavedLookId: UUID?
     var isExporting: Bool = false
     var exportProgress: Double = 0
     var exportProgressMessage: String?
@@ -117,5 +126,68 @@ final class EditorState {
 
     func cancelExport() {
         currentExportTask?.cancel()
+    }
+
+    // MARK: - M5-C.2a Saved Look bridge
+
+    /// Snapshot of the values `LibraryViewModel.saveCurrentLook` needs
+    /// to persist a `SavedLookEntry` from the current EditorState.
+    /// `paramOverrides` is `.empty` until M5-C.3 introduces per-parameter
+    /// editing UX. `creativeLut` is `.bundled` when a built-in Look is
+    /// active (preserves the slug / filename / pinned sha through the
+    /// save round-trip), nil otherwise.
+    struct SaveLookPayload {
+        let presetName: String
+        let presetVersion: String
+        let strength: Double
+        let quickState: FilmtoneQuickState
+        let paramOverrides: FilmtonePhase0ParamsPatch
+        let creativeLut: CreativeLutBinding?
+    }
+
+    func currentLookSavePayload() -> SaveLookPayload {
+        let creativeLut: CreativeLutBinding?
+        if let slug = lookSlug,
+           let look = FilmtoneCreativePackCatalog.find(slug: slug) {
+            creativeLut = .bundled(
+                slug: look.slug,
+                filename: look.bundledFilename,
+                sha256: look.pinnedSha256,
+                intensity: look.intensity
+            )
+        } else {
+            creativeLut = nil
+        }
+        return SaveLookPayload(
+            presetName: presetName,
+            presetVersion: FilmtonePresetCatalog.presetVersion,
+            strength: presetStrength,
+            quickState: .zero,
+            paramOverrides: .empty,
+            creativeLut: creativeLut
+        )
+    }
+
+    /// Apply a SavedLookEntry to live render state. Built-in entries
+    /// land via `creativeLut.bundledSlug`; user-saved entries with a
+    /// nil binding clear the lookSlug. paramOverrides on the entry are
+    /// not yet reapplied — M5-C.3 wires that path once the Adjustments
+    /// editing UX lands.
+    func applySavedLook(_ entry: SavedLookEntry) {
+        selectedSavedLookId = entry.id
+        presetName = entry.presetName
+        presetStrength = entry.strength
+        if let bundledSlug = entry.creativeLut?.bundledSlug {
+            lookSlug = bundledSlug
+        } else {
+            lookSlug = nil
+        }
+    }
+
+    /// Reset the Look picker to "None". Mirrors what tapping the None
+    /// row does — clears slug + selection without touching strength.
+    func clearSavedLookSelection() {
+        selectedSavedLookId = nil
+        lookSlug = nil
     }
 }

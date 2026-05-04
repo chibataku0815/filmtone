@@ -16,7 +16,11 @@
 
 ## 作業宣言（Lock Declaration）
 
-タスク開始時に `.claude/tasks/ACTIVE-PARALLEL-TASK.md` に記録（必要に応じて新規作成）:
+タスク開始時に `.claude/tasks/ACTIVE-PARALLEL-TASK.md` に記録（必要に応じて新規作成）。
+ただし Native Desktop v2 では `docs/filmtone/desktop/native-desktop-v2/active.md`
+が現在 subtask の正本なので、そこに edit targets / read-only references /
+verification を書く。Native v2 では `.claude/tasks/ACTIVE-PARALLEL-TASK.md`
+を現在状態の正本にしない。
 
 ```markdown
 ## [タスク名]
@@ -100,6 +104,19 @@
 2. 現状、完了済み、未完了、ブロッカーを明記
 3. `ACTIVE-PARALLEL-TASK.md` のステータスを「引き継ぎ待ち」に更新
 4. 次のエージェントは引き継ぎ doc を読んでから開始
+
+Native Desktop v2 では長大な handoff を新規作成しない。完了した
+`active.md` を `docs/filmtone/desktop/native-desktop-v2/archive/` に移動し、
+`strategy.md` へ 1〜3 行だけ追記する。旧 handoff / dated plan docs は
+参照専用で、現在状態の正本にしない。
+
+Native Desktop v2 の中規模差し込みは handoff ではなく `paused/` で扱う。
+現 `active.md` 末尾に `Paused` を追記して完了済み / 未完を短く書き、
+`paused/YYYY-MM-DD-{slug}.md` へ退避する。その後、差し込み専用の
+`active.md` を 1 つだけ作る。差し込み完了後は archive し、必要なら
+`strategy.md` に短く追記してから退避中の active を `active.md` に戻す。
+milestone を変える差し込みは先に `strategy.md` の
+`Interrupt / Decision Log` へ記録する。
 
 ### handoff §8.5（並列 stream 用 4 セクション機構化）
 
