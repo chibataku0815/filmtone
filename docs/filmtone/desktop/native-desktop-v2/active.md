@@ -1,192 +1,221 @@
-# M5-C.3b Advanced Per-Parameter Override Editing UX
+# M4-A Shared Swift Boundary Cut Line
 
-Date opened: 2026-05-04 JST (proposal — awaiting user approval)
+Date opened: 2026-05-04 JST
 
 ## Milestone
 
-M5 Native Editing UI. M5-C.3b closes the M5-C.3 series opened by the
-parity gap "Adjustment parity: the native app needs quick and advanced
-parameter editing, not just Look strength" (see
-`archive/2026-05-04-m5-c-ios-feature-parity-audit.md`). M5-C.3a lit up
-the `paramOverrides` storage / apply / Codable / sidecar pipeline; this
-slice surfaces the editor UI on top of it.
+M4 Shared Contract Consolidation, opened as a milestone-changing interrupt from
+M5-C.4 after the user flagged that Native Desktop v2 is drifting into
+Desktop-only copies of iOS logic.
 
 ## Goal
 
-Land a **per-parameter override editor** so the user can dial any of
-the 35 `FilmtonePhase0Params` keys above the resolved (preset + Look +
-Quick) baseline, with the same correctness / round-trip guarantees the
-M5-C.3a Quick path already provides:
+Define the boundary between:
 
-- live preview reflects each edit immediately
-- per-key overrides persist into the saved Look (already wired via
-  `EditorState.paramOverrides` ⇄ `SavedLookEntry.paramOverrides`)
-- export sidecar's `gradeParams` block reflects the override-applied
-  resolved params (already wired via `FilmtoneSidecarWriter`)
+- **Reusable iOS-canonical pure Swift logic** that should be consumed by both
+  iOS and macOS from one shared owner.
+- **Mac-native UI / platform shell** that should remain Desktop-specific even
+  when it mirrors iOS workflows.
 
-## Why this slice (本質)
+This slice intentionally does not move files yet. It creates the cut line and
+extraction order so the next implementation slice can consolidate without
+destabilizing the iOS lane or mixing architecture work into M5-C.4 UI code.
 
-- M5-C.3a closed the storage / apply / serialization gap but the user
-  has no way to *write* paramOverrides — the only path that produces
-  non-empty overrides today is a future iOS-saved Look opened on
-  Desktop. Without UI, the field is dead weight.
-- iOS canonical has a per-parameter editor that lets users drift any
-  of the 35 keys above the preset baseline. macOS lacking this means
-  any creative session that needs (e.g.) "Stone but with halation
-  spread −15%" forces the user to bake that into a custom preset
-  generator output, breaking the workflow loop.
-- This slice is purely additive UI on top of M5-C.3a's lit storage —
-  no math changes, no protocol changes, no new resolve sites.
+## Why this slice
+
+- M5-C.1 / C.2 / C.3 / C.4 have correctly treated iOS as canonical, but much of
+  the result is hand-ported code, not shared code.
+- More M5 work will add more copies unless the shared boundary is explicit now.
+- M4 was deferred to avoid premature module churn, but Native Desktop behavior
+  is now stable enough that the highest-risk shared contracts can be identified
+  before they sprawl further.
 
 ## Scope
 
 ### In
 
-1. **`UI/ParamRow.swift`** — single-row component
-   - label + signed value readout + Slider + per-row Reset button
-   - Reset removes the key from `state.paramOverrides.values`, falling
-     back to the resolved (preset + Look + Quick) baseline
-   - bind via `state.paramOverrides.values[key]` (computed slider value
-     = `overrides[key] ?? resolvedBaseline.value(for: key)`)
-   - Slider range derived from per-key bounds. Generator-bounded keys
-     (`rgbShift`, `grainIntensity`) use the generated max constants;
-     unbounded keys use sensible UX caps (e.g. exposure ±2 stops,
-     saturation 0…2, temperature −0.5…+0.5 — match iOS conventions
-     by reading `apps/capacitor-film-lab-ios/ios/App/App/...` if a
-     canonical bounds map exists, otherwise inline the same caps the
-     iOS UI uses today)
+- Build a compact matrix of current iOS/macOS logic ownership:
+  - share now
+  - share after one cleanup
+  - keep platform-specific
+  - generated-only / do-not-hand-edit
+- Identify the minimum first shared Swift module or package boundary.
+- Define migration order and safety gates for the first extraction.
+- Record no-go areas where Mac must translate iOS behavior into native idioms
+  instead of sharing implementation.
 
-2. **`UI/AdvancedParamControls.swift`** — DisclosureGroup container
-   - DisclosureGroups by category, collapsed by default:
-     - **Tone**: exposure, contrast, saturation, temperature, tint,
-       fade, shadowTone, highlightTone, shadowHue, highlightHue,
-       printContrast
-     - **Color Cast**: cyan, magenta, yellow
-     - **Optics**: rgbShift, lensSoftness, diffusion
-     - **Bloom**: bloomThreshold, bloomStrength, bloomRadius,
-       bloomSoftKnee
-     - **Halation**: halationIntensity, halationSpread, halationHue,
-       halationThreshold, halationRadius, halationSoftKnee
-     - **Grain**: grainIntensity, grainSize, grainRadialMix
-     - **Compression**: compressionAmount, compressionRange
-     - **Motion**: shutterAngle, trailIntensity
-     - **Vignette**: vignette
-   - Footer: "Reset All Overrides" button (clears
-     `state.paramOverrides.values` entirely; disabled when empty)
-   - Same Pass 4 dark-tint `.clear` Liquid Glass posture as
-     `QuickAdjustControls` / `GradeControls`
+### Out
 
-3. **`State/EditorState.swift`** — minor extension
-   - `paramOverridesIsActive: Bool` (mirrors `quickStateIsActive`)
-   - `setParamOverride(key:value:)` — writes through to
-     `paramOverrides.values[key] = value`
-   - `clearParamOverride(key:)` — removes the key from
-     `paramOverrides.values`
-   - `resetAllParamOverrides()` — sets `paramOverrides = .empty`
-   - `resolvedBaselineForOverrides() -> FilmtonePhase0Params` — exposes
-     the (preset + Look + Quick) baseline (= `resolved` with
-     `paramOverrides = .empty`) so `ParamRow` knows what value to
-     display when a key has no override yet
+- Moving code into an SPM target.
+- Editing iOS behavior.
+- Editing Desktop product behavior.
+- Refactoring M5-C.4 Export Inspector code.
+- Changing generated Swift manually.
 
-4. **`UI/RootWindowView.swift`** — insert `AdvancedParamControls` below
-   `QuickAdjustControls` so right rail reads top-down: Source Profile
-   → Look → Quick → **Advanced** → Strength → Grade
+## Current Findings
 
-5. **`apps/filmtone-desktop-macos/Verify/main.swift`** — extend harness
-   - per-key override write/read round-trip via `EditorState` API
-   - "set then clear" empties the dict (no orphan zero entries)
-   - resolvedBaseline matches `resolved(..., paramOverrides: .empty)`
-     for any non-empty override state
+### Share Now
 
-### Out (deferred to M5-C.3c if desired)
+These are pure Swift contracts with little or no platform dependency:
 
-- "Show only modified" filter toggle (UX polish)
-- Per-group Reset (only top-level "Reset All" lands here)
-- Drag-numeric scrub (slider only)
-- Numeric text-field input (slider only)
-- Hidden defaults editor (`FilmtonePhase0HiddenDefaults` —
-  intentionally hidden per name)
-- Curve-editor surfaces (LUT-like nodes, beyond per-key sliders)
+- `FilmtonePhase0Generated.swift` — already byte-identical between iOS and
+  Desktop. It should stay generated-only and be consumed from one generated
+  artifact.
+- `FilmtonePhase0ParamsPatch` / param key accessors / patch application.
+- `FilmtoneQuickState` helpers and quick-weight application.
+- Preset interpolation and resolve order:
+  `interpolate preset -> paramOverrides -> quickState`.
+- Source-profile math primitives (`FilmtoneSourceProfileMath`) after the
+  Desktop Apple Log cube-builder placement is normalized.
+- Cube parsing and RGB/RGBA packing helpers, with platform-specific packing kept
+  as an adapter if Core Image requirements diverge.
+- Creative Pack 01 catalog identities: Stone / Urban slugs, UUIDs, filenames,
+  pinned hashes, intensity, pack id, and param override patches.
+- Saved Look schema types (`SavedLookEntry`, `CreativeLutBinding`,
+  `LibrarySnapshot`) once file-store behavior is separated from schema.
 
-## Approach
+### Share After One Cleanup
 
-iOS canonical has a per-key sliders surface with categorization. The
-storage shape (`FilmtonePhase0ParamsPatch.values: [String: Double]`)
-matches iOS verbatim, so this slice is mostly UI mechanics — no math
-to port. Resolve order is already locked
-(`interpolate → applyingPatch(paramOverrides) → applyQuickState`).
+These are close, but need a seam before sharing:
 
-Per-key bound caps: where the generator emits a max constant
-(`rgbShiftMax`, `grainIntensityMax`), use it. Otherwise pick
-sensible UX caps that mirror what iOS exposes today — verify by
-reading `apps/capacitor-film-lab-ios/ios/App/App/Filmtone*.swift`
-during implementation. Do not invent caps.
+- Source-profile catalog and selection:
+  iOS has `.userImport`; Desktop currently omits it. Shared core should own
+  built-in catalog identities and Auto resolution, while each app owns user LUT
+  availability.
+- Export result / progress DTOs:
+  iOS has `Phase0ExportProgressDTO` / `Phase0ExportResultDTO`; Desktop has
+  `ExportResultSnapshot`. Shared core should own neutral export metrics, while
+  iOS Save-to-Photos and Mac Reveal/Share stay platform-specific.
+- Human-readable file size and elapsed labels:
+  current Desktop `FilmtoneFormatters` duplicates iOS string behavior only
+  partially. Shared core can own raw formatter policy; UI localization remains
+  app-owned.
+- Sidecar payload construction:
+  iOS has the canonical large builder; Desktop has a smaller writer. Shared
+  core should own schema structs / payload construction, with each app supplying
+  platform identity, output URL, and optional platform telemetry.
 
-ParamRow value resolution:
+### Keep Platform-Specific
 
-```swift
-let displayValue = state.paramOverrides.values[key]
-    ?? state.resolvedBaselineForOverrides().value(for: key)
-```
+- SwiftUI/AppKit view structure: `RootWindowView`, `ExportInspectorPanel`,
+  Liquid Glass surfaces, toolbar, right rail, `NSSavePanel`.
+- Finder actions: `NSWorkspace.shared.activateFileViewerSelecting`.
+- Mac share popover: `NSSharingServicePicker`.
+- iOS Photos save, iOS share sheet, Live Activity, notifications, WebView /
+  Capacitor bridge, app cache protection.
+- AVFoundation session orchestration where iOS background execution or Photos
+  permissions affect behavior.
 
-Slider edit calls `state.setParamOverride(key:value:)`. Per-row Reset
-calls `state.clearParamOverride(key:)`. Both trigger `@Observable`
-re-render → preview re-renders via `PreviewRenderKey`'s existing
-`paramOverrides` Hashable participation.
+### Generated / Do Not Hand Edit
 
-## Done conditions
+- iOS generated Swift such as
+  `apps/capacitor-film-lab-ios/ios/App/App/FilmtonePhase0Generated.swift`.
+- Desktop generated mirror:
+  `apps/filmtone-desktop-macos/FilmtoneDesktop/SharedGenerated/FilmtonePhase0Generated.swift`.
 
-- `xcodebuild -scheme FilmtoneDesktop -configuration Debug
-  -destination 'platform=macOS' build` passes clean (Swift 6 strict
-  concurrency)
-- All 35 `FilmtonePhase0Params` keys appear in some category — no
-  silent drops. Verify count == `FilmtonePhase0Params.keyPaths.count`
-  at compile time (constant array enumeration).
-- Per-row override + per-row reset works end-to-end (write → preview
-  reacts → reset → preview returns to baseline)
-- "Reset All Overrides" empties `paramOverrides.values` and the
-  preview returns to (preset + Look + Quick) baseline
-- Save Look with overrides → switch Picker away → return → overrides
-  restore (M5-C.3a round-trip path; just verify it works through the
-  new UI)
-- `Verify/run.sh` extended with per-key override harness tests, all
-  PASS
+## Proposed First Extraction
 
-## Edit Targets
+Create a shared pure Swift contract target at
+`packages/film-lab-swift-core`, owned by this repo and consumed locally by both
+apps before any public release cutover.
 
-- `apps/filmtone-desktop-macos/FilmtoneDesktop/UI/ParamRow.swift` (new)
-- `apps/filmtone-desktop-macos/FilmtoneDesktop/UI/AdvancedParamControls.swift` (new)
-- `apps/filmtone-desktop-macos/FilmtoneDesktop/State/EditorState.swift` (extend)
-- `apps/filmtone-desktop-macos/FilmtoneDesktop/UI/RootWindowView.swift` (extend)
-- `apps/filmtone-desktop-macos/FilmtoneDesktop.xcodeproj/project.pbxproj` (register new files)
-- `apps/filmtone-desktop-macos/Verify/main.swift` (extend harness)
+Repo check:
+
+- There is no existing `Package.swift` in this worktree.
+- Current `packages/` entries are Bun/TypeScript workspaces only.
+- Neither the iOS nor macOS Xcode project currently has
+  `XCLocalSwiftPackageReference` / `XCRemoteSwiftPackageReference` package
+  integration.
+- Therefore the first implementation slice should introduce the local Swift
+  package and wire both Xcode app targets to that local package explicitly,
+  rather than hiding shared Swift under an existing JS package.
+
+First payload should be intentionally narrow:
+
+1. Generated Phase 0 params artifact.
+2. `FilmtonePhase0ParamsPatch`.
+3. `FilmtoneQuickState` helpers.
+4. Preset resolve / interpolation / quick application.
+5. Creative Pack 01 identity catalog without Bundle resource loading.
+
+Reason: these are high-value, already exercised by Desktop Verify, and mostly
+independent of AppKit/UIKit/AVFoundation. Source-profile and sidecar sharing
+should follow once the first shared target compiles in both apps.
+
+## First Implementation Route
+
+Open a follow-up active slice, **M4-B Shared Phase0 Core Package**, with this
+implementation order:
+
+1. Add `packages/film-lab-swift-core/Package.swift`.
+2. Add `Sources/FilmLabSwiftCore/` with only Foundation-level files from the
+   Proposed First Extraction list.
+3. Add focused package tests for preset interpolation, Quick application,
+   param patch application, and Creative Pack identity constants.
+4. Wire Desktop `FilmtoneDesktop.xcodeproj` to the local package product.
+5. Wire iOS `App.xcodeproj` to the same local package product.
+6. Remove duplicated app-local copies only after both targets compile against
+   the shared product.
+
+Do not start with source-profile, sidecar, export session, AVFoundation, or UI.
+Those are second-wave extractions after the first package proves the integration
+path.
+
+## Migration Safety Gates
+
+- iOS build / verify remains green after consuming the shared target.
+- macOS build / Verify harness remains green after consuming the shared target.
+- Generated Swift remains generated-only; no manual edits to generated outputs.
+- No sidecar schema bump.
+- No UI changes in the first extraction slice.
+- Existing Desktop M5-C.4 paused work resumes with no product behavior changes.
+
+## Checklist
+
+- [x] Pause current M5-C.4 active task without reverting its code.
+- [x] Record strategy decision for pulling M4-A forward.
+- [x] Create this M4-A active task with a bounded non-code scope.
+- [x] Identify first-pass share / platform-specific boundaries.
+- [x] Confirm exact build integration route for the first shared target.
+- [x] Decide whether the first extraction uses a repo-local SPM package under
+  `packages/film-lab-swift-core` or an app-local Swift package before moving to
+  `packages/`.
+- [ ] Close M4-A with the selected first implementation slice and restore the
+  paused M5-C.4 active task.
 
 ## Read-Only References
 
-- `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtonePhase0ParamsPatch.swift` (storage shape)
-- `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtonePresetCatalog.swift` (resolve order)
-- `apps/filmtone-desktop-macos/FilmtoneDesktop/SharedGenerated/FilmtonePhase0Generated.swift` (per-key max constants)
-- `apps/capacitor-film-lab-ios/ios/App/App/...` (iOS canonical UI bound caps reference)
-- M5-C.3a archive: `archive/2026-05-04-m5-c3a-quick-adjust-parity-and-saved-look-round-trip.md`
+- iOS canonical:
+  `apps/capacitor-film-lab-ios/ios/App/App/FilmtonePhase0Generated.swift`
+- iOS canonical:
+  `apps/capacitor-film-lab-ios/ios/App/App/FilmtonePhase0Math.swift`
+- iOS canonical:
+  `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneSourceProfileMath.swift`
+- iOS canonical:
+  `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneSourceProfileCatalog.swift`
+- iOS canonical:
+  `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneExportSidecarBuilder.swift`
+- Desktop current:
+  `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/`
+- Desktop current:
+  `apps/filmtone-desktop-macos/FilmtoneDesktop/Domain/`
+- Desktop current:
+  `apps/filmtone-desktop-macos/FilmtoneDesktop/Export/`
+- Paused M5-C.4:
+  `paused/2026-05-04-m5-c4-export-inspector.md`
 
-## Out Of Scope
+## Verification
 
-- Math changes (none — storage / apply path is already correct)
-- Protocol changes (FilmtoneSidecarRequest already carries paramOverrides)
-- New resolve sites (one resolve site, all consumers benefit — preserved)
-- iOS canonical bound-cap re-derivation if iOS doesn't have an
-  authoritative map (use sensible UX caps; do not block on iOS
-  authoritative bounds — log as Unexpected for a future audit)
+- 2026-05-04 JST: Docs / strategy-only change.
+- `git diff --check` passed.
+- No product build required until an implementation extraction begins.
 
-## Estimated size
+## Done Conditions
 
-Multi-hour slice (~M5-C.3a comparable: 6 files, ~600 LOC including
-~35 ParamRow registrations and harness extensions). Single commit at
-landing. No interim partial-state commits because the editor must be
-end-to-end functional before it's user-facing.
-
-## Approval gate
-
-Per `strategy.md` Operating Rules — implementation paused until user
-approves this active.md or amends scope (e.g. defer to M5-C.4 / M5-C.2b
-first).
+- The first shared-code extraction target and route are explicit.
+- The platform-specific no-go list is explicit enough to prevent accidental
+  UIKit/AppKit coupling in shared core.
+- A follow-up implementation active can be opened without rereading the whole
+  Native Desktop history.
+- M5-C.4 can be restored from `paused/` after M4-A without losing its current
+  verification state.

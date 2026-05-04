@@ -16,8 +16,8 @@ content layer is intentionally excluded to keep color judgment uncompromised.
 
 Native Desktop v2 replaces the Electron Desktop product
 (`apps/desktop-film-lab-batch`) as a **single-product cutover**; no parallel
-distribution. Electron 1.0.3 is the final build of the legacy lane (frozen
-download for pre-macOS-26 users). Cutover details: see
+distribution. Electron 1.0.4 is the final public build of the legacy lane
+(frozen download for pre-macOS-26 users). Cutover details: see
 `../release-cutover/cutover-architecture.md`.
 
 ## Measurable Done Conditions
@@ -30,9 +30,9 @@ download for pre-macOS-26 users). Cutover details: see
 - Apple Liquid Glass is adopted as the primary UI material on toolbar / sidebar
   / inspector / picker / control panels; the preview content layer remains
   glass-free per Apple HIG.
-- Electron Desktop is sunsetting at 1.0.3 (frozen). Native Desktop v2 ships
+- Electron Desktop is sunsetting at 1.0.4 (frozen). Native Desktop v2 ships
   under the same Bundle ID `com.chibatakumi.film-lab-desktop` so existing
-  installs upgrade in place when 2.0.0 lands.
+  installs upgrade in place when 1.4 lands.
 - The app can be built, smoke-tested, signed/notarized, and distributed as the
   primary Desktop release candidate.
 
@@ -43,9 +43,9 @@ download for pre-macOS-26 users). Cutover details: see
 | M1 | Native Contract And Skeleton | none | Complete | Native app builds, launches a native window, uses SwiftUI/AppKit controls, and does not change the Electron release rail. |
 | M2 | Still And Video Vertical Slice | M1 | Complete | Still and video open, preview, export, and sidecar paths work through the native app. |
 | M3 | Native Color And Optics Parity | M2 | In progress | Built-in Looks use the iOS-canonical color and optics stages; performance is acceptable at 4K; remaining parity gaps are explicit. |
-| M4 | Shared Contract Consolidation | M3 | Deferred | Shared Swift contract ownership is clear, generated Swift remains generated-only, and iOS/macOS consume the same canonical contract without destabilizing the iOS lane. |
+| M4 | Shared Contract Consolidation | M3 | In progress (M4-A boundary cut) | Shared Swift contract ownership is clear, generated Swift remains generated-only, and iOS/macOS consume the same canonical contract without destabilizing the iOS lane. |
 | M5 | Native Editing UI | M3 | In progress | Core Desktop workflows are usable in native UI: look selection, preview navigation, export controls, progress/cancel, and Finder integration. Apple Liquid Glass is applied systematically to control surfaces (toolbar / sidebar / inspector / picker / control panels), preview content layer excluded. |
-| M6 | Release Cutover | M5 | In progress | release-cutover lane Phase 1-6 done (signing posture + pipeline + 0.1.0 smoke + 2.0.0 cutover identity locked: Bundle ID `com.chibatakumi.film-lab-desktop` / Product Name `Filmtone` / MARKETING_VERSION `2.0.0`). Final 2.0.0 公開 gate = M5-C P0 (C.2 Look library / C.3 Adjustments / C.4 Export panel) closure。詳細: `../release-cutover/cutover-architecture.md`。 |
+| M6 | Release Cutover | M5 | In progress | release-cutover lane Phase 1-7 done (signing posture + pipeline + 0.1.0 smoke + cutover identity + distribution scripts; version policy corrected to iOS-aligned 1.4: Bundle ID `com.chibatakumi.film-lab-desktop` / Product Name `Filmtone` / MARKETING_VERSION `1.4`). Final 1.4 公開 gate = M5-C P0 (C.2 Look library / C.3 Adjustments / C.4 Export panel) closure。詳細: `../release-cutover/cutover-architecture.md`。 |
 
 ## Current Strategic State
 
@@ -73,8 +73,9 @@ download for pre-macOS-26 users). Cutover details: see
   integration / look selection UX). Prioritize 本質 product quality.
 - Baseline-C population is intentionally treated as quality shell work unless
   formal parity proof is requested.
-- M4 SPM consolidation remains deferred until native behavior is stable enough
-  that module movement will not distract from product quality.
+- M4 implementation extraction remains deferred, but M4-A Shared Swift Boundary
+  Cut Line is now active as a short interrupt before more M5-C Desktop-only
+  copies accumulate.
 - **Parallel release lane** is in progress at
   `docs/filmtone/desktop/release-cutover/` (separate active.md singleton from
   this lane). Phase 1 closed 2026-05-04: M3 LOW gap `printContrast` sign-gate
@@ -86,13 +87,20 @@ download for pre-macOS-26 users). Cutover details: see
   notarize submission via the user's `ASC_ISSUER_ID` env, and (b) optional App
   Category polish.
 
+## Interrupt / Decision Log
+
+- 2026-05-04: User flagged that Native Desktop v2 feels like it is not actually
+  reusing iOS implementation. Decision: pause M5-C.4 temporarily and pull M4-A
+  forward as a bounded architecture slice that defines reusable pure Swift
+  ownership vs. Mac-native UI/platform shell before any SPM/file movement.
+
 ## Constraints
 
 - macOS target is macOS 26 only.
 - SwiftUI-first; AppKit only for macOS-specific interop and platform behavior.
 - iOS is the canonical color/optics reference, but the iOS project must remain
   untouched unless the active task explicitly says otherwise.
-- Electron Desktop 1.0.3 is the final legacy build. Native Desktop v2 takes
+- Electron Desktop 1.0.4 is the final public legacy build. Native Desktop v2 takes
   over the same Bundle ID (`com.chibatakumi.film-lab-desktop`) + fixed
   download URL on cutover (gated on M5-C P0 closure).
 - Sidecar changes are additive only; avoid schema bumps until a product need
@@ -335,14 +343,15 @@ download for pre-macOS-26 users). Cutover details: see
   OQ-1〜OQ-4 列挙) を ship。pbxproj Debug+Release 両方を Bundle ID
   `co.fores-tone.filmtone.desktop` → `com.chibatakumi.film-lab-desktop`
   (Electron drop-in upgrade)、PRODUCT_NAME `$(TARGET_NAME)` → `Filmtone`、
-  MARKETING_VERSION `0.1.0` → `2.0.0` (Electron 1.0.3 を semver で超え) に
+  MARKETING_VERSION `0.1.0` → `2.0.0` (later superseded by the iOS-aligned
+  `1.4` version policy below) に
   更新。`scripts/release-macos.sh` + `scripts/package-dmg.sh` の APP_NAME /
   BUNDLE_ID を同期。`xcodebuild -scheme FilmtoneDesktop -configuration Debug
   build` → `** BUILD SUCCEEDED **`、生成 `Filmtone.app` Info.plist で
   CFBundleIdentifier=com.chibatakumi.film-lab-desktop /
   CFBundleShortVersionString=2.0.0 / CFBundleName=Filmtone / 全 8 key 期待値
-  確認。次の `scripts/release-macos.sh` 実行は 2.0.0 cutover identity の
-  drop-in upgrade artifact を produce する (実 release は M5-C P0 closure 後)。
+  確認。Phase 6 当時の `2.0.0` artifact plan は本日 user 決定で `1.4`
+  に supersede 済み (実 release は M5-C P0 closure 後)。
   Archived as `archive/2026-05-04-release-phase-6-cutover-architecture-brand-alignment.md`。
 - 2026-05-04: M5-C.3a verified visually (user confirmed Quick adjust
   Film/Era/Dynamics ripple into preview, saved-Look round-trip restores
@@ -363,6 +372,12 @@ download for pre-macOS-26 users). Cutover details: see
   `../release-cutover/cutover-architecture.md` (decisions A〜K)、未決定は
   Open Questions OQ-1〜OQ-4 (本質に直接影響しない、後続 user 判断)。
   Memory 永続化: `~/.claude/projects/-Volumes-.../memory/project_native_v2_replaces_electron.md`。
+
+- 2026-05-04: **Native Desktop v2 release version = `1.4`** に correction
+  (user 明示)。理由: Native Desktop v2 は iOS canonical の Mac 版なので iOS public/local
+  version `1.4` と揃える。Electron public latest `1.0.4` より semver 上は高いため
+  existing update path は維持。current pbxproj `MARKETING_VERSION = 1.4`、release
+  artifact は `Filmtone-1.4.dmg`。
 
 - 2026-05-04: M5-A.2 Look Canonical Parity inserted as mid-size Interrupt.
   Visual Smoke surfaced that the Desktop Look picker (Reset / iPhone / Soft Blue
