@@ -249,18 +249,27 @@ Already committed on the current branch:
 
 Remaining before this slice can archive:
 
-1. Re-run `bun run verify:macos` and `Verify/run.sh` on the current
-   post-M4-B `main` to confirm no regression from the SPM cutover.
+1. ~~Re-run `bun run verify:macos` and `Verify/run.sh` on the current
+   post-M4-B branch to confirm no regression from the SPM cutover.~~
+   **Done 2026-05-04** after M4-B follow-up commit `d4d46cf3`:
+   `xcodebuild -scheme FilmtoneDesktop -configuration Debug build` ✅
+   BUILD SUCCEEDED, `Verify/run.sh` ✅ 36/36 PASS, iOS
+   `xcodebuild -scheme App -destination 'generic/platform=iOS' build` ✅
+   BUILD SUCCEEDED, `swift test` 27/27 ✅, generator `--check` EXIT 0,
+   `git diff --check` EXIT 0.
 2. Manual visual smoke for **ready / progress / finished / blocked**
-   states on a real source file (still + video).
+   states on a real source file (still + video). *(user-driven)*
 3. Finder reveal tap-through (output file selected in Finder).
+   *(user-driven)*
 4. NSSharingServicePicker tap-through (share sheet anchors near the
-   share button, not the window center).
+   share button, not the window center). *(user-driven)*
 5. Format picker (PNG ↔ JPEG) + JPEG quality slider exercised at least
-   once.
+   once. *(user-driven)*
 6. Source-cap blocked state confirmed on an HDR / oversized source.
+   *(user-driven)*
 7. Archive this active.md → `archive/2026-05-04-m5-c4-export-inspector.md`
    and append a 1-3 line Completion Log entry to `strategy.md`.
+   *(after #2-#6 land)*
 
 There is no further code work expected for the happy path; the slice
 is in user-driven validation phase. If smoke surfaces a regression,
