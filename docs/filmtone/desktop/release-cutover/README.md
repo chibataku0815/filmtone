@@ -150,11 +150,22 @@ entitlements: 4 keys all = false
 - exportArchive の "No App Category" soft warning は次回 release run で消える想定
 - archive: `archive/2026-05-04-release-phase-2-app-category.md`
 
-`INFOPLIST_KEY_NSHumanReadableCopyright` は legal entity 名 user 提供待ちで空維持。
-`CFBundleDocumentTypes` は real Info.plist file 化 = infra refactor のため Phase 2
-範囲外、必要時に別 phase で扱う。
+## Phase 3 close summary
+
+2 commit landed (2026-05-04):
+
+- scripts/release-macos.sh + scripts/package-dmg.sh: dual `ASC_KEY_PATH` /
+  `ASC_KEY_CONTENT` env support (iOS Fastfile parity、CI flow ready)
+- temp .p8 cleanup trap を global var return に修正 (subshell pitfall 回避)
+- `preflight_signing_cert()` で keychain cert fail-fast (archive 起動前)
+- `~/` tilde expansion in `ASC_KEY_PATH` (defensive)
+- pbxproj `INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 Takumi Chiba"`
+  (iOS canonical truth `fastlane/metadata/copyright.txt` 由来)
+- archive: `archive/2026-05-04-release-phase-3-pipeline-hardening-and-copyright.md`
+
+`CFBundleDocumentTypes` (Finder Open With) は INFOPLIST_KEY_* 経由不可で real
+Info.plist file 化 = infra refactor のため引き続き scope 外。
 
 次フェーズ (新 active.md 化、user-driven trigger):
 - 実 notarize end-to-end run の結果次第で raised issue 対応
 - Sparkle 等 auto-update は別 lane (本 lane 範囲外、外殻)
-- legal entity 名確定 → `NSHumanReadableCopyright` 設定 (1 行 polish)
