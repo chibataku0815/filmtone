@@ -95,6 +95,29 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
   `archive/2026-05-04-m5-c4-export-inspector.md`. → M5-C P0 (C.2a foundation
   + C.3a parity + C.4 inspector) すべて closed。M6 1.4 公開 gate は残り
   user-driven notarize submission のみ。
+- 2026-05-04 user smoke で 5 個の追加ギャップ判明 → 推奨順で計画化:
+  - **M5-E.1 App Icon Asset Population** (Tier A, ~20 min): `Assets.xcassets/
+    AppIcon.appiconset/Contents.json` は 10 entry 宣言済みだが .png 0 個 →
+    placeholder アイコンのまま起動。iOS の `AppIcon-512@2x.png` を source に
+    macOS sips で 10 size 生成、Contents.json に `filename` 補完。
+  - **M5-D.1 Video Scrub Bar Glass Posture + Visibility** (Tier A, ~30 min):
+    `VideoScrubBar` (RootWindowView.swift:371) は landed 済みだが
+    `.glassEffect` 未適用 + bottom-anchored capsule wrap なし → 発見しづらい。
+    Pass 4 `.clear` posture に統一。
+  - **M5-F.1 Inline Button Glass Posture Pass** (Tier B, ~1-2h): Export
+    Inspector / Grade / QuickAdjust 等の inline button が `.borderedProminent`
+    system default (smoke screenshot で「しょぼすぎる」と判定)。Pass 1-4 は
+    panel/capsule/scrub/toolbar のみ → Pass 5 として inline button を
+    `.glassEffect(.clear)` 系 posture に統一、配色も dark glass と調和させる。
+  - **M5-D.2 Native Video Playback** (Tier B, ~2-3h): Play/Pause button +
+    AVPlayer 駆動の time observer + Space-key shortcut。realtime grade 維持は
+    重い → 着手前に「play 中は raw decoded frame で grade-off プレビュー」か
+    「decode + grade で frame drop 容認」を user 判断。
+  - **M5-C.3b Advanced Per-Parameter Override Editing UX** (Tier C, ~半日):
+    iOS canonical `FilmtoneStrengthSheet` + `FilmtoneAdjustmentHelpSheet` の
+    Desktop 版。30 個前後の paramOverrides field を category 別に list 化、
+    paramOverrides storage / apply 経路は M5-C.3a で lit up 済み。Desktop UX
+    は sheet ではなく right-rail 拡張 panel か popover で適合化。
 - Future product direction: cross-device SSD workflow. The intended shape is
   source media moved by SSD / Files / Finder, shared sidecar + Look intent moved
   with the source, Desktop as the master / 4K-capable exporter, and iPhone as
@@ -129,6 +152,15 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
   Postcard output. Decision: treat this as a strategic compatibility constraint
   for M4 shared core / sidecar / output-profile work, not as an immediate M5-C
   UI requirement.
+- 2026-05-04: M5-C.4 archive 後の user smoke で 5 個の追加ギャップ surface —
+  (1) playback 機能なし、(2) scrub bar が discoverable でない (`.glassEffect`
+  未適用)、(3) iOS 「調整」+ 詳細変更 (FilmtoneStrengthSheet + AdjustmentHelpSheet)
+  が Desktop 不在、(4) AppIcon.appiconset に .png 0 個で placeholder アイコン、
+  (5) inline button が `.borderedProminent` system default で dark glass posture
+  と整合せず「しょぼい」。Decision: Tier A → Tier B → Tier C の順で 5 slice 化
+  (M5-E.1 → M5-D.1 → M5-F.1 → M5-D.2 → M5-C.3b)。Tier A 2 件は本質直結 + 短い
+  ので連続着手、Tier B B2 → B1 順、C は M5-C P0 closure 後の P1 だが体感
+  優先度から B 着手中に再評価。
 - 2026-05-04: User confirmed the DaVinci highlight-marker direction. Local
   Resolve docs and existing Lua scripts show the route is feasible:
   source-relative Filmtone markers can become Resolve markers or direct
