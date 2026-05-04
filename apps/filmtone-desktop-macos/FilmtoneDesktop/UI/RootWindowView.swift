@@ -13,7 +13,8 @@ struct RootWindowView: View {
                 sourceKind: state.sourceKind,
                 presetName: state.presetName,
                 presetStrength: state.presetStrength,
-                lookSlug: state.lookSlug
+                lookSlug: state.lookSlug,
+                videoPreviewSeconds: state.videoPreviewSeconds
             )
             VStack(alignment: .trailing, spacing: 12) {
                 GlassControlGroup()
@@ -31,6 +32,20 @@ struct RootWindowView: View {
                 }
             }
             .padding(20)
+            // M5-A.3: scrub bar pinned to the bottom-center, visible only
+            // when a video is loaded and its duration probe has settled.
+            if state.sourceKind == .video,
+               let duration = state.videoDurationSeconds,
+               duration > 0 {
+                VStack {
+                    Spacer()
+                    VideoScrubBar(state: state, duration: duration)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                        .padding(20)
+                }
+            }
         }
         .frame(minWidth: 880, minHeight: 560)
         .toolbar {
@@ -192,6 +207,44 @@ struct RootWindowView: View {
                 }
             }
         }
+    }
+}
+
+/// M5-A.3: scrub bar for video preview. Continuous binding to
+/// `state.videoPreviewSeconds`; coalescing of rapid drag events happens
+/// downstream in `PreviewSurface` via in-flight Task cancellation.
+private struct VideoScrubBar: View {
+    @Bindable var state: EditorState
+    let duration: Double
+
+    private var seconds: Binding<Double> {
+        Binding(
+            get: { state.videoPreviewSeconds ?? 0 },
+            set: { state.videoPreviewSeconds = max(0, min($0, duration)) }
+        )
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(format(seconds.wrappedValue))
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .frame(minWidth: 64, alignment: .leading)
+            Slider(value: seconds, in: 0...max(duration, 0.001))
+            Text(format(duration))
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .frame(minWidth: 64, alignment: .trailing)
+        }
+        .frame(maxWidth: 560)
+    }
+
+    private func format(_ value: Double) -> String {
+        guard value.isFinite, value >= 0 else { return "0:00.00" }
+        let total = value
+        let minutes = Int(total / 60)
+        let secondsRemainder = total - Double(minutes * 60)
+        return String(format: "%d:%05.2f", minutes, secondsRemainder)
     }
 }
 

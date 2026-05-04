@@ -8,6 +8,10 @@ struct PreviewSurface: View {
     let presetName: String
     let presetStrength: Double
     let lookSlug: String?
+    /// M5-A.3: scrub-bar time in seconds for video sources. `nil`
+    /// triggers the legacy midpoint loader (still path or pre-probe
+    /// state — keeps first paint identical to pre-M5-A.3).
+    let videoPreviewSeconds: Double?
 
     var body: some View {
         Color.black
@@ -18,7 +22,8 @@ struct PreviewSurface: View {
                         sourceKind: sourceKind,
                         presetName: presetName,
                         presetStrength: presetStrength,
-                        lookSlug: lookSlug
+                        lookSlug: lookSlug,
+                        videoPreviewSeconds: videoPreviewSeconds
                     )
                 } else {
                     EmptyPreviewLabel()
@@ -33,6 +38,7 @@ private struct PreviewImageView: NSViewRepresentable {
     let presetName: String
     let presetStrength: Double
     let lookSlug: String?
+    let videoPreviewSeconds: Double?
 
     final class Coordinator {
         var currentTask: Task<Void, Never>?
@@ -56,6 +62,9 @@ private struct PreviewImageView: NSViewRepresentable {
         // a Task and cancel any in-flight Task on subsequent updates so
         // preset switches don't cause stale frame races. Phase 3 will move
         // to MTKView with caching.
+        // M5-A.3: scrub-bar drag emits a stream of `videoPreviewSeconds`
+        // updates; the same cancel-on-update pattern coalesces them so
+        // the most recent time wins.
         context.coordinator.currentTask?.cancel()
 
         let url = sourceURL
@@ -63,6 +72,7 @@ private struct PreviewImageView: NSViewRepresentable {
         let preset = presetName
         let strength = presetStrength
         let slug = lookSlug
+        let scrubSeconds = videoPreviewSeconds
 
         switch kind {
         case .still:
@@ -78,7 +88,18 @@ private struct PreviewImageView: NSViewRepresentable {
             )
         case .video:
             context.coordinator.currentTask = Task { @MainActor in
-                let preview = try? await FilmtoneVideoFramePreviewLoader.loadMidpointFrame(from: url)
+                let preview: FilmtoneVideoFramePreview?
+                if let scrubSeconds {
+                    preview = try? await FilmtoneVideoFramePreviewLoader.loadFrame(
+                        from: url,
+                        atSeconds: scrubSeconds
+                    )
+                } else {
+                    // Pre-probe: duration not yet known. Fall back to the
+                    // legacy midpoint loader so first paint is identical
+                    // to pre-M5-A.3 behavior.
+                    preview = try? await FilmtoneVideoFramePreviewLoader.loadMidpointFrame(from: url)
+                }
                 guard !Task.isCancelled else { return }
                 renderAndAssign(
                     source: preview?.image,
@@ -164,7 +185,8 @@ private struct EmptyPreviewLabel: View {
         sourceKind: .still,
         presetName: "reset",
         presetStrength: 1.0,
-        lookSlug: nil
+        lookSlug: nil,
+        videoPreviewSeconds: nil
     )
     .frame(width: 600, height: 400)
 }
