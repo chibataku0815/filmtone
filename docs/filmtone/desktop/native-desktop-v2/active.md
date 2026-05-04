@@ -117,4 +117,49 @@ as part of the same lens system, not as three independent surfaces.
 
 ## Unexpected / Follow-up
 
-(empty — populated by user smoke result and agent triage)
+### 2026-05-04 user smoke result: V1–V6 base posture FAIL — 4 substantive findings
+
+User ran S3 against the rebuilt `.app` and surfaced 4 distinct issues. The
+base `.regular` posture without the surrounding chrome opt-in does not
+deliver Apple Liquid Glass — it falls back to a `.regularMaterial`-shaped
+frosted pane. Pass 3 (variant exploration) is now strictly blocked behind
+fixing this base setup; tinting a still-broken base does not help.
+
+| # | User report | Root cause (verified vs SDK swiftinterface) | Fix |
+|---|---|---|---|
+| F1 | "プリセットは必要ない" — Preset row in `GradeControls` is redundant alongside the Look picker | Vocabulary lock landed; Look-tier is now the SSOT; Preset has been internally pinned to `reset` whenever a Look is selected, so the row only matters in the unused "no Look" mode | Remove the Preset Picker from `GradeControls`. Keep Look + Strength only. Internally `state.presetName` stays at `defaultName`. |
+| F2 | "Apple Liquid Glass ではなく、ただの磨りガラスのようなもの" — panels look frosted, not refractive | macOS 26's `.glassEffect(.regular, in:)` reads as frosted material when there's no extended content beneath it. The system needs the underlying content layer to extend into the toolbar / chrome region (`backgroundExtensionEffect()`) so the glass has something visually rich to refract. Without that, both Pass 1 panels and the system chrome read as flat material. | Apply `.backgroundExtensionEffect()` to `PreviewSurface` so it extends into the toolbar / window-edge region. Add `.tint(...)` to the right-rail glass to nudge edge specularity. |
+| F3 | "ヘッダー部分も Apple Liquid Glass になっていない" — toolbar is opaque white, not translucent | `WindowGroup` currently inherits `DefaultWindowToolbarStyle` (`.automatic`). On macOS 26, the unified Apple Liquid Glass toolbar requires explicit opt-in via `.windowToolbarStyle(.unified)` or `.unifiedCompact`. Without it, the toolbar paints as a solid bar. | Add `.windowToolbarStyle(.unified)` to `WindowGroup` in `FilmtoneDesktopApp`. |
+| F4 | "スクラブの位置もおかしい" — bottom-center scrub bar overlay reads as floating in the preview area, awkwardly placed | Scrub bar is overlaid inside the `ZStack` with `Spacer() + .padding(20)`, sitting too far above the window's bottom edge and visually disconnected from the preview boundary. With the new `backgroundExtensionEffect`, the scrub bar should sit naturally near the bottom chrome edge. | Tighten bottom padding (`.padding(.bottom, 12)`) and let the inner `.frame(maxWidth: 560)` keep horizontal containment but allow the scrub bar to sit closer to the window edge as a chrome-adjacent control. |
+
+### F1–F4 implementation plan
+
+1. **`GradeControls.swift`** — remove the Preset `Picker`, drop
+   `presetDisabled` / related opacity, simplify `strengthDisabled` to
+   "disabled when Look = None" (since the Reset preset path is no longer
+   user-selectable).
+2. **`FilmtoneDesktopApp.swift`** — `.windowToolbarStyle(.unified)` on
+   `WindowGroup`.
+3. **`RootWindowView.swift`** —
+   - Add `.backgroundExtensionEffect()` on the `ZStack` (or the
+     `PreviewSurface`) so content extends into chrome.
+   - Switch `.glassEffect(.regular, in: …)` to
+     `.glassEffect(.regular.tint(.white.opacity(0.06)), in: …)` to give
+     edges visible specularity without changing the underlying neutrality.
+   - Move `VideoScrubBar` overlay closer to the window bottom edge via
+     `.padding(.bottom, 12)` instead of the wrapping `.padding(20)`.
+
+### F1–F4 stages
+
+| Stage | Action |
+|---|---|
+| F-S1 | Edit `GradeControls.swift` (F1) |
+| F-S2 | Edit `FilmtoneDesktopApp.swift` (F3) |
+| F-S3 | Edit `RootWindowView.swift` (F2 + F4) |
+| F-S4 | Rebuild `.app` |
+| F-S5 | Single bundled commit (per `feedback_dont_overengineer_dirty_state_split` — these four findings are one product-quality fix) |
+| F-S6 | Re-launch and request user re-smoke against the same V1–V6 + the four findings |
+
+Pass 3 (tint / variant exploration beyond `.tint(.white.opacity(0.06))`)
+remains deferred until the F-cycle smoke validates the corrected base
+posture.
