@@ -17,13 +17,14 @@ Completion Log に短く反映する (本 lane の archive 経由で参照)。
 
 | ID | 内容 | 状態 |
 |---|---|---|
-| M3-fix | iOS canonical との小 drift (printContrast sign-gate) を閉 | In progress |
-| M6-1 | release-cutover lane doc tree 開設 (この文書) | Done |
-| M6-2 | Hardened Runtime + entitlements + DEVELOPMENT_TEAM 配線 | Pending |
-| M6-3 | scripts/release-macos.sh (build/archive/notarize/staple) | Pending |
-| M6-4 | DMG packaging (hdiutil 直、create-dmg 不要) | Pending |
-| M6-5 | portfolio submodule bump 手順 (release flow に) | Pending |
-| M6-6 | end-to-end dry-run (v0.1.0-rc1) | Pending |
+| M3-fix | iOS canonical との小 drift (printContrast sign-gate) を閉 | **Done** (`4e72aae`) |
+| M6-1 | release-cutover lane doc tree 開設 (この文書) | **Done** (`2942f9a`) |
+| M6-2 | Hardened Runtime + entitlements + DEVELOPMENT_TEAM 配線 | **Done** (`ac51869`) |
+| M6-3 | scripts/release-macos.sh (build/archive/notarize/staple) | **Done** (`8bd41b4`) |
+| M6-4 | DMG packaging (hdiutil 直、create-dmg 不要) | **Done** (`8bd41b4`) |
+| M6-5 | portfolio submodule bump 手順 (本 README 末尾参照) | **Done** |
+| M6-6 | end-to-end dry-run (v0.1.0-rc1) | **Partial** — archive + exportArchive 実機 verify 済、notarize は user env 必要 |
+| polish | App Category 設定 (notarize blocker でない) | Pending follow-up |
 
 ## Out of scope (本 lane では扱わない)
 
@@ -67,3 +68,79 @@ Completion Log に短く反映する (本 lane の archive 経由で参照)。
 - `MARKETING_VERSION = 0.1.0` 維持で `0.1.0-rc1` を dry-run、smoke 通過後に
   `0.1.0` で公開 release。
 - `CURRENT_PROJECT_VERSION` (build number) は release ごとに +1。
+
+## Release run 手順 (user-driven)
+
+Phase 1 で signing posture + scripts は ship 済。実 release は user の Apple
+Developer 環境 env で 1 コマンド実行。
+
+```bash
+# ASC API key は ~/.appstoreconnect/private_keys/AuthKey_TM2BK9269B.p8 既配置
+export ASC_KEY_ID=TM2BK9269B
+export ASC_ISSUER_ID=<App Store Connect の Users and Access > Keys で確認できる UUID>
+export ASC_KEY_PATH=~/.appstoreconnect/private_keys/AuthKey_TM2BK9269B.p8
+
+cd /Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-native-desktop-plan
+
+# 1. archive → notarize → staple → spctl assess
+scripts/release-macos.sh
+
+# 2. notarized .app を DMG 化 → DMG も notarize → staple → Gatekeeper assess
+scripts/package-dmg.sh
+```
+
+出力:
+
+- `apps/filmtone-desktop-macos/build/release/0.1.0/FilmtoneDesktop.app`
+  (notarized + stapled)
+- `apps/filmtone-desktop-macos/build/release/0.1.0/FilmtoneDesktop-0.1.0.dmg`
+  (notarized + stapled、配布可能)
+
+notarize 拒否時は `notarize-rejection.json` が出力される。所要時間は
+notarize submit が数分 (Apple 側 queue 次第)。
+
+## Portfolio submodule bump (release 後の波及)
+
+filmtone main に release commit (or tag) が land した後、portfolio repo の
+`vendor/filmtone` submodule pin を bump して公開窓 (landing / support / privacy /
+release-notes / journal) に新 release を反映する。
+
+```bash
+cd /Volumes/SamsungPortableSSDX5001/documents/forestone/chibatakumi-portfolio
+git submodule update --remote vendor/filmtone
+git add vendor/filmtone
+git commit -m "chore(filmtone): bump submodule to 0.1.0"
+# (push は user)
+```
+
+vercel deploy は portfolio の `apps/web` build に依存するので submodule pin
+が古いと公開窓が古いまま。release 完了 = filmtone main land + portfolio bump
++ portfolio push の 3 つ揃って初めて公開反映。
+
+詳細は CLAUDE.md §7 (Submodule update 手順) を参照。
+
+## Phase 1 close summary
+
+5 commits landed (2026-05-04):
+
+1. `4e72aae` fix(macos): M3 printContrast sign-gate match iOS canonical
+2. `ac51869` feat(macos): M6 signing prep — Hardened Runtime + Developer ID + entitlements
+3. `2942f9a` docs(release-cutover): open parallel release lane
+4. `8bd41b4` feat(release): M6 macOS release pipeline — archive / notarize / DMG
+5. (this commit) docs(release-cutover): archive Phase 1 + bump手順
+
+Codesign verification on the archived + exportArchive build:
+
+```
+Authority=Developer ID Application: takumi chiba (C3G77H8NM6)
+Format=app bundle with Mach-O universal (x86_64 arm64)
+flags=0x10000(runtime)            # Hardened Runtime active
+Timestamp=May 4, 2026              # secure timestamp present
+TeamIdentifier=C3G77H8NM6
+entitlements: 4 keys all = false
+```
+
+次フェーズ (新 active.md 化):
+- App Category polish + Info.plist 補完 (notarize blocker でないが release 品質 polish)
+- 実 notarize end-to-end run の結果次第で raised issue 対応
+- Sparkle 等 auto-update は別 lane (本 lane 範囲外、外殻)
