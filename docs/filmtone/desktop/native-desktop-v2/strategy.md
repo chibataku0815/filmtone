@@ -71,6 +71,16 @@ shipping Electron rail.
   formal parity proof is requested.
 - M4 SPM consolidation remains deferred until native behavior is stable enough
   that module movement will not distract from product quality.
+- **Parallel release lane** is in progress at
+  `docs/filmtone/desktop/release-cutover/` (separate active.md singleton from
+  this lane). Phase 1 closed 2026-05-04: M3 LOW gap `printContrast` sign-gate
+  fixed, M6 signing posture wired (Hardened Runtime + Developer ID + entitlements
+  + secure timestamp), `scripts/release-macos.sh` + `scripts/package-dmg.sh` +
+  `ExportOptions.plist` shipped, archive + exportArchive verified against the
+  real Developer ID Application identity (Team C3G77H8NM6, universal binary,
+  notarize-ready). The remaining release-cutover gates are (a) the user-driven
+  notarize submission via the user's `ASC_ISSUER_ID` env, and (b) optional App
+  Category polish.
 
 ## Constraints
 
@@ -131,6 +141,14 @@ shipping Electron rail.
   yellow-folder PBXGroup flattens cubes into `Contents/Resources/`, so the
   Loader resolves by name + extension (no `subdirectory:`) — revisit the
   blue-vs-yellow note when iOS / Desktop pbxproj patterns are unified.
+- 2026-05-04: Release-cutover Phase 1 closed (parallel lane,
+  `docs/filmtone/desktop/release-cutover/`). 5 commits: `4e72aae` M3
+  printContrast canonical fix; `ac51869` M6 signing prep (Hardened Runtime +
+  Developer ID + entitlements + --timestamp); `2942f9a` lane doc tree;
+  `8bd41b4` release pipeline (release-macos.sh, package-dmg.sh,
+  ExportOptions.plist); `37205a0` Phase 1 archive + portfolio bump 手順.
+  Archive + exportArchive verified bytewise on real Developer ID identity.
+  Remaining: user-driven notarize submit + DMG publish.
 - 2026-05-04: M5-A.3 Video Preview Scrub landed — preview gains a
   scrub bar over a video source's timeline (0…duration slider); Loader
   factored to `loadFrame(from:atSeconds:)` with `loadMidpointFrame` as a
