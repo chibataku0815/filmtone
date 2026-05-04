@@ -23,8 +23,8 @@ Completion Log に短く反映する (本 lane の archive 経由で参照)。
 | M6-3 | scripts/release-macos.sh (build/archive/notarize/staple) | **Done** (`8bd41b4`) |
 | M6-4 | DMG packaging (hdiutil 直、create-dmg 不要) | **Done** (`8bd41b4`) |
 | M6-5 | portfolio submodule bump 手順 (本 README 末尾参照) | **Done** |
-| M6-6 | end-to-end dry-run (v0.1.0-rc1) | **Partial** — archive + exportArchive 実機 verify 済、notarize は user env 必要 |
-| polish | App Category 設定 (notarize blocker でない) | Pending follow-up |
+| M6-6 | end-to-end dry-run (v0.1.0-rc1) | **Partial** — archive + exportArchive 実機 verify 済 (Phase 4 で M5 最新 commit 群でも再確認 — `flags=0x10000(runtime)` + Authority chain + secure timestamp + 生成 Info.plist 全 key 健全)、notarize は user env 必要 |
+| polish | App Category 設定 (notarize blocker でない) | **Done** (Phase 2) |
 
 ## Out of scope (本 lane では扱わない)
 
@@ -166,6 +166,37 @@ entitlements: 4 keys all = false
 `CFBundleDocumentTypes` (Finder Open With) は INFOPLIST_KEY_* 経由不可で real
 Info.plist file 化 = infra refactor のため引き続き scope 外。
 
+## Phase 4 close summary
+
+実装変更なし、検証 deliverable のみ (2026-05-04):
+
+- ASC env 不要範囲 (archive Step 1 + exportArchive Step 2) を本 chat で実行、
+  M5 lane の最近 commit 群 (Pass 3 `.clear` posture / Pass 4 `.clear.tint
+  (.black.opacity(0.30))` 仕上げ / M5-A.3 video scrub / F-S6.1-2 toolbar +
+  preview Image refactor) が Release build path を壊していないことを確認。
+- `xcodebuild ... archive` `** ARCHIVE SUCCEEDED **`、`xcodebuild
+  -exportArchive` `** EXPORT SUCCEEDED **`。
+- `codesign --verify --deep --strict --verbose=4`: valid on disk + satisfies
+  Designated Requirement。
+- `codesign -dvvv`: `flags=0x10000(runtime)` ✓ Hardened Runtime active、
+  Authority chain (Developer ID Application: takumi chiba (C3G77H8NM6) →
+  Developer ID Certification Authority → Apple Root CA) ✓、
+  `Timestamp=May 4, 2026 at 13:56:24` ✓ secure timestamp present、
+  `Format=app bundle with Mach-O universal (x86_64 arm64)` ✓ universal。
+- 生成 Info.plist: `CFBundleShortVersionString=0.1.0` / `CFBundleVersion=1` /
+  `CFBundleIdentifier=co.fores-tone.filmtone.desktop` /
+  `LSApplicationCategoryType=public.app-category.photography` /
+  `NSHumanReadableCopyright=© 2026 Takumi Chiba` /
+  `LSMinimumSystemVersion=26.0` 全 OK。
+- `spctl --assess --type execute`: `rejected source=Unnotarized Developer ID`
+  ← Apple notary chain が未付加なだけの expected reject、cert chain 経路
+  自体は受理。user の初回 `scripts/release-macos.sh` 実行時、archive と
+  exportArchive は確実に通る = 失敗が起こり得るのは notarytool submit
+  と spctl --assess (notarize 後) のみ。
+- archive: `archive/2026-05-04-release-phase-4-preflight-readiness.md`
+
 次フェーズ (新 active.md 化、user-driven trigger):
-- 実 notarize end-to-end run の結果次第で raised issue 対応
+- M6-6 実 notarize end-to-end run (user `ASC_ISSUER_ID` 設定 → `scripts
+  /release-macos.sh` → `scripts/package-dmg.sh`)
+- 実 run の結果次第で raised issue 対応
 - Sparkle 等 auto-update は別 lane (本 lane 範囲外、外殻)
