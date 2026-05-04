@@ -10,7 +10,9 @@ Keep it short. Do not put implementation steps or file-level details here.
 Replace the current Electron Desktop product lane with a macOS 26 native
 SwiftUI/AppKit application that matches or beats the current Desktop release on
 preview quality, still export, video export, sidecar correctness, and user-facing
-Mac experience.
+Mac experience. The primary UI material is **Apple Liquid Glass** across control
+surfaces (toolbar / sidebar / inspector / picker / control panels); the preview
+content layer is intentionally excluded to keep color judgment uncompromised.
 
 The native app must remain a parallel lane until it is clearly better than the
 shipping Electron rail.
@@ -22,6 +24,9 @@ shipping Electron rail.
   grade pipeline for the supported built-in Looks.
 - Still and video exports write sidecars without a schema bump.
 - Look vocabulary is unified before any public release cutover.
+- Apple Liquid Glass is adopted as the primary UI material on toolbar / sidebar
+  / inspector / picker / control panels; the preview content layer remains
+  glass-free per Apple HIG.
 - Electron Desktop release behavior remains unchanged until the native lane is
   explicitly promoted.
 - The app can be built, smoke-tested, signed/notarized, and distributed as the
@@ -35,7 +40,7 @@ shipping Electron rail.
 | M2 | Still And Video Vertical Slice | M1 | Complete | Still and video open, preview, export, and sidecar paths work through the native app. |
 | M3 | Native Color And Optics Parity | M2 | In progress | Built-in Looks use the iOS-canonical color and optics stages; performance is acceptable at 4K; remaining parity gaps are explicit. |
 | M4 | Shared Contract Consolidation | M3 | Deferred | Shared Swift contract ownership is clear, generated Swift remains generated-only, and iOS/macOS consume the same canonical contract without destabilizing the iOS lane. |
-| M5 | Native Editing UI | M3 | In progress | Core Desktop workflows are usable in native UI: look selection, preview navigation, export controls, progress/cancel, and Finder integration. |
+| M5 | Native Editing UI | M3 | In progress | Core Desktop workflows are usable in native UI: look selection, preview navigation, export controls, progress/cancel, and Finder integration. Apple Liquid Glass is applied systematically to control surfaces (toolbar / sidebar / inspector / picker / control panels), preview content layer excluded. |
 | M6 | Release Cutover | M4, M5 | Not started | Signed/notarized app, release QA, public copy, portfolio/submodule updates, and Look vocabulary gate are complete. |
 
 ## Current Strategic State
@@ -46,9 +51,17 @@ shipping Electron rail.
   stages, and 4K performance measurement are complete enough to unblock M5.
 - M5 is the current product milestone.
 - M5-A.2 Look Canonical Parity (Stone / Urban Creative LUT Pack 01 port from
-  iOS) landed 2026-05-04 across 3 commits and is archived. `active.md` is
-  vacant — next subtask is the deferred original Tier 1 #2 (動画スクラブ) or
-  another M5 surface item, to be opened on review.
+  iOS) landed 2026-05-04 across 3 commits and is archived.
+- M5-A.3 Video Preview Scrub landed 2026-05-04 (single commit 3b12805,
+  preview-only, no CLI / export regression — Stone hash byte-identical to
+  M5-A.2 archive record). Visual scrub UX smoke deferred to user. Archived
+  immediately to make room for the user-requested M5-B interrupt slice.
+- M5-B (UI Material — Apple Liquid Glass) is the **current active slice**
+  within M5 (not a new milestone). Current implementation prior to M5-B is
+  a single `.glassEffect()` validation site in `GlassControlGroup.swift`;
+  the rest of the control panels (GradeControls / ExportProgressBar /
+  VideoScrubBar) still use legacy `.regularMaterial`. M5-B systematizes
+  the adoption.
 - Baseline-C population is intentionally treated as quality shell work unless
   formal parity proof is requested.
 - M4 SPM consolidation remains deferred until native behavior is stable enough
@@ -113,6 +126,15 @@ shipping Electron rail.
   yellow-folder PBXGroup flattens cubes into `Contents/Resources/`, so the
   Loader resolves by name + extension (no `subdirectory:`) — revisit the
   blue-vs-yellow note when iOS / Desktop pbxproj patterns are unified.
+- 2026-05-04: M5-A.3 Video Preview Scrub landed — preview gains a
+  scrub bar over a video source's timeline (0…duration slider); Loader
+  factored to `loadFrame(from:atSeconds:)` with `loadMidpointFrame` as a
+  thin wrapper; `EditorState` lifted to `@MainActor` so the new
+  duration-probe Task satisfies Swift 6 strict concurrency. Single commit
+  3b12805. CLI regression check: Stone @ 1.0 hash byte-identical to the
+  M5-A.2 archive record → preview-only changes did not perturb export
+  paths. Visual scrub UX smoke deferred to user. Archived as
+  `archive/2026-05-04-m5-a3-video-preview-scrub.md`.
 
 ## Interrupt / Decision Log
 
@@ -123,6 +145,15 @@ shipping Electron rail.
   Desktop. Original Tier 1 #2 (video scrubbing) is deferred behind M5-A.2 so
   the 2-tier Look/Preset structure is established before further UI work.
   No milestone-table change; M5 still owns this slice.
+- 2026-05-04: Decided to open **M5-B (UI Material — Apple Liquid Glass)** as a
+  slice within M5 rather than a new milestone. Reasoning: it is a UI quality
+  dimension of Native Editing UI (M5), not an independent dependency; mirrors
+  the M5-A.* slice pattern; avoids milestone-table churn. Scope: systematic
+  adoption of Apple Liquid Glass across toolbar / sidebar / inspector / picker
+  / control panels; preview content layer explicitly excluded (Apple HIG +
+  color-judgment integrity). Goal and Done Conditions updated to make this an
+  explicit release-grade requirement. Implementation prioritization vs. Tier 1
+  #2 (video scrubbing) is left to the next active.md decision.
 
 ## Operating Rules
 

@@ -1,97 +1,87 @@
-# M5-A.3 Video Preview Scrub
+# M5-B Apple Liquid Glass Adoption (Pass 1)
 
 Date: 2026-05-04 JST
 Milestone: M5
-Classification: Tier 1 (deferred from M5-A.2 interrupt; resumed)
+Classification: Interrupt — user-requested UI material upgrade
 Status: In progress
 Worktree: `/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-native-desktop-plan`
 Branch: `feature/native-desktop-plan`
 
 ## Why
 
-After M5-A.2 the still preview shows the Stone / Urban Look live, but the
-video preview is pinned to the midpoint frame — the Look's effect across
-the timeline (skin / highlight / shadow distribution shifts) is invisible.
-Scrubbing is the smallest UI addition that lets the user see how a Look
-behaves on temporally varying material. It is the highest-value next
-M5 slice on the user-facing product surface.
+Strategy now lists Apple Liquid Glass as the primary UI material for
+Native Desktop v2 control surfaces (`Goal` + `Done Conditions` updated
+this session). Currently only `GlassControlGroup.swift` uses
+`.glassEffect()`; every other floating control panel
+(`GradeControls` / `ExportProgressBar` / `VideoScrubBar`) still uses
+the legacy `.regularMaterial` background. Pass 1 closes that gap on the
+visible control panels so the native app reads as a Liquid-Glass-first
+surface, matching the Done Condition language. Toolbar / window chrome
+is system-driven on macOS 26 and is treated as a separate
+audit (Pass 2) so this slice stays small and reviewable.
 
-## Scope (本質)
+## Scope (本質, Pass 1)
 
-- Video sources gain a scrub bar that picks the previewed frame time.
-- Preview reuses the existing iOS-canonical grade path with the scrubbed
-  frame instead of the midpoint.
-- Look + Preset + Strength controls keep working at the new scrub time.
-- Single in-flight frame request; latest scrub time wins.
+- Migrate the three currently-`.regularMaterial` floating panels to
+  `.glassEffect(.regular, in: …)` matching the existing
+  `GlassControlGroup` posture.
+  - `GradeControls` panel
+  - `ExportProgressBar` panel
+  - `VideoScrubBar` panel
+- Preserve the existing rounded-rectangle / capsule shape per panel —
+  this slice is material substitution, not layout redesign.
+- Keep the preview content layer (`PreviewSurface` `Color.black`
+  backdrop) glass-free per strategy + Apple HIG.
+- Build clean under Swift 6 strict concurrency.
 
-## Out of scope (外殻)
+## Out of scope (外殻 — Pass 2 / later)
 
-- AVPlayerLayer / MTKView migration (Phase 3 backlog).
-- Disk / memory frame cache across scrub (separate optimization lane).
-- Timeline thumbnail strip / scrubber-thumb image.
-- Keyboard shortcut nudge (±1 frame). Recorded as Follow-up.
-- Still preview behavior — unchanged.
-- Export paths (still + video) — unchanged.
-- CLI surface — unchanged (scrub is preview-only).
+- `GlassEffectContainer` grouping for refraction-coordinated nearby
+  glass shapes — visually nice-to-have once panels overlap or interact;
+  defer until Pass 1 lands and we have a real visual baseline.
+- Toolbar / window chrome audit (system-driven on macOS 26; verify it
+  is already Liquid Glass and document the conclusion in Pass 2).
+- New sidebar / inspector design — none currently exist.
+- Any color / opacity tuning beyond `.regular`.
+- iOS surface — untouched.
+- Export and pipeline logic — untouched.
 
 ## Stages
 
-- [x] S1 — Loader extension. Added
-  `FilmtoneVideoFramePreviewLoader.loadFrame(from:atSeconds:)` plus a
-  helper `loadDurationSeconds(from:)`. `loadMidpointFrame` is now a
-  thin wrapper that probes duration then delegates to `loadFrame`.
-  Tolerance fallback (zero → 0.5 s) preserved.
-- [x] S2 — State. Added `videoPreviewSeconds: Double?` and
-  `videoDurationSeconds: Double?` to `EditorState`. `setSource` cancels
-  any in-flight duration probe, drops stale scrub state, and starts a
-  new probe for video sources. The probe seeds
-  `videoPreviewSeconds = duration × 0.5` so first paint matches
-  pre-M5-A.3 midpoint behavior. `EditorState` is now `@MainActor` (it
-  was already main-actor in practice; required to satisfy Swift 6 strict
-  concurrency on the new probe Task that mutates `self`).
-- [x] S3 — Preview wire-up. `PreviewSurface` accepts
-  `videoPreviewSeconds: Double?` and forwards it. Pre-probe (nil) falls
-  back to `loadMidpointFrame` so the first paint is identical to the
-  pre-M5-A.3 path. Existing Task cancellation coalesces rapid scrub
-  updates.
-- [x] S4 — Scrub UI. Added `VideoScrubBar` overlay pinned bottom-center
-  in `RootWindowView`. Visible only when `state.sourceKind == .video`
-  and `videoDurationSeconds > 0`. Slider 0…duration with monospaced
-  `M:SS.SS / M:SS.SS` labels.
-- [x] S5 — Build + CLI regression. `xcodebuild ... build` →
-  `BUILD SUCCEEDED` (Swift 6 strict concurrency clean). CLI still smoke
-  (Stone @ 1.0 on `09-skin-light.png`) hash =
-  `436bfc812627f489d7680dededb8ed6af0bc3bcb7db6d9e3d26c8ea9d5f49931`,
-  identical to the M5-A.2 archive record → preview-only changes did not
-  perturb any export path. Visual scrub UX smoke (drag 0→100%, Look
-  consistency across timeline, no flicker on rapid drags) is deferred
-  to the user — same posture as M5-A.2 archive.
-- [ ] S6 — Commit. One feat commit covering loader + state + UI + wiring.
+- [ ] S1 — `GradeControls` panel: replace
+  `.background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))`
+  with `.glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12))`
+  in `RootWindowView.swift`. Preserve padding.
+- [ ] S2 — `ExportProgressBar` panel: same substitution.
+- [ ] S3 — `VideoScrubBar` panel: same substitution.
+- [ ] S4 — Build via `xcodebuild` → `BUILD SUCCEEDED` under Swift 6
+  strict concurrency.
+- [ ] S5 — CLI regression smoke (Stone @ 1.0 on
+  `09-skin-light.png`) → hash must remain
+  `436bfc81…d5f49931` (UI-only change must not perturb the grade
+  pipeline). Visual material smoke deferred to user.
+- [ ] S6 — Commit. One feat commit.
 
 ## Stage granularity
 
-- S1 ~15 min
-- S2 ~15 min
-- S3 ~10 min
-- S4 ~25 min
-- S5 ~15 min
+- S1 ~5 min
+- S2 ~5 min
+- S3 ~5 min
+- S4 ~10 min
+- S5 ~5 min
 - S6 ~5 min
 
-Total ≈ 85 min, single sitting.
+Total ≈ 35 min.
 
 ## Invariants
 
-- Still preview path: zero behavioural change.
-- Export paths (still + video): zero behavioural change.
-- iOS-canonical grade pipeline + Look cube applied per scrubbed frame —
-  no shortcuts on preview accuracy.
-- Latest scrub time wins; in-flight tasks cancelled (existing Task
-  cancellation pattern in `PreviewSurface` preserved).
-- Default scrub time on first video open = `duration × 0.5` so opening a
-  video and not touching the slider matches the pre-M5-A.3 midpoint
-  preview frame.
-- `AVAssetImageGenerator` tolerance: zero first, fall back to 0.5 s —
-  same recovery pattern as the existing midpoint loader.
+- Grade pipeline + sidecar + export paths: zero behavioural change. CLI
+  hash regression check is the gate.
+- Preview content layer remains a plain opaque backdrop.
+- Existing `GlassControlGroup` (`.glassEffect(.regular, in: Capsule())`)
+  is the reference posture for material + shape semantics.
+- Padding and corner radius preserved on each panel.
+- macOS 26 only — `.glassEffect` is the macOS 26 Liquid Glass API.
 
 ## Unexpected
 
@@ -99,12 +89,16 @@ Total ≈ 85 min, single sitting.
 
 ## Follow-up
 
-- Reuse a single `AVURLAsset` + `AVAssetImageGenerator` across scrub
-  events instead of constructing both per frame.
-- Disk-backed frame cache so backward scrub does not re-decode.
-- Timeline thumbnail strip (horizontal scrubber thumb cache).
-- Keyboard shortcut: ←/→ for ±1 frame nudge.
-- `AVPlayerLayer` / `MTKView` migration (Phase 3).
+- Pass 2: `GlassEffectContainer` audit to coordinate refraction across
+  the right-rail stack (`GlassControlGroup` + `GradeControls` +
+  `ExportProgressBar`).
+- Pass 2: toolbar / window chrome audit on macOS 26 — document whether
+  the system delivers Liquid Glass automatically or whether explicit
+  modifiers are needed.
+- Pass 2: visual smoke against a dark and a bright preview backdrop to
+  confirm legibility on both poles.
+- Tint / variant exploration (`.tinted` / `.identity`) once the base
+  posture is stable.
 
 ## Result
 
