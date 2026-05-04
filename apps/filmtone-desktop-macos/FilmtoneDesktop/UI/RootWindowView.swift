@@ -16,10 +16,11 @@ struct RootWindowView: View {
                 lookSlug: state.lookSlug,
                 videoPreviewSeconds: state.videoPreviewSeconds
             )
-            // M5-B Pass 2 + F2: GlassEffectContainer coordinates refraction
-            // across the right-rail panels; the .regular.tint(...) gives
-            // edges visible specularity so they read as Apple Liquid Glass
-            // rather than a frosted material pane.
+            // GlassEffectContainer coordinates refraction across the right-rail
+            // panels; .regular (no tint) keeps the canonical Apple Liquid Glass
+            // appearance — diagnostic with .red.opacity(0.7) confirmed the
+            // modifier is operational, the prior subtle look was Liquid Glass
+            // behaving as macOS HIG specifies (more restrained than iOS).
             GlassEffectContainer {
                 VStack(alignment: .trailing, spacing: 12) {
                     GlassControlGroup()
@@ -28,7 +29,7 @@ struct RootWindowView: View {
                             .padding(.horizontal, 14)
                             .padding(.vertical, 8)
                             .glassEffect(
-                                .regular.tint(.white.opacity(0.06)),
+                                .regular,
                                 in: RoundedRectangle(cornerRadius: 12)
                             )
                     }
@@ -37,7 +38,7 @@ struct RootWindowView: View {
                             .padding(.horizontal, 14)
                             .padding(.vertical, 8)
                             .glassEffect(
-                                .regular.tint(.white.opacity(0.06)),
+                                .regular,
                                 in: RoundedRectangle(cornerRadius: 12)
                             )
                     }
@@ -56,7 +57,7 @@ struct RootWindowView: View {
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
                         .glassEffect(
-                            .regular.tint(.white.opacity(0.06)),
+                            .regular,
                             in: RoundedRectangle(cornerRadius: 12)
                         )
                         .padding(.bottom, 12)
@@ -64,6 +65,14 @@ struct RootWindowView: View {
             }
         }
         .frame(minWidth: 880, minHeight: 560)
+        // The real reason the toolbar previously read as solid white was an
+        // opaque AppKit toolbar background painted on top of the Liquid Glass
+        // chrome. Hiding it lets the preview Image (which already extends via
+        // backgroundExtensionEffect) show through, giving the unified Apple
+        // Liquid Glass toolbar real content to refract — toolbar buttons and
+        // title still render normally, but the chrome bar itself becomes the
+        // glass surface the design language calls for.
+        .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Image(systemName: "camera.aperture")

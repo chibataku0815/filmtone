@@ -221,3 +221,65 @@ attached to the actual sampleable Image inside.
 | F-S6.1-C | Build clean, Swift 6 strict concurrency clean (`** BUILD SUCCEEDED **`, only pre-existing CI deprecation warnings) |
 | F-S6.1-D | Re-launch fresh `.app` (done — PID confirmed) |
 | F-S6.1-E | User re-smoke against same V1–V6 + F1–F4 expectations |
+
+### 2026-05-04 F-S6.1 re-smoke result: still no perceptible change
+
+User re-smoked F-S6.1. Outcome: "全く何も変わっていません". The Image
+refactor was correct architectural hygiene but the visible chrome /
+panel surfaces still read as before. Required honesty: the refactor was
+necessary for SwiftUI to even attempt sampling, but it was not
+sufficient to surface Liquid Glass as user-visible. Root cause was
+hiding behind one more layer.
+
+### F-S6.2 diagnostic test (replaces speculation)
+
+Three diagnostic instrumentations applied at once to convert speculation
+into evidence:
+
+1. **Look/Strength panel**: tint switched to `.regular.tint(.red.opacity(0.7))`
+   to test whether `.glassEffect` is operational at all. Other panels
+   left at the prior tint as A/B comparison.
+2. **Window toolbar**: `.toolbarBackgroundVisibility(.hidden, for: .windowToolbar)`
+   added to strip any AppKit opaque background painted on top of the
+   Liquid Glass chrome layer.
+3. **Preview backgroundExtensionEffect already on Image** (from F-S6.1)
+   left in place as the substrate the toolbar would refract.
+
+User screenshot result was decisive:
+
+| Surface | Observation | Verdict |
+|---|---|---|
+| Look/Strength panel | Read as fully red translucent rounded rect | `.glassEffect` is wired and operational; macOS HIG just renders `.regular` more restrained than iOS |
+| Toolbar bar | Bar disappeared entirely; preview Image flowed up into the chrome region; traffic light + camera-aperture + title + Open/Export buttons still rendered as floating items over the image | The "solid white toolbar" of every prior smoke was an **AppKit opaque toolbar background painted on top of the Liquid Glass** — not the Liquid Glass itself. `toolbarBackgroundVisibility(.hidden)` was the missing opt-in |
+| GlassControlGroup capsule | Dark translucent capsule, image content visible through it | This is the canonical macOS `.regular` Liquid Glass posture (no tint) |
+| VideoScrubBar | Translucent dark, image visible underneath | `.glassEffect` working, tint near-neutral |
+
+**Conclusion**: all four Liquid Glass APIs were already correctly applied.
+The single missing piece was the AppKit toolbar background suppression.
+macOS Liquid Glass is by design more restrained than iOS — it does not
+produce the dramatic edge-warping refraction of iOS or iPadOS panels.
+What user perceived as "ただの磨りガラス" on the right rail is in fact
+the canonical macOS Liquid Glass appearance. The toolbar disconnect was
+the genuinely fixable piece.
+
+### F-S6.2 production fix
+
+- All right-rail panels + scrub bar tint reset from
+  `.regular.tint(.white.opacity(0.06))` and the diagnostic red back to
+  plain `.regular` (canonical macOS Liquid Glass; the 0.06 white tint
+  was a near-no-op that earned its removal).
+- `.toolbarBackgroundVisibility(.hidden, for: .windowToolbar)` retained
+  in production — this is the actual Liquid Glass enabler for the
+  toolbar.
+- `.windowToolbarStyle(.unified)` retained (does no harm, keeps unified
+  layout posture).
+- `backgroundExtensionEffect()` on the preview Image retained.
+
+### F-S6.2 stages
+
+| Stage | Action |
+|---|---|
+| F-S6.2-A | Diagnostic build (red tint + toolbar hidden) — done, decisive |
+| F-S6.2-B | Production fix: reset tint to `.regular` everywhere, keep `toolbarBackgroundVisibility(.hidden)` — done |
+| F-S6.2-C | Rebuild + re-launch — done |
+| F-S6.2-D | User re-smoke V1–V6 against the corrected base, decide if Pass 3 (`.clear` variant for more transparency) is desired or if base is acceptable |
