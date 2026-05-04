@@ -57,6 +57,31 @@ final class EditorState {
     var exportProgressMessage: String?
     var lastExportSummary: String?
 
+    /// M5-C.4: pre-export format selection (still only — video stays h264).
+    /// Default `.png` matches the previous implicit default (NSSavePanel
+    /// prefilled `.png`).
+    var exportFormat: StillExportFormat = .png
+    /// M5-C.4: JPEG quality (0.5...1.0). Default 0.95 preserves the
+    /// pre-M5-C.4 hardcoded value bytewise. Ignored when `exportFormat`
+    /// is `.png`. didSet clamps so UI can't push the value out of range.
+    var jpegQuality: Double = 0.95 {
+        didSet {
+            let clamped = min(1.0, max(0.5, jpegQuality))
+            if clamped != jpegQuality { jpegQuality = clamped }
+        }
+    }
+    /// M5-C.4: stamped at NSSavePanel-OK so the finished state can show
+    /// elapsed seconds. Cleared when the result snapshot is reset.
+    @ObservationIgnored
+    var exportStartedAt: Date?
+    /// M5-C.4: persists across renders — drives the inspector's
+    /// "finished" state. Cleared by `resetExportResult()` (Export Again
+    /// button) or by the next export start.
+    var lastExportResult: ExportResultSnapshot?
+    /// M5-C.4: separated from `lastExportSummary` so the inspector can
+    /// surface failures without erasing the previous successful result.
+    var lastExportError: String?
+
     @ObservationIgnored
     var currentExportTask: Task<Void, Never>?
     @ObservationIgnored
@@ -123,6 +148,14 @@ final class EditorState {
         // Picker resolved-Auto label don't misreport stale state until the
         // PreviewSurface re-probes the new source.
         probedSourceColorClass = nil
+        // M5-C.4: previous export's snapshot belonged to the previous
+        // source — clear so the inspector returns to ready state for
+        // the new source.
+        lastExportResult = nil
+        lastExportError = nil
+        lastExportSummary = nil
+        exportStartedAt = nil
+        exportProgress = 0
 
         if let url, kind == .video {
             startVideoDurationProbe(for: url)
@@ -153,6 +186,36 @@ final class EditorState {
 
     func cancelExport() {
         currentExportTask?.cancel()
+    }
+
+    // MARK: - M5-C.4 Export inspector
+
+    /// Single source-cap reason rendered as the inspector's blocked
+    /// state. Mirrors iOS `store.sourceViolations` shape (array) so the
+    /// View's ForEach can stay identical even if Desktop later surfaces
+    /// multiple violations.
+    var sourceCapViolations: [String] {
+        guard sourceURL != nil,
+              let reason = FilmtoneSourceInputTransform.sourceCapReason(
+                probedColorClass: probedSourceColorClass
+              ),
+              FilmtoneSourceInputTransform.sourceExceedsCapacity(
+                selection: sourceProfileSelection,
+                probedColorClass: probedSourceColorClass
+              )
+        else { return [] }
+        return [reason]
+    }
+
+    /// Clear the finished-state snapshot so the inspector returns to
+    /// the ready state. Called by the inspector's "Export Again" button
+    /// and by `setSource(...)` when a new source is loaded.
+    func resetExportResult() {
+        lastExportResult = nil
+        lastExportError = nil
+        lastExportSummary = nil
+        exportStartedAt = nil
+        exportProgress = 0
     }
 
     // MARK: - M5-C.2a Saved Look bridge

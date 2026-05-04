@@ -36,6 +36,7 @@ struct FilmtoneStillExportRequest: FilmtoneSidecarRequest {
     let presetStrength: Double
     let lookSlug: String?
     let format: StillExportFormat
+    let jpegQuality: Double
     let sourceProfileSelection: CameraProfileSelection
     let quickState: FilmtoneQuickState
     let paramOverrides: FilmtonePhase0ParamsPatch
@@ -48,6 +49,7 @@ struct FilmtoneStillExportRequest: FilmtoneSidecarRequest {
         presetStrength: Double = FilmtonePresetCatalog.presetStrengthDefault,
         lookSlug: String? = nil,
         format: StillExportFormat,
+        jpegQuality: Double = 0.95,
         sourceProfileSelection: CameraProfileSelection = .auto,
         quickState: FilmtoneQuickState = .zero,
         paramOverrides: FilmtonePhase0ParamsPatch = .empty
@@ -58,6 +60,9 @@ struct FilmtoneStillExportRequest: FilmtoneSidecarRequest {
         self.presetStrength = presetStrength
         self.lookSlug = lookSlug
         self.format = format
+        // M5-C.4: clamp at request boundary so a stale UI value can't
+        // push a bogus quality through to the encoder.
+        self.jpegQuality = min(1.0, max(0.5, jpegQuality))
         self.sourceProfileSelection = sourceProfileSelection
         self.quickState = quickState
         self.paramOverrides = paramOverrides
@@ -187,7 +192,9 @@ enum FilmtoneStillExporter {
                     to: request.outputURL,
                     colorSpace: outputSpace,
                     options: [
-                        kCGImageDestinationLossyCompressionQuality as CIImageRepresentationOption: 0.95
+                        // M5-C.4: request-driven quality (default 0.95
+                        // matches pre-M5-C.4 hardcoded behavior).
+                        kCGImageDestinationLossyCompressionQuality as CIImageRepresentationOption: request.jpegQuality
                     ]
                 )
             }

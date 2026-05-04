@@ -378,4 +378,57 @@ runner.test("FilmtonePhase0ParamsPatch distinct patches compare non-equal") {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Test group 8 — M5-C.4 Export Inspector formatters + clamps.
+// FilmtoneFormatters is a Foundation-only helper used by the inspector to
+// surface elapsed time / file size / clamped JPEG quality. Tested here so a
+// regression in the displayed copy or clamp range is caught before the user
+// hits it visually.
+// ---------------------------------------------------------------------------
+
+runner.test("formattedFileSize boundaries (B / KB / MB / GB)") {
+    try assertEqual(FilmtoneFormatters.formattedFileSize(0), "0 B")
+    try assertEqual(FilmtoneFormatters.formattedFileSize(999), "999 B")
+    try assertEqual(FilmtoneFormatters.formattedFileSize(1024), "1.0 KB")
+    try assertEqual(FilmtoneFormatters.formattedFileSize(1536 * 1024), "1.5 MB")
+    try assertEqual(FilmtoneFormatters.formattedFileSize(2_899_102_924), "2.7 GB")
+}
+
+runner.test("formattedFileSize negative input clamps to 0 B") {
+    try assertEqual(FilmtoneFormatters.formattedFileSize(-100), "0 B")
+}
+
+runner.test("formattedElapsed sub-minute uses one-decimal seconds") {
+    try assertEqual(FilmtoneFormatters.formattedElapsed(0.0), "0.0s")
+    try assertEqual(FilmtoneFormatters.formattedElapsed(0.5), "0.5s")
+    try assertEqual(FilmtoneFormatters.formattedElapsed(12.4), "12.4s")
+    try assertEqual(FilmtoneFormatters.formattedElapsed(59.9), "59.9s")
+}
+
+runner.test("formattedElapsed minutes uses Mm SSs") {
+    try assertEqual(FilmtoneFormatters.formattedElapsed(60), "1m 00s")
+    try assertEqual(FilmtoneFormatters.formattedElapsed(90), "1m 30s")
+    try assertEqual(FilmtoneFormatters.formattedElapsed(599), "9m 59s")
+}
+
+runner.test("formattedElapsed hours uses Hh MMm SSs") {
+    try assertEqual(FilmtoneFormatters.formattedElapsed(3600), "1h 00m 00s")
+    try assertEqual(FilmtoneFormatters.formattedElapsed(3661), "1h 01m 01s")
+    try assertEqual(FilmtoneFormatters.formattedElapsed(7325), "2h 02m 05s")
+}
+
+runner.test("formattedElapsed handles non-finite + negative") {
+    try assertEqual(FilmtoneFormatters.formattedElapsed(.nan), "—")
+    try assertEqual(FilmtoneFormatters.formattedElapsed(-1), "—")
+}
+
+runner.test("clampedJpegQuality enforces 0.5...1.0 range") {
+    try assertClose(FilmtoneFormatters.clampedJpegQuality(0.95), 0.95)
+    try assertClose(FilmtoneFormatters.clampedJpegQuality(0.5), 0.5)
+    try assertClose(FilmtoneFormatters.clampedJpegQuality(1.0), 1.0)
+    try assertClose(FilmtoneFormatters.clampedJpegQuality(0.0), 0.5)
+    try assertClose(FilmtoneFormatters.clampedJpegQuality(1.5), 1.0)
+    try assertClose(FilmtoneFormatters.clampedJpegQuality(-1.0), 0.5)
+}
+
 exit(runner.summary())

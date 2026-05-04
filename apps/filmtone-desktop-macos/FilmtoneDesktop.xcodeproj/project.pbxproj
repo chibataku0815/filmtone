@@ -52,6 +52,9 @@
 		FT0000000000000000000A2B /* LibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B2B /* LibraryViewModel.swift */; };
 		FT0000000000000000000A2C /* LookLibraryControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B2C /* LookLibraryControls.swift */; };
 		FT0000000000000000000A2D /* QuickAdjustControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B2D /* QuickAdjustControls.swift */; };
+		FT0000000000000000000A2E /* MetricRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B2E /* MetricRow.swift */; };
+		FT0000000000000000000A2F /* ExportInspectorPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B2F /* ExportInspectorPanel.swift */; };
+		FT0000000000000000000A30 /* FilmtoneExportSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B30 /* FilmtoneExportSnapshot.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -100,6 +103,9 @@
 		FT0000000000000000000B2B /* LibraryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryViewModel.swift; sourceTree = "<group>"; };
 		FT0000000000000000000B2C /* LookLibraryControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LookLibraryControls.swift; sourceTree = "<group>"; };
 		FT0000000000000000000B2D /* QuickAdjustControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickAdjustControls.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B2E /* MetricRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricRow.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B2F /* ExportInspectorPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportInspectorPanel.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B30 /* FilmtoneExportSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneExportSnapshot.swift; sourceTree = "<group>"; };
 		FT0000000000000000000C01 /* FilmtoneDesktop.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FilmtoneDesktop.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -175,6 +181,8 @@
 				FT0000000000000000000B28 /* SourceProfileControls.swift */,
 				FT0000000000000000000B2C /* LookLibraryControls.swift */,
 				FT0000000000000000000B2D /* QuickAdjustControls.swift */,
+				FT0000000000000000000B2E /* MetricRow.swift */,
+				FT0000000000000000000B2F /* ExportInspectorPanel.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -238,6 +246,7 @@
 				FT0000000000000000000B10 /* FilmtoneSidecarWriter.swift */,
 				FT0000000000000000000B12 /* FilmtoneSidecarTypes.swift */,
 				FT0000000000000000000B16 /* FilmtoneVideoExporter.swift */,
+				FT0000000000000000000B30 /* FilmtoneExportSnapshot.swift */,
 			);
 			path = Export;
 			sourceTree = "<group>";
@@ -375,6 +384,9 @@
 				FT0000000000000000000A2B /* LibraryViewModel.swift in Sources */,
 				FT0000000000000000000A2C /* LookLibraryControls.swift in Sources */,
 				FT0000000000000000000A2D /* QuickAdjustControls.swift in Sources */,
+				FT0000000000000000000A2E /* MetricRow.swift in Sources */,
+				FT0000000000000000000A2F /* ExportInspectorPanel.swift in Sources */,
+				FT0000000000000000000A30 /* FilmtoneExportSnapshot.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -520,7 +532,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 2.0.0;
+				MARKETING_VERSION = 1.4;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.chibatakumi.film-lab-desktop";
 				PRODUCT_NAME = Filmtone;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -548,7 +560,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 2.0.0;
+				MARKETING_VERSION = 1.4;
 				OTHER_CODE_SIGN_FLAGS = "--timestamp";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.chibatakumi.film-lab-desktop";
 				PRODUCT_NAME = Filmtone;

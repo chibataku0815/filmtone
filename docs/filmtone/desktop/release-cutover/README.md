@@ -6,7 +6,7 @@ M5 lane (`docs/filmtone/desktop/native-desktop-v2/`) と並列で動く独立 la
 **Cutover direction (2026-05-04 確定)**: Native Desktop v2 は Electron Desktop
 (`apps/desktop-film-lab-batch`) の **単一置換後継**、並走しない。Bundle ID は
 `com.chibatakumi.film-lab-desktop` (Electron と同一、drop-in upgrade)、version
-は `2.0.0` から start (Electron 1.0.3 を semver で超える)。詳細決定 + Open
+は `2.0.0` から start (Electron 1.0.4 を semver で超える)。詳細決定 + Open
 Questions: [`cutover-architecture.md`](cutover-architecture.md) (persistent
 reference doc、本 lane の決定 SSOT)。
 
@@ -75,7 +75,7 @@ Completion Log に短く反映する (本 lane の archive 経由で参照)。
 
 ## Release version 方針
 
-- **公開 release version は `2.0.0` から start** (Electron Desktop 1.0.3 を
+- **公開 release version は `2.0.0` から start** (Electron Desktop 1.0.4 を
   semver で超え、既存 user の update path で自動着地、cutover-architecture
   decision B)。
 - `0.1.0` は Phase 5 で smoke 専用 build (notarize 経路の検証用)。**公開しない**。
@@ -297,7 +297,7 @@ A〜K)。残 Open Questions OQ-1〜OQ-4 (batch / 寄付 / Smart Look AI / cutove
 - archive: `archive/2026-05-04-release-phase-6-cutover-architecture-brand-alignment.md`
 
 → 次の `scripts/release-macos.sh` 実行は **drop-in upgrade artifact** として
-Electron 1.0.3 install を上書きできる identity を持つ `Filmtone.app` (notarized
+Electron 1.0.4 install を上書きできる identity を持つ `Filmtone.app` (notarized
 + stapled、`Filmtone-2.0.0.dmg`) を produce する。
 
 ただし実 2.0.0 公開 release pipeline は M5-C P0 closure (M5 chat 担当、本
@@ -313,4 +313,4 @@ lane scope 外) 後 Phase 9 で実施。本 chat はここまでで release-cuto
   / Adjustments / Export panel の iOS parity)
 - **Phase 9**: 2.0.0 公開 release run (`scripts/release-macos.sh` + `package-dmg.sh` +
   Phase 7 で整備された Blob upload + update-meta switch)
-- **Phase 10**: Electron 1.0.3 deprecation notice + workspace archived status
+- **Phase 10**: Electron 1.0.4 deprecation notice + workspace archived status

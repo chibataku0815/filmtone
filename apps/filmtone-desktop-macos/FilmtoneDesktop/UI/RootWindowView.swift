@@ -74,15 +74,22 @@ struct RootWindowView: View {
                                 .clear.tint(.black.opacity(0.30)),
                                 in: RoundedRectangle(cornerRadius: 12)
                             )
-                    }
-                    if state.isExporting {
-                        ExportProgressBar(state: state)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .glassEffect(
-                                .clear,
-                                in: RoundedRectangle(cornerRadius: 12)
-                            )
+                        // M5-C.4: Mac-native Export Inspector replaces
+                        // the previous one-line ExportProgressBar +
+                        // toolbar-only flow. Persistent panel that
+                        // surfaces format / quality controls before the
+                        // run, live progress while running, and elapsed
+                        // / dims / file size / Reveal / Share after.
+                        ExportInspectorPanel(
+                            state: state,
+                            onExportTap: { presentExportPanel() }
+                        )
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .glassEffect(
+                            .clear.tint(.black.opacity(0.30)),
+                            in: RoundedRectangle(cornerRadius: 12)
+                        )
                     }
                 }
             }
@@ -209,18 +216,24 @@ struct RootWindowView: View {
     }
 
     private func presentStillExportPanel(sourceURL: URL) {
+        // M5-C.4: format / quality come from the inspector's controls,
+        // not the NSSavePanel filename extension. The panel still
+        // accepts both content types so the user can override the
+        // extension manually if they want.
         let panel = NSSavePanel()
-        panel.allowedContentTypes = [.png, .jpeg]
+        panel.allowedContentTypes = state.exportFormat == .jpeg ? [.jpeg, .png] : [.png, .jpeg]
         panel.canCreateDirectories = true
-        panel.nameFieldStringValue = sourceURL.deletingPathExtension().lastPathComponent + "-" + state.presetName + ".png"
+        panel.nameFieldStringValue = sourceURL.deletingPathExtension().lastPathComponent
+            + "-" + state.presetName
+            + "." + state.exportFormat.fileExtension
         panel.message = "Export the still + sidecar JSON"
         guard panel.runModal() == .OK, let outputURL = panel.url else { return }
 
-        let format: StillExportFormat
-        switch outputURL.pathExtension.lowercased() {
-        case "jpg", "jpeg": format = .jpeg
-        default: format = .png
-        }
+        // Inspector-driven format wins; if the user hand-typed a
+        // mismatched extension, we still honor inspector intent because
+        // the encoder is what writes the bytes.
+        let format = state.exportFormat
+        let jpegQuality = state.jpegQuality
 
         let request = FilmtoneStillExportRequest(
             sourceURL: sourceURL,
@@ -229,22 +242,40 @@ struct RootWindowView: View {
             presetStrength: state.presetStrength,
             lookSlug: state.lookSlug,
             format: format,
+            jpegQuality: jpegQuality,
             sourceProfileSelection: state.sourceProfileSelection,
             quickState: state.quickState,
             paramOverrides: state.paramOverrides
         )
 
+        let startedAt = Date()
+        state.exportStartedAt = startedAt
+        state.lastExportResult = nil
+        state.lastExportError = nil
         state.isExporting = true
         state.exportProgress = 0
         state.exportProgressMessage = "Exporting still…"
         state.currentExportTask = Task.detached {
             do {
                 let result = try FilmtoneStillExporter.export(request)
+                let fileSize = (try? FileManager.default.attributesOfItem(atPath: result.outputURL.path)[.size] as? Int64) ?? 0
+                let elapsed = Date().timeIntervalSince(startedAt)
                 await MainActor.run {
                     state.isExporting = false
                     state.exportProgress = 1
                     state.exportProgressMessage = nil
-                    state.lastExportSummary = "Exported \(result.pixelWidth)×\(result.pixelHeight) → \(result.outputURL.lastPathComponent)"
+                    state.lastExportSummary = nil
+                    state.lastExportError = nil
+                    state.lastExportResult = ExportResultSnapshot(
+                        outputURL: result.outputURL,
+                        sidecarURL: result.sidecarURL,
+                        pixelWidth: result.pixelWidth,
+                        pixelHeight: result.pixelHeight,
+                        processedFrames: nil,
+                        fileSizeBytes: fileSize,
+                        elapsedSeconds: elapsed,
+                        sourceKind: .still
+                    )
                     state.currentExportTask = nil
                 }
             } catch {
@@ -252,7 +283,7 @@ struct RootWindowView: View {
                     state.isExporting = false
                     state.exportProgress = 0
                     state.exportProgressMessage = nil
-                    state.lastExportSummary = "Export failed: \(error)"
+                    state.lastExportError = "Export failed: \(error.localizedDescription)"
                     state.currentExportTask = nil
                 }
             }
@@ -278,6 +309,10 @@ struct RootWindowView: View {
             paramOverrides: state.paramOverrides
         )
 
+        let startedAt = Date()
+        state.exportStartedAt = startedAt
+        state.lastExportResult = nil
+        state.lastExportError = nil
         state.isExporting = true
         state.exportProgress = 0
         state.exportProgressMessage = "Reading video…"
@@ -289,11 +324,24 @@ struct RootWindowView: View {
                         state.exportProgressMessage = "Rendering frame \(progress.processedFrames)/\(progress.estimatedTotalFrames)"
                     }
                 }
+                let fileSize = (try? FileManager.default.attributesOfItem(atPath: result.outputURL.path)[.size] as? Int64) ?? 0
+                let elapsed = Date().timeIntervalSince(startedAt)
                 await MainActor.run {
                     state.isExporting = false
                     state.exportProgress = 1
                     state.exportProgressMessage = nil
-                    state.lastExportSummary = "Exported \(result.outputWidth)×\(result.outputHeight), \(result.processedFrames) frames → \(result.outputURL.lastPathComponent)"
+                    state.lastExportSummary = nil
+                    state.lastExportError = nil
+                    state.lastExportResult = ExportResultSnapshot(
+                        outputURL: result.outputURL,
+                        sidecarURL: result.sidecarURL,
+                        pixelWidth: result.outputWidth,
+                        pixelHeight: result.outputHeight,
+                        processedFrames: result.processedFrames,
+                        fileSizeBytes: fileSize,
+                        elapsedSeconds: elapsed,
+                        sourceKind: .video
+                    )
                     state.currentExportTask = nil
                 }
             } catch is CancellationError {
@@ -301,7 +349,7 @@ struct RootWindowView: View {
                     state.isExporting = false
                     state.exportProgress = 0
                     state.exportProgressMessage = nil
-                    state.lastExportSummary = "Export cancelled"
+                    state.lastExportError = "Export cancelled"
                     state.currentExportTask = nil
                 }
             } catch {
@@ -309,7 +357,7 @@ struct RootWindowView: View {
                     state.isExporting = false
                     state.exportProgress = 0
                     state.exportProgressMessage = nil
-                    state.lastExportSummary = "Export failed: \(error)"
+                    state.lastExportError = "Export failed: \(error.localizedDescription)"
                     state.currentExportTask = nil
                 }
             }
@@ -352,30 +400,6 @@ private struct VideoScrubBar: View {
         let minutes = Int(total / 60)
         let secondsRemainder = total - Double(minutes * 60)
         return String(format: "%d:%05.2f", minutes, secondsRemainder)
-    }
-}
-
-private struct ExportProgressBar: View {
-    @Bindable var state: EditorState
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            ProgressView(value: state.exportProgress)
-                .progressViewStyle(.linear)
-                .frame(width: 240)
-            HStack {
-                if let message = state.exportProgressMessage {
-                    Text(message)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button("Cancel") {
-                    state.cancelExport()
-                }
-                .controlSize(.small)
-            }
-        }
     }
 }
 

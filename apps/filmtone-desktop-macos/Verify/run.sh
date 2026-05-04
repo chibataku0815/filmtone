@@ -25,6 +25,7 @@ SOURCES=(
   "$SRC_ROOT/Color/FilmtoneCreativeLutLoader.swift"
   "$SRC_ROOT/Export/FilmtoneSidecarTypes.swift"
   "$SRC_ROOT/Export/FilmtoneSidecarWriter.swift"
+  "$SRC_ROOT/Export/FilmtoneExportSnapshot.swift"
   "$HERE/main.swift"
 )
 
