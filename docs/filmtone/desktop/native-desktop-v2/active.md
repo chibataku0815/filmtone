@@ -163,3 +163,61 @@ fixing this base setup; tinting a still-broken base does not help.
 Pass 3 (tint / variant exploration beyond `.tint(.white.opacity(0.06))`)
 remains deferred until the F-cycle smoke validates the corrected base
 posture.
+
+### 2026-05-04 F-cycle re-smoke result: F2/F3/F4 visual non-effect — true root cause identified
+
+User ran F-S6 re-smoke against fresh build (12:28 JST, commit `1f4d4db0`).
+F1 (Preset row removed) ✅ visible. F2 / F3 / F4 visual effects reported
+as **almost no visible change** vs pre-F-cycle build. Triage in the prior
+table identified candidate causes; ground truth obtained via Apple
+Landmarks sample (`developer.apple.com/.../Landmarks-Applying-a-background-extension-effect`)
++ official `View.backgroundExtensionEffect()` reference + community
+Liquid Glass references shows the **real** root cause is architectural,
+not API-call-shape:
+
+**`PreviewSurface` rendered the source image via `NSViewRepresentable`
+wrapping `NSImageView`.** SwiftUI's Liquid Glass refraction system
+(`.glassEffect`, `.backgroundExtensionEffect()`, unified toolbar
+chrome) samples pixels from the SwiftUI render tree to compute
+lensing. NSViewRepresentable content is **opaque** to that sampler:
+the Liquid Glass code sees no content beneath it and falls back to a
+flat material appearance. This explains the symptom set in one stroke:
+
+- Toolbar reads as solid white because there is no SwiftUI-visible
+  content extending into the chrome region for it to refract.
+- Right-rail panels read as frosted because `.glassEffect` cannot
+  sample the NSImageView pixels under them — same fallback.
+- `.backgroundExtensionEffect()` applied to PreviewSurface had no
+  observable effect because Color.black was the modifier's actual
+  target (the modifier mirrors and blurs the receiver into the safe
+  area; black-on-black mirroring is invisible).
+
+Apple's verbatim Landmarks pattern is `Image(...).resizable().scaledToFill().backgroundExtensionEffect()` —
+the modifier expects to receive an `Image` view as the content to
+extend, not a surrounding container.
+
+### F-S6.1 fix (real)
+
+Refactor `PreviewSurface` to render via SwiftUI `Image(nsImage:)`
+instead of `NSViewRepresentable`/`NSImageView`. Pipeline (URL →
+CIImage → grade → CGImage → NSImage) preserved verbatim, but final
+display step is a SwiftUI Image with `.resizable().scaledToFill()
+.clipped().backgroundExtensionEffect()`. Rendering moved into a
+`@State private var renderedImage: NSImage?` driven by `.task(id:)`
+so source / preset / scrub-bar updates re-render. Heavy CIImage work
+runs in `Task.detached(priority: .userInitiated)` to keep the main
+actor responsive.
+
+Side effect: removes the duplicate `.backgroundExtensionEffect()` call
+on PreviewSurface in `RootWindowView`, since the modifier is now
+attached to the actual sampleable Image inside.
+
+### F-S6.1 stages
+
+| Stage | Action |
+|---|---|
+| F-S6.1-A | Refactor `PreviewSurface.swift` to SwiftUI Image(nsImage:) (done) |
+| F-S6.1-B | Remove duplicate `.backgroundExtensionEffect()` on PreviewSurface in `RootWindowView` (done) |
+| F-S6.1-C | Build clean, Swift 6 strict concurrency clean (`** BUILD SUCCEEDED **`, only pre-existing CI deprecation warnings) |
+| F-S6.1-D | Re-launch fresh `.app` (done — PID confirmed) |
+| F-S6.1-E | User re-smoke against same V1–V6 + F1–F4 expectations |

@@ -16,11 +16,6 @@ struct RootWindowView: View {
                 lookSlug: state.lookSlug,
                 videoPreviewSeconds: state.videoPreviewSeconds
             )
-            // M5-B F2: extend preview content under the toolbar / window
-            // chrome so the unified Apple Liquid Glass toolbar has rich
-            // content to refract. Without this, the chrome paints over an
-            // empty background and reads as a flat opaque bar.
-            .backgroundExtensionEffect()
             // M5-B Pass 2 + F2: GlassEffectContainer coordinates refraction
             // across the right-rail panels; the .regular.tint(...) gives
             // edges visible specularity so they read as Apple Liquid Glass
