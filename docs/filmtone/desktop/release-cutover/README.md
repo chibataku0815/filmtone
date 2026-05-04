@@ -140,7 +140,21 @@ TeamIdentifier=C3G77H8NM6
 entitlements: 4 keys all = false
 ```
 
-次フェーズ (新 active.md 化):
-- App Category polish + Info.plist 補完 (notarize blocker でないが release 品質 polish)
+## Phase 2 close summary
+
+1 commit landed (2026-05-04):
+
+- pbxproj Debug + Release に `INFOPLIST_KEY_LSApplicationCategoryType =
+  "public.app-category.photography"` 追加
+- Debug build pass、生成 Info.plist で `LSApplicationCategoryType` 反映確認
+- exportArchive の "No App Category" soft warning は次回 release run で消える想定
+- archive: `archive/2026-05-04-release-phase-2-app-category.md`
+
+`INFOPLIST_KEY_NSHumanReadableCopyright` は legal entity 名 user 提供待ちで空維持。
+`CFBundleDocumentTypes` は real Info.plist file 化 = infra refactor のため Phase 2
+範囲外、必要時に別 phase で扱う。
+
+次フェーズ (新 active.md 化、user-driven trigger):
 - 実 notarize end-to-end run の結果次第で raised issue 対応
 - Sparkle 等 auto-update は別 lane (本 lane 範囲外、外殻)
+- legal entity 名確定 → `NSHumanReadableCopyright` 設定 (1 行 polish)
