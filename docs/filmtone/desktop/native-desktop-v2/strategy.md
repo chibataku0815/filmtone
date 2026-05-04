@@ -43,7 +43,7 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
 | M1 | Native Contract And Skeleton | none | Complete | Native app builds, launches a native window, uses SwiftUI/AppKit controls, and does not change the Electron release rail. |
 | M2 | Still And Video Vertical Slice | M1 | Complete | Still and video open, preview, export, and sidecar paths work through the native app. |
 | M3 | Native Color And Optics Parity | M2 | In progress | Built-in Looks use the iOS-canonical color and optics stages; performance is acceptable at 4K; remaining parity gaps are explicit. |
-| M4 | Shared Contract Consolidation | M3 | In progress (M4-A boundary cut) | Shared Swift contract ownership is clear, generated Swift remains generated-only, and iOS/macOS consume the same canonical contract without destabilizing the iOS lane. |
+| M4 | Shared Contract Consolidation | M3 | In progress (M4-B Phase0 core package) | Shared Swift contract ownership is clear, generated Swift remains generated-only, and iOS/macOS consume the same canonical contract without destabilizing the iOS lane. |
 | M5 | Native Editing UI | M3 | In progress | Core Desktop workflows are usable in native UI: look selection, preview navigation, export controls, progress/cancel, and Finder integration. Apple Liquid Glass is applied systematically to control surfaces (toolbar / sidebar / inspector / picker / control panels), preview content layer excluded. |
 | M6 | Release Cutover | M5 | In progress | release-cutover lane Phase 1-7 done (signing posture + pipeline + 0.1.0 smoke + cutover identity + distribution scripts; version policy corrected to iOS-aligned 1.4: Bundle ID `com.chibatakumi.film-lab-desktop` / Product Name `Filmtone` / MARKETING_VERSION `1.4`). Final 1.4 公開 gate = M5-C P0 (C.2 Look library / C.3 Adjustments / C.4 Export panel) closure。詳細: `../release-cutover/cutover-architecture.md`。 |
 
@@ -73,9 +73,11 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
   integration / look selection UX). Prioritize 本質 product quality.
 - Baseline-C population is intentionally treated as quality shell work unless
   formal parity proof is requested.
-- M4 implementation extraction remains deferred, but M4-A Shared Swift Boundary
-  Cut Line is now active as a short interrupt before more M5-C Desktop-only
-  copies accumulate.
+- M4-A Shared Swift Boundary Cut Line closed 2026-05-04 — boundary matrix +
+  first extraction route at `packages/film-lab-swift-core` confirmed. M4-B
+  Shared Phase0 Core Package is now the active implementation slice; M5-C.4
+  Export Inspector remains paused at `paused/2026-05-04-m5-c4-export-inspector.md`
+  pending M4-B closure.
 - **Parallel release lane** is in progress at
   `docs/filmtone/desktop/release-cutover/` (separate active.md singleton from
   this lane). Phase 1 closed 2026-05-04: M3 LOW gap `printContrast` sign-gate
@@ -363,6 +365,14 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
   `archive/2026-05-04-m5-c3a-quick-adjust-parity-and-saved-look-round-trip.md`.
   M5-C.3 series remaining: M5-C.3b advanced per-parameter override
   editing UX (paramOverrides storage / apply path already lit up).
+- 2026-05-04: M4-A Shared Swift Boundary Cut Line closed — boundary matrix
+  set (share-now / share-after-cleanup / keep-platform-specific /
+  generated-only) and first extraction route confirmed: repo-local Swift
+  Package at `packages/film-lab-swift-core`, both Xcode targets consume via
+  XCLocalSwiftPackageReference. No code moved (boundary slice only).
+  Archived as `archive/2026-05-04-m4-a-shared-swift-boundary-cut-line.md`;
+  M4-B Shared Phase0 Core Package opens as the implementation slice. M5-C.4
+  Export Inspector remains paused.
 
 ## Interrupt / Decision Log
 
