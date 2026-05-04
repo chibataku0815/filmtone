@@ -297,25 +297,62 @@ the CodingKey type itself.
 8. Commit: deferred until user requests git operations (per CLAUDE.md §9
    "Git 操作は user が行う").
 
-### Phase 3 — iOS consumption + generator simplification
+### Phase 3 — iOS consumption + generator simplification — **DONE 2026-05-04**
 
-1. Add `XCLocalSwiftPackageReference` + product link to iOS pbxproj.
-2. Edit iOS files to delete the lifted struct declarations and add
-   `import FilmLabSwiftCore` where needed. Keep iOS-only Patch / Params
-   methods (`normalized(over:)`, `settingValue(_:for:over:)`,
-   `normalizedPreservingOpticsGlow(over:)`, `Phase0Params.asDTO()`) as
-   iOS-side **extensions** on the package types — they depend on iOS-only
-   `FilmtonePhase0Math.clampParam` / `paramEqualityTolerance` and
-   `Phase0ParamsDTO`, which stay app-local.
-3. Drop the `ios` target from `scripts/generate-filmtone-swift.ts` (final
-   collapse to single output: package public). Confirm package file
-   unchanged (MD5 stable) and the former app-local iOS file is no longer
-   rewritten.
-4. `xcodebuild` iOS Debug — green.
-5. Commit: `feat(ios): consume film-lab-swift-core, simplify generator`.
+1. Added `XCLocalSwiftPackageReference` (relativePath `../../../../packages/film-lab-swift-core`)
+   + `XCSwiftPackageProductDependency` (`FilmLabSwiftCore`) to iOS pbxproj.
+   `PBXProject.packageReferences` + `PBXNativeTarget.packageProductDependencies`
+   + `Frameworks` build phase entry wired. UUIDs `F4...0001` (PBXBuildFile),
+   `F4...0010` (XCLocalSwiftPackageReference), `F4...0020`
+   (XCSwiftPackageProductDependency). [done]
+2. Deleted `apps/capacitor-film-lab-ios/ios/App/App/FilmtonePhase0Generated.swift`
+   (former generated artifact) + matching pbxproj entries
+   (`D1...000D` PBXBuildFile + Sources phase, `C1...000D` PBXFileReference +
+   group children). [done]
+3. Edited `FilmtonePhase0Math.swift`: deleted the 4 struct declarations
+   (`FilmtoneQuickState`, `FilmtonePhase0Params`, `FilmtonePhase0ParamsPatch`,
+   `FilmtonePhase0HiddenDefaults`); added `import FilmLabSwiftCore`; kept
+   iOS-only Patch / Params methods (`normalized(over:)`,
+   `settingValue(_:for:over:)`, `normalizedPreservingOpticsGlow(over:)`,
+   `Phase0Params.asDTO()`) as iOS-side **extensions** on the package types
+   — they depend on iOS-only `FilmtonePhase0Math.clampParam` /
+   `paramEqualityTolerance` and `Phase0ParamsDTO`, which stay app-local.
+   `FilmtoneProjectState` and `FilmtoneRequestBuildError` remain iOS-local.
+   [done]
+4. Edited `FilmtoneMediaTypes.swift`: removed `Phase0OutputProfileDTO`
+   declaration; added `import FilmLabSwiftCore`. [done]
+5. Added `import FilmLabSwiftCore` to 12 consumer files surfaced by
+   xcodebuild "cannot find type" errors: FilmtoneLibrarySchema.swift,
+   FilmtoneExportSession.swift, FilmtoneBuiltInCatalog.swift,
+   FilmtoneStrengthSheetData.swift, FilmtoneAdvancedParamsModel.swift,
+   FilmtoneLibraryStore.swift, FilmtoneEditorStore.swift,
+   FilmtoneSnapshotSupport.swift, FilmtoneStrengthSheet.swift,
+   FilmtoneFullscreenLutEditor.swift, FilmtoneHelpAssetGenerator.swift,
+   FilmtoneRayAngleOptics.swift. [done]
+6. Generator updated: dropped `ios` target — now emits to a single path
+   (package public). `bun run scripts/generate-filmtone-swift.ts --check`
+   EXIT 0 (1-output stable). [done]
+7. Verification: `xcodebuild -workspace apps/capacitor-film-lab-ios/ios/App/App.xcworkspace
+   -scheme App -configuration Debug -destination 'generic/platform=iOS'
+   build` ✅ BUILD SUCCEEDED. `swift test` 27/27 still green. Desktop
+   `Verify/run.sh` 36/36 still PASS. `git diff --check` ✅ EXIT 0.
+   `plutil -lint App.xcodeproj/project.pbxproj` ✅ OK. [done]
+8. Commit: bundled with Phase 1 + 1.5 + 2 into single
+   `feat(swift-core): M4-B Shared Phase0 Core Package — iOS+Desktop SPM 化`
+   (`5efb7072`). Closeout doc separate (`7663bd1f`).
 
-A fourth optional commit can drop the now-unused iOS / Desktop local
-files if Phase 2 / 3 left any leftover.
+### Phase 3 follow-up — iOS extension dedup — **DONE 2026-05-04**
+
+After Phase 3 landed, three iOS-extension helpers (`removingValue(for:)`,
+`opticsGlowKeys`, `densifyingOpticsGlow(from:)`) were noted to duplicate
+the package's `public` implementations on `FilmtonePhase0ParamsPatch`.
+Compilation prefers the iOS extension over the package type, partially
+defeating the consolidation goal. Removed the three duplicates from
+`FilmtonePhase0Math.swift`; `Self.opticsGlowKeys` inside the kept
+`normalizedPreservingOpticsGlow(over:)` extension now resolves to the
+package's public static let. iOS-only methods remaining as extensions:
+`normalized(over:)`, `settingValue(_:for:over:)`,
+`normalizedPreservingOpticsGlow(over:)`, `Phase0Params.asDTO()`.
 
 ## Done conditions
 
@@ -437,14 +474,14 @@ without confirmation.
 
 - [x] Phase 1: package skeleton + tests green (22 tests: Phase0Codable + GeneratedLandmark)
 - [x] Phase 1.5: emitter `accessLevel: "public"` + 5 hand-written types publicized + PublicImportSmokeTests (5 tests). Total: 27/27 green
-- [ ] Phase 1 + 1.5 bundled commit (deferred — user-controlled git)
 - [x] Phase 2: Desktop wired (pbxproj + 13 imports + 3 deletions) + Verify rewritten to module-link + Verify 36/36 PASS + xcodebuild Debug ✅ + generator macos target dropped (3→2 outputs)
-- [ ] Phase 2 commit (deferred — user-controlled git)
-- [ ] Phase 3: iOS wired + xcodebuild green + generator collapsed to single output
-- [ ] Phase 3 commit
-- [ ] Restore `paused/2026-05-04-m5-c4-export-inspector.md` to `active.md`
-- [ ] Archive this M4-B active to `archive/2026-05-04-m4-b-shared-phase0-core-package.md`
-- [ ] Append 1-3 line Completion Log entry to `strategy.md`
+- [x] Phase 3: iOS wired (pbxproj + 14 imports + 5 deletions including duplicate Phase0Generated.swift) + xcodebuild Debug ✅ + generator collapsed to single output (2→1)
+- [x] Phase 3 follow-up: removed 3 duplicate helpers (`removingValue`, `opticsGlowKeys`, `densifyingOpticsGlow`) from iOS extension in favor of package `public` implementations
+- [x] Bundled M4-B commit `5efb7072` (`feat(swift-core): M4-B Shared Phase0 Core Package — iOS+Desktop SPM 化`)
+- [x] Closeout commit `7663bd1f` (`docs(native-desktop-v2): close M4-B, restore M5-C.4 Export Inspector`)
+- [x] Restore `paused/2026-05-04-m5-c4-export-inspector.md` to `active.md`
+- [x] Archive this M4-B active to `archive/2026-05-04-m4-b-shared-phase0-core-package.md`
+- [x] Append Completion Log entry to `strategy.md` (entry pending user's strategy.md commit lane — text already in worktree)
 
 ## Verification
 

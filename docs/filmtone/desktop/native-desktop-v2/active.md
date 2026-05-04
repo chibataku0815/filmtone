@@ -228,32 +228,40 @@ Auto-mode: implementation proceeding immediately per user's
 2026-05-04 JST. Commits will be made by the agent. Compact at
 implementation/build/launch boundaries.
 
-## Paused
+## Resume
 
-Paused: 2026-05-04 JST.
+Resumed: 2026-05-04 JST after M4-B Shared Phase0 Core Package closure
+(`archive/2026-05-04-m4-b-shared-phase0-core-package.md`, commits
+`5efb7072` + `7663bd1f`).
 
-Reason: user explicitly approved moving M4 Shared Contract Consolidation forward
-to cut the line between reusable iOS-canonical pure Swift logic and Mac-native
-UI / platform shell before more Desktop-only copies accumulate.
+Already committed on the current branch:
 
-Done before pause:
+- Implementation files: `EditorState.swift`, `ExportInspectorPanel.swift`,
+  `MetricRow.swift`, `FilmtoneExportSnapshot.swift`, `RootWindowView.swift`,
+  `FilmtoneStillExporter.swift`, project file registration, and Verify
+  harness formatter / JPEG clamp tests landed in commit `5cea00c6`
+  (`feat(macos): M5-C.4 Mac-native Export Inspector`).
+- `bun run verify:macos` ✅ BUILD SUCCEEDED at pause time.
+- `apps/filmtone-desktop-macos/Verify/run.sh` ✅ 36/36 PASS at pause time.
+- Code path is unchanged through the M4-B SPM extraction (Desktop now
+  imports `FilmLabSwiftCore` for the Phase0 types but Export Inspector
+  logic itself was not touched).
 
-- Export Inspector implementation files are present on the current branch:
-  `EditorState.swift`, `ExportInspectorPanel.swift`, `MetricRow.swift`,
-  `FilmtoneExportSnapshot.swift`, `RootWindowView.swift`,
-  `FilmtoneStillExporter.swift`, project file registration, and Verify harness
-  formatter / JPEG clamp tests.
-- `bun run verify:macos` passed with `** BUILD SUCCEEDED **`.
-- `apps/filmtone-desktop-macos/Verify/run.sh` passed 36/36.
+Remaining before this slice can archive:
 
-Not done:
+1. Re-run `bun run verify:macos` and `Verify/run.sh` on the current
+   post-M4-B `main` to confirm no regression from the SPM cutover.
+2. Manual visual smoke for **ready / progress / finished / blocked**
+   states on a real source file (still + video).
+3. Finder reveal tap-through (output file selected in Finder).
+4. NSSharingServicePicker tap-through (share sheet anchors near the
+   share button, not the window center).
+5. Format picker (PNG ↔ JPEG) + JPEG quality slider exercised at least
+   once.
+6. Source-cap blocked state confirmed on an HDR / oversized source.
+7. Archive this active.md → `archive/2026-05-04-m5-c4-export-inspector.md`
+   and append a 1-3 line Completion Log entry to `strategy.md`.
 
-- No manual visual smoke yet for ready / progress / finished / blocked states.
-- No Finder reveal / Share popover tap-through smoke yet.
-- M5-C.4 has not been archived or committed.
-
-Resume condition:
-
-- After the M4-A shared-boundary slice is closed, restore this file to
-  `active.md`, rerun the small verification, complete the visual smoke, then
-  archive M5-C.4 normally.
+There is no further code work expected for the happy path; the slice
+is in user-driven validation phase. If smoke surfaces a regression,
+narrow fix here in this active.md before archiving.

@@ -43,7 +43,7 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
 | M1 | Native Contract And Skeleton | none | Complete | Native app builds, launches a native window, uses SwiftUI/AppKit controls, and does not change the Electron release rail. |
 | M2 | Still And Video Vertical Slice | M1 | Complete | Still and video open, preview, export, and sidecar paths work through the native app. |
 | M3 | Native Color And Optics Parity | M2 | In progress | Built-in Looks use the iOS-canonical color and optics stages; performance is acceptable at 4K; remaining parity gaps are explicit. |
-| M4 | Shared Contract Consolidation | M3 | In progress (M4-B Phase0 core package) | Shared Swift contract ownership is clear, generated Swift remains generated-only, and iOS/macOS consume the same canonical contract without destabilizing the iOS lane. |
+| M4 | Shared Contract Consolidation | M3 | In progress (M4-B Phase0 core closed; preset / source profile / sidecar / cube parser slices follow) | Shared Swift contract ownership is clear, generated Swift remains generated-only, and iOS/macOS consume the same canonical contract without destabilizing the iOS lane. |
 | M5 | Native Editing UI | M3 | In progress | Core Desktop workflows are usable in native UI: look selection, preview navigation, export controls, progress/cancel, and Finder integration. Apple Liquid Glass is applied systematically to control surfaces (toolbar / sidebar / inspector / picker / control panels), preview content layer excluded. |
 | M6 | Release Cutover | M5 | In progress | release-cutover lane Phase 1-7 done (signing posture + pipeline + 0.1.0 smoke + cutover identity + distribution scripts; version policy corrected to iOS-aligned 1.4: Bundle ID `com.chibatakumi.film-lab-desktop` / Product Name `Filmtone` / MARKETING_VERSION `1.4`). Final 1.4 公開 gate = M5-C P0 (C.2 Look library / C.3 Adjustments / C.4 Export panel) closure。詳細: `../release-cutover/cutover-architecture.md`。 |
 
@@ -74,10 +74,35 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
 - Baseline-C population is intentionally treated as quality shell work unless
   formal parity proof is requested.
 - M4-A Shared Swift Boundary Cut Line closed 2026-05-04 — boundary matrix +
-  first extraction route at `packages/film-lab-swift-core` confirmed. M4-B
-  Shared Phase0 Core Package is now the active implementation slice; M5-C.4
-  Export Inspector remains paused at `paused/2026-05-04-m5-c4-export-inspector.md`
-  pending M4-B closure.
+  first extraction route at `packages/film-lab-swift-core` confirmed.
+- M4-B Shared Phase0 Core Package closed 2026-05-04 (commits `5efb7072` +
+  `7663bd1f`). `FilmLabSwiftCore` SPM lit up via XCLocalSwiftPackageReference
+  on both Desktop and iOS targets; iOS local copies of `FilmtoneQuickState`,
+  `FilmtonePhase0Params`, `FilmtonePhase0ParamsPatch`,
+  `FilmtonePhase0HiddenDefaults`, `Phase0OutputProfileDTO`, and the generated
+  `FilmtonePhase0Generated.swift` deleted; iOS-only Patch / Params methods
+  preserved as extensions on the package types. Generator collapsed from
+  3 outputs → 1 (package public). `swift test` 27/27 ✅, Desktop xcodebuild
+  Debug ✅, iOS xcodebuild Debug ✅, Verify 36/36 ✅. Archive:
+  `archive/2026-05-04-m4-b-shared-phase0-core-package.md`.
+- M5-C.4 Export Inspector restored to `active.md` 2026-05-04 in
+  user-driven validation phase: implementation already committed
+  (`5cea00c6`), remaining work is `bun run verify:macos` / `Verify/run.sh`
+  re-run on post-M4-B main + visual smoke (ready/progress/finished/blocked,
+  Finder reveal, Share popover, format picker + JPEG quality, source-cap
+  blocked state) before archive.
+- Future product direction: cross-device SSD workflow. The intended shape is
+  source media moved by SSD / Files / Finder, shared sidecar + Look intent moved
+  with the source, Desktop as the master / 4K-capable exporter, and iPhone as
+  the lightweight FHD / Postcard exporter. This is not a first native release
+  gate yet, but M4 shared core and sidecar decisions must preserve this route.
+- Future product direction: DaVinci highlight-marker handoff. Filmtone iOS and
+  Desktop should be able to write source-relative highlight markers into the
+  shared sidecar/package, so a DaVinci Workspace Script can create markers or a
+  marker-centered rough-cut timeline from the same source media after SSD /
+  Files / Finder handoff. This is a future sidecar/Connect slice, not an M4-B
+  Phase0 core requirement. Plan:
+  `davinci-highlight-marker-handoff-plan.md`.
 - **Parallel release lane** is in progress at
   `docs/filmtone/desktop/release-cutover/` (separate active.md singleton from
   this lane). Phase 1 closed 2026-05-04: M3 LOW gap `printContrast` sign-gate
@@ -95,6 +120,18 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
   reusing iOS implementation. Decision: pause M5-C.4 temporarily and pull M4-A
   forward as a bounded architecture slice that defines reusable pure Swift
   ownership vs. Mac-native UI/platform shell before any SPM/file movement.
+- 2026-05-04: User confirmed the larger cross-device direction: SSD-based
+  source handoff, Desktop for master / 4K output, iPhone for simpler FHD /
+  Postcard output. Decision: treat this as a strategic compatibility constraint
+  for M4 shared core / sidecar / output-profile work, not as an immediate M5-C
+  UI requirement.
+- 2026-05-04: User confirmed the DaVinci highlight-marker direction. Local
+  Resolve docs and existing Lua scripts show the route is feasible:
+  source-relative Filmtone markers can become Resolve markers or direct
+  `AppendToTimeline` clip ranges. Decision: preserve this as an additive
+  sidecar/package compatibility constraint; do not mix it into the current
+  Phase0 core extraction. Detailed future-slice plan captured in
+  `davinci-highlight-marker-handoff-plan.md`.
 
 ## Constraints
 
@@ -121,6 +158,15 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
   before release cutover or tracked as a post-parity hardening task?
 - What is the minimum signed/notarized distribution surface for the first native
   Desktop release candidate?
+- Which exact output-profile vocabulary should represent Desktop master / 4K
+  vs. iPhone FHD / Postcard without overloading the current iOS
+  `quality` / `speed` render-mode enum?
+- What source identity / relink fields should the sidecar carry so an SSD-moved
+  source can reconnect cleanly on both Mac and iPhone?
+- What exact additive sidecar shape should represent highlight markers
+  (`sourceTimeSec`, `sourceFrame`, `sourceFps`, `preRollSec`, `postRollSec`,
+  marker color/name/note, and stable marker IDs) so DaVinci can round-trip them
+  through marker `customData` without binding Filmtone to Resolve-only fields?
 
 ## Completion Log
 
@@ -373,6 +419,14 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
   Archived as `archive/2026-05-04-m4-a-shared-swift-boundary-cut-line.md`;
   M4-B Shared Phase0 Core Package opens as the implementation slice. M5-C.4
   Export Inspector remains paused.
+- 2026-05-04: M4-B Shared Phase0 Core Package closed — `FilmLabSwiftCore`
+  SPM 化完了 (Phase 1 = package skeleton + 27/27 tests、Phase 1.5 =
+  emitter `accessLevel` + public API、Phase 2 = Desktop wired + Verify
+  module-link、Phase 3 = iOS wired + iOS-only methods を extension 化 +
+  generator 1-output 集約)。iOS / Desktop 両方 xcodebuild Debug ✅、
+  Verify 36/36 ✅、generator --check ✅。Archived as
+  `archive/2026-05-04-m4-b-shared-phase0-core-package.md`、commit `5efb7072`。
+  M5-C.4 Export Inspector を `active.md` に復帰。
 
 ## Interrupt / Decision Log
 
