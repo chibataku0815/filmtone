@@ -96,10 +96,8 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
   + C.3a parity + C.4 inspector) すべて closed。M6 1.4 公開 gate は残り
   user-driven notarize submission のみ。
 - 2026-05-04 user smoke で 5 個の追加ギャップ判明 → 推奨順で計画化:
-  - **M5-E.1 App Icon Asset Population** (Tier A, ~20 min): `Assets.xcassets/
-    AppIcon.appiconset/Contents.json` は 10 entry 宣言済みだが .png 0 個 →
-    placeholder アイコンのまま起動。iOS の `AppIcon-512@2x.png` を source に
-    macOS sips で 10 size 生成、Contents.json に `filename` 補完。
+  - **M5-E.1 App Icon Asset Population** (Tier A, ~20 min) — **closed
+    2026-05-05**。詳細は Completion Log を参照。
   - **M5-D.1 Video Scrub Bar Glass Posture + Visibility** (Tier A, ~30 min):
     `VideoScrubBar` (RootWindowView.swift:371) は landed 済みだが
     `.glassEffect` 未適用 + bottom-anchored capsule wrap なし → 発見しづらい。
@@ -480,6 +478,14 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
   `archive/2026-05-04-m5-c4-export-inspector.md`。M5-C P0 (C.2a + C.3a +
   C.4) ここで closure → release-cutover lane 1.4 公開 gate は残り
   user-driven notarize submission のみ。
+- 2026-05-05: M5-E.1 App Icon Asset Population closed — iOS canonical
+  `AppIcon-512@2x.png` (1024×1024) を source に `sips -z` で 10 size
+  生成 (16/32/128/256/512 × 1x/2x、計 10 PNG)、`AppIcon.appiconset/
+  Contents.json` に `filename` keys 補完。Desktop xcodebuild Debug ✅、
+  `Filmtone.app/Contents/Resources/AppIcon.icns` 99k 生成確認、image-
+  resource warning なし。Tier A 5-gap 1 件目 closure。Visual smoke
+  (Dock / Finder / About box の icon 表示) は user-driven。Archived as
+  `archive/2026-05-04-m5-e1-app-icon.md`。
 
 ## Interrupt / Decision Log
 
