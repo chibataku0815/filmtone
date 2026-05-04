@@ -1,5 +1,6 @@
 import AVFoundation
 import CryptoKit
+import FilmLabSwiftCore
 import Foundation
 import SwiftUI
 import UIKit

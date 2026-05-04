@@ -1,3 +1,4 @@
+import FilmLabSwiftCore
 import Foundation
 
 // M5-C.2a: Saved Look library schema for Native Desktop v2.
@@ -228,9 +229,8 @@ struct LibrarySnapshot: Equatable, Sendable {
     }
 }
 
-// `FilmtoneQuickState` (Domain/Phase0Types.swift) and
-// `FilmtonePhase0ParamsPatch` (Color/FilmtonePhase0ParamsPatch.swift)
-// declare Codable + Equatable + Sendable conformance directly on the
-// struct so Swift can synthesize the witnesses — Sendable in particular
-// must live in the declaring file, and Codable synthesis only works
-// from the same file as well.
+// `FilmtoneQuickState` and `FilmtonePhase0ParamsPatch` declare
+// Codable + Equatable + Sendable conformance in the FilmLabSwiftCore
+// package (M4-B Phase 2) so Swift can synthesize the witnesses —
+// Sendable in particular must live in the declaring file, and Codable
+// synthesis only works from the same file as well.

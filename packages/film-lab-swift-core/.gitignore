@@ -1,0 +1,5 @@
+# SwiftPM local build artifacts
+.build/
+Package.resolved
+*.xcodeproj
+.swiftpm/

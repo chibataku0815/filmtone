@@ -1,6 +1,7 @@
 import AVFoundation
 import CoreGraphics
 import CoreImage
+import FilmLabSwiftCore
 import Foundation
 import UIKit
 

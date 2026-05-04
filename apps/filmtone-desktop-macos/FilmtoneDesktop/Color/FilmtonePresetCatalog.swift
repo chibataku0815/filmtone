@@ -1,3 +1,4 @@
+import FilmLabSwiftCore
 import Foundation
 
 // Wraps the 4 built-in presets emitted by `bun run generate:swift` into

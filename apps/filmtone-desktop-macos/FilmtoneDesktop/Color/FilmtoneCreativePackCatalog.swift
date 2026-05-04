@@ -1,3 +1,4 @@
+import FilmLabSwiftCore
 import Foundation
 
 // Hand-port of the iOS Creative LUT Pack 01 catalog

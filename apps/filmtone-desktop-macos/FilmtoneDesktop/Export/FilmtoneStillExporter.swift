@@ -1,5 +1,6 @@
 import CoreImage
 import CoreGraphics
+import FilmLabSwiftCore
 import Foundation
 import ImageIO
 import UniformTypeIdentifiers

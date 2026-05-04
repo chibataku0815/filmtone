@@ -232,3 +232,58 @@ test("iOS preset overrides never mutate hiddenDefaults values", () => {
   // after the overrides run.
   expect(payload.hiddenDefaults).toEqual(CONTRACT_DEFAULTS);
 });
+
+test("default access level is internal — iOS App / Desktop SharedGenerated emit shape unchanged", () => {
+  const rendered = renderFilmtoneIosSwiftPayload();
+  expect(rendered).toContain("\nenum FilmtonePhase0Generated {");
+  expect(rendered).not.toContain("public enum FilmtonePhase0Generated");
+  expect(rendered).not.toContain("public static let");
+  // Spot-check a representative member is emitted as plain `static let`.
+  expect(rendered).toContain("    static let schemaVersion = 2");
+  expect(rendered).toContain("    static let resetParams: FilmtonePhase0Params =");
+});
+
+test("public access level prefixes enum + every static let with `public` for FilmLabSwiftCore package", () => {
+  const rendered = renderFilmtoneIosSwiftPayload(undefined, { accessLevel: "public" });
+  expect(rendered).toContain("\npublic enum FilmtonePhase0Generated {");
+  // Every `static let` member must be public so cross-module consumers
+  // (Desktop / iOS via `import FilmLabSwiftCore`) can reach them.
+  for (const member of [
+    "schemaVersion",
+    "presetVersion",
+    "presetDefault",
+    "presetStrengthDefault",
+    "paramKeys",
+    "quickAxisIds",
+    "quickAxisMin",
+    "quickAxisMax",
+    "quickAxisStep",
+    "defaultQuickState",
+    "outputProfile",
+    "rgbShiftMax",
+    "grainIntensityMax",
+    "sourceDurationCapSec",
+    "sourceLongEdgeCap",
+    "sourceFileSizeCapBytes",
+    "resetParams",
+    "paramsByName",
+    "hiddenDefaults",
+    "quickWeights",
+  ]) {
+    expect(rendered).toContain(`public static let ${member}`);
+  }
+  // Sanity: literal initializers are unchanged (still call public inits in
+  // the package context — emitter does not re-emit those call sites).
+  expect(rendered).toContain('"iphone": .init(');
+  expect(rendered).toContain("crossFilterEdgeStrengthGain: 0.25");
+});
+
+test("public-vs-internal output is byte-identical except for the access modifier", () => {
+  const internal_ = renderFilmtoneIosSwiftPayload();
+  const public_ = renderFilmtoneIosSwiftPayload(undefined, { accessLevel: "public" });
+  // Stripping every `public ` prefix from the public output must reduce it
+  // to the internal output exactly. This catches accidental shape drift
+  // between modes (e.g. one mode adding a comment or a reordered field).
+  const stripped = public_.replace(/public /g, "");
+  expect(stripped).toBe(internal_);
+});

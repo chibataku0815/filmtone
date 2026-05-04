@@ -1,13 +1,13 @@
-# Filmtone Native Desktop v2 (Phase 0 + 1a)
+# Filmtone Native Desktop v2 (Phase 0 + 1a + M4-B Phase 2)
 
 SwiftUI / AppKit ベースの macOS native app。全体計画書は
 `docs/filmtone/desktop/filmtone-native-desktop-transition-plan-2026-05-03-jst.md`。
 
 ## 現状 Scope
 
-Phase 0 (Skeleton) + Phase 1a (Open + Preview precondition) まで完了。
-grade / export / sidecar / parity は **Phase 1b 以降**、video slice は
-**Phase 1c**。
+Phase 0 (Skeleton) + Phase 1a (Open + Preview precondition) + M4-B Phase 2
+(FilmLabSwiftCore SPM 取り込み) まで完了。grade / export / sidecar / parity
+は **Phase 1b 以降**、video slice は **Phase 1c**。
 
 含まれているもの:
 
@@ -19,12 +19,11 @@ grade / export / sidecar / parity は **Phase 1b 以降**、video slice は
   ラップした静止画 preview。`Color.black` 背景。grade なし生表示
 - `UI/GlassControlGroup.swift` — `glassEffect(.regular, in: Capsule())` の
   custom 例
-- `Domain/Phase0Types.swift` — `FilmtoneQuickState` / `FilmtonePhase0Params` /
-  `Phase0OutputProfileDTO` / `FilmtonePhase0HiddenDefaults` の最小 stub。
-  iOS 側型を duplicate しているのは Phase 2 SPM 化までの暫定 (本書 §SharedGenerated)
-- `SharedGenerated/FilmtonePhase0Generated.swift` — TS contract から生成された
-  Swift。Phase 1a で **Compile Sources に取り込み済み** (`Domain/Phase0Types.swift`
-  が依存型を提供しているため)
+- Phase 0 types (`FilmtoneQuickState` / `FilmtonePhase0Params` /
+  `FilmtonePhase0ParamsPatch` / `Phase0OutputProfileDTO` /
+  `FilmtonePhase0HiddenDefaults`) は `packages/film-lab-swift-core`
+  (FilmLabSwiftCore) に集約済み。Desktop は `import FilmLabSwiftCore` で
+  consume する (M4-B Phase 2、2026-05-04)。
 
 ## Build
 
@@ -32,7 +31,7 @@ grade / export / sidecar / parity は **Phase 1b 以降**、video slice は
 # 1. Core パッケージビルド (TS contract source)
 bun run build:core
 
-# 2. 生成 Swift を emit (iOS と macOS 両方へ)
+# 2. 生成 Swift を emit (Phase 2 時点では iOS internal + package public の 2 出力)
 bun run generate:swift
 
 # 3. macOS app build
@@ -42,27 +41,16 @@ bun run verify:macos
 open apps/filmtone-desktop-macos/build/Build/Products/Debug/FilmtoneDesktop.app
 ```
 
-## SharedGenerated と Domain の関係
+## FilmLabSwiftCore (SPM) との関係
 
-`SharedGenerated/FilmtonePhase0Generated.swift` は次の型に依存する:
+Phase 0 types はすべて `packages/film-lab-swift-core` の
+`FilmLabSwiftCore` モジュールに公開 API として配置されている。
+`FilmtoneDesktop.xcodeproj` は `XCLocalSwiftPackageReference` 経由で
+package を参照し、Swift ファイルでは `import FilmLabSwiftCore` で取り込む。
 
-- `FilmtoneQuickState`
-- `FilmtonePhase0Params`
-- `Phase0OutputProfileDTO`
-- `FilmtonePhase0HiddenDefaults`
-
-iOS では `FilmtonePhase0Math.swift` + `FilmtoneMediaTypes.swift` がこれを
-提供する (両方 481 / 763 行ある full implementation)。macOS では Phase 1a
-時点では **Domain/Phase0Types.swift の memberwise-init 用 stub** だけを
-duplicate して `SharedGenerated` を compile-link 可能にしている。Method /
-Codable / DTO graph は Phase 1b 以降で必要になった分だけ port する。
-
-**Phase 2** で iOS の `FilmtoneColorPipeline` / `FilmtoneMetalOpticsRenderer`
-移管とまとめて SPM 化する (`packages/film-lab-swift-core/` 予定、
-`swift-tools-version: 6.2`)。SPM が登場した時点で `Domain/Phase0Types.swift`
-は削除し、import に切り替える。iOS と macOS の `Phase0Generated.swift` は
-generator dual-target emit によって機械的に bit-identical (`diff -q` で常時
-確認可能)。
+M4-B Phase 3 で iOS App も同 package を取り込むと、generator は
+`apps/capacitor-film-lab-ios/...` 出力を捨てて package public 1 出力に
+集約される予定。
 
 ## Hand-written `.xcodeproj` について
 

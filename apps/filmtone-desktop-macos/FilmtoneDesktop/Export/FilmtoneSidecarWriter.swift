@@ -1,3 +1,4 @@
+import FilmLabSwiftCore
 import Foundation
 
 // Sidecar Case B (Look canonical only) per master handoff §10. Look

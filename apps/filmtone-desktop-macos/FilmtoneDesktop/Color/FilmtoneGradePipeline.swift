@@ -1,4 +1,5 @@
 import CoreImage
+import FilmLabSwiftCore
 import Foundation
 
 // Phase 1b primary grade chain: baseGradeV2 → filmCompressionV2 → printStage.

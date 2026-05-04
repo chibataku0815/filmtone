@@ -2,6 +2,7 @@ import AVFoundation
 import CoreImage
 import CoreMedia
 import CoreVideo
+import FilmLabSwiftCore
 import Foundation
 
 enum FilmtoneVideoCodec: String, Sendable {

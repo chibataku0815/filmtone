@@ -1,3 +1,4 @@
+import FilmLabSwiftCore
 import Foundation
 
 enum FilmtoneSourceKind: String, Sendable {

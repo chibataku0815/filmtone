@@ -1,3 +1,4 @@
+import FilmLabSwiftCore
 import Foundation
 
 /// Static catalog of built-in Filmtone Looks shipped with the app bundle.

@@ -1,3 +1,4 @@
+import FilmLabSwiftCore
 import Foundation
 
 // M5-C.3a verification harness — exercises the Quick adjust + saved-Look

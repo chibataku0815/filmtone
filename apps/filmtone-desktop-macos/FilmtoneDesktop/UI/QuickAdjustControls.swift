@@ -1,3 +1,4 @@
+import FilmLabSwiftCore
 import SwiftUI
 
 // M5-C.3a: Quick adjust 3-axis surface (filmCharacter / era / dynamics).

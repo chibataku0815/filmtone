@@ -1,5 +1,6 @@
 import AVFoundation
 import AVKit
+import FilmLabSwiftCore
 import SwiftUI
 import UIKit
 

@@ -1,5 +1,6 @@
 import AppKit
 import CoreImage
+import FilmLabSwiftCore
 import SwiftUI
 
 // M5-B F2 (real root cause): rendered via SwiftUI Image(nsImage:) instead
