@@ -3,11 +3,17 @@
 # notarized, stapled DMG ready for public distribution.
 #
 # Usage:
-#   ASC_KEY_ID=... ASC_ISSUER_ID=... ASC_KEY_PATH=... \
+#   ASC_KEY_ID=... ASC_ISSUER_ID=... \
+#     ASC_KEY_PATH=... | ASC_KEY_CONTENT=... \
 #     scripts/package-dmg.sh [VERSION] [OUTPUT_DIR]
 #
 # Defaults match release-macos.sh: VERSION = MARKETING_VERSION,
 # OUTPUT_DIR = apps/filmtone-desktop-macos/build/release/<version>.
+#
+# ASC API key env (matches iOS Fastfile pattern):
+#   ASC_KEY_CONTENT — raw .p8 content, "\n" literal escapes accepted (CI flow)
+#   ASC_KEY_PATH    — file path to .p8 (local dev flow)
+#   At least one of the two must be set.
 #
 # Pre-condition:
 #   $OUTPUT_DIR/FilmtoneDesktop.app exists, is notarized + stapled
@@ -42,16 +48,42 @@ read_marketing_version() {
         | tr -d ' '
 }
 
+# Resolve the App Store Connect API key (.p8) to an absolute file path.
+# Mirrors iOS Fastfile (asc_api_key_configured? + resolve_asc_key_file_path!).
+# Duplicated from scripts/release-macos.sh — keep in sync if signature changes.
+# Returns via the global ASC_KEY_PATH_ABS so the EXIT trap survives in the
+# parent shell (capturing via $(...) would delete the temp key prematurely).
+resolve_asc_key_path() {
+    if [[ -n "${ASC_KEY_CONTENT:-}" ]]; then
+        local tmp
+        tmp="$(mktemp -t filmtone-asc-key.XXXXXX)"
+        printf '%s' "$ASC_KEY_CONTENT" | sed $'s/\\\\n/\\\n/g' >"$tmp"
+        chmod 600 "$tmp"
+        # shellcheck disable=SC2064
+        trap "rm -f '$tmp'" EXIT
+        ASC_KEY_PATH_ABS="$tmp"
+        return
+    fi
+
+    if [[ -n "${ASC_KEY_PATH:-}" ]]; then
+        local expanded="${ASC_KEY_PATH/#\~\//$HOME/}"
+        [[ -f "$expanded" ]] || err "ASC API key not found at $expanded"
+        ASC_KEY_PATH_ABS="$(cd "$(dirname "$expanded")" && pwd)/$(basename "$expanded")"
+        return
+    fi
+
+    err "Set either ASC_KEY_CONTENT or ASC_KEY_PATH"
+}
+
 VERSION="${1:-$(read_marketing_version)}"
 OUTPUT_DIR_ARG="${2:-}"
 OUTPUT_DIR="${OUTPUT_DIR_ARG:-$APP_DIR/build/release/$VERSION}"
 
 [[ -n "${ASC_KEY_ID:-}" ]] || err "ASC_KEY_ID required"
 [[ -n "${ASC_ISSUER_ID:-}" ]] || err "ASC_ISSUER_ID required"
-[[ -n "${ASC_KEY_PATH:-}" ]] || err "ASC_KEY_PATH required"
 
-ASC_KEY_PATH_ABS="$(cd "$(dirname "$ASC_KEY_PATH")" && pwd)/$(basename "$ASC_KEY_PATH")"
-[[ -f "$ASC_KEY_PATH_ABS" ]] || err "ASC API key not found at $ASC_KEY_PATH_ABS"
+ASC_KEY_PATH_ABS=""
+resolve_asc_key_path
 
 readonly APP_PATH="$OUTPUT_DIR/$APP_NAME.app"
 [[ -d "$APP_PATH" ]] || err "$APP_PATH not found — run scripts/release-macos.sh first"

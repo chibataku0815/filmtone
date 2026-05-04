@@ -2,16 +2,21 @@
 # release-macos.sh — build / sign / notarize / staple FilmtoneDesktop.app
 #
 # Usage:
-#   ASC_KEY_ID=... ASC_ISSUER_ID=... ASC_KEY_PATH=... \
+#   ASC_KEY_ID=... ASC_ISSUER_ID=... \
+#     ASC_KEY_PATH=... | ASC_KEY_CONTENT=... \
 #     scripts/release-macos.sh [VERSION] [OUTPUT_DIR]
 #
 # Defaults:
 #   VERSION    = MARKETING_VERSION read from project.pbxproj
 #   OUTPUT_DIR = apps/filmtone-desktop-macos/build/release/<version>
 #
+# ASC API key env (matches iOS Fastfile pattern):
+#   ASC_KEY_CONTENT — raw .p8 content, "\n" literal escapes accepted (CI flow)
+#   ASC_KEY_PATH    — file path to .p8 (local dev flow)
+#   At least one of the two must be set.
+#
 # Requirements:
 #   - Developer ID Application cert in keychain (Team C3G77H8NM6)
-#   - ASC API key (.p8) at $ASC_KEY_PATH
 #   - Xcode 16+ (notarytool, xcodebuild)
 #
 # Pipeline:
@@ -53,16 +58,58 @@ read_marketing_version() {
         | tr -d ' '
 }
 
+# Resolve the App Store Connect API key (.p8) to an absolute file path.
+# Mirrors iOS Fastfile (asc_api_key_configured? + resolve_asc_key_file_path!).
+#   ASC_KEY_CONTENT — raw key content with optional "\n" escapes
+#       → write to mktemp 0600, register cleanup trap, set ASC_KEY_PATH_ABS
+#   ASC_KEY_PATH    — file path; "~/" expanded, resolved to absolute
+# Note: returns via the global ASC_KEY_PATH_ABS so the EXIT trap survives in
+# the parent shell. Capturing via $(...) would discard the trap when the
+# command substitution subshell exits, deleting the temp key prematurely.
+resolve_asc_key_path() {
+    if [[ -n "${ASC_KEY_CONTENT:-}" ]]; then
+        local tmp
+        tmp="$(mktemp -t filmtone-asc-key.XXXXXX)"
+        # Mirror iOS Fastfile: convert literal "\n" sequences to real newlines.
+        printf '%s' "$ASC_KEY_CONTENT" | sed $'s/\\\\n/\\\n/g' >"$tmp"
+        chmod 600 "$tmp"
+        # shellcheck disable=SC2064
+        trap "rm -f '$tmp'" EXIT
+        ASC_KEY_PATH_ABS="$tmp"
+        return
+    fi
+
+    if [[ -n "${ASC_KEY_PATH:-}" ]]; then
+        local expanded="${ASC_KEY_PATH/#\~\//$HOME/}"
+        [[ -f "$expanded" ]] || err "ASC API key not found at $expanded"
+        ASC_KEY_PATH_ABS="$(cd "$(dirname "$expanded")" && pwd)/$(basename "$expanded")"
+        return
+    fi
+
+    err "Set either ASC_KEY_CONTENT or ASC_KEY_PATH"
+}
+
+# Pre-flight: confirm Developer ID Application cert is in keychain so we
+# fail in 1 second instead of after a multi-minute archive.
+preflight_signing_cert() {
+    if ! security find-identity -v -p codesigning 2>/dev/null \
+        | grep -F "Developer ID Application: takumi chiba ($TEAM_ID)" \
+        >/dev/null
+    then
+        err "Developer ID Application cert (Team $TEAM_ID) not found in keychain"
+    fi
+}
+
 VERSION="${1:-$(read_marketing_version)}"
 OUTPUT_DIR_ARG="${2:-}"
 OUTPUT_DIR="${OUTPUT_DIR_ARG:-$APP_DIR/build/release/$VERSION}"
 
 [[ -n "${ASC_KEY_ID:-}" ]] || err "ASC_KEY_ID required"
 [[ -n "${ASC_ISSUER_ID:-}" ]] || err "ASC_ISSUER_ID required"
-[[ -n "${ASC_KEY_PATH:-}" ]] || err "ASC_KEY_PATH required (.p8 file path)"
 
-ASC_KEY_PATH_ABS="$(cd "$(dirname "$ASC_KEY_PATH")" && pwd)/$(basename "$ASC_KEY_PATH")"
-[[ -f "$ASC_KEY_PATH_ABS" ]] || err "ASC API key not found at $ASC_KEY_PATH_ABS"
+ASC_KEY_PATH_ABS=""
+resolve_asc_key_path
+preflight_signing_cert
 
 # --- prep ---
 
