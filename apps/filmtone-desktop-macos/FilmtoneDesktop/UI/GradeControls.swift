@@ -3,25 +3,20 @@ import SwiftUI
 struct GradeControls: View {
     @Bindable var state: EditorState
 
-    // M5-A.2: 2-tier picker. Look (top) is the high layer — None means
-    // "no Creative LUT", picking a Look forces the underlying preset to
-    // `reset` so the cube + paramOverrides are the only color expression.
-    // Preset (bottom) is the low layer, only enabled when Look = None.
+    // M5-A.2: Look (the high layer) is the only user-facing color choice.
+    // `state.presetName` stays pinned to `defaultName` (= reset) — the
+    // Look's paramOverrides + cube are the SSOT, matching iOS
+    // basePreset = "reset". Strength interpolates bareline ↔ Look.
     private static let lookOptions: [(label: String, slug: String?)] = [
         ("None", nil),
         ("Stone", "filmtone-creative-pack-01-stone"),
         ("Urban", "filmtone-creative-pack-01-urban"),
     ]
 
-    private var presetDisabled: Bool {
-        state.lookSlug != nil
-    }
-
     private var strengthDisabled: Bool {
-        // Enabled when a Look is selected (Look strength controls the
-        // bareline ↔ Look interpolation) OR when a non-reset preset is
-        // selected. Pure reset has nothing to interpolate.
-        state.lookSlug == nil && state.presetName == FilmtonePresetCatalog.defaultName
+        // Strength only does work when a Look is active — without one,
+        // the bareline pivot has no target to interpolate toward.
+        state.lookSlug == nil
     }
 
     private var strengthPercent: Int {
@@ -34,12 +29,7 @@ struct GradeControls: View {
             set: { newValue in
                 let slug = newValue.isEmpty ? nil : newValue
                 state.lookSlug = slug
-                if slug != nil {
-                    // Pin the underlying preset to reset so the Look's
-                    // paramOverrides + cube are the SSOT for color
-                    // expression — matches iOS basePreset = "reset".
-                    state.presetName = FilmtonePresetCatalog.defaultName
-                }
+                state.presetName = FilmtonePresetCatalog.defaultName
             }
         )
     }
@@ -52,15 +42,6 @@ struct GradeControls: View {
                 }
             }
             .pickerStyle(.menu)
-
-            Picker("Preset", selection: $state.presetName) {
-                ForEach(FilmtonePresetCatalog.orderedNames, id: \.self) { name in
-                    Text(FilmtonePresetCatalog.displayName(for: name)).tag(name)
-                }
-            }
-            .pickerStyle(.menu)
-            .disabled(presetDisabled)
-            .opacity(presetDisabled ? 0.5 : 1.0)
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack {

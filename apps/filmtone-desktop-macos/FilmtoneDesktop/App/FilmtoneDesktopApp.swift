@@ -37,6 +37,9 @@ struct FilmtoneDesktopApp: App {
             RootWindowView()
         }
         .windowResizability(.contentMinSize)
+        // macOS 26 unified Apple Liquid Glass toolbar/chrome requires
+        // explicit opt-in; .automatic falls back to a flat opaque bar.
+        .windowToolbarStyle(.unified)
         .commands {
             AppCommands()
         }

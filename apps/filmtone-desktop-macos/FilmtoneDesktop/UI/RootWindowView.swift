@@ -16,9 +16,15 @@ struct RootWindowView: View {
                 lookSlug: state.lookSlug,
                 videoPreviewSeconds: state.videoPreviewSeconds
             )
-            // M5-B Pass 2: GlassEffectContainer coordinates refraction
-            // across the right-rail panels so they read as one cohesive
-            // Apple Liquid Glass surface instead of three independent lenses.
+            // M5-B F2: extend preview content under the toolbar / window
+            // chrome so the unified Apple Liquid Glass toolbar has rich
+            // content to refract. Without this, the chrome paints over an
+            // empty background and reads as a flat opaque bar.
+            .backgroundExtensionEffect()
+            // M5-B Pass 2 + F2: GlassEffectContainer coordinates refraction
+            // across the right-rail panels; the .regular.tint(...) gives
+            // edges visible specularity so they read as Apple Liquid Glass
+            // rather than a frosted material pane.
             GlassEffectContainer {
                 VStack(alignment: .trailing, spacing: 12) {
                     GlassControlGroup()
@@ -26,19 +32,26 @@ struct RootWindowView: View {
                         GradeControls(state: state)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 8)
-                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12))
+                            .glassEffect(
+                                .regular.tint(.white.opacity(0.06)),
+                                in: RoundedRectangle(cornerRadius: 12)
+                            )
                     }
                     if state.isExporting {
                         ExportProgressBar(state: state)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 8)
-                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12))
+                            .glassEffect(
+                                .regular.tint(.white.opacity(0.06)),
+                                in: RoundedRectangle(cornerRadius: 12)
+                            )
                     }
                 }
             }
             .padding(20)
-            // M5-A.3: scrub bar pinned to the bottom-center, visible only
-            // when a video is loaded and its duration probe has settled.
+            // M5-A.3 + F4: scrub bar sits close to the window's bottom
+            // edge (12pt padding) so it reads as a chrome-adjacent control
+            // rather than a panel floating mid-preview.
             if state.sourceKind == .video,
                let duration = state.videoDurationSeconds,
                duration > 0 {
@@ -47,8 +60,11 @@ struct RootWindowView: View {
                     VideoScrubBar(state: state, duration: duration)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
-                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12))
-                        .padding(20)
+                        .glassEffect(
+                            .regular.tint(.white.opacity(0.06)),
+                            in: RoundedRectangle(cornerRadius: 12)
+                        )
+                        .padding(.bottom, 12)
                 }
             }
         }
