@@ -74,6 +74,10 @@ struct ExportInspectorPanel: View {
                     .lineLimit(3)
             }
 
+            // M5-F.1: Apple canonical macOS 26 prominent button posture
+            // for the right-rail dark-tinted Liquid Glass container.
+            // Replaces .borderedProminent (system blue solid box) which
+            // read as out-of-family on the dark glass chrome.
             Button {
                 onExportTap()
             } label: {
@@ -84,7 +88,7 @@ struct ExportInspectorPanel: View {
                 }
                 .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.glassProminent)
             .controlSize(.regular)
             .disabled(state.sourceURL == nil)
         }
@@ -100,6 +104,7 @@ struct ExportInspectorPanel: View {
                 Button("Cancel") {
                     state.cancelExport()
                 }
+                .buttonStyle(.glass)
                 .controlSize(.small)
             }
             ProgressView(value: state.exportProgress)
@@ -161,6 +166,7 @@ struct ExportInspectorPanel: View {
                     }
                     .frame(maxWidth: .infinity)
                 }
+                .buttonStyle(.glass)
                 .controlSize(.small)
 
                 ShareSourceButton(url: result.outputURL)
@@ -176,6 +182,7 @@ struct ExportInspectorPanel: View {
                 }
                 .frame(maxWidth: .infinity)
             }
+            .buttonStyle(.glass)
             .controlSize(.small)
         }
     }

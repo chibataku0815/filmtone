@@ -103,11 +103,11 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
     未適用 + bottom-anchored 不足) は M5-B Pass 1 / Pass 4 で既に landed
     済みだったため、実際の visibility 問題 (右レール `.clear.tint` と素
     `.clear` の posture 不一致) に再 scope して closure。
-  - **M5-F.1 Inline Button Glass Posture Pass** (Tier B, ~1-2h): Export
-    Inspector / Grade / QuickAdjust 等の inline button が `.borderedProminent`
-    system default (smoke screenshot で「しょぼすぎる」と判定)。Pass 1-4 は
-    panel/capsule/scrub/toolbar のみ → Pass 5 として inline button を
-    `.glassEffect(.clear)` 系 posture に統一、配色も dark glass と調和させる。
+  - **M5-F.1 Inline Button Glass Posture Pass** (Tier B, ~30 min) — **closed
+    2026-05-05**。詳細は Completion Log を参照。Apple canonical macOS 26
+    `.buttonStyle(.glassProminent)` / `.glass` で 4 button (Export primary /
+    Cancel / Reveal / Export Again) を統一。当初 ~1-2h 推定だったが Apple
+    canonical 1 行解決で 30 分に短縮。
   - **M5-D.2 Native Video Playback** (Tier B, ~2-3h): Play/Pause button +
     AVPlayer 駆動の time observer + Space-key shortcut。realtime grade 維持は
     重い → 着手前に「play 中は raw decoded frame で grade-off プレビュー」か
@@ -499,6 +499,21 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
   concurrency warning なし。Tier A 5-gap 2 件目 closure。Visual smoke
   (bright / dark preview 両方で scrub bar が一目でわかる) は user-driven。
   Archived as `archive/2026-05-05-m5-d1-scrub-bar-visibility.md`。
+- 2026-05-05: M5-F.1 Inline Button Glass Posture Pass (Pass 5) closed —
+  ExportInspectorPanel の 4 button posture を Apple canonical macOS 26
+  Liquid Glass family に統一: primary Export Video/Still
+  `.buttonStyle(.borderedProminent)` → `.glassProminent`、secondary
+  Cancel / Reveal / Export Again → `.buttonStyle(.glass)` 追加。`.glassProminent`
+  / `.glass` は macOS 26 SwiftUI SDK 既定 (xcodebuild compile で SDK
+  存在検証 → custom `.glassEffect` modifier wrapping fallback 不要)。
+  Smoke screenshot で名指しされた system blue solid box が dark glass
+  chrome から消失。Desktop xcodebuild Debug ✅、Swift 6 strict
+  concurrency warning なし。Tier B 5-gap 1 件目 closure (~30 分、当初
+  ~1-2h 見積より大幅短縮)。Out of scope: NSButton AppKit Share bridge
+  (anchor 制御保持のため)、LookLibrary `.borderless` (smoke 不満なし)、
+  QuickAdjust default (same)、toolbar buttons (macOS 26 HIG default)。
+  Visual smoke (4 button が dark glass container と調和) は user-driven。
+  Archived as `archive/2026-05-05-m5-f1-inline-button-glass-pass.md`。
 
 ## Interrupt / Decision Log
 
