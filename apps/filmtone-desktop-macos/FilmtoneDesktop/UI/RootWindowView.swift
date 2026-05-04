@@ -16,19 +16,24 @@ struct RootWindowView: View {
                 lookSlug: state.lookSlug,
                 videoPreviewSeconds: state.videoPreviewSeconds
             )
-            VStack(alignment: .trailing, spacing: 12) {
-                GlassControlGroup()
-                if state.sourceURL != nil {
-                    GradeControls(state: state)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12))
-                }
-                if state.isExporting {
-                    ExportProgressBar(state: state)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12))
+            // M5-B Pass 2: GlassEffectContainer coordinates refraction
+            // across the right-rail panels so they read as one cohesive
+            // Apple Liquid Glass surface instead of three independent lenses.
+            GlassEffectContainer {
+                VStack(alignment: .trailing, spacing: 12) {
+                    GlassControlGroup()
+                    if state.sourceURL != nil {
+                        GradeControls(state: state)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12))
+                    }
+                    if state.isExporting {
+                        ExportProgressBar(state: state)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12))
+                    }
                 }
             }
             .padding(20)
