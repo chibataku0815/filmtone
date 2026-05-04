@@ -344,6 +344,16 @@ download for pre-macOS-26 users). Cutover details: see
   確認。次の `scripts/release-macos.sh` 実行は 2.0.0 cutover identity の
   drop-in upgrade artifact を produce する (実 release は M5-C P0 closure 後)。
   Archived as `archive/2026-05-04-release-phase-6-cutover-architecture-brand-alignment.md`。
+- 2026-05-04: M5-C.3a verified visually (user confirmed Quick adjust
+  Film/Era/Dynamics ripple into preview, saved-Look round-trip restores
+  Quick offsets, Reset Quick zeroes axes, sidecar `quickState` block
+  carries live values). Standalone swiftc verification harness landed
+  at `apps/filmtone-desktop-macos/Verify/run.sh` — 29/29 PASS covers
+  preset×strength parity, Quick math, sidecar payload, SavedLookEntry
+  Codable round-trip, ordering, Hashable distinctness. Archived as
+  `archive/2026-05-04-m5-c3a-quick-adjust-parity-and-saved-look-round-trip.md`.
+  M5-C.3 series remaining: M5-C.3b advanced per-parameter override
+  editing UX (paramOverrides storage / apply path already lit up).
 
 ## Interrupt / Decision Log
 
