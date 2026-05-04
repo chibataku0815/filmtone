@@ -16,12 +16,11 @@ struct RootWindowView: View {
                 lookSlug: state.lookSlug,
                 videoPreviewSeconds: state.videoPreviewSeconds
             )
-            // GlassEffectContainer coordinates refraction across the right-rail
-            // panels; .regular (no tint) keeps the canonical Apple Liquid Glass
-            // appearance — diagnostic with .red.opacity(0.7) confirmed the
-            // modifier is operational, the prior subtle look was Liquid Glass
-            // behaving as macOS HIG specifies (more restrained than iOS).
-            GlassEffectContainer {
+            // M5-B Pass 3: user confirmed `.clear` posture is the correct
+            // Apple Liquid Glass dramatic refraction; all panels and the
+            // capsule unified on `.clear`. GlassEffectContainer(spacing: 12)
+            // coordinates morphing/refraction across the right rail.
+            GlassEffectContainer(spacing: 12) {
                 VStack(alignment: .trailing, spacing: 12) {
                     GlassControlGroup()
                     if state.sourceURL != nil {
@@ -29,7 +28,7 @@ struct RootWindowView: View {
                             .padding(.horizontal, 14)
                             .padding(.vertical, 8)
                             .glassEffect(
-                                .regular,
+                                .clear,
                                 in: RoundedRectangle(cornerRadius: 12)
                             )
                     }
@@ -38,7 +37,7 @@ struct RootWindowView: View {
                             .padding(.horizontal, 14)
                             .padding(.vertical, 8)
                             .glassEffect(
-                                .regular,
+                                .clear,
                                 in: RoundedRectangle(cornerRadius: 12)
                             )
                     }
@@ -51,17 +50,22 @@ struct RootWindowView: View {
             if state.sourceKind == .video,
                let duration = state.videoDurationSeconds,
                duration > 0 {
+                // Full-width VStack so the scrub bar centers horizontally in
+                // the window. Without .frame(maxWidth: .infinity) the VStack
+                // sizes to its child intrinsic width and the ZStack's
+                // .topTrailing alignment pushes it to the right edge.
                 VStack {
                     Spacer()
                     VideoScrubBar(state: state, duration: duration)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
                         .glassEffect(
-                            .regular,
+                            .clear,
                             in: RoundedRectangle(cornerRadius: 12)
                         )
-                        .padding(.bottom, 12)
+                        .padding(.bottom, 60)
                 }
+                .frame(maxWidth: .infinity)
             }
         }
         .frame(minWidth: 880, minHeight: 560)

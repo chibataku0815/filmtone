@@ -10,7 +10,7 @@ struct GlassControlGroup: View {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 10)
-        .glassEffect(.regular, in: Capsule())
+        .glassEffect(.clear, in: Capsule())
     }
 }
 

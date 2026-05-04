@@ -186,6 +186,28 @@ shipping Electron rail.
   `archive/2026-05-04-m5-b-liquid-glass-pass-2.md`. Pass 3
   (tint / variant exploration) deferred until base-posture visual
   smoke validates `.regular`.
+- 2026-05-04: M5-B F-cycle + Pass 3 closed — user smoke surfaced 4
+  failures and three rounds of speculation produced no visible change
+  until a diagnostic build (extreme red tint + toolbar background
+  hidden) decisively localised the root causes. Two architectural
+  blockers were the actual problem: (1) `PreviewSurface` rendered via
+  `NSViewRepresentable`/`NSImageView`, opaque to the Liquid Glass
+  pixel sampler; refactored to SwiftUI `Image(nsImage:).resizable()
+  .scaledToFill().backgroundExtensionEffect()`, and (2) AppKit was
+  painting an opaque toolbar background on top of the Liquid Glass
+  chrome — `.toolbarBackgroundVisibility(.hidden, for: .windowToolbar)`
+  is the missing opt-in (`.windowToolbarStyle(.unified)` alone is not
+  enough). Production posture: all panels + capsule + scrub bar use
+  `.glassEffect(.clear, in: …)` for the dramatic refraction the user
+  expected; `GlassEffectContainer(spacing: 12)` coordinates the right
+  rail; scrub bar centered horizontally via outer
+  `.frame(maxWidth: .infinity)` with `.padding(.bottom, 60)`. Commits
+  `cab2a953` (Image refactor), `6c27b372` (toolbar background +
+  diagnostic-confirmed `.regular` base), and Pass 3 unification as
+  part of the F-cycle. Archived as
+  `archive/2026-05-04-m5-b-liquid-glass-fcycle-and-pass3.md`. M5-B
+  visual base posture is closed; further dimensions
+  (sidebar/inspector/menu surfaces) only when those views exist.
 
 ## Interrupt / Decision Log
 
