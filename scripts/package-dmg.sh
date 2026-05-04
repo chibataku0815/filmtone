@@ -35,7 +35,7 @@ set -euo pipefail
 readonly REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly APP_DIR="$REPO_ROOT/apps/filmtone-desktop-macos"
 readonly PROJECT="$APP_DIR/FilmtoneDesktop.xcodeproj"
-readonly APP_NAME="FilmtoneDesktop"
+readonly APP_NAME="Filmtone"
 readonly TEAM_ID="C3G77H8NM6"
 readonly SIGN_IDENTITY="Developer ID Application: takumi chiba ($TEAM_ID)"
 

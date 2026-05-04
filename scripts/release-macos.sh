@@ -43,8 +43,8 @@ readonly APP_DIR="$REPO_ROOT/apps/filmtone-desktop-macos"
 readonly PROJECT="$APP_DIR/FilmtoneDesktop.xcodeproj"
 readonly EXPORT_OPTIONS="$APP_DIR/ExportOptions.plist"
 readonly SCHEME="FilmtoneDesktop"
-readonly APP_NAME="FilmtoneDesktop"
-readonly BUNDLE_ID="co.fores-tone.filmtone.desktop"
+readonly APP_NAME="Filmtone"
+readonly BUNDLE_ID="com.chibatakumi.film-lab-desktop"
 readonly TEAM_ID="C3G77H8NM6"
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*" >&2; }
