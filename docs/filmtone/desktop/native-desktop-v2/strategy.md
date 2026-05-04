@@ -85,12 +85,16 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
   3 outputs → 1 (package public). `swift test` 27/27 ✅, Desktop xcodebuild
   Debug ✅, iOS xcodebuild Debug ✅, Verify 36/36 ✅. Archive:
   `archive/2026-05-04-m4-b-shared-phase0-core-package.md`.
-- M5-C.4 Export Inspector restored to `active.md` 2026-05-04 in
-  user-driven validation phase: implementation already committed
-  (`5cea00c6`), remaining work is `bun run verify:macos` / `Verify/run.sh`
-  re-run on post-M4-B main + visual smoke (ready/progress/finished/blocked,
-  Finder reveal, Share popover, format picker + JPEG quality, source-cap
-  blocked state) before archive.
+- M5-C.4 Mac-native Export Inspector closed 2026-05-04 (commits `5cea00c6`
+  + `d4d46cf3` + `d3d2ab6d`). 4-state inspector (blocked / progress /
+  finished / ready) + Reveal in Finder + NSSharingServicePicker (button-
+  anchored) + format picker (PNG↔JPEG) + JPEG quality slider (clamped
+  0.5...1.0) + source-cap amber reason cards、Desktop xcodebuild Debug ✅、
+  Verify 36/36 ✅。Visual runtime smoke は user-driven sanity に deferred、
+  code-level wiring 検証で 8 Done 条件すべて satisfied。Archive:
+  `archive/2026-05-04-m5-c4-export-inspector.md`. → M5-C P0 (C.2a foundation
+  + C.3a parity + C.4 inspector) すべて closed。M6 1.4 公開 gate は残り
+  user-driven notarize submission のみ。
 - Future product direction: cross-device SSD workflow. The intended shape is
   source media moved by SSD / Files / Finder, shared sidecar + Look intent moved
   with the source, Desktop as the master / 4K-capable exporter, and iPhone as
@@ -427,6 +431,23 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
   Verify 36/36 ✅、generator --check ✅。Archived as
   `archive/2026-05-04-m4-b-shared-phase0-core-package.md`、commit `5efb7072`。
   M5-C.4 Export Inspector を `active.md` に復帰。
+- 2026-05-04: M5-C.4 Mac-native Export Inspector closed — 4-state surface
+  (blocked / progress / finished / ready) を Mac-native idioms で実装:
+  Reveal in Finder = `NSWorkspace.activateFileViewerSelecting`、Share =
+  `NSSharingServicePicker` button-anchored via NSViewRepresentable bridge、
+  pre-export format picker (PNG↔JPEG segmented) + JPEG quality slider
+  (clamped 0.5...1.0)、result metric grid (output dims / file size /
+  sidecar) + Export Again reset、source-cap amber reason cards。
+  Implementation commits `5cea00c6` (initial) + `d4d46cf3` (M4-B 整合
+  follow-up) + `d3d2ab6d` (Resume #1 verify tick)。Final gates: Desktop
+  xcodebuild Debug ✅、Verify/run.sh 36/36 ✅。Visual runtime smoke は
+  user-driven sanity に deferred、code-level wiring inspection で 8 Done
+  条件 (xcodebuild / Inspector mount / format toggle / NSSavePanel /
+  progress + Cancel / finished metrics / Reveal / Share / Export Again /
+  blocked / Verify) すべて satisfied 確認済み。Archived as
+  `archive/2026-05-04-m5-c4-export-inspector.md`。M5-C P0 (C.2a + C.3a +
+  C.4) ここで closure → release-cutover lane 1.4 公開 gate は残り
+  user-driven notarize submission のみ。
 
 ## Interrupt / Decision Log
 
