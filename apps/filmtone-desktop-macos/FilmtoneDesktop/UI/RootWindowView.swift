@@ -24,11 +24,16 @@ struct RootWindowView: View {
                 VStack(alignment: .trailing, spacing: 12) {
                     GlassControlGroup()
                     if state.sourceURL != nil {
+                        // M5-B Pass 4: subtle dark tint on `.clear` Liquid
+                        // Glass gives the operating panel a stable luminance
+                        // baseline for white text + visible Slider track,
+                        // while preserving Pass 3's dramatic refraction
+                        // posture on the rest of the chrome.
                         GradeControls(state: state)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 8)
                             .glassEffect(
-                                .clear,
+                                .clear.tint(.black.opacity(0.30)),
                                 in: RoundedRectangle(cornerRadius: 12)
                             )
                     }

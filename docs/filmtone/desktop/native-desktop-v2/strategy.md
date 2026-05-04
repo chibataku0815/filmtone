@@ -208,6 +208,34 @@ shipping Electron rail.
   `archive/2026-05-04-m5-b-liquid-glass-fcycle-and-pass3.md`. M5-B
   visual base posture is closed; further dimensions
   (sidebar/inspector/menu surfaces) only when those views exist.
+- 2026-05-04: M5-B Pass 4 (GradeControls readability) closed — user
+  smoke after Pass 3 surfaced that the only operating panel
+  (`GradeControls` Picker + Strength + Slider) lost text/track
+  contrast over bright preview content. Diagnostic-first single
+  build proved `Glass.clear.tint(.black.opacity(_:))` actually wires
+  on `.clear` despite prior memory caveat (which only applied to
+  *light* tints), and a one-shot pivot landed: `GradeControls` panel
+  uses `.clear.tint(.black.opacity(0.30))`, labels use
+  `.foregroundStyle(.white)` (`.white.opacity(0.7)` for the percent),
+  Slider uses `.tint(.white)`, and the Picker takes `.colorScheme
+  (.dark)` so its AppKit-bridged NSPopUpButton renders white-label
+  dark-chrome instead of the SwiftUI-ignored `.foregroundStyle(.white)`.
+  Capsule, scrub bar, toolbar, and chrome unchanged — Pass 3 `.clear`
+  posture preserved everywhere except the operating panel. M5-B body
+  of work is now closed across Pass 1 / 2 / 3 / 4 + F-cycle.
+- 2026-05-04: M5-C iOS Feature Parity Audit closed — read iOS Phase 0
+  editor + Swift surfaces and Native Desktop v2 source, built a
+  workflow-grouped parity gap table, and classified P0 (Source
+  Profile, source-cap/HDR gate, Look library, Adjustments, Export
+  panel), P1 (playback compare, custom creative LUT, persistence,
+  optical/depth surfacing), P2 (literal iOS onboarding, Live
+  Activity / notifications). Recommended **M5-C.1 Native Source
+  Profile And Source Gate Parity** as the next implementation slice
+  because it closes the highest correctness gap (iOS Auto/Apple Log/
+  Apple Log 2/DJI/Canon/Panasonic/Sony/Rec.709 normalization is
+  missing on Desktop and silently changes export truth). Archived as
+  `archive/2026-05-04-m5-c-ios-feature-parity-audit.md`; new
+  `active.md` opens M5-C.1.
 
 ## Interrupt / Decision Log
 

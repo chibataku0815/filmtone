@@ -35,6 +35,13 @@ struct GradeControls: View {
     }
 
     var body: some View {
+        // M5-B Pass 4: explicit white text + Slider tint give guaranteed
+        // contrast on the dark-tinted Liquid Glass surface set by
+        // RootWindowView. The Picker popup button is an AppKit
+        // NSPopUpButton bridge that ignores `.foregroundStyle(.white)`;
+        // `.colorScheme(.dark)` is the canonical macOS escape — it tells the
+        // bridged control to render in dark-chrome mode (white label, dark
+        // button background), which fits the dark-tinted glass surface.
         VStack(alignment: .leading, spacing: 10) {
             Picker("Look", selection: lookBinding) {
                 ForEach(Self.lookOptions, id: \.label) { option in
@@ -42,17 +49,20 @@ struct GradeControls: View {
                 }
             }
             .pickerStyle(.menu)
+            .colorScheme(.dark)
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text("Strength")
                         .font(.callout)
+                        .foregroundStyle(.white)
                     Spacer()
                     Text("\(strengthPercent)%")
                         .font(.callout.monospacedDigit())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.white.opacity(0.7))
                 }
                 Slider(value: $state.presetStrength, in: 0...1)
+                    .tint(.white)
                     .disabled(strengthDisabled)
             }
             .frame(width: 220)
