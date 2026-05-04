@@ -98,10 +98,11 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
 - 2026-05-04 user smoke で 5 個の追加ギャップ判明 → 推奨順で計画化:
   - **M5-E.1 App Icon Asset Population** (Tier A, ~20 min) — **closed
     2026-05-05**。詳細は Completion Log を参照。
-  - **M5-D.1 Video Scrub Bar Glass Posture + Visibility** (Tier A, ~30 min):
-    `VideoScrubBar` (RootWindowView.swift:371) は landed 済みだが
-    `.glassEffect` 未適用 + bottom-anchored capsule wrap なし → 発見しづらい。
-    Pass 4 `.clear` posture に統一。
+  - **M5-D.1 Video Scrub Bar Visibility** (Tier A, ~15 min) — **closed
+    2026-05-05**。詳細は Completion Log を参照。当初 scope (`.glassEffect`
+    未適用 + bottom-anchored 不足) は M5-B Pass 1 / Pass 4 で既に landed
+    済みだったため、実際の visibility 問題 (右レール `.clear.tint` と素
+    `.clear` の posture 不一致) に再 scope して closure。
   - **M5-F.1 Inline Button Glass Posture Pass** (Tier B, ~1-2h): Export
     Inspector / Grade / QuickAdjust 等の inline button が `.borderedProminent`
     system default (smoke screenshot で「しょぼすぎる」と判定)。Pass 1-4 は
@@ -485,7 +486,19 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
   `Filmtone.app/Contents/Resources/AppIcon.icns` 99k 生成確認、image-
   resource warning なし。Tier A 5-gap 1 件目 closure。Visual smoke
   (Dock / Finder / About box の icon 表示) は user-driven。Archived as
-  `archive/2026-05-04-m5-e1-app-icon.md`。
+  `archive/2026-05-04-m5-e1-app-icon.md`、commit `758ada3a`。
+- 2026-05-05: M5-D.1 Video Scrub Bar Visibility closed — 着手時に当初
+  scope (`.glassEffect` 未適用 + bottom-anchored capsule wrap なし) が
+  M5-B Pass 1 / Pass 4 で既に landed 済みであることが判明。実際の
+  visibility 問題は scrub bar capsule の素 `.clear` posture が右レール
+  panel 5 個 (`SourceProfile` / `LookLibrary` / `QuickAdjust` / `Grade` /
+  `ExportInspector`) の `.clear.tint(.black.opacity(0.30))` posture と
+  不整合 → 明るい preview 上で消失する点。Re-scope して capsule posture
+  を `.clear.tint(.black.opacity(0.30))` に統一 (`RootWindowView.swift:112-117`、
+  inline comment 追加)。Desktop xcodebuild Debug ✅、Swift 6 strict
+  concurrency warning なし。Tier A 5-gap 2 件目 closure。Visual smoke
+  (bright / dark preview 両方で scrub bar が一目でわかる) は user-driven。
+  Archived as `archive/2026-05-05-m5-d1-scrub-bar-visibility.md`。
 
 ## Interrupt / Decision Log
 

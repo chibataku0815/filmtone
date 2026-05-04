@@ -106,11 +106,16 @@ struct RootWindowView: View {
                 // .topTrailing alignment pushes it to the right edge.
                 VStack {
                     Spacer()
+                    // M5-D.1: dark-tinted .clear posture matches the
+                    // right-rail panels so the scrub bar reads as the same
+                    // chrome family and stays visible on bright preview
+                    // frames where untinted .clear refracts into the
+                    // backdrop.
                     VideoScrubBar(state: state, duration: duration)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
                         .glassEffect(
-                            .clear,
+                            .clear.tint(.black.opacity(0.30)),
                             in: RoundedRectangle(cornerRadius: 12)
                         )
                         .padding(.bottom, 60)
