@@ -293,6 +293,25 @@ shipping Electron rail.
   release-cutover lane の M6-6 は user の `ASC_ISSUER_ID` 設定で
   `scripts/release-macos.sh` を流すだけの状態。Archived as
   `archive/2026-05-04-release-phase-4-preflight-readiness.md`。
+- 2026-05-04: M5-C.3a Quick Adjust Parity And Saved-Look Round-Trip
+  landed — `FilmtoneQuickState` helpers (`clamped` / `value(forAxis:)` /
+  `clampAxis`) ported verbatim from iOS canonical into
+  `Domain/Phase0Types.swift`. New `FilmtonePresetCatalog.applyQuickState`
+  + 5-arg `resolved(...)` thread `quickState` and `paramOverrides`
+  through the existing single resolve site so Preview / StillExporter /
+  VideoExporter / SidecarWriter all honor them with no per-consumer
+  re-plumbing. EditorState gains `quickState` + `paramOverrides`
+  storage; `applySavedLook` / `currentLookSavePayload` /
+  `clearSavedLookSelection` complete the saved-Look round-trip (was
+  previously dropping both fields). New `QuickAdjustControls.swift` —
+  3 signed sliders (Film / Era / Dynamics, [-1,+1], step 0.01) +
+  Reset Quick button, Pass 4 dark-tint `.clear` Liquid Glass posture.
+  Sidecar `quickState` block now emits live values instead of
+  `[0,0,0]`. Build clean (Swift 6, xcodebuild Debug). M5-C.3b advanced
+  per-parameter override editing UX remains deferred (storage / apply
+  path is already lit up for it). User to verify visually:
+  filmCharacter / era / dynamics move preview, save+restore round-trip
+  preserves Quick offsets, sidecar carries live quickState.
 - 2026-05-04: Release-cutover Phase 5 — M6-6 end-to-end release run pass。
   `ASC_ISSUER_ID` を `apps/capacitor-film-lab-ios/.env.local` から流用
   (iOS Fastfile parity)、`scripts/release-macos.sh` 6/6 step + `scripts/

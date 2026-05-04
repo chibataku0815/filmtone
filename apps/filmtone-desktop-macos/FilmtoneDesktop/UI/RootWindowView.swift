@@ -17,7 +17,9 @@ struct RootWindowView: View {
                 presetStrength: state.presetStrength,
                 lookSlug: state.lookSlug,
                 videoPreviewSeconds: state.videoPreviewSeconds,
-                sourceProfileSelection: state.sourceProfileSelection
+                sourceProfileSelection: state.sourceProfileSelection,
+                quickState: state.quickState,
+                paramOverrides: state.paramOverrides
             )
             // M5-B Pass 3: user confirmed `.clear` posture is the correct
             // Apple Liquid Glass dramatic refraction; all panels and the
@@ -44,6 +46,16 @@ struct RootWindowView: View {
                         // so the user picks input → Look → strength in
                         // top-down reading order.
                         LookLibraryControls(state: state, library: library)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .glassEffect(
+                                .clear.tint(.black.opacity(0.30)),
+                                in: RoundedRectangle(cornerRadius: 12)
+                            )
+                        // M5-C.3a: Quick adjust 3-axis sliders sit between
+                        // Look selection and Strength so the user reads
+                        // top-down: input → Look → Quick offsets → Strength.
+                        QuickAdjustControls(state: state)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 8)
                             .glassEffect(
@@ -217,7 +229,9 @@ struct RootWindowView: View {
             presetStrength: state.presetStrength,
             lookSlug: state.lookSlug,
             format: format,
-            sourceProfileSelection: state.sourceProfileSelection
+            sourceProfileSelection: state.sourceProfileSelection,
+            quickState: state.quickState,
+            paramOverrides: state.paramOverrides
         )
 
         state.isExporting = true
@@ -259,7 +273,9 @@ struct RootWindowView: View {
             presetName: state.presetName,
             presetStrength: state.presetStrength,
             lookSlug: state.lookSlug,
-            sourceProfileSelection: state.sourceProfileSelection
+            sourceProfileSelection: state.sourceProfileSelection,
+            quickState: state.quickState,
+            paramOverrides: state.paramOverrides
         )
 
         state.isExporting = true

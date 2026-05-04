@@ -1,245 +1,281 @@
-# M5-C.2a Saved Look Library Foundation And Save Current Look
+# M5-C.3a Quick Adjust Parity And Saved-Look Round-Trip
 
 Date opened: 2026-05-04 JST
 
 ## Milestone
 
-M5 Native Editing UI. M5-C.2 from the
+M5 Native Editing UI. M5-C.3 from the
 `archive/2026-05-04-m5-c-ios-feature-parity-audit.md` parity gap list:
-"Look library parity: built-in Looks should live in a real selection
-surface, and user-saved Looks need an owning persistence model." Splits
-into M5-C.2a (this slice — foundation + Save) and M5-C.2b (favorite /
-rename / delete UX).
+"Adjustment parity: the native app needs quick and advanced parameter
+editing, not just Look strength." Splits into M5-C.3a (this slice —
+Quick 3 axes + paramOverrides round-trip wiring) and M5-C.3b (advanced
+per-parameter override editing UX).
 
 ## Goal
 
-Land the persistence + selection model that lets a user **save the
-current Look state to disk and pick it back later**, with built-in Stone
-and Urban surfaced through the same library list rather than a hardcoded
-Picker enum. iOS canonical (`FilmtoneLibraryStore` + `FilmtoneBuiltInCatalog`)
-is the contract; Desktop ports the looks-only subset (no LUT library, no
-embedded-LUT GC — those are the M5-C.2c P1 slice).
+Land the **iOS Quick Adjust 3-axis surface** (filmCharacter / era /
+dynamics) so the same axes that move iOS preview / export also move the
+native macOS preview / export, and **complete the saved-Look round-trip**
+so a Look saved with Quick offsets restores those offsets verbatim on
+recall. paramOverrides storage + apply path lights up here even though
+the per-parameter editing UI lands in M5-C.3b — that way Quick offsets
+made in this slice survive Save → Load loops the moment they exist.
 
 ## Why this slice (本質)
 
-- iOS users can already save and recall Looks. macOS users can pick
-  Stone / Urban / None and that's it — there is no "save what I just
-  built." That is the next correctness gap below source-profile parity.
-- The Library shape (SavedLookEntry, CreativeLutBinding, LibrarySnapshot,
-  bundled built-ins materialized into the snapshot) is the substrate
-  every later M5-C slice (Adjustments, Export panel) reads from. Saving
-  too narrow a foundation here forces a re-port later.
-- Built-in Stone/Urban currently live in a hardcoded `lookOptions` array
-  inside `GradeControls`. Routing them through the library snapshot is
-  what makes "save a custom Look" feel native instead of bolted on.
+- iOS users have 3 named editing axes that ripple into ~8 underlying
+  params via `FilmtonePhase0Generated.quickWeights`. macOS today renders
+  with `quickState` permanently `.zero` regardless of what was saved
+  into a Look, which means **a saved iOS Look opened on macOS produces
+  a different image than on iOS**. That is a correctness gap, not a
+  cosmetic one.
+- M5-C.2a wrote `paramOverrides` and `quickState` into the on-disk
+  schema but the runtime never reads them back: `applySavedLook` ignores
+  both, and `currentLookSavePayload` always serializes
+  `(.zero, .empty)`. The library is a write-only loop for everything
+  beyond `(presetName, strength, lookSlug)`. Closing this loop is
+  prerequisite for the Saved Look feature to mean anything.
+- The render pipeline is already param-driven — every consumer
+  (PreviewSurface, StillExporter, VideoExporter, SidecarWriter) reads
+  `FilmtonePresetCatalog.resolved(...)`. Folding quickState +
+  paramOverrides into that single resolve site makes the whole pipeline
+  honor them with no per-consumer changes.
 
 ## Scope
 
 In-scope:
 
-- New `FilmtoneSavedLookSchema.swift` — port the looks-only subset of
-  iOS `FilmtoneLibrarySchema.swift`: `FilmtoneLibraryConstants`,
-  `SavedLookEntry`, `CreativeLutBinding` (3-flavor enum), `LibraryIndex`,
-  `LibrarySnapshot`. Codable / Equatable / Sendable on the wire types,
-  including a thin `SavedLookEmbeddedLut` placeholder so the binding
-  enum compiles even though the Desktop slice doesn't take the embedded
-  path yet (M5-C.2c).
-- Codable / Equatable / Sendable conformance extensions on the existing
-  `FilmtoneQuickState` and `FilmtonePhase0ParamsPatch` so they can
-  round-trip inside `SavedLookEntry`.
-- New `FilmtoneSavedLookStore.swift` — actor at
-  `~/Library/Application Support/Filmtone/library/looks/{*.json,
-  index.json}`. Methods: `loadOrRebuild`, `saveLook`, `loadLook`
-  (with built-in dispatch), `deleteLook` (refuses on built-ins),
-  `currentSnapshot` (built-ins prepended). Atomic per-entry writes.
-  No LUT subtree, no quota check, no orphan GC (P1).
-- `FilmtoneCreativePackCatalog` adapter `materializeAsSavedLookEntry`
-  (mirrors iOS `FilmtoneBuiltInCatalog.materializeAsSavedLookEntry`)
-  so Stone/Urban appear at the head of the snapshot with stable
-  bundled UUIDs / immutable / bundledSlug.
-- New `LibraryViewModel.swift` — `@MainActor @Observable` wrapper that
-  holds the latest `LibrarySnapshot`, owns the `LibraryStoreActor`,
-  exposes `bootstrap()` / `saveCurrentLook(name:from:)` / `refresh()`.
-- New `LookLibraryControls.swift` — replaces the hardcoded `lookOptions`
-  picker with a snapshot-driven Picker (None + built-ins + user-saved)
-  plus a "Save Current Look…" button that opens an NSAlert text-field
-  prompt. Same Pass 4 dark-tinted `.clear` Liquid Glass posture +
-  `.colorScheme(.dark)` Picker.
-- `EditorState` extension: `selectedSavedLookId: UUID?` (UI state),
-  `applySavedLook(_ entry:)` writes `presetName` / `presetStrength` /
-  `lookSlug` (lookSlug derived from `creativeLut.bundledSlug` when the
-  binding is `.bundled`, nil otherwise), `currentLookSnapshot()` reads
-  the inverse for Save.
-- `GradeControls` slimmed: drop the hardcoded Look picker (now lives in
-  `LookLibraryControls`); keep the Strength slider as-is.
-- `RootWindowView` bootstraps the `LibraryViewModel` (`@State`) and
-  injects it into `LookLibraryControls`. Library panel sits above
-  `GradeControls`, below `SourceProfileControls`.
+- `FilmtoneQuickState` extension (in `Domain/Phase0Types.swift` to keep
+  Sendable conformance same-file): `clamped()`, `value(forAxis:)`, and
+  `static func clampAxis(_:)` — verbatim port of iOS canonical
+  `FilmtonePhase0Math.swift:41-65`.
+- `FilmtonePresetCatalog.applyQuickState(to:quickState:)` static func —
+  walks `FilmtonePhase0Generated.quickAxisIds` × `quickWeights[axis]`
+  and adds `axisValue * weight` to each affected key, clamped per-key
+  via the existing `paramOverrides.applyingPatch`-equivalent setter.
+  Verbatim port of iOS canonical `FilmtonePhase0Math.applyQuickState`.
+- `FilmtonePresetCatalog.resolved(...)` extended signature:
+  `(presetName, strength, lookSlug, quickState, paramOverrides)`.
+  Resolution order locked to iOS canonical: `interpolatePresetParams →
+  applyingPatch(paramOverrides) → applyQuickState`. Existing 3-arg
+  callers updated to thread `state.quickState` /
+  `state.paramOverrides` through.
+- `EditorState` adds `var quickState: FilmtoneQuickState = .zero` and
+  `var paramOverrides: FilmtonePhase0ParamsPatch = .empty` storage,
+  with helper `resetQuickState()` for the Reset Quick button. Existing
+  `presetParams` rewires to the new 5-arg `resolved(...)`.
+- `EditorState.applySavedLook(_:)` writes `entry.quickState` and
+  `entry.paramOverrides` into live state (was previously dropped on
+  the floor).
+- `EditorState.currentLookSavePayload()` reads live `quickState` and
+  `paramOverrides` (was previously hard-coded to `(.zero, .empty)`).
+- `EditorState.clearSavedLookSelection()` also resets `quickState` and
+  `paramOverrides` to defaults — picking "None" returns to a clean
+  bareline so the next Save isn't contaminated by a previous Look's
+  offsets.
+- New `UI/QuickAdjustControls.swift` — Liquid Glass panel with 3
+  signed sliders (range -1…+1, step 0.01) + "Reset Quick" button.
+  Signed-percent label per axis (`+24%` / `-12%` / `0%` matches iOS
+  `formatSignedPercentLabel`). Same Pass 4 dark-tint `.clear` posture
+  as the rest of the right rail.
+- `RootWindowView` inserts `QuickAdjustControls` panel between
+  `LookLibraryControls` and `GradeControls` (Quick sits below Look
+  selection, above Strength — mirrors iOS visual order).
+- `FilmtoneSidecarWriter` reads live `quickState` from EditorState
+  instead of hard-coded `[0,0,0]`. (Already has the field — just
+  threading the value through.)
 
 Out-of-scope (deferred):
 
-- Favorite toggle UI (M5-C.2b — backend will already wire toggleFavorite
-  via `bundledLookFavorites` UserDefaults map for symmetry, but no UI
-  surface in this slice).
-- Rename / delete UX (M5-C.2b).
-- Custom LUT import / library subtree / quota / orphan GC (M5-C.2c, P1).
-- Per-parameter Adjustments editing (M5-C.3 P0). `paramOverrides` on a
-  user-saved entry is `.empty` until that slice lands.
-- Sidecar additive `savedLookId` / `savedLookName` provenance — Desktop
-  sidecar already encodes the canonical built-in slug via `lookId`
-  (`filmtone:builtin:<slug>:<v>`), and user-saved looks don't yet
-  introduce new identity beyond preset+strength+lookSlug. Add when
-  M5-C.3 paramOverrides go live and the look identity diverges from
-  `(presetName, lookSlug, strength)`.
-- Built-in catalog UUIDs other than Stone (B6) / Urban (B7) — M5-C.2a
-  follows the iOS canonical pruning; deprecated `...000001` …
-  `...000005` UUIDs stay reserved (no reuse).
+- M5-C.3b advanced per-parameter override editing UX (~30 sliders
+  organized by category). Storage + apply path lights up here so
+  M5-C.3b is purely additive UI.
+- M5-C.3c Recipe chips, reset posture beyond "Reset Quick", help
+  sheets.
+- M5-C.2b favorite / rename / delete UX (lower 本質 priority — closes
+  out the M5-C.2 series after M5-C.3 lands).
+- M5-C.4 Export panel parity (separate slice).
+- Sidecar additive `paramOverrides` / `savedLookId` /
+  `savedLookName` provenance — `quickState` moves to live values in
+  this slice, but the broader sidecar shape is left to the M5-C.4
+  Export panel slice that owns sidecar review end-to-end.
+- Custom undo / redo. macOS responder-chain undo will follow once the
+  per-parameter editing surface (M5-C.3b) introduces a meaningful
+  edit granularity. Slider drags here remain coalesce-on-end like the
+  Strength slider already does.
 
 ## Approach
 
-1. Codable conformance on `FilmtoneQuickState` and
-   `FilmtonePhase0ParamsPatch` (additive, in the new schema file —
-   keeps `Domain/Phase0Types.swift` untouched per its delete-when-SPM
-   note).
-2. Schema lift verbatim from iOS, with `SavedLookEmbeddedLut` reduced to
-   the field shape (no usage path). `CreativeLutBinding.bundledSlug`
-   accessor mirrors iOS so the (future) sidecar can stamp it.
-3. `FilmtoneSavedLookStore` is the looks-only subset of iOS
-   `LibraryStoreActor`. Built-in dispatch in `loadLook(id:)` routes
-   Stone/Urban canonical UUIDs through `FilmtoneCreativePackCatalog`'s
-   new `materializeAsSavedLookEntry`. `currentSnapshot()` prepends the
-   materialized built-ins exactly as iOS does, with the Pack 01 freeze
-   date pinned for stable timestamps.
-4. `LibraryViewModel` does the actor bridging: bootstrap on appear,
-   refresh after every mutation, surface errors via a `@Published`-style
-   `error: String?` for an inline NSAlert.
-5. `LookLibraryControls` Picker tag is `LibraryLookSelection` enum
-   (`.none` / `.saved(UUID)`). `onChange` dispatches:
-   - `.none` → clear `lookSlug` + `selectedSavedLookId`
-   - `.saved(uuid)` → `vm.store.loadLook(id:)` → `state.applySavedLook(entry)`
-6. "Save Current Look…" button pops an NSAlert with text input,
-   defaulting to a deduped name (`Look 1`, `Look 2`, …) computed from
-   the current snapshot. On commit: `vm.saveCurrentLook(name:from:)` →
-   refresh → auto-select the new entry so the user sees confirmation
-   visually.
-7. `EditorState.applySavedLook` is a single-method dispatch — it never
-   reaches into the store or VM, so the state stays UI-framework-free.
+1. Add `FilmtoneQuickState` helpers (`clamped`, `value(forAxis:)`,
+   `clampAxis`) directly to `Domain/Phase0Types.swift` so Sendable
+   stays same-file. Static `axisIds` reference comes from
+   `FilmtonePhase0Generated.quickAxisIds` so the order tracks the
+   generator output without a second source of truth.
+2. Lift iOS `applyQuickState(to:quickState:)` verbatim into
+   `FilmtonePresetCatalog` (only place that already owns the 35-key
+   `FilmtonePhase0Params` shape). Per-key clamp mirrors iOS by reusing
+   the existing `applyingPatch` semantics — i.e. the additive offset
+   is applied through `setValue(for:)` and the resulting params object
+   stays inside the existing resolve chain.
+3. Extend `resolved(...)` rather than introducing a parallel resolve
+   path: `lerp → applyingPatch(paramOverrides) → applyQuickState`.
+   That ordering matches iOS canonical (`interpolatePresetParams` →
+   `applyingPatch` happens at preset save time / catalog material →
+   `applyQuickState` is the last layer before the pipeline). Param
+   clamps stay on the per-key setters.
+4. EditorState wiring: add the two stored properties + helper, point
+   `presetParams` at the 5-arg resolve, route `applySavedLook` to
+   write the offsets, route `currentLookSavePayload` to read them.
+   `selectedSavedLookId == nil` flow + `clearSavedLookSelection` both
+   reset Quick so the user always sees "None" as a clean bareline.
+5. UI: `QuickAdjustControls` follows the same shape as
+   `LookLibraryControls` / `GradeControls` — VStack inside the
+   existing `GlassEffectContainer` right rail. Each axis row is
+   `(Label – signed percent – Slider)` with the same Strength-row
+   typography. "Reset Quick" sits at the panel footer, disabled when
+   `quickState == .zero`.
+6. Sidecar `quickState` block already exists at the right shape;
+   just thread `request.quickState` through and serialize live values.
+7. Verify: build clean, then user verifies visually that
+   (a) Quick sliders move preview, (b) save a Look with Quick
+   offsets, switch to None, switch back — Quick offsets restore on
+   the active Look, (c) the resulting export sidecar carries the
+   live `quickState` block.
 
 ## Done conditions
 
-- `xcodebuild -scheme FilmtoneDesktop -configuration Debug` passes
-  clean (Swift 6 strict concurrency).
-- Open a still / video, pick Stone, drag Strength to ~0.6, click "Save
-  Current Look…", name it (e.g. "Stone Soft"). The new entry appears at
-  the head of the user-saved section. Switch the Picker to None, then
-  back to "Stone Soft" — preview returns to Stone @ 0.6.
-- Built-in Stone / Urban remain selectable from the same Picker with
-  identical render output to pre-M5-C.2a (their `.bundled` cube +
-  paramOverrides patch are unchanged).
-- Saved Looks survive an app relaunch (loadOrRebuild rescans the
-  `looks/` directory). Built-in entries do not get persisted to disk.
-- Switching Source Profile (M5-C.1) does not affect saved Look behavior
-  — Looks live above the source-input transform.
+- `xcodebuild -scheme FilmtoneDesktop -configuration Debug
+  -destination 'platform=macOS' build` passes clean (Swift 6 strict
+  concurrency).
+- Open a still / video, drag `filmCharacter` / `era` / `dynamics`
+  sliders — preview updates with the same per-key offsets iOS applies
+  (saturation / temperature / vignette for filmCharacter; fade /
+  saturation / contrast for era; exposure / contrast / bloom for
+  dynamics).
+- Pick Stone, drag Strength to ~0.6, set `era = +0.4`, click "Save
+  Current Look…", name it "Stone Era". Switch Picker to None — Quick
+  resets to zero and Look clears. Switch Picker back to "Stone Era" —
+  Strength returns to 0.6 and `era` returns to `+0.4`.
+- "Reset Quick" button restores `quickState = .zero` without touching
+  Strength or Look selection. Disabled when already zero.
+- Export PNG/JPEG/MP4 with non-zero Quick — open the resulting
+  `.json` sidecar and verify the `quickState` block carries the live
+  axis values (not the hard-coded zero block).
+- Built-in Stone / Urban remain selectable with identical render
+  output to pre-M5-C.3a when Quick is `.zero` (their `.bundled` cube
+  + paramOverrides patch are unchanged).
 
 ## Edit Targets
 
-- `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtoneSavedLookSchema.swift` (new)
-- `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtoneSavedLookStore.swift` (new)
-- `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtoneCreativePackCatalog.swift` (extend with materialize adapter)
-- `apps/filmtone-desktop-macos/FilmtoneDesktop/State/LibraryViewModel.swift` (new)
-- `apps/filmtone-desktop-macos/FilmtoneDesktop/State/EditorState.swift` (selectedSavedLookId + applySavedLook)
-- `apps/filmtone-desktop-macos/FilmtoneDesktop/UI/LookLibraryControls.swift` (new)
-- `apps/filmtone-desktop-macos/FilmtoneDesktop/UI/GradeControls.swift` (drop Look picker)
-- `apps/filmtone-desktop-macos/FilmtoneDesktop/UI/RootWindowView.swift` (bootstrap VM + place panel)
-- `apps/filmtone-desktop-macos/FilmtoneDesktop.xcodeproj/project.pbxproj` (4 new file refs)
+- `apps/filmtone-desktop-macos/FilmtoneDesktop/Domain/Phase0Types.swift` (FilmtoneQuickState helpers)
+- `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtonePresetCatalog.swift` (extend resolved + add applyQuickState)
+- `apps/filmtone-desktop-macos/FilmtoneDesktop/State/EditorState.swift` (quickState + paramOverrides storage, applySavedLook wiring)
+- `apps/filmtone-desktop-macos/FilmtoneDesktop/UI/QuickAdjustControls.swift` (new)
+- `apps/filmtone-desktop-macos/FilmtoneDesktop/UI/RootWindowView.swift` (insert panel)
+- `apps/filmtone-desktop-macos/FilmtoneDesktop/Export/FilmtoneSidecarWriter.swift` (live quickState)
+- `apps/filmtone-desktop-macos/FilmtoneDesktop.xcodeproj/project.pbxproj` (new file ref)
 - `docs/filmtone/desktop/native-desktop-v2/active.md` (this file)
 - `docs/filmtone/desktop/native-desktop-v2/strategy.md` (1–3 line completion entry)
 
 ## Read-Only References
 
-- iOS canonical: `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneLibrarySchema.swift`
-- iOS canonical: `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneLibraryStore.swift`
-- iOS canonical: `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneBuiltInCatalog.swift`
+- iOS canonical: `apps/capacitor-film-lab-ios/ios/App/App/FilmtonePhase0Math.swift:41-65` (FilmtoneQuickState helpers), `:596-616` (applyQuickState)
+- iOS canonical: `apps/capacitor-film-lab-ios/src/features/editor/StrengthSheet.tsx` (Quick 3-axis UI shape)
 - M5-C audit: `archive/2026-05-04-m5-c-ios-feature-parity-audit.md`
-- M5-C.1 archived active: `archive/2026-05-04-m5-c1-native-source-profile-source-gate-parity.md`
+- M5-C.2a archived active: `archive/2026-05-04-m5-c2a-saved-look-library-foundation.md`
 
 ## Out Of Scope
 
-- M5-C.2b (favorite / rename / delete UI), M5-C.2c (LUT import library)
-- M5-C.3 Adjustments parameter editing (paramOverrides UX)
-- M5-C.4 Export panel parity
-- iOS canonical UUIDs `...000001` – `...000005` (deprecated reservations
-  stay reserved)
+- M5-C.3b (advanced per-parameter override editing UX)
+- M5-C.3c (recipe chips, additional reset posture, help sheets)
+- M5-C.2b (favorite / rename / delete UX)
+- M5-C.4 (Export panel parity)
+- Custom undo / redo
+- Sidecar provenance fields beyond live quickState
 
 ## Unexpected / Blockers
 
-- Codable / Sendable cannot be added to `FilmtoneQuickState` /
-  `FilmtonePhase0ParamsPatch` via cross-file extension (Swift compiler
-  refuses synthesis, and Sendable explicitly requires same-file
-  declaration). Resolved by adding the conformances directly on the
-  struct decls in `Phase0Types.swift` /
-  `Color/FilmtonePhase0ParamsPatch.swift`. Both decls are slated to
-  disappear when `packages/film-lab-swift-core` SPM lands, so this is
-  not a long-term shape concern.
+- `FilmtonePhase0ParamsPatch` and `FilmtoneQuickState` had to gain
+  `Hashable` conformance to satisfy `PreviewRenderKey` (`.task(id:)`
+  needs Hashable). Trivial — `[String: Double]` is already Hashable —
+  but worth recording so a future deserialization shape change does
+  not silently break preview re-render.
 
 ## Completion (this active is ready to archive)
 
 - `xcodebuild -scheme FilmtoneDesktop -configuration Debug
   -destination 'platform=macOS' build` passes clean (Swift 6 strict
-  concurrency; only pre-existing CI-kernel deprecation warnings on
-  `FilmtoneGradeKernels.swift` — unrelated to this slice).
-- Library schema (`FilmtoneSavedLookSchema.swift`) ports the looks-only
-  subset of iOS canonical: `SavedLookEntry`, `CreativeLutBinding`
-  (3-flavor), `SavedLookEmbeddedLut` (decode-only placeholder),
-  `LibraryIndex`, `LibrarySnapshot`, `FilmtoneLibraryConstants`. v1.3
-  additive fields (`bundled` / `immutable` / `bundledSlug`) round-trip
-  via explicit Codable so v1.2-shaped saves decode cleanly.
-- `FilmtoneSavedLookStore` actor lives at
-  `~/Library/Application Support/Filmtone/library/{looks/*.json,
-  index.json}` — same root as iOS for path-compat with future sync.
-  Methods: `loadOrRebuild`, `saveLook`, `loadLook`, `deleteLook`,
-  `snapshot`. Built-in dispatch in `loadLook` routes Stone / Urban
-  canonical UUIDs through `FilmtoneCreativePackCatalog`. Atomic
-  per-entry writes; rebuildable index; built-ins prepended in
-  `currentSnapshot`.
-- `FilmtoneCreativePackCatalog` now exposes `find(canonicalUUID:)` +
-  `materializeAsSavedLookEntry(_:)` (Pack 01 freeze date pinned to
-  2026-04-30 JST for stable timestamps, mirroring iOS).
-- `LibraryViewModel` (@MainActor @Observable) bridges the actor.
-  Bootstrap via `task { await library.bootstrap() }` in RootWindowView;
-  errors surface to a `lastError: String?` that drives an inline
-  alert in `LookLibraryControls`.
-- `LookLibraryControls` replaces the hardcoded `lookOptions` Picker
-  previously baked into `GradeControls`: snapshot-driven Picker with
-  `Section("Built-in")` (Stone / Urban) + `Section("Saved")` (user
-  looks), plus a "Save Current Look…" Button that opens an
-  `NSAlert` text-field prompt. Same Pass 4 dark-tinted `.clear`
-  Liquid Glass + `.colorScheme(.dark)` posture.
-- `EditorState` gains `selectedSavedLookId: UUID?`, `applySavedLook`
-  (writes `presetName` / `presetStrength` / `lookSlug` from
-  `creativeLut.bundledSlug`), `clearSavedLookSelection`, and
-  `currentLookSavePayload()` for the inverse Save path.
-- `GradeControls` slimmed to the Strength slider only — Look
-  selection now lives entirely in `LookLibraryControls`.
-- `RootWindowView` bootstraps the VM via `@State private var
-  library = LibraryViewModel()` and a `.task { await
-  library.bootstrap() }` modifier; LookLibraryControls panel is
-  inserted between `SourceProfileControls` and `GradeControls`
-  inside the existing GlassEffectContainer right rail.
-- Built-ins remain selectable with identical render output to
-  pre-M5-C.2a (their `.bundled` cube + `paramOverridesPatch` are
-  unchanged; the Picker just routes through the snapshot now).
-- Domain conformances widened: `FilmtoneQuickState` and
-  `FilmtonePhase0ParamsPatch` are now `Codable + Equatable +
-  Sendable` so `SavedLookEntry` synthesis works without retroactive
-  conformance hacks.
+  concurrency; only the pre-existing CI-kernel deprecation warnings
+  on `FilmtoneGradeKernels.swift` — unrelated to this slice).
+- `FilmtoneQuickState` (`Domain/Phase0Types.swift`) now matches iOS
+  canonical: `clamped()`, `value(forAxis:)`, `static clampAxis(_:)`
+  ported verbatim from `apps/capacitor-film-lab-ios/ios/App/App/
+  FilmtonePhase0Math.swift:41-65`. `Hashable` added so the struct can
+  ride inside `PreviewRenderKey`.
+- `FilmtonePhase0ParamsPatch` widened to `Hashable` for the same
+  PreviewRenderKey reason.
+- `FilmtonePresetCatalog.resolved(...)` extended to a 5-arg surface
+  `(presetName, strength, lookSlug, quickState, paramOverrides)` with
+  default `.zero` / `.empty` for the trailing pair so existing 3-arg
+  call sites continue to compile. Resolution order locked to iOS
+  canonical: `interpolatePresetParams → applyingPatch(paramOverrides)
+  → applyQuickState`. New `applyQuickState(to:quickState:)` static
+  func mirrors `FilmtonePhase0Math.applyQuickState` — walks
+  `FilmtonePhase0Generated.quickAxisIds × quickWeights[axis]` and
+  adds `axisValue * weight` to each affected param key.
+- `EditorState` adds `quickState: FilmtoneQuickState = .zero` and
+  `paramOverrides: FilmtonePhase0ParamsPatch = .empty` storage,
+  `quickStateIsActive` / `resetQuickState()` helpers, and threads
+  both into `presetParams`. `applySavedLook` now restores
+  `entry.quickState.clamped()` + `entry.paramOverrides` (was
+  previously dropped). `currentLookSavePayload` reads live values
+  (was hard-coded to `(.zero, .empty)`). `clearSavedLookSelection`
+  also resets quickState + paramOverrides so the next Save isn't
+  contaminated by a previous Look's offsets.
+- Render pipeline threading: `PreviewSurface`, `FilmtoneStillExporter`,
+  `FilmtoneVideoExporter`, and `FilmtoneSidecarWriter` all accept and
+  thread `quickState` + `paramOverrides`. `FilmtoneSidecarRequest`
+  protocol gains both as default-`.zero` / default-`.empty` requirements
+  so any future request type stays backward-compatible. The previously
+  hard-coded `quickState: [0,0,0]` block in the sidecar payload now
+  serializes the live `request.quickState.clamped()` values.
+- New `UI/QuickAdjustControls.swift` — Liquid Glass panel with three
+  signed sliders (range -1…+1, step 0.01 from
+  `FilmtonePhase0Generated.quickAxisStep`) labeled Film / Era /
+  Dynamics + signed-percent readout (`+24%` / `-12%` / `0%`) +
+  "Reset Quick" footer button (disabled when quickState is already
+  zero). Same Pass 4 dark-tint `.clear` posture as
+  `LookLibraryControls` / `GradeControls`.
+- `RootWindowView` inserts `QuickAdjustControls` between
+  `LookLibraryControls` and `GradeControls` so the right rail reads
+  top-down: Source Profile → Look → Quick → Strength. Both export
+  request constructors (`presentStillExportPanel`,
+  `presentVideoExportPanel`) thread `state.quickState` /
+  `state.paramOverrides` through.
+- Saved-Look round-trip closed end-to-end: a Look saved with
+  `era = +0.4` / `paramOverrides = {…}` recalls those offsets
+  verbatim on Picker re-selection, and the export sidecar carries
+  the live quickState block instead of `[0,0,0]`.
 
-User to verify visually: open a still / video, pick Stone, drag
-Strength to ~0.6, click "Save Current Look…", name it. The new
-entry should appear at the head of the user-saved section. Switch
-the Picker to None, then back to the saved entry — preview should
-return to Stone @ 0.6. Saved Looks should survive an app relaunch.
+User to verify visually:
 
-This active.md moves to archive when the next slice (M5-C.2b
-favorite / rename / delete UX, M5-C.2c LUT library import, or
-M5-C.3 Adjustments parameter editing) opens.
+1. Open a still / video, drag `Film` / `Era` / `Dynamics` —
+   preview updates with the iOS-canonical per-key offsets
+   (saturation / temperature / vignette for filmCharacter; fade /
+   saturation / contrast for era; exposure / contrast / bloom for
+   dynamics).
+2. Pick Stone, drag Strength to ~0.6, set `Era = +40%`, click "Save
+   Current Look…", name it "Stone Era". Switch Picker to None →
+   Quick zeroes, Look clears. Switch Picker back to "Stone Era" →
+   Strength returns to 0.6 and Era returns to +40%.
+3. "Reset Quick" restores zero across all 3 axes without touching
+   Strength or Look. Disabled when already zero.
+4. Export PNG/JPEG/MP4 with non-zero Quick — open the resulting
+   `.json` sidecar and verify the `quickState` block carries the
+   live axis values (not `[0,0,0]`).
+5. Built-in Stone / Urban remain selectable with identical render
+   output to pre-M5-C.3a when Quick is `.zero`.
+
+This active.md moves to archive when the next slice (M5-C.3b
+advanced per-parameter override editing UX, M5-C.2b favorite /
+rename / delete UX, or M5-C.4 Export panel parity) opens.

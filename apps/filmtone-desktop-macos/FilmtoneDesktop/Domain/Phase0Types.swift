@@ -6,7 +6,7 @@ import Foundation
 // and FilmtoneMediaTypes.swift. Phase 2 (SPM packages/film-lab-swift-core)
 // absorbs both copies; this file is deleted at that point.
 
-struct FilmtoneQuickState: Codable, Equatable, Sendable {
+struct FilmtoneQuickState: Codable, Equatable, Hashable, Sendable {
     var filmCharacter: Double
     var era: Double
     var dynamics: Double
@@ -16,6 +16,34 @@ struct FilmtoneQuickState: Codable, Equatable, Sendable {
         era: 0,
         dynamics: 0
     )
+
+    func clamped() -> FilmtoneQuickState {
+        .init(
+            filmCharacter: Self.clampAxis(filmCharacter),
+            era: Self.clampAxis(era),
+            dynamics: Self.clampAxis(dynamics)
+        )
+    }
+
+    func value(forAxis axis: String) -> Double {
+        switch axis {
+        case "filmCharacter":
+            return filmCharacter
+        case "era":
+            return era
+        case "dynamics":
+            return dynamics
+        default:
+            return 0
+        }
+    }
+
+    static func clampAxis(_ value: Double) -> Double {
+        max(
+            FilmtonePhase0Generated.quickAxisMin,
+            min(FilmtonePhase0Generated.quickAxisMax, value)
+        )
+    }
 }
 
 struct FilmtonePhase0Params {

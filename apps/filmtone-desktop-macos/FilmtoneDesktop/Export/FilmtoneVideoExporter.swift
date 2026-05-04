@@ -19,6 +19,8 @@ struct FilmtoneVideoExportRequest: FilmtoneSidecarRequest {
     let lookSlug: String?
     let codec: FilmtoneVideoCodec
     let sourceProfileSelection: CameraProfileSelection
+    let quickState: FilmtoneQuickState
+    let paramOverrides: FilmtonePhase0ParamsPatch
     var sourceKind: FilmtoneSourceKind { .video }
 
     init(
@@ -28,7 +30,9 @@ struct FilmtoneVideoExportRequest: FilmtoneSidecarRequest {
         presetStrength: Double = FilmtonePresetCatalog.presetStrengthDefault,
         lookSlug: String? = nil,
         codec: FilmtoneVideoCodec = .h264,
-        sourceProfileSelection: CameraProfileSelection = .auto
+        sourceProfileSelection: CameraProfileSelection = .auto,
+        quickState: FilmtoneQuickState = .zero,
+        paramOverrides: FilmtonePhase0ParamsPatch = .empty
     ) {
         self.sourceURL = sourceURL
         self.outputURL = outputURL
@@ -37,6 +41,8 @@ struct FilmtoneVideoExportRequest: FilmtoneSidecarRequest {
         self.lookSlug = lookSlug
         self.codec = codec
         self.sourceProfileSelection = sourceProfileSelection
+        self.quickState = quickState
+        self.paramOverrides = paramOverrides
     }
 }
 
@@ -106,7 +112,9 @@ enum FilmtoneVideoExporter {
         let params = FilmtonePresetCatalog.resolved(
             presetName: request.presetName,
             strength: request.presetStrength,
-            lookSlug: request.lookSlug
+            lookSlug: request.lookSlug,
+            quickState: request.quickState,
+            paramOverrides: request.paramOverrides
         )
         let sourceSeed = FilmtoneGradePipeline.makeStableSourceSeed(
             from: request.sourceURL.absoluteString

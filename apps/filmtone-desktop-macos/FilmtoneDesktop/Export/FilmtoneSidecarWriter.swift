@@ -53,10 +53,13 @@ enum FilmtoneSidecarWriter {
         resolvedSourceProfile: CameraProfileCatalogEntry? = nil
     ) -> [String: Any] {
         let strength = FilmtonePresetCatalog.clampStrength(request.presetStrength)
+        let liveQuickState = request.quickState.clamped()
         let params = FilmtonePresetCatalog.resolved(
             presetName: request.presetName,
             strength: strength,
-            lookSlug: request.lookSlug
+            lookSlug: request.lookSlug,
+            quickState: liveQuickState,
+            paramOverrides: request.paramOverrides
         )
         let lookVersion = FilmtonePresetCatalog.presetVersion
 
@@ -97,9 +100,9 @@ enum FilmtoneSidecarWriter {
             "lookId": lookId,
             "lookVersion": lookVersion,
             "quickState": [
-                "filmCharacter": 0.0,
-                "era": 0.0,
-                "dynamics": 0.0,
+                "filmCharacter": liveQuickState.filmCharacter,
+                "era": liveQuickState.era,
+                "dynamics": liveQuickState.dynamics,
             ],
         ]
         if let sourceInterpretation {

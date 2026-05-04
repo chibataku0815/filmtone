@@ -83,22 +83,66 @@ enum FilmtonePresetCatalog {
     /// `resetParams` pivot. The slider then lerps between bareline and
     /// target — strength=0 collapses to bareline, strength=1 lands on the
     /// Look's signature optics.
+    ///
+    /// M5-C.3a additive: after the preset/strength/look resolve, apply
+    /// the saved-Look user `paramOverrides` patch (per-key offsets), then
+    /// run `applyQuickState` for the 3-axis Quick offsets. Resolution
+    /// order matches iOS canonical (`FilmtonePhase0Math.swift`) so a
+    /// Look saved on iOS produces identical params on macOS.
     static func resolved(
         presetName: String,
         strength: Double,
-        lookSlug: String?
+        lookSlug: String?,
+        quickState: FilmtoneQuickState = .zero,
+        paramOverrides: FilmtonePhase0ParamsPatch = .empty
     ) -> FilmtonePhase0Params {
-        guard let lookSlug,
-              let look = FilmtoneCreativePackCatalog.find(slug: lookSlug) else {
-            return params(for: presetName, strength: strength)
+        let base: FilmtonePhase0Params
+        if let lookSlug,
+           let look = FilmtoneCreativePackCatalog.find(slug: lookSlug) {
+            let reset = FilmtonePhase0Generated.resetParams
+            let target = reset.applyingPatch(look.paramOverridesPatch)
+            let t = clampStrength(strength)
+            if t >= 1.0 {
+                base = target
+            } else if t <= 0.0 {
+                base = reset
+            } else {
+                base = lerp(reset: reset, target: target, t: t)
+            }
+        } else {
+            base = params(for: presetName, strength: strength)
         }
 
-        let reset = FilmtonePhase0Generated.resetParams
-        let target = reset.applyingPatch(look.paramOverridesPatch)
-        let t = clampStrength(strength)
-        if t >= 1.0 { return target }
-        if t <= 0.0 { return reset }
-        return lerp(reset: reset, target: target, t: t)
+        let withOverrides = paramOverrides.isEmpty
+            ? base
+            : base.applyingPatch(paramOverrides)
+        return applyQuickState(to: withOverrides, quickState: quickState)
+    }
+
+    /// M5-C.3a — verbatim port of iOS `FilmtonePhase0Math.applyQuickState`.
+    /// Each Quick axis (`filmCharacter` / `era` / `dynamics`) carries an
+    /// additive weighted offset over a fixed subset of param keys, summed
+    /// into the running params object. Per-key clamps live on the params
+    /// setter (already enforced by `setValue(_:for:)` for keys with
+    /// generator-level bounds; the rest are unbounded by design).
+    static func applyQuickState(
+        to base: FilmtonePhase0Params,
+        quickState: FilmtoneQuickState
+    ) -> FilmtonePhase0Params {
+        let clamped = quickState.clamped()
+        var next = base
+        for axis in FilmtonePhase0Generated.quickAxisIds {
+            let axisValue = clamped.value(forAxis: axis)
+            guard axisValue != 0,
+                  let weights = FilmtonePhase0Generated.quickWeights[axis] else {
+                continue
+            }
+            for (key, weight) in weights {
+                let updated = next.value(for: key) + axisValue * weight
+                next.setValue(updated, for: key)
+            }
+        }
+        return next
     }
 
     private static func lerp(

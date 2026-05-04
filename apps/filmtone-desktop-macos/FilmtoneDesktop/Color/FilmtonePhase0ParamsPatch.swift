@@ -74,7 +74,7 @@ extension FilmtonePhase0Params {
     }
 }
 
-struct FilmtonePhase0ParamsPatch: Codable, Equatable, Sendable {
+struct FilmtonePhase0ParamsPatch: Codable, Equatable, Hashable, Sendable {
     var values: [String: Double]
 
     static let empty = FilmtonePhase0ParamsPatch(values: [:])

@@ -24,6 +24,12 @@ struct PreviewSurface: View {
     /// .builtIn(...) is sticky. Routed into the preview render so the
     /// Picker change drives a visible re-grade.
     let sourceProfileSelection: CameraProfileSelection
+    /// M5-C.3a: Quick adjust 3-axis offsets folded into the resolved
+    /// render params after preset/look/strength resolution.
+    let quickState: FilmtoneQuickState
+    /// M5-C.3a: per-key parameter override patch applied between the
+    /// preset/look resolve and the quick-state pass.
+    let paramOverrides: FilmtonePhase0ParamsPatch
 
     @State private var renderedImage: NSImage?
 
@@ -53,7 +59,9 @@ struct PreviewSurface: View {
             presetStrength: presetStrength,
             lookSlug: lookSlug,
             videoPreviewSeconds: videoPreviewSeconds,
-            sourceProfileSelection: sourceProfileSelection
+            sourceProfileSelection: sourceProfileSelection,
+            quickState: quickState,
+            paramOverrides: paramOverrides
         )) {
             await renderCurrent()
         }
@@ -70,6 +78,8 @@ struct PreviewSurface: View {
         let slug = lookSlug
         let scrubSeconds = videoPreviewSeconds
         let profileSelection = sourceProfileSelection
+        let quick = quickState
+        let overrides = paramOverrides
 
         let source: CIImage?
         let probedColorClass: SourceColorClassDTO?
@@ -107,7 +117,9 @@ struct PreviewSurface: View {
                 sourceURL: sourceURL,
                 fallbackURL: sourceURL,
                 sourceProfileSelection: profileSelection,
-                probedColorClass: probedColorClass
+                probedColorClass: probedColorClass,
+                quickState: quick,
+                paramOverrides: overrides
             )
         }.value
 
@@ -123,7 +135,9 @@ struct PreviewSurface: View {
         sourceURL: URL,
         fallbackURL: URL,
         sourceProfileSelection: CameraProfileSelection,
-        probedColorClass: SourceColorClassDTO?
+        probedColorClass: SourceColorClassDTO?,
+        quickState: FilmtoneQuickState,
+        paramOverrides: FilmtonePhase0ParamsPatch
     ) -> NSImage? {
         guard let source else {
             return NSImage(contentsOf: fallbackURL)
@@ -140,7 +154,9 @@ struct PreviewSurface: View {
         let params = FilmtonePresetCatalog.resolved(
             presetName: presetName,
             strength: presetStrength,
-            lookSlug: lookSlug
+            lookSlug: lookSlug,
+            quickState: quickState,
+            paramOverrides: paramOverrides
         )
         let sourceSeed = FilmtoneGradePipeline.makeStableSourceSeed(
             from: sourceURL.absoluteString
@@ -182,6 +198,8 @@ private struct PreviewRenderKey: Hashable {
     let lookSlug: String?
     let videoPreviewSeconds: Double?
     let sourceProfileSelection: CameraProfileSelection
+    let quickState: FilmtoneQuickState
+    let paramOverrides: FilmtonePhase0ParamsPatch
 }
 
 private struct EmptyPreviewLabel: View {
@@ -206,7 +224,9 @@ private struct EmptyPreviewLabel: View {
         presetStrength: 1.0,
         lookSlug: nil,
         videoPreviewSeconds: nil,
-        sourceProfileSelection: .auto
+        sourceProfileSelection: .auto,
+        quickState: .zero,
+        paramOverrides: .empty
     )
     .frame(width: 600, height: 400)
 }

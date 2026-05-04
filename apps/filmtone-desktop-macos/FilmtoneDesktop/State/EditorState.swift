@@ -41,6 +41,17 @@ final class EditorState {
     /// UI-tracking sugar so the Picker remains consistent across
     /// re-selection of the same Look.
     var selectedSavedLookId: UUID?
+    /// M5-C.3a: Quick adjust 3-axis state (filmCharacter / era / dynamics)
+    /// each in [-1, 1]. Folded into the resolved render params via
+    /// `FilmtonePresetCatalog.applyQuickState`. Saved/restored as part of
+    /// the saved-Look round-trip and emitted to the export sidecar.
+    var quickState: FilmtoneQuickState = .zero
+    /// M5-C.3a: per-key parameter override patch (sparse, additive on top
+    /// of the preset/look-resolved params, evaluated before quickState).
+    /// UI editing surface lands in M5-C.3b; the storage / save-load
+    /// round-trip lights up here so a Look saved with overrides restores
+    /// them on recall the moment the editing UI exists.
+    var paramOverrides: FilmtonePhase0ParamsPatch = .empty
     var isExporting: Bool = false
     var exportProgress: Double = 0
     var exportProgressMessage: String?
@@ -55,8 +66,24 @@ final class EditorState {
         FilmtonePresetCatalog.resolved(
             presetName: presetName,
             strength: presetStrength,
-            lookSlug: lookSlug
+            lookSlug: lookSlug,
+            quickState: quickState,
+            paramOverrides: paramOverrides
         )
+    }
+
+    /// M5-C.3a: true when any Quick axis carries a non-zero offset.
+    /// Drives "Reset Quick" button enablement.
+    var quickStateIsActive: Bool {
+        quickState.filmCharacter != 0 ||
+        quickState.era != 0 ||
+        quickState.dynamics != 0
+    }
+
+    /// M5-C.3a: clear all 3 axes back to zero without touching Look /
+    /// strength / paramOverrides.
+    func resetQuickState() {
+        quickState = .zero
     }
 
     /// D4-ii: when a Look is selected and strength > 0, resolve the cube
@@ -162,17 +189,17 @@ final class EditorState {
             presetName: presetName,
             presetVersion: FilmtonePresetCatalog.presetVersion,
             strength: presetStrength,
-            quickState: .zero,
-            paramOverrides: .empty,
+            quickState: quickState,
+            paramOverrides: paramOverrides,
             creativeLut: creativeLut
         )
     }
 
     /// Apply a SavedLookEntry to live render state. Built-in entries
     /// land via `creativeLut.bundledSlug`; user-saved entries with a
-    /// nil binding clear the lookSlug. paramOverrides on the entry are
-    /// not yet reapplied — M5-C.3 wires that path once the Adjustments
-    /// editing UX lands.
+    /// nil binding clear the lookSlug. M5-C.3a: also restores the
+    /// entry's `quickState` and `paramOverrides` so a Look saved with
+    /// Quick offsets / per-key overrides round-trips faithfully.
     func applySavedLook(_ entry: SavedLookEntry) {
         selectedSavedLookId = entry.id
         presetName = entry.presetName
@@ -182,12 +209,18 @@ final class EditorState {
         } else {
             lookSlug = nil
         }
+        quickState = entry.quickState.clamped()
+        paramOverrides = entry.paramOverrides
     }
 
     /// Reset the Look picker to "None". Mirrors what tapping the None
-    /// row does — clears slug + selection without touching strength.
+    /// row does — clears slug + selection. M5-C.3a: also drops live
+    /// Quick state and paramOverrides back to defaults so the next
+    /// Save isn't contaminated by a previous Look's offsets.
     func clearSavedLookSelection() {
         selectedSavedLookId = nil
         lookSlug = nil
+        quickState = .zero
+        paramOverrides = .empty
     }
 }

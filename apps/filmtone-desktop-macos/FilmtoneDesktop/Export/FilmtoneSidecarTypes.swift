@@ -20,8 +20,17 @@ protocol FilmtoneSidecarRequest: Sendable {
     /// or `.builtIn(catalogId:)`. Default = `.auto` for protocol-level
     /// backward compatibility; existing callers see no behavior change.
     var sourceProfileSelection: CameraProfileSelection { get }
+    /// M5-C.3a: Quick adjust 3-axis offsets folded into the resolved
+    /// render params. Default = `.zero` so existing callers see no
+    /// behavior change; new export call sites thread live state through.
+    var quickState: FilmtoneQuickState { get }
+    /// M5-C.3a: per-key parameter override patch applied between the
+    /// preset/look resolve and the quick-state pass. Default = `.empty`.
+    var paramOverrides: FilmtonePhase0ParamsPatch { get }
 }
 
 extension FilmtoneSidecarRequest {
     var sourceProfileSelection: CameraProfileSelection { .auto }
+    var quickState: FilmtoneQuickState { .zero }
+    var paramOverrides: FilmtonePhase0ParamsPatch { .empty }
 }
