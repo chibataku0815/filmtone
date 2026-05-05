@@ -260,7 +260,7 @@ async function main() {
   if (!wantsSyncEnv) {
     console.log(
       `\n[${functionName}] Production の env を自動更新するには次を付けて再実行:\n` +
-        `  bun run release:upload-dmg -- --sync-vercel-env\n` +
+        `  bun run release:upload-dmg -- --confirm-prod --sync-vercel-env\n` +
         `または手動:\n` +
         `  cd "${portfolioRootPath}" && bunx vercel@50 env add FILM_LAB_DESKTOP_DOWNLOAD_URL production --value "${publicUrl}" --yes --force`,
     );

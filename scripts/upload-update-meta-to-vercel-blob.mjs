@@ -240,7 +240,7 @@ async function main() {
   if (!wantsSyncEnv) {
     console.log(
       `\n[${functionName}] production env を更新するには:\n` +
-        `  bun run release:upload-update-meta -- --sync-vercel-env`,
+        `  bun run release:upload-update-meta -- --confirm-prod --sync-vercel-env`,
     );
     return 0;
   }

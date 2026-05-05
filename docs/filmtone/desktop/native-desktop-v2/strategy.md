@@ -48,12 +48,12 @@ content layer stays glass-free so color judgment is not compromised.
 | M3 | Native Color And Optics Parity | M2 | In progress | Built-in Looks use iOS-canonical color/optics stages; remaining parity gaps are explicit. |
 | M4 | Shared Contract Consolidation | M3 | In progress | Shared Swift ownership is clear and iOS/macOS consume the same canonical contract where practical. |
 | M5 | Native Editing UI | M3 | Validation / thin fixes | Core editing workflows are usable and visually acceptable in the native UI. |
-| M6 | Release Cutover | M5 | In progress | Regenerated v1.4 native artifact is signed/notarized/stapled and connected to the fixed Desktop release rail. |
+| M6 | Release Cutover | M5 | Pre-release after rollback | Regenerated v1.4 native artifact is signed/notarized/stapled and connected to the fixed Desktop release rail. |
 
 ## Current Strategic State
 
 - Branch: `feature/native-desktop-plan`
-- Current integrated HEAD: `6097acdd` (`Integrate M5-K native desktop polish`)
+- Current integrated HEAD: `f0e81e71` (`Update native desktop v2 plan after M5-K`)
 - Integration base before M5-K1/K2/K3/K4: `0b79861f`
 - No M5-K product `active.md` should remain open. If `active.md` exists during
   DHM / release-cutover interrupts, do not treat it as current M5-K state.
@@ -69,9 +69,8 @@ slider polish have been integrated into the native plan branch.
 The user visually accepted the current M5-J integrated state on 2026-05-05.
 M5-K1 / K2 / K3 / K4 are integrated: chrome/opening readability, Look + strength
 grouping, draggable still/video compare split, and graded scrub thumbnail
-preview. K4 hover follow-up fixes are included in `6097acdd`; final user visual
-confirmation that hover thumbnails no longer move or shake the scrub bar remains
-a release-smoke item until explicitly accepted.
+preview. K4 hover follow-up fixes are included in `6097acdd`; the user visually
+confirmed on 2026-05-05 that the scrub hover behavior is acceptable.
 
 ## Current M5-K State
 
@@ -130,12 +129,22 @@ archive/2026-05-05-m5-k4-review-fix-2-quantize-within-duration.md
 archive/2026-05-05-m5-k4-integration.md
 ```
 
-## Release Cutover Gate
+## Release Cutover State
 
-Do not regenerate or publish the v1.4 public artifact until:
+The first v1.4 public replacement cutover attempt on 2026-05-05 was rolled back
+after the user clarified the desired sequence: first make the parent branch
+correct, then merge `main`, then release.
 
-- M5-K visual follow-ups that affect first-run/editing confidence are either
-  closed or explicitly deferred.
+Current public state after rollback:
+
+- update metadata reports `latestVersion: "1.0.4"`
+- the public download complete page is back on the legacy Desktop DMG
+  `filmtone-1.0.3-arm64.dmg`
+- the Native `Filmtone-1.4.dmg` artifact exists in Vercel Blob, but it is not
+  the active public update target
+
+Pre-cutover gates from the first attempt that passed and remain useful evidence:
+
 - `bash apps/filmtone-desktop-macos/Verify/run.sh` passes.
 - `bun run verify:macos` passes.
 - User visual smoke passes on opening, still preview, video playback, sidebar,
@@ -143,6 +152,12 @@ Do not regenerate or publish the v1.4 public artifact until:
   export/share.
 - Release-cutover docs/scripts are reconciled with the v1.4 identity and fixed
   download/update rail.
+
+Remaining product follow-ups before the clean release run:
+
+- Source Auto / Conversion LUT parity.
+- Backlight Veil parity.
+- Advanced recipe chip discoverability.
 
 Release-cutover details live in:
 
@@ -205,8 +220,21 @@ not a v1.4 gate unless the user explicitly changes release scope.
 still/video compare, and graded scrub thumbnail preview. Verification was green
 (`Verify/run.sh` 86/86, `bun run verify:macos`, `git diff --check`), and K4
 visual follow-ups for hover hit-testing, hover geometry stability, and overlay
-layout are included. Final user visual confirmation of scrub thumbnail hover
-stability remains pending.
+layout are included. User visual confirmation of scrub thumbnail hover stability
+passed on 2026-05-05.
+
+2026-05-05: Replacement cutover readiness prep added a read-only
+`release:cutover-preflight`, Native Desktop `RELEASE_NOTES-v1.4.md`, and a
+public runbook / rollback checklist under `docs/filmtone/desktop/release-cutover/`.
+Public update-meta remains on Desktop `1.0.4`; Phase 9 release run stays blocked
+until the remaining product parity gates are closed or explicitly deferred.
+
+2026-05-05: Phase 9 replacement cutover was attempted, then rolled back after
+the user clarified the desired order: parent branch correction, `main` merge,
+then release. The generated `Filmtone.app` and `Filmtone-1.4.dmg` were signed,
+notarized, stapled, and Gatekeeper accepted, and the DMG remains uploaded to
+Vercel Blob. Public update metadata and the download surface have been restored
+to the legacy Desktop rail (`latestVersion: "1.0.4"`).
 
 2026-05-05: DHM shared highlight marker MVP landed in isolated worktree
 `feature/shared-highlight-markers`: source-relative marker contract, iOS/Desktop
