@@ -33,6 +33,7 @@ struct RootWindowView: View {
                 sourceProfileSelection: state.sourceProfileSelection,
                 quickState: state.quickState,
                 paramOverrides: state.paramOverrides,
+                compareEnabled: state.isCompareEnabled,
                 onOpenRequested: { presentOpenPanel() }
             )
             .ignoresSafeArea(.container, edges: .all)
@@ -143,6 +144,32 @@ struct RootWindowView: View {
                 .buttonStyle(.glass)
                 .help("Open a still image or video")
                 .filmtonePointingHandCursor()
+            }
+            ToolbarItem(placement: .primaryAction) {
+                // M5-J.2: Before/After 50:50 compare toggle. Disabled
+                // until a source is loaded so the unmodified `V` shortcut
+                // is a no-op in the empty state. Save Look rename / save
+                // prompts use AppKit `NSAlert` (modal, separate keyWindow)
+                // so the toolbar shortcut does not fire while a prompt is
+                // up. SF Symbol flips to `.fill` on ON for a subtle visual
+                // affordance without adding a label.
+                Button {
+                    state.toggleCompare()
+                } label: {
+                    Label(
+                        "Compare",
+                        systemImage: state.isCompareEnabled
+                            ? "rectangle.split.2x1.fill"
+                            : "rectangle.split.2x1"
+                    )
+                }
+                .keyboardShortcut("v", modifiers: [])
+                .buttonStyle(.glass)
+                .disabled(state.sourceURL == nil)
+                .help(state.isCompareEnabled
+                    ? "Hide Before/After (V)"
+                    : "Show Before/After (V)")
+                .filmtonePointingHandCursor(state.sourceURL != nil)
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {
@@ -529,6 +556,7 @@ private struct VideoCompositionRefreshKey: Equatable {
     let probedSourceColorClass: SourceColorClassDTO?
     let quickState: FilmtoneQuickState
     let paramOverrides: FilmtonePhase0ParamsPatch
+    let compareEnabled: Bool
 
     @MainActor
     init(state: EditorState) {
@@ -539,6 +567,7 @@ private struct VideoCompositionRefreshKey: Equatable {
         self.probedSourceColorClass = state.probedSourceColorClass
         self.quickState = state.quickState
         self.paramOverrides = state.paramOverrides
+        self.compareEnabled = state.isCompareEnabled
     }
 }
 

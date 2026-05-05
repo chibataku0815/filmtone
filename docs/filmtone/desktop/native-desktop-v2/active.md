@@ -23,10 +23,10 @@ branches into the M5-J integration branch after M5-J3 v2.
 
 ## Checklist
 
-- [ ] Confirm worker branches are clean and archived.
-- [ ] Merge M5-J1 v2.
-- [ ] Merge M5-J2 v2.
-- [ ] Resolve pbxproj / RootWindowView / strategy conflicts with both features retained.
+- [x] Confirm worker branches are clean and archived.
+- [x] Merge M5-J1 v2.
+- [x] Merge M5-J2 v2.
+- [x] Resolve pbxproj / RootWindowView / strategy conflicts with both features retained.
 - [ ] Run `apps/filmtone-desktop-macos/Verify/run.sh`.
 - [ ] Run `bun run verify:macos`.
 - [ ] Run `git diff --check`.

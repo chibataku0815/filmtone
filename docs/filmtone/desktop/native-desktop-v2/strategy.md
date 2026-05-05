@@ -279,6 +279,14 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
 
 ## Completion Log
 
+- 2026-05-05: **M5-J.2 Before/After Compare (v1.4 minimal) landed** on
+  `feature/native-desktop-m5-j2-compare-v2` (base `ca9acea6`)。`Color/
+  FilmtoneCompareCompose.swift` 新規 + EditorState `isCompareEnabled` /
+  `toggleCompare()` + still / video composition 経路で 50:50 split
+  (左 = pre-transform source、右 = graded) + toolbar Compare button
+  (`V`、source 未読込み時 disabled、SF Symbol fill toggle)。`bun run
+  verify:macos` ✅、Verify 65/65 ✅、`git diff --check` clean。Archive:
+  `archive/2026-05-05-m5-j2-compare-v2.md`。
 - 2026-05-05: **M5-J1 v2 Editing Sidebar Shell closed** (worker branch
   `feature/native-desktop-m5-j1-sidebar-shell-v2`、base `ca9acea6`)。右
   レール 5 panel を `EditorSidebar` (320pt 固定 + `ScrollView` + 8px grid)

@@ -115,6 +115,11 @@ final class EditorState {
     /// would yank the slider thumb away from the user's finger.
     @ObservationIgnored
     var isScrubbing: Bool = false
+    /// M5-J.2: Before/After 50:50 compare. When true the still preview
+    /// composes left=source / right=graded via FilmtoneCompareCompose,
+    /// and the video composition handler does the same for each
+    /// composed frame. Preview-only — does not affect export or sidecar.
+    var isCompareEnabled: Bool = false
 
     var presetParams: FilmtonePhase0Params {
         FilmtonePresetCatalog.resolved(
@@ -251,8 +256,17 @@ final class EditorState {
             probedColorClass: probedSourceColorClass,
             quickState: quickState,
             paramOverrides: paramOverrides,
+            compareEnabled: isCompareEnabled,
             sourceURL: url ?? sourceURL ?? URL(fileURLWithPath: "/")
         )
+    }
+
+    /// M5-J.2: flip the compare toggle. Toolbar disables the button when
+    /// no source is loaded, so this is only called in a meaningful state;
+    /// the value still flips for either source kind to keep the binding
+    /// behavior simple.
+    func toggleCompare() {
+        isCompareEnabled.toggle()
     }
 
     /// M5-A.3: probes video duration off the main actor and seeds
