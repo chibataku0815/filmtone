@@ -163,6 +163,30 @@ final class FilmtoneEditorFacade {
         }
     }
 
+    func runHighlightReel(
+        request: Phase0ExportRequestDTO,
+        protectedCacheURIs: [String] = [],
+        appliedSavedLook: SavedLookEntry? = nil,
+        cameraProfile: CameraProfileSelection? = nil,
+        highlightMarkers: FilmtoneHighlightMarkers?,
+        onProgress: @escaping @MainActor (Phase0ExportProgressDTO) -> Void
+    ) async throws -> Phase0ExportResultDTO {
+        let protectedCacheURLs = protectedCacheURIs.compactMap { try? runtime.resolveFileURL($0) }
+        return try await runtime.runHighlightReel(
+            request: request,
+            protectedCacheURLs: protectedCacheURLs,
+            appliedSavedLook: appliedSavedLook,
+            cameraProfile: cameraProfile,
+            highlightMarkers: highlightMarkers
+        ) { progress in
+            DispatchQueue.main.async {
+                Task { @MainActor in
+                    onProgress(progress)
+                }
+            }
+        }
+    }
+
     func saveToPhotos(uri: String) async throws {
         try await runtime.saveToPhotos(uri: uri)
     }

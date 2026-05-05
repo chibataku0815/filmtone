@@ -20,28 +20,21 @@ struct FilmtoneExportPanel: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(store.exportResult == nil ? store.strings.exportSectionTitle : store.strings.resultTitle)
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.white)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(store.exportResult == nil ? store.strings.exportSectionTitle : store.strings.resultTitle)
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.86)
 
-                Text(statusLine)
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.66))
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .layoutPriority(1)
-
-            HStack(spacing: 8) {
-                Button(store.strings.exportStart) {
-                    Task { await store.export() }
+                    Text(statusLine)
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.66))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .buttonStyle(.glassProminent)
-                .controlSize(.regular)
-                .lineLimit(1)
-                .disabled(!canExport)
-                .accessibilityIdentifier("filmtone.export.primary")
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 if let onDismiss {
                     Button {
@@ -55,8 +48,36 @@ struct FilmtoneExportPanel: View {
                     .accessibilityIdentifier("filmtone.export.dismiss")
                 }
             }
-            .fixedSize()
+
+            HStack(spacing: 10) {
+                if store.canCreateHighlightReel {
+                    Button(highlightActionLabel) {
+                        Task { await store.exportHighlightReel() }
+                    }
+                    .buttonStyle(.glass)
+                    .controlSize(.regular)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.86)
+                    .accessibilityIdentifier("filmtone.export.highlightReel")
+                }
+
+                Spacer(minLength: 0)
+
+                Button(store.strings.exportStart) {
+                    Task { await store.export() }
+                }
+                .buttonStyle(.glassProminent)
+                .controlSize(.regular)
+                .lineLimit(1)
+                .minimumScaleFactor(0.86)
+                .disabled(!canExport)
+                .accessibilityIdentifier("filmtone.export.primary")
+            }
         }
+    }
+
+    private var highlightActionLabel: String {
+        store.strings.usesJapaneseTypography ? "ハイライト" : "Highlight"
     }
 
     @ViewBuilder

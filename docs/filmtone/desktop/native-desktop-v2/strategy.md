@@ -204,6 +204,7 @@ Use these archives as evidence, not as current truth.
 - `archive/2026-05-05-m5-k4-integration.md`
 - `archive/2026-05-05-dhm-shared-highlight-marker-mvp.md`
 - `archive/2026-05-05-dhm-5-davinci-e2e-smoke-harness.md`
+- `archive/2026-05-05-dhm-5-marker-highlight-reel.md`
 
 ### Architecture / Parity Evidence
 
@@ -238,6 +239,11 @@ passed on 2026-05-05.
 public runbook / rollback checklist under `docs/filmtone/desktop/release-cutover/`.
 At creation time, public update-meta remained on Desktop `1.0.4`; this was later
 superseded by the M5-L parity follow-ups and M6 clean public release.
+
+2026-05-05: DHM-5 marker Highlight Reel is implemented across shared Swift
+core, iOS, Native Desktop, and DaVinci. Verification covered shared Swift tests,
+iOS verify + Simulator build, Native Desktop Verify + Debug build/launch, and
+DaVinci dry-run plus Resolve smoke for `customData` and `Highlight_Auto`.
 
 2026-05-05: Phase 9 replacement cutover was attempted, then rolled back after
 the user clarified the desired order: parent branch correction, `main` merge,

@@ -327,6 +327,60 @@ runner.test("sidecar reader loads iOS highlightMarkers by source filename") {
     try assertEqual(markers?.markers.first?.createdOnPlatform, Optional("ios"))
 }
 
+runner.test("highlight reel export route uses centered merged marker segments") {
+    let markers = FilmtoneHighlightMarkers(
+        sourceIdentity: FilmtoneMarkerSourceIdentity(
+            filename: "clip.mov",
+            durationSec: 8,
+            fps: 24,
+            fileSizeBytes: 2048
+        ),
+        markers: [
+            FilmtoneHighlightMarker(
+                id: "marker-a",
+                sourceTimeSec: 1.0,
+                sourceFps: 24,
+                createdOnPlatform: "macos",
+                createdAtIso: "2026-05-05T00:00:00.000Z"
+            ),
+            FilmtoneHighlightMarker(
+                id: "marker-b",
+                sourceTimeSec: 1.7,
+                sourceFps: 24,
+                createdOnPlatform: "macos",
+                createdAtIso: "2026-05-05T00:00:00.000Z"
+            ),
+            FilmtoneHighlightMarker(
+                id: "marker-tail",
+                sourceTimeSec: 7.9,
+                sourceFps: 24,
+                createdOnPlatform: "macos",
+                createdAtIso: "2026-05-05T00:00:00.000Z"
+            ),
+        ]
+    )
+    let request = StubSidecarRequest(
+        sourceURL: URL(fileURLWithPath: "/tmp/clip.mov"),
+        outputURL: URL(fileURLWithPath: "/tmp/highlight-reel.mp4"),
+        presetName: "reset",
+        presetStrength: 1.0,
+        lookSlug: nil,
+        sourceKind: .video,
+        quickState: .zero,
+        paramOverrides: .empty,
+        highlightMarkers: markers
+    )
+
+    let segments = request.highlightMarkers?.highlightReelSegments() ?? []
+    try assertEqual(segments.count, 2)
+    try assertEqual(segments[0].markerIds, ["marker-a", "marker-b"])
+    try assertClose(segments[0].sourceStartSec, 0.5)
+    try assertClose(segments[0].sourceEndSec, 2.2)
+    try assertEqual(segments[1].markerIds, ["marker-tail"])
+    try assertClose(segments[1].sourceStartSec, 7.0)
+    try assertClose(segments[1].sourceEndSec, 8.0)
+}
+
 runner.test("Backlight Veil catalog exposes shared profile ids + supported values") {
     try assertEqual(
         FilmtoneOpticalFilterCatalog.profiles.map(\.id),

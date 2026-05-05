@@ -544,15 +544,15 @@ struct FilmtoneFullscreenLutEditor: View {
                 .accessibilityLabel(Text(store.strings.fullscreenCloseAccessibility))
                 .accessibilityIdentifier("filmtone.fullscreen.close")
 
-                Spacer(minLength: 6)
-
                 if let activeLookTitle = activeAppliedLookTitle {
                     Text(activeLookTitle)
                         .font(.subheadline.weight(.semibold))
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
+                        .truncationMode(.tail)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
+                        .frame(maxWidth: 132)
                         .liquidGlassSurface(in: Capsule())
                         .accessibilityIdentifier("filmtone.fullscreen.title")
                 }
@@ -1114,43 +1114,90 @@ private struct FullscreenLookCarousel: View {
     let onClear: () -> Void
 
     var body: some View {
+        if entries.count <= 2 {
+            fixedLookRow
+        } else {
+            scrollingLookRow
+        }
+    }
+
+    private var fixedLookRow: some View {
+        GlassGroup(spacing: 10) {
+            HStack(spacing: 10) {
+                clearLookChip(fillsWidth: true)
+                    .frame(maxWidth: .infinity)
+
+                ForEach(entries) { entry in
+                    lookChip(entry, fillsWidth: true)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .padding(.vertical, 2)
+        }
+        .accessibilityIdentifier("filmtone.fullscreen.lookCarousel")
+    }
+
+    private var scrollingLookRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             GlassGroup(spacing: 10) {
                 HStack(spacing: 10) {
-                    GlassActionButton(
-                        isProminent: !hasCreativeLut && activeLookId == nil,
-                        controlSize: .regular
-                    ) {
-                        Label(strings.fullscreenNoLookLabel, systemImage: "circle.dashed")
-                            .labelStyle(.titleAndIcon)
-                            .font(.subheadline.weight(.semibold))
-                    } action: {
-                        onClear()
-                    }
-                    .accessibilityIdentifier("filmtone.fullscreen.lookChip.none")
+                    clearLookChip(fillsWidth: false)
 
                     ForEach(entries) { entry in
-                        GlassActionButton(
-                            isProminent: activeLookId == entry.id,
-                            controlSize: .regular
-                        ) {
-                            Label(
-                                strings.displayName(for: entry),
-                                systemImage: entry.bundled ? "sparkles" : "camera.aperture"
-                            )
-                            .labelStyle(.titleAndIcon)
-                            .font(.subheadline.weight(.semibold))
-                        } action: {
-                            onApply(entry)
-                        }
-                        .accessibilityIdentifier(
-                            "filmtone.fullscreen.lookChip.\(entry.id.uuidString.lowercased())"
-                        )
+                        lookChip(entry, fillsWidth: false)
                     }
                 }
                 .padding(.vertical, 2)
             }
         }
         .accessibilityIdentifier("filmtone.fullscreen.lookCarousel")
+    }
+
+    private func clearLookChip(fillsWidth: Bool) -> some View {
+        GlassActionButton(
+            isProminent: !hasCreativeLut && activeLookId == nil,
+            controlSize: .regular
+        ) {
+            lookChipLabel(
+                title: strings.fullscreenNoLookLabel,
+                systemImage: "circle.dashed",
+                fillsWidth: fillsWidth
+            )
+        } action: {
+            onClear()
+        }
+        .accessibilityIdentifier("filmtone.fullscreen.lookChip.none")
+    }
+
+    private func lookChip(_ entry: SavedLookEntry, fillsWidth: Bool) -> some View {
+        GlassActionButton(
+            isProminent: activeLookId == entry.id,
+            controlSize: .regular
+        ) {
+            lookChipLabel(
+                title: strings.displayName(for: entry),
+                systemImage: entry.bundled ? "sparkles" : "camera.aperture",
+                fillsWidth: fillsWidth
+            )
+        } action: {
+            onApply(entry)
+        }
+        .accessibilityIdentifier(
+            "filmtone.fullscreen.lookChip.\(entry.id.uuidString.lowercased())"
+        )
+    }
+
+    private func lookChipLabel(title: String, systemImage: String, fillsWidth: Bool) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: systemImage)
+                .font(.subheadline.weight(.semibold))
+                .frame(width: 18)
+
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+        }
+        .frame(maxWidth: fillsWidth ? .infinity : nil, alignment: .center)
     }
 }

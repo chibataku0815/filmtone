@@ -442,6 +442,46 @@ final class FilmtoneMediaRuntime {
         }
     }
 
+    func runHighlightReel(
+        request: Phase0ExportRequestDTO,
+        sourceURL: URL? = nil,
+        protectedCacheURLs: [URL] = [],
+        appliedSavedLook: SavedLookEntry? = nil,
+        cameraProfile: CameraProfileSelection? = nil,
+        highlightMarkers: FilmtoneHighlightMarkers?,
+        onProgress: @escaping (Phase0ExportProgressDTO) -> Void
+    ) async throws -> Phase0ExportResultDTO {
+        let resolvedSourceURL = try sourceURL ?? resolveFileURL(request.sourceUri)
+        _ = try? cacheStore.pruneStandard(protecting: [resolvedSourceURL] + protectedCacheURLs)
+        let exportSession = try makeExportSession(
+            request: request,
+            sourceURL: resolvedSourceURL,
+            appliedSavedLook: appliedSavedLook,
+            cameraProfile: cameraProfile,
+            highlightMarkers: highlightMarkers
+        )
+
+        await beginForegroundExportActivity()
+        await ExportCancelController.shared.attach(exportSession)
+        defer {
+            Task { @MainActor in
+                await ExportCancelController.shared.detach()
+                await endForegroundExportActivity()
+            }
+        }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    let result = try exportSession.runHighlightReel(progress: onProgress)
+                    continuation.resume(returning: result)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
     /// Stream 3 (W1-C) §6.5 — UI label for renderMode in the Live Activity.
     /// Mirrors the planned WebView rename (Stream 4): `.quality` → "Master",
     /// `.speed` → "Postcard". Defaults to "Master" when absent (matches the

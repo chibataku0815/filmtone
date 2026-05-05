@@ -1,0 +1,10 @@
+[DHM-5 Native Desktop launch]
+Command:
+open -n /Users/chibatakumi/Library/Developer/Xcode/DerivedData/FilmtoneDesktop-bhqkqbavrixjkseykoyftbdapsrn/Build/Products/Debug/Filmtone.app
+
+Result:
+PASS
+
+Observed:
+app_path=/Users/chibatakumi/Library/Developer/Xcode/DerivedData/FilmtoneDesktop-bhqkqbavrixjkseykoyftbdapsrn/Build/Products/Debug/Filmtone.app
+pid=4380 /Users/chibatakumi/Library/Developer/Xcode/DerivedData/FilmtoneDesktop-bhqkqbavrixjkseykoyftbdapsrn/Build/Products/Debug/Filmtone.app/Contents/MacOS/Filmtone

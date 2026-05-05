@@ -334,7 +334,7 @@ if ! grep -q "\[Filmtone Resolve Smoke\] created-project=$PROJECT_NAME" <<<"$set
 fi
 first_import_output="$("$FUSCRIPT" "$IMPORTER" --package "$PACKAGE_DIR" 2>&1)"
 printf '%s\n' "$first_import_output"
-if ! grep -q "created Highlight_Auto timeline with 1 source-relative range" <<<"$first_import_output"; then
+if ! grep -q "created Highlight_Auto timeline with 1 highlight reel segment" <<<"$first_import_output"; then
   echo "[Filmtone Resolve Smoke] importer did not create the expected Highlight_Auto timeline" >&2
   exit 1
 fi

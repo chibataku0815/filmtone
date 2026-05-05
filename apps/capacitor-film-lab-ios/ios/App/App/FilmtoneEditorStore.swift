@@ -577,6 +577,17 @@ final class FilmtoneEditorStore: ObservableObject {
         highlightMarkers?.markers ?? []
     }
 
+    var canCreateHighlightReel: Bool {
+        guard source?.kind == .video,
+              sourceViolations.isEmpty,
+              !isBusy,
+              !isSavingToPhotos,
+              let segments = exportHighlightMarkers?.highlightReelSegments() else {
+            return false
+        }
+        return !segments.isEmpty
+    }
+
     var previewError: String? {
         preview.error
     }
@@ -1640,6 +1651,45 @@ final class FilmtoneEditorStore: ObservableObject {
         } catch {
             self.error = strings.userMessage(for: error, context: .share)
             presentToast(strings.toastShareFailed, kind: .error)
+        }
+    }
+
+    func exportHighlightReel() async {
+        guard canCreateHighlightReel else {
+            return
+        }
+
+        do {
+            let request = try FilmtonePhase0Math.buildExportRequest(
+                source: source,
+                probe: probe,
+                project: project
+            )
+            let resolvedSavedLook = await resolveAppliedSavedLookForExport()
+            let cameraProfileSelection = project.cameraProfile
+
+            isBusy = true
+            error = nil
+            notice = nil
+            exportProgress = nil
+            let cacheProtection = protectedCacheURIs
+            let result = try await facade.runHighlightReel(
+                request: request,
+                protectedCacheURIs: cacheProtection,
+                appliedSavedLook: resolvedSavedLook,
+                cameraProfile: cameraProfileSelection,
+                highlightMarkers: exportHighlightMarkers
+            ) { [weak self] progress in
+                self?.exportProgress = progress
+            }
+
+            isBusy = false
+            exportProgress = nil
+            _ = try await facade.shareOutput(mediaURI: result.outputUri)
+        } catch {
+            isBusy = false
+            exportProgress = nil
+            self.error = strings.userMessage(for: error, context: .export)
         }
     }
 

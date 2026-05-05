@@ -36,6 +36,7 @@ struct TestSidecarBuilder {
         try runSavedLookProvenance()
         try runCameraProfileProvenance()
         try runHighlightMarkersSidecarBlock()
+        try runHighlightReelSegmentContract()
         try runConnectPackageUriOrdering()
         try runConnectCubeWriter()
         try runConnectDctlWriter()
@@ -473,6 +474,48 @@ struct TestSidecarBuilder {
             parsed.highlightMarkers?.markers.first?.sourceFrame != nil,
             "highlight marker should carry sourceFrame when fps is present"
         )
+    }
+
+    static func runHighlightReelSegmentContract() throws {
+        let markers = FilmtoneHighlightMarkers(
+            sourceIdentity: FilmtoneMarkerSourceIdentity(
+                filename: "clip.mov",
+                durationSec: 8,
+                fps: 24,
+                fileSizeBytes: 1024
+            ),
+            markers: [
+                FilmtoneHighlightMarker(
+                    id: "m1",
+                    sourceTimeSec: 1.0,
+                    sourceFps: 24,
+                    createdOnPlatform: "ios",
+                    createdAtIso: "2026-05-05T00:00:00.000Z"
+                ),
+                FilmtoneHighlightMarker(
+                    id: "m2",
+                    sourceTimeSec: 1.7,
+                    sourceFps: 24,
+                    createdOnPlatform: "ios",
+                    createdAtIso: "2026-05-05T00:00:01.000Z"
+                ),
+                FilmtoneHighlightMarker(
+                    id: "m3",
+                    sourceTimeSec: 7.9,
+                    sourceFps: 24,
+                    createdOnPlatform: "ios",
+                    createdAtIso: "2026-05-05T00:00:02.000Z"
+                ),
+            ]
+        )
+
+        let segments = markers.highlightReelSegments()
+        try expect(segments.count == 2, "overlapping marker segments should merge")
+        try expect(segments[0].markerIds == ["m1", "m2"], "merged segment marker ids changed")
+        try expect(abs(segments[0].sourceStartSec - 0.5) < 1e-9, "merged segment start changed")
+        try expect(abs(segments[0].sourceEndSec - 2.2) < 1e-9, "merged segment end changed")
+        try expect(abs(segments[1].sourceStartSec - 7.0) < 1e-9, "tail segment should shift inside source bounds")
+        try expect(abs(segments[1].sourceEndSec - 8.0) < 1e-9, "tail segment end should clamp to source duration")
     }
 
     // MARK: - Connect cube writer

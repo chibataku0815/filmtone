@@ -40,6 +40,9 @@ struct EditorSidebar: View {
                             state: state,
                             onExportTap: {
                                 exportCoordinator.presentExportPanel(for: state)
+                            },
+                            onHighlightReelTap: {
+                                exportCoordinator.presentHighlightReelPanel(for: state)
                             }
                         )
                         .modifier(EditorSidebarPanelGlass())

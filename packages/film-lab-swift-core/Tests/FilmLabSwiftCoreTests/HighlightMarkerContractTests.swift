@@ -123,4 +123,166 @@ final class HighlightMarkerContractTests: XCTestCase {
         XCTAssertTrue(markers.isEmpty)
         XCTAssertEqual(FilmtoneHighlightMarker.frameIndex(sourceTimeSec: 1.5, fps: 30), 45)
     }
+
+    func testHighlightReelSegmentsCenterMarkersAtOneSecond() {
+        let markers = FilmtoneHighlightMarkers(
+            sourceIdentity: FilmtoneMarkerSourceIdentity(
+                filename: "source.mov",
+                durationSec: 20,
+                fps: 24,
+                fileSizeBytes: 256
+            ),
+            markers: [
+                FilmtoneHighlightMarker(
+                    id: "m1",
+                    sourceTimeSec: 10,
+                    sourceFps: 24,
+                    createdOnPlatform: "ios",
+                    createdAtIso: "2026-05-05T01:00:00.000Z"
+                )
+            ]
+        )
+
+        let segments = markers.highlightReelSegments()
+
+        XCTAssertEqual(segments.count, 1)
+        XCTAssertEqual(segments[0].markerIds, ["m1"])
+        XCTAssertEqual(segments[0].sourceStartSec, 9.5)
+        XCTAssertEqual(segments[0].sourceEndSec, 10.5)
+        XCTAssertEqual(segments[0].durationSec, 1.0)
+        XCTAssertEqual(segments[0].sourceStartFrame, 228)
+        XCTAssertEqual(segments[0].sourceEndFrame, 252)
+    }
+
+    func testHighlightReelSegmentsClampToSourceEdgesWhileKeepingOneSecondWhenPossible() {
+        let identity = FilmtoneMarkerSourceIdentity(
+            filename: "source.mov",
+            durationSec: 10,
+            fps: 30,
+            fileSizeBytes: 256
+        )
+        let markers = FilmtoneHighlightMarkers(
+            sourceIdentity: identity,
+            markers: [
+                FilmtoneHighlightMarker(
+                    id: "start",
+                    sourceTimeSec: 0.1,
+                    sourceFps: 30,
+                    createdOnPlatform: "ios",
+                    createdAtIso: "2026-05-05T01:00:00.000Z"
+                ),
+                FilmtoneHighlightMarker(
+                    id: "end",
+                    sourceTimeSec: 9.9,
+                    sourceFps: 30,
+                    createdOnPlatform: "ios",
+                    createdAtIso: "2026-05-05T01:00:01.000Z"
+                )
+            ]
+        )
+
+        let segments = markers.highlightReelSegments()
+
+        XCTAssertEqual(segments.count, 2)
+        XCTAssertEqual(segments[0].markerIds, ["start"])
+        XCTAssertEqual(segments[0].sourceStartSec, 0)
+        XCTAssertEqual(segments[0].sourceEndSec, 1)
+        XCTAssertEqual(segments[1].markerIds, ["end"])
+        XCTAssertEqual(segments[1].sourceStartSec, 9)
+        XCTAssertEqual(segments[1].sourceEndSec, 10)
+    }
+
+    func testHighlightReelSegmentsUseWholeSourceWhenSourceIsShorterThanClip() {
+        let markers = FilmtoneHighlightMarkers(
+            sourceIdentity: FilmtoneMarkerSourceIdentity(
+                filename: "short.mov",
+                durationSec: 0.6,
+                fps: 24,
+                fileSizeBytes: 128
+            ),
+            markers: [
+                FilmtoneHighlightMarker(
+                    id: "m1",
+                    sourceTimeSec: 0.3,
+                    sourceFps: 24,
+                    createdOnPlatform: "macos",
+                    createdAtIso: "2026-05-05T01:00:00.000Z"
+                )
+            ]
+        )
+
+        let segments = markers.highlightReelSegments()
+
+        XCTAssertEqual(segments.count, 1)
+        XCTAssertEqual(segments[0].sourceStartSec, 0)
+        XCTAssertEqual(segments[0].sourceEndSec, 0.6)
+        XCTAssertEqual(segments[0].durationSec, 0.6)
+    }
+
+    func testHighlightReelSegmentsMergeOverlapsAndPreserveMarkerIds() {
+        let markers = FilmtoneHighlightMarkers(
+            sourceIdentity: FilmtoneMarkerSourceIdentity(
+                filename: "source.mov",
+                durationSec: 20,
+                fps: 30,
+                fileSizeBytes: 256
+            ),
+            markers: [
+                FilmtoneHighlightMarker(
+                    id: "m1",
+                    sourceTimeSec: 5.0,
+                    sourceFps: 30,
+                    createdOnPlatform: "ios",
+                    createdAtIso: "2026-05-05T01:00:00.000Z"
+                ),
+                FilmtoneHighlightMarker(
+                    id: "m2",
+                    sourceTimeSec: 5.8,
+                    sourceFps: 30,
+                    createdOnPlatform: "ios",
+                    createdAtIso: "2026-05-05T01:00:01.000Z"
+                )
+            ]
+        )
+
+        let merged = markers.highlightReelSegments()
+        let unmerged = markers.highlightReelSegments(
+            options: FilmtoneHighlightReelOptions(clipDurationSec: 1.0, mergeOverlaps: false)
+        )
+
+        XCTAssertEqual(merged.count, 1)
+        XCTAssertEqual(merged[0].markerIds, ["m1", "m2"])
+        XCTAssertEqual(merged[0].sourceStartSec, 4.5)
+        XCTAssertEqual(merged[0].sourceEndSec, 6.3)
+        XCTAssertEqual(unmerged.count, 2)
+    }
+
+    func testHighlightReelSegmentsSkipInvalidMarkers() {
+        let segments = FilmtoneHighlightClipSegment.segments(
+            from: [
+                FilmtoneHighlightMarker(
+                    id: "",
+                    sourceTimeSec: 1,
+                    sourceFrame: nil,
+                    sourceFps: 24,
+                    preRollSec: 2,
+                    postRollSec: 3,
+                    createdOnPlatform: "ios",
+                    createdAtIso: "2026-05-05T01:00:00.000Z"
+                ),
+                FilmtoneHighlightMarker(
+                    id: "valid",
+                    sourceTimeSec: 2,
+                    sourceFps: 24,
+                    createdOnPlatform: "ios",
+                    createdAtIso: "2026-05-05T01:00:01.000Z"
+                )
+            ],
+            sourceDurationSec: 10,
+            sourceFps: 24
+        )
+
+        XCTAssertEqual(segments.count, 1)
+        XCTAssertEqual(segments[0].markerIds, ["valid"])
+    }
 }

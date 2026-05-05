@@ -27,6 +27,14 @@ final class ExportCoordinator {
         }
     }
 
+    func presentHighlightReelPanel(for state: EditorState) {
+        guard state.canCreateHighlightReel,
+              let sourceURL = state.sourceURL else {
+            return
+        }
+        presentVideoHighlightReelPanel(state: state, sourceURL: sourceURL)
+    }
+
     // MARK: - Still
 
     private func presentStillExportPanel(state: EditorState, sourceURL: URL) {
@@ -178,6 +186,82 @@ final class ExportCoordinator {
                     state.exportProgress = 0
                     state.exportProgressMessage = nil
                     state.lastExportError = "Export failed: \(error.localizedDescription)"
+                    state.currentExportTask = nil
+                }
+            }
+        }
+    }
+
+    private func presentVideoHighlightReelPanel(state: EditorState, sourceURL: URL) {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.mpeg4Movie]
+        panel.canCreateDirectories = true
+        panel.nameFieldStringValue = sourceURL.deletingPathExtension().lastPathComponent + "-highlight-reel.mp4"
+        panel.message = "Export a silent Highlight from video markers"
+        guard panel.runModal() == .OK, let outputURL = panel.url else { return }
+
+        let request = FilmtoneVideoExportRequest(
+            sourceURL: sourceURL,
+            outputURL: outputURL,
+            presetName: state.presetName,
+            presetStrength: state.presetStrength,
+            lookSlug: state.lookSlug,
+            sourceProfileSelection: state.sourceProfileSelection,
+            quickState: state.quickState,
+            paramOverrides: state.paramOverrides,
+            highlightMarkers: state.exportHighlightMarkers,
+            opticalFilterProfileId: state.opticalFilterProfileId
+        )
+
+        let startedAt = Date()
+        state.exportStartedAt = startedAt
+        state.lastExportResult = nil
+        state.lastExportError = nil
+        state.isExporting = true
+        state.exportProgress = 0
+        state.exportProgressMessage = "Building Highlight…"
+        state.currentExportTask = Task.detached {
+            do {
+                let result = try await FilmtoneVideoExporter.exportHighlightReel(request) { progress in
+                    Task { @MainActor in
+                        state.exportProgress = progress.normalized
+                        state.exportProgressMessage = "Rendering frame \(progress.processedFrames)/\(progress.estimatedTotalFrames)"
+                    }
+                }
+                let fileSize = (try? FileManager.default.attributesOfItem(atPath: result.outputURL.path)[.size] as? Int64) ?? 0
+                let elapsed = Date().timeIntervalSince(startedAt)
+                await MainActor.run {
+                    state.isExporting = false
+                    state.exportProgress = 1
+                    state.exportProgressMessage = nil
+                    state.lastExportSummary = nil
+                    state.lastExportError = nil
+                    state.lastExportResult = ExportResultSnapshot(
+                        outputURL: result.outputURL,
+                        sidecarURL: nil,
+                        pixelWidth: result.outputWidth,
+                        pixelHeight: result.outputHeight,
+                        processedFrames: result.processedFrames,
+                        fileSizeBytes: fileSize,
+                        elapsedSeconds: elapsed,
+                        sourceKind: .video
+                    )
+                    state.currentExportTask = nil
+                }
+            } catch is CancellationError {
+                await MainActor.run {
+                    state.isExporting = false
+                    state.exportProgress = 0
+                    state.exportProgressMessage = nil
+                    state.lastExportError = "Highlight cancelled"
+                    state.currentExportTask = nil
+                }
+            } catch {
+                await MainActor.run {
+                    state.isExporting = false
+                    state.exportProgress = 0
+                    state.exportProgressMessage = nil
+                    state.lastExportError = "Highlight failed: \(error.localizedDescription)"
                     state.currentExportTask = nil
                 }
             }

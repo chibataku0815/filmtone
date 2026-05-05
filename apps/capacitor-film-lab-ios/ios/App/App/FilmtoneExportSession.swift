@@ -399,6 +399,51 @@ final class FilmtoneExportSession {
         )
     }
 
+    func runHighlightReel(
+        progress: @escaping (Phase0ExportProgressDTO) -> Void
+    ) throws -> Phase0ExportResultDTO {
+        defer {
+            ciContext.clearCaches()
+        }
+        guard request.sourceKind == .video else {
+            throw FilmtoneMediaError.exportFailed("Highlight is available for video sources only.")
+        }
+        guard let segments = highlightMarkers?.highlightReelSegments(), !segments.isEmpty else {
+            throw FilmtoneMediaError.exportFailed("Add at least one highlight marker before creating a Highlight.")
+        }
+
+        let startedAt = Date()
+        progress(.init(stage: .preflight, progress: 0.03, currentFrame: nil, totalFrames: nil, message: "Preparing Highlight"))
+        let result = try exportVideo(
+            progress: progress,
+            highlightSegments: segments
+        )
+        let elapsedMs = Int(Date().timeIntervalSince(startedAt) * 1000.0)
+        let fileSizeBytes = try outputURL.resourceValues(forKeys: [.fileSizeKey]).fileSize
+        let realtimeRatio: Double?
+        if let duration = result.sourceDurationSec, duration > 0 {
+            realtimeRatio = Double(elapsedMs) / (duration * 1000.0)
+        } else {
+            realtimeRatio = nil
+        }
+
+        progress(.init(stage: .completed, progress: 1.0, currentFrame: result.frameCount, totalFrames: result.frameCount, message: "Highlight complete"))
+
+        return Phase0ExportResultDTO(
+            outputUri: outputURL.absoluteString,
+            elapsedMs: elapsedMs,
+            outputWidth: Int(result.outputSize.width.rounded()),
+            outputHeight: Int(result.outputSize.height.rounded()),
+            outputFps: request.output.fps,
+            fileSizeBytes: fileSizeBytes,
+            realtimeRatio: realtimeRatio,
+            audioPreserved: false,
+            benchmarkRecord: nil,
+            sidecarUri: nil,
+            packageFileUris: nil
+        )
+    }
+
     /// Assemble and atomically write the filmtone-ios-export-session-v1 sidecar.
     /// Returns the sidecar absolute URL string on success, `nil` on any failure.
     private func writeExportSidecar(
@@ -627,7 +672,8 @@ final class FilmtoneExportSession {
     }
 
     private func exportVideo(
-        progress: @escaping (Phase0ExportProgressDTO) -> Void
+        progress: @escaping (Phase0ExportProgressDTO) -> Void,
+        highlightSegments: [FilmtoneHighlightClipSegment]? = nil
     ) throws -> CompletedExport {
         try prepareQualityMezzanineForExport(progress: progress)
         var effectiveSourceURL = resolvedVideoSourceURL()
@@ -707,6 +753,12 @@ final class FilmtoneExportSession {
         }
 
         let sourceDurationSec = CMTimeGetSeconds(asset.duration)
+        let highlightTimeline = highlightSegments.flatMap {
+            FilmtoneHighlightReelFrameTimeline(
+                segments: $0,
+                outputFps: request.output.fps
+            )
+        }
         let outputSize = Self.scaledSize(for: videoTrack, longEdge: request.output.longEdge)
         let writer = try makeWriter(outputSize: outputSize)
         let videoInput = makeVideoInput(outputSize: outputSize)
@@ -724,7 +776,9 @@ final class FilmtoneExportSession {
         }
         writer.add(videoInput)
 
-        let audioTrack = request.output.preserveAudio ? asset.tracks(withMediaType: .audio).first : nil
+        let audioTrack = highlightTimeline == nil && request.output.preserveAudio
+            ? asset.tracks(withMediaType: .audio).first
+            : nil
         let audioInput: AVAssetWriterInput?
         let audioOutput: AVAssetReaderTrackOutput?
         if let audioTrack {
@@ -764,10 +818,12 @@ final class FilmtoneExportSession {
         }
         writer.startSession(atSourceTime: .zero)
 
-        let outputFrameCount = max(
+        let outputFrameCount = highlightTimeline?.totalFrameCount ?? max(
             1,
             Int(floor((sourceDurationSec.isFinite ? sourceDurationSec : 0) * Double(request.output.fps) + 1e-6))
         )
+        let outputDurationSec = highlightTimeline?.durationSec
+            ?? (sourceDurationSec.isFinite ? sourceDurationSec : 0)
         var renderedFrames = 0
         let completionLock = NSLock()
         let failureLock = NSLock()
@@ -849,6 +905,18 @@ final class FilmtoneExportSession {
             CMTime(value: CMTimeValue(frameIndex), timescale: CMTimeScale(max(1, request.output.fps)))
         }
 
+        func sourceLookupTime(for frameIndex: Int) -> CMTime {
+            guard let highlightTimeline,
+                  let sourceTimeSec = highlightTimeline.sourceTimeSec(forOutputFrameIndex: frameIndex) else {
+                return outputPresentationTime(for: frameIndex)
+            }
+            return CMTime(seconds: sourceTimeSec, preferredTimescale: 60_000)
+        }
+
+        func sourceSegmentIndex(for frameIndex: Int) -> Int? {
+            highlightTimeline?.segmentIndex(forOutputFrameIndex: frameIndex)
+        }
+
         func makeTimedVideoSample(_ sampleBuffer: CMSampleBuffer) -> TimedVideoSample {
             let rawTime = Self.validPresentationTime(for: sampleBuffer)
             if sourceTimeOffset == nil {
@@ -860,12 +928,12 @@ final class FilmtoneExportSession {
             return (sampleBuffer, rawTime, timelineTime)
         }
 
-        func prepareDepthForOutputFrame(at outputPresentationTime: CMTime) {
+        func prepareDepthForSourceTime(at sourceLookupTime: CMTime) {
             guard let reader = depthReader else {
                 loadedDepthMap = nil
                 return
             }
-            let lookupTime = CMTimeAdd(outputPresentationTime, sourceTimeOffset ?? .zero)
+            let lookupTime = CMTimeAdd(sourceLookupTime, sourceTimeOffset ?? .zero)
             let decodeStart = Date()
             // Advance until pendingDepthFrame.pts > current output pts (or EOS).
             // The rendered video sample is resampled to the 24 fps output
@@ -903,13 +971,22 @@ final class FilmtoneExportSession {
                 }
             }
         }
+        var renderedHighlightSegmentIndex: Int?
 
         func appendOutputFrame(
             using sample: TimedVideoSample,
-            at outputPresentationTime: CMTime
+            at outputPresentationTime: CMTime,
+            sourceLookupTime: CMTime,
+            sourceSegmentIndex: Int?
         ) throws {
-            prepareDepthForOutputFrame(at: outputPresentationTime)
+            prepareDepthForSourceTime(at: sourceLookupTime)
+            if let sourceSegmentIndex,
+               sourceSegmentIndex != renderedHighlightSegmentIndex {
+                exportMotionBlurAccumulator.reset()
+                renderedHighlightSegmentIndex = sourceSegmentIndex
+            }
             let outputTimeSec = CMTimeGetSeconds(outputPresentationTime)
+            let sourceTimeSec = CMTimeGetSeconds(sourceLookupTime)
             let appendedFrame = try appendVideoSample(
                 sample.buffer,
                 videoInput: videoInput,
@@ -919,7 +996,7 @@ final class FilmtoneExportSession {
                 videoTrack: videoTrack,
                 outputSize: outputSize,
                 outputPresentationTime: outputPresentationTime,
-                renderTimeSeconds: outputTimeSec.isFinite ? outputTimeSec : 0,
+                renderTimeSeconds: sourceTimeSec.isFinite ? sourceTimeSec : (outputTimeSec.isFinite ? outputTimeSec : 0),
                 waitForReady: false
             )
             guard appendedFrame else {
@@ -931,7 +1008,7 @@ final class FilmtoneExportSession {
             if renderedFrames == 1 || renderedFrames % 12 == 0 {
                 let normalizedProgress = renderingProgress(
                     presentationTime: outputPresentationTime,
-                    sourceDurationSec: sourceDurationSec
+                    sourceDurationSec: outputDurationSec
                 )
                 progress(.init(
                     stage: .rendering,
@@ -994,20 +1071,26 @@ final class FilmtoneExportSession {
 
                     if let lookahead = lookaheadVideoSample {
                         let outputTime = outputPresentationTime(for: nextOutputFrameIndex)
-                        if CMTimeCompare(outputTime, lookahead.timelineTime) < 0 {
+                        let sourceTime = sourceLookupTime(for: nextOutputFrameIndex)
+                        if CMTimeCompare(sourceTime, lookahead.timelineTime) < 0 {
                             guard let previous = previousVideoSample else {
                                 throw FilmtoneMediaError.exportFailed("The first decoded video frame was unavailable.")
                             }
                             let previousDelta = Self.absoluteSecondsBetween(
                                 previous.timelineTime,
-                                outputTime
+                                sourceTime
                             )
                             let lookaheadDelta = Self.absoluteSecondsBetween(
                                 lookahead.timelineTime,
-                                outputTime
+                                sourceTime
                             )
                             let selectedSample = previousDelta <= lookaheadDelta ? previous : lookahead
-                            try appendOutputFrame(using: selectedSample, at: outputTime)
+                            try appendOutputFrame(
+                                using: selectedSample,
+                                at: outputTime,
+                                sourceLookupTime: sourceTime,
+                                sourceSegmentIndex: sourceSegmentIndex(for: nextOutputFrameIndex)
+                            )
                         } else {
                             previousVideoSample = lookahead
                             lookaheadVideoSample = nil
@@ -1016,9 +1099,12 @@ final class FilmtoneExportSession {
                     }
 
                     if sourceReaderExhausted, let previous = previousVideoSample {
+                        let outputTime = outputPresentationTime(for: nextOutputFrameIndex)
                         try appendOutputFrame(
                             using: previous,
-                            at: outputPresentationTime(for: nextOutputFrameIndex)
+                            at: outputTime,
+                            sourceLookupTime: sourceLookupTime(for: nextOutputFrameIndex),
+                            sourceSegmentIndex: sourceSegmentIndex(for: nextOutputFrameIndex)
                         )
                         continue
                     }
@@ -1082,7 +1168,7 @@ final class FilmtoneExportSession {
         return CompletedExport(
             outputSize: outputSize,
             frameCount: renderedFrames,
-            sourceDurationSec: sourceDurationSec.isFinite ? sourceDurationSec : nil,
+            sourceDurationSec: outputDurationSec.isFinite ? outputDurationSec : nil,
             audioPreserved: audioInput != nil
         )
     }
@@ -3445,6 +3531,62 @@ private struct CompletedExport {
     let frameCount: Int
     let sourceDurationSec: Double?
     let audioPreserved: Bool
+}
+
+private struct FilmtoneHighlightReelFrameTimeline {
+    private struct Entry {
+        let segmentIndex: Int
+        let outputStartFrame: Int
+        let frameCount: Int
+        let sourceStartSec: Double
+    }
+
+    private let entries: [Entry]
+    let totalFrameCount: Int
+    let durationSec: Double
+    private let outputFps: Int
+
+    init?(segments: [FilmtoneHighlightClipSegment], outputFps: Int) {
+        let fps = max(1, outputFps)
+        var nextOutputStartFrame = 0
+        var builtEntries: [Entry] = []
+        for (index, segment) in segments.enumerated() where segment.durationSec > 0 {
+            let frameCount = max(1, Int(floor(segment.durationSec * Double(fps) + 1e-6)))
+            builtEntries.append(Entry(
+                segmentIndex: index,
+                outputStartFrame: nextOutputStartFrame,
+                frameCount: frameCount,
+                sourceStartSec: segment.sourceStartSec
+            ))
+            nextOutputStartFrame += frameCount
+        }
+        guard nextOutputStartFrame > 0 else {
+            return nil
+        }
+        self.entries = builtEntries
+        self.totalFrameCount = nextOutputStartFrame
+        self.durationSec = Double(nextOutputStartFrame) / Double(fps)
+        self.outputFps = fps
+    }
+
+    func sourceTimeSec(forOutputFrameIndex frameIndex: Int) -> Double? {
+        guard let entry = entry(forOutputFrameIndex: frameIndex) else {
+            return nil
+        }
+        let localFrame = max(0, frameIndex - entry.outputStartFrame)
+        return entry.sourceStartSec + (Double(localFrame) / Double(outputFps))
+    }
+
+    func segmentIndex(forOutputFrameIndex frameIndex: Int) -> Int? {
+        entry(forOutputFrameIndex: frameIndex)?.segmentIndex
+    }
+
+    private func entry(forOutputFrameIndex frameIndex: Int) -> Entry? {
+        entries.first { entry in
+            frameIndex >= entry.outputStartFrame
+                && frameIndex < entry.outputStartFrame + entry.frameCount
+        }
+    }
 }
 
 private enum FilmtoneExportRenderSubstage: String, CaseIterable {

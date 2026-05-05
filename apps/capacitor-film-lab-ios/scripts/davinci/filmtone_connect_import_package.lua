@@ -22,6 +22,7 @@ local DEFAULT_REFERENCE_FILENAME = "reference-after.jpg"
 local CONNECT_PACKAGE_V2 = "filmtone-connect-package-v2"
 local HIGHLIGHT_MARKER_SCHEMA = "filmtone-highlight-markers-v1"
 local HIGHLIGHT_MARKER_CUSTOM_DATA_PREFIX = "filmtone-highlight-marker:"
+local HIGHLIGHT_REEL_CLIP_DURATION_SEC = 1.0
 
 local function log(message)
     print("[Filmtone Connect] " .. tostring(message))
@@ -628,6 +629,19 @@ local function marker_source_frame(marker, package)
     return rounded_frame(source_time * marker_fps(marker, package))
 end
 
+local function marker_source_time_sec(marker, package)
+    local source_time = numeric_value(marker.sourceTimeSec)
+    if source_time ~= nil and source_time >= 0 then
+        return source_time
+    end
+    local source_frame = rounded_frame(marker.sourceFrame)
+    local fps = marker_fps(marker, package)
+    if source_frame == nil or fps <= 0 then
+        return nil
+    end
+    return source_frame / fps
+end
+
 local function marker_handle_frames(marker, package)
     local fps = marker_fps(marker, package)
     local pre_roll = clamp_min(marker.preRollSec, 0)
@@ -674,31 +688,113 @@ local function marker_note(marker, package)
     return table.concat(lines, "\n")
 end
 
-local function highlight_rough_cut_ranges(package)
-    local ranges = {}
+local function highlight_source_duration_sec(package)
+    local block = highlight_marker_block(package.sidecar) or {}
+    local source_identity = block.sourceIdentity or {}
+    local duration = numeric_value(source_identity.durationSec)
+    if duration ~= nil and duration > 0 then
+        return duration
+    end
+    return nil
+end
+
+local function centered_highlight_bounds(center_sec, source_duration_sec)
+    local clip_duration = HIGHLIGHT_REEL_CLIP_DURATION_SEC
+    local half_duration = clip_duration / 2
+    if source_duration_sec ~= nil then
+        if source_duration_sec <= clip_duration then
+            return 0, source_duration_sec
+        end
+        local max_start = source_duration_sec - clip_duration
+        local start_sec = center_sec - half_duration
+        if start_sec < 0 then
+            start_sec = 0
+        elseif start_sec > max_start then
+            start_sec = max_start
+        end
+        return start_sec, start_sec + clip_duration
+    end
+
+    local start_sec = center_sec - half_duration
+    if start_sec < 0 then
+        start_sec = 0
+    end
+    return start_sec, start_sec + clip_duration
+end
+
+local function unique_marker_ids(marker_ids)
+    local seen = {}
+    local result = {}
+    for _, marker_id in ipairs(marker_ids) do
+        marker_id = tostring(marker_id)
+        if marker_id ~= "" and not seen[marker_id] then
+            seen[marker_id] = true
+            result[#result + 1] = marker_id
+        end
+    end
+    return result
+end
+
+local function highlight_reel_segments(package)
+    local raw_segments = {}
+    local source_duration = highlight_source_duration_sec(package)
     for _, marker in ipairs(highlight_markers(package)) do
-        if type(marker) == "table" and marker.id ~= nil then
-            local center_frame = marker_source_frame(marker, package)
-            if center_frame ~= nil then
-                local pre_frames, post_frames = marker_handle_frames(marker, package)
-                local start_frame = center_frame - pre_frames
-                if start_frame < 0 then
-                    start_frame = 0
+        if type(marker) == "table" and marker.id ~= nil and tostring(marker.id) ~= "" then
+            local center_sec = marker_source_time_sec(marker, package)
+            if center_sec ~= nil and center_sec >= 0 then
+                local fps = marker_fps(marker, package)
+                local start_sec, end_sec = centered_highlight_bounds(center_sec, source_duration)
+                if end_sec > start_sec then
+                    local start_frame = rounded_frame(start_sec * fps) or 0
+                    local end_frame = rounded_frame(end_sec * fps) or (start_frame + 1)
+                    if end_frame <= start_frame then
+                        end_frame = start_frame + 1
+                    end
+                    raw_segments[#raw_segments + 1] = {
+                        markers = { marker },
+                        marker_ids = { tostring(marker.id) },
+                        source_start_sec = start_sec,
+                        source_end_sec = end_sec,
+                        duration_sec = end_sec - start_sec,
+                        start_frame = start_frame,
+                        end_frame = end_frame,
+                        center_sec = center_sec,
+                        center_frame = rounded_frame(center_sec * fps),
+                        fps = fps,
+                    }
                 end
-                local end_frame = center_frame + post_frames
-                if end_frame <= start_frame then
-                    end_frame = start_frame + 1
-                end
-                ranges[#ranges + 1] = {
-                    marker = marker,
-                    start_frame = start_frame,
-                    end_frame = end_frame,
-                    center_frame = center_frame,
-                }
             end
         end
     end
-    return ranges
+
+    table.sort(raw_segments, function(a, b)
+        if a.source_start_sec == b.source_start_sec then
+            return table.concat(a.marker_ids, ",") < table.concat(b.marker_ids, ",")
+        end
+        return a.source_start_sec < b.source_start_sec
+    end)
+
+    local merged = {}
+    for _, segment in ipairs(raw_segments) do
+        local current = merged[#merged]
+        if current and segment.source_start_sec <= current.source_end_sec then
+            if segment.source_end_sec > current.source_end_sec then
+                current.source_end_sec = segment.source_end_sec
+                current.duration_sec = current.source_end_sec - current.source_start_sec
+                current.end_frame = segment.end_frame
+            end
+            for _, marker in ipairs(segment.markers) do
+                current.markers[#current.markers + 1] = marker
+            end
+            for _, marker_id in ipairs(segment.marker_ids) do
+                current.marker_ids[#current.marker_ids + 1] = marker_id
+            end
+            current.marker_ids = unique_marker_ids(current.marker_ids)
+        else
+            merged[#merged + 1] = segment
+        end
+    end
+    return merged
 end
 
 local function active_amount(params, key)
@@ -1014,8 +1110,8 @@ local function add_highlight_markers(project, timeline_item, media_pool_item, pa
 end
 
 local function create_highlight_auto_timeline(project, media_pool, media_pool_item, package)
-    local ranges = highlight_rough_cut_ranges(package)
-    if #ranges == 0 then
+    local segments = highlight_reel_segments(package)
+    if #segments == 0 then
         return nil
     end
     if not (media_pool and media_pool.CreateEmptyTimeline and media_pool.AppendToTimeline) then
@@ -1038,11 +1134,11 @@ local function create_highlight_auto_timeline(project, media_pool, media_pool_it
     end
 
     local clip_infos = {}
-    for _, range in ipairs(ranges) do
+    for _, segment in ipairs(segments) do
         clip_infos[#clip_infos + 1] = {
             mediaPoolItem = media_pool_item,
-            startFrame = range.start_frame,
-            endFrame = range.end_frame,
+            startFrame = segment.start_frame,
+            endFrame = segment.end_frame,
             mediaType = 1,
         }
     end
@@ -1052,7 +1148,7 @@ local function create_highlight_auto_timeline(project, media_pool, media_pool_it
     else
         log("created Highlight_Auto timeline with "
             .. tostring(#clip_infos)
-            .. " source-relative range(s): "
+            .. " highlight reel segment(s): "
             .. timeline_name)
     end
 
@@ -1232,17 +1328,25 @@ local function print_package_summary(package)
     log("dctl: " .. fmt_value(package.dctl_path, "none"))
     log("reference: " .. fmt_value(package.reference_path, "none"))
     log("highlight markers: " .. tostring(highlight_marker_count(package)))
-    for _, range in ipairs(highlight_rough_cut_ranges(package)) do
-        log("highlight marker "
-            .. tostring(range.marker.id)
-            .. ": frame="
-            .. tostring(range.center_frame)
-            .. " range="
-            .. tostring(range.start_frame)
+    local segments = highlight_reel_segments(package)
+    log("highlight reel segments: " .. tostring(#segments))
+    for index, segment in ipairs(segments) do
+        local custom_data_values = {}
+        for _, marker in ipairs(segment.markers) do
+            custom_data_values[#custom_data_values + 1] = marker_custom_data(marker)
+        end
+        log("highlight reel segment "
+            .. tostring(index)
+            .. ": markers="
+            .. table.concat(segment.marker_ids, ",")
+            .. " seconds="
+            .. string.format("%.3f-%.3f", segment.source_start_sec, segment.source_end_sec)
+            .. " frames="
+            .. tostring(segment.start_frame)
             .. "-"
-            .. tostring(range.end_frame)
+            .. tostring(segment.end_frame)
             .. " customData="
-            .. marker_custom_data(range.marker))
+            .. table.concat(custom_data_values, ","))
     end
     log("marker note:\n" .. build_note(package))
 end
