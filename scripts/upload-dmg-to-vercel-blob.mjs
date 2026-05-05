@@ -3,7 +3,7 @@
  * @description 配布 pathname は固定規約 (`filmtone/desktop/Filmtone-${version}.dmg`)。
  *              `bunx vercel@50 blob put` を呼びます。Electron 1.0.4 までと同じ env var
  *              `FILM_LAB_DESKTOP_DOWNLOAD_URL` を更新するので、portfolio の download 導線は
- *              手動切替不要で 2.0.0 に切り替わります (cutover-architecture.md decision E)。
+ *              手動切替不要で 1.4 に切り替わります (cutover-architecture.md decision G)。
  * @limitations `BLOB_READ_WRITE_TOKEN` が必要。portfolio repo の `.env.local` に
  *              `vercel env pull` 済みなら自動読込。
  *              portfolio root の解決は `PORTFOLIO_ROOT` env or sibling
@@ -184,8 +184,8 @@ async function main() {
     return 1;
   }
 
-  // Electron 1.0.4 と同じ `filmtone/desktop/` prefix 配下に配置 (cutover-architecture.md decision E)。
-  // 旧 1.0.4 DMG (`filmtone-1.0.4-arm64.dmg`) と Native v2 DMG (`Filmtone-2.0.0.dmg`) は別 file 名なので衝突しない。
+  // Electron 1.0.4 と同じ `filmtone/desktop/` prefix 配下に配置 (cutover-architecture.md decision G)。
+  // 旧 1.0.4 DMG (`filmtone-1.0.4-arm64.dmg`) と Native v2 DMG (`Filmtone-1.4.dmg`) は別 file 名なので衝突しない。
   const pathname = `${releaseMeta.artifactSlug}/desktop/${releaseMeta.dmgFileName}`;
 
   if (!wantsConfirmProd) {

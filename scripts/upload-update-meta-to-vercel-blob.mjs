@@ -3,8 +3,8 @@
  * @description 固定 pathname `film-lab/desktop/update-meta.json` (Electron 1.0.4 までと同じ)。
  *              `--sync-vercel-env` で `FILM_LAB_DESKTOP_UPDATE_CHECK_URL` を production に反映。
  *              Electron 1.0.4 のクライアントもこの URL を polling し続けるので、
- *              `latestVersion: 2.0.0` を書いておくと Electron user に upgrade 通知が出る
- *              (cutover-architecture.md decision E)。
+ *              `latestVersion: 1.4` を書いておくと Electron user に upgrade 通知が出る
+ *              (cutover-architecture.md decision G)。
  * @limitations DMG アップロードとは別コマンド。順序: DMG upload → update-meta upload。
  */
 import { spawnSync } from "node:child_process";
@@ -162,7 +162,7 @@ async function main() {
   };
 
   // Electron 1.0.4 までと同じ pathname。Electron client は polling し続ける前提なので、
-  // 2.0.0 を書いた瞬間に in-app upgrade 通知が走る。
+  // 1.4 を書いた瞬間に in-app upgrade 通知が走る。
   const pathname = "film-lab/desktop/update-meta.json";
 
   if (!wantsConfirmProd) {
@@ -252,7 +252,7 @@ async function main() {
   }
   console.log(
     `[${functionName}] FILM_LAB_DESKTOP_UPDATE_CHECK_URL を production に反映しました。\n` +
-      `次: portfolio 側を本番 deploy すると Electron 1.0.4 / Native 2.0.0 双方が新 latestVersion を polling 取得します。`,
+      `次: portfolio 側を本番 deploy すると Electron 1.0.4 / Native 1.4 双方が新 latestVersion を polling 取得します。`,
   );
   return 0;
 }
