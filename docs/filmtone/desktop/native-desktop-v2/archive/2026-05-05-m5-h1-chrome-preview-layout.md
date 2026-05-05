@@ -47,36 +47,18 @@ established in M5-B Pass 1–4 must be preserved.
       itself is repurposed as a brand pill (AppIcon + `Filmtone` wordmark in
       a Liquid Glass capsule), currently unwired but available
 - [x] Preview switches from `.scaledToFill().clipped()` to `.scaledToFit()`;
-      the new `FilmtoneBackdrop` carries `.backgroundExtensionEffect()` so
-      the toolbar continues to refract a real surface
+      backdrop carries `.backgroundExtensionEffect()` so the Liquid Glass
+      toolbar continues to refract a real surface
 - [x] Empty-preview state rebuilt: `FilmtoneBackdrop` warm near-black
       gradient + AppIcon mark (96pt) + `Filmtone` wordmark (28pt, tracking 4)
       + Japanese CTA `素材を開いて始めましょう`
+- [x] **M5-H.1.1 fix:** `FilmtoneBackdrop` gated to the empty state only.
+      Once a source URL is set the backdrop swaps to a neutral `Color.black`
+      so `.scaledToFit()` letterbox bars don't bleed warm tone into color
+      judgment on the preview content
 - [x] Right-rail panel `.padding(.horizontal, 14)` → `16` across all 5
       panels and the bottom scrub bar; vertical 8pt and rail spacing 12pt
       already on grid
-
-## Verification
-
-- `apps/filmtone-desktop-macos/Verify/run.sh` → 42/42 passed (no regression
-  vs. M5-G.2 baseline).
-- `bun run verify:macos` → xcodebuild Debug `** BUILD SUCCEEDED **`,
-  Swift 6 strict concurrency clean, codesign + Validate + LaunchServices
-  registration green.
-- Visual smoke (still + video open, right-rail visibility, scaledToFit
-  letterboxing, brand launch screen) deferred to user-driven sanity per
-  active scope.
-
-## Done Conditions
-
-- [x] All checklist items checked.
-- [x] xcodebuild Debug PASS.
-- [x] Verify script PASS (42/42).
-- [x] No `Phase 0` substring remains in user-facing surfaces; only the two
-      M5-H.1 explanatory comments (in `GlassControlGroup.swift` and
-      `RootWindowView.swift`) reference the retired banner historically,
-      and `Color/FilmtoneGradeKernels.swift` keeps its internal generator
-      reference per active scope.
 
 ## Out of Scope
 
@@ -89,20 +71,37 @@ established in M5-B Pass 1–4 must be preserved.
 
 ## Verification
 
-- `bun run verify:macos`
-- `apps/filmtone-desktop-macos/Verify/run.sh`
-- xcodebuild Debug (Swift 6 strict concurrency)
-- Visual smoke (deferred to user): open still + video, confirm right rail
-  stays in-frame and preview is letterboxed without clipping
+- `apps/filmtone-desktop-macos/Verify/run.sh` → 42/42 passed (no regression
+  vs. M5-G.2 baseline; backdrop gating is UI-only, no Verify surface
+  affected).
+- `bun run verify:macos` → xcodebuild Debug `** BUILD SUCCEEDED **`,
+  Swift 6 strict concurrency clean, codesign + Validate + LaunchServices
+  registration green.
+- `git diff --check` → clean (no whitespace errors).
+- Visual smoke (still + video open, right-rail visibility, scaledToFit
+  letterboxing on neutral black, brand launch screen on the empty state)
+  deferred to user-driven sanity per active scope.
 
 ## Done Conditions
 
-- All checklist items checked.
-- xcodebuild Debug PASS.
-- Verify script PASS (no regression vs. M5-G.2 baseline = 42 tests).
-- No `Phase 0` substring remains in `apps/filmtone-desktop-macos/FilmtoneDesktop/`
-  user-facing surfaces (Color/ source comment is allowed).
+- [x] All checklist items checked, including the H1.1 backdrop-gating fix.
+- [x] xcodebuild Debug PASS.
+- [x] Verify script PASS (42/42).
+- [x] `git diff --check` clean.
+- [x] No `Phase 0` substring remains in user-facing surfaces; only the two
+      M5-H.1 explanatory comments (in `GlassControlGroup.swift` and
+      `RootWindowView.swift`) reference the retired banner historically,
+      and `Color/FilmtoneGradeKernels.swift` keeps its internal generator
+      reference per active scope.
 
 ## Unexpected / Follow-up
 
-(populated as work progresses)
+- 2026-05-05 (post-commit `0251b585`): user feedback flagged a color-judgment
+  integrity defect — the warm `FilmtoneBackdrop` gradient was being used as
+  the letterbox backdrop while a source was loaded, biasing perceived color
+  on the preview content. Fixed by gating `FilmtoneBackdrop` to the
+  `sourceURL == nil` empty state and switching to a neutral `Color.black`
+  the moment any source is set (covers both pre-render probe state and
+  fully-rendered state, so there is no flash of warm tone between the two).
+  Both branches keep `.backgroundExtensionEffect()` so the Liquid Glass
+  toolbar still has surface to refract.

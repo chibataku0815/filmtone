@@ -36,24 +36,31 @@ struct PreviewSurface: View {
 
     var body: some View {
         ZStack {
-            // M5-H.1: branded backdrop replaces the flat `Color.black`. The
-            // gradient still extends via .backgroundExtensionEffect() so
-            // the Liquid Glass toolbar/chrome has continuous content to
-            // refract even when the rendered image is letterboxed.
-            FilmtoneBackdrop()
-                .backgroundExtensionEffect()
-            if let renderedImage {
-                // M5-H.1: switched from `.scaledToFill().clipped()` to
-                // `.scaledToFit()` so source aspect ratio is preserved end
-                // to end (vertical phone footage no longer gets cropped to
-                // a center band, ultra-wide stills no longer lose edges).
-                // Toolbar refraction is now satisfied by the FilmtoneBackdrop
-                // layer above, so we don't need the image to extend.
-                Image(nsImage: renderedImage)
-                    .resizable()
-                    .scaledToFit()
-            } else if sourceURL == nil {
+            // M5-H.1.1: branded `FilmtoneBackdrop` is gated to the empty
+            // launch state only. The moment a source loads (or even before
+            // the first render lands while the probe is in flight) we swap
+            // to a neutral `Color.black` backdrop so any letterbox bars
+            // around `.scaledToFit()` don't bleed warm tone into color
+            // judgment on the preview. Both branches keep
+            // `.backgroundExtensionEffect()` so the Liquid Glass toolbar
+            // continues to refract a real surface.
+            if sourceURL == nil {
+                FilmtoneBackdrop()
+                    .backgroundExtensionEffect()
                 EmptyPreviewLabel()
+            } else {
+                Color.black
+                    .backgroundExtensionEffect()
+                if let renderedImage {
+                    // M5-H.1: switched from `.scaledToFill().clipped()` to
+                    // `.scaledToFit()` so source aspect ratio is preserved
+                    // end to end (vertical phone footage no longer gets
+                    // cropped to a center band, ultra-wide stills no longer
+                    // lose edges).
+                    Image(nsImage: renderedImage)
+                        .resizable()
+                        .scaledToFit()
+                }
             }
         }
         .task(id: PreviewRenderKey(
