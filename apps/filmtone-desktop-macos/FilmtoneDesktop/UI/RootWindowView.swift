@@ -654,6 +654,9 @@ private struct VideoScrubBar: View {
                     }
                 )
 
+                highlightMarkerRail(width: proxy.size.width)
+                    .allowsHitTesting(false)
+
                 ScrubHoverTrackingView { nextFraction in
                     if let nextFraction {
                         hoverFraction = nextFraction
@@ -682,6 +685,38 @@ private struct VideoScrubBar: View {
             )
         }
         .frame(height: 24)
+    }
+
+    private func highlightMarkerRail(width: CGFloat) -> some View {
+        ZStack(alignment: .leading) {
+            ForEach(state.highlightMarkerList, id: \.id) { marker in
+                let x = markerCenterX(for: marker.sourceTimeSec, width: width)
+                VStack(spacing: 1) {
+                    Image(systemName: "bookmark.fill")
+                        .font(.system(size: 8, weight: .bold))
+                        .symbolRenderingMode(.monochrome)
+                    Capsule()
+                        .frame(width: 2, height: 10)
+                }
+                .foregroundStyle(Color.yellow)
+                .shadow(color: Color.black.opacity(0.55), radius: 2, x: 0, y: 1)
+                .frame(width: 16, height: 24)
+                .offset(x: x - 8)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+    }
+
+    private func markerCenterX(for sourceTimeSec: Double, width: CGFloat) -> CGFloat {
+        guard duration.isFinite,
+              duration > 0,
+              sourceTimeSec.isFinite else {
+            return 0
+        }
+        let knob: CGFloat = 18
+        let usable = max(width - knob, 1)
+        let ratio = min(1.0, max(0.0, sourceTimeSec / duration))
+        return knob / 2 + CGFloat(ratio) * usable
     }
 
     private func thumbnailCard(image: NSImage) -> some View {
