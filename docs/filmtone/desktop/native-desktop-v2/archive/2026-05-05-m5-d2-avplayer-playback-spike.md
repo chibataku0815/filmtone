@@ -92,7 +92,7 @@ playbackTask = Task { @MainActor [weak self] in
 | C4 | Preview の resolution cap が一切ない | 4K source = 8.3 Mpx を halation 6-mip 含む full grade pipeline に毎フレーム流す。M-series でも厳しい |
 | C5 | Sleep が `1/24` 固定 (cost 無視) | Wall-clock との同期なし。drift か frame drop か |
 | C6 | Audio サポートなし | 「映像アプリなのに音が出ない」product gap |
-| C7 | iOS と preview architecture が違う | iOS は `AVMutableVideoComposition + applyingCIFiltersWithHandler` (sequential decode + AVFoundation pipelining)、Desktop は random-access timer。grade math は M4-B で共有済みなのに pipeline shell が divergent |
+| C7 | iOS と preview architecture が違う | iOS は `AVMutableVideoComposition + applyingCIFiltersWithHandler` (sequential decode + AVFoundation pipelining)、Desktop は random-access timer。M4-B で parameter contract (`FilmtonePhase0Params` ほか) は共有しているが、grade math 本体は Desktop / iOS とも app-local 並走で、preview pipeline shell も divergent |
 
 ## iOS Canonical (Reference)
 
@@ -266,16 +266,20 @@ playback path 経由の出力が still preview / export path の出力と byte �
   WebGL renderer で 0 lag video preview を実現済みで、Native Desktop が
   「同じ video を開いてもまともに再生できない」状態で cutover すると
   user-perceived regression になる。
-- **推奨**: **v1.5 blocking**。v1.4 は MVP timer + preview resolution cap だけ
-  入れて公開 → v1.5 で AVPlayer route + audio + 速度切替 を landing。
-  - v1.4 hot-fix 案: PreviewSurface に `CILanczosScaleTransform` cap (longEdge
-    1280) を 1 line 入れるだけで体感は劇的に改善する見込み (C4 単独で coverage
-    の 70% 程度)。Architecture 移行不要、~30 分。これは別 active.md で扱う。
+- **推奨**: **v1.5 blocking**。v1.4 については Alt A hot-fix candidate を
+  用意しておき、user visual smoke で「v1.4 公開許容ラインか」を判定して
+  採否を決める。許容できないなら v1.4 を hold して v1.5 と一括で Primary
+  を入れる選択肢も残す。Audio + 速度切替 + compare mode は Primary route
+  でしか lit up しないので、いずれにせよ v1.5 で Primary 着地する想定。
+  - v1.4 hot-fix candidate (Alt A 参照): PreviewSurface に
+    `CILanczosScaleTransform` cap (longEdge 1280 等) + asset/probe cache
+    を入れる。架構移行はしない。**実効果は実機 / 実 source 依存で断定
+    しない** — 採否は visual smoke 判定。詳細は §代替案 §Alt A を参照。
 - **v1.5 開ければ**: 本 spike の Primary route を 1 active.md に細分化 (Step
   1 = video session skeleton + AVPlayerView wrap、Step 2 = composition handler
   + grade wiring、Step 3 = scrub/play wiring + EditorState rewrite、Step 4 =
-  compare mode + rate menu、Step 5 = Verify update + visual smoke)。総計
-  半日〜1 日。
+  compare mode + rate menu、Step 5 = Verify update + visual smoke)。総工数
+  は実装中に再見積もり。
 
 ## 代替案
 
