@@ -33,6 +33,15 @@ struct PreviewSurface: View {
     let paramOverrides: FilmtonePhase0ParamsPatch
 
     @State private var renderedImage: NSImage?
+    /// M5-H.1.2: identity of the source that produced `renderedImage`.
+    /// The body gates the cached frame on `renderedSourceURL == sourceURL`
+    /// so a source swap doesn't flash the prior source's last frame on
+    /// top of the new source's black backdrop while the new render is in
+    /// flight. Same-source param changes (preset / strength / Look /
+    /// Quick / overrides / scrub) keep this URL equal to `sourceURL`,
+    /// so the previous frame stays visible until the new one lands —
+    /// the user never sees an intentional black flash mid-edit.
+    @State private var renderedSourceURL: URL?
 
     var body: some View {
         ZStack {
@@ -51,12 +60,15 @@ struct PreviewSurface: View {
             } else {
                 Color.black
                     .backgroundExtensionEffect()
-                if let renderedImage {
+                if let renderedImage, renderedSourceURL == sourceURL {
                     // M5-H.1: switched from `.scaledToFill().clipped()` to
                     // `.scaledToFit()` so source aspect ratio is preserved
                     // end to end (vertical phone footage no longer gets
                     // cropped to a center band, ultra-wide stills no longer
                     // lose edges).
+                    // M5-H.1.2: identity gate ensures we never paint the
+                    // previous source's frame over the new source's
+                    // backdrop during a source swap.
                     Image(nsImage: renderedImage)
                         .resizable()
                         .scaledToFit()
@@ -80,7 +92,10 @@ struct PreviewSurface: View {
 
     private func renderCurrent() async {
         guard let sourceURL else {
+            // M5-H.1.2: clear both the cached frame and its source identity
+            // so the next source open starts from a clean slate.
             renderedImage = nil
+            renderedSourceURL = nil
             state.probedSourceColorClass = nil
             return
         }
@@ -135,7 +150,14 @@ struct PreviewSurface: View {
         }.value
 
         guard !Task.isCancelled else { return }
+        // M5-H.1.2: update the cached frame and its source identity in the
+        // same MainActor turn. On render success the gate
+        // `renderedSourceURL == sourceURL` opens; on failure (nsImage nil)
+        // we clear the identity too so the gate stays closed and the
+        // black backdrop is what shows, not a stale frame from a prior
+        // source.
         renderedImage = nsImage
+        renderedSourceURL = (nsImage != nil) ? sourceURL : nil
     }
 
     nonisolated private static func renderToNSImage(

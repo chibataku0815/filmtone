@@ -105,3 +105,16 @@ established in M5-B Pass 1–4 must be preserved.
   fully-rendered state, so there is no flash of warm tone between the two).
   Both branches keep `.backgroundExtensionEffect()` so the Liquid Glass
   toolbar still has surface to refract.
+- 2026-05-05 (post-commit `d12f1318`, **M5-H.1.2**): user feedback flagged
+  that on a source swap the previous source's last rendered frame would
+  briefly paint over the new source's black backdrop while the new render
+  was in flight. Fixed by adding `@State private var renderedSourceURL:
+  URL?` to `PreviewSurface` and gating the cached frame on
+  `renderedSourceURL == sourceURL` in the body. `renderCurrent()` now
+  updates `renderedImage` and `renderedSourceURL` in the same MainActor
+  turn — on success both bind to the new source, on failure both clear
+  so the gate stays closed and a stale frame can't surface. The empty
+  branch (`sourceURL == nil`) also clears both. Same-source param
+  changes (preset / strength / Look / Quick / overrides / scrub) do not
+  touch `renderedSourceURL`, so the prior frame stays visible until the
+  new render lands — no intentional black flash mid-edit.
