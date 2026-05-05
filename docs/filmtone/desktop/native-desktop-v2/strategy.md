@@ -130,13 +130,6 @@ archive/2026-05-05-m5-k4-review-fix-2-quantize-within-duration.md
 archive/2026-05-05-m5-k4-integration.md
 ```
 
-### M5-M Portrait Layout + Backlight Veil + Compact Opening
-
-Closed 2026-05-05. Portrait sources reserve sidebar/scrub geometry, Backlight
-Veil profile/intensity is wired through still/video preview and export, and the
-empty launch opens compact. Archive:
-`archive/2026-05-05-m5-m-portrait-backlight-opening.md`
-
 ## Release Cutover State
 
 Native Desktop v2 replaced the public Desktop release rail on 2026-05-05 after
@@ -209,7 +202,6 @@ Use these archives as evidence, not as current truth.
 - `archive/2026-05-05-m5-k4-review-fixes.md`
 - `archive/2026-05-05-m5-k4-review-fix-2-quantize-within-duration.md`
 - `archive/2026-05-05-m5-k4-integration.md`
-- `archive/2026-05-05-m5-m-portrait-backlight-opening.md`
 - `archive/2026-05-05-dhm-shared-highlight-marker-mvp.md`
 - `archive/2026-05-05-dhm-5-davinci-e2e-smoke-harness.md`
 - `archive/2026-05-05-dhm-5-marker-highlight-reel.md`
