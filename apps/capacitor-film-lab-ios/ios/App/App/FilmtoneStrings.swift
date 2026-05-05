@@ -261,6 +261,24 @@ struct FilmtoneStrings {
     let desktopHandoffBody: String
     let desktopHandoffPrimaryAction: String
     let desktopHandoffSecondaryAction: String
+
+    // MARK: - Storage management
+    //
+    // Storage section in the Source / LUT library sheet. Lets the user see
+    // how much disk Filmtone is holding in cachesDirectory and release it
+    // intentionally beyond the standard retention policy. Saved LUTs and
+    // saved Looks live in Application Support, not in this cache, so the
+    // release flow is non-destructive to the user library.
+    let storageTitle: String
+    let storageExplanation: String
+    let storageReleaseButton: String
+    let storageReleaseHint: String
+    let storageReleasedNotice: String
+    let storageLowDiskNotice: String
+    let storageBucketSources: String
+    let storageBucketMezzanine: String
+    let storageBucketExports: String
+    let storageBucketOther: String
 }
 
 extension FilmtoneStrings {
@@ -1619,6 +1637,58 @@ extension FilmtoneStrings {
             "filmtone.desktop_handoff.secondary",
             defaultValue: prefersJapanese ? "別の動画を選ぶ" : "Choose Another Video",
             comment: "Secondary CTA on the >5min Desktop handoff sheet — dismisses without changing source state."
+        )
+        storageTitle = filmtoneLocalized(
+            "filmtone.storage.title",
+            defaultValue: prefersJapanese ? "ストレージ" : "Storage",
+            comment: "Section title for the cache storage controls in the Source / LUT library sheet."
+        )
+        storageExplanation = filmtoneLocalized(
+            "filmtone.storage.explanation",
+            defaultValue: prefersJapanese
+                ? "動画素材がストレージの大半を占めています。再編集を速くするため一時保持し、1 日後に自動整理されます。"
+                : "Imported videos use most of this space. Filmtone keeps them for fast re-edits and auto-clears them after a day.",
+            comment: "Explanatory caption shown above the storage breakdown explaining why imported video sources dominate the cache and how long they stay."
+        )
+        storageReleaseButton = filmtoneLocalized(
+            "filmtone.storage.release",
+            defaultValue: prefersJapanese ? "キャッシュを解放" : "Release Cache",
+            comment: "Primary action that releases cached source / mezzanine / export files."
+        )
+        storageReleaseHint = filmtoneLocalized(
+            "filmtone.storage.release_hint",
+            defaultValue: prefersJapanese ? "編集中の素材は保持されます" : "Your active project is preserved.",
+            comment: "Helper text under the release-cache button explaining that protected files are kept."
+        )
+        storageReleasedNotice = filmtoneLocalized(
+            "filmtone.storage.released_notice",
+            defaultValue: prefersJapanese ? "%@ を解放しました" : "Released %@",
+            comment: "Inline notice shown after manual cache release. %@ is a localized byte count, e.g. \"3.2 GB\"."
+        )
+        storageLowDiskNotice = filmtoneLocalized(
+            "filmtone.storage.low_disk_notice",
+            defaultValue: prefersJapanese ? "ストレージを %@ 空けました" : "Freed %@ of storage",
+            comment: "Inline notice shown when the auto low-disk path freed cache before an import. %@ is a localized byte count."
+        )
+        storageBucketSources = filmtoneLocalized(
+            "filmtone.storage.bucket.sources",
+            defaultValue: prefersJapanese ? "素材" : "Sources",
+            comment: "Label for the imported-source cache bucket in the storage breakdown."
+        )
+        storageBucketMezzanine = filmtoneLocalized(
+            "filmtone.storage.bucket.mezzanine",
+            defaultValue: prefersJapanese ? "プレビュー素材" : "Preview Cache",
+            comment: "Label for the mezzanine cache bucket (transcoded preview material)."
+        )
+        storageBucketExports = filmtoneLocalized(
+            "filmtone.storage.bucket.exports",
+            defaultValue: prefersJapanese ? "書き出し済み" : "Exports",
+            comment: "Label for the exports cache bucket (rendered output kept after save-to-Photos)."
+        )
+        storageBucketOther = filmtoneLocalized(
+            "filmtone.storage.bucket.other",
+            defaultValue: prefersJapanese ? "その他" : "Other",
+            comment: "Label for the combined LUT + preview thumbnail caches in the storage breakdown."
         )
     }
 

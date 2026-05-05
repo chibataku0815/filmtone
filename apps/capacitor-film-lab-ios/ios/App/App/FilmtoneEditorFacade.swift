@@ -242,6 +242,24 @@ final class FilmtoneEditorFacade {
         }
     }
 
+    func cacheInventory() async -> CacheInventoryDTO? {
+        await withCheckedContinuation { (continuation: CheckedContinuation<CacheInventoryDTO?, Never>) in
+            cacheMaintenanceQueue.async { [runtime] in
+                let snapshot = try? runtime.cacheInventorySnapshot()
+                continuation.resume(returning: snapshot)
+            }
+        }
+    }
+
+    func releaseCache(protecting uris: [String]) async -> CacheReleaseResultDTO? {
+        await withCheckedContinuation { (continuation: CheckedContinuation<CacheReleaseResultDTO?, Never>) in
+            cacheMaintenanceQueue.async { [runtime] in
+                let result = try? runtime.releaseCache(protectedURIs: uris)
+                continuation.resume(returning: result)
+            }
+        }
+    }
+
     @discardableResult
     func removeLocalFiles(uris: [String]) -> Bool {
         let urls = uris.compactMap { try? runtime.resolveFileURL($0) }

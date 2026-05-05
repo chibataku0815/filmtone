@@ -307,6 +307,14 @@ final class CacheStore {
     }
 
     @discardableResult
+    func pruneLowDiskAggressive(
+        protecting protectedURLs: [URL] = [],
+        now: Date = Date()
+    ) throws -> CachePruneResult {
+        try prune(policy: .lowDiskAggressive(protecting: protectedURLs, now: now))
+    }
+
+    @discardableResult
     func removeGeneratedFiles(_ urls: [URL]) throws -> CachePruneResult {
         var removedCount = 0
         var removedBytes: Int64 = 0
@@ -514,7 +522,7 @@ struct CacheRetentionPolicy {
 
     private static let sourceReuseMaxBytes: Int64 = 8 * 1024 * 1024 * 1024
     private static let sourceReuseMaxEntries = 2
-    private static let sourceReuseMaxAge: TimeInterval = 7 * 24 * 60 * 60
+    private static let sourceReuseMaxAge: TimeInterval = 24 * 60 * 60
 
     init(
         bucketRules: [CacheStore.Bucket: BucketRule],
@@ -558,6 +566,27 @@ struct CacheRetentionPolicy {
                 .previews: .init(maxBytes: 64 * 1024 * 1024, maxAge: 24 * 60 * 60),
                 .mezzanine: .init(maxBytes: 1_073_741_824, maxEntries: 4),
                 .luts: .init(maxBytes: 20 * 1024 * 1024, maxAge: 30 * 24 * 60 * 60),
+            ],
+            protectedURLs: protectedURLs,
+            now: now
+        )
+    }
+
+    /// Drop everything that is not actively in use. Used for (a) the manual
+    /// "Release cache" UI affordance and (b) automatic pre-import recovery
+    /// when the device is critically low on disk. Saved LUTs and saved looks
+    /// live in Application Support, not in this cache, so they are unaffected.
+    static func lowDiskAggressive(
+        protecting protectedURLs: [URL] = [],
+        now: Date = Date()
+    ) -> CacheRetentionPolicy {
+        CacheRetentionPolicy(
+            bucketRules: [
+                .sources: .init(keepOnlyProtected: true),
+                .exports: .init(keepOnlyProtected: true),
+                .previews: .init(keepOnlyProtected: true),
+                .mezzanine: .init(keepOnlyProtected: true),
+                .luts: .init(keepOnlyProtected: true),
             ],
             protectedURLs: protectedURLs,
             now: now

@@ -15,6 +15,8 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "saveToPhotos", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "shareOutput", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "cancelExport", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "cacheInventory", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "releaseCache", returnType: CAPPluginReturnPromise),
     ]
 
     private var assetPickerService: AssetPickerService?
@@ -31,10 +33,20 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
         do {
             let cacheStore = try CacheStore()
             let mezzanineService = MezzanineService(cacheStore: cacheStore)
-            self.assetPickerService = AssetPickerService(
+            let pickerService = AssetPickerService(
                 cacheStore: cacheStore,
                 mezzanineService: mezzanineService
             )
+            pickerService.cachePrunedNoticeHandler = { [weak self] removedBytes in
+                guard let self else { return }
+                DispatchQueue.main.async {
+                    self.notifyListeners("cachePrunedNotice", data: [
+                        "removedBytes": NSNumber(value: removedBytes),
+                        "trigger": "lowDisk",
+                    ])
+                }
+            }
+            self.assetPickerService = pickerService
             self.runtime = FilmtoneMediaRuntime(
                 cacheStore: cacheStore,
                 mezzanineService: mezzanineService,
@@ -309,6 +321,34 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    @objc func cacheInventory(_ call: CAPPluginCall) {
+        guard let runtime else {
+            reject(call, with: FilmtoneMediaError.cacheFailed("Cache store is unavailable."))
+            return
+        }
+        do {
+            let snapshot = try runtime.cacheInventorySnapshot()
+            call.resolve(with: snapshot)
+        } catch {
+            reject(call, with: error)
+        }
+    }
+
+    @objc func releaseCache(_ call: CAPPluginCall) {
+        guard let runtime else {
+            reject(call, with: FilmtoneMediaError.cacheFailed("Cache store is unavailable."))
+            return
+        }
+        do {
+            let options = try? call.decode(ReleaseCacheOptions.self)
+            let protectedURIs = options?.protectedURIs ?? []
+            let result = try runtime.releaseCache(protectedURIs: protectedURIs)
+            call.resolve(with: result)
+        } catch {
+            reject(call, with: error)
+        }
+    }
+
     @objc func cancelExport(_ call: CAPPluginCall) {
         let session = currentExportSession
         let task = currentExportTask
@@ -397,4 +437,8 @@ private struct ShareOptions: Decodable {
     let packageFileUris: [String]?
     let title: String?
     let text: String?
+}
+
+private struct ReleaseCacheOptions: Decodable {
+    let protectedURIs: [String]?
 }

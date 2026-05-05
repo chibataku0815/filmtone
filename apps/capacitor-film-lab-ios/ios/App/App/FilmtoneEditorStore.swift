@@ -466,6 +466,11 @@ final class FilmtoneEditorStore: ObservableObject {
     /// mutation so SwiftUI redraws the Recent strip / Saved Looks chips
     /// without per-render disk reads.
     @Published var library: LibrarySnapshot = .empty
+    /// Snapshot of bytes held under `cachesDirectory/FilmtonePhase0/`. Loaded
+    /// lazily when the storage section opens; cleared after manual release so
+    /// the UI re-fetches.
+    @Published private(set) var cacheInventory: CacheInventoryDTO?
+    @Published private(set) var isReleasingCache = false
     /// Set when an `applySavedLook` mutation lands; cleared by every other
     /// project mutation. Read by the export pipeline so the sidecar can
     /// record which Saved Look produced the export. (Sidecar field-set is
@@ -1772,6 +1777,36 @@ final class FilmtoneEditorStore: ObservableObject {
             return
         }
         reclaimCacheForCurrentState()
+    }
+
+    @MainActor
+    func loadCacheInventory() async {
+        let snapshot = await facade.cacheInventory()
+        cacheInventory = snapshot
+    }
+
+    @MainActor
+    func releaseCache() async {
+        guard !isReleasingCache, !isBusy, !isSavingToPhotos else {
+            return
+        }
+        isReleasingCache = true
+        defer { isReleasingCache = false }
+
+        let result = await facade.releaseCache(protecting: protectedCacheURIs)
+        await loadCacheInventory()
+
+        if let result, result.removedBytes > 0 {
+            let formatted = ByteCountFormatter.string(
+                fromByteCount: result.removedBytes,
+                countStyle: .file
+            )
+            notice = String(
+                format: strings.storageReleasedNotice,
+                locale: Locale.current,
+                formatted
+            )
+        }
     }
 
     private var protectedCacheURIs: [String] {

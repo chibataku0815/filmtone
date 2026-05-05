@@ -46,6 +46,8 @@ final class AssetPickerService: NSObject {
     private static let minimumProResSizedCopyBufferBytes: Int64 = 64 * 1024 * 1024
     private static let maximumProResSizedCopyBufferBytes: Int64 = 512 * 1024 * 1024
 
+    private static let lowDiskThresholdBytes: Int64 = 2 * 1024 * 1024 * 1024
+
     private let cacheStore: CacheStore
     private let mezzanineService: MezzanineService
     private var sourceContinuation: CheckedContinuation<SourceInfoDTO?, Error>?
@@ -53,6 +55,7 @@ final class AssetPickerService: NSObject {
     private var activeDocumentPickerPurpose: DocumentPickerPurpose?
     private var sourceImportProgressHandler: (@MainActor (FilmtoneSourceImportProgress) -> Void)?
     private var protectedCacheURLsDuringImport: [URL] = []
+    var cachePrunedNoticeHandler: ((Int64) -> Void)?
 
     init(cacheStore: CacheStore, mezzanineService: MezzanineService) {
         self.cacheStore = cacheStore
@@ -695,6 +698,16 @@ final class AssetPickerService: NSObject {
     }
 
     private func reclaimBeforeSourceImport() {
+        let availableBytes = (try? availableImportCapacityBytes()) ?? nil
+        if let availableBytes, availableBytes < Self.lowDiskThresholdBytes {
+            if let result = try? cacheStore.pruneLowDiskAggressive(
+                protecting: protectedCacheURLsDuringImport
+            ), result.removedBytes > 0 {
+                let removedBytes = result.removedBytes
+                cachePrunedNoticeHandler?(removedBytes)
+            }
+            return
+        }
         _ = try? cacheStore.pruneBeforeSourceImport(protecting: protectedCacheURLsDuringImport)
     }
 }

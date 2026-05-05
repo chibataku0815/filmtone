@@ -6,7 +6,12 @@ import type {
   SourceInfo,
   SourceProbe,
 } from "film-lab-core";
-import type { FilmtoneMediaPlugin, PickedLutFile } from "./filmtoneMedia";
+import type {
+  CacheInventory,
+  CacheReleaseResult,
+  FilmtoneMediaPlugin,
+  PickedLutFile,
+} from "./filmtoneMedia";
 
 function pickFile(accept: string): Promise<File | null> {
   return new Promise((resolve) => {
@@ -263,6 +268,26 @@ export class FilmtoneMediaWeb extends WebPlugin implements FilmtoneMediaPlugin {
       window.clearTimeout(this.exportTimer);
       this.exportTimer = null;
     }
+  }
+
+  async cacheInventory(): Promise<CacheInventory> {
+    const empty = { bytes: 0, count: 0 };
+    return {
+      totalBytes: 0,
+      sources: empty,
+      mezzanine: empty,
+      exports: empty,
+      previews: empty,
+      luts: empty,
+    };
+  }
+
+  async releaseCache(): Promise<CacheReleaseResult> {
+    return {
+      removedCount: 0,
+      removedBytes: 0,
+      retainedBytes: 0,
+    };
   }
 
   private async stepProgress(

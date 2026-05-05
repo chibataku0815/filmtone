@@ -582,6 +582,43 @@ struct Phase0PreviewRenderResultDTO: Encodable {
     let posterTimeSec: Double?
 }
 
+struct CacheBucketInventoryDTO: Encodable {
+    let bytes: Int64
+    let count: Int
+}
+
+struct CacheInventoryDTO: Encodable {
+    let totalBytes: Int64
+    let sources: CacheBucketInventoryDTO
+    let mezzanine: CacheBucketInventoryDTO
+    let exports: CacheBucketInventoryDTO
+    let previews: CacheBucketInventoryDTO
+    let luts: CacheBucketInventoryDTO
+
+    init(inventory: CacheInventory) {
+        self.totalBytes = inventory.totalBytes
+        self.sources = CacheBucketInventoryDTO(bucket: .sources, inventory: inventory)
+        self.mezzanine = CacheBucketInventoryDTO(bucket: .mezzanine, inventory: inventory)
+        self.exports = CacheBucketInventoryDTO(bucket: .exports, inventory: inventory)
+        self.previews = CacheBucketInventoryDTO(bucket: .previews, inventory: inventory)
+        self.luts = CacheBucketInventoryDTO(bucket: .luts, inventory: inventory)
+    }
+}
+
+struct CacheReleaseResultDTO: Encodable {
+    let removedCount: Int
+    let removedBytes: Int64
+    let retainedBytes: Int64
+}
+
+extension CacheBucketInventoryDTO {
+    fileprivate init(bucket: CacheStore.Bucket, inventory: CacheInventory) {
+        let entries = inventory.entries(in: bucket)
+        self.bytes = entries.reduce(Int64(0)) { $0 + $1.sizeBytes }
+        self.count = entries.count
+    }
+}
+
 enum FilmtoneMediaError: LocalizedError {
     case bridgeUnavailable
     case invalidURL(String)
