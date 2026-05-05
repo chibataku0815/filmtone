@@ -70,6 +70,7 @@ private struct StubSidecarRequest: FilmtoneSidecarRequest {
     let sourceKind: FilmtoneSourceKind
     let quickState: FilmtoneQuickState
     let paramOverrides: FilmtonePhase0ParamsPatch
+    var highlightMarkers: FilmtoneHighlightMarkers? = nil
 }
 
 private let runner = TestRunner()
@@ -236,6 +237,93 @@ runner.test("sidecar gradeParams reflect Quick + paramOverrides applied") {
         let expectedV = expectedDirect.value(for: key)
         try assertClose(payloadV, expectedV, "gradeParams.\(key)")
     }
+}
+
+runner.test("sidecar emits highlightMarkers block with stable id") {
+    let markers = FilmtoneHighlightMarkers(
+        sourceIdentity: FilmtoneMarkerSourceIdentity(
+            filename: "clip.mov",
+            durationSec: 20,
+            fps: 24,
+            fileSizeBytes: 1024
+        ),
+        markers: [
+            FilmtoneHighlightMarker(
+                id: "filmtone-marker-desktop-test",
+                sourceTimeSec: 5,
+                sourceFps: 24,
+                createdOnPlatform: "macos",
+                createdAtIso: "2026-05-05T00:00:00.000Z"
+            )
+        ]
+    )
+    let req = StubSidecarRequest(
+        sourceURL: URL(fileURLWithPath: "/tmp/clip.mov"),
+        outputURL: URL(fileURLWithPath: "/tmp/out.mp4"),
+        presetName: "reset",
+        presetStrength: 1.0,
+        lookSlug: nil,
+        sourceKind: .video,
+        quickState: .zero,
+        paramOverrides: .empty,
+        highlightMarkers: markers
+    )
+    let payload = FilmtoneSidecarWriter.sidecarPayload(for: req)
+    guard
+        let block = payload["highlightMarkers"] as? [String: Any],
+        let markerList = block["markers"] as? [[String: Any]],
+        let first = markerList.first
+    else {
+        throw AssertionError(description: "highlightMarkers block missing")
+    }
+    try assertEqual(block["schema"] as? String, Optional(FilmtoneHighlightMarkers.schemaID))
+    try assertEqual(first["id"] as? String, Optional("filmtone-marker-desktop-test"))
+    try assertEqual(first["createdOnPlatform"] as? String, Optional("macos"))
+    try assertEqual(first["sourceFrame"] as? Int, Optional(120))
+}
+
+runner.test("sidecar reader loads iOS highlightMarkers by source filename") {
+    let tempDir = FileManager.default.temporaryDirectory
+        .appendingPathComponent("filmtone-marker-read-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tempDir) }
+
+    let sourceURL = tempDir.appendingPathComponent("clip.mov")
+    FileManager.default.createFile(atPath: sourceURL.path, contents: Data())
+    let sidecarURL = tempDir.appendingPathComponent("rendered.mp4.filmtone-ios-export-session-v1.json")
+    let json = """
+    {
+      "package": { "sourceMediaFilename": "clip.mov" },
+      "highlightMarkers": {
+        "schema": "filmtone-highlight-markers-v1",
+        "sourceIdentity": {
+          "filename": "clip.mov",
+          "durationSec": 20,
+          "fps": 24,
+          "fileSizeBytes": 1024
+        },
+        "defaults": { "preRollSec": 2, "postRollSec": 3 },
+        "markers": [{
+          "id": "filmtone-marker-ios-test",
+          "sourceTimeSec": 5,
+          "sourceFrame": 120,
+          "sourceFps": 24,
+          "preRollSec": 2,
+          "postRollSec": 3,
+          "color": "Blue",
+          "name": "Highlight",
+          "note": "",
+          "createdOnPlatform": "ios",
+          "createdAtIso": "2026-05-05T00:00:00.000Z"
+        }]
+      }
+    }
+    """
+    try Data(json.utf8).write(to: sidecarURL)
+
+    let markers = FilmtoneSidecarWriter.readHighlightMarkers(matchingSourceURL: sourceURL)
+    try assertEqual(markers?.markers.first?.id, Optional("filmtone-marker-ios-test"))
+    try assertEqual(markers?.markers.first?.createdOnPlatform, Optional("ios"))
 }
 
 // ---------------------------------------------------------------------------

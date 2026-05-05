@@ -22,6 +22,7 @@ struct FilmtoneVideoExportRequest: FilmtoneSidecarRequest {
     let sourceProfileSelection: CameraProfileSelection
     let quickState: FilmtoneQuickState
     let paramOverrides: FilmtonePhase0ParamsPatch
+    let highlightMarkers: FilmtoneHighlightMarkers?
     var sourceKind: FilmtoneSourceKind { .video }
 
     init(
@@ -33,7 +34,8 @@ struct FilmtoneVideoExportRequest: FilmtoneSidecarRequest {
         codec: FilmtoneVideoCodec = .h264,
         sourceProfileSelection: CameraProfileSelection = .auto,
         quickState: FilmtoneQuickState = .zero,
-        paramOverrides: FilmtonePhase0ParamsPatch = .empty
+        paramOverrides: FilmtonePhase0ParamsPatch = .empty,
+        highlightMarkers: FilmtoneHighlightMarkers? = nil
     ) {
         self.sourceURL = sourceURL
         self.outputURL = outputURL
@@ -44,6 +46,7 @@ struct FilmtoneVideoExportRequest: FilmtoneSidecarRequest {
         self.sourceProfileSelection = sourceProfileSelection
         self.quickState = quickState
         self.paramOverrides = paramOverrides
+        self.highlightMarkers = highlightMarkers
     }
 }
 

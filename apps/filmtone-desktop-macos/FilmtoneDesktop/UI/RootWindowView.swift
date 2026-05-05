@@ -607,6 +607,39 @@ private struct VideoScrubBar: View {
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
                 .frame(minWidth: 64, alignment: .leading)
+            Button {
+                state.addHighlightMarker(at: seconds.wrappedValue)
+            } label: {
+                Image(systemName: "bookmark.fill")
+                    .frame(width: 14, height: 14)
+            }
+            .buttonStyle(FilmtoneGlassIconButtonStyle(isActive: !state.highlightMarkerList.isEmpty))
+            .keyboardShortcut("m", modifiers: [])
+            .help("Add highlight marker (M)")
+            .filmtonePointingHandCursor()
+            if !state.highlightMarkerList.isEmpty {
+                HighlightMarkerMenu(state: state)
+            }
+            Button {
+                state.jumpToPreviousHighlightMarker()
+            } label: {
+                Label("BACK", systemImage: "arrow.left.circle.fill")
+            }
+            .buttonStyle(FilmtoneGlassSecondaryButtonStyle(compact: true))
+            .keyboardShortcut("j", modifiers: .shift)
+            .disabled(state.highlightMarkerList.isEmpty)
+            .help("Jump to previous highlight marker (Shift-J)")
+            .filmtonePointingHandCursor(!state.highlightMarkerList.isEmpty)
+            Button {
+                state.jumpToNextHighlightMarker()
+            } label: {
+                Label("JUMP", systemImage: "arrow.right.circle.fill")
+            }
+            .buttonStyle(FilmtoneGlassSecondaryButtonStyle(compact: true))
+            .keyboardShortcut("j", modifiers: [])
+            .disabled(state.highlightMarkerList.isEmpty)
+            .help("Jump to next highlight marker (J)")
+            .filmtonePointingHandCursor(!state.highlightMarkerList.isEmpty)
             sliderArea
             Text(format(duration))
                 .font(.caption.monospacedDigit())
@@ -642,6 +675,8 @@ private struct VideoScrubBar: View {
                     }
                 )
 
+                highlightMarkerRail(width: proxy.size.width)
+
                 ScrubHoverTrackingView { nextFraction in
                     if let nextFraction {
                         hoverFraction = nextFraction
@@ -670,6 +705,46 @@ private struct VideoScrubBar: View {
             )
         }
         .frame(height: 24)
+    }
+
+    private func highlightMarkerRail(width: CGFloat) -> some View {
+        ZStack(alignment: .leading) {
+            ForEach(state.highlightMarkerList, id: \.id) { marker in
+                let x = markerCenterX(for: marker.sourceTimeSec, width: width)
+                Button {
+                    state.jumpToHighlightMarker(id: marker.id)
+                } label: {
+                    VStack(spacing: 1) {
+                        Image(systemName: "bookmark.fill")
+                            .font(.system(size: 8, weight: .bold))
+                            .symbolRenderingMode(.monochrome)
+                        Capsule()
+                            .frame(width: 2, height: 10)
+                    }
+                    .foregroundStyle(Color.yellow)
+                    .shadow(color: Color.black.opacity(0.55), radius: 2, x: 0, y: 1)
+                    .frame(width: 16, height: 24)
+                }
+                .buttonStyle(.plain)
+                .contentShape(Rectangle())
+                .help("Jump to highlight marker")
+                .filmtonePointingHandCursor()
+                .offset(x: x - 8)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+    }
+
+    private func markerCenterX(for sourceTimeSec: Double, width: CGFloat) -> CGFloat {
+        guard duration.isFinite,
+              duration > 0,
+              sourceTimeSec.isFinite else {
+            return 0
+        }
+        let knob: CGFloat = 18
+        let usable = max(width - knob, 1)
+        let ratio = min(1.0, max(0.0, sourceTimeSec / duration))
+        return knob / 2 + CGFloat(ratio) * usable
     }
 
     private func thumbnailCard(image: NSImage) -> some View {
@@ -849,6 +924,51 @@ private struct SliderFrameInBarKey: PreferenceKey {
     static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
         let next = nextValue()
         if next != .zero { value = next }
+    }
+}
+
+/// Compact access to source-relative highlight markers without expanding the
+/// floating scrub bar or disturbing hover thumbnail layout.
+private struct HighlightMarkerMenu: View {
+    @Bindable var state: EditorState
+
+    var body: some View {
+        Menu {
+            ForEach(state.highlightMarkerList, id: \.id) { marker in
+                Button {
+                    state.jumpToHighlightMarker(id: marker.id)
+                } label: {
+                    Label(Self.label(for: marker.sourceTimeSec), systemImage: "arrow.right.circle")
+                }
+
+                Button(role: .destructive) {
+                    state.removeHighlightMarker(id: marker.id)
+                } label: {
+                    Label("Delete \(Self.label(for: marker.sourceTimeSec))", systemImage: "trash")
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "bookmark.fill")
+                Text("\(state.highlightMarkerList.count)")
+                    .font(.caption.monospacedDigit())
+            }
+            .foregroundStyle(.white)
+            .frame(minWidth: 34)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .controlSize(.small)
+        .colorScheme(.dark)
+        .help("Highlight markers")
+    }
+
+    private static func label(for value: Double) -> String {
+        guard value.isFinite, value >= 0 else { return "0:00.00" }
+        let total = value
+        let minutes = Int(total / 60)
+        let secondsRemainder = total - Double(minutes * 60)
+        return String(format: "%d:%05.2f", minutes, secondsRemainder)
     }
 }
 

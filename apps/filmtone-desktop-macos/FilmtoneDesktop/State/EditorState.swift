@@ -23,6 +23,8 @@ final class EditorState {
     /// M5-A.3: probed video duration in seconds. `nil` for stills or
     /// before the probe completes. Drives the scrub bar range.
     var videoDurationSeconds: Double?
+    /// Nominal source fps used to derive Resolve-friendly marker frame ids.
+    var videoNominalFrameRate: Double?
     /// M5-I.2: mirrors `videoSession?.player.timeControlStatus == .playing`,
     /// pushed via the session's `onPlayingChange` callback so the
     /// Play/Pause button glyph stays in sync with the AVPlayer rather
@@ -64,6 +66,8 @@ final class EditorState {
     /// round-trip lights up here so a Look saved with overrides restores
     /// them on recall the moment the editing UI exists.
     var paramOverrides: FilmtonePhase0ParamsPatch = .empty
+    /// Source-relative highlight markers shared with iOS and DaVinci.
+    var highlightMarkers: FilmtoneHighlightMarkers?
     var isExporting: Bool = false
     var exportProgress: Double = 0
     var exportProgressMessage: String?
@@ -198,6 +202,12 @@ final class EditorState {
         isPlaying = false
         videoPreviewSeconds = nil
         videoDurationSeconds = nil
+        videoNominalFrameRate = nil
+        if let url, kind == .video {
+            highlightMarkers = FilmtoneSidecarWriter.readHighlightMarkers(matchingSourceURL: url)
+        } else {
+            highlightMarkers = nil
+        }
         // M5-C.1: clear the previous probe's color class so the gate /
         // Picker resolved-Auto label don't misreport stale state until the
         // PreviewSurface re-probes the new source.
@@ -289,8 +299,11 @@ final class EditorState {
     private func startVideoDurationProbe(for url: URL) {
         currentDurationProbeTask = Task { @MainActor [weak self] in
             guard let self else { return }
-            let probedDuration = try? await FilmtoneVideoFramePreviewLoader
-                .loadDurationSeconds(from: url)
+            let videoProbe = try? await FilmtoneSourceProber.probeVideo(sourceURL: url)
+            var probedDuration = videoProbe?.durationSeconds
+            if probedDuration == nil {
+                probedDuration = try? await FilmtoneVideoFramePreviewLoader.loadDurationSeconds(from: url)
+            }
             guard !Task.isCancelled,
                   self.sourceURL == url,
                   let probedDuration,
@@ -300,6 +313,11 @@ final class EditorState {
             }
             self.videoDurationSeconds = probedDuration
             self.videoPreviewSeconds = probedDuration * 0.5
+            if let frameRate = videoProbe?.nominalFrameRate,
+               frameRate.isFinite,
+               frameRate > 0 {
+                self.videoNominalFrameRate = Double(frameRate)
+            }
         }
     }
 
@@ -339,6 +357,135 @@ final class EditorState {
     func refreshVideoCompositionIfNeeded() {
         guard let videoSession else { return }
         videoSession.updateInputs(currentVideoRenderInputs())
+    }
+
+    var highlightMarkerList: [FilmtoneHighlightMarker] {
+        highlightMarkers?.markers ?? []
+    }
+
+    var exportHighlightMarkers: FilmtoneHighlightMarkers? {
+        guard let highlightMarkers, !highlightMarkers.isEmpty else {
+            return nil
+        }
+        return highlightMarkers
+    }
+
+    func addHighlightMarker(at sourceTimeSec: Double) {
+        guard sourceKind == .video,
+              let sourceIdentity = currentMarkerSourceIdentity() else {
+            return
+        }
+        let duration = videoDurationSeconds
+        let clampedTime: Double
+        if let duration, duration.isFinite, duration > 0 {
+            clampedTime = min(max(sourceTimeSec, 0), duration)
+        } else {
+            clampedTime = max(sourceTimeSec, 0)
+        }
+        let current = highlightMarkers ?? FilmtoneHighlightMarkers(
+            sourceIdentity: sourceIdentity,
+            markers: []
+        )
+        if current.marker(near: clampedTime) != nil {
+            return
+        }
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let marker = FilmtoneHighlightMarker(
+            id: "filmtone-marker-\(UUID().uuidString)",
+            sourceTimeSec: clampedTime,
+            sourceFps: sourceIdentity.fps,
+            createdOnPlatform: "macos",
+            createdAtIso: formatter.string(from: Date())
+        )
+        highlightMarkers = current.replacingOrAppending(marker)
+        invalidateExportPackageState()
+    }
+
+    func removeHighlightMarker(id: String) {
+        guard let current = highlightMarkers else {
+            return
+        }
+        let remaining = current.markers.filter { $0.id != id }
+        highlightMarkers = remaining.isEmpty
+            ? nil
+            : FilmtoneHighlightMarkers(
+                schema: current.schema,
+                sourceIdentity: current.sourceIdentity,
+                defaults: current.defaults,
+                markers: remaining
+        )
+        invalidateExportPackageState()
+    }
+
+    func jumpToHighlightMarker(id: String) {
+        guard let marker = highlightMarkerList.first(where: { $0.id == id }) else {
+            return
+        }
+        videoSession?.pause()
+        isPlaying = false
+        let duration = videoDurationSeconds
+        let targetSeconds: Double
+        if let duration, duration.isFinite, duration > 0 {
+            targetSeconds = min(max(marker.sourceTimeSec, 0), duration)
+        } else {
+            targetSeconds = max(marker.sourceTimeSec, 0)
+        }
+        videoPreviewSeconds = targetSeconds
+        seekVideo(toSeconds: targetSeconds)
+    }
+
+    func jumpToNextHighlightMarker() {
+        let markers = sortedHighlightMarkerList()
+        guard !markers.isEmpty else {
+            return
+        }
+        let currentTime = videoPreviewSeconds ?? 0
+        let nextThreshold = currentTime + 0.01
+        let target = markers.first { $0.sourceTimeSec > nextThreshold } ?? markers[0]
+        jumpToHighlightMarker(id: target.id)
+    }
+
+    func jumpToPreviousHighlightMarker() {
+        let markers = sortedHighlightMarkerList()
+        guard let lastMarker = markers.last else {
+            return
+        }
+        let currentTime = videoPreviewSeconds ?? 0
+        let previousThreshold = currentTime - 0.01
+        let target = markers.last { $0.sourceTimeSec < previousThreshold } ?? lastMarker
+        jumpToHighlightMarker(id: target.id)
+    }
+
+    private func sortedHighlightMarkerList() -> [FilmtoneHighlightMarker] {
+        highlightMarkerList.sorted {
+            if $0.sourceTimeSec == $1.sourceTimeSec {
+                return $0.id < $1.id
+            }
+            return $0.sourceTimeSec < $1.sourceTimeSec
+        }
+    }
+
+    private func currentMarkerSourceIdentity() -> FilmtoneMarkerSourceIdentity? {
+        guard let sourceURL else {
+            return nil
+        }
+        let attributes = try? FileManager.default.attributesOfItem(atPath: sourceURL.path)
+        let fileSize = attributes?[.size] as? Int64
+        return FilmtoneMarkerSourceIdentity(
+            filename: sourceURL.lastPathComponent,
+            durationSec: videoDurationSeconds,
+            fps: FilmtoneHighlightMarker.validFPS(videoNominalFrameRate),
+            fileSizeBytes: fileSize
+        )
+    }
+
+    private func invalidateExportPackageState() {
+        lastExportResult = nil
+        lastExportError = nil
+        lastExportSummary = nil
+        exportProgress = 0
     }
 
     // MARK: - M5-C.4 Export inspector

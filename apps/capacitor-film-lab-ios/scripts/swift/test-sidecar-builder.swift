@@ -1,5 +1,6 @@
 import Foundation
 import CoreGraphics
+import FilmLabSwiftCore
 
 struct SidecarCheckError: LocalizedError {
     let message: String
@@ -15,15 +16,110 @@ func expect(_ condition: @autoclosure () -> Bool, _ message: String) throws {
 @main
 struct TestSidecarBuilder {
     static func main() throws {
+        let args = Array(CommandLine.arguments.dropFirst())
+        if args.first == "--emit-highlight-marker-sidecar" {
+            try expect(
+                args.count == 3,
+                "usage: test-sidecar-builder --emit-highlight-marker-sidecar <hlg-export-request> <output-sidecar-json>"
+            )
+            try emitHighlightMarkerSidecar(
+                fixturePath: args[1],
+                outputPath: args[2]
+            )
+            print("App-generated highlight marker sidecar written: \(args[2])")
+            return
+        }
+
         try runHlgFixtureBuild()
         try runSidecarURLDerivation()
         try runImageJobDerivation()
         try runSavedLookProvenance()
         try runCameraProfileProvenance()
+        try runHighlightMarkersSidecarBlock()
         try runConnectPackageUriOrdering()
         try runConnectCubeWriter()
         try runConnectDctlWriter()
         print("Sidecar builder tests passed")
+    }
+
+    static func emitHighlightMarkerSidecar(
+        fixturePath: String,
+        outputPath: String
+    ) throws {
+        let fixtureURL = URL(fileURLWithPath: fixturePath)
+        let outputURL = URL(fileURLWithPath: outputPath)
+        let decoder = JSONDecoder()
+        let request = try decoder.decode(
+            Phase0ExportRequestDTO.self,
+            from: Data(contentsOf: fixtureURL)
+        )
+        let markers = FilmtoneHighlightMarkers(
+            sourceIdentity: FilmtoneMarkerSourceIdentity(
+                filename: "C0061.mov",
+                durationSec: 123.45,
+                fps: 29.97,
+                fileSizeBytes: 123_456_789,
+                contentHash: "sha256:app-generated-smoke"
+            ),
+            markers: [
+                FilmtoneHighlightMarker(
+                    id: "filmtone-marker-001",
+                    sourceTimeSec: 42.13,
+                    sourceFps: 29.97,
+                    createdOnPlatform: "ios",
+                    createdAtIso: "2026-05-05T00:00:00.000Z"
+                )
+            ]
+        )
+        let inputs = SidecarBuildInputs(
+            request: request,
+            sourceProbe: request.sourceProbe,
+            hdrPolicy: request.sourceProbe?.sourceVideoMetadata?.hdrPreparationPolicy,
+            degradedDecodePath: false,
+            outputURL: URL(fileURLWithPath: "/tmp/C0061-filmtone.mov"),
+            outputSize: CGSize(width: 3840, height: 2160),
+            fileSizeBytes: 12_345_678,
+            elapsedMs: 4_200,
+            realtimeRatio: 0.35,
+            audioPreserved: true,
+            identity: SidecarDeviceIdentity(
+                appVersion: "1.4.0",
+                buildNumber: "99",
+                deviceModel: "iPhone17,1",
+                iosVersion: "26.2",
+                exportedAtIso: "2026-05-05T00:00:00.000Z"
+            ),
+            renderMode: "quality",
+            mezzanineUsedVariant: nil,
+            mezzanineProfileVersion: nil,
+            colorPipeline: FilmtoneColorPipeline.defaultOutputContract(
+                sourceMetadata: request.sourceProbe?.sourceVideoMetadata?.color,
+                sourceColorClass: request.sourceProbe?.sourceVideoMetadata?.colorClass
+            ),
+            package: SidecarPackage(
+                sourceMediaFilename: "C0061.mov",
+                renderedMediaFilename: "C0061-filmtone.mov",
+                referenceAfterFilename: "reference-after.jpg",
+                referenceAfterTimeSec: 42.13,
+                combinedColorFilename: "combined-color.cube",
+                effectsDctlFilename: "filmtone-bridge.dctl"
+            ),
+            depth: nil,
+            appliedSavedLook: nil,
+            cameraProfile: nil,
+            highlightMarkers: markers
+        )
+        let data = try FilmtoneExportSidecarBuilder.build(inputs)
+        let parsed = try decoder.decode(ParsedSidecar.self, from: data)
+        let markerParsed = try decoder.decode(HighlightMarkerProbeSidecar.self, from: data)
+        try expect(parsed.package?.sourceMediaFilename == "C0061.mov", "emitted sidecar package source mismatch")
+        try expect(parsed.package?.effects?.dctl == "filmtone-bridge.dctl", "emitted sidecar DCTL mismatch")
+        try expect(markerParsed.highlightMarkers?.markers.first?.id == "filmtone-marker-001", "emitted sidecar marker id mismatch")
+        try FileManager.default.createDirectory(
+            at: outputURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try data.write(to: outputURL, options: [.atomic])
     }
 
     // MARK: - HLG fixture: build + schema asserts
@@ -300,6 +396,82 @@ struct TestSidecarBuilder {
                 "file:///tmp/reference-after.jpg",
             ],
             "connect package URI ordering changed"
+        )
+    }
+
+    static func runHighlightMarkersSidecarBlock() throws {
+        let fixtureURL = URL(fileURLWithPath: CommandLine.arguments[1])
+        let decoder = JSONDecoder()
+        let request = try decoder.decode(
+            Phase0ExportRequestDTO.self,
+            from: Data(contentsOf: fixtureURL)
+        )
+        let markers = FilmtoneHighlightMarkers(
+            sourceIdentity: FilmtoneMarkerSourceIdentity(
+                filename: request.sourceProbe?.filename,
+                durationSec: request.sourceProbe?.durationSec,
+                fps: request.sourceProbe?.frameRate,
+                fileSizeBytes: request.sourceProbe?.fileSizeBytes.map { Int64($0) }
+            ),
+            markers: [
+                FilmtoneHighlightMarker(
+                    id: "filmtone-marker-test",
+                    sourceTimeSec: 2.5,
+                    sourceFps: request.sourceProbe?.frameRate,
+                    createdOnPlatform: "ios",
+                    createdAtIso: "2026-05-05T00:00:00.000Z"
+                )
+            ]
+        )
+        let inputs = SidecarBuildInputs(
+            request: request,
+            sourceProbe: request.sourceProbe,
+            hdrPolicy: request.sourceProbe?.sourceVideoMetadata?.hdrPreparationPolicy,
+            degradedDecodePath: false,
+            outputURL: URL(fileURLWithPath: "/tmp/phase0-export.mp4"),
+            outputSize: CGSize(width: 1920, height: 1080),
+            fileSizeBytes: 12_345_678,
+            elapsedMs: 4_200,
+            realtimeRatio: 0.35,
+            audioPreserved: true,
+            identity: SidecarDeviceIdentity(
+                appVersion: "1.4.0",
+                buildNumber: "99",
+                deviceModel: "iPhone17,1",
+                iosVersion: "26.2",
+                exportedAtIso: "2026-05-05T00:00:00.000Z"
+            ),
+            renderMode: "quality",
+            mezzanineUsedVariant: nil,
+            mezzanineProfileVersion: nil,
+            colorPipeline: FilmtoneColorPipeline.defaultOutputContract(
+                sourceMetadata: request.sourceProbe?.sourceVideoMetadata?.color,
+                sourceColorClass: request.sourceProbe?.sourceVideoMetadata?.colorClass
+            ),
+            package: nil,
+            depth: nil,
+            appliedSavedLook: nil,
+            cameraProfile: nil,
+            highlightMarkers: markers
+        )
+
+        let data = try FilmtoneExportSidecarBuilder.build(inputs)
+        let parsed = try decoder.decode(HighlightMarkerProbeSidecar.self, from: data)
+        try expect(
+            parsed.highlightMarkers?.schema == FilmtoneHighlightMarkers.schemaID,
+            "highlightMarkers.schema mismatch"
+        )
+        try expect(
+            parsed.highlightMarkers?.markers.first?.id == "filmtone-marker-test",
+            "highlight marker id missing"
+        )
+        try expect(
+            parsed.highlightMarkers?.markers.first?.createdOnPlatform == "ios",
+            "highlight marker platform missing"
+        )
+        try expect(
+            parsed.highlightMarkers?.markers.first?.sourceFrame != nil,
+            "highlight marker should carry sourceFrame when fps is present"
         )
     }
 
@@ -1072,6 +1244,10 @@ private struct ParsedSavedLookRef: Decodable {
 // cameraProfile assertions.
 private struct CameraProfileProbeSidecar: Decodable {
     let cameraProfile: ParsedCameraProfile?
+}
+
+private struct HighlightMarkerProbeSidecar: Decodable {
+    let highlightMarkers: FilmtoneHighlightMarkers?
 }
 
 private struct ParsedCameraProfile: Decodable {

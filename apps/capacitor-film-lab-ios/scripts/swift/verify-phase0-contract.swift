@@ -1,4 +1,5 @@
 import Foundation
+import FilmLabSwiftCore
 
 struct ContractCheckError: LocalizedError {
     let message: String

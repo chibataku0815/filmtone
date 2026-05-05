@@ -6,7 +6,7 @@
 # modifiers + explicit memberwise inits that need module resolution, not
 # source concatenation. So we `swift build` the package first, then `swiftc`
 # the remaining Foundation-only Desktop sources with `-I $PKG_BIN_PATH/Modules`
-# and link the 5 SwiftPM-emitted `.swift.o` objects from
+# and link the SwiftPM-emitted `.swift.o` objects from
 # `$PKG_BIN_PATH/FilmLabSwiftCore.build/` directly (SwiftPM does not emit
 # `libFilmLabSwiftCore.a` / `.dylib` for library products by default).
 
@@ -32,6 +32,7 @@ PKG_OBJECTS=(
   "$PKG_OBJ_DIR/FilmtoneQuickState.swift.o"
   "$PKG_OBJ_DIR/FilmtonePhase0Params.swift.o"
   "$PKG_OBJ_DIR/FilmtonePhase0ParamsPatch.swift.o"
+  "$PKG_OBJ_DIR/FilmtoneHighlightMarkers.swift.o"
   "$PKG_OBJ_DIR/Phase0OutputProfileDTO.swift.o"
 )
 

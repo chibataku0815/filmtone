@@ -28,6 +28,10 @@ final class FilmtoneExportSession {
     /// Kept off `Phase0ExportRequestDTO` because it's iOS-side state, not
     /// a value the JS bridge needs to round-trip.
     private let cameraProfileSelection: CameraProfileSelection?
+    /// Source-relative marker intent captured in the editor. The export
+    /// session only writes it into the sidecar; media pixels and Photos save
+    /// remain unchanged.
+    private let highlightMarkers: FilmtoneHighlightMarkers?
     private(set) var didUseMezzanineVariant: ProfileVariant?
     /// v1.4 sidecar telemetry: route validation outcome for the consumed
     /// mezzanine. "valid" when the routed-to URL passed isValidMezzanine right
@@ -179,7 +183,8 @@ final class FilmtoneExportSession {
         cacheStore: CacheStore,
         mezzanineService: MezzanineService? = nil,
         appliedSavedLook: SavedLookEntry? = nil,
-        cameraProfile: CameraProfileSelection? = nil
+        cameraProfile: CameraProfileSelection? = nil,
+        highlightMarkers: FilmtoneHighlightMarkers? = nil
     ) throws {
         self.request = request
         self.sourceURL = sourceURL
@@ -187,6 +192,7 @@ final class FilmtoneExportSession {
         self.mezzanineService = mezzanineService
         self.appliedSavedLook = appliedSavedLook
         self.cameraProfileSelection = cameraProfile
+        self.highlightMarkers = highlightMarkers?.isEmpty == false ? highlightMarkers : nil
         self.disableGlowFamilyForExport = Self.environmentFlagEnabled("FILMTONE_EXPORT_DISABLE_GLOW_FAMILY")
         self.useMetalOpticsForExport = Self.environmentFlagEnabled("FILMTONE_EXPORT_METAL_OPTICS")
         self.outputURL = try cacheStore.temporaryExportURL(pathExtension: request.output.container)
@@ -507,7 +513,8 @@ final class FilmtoneExportSession {
             depth: depthSidecar,
             appliedSavedLook: savedLookRef,
             cameraProfile: cameraProfileBlock,
-            performance: performance
+            performance: performance,
+            highlightMarkers: highlightMarkers
         )
 
         let sidecarURL = FilmtoneExportSidecarBuilder.sidecarURL(for: outputURL)
@@ -1535,7 +1542,19 @@ final class FilmtoneExportSession {
         timeSeconds: Double,
         stageProfilingOutputSize: CGSize? = nil
     ) -> CIImage {
-        let params = request.grade.params
+        // Backlight Veil Phase 1c — when a Backlight Veil family is active,
+        // its 12 spatial keys (bloom / halation / diffusion / lensSoftness /
+        // rgbShift) override the user's optical signature so the scatter
+        // math has the canonical plate inputs. Color-grade params (exposure
+        // / contrast / LUT etc.) stay untouched, so the user's Look color
+        // is preserved and the Veil layers on top as a lens veil.
+        let baseParams = request.grade.params
+        let params: Phase0ParamsDTO
+        if let veilSpatial = currentBacklightVeilProfile()?.spatial {
+            params = applyBacklightVeilSpatialOverrides(baseParams, spatial: veilSpatial)
+        } else {
+            params = baseParams
+        }
         let presetVersion = request.grade.presetVersion
         var current = image
 
@@ -1722,7 +1741,79 @@ final class FilmtoneExportSession {
         return current
     }
 
+    /// Backlight Veil Phase 1c — resolves the currently-selected profile
+    /// (6 optical + 12 spatial keys) from
+    /// `FilmtoneOpticalFilterSelectionStore.shared.currentId`. Returns nil
+    /// when OFF, in which case the legacy composite path runs unchanged.
+    /// In-memory singleton, not persisted.
+    private func currentBacklightVeilProfile()
+        -> FilmtoneOpticalFiltersGenerated.Profile? {
+        guard
+            let filterId = FilmtoneOpticalFilterSelectionStore.shared.currentId,
+            let profile = FilmtoneOpticalFiltersGenerated.backlightVeilProfiles
+                .first(where: { $0.id == filterId })
+        else {
+            return nil
+        }
+        return profile
+    }
+
+    /// Backlight Veil Phase 1c — produces a `Phase0ParamsDTO` whose
+    /// bloom / halation / diffusion plate keys (10 spatial values) are
+    /// replaced by the active Backlight Veil profile's canonical curve.
+    /// Mirrors the Desktop `buildOpticalFilterParamPatch` semantics
+    /// (`packages/film-lab-core/src/optical-filter-profiles.ts:677-689`)
+    /// where the optical filter family overrides the user's optical
+    /// signature so the scatter math has stable plate inputs regardless
+    /// of which Look / preset is active. Color-grade params (exposure /
+    /// contrast / saturation / LUT etc.) remain untouched — Look's color
+    /// stays, lens behavior is replaced.
+    private func applyBacklightVeilSpatialOverrides(
+        _ params: Phase0ParamsDTO,
+        spatial s: FilmtoneOpticalFiltersGenerated.SpatialKeys
+    ) -> Phase0ParamsDTO {
+        Phase0ParamsDTO(
+            exposure: params.exposure,
+            contrast: params.contrast,
+            saturation: params.saturation,
+            temperature: params.temperature,
+            tint: params.tint,
+            rgbShift: s.rgbShift,
+            lensSoftness: s.lensSoftness,
+            grainRadialMix: params.grainRadialMix,
+            grainSize: params.grainSize,
+            bloomThreshold: s.bloomThreshold,
+            bloomStrength: s.bloomStrength,
+            bloomRadius: s.bloomRadius,
+            diffusion: s.diffusion,
+            halationIntensity: s.halationIntensity,
+            halationSpread: params.halationSpread,
+            halationHue: s.halationHue,
+            halationThreshold: s.halationThreshold,
+            halationRadius: s.halationRadius,
+            bloomSoftKnee: s.bloomSoftKnee,
+            halationSoftKnee: s.halationSoftKnee,
+            compressionAmount: params.compressionAmount,
+            compressionRange: params.compressionRange,
+            printContrast: params.printContrast,
+            cyan: params.cyan,
+            magenta: params.magenta,
+            yellow: params.yellow,
+            shutterAngle: params.shutterAngle,
+            trailIntensity: params.trailIntensity,
+            fade: params.fade,
+            shadowTone: params.shadowTone,
+            highlightTone: params.highlightTone,
+            shadowHue: params.shadowHue,
+            highlightHue: params.highlightHue,
+            vignette: params.vignette,
+            grainIntensity: params.grainIntensity
+        )
+    }
+
     private func applyGlowFamilyStage(to image: CIImage, params: Phase0ParamsDTO) -> CIImage {
+        let backlightVeilOptical = currentBacklightVeilProfile()?.optical
+
         // v1.5 Metal optics prototype gate. Quality video exports without
         // depth payload may route the entire glow family chain to the custom
         // MTLComputePipeline path. The renderer falls back internally on any
@@ -1735,6 +1826,17 @@ final class FilmtoneExportSession {
            loadedDepthMap == nil,
            let renderer = metalOpticsRenderer
         {
+            let opticalScatterParams: FilmtoneMetalOpticsRenderer.OpticalScatterParams? =
+                backlightVeilOptical.map { keys in
+                    FilmtoneMetalOpticsRenderer.OpticalScatterParams(
+                        directTransmission: keys.directTransmission,
+                        blackRetention: keys.blackRetention,
+                        scatterStrength: keys.scatterStrength,
+                        highlightReactivity: keys.highlightReactivity,
+                        warmScatter: keys.warmScatter,
+                        spectralTail: keys.spectralTail
+                    )
+                }
             let glowParams = FilmtoneMetalOpticsRenderer.GlowFrameParams(
                 bloomStrength: params.bloomStrength,
                 bloomThreshold: params.bloomThreshold,
@@ -1753,7 +1855,8 @@ final class FilmtoneExportSession {
                 diffusion: params.diffusion,
                 diffusionMipLevels: Self.diffusionMipLevels,
                 diffusionCompositeBase: Self.diffusionCompositeBase,
-                glowBaseScale: Self.glowBaseScale
+                glowBaseScale: Self.glowBaseScale,
+                opticalScatter: opticalScatterParams
             )
             // Phase 2 段階 1: fold the vignette stage into the same Metal
             // pass when the params justify it. Vignette is only chained when
@@ -1916,6 +2019,31 @@ final class FilmtoneExportSession {
             params.diffusion > 0.0001
         else {
             return image
+        }
+
+        if let backlightVeilOptical {
+            // Backlight Veil Phase 1c CI fallback — verbatim WGSL §4.4 port.
+            // 9 args (3 spatial floats + 6 optical floats); diffusionBase
+            // drops out because the new kernel multiplies diffused by the
+            // hardcoded 0.24 from WGSL.
+            guard let kernel = OpticalKernels.glowCompositeBacklightVeil else {
+                return image
+            }
+            return kernel.apply(extent: extent, arguments: [
+                image,
+                bloomImage,
+                halationImage,
+                diffusionImage,
+                params.bloomStrength,
+                params.halationIntensity,
+                params.diffusion,
+                backlightVeilOptical.directTransmission,
+                backlightVeilOptical.blackRetention,
+                backlightVeilOptical.scatterStrength,
+                backlightVeilOptical.highlightReactivity,
+                backlightVeilOptical.warmScatter,
+                backlightVeilOptical.spectralTail,
+            ]) ?? image
         }
 
         guard let kernel = OpticalKernels.glowComposite else {
@@ -4260,6 +4388,46 @@ kernel vec4 glowComposite(__sample base, __sample bloom, __sample halation, __sa
     }
 
     return vec4(clamp(result, 0.0, 1.0), base.a);
+}
+""")
+
+    /// Backlight Veil composite — verbatim CI port of the WGSL direct +
+    /// scatter branch at
+    /// `packages/film-lab-renderer/src/webgpu/shaders/composite.frag.wgsl.ts:288-316`.
+    /// Used only when the optical filter family selects Backlight Veil; the
+    /// legacy `glowComposite` kernel above remains the path for every other
+    /// look so existing exports are byte-equivalent. Output is intentionally
+    /// unclamped to mirror WGSL — downstream stages (vignette / final 8-bit
+    /// conversion) handle headroom.
+    static let glowCompositeBacklightVeil = CIColorKernel(source: """
+vec3 glowShoulder(vec3 energy) {
+    return 1.0 - exp(-max(energy, vec3(0.0)));
+}
+
+kernel vec4 glowCompositeBacklightVeil(__sample base, __sample bloom, __sample halation, __sample diffusionImage, float bloomStrength, float halationIntensity, float diffusionAmount, float directTransmission, float blackRetention, float scatterStrength, float highlightReactivity, float warmScatter, float spectralTail) {
+    vec3 luma709 = vec3(0.2126, 0.7152, 0.0722);
+    vec3 baseRgb = base.rgb;
+    vec3 bloomRgb = bloom.rgb * bloomStrength;
+    vec3 halationRgb = halation.rgb * halationIntensity;
+    vec3 diffusedRgb = diffusionImage.rgb;
+
+    float baseLuma = dot(baseRgb, luma709);
+    float shadowHold = 1.0 - smoothstep(0.02, 0.34, baseLuma);
+    float directLoss = (1.0 - directTransmission) * scatterStrength * (1.0 - shadowHold * blackRetention * 0.75);
+    vec3 direct = baseRgb * (1.0 - directLoss);
+
+    float highlightMask = smoothstep(0.42, 1.28, dot(max(baseRgb, vec3(0.0)), luma709));
+    float highlightDrive = mix(1.0, 1.0 + highlightMask * 1.65, highlightReactivity);
+    float blackProtect = mix(1.0, smoothstep(0.04, 0.48, baseLuma), blackRetention);
+    vec3 warmBias = vec3(
+        1.0 + warmScatter * 0.18 + spectralTail * 0.12,
+        1.0 + warmScatter * 0.05,
+        1.0 - warmScatter * 0.10 - spectralTail * 0.08
+    );
+    vec3 scatterEnergy = bloomRgb * 0.82 + halationRgb * 1.08 + diffusedRgb * diffusionAmount * 0.24;
+    vec3 scatter = glowShoulder(scatterEnergy * warmBias * scatterStrength * highlightDrive * blackProtect);
+
+    return vec4(direct + scatter, base.a);
 }
 """)
 

@@ -3,10 +3,11 @@ set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
 APP_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+REPO_ROOT=$(CDPATH= cd -- "$APP_DIR/../.." && pwd)
 FIXTURE_DIR="$SCRIPT_DIR/fixtures/phase0-contract"
 SWIFT_SUPPORT="$SCRIPT_DIR/swift/phase0-contract-support.swift"
 SWIFT_CHECK="$SCRIPT_DIR/swift/verify-phase0-contract.swift"
-PHASE0_GENERATED="$APP_DIR/ios/App/App/FilmtonePhase0Generated.swift"
+SWIFT_CORE_DIR="$REPO_ROOT/packages/film-lab-swift-core/Sources/FilmLabSwiftCore"
 PHASE0_MATH="$APP_DIR/ios/App/App/FilmtonePhase0Math.swift"
 MOTION_MATH="$APP_DIR/ios/App/App/FilmtoneMotionBlurMath.swift"
 # v1.3 Camera Profiles Phase A — `FilmtoneProjectState.cameraProfile` references
@@ -23,24 +24,55 @@ SDK_VERSION=$(xcrun --sdk iphonesimulator --show-sdk-version)
 SDK_MAJOR=${SDK_VERSION%%.*}
 SIMULATOR_TARGET="arm64-apple-ios${SDK_MAJOR}.0-simulator"
 HOST_BINARY=$(mktemp "${TMPDIR:-/tmp}/phase0-contract-check.XXXXXX")
+HOST_CORE_MODULE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/filmtone-swift-core-host.XXXXXX")
+IOS_CORE_MODULE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/filmtone-swift-core-ios.XXXXXX")
+HOST_CORE_LIB="$HOST_CORE_MODULE_DIR/libFilmLabSwiftCore.a"
 CLEANUP_FILES="$HOST_BINARY"
-trap 'rm -f $CLEANUP_FILES' EXIT
+trap 'rm -f $CLEANUP_FILES; rm -rf "$HOST_CORE_MODULE_DIR" "$IOS_CORE_MODULE_DIR"' EXIT
+
+build_swift_core_module() {
+  module_dir="$1"
+  sdk="$2"
+  shift 2
+
+  if [ -n "$sdk" ]; then
+    swiftc_cmd="xcrun --sdk $sdk swiftc"
+  else
+    swiftc_cmd="xcrun swiftc"
+  fi
+
+  $swiftc_cmd \
+    -parse-as-library \
+    -emit-module \
+    -emit-library \
+    -static \
+    -module-name FilmLabSwiftCore \
+    -emit-module-path "$module_dir/FilmLabSwiftCore.swiftmodule" \
+    "$@" \
+    -o "$module_dir/libFilmLabSwiftCore.a" \
+    "$SWIFT_CORE_DIR"/*.swift \
+    "$SWIFT_CORE_DIR"/Generated/*.swift
+}
+
+build_swift_core_module "$IOS_CORE_MODULE_DIR" iphonesimulator -target "$SIMULATOR_TARGET"
+build_swift_core_module "$HOST_CORE_MODULE_DIR" ""
 
 xcrun --sdk iphonesimulator swiftc \
   -target "$SIMULATOR_TARGET" \
+  -I "$IOS_CORE_MODULE_DIR" \
   -typecheck \
   "$SWIFT_SUPPORT" \
   "$SOURCE_PROFILE_SCHEMA" \
-  "$PHASE0_GENERATED" \
   "$PHASE0_MATH" \
   "$MOTION_MATH" \
   "$SWIFT_CHECK"
 
 xcrun swiftc \
+  -I "$HOST_CORE_MODULE_DIR" \
+  "$HOST_CORE_LIB" \
   -o "$HOST_BINARY" \
   "$SWIFT_SUPPORT" \
   "$SOURCE_PROFILE_SCHEMA" \
-  "$PHASE0_GENERATED" \
   "$PHASE0_MATH" \
   "$MOTION_MATH" \
   "$SWIFT_CHECK"
@@ -96,6 +128,8 @@ if [ -f "$CLASSIFIER_SCRIPT" ]; then
   CLEANUP_FILES="$CLEANUP_FILES $CLASSIFIER_BIN"
   xcrun swiftc \
     -o "$CLASSIFIER_BIN" \
+    -I "$HOST_CORE_MODULE_DIR" \
+    "$HOST_CORE_LIB" \
     "$SWIFT_SUPPORT" \
     "$APP_DIR/ios/App/App/SourceColorMetadataNormalizer.swift" \
     "$APP_DIR/ios/App/App/SourceColorClassifier.swift" \
@@ -114,6 +148,8 @@ if [ -f "$RAYANGLE_SCRIPT" ] && [ -f "$RAYANGLE_SRC" ]; then
   CLEANUP_FILES="$CLEANUP_FILES $RAYANGLE_BIN"
   xcrun swiftc \
     -o "$RAYANGLE_BIN" \
+    -I "$HOST_CORE_MODULE_DIR" \
+    "$HOST_CORE_LIB" \
     "$SWIFT_SUPPORT" \
     "$RAYANGLE_SRC" \
     "$RAYANGLE_SCRIPT"
@@ -152,6 +188,8 @@ if [ -f "$SIDECAR_SCRIPT" ] && [ -f "$SIDECAR_SRC" ]; then
   # sidecar test compile must pull the schema in too.
   xcrun swiftc \
     -o "$SIDECAR_BIN" \
+    -I "$HOST_CORE_MODULE_DIR" \
+    "$HOST_CORE_LIB" \
     "$SWIFT_SUPPORT" \
     "$SOURCE_PROFILE_SCHEMA" \
     "$APP_DIR/ios/App/App/FilmtoneColorPipeline.swift" \
