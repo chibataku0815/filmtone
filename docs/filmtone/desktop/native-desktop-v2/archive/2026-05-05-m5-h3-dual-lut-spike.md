@@ -33,7 +33,7 @@ Desktop は対照的に:
 | Creative LUT binding | `CreativeLutBinding` enum @ `FilmtoneDesktop/Color/FilmtoneSavedLookSchema.swift:121` | 各 case (`.libraryRef` / `.embedded` / `.bundled`) に `intensity: Double` あり |
 | EditorState | `FilmtoneDesktop/State/EditorState.swift:9` (sourceProfileSelection L35, lookSlug L17, presetStrength L13) | source/creative の binding は持つが intensity 配線済みなのは `presetStrength` のみ |
 | SaveLookPayload | `FilmtoneDesktop/State/SaveLookPayload.swift:14` (M5-G.1 で lift) | `creativeLut: CreativeLutBinding?` 1 つ |
-| Sidecar writer | `FilmtoneDesktop/Color/FilmtoneSidecarWriter.swift:51` | `sidecarPayload()` は creativeLut 単一 block emit |
+| Sidecar writer | `FilmtoneDesktop/Export/FilmtoneSidecarWriter.swift:51` | `sidecarPayload()` は creativeLut 単一 block emit |
 | Pipeline 順 | `FilmtoneDesktop/Color/FilmtoneGradePipeline.swift:17` (順序 comment), `:42` apply, `:85` `applyCreativeLutStage` | sourceInput → baseGrade → … → grain → creativeLut → printStage。**creativeLut intensity = 1.0 pinned (bug)** |
 | Schema version | `SavedLookEntry.schemaVersion = 2` @ `FilmtoneSavedLookSchema.swift:30-62` | decode は `decodeIfPresent` で optional 互換 |
 
@@ -49,20 +49,37 @@ Desktop は対照的に:
 
 ## 2. 推奨アーキテクチャ
 
-### 2.1 命名・スキーマは iOS に揃える(Source Profile は残す)
+### 2.1 input LUT は project state surface のみ。Saved Look library には載せない
 
+- **input LUT は source-dependent normalization** として扱う(iOS / Desktop
+  canonical 共通の意味論)。「このカメラ素材を normalize するための LUT」
+  であって「creative grade preset」ではない。
+- したがって **inputLut が乗る surface は次の 4 つに限定**:
+  1. `EditorState`(project の現在 input LUT 選択)
+  2. project state(open file ごとに保持される source-side state)
+  3. export request(`FilmtoneStillExportRequest` 等の export 直前 payload)
+  4. sidecar(export 出力に伴う `.filmtone.json` block)
+- **`SavedLookEntry` / `SaveLookPayload` / `LibraryViewModel` 保存 payload
+  には inputLut を載せない**。Saved Look library は creative LUT preset の
+  library であり続ける。`inputLut` を Saved Look に焼くと「camera
+  normalize 設定が creative preset に紛れ込む」semantic 破綻になる。
+- 結果として **`SavedLookEntry.schemaVersion` 2→3 の bump はこの lane では
+  行わない**。Saved Look 側は creativeLut 1 本のままで sidecar 側だけ
+  iOS 互換の dual block にする。
 - **新規 `InputLutBinding`** を `CreativeLutBinding` の構造クローンで導入(case
   3 つ + `intensity: Double`)。Generic 化しない — 焼かない方が
-  diff/grep がしやすく、Codable schema 互換も追いやすい。
+  diff/grep がしやすく、Codable schema 互換も追いやすい。型は project
+  state / export request / sidecar 内でのみ使う。
 - **`CameraProfileSelection` (parametric) は deprecate しない**。Source
   profile は「カメラの色空間 normalize」で意味的に input LUT の
   parametric 版。新 `inputLut` は **任意の override** として coexist:
   - `inputLut == nil` の時は parametric source profile が動く(現状互換)
   - `inputLut != nil` の時は parametric stage を skip し、CIColorCubeWithColorSpace
     を入れる
-- **Sidecar field 名も iOS と同じ `inputLut` / `creativeLut`**。Desktop ↔
+- **Sidecar field 名は iOS と同じ `inputLut` / `creativeLut`**。Desktop ↔
   iOS の round-trip を将来 v1.6 以降で取りに行く時、ここで揃えておく
-  と migration が要らない。
+  と migration が要らない。Saved Look schema は **iOS 側も creativeLut
+  単独** なので bump 不要。
 - `intensity` 配置は iOS 通り **各 LUT binding 内**(slider 2 本)。
 
 ### 2.2 intensity slider の置き場所
@@ -96,48 +113,52 @@ print)。
 
 | # | ファイル | 変更概要 |
 |---|---|---|
-| 1 | `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtoneGradePipeline.swift` | `applyCreativeLutStage` の intensity 配線(bug fix)、`applyInputLutStage` 追加 |
-| 2 | `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtoneSavedLookSchema.swift` | `InputLutBinding` 追加、`SavedLookEntry` に `inputLut: InputLutBinding?` 追加、`schemaVersion: 3` |
-| 3 | `apps/filmtone-desktop-macos/FilmtoneDesktop/State/SaveLookPayload.swift` | `inputLut: InputLutBinding?` 追加 |
-| 4 | `apps/filmtone-desktop-macos/FilmtoneDesktop/State/EditorState.swift` | `inputLutBinding: InputLutBinding?` 追加、`sourceProfileSelection` は維持 |
-| 5 | `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtoneSidecarWriter.swift` | sidecar に `inputLut` block 追加(iOS の `SidecarLutRef` field 名に揃える) |
-| 6 | `apps/filmtone-desktop-macos/FilmtoneDesktop/State/FilmtoneSavedLookStore.swift` | load/save の inputLut path |
-| 7 | `apps/filmtone-desktop-macos/FilmtoneDesktop/UI/...` (LibraryViewModel + Quick/Advanced panel) | Camera LUT picker UI、creativeLut intensity slider、inputLut intensity slider |
-| 8 | `apps/filmtone-desktop-macos/Verify/main.swift` + `run.sh` SOURCES | dual LUT round-trip + intensity blend regression test |
-| 9 | `apps/filmtone-desktop-macos/FilmtoneDesktop/State/ExportCoordinator.swift` (M5-G.1 産物) | sidecar 入力に inputLut binding を渡す配線 |
+| 1 | `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtoneGradePipeline.swift` | `applyCreativeLutStage` の intensity 配線(bug fix)、`applyInputLutStage` 追加(`inputLutBinding != nil` の時 parametric source stage を skip) |
+| 2 | `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtoneSavedLookSchema.swift` | **`InputLutBinding` の宣言のみ**(新型を Color/ に置く)。`SavedLookEntry` は touch しない、`schemaVersion` も 2 のまま |
+| 3 | `apps/filmtone-desktop-macos/FilmtoneDesktop/State/EditorState.swift` | `inputLutBinding: InputLutBinding?` 追加、`sourceProfileSelection` は維持 |
+| 4 | `apps/filmtone-desktop-macos/FilmtoneDesktop/Export/FilmtoneSidecarWriter.swift` | sidecar に `inputLut` block 追加(iOS の `SidecarLutRef` field 名に揃える)。creativeLut block は既存通り |
+| 5 | `apps/filmtone-desktop-macos/FilmtoneDesktop/State/ExportCoordinator.swift` (M5-G.1 産物) | export request 構築時に EditorState から `inputLutBinding` を取って sidecar writer に渡す配線 |
+| 6 | `apps/filmtone-desktop-macos/FilmtoneDesktop/UI/...` (Quick/Advanced panel) | Camera (Input) LUT picker UI + intensity slider、creativeLut intensity slider。**LibraryViewModel の保存 payload には inputLut を含めない**(Saved Look は creative LUT only) |
+| 7 | `apps/filmtone-desktop-macos/Verify/main.swift` + `run.sh` SOURCES | creativeLut intensity blend regression、`inputLutBinding != nil` 時の parametric stage skip invariant、sidecar dual block round-trip |
+
+**touch しない**:
+- `apps/filmtone-desktop-macos/FilmtoneDesktop/State/SaveLookPayload.swift` — Saved Look library payload は creativeLut のみ
+- `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtoneSavedLookStore.swift` — load/save 経路は creativeLut のみ
+- `apps/filmtone-desktop-macos/FilmtoneDesktop/UI/.../LibraryViewModel.*` の保存 payload 構築側
 
 ## 4. Migration / sidecar 互換リスク
 
 | リスク | 影響 | 対処 |
 |---|---|---|
-| 既存 `schemaVersion: 2` sidecar に `inputLut` 無し | read 時 nil 想定 | `decodeIfPresent` で optional → 無害(既に同パターンで `creativeLut` を扱っている) |
-| `creativeLut intensity != 1.0` を持つ既存 SavedLookEntry | 現在は intensity 無視されているので「bug fix で見え方が変わる」 | 既存 entry の SHA + intensity を migration 起動時に scan、intensity != 1.0 がある場合は changelog で behavior change を明記。silent fix にしない |
+| 既存 sidecar(creativeLut のみ)を読む | sidecar reader 側はまだ無いが、将来 round-trip を取る時に旧 sidecar には `inputLut` が無い | `decodeIfPresent` で optional → 無害(既に creativeLut が optional) |
+| `creativeLut intensity != 1.0` を持つ既存 `SavedLookEntry` | 現在は intensity 無視されているので「bug fix で見え方が変わる」 | 既存 entry の SHA + intensity を起動時 / migration 時に scan、intensity != 1.0 がある場合は changelog で behavior change を明記。silent fix にしない |
 | iOS との sidecar field 名互換 | 一致しないと将来の cross-platform sync で再 migration が必要 | iOS と同じ `inputLut` / `creativeLut` + `SidecarLutRef.{size,intensity,sourceHash,bundledSlug,bundledPackId}` を踏襲 |
 | `sourceProfileSelection` (parametric) と `inputLutBinding` の競合 | preview/export で 2 重適用される事故 | `inputLutBinding != nil` の時は parametric source stage を **skip**(片方のみ動く invariant を pipeline test で pin) |
-| bundled LUT catalog の slug 衝突 | LUT1/LUT2 で同 slug が出ると catalog lookup が曖昧 | `BundledLutCatalog` を slot ごとに 2 つ (`InputLutCatalog` / `CreativeLutCatalog`) に分けるか、slug の prefix で disambiguate |
+| bundled LUT catalog の slug 衝突 | input LUT と creative LUT で同 slug が出ると catalog lookup が曖昧 | `BundledLutCatalog` を slot ごとに 2 つ (`InputLutCatalog` / `CreativeLutCatalog`) に分けるか、slug の prefix で disambiguate |
+| `SavedLookEntry.schemaVersion` を不必要に bump しないこと | bump すると iOS 側との Saved Look schema 整合(iOS も creativeLut 単独)が崩れ、Library migration が雪だるま化する | この lane では `schemaVersion: 2` 維持。inputLut は project state / sidecar surface のみ |
 | 用語ロック | CLAUDE.md §6: `Look` は Stone / Urban Creative LUT Pack 文脈専用、`Preset` と `Look` を混同しない | この lane の rename も含め、`Look` は touch しない。新規型は `InputLutBinding` (Look ではなく LUT) |
 
 ## 5. Commit 分割案 (3 commits)
 
 | # | Commit | 含まれる変更 | gate |
 |---|---|---|---|
-| C1 | `fix(macos): wire creative LUT intensity through gradePipeline` | `FilmtoneGradePipeline.applyCreativeLutStage` の intensity 配線、Verify に creativeLut intensity blend test 追加。スキーマは触らない | **v1.4 gate 必須**(latent bug fix) |
-| C2 | `feat(macos): add inputLutBinding schema + payload + state` | `InputLutBinding` 導入、`SavedLookEntry`(schemaVersion 2→3)・`SaveLookPayload`・`EditorState` に inputLut 追加、Codable round-trip & v2→v3 decode 互換 test。pipeline / UI は **触らない**(field を持つだけの thin slice) | v1.5 |
-| C3 | `feat(macos): wire input LUT stage + sidecar block + UI pickers` | `FilmtoneGradePipeline.applyInputLutStage` 追加(parametric stage の skip 含む)、`FilmtoneSidecarWriter` に inputLut block(iOS SidecarLutRef field 名)、Quick/Advanced UI に Camera LUT picker + intensity slider 2 本 | v1.5 |
+| C1 | `fix(macos): wire creative LUT intensity through gradePipeline` | `FilmtoneGradePipeline.applyCreativeLutStage` の intensity 配線、Verify に creativeLut intensity blend test 追加。スキーマは触らない | **v1.4-preferred** thin correctness fix(下記 §6 参照) |
+| C2 | `feat(macos): add InputLutBinding type + EditorState surface` | `InputLutBinding` を `Color/FilmtoneSavedLookSchema.swift` に宣言(型のみ)、`EditorState` に `inputLutBinding: InputLutBinding?` 追加。**SavedLookEntry / SaveLookPayload / SavedLookStore は touch しない**、`schemaVersion` は 2 のまま。pipeline / sidecar / UI も触らない thin slice | v1.5 |
+| C3 | `feat(macos): wire input LUT stage + sidecar block + UI pickers` | `FilmtoneGradePipeline.applyInputLutStage` 追加(parametric source stage の skip 含む)、`Export/FilmtoneSidecarWriter` に inputLut block(iOS `SidecarLutRef` field 名)、`ExportCoordinator` の export request 構築側に EditorState の inputLut 配線、Quick/Advanced UI に Camera LUT picker + intensity slider 2 本(LibraryViewModel 保存 payload には触れない) | v1.5 |
 
-C2 を schema-only の thin slice にすることで、UI と pipeline 変更が
-入る C3 の review surface が schema 変更で膨らまない(M5-G.1 と同じ
-責務分離原則)。
+C2 を「型 + EditorState 1 field」だけの thin slice に絞ることで、
+pipeline / sidecar / UI が入る C3 の review surface が schema や Library
+の話で膨らまない(M5-G.1 と同じ責務分離原則)。
 
 ## 6. v1.4 gate に含めるべきか / v1.5 でよいか
 
 | 案件 | 推奨 | 理由 |
 |---|---|---|
-| **C1 (creative LUT intensity 配線 bug fix)** | **v1.4 gate** | 既存 UI に intensity 概念が露出していなくても、SavedLookEntry は intensity 値を持っている。v1.4 で landing する dual LUT 議論より先に「持っている値が効かない」状態の方を先に閉じる。test surface 小、regression 範囲は creativeLut stage のみ |
-| **C2 + C3 (Dual LUT 本体)** | **v1.5** | 新 schema、新 UI、Source Profile parametric との coexistence — 全て新機能扱い。v1.4 は M5-H smoke defects (chrome layout / adjust library) と notarize 提出が gate なので、新 surface を相乗りさせると test 計画が膨らむ |
+| **C1 (creative LUT intensity 配線 bug fix)** | **v1.4-preferred thin correctness fix。低リスクなら notarize 前に実装推奨** | hard gate(必須)とは扱わない。`SavedLookEntry` は intensity 値を持っているのに pipeline が無視している latent correctness gap で、test surface は creativeLut stage 単独・Verify regression 1〜2 件で囲える。M5-H smoke 完了後、notarize submission の直前に **diff < 30 行** で着地できる場合は入れる。pipeline regression が膨らむなら無理せず v1.5 へ送る |
+| **C2 + C3 (Dual LUT 本体)** | **v1.5** | 新型 + 新 pipeline stage + 新 UI + Source Profile parametric との coexistence — 全て新機能扱い。v1.4 は M5-H smoke defects (chrome layout / adjust library) と notarize 提出が gate なので、新 surface を相乗りさせると test 計画が膨らむ |
 
-ただし C1 を v1.4 gate に入れると **既存 SavedLookEntry の見え方が
-変わる**(intensity != 1.0 を持つ entry がある場合)。changelog 明記必須。
+C1 を v1.4 に入れる場合、**既存 `SavedLookEntry` の見え方が変わる**
+(intensity != 1.0 を持つ entry がある場合)ので changelog 明記必須。
 silent fix にすると `feedback_no_silent_stream_redefine` 違反相当の
 体験変化を user に押し付けることになる。
 
@@ -157,6 +178,9 @@ C1〜C3 を実装する後続 lane では Verify に以下を追加する:
 
 - creativeLut intensity blend regression(0.0 / 0.5 / 1.0 で出力差分が
   monotonic に変化することを pin)
-- SavedLookEntry v2 → v3 decode 互換
 - `inputLutBinding != nil` の時 parametric source stage が skip される
   invariant
+- sidecar dual block round-trip(`inputLut` + `creativeLut` 両方が writer
+  で emit され、iOS `SidecarLutRef` schema と field 名が一致する)
+- `SavedLookEntry` の Codable は **touch しない**(回帰しない確認のため
+  既存 schemaVersion 2 round-trip test を残す)
