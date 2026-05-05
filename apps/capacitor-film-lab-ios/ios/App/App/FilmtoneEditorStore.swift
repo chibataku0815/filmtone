@@ -439,6 +439,7 @@ final class FilmtoneEditorStore: ObservableObject {
     @Published var probe: SourceProbeDTO?
     @Published var preview: FilmtonePreviewState = .empty
     @Published var comparePreviewFrame: FilmtoneComparePreviewFrame?
+    @Published var highlightMarkers: FilmtoneHighlightMarkers?
     @Published var isCompareHeld = false
     @Published var exportProgress: Phase0ExportProgressDTO?
     @Published var exportResult: Phase0ExportResultDTO?
@@ -570,6 +571,10 @@ final class FilmtoneEditorStore: ObservableObject {
 
     var videoPreviewState: FilmtoneVideoPreviewState? {
         preview.videoState
+    }
+
+    var highlightMarkerList: [FilmtoneHighlightMarker] {
+        highlightMarkers?.markers ?? []
     }
 
     var previewError: String? {
@@ -849,6 +854,7 @@ final class FilmtoneEditorStore: ObservableObject {
         toastDismissTask = nil
         toast = nil
         appliedSavedLookId = nil
+        highlightMarkers = nil
         // Library subtree is wiped by AppDelegate on snapshot bootstrap; this
         // mirrors that on the in-memory side so the snapshot fixture starts
         // with an empty Recent / Saved Looks state.
@@ -995,6 +1001,54 @@ final class FilmtoneEditorStore: ObservableObject {
         }
         await videoPreviewSession.setCompareMode(mode)
         syncPreviewFromVideoSession()
+    }
+
+    func addHighlightMarker(at sourceTimeSec: Double) {
+        guard source?.kind == .video,
+              let sourceIdentity = currentMarkerSourceIdentity() else {
+            return
+        }
+        let duration = probe?.durationSec ?? videoPreviewState?.durationSec
+        let clampedTime: Double
+        if let duration, duration.isFinite, duration > 0 {
+            clampedTime = min(max(sourceTimeSec, 0), duration)
+        } else {
+            clampedTime = max(sourceTimeSec, 0)
+        }
+
+        let current = highlightMarkers ?? FilmtoneHighlightMarkers(
+            sourceIdentity: sourceIdentity,
+            markers: []
+        )
+        if current.marker(near: clampedTime) != nil {
+            return
+        }
+
+        let marker = FilmtoneHighlightMarker(
+            id: "filmtone-marker-\(UUID().uuidString)",
+            sourceTimeSec: clampedTime,
+            sourceFps: sourceIdentity.fps,
+            createdOnPlatform: "ios",
+            createdAtIso: ISO8601DateFormatter.filmtoneSidecar.string(from: Date())
+        )
+        highlightMarkers = current.replacingOrAppending(marker)
+        invalidateExportPackageState()
+    }
+
+    func removeHighlightMarker(id: String) {
+        guard let current = highlightMarkers else {
+            return
+        }
+        let remaining = current.markers.filter { $0.id != id }
+        highlightMarkers = remaining.isEmpty
+            ? nil
+            : FilmtoneHighlightMarkers(
+                schema: current.schema,
+                sourceIdentity: current.sourceIdentity,
+                defaults: current.defaults,
+                markers: remaining
+            )
+        invalidateExportPackageState()
     }
 
     func importInputLut() async {
@@ -1462,7 +1516,8 @@ final class FilmtoneEditorStore: ObservableObject {
                 request: request,
                 protectedCacheURIs: cacheProtection,
                 appliedSavedLook: resolvedSavedLook,
-                cameraProfile: cameraProfileSelection
+                cameraProfile: cameraProfileSelection,
+                highlightMarkers: exportHighlightMarkers
             ) { [weak self] progress in
                 self?.exportProgress = progress
             }
@@ -1512,7 +1567,8 @@ final class FilmtoneEditorStore: ObservableObject {
                 request: request,
                 protectedCacheURIs: cacheProtection,
                 appliedSavedLook: resolvedSavedLook,
-                cameraProfile: cameraProfileSelection
+                cameraProfile: cameraProfileSelection,
+                highlightMarkers: exportHighlightMarkers
             ) { [weak self] progress in
                 self?.exportProgress = progress
             }
@@ -1771,6 +1827,7 @@ final class FilmtoneEditorStore: ObservableObject {
         self.exportProgress = nil
         self.exportLocalAvailability = .none
         self.sourceLoadState = nil
+        self.highlightMarkers = nil
         facade.prewarmMezzanines(for: source)
     }
 
@@ -1793,6 +1850,41 @@ final class FilmtoneEditorStore: ObservableObject {
         exportProgress = nil
         exportLocalAvailability = .none
         saveToPhotosState = .notRun
+    }
+
+    private func invalidateExportPackageState() {
+        exportResult = nil
+        exportProgress = nil
+        exportLocalAvailability = .none
+        saveToPhotosState = .notRun
+    }
+
+    private var exportHighlightMarkers: FilmtoneHighlightMarkers? {
+        guard let highlightMarkers, !highlightMarkers.isEmpty else {
+            return nil
+        }
+        return highlightMarkers
+    }
+
+    private func currentMarkerSourceIdentity() -> FilmtoneMarkerSourceIdentity? {
+        guard let source else {
+            return nil
+        }
+        let fps = FilmtoneHighlightMarker.validFPS(
+            probe?.frameRate ?? probe?.sourceVideoMetadata?.timing?.nominalFrameRate
+        )
+        let filename: String = {
+            if let probeFilename = probe?.filename, !probeFilename.isEmpty {
+                return probeFilename
+            }
+            return source.filename
+        }()
+        return FilmtoneMarkerSourceIdentity(
+            filename: filename,
+            durationSec: probe?.durationSec,
+            fps: fps,
+            fileSizeBytes: probe?.fileSizeBytes.map { Int64($0) }
+        )
     }
 
     private func applySourceImportProgress(

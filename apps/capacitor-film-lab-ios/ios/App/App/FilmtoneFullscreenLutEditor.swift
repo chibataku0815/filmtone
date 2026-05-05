@@ -510,6 +510,8 @@ struct FilmtoneFullscreenLutEditor: View {
                 if store.videoPreviewState != nil {
                     videoScrubberPill
                         .padding(.horizontal, 12)
+                    highlightMarkerStrip
+                        .padding(.horizontal, 12)
                         .padding(.bottom, 10)
                 }
 
@@ -782,6 +784,25 @@ struct FilmtoneFullscreenLutEditor: View {
                 .font(.caption.monospacedDigit())
                 .frame(width: 42, alignment: .leading)
 
+            GlassActionButton(
+                isProminent: store.highlightMarkerList.contains {
+                    abs($0.sourceTimeSec - videoController.currentTime) <= FilmtoneHighlightMarker.duplicateToleranceSec
+                },
+                controlSize: .regular
+            ) {
+                HStack(spacing: 5) {
+                    Image(systemName: "bookmark.fill")
+                    if !store.highlightMarkerList.isEmpty {
+                        Text("\(store.highlightMarkerList.count)")
+                            .font(.caption2.monospacedDigit().weight(.semibold))
+                    }
+                }
+            } action: {
+                store.addHighlightMarker(at: videoController.currentTime)
+            }
+            .accessibilityLabel(Text("Add highlight marker"))
+            .accessibilityIdentifier("filmtone.fullscreen.video.marker.add")
+
             Slider(
                 value: bind,
                 in: 0...upper,
@@ -798,6 +819,54 @@ struct FilmtoneFullscreenLutEditor: View {
         .padding(.vertical, 10)
         .liquidGlassSurface(in: Capsule(), interactive: true)
         .accessibilityIdentifier("filmtone.fullscreen.video.scrubber")
+    }
+
+    @ViewBuilder
+    private var highlightMarkerStrip: some View {
+        if !store.highlightMarkerList.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(store.highlightMarkerList, id: \.id) { marker in
+                        HStack(spacing: 4) {
+                            Button {
+                                jumpToHighlightMarker(marker)
+                            } label: {
+                                HStack(spacing: 5) {
+                                    Image(systemName: "bookmark.fill")
+                                    Text(fullscreenFormatTime(marker.sourceTimeSec))
+                                        .font(.caption.monospacedDigit().weight(.semibold))
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(Text("Jump to highlight marker"))
+
+                            Button {
+                                store.removeHighlightMarker(id: marker.id)
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.caption2.weight(.bold))
+                                    .frame(width: 18, height: 18)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(Text("Delete highlight marker"))
+                        }
+                        .padding(.leading, 10)
+                        .padding(.trailing, 6)
+                        .padding(.vertical, 7)
+                        .liquidGlassSurface(in: Capsule(), interactive: true)
+                    }
+                }
+                .padding(.horizontal, 2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityIdentifier("filmtone.fullscreen.video.marker.strip")
+        }
+    }
+
+    private func jumpToHighlightMarker(_ marker: FilmtoneHighlightMarker) {
+        let target = max(0, min(marker.sourceTimeSec, max(videoController.duration, marker.sourceTimeSec)))
+        videoController.currentTime = target
+        videoController.seek(to: target)
     }
 
     // MARK: Bottom dock — chips + sliders, no card-in-card.

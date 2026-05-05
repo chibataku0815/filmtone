@@ -28,10 +28,13 @@ protocol FilmtoneSidecarRequest: Sendable {
     /// M5-C.3a: per-key parameter override patch applied between the
     /// preset/look resolve and the quick-state pass. Default = `.empty`.
     var paramOverrides: FilmtonePhase0ParamsPatch { get }
+    /// Source-relative highlight markers shared with iOS and DaVinci.
+    var highlightMarkers: FilmtoneHighlightMarkers? { get }
 }
 
 extension FilmtoneSidecarRequest {
     var sourceProfileSelection: CameraProfileSelection { .auto }
     var quickState: FilmtoneQuickState { .zero }
     var paramOverrides: FilmtonePhase0ParamsPatch { .empty }
+    var highlightMarkers: FilmtoneHighlightMarkers? { nil }
 }

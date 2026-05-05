@@ -1,0 +1,113 @@
+App-generated highlight marker sidecar written: /tmp/filmtone-highlight-marker-resolve.MM6ytd/C0061.filmtone-ios-export-session-v1.json
+[Filmtone Resolve Smoke] sidecar=app-generated:/tmp/filmtone-highlight-marker-resolve.MM6ytd/C0061.filmtone-ios-export-session-v1.json
+
+DaVinci Resolve Script Interpreter
+Copyright (C) 2005 - 2026 Blackmagic Design Pty. Ltd.
+
+[Filmtone Resolve Smoke] closing-empty-startup-project=Untitled Project
+[Filmtone Resolve Smoke] created-project=Filmtone Highlight Marker Smoke 20260505-191441
+
+DaVinci Resolve Script Interpreter
+Copyright (C) 2005 - 2026 Blackmagic Design Pty. Ltd.
+
+[Filmtone Connect] package: /tmp/filmtone-highlight-marker-resolve.MM6ytd
+[Filmtone Connect] sidecar: /tmp/filmtone-highlight-marker-resolve.MM6ytd/C0061.filmtone-ios-export-session-v1.json
+[Filmtone Connect] layout: filmtone-connect-package-v2
+[Filmtone Connect] source media: /tmp/filmtone-highlight-marker-resolve.MM6ytd/C0061.mov
+[Filmtone Connect] rendered media: /tmp/filmtone-highlight-marker-resolve.MM6ytd/C0061-filmtone.mov
+[Filmtone Connect] lut: /tmp/filmtone-highlight-marker-resolve.MM6ytd/combined-color.cube
+[Filmtone Connect] dctl: /tmp/filmtone-highlight-marker-resolve.MM6ytd/filmtone-bridge.dctl
+[Filmtone Connect] reference: /tmp/filmtone-highlight-marker-resolve.MM6ytd/reference-after.jpg
+[Filmtone Connect] highlight markers: 1
+[Filmtone Connect] highlight marker filmtone-marker-001: frame=1263 range=1203-1353 customData=filmtone-highlight-marker:filmtone-marker-001
+[Filmtone Connect] marker note:
+Filmtone Connect for DaVinci v0
+Package: /tmp/filmtone-highlight-marker-resolve.MM6ytd
+Layout: filmtone-connect-package-v2
+Sidecar: C0061.filmtone-ios-export-session-v1.json
+Preset: cinematic (v2)
+Source media: /tmp/filmtone-highlight-marker-resolve.MM6ytd/C0061.mov
+Rendered iOS media: /tmp/filmtone-highlight-marker-resolve.MM6ytd/C0061-filmtone.mov
+Output: rec709-sdr-mp4 / bt709/bt709/bt709 / 3840x2160 24fps h264.mp4
+LUT: combined-color.cube; preOptical=none; postOptical=none -> node 1; inputLut(size=2, intensity=1); creativeLut(size=2, intensity=0.72)
+DCTL: /tmp/filmtone-highlight-marker-resolve.MM6ytd/filmtone-bridge.dctl
+Bridge coverage: combined-color cube through DCTL; optical/time effects remain explicit visual equivalence blockers until ported.
+Baked effects: bloomStrength=0.1, bloomRadius=0.42, diffusion=0.08, halationIntensity=0.14, halationSpread=18, halationRadius=0.58, grainIntensity=0.12, grainSize=0.32, vignette=0.15, lensSoftness=0.05, rgbShift=0.001
+Highlight markers: 1
+Depth: used=false, source=none, renderer=none, framesWithDepth=n/a
+Mezzanine: used=false, variant=none, profileVersion=none
+Reference: /tmp/filmtone-highlight-marker-resolve.MM6ytd/reference-after.jpg at 42.13s
+Equivalence gate: source media plus Filmtone bridge must match the iOS rendered/reference output; package existence alone is not a claim.
+[Filmtone Connect] requested timeline settings: 3840x2160 24fps
+[Filmtone Connect] imported source media: /tmp/filmtone-highlight-marker-resolve.MM6ytd/C0061.mov
+[Filmtone Connect] timeline item ready
+[Filmtone Connect] applied staged LUT to node 1: Filmtone Connect/filmtone-bridge.dctl (/Library/Application Support/Blackmagic Design/DaVinci Resolve/LUT/Filmtone Connect/filmtone-bridge.dctl)
+[Filmtone Connect] applied Filmtone DCTL bridge; DCTL references package color LUTs
+[Filmtone Connect] added Filmtone marker to timeline item
+[Filmtone Connect] added 1 Filmtone highlight marker(s)
+[Filmtone Connect] created Highlight_Auto timeline with 1 source-relative range(s): Highlight_Auto - C0061 - 1777976093
+[Filmtone Connect] imported reference still into Gallery: /tmp/filmtone-highlight-marker-resolve.MM6ytd/reference-after.jpg
+[Filmtone Connect] done. Verify node 1 LUT, marker note, and reference still visually in Resolve.
+
+DaVinci Resolve Script Interpreter
+Copyright (C) 2005 - 2026 Blackmagic Design Pty. Ltd.
+
+[Filmtone Connect] package: /tmp/filmtone-highlight-marker-resolve.MM6ytd
+[Filmtone Connect] sidecar: /tmp/filmtone-highlight-marker-resolve.MM6ytd/C0061.filmtone-ios-export-session-v1.json
+[Filmtone Connect] layout: filmtone-connect-package-v2
+[Filmtone Connect] source media: /tmp/filmtone-highlight-marker-resolve.MM6ytd/C0061.mov
+[Filmtone Connect] rendered media: /tmp/filmtone-highlight-marker-resolve.MM6ytd/C0061-filmtone.mov
+[Filmtone Connect] lut: /tmp/filmtone-highlight-marker-resolve.MM6ytd/combined-color.cube
+[Filmtone Connect] dctl: /tmp/filmtone-highlight-marker-resolve.MM6ytd/filmtone-bridge.dctl
+[Filmtone Connect] reference: /tmp/filmtone-highlight-marker-resolve.MM6ytd/reference-after.jpg
+[Filmtone Connect] highlight markers: 1
+[Filmtone Connect] highlight marker filmtone-marker-001: frame=1263 range=1203-1353 customData=filmtone-highlight-marker:filmtone-marker-001
+[Filmtone Connect] marker note:
+Filmtone Connect for DaVinci v0
+Package: /tmp/filmtone-highlight-marker-resolve.MM6ytd
+Layout: filmtone-connect-package-v2
+Sidecar: C0061.filmtone-ios-export-session-v1.json
+Preset: cinematic (v2)
+Source media: /tmp/filmtone-highlight-marker-resolve.MM6ytd/C0061.mov
+Rendered iOS media: /tmp/filmtone-highlight-marker-resolve.MM6ytd/C0061-filmtone.mov
+Output: rec709-sdr-mp4 / bt709/bt709/bt709 / 3840x2160 24fps h264.mp4
+LUT: combined-color.cube; preOptical=none; postOptical=none -> node 1; inputLut(size=2, intensity=1); creativeLut(size=2, intensity=0.72)
+DCTL: /tmp/filmtone-highlight-marker-resolve.MM6ytd/filmtone-bridge.dctl
+Bridge coverage: combined-color cube through DCTL; optical/time effects remain explicit visual equivalence blockers until ported.
+Baked effects: bloomStrength=0.1, bloomRadius=0.42, diffusion=0.08, halationIntensity=0.14, halationSpread=18, halationRadius=0.58, grainIntensity=0.12, grainSize=0.32, vignette=0.15, lensSoftness=0.05, rgbShift=0.001
+Highlight markers: 1
+Depth: used=false, source=none, renderer=none, framesWithDepth=n/a
+Mezzanine: used=false, variant=none, profileVersion=none
+Reference: /tmp/filmtone-highlight-marker-resolve.MM6ytd/reference-after.jpg at 42.13s
+Equivalence gate: source media plus Filmtone bridge must match the iOS rendered/reference output; package existence alone is not a claim.
+[Filmtone Connect] requested timeline settings: 3840x2160 24fps
+[Filmtone Connect] imported source media: /tmp/filmtone-highlight-marker-resolve.MM6ytd/C0061.mov
+[Filmtone Connect] timeline item ready
+[Filmtone Connect] applied staged LUT to node 1: Filmtone Connect/filmtone-bridge.dctl (/Library/Application Support/Blackmagic Design/DaVinci Resolve/LUT/Filmtone Connect/filmtone-bridge.dctl)
+[Filmtone Connect] applied Filmtone DCTL bridge; DCTL references package color LUTs
+[Filmtone Connect] added Filmtone marker to timeline item
+[Filmtone Connect] refreshed highlight marker customData=filmtone-highlight-marker:filmtone-marker-001
+[Filmtone Connect] added 1 Filmtone highlight marker(s)
+[Filmtone Connect] refreshed 1 existing Filmtone highlight marker(s)
+[Filmtone Connect] created Highlight_Auto timeline with 1 source-relative range(s): Highlight_Auto - C0061 - 1777976095
+[Filmtone Connect] imported reference still into Gallery: /tmp/filmtone-highlight-marker-resolve.MM6ytd/reference-after.jpg
+[Filmtone Connect] done. Verify node 1 LUT, marker note, and reference still visually in Resolve.
+
+DaVinci Resolve Script Interpreter
+Copyright (C) 2005 - 2026 Blackmagic Design Pty. Ltd.
+
+[Filmtone Resolve Smoke] project=Filmtone Highlight Marker Smoke 20260505-191441
+[Filmtone Resolve Smoke] timelineCount=4
+[Filmtone Resolve Smoke] timeline[1]=Filmtone Connect Source - C0061 - 1777976093 videoItems=1
+[Filmtone Resolve Smoke] timeline[2]=Highlight_Auto - C0061 - 1777976093 videoItems=1
+[Filmtone Resolve Smoke] timeline[3]=Filmtone Connect Source - C0061 - 1777976094 videoItems=1
+[Filmtone Resolve Smoke] highlight marker customData=filmtone-highlight-marker:filmtone-marker-001 name=Highlight color=Blue duration=150
+[Filmtone Resolve Smoke] timeline[4]=Highlight_Auto - C0061 - 1777976095 videoItems=1
+[Filmtone Resolve Smoke] PASS customData uniqueness + Highlight_Auto timeline verified
+[Filmtone Resolve Smoke] package=/tmp/filmtone-highlight-marker-resolve.MM6ytd
+
+DaVinci Resolve Script Interpreter
+Copyright (C) 2005 - 2026 Blackmagic Design Pty. Ltd.
+
+[Filmtone Resolve Smoke] closed-temp-project=true
+[Filmtone Resolve Smoke] deleted-temp-project=true

@@ -607,6 +607,18 @@ private struct VideoScrubBar: View {
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
                 .frame(minWidth: 64, alignment: .leading)
+            Button {
+                state.addHighlightMarker(at: seconds.wrappedValue)
+            } label: {
+                Image(systemName: "bookmark.fill")
+                    .frame(width: 14, height: 14)
+            }
+            .buttonStyle(FilmtoneGlassIconButtonStyle(isActive: !state.highlightMarkerList.isEmpty))
+            .help("Add highlight marker")
+            .filmtonePointingHandCursor()
+            if !state.highlightMarkerList.isEmpty {
+                HighlightMarkerMenu(state: state)
+            }
             sliderArea
             Text(format(duration))
                 .font(.caption.monospacedDigit())
@@ -849,6 +861,51 @@ private struct SliderFrameInBarKey: PreferenceKey {
     static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
         let next = nextValue()
         if next != .zero { value = next }
+    }
+}
+
+/// Compact access to source-relative highlight markers without expanding the
+/// floating scrub bar or disturbing hover thumbnail layout.
+private struct HighlightMarkerMenu: View {
+    @Bindable var state: EditorState
+
+    var body: some View {
+        Menu {
+            ForEach(state.highlightMarkerList, id: \.id) { marker in
+                Button {
+                    state.jumpToHighlightMarker(id: marker.id)
+                } label: {
+                    Label(Self.label(for: marker.sourceTimeSec), systemImage: "arrow.right.circle")
+                }
+
+                Button(role: .destructive) {
+                    state.removeHighlightMarker(id: marker.id)
+                } label: {
+                    Label("Delete \(Self.label(for: marker.sourceTimeSec))", systemImage: "trash")
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "bookmark.fill")
+                Text("\(state.highlightMarkerList.count)")
+                    .font(.caption.monospacedDigit())
+            }
+            .foregroundStyle(.white)
+            .frame(minWidth: 34)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .controlSize(.small)
+        .colorScheme(.dark)
+        .help("Highlight markers")
+    }
+
+    private static func label(for value: Double) -> String {
+        guard value.isFinite, value >= 0 else { return "0:00.00" }
+        let total = value
+        let minutes = Int(total / 60)
+        let secondsRemainder = total - Double(minutes * 60)
+        return String(format: "%d:%05.2f", minutes, secondsRemainder)
     }
 }
 
