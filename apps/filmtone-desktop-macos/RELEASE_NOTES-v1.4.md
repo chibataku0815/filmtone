@@ -54,15 +54,17 @@ review without moving the seek bar.
 
 These are accepted follow-ups for this cutover:
 
-- Native Desktop source profile auto-selection needs deeper iOS parity review.
-- Backlight Veil parity is not in the native app yet.
-- iOS-style advanced recipe chips (`None` / `Default` / `Strong`) need to be
-  more visible in the Desktop editing path.
+- Source profile auto-selection needs broader real-media coverage beyond the
+  verified Apple Log / Apple Log 2 path.
+- Backlight Veil is available, but difficult backlit footage should be watched
+  for iOS/Desktop visual tuning.
+- iOS-style advanced recipe chips (`None` / `Default` / `Strong`) are visible,
+  but longer-session Desktop QA should confirm the model is understandable.
 
 ## Checksum
 
 ```text
-a891ccfdba470cd68e39273130485e92d21a89f4f7879a0650baca57abff3e68  Filmtone-1.4.dmg
+40d2b2fd745c648849d310856e2bcd5d0db0afd948b3842fd83800f68e705cb8  Filmtone-1.4.dmg
 ```
 
 ## Feedback

@@ -1,8 +1,8 @@
 # Cutover Architecture — Native Desktop v2 が Electron Desktop を置換
 
 Date: 2026-05-04 JST
-Status: Decisions locked (推奨パス、auto-mode で本 chat が判断代理)、
-        実装は Phase 6+ で進行、cutover gate は M5-C P0 closure。
+Status: Decisions locked; Native Desktop v1.4 public cutover completed on
+        2026-05-05 after parent branch correction and `origin/main` merge.
 
 > このドキュメントは **persistent reference**。release-cutover lane の
 > active.md singleton (transient) ではない。決定が変わるたびに該当節を
@@ -31,7 +31,7 @@ Source: user 2026-05-04 確認 — "Native Desktop は iOS 版を踏襲したデ
 | **E** | Architecture | universal (x86_64+arm64) | Electron は arm64-only。26.0 で x86_64 はマイノリティだが出力コスト無いため広く対応 |
 | **F** | Asset name | `Filmtone-${version}.dmg` | Electron `filmtone-${version}-arm64.dmg` の arch suffix 削除 (universal なので冗長)。case 統一 (`F` 大文字、product name と整合) |
 | **G** | Distribution channel | 固定 DL URL `https://www.chibatakumi.studio/film-lab/download` を Native v2 build に切替。Vercel Blob upload + `update-meta.json` schema は Electron 既存 flow から port | 既存導線を破壊せず Native v2 に bridge。Phase 7+ で `desktop-film-lab-batch/scripts/upload-dmg-to-vercel-blob.mjs` + `upload-update-meta-to-vercel-blob.mjs` を Native v2 用に adapt |
-| **H** | Cutover gate | Parent branch correction, `main` merge, then product gates closure or explicit user defer for remaining parity gaps | 2026-05-05 user clarified order after the first cutover attempt: correct parent branch, merge `main`, then release |
+| **H** | Cutover gate | Parent branch correction, `main` merge, then clean release run | 2026-05-05 user clarified order after the first cutover attempt: correct parent branch, merge `main`, then release. The clean run completed from code HEAD `4f2e5eba` |
 | **I** | Electron sunset | 1.0.4 = 最終公開、`apps/desktop-film-lab-batch` workspace は cutover 後 archived status | 並走不要 declaration の論理帰結 |
 | **J** | Migration messaging | Native v2 1.4 release notes に「macOS 26+ 必須」「pre-26.0 user は 1.0.4 frozen legacy URL を継続使用」明記 | 既存 user の install 失敗 / 困惑回避 |
 | **K** | TS workspace 取扱 | `film-lab-renderer` / `film-lab-ui` (TS) は portfolio web 側 consume が継続するなら残置、しないなら deprecate | 後続判断、本 lane scope 外 |
@@ -58,10 +58,10 @@ Phase 番号は release-cutover lane 内連番。M5-C は別 lane (M5 chat 担�
 | 5 | end-to-end release run (0.1.0 smoke) | ✓ Done (commit 524bea69) |
 | 6 | Cutover Architecture & Brand Alignment: pbxproj (Bundle ID/ProductName/Version) + scripts (APP_NAME) | ✓ Done (commit b2ba72c8) |
 | **7** | **Distribution scripts port** (Vercel Blob upload + update-meta.json) — Electron flow から adapt、source-of-truth を pbxproj に切替 | **✓ Done** |
-| **8** | Parent branch correction + product gates closure / explicit defer | Pending |
+| **8** | Parent branch correction + product gates closure / explicit defer | **✓ Done** (M5-L parity follow-ups + parent branch normalization + `main` merge) |
 | **8.5** | Replacement readiness pack (read-only preflight, v1.4 release notes draft, public runbook, rollback notes) | **✓ Done (2026-05-05)** |
-| 9 | 1.4 release pipeline run (notarize + DMG + Blob upload + update-meta switch) | Pending after `main` merge |
-| 10 | Electron 1.0.4 deprecation notice + workspace archived status | Pending Phase 9 |
+| 9 | 1.4 release pipeline run (notarize + DMG + Blob upload + update-meta switch) | **✓ Done (2026-05-05)** |
+| 10 | Electron 1.0.4 deprecation notice + workspace archived status | Post-release follow-up |
 
 ## 4. Risk register
 
@@ -72,7 +72,7 @@ Phase 番号は release-cutover lane 内連番。M5-C は別 lane (M5 chat 担�
 | `update-meta.json` schema 不整合で既存 Electron user の update check 壊れる | Phase 7 で Electron schema を verbatim 流用、version field のみ書換え |
 | pre-26.0 user 大量に Electron 起動失敗 | min macOS strict + 1.0.4 frozen legacy URL 提示、release notes 明記 (J) |
 | Vercel Blob URL 切替時の cache 問題 | upload-update-meta script で Cache-Control header 設定、production env vercel sync で SSOT 化 |
-| Product parity gap を残したまま "iOS-aligned Desktop v1.4" として公開してしまう | Clean release 前に Source Auto / Backlight Veil / Advanced recipe chip discoverability を close または明示 defer する |
+| Product parity gap を残したまま "iOS-aligned Desktop v1.4" として公開してしまう | Source Auto / Backlight Veil / Advanced recipe chip discoverability は M5-L で close。残りは population testing と post-release visual tuning として追跡 |
 
 ## 5. Decision Log
 
@@ -110,10 +110,11 @@ Phase 番号は release-cutover lane 内連番。M5-C は別 lane (M5 chat 担�
 - **2026-05-05** Replacement readiness pack: added read-only
   `bun run release:cutover-preflight`, Native Desktop
   `RELEASE_NOTES-v1.4.md`, and
-  `2026-05-05-native-v2-replacement-readiness.md`. Public release remains
-  blocked until product gates close or the user explicitly defers each remaining
-  parity issue. Production upload commands keep `--confirm-prod`; update-meta
-  upload remains the final public switch.
+  `2026-05-05-native-v2-replacement-readiness.md`. At creation time, public
+  release remained blocked until product gates closed or the user explicitly
+  deferred each remaining parity issue; this was later superseded by M5-L and
+  the clean Phase 9 release. Production upload commands keep `--confirm-prod`;
+  update-meta upload remains the final public switch.
 - **2026-05-05** Phase 9 attempt + rollback: notarized + stapled
   `Filmtone.app` and `Filmtone-1.4.dmg`, uploaded DMG to Vercel Blob, synced
   download env, redeployed the existing production Vercel deployment without
@@ -122,6 +123,13 @@ Phase 番号は release-cutover lane 内連番。M5-C は別 lane (M5 chat 担�
   restored update metadata to `latestVersion: "1.0.4"` and the download env to
   the legacy Desktop DMG. Public release truth again reports Desktop latest
   `1.0.4`. Next sequence: parent branch correction, `main` merge, then release.
+- **2026-05-05** Phase 9 clean release: after parent branch correction and
+  `origin/main` merge, Native Desktop v1.4 was rebuilt from code HEAD
+  `4f2e5eba`, signed, notarized, stapled, packaged as
+  `Filmtone-1.4.dmg`, uploaded to Vercel Blob, wired into the fixed Desktop
+  download rail, and published by switching update metadata to
+  `latestVersion: "1.4"`. DMG sha256:
+  `40d2b2fd745c648849d310856e2bcd5d0db0afd948b3842fd83800f68e705cb8`.
 
 ## 6. 関連
 

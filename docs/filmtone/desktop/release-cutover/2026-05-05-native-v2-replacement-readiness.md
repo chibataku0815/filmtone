@@ -4,38 +4,44 @@ Date: 2026-05-05 JST
 Branch: `feature/native-desktop-plan`
 Current HEAD at drafting time: `f0e81e71`
 Post-rollback truth HEAD: `60809f84`
+Final release code HEAD: `4f2e5eba`
 
 ## Purpose
 
-Prepare the safe public cutover from legacy Electron Desktop to Native Desktop
-v2. This is not the public release run. It defines what must be true before the
-fixed Desktop download/update rail is pointed at the native v1.4 artifact.
+Prepare and record the safe public cutover from legacy Electron Desktop to
+Native Desktop v2. The original purpose was pre-release readiness; the final
+section now records the clean 2026-05-05 v1.4 public switch after parent branch
+correction and `origin/main` merge.
 
-## Cutover Attempt / Rollback Update
+## Final Cutover Update
 
-Public cutover was attempted on 2026-05-05, then rolled back after the user
-clarified the desired order: correct the parent branch, merge `main`, then
-release.
+Public cutover completed on 2026-05-05 after the user-directed order was
+honored: correct the parent branch, merge `main`, then release.
 
-- Public update metadata is back to `latestVersion: "1.0.4"`.
+- Public update metadata reports `latestVersion: "1.4"`.
 - Native Desktop DMG:
   `https://ehi6m41cp33jiopb.public.blob.vercel-storage.com/filmtone/desktop/Filmtone-1.4.dmg`
 - DMG sha256:
-  `a891ccfdba470cd68e39273130485e92d21a89f4f7879a0650baca57abff3e68`
+  `40d2b2fd745c648849d310856e2bcd5d0db0afd948b3842fd83800f68e705cb8`
 - The fixed download path still starts at
   `https://www.chibatakumi.studio/film-lab/download` and routes into the
   Filmtone download surface.
-- The public download complete page is back on the legacy Desktop DMG
-  `filmtone-1.0.3-arm64.dmg`.
-- The previously listed product parity gaps remain pre-release risks or
-  explicit-defer candidates for the clean release run.
+- The public download complete page references `Filmtone-1.4.dmg`.
+- Production Vercel deployment:
+  `chibatakumi-portfolio-1bttmm5np-forestones-projects.vercel.app`, aliased to
+  `https://www.chibatakumi.studio`.
+- Release truth script reports public Desktop latest `1.4`.
 
-## Pre-Cutover Truth
+The first public attempt earlier on 2026-05-05 was rolled back when the user
+clarified the desired order. That rollback is preserved in the archive as
+historical evidence; it is superseded by this final clean release.
+
+## Final Truth
 
 Truth scripts run on 2026-05-05:
 
-- Public Desktop latest: `1.0.4` from update metadata.
-- Native Desktop release target: `1.4`.
+- Public Desktop latest: `1.4` from update metadata.
+- Native Desktop release version: `1.4`.
 - Local Native Desktop Bundle ID: `com.chibatakumi.film-lab-desktop`.
 - Local Native Desktop product name: `Filmtone`.
 - iOS public version: `1.4`.
@@ -58,20 +64,17 @@ read from `apps/filmtone-desktop-macos/FilmtoneDesktop.xcodeproj/project.pbxproj
   clients poll it and will show the upgrade prompt once `latestVersion` becomes
   `1.4`.
 
-## Product Gates Before Public Cutover
+## Product Gates For Public Cutover
 
-Do not write production `update-meta.json` until these are true:
+Production `update-meta.json` was written only after these were true:
 
 - Native Desktop visual smoke passes for opening, still preview, video
   playback, sidebar, Look/strength editing, compare, scrub thumbnail hover/drag,
   and export/share.
-- Source profile auto-selection / conversion LUT behavior is either confirmed
-  iOS-equivalent or explicitly deferred by the user.
-- Backlight Veil parity is either implemented or explicitly deferred by the
-  user.
+- Source profile auto-selection / conversion LUT behavior landed in M5-L1.
+- Backlight Veil parity landed in M5-L3.
 - iOS-style advanced recipe chips (`None` / `Default` / `Strong`, Japanese
-  `なし` / `標準` / `強め`) are either visible in the Desktop editing path or
-  explicitly deferred by the user.
+  `なし` / `標準` / `強め`) landed in M5-L2.
 - `bash apps/filmtone-desktop-macos/Verify/run.sh` passes.
 - `bun run verify:macos` passes.
 - `git diff --check` is clean.
@@ -99,7 +102,7 @@ artifact is built. That warning is expected during planning.
 
 ## Public Cutover Run Order
 
-Only after the product gates are closed:
+Completed run order:
 
 ```bash
 export ASC_KEY_ID=TM2BK9269B
@@ -112,7 +115,7 @@ scripts/package-dmg.sh
 bun run release:cutover-preflight
 ```
 
-Then manually inspect the generated artifact:
+Manual inspection checkpoint:
 
 ```bash
 open apps/filmtone-desktop-macos/build/release/1.4/Filmtone-1.4.dmg
@@ -131,8 +134,8 @@ Upload the DMG first:
 bun run release:upload-dmg -- --confirm-prod --sync-vercel-env
 ```
 
-Before switching update metadata, verify the fixed download page resolves to
-the new DMG and still gives users a valid installer.
+Before switching update metadata, the fixed download page was verified to
+resolve to the new DMG and still give users a valid installer.
 
 Switch update metadata last:
 
@@ -146,7 +149,7 @@ Then rerun:
 /Volumes/SamsungPortableSSDX5001/documents/life/scripts/check-filmtone-release-truth.sh /Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-native-desktop-plan
 ```
 
-Expected after cutover:
+Actual after cutover:
 
 - public update metadata `latestVersion` is `1.4`
 - public download page points to the Native Desktop DMG
@@ -169,8 +172,8 @@ page / release notes values. Then redeploy portfolio if env values changed.
 
 ## Non-Goals
 
-- Do not publish before the remaining product gates are closed or explicitly
-  deferred.
+- Do not use readiness prep as permission to publish before product gates close
+  or are explicitly deferred.
 - Do not archive or delete `apps/desktop-film-lab-batch/` in this prep step.
 - Do not change the public download URL shape.
 - Do not add Sparkle or background auto-update for v1.4.
@@ -178,9 +181,9 @@ page / release notes values. Then redeploy portfolio if env values changed.
 
 ## Remaining Release Risks
 
-- The attached iOS parity issues are real product confidence risks until closed
-  or deferred.
+- The iOS parity issues that blocked readiness were closed before the clean
+  release, but broader real-media population testing is still needed.
 - The final update-meta write is public and affects Electron 1.0.4 users on
   their next update check.
-- Portfolio deployment must be verified after env changes; Blob upload alone is
-  not the full public web update.
+- Portfolio production deployment was verified after env changes; source-level
+  portfolio submodule permanence remains a post-release follow-up.

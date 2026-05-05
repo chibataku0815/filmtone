@@ -34,7 +34,7 @@ Completion Log に短く反映する (本 lane の archive 経由で参照)。
 | M6-7 | Cutover Architecture & Brand Alignment (Bundle ID / Product Name / 1.4) | **Done** (Phase 6 + version-policy correction) |
 | M6-8 | Distribution scripts port (Vercel Blob + update-meta.json) | **Done** (Phase 7) |
 | M6-8.5 | Replacement readiness pack (preflight + release notes + public runbook) | **Done** (2026-05-05 readiness doc) |
-| M6-9 | 1.4 公開 release run | Pending after parent branch correction + `main` merge |
+| M6-9 | 1.4 公開 release run | **Done** (clean run after parent branch correction + `main` merge) |
 | polish | App Category 設定 (notarize blocker でない) | **Done** (Phase 2) |
 
 ## Out of scope (本 lane では扱わない)
@@ -114,31 +114,33 @@ bun run release:cutover-preflight
 
 出力:
 
-- `apps/filmtone-desktop-macos/build/release/0.1.0/FilmtoneDesktop.app`
+- `apps/filmtone-desktop-macos/build/release/1.4/Filmtone.app`
   (notarized + stapled)
-- `apps/filmtone-desktop-macos/build/release/0.1.0/FilmtoneDesktop-0.1.0.dmg`
+- `apps/filmtone-desktop-macos/build/release/1.4/Filmtone-1.4.dmg`
   (notarized + stapled、配布可能)
 
 notarize 拒否時は `notarize-rejection.json` が出力される。所要時間は
 notarize submit が数分 (Apple 側 queue 次第)。
 
-## Portfolio submodule bump (release 後の波及)
+## Portfolio source follow-up (release 後の波及)
 
 filmtone main に release commit (or tag) が land した後、portfolio repo の
 `vendor/filmtone` submodule pin を bump して公開窓 (landing / support / privacy /
-release-notes / journal) に新 release を反映する。
+release-notes / journal) に新 release source を反映する。2026-05-05 の公開
+cutover は Vercel production env + remote redeploy で完了済みなので、この手順は
+公開切替そのものではなく、portfolio repo の source permanence 用 follow-up。
 
 ```bash
 cd /Volumes/SamsungPortableSSDX5001/documents/forestone/chibatakumi-portfolio
 git submodule update --remote vendor/filmtone
 git add vendor/filmtone
-git commit -m "chore(filmtone): bump submodule to 0.1.0"
+git commit -m "chore(filmtone): bump submodule to 1.4"
 # (push は user)
 ```
 
-vercel deploy は portfolio の `apps/web` build に依存するので submodule pin
-が古いと公開窓が古いまま。release 完了 = filmtone main land + portfolio bump
-+ portfolio push の 3 つ揃って初めて公開反映。
+今後 public web を source から再デプロイする場合、submodule pin が古いと
+release notes / static source 由来の表示が古くなる。公開 download/update rail
+の current truth は Vercel env と Blob metadata を truth scripts で確認する。
 
 詳細は CLAUDE.md §7 (Submodule update 手順) を参照。
 
@@ -352,12 +354,16 @@ bun run release:upload-update-meta -- --confirm-prod --sync-vercel-env
 1.0.4 clients poll that metadata and will surface the v1.4 upgrade prompt after
 `latestVersion` changes.
 
-## Phase 9 attempt / rollback summary
+## Phase 9 clean release summary
 
-Public replacement cutover was attempted on 2026-05-05, then rolled back when
-the user clarified the desired release order.
+Public replacement cutover completed on 2026-05-05 after the user-directed
+sequence was honored: parent branch correction, `origin/main` merge, then clean
+release.
 
-- `bash apps/filmtone-desktop-macos/Verify/run.sh` passed (`86/86`).
+- Release code HEAD:
+  `4f2e5eba` (`Merge remote-tracking branch 'origin/main' into feature/native-desktop-plan`).
+- `bun run release:cutover-preflight` passed before the public switch.
+- `bash apps/filmtone-desktop-macos/Verify/run.sh` passed (`99/99`).
 - `bun run verify:macos` passed (`** BUILD SUCCEEDED **`).
 - `git diff --check` passed.
 - `scripts/release-macos.sh` produced notarized + stapled
@@ -367,22 +373,24 @@ the user clarified the desired release order.
   `apps/filmtone-desktop-macos/build/release/1.4/Filmtone-1.4.dmg`;
   Gatekeeper accepted it as `Notarized Developer ID`.
 - DMG sha256:
-  `a891ccfdba470cd68e39273130485e92d21a89f4f7879a0650baca57abff3e68`.
+  `40d2b2fd745c648849d310856e2bcd5d0db0afd948b3842fd83800f68e705cb8`.
 - Uploaded DMG to:
   `https://ehi6m41cp33jiopb.public.blob.vercel-storage.com/filmtone/desktop/Filmtone-1.4.dmg`.
 - Synced `FILM_LAB_DESKTOP_DOWNLOAD_URL` and redeployed the current production
   Vercel deployment without using the dirty local portfolio worktree.
+- Production deployment:
+  `chibatakumi-portfolio-1bttmm5np-forestones-projects.vercel.app`, aliased to
+  `https://www.chibatakumi.studio`.
 - Verified the public download complete page references `Filmtone-1.4.dmg`.
 - Uploaded `film-lab/desktop/update-meta.json` with `latestVersion: "1.4"` and
   `downloadPageUrl: "https://www.chibatakumi.studio/film-lab/download"`.
-- Rollback then restored `film-lab/desktop/update-meta.json` to
-  `latestVersion: "1.0.4"`.
-- Rollback restored `FILM_LAB_DESKTOP_DOWNLOAD_URL` to the legacy Desktop DMG
-  and redeployed the current production Vercel deployment.
-- Release truth script now again reports public Desktop latest `1.0.4`.
+- Release truth script reports public Desktop latest `1.4`.
 
-Remaining pre-release product risks / explicit-defer candidates:
+Remaining post-release product risks:
 
-- Source Auto / Conversion LUT parity.
-- Backlight Veil parity.
-- Advanced recipe chip discoverability.
+- Source Auto / Conversion LUT parity has landed, but more real-media
+  population testing is still useful.
+- Backlight Veil has landed, but iOS/Desktop visual parity should be watched on
+  difficult backlit clips.
+- Advanced recipe chips are visible, but longer-session Desktop QA should check
+  whether users understand the iOS-style `None` / `Default` / `Strong` model.

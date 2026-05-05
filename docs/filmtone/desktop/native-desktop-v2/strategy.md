@@ -48,18 +48,19 @@ content layer stays glass-free so color judgment is not compromised.
 | M3 | Native Color And Optics Parity | M2 | In progress | Built-in Looks use iOS-canonical color/optics stages; remaining parity gaps are explicit. |
 | M4 | Shared Contract Consolidation | M3 | In progress | Shared Swift ownership is clear and iOS/macOS consume the same canonical contract where practical. |
 | M5 | Native Editing UI | M3 | Validation / thin fixes | Core editing workflows are usable and visually acceptable in the native UI. |
-| M6 | Release Cutover | M5 | Pre-release after rollback | Regenerated v1.4 native artifact is signed/notarized/stapled and connected to the fixed Desktop release rail. |
+| M6 | Release Cutover | M5 | Released 2026-05-05 | Public update metadata reports Desktop `1.4`, and the fixed Desktop download rail points to the notarized Native DMG. |
 
 ## Current Strategic State
 
 - Branch: `feature/native-desktop-plan`
-- Current integrated HEAD: `f0e81e71` (`Update native desktop v2 plan after M5-K`)
+- Current integrated code HEAD for the public artifact: `4f2e5eba`
+  (`Merge remote-tracking branch 'origin/main' into feature/native-desktop-plan`)
 - Integration base before M5-K1/K2/K3/K4: `0b79861f`
 - No M5-K product `active.md` should remain open. If `active.md` exists during
   DHM / release-cutover interrupts, do not treat it as current M5-K state.
-- Public Desktop latest from truth script: `1.0.4` via update metadata.
+- Public Desktop latest from truth script: `1.4` via update metadata.
 - iOS public and local marketing version from truth script: `1.4`.
-- Native Desktop v2 release target: Desktop v1.4, aligned with iOS.
+- Native Desktop v2 public release: Desktop v1.4, aligned with iOS.
 
 M1 and M2 are closed. M3 and M4 stay open for parity hardening and shared-core
 promotion, but they no longer block M5 UI validation. M5-C P0, M5-G
@@ -131,33 +132,42 @@ archive/2026-05-05-m5-k4-integration.md
 
 ## Release Cutover State
 
-The first v1.4 public replacement cutover attempt on 2026-05-05 was rolled back
-after the user clarified the desired sequence: first make the parent branch
-correct, then merge `main`, then release.
+Native Desktop v2 replaced the public Desktop release rail on 2026-05-05 after
+the parent branch was corrected, `origin/main` was merged, and the clean v1.4
+release run completed from code HEAD `4f2e5eba`.
 
-Current public state after rollback:
+Current public state:
 
-- update metadata reports `latestVersion: "1.0.4"`
-- the public download complete page is back on the legacy Desktop DMG
-  `filmtone-1.0.3-arm64.dmg`
-- the Native `Filmtone-1.4.dmg` artifact exists in Vercel Blob, but it is not
-  the active public update target
+- update metadata reports `latestVersion: "1.4"`
+- fixed download page:
+  `https://www.chibatakumi.studio/film-lab/download`
+- active DMG:
+  `https://ehi6m41cp33jiopb.public.blob.vercel-storage.com/filmtone/desktop/Filmtone-1.4.dmg`
+- DMG sha256:
+  `40d2b2fd745c648849d310856e2bcd5d0db0afd948b3842fd83800f68e705cb8`
+- production Vercel deployment:
+  `chibatakumi-portfolio-1bttmm5np-forestones-projects.vercel.app`
 
-Pre-cutover gates from the first attempt that passed and remain useful evidence:
+Release gates passed:
 
-- `bash apps/filmtone-desktop-macos/Verify/run.sh` passes.
-- `bun run verify:macos` passes.
-- User visual smoke passes on opening, still preview, video playback, sidebar,
-  Look/strength editing, compare, scrub thumbnail hover/drag stability, and
-  export/share.
-- Release-cutover docs/scripts are reconciled with the v1.4 identity and fixed
-  download/update rail.
+- `bun run release:cutover-preflight`
+- `bash apps/filmtone-desktop-macos/Verify/run.sh` (`99/99`)
+- `bun run verify:macos`
+- `git diff --check`
+- `scripts/release-macos.sh`
+- `scripts/package-dmg.sh`
+- public DMG HEAD check
+- public update-meta check
+- release truth script
 
-Remaining product follow-ups before the clean release run:
+Remaining post-release product risks:
 
-- Source Auto / Conversion LUT parity.
-- Backlight Veil parity.
-- Advanced recipe chip discoverability.
+- Broader real-media Source Auto / Conversion LUT coverage still needs more
+  population testing beyond the accepted Apple Log / Apple Log 2 parity path.
+- Backlight Veil is implemented in the Native app, but visual tuning should be
+  watched against iOS on difficult backlit footage.
+- Advanced recipe chips are visible, but the full iOS editing mental model still
+  needs longer-session product QA on Desktop.
 
 Release-cutover details live in:
 
@@ -226,8 +236,8 @@ passed on 2026-05-05.
 2026-05-05: Replacement cutover readiness prep added a read-only
 `release:cutover-preflight`, Native Desktop `RELEASE_NOTES-v1.4.md`, and a
 public runbook / rollback checklist under `docs/filmtone/desktop/release-cutover/`.
-Public update-meta remains on Desktop `1.0.4`; Phase 9 release run stays blocked
-until the remaining product parity gates are closed or explicitly deferred.
+At creation time, public update-meta remained on Desktop `1.0.4`; this was later
+superseded by the M5-L parity follow-ups and M6 clean public release.
 
 2026-05-05: Phase 9 replacement cutover was attempted, then rolled back after
 the user clarified the desired order: parent branch correction, `main` merge,
@@ -280,6 +290,12 @@ supported values through preview/export, and emits sidecar profile identity.
 Verification was green (`Verify/run.sh` 97/97, `bun run verify:macos`,
 `git diff --check`); Debug app launched.
 
+2026-05-05: M6 clean public release completed after parent-branch correction and
+`origin/main` merge. Native Desktop v1.4 is now the active public Desktop rail;
+update metadata reports `latestVersion: "1.4"`, and the fixed download page
+points at the notarized/stapled `Filmtone-1.4.dmg` built from code HEAD
+`4f2e5eba`.
+
 ## Constraints
 
 - macOS target is macOS 26 only.
@@ -304,8 +320,6 @@ Verification was green (`Verify/run.sh` 97/97, `bun run verify:macos`,
   Dual LUT surface to v1.5?
 - Does baseline-C need formal population now, or only when release QA asks for
   broader parity proof?
-- What exact release metadata should ship with the regenerated v1.4 notarized
-  DMG?
 - What source identity / relink fields should the sidecar carry for SSD movement
   between Mac and iPhone?
 - What source relink/content identity should v2 add beyond filename/duration/fps
