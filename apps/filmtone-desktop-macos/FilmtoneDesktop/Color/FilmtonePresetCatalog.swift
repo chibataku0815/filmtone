@@ -107,11 +107,26 @@ enum FilmtonePresetCatalog {
     /// panel, and made the iOS-canonical recipe stamps (`max(base.X, …)`)
     /// land at `recipe + Quick*weight` instead of the iOS-rendered
     /// `recipe`. The order swap brings byte parity back.
+    ///
+    /// M5-M follow-up (Look × Veil energy max-merge): when both a Look and
+    /// a Backlight Veil profile are engaged, Veil's `paramPatch` is layered
+    /// AFTER `applyQuickState` and BEFORE `userOverrides`, with split
+    /// semantics — energy keys (`FilmtoneOpticalFilterCatalog.energyScaledKeys`)
+    /// max-merge against the post-Quick base so Veil never *reduces* the
+    /// Look's existing optical character (Veil profile values were authored
+    /// against a reset baseline, so an absolute overwrite would knock down
+    /// `lensSoftness` 0.095→0.08 and `rgbShift` 0.0032→0.0007 under Stone).
+    /// Structural keys (thresholds / radii / hue / soft-knee) keep absolute
+    /// overwrite so Veil's spatial shape still wins. User-facing
+    /// `paramOverrides` (advanced panel edits) always land last as an
+    /// absolute set — they win over both Look and Veil.
     static func resolved(
         presetName: String,
         strength: Double,
         lookSlug: String?,
         quickState: FilmtoneQuickState = .zero,
+        opticalFilterProfileId: String? = nil,
+        opticalFilterIntensity: Double = 1.0,
         paramOverrides: FilmtonePhase0ParamsPatch = .empty
     ) -> FilmtonePhase0Params {
         let base: FilmtonePhase0Params
@@ -125,14 +140,54 @@ enum FilmtonePresetCatalog {
         }
 
         let withQuick = applyQuickState(to: base, quickState: quickState)
-        // Drop overrides that already match the post-Quick base so a
+        let withVeil = applyVeilPatch(
+            to: withQuick,
+            profileId: opticalFilterProfileId,
+            intensity: opticalFilterIntensity
+        )
+        // Drop overrides that already match the post-Veil base so a
         // saved Look that round-trips through Adjust without changing
         // anything does not pin redundant values into `paramOverrides`.
-        // Mirrors iOS `paramOverrides.normalized(over: base+Quick)`.
-        let normalized = paramOverrides.normalized(over: withQuick)
+        // Mirrors iOS `paramOverrides.normalized(over: base+Quick)`; the
+        // normalization base also includes the Veil layer so a
+        // Veil-supplied value isn't redundantly pinned by an unmodified
+        // paramOverrides patch when it round-trips through save/load.
+        let normalized = paramOverrides.normalized(over: withVeil)
         return normalized.isEmpty
-            ? withQuick
-            : withQuick.applyingPatch(normalized)
+            ? withVeil
+            : withVeil.applyingPatch(normalized)
+    }
+
+    /// Layer the Backlight Veil profile patch on top of a base set of
+    /// resolved params (post-Quick). Energy keys max-merge against the
+    /// base — `max(base[key], veil[key] * intensity)` — so a Look that
+    /// already raised them above the Veil's authored value is preserved.
+    /// Structural keys (`!energyScaledKeys`) keep absolute overwrite so
+    /// the Veil's spatial shape (thresholds / radii / hue / softKnee)
+    /// still defines how the bloom / halation / scatter resolves.
+    /// Returns `base` unchanged when intensity ≤ 0 or the profile is nil.
+    private static func applyVeilPatch(
+        to base: FilmtonePhase0Params,
+        profileId: String?,
+        intensity: Double
+    ) -> FilmtonePhase0Params {
+        let clamped = clampStrength(intensity)
+        guard clamped > 0,
+              let profile = FilmtoneOpticalFilterCatalog.profile(for: profileId) else {
+            return base
+        }
+        var next = base
+        for (key, veilValue) in profile.paramPatch.values {
+            if FilmtoneOpticalFilterCatalog.energyScaledKeys.contains(key) {
+                let scaled = veilValue * clamped
+                if scaled > next.value(for: key) {
+                    next.setValue(scaled, for: key)
+                }
+            } else {
+                next.setValue(veilValue, for: key)
+            }
+        }
+        return next
     }
 
     /// M5-C.3a — verbatim port of iOS `FilmtonePhase0Math.applyQuickState`.

@@ -14,6 +14,31 @@ export interface PickedLutFile {
   uri?: string;
 }
 
+export interface CacheBucketInventory {
+  bytes: number;
+  count: number;
+}
+
+export interface CacheInventory {
+  totalBytes: number;
+  sources: CacheBucketInventory;
+  mezzanine: CacheBucketInventory;
+  exports: CacheBucketInventory;
+  previews: CacheBucketInventory;
+  luts: CacheBucketInventory;
+}
+
+export interface CacheReleaseResult {
+  removedCount: number;
+  removedBytes: number;
+  retainedBytes: number;
+}
+
+export interface CachePrunedNotice {
+  removedBytes: number;
+  trigger: "lowDisk";
+}
+
 export interface FilmtoneMediaPlugin {
   pickSource(): Promise<SourceInfo | null>;
   pickLutFile(options?: { slot?: "inputLut" | "creativeLut" }): Promise<PickedLutFile | null>;
@@ -27,9 +52,15 @@ export interface FilmtoneMediaPlugin {
     packageFileUris?: string[];
   }): Promise<void>;
   cancelExport(): Promise<void>;
+  cacheInventory(): Promise<CacheInventory>;
+  releaseCache(options?: { protectedURIs?: string[] }): Promise<CacheReleaseResult>;
   addListener(
     eventName: "exportProgress",
     listenerFunc: (progress: Phase0ExportProgress) => void,
+  ): Promise<PluginListenerHandle>;
+  addListener(
+    eventName: "cachePrunedNotice",
+    listenerFunc: (notice: CachePrunedNotice) => void,
   ): Promise<PluginListenerHandle>;
 }
 

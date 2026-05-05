@@ -58,6 +58,22 @@ final class FilmtoneMediaRuntime {
         throw invalidFileURLError(uri)
     }
 
+    func cacheInventorySnapshot() throws -> CacheInventoryDTO {
+        let inventory = try cacheStore.inventory()
+        return CacheInventoryDTO(inventory: inventory)
+    }
+
+    @discardableResult
+    func releaseCache(protectedURIs: [String]) throws -> CacheReleaseResultDTO {
+        let urls = protectedURIs.compactMap { try? resolveFileURL($0) }
+        let result = try cacheStore.pruneLowDiskAggressive(protecting: urls)
+        return CacheReleaseResultDTO(
+            removedCount: result.removedCount,
+            removedBytes: result.removedBytes,
+            retainedBytes: result.retainedBytes
+        )
+    }
+
     func probeSource(
         _ source: SourceInfoDTO,
         sourceURL: URL? = nil

@@ -628,8 +628,8 @@ struct FilmtoneFullscreenLutEditor: View {
         return GlassGroup(spacing: 6) {
             HStack(spacing: 6) {
                 triggerButton(
-                    label: ja ? "素材" : "Source",
-                    systemImage: "film",
+                    label: "LUT",
+                    systemImage: "square.stack.3d.up",
                     identifier: "filmtone.fullscreen.trigger.source"
                 ) {
                     onSourceTap()
@@ -1114,11 +1114,14 @@ private struct FullscreenLookCarousel: View {
     let onClear: () -> Void
 
     var body: some View {
-        if entries.count <= 2 {
-            fixedLookRow
-        } else {
-            scrollingLookRow
+        Group {
+            if entries.count <= 2 {
+                fixedLookRow
+            } else {
+                scrollingLookRow
+            }
         }
+        .frame(maxWidth: .infinity)
     }
 
     private var fixedLookRow: some View {
@@ -1132,6 +1135,7 @@ private struct FullscreenLookCarousel: View {
                         .frame(maxWidth: .infinity)
                 }
             }
+            .frame(maxWidth: .infinity)
             .padding(.vertical, 2)
         }
         .accessibilityIdentifier("filmtone.fullscreen.lookCarousel")

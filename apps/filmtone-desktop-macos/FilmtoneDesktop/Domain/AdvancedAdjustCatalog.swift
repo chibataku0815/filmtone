@@ -485,7 +485,13 @@ enum FilmtoneOpticalFilterCatalog {
     /// scatter coefficients (directTransmission/blackRetention/scatterStrength/
     /// highlightReactivity/warmScatter/spectralTail) follow the same posture
     /// in `intensityScaledScatter(for:intensity:)`.
-    private static let energyScaledKeys: Set<String> = [
+    ///
+    /// Exposed `static` (not `private`) so `FilmtonePresetCatalog.resolved`
+    /// can apply max-merge semantics for these keys when a Look already
+    /// raised them — Veil profile patches were authored against the reset
+    /// baseline, so an absolute overwrite would *reduce* lensSoftness /
+    /// rgbShift on top of Stone / Urban (which set them higher).
+    static let energyScaledKeys: Set<String> = [
         "bloomStrength",
         "halationIntensity",
         "diffusion",

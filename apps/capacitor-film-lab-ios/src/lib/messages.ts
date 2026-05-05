@@ -109,6 +109,8 @@ const appCopy = {
     depthRealismToggleLabel: "Portrait Depth Realism",
     depthRealismTooltip: "Separates mist, glow, and halation intensity between subject and background using portrait depth.",
     depthRealismUnavailable: "Source needs portrait depth data.",
+    storageLowDiskNotice: "Freed {{bytes}} of storage so the import can proceed.",
+    storageReleasedNotice: "Released {{bytes}} from the cache.",
   },
   ja: {
     appName: "Filmtone",
@@ -207,6 +209,8 @@ const appCopy = {
     depthRealismToggleLabel: "ポートレート深度リアリズム",
     depthRealismTooltip: "ポートレート深度を使い、被写体と背景で霞・グロウ・ハレーションの強度を分離します。",
     depthRealismUnavailable: "ソースにポートレート深度データが必要です。",
+    storageLowDiskNotice: "ストレージを {{bytes}} 空けて読み込みを続けます。",
+    storageReleasedNotice: "{{bytes}} を解放しました。",
   },
 } as const;
 

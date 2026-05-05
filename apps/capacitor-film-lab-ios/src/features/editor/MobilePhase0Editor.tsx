@@ -98,6 +98,13 @@ function formatSignedPercentLabel(value: number): string {
   return `${sign}${Math.round(value * 100)}%`;
 }
 
+function formatStorageBytes(value: number): string {
+  if (value >= 1024 ** 3) return `${(value / 1024 ** 3).toFixed(1)} GB`;
+  if (value >= 1024 ** 2) return `${(value / 1024 ** 2).toFixed(1)} MB`;
+  if (value >= 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${value} B`;
+}
+
 function formatDurationCompact(value?: number): string | null {
   if (typeof value !== "number" || Number.isNaN(value)) return null;
   const roundedTenth = Math.round(value * 10) / 10;
@@ -140,6 +147,7 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
 
   useEffect(() => {
     let cancelled = false;
+    const handles: Array<{ remove: () => void }> = [];
 
     filmtoneMedia
       .addListener("exportProgress", (progress) => {
@@ -150,15 +158,31 @@ export function MobilePhase0Editor({ strings }: MobilePhase0EditorProps) {
         }));
       })
       .then((handle) => {
-        if (cancelled) {
-          handle.remove();
-        }
+        if (cancelled) handle.remove();
+        else handles.push(handle);
+      });
+
+    filmtoneMedia
+      .addListener("cachePrunedNotice", (notice) => {
+        if (cancelled) return;
+        if (notice.removedBytes <= 0) return;
+        const formatted = formatStorageBytes(notice.removedBytes);
+        const message = strings.storageLowDiskNotice.replace("{{bytes}}", formatted);
+        setState((current) => ({
+          ...current,
+          notice: message,
+        }));
+      })
+      .then((handle) => {
+        if (cancelled) handle.remove();
+        else handles.push(handle);
       });
 
     return () => {
       cancelled = true;
+      handles.forEach((handle) => handle.remove());
     };
-  }, []);
+  }, [strings.storageLowDiskNotice]);
 
   useEffect(() => {
     savePhase0Project(state.project);

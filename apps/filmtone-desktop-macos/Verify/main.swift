@@ -2489,4 +2489,200 @@ runner.test("intensity sidecar omits opticalFilterIntensity when 1.0") {
     try assertClose(storedIntensity ?? .nan, 0.5, "opticalFilterIntensity should be 0.5 in sidecar")
 }
 
+// ---------------------------------------------------------------------------
+// Test group 17 — M5-M follow-up (Look × Veil energy max-merge).
+// FilmtonePresetCatalog.resolved() now layers Veil's paramPatch with split
+// semantics: energy keys (bloomStrength / halationIntensity / diffusion /
+// lensSoftness / rgbShift) max-merge against the post-Quick base so a Look
+// that already raised them isn't knocked back down by Veil's reset-baseline
+// authored values. Structural keys (thresholds / radii / hue / softKnee)
+// keep absolute overwrite. User paramOverrides always win last.
+// Regression context: under Stone, Veil 1/4's lensSoftness=0.08 was
+// overwriting Stone's lensSoftness=0.095, and Veil's rgbShift=0.0007 was
+// overwriting Stone's 0.0032 — Veil read as "weaker" instead of "stronger".
+// ---------------------------------------------------------------------------
+
+private let stoneSlug = "filmtone-creative-pack-01-stone"
+
+runner.test("Stone+Veil1/4: lensSoftness max-merges (Stone 0.095 preserved over Veil 0.08)") {
+    let stoneOnly = FilmtonePresetCatalog.resolved(
+        presetName: "reset",
+        strength: 1.0,
+        lookSlug: stoneSlug
+    )
+    let stoneVeil = FilmtonePresetCatalog.resolved(
+        presetName: "reset",
+        strength: 1.0,
+        lookSlug: stoneSlug,
+        opticalFilterProfileId: "backlightVeil-1-4",
+        opticalFilterIntensity: 1.0
+    )
+    if stoneVeil.lensSoftness < stoneOnly.lensSoftness {
+        throw AssertionError(
+            description: "Veil reduced Stone's lensSoftness: stone=\(stoneOnly.lensSoftness) stoneVeil=\(stoneVeil.lensSoftness)"
+        )
+    }
+    try assertClose(stoneVeil.lensSoftness, stoneOnly.lensSoftness, "Stone 0.095 > Veil 1/4 0.08, max wins")
+}
+
+runner.test("Stone+Veil1/4: rgbShift max-merges (Stone 0.0032 preserved over Veil 0.0007)") {
+    let stoneOnly = FilmtonePresetCatalog.resolved(
+        presetName: "reset",
+        strength: 1.0,
+        lookSlug: stoneSlug
+    )
+    let stoneVeil = FilmtonePresetCatalog.resolved(
+        presetName: "reset",
+        strength: 1.0,
+        lookSlug: stoneSlug,
+        opticalFilterProfileId: "backlightVeil-1-4",
+        opticalFilterIntensity: 1.0
+    )
+    if stoneVeil.rgbShift < stoneOnly.rgbShift {
+        throw AssertionError(
+            description: "Veil reduced Stone's rgbShift: stone=\(stoneOnly.rgbShift) stoneVeil=\(stoneVeil.rgbShift)"
+        )
+    }
+    try assertClose(stoneVeil.rgbShift, stoneOnly.rgbShift, "Stone 0.0032 > Veil 1/4 0.0007, max wins")
+}
+
+runner.test("Stone+Veil1/4: bloomStrength rises above Stone (Veil 0.38 > Stone 0.20)") {
+    let stoneVeil = FilmtonePresetCatalog.resolved(
+        presetName: "reset",
+        strength: 1.0,
+        lookSlug: stoneSlug,
+        opticalFilterProfileId: "backlightVeil-1-4",
+        opticalFilterIntensity: 1.0
+    )
+    try assertClose(stoneVeil.bloomStrength, 0.38, "Veil 0.38 wins via max-merge")
+}
+
+runner.test("Stone+Veil1/4: structural bloomThreshold takes Veil's value (0.56, not Stone's 0.64)") {
+    let stoneVeil = FilmtonePresetCatalog.resolved(
+        presetName: "reset",
+        strength: 1.0,
+        lookSlug: stoneSlug,
+        opticalFilterProfileId: "backlightVeil-1-4",
+        opticalFilterIntensity: 1.0
+    )
+    // bloomThreshold is structural — Veil overwrites regardless of base value
+    try assertClose(stoneVeil.bloomThreshold, 0.56)
+    try assertClose(stoneVeil.bloomRadius, 0.80)
+    try assertClose(stoneVeil.halationHue, 22)
+}
+
+runner.test("Stone+Veil1/4 at intensity=0: byte-identical to Stone-only") {
+    let stoneOnly = FilmtonePresetCatalog.resolved(
+        presetName: "reset",
+        strength: 1.0,
+        lookSlug: stoneSlug
+    )
+    let stoneVeilZero = FilmtonePresetCatalog.resolved(
+        presetName: "reset",
+        strength: 1.0,
+        lookSlug: stoneSlug,
+        opticalFilterProfileId: "backlightVeil-1-4",
+        opticalFilterIntensity: 0.0
+    )
+    try assertParamsEqual(stoneVeilZero, stoneOnly, "intensity=0 must skip Veil layer entirely")
+}
+
+runner.test("user paramOverride bloomStrength=0.05 wins over Stone+Veil1/2") {
+    let patch = FilmtonePhase0ParamsPatch(values: ["bloomStrength": 0.05])
+    let result = FilmtonePresetCatalog.resolved(
+        presetName: "reset",
+        strength: 1.0,
+        lookSlug: stoneSlug,
+        opticalFilterProfileId: "backlightVeil-1-2",
+        opticalFilterIntensity: 1.0,
+        paramOverrides: patch
+    )
+    try assertClose(result.bloomStrength, 0.05, "user override is final-stage absolute overwrite")
+}
+
+runner.test("Veil energy max-merge: intensity 1 ≥ intensity 0.5 ≥ intensity 0 (monotonic)") {
+    // Stone supplies a definitively non-zero base for every energy key
+    // (lensSoftness 0.095, rgbShift 0.0032, bloomStrength 0.20, etc.) so
+    // the max-merge envelope is exercised on a non-trivial baseline.
+    let intensity1 = FilmtonePresetCatalog.resolved(
+        presetName: "reset",
+        strength: 1.0,
+        lookSlug: stoneSlug,
+        opticalFilterProfileId: "backlightVeil-1-2",
+        opticalFilterIntensity: 1.0
+    )
+    let intensity05 = FilmtonePresetCatalog.resolved(
+        presetName: "reset",
+        strength: 1.0,
+        lookSlug: stoneSlug,
+        opticalFilterProfileId: "backlightVeil-1-2",
+        opticalFilterIntensity: 0.5
+    )
+    let intensity0 = FilmtonePresetCatalog.resolved(
+        presetName: "reset",
+        strength: 1.0,
+        lookSlug: stoneSlug,
+        opticalFilterProfileId: "backlightVeil-1-2",
+        opticalFilterIntensity: 0.0
+    )
+    // For each Veil energy key: max-merge produces a monotonic envelope
+    // intensity1 ≥ intensity05 ≥ intensity0 — never *reduces* below base
+    // as intensity attenuates.
+    for key in ["bloomStrength", "halationIntensity", "diffusion", "lensSoftness", "rgbShift"] {
+        let v1 = intensity1.value(for: key)
+        let v05 = intensity05.value(for: key)
+        let v0 = intensity0.value(for: key)
+        if v1 + 1e-12 < v05 {
+            throw AssertionError(description: "\(key): intensity1=\(v1) < intensity05=\(v05) — monotonicity broken")
+        }
+        if v05 + 1e-12 < v0 {
+            throw AssertionError(description: "\(key): intensity05=\(v05) < intensity0=\(v0) — Veil reduced base")
+        }
+    }
+    // intensity0 must equal Stone-only baseline byte-for-byte.
+    let stoneOnly = FilmtonePresetCatalog.resolved(
+        presetName: "reset",
+        strength: 1.0,
+        lookSlug: stoneSlug
+    )
+    try assertParamsEqual(intensity0, stoneOnly, "intensity=0 must skip Veil layer")
+}
+
+runner.test("Veil-only (no Look) matches legacy renderParamOverrides flat-patch result") {
+    // Regression guard: lookSlug=nil + Veil through new resolved path must
+    // produce the same final params as the legacy
+    // `renderParamOverrides → applyingPatch` indirection used elsewhere.
+    let veilProfileId = "backlightVeil-1-4"
+    let veilIntensity = 0.7
+    let userOverrides = FilmtonePhase0ParamsPatch.empty
+
+    let newPath = FilmtonePresetCatalog.resolved(
+        presetName: "reset",
+        strength: 1.0,
+        lookSlug: nil,
+        opticalFilterProfileId: veilProfileId,
+        opticalFilterIntensity: veilIntensity,
+        paramOverrides: userOverrides
+    )
+
+    let legacyFlat = FilmtoneOpticalFilterCatalog.renderParamOverrides(
+        profileId: veilProfileId,
+        intensity: veilIntensity,
+        userOverrides: userOverrides
+    )
+    let legacyPath = FilmtonePresetCatalog.resolved(
+        presetName: "reset",
+        strength: 1.0,
+        lookSlug: nil,
+        paramOverrides: legacyFlat
+    )
+
+    // With reset baseline, base[key] == 0 for energy keys, so max(0, scaled) == scaled
+    // and the new max-merge path produces identical params to legacy applyingPatch.
+    try assertParamsEqual(
+        newPath, legacyPath,
+        "lookSlug=nil + Veil through new path must match legacy flat-patch result"
+    )
+}
+
 exit(runner.summary())
