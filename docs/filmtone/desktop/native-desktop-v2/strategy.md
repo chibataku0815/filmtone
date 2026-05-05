@@ -628,6 +628,22 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
   Visual smoke (短い 1080p video で graded playback、Space-key、scrub
   drag → auto-pause) は user-driven。Archived as
   `archive/2026-05-05-m5-d2-native-video-playback.md`。
+- 2026-05-05: **M5-H fanout integrated** (worker → coordinator merge)。
+  M5-H.1 App Chrome / Preview Layout (3 commits: 0251b585 + d12f1318 +
+  9dd0c2c2、cherry-pick 6ea6fbe9..c9195010) — RootWindowView 4-region
+  chrome + PreviewSurface backdrop / cached frame source-identity gating。
+  M5-H.2 Adjust + Library iOS canonical parity (2 commits: a4c471b9 +
+  072b0c07、cherry-pick 77d2998c..a1ed95f9) — AdvancedAdjustCatalog full
+  iOS parity、SavedLookStore built-in favorite + resolve order、
+  LookLibraryControls UI、Verify 42 → 56 PASS。M5-H.3 Dual LUT + intensity
+  slider spike (3 doc-only commits: 985ccfd9 + fdd1a9d7 + 793226c3、
+  cherry-pick e20ec45a..699b1b4f) — read-only design spike、実装は次 slice
+  (C1 v1.4-preferred thin fix / C2-C3 v1.5) で worker 配賦。M5-H.4 は
+  worktree / spike doc 不在のため今回統合スコープ外。Desktop xcodebuild
+  Debug ✅、Verify 56/56 ✅、`git diff --check` clean。Archived as
+  `archive/2026-05-05-m5-h1-chrome-preview-layout.md` /
+  `archive/2026-05-05-m5-h2-adjust-library-parity.md` /
+  `archive/2026-05-05-m5-h3-dual-lut-spike.md`。
 
 ## Interrupt / Decision Log
 
