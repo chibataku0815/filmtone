@@ -14,10 +14,11 @@ verification on the merged uncommitted state in this worktree.
 
 ## Goal
 
-1. Portrait video editing must not place editor panels or the scrub bar over
-   the loaded media. When the source aspect is portrait (height > width), the
-   editor sidebar and scrub bar must sit beside / below the media instead of
-   overlaying it.
+1. Portrait video editing must prioritize preview scale and readability over
+   strict non-overlap. When the source aspect is portrait (height > width), the
+   preview must own the full window and the editor sidebar / scrub bar may
+   overlay it with tight insets; do not reserve a transparent right column or a
+   permanent scrub-bar gutter.
 2. Backlight Veil must visibly affect both still and video preview, and must
    visibly affect export. The control surface must expose a cursor (continuous
    intensity) in addition to the existing density chips, and the user must be
@@ -35,14 +36,15 @@ filter families.
 ### Shell layout (CC-A)
 
 - `apps/filmtone-desktop-macos/FilmtoneDesktop/UI/RootWindowView.swift`
-  - portrait-aware overlay layout for `EditorSidebar` and `VideoScrubBar`
+  - unified overlay layout for `EditorSidebar` and `VideoScrubBar`; portrait
+    must not split into a fixed sidebar column
   - compact opening container constraints
 - `apps/filmtone-desktop-macos/FilmtoneDesktop/UI/PreviewSurface.swift`
-  - aspect-aware reservation of editor / scrub-bar safe regions when needed
+  - loaded-source matte / preview backing so transparent glass never samples
+    unrelated desktop content
   - compact `EmptyPreviewLabel` plate sizing
 - `apps/filmtone-desktop-macos/FilmtoneDesktop/UI/EditorSidebar.swift`
-  - portrait inspector posture (allowed to drop fixed width, switch to a
-    narrower bottom-or-side rail) when the source is portrait
+  - stronger loaded-overlay contrast for portrait inspector readability
 - `apps/filmtone-desktop-macos/Verify/main.swift`
   - portrait layout assertions if a contract test surface is needed
 
@@ -81,8 +83,8 @@ filter families.
 ## Checklist
 
 - [x] CC-A: detect portrait media via `state.videoSession.displayAspectRatio`
-  for video and the rendered frame size for stills; flip the sidebar and
-  scrub-bar layout accordingly
+  for video and the rendered frame size for stills; tune overlay insets /
+  window sizing accordingly without reserving a sidebar column
 - [x] CC-A: keep `⌘\` sidebar toggle, Compare toggle, and the K4 scrub
   thumbnail overlay all functional in both layout postures
 - [x] CC-A: empty `EmptyPreviewLabel` plate stays at a fixed compact size
@@ -126,33 +128,34 @@ filter families.
 - [ ] Integrator: archive this `active.md` and append a 1-3 line note to
   `strategy.md` — **deferred until visual smoke passes**
 
-## Verification Result (2026-05-05 JST, post-review fix)
+## Verification Result (2026-05-05 JST, post-readability fix)
 
-- `bash apps/filmtone-desktop-macos/Verify/run.sh` → **111/111 passed, 0 failed**
-  (M5-M intensity tests now assert energy/structural split + anti-regression
-  for the legacy `mapValues * intensity` bug, plus three new
-  `intensityScaledScatter` tests covering the 1.0 byte-equivalence,
-  the 0.0 nil-fallback, and the 0.5 mix toward neutral coefficients).
+- `bash apps/filmtone-desktop-macos/Verify/run.sh` → **113/113 passed, 0 failed**.
 - `bun run verify:macos` → **BUILD SUCCEEDED** (Debug build, FilmtoneDesktop +
   FilmLabSwiftCore link clean against macOS 26.4 SDK).
 - `git diff --check` → clean (no whitespace errors).
 - Portrait video visual smoke → **deferred to user**. The integrator cannot
   load a portrait iPhone clip into the Debug app from the harness; the user
-  is asked to confirm that (a) the editor sidebar and scrub bar do not overlay
-  the portrait media, (b) the empty opening plate stays compact regardless of
-  window size, (c) moving the Backlight Veil intensity cursor visibly changes
-  the still and video preview on a representative source.
+  is asked to confirm that (a) the portrait preview owns the full window with
+  no transparent right column / scrub gutter, (b) the overlaid editor sidebar
+  and scrub bar remain readable, (c) the empty opening plate stays compact
+  regardless of window size, (d) moving the Backlight Veil intensity cursor
+  visibly changes the still and video preview on a representative source.
 
 ## Integrated Surfaces (final)
 
-- CC-A (`feature/native-desktop-m5-m-shell-layout`): `RootWindowView.swift`
-  splits into landscape (existing ZStack overlay) and portrait (HStack media
-  column + 332pt sidebar column, scrub bar below media) layouts, with
-  `isPortraitSource` driven by `videoSession.displayAspectRatio` for video and
-  a new `sourceAspectRatio` state for still. `resizeWindow` clears the aspect
-  lock and reserves the sidebar column when portrait. `EmptyPreviewLabel` is
-  pinned with `.fixedSize()` so the plate never stretches with the window.
-  EditorSidebar is not modified.
+- CC-A (`feature/native-desktop-m5-m-shell-layout`, corrected by 2026-05-05
+  portrait readability follow-up): `RootWindowView.swift` now uses one ZStack
+  overlay posture for landscape and portrait. `PreviewSurface` fills the
+  window; `EditorSidebar` and `VideoScrubBar` float above it with portrait
+  insets. The prior HStack media column + 332pt sidebar reservation was removed
+  because user visual smoke showed it created empty space and made the sidebar
+  unreadable. `resizeWindow` keeps a wider portrait editing canvas without
+  shrinking the preview for sidebar toggles. `PreviewSurface` uses a loaded
+  matte without background extension so transparent glass cannot refract
+  unrelated desktop text. `EditorSidebar` uses stronger loaded-overlay contrast.
+  `EmptyPreviewLabel` remains pinned with `.fixedSize()` so the plate never
+  stretches with the window.
 - CC-B (`feature/native-desktop-m5-m-backlight-optics`): adds
   `state.opticalFilterIntensity` (clamped 0…1, default 1.0), folded into
   `state.renderParamOverrides` via the new
@@ -182,8 +185,9 @@ git diff --check
 ```
 
 Plus manual portrait video visual smoke (Debug app launch, open a portrait
-iPhone clip, confirm sidebar and scrub bar do not overlay the media; toggle
-Backlight Veil cursor and confirm the preview visibly changes).
+iPhone clip, confirm there is no transparent right column / scrub gutter, the
+overlaid sidebar and scrub bar are readable, and toggling the Backlight Veil
+cursor visibly changes the preview).
 
 ## Stop Conditions
 
@@ -311,36 +315,23 @@ Compact opening fix (2026-05-05, post-review, integrator):
   111/111; `bun run verify:macos` → BUILD SUCCEEDED;
   `git diff --check` → clean.
 
-Portrait sidebar reservation fix (2026-05-05, post-review, integrator):
+Portrait overlay readability correction (2026-05-05, visual follow-up):
 
-- ultrareview flagged P2: `RootWindowView.resizeWindow(toMediaDisplaySize:)`
-  computed `contentMinimum` from `availableContentSize` and assigned it
-  to both `minimumContentSize` and `window.contentMinSize` without ever
-  adding `sidebarReservation`. The `mediaSize` clamp also subtracted
-  `sidebarReservation` from a value that did not contain it, so the
-  total window minimum was effectively media-only. Combined with the
-  absence of any `.onChange(of: sidebarOpen)`, opening a portrait video
-  with the sidebar closed (`@AppStorage` remembered state) and then
-  toggling `⌘\` shoved the 332pt sidebar column into the existing window
-  width, crushing the media column.
-- Real fix: introduce a `mediaContentMinimum` derived from the
-  screen-available budget *minus* the sidebar reservation, then build
-  `contentMinimum = mediaContentMinimum + sidebarReservation` so the
-  total window floor includes the sidebar column. The `mediaSize` clamp
-  now compares against `mediaContentMinimum` directly. Cache the opened
-  media display size in a new `@State lastMediaDisplaySize` so a
-  portrait `.onChange(of: sidebarOpen)` can re-run
-  `resizeWindow(toMediaDisplaySize:)` with the same media size, growing
-  or shrinking the window by exactly `portraitSidebarColumnWidth` and
-  re-asserting the new floor. `applyCompactOpeningPosture()` clears the
-  cache so an empty-state sidebar toggle does not re-apply stale media
-  sizing.
-- Landscape skips the sidebar onChange branch — landscape uses a ZStack
-  overlay where `EditorSidebar` floats over the preview, so toggling the
-  sidebar there does not change layout geometry.
-- Verification: `bash apps/filmtone-desktop-macos/Verify/run.sh` →
-  111/111; `bun run verify:macos` → BUILD SUCCEEDED;
-  `git diff --check` → clean.
+- User visual smoke rejected the post-review portrait reservation fix: the
+  media/sidebar split avoided overlap but created a transparent right column,
+  crushed preview readability, and let inspector glass refract unrelated
+  desktop text. Product decision changed: portrait overlap is acceptable when
+  it preserves preview size and readability.
+- Real fix: remove the portrait HStack / sidebar reservation path and use the
+  same ZStack overlay posture for portrait and landscape. `PreviewSurface`
+  fills the full window; `EditorSidebar` and `VideoScrubBar` overlay it with
+  portrait-specific insets. `resizeWindow(toMediaDisplaySize:)` no longer
+  grows or shrinks the window on sidebar toggle; it uses a wider portrait
+  editing canvas without reserving a fixed sidebar column. Loaded preview matte
+  no longer uses background extension, and sidebar glass uses stronger contrast.
+- Verification for this follow-up: `bash
+  apps/filmtone-desktop-macos/Verify/run.sh`, `bun run verify:macos`, and
+  `git diff --check` passed. Portrait visual smoke remains user-pending.
 
 Video pre-session aspect fallback fix (2026-05-05, integrator):
 
@@ -400,3 +391,54 @@ Look Strength continuous response (2026-05-05, post-M5-M):
 - Closed 2026-05-05 by user visual smoke (Stone / Urban Strength slider
   responds continuously across the 0–100 % range). Promoted to
   `strategy.md` Completion Log; merged into `main` along with M5-M.
+
+Portrait UI black-matte recovery (2026-05-06, post-merge regression):
+
+- User visual smoke on the merged M5-M build rejected the recent attempt
+  to "fix" portrait readability with a black matte / sidebar rail / wider
+  portrait window: it produced a giant left black bar, a continuous
+  vertical dark frame behind the inspector, a hard split where the
+  panels' right half darkened, and shrunk the actual preview. The
+  premise — "fill exposed transparency with an opaque dark surface" —
+  is recorded as wrong. Logged in `feedback_no_black_matte_for_glass_exposure`
+  for future chats.
+- Done conditions were rewritten so the next iteration does not regress
+  back to the same shape:
+  - portrait window matches the source aspect (no widening for the
+    overlaid sidebar);
+  - no continuous dark rail behind the inspector;
+  - no opaque "loaded" matte under the preview surface;
+  - exposed background, when it appears, is filled with a media-derived
+    `scaledToFill + blur + dim` copy (still: graded NSImage; video:
+    scrub-thumbnail provider poster), never solid black, never desktop
+    transparency;
+  - the actual color-judgment media stays aspect-fit and glass-free.
+- Real fix:
+  - `EditorSidebar.swift`: removed the `RoundedRectangle(cornerRadius:
+    20)` backing + drop shadow that produced the rail. Per-panel tint
+    pulled back from `0.50` to `0.32` (within the 0.30–0.34 ceiling)
+    so each panel reads as discrete glass over the media beneath it.
+  - `RootWindowView.swift`: removed
+    `portraitOverlayMinimumContentWidth` / `portraitOverlayPreferredContentWidth`
+    and the helper `adjustedContentSizeForOverlay`. Portrait now uses
+    the same media-aspect-fit window as landscape, so opening a 9:16
+    iPhone clip yields a tall narrow window with no pillarbox black
+    bar. `contentAspectRatio` is locked for both orientations because
+    the window already matches the source.
+  - `PreviewSurface.swift`: replaced `NeutralFrostedPreviewMatte` (the
+    opaque dark wash) with `MediaDerivedBackdrop`, a `scaledToFill +
+    blur(56) + saturation(0.85) + Color.black.opacity(0.42)` copy of
+    the foreground frame. Stills feed it `renderedFrames?.graded`;
+    video seeds a low-res poster from `state.videoSession?.thumbnailProvider`
+    via a new `VideoBackdropTaskKey` task that fires once per source /
+    session change (not per scrub tick, so the backdrop stays stable).
+    Empty state continues to use the branded clear-glass field.
+- Verification (2026-05-06): `git diff --check` → clean;
+  `bash apps/filmtone-desktop-macos/Verify/run.sh` → **121/121 passed**;
+  `bun run verify:macos` → **BUILD SUCCEEDED**. Portrait visual smoke
+  remains user-pending — open one portrait iPhone clip + one landscape
+  clip + one still in the Debug app and check: no black bars, no
+  continuous rail, no hard split, scrub bar reads as a media overlay,
+  empty opening still compact, sidebar open/close keeps the window
+  geometry stable.
+- Out of scope: color/export pipeline, iOS, schema bump.

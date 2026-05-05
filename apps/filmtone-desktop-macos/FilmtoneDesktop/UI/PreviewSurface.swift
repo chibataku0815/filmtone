@@ -61,15 +61,29 @@ struct PreviewSurface: View {
     /// so the previous frame stays visible until the new one lands —
     /// the user never sees an intentional black flash mid-edit.
     @State private var renderedSourceURL: URL?
+    /// M5-M visual recovery: low-resolution video poster used as the
+    /// media-derived backdrop layer (`scaledToFill + blur + dim`). Seeded
+    /// once per video session via the existing scrub thumbnail provider so
+    /// the backdrop never goes solid-black or transparent-desktop in any
+    /// region uncovered by the aspect-fit AVPlayer view.
+    @State private var videoBackdropImage: NSImage?
+    @State private var videoBackdropSeededFor: URL?
 
     var body: some View {
         ZStack {
-            // M5-I.4a: empty launches on a branded Liquid Glass backdrop;
-            // loaded media sits on a neutral dark frosted matte instead of
-            // pure black. The content layer itself remains glass-free so
-            // grading judgment stays trustworthy.
-            PreviewBackdrop(mode: sourceURL == nil ? .empty : .loaded)
-                .backgroundExtensionEffect()
+            // M5-M visual recovery: empty launch keeps the branded clear
+            // Liquid Glass field; loaded media uses a media-derived blurred
+            // copy (still: graded frame; video: scrub-thumbnail poster) as
+            // the backdrop, never solid black and never bare desktop. The
+            // actual color-judgment media renders aspect-fit / glass-free
+            // on top of the backdrop in the layers below.
+            if sourceURL == nil {
+                PreviewBackdrop(mode: .empty)
+                    .backgroundExtensionEffect()
+            } else {
+                MediaDerivedBackdrop(image: backdropImage)
+                    .backgroundExtensionEffect()
+            }
             if sourceURL == nil {
                 // M5-M: `.fixedSize()` pins the plate to its intrinsic
                 // compact size regardless of the window width/height. The
@@ -149,6 +163,54 @@ struct PreviewSurface: View {
             opticalFilterIntensity: opticalFilterIntensity
         )) {
             await renderCurrent()
+        }
+        // M5-M visual recovery: seed (or reset) the video backdrop poster
+        // whenever the source identity or session presence changes. The
+        // thumbnail provider quantizes to 0.25s buckets and serves a
+        // ~240px-edge frame, so this is cheap and yields a stable poster
+        // for the blurred backdrop. Stills bypass: the backdrop reads
+        // `renderedFrames?.graded` directly.
+        .task(id: VideoBackdropTaskKey(
+            sourceURL: sourceURL,
+            sourceKind: sourceKind,
+            hasSession: state.videoSession != nil
+        )) {
+            seedVideoBackdrop()
+        }
+    }
+
+    /// Frame the media-derived backdrop should blur + dim. Stills use the
+    /// already-rendered graded NSImage so the backdrop and the foreground
+    /// are pixel-coherent. Video uses a poster captured by the scrub
+    /// thumbnail provider.
+    private var backdropImage: NSImage? {
+        if sourceKind == .still {
+            guard renderedSourceURL == sourceURL else { return nil }
+            return renderedFrames?.graded
+        }
+        return videoBackdropImage
+    }
+
+    private func seedVideoBackdrop() {
+        guard sourceKind == .video, let url = sourceURL else {
+            videoBackdropImage = nil
+            videoBackdropSeededFor = nil
+            return
+        }
+        // New source: invalidate the previous poster so we don't flash it
+        // behind the wrong AVPlayer content.
+        if videoBackdropSeededFor != url {
+            videoBackdropImage = nil
+        }
+        guard let session = state.videoSession,
+              videoBackdropSeededFor != url else { return }
+        let secs = videoPreviewSeconds ?? 0
+        videoBackdropSeededFor = url
+        session.thumbnailProvider.requestThumbnail(atSeconds: secs) { image, _ in
+            // Drop late completions for a source the user has already
+            // moved on from.
+            guard sourceURL == url else { return }
+            videoBackdropImage = image
         }
     }
 
@@ -379,6 +441,16 @@ private struct PreviewRenderKey: Hashable {
     let opticalFilterIntensity: Double
 }
 
+/// M5-M visual recovery: drives the one-shot video poster fetch behind
+/// `MediaDerivedBackdrop`. Fires when the source url, the source kind, or
+/// the session attachment flips — not on every scrub tick, so the
+/// backdrop stays stable while the user moves around the timeline.
+private struct VideoBackdropTaskKey: Hashable {
+    let sourceURL: URL?
+    let sourceKind: FilmtoneSourceKind
+    let hasSession: Bool
+}
+
 /// M5-K3: still preview compositor. Lays the graded NSImage on the full
 /// preview area, then masks the raw companion frame on top of the left
 /// half determined by `compareSplitFraction`. Both NSImages are sized to
@@ -506,7 +578,6 @@ private struct CompareSplitGrip: View {
 private struct PreviewBackdrop: View {
     enum Mode {
         case empty
-        case loaded
     }
 
     let mode: Mode
@@ -515,31 +586,40 @@ private struct PreviewBackdrop: View {
         switch mode {
         case .empty:
             BrandedOpeningBackdrop()
-        case .loaded:
-            NeutralFrostedPreviewMatte()
         }
     }
 }
 
-// M5-I.4a: neutral matte for letterbox / pillarbox areas. The material is
-// intentionally near-neutral and dark, softer than pure black but without
-// warm/cool cast that could bias preview color judgment.
-private struct NeutralFrostedPreviewMatte: View {
+// M5-M visual recovery: media-derived backdrop. When a frame is available
+// (still: graded NSImage; video: low-res scrub-thumbnail poster) the
+// backdrop fills the window with a `scaledToFill + blur + dim` copy so any
+// area not covered by the aspect-fit foreground media (or refracted by the
+// overlaid inspector glass) shows the same source content rather than a
+// solid black matte or transparent desktop. The fallback while a frame is
+// pending is a near-neutral dark wash — explicitly not pure black, never
+// allowed to drop to bare desktop transparency. The actual grading-judgment
+// media draws on top of this, glass-free, at aspect-fit.
+private struct MediaDerivedBackdrop: View {
+    let image: NSImage?
+
     var body: some View {
         ZStack {
+            // Near-neutral dark fallback. Sits behind the blurred media
+            // copy so a brief frame-loading window does not flash desktop
+            // through the transparent AppKit window.
             Color(red: 0.078, green: 0.078, blue: 0.082)
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .opacity(0.18)
-            LinearGradient(
-                colors: [
-                    Color.white.opacity(0.035),
-                    Color.black.opacity(0.08)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+            if let image {
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .blur(radius: 56, opaque: true)
+                    .saturation(0.85)
+                    .overlay(Color.black.opacity(0.42))
+                    .clipped()
+                    .transition(.opacity)
+            }
         }
+        .animation(.easeInOut(duration: 0.35), value: image != nil)
     }
 }
 

@@ -157,16 +157,34 @@ final class EditorState {
         }
     }
 
+    /// M5-M follow-up (Look × Veil energy max-merge): pass the Veil profile
+    /// id + intensity directly into `resolved()` so its 3-stage layering
+    /// (base+Look → Quick → Veil[max-merge energy / overwrite structural]
+    /// → user paramOverrides) keeps Look-raised energy keys (e.g. Stone's
+    /// `lensSoftness 0.095`) from being knocked back down by the Veil
+    /// profile's reset-baseline-authored values (`lensSoftness 0.08`).
+    /// `paramOverrides` here is the *raw* user manual overrides — Veil
+    /// patch resolution moved into `resolved()` itself.
     var presetParams: FilmtonePhase0Params {
         FilmtonePresetCatalog.resolved(
             presetName: presetName,
             strength: presetStrength,
             lookSlug: lookSlug,
             quickState: quickState,
-            paramOverrides: renderParamOverrides
+            opticalFilterProfileId: opticalFilterProfileId,
+            opticalFilterIntensity: opticalFilterIntensity,
+            paramOverrides: paramOverrides
         )
     }
 
+    /// Flat (Veil + user) paramOverrides patch consumed by callers that
+    /// don't go through `presetParams` — sidecar serialization,
+    /// VideoCompositionRefreshKey hashing, and any non-Veil-aware
+    /// resolved() callsite. Behavior here is unchanged from M5-M: Veil
+    /// energy keys are intensity-scaled, structural keys pass through,
+    /// user overrides win at full strength. The new max-merge semantics
+    /// live exclusively in `FilmtonePresetCatalog.resolved()` so cache-key
+    /// equality and sidecar payloads stay byte-stable.
     var renderParamOverrides: FilmtonePhase0ParamsPatch {
         FilmtoneOpticalFilterCatalog.renderParamOverrides(
             profileId: opticalFilterProfileId,

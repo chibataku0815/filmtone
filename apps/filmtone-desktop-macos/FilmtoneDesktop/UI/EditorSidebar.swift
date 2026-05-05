@@ -2,10 +2,10 @@ import SwiftUI
 
 // M5-J1: Editing sidebar shell. Splits the right-rail panel stack out of
 // `RootWindowView` so the chrome can:
-//   1) reserve top inset for the macOS 26 unified toolbar (~52pt) plus a
-//      small breathing margin, applied at the call site as 72pt;
-//   2) reserve bottom inset for the floating `VideoScrubBar` (capsule
-//      ~36pt + .padding(.bottom, 64) + visual breathing room) at 120pt;
+//   1) reserve top inset for the macOS 26 unified toolbar plus a small
+//      breathing margin, applied at the call site;
+//   2) reserve bottom inset for the floating `VideoScrubBar`, with portrait
+//      using a tighter overlay inset than landscape;
 //   3) clip vertical overflow into a ScrollView so a tall stack of
 //      source / library / quick / grade / inspector panels never spills
 //      past the window's bottom edge regardless of source state;
@@ -56,19 +56,18 @@ struct EditorSidebar: View {
     }
 }
 
-// Per-panel glass posture extracted so every panel inside the sidebar
-// uses the same Pass 4 dark-tinted .clear Apple Liquid Glass treatment
-// the right rail already uses (M5-I.3 8px grid: 16/16 padding,
-// cornerRadius 16). Extracted as a ViewModifier (rather than a free
-// `View` extension) so the call site reads as a single `.modifier(...)`
-// without duplicating the `.glassEffect` invocation across five callers.
+// Per-panel glass posture: dark-tinted .clear Apple Liquid Glass so each
+// panel reads on top of the underlying media without a continuous backing
+// rail that would feel like a fixed sidebar column. The tint stays in the
+// 0.30–0.34 range so text remains readable on bright portrait footage
+// while the panels still refract the media beneath.
 private struct EditorSidebarPanelGlass: ViewModifier {
     func body(content: Content) -> some View {
         content
             .padding(.horizontal, 16)
             .padding(.vertical, 16)
             .glassEffect(
-                .clear.tint(.black.opacity(0.30)),
+                .clear.tint(.black.opacity(0.32)),
                 in: RoundedRectangle(cornerRadius: 16)
             )
     }
