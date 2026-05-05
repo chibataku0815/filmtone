@@ -250,6 +250,17 @@ struct FilmtoneStrings {
     // Current catalog exposes Creative LUT Pack 01.
     let builtInLookCreativePack01Stone: String
     let builtInLookCreativePack01Urban: String
+
+    // MARK: - Desktop handoff (>5min video prompt)
+    //
+    // iOS caps source video duration at PHASE0_MAX_SOURCE_DURATION_SEC (300s)
+    // because the iPhone preview/export pipeline is tuned for short clips.
+    // Longer footage is routed to Filmtone Desktop via this dedicated sheet
+    // instead of the generic source-cap error.
+    let desktopHandoffTitle: String
+    let desktopHandoffBody: String
+    let desktopHandoffPrimaryAction: String
+    let desktopHandoffSecondaryAction: String
 }
 
 extension FilmtoneStrings {
@@ -1584,6 +1595,30 @@ extension FilmtoneStrings {
             "filmtone.fullscreen.no_look",
             defaultValue: prefersJapanese ? "なし" : "None",
             comment: "Carousel chip label that clears the active creative LUT (Filmtone-only)."
+        )
+        desktopHandoffTitle = filmtoneLocalized(
+            "filmtone.desktop_handoff.title",
+            defaultValue: prefersJapanese
+                ? "5分を超える動画はDesktop版で編集できます"
+                : "Edit videos over 5 minutes on Desktop",
+            comment: "Title for the dedicated sheet shown when the picked video exceeds the 5-minute iOS source duration cap."
+        )
+        desktopHandoffBody = filmtoneLocalized(
+            "filmtone.desktop_handoff.body",
+            defaultValue: prefersJapanese
+                ? "Filmtone iOSは、iPhone上で安定してプレビューと書き出しができる長さに最適化しています。長めの動画や本格的な編集には、Filmtone Desktopをご利用ください。"
+                : "Filmtone iOS is optimized for reliable preview and export on iPhone. For longer footage or more involved editing, use Filmtone Desktop.",
+            comment: "Body copy for the >5min Desktop handoff sheet."
+        )
+        desktopHandoffPrimaryAction = filmtoneLocalized(
+            "filmtone.desktop_handoff.primary",
+            defaultValue: prefersJapanese ? "Desktop版を見る" : "View Desktop",
+            comment: "Primary CTA on the >5min Desktop handoff sheet — opens the Filmtone Desktop download page."
+        )
+        desktopHandoffSecondaryAction = filmtoneLocalized(
+            "filmtone.desktop_handoff.secondary",
+            defaultValue: prefersJapanese ? "別の動画を選ぶ" : "Choose Another Video",
+            comment: "Secondary CTA on the >5min Desktop handoff sheet — dismisses without changing source state."
         )
     }
 

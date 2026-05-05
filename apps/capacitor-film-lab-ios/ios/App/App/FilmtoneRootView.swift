@@ -82,6 +82,11 @@ struct FilmtoneRootView: View {
                 exportSheetPresented = false
             }
         }
+        .sheet(isPresented: $store.desktopHandoffPromptPresented) {
+            FilmtoneDesktopHandoffSheet(strings: store.strings) {
+                store.desktopHandoffPromptPresented = false
+            }
+        }
         .fullScreenCover(isPresented: $onboardingPresented, onDismiss: openSourcePickerIfNeeded) {
             FilmtoneOnboardingView(
                 strings: store.strings,
@@ -102,6 +107,11 @@ struct FilmtoneRootView: View {
                 }
             } else {
                 presentOnboardingIfNeeded()
+            }
+        }
+        .onChange(of: store.desktopHandoffPromptPresented) { isPresented in
+            if isPresented {
+                pendingLookOnPickComplete = nil
             }
         }
         .confirmationDialog(
@@ -308,5 +318,82 @@ struct FilmtoneRootView: View {
 
     private func percentLabel(_ value: Double) -> String {
         "\(Int((value * 100).rounded()))%"
+    }
+}
+
+/// Sheet presented when the user picks a video longer than the iOS source
+/// duration cap (`PHASE0_MAX_SOURCE_DURATION_SEC`, 300s). Routes the user to
+/// Filmtone Desktop instead of accepting the clip into the editor — there is
+/// intentionally no "continue anyway" affordance, because iPhone preview /
+/// export quality is tuned for short clips. Does not mutate source state on
+/// dismiss; the picker import has already been reclaimed by the store.
+struct FilmtoneDesktopHandoffSheet: View {
+    let strings: FilmtoneStrings
+    let onDismiss: () -> Void
+
+    private static let desktopDownloadURL = URL(
+        string: "https://www.chibatakumi.studio/film-lab/download"
+    )!
+
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 24) {
+                Image(systemName: "desktopcomputer.and.arrow.down")
+                    .font(.system(size: 56, weight: .light))
+                    .foregroundStyle(.tint)
+                    .padding(.top, 24)
+                    .accessibilityHidden(true)
+
+                VStack(spacing: 12) {
+                    Text(strings.desktopHandoffTitle)
+                        .font(.title3.weight(.semibold))
+                        .multilineTextAlignment(.center)
+                        .accessibilityIdentifier("filmtone.desktopHandoff.title")
+
+                    Text(strings.desktopHandoffBody)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .accessibilityIdentifier("filmtone.desktopHandoff.body")
+                }
+                .padding(.horizontal, 24)
+
+                Spacer(minLength: 8)
+
+                VStack(spacing: 12) {
+                    Button {
+                        openURL(Self.desktopDownloadURL)
+                        onDismiss()
+                    } label: {
+                        Text(strings.desktopHandoffPrimaryAction)
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .accessibilityIdentifier("filmtone.desktopHandoff.primary")
+
+                    Button(role: .cancel) {
+                        onDismiss()
+                    } label: {
+                        Text(strings.desktopHandoffSecondaryAction)
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .accessibilityIdentifier("filmtone.desktopHandoff.secondary")
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20)
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .interactiveDismissDisabled(false)
+        }
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
+        .accessibilityIdentifier("filmtone.desktopHandoff.sheet")
     }
 }

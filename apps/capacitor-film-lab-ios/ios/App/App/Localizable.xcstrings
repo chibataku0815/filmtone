@@ -438,6 +438,74 @@
         }
       }
     },
+    "filmtone.desktop_handoff.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filmtone iOS is optimized for reliable preview and export on iPhone. For longer footage or more involved editing, use Filmtone Desktop."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filmtone iOSは、iPhone上で安定してプレビューと書き出しができる長さに最適化しています。長めの動画や本格的な編集には、Filmtone Desktopをご利用ください。"
+          }
+        }
+      }
+    },
+    "filmtone.desktop_handoff.primary" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View Desktop"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desktop版を見る"
+          }
+        }
+      }
+    },
+    "filmtone.desktop_handoff.secondary" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose Another Video"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "別の動画を選ぶ"
+          }
+        }
+      }
+    },
+    "filmtone.desktop_handoff.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit videos over 5 minutes on Desktop"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "5分を超える動画はDesktop版で編集できます"
+          }
+        }
+      }
+    },
     "filmtone.duration.minutes_seconds" : {
       "extractionState" : "stale",
       "localizations" : {

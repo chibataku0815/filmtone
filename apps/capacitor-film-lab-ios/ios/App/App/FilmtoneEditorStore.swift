@@ -450,6 +450,13 @@ final class FilmtoneEditorStore: ObservableObject {
     @Published var isBusy = false
     @Published var notice: String?
     @Published var error: String?
+    /// Set true when the user picks a video longer than the iOS source
+    /// duration cap (`PHASE0_MAX_SOURCE_DURATION_SEC`, 300s). Surfaces a
+    /// dedicated Desktop handoff sheet instead of routing the clip through
+    /// the generic source-cap error so users get a clear path to Filmtone
+    /// Desktop. Existing source / project state is preserved while this is
+    /// set — the picker import is discarded by `reclaimCacheForCurrentState`.
+    @Published var desktopHandoffPromptPresented = false
     /// Viewport-level transient toast. Coexists with `notice` / `error`
     /// (inline panels) so neither path is broken; toast surfaces save /
     /// export / share feedback above the ScrollView. Never set directly by
@@ -899,6 +906,25 @@ final class FilmtoneEditorStore: ObservableObject {
                 isDeterminate: false
             )
             let probe = try facade.probeSource(source)
+            // iOS caps source video duration at PHASE0_MAX_SOURCE_DURATION_SEC
+            // (300s). For >5:00 video, route to a dedicated Desktop handoff
+            // sheet instead of replacing the existing source with one that
+            // would fail the export request build with a generic source-cap
+            // error. We deliberately skip applyProbe / persist /
+            // schedulePreviewRender so the prior source (if any) keeps
+            // displaying; the orphaned imported file is reclaimed by
+            // `reclaimCacheForCurrentState` because `protectedCacheURIs`
+            // derives from the unchanged `source`.
+            if probe.kind == .video,
+               let durationSec = probe.durationSec,
+               durationSec > FilmtonePhase0Math.sourceDurationCapSec
+            {
+                isBusy = false
+                sourceLoadState = nil
+                reclaimCacheForCurrentState()
+                desktopHandoffPromptPresented = true
+                return
+            }
             applyProbe(source: source, probe: probe)
             isBusy = false
             sourceLoadState = nil
