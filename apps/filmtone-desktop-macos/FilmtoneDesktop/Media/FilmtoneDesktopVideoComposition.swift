@@ -25,6 +25,10 @@ struct FilmtoneDesktopVideoRenderInputs: Sendable {
     let probedColorClass: SourceColorClassDTO?
     let quickState: FilmtoneQuickState
     let paramOverrides: FilmtonePhase0ParamsPatch
+    /// M5-J.2: when true the composition handler emits a 50:50 split
+    /// (left = pre-transform source, right = graded) instead of the
+    /// graded frame alone. Preview-only — never reaches the export path.
+    let compareEnabled: Bool
     let sourceURL: URL
 }
 
@@ -75,6 +79,7 @@ enum FilmtoneDesktopVideoComposition {
         )
 
         let renderBounds = CGRect(origin: .zero, size: renderSize)
+        let compareEnabled = inputs.compareEnabled
         let composition = AVMutableVideoComposition(
             asset: asset,
             applyingCIFiltersWithHandler: { request in
@@ -104,7 +109,22 @@ enum FilmtoneDesktopVideoComposition {
                 // composition canvas. Crop back to renderBounds so
                 // AVFoundation receives exactly the requested preview frame.
                 let cropped = graded.cropped(to: renderBounds)
-                request.finish(with: cropped, context: FilmtoneCIContext.shared)
+                let output: CIImage
+                if compareEnabled {
+                    // M5-J.2: left = pre-transform source (intentionally
+                    // flat for log inputs), right = graded. `base` already
+                    // sits on `renderBounds`, and `cropped` is also clamped
+                    // to `renderBounds`, so the helper's rescale is a no-op
+                    // here but keeps the still / video paths convergent.
+                    output = FilmtoneCompareCompose.makeSplit(
+                        source: base,
+                        graded: cropped,
+                        splitAt: 0.5
+                    )
+                } else {
+                    output = cropped
+                }
+                request.finish(with: output, context: FilmtoneCIContext.shared)
             }
         )
 

@@ -63,6 +63,7 @@
 		FT0000000000000000000A39 /* FilmtoneDesktopVideoComposition.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B38 /* FilmtoneDesktopVideoComposition.swift */; };
 		FT0000000000000000000A3A /* FilmtoneDesktopPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B39 /* FilmtoneDesktopPlayerView.swift */; };
 		FT0000000000000000000A3B /* FilmtoneGlassControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B3A /* FilmtoneGlassControls.swift */; };
+		FT0000000000000000000A3C /* FilmtoneCompareCompose.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B3B /* FilmtoneCompareCompose.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -121,6 +122,7 @@
 		FT0000000000000000000B38 /* FilmtoneDesktopVideoComposition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneDesktopVideoComposition.swift; sourceTree = "<group>"; };
 		FT0000000000000000000B39 /* FilmtoneDesktopPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneDesktopPlayerView.swift; sourceTree = "<group>"; };
 		FT0000000000000000000B3A /* FilmtoneGlassControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneGlassControls.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B3B /* FilmtoneCompareCompose.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCompareCompose.swift; sourceTree = "<group>"; };
 		FT0000000000000000000C01 /* FilmtoneDesktop.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FilmtoneDesktop.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -236,6 +238,7 @@
 				FT0000000000000000000B27 /* FilmtoneSourceInputTransform.swift */,
 				FT0000000000000000000B29 /* FilmtoneSavedLookSchema.swift */,
 				FT0000000000000000000B2A /* FilmtoneSavedLookStore.swift */,
+				FT0000000000000000000B3B /* FilmtoneCompareCompose.swift */,
 			);
 			path = Color;
 			sourceTree = "<group>";
@@ -415,6 +418,7 @@
 				FT0000000000000000000A39 /* FilmtoneDesktopVideoComposition.swift in Sources */,
 				FT0000000000000000000A3A /* FilmtoneDesktopPlayerView.swift in Sources */,
 				FT0000000000000000000A3B /* FilmtoneGlassControls.swift in Sources */,
+				FT0000000000000000000A3C /* FilmtoneCompareCompose.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

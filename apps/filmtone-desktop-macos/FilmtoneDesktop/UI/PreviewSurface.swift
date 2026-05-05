@@ -31,6 +31,11 @@ struct PreviewSurface: View {
     /// M5-C.3a: per-key parameter override patch applied between the
     /// preset/look resolve and the quick-state pass.
     let paramOverrides: FilmtonePhase0ParamsPatch
+    /// M5-J.2: when true the still render path composes a 50:50
+    /// Before/After split (left = source, right = graded) before
+    /// rasterizing to NSImage. Video sources read this through
+    /// `FilmtoneDesktopVideoRenderInputs.compareEnabled` instead.
+    let compareEnabled: Bool
     /// M5-I.4a: empty-state CTA entry point. RootWindowView owns the
     /// platform file picker; PreviewSurface only renders the open affordance.
     let onOpenRequested: () -> Void
@@ -99,7 +104,8 @@ struct PreviewSurface: View {
             videoPreviewSeconds: sourceKind == .video ? nil : videoPreviewSeconds,
             sourceProfileSelection: sourceProfileSelection,
             quickState: quickState,
-            paramOverrides: paramOverrides
+            paramOverrides: paramOverrides,
+            compareEnabled: compareEnabled
         )) {
             await renderCurrent()
         }
@@ -130,6 +136,7 @@ struct PreviewSurface: View {
         let profileSelection = sourceProfileSelection
         let quick = quickState
         let overrides = paramOverrides
+        let compare = compareEnabled
 
         let source: CIImage? = CIImage(contentsOf: sourceURL)
         let probedColorClass: SourceColorClassDTO? =
@@ -148,7 +155,8 @@ struct PreviewSurface: View {
                 sourceProfileSelection: profileSelection,
                 probedColorClass: probedColorClass,
                 quickState: quick,
-                paramOverrides: overrides
+                paramOverrides: overrides,
+                compareEnabled: compare
             )
         }.value
 
@@ -173,7 +181,8 @@ struct PreviewSurface: View {
         sourceProfileSelection: CameraProfileSelection,
         probedColorClass: SourceColorClassDTO?,
         quickState: FilmtoneQuickState,
-        paramOverrides: FilmtonePhase0ParamsPatch
+        paramOverrides: FilmtonePhase0ParamsPatch,
+        compareEnabled: Bool
     ) -> NSImage? {
         guard let source else {
             return NSImage(contentsOf: fallbackURL)
@@ -211,8 +220,15 @@ struct PreviewSurface: View {
             sourceSeed: sourceSeed,
             creativeLut: creativeLut
         )
+        // M5-J.2: compose 50:50 (left=raw source pre-transform, right=graded)
+        // when the compare toggle is on. Helper rescales `source` onto the
+        // graded canvas extent so split rectangles always have meaningful
+        // pixels behind them.
+        let output: CIImage = compareEnabled
+            ? FilmtoneCompareCompose.makeSplit(source: source, graded: graded, splitAt: 0.5)
+            : graded
         guard let cg = FilmtoneCIContext.shared.createCGImage(
-            graded,
+            output,
             from: graded.extent,
             format: .RGBA8,
             colorSpace: FilmtoneCIContext.outputColorSpace
@@ -236,6 +252,7 @@ private struct PreviewRenderKey: Hashable {
     let sourceProfileSelection: CameraProfileSelection
     let quickState: FilmtoneQuickState
     let paramOverrides: FilmtonePhase0ParamsPatch
+    let compareEnabled: Bool
 }
 
 private struct PreviewBackdrop: View {
@@ -384,6 +401,7 @@ private struct BrandedOpeningBackdrop: View {
         sourceProfileSelection: .auto,
         quickState: .zero,
         paramOverrides: .empty,
+        compareEnabled: false,
         onOpenRequested: {}
     )
     .frame(width: 600, height: 400)
