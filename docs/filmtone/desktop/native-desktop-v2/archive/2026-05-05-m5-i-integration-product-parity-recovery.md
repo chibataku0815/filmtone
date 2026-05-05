@@ -35,10 +35,10 @@ agent-rule updates separated by commit.
 - [x] Apply I4a preview/background patch after AVPlayer and resolve conflicts.
 - [x] Choose one control-polish implementation and avoid duplicate control systems.
 - [x] Integrate parent release-cutover / AGENTS dirty state in a separate commit.
-- [ ] Run `git diff --check`.
-- [ ] Run `apps/filmtone-desktop-macos/Verify/run.sh`.
-- [ ] Run `bun run verify:macos`.
-- [ ] Archive this active task and append a short strategy note.
+- [x] Run `git diff --check`.
+- [x] Run `apps/filmtone-desktop-macos/Verify/run.sh`.
+- [x] Run `bun run verify:macos`.
+- [x] Archive this active task and append a short strategy note.
 
 ## Done Conditions
 
@@ -61,3 +61,19 @@ agent-rule updates separated by commit.
 - Portfolio submodule bump.
 - iOS Backlight implementation.
 - Portfolio/public push.
+
+## Verification
+
+- `git diff --check` clean.
+- `apps/filmtone-desktop-macos/Verify/run.sh`: 65/65 passed.
+- `bun run verify:macos`: Debug build succeeded after restoring the I4a
+  `WindowAccessor` / `RootSafeAreaTopInsetKey` helpers lost during the parent
+  UI conflict resolution.
+
+## Remaining Manual Smoke Risks
+
+- Compare bar / before-after wipe is not implemented in this integration.
+- AVPlayer preview path builds and should remove timer-driven stutter, but real
+  footage smoothness still needs user visual smoke on representative clips.
+- Final release artifact regeneration / notarization is intentionally later,
+  after product-scope visual smoke freezes.

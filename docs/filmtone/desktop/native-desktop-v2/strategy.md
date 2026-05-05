@@ -279,6 +279,11 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
 
 ## Completion Log
 
+- 2026-05-05: **M5-I integration branch closed**。I1 localization, I2
+  AVPlayer preview route, I4a preview/background, parent glass control polish,
+  and parent 1.4 release-cutover / AGENTS dirty state were integrated as
+  separated commits on `feature/native-desktop-m5-i-integration`. Verify 65/65
+  ✅、`bun run verify:macos` Debug build ✅、`git diff --check` clean。
 - 2026-05-05: **M5-I.3 Control Spacing And Slider Polish closed**。Right rail
   panel gap / padding を 8px grid ベース (16/24) に整理、Source / Look の
   large nested card background を削除して value chip のみを select affordance
