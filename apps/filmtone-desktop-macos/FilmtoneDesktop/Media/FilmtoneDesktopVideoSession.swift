@@ -87,7 +87,12 @@ final class FilmtoneDesktopVideoSession {
         self.durationSeconds = durationSeconds
         self.probedColorClass = probedColorClass
         self.cameraOptics = cameraOptics
-        self.currentInputs = inputs
+        // M5-M (CC-B): EditorState builds the initial inputs before
+        // the session attaches, so its `cameraOptics` field is nil at
+        // this point. Substitute the probe-derived value so the first
+        // composition handler sees the actual lens metadata.
+        let resolvedInputs = Self.resolveInputs(inputs, cameraOptics: cameraOptics)
+        self.currentInputs = resolvedInputs
 
         let playerItem = AVPlayerItem(asset: asset)
         // Force the item to wait until the freshly-assigned composition
@@ -101,7 +106,7 @@ final class FilmtoneDesktopVideoSession {
             naturalSize: naturalSize,
             preferredTransform: preferredTransform,
             nominalFrameRate: nominalFrameRate,
-            inputs: inputs
+            inputs: resolvedInputs
         ) {
             playerItem.videoComposition = composition
         }
@@ -247,7 +252,7 @@ final class FilmtoneDesktopVideoSession {
     /// graded composition so the next composed frame reflects the new
     /// preset / strength / look / quick / overrides / source-profile.
     func updateInputs(_ inputs: FilmtoneDesktopVideoRenderInputs) {
-        currentInputs = inputs
+        currentInputs = Self.resolveInputs(inputs, cameraOptics: cameraOptics)
         refreshTask?.cancel()
         refreshTask = Task { @MainActor [weak self] in
             // 100ms debounce keeps slider drags from spawning a rebuild
@@ -314,5 +319,32 @@ final class FilmtoneDesktopVideoSession {
                 self?.onPlayingChange?(playing)
             }
         }
+    }
+
+    // M5-M (CC-B): EditorState builds render inputs without seeing the
+    // session yet (the assignment back to `editor.videoSession` only
+    // happens after `prepare(...)` completes), so its `cameraOptics`
+    // field arrives nil. The session has the probe-derived metadata,
+    // so substitute it into every composition / thumbnail input bundle.
+    private static func resolveInputs(
+        _ inputs: FilmtoneDesktopVideoRenderInputs,
+        cameraOptics: CameraOpticsDTO?
+    ) -> FilmtoneDesktopVideoRenderInputs {
+        if inputs.cameraOptics != nil { return inputs }
+        return FilmtoneDesktopVideoRenderInputs(
+            presetName: inputs.presetName,
+            presetStrength: inputs.presetStrength,
+            lookSlug: inputs.lookSlug,
+            sourceProfileSelection: inputs.sourceProfileSelection,
+            probedColorClass: inputs.probedColorClass,
+            quickState: inputs.quickState,
+            paramOverrides: inputs.paramOverrides,
+            compareEnabled: inputs.compareEnabled,
+            compareSplitFraction: inputs.compareSplitFraction,
+            sourceURL: inputs.sourceURL,
+            opticalFilterProfileId: inputs.opticalFilterProfileId,
+            opticalFilterIntensity: inputs.opticalFilterIntensity,
+            cameraOptics: cameraOptics
+        )
     }
 }

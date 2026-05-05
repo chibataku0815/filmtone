@@ -9,8 +9,19 @@ struct RootWindowView: View {
     @State private var state = EditorState()
     @State private var library = LibraryViewModel()
     @State private var hostingWindow: NSWindow?
-    @State private var minimumContentSize = CGSize(width: 1080, height: 720)
+    // M5-M follow-up: empty opening starts at a compact floor so the launch
+    // window reads as a compact opening dialog rather than a 1080×720
+    // marketing slab. `resizeWindow(toMediaDisplaySize:)` raises this floor
+    // (and the actual frame) once the user opens media; `onChange(state.sourceURL == nil)`
+    // shrinks back to compact when the source is cleared.
+    @State private var minimumContentSize = Self.compactOpeningMinimumSize
     @State private var rootSafeAreaTopInset: CGFloat = 0
+    // M5-M follow-up (portrait sidebar reapply): cached display size of the
+    // currently-opened source. `resizeWindow(toMediaDisplaySize:)` writes
+    // this on each open / video-session arrival; the `sidebarOpen` onChange
+    // re-runs the same path with this size so portrait sidebar toggles
+    // recompute media column + sidebar reservation correctly.
+    @State private var lastMediaDisplaySize: CGSize? = nil
     // M5-G.1: export user flow lives on the coordinator now. Root view
     // just calls into it from the toolbar Export button + the inspector
     // tap callback (P2 from 2026-05-05 review).
@@ -19,70 +30,33 @@ struct RootWindowView: View {
     // across source changes. `@AppStorage` writes do not reset when
     // `state.setSource` runs, so the user's last preference holds.
     @AppStorage("editorSidebarOpen") private var sidebarOpen: Bool = true
+    // M5-M: cached display aspect ratio of the opened source. Updated on
+    // source open and on video session arrival. Stills populate this from
+    // `stillDisplaySize`; video reads from `videoSession.displayAspectRatio`
+    // reactively via the @Observable chain. nil = no source (empty state).
+    @State private var sourceAspectRatio: CGFloat? = nil
+
+    // M5-M: portrait when aspect < 1.0 (height > width). Nil (no source)
+    // is treated as landscape so the empty opening screen uses the default
+    // full-window ZStack layout. Video derives aspect reactively from the
+    // session; stills populate via `resizeWindowToSourceAspect`.
+    private var isPortraitSource: Bool {
+        if state.sourceKind == .video, let session = state.videoSession {
+            return session.displayAspectRatio < 1.0
+        }
+        guard let ratio = sourceAspectRatio else { return false }
+        return ratio < 1.0
+    }
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            PreviewSurface(
-                state: state,
-                sourceURL: state.sourceURL,
-                sourceKind: state.sourceKind,
-                presetName: state.presetName,
-                presetStrength: state.presetStrength,
-                lookSlug: state.lookSlug,
-                videoPreviewSeconds: state.videoPreviewSeconds,
-                sourceProfileSelection: state.sourceProfileSelection,
-                quickState: state.quickState,
-                paramOverrides: state.renderParamOverrides,
-                compareEnabled: state.isCompareEnabled,
-                onOpenRequested: { presentOpenPanel() }
-            )
-            .ignoresSafeArea(.container, edges: .all)
-            // M5-J1: the right-rail panel stack moved into `EditorSidebar`
-            // so the chrome can:
-            //   1) reserve top inset (72pt) for the unified toolbar +
-            //      breathing margin so panels never tuck under the
-            //      titlebar/glass toolbar background;
-            //   2) reserve bottom inset (120pt) so panels never overlap
-            //      the floating `VideoScrubBar` capsule for video sources;
-            //   3) clip vertical overflow into the sidebar's internal
-            //      ScrollView so a tall stack (Source/Look/Quick/Grade/
-            //      Inspector) is always operable, regardless of source
-            //      kind or window height;
-            //   4) collapse cleanly via `⌘\` / toolbar `sidebar.right`
-            //      so the preview can reclaim the full window width.
-            // The `if sidebarOpen` gate uses `@AppStorage`, so the user's
-            // last preference persists across source changes and relaunches.
-            if sidebarOpen {
-                EditorSidebar(
-                    state: state,
-                    library: library,
-                    exportCoordinator: exportCoordinator
-                )
-                .padding(.top, 72)
-                .padding(.bottom, 120)
-                .padding(.trailing, 12)
-            }
-            // M5-A.3 + F4: scrub bar sits close to the window's bottom
-            // edge (12pt padding) so it reads as a chrome-adjacent control
-            // rather than a panel floating mid-preview.
-            if state.sourceKind == .video,
-               let duration = state.videoDurationSeconds,
-               duration > 0 {
-                // Full-width VStack so the scrub bar centers horizontally in
-                // the window. Without .frame(maxWidth: .infinity) the VStack
-                // sizes to its child intrinsic width and the ZStack's
-                // .topTrailing alignment pushes it to the right edge.
-                // M5-K4: the bar (capsule + glass clip) and the floating
-                // thumbnail overlay are both owned by `VideoScrubBar`, so
-                // the thumbnail can render outside the capsule's
-                // `.glassEffect` clip without escaping the bar's known
-                // horizontal bounds.
-                VStack {
-                    Spacer()
-                    VideoScrubBar(state: state, duration: duration)
-                        .padding(.bottom, 64)
-                }
-                .frame(maxWidth: .infinity)
+        // M5-M: landscape keeps the existing M5-J / M5-K ZStack overlay
+        // behavior. Portrait switches to an HStack column split so the
+        // sidebar and scrub bar never overlay the media rectangle.
+        Group {
+            if isPortraitSource {
+                portraitLayout
+            } else {
+                landscapeLayout
             }
         }
         // M5-I.4a follow-up: empty launch keeps a roomier floor, then
@@ -100,6 +74,29 @@ struct RootWindowView: View {
         // No-op for stills (videoSession is nil).
         .onChange(of: VideoCompositionRefreshKey(state: state)) { _, _ in
             state.refreshVideoCompositionIfNeeded()
+        }
+        // M5-M: when the source is cleared, reset the stored still aspect
+        // so `isPortraitSource` reverts to landscape (empty-state layout).
+        // M5-M follow-up: also shrink the window back to the compact opening
+        // posture so a closed-source state does not leave a 1440×980 frame
+        // that the user must resize themselves before reopening media.
+        .onChange(of: state.sourceURL) { _, newURL in
+            if newURL == nil {
+                sourceAspectRatio = nil
+                applyCompactOpeningPosture()
+            }
+        }
+        // M5-M follow-up: portrait sidebar toggle has to re-apply the
+        // window sizing so the 332pt sidebar column does not squeeze into
+        // the existing media column. Landscape uses a ZStack overlay
+        // (sidebar floats over the preview) so its layout is independent
+        // of `sidebarOpen` and we skip there.
+        .onChange(of: sidebarOpen) { oldValue, newValue in
+            guard isPortraitSource,
+                  oldValue != newValue,
+                  let mediaSize = lastMediaDisplaySize
+            else { return }
+            resizeWindow(toMediaDisplaySize: mediaSize)
         }
         // M5-C.2a: load the on-disk library so the Picker lists saved
         // Looks at first paint. Built-in Stone / Urban appear immediately
@@ -209,6 +206,112 @@ struct RootWindowView: View {
         }
     }
 
+    // M5-M: landscape posture — existing M5-J / M5-K ZStack overlay behavior.
+    // EditorSidebar overlays the right rail; VideoScrubBar floats at the
+    // bottom. No change from pre-M5-M for landscape sources.
+    @ViewBuilder
+    private var landscapeLayout: some View {
+        ZStack(alignment: .topTrailing) {
+            PreviewSurface(
+                state: state,
+                sourceURL: state.sourceURL,
+                sourceKind: state.sourceKind,
+                presetName: state.presetName,
+                presetStrength: state.presetStrength,
+                lookSlug: state.lookSlug,
+                videoPreviewSeconds: state.videoPreviewSeconds,
+                sourceProfileSelection: state.sourceProfileSelection,
+                quickState: state.quickState,
+                paramOverrides: state.renderParamOverrides,
+                opticalFilterProfileId: state.opticalFilterProfileId,
+                opticalFilterIntensity: state.opticalFilterIntensity,
+                compareEnabled: state.isCompareEnabled,
+                onOpenRequested: { presentOpenPanel() }
+            )
+            .ignoresSafeArea(.container, edges: .all)
+            // M5-J1: sidebar overlays the right edge. Top/bottom insets
+            // keep panels clear of the toolbar chrome and the scrub bar.
+            if sidebarOpen {
+                EditorSidebar(
+                    state: state,
+                    library: library,
+                    exportCoordinator: exportCoordinator
+                )
+                .padding(.top, 72)
+                .padding(.bottom, 120)
+                .padding(.trailing, 12)
+            }
+            // M5-A.3 + F4: scrub bar floats above the window bottom edge.
+            if state.sourceKind == .video,
+               let duration = state.videoDurationSeconds,
+               duration > 0 {
+                VStack {
+                    Spacer()
+                    VideoScrubBar(state: state, duration: duration)
+                        .padding(.bottom, 64)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    // M5-M: portrait posture — HStack splits the window into a media column
+    // (left, expands) and a sidebar column (right, fixed 320pt when open).
+    // The scrub bar lives below the media column in a VStack so it never
+    // overlays the portrait rectangle. ⌘\ and Compare (V) are fully
+    // preserved; the K4 thumbnail overlay works because `VideoScrubBar` is
+    // identical — only its parent container changes.
+    @ViewBuilder
+    private var portraitLayout: some View {
+        HStack(alignment: .top, spacing: 0) {
+            // Media column: PreviewSurface fills remaining width.
+            VStack(spacing: 0) {
+                PreviewSurface(
+                    state: state,
+                    sourceURL: state.sourceURL,
+                    sourceKind: state.sourceKind,
+                    presetName: state.presetName,
+                    presetStrength: state.presetStrength,
+                    lookSlug: state.lookSlug,
+                    videoPreviewSeconds: state.videoPreviewSeconds,
+                    sourceProfileSelection: state.sourceProfileSelection,
+                    quickState: state.quickState,
+                    paramOverrides: state.renderParamOverrides,
+                    opticalFilterProfileId: state.opticalFilterProfileId,
+                    opticalFilterIntensity: state.opticalFilterIntensity,
+                    compareEnabled: state.isCompareEnabled,
+                    onOpenRequested: { presentOpenPanel() }
+                )
+                // M5-M: portrait scrub bar sits below the media, not
+                // floating on top of it. Maintains K4 thumbnail overlay
+                // behavior — VideoScrubBar is unmodified.
+                if state.sourceKind == .video,
+                   let duration = state.videoDurationSeconds,
+                   duration > 0 {
+                    VideoScrubBar(state: state, duration: duration)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 16)
+                        .padding(.top, 8)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Sidebar column: fixed-width rail, scrollable, top-inset for
+            // toolbar chrome. No bottom inset needed — scrub bar is not
+            // floating over this column.
+            if sidebarOpen {
+                EditorSidebar(
+                    state: state,
+                    library: library,
+                    exportCoordinator: exportCoordinator
+                )
+                .padding(.top, 72)
+                .padding(.bottom, 16)
+                .padding(.trailing, 12)
+            }
+        }
+        .ignoresSafeArea(.container, edges: .all)
+    }
+
     private var sourceCapBlocked: Bool {
         guard state.sourceURL != nil else { return false }
         return FilmtoneSourceInputTransform.sourceExceedsCapacity(
@@ -250,6 +353,11 @@ struct RootWindowView: View {
         switch kind {
         case .still:
             guard let mediaSize = stillDisplaySize(url: url) else { return }
+            // M5-M: capture still aspect for portrait detection before
+            // resizing the window.
+            sourceAspectRatio = mediaSize.width > 0 && mediaSize.height > 0
+                ? mediaSize.width / mediaSize.height
+                : nil
             resizeWindow(toMediaDisplaySize: mediaSize)
         case .video:
             Task {
@@ -259,6 +367,9 @@ struct RootWindowView: View {
                 let mediaSize = CGSize(width: abs(displayRect.width), height: abs(displayRect.height))
                 await MainActor.run {
                     guard state.sourceURL == url else { return }
+                    // M5-M: video aspect is derived reactively from
+                    // `state.videoSession.displayAspectRatio` via
+                    // `isPortraitSource`; no explicit store needed for video.
                     resizeWindow(toMediaDisplaySize: mediaSize)
                 }
             }
@@ -267,8 +378,23 @@ struct RootWindowView: View {
 
     private func resolveWindow(_ window: NSWindow?) {
         guard let window else { return }
+        let firstResolve = (hostingWindow == nil)
         hostingWindow = window
         configureWindowForTransparentGlass(window)
+        // M5-M follow-up: on first attach, anchor `contentMinSize` to the
+        // compact floor and — if the user has not opened media yet — shrink
+        // the actual frame to the compact opening size centered on screen.
+        // After media opens, `resizeWindow(toMediaDisplaySize:)` updates both
+        // the floor and the frame to fit the source.
+        if firstResolve {
+            window.contentMinSize = NSSize(
+                width: minimumContentSize.width,
+                height: minimumContentSize.height
+            )
+            if state.sourceURL == nil {
+                applyCompactOpeningFrame(to: window)
+            }
+        }
     }
 
     private func configureWindowForTransparentGlass(_ window: NSWindow) {
@@ -289,16 +415,74 @@ struct RootWindowView: View {
         window.contentView?.layer?.backgroundColor = NSColor.clear.cgColor
     }
 
+    // M5-M: portrait HStack layout places the sidebar in a 332pt column
+    // beside the media. The window resize adds this offset so the media
+    // column still gets its intended pixel area.
+    private static let portraitSidebarColumnWidth: CGFloat = 332
+
+    // M5-M follow-up: compact opening floor + initial frame. The empty-state
+    // plate (`EmptyPreviewLabel`) plus toolbar chrome fits inside this frame
+    // with breathing room; lowering the floor below this would let AppKit
+    // shrink the window past where the plate stays legible.
+    private static let compactOpeningMinimumSize = CGSize(width: 480, height: 400)
+    private static let compactOpeningInitialSize = CGSize(width: 600, height: 500)
+
+    private func applyCompactOpeningFrame(to window: NSWindow) {
+        let openingContentSize = NSSize(
+            width: Self.compactOpeningInitialSize.width,
+            height: Self.compactOpeningInitialSize.height
+        )
+        let frameRect = window.frameRect(forContentRect: CGRect(
+            origin: .zero,
+            size: openingContentSize
+        ))
+        let screenFrame = (window.screen ?? NSScreen.main)?.visibleFrame ?? window.frame
+        let centerOrigin = CGPoint(
+            x: screenFrame.midX - frameRect.width / 2,
+            y: screenFrame.midY - frameRect.height / 2
+        )
+        window.contentAspectRatio = NSSize(width: 0, height: 0)
+        window.resizeIncrements = NSSize(width: 1, height: 1)
+        window.setFrame(
+            CGRect(origin: centerOrigin, size: frameRect.size),
+            display: true,
+            animate: false
+        )
+    }
+
+    private func applyCompactOpeningPosture() {
+        guard let window = hostingWindow else { return }
+        minimumContentSize = Self.compactOpeningMinimumSize
+        window.contentMinSize = NSSize(
+            width: Self.compactOpeningMinimumSize.width,
+            height: Self.compactOpeningMinimumSize.height
+        )
+        // No source open → drop the cached media size so a future sidebar
+        // toggle in the empty state does not try to re-apply media sizing.
+        lastMediaDisplaySize = nil
+        applyCompactOpeningFrame(to: window)
+    }
+
     private func resizeWindow(toMediaDisplaySize mediaSize: CGSize) {
         guard let window = hostingWindow ?? NSApp.keyWindow,
               mediaSize.width > 0,
               mediaSize.height > 0
         else { return }
+        // Cache the media size so a portrait sidebar toggle can re-apply
+        // the same sizing path without re-probing the source.
+        lastMediaDisplaySize = mediaSize
 
         let screenFrame = (window.screen ?? NSScreen.main)?.visibleFrame ?? window.frame
         let aspect = mediaSize.width / mediaSize.height
+        let isPortrait = aspect < 1.0
         let frameInset = windowFrameInset(for: window)
         let topChromeAllowance = previewTopChromeAllowance(for: window)
+        // M5-M: portrait HStack layout needs the sidebar column width
+        // added to the available / preferred sizes so the media column
+        // receives its full intended pixel area without crowding.
+        let sidebarReservation: CGFloat = (isPortrait && sidebarOpen)
+            ? Self.portraitSidebarColumnWidth
+            : 0
         let availableContentSize = CGSize(
             width: max(360, screenFrame.width - 96 - frameInset.width),
             height: max(320, screenFrame.height - 96 - frameInset.height)
@@ -307,23 +491,61 @@ struct RootWindowView: View {
             width: min(availableContentSize.width, 1440),
             height: min(availableContentSize.height, 980)
         )
-        let contentMinimum = minimumContentSize(
+        // Compute the media-column portion of the preferred area.
+        let mediaPreferredSize = CGSize(
+            width: max(360, preferredContentSize.width - sidebarReservation),
+            height: preferredContentSize.height
+        )
+        // Media-only minimum derived from aspect + screen-available budget
+        // after reserving the portrait sidebar column. Without subtracting
+        // the reservation here, the requested media minimum could exceed
+        // the column's actual screen budget on narrow displays.
+        let mediaAvailableSize = CGSize(
+            width: max(360, availableContentSize.width - sidebarReservation),
+            height: availableContentSize.height
+        )
+        let mediaContentMinimum = minimumContentSize(
             forAspect: aspect,
             topChromeAllowance: topChromeAllowance,
-            within: availableContentSize
+            within: mediaAvailableSize
+        )
+        // Total window minimum includes the sidebar reservation so the
+        // user cannot shrink the window below media-min + sidebar-min.
+        // Without this, opening the sidebar in portrait squeezed the
+        // 332pt column into the existing window width and crushed the
+        // media column.
+        let contentMinimum = CGSize(
+            width: mediaContentMinimum.width + sidebarReservation,
+            height: mediaContentMinimum.height
         )
         minimumContentSize = contentMinimum
         window.contentMinSize = contentMinimum
 
-        var contentSize = previewAreaAspectFitSize(
+        var mediaSize = previewAreaAspectFitSize(
             aspect: aspect,
             topChromeAllowance: topChromeAllowance,
-            in: preferredContentSize
+            in: mediaPreferredSize
         )
-        if contentSize.width < contentMinimum.width || contentSize.height < contentMinimum.height {
-            contentSize = contentMinimum
+        if mediaSize.width < mediaContentMinimum.width || mediaSize.height < mediaContentMinimum.height {
+            mediaSize = CGSize(
+                width: max(mediaSize.width, mediaContentMinimum.width),
+                height: max(mediaSize.height, mediaContentMinimum.height)
+            )
         }
-        window.contentAspectRatio = contentSize
+        // Total content size: media column + sidebar reservation.
+        let contentSize = CGSize(
+            width: mediaSize.width + sidebarReservation,
+            height: mediaSize.height
+        )
+        // M5-M: portrait HStack aspect changes with sidebar open/closed.
+        // Clear the fixed aspect ratio so free resize works; landscape
+        // keeps the locked aspect for the QuickTime-style UX.
+        if isPortrait {
+            window.contentAspectRatio = NSSize(width: 0, height: 0)
+            window.resizeIncrements = NSSize(width: 1, height: 1)
+        } else {
+            window.contentAspectRatio = contentSize
+        }
 
         let currentFrame = window.frame
         let frameRect = window.frameRect(forContentRect: CGRect(origin: .zero, size: contentSize))

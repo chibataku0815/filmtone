@@ -290,6 +290,12 @@ supported values through preview/export, and emits sidecar profile identity.
 Verification was green (`Verify/run.sh` 97/97, `bun run verify:macos`,
 `git diff --check`); Debug app launched.
 
+2026-05-05: M5-M Portrait Layout + Backlight Veil + Compact Opening — code
+verification passed (`Verify/run.sh` 111/111, `bun run verify:macos`,
+`git diff --check`); portrait video / still / Backlight Veil cursor visual
+smoke remains user-pending. Lane is open as `active.md`; do not archive
+until the user confirms visual smoke.
+
 2026-05-05: M6 clean public release completed after parent-branch correction and
 `origin/main` merge. Native Desktop v1.4 is now the active public Desktop rail;
 update metadata reports `latestVersion: "1.4"`, and the fixed download page

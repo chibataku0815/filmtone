@@ -31,6 +31,15 @@ struct PreviewSurface: View {
     /// M5-C.3a: per-key parameter override patch applied between the
     /// preset/look resolve and the quick-state pass.
     let paramOverrides: FilmtonePhase0ParamsPatch
+    /// M5-M (CC-B): Backlight Veil profile id + continuous intensity. The
+    /// still preview path resolves the optical scatter coefficients in
+    /// `FilmtoneGradePipeline.apply` so the live preview matches video /
+    /// export Backlight behavior. `paramOverrides` already carries the
+    /// (intensity-scaled) energy-key changes from
+    /// `FilmtoneOpticalFilterCatalog.renderParamOverrides`; these two
+    /// fields drive the optical scatter composite branch + cache key.
+    let opticalFilterProfileId: String?
+    let opticalFilterIntensity: Double
     /// M5-J.2 / M5-K3: when true the still preview also renders a raw
     /// pre-transform companion frame so the compare overlay can show
     /// left=source / right=graded as a SwiftUI mask, and so dragging the
@@ -62,7 +71,14 @@ struct PreviewSurface: View {
             PreviewBackdrop(mode: sourceURL == nil ? .empty : .loaded)
                 .backgroundExtensionEffect()
             if sourceURL == nil {
+                // M5-M: `.fixedSize()` pins the plate to its intrinsic
+                // compact size regardless of the window width/height. The
+                // surrounding `BrandedOpeningBackdrop` still fills the
+                // window; only the labeled plate stays compact. Keeps
+                // K1's bounded luminous-field readability without regressing
+                // to a stretching marketing-page posture on wide windows.
                 EmptyPreviewLabel(onOpenRequested: onOpenRequested)
+                    .fixedSize()
             } else {
                 // M5-I.2: video sources mount the AVPlayer view as soon as
                 // `state.videoSession` lands. The session probes the asset
@@ -128,7 +144,9 @@ struct PreviewSurface: View {
             sourceProfileSelection: sourceProfileSelection,
             quickState: quickState,
             paramOverrides: paramOverrides,
-            compareEnabled: compareEnabled
+            compareEnabled: compareEnabled,
+            opticalFilterProfileId: opticalFilterProfileId,
+            opticalFilterIntensity: opticalFilterIntensity
         )) {
             await renderCurrent()
         }
@@ -178,10 +196,13 @@ struct PreviewSurface: View {
         let quick = quickState
         let overrides = paramOverrides
         let compare = compareEnabled
+        let opticalProfileId = opticalFilterProfileId
+        let opticalIntensity = opticalFilterIntensity
 
         let source: CIImage? = CIImage(contentsOf: sourceURL)
-        let probedColorClass: SourceColorClassDTO? =
-            FilmtoneSourceProber.probeStill(sourceURL: sourceURL).colorClass
+        let probe = FilmtoneSourceProber.probeStill(sourceURL: sourceURL)
+        let probedColorClass: SourceColorClassDTO? = probe.colorClass
+        let probedOptics: CameraOpticsDTO? = probe.cameraOptics
         guard !Task.isCancelled else { return }
         state.applyProbedSourceColorClass(probedColorClass, for: sourceURL)
 
@@ -197,7 +218,10 @@ struct PreviewSurface: View {
                 probedColorClass: probedColorClass,
                 quickState: quick,
                 paramOverrides: overrides,
-                compareEnabled: compare
+                compareEnabled: compare,
+                opticalFilterProfileId: opticalProfileId,
+                opticalFilterIntensity: opticalIntensity,
+                cameraOptics: probedOptics
             )
         }.value
 
@@ -223,7 +247,15 @@ struct PreviewSurface: View {
         probedColorClass: SourceColorClassDTO?,
         quickState: FilmtoneQuickState,
         paramOverrides: FilmtonePhase0ParamsPatch,
-        compareEnabled: Bool
+        compareEnabled: Bool,
+        // M5-M (CC-B): Backlight Veil profile + intensity + still-probe
+        // camera optics. Threaded from `state.opticalFilterProfileId` /
+        // `state.opticalFilterIntensity` and `FilmtoneSourceProber.probeStill`
+        // so the still live preview routes through the same Backlight Veil
+        // composite as exports / video preview, at the user's chosen strength.
+        opticalFilterProfileId: String?,
+        opticalFilterIntensity: Double,
+        cameraOptics: CameraOpticsDTO?
     ) -> RenderedFrames? {
         guard let source else {
             // CIImage failed (HEIC variant etc.) — fall back to a directly
@@ -267,7 +299,10 @@ struct PreviewSurface: View {
             to: normalizedSource,
             params: params,
             sourceSeed: sourceSeed,
-            creativeLut: creativeLut
+            cameraOptics: cameraOptics,
+            creativeLut: creativeLut,
+            opticalFilterProfileId: opticalFilterProfileId,
+            opticalFilterIntensity: opticalFilterIntensity
         )
         guard let gradedNSImage = rasterize(
             ciImage: graded,
@@ -339,6 +374,8 @@ private struct PreviewRenderKey: Hashable {
     let quickState: FilmtoneQuickState
     let paramOverrides: FilmtonePhase0ParamsPatch
     let compareEnabled: Bool
+    let opticalFilterProfileId: String?
+    let opticalFilterIntensity: Double
 }
 
 /// M5-K3: still preview compositor. Lays the graded NSImage on the full
@@ -656,6 +693,8 @@ private struct BrandedOpeningBackdrop: View {
         sourceProfileSelection: .auto,
         quickState: .zero,
         paramOverrides: .empty,
+        opticalFilterProfileId: nil,
+        opticalFilterIntensity: 1.0,
         compareEnabled: false,
         onOpenRequested: {}
     )

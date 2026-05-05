@@ -40,6 +40,7 @@ SOURCES=(
   "$SRC_ROOT/Domain/CameraOpticsDTO.swift"
   "$SRC_ROOT/Domain/SourceColorTypes.swift"
   "$SRC_ROOT/Domain/FilmtoneDesktopStrings.swift"
+  "$SRC_ROOT/Domain/FilmtoneOpticalScatterMath.swift"
   "$SRC_ROOT/Domain/AdvancedAdjustCatalog.swift"
   "$SRC_ROOT/Domain/FilmtoneCompareSplitMath.swift"
   "$SRC_ROOT/Color/FilmtonePresetCatalog.swift"

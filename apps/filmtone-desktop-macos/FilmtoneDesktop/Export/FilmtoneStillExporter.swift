@@ -43,6 +43,8 @@ struct FilmtoneStillExportRequest: FilmtoneSidecarRequest {
     let paramOverrides: FilmtonePhase0ParamsPatch
     let highlightMarkers: FilmtoneHighlightMarkers?
     let opticalFilterProfileId: String?
+    /// M5-M (CC-B): intensity scalar for the optical filter profile (0…1).
+    let opticalFilterIntensity: Double
     var sourceKind: FilmtoneSourceKind { .still }
 
     init(
@@ -57,7 +59,8 @@ struct FilmtoneStillExportRequest: FilmtoneSidecarRequest {
         quickState: FilmtoneQuickState = .zero,
         paramOverrides: FilmtonePhase0ParamsPatch = .empty,
         highlightMarkers: FilmtoneHighlightMarkers? = nil,
-        opticalFilterProfileId: String? = nil
+        opticalFilterProfileId: String? = nil,
+        opticalFilterIntensity: Double = 1.0
     ) {
         self.sourceURL = sourceURL
         self.outputURL = outputURL
@@ -73,6 +76,7 @@ struct FilmtoneStillExportRequest: FilmtoneSidecarRequest {
         self.paramOverrides = paramOverrides
         self.highlightMarkers = highlightMarkers
         self.opticalFilterProfileId = opticalFilterProfileId
+        self.opticalFilterIntensity = max(0, min(1, opticalFilterIntensity))
     }
 }
 
@@ -130,6 +134,7 @@ enum FilmtoneStillExporter {
             quickState: request.quickState,
             paramOverrides: FilmtoneOpticalFilterCatalog.renderParamOverrides(
                 profileId: request.opticalFilterProfileId,
+                intensity: request.opticalFilterIntensity,
                 userOverrides: request.paramOverrides
             )
         )
@@ -149,7 +154,9 @@ enum FilmtoneStillExporter {
             params: params,
             sourceSeed: sourceSeed,
             cameraOptics: probe.cameraOptics,
-            creativeLut: creativeLut
+            creativeLut: creativeLut,
+            opticalFilterProfileId: request.opticalFilterProfileId,
+            opticalFilterIntensity: request.opticalFilterIntensity
         )
 
         try render(graded, request: request, contract: contract)

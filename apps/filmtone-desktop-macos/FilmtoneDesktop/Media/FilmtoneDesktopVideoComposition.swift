@@ -35,6 +35,21 @@ struct FilmtoneDesktopVideoRenderInputs: Sendable {
     /// the new fraction; defaults to mid-frame for fresh sessions.
     let compareSplitFraction: Double
     let sourceURL: URL
+    /// M5-M (CC-B): Backlight Veil profile selection. The composition
+    /// handler resolves this through `FilmtoneOpticalFilterCatalog` and
+    /// forwards the six scatter coefficients to `FilmtoneGradePipeline`.
+    /// `nil` keeps the legacy glow composite path bytewise.
+    let opticalFilterProfileId: String?
+    /// M5-M (CC-B): continuous Backlight Veil intensity in `[0, 1]`. At 0
+    /// the composition handler routes back to the legacy glow composite
+    /// (no Backlight-specific direct-loss / scatter math); at 1 the
+    /// behavior is identical to the original chip-only path.
+    let opticalFilterIntensity: Double
+    /// M5-M (CC-B): probed source camera optics. Already used by the
+    /// vignette stage in the export path; threading it into the preview
+    /// / scrub-thumbnail composition handler keeps Backlight Veil and
+    /// vignette behaviorally consistent across surfaces.
+    let cameraOptics: CameraOpticsDTO?
 }
 
 enum FilmtoneDesktopVideoComposition {
@@ -141,6 +156,9 @@ enum FilmtoneDesktopVideoComposition {
         let compareSplitFraction = FilmtoneCompareSplitMath.clamp(
             inputs.compareSplitFraction
         )
+        let opticalFilterProfileId = inputs.opticalFilterProfileId
+        let opticalFilterIntensity = inputs.opticalFilterIntensity
+        let cameraOptics = inputs.cameraOptics
         let composition = AVMutableVideoComposition(
             asset: asset,
             applyingCIFiltersWithHandler: { request in
@@ -164,7 +182,10 @@ enum FilmtoneDesktopVideoComposition {
                     params: resolvedParams,
                     frameTimeSeconds: timeSeconds.isFinite ? timeSeconds : 0,
                     sourceSeed: sourceSeed,
-                    creativeLut: preparedCreativeLut
+                    cameraOptics: cameraOptics,
+                    creativeLut: preparedCreativeLut,
+                    opticalFilterProfileId: opticalFilterProfileId,
+                    opticalFilterIntensity: opticalFilterIntensity
                 )
                 // Halation / bloom mip pyramids can grow extent beyond the
                 // composition canvas. Crop back to renderBounds so

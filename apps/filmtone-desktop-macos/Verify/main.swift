@@ -358,6 +358,169 @@ runner.test("Backlight Veil render patch preserves manual advanced override prio
     try assertClose(merged.values["exposure"] ?? -1, 0.25)
 }
 
+runner.test("Backlight Veil profiles carry six optical scatter coefficients with monotonic progression") {
+    let densities = ["backlightVeil-1-8", "backlightVeil-1-4", "backlightVeil-1-2"]
+    var resolved: [FilmtoneOpticalScatterParams] = []
+    for id in densities {
+        guard let scatter = FilmtoneOpticalFilterCatalog.opticalScatter(for: id) else {
+            throw AssertionError(
+                description: "\(id) missing optical scatter; M5-M expects every Backlight Veil density to expose iOS-canonical coefficients"
+            )
+        }
+        resolved.append(scatter)
+    }
+    // None must collapse to nil so the legacy glow composite stays the
+    // default render path.
+    if FilmtoneOpticalFilterCatalog.opticalScatter(for: "none") != nil {
+        throw AssertionError(description: "'none' must not carry optical scatter coefficients")
+    }
+    if FilmtoneOpticalFilterCatalog.opticalScatter(for: nil) != nil {
+        throw AssertionError(description: "nil profile id must not carry optical scatter")
+    }
+    let strengths = resolved.map(\.scatterStrength)
+    let directLosses = resolved.map { 1.0 - $0.directTransmission }
+    let highlightDrives = resolved.map(\.highlightReactivity)
+    let blackHolds = resolved.map(\.blackRetention)
+    for index in 1..<strengths.count {
+        if !(strengths[index] > strengths[index - 1]) {
+            throw AssertionError(
+                description: "scatterStrength must increase 1/8 < 1/4 < 1/2 (got \(strengths))"
+            )
+        }
+        if !(directLosses[index] > directLosses[index - 1]) {
+            throw AssertionError(
+                description: "(1 - directTransmission) must increase 1/8 < 1/4 < 1/2 (got \(directLosses))"
+            )
+        }
+        if !(highlightDrives[index] > highlightDrives[index - 1]) {
+            throw AssertionError(
+                description: "highlightReactivity must increase 1/8 < 1/4 < 1/2 (got \(highlightDrives))"
+            )
+        }
+        if !(blackHolds[index] < blackHolds[index - 1]) {
+            throw AssertionError(
+                description: "blackRetention must decrease 1/8 > 1/4 > 1/2 (got \(blackHolds))"
+            )
+        }
+    }
+    // Spot-check the canonical 1/4 values against `optical-filter-profiles.ts`.
+    try assertClose(resolved[1].directTransmission, 0.81)
+    try assertClose(resolved[1].blackRetention, 0.56)
+    try assertClose(resolved[1].scatterStrength, 0.66)
+    try assertClose(resolved[1].highlightReactivity, 0.78)
+    try assertClose(resolved[1].warmScatter, 0.17)
+    try assertClose(resolved[1].spectralTail, 0.07)
+}
+
+runner.test("Backlight Veil composite delta progresses None < 1/8 < 1/4 < 1/2 on a synthetic bright frame") {
+    // The Backlight Veil scenario is a shadow subject silhouetted
+    // against a bright source. Sample that with a deep-shadow base
+    // pixel and bright bloom + halation + diffusion plates: the veil
+    // adds scatter into the shadow at progressively higher densities,
+    // so absolute output delta from the unprocessed base must rise
+    // monotonically with density. (At very bright base pixels direct
+    // loss can dominate scatter and the delta is non-monotonic — use
+    // shadow base here, matching the user-perceived Backlight scenario.)
+    let basePixel = (0.05, 0.04, 0.03)
+    let plate = (0.5, 0.5, 0.5)
+    let bloomStrength = 0.4
+    let halationIntensity = 0.18
+    let diffusionAmount = 0.25
+
+    func deltaFor(_ id: String?) -> Double {
+        let scatter = FilmtoneOpticalFilterCatalog.opticalScatter(for: id)
+        let composed: (Double, Double, Double)
+        if let scatter {
+            composed = FilmtoneOpticalScatterMath.composite(
+                base: basePixel,
+                bloom: plate,
+                halation: plate,
+                diffusion: plate,
+                bloomStrength: bloomStrength,
+                halationIntensity: halationIntensity,
+                diffusionAmount: diffusionAmount,
+                optical: scatter
+            )
+        } else {
+            composed = basePixel
+        }
+        let dr = composed.0 - basePixel.0
+        let dg = composed.1 - basePixel.1
+        let db = composed.2 - basePixel.2
+        return abs(dr) + abs(dg) + abs(db)
+    }
+
+    let deltas: [Double] = [
+        deltaFor(nil),
+        deltaFor("backlightVeil-1-8"),
+        deltaFor("backlightVeil-1-4"),
+        deltaFor("backlightVeil-1-2"),
+    ]
+    if !(deltas[0] < 1e-9) {
+        throw AssertionError(description: "None must produce zero delta against base (got \(deltas[0]))")
+    }
+    for index in 1..<deltas.count {
+        if !(deltas[index] > deltas[index - 1] + 0.005) {
+            throw AssertionError(
+                description: "composite delta must increase materially with density (got \(deltas))"
+            )
+        }
+    }
+}
+
+runner.test("Backlight Veil composite preserves shadow ordering and warm-biases scatter") {
+    let scatter = FilmtoneOpticalFilterCatalog.opticalScatter(for: "backlightVeil-1-2")!
+    let plate = (0.4, 0.4, 0.4)
+    // Bright base falls back closer to base after direct loss; shadow
+    // base picks up scatter. Both should still keep the highlight luma
+    // above the shadow luma with the veil applied.
+    let highlight = FilmtoneOpticalScatterMath.composite(
+        base: (0.95, 0.85, 0.60),
+        bloom: plate,
+        halation: plate,
+        diffusion: plate,
+        bloomStrength: 0.4,
+        halationIntensity: 0.18,
+        diffusionAmount: 0.25,
+        optical: scatter
+    )
+    let shadow = FilmtoneOpticalScatterMath.composite(
+        base: (0.06, 0.05, 0.04),
+        bloom: plate,
+        halation: plate,
+        diffusion: plate,
+        bloomStrength: 0.4,
+        halationIntensity: 0.18,
+        diffusionAmount: 0.25,
+        optical: scatter
+    )
+    let highlightLuma = FilmtoneOpticalScatterMath.luma(highlight)
+    let shadowLuma = FilmtoneOpticalScatterMath.luma(shadow)
+    if !(highlightLuma > shadowLuma + 0.3) {
+        throw AssertionError(
+            description: "Backlight Veil 1/2 must keep shadows below highlights (got shadow=\(shadowLuma) highlight=\(highlightLuma))"
+        )
+    }
+    // Warm bias acts on the scatter contribution. At a neutral gray
+    // base the direct-loss is symmetric across channels, so the
+    // composed result must skew warm (R > B) under the 1/2 veil.
+    let neutral = FilmtoneOpticalScatterMath.composite(
+        base: (0.45, 0.45, 0.45),
+        bloom: plate,
+        halation: plate,
+        diffusion: plate,
+        bloomStrength: 0.4,
+        halationIntensity: 0.18,
+        diffusionAmount: 0.25,
+        optical: scatter
+    )
+    if !(neutral.0 > neutral.2 + 0.005) {
+        throw AssertionError(
+            description: "Backlight Veil 1/2 must warm-bias a neutral mid pixel (R > B), got neutral=\(neutral)"
+        )
+    }
+}
+
 runner.test("sidecar records Backlight Veil identity and resolves gradeParams") {
     struct OpticalSidecarRequest: FilmtoneSidecarRequest {
         let sourceURL = URL(fileURLWithPath: "/tmp/in.mov")
@@ -1947,6 +2110,295 @@ runner.test("FilmtoneCompareSplitMath.clamp collapses non-finite to default") {
     try assertClose(FilmtoneCompareSplitMath.clamp(.nan), FilmtoneCompareSplitMath.default)
     try assertClose(FilmtoneCompareSplitMath.clamp(.infinity), FilmtoneCompareSplitMath.default)
     try assertClose(FilmtoneCompareSplitMath.clamp(-.infinity), FilmtoneCompareSplitMath.default)
+}
+
+// ---------------------------------------------------------------------------
+// Test group 16 — M5-M (CC-B) intensity cursor regression.
+// intensity == 1.0 must reproduce the M5-L3 chip-only patch byte-for-byte.
+// intensity == 0.0 must produce an empty patch contribution from the profile
+// (user overrides are unaffected). Monotonicity: increasing intensity from
+// 0 toward 1 must monotonically increase each profile key's magnitude.
+// ---------------------------------------------------------------------------
+
+runner.test("intensity 1.0 is byte-equivalent to M5-L3 chip-only patch") {
+    for profile in FilmtoneOpticalFilterCatalog.profiles {
+        // Chip-only path (M5-L3 backward-compat overload, intensity=1.0).
+        let legacy = FilmtoneOpticalFilterCatalog.renderParamOverrides(
+            profileId: profile.id,
+            userOverrides: .empty
+        )
+        // New intensity-aware path at 1.0.
+        let withIntensity = FilmtoneOpticalFilterCatalog.renderParamOverrides(
+            profileId: profile.id,
+            intensity: 1.0,
+            userOverrides: .empty
+        )
+        for (key, legacyVal) in legacy.values {
+            let intensityVal = withIntensity.values[key] ?? .nan
+            try assertClose(
+                intensityVal, legacyVal,
+                "profile=\(profile.id) key=\(key): intensity=1.0 must equal chip-only"
+            )
+        }
+        // No extra keys should appear at intensity=1.0.
+        for key in withIntensity.values.keys {
+            if legacy.values[key] == nil {
+                throw AssertionError(
+                    description: "profile=\(profile.id): unexpected key '\(key)' at intensity=1.0"
+                )
+            }
+        }
+    }
+}
+
+runner.test("intensity 0.0 produces empty profile contribution (no extra keys)") {
+    for profile in FilmtoneOpticalFilterCatalog.profiles {
+        let patch = FilmtoneOpticalFilterCatalog.renderParamOverrides(
+            profileId: profile.id,
+            intensity: 0.0,
+            userOverrides: .empty
+        )
+        // All profile keys should be 0 (or absent) — user overrides are
+        // empty, so no key from the catalog should survive at non-zero.
+        for (key, val) in patch.values {
+            // Profile patch keys multiplied by 0 → should all be 0.
+            try assertClose(
+                val, 0.0,
+                "profile=\(profile.id) key=\(key): intensity=0.0 must zero profile contribution"
+            )
+        }
+    }
+}
+
+runner.test("intensity userOverrides are not attenuated by intensity scalar") {
+    // User overrides (advanced panel edits) must survive intensity=0.0
+    // unchanged — they represent direct per-key edits, not Backlight Veil.
+    let userOverrides = FilmtonePhase0ParamsPatch(values: [
+        "exposure": 0.42,
+        "bloomStrength": 0.75,
+    ])
+    let patch = FilmtoneOpticalFilterCatalog.renderParamOverrides(
+        profileId: "backlightVeil-1-4",
+        intensity: 0.0,
+        userOverrides: userOverrides
+    )
+    try assertClose(patch.values["exposure"] ?? .nan, 0.42, "exposure override survives intensity=0")
+    try assertClose(patch.values["bloomStrength"] ?? .nan, 0.75, "bloomStrength override survives intensity=0")
+}
+
+runner.test("intensity scales energy keys linearly; structural keys pass through verbatim") {
+    // Energy keys are "how much" the effect emits — bloom / halation /
+    // diffusion strengths, lensSoftness, rgbShift. These attenuate
+    // linearly with intensity so 0.5 = half the energy.
+    //
+    // Structural keys are "where / what shape" — bloomThreshold,
+    // bloomRadius, bloomSoftKnee, halationThreshold, halationRadius,
+    // halationHue, halationSoftKnee. These pass through verbatim while
+    // the profile is engaged (intensity > 0). Scaling them by intensity
+    // would lower the bloom threshold at half intensity, making the veil
+    // engage on darker pixels — i.e. *more* aggressive at 0.5 than 1.0.
+    // The earlier `mapValues { $0 * intensity }` had that bug.
+    let energyKeys: Set<String> = [
+        "bloomStrength",
+        "halationIntensity",
+        "diffusion",
+        "lensSoftness",
+        "rgbShift",
+    ]
+    let structuralKeys: Set<String> = [
+        "bloomThreshold",
+        "bloomRadius",
+        "bloomSoftKnee",
+        "halationThreshold",
+        "halationRadius",
+        "halationHue",
+        "halationSoftKnee",
+    ]
+    for profile in FilmtoneOpticalFilterCatalog.profiles {
+        let at1 = FilmtoneOpticalFilterCatalog.renderParamOverrides(
+            profileId: profile.id,
+            intensity: 1.0,
+            userOverrides: .empty
+        )
+        let at05 = FilmtoneOpticalFilterCatalog.renderParamOverrides(
+            profileId: profile.id,
+            intensity: 0.5,
+            userOverrides: .empty
+        )
+        let at01 = FilmtoneOpticalFilterCatalog.renderParamOverrides(
+            profileId: profile.id,
+            intensity: 0.1,
+            userOverrides: .empty
+        )
+        for (key, val1) in at1.values {
+            let val05 = at05.values[key] ?? .nan
+            let val01 = at01.values[key] ?? .nan
+            if energyKeys.contains(key) {
+                try assertClose(
+                    val05, val1 * 0.5,
+                    "energy key \(key) on \(profile.id): expected 0.5*full at intensity=0.5"
+                )
+                try assertClose(
+                    val01, val1 * 0.1,
+                    "energy key \(key) on \(profile.id): expected 0.1*full at intensity=0.1"
+                )
+            } else if structuralKeys.contains(key) {
+                try assertClose(
+                    val05, val1,
+                    "structural key \(key) on \(profile.id): must NOT scale with intensity (got \(val05) at 0.5, expected \(val1))"
+                )
+                try assertClose(
+                    val01, val1,
+                    "structural key \(key) on \(profile.id): must NOT scale with intensity (got \(val01) at 0.1, expected \(val1))"
+                )
+            } else {
+                throw AssertionError(
+                    description: "Unknown profile key \(key) — classify it in energyKeys or structuralKeys"
+                )
+            }
+        }
+    }
+}
+
+runner.test("intensity does not pre-load thresholds (anti-regression for mapValues bug)") {
+    // The pre-fix `mapValues { $0 * intensity }` made `bloomThreshold`
+    // 0.28 at intensity=0.5 for the 1/4 profile (catalog 0.56). Lower
+    // threshold means the veil engages on darker pixels — i.e. *more*
+    // aggressive at half intensity than at full. This guard locks the
+    // fix so the bug cannot come back through a future refactor.
+    let half = FilmtoneOpticalFilterCatalog.renderParamOverrides(
+        profileId: "backlightVeil-1-4",
+        intensity: 0.5,
+        userOverrides: .empty
+    )
+    guard let bloomThresholdHalf = half.values["bloomThreshold"] else {
+        throw AssertionError(
+            description: "bloomThreshold must be present in the patch at intensity=0.5"
+        )
+    }
+    try assertClose(
+        bloomThresholdHalf, 0.56,
+        "bloomThreshold must pass through profile value 0.56 at intensity=0.5"
+    )
+    if abs(bloomThresholdHalf - 0.28) < 1e-6 {
+        throw AssertionError(
+            description: "bloomThreshold==0.28 at intensity=0.5 indicates the legacy `mapValues * intensity` bug regressed"
+        )
+    }
+}
+
+runner.test("intensityScaledScatter returns nil at intensity 0 (legacy glow fallback)") {
+    // GradePipeline routes through the Backlight Veil CIKernel only when
+    // `intensityScaledScatter` returns non-nil. At intensity == 0 the
+    // user has zeroed the Backlight contribution: the pipeline must fall
+    // back to the legacy `glowComposite` (no Backlight-specific direct
+    // loss / scatter math). Identical to selecting None.
+    for profile in FilmtoneOpticalFilterCatalog.profiles {
+        let scatter = FilmtoneOpticalFilterCatalog.intensityScaledScatter(
+            for: profile.id,
+            intensity: 0.0
+        )
+        if scatter != nil {
+            throw AssertionError(
+                description: "\(profile.id) at intensity=0 must yield nil scatter so GradePipeline falls back to legacy glow composite"
+            )
+        }
+    }
+    // A tiny but non-zero intensity still produces scaled scatter so the
+    // user sees a faint Backlight effect even at low strength.
+    if FilmtoneOpticalFilterCatalog.intensityScaledScatter(
+        for: "backlightVeil-1-4",
+        intensity: 0.1
+    ) == nil {
+        throw AssertionError(
+            description: "intensity=0.1 must still produce scaled scatter (engaged at low strength)"
+        )
+    }
+    // Negative or NaN-like extreme values clamp to nil too.
+    if FilmtoneOpticalFilterCatalog.intensityScaledScatter(
+        for: "backlightVeil-1-4",
+        intensity: -0.5
+    ) != nil {
+        throw AssertionError(
+            description: "intensity<0 must clamp to nil scatter"
+        )
+    }
+}
+
+runner.test("intensityScaledScatter at 1.0 equals catalog scatter byte-for-byte") {
+    for profile in FilmtoneOpticalFilterCatalog.profiles {
+        guard let scaled = FilmtoneOpticalFilterCatalog.intensityScaledScatter(
+            for: profile.id,
+            intensity: 1.0
+        ), let raw = FilmtoneOpticalFilterCatalog.opticalScatter(for: profile.id) else {
+            throw AssertionError(
+                description: "\(profile.id) scatter resolution failed at intensity=1.0"
+            )
+        }
+        try assertClose(scaled.directTransmission, raw.directTransmission)
+        try assertClose(scaled.blackRetention, raw.blackRetention)
+        try assertClose(scaled.scatterStrength, raw.scatterStrength)
+        try assertClose(scaled.highlightReactivity, raw.highlightReactivity)
+        try assertClose(scaled.warmScatter, raw.warmScatter)
+        try assertClose(scaled.spectralTail, raw.spectralTail)
+    }
+}
+
+runner.test("intensityScaledScatter at 0.5 blends toward neutral-no-effect coefficients") {
+    // Neutral targets: directTransmission → 1.0 (no direct loss),
+    // all other coefficients → 0 (no scatter / shadow protect /
+    // highlight reactivity / warm bias / spectral tail). At 0.5 the
+    // values sit halfway between catalog and neutral.
+    guard let raw = FilmtoneOpticalFilterCatalog.opticalScatter(for: "backlightVeil-1-4"),
+          let scaled = FilmtoneOpticalFilterCatalog.intensityScaledScatter(
+            for: "backlightVeil-1-4",
+            intensity: 0.5
+          ) else {
+        throw AssertionError(description: "1/4 scatter resolution failed at intensity=0.5")
+    }
+    // dT: mix(1.0, raw.dT, 0.5) = 1.0 - 0.5 * (1.0 - raw.dT)
+    let expectedDT = 1.0 - 0.5 * (1.0 - raw.directTransmission)
+    try assertClose(scaled.directTransmission, expectedDT)
+    try assertClose(scaled.blackRetention, raw.blackRetention * 0.5)
+    try assertClose(scaled.scatterStrength, raw.scatterStrength * 0.5)
+    try assertClose(scaled.highlightReactivity, raw.highlightReactivity * 0.5)
+    try assertClose(scaled.warmScatter, raw.warmScatter * 0.5)
+    try assertClose(scaled.spectralTail, raw.spectralTail * 0.5)
+}
+
+runner.test("intensity sidecar omits opticalFilterIntensity when 1.0") {
+    struct IntensitySidecarRequest: FilmtoneSidecarRequest {
+        let sourceURL = URL(fileURLWithPath: "/tmp/in.png")
+        let outputURL = URL(fileURLWithPath: "/tmp/out.png")
+        let presetName = "reset"
+        let presetStrength = 1.0
+        let lookSlug: String? = nil
+        let sourceKind: FilmtoneSourceKind = .still
+        let quickState = FilmtoneQuickState.zero
+        let paramOverrides = FilmtonePhase0ParamsPatch.empty
+        let opticalFilterProfileId: String? = "backlightVeil-1-4"
+        let opticalFilterIntensity: Double
+    }
+    // At 1.0, opticalFilterIntensity should be absent from the sidecar block.
+    let payload1 = FilmtoneSidecarWriter.sidecarPayload(
+        for: IntensitySidecarRequest(opticalFilterIntensity: 1.0)
+    )
+    if let block = payload1["opticalFilterProfile"] as? [String: Any] {
+        if block["opticalFilterIntensity"] != nil {
+            throw AssertionError(
+                description: "opticalFilterIntensity must be omitted from sidecar when 1.0"
+            )
+        }
+    }
+    // At 0.5, opticalFilterIntensity should be present.
+    let payload05 = FilmtoneSidecarWriter.sidecarPayload(
+        for: IntensitySidecarRequest(opticalFilterIntensity: 0.5)
+    )
+    guard let block05 = payload05["opticalFilterProfile"] as? [String: Any] else {
+        throw AssertionError(description: "opticalFilterProfile block missing at intensity=0.5")
+    }
+    let storedIntensity = block05["opticalFilterIntensity"] as? Double
+    try assertClose(storedIntensity ?? .nan, 0.5, "opticalFilterIntensity should be 0.5 in sidecar")
 }
 
 exit(runner.summary())

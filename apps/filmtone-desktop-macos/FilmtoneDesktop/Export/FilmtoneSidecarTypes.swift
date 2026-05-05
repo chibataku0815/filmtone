@@ -34,6 +34,10 @@ protocol FilmtoneSidecarRequest: Sendable {
     /// from `paramOverrides` so sidecar metadata can preserve identity
     /// while grade params still resolve through the existing patch path.
     var opticalFilterProfileId: String? { get }
+    /// M5-M (CC-B): continuous intensity scalar for the optical filter profile
+    /// (0…1). Default 1.0 → M5-L3 chip-only behavior. Omitted from sidecar
+    /// when 1.0 for backward compatibility.
+    var opticalFilterIntensity: Double { get }
 }
 
 extension FilmtoneSidecarRequest {
@@ -42,4 +46,5 @@ extension FilmtoneSidecarRequest {
     var paramOverrides: FilmtonePhase0ParamsPatch { .empty }
     var highlightMarkers: FilmtoneHighlightMarkers? { nil }
     var opticalFilterProfileId: String? { nil }
+    var opticalFilterIntensity: Double { 1.0 }
 }

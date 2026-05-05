@@ -67,6 +67,7 @@
 		FT0000000000000000000A3E /* FilmtoneCompareSplitMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B3D /* FilmtoneCompareSplitMath.swift */; };
 		FT0000000000000000000A3F /* FilmtoneVideoScrubThumbnailProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B3E /* FilmtoneVideoScrubThumbnailProvider.swift */; };
 		FT0000000000000000000A40 /* FilmtoneScrubThumbnailMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B3F /* FilmtoneScrubThumbnailMath.swift */; };
+		FT0000000000000000000A41 /* FilmtoneOpticalScatterMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B40 /* FilmtoneOpticalScatterMath.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -129,6 +130,7 @@
 		FT0000000000000000000B3D /* FilmtoneCompareSplitMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCompareSplitMath.swift; sourceTree = "<group>"; };
 		FT0000000000000000000B3E /* FilmtoneVideoScrubThumbnailProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneVideoScrubThumbnailProvider.swift; sourceTree = "<group>"; };
 		FT0000000000000000000B3F /* FilmtoneScrubThumbnailMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneScrubThumbnailMath.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B40 /* FilmtoneOpticalScatterMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneOpticalScatterMath.swift; sourceTree = "<group>"; };
 		FT0000000000000000000C01 /* FilmtoneDesktop.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FilmtoneDesktop.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -221,6 +223,7 @@
 				FT0000000000000000000B36 /* FilmtoneDesktopStrings.swift */,
 				FT0000000000000000000B31 /* AdvancedAdjustCatalog.swift */,
 				FT0000000000000000000B3D /* FilmtoneCompareSplitMath.swift */,
+				FT0000000000000000000B40 /* FilmtoneOpticalScatterMath.swift */,
 			);
 			path = Domain;
 			sourceTree = "<group>";
@@ -431,6 +434,7 @@
 				FT0000000000000000000A3E /* FilmtoneCompareSplitMath.swift in Sources */,
 				FT0000000000000000000A3F /* FilmtoneVideoScrubThumbnailProvider.swift in Sources */,
 				FT0000000000000000000A40 /* FilmtoneScrubThumbnailMath.swift in Sources */,
+				FT0000000000000000000A41 /* FilmtoneOpticalScatterMath.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -45,7 +45,9 @@ enum FilmtoneGradePipeline {
         frameTimeSeconds: Double = 0,
         sourceSeed: Double = 0,
         cameraOptics: CameraOpticsDTO? = nil,
-        creativeLut: PreparedCreativeLut? = nil
+        creativeLut: PreparedCreativeLut? = nil,
+        opticalFilterProfileId: String? = nil,
+        opticalFilterIntensity: Double = 1.0
     ) -> CIImage {
         var current = image
 
@@ -56,7 +58,23 @@ enum FilmtoneGradePipeline {
             current = applyFilmCompressionV2(to: current, params: params)
         }
         current = applyEdgeOpticsStage(to: current, params: params)
-        current = applyGlowFamilyStage(to: current, params: params)
+        // M5-M (CC-B): Backlight Veil profiles route through a CIKernel
+        // composite that uses the six iOS-canonical optical scatter
+        // coefficients (direct loss, black retention, scatter strength,
+        // highlight reactivity, warm bias, spectral tail). Other profile
+        // selections (or `nil`), or intensity ≤ 0, fall through to the
+        // legacy glowComposite path so non-veil renders stay bytewise
+        // identical and intensity=0 leaves only explicit user overrides
+        // visible (no Backlight-specific direct-loss/scatter math).
+        let opticalScatter = FilmtoneOpticalFilterCatalog.intensityScaledScatter(
+            for: opticalFilterProfileId,
+            intensity: opticalFilterIntensity
+        )
+        current = applyGlowFamilyStage(
+            to: current,
+            params: params,
+            opticalScatter: opticalScatter
+        )
         if params.vignette > 0.0001 {
             current = applyVignette(to: current, params: params, cameraOptics: cameraOptics)
         }
@@ -315,7 +333,11 @@ enum FilmtoneGradePipeline {
 
     // MARK: — Glow family (C5b A.2 — bloom + halation + diffusion plates all active)
 
-    private static func applyGlowFamilyStage(to image: CIImage, params: FilmtonePhase0Params) -> CIImage {
+    private static func applyGlowFamilyStage(
+        to image: CIImage,
+        params: FilmtonePhase0Params,
+        opticalScatter: FilmtoneOpticalScatterParams? = nil
+    ) -> CIImage {
         guard
             params.bloomStrength > 0.0001 ||
             params.halationIntensity > 0.0001 ||
@@ -376,6 +398,25 @@ enum FilmtoneGradePipeline {
             )
         } else {
             diffusionImage = black
+        }
+
+        if let opticalScatter,
+           let veilKernel = FilmtoneGradeKernels.glowCompositeBacklightVeil {
+            return veilKernel.apply(extent: extent, arguments: [
+                image,
+                bloomImage,
+                halationImage,
+                diffusionImage,
+                params.bloomStrength,
+                params.halationIntensity,
+                params.diffusion,
+                opticalScatter.directTransmission,
+                opticalScatter.blackRetention,
+                opticalScatter.scatterStrength,
+                opticalScatter.highlightReactivity,
+                opticalScatter.warmScatter,
+                opticalScatter.spectralTail,
+            ]) ?? image
         }
 
         guard let kernel = FilmtoneGradeKernels.glowComposite else { return image }

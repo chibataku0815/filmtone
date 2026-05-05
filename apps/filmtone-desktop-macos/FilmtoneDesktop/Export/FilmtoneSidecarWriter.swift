@@ -62,6 +62,7 @@ enum FilmtoneSidecarWriter {
             quickState: liveQuickState,
             paramOverrides: FilmtoneOpticalFilterCatalog.renderParamOverrides(
                 profileId: request.opticalFilterProfileId,
+                intensity: request.opticalFilterIntensity,
                 userOverrides: request.paramOverrides
             )
         )
@@ -137,9 +138,17 @@ enum FilmtoneSidecarWriter {
         // M5-L3 additive: preserve the named optical filter identity
         // separately from `gradeParams`, which already contains the
         // resolved visible Backlight Veil values.
-        if let opticalFilterProfile = FilmtoneOpticalFilterCatalog.sidecarPayload(
+        // M5-M (CC-B) additive: emit `opticalFilterIntensity` when it
+        // differs from 1.0 so readers can reconstruct the user's cursor
+        // position. Omit at 1.0 for backward-compat (old readers ignore
+        // the extra key anyway; new readers default to 1.0 when absent).
+        if var opticalFilterProfile = FilmtoneOpticalFilterCatalog.sidecarPayload(
             for: request.opticalFilterProfileId
         ) {
+            let intensity = request.opticalFilterIntensity
+            if abs(intensity - 1.0) > 1e-9 {
+                opticalFilterProfile["opticalFilterIntensity"] = intensity
+            }
             payload["opticalFilterProfile"] = opticalFilterProfile
         }
         // M5-A.2 additive: emit `creativeLut` provenance when a Look is
