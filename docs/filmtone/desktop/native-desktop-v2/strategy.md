@@ -1,6 +1,7 @@
 # Filmtone Native Desktop v2 Strategy
 
-Date: 2026-05-04 JST
+Date opened: 2026-05-04 JST
+Last updated: 2026-05-05 JST
 
 This file is the strategic source of truth for the Native Desktop v2 lane.
 Keep it short. Do not put implementation steps or file-level details here.
@@ -44,8 +45,8 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
 | M2 | Still And Video Vertical Slice | M1 | Complete | Still and video open, preview, export, and sidecar paths work through the native app. |
 | M3 | Native Color And Optics Parity | M2 | In progress | Built-in Looks use the iOS-canonical color and optics stages; performance is acceptable at 4K; remaining parity gaps are explicit. |
 | M4 | Shared Contract Consolidation | M3 | In progress (M4-B Phase0 core closed; preset / source profile / sidecar / cube parser slices follow) | Shared Swift contract ownership is clear, generated Swift remains generated-only, and iOS/macOS consume the same canonical contract without destabilizing the iOS lane. |
-| M5 | Native Editing UI | M3 | In progress | Core Desktop workflows are usable in native UI: look selection, preview navigation, export controls, progress/cancel, and Finder integration. Apple Liquid Glass is applied systematically to control surfaces (toolbar / sidebar / inspector / picker / control panels), preview content layer excluded. |
-| M6 | Release Cutover | M5 | In progress | release-cutover lane Phase 1-7 done (signing posture + pipeline + 0.1.0 smoke + cutover identity + distribution scripts; version policy corrected to iOS-aligned 1.4: Bundle ID `com.chibatakumi.film-lab-desktop` / Product Name `Filmtone` / MARKETING_VERSION `1.4`). Final 1.4 公開 gate = M5-C P0 (C.2 Look library / C.3 Adjustments / C.4 Export panel) closure。詳細: `../release-cutover/cutover-architecture.md`。 |
+| M5 | Native Editing UI | M3 | Validation / thin fixes | Core Desktop workflows are usable in native UI: look selection, preview navigation, export controls, progress/cancel, Finder integration, App chrome/layout, Adjust/Library parity, and playback MVP. Apple Liquid Glass is applied systematically to control surfaces, preview content layer excluded. Final v1.4 product gate is user visual smoke plus D.2.0a / H.3-C1 go/no-go. |
+| M6 | Release Cutover | M5 | In progress | release-cutover lane proved signing / notarize / stapled DMG pipeline and cutover identity. Version policy is iOS-aligned 1.4: Bundle ID `com.chibatakumi.film-lab-desktop` / Product Name `Filmtone` / MARKETING_VERSION `1.4`. After M5 validation freezes, regenerate the actual 1.4 artifact, notarize/staple it, and publish through the fixed Desktop update/download rail. Details: `../release-cutover/cutover-architecture.md`. |
 
 ## Current Strategic State
 
@@ -53,24 +54,28 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
 - M3 remains open for known parity hardening gaps, but its source-color
   foundation, modern AVFoundation migration, RayAngleOptics, initial optical
   stages, and 4K performance measurement are complete enough to unblock M5.
-- M5 is the current product milestone.
+- M5 is in v1.4 release-candidate validation. M5-C P0 is closed, the
+  user-reported 5-gap surface has implementation coverage, and M5-H / D2
+  fanout has been integrated. No `active.md` is currently open. The next
+  implementation `active.md` should be only one of:
+  - v1.4 visual-smoke defects from H1 chrome/layout, H2 Adjust/Library,
+    D2 playback, Saved Look favorite/delete, and export/share;
+  - M5-D.2.0a preview downscale + probe/asset cache if playback smoke shows
+    unacceptable stutter;
+  - M5-H.3 C1 creative LUT intensity wiring if the diff stays a thin
+    correctness fix;
+  - release-cutover 1.4 artifact regeneration / notarize after product scope
+    freezes.
 - M5-A.2 Look Canonical Parity (Stone / Urban Creative LUT Pack 01 port from
   iOS) landed 2026-05-04 across 3 commits and is archived.
 - M5-A.3 Video Preview Scrub landed 2026-05-04 (single commit 3b12805,
   preview-only, no CLI / export regression — Stone hash byte-identical to
   M5-A.2 archive record). Visual scrub UX smoke deferred to user. Archived
   immediately to make room for the user-requested M5-B interrupt slice.
-- M5-B Apple Liquid Glass Adoption Pass 1 + Pass 2 both landed and
-  archived. All floating control panels use `.glassEffect(.regular, in: …)`,
-  the right-rail stack is wrapped in `GlassEffectContainer` for
-  coordinated refraction, and toolbar / window chrome runs on macOS 26
-  system-default Apple Liquid Glass without explicit opt-in. Preview
-  content layer remains glass-free per strategy. No active slice is
-  currently open — next active.md should decide between (a) user
-  visual smoke validating Pass 1 + Pass 2 on bright/dark preview
-  backdrops, then optional M5-B Pass 3 (tint / variant exploration),
-  or (b) advancing M5 product surface (Tier 1 #2 successor / Finder
-  integration / look selection UX). Prioritize 本質 product quality.
+- M5-B Apple Liquid Glass adoption is closed across Pass 1 / 2 / 3 / 4 +
+  F-cycle. Right-rail panels, scrub bar, inline export buttons, and window
+  chrome now use the macOS 26 glass posture proven in user smoke; preview
+  content remains glass-free for color judgment.
 - Baseline-C population is intentionally treated as quality shell work unless
   formal parity proof is requested.
 - M4-A Shared Swift Boundary Cut Line closed 2026-05-04 — boundary matrix +
@@ -93,8 +98,10 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
   Verify 36/36 ✅。Visual runtime smoke は user-driven sanity に deferred、
   code-level wiring 検証で 8 Done 条件すべて satisfied。Archive:
   `archive/2026-05-04-m5-c4-export-inspector.md`. → M5-C P0 (C.2a foundation
-  + C.3a parity + C.4 inspector) すべて closed。M6 1.4 公開 gate は残り
-  user-driven notarize submission のみ。
+  + C.3a parity + C.4 inspector) すべて closed。Later user smoke opened
+  the M5-E / D / F / C.3b / H follow-ups below, so the current 1.4 gate is
+  visual smoke + D.2.0a / H.3-C1 go/no-go + release-cutover 1.4 artifact
+  regeneration / notarize.
 - 2026-05-04 user smoke で 5 個の追加ギャップ判明 → 推奨順で計画化:
   - **M5-E.1 App Icon Asset Population** (Tier A, ~20 min) — **closed
     2026-05-05**。詳細は Completion Log を参照。
@@ -140,8 +147,8 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
     採用。iOS catalog mirror + clamp + per-key reset + Reset All で 30 + 2
     field を直接編集可能化。catalog data は責務分離のため `Domain/`
     AdvancedAdjustCatalog、editing helpers は `EditorState+ParamOverrides`
-    extension に切り出し。これで 5-gap 5/5 全 close — 残作業は user smoke
-    + notarize submission のみ。
+    extension に切り出し。これで当時の 5-gap 5/5 は実装 close。現在の
+    v1.4 gate は後続 H/D2 checkpoint の visual smoke + thin-fix go/no-go。
 - 2026-05-05 multi-agent review が M5-C.3b 着地後の architecture / coverage
   gap を 4 件 (P2 × 3 + P3 × 1) 指摘 → **M5-G Architecture Thin Cuts** 2 slice
   で着地済 (commits `a68d5884` + `c0a12463`):
@@ -170,6 +177,14 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
   残像の長さ が surface する。Verify 56 → 65 PASS (新 9 tests: EN/JA group /
   preset / tone recipe / paramLabel / affordance copy + JA catalog 経路 2)、
   xcodebuild Debug ✅。Archive: `archive/2026-05-05-m5-i1-localization-copy-parity.md`。
+- 2026-05-05 M5-H / D2 integration checkpoint: H1 App Chrome / Preview
+  Layout, H2 Adjust + Library iOS canonical parity, H3 Dual LUT design
+  spike, and D2 AVPlayer playback spike are integrated on the native plan
+  branch. Current Verify is 56/56. H3 C1 (creative LUT intensity wiring) is
+  v1.4-preferred only if it remains a tiny correctness fix; full Dual LUT
+  (`InputLutBinding` + UI + sidecar dual block) is v1.5. D2.0a is a v1.4
+  hot-fix candidate only if user smoke proves the timer-driven playback MVP
+  is not acceptable.
 - Future product direction: cross-device SSD workflow. The intended shape is
   source media moved by SSD / Files / Finder, shared sidecar + Look intent moved
   with the source, Desktop as the master / 4K-capable exporter, and iPhone as
@@ -183,15 +198,17 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
   Phase0 core requirement. Plan:
   `davinci-highlight-marker-handoff-plan.md`.
 - **Parallel release lane** is in progress at
-  `docs/filmtone/desktop/release-cutover/` (separate active.md singleton from
-  this lane). Phase 1 closed 2026-05-04: M3 LOW gap `printContrast` sign-gate
+  `docs/filmtone/desktop/release-cutover/` as a separate work scope from this
+  lane. Phase 1 closed 2026-05-04: M3 LOW gap `printContrast` sign-gate
   fixed, M6 signing posture wired (Hardened Runtime + Developer ID + entitlements
   + secure timestamp), `scripts/release-macos.sh` + `scripts/package-dmg.sh` +
   `ExportOptions.plist` shipped, archive + exportArchive verified against the
   real Developer ID Application identity (Team C3G77H8NM6, universal binary,
-  notarize-ready). The remaining release-cutover gates are (a) the user-driven
-  notarize submission via the user's `ASC_ISSUER_ID` env, and (b) optional App
-  Category polish.
+  notarize-ready). The pipeline has already produced notarized/stapled
+  artifacts in earlier release-cutover phases, but the real public artifact
+  must be regenerated after v1.4 product scope freezes. Keep release-cutover
+  dirty/script work separate from native M5 validation unless that lane owner
+  explicitly merges it.
 
 ## Interrupt / Decision Log
 
@@ -229,7 +246,8 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
   untouched unless the active task explicitly says otherwise.
 - Electron Desktop 1.0.4 is the final public legacy build. Native Desktop v2 takes
   over the same Bundle ID (`com.chibatakumi.film-lab-desktop`) + fixed
-  download URL on cutover (gated on M5-C P0 closure).
+  download URL on cutover (gated on v1.4 visual smoke, thin-fix decisions, and
+  release-cutover artifact regeneration).
 - Sidecar changes are additive only; avoid schema bumps until a product need
   requires one.
 - Generated Swift must not be hand-edited.
@@ -239,13 +257,16 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
 
 ## Open Questions
 
-- When will Desktop Look Unification land on main, enabling sidecar dual emit?
 - Does baseline-C need to be populated now, or only when formal QA is requested?
-- Should SPM consolidation happen before or after Native Editing UI work?
 - Should deprecated Core Image kernel construction be migrated to Metal CIKernel
   before release cutover or tracked as a post-parity hardening task?
-- What is the minimum signed/notarized distribution surface for the first native
-  Desktop release candidate?
+- Does M5-D.2.0a need to land in v1.4, or is timer-driven playback acceptable
+  for the first native cutover after visual smoke?
+- Should M5-H.3 C1 creative LUT intensity wiring land before v1.4 notarize, or
+  move with the full Dual LUT surface to v1.5?
+- What is the minimum user visual-smoke set that freezes v1.4 product scope?
+- What exact release-cutover metadata and fixed-download update payload should
+  ship with the regenerated 1.4 notarized DMG?
 - Which exact output-profile vocabulary should represent Desktop master / 4K
   vs. iPhone FHD / Postcard without overloading the current iOS
   `quality` / `speed` render-mode enum?
@@ -258,6 +279,26 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
 
 ## Completion Log
 
+- 2026-05-05: **M5-I.3 Control Spacing And Slider Polish closed**。Right rail
+  panel gap / padding を 8px grid ベース (16/24) に整理、Source / Look の
+  large nested card background を削除して value chip のみを select affordance
+  に残した。Native SwiftUI Slider は right rail / adjust popover / scrub bar
+  で `FilmtoneGlassSlider` に置換し、下部の不要線を除去。`bun run
+  verify:macos` ✅、`git diff --check` clean。Archived as
+  `archive/2026-05-05-m5-i3-control-spacing-and-slider-polish.md`。
+- 2026-05-05: **M5-I.2 Glass Control Visual Correction closed**。M5-I.1 の
+  reference 解釈を修正し、黒テーマではなく既存 Liquid Glass 上の shine /
+  inner highlight のみに寄せた。Source / Look trigger は左ラベル + 発光
+  value chip の custom capsule に変更。stale duplicate Debug process を
+  kill して current build を relaunch。`bun run verify:macos` ✅、
+  `git diff --check` clean。Archived as
+  `archive/2026-05-05-m5-i2-glass-control-visual-correction.md`。
+- 2026-05-05: **M5-I.1 UI/UX Glass Control Pass closed**。Source / Look /
+  Export Format を default Picker から full-width glass menu / segment control
+  に置換し、primary / secondary / icon button hierarchy + enabled-only
+  pointing-hand cursor helper を追加。Preview content layer は未変更。
+  `bun run verify:macos` ✅、`git diff --check` clean。Archived as
+  `archive/2026-05-05-m5-i1-ui-ux-glass-control-pass.md`。
 - 2026-05-05: **M5-G Architecture Thin Cuts closed** (commits `a68d5884`
   + `c0a12463`)。Post-M5-C.3b multi-agent review が 4 件 (P2 RootWindowView
   export orchestration / P2 AdvancedAdjustCatalog + EditorState+
@@ -325,9 +366,9 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
   EditorState 本体 = source/preset/look/quick/export/playback、override 編集
   helpers = extension file、と層が分離。Build clean (Swift 6 strict, xcodebuild
   Debug PASS, 警告なし)。Archived as
-  `archive/2026-05-05-m5-c3b-advanced-adjust-editor.md`。**5-gap 全 close**:
-  E.1 / D.1 / F.1 / D.2 / C.3b 全完了で残作業は (a) user-driven visual smoke
-  全 5 件、(b) notarize submission のみ。
+  `archive/2026-05-05-m5-c3b-advanced-adjust-editor.md`。**当時の 5-gap
+  implementation は close**: E.1 / D.1 / F.1 / D.2 / C.3b 全完了。現在は
+  M5-H / D2 checkpoint 後の visual smoke + thin-fix go/no-go が v1.4 gate。
 - 2026-05-03: M1 completed with the native macOS skeleton and generated Swift
   contract lane.
 - 2026-05-03: M2 completed with native still/video vertical slices and sidecar
@@ -557,7 +598,7 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
   CFBundleIdentifier=com.chibatakumi.film-lab-desktop /
   CFBundleShortVersionString=2.0.0 / CFBundleName=Filmtone / 全 8 key 期待値
   確認。Phase 6 当時の `2.0.0` artifact plan は本日 user 決定で `1.4`
-  に supersede 済み (実 release は M5-C P0 closure 後)。
+  に supersede 済み (実 release は v1.4 visual smoke + thin-fix decisions 後)。
   Archived as `archive/2026-05-04-release-phase-6-cutover-architecture-brand-alignment.md`。
 - 2026-05-04: M5-C.3a verified visually (user confirmed Quick adjust
   Film/Era/Dynamics ripple into preview, saved-Look round-trip restores
@@ -600,8 +641,9 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
   progress + Cancel / finished metrics / Reveal / Share / Export Again /
   blocked / Verify) すべて satisfied 確認済み。Archived as
   `archive/2026-05-04-m5-c4-export-inspector.md`。M5-C P0 (C.2a + C.3a +
-  C.4) ここで closure → release-cutover lane 1.4 公開 gate は残り
-  user-driven notarize submission のみ。
+  C.4) はここで closure。Later user smoke で追加 H/D2 follow-up が開いた
+  ため、現在の 1.4 公開 gate は visual smoke + thin-fix decisions + regenerated
+  1.4 notarized artifact。
 - 2026-05-05: M5-E.1 App Icon Asset Population closed — iOS canonical
   `AppIcon-512@2x.png` (1024×1024) を source に `sips -z` で 10 size
   生成 (16/32/128/256/512 × 1x/2x、計 10 PNG)、`AppIcon.appiconset/

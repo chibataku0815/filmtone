@@ -71,38 +71,60 @@ struct LookLibraryControls: View {
         return library.snapshot.lookEntry(id: id)
     }
 
+    private var selectedLookLabel: String {
+        guard let entry = selectedAnyLook else { return "None" }
+        return "\(entry.favorite ? "★ " : "")\(entry.name)"
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Picker("Look", selection: selectionBinding) {
-                Text("None").tag(Selection.none)
+        VStack(alignment: .leading, spacing: 16) {
+            Menu {
+                Button {
+                    selectionBinding.wrappedValue = .none
+                } label: {
+                    menuRow("None", selected: selectionBinding.wrappedValue == .none)
+                }
                 let bundled = library.snapshot.looks.filter { $0.bundled }
                 let user = library.snapshot.looks.filter { !$0.bundled }
                 if !bundled.isEmpty {
                     Section("Built-in") {
                         ForEach(bundled, id: \.id) { entry in
-                            // M5-H.2: built-in favorites flow through
-                            // the same UserDefaults map as user entries
-                            // so the ★ prefix is symmetric.
-                            Text("\(entry.favorite ? "★ " : "")\(entry.name)")
-                                .tag(Selection.saved(entry.id))
+                            Button {
+                                selectionBinding.wrappedValue = .saved(entry.id)
+                            } label: {
+                                menuRow(
+                                    entry.name,
+                                    selected: selectionBinding.wrappedValue == .saved(entry.id),
+                                    favorite: entry.favorite
+                                )
+                            }
                         }
                     }
                 }
                 if !user.isEmpty {
                     Section(savedLooksHeader ?? "Saved") {
                         ForEach(user, id: \.id) { entry in
-                            // M5-H.2: prefix with ★ so the favorite flag
-                            // is visible inside the menu list (Mac-native
-                            // alternative to the iOS list-row swipe action).
-                            Text("\(entry.favorite ? "★ " : "")\(entry.name)")
-                                .tag(Selection.saved(entry.id))
+                            Button {
+                                selectionBinding.wrappedValue = .saved(entry.id)
+                            } label: {
+                                menuRow(
+                                    entry.name,
+                                    selected: selectionBinding.wrappedValue == .saved(entry.id),
+                                    favorite: entry.favorite
+                                )
+                            }
                         }
                     }
                 }
+            } label: {
+                FilmtoneGlassMenuTrigger(
+                    title: "Look",
+                    value: selectedLookLabel,
+                    systemImage: selectedAnyLook?.favorite == true ? "star.fill" : "sparkles",
+                    accent: selectedAnyLook?.favorite == true ? Color.yellow : Color(red: 0.84, green: 0.72, blue: 1.0)
+                )
             }
-            .pickerStyle(.menu)
-            .colorScheme(.dark)
-            .frame(width: 220)
+            .filmtoneGlassMenuChrome()
 
             // M5-H.2: inline favorite / rename / delete row. Always
             // visible so the controls are discoverable; disabled when
@@ -114,11 +136,11 @@ struct LookLibraryControls: View {
                 presentSavePrompt()
             } label: {
                 Label("Save Current Look…", systemImage: "square.and.arrow.down")
-                    .font(.callout)
-                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .buttonStyle(.borderless)
-            .frame(width: 220, alignment: .leading)
+            .buttonStyle(FilmtoneGlassSecondaryButtonStyle(compact: true))
+            .frame(width: 220)
+            .filmtonePointingHandCursor()
         }
         .alert(
             "Library error",
@@ -148,13 +170,12 @@ struct LookLibraryControls: View {
                 }
             } label: {
                 Image(systemName: isFavorite ? "star.fill" : "star")
-                    .foregroundStyle(isFavorite ? Color.yellow : .white)
                     .frame(width: 14, height: 14)
             }
-            .buttonStyle(.glass)
-            .controlSize(.small)
+            .buttonStyle(FilmtoneGlassIconButtonStyle(isActive: isFavorite))
             .help(isFavorite ? "Remove from favorites" : "Mark as favorite")
             .disabled(favoriteTarget == nil)
+            .filmtonePointingHandCursor(favoriteTarget != nil)
 
             Button {
                 guard let target else { return }
@@ -164,12 +185,11 @@ struct LookLibraryControls: View {
                     .labelStyle(.titleAndIcon)
                     .font(.caption.weight(.semibold))
                     .padding(.horizontal, 4)
-                    .foregroundStyle(.white)
             }
-            .buttonStyle(.glass)
-            .controlSize(.small)
+            .buttonStyle(FilmtoneGlassSecondaryButtonStyle(compact: true))
             .help("Rename Look")
             .disabled(target == nil)
+            .filmtonePointingHandCursor(target != nil)
 
             Button {
                 guard let target else { return }
@@ -179,16 +199,25 @@ struct LookLibraryControls: View {
                     .labelStyle(.titleAndIcon)
                     .font(.caption.weight(.semibold))
                     .padding(.horizontal, 4)
-                    .foregroundStyle(.white)
             }
-            .buttonStyle(.glass)
-            .controlSize(.small)
+            .buttonStyle(FilmtoneGlassSecondaryButtonStyle(compact: true))
             .help("Delete Look")
             .disabled(target == nil)
+            .filmtonePointingHandCursor(target != nil)
 
             Spacer(minLength: 0)
         }
         .frame(width: 220, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func menuRow(_ title: String, selected: Bool, favorite: Bool = false) -> some View {
+        let displayTitle = "\(favorite ? "★ " : "")\(title)"
+        if selected {
+            Label(displayTitle, systemImage: "checkmark")
+        } else {
+            Text(displayTitle)
+        }
     }
 
     private func presentSavePrompt() {

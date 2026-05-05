@@ -17,8 +17,8 @@ struct QuickAdjustControls: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 8) {
                 Text("Quick")
                     .font(.callout.weight(.semibold))
                     .foregroundStyle(.white)
@@ -30,8 +30,8 @@ struct QuickAdjustControls: View {
                     Text("\(state.paramOverridesActiveCount) advanced")
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(.black)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
                         .background(Color.yellow.opacity(0.85), in: Capsule())
                 }
             }
@@ -52,8 +52,9 @@ struct QuickAdjustControls: View {
                 Button("Reset Quick") {
                     state.resetQuickState()
                 }
-                .controlSize(.small)
+                .buttonStyle(FilmtoneGlassSecondaryButtonStyle(compact: true))
                 .disabled(resetDisabled)
+                .filmtonePointingHandCursor(!resetDisabled)
                 // M5-C.3b: opens the AdvancedAdjustEditor popover with
                 // direct per-key access to the 30+ paramOverrides knobs
                 // (iOS canonical FilmtoneStrengthSheet advanced section
@@ -61,9 +62,9 @@ struct QuickAdjustControls: View {
                 Button("Adjust…") {
                     advancedPopoverOpen = true
                 }
-                .buttonStyle(.glass)
-                .controlSize(.small)
+                .buttonStyle(FilmtoneGlassSecondaryButtonStyle(compact: true))
                 .help("Edit advanced per-parameter overrides")
+                .filmtonePointingHandCursor()
                 .popover(
                     isPresented: $advancedPopoverOpen,
                     arrowEdge: .trailing
@@ -73,7 +74,7 @@ struct QuickAdjustControls: View {
                     }
                 }
             }
-            .padding(.top, 2)
+            .padding(.top, 0)
         }
         .frame(width: 220)
     }
@@ -83,7 +84,7 @@ struct QuickAdjustControls: View {
         title: String,
         value: Binding<Double>
     ) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(title)
                     .font(.callout)
@@ -93,12 +94,11 @@ struct QuickAdjustControls: View {
                     .font(.callout.monospacedDigit())
                     .foregroundStyle(.white.opacity(0.7))
             }
-            Slider(
+            FilmtoneGlassSlider(
                 value: value,
-                in: FilmtonePhase0Generated.quickAxisMin...FilmtonePhase0Generated.quickAxisMax,
+                range: FilmtonePhase0Generated.quickAxisMin...FilmtonePhase0Generated.quickAxisMax,
                 step: FilmtonePhase0Generated.quickAxisStep
             )
-            .tint(.white)
         }
     }
 

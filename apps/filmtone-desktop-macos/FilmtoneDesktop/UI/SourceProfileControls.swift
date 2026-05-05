@@ -60,16 +60,40 @@ struct SourceProfileControls: View {
             }
     }
 
+    private var selectedLabel: String {
+        switch state.sourceProfileSelection {
+        case .auto:
+            return Self.optionLabel
+        case .builtIn(let catalogId):
+            return FilmtoneSourceProfileCatalog.entry(forCatalogId: catalogId)?.englishName ?? catalogId
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Picker("Source", selection: selectionBinding) {
-                ForEach(Self.options, id: \.self) { option in
-                    Text(option.label).tag(option.selection)
+            Menu {
+                Button {
+                    selectionBinding.wrappedValue = .auto
+                } label: {
+                    menuRow("Auto", selected: state.sourceProfileSelection == .auto)
                 }
+                Section("Camera Profiles") {
+                    ForEach(Self.options.dropFirst(), id: \.self) { option in
+                        Button {
+                            selectionBinding.wrappedValue = option.selection
+                        } label: {
+                            menuRow(option.label, selected: state.sourceProfileSelection == option.selection)
+                        }
+                    }
+                }
+            } label: {
+                FilmtoneGlassMenuTrigger(
+                    title: "Source",
+                    value: selectedLabel,
+                    systemImage: "camera.filters"
+                )
             }
-            .pickerStyle(.menu)
-            .colorScheme(.dark)
-            .frame(width: 220)
+            .filmtoneGlassMenuChrome()
 
             if let notice = sourceCapNotice {
                 Text(notice)
@@ -83,6 +107,15 @@ struct SourceProfileControls: View {
                     .foregroundStyle(.white.opacity(0.7))
                     .frame(width: 220, alignment: .leading)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func menuRow(_ title: String, selected: Bool) -> some View {
+        if selected {
+            Label(title, systemImage: "checkmark")
+        } else {
+            Text(title)
         }
     }
 }

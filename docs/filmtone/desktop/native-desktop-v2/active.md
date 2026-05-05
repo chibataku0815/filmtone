@@ -33,7 +33,7 @@ agent-rule updates separated by commit.
 - [x] Apply I1 localization/copy parity patch only.
 - [x] Cherry-pick I2 AVPlayer preview route commit only.
 - [x] Apply I4a preview/background patch after AVPlayer and resolve conflicts.
-- [ ] Choose one control-polish implementation and avoid duplicate control systems.
+- [x] Choose one control-polish implementation and avoid duplicate control systems.
 - [ ] Integrate parent release-cutover / AGENTS dirty state in a separate commit.
 - [ ] Run `git diff --check`.
 - [ ] Run `apps/filmtone-desktop-macos/Verify/run.sh`.

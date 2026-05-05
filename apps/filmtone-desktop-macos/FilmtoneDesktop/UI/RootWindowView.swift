@@ -39,8 +39,8 @@ struct RootWindowView: View {
             // M5-H.1: the leading `GlassControlGroup()` "Phase 0" placeholder
             // banner was retired — the right rail now opens directly with
             // the source-loaded panels (or stays empty until a source loads).
-            GlassEffectContainer(spacing: 12) {
-                VStack(alignment: .trailing, spacing: 12) {
+            GlassEffectContainer(spacing: 16) {
+                VStack(alignment: .trailing, spacing: 16) {
                     if state.sourceURL != nil {
                         // M5-C.1: Source Profile Picker — sits above the Look
                         // controls so the user picks the input transform
@@ -48,10 +48,10 @@ struct RootWindowView: View {
                         // .clear glass posture for visual continuity.
                         SourceProfileControls(state: state)
                             .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
+                            .padding(.vertical, 16)
                             .glassEffect(
                                 .clear.tint(.black.opacity(0.30)),
-                                in: RoundedRectangle(cornerRadius: 12)
+                                in: RoundedRectangle(cornerRadius: 16)
                             )
                         // M5-C.2a: snapshot-driven Look library Picker +
                         // "Save Current Look…" button. Sits between the
@@ -60,20 +60,20 @@ struct RootWindowView: View {
                         // top-down reading order.
                         LookLibraryControls(state: state, library: library)
                             .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
+                            .padding(.vertical, 16)
                             .glassEffect(
                                 .clear.tint(.black.opacity(0.30)),
-                                in: RoundedRectangle(cornerRadius: 12)
+                                in: RoundedRectangle(cornerRadius: 16)
                             )
                         // M5-C.3a: Quick adjust 3-axis sliders sit between
                         // Look selection and Strength so the user reads
                         // top-down: input → Look → Quick offsets → Strength.
                         QuickAdjustControls(state: state)
                             .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
+                            .padding(.vertical, 16)
                             .glassEffect(
                                 .clear.tint(.black.opacity(0.30)),
-                                in: RoundedRectangle(cornerRadius: 12)
+                                in: RoundedRectangle(cornerRadius: 16)
                             )
                         // M5-B Pass 4: subtle dark tint on `.clear` Liquid
                         // Glass gives the operating panel a stable luminance
@@ -82,10 +82,10 @@ struct RootWindowView: View {
                         // posture on the rest of the chrome.
                         GradeControls(state: state)
                             .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
+                            .padding(.vertical, 16)
                             .glassEffect(
                                 .clear.tint(.black.opacity(0.30)),
-                                in: RoundedRectangle(cornerRadius: 12)
+                                in: RoundedRectangle(cornerRadius: 16)
                             )
                         // M5-C.4: Mac-native Export Inspector replaces
                         // the previous one-line ExportProgressBar +
@@ -98,15 +98,15 @@ struct RootWindowView: View {
                             onExportTap: { exportCoordinator.presentExportPanel(for: state) }
                         )
                         .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 16)
                         .glassEffect(
                             .clear.tint(.black.opacity(0.30)),
-                            in: RoundedRectangle(cornerRadius: 12)
+                            in: RoundedRectangle(cornerRadius: 16)
                         )
                     }
                 }
             }
-            .padding(20)
+            .padding(24)
             // M5-A.3 + F4: scrub bar sits close to the window's bottom
             // edge (12pt padding) so it reads as a chrome-adjacent control
             // rather than a panel floating mid-preview.
@@ -126,12 +126,12 @@ struct RootWindowView: View {
                     // backdrop.
                     VideoScrubBar(state: state, duration: duration)
                         .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 16)
                         .glassEffect(
                             .clear.tint(.black.opacity(0.30)),
-                            in: RoundedRectangle(cornerRadius: 12)
+                            in: RoundedRectangle(cornerRadius: 16)
                         )
-                        .padding(.bottom, 60)
+                        .padding(.bottom, 64)
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -186,7 +186,9 @@ struct RootWindowView: View {
                     Label("Open", systemImage: "folder")
                 }
                 .keyboardShortcut("o", modifiers: .command)
+                .buttonStyle(.glass)
                 .help("Open a still image or video")
+                .filmtonePointingHandCursor()
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {
@@ -195,8 +197,10 @@ struct RootWindowView: View {
                     Label("Export", systemImage: "square.and.arrow.up")
                 }
                 .keyboardShortcut("e", modifiers: .command)
+                .buttonStyle(.glassProminent)
                 .disabled(exportDisabled)
                 .help(exportHelpText)
+                .filmtonePointingHandCursor(!exportDisabled)
             }
         }
     }
@@ -468,17 +472,17 @@ private struct VideoScrubBar: View {
                 Image(systemName: state.isPlaying ? "pause.fill" : "play.fill")
                     .frame(width: 14, height: 14)
             }
-            .buttonStyle(.glass)
-            .controlSize(.small)
+            .buttonStyle(FilmtoneGlassIconButtonStyle())
             .keyboardShortcut(.space, modifiers: [])
             .help(state.isPlaying ? "Pause (Space)" : "Play (Space)")
+            .filmtonePointingHandCursor()
             Text(format(seconds.wrappedValue))
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
                 .frame(minWidth: 64, alignment: .leading)
-            Slider(
+            FilmtoneGlassSlider(
                 value: seconds,
-                in: 0...max(duration, 0.001),
+                range: 0...max(duration, 0.001),
                 onEditingChanged: { editing in
                     // Drag start: hold the periodic time observer off so
                     // it doesn't fight the user's finger; pause playback

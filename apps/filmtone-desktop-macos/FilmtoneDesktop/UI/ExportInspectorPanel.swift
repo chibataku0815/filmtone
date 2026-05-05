@@ -16,7 +16,7 @@ struct ExportInspectorPanel: View {
     let onExportTap: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 16) {
             Text("Export")
                 .font(.callout.weight(.semibold))
                 .foregroundStyle(.white)
@@ -42,17 +42,10 @@ struct ExportInspectorPanel: View {
 
     private var readyState: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Picker("Format", selection: $state.exportFormat) {
-                Text("PNG").tag(StillExportFormat.png)
-                Text("JPEG").tag(StillExportFormat.jpeg)
-            }
-            .labelsHidden()
-            .pickerStyle(.segmented)
-            .colorScheme(.dark)
-            .disabled(state.sourceKind == .video)
+            formatSelector
 
             if state.exportFormat == .jpeg && state.sourceKind == .still {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text("Quality")
                             .font(.callout)
@@ -62,8 +55,7 @@ struct ExportInspectorPanel: View {
                             .font(.callout.monospacedDigit())
                             .foregroundStyle(.white.opacity(0.7))
                     }
-                    Slider(value: $state.jpegQuality, in: 0.5...1.0)
-                        .tint(.white)
+                    FilmtoneGlassSlider(value: $state.jpegQuality, range: 0.5...1.0)
                 }
             }
 
@@ -85,13 +77,47 @@ struct ExportInspectorPanel: View {
                     Image(systemName: "square.and.arrow.up")
                     Text(state.sourceKind == .video ? "Export Video…" : "Export Still…")
                     Spacer()
+                    Image(systemName: "arrow.right")
                 }
                 .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.glassProminent)
-            .controlSize(.regular)
+            .buttonStyle(FilmtoneGlassPrimaryButtonStyle())
             .disabled(state.sourceURL == nil)
+            .filmtonePointingHandCursor(state.sourceURL != nil)
         }
+    }
+
+    private var formatSelector: some View {
+        HStack(spacing: 4) {
+            exportFormatButton(.png, label: "PNG")
+            exportFormatButton(.jpeg, label: "JPEG")
+        }
+        .padding(4)
+        .frame(width: 220)
+        .background(
+            Capsule()
+                .fill(Color.black.opacity(0.16))
+        )
+        .glassEffect(
+            .clear.tint(Color.white.opacity(0.07)),
+            in: Capsule()
+        )
+        .overlay(
+            Capsule()
+                .stroke(Color.white.opacity(0.14), lineWidth: 1)
+        )
+        .disabled(state.sourceKind == .video)
+    }
+
+    private func exportFormatButton(_ format: StillExportFormat, label: String) -> some View {
+        Button {
+            state.exportFormat = format
+        } label: {
+            Text(label)
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(FilmtoneGlassSegmentButtonStyle(isSelected: state.exportFormat == format))
+        .filmtonePointingHandCursor(state.sourceKind != .video)
     }
 
     private var progressState: some View {
@@ -104,8 +130,8 @@ struct ExportInspectorPanel: View {
                 Button("Cancel") {
                     state.cancelExport()
                 }
-                .buttonStyle(.glass)
-                .controlSize(.small)
+                .buttonStyle(FilmtoneGlassSecondaryButtonStyle(compact: true))
+                .filmtonePointingHandCursor()
             }
             ProgressView(value: state.exportProgress)
                 .progressViewStyle(.linear)
@@ -166,8 +192,8 @@ struct ExportInspectorPanel: View {
                     }
                     .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.glass)
-                .controlSize(.small)
+                .buttonStyle(FilmtoneGlassSecondaryButtonStyle(compact: true))
+                .filmtonePointingHandCursor()
 
                 ShareSourceButton(url: result.outputURL)
             }
@@ -182,8 +208,8 @@ struct ExportInspectorPanel: View {
                 }
                 .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.glass)
-            .controlSize(.small)
+            .buttonStyle(FilmtoneGlassSecondaryButtonStyle(compact: true))
+            .filmtonePointingHandCursor()
         }
     }
 
@@ -224,29 +250,38 @@ struct ExportInspectorPanel: View {
 /// cursor.
 private struct ShareSourceButton: View {
     let url: URL
+    @State private var shareRequest = 0
 
     var body: some View {
-        ShareAnchor(url: url)
+        Button {
+            shareRequest += 1
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "square.and.arrow.up")
+                Text("Share")
+            }
             .frame(maxWidth: .infinity)
-            .frame(height: 22)
+        }
+        .buttonStyle(FilmtoneGlassSecondaryButtonStyle(compact: true))
+        .filmtonePointingHandCursor()
+        .background(ShareAnchor(url: url, request: shareRequest))
     }
 }
 
 private struct ShareAnchor: NSViewRepresentable {
     let url: URL
+    let request: Int
 
-    func makeNSView(context: Context) -> NSButton {
-        let button = NSButton(title: "Share", target: context.coordinator, action: #selector(Coordinator.share(_:)))
-        button.bezelStyle = .rounded
-        button.controlSize = .small
-        button.image = NSImage(systemSymbolName: "square.and.arrow.up", accessibilityDescription: "Share")
-        button.imagePosition = .imageLeading
-        return button
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        context.coordinator.anchorView = view
+        return view
     }
 
-    func updateNSView(_ nsView: NSButton, context: Context) {
+    func updateNSView(_ nsView: NSView, context: Context) {
         context.coordinator.url = url
-        nsView.target = context.coordinator
+        context.coordinator.anchorView = nsView
+        context.coordinator.showIfNeeded(request: request)
     }
 
     func makeCoordinator() -> Coordinator {
@@ -255,11 +290,18 @@ private struct ShareAnchor: NSViewRepresentable {
 
     final class Coordinator: NSObject {
         var url: URL
+        weak var anchorView: NSView?
+        private var lastRequest = 0
+
         init(url: URL) { self.url = url }
 
-        @objc func share(_ sender: NSButton) {
+        @MainActor
+        func showIfNeeded(request: Int) {
+            guard request != lastRequest else { return }
+            lastRequest = request
+            guard request > 0, let anchorView else { return }
             let picker = NSSharingServicePicker(items: [url])
-            picker.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
+            picker.show(relativeTo: anchorView.bounds, of: anchorView, preferredEdge: .minY)
         }
     }
 }

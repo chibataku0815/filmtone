@@ -22,7 +22,7 @@ struct GradeControls: View {
         // M5-B Pass 4: explicit white text + Slider tint give guaranteed
         // contrast on the dark-tinted Liquid Glass surface set by
         // RootWindowView.
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("Strength")
                     .font(.callout)
@@ -32,8 +32,7 @@ struct GradeControls: View {
                     .font(.callout.monospacedDigit())
                     .foregroundStyle(.white.opacity(0.7))
             }
-            Slider(value: $state.presetStrength, in: 0...1)
-                .tint(.white)
+            FilmtoneGlassSlider(value: $state.presetStrength, range: 0...1)
                 .disabled(strengthDisabled)
         }
         .frame(width: 220)

@@ -66,9 +66,9 @@ struct AdvancedAdjustEditor: View {
                     .font(.body.weight(.medium))
                     .frame(width: 14, height: 14)
             }
-            .buttonStyle(.glass)
-            .controlSize(.small)
+            .buttonStyle(FilmtoneGlassIconButtonStyle())
             .help(strings.advancedClose)
+            .filmtonePointingHandCursor()
         }
     }
 
@@ -151,9 +151,9 @@ struct AdvancedAdjustEditor: View {
                     .font(.caption.weight(.semibold))
                     .padding(.horizontal, 4)
             }
-            .buttonStyle(.glassProminent)
-            .controlSize(.small)
+            .buttonStyle(FilmtoneGlassSegmentButtonStyle(isSelected: true))
             .help(helpText)
+            .filmtonePointingHandCursor()
         } else {
             Button {
                 state.applyAdvancedRecipe(recipe, in: group)
@@ -162,9 +162,9 @@ struct AdvancedAdjustEditor: View {
                     .font(.caption.weight(.semibold))
                     .padding(.horizontal, 4)
             }
-            .buttonStyle(.glass)
-            .controlSize(.small)
+            .buttonStyle(FilmtoneGlassSecondaryButtonStyle(compact: true))
             .help(helpText)
+            .filmtonePointingHandCursor()
         }
     }
 
@@ -202,13 +202,12 @@ struct AdvancedAdjustEditor: View {
                         .font(.caption.weight(.medium))
                         .frame(width: 12, height: 12)
                 }
-                .buttonStyle(.glass)
-                .controlSize(.small)
+                .buttonStyle(FilmtoneGlassIconButtonStyle())
                 .disabled(!isActive)
                 .help(strings.advancedResetParamHelp(control.label))
+                .filmtonePointingHandCursor(isActive)
             }
-            Slider(value: valueBinding, in: control.range)
-                .tint(.white)
+            FilmtoneGlassSlider(value: valueBinding, range: control.range)
         }
     }
 
@@ -223,9 +222,9 @@ struct AdvancedAdjustEditor: View {
                     Text(strings.advancedResetAllOverrides)
                 }
             }
-            .buttonStyle(.glass)
-            .controlSize(.regular)
+            .buttonStyle(FilmtoneGlassSecondaryButtonStyle())
             .disabled(state.paramOverridesActiveCount == 0)
+            .filmtonePointingHandCursor(state.paramOverridesActiveCount > 0)
         }
     }
 }
