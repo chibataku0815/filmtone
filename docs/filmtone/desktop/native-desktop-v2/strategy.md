@@ -279,6 +279,17 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
 
 ## Completion Log
 
+- 2026-05-05: **M5-J3 Slider Visual Polish v2 closed** (worktree
+  `filmtone-native-desktop-m5-j3-slider-polish-v2`、base `ca9acea6`)。
+  `FilmtoneGlassSlider` を 1 file in-place 改修 — knob 32→18pt
+  (hover/drag 22pt)、track 8→5pt、unfilled `Color.white.opacity(0.12)`、
+  filled `Color.white.opacity(0.45)` glass highlight、knob radius 補償の
+  edge-of-track 算出、`@Environment(\.isEnabled)` で disabled dim、
+  `onChange(of: isEnabled)` で drag 中 disabled flip 時 latch を防止。
+  `range:` / `step:` / `onEditingChanged:` API、cursor、`onDisappear`
+  cleanup は維持。5 call site 触らず。Verify 65/65 ✅、
+  `bun run verify:macos` Debug ✅、`git diff --check` clean。Archived as
+  `archive/2026-05-05-m5-j3-slider-polish-v2.md`。
 - 2026-05-05: **M5-I integration branch closed**。I1 localization, I2
   AVPlayer preview route, I4a preview/background, parent glass control polish,
   and parent 1.4 release-cutover / AGENTS dirty state were integrated as

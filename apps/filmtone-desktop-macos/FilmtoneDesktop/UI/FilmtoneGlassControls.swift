@@ -68,62 +68,93 @@ struct FilmtoneGlassMenuTrigger: View {
     }
 }
 
+// M5-J3 v2: dark Liquid Glass posture for the right rail. The knob shrank
+// from 32→18pt (22pt on hover/drag), the track from 8→5pt, the unfilled
+// segment dropped to a low-contrast white, and the filled segment is now
+// a glass highlight rather than pure white. Knob center math compensates
+// for knob radius so edge-of-track positions read correctly under the
+// dynamic knob size. `range:` / `step:` / `onEditingChanged:` API,
+// `.filmtonePointingHandCursor()`, and the `onDisappear` cleanup contract
+// (`state.isScrubbing` on the VideoScrubBar depends on it) are preserved.
 struct FilmtoneGlassSlider: View {
     @Binding var value: Double
     let range: ClosedRange<Double>
     var step: Double? = nil
     var onEditingChanged: ((Bool) -> Void)? = nil
 
-    private let trackHeight: CGFloat = 8
-    private let knobSize: CGFloat = 32
+    @Environment(\.isEnabled) private var isEnabled
     @State private var isDragging = false
+    @State private var isHovering = false
+
+    private let rowHeight: CGFloat = 24
+    private let trackHeight: CGFloat = 5
+    private let knobBase: CGFloat = 18
+    private let knobActive: CGFloat = 22
 
     var body: some View {
         GeometryReader { proxy in
             let width = max(proxy.size.width, 1)
+            let knob = (isDragging || isHovering) ? knobActive : knobBase
+            let usable = max(width - knob, 1)
             let ratio = normalizedRatio
+            let knobCenterX = usable * ratio + knob / 2
+
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.60),
-                                Color.white.opacity(0.26)
-                            ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
+                    .fill(Color.white.opacity(0.12))
                     .frame(height: trackHeight)
                 Capsule()
-                    .fill(Color.white.opacity(0.92))
-                    .frame(width: max(knobSize / 2, width * ratio), height: trackHeight)
+                    .fill(Color.white.opacity(isEnabled ? 0.45 : 0.18))
+                    .frame(width: max(0, knobCenterX), height: trackHeight)
                 Circle()
-                    .fill(Color.white)
-                    .frame(width: knobSize, height: knobSize)
-                    .shadow(color: Color.black.opacity(0.20), radius: 8, x: 0, y: 4)
-                    .offset(x: min(max(width * ratio - knobSize / 2, 0), width - knobSize))
+                    .fill(Color.white.opacity(isEnabled ? 0.92 : 0.40))
+                    .overlay(
+                        Circle()
+                            .stroke(Color.white.opacity(isEnabled ? 0.20 : 0), lineWidth: 0.5)
+                    )
+                    .shadow(color: Color.black.opacity(isEnabled ? 0.18 : 0), radius: 1.5, x: 0, y: 1)
+                    .frame(width: knob, height: knob)
+                    .offset(x: knobCenterX - knob / 2)
+                    .animation(.easeOut(duration: 0.12), value: isDragging)
+                    .animation(.easeOut(duration: 0.12), value: isHovering)
             }
-            .frame(height: knobSize)
+            .frame(height: rowHeight, alignment: .center)
             .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { gesture in
+                        guard isEnabled else { return }
                         if !isDragging {
                             isDragging = true
                             onEditingChanged?(true)
                         }
-                        updateValue(at: gesture.location.x, width: width)
+                        updateValue(at: gesture.location.x, width: width, knob: knob)
                     }
                     .onEnded { gesture in
-                        updateValue(at: gesture.location.x, width: width)
+                        // Cleanup must run even if `.disabled` flipped on
+                        // mid-drag — otherwise `isDragging` and any caller
+                        // (`state.isScrubbing` on the VideoScrubBar) latch on.
+                        if isEnabled {
+                            updateValue(at: gesture.location.x, width: width, knob: knob)
+                        }
                         if isDragging {
                             isDragging = false
                             onEditingChanged?(false)
                         }
                     }
             )
+            .onHover { hovering in
+                isHovering = hovering && isEnabled
+            }
             .filmtonePointingHandCursor()
+            .onChange(of: isEnabled) { _, nowEnabled in
+                guard !nowEnabled else { return }
+                if isDragging {
+                    isDragging = false
+                    onEditingChanged?(false)
+                }
+                if isHovering { isHovering = false }
+            }
             .onDisappear {
                 if isDragging {
                     isDragging = false
@@ -131,7 +162,8 @@ struct FilmtoneGlassSlider: View {
                 }
             }
         }
-        .frame(height: knobSize)
+        .frame(height: rowHeight)
+        .opacity(isEnabled ? 1 : 0.55)
     }
 
     private var normalizedRatio: CGFloat {
@@ -140,8 +172,9 @@ struct FilmtoneGlassSlider: View {
         return CGFloat((clamped - range.lowerBound) / (range.upperBound - range.lowerBound))
     }
 
-    private func updateValue(at locationX: CGFloat, width: CGFloat) {
-        let ratio = min(1.0, max(0.0, Double(locationX / max(width, 1))))
+    private func updateValue(at locationX: CGFloat, width: CGFloat, knob: CGFloat) {
+        let usable = max(width - knob, 1)
+        let ratio = min(1.0, max(0.0, Double((locationX - knob / 2) / usable)))
         var nextValue = range.lowerBound + (range.upperBound - range.lowerBound) * ratio
         if let step, step > 0 {
             nextValue = (nextValue / step).rounded() * step
