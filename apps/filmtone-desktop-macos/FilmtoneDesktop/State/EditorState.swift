@@ -290,21 +290,11 @@ final class EditorState {
 
     // MARK: - M5-C.2a Saved Look bridge
 
-    /// Snapshot of the values `LibraryViewModel.saveCurrentLook` needs
-    /// to persist a `SavedLookEntry` from the current EditorState.
-    /// `paramOverrides` is `.empty` until M5-C.3 introduces per-parameter
-    /// editing UX. `creativeLut` is `.bundled` when a built-in Look is
-    /// active (preserves the slug / filename / pinned sha through the
-    /// save round-trip), nil otherwise.
-    struct SaveLookPayload {
-        let presetName: String
-        let presetVersion: String
-        let strength: Double
-        let quickState: FilmtoneQuickState
-        let paramOverrides: FilmtonePhase0ParamsPatch
-        let creativeLut: CreativeLutBinding?
-    }
-
+    /// Build a `SaveLookPayload` snapshot from the live render state.
+    /// `LibraryViewModel.saveCurrentLook(name:payload:)` consumes this;
+    /// the payload type itself lives in `SaveLookPayload.swift` (M5-G.1
+    /// lift) so the library feature does not transitively depend on
+    /// the whole `EditorState`.
     func currentLookSavePayload() -> SaveLookPayload {
         let creativeLut: CreativeLutBinding?
         if let slug = lookSlug,

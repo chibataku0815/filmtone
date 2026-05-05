@@ -56,6 +56,8 @@
 		FT0000000000000000000A32 /* AdvancedAdjustCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B31 /* AdvancedAdjustCatalog.swift */; };
 		FT0000000000000000000A33 /* AdvancedAdjustEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B32 /* AdvancedAdjustEditor.swift */; };
 		FT0000000000000000000A34 /* EditorState+ParamOverrides.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B33 /* EditorState+ParamOverrides.swift */; };
+		FT0000000000000000000A35 /* ExportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B34 /* ExportCoordinator.swift */; };
+		FT0000000000000000000A36 /* SaveLookPayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B35 /* SaveLookPayload.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -107,6 +109,8 @@
 		FT0000000000000000000B31 /* AdvancedAdjustCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvancedAdjustCatalog.swift; sourceTree = "<group>"; };
 		FT0000000000000000000B32 /* AdvancedAdjustEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvancedAdjustEditor.swift; sourceTree = "<group>"; };
 		FT0000000000000000000B33 /* EditorState+ParamOverrides.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EditorState+ParamOverrides.swift"; sourceTree = "<group>"; };
+		FT0000000000000000000B34 /* ExportCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportCoordinator.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B35 /* SaveLookPayload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveLookPayload.swift; sourceTree = "<group>"; };
 		FT0000000000000000000C01 /* FilmtoneDesktop.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FilmtoneDesktop.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -228,7 +232,9 @@
 			children = (
 				FT0000000000000000000B0D /* EditorState.swift */,
 				FT0000000000000000000B33 /* EditorState+ParamOverrides.swift */,
+				FT0000000000000000000B34 /* ExportCoordinator.swift */,
 				FT0000000000000000000B2B /* LibraryViewModel.swift */,
+				FT0000000000000000000B35 /* SaveLookPayload.swift */,
 			);
 			path = State;
 			sourceTree = "<group>";
@@ -387,6 +393,8 @@
 				FT0000000000000000000A32 /* AdvancedAdjustCatalog.swift in Sources */,
 				FT0000000000000000000A33 /* AdvancedAdjustEditor.swift in Sources */,
 				FT0000000000000000000A34 /* EditorState+ParamOverrides.swift in Sources */,
+				FT0000000000000000000A35 /* ExportCoordinator.swift in Sources */,
+				FT0000000000000000000A36 /* SaveLookPayload.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

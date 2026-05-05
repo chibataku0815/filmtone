@@ -63,11 +63,13 @@ final class LibraryViewModel {
         }
     }
 
-    /// Snapshot the current EditorState into a SavedLookEntry on disk
-    /// and return the stored entry so the caller can auto-select it.
+    /// Persist a `SaveLookPayload` snapshot to disk and return the
+    /// stored entry so the caller can auto-select it. M5-G.1: takes
+    /// the payload directly instead of the whole `EditorState`, so the
+    /// library feature does not depend on the full editor surface
+    /// (P3 from 2026-05-05 review).
     @discardableResult
-    func saveCurrentLook(name: String, from state: EditorState) async -> SavedLookEntry? {
-        let payload = state.currentLookSavePayload()
+    func saveCurrentLook(name: String, payload: SaveLookPayload) async -> SavedLookEntry? {
         do {
             let entry = try await store.saveLook(
                 name: name,

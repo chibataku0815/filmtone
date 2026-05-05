@@ -117,7 +117,10 @@ struct LookLibraryControls: View {
         let name = typed.isEmpty ? defaultName(for: library.snapshot) : typed
 
         Task { @MainActor in
-            if let saved = await library.saveCurrentLook(name: name, from: state) {
+            // M5-G.1: pass the payload directly so LibraryViewModel
+            // does not depend on the whole EditorState surface.
+            let payload = state.currentLookSavePayload()
+            if let saved = await library.saveCurrentLook(name: name, payload: payload) {
                 state.selectedSavedLookId = saved.id
             }
         }
