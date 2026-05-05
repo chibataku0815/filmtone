@@ -58,3 +58,16 @@ plus sidecar JSON are present.
   resolves for `com.chibatakumi.film-lab-desktop` / `MAC_OS`.
 - Exact validation error:
   `Cannot determine the Apple ID from Bundle ID 'com.chibatakumi.film-lab-desktop' and platform 'MAC_OS'.`
+
+2026-05-06:
+
+- Confirmed the macOS App Store Connect app record exists:
+  Apple ID `6766605429`, Bundle ID `com.chibatakumi.film-lab-desktop`, SKU
+  `filmtone-macos`.
+- `altool --validate-app` passed for
+  `apps/filmtone-desktop-macos/build/app-store/1.4/export/Filmtone.pkg`.
+- `altool --upload-package --wait` passed.
+- Delivery UUID: `759ae36e-be06-4251-8f6c-f48579c6dfbe`
+- ASC processing status: `VALID`
+- Uploaded build: `CFBundleShortVersionString=1.4`, `CFBundleVersion=1`,
+  App Store eligible.
