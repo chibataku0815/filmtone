@@ -1,4 +1,7 @@
 import Foundation
+import FilmLabSwiftCore
+
+typealias Phase0OutputProfileDTO = FilmLabSwiftCore.Phase0OutputProfileDTO
 
 enum FilmtoneSourceKind: String, Codable {
     case image
@@ -173,14 +176,6 @@ struct SourceProbeDTO: Codable {
     let inputTransformPolicy: SourceInputTransformPolicyDTO?
     let cameraOptics: CameraOpticsDTO?
     let sourceVideoMetadata: SourceVideoMetadataDTO?
-}
-
-struct Phase0OutputProfileDTO: Codable, Equatable {
-    let longEdge: Int
-    let fps: Int
-    let codec: String
-    let container: String
-    let preserveAudio: Bool
 }
 
 struct Phase0QuickStateDTO: Codable {
