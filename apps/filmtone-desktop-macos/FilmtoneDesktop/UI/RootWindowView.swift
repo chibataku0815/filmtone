@@ -30,16 +30,18 @@ struct RootWindowView: View {
     // across source changes. `@AppStorage` writes do not reset when
     // `state.setSource` runs, so the user's last preference holds.
     @AppStorage("editorSidebarOpen") private var sidebarOpen: Bool = true
-    // M5-M: cached display aspect ratio of the opened source. Updated on
-    // source open and on video session arrival. Stills populate this from
-    // `stillDisplaySize`; video reads from `videoSession.displayAspectRatio`
-    // reactively via the @Observable chain. nil = no source (empty state).
+    // M5-M: cached display aspect ratio of the opened source. Stills populate
+    // this from `stillDisplaySize`; video seeds it from the initial probe so
+    // portrait layout / sidebar sizing are correct before `videoSession`
+    // attaches, then reads `videoSession.displayAspectRatio` reactively once
+    // available. nil = no source (empty state / pending probe).
     @State private var sourceAspectRatio: CGFloat? = nil
 
     // M5-M: portrait when aspect < 1.0 (height > width). Nil (no source)
     // is treated as landscape so the empty opening screen uses the default
     // full-window ZStack layout. Video derives aspect reactively from the
-    // session; stills populate via `resizeWindowToSourceAspect`.
+    // session when available, with `sourceAspectRatio` as the pre-session
+    // probe fallback.
     private var isPortraitSource: Bool {
         if state.sourceKind == .video, let session = state.videoSession {
             return session.displayAspectRatio < 1.0
@@ -350,6 +352,14 @@ struct RootWindowView: View {
     }
 
     private func resizeWindowToSourceAspect(url: URL, kind: FilmtoneSourceKind) {
+        // New source selection must not inherit the prior source's geometry
+        // while a still/video probe is pending or failed. In particular, video
+        // `videoSession` arrives asynchronously, so `isPortraitSource` uses
+        // this nil state as a neutral fallback until the probe below seeds the
+        // actual display aspect.
+        sourceAspectRatio = nil
+        lastMediaDisplaySize = nil
+
         switch kind {
         case .still:
             guard let mediaSize = stillDisplaySize(url: url) else { return }
@@ -367,9 +377,12 @@ struct RootWindowView: View {
                 let mediaSize = CGSize(width: abs(displayRect.width), height: abs(displayRect.height))
                 await MainActor.run {
                     guard state.sourceURL == url else { return }
-                    // M5-M: video aspect is derived reactively from
-                    // `state.videoSession.displayAspectRatio` via
-                    // `isPortraitSource`; no explicit store needed for video.
+                    // M5-M follow-up: seed the same aspect cache used by stills
+                    // so portrait layout and sidebar reservation are correct
+                    // before `state.videoSession` attaches.
+                    sourceAspectRatio = mediaSize.width > 0 && mediaSize.height > 0
+                        ? mediaSize.width / mediaSize.height
+                        : nil
                     resizeWindow(toMediaDisplaySize: mediaSize)
                 }
             }
