@@ -655,7 +655,6 @@ private struct VideoScrubBar: View {
                 )
 
                 highlightMarkerRail(width: proxy.size.width)
-                    .allowsHitTesting(false)
 
                 ScrubHoverTrackingView { nextFraction in
                     if let nextFraction {
@@ -691,16 +690,24 @@ private struct VideoScrubBar: View {
         ZStack(alignment: .leading) {
             ForEach(state.highlightMarkerList, id: \.id) { marker in
                 let x = markerCenterX(for: marker.sourceTimeSec, width: width)
-                VStack(spacing: 1) {
-                    Image(systemName: "bookmark.fill")
-                        .font(.system(size: 8, weight: .bold))
-                        .symbolRenderingMode(.monochrome)
-                    Capsule()
-                        .frame(width: 2, height: 10)
+                Button {
+                    state.jumpToHighlightMarker(id: marker.id)
+                } label: {
+                    VStack(spacing: 1) {
+                        Image(systemName: "bookmark.fill")
+                            .font(.system(size: 8, weight: .bold))
+                            .symbolRenderingMode(.monochrome)
+                        Capsule()
+                            .frame(width: 2, height: 10)
+                    }
+                    .foregroundStyle(Color.yellow)
+                    .shadow(color: Color.black.opacity(0.55), radius: 2, x: 0, y: 1)
+                    .frame(width: 16, height: 24)
                 }
-                .foregroundStyle(Color.yellow)
-                .shadow(color: Color.black.opacity(0.55), radius: 2, x: 0, y: 1)
-                .frame(width: 16, height: 24)
+                .buttonStyle(.plain)
+                .contentShape(Rectangle())
+                .help("Jump to highlight marker")
+                .filmtonePointingHandCursor()
                 .offset(x: x - 8)
             }
         }
