@@ -442,6 +442,32 @@ struct RootWindowView: View {
 
 }
 
+private struct RootSafeAreaTopInsetKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+private struct WindowAccessor: NSViewRepresentable {
+    let onResolve: (NSWindow?) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            onResolve(view.window)
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            onResolve(nsView.window)
+        }
+    }
+}
+
 /// M5-A.3 / M5-D.2 / M5-I.2: scrub bar for video preview. The Slider
 /// drives `AVPlayer.seek(to:)` directly; the periodic time observer in
 /// `FilmtoneDesktopVideoSession` pushes player time back into
