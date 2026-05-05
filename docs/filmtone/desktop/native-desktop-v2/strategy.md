@@ -313,6 +313,18 @@ green; user visual smoke confirmed continuous Stone/Urban response.
 Deviation from iOS canonical (preset-lerp vs LUT alpha) is byte-identical
 at strength=1.0 and divergent by design at intermediate strengths.
 
+2026-05-06: M5-M.3 Portrait inspector iOS-faithful posture — landed on
+`fix/native-desktop-look-veil-energy-max-merge`. Two prior visual recovery
+rounds (black matte / continuous rail / window widening; then media-derived
+blurred backdrop) were rejected by user smoke. Recipe now mirrors iOS:
+loaded backdrop = solid `Color.black`; portrait inspector = summoned
+`EditorBottomSheet` slide-up (default closed via `editorBottomSheetOpen`);
+landscape keeps right-rail `EditorSidebar` (default open). ⌘\\ toggles the
+current surface. `MediaDerivedBackdrop` / `videoBackdropImage` /
+`seedVideoBackdrop` / `VideoBackdropTaskKey` removed from `PreviewSurface`.
+Verify 121/121, `verify:macos` BUILD SUCCEEDED, `git diff --check` clean;
+visual smoke user-pending.
+
 2026-05-05: M6 clean public release completed after parent-branch correction and
 `origin/main` merge. Native Desktop v1.4 is now the active public Desktop rail;
 update metadata reports `latestVersion: "1.4"`, and the fixed download page

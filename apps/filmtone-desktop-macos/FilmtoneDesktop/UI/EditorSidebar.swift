@@ -1,22 +1,27 @@
 import SwiftUI
 
-// M5-J1: Editing sidebar shell. Splits the right-rail panel stack out of
-// `RootWindowView` so the chrome can:
-//   1) reserve top inset for the macOS 26 unified toolbar plus a small
-//      breathing margin, applied at the call site;
-//   2) reserve bottom inset for the floating `VideoScrubBar`, with portrait
-//      using a tighter overlay inset than landscape;
-//   3) clip vertical overflow into a ScrollView so a tall stack of
-//      source / library / quick / grade / inspector panels never spills
-//      past the window's bottom edge regardless of source state;
-//   4) collapse cleanly so the preview can use the full window width
-//      when the user is just viewing.
+// M5-J1 / M5-M.3: editing panel container. A single right-rail surface
+// (`EditorSidebar`) is reused for both landscape and portrait sources — the
+// only difference is which `@AppStorage` key drives its visibility:
+//   - Landscape → `editorSidebarOpen` (default true). Rail is present from
+//     launch; ⌘\ toggles it.
+//   - Portrait → `editorPortraitInspectorOpen` (default false). Rail starts
+//     hidden so the loaded portrait clip is fully visible; ⌘\ summons /
+//     dismisses it. The summon transition is `.move(edge: .trailing)` so
+//     the rail slides in/out from the right edge.
 //
-// Spacing follows the M5-I.3 8px grid that the right rail already uses:
-// per-panel padding 16/16, container spacing 16, RoundedRectangle
-// cornerRadius 16. Width is fixed at 320pt — narrow enough to keep the
-// preview generous on a 1080-wide minimum window, wide enough that the
-// iOS-canonical recipe rows in the panels do not wrap.
+// The 4-panel content (`EditorPanelStack`) is shared across both, so Source /
+// Look / Quick / Export behave identically regardless of source orientation.
+//
+// Posture decisions:
+//   - Per-panel glass via `EditorSidebarPanelGlass` (RoundedRectangle 16,
+//     dark-tinted .clear @ 0.32 opacity). No continuous backing rail —
+//     each panel is a discrete glass capsule so the underlying media
+//     refracts between panels.
+//   - 16pt vertical spacing between panels, 4pt vertical breathing room
+//     at the stack edges (M5-I.3 8px grid).
+//   - Panels mount only when a source is loaded; the empty launch state
+//     never shows the inspector chrome.
 struct EditorSidebar: View {
     @Bindable var state: EditorState
     @Bindable var library: LibraryViewModel
@@ -25,30 +30,11 @@ struct EditorSidebar: View {
     var body: some View {
         GlassEffectContainer(spacing: 16) {
             ScrollView(.vertical, showsIndicators: true) {
-                VStack(alignment: .trailing, spacing: 16) {
-                    if state.sourceURL != nil {
-                        SourceProfileControls(state: state)
-                            .modifier(EditorSidebarPanelGlass())
-                        // M5-K2: Look + strength now live as one block
-                        // inside `LookLibraryControls`. The standalone
-                        // `GradeControls` panel was removed.
-                        LookLibraryControls(state: state, library: library)
-                            .modifier(EditorSidebarPanelGlass())
-                        QuickAdjustControls(state: state)
-                            .modifier(EditorSidebarPanelGlass())
-                        ExportInspectorPanel(
-                            state: state,
-                            onExportTap: {
-                                exportCoordinator.presentExportPanel(for: state)
-                            },
-                            onHighlightReelTap: {
-                                exportCoordinator.presentHighlightReelPanel(for: state)
-                            }
-                        )
-                        .modifier(EditorSidebarPanelGlass())
-                    }
-                }
-                .padding(.vertical, 4)
+                EditorPanelStack(
+                    state: state,
+                    library: library,
+                    exportCoordinator: exportCoordinator
+                )
                 .frame(maxWidth: .infinity)
             }
         }
@@ -56,11 +42,43 @@ struct EditorSidebar: View {
     }
 }
 
+struct EditorPanelStack: View {
+    @Bindable var state: EditorState
+    @Bindable var library: LibraryViewModel
+    var exportCoordinator: ExportCoordinator
+
+    var body: some View {
+        VStack(spacing: 16) {
+            if state.sourceURL != nil {
+                SourceProfileControls(state: state)
+                    .modifier(EditorSidebarPanelGlass())
+                // M5-K2: Look + strength now live as one block inside
+                // `LookLibraryControls`. The standalone `GradeControls`
+                // panel was removed.
+                LookLibraryControls(state: state, library: library)
+                    .modifier(EditorSidebarPanelGlass())
+                QuickAdjustControls(state: state)
+                    .modifier(EditorSidebarPanelGlass())
+                ExportInspectorPanel(
+                    state: state,
+                    onExportTap: {
+                        exportCoordinator.presentExportPanel(for: state)
+                    },
+                    onHighlightReelTap: {
+                        exportCoordinator.presentHighlightReelPanel(for: state)
+                    }
+                )
+                .modifier(EditorSidebarPanelGlass())
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
 // Per-panel glass posture: dark-tinted .clear Apple Liquid Glass so each
 // panel reads on top of the underlying media without a continuous backing
-// rail that would feel like a fixed sidebar column. The tint stays in the
-// 0.30–0.34 range so text remains readable on bright portrait footage
-// while the panels still refract the media beneath.
+// rail. Tint stays in the 0.30–0.34 range so text remains readable on
+// bright portrait footage while the panels still refract the media beneath.
 private struct EditorSidebarPanelGlass: ViewModifier {
     func body(content: Content) -> some View {
         content

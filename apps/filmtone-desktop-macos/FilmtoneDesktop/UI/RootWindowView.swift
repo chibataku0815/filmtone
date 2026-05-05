@@ -25,10 +25,16 @@ struct RootWindowView: View {
     // just calls into it from the toolbar Export button + the inspector
     // tap callback (P2 from 2026-05-05 review).
     @State private var exportCoordinator = ExportCoordinator()
-    // M5-J1: editing sidebar open/close persists across launches and
-    // across source changes. `@AppStorage` writes do not reset when
-    // `state.setSource` runs, so the user's last preference holds.
+    // M5-J1: landscape right-rail open/close. Persists across launches
+    // and source changes via `@AppStorage` so the user's last preference
+    // holds. Default true: landscape opens with the inspector visible.
     @AppStorage("editorSidebarOpen") private var sidebarOpen: Bool = true
+    // M5-M.3: portrait summoned right-rail slide-in. Default false so a
+    // freshly opened portrait clip shows full media unobstructed; ⌘\ slides
+    // the rail in from the trailing edge and dismisses it. Reuses the same
+    // `EditorSidebar` surface as the landscape rail — only the visibility
+    // default and slide animation differ.
+    @AppStorage("editorPortraitInspectorOpen") private var portraitInspectorOpen: Bool = false
     // M5-M: cached display aspect ratio of the opened source. Stills populate
     // this from `stillDisplaySize`; video seeds it from the initial probe so
     // portrait overlay insets / window sizing are correct before `videoSession`
@@ -47,6 +53,21 @@ struct RootWindowView: View {
         }
         guard let ratio = sourceAspectRatio else { return false }
         return ratio < 1.0
+    }
+
+    // M5-M.3: which inspector surface is "current" for the loaded source.
+    // Portrait → bottom sheet; landscape → right rail. Drives the toolbar
+    // toggle button label/help and the ⌘\ keyboard shortcut binding.
+    private var inspectorVisible: Bool {
+        isPortraitSource ? portraitInspectorOpen : sidebarOpen
+    }
+
+    private func toggleInspector() {
+        if isPortraitSource {
+            portraitInspectorOpen.toggle()
+        } else {
+            sidebarOpen.toggle()
+        }
     }
 
     var body: some View {
@@ -172,26 +193,35 @@ struct RootWindowView: View {
             // every toggle; Hide/Show wording lives only in `.help(...)`.
             ToolbarItem(id: "filmtone.toolbar.sidebar", placement: .primaryAction) {
                 Button {
-                    sidebarOpen.toggle()
+                    toggleInspector()
                 } label: {
                     Label("Inspector", systemImage: "sidebar.right")
                 }
                 .keyboardShortcut("\\", modifiers: .command)
                 .buttonStyle(.glass)
-                .help(sidebarOpen
-                      ? "Hide editing sidebar (⌘\\)"
-                      : "Show editing sidebar (⌘\\)")
+                .help(inspectorVisible
+                      ? "Hide editing panel (⌘\\)"
+                      : "Show editing panel (⌘\\)")
                 .filmtonePointingHandCursor()
             }
         }
     }
 
-    // M5-M visual correction: both landscape and portrait use the same
-    // source-first overlay posture. The previous portrait HStack reserved a
-    // transparent right column, which made vertical footage smaller and let
-    // Liquid Glass refract unrelated desktop text behind the inspector.
-    // PreviewSurface now owns the full window; the inspector and scrub bar
-    // float above it with orientation-tuned insets.
+    // M5-M.3: inspector posture — single right-rail (`EditorSidebar`)
+    // reused across orientations, distinguished only by which `@AppStorage`
+    // key drives visibility:
+    //   - Landscape: `editorSidebarOpen` (default true). Rail is present
+    //     from launch; ⌘\ toggles.
+    //   - Portrait: `editorPortraitInspectorOpen` (default false). Rail
+    //     starts hidden so the loaded portrait clip is fully visible; ⌘\
+    //     summons and dismisses with a `.move(edge: .trailing)` slide.
+    // The rail's bottom edge sits above the floating scrub bar capsule
+    // (driven by `sidebarBottomPadding`) so the inspector never covers the
+    // scrub bar — the user can scrub while the inspector is summoned.
+    // Window aspect is locked to source aspect for both, so the only pixels
+    // the loaded backdrop ever covers are the rare letterbox residual from
+    // the snap-to-aspect resize, filled by `PreviewSurface`'s solid
+    // `Color.black` backdrop (iOS canonical recipe).
     @ViewBuilder
     private var editorOverlayLayout: some View {
         ZStack(alignment: .topTrailing) {
@@ -212,19 +242,27 @@ struct RootWindowView: View {
                 onOpenRequested: { presentOpenPanel() }
             )
             .ignoresSafeArea(.container, edges: .all)
-            // M5-J1: sidebar overlays the right edge. Top/bottom insets
-            // keep panels clear of the toolbar chrome and the scrub bar.
-            if sidebarOpen {
+            // Right-rail inspector. Same `EditorSidebar` for both portrait
+            // and landscape. `inspectorVisible` resolves to the right
+            // `@AppStorage` based on `isPortraitSource`. The slide-in
+            // transition only animates the portrait summon (landscape
+            // default-open mounts without animation on first paint).
+            if inspectorVisible {
                 EditorSidebar(
                     state: state,
                     library: library,
                     exportCoordinator: exportCoordinator
                 )
-                .padding(.top, sidebarTopPadding)
+                .padding(.top, 72)
                 .padding(.bottom, sidebarBottomPadding)
-                .padding(.trailing, sidebarTrailingPadding)
+                .padding(.trailing, 12)
+                .transition(.move(edge: .trailing).combined(with: .opacity))
             }
             // M5-A.3 + F4: scrub bar floats above the window bottom edge.
+            // The inspector's bottom edge clears the scrub bar via
+            // `sidebarBottomPadding`, so the scrub bar stays usable while
+            // the inspector is open — no width-shrink or visibility change
+            // on the scrub bar itself.
             if state.sourceKind == .video,
                let duration = state.videoDurationSeconds,
                duration > 0 {
@@ -237,21 +275,24 @@ struct RootWindowView: View {
                 .frame(maxWidth: .infinity)
             }
         }
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: sidebarOpen)
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: portraitInspectorOpen)
     }
 
-    private var sidebarTopPadding: CGFloat {
-        isPortraitSource ? 64 : 72
-    }
-
+    // Inspector bottom inset. When a video is loaded the rail's bottom
+    // edge must clear the floating 2-row scrub bar capsule so the user
+    // can scrub while the inspector is summoned. Portrait uses a tighter
+    // inset because the scrub bar itself sits closer to the window bottom
+    // (`scrubBarBottomPadding` = 24 portrait, 64 landscape); the offsets
+    // here = scrub_bottom + scrub_height(~80) + breath(12).
     private var sidebarBottomPadding: CGFloat {
-        guard state.sourceKind == .video else { return isPortraitSource ? 20 : 24 }
-        return isPortraitSource ? 96 : 120
+        guard state.sourceKind == .video else { return 24 }
+        return isPortraitSource ? 116 : 156
     }
 
-    private var sidebarTrailingPadding: CGFloat {
-        isPortraitSource ? 10 : 12
-    }
-
+    // Scrub bar bottom inset. Portrait clips lift the capsule slightly
+    // closer to the media bottom so it doesn't float in dead space below
+    // the aspect-locked window bottom; landscape uses a roomier inset.
     private var scrubBarBottomPadding: CGFloat {
         isPortraitSource ? 24 : 64
     }
@@ -730,6 +771,28 @@ private struct VideoScrubBar: View {
     }
 
     private var capsule: some View {
+        // M5-M.3: 2-row layout. The single-row capsule grew too dense once
+        // bookmark + jump-prev / jump-next + speed were added, so the
+        // controls split across two rows of related actions:
+        //   Row 1 (transport): play | current time | slider | total time | speed
+        //   Row 2 (markers):   add | (menu) | prev | next | spacer
+        // The slider lives on row 1 next to the time bookends so the primary
+        // scrubbing affordance stays large; the secondary marker controls
+        // sit on row 2 left-aligned with a trailing spacer so the row stays
+        // visually grounded even when no markers exist yet.
+        VStack(spacing: 8) {
+            transportRow
+            markersRow
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .glassEffect(
+            .clear.tint(.black.opacity(0.30)),
+            in: RoundedRectangle(cornerRadius: Self.capsuleCornerRadius)
+        )
+    }
+
+    private var transportRow: some View {
         HStack(spacing: 12) {
             Button {
                 state.togglePlayback()
@@ -745,6 +808,17 @@ private struct VideoScrubBar: View {
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
                 .frame(minWidth: 64, alignment: .leading)
+            sliderArea
+            Text(format(duration))
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .frame(minWidth: 64, alignment: .trailing)
+            PlaybackRateMenu(state: state)
+        }
+    }
+
+    private var markersRow: some View {
+        HStack(spacing: 12) {
             Button {
                 state.addHighlightMarker(at: seconds.wrappedValue)
             } label: {
@@ -778,19 +852,8 @@ private struct VideoScrubBar: View {
             .disabled(state.highlightMarkerList.isEmpty)
             .help("Jump to next highlight marker (J)")
             .filmtonePointingHandCursor(!state.highlightMarkerList.isEmpty)
-            sliderArea
-            Text(format(duration))
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
-                .frame(minWidth: 64, alignment: .trailing)
-            PlaybackRateMenu(state: state)
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 16)
-        .glassEffect(
-            .clear.tint(.black.opacity(0.30)),
-            in: RoundedRectangle(cornerRadius: Self.capsuleCornerRadius)
-        )
     }
 
     private var sliderArea: some View {
