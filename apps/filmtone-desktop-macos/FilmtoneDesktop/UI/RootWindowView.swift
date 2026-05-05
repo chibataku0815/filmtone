@@ -1,12 +1,16 @@
 import AppKit
 import AVFoundation
 import FilmLabSwiftCore
+import ImageIO
 import SwiftUI
 import UniformTypeIdentifiers
 
 struct RootWindowView: View {
     @State private var state = EditorState()
     @State private var library = LibraryViewModel()
+    @State private var hostingWindow: NSWindow?
+    @State private var minimumContentSize = CGSize(width: 1080, height: 720)
+    @State private var rootSafeAreaTopInset: CGFloat = 0
     // M5-G.1: export user flow lives on the coordinator now. Root view
     // just calls into it from the toolbar Export button + the inspector
     // tap callback (P2 from 2026-05-05 review).
@@ -24,8 +28,10 @@ struct RootWindowView: View {
                 videoPreviewSeconds: state.videoPreviewSeconds,
                 sourceProfileSelection: state.sourceProfileSelection,
                 quickState: state.quickState,
-                paramOverrides: state.paramOverrides
+                paramOverrides: state.paramOverrides,
+                onOpenRequested: { presentOpenPanel() }
             )
+            .ignoresSafeArea(.container, edges: .all)
             // M5-B Pass 3: user confirmed `.clear` posture is the correct
             // Apple Liquid Glass dramatic refraction; all panels and the
             // capsule unified on `.clear`. GlassEffectContainer(spacing: 12)
@@ -130,12 +136,11 @@ struct RootWindowView: View {
                 .frame(maxWidth: .infinity)
             }
         }
-        // M5-H.1: with the 5-panel right rail (SourceProfile / LookLibrary
-        // / QuickAdjust / Grade / ExportInspector) the previous
-        // 880×560 minimum could clip the rail vertically once a source
-        // loaded. Bumping to 1080×720 keeps the rail visible at minimum
-        // size; .defaultSize on WindowGroup opens at a roomier 1280×800.
-        .frame(minWidth: 1080, minHeight: 720)
+        // M5-I.4a follow-up: empty launch keeps a roomier floor, then
+        // opening media relaxes the floor to that source's display aspect
+        // so the window behaves closer to QuickTime instead of forcing
+        // letterbox / pillarbox through a fixed desktop minimum.
+        .frame(minWidth: minimumContentSize.width, minHeight: minimumContentSize.height)
         // M5-I.2: any edit that changes a render input must rebuild the
         // graded `AVMutableVideoComposition` so the next composed frame
         // reflects the user's intent. Collapsing the 7 individual
@@ -154,32 +159,26 @@ struct RootWindowView: View {
         .task {
             await library.bootstrap()
         }
-        // The real reason the toolbar previously read as solid white was an
-        // opaque AppKit toolbar background painted on top of the Liquid Glass
-        // chrome. Hiding it lets the preview Image (which already extends via
-        // backgroundExtensionEffect) show through, giving the unified Apple
-        // Liquid Glass toolbar real content to refract — toolbar buttons and
-        // title still render normally, but the chrome bar itself becomes the
-        // glass surface the design language calls for.
+        .background(WindowAccessor { window in
+            resolveWindow(window)
+        })
+        .background(
+            GeometryReader { proxy in
+                Color.clear.preference(
+                    key: RootSafeAreaTopInsetKey.self,
+                    value: proxy.safeAreaInsets.top
+                )
+            }
+        )
+        .onPreferenceChange(RootSafeAreaTopInsetKey.self) { inset in
+            rootSafeAreaTopInset = inset
+        }
+        // Hide the opaque AppKit toolbar background so the unified chrome can
+        // refract the preview / opening surface. The titlebar brand is hidden
+        // separately in `configureWindowForTransparentGlass(_:)`; Open /
+        // Export stay as the only visible toolbar actions.
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .toolbar {
-            ToolbarItem(placement: .navigation) {
-                // M5-H.1: replace the `camera.aperture` SF Symbol placeholder
-                // with the iOS-canonical AppIcon (already populated by
-                // M5-E.1, commit 758ada3a). NSApp.applicationIconImage is
-                // the live runtime icon, so we don't duplicate the asset.
-                // Group wraps the optional so ToolbarContentBuilder gets a
-                // concrete View (some View?) — without it the build fails
-                // on `'ToolbarItem<(), some View?>' conform to 'View'`.
-                Group {
-                    if let icon = NSApp.applicationIconImage {
-                        Image(nsImage: icon)
-                            .resizable()
-                            .interpolation(.high)
-                            .frame(width: 20, height: 20)
-                    }
-                }
-            }
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     presentOpenPanel()
@@ -233,8 +232,199 @@ struct RootWindowView: View {
         panel.prompt = "Open"
         panel.message = "Choose a still image or short video to preview"
         if panel.runModal() == .OK, let url = panel.url {
-            state.setSource(url, kind: detectSourceKind(of: url))
+            let kind = detectSourceKind(of: url)
+            state.setSource(url, kind: kind)
+            resizeWindowToSourceAspect(url: url, kind: kind)
         }
+    }
+
+    private func resizeWindowToSourceAspect(url: URL, kind: FilmtoneSourceKind) {
+        switch kind {
+        case .still:
+            guard let mediaSize = stillDisplaySize(url: url) else { return }
+            resizeWindow(toMediaDisplaySize: mediaSize)
+        case .video:
+            Task {
+                guard let probe = try? await FilmtoneSourceProber.probeVideo(sourceURL: url) else { return }
+                let displayRect = CGRect(origin: .zero, size: probe.naturalSize)
+                    .applying(probe.preferredTransform)
+                let mediaSize = CGSize(width: abs(displayRect.width), height: abs(displayRect.height))
+                await MainActor.run {
+                    guard state.sourceURL == url else { return }
+                    resizeWindow(toMediaDisplaySize: mediaSize)
+                }
+            }
+        }
+    }
+
+    private func resolveWindow(_ window: NSWindow?) {
+        guard let window else { return }
+        hostingWindow = window
+        configureWindowForTransparentGlass(window)
+    }
+
+    private func configureWindowForTransparentGlass(_ window: NSWindow) {
+        // SwiftUI `.clear` / `.glassEffect` cannot reveal anything outside
+        // the app while AppKit keeps the backing window opaque. Make the
+        // window itself transparent so the empty opening state can behave
+        // like clear Liquid Glass instead of a painted dark canvas.
+        window.styleMask.insert(.fullSizeContentView)
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.title = ""
+        window.subtitle = ""
+        window.toolbarStyle = .unifiedCompact
+        window.hasShadow = true
+        window.contentView?.wantsLayer = true
+        window.contentView?.layer?.backgroundColor = NSColor.clear.cgColor
+    }
+
+    private func resizeWindow(toMediaDisplaySize mediaSize: CGSize) {
+        guard let window = hostingWindow ?? NSApp.keyWindow,
+              mediaSize.width > 0,
+              mediaSize.height > 0
+        else { return }
+
+        let screenFrame = (window.screen ?? NSScreen.main)?.visibleFrame ?? window.frame
+        let aspect = mediaSize.width / mediaSize.height
+        let frameInset = windowFrameInset(for: window)
+        let topChromeAllowance = previewTopChromeAllowance(for: window)
+        let availableContentSize = CGSize(
+            width: max(360, screenFrame.width - 96 - frameInset.width),
+            height: max(320, screenFrame.height - 96 - frameInset.height)
+        )
+        let preferredContentSize = CGSize(
+            width: min(availableContentSize.width, 1440),
+            height: min(availableContentSize.height, 980)
+        )
+        let contentMinimum = minimumContentSize(
+            forAspect: aspect,
+            topChromeAllowance: topChromeAllowance,
+            within: availableContentSize
+        )
+        minimumContentSize = contentMinimum
+        window.contentMinSize = contentMinimum
+
+        var contentSize = previewAreaAspectFitSize(
+            aspect: aspect,
+            topChromeAllowance: topChromeAllowance,
+            in: preferredContentSize
+        )
+        if contentSize.width < contentMinimum.width || contentSize.height < contentMinimum.height {
+            contentSize = contentMinimum
+        }
+        window.contentAspectRatio = contentSize
+
+        let currentFrame = window.frame
+        let frameRect = window.frameRect(forContentRect: CGRect(origin: .zero, size: contentSize))
+        let nextOrigin = CGPoint(
+            x: currentFrame.midX - frameRect.width / 2,
+            y: currentFrame.midY - frameRect.height / 2
+        )
+        var nextFrame = CGRect(origin: nextOrigin, size: frameRect.size)
+        if nextFrame.width <= screenFrame.width {
+            nextFrame.origin.x = min(max(nextFrame.minX, screenFrame.minX), screenFrame.maxX - nextFrame.width)
+        } else {
+            nextFrame.origin.x = screenFrame.minX
+        }
+        if nextFrame.height <= screenFrame.height {
+            nextFrame.origin.y = min(max(nextFrame.minY, screenFrame.minY), screenFrame.maxY - nextFrame.height)
+        } else {
+            nextFrame.origin.y = screenFrame.minY
+        }
+        window.setFrame(nextFrame, display: true, animate: true)
+    }
+
+    private func stillDisplaySize(url: URL) -> CGSize? {
+        guard let imageSource = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [CFString: Any]
+        else { return nil }
+        let width = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.doubleValue ?? 0
+        let height = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.doubleValue ?? 0
+        guard width > 0, height > 0 else { return nil }
+        let orientationRaw = (properties[kCGImagePropertyOrientation] as? NSNumber)?.uint32Value
+        let orientation = orientationRaw.flatMap(CGImagePropertyOrientation.init(rawValue:))
+        let swapsAxes = orientation == .left
+            || orientation == .leftMirrored
+            || orientation == .right
+            || orientation == .rightMirrored
+        return swapsAxes
+            ? CGSize(width: height, height: width)
+            : CGSize(width: width, height: height)
+    }
+
+    private func previewAreaAspectFitSize(
+        aspect: CGFloat,
+        topChromeAllowance: CGFloat,
+        in bounds: CGSize
+    ) -> CGSize {
+        let previewHeightBounds = max(1, bounds.height - topChromeAllowance)
+        var size = CGSize(
+            width: bounds.width,
+            height: bounds.width / aspect + topChromeAllowance
+        )
+        if size.height > bounds.height {
+            size.height = previewHeightBounds + topChromeAllowance
+            size.width = previewHeightBounds * aspect
+        }
+        return size
+    }
+
+    private func minimumContentSize(
+        forAspect aspect: CGFloat,
+        topChromeAllowance: CGFloat,
+        within bounds: CGSize
+    ) -> CGSize {
+        let minShort: CGFloat = 360
+        let minLong: CGFloat = 720
+        let requestedPreviewSize: CGSize
+        if aspect >= 1 {
+            let width = max(minLong, minShort * aspect)
+            requestedPreviewSize = CGSize(width: width, height: width / aspect)
+        } else {
+            let height = max(minLong, minShort / aspect)
+            requestedPreviewSize = CGSize(width: height * aspect, height: height)
+        }
+        let requested = CGSize(
+            width: requestedPreviewSize.width,
+            height: requestedPreviewSize.height + topChromeAllowance
+        )
+        if requested.width <= bounds.width, requested.height <= bounds.height {
+            return requested
+        }
+        return previewAreaAspectFitSize(
+            aspect: aspect,
+            topChromeAllowance: topChromeAllowance,
+            in: bounds
+        )
+    }
+
+    private func windowFrameInset(for window: NSWindow) -> CGSize {
+        let contentSize = CGSize(width: 1000, height: 1000)
+        let frameSize = window.frameRect(forContentRect: CGRect(origin: .zero, size: contentSize)).size
+        return CGSize(
+            width: max(0, frameSize.width - contentSize.width),
+            height: max(0, frameSize.height - contentSize.height)
+        )
+    }
+
+    private func previewTopChromeAllowance(for window: NSWindow) -> CGFloat {
+        if window.styleMask.contains(.fullSizeContentView) {
+            return 0
+        }
+        let layoutInset = window.contentView.map { contentView in
+            max(0, contentView.bounds.height - window.contentLayoutRect.height)
+        } ?? 0
+        let measuredInset = max(rootSafeAreaTopInset, layoutInset)
+        if measuredInset > 1 {
+            return min(measuredInset, 96)
+        }
+        // macOS unified toolbar / titlebar height when SwiftUI has not
+        // reported safe-area geometry yet. This is only used to calculate
+        // the first post-open window resize.
+        return 34
     }
 
     private func detectSourceKind(of url: URL) -> FilmtoneSourceKind {

@@ -31,6 +31,9 @@ struct PreviewSurface: View {
     /// M5-C.3a: per-key parameter override patch applied between the
     /// preset/look resolve and the quick-state pass.
     let paramOverrides: FilmtonePhase0ParamsPatch
+    /// M5-I.4a: empty-state CTA entry point. RootWindowView owns the
+    /// platform file picker; PreviewSurface only renders the open affordance.
+    let onOpenRequested: () -> Void
 
     @State private var renderedImage: NSImage?
     /// M5-H.1.2: identity of the source that produced `renderedImage`.
@@ -45,28 +48,22 @@ struct PreviewSurface: View {
 
     var body: some View {
         ZStack {
-            // M5-H.1.1: branded `FilmtoneBackdrop` is gated to the empty
-            // launch state only. The moment a source loads (or even before
-            // the first render lands while the probe is in flight) we swap
-            // to a neutral `Color.black` backdrop so any letterbox bars
-            // around `.scaledToFit()` don't bleed warm tone into color
-            // judgment on the preview. Both branches keep
-            // `.backgroundExtensionEffect()` so the Liquid Glass toolbar
-            // continues to refract a real surface.
+            // M5-I.4a: empty launches on a branded Liquid Glass backdrop;
+            // loaded media sits on a neutral dark frosted matte instead of
+            // pure black. The content layer itself remains glass-free so
+            // grading judgment stays trustworthy.
+            PreviewBackdrop(mode: sourceURL == nil ? .empty : .loaded)
+                .backgroundExtensionEffect()
             if sourceURL == nil {
-                FilmtoneBackdrop()
-                    .backgroundExtensionEffect()
-                EmptyPreviewLabel()
+                EmptyPreviewLabel(onOpenRequested: onOpenRequested)
             } else {
-                Color.black
-                    .backgroundExtensionEffect()
                 // M5-I.2: video sources mount the AVPlayer view as soon as
                 // `state.videoSession` lands. The session probes the asset
                 // off-actor, builds the graded `AVMutableVideoComposition`,
                 // and AVFoundation now owns the per-frame decode + grade
                 // loop on its private dispatch queue. The brief window
                 // between `setSource(.video)` and session readiness shows
-                // only the black backdrop above (no `Image(nsImage:)`
+                // only the preview matte above (no `Image(nsImage:)`
                 // bridging frame — random-seek extraction is exactly the
                 // path this slice removes).
                 if sourceKind == .video, let session = state.videoSession {
@@ -241,46 +238,137 @@ private struct PreviewRenderKey: Hashable {
     let paramOverrides: FilmtonePhase0ParamsPatch
 }
 
-// M5-H.1: replaces the prior dark + system-icon placeholder. Uses the
-// runtime AppIcon so the launch state visually anchors on the brand mark
-// the user already sees in the Dock / Finder, plus the wordmark and a
-// soft Japanese CTA. Stays inside the FilmtoneBackdrop gradient so the
-// Liquid Glass chrome above continues to refract a real surface.
-private struct EmptyPreviewLabel: View {
+private struct PreviewBackdrop: View {
+    enum Mode {
+        case empty
+        case loaded
+    }
+
+    let mode: Mode
+
     var body: some View {
-        VStack(spacing: 16) {
-            if let icon = NSApp.applicationIconImage {
-                Image(nsImage: icon)
-                    .resizable()
-                    .interpolation(.high)
-                    .frame(width: 96, height: 96)
-                    .opacity(0.92)
-            }
-            Text("Filmtone")
-                .font(.system(size: 28, weight: .light))
-                .tracking(4)
-                .foregroundStyle(.white.opacity(0.92))
-            Text("素材を開いて始めましょう")
-                .font(.callout)
-                .foregroundStyle(.white.opacity(0.6))
+        switch mode {
+        case .empty:
+            BrandedOpeningBackdrop()
+        case .loaded:
+            NeutralFrostedPreviewMatte()
         }
     }
 }
 
-// M5-H.1: brand backdrop. Warm-leaning near-black gradient evokes the
-// dark-room negative-on-light-table feel without competing with the
-// preview content; identical to the iOS launch palette tone, kept dark
-// enough that color judgment on the preview is unaffected.
-private struct FilmtoneBackdrop: View {
+// M5-I.4a: neutral matte for letterbox / pillarbox areas. The material is
+// intentionally near-neutral and dark, softer than pure black but without
+// warm/cool cast that could bias preview color judgment.
+private struct NeutralFrostedPreviewMatte: View {
     var body: some View {
-        LinearGradient(
-            colors: [
-                Color(red: 0.07, green: 0.06, blue: 0.05),
-                Color(red: 0.02, green: 0.02, blue: 0.02)
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
+        ZStack {
+            Color(red: 0.078, green: 0.078, blue: 0.082)
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .opacity(0.18)
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.035),
+                    Color.black.opacity(0.08)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+    }
+}
+
+// M5-I.4a: replaces the prior flat opening placeholder with a branded
+// Liquid Glass surface and an actual Open CTA. Uses the runtime AppIcon so
+// the launch state anchors on the same mark shown in Dock / Finder.
+private struct EmptyPreviewLabel: View {
+    let onOpenRequested: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        GlassEffectContainer(spacing: 18) {
+            VStack(spacing: 20) {
+                VStack(spacing: 16) {
+                    if let icon = NSApp.applicationIconImage {
+                        Image(nsImage: icon)
+                            .resizable()
+                            .interpolation(.high)
+                            .frame(width: 92, height: 92)
+                            .opacity(0.94)
+                    }
+                    Text("Filmtone")
+                        .font(.system(size: 28, weight: .light))
+                        .tracking(4)
+                        .foregroundStyle(primaryTextStyle)
+                    Text("素材を開いて始めましょう")
+                        .font(.callout)
+                        .foregroundStyle(secondaryTextStyle)
+                }
+                .padding(.horizontal, 44)
+                .padding(.vertical, 28)
+
+                Button {
+                    onOpenRequested()
+                } label: {
+                    Label("素材を開く", systemImage: "folder")
+                        .font(.headline)
+                }
+                .buttonStyle(.glass)
+                .controlSize(.large)
+                .help("Open a still image or video")
+            }
+        }
+    }
+
+    private var primaryTextStyle: some ShapeStyle {
+        colorScheme == .light ? Color.black.opacity(0.82) : Color.white.opacity(0.92)
+    }
+
+    private var secondaryTextStyle: some ShapeStyle {
+        colorScheme == .light ? Color.black.opacity(0.52) : Color.white.opacity(0.64)
+    }
+}
+
+// M5-I.4a: opening-only clear Liquid Glass field. This avoids the dark
+// background + gray card posture. The AppKit window is also non-opaque, so
+// this layer can actually reveal the desktop / windows behind Filmtone.
+private struct BrandedOpeningBackdrop: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        GlassEffectContainer(spacing: 0) {
+            ZStack {
+                Color.clear
+                Rectangle()
+                    .fill(baseClearWash)
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(colorScheme == .light ? 0.12 : 0.055),
+                        Color.white.opacity(colorScheme == .light ? 0.025 : 0.010),
+                        Color.clear
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                RadialGradient(
+                    colors: [
+                        Color.white.opacity(colorScheme == .light ? 0.105 : 0.055),
+                        Color.clear
+                    ],
+                    center: .center,
+                    startRadius: 80,
+                    endRadius: 620
+                )
+                .blendMode(.screen)
+            }
+            .glassEffect(.clear, in: Rectangle())
+        }
+    }
+
+    private var baseClearWash: Color {
+        colorScheme == .light
+            ? Color.white.opacity(0.022)
+            : Color.white.opacity(0.010)
     }
 }
 
@@ -295,7 +383,8 @@ private struct FilmtoneBackdrop: View {
         videoPreviewSeconds: nil,
         sourceProfileSelection: .auto,
         quickState: .zero,
-        paramOverrides: .empty
+        paramOverrides: .empty,
+        onOpenRequested: {}
     )
     .frame(width: 600, height: 400)
 }

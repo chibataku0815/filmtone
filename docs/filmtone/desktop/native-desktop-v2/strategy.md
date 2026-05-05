@@ -719,6 +719,48 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
   + **M5-D.2.1** (v1.5 Primary route、iOS canonical AVPlayer port)。実装ゼロ /
   pbxproj 不変 / Verify 不変。Archived as
   `archive/2026-05-05-m5-d2-avplayer-playback-spike.md`。
+- 2026-05-05: **M5-I.4a Preview Background / Liquid Glass Treatment** closed.
+  Empty state now uses a branded Liquid Glass open CTA; loaded media letterbox /
+  pillarbox uses a neutral dark frosted matte instead of pure black while preview
+  content remains `.scaledToFit()` and glass-free. Desktop xcodebuild Debug ✅、
+  Verify 56/56 ✅、`git diff --check` clean。Archived as
+  `archive/2026-05-05-m5-i4a-preview-background-liquid-glass.md`。
+- 2026-05-05: **M5-I.4a clear opening follow-up** closed after user visual
+  smoke. Opening posture changed from dark gradient + gray slab to a full-window
+  clear Liquid Glass field with a transparent glass CTA; loaded preview behavior
+  unchanged. Desktop xcodebuild Debug ✅、Verify 56/56 ✅、`git diff --check`
+  clean。Archived as
+  `archive/2026-05-05-m5-i4a-clear-opening-glass-follow-up.md`。
+- 2026-05-05: **M5-I.4a QuickTime-style aspect-fit window follow-up** closed.
+  Opening a still / video now probes display size and resizes the macOS content
+  window toward source aspect ratio within screen bounds, with relaxed dynamic
+  content minimums + `contentAspectRatio`; preview remains `.scaledToFit()`.
+  Desktop xcodebuild Debug ✅、Verify 56/56 ✅、`git diff --check` clean。
+  Archived as `archive/2026-05-05-m5-i4a-quicktime-aspect-fit-window.md`。
+- 2026-05-05: **M5-I.4a opening true transparency follow-up** closed.
+  Opening now makes the hosting `NSWindow` non-opaque with a clear backing
+  color, and the empty backdrop fill was reduced so Liquid Glass can actually
+  reveal content behind the Filmtone window. Loaded preview behavior unchanged.
+  Desktop xcodebuild Debug ✅、Verify 56/56 ✅、`git diff --check` clean。
+  Archived as `archive/2026-05-05-m5-i4a-opening-true-transparency.md`。
+- 2026-05-05: **M5-I.4a titlebar brand cleanup** closed. Removed the custom
+  navigation app icon and hid the AppKit titlebar title so the clear opening
+  surface is not duplicated by a top-left `Filmtone` wordmark; Open / Export
+  toolbar actions remain. Desktop xcodebuild Debug ✅、Verify 56/56 ✅、
+  `git diff --check` clean。Archived as
+  `archive/2026-05-05-m5-i4a-titlebar-brand-cleanup.md`。
+- 2026-05-05: **M5-I.4a preview-area aspect correction** closed after visual
+  smoke still showed side matte. Resize math now measures / infers top toolbar
+  safe-area and fits the actual preview body to source aspect before adding
+  chrome height back to the window content size. Desktop xcodebuild Debug ✅、
+  Verify 56/56 ✅、`git diff --check` clean。Archived as
+  `archive/2026-05-05-m5-i4a-preview-area-aspect-fit.md`。
+- 2026-05-05: **M5-I.4a full-size preview chrome** closed after visual smoke
+  showed the macOS titlebar still consuming top preview space. Hosting window
+  now uses `.fullSizeContentView`, clears / hides title, and treats top chrome
+  allowance as zero for aspect-fit resize; Open / Export toolbar actions remain.
+  Desktop xcodebuild Debug ✅、Verify 56/56 ✅、`git diff --check` clean。
+  Archived as `archive/2026-05-05-m5-i4a-full-size-preview-chrome.md`。
 
 ## Interrupt / Decision Log
 
