@@ -30,7 +30,15 @@ actor FilmtoneSavedLookStore {
         }
     }
 
+    /// UserDefaults key holding the array of UUID strings for built-in
+    /// looks the user has favorited. Mirrors iOS's UserDefaults-backed
+    /// favorite map for built-in entries — the catalog JSON itself stays
+    /// immutable (rename / delete still refuse) but favorite is stored
+    /// alongside the bundled materialized entry at snapshot time.
+    static let builtInFavoritesUserDefaultsKey = "filmtone.library.builtInFavorites"
+
     private let fileManager: FileManager
+    private let defaults: UserDefaults
     private let rootURL: URL
     private let looksURL: URL
     private let indexURL: URL
@@ -38,8 +46,11 @@ actor FilmtoneSavedLookStore {
     private var looks: [UUID: SavedLookEntry] = [:]
     private var didLoad = false
 
-    init(fileManager: FileManager = .default, rootURL: URL? = nil) throws {
+    init(fileManager: FileManager = .default,
+         rootURL: URL? = nil,
+         defaults: UserDefaults = .standard) throws {
         self.fileManager = fileManager
+        self.defaults = defaults
         let resolvedRoot: URL
         if let rootURL {
             resolvedRoot = rootURL
@@ -58,6 +69,22 @@ actor FilmtoneSavedLookStore {
 
         try Self.ensureDirectory(at: resolvedRoot, fileManager: fileManager)
         try Self.ensureDirectory(at: looksURL, fileManager: fileManager)
+    }
+
+    private var builtInFavorites: Set<UUID> {
+        let raw = defaults.array(forKey: Self.builtInFavoritesUserDefaultsKey) as? [String] ?? []
+        return Set(raw.compactMap(UUID.init(uuidString:)))
+    }
+
+    private func setBuiltInFavorite(_ id: UUID, favorite: Bool) {
+        var current = builtInFavorites
+        if favorite {
+            current.insert(id)
+        } else {
+            current.remove(id)
+        }
+        let strings = current.map { $0.uuidString }
+        defaults.set(strings, forKey: Self.builtInFavoritesUserDefaultsKey)
     }
 
     // MARK: - Loading
@@ -182,13 +209,18 @@ actor FilmtoneSavedLookStore {
         return entry
     }
 
-    /// Toggle (or set) the favorite flag on a user Saved Look. Built-in
-    /// entries reject with `.immutableEntry` since their favorite state
-    /// is materialized from the catalog at read time.
+    /// Toggle (or set) the favorite flag on a Saved Look. Both user
+    /// entries and built-ins are accepted — built-ins keep their JSON
+    /// immutable (rename / delete still refuse) but favorite persists in
+    /// a UserDefaults map so the picker can surface it like any other
+    /// favorite. iOS canonical does the same split.
     @discardableResult
     func setFavorite(id: UUID, favorite: Bool) throws -> SavedLookEntry {
-        if let slug = FilmtoneCreativePackCatalog.find(canonicalUUID: id)?.slug {
-            throw StoreError.immutableEntry(slug: slug)
+        if let bundled = FilmtoneCreativePackCatalog.find(canonicalUUID: id) {
+            setBuiltInFavorite(id, favorite: favorite)
+            var entry = FilmtoneCreativePackCatalog.materializeAsSavedLookEntry(bundled)
+            entry.favorite = favorite
+            return entry
         }
         if !didLoad {
             _ = try loadOrRebuild()
@@ -222,8 +254,16 @@ actor FilmtoneSavedLookStore {
         // Built-in Stone / Urban prepended (mirrors iOS
         // `LibraryStoreActor.currentSnapshot`). User looks sorted by
         // favorite, then updatedAt desc, then name.
-        let builtInLooks = FilmtoneCreativePackCatalog.all.map {
-            FilmtoneCreativePackCatalog.materializeAsSavedLookEntry($0)
+        // M5-H.2: built-in favorite is read from the UserDefaults map at
+        // materialize time so the picker shows ★ on bundled entries the
+        // user has favorited (the catalog JSON itself stays immutable).
+        let favorites = builtInFavorites
+        let builtInLooks: [SavedLookEntry] = FilmtoneCreativePackCatalog.all.map { cat in
+            var entry = FilmtoneCreativePackCatalog.materializeAsSavedLookEntry(cat)
+            if favorites.contains(entry.id) {
+                entry.favorite = true
+            }
+            return entry
         }
         let sortedUserLooks = looks.values.sorted { lhs, rhs in
             if lhs.favorite != rhs.favorite {

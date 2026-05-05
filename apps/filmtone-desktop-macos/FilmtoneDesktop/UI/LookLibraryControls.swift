@@ -50,10 +50,9 @@ struct LookLibraryControls: View {
     }
 
     /// Currently-selected user (non-bundled) Saved Look, or nil when the
-    /// selection is None / built-in. Drives the inline rename / delete /
-    /// favorite buttons' enabled state — built-in entries refuse those
-    /// operations at the actor layer, so we grey the controls out before
-    /// the user even tries.
+    /// selection is None / built-in. Drives the rename / delete buttons'
+    /// enabled state — bundled entries refuse those mutations at the
+    /// actor layer, so we grey them out before the user even tries.
     private var selectedUserLook: SavedLookEntry? {
         guard let id = state.selectedSavedLookId,
               let entry = library.snapshot.lookEntry(id: id),
@@ -61,6 +60,15 @@ struct LookLibraryControls: View {
             return nil
         }
         return entry
+    }
+
+    /// Currently-selected Saved Look regardless of bundled status.
+    /// Drives the favorite button — built-ins persist favorite via the
+    /// store's UserDefaults map (M5-H.2 parity with iOS), so favoriting
+    /// stays available even when rename / delete cannot be.
+    private var selectedAnyLook: SavedLookEntry? {
+        guard let id = state.selectedSavedLookId else { return nil }
+        return library.snapshot.lookEntry(id: id)
     }
 
     var body: some View {
@@ -72,7 +80,11 @@ struct LookLibraryControls: View {
                 if !bundled.isEmpty {
                     Section("Built-in") {
                         ForEach(bundled, id: \.id) { entry in
-                            Text(entry.name).tag(Selection.saved(entry.id))
+                            // M5-H.2: built-in favorites flow through
+                            // the same UserDefaults map as user entries
+                            // so the ★ prefix is symmetric.
+                            Text("\(entry.favorite ? "★ " : "")\(entry.name)")
+                                .tag(Selection.saved(entry.id))
                         }
                     }
                 }
@@ -126,12 +138,13 @@ struct LookLibraryControls: View {
     @ViewBuilder
     private var libraryActionRow: some View {
         let target = selectedUserLook
-        let isFavorite = target?.favorite ?? false
+        let favoriteTarget = selectedAnyLook
+        let isFavorite = favoriteTarget?.favorite ?? false
         HStack(spacing: 8) {
             Button {
-                guard let target else { return }
+                guard let favoriteTarget else { return }
                 Task { @MainActor in
-                    _ = await library.toggleFavorite(id: target.id)
+                    _ = await library.toggleFavorite(id: favoriteTarget.id)
                 }
             } label: {
                 Image(systemName: isFavorite ? "star.fill" : "star")
@@ -141,7 +154,7 @@ struct LookLibraryControls: View {
             .buttonStyle(.glass)
             .controlSize(.small)
             .help(isFavorite ? "Remove from favorites" : "Mark as favorite")
-            .disabled(target == nil)
+            .disabled(favoriteTarget == nil)
 
             Button {
                 guard let target else { return }

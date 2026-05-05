@@ -297,14 +297,22 @@ runner.test("FilmtoneQuickState.zero is 0/0/0") {
 }
 
 // ---------------------------------------------------------------------------
-// Test group 6 — Resolution order (M5-C.3a invariant).
-// iOS canonical: interpolate → applyingPatch(paramOverrides) → applyQuickState.
-// paramOverrides MUST land before quickState; if a key appears in both,
-// the final value should be (overrideValue + axisValue * weight).
+// Test group 6 — Resolution order (M5-H.2 corrected to iOS canonical).
+// iOS canonical (`FilmtonePhase0Math.resolveParams`): interpolate →
+// applyQuickState → applyingPatch(paramOverrides). paramOverrides land
+// LAST and absolutely set the value — Quick is overwritten on any key
+// the user has explicitly overridden.
+//
+// Earlier (M5-C.3a) Desktop swapped the order so an override key
+// inherited a Quick delta on top. That broke recipe parity with iOS
+// (recipes' max(base, target) values landed at +Quick*weight after
+// render) and made the Adjust panel slider show one value while the
+// preview rendered another. M5-H.2 commit fixed both directions.
 // ---------------------------------------------------------------------------
 
-runner.test("paramOverrides then quickState — ordering matches iOS canonical") {
-    // Find a (axis, key) pair with a non-zero weight to test ordering on.
+runner.test("resolved order: Quick then paramOverrides — overrides win absolute") {
+    // Find a (axis, key) pair with a non-zero weight so Quick would
+    // visibly affect the key without an override.
     var pickedAxis: String? = nil
     var pickedKey: String? = nil
     var pickedWeight: Double = 0
@@ -336,11 +344,45 @@ runner.test("paramOverrides then quickState — ordering matches iOS canonical")
         quickState: qs,
         paramOverrides: patch
     )
-    let expected = absoluteValue + 0.5 * pickedWeight
+    // iOS canonical: override is the final value. Quick is overwritten
+    // on this key. (Pre-fix Desktop returned absoluteValue + 0.5*weight.)
+    try assertClose(
+        result.value(for: key),
+        absoluteValue,
+        "axis=\(axis) key=\(key) override should win absolute over Quick=\(0.5 * pickedWeight)"
+    )
+}
+
+runner.test("resolved order: Quick still affects keys that have no override") {
+    // Sanity check that swapping the order didn't disable Quick entirely
+    // — only override KEYS lose their Quick contribution.
+    var pickedKey: String? = nil
+    var pickedWeight: Double = 0
+    if let weights = FilmtonePhase0Generated.quickWeights["filmCharacter"] {
+        for (key, weight) in weights where weight != 0 {
+            pickedKey = key
+            pickedWeight = weight
+            break
+        }
+    }
+    guard let key = pickedKey else {
+        throw AssertionError(description: "no non-zero filmCharacter weight")
+    }
+    let baseParams = FilmtonePresetCatalog.params(for: "reset", strength: 1.0)
+    var qs = FilmtoneQuickState.zero
+    qs.filmCharacter = 0.5
+    let result = FilmtonePresetCatalog.resolved(
+        presetName: "reset",
+        strength: 1.0,
+        lookSlug: nil,
+        quickState: qs,
+        paramOverrides: .empty
+    )
+    let expected = baseParams.value(for: key) + 0.5 * pickedWeight
     try assertClose(
         result.value(for: key),
         expected,
-        "axis=\(axis) key=\(key) override=\(absoluteValue) +0.5*\(pickedWeight)"
+        "key=\(key) without override should reflect Quick"
     )
 }
 
@@ -354,6 +396,26 @@ runner.test("paramOverrides applies absolute (set), not delta") {
         paramOverrides: patch
     )
     try assertClose(result.exposure, 0.42, "exposure should be set, not added")
+}
+
+runner.test("normalized(over:) drops overrides that match resolved base") {
+    // Recipe stamps that happen to match the post-Quick base shouldn't
+    // pin redundant entries in paramOverrides — `normalized(over:)`
+    // strips them, mirroring iOS behavior.
+    let baseParams = FilmtonePresetCatalog.params(for: "reset", strength: 1.0)
+    let exposureBase = baseParams.exposure
+    let patch = FilmtonePhase0ParamsPatch(values: [
+        "exposure": exposureBase, // matches base → drop
+        "contrast": 1.5,           // differs from base 1.0 → keep
+    ])
+    let normalized = patch.normalized(over: baseParams)
+    if normalized.values["exposure"] != nil {
+        throw AssertionError(description: "exposure=\(exposureBase) should be dropped (matches base)")
+    }
+    guard let contrast = normalized.values["contrast"] else {
+        throw AssertionError(description: "contrast=1.5 should be kept (differs from base)")
+    }
+    try assertClose(contrast, 1.5, "contrast preserved through normalize")
 }
 
 // ---------------------------------------------------------------------------
@@ -691,6 +753,72 @@ runner.test("Tone recipes ship the iOS canonical 4-chip set") {
     try assertEqual(ids, ["standard", "airy", "sunset", "depth"], "tone recipe order")
 }
 
+runner.test("Recipe stamp + Quick does not double-apply Quick on stamped key") {
+    // M5-H.2 P2 regression test. Pre-fix Desktop applied override then
+    // Quick, so a recipe stamp like `bloomStrength=0.34` rendered at
+    // 0.34 + Quick.dynamics * weight (visible drift between iOS and
+    // Desktop). With the iOS-canonical Quick → override order, the
+    // recipe value is the final value: Quick does not re-apply on the
+    // stamped key. Pick a recipe that touches a Quick-affected key.
+    var qs = FilmtoneQuickState.zero
+    qs.dynamics = 0.5
+
+    // Find a glow / grain recipe stamp key that overlaps a Quick weight.
+    let quickAffectedKeys: Set<String> = {
+        var s: Set<String> = []
+        for axis in FilmtonePhase0Generated.quickAxisIds {
+            if let weights = FilmtonePhase0Generated.quickWeights[axis] {
+                for (key, weight) in weights where weight != 0 {
+                    s.insert(key)
+                }
+            }
+        }
+        return s
+    }()
+
+    let baseParams = FilmtonePresetCatalog.params(
+        for: FilmtonePresetCatalog.defaultName,
+        strength: 1.0
+    )
+
+    // Glow group: Default recipe touches bloomStrength etc. Check
+    // whichever stamped key is also Quick-affected.
+    guard let glow = AdvancedAdjustCatalog.allGroups.first(where: { $0.id == "glow" }),
+          let recipe = glow.recipes.first(where: { $0.id == "default" }) else {
+        throw AssertionError(description: "glow group / default recipe missing")
+    }
+    let recipeValues = recipe.values(baseParams)
+
+    // Pick the first key that is both stamped by the recipe and affected by Quick.
+    var target: String?
+    for (key, _) in recipeValues where quickAffectedKeys.contains(key) {
+        target = key
+        break
+    }
+    guard let key = target else {
+        // If no overlap, the test premise is moot — but the resolve
+        // order fix still matters. Skip with a pass.
+        return
+    }
+
+    let recipeValue = recipeValues[key]!
+    let patch = FilmtonePhase0ParamsPatch(values: [key: recipeValue])
+    let result = FilmtonePresetCatalog.resolved(
+        presetName: FilmtonePresetCatalog.defaultName,
+        strength: 1.0,
+        lookSlug: nil,
+        quickState: qs,
+        paramOverrides: patch
+    )
+    // The override sets the value absolutely; Quick is overwritten.
+    let clamped = AdvancedAdjustCatalog.clamp(recipeValue, for: key)
+    try assertClose(
+        result.value(for: key),
+        clamped,
+        "key=\(key) recipe=\(recipeValue) — Quick must not re-apply on overridden key"
+    )
+}
+
 // ---------------------------------------------------------------------------
 // Test group 12 — M5-H.2 SavedLookStore rename / favorite / delete.
 // Built-in entries must reject mutation; user entries must round-trip
@@ -698,14 +826,24 @@ runner.test("Tone recipes ship the iOS canonical 4-chip set") {
 // in-memory mutation.
 // ---------------------------------------------------------------------------
 
+private func makeIsolatedDefaults() -> UserDefaults {
+    // Per-test suite name keeps the verify harness from clobbering the
+    // user's real ~/Library/Preferences map and isolates tests from
+    // each other. removePersistentDomain in defer cleans the suite up.
+    let name = "filmtone-verify-defaults-\(UUID().uuidString)"
+    return UserDefaults(suiteName: name) ?? .standard
+}
+
 private func runStoreTests() async {
     let tempRoot = URL(fileURLWithPath: NSTemporaryDirectory())
         .appendingPathComponent("filmtone-verify-store-\(UUID().uuidString)", isDirectory: true)
 
-    runner.test("SavedLookStore rename + favorite persist across reload") {
+    runner.test("SavedLookStore rename + favorite persist across reload (user entry)") {
+        let defaults = makeIsolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: defaults.dictionaryRepresentation().keys.first ?? "") }
         let store: FilmtoneSavedLookStore
         do {
-            store = try FilmtoneSavedLookStore(rootURL: tempRoot)
+            store = try FilmtoneSavedLookStore(rootURL: tempRoot, defaults: defaults)
         } catch {
             throw AssertionError(description: "store init failed: \(error)")
         }
@@ -737,7 +875,7 @@ private func runStoreTests() async {
 
                 // Independent reload via a fresh store instance — proves
                 // the change is on disk, not just in the actor cache.
-                let store2 = try FilmtoneSavedLookStore(rootURL: tempRoot)
+                let store2 = try FilmtoneSavedLookStore(rootURL: tempRoot, defaults: defaults)
                 let snap = try await store2.loadOrRebuild()
                 let user = snap.looks.first { !$0.bundled }
                 reloadedName = user?.name
@@ -756,10 +894,79 @@ private func runStoreTests() async {
         try assertEqual(reloadedFavorite, true, "favorite survives reload")
     }
 
-    runner.test("SavedLookStore deleteLook removes user entry from snapshot") {
+    runner.test("SavedLookStore favorite on built-in persists via UserDefaults map") {
+        // M5-H.2 P2 fix: iOS allows favoriting built-in Looks via a
+        // UserDefaults map. Rename / delete remain immutable, but
+        // favorite now flips through the map and surfaces in the next
+        // snapshot — including across a fresh store instance.
+        let defaults = makeIsolatedDefaults()
         let store: FilmtoneSavedLookStore
         do {
-            store = try FilmtoneSavedLookStore(rootURL: tempRoot.appendingPathComponent("delete"))
+            store = try FilmtoneSavedLookStore(
+                rootURL: tempRoot.appendingPathComponent("builtinfav"),
+                defaults: defaults
+            )
+        } catch {
+            throw AssertionError(description: "store init failed: \(error)")
+        }
+        defer {
+            try? FileManager.default.removeItem(at: tempRoot)
+            defaults.removeObject(forKey: FilmtoneSavedLookStore.builtInFavoritesUserDefaultsKey)
+        }
+
+        let semaphore = DispatchSemaphore(value: 0)
+        var caught: Error?
+        var afterStarFavorite: Bool?
+        var snapshotFavorite: Bool?
+        var freshSnapshotFavorite: Bool?
+        var afterUnstarFavorite: Bool?
+
+        Task {
+            do {
+                _ = try await store.loadOrRebuild()
+                let snap0 = await store.snapshot()
+                guard let bundled = snap0.looks.first(where: { $0.bundled }) else {
+                    throw AssertionError(description: "no bundled look to favorite")
+                }
+                let starred = try await store.setFavorite(id: bundled.id, favorite: true)
+                afterStarFavorite = starred.favorite
+                let snap1 = await store.snapshot()
+                snapshotFavorite = snap1.lookEntry(id: bundled.id)?.favorite
+
+                // Fresh store proves the favorite came from UserDefaults,
+                // not the actor's in-memory cache.
+                let store2 = try FilmtoneSavedLookStore(
+                    rootURL: tempRoot.appendingPathComponent("builtinfav"),
+                    defaults: defaults
+                )
+                _ = try await store2.loadOrRebuild()
+                let snap2 = await store2.snapshot()
+                freshSnapshotFavorite = snap2.lookEntry(id: bundled.id)?.favorite
+
+                let unstarred = try await store.setFavorite(id: bundled.id, favorite: false)
+                afterUnstarFavorite = unstarred.favorite
+            } catch {
+                caught = error
+            }
+            semaphore.signal()
+        }
+        semaphore.wait()
+
+        if let caught { throw AssertionError(description: "built-in favorite flow failed: \(caught)") }
+        try assertEqual(afterStarFavorite, true, "setFavorite(true) returns favorite=true")
+        try assertEqual(snapshotFavorite, true, "in-process snapshot reflects favorite")
+        try assertEqual(freshSnapshotFavorite, true, "fresh store snapshot reads favorite from UserDefaults")
+        try assertEqual(afterUnstarFavorite, false, "setFavorite(false) clears the flag")
+    }
+
+    runner.test("SavedLookStore deleteLook removes user entry from snapshot") {
+        let defaults = makeIsolatedDefaults()
+        let store: FilmtoneSavedLookStore
+        do {
+            store = try FilmtoneSavedLookStore(
+                rootURL: tempRoot.appendingPathComponent("delete"),
+                defaults: defaults
+            )
         } catch {
             throw AssertionError(description: "store init failed: \(error)")
         }
@@ -795,10 +1002,14 @@ private func runStoreTests() async {
         try assertEqual(afterDeleteUserCount, 0, "user looks should be empty after delete")
     }
 
-    runner.test("SavedLookStore rejects rename / delete / favorite on built-in entries") {
+    runner.test("SavedLookStore rejects rename / delete on built-in entries (favorite now allowed)") {
+        let defaults = makeIsolatedDefaults()
         let store: FilmtoneSavedLookStore
         do {
-            store = try FilmtoneSavedLookStore(rootURL: tempRoot.appendingPathComponent("immutable"))
+            store = try FilmtoneSavedLookStore(
+                rootURL: tempRoot.appendingPathComponent("immutable"),
+                defaults: defaults
+            )
         } catch {
             throw AssertionError(description: "store init failed: \(error)")
         }
@@ -807,7 +1018,6 @@ private func runStoreTests() async {
         let semaphore = DispatchSemaphore(value: 0)
         var renameError: Error?
         var deleteError: Error?
-        var favoriteError: Error?
 
         Task {
             _ = try? await store.loadOrRebuild()
@@ -818,8 +1028,6 @@ private func runStoreTests() async {
             }
             do { _ = try await store.renameLook(id: bundled.id, newName: "Hijack") }
             catch { renameError = error }
-            do { _ = try await store.setFavorite(id: bundled.id, favorite: true) }
-            catch { favoriteError = error }
             do { _ = try await store.deleteLook(id: bundled.id) }
             catch { deleteError = error }
             semaphore.signal()
@@ -829,10 +1037,6 @@ private func runStoreTests() async {
         guard let rename = renameError as? FilmtoneSavedLookStore.StoreError,
               case .immutableEntry = rename else {
             throw AssertionError(description: "rename of built-in must throw .immutableEntry, got \(String(describing: renameError))")
-        }
-        guard let fav = favoriteError as? FilmtoneSavedLookStore.StoreError,
-              case .immutableEntry = fav else {
-            throw AssertionError(description: "favorite of built-in must throw .immutableEntry, got \(String(describing: favoriteError))")
         }
         guard let del = deleteError as? FilmtoneSavedLookStore.StoreError,
               case .immutableEntry = del else {

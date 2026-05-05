@@ -85,11 +85,20 @@ enum FilmtonePresetCatalog {
     /// target — strength=0 collapses to bareline, strength=1 lands on the
     /// Look's signature optics.
     ///
-    /// M5-C.3a additive: after the preset/strength/look resolve, apply
-    /// the saved-Look user `paramOverrides` patch (per-key offsets), then
-    /// run `applyQuickState` for the 3-axis Quick offsets. Resolution
-    /// order matches iOS canonical (`FilmtonePhase0Math.swift`) so a
-    /// Look saved on iOS produces identical params on macOS.
+    /// M5-C.3a + M5-H.2 fix: after the preset/strength/look resolve, run
+    /// `applyQuickState` for the 3-axis Quick offsets, then layer the
+    /// `paramOverrides` patch on top. Order mirrors iOS canonical
+    /// (`FilmtonePhase0Math.resolveParams`) so a Look saved on iOS produces
+    /// identical params on macOS — and crucially, an explicit override
+    /// value lands as an absolute set (Quick does not re-apply on top of
+    /// it), which matches what the user sees in `AdvancedAdjustEditor`
+    /// sliders.
+    ///
+    /// Earlier (M5-C.3a) the order was preset → override → Quick. That
+    /// caused a double-Quick on any key the user touched in the Adjust
+    /// panel, and made the iOS-canonical recipe stamps (`max(base.X, …)`)
+    /// land at `recipe + Quick*weight` instead of the iOS-rendered
+    /// `recipe`. The order swap brings byte parity back.
     static func resolved(
         presetName: String,
         strength: Double,
@@ -114,10 +123,15 @@ enum FilmtonePresetCatalog {
             base = params(for: presetName, strength: strength)
         }
 
-        let withOverrides = paramOverrides.isEmpty
-            ? base
-            : base.applyingPatch(paramOverrides)
-        return applyQuickState(to: withOverrides, quickState: quickState)
+        let withQuick = applyQuickState(to: base, quickState: quickState)
+        // Drop overrides that already match the post-Quick base so a
+        // saved Look that round-trips through Adjust without changing
+        // anything does not pin redundant values into `paramOverrides`.
+        // Mirrors iOS `paramOverrides.normalized(over: base+Quick)`.
+        let normalized = paramOverrides.normalized(over: withQuick)
+        return normalized.isEmpty
+            ? withQuick
+            : withQuick.applyingPatch(normalized)
     }
 
     /// M5-C.3a — verbatim port of iOS `FilmtonePhase0Math.applyQuickState`.

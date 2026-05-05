@@ -265,3 +265,59 @@ recipe chip cycle on each non-basic group) is user-driven.
 Out-of-scope follow-ups recorded above (M5-O optical filter family
 selector, M5-H.2.1 AdjustmentHelpSheet equivalent, M5-C.2c LUT
 library subtree).
+
+## Post-review P2 fixes (2026-05-05, follow-up commit)
+
+Reviewer flagged two parity gaps after the initial commit. Both fixed
+in a follow-up commit on the same branch:
+
+1. **Quick / paramOverrides resolve order** — `FilmtonePresetCatalog
+   .resolved` was applying paramOverrides before Quick (`preset →
+   override → Quick`), opposite to iOS canonical
+   `FilmtonePhase0Math.resolveParams` (`preset → Quick → override`).
+   Effect: any user-overridden key (recipe stamp or direct slider)
+   silently picked up an extra Quick delta on Desktop, so a recipe
+   value `max(base.bloomStrength, 0.34)` rendered at `0.34 + Quick`
+   on Desktop while iOS rendered at `0.34`. The Adjust panel slider
+   also showed a different number than the rendered preview for the
+   same reason. Swap landed in `Color/FilmtonePresetCatalog.swift`.
+   The M5-C.3a Test group 6 was rewritten — its previous assertion
+   (`override + Quick*weight`) was Desktop-current behavior
+   incorrectly labeled "iOS canonical"; it now asserts override-
+   wins-absolute and adds a regression test that recipe stamps +
+   Quick land at the recipe value (not the doubled value).
+2. **`FilmtonePhase0ParamsPatch.normalized(over:)`** — added as a
+   Desktop-local extension on top of `AdvancedAdjustCatalog.clamp` +
+   tolerance `0.0001`, mirroring iOS so trivial overrides that
+   happen to match the post-Quick base drop out of the saved patch
+   instead of pinning identity entries.
+3. **Built-in Saved Look favorite** — Desktop refused with
+   `.immutableEntry`; iOS allows favoriting built-ins via a
+   UserDefaults-backed map (rename / delete still immutable).
+   Implemented the same split: `FilmtoneSavedLookStore` now reads /
+   writes `filmtone.library.builtInFavorites` from injected
+   `UserDefaults` (default `.standard`). `setFavorite(id:favorite:)`
+   dispatches built-in ↔ user; `currentSnapshot()` overlays the map
+   onto the materialized bundled entry; rename / delete still throw
+   `.immutableEntry` for built-ins. `LookLibraryControls`
+   `selectedAnyLook` enables the favorite button regardless of
+   bundled status, while `selectedUserLook` continues to gate rename
+   / delete. Picker bundled section also gains the `★` prefix.
+
+Verification after follow-up:
+
+- `apps/filmtone-desktop-macos/Verify/run.sh`: 56/56 passed (was
+  52, +4: order rewrite + normalized helper + recipe non-double-
+  Quick + built-in favorite UserDefaults round-trip).
+- `xcodebuild -scheme FilmtoneDesktop -configuration Debug build`:
+  BUILD SUCCEEDED. Only warnings are pre-existing
+  `FilmtoneGradeKernels.swift` Core Image Kernel deprecation and a
+  pre-existing main-actor `bounds` warning in
+  `ExportInspectorPanel.swift:262`; nothing new introduced by this
+  follow-up.
+
+Backlight Veil decision unchanged — still defer to M5-O. The
+follow-up does NOT touch any other resolve path (look apply,
+sidecar `gradeParams`, CLI export) — those all route through
+`FilmtonePresetCatalog.resolved` so they pick up the canonical
+order automatically.

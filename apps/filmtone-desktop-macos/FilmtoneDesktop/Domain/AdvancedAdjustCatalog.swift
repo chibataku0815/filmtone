@@ -323,4 +323,28 @@ enum AdvancedAdjustCatalog {
     static func formatValue(_ value: Double, digits: Int) -> String {
         String(format: "%.\(digits)f", value)
     }
+
+    /// Mirror of iOS `FilmtonePhase0Math.paramEqualityTolerance`. Used by
+    /// `FilmtonePhase0ParamsPatch.normalized(over:)` so an override that
+    /// equals the resolved baseline drops out before it gets pinned into
+    /// the patch — keeps saved-Look JSON tight and prevents recipe stamps
+    /// from materializing redundant identity entries.
+    static let paramEqualityTolerance: Double = 0.0001
+}
+
+extension FilmtonePhase0ParamsPatch {
+    /// Drop every override whose clamped value matches the resolved base
+    /// within `paramEqualityTolerance`. Mirrors iOS
+    /// `FilmtonePhase0ParamsPatch.normalized(over:)` so the post-Quick
+    /// resolve produces an identical patch shape on both platforms.
+    func normalized(over base: FilmtonePhase0Params) -> FilmtonePhase0ParamsPatch {
+        var next: [String: Double] = [:]
+        for (key, value) in values {
+            let clamped = AdvancedAdjustCatalog.clamp(value, for: key)
+            if abs(clamped - base.value(for: key)) >= AdvancedAdjustCatalog.paramEqualityTolerance {
+                next[key] = clamped
+            }
+        }
+        return FilmtonePhase0ParamsPatch(values: next)
+    }
 }
