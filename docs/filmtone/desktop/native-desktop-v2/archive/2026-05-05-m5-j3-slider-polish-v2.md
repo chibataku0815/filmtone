@@ -36,8 +36,8 @@ Right rail 上に縦に 4-5 スタックされる `FilmtoneGlassSlider` (Quick �
 
 ## Visual / Behavior Spec
 
-- knob: base 18pt、hover/drag 22pt、`.easeOut(0.12)` で scale。
-- track: 5pt 厚。
+- knob: base **14pt**、hover/drag **18pt**、`.easeOut(0.12)` で scale (初期 18/22 で smoke、user 指摘で 14/18 に縮小確定)。
+- track: **4pt** 厚 (初期 5pt → smoke で 4pt 確定)。
 - 未選択 track: `Color.white.opacity(~0.12)` (low contrast)。
 - filled track: pure white ではなく glass highlight 程度 (`Color.white.opacity(~0.45)`)。
 - knob: `Color.white.opacity(~0.92)` + 0.5pt 微 stroke + 軽い影 (元の重い shadow は廃止)。
@@ -85,7 +85,7 @@ Right rail 上に縦に 4-5 スタックされる `FilmtoneGlassSlider` (Quick �
 
 ## Done Conditions
 
-- knob 18pt / 22pt scale + 5pt track + low-contrast unfilled + glass highlight filled が実装済。
+- knob 14pt / 18pt hover-drag scale + 4pt track + low-contrast unfilled + glass highlight filled が実装済 (user 視覚 smoke 後に 18/22/5 → 14/18/4 へ縮小確定)。
 - API (`range:` / `step:` / `onEditingChanged:`) と cursor / onDisappear / onEnded cleanup が温存。
 - Verify + xcodebuild Debug + diff check の 3 gate pass。
 - Archive 済 + strategy completion log 更新済 + 1 commit。

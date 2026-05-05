@@ -281,8 +281,9 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
 
 - 2026-05-05: **M5-J3 Slider Visual Polish v2 closed** (worktree
   `filmtone-native-desktop-m5-j3-slider-polish-v2`、base `ca9acea6`)。
-  `FilmtoneGlassSlider` を 1 file in-place 改修 — knob 32→18pt
-  (hover/drag 22pt)、track 8→5pt、unfilled `Color.white.opacity(0.12)`、
+  `FilmtoneGlassSlider` を 1 file in-place 改修 — knob 32→14pt
+  (hover/drag 18pt、user 視覚 smoke で 18→14 に再縮小確定)、
+  track 8→4pt、unfilled `Color.white.opacity(0.12)`、
   filled `Color.white.opacity(0.45)` glass highlight、knob radius 補償の
   edge-of-track 算出、`@Environment(\.isEnabled)` で disabled dim、
   `onChange(of: isEnabled)` で drag 中 disabled flip 時 latch を防止。

@@ -87,9 +87,9 @@ struct FilmtoneGlassSlider: View {
     @State private var isHovering = false
 
     private let rowHeight: CGFloat = 24
-    private let trackHeight: CGFloat = 5
-    private let knobBase: CGFloat = 18
-    private let knobActive: CGFloat = 22
+    private let trackHeight: CGFloat = 4
+    private let knobBase: CGFloat = 14
+    private let knobActive: CGFloat = 18
 
     var body: some View {
         GeometryReader { proxy in
