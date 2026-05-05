@@ -138,9 +138,27 @@ playbackTask = Task { @MainActor [weak self] in
 
 ## 推奨案 (Primary): AVPlayer + AVMutableVideoComposition (iOS-canonical port)
 
-iOS と **同じ primitive を使う**。grade math は M4-B `FilmLabSwiftCore` 経由で
-既に共有済みなので、移植は pipeline shell + composition handler + AppKit
-player view だけ。
+iOS と **同じ primitive を使う**。
+
+**Shared today (M4-B Phase0 core)**: parameter contract — `FilmtonePhase0Params`
+/ `FilmtonePhase0ParamsPatch` / `FilmtoneQuickState` / `Phase0OutputProfileDTO`
++ 生成 `FilmtonePhase0Generated` のみ (`packages/film-lab-swift-core/Sources/
+FilmLabSwiftCore/`)。
+
+**Not shared (app-local on both sides)**: grade math 本体。Desktop の
+`apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtoneGradePipeline.swift`
+と iOS の `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneExportSession.swift`
+内 `renderablePreviewVideoImage` は **別実装が並走**。iOS canonical との parity
+は Verify (M5-G.2 で 42/42、AdvancedAdjustCatalog parity 等) + 手 port で
+維持されている状態。
+
+つまり Primary route の作業は (a) parameter resolve は M4-B 既存路線で済む、
+(b) composition handler から呼ぶ grade pipeline は **既存の Desktop
+`FilmtoneGradePipeline.apply` を再利用** (新規実装ではない)、(c) ただし
+playback path 経由の出力が still preview / export path の出力と byte 一致
+することを **明示的に parity 確認** する必要がある (preview shell の入出
+力契約変更を伴うため)。「移植は shell だけ」と書くと grade parity の
+確認 cost を見落とすので避ける。
 
 ### 設計
 
@@ -205,15 +223,16 @@ player view だけ。
 
 ### iOS との parity
 
-| 領域 | iOS | Desktop (推奨後) |
-|---|---|---|
-| Grade math | `FilmtoneGradePipeline` (FilmLabSwiftCore) | 同 (既に共有) |
-| Per-frame loop | `applyingCIFiltersWithHandler` | 同 |
-| Compare mode | graded / original AVPlayerItem swap | 同 |
-| Composition refresh | `gradedItem.videoComposition = new` + re-seek | 同 |
-| 表示 | `AVPlayerViewController` | `AVPlayerView` (NSViewRepresentable) |
-| Audio | AVPlayer 標準 | 同 |
-| Time scrub | `AVPlayerViewController` 標準 controls | 自前 `VideoScrubBar` (Liquid Glass posture 維持) or `AVPlayerView` controls。後者を採れば work が更に減る |
+| 領域 | iOS | Desktop (推奨後) | Share status |
+|---|---|---|---|
+| Parameter contract | `FilmLabSwiftCore` (Phase0Params / Patch / Quick / OutputProfile) | 同 | M4-B で既に共有 |
+| Grade math 本体 | `FilmtoneExportSession.renderablePreviewVideoImage` (app-local) | `FilmtoneGradePipeline.apply` (app-local) | **並走 (parity は Verify + 手 port で維持)** |
+| Per-frame loop | `applyingCIFiltersWithHandler` | 同 | OS primitive |
+| Compare mode | graded / original AVPlayerItem swap | 同 | OS primitive |
+| Composition refresh | `gradedItem.videoComposition = new` + re-seek | 同 | OS primitive |
+| 表示 | `AVPlayerViewController` | `AVPlayerView` (NSViewRepresentable) | platform shell |
+| Audio | AVPlayer 標準 | 同 | OS primitive |
+| Time scrub | `AVPlayerViewController` 標準 controls | 自前 `VideoScrubBar` (Liquid Glass posture 維持) or `AVPlayerView` controls。後者を採れば work が更に減る | UI 層 |
 
 ### 必須の secondary mitigation (route 共通)
 
@@ -260,17 +279,22 @@ player view だけ。
 
 ## 代替案
 
-### Alt A: Timer + Preview Downscale + Asset Cache (Defensive Hot-fix)
+### Alt A: Timer + Preview Downscale + Asset Cache (Defensive Hot-fix Candidate)
 
 最小 diff で C1 / C3 / C4 だけ潰す。Architecture 残置。
 
-- 効果: カクつき 70% 軽減見込み (downscale + asset reuse + probe cache 単独で)。
+- **仮説 (要 visual smoke 検証)**: downscale + asset reuse + probe cache の
+  3 点で C1/C3/C4 起因のフレーム時間は理論上数倍〜10 倍下がる見込み。
+  「何 % 改善」「何 fps」は実機 / 実 source 依存なので断定しない。
 - 残: audio なし、wall-clock drift 残置、`AVAssetImageGenerator` random-seek
   primitive 残置 (long-GOP H.265 で頭出しが遅い source は依然厳しい)。
-- 用途: **v1.4 hot-fix 専用**。これだけでは architecture 負債が残るので
-  v1.5 で必ず Primary に置換。
-- 工数: ~30-60 分、新規ファイル 0、modify 2 ファイル
-  (`Media/FilmtoneVideoFramePreview.swift` + `UI/PreviewSurface.swift`)。
+- 用途: **v1.4 hot-fix candidate**。採否は Primary route 投入前に user
+  visual smoke で「v1.4 公開許容ラインか」を判定してから決める。許容
+  できないなら v1.4 を hold して v1.5 と一括で Primary を入れる選択肢も
+  残す。
+- 工数感 (目安、保証ではない): 新規ファイル 0、modify 2 ファイル
+  (`Media/FilmtoneVideoFramePreview.swift` + `UI/PreviewSurface.swift`)、
+  実装 + xcodebuild + visual smoke で短時間で着地し得る。pbxproj 触らない。
 
 ### Alt B: AVAssetReader Sequential Decode → CIImage → Grade → MTKView
 
@@ -364,15 +388,18 @@ Build verify (本 spike 内では実行しない、参考):
 ## v1.4 / v1.5 への載せ方 (推奨)
 
 - **v1.4 (今 release gate 上)**:
-  - Alt A の最小 hot-fix だけ入れる (preview downscale + asset/probe cache)。
-  - 別 active.md で 30-60 分スコープ。Title 案: `M5-D.2.0a Preview Downscale
-    & Asset Cache (Hot-fix)`。
-  - これで体感のカクつきは劇的に改善する見込み (C1/C3/C4 解消)。Drift と
-    audio absent は残るが、user smoke 上「再生できる」状態にはなる。
+  - Alt A を hot-fix candidate として用意可能。Title 案: `M5-D.2.0a Preview
+    Downscale & Probe/Asset Cache (Hot-fix)`。**採否は visual smoke 判定**
+    — Primary route まで待てるなら v1.4 で hold して v1.5 一括着地でも可。
+  - hot-fix を入れた場合の残: drift と audio absent は残置 (architecture
+    起因のため Alt A では解消しない)。user-perceived 改善が「再生できる」
+    ラインに届くかは実 source / 実機での visual smoke で判定する。
 - **v1.5 (公開後 immediately follow)**:
   - Primary route を 5 step active.md に分割して着地。
-  - iOS canonical preview architecture に統一。Audio + 速度切替 + compare
-    mode が同時に lit up する。
+  - iOS canonical preview architecture に揃える (parameter contract は
+    M4-B 既存共有、grade pipeline 本体は app-local 並走のまま、playback
+    出力の still/export parity を Verify で pin する)。Audio + 速度切替 +
+    compare mode が同時に lit up する。
   - Title 案: `M5-D.2.1 AVPlayer Preview Route (iOS-canonical port)`。
 
 ## Out Of Scope (本 spike)
