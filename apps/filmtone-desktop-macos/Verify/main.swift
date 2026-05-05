@@ -670,8 +670,11 @@ private let iosCanonicalParamLabels: [String: String] = [
 ]
 
 runner.test("AdvancedAdjustCatalog labels match iOS canonical paramLabels") {
+    // M5-I.1: read the catalog with `.english` strings explicitly so the
+    // assertion is deterministic on JA hosts where `.current` would
+    // resolve to `.japanese` and produce a JA tail (e.g. シャッターアングル).
     var byKey: [String: String] = [:]
-    for group in AdvancedAdjustCatalog.allGroups {
+    for group in AdvancedAdjustCatalog.allGroups(strings: .english) {
         for control in group.controls {
             byKey[control.key] = control.label
         }
@@ -691,7 +694,7 @@ runner.test("AdvancedAdjustCatalog labels match iOS canonical paramLabels") {
 }
 
 runner.test("AdvancedAdjustCatalog group titles include Tone (renamed from Process)") {
-    let titles = AdvancedAdjustCatalog.allGroups.map(\.title)
+    let titles = AdvancedAdjustCatalog.allGroups(strings: .english).map(\.title)
     let expected = ["Basic", "Tone", "Optics", "Glow", "Grain", "Motion"]
     try assertEqual(titles, expected, "group title order + spelling")
 }
@@ -1073,6 +1076,119 @@ private func runStoreTests() async {
             throw AssertionError(description: "delete of built-in must throw .immutableEntry, got \(String(describing: deleteError))")
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Test group 13 — M5-I.1 FilmtoneDesktopStrings JA/EN parity. The Desktop
+// localization layer must hold the same canonical English defaults the
+// catalog ships today AND the iOS canonical Japanese variants for the
+// labels iOS branches on `prefersJapanese`. Every assertion here pins a
+// single string the user sees in the AdvancedAdjustEditor so a JA host
+// never silently regresses to English copy when it should not.
+// ---------------------------------------------------------------------------
+
+runner.test("FilmtoneDesktopStrings.english carries the iOS canonical group titles") {
+    try assertEqual(FilmtoneDesktopStrings.english.groupBasic, "Basic", "english groupBasic")
+    try assertEqual(FilmtoneDesktopStrings.english.groupTone, "Tone", "english groupTone")
+    try assertEqual(FilmtoneDesktopStrings.english.groupOptics, "Optics", "english groupOptics")
+    try assertEqual(FilmtoneDesktopStrings.english.groupGlow, "Glow", "english groupGlow")
+    try assertEqual(FilmtoneDesktopStrings.english.groupGrain, "Grain", "english groupGrain")
+    try assertEqual(FilmtoneDesktopStrings.english.groupMotion, "Motion", "english groupMotion")
+}
+
+runner.test("FilmtoneDesktopStrings.japanese carries the iOS canonical Tone (階調)") {
+    // iOS only translates `groupTone` ("階調"); the other group titles keep
+    // their English defaultValue even on JA locale.
+    try assertEqual(FilmtoneDesktopStrings.japanese.groupBasic, "Basic", "japanese groupBasic falls back to EN per iOS")
+    try assertEqual(FilmtoneDesktopStrings.japanese.groupTone, "階調", "japanese groupTone")
+    try assertEqual(FilmtoneDesktopStrings.japanese.groupOptics, "Optics", "japanese groupOptics falls back to EN per iOS")
+    try assertEqual(FilmtoneDesktopStrings.japanese.groupGlow, "Glow", "japanese groupGlow falls back to EN per iOS")
+    try assertEqual(FilmtoneDesktopStrings.japanese.groupGrain, "Grain", "japanese groupGrain falls back to EN per iOS")
+    try assertEqual(FilmtoneDesktopStrings.japanese.groupMotion, "Motion", "japanese groupMotion falls back to EN per iOS")
+}
+
+runner.test("FilmtoneDesktopStrings preset chips match iOS defaults (None/なし, Default/標準, Strong/強め)") {
+    try assertEqual(FilmtoneDesktopStrings.english.presetNone, "None", "english presetNone")
+    try assertEqual(FilmtoneDesktopStrings.english.presetDefault, "Default", "english presetDefault")
+    try assertEqual(FilmtoneDesktopStrings.english.presetStrong, "Strong", "english presetStrong")
+    try assertEqual(FilmtoneDesktopStrings.japanese.presetNone, "なし", "japanese presetNone")
+    try assertEqual(FilmtoneDesktopStrings.japanese.presetDefault, "標準", "japanese presetDefault")
+    try assertEqual(FilmtoneDesktopStrings.japanese.presetStrong, "強め", "japanese presetStrong")
+}
+
+runner.test("FilmtoneDesktopStrings tone recipe chips match iOS defaults (Standard/標準, Airy/爽やか, Sunset/夕景, Depth/深み)") {
+    try assertEqual(FilmtoneDesktopStrings.english.toneStandard, "Standard", "english toneStandard")
+    try assertEqual(FilmtoneDesktopStrings.english.toneAiry, "Airy", "english toneAiry")
+    try assertEqual(FilmtoneDesktopStrings.english.toneSunset, "Sunset", "english toneSunset")
+    try assertEqual(FilmtoneDesktopStrings.english.toneDepth, "Depth", "english toneDepth")
+    try assertEqual(FilmtoneDesktopStrings.japanese.toneStandard, "標準", "japanese toneStandard")
+    try assertEqual(FilmtoneDesktopStrings.japanese.toneAiry, "爽やか", "japanese toneAiry")
+    try assertEqual(FilmtoneDesktopStrings.japanese.toneSunset, "夕景", "japanese toneSunset")
+    try assertEqual(FilmtoneDesktopStrings.japanese.toneDepth, "深み", "japanese toneDepth")
+}
+
+runner.test("FilmtoneDesktopStrings paramLabel mirrors iOS branching (Exposure EN-only; shutterAngle/trailIntensity translate)") {
+    // iOS defaults most paramLabels to English even on JA locale; only
+    // shutterAngle and trailIntensity carry an explicit JA variant.
+    try assertEqual(FilmtoneDesktopStrings.english.paramLabel(for: "exposure"), "Exposure", "english exposure")
+    try assertEqual(FilmtoneDesktopStrings.english.paramLabel(for: "shutterAngle"), "Shutter Angle", "english shutterAngle")
+    try assertEqual(FilmtoneDesktopStrings.english.paramLabel(for: "trailIntensity"), "Trail Length", "english trailIntensity")
+    try assertEqual(FilmtoneDesktopStrings.japanese.paramLabel(for: "exposure"), "Exposure", "japanese exposure falls back to EN per iOS")
+    try assertEqual(FilmtoneDesktopStrings.japanese.paramLabel(for: "shutterAngle"), "シャッターアングル", "japanese shutterAngle")
+    try assertEqual(FilmtoneDesktopStrings.japanese.paramLabel(for: "trailIntensity"), "残像の長さ", "japanese trailIntensity")
+}
+
+runner.test("FilmtoneDesktopStrings paramLabel falls back to the key when unknown") {
+    try assertEqual(
+        FilmtoneDesktopStrings.english.paramLabel(for: "someUnknownKey"),
+        "someUnknownKey",
+        "unknown key passes through"
+    )
+}
+
+runner.test("FilmtoneDesktopStrings supplies localized affordance copy") {
+    try assertEqual(FilmtoneDesktopStrings.english.advancedTitle, "Advanced Adjust", "english advancedTitle")
+    try assertEqual(FilmtoneDesktopStrings.japanese.advancedTitle, "詳細調整", "japanese advancedTitle")
+    try assertEqual(FilmtoneDesktopStrings.english.advancedResetAllOverrides, "Reset All Overrides", "english resetAll")
+    try assertEqual(FilmtoneDesktopStrings.japanese.advancedResetAllOverrides, "すべてのオーバーライドをリセット", "japanese resetAll")
+    try assertEqual(FilmtoneDesktopStrings.english.advancedClose, "Close", "english close")
+    try assertEqual(FilmtoneDesktopStrings.japanese.advancedClose, "閉じる", "japanese close")
+}
+
+runner.test("AdvancedAdjustCatalog with .japanese surfaces 階調 + tone JA recipe chips") {
+    let groups = AdvancedAdjustCatalog.allGroups(strings: .japanese)
+    let titles = groups.map(\.title)
+    try assertEqual(titles, ["Basic", "階調", "Optics", "Glow", "Grain", "Motion"], "JA group title order")
+    guard let process = groups.first(where: { $0.id == "process" }) else {
+        throw AssertionError(description: "process group missing under .japanese")
+    }
+    let toneLabels = process.recipes.map(\.label)
+    try assertEqual(toneLabels, ["標準", "爽やか", "夕景", "深み"], "JA tone recipe labels")
+    guard let glow = groups.first(where: { $0.id == "glow" }) else {
+        throw AssertionError(description: "glow group missing under .japanese")
+    }
+    let glowRecipeLabels = glow.recipes.map(\.label)
+    try assertEqual(glowRecipeLabels, ["なし", "標準", "強め"], "JA standard recipe labels")
+}
+
+runner.test("AdvancedAdjustCatalog with .japanese translates motion params, leaves the rest at iOS default") {
+    let groups = AdvancedAdjustCatalog.allGroups(strings: .japanese)
+    guard let motion = groups.first(where: { $0.id == "motion" }) else {
+        throw AssertionError(description: "motion group missing under .japanese")
+    }
+    var jaByKey: [String: String] = [:]
+    for control in motion.controls {
+        jaByKey[control.key] = control.label
+    }
+    try assertEqual(jaByKey["shutterAngle"], "シャッターアングル", "JA shutterAngle in motion group")
+    try assertEqual(jaByKey["trailIntensity"], "残像の長さ", "JA trailIntensity in motion group")
+
+    // basic.exposure remains EN per iOS default
+    guard let basic = groups.first(where: { $0.id == "basic" }),
+          let exposure = basic.controls.first(where: { $0.key == "exposure" }) else {
+        throw AssertionError(description: "basic.exposure missing under .japanese")
+    }
+    try assertEqual(exposure.label, "Exposure", "basic.exposure stays EN under .japanese per iOS")
 }
 
 let storeSemaphore = DispatchSemaphore(value: 0)

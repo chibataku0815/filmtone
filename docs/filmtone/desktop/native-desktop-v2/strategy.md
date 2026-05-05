@@ -162,6 +162,14 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
     (`isExporting` / `lastExportResult` 等) を ExportCoordinator に促進
     する Phase 2、`FilmtonePhase0Math.clampParam` を film-lab-swift-core
     に promote する Phase 3 (iOS canonical surface 触るので別 review)。
+- 2026-05-05: **M5-I.1 Localization / Copy Parity closed** (worktree
+  `filmtone-native-desktop-m5-i1-localization`)。`Domain/FilmtoneDesktopStrings.swift`
+  新規 (EN/JA struct + `.current` Locale 解決)、`AdvancedAdjustCatalog` /
+  `AdvancedAdjustEditor` から hard-coded EN を全廃、JA host で iOS canonical
+  階調 / なし / 標準 / 強め / 爽やか / 夕景 / 深み / シャッターアングル /
+  残像の長さ が surface する。Verify 56 → 65 PASS (新 9 tests: EN/JA group /
+  preset / tone recipe / paramLabel / affordance copy + JA catalog 経路 2)、
+  xcodebuild Debug ✅。Archive: `archive/2026-05-05-m5-i1-localization-copy-parity.md`。
 - Future product direction: cross-device SSD workflow. The intended shape is
   source media moved by SSD / Files / Finder, shared sidecar + Look intent moved
   with the source, Desktop as the master / 4K-capable exporter, and iPhone as

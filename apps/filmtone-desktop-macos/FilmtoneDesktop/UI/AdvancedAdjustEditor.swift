@@ -7,14 +7,19 @@ import SwiftUI
 // categories, each with rows of (label, value, slider, per-row reset).
 // The popover frame is sized once (480×600) so the user can scroll
 // through the full catalog without the window jumping.
+//
+// M5-I.1: every user-facing string flows through `FilmtoneDesktopStrings`
+// so JA/EN host locale picks up the iOS canonical 階調 / なし / 標準 /
+// 強め / 爽やか / 夕景 / 深み labels without per-call branching here.
 struct AdvancedAdjustEditor: View {
     @Bindable var state: EditorState
+    var strings: FilmtoneDesktopStrings = .current
     var onClose: () -> Void
 
     @State private var expandedGroupIds: Set<String> = ["basic"]
 
     private var groups: [AdvancedAdjustCatalog.Group] {
-        AdvancedAdjustCatalog.groups(forVideo: state.sourceKind == .video)
+        AdvancedAdjustCatalog.groups(forVideo: state.sourceKind == .video, strings: strings)
     }
 
     var body: some View {
@@ -47,7 +52,7 @@ struct AdvancedAdjustEditor: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            Text("Advanced Adjust")
+            Text(strings.advancedTitle)
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.white)
             Spacer()
@@ -63,14 +68,14 @@ struct AdvancedAdjustEditor: View {
             }
             .buttonStyle(.glass)
             .controlSize(.small)
-            .help("Close")
+            .help(strings.advancedClose)
         }
     }
 
     private var activeBadge: String {
         let active = state.paramOverridesActiveCount
         let total = state.paramOverridesAvailableCount
-        return "\(active) / \(total) active"
+        return strings.advancedActiveBadgeFormat(active, total)
     }
 
     @ViewBuilder
@@ -132,8 +137,8 @@ struct AdvancedAdjustEditor: View {
                               in group: AdvancedAdjustCatalog.Group,
                               isActive: Bool) -> some View {
         let helpText = recipe.kind == .none
-            ? "Clear \(group.title) overrides"
-            : "Apply \(recipe.label) preset to \(group.title)"
+            ? strings.advancedClearGroupHelp(group.title)
+            : strings.advancedApplyRecipeHelp(recipe.label, group.title)
         // SwiftUI button styles don't share a common erased type, so a
         // ternary on the modifier is not allowed — branch the View tree
         // instead. Both arms keep the same label / action / size so only
@@ -200,7 +205,7 @@ struct AdvancedAdjustEditor: View {
                 .buttonStyle(.glass)
                 .controlSize(.small)
                 .disabled(!isActive)
-                .help("Reset \(control.label) to base value")
+                .help(strings.advancedResetParamHelp(control.label))
             }
             Slider(value: valueBinding, in: control.range)
                 .tint(.white)
@@ -215,7 +220,7 @@ struct AdvancedAdjustEditor: View {
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "arrow.counterclockwise")
-                    Text("Reset All Overrides")
+                    Text(strings.advancedResetAllOverrides)
                 }
             }
             .buttonStyle(.glass)
