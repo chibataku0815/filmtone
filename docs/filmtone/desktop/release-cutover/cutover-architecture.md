@@ -61,7 +61,7 @@ Phase 番号は release-cutover lane 内連番。M5-C は別 lane (M5 chat 担�
 | **8** | Parent branch correction + product gates closure / explicit defer | **✓ Done** (M5-L parity follow-ups + parent branch normalization + `main` merge) |
 | **8.5** | Replacement readiness pack (read-only preflight, v1.4 release notes draft, public runbook, rollback notes) | **✓ Done (2026-05-05)** |
 | 9 | 1.4 release pipeline run (notarize + DMG + Blob upload + update-meta switch) | **✓ Done (2026-05-05)** |
-| 10 | Electron 1.0.4 deprecation notice + workspace archived status | Post-release follow-up |
+| 10 | Electron 1.0.4 deprecation notice + workspace archived status | **✓ Done** (frozen legacy notice recorded; workspace retained for rollback / pre-macOS-26 access) |
 
 ## 4. Risk register
 
@@ -130,6 +130,10 @@ Phase 番号は release-cutover lane 内連番。M5-C は別 lane (M5 chat 担�
   download rail, and published by switching update metadata to
   `latestVersion: "1.4"`. DMG sha256:
   `40d2b2fd745c648849d310856e2bcd5d0db0afd948b3842fd83800f68e705cb8`.
+- **2026-05-05** Phase 10 source finalization: Electron Desktop workspace is
+  recorded as frozen legacy access for pre-macOS-26 users and emergency
+  rollback. New Desktop product work belongs in Native Desktop; Electron remains
+  source-retained, not deleted.
 
 ## 6. 関連
 

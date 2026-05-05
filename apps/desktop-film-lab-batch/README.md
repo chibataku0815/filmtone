@@ -2,6 +2,16 @@
 
 Filmtone Desktop は、Filmtone の **macOS 向けローカル書き出しアプリ**です。写真フォルダの一括処理と、動画 1 本の MP4 書き出しを Desktop 上で行います。
 
+## Legacy status
+
+This Electron workspace is frozen at Desktop `1.0.4` as legacy access for users
+who cannot run the native macOS 26 app. New Desktop product work belongs in
+`apps/filmtone-desktop-macos/`.
+
+Keep this workspace buildable for emergency rollback and pre-macOS-26 support,
+but do not add new Filmtone Desktop features here. The public Desktop
+download/update rail now points to Native Desktop v1.4.
+
 ## 公開版の固定事項
 
 - **固定ダウンロード URL:** `https://www.chibatakumi.studio/film-lab/download`

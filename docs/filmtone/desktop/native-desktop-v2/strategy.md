@@ -296,6 +296,11 @@ update metadata reports `latestVersion: "1.4"`, and the fixed download page
 points at the notarized/stapled `Filmtone-1.4.dmg` built from code HEAD
 `4f2e5eba`.
 
+2026-05-05: M6 post-release source finalization closed the Electron workspace
+as frozen legacy source for pre-macOS-26 access and emergency rollback. Native
+Desktop is the active Desktop product lane; Electron remains source-retained,
+not deleted.
+
 ## Constraints
 
 - macOS target is macOS 26 only.

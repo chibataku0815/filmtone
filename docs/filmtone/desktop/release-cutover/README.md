@@ -35,6 +35,7 @@ Completion Log に短く反映する (本 lane の archive 経由で参照)。
 | M6-8 | Distribution scripts port (Vercel Blob + update-meta.json) | **Done** (Phase 7) |
 | M6-8.5 | Replacement readiness pack (preflight + release notes + public runbook) | **Done** (2026-05-05 readiness doc) |
 | M6-9 | 1.4 公開 release run | **Done** (clean run after parent branch correction + `main` merge) |
+| M6-10 | Electron 1.0.4 frozen-legacy source status | **Done** (workspace retained; new Desktop work moves to Native) |
 | polish | App Category 設定 (notarize blocker でない) | **Done** (Phase 2) |
 
 ## Out of scope (本 lane では扱わない)
@@ -326,6 +327,9 @@ explicit defer 判断として残す。
 - **Phase 9**: pending — clean 1.4 public release run after parent branch
   correction and `main` merge
 - **Phase 10**: Electron 1.0.4 deprecation notice + workspace archived status
+  is closed as source policy: `apps/desktop-film-lab-batch/` stays in the repo
+  for emergency rollback and pre-macOS-26 access, but new Desktop product work
+  belongs in `apps/filmtone-desktop-macos/`.
 
 ## Replacement readiness pack (2026-05-05)
 
