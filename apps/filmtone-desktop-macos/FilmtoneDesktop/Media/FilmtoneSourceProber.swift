@@ -2,6 +2,7 @@ import AVFoundation
 import CoreGraphics
 import CoreImage
 import CoreMedia
+import CoreVideo
 import Foundation
 import ImageIO
 
@@ -69,7 +70,7 @@ enum FilmtoneSourceProber {
         let durationCMTime = try await asset.load(.duration)
         let durationSec = max(0, CMTimeGetSeconds(durationCMTime))
 
-        let metadata = colorMetadata(from: descriptions)
+        let metadata = colorMetadata(from: descriptions, asset: asset, track: track)
         let colorClass = metadata.map(SourceColorClassifier.classify)
 
         let optics = await cameraOptics(
@@ -139,7 +140,9 @@ enum FilmtoneSourceProber {
     }
 
     private static func colorMetadata(
-        from descriptions: [CMFormatDescription]
+        from descriptions: [CMFormatDescription],
+        asset: AVAsset,
+        track: AVAssetTrack
     ) -> SourceColorMetadataDTO? {
         guard let cmDescription = descriptions.first else {
             return nil
@@ -161,12 +164,29 @@ enum FilmtoneSourceProber {
             cfKey: kCMFormatDescriptionExtension_YCbCrMatrix,
             stringKey: "YCbCrMatrix"
         )
-        let rawLogTransfer: String? = FormatExtensionReader.string(
-            in: extensions,
-            cfKey: kCMFormatDescriptionExtension_LogTransferFunction,
-            stringKey: "LogTransferFunction"
+        let rawLogTransfer: String? = {
+            if #available(macOS 14.2, *) {
+                return FormatExtensionReader.string(
+                    in: extensions,
+                    cfKey: kCMFormatDescriptionExtension_LogTransferFunction,
+                    stringKey: "LogTransferFunction"
+                )
+            }
+            return FormatExtensionReader.string(
+                in: extensions,
+                cfKey: nil,
+                stringKey: "LogTransferFunction"
+            )
+        }()
+        let formatDescriptionLogTransfer =
+            SourceColorMetadataNormalizer.normalizeLogTransferFunction(rawLogTransfer)
+        let sampleLogTransfer = formatDescriptionLogTransfer == nil
+            ? firstSampleLogTransferFunction(asset: asset, track: track)
+            : nil
+        let normalizedLogTransfer = resolveLogTransfer(
+            formatDescriptionRaw: rawLogTransfer,
+            firstSampleFallback: sampleLogTransfer
         )
-        let normalizedLogTransfer = SourceColorMetadataNormalizer.normalizeLogTransferFunction(rawLogTransfer)
 
         let normalizedTransfer = SourceColorMetadataNormalizer.normalizeTransfer(rawTransfer)
         let normalizedPrimaries = SourceColorMetadataNormalizer.normalizePrimaries(rawPrimaries)
@@ -192,6 +212,61 @@ enum FilmtoneSourceProber {
             hasMasteringDisplayMetadata: hasMasteringDisplay,
             hasContentLightMetadata: hasContentLight
         )
+    }
+
+    static func resolveLogTransfer(
+        formatDescriptionRaw rawLogTransfer: String?,
+        firstSampleFallback: SourceLogTransferFunctionDTO?
+    ) -> SourceLogTransferFunctionDTO? {
+        SourceColorMetadataNormalizer.normalizeLogTransferFunction(rawLogTransfer)
+            ?? firstSampleFallback
+    }
+
+    private static func firstSampleLogTransferFunction(
+        asset: AVAsset,
+        track: AVAssetTrack
+    ) -> SourceLogTransferFunctionDTO? {
+        guard #available(macOS 14.2, *) else {
+            return nil
+        }
+
+        do {
+            let reader = try AVAssetReader(asset: asset)
+            let output = AVAssetReaderTrackOutput(
+                track: track,
+                outputSettings: [
+                    kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA),
+                    AVVideoAllowWideColorKey: true,
+                ]
+            )
+            output.alwaysCopiesSampleData = false
+            guard reader.canAdd(output) else {
+                return nil
+            }
+            reader.add(output)
+            guard reader.startReading() else {
+                return nil
+            }
+            defer {
+                if reader.status == .reading {
+                    reader.cancelReading()
+                }
+            }
+            guard
+                let sampleBuffer = output.copyNextSampleBuffer(),
+                let imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer),
+                let raw = CVBufferCopyAttachment(
+                    imageBuffer,
+                    kCVImageBufferLogTransferFunctionKey,
+                    nil
+                )
+            else {
+                return nil
+            }
+            return SourceColorMetadataNormalizer.normalizeLogTransferFunction(String(describing: raw))
+        } catch {
+            return nil
+        }
     }
 
     // MARK: - Still helpers

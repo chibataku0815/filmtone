@@ -32,7 +32,7 @@ struct RootWindowView: View {
                 videoPreviewSeconds: state.videoPreviewSeconds,
                 sourceProfileSelection: state.sourceProfileSelection,
                 quickState: state.quickState,
-                paramOverrides: state.paramOverrides,
+                paramOverrides: state.renderParamOverrides,
                 compareEnabled: state.isCompareEnabled,
                 onOpenRequested: { presentOpenPanel() }
             )
@@ -1000,7 +1000,7 @@ private struct VideoCompositionRefreshKey: Equatable {
         self.sourceProfileSelection = state.sourceProfileSelection
         self.probedSourceColorClass = state.probedSourceColorClass
         self.quickState = state.quickState
-        self.paramOverrides = state.paramOverrides
+        self.paramOverrides = state.renderParamOverrides
         self.compareEnabled = state.isCompareEnabled
         self.compareSplitFraction = state.compareSplitFraction
     }

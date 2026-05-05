@@ -183,7 +183,7 @@ struct PreviewSurface: View {
         let probedColorClass: SourceColorClassDTO? =
             FilmtoneSourceProber.probeStill(sourceURL: sourceURL).colorClass
         guard !Task.isCancelled else { return }
-        state.probedSourceColorClass = probedColorClass
+        state.applyProbedSourceColorClass(probedColorClass, for: sourceURL)
 
         let frames = await Task.detached(priority: .userInitiated) { () -> RenderedFrames? in
             return PreviewSurface.renderFrames(

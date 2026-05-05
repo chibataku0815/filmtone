@@ -63,6 +63,9 @@ struct SourceProfileControls: View {
     private var selectedLabel: String {
         switch state.sourceProfileSelection {
         case .auto:
+            if let resolvedAutoEntry {
+                return FilmtoneSourceProfileCatalog.autoResolvedValueLabel(for: resolvedAutoEntry)
+            }
             return Self.optionLabel
         case .builtIn(let catalogId):
             return FilmtoneSourceProfileCatalog.entry(forCatalogId: catalogId)?.englishName ?? catalogId
@@ -102,7 +105,10 @@ struct SourceProfileControls: View {
                     .frame(width: 220, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
             } else if let resolvedAutoEntry {
-                Text("Detected: \(resolvedAutoEntry.englishName)")
+                Text(FilmtoneSourceProfileCatalog.autoDetectedCaption(
+                    for: resolvedAutoEntry,
+                    prefersJapanese: FilmtoneDesktopStrings.prefersJapanese()
+                ))
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.7))
                     .frame(width: 220, alignment: .leading)

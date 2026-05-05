@@ -16,6 +16,14 @@ struct QuickAdjustControls: View {
         !state.quickStateIsActive
     }
 
+    private var selectedOpticalFilterId: String {
+        state.opticalFilterProfileId ?? FilmtoneOpticalFilterCatalog.noneIdentifier
+    }
+
+    private var selectedOpticalFilterLabel: String {
+        FilmtoneOpticalFilterCatalog.profile(for: state.opticalFilterProfileId)?.shortLabel ?? "None"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 8) {
@@ -47,6 +55,7 @@ struct QuickAdjustControls: View {
                 title: "Dynamics",
                 value: $state.quickState.dynamics
             )
+            opticalFilterSection
             HStack(spacing: 8) {
                 Spacer()
                 Button("Reset Quick") {
@@ -77,6 +86,52 @@ struct QuickAdjustControls: View {
             .padding(.top, 0)
         }
         .frame(width: 220)
+    }
+
+    private var opticalFilterSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Backlight Veil")
+                    .font(.callout)
+                    .foregroundStyle(.white)
+                Spacer()
+                Text(selectedOpticalFilterLabel)
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+            HStack(spacing: 6) {
+                ForEach(Self.opticalFilterOptions, id: \.id) { option in
+                    opticalFilterChip(option)
+                }
+            }
+        }
+    }
+
+    private func opticalFilterChip(_ option: OpticalFilterOption) -> some View {
+        let active = option.id == selectedOpticalFilterId
+        return Button {
+            state.opticalFilterProfileId = option.id == FilmtoneOpticalFilterCatalog.noneIdentifier
+                ? nil
+                : option.id
+        } label: {
+            Text(option.label)
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+                .foregroundStyle(active ? .black : .white.opacity(0.88))
+                .background(
+                    active ? Color.white.opacity(0.92) : Color.white.opacity(0.12),
+                    in: Capsule()
+                )
+                .overlay {
+                    Capsule()
+                        .strokeBorder(Color.white.opacity(active ? 0 : 0.24), lineWidth: 1)
+                }
+        }
+        .buttonStyle(.plain)
+        .help(option.help)
+        .filmtonePointingHandCursor()
     }
 
     @ViewBuilder
@@ -110,4 +165,20 @@ struct QuickAdjustControls: View {
         }
         return "\(intValue)%"
     }
+
+    private static let opticalFilterOptions: [OpticalFilterOption] = [
+        .init(
+            id: FilmtoneOpticalFilterCatalog.noneIdentifier,
+            label: "None",
+            help: "Clear Backlight Veil"
+        ),
+    ] + FilmtoneOpticalFilterCatalog.profiles.map {
+        .init(id: $0.id, label: $0.shortLabel, help: "Apply \($0.displayName)")
+    }
+}
+
+private struct OpticalFilterOption {
+    let id: String
+    let label: String
+    let help: String
 }

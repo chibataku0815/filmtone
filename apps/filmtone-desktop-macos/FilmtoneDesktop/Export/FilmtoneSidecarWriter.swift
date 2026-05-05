@@ -60,7 +60,10 @@ enum FilmtoneSidecarWriter {
             strength: strength,
             lookSlug: request.lookSlug,
             quickState: liveQuickState,
-            paramOverrides: request.paramOverrides
+            paramOverrides: FilmtoneOpticalFilterCatalog.renderParamOverrides(
+                profileId: request.opticalFilterProfileId,
+                userOverrides: request.paramOverrides
+            )
         )
         let lookVersion = FilmtonePresetCatalog.presetVersion
 
@@ -131,6 +134,14 @@ enum FilmtoneSidecarWriter {
             }
         }
         payload["sourceProfile"] = sourceProfilePayload
+        // M5-L3 additive: preserve the named optical filter identity
+        // separately from `gradeParams`, which already contains the
+        // resolved visible Backlight Veil values.
+        if let opticalFilterProfile = FilmtoneOpticalFilterCatalog.sidecarPayload(
+            for: request.opticalFilterProfileId
+        ) {
+            payload["opticalFilterProfile"] = opticalFilterProfile
+        }
         // M5-A.2 additive: emit `creativeLut` provenance when a Look is
         // active and its cube resolves. SHA mismatch / missing resource
         // path returns nil from the loader → block is omitted (OQ-3:

@@ -3,9 +3,9 @@ import SwiftUI
 
 // M5-C.3b: Popover content for the right-rail "Adjust…" button. Direct
 // per-key editing of `paramOverrides` matching the iOS canonical
-// `FilmtoneStrengthSheet` advanced section. DisclosureGroup × N
-// categories, each with rows of (label, value, slider, per-row reset).
-// The popover frame is sized once (480×600) so the user can scroll
+// `FilmtoneStrengthSheet` advanced section. Recipe chips stay visible
+// at the group level; each group can expand into rows of (label, value,
+// slider, per-row reset). The popover frame is sized once (480×600) so the user can scroll
 // through the full catalog without the window jumping.
 //
 // M5-I.1: every user-facing string flows through `FilmtoneDesktopStrings`
@@ -16,7 +16,7 @@ struct AdvancedAdjustEditor: View {
     var strings: FilmtoneDesktopStrings = .current
     var onClose: () -> Void
 
-    @State private var expandedGroupIds: Set<String> = ["basic"]
+    @State private var expandedGroupIds: Set<String> = []
 
     private var groups: [AdvancedAdjustCatalog.Group] {
         AdvancedAdjustCatalog.groups(forVideo: state.sourceKind == .video, strings: strings)
@@ -89,36 +89,57 @@ struct AdvancedAdjustEditor: View {
         )
         let activeInGroup = group.controls.filter { state.isParamOverridden($0.key) }.count
 
-        DisclosureGroup(isExpanded: isExpanded) {
-            VStack(alignment: .leading, spacing: 12) {
-                if !group.recipes.isEmpty {
-                    recipeChipRow(for: group)
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                isExpanded.wrappedValue.toggle()
+            } label: {
+                HStack(spacing: 8) {
+                    Text(group.title)
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(.white)
+                    Text("(\(group.controls.count))")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.white.opacity(0.5))
+                    if activeInGroup > 0 {
+                        Text("\(activeInGroup) on")
+                            .font(.caption2.monospacedDigit().weight(.semibold))
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.yellow.opacity(0.85), in: Capsule())
+                    }
+                    Spacer()
+                    Image(systemName: isExpanded.wrappedValue ? "chevron.up" : "chevron.down")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.white.opacity(0.68))
+                        .frame(width: 18, height: 18)
                 }
-                ForEach(group.controls) { control in
-                    paramRow(control)
-                }
+                .contentShape(Rectangle())
             }
-            .padding(.top, 8)
-            .padding(.leading, 4)
-        } label: {
-            HStack(spacing: 8) {
-                Text(group.title)
-                    .font(.callout.weight(.semibold))
-                    .foregroundStyle(.white)
-                Text("(\(group.controls.count))")
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.white.opacity(0.5))
-                if activeInGroup > 0 {
-                    Text("\(activeInGroup) on")
-                        .font(.caption2.monospacedDigit().weight(.semibold))
-                        .foregroundStyle(.black)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.yellow.opacity(0.85), in: Capsule())
+            .buttonStyle(.plain)
+            .filmtonePointingHandCursor()
+
+            if !group.recipes.isEmpty {
+                recipeChipRow(for: group)
+                    .padding(.leading, 4)
+                    .padding(.bottom, isExpanded.wrappedValue ? 2 : 8)
+            }
+
+            if isExpanded.wrappedValue {
+                Divider()
+                    .background(Color.white.opacity(0.08))
+                    .padding(.top, 2)
+
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(group.controls) { control in
+                        paramRow(control)
+                    }
                 }
-                Spacer()
+                .padding(.top, 4)
+                .padding(.leading, 4)
             }
         }
+        .padding(.vertical, 4)
     }
 
     @ViewBuilder

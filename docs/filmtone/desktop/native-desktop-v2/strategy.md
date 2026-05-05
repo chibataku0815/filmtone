@@ -232,6 +232,26 @@ and delete while preserving the shared sidecar marker contract.
 real DaVinci repeated-import readback under
 `evidence/2026-05-05-dhm-8-direct-smoke/`.
 
+2026-05-05: M5-L1 Source Auto / Conversion LUT parity landed on
+`feature/native-desktop-m5-l1-source-auto`: Desktop Auto now uses the iOS-style
+first-sample Apple Log fallback, source-profile retention, and visible Auto
+detection labels. Verification was green (`Verify/run.sh` 93/93,
+`bun run verify:macos`, `git diff --check`); Debug app launched, and the user
+confirmed real-device / real-media visual smoke.
+
+2026-05-05: M5-L2 Advanced Recipe Chip Discoverability landed on
+`feature/native-desktop-m5-l2-advanced-chips`: Desktop advanced editing now
+surfaces iOS-style recipe chips beside their groups before slider expansion.
+Verification was green (`Verify/run.sh` 94/94, `bun run verify:macos`,
+`git diff --check`); Debug app launched.
+
+2026-05-05: M5-L3 Backlight Veil landed on
+`feature/native-desktop-m5-l2-advanced-chips`: Native Desktop now exposes
+Backlight Veil 1/8, 1/4, and 1/2 as a named optical filter, resolves its
+supported values through preview/export, and emits sidecar profile identity.
+Verification was green (`Verify/run.sh` 97/97, `bun run verify:macos`,
+`git diff --check`); Debug app launched.
+
 ## Constraints
 
 - macOS target is macOS 26 only.

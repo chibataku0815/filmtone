@@ -60,7 +60,8 @@ final class ExportCoordinator {
             sourceProfileSelection: state.sourceProfileSelection,
             quickState: state.quickState,
             paramOverrides: state.paramOverrides,
-            highlightMarkers: nil
+            highlightMarkers: nil,
+            opticalFilterProfileId: state.opticalFilterProfileId
         )
 
         let startedAt = Date()
@@ -124,7 +125,8 @@ final class ExportCoordinator {
             sourceProfileSelection: state.sourceProfileSelection,
             quickState: state.quickState,
             paramOverrides: state.paramOverrides,
-            highlightMarkers: state.exportHighlightMarkers
+            highlightMarkers: state.exportHighlightMarkers,
+            opticalFilterProfileId: state.opticalFilterProfileId
         )
 
         let startedAt = Date()

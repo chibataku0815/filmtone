@@ -46,6 +46,10 @@ final class EditorState {
     /// can mirror Auto's resolved choice and the source-cap gate can decide
     /// whether to disable Export.
     var probedSourceColorClass: SourceColorClassDTO?
+    /// M5-L1: source-change profile retention/reset is applied exactly once
+    /// per opened source after the first still/video probe lands.
+    @ObservationIgnored
+    var sourceProfilePolicyAppliedURL: URL?
     /// M5-C.2a: which library entry is shown selected in the Look picker.
     /// nil = "None" (no Look). Built-in Stone / Urban appear here via
     /// their canonical catalog UUIDs (`FilmtoneCreativePackCatalog.find
@@ -68,6 +72,10 @@ final class EditorState {
     var paramOverrides: FilmtonePhase0ParamsPatch = .empty
     /// Source-relative highlight markers shared with iOS and DaVinci.
     var highlightMarkers: FilmtoneHighlightMarkers?
+    /// M5-L3: named optical filter profile selection. `nil` means no
+    /// filter. Backlight Veil profiles resolve to a render-time patch
+    /// that manual `paramOverrides` can still override key-by-key.
+    var opticalFilterProfileId: String?
     var isExporting: Bool = false
     var exportProgress: Double = 0
     var exportProgressMessage: String?
@@ -142,7 +150,14 @@ final class EditorState {
             strength: presetStrength,
             lookSlug: lookSlug,
             quickState: quickState,
-            paramOverrides: paramOverrides
+            paramOverrides: renderParamOverrides
+        )
+    }
+
+    var renderParamOverrides: FilmtonePhase0ParamsPatch {
+        FilmtoneOpticalFilterCatalog.renderParamOverrides(
+            profileId: opticalFilterProfileId,
+            userOverrides: paramOverrides
         )
     }
 
@@ -212,6 +227,7 @@ final class EditorState {
         // Picker resolved-Auto label don't misreport stale state until the
         // PreviewSurface re-probes the new source.
         probedSourceColorClass = nil
+        sourceProfilePolicyAppliedURL = nil
         // M5-C.4: previous export's snapshot belonged to the previous
         // source — clear so the inspector returns to ready state for
         // the new source.
@@ -247,7 +263,7 @@ final class EditorState {
                 return
             }
             self.videoSession = session
-            self.probedSourceColorClass = session.probedColorClass
+            self.applyProbedSourceColorClass(session.probedColorClass, for: url)
             // Apply the playback rate the user previously selected before
             // a new source replaced the prior session.
             session.setRate(self.playbackRate)
@@ -276,11 +292,26 @@ final class EditorState {
             sourceProfileSelection: sourceProfileSelection,
             probedColorClass: probedSourceColorClass,
             quickState: quickState,
-            paramOverrides: paramOverrides,
+            paramOverrides: renderParamOverrides,
             compareEnabled: isCompareEnabled,
             compareSplitFraction: compareSplitFraction,
             sourceURL: url ?? sourceURL ?? URL(fileURLWithPath: "/")
         )
+    }
+
+    func applyProbedSourceColorClass(_ colorClass: SourceColorClassDTO?, for url: URL) {
+        guard sourceURL == url else { return }
+        probedSourceColorClass = colorClass
+        guard sourceProfilePolicyAppliedURL != url else { return }
+        sourceProfilePolicyAppliedURL = url
+
+        let retained = FilmtoneSourceProfileCatalog.selectionAfterSourceChange(
+            sourceProfileSelection,
+            probedColorClass: colorClass
+        )
+        if retained != sourceProfileSelection {
+            sourceProfileSelection = retained
+        }
     }
 
     /// M5-J.2: flip the compare toggle. Toolbar disables the button when

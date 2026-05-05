@@ -71,6 +71,7 @@ private struct StubSidecarRequest: FilmtoneSidecarRequest {
     let quickState: FilmtoneQuickState
     let paramOverrides: FilmtonePhase0ParamsPatch
     var highlightMarkers: FilmtoneHighlightMarkers? = nil
+    let opticalFilterProfileId: String? = nil
 }
 
 private let runner = TestRunner()
@@ -324,6 +325,66 @@ runner.test("sidecar reader loads iOS highlightMarkers by source filename") {
     let markers = FilmtoneSidecarWriter.readHighlightMarkers(matchingSourceURL: sourceURL)
     try assertEqual(markers?.markers.first?.id, Optional("filmtone-marker-ios-test"))
     try assertEqual(markers?.markers.first?.createdOnPlatform, Optional("ios"))
+}
+
+runner.test("Backlight Veil catalog exposes shared profile ids + supported values") {
+    try assertEqual(
+        FilmtoneOpticalFilterCatalog.profiles.map(\.id),
+        ["backlightVeil-1-8", "backlightVeil-1-4", "backlightVeil-1-2"],
+        "Native should expose the product-facing Backlight Veil densities"
+    )
+    guard let profile = FilmtoneOpticalFilterCatalog.profile(for: "backlightVeil-1-4") else {
+        throw AssertionError(description: "Backlight Veil 1/4 profile missing")
+    }
+    try assertEqual(profile.family, "backlightVeil")
+    try assertEqual(profile.density, "1/4")
+    try assertClose(profile.paramPatch.values["bloomThreshold"] ?? -1, 0.56)
+    try assertClose(profile.paramPatch.values["bloomStrength"] ?? -1, 0.38)
+    try assertClose(profile.paramPatch.values["diffusion"] ?? -1, 0.24)
+    try assertClose(profile.paramPatch.values["halationIntensity"] ?? -1, 0.14)
+    try assertClose(profile.paramPatch.values["lensSoftness"] ?? -1, 0.08)
+}
+
+runner.test("Backlight Veil render patch preserves manual advanced override priority") {
+    let merged = FilmtoneOpticalFilterCatalog.renderParamOverrides(
+        profileId: "backlightVeil-1-4",
+        userOverrides: FilmtonePhase0ParamsPatch(values: [
+            "bloomStrength": 0.91,
+            "exposure": 0.25,
+        ])
+    )
+    try assertClose(merged.values["bloomThreshold"] ?? -1, 0.56)
+    try assertClose(merged.values["bloomStrength"] ?? -1, 0.91)
+    try assertClose(merged.values["exposure"] ?? -1, 0.25)
+}
+
+runner.test("sidecar records Backlight Veil identity and resolves gradeParams") {
+    struct OpticalSidecarRequest: FilmtoneSidecarRequest {
+        let sourceURL = URL(fileURLWithPath: "/tmp/in.mov")
+        let outputURL = URL(fileURLWithPath: "/tmp/out.mp4")
+        let presetName = "reset"
+        let presetStrength = 1.0
+        let lookSlug: String? = nil
+        let sourceKind: FilmtoneSourceKind = .video
+        let quickState = FilmtoneQuickState.zero
+        let paramOverrides = FilmtonePhase0ParamsPatch(values: [
+            "diffusion": 0.31,
+        ])
+        let opticalFilterProfileId: String? = "backlightVeil-1-4"
+    }
+    let payload = FilmtoneSidecarWriter.sidecarPayload(for: OpticalSidecarRequest())
+    guard let optical = payload["opticalFilterProfile"] as? [String: String] else {
+        throw AssertionError(description: "opticalFilterProfile block missing")
+    }
+    try assertEqual(optical["id"], "backlightVeil-1-4")
+    try assertEqual(optical["family"], "backlightVeil")
+    try assertEqual(optical["density"], "1/4")
+    guard let grade = payload["gradeParams"] as? [String: Double] else {
+        throw AssertionError(description: "gradeParams missing")
+    }
+    try assertClose(grade["bloomStrength"] ?? -1, 0.38)
+    try assertClose(grade["diffusion"] ?? -1, 0.31)
+    try assertClose(grade["halationIntensity"] ?? -1, 0.14)
 }
 
 // ---------------------------------------------------------------------------
@@ -813,6 +874,19 @@ runner.test("Each non-basic group ships at least one none + one stamp recipe") {
 runner.test("basic group keeps no recipes (mirrors iOS)") {
     let basic = AdvancedAdjustCatalog.allGroups.first { $0.id == "basic" }
     try assertEqual(basic?.recipes.isEmpty, true, "basic group should ship no chips")
+}
+
+runner.test("AdvancedAdjustCatalog visible recipe chip groups match first-open Desktop surface") {
+    try assertEqual(
+        AdvancedAdjustCatalog.visibleRecipeChipGroupIds(forVideo: false),
+        ["process", "optics", "glow", "grain"],
+        "still mode should expose all still recipe chip groups and omit basic"
+    )
+    try assertEqual(
+        AdvancedAdjustCatalog.visibleRecipeChipGroupIds(forVideo: true),
+        ["process", "optics", "glow", "grain", "motion"],
+        "video mode should add the motion recipe chip group"
+    )
 }
 
 runner.test("Recipe stamped keys are confined to their own group") {
@@ -1674,6 +1748,163 @@ runner.test("FilmtoneScrubThumbnailCacheKey is signature-aware Hashable") {
     try assertEqual(set.count, 3, "set dedupes a1/a2 but keeps b and c")
 }
 
+// ---------------------------------------------------------------------------
+// Test group 14 — M5-L1 Source Auto / Conversion LUT parity. Pins the iOS
+// source-profile retention rule and the Apple Log / Apple Log 2 detection
+// fallback Desktop now shares with iOS.
+// ---------------------------------------------------------------------------
+
+runner.test("SourceColorMetadataNormalizer accepts CVImageBuffer Apple Log tokens") {
+    try assertEqual(
+        SourceColorMetadataNormalizer.normalizeLogTransferFunction(
+            "kCVImageBufferLogTransferFunction_AppleLog"
+        ),
+        .appleLog,
+        "Apple Log sample-buffer attachment"
+    )
+    try assertEqual(
+        SourceColorMetadataNormalizer.normalizeLogTransferFunction(
+            "kCVImageBufferLogTransferFunction_AppleLog2"
+        ),
+        .appleLog2,
+        "Apple Log 2 sample-buffer attachment"
+    )
+}
+
+runner.test("FilmtoneSourceProber resolves first-sample log fallback when format metadata is empty") {
+    try assertEqual(
+        FilmtoneSourceProber.resolveLogTransfer(
+            formatDescriptionRaw: nil,
+            firstSampleFallback: .appleLog
+        ),
+        .appleLog,
+        "missing format-description log should use first sample"
+    )
+    try assertEqual(
+        FilmtoneSourceProber.resolveLogTransfer(
+            formatDescriptionRaw: nil,
+            firstSampleFallback: .appleLog2
+        ),
+        .appleLog2,
+        "missing format-description log should use first sample Apple Log 2"
+    )
+}
+
+runner.test("FilmtoneSourceProber keeps format-description log over fallback") {
+    try assertEqual(
+        FilmtoneSourceProber.resolveLogTransfer(
+            formatDescriptionRaw: "kCMFormatDescriptionLogTransferFunction_AppleLog",
+            firstSampleFallback: .appleLog2
+        ),
+        .appleLog,
+        "track metadata has priority over sample fallback"
+    )
+}
+
+runner.test("SourceColorClassifier maps fallback Apple Log metadata to auto-resolvable classes") {
+    let appleLog = SourceColorMetadataDTO(
+        colorRange: nil,
+        colorSpace: "bt2020nc",
+        colorTransfer: SourceLogTransferFunctionDTO.appleLog.rawValue,
+        colorPrimaries: "bt2020",
+        logTransferFunction: .appleLog,
+        hasMasteringDisplayMetadata: false,
+        hasContentLightMetadata: false
+    )
+    let appleLog2 = SourceColorMetadataDTO(
+        colorRange: nil,
+        colorSpace: "bt2020nc",
+        colorTransfer: SourceLogTransferFunctionDTO.appleLog2.rawValue,
+        colorPrimaries: "bt2020",
+        logTransferFunction: .appleLog2,
+        hasMasteringDisplayMetadata: false,
+        hasContentLightMetadata: false
+    )
+    try assertEqual(SourceColorClassifier.classify(appleLog), .appleLog)
+    try assertEqual(SourceColorClassifier.classify(appleLog2), .appleLog2)
+    try assertEqual(
+        FilmtoneSourceProfileCatalog.entry(forColorClass: .appleLog)?.englishName,
+        "Apple Log"
+    )
+    try assertEqual(
+        FilmtoneSourceProfileCatalog.entry(forColorClass: .appleLog2)?.englishName,
+        "Apple Log 2"
+    )
+}
+
+runner.test("Source profile source-change policy resets detectable mismatches to Auto") {
+    let appleLogSelection = CameraProfileSelection.builtIn(
+        catalogId: "built-in:source-profile.apple-log"
+    )
+    let rec709Selection = CameraProfileSelection.builtIn(
+        catalogId: "built-in:source-profile.rec709"
+    )
+    try assertEqual(
+        FilmtoneSourceProfileCatalog.selectionAfterSourceChange(
+            appleLogSelection,
+            probedColorClass: .appleLog
+        ),
+        appleLogSelection,
+        "matching Apple Log source keeps manual selection"
+    )
+    try assertEqual(
+        FilmtoneSourceProfileCatalog.selectionAfterSourceChange(
+            appleLogSelection,
+            probedColorClass: .sdrBt709
+        ),
+        .auto,
+        "Apple Log manual pick should reset on SDR mismatch"
+    )
+    try assertEqual(
+        FilmtoneSourceProfileCatalog.selectionAfterSourceChange(
+            rec709Selection,
+            probedColorClass: .appleLog
+        ),
+        .auto,
+        "Rec.709 manual pick should reset on Apple Log mismatch"
+    )
+}
+
+runner.test("Source profile source-change policy keeps non-detectable manual picks sticky") {
+    let vLogSelection = CameraProfileSelection.builtIn(
+        catalogId: "built-in:source-profile.panasonic-vlog"
+    )
+    try assertEqual(
+        FilmtoneSourceProfileCatalog.selectionAfterSourceChange(
+            vLogSelection,
+            probedColorClass: .sdrBt709
+        ),
+        vLogSelection,
+        "V-Log stays sticky because container metadata cannot prove mismatch"
+    )
+    try assertEqual(
+        FilmtoneSourceProfileCatalog.selectionAfterSourceChange(
+            .builtIn(catalogId: "built-in:source-profile.missing"),
+            probedColorClass: .appleLog
+        ),
+        .auto,
+        "missing catalog row should fall back to Auto"
+    )
+}
+
+runner.test("Source profile Auto detection labels match iOS-style wording") {
+    guard let appleLog = FilmtoneSourceProfileCatalog.entry(forColorClass: .appleLog) else {
+        throw AssertionError(description: "Apple Log catalog row missing")
+    }
+    try assertEqual(
+        FilmtoneSourceProfileCatalog.autoResolvedValueLabel(for: appleLog),
+        "Auto -> Apple Log"
+    )
+    try assertEqual(
+        FilmtoneSourceProfileCatalog.autoDetectedCaption(for: appleLog, prefersJapanese: false),
+        "Auto -> Apple Log detected"
+    )
+    try assertEqual(
+        FilmtoneSourceProfileCatalog.autoDetectedCaption(for: appleLog, prefersJapanese: true),
+        "Auto -> Apple Log 検出"
+    )
+}
+
 let storeSemaphore = DispatchSemaphore(value: 0)
 Task {
     await runStoreTests()
@@ -1682,7 +1913,7 @@ Task {
 storeSemaphore.wait()
 
 // ---------------------------------------------------------------------------
-// Test group 14 — M5-K3 FilmtoneCompareSplitMath. Pins the boundary
+// Test group 15 — M5-K3 FilmtoneCompareSplitMath. Pins the boundary
 // behavior of the shared split-fraction helper so EditorState.didSet,
 // FilmtoneCompareCompose.makeSplit, and the AVPlayer composition handler
 // never silently drift on what counts as a valid compare position.

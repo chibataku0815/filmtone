@@ -275,6 +275,12 @@ enum AdvancedAdjustCatalog {
         allGroups(strings: strings).filter { !$0.videoOnly || isVideo }
     }
 
+    static func visibleRecipeChipGroupIds(forVideo isVideo: Bool) -> [String] {
+        groups(forVideo: isVideo, strings: .english)
+            .filter { !$0.recipes.isEmpty }
+            .map(\.id)
+    }
+
     static func group(forId id: String,
                       strings: FilmtoneDesktopStrings = .current) -> Group? {
         allGroups(strings: strings).first { $0.id == id }
@@ -353,6 +359,118 @@ enum AdvancedAdjustCatalog {
     /// the patch — keeps saved-Look JSON tight and prevents recipe stamps
     /// from materializing redundant identity entries.
     static let paramEqualityTolerance: Double = 0.0001
+}
+
+enum FilmtoneOpticalFilterCatalog {
+    struct Profile: Identifiable, Hashable, Sendable {
+        let id: String
+        let family: String
+        let density: String
+        let displayName: String
+        let shortLabel: String
+        let paramPatch: FilmtonePhase0ParamsPatch
+    }
+
+    static let noneIdentifier = "none"
+
+    static let profiles: [Profile] = [
+        .init(
+            id: "backlightVeil-1-8",
+            family: "backlightVeil",
+            density: "1/8",
+            displayName: "Backlight Veil 1/8",
+            shortLabel: "1/8",
+            paramPatch: supportedBacklightVeilPatch([
+                "bloomThreshold": 0.66,
+                "bloomStrength": 0.20,
+                "bloomRadius": 0.70,
+                "bloomSoftKnee": 0.70,
+                "diffusion": 0.12,
+                "halationIntensity": 0.07,
+                "halationThreshold": 0.58,
+                "halationRadius": 0.52,
+                "halationHue": 22,
+                "halationSoftKnee": 0.48,
+                "lensSoftness": 0.06,
+                "rgbShift": 0.0005,
+            ])
+        ),
+        .init(
+            id: "backlightVeil-1-4",
+            family: "backlightVeil",
+            density: "1/4",
+            displayName: "Backlight Veil 1/4",
+            shortLabel: "1/4",
+            paramPatch: supportedBacklightVeilPatch([
+                "bloomThreshold": 0.56,
+                "bloomStrength": 0.38,
+                "bloomRadius": 0.80,
+                "bloomSoftKnee": 0.76,
+                "diffusion": 0.24,
+                "halationIntensity": 0.14,
+                "halationThreshold": 0.52,
+                "halationRadius": 0.62,
+                "halationHue": 22,
+                "halationSoftKnee": 0.56,
+                "lensSoftness": 0.08,
+                "rgbShift": 0.0007,
+            ])
+        ),
+        .init(
+            id: "backlightVeil-1-2",
+            family: "backlightVeil",
+            density: "1/2",
+            displayName: "Backlight Veil 1/2",
+            shortLabel: "1/2",
+            paramPatch: supportedBacklightVeilPatch([
+                "bloomThreshold": 0.50,
+                "bloomStrength": 0.60,
+                "bloomRadius": 0.88,
+                "bloomSoftKnee": 0.82,
+                "diffusion": 0.38,
+                "halationIntensity": 0.22,
+                "halationThreshold": 0.46,
+                "halationRadius": 0.74,
+                "halationHue": 22,
+                "halationSoftKnee": 0.64,
+                "lensSoftness": 0.10,
+                "rgbShift": 0.0009,
+            ])
+        ),
+    ]
+
+    static func profile(for id: String?) -> Profile? {
+        guard let id, id != noneIdentifier else { return nil }
+        return profiles.first { $0.id == id }
+    }
+
+    static func renderParamOverrides(
+        profileId: String?,
+        userOverrides: FilmtonePhase0ParamsPatch
+    ) -> FilmtonePhase0ParamsPatch {
+        var values = profile(for: profileId)?.paramPatch.values ?? [:]
+        for (key, value) in userOverrides.values {
+            values[key] = value
+        }
+        return FilmtonePhase0ParamsPatch(values: values)
+    }
+
+    static func sidecarPayload(for id: String?) -> [String: Any]? {
+        guard let profile = profile(for: id) else { return nil }
+        return [
+            "id": profile.id,
+            "family": profile.family,
+            "density": profile.density,
+            "displayName": profile.displayName,
+        ]
+    }
+
+    private static func supportedBacklightVeilPatch(_ values: [String: Double]) -> FilmtonePhase0ParamsPatch {
+        let clamped = values.reduce(into: [String: Double]()) { result, element in
+            result[element.key] = AdvancedAdjustCatalog.clamp(element.value, for: element.key)
+        }
+        return FilmtonePhase0ParamsPatch(values: clamped)
+    }
 }
 
 extension FilmtonePhase0ParamsPatch {
