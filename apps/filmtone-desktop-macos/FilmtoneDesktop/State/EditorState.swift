@@ -23,11 +23,17 @@ final class EditorState {
     /// M5-A.3: probed video duration in seconds. `nil` for stills or
     /// before the probe completes. Drives the scrub bar range.
     var videoDurationSeconds: Double?
-    /// M5-D.2: true while the playback Task is incrementing
-    /// `videoPreviewSeconds` on a 24 fps tick. UI-side toggle via
-    /// `togglePlayback()` / Space-key. Manual scrub drag also flips this
-    /// off via the slider's onEditingChanged hook.
+    /// M5-I.2: mirrors `videoSession?.player.timeControlStatus == .playing`,
+    /// pushed via the session's `onPlayingChange` callback so the
+    /// Play/Pause button glyph stays in sync with the AVPlayer rather
+    /// than being driven by a timer Task. `togglePlayback()` /
+    /// `Space-key` flip the underlying player; the observer flips this.
     var isPlaying: Bool = false
+    /// M5-I.2: user-selected playback rate (1× / 2× / 3×). Default 1×.
+    /// Pushed into `videoSession.setRate(_:)` on change. Stored on
+    /// EditorState so the rate menu binding survives session rebuilds
+    /// (open new source → reuse the previously-selected rate).
+    var playbackRate: Double = 1.0
     /// M5-C.1: source profile selection. `.auto` resolves at probe time
     /// (matches iOS canonical detection-hint catalog) — sticky on `.builtIn`
     /// because container metadata cannot reliably distinguish the synthesized
@@ -92,11 +98,23 @@ final class EditorState {
     var currentExportTask: Task<Void, Never>?
     @ObservationIgnored
     var currentDurationProbeTask: Task<Void, Never>?
-    /// M5-D.2: playback ticker driving `videoPreviewSeconds` forward at
-    /// 24 fps while `isPlaying`. Cancelled by `stopPlayback()` /
-    /// `setSource(_:)` / end-of-video.
+    /// M5-I.2: AVPlayer-backed playback session for the currently loaded
+    /// video. Built async after `setSource(.video)` via
+    /// `currentSessionPrepareTask`; released to nil on still / no source.
+    /// The session owns the AVPlayer + AVPlayerItem and the periodic time
+    /// observer that pushes back into `videoPreviewSeconds`. NOT
+    /// `@ObservationIgnored` — `PreviewSurface` reads it to swap from the
+    /// black bridging backdrop to the AVPlayer view as soon as the session
+    /// lands, so the body must re-evaluate when the assignment changes.
+    var videoSession: FilmtoneDesktopVideoSession?
     @ObservationIgnored
-    var playbackTask: Task<Void, Never>?
+    var currentSessionPrepareTask: Task<Void, Never>?
+    /// M5-I.2: guards against the periodic time observer fighting an
+    /// active scrub drag — when the scrub bar is in `onEditingChanged
+    /// (true)` the observer's writes back into `videoPreviewSeconds`
+    /// would yank the slider thumb away from the user's finger.
+    @ObservationIgnored
+    var isScrubbing: Bool = false
 
     var presetParams: FilmtonePhase0Params {
         FilmtonePresetCatalog.resolved(
@@ -153,11 +171,15 @@ final class EditorState {
         // from the previous source.
         currentDurationProbeTask?.cancel()
         currentDurationProbeTask = nil
-        // M5-D.2: kill any in-flight playback ticker too — a new source
-        // means the old time axis is gone, so a residual Task would
-        // increment the new source's videoPreviewSeconds before duration
-        // probe completes.
-        stopPlayback()
+        // M5-I.2: tear down the previous session so its AVPlayer stops
+        // ticking and the periodic time observer is removed before the
+        // next session takes over. A residual session would race the
+        // new source's videoPreviewSeconds writes.
+        currentSessionPrepareTask?.cancel()
+        currentSessionPrepareTask = nil
+        videoSession?.teardown()
+        videoSession = nil
+        isPlaying = false
         videoPreviewSeconds = nil
         videoDurationSeconds = nil
         // M5-C.1: clear the previous probe's color class so the gate /
@@ -175,7 +197,62 @@ final class EditorState {
 
         if let url, kind == .video {
             startVideoDurationProbe(for: url)
+            startVideoSessionPrepare(for: url)
         }
+    }
+
+    /// M5-I.2: spin up the AVPlayer-backed session for `url`. Probes the
+    /// asset off-actor (FilmtoneSourceProber.probeVideo), captures track
+    /// metadata + color class, builds the session, wires its time +
+    /// playing-status observers back into EditorState, and pushes the
+    /// initial render inputs so the first composed frame matches the
+    /// editor's current preset / look / quick / overrides / profile.
+    private func startVideoSessionPrepare(for url: URL) {
+        let initialInputs = currentVideoRenderInputs(for: url)
+        currentSessionPrepareTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let session = try? await FilmtoneDesktopVideoSession.prepare(
+                sourceURL: url,
+                inputs: initialInputs
+            )
+            guard !Task.isCancelled,
+                  self.sourceURL == url,
+                  let session else {
+                return
+            }
+            self.videoSession = session
+            self.probedSourceColorClass = session.probedColorClass
+            // Apply the playback rate the user previously selected before
+            // a new source replaced the prior session.
+            session.setRate(self.playbackRate)
+            session.onTimeUpdate = { [weak self] seconds in
+                guard let self else { return }
+                if self.isScrubbing { return }
+                self.videoPreviewSeconds = seconds
+            }
+            session.onPlayingChange = { [weak self] playing in
+                self?.isPlaying = playing
+            }
+        }
+    }
+
+    /// Snapshot the current edit state into a Sendable bundle for the
+    /// composition factory. Captured at composition-build time and
+    /// closed over by the per-frame handler so each rebuild renders a
+    /// coherent set of params (no mid-frame state tear).
+    func currentVideoRenderInputs(
+        for url: URL? = nil
+    ) -> FilmtoneDesktopVideoRenderInputs {
+        FilmtoneDesktopVideoRenderInputs(
+            presetName: presetName,
+            presetStrength: presetStrength,
+            lookSlug: lookSlug,
+            sourceProfileSelection: sourceProfileSelection,
+            probedColorClass: probedSourceColorClass,
+            quickState: quickState,
+            paramOverrides: paramOverrides,
+            sourceURL: url ?? sourceURL ?? URL(fileURLWithPath: "/")
+        )
     }
 
     /// M5-A.3: probes video duration off the main actor and seeds
@@ -204,58 +281,38 @@ final class EditorState {
         currentExportTask?.cancel()
     }
 
-    // MARK: - M5-D.2 Playback ticker
+    // MARK: - M5-I.2 AVPlayer-backed playback
 
-    /// Toggle 24 fps playback driving `videoPreviewSeconds` through the
-    /// existing scrub-driven preview pipeline. Frame drops emerge
-    /// naturally from the in-flight cancellation pattern in
-    /// `PreviewSurface` — the ticker requests frames faster than the
-    /// CIKernel grade pipeline can serve, and stale requests cancel.
-    /// AVPlayer migration is a follow-up slice if this MVP is too slow.
+    /// Toggle real AVPlayer playback. Delegates to the live session's
+    /// `togglePlayback()`; `isPlaying` is then updated by the session's
+    /// `onPlayingChange` callback so this stays in lockstep with
+    /// `AVPlayer.timeControlStatus`.
     func togglePlayback() {
-        if isPlaying {
-            stopPlayback()
-        } else {
-            startPlayback()
-        }
+        videoSession?.togglePlayback()
     }
 
-    func startPlayback() {
-        guard sourceKind == .video,
-              let duration = videoDurationSeconds,
-              duration > 0,
-              videoPreviewSeconds != nil else {
-            return
-        }
-        // Cancel any prior ticker before starting a new one.
-        playbackTask?.cancel()
-        isPlaying = true
-        playbackTask = Task { @MainActor [weak self] in
-            // Nominal 24 fps; real pipeline framerate is governed by the
-            // scrub-driven decode + grade pipeline behind PreviewSurface.
-            let dt = 1.0 / 24.0
-            let stepNanos = UInt64(dt * 1_000_000_000)
-            while true {
-                try? await Task.sleep(nanoseconds: stepNanos)
-                guard !Task.isCancelled,
-                      let s = self,
-                      s.isPlaying else { return }
-                let next = (s.videoPreviewSeconds ?? 0) + dt
-                if next >= duration {
-                    s.videoPreviewSeconds = duration
-                    s.isPlaying = false
-                    s.playbackTask = nil
-                    return
-                }
-                s.videoPreviewSeconds = next
-            }
-        }
+    /// Seek the AVPlayer (used by the scrub bar). Holds `isScrubbing`
+    /// so the session's periodic time observer doesn't fight the drag.
+    func seekVideo(toSeconds seconds: Double) {
+        videoSession?.seek(toSeconds: seconds)
     }
 
-    func stopPlayback() {
-        playbackTask?.cancel()
-        playbackTask = nil
-        isPlaying = false
+    /// Update playback rate (1×/2×/3×). Stored on EditorState so the
+    /// rate menu binding is stable across session rebuilds.
+    func setPlaybackRate(_ rate: Double) {
+        playbackRate = rate
+        videoSession?.setRate(rate)
+    }
+
+    /// Push the current edit state snapshot into the live video
+    /// session's composition. Called from RootWindowView's onChange
+    /// hooks for preset / strength / look / quick / overrides /
+    /// sourceProfileSelection so a video user sees the edit roll
+    /// through to the next composed frame within the session's 100ms
+    /// debounce window.
+    func refreshVideoCompositionIfNeeded() {
+        guard let videoSession else { return }
+        videoSession.updateInputs(currentVideoRenderInputs())
     }
 
     // MARK: - M5-C.4 Export inspector

@@ -59,6 +59,9 @@
 		FT0000000000000000000A35 /* ExportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B34 /* ExportCoordinator.swift */; };
 		FT0000000000000000000A36 /* SaveLookPayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B35 /* SaveLookPayload.swift */; };
 		FT0000000000000000000A37 /* FilmtoneDesktopStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B36 /* FilmtoneDesktopStrings.swift */; };
+		FT0000000000000000000A38 /* FilmtoneDesktopVideoSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B37 /* FilmtoneDesktopVideoSession.swift */; };
+		FT0000000000000000000A39 /* FilmtoneDesktopVideoComposition.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B38 /* FilmtoneDesktopVideoComposition.swift */; };
+		FT0000000000000000000A3A /* FilmtoneDesktopPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B39 /* FilmtoneDesktopPlayerView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -113,6 +116,9 @@
 		FT0000000000000000000B34 /* ExportCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportCoordinator.swift; sourceTree = "<group>"; };
 		FT0000000000000000000B35 /* SaveLookPayload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveLookPayload.swift; sourceTree = "<group>"; };
 		FT0000000000000000000B36 /* FilmtoneDesktopStrings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneDesktopStrings.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B37 /* FilmtoneDesktopVideoSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneDesktopVideoSession.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B38 /* FilmtoneDesktopVideoComposition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneDesktopVideoComposition.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B39 /* FilmtoneDesktopPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneDesktopPlayerView.swift; sourceTree = "<group>"; };
 		FT0000000000000000000C01 /* FilmtoneDesktop.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FilmtoneDesktop.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -191,6 +197,7 @@
 				FT0000000000000000000B2E /* MetricRow.swift */,
 				FT0000000000000000000B2F /* ExportInspectorPanel.swift */,
 				FT0000000000000000000B32 /* AdvancedAdjustEditor.swift */,
+				FT0000000000000000000B39 /* FilmtoneDesktopPlayerView.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -262,6 +269,8 @@
 				FT0000000000000000000B15 /* FilmtoneVideoWriter.swift */,
 				FT0000000000000000000B1B /* FormatExtensionReader.swift */,
 				FT0000000000000000000B1C /* FilmtoneSourceProber.swift */,
+				FT0000000000000000000B37 /* FilmtoneDesktopVideoSession.swift */,
+				FT0000000000000000000B38 /* FilmtoneDesktopVideoComposition.swift */,
 			);
 			path = Media;
 			sourceTree = "<group>";
@@ -399,6 +408,9 @@
 				FT0000000000000000000A34 /* EditorState+ParamOverrides.swift in Sources */,
 				FT0000000000000000000A35 /* ExportCoordinator.swift in Sources */,
 				FT0000000000000000000A36 /* SaveLookPayload.swift in Sources */,
+				FT0000000000000000000A38 /* FilmtoneDesktopVideoSession.swift in Sources */,
+				FT0000000000000000000A39 /* FilmtoneDesktopVideoComposition.swift in Sources */,
+				FT0000000000000000000A3A /* FilmtoneDesktopPlayerView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

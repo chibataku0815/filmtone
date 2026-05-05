@@ -1,0 +1,169 @@
+import AVFoundation
+import CoreImage
+import CoreMedia
+import FilmLabSwiftCore
+import Foundation
+
+// M5-I.2 AVPlayer preview route — composition factory.
+//
+// Given an asset + its video track + a snapshot of the user-driven render
+// inputs, returns an `AVMutableVideoComposition` whose handler runs the
+// Filmtone source-profile transform and grade pipeline once per composed
+// frame. AVFoundation calls the handler on its private dispatch queue, so
+// the handler must be free of any MainActor / non-Sendable capture.
+//
+// Render size is capped to 1280 long-edge after honoring the track's
+// preferredTransform (vertical iPhone footage stays vertical), matching
+// the iOS preview cost envelope. Grade math is identical to the still
+// preview path; only the per-frame plumbing changes.
+
+struct FilmtoneDesktopVideoRenderInputs: Sendable {
+    let presetName: String
+    let presetStrength: Double
+    let lookSlug: String?
+    let sourceProfileSelection: CameraProfileSelection
+    let probedColorClass: SourceColorClassDTO?
+    let quickState: FilmtoneQuickState
+    let paramOverrides: FilmtonePhase0ParamsPatch
+    let sourceURL: URL
+}
+
+enum FilmtoneDesktopVideoComposition {
+
+    static let previewLongEdge: CGFloat = 1280
+
+    /// Build a graded video composition. Returns `nil` if the track is
+    /// unusable (zero size etc.); caller falls back to no composition
+    /// (raw playback) in that case.
+    static func make(
+        asset: AVAsset,
+        videoTrack: AVAssetTrack,
+        naturalSize: CGSize,
+        preferredTransform: CGAffineTransform,
+        nominalFrameRate: Float,
+        inputs: FilmtoneDesktopVideoRenderInputs
+    ) -> AVMutableVideoComposition? {
+        let renderSize = previewRenderSize(
+            naturalSize: naturalSize,
+            preferredTransform: preferredTransform
+        )
+        guard renderSize.width > 0, renderSize.height > 0 else { return nil }
+
+        // Resolve invariants once per composition build so the handler
+        // closure does not redo them per frame.
+        let resolvedParams = FilmtonePresetCatalog.resolved(
+            presetName: inputs.presetName,
+            strength: inputs.presetStrength,
+            lookSlug: inputs.lookSlug,
+            quickState: inputs.quickState,
+            paramOverrides: inputs.paramOverrides
+        )
+        let resolvedProfileEntry = FilmtoneSourceInputTransform.resolve(
+            selection: inputs.sourceProfileSelection,
+            probedColorClass: inputs.probedColorClass
+        )
+        let preparedCreativeLut: PreparedCreativeLut?
+        if let slug = inputs.lookSlug,
+           inputs.presetStrength > 0,
+           let look = FilmtoneCreativePackCatalog.find(slug: slug) {
+            preparedCreativeLut = FilmtoneCreativeLutLoader.load(look: look)
+        } else {
+            preparedCreativeLut = nil
+        }
+        let sourceSeed = FilmtoneGradePipeline.makeStableSourceSeed(
+            from: inputs.sourceURL.absoluteString
+        )
+
+        let renderBounds = CGRect(origin: .zero, size: renderSize)
+        let composition = AVMutableVideoComposition(
+            asset: asset,
+            applyingCIFiltersWithHandler: { request in
+                let timeSeconds = CMTimeGetSeconds(request.compositionTime)
+                // AVVideoComposition provides `sourceImage` in presentation
+                // orientation, but its extent may still be the asset's source
+                // pixel extent. Normalize it onto this composition's
+                // `renderSize` before grading, matching the iOS live-preview
+                // route. Returning source-sized frames into a 1280-capped
+                // render canvas causes visible cropping / incomplete framing.
+                let base = scaledPreviewSourceImage(
+                    request.sourceImage,
+                    outputSize: renderSize
+                )
+                let normalized = FilmtoneSourceInputTransform.apply(
+                    to: base,
+                    entry: resolvedProfileEntry
+                )
+                let graded = FilmtoneGradePipeline.apply(
+                    to: normalized,
+                    params: resolvedParams,
+                    frameTimeSeconds: timeSeconds.isFinite ? timeSeconds : 0,
+                    sourceSeed: sourceSeed,
+                    creativeLut: preparedCreativeLut
+                )
+                // Halation / bloom mip pyramids can grow extent beyond the
+                // composition canvas. Crop back to renderBounds so
+                // AVFoundation receives exactly the requested preview frame.
+                let cropped = graded.cropped(to: renderBounds)
+                request.finish(with: cropped, context: FilmtoneCIContext.shared)
+            }
+        )
+
+        composition.renderSize = renderSize
+
+        // AVFoundation requires a positive frameDuration. Source nominal
+        // rate is preferred; fall back to 30 fps if AVAssetTrack reports
+        // zero (some odd containers / image sequences).
+        let fps = nominalFrameRate > 0 ? nominalFrameRate : 30
+        composition.frameDuration = CMTime(
+            value: 1,
+            timescale: CMTimeScale(fps.rounded())
+        )
+
+        return composition
+    }
+
+    /// Apply the track's preferredTransform to the natural size, then
+    /// scale the result so the long edge equals `previewLongEdge`. This
+    /// keeps vertical iPhone footage vertical while honoring the cost
+    /// envelope the grade pipeline (halation 6-mip pyramid + grain) was
+    /// tuned against on iOS.
+    static func previewRenderSize(
+        naturalSize: CGSize,
+        preferredTransform: CGAffineTransform
+    ) -> CGSize {
+        let oriented = naturalSize.applying(preferredTransform)
+        let displayWidth = abs(oriented.width)
+        let displayHeight = abs(oriented.height)
+        guard displayWidth > 0, displayHeight > 0 else { return .zero }
+
+        let longEdge = max(displayWidth, displayHeight)
+        guard longEdge > previewLongEdge else {
+            return CGSize(
+                width: max(1, displayWidth.rounded()),
+                height: max(1, displayHeight.rounded())
+            )
+        }
+        let scale = previewLongEdge / longEdge
+        return CGSize(
+            width: max(1, (displayWidth * scale).rounded()),
+            height: max(1, (displayHeight * scale).rounded())
+        )
+    }
+
+    /// Mirrors iOS `scaledPreviewVideoSourceImage`: AVVideoComposition has
+    /// already applied presentation orientation, so only normalize origin,
+    /// scale into the preview canvas, and crop to the exact render bounds.
+    static func scaledPreviewSourceImage(_ image: CIImage, outputSize: CGSize) -> CIImage {
+        let normalized = image.transformed(by: CGAffineTransform(
+            translationX: -image.extent.origin.x,
+            y: -image.extent.origin.y
+        ))
+        let width = max(normalized.extent.width, 1)
+        let height = max(normalized.extent.height, 1)
+        let scaleX = outputSize.width / width
+        let scaleY = outputSize.height / height
+        return normalized
+            .transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
+            .cropped(to: CGRect(origin: .zero, size: outputSize))
+    }
+}

@@ -673,6 +673,38 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
   `archive/2026-05-05-m5-h1-chrome-preview-layout.md` /
   `archive/2026-05-05-m5-h2-adjust-library-parity.md` /
   `archive/2026-05-05-m5-h3-dual-lut-spike.md`。
+- 2026-05-05: **M5-I.2 AVPlayer Preview Route landed** — promoted from
+  v1.5 lane to current blocker after user reported continued stutter on
+  the M5-D.2 timer-driven MVP. Added `Media/FilmtoneDesktopVideoSession.swift`
+  (@MainActor; owns one AVPlayer + graded AVPlayerItem; periodic 30Hz
+  time observer drives `videoPreviewSeconds`; debounced 100ms composition
+  refresh + same-time re-seek; play / pause / seek / 1×–4× rate API),
+  `Media/FilmtoneDesktopVideoComposition.swift` (factory builds
+  `AVMutableVideoComposition.applyingCIFiltersWithHandler` running
+  `FilmtoneSourceInputTransform` + `FilmtoneGradePipeline` at
+  1280-long-edge `renderSize`, honoring track `preferredTransform` so
+  vertical iPhone footage stays vertical), and `UI/FilmtoneDesktopPlayerView.swift`
+  (`NSViewRepresentable` over `AVPlayerView` with `controlsStyle = .none`
+  / `videoGravity = .resizeAspect`). EditorState dropped the 24fps
+  `playbackTask` ticker entirely and now delegates `togglePlayback` /
+  `seekVideo` / `setPlaybackRate` to the session; `setSource(.video)`
+  spins up the session asynchronously and writes `probedSourceColorClass`
+  from the session probe (no longer per-frame in `PreviewSurface`).
+  `PreviewSurface` branches to the player view when the session lands;
+  the still path is unchanged. `RootWindowView`'s `VideoScrubBar`
+  drives `player.seek(to:)` directly and gains a 1×/2×/3× rate menu;
+  param changes flow through one `VideoCompositionRefreshKey`-driven
+  `.onChange` (the chain of 7 individual `.onChange` modifiers tripped
+  the SwiftUI body type-checker). Audio works because AVPlayer routes
+  it natively. Build (`bun run verify:macos`) PASS, Verify 56/56 ✅,
+  `git diff --check` clean. Two macOS 26.0 deprecation **warnings** on
+  the synchronous `AVMutableVideoComposition` initializer remain — the
+  async `AVVideoComposition.videoComposition(with:applyingCIFilters
+  WithHandler:)` migration is a follow-up slice (M5-I.3 candidate).
+  Visual smoke (1080p / 4K iPhone footage smooth playback + audio +
+  rate menu + scrub-during-playback + edit-while-playing) is
+  user-driven. Archived as
+  `archive/2026-05-05-m5-i2-avplayer-preview-route.md`.
 - 2026-05-05: **M5-D.2 AVPlayer playback spike** integrated (3 doc-only
   commits: ec89bfc3 + abcfd4f5 + 4e6ff041、cherry-pick efca41a7..86ab8436)。
   M5-D.2 MVP の Timer-driven 再生で frame-drop が natural に出る前提を

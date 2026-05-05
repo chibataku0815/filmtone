@@ -1,5 +1,6 @@
 import AppKit
 import AVFoundation
+import FilmLabSwiftCore
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -135,6 +136,17 @@ struct RootWindowView: View {
         // loaded. Bumping to 1080×720 keeps the rail visible at minimum
         // size; .defaultSize on WindowGroup opens at a roomier 1280×800.
         .frame(minWidth: 1080, minHeight: 720)
+        // M5-I.2: any edit that changes a render input must rebuild the
+        // graded `AVMutableVideoComposition` so the next composed frame
+        // reflects the user's intent. Collapsing the 7 individual
+        // `.onChange(of:)` modifiers into one Hashable refresh key keeps
+        // the SwiftUI body type-checker tractable (the long modifier
+        // chain previously tripped "expression too complex"); the
+        // session itself debounces 100ms to absorb rapid Slider drags.
+        // No-op for stills (videoSession is nil).
+        .onChange(of: VideoCompositionRefreshKey(state: state)) { _, _ in
+            state.refreshVideoCompositionIfNeeded()
+        }
         // M5-C.2a: load the on-disk library so the Picker lists saved
         // Looks at first paint. Built-in Stone / Urban appear immediately
         // via the empty-snapshot prefix path; user-saved entries fade in
@@ -236,11 +248,13 @@ struct RootWindowView: View {
 
 }
 
-/// M5-A.3: scrub bar for video preview. Continuous binding to
-/// `state.videoPreviewSeconds`; coalescing of rapid drag events happens
-/// downstream in `PreviewSurface` via in-flight Task cancellation.
-/// M5-D.2: gains a Play/Pause button + Space-key shortcut. Manual scrub
-/// drag pauses playback via `onEditingChanged`.
+/// M5-A.3 / M5-D.2 / M5-I.2: scrub bar for video preview. The Slider
+/// drives `AVPlayer.seek(to:)` directly; the periodic time observer in
+/// `FilmtoneDesktopVideoSession` pushes player time back into
+/// `state.videoPreviewSeconds` so the thumb follows playback. Manual
+/// drag flips `state.isScrubbing` so the observer doesn't yank the
+/// thumb mid-drag, and pauses playback for the duration of the drag.
+/// Adds a 1×/2×/3× rate menu (M5-I.2 acceptance).
 private struct VideoScrubBar: View {
     @Bindable var state: EditorState
     let duration: Double
@@ -248,7 +262,11 @@ private struct VideoScrubBar: View {
     private var seconds: Binding<Double> {
         Binding(
             get: { state.videoPreviewSeconds ?? 0 },
-            set: { state.videoPreviewSeconds = max(0, min($0, duration)) }
+            set: { newValue in
+                let clamped = max(0, min(newValue, duration))
+                state.videoPreviewSeconds = clamped
+                state.seekVideo(toSeconds: clamped)
+            }
         )
     }
 
@@ -272,17 +290,24 @@ private struct VideoScrubBar: View {
                 value: seconds,
                 in: 0...max(duration, 0.001),
                 onEditingChanged: { editing in
-                    // Pause playback the moment the user grabs the scrub
-                    // thumb so the ticker doesn't fight the drag.
-                    if editing { state.stopPlayback() }
+                    // Drag start: hold the periodic time observer off so
+                    // it doesn't fight the user's finger; pause playback
+                    // so AVPlayer doesn't keep advancing under the seek.
+                    // Drag end: clear the flag and let the observer
+                    // resume time updates. Resume must be explicit Play.
+                    state.isScrubbing = editing
+                    if editing {
+                        state.videoSession?.pause()
+                    }
                 }
             )
             Text(format(duration))
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
                 .frame(minWidth: 64, alignment: .trailing)
+            PlaybackRateMenu(state: state)
         }
-        .frame(maxWidth: 560)
+        .frame(maxWidth: 600)
     }
 
     private func format(_ value: Double) -> String {
@@ -291,6 +316,78 @@ private struct VideoScrubBar: View {
         let minutes = Int(total / 60)
         let secondsRemainder = total - Double(minutes * 60)
         return String(format: "%d:%05.2f", minutes, secondsRemainder)
+    }
+}
+
+/// M5-I.2: snapshot of EditorState fields that, when any change, mean
+/// the graded `AVMutableVideoComposition` must be rebuilt. Collapses
+/// what would otherwise be 7 chained `.onChange(of:)` modifiers (which
+/// trip the SwiftUI body type-checker on `RootWindowView`) into one
+/// Equatable value the body can watch.
+private struct VideoCompositionRefreshKey: Equatable {
+    let presetName: String
+    let presetStrength: Double
+    let lookSlug: String?
+    let sourceProfileSelection: CameraProfileSelection
+    let probedSourceColorClass: SourceColorClassDTO?
+    let quickState: FilmtoneQuickState
+    let paramOverrides: FilmtonePhase0ParamsPatch
+
+    @MainActor
+    init(state: EditorState) {
+        self.presetName = state.presetName
+        self.presetStrength = state.presetStrength
+        self.lookSlug = state.lookSlug
+        self.sourceProfileSelection = state.sourceProfileSelection
+        self.probedSourceColorClass = state.probedSourceColorClass
+        self.quickState = state.quickState
+        self.paramOverrides = state.paramOverrides
+    }
+}
+
+/// M5-I.2: 1× / 2× / 3× playback rate selector. Sits on the right of
+/// the scrub bar; matches the dark Liquid Glass posture of the
+/// surrounding capsule via `.colorScheme(.dark)` so the AppKit-bridged
+/// menu chrome inherits white-on-dark.
+private struct PlaybackRateMenu: View {
+    @Bindable var state: EditorState
+
+    private static let options: [Double] = [1.0, 2.0, 3.0]
+
+    var body: some View {
+        Menu {
+            ForEach(Self.options, id: \.self) { rate in
+                Button {
+                    state.setPlaybackRate(rate)
+                } label: {
+                    HStack {
+                        Text("\(Self.label(for: rate))")
+                        if abs(rate - state.playbackRate) < 0.01 {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            Text(Self.label(for: state.playbackRate))
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.white)
+                .frame(minWidth: 28)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .controlSize(.small)
+        .colorScheme(.dark)
+        .help("Playback rate")
+    }
+
+    private static func label(for rate: Double) -> String {
+        // Integer rates render as "1×", "2×"; fractional rates fall back
+        // to one decimal so future additions like 0.5× display sanely.
+        if abs(rate.rounded() - rate) < 0.01 {
+            return "\(Int(rate))×"
+        }
+        return String(format: "%.1f×", rate)
     }
 }
 

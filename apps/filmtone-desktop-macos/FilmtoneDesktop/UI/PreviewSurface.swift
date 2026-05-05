@@ -60,7 +60,20 @@ struct PreviewSurface: View {
             } else {
                 Color.black
                     .backgroundExtensionEffect()
-                if let renderedImage, renderedSourceURL == sourceURL {
+                // M5-I.2: video sources mount the AVPlayer view as soon as
+                // `state.videoSession` lands. The session probes the asset
+                // off-actor, builds the graded `AVMutableVideoComposition`,
+                // and AVFoundation now owns the per-frame decode + grade
+                // loop on its private dispatch queue. The brief window
+                // between `setSource(.video)` and session readiness shows
+                // only the black backdrop above (no `Image(nsImage:)`
+                // bridging frame — random-seek extraction is exactly the
+                // path this slice removes).
+                if sourceKind == .video, let session = state.videoSession {
+                    FilmtoneDesktopPlayerView(player: session.player)
+                } else if sourceKind == .still,
+                          let renderedImage,
+                          renderedSourceURL == sourceURL {
                     // M5-H.1: switched from `.scaledToFill().clipped()` to
                     // `.scaledToFit()` so source aspect ratio is preserved
                     // end to end (vertical phone footage no longer gets
@@ -75,13 +88,18 @@ struct PreviewSurface: View {
                 }
             }
         }
+        // M5-I.2: video sources no longer need the still render path or the
+        // per-tick scrub re-extract — the AVPlayer composition handler is
+        // the live preview. Only still sources rerun `renderCurrent()` on
+        // edit changes, so the task key drops `videoPreviewSeconds` for
+        // video and the renderer early-returns on `.video`.
         .task(id: PreviewRenderKey(
             sourceURL: sourceURL,
             sourceKind: sourceKind,
             presetName: presetName,
             presetStrength: presetStrength,
             lookSlug: lookSlug,
-            videoPreviewSeconds: videoPreviewSeconds,
+            videoPreviewSeconds: sourceKind == .video ? nil : videoPreviewSeconds,
             sourceProfileSelection: sourceProfileSelection,
             quickState: quickState,
             paramOverrides: paramOverrides
@@ -99,38 +117,26 @@ struct PreviewSurface: View {
             state.probedSourceColorClass = nil
             return
         }
+        // M5-I.2: video preview is owned by FilmtoneDesktopVideoSession
+        // (AVPlayer + AVMutableVideoComposition). The session probes the
+        // asset and pushes `probedColorClass` back into EditorState
+        // itself, so this path stays still-only — short-circuit before
+        // any AVAssetImageGenerator extraction runs.
+        if sourceKind == .video {
+            renderedImage = nil
+            renderedSourceURL = nil
+            return
+        }
         let preset = presetName
         let strength = presetStrength
         let slug = lookSlug
-        let scrubSeconds = videoPreviewSeconds
         let profileSelection = sourceProfileSelection
         let quick = quickState
         let overrides = paramOverrides
 
-        let source: CIImage?
-        let probedColorClass: SourceColorClassDTO?
-        switch sourceKind {
-        case .still:
-            source = CIImage(contentsOf: sourceURL)
-            probedColorClass = FilmtoneSourceProber.probeStill(sourceURL: sourceURL).colorClass
-        case .video:
-            // M5-C.1: probe video color class for the Picker resolved-Auto
-            // label and the source-cap gate. Errors are swallowed (probe
-            // failure → nil colorClass → identity transform; preview
-            // proceeds with the legacy code path).
-            let probedClass = (try? await FilmtoneSourceProber.probeVideo(sourceURL: sourceURL))?.colorClass
-            probedColorClass = probedClass
-            if let scrubSeconds {
-                source = (try? await FilmtoneVideoFramePreviewLoader.loadFrame(
-                    from: sourceURL,
-                    atSeconds: scrubSeconds
-                ))?.image
-            } else {
-                source = (try? await FilmtoneVideoFramePreviewLoader.loadMidpointFrame(
-                    from: sourceURL
-                ))?.image
-            }
-        }
+        let source: CIImage? = CIImage(contentsOf: sourceURL)
+        let probedColorClass: SourceColorClassDTO? =
+            FilmtoneSourceProber.probeStill(sourceURL: sourceURL).colorClass
         guard !Task.isCancelled else { return }
         state.probedSourceColorClass = probedColorClass
 
