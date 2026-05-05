@@ -45,3 +45,16 @@ Before App Store Connect upload, run one final human GUI smoke on the exported o
 installed MAS-style build: open one still, one landscape video, and one portrait
 iPhone video, then export each to a chosen non-container folder and confirm media
 plus sidecar JSON are present.
+
+## Release Attempt Log
+
+2026-05-05:
+
+- Rebuilt the MAS package from `main`:
+  `apps/filmtone-desktop-macos/build/app-store/1.4/export/Filmtone.pkg`
+- Confirmed Developer Portal Bundle ID exists:
+  `com.chibatakumi.film-lab-desktop`
+- App Store Connect validation is blocked because no macOS app record currently
+  resolves for `com.chibatakumi.film-lab-desktop` / `MAC_OS`.
+- Exact validation error:
+  `Cannot determine the Apple ID from Bundle ID 'com.chibatakumi.film-lab-desktop' and platform 'MAC_OS'.`
