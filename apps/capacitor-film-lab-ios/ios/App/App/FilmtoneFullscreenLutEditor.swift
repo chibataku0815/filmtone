@@ -1,5 +1,6 @@
 import AVFoundation
 import AVKit
+import FilmLabSwiftCore
 import SwiftUI
 import UIKit
 
@@ -509,6 +510,8 @@ struct FilmtoneFullscreenLutEditor: View {
                 if store.videoPreviewState != nil {
                     videoScrubberPill
                         .padding(.horizontal, 12)
+                    highlightMarkerStrip
+                        .padding(.horizontal, 12)
                         .padding(.bottom, 10)
                 }
 
@@ -781,13 +784,7 @@ struct FilmtoneFullscreenLutEditor: View {
                 .font(.caption.monospacedDigit())
                 .frame(width: 42, alignment: .leading)
 
-            Slider(
-                value: bind,
-                in: 0...upper,
-                onEditingChanged: { editing in
-                    videoController.isScrubbing = editing
-                }
-            )
+            markerSlider(value: bind, upper: upper)
 
             Text(fullscreenFormatRemaining(videoController.currentTime, videoController.duration))
                 .font(.caption.monospacedDigit())
@@ -797,6 +794,195 @@ struct FilmtoneFullscreenLutEditor: View {
         .padding(.vertical, 10)
         .liquidGlassSurface(in: Capsule(), interactive: true)
         .accessibilityIdentifier("filmtone.fullscreen.video.scrubber")
+    }
+
+    private func markerSlider(value: Binding<Double>, upper: Double) -> some View {
+        GeometryReader { proxy in
+            ZStack {
+                Slider(
+                    value: value,
+                    in: 0...upper,
+                    onEditingChanged: { editing in
+                        videoController.isScrubbing = editing
+                    }
+                )
+
+                highlightMarkerRail(width: proxy.size.width)
+            }
+        }
+        .frame(height: 32)
+    }
+
+    private func highlightMarkerRail(width: CGFloat) -> some View {
+        ZStack(alignment: .leading) {
+            ForEach(store.highlightMarkerList, id: \.id) { marker in
+                let x = markerCenterX(for: marker.sourceTimeSec, width: width)
+                VStack(spacing: 1) {
+                    Image(systemName: "bookmark.fill")
+                        .font(.system(size: 8, weight: .bold))
+                        .symbolRenderingMode(.monochrome)
+                    Capsule()
+                        .frame(width: 2, height: 10)
+                }
+                .foregroundStyle(Color.yellow)
+                .shadow(color: Color.black.opacity(0.55), radius: 2, x: 0, y: 1)
+                .frame(width: 18, height: 28)
+                .offset(x: x - 9)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private func markerCenterX(for sourceTimeSec: Double, width: CGFloat) -> CGFloat {
+        guard videoController.duration.isFinite,
+              videoController.duration > 0,
+              sourceTimeSec.isFinite else {
+            return 0
+        }
+        let knob: CGFloat = 28
+        let usable = max(width - knob, 1)
+        let ratio = min(1.0, max(0.0, sourceTimeSec / videoController.duration))
+        return knob / 2 + CGFloat(ratio) * usable
+    }
+
+    @ViewBuilder
+    private var highlightMarkerStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                markerStripControls
+
+                ForEach(store.highlightMarkerList, id: \.id) { marker in
+                    HStack(spacing: 4) {
+                        Button {
+                            jumpToHighlightMarker(marker)
+                        } label: {
+                            HStack(spacing: 5) {
+                                Image(systemName: "bookmark.fill")
+                                Text(verbatim: fullscreenFormatTime(marker.sourceTimeSec))
+                                    .font(.caption.monospacedDigit().weight(.semibold))
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(Text(verbatim: "Jump to highlight marker"))
+
+                        Button {
+                            store.removeHighlightMarker(id: marker.id)
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.caption2.weight(.bold))
+                                .frame(width: 18, height: 18)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(Text(verbatim: "Delete highlight marker"))
+                    }
+                    .padding(.leading, 10)
+                    .padding(.trailing, 6)
+                    .padding(.vertical, 7)
+                    .liquidGlassSurface(in: Capsule(), interactive: true)
+                }
+            }
+            .padding(.horizontal, 2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier("filmtone.fullscreen.video.marker.strip")
+    }
+
+    private var markerStripControls: some View {
+        HStack(spacing: 6) {
+            markerStripControlButton(
+                systemName: "bookmark.fill",
+                isProminent: isAtExistingHighlightMarker
+            ) {
+                store.addHighlightMarker(at: videoController.currentTime)
+            }
+            .keyboardShortcut("m", modifiers: [])
+            .accessibilityLabel(Text(verbatim: "Add highlight marker"))
+            .accessibilityIdentifier("filmtone.fullscreen.video.marker.add")
+
+            markerStripControlButton(
+                systemName: "arrow.left.circle.fill",
+                isDisabled: store.highlightMarkerList.isEmpty
+            ) {
+                jumpToPreviousHighlightMarker()
+            }
+            .keyboardShortcut("j", modifiers: .shift)
+            .accessibilityLabel(Text(verbatim: "Jump to previous highlight marker"))
+            .accessibilityIdentifier("filmtone.fullscreen.video.marker.previous")
+
+            markerStripControlButton(
+                systemName: "arrow.right.circle.fill",
+                isDisabled: store.highlightMarkerList.isEmpty
+            ) {
+                jumpToNextHighlightMarker()
+            }
+            .keyboardShortcut("j", modifiers: [])
+            .accessibilityLabel(Text(verbatim: "Jump to next highlight marker"))
+            .accessibilityIdentifier("filmtone.fullscreen.video.marker.next")
+        }
+        .padding(.vertical, 1)
+    }
+
+    private var isAtExistingHighlightMarker: Bool {
+        store.highlightMarkerList.contains {
+            abs($0.sourceTimeSec - videoController.currentTime) <= FilmtoneHighlightMarker.duplicateToleranceSec
+        }
+    }
+
+    private func markerStripControlButton(
+        systemName: String,
+        isProminent: Bool = false,
+        isDisabled: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 14, weight: .semibold))
+                .symbolRenderingMode(.monochrome)
+                .foregroundStyle(isProminent ? Color.yellow : Color.primary)
+                .frame(width: 30, height: 30)
+        }
+        .buttonStyle(.plain)
+        .disabled(isDisabled)
+        .opacity(isDisabled ? 0.42 : 1)
+        .contentShape(Circle())
+        .liquidGlassSurface(
+            in: Circle(),
+            tint: isProminent ? Color.yellow.opacity(0.22) : nil,
+            interactive: !isDisabled
+        )
+    }
+
+    private func jumpToHighlightMarker(_ marker: FilmtoneHighlightMarker) {
+        let target = max(0, min(marker.sourceTimeSec, max(videoController.duration, marker.sourceTimeSec)))
+        videoController.currentTime = target
+        videoController.seek(to: target)
+    }
+
+    private func jumpToNextHighlightMarker() {
+        let markers = sortedHighlightMarkerList()
+        guard !markers.isEmpty else { return }
+        let nextThreshold = videoController.currentTime + 0.01
+        let target = markers.first { $0.sourceTimeSec > nextThreshold } ?? markers[0]
+        jumpToHighlightMarker(target)
+    }
+
+    private func jumpToPreviousHighlightMarker() {
+        let markers = sortedHighlightMarkerList()
+        guard let lastMarker = markers.last else { return }
+        let previousThreshold = videoController.currentTime - 0.01
+        let target = markers.last { $0.sourceTimeSec < previousThreshold } ?? lastMarker
+        jumpToHighlightMarker(target)
+    }
+
+    private func sortedHighlightMarkerList() -> [FilmtoneHighlightMarker] {
+        store.highlightMarkerList.sorted {
+            if $0.sourceTimeSec == $1.sourceTimeSec {
+                return $0.id < $1.id
+            }
+            return $0.sourceTimeSec < $1.sourceTimeSec
+        }
     }
 
     // MARK: Bottom dock — chips + sliders, no card-in-card.

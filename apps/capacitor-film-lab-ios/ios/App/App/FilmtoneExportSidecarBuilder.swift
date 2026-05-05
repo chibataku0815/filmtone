@@ -1,5 +1,6 @@
 import Foundation
 import CoreGraphics
+import FilmLabSwiftCore
 
 // MARK: - Builder inputs
 
@@ -75,6 +76,10 @@ struct SidecarBuildInputs {
     /// v1.5 additive export bottleneck telemetry. nil preserves the previous
     /// sidecar shape for legacy/unit-test call sites.
     var performance: SidecarPerformance? = nil
+    /// Source-relative highlight markers shared by iOS, Desktop, and DaVinci.
+    /// nil preserves the previous sidecar shape; an empty marker list should
+    /// be omitted by callers.
+    var highlightMarkers: FilmtoneHighlightMarkers? = nil
 }
 
 // MARK: - Sidecar schema (filmtone-ios-export-session-v1)
@@ -121,6 +126,9 @@ struct FilmtoneExportSidecarV1: Encodable {
     let cameraProfile: SidecarCameraProfile?
     /// v1.5 additive wall-clock stage totals used to identify export bottlenecks.
     let performance: SidecarPerformance?
+    /// Source-relative marker intent for DaVinci / Desktop round-trip. Additive
+    /// optional V1 field; absence means no marker intent.
+    let highlightMarkers: FilmtoneHighlightMarkers?
 }
 
 struct SidecarDevice: Encodable {
@@ -582,7 +590,8 @@ enum FilmtoneExportSidecarBuilder {
             depth: depth,
             savedLook: inputs.appliedSavedLook,
             cameraProfile: inputs.cameraProfile,
-            performance: inputs.performance
+            performance: inputs.performance,
+            highlightMarkers: inputs.highlightMarkers
         )
     }
 

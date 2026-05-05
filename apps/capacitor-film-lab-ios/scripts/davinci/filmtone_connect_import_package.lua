@@ -20,6 +20,8 @@ local DEFAULT_LUT_FILENAME = "combined-color.cube"
 local DEFAULT_DCTL_FILENAME = "filmtone-bridge.dctl"
 local DEFAULT_REFERENCE_FILENAME = "reference-after.jpg"
 local CONNECT_PACKAGE_V2 = "filmtone-connect-package-v2"
+local HIGHLIGHT_MARKER_SCHEMA = "filmtone-highlight-markers-v1"
+local HIGHLIGHT_MARKER_CUSTOM_DATA_PREFIX = "filmtone-highlight-marker:"
 
 local function log(message)
     print("[Filmtone Connect] " .. tostring(message))
@@ -110,6 +112,29 @@ local function first_table_value(values)
         return value
     end
     return nil
+end
+
+local function table_values(values)
+    local result = {}
+    if type(values) ~= "table" then
+        return result
+    end
+    for _, value in pairs(values) do
+        if value ~= nil then
+            result[#result + 1] = value
+        end
+    end
+    return result
+end
+
+local function table_has_any_value(values)
+    if type(values) ~= "table" then
+        return false
+    end
+    for _, _ in pairs(values) do
+        return true
+    end
+    return false
 end
 
 local function parse_args()
@@ -519,6 +544,163 @@ local function fmt_value(value, fallback)
     return tostring(value)
 end
 
+local function numeric_value(value)
+    if type(value) == "number" then
+        return value
+    end
+    if type(value) == "string" then
+        return tonumber(value)
+    end
+    return nil
+end
+
+local function rounded_frame(value)
+    value = numeric_value(value)
+    if value == nil then
+        return nil
+    end
+    if value >= 0 then
+        return math.floor(value + 0.5)
+    end
+    return math.ceil(value - 0.5)
+end
+
+local function clamp_min(value, minimum)
+    value = numeric_value(value)
+    if value == nil then
+        return minimum
+    end
+    if value < minimum then
+        return minimum
+    end
+    return value
+end
+
+local function highlight_marker_block(sidecar)
+    local block = sidecar and sidecar.highlightMarkers
+    if type(block) ~= "table" then
+        return nil
+    end
+    if block.schema ~= HIGHLIGHT_MARKER_SCHEMA then
+        log("ignoring unsupported highlightMarkers schema: " .. fmt_value(block.schema, "missing"))
+        return nil
+    end
+    return block
+end
+
+local function highlight_markers(package)
+    local block = highlight_marker_block(package.sidecar)
+    if type(block) ~= "table" or type(block.markers) ~= "table" then
+        return {}
+    end
+    return block.markers
+end
+
+local function highlight_marker_count(package)
+    local count = 0
+    for _, marker in ipairs(highlight_markers(package)) do
+        if type(marker) == "table" and marker.id ~= nil then
+            count = count + 1
+        end
+    end
+    return count
+end
+
+local function marker_fps(marker, package)
+    local block = highlight_marker_block(package.sidecar) or {}
+    local source_identity = block.sourceIdentity or {}
+    local output = package.sidecar.output or {}
+    return numeric_value(marker.sourceFps)
+        or numeric_value(source_identity.fps)
+        or numeric_value(output.fps)
+        or 30
+end
+
+local function marker_source_frame(marker, package)
+    local explicit_frame = rounded_frame(marker.sourceFrame)
+    if explicit_frame ~= nil then
+        return explicit_frame
+    end
+    local source_time = numeric_value(marker.sourceTimeSec)
+    if source_time == nil then
+        return nil
+    end
+    return rounded_frame(source_time * marker_fps(marker, package))
+end
+
+local function marker_handle_frames(marker, package)
+    local fps = marker_fps(marker, package)
+    local pre_roll = clamp_min(marker.preRollSec, 0)
+    local post_roll = clamp_min(marker.postRollSec, 0)
+    local pre_frames = rounded_frame(pre_roll * fps) or 0
+    local post_frames = rounded_frame(post_roll * fps) or 0
+    return pre_frames, post_frames, fps
+end
+
+local function marker_custom_data(marker)
+    return HIGHLIGHT_MARKER_CUSTOM_DATA_PREFIX .. tostring(marker.id)
+end
+
+local function marker_display_name(marker)
+    local name = trim(marker.name)
+    if name and name ~= "" then
+        return name
+    end
+    return "Highlight"
+end
+
+local function marker_color(marker)
+    local color = trim(marker.color)
+    if color and color ~= "" then
+        return color
+    end
+    return "Blue"
+end
+
+local function marker_note(marker, package)
+    local source_frame = marker_source_frame(marker, package)
+    local pre_frames, post_frames, fps = marker_handle_frames(marker, package)
+    local lines = {
+        "Filmtone highlight marker",
+        "ID: " .. tostring(marker.id),
+        "Source time: " .. fmt_value(marker.sourceTimeSec, "unknown") .. "s",
+        "Source frame: " .. fmt_value(source_frame, "unknown") .. " @ " .. fmt_value(fps, "unknown") .. "fps",
+        "Handles: -" .. fmt_value(marker.preRollSec, "0") .. "s/+" .. fmt_value(marker.postRollSec, "0") .. "s"
+            .. " (" .. tostring(pre_frames) .. "/" .. tostring(post_frames) .. " frames)",
+    }
+    if marker.createdOnPlatform then
+        lines[#lines + 1] = "Created by: " .. tostring(marker.createdOnPlatform)
+    end
+    return table.concat(lines, "\n")
+end
+
+local function highlight_rough_cut_ranges(package)
+    local ranges = {}
+    for _, marker in ipairs(highlight_markers(package)) do
+        if type(marker) == "table" and marker.id ~= nil then
+            local center_frame = marker_source_frame(marker, package)
+            if center_frame ~= nil then
+                local pre_frames, post_frames = marker_handle_frames(marker, package)
+                local start_frame = center_frame - pre_frames
+                if start_frame < 0 then
+                    start_frame = 0
+                end
+                local end_frame = center_frame + post_frames
+                if end_frame <= start_frame then
+                    end_frame = start_frame + 1
+                end
+                ranges[#ranges + 1] = {
+                    marker = marker,
+                    start_frame = start_frame,
+                    end_frame = end_frame,
+                    center_frame = center_frame,
+                }
+            end
+        end
+    end
+    return ranges
+end
+
 local function active_amount(params, key)
     if type(params) ~= "table" or type(params[key]) ~= "number" then
         return nil
@@ -606,6 +788,7 @@ local function build_note(package)
         "DCTL: " .. fmt_value(package.dctl_path, "none"),
         build_bridge_coverage_summary(package),
         "Baked effects: " .. build_effect_summary(sidecar),
+        "Highlight markers: " .. tostring(highlight_marker_count(package)),
         "Depth: used=" .. fmt_value(depth.used, "unknown")
             .. ", source=" .. fmt_value(depth.source, "none")
             .. ", renderer=" .. fmt_value(depth.renderer, "none")
@@ -699,6 +882,184 @@ local function add_filmtone_marker(timeline_item, media_pool_item, note, sidecar
     end
     log("could not add marker; printing note instead\n" .. note)
     return false
+end
+
+local function marker_exists_by_custom_data(target, custom_data)
+    if type(target) ~= "userdata" and type(target) ~= "table" then
+        return false
+    end
+    local ok, marker = pcall(function()
+        return target:GetMarkerByCustomData(custom_data)
+    end)
+    if not ok then
+        return false
+    end
+    return table_has_any_value(marker)
+end
+
+local function delete_markers_by_custom_data(target, custom_data)
+    if type(target) ~= "userdata" and type(target) ~= "table" then
+        return 0
+    end
+    local deleted = 0
+    for _ = 1, 20 do
+        if not marker_exists_by_custom_data(target, custom_data) then
+            break
+        end
+        local ok, did_delete = pcall(function()
+            return target:DeleteMarkerByCustomData(custom_data)
+        end)
+        if not ok or not did_delete then
+            break
+        end
+        deleted = deleted + 1
+    end
+    return deleted
+end
+
+local function delete_existing_highlight_markers(project, timeline_item, media_pool_item, custom_data)
+    local deleted = 0
+    local seen = {}
+    local function delete_target(target)
+        if (type(target) ~= "userdata" and type(target) ~= "table") or seen[target] then
+            return
+        end
+        seen[target] = true
+        deleted = deleted + delete_markers_by_custom_data(target, custom_data)
+    end
+
+    delete_target(timeline_item)
+    delete_target(media_pool_item)
+
+    local timeline_count = project and project.GetTimelineCount and project:GetTimelineCount() or 0
+    for timeline_index = 1, timeline_count do
+        local timeline = project.GetTimelineByIndex and project:GetTimelineByIndex(timeline_index) or nil
+        delete_target(timeline)
+        local video_track_count = timeline and timeline.GetTrackCount and timeline:GetTrackCount("video") or 0
+        for track_index = 1, video_track_count do
+            local items = timeline.GetItemListInTrack and timeline:GetItemListInTrack("video", track_index) or {}
+            for _, item in ipairs(table_values(items)) do
+                delete_target(item)
+            end
+        end
+    end
+
+    return deleted
+end
+
+local function add_highlight_markers(project, timeline_item, media_pool_item, package)
+    local added = 0
+    local refreshed = 0
+    local skipped = 0
+    for _, marker in ipairs(highlight_markers(package)) do
+        if type(marker) ~= "table" or marker.id == nil then
+            skipped = skipped + 1
+        else
+            local frame_id = marker_source_frame(marker, package)
+            if frame_id == nil then
+                skipped = skipped + 1
+            else
+                local pre_frames, post_frames = marker_handle_frames(marker, package)
+                local duration = pre_frames + post_frames
+                if duration < 1 then
+                    duration = 1
+                end
+                local custom_data = marker_custom_data(marker)
+                local deleted = delete_existing_highlight_markers(project, timeline_item, media_pool_item, custom_data)
+                local ok = false
+                if timeline_item and timeline_item.AddMarker then
+                    ok = timeline_item:AddMarker(
+                        frame_id,
+                        marker_color(marker),
+                        marker_display_name(marker),
+                        marker_note(marker, package),
+                        duration,
+                        custom_data
+                    )
+                end
+                if not ok and media_pool_item and media_pool_item.AddMarker then
+                    ok = media_pool_item:AddMarker(
+                        frame_id,
+                        marker_color(marker),
+                        marker_display_name(marker),
+                        marker_note(marker, package),
+                        duration,
+                        custom_data
+                    )
+                end
+                if ok then
+                    added = added + 1
+                    if deleted > 0 then
+                        refreshed = refreshed + 1
+                        log("refreshed highlight marker customData=" .. custom_data)
+                    end
+                else
+                    skipped = skipped + 1
+                    log("could not add highlight marker " .. tostring(marker.id)
+                        .. "; customData=" .. custom_data)
+                end
+            end
+        end
+    end
+    if added > 0 then
+        log("added " .. tostring(added) .. " Filmtone highlight marker(s)")
+    end
+    if refreshed > 0 then
+        log("refreshed " .. tostring(refreshed) .. " existing Filmtone highlight marker(s)")
+    end
+    if skipped > 0 then
+        log("skipped " .. tostring(skipped) .. " highlight marker(s)")
+    end
+    return added
+end
+
+local function create_highlight_auto_timeline(project, media_pool, media_pool_item, package)
+    local ranges = highlight_rough_cut_ranges(package)
+    if #ranges == 0 then
+        return nil
+    end
+    if not (media_pool and media_pool.CreateEmptyTimeline and media_pool.AppendToTimeline) then
+        log("Resolve MediaPool rough-cut APIs are unavailable; skipped Highlight_Auto timeline")
+        return nil
+    end
+
+    local timeline_name = "Highlight_Auto - "
+        .. without_extension(basename(package.media_path))
+        .. " - "
+        .. tostring(os.time())
+    local previous_timeline = project and project.GetCurrentTimeline and project:GetCurrentTimeline()
+    local highlight_timeline = media_pool:CreateEmptyTimeline(timeline_name)
+    if not highlight_timeline then
+        log("could not create Highlight_Auto timeline")
+        return nil
+    end
+    if project and project.SetCurrentTimeline then
+        project:SetCurrentTimeline(highlight_timeline)
+    end
+
+    local clip_infos = {}
+    for _, range in ipairs(ranges) do
+        clip_infos[#clip_infos + 1] = {
+            mediaPoolItem = media_pool_item,
+            startFrame = range.start_frame,
+            endFrame = range.end_frame,
+            mediaType = 1,
+        }
+    end
+    local appended = media_pool:AppendToTimeline(clip_infos)
+    if not appended or not first_table_value(appended) then
+        log("created Highlight_Auto timeline but failed to append marker ranges")
+    else
+        log("created Highlight_Auto timeline with "
+            .. tostring(#clip_infos)
+            .. " source-relative range(s): "
+            .. timeline_name)
+    end
+
+    if previous_timeline and project and project.SetCurrentTimeline then
+        project:SetCurrentTimeline(previous_timeline)
+    end
+    return highlight_timeline
 end
 
 local function apply_lut_to_item(project, timeline_item, lut_path)
@@ -850,6 +1211,8 @@ local function run_resolve_import(package)
 
     local note = build_note(package)
     add_filmtone_marker(timeline_item, media_pool_item, note, package.sidecar)
+    add_highlight_markers(project, timeline_item, media_pool_item, package)
+    create_highlight_auto_timeline(project, media_pool, media_pool_item, package)
     if media_pool_item and media_pool_item.SetThirdPartyMetadata then
         media_pool_item:SetThirdPartyMetadata("Filmtone Connect", note)
     end
@@ -868,6 +1231,19 @@ local function print_package_summary(package)
     log("lut: " .. package.lut_path)
     log("dctl: " .. fmt_value(package.dctl_path, "none"))
     log("reference: " .. fmt_value(package.reference_path, "none"))
+    log("highlight markers: " .. tostring(highlight_marker_count(package)))
+    for _, range in ipairs(highlight_rough_cut_ranges(package)) do
+        log("highlight marker "
+            .. tostring(range.marker.id)
+            .. ": frame="
+            .. tostring(range.center_frame)
+            .. " range="
+            .. tostring(range.start_frame)
+            .. "-"
+            .. tostring(range.end_frame)
+            .. " customData="
+            .. marker_custom_data(range.marker))
+    end
     log("marker note:\n" .. build_note(package))
 end
 

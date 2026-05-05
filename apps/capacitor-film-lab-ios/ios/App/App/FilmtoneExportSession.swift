@@ -1,6 +1,7 @@
 import AVFoundation
 import CoreImage
 import CoreImage.CIFilterBuiltins
+import FilmLabSwiftCore
 import Foundation
 import os
 import UIKit
@@ -27,6 +28,10 @@ final class FilmtoneExportSession {
     /// Kept off `Phase0ExportRequestDTO` because it's iOS-side state, not
     /// a value the JS bridge needs to round-trip.
     private let cameraProfileSelection: CameraProfileSelection?
+    /// Source-relative marker intent captured in the editor. The export
+    /// session only writes it into the sidecar; media pixels and Photos save
+    /// remain unchanged.
+    private let highlightMarkers: FilmtoneHighlightMarkers?
     private(set) var didUseMezzanineVariant: ProfileVariant?
     /// v1.4 sidecar telemetry: route validation outcome for the consumed
     /// mezzanine. "valid" when the routed-to URL passed isValidMezzanine right
@@ -178,7 +183,8 @@ final class FilmtoneExportSession {
         cacheStore: CacheStore,
         mezzanineService: MezzanineService? = nil,
         appliedSavedLook: SavedLookEntry? = nil,
-        cameraProfile: CameraProfileSelection? = nil
+        cameraProfile: CameraProfileSelection? = nil,
+        highlightMarkers: FilmtoneHighlightMarkers? = nil
     ) throws {
         self.request = request
         self.sourceURL = sourceURL
@@ -186,6 +192,7 @@ final class FilmtoneExportSession {
         self.mezzanineService = mezzanineService
         self.appliedSavedLook = appliedSavedLook
         self.cameraProfileSelection = cameraProfile
+        self.highlightMarkers = highlightMarkers?.isEmpty == false ? highlightMarkers : nil
         self.disableGlowFamilyForExport = Self.environmentFlagEnabled("FILMTONE_EXPORT_DISABLE_GLOW_FAMILY")
         self.useMetalOpticsForExport = Self.environmentFlagEnabled("FILMTONE_EXPORT_METAL_OPTICS")
         self.outputURL = try cacheStore.temporaryExportURL(pathExtension: request.output.container)
@@ -506,7 +513,8 @@ final class FilmtoneExportSession {
             depth: depthSidecar,
             appliedSavedLook: savedLookRef,
             cameraProfile: cameraProfileBlock,
-            performance: performance
+            performance: performance,
+            highlightMarkers: highlightMarkers
         )
 
         let sidecarURL = FilmtoneExportSidecarBuilder.sidecarURL(for: outputURL)

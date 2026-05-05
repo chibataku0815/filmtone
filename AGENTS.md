@@ -13,6 +13,9 @@ then work on the product surface.
 3. Open only the current target entry:
    - repo-wide context: `README.md`, then `CLAUDE.md` if policy details matter
    - Desktop: `apps/desktop-film-lab-batch/` and `docs/filmtone/desktop/`
+   - Native Desktop v2:
+     `/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-native-desktop-plan/docs/filmtone/desktop/native-desktop-v2/strategy.md`,
+     then `active.md` in that dedicated worktree if present
    - iOS: `apps/capacitor-film-lab-ios/CLAUDE.md`, then the exact Swift/TS
      surface
    - shared packages: the specific package under `packages/`
@@ -28,6 +31,7 @@ there directly after this file.
 | Request mentions | Start here | Primary check |
 |---|---|---|
 | Desktop, macOS, release, update metadata | `apps/desktop-film-lab-batch/` and `docs/filmtone/desktop/` | `bun run verify:desktop` |
+| Native Desktop v2, SwiftUI Desktop, macOS native app | `/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-native-desktop-plan/docs/filmtone/desktop/native-desktop-v2/strategy.md` and `active.md` | `bun run verify:macos` in the native worktree |
 | iOS, App Store, Xcode, TestFlight, Swift, Capacitor | `apps/capacitor-film-lab-ios/CLAUDE.md` | `bun run verify:ios` |
 | color math, presets, LUT, schema, Swift payload | `packages/film-lab-core/` | `bun run build:core` and relevant package tests |
 | renderer, WebGL, WebGPU, shader parity | `packages/film-lab-renderer/` | `bun run build:renderer` |
@@ -43,6 +47,67 @@ Portfolio lives at:
 
 Portfolio is the public web window. It consumes this repo through
 `vendor/filmtone`. Do not edit Filmtone implementation in portfolio.
+
+## Long-Running Task Model
+
+Use the 2-layer model for long-running product lanes. For each project, propose
+the placement first. For Filmtone Native Desktop v2, the canonical placement is
+the dedicated worktree:
+
+```text
+/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-native-desktop-plan/docs/filmtone/desktop/native-desktop-v2/
+├── strategy.md
+├── active.md
+├── paused/
+└── archive/
+```
+
+Documents:
+
+- `strategy.md` is the long-term source of truth: goal, measurable Done
+  conditions, milestones, dependencies, constraints, open questions, and short
+  completion logs only.
+- `active.md` is the only current subtask. It must name the milestone, goal,
+  edit targets, read-only references, checklist, verification, Done conditions,
+  stop conditions (Done met / unexpected / N consecutive verification failures —
+  pick a concrete N, default 3), out-of-scope items, and unexpected blockers.
+- `archive/YYYY-MM-DD-{slug}.md` stores completed `active.md` logs.
+- `paused/YYYY-MM-DD-{slug}.md` stores interrupted, incomplete active tasks.
+
+Rules:
+
+- Start Native Desktop v2 sessions by reading `strategy.md`, then `active.md` in
+  the dedicated worktree if present. If `active.md` is missing, propose the next
+  subtask and wait.
+- Do not implement without an `active.md`, and do not mix multiple subtasks into
+  one `active.md`.
+- Work only inside the current `active.md` scope. If scope needs to change, stop
+  and record the issue before proposing the next step.
+- Stop and report when a stop condition fires. Do not loop on a failing
+  verification step indefinitely — once the documented N is reached, hand back.
+- While implementing, update completed checklist items as they finish.
+- On completion, record verification in `active.md`, move it to `archive/`, and
+  append only a 1-3 line milestone note to `strategy.md`.
+- Existing handoffs and old plan docs are read-only evidence. Do not treat them
+  as current truth.
+
+Interrupts:
+
+- Keep exactly one current `active.md`. Do not merge parallel work into it.
+- 5-30 minute fixes stay in the current `active.md` under `Unexpected` or
+  `Follow-up` if they belong to the active scope.
+- Half-day to multi-day interrupts pause the current task: append a `Paused`
+  section to `active.md`, briefly list done vs. not done, move it to
+  `paused/YYYY-MM-DD-{slug}.md`, then create a new interrupt-only `active.md`.
+- The interrupt `active.md` must name its milestone, or say `Interrupt` when it
+  is outside the current milestone.
+- When the interrupt finishes, archive it to `archive/YYYY-MM-DD-{slug}.md`,
+  append 1-3 lines to `strategy.md` only if strategy state changed, then restore
+  the paused file back to `active.md`.
+- Milestone-changing interrupts require an `Interrupt / Decision Log` note in
+  `strategy.md` before creating the new `active.md`.
+- Long-term direction changes are milestone-structure changes. Stop and get
+  review before implementation.
 
 ## Execution Bias
 
@@ -98,6 +163,7 @@ bun run build:core
 bun run build:renderer
 bun run build:smart-look
 bun run verify:desktop
+bun run verify:macos
 bun run verify:ios
 bun run check:filmtone-copy
 git diff --check
@@ -106,6 +172,7 @@ git diff --check
 Guidance:
 
 - Desktop behavior/export changes: `bun run verify:desktop`.
+- Native Desktop v2 behavior/export changes: `bun run verify:macos`.
 - iOS native/bridge/export changes: `bun run verify:ios`; if Swift build risk is
   material, run the `xcodebuild` command documented in
   `apps/capacitor-film-lab-ios/CLAUDE.md`.
@@ -132,6 +199,12 @@ Guidance:
   local `.env` files.
 - Copy vocabulary: use `動画`, not `短尺動画`; use `video`, `videos`, or
   `footage`, not active positioning such as `short-form video`.
+- Preset/Look vocabulary: `Preset` is the curve/grade foundation. `Look` is
+  reserved for the Stone/Urban Creative LUT Pack context. The old
+  Preset/Look rename premise from `feature/desktop-look-unification` is
+  withdrawn; do not add new references to alias artifacts such as
+  `BaseLookName`, `BASE_LOOKS`, `lookPresetId`, or `currentExportLookPreset`
+  unless the task explicitly removes or quarantines that legacy layer.
 
 ## Dirty Worktree Policy
 
@@ -150,6 +223,8 @@ future chat needs.
 Preferred locations:
 
 - Desktop: `docs/filmtone/desktop/`
+- Native Desktop v2:
+  `/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-native-desktop-plan/docs/filmtone/desktop/native-desktop-v2/`
 - iOS: `docs/filmtone/ios/`
 - Cross-cutting Filmtone docs: `docs/filmtone/`
 - life-level strategy or route docs:

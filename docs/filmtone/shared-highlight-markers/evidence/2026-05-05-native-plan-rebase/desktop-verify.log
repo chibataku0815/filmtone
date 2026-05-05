@@ -1,0 +1,95 @@
+[verify] building FilmLabSwiftCore (debug)...
+[0/1] Planning build
+Building for debugging...
+[0/1] Write swift-version--58304C5D6DBC2206.txt
+Build complete! (0.11s)
+  PASS  parity preset=reset strength=0.0
+  PASS  parity preset=reset strength=0.25
+  PASS  parity preset=reset strength=0.6
+  PASS  parity preset=reset strength=1.0
+  PASS  parity preset=amberGlow strength=0.0
+  PASS  parity preset=amberGlow strength=0.25
+  PASS  parity preset=amberGlow strength=0.6
+  PASS  parity preset=amberGlow strength=1.0
+  PASS  parity preset=iphone strength=0.0
+  PASS  parity preset=iphone strength=0.25
+  PASS  parity preset=iphone strength=0.6
+  PASS  parity preset=iphone strength=1.0
+  PASS  parity preset=softBlue strength=0.0
+  PASS  parity preset=softBlue strength=0.25
+  PASS  parity preset=softBlue strength=0.6
+  PASS  parity preset=softBlue strength=1.0
+  PASS  quick axis=filmCharacter @+0.5 shifts by 0.5*weight
+  PASS  quick axis=era @+0.5 shifts by 0.5*weight
+  PASS  quick axis=dynamics @+0.5 shifts by 0.5*weight
+  PASS  quick axis filmCharacter @-0.5 mirrors @+0.5
+  PASS  sidecar quickState block emits live values
+  PASS  sidecar quickState clamps out-of-range values
+  PASS  sidecar gradeParams reflect Quick + paramOverrides applied
+  PASS  sidecar emits highlightMarkers block with stable id
+  PASS  sidecar reader loads iOS highlightMarkers by source filename
+  PASS  SavedLookEntry round-trip preserves quickState + paramOverrides
+  PASS  FilmtoneQuickState.zero is 0/0/0
+  PASS  resolved order: Quick then paramOverrides — overrides win absolute
+  PASS  resolved order: Quick still affects keys that have no override
+  PASS  paramOverrides applies absolute (set), not delta
+  PASS  normalized(over:) drops overrides that match resolved base
+  PASS  FilmtoneQuickState distinct values compare non-equal
+  PASS  FilmtonePhase0ParamsPatch distinct patches compare non-equal
+  PASS  formattedFileSize boundaries (B / KB / MB / GB)
+  PASS  formattedFileSize negative input clamps to 0 B
+  PASS  formattedElapsed sub-minute uses one-decimal seconds
+  PASS  formattedElapsed minutes uses Mm SSs
+  PASS  formattedElapsed hours uses Hh MMm SSs
+  PASS  formattedElapsed handles non-finite + negative
+  PASS  clampedJpegQuality enforces 0.5...1.0 range
+  PASS  AdvancedAdjustCatalog group + control counts match the spec
+  PASS  AdvancedAdjustCatalog video-only filter hides motion in still mode
+  PASS  AdvancedAdjustCatalog keys are real Phase0 params
+  PASS  AdvancedAdjustCatalog.clamp respects per-key range branches
+  PASS  AdvancedAdjustCatalog.clamp shutterAngle iOS-canonical discontinuity
+  PASS  AdvancedAdjustCatalog.clamp default branch is identity
+  PASS  AdvancedAdjustCatalog labels match iOS canonical paramLabels
+  PASS  AdvancedAdjustCatalog group titles include Tone (renamed from Process)
+  PASS  Each non-basic group ships at least one none + one stamp recipe
+  PASS  basic group keeps no recipes (mirrors iOS)
+  PASS  Recipe stamped keys are confined to their own group
+  PASS  Recipe stamped values survive catalog clamp without drift
+  PASS  Tone recipes ship the iOS canonical 4-chip set
+  PASS  Recipe stamp + Quick does not double-apply Quick on stamped key
+  PASS  FilmtoneDesktopStrings.english carries the iOS canonical group titles
+  PASS  FilmtoneDesktopStrings.japanese carries the iOS canonical Tone (階調)
+  PASS  FilmtoneDesktopStrings preset chips match iOS defaults (None/なし, Default/標準, Strong/強め)
+  PASS  FilmtoneDesktopStrings tone recipe chips match iOS defaults (Standard/標準, Airy/爽やか, Sunset/夕景, Depth/深み)
+  PASS  FilmtoneDesktopStrings paramLabel mirrors iOS branching (Exposure EN-only; shutterAngle/trailIntensity translate)
+  PASS  FilmtoneDesktopStrings paramLabel falls back to the key when unknown
+  PASS  FilmtoneDesktopStrings supplies localized affordance copy
+  PASS  AdvancedAdjustCatalog with .japanese surfaces 階調 + tone JA recipe chips
+  PASS  AdvancedAdjustCatalog with .japanese translates motion params, leaves the rest at iOS default
+  PASS  FilmtoneScrubThumbnailMath.quantize default bucket = 0.25s
+  PASS  FilmtoneScrubThumbnailMath.quantize clamps non-finite / negative
+  PASS  FilmtoneScrubThumbnailMath.quantize honors custom bucket
+  PASS  FilmtoneScrubThumbnailMath.clampToDuration: typical clamp
+  PASS  FilmtoneScrubThumbnailMath.clampToDuration: zero / non-finite duration
+  PASS  FilmtoneScrubThumbnailMath.clampToDuration: non-finite seconds
+  PASS  FilmtoneScrubThumbnailMath: end-of-asset request quantizes within bounds
+  PASS  FilmtoneScrubThumbnailMath.quantizeWithinDuration: round-up overshoot floors back
+  PASS  FilmtoneScrubThumbnailMath.quantizeWithinDuration: exact-bucket boundary kept
+  PASS  FilmtoneScrubThumbnailMath.quantizeWithinDuration: mid-range pass-through
+  PASS  FilmtoneScrubThumbnailMath.quantizeWithinDuration: zero / non-finite / sub-bucket duration
+  PASS  FilmtoneScrubThumbnailMath.clampHoverFraction clamps to [0,1]
+  PASS  FilmtoneScrubThumbnailMath.clampHoverFraction agrees with FilmtoneGlassSlider knob math
+  PASS  FilmtoneScrubThumbnailMath.clampThumbnailCenterX keeps overlay inside bar
+  PASS  FilmtoneScrubThumbnailMath.clampThumbnailCenterX falls back to bar center when overlay overflows
+  PASS  FilmtoneScrubThumbnailCacheKey is signature-aware Hashable
+  PASS  SavedLookStore rename + favorite persist across reload (user entry)
+  PASS  SavedLookStore favorite on built-in persists via UserDefaults map
+  PASS  SavedLookStore deleteLook removes user entry from snapshot
+  PASS  SavedLookStore rejects rename / delete on built-in entries (favorite now allowed)
+  PASS  FilmtoneCompareSplitMath default is 0.5
+  PASS  FilmtoneCompareSplitMath range is 0...1 inclusive
+  PASS  FilmtoneCompareSplitMath.clamp identity inside range
+  PASS  FilmtoneCompareSplitMath.clamp pulls out-of-range to bounds
+  PASS  FilmtoneCompareSplitMath.clamp collapses non-finite to default
+
+  88/88 passed, 0 failed

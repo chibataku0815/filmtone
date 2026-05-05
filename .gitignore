@@ -23,6 +23,15 @@ packages/**/node_modules/
 # production
 /build
 
+# macOS Native Desktop v2 — xcodebuild output
+apps/filmtone-desktop-macos/build/
+**/xcuserdata/
+**/*.xcuserstate
+**/DerivedData/
+
+# macOS Phase 1b parity outputs
+/test-out/
+
 # misc
 .DS_Store
 *.pem

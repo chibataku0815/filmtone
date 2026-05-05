@@ -20,11 +20,16 @@
     "build:core": "bun run --cwd packages/film-lab-core build",
     "build:renderer": "bun run --cwd packages/film-lab-renderer build",
     "build:smart-look": "bun run --cwd packages/film-lab-smart-look build",
-    "generate:ios-swift": "bun run scripts/generate-filmtone-ios-swift.ts",
+    "generate:swift": "bun run scripts/generate-filmtone-swift.ts",
+    "generate:ios-swift": "bun run generate:swift",
     "typecheck:desktop": "bun run --cwd apps/desktop-film-lab-batch tsc -p tsconfig.json --noEmit",
     "typecheck:shared": "sh ./scripts/typecheck-shared.sh",
     "verify:desktop": "sh ./scripts/verify-desktop.sh",
     "verify:ios": "sh ./scripts/verify-ios.sh",
+    "verify:macos": "xcodebuild -project apps/filmtone-desktop-macos/FilmtoneDesktop.xcodeproj -scheme FilmtoneDesktop -destination 'platform=macOS' -configuration Debug -derivedDataPath apps/filmtone-desktop-macos/build build",
+    "release:cutover-preflight": "bun run scripts/release-cutover-preflight.mjs",
+    "release:upload-dmg": "bun run scripts/upload-dmg-to-vercel-blob.mjs",
+    "release:upload-update-meta": "bun run scripts/upload-update-meta-to-vercel-blob.mjs",
     "postinstall": "bun run build:core && bun run build:renderer && bun run build:smart-look"
   }
 }
