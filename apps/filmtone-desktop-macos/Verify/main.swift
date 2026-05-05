@@ -311,30 +311,52 @@ runner.test("FilmtoneQuickState.zero is 0/0/0") {
 // ---------------------------------------------------------------------------
 
 runner.test("resolved order: Quick then paramOverrides — overrides win absolute") {
-    // Find a (axis, key) pair with a non-zero weight so Quick would
-    // visibly affect the key without an override.
-    var pickedAxis: String? = nil
-    var pickedKey: String? = nil
-    var pickedWeight: Double = 0
-    outer: for axis in FilmtonePhase0Generated.quickAxisIds {
+    // Find a (axis, key) pair such that:
+    //  - the key has a non-zero Quick weight (so Quick would visibly
+    //    move the key absent an override),
+    //  - the chosen `absoluteValue` survives `AdvancedAdjustCatalog.clamp`
+    //    unchanged for the key (so `expected == absoluteValue`),
+    //  - the clamped value differs from base+Quick by more than the
+    //    `paramEqualityTolerance`, so `normalized(over:)` keeps the
+    //    override instead of dropping it as identity.
+    // Iterate sorted axes / keys so the test picks the same pair on
+    // every host (Dictionary iteration order is not stable across runs
+    // — picking a clamp-tight key like `grainIntensity` would silently
+    // round 0.123 to 0.1 and break the equality assertion).
+    let absoluteValue: Double = 0.5
+    let baseParams = FilmtonePresetCatalog.params(for: "reset", strength: 1.0)
+
+    var pickedAxis: String?
+    var pickedKey: String?
+    var pickedQuickContribution: Double = 0
+
+    outer: for axis in FilmtonePhase0Generated.quickAxisIds.sorted() {
         guard let weights = FilmtonePhase0Generated.quickWeights[axis] else { continue }
-        for (key, weight) in weights where weight != 0 {
+        for (key, weight) in weights.sorted(by: { $0.key < $1.key }) where weight != 0 {
+            let clamped = AdvancedAdjustCatalog.clamp(absoluteValue, for: key)
+            // Reject keys whose range would clamp our chosen value.
+            if abs(clamped - absoluteValue) > 1e-9 { continue }
+            // Reject keys where the override would equal base+Quick
+            // within tolerance (would get normalized out as identity).
+            let baseAfterQuick = baseParams.value(for: key) + 0.5 * weight
+            if abs(clamped - baseAfterQuick) < AdvancedAdjustCatalog.paramEqualityTolerance { continue }
             pickedAxis = axis
             pickedKey = key
-            pickedWeight = weight
+            pickedQuickContribution = 0.5 * weight
             break outer
         }
     }
+
     guard let axis = pickedAxis, let key = pickedKey else {
-        throw AssertionError(description: "no non-zero quickWeight to test")
+        throw AssertionError(description: "no Quick-affected key fits the absolute=\(absoluteValue) test premise")
     }
-    let absoluteValue = 0.123
+
     var qs = FilmtoneQuickState.zero
     switch axis {
     case "filmCharacter": qs.filmCharacter = 0.5
     case "era": qs.era = 0.5
     case "dynamics": qs.dynamics = 0.5
-    default: throw AssertionError(description: "unknown axis")
+    default: throw AssertionError(description: "unknown axis \(axis)")
     }
     let patch = FilmtonePhase0ParamsPatch(values: [key: absoluteValue])
     let result = FilmtonePresetCatalog.resolved(
@@ -345,11 +367,11 @@ runner.test("resolved order: Quick then paramOverrides — overrides win absolut
         paramOverrides: patch
     )
     // iOS canonical: override is the final value. Quick is overwritten
-    // on this key. (Pre-fix Desktop returned absoluteValue + 0.5*weight.)
+    // on this key. Pre-fix Desktop returned absoluteValue + Quick.
     try assertClose(
         result.value(for: key),
         absoluteValue,
-        "axis=\(axis) key=\(key) override should win absolute over Quick=\(0.5 * pickedWeight)"
+        "axis=\(axis) key=\(key) override should win absolute over Quick=\(pickedQuickContribution)"
     )
 }
 
@@ -759,21 +781,20 @@ runner.test("Recipe stamp + Quick does not double-apply Quick on stamped key") {
     // 0.34 + Quick.dynamics * weight (visible drift between iOS and
     // Desktop). With the iOS-canonical Quick → override order, the
     // recipe value is the final value: Quick does not re-apply on the
-    // stamped key. Pick a recipe that touches a Quick-affected key.
+    // stamped key.
     var qs = FilmtoneQuickState.zero
     qs.dynamics = 0.5
 
-    // Find a glow / grain recipe stamp key that overlaps a Quick weight.
-    let quickAffectedKeys: Set<String> = {
-        var s: Set<String> = []
+    let quickWeightByKey: [String: Double] = {
+        var m: [String: Double] = [:]
         for axis in FilmtonePhase0Generated.quickAxisIds {
             if let weights = FilmtonePhase0Generated.quickWeights[axis] {
                 for (key, weight) in weights where weight != 0 {
-                    s.insert(key)
+                    m[key] = weight
                 }
             }
         }
-        return s
+        return m
     }()
 
     let baseParams = FilmtonePresetCatalog.params(
@@ -781,28 +802,39 @@ runner.test("Recipe stamp + Quick does not double-apply Quick on stamped key") {
         strength: 1.0
     )
 
-    // Glow group: Default recipe touches bloomStrength etc. Check
-    // whichever stamped key is also Quick-affected.
     guard let glow = AdvancedAdjustCatalog.allGroups.first(where: { $0.id == "glow" }),
           let recipe = glow.recipes.first(where: { $0.id == "default" }) else {
         throw AssertionError(description: "glow group / default recipe missing")
     }
     let recipeValues = recipe.values(baseParams)
 
-    // Pick the first key that is both stamped by the recipe and affected by Quick.
-    var target: String?
-    for (key, _) in recipeValues where quickAffectedKeys.contains(key) {
-        target = key
+    // Sort keys so test pickup is deterministic across runs (Dictionary
+    // iteration order is not stable). Skip any key whose recipe value
+    // would either round through clamp (means the test premise of
+    // "absolute survives" is not true for that key) or land within
+    // `paramEqualityTolerance` of base+Quick (would normalize out as
+    // identity, leaving result == base+Quick instead of recipe value).
+    var pickedKey: String?
+    var pickedRecipeValue: Double = 0
+    for key in recipeValues.keys.sorted() {
+        guard let weight = quickWeightByKey[key], let recipeValue = recipeValues[key] else { continue }
+        let clamped = AdvancedAdjustCatalog.clamp(recipeValue, for: key)
+        if abs(clamped - recipeValue) > 1e-9 { continue }
+        let baseAfterQuick = baseParams.value(for: key) + qs.dynamics * weight
+        if abs(clamped - baseAfterQuick) < AdvancedAdjustCatalog.paramEqualityTolerance { continue }
+        pickedKey = key
+        pickedRecipeValue = recipeValue
         break
     }
-    guard let key = target else {
-        // If no overlap, the test premise is moot — but the resolve
-        // order fix still matters. Skip with a pass.
+    guard let key = pickedKey else {
+        // No Quick-affected glow key has a recipe stamp that fits the
+        // test premise on this preset — assertion is moot, the test
+        // group still exercises the resolve-order rewrite via the
+        // earlier "overrides win absolute" test.
         return
     }
 
-    let recipeValue = recipeValues[key]!
-    let patch = FilmtonePhase0ParamsPatch(values: [key: recipeValue])
+    let patch = FilmtonePhase0ParamsPatch(values: [key: pickedRecipeValue])
     let result = FilmtonePresetCatalog.resolved(
         presetName: FilmtonePresetCatalog.defaultName,
         strength: 1.0,
@@ -810,12 +842,10 @@ runner.test("Recipe stamp + Quick does not double-apply Quick on stamped key") {
         quickState: qs,
         paramOverrides: patch
     )
-    // The override sets the value absolutely; Quick is overwritten.
-    let clamped = AdvancedAdjustCatalog.clamp(recipeValue, for: key)
     try assertClose(
         result.value(for: key),
-        clamped,
-        "key=\(key) recipe=\(recipeValue) — Quick must not re-apply on overridden key"
+        pickedRecipeValue,
+        "key=\(key) recipe=\(pickedRecipeValue) — Quick must not re-apply on overridden key"
     )
 }
 

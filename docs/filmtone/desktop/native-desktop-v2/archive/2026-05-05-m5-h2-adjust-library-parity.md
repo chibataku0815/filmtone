@@ -321,3 +321,36 @@ follow-up does NOT touch any other resolve path (look apply,
 sidecar `gradeParams`, CLI export) — those all route through
 `FilmtonePresetCatalog.resolved` so they pick up the canonical
 order automatically.
+
+## Post-review P1 fix (2026-05-05, third commit)
+
+Reviewer flagged that the Test group 6 first assertion (`resolved
+order: Quick then paramOverrides — overrides win absolute`) was
+non-deterministic across hosts: it iterated
+`FilmtonePhase0Generated.quickWeights[axis]` (a `[String: Double]`
+dictionary) in unspecified order, so on some hosts it picked
+`grainIntensity` and the chosen `absoluteValue = 0.123` got rounded
+to the catalog max `0.1` by `AdvancedAdjustCatalog.clamp`,
+making the equality assertion fail.
+
+Fix: iterate axes / keys in sorted order, pick a key where the
+chosen `absoluteValue` survives `clamp` unchanged AND differs from
+`base + Quick` by more than `paramEqualityTolerance` so the
+`normalized(over:)` step keeps the override. Same pattern applied
+to the recipe non-double-Quick test for symmetry. 3 consecutive
+local runs returned `56/56 passed, 0 failed` with the targeted
+PASSes stable.
+
+### Known follow-up (not a merge blocker, recorded for next slice)
+
+Reviewer also noted: `normalized(over:)` runs inside
+`FilmtonePresetCatalog.resolved` but is **not** routed back into
+`EditorState.paramOverrides`. So a user-set override that happens to
+match `base + Quick` within tolerance still counts toward
+`paramOverridesActiveCount` (drives the QuickAdjust override chip
+and the AdvancedAdjustEditor header badge) and still ends up in the
+`SaveLookPayload` written to disk — even though it has zero render
+effect. The conservative fix is to normalize the patch at
+`paramOverridesActiveCount` / `currentLookSavePayload()` read time
+(don't mutate `setParamOverride` so the slider's binding stays
+stable mid-drag). Tracked as `M5-H.2.2` follow-up.
