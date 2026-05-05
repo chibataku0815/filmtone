@@ -1844,16 +1844,30 @@ final class FilmtoneExportSession {
         return profile
     }
 
-    /// Backlight Veil Phase 1c — produces a `Phase0ParamsDTO` whose
-    /// bloom / halation / diffusion plate keys (10 spatial values) are
-    /// replaced by the active Backlight Veil profile's canonical curve.
-    /// Mirrors the Desktop `buildOpticalFilterParamPatch` semantics
-    /// (`packages/film-lab-core/src/optical-filter-profiles.ts:677-689`)
-    /// where the optical filter family overrides the user's optical
-    /// signature so the scatter math has stable plate inputs regardless
-    /// of which Look / preset is active. Color-grade params (exposure /
-    /// contrast / saturation / LUT etc.) remain untouched — Look's color
-    /// stays, lens behavior is replaced.
+    /// Backlight Veil Phase 1c (energy max-merge port from macOS, 2026-05-06)
+    /// — produces a `Phase0ParamsDTO` that layers the active Backlight Veil
+    /// profile's spatial keys onto the existing `params`. Color-grade params
+    /// (exposure / contrast / saturation / LUT etc.) remain untouched.
+    ///
+    /// Two merge regimes for the 12 spatial keys:
+    ///   * **Energy keys** (`bloomStrength` / `halationIntensity` / `diffusion`
+    ///     / `lensSoftness` / `rgbShift`): `max(params[k], veil[k])`. Veil
+    ///     profiles are authored against the reset baseline; absolute overwrite
+    ///     would let a Look (Stone `lensSoftness=0.095`, `rgbShift=0.0032`)
+    ///     get clobbered by Veil's lower defaults (Veil 1/4 `lensSoftness=0.08`,
+    ///     `rgbShift=0.0007`), perceptually weakening the veil.
+    ///   * **Structural keys** (`bloomThreshold` / `bloomRadius` /
+    ///     `bloomSoftKnee` / `halationThreshold` / `halationRadius` /
+    ///     `halationHue` / `halationSoftKnee`): absolute overwrite — Veil's
+    ///     spatial shape wins so the scatter math has stable plate inputs.
+    ///
+    /// Mirrors macOS `FilmtonePresetCatalog.applyVeilPatch`
+    /// (`apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtonePresetCatalog.swift`).
+    /// Note: iOS `state.paramOverrides` mixes Look-derived patch and
+    /// user-manual edits in one map, so user-manual overrides do not get
+    /// last-write-wins precedence over Veil energy keys here (macOS does,
+    /// because it threads `paramOverrides` separately). Tracked as known
+    /// iOS divergence.
     private func applyBacklightVeilSpatialOverrides(
         _ params: Phase0ParamsDTO,
         spatial s: FilmtoneOpticalFiltersGenerated.SpatialKeys
@@ -1864,15 +1878,15 @@ final class FilmtoneExportSession {
             saturation: params.saturation,
             temperature: params.temperature,
             tint: params.tint,
-            rgbShift: s.rgbShift,
-            lensSoftness: s.lensSoftness,
+            rgbShift: max(params.rgbShift, s.rgbShift),
+            lensSoftness: max(params.lensSoftness, s.lensSoftness),
             grainRadialMix: params.grainRadialMix,
             grainSize: params.grainSize,
             bloomThreshold: s.bloomThreshold,
-            bloomStrength: s.bloomStrength,
+            bloomStrength: max(params.bloomStrength, s.bloomStrength),
             bloomRadius: s.bloomRadius,
-            diffusion: s.diffusion,
-            halationIntensity: s.halationIntensity,
+            diffusion: max(params.diffusion, s.diffusion),
+            halationIntensity: max(params.halationIntensity, s.halationIntensity),
             halationSpread: params.halationSpread,
             halationHue: s.halationHue,
             halationThreshold: s.halationThreshold,
