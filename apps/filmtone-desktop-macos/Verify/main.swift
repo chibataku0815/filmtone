@@ -432,4 +432,116 @@ runner.test("clampedJpegQuality enforces 0.5...1.0 range") {
     try assertClose(FilmtoneFormatters.clampedJpegQuality(-1.0), 0.5)
 }
 
+// ---------------------------------------------------------------------------
+// Test group 9 — M5-G.2 AdvancedAdjustCatalog parity (post-M5-C.3b review).
+// AdvancedAdjustCatalog mirrors iOS canonical
+// `FilmtoneStrengthSheetData.advancedParamGroups` + `FilmtonePhase0Math
+// .clampParam`. iOS canonical clampParam does NOT live in
+// film-lab-swift-core today, so these tests pin the Desktop catalog's
+// own clamp surface instead — promoting clampParam into the shared
+// package is a separate slice. Tests here guard against silent regression
+// of either the catalog field set or the per-key clamp behavior.
+// ---------------------------------------------------------------------------
+
+runner.test("AdvancedAdjustCatalog group + control counts match the spec") {
+    let allKeys = AdvancedAdjustCatalog.allGroups.flatMap { $0.controls.map(\.key) }
+    try assertEqual(AdvancedAdjustCatalog.allGroups.count, 6, "expected 6 groups")
+    try assertEqual(allKeys.count, 31, "expected 31 controls total")
+    try assertEqual(
+        Set(allKeys).count, 31,
+        "control key collision — every key must appear exactly once"
+    )
+}
+
+runner.test("AdvancedAdjustCatalog video-only filter hides motion in still mode") {
+    let stillKeys = AdvancedAdjustCatalog.groups(forVideo: false)
+        .flatMap { $0.controls.map(\.key) }
+    let videoKeys = AdvancedAdjustCatalog.groups(forVideo: true)
+        .flatMap { $0.controls.map(\.key) }
+    try assertEqual(stillKeys.count, 29, "still mode = 31 - 2 motion")
+    try assertEqual(videoKeys.count, 31, "video mode exposes all 31")
+    if stillKeys.contains("shutterAngle") || stillKeys.contains("trailIntensity") {
+        throw AssertionError(description: "still mode must not surface motion params")
+    }
+    if !videoKeys.contains("shutterAngle") || !videoKeys.contains("trailIntensity") {
+        throw AssertionError(description: "video mode must surface motion params")
+    }
+}
+
+runner.test("AdvancedAdjustCatalog keys are real Phase0 params") {
+    // Catalog drives sliders that ultimately call `presetParams.value
+    // (for: key)` — every catalog key must resolve through
+    // FilmtonePhase0Params.keyPaths or the slider thumb shows nothing.
+    let phase0Keys = Set(FilmtonePhase0Params.keyPaths.keys)
+    for key in AdvancedAdjustCatalog.allGroups.flatMap({ $0.controls.map(\.key) }) {
+        if !phase0Keys.contains(key) {
+            throw AssertionError(
+                description: "catalog key '\(key)' is not in FilmtonePhase0Params.keyPaths"
+            )
+        }
+    }
+}
+
+runner.test("AdvancedAdjustCatalog.clamp respects per-key range branches") {
+    // Sample one representative value below + above the range for each
+    // distinct clamp branch in AdvancedAdjustCatalog.clamp. iOS-canonical
+    // shutterAngle discontinuity is exercised in the next test.
+    try assertClose(AdvancedAdjustCatalog.clamp(-5, for: "exposure"), -2, "exposure floor")
+    try assertClose(AdvancedAdjustCatalog.clamp(5, for: "exposure"), 2, "exposure ceiling")
+    try assertClose(AdvancedAdjustCatalog.clamp(-1, for: "contrast"), 0, "contrast floor")
+    try assertClose(AdvancedAdjustCatalog.clamp(5, for: "contrast"), 2, "contrast ceiling")
+    try assertClose(AdvancedAdjustCatalog.clamp(-2, for: "temperature"), -1, "temperature floor")
+    try assertClose(AdvancedAdjustCatalog.clamp(2, for: "temperature"), 1, "temperature ceiling")
+    try assertClose(AdvancedAdjustCatalog.clamp(-5, for: "halationSpread"), 0, "halationSpread floor")
+    try assertClose(AdvancedAdjustCatalog.clamp(50, for: "halationSpread"), 40, "halationSpread ceiling")
+    try assertClose(AdvancedAdjustCatalog.clamp(-5, for: "halationHue"), 0, "halationHue floor")
+    try assertClose(AdvancedAdjustCatalog.clamp(150, for: "halationHue"), 100, "halationHue ceiling")
+    try assertClose(AdvancedAdjustCatalog.clamp(-1, for: "trailIntensity"), 0, "trailIntensity floor")
+    try assertClose(AdvancedAdjustCatalog.clamp(2, for: "trailIntensity"), 0.95, "trailIntensity ceiling")
+    try assertClose(AdvancedAdjustCatalog.clamp(-1, for: "rgbShift"), 0, "rgbShift floor")
+    try assertClose(
+        AdvancedAdjustCatalog.clamp(1, for: "rgbShift"),
+        FilmtonePhase0Generated.rgbShiftMax,
+        "rgbShift ceiling tracks generated max"
+    )
+    try assertClose(
+        AdvancedAdjustCatalog.clamp(1, for: "grainIntensity"),
+        FilmtonePhase0Generated.grainIntensityMax,
+        "grainIntensity ceiling tracks generated max"
+    )
+    // Generic 0...1 branch
+    try assertClose(AdvancedAdjustCatalog.clamp(-1, for: "vignette"), 0, "vignette floor")
+    try assertClose(AdvancedAdjustCatalog.clamp(2, for: "vignette"), 1, "vignette ceiling")
+    try assertClose(AdvancedAdjustCatalog.clamp(-1, for: "lensSoftness"), 0, "lensSoftness floor")
+    try assertClose(AdvancedAdjustCatalog.clamp(2, for: "lensSoftness"), 1, "lensSoftness ceiling")
+}
+
+runner.test("AdvancedAdjustCatalog.clamp shutterAngle iOS-canonical discontinuity") {
+    // iOS canonical FilmtonePhase0Math.clampParam: < 90 collapses to 0
+    // (motion blur disabled); 90..<180 snaps up to 180 (canonical
+    // half-circle minimum); 180...720 is linear; >720 caps at 720.
+    try assertClose(AdvancedAdjustCatalog.clamp(-50, for: "shutterAngle"), 0, "below 0 → 0")
+    try assertClose(AdvancedAdjustCatalog.clamp(0, for: "shutterAngle"), 0, "at 0 stays 0")
+    try assertClose(AdvancedAdjustCatalog.clamp(45, for: "shutterAngle"), 0, "<90 collapses to 0")
+    try assertClose(AdvancedAdjustCatalog.clamp(89, for: "shutterAngle"), 0, "just below 90 → 0")
+    try assertClose(AdvancedAdjustCatalog.clamp(90, for: "shutterAngle"), 180, "≥90 snaps to 180")
+    try assertClose(AdvancedAdjustCatalog.clamp(179, for: "shutterAngle"), 180, "<180 snaps to 180")
+    try assertClose(AdvancedAdjustCatalog.clamp(180, for: "shutterAngle"), 180, "180 stays 180")
+    try assertClose(AdvancedAdjustCatalog.clamp(360, for: "shutterAngle"), 360, "interior linear")
+    try assertClose(AdvancedAdjustCatalog.clamp(720, for: "shutterAngle"), 720, "ceiling 720")
+    try assertClose(AdvancedAdjustCatalog.clamp(800, for: "shutterAngle"), 720, ">720 → 720")
+}
+
+runner.test("AdvancedAdjustCatalog.clamp default branch is identity") {
+    // Unknown key falls through to identity. Documents the contract
+    // that the catalog does not silently filter out keys it doesn't
+    // recognize — a future Phase0 param can be added without an
+    // immediate clamp branch.
+    try assertClose(
+        AdvancedAdjustCatalog.clamp(42, for: "someNewParamNotInCatalog"),
+        42,
+        "identity passthrough for unknown key"
+    )
+}
+
 exit(runner.summary())

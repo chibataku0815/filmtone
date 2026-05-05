@@ -38,6 +38,7 @@ PKG_OBJECTS=(
 SOURCES=(
   "$SRC_ROOT/Domain/CameraOpticsDTO.swift"
   "$SRC_ROOT/Domain/SourceColorTypes.swift"
+  "$SRC_ROOT/Domain/AdvancedAdjustCatalog.swift"
   "$SRC_ROOT/Color/FilmtonePresetCatalog.swift"
   "$SRC_ROOT/Color/FilmtoneCreativePackCatalog.swift"
   "$SRC_ROOT/Color/FilmtoneSavedLookSchema.swift"
