@@ -114,7 +114,7 @@ print)。
 | # | ファイル | 変更概要 |
 |---|---|---|
 | 1 | `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtoneGradePipeline.swift` | `applyCreativeLutStage` の intensity 配線(bug fix)、`applyInputLutStage` 追加(`inputLutBinding != nil` の時 parametric source stage を skip) |
-| 2 | `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtoneSavedLookSchema.swift` | **`InputLutBinding` の宣言のみ**(新型を Color/ に置く)。`SavedLookEntry` は touch しない、`schemaVersion` も 2 のまま |
+| 2 | `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/InputLutBinding.swift` (**新規**) | `InputLutBinding` の宣言を専用ファイルに置く。`Color/FilmtoneSavedLookSchema.swift` は touch しない(SavedLookEntry / `schemaVersion` も 2 のまま)。`CreativeLutBinding` の移動は churn になるので今はしない |
 | 3 | `apps/filmtone-desktop-macos/FilmtoneDesktop/State/EditorState.swift` | `inputLutBinding: InputLutBinding?` 追加、`sourceProfileSelection` は維持 |
 | 4 | `apps/filmtone-desktop-macos/FilmtoneDesktop/Export/FilmtoneSidecarWriter.swift` | sidecar に `inputLut` block 追加(iOS の `SidecarLutRef` field 名に揃える)。creativeLut block は既存通り |
 | 5 | `apps/filmtone-desktop-macos/FilmtoneDesktop/State/ExportCoordinator.swift` (M5-G.1 産物) | export request 構築時に EditorState から `inputLutBinding` を取って sidecar writer に渡す配線 |
@@ -143,7 +143,7 @@ print)。
 | # | Commit | 含まれる変更 | gate |
 |---|---|---|---|
 | C1 | `fix(macos): wire creative LUT intensity through gradePipeline` | `FilmtoneGradePipeline.applyCreativeLutStage` の intensity 配線、Verify に creativeLut intensity blend test 追加。スキーマは触らない | **v1.4-preferred** thin correctness fix(下記 §6 参照) |
-| C2 | `feat(macos): add InputLutBinding type + EditorState surface` | `InputLutBinding` を `Color/FilmtoneSavedLookSchema.swift` に宣言(型のみ)、`EditorState` に `inputLutBinding: InputLutBinding?` 追加。**SavedLookEntry / SaveLookPayload / SavedLookStore は touch しない**、`schemaVersion` は 2 のまま。pipeline / sidecar / UI も触らない thin slice | v1.5 |
+| C2 | `feat(macos): add InputLutBinding type + EditorState surface` | 新規 `Color/InputLutBinding.swift` に `InputLutBinding` 宣言(型のみ、`Color/FilmtoneSavedLookSchema.swift` は touch しない)、`EditorState` に `inputLutBinding: InputLutBinding?` 追加、pbxproj に新ファイル登録 + Verify SOURCES 追加。**SavedLookEntry / SaveLookPayload / SavedLookStore / LibraryViewModel は touch しない**、`schemaVersion` は 2 のまま。pipeline / sidecar / UI も触らない thin slice | v1.5 |
 | C3 | `feat(macos): wire input LUT stage + sidecar block + UI pickers` | `FilmtoneGradePipeline.applyInputLutStage` 追加(parametric source stage の skip 含む)、`Export/FilmtoneSidecarWriter` に inputLut block(iOS `SidecarLutRef` field 名)、`ExportCoordinator` の export request 構築側に EditorState の inputLut 配線、Quick/Advanced UI に Camera LUT picker + intensity slider 2 本(LibraryViewModel 保存 payload には触れない) | v1.5 |
 
 C2 を「型 + EditorState 1 field」だけの thin slice に絞ることで、
