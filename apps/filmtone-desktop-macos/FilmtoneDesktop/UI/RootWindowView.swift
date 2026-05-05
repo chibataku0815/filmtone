@@ -15,6 +15,10 @@ struct RootWindowView: View {
     // just calls into it from the toolbar Export button + the inspector
     // tap callback (P2 from 2026-05-05 review).
     @State private var exportCoordinator = ExportCoordinator()
+    // M5-J1: editing sidebar open/close persists across launches and
+    // across source changes. `@AppStorage` writes do not reset when
+    // `state.setSource` runs, so the user's last preference holds.
+    @AppStorage("editorSidebarOpen") private var sidebarOpen: Bool = true
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -32,81 +36,31 @@ struct RootWindowView: View {
                 onOpenRequested: { presentOpenPanel() }
             )
             .ignoresSafeArea(.container, edges: .all)
-            // M5-B Pass 3: user confirmed `.clear` posture is the correct
-            // Apple Liquid Glass dramatic refraction; all panels and the
-            // capsule unified on `.clear`. GlassEffectContainer(spacing: 12)
-            // coordinates morphing/refraction across the right rail.
-            // M5-H.1: the leading `GlassControlGroup()` "Phase 0" placeholder
-            // banner was retired — the right rail now opens directly with
-            // the source-loaded panels (or stays empty until a source loads).
-            GlassEffectContainer(spacing: 16) {
-                VStack(alignment: .trailing, spacing: 16) {
-                    if state.sourceURL != nil {
-                        // M5-C.1: Source Profile Picker — sits above the Look
-                        // controls so the user picks the input transform
-                        // before the Look layer. Same Pass 4 dark-tinted
-                        // .clear glass posture for visual continuity.
-                        SourceProfileControls(state: state)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 16)
-                            .glassEffect(
-                                .clear.tint(.black.opacity(0.30)),
-                                in: RoundedRectangle(cornerRadius: 16)
-                            )
-                        // M5-C.2a: snapshot-driven Look library Picker +
-                        // "Save Current Look…" button. Sits between the
-                        // source-side normalization and the strength slider
-                        // so the user picks input → Look → strength in
-                        // top-down reading order.
-                        LookLibraryControls(state: state, library: library)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 16)
-                            .glassEffect(
-                                .clear.tint(.black.opacity(0.30)),
-                                in: RoundedRectangle(cornerRadius: 16)
-                            )
-                        // M5-C.3a: Quick adjust 3-axis sliders sit between
-                        // Look selection and Strength so the user reads
-                        // top-down: input → Look → Quick offsets → Strength.
-                        QuickAdjustControls(state: state)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 16)
-                            .glassEffect(
-                                .clear.tint(.black.opacity(0.30)),
-                                in: RoundedRectangle(cornerRadius: 16)
-                            )
-                        // M5-B Pass 4: subtle dark tint on `.clear` Liquid
-                        // Glass gives the operating panel a stable luminance
-                        // baseline for white text + visible Slider track,
-                        // while preserving Pass 3's dramatic refraction
-                        // posture on the rest of the chrome.
-                        GradeControls(state: state)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 16)
-                            .glassEffect(
-                                .clear.tint(.black.opacity(0.30)),
-                                in: RoundedRectangle(cornerRadius: 16)
-                            )
-                        // M5-C.4: Mac-native Export Inspector replaces
-                        // the previous one-line ExportProgressBar +
-                        // toolbar-only flow. Persistent panel that
-                        // surfaces format / quality controls before the
-                        // run, live progress while running, and elapsed
-                        // / dims / file size / Reveal / Share after.
-                        ExportInspectorPanel(
-                            state: state,
-                            onExportTap: { exportCoordinator.presentExportPanel(for: state) }
-                        )
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 16)
-                        .glassEffect(
-                            .clear.tint(.black.opacity(0.30)),
-                            in: RoundedRectangle(cornerRadius: 16)
-                        )
-                    }
-                }
+            // M5-J1: the right-rail panel stack moved into `EditorSidebar`
+            // so the chrome can:
+            //   1) reserve top inset (72pt) for the unified toolbar +
+            //      breathing margin so panels never tuck under the
+            //      titlebar/glass toolbar background;
+            //   2) reserve bottom inset (120pt) so panels never overlap
+            //      the floating `VideoScrubBar` capsule for video sources;
+            //   3) clip vertical overflow into the sidebar's internal
+            //      ScrollView so a tall stack (Source/Look/Quick/Grade/
+            //      Inspector) is always operable, regardless of source
+            //      kind or window height;
+            //   4) collapse cleanly via `⌘\` / toolbar `sidebar.right`
+            //      so the preview can reclaim the full window width.
+            // The `if sidebarOpen` gate uses `@AppStorage`, so the user's
+            // last preference persists across source changes and relaunches.
+            if sidebarOpen {
+                EditorSidebar(
+                    state: state,
+                    library: library,
+                    exportCoordinator: exportCoordinator
+                )
+                .padding(.top, 72)
+                .padding(.bottom, 120)
+                .padding(.trailing, 12)
             }
-            .padding(24)
             // M5-A.3 + F4: scrub bar sits close to the window's bottom
             // edge (12pt padding) so it reads as a chrome-adjacent control
             // rather than a panel floating mid-preview.
@@ -201,6 +155,29 @@ struct RootWindowView: View {
                 .disabled(exportDisabled)
                 .help(exportHelpText)
                 .filmtonePointingHandCursor(!exportDisabled)
+            }
+            // M5-J1: sidebar open/close. `⌘\` follows the macOS HIG
+            // trailing-inspector convention. Lives next to Open/Export so
+            // collapsed state still surfaces the reopen affordance.
+            // `keyboardShortcut` on a Toolbar Button is scoped through the
+            // first-responder chain, so a focused TextField or NSOpenPanel
+            // sheet absorbs `⌘\` first and the toggle does not fire mid
+            // text input / save prompt.
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    sidebarOpen.toggle()
+                } label: {
+                    Label(
+                        sidebarOpen ? "Hide Inspector" : "Show Inspector",
+                        systemImage: "sidebar.right"
+                    )
+                }
+                .keyboardShortcut("\\", modifiers: .command)
+                .buttonStyle(.glass)
+                .help(sidebarOpen
+                      ? "Hide editing sidebar (⌘\\)"
+                      : "Show editing sidebar (⌘\\)")
+                .filmtonePointingHandCursor()
             }
         }
     }
