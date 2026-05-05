@@ -289,6 +289,7 @@ enum FilmtoneVideoExporter {
             sourceSeed: sourceSeed,
             cameraOptics: probe.cameraOptics,
             creativeLut: creativeLut,
+            lutIntensity: FilmtonePresetCatalog.clampStrength(request.presetStrength),
             opticalFilterProfileId: request.opticalFilterProfileId,
             opticalFilterIntensity: request.opticalFilterIntensity,
             ciContext: context,
@@ -397,6 +398,7 @@ enum FilmtoneVideoExporter {
             ),
             cameraOptics: probe.cameraOptics,
             creativeLut: creativeLut,
+            lutIntensity: FilmtonePresetCatalog.clampStrength(request.presetStrength),
             opticalFilterProfileId: request.opticalFilterProfileId,
             opticalFilterIntensity: request.opticalFilterIntensity,
             ciContext: FilmtoneCIContext.shared,
@@ -450,6 +452,7 @@ enum FilmtoneVideoExporter {
                 sourceSeed: renderContext.sourceSeed,
                 cameraOptics: renderContext.cameraOptics,
                 creativeLut: renderContext.creativeLut,
+                lutIntensity: renderContext.lutIntensity,
                 opticalFilterProfileId: renderContext.opticalFilterProfileId,
                 opticalFilterIntensity: renderContext.opticalFilterIntensity
             ).cropped(to: renderContext.renderBounds)
@@ -515,6 +518,7 @@ private struct VideoFrameRenderContext {
     let sourceSeed: Double
     let cameraOptics: CameraOpticsDTO?
     let creativeLut: PreparedCreativeLut?
+    let lutIntensity: Double
     let opticalFilterProfileId: String?
     let opticalFilterIntensity: Double
     let ciContext: CIContext

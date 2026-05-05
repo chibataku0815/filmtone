@@ -159,6 +159,7 @@ enum FilmtoneDesktopVideoComposition {
         let opticalFilterProfileId = inputs.opticalFilterProfileId
         let opticalFilterIntensity = inputs.opticalFilterIntensity
         let cameraOptics = inputs.cameraOptics
+        let lutIntensity = FilmtonePresetCatalog.clampStrength(inputs.presetStrength)
         let composition = AVMutableVideoComposition(
             asset: asset,
             applyingCIFiltersWithHandler: { request in
@@ -184,6 +185,7 @@ enum FilmtoneDesktopVideoComposition {
                     sourceSeed: sourceSeed,
                     cameraOptics: cameraOptics,
                     creativeLut: preparedCreativeLut,
+                    lutIntensity: lutIntensity,
                     opticalFilterProfileId: opticalFilterProfileId,
                     opticalFilterIntensity: opticalFilterIntensity
                 )
