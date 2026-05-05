@@ -123,6 +123,26 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
     AdvancedAdjustCatalog、editing helpers は `EditorState+ParamOverrides`
     extension に切り出し。これで 5-gap 5/5 全 close — 残作業は user smoke
     + notarize submission のみ。
+- 2026-05-05 multi-agent review が M5-C.3b 着地後の architecture / coverage
+  gap を 4 件 (P2 × 3 + P3 × 1) 指摘 → **M5-G Architecture Thin Cuts** 2 slice
+  で着地済 (commits `a68d5884` + `c0a12463`):
+  - **M5-G.1 ExportCoordinator extraction + SaveLookPayload lift** —
+    `RootWindowView` から ~150 行の export user flow を `State/
+    ExportCoordinator.swift` (`@MainActor final class`) に切り出し、root
+    view は panel composition + toolbar wiring に縮小。`SaveLookPayload`
+    を `EditorState` nested struct から `State/SaveLookPayload.swift` の
+    top-level struct に lift、`LibraryViewModel.saveCurrentLook` は
+    `(name:payload:)` に変更で library feature が EditorState 全体に依存
+    しなくなる。Build PASS / Verify 36/36 ✅。
+  - **M5-G.2 AdvancedAdjustCatalog parity in Verify** — `Domain/
+    AdvancedAdjustCatalog.swift` を Verify SOURCES に追加、Test group 9
+    (6 tests: 構成 / video filter / Phase0 keyPaths parity / 範囲 clamp 各
+    branch / shutterAngle iOS-canonical 不連続 / default identity) で
+    M5-C.3b の silent regression を防止。Verify 36 → 42 ✅。
+  - 残 follow-up (本 lane 範囲外、必要時に別 slice): export state field
+    (`isExporting` / `lastExportResult` 等) を ExportCoordinator に促進
+    する Phase 2、`FilmtonePhase0Math.clampParam` を film-lab-swift-core
+    に promote する Phase 3 (iOS canonical surface 触るので別 review)。
 - Future product direction: cross-device SSD workflow. The intended shape is
   source media moved by SSD / Files / Finder, shared sidecar + Look intent moved
   with the source, Desktop as the master / 4K-capable exporter, and iPhone as
@@ -211,6 +231,43 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
 
 ## Completion Log
 
+- 2026-05-05: **M5-G Architecture Thin Cuts closed** (commits `a68d5884`
+  + `c0a12463`)。Post-M5-C.3b multi-agent review が 4 件 (P2 RootWindowView
+  export orchestration / P2 AdvancedAdjustCatalog + EditorState+
+  ParamOverrides の Verify 未カバレッジ / P2 catalog の iOS canonical 重複 /
+  P3 LibraryViewModel が EditorState 全体に依存) を指摘 → 2 slice で着地。
+  **M5-G.1**: `State/ExportCoordinator.swift` 新規 (`@MainActor final
+  class`、`presentExportPanel(for:)` + 内部 still / video panel methods、
+  `EditorState` に対しては stateless)、RootWindowView から 3 つの
+  presentExportPanel / presentStillExportPanel / presentVideoExportPanel
+  関数を削除し toolbar Export button + `ExportInspectorPanel.onExportTap`
+  の 2 call site が `exportCoordinator.presentExportPanel(for: state)` に
+  delegate。`SaveLookPayload` を `EditorState` nested から `State/
+  SaveLookPayload.swift` の top-level struct に lift、`LibraryViewModel.
+  saveCurrentLook` を `(name:payload:)` に変更、`LookLibraryControls` は
+  `state.currentLookSavePayload()` を渡す形に。pbxproj A35/B34 (Export
+  Coordinator) + A36/B35 (SaveLookPayload) を State group + Sources phase
+  に登録。Build (xcodebuild Debug) PASS、Verify 36/36 ✅、Swift 6 strict
+  clean、警告なし。**M5-G.2**: `Verify/main.swift` に Test group 9 を追加 —
+  (a) `allGroups` 6 groups × 31 controls + key collision 防止、(b) video-
+  only filter (still mode = 29、video mode = 31、motion 2 が still で
+  非露出)、(c) catalog keys ⊂ `FilmtonePhase0Params.keyPaths` (31 全 key
+  が Phase0 surface に解決することを初めて pin)、(d) per-key clamp 範囲
+  (各 distinct branch: ±2 exposure / 0...2 contrast / ±1 temperature /
+  0...40 halationSpread / 0...100 halationHue / 0...0.95 trailIntensity /
+  rgbShift / grainIntensity が `FilmtonePhase0Generated.*Max` に bind /
+  汎用 0...1)、(e) shutterAngle の iOS-canonical 不連続 (`<90` → 0、
+  `90..<180` → 180、180...720 線形、>720 → 720)、(f) default branch =
+  identity passthrough。`Verify/run.sh` SOURCES に `Domain/Advanced
+  AdjustCatalog.swift` 追加。Verify 36 → 42 ✅。`FilmtonePhase0Math.
+  clampParam` は film-lab-swift-core に未昇格 (現状 iOS app 内専用) のため
+  catalog clamp の delegate 化はせず、Desktop 側 surface の自己 pin で着地。
+  shared package promotion は別 lane (M4-B Phase 3 候補) で扱う。
+  out-of-scope: export state field (`isExporting` / `lastExportResult`
+  等) を ExportCoordinator に migrate する Phase 2 (ExportInspectorPanel
+  bind 全部触るので別 slice 推奨)、OpenCoordinator 抽出 (1 関数 / call
+  site も 1 つで thin cut の justification なし)。Archived as
+  `archive/2026-05-05-m5-g-architecture-thin-cuts.md`。
 - 2026-05-05: **M5-C.3b Advanced Per-Parameter Override Editing UX (Desktop)
   closed**。Option B (popover) 採用で着手 — auto-mode、user 直接 review なし
   (standing directive: 本質優先 / 保守的に hedge しない / commit agent 委譲)。

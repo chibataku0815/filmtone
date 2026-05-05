@@ -92,4 +92,23 @@ larger lift owned by a separate M4-B follow-up slice.
 
 ## Status
 
-Not started. Implementation begins immediately after this file lands.
+**Closed 2026-05-05.** Both slices landed:
+
+- **M5-G.1** — commit `a68d5884` (8 files, +327/-180). xcodebuild Debug
+  PASS, Verify 36/36 ✅, Swift 6 strict clean.
+- **M5-G.2** — commit `c0a12463` (2 files, +113). Verify 36 → 42 ✅.
+
+Confirmed positive findings during execution:
+
+- All 31 catalog keys resolve through `FilmtonePhase0Params.keyPaths`
+  — first time this was pinned. Catalog had no silently-orphan keys.
+- Behavior-preserving move: no test or build behavior changed by the
+  ExportCoordinator extraction; the SaveLookPayload lift; or the
+  `LibraryViewModel.saveCurrentLook` signature change.
+- `FilmtonePhase0Math.clampParam` confirmed absent from
+  `film-lab-swift-core` — only `FilmtoneQuickState.clampAxis` is shared.
+  Catalog parity test pins Desktop's own clamp surface; cross-platform
+  delegation is a follow-up that touches the iOS canonical surface.
+
+Strategy.md gained both a Current Strategic State note and a Completion
+Log entry. This active.md is preserved as the archive record.
