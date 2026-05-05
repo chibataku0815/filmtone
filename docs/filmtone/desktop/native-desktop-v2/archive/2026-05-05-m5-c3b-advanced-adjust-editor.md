@@ -2,9 +2,9 @@
 
 Date opened: 2026-05-05 JST (auto-mode、Tier C 5-gap 5 件目 = 最終)
 
-**Status: PROPOSED — implementation pending user review of UX shape (A / B
-options below). 半日 size のため active.md 単独で実装着手は避けて、UX
-shape 確定後に着手する。**
+**Status: CLOSED 2026-05-05** — commit `495132f7`. **Option B (popover)**
+implemented in auto-mode after user directive. Detail in §"Status (added
+at archive time)" at the bottom of this file.
 
 ## Milestone
 
@@ -209,3 +209,22 @@ category catalog の transcribe 確認は user review が望ましいため、
 implementation 着手前に明示的に user 承認を取る。**
 
 承認後の実装は agent が連続着手 (commit 含む)。
+
+## Status (added at archive time)
+
+**Closed 2026-05-05** — commit `495132f7` (7 files, +698/-8). Picked
+**Option B (popover)** so the 30+ row editing surface gets 480×600pt
+to breathe instead of fighting the 220pt right-rail width.
+
+Implementation details, the responsibility-separation course
+correction (catalog → `Domain/`, editing helpers →
+`State/EditorState+ParamOverrides.swift` extension), and the 5/5
+gap closure recap live in `strategy.md` Completion Log under the
+2026-05-05 M5-C.3b entry.
+
+A 2026-05-05 multi-agent review surfaced 4 architecture / coverage
+gaps that landed against M5-C.3b (P2 RootWindowView export
+orchestration, P2 missing Verify coverage, P2 catalog parity gap,
+P3 LibraryViewModel coupling). Those were addressed in the M5-G
+Architecture Thin Cuts slice — see
+`archive/2026-05-05-m5-g-architecture-thin-cuts.md`.
