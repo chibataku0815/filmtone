@@ -1,5 +1,6 @@
 import Foundation
 import AVFoundation
+import FilmLabSwiftCore
 import UIKit
 
 @MainActor
@@ -143,6 +144,7 @@ final class FilmtoneEditorFacade {
         protectedCacheURIs: [String] = [],
         appliedSavedLook: SavedLookEntry? = nil,
         cameraProfile: CameraProfileSelection? = nil,
+        highlightMarkers: FilmtoneHighlightMarkers? = nil,
         onProgress: @escaping @MainActor (Phase0ExportProgressDTO) -> Void
     ) async throws -> Phase0ExportResultDTO {
         let protectedCacheURLs = protectedCacheURIs.compactMap { try? runtime.resolveFileURL($0) }
@@ -150,7 +152,8 @@ final class FilmtoneEditorFacade {
             request: request,
             protectedCacheURLs: protectedCacheURLs,
             appliedSavedLook: appliedSavedLook,
-            cameraProfile: cameraProfile
+            cameraProfile: cameraProfile,
+            highlightMarkers: highlightMarkers
         ) { progress in
             DispatchQueue.main.async {
                 Task { @MainActor in

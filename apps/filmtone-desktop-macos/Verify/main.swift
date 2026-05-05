@@ -70,6 +70,8 @@ private struct StubSidecarRequest: FilmtoneSidecarRequest {
     let sourceKind: FilmtoneSourceKind
     let quickState: FilmtoneQuickState
     let paramOverrides: FilmtonePhase0ParamsPatch
+    var highlightMarkers: FilmtoneHighlightMarkers? = nil
+    let opticalFilterProfileId: String? = nil
 }
 
 private let runner = TestRunner()
@@ -236,6 +238,153 @@ runner.test("sidecar gradeParams reflect Quick + paramOverrides applied") {
         let expectedV = expectedDirect.value(for: key)
         try assertClose(payloadV, expectedV, "gradeParams.\(key)")
     }
+}
+
+runner.test("sidecar emits highlightMarkers block with stable id") {
+    let markers = FilmtoneHighlightMarkers(
+        sourceIdentity: FilmtoneMarkerSourceIdentity(
+            filename: "clip.mov",
+            durationSec: 20,
+            fps: 24,
+            fileSizeBytes: 1024
+        ),
+        markers: [
+            FilmtoneHighlightMarker(
+                id: "filmtone-marker-desktop-test",
+                sourceTimeSec: 5,
+                sourceFps: 24,
+                createdOnPlatform: "macos",
+                createdAtIso: "2026-05-05T00:00:00.000Z"
+            )
+        ]
+    )
+    let req = StubSidecarRequest(
+        sourceURL: URL(fileURLWithPath: "/tmp/clip.mov"),
+        outputURL: URL(fileURLWithPath: "/tmp/out.mp4"),
+        presetName: "reset",
+        presetStrength: 1.0,
+        lookSlug: nil,
+        sourceKind: .video,
+        quickState: .zero,
+        paramOverrides: .empty,
+        highlightMarkers: markers
+    )
+    let payload = FilmtoneSidecarWriter.sidecarPayload(for: req)
+    guard
+        let block = payload["highlightMarkers"] as? [String: Any],
+        let markerList = block["markers"] as? [[String: Any]],
+        let first = markerList.first
+    else {
+        throw AssertionError(description: "highlightMarkers block missing")
+    }
+    try assertEqual(block["schema"] as? String, Optional(FilmtoneHighlightMarkers.schemaID))
+    try assertEqual(first["id"] as? String, Optional("filmtone-marker-desktop-test"))
+    try assertEqual(first["createdOnPlatform"] as? String, Optional("macos"))
+    try assertEqual(first["sourceFrame"] as? Int, Optional(120))
+}
+
+runner.test("sidecar reader loads iOS highlightMarkers by source filename") {
+    let tempDir = FileManager.default.temporaryDirectory
+        .appendingPathComponent("filmtone-marker-read-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tempDir) }
+
+    let sourceURL = tempDir.appendingPathComponent("clip.mov")
+    FileManager.default.createFile(atPath: sourceURL.path, contents: Data())
+    let sidecarURL = tempDir.appendingPathComponent("rendered.mp4.filmtone-ios-export-session-v1.json")
+    let json = """
+    {
+      "package": { "sourceMediaFilename": "clip.mov" },
+      "highlightMarkers": {
+        "schema": "filmtone-highlight-markers-v1",
+        "sourceIdentity": {
+          "filename": "clip.mov",
+          "durationSec": 20,
+          "fps": 24,
+          "fileSizeBytes": 1024
+        },
+        "defaults": { "preRollSec": 2, "postRollSec": 3 },
+        "markers": [{
+          "id": "filmtone-marker-ios-test",
+          "sourceTimeSec": 5,
+          "sourceFrame": 120,
+          "sourceFps": 24,
+          "preRollSec": 2,
+          "postRollSec": 3,
+          "color": "Blue",
+          "name": "Highlight",
+          "note": "",
+          "createdOnPlatform": "ios",
+          "createdAtIso": "2026-05-05T00:00:00.000Z"
+        }]
+      }
+    }
+    """
+    try Data(json.utf8).write(to: sidecarURL)
+
+    let markers = FilmtoneSidecarWriter.readHighlightMarkers(matchingSourceURL: sourceURL)
+    try assertEqual(markers?.markers.first?.id, Optional("filmtone-marker-ios-test"))
+    try assertEqual(markers?.markers.first?.createdOnPlatform, Optional("ios"))
+}
+
+runner.test("Backlight Veil catalog exposes shared profile ids + supported values") {
+    try assertEqual(
+        FilmtoneOpticalFilterCatalog.profiles.map(\.id),
+        ["backlightVeil-1-8", "backlightVeil-1-4", "backlightVeil-1-2"],
+        "Native should expose the product-facing Backlight Veil densities"
+    )
+    guard let profile = FilmtoneOpticalFilterCatalog.profile(for: "backlightVeil-1-4") else {
+        throw AssertionError(description: "Backlight Veil 1/4 profile missing")
+    }
+    try assertEqual(profile.family, "backlightVeil")
+    try assertEqual(profile.density, "1/4")
+    try assertClose(profile.paramPatch.values["bloomThreshold"] ?? -1, 0.56)
+    try assertClose(profile.paramPatch.values["bloomStrength"] ?? -1, 0.38)
+    try assertClose(profile.paramPatch.values["diffusion"] ?? -1, 0.24)
+    try assertClose(profile.paramPatch.values["halationIntensity"] ?? -1, 0.14)
+    try assertClose(profile.paramPatch.values["lensSoftness"] ?? -1, 0.08)
+}
+
+runner.test("Backlight Veil render patch preserves manual advanced override priority") {
+    let merged = FilmtoneOpticalFilterCatalog.renderParamOverrides(
+        profileId: "backlightVeil-1-4",
+        userOverrides: FilmtonePhase0ParamsPatch(values: [
+            "bloomStrength": 0.91,
+            "exposure": 0.25,
+        ])
+    )
+    try assertClose(merged.values["bloomThreshold"] ?? -1, 0.56)
+    try assertClose(merged.values["bloomStrength"] ?? -1, 0.91)
+    try assertClose(merged.values["exposure"] ?? -1, 0.25)
+}
+
+runner.test("sidecar records Backlight Veil identity and resolves gradeParams") {
+    struct OpticalSidecarRequest: FilmtoneSidecarRequest {
+        let sourceURL = URL(fileURLWithPath: "/tmp/in.mov")
+        let outputURL = URL(fileURLWithPath: "/tmp/out.mp4")
+        let presetName = "reset"
+        let presetStrength = 1.0
+        let lookSlug: String? = nil
+        let sourceKind: FilmtoneSourceKind = .video
+        let quickState = FilmtoneQuickState.zero
+        let paramOverrides = FilmtonePhase0ParamsPatch(values: [
+            "diffusion": 0.31,
+        ])
+        let opticalFilterProfileId: String? = "backlightVeil-1-4"
+    }
+    let payload = FilmtoneSidecarWriter.sidecarPayload(for: OpticalSidecarRequest())
+    guard let optical = payload["opticalFilterProfile"] as? [String: String] else {
+        throw AssertionError(description: "opticalFilterProfile block missing")
+    }
+    try assertEqual(optical["id"], "backlightVeil-1-4")
+    try assertEqual(optical["family"], "backlightVeil")
+    try assertEqual(optical["density"], "1/4")
+    guard let grade = payload["gradeParams"] as? [String: Double] else {
+        throw AssertionError(description: "gradeParams missing")
+    }
+    try assertClose(grade["bloomStrength"] ?? -1, 0.38)
+    try assertClose(grade["diffusion"] ?? -1, 0.31)
+    try assertClose(grade["halationIntensity"] ?? -1, 0.14)
 }
 
 // ---------------------------------------------------------------------------
@@ -670,8 +819,11 @@ private let iosCanonicalParamLabels: [String: String] = [
 ]
 
 runner.test("AdvancedAdjustCatalog labels match iOS canonical paramLabels") {
+    // M5-I.1: read the catalog with `.english` strings explicitly so the
+    // assertion is deterministic on JA hosts where `.current` would
+    // resolve to `.japanese` and produce a JA tail (e.g. シャッターアングル).
     var byKey: [String: String] = [:]
-    for group in AdvancedAdjustCatalog.allGroups {
+    for group in AdvancedAdjustCatalog.allGroups(strings: .english) {
         for control in group.controls {
             byKey[control.key] = control.label
         }
@@ -691,7 +843,7 @@ runner.test("AdvancedAdjustCatalog labels match iOS canonical paramLabels") {
 }
 
 runner.test("AdvancedAdjustCatalog group titles include Tone (renamed from Process)") {
-    let titles = AdvancedAdjustCatalog.allGroups.map(\.title)
+    let titles = AdvancedAdjustCatalog.allGroups(strings: .english).map(\.title)
     let expected = ["Basic", "Tone", "Optics", "Glow", "Grain", "Motion"]
     try assertEqual(titles, expected, "group title order + spelling")
 }
@@ -722,6 +874,19 @@ runner.test("Each non-basic group ships at least one none + one stamp recipe") {
 runner.test("basic group keeps no recipes (mirrors iOS)") {
     let basic = AdvancedAdjustCatalog.allGroups.first { $0.id == "basic" }
     try assertEqual(basic?.recipes.isEmpty, true, "basic group should ship no chips")
+}
+
+runner.test("AdvancedAdjustCatalog visible recipe chip groups match first-open Desktop surface") {
+    try assertEqual(
+        AdvancedAdjustCatalog.visibleRecipeChipGroupIds(forVideo: false),
+        ["process", "optics", "glow", "grain"],
+        "still mode should expose all still recipe chip groups and omit basic"
+    )
+    try assertEqual(
+        AdvancedAdjustCatalog.visibleRecipeChipGroupIds(forVideo: true),
+        ["process", "optics", "glow", "grain", "motion"],
+        "video mode should add the motion recipe chip group"
+    )
 }
 
 runner.test("Recipe stamped keys are confined to their own group") {
@@ -1075,11 +1240,713 @@ private func runStoreTests() async {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Test group 13 — M5-I.1 FilmtoneDesktopStrings JA/EN parity. The Desktop
+// localization layer must hold the same canonical English defaults the
+// catalog ships today AND the iOS canonical Japanese variants for the
+// labels iOS branches on `prefersJapanese`. Every assertion here pins a
+// single string the user sees in the AdvancedAdjustEditor so a JA host
+// never silently regresses to English copy when it should not.
+// ---------------------------------------------------------------------------
+
+runner.test("FilmtoneDesktopStrings.english carries the iOS canonical group titles") {
+    try assertEqual(FilmtoneDesktopStrings.english.groupBasic, "Basic", "english groupBasic")
+    try assertEqual(FilmtoneDesktopStrings.english.groupTone, "Tone", "english groupTone")
+    try assertEqual(FilmtoneDesktopStrings.english.groupOptics, "Optics", "english groupOptics")
+    try assertEqual(FilmtoneDesktopStrings.english.groupGlow, "Glow", "english groupGlow")
+    try assertEqual(FilmtoneDesktopStrings.english.groupGrain, "Grain", "english groupGrain")
+    try assertEqual(FilmtoneDesktopStrings.english.groupMotion, "Motion", "english groupMotion")
+}
+
+runner.test("FilmtoneDesktopStrings.japanese carries the iOS canonical Tone (階調)") {
+    // iOS only translates `groupTone` ("階調"); the other group titles keep
+    // their English defaultValue even on JA locale.
+    try assertEqual(FilmtoneDesktopStrings.japanese.groupBasic, "Basic", "japanese groupBasic falls back to EN per iOS")
+    try assertEqual(FilmtoneDesktopStrings.japanese.groupTone, "階調", "japanese groupTone")
+    try assertEqual(FilmtoneDesktopStrings.japanese.groupOptics, "Optics", "japanese groupOptics falls back to EN per iOS")
+    try assertEqual(FilmtoneDesktopStrings.japanese.groupGlow, "Glow", "japanese groupGlow falls back to EN per iOS")
+    try assertEqual(FilmtoneDesktopStrings.japanese.groupGrain, "Grain", "japanese groupGrain falls back to EN per iOS")
+    try assertEqual(FilmtoneDesktopStrings.japanese.groupMotion, "Motion", "japanese groupMotion falls back to EN per iOS")
+}
+
+runner.test("FilmtoneDesktopStrings preset chips match iOS defaults (None/なし, Default/標準, Strong/強め)") {
+    try assertEqual(FilmtoneDesktopStrings.english.presetNone, "None", "english presetNone")
+    try assertEqual(FilmtoneDesktopStrings.english.presetDefault, "Default", "english presetDefault")
+    try assertEqual(FilmtoneDesktopStrings.english.presetStrong, "Strong", "english presetStrong")
+    try assertEqual(FilmtoneDesktopStrings.japanese.presetNone, "なし", "japanese presetNone")
+    try assertEqual(FilmtoneDesktopStrings.japanese.presetDefault, "標準", "japanese presetDefault")
+    try assertEqual(FilmtoneDesktopStrings.japanese.presetStrong, "強め", "japanese presetStrong")
+}
+
+runner.test("FilmtoneDesktopStrings tone recipe chips match iOS defaults (Standard/標準, Airy/爽やか, Sunset/夕景, Depth/深み)") {
+    try assertEqual(FilmtoneDesktopStrings.english.toneStandard, "Standard", "english toneStandard")
+    try assertEqual(FilmtoneDesktopStrings.english.toneAiry, "Airy", "english toneAiry")
+    try assertEqual(FilmtoneDesktopStrings.english.toneSunset, "Sunset", "english toneSunset")
+    try assertEqual(FilmtoneDesktopStrings.english.toneDepth, "Depth", "english toneDepth")
+    try assertEqual(FilmtoneDesktopStrings.japanese.toneStandard, "標準", "japanese toneStandard")
+    try assertEqual(FilmtoneDesktopStrings.japanese.toneAiry, "爽やか", "japanese toneAiry")
+    try assertEqual(FilmtoneDesktopStrings.japanese.toneSunset, "夕景", "japanese toneSunset")
+    try assertEqual(FilmtoneDesktopStrings.japanese.toneDepth, "深み", "japanese toneDepth")
+}
+
+runner.test("FilmtoneDesktopStrings paramLabel mirrors iOS branching (Exposure EN-only; shutterAngle/trailIntensity translate)") {
+    // iOS defaults most paramLabels to English even on JA locale; only
+    // shutterAngle and trailIntensity carry an explicit JA variant.
+    try assertEqual(FilmtoneDesktopStrings.english.paramLabel(for: "exposure"), "Exposure", "english exposure")
+    try assertEqual(FilmtoneDesktopStrings.english.paramLabel(for: "shutterAngle"), "Shutter Angle", "english shutterAngle")
+    try assertEqual(FilmtoneDesktopStrings.english.paramLabel(for: "trailIntensity"), "Trail Length", "english trailIntensity")
+    try assertEqual(FilmtoneDesktopStrings.japanese.paramLabel(for: "exposure"), "Exposure", "japanese exposure falls back to EN per iOS")
+    try assertEqual(FilmtoneDesktopStrings.japanese.paramLabel(for: "shutterAngle"), "シャッターアングル", "japanese shutterAngle")
+    try assertEqual(FilmtoneDesktopStrings.japanese.paramLabel(for: "trailIntensity"), "残像の長さ", "japanese trailIntensity")
+}
+
+runner.test("FilmtoneDesktopStrings paramLabel falls back to the key when unknown") {
+    try assertEqual(
+        FilmtoneDesktopStrings.english.paramLabel(for: "someUnknownKey"),
+        "someUnknownKey",
+        "unknown key passes through"
+    )
+}
+
+runner.test("FilmtoneDesktopStrings supplies localized affordance copy") {
+    try assertEqual(FilmtoneDesktopStrings.english.advancedTitle, "Advanced Adjust", "english advancedTitle")
+    try assertEqual(FilmtoneDesktopStrings.japanese.advancedTitle, "詳細調整", "japanese advancedTitle")
+    try assertEqual(FilmtoneDesktopStrings.english.advancedResetAllOverrides, "Reset All Overrides", "english resetAll")
+    try assertEqual(FilmtoneDesktopStrings.japanese.advancedResetAllOverrides, "すべてのオーバーライドをリセット", "japanese resetAll")
+    try assertEqual(FilmtoneDesktopStrings.english.advancedClose, "Close", "english close")
+    try assertEqual(FilmtoneDesktopStrings.japanese.advancedClose, "閉じる", "japanese close")
+}
+
+runner.test("AdvancedAdjustCatalog with .japanese surfaces 階調 + tone JA recipe chips") {
+    let groups = AdvancedAdjustCatalog.allGroups(strings: .japanese)
+    let titles = groups.map(\.title)
+    try assertEqual(titles, ["Basic", "階調", "Optics", "Glow", "Grain", "Motion"], "JA group title order")
+    guard let process = groups.first(where: { $0.id == "process" }) else {
+        throw AssertionError(description: "process group missing under .japanese")
+    }
+    let toneLabels = process.recipes.map(\.label)
+    try assertEqual(toneLabels, ["標準", "爽やか", "夕景", "深み"], "JA tone recipe labels")
+    guard let glow = groups.first(where: { $0.id == "glow" }) else {
+        throw AssertionError(description: "glow group missing under .japanese")
+    }
+    let glowRecipeLabels = glow.recipes.map(\.label)
+    try assertEqual(glowRecipeLabels, ["なし", "標準", "強め"], "JA standard recipe labels")
+}
+
+runner.test("AdvancedAdjustCatalog with .japanese translates motion params, leaves the rest at iOS default") {
+    let groups = AdvancedAdjustCatalog.allGroups(strings: .japanese)
+    guard let motion = groups.first(where: { $0.id == "motion" }) else {
+        throw AssertionError(description: "motion group missing under .japanese")
+    }
+    var jaByKey: [String: String] = [:]
+    for control in motion.controls {
+        jaByKey[control.key] = control.label
+    }
+    try assertEqual(jaByKey["shutterAngle"], "シャッターアングル", "JA shutterAngle in motion group")
+    try assertEqual(jaByKey["trailIntensity"], "残像の長さ", "JA trailIntensity in motion group")
+
+    // basic.exposure remains EN per iOS default
+    guard let basic = groups.first(where: { $0.id == "basic" }),
+          let exposure = basic.controls.first(where: { $0.key == "exposure" }) else {
+        throw AssertionError(description: "basic.exposure missing under .japanese")
+    }
+    try assertEqual(exposure.label, "Exposure", "basic.exposure stays EN under .japanese per iOS")
+}
+
+// ---------------------------------------------------------------------------
+// M5-K4 — Scrub thumbnail math.
+// Pure helpers that the AV-bound provider depends on for cache key bucketing
+// and thumbnail-overlay placement. Verified here so a regression in either
+// helper trips the harness instead of surfacing as a UI glitch on the scrub
+// bar.
+// ---------------------------------------------------------------------------
+
+runner.test("FilmtoneScrubThumbnailMath.quantize default bucket = 0.25s") {
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantize(seconds: 0.0),
+        0.0,
+        eps: 1e-9,
+        "0 → 0"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantize(seconds: 0.124),
+        0.0,
+        eps: 1e-9,
+        "0.124 → 0 (rounds down)"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantize(seconds: 0.125),
+        0.25,
+        eps: 1e-9,
+        "0.125 → 0.25 (banker's rounding lands on even quarter)"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantize(seconds: 0.30),
+        0.25,
+        eps: 1e-9,
+        "0.30 → 0.25"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantize(seconds: 0.40),
+        0.50,
+        eps: 1e-9,
+        "0.40 → 0.50"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantize(seconds: 1.74),
+        1.75,
+        eps: 1e-9,
+        "1.74 → 1.75"
+    )
+}
+
+runner.test("FilmtoneScrubThumbnailMath.quantize clamps non-finite / negative") {
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantize(seconds: -0.5),
+        0.0,
+        eps: 1e-9,
+        "negative → 0"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantize(seconds: .nan),
+        0.0,
+        eps: 1e-9,
+        "NaN → 0"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantize(seconds: .infinity),
+        0.0,
+        eps: 1e-9,
+        "+inf → 0"
+    )
+}
+
+runner.test("FilmtoneScrubThumbnailMath.quantize honors custom bucket") {
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantize(seconds: 1.7, bucket: 1.0),
+        2.0,
+        eps: 1e-9,
+        "1.7 with 1s bucket → 2.0"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantize(seconds: 1.7, bucket: 0.0),
+        1.7,
+        eps: 1e-9,
+        "0 bucket → passthrough"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantize(seconds: 1.7, bucket: -0.5),
+        1.7,
+        eps: 1e-9,
+        "negative bucket → passthrough"
+    )
+}
+
+runner.test("FilmtoneScrubThumbnailMath.clampToDuration: typical clamp") {
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampToDuration(seconds: -1.0, duration: 12.34),
+        0.0,
+        eps: 1e-9,
+        "negative seconds → 0"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampToDuration(seconds: 5.0, duration: 12.34),
+        5.0,
+        eps: 1e-9,
+        "in-range passthrough"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampToDuration(seconds: 99.0, duration: 12.34),
+        12.34,
+        eps: 1e-9,
+        "past-end → duration"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampToDuration(seconds: 12.34, duration: 12.34),
+        12.34,
+        eps: 1e-9,
+        "exactly-end stays at duration"
+    )
+}
+
+runner.test("FilmtoneScrubThumbnailMath.clampToDuration: zero / non-finite duration") {
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampToDuration(seconds: 5.0, duration: 0.0),
+        0.0,
+        eps: 1e-9,
+        "zero duration → 0"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampToDuration(seconds: 5.0, duration: -3.0),
+        0.0,
+        eps: 1e-9,
+        "negative duration → 0"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampToDuration(seconds: 5.0, duration: .nan),
+        0.0,
+        eps: 1e-9,
+        "NaN duration → 0"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampToDuration(seconds: 5.0, duration: .infinity),
+        0.0,
+        eps: 1e-9,
+        "infinite duration → 0 (treated as invalid)"
+    )
+}
+
+runner.test("FilmtoneScrubThumbnailMath.clampToDuration: non-finite seconds") {
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampToDuration(seconds: .nan, duration: 12.34),
+        0.0,
+        eps: 1e-9,
+        "NaN seconds → 0"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampToDuration(seconds: .infinity, duration: 12.34),
+        0.0,
+        eps: 1e-9,
+        "infinite seconds → 0"
+    )
+}
+
+runner.test("FilmtoneScrubThumbnailMath: end-of-asset request quantizes within bounds") {
+    // Repro for the P2 review finding: a far-right hover at fraction
+    // 1.0 against a 12.34s asset previously quantized to 12.5s, beyond
+    // the asset's end. With clamp + quantize the request lands at the
+    // last in-range bucket (12.25s) and never escapes the asset.
+    let duration = 12.34
+    let request = duration  // far-right hover
+    let clamped = FilmtoneScrubThumbnailMath.clampToDuration(
+        seconds: request,
+        duration: duration
+    )
+    let quantized = FilmtoneScrubThumbnailMath.quantize(seconds: clamped)
+    if quantized > duration {
+        throw AssertionError(
+            description: "quantized \(quantized) escaped duration \(duration)"
+        )
+    }
+    try assertClose(quantized, 12.25, eps: 1e-9, "lands on last in-range 0.25s bucket")
+}
+
+runner.test("FilmtoneScrubThumbnailMath.quantizeWithinDuration: round-up overshoot floors back") {
+    // Follow-up review finding: clamp-then-quantize chain still lets
+    // round-half-to-even push past `duration`. 12.38 / 0.25 = 49.52,
+    // which rounds to 50 → 12.50, beyond the 12.38s asset. The helper
+    // detects the overshoot and floors to the last bucket ≤ duration.
+    let duration1 = 12.38
+    let q1 = FilmtoneScrubThumbnailMath.quantizeWithinDuration(
+        seconds: duration1,
+        duration: duration1
+    )
+    if q1 > duration1 {
+        throw AssertionError(
+            description: "quantized \(q1) escaped duration \(duration1)"
+        )
+    }
+    try assertClose(q1, 12.25, eps: 1e-9, "12.38s asset → last in-range bucket 12.25")
+
+    // 12.88s asset: 51.5 / .toNearestOrEven → 52 → 13.0, past 12.88.
+    // Floor must back off to 12.75.
+    let duration2 = 12.88
+    let q2 = FilmtoneScrubThumbnailMath.quantizeWithinDuration(
+        seconds: duration2,
+        duration: duration2
+    )
+    if q2 > duration2 {
+        throw AssertionError(
+            description: "quantized \(q2) escaped duration \(duration2)"
+        )
+    }
+    try assertClose(q2, 12.75, eps: 1e-9, "12.88s asset → last in-range bucket 12.75")
+
+    // Slightly-past-bucket like 12.39 also rounds up to 12.50 and must
+    // floor to 12.25.
+    let duration3 = 12.39
+    let q3 = FilmtoneScrubThumbnailMath.quantizeWithinDuration(
+        seconds: duration3,
+        duration: duration3
+    )
+    if q3 > duration3 {
+        throw AssertionError(
+            description: "quantized \(q3) escaped duration \(duration3)"
+        )
+    }
+    try assertClose(q3, 12.25, eps: 1e-9, "12.39s asset → last in-range bucket 12.25")
+}
+
+runner.test("FilmtoneScrubThumbnailMath.quantizeWithinDuration: exact-bucket boundary kept") {
+    // When duration *is* a bucket boundary, the rounded bucket equals
+    // duration and must not be floored away — would lose the final
+    // thumbnail on perfectly aligned clips.
+    let duration = 12.50
+    let q = FilmtoneScrubThumbnailMath.quantizeWithinDuration(
+        seconds: duration,
+        duration: duration
+    )
+    try assertClose(q, 12.50, eps: 1e-9, "12.50s asset → 12.50 (bucket = duration)")
+
+    // Just past the bucket (round-down side): 12.5001 / 0.25 = 50.0004
+    // → 50 → 12.50, in range, return as-is.
+    let q2 = FilmtoneScrubThumbnailMath.quantizeWithinDuration(
+        seconds: 12.5001,
+        duration: 12.5001
+    )
+    try assertClose(q2, 12.50, eps: 1e-9, "12.5001s asset → 12.50 (rounded down, in range)")
+}
+
+runner.test("FilmtoneScrubThumbnailMath.quantizeWithinDuration: mid-range pass-through") {
+    // Mid-range hovers must behave identically to the pre-helper chain —
+    // the floor branch only activates when quantize overshoots.
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantizeWithinDuration(seconds: 5.0, duration: 12.38),
+        5.0,
+        eps: 1e-9,
+        "exact-on-bucket mid-range untouched"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantizeWithinDuration(seconds: 5.13, duration: 12.38),
+        5.25,
+        eps: 1e-9,
+        "5.13 rounds to 5.25, well inside 12.38s"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantizeWithinDuration(seconds: -1.0, duration: 12.38),
+        0.0,
+        eps: 1e-9,
+        "negative request clamps to 0"
+    )
+}
+
+runner.test("FilmtoneScrubThumbnailMath.quantizeWithinDuration: zero / non-finite / sub-bucket duration") {
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantizeWithinDuration(seconds: 5.0, duration: 0.0),
+        0.0,
+        eps: 1e-9,
+        "zero duration → 0"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantizeWithinDuration(seconds: 5.0, duration: -3.0),
+        0.0,
+        eps: 1e-9,
+        "negative duration → 0"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantizeWithinDuration(seconds: 5.0, duration: .nan),
+        0.0,
+        eps: 1e-9,
+        "NaN duration → 0"
+    )
+    // Sub-bucket duration: 0.10s asset, far-right hover. quantize would
+    // round to 0 (already in range), so the helper returns 0 — correct
+    // first-frame thumbnail for an extremely short clip.
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantizeWithinDuration(seconds: 0.10, duration: 0.10),
+        0.0,
+        eps: 1e-9,
+        "sub-bucket duration → 0 (first-frame thumbnail)"
+    )
+}
+
+runner.test("FilmtoneScrubThumbnailMath.clampHoverFraction clamps to [0,1]") {
+    let width: CGFloat = 200
+    let knob: CGFloat = 18
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampHoverFraction(x: -50, width: width, knob: knob),
+        0.0,
+        eps: 1e-9,
+        "left of bar → 0"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampHoverFraction(x: 0, width: width, knob: knob),
+        0.0,
+        eps: 1e-9,
+        "left edge minus knob/2 still clamps to 0"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampHoverFraction(x: width, width: width, knob: knob),
+        1.0,
+        eps: 1e-9,
+        "right edge → 1"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampHoverFraction(x: width + 50, width: width, knob: knob),
+        1.0,
+        eps: 1e-9,
+        "right of bar → 1"
+    )
+}
+
+runner.test("FilmtoneScrubThumbnailMath.clampHoverFraction agrees with FilmtoneGlassSlider knob math") {
+    // FilmtoneGlassSlider.updateValue computes ratio = (x - knob/2) / (width - knob).
+    // Replicate that here at a midpoint so any future helper drift surfaces.
+    let width: CGFloat = 600
+    let knob: CGFloat = 18
+    let usable = width - knob
+    let cursorX = knob / 2 + usable * 0.5
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampHoverFraction(x: cursorX, width: width, knob: knob),
+        0.5,
+        eps: 1e-9,
+        "midpoint → 0.5"
+    )
+}
+
+runner.test("FilmtoneScrubThumbnailMath.clampThumbnailCenterX keeps overlay inside bar") {
+    // Cursor at left end pushes overlay to its leftmost legal center.
+    let leftCenter = FilmtoneScrubThumbnailMath.clampThumbnailCenterX(
+        cursorX: 0,
+        thumbnailWidth: 170,
+        scrubBarMinX: 0,
+        scrubBarMaxX: 600
+    )
+    try assertClose(leftCenter, 85, eps: 1e-9, "left clamp = thumbnailWidth/2")
+
+    // Cursor in the middle of the bar passes through.
+    let mid = FilmtoneScrubThumbnailMath.clampThumbnailCenterX(
+        cursorX: 300,
+        thumbnailWidth: 170,
+        scrubBarMinX: 0,
+        scrubBarMaxX: 600
+    )
+    try assertClose(mid, 300, eps: 1e-9, "midpoint passthrough")
+
+    // Cursor at right end pushes overlay to its rightmost legal center.
+    let rightCenter = FilmtoneScrubThumbnailMath.clampThumbnailCenterX(
+        cursorX: 600,
+        thumbnailWidth: 170,
+        scrubBarMinX: 0,
+        scrubBarMaxX: 600
+    )
+    try assertClose(rightCenter, 515, eps: 1e-9, "right clamp = scrubBarMaxX - thumbnailWidth/2")
+}
+
+runner.test("FilmtoneScrubThumbnailMath.clampThumbnailCenterX falls back to bar center when overlay overflows") {
+    // Bar width 100, thumbnail width 170 — no clamp can keep both edges
+    // inside, so the helper returns the bar's center.
+    let center = FilmtoneScrubThumbnailMath.clampThumbnailCenterX(
+        cursorX: 60,
+        thumbnailWidth: 170,
+        scrubBarMinX: 10,
+        scrubBarMaxX: 110
+    )
+    try assertClose(center, 60, eps: 1e-9, "overflow → bar center")
+}
+
+runner.test("FilmtoneScrubThumbnailCacheKey is signature-aware Hashable") {
+    let a1 = FilmtoneScrubThumbnailCacheKey(quantizedSeconds: 1.25, signature: 0)
+    let a2 = FilmtoneScrubThumbnailCacheKey(quantizedSeconds: 1.25, signature: 0)
+    let b = FilmtoneScrubThumbnailCacheKey(quantizedSeconds: 1.25, signature: 1)
+    let c = FilmtoneScrubThumbnailCacheKey(quantizedSeconds: 1.50, signature: 0)
+    try assertEqual(a1, a2, "same seconds + same signature collide")
+    if a1 == b { throw AssertionError(description: "different signature must distinguish keys") }
+    if a1 == c { throw AssertionError(description: "different seconds must distinguish keys") }
+    var set: Set<FilmtoneScrubThumbnailCacheKey> = []
+    set.insert(a1); set.insert(a2); set.insert(b); set.insert(c)
+    try assertEqual(set.count, 3, "set dedupes a1/a2 but keeps b and c")
+}
+
+// ---------------------------------------------------------------------------
+// Test group 14 — M5-L1 Source Auto / Conversion LUT parity. Pins the iOS
+// source-profile retention rule and the Apple Log / Apple Log 2 detection
+// fallback Desktop now shares with iOS.
+// ---------------------------------------------------------------------------
+
+runner.test("SourceColorMetadataNormalizer accepts CVImageBuffer Apple Log tokens") {
+    try assertEqual(
+        SourceColorMetadataNormalizer.normalizeLogTransferFunction(
+            "kCVImageBufferLogTransferFunction_AppleLog"
+        ),
+        .appleLog,
+        "Apple Log sample-buffer attachment"
+    )
+    try assertEqual(
+        SourceColorMetadataNormalizer.normalizeLogTransferFunction(
+            "kCVImageBufferLogTransferFunction_AppleLog2"
+        ),
+        .appleLog2,
+        "Apple Log 2 sample-buffer attachment"
+    )
+}
+
+runner.test("FilmtoneSourceProber resolves first-sample log fallback when format metadata is empty") {
+    try assertEqual(
+        FilmtoneSourceProber.resolveLogTransfer(
+            formatDescriptionRaw: nil,
+            firstSampleFallback: .appleLog
+        ),
+        .appleLog,
+        "missing format-description log should use first sample"
+    )
+    try assertEqual(
+        FilmtoneSourceProber.resolveLogTransfer(
+            formatDescriptionRaw: nil,
+            firstSampleFallback: .appleLog2
+        ),
+        .appleLog2,
+        "missing format-description log should use first sample Apple Log 2"
+    )
+}
+
+runner.test("FilmtoneSourceProber keeps format-description log over fallback") {
+    try assertEqual(
+        FilmtoneSourceProber.resolveLogTransfer(
+            formatDescriptionRaw: "kCMFormatDescriptionLogTransferFunction_AppleLog",
+            firstSampleFallback: .appleLog2
+        ),
+        .appleLog,
+        "track metadata has priority over sample fallback"
+    )
+}
+
+runner.test("SourceColorClassifier maps fallback Apple Log metadata to auto-resolvable classes") {
+    let appleLog = SourceColorMetadataDTO(
+        colorRange: nil,
+        colorSpace: "bt2020nc",
+        colorTransfer: SourceLogTransferFunctionDTO.appleLog.rawValue,
+        colorPrimaries: "bt2020",
+        logTransferFunction: .appleLog,
+        hasMasteringDisplayMetadata: false,
+        hasContentLightMetadata: false
+    )
+    let appleLog2 = SourceColorMetadataDTO(
+        colorRange: nil,
+        colorSpace: "bt2020nc",
+        colorTransfer: SourceLogTransferFunctionDTO.appleLog2.rawValue,
+        colorPrimaries: "bt2020",
+        logTransferFunction: .appleLog2,
+        hasMasteringDisplayMetadata: false,
+        hasContentLightMetadata: false
+    )
+    try assertEqual(SourceColorClassifier.classify(appleLog), .appleLog)
+    try assertEqual(SourceColorClassifier.classify(appleLog2), .appleLog2)
+    try assertEqual(
+        FilmtoneSourceProfileCatalog.entry(forColorClass: .appleLog)?.englishName,
+        "Apple Log"
+    )
+    try assertEqual(
+        FilmtoneSourceProfileCatalog.entry(forColorClass: .appleLog2)?.englishName,
+        "Apple Log 2"
+    )
+}
+
+runner.test("Source profile source-change policy resets detectable mismatches to Auto") {
+    let appleLogSelection = CameraProfileSelection.builtIn(
+        catalogId: "built-in:source-profile.apple-log"
+    )
+    let rec709Selection = CameraProfileSelection.builtIn(
+        catalogId: "built-in:source-profile.rec709"
+    )
+    try assertEqual(
+        FilmtoneSourceProfileCatalog.selectionAfterSourceChange(
+            appleLogSelection,
+            probedColorClass: .appleLog
+        ),
+        appleLogSelection,
+        "matching Apple Log source keeps manual selection"
+    )
+    try assertEqual(
+        FilmtoneSourceProfileCatalog.selectionAfterSourceChange(
+            appleLogSelection,
+            probedColorClass: .sdrBt709
+        ),
+        .auto,
+        "Apple Log manual pick should reset on SDR mismatch"
+    )
+    try assertEqual(
+        FilmtoneSourceProfileCatalog.selectionAfterSourceChange(
+            rec709Selection,
+            probedColorClass: .appleLog
+        ),
+        .auto,
+        "Rec.709 manual pick should reset on Apple Log mismatch"
+    )
+}
+
+runner.test("Source profile source-change policy keeps non-detectable manual picks sticky") {
+    let vLogSelection = CameraProfileSelection.builtIn(
+        catalogId: "built-in:source-profile.panasonic-vlog"
+    )
+    try assertEqual(
+        FilmtoneSourceProfileCatalog.selectionAfterSourceChange(
+            vLogSelection,
+            probedColorClass: .sdrBt709
+        ),
+        vLogSelection,
+        "V-Log stays sticky because container metadata cannot prove mismatch"
+    )
+    try assertEqual(
+        FilmtoneSourceProfileCatalog.selectionAfterSourceChange(
+            .builtIn(catalogId: "built-in:source-profile.missing"),
+            probedColorClass: .appleLog
+        ),
+        .auto,
+        "missing catalog row should fall back to Auto"
+    )
+}
+
+runner.test("Source profile Auto detection labels match iOS-style wording") {
+    guard let appleLog = FilmtoneSourceProfileCatalog.entry(forColorClass: .appleLog) else {
+        throw AssertionError(description: "Apple Log catalog row missing")
+    }
+    try assertEqual(
+        FilmtoneSourceProfileCatalog.autoResolvedValueLabel(for: appleLog),
+        "Auto -> Apple Log"
+    )
+    try assertEqual(
+        FilmtoneSourceProfileCatalog.autoDetectedCaption(for: appleLog, prefersJapanese: false),
+        "Auto -> Apple Log detected"
+    )
+    try assertEqual(
+        FilmtoneSourceProfileCatalog.autoDetectedCaption(for: appleLog, prefersJapanese: true),
+        "Auto -> Apple Log 検出"
+    )
+}
+
 let storeSemaphore = DispatchSemaphore(value: 0)
 Task {
     await runStoreTests()
     storeSemaphore.signal()
 }
 storeSemaphore.wait()
+
+// ---------------------------------------------------------------------------
+// Test group 15 — M5-K3 FilmtoneCompareSplitMath. Pins the boundary
+// behavior of the shared split-fraction helper so EditorState.didSet,
+// FilmtoneCompareCompose.makeSplit, and the AVPlayer composition handler
+// never silently drift on what counts as a valid compare position.
+// ---------------------------------------------------------------------------
+
+runner.test("FilmtoneCompareSplitMath default is 0.5") {
+    try assertClose(FilmtoneCompareSplitMath.default, 0.5)
+}
+
+runner.test("FilmtoneCompareSplitMath range is 0...1 inclusive") {
+    try assertClose(FilmtoneCompareSplitMath.range.lowerBound, 0.0)
+    try assertClose(FilmtoneCompareSplitMath.range.upperBound, 1.0)
+}
+
+runner.test("FilmtoneCompareSplitMath.clamp identity inside range") {
+    try assertClose(FilmtoneCompareSplitMath.clamp(0.0), 0.0)
+    try assertClose(FilmtoneCompareSplitMath.clamp(0.25), 0.25)
+    try assertClose(FilmtoneCompareSplitMath.clamp(0.5), 0.5)
+    try assertClose(FilmtoneCompareSplitMath.clamp(0.75), 0.75)
+    try assertClose(FilmtoneCompareSplitMath.clamp(1.0), 1.0)
+}
+
+runner.test("FilmtoneCompareSplitMath.clamp pulls out-of-range to bounds") {
+    try assertClose(FilmtoneCompareSplitMath.clamp(-0.25), 0.0)
+    try assertClose(FilmtoneCompareSplitMath.clamp(-1_000), 0.0)
+    try assertClose(FilmtoneCompareSplitMath.clamp(1.25), 1.0)
+    try assertClose(FilmtoneCompareSplitMath.clamp(1_000_000), 1.0)
+}
+
+runner.test("FilmtoneCompareSplitMath.clamp collapses non-finite to default") {
+    try assertClose(FilmtoneCompareSplitMath.clamp(.nan), FilmtoneCompareSplitMath.default)
+    try assertClose(FilmtoneCompareSplitMath.clamp(.infinity), FilmtoneCompareSplitMath.default)
+    try assertClose(FilmtoneCompareSplitMath.clamp(-.infinity), FilmtoneCompareSplitMath.default)
+}
 
 exit(runner.summary())

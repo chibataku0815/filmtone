@@ -28,9 +28,9 @@
 #   6. spctl --assess to verify Gatekeeper accepts the stapled bundle
 #
 # Output:
-#   $OUTPUT_DIR/FilmtoneDesktop.app                 (notarized + stapled)
-#   $OUTPUT_DIR/FilmtoneDesktop.xcarchive
-#   $OUTPUT_DIR/FilmtoneDesktop.notarize.zip
+#   $OUTPUT_DIR/Filmtone.app                        (notarized + stapled)
+#   $OUTPUT_DIR/Filmtone.xcarchive
+#   $OUTPUT_DIR/Filmtone.notarize.zip
 #   $OUTPUT_DIR/notarize-submission.json
 #   $OUTPUT_DIR/build.log
 #

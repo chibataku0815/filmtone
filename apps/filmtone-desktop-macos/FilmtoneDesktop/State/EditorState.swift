@@ -23,11 +23,19 @@ final class EditorState {
     /// M5-A.3: probed video duration in seconds. `nil` for stills or
     /// before the probe completes. Drives the scrub bar range.
     var videoDurationSeconds: Double?
-    /// M5-D.2: true while the playback Task is incrementing
-    /// `videoPreviewSeconds` on a 24 fps tick. UI-side toggle via
-    /// `togglePlayback()` / Space-key. Manual scrub drag also flips this
-    /// off via the slider's onEditingChanged hook.
+    /// Nominal source fps used to derive Resolve-friendly marker frame ids.
+    var videoNominalFrameRate: Double?
+    /// M5-I.2: mirrors `videoSession?.player.timeControlStatus == .playing`,
+    /// pushed via the session's `onPlayingChange` callback so the
+    /// Play/Pause button glyph stays in sync with the AVPlayer rather
+    /// than being driven by a timer Task. `togglePlayback()` /
+    /// `Space-key` flip the underlying player; the observer flips this.
     var isPlaying: Bool = false
+    /// M5-I.2: user-selected playback rate (1× / 2× / 3×). Default 1×.
+    /// Pushed into `videoSession.setRate(_:)` on change. Stored on
+    /// EditorState so the rate menu binding survives session rebuilds
+    /// (open new source → reuse the previously-selected rate).
+    var playbackRate: Double = 1.0
     /// M5-C.1: source profile selection. `.auto` resolves at probe time
     /// (matches iOS canonical detection-hint catalog) — sticky on `.builtIn`
     /// because container metadata cannot reliably distinguish the synthesized
@@ -38,6 +46,10 @@ final class EditorState {
     /// can mirror Auto's resolved choice and the source-cap gate can decide
     /// whether to disable Export.
     var probedSourceColorClass: SourceColorClassDTO?
+    /// M5-L1: source-change profile retention/reset is applied exactly once
+    /// per opened source after the first still/video probe lands.
+    @ObservationIgnored
+    var sourceProfilePolicyAppliedURL: URL?
     /// M5-C.2a: which library entry is shown selected in the Look picker.
     /// nil = "None" (no Look). Built-in Stone / Urban appear here via
     /// their canonical catalog UUIDs (`FilmtoneCreativePackCatalog.find
@@ -58,6 +70,12 @@ final class EditorState {
     /// round-trip lights up here so a Look saved with overrides restores
     /// them on recall the moment the editing UI exists.
     var paramOverrides: FilmtonePhase0ParamsPatch = .empty
+    /// Source-relative highlight markers shared with iOS and DaVinci.
+    var highlightMarkers: FilmtoneHighlightMarkers?
+    /// M5-L3: named optical filter profile selection. `nil` means no
+    /// filter. Backlight Veil profiles resolve to a render-time patch
+    /// that manual `paramOverrides` can still override key-by-key.
+    var opticalFilterProfileId: String?
     var isExporting: Bool = false
     var exportProgress: Double = 0
     var exportProgressMessage: String?
@@ -92,11 +110,39 @@ final class EditorState {
     var currentExportTask: Task<Void, Never>?
     @ObservationIgnored
     var currentDurationProbeTask: Task<Void, Never>?
-    /// M5-D.2: playback ticker driving `videoPreviewSeconds` forward at
-    /// 24 fps while `isPlaying`. Cancelled by `stopPlayback()` /
-    /// `setSource(_:)` / end-of-video.
+    /// M5-I.2: AVPlayer-backed playback session for the currently loaded
+    /// video. Built async after `setSource(.video)` via
+    /// `currentSessionPrepareTask`; released to nil on still / no source.
+    /// The session owns the AVPlayer + AVPlayerItem and the periodic time
+    /// observer that pushes back into `videoPreviewSeconds`. NOT
+    /// `@ObservationIgnored` — `PreviewSurface` reads it to swap from the
+    /// black bridging backdrop to the AVPlayer view as soon as the session
+    /// lands, so the body must re-evaluate when the assignment changes.
+    var videoSession: FilmtoneDesktopVideoSession?
     @ObservationIgnored
-    var playbackTask: Task<Void, Never>?
+    var currentSessionPrepareTask: Task<Void, Never>?
+    /// M5-I.2: guards against the periodic time observer fighting an
+    /// active scrub drag — when the scrub bar is in `onEditingChanged
+    /// (true)` the observer's writes back into `videoPreviewSeconds`
+    /// would yank the slider thumb away from the user's finger.
+    @ObservationIgnored
+    var isScrubbing: Bool = false
+    /// M5-J.2: Before/After 50:50 compare. When true the still preview
+    /// composes left=source / right=graded via FilmtoneCompareCompose,
+    /// and the video composition handler does the same for each
+    /// composed frame. Preview-only — does not affect export or sidecar.
+    var isCompareEnabled: Bool = false
+    /// M5-K3: horizontal split position the compare overlay is anchored
+    /// to, in [0, 1]. didSet collapses non-finite drags and out-of-range
+    /// values back into `FilmtoneCompareSplitMath.range` so the still
+    /// composer and video composition handler always receive a sane
+    /// fraction. Default mirrors the M5-J.2 fixed 50:50 starting point.
+    var compareSplitFraction: Double = FilmtoneCompareSplitMath.default {
+        didSet {
+            let clamped = FilmtoneCompareSplitMath.clamp(compareSplitFraction)
+            if clamped != compareSplitFraction { compareSplitFraction = clamped }
+        }
+    }
 
     var presetParams: FilmtonePhase0Params {
         FilmtonePresetCatalog.resolved(
@@ -104,7 +150,14 @@ final class EditorState {
             strength: presetStrength,
             lookSlug: lookSlug,
             quickState: quickState,
-            paramOverrides: paramOverrides
+            paramOverrides: renderParamOverrides
+        )
+    }
+
+    var renderParamOverrides: FilmtonePhase0ParamsPatch {
+        FilmtoneOpticalFilterCatalog.renderParamOverrides(
+            profileId: opticalFilterProfileId,
+            userOverrides: paramOverrides
         )
     }
 
@@ -153,17 +206,28 @@ final class EditorState {
         // from the previous source.
         currentDurationProbeTask?.cancel()
         currentDurationProbeTask = nil
-        // M5-D.2: kill any in-flight playback ticker too — a new source
-        // means the old time axis is gone, so a residual Task would
-        // increment the new source's videoPreviewSeconds before duration
-        // probe completes.
-        stopPlayback()
+        // M5-I.2: tear down the previous session so its AVPlayer stops
+        // ticking and the periodic time observer is removed before the
+        // next session takes over. A residual session would race the
+        // new source's videoPreviewSeconds writes.
+        currentSessionPrepareTask?.cancel()
+        currentSessionPrepareTask = nil
+        videoSession?.teardown()
+        videoSession = nil
+        isPlaying = false
         videoPreviewSeconds = nil
         videoDurationSeconds = nil
+        videoNominalFrameRate = nil
+        if let url, kind == .video {
+            highlightMarkers = FilmtoneSidecarWriter.readHighlightMarkers(matchingSourceURL: url)
+        } else {
+            highlightMarkers = nil
+        }
         // M5-C.1: clear the previous probe's color class so the gate /
         // Picker resolved-Auto label don't misreport stale state until the
         // PreviewSurface re-probes the new source.
         probedSourceColorClass = nil
+        sourceProfilePolicyAppliedURL = nil
         // M5-C.4: previous export's snapshot belonged to the previous
         // source — clear so the inspector returns to ready state for
         // the new source.
@@ -175,7 +239,87 @@ final class EditorState {
 
         if let url, kind == .video {
             startVideoDurationProbe(for: url)
+            startVideoSessionPrepare(for: url)
         }
+    }
+
+    /// M5-I.2: spin up the AVPlayer-backed session for `url`. Probes the
+    /// asset off-actor (FilmtoneSourceProber.probeVideo), captures track
+    /// metadata + color class, builds the session, wires its time +
+    /// playing-status observers back into EditorState, and pushes the
+    /// initial render inputs so the first composed frame matches the
+    /// editor's current preset / look / quick / overrides / profile.
+    private func startVideoSessionPrepare(for url: URL) {
+        let initialInputs = currentVideoRenderInputs(for: url)
+        currentSessionPrepareTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let session = try? await FilmtoneDesktopVideoSession.prepare(
+                sourceURL: url,
+                inputs: initialInputs
+            )
+            guard !Task.isCancelled,
+                  self.sourceURL == url,
+                  let session else {
+                return
+            }
+            self.videoSession = session
+            self.applyProbedSourceColorClass(session.probedColorClass, for: url)
+            // Apply the playback rate the user previously selected before
+            // a new source replaced the prior session.
+            session.setRate(self.playbackRate)
+            session.onTimeUpdate = { [weak self] seconds in
+                guard let self else { return }
+                if self.isScrubbing { return }
+                self.videoPreviewSeconds = seconds
+            }
+            session.onPlayingChange = { [weak self] playing in
+                self?.isPlaying = playing
+            }
+        }
+    }
+
+    /// Snapshot the current edit state into a Sendable bundle for the
+    /// composition factory. Captured at composition-build time and
+    /// closed over by the per-frame handler so each rebuild renders a
+    /// coherent set of params (no mid-frame state tear).
+    func currentVideoRenderInputs(
+        for url: URL? = nil
+    ) -> FilmtoneDesktopVideoRenderInputs {
+        FilmtoneDesktopVideoRenderInputs(
+            presetName: presetName,
+            presetStrength: presetStrength,
+            lookSlug: lookSlug,
+            sourceProfileSelection: sourceProfileSelection,
+            probedColorClass: probedSourceColorClass,
+            quickState: quickState,
+            paramOverrides: renderParamOverrides,
+            compareEnabled: isCompareEnabled,
+            compareSplitFraction: compareSplitFraction,
+            sourceURL: url ?? sourceURL ?? URL(fileURLWithPath: "/")
+        )
+    }
+
+    func applyProbedSourceColorClass(_ colorClass: SourceColorClassDTO?, for url: URL) {
+        guard sourceURL == url else { return }
+        probedSourceColorClass = colorClass
+        guard sourceProfilePolicyAppliedURL != url else { return }
+        sourceProfilePolicyAppliedURL = url
+
+        let retained = FilmtoneSourceProfileCatalog.selectionAfterSourceChange(
+            sourceProfileSelection,
+            probedColorClass: colorClass
+        )
+        if retained != sourceProfileSelection {
+            sourceProfileSelection = retained
+        }
+    }
+
+    /// M5-J.2: flip the compare toggle. Toolbar disables the button when
+    /// no source is loaded, so this is only called in a meaningful state;
+    /// the value still flips for either source kind to keep the binding
+    /// behavior simple.
+    func toggleCompare() {
+        isCompareEnabled.toggle()
     }
 
     /// M5-A.3: probes video duration off the main actor and seeds
@@ -186,8 +330,11 @@ final class EditorState {
     private func startVideoDurationProbe(for url: URL) {
         currentDurationProbeTask = Task { @MainActor [weak self] in
             guard let self else { return }
-            let probedDuration = try? await FilmtoneVideoFramePreviewLoader
-                .loadDurationSeconds(from: url)
+            let videoProbe = try? await FilmtoneSourceProber.probeVideo(sourceURL: url)
+            var probedDuration = videoProbe?.durationSeconds
+            if probedDuration == nil {
+                probedDuration = try? await FilmtoneVideoFramePreviewLoader.loadDurationSeconds(from: url)
+            }
             guard !Task.isCancelled,
                   self.sourceURL == url,
                   let probedDuration,
@@ -197,6 +344,11 @@ final class EditorState {
             }
             self.videoDurationSeconds = probedDuration
             self.videoPreviewSeconds = probedDuration * 0.5
+            if let frameRate = videoProbe?.nominalFrameRate,
+               frameRate.isFinite,
+               frameRate > 0 {
+                self.videoNominalFrameRate = Double(frameRate)
+            }
         }
     }
 
@@ -204,58 +356,167 @@ final class EditorState {
         currentExportTask?.cancel()
     }
 
-    // MARK: - M5-D.2 Playback ticker
+    // MARK: - M5-I.2 AVPlayer-backed playback
 
-    /// Toggle 24 fps playback driving `videoPreviewSeconds` through the
-    /// existing scrub-driven preview pipeline. Frame drops emerge
-    /// naturally from the in-flight cancellation pattern in
-    /// `PreviewSurface` — the ticker requests frames faster than the
-    /// CIKernel grade pipeline can serve, and stale requests cancel.
-    /// AVPlayer migration is a follow-up slice if this MVP is too slow.
+    /// Toggle real AVPlayer playback. Delegates to the live session's
+    /// `togglePlayback()`; `isPlaying` is then updated by the session's
+    /// `onPlayingChange` callback so this stays in lockstep with
+    /// `AVPlayer.timeControlStatus`.
     func togglePlayback() {
-        if isPlaying {
-            stopPlayback()
-        } else {
-            startPlayback()
-        }
+        videoSession?.togglePlayback()
     }
 
-    func startPlayback() {
+    /// Seek the AVPlayer (used by the scrub bar). Holds `isScrubbing`
+    /// so the session's periodic time observer doesn't fight the drag.
+    func seekVideo(toSeconds seconds: Double) {
+        videoSession?.seek(toSeconds: seconds)
+    }
+
+    /// Update playback rate (1×/2×/3×). Stored on EditorState so the
+    /// rate menu binding is stable across session rebuilds.
+    func setPlaybackRate(_ rate: Double) {
+        playbackRate = rate
+        videoSession?.setRate(rate)
+    }
+
+    /// Push the current edit state snapshot into the live video
+    /// session's composition. Called from RootWindowView's onChange
+    /// hooks for preset / strength / look / quick / overrides /
+    /// sourceProfileSelection so a video user sees the edit roll
+    /// through to the next composed frame within the session's 100ms
+    /// debounce window.
+    func refreshVideoCompositionIfNeeded() {
+        guard let videoSession else { return }
+        videoSession.updateInputs(currentVideoRenderInputs())
+    }
+
+    var highlightMarkerList: [FilmtoneHighlightMarker] {
+        highlightMarkers?.markers ?? []
+    }
+
+    var exportHighlightMarkers: FilmtoneHighlightMarkers? {
+        guard let highlightMarkers, !highlightMarkers.isEmpty else {
+            return nil
+        }
+        return highlightMarkers
+    }
+
+    func addHighlightMarker(at sourceTimeSec: Double) {
         guard sourceKind == .video,
-              let duration = videoDurationSeconds,
-              duration > 0,
-              videoPreviewSeconds != nil else {
+              let sourceIdentity = currentMarkerSourceIdentity() else {
             return
         }
-        // Cancel any prior ticker before starting a new one.
-        playbackTask?.cancel()
-        isPlaying = true
-        playbackTask = Task { @MainActor [weak self] in
-            // Nominal 24 fps; real pipeline framerate is governed by the
-            // scrub-driven decode + grade pipeline behind PreviewSurface.
-            let dt = 1.0 / 24.0
-            let stepNanos = UInt64(dt * 1_000_000_000)
-            while true {
-                try? await Task.sleep(nanoseconds: stepNanos)
-                guard !Task.isCancelled,
-                      let s = self,
-                      s.isPlaying else { return }
-                let next = (s.videoPreviewSeconds ?? 0) + dt
-                if next >= duration {
-                    s.videoPreviewSeconds = duration
-                    s.isPlaying = false
-                    s.playbackTask = nil
-                    return
-                }
-                s.videoPreviewSeconds = next
+        let duration = videoDurationSeconds
+        let clampedTime: Double
+        if let duration, duration.isFinite, duration > 0 {
+            clampedTime = min(max(sourceTimeSec, 0), duration)
+        } else {
+            clampedTime = max(sourceTimeSec, 0)
+        }
+        let current = highlightMarkers ?? FilmtoneHighlightMarkers(
+            sourceIdentity: sourceIdentity,
+            markers: []
+        )
+        if current.marker(near: clampedTime) != nil {
+            return
+        }
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let marker = FilmtoneHighlightMarker(
+            id: "filmtone-marker-\(UUID().uuidString)",
+            sourceTimeSec: clampedTime,
+            sourceFps: sourceIdentity.fps,
+            createdOnPlatform: "macos",
+            createdAtIso: formatter.string(from: Date())
+        )
+        highlightMarkers = current.replacingOrAppending(marker)
+        invalidateExportPackageState()
+    }
+
+    func removeHighlightMarker(id: String) {
+        guard let current = highlightMarkers else {
+            return
+        }
+        let remaining = current.markers.filter { $0.id != id }
+        highlightMarkers = remaining.isEmpty
+            ? nil
+            : FilmtoneHighlightMarkers(
+                schema: current.schema,
+                sourceIdentity: current.sourceIdentity,
+                defaults: current.defaults,
+                markers: remaining
+        )
+        invalidateExportPackageState()
+    }
+
+    func jumpToHighlightMarker(id: String) {
+        guard let marker = highlightMarkerList.first(where: { $0.id == id }) else {
+            return
+        }
+        videoSession?.pause()
+        isPlaying = false
+        let duration = videoDurationSeconds
+        let targetSeconds: Double
+        if let duration, duration.isFinite, duration > 0 {
+            targetSeconds = min(max(marker.sourceTimeSec, 0), duration)
+        } else {
+            targetSeconds = max(marker.sourceTimeSec, 0)
+        }
+        videoPreviewSeconds = targetSeconds
+        seekVideo(toSeconds: targetSeconds)
+    }
+
+    func jumpToNextHighlightMarker() {
+        let markers = sortedHighlightMarkerList()
+        guard !markers.isEmpty else {
+            return
+        }
+        let currentTime = videoPreviewSeconds ?? 0
+        let nextThreshold = currentTime + 0.01
+        let target = markers.first { $0.sourceTimeSec > nextThreshold } ?? markers[0]
+        jumpToHighlightMarker(id: target.id)
+    }
+
+    func jumpToPreviousHighlightMarker() {
+        let markers = sortedHighlightMarkerList()
+        guard let lastMarker = markers.last else {
+            return
+        }
+        let currentTime = videoPreviewSeconds ?? 0
+        let previousThreshold = currentTime - 0.01
+        let target = markers.last { $0.sourceTimeSec < previousThreshold } ?? lastMarker
+        jumpToHighlightMarker(id: target.id)
+    }
+
+    private func sortedHighlightMarkerList() -> [FilmtoneHighlightMarker] {
+        highlightMarkerList.sorted {
+            if $0.sourceTimeSec == $1.sourceTimeSec {
+                return $0.id < $1.id
             }
+            return $0.sourceTimeSec < $1.sourceTimeSec
         }
     }
 
-    func stopPlayback() {
-        playbackTask?.cancel()
-        playbackTask = nil
-        isPlaying = false
+    private func currentMarkerSourceIdentity() -> FilmtoneMarkerSourceIdentity? {
+        guard let sourceURL else {
+            return nil
+        }
+        let attributes = try? FileManager.default.attributesOfItem(atPath: sourceURL.path)
+        let fileSize = attributes?[.size] as? Int64
+        return FilmtoneMarkerSourceIdentity(
+            filename: sourceURL.lastPathComponent,
+            durationSec: videoDurationSeconds,
+            fps: FilmtoneHighlightMarker.validFPS(videoNominalFrameRate),
+            fileSizeBytes: fileSize
+        )
+    }
+
+    private func invalidateExportPackageState() {
+        lastExportResult = nil
+        lastExportError = nil
+        lastExportSummary = nil
+        exportProgress = 0
     }
 
     // MARK: - M5-C.4 Export inspector

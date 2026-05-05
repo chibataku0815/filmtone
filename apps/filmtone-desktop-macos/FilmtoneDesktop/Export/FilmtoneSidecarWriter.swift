@@ -60,7 +60,10 @@ enum FilmtoneSidecarWriter {
             strength: strength,
             lookSlug: request.lookSlug,
             quickState: liveQuickState,
-            paramOverrides: request.paramOverrides
+            paramOverrides: FilmtoneOpticalFilterCatalog.renderParamOverrides(
+                profileId: request.opticalFilterProfileId,
+                userOverrides: request.paramOverrides
+            )
         )
         let lookVersion = FilmtonePresetCatalog.presetVersion
 
@@ -109,6 +112,11 @@ enum FilmtoneSidecarWriter {
         if let sourceInterpretation {
             payload["sourceInterpretation"] = sourceInterpretation
         }
+        if let highlightMarkers = request.highlightMarkers,
+           !highlightMarkers.isEmpty,
+           let markerPayload = try? jsonObject(highlightMarkers) {
+            payload["highlightMarkers"] = markerPayload
+        }
         // M5-C.1 additive: emit the user's source profile selection plus
         // (when known) the catalog entry actually applied. `selection`
         // captures intent (Auto vs sticky pick); `resolvedId` captures what
@@ -126,6 +134,14 @@ enum FilmtoneSidecarWriter {
             }
         }
         payload["sourceProfile"] = sourceProfilePayload
+        // M5-L3 additive: preserve the named optical filter identity
+        // separately from `gradeParams`, which already contains the
+        // resolved visible Backlight Veil values.
+        if let opticalFilterProfile = FilmtoneOpticalFilterCatalog.sidecarPayload(
+            for: request.opticalFilterProfileId
+        ) {
+            payload["opticalFilterProfile"] = opticalFilterProfile
+        }
         // M5-A.2 additive: emit `creativeLut` provenance when a Look is
         // active and its cube resolves. SHA mismatch / missing resource
         // path returns nil from the loader → block is omitted (OQ-3:
@@ -143,6 +159,52 @@ enum FilmtoneSidecarWriter {
             ]
         }
         return payload
+    }
+
+    static func readHighlightMarkers(matchingSourceURL sourceURL: URL) -> FilmtoneHighlightMarkers? {
+        let directory = sourceURL.deletingLastPathComponent()
+        guard
+            let urls = try? FileManager.default.contentsOfDirectory(
+                at: directory,
+                includingPropertiesForKeys: nil
+            )
+        else {
+            return nil
+        }
+
+        let sourceFilename = sourceURL.lastPathComponent
+        for url in urls
+            .filter({ $0.pathExtension.lowercased() == "json" && $0.lastPathComponent.lowercased().contains("filmtone") })
+            .sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+            guard
+                let data = try? Data(contentsOf: url),
+                let envelope = try? JSONDecoder().decode(HighlightMarkerEnvelope.self, from: data),
+                let markers = envelope.highlightMarkers,
+                !markers.isEmpty
+            else {
+                continue
+            }
+            if markers.sourceIdentity.filename == nil ||
+                markers.sourceIdentity.filename == sourceFilename ||
+                envelope.package?.sourceMediaFilename == sourceFilename {
+                return markers
+            }
+        }
+        return nil
+    }
+
+    private static func jsonObject<T: Encodable>(_ value: T) throws -> Any {
+        let data = try JSONEncoder().encode(value)
+        return try JSONSerialization.jsonObject(with: data)
+    }
+
+    private struct HighlightMarkerEnvelope: Decodable {
+        let package: HighlightMarkerPackage?
+        let highlightMarkers: FilmtoneHighlightMarkers?
+    }
+
+    private struct HighlightMarkerPackage: Decodable {
+        let sourceMediaFilename: String?
     }
 
     private static func gradeParamsDictionary(_ p: FilmtonePhase0Params) -> [String: Double] {

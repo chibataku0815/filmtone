@@ -194,4 +194,34 @@ enum FilmtoneSourceProfileCatalog {
         guard let colorClass else { return nil }
         return allProfiles.first(where: { $0.detectionHint == colorClass })
     }
+
+    static func selectionAfterSourceChange(
+        _ selection: CameraProfileSelection,
+        probedColorClass: SourceColorClassDTO?
+    ) -> CameraProfileSelection {
+        switch selection {
+        case .auto:
+            return .auto
+        case .builtIn(let catalogId):
+            guard let entry = entry(forCatalogId: catalogId) else {
+                return .auto
+            }
+            guard let detectionHint = entry.detectionHint else {
+                return selection
+            }
+            return detectionHint == probedColorClass ? selection : .auto
+        }
+    }
+
+    static func autoResolvedValueLabel(for entry: CameraProfileCatalogEntry) -> String {
+        "Auto -> \(entry.englishName)"
+    }
+
+    static func autoDetectedCaption(
+        for entry: CameraProfileCatalogEntry,
+        prefersJapanese: Bool
+    ) -> String {
+        let suffix = prefersJapanese ? "検出" : "detected"
+        return "\(autoResolvedValueLabel(for: entry)) \(suffix)"
+    }
 }

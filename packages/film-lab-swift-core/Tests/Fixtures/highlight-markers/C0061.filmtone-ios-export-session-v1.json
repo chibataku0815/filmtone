@@ -1,0 +1,95 @@
+{
+  "kind": "filmtone-export-session",
+  "schema": "filmtone-ios-export-session-v1",
+  "exportedAtIso": "2026-05-05T00:00:00.000Z",
+  "source": {
+    "mediaType": "video",
+    "filename": "C0061.mov",
+    "durationSec": 123.45,
+    "fps": 29.97
+  },
+  "look": {
+    "presetId": "cinema",
+    "presetName": "Cinema",
+    "presetVersion": "fixture",
+    "params": {
+      "grainIntensity": 0.1,
+      "halationIntensity": 0.0
+    }
+  },
+  "output": {
+    "outputUri": "file:///tmp/C0061-filmtone.mov",
+    "outputColorProfile": "rec709",
+    "colorPrimaries": "ITU_R_709_2",
+    "colorTransfer": "ITU_R_709_2",
+    "colorSpace": "ITU_R_709_2",
+    "outputWidth": 3840,
+    "outputHeight": 2160,
+    "fps": 29.97,
+    "codec": "prores422",
+    "container": "mov"
+  },
+  "lutRefs": {
+    "inputLut": {
+      "size": 33,
+      "intensity": 1.0
+    },
+    "creativeLut": {
+      "size": 33,
+      "intensity": 1.0
+    }
+  },
+  "depth": {
+    "used": false,
+    "source": null,
+    "renderer": null,
+    "framesWithDepth": 0
+  },
+  "mezzanine": {
+    "used": false,
+    "variant": null,
+    "profileVersion": null
+  },
+  "package": {
+    "layout": "filmtone-connect-package-v2",
+    "sourceMediaFilename": "C0061.mov",
+    "renderedMediaFilename": "C0061-filmtone.mov",
+    "referenceAfterFilename": "reference-after.jpg",
+    "referenceAfterTimeSec": 42.13,
+    "luts": {
+      "combinedColor": "combined-color.cube"
+    },
+    "effects": {
+      "dctl": "filmtone-bridge.dctl"
+    }
+  },
+  "highlightMarkers": {
+    "schema": "filmtone-highlight-markers-v1",
+    "sourceIdentity": {
+      "filename": "C0061.mov",
+      "durationSec": 123.45,
+      "fps": 29.97,
+      "fileSizeBytes": 123456789,
+      "contentHash": "sha256:fixture"
+    },
+    "defaults": {
+      "preRollSec": 2.0,
+      "postRollSec": 3.0
+    },
+    "markers": [
+      {
+        "id": "filmtone-marker-001",
+        "sourceTimeSec": 42.13,
+        "sourceFrame": 1263,
+        "sourceFps": 29.97,
+        "preRollSec": 2.0,
+        "postRollSec": 3.0,
+        "color": "Blue",
+        "name": "Highlight",
+        "note": "",
+        "createdOnPlatform": "ios",
+        "createdAtIso": "2026-05-05T00:00:00.000Z"
+      }
+    ]
+  }
+}

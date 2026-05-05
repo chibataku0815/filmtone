@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# package-dmg.sh — wrap a notarized FilmtoneDesktop.app in a signed,
+# package-dmg.sh — wrap a notarized Filmtone.app in a signed,
 # notarized, stapled DMG ready for public distribution.
 #
 # Usage:
@@ -16,7 +16,7 @@
 #   At least one of the two must be set.
 #
 # Pre-condition:
-#   $OUTPUT_DIR/FilmtoneDesktop.app exists, is notarized + stapled
+#   $OUTPUT_DIR/Filmtone.app exists, is notarized + stapled
 #   (release-macos.sh produces this).
 #
 # Pipeline:
@@ -28,7 +28,7 @@
 #   6. spctl --assess --type open --context context:primary-signature
 #
 # Output:
-#   $OUTPUT_DIR/FilmtoneDesktop-<version>.dmg  (notarized + stapled)
+#   $OUTPUT_DIR/Filmtone-<version>.dmg  (notarized + stapled)
 
 set -euo pipefail
 

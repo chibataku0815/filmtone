@@ -4,7 +4,7 @@
  *              `MARKETING_VERSION` と `PRODUCT_NAME` を正本として配布名を組み立てます。
  *              旧 Electron の `apps/desktop-film-lab-batch/scripts/release-artifact-meta.mjs`
  *              の Native v2 移植版。pathname / env var 名は cutover-architecture.md
- *              decision E (Bundle ID 引継) と整合させ Electron 1.0.4 user の自動 upgrade 経路を保ちます。
+ *              decisions A/G (Bundle ID 引継 + distribution channel) と整合させ Electron 1.0.4 user の自動 upgrade 経路を保ちます。
  * @limitations 版の正本は pbxproj。Marketing version を上げる時は Debug + Release
  *              両 buildSettings を必ず一致させてください (release-macos.sh が一方しか読まないため)。
  */
@@ -45,7 +45,7 @@ export function slugifyProductName(productName) {
 /**
  * @description release notes の版付きファイル名を返します (Electron 互換)。
  * @param {string} version - pbxproj の MARKETING_VERSION
- * @returns {string} 例: `RELEASE_NOTES-v2.0.0.md`
+ * @returns {string} 例: `RELEASE_NOTES-v1.4.md`
  */
 export function buildReleaseNotesFileName(version) {
   return `RELEASE_NOTES-v${version}.md`;

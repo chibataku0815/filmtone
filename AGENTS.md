@@ -69,7 +69,8 @@ Documents:
   completion logs only.
 - `active.md` is the only current subtask. It must name the milestone, goal,
   edit targets, read-only references, checklist, verification, Done conditions,
-  out-of-scope items, and unexpected blockers.
+  stop conditions (Done met / unexpected / N consecutive verification failures —
+  pick a concrete N, default 3), out-of-scope items, and unexpected blockers.
 - `archive/YYYY-MM-DD-{slug}.md` stores completed `active.md` logs.
 - `paused/YYYY-MM-DD-{slug}.md` stores interrupted, incomplete active tasks.
 
@@ -82,6 +83,8 @@ Rules:
   one `active.md`.
 - Work only inside the current `active.md` scope. If scope needs to change, stop
   and record the issue before proposing the next step.
+- Stop and report when a stop condition fires. Do not loop on a failing
+  verification step indefinitely — once the documented N is reached, hand back.
 - While implementing, update completed checklist items as they finish.
 - On completion, record verification in `active.md`, move it to `archive/`, and
   append only a 1-3 line milestone note to `strategy.md`.

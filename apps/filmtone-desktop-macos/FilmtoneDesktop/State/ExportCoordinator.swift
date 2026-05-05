@@ -59,7 +59,9 @@ final class ExportCoordinator {
             jpegQuality: jpegQuality,
             sourceProfileSelection: state.sourceProfileSelection,
             quickState: state.quickState,
-            paramOverrides: state.paramOverrides
+            paramOverrides: state.paramOverrides,
+            highlightMarkers: nil,
+            opticalFilterProfileId: state.opticalFilterProfileId
         )
 
         let startedAt = Date()
@@ -122,7 +124,9 @@ final class ExportCoordinator {
             lookSlug: state.lookSlug,
             sourceProfileSelection: state.sourceProfileSelection,
             quickState: state.quickState,
-            paramOverrides: state.paramOverrides
+            paramOverrides: state.paramOverrides,
+            highlightMarkers: state.exportHighlightMarkers,
+            opticalFilterProfileId: state.opticalFilterProfileId
         )
 
         let startedAt = Date()

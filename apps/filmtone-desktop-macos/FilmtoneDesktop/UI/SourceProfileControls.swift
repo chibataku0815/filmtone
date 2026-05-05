@@ -1,12 +1,12 @@
 import SwiftUI
 
-// M5-C.1: right-rail Source Profile Picker. Sits above GradeControls so the
+// M5-C.1: right-rail Source Profile Picker. Sits above the Look panel so the
 // user picks the source-side normalization (Auto / Apple Log / Apple Log 2 /
 // DJI D-Log / D-Log M / Canon C-Log / Canon Log 3 + Cinema Gamut / V-Log /
 // S-Log3 / Rec.709) before the Look layer.
 //
-// Visual posture matches GradeControls (Pass 4 readability fix): white labels
-// on dark-tinted .clear Liquid Glass, with `.colorScheme(.dark)` on the
+// Visual posture matches the right-rail controls (Pass 4 readability fix):
+// white labels on dark-tinted .clear Liquid Glass, with `.colorScheme(.dark)` on the
 // Picker so the AppKit-bridged NSPopUpButton renders with a white label.
 //
 // Auto resolution surfaces a small "Detected: <englishName>" caption
@@ -60,16 +60,43 @@ struct SourceProfileControls: View {
             }
     }
 
+    private var selectedLabel: String {
+        switch state.sourceProfileSelection {
+        case .auto:
+            if let resolvedAutoEntry {
+                return FilmtoneSourceProfileCatalog.autoResolvedValueLabel(for: resolvedAutoEntry)
+            }
+            return Self.optionLabel
+        case .builtIn(let catalogId):
+            return FilmtoneSourceProfileCatalog.entry(forCatalogId: catalogId)?.englishName ?? catalogId
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Picker("Source", selection: selectionBinding) {
-                ForEach(Self.options, id: \.self) { option in
-                    Text(option.label).tag(option.selection)
+            Menu {
+                Button {
+                    selectionBinding.wrappedValue = .auto
+                } label: {
+                    menuRow("Auto", selected: state.sourceProfileSelection == .auto)
                 }
+                Section("Camera Profiles") {
+                    ForEach(Self.options.dropFirst(), id: \.self) { option in
+                        Button {
+                            selectionBinding.wrappedValue = option.selection
+                        } label: {
+                            menuRow(option.label, selected: state.sourceProfileSelection == option.selection)
+                        }
+                    }
+                }
+            } label: {
+                FilmtoneGlassMenuTrigger(
+                    title: "Source",
+                    value: selectedLabel,
+                    systemImage: "camera.filters"
+                )
             }
-            .pickerStyle(.menu)
-            .colorScheme(.dark)
-            .frame(width: 220)
+            .filmtoneGlassMenuChrome()
 
             if let notice = sourceCapNotice {
                 Text(notice)
@@ -78,11 +105,23 @@ struct SourceProfileControls: View {
                     .frame(width: 220, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
             } else if let resolvedAutoEntry {
-                Text("Detected: \(resolvedAutoEntry.englishName)")
+                Text(FilmtoneSourceProfileCatalog.autoDetectedCaption(
+                    for: resolvedAutoEntry,
+                    prefersJapanese: FilmtoneDesktopStrings.prefersJapanese()
+                ))
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.7))
                     .frame(width: 220, alignment: .leading)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func menuRow(_ title: String, selected: Bool) -> some View {
+        if selected {
+            Label(title, systemImage: "checkmark")
+        } else {
+            Text(title)
         }
     }
 }

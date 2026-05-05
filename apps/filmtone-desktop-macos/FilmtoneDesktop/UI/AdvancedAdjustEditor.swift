@@ -3,18 +3,23 @@ import SwiftUI
 
 // M5-C.3b: Popover content for the right-rail "Adjust…" button. Direct
 // per-key editing of `paramOverrides` matching the iOS canonical
-// `FilmtoneStrengthSheet` advanced section. DisclosureGroup × N
-// categories, each with rows of (label, value, slider, per-row reset).
-// The popover frame is sized once (480×600) so the user can scroll
+// `FilmtoneStrengthSheet` advanced section. Recipe chips stay visible
+// at the group level; each group can expand into rows of (label, value,
+// slider, per-row reset). The popover frame is sized once (480×600) so the user can scroll
 // through the full catalog without the window jumping.
+//
+// M5-I.1: every user-facing string flows through `FilmtoneDesktopStrings`
+// so JA/EN host locale picks up the iOS canonical 階調 / なし / 標準 /
+// 強め / 爽やか / 夕景 / 深み labels without per-call branching here.
 struct AdvancedAdjustEditor: View {
     @Bindable var state: EditorState
+    var strings: FilmtoneDesktopStrings = .current
     var onClose: () -> Void
 
-    @State private var expandedGroupIds: Set<String> = ["basic"]
+    @State private var expandedGroupIds: Set<String> = []
 
     private var groups: [AdvancedAdjustCatalog.Group] {
-        AdvancedAdjustCatalog.groups(forVideo: state.sourceKind == .video)
+        AdvancedAdjustCatalog.groups(forVideo: state.sourceKind == .video, strings: strings)
     }
 
     var body: some View {
@@ -47,7 +52,7 @@ struct AdvancedAdjustEditor: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            Text("Advanced Adjust")
+            Text(strings.advancedTitle)
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.white)
             Spacer()
@@ -61,16 +66,16 @@ struct AdvancedAdjustEditor: View {
                     .font(.body.weight(.medium))
                     .frame(width: 14, height: 14)
             }
-            .buttonStyle(.glass)
-            .controlSize(.small)
-            .help("Close")
+            .buttonStyle(FilmtoneGlassIconButtonStyle())
+            .help(strings.advancedClose)
+            .filmtonePointingHandCursor()
         }
     }
 
     private var activeBadge: String {
         let active = state.paramOverridesActiveCount
         let total = state.paramOverridesAvailableCount
-        return "\(active) / \(total) active"
+        return strings.advancedActiveBadgeFormat(active, total)
     }
 
     @ViewBuilder
@@ -84,36 +89,57 @@ struct AdvancedAdjustEditor: View {
         )
         let activeInGroup = group.controls.filter { state.isParamOverridden($0.key) }.count
 
-        DisclosureGroup(isExpanded: isExpanded) {
-            VStack(alignment: .leading, spacing: 12) {
-                if !group.recipes.isEmpty {
-                    recipeChipRow(for: group)
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                isExpanded.wrappedValue.toggle()
+            } label: {
+                HStack(spacing: 8) {
+                    Text(group.title)
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(.white)
+                    Text("(\(group.controls.count))")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.white.opacity(0.5))
+                    if activeInGroup > 0 {
+                        Text("\(activeInGroup) on")
+                            .font(.caption2.monospacedDigit().weight(.semibold))
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.yellow.opacity(0.85), in: Capsule())
+                    }
+                    Spacer()
+                    Image(systemName: isExpanded.wrappedValue ? "chevron.up" : "chevron.down")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.white.opacity(0.68))
+                        .frame(width: 18, height: 18)
                 }
-                ForEach(group.controls) { control in
-                    paramRow(control)
-                }
+                .contentShape(Rectangle())
             }
-            .padding(.top, 8)
-            .padding(.leading, 4)
-        } label: {
-            HStack(spacing: 8) {
-                Text(group.title)
-                    .font(.callout.weight(.semibold))
-                    .foregroundStyle(.white)
-                Text("(\(group.controls.count))")
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.white.opacity(0.5))
-                if activeInGroup > 0 {
-                    Text("\(activeInGroup) on")
-                        .font(.caption2.monospacedDigit().weight(.semibold))
-                        .foregroundStyle(.black)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.yellow.opacity(0.85), in: Capsule())
+            .buttonStyle(.plain)
+            .filmtonePointingHandCursor()
+
+            if !group.recipes.isEmpty {
+                recipeChipRow(for: group)
+                    .padding(.leading, 4)
+                    .padding(.bottom, isExpanded.wrappedValue ? 2 : 8)
+            }
+
+            if isExpanded.wrappedValue {
+                Divider()
+                    .background(Color.white.opacity(0.08))
+                    .padding(.top, 2)
+
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(group.controls) { control in
+                        paramRow(control)
+                    }
                 }
-                Spacer()
+                .padding(.top, 4)
+                .padding(.leading, 4)
             }
         }
+        .padding(.vertical, 4)
     }
 
     @ViewBuilder
@@ -132,8 +158,8 @@ struct AdvancedAdjustEditor: View {
                               in group: AdvancedAdjustCatalog.Group,
                               isActive: Bool) -> some View {
         let helpText = recipe.kind == .none
-            ? "Clear \(group.title) overrides"
-            : "Apply \(recipe.label) preset to \(group.title)"
+            ? strings.advancedClearGroupHelp(group.title)
+            : strings.advancedApplyRecipeHelp(recipe.label, group.title)
         // SwiftUI button styles don't share a common erased type, so a
         // ternary on the modifier is not allowed — branch the View tree
         // instead. Both arms keep the same label / action / size so only
@@ -146,9 +172,9 @@ struct AdvancedAdjustEditor: View {
                     .font(.caption.weight(.semibold))
                     .padding(.horizontal, 4)
             }
-            .buttonStyle(.glassProminent)
-            .controlSize(.small)
+            .buttonStyle(FilmtoneGlassSegmentButtonStyle(isSelected: true))
             .help(helpText)
+            .filmtonePointingHandCursor()
         } else {
             Button {
                 state.applyAdvancedRecipe(recipe, in: group)
@@ -157,9 +183,9 @@ struct AdvancedAdjustEditor: View {
                     .font(.caption.weight(.semibold))
                     .padding(.horizontal, 4)
             }
-            .buttonStyle(.glass)
-            .controlSize(.small)
+            .buttonStyle(FilmtoneGlassSecondaryButtonStyle(compact: true))
             .help(helpText)
+            .filmtonePointingHandCursor()
         }
     }
 
@@ -197,13 +223,12 @@ struct AdvancedAdjustEditor: View {
                         .font(.caption.weight(.medium))
                         .frame(width: 12, height: 12)
                 }
-                .buttonStyle(.glass)
-                .controlSize(.small)
+                .buttonStyle(FilmtoneGlassIconButtonStyle())
                 .disabled(!isActive)
-                .help("Reset \(control.label) to base value")
+                .help(strings.advancedResetParamHelp(control.label))
+                .filmtonePointingHandCursor(isActive)
             }
-            Slider(value: valueBinding, in: control.range)
-                .tint(.white)
+            FilmtoneGlassSlider(value: valueBinding, range: control.range)
         }
     }
 
@@ -215,12 +240,12 @@ struct AdvancedAdjustEditor: View {
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "arrow.counterclockwise")
-                    Text("Reset All Overrides")
+                    Text(strings.advancedResetAllOverrides)
                 }
             }
-            .buttonStyle(.glass)
-            .controlSize(.regular)
+            .buttonStyle(FilmtoneGlassSecondaryButtonStyle())
             .disabled(state.paramOverridesActiveCount == 0)
+            .filmtonePointingHandCursor(state.paramOverridesActiveCount > 0)
         }
     }
 }

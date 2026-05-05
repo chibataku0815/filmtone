@@ -1,4 +1,5 @@
 import AVFoundation
+import FilmLabSwiftCore
 import Foundation
 import UIKit
 
@@ -99,7 +100,8 @@ final class FilmtoneMediaRuntime {
         request: Phase0ExportRequestDTO,
         sourceURL: URL? = nil,
         appliedSavedLook: SavedLookEntry? = nil,
-        cameraProfile: CameraProfileSelection? = nil
+        cameraProfile: CameraProfileSelection? = nil,
+        highlightMarkers: FilmtoneHighlightMarkers? = nil
     ) throws -> FilmtoneExportSession {
         let resolvedSourceURL = try sourceURL ?? resolveFileURL(request.sourceUri)
         return try FilmtoneExportSession(
@@ -108,7 +110,8 @@ final class FilmtoneMediaRuntime {
             cacheStore: cacheStore,
             mezzanineService: mezzanineService,
             appliedSavedLook: appliedSavedLook,
-            cameraProfile: cameraProfile
+            cameraProfile: cameraProfile,
+            highlightMarkers: highlightMarkers
         )
     }
 
@@ -241,6 +244,7 @@ final class FilmtoneMediaRuntime {
         protectedCacheURLs: [URL] = [],
         appliedSavedLook: SavedLookEntry? = nil,
         cameraProfile: CameraProfileSelection? = nil,
+        highlightMarkers: FilmtoneHighlightMarkers? = nil,
         onProgress: @escaping (Phase0ExportProgressDTO) -> Void
     ) async throws -> Phase0ExportResultDTO {
         let resolvedSourceURL = try sourceURL ?? resolveFileURL(request.sourceUri)
@@ -249,7 +253,8 @@ final class FilmtoneMediaRuntime {
             request: request,
             sourceURL: resolvedSourceURL,
             appliedSavedLook: appliedSavedLook,
-            cameraProfile: cameraProfile
+            cameraProfile: cameraProfile,
+            highlightMarkers: highlightMarkers
         )
         let benchmarkCollector = collector ?? makeBenchmarkCollector(request: request)
 

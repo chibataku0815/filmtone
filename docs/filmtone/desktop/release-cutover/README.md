@@ -6,7 +6,7 @@ M5 lane (`docs/filmtone/desktop/native-desktop-v2/`) と並列で動く独立 la
 **Cutover direction (2026-05-04 確定)**: Native Desktop v2 は Electron Desktop
 (`apps/desktop-film-lab-batch`) の **単一置換後継**、並走しない。Bundle ID は
 `com.chibatakumi.film-lab-desktop` (Electron と同一、drop-in upgrade)、version
-は `2.0.0` から start (Electron 1.0.4 を semver で超える)。詳細決定 + Open
+は iOS と合わせて `1.4` から start (Electron 1.0.4 を semver で超える)。詳細決定 + Open
 Questions: [`cutover-architecture.md`](cutover-architecture.md) (persistent
 reference doc、本 lane の決定 SSOT)。
 
@@ -31,9 +31,11 @@ Completion Log に短く反映する (本 lane の archive 経由で参照)。
 | M6-4 | DMG packaging (hdiutil 直、create-dmg 不要) | **Done** (`8bd41b4`) |
 | M6-5 | portfolio submodule bump 手順 (本 README 末尾参照) | **Done** |
 | M6-6 | end-to-end release run (v0.1.0 smoke) | **Done** (Phase 5 — notarized + stapled `.app` + DMG、Gatekeeper accepted、internal smoke build) |
-| M6-7 | Cutover Architecture & Brand Alignment (Bundle ID / Product Name / 2.0.0) | **Done** (Phase 6) |
-| M6-8 | Distribution scripts port (Vercel Blob + update-meta.json) | Pending (Phase 7) |
-| M6-9 | 2.0.0 公開 release run (M5-C P0 closure 待ち) | Pending (Phase 9、M5-C P0 後) |
+| M6-7 | Cutover Architecture & Brand Alignment (Bundle ID / Product Name / 1.4) | **Done** (Phase 6 + version-policy correction) |
+| M6-8 | Distribution scripts port (Vercel Blob + update-meta.json) | **Done** (Phase 7) |
+| M6-8.5 | Replacement readiness pack (preflight + release notes + public runbook) | **Done** (2026-05-05 readiness doc) |
+| M6-9 | 1.4 公開 release run | **Done** (clean run after parent branch correction + `main` merge) |
+| M6-10 | Electron 1.0.4 frozen-legacy source status | **Done** (workspace retained; new Desktop work moves to Native) |
 | polish | App Category 設定 (notarize blocker でない) | **Done** (Phase 2) |
 
 ## Out of scope (本 lane では扱わない)
@@ -75,12 +77,13 @@ Completion Log に短く反映する (本 lane の archive 経由で参照)。
 
 ## Release version 方針
 
-- **公開 release version は `2.0.0` から start** (Electron Desktop 1.0.4 を
-  semver で超え、既存 user の update path で自動着地、cutover-architecture
-  decision B)。
+- **公開 release version は `1.4` から start** (iOS public/local version と揃え、
+  Electron Desktop 1.0.4 を semver で超え、既存 user の update path で自動着地、
+  cutover-architecture decision B)。
 - `0.1.0` は Phase 5 で smoke 専用 build (notarize 経路の検証用)。**公開しない**。
-- Phase 6 で pbxproj `MARKETING_VERSION = 2.0.0` に確定済。次の release run は
-  `Filmtone-2.0.0.dmg` を produce する (`scripts/package-dmg.sh` の APP_NAME
+- Phase 6 当初の `MARKETING_VERSION = 2.0.0` は user 明示決定で supersede。current
+  pbxproj は `MARKETING_VERSION = 1.4`。次の release run は
+  `Filmtone-1.4.dmg` を produce する (`scripts/package-dmg.sh` の APP_NAME
   連動)。
 - `CURRENT_PROJECT_VERSION` (build number) は release ごとに +1 (現 `1`)。
 
@@ -97,40 +100,48 @@ export ASC_KEY_PATH=~/.appstoreconnect/private_keys/AuthKey_TM2BK9269B.p8
 
 cd /Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-native-desktop-plan
 
+# 0. Read-only preflight. This must not write public state.
+bun run release:cutover-preflight
+
 # 1. archive → notarize → staple → spctl assess
 scripts/release-macos.sh
 
 # 2. notarized .app を DMG 化 → DMG も notarize → staple → Gatekeeper assess
 scripts/package-dmg.sh
+
+# 3. Confirm the generated artifact still matches cutover expectations.
+bun run release:cutover-preflight
 ```
 
 出力:
 
-- `apps/filmtone-desktop-macos/build/release/0.1.0/FilmtoneDesktop.app`
+- `apps/filmtone-desktop-macos/build/release/1.4/Filmtone.app`
   (notarized + stapled)
-- `apps/filmtone-desktop-macos/build/release/0.1.0/FilmtoneDesktop-0.1.0.dmg`
+- `apps/filmtone-desktop-macos/build/release/1.4/Filmtone-1.4.dmg`
   (notarized + stapled、配布可能)
 
 notarize 拒否時は `notarize-rejection.json` が出力される。所要時間は
 notarize submit が数分 (Apple 側 queue 次第)。
 
-## Portfolio submodule bump (release 後の波及)
+## Portfolio source follow-up (release 後の波及)
 
 filmtone main に release commit (or tag) が land した後、portfolio repo の
 `vendor/filmtone` submodule pin を bump して公開窓 (landing / support / privacy /
-release-notes / journal) に新 release を反映する。
+release-notes / journal) に新 release source を反映する。2026-05-05 の公開
+cutover は Vercel production env + remote redeploy で完了済みなので、この手順は
+公開切替そのものではなく、portfolio repo の source permanence 用 follow-up。
 
 ```bash
 cd /Volumes/SamsungPortableSSDX5001/documents/forestone/chibatakumi-portfolio
 git submodule update --remote vendor/filmtone
 git add vendor/filmtone
-git commit -m "chore(filmtone): bump submodule to 0.1.0"
+git commit -m "chore(filmtone): bump submodule to 1.4"
 # (push は user)
 ```
 
-vercel deploy は portfolio の `apps/web` build に依存するので submodule pin
-が古いと公開窓が古いまま。release 完了 = filmtone main land + portfolio bump
-+ portfolio push の 3 つ揃って初めて公開反映。
+今後 public web を source から再デプロイする場合、submodule pin が古いと
+release notes / static source 由来の表示が古くなる。公開 download/update rail
+の current truth は Vercel env と Blob metadata を truth scripts で確認する。
 
 詳細は CLAUDE.md §7 (Submodule update 手順) を参照。
 
@@ -256,7 +267,7 @@ Info.plist file 化 = infra refactor のため引き続き scope 外。
 
 → M6-6 (smoke) = **Done**。実 cutover 公開は Phase 6 (本 chat) で identity 整え、
 Phase 7 (Distribution scripts port) + Phase 8 (M5-C P0 closure 待ち) + Phase 9
-(2.0.0 公開 run) の順に進む。
+(1.4 公開 run) の順に進む。
 
 ## Phase 6 close summary
 
@@ -276,9 +287,10 @@ A〜K)。残 Open Questions OQ-1〜OQ-4 (batch / 寄付 / Smart Look AI / cutove
   - `PRODUCT_BUNDLE_IDENTIFIER` = `co.fores-tone.filmtone.desktop` →
     **`com.chibatakumi.film-lab-desktop`** (Electron と同一、drop-in upgrade)
   - `PRODUCT_NAME` = `$(TARGET_NAME)` → **`Filmtone`** (bundle 名 `Filmtone.app`)
-  - `MARKETING_VERSION` = `0.1.0` → **`2.0.0`**
+  - `MARKETING_VERSION` = `0.1.0` → **`2.0.0`** at Phase 6, then user decision
+    superseded current value to **`1.4`**
 - `scripts/release-macos.sh`: `APP_NAME=Filmtone` / `BUNDLE_ID=com.chibatakumi.film-lab-desktop`
-- `scripts/package-dmg.sh`: `APP_NAME=Filmtone` (DMG 出力 `Filmtone-2.0.0.dmg`)
+- `scripts/package-dmg.sh`: `APP_NAME=Filmtone` (current DMG 出力 `Filmtone-1.4.dmg`)
 
 検証:
 
@@ -290,6 +302,7 @@ A〜K)。残 Open Questions OQ-1〜OQ-4 (batch / 寄付 / Smart Look AI / cutove
   CFBundleShortVersionString=2.0.0 / CFBundleVersion=1 / CFBundleName=Filmtone /
   CFBundleExecutable=Filmtone / LSApplicationCategoryType=public.app-category.photography /
   LSMinimumSystemVersion=26.0 / NSHumanReadableCopyright=© 2026 Takumi Chiba
+  (Phase 6 検証値。current MARKETING_VERSION は `1.4`)
 - Debug auto signing が `Apple Development: takumi chiba (262F3A4568)` で成功 =
   Bundle ID 変更で Apple 証明書チェーンが破綻していない (Developer ID は
   Team-bound、Bundle ID 制約なし)。Release 側 Manual signing は preflight で
@@ -298,19 +311,90 @@ A〜K)。残 Open Questions OQ-1〜OQ-4 (batch / 寄付 / Smart Look AI / cutove
 
 → 次の `scripts/release-macos.sh` 実行は **drop-in upgrade artifact** として
 Electron 1.0.4 install を上書きできる identity を持つ `Filmtone.app` (notarized
-+ stapled、`Filmtone-2.0.0.dmg`) を produce する。
++ stapled、`Filmtone-1.4.dmg`) を produce する。
 
-ただし実 2.0.0 公開 release pipeline は M5-C P0 closure (M5 chat 担当、本
-lane scope 外) 後 Phase 9 で実施。本 chat はここまでで release-cutover lane
-物理作業完了。
+2026-05-05 に一度 Phase 9 を実行したが、その後 user が「親ブランチを正しい
+形にしてから `main` merge、その後 release」という順序を明示したため、public
+switch は rollback 済み。Source Auto / Conversion LUT parity、Backlight Veil、
+Advanced recipe chip discoverability は clean release 前の product follow-up /
+explicit defer 判断として残す。
 
-次フェーズ (新 active.md 化、user trigger):
+次フェーズ (user trigger):
 
-- **Phase 7**: Distribution scripts port — Electron `desktop-film-lab-batch/scripts/
-  upload-dmg-to-vercel-blob.mjs` + `upload-update-meta-to-vercel-blob.mjs` の
-  flow を Native v2 用に adapt。本 chat でも追加 turn で実装可
-- **Phase 8** (M5 chat scope): M5-C.2 / C.3 / C.4 closure (cutover gate、Look library
-  / Adjustments / Export panel の iOS parity)
-- **Phase 9**: 2.0.0 公開 release run (`scripts/release-macos.sh` + `package-dmg.sh` +
-  Phase 7 で整備された Blob upload + update-meta switch)
+- **Phase 8** (M5 chat scope): product parity follow-ups / explicit defer
+  decision (Source Auto / Conversion LUT parity + Backlight Veil + Advanced
+  recipe chip discoverability)
+- **Phase 9**: pending — clean 1.4 public release run after parent branch
+  correction and `main` merge
 - **Phase 10**: Electron 1.0.4 deprecation notice + workspace archived status
+  is closed as source policy: `apps/desktop-film-lab-batch/` stays in the repo
+  for emergency rollback and pre-macOS-26 access, but new Desktop product work
+  belongs in `apps/filmtone-desktop-macos/`.
+
+## Replacement readiness pack (2026-05-05)
+
+Preparation for the public replacement path now lives in:
+
+```text
+docs/filmtone/desktop/release-cutover/2026-05-05-native-v2-replacement-readiness.md
+apps/filmtone-desktop-macos/RELEASE_NOTES-v1.4.md
+scripts/release-cutover-preflight.mjs
+```
+
+Read-only preflight:
+
+```bash
+bun run release:cutover-preflight
+```
+
+The production write commands intentionally require `--confirm-prod`:
+
+```bash
+bun run release:upload-dmg -- --confirm-prod --sync-vercel-env
+bun run release:upload-update-meta -- --confirm-prod --sync-vercel-env
+```
+
+`upload-update-meta` must remain the final public switch because Electron
+1.0.4 clients poll that metadata and will surface the v1.4 upgrade prompt after
+`latestVersion` changes.
+
+## Phase 9 clean release summary
+
+Public replacement cutover completed on 2026-05-05 after the user-directed
+sequence was honored: parent branch correction, `origin/main` merge, then clean
+release.
+
+- Release code HEAD:
+  `4f2e5eba` (`Merge remote-tracking branch 'origin/main' into feature/native-desktop-plan`).
+- `bun run release:cutover-preflight` passed before the public switch.
+- `bash apps/filmtone-desktop-macos/Verify/run.sh` passed (`99/99`).
+- `bun run verify:macos` passed (`** BUILD SUCCEEDED **`).
+- `git diff --check` passed.
+- `scripts/release-macos.sh` produced notarized + stapled
+  `apps/filmtone-desktop-macos/build/release/1.4/Filmtone.app`; Gatekeeper
+  accepted it as `Notarized Developer ID`.
+- `scripts/package-dmg.sh` produced notarized + stapled
+  `apps/filmtone-desktop-macos/build/release/1.4/Filmtone-1.4.dmg`;
+  Gatekeeper accepted it as `Notarized Developer ID`.
+- DMG sha256:
+  `40d2b2fd745c648849d310856e2bcd5d0db0afd948b3842fd83800f68e705cb8`.
+- Uploaded DMG to:
+  `https://ehi6m41cp33jiopb.public.blob.vercel-storage.com/filmtone/desktop/Filmtone-1.4.dmg`.
+- Synced `FILM_LAB_DESKTOP_DOWNLOAD_URL` and redeployed the current production
+  Vercel deployment without using the dirty local portfolio worktree.
+- Production deployment:
+  `chibatakumi-portfolio-1bttmm5np-forestones-projects.vercel.app`, aliased to
+  `https://www.chibatakumi.studio`.
+- Verified the public download complete page references `Filmtone-1.4.dmg`.
+- Uploaded `film-lab/desktop/update-meta.json` with `latestVersion: "1.4"` and
+  `downloadPageUrl: "https://www.chibatakumi.studio/film-lab/download"`.
+- Release truth script reports public Desktop latest `1.4`.
+
+Remaining post-release product risks:
+
+- Source Auto / Conversion LUT parity has landed, but more real-media
+  population testing is still useful.
+- Backlight Veil has landed, but iOS/Desktop visual parity should be watched on
+  difficult backlit clips.
+- Advanced recipe chips are visible, but longer-session Desktop QA should check
+  whether users understand the iOS-style `None` / `Default` / `Strong` model.
