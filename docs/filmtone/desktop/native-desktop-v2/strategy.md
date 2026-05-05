@@ -632,10 +632,12 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
   M5-H.1 App Chrome / Preview Layout (3 commits: 0251b585 + d12f1318 +
   9dd0c2c2、cherry-pick 6ea6fbe9..c9195010) — RootWindowView 4-region
   chrome + PreviewSurface backdrop / cached frame source-identity gating。
-  M5-H.2 Adjust + Library iOS canonical parity (2 commits: a4c471b9 +
-  072b0c07、cherry-pick 77d2998c..a1ed95f9) — AdvancedAdjustCatalog full
-  iOS parity、SavedLookStore built-in favorite + resolve order、
-  LookLibraryControls UI、Verify 42 → 56 PASS。M5-H.3 Dual LUT + intensity
+  M5-H.2 Adjust + Library iOS canonical parity (3 commits: a4c471b9 +
+  072b0c07 + 86da5b23、cherry-pick 77d2998c..a1ed95f9 + 5bb99e58) —
+  AdvancedAdjustCatalog full iOS parity、SavedLookStore built-in
+  favorite + resolve order、LookLibraryControls UI、P1 で resolve-order
+  test を host 非依存にする determinism fix(quickWeights dict iteration
+  順 → sorted、clamp 損失しない key を選択)、Verify 42 → 56 PASS。M5-H.3 Dual LUT + intensity
   slider spike (3 doc-only commits: 985ccfd9 + fdd1a9d7 + 793226c3、
   cherry-pick e20ec45a..699b1b4f) — read-only design spike、実装は次 slice
   (C1 v1.4-preferred thin fix / C2-C3 v1.5) で worker 配賦。M5-H.4 は
