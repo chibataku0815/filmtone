@@ -28,7 +28,34 @@ Filmtone は色再現・LUT・smart-look を提供するクロスプラットフ
 | `.ai/parallel-work.md` | パラレルワーク協調 | 全ツール |
 | `CLAUDE.md` | Claude Code 補足 | Claude Code |
 | `apps/capacitor-film-lab-ios/CLAUDE.md` | iOS-specific | Claude Code |
+| `docs/filmtone/desktop/native-desktop-v2/strategy.md` | Native Desktop v2 長期戦略 | 全ツール |
+| `docs/filmtone/desktop/native-desktop-v2/active.md` | Native Desktop v2 現在の単一 subtask | 全ツール |
 | `messages/{en,ja}.json` | 共通コピー | 全ツール |
+
+---
+
+## 長期タスク運用
+
+Native Desktop v2 は 2-layer model を使う。
+
+- 正本配置: `docs/filmtone/desktop/native-desktop-v2/`
+- `strategy.md`: ゴール、計測可能な Done 条件、マイルストーン、依存関係、制約、未確定事項、短い完了ログだけを書く。
+- `active.md`: 現在進行中の subtask 1 つだけを書く。実装前に必ず存在していること。
+- `paused/YYYY-MM-DD-{slug}.md`: 中規模差し込みで一時停止した未完了 `active.md`。
+- `archive/YYYY-MM-DD-{slug}.md`: 完了した `active.md` の短い完了ログ。
+- 旧 handoff / dated plan docs は参照専用。現在状態の正本にしない。
+
+実装開始時は `strategy.md` → `active.md` の順で読み、`active.md` がなければ次の subtask 案を作ってレビュー待ちにする。
+`active.md` は常に 1 つだけにする。
+
+差し込みタスク:
+
+- 5〜30 分の軽微修正は、現 `active.md` の `Unexpected` / `Follow-up` に記録し、active scope に属する場合だけ同 active 内で扱う。
+- 半日〜数日の差し込みは、現 `active.md` 末尾に `Paused` を追記して完了済み / 未完を短く書き、`paused/YYYY-MM-DD-{slug}.md` へ退避してから差し込み専用 `active.md` を作る。
+- 差し込み `active.md` は対象 milestone を明記する。属さない場合は `Interrupt` と書く。
+- 差し込み完了後は `active.md` を `archive/YYYY-MM-DD-{slug}.md` へ移動し、必要な場合だけ `strategy.md` に 1〜3 行追記して、退避中の active を `active.md` に戻す。
+- milestone を変える差し込みは、`strategy.md` の `Interrupt / Decision Log` に短く追記してから `active.md` を作る。
+- 長期方針を変える差し込みは milestone 構造変更扱い。実装前にレビューする。
 
 ---
 

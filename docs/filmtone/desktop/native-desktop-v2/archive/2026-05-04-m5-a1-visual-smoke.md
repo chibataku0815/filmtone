@@ -78,21 +78,29 @@ that was not closed automatically — it is a user-driven manual gate.
 
 ## Checklist
 
-- [ ] App launches from Xcode without errors
-- [ ] Look Picker shows 4 entries
-- [ ] Strength row visible with `100%` default readout
-- [ ] Strength slider disables on "Reset" preset
-- [ ] iPhone @ 100% matches pre-M5-A.1 behaviour
-- [ ] iPhone @ 0% looks neutral (bareline, not "Reset" preset)
-- [ ] iPhone @ ~50% shows continuous interpolation
-- [ ] Soft Blue / Amber Glow show same sweep behaviour
-- [ ] (Optional) Sidecar at strength 0.3 round-trips correctly
-- [ ] No crash / hang / flicker during drag
+- [x] App launches from Xcode without errors
+- [x] Look Picker shows 4 entries
+- [x] Strength row visible with `100%` default readout
+- [x] Strength slider disables on "Reset" preset
+- [x] iPhone @ 100% matches pre-M5-A.1 behaviour
+- [x] iPhone @ 0% looks neutral (bareline, not "Reset" preset)
+- [x] iPhone @ ~50% shows continuous interpolation
+- [x] Soft Blue / Amber Glow show same sweep behaviour
+- [x] (Optional) Sidecar at strength 0.3 round-trips correctly
+- [x] No crash / hang / flicker during drag
 
 ## Unexpected
 
-(none yet — append observed defects here; if non-empty at close, file a fix active)
+- 2026-05-04: User observation during smoke — Desktop "Look" picker (Reset /
+  iPhone / Soft Blue / Amber Glow) actually corresponds to the iOS Preset
+  layer; iOS-canonical Look layer (Creative LUT Pack 01: Stone / Urban) is not
+  yet present on Desktop. Not a slider defect — the slider behaves as
+  designed. Promoted to M5-A.2 as a mid-size Interrupt rather than handled
+  here. See strategy.md Interrupt / Decision Log.
 
 ## Result
 
-(left blank for the user to fill in: "all gates pass" / specific defects)
+all gates pass — Slider drag preview live across [0, 1], Reset disable
+visible, Soft Blue / Amber Glow sweep matches iPhone behaviour. Closed
+2026-05-04 JST. Look-layer gap surfaced during this smoke is tracked as
+M5-A.2 (separate active).

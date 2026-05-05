@@ -1,4 +1,5 @@
 import CoreImage
+import FilmLabSwiftCore
 import Foundation
 
 // Phase 1b primary grade chain: baseGradeV2 → filmCompressionV2 → printStage.
@@ -8,8 +9,12 @@ import Foundation
 // Phase 2 C5b A.2: halation + diffusion plates activated (bloom + halation + diffusion all live).
 // Phase 2 C5b A.3: edgeOptics (radialRGBSplit + edgeSoftnessBlend) inserted between
 //   filmCompressionV2 and glowFamily (iOS canonical order, FilmtoneExportSession L1565).
+// M5-A.2: creativeLut inserted between grain and printStage (iOS canonical
+//   FilmtoneExportSession L1561). Stone / Urban use intensity = 1.0 (simple
+//   path only — no alpha-blend branch). Caller passes nil for the legacy
+//   "no Look" path; the stage is a no-op then.
 //
-//   baseGradeV2 → filmCompressionV2 → edgeOptics → glowFamily → vignette → grain → printStage
+//   baseGradeV2 → filmCompressionV2 → edgeOptics → glowFamily → vignette → grain → creativeLut → printStage
 
 enum FilmtoneGradePipeline {
 
@@ -39,7 +44,8 @@ enum FilmtoneGradePipeline {
         params: FilmtonePhase0Params,
         frameTimeSeconds: Double = 0,
         sourceSeed: Double = 0,
-        cameraOptics: CameraOpticsDTO? = nil
+        cameraOptics: CameraOpticsDTO? = nil,
+        creativeLut: PreparedCreativeLut? = nil
     ) -> CIImage {
         var current = image
 
@@ -64,11 +70,27 @@ enum FilmtoneGradePipeline {
                 sourceSeed: sourceSeed
             )
         }
+        if let creativeLut {
+            current = applyCreativeLutStage(to: current, lut: creativeLut)
+        }
         if shouldApplyPrintStage(params) {
             current = applyPrintStage(to: current, params: params)
         }
 
         return current
+    }
+
+    // MARK: — Creative LUT (M5-A.2 — iOS canonical FilmtoneExportSession L2077)
+
+    private static func applyCreativeLutStage(to image: CIImage, lut: PreparedCreativeLut) -> CIImage {
+        // Stone / Urban pin intensity = 1.0; the alpha-blend branch is
+        // unreachable for v1.4 Pack 01. Keeping the simple path means the
+        // pipeline does not need to know about D3-β/γ blending modes.
+        image.applyingFilter("CIColorCubeWithColorSpace", parameters: [
+            "inputCubeDimension": lut.size,
+            "inputCubeData": lut.cubeData,
+            "inputColorSpace": FilmtoneCIContext.outputColorSpace,
+        ])
     }
 
     // MARK: — Grade stages
@@ -87,7 +109,7 @@ enum FilmtoneGradePipeline {
 
     private static func shouldApplyPrintStage(_ p: FilmtonePhase0Params) -> Bool {
         let epsilon = 1e-4
-        return abs(p.printContrast) > epsilon
+        return p.printContrast > epsilon
             || abs(p.cyan) > epsilon
             || abs(p.magenta) > epsilon
             || abs(p.yellow) > epsilon

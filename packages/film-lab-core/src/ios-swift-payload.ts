@@ -212,42 +212,62 @@ function renderHiddenDefaults(
   ].join("\n");
 }
 
-export function renderFilmtoneIosSwiftPayload(payload = buildFilmtoneIosSwiftPayload()): string {
+export type FilmtoneSwiftAccessLevel = "internal" | "public";
+
+export interface RenderFilmtoneIosSwiftPayloadOptions {
+  /**
+   * Access modifier applied to the generated `enum FilmtonePhase0Generated`
+   * and every `static let` member. `"internal"` (default) preserves the
+   * legacy app-local emit shape used by iOS App / Desktop SharedGenerated.
+   * `"public"` is used by the Swift Package (FilmLabSwiftCore) target so
+   * downstream modules can `import FilmLabSwiftCore` and reach these symbols
+   * through the normal public API surface.
+   */
+  accessLevel?: FilmtoneSwiftAccessLevel;
+}
+
+export function renderFilmtoneIosSwiftPayload(
+  payload: FilmtoneIosSwiftPayload = buildFilmtoneIosSwiftPayload(),
+  options: RenderFilmtoneIosSwiftPayloadOptions = {},
+): string {
+  const accessLevel = options.accessLevel ?? "internal";
+  const enumPrefix = accessLevel === "public" ? "public " : "";
+  const memberPrefix = accessLevel === "public" ? "public " : "";
   const resetParams = renderPhase0ParamsInit(payload.resetParams, "        ").replace(/^/gm, "    ");
   return `import Foundation
 
-enum FilmtonePhase0Generated {
-    static let schemaVersion = ${payload.schemaVersion}
-    static let presetVersion = ${renderSwiftString(payload.presetVersion)}
-    static let presetDefault = ${renderSwiftString(payload.presetDefault)}
-    static let presetStrengthDefault = ${renderSwiftNumber(payload.presetStrengthDefault)}
-    static let paramKeys: [String] = ${renderSwiftStringArray(payload.paramKeys)}
-    static let quickAxisIds: [String] = ${renderSwiftStringArray(payload.quickAxisIds)}
-    static let quickAxisMin = ${renderSwiftNumber(payload.quickAxisRange.min)}
-    static let quickAxisMax = ${renderSwiftNumber(payload.quickAxisRange.max)}
-    static let quickAxisStep = ${renderSwiftNumber(payload.quickAxisRange.step)}
-    static let defaultQuickState = FilmtoneQuickState(
+${enumPrefix}enum FilmtonePhase0Generated {
+    ${memberPrefix}static let schemaVersion = ${payload.schemaVersion}
+    ${memberPrefix}static let presetVersion = ${renderSwiftString(payload.presetVersion)}
+    ${memberPrefix}static let presetDefault = ${renderSwiftString(payload.presetDefault)}
+    ${memberPrefix}static let presetStrengthDefault = ${renderSwiftNumber(payload.presetStrengthDefault)}
+    ${memberPrefix}static let paramKeys: [String] = ${renderSwiftStringArray(payload.paramKeys)}
+    ${memberPrefix}static let quickAxisIds: [String] = ${renderSwiftStringArray(payload.quickAxisIds)}
+    ${memberPrefix}static let quickAxisMin = ${renderSwiftNumber(payload.quickAxisRange.min)}
+    ${memberPrefix}static let quickAxisMax = ${renderSwiftNumber(payload.quickAxisRange.max)}
+    ${memberPrefix}static let quickAxisStep = ${renderSwiftNumber(payload.quickAxisRange.step)}
+    ${memberPrefix}static let defaultQuickState = FilmtoneQuickState(
         filmCharacter: ${renderSwiftNumber(payload.defaultQuickState.filmCharacter)},
         era: ${renderSwiftNumber(payload.defaultQuickState.era)},
         dynamics: ${renderSwiftNumber(payload.defaultQuickState.dynamics)}
     )
-    static let outputProfile = Phase0OutputProfileDTO(
+    ${memberPrefix}static let outputProfile = Phase0OutputProfileDTO(
         longEdge: ${payload.outputProfile.longEdge},
         fps: ${payload.outputProfile.fps},
         codec: ${renderSwiftString(payload.outputProfile.codec)},
         container: ${renderSwiftString(payload.outputProfile.container)},
         preserveAudio: ${payload.outputProfile.preserveAudio ? "true" : "false"}
     )
-    static let rgbShiftMax = ${renderSwiftNumber(payload.rgbShiftMax)}
-    static let grainIntensityMax = ${renderSwiftNumber(payload.grainIntensityMax)}
-    static let sourceDurationCapSec = ${renderSwiftNumber(payload.sourceCaps.durationSec)}
-    static let sourceLongEdgeCap = ${payload.sourceCaps.longEdge}
-    static let sourceFileSizeCapBytes = ${payload.sourceCaps.fileSizeBytes}
-    static let resetParams: FilmtonePhase0Params =
+    ${memberPrefix}static let rgbShiftMax = ${renderSwiftNumber(payload.rgbShiftMax)}
+    ${memberPrefix}static let grainIntensityMax = ${renderSwiftNumber(payload.grainIntensityMax)}
+    ${memberPrefix}static let sourceDurationCapSec = ${renderSwiftNumber(payload.sourceCaps.durationSec)}
+    ${memberPrefix}static let sourceLongEdgeCap = ${payload.sourceCaps.longEdge}
+    ${memberPrefix}static let sourceFileSizeCapBytes = ${payload.sourceCaps.fileSizeBytes}
+    ${memberPrefix}static let resetParams: FilmtonePhase0Params =
 ${resetParams}
-    static let paramsByName: [String: FilmtonePhase0Params] = ${renderPresetMap(payload.presets)}
-    static let hiddenDefaults = ${renderHiddenDefaults(payload.hiddenDefaults)}
-    static let quickWeights: [String: [String: Double]] = ${renderQuickWeights(payload.quickWeights)}
+    ${memberPrefix}static let paramsByName: [String: FilmtonePhase0Params] = ${renderPresetMap(payload.presets)}
+    ${memberPrefix}static let hiddenDefaults = ${renderHiddenDefaults(payload.hiddenDefaults)}
+    ${memberPrefix}static let quickWeights: [String: [String: Double]] = ${renderQuickWeights(payload.quickWeights)}
 }
 `;
 }

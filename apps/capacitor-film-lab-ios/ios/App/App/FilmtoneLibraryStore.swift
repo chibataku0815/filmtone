@@ -1,3 +1,4 @@
+import FilmLabSwiftCore
 import Foundation
 
 /// Single owner of `~/Library/Application Support/Filmtone/library/`.

@@ -1,3 +1,4 @@
+import FilmLabSwiftCore
 import Foundation
 import UIKit
 
@@ -271,13 +272,8 @@ struct SourceProbeDTO: Codable {
     }
 }
 
-struct Phase0OutputProfileDTO: Codable {
-    let longEdge: Int
-    let fps: Int
-    let codec: String
-    let container: String
-    let preserveAudio: Bool
-}
+// `Phase0OutputProfileDTO` は FilmLabSwiftCore (M4-B Phase 2/3) に集約済み。
+// import 経由で参照する。
 
 struct Phase0QuickStateDTO: Codable {
     let filmCharacter: Double

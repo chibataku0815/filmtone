@@ -12,8 +12,6 @@
 		FT0000000000000000000A03 /* RootWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B03 /* RootWindowView.swift */; };
 		FT0000000000000000000A04 /* GlassControlGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B04 /* GlassControlGroup.swift */; };
 		FT0000000000000000000A05 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B05 /* Assets.xcassets */; };
-		FT0000000000000000000A06 /* Phase0Types.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B06 /* Phase0Types.swift */; };
-		FT0000000000000000000A07 /* FilmtonePhase0Generated.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B07 /* FilmtonePhase0Generated.swift */; };
 		FT0000000000000000000A08 /* PreviewSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B08 /* PreviewSurface.swift */; };
 		FT0000000000000000000A09 /* FilmtoneGradeKernels.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B09 /* FilmtoneGradeKernels.swift */; };
 		FT0000000000000000000A0A /* FilmtoneGradePipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B0A /* FilmtoneGradePipeline.swift */; };
@@ -37,6 +35,29 @@
 		FT0000000000000000000A1C /* FilmtoneSourceProber.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B1C /* FilmtoneSourceProber.swift */; };
 		FT0000000000000000000A1D /* CameraOpticsDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B1D /* CameraOpticsDTO.swift */; };
 		FT0000000000000000000A1E /* FilmtoneRayAngleOptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B1E /* FilmtoneRayAngleOptics.swift */; };
+		FT0000000000000000000A20 /* FilmtoneCubeParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B20 /* FilmtoneCubeParser.swift */; };
+		FT0000000000000000000A21 /* FilmtoneCreativePackCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B21 /* FilmtoneCreativePackCatalog.swift */; };
+		FT0000000000000000000A22 /* FilmtoneCreativeLutLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B22 /* FilmtoneCreativeLutLoader.swift */; };
+		FT0000000000000000000A23 /* filmtone-creative-pack-01-stone.cube in Resources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B23 /* filmtone-creative-pack-01-stone.cube */; };
+		FT0000000000000000000A24 /* filmtone-creative-pack-01-urban.cube in Resources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B24 /* filmtone-creative-pack-01-urban.cube */; };
+		FT0000000000000000000A25 /* FilmtoneSourceProfileMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B25 /* FilmtoneSourceProfileMath.swift */; };
+		FT0000000000000000000A26 /* FilmtoneSourceProfileCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B26 /* FilmtoneSourceProfileCatalog.swift */; };
+		FT0000000000000000000A27 /* FilmtoneSourceInputTransform.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B27 /* FilmtoneSourceInputTransform.swift */; };
+		FT0000000000000000000A28 /* SourceProfileControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B28 /* SourceProfileControls.swift */; };
+		FT0000000000000000000A29 /* FilmtoneSavedLookSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B29 /* FilmtoneSavedLookSchema.swift */; };
+		FT0000000000000000000A2A /* FilmtoneSavedLookStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B2A /* FilmtoneSavedLookStore.swift */; };
+		FT0000000000000000000A2B /* LibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B2B /* LibraryViewModel.swift */; };
+		FT0000000000000000000A2C /* LookLibraryControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B2C /* LookLibraryControls.swift */; };
+		FT0000000000000000000A2D /* QuickAdjustControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B2D /* QuickAdjustControls.swift */; };
+		FT0000000000000000000A2E /* MetricRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B2E /* MetricRow.swift */; };
+		FT0000000000000000000A2F /* ExportInspectorPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B2F /* ExportInspectorPanel.swift */; };
+		FT0000000000000000000A30 /* FilmtoneExportSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B30 /* FilmtoneExportSnapshot.swift */; };
+		FT0000000000000000000A31 /* FilmLabSwiftCore in Frameworks */ = {isa = PBXBuildFile; productRef = FT0000000000000000001501 /* FilmLabSwiftCore */; };
+		FT0000000000000000000A32 /* AdvancedAdjustCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B31 /* AdvancedAdjustCatalog.swift */; };
+		FT0000000000000000000A33 /* AdvancedAdjustEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B32 /* AdvancedAdjustEditor.swift */; };
+		FT0000000000000000000A34 /* EditorState+ParamOverrides.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B33 /* EditorState+ParamOverrides.swift */; };
+		FT0000000000000000000A35 /* ExportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B34 /* ExportCoordinator.swift */; };
+		FT0000000000000000000A36 /* SaveLookPayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B35 /* SaveLookPayload.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -45,8 +66,6 @@
 		FT0000000000000000000B03 /* RootWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootWindowView.swift; sourceTree = "<group>"; };
 		FT0000000000000000000B04 /* GlassControlGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassControlGroup.swift; sourceTree = "<group>"; };
 		FT0000000000000000000B05 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		FT0000000000000000000B06 /* Phase0Types.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Phase0Types.swift; sourceTree = "<group>"; };
-		FT0000000000000000000B07 /* FilmtonePhase0Generated.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtonePhase0Generated.swift; sourceTree = "<group>"; };
 		FT0000000000000000000B08 /* PreviewSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewSurface.swift; sourceTree = "<group>"; };
 		FT0000000000000000000B09 /* FilmtoneGradeKernels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneGradeKernels.swift; sourceTree = "<group>"; };
 		FT0000000000000000000B0A /* FilmtoneGradePipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneGradePipeline.swift; sourceTree = "<group>"; };
@@ -70,6 +89,28 @@
 		FT0000000000000000000B1C /* FilmtoneSourceProber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneSourceProber.swift; sourceTree = "<group>"; };
 		FT0000000000000000000B1D /* CameraOpticsDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraOpticsDTO.swift; sourceTree = "<group>"; };
 		FT0000000000000000000B1E /* FilmtoneRayAngleOptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneRayAngleOptics.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B20 /* FilmtoneCubeParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCubeParser.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B21 /* FilmtoneCreativePackCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCreativePackCatalog.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B22 /* FilmtoneCreativeLutLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCreativeLutLoader.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B23 /* filmtone-creative-pack-01-stone.cube */ = {isa = PBXFileReference; lastKnownFileType = text; path = "filmtone-creative-pack-01-stone.cube"; sourceTree = "<group>"; };
+		FT0000000000000000000B24 /* filmtone-creative-pack-01-urban.cube */ = {isa = PBXFileReference; lastKnownFileType = text; path = "filmtone-creative-pack-01-urban.cube"; sourceTree = "<group>"; };
+		FT0000000000000000000B25 /* FilmtoneSourceProfileMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneSourceProfileMath.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B26 /* FilmtoneSourceProfileCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneSourceProfileCatalog.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B27 /* FilmtoneSourceInputTransform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneSourceInputTransform.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B28 /* SourceProfileControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceProfileControls.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B29 /* FilmtoneSavedLookSchema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneSavedLookSchema.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B2A /* FilmtoneSavedLookStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneSavedLookStore.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B2B /* LibraryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryViewModel.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B2C /* LookLibraryControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LookLibraryControls.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B2D /* QuickAdjustControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickAdjustControls.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B2E /* MetricRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricRow.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B2F /* ExportInspectorPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportInspectorPanel.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B30 /* FilmtoneExportSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneExportSnapshot.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B31 /* AdvancedAdjustCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvancedAdjustCatalog.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B32 /* AdvancedAdjustEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvancedAdjustEditor.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B33 /* EditorState+ParamOverrides.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EditorState+ParamOverrides.swift"; sourceTree = "<group>"; };
+		FT0000000000000000000B34 /* ExportCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportCoordinator.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B35 /* SaveLookPayload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveLookPayload.swift; sourceTree = "<group>"; };
 		FT0000000000000000000C01 /* FilmtoneDesktop.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FilmtoneDesktop.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -78,6 +119,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FT0000000000000000000A31 /* FilmLabSwiftCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -102,10 +144,27 @@
 				FT0000000000000000000E09 /* State */,
 				FT0000000000000000000E0A /* Export */,
 				FT0000000000000000000E0B /* Media */,
-				FT0000000000000000000E07 /* SharedGenerated */,
+				FT0000000000000000000E0C /* Resources */,
 				FT0000000000000000000B05 /* Assets.xcassets */,
 			);
 			path = FilmtoneDesktop;
+			sourceTree = "<group>";
+		};
+		FT0000000000000000000E0C /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				FT0000000000000000000E0D /* CreativeLuts */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		FT0000000000000000000E0D /* CreativeLuts */ = {
+			isa = PBXGroup;
+			children = (
+				FT0000000000000000000B23 /* filmtone-creative-pack-01-stone.cube */,
+				FT0000000000000000000B24 /* filmtone-creative-pack-01-urban.cube */,
+			);
+			path = CreativeLuts;
 			sourceTree = "<group>";
 		};
 		FT0000000000000000000E03 /* App */ = {
@@ -124,6 +183,12 @@
 				FT0000000000000000000B04 /* GlassControlGroup.swift */,
 				FT0000000000000000000B08 /* PreviewSurface.swift */,
 				FT0000000000000000000B0E /* GradeControls.swift */,
+				FT0000000000000000000B28 /* SourceProfileControls.swift */,
+				FT0000000000000000000B2C /* LookLibraryControls.swift */,
+				FT0000000000000000000B2D /* QuickAdjustControls.swift */,
+				FT0000000000000000000B2E /* MetricRow.swift */,
+				FT0000000000000000000B2F /* ExportInspectorPanel.swift */,
+				FT0000000000000000000B32 /* AdvancedAdjustEditor.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -131,19 +196,11 @@
 		FT0000000000000000000E05 /* Domain */ = {
 			isa = PBXGroup;
 			children = (
-				FT0000000000000000000B06 /* Phase0Types.swift */,
 				FT0000000000000000000B17 /* SourceColorTypes.swift */,
 				FT0000000000000000000B1D /* CameraOpticsDTO.swift */,
+				FT0000000000000000000B31 /* AdvancedAdjustCatalog.swift */,
 			);
 			path = Domain;
-			sourceTree = "<group>";
-		};
-		FT0000000000000000000E07 /* SharedGenerated */ = {
-			isa = PBXGroup;
-			children = (
-				FT0000000000000000000B07 /* FilmtonePhase0Generated.swift */,
-			);
-			path = SharedGenerated;
 			sourceTree = "<group>";
 		};
 		FT0000000000000000000E08 /* Color */ = {
@@ -158,6 +215,14 @@
 				FT0000000000000000000B18 /* SourceColorMetadataNormalizer.swift */,
 				FT0000000000000000000B19 /* SourceColorClassifier.swift */,
 				FT0000000000000000000B1E /* FilmtoneRayAngleOptics.swift */,
+				FT0000000000000000000B20 /* FilmtoneCubeParser.swift */,
+				FT0000000000000000000B21 /* FilmtoneCreativePackCatalog.swift */,
+				FT0000000000000000000B22 /* FilmtoneCreativeLutLoader.swift */,
+				FT0000000000000000000B25 /* FilmtoneSourceProfileMath.swift */,
+				FT0000000000000000000B26 /* FilmtoneSourceProfileCatalog.swift */,
+				FT0000000000000000000B27 /* FilmtoneSourceInputTransform.swift */,
+				FT0000000000000000000B29 /* FilmtoneSavedLookSchema.swift */,
+				FT0000000000000000000B2A /* FilmtoneSavedLookStore.swift */,
 			);
 			path = Color;
 			sourceTree = "<group>";
@@ -166,6 +231,10 @@
 			isa = PBXGroup;
 			children = (
 				FT0000000000000000000B0D /* EditorState.swift */,
+				FT0000000000000000000B33 /* EditorState+ParamOverrides.swift */,
+				FT0000000000000000000B34 /* ExportCoordinator.swift */,
+				FT0000000000000000000B2B /* LibraryViewModel.swift */,
+				FT0000000000000000000B35 /* SaveLookPayload.swift */,
 			);
 			path = State;
 			sourceTree = "<group>";
@@ -177,6 +246,7 @@
 				FT0000000000000000000B10 /* FilmtoneSidecarWriter.swift */,
 				FT0000000000000000000B12 /* FilmtoneSidecarTypes.swift */,
 				FT0000000000000000000B16 /* FilmtoneVideoExporter.swift */,
+				FT0000000000000000000B30 /* FilmtoneExportSnapshot.swift */,
 			);
 			path = Export;
 			sourceTree = "<group>";
@@ -217,6 +287,9 @@
 			dependencies = (
 			);
 			name = FilmtoneDesktop;
+			packageProductDependencies = (
+				FT0000000000000000001501 /* FilmLabSwiftCore */,
+			);
 			productName = FilmtoneDesktop;
 			productReference = FT0000000000000000000C01 /* FilmtoneDesktop.app */;
 			productType = "com.apple.product-type.application";
@@ -245,6 +318,9 @@
 				Base,
 			);
 			mainGroup = FT0000000000000000000E01;
+			packageReferences = (
+				FT0000000000000000001401 /* XCLocalSwiftPackageReference "../../packages/film-lab-swift-core" */,
+			);
 			productRefGroup = FT0000000000000000000E06 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -260,6 +336,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				FT0000000000000000000A05 /* Assets.xcassets in Resources */,
+				FT0000000000000000000A23 /* filmtone-creative-pack-01-stone.cube in Resources */,
+				FT0000000000000000000A24 /* filmtone-creative-pack-01-urban.cube in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -274,8 +352,6 @@
 				FT0000000000000000000A02 /* AppCommands.swift in Sources */,
 				FT0000000000000000000A03 /* RootWindowView.swift in Sources */,
 				FT0000000000000000000A04 /* GlassControlGroup.swift in Sources */,
-				FT0000000000000000000A06 /* Phase0Types.swift in Sources */,
-				FT0000000000000000000A07 /* FilmtonePhase0Generated.swift in Sources */,
 				FT0000000000000000000A08 /* PreviewSurface.swift in Sources */,
 				FT0000000000000000000A09 /* FilmtoneGradeKernels.swift in Sources */,
 				FT0000000000000000000A0A /* FilmtoneGradePipeline.swift in Sources */,
@@ -299,6 +375,26 @@
 				FT0000000000000000000A1C /* FilmtoneSourceProber.swift in Sources */,
 				FT0000000000000000000A1D /* CameraOpticsDTO.swift in Sources */,
 				FT0000000000000000000A1E /* FilmtoneRayAngleOptics.swift in Sources */,
+				FT0000000000000000000A20 /* FilmtoneCubeParser.swift in Sources */,
+				FT0000000000000000000A21 /* FilmtoneCreativePackCatalog.swift in Sources */,
+				FT0000000000000000000A22 /* FilmtoneCreativeLutLoader.swift in Sources */,
+				FT0000000000000000000A25 /* FilmtoneSourceProfileMath.swift in Sources */,
+				FT0000000000000000000A26 /* FilmtoneSourceProfileCatalog.swift in Sources */,
+				FT0000000000000000000A27 /* FilmtoneSourceInputTransform.swift in Sources */,
+				FT0000000000000000000A28 /* SourceProfileControls.swift in Sources */,
+				FT0000000000000000000A29 /* FilmtoneSavedLookSchema.swift in Sources */,
+				FT0000000000000000000A2A /* FilmtoneSavedLookStore.swift in Sources */,
+				FT0000000000000000000A2B /* LibraryViewModel.swift in Sources */,
+				FT0000000000000000000A2C /* LookLibraryControls.swift in Sources */,
+				FT0000000000000000000A2D /* QuickAdjustControls.swift in Sources */,
+				FT0000000000000000000A2E /* MetricRow.swift in Sources */,
+				FT0000000000000000000A2F /* ExportInspectorPanel.swift in Sources */,
+				FT0000000000000000000A30 /* FilmtoneExportSnapshot.swift in Sources */,
+				FT0000000000000000000A32 /* AdvancedAdjustCatalog.swift in Sources */,
+				FT0000000000000000000A33 /* AdvancedAdjustEditor.swift in Sources */,
+				FT0000000000000000000A34 /* EditorState+ParamOverrides.swift in Sources */,
+				FT0000000000000000000A35 /* ExportCoordinator.swift in Sources */,
+				FT0000000000000000000A36 /* SaveLookPayload.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -430,20 +526,23 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = FilmtoneDesktop/FilmtoneDesktop.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = C3G77H8NM6;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.photography";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 Takumi Chiba";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "co.fores-tone.filmtone.desktop";
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				MARKETING_VERSION = 1.4;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.chibatakumi.film-lab-desktop";
+				PRODUCT_NAME = Filmtone;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
 			};
@@ -454,20 +553,25 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_ENTITLEMENTS = FilmtoneDesktop/FilmtoneDesktop.entitlements;
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = C3G77H8NM6;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.photography";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 Takumi Chiba";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "co.fores-tone.filmtone.desktop";
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				MARKETING_VERSION = 1.4;
+				OTHER_CODE_SIGN_FLAGS = "--timestamp";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.chibatakumi.film-lab-desktop";
+				PRODUCT_NAME = Filmtone;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
 			};
@@ -495,6 +599,20 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		FT0000000000000000001401 /* XCLocalSwiftPackageReference "../../packages/film-lab-swift-core" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "../../packages/film-lab-swift-core";
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		FT0000000000000000001501 /* FilmLabSwiftCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = FilmLabSwiftCore;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = FT00000000000000000012A1 /* Project object */;
 }

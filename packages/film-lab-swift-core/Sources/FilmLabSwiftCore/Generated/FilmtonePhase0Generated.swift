@@ -1,33 +1,33 @@
 import Foundation
 
-enum FilmtonePhase0Generated {
-    static let schemaVersion = 2
-    static let presetVersion = "v2"
-    static let presetDefault = "reset"
-    static let presetStrengthDefault = 1.0
-    static let paramKeys: [String] = ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "grainRadialMix", "grainSize", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "shutterAngle", "trailIntensity", "fade", "shadowTone", "highlightTone", "shadowHue", "highlightHue", "vignette", "grainIntensity"]
-    static let quickAxisIds: [String] = ["filmCharacter", "era", "dynamics"]
-    static let quickAxisMin = -1.0
-    static let quickAxisMax = 1.0
-    static let quickAxisStep = 0.01
-    static let defaultQuickState = FilmtoneQuickState(
+public enum FilmtonePhase0Generated {
+    public static let schemaVersion = 2
+    public static let presetVersion = "v2"
+    public static let presetDefault = "reset"
+    public static let presetStrengthDefault = 1.0
+    public static let paramKeys: [String] = ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "grainRadialMix", "grainSize", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "shutterAngle", "trailIntensity", "fade", "shadowTone", "highlightTone", "shadowHue", "highlightHue", "vignette", "grainIntensity"]
+    public static let quickAxisIds: [String] = ["filmCharacter", "era", "dynamics"]
+    public static let quickAxisMin = -1.0
+    public static let quickAxisMax = 1.0
+    public static let quickAxisStep = 0.01
+    public static let defaultQuickState = FilmtoneQuickState(
         filmCharacter: 0.0,
         era: 0.0,
         dynamics: 0.0
     )
-    static let outputProfile = Phase0OutputProfileDTO(
+    public static let outputProfile = Phase0OutputProfileDTO(
         longEdge: 1920,
         fps: 24,
         codec: "h264",
         container: "mp4",
         preserveAudio: true
     )
-    static let rgbShiftMax = 0.005
-    static let grainIntensityMax = 0.1
-    static let sourceDurationCapSec = 300.0
-    static let sourceLongEdgeCap = 4096
-    static let sourceFileSizeCapBytes = 8589934592
-    static let resetParams: FilmtonePhase0Params =
+    public static let rgbShiftMax = 0.005
+    public static let grainIntensityMax = 0.1
+    public static let sourceDurationCapSec = 300.0
+    public static let sourceLongEdgeCap = 4096
+    public static let sourceFileSizeCapBytes = 8589934592
+    public static let resetParams: FilmtonePhase0Params =
     .init(
             exposure: 0.0,
             contrast: 1.0,
@@ -65,7 +65,7 @@ enum FilmtonePhase0Generated {
             vignette: 0.0,
             grainIntensity: 0.0
         )
-    static let paramsByName: [String: FilmtonePhase0Params] = [
+    public static let paramsByName: [String: FilmtonePhase0Params] = [
         "reset": .init(
             exposure: 0.0,
             contrast: 1.0,
@@ -215,7 +215,7 @@ enum FilmtonePhase0Generated {
             grainIntensity: 0.016
         )
     ]
-    static let hiddenDefaults = FilmtonePhase0HiddenDefaults(
+    public static let hiddenDefaults = FilmtonePhase0HiddenDefaults(
         depthMistGain: 0.0,
         depthGlowGain: 0.0,
         depthRayAngleGamma: 1.4,
@@ -236,7 +236,7 @@ enum FilmtonePhase0Generated {
         crossFilterEdgeLengthGain: 0.45,
         crossFilterEdgeStrengthGain: 0.25
     )
-    static let quickWeights: [String: [String: Double]] = [
+    public static let quickWeights: [String: [String: Double]] = [
         "filmCharacter": [
             "saturation": 0.24,
             "temperature": 0.16,

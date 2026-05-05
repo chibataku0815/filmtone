@@ -1,3 +1,4 @@
+import FilmLabSwiftCore
 import Foundation
 
 // Sidecar Case B (Look canonical only) per master handoff §10. Look
@@ -24,10 +25,15 @@ enum FilmtoneSidecarWriter {
 
     static func writeSidecar(
         for request: any FilmtoneSidecarRequest,
-        sourceInterpretation: String? = nil
+        sourceInterpretation: String? = nil,
+        resolvedSourceProfile: CameraProfileCatalogEntry? = nil
     ) throws -> URL {
         let sidecarURL = sidecarURL(for: request.outputURL)
-        let payload = sidecarPayload(for: request, sourceInterpretation: sourceInterpretation)
+        let payload = sidecarPayload(
+            for: request,
+            sourceInterpretation: sourceInterpretation,
+            resolvedSourceProfile: resolvedSourceProfile
+        )
         let json = try JSONSerialization.data(
             withJSONObject: payload,
             options: [.prettyPrinted, .sortedKeys]
@@ -44,15 +50,34 @@ enum FilmtoneSidecarWriter {
 
     static func sidecarPayload(
         for request: any FilmtoneSidecarRequest,
-        sourceInterpretation: String? = nil
+        sourceInterpretation: String? = nil,
+        resolvedSourceProfile: CameraProfileCatalogEntry? = nil
     ) -> [String: Any] {
         let strength = FilmtonePresetCatalog.clampStrength(request.presetStrength)
-        let params = FilmtonePresetCatalog.params(
-            for: request.presetName,
-            strength: strength
+        let liveQuickState = request.quickState.clamped()
+        let params = FilmtonePresetCatalog.resolved(
+            presetName: request.presetName,
+            strength: strength,
+            lookSlug: request.lookSlug,
+            quickState: liveQuickState,
+            paramOverrides: request.paramOverrides
         )
-        let lookId = FilmtonePresetCatalog.lookId(for: request.presetName)
         let lookVersion = FilmtonePresetCatalog.presetVersion
+
+        // M5-A.2: when a Look is active, switch lookId to the
+        // `filmtone:builtin:<slug>:<v>` namespace and overwrite
+        // baseLookName with the slug so a sidecar consumer can route by
+        // identity. baseLookName intentionally hides the underlying preset
+        // ("reset") because the Look's overrides + cube are the SSOT.
+        let lookId: String
+        let baseLookName: String
+        if let lookSlug = request.lookSlug {
+            lookId = FilmtonePresetCatalog.lookId(forSlug: lookSlug)
+            baseLookName = lookSlug
+        } else {
+            lookId = FilmtonePresetCatalog.lookId(for: request.presetName)
+            baseLookName = request.presetName
+        }
 
         let isoFormatter = ISO8601DateFormatter()
         isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -70,19 +95,52 @@ enum FilmtoneSidecarWriter {
             "batchLookChoice": [
                 "lookId": lookId,
                 "lookVersion": lookVersion,
-                "baseLookName": request.presetName,
+                "baseLookName": baseLookName,
                 "strength": strength,
             ],
             "lookId": lookId,
             "lookVersion": lookVersion,
             "quickState": [
-                "filmCharacter": 0.0,
-                "era": 0.0,
-                "dynamics": 0.0,
+                "filmCharacter": liveQuickState.filmCharacter,
+                "era": liveQuickState.era,
+                "dynamics": liveQuickState.dynamics,
             ],
         ]
         if let sourceInterpretation {
             payload["sourceInterpretation"] = sourceInterpretation
+        }
+        // M5-C.1 additive: emit the user's source profile selection plus
+        // (when known) the catalog entry actually applied. `selection`
+        // captures intent (Auto vs sticky pick); `resolvedId` captures what
+        // the export actually applied — useful when Auto resolved to
+        // something like `apple-log` after probe. Existing readers ignore
+        // unknown fields → backward-compatible.
+        var sourceProfilePayload: [String: Any] = [
+            "selection": request.sourceProfileSelection.identifierString,
+        ]
+        if let resolvedSourceProfile {
+            sourceProfilePayload["resolvedId"] = resolvedSourceProfile.id
+            sourceProfilePayload["resolvedName"] = resolvedSourceProfile.englishName
+            if let curve = resolvedSourceProfile.curve {
+                sourceProfilePayload["resolvedCurve"] = curve.rawValue
+            }
+        }
+        payload["sourceProfile"] = sourceProfilePayload
+        // M5-A.2 additive: emit `creativeLut` provenance when a Look is
+        // active and its cube resolves. SHA mismatch / missing resource
+        // path returns nil from the loader → block is omitted (OQ-3:
+        // attempted-and-failed signal not surfaced in the sidecar).
+        if let lookSlug = request.lookSlug,
+           strength > 0,
+           let look = FilmtoneCreativePackCatalog.find(slug: lookSlug),
+           let prepared = FilmtoneCreativeLutLoader.load(look: look) {
+            payload["creativeLut"] = [
+                "size": prepared.size,
+                "intensity": prepared.intensity,
+                "sourceHash": prepared.sourceHash,
+                "bundledSlug": look.slug,
+                "bundledPackId": look.packId,
+            ]
         }
         return payload
     }

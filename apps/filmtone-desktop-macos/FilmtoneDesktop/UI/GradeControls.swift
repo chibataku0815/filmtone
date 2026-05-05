@@ -1,10 +1,17 @@
 import SwiftUI
 
+// M5-C.2a: GradeControls is now strength-only. The Look picker moved
+// out of here into `LookLibraryControls`, which is snapshot-driven and
+// hosts both built-in catalog entries and user-saved Looks plus the
+// "Save Current Look…" affordance.
+
 struct GradeControls: View {
     @Bindable var state: EditorState
 
     private var strengthDisabled: Bool {
-        state.presetName == FilmtonePresetCatalog.defaultName
+        // Strength only does work when a Look is active — without one,
+        // the bareline pivot has no target to interpolate toward.
+        state.lookSlug == nil
     }
 
     private var strengthPercent: Int {
@@ -12,28 +19,24 @@ struct GradeControls: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Picker("Look", selection: $state.presetName) {
-                ForEach(FilmtonePresetCatalog.orderedNames, id: \.self) { name in
-                    Text(FilmtonePresetCatalog.displayName(for: name)).tag(name)
-                }
+        // M5-B Pass 4: explicit white text + Slider tint give guaranteed
+        // contrast on the dark-tinted Liquid Glass surface set by
+        // RootWindowView.
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Strength")
+                    .font(.callout)
+                    .foregroundStyle(.white)
+                Spacer()
+                Text("\(strengthPercent)%")
+                    .font(.callout.monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.7))
             }
-            .pickerStyle(.menu)
-
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text("Strength")
-                        .font(.callout)
-                    Spacer()
-                    Text("\(strengthPercent)%")
-                        .font(.callout.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
-                Slider(value: $state.presetStrength, in: 0...1)
-                    .disabled(strengthDisabled)
-            }
-            .frame(width: 220)
-            .opacity(strengthDisabled ? 0.5 : 1.0)
+            Slider(value: $state.presetStrength, in: 0...1)
+                .tint(.white)
+                .disabled(strengthDisabled)
         }
+        .frame(width: 220)
+        .opacity(strengthDisabled ? 0.5 : 1.0)
     }
 }

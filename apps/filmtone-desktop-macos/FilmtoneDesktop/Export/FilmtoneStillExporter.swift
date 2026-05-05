@@ -1,5 +1,6 @@
 import CoreImage
 import CoreGraphics
+import FilmLabSwiftCore
 import Foundation
 import ImageIO
 import UniformTypeIdentifiers
@@ -34,7 +35,12 @@ struct FilmtoneStillExportRequest: FilmtoneSidecarRequest {
     let outputURL: URL
     let presetName: String
     let presetStrength: Double
+    let lookSlug: String?
     let format: StillExportFormat
+    let jpegQuality: Double
+    let sourceProfileSelection: CameraProfileSelection
+    let quickState: FilmtoneQuickState
+    let paramOverrides: FilmtonePhase0ParamsPatch
     var sourceKind: FilmtoneSourceKind { .still }
 
     init(
@@ -42,13 +48,25 @@ struct FilmtoneStillExportRequest: FilmtoneSidecarRequest {
         outputURL: URL,
         presetName: String,
         presetStrength: Double = FilmtonePresetCatalog.presetStrengthDefault,
-        format: StillExportFormat
+        lookSlug: String? = nil,
+        format: StillExportFormat,
+        jpegQuality: Double = 0.95,
+        sourceProfileSelection: CameraProfileSelection = .auto,
+        quickState: FilmtoneQuickState = .zero,
+        paramOverrides: FilmtonePhase0ParamsPatch = .empty
     ) {
         self.sourceURL = sourceURL
         self.outputURL = outputURL
         self.presetName = presetName
         self.presetStrength = presetStrength
+        self.lookSlug = lookSlug
         self.format = format
+        // M5-C.4: clamp at request boundary so a stale UI value can't
+        // push a bogus quality through to the encoder.
+        self.jpegQuality = min(1.0, max(0.5, jpegQuality))
+        self.sourceProfileSelection = sourceProfileSelection
+        self.quickState = quickState
+        self.paramOverrides = paramOverrides
     }
 }
 
@@ -85,18 +103,44 @@ enum FilmtoneStillExporter {
             throw FilmtoneStillExportError.sourceUnreadable(request.sourceURL)
         }
 
-        let params = FilmtonePresetCatalog.params(
-            for: request.presetName,
-            strength: request.presetStrength
+        // M5-C.1: resolve source profile (Auto matches detection-hint
+        // catalog; .builtIn is sticky) and apply the cube before grade.
+        // For SDR Rec.709 / Display P3 / unknown sources Auto resolves to
+        // the Rec.709 nilCurve entry (or no entry) → no transform → bytewise
+        // identity preserved against pre-M5-C.1 output.
+        let resolvedProfile = FilmtoneSourceInputTransform.resolve(
+            selection: request.sourceProfileSelection,
+            probedColorClass: probe.colorClass
+        )
+        let normalizedSource = FilmtoneSourceInputTransform.apply(
+            to: source,
+            entry: resolvedProfile
+        )
+
+        let params = FilmtonePresetCatalog.resolved(
+            presetName: request.presetName,
+            strength: request.presetStrength,
+            lookSlug: request.lookSlug,
+            quickState: request.quickState,
+            paramOverrides: request.paramOverrides
         )
         let sourceSeed = FilmtoneGradePipeline.makeStableSourceSeed(
             from: request.sourceURL.absoluteString
         )
+        let creativeLut: PreparedCreativeLut?
+        if let lookSlug = request.lookSlug,
+           request.presetStrength > 0,
+           let look = FilmtoneCreativePackCatalog.find(slug: lookSlug) {
+            creativeLut = FilmtoneCreativeLutLoader.load(look: look)
+        } else {
+            creativeLut = nil
+        }
         let graded = FilmtoneGradePipeline.apply(
-            to: source,
+            to: normalizedSource,
             params: params,
             sourceSeed: sourceSeed,
-            cameraOptics: probe.cameraOptics
+            cameraOptics: probe.cameraOptics,
+            creativeLut: creativeLut
         )
 
         try render(graded, request: request, contract: contract)
@@ -105,7 +149,8 @@ enum FilmtoneStillExporter {
         if writeSidecar {
             sidecarURL = try FilmtoneSidecarWriter.writeSidecar(
                 for: request,
-                sourceInterpretation: contract.sourceInterpretationID
+                sourceInterpretation: contract.sourceInterpretationID,
+                resolvedSourceProfile: resolvedProfile
             )
         }
 
@@ -148,7 +193,9 @@ enum FilmtoneStillExporter {
                     to: request.outputURL,
                     colorSpace: outputSpace,
                     options: [
-                        kCGImageDestinationLossyCompressionQuality as CIImageRepresentationOption: 0.95
+                        // M5-C.4: request-driven quality (default 0.95
+                        // matches pre-M5-C.4 hardcoded behavior).
+                        kCGImageDestinationLossyCompressionQuality as CIImageRepresentationOption: request.jpegQuality
                     ]
                 )
             }

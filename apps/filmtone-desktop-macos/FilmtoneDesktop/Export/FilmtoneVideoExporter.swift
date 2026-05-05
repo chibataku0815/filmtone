@@ -2,6 +2,7 @@ import AVFoundation
 import CoreImage
 import CoreMedia
 import CoreVideo
+import FilmLabSwiftCore
 import Foundation
 
 enum FilmtoneVideoCodec: String, Sendable {
@@ -16,7 +17,11 @@ struct FilmtoneVideoExportRequest: FilmtoneSidecarRequest {
     let outputURL: URL
     let presetName: String
     let presetStrength: Double
+    let lookSlug: String?
     let codec: FilmtoneVideoCodec
+    let sourceProfileSelection: CameraProfileSelection
+    let quickState: FilmtoneQuickState
+    let paramOverrides: FilmtonePhase0ParamsPatch
     var sourceKind: FilmtoneSourceKind { .video }
 
     init(
@@ -24,13 +29,21 @@ struct FilmtoneVideoExportRequest: FilmtoneSidecarRequest {
         outputURL: URL,
         presetName: String,
         presetStrength: Double = FilmtonePresetCatalog.presetStrengthDefault,
-        codec: FilmtoneVideoCodec = .h264
+        lookSlug: String? = nil,
+        codec: FilmtoneVideoCodec = .h264,
+        sourceProfileSelection: CameraProfileSelection = .auto,
+        quickState: FilmtoneQuickState = .zero,
+        paramOverrides: FilmtonePhase0ParamsPatch = .empty
     ) {
         self.sourceURL = sourceURL
         self.outputURL = outputURL
         self.presetName = presetName
         self.presetStrength = presetStrength
+        self.lookSlug = lookSlug
         self.codec = codec
+        self.sourceProfileSelection = sourceProfileSelection
+        self.quickState = quickState
+        self.paramOverrides = paramOverrides
     }
 }
 
@@ -69,6 +82,14 @@ enum FilmtoneVideoExporter {
             sourceMetadata: probe.metadata,
             sourceColorClass: probe.colorClass
         )
+        // M5-C.1: resolve catalog entry once for the entire export. Pre-warm
+        // the cube cache so the per-frame loop reuses the parsed cube blob
+        // (NSLock + dictionary in FilmtoneSourceInputTransform).
+        let resolvedProfile = FilmtoneSourceInputTransform.resolve(
+            selection: request.sourceProfileSelection,
+            probedColorClass: probe.colorClass
+        )
+        _ = FilmtoneSourceInputTransform.prepareCube(for: resolvedProfile?.curve)
         let reader = try FilmtoneVideoReader(probe: probe, contract: contract)
 
         // Display orientation (portrait capture etc. swaps width/height).
@@ -89,13 +110,27 @@ enum FilmtoneVideoExporter {
         try writer.start()
         try reader.start()
 
-        let params = FilmtonePresetCatalog.params(
-            for: request.presetName,
-            strength: request.presetStrength
+        let params = FilmtonePresetCatalog.resolved(
+            presetName: request.presetName,
+            strength: request.presetStrength,
+            lookSlug: request.lookSlug,
+            quickState: request.quickState,
+            paramOverrides: request.paramOverrides
         )
         let sourceSeed = FilmtoneGradePipeline.makeStableSourceSeed(
             from: request.sourceURL.absoluteString
         )
+        // M5-A.2: resolve the cube ONCE outside the frame loop. The NSCache
+        // hit guarantees a parsed cube survives this entire export. nil
+        // when no Look is selected or strength gate is closed (D4-ii).
+        let creativeLut: PreparedCreativeLut?
+        if let lookSlug = request.lookSlug,
+           request.presetStrength > 0,
+           let look = FilmtoneCreativePackCatalog.find(slug: lookSlug) {
+            creativeLut = FilmtoneCreativeLutLoader.load(look: look)
+        } else {
+            creativeLut = nil
+        }
         let context = FilmtoneCIContext.shared
         let outputColorSpace = contract.destinationColorSpace
         let renderBounds = CGRect(origin: .zero, size: outputSize)
@@ -141,17 +176,27 @@ enum FilmtoneVideoExporter {
                     let scaleY = outputSize.height / max(normalized.extent.height, 1)
                     let scaled = normalized.transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
 
+                    // M5-C.1: apply the source profile cube before grade.
+                    // For Auto on Rec.709 / unknown sources (no entry / nil
+                    // curve) this is identity, preserving pre-M5-C.1 output
+                    // bytewise.
+                    let normalized709 = FilmtoneSourceInputTransform.apply(
+                        to: scaled,
+                        entry: resolvedProfile
+                    )
+
                     // Phase 2 C5a: forward CMTime presentation seconds to the
                     // grain kernel so each frame draws a fresh grain pattern
                     // (kernel does floor(t*3) → 3 refresh per source-second).
                     let secondsRaw = CMTimeGetSeconds(validTime)
                     let frameTimeSeconds = secondsRaw.isFinite ? max(secondsRaw, 0) : 0
                     let graded = FilmtoneGradePipeline.apply(
-                        to: scaled,
+                        to: normalized709,
                         params: params,
                         frameTimeSeconds: frameTimeSeconds,
                         sourceSeed: sourceSeed,
-                        cameraOptics: probe.cameraOptics
+                        cameraOptics: probe.cameraOptics,
+                        creativeLut: creativeLut
                     ).cropped(to: renderBounds)
 
                     context.render(
@@ -187,7 +232,8 @@ enum FilmtoneVideoExporter {
         if writeSidecar {
             sidecarURL = try FilmtoneSidecarWriter.writeSidecar(
                 for: request,
-                sourceInterpretation: contract.sourceInterpretationID
+                sourceInterpretation: contract.sourceInterpretationID,
+                resolvedSourceProfile: resolvedProfile
             )
         }
 

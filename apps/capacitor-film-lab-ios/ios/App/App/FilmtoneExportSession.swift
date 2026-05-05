@@ -1,6 +1,7 @@
 import AVFoundation
 import CoreImage
 import CoreImage.CIFilterBuiltins
+import FilmLabSwiftCore
 import Foundation
 import os
 import UIKit

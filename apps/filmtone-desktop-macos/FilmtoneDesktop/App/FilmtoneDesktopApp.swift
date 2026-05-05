@@ -11,16 +11,20 @@ import SwiftUI
 //   FilmtoneDesktop --export-still \
 //     --input <path/to/source.png> \
 //     --output <path/to/output.png> \
-//     --preset reset \
+//     [--preset reset|iphone|softBlue|amberGlow] \
+//     [--look filmtone-creative-pack-01-stone|filmtone-creative-pack-01-urban] \
 //     [--strength 0.0..1.0] \
 //     [--format png|jpeg] [--no-sidecar]
 //
 //   FilmtoneDesktop --export-video \
 //     --input <path/to/source.mov> \
 //     --output <path/to/output.mp4> \
-//     --preset reset \
-//     [--strength 0.0..1.0] \
-//     [--no-sidecar]
+//     [--preset ...] [--look ...] [--strength 0.0..1.0] [--no-sidecar]
+//
+// `--preset` and `--look` may both be present. When they are, --look wins
+// (basePreset is forced to `reset` so the cube + paramOverrides are the
+// SSOT) and a warning is written to stderr. Unknown --look slugs exit with
+// status 64 (usage error) before any rendering starts.
 
 @main
 struct FilmtoneDesktopApp: App {
@@ -29,10 +33,17 @@ struct FilmtoneDesktopApp: App {
     }
 
     var body: some Scene {
-        WindowGroup("Filmtone Desktop") {
+        WindowGroup("Filmtone") {
             RootWindowView()
         }
+        // M5-H.1: pin a sensible first-launch size so the right rail
+        // never lands clipped on the trailing edge, but stay below the
+        // typical 14"/16" laptop screen so the window doesn't dominate.
+        .defaultSize(width: 1280, height: 800)
         .windowResizability(.contentMinSize)
+        // macOS 26 unified Apple Liquid Glass toolbar/chrome requires
+        // explicit opt-in; .automatic falls back to a flat opaque bar.
+        .windowToolbarStyle(.unified)
         .commands {
             AppCommands()
         }
@@ -71,16 +82,19 @@ enum FilmtoneDesktopCLI {
     private static func parseStillExportArgs(_ args: [String]) throws -> FilmtoneStillExportRequest {
         let inputPath = try value(for: "--input", in: args)
         let outputPath = try value(for: "--output", in: args)
-        let preset = (try? value(for: "--preset", in: args)) ?? FilmtonePresetCatalog.defaultName
+        let rawPreset = (try? value(for: "--preset", in: args)) ?? FilmtonePresetCatalog.defaultName
+        let lookSlug = try parseLook(args: args)
         let strength = parseStrength(args)
         let formatString = (try? value(for: "--format", in: args)) ?? "png"
         let format = StillExportFormat(rawValue: formatString) ?? .png
+        let preset = lookSlug == nil ? rawPreset : FilmtonePresetCatalog.defaultName
 
         return FilmtoneStillExportRequest(
             sourceURL: URL(fileURLWithPath: inputPath),
             outputURL: URL(fileURLWithPath: outputPath),
             presetName: preset,
             presetStrength: strength,
+            lookSlug: lookSlug,
             format: format
         )
     }
@@ -107,16 +121,42 @@ enum FilmtoneDesktopCLI {
     private static func parseVideoExportArgs(_ args: [String]) throws -> FilmtoneVideoExportRequest {
         let inputPath = try value(for: "--input", in: args)
         let outputPath = try value(for: "--output", in: args)
-        let preset = (try? value(for: "--preset", in: args)) ?? FilmtonePresetCatalog.defaultName
+        let rawPreset = (try? value(for: "--preset", in: args)) ?? FilmtonePresetCatalog.defaultName
+        let lookSlug = try parseLook(args: args)
         let strength = parseStrength(args)
+        let preset = lookSlug == nil ? rawPreset : FilmtonePresetCatalog.defaultName
 
         return FilmtoneVideoExportRequest(
             sourceURL: URL(fileURLWithPath: inputPath),
             outputURL: URL(fileURLWithPath: outputPath),
             presetName: preset,
             presetStrength: strength,
+            lookSlug: lookSlug,
             codec: .h264
         )
+    }
+
+    /// Parses `--look <slug>`, validates against the bundled catalog, and
+    /// emits a stderr warning when both `--preset` and `--look` are set
+    /// (look wins). Unknown slugs throw exit-code 64 (usage error)
+    /// before any IO so a CI script gets a clear signal.
+    private static func parseLook(args: [String]) throws -> String? {
+        guard let raw = try? value(for: "--look", in: args), !raw.isEmpty else {
+            return nil
+        }
+        guard FilmtoneCreativePackCatalog.find(slug: raw) != nil else {
+            throw NSError(
+                domain: "FilmtoneDesktopCLI",
+                code: 64,
+                userInfo: [NSLocalizedDescriptionKey: "unknown --look slug: \(raw)"]
+            )
+        }
+        if args.contains("--preset") {
+            FileHandle.standardError.write(
+                Data("filmtone-desktop: --look \(raw) overrides --preset (basePreset = reset)\n".utf8)
+            )
+        }
+        return raw
     }
 
     private static func parseStrength(_ args: [String]) -> Double {

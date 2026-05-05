@@ -1,3 +1,4 @@
+import FilmLabSwiftCore
 import Foundation
 
 // Wraps the 4 built-in presets emitted by `bun run generate:swift` into
@@ -63,6 +64,100 @@ enum FilmtonePresetCatalog {
         // `filmtone:base:<presetName>:<presetVersion>`. Matches Case B sidecar
         // contract in master handoff §10.
         "filmtone:base:\(name):\(presetVersion)"
+    }
+
+    static func lookId(forSlug slug: String) -> String {
+        // M5-A.2: built-in Creative LUT Pack 01 slugs (Stone / Urban) get a
+        // dedicated namespace. Distinct from `filmtone:base:<preset>:<v>` so
+        // a sidecar consumer can route by `:builtin:` vs `:base:` without
+        // splitting on slug content.
+        "filmtone:builtin:\(slug):\(presetVersion)"
+    }
+
+    /// M5-A.2 — preset-blend (D3-α) resolution that combines a Look's
+    /// `paramOverrides` with a strength slider. When `lookSlug` is nil this
+    /// delegates to the existing preset path so the legacy 4-preset UI is
+    /// byte-identical.
+    ///
+    /// When a Look is selected, the high-layer is `target = reset +
+    /// paramOverridesPatch` and the low layer is forced to the bareline
+    /// `resetParams` pivot. The slider then lerps between bareline and
+    /// target — strength=0 collapses to bareline, strength=1 lands on the
+    /// Look's signature optics.
+    ///
+    /// M5-C.3a + M5-H.2 fix: after the preset/strength/look resolve, run
+    /// `applyQuickState` for the 3-axis Quick offsets, then layer the
+    /// `paramOverrides` patch on top. Order mirrors iOS canonical
+    /// (`FilmtonePhase0Math.resolveParams`) so a Look saved on iOS produces
+    /// identical params on macOS — and crucially, an explicit override
+    /// value lands as an absolute set (Quick does not re-apply on top of
+    /// it), which matches what the user sees in `AdvancedAdjustEditor`
+    /// sliders.
+    ///
+    /// Earlier (M5-C.3a) the order was preset → override → Quick. That
+    /// caused a double-Quick on any key the user touched in the Adjust
+    /// panel, and made the iOS-canonical recipe stamps (`max(base.X, …)`)
+    /// land at `recipe + Quick*weight` instead of the iOS-rendered
+    /// `recipe`. The order swap brings byte parity back.
+    static func resolved(
+        presetName: String,
+        strength: Double,
+        lookSlug: String?,
+        quickState: FilmtoneQuickState = .zero,
+        paramOverrides: FilmtonePhase0ParamsPatch = .empty
+    ) -> FilmtonePhase0Params {
+        let base: FilmtonePhase0Params
+        if let lookSlug,
+           let look = FilmtoneCreativePackCatalog.find(slug: lookSlug) {
+            let reset = FilmtonePhase0Generated.resetParams
+            let target = reset.applyingPatch(look.paramOverridesPatch)
+            let t = clampStrength(strength)
+            if t >= 1.0 {
+                base = target
+            } else if t <= 0.0 {
+                base = reset
+            } else {
+                base = lerp(reset: reset, target: target, t: t)
+            }
+        } else {
+            base = params(for: presetName, strength: strength)
+        }
+
+        let withQuick = applyQuickState(to: base, quickState: quickState)
+        // Drop overrides that already match the post-Quick base so a
+        // saved Look that round-trips through Adjust without changing
+        // anything does not pin redundant values into `paramOverrides`.
+        // Mirrors iOS `paramOverrides.normalized(over: base+Quick)`.
+        let normalized = paramOverrides.normalized(over: withQuick)
+        return normalized.isEmpty
+            ? withQuick
+            : withQuick.applyingPatch(normalized)
+    }
+
+    /// M5-C.3a — verbatim port of iOS `FilmtonePhase0Math.applyQuickState`.
+    /// Each Quick axis (`filmCharacter` / `era` / `dynamics`) carries an
+    /// additive weighted offset over a fixed subset of param keys, summed
+    /// into the running params object. Per-key clamps live on the params
+    /// setter (already enforced by `setValue(_:for:)` for keys with
+    /// generator-level bounds; the rest are unbounded by design).
+    static func applyQuickState(
+        to base: FilmtonePhase0Params,
+        quickState: FilmtoneQuickState
+    ) -> FilmtonePhase0Params {
+        let clamped = quickState.clamped()
+        var next = base
+        for axis in FilmtonePhase0Generated.quickAxisIds {
+            let axisValue = clamped.value(forAxis: axis)
+            guard axisValue != 0,
+                  let weights = FilmtonePhase0Generated.quickWeights[axis] else {
+                continue
+            }
+            for (key, weight) in weights {
+                let updated = next.value(for: key) + axisValue * weight
+                next.setValue(updated, for: key)
+            }
+        }
+        return next
     }
 
     private static func lerp(

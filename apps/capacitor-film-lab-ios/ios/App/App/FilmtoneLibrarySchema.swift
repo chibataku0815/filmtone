@@ -1,3 +1,4 @@
+import FilmLabSwiftCore
 import Foundation
 
 /// Hard-coded constants for the Filmtone library subtree.

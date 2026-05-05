@@ -1,4 +1,5 @@
 import CoreImage
+import FilmLabSwiftCore
 import Foundation
 
 /// Ray-angle optics helper for field-of-view aware kernels.
