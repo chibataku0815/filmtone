@@ -401,6 +401,18 @@ final class EditorState {
         return highlightMarkers
     }
 
+    var canCreateHighlightReel: Bool {
+        guard sourceKind == .video,
+              sourceURL != nil,
+              !isExporting,
+              sourceCapViolations.isEmpty,
+              let segments = exportHighlightMarkers?.highlightReelSegments(),
+              !segments.isEmpty else {
+            return false
+        }
+        return true
+    }
+
     func addHighlightMarker(at sourceTimeSec: Double) {
         guard sourceKind == .video,
               let sourceIdentity = currentMarkerSourceIdentity() else {

@@ -1,0 +1,20 @@
+[DHM-5 DaVinci Resolve smoke]
+Command:
+apps/capacitor-film-lab-ios/scripts/davinci/verify-highlight-marker-import.sh
+
+Result:
+PASS
+
+Key observed lines from the successful run:
+[Filmtone Connect] highlight markers: 1
+[Filmtone Connect] highlight reel segments: 1
+[Filmtone Connect] highlight reel segment 1: markers=filmtone-marker-001 seconds=41.630-42.630 frames=1248-1278 customData=filmtone-highlight-marker:filmtone-marker-001
+[Filmtone Connect] created Highlight_Auto timeline with 1 highlight reel segment(s): Highlight_Auto - C0061 - 1777986292
+[Filmtone Connect] refreshed highlight marker customData=filmtone-highlight-marker:filmtone-marker-001
+[Filmtone Connect] created Highlight_Auto timeline with 1 highlight reel segment(s): Highlight_Auto - C0061 - 1777986293
+[Filmtone Resolve Smoke] timeline[2]=Highlight_Auto - C0061 - 1777986292 videoItems=1
+[Filmtone Resolve Smoke] highlight marker customData=filmtone-highlight-marker:filmtone-marker-001 name=Highlight color=Blue duration=150
+[Filmtone Resolve Smoke] timeline[4]=Highlight_Auto - C0061 - 1777986293 videoItems=1
+[Filmtone Resolve Smoke] PASS customData uniqueness + Highlight_Auto timeline verified
+[Filmtone Resolve Smoke] closed-temp-project=true
+[Filmtone Resolve Smoke] deleted-temp-project=true

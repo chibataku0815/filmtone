@@ -14,6 +14,7 @@ import SwiftUI
 struct ExportInspectorPanel: View {
     @Bindable var state: EditorState
     let onExportTap: () -> Void
+    let onHighlightReelTap: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -84,6 +85,23 @@ struct ExportInspectorPanel: View {
             .buttonStyle(FilmtoneGlassPrimaryButtonStyle())
             .disabled(state.sourceURL == nil)
             .filmtonePointingHandCursor(state.sourceURL != nil)
+
+            if state.canCreateHighlightReel {
+                Button {
+                    onHighlightReelTap()
+                } label: {
+                    HStack {
+                        Image(systemName: "film.stack")
+                        Text("Highlight…")
+                        Spacer()
+                        Image(systemName: "arrow.right")
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(FilmtoneGlassSecondaryButtonStyle(compact: true))
+                .accessibilityIdentifier("filmtone.export.highlightReel")
+                .filmtonePointingHandCursor()
+            }
         }
     }
 

@@ -169,4 +169,165 @@ public struct FilmtoneHighlightMarkers: Codable, Equatable, Hashable, Sendable {
             markers: next
         )
     }
+
+    public func highlightReelSegments(
+        options: FilmtoneHighlightReelOptions = .standard
+    ) -> [FilmtoneHighlightClipSegment] {
+        FilmtoneHighlightClipSegment.segments(
+            from: markers,
+            sourceDurationSec: sourceIdentity.durationSec,
+            sourceFps: sourceIdentity.fps,
+            options: options
+        )
+    }
+}
+
+public struct FilmtoneHighlightReelOptions: Codable, Equatable, Hashable, Sendable {
+    public static let standard = FilmtoneHighlightReelOptions(
+        clipDurationSec: 1.0,
+        mergeOverlaps: true
+    )
+
+    public var clipDurationSec: Double
+    public var mergeOverlaps: Bool
+
+    public init(clipDurationSec: Double = 1.0, mergeOverlaps: Bool = true) {
+        self.clipDurationSec = clipDurationSec.isFinite && clipDurationSec > 0
+            ? clipDurationSec
+            : 1.0
+        self.mergeOverlaps = mergeOverlaps
+    }
+}
+
+public struct FilmtoneHighlightClipSegment: Codable, Equatable, Hashable, Sendable {
+    public var markerIds: [String]
+    public var sourceStartSec: Double
+    public var sourceEndSec: Double
+    public var durationSec: Double
+    public var sourceStartFrame: Int?
+    public var sourceEndFrame: Int?
+    public var sourceFps: Double?
+
+    public init(
+        markerIds: [String],
+        sourceStartSec: Double,
+        sourceEndSec: Double,
+        sourceFps: Double?
+    ) {
+        let start = sourceStartSec.isFinite ? max(0, sourceStartSec) : 0
+        let end = sourceEndSec.isFinite ? max(start, sourceEndSec) : start
+        let validFps = FilmtoneHighlightMarker.validFPS(sourceFps)
+
+        self.markerIds = Self.uniqueMarkerIds(markerIds)
+        self.sourceStartSec = start
+        self.sourceEndSec = end
+        self.durationSec = max(0, end - start)
+        self.sourceFps = validFps
+        self.sourceStartFrame = Self.frameIndex(seconds: start, fps: validFps)
+        self.sourceEndFrame = Self.frameIndex(seconds: end, fps: validFps)
+    }
+
+    public static func segments(
+        from markers: [FilmtoneHighlightMarker],
+        sourceDurationSec: Double?,
+        sourceFps: Double?,
+        options: FilmtoneHighlightReelOptions = .standard
+    ) -> [FilmtoneHighlightClipSegment] {
+        let validDuration = sourceDurationSec.flatMap { value in
+            value.isFinite && value > 0 ? value : nil
+        }
+        let validFps = FilmtoneHighlightMarker.validFPS(sourceFps)
+        let clipDuration = options.clipDurationSec
+        let halfDuration = clipDuration / 2.0
+
+        let rawSegments = markers
+            .filter { !$0.id.isEmpty && $0.sourceTimeSec.isFinite && $0.sourceTimeSec >= 0 }
+            .sorted { lhs, rhs in
+                if lhs.sourceTimeSec == rhs.sourceTimeSec {
+                    return lhs.id < rhs.id
+                }
+                return lhs.sourceTimeSec < rhs.sourceTimeSec
+            }
+            .map { marker in
+                let markerFps = validFps ?? marker.sourceFps
+                let bounds = centeredBounds(
+                    centerSec: marker.sourceTimeSec,
+                    clipDurationSec: clipDuration,
+                    halfDurationSec: halfDuration,
+                    sourceDurationSec: validDuration
+                )
+                return FilmtoneHighlightClipSegment(
+                    markerIds: [marker.id],
+                    sourceStartSec: bounds.start,
+                    sourceEndSec: bounds.end,
+                    sourceFps: markerFps
+                )
+            }
+            .filter { $0.durationSec > 0 }
+
+        guard options.mergeOverlaps else {
+            return rawSegments
+        }
+        return mergeOverlapping(rawSegments)
+    }
+
+    private static func centeredBounds(
+        centerSec: Double,
+        clipDurationSec: Double,
+        halfDurationSec: Double,
+        sourceDurationSec: Double?
+    ) -> (start: Double, end: Double) {
+        guard let sourceDurationSec else {
+            let start = max(0, centerSec - halfDurationSec)
+            return (start, start + clipDurationSec)
+        }
+        if sourceDurationSec <= clipDurationSec {
+            return (0, sourceDurationSec)
+        }
+
+        let unclampedStart = centerSec - halfDurationSec
+        let maxStart = sourceDurationSec - clipDurationSec
+        let start = min(max(0, unclampedStart), maxStart)
+        return (start, start + clipDurationSec)
+    }
+
+    private static func mergeOverlapping(
+        _ segments: [FilmtoneHighlightClipSegment]
+    ) -> [FilmtoneHighlightClipSegment] {
+        var merged: [FilmtoneHighlightClipSegment] = []
+        for segment in segments {
+            guard var current = merged.popLast() else {
+                merged.append(segment)
+                continue
+            }
+            if segment.sourceStartSec <= current.sourceEndSec {
+                current = FilmtoneHighlightClipSegment(
+                    markerIds: current.markerIds + segment.markerIds,
+                    sourceStartSec: current.sourceStartSec,
+                    sourceEndSec: max(current.sourceEndSec, segment.sourceEndSec),
+                    sourceFps: current.sourceFps ?? segment.sourceFps
+                )
+                merged.append(current)
+            } else {
+                merged.append(current)
+                merged.append(segment)
+            }
+        }
+        return merged
+    }
+
+    private static func uniqueMarkerIds(_ markerIds: [String]) -> [String] {
+        var seen = Set<String>()
+        return markerIds.filter { markerId in
+            guard !markerId.isEmpty, !seen.contains(markerId) else {
+                return false
+            }
+            seen.insert(markerId)
+            return true
+        }
+    }
+
+    private static func frameIndex(seconds: Double, fps: Double?) -> Int? {
+        FilmtoneHighlightMarker.frameIndex(sourceTimeSec: seconds, fps: fps)
+    }
 }
