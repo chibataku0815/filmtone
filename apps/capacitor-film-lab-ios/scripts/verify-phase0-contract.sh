@@ -171,6 +171,18 @@ if [ -f "$SOURCE_PROFILE_MATH_SCRIPT" ] && [ -f "$SOURCE_PROFILE_MATH_SRC" ] && 
   "$SOURCE_PROFILE_MATH_BIN" "$SOURCE_PROFILE_FIXTURES"
 fi
 
+# --- Look × Veil energy max-merge contract (2026-05-06 iOS port) ---
+LOOK_VEIL_MERGE_SCRIPT="$SCRIPT_DIR/swift/test-look-veil-energy-merge.swift"
+if [ -f "$LOOK_VEIL_MERGE_SCRIPT" ]; then
+  echo "==> look × veil energy merge test"
+  LOOK_VEIL_MERGE_BIN=$(mktemp "${TMPDIR:-/tmp}/phase0-look-veil-merge-check.XXXXXX")
+  CLEANUP_FILES="$CLEANUP_FILES $LOOK_VEIL_MERGE_BIN"
+  xcrun swiftc \
+    -o "$LOOK_VEIL_MERGE_BIN" \
+    "$LOOK_VEIL_MERGE_SCRIPT"
+  "$LOOK_VEIL_MERGE_BIN"
+fi
+
 # --- Stream 5: sidecar builder test (may not exist yet at Wave 2 branch time) ---
 SIDECAR_SCRIPT="$SCRIPT_DIR/swift/test-sidecar-builder.swift"
 SIDECAR_SRC="$APP_DIR/ios/App/App/FilmtoneExportSidecarBuilder.swift"
