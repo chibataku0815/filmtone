@@ -342,4 +342,23 @@ Portrait sidebar reservation fix (2026-05-05, post-review, integrator):
   111/111; `bun run verify:macos` → BUILD SUCCEEDED;
   `git diff --check` → clean.
 
-(populated as the streams report)
+Video pre-session aspect fallback fix (2026-05-05, integrator):
+
+- Follow-up review flagged a remaining timing gap: `isPortraitSource` uses
+  `videoSession.displayAspectRatio` for videos, but `videoSession` arrives
+  asynchronously. During that prepare window the fallback `sourceAspectRatio`
+  could still hold the previous source's still aspect, and the new portrait
+  sidebar reapply gate could skip a user sidebar toggle before the session
+  attached. Fixed by clearing `sourceAspectRatio` and `lastMediaDisplaySize`
+  at the start of every new source resize path, then seeding
+  `sourceAspectRatio` from the video probe's display size before calling
+  `resizeWindow(toMediaDisplaySize:)`.
+- Verification: `git diff --check` → clean;
+  `bash apps/filmtone-desktop-macos/Verify/run.sh` → 111/111;
+  `bun run verify:macos` → BUILD SUCCEEDED.
+
+Close note (2026-05-05):
+
+- M5-M implementation is ready for main merge per user direction. Remaining
+  product risk: manual Debug-app visual smoke with a real portrait iPhone clip
+  was not run in this chat; machine gates and static review are clean.
