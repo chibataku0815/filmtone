@@ -42,6 +42,7 @@ SOURCES=(
   "$SRC_ROOT/Color/FilmtonePresetCatalog.swift"
   "$SRC_ROOT/Color/FilmtoneCreativePackCatalog.swift"
   "$SRC_ROOT/Color/FilmtoneSavedLookSchema.swift"
+  "$SRC_ROOT/Color/FilmtoneSavedLookStore.swift"
   "$SRC_ROOT/Color/FilmtoneSourceProfileCatalog.swift"
   "$SRC_ROOT/Color/FilmtoneCubeParser.swift"
   "$SRC_ROOT/Color/FilmtoneCreativeLutLoader.swift"

@@ -100,6 +100,57 @@ final class LibraryViewModel {
         }
     }
 
+    /// Rename a user Saved Look. Built-in selections raise
+    /// `lastError` (the actor refuses with `.immutableEntry`) so the
+    /// inline alert nudges the user toward saving a copy first. Returns
+    /// the updated entry on success so the caller can re-select it
+    /// (id stays stable; only the name + updatedAt change).
+    @discardableResult
+    func renameLook(id: UUID, newName: String) async -> SavedLookEntry? {
+        do {
+            let entry = try await store.renameLook(id: id, newName: newName)
+            await refresh()
+            return entry
+        } catch {
+            self.lastError = error.localizedDescription
+            return nil
+        }
+    }
+
+    /// Toggle the favorite flag on a user Saved Look. The actor sorts
+    /// favorites first in the snapshot, so the picker re-orders on the
+    /// next refresh.
+    @discardableResult
+    func toggleFavorite(id: UUID) async -> SavedLookEntry? {
+        guard let current = snapshot.lookEntry(id: id) else {
+            return nil
+        }
+        do {
+            let entry = try await store.setFavorite(id: id, favorite: !current.favorite)
+            await refresh()
+            return entry
+        } catch {
+            self.lastError = error.localizedDescription
+            return nil
+        }
+    }
+
+    /// Delete a user Saved Look. Built-ins refuse with `.immutableEntry`
+    /// (surfaced as `lastError`). Returns true on success so the caller
+    /// can clear `selectedSavedLookId` if it was pointing at the deleted
+    /// entry.
+    @discardableResult
+    func deleteLook(id: UUID) async -> Bool {
+        do {
+            _ = try await store.deleteLook(id: id)
+            await refresh()
+            return true
+        } catch {
+            self.lastError = error.localizedDescription
+            return false
+        }
+    }
+
     private static func unsafeStoreFallback() -> FilmtoneSavedLookStore {
         // Theoretical: both ApplicationSupport and the temporary
         // directory path failed init. Force-try here is acceptable

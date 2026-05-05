@@ -86,6 +86,9 @@ struct AdvancedAdjustEditor: View {
 
         DisclosureGroup(isExpanded: isExpanded) {
             VStack(alignment: .leading, spacing: 12) {
+                if !group.recipes.isEmpty {
+                    recipeChipRow(for: group)
+                }
                 ForEach(group.controls) { control in
                     paramRow(control)
                 }
@@ -110,6 +113,53 @@ struct AdvancedAdjustEditor: View {
                 }
                 Spacer()
             }
+        }
+    }
+
+    @ViewBuilder
+    private func recipeChipRow(for group: AdvancedAdjustCatalog.Group) -> some View {
+        let activeId = state.activeRecipeId(in: group)
+        HStack(spacing: 8) {
+            ForEach(group.recipes) { recipe in
+                recipeChip(recipe, in: group, isActive: recipe.id == activeId)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    @ViewBuilder
+    private func recipeChip(_ recipe: AdvancedAdjustCatalog.Recipe,
+                              in group: AdvancedAdjustCatalog.Group,
+                              isActive: Bool) -> some View {
+        let helpText = recipe.kind == .none
+            ? "Clear \(group.title) overrides"
+            : "Apply \(recipe.label) preset to \(group.title)"
+        // SwiftUI button styles don't share a common erased type, so a
+        // ternary on the modifier is not allowed — branch the View tree
+        // instead. Both arms keep the same label / action / size so only
+        // the visual posture differs (.glassProminent for active).
+        if isActive {
+            Button {
+                state.applyAdvancedRecipe(recipe, in: group)
+            } label: {
+                Text(recipe.label)
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 4)
+            }
+            .buttonStyle(.glassProminent)
+            .controlSize(.small)
+            .help(helpText)
+        } else {
+            Button {
+                state.applyAdvancedRecipe(recipe, in: group)
+            } label: {
+                Text(recipe.label)
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 4)
+            }
+            .buttonStyle(.glass)
+            .controlSize(.small)
+            .help(helpText)
         }
     }
 

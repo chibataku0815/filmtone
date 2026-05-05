@@ -544,4 +544,308 @@ runner.test("AdvancedAdjustCatalog.clamp default branch is identity") {
     )
 }
 
+// ---------------------------------------------------------------------------
+// Test group 10 — M5-H.2 catalog label parity with iOS canonical
+// `FilmtoneStrings.paramLabels`. Drift detector: a Desktop label rename
+// without an iOS counterpart will fail this test, so the two platforms'
+// sliders never silently drift in name.
+// ---------------------------------------------------------------------------
+
+private let iosCanonicalParamLabels: [String: String] = [
+    "exposure": "Exposure",
+    "contrast": "Contrast",
+    "saturation": "Saturation",
+    "temperature": "Temperature",
+    "tint": "Tint",
+    "fade": "Fade",
+    "rgbShift": "Color fringing",
+    "lensSoftness": "Lens softness",
+    "vignette": "Vignette",
+    "bloomThreshold": "Bloom Threshold",
+    "bloomStrength": "Bloom Strength",
+    "bloomRadius": "Bloom Radius",
+    "bloomSoftKnee": "Bloom Soft Knee",
+    "halationIntensity": "Halation Intensity",
+    "halationSpread": "Halation Spread",
+    "halationHue": "Halation Hue",
+    "halationThreshold": "Halation Threshold",
+    "halationRadius": "Halation Radius",
+    "halationSoftKnee": "Halation Soft Knee",
+    "diffusion": "Diffusion",
+    "grainIntensity": "Grain Strength",
+    "grainSize": "Grain Size",
+    "grainRadialMix": "Grain edge emphasis",
+    "compressionAmount": "Highlight softness",
+    "compressionRange": "Tone span",
+    "printContrast": "Print Contrast",
+    "cyan": "Cyan",
+    "magenta": "Magenta",
+    "yellow": "Yellow",
+    "shutterAngle": "Shutter Angle",
+    "trailIntensity": "Trail Length",
+]
+
+runner.test("AdvancedAdjustCatalog labels match iOS canonical paramLabels") {
+    var byKey: [String: String] = [:]
+    for group in AdvancedAdjustCatalog.allGroups {
+        for control in group.controls {
+            byKey[control.key] = control.label
+        }
+    }
+    for (key, expected) in iosCanonicalParamLabels {
+        guard let actual = byKey[key] else {
+            throw AssertionError(
+                description: "catalog missing key '\(key)' (iOS canonical label '\(expected)')"
+            )
+        }
+        if actual != expected {
+            throw AssertionError(
+                description: "label drift on '\(key)': Desktop '\(actual)' vs iOS '\(expected)'"
+            )
+        }
+    }
+}
+
+runner.test("AdvancedAdjustCatalog group titles include Tone (renamed from Process)") {
+    let titles = AdvancedAdjustCatalog.allGroups.map(\.title)
+    let expected = ["Basic", "Tone", "Optics", "Glow", "Grain", "Motion"]
+    try assertEqual(titles, expected, "group title order + spelling")
+}
+
+// ---------------------------------------------------------------------------
+// Test group 11 — M5-H.2 recipe shape + key validity. Every recipe must
+// (a) carry a `none` chip plus at least one stamp, (b) restrict its
+// stamped keys to the controls that live in the same group, and (c)
+// emit values that survive AdvancedAdjustCatalog.clamp without drift.
+// ---------------------------------------------------------------------------
+
+runner.test("Each non-basic group ships at least one none + one stamp recipe") {
+    for group in AdvancedAdjustCatalog.allGroups where group.id != "basic" {
+        let kinds = group.recipes.map(\.kind)
+        if !kinds.contains(.none) {
+            throw AssertionError(
+                description: "group '\(group.id)' missing .none recipe (clear chip)"
+            )
+        }
+        if !kinds.contains(.stamp) {
+            throw AssertionError(
+                description: "group '\(group.id)' missing any .stamp recipe"
+            )
+        }
+    }
+}
+
+runner.test("basic group keeps no recipes (mirrors iOS)") {
+    let basic = AdvancedAdjustCatalog.allGroups.first { $0.id == "basic" }
+    try assertEqual(basic?.recipes.isEmpty, true, "basic group should ship no chips")
+}
+
+runner.test("Recipe stamped keys are confined to their own group") {
+    let baseParams = FilmtonePresetCatalog.params(
+        for: FilmtonePresetCatalog.defaultName,
+        strength: 1.0
+    )
+    for group in AdvancedAdjustCatalog.allGroups where !group.recipes.isEmpty {
+        let groupKeys = Set(group.controls.map(\.key))
+        for recipe in group.recipes where recipe.kind == .stamp {
+            let emitted = recipe.values(baseParams)
+            for key in emitted.keys {
+                if !groupKeys.contains(key) {
+                    throw AssertionError(
+                        description: "recipe '\(group.id).\(recipe.id)' stamps '\(key)' outside its group"
+                    )
+                }
+            }
+        }
+    }
+}
+
+runner.test("Recipe stamped values survive catalog clamp without drift") {
+    // None of the canonical recipe values should be out-of-range for
+    // their key — if a recipe writes a value that clamp would change,
+    // applyAdvancedRecipe would silently rewrite it and the chip stops
+    // round-tripping cleanly.
+    let baseParams = FilmtonePresetCatalog.params(
+        for: FilmtonePresetCatalog.defaultName,
+        strength: 1.0
+    )
+    for group in AdvancedAdjustCatalog.allGroups where !group.recipes.isEmpty {
+        for recipe in group.recipes where recipe.kind == .stamp {
+            let emitted = recipe.values(baseParams)
+            for (key, value) in emitted {
+                let clamped = AdvancedAdjustCatalog.clamp(value, for: key)
+                try assertClose(
+                    clamped, value, eps: 1e-9,
+                    "recipe '\(group.id).\(recipe.id)' value for '\(key)' was clamped"
+                )
+            }
+        }
+    }
+}
+
+runner.test("Tone recipes ship the iOS canonical 4-chip set") {
+    guard let tone = AdvancedAdjustCatalog.allGroups.first(where: { $0.id == "process" }) else {
+        throw AssertionError(description: "process group missing")
+    }
+    let ids = tone.recipes.map(\.id)
+    try assertEqual(ids, ["standard", "airy", "sunset", "depth"], "tone recipe order")
+}
+
+// ---------------------------------------------------------------------------
+// Test group 12 — M5-H.2 SavedLookStore rename / favorite / delete.
+// Built-in entries must reject mutation; user entries must round-trip
+// across loadOrRebuild() so the disk write is durable, not just an
+// in-memory mutation.
+// ---------------------------------------------------------------------------
+
+private func runStoreTests() async {
+    let tempRoot = URL(fileURLWithPath: NSTemporaryDirectory())
+        .appendingPathComponent("filmtone-verify-store-\(UUID().uuidString)", isDirectory: true)
+
+    runner.test("SavedLookStore rename + favorite persist across reload") {
+        let store: FilmtoneSavedLookStore
+        do {
+            store = try FilmtoneSavedLookStore(rootURL: tempRoot)
+        } catch {
+            throw AssertionError(description: "store init failed: \(error)")
+        }
+        defer { try? FileManager.default.removeItem(at: tempRoot) }
+
+        let semaphore = DispatchSemaphore(value: 0)
+        var caught: Error?
+        var renamedName: String?
+        var renamedFavorite: Bool?
+        var reloadedName: String?
+        var reloadedFavorite: Bool?
+
+        Task {
+            do {
+                _ = try await store.loadOrRebuild()
+                let saved = try await store.saveLook(
+                    name: "Original",
+                    presetName: "reset",
+                    presetVersion: FilmtonePresetCatalog.presetVersion,
+                    strength: 0.5,
+                    quickState: .zero,
+                    paramOverrides: .empty,
+                    creativeLut: nil
+                )
+                let renamed = try await store.renameLook(id: saved.id, newName: "Renamed")
+                let starred = try await store.setFavorite(id: saved.id, favorite: true)
+                renamedName = renamed.name
+                renamedFavorite = starred.favorite
+
+                // Independent reload via a fresh store instance — proves
+                // the change is on disk, not just in the actor cache.
+                let store2 = try FilmtoneSavedLookStore(rootURL: tempRoot)
+                let snap = try await store2.loadOrRebuild()
+                let user = snap.looks.first { !$0.bundled }
+                reloadedName = user?.name
+                reloadedFavorite = user?.favorite
+            } catch {
+                caught = error
+            }
+            semaphore.signal()
+        }
+        semaphore.wait()
+
+        if let caught { throw AssertionError(description: "store flow failed: \(caught)") }
+        try assertEqual(renamedName, "Renamed", "rename returns updated name")
+        try assertEqual(renamedFavorite, true, "favorite returns updated flag")
+        try assertEqual(reloadedName, "Renamed", "rename survives reload")
+        try assertEqual(reloadedFavorite, true, "favorite survives reload")
+    }
+
+    runner.test("SavedLookStore deleteLook removes user entry from snapshot") {
+        let store: FilmtoneSavedLookStore
+        do {
+            store = try FilmtoneSavedLookStore(rootURL: tempRoot.appendingPathComponent("delete"))
+        } catch {
+            throw AssertionError(description: "store init failed: \(error)")
+        }
+        defer { try? FileManager.default.removeItem(at: tempRoot) }
+
+        let semaphore = DispatchSemaphore(value: 0)
+        var caught: Error?
+        var afterDeleteUserCount: Int?
+
+        Task {
+            do {
+                _ = try await store.loadOrRebuild()
+                let saved = try await store.saveLook(
+                    name: "Doomed",
+                    presetName: "reset",
+                    presetVersion: FilmtonePresetCatalog.presetVersion,
+                    strength: 1.0,
+                    quickState: .zero,
+                    paramOverrides: .empty,
+                    creativeLut: nil
+                )
+                _ = try await store.deleteLook(id: saved.id)
+                let snap = await store.snapshot()
+                afterDeleteUserCount = snap.looks.filter { !$0.bundled }.count
+            } catch {
+                caught = error
+            }
+            semaphore.signal()
+        }
+        semaphore.wait()
+
+        if let caught { throw AssertionError(description: "delete flow failed: \(caught)") }
+        try assertEqual(afterDeleteUserCount, 0, "user looks should be empty after delete")
+    }
+
+    runner.test("SavedLookStore rejects rename / delete / favorite on built-in entries") {
+        let store: FilmtoneSavedLookStore
+        do {
+            store = try FilmtoneSavedLookStore(rootURL: tempRoot.appendingPathComponent("immutable"))
+        } catch {
+            throw AssertionError(description: "store init failed: \(error)")
+        }
+        defer { try? FileManager.default.removeItem(at: tempRoot) }
+
+        let semaphore = DispatchSemaphore(value: 0)
+        var renameError: Error?
+        var deleteError: Error?
+        var favoriteError: Error?
+
+        Task {
+            _ = try? await store.loadOrRebuild()
+            let snap = await store.snapshot()
+            guard let bundled = snap.looks.first(where: { $0.bundled }) else {
+                semaphore.signal()
+                return
+            }
+            do { _ = try await store.renameLook(id: bundled.id, newName: "Hijack") }
+            catch { renameError = error }
+            do { _ = try await store.setFavorite(id: bundled.id, favorite: true) }
+            catch { favoriteError = error }
+            do { _ = try await store.deleteLook(id: bundled.id) }
+            catch { deleteError = error }
+            semaphore.signal()
+        }
+        semaphore.wait()
+
+        guard let rename = renameError as? FilmtoneSavedLookStore.StoreError,
+              case .immutableEntry = rename else {
+            throw AssertionError(description: "rename of built-in must throw .immutableEntry, got \(String(describing: renameError))")
+        }
+        guard let fav = favoriteError as? FilmtoneSavedLookStore.StoreError,
+              case .immutableEntry = fav else {
+            throw AssertionError(description: "favorite of built-in must throw .immutableEntry, got \(String(describing: favoriteError))")
+        }
+        guard let del = deleteError as? FilmtoneSavedLookStore.StoreError,
+              case .immutableEntry = del else {
+            throw AssertionError(description: "delete of built-in must throw .immutableEntry, got \(String(describing: deleteError))")
+        }
+    }
+}
+
+let storeSemaphore = DispatchSemaphore(value: 0)
+Task {
+    await runStoreTests()
+    storeSemaphore.signal()
+}
+storeSemaphore.wait()
+
 exit(runner.summary())

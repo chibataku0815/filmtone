@@ -158,6 +158,51 @@ actor FilmtoneSavedLookStore {
         return currentSnapshot()
     }
 
+    /// Rename a user Saved Look. Built-in entries reject with
+    /// `.immutableEntry`. Empty / whitespace-only input falls back to
+    /// the existing default name. Atomic per-entry write so a crash mid-
+    /// rename does not leave the on-disk JSON half-written.
+    @discardableResult
+    func renameLook(id: UUID, newName: String) throws -> SavedLookEntry {
+        if let slug = FilmtoneCreativePackCatalog.find(canonicalUUID: id)?.slug {
+            throw StoreError.immutableEntry(slug: slug)
+        }
+        if !didLoad {
+            _ = try loadOrRebuild()
+        }
+        guard var entry = looks[id] else {
+            throw StoreError.lookNotFound(id)
+        }
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolved = trimmed.isEmpty ? defaultLookName() : trimmed
+        entry.name = resolved
+        entry.updatedAt = Date()
+        try saveLookEntry(entry)
+        looks[id] = entry
+        return entry
+    }
+
+    /// Toggle (or set) the favorite flag on a user Saved Look. Built-in
+    /// entries reject with `.immutableEntry` since their favorite state
+    /// is materialized from the catalog at read time.
+    @discardableResult
+    func setFavorite(id: UUID, favorite: Bool) throws -> SavedLookEntry {
+        if let slug = FilmtoneCreativePackCatalog.find(canonicalUUID: id)?.slug {
+            throw StoreError.immutableEntry(slug: slug)
+        }
+        if !didLoad {
+            _ = try loadOrRebuild()
+        }
+        guard var entry = looks[id] else {
+            throw StoreError.lookNotFound(id)
+        }
+        entry.favorite = favorite
+        entry.updatedAt = Date()
+        try saveLookEntry(entry)
+        looks[id] = entry
+        return entry
+    }
+
     /// Resolve a Saved Look by id. Built-in catalog ids materialize from
     /// `FilmtoneCreativePackCatalog` (no disk I/O); user-saved ids
     /// return the in-memory entry.
