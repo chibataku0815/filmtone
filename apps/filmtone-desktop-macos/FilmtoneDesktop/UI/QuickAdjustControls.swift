@@ -10,15 +10,31 @@ import SwiftUI
 struct QuickAdjustControls: View {
     @Bindable var state: EditorState
 
+    @State private var advancedPopoverOpen = false
+
     private var resetDisabled: Bool {
         !state.quickStateIsActive
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Quick")
-                .font(.callout.weight(.semibold))
-                .foregroundStyle(.white)
+            HStack(spacing: 6) {
+                Text("Quick")
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(.white)
+                Spacer()
+                if state.paramOverridesActiveCount > 0 {
+                    // M5-C.3b: surface the override count inline so the
+                    // user sees that the popover holds active state even
+                    // when it's closed.
+                    Text("\(state.paramOverridesActiveCount) advanced")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.yellow.opacity(0.85), in: Capsule())
+                }
+            }
             axisRow(
                 title: "Film",
                 value: $state.quickState.filmCharacter
@@ -31,13 +47,31 @@ struct QuickAdjustControls: View {
                 title: "Dynamics",
                 value: $state.quickState.dynamics
             )
-            HStack {
+            HStack(spacing: 8) {
                 Spacer()
                 Button("Reset Quick") {
                     state.resetQuickState()
                 }
                 .controlSize(.small)
                 .disabled(resetDisabled)
+                // M5-C.3b: opens the AdvancedAdjustEditor popover with
+                // direct per-key access to the 30+ paramOverrides knobs
+                // (iOS canonical FilmtoneStrengthSheet advanced section
+                // equivalent).
+                Button("Adjust…") {
+                    advancedPopoverOpen = true
+                }
+                .buttonStyle(.glass)
+                .controlSize(.small)
+                .help("Edit advanced per-parameter overrides")
+                .popover(
+                    isPresented: $advancedPopoverOpen,
+                    arrowEdge: .trailing
+                ) {
+                    AdvancedAdjustEditor(state: state) {
+                        advancedPopoverOpen = false
+                    }
+                }
             }
             .padding(.top, 2)
         }

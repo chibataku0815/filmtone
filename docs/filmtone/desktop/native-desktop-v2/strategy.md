@@ -117,10 +117,12 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
     が成立。AVPlayer migration は perf 不足が visual smoke で判明した
     場合の follow-up slice (M5-D.2.1 候補)。
   - **M5-C.3b Advanced Per-Parameter Override Editing UX** (Tier C, ~半日):
-    iOS canonical `FilmtoneStrengthSheet` + `FilmtoneAdjustmentHelpSheet` の
-    Desktop 版。30 個前後の paramOverrides field を category 別に list 化、
-    paramOverrides storage / apply 経路は M5-C.3a で lit up 済み。Desktop UX
-    は sheet ではなく right-rail 拡張 panel か popover で適合化。
+    **closed 2026-05-05**。詳細は Completion Log を参照。Option B (popover)
+    採用。iOS catalog mirror + clamp + per-key reset + Reset All で 30 + 2
+    field を直接編集可能化。catalog data は責務分離のため `Domain/`
+    AdvancedAdjustCatalog、editing helpers は `EditorState+ParamOverrides`
+    extension に切り出し。これで 5-gap 5/5 全 close — 残作業は user smoke
+    + notarize submission のみ。
 - Future product direction: cross-device SSD workflow. The intended shape is
   source media moved by SSD / Files / Finder, shared sidecar + Look intent moved
   with the source, Desktop as the master / 4K-capable exporter, and iPhone as
@@ -209,6 +211,39 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
 
 ## Completion Log
 
+- 2026-05-05: **M5-C.3b Advanced Per-Parameter Override Editing UX (Desktop)
+  closed**。Option B (popover) 採用で着手 — auto-mode、user 直接 review なし
+  (standing directive: 本質優先 / 保守的に hedge しない / commit agent 委譲)。
+  実装内容: (1) `Domain/AdvancedAdjustCatalog.swift` 新規 — iOS canonical
+  `FilmtoneStrengthSheetData.advancedParamGroups` の port (basic 6 / process 6
+  / optics 3 / glow 11 / grain 3 / motion 2 video-only = 31 field)、`clamp`
+  関数は iOS `FilmtonePhase0Math.clampParam` のミラー (shutterAngle の 90 未満
+  → 0 / 90..<180 → 180 snap も含む)。(2) `State/EditorState+ParamOverrides.swift`
+  新規 — `effectiveParamValue(for:)` / `isParamOverridden(_:)` /
+  `setParamOverride(_:for:)` / `clearParamOverride(for:)` /
+  `clearAllParamOverrides()` / `paramOverridesActiveCount` /
+  `paramOverridesAvailableCount`。EditorState 本体の god object 化を緩和する
+  ため extension file に分離。(3) `UI/AdvancedAdjustEditor.swift` 新規 —
+  Popover content (480×600pt 固定)。Header (title + N/M active badge + close
+  button) / Scrollable DisclosureGroup × 6 (basic デフォルト展開、各 group は
+  active count chip 付き) / Footer (Reset All Overrides button)。各 row は
+  active dot + label + value + per-row reset button + Slider。(4)
+  `UI/QuickAdjustControls.swift` 改修 — 末尾に `.buttonStyle(.glass)` の
+  "Adjust…" button + override count chip (active 時のみ表示) を追加、
+  `.popover(arrowEdge: .trailing)` で AdvancedAdjustEditor anchor。(5)
+  `FilmtoneDesktop.xcodeproj` 4 file 登録 (catalog は Domain group、editor は
+  UI group、extension は State group、build IDs A32/A33/A34 + file refs
+  B31/B32/B33)。**責務分離の course correction**: 着手中に user から
+  「責務分離と feature アーキテクチャ意識して作ってますか」と問われ、最初
+  catalog を `UI/`、helpers を EditorState 本体に直入れしていたのを honest
+  に認め、build 前に catalog を `Domain/` 移動 + helpers を extension file 化
+  へ refactor。これで pure data + clamp = Domain 層、SwiftUI View = UI 層、
+  EditorState 本体 = source/preset/look/quick/export/playback、override 編集
+  helpers = extension file、と層が分離。Build clean (Swift 6 strict, xcodebuild
+  Debug PASS, 警告なし)。Archived as
+  `archive/2026-05-05-m5-c3b-advanced-adjust-editor.md`。**5-gap 全 close**:
+  E.1 / D.1 / F.1 / D.2 / C.3b 全完了で残作業は (a) user-driven visual smoke
+  全 5 件、(b) notarize submission のみ。
 - 2026-05-03: M1 completed with the native macOS skeleton and generated Swift
   contract lane.
 - 2026-05-03: M2 completed with native still/video vertical slices and sidecar
