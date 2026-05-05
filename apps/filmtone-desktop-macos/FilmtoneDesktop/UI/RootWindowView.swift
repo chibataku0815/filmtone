@@ -199,9 +199,13 @@ struct RootWindowView: View {
                 }
                 .keyboardShortcut("\\", modifiers: .command)
                 .buttonStyle(.glass)
-                .help(inspectorVisible
-                      ? "Hide editing panel (⌘\\)"
-                      : "Show editing panel (⌘\\)")
+                // M5-M.3 follow-up: static help text. The previous
+                // `inspectorVisible ? "Hide..." : "Show..."` ternary forced
+                // the Label / .help to recompute on every ⌘\ press, which
+                // — combined with the toolbar's Liquid Glass background
+                // re-sampling as the rail slid in — read as flicker on
+                // each toggle. A single phrasing carries both intents.
+                .help("Show / Hide editing panel (⌘\\)")
                 .filmtonePointingHandCursor()
             }
         }
@@ -256,7 +260,13 @@ struct RootWindowView: View {
                 .padding(.top, 72)
                 .padding(.bottom, sidebarBottomPadding)
                 .padding(.trailing, 12)
-                .transition(.move(edge: .trailing).combined(with: .opacity))
+                // M5-M.3 follow-up: pure `.move(edge: .trailing)` without
+                // `.combined(with: .opacity)`. The opacity fade compounded
+                // with the slide as a visible flicker — especially on the
+                // toolbar's Apple Liquid Glass buttons re-sampling the
+                // partially-transparent rail mid-animation. The slide alone
+                // hides the rail at the trailing edge, which is enough.
+                .transition(.move(edge: .trailing))
             }
             // M5-A.3 + F4: scrub bar floats above the window bottom edge.
             // The inspector's bottom edge clears the scrub bar via
@@ -275,19 +285,26 @@ struct RootWindowView: View {
                 .frame(maxWidth: .infinity)
             }
         }
-        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: sidebarOpen)
-        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: portraitInspectorOpen)
+        // M5-M.3 follow-up: single animation hook on the resolved
+        // `inspectorVisible` instead of two stacked modifiers (one per
+        // @AppStorage value). Two stacked animations on a shared subtree
+        // could fire the same change twice — once for each modifier —
+        // producing a visible double-step on toolbar redraws and the rail
+        // slide. A single animation tied to the resolved boolean keeps
+        // every toggle to a single spring step.
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: inspectorVisible)
     }
 
     // Inspector bottom inset. When a video is loaded the rail's bottom
     // edge must clear the floating 2-row scrub bar capsule so the user
-    // can scrub while the inspector is summoned. Portrait uses a tighter
-    // inset because the scrub bar itself sits closer to the window bottom
-    // (`scrubBarBottomPadding` = 24 portrait, 64 landscape); the offsets
-    // here = scrub_bottom + scrub_height(~80) + breath(12).
+    // can scrub while the inspector is summoned, with a generous
+    // breathing band so the bottom-most panel (Export) doesn't visually
+    // bleed into the scrub bar. Portrait uses a tighter inset because the
+    // scrub bar itself sits closer to the window bottom
+    // (`scrubBarBottomPadding` = 24 portrait, 64 landscape).
     private var sidebarBottomPadding: CGFloat {
         guard state.sourceKind == .video else { return 24 }
-        return isPortraitSource ? 116 : 156
+        return isPortraitSource ? 160 : 200
     }
 
     // Scrub bar bottom inset. Portrait clips lift the capsule slightly

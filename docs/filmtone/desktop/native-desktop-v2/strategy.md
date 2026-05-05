@@ -325,6 +325,17 @@ current surface. `MediaDerivedBackdrop` / `videoBackdropImage` /
 Verify 121/121, `verify:macos` BUILD SUCCEEDED, `git diff --check` clean;
 visual smoke user-pending.
 
+2026-05-06: M5-M.3 follow-up after bottom-sheet smoke — replaced summoned
+bottom-sheet with right-rail slide-in for portrait. `EditorBottomSheet`
+removed; both orientations now mount the same `EditorSidebar` (320pt right
+rail), distinguished only by the `@AppStorage` key driving visibility
+(`editorPortraitInspectorOpen` default false vs `editorSidebarOpen`
+default true). Scrub bar split to 2 rows (transport + markers); inspector
+bottom inset (`sidebarBottomPadding`) bumped so the rail's bottom edge
+clears the 2-row scrub bar capsule — user can scrub while inspector is
+summoned. Verify 121/121, `verify:macos` BUILD SUCCEEDED, `git diff --check`
+clean; visual smoke user-pending.
+
 2026-05-05: M6 clean public release completed after parent-branch correction and
 `origin/main` merge. Native Desktop v1.4 is now the active public Desktop rail;
 update metadata reports `latestVersion: "1.4"`, and the fixed download page
