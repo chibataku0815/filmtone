@@ -301,6 +301,7 @@ struct PreviewSurface: View {
             sourceSeed: sourceSeed,
             cameraOptics: cameraOptics,
             creativeLut: creativeLut,
+            lutIntensity: FilmtonePresetCatalog.clampStrength(presetStrength),
             opticalFilterProfileId: opticalFilterProfileId,
             opticalFilterIntensity: opticalFilterIntensity
         )

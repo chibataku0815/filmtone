@@ -79,11 +79,19 @@ enum FilmtonePresetCatalog {
     /// delegates to the existing preset path so the legacy 4-preset UI is
     /// byte-identical.
     ///
-    /// When a Look is selected, the high-layer is `target = reset +
-    /// paramOverridesPatch` and the low layer is forced to the bareline
-    /// `resetParams` pivot. The slider then lerps between bareline and
-    /// target — strength=0 collapses to bareline, strength=1 lands on the
-    /// Look's signature optics.
+    /// M5-M follow-up: when a Look is engaged the Look path resolves to the
+    /// Look's full target params (`reset + paramOverridesPatch`) regardless
+    /// of strength. The user-facing Strength slider is delegated to the
+    /// creative LUT alpha (driven via
+    /// `FilmtoneGradePipeline.apply(lutIntensity:)`). Resolving here to the
+    /// full target avoids `preset_lerp(t) × lut_alpha(t) ≈ t²` double
+    /// attenuation that collapsed the visible response into a near-binary
+    /// curve. strength=1.0 stays byte-identical to the prior
+    /// implementation; intermediate strengths now lerp the LUT color cast
+    /// over the Look's full optical signature (bloom / vignette / grain /
+    /// halation / etc. resolved to target). Deviation from iOS canonical:
+    /// iOS's `presetStrength` drives a preset-lerp instead, with
+    /// `lut.intensity` pinned to the Pack 01 default 1.0.
     ///
     /// M5-C.3a + M5-H.2 fix: after the preset/strength/look resolve, run
     /// `applyQuickState` for the 3-axis Quick offsets, then layer the
@@ -109,16 +117,9 @@ enum FilmtonePresetCatalog {
         let base: FilmtonePhase0Params
         if let lookSlug,
            let look = FilmtoneCreativePackCatalog.find(slug: lookSlug) {
-            let reset = FilmtonePhase0Generated.resetParams
-            let target = reset.applyingPatch(look.paramOverridesPatch)
-            let t = clampStrength(strength)
-            if t >= 1.0 {
-                base = target
-            } else if t <= 0.0 {
-                base = reset
-            } else {
-                base = lerp(reset: reset, target: target, t: t)
-            }
+            // Strength is owned by the LUT alpha stage; resolve to target.
+            base = FilmtonePhase0Generated.resetParams
+                .applyingPatch(look.paramOverridesPatch)
         } else {
             base = params(for: presetName, strength: strength)
         }

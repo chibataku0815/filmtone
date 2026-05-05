@@ -362,3 +362,41 @@ Close note (2026-05-05):
 - M5-M implementation is ready for main merge per user direction. Remaining
   product risk: manual Debug-app visual smoke with a real portrait iPhone clip
   was not run in this chat; machine gates and static review are clean.
+
+Look Strength continuous response (2026-05-05, post-M5-M):
+
+- Reported: the Look Strength slider in the Native Desktop v2 UI behaved as
+  a 0/100 binary because `FilmtoneGradePipeline.applyCreativeLutStage` had
+  no path for user-strength alpha (Pack 01 pinned `lut.intensity = 1.0`),
+  and the preset 35-param lerp alone could not visibly compete with the
+  LUT color cube as the dominant signal.
+- Fix (`feature/native-desktop-look-strength-fix` worktree, branched from
+  main `cb802a2c`): `FilmtoneGradePipeline.apply` gains `lutIntensity:
+  Double = 1.0`; `applyCreativeLutStage` ports the iOS canonical
+  `applyLut` alpha-blend (`CIColorMatrix` + `CISourceOverCompositing`) with
+  a fast path at `≥0.999` (cube only) and `≤0.001` (passthrough).
+  `FilmtonePresetCatalog.resolved` now resolves the Look path to its full
+  `target` params unconditionally (no preset-lerp), so the Strength slider
+  is owned exclusively by the LUT alpha and avoids `t²` double attenuation.
+  All five callers — `PreviewSurface`, `FilmtoneStillExporter`,
+  `FilmtoneVideoExporter` (×2 `VideoFrameRenderContext` initializers + the
+  per-frame `apply` call), and `FilmtoneDesktopVideoComposition` — pass
+  `clampStrength(presetStrength)` into the pipeline. The
+  `presetStrength > 0` LUT-load gate is preserved as a second line of
+  defense.
+- iOS canonical deviation: iOS keeps `presetStrength` as a preset-lerp
+  driver with `lut.intensity = 1.0` (Pack 01 pin); macOS now drives
+  `lut.intensity = presetStrength`. `strength = 1.0` is byte-identical
+  across platforms and across the pre/post-fix macOS path; intermediate
+  strengths diverge by design.
+- Verification: `xcodebuild ... build` → BUILD SUCCEEDED (warnings are
+  pre-existing CIKernel deprecation + `AVMutableVideoComposition`
+  deprecation; no new diagnostics from this fix). Visual A/B (Stone /
+  Urban × strength {0, 0.25, 0.50, 0.75, 1.0}) and `cmp` byte-parity at
+  `strength = 1.0` deferred to user smoke.
+- Strategy note for archive time: this is the `M5-M.fixup` referenced
+  earlier — promote to `strategy.md` Completion Log only after user
+  visual smoke confirms continuous response + 1.0 byte parity.
+- Closed 2026-05-05 by user visual smoke (Stone / Urban Strength slider
+  responds continuously across the 0–100 % range). Promoted to
+  `strategy.md` Completion Log; merged into `main` along with M5-M.

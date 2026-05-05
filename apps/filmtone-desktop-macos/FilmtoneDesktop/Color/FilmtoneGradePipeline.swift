@@ -10,9 +10,16 @@ import Foundation
 // Phase 2 C5b A.3: edgeOptics (radialRGBSplit + edgeSoftnessBlend) inserted between
 //   filmCompressionV2 and glowFamily (iOS canonical order, FilmtoneExportSession L1565).
 // M5-A.2: creativeLut inserted between grain and printStage (iOS canonical
-//   FilmtoneExportSession L1561). Stone / Urban use intensity = 1.0 (simple
-//   path only — no alpha-blend branch). Caller passes nil for the legacy
+//   FilmtoneExportSession L1561). Caller passes nil for the legacy
 //   "no Look" path; the stage is a no-op then.
+// M5-M follow-up: the creative LUT stage now alpha-blends by the caller's
+//   `lutIntensity`. iOS canonical pins `lut.intensity = 1.0` per Pack 01
+//   recipe and lets `presetStrength` drive a preset-lerp; on macOS we
+//   instead resolve the Look path to its full target params and route the
+//   user-facing Strength slider into this stage's alpha. strength=1.0 is
+//   byte-identical to the prior simple path; intermediate strengths are
+//   the documented platform divergence (continuous LUT alpha vs preset
+//   lerp).
 //
 //   baseGradeV2 → filmCompressionV2 → edgeOptics → glowFamily → vignette → grain → creativeLut → printStage
 
@@ -46,6 +53,7 @@ enum FilmtoneGradePipeline {
         sourceSeed: Double = 0,
         cameraOptics: CameraOpticsDTO? = nil,
         creativeLut: PreparedCreativeLut? = nil,
+        lutIntensity: Double = 1.0,
         opticalFilterProfileId: String? = nil,
         opticalFilterIntensity: Double = 1.0
     ) -> CIImage {
@@ -89,7 +97,11 @@ enum FilmtoneGradePipeline {
             )
         }
         if let creativeLut {
-            current = applyCreativeLutStage(to: current, lut: creativeLut)
+            current = applyCreativeLutStage(
+                to: current,
+                lut: creativeLut,
+                intensity: lutIntensity
+            )
         }
         if shouldApplyPrintStage(params) {
             current = applyPrintStage(to: current, params: params)
@@ -100,15 +112,33 @@ enum FilmtoneGradePipeline {
 
     // MARK: — Creative LUT (M5-A.2 — iOS canonical FilmtoneExportSession L2077)
 
-    private static func applyCreativeLutStage(to image: CIImage, lut: PreparedCreativeLut) -> CIImage {
-        // Stone / Urban pin intensity = 1.0; the alpha-blend branch is
-        // unreachable for v1.4 Pack 01. Keeping the simple path means the
-        // pipeline does not need to know about D3-β/γ blending modes.
-        image.applyingFilter("CIColorCubeWithColorSpace", parameters: [
+    private static func applyCreativeLutStage(
+        to image: CIImage,
+        lut: PreparedCreativeLut,
+        intensity: Double
+    ) -> CIImage {
+        // M5-M follow-up: alpha-blend mirroring iOS `applyLut`
+        // (FilmtoneExportSession L2292-2311). `intensity` is the user-facing
+        // Look Strength on macOS; iOS pins it to `lut.intensity` (Pack 01 =
+        // 1.0) and drives the slider through preset-lerp. strength=1.0
+        // collapses to the same `CIColorCubeWithColorSpace`-only path as
+        // the previous implementation (byte-identical).
+        let cubed = image.applyingFilter("CIColorCubeWithColorSpace", parameters: [
             "inputCubeDimension": lut.size,
             "inputCubeData": lut.cubeData,
             "inputColorSpace": FilmtoneCIContext.outputColorSpace,
         ])
+        let alpha = clampValue(intensity)
+        if alpha >= 0.999 { return cubed }
+        if alpha <= 0.001 { return image }
+        let attenuated = cubed.applyingFilter("CIColorMatrix", parameters: [
+            "inputAVector": CIVector(x: 0, y: 0, z: 0, w: alpha),
+        ])
+        return attenuated
+            .applyingFilter("CISourceOverCompositing", parameters: [
+                kCIInputBackgroundImageKey: image,
+            ])
+            .cropped(to: image.extent)
     }
 
     // MARK: — Grade stages

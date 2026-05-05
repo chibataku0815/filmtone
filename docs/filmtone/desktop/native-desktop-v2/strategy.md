@@ -302,6 +302,17 @@ verification passed (`Verify/run.sh` 111/111, `bun run verify:macos`,
 smoke remains user-pending. Lane is open as `active.md`; do not archive
 until the user confirms visual smoke.
 
+2026-05-05: M5-M.fixup Look Strength continuous response — landed on
+`feature/native-desktop-look-strength-fix`. The Look Strength slider was
+binary because `applyCreativeLutStage` ran the cube at full intensity and
+preset-lerp alone could not visibly attenuate the LUT signal. Pipeline now
+takes `lutIntensity` (iOS-canonical alpha-blend port: `CIColorMatrix` +
+`CISourceOverCompositing`) and the Look path resolves to its full target
+params, leaving the slider to drive LUT alpha exclusively. `xcodebuild`
+green; user visual smoke confirmed continuous Stone/Urban response.
+Deviation from iOS canonical (preset-lerp vs LUT alpha) is byte-identical
+at strength=1.0 and divergent by design at intermediate strengths.
+
 2026-05-05: M6 clean public release completed after parent-branch correction and
 `origin/main` merge. Native Desktop v1.4 is now the active public Desktop rail;
 update metadata reports `latestVersion: "1.4"`, and the fixed download page

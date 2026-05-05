@@ -155,6 +155,7 @@ enum FilmtoneStillExporter {
             sourceSeed: sourceSeed,
             cameraOptics: probe.cameraOptics,
             creativeLut: creativeLut,
+            lutIntensity: FilmtonePresetCatalog.clampStrength(request.presetStrength),
             opticalFilterProfileId: request.opticalFilterProfileId,
             opticalFilterIntensity: request.opticalFilterIntensity
         )
