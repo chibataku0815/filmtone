@@ -104,15 +104,51 @@ struct QuickAdjustControls: View {
                     opticalFilterChip(option)
                 }
             }
+            // M5-M (CC-B): continuous intensity cursor (0…1).
+            // Disabled and dimmed when chip is None (no profile selected).
+            // At 1.0 the effect matches the M5-L3 chip-only behavior.
+            let intensityActive = state.opticalFilterProfileId != nil
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("Intensity")
+                        .font(.callout)
+                        .foregroundStyle(intensityActive ? .white : .white.opacity(0.35))
+                    Spacer()
+                    Text(intensityPercent(state.opticalFilterIntensity))
+                        .font(.callout.monospacedDigit())
+                        .foregroundStyle(intensityActive ? .white.opacity(0.7) : .white.opacity(0.25))
+                }
+                FilmtoneGlassSlider(
+                    value: $state.opticalFilterIntensity,
+                    range: 0...1,
+                    step: 0.01
+                )
+                .disabled(!intensityActive)
+                .opacity(intensityActive ? 1 : 0.35)
+            }
         }
+    }
+
+    private func intensityPercent(_ value: Double) -> String {
+        let intValue = Int((value * 100).rounded())
+        return "\(intValue)%"
     }
 
     private func opticalFilterChip(_ option: OpticalFilterOption) -> some View {
         let active = option.id == selectedOpticalFilterId
         return Button {
-            state.opticalFilterProfileId = option.id == FilmtoneOpticalFilterCatalog.noneIdentifier
+            let newProfileId: String? = option.id == FilmtoneOpticalFilterCatalog.noneIdentifier
                 ? nil
                 : option.id
+            // M5-M (CC-B): when a density chip is selected for the first time
+            // (or switched to a different density), reset intensity to 1.0 so
+            // the chip-select experience matches the M5-L3 baseline. When
+            // clearing to None, leave intensity intact (it has no effect when
+            // profileId is nil) so re-selecting a chip restores a natural 1.0.
+            if newProfileId != state.opticalFilterProfileId, newProfileId != nil {
+                state.opticalFilterIntensity = 1.0
+            }
+            state.opticalFilterProfileId = newProfileId
         } label: {
             Text(option.label)
                 .font(.caption.weight(.semibold))
@@ -128,6 +164,13 @@ struct QuickAdjustControls: View {
                     Capsule()
                         .strokeBorder(Color.white.opacity(active ? 0 : 0.24), lineWidth: 1)
                 }
+                // M5-M (CC-B): align hit-test + hover region with the
+                // visible capsule. Without an explicit contentShape the
+                // chip's click + cursor area snaps to the rectangular
+                // bounds of the Text frame, so the rounded capsule edges
+                // sit outside the hit shape and the pointing-hand cursor
+                // never engages over those bands.
+                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .help(option.help)

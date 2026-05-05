@@ -369,6 +369,13 @@ enum FilmtoneOpticalFilterCatalog {
         let displayName: String
         let shortLabel: String
         let paramPatch: FilmtonePhase0ParamsPatch
+        /// M5-M (CC-B): six WGSL §4.4 / iOS `OpticalScatterParams`
+        /// coefficients. Values mirror `optical-filter-profiles.ts`
+        /// Backlight Veil entries so a Native render delivers the same
+        /// direct-loss + scatter math the iOS Metal optics path applies.
+        /// `nil` for non-optical-scatter profiles (legacy / future filters
+        /// that never carried these keys).
+        let opticalScatter: FilmtoneOpticalScatterParams?
     }
 
     static let noneIdentifier = "none"
@@ -393,7 +400,15 @@ enum FilmtoneOpticalFilterCatalog {
                 "halationSoftKnee": 0.48,
                 "lensSoftness": 0.06,
                 "rgbShift": 0.0005,
-            ])
+            ]),
+            opticalScatter: FilmtoneOpticalScatterParams(
+                directTransmission: 0.92,
+                blackRetention: 0.78,
+                scatterStrength: 0.42,
+                highlightReactivity: 0.62,
+                warmScatter: 0.10,
+                spectralTail: 0.04
+            )
         ),
         .init(
             id: "backlightVeil-1-4",
@@ -414,7 +429,15 @@ enum FilmtoneOpticalFilterCatalog {
                 "halationSoftKnee": 0.56,
                 "lensSoftness": 0.08,
                 "rgbShift": 0.0007,
-            ])
+            ]),
+            opticalScatter: FilmtoneOpticalScatterParams(
+                directTransmission: 0.81,
+                blackRetention: 0.56,
+                scatterStrength: 0.66,
+                highlightReactivity: 0.78,
+                warmScatter: 0.17,
+                spectralTail: 0.07
+            )
         ),
         .init(
             id: "backlightVeil-1-2",
@@ -435,24 +458,115 @@ enum FilmtoneOpticalFilterCatalog {
                 "halationSoftKnee": 0.64,
                 "lensSoftness": 0.10,
                 "rgbShift": 0.0009,
-            ])
+            ]),
+            opticalScatter: FilmtoneOpticalScatterParams(
+                directTransmission: 0.70,
+                blackRetention: 0.36,
+                scatterStrength: 0.90,
+                highlightReactivity: 0.95,
+                warmScatter: 0.24,
+                spectralTail: 0.10
+            )
         ),
     ]
+
+    static func opticalScatter(for id: String?) -> FilmtoneOpticalScatterParams? {
+        profile(for: id)?.opticalScatter
+    }
 
     static func profile(for id: String?) -> Profile? {
         guard let id, id != noneIdentifier else { return nil }
         return profiles.first { $0.id == id }
     }
 
+    /// Profile-patch keys that represent "how much" energy the effect emits.
+    /// These are linearly attenuated by `intensity` so 0 = no contribution and
+    /// 1 = full profile. Mirrors the iOS-canonical optical scatter path: the
+    /// scatter coefficients (directTransmission/blackRetention/scatterStrength/
+    /// highlightReactivity/warmScatter/spectralTail) follow the same posture
+    /// in `intensityScaledScatter(for:intensity:)`.
+    private static let energyScaledKeys: Set<String> = [
+        "bloomStrength",
+        "halationIntensity",
+        "diffusion",
+        "lensSoftness",
+        "rgbShift",
+    ]
+
+    /// Resolve the optical filter patch for the given profile + user overrides,
+    /// modulated by `intensity` in `[0, 1]`. At intensity 1.0 the output is
+    /// byte-for-byte identical to the M5-L3 chip-only behavior. At 0.0 the
+    /// profile contribution is fully removed (only explicit `userOverrides`
+    /// remain — they always pass through at full strength). Between, only
+    /// the energy keys (`energyScaledKeys`) attenuate; structural keys
+    /// (thresholds / radii / hue / soft-knee) pass through verbatim once the
+    /// profile is engaged so the effect weakens in amount, not in shape.
+    /// Scaling thresholds would lower them at intermediate intensity and make
+    /// bloom/halation kick in earlier — i.e. *more* aggressive instead of
+    /// less. Same logic for radius / hue / soft-knee — they are "where /
+    /// what shape", not "how much".
     static func renderParamOverrides(
         profileId: String?,
+        intensity: Double,
         userOverrides: FilmtonePhase0ParamsPatch
     ) -> FilmtonePhase0ParamsPatch {
-        var values = profile(for: profileId)?.paramPatch.values ?? [:]
+        let clampedIntensity = max(0, min(1, intensity))
+        var values: [String: Double] = [:]
+        if clampedIntensity > 0,
+           let patch = profile(for: profileId)?.paramPatch.values,
+           !patch.isEmpty {
+            for (key, profileValue) in patch {
+                if energyScaledKeys.contains(key) {
+                    values[key] = profileValue * clampedIntensity
+                } else {
+                    // Structural key: pass profile value through verbatim
+                    // while the profile is engaged.
+                    values[key] = profileValue
+                }
+            }
+        }
+        // User overrides (advanced panel edits) always win at full strength.
         for (key, value) in userOverrides.values {
             values[key] = value
         }
         return FilmtonePhase0ParamsPatch(values: values)
+    }
+
+    /// Resolve the optical scatter coefficients for the Backlight Veil
+    /// composite, blended toward neutral-no-effect by `(1 - intensity)`.
+    /// Returns nil at intensity ≤ 0 so callers can route back to the legacy
+    /// glow composite (no Backlight-specific direct-loss / scatter math).
+    /// Neutral targets:
+    ///   - directTransmission → 1.0 (no direct loss)
+    ///   - all other coefficients → 0 (no scatter / shadow protect /
+    ///     highlight reactivity / warm bias / spectral tail)
+    static func intensityScaledScatter(
+        for profileId: String?,
+        intensity: Double
+    ) -> FilmtoneOpticalScatterParams? {
+        let clamped = max(0, min(1, intensity))
+        guard clamped > 0,
+              let scatter = opticalScatter(for: profileId) else {
+            return nil
+        }
+        if clamped >= 1 { return scatter }
+        return FilmtoneOpticalScatterParams(
+            directTransmission: 1.0 - (1.0 - scatter.directTransmission) * clamped,
+            blackRetention: scatter.blackRetention * clamped,
+            scatterStrength: scatter.scatterStrength * clamped,
+            highlightReactivity: scatter.highlightReactivity * clamped,
+            warmScatter: scatter.warmScatter * clamped,
+            spectralTail: scatter.spectralTail * clamped
+        )
+    }
+
+    /// Backward-compatible overload for call sites that do not carry an
+    /// intensity value (defaults to 1.0 → M5-L3 chip-only behavior).
+    static func renderParamOverrides(
+        profileId: String?,
+        userOverrides: FilmtonePhase0ParamsPatch
+    ) -> FilmtonePhase0ParamsPatch {
+        renderParamOverrides(profileId: profileId, intensity: 1.0, userOverrides: userOverrides)
     }
 
     static func sidecarPayload(for id: String?) -> [String: Any]? {

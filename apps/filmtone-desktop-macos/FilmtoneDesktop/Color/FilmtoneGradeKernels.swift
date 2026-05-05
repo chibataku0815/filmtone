@@ -218,6 +218,65 @@ kernel vec4 softKneeHighlight(__sample image, float threshold, float knee, __col
 }
 """)
 
+    // M5-M (CC-B): Backlight Veil composite — CI Kernel Language port of
+    // the iOS MSL `filmtoneGlowCompositeBacklightVeil` (FilmtoneMetalOpticsRenderer)
+    // and the WGSL §4.4 reference (`composite.frag.wgsl.ts:288-316`).
+    // Same channel weights, smoothstep edges, and warm-bias coefficients
+    // as `FilmtoneOpticalScatterMath.composite` so the CPU port (used by
+    // Verify) and the GPU kernel produce the same result on a given pixel.
+    // Selected only when `FilmtoneGradePipeline.apply` is invoked with a
+    // Backlight Veil `opticalFilterProfileId`; the legacy `glowComposite`
+    // kernel above remains the default path so non-veil renders stay
+    // bytewise identical to pre-M5-M.
+    static let glowCompositeBacklightVeil: CIColorKernel? = CIColorKernel(source: """
+vec3 veilShoulder(vec3 energy) {
+    return 1.0 - exp(-max(energy, vec3(0.0)));
+}
+
+kernel vec4 glowCompositeBacklightVeil(
+    __sample base,
+    __sample bloom,
+    __sample halation,
+    __sample diffusionImage,
+    float bloomStrength,
+    float halationIntensity,
+    float diffusionAmount,
+    float directTransmission,
+    float blackRetention,
+    float scatterStrength,
+    float highlightReactivity,
+    float warmScatter,
+    float spectralTail
+) {
+    vec3 baseRgb = base.rgb;
+    vec3 bloomRgb = bloom.rgb * bloomStrength;
+    vec3 halationRgb = halation.rgb * halationIntensity;
+    vec3 diffusedRgb = diffusionImage.rgb;
+
+    float baseLuma = dot(baseRgb, vec3(0.2126, 0.7152, 0.0722));
+    float shadowHold = 1.0 - smoothstep(0.02, 0.34, baseLuma);
+    float directLoss = (1.0 - directTransmission)
+                     * scatterStrength
+                     * (1.0 - shadowHold * blackRetention * 0.75);
+    vec3 direct = baseRgb * (1.0 - directLoss);
+
+    float highlightMask = smoothstep(0.42, 1.28, dot(max(baseRgb, vec3(0.0)), vec3(0.2126, 0.7152, 0.0722)));
+    float highlightDrive = mix(1.0, 1.0 + highlightMask * 1.65, highlightReactivity);
+    float blackProtect = mix(1.0, smoothstep(0.04, 0.48, baseLuma), blackRetention);
+    vec3 warmBias = vec3(
+        1.0 + warmScatter * 0.18 + spectralTail * 0.12,
+        1.0 + warmScatter * 0.05,
+        1.0 - warmScatter * 0.10 - spectralTail * 0.08
+    );
+    vec3 scatterEnergy = bloomRgb * 0.82
+                       + halationRgb * 1.08
+                       + diffusedRgb * diffusionAmount * 0.24;
+    vec3 scatter = veilShoulder(scatterEnergy * warmBias * scatterStrength * highlightDrive * blackProtect);
+
+    return vec4(direct + scatter, base.a);
+}
+""")
+
     // glowComposite: bloom + halation + diffusion energy compositing
     // (verbatim from iOS OpticalKernels line 4239–4263)
     static let glowComposite: CIColorKernel? = CIColorKernel(source: """

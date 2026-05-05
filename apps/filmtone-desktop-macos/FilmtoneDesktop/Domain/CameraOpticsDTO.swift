@@ -1,6 +1,6 @@
 import Foundation
 
-struct CameraOpticsDTO: Codable {
+struct CameraOpticsDTO: Codable, Sendable, Hashable {
     let source: String
     let fxPx: Double?
     let fyPx: Double?

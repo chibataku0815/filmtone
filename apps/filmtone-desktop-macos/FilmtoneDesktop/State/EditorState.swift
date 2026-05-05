@@ -76,6 +76,19 @@ final class EditorState {
     /// filter. Backlight Veil profiles resolve to a render-time patch
     /// that manual `paramOverrides` can still override key-by-key.
     var opticalFilterProfileId: String?
+    /// M5-M (CC-B): continuous intensity scalar for the Backlight Veil profile.
+    /// Range 0…1; default 1.0 so selecting a density chip matches M5-L3
+    /// chip-only behavior byte-for-byte. At 0.0 the profile contribution is
+    /// zeroed (only explicit `paramOverrides` remain). Has no effect when
+    /// `opticalFilterProfileId` is nil (chip = None). Folded into
+    /// `renderParamOverrides` so `VideoCompositionRefreshKey` picks up
+    /// changes automatically.
+    var opticalFilterIntensity: Double = 1.0 {
+        didSet {
+            let clamped = max(0, min(1, opticalFilterIntensity))
+            if clamped != opticalFilterIntensity { opticalFilterIntensity = clamped }
+        }
+    }
     var isExporting: Bool = false
     var exportProgress: Double = 0
     var exportProgressMessage: String?
@@ -157,6 +170,7 @@ final class EditorState {
     var renderParamOverrides: FilmtonePhase0ParamsPatch {
         FilmtoneOpticalFilterCatalog.renderParamOverrides(
             profileId: opticalFilterProfileId,
+            intensity: opticalFilterIntensity,
             userOverrides: paramOverrides
         )
     }
@@ -295,7 +309,17 @@ final class EditorState {
             paramOverrides: renderParamOverrides,
             compareEnabled: isCompareEnabled,
             compareSplitFraction: compareSplitFraction,
-            sourceURL: url ?? sourceURL ?? URL(fileURLWithPath: "/")
+            sourceURL: url ?? sourceURL ?? URL(fileURLWithPath: "/"),
+            // M5-M (CC-B): forward Backlight Veil identity, intensity,
+            // and probed camera optics so video preview / scrub thumbnails
+            // route through the optical scatter composite at the user's
+            // chosen strength. At intensity=0 the handler falls back to
+            // the legacy glow composite (no Backlight-specific math), so
+            // dragging the cursor to 0 with a chip selected is bytewise
+            // equivalent to selecting None.
+            opticalFilterProfileId: opticalFilterProfileId,
+            opticalFilterIntensity: opticalFilterIntensity,
+            cameraOptics: videoSession?.cameraOptics
         )
     }
 

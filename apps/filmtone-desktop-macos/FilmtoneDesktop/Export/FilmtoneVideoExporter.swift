@@ -24,6 +24,8 @@ struct FilmtoneVideoExportRequest: FilmtoneSidecarRequest {
     let paramOverrides: FilmtonePhase0ParamsPatch
     let highlightMarkers: FilmtoneHighlightMarkers?
     let opticalFilterProfileId: String?
+    /// M5-M (CC-B): intensity scalar for the optical filter profile (0…1).
+    let opticalFilterIntensity: Double
     var sourceKind: FilmtoneSourceKind { .video }
 
     init(
@@ -37,7 +39,8 @@ struct FilmtoneVideoExportRequest: FilmtoneSidecarRequest {
         quickState: FilmtoneQuickState = .zero,
         paramOverrides: FilmtonePhase0ParamsPatch = .empty,
         highlightMarkers: FilmtoneHighlightMarkers? = nil,
-        opticalFilterProfileId: String? = nil
+        opticalFilterProfileId: String? = nil,
+        opticalFilterIntensity: Double = 1.0
     ) {
         self.sourceURL = sourceURL
         self.outputURL = outputURL
@@ -50,6 +53,7 @@ struct FilmtoneVideoExportRequest: FilmtoneSidecarRequest {
         self.paramOverrides = paramOverrides
         self.highlightMarkers = highlightMarkers
         self.opticalFilterProfileId = opticalFilterProfileId
+        self.opticalFilterIntensity = max(0, min(1, opticalFilterIntensity))
     }
 }
 
@@ -256,6 +260,7 @@ enum FilmtoneVideoExporter {
             quickState: request.quickState,
             paramOverrides: FilmtoneOpticalFilterCatalog.renderParamOverrides(
                 profileId: request.opticalFilterProfileId,
+                intensity: request.opticalFilterIntensity,
                 userOverrides: request.paramOverrides
             )
         )
@@ -284,6 +289,8 @@ enum FilmtoneVideoExporter {
             sourceSeed: sourceSeed,
             cameraOptics: probe.cameraOptics,
             creativeLut: creativeLut,
+            opticalFilterProfileId: request.opticalFilterProfileId,
+            opticalFilterIntensity: request.opticalFilterIntensity,
             ciContext: context,
             outputColorSpace: outputColorSpace,
             renderBounds: renderBounds,
@@ -369,6 +376,7 @@ enum FilmtoneVideoExporter {
             quickState: request.quickState,
             paramOverrides: FilmtoneOpticalFilterCatalog.renderParamOverrides(
                 profileId: request.opticalFilterProfileId,
+                intensity: request.opticalFilterIntensity,
                 userOverrides: request.paramOverrides
             )
         )
@@ -389,6 +397,8 @@ enum FilmtoneVideoExporter {
             ),
             cameraOptics: probe.cameraOptics,
             creativeLut: creativeLut,
+            opticalFilterProfileId: request.opticalFilterProfileId,
+            opticalFilterIntensity: request.opticalFilterIntensity,
             ciContext: FilmtoneCIContext.shared,
             outputColorSpace: contract.destinationColorSpace,
             renderBounds: CGRect(origin: .zero, size: outputSize),
@@ -439,7 +449,9 @@ enum FilmtoneVideoExporter {
                 frameTimeSeconds: max(frameTimeSeconds, 0),
                 sourceSeed: renderContext.sourceSeed,
                 cameraOptics: renderContext.cameraOptics,
-                creativeLut: renderContext.creativeLut
+                creativeLut: renderContext.creativeLut,
+                opticalFilterProfileId: renderContext.opticalFilterProfileId,
+                opticalFilterIntensity: renderContext.opticalFilterIntensity
             ).cropped(to: renderContext.renderBounds)
 
             renderContext.ciContext.render(
@@ -503,6 +515,8 @@ private struct VideoFrameRenderContext {
     let sourceSeed: Double
     let cameraOptics: CameraOpticsDTO?
     let creativeLut: PreparedCreativeLut?
+    let opticalFilterProfileId: String?
+    let opticalFilterIntensity: Double
     let ciContext: CIContext
     let outputColorSpace: CGColorSpace
     let renderBounds: CGRect
