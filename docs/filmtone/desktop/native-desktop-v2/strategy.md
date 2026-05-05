@@ -279,6 +279,14 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
 
 ## Completion Log
 
+- 2026-05-05: **M5-J1 v2 Editing Sidebar Shell closed** (worker branch
+  `feature/native-desktop-m5-j1-sidebar-shell-v2`、base `ca9acea6`)。右
+  レール 5 panel を `EditorSidebar` (320pt 固定 + `ScrollView` + 8px grid)
+  に切り出し、`@AppStorage("editorSidebarOpen")` + `⌘\` toggle で開閉式に。
+  `bun run verify:macos` ✅ + Verify 65/65 ✅ + `git diff --check` clean。
+  Archive: `archive/2026-05-05-m5-j1-sidebar-shell-v2.md`. M5-I 統合 surface
+  は touched 0 line; canonical plan strategy.md への propagate は J1/J2/J3
+  統合後に coordinator がまとめて。
 - 2026-05-05: **M5-I integration branch closed**。I1 localization, I2
   AVPlayer preview route, I4a preview/background, parent glass control polish,
   and parent 1.4 release-cutover / AGENTS dirty state were integrated as
