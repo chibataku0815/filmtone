@@ -614,11 +614,32 @@ private struct VideoScrubBar: View {
                     .frame(width: 14, height: 14)
             }
             .buttonStyle(FilmtoneGlassIconButtonStyle(isActive: !state.highlightMarkerList.isEmpty))
-            .help("Add highlight marker")
+            .keyboardShortcut("m", modifiers: [])
+            .help("Add highlight marker (M)")
             .filmtonePointingHandCursor()
             if !state.highlightMarkerList.isEmpty {
                 HighlightMarkerMenu(state: state)
             }
+            Button {
+                state.jumpToPreviousHighlightMarker()
+            } label: {
+                Label("BACK", systemImage: "arrow.left.circle.fill")
+            }
+            .buttonStyle(FilmtoneGlassSecondaryButtonStyle(compact: true))
+            .keyboardShortcut("j", modifiers: .shift)
+            .disabled(state.highlightMarkerList.isEmpty)
+            .help("Jump to previous highlight marker (Shift-J)")
+            .filmtonePointingHandCursor(!state.highlightMarkerList.isEmpty)
+            Button {
+                state.jumpToNextHighlightMarker()
+            } label: {
+                Label("JUMP", systemImage: "arrow.right.circle.fill")
+            }
+            .buttonStyle(FilmtoneGlassSecondaryButtonStyle(compact: true))
+            .keyboardShortcut("j", modifiers: [])
+            .disabled(state.highlightMarkerList.isEmpty)
+            .help("Jump to next highlight marker (J)")
+            .filmtonePointingHandCursor(!state.highlightMarkerList.isEmpty)
             sliderArea
             Text(format(duration))
                 .font(.caption.monospacedDigit())

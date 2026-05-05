@@ -436,6 +436,37 @@ final class EditorState {
         seekVideo(toSeconds: targetSeconds)
     }
 
+    func jumpToNextHighlightMarker() {
+        let markers = sortedHighlightMarkerList()
+        guard !markers.isEmpty else {
+            return
+        }
+        let currentTime = videoPreviewSeconds ?? 0
+        let nextThreshold = currentTime + 0.01
+        let target = markers.first { $0.sourceTimeSec > nextThreshold } ?? markers[0]
+        jumpToHighlightMarker(id: target.id)
+    }
+
+    func jumpToPreviousHighlightMarker() {
+        let markers = sortedHighlightMarkerList()
+        guard let lastMarker = markers.last else {
+            return
+        }
+        let currentTime = videoPreviewSeconds ?? 0
+        let previousThreshold = currentTime - 0.01
+        let target = markers.last { $0.sourceTimeSec < previousThreshold } ?? lastMarker
+        jumpToHighlightMarker(id: target.id)
+    }
+
+    private func sortedHighlightMarkerList() -> [FilmtoneHighlightMarker] {
+        highlightMarkerList.sorted {
+            if $0.sourceTimeSec == $1.sourceTimeSec {
+                return $0.id < $1.id
+            }
+            return $0.sourceTimeSec < $1.sourceTimeSec
+        }
+    }
+
     private func currentMarkerSourceIdentity() -> FilmtoneMarkerSourceIdentity? {
         guard let sourceURL else {
             return nil
