@@ -80,6 +80,8 @@ final class ExportCoordinator {
         state.exportProgress = 0
         state.exportProgressMessage = "Exporting still…"
         state.currentExportTask = Task.detached {
+            let scopedURLs = Self.startSandboxAccess(forSource: request.sourceURL, output: request.outputURL)
+            defer { Self.stopSandboxAccess(scopedURLs) }
             do {
                 let result = try FilmtoneStillExporter.export(request)
                 let fileSize = (try? FileManager.default.attributesOfItem(atPath: result.outputURL.path)[.size] as? Int64) ?? 0
@@ -145,6 +147,8 @@ final class ExportCoordinator {
         state.exportProgress = 0
         state.exportProgressMessage = "Reading video…"
         state.currentExportTask = Task.detached {
+            let scopedURLs = Self.startSandboxAccess(forSource: request.sourceURL, output: request.outputURL)
+            defer { Self.stopSandboxAccess(scopedURLs) }
             do {
                 let result = try await FilmtoneVideoExporter.export(request) { progress in
                     Task { @MainActor in
@@ -221,6 +225,8 @@ final class ExportCoordinator {
         state.exportProgress = 0
         state.exportProgressMessage = "Building Highlight…"
         state.currentExportTask = Task.detached {
+            let scopedURLs = Self.startSandboxAccess(forSource: request.sourceURL, output: request.outputURL)
+            defer { Self.stopSandboxAccess(scopedURLs) }
             do {
                 let result = try await FilmtoneVideoExporter.exportHighlightReel(request) { progress in
                     Task { @MainActor in
@@ -265,6 +271,31 @@ final class ExportCoordinator {
                     state.currentExportTask = nil
                 }
             }
+        }
+    }
+
+    nonisolated private static func startSandboxAccess(forSource sourceURL: URL, output outputURL: URL) -> [URL] {
+        let candidates = [
+            sourceURL,
+            outputURL,
+            outputURL.deletingLastPathComponent(),
+        ]
+
+        var seen = Set<URL>()
+        var scopedURLs: [URL] = []
+        for candidate in candidates {
+            let url = candidate.standardizedFileURL
+            guard seen.insert(url).inserted else { continue }
+            if url.startAccessingSecurityScopedResource() {
+                scopedURLs.append(url)
+            }
+        }
+        return scopedURLs
+    }
+
+    nonisolated private static func stopSandboxAccess(_ scopedURLs: [URL]) {
+        for url in scopedURLs.reversed() {
+            url.stopAccessingSecurityScopedResource()
         }
     }
 }

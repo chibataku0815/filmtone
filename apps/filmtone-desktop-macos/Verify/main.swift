@@ -327,6 +327,40 @@ runner.test("sidecar reader loads iOS highlightMarkers by source filename") {
     try assertEqual(markers?.markers.first?.createdOnPlatform, Optional("ios"))
 }
 
+runner.test("sidecar writer creates adjacent JSON beside selected export") {
+    let tempDir = FileManager.default.temporaryDirectory
+        .appendingPathComponent("filmtone-sandbox-sidecar-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tempDir) }
+
+    let sourceURL = tempDir.appendingPathComponent("source.mov")
+    let outputURL = tempDir.appendingPathComponent("selected-export.mp4")
+    FileManager.default.createFile(atPath: sourceURL.path, contents: Data())
+
+    let req = StubSidecarRequest(
+        sourceURL: sourceURL,
+        outputURL: outputURL,
+        presetName: "reset",
+        presetStrength: 1.0,
+        lookSlug: nil,
+        sourceKind: .video,
+        quickState: .zero,
+        paramOverrides: .empty,
+        highlightMarkers: nil
+    )
+
+    let sidecarURL = try FilmtoneSidecarWriter.writeSidecar(for: req)
+    try assertEqual(
+        sidecarURL.deletingLastPathComponent(),
+        outputURL.deletingLastPathComponent(),
+        "sidecar directory"
+    )
+    try assertEqual(sidecarURL.lastPathComponent, "selected-export.filmtone.json", "sidecar filename")
+    guard FileManager.default.fileExists(atPath: sidecarURL.path) else {
+        throw AssertionError(description: "sidecar was not written next to export")
+    }
+}
+
 runner.test("highlight reel export route uses centered merged marker segments") {
     let markers = FilmtoneHighlightMarkers(
         sourceIdentity: FilmtoneMarkerSourceIdentity(
