@@ -301,6 +301,10 @@ as frozen legacy source for pre-macOS-26 access and emergency rollback. Native
 Desktop is the active Desktop product lane; Electron remains source-retained,
 not deleted.
 
+2026-05-05: M6 source permanence finished: `feature/native-desktop-plan` was
+pushed, `main` was updated through merge commit `3ce0f1b0`, `desktop-v1.4` was
+tagged, and portfolio `vendor/filmtone` was bumped to that source state.
+
 ## Constraints
 
 - macOS target is macOS 26 only.
