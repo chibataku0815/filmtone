@@ -25,16 +25,27 @@ struct FilmtoneDesktopVideoRenderInputs: Sendable {
     let probedColorClass: SourceColorClassDTO?
     let quickState: FilmtoneQuickState
     let paramOverrides: FilmtonePhase0ParamsPatch
-    /// M5-J.2: when true the composition handler emits a 50:50 split
+    /// M5-J.2: when true the composition handler emits a split
     /// (left = pre-transform source, right = graded) instead of the
     /// graded frame alone. Preview-only — never reaches the export path.
     let compareEnabled: Bool
+    /// M5-K3: horizontal split position in [0, 1] used when
+    /// `compareEnabled` is true. Pulled from `EditorState.compareSplit
+    /// Fraction` so a video composition rebuild after a drag picks up
+    /// the new fraction; defaults to mid-frame for fresh sessions.
+    let compareSplitFraction: Double
     let sourceURL: URL
 }
 
 enum FilmtoneDesktopVideoComposition {
 
     static let previewLongEdge: CGFloat = 1280
+    /// M5-K4: long-edge cap for scrub-thumbnail rendering. Far smaller than
+    /// the live 1280 preview canvas so per-thumbnail grade cost stays
+    /// negligible against the live AVPlayer GPU path. Owned here so the
+    /// composition factory and the scrub-thumbnail provider agree without
+    /// a cross-file constant import.
+    static let thumbnailLongEdge: CGFloat = 240
 
     /// Build a graded video composition. Returns `nil` if the track is
     /// unusable (zero size etc.); caller falls back to no composition
@@ -51,6 +62,49 @@ enum FilmtoneDesktopVideoComposition {
             naturalSize: naturalSize,
             preferredTransform: preferredTransform
         )
+        return makeComposition(
+            asset: asset,
+            videoTrack: videoTrack,
+            naturalSize: naturalSize,
+            preferredTransform: preferredTransform,
+            nominalFrameRate: nominalFrameRate,
+            inputs: inputs,
+            renderSize: renderSize
+        )
+    }
+
+    /// M5-K4: small-canvas variant for `AVAssetImageGenerator`-backed scrub
+    /// thumbnails. Identical handler to `make(...)` so the thumbnail visual
+    /// stays consistent with the live preview; only the canvas shrinks.
+    static func makeThumbnailComposition(
+        asset: AVAsset,
+        videoTrack: AVAssetTrack,
+        naturalSize: CGSize,
+        preferredTransform: CGAffineTransform,
+        nominalFrameRate: Float,
+        inputs: FilmtoneDesktopVideoRenderInputs,
+        renderSize: CGSize
+    ) -> AVMutableVideoComposition? {
+        return makeComposition(
+            asset: asset,
+            videoTrack: videoTrack,
+            naturalSize: naturalSize,
+            preferredTransform: preferredTransform,
+            nominalFrameRate: nominalFrameRate,
+            inputs: inputs,
+            renderSize: renderSize
+        )
+    }
+
+    private static func makeComposition(
+        asset: AVAsset,
+        videoTrack: AVAssetTrack,
+        naturalSize: CGSize,
+        preferredTransform: CGAffineTransform,
+        nominalFrameRate: Float,
+        inputs: FilmtoneDesktopVideoRenderInputs,
+        renderSize: CGSize
+    ) -> AVMutableVideoComposition? {
         guard renderSize.width > 0, renderSize.height > 0 else { return nil }
 
         // Resolve invariants once per composition build so the handler
@@ -80,6 +134,13 @@ enum FilmtoneDesktopVideoComposition {
 
         let renderBounds = CGRect(origin: .zero, size: renderSize)
         let compareEnabled = inputs.compareEnabled
+        // M5-K3: snapshot the clamped split fraction at composition build
+        // time. Drag updates rebuild the composition (RootWindowView's
+        // VideoCompositionRefreshKey) so each handler invocation sees a
+        // fresh, valid fraction.
+        let compareSplitFraction = FilmtoneCompareSplitMath.clamp(
+            inputs.compareSplitFraction
+        )
         let composition = AVMutableVideoComposition(
             asset: asset,
             applyingCIFiltersWithHandler: { request in
@@ -111,15 +172,17 @@ enum FilmtoneDesktopVideoComposition {
                 let cropped = graded.cropped(to: renderBounds)
                 let output: CIImage
                 if compareEnabled {
-                    // M5-J.2: left = pre-transform source (intentionally
-                    // flat for log inputs), right = graded. `base` already
-                    // sits on `renderBounds`, and `cropped` is also clamped
-                    // to `renderBounds`, so the helper's rescale is a no-op
-                    // here but keeps the still / video paths convergent.
+                    // M5-J.2 / M5-K3: left = pre-transform source
+                    // (intentionally flat for log inputs), right = graded.
+                    // `base` already sits on `renderBounds`, and `cropped`
+                    // is also clamped to `renderBounds`, so the helper's
+                    // rescale is a no-op here but keeps the still / video
+                    // paths convergent. Split position threads through
+                    // from `EditorState.compareSplitFraction`.
                     output = FilmtoneCompareCompose.makeSplit(
                         source: base,
                         graded: cropped,
-                        splitAt: 0.5
+                        splitAt: compareSplitFraction
                     )
                 } else {
                     output = cropped
@@ -151,19 +214,44 @@ enum FilmtoneDesktopVideoComposition {
         naturalSize: CGSize,
         preferredTransform: CGAffineTransform
     ) -> CGSize {
+        return scaledRenderSize(
+            naturalSize: naturalSize,
+            preferredTransform: preferredTransform,
+            longEdgeCap: previewLongEdge
+        )
+    }
+
+    /// M5-K4: orientation-aware thumbnail canvas. Same shape as
+    /// `previewRenderSize` but capped at `thumbnailLongEdge`.
+    static func thumbnailRenderSize(
+        naturalSize: CGSize,
+        preferredTransform: CGAffineTransform
+    ) -> CGSize {
+        return scaledRenderSize(
+            naturalSize: naturalSize,
+            preferredTransform: preferredTransform,
+            longEdgeCap: thumbnailLongEdge
+        )
+    }
+
+    private static func scaledRenderSize(
+        naturalSize: CGSize,
+        preferredTransform: CGAffineTransform,
+        longEdgeCap: CGFloat
+    ) -> CGSize {
         let oriented = naturalSize.applying(preferredTransform)
         let displayWidth = abs(oriented.width)
         let displayHeight = abs(oriented.height)
         guard displayWidth > 0, displayHeight > 0 else { return .zero }
 
         let longEdge = max(displayWidth, displayHeight)
-        guard longEdge > previewLongEdge else {
+        guard longEdge > longEdgeCap else {
             return CGSize(
                 width: max(1, displayWidth.rounded()),
                 height: max(1, displayHeight.rounded())
             )
         }
-        let scale = previewLongEdge / longEdge
+        let scale = longEdgeCap / longEdge
         return CGSize(
             width: max(1, (displayWidth * scale).rounded()),
             height: max(1, (displayHeight * scale).rounded())

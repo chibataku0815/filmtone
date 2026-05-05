@@ -39,6 +39,26 @@ final class FilmtoneDesktopVideoSession {
     private var timeObserver: Any?
     private var rateObservation: NSKeyValueObservation?
 
+    /// M5-K4: graded scrub-bar thumbnail provider. Built lazily on first
+    /// access so still preview / non-hovering video sessions don't pay
+    /// for the AVAssetImageGenerator + thumbnail composition allocation.
+    /// Inputs ride along with the live composition refresh below.
+    private var _thumbnailProvider: FilmtoneVideoScrubThumbnailProvider?
+    var thumbnailProvider: FilmtoneVideoScrubThumbnailProvider {
+        if let existing = _thumbnailProvider { return existing }
+        let provider = FilmtoneVideoScrubThumbnailProvider(
+            asset: asset,
+            videoTrack: videoTrack,
+            naturalSize: naturalSize,
+            preferredTransform: preferredTransform,
+            nominalFrameRate: nominalFrameRate,
+            durationSeconds: durationSeconds,
+            inputs: currentInputs
+        )
+        _thumbnailProvider = provider
+        return provider
+    }
+
     /// Pushed each periodic tick. EditorState wires this to keep
     /// `videoPreviewSeconds` in sync so the scrub bar follows playback.
     var onTimeUpdate: ((Double) -> Void)?
@@ -150,12 +170,31 @@ final class FilmtoneDesktopVideoSession {
         timeObserver = nil
         rateObservation?.invalidate()
         rateObservation = nil
+        // M5-K4: drop the AVAssetImageGenerator alongside the player so a
+        // background generation does not finish writing into a freed
+        // composition handler after the source flips.
+        _thumbnailProvider?.teardown()
+        _thumbnailProvider = nil
     }
 
     // MARK: - Playback control
 
     var isPlaying: Bool {
         player.timeControlStatus == .playing
+    }
+
+    /// M5-K3: oriented (post-`preferredTransform`) display aspect ratio
+    /// for the loaded video. Used by the compare drag-handle overlay so
+    /// it constrains itself to the AVPlayer's actual letterboxed rect
+    /// instead of the full preview region. Falls back to 1:1 only when
+    /// the probe returned a degenerate size — `prepare(...)` rejects
+    /// zero-sized assets, so this floor is just a divide-by-zero guard.
+    var displayAspectRatio: CGFloat {
+        let oriented = naturalSize.applying(preferredTransform)
+        let width = abs(oriented.width)
+        let height = abs(oriented.height)
+        guard width > 0, height > 0 else { return 1 }
+        return width / height
     }
 
     func togglePlayback() {
@@ -230,6 +269,11 @@ final class FilmtoneDesktopVideoSession {
             inputs: currentInputs
         ) else { return }
         item.videoComposition = composition
+        // M5-K4: keep the (possibly already-built) thumbnail provider in
+        // lockstep with the live composition so hovering reflects the
+        // edit the user just made. Provider rebuild is cheap relative to
+        // the live AVPlayerItem composition swap.
+        _thumbnailProvider?.updateInputs(currentInputs)
         // Force the item to render the current frame through the new
         // composition. seekingWaitsForVideoCompositionRendering = true
         // (set in init) makes the seek block until the new composition

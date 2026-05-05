@@ -4,8 +4,8 @@ import SwiftUI
 // M5-C.3a: Quick adjust 3-axis surface (filmCharacter / era / dynamics).
 // Each axis is a signed slider in [-1, +1]; the values fold into the
 // resolved render params via FilmtonePresetCatalog.applyQuickState. UI
-// posture matches GradeControls / LookLibraryControls — explicit white
-// text + Slider tint over the dark-tinted Liquid Glass right rail.
+// posture matches LookLibraryControls — explicit white text + Slider tint
+// over the dark-tinted Liquid Glass right rail.
 
 struct QuickAdjustControls: View {
     @Bindable var state: EditorState

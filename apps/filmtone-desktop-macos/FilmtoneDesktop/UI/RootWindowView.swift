@@ -72,20 +72,14 @@ struct RootWindowView: View {
                 // the window. Without .frame(maxWidth: .infinity) the VStack
                 // sizes to its child intrinsic width and the ZStack's
                 // .topTrailing alignment pushes it to the right edge.
+                // M5-K4: the bar (capsule + glass clip) and the floating
+                // thumbnail overlay are both owned by `VideoScrubBar`, so
+                // the thumbnail can render outside the capsule's
+                // `.glassEffect` clip without escaping the bar's known
+                // horizontal bounds.
                 VStack {
                     Spacer()
-                    // M5-D.1: dark-tinted .clear posture matches the
-                    // right-rail panels so the scrub bar reads as the same
-                    // chrome family and stays visible on bright preview
-                    // frames where untinted .clear refracts into the
-                    // backdrop.
                     VideoScrubBar(state: state, duration: duration)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 16)
-                        .glassEffect(
-                            .clear.tint(.black.opacity(0.30)),
-                            in: RoundedRectangle(cornerRadius: 16)
-                        )
                         .padding(.bottom, 64)
                 }
                 .frame(maxWidth: .infinity)
@@ -133,8 +127,16 @@ struct RootWindowView: View {
         // separately in `configureWindowForTransparentGlass(_:)`; Open /
         // Export stay as the only visible toolbar actions.
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+        // M5-K1: explicit `id:` on every ToolbarItem keeps identity stable
+        // across body re-evaluations (sidebar open/close, compare flip,
+        // export-disabled flip). Each `Label`'s title and `systemImage`
+        // are also held constant — state-dependent text is moved to
+        // `.help(...)`, and Compare's fill toggle uses `.symbolVariant`
+        // instead of swapping the systemImage string. Without this, the
+        // sidebar toggle visibly redrew the neighbouring Open / Compare /
+        // Export icons because their parent ToolbarItem identity was lost.
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItem(id: "filmtone.toolbar.open", placement: .primaryAction) {
                 Button {
                     presentOpenPanel()
                 } label: {
@@ -145,23 +147,22 @@ struct RootWindowView: View {
                 .help("Open a still image or video")
                 .filmtonePointingHandCursor()
             }
-            ToolbarItem(placement: .primaryAction) {
-                // M5-J.2: Before/After 50:50 compare toggle. Disabled
-                // until a source is loaded so the unmodified `V` shortcut
-                // is a no-op in the empty state. Save Look rename / save
-                // prompts use AppKit `NSAlert` (modal, separate keyWindow)
-                // so the toolbar shortcut does not fire while a prompt is
-                // up. SF Symbol flips to `.fill` on ON for a subtle visual
-                // affordance without adding a label.
+            ToolbarItem(id: "filmtone.toolbar.compare", placement: .primaryAction) {
+                // M5-J.2 + M5-K1: Before/After 50:50 compare toggle. The
+                // `Label` is structurally constant (title + base
+                // systemImage); `.symbolVariant(.fill)` selects the
+                // filled glyph on ON, leaving Label identity untouched
+                // so flipping compare doesn't ripple a redraw to its
+                // toolbar siblings. Disabled until a source is loaded so
+                // the unmodified `V` shortcut is a no-op in the empty
+                // state. Save Look rename / save prompts use AppKit
+                // `NSAlert` (modal, separate keyWindow) so the toolbar
+                // shortcut does not fire while a prompt is up.
                 Button {
                     state.toggleCompare()
                 } label: {
-                    Label(
-                        "Compare",
-                        systemImage: state.isCompareEnabled
-                            ? "rectangle.split.2x1.fill"
-                            : "rectangle.split.2x1"
-                    )
+                    Label("Compare", systemImage: "rectangle.split.2x1")
+                        .symbolVariant(state.isCompareEnabled ? .fill : .none)
                 }
                 .keyboardShortcut("v", modifiers: [])
                 .buttonStyle(.glass)
@@ -171,7 +172,7 @@ struct RootWindowView: View {
                     : "Show Before/After (V)")
                 .filmtonePointingHandCursor(state.sourceURL != nil)
             }
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItem(id: "filmtone.toolbar.export", placement: .primaryAction) {
                 Button {
                     exportCoordinator.presentExportPanel(for: state)
                 } label: {
@@ -183,21 +184,20 @@ struct RootWindowView: View {
                 .help(exportHelpText)
                 .filmtonePointingHandCursor(!exportDisabled)
             }
-            // M5-J1: sidebar open/close. `⌘\` follows the macOS HIG
-            // trailing-inspector convention. Lives next to Open/Export so
-            // collapsed state still surfaces the reopen affordance.
+            // M5-J1 + M5-K1: sidebar open/close. `⌘\` follows the macOS
+            // HIG trailing-inspector convention. Lives next to Open/Export
+            // so collapsed state still surfaces the reopen affordance.
             // `keyboardShortcut` on a Toolbar Button is scoped through the
             // first-responder chain, so a focused TextField or NSOpenPanel
             // sheet absorbs `⌘\` first and the toggle does not fire mid
-            // text input / save prompt.
-            ToolbarItem(placement: .primaryAction) {
+            // text input / save prompt. The `Label` keeps a fixed title
+            // ("Inspector") so the ToolbarItem identity is preserved on
+            // every toggle; Hide/Show wording lives only in `.help(...)`.
+            ToolbarItem(id: "filmtone.toolbar.sidebar", placement: .primaryAction) {
                 Button {
                     sidebarOpen.toggle()
                 } label: {
-                    Label(
-                        sidebarOpen ? "Hide Inspector" : "Show Inspector",
-                        systemImage: "sidebar.right"
-                    )
+                    Label("Inspector", systemImage: "sidebar.right")
                 }
                 .keyboardShortcut("\\", modifiers: .command)
                 .buttonStyle(.glass)
@@ -472,16 +472,41 @@ private struct WindowAccessor: NSViewRepresentable {
     }
 }
 
-/// M5-A.3 / M5-D.2 / M5-I.2: scrub bar for video preview. The Slider
-/// drives `AVPlayer.seek(to:)` directly; the periodic time observer in
-/// `FilmtoneDesktopVideoSession` pushes player time back into
-/// `state.videoPreviewSeconds` so the thumb follows playback. Manual
-/// drag flips `state.isScrubbing` so the observer doesn't yank the
-/// thumb mid-drag, and pauses playback for the duration of the drag.
-/// Adds a 1×/2×/3× rate menu (M5-I.2 acceptance).
+/// M5-A.3 / M5-D.2 / M5-I.2 / M5-K4: scrub bar for video preview. The
+/// Slider drives `AVPlayer.seek(to:)` directly; the periodic time
+/// observer in `FilmtoneDesktopVideoSession` pushes player time back
+/// into `state.videoPreviewSeconds` so the thumb follows playback.
+/// Manual drag flips `state.isScrubbing` so the observer doesn't yank
+/// the thumb mid-drag, and pauses playback for the duration of the
+/// drag. M5-I.2 added a 1×/2×/3× rate menu. M5-K4 adds a hover/drag
+/// thumbnail overlay above the capsule, served by the session's
+/// `FilmtoneVideoScrubThumbnailProvider`.
 private struct VideoScrubBar: View {
     @Bindable var state: EditorState
     let duration: Double
+
+    // Geometry needed to position the thumbnail overlay relative to the
+    // bar's capsule. Captured via `PreferenceKey` so the overlay can sit
+    // outside the capsule's `.glassEffect` clip without losing horizontal
+    // alignment with the slider.
+    @State private var sliderFrameInBar: CGRect = .zero
+    // Measured capsule outer-bound, in the scrub bar's named coordinate
+    // space. Drives the thumbnail's edge-clamp so narrow windows don't
+    // place the card past the actual bar edge (the previous fallback to
+    // `scrubBarMaxContentWidth` always assumed the max width).
+    @State private var capsuleFrameInBar: CGRect = .zero
+    @State private var hoverFraction: Double?
+
+    // Latest delivered thumbnail. Holds across hover gaps so a brief
+    // pause between hover events doesn't blink the card off-screen.
+    @State private var thumbnailImage: NSImage?
+    @State private var thumbnailDisplayedSeconds: Double?
+
+    private static let capsuleCornerRadius: CGFloat = 16
+    private static let scrubBarMaxContentWidth: CGFloat = 600
+    private static let thumbnailDisplayHeight: CGFloat = 96
+    private static let thumbnailDisplayMaxWidth: CGFloat = 170
+    private static let thumbnailGapAboveCapsule: CGFloat = 12
 
     private var seconds: Binding<Double> {
         Binding(
@@ -494,7 +519,79 @@ private struct VideoScrubBar: View {
         )
     }
 
+    /// Active fraction (0…1) along the slider — hover wins over drag so
+    /// a user dragging while still moving the cursor sees the thumbnail
+    /// follow the cursor, not the slightly-laggier `videoPreviewSeconds`.
+    private var activeThumbnailFraction: Double? {
+        if let hoverFraction { return hoverFraction }
+        if state.isScrubbing, duration > 0,
+           let secs = state.videoPreviewSeconds {
+            return min(1.0, max(0.0, secs / duration))
+        }
+        return nil
+    }
+
+    private var thumbnailVisible: Bool {
+        activeThumbnailFraction != nil && thumbnailImage != nil
+    }
+
     var body: some View {
+        // M5-D.1: dark-tinted .clear posture matches the right-rail
+        // panels so the scrub bar reads as the same chrome family and
+        // stays visible on bright preview frames where untinted .clear
+        // refracts into the backdrop.
+        //
+        // M5-K4 follow-up: thumbnail must be an overlay, not a ZStack
+        // sibling. A ZStack sibling participates in layout at its
+        // un-offset 170x96 size, so the bottom-anchored scrub bar jumps
+        // upward as soon as a thumbnail appears.
+        capsule
+            .background(
+                GeometryReader { proxy in
+                    Color.clear
+                        .preference(
+                            key: ScrubBarCapsuleFrameKey.self,
+                            value: proxy.frame(in: .named("scrubBar"))
+                        )
+                }
+            )
+            .overlay(alignment: .topLeading) {
+                if thumbnailVisible,
+                   let image = thumbnailImage,
+                   let frac = activeThumbnailFraction {
+                    thumbnailCard(image: image)
+                        .offset(thumbnailOffset(forFraction: frac))
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                }
+            }
+            .coordinateSpace(name: "scrubBar")
+            .frame(maxWidth: Self.scrubBarMaxContentWidth)
+            .onPreferenceChange(SliderFrameInBarKey.self) { rect in
+                sliderFrameInBar = rect
+            }
+            .onPreferenceChange(ScrubBarCapsuleFrameKey.self) { rect in
+                capsuleFrameInBar = rect
+            }
+            // Drag-driven thumbnail refresh — when the user drags without
+            // moving the cursor (e.g. paused on a fixed point), still keep
+            // the thumbnail in sync with `videoPreviewSeconds`.
+            .onChange(of: state.videoPreviewSeconds) { _, _ in
+                guard hoverFraction == nil, state.isScrubbing else { return }
+                requestActiveThumbnail()
+            }
+            // When scrub ends and hover already left, drop the cached image
+            // so the next hover/scrub starts cleanly.
+            .onChange(of: state.isScrubbing) { _, scrubbing in
+                if !scrubbing, hoverFraction == nil {
+                    thumbnailImage = nil
+                    thumbnailDisplayedSeconds = nil
+                }
+            }
+            .animation(.easeOut(duration: 0.12), value: thumbnailVisible)
+    }
+
+    private var capsule: some View {
         HStack(spacing: 12) {
             Button {
                 state.togglePlayback()
@@ -510,28 +607,142 @@ private struct VideoScrubBar: View {
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
                 .frame(minWidth: 64, alignment: .leading)
-            FilmtoneGlassSlider(
-                value: seconds,
-                range: 0...max(duration, 0.001),
-                onEditingChanged: { editing in
-                    // Drag start: hold the periodic time observer off so
-                    // it doesn't fight the user's finger; pause playback
-                    // so AVPlayer doesn't keep advancing under the seek.
-                    // Drag end: clear the flag and let the observer
-                    // resume time updates. Resume must be explicit Play.
-                    state.isScrubbing = editing
-                    if editing {
-                        state.videoSession?.pause()
-                    }
-                }
-            )
+            sliderArea
             Text(format(duration))
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
                 .frame(minWidth: 64, alignment: .trailing)
             PlaybackRateMenu(state: state)
         }
-        .frame(maxWidth: 600)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 16)
+        .glassEffect(
+            .clear.tint(.black.opacity(0.30)),
+            in: RoundedRectangle(cornerRadius: Self.capsuleCornerRadius)
+        )
+    }
+
+    private var sliderArea: some View {
+        GeometryReader { proxy in
+            ZStack {
+                FilmtoneGlassSlider(
+                    value: seconds,
+                    range: 0...max(duration, 0.001),
+                    expandsOnHover: false,
+                    onEditingChanged: { editing in
+                        // Drag start: hold the periodic time observer off so it
+                        // doesn't fight the user's finger; pause playback so
+                        // AVPlayer doesn't keep advancing under the seek. Drag
+                        // end: clear the flag and let the observer resume time
+                        // updates. Resume must be explicit Play.
+                        state.isScrubbing = editing
+                        if editing {
+                            state.videoSession?.pause()
+                        }
+                    }
+                )
+
+                ScrubHoverTrackingView { nextFraction in
+                    if let nextFraction {
+                        hoverFraction = nextFraction
+                        requestActiveThumbnail()
+                    } else {
+                        hoverFraction = nil
+                        // Keep the last delivered thumbnail until the drag
+                        // (if any) ends or the user re-hovers, so a brief
+                        // cursor exit doesn't blink the overlay off mid-action.
+                        if !state.isScrubbing {
+                            // Slight delay would feel laggy; drop immediately
+                            // so the overlay tracks the user's actual intent.
+                            thumbnailImage = nil
+                            thumbnailDisplayedSeconds = nil
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .background(
+                Color.clear
+                    .preference(
+                        key: SliderFrameInBarKey.self,
+                        value: proxy.frame(in: .named("scrubBar"))
+                    )
+            )
+        }
+        .frame(height: 24)
+    }
+
+    private func thumbnailCard(image: NSImage) -> some View {
+        // `.scaledToFit` over a neutral black backing letterboxes/pillar-
+        // boxes inside a fixed 170×96 card. Filmtone supports portrait
+        // iPhone footage, so `.scaledToFill` would crop most of the frame
+        // away; the card frame stays stable so the overlay still tracks
+        // the cursor cleanly.
+        ZStack {
+            Color.black
+            Image(nsImage: image)
+                .resizable()
+                .scaledToFit()
+        }
+        .frame(
+            width: Self.thumbnailDisplayMaxWidth,
+            height: Self.thumbnailDisplayHeight
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.white.opacity(0.18), lineWidth: 0.5)
+        )
+        .shadow(color: Color.black.opacity(0.45), radius: 12, x: 0, y: 6)
+    }
+
+    private func thumbnailOffset(forFraction frac: Double) -> CGSize {
+        guard sliderFrameInBar.width > 0 else { return .zero }
+        let knob: CGFloat = 18
+        let usable = max(sliderFrameInBar.width - knob, 1)
+        let cursorXInBar = sliderFrameInBar.minX + knob / 2 + CGFloat(frac) * usable
+        // Clamp against the capsule's *measured* bounds in the scrub bar's
+        // named coordinate space. On a narrow window the capsule is < the
+        // 600pt max-content cap, so the prior `max(slider.maxX,
+        // scrubBarMaxContentWidth)` could place the overlay past the
+        // actual capsule/window edge. Fall back to the slider frame only
+        // if the capsule preference hasn't arrived yet (first paint).
+        let barMinX: CGFloat
+        let barMaxX: CGFloat
+        if capsuleFrameInBar.width > 0 {
+            barMinX = capsuleFrameInBar.minX
+            barMaxX = capsuleFrameInBar.maxX
+        } else {
+            barMinX = sliderFrameInBar.minX
+            barMaxX = sliderFrameInBar.maxX
+        }
+        let centerX = FilmtoneScrubThumbnailMath.clampThumbnailCenterX(
+            cursorX: cursorXInBar,
+            thumbnailWidth: Self.thumbnailDisplayMaxWidth,
+            scrubBarMinX: barMinX,
+            scrubBarMaxX: barMaxX
+        )
+        return CGSize(
+            width: centerX - Self.thumbnailDisplayMaxWidth / 2,
+            height: -(Self.thumbnailDisplayHeight + Self.thumbnailGapAboveCapsule)
+        )
+    }
+
+    private func requestActiveThumbnail() {
+        guard let frac = activeThumbnailFraction,
+              let session = state.videoSession,
+              duration > 0 else { return }
+        let secs = duration * frac
+        session.thumbnailProvider.requestThumbnail(
+            atSeconds: secs
+        ) { image, atSeconds in
+            // Drop the result if the user has already moved past the
+            // bucket this image represents — the provider already drops
+            // by `latestRequestSeconds`, but a hover->ended transition
+            // between the in-flight start and finish can still race here.
+            thumbnailImage = image
+            thumbnailDisplayedSeconds = atSeconds
+        }
     }
 
     private func format(_ value: Double) -> String {
@@ -540,6 +751,104 @@ private struct VideoScrubBar: View {
         let minutes = Int(total / 60)
         let secondsRemainder = total - Double(minutes * 60)
         return String(format: "%d:%05.2f", minutes, secondsRemainder)
+    }
+}
+
+/// M5-K4 follow-up: mouse tracking for scrub thumbnails that does not
+/// participate in hit-testing. SwiftUI `onContinuousHover` attached to the
+/// slider view caused the slider's own hover affordance and tracking region
+/// to churn together, which made the seek bar visually shake. This AppKit
+/// tracker reports mouse movement while returning `nil` from `hitTest(_:)`,
+/// so the underlying `FilmtoneGlassSlider` keeps owning click/drag gestures.
+private struct ScrubHoverTrackingView: NSViewRepresentable {
+    let onFractionChange: (Double?) -> Void
+
+    func makeNSView(context: Context) -> TrackingView {
+        let view = TrackingView()
+        view.onFractionChange = onFractionChange
+        return view
+    }
+
+    func updateNSView(_ nsView: TrackingView, context: Context) {
+        nsView.onFractionChange = onFractionChange
+    }
+
+    final class TrackingView: NSView {
+        var onFractionChange: ((Double?) -> Void)?
+
+        private var trackingArea: NSTrackingArea?
+
+        override var acceptsFirstResponder: Bool { false }
+
+        override func hitTest(_ point: NSPoint) -> NSView? {
+            nil
+        }
+
+        override func updateTrackingAreas() {
+            if let trackingArea {
+                removeTrackingArea(trackingArea)
+            }
+            let next = NSTrackingArea(
+                rect: .zero,
+                options: [
+                    .activeInActiveApp,
+                    .inVisibleRect,
+                    .mouseEnteredAndExited,
+                    .mouseMoved
+                ],
+                owner: self,
+                userInfo: nil
+            )
+            addTrackingArea(next)
+            trackingArea = next
+            super.updateTrackingAreas()
+        }
+
+        override func mouseEntered(with event: NSEvent) {
+            report(event)
+        }
+
+        override func mouseMoved(with event: NSEvent) {
+            report(event)
+        }
+
+        override func mouseExited(with event: NSEvent) {
+            onFractionChange?(nil)
+        }
+
+        private func report(_ event: NSEvent) {
+            let point = convert(event.locationInWindow, from: nil)
+            let width = max(bounds.width, 1)
+            let fraction = FilmtoneScrubThumbnailMath.clampHoverFraction(
+                x: point.x,
+                width: width,
+                knob: 18
+            )
+            onFractionChange?(fraction)
+        }
+    }
+}
+
+/// M5-K4: capsule frame key. Reserved for future overlay placement
+/// against the capsule outer rect; not consumed by the current code
+/// path but kept so a future iteration can place markers along the
+/// capsule rather than the slider track.
+private struct ScrubBarCapsuleFrameKey: PreferenceKey {
+    static let defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        let next = nextValue()
+        if next != .zero { value = next }
+    }
+}
+
+/// M5-K4: slider frame in the scrub bar's named coordinate space.
+/// Drives the thumbnail's horizontal position so the overlay sits at
+/// the cursor's slider-relative X regardless of the chrome around it.
+private struct SliderFrameInBarKey: PreferenceKey {
+    static let defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        let next = nextValue()
+        if next != .zero { value = next }
     }
 }
 
@@ -557,6 +866,11 @@ private struct VideoCompositionRefreshKey: Equatable {
     let quickState: FilmtoneQuickState
     let paramOverrides: FilmtonePhase0ParamsPatch
     let compareEnabled: Bool
+    /// M5-K3: drag-induced fraction changes must rebuild the AVPlayer
+    /// composition so the next composed frame reflects the new split.
+    /// The session itself debounces 100ms, so dragging during playback
+    /// throttles to at most 10 rebuilds/sec.
+    let compareSplitFraction: Double
 
     @MainActor
     init(state: EditorState) {
@@ -568,6 +882,7 @@ private struct VideoCompositionRefreshKey: Equatable {
         self.quickState = state.quickState
         self.paramOverrides = state.paramOverrides
         self.compareEnabled = state.isCompareEnabled
+        self.compareSplitFraction = state.compareSplitFraction
     }
 }
 

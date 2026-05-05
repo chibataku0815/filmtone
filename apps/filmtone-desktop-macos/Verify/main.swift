@@ -1191,11 +1191,443 @@ runner.test("AdvancedAdjustCatalog with .japanese translates motion params, leav
     try assertEqual(exposure.label, "Exposure", "basic.exposure stays EN under .japanese per iOS")
 }
 
+// ---------------------------------------------------------------------------
+// M5-K4 — Scrub thumbnail math.
+// Pure helpers that the AV-bound provider depends on for cache key bucketing
+// and thumbnail-overlay placement. Verified here so a regression in either
+// helper trips the harness instead of surfacing as a UI glitch on the scrub
+// bar.
+// ---------------------------------------------------------------------------
+
+runner.test("FilmtoneScrubThumbnailMath.quantize default bucket = 0.25s") {
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantize(seconds: 0.0),
+        0.0,
+        eps: 1e-9,
+        "0 → 0"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantize(seconds: 0.124),
+        0.0,
+        eps: 1e-9,
+        "0.124 → 0 (rounds down)"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantize(seconds: 0.125),
+        0.25,
+        eps: 1e-9,
+        "0.125 → 0.25 (banker's rounding lands on even quarter)"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantize(seconds: 0.30),
+        0.25,
+        eps: 1e-9,
+        "0.30 → 0.25"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantize(seconds: 0.40),
+        0.50,
+        eps: 1e-9,
+        "0.40 → 0.50"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantize(seconds: 1.74),
+        1.75,
+        eps: 1e-9,
+        "1.74 → 1.75"
+    )
+}
+
+runner.test("FilmtoneScrubThumbnailMath.quantize clamps non-finite / negative") {
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantize(seconds: -0.5),
+        0.0,
+        eps: 1e-9,
+        "negative → 0"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantize(seconds: .nan),
+        0.0,
+        eps: 1e-9,
+        "NaN → 0"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantize(seconds: .infinity),
+        0.0,
+        eps: 1e-9,
+        "+inf → 0"
+    )
+}
+
+runner.test("FilmtoneScrubThumbnailMath.quantize honors custom bucket") {
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantize(seconds: 1.7, bucket: 1.0),
+        2.0,
+        eps: 1e-9,
+        "1.7 with 1s bucket → 2.0"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantize(seconds: 1.7, bucket: 0.0),
+        1.7,
+        eps: 1e-9,
+        "0 bucket → passthrough"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantize(seconds: 1.7, bucket: -0.5),
+        1.7,
+        eps: 1e-9,
+        "negative bucket → passthrough"
+    )
+}
+
+runner.test("FilmtoneScrubThumbnailMath.clampToDuration: typical clamp") {
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampToDuration(seconds: -1.0, duration: 12.34),
+        0.0,
+        eps: 1e-9,
+        "negative seconds → 0"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampToDuration(seconds: 5.0, duration: 12.34),
+        5.0,
+        eps: 1e-9,
+        "in-range passthrough"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampToDuration(seconds: 99.0, duration: 12.34),
+        12.34,
+        eps: 1e-9,
+        "past-end → duration"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampToDuration(seconds: 12.34, duration: 12.34),
+        12.34,
+        eps: 1e-9,
+        "exactly-end stays at duration"
+    )
+}
+
+runner.test("FilmtoneScrubThumbnailMath.clampToDuration: zero / non-finite duration") {
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampToDuration(seconds: 5.0, duration: 0.0),
+        0.0,
+        eps: 1e-9,
+        "zero duration → 0"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampToDuration(seconds: 5.0, duration: -3.0),
+        0.0,
+        eps: 1e-9,
+        "negative duration → 0"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampToDuration(seconds: 5.0, duration: .nan),
+        0.0,
+        eps: 1e-9,
+        "NaN duration → 0"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampToDuration(seconds: 5.0, duration: .infinity),
+        0.0,
+        eps: 1e-9,
+        "infinite duration → 0 (treated as invalid)"
+    )
+}
+
+runner.test("FilmtoneScrubThumbnailMath.clampToDuration: non-finite seconds") {
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampToDuration(seconds: .nan, duration: 12.34),
+        0.0,
+        eps: 1e-9,
+        "NaN seconds → 0"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampToDuration(seconds: .infinity, duration: 12.34),
+        0.0,
+        eps: 1e-9,
+        "infinite seconds → 0"
+    )
+}
+
+runner.test("FilmtoneScrubThumbnailMath: end-of-asset request quantizes within bounds") {
+    // Repro for the P2 review finding: a far-right hover at fraction
+    // 1.0 against a 12.34s asset previously quantized to 12.5s, beyond
+    // the asset's end. With clamp + quantize the request lands at the
+    // last in-range bucket (12.25s) and never escapes the asset.
+    let duration = 12.34
+    let request = duration  // far-right hover
+    let clamped = FilmtoneScrubThumbnailMath.clampToDuration(
+        seconds: request,
+        duration: duration
+    )
+    let quantized = FilmtoneScrubThumbnailMath.quantize(seconds: clamped)
+    if quantized > duration {
+        throw AssertionError(
+            description: "quantized \(quantized) escaped duration \(duration)"
+        )
+    }
+    try assertClose(quantized, 12.25, eps: 1e-9, "lands on last in-range 0.25s bucket")
+}
+
+runner.test("FilmtoneScrubThumbnailMath.quantizeWithinDuration: round-up overshoot floors back") {
+    // Follow-up review finding: clamp-then-quantize chain still lets
+    // round-half-to-even push past `duration`. 12.38 / 0.25 = 49.52,
+    // which rounds to 50 → 12.50, beyond the 12.38s asset. The helper
+    // detects the overshoot and floors to the last bucket ≤ duration.
+    let duration1 = 12.38
+    let q1 = FilmtoneScrubThumbnailMath.quantizeWithinDuration(
+        seconds: duration1,
+        duration: duration1
+    )
+    if q1 > duration1 {
+        throw AssertionError(
+            description: "quantized \(q1) escaped duration \(duration1)"
+        )
+    }
+    try assertClose(q1, 12.25, eps: 1e-9, "12.38s asset → last in-range bucket 12.25")
+
+    // 12.88s asset: 51.5 / .toNearestOrEven → 52 → 13.0, past 12.88.
+    // Floor must back off to 12.75.
+    let duration2 = 12.88
+    let q2 = FilmtoneScrubThumbnailMath.quantizeWithinDuration(
+        seconds: duration2,
+        duration: duration2
+    )
+    if q2 > duration2 {
+        throw AssertionError(
+            description: "quantized \(q2) escaped duration \(duration2)"
+        )
+    }
+    try assertClose(q2, 12.75, eps: 1e-9, "12.88s asset → last in-range bucket 12.75")
+
+    // Slightly-past-bucket like 12.39 also rounds up to 12.50 and must
+    // floor to 12.25.
+    let duration3 = 12.39
+    let q3 = FilmtoneScrubThumbnailMath.quantizeWithinDuration(
+        seconds: duration3,
+        duration: duration3
+    )
+    if q3 > duration3 {
+        throw AssertionError(
+            description: "quantized \(q3) escaped duration \(duration3)"
+        )
+    }
+    try assertClose(q3, 12.25, eps: 1e-9, "12.39s asset → last in-range bucket 12.25")
+}
+
+runner.test("FilmtoneScrubThumbnailMath.quantizeWithinDuration: exact-bucket boundary kept") {
+    // When duration *is* a bucket boundary, the rounded bucket equals
+    // duration and must not be floored away — would lose the final
+    // thumbnail on perfectly aligned clips.
+    let duration = 12.50
+    let q = FilmtoneScrubThumbnailMath.quantizeWithinDuration(
+        seconds: duration,
+        duration: duration
+    )
+    try assertClose(q, 12.50, eps: 1e-9, "12.50s asset → 12.50 (bucket = duration)")
+
+    // Just past the bucket (round-down side): 12.5001 / 0.25 = 50.0004
+    // → 50 → 12.50, in range, return as-is.
+    let q2 = FilmtoneScrubThumbnailMath.quantizeWithinDuration(
+        seconds: 12.5001,
+        duration: 12.5001
+    )
+    try assertClose(q2, 12.50, eps: 1e-9, "12.5001s asset → 12.50 (rounded down, in range)")
+}
+
+runner.test("FilmtoneScrubThumbnailMath.quantizeWithinDuration: mid-range pass-through") {
+    // Mid-range hovers must behave identically to the pre-helper chain —
+    // the floor branch only activates when quantize overshoots.
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantizeWithinDuration(seconds: 5.0, duration: 12.38),
+        5.0,
+        eps: 1e-9,
+        "exact-on-bucket mid-range untouched"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantizeWithinDuration(seconds: 5.13, duration: 12.38),
+        5.25,
+        eps: 1e-9,
+        "5.13 rounds to 5.25, well inside 12.38s"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantizeWithinDuration(seconds: -1.0, duration: 12.38),
+        0.0,
+        eps: 1e-9,
+        "negative request clamps to 0"
+    )
+}
+
+runner.test("FilmtoneScrubThumbnailMath.quantizeWithinDuration: zero / non-finite / sub-bucket duration") {
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantizeWithinDuration(seconds: 5.0, duration: 0.0),
+        0.0,
+        eps: 1e-9,
+        "zero duration → 0"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantizeWithinDuration(seconds: 5.0, duration: -3.0),
+        0.0,
+        eps: 1e-9,
+        "negative duration → 0"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantizeWithinDuration(seconds: 5.0, duration: .nan),
+        0.0,
+        eps: 1e-9,
+        "NaN duration → 0"
+    )
+    // Sub-bucket duration: 0.10s asset, far-right hover. quantize would
+    // round to 0 (already in range), so the helper returns 0 — correct
+    // first-frame thumbnail for an extremely short clip.
+    try assertClose(
+        FilmtoneScrubThumbnailMath.quantizeWithinDuration(seconds: 0.10, duration: 0.10),
+        0.0,
+        eps: 1e-9,
+        "sub-bucket duration → 0 (first-frame thumbnail)"
+    )
+}
+
+runner.test("FilmtoneScrubThumbnailMath.clampHoverFraction clamps to [0,1]") {
+    let width: CGFloat = 200
+    let knob: CGFloat = 18
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampHoverFraction(x: -50, width: width, knob: knob),
+        0.0,
+        eps: 1e-9,
+        "left of bar → 0"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampHoverFraction(x: 0, width: width, knob: knob),
+        0.0,
+        eps: 1e-9,
+        "left edge minus knob/2 still clamps to 0"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampHoverFraction(x: width, width: width, knob: knob),
+        1.0,
+        eps: 1e-9,
+        "right edge → 1"
+    )
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampHoverFraction(x: width + 50, width: width, knob: knob),
+        1.0,
+        eps: 1e-9,
+        "right of bar → 1"
+    )
+}
+
+runner.test("FilmtoneScrubThumbnailMath.clampHoverFraction agrees with FilmtoneGlassSlider knob math") {
+    // FilmtoneGlassSlider.updateValue computes ratio = (x - knob/2) / (width - knob).
+    // Replicate that here at a midpoint so any future helper drift surfaces.
+    let width: CGFloat = 600
+    let knob: CGFloat = 18
+    let usable = width - knob
+    let cursorX = knob / 2 + usable * 0.5
+    try assertClose(
+        FilmtoneScrubThumbnailMath.clampHoverFraction(x: cursorX, width: width, knob: knob),
+        0.5,
+        eps: 1e-9,
+        "midpoint → 0.5"
+    )
+}
+
+runner.test("FilmtoneScrubThumbnailMath.clampThumbnailCenterX keeps overlay inside bar") {
+    // Cursor at left end pushes overlay to its leftmost legal center.
+    let leftCenter = FilmtoneScrubThumbnailMath.clampThumbnailCenterX(
+        cursorX: 0,
+        thumbnailWidth: 170,
+        scrubBarMinX: 0,
+        scrubBarMaxX: 600
+    )
+    try assertClose(leftCenter, 85, eps: 1e-9, "left clamp = thumbnailWidth/2")
+
+    // Cursor in the middle of the bar passes through.
+    let mid = FilmtoneScrubThumbnailMath.clampThumbnailCenterX(
+        cursorX: 300,
+        thumbnailWidth: 170,
+        scrubBarMinX: 0,
+        scrubBarMaxX: 600
+    )
+    try assertClose(mid, 300, eps: 1e-9, "midpoint passthrough")
+
+    // Cursor at right end pushes overlay to its rightmost legal center.
+    let rightCenter = FilmtoneScrubThumbnailMath.clampThumbnailCenterX(
+        cursorX: 600,
+        thumbnailWidth: 170,
+        scrubBarMinX: 0,
+        scrubBarMaxX: 600
+    )
+    try assertClose(rightCenter, 515, eps: 1e-9, "right clamp = scrubBarMaxX - thumbnailWidth/2")
+}
+
+runner.test("FilmtoneScrubThumbnailMath.clampThumbnailCenterX falls back to bar center when overlay overflows") {
+    // Bar width 100, thumbnail width 170 — no clamp can keep both edges
+    // inside, so the helper returns the bar's center.
+    let center = FilmtoneScrubThumbnailMath.clampThumbnailCenterX(
+        cursorX: 60,
+        thumbnailWidth: 170,
+        scrubBarMinX: 10,
+        scrubBarMaxX: 110
+    )
+    try assertClose(center, 60, eps: 1e-9, "overflow → bar center")
+}
+
+runner.test("FilmtoneScrubThumbnailCacheKey is signature-aware Hashable") {
+    let a1 = FilmtoneScrubThumbnailCacheKey(quantizedSeconds: 1.25, signature: 0)
+    let a2 = FilmtoneScrubThumbnailCacheKey(quantizedSeconds: 1.25, signature: 0)
+    let b = FilmtoneScrubThumbnailCacheKey(quantizedSeconds: 1.25, signature: 1)
+    let c = FilmtoneScrubThumbnailCacheKey(quantizedSeconds: 1.50, signature: 0)
+    try assertEqual(a1, a2, "same seconds + same signature collide")
+    if a1 == b { throw AssertionError(description: "different signature must distinguish keys") }
+    if a1 == c { throw AssertionError(description: "different seconds must distinguish keys") }
+    var set: Set<FilmtoneScrubThumbnailCacheKey> = []
+    set.insert(a1); set.insert(a2); set.insert(b); set.insert(c)
+    try assertEqual(set.count, 3, "set dedupes a1/a2 but keeps b and c")
+}
+
 let storeSemaphore = DispatchSemaphore(value: 0)
 Task {
     await runStoreTests()
     storeSemaphore.signal()
 }
 storeSemaphore.wait()
+
+// ---------------------------------------------------------------------------
+// Test group 14 — M5-K3 FilmtoneCompareSplitMath. Pins the boundary
+// behavior of the shared split-fraction helper so EditorState.didSet,
+// FilmtoneCompareCompose.makeSplit, and the AVPlayer composition handler
+// never silently drift on what counts as a valid compare position.
+// ---------------------------------------------------------------------------
+
+runner.test("FilmtoneCompareSplitMath default is 0.5") {
+    try assertClose(FilmtoneCompareSplitMath.default, 0.5)
+}
+
+runner.test("FilmtoneCompareSplitMath range is 0...1 inclusive") {
+    try assertClose(FilmtoneCompareSplitMath.range.lowerBound, 0.0)
+    try assertClose(FilmtoneCompareSplitMath.range.upperBound, 1.0)
+}
+
+runner.test("FilmtoneCompareSplitMath.clamp identity inside range") {
+    try assertClose(FilmtoneCompareSplitMath.clamp(0.0), 0.0)
+    try assertClose(FilmtoneCompareSplitMath.clamp(0.25), 0.25)
+    try assertClose(FilmtoneCompareSplitMath.clamp(0.5), 0.5)
+    try assertClose(FilmtoneCompareSplitMath.clamp(0.75), 0.75)
+    try assertClose(FilmtoneCompareSplitMath.clamp(1.0), 1.0)
+}
+
+runner.test("FilmtoneCompareSplitMath.clamp pulls out-of-range to bounds") {
+    try assertClose(FilmtoneCompareSplitMath.clamp(-0.25), 0.0)
+    try assertClose(FilmtoneCompareSplitMath.clamp(-1_000), 0.0)
+    try assertClose(FilmtoneCompareSplitMath.clamp(1.25), 1.0)
+    try assertClose(FilmtoneCompareSplitMath.clamp(1_000_000), 1.0)
+}
+
+runner.test("FilmtoneCompareSplitMath.clamp collapses non-finite to default") {
+    try assertClose(FilmtoneCompareSplitMath.clamp(.nan), FilmtoneCompareSplitMath.default)
+    try assertClose(FilmtoneCompareSplitMath.clamp(.infinity), FilmtoneCompareSplitMath.default)
+    try assertClose(FilmtoneCompareSplitMath.clamp(-.infinity), FilmtoneCompareSplitMath.default)
+}
 
 exit(runner.summary())

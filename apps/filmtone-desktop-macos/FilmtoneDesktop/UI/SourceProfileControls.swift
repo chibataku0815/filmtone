@@ -1,12 +1,12 @@
 import SwiftUI
 
-// M5-C.1: right-rail Source Profile Picker. Sits above GradeControls so the
+// M5-C.1: right-rail Source Profile Picker. Sits above the Look panel so the
 // user picks the source-side normalization (Auto / Apple Log / Apple Log 2 /
 // DJI D-Log / D-Log M / Canon C-Log / Canon Log 3 + Cinema Gamut / V-Log /
 // S-Log3 / Rec.709) before the Look layer.
 //
-// Visual posture matches GradeControls (Pass 4 readability fix): white labels
-// on dark-tinted .clear Liquid Glass, with `.colorScheme(.dark)` on the
+// Visual posture matches the right-rail controls (Pass 4 readability fix):
+// white labels on dark-tinted .clear Liquid Glass, with `.colorScheme(.dark)` on the
 // Picker so the AppKit-bridged NSPopUpButton renders with a white label.
 //
 // Auto resolution surfaces a small "Detected: <englishName>" caption

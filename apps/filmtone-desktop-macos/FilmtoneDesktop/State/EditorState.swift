@@ -120,6 +120,17 @@ final class EditorState {
     /// and the video composition handler does the same for each
     /// composed frame. Preview-only — does not affect export or sidecar.
     var isCompareEnabled: Bool = false
+    /// M5-K3: horizontal split position the compare overlay is anchored
+    /// to, in [0, 1]. didSet collapses non-finite drags and out-of-range
+    /// values back into `FilmtoneCompareSplitMath.range` so the still
+    /// composer and video composition handler always receive a sane
+    /// fraction. Default mirrors the M5-J.2 fixed 50:50 starting point.
+    var compareSplitFraction: Double = FilmtoneCompareSplitMath.default {
+        didSet {
+            let clamped = FilmtoneCompareSplitMath.clamp(compareSplitFraction)
+            if clamped != compareSplitFraction { compareSplitFraction = clamped }
+        }
+    }
 
     var presetParams: FilmtonePhase0Params {
         FilmtonePresetCatalog.resolved(
@@ -257,6 +268,7 @@ final class EditorState {
             quickState: quickState,
             paramOverrides: paramOverrides,
             compareEnabled: isCompareEnabled,
+            compareSplitFraction: compareSplitFraction,
             sourceURL: url ?? sourceURL ?? URL(fileURLWithPath: "/")
         )
     }

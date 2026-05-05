@@ -80,6 +80,7 @@ struct FilmtoneGlassSlider: View {
     @Binding var value: Double
     let range: ClosedRange<Double>
     var step: Double? = nil
+    var expandsOnHover = true
     var onEditingChanged: ((Bool) -> Void)? = nil
 
     @Environment(\.isEnabled) private var isEnabled
@@ -94,7 +95,7 @@ struct FilmtoneGlassSlider: View {
     var body: some View {
         GeometryReader { proxy in
             let width = max(proxy.size.width, 1)
-            let knob = (isDragging || isHovering) ? knobActive : knobBase
+            let knob = (isDragging || (expandsOnHover && isHovering)) ? knobActive : knobBase
             let usable = max(width - knob, 1)
             let ratio = normalizedRatio
             let knobCenterX = usable * ratio + knob / 2

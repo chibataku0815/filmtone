@@ -29,11 +29,12 @@ struct EditorSidebar: View {
                     if state.sourceURL != nil {
                         SourceProfileControls(state: state)
                             .modifier(EditorSidebarPanelGlass())
+                        // M5-K2: Look + strength now live as one block
+                        // inside `LookLibraryControls`. The standalone
+                        // `GradeControls` panel was removed.
                         LookLibraryControls(state: state, library: library)
                             .modifier(EditorSidebarPanelGlass())
                         QuickAdjustControls(state: state)
-                            .modifier(EditorSidebarPanelGlass())
-                        GradeControls(state: state)
                             .modifier(EditorSidebarPanelGlass())
                         ExportInspectorPanel(
                             state: state,

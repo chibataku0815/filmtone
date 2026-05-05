@@ -6,9 +6,13 @@ import SwiftUI
 // `GradeControls`. Built-in Stone / Urban appear ahead of user-saved
 // looks because the store prepends them in `currentSnapshot()`.
 //
-// Visual posture matches `GradeControls` and `SourceProfileControls`
-// (Pass 4 readability fix): white labels on dark-tinted `.clear` Liquid
-// Glass with `.colorScheme(.dark)` on the AppKit-bridged Picker.
+// M5-K2: the Look strength slider lives inside this same panel, directly
+// under the Look menu trigger, so the picker and its strength read as one
+// conceptual control. The standalone `GradeControls` panel was removed.
+//
+// Visual posture matches `SourceProfileControls` (Pass 4 readability fix):
+// white labels on dark-tinted `.clear` Liquid Glass with `.colorScheme(.dark)`
+// on the AppKit-bridged Picker.
 
 struct LookLibraryControls: View {
     @Bindable var state: EditorState
@@ -76,55 +80,75 @@ struct LookLibraryControls: View {
         return "\(entry.favorite ? "★ " : "")\(entry.name)"
     }
 
+    // M5-K2: strength only does work when a Look is active — without one,
+    // the bareline pivot has no target to interpolate toward. We keep the
+    // row visible (greyed) so the user still sees the relationship between
+    // Look and strength.
+    private var strengthDisabled: Bool {
+        state.lookSlug == nil
+    }
+
+    private var strengthPercent: Int {
+        Int((state.presetStrength * 100).rounded())
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Menu {
-                Button {
-                    selectionBinding.wrappedValue = .none
+            // M5-K2: Look picker + strength slider read as one block.
+            // Inner spacing 8pt keeps them visually bound; the outer 16pt
+            // rhythm separates this group from the library action row and
+            // Save button below.
+            VStack(alignment: .leading, spacing: 8) {
+                Menu {
+                    Button {
+                        selectionBinding.wrappedValue = .none
+                    } label: {
+                        menuRow("None", selected: selectionBinding.wrappedValue == .none)
+                    }
+                    let bundled = library.snapshot.looks.filter { $0.bundled }
+                    let user = library.snapshot.looks.filter { !$0.bundled }
+                    if !bundled.isEmpty {
+                        Section("Built-in") {
+                            ForEach(bundled, id: \.id) { entry in
+                                Button {
+                                    selectionBinding.wrappedValue = .saved(entry.id)
+                                } label: {
+                                    menuRow(
+                                        entry.name,
+                                        selected: selectionBinding.wrappedValue == .saved(entry.id),
+                                        favorite: entry.favorite
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    if !user.isEmpty {
+                        Section(savedLooksHeader ?? "Saved") {
+                            ForEach(user, id: \.id) { entry in
+                                Button {
+                                    selectionBinding.wrappedValue = .saved(entry.id)
+                                } label: {
+                                    menuRow(
+                                        entry.name,
+                                        selected: selectionBinding.wrappedValue == .saved(entry.id),
+                                        favorite: entry.favorite
+                                    )
+                                }
+                            }
+                        }
+                    }
                 } label: {
-                    menuRow("None", selected: selectionBinding.wrappedValue == .none)
+                    FilmtoneGlassMenuTrigger(
+                        title: "Look",
+                        value: selectedLookLabel,
+                        systemImage: selectedAnyLook?.favorite == true ? "star.fill" : "sparkles",
+                        accent: selectedAnyLook?.favorite == true ? Color.yellow : Color(red: 0.84, green: 0.72, blue: 1.0)
+                    )
                 }
-                let bundled = library.snapshot.looks.filter { $0.bundled }
-                let user = library.snapshot.looks.filter { !$0.bundled }
-                if !bundled.isEmpty {
-                    Section("Built-in") {
-                        ForEach(bundled, id: \.id) { entry in
-                            Button {
-                                selectionBinding.wrappedValue = .saved(entry.id)
-                            } label: {
-                                menuRow(
-                                    entry.name,
-                                    selected: selectionBinding.wrappedValue == .saved(entry.id),
-                                    favorite: entry.favorite
-                                )
-                            }
-                        }
-                    }
-                }
-                if !user.isEmpty {
-                    Section(savedLooksHeader ?? "Saved") {
-                        ForEach(user, id: \.id) { entry in
-                            Button {
-                                selectionBinding.wrappedValue = .saved(entry.id)
-                            } label: {
-                                menuRow(
-                                    entry.name,
-                                    selected: selectionBinding.wrappedValue == .saved(entry.id),
-                                    favorite: entry.favorite
-                                )
-                            }
-                        }
-                    }
-                }
-            } label: {
-                FilmtoneGlassMenuTrigger(
-                    title: "Look",
-                    value: selectedLookLabel,
-                    systemImage: selectedAnyLook?.favorite == true ? "star.fill" : "sparkles",
-                    accent: selectedAnyLook?.favorite == true ? Color.yellow : Color(red: 0.84, green: 0.72, blue: 1.0)
-                )
+                .filmtoneGlassMenuChrome()
+
+                strengthRow
             }
-            .filmtoneGlassMenuChrome()
 
             // M5-H.2: inline favorite / rename / delete row. Always
             // visible so the controls are discoverable; disabled when
@@ -155,6 +179,27 @@ struct LookLibraryControls: View {
                 Text(library.lastError ?? "")
             }
         )
+    }
+
+    @ViewBuilder
+    private var strengthRow: some View {
+        // M5-B Pass 4 readability posture preserved: explicit white text
+        // + Slider tint over the dark-tinted Liquid Glass right rail.
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Strength")
+                    .font(.callout)
+                    .foregroundStyle(.white)
+                Spacer()
+                Text("\(strengthPercent)%")
+                    .font(.callout.monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+            FilmtoneGlassSlider(value: $state.presetStrength, range: 0...1)
+                .disabled(strengthDisabled)
+        }
+        .frame(width: 220)
+        .opacity(strengthDisabled ? 0.5 : 1.0)
     }
 
     @ViewBuilder

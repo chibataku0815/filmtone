@@ -40,6 +40,7 @@ SOURCES=(
   "$SRC_ROOT/Domain/SourceColorTypes.swift"
   "$SRC_ROOT/Domain/FilmtoneDesktopStrings.swift"
   "$SRC_ROOT/Domain/AdvancedAdjustCatalog.swift"
+  "$SRC_ROOT/Domain/FilmtoneCompareSplitMath.swift"
   "$SRC_ROOT/Color/FilmtonePresetCatalog.swift"
   "$SRC_ROOT/Color/FilmtoneCreativePackCatalog.swift"
   "$SRC_ROOT/Color/FilmtoneSavedLookSchema.swift"
@@ -50,6 +51,7 @@ SOURCES=(
   "$SRC_ROOT/Export/FilmtoneSidecarTypes.swift"
   "$SRC_ROOT/Export/FilmtoneSidecarWriter.swift"
   "$SRC_ROOT/Export/FilmtoneExportSnapshot.swift"
+  "$SRC_ROOT/Media/FilmtoneScrubThumbnailMath.swift"
   "$HERE/main.swift"
 )
 
