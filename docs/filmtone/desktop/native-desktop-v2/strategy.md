@@ -111,11 +111,30 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
   - **M5-D.2 Native Video Playback** (Tier B, ~50 min) — **closed
     2026-05-05** (MVP path)。詳細は Completion Log を参照。strategy 旧 gate
     (raw decode vs decode+grade の user 判断) は前提が変わったため bypass:
-    既存 scrub-driven preview pipeline (`previewMaxLong` scaled +
-    in-flight Task cancellation) が既に decode+grade で frame-drop を
-    natural に出すので、Timer driven `videoPreviewSeconds` 増分で MVP
-    が成立。AVPlayer migration は perf 不足が visual smoke で判明した
-    場合の follow-up slice (M5-D.2.1 候補)。
+    既存 scrub-driven preview pipeline (in-flight Task cancellation で
+    frame-drop を natural に出す) で Timer driven `videoPreviewSeconds`
+    増分の MVP が成立。AVPlayer migration は perf 不足が visual smoke で
+    判明した場合の follow-up slice (M5-D.2.1 候補)。
+    **Correction (2026-05-05、M5-D.2 spike で判明)**: 当初本行で
+    `previewMaxLong scaled` と書いていたが、Desktop には preview scale
+    symbol が存在せず、source 解像度のまま grade pipeline を流していた。
+    M5-D.2.0a (v1.4 hot-fix candidate) で probe / asset cache + 1280
+    long-side downscale、M5-D.2.1 (v1.5) で AVPlayer Primary route 着地予定。
+  - **M5-D.2.0a Preview Downscale + Probe/Asset Cache** (Tier B hot-fix
+    candidate, ~半日) — **registered 2026-05-05、v1.4 候補 (採否は visual
+    smoke 判定)**。spike 推奨 Alt A: AVAsset 単一 instance 共有 + probe 結果
+    cache + `composition.renderSize` を long-side 1280 に固定。drift /
+    audio absent は残置 (architecture 起因、Primary route で解消)。Primary
+    route まで待てるなら hold して v1.5 一括着地でも可。詳細:
+    `archive/2026-05-05-m5-d2-avplayer-playback-spike.md` §「v1.4 / v1.5
+    への載せ方」。
+  - **M5-D.2.1 AVPlayer Preview Route (iOS-canonical port)** (Tier B
+    Primary, 5 step 想定) — **registered 2026-05-05、v1.5 lane**。AVPlayer
+    + AVMutableVideoComposition + `applyingCIFiltersWithHandler` で
+    iOS canonical preview architecture に揃える。grade pipeline 本体は
+    app-local 並走、playback 出力の still / export parity を Verify で
+    pin。Audio + 速度切替 + compare mode が同時に lit up する。詳細:
+    spike doc §「Primary route 推奨」+ §「v1.4 / v1.5 への載せ方」。
   - **M5-C.3b Advanced Per-Parameter Override Editing UX** (Tier C, ~半日):
     **closed 2026-05-05**。詳細は Completion Log を参照。Option B (popover)
     採用。iOS catalog mirror + clamp + per-key reset + Reset All で 30 + 2
@@ -646,6 +665,20 @@ distribution. Electron 1.0.4 is the final public build of the legacy lane
   `archive/2026-05-05-m5-h1-chrome-preview-layout.md` /
   `archive/2026-05-05-m5-h2-adjust-library-parity.md` /
   `archive/2026-05-05-m5-h3-dual-lut-spike.md`。
+- 2026-05-05: **M5-D.2 AVPlayer playback spike** integrated (3 doc-only
+  commits: ec89bfc3 + abcfd4f5 + 4e6ff041、cherry-pick efca41a7..86ab8436)。
+  M5-D.2 MVP の Timer-driven 再生で frame-drop が natural に出る前提を
+  C1〜C7 7 軸で精査、AVPlayer + AVMutableVideoComposition Primary route と
+  Alt A〜D 代替案を列挙、Performance risk を route × severity で表化。
+  副産物として **MVP archive + strategy 旧記述の factual error** を spike
+  worker grep で特定 — `previewMaxLong` symbol は Desktop に存在せず source
+  解像度のまま decode + grade していた事実を訂正(strategy.md L114 + archive
+  `2026-05-05-m5-d2-native-video-playback.md` L31)。Coordinator 側で 2 follow-up
+  lane を Current Strategic State に登録: **M5-D.2.0a** (v1.4 hot-fix candidate、
+  probe / asset cache + 1280 long-side downscale、採否 visual smoke 判定)
+  + **M5-D.2.1** (v1.5 Primary route、iOS canonical AVPlayer port)。実装ゼロ /
+  pbxproj 不変 / Verify 不変。Archived as
+  `archive/2026-05-05-m5-d2-avplayer-playback-spike.md`。
 
 ## Interrupt / Decision Log
 

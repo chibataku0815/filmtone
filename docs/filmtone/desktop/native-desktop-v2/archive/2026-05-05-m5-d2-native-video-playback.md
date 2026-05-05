@@ -28,11 +28,17 @@ preview pipeline をそのまま再利用。AVPlayer 移行は perf 不足が判
 
 理由:
 - **既存 preview pipeline (`PreviewSurface` + `FilmtoneVideoFramePreviewLoader`
-  + grade pipeline) は scaled preview (`previewMaxLong`) で動作済み**。
-  scrub bar の値が変わると 1 frame ごとに非同期 decode + grade + display
-  する仕組みが M5-A.3 で landed。Timer で `videoPreviewSeconds` を nominal
-  rate で前進させれば、既存 in-flight Task cancellation pattern が自然に
-  frame-drop を実現する。
+  + grade pipeline) が動作済み**。scrub bar の値が変わると 1 frame ごとに
+  非同期 decode + grade + display する仕組みが M5-A.3 で landed。Timer で
+  `videoPreviewSeconds` を nominal rate で前進させれば、既存 in-flight Task
+  cancellation pattern が自然に frame-drop を実現する。
+  > **Correction (2026-05-05、M5-D.2 spike で判明)**: 当初「`scaled preview
+  > (previewMaxLong)` で動作」と書いていたが、Desktop には preview scale
+  > symbol が存在せず、source 解像度のまま grade pipeline を流していた
+  > (`grep -r previewMaxLong apps/filmtone-desktop-macos/` → 0 hit)。
+  > frame-drop は実現するが decode コスト自体は MVP 前提より高く、M5-D.2.0a
+  > (v1.4 hot-fix candidate) で probe + 1280 long-side downscale を入れる
+  > 案、M5-D.2.1 (v1.5) で AVPlayer Primary route 着地予定。
 - AVPlayer + AVPlayerItemVideoOutput への移行は別 architecture (CVPixelBuffer
   → CIImage 経路、CMTime 同期、別 grade pipeline branch) で 2-3h+ の slice。
   perf 不足の証拠なしで先取り実装は overengineering。
