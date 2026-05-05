@@ -53,8 +53,10 @@ content layer stays glass-free so color judgment is not compromised.
 ## Current Strategic State
 
 - Branch: `feature/native-desktop-plan`
-- Current checked HEAD during this cleanup: `0b79861f`
-- No product `active.md` should remain open after this cleanup.
+- Current integrated HEAD: `6097acdd` (`Integrate M5-K native desktop polish`)
+- Integration base before M5-K1/K2/K3/K4: `0b79861f`
+- No M5-K product `active.md` should remain open. If `active.md` exists during
+  DHM / release-cutover interrupts, do not treat it as current M5-K state.
 - Public Desktop latest from truth script: `1.0.4` via update metadata.
 - iOS public and local marketing version from truth script: `1.4`.
 - Native Desktop v2 release target: Desktop v1.4, aligned with iOS.
@@ -67,7 +69,9 @@ slider polish have been integrated into the native plan branch.
 The user visually accepted the current M5-J integrated state on 2026-05-05.
 M5-K1 / K2 / K3 / K4 are integrated: chrome/opening readability, Look + strength
 grouping, draggable still/video compare split, and graded scrub thumbnail
-preview.
+preview. K4 hover follow-up fixes are included in `6097acdd`; final user visual
+confirmation that hover thumbnails no longer move or shake the scrub bar remains
+a release-smoke item until explicitly accepted.
 
 ## Current M5-K State
 
@@ -112,7 +116,10 @@ archive/2026-05-05-m5-k3-compare-bar.md
 Closed 2026-05-05. Hover/drag over the video scrub bar now requests graded,
 cached thumbnails via a small-canvas AVAssetImageGenerator composition. Review
 fixes added in-flight request coalescing, duration-safe quantization, measured
-capsule clamping, and portrait-safe letterboxing.
+capsule clamping, and portrait-safe letterboxing. Parent integration follow-ups
+then moved hover tracking to a non-hit-testing AppKit tracking layer, disabled
+video scrub hover knob expansion, and rendered the thumbnail as a non-layout
+overlay so hover does not shake or move the scrub bar.
 
 Archives:
 
@@ -120,6 +127,7 @@ Archives:
 archive/2026-05-05-m5-k4-scrub-thumbnail-preview.md
 archive/2026-05-05-m5-k4-review-fixes.md
 archive/2026-05-05-m5-k4-review-fix-2-quantize-within-duration.md
+archive/2026-05-05-m5-k4-integration.md
 ```
 
 ## Release Cutover Gate
@@ -131,7 +139,8 @@ Do not regenerate or publish the v1.4 public artifact until:
 - `bash apps/filmtone-desktop-macos/Verify/run.sh` passes.
 - `bun run verify:macos` passes.
 - User visual smoke passes on opening, still preview, video playback, sidebar,
-  Look/strength editing, compare, and export/share.
+  Look/strength editing, compare, scrub thumbnail hover/drag stability, and
+  export/share.
 - Release-cutover docs/scripts are reconciled with the v1.4 identity and fixed
   download/update rail.
 
@@ -167,6 +176,7 @@ Use these archives as evidence, not as current truth.
 - `archive/2026-05-05-m5-k4-scrub-thumbnail-preview.md`
 - `archive/2026-05-05-m5-k4-review-fixes.md`
 - `archive/2026-05-05-m5-k4-review-fix-2-quantize-within-duration.md`
+- `archive/2026-05-05-m5-k4-integration.md`
 - `archive/2026-05-05-dhm-shared-highlight-marker-mvp.md`
 - `archive/2026-05-05-dhm-5-davinci-e2e-smoke-harness.md`
 
@@ -189,6 +199,14 @@ Use these archives as evidence, not as current truth.
 
 Future cross-device SSD / sidecar / DaVinci work is a compatibility constraint,
 not a v1.4 gate unless the user explicitly changes release scope.
+
+2026-05-05: M5-K1/K2/K3/K4 integrated into `feature/native-desktop-plan` as
+`6097acdd`: chrome/opening readability, Look + strength grouping, draggable
+still/video compare, and graded scrub thumbnail preview. Verification was green
+(`Verify/run.sh` 86/86, `bun run verify:macos`, `git diff --check`), and K4
+visual follow-ups for hover hit-testing, hover geometry stability, and overlay
+layout are included. Final user visual confirmation of scrub thumbnail hover
+stability remains pending.
 
 2026-05-05: DHM shared highlight marker MVP landed in isolated worktree
 `feature/shared-highlight-markers`: source-relative marker contract, iOS/Desktop
