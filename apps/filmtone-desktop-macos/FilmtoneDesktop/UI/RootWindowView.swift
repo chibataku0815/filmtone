@@ -29,16 +29,18 @@ struct RootWindowView: View {
             // Apple Liquid Glass dramatic refraction; all panels and the
             // capsule unified on `.clear`. GlassEffectContainer(spacing: 12)
             // coordinates morphing/refraction across the right rail.
+            // M5-H.1: the leading `GlassControlGroup()` "Phase 0" placeholder
+            // banner was retired — the right rail now opens directly with
+            // the source-loaded panels (or stays empty until a source loads).
             GlassEffectContainer(spacing: 12) {
                 VStack(alignment: .trailing, spacing: 12) {
-                    GlassControlGroup()
                     if state.sourceURL != nil {
                         // M5-C.1: Source Profile Picker — sits above the Look
                         // controls so the user picks the input transform
                         // before the Look layer. Same Pass 4 dark-tinted
                         // .clear glass posture for visual continuity.
                         SourceProfileControls(state: state)
-                            .padding(.horizontal, 14)
+                            .padding(.horizontal, 16)
                             .padding(.vertical, 8)
                             .glassEffect(
                                 .clear.tint(.black.opacity(0.30)),
@@ -50,7 +52,7 @@ struct RootWindowView: View {
                         // so the user picks input → Look → strength in
                         // top-down reading order.
                         LookLibraryControls(state: state, library: library)
-                            .padding(.horizontal, 14)
+                            .padding(.horizontal, 16)
                             .padding(.vertical, 8)
                             .glassEffect(
                                 .clear.tint(.black.opacity(0.30)),
@@ -60,7 +62,7 @@ struct RootWindowView: View {
                         // Look selection and Strength so the user reads
                         // top-down: input → Look → Quick offsets → Strength.
                         QuickAdjustControls(state: state)
-                            .padding(.horizontal, 14)
+                            .padding(.horizontal, 16)
                             .padding(.vertical, 8)
                             .glassEffect(
                                 .clear.tint(.black.opacity(0.30)),
@@ -72,7 +74,7 @@ struct RootWindowView: View {
                         // while preserving Pass 3's dramatic refraction
                         // posture on the rest of the chrome.
                         GradeControls(state: state)
-                            .padding(.horizontal, 14)
+                            .padding(.horizontal, 16)
                             .padding(.vertical, 8)
                             .glassEffect(
                                 .clear.tint(.black.opacity(0.30)),
@@ -88,7 +90,7 @@ struct RootWindowView: View {
                             state: state,
                             onExportTap: { exportCoordinator.presentExportPanel(for: state) }
                         )
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, 16)
                         .padding(.vertical, 8)
                         .glassEffect(
                             .clear.tint(.black.opacity(0.30)),
@@ -116,7 +118,7 @@ struct RootWindowView: View {
                     // frames where untinted .clear refracts into the
                     // backdrop.
                     VideoScrubBar(state: state, duration: duration)
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, 16)
                         .padding(.vertical, 8)
                         .glassEffect(
                             .clear.tint(.black.opacity(0.30)),
@@ -127,7 +129,12 @@ struct RootWindowView: View {
                 .frame(maxWidth: .infinity)
             }
         }
-        .frame(minWidth: 880, minHeight: 560)
+        // M5-H.1: with the 5-panel right rail (SourceProfile / LookLibrary
+        // / QuickAdjust / Grade / ExportInspector) the previous
+        // 880×560 minimum could clip the rail vertically once a source
+        // loaded. Bumping to 1080×720 keeps the rail visible at minimum
+        // size; .defaultSize on WindowGroup opens at a roomier 1280×800.
+        .frame(minWidth: 1080, minHeight: 720)
         // M5-C.2a: load the on-disk library so the Picker lists saved
         // Looks at first paint. Built-in Stone / Urban appear immediately
         // via the empty-snapshot prefix path; user-saved entries fade in
@@ -145,8 +152,21 @@ struct RootWindowView: View {
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .toolbar {
             ToolbarItem(placement: .navigation) {
-                Image(systemName: "camera.aperture")
-                    .symbolRenderingMode(.hierarchical)
+                // M5-H.1: replace the `camera.aperture` SF Symbol placeholder
+                // with the iOS-canonical AppIcon (already populated by
+                // M5-E.1, commit 758ada3a). NSApp.applicationIconImage is
+                // the live runtime icon, so we don't duplicate the asset.
+                // Group wraps the optional so ToolbarContentBuilder gets a
+                // concrete View (some View?) — without it the build fails
+                // on `'ToolbarItem<(), some View?>' conform to 'View'`.
+                Group {
+                    if let icon = NSApp.applicationIconImage {
+                        Image(nsImage: icon)
+                            .resizable()
+                            .interpolation(.high)
+                            .frame(width: 20, height: 20)
+                    }
+                }
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {

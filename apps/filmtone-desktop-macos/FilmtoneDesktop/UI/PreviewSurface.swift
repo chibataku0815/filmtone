@@ -36,19 +36,22 @@ struct PreviewSurface: View {
 
     var body: some View {
         ZStack {
-            Color.black
+            // M5-H.1: branded backdrop replaces the flat `Color.black`. The
+            // gradient still extends via .backgroundExtensionEffect() so
+            // the Liquid Glass toolbar/chrome has continuous content to
+            // refract even when the rendered image is letterboxed.
+            FilmtoneBackdrop()
+                .backgroundExtensionEffect()
             if let renderedImage {
-                // Apple's Landmarks sample applies backgroundExtensionEffect()
-                // directly on Image(...).resizable().scaledToFill() so the
-                // image extends/mirrors into the toolbar safe area. Liquid
-                // Glass chrome refracts what's beneath it — SwiftUI must be
-                // able to sample those pixels, which an NSViewRepresentable
-                // would block.
+                // M5-H.1: switched from `.scaledToFill().clipped()` to
+                // `.scaledToFit()` so source aspect ratio is preserved end
+                // to end (vertical phone footage no longer gets cropped to
+                // a center band, ultra-wide stills no longer lose edges).
+                // Toolbar refraction is now satisfied by the FilmtoneBackdrop
+                // layer above, so we don't need the image to extend.
                 Image(nsImage: renderedImage)
                     .resizable()
-                    .scaledToFill()
-                    .clipped()
-                    .backgroundExtensionEffect()
+                    .scaledToFit()
             } else if sourceURL == nil {
                 EmptyPreviewLabel()
             }
@@ -203,16 +206,46 @@ private struct PreviewRenderKey: Hashable {
     let paramOverrides: FilmtonePhase0ParamsPatch
 }
 
+// M5-H.1: replaces the prior dark + system-icon placeholder. Uses the
+// runtime AppIcon so the launch state visually anchors on the brand mark
+// the user already sees in the Dock / Finder, plus the wordmark and a
+// soft Japanese CTA. Stays inside the FilmtoneBackdrop gradient so the
+// Liquid Glass chrome above continues to refract a real surface.
 private struct EmptyPreviewLabel: View {
     var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "photo")
-                .font(.system(size: 36, weight: .light))
-                .foregroundStyle(.secondary)
-            Text("Open a still image or video to preview")
+        VStack(spacing: 16) {
+            if let icon = NSApp.applicationIconImage {
+                Image(nsImage: icon)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 96, height: 96)
+                    .opacity(0.92)
+            }
+            Text("Filmtone")
+                .font(.system(size: 28, weight: .light))
+                .tracking(4)
+                .foregroundStyle(.white.opacity(0.92))
+            Text("素材を開いて始めましょう")
                 .font(.callout)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white.opacity(0.6))
         }
+    }
+}
+
+// M5-H.1: brand backdrop. Warm-leaning near-black gradient evokes the
+// dark-room negative-on-light-table feel without competing with the
+// preview content; identical to the iOS launch palette tone, kept dark
+// enough that color judgment on the preview is unaffected.
+private struct FilmtoneBackdrop: View {
+    var body: some View {
+        LinearGradient(
+            colors: [
+                Color(red: 0.07, green: 0.06, blue: 0.05),
+                Color(red: 0.02, green: 0.02, blue: 0.02)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
     }
 }
 

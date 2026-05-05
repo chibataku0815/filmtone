@@ -33,9 +33,13 @@ struct FilmtoneDesktopApp: App {
     }
 
     var body: some Scene {
-        WindowGroup("Filmtone Desktop") {
+        WindowGroup("Filmtone") {
             RootWindowView()
         }
+        // M5-H.1: pin a sensible first-launch size so the right rail
+        // never lands clipped on the trailing edge, but stay below the
+        // typical 14"/16" laptop screen so the window doesn't dominate.
+        .defaultSize(width: 1280, height: 800)
         .windowResizability(.contentMinSize)
         // macOS 26 unified Apple Liquid Glass toolbar/chrome requires
         // explicit opt-in; .automatic falls back to a flat opaque bar.
