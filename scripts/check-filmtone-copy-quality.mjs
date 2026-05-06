@@ -15,9 +15,23 @@ const metadataFields = [
   "promotional_text",
   "description",
   "keywords",
+  "release_notes",
 ];
 
-const metadataLocales = ["ja", "en-US"];
+const metadataLocales = ["ja", "en-US", "en-GB"];
+
+const metadataTargets = [
+  {
+    label: "iOS",
+    basePath: "apps/capacitor-film-lab-ios/fastlane/metadata",
+    locales: metadataLocales,
+  },
+  {
+    label: "macOS",
+    basePath: "apps/filmtone-desktop-macos/fastlane/metadata",
+    locales: ["ja", "en-US"],
+  },
+];
 
 const appStoreLimits = new Map([
   ["name", { max: 30, metric: "chars" }],
@@ -25,6 +39,7 @@ const appStoreLimits = new Map([
   ["promotional_text", { max: 170, metric: "chars" }],
   ["description", { max: 4000, metric: "chars" }],
   ["keywords", { max: 100, metric: "bytes" }],
+  ["release_notes", { max: 4000, metric: "chars" }],
 ]);
 
 const styleSkipKeyParts = [
@@ -348,32 +363,46 @@ function checkWebMessages() {
 }
 
 function checkMetadata() {
-  for (const locale of metadataLocales) {
-    for (const field of metadataFields) {
-      const relativePath = `apps/capacitor-film-lab-ios/fastlane/metadata/${locale}/${field}.txt`;
-      const fullPath = path.join(repoRoot, relativePath);
-      const text = fs.readFileSync(fullPath, "utf8").trim();
-      const limit = appStoreLimits.get(field);
-      if (limit) {
-        const count =
-          limit.metric === "bytes" ? byteCount(text) : charCount(text);
-        if (count > limit.max) {
+  for (const target of metadataTargets) {
+    for (const locale of target.locales) {
+      for (const field of metadataFields) {
+        const relativePath = `${target.basePath}/${locale}/${field}.txt`;
+        const fullPath = path.join(repoRoot, relativePath);
+        if (!fs.existsSync(fullPath)) {
           addFinding({
             file: relativePath,
             key: field,
-            rule: "app-store-limit",
-            matched: `${count}/${limit.max} ${limit.metric}`,
-            reason: "The App Store field exceeds Apple's documented limit.",
-            rewrite: "Shorten the field before upload.",
+            rule: "missing-app-store-field",
+            matched: target.label,
+            reason: "A required App Store metadata field is missing.",
+            rewrite: "Add the field before upload.",
           });
+          continue;
         }
+
+        const text = fs.readFileSync(fullPath, "utf8").trim();
+        const limit = appStoreLimits.get(field);
+        if (limit) {
+          const count =
+            limit.metric === "bytes" ? byteCount(text) : charCount(text);
+          if (count > limit.max) {
+            addFinding({
+              file: relativePath,
+              key: field,
+              rule: "app-store-limit",
+              matched: `${count}/${limit.max} ${limit.metric}`,
+              reason: "The App Store field exceeds Apple's documented limit.",
+              rewrite: "Shorten the field before upload.",
+            });
+          }
+        }
+        checkText({
+          file: relativePath,
+          key: field,
+          text,
+          isKeywords: field === "keywords",
+        });
       }
-      checkText({
-        file: relativePath,
-        key: field,
-        text,
-        isKeywords: field === "keywords",
-      });
     }
   }
 }

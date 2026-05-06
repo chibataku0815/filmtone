@@ -19,11 +19,13 @@ Done in this lane:
 - Keep sidecar JSON output adjacent to the selected export file.
 - Add checks that protect the Developer ID lane from accidental MAS changes.
 
-Not included:
+Still not included:
 
-- App Store Connect app record creation.
-- Metadata, screenshots, privacy answers, upload, review submission, or public
-  release switch.
+- Screenshots, unless staged under
+  `apps/filmtone-desktop-macos/fastlane/screenshots/` and uploaded with
+  `UPLOAD_SCREENSHOTS=1`.
+- Final App Privacy submission in App Store Connect.
+- Review submission or public release switch.
 - Universal Purchase with the existing iOS app.
 - Human GUI smoke of the installed/exported build with real still, landscape
   video, and portrait iPhone video sources.
@@ -71,3 +73,21 @@ plus sidecar JSON are present.
 - ASC processing status: `VALID`
 - Uploaded build: `CFBundleShortVersionString=1.4`, `CFBundleVersion=1`,
   App Store eligible.
+- Added fastlane automation for the macOS App Store lane:
+  metadata upload, pkg upload, combined release upload, delivery status, guarded
+  review submission, and App Privacy boundary reporting.
+- Uploaded localized `ja` / `en-US` metadata and App Review information through
+  `bun run release:macos-appstore:metadata`.
+- Confirmed delivery status through
+  `DELIVERY_ID=759ae36e-be06-4251-8f6c-f48579c6dfbe bun run release:macos-appstore:status`;
+  processing remained `VALID` and App Store eligible.
+
+Remaining before review submission:
+
+- Add Mac App Store screenshots in App Store Connect or stage them under
+  `apps/filmtone-desktop-macos/fastlane/screenshots/` and run with
+  `UPLOAD_SCREENSHOTS=1`.
+- Set App Privacy answers. The current local-first answer draft is
+  `apps/filmtone-desktop-macos/fastlane/app_privacy.md`.
+- Submit with `SUBMIT_FOR_REVIEW=1 CONFIRM_METADATA_READY=1 bun run
+  release:macos-appstore:submit-review` after screenshots and privacy are set.

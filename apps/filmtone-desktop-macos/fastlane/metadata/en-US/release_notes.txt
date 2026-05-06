@@ -1,0 +1,1 @@
+This first native macOS release adds video and still preview, Looks, Source Profile switching, Before/After comparison, local export, and sidecar JSON output.

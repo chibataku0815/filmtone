@@ -1,0 +1,14 @@
+Filmtoneは、動画と写真の色をMac上で確認・調整し、ローカルに書き出せるネイティブmacOSアプリです。
+
+Lookを選び、Quick controlsでトーンを整え、必要に応じてSource Profile / Camera Conversionを切り替えられます。Before/Afterの分割比較で色を確かめてから、選択したフォルダへ書き出せます。
+
+主な機能:
+- 静止画と動画のプレビュー
+- Film LookとLUT強度の調整
+- Source Profile / Camera Conversionの切り替え
+- Before/Afterの分割比較
+- 動画の再生、速度変更、スクラブ確認
+- 選択したフォルダへのローカル書き出し
+- 書き出し結果に対応するsidecar JSONの保存
+
+ログイン、サブスクリプション、AI生成は不要です。素材を開き、色を確認し、必要な場所へ書き出す流れをMac上で完結できます。

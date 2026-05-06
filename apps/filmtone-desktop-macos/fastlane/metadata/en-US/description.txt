@@ -1,0 +1,14 @@
+Filmtone is a native macOS LUT editor for checking, adjusting, and exporting the color of videos and still images locally.
+
+Choose a Look, tune Quick controls, switch Source Profile / Camera Conversion when needed, compare before and after, then export to a folder you select. The workflow stays local and is built for reviewing media before it leaves your desktop.
+
+Key features:
+- Still image and video preview
+- Film Looks and LUT strength control
+- Source Profile / Camera Conversion switching
+- Before/After split comparison
+- Video playback, rate control, and scrubbing
+- Local export to a user-selected folder
+- Sidecar JSON saved with exported media
+
+No account, cloud sync, subscription, or AI generation is required. Open your material, make a color decision, and export the result from your Mac.

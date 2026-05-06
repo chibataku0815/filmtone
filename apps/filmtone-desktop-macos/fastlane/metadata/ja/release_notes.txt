@@ -1,0 +1,1 @@
+macOS向けのネイティブ版として、動画と写真のプレビュー、Look調整、Source Profile切り替え、Before/After比較、ローカル書き出し、sidecar JSON保存に対応しました。

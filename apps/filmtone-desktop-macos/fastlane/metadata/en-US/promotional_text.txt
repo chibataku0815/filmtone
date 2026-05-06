@@ -1,0 +1,1 @@
+Edit film color on Mac with Looks, Source Profile, Quick controls, Before/After compare, and local export with sidecar JSON.
