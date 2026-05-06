@@ -48,8 +48,8 @@ if pm and pm.SaveProject then
 end
 
 print("fixed_timeline=" .. tostring(timeline:GetName()))
-print("before_track=V2 PositionY=-376")
-print("after_track=V3 PositionY=376")
+print("before_track=V2 Tilt=376")
+print("after_track=V3 Tilt=-376")
 local function fmt(value)
     if value == nil then return "nil" end
     return tostring(value)

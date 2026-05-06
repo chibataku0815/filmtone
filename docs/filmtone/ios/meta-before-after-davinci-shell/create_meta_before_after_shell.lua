@@ -84,9 +84,9 @@ local function set_item_property(item, key, value)
     return false
 end
 
-local function set_clip_vertical_position(item, value)
-    set_item_property(item, "PositionY", value)
-    set_item_property(item, "Tilt", value)
+local function set_clip_vertical_position(item, tilt_value)
+    set_item_property(item, "PositionY", -tilt_value)
+    set_item_property(item, "Tilt", tilt_value)
 end
 
 local resolve = Resolve()
@@ -169,12 +169,12 @@ local before_item = first_value(before_items)
 local after_item = first_value(after_items)
 
 if before_item then
-    set_clip_vertical_position(before_item, -376)
+    set_clip_vertical_position(before_item, 376)
     set_item_property(before_item, "ZoomX", 1)
     set_item_property(before_item, "ZoomY", 1)
 end
 if after_item then
-    set_clip_vertical_position(after_item, 376)
+    set_clip_vertical_position(after_item, -376)
     set_item_property(after_item, "ZoomX", 1)
     set_item_property(after_item, "ZoomY", 1)
 end
