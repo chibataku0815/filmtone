@@ -727,16 +727,16 @@ xcodebuild -workspace apps/capacitor-film-lab-ios/ios/App/App.xcworkspace -schem
 - 新 Swift ファイル 2 件（`FilmtoneCreativeLutMath.swift`, `FilmtoneCubeWriter.swift`）は pbxproj 4-section 全部に登録（`grep -c <ファイル名> ios/App/App.xcodeproj/project.pbxproj` ≥ 4）
 - DTO に追加しない（facade chain 経由）
 - Vocabulary gate: JP `短尺動画` 禁止 / EN `short-form video` 禁止
-- 既存 untracked 4 docs (`docs/filmtone/ios/filmtone-connect-*` 3 件 + 既存 `docs/guides/2026-04-30-filmtone-ios-v1.3-release-prep-handoff.md`) を触らない
+- 既存 untracked 4 docs (`docs/filmtone/ios/archive/legacy-handoffs-2026-04-20-to-2026-05-03/filmtone-connect-*` 3 件 + 既存 `docs/guides/2026-04-30-filmtone-ios-v1.3-release-prep-handoff.md`) を触らない
 - DaVinci spike worktree (`feature/filmtone-davinci-connect-package`) のコードに依存しない設計（Phase F の merge までは独立 build）
 
 ---
 
 ## 12. 関連ドキュメント
 
-- `docs/filmtone/ios/filmtone-connect-davinci-overall-plan-2026-04-30-jst.md` — DaVinci Connect 全体計画（Phase 1 で combined-color.cube が必要）
-- `docs/filmtone/ios/filmtone-connect-davinci-real-package-export-handoff-2026-04-30-jst.md` — Phase 1 ハンドオフ
-- `docs/filmtone/ios/filmtone-connect-for-davinci-feasibility-handoff-2026-04-29-jst.md` — PeekLut positioning pivot
+- `docs/filmtone/ios/archive/legacy-handoffs-2026-04-20-to-2026-05-03/filmtone-connect-davinci-overall-plan-2026-04-30-jst.md` — DaVinci Connect 全体計画（Phase 1 で combined-color.cube が必要）
+- `docs/filmtone/ios/archive/legacy-handoffs-2026-04-20-to-2026-05-03/filmtone-connect-davinci-real-package-export-handoff-2026-04-30-jst.md` — Phase 1 ハンドオフ
+- `docs/filmtone/ios/archive/legacy-handoffs-2026-04-20-to-2026-05-03/filmtone-connect-for-davinci-feasibility-handoff-2026-04-29-jst.md` — PeekLut positioning pivot
 - `docs/guides/2026-04-30-filmtone-ios-v1.3-release-prep-handoff.md` — v1.3 release prep（v1.4 はこの後着手）
 - `.claude/knowledge/patterns/2026-04-30-source-profile-fixture-pipeline.md` — Source Profile fixture テンプレート（同形で踏襲）
 - `.claude/knowledge/patterns/2026-04-30-ios-state-vs-wire-dto.md` — DTO vs facade chain 判断フロー

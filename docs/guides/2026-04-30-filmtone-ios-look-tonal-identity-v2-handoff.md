@@ -334,7 +334,7 @@ xcodebuild -workspace apps/capacitor-film-lab-ios/ios/App/App.xcworkspace -schem
 - `FilmtonePhase0Generated.swift` 手動編集禁止 (generator 経由のみ)
 - silent fallback 禁止 (CLAUDE.md §11 `feedback_no_fallback_bug_hotbed`)
 - Vocabulary gate: JP `短尺動画` 禁止 / EN `short-form video` 禁止
-- 既存 untracked 4 docs (`docs/filmtone/ios/filmtone-connect-davinci-*` 3 件 + `docs/guides/2026-04-30-filmtone-ios-v1.3-release-rail-resume-handoff.md`) は触らない
+- 既存 untracked 4 docs (`docs/filmtone/ios/archive/legacy-handoffs-2026-04-20-to-2026-05-03/filmtone-connect-davinci-*` 3 件 + `docs/guides/2026-04-30-filmtone-ios-v1.3-release-rail-resume-handoff.md`) は触らない
 - DaVinci spike worktree (`feature/filmtone-davinci-connect-package`) のコードに依存しない
 
 ---
@@ -427,7 +427,7 @@ handoff doc を最初に通読してから着手してください (§5 で何�
 ## 11. 関連 doc references
 
 - `docs/guides/2026-04-30-filmtone-ios-creative-lut-export-feasibility-handoff.md` — original feasibility (LUT export は v1.4.x/v1.5 で再開)
-- `docs/filmtone/ios/filmtone-connect-davinci-overall-plan-2026-04-30-jst.md` — v1.5+ 全体計画
+- `docs/filmtone/ios/archive/legacy-handoffs-2026-04-20-to-2026-05-03/filmtone-connect-davinci-overall-plan-2026-04-30-jst.md` — v1.5+ 全体計画
 - `apps/capacitor-film-lab-ios/CLAUDE.md` §1 運用原則 / §5 不変条件 / §13 Built-in Catalog
 - `packages/film-lab-core/src/presets.ts` — 10 film stock の Phase0 params (新チャットの reference)
 - `packages/film-lab-core/src/look-ids.ts` — `IOS_PRESET_VERSION` 追加済み

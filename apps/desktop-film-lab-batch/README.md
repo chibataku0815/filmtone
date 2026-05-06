@@ -46,7 +46,7 @@ download/update rail now points to Native Desktop v1.4.
 
 Desktop の **配布ファイル名** と **更新通知の版数** は、どちらも `package.json` の `version` を正本にします。
 
-> 最新版・次版を言う前に、必ず [`../../docs/filmtone-release-version-sources.md`](../../docs/filmtone-release-version-sources.md) の確認順を通します。古い `life` handoff や Web release notes だけから版番号を推測しないでください。
+> 最新版・次版を言う前に、必ず [`../../docs/filmtone/filmtone-release-version-sources.md`](../../docs/filmtone/filmtone-release-version-sources.md) の確認順を通します。古い `life` handoff や Web release notes だけから版番号を推測しないでください。
 
 1. `apps/desktop-film-lab-batch/package.json` の `version` を上げる
 2. `RELEASE_NOTES-v<version>.md` を用意または更新する

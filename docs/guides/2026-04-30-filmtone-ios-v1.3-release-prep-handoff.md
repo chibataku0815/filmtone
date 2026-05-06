@@ -140,7 +140,7 @@ v1.3 makes Filmtone usable from first launch. Five built-in Filmtone Looks — i
 - **JP**: `短尺動画` 禁止。`動画` を使う。
 - **EN**: `short-form video` / `short-form clips` / `short clips` 禁止。`video` / `videos` / `footage` / `clip` を使う。
 - App Store description.txt は無変更（v1.2 + cap）。
-- Filmtone Connect for DaVinci の non-claim ガード（`docs/filmtone/ios/filmtone-connect-davinci-overall-plan-2026-04-30-jst.md` §6 Gate E）：「complete recreation」「DaVinci replacement」「all Filmtone effects editable in Resolve」を release notes に書かない（今は問題なし、`feature/filmtone-davinci-connect-package` ブランチ向け）。
+- Filmtone Connect for DaVinci の non-claim ガード（`docs/filmtone/ios/archive/legacy-handoffs-2026-04-20-to-2026-05-03/filmtone-connect-davinci-overall-plan-2026-04-30-jst.md` §6 Gate E）：「complete recreation」「DaVinci replacement」「all Filmtone effects editable in Resolve」を release notes に書かない（今は問題なし、`feature/filmtone-davinci-connect-package` ブランチ向け）。
 
 ---
 
@@ -211,7 +211,7 @@ ASC submit 前 smoke：
 - 新 `.swift` ファイル追加時は pbxproj 4 セクション全部に登録（`grep -c <ファイル名> ios/App/App.xcodeproj/project.pbxproj` ≥ 4）
 - Custom Codable は extension に書く（synthesized memberwise init 維持）
 - ASC 関連 env var (`ASC_KEY_ID` / `ASC_ISSUER_ID` / `ASC_KEY_CONTENT` or `ASC_KEY_PATH`) はコミット禁止
-- DaVinci 3 untracked handoff docs（`docs/filmtone/ios/filmtone-connect-*`）を commit / move / delete しない
+- DaVinci 3 untracked handoff docs（`docs/filmtone/ios/archive/legacy-handoffs-2026-04-20-to-2026-05-03/filmtone-connect-*`）を commit / move / delete しない
 - `--no-verify` / `--no-gpg-sign` 禁止（user 明示承認時のみ）
 - Push は明示承認後のみ
 - Vocabulary gate: JP `短尺動画` 禁止 / EN `short-form video` 禁止

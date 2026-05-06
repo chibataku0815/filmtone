@@ -1,10 +1,11 @@
 # Filmtone AI Scene Pick Validation Handoff
 
 Last updated: 2026-04-20
-Primary repo: `/Volumes/SamsungPortableSSDX5001/documents/forestone/chibatakumi-portfolio`
+Primary repo at handoff time: `/Volumes/SamsungPortableSSDX5001/documents/forestone/chibatakumi-portfolio`
+Current implementation repo: `/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone`
 Branch at handoff time: `feature/webgpu-migration-v1`
 Latest feature commit already created for heuristic recommendation work: `db8cfdf52e1c9a6e0a44f5415992e78260cd68f2`
-Related existing handoff: [scene-aware-optical-finish-handoff-2026-04-20.md](/Volumes/SamsungPortableSSDX5001/documents/forestone/chibatakumi-portfolio/apps/desktop-film-lab-batch/docs/scene-aware-optical-finish-handoff-2026-04-20.md)
+Related existing handoff: [scene-aware-optical-finish-handoff-2026-04-20.md](./scene-aware-optical-finish-handoff-2026-04-20.md)
 
 ## 1. Why This New Handoff Exists
 
@@ -41,7 +42,7 @@ Current implementation status:
 
 Read the prior handoff before coding anything:
 
-- [scene-aware-optical-finish-handoff-2026-04-20.md](/Volumes/SamsungPortableSSDX5001/documents/forestone/chibatakumi-portfolio/apps/desktop-film-lab-batch/docs/scene-aware-optical-finish-handoff-2026-04-20.md)
+- [scene-aware-optical-finish-handoff-2026-04-20.md](./scene-aware-optical-finish-handoff-2026-04-20.md)
 
 ## 3. Final Product Judgment From The User
 
@@ -275,7 +276,7 @@ The UI only needs to be good enough to evaluate:
 
 Read:
 
-- [scene-aware-optical-finish-handoff-2026-04-20.md](/Volumes/SamsungPortableSSDX5001/documents/forestone/chibatakumi-portfolio/apps/desktop-film-lab-batch/docs/scene-aware-optical-finish-handoff-2026-04-20.md)
+- [scene-aware-optical-finish-handoff-2026-04-20.md](./scene-aware-optical-finish-handoff-2026-04-20.md)
 - this document
 
 ### Step 2
@@ -461,11 +462,11 @@ Paste the following as the opening prompt in the next chat.
 ```text
 Read these two handoff documents first and treat them as the authoritative context:
 
-1. /Volumes/SamsungPortableSSDX5001/documents/forestone/chibatakumi-portfolio/apps/desktop-film-lab-batch/docs/scene-aware-optical-finish-handoff-2026-04-20.md
-2. /Volumes/SamsungPortableSSDX5001/documents/forestone/chibatakumi-portfolio/apps/desktop-film-lab-batch/docs/ai-scene-pick-validation-handoff-2026-04-20.md
+1. /Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone/apps/desktop-film-lab-batch/docs/scene-aware-optical-finish-handoff-2026-04-20.md
+2. /Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone/apps/desktop-film-lab-batch/docs/ai-scene-pick-validation-handoff-2026-04-20.md
 
 Repo:
-/Volumes/SamsungPortableSSDX5001/documents/forestone/chibatakumi-portfolio
+/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone
 
 Current branch at prior handoff:
 feature/webgpu-migration-v1
@@ -528,4 +529,3 @@ The next chat should behave as if the question is:
 “Can AI remove the need for the user to choose the representative scene by eye, using the smallest possible PoC built on top of the already-working heuristic recommendation system?”
 
 That is the highest-value next step.
-

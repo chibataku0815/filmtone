@@ -300,7 +300,7 @@ All access dates: 2026-04-24.
 - [FFmpeg Trac #6132 — SMPTE 2084 support in colorspace filter](https://trac.ffmpeg.org/ticket/6132) — confirms `colorspace` filter does not handle transfer; reinforces the "zscale is mandatory for PQ linearization" position.
 - [libplacebo options documentation](https://libplacebo.org/options/) — authoritative list of `tonemapping` values including `bt.2390` (spline), `spline`, `mobius`.
 - [Tony Tascioglu Wiki — AV1 encoding with HDR to SDR tonemapping](https://wiki.tonytascioglu.com/scripts/ffmpeg/av1_hdr_sdr) — alternate practical recipe; useful sanity check on filter ordering.
-- [Gemini CLI synthesis (2026-04-24, model: gemini-2.5-pro)](internal) — confirms 2026-current "prefer libplacebo when available" community consensus. Cross-verified against the zscale / libplacebo / tonemap docs above.
+- Gemini CLI synthesis (2026-04-24, model: gemini-2.5-pro) — confirms 2026-current "prefer libplacebo when available" community consensus. Cross-verified against the zscale / libplacebo / tonemap docs above.
 
 ### Cited but not used
 

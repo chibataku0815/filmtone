@@ -39,9 +39,9 @@
 ### Untracked files（next chat でも触らない）
 
 ```
-?? docs/filmtone/ios/filmtone-connect-davinci-overall-plan-2026-04-30-jst.md
-?? docs/filmtone/ios/filmtone-connect-davinci-real-package-export-handoff-2026-04-30-jst.md
-?? docs/filmtone/ios/filmtone-connect-for-davinci-feasibility-handoff-2026-04-29-jst.md
+?? docs/filmtone/ios/archive/legacy-handoffs-2026-04-20-to-2026-05-03/filmtone-connect-davinci-overall-plan-2026-04-30-jst.md
+?? docs/filmtone/ios/archive/legacy-handoffs-2026-04-20-to-2026-05-03/filmtone-connect-davinci-real-package-export-handoff-2026-04-30-jst.md
+?? docs/filmtone/ios/archive/legacy-handoffs-2026-04-20-to-2026-05-03/filmtone-connect-for-davinci-feasibility-handoff-2026-04-29-jst.md
 ?? docs/guides/2026-04-30-filmtone-ios-creative-lut-export-feasibility-handoff.md
 ```
 
