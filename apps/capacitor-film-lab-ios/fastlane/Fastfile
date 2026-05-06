@@ -16,6 +16,7 @@ METADATA_TEMPLATE_PATH = File.join(FASTLANE_DIR, "metadata")
 GENERATED_PATH = File.join(FASTLANE_DIR, ".generated")
 SCREENSHOT_CACHE_ROOT = File.expand_path("~/Library/Caches/tools.fastlane")
 SCREENSHOT_CACHE_PATH = File.join(SCREENSHOT_CACHE_ROOT, "screenshots")
+METADATA_LOCALES = ["ja", "en-US", "en-GB"].freeze
 SCREENSHOT_LOCALES = ["ja", "en-US"].freeze
 SCREENSHOT_FILE_SUFFIXES = [
   "01_source_loaded_preview",
@@ -134,14 +135,14 @@ def read_text_if_present(path)
 end
 
 def localized_release_note_texts
-  {
-    "ja" => read_text_if_present(File.join(METADATA_TEMPLATE_PATH, "ja", "release_notes.txt")),
-    "en-US" => read_text_if_present(File.join(METADATA_TEMPLATE_PATH, "en-US", "release_notes.txt")),
-  }.compact
+  METADATA_LOCALES.each_with_object({}) do |locale, memo|
+    text = read_text_if_present(File.join(METADATA_TEMPLATE_PATH, locale, "release_notes.txt"))
+    memo[locale] = text if text
+  end
 end
 
 def localized_metadata_texts(filename)
-  SCREENSHOT_LOCALES.each_with_object({}) do |locale, memo|
+  METADATA_LOCALES.each_with_object({}) do |locale, memo|
     text = read_text_if_present(File.join(METADATA_TEMPLATE_PATH, locale, filename))
     memo[locale] = text if text
   end
@@ -170,7 +171,7 @@ def stage_metadata!
   FileUtils.mkdir_p(staged_path)
   FileUtils.cp_r(Dir.glob(File.join(METADATA_TEMPLATE_PATH, "*")), staged_path)
 
-  %w[ja en-US].each do |locale|
+  METADATA_LOCALES.each do |locale|
     locale_dir = File.join(staged_path, locale)
     FileUtils.mkdir_p(locale_dir)
     File.write(File.join(locale_dir, "marketing_url.txt"), "#{marketing_url_for(locale)}\n")
@@ -272,7 +273,7 @@ def app_review_information!
     demo_user: normalized_env("REVIEW_DEMO_USER"),
     demo_password: normalized_env("REVIEW_DEMO_PASSWORD"),
     notes: normalized_env("REVIEW_NOTES") ||
-      "Filmtone is local-first. Review the flow by importing a photo or video, choosing a preset, adjusting Quick controls, optionally applying Camera Profile and Film Look LUTs, then exporting and saving to Photos. No login, subscription, AI generation, or cloud sync is required.",
+      "Filmtone is local-first. Review the flow by importing a photo or video, choosing a Look, adjusting Quick controls, optionally applying Source Profile and Film Look LUTs, then exporting and saving to Photos. No login, subscription, AI generation, or cloud sync is required.",
   }.compact
 end
 

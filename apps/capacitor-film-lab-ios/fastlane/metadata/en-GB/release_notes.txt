@@ -1,0 +1,1 @@
+This update adds highlight marker export flow foundations, a Desktop handoff sheet for videos longer than five minutes, user-initiated cache release, proactive low-disk cleanup, Look and Backlight Veil max-merge parity with macOS, and reorganised App Store metadata for film grade, LUT, colour, photo, and video discovery.

@@ -1,1 +1,1 @@
-video,photo,filter,prores,hdr,p3,log,cube,preset,bloom,grain,halation,look
+prores,hdr,p3,log,cube,preset,bloom,grain,halation,vintage,retro,vlog,photo,video

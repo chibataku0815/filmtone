@@ -1,1 +1,1 @@
-Color grading, local export
+Color Grade, Compare, Export

@@ -1,0 +1,9 @@
+Filmtone is an iPhone editor for choosing a film grade, tuning colour correction, shaping soft glow and grain, then exporting locally to save or share. Pick media, apply a built-in finish, adjust brightness, contrast, and saturation with Quick controls, compare before/after, and finish without leaving your iPhone.
+
+Use Filmtone when the built-in editor feels too plain, but opening a full timeline-based video editing app feels too heavy. It is made for deciding a colour direction, checking the result, and exporting from iPhone without turning a simple finish into a large editing session.
+
+The editor is a full-screen Liquid Glass workspace. Preview stays at the centre, while the bottom rail gives you a direct flow: choose a finish, adjust how strongly it applies, and check the result right away.
+
+For more control, Filmtone supports two .cube LUT slots: Source Profile and Film Look. Source Profile is for input-side handling such as Apple Log, Apple Log 2, S-Log3, V-Log, and Rec.709. Film Look is for the final colour treatment. When you use camera-originated Log material or your own .cube LUT, you can keep the input transform and the finishing colour separate.
+
+Use Filmtone for daily footage, travel footage, social posts, covers, thumbnails, LUT-based colour correction, and camera-originated Log workflows that still need to stay lightweight.
