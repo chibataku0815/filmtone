@@ -217,6 +217,29 @@ Recommended primary format:
 - SDR Rec.709 target for social delivery unless the user explicitly wants an HDR
   experiment.
 
+## Companion DaVinci Shell Assets
+
+This repository now includes a placeholder Resolve starter shell:
+
+```text
+docs/filmtone/ios/meta-before-after-davinci-shell/
+```
+
+Contents:
+
+- `layout_background_9x16.png` and `layout_background_9x16_15s.mp4`
+- `before_horizontal_placeholder.png` and `before_horizontal_placeholder_15s.mp4`
+- `after_horizontal_placeholder.png` and `after_horizontal_placeholder_15s.mp4`
+- `create_meta_before_after_shell.lua`
+- `fix_current_shell_layout.lua`
+
+Use these only as production scaffolding. They are not final ad creative. The Lua
+script creates a 1080 x 1920, 30 fps, 15-second stacked Before/After timeline
+with bins and markers, so the next chat can move directly into replacing
+placeholders with the user's real footage and copy. The optional fix script
+corrects an already open shell timeline to the current Before-top / After-bottom
+layout.
+
 ## DaVinci Resolve Support Scope
 
 The next chat should help with concrete Resolve actions such as:
