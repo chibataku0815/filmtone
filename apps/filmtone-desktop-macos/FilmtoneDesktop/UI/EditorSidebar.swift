@@ -28,17 +28,25 @@ struct EditorSidebar: View {
     var exportCoordinator: ExportCoordinator
 
     var body: some View {
-        GlassEffectContainer(spacing: 16) {
-            ScrollView(.vertical, showsIndicators: true) {
-                EditorPanelStack(
-                    state: state,
-                    library: library,
-                    exportCoordinator: exportCoordinator
-                )
-                .frame(maxWidth: .infinity)
-            }
+        // M8: macOS 26 `GlassEffectContainer` was found to consume hit-test
+        // events in the lower portion of the rail when video sources were
+        // loaded — the morphing-between-glass-surfaces behavior installs an
+        // NSView-backed surface that reads as part of the AppKit responder
+        // chain and SwiftUI `.zIndex(2)` cannot reorder past it. Per-panel
+        // `.glassEffect` (`EditorSidebarPanelGlass` modifier in
+        // `EditorPanelStack` below) is innocent and renders independently.
+        // Trade-off: panels no longer morph into adjacent panels, but each
+        // remains a discrete Liquid Glass capsule with full hit testing.
+        ScrollView(.vertical, showsIndicators: true) {
+            EditorPanelStack(
+                state: state,
+                library: library,
+                exportCoordinator: exportCoordinator
+            )
+            .frame(maxWidth: .infinity)
         }
         .frame(width: 320)
+        .contentShape(Rectangle())
     }
 }
 
@@ -52,9 +60,6 @@ struct EditorPanelStack: View {
             if state.sourceURL != nil {
                 SourceProfileControls(state: state)
                     .modifier(EditorSidebarPanelGlass())
-                // M5-K2: Look + strength now live as one block inside
-                // `LookLibraryControls`. The standalone `GradeControls`
-                // panel was removed.
                 LookLibraryControls(state: state, library: library)
                     .modifier(EditorSidebarPanelGlass())
                 QuickAdjustControls(state: state)

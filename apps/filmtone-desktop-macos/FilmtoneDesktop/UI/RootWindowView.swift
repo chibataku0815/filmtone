@@ -29,6 +29,7 @@ struct RootWindowView: View {
     // and source changes via `@AppStorage` so the user's last preference
     // holds. Default true: landscape opens with the inspector visible.
     @AppStorage("editorSidebarOpen") private var sidebarOpen: Bool = true
+    @State private var openPanelPresented: Bool = false
     // M5-M.3: portrait summoned right-rail slide-in. Default false so a
     // freshly opened portrait clip shows full media unobstructed; ⌘\ slides
     // the rail in from the trailing edge and dismisses it. Reuses the same
@@ -174,10 +175,23 @@ struct RootWindowView: View {
                 Button {
                     exportCoordinator.presentExportPanel(for: state)
                 } label: {
+                    // `square.and.arrow.up`'s arrow protrudes above the
+                    // square, giving the SF Symbol a taller intrinsic
+                    // bounding box than `folder` / `rectangle.split.2x1` /
+                    // `sidebar.right`. Left at default scale the toolbar
+                    // pill auto-sized taller and Liquid Glass sampled a
+                    // larger area, making Export visibly bigger and
+                    // brighter than its neighbours. `.imageScale(.small)`
+                    // shrinks just this symbol so the four pills match.
                     Label("Export", systemImage: "square.and.arrow.up")
+                        .imageScale(.small)
                 }
                 .keyboardShortcut("e", modifiers: .command)
-                .buttonStyle(.glassProminent)
+                // Match the other toolbar items' `.glass` posture. The
+                // `.glassProminent` accent fill extended its tint past the
+                // pill outline, making Export visibly bleed against its
+                // neighbours.
+                .buttonStyle(.glass)
                 .disabled(exportDisabled)
                 .help(exportHelpText)
                 .filmtonePointingHandCursor(!exportDisabled)
@@ -199,6 +213,10 @@ struct RootWindowView: View {
                 }
                 .keyboardShortcut("\\", modifiers: .command)
                 .buttonStyle(.glass)
+                // No source = nothing to inspect; mirror Compare / Export
+                // disabled posture so the empty state cannot summon an
+                // inspector with no content.
+                .disabled(state.sourceURL == nil)
                 // M5-M.3 follow-up: static help text. The previous
                 // `inspectorVisible ? "Hide..." : "Show..."` ternary forced
                 // the Label / .help to recompute on every ⌘\ press, which
@@ -206,7 +224,7 @@ struct RootWindowView: View {
                 // re-sampling as the rail slid in — read as flicker on
                 // each toggle. A single phrasing carries both intents.
                 .help("Show / Hide editing panel (⌘\\)")
-                .filmtonePointingHandCursor()
+                .filmtonePointingHandCursor(state.sourceURL != nil)
             }
         }
     }
@@ -219,9 +237,11 @@ struct RootWindowView: View {
     //   - Portrait: `editorPortraitInspectorOpen` (default false). Rail
     //     starts hidden so the loaded portrait clip is fully visible; ⌘\
     //     summons and dismisses with a `.move(edge: .trailing)` slide.
-    // The rail's bottom edge sits above the floating scrub bar capsule
-    // (driven by `sidebarBottomPadding`) so the inspector never covers the
-    // scrub bar — the user can scrub while the inspector is summoned.
+    // The rail extends to the window bottom (only a 24pt breathing inset).
+    // The floating scrub bar capsule shrinks horizontally when the
+    // inspector is open so the rail and scrub bar live side-by-side
+    // instead of stacking vertically — the user can scrub while every
+    // panel including Export is reachable.
     // Window aspect is locked to source aspect for both, so the only pixels
     // the loaded backdrop ever covers are the rare letterbox residual from
     // the snap-to-aspect resize, filled by `PreviewSurface`'s solid
@@ -242,8 +262,7 @@ struct RootWindowView: View {
                 paramOverrides: state.renderParamOverrides,
                 opticalFilterProfileId: state.opticalFilterProfileId,
                 opticalFilterIntensity: state.opticalFilterIntensity,
-                compareEnabled: state.isCompareEnabled,
-                onOpenRequested: { presentOpenPanel() }
+                compareEnabled: state.isCompareEnabled
             )
             .ignoresSafeArea(.container, edges: .all)
             // Right-rail inspector. Same `EditorSidebar` for both portrait
@@ -267,22 +286,23 @@ struct RootWindowView: View {
                 // partially-transparent rail mid-animation. The slide alone
                 // hides the rail at the trailing edge, which is enough.
                 .transition(.move(edge: .trailing))
+                // M8: the scrub overlay is a bottom-aligned full-window
+                // layout container. Keep the inspector above that container
+                // so transparent scrub padding can never steal taps from
+                // controls that are visibly inside the right rail.
+                .zIndex(2)
             }
             // M5-A.3 + F4: scrub bar floats above the window bottom edge.
-            // The inspector's bottom edge clears the scrub bar via
-            // `sidebarBottomPadding`, so the scrub bar stays usable while
-            // the inspector is open — no width-shrink or visibility change
-            // on the scrub bar itself.
+            // When the inspector is open, the scrub bar reserves a right
+            // gutter equal to the rail footprint (320 width + 12 trailing
+            // pad) so it shrinks horizontally to live alongside the rail.
+            // Both surfaces remain fully usable simultaneously and the
+            // rail no longer needs vertical clearance above the scrub bar.
             if state.sourceKind == .video,
                let duration = state.videoDurationSeconds,
                duration > 0 {
-                VStack {
-                    Spacer()
-                    VideoScrubBar(state: state, duration: duration)
-                        .padding(.horizontal, isPortraitSource ? 12 : 0)
-                        .padding(.bottom, scrubBarBottomPadding)
-                }
-                .frame(maxWidth: .infinity)
+                videoScrubOverlay(duration: duration)
+                    .zIndex(1)
             }
         }
         // M5-M.3 follow-up: single animation hook on the resolved
@@ -295,17 +315,64 @@ struct RootWindowView: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: inspectorVisible)
     }
 
-    // Inspector bottom inset. When a video is loaded the rail's bottom
-    // edge must clear the floating 2-row scrub bar capsule so the user
-    // can scrub while the inspector is summoned, with a generous
-    // breathing band so the bottom-most panel (Export) doesn't visually
-    // bleed into the scrub bar. Portrait uses a tighter inset because the
-    // scrub bar itself sits closer to the window bottom
-    // (`scrubBarBottomPadding` = 24 portrait, 64 landscape).
-    private var sidebarBottomPadding: CGFloat {
-        guard state.sourceKind == .video else { return 24 }
-        return isPortraitSource ? 160 : 200
+    // M8 follow-up: the previous structure used a top `Spacer(minLength: 0)
+    // .allowsHitTesting(false)` to push the scrub strip to the bottom of a
+    // full-window VStack. In practice SwiftUI on macOS 26 still claimed
+    // mouse events in the Spacer's y-range — likely because Spacer in a
+    // .frame(maxHeight:.infinity) container picks up the whole vertical
+    // band as its layout extent and hit testing then resolves to the
+    // VStack rather than falling through. The visible symptom: chips in
+    // the right rail's lower half stopped responding when scrolled into
+    // that band, and only worked when scrolled back above it.
+    //
+    // The fix: drop the Spacer. The VStack now hugs its scrub-strip
+    // content (scrub bar height + bottom padding only); the outer
+    // `.frame(maxHeight: .infinity, alignment: .bottom)` anchors that
+    // content to the window bottom without filling the upper space with
+    // a hit-claiming layout box. The empty area above the strip is pure
+    // layout — no SwiftUI content there — so hits in the rail's lower
+    // half pass through to the inspector at .zIndex(2).
+    @ViewBuilder
+    private func videoScrubOverlay(duration: Double) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                Spacer(minLength: 0)
+                    .allowsHitTesting(false)
+                VideoScrubBar(state: state, duration: duration)
+                    .padding(.horizontal, isPortraitSource ? 12 : 0)
+                Spacer(minLength: 0)
+                    .allowsHitTesting(false)
+            }
+            // Right inset the width of the inspector footprint so the
+            // scrub bar centers within the area to the left of the rail
+            // when the inspector is open. Applying this as `.padding`
+            // rather than a `Color.clear` sibling keeps the HStack at its
+            // intrinsic (scrub bar) height — `Color.clear.frame(width:)`
+            // leaves height unconstrained and would expand the row to
+            // fill the whole window, lifting the scrub bar to vertical
+            // center.
+            .padding(.trailing, inspectorVisible ? inspectorReservedWidth : 0)
+            if scrubBarBottomPadding > 0 {
+                Color.clear
+                    .frame(height: scrubBarBottomPadding)
+                    .allowsHitTesting(false)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
     }
+
+    // Inspector bottom inset. The rail extends to near the window bottom
+    // regardless of source kind — the floating scrub bar capsule shrinks
+    // horizontally (`videoScrubOverlay` reserves a right gutter of
+    // `inspectorReservedWidth` when the inspector is open) so the rail
+    // no longer needs vertical clearance above it. The 24pt inset gives
+    // the bottom-most panel a breathing band against the window edge.
+    private var sidebarBottomPadding: CGFloat { 24 }
+
+    // Width reserved on the right edge of `videoScrubOverlay` for the
+    // inspector when it's open: `EditorSidebar` is 320pt wide and is
+    // mounted with a 12pt trailing pad in `editorOverlayLayout`.
+    private var inspectorReservedWidth: CGFloat { 320 + 12 }
 
     // Scrub bar bottom inset. Portrait clips lift the capsule slightly
     // closer to the media bottom so it doesn't float in dead space below
@@ -337,6 +404,7 @@ struct RootWindowView: View {
     }
 
     private func presentOpenPanel() {
+        guard !openPanelPresented else { return }
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.image, .movie, .quickTimeMovie, .mpeg4Movie]
         panel.allowsMultipleSelection = false
@@ -344,11 +412,29 @@ struct RootWindowView: View {
         panel.canChooseFiles = true
         panel.prompt = "Open"
         panel.message = "Choose a still image or short video to preview"
-        if panel.runModal() == .OK, let url = panel.url {
-            let kind = detectSourceKind(of: url)
-            state.setSource(url, kind: kind)
-            resizeWindowToSourceAspect(url: url, kind: kind)
+
+        openPanelPresented = true
+        let targetWindow = hostingWindow ?? NSApp.keyWindow ?? NSApp.mainWindow
+        NSApp.activate(ignoringOtherApps: true)
+        if let targetWindow {
+            targetWindow.makeKeyAndOrderFront(nil)
         }
+        // Window-attached sheets can become invisible on the transparent
+        // full-size Liquid Glass window while still disabling the app. Present
+        // the picker as an app-modal panel and explicitly raise it instead.
+        panel.level = .modalPanel
+        panel.center()
+        panel.begin { response in
+            completeOpenPanel(response: response, url: panel.url)
+        }
+    }
+
+    private func completeOpenPanel(response: NSApplication.ModalResponse, url: URL?) {
+        openPanelPresented = false
+        guard response == .OK, let url else { return }
+        let kind = detectSourceKind(of: url)
+        state.setSource(url, kind: kind)
+        resizeWindowToSourceAspect(url: url, kind: kind)
     }
 
     private func resizeWindowToSourceAspect(url: URL, kind: FilmtoneSourceKind) {

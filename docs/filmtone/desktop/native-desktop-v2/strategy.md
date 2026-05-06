@@ -49,6 +49,7 @@ content layer stays glass-free so color judgment is not compromised.
 | M4 | Shared Contract Consolidation | M3 | In progress | Shared Swift ownership is clear and iOS/macOS consume the same canonical contract where practical. |
 | M5 | Native Editing UI | M3 | Validation / thin fixes | Core editing workflows are usable and visually acceptable in the native UI. |
 | M6 | Release Cutover | M5 | Released 2026-05-05 | Public update metadata reports Desktop `1.4`, and the fixed Desktop download rail points to the notarized Native DMG. |
+| M7 | Native Desktop v1.5 Release | M6 | Local prep / external release blocked | Desktop `1.5` release files and local verification are ready; signing, notarization, DMG packaging, upload, and public update-meta switch still require explicit release action. |
 
 ## Current Strategic State
 
@@ -62,9 +63,13 @@ content layer stays glass-free so color judgment is not compromised.
   DHM / release-cutover interrupts, do not treat it as current M5-K state.
 - Public Desktop latest from truth script: `1.4` via update metadata.
 - iOS truth script reports separate public and local axes: public App Store
-  version `1.4`; local Xcode candidate `1.5` build `4`.
-- Native Desktop v2 public release: Desktop v1.4, aligned with the public iOS
-  generation while iOS local candidate work can move independently.
+  version `1.5`; local Xcode candidate `1.5` build `4`.
+- Native Desktop v2 public release remains Desktop v1.4. Desktop release truth
+  and iOS App Store truth are now separate public axes; rerun truth scripts
+  before making release/version claims.
+- Active Desktop task: M7 Native Desktop v1.5 Release. Local release prep and
+  verification are green; external signing/notarization/upload/public switch
+  have not been run.
 
 M1 and M2 are closed. M3 and M4 stay open for parity hardening and shared-core
 promotion, but they no longer block M5 UI validation. M5-C P0, M5-G
@@ -260,8 +265,13 @@ DaVinci dry-run plus Resolve smoke for `customData` and `Highlight_Auto`.
 the user clarified the desired order: parent branch correction, `main` merge,
 then release. The generated `Filmtone.app` and `Filmtone-1.4.dmg` were signed,
 notarized, stapled, and Gatekeeper accepted, and the DMG remains uploaded to
-Vercel Blob. Public update metadata and the download surface have been restored
-to the legacy Desktop rail (`latestVersion: "1.0.4"`).
+Vercel Blob. The temporary rollback to the legacy Desktop rail was later
+superseded by the clean Phase 9 release; current public update metadata reports
+`latestVersion: "1.4"`.
+
+2026-05-06: Truth refresh after the public iOS 1.5 propagation reports Desktop
+public latest `1.4`, iOS public App Store version `1.5`, and local Xcode
+candidate `1.5` build `4`. Keep Desktop and iOS public release axes separate.
 
 2026-05-05: DHM shared highlight marker MVP landed in isolated worktree
 `feature/shared-highlight-markers`: source-relative marker contract, iOS/Desktop
@@ -362,6 +372,48 @@ not deleted.
 2026-05-05: M6 source permanence finished: `feature/native-desktop-plan` was
 pushed, `main` was updated through merge commit `3ce0f1b0`, `desktop-v1.4` was
 tagged, and portfolio `vendor/filmtone` was bumped to that source state.
+
+2026-05-06: M7 Native Desktop v1.5 public release completed. Native Desktop
+`MARKETING_VERSION=1.5` / build `2`, `Filmtone-1.5.dmg` is signed, notarized,
+stapled, uploaded to Vercel Blob, and public update metadata reports
+`latestVersion: "1.5"`.
+
+2026-05-06: M8 inspector bottom hit-testing fix closed. Transparent scrub-bar
+overlay spacers no longer steal clicks from visible right-rail Quick controls;
+verification passed (`Verify/run.sh` 121/121, `verify:macos`, `git diff --check`).
+
+2026-05-06: M8 opening media picker foreground attempt closed. Empty-state and
+toolbar Open were routed through a guarded Filmtone-window sheet; verification
+passed, but visual QA later showed the transparent Liquid Glass window could
+hide that sheet while disabling the app.
+
+2026-05-06: M8 opening picker presentation fix closed. The sheet route was
+replaced with an explicitly-raised app-modal Open panel after the transparent
+Liquid Glass window hid sheets while disabling the app; verification passed and
+Computer Use confirmed the empty CTA opens the visible panel.
+
+2026-05-06: M8 right-rail lower-half hit dead zone closed. The macOS 26
+`GlassEffectContainer` wrapper around the inspector ScrollView claimed hits in
+the lower window y-band via its NSView-backed morphing surface, which SwiftUI
+`.zIndex(2)` could not reorder past. Removed the container; per-panel
+`.glassEffect` (`EditorSidebarPanelGlass` modifier) was innocent and remains
+in place — panels render as discrete Liquid Glass capsules instead of morphing
+into adjacent ones. Diagnostic chain ruled out AVPlayerView, videoScrubOverlay
+frame, then isolated container vs per-panel glass via Step 0c/0d. Visual
+parity confirmed with no glass regression and full hit coverage from rail
+top to bottom.
+
+2026-05-06: M8 right-rail bottom extension. `sidebarBottomPadding` no longer
+carves a 160/200pt clearance over the floating scrub bar — it returns 24pt
+for every source kind, so the inspector reaches the window bottom.
+`videoScrubOverlay` reserves a right gutter equal to the rail footprint
+(`inspectorReservedWidth` = 320 + 12) when the inspector is open, shrinking
+the scrub capsule horizontally so it lives alongside the rail instead of
+disappearing behind it. Reservation is applied as `.padding(.trailing, …)`
+on the scrub HStack rather than a `Color.clear` sibling because
+`Color.clear.frame(width:)` leaves vertical extent unconstrained and would
+expand the row to fill the window height, re-centering the scrub bar
+vertically.
 
 ## Constraints
 
