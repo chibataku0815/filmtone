@@ -1,4 +1,4 @@
-# Active — M5-M.3 Portrait inspector right-rail slide-in + 2-row scrub bar
+# Archive — M5-M.3 Portrait inspector right-rail slide-in + 2-row scrub bar
 
 Date opened: 2026-05-06 JST
 Milestone: `M5-M.3 Portrait inspector right-rail slide-in`
@@ -72,7 +72,7 @@ gate), Look / Quick / Export panel internals, optical filter families.
 - [x] `git diff --check` clean.
 - [x] `bash apps/filmtone-desktop-macos/Verify/run.sh` → 121/121 passed.
 - [x] `bun run verify:macos` → BUILD SUCCEEDED.
-- [ ] User visual smoke (Debug app):
+- [x] User visual smoke (Debug app, user-confirmed 2026-05-06 JST):
   - portrait clip — media fills window, no left/right black bars,
     inspector default-closed, ⌘\\ slides the rail in from the right,
     dismiss → media unobstructed
@@ -84,7 +84,7 @@ gate), Look / Quick / Export panel internals, optical filter families.
   - still — both portrait + landscape inspector behavior matches video
   - empty launch — branded plate + Liquid Glass field, compact
   - Backlight Veil chip + cursor still drive visible preview change
-- [ ] Archive this `active.md` to `archive/` and append a 1–3 line note
+- [x] Archive this `active.md` to `archive/` and append a 1–3 line note
   to `strategy.md` after visual smoke passes.
 
 ## Verification
@@ -98,6 +98,9 @@ bun run verify:macos
 Then open the Debug app
 (`apps/filmtone-desktop-macos/build/Build/Products/Debug/Filmtone.app`)
 and run the smoke list above.
+
+Visual smoke accepted by the user on 2026-05-06 JST; all remaining work for this
+active task is complete.
 
 ## Stop conditions
 

@@ -12,10 +12,11 @@ then work on the product surface.
 2. Run `git status --short --branch`.
 3. Open only the current target entry:
    - repo-wide context: `README.md`, then `CLAUDE.md` if policy details matter
-   - Desktop: `apps/desktop-film-lab-batch/` and `docs/filmtone/desktop/`
+   - Desktop: `apps/desktop-film-lab-batch/` and
+     `docs/filmtone/desktop/README.md`
    - Native Desktop v2:
-     `/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-native-desktop-plan/docs/filmtone/desktop/native-desktop-v2/strategy.md`,
-     then `active.md` in that dedicated worktree if present
+     `docs/filmtone/desktop/native-desktop-v2/strategy.md`, then `active.md`
+     in this repository if present
    - iOS: `apps/capacitor-film-lab-ios/CLAUDE.md`, then the exact Swift/TS
      surface
    - shared packages: the specific package under `packages/`
@@ -30,8 +31,8 @@ there directly after this file.
 
 | Request mentions | Start here | Primary check |
 |---|---|---|
-| Desktop, macOS, release, update metadata | `apps/desktop-film-lab-batch/` and `docs/filmtone/desktop/` | `bun run verify:desktop` |
-| Native Desktop v2, SwiftUI Desktop, macOS native app | `/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-native-desktop-plan/docs/filmtone/desktop/native-desktop-v2/strategy.md` and `active.md` | `bun run verify:macos` in the native worktree |
+| Desktop, macOS, release, update metadata | `apps/desktop-film-lab-batch/` and `docs/filmtone/desktop/README.md` | `bun run verify:desktop` |
+| Native Desktop v2, SwiftUI Desktop, macOS native app | `docs/filmtone/desktop/native-desktop-v2/strategy.md` and `active.md` if present | `bun run verify:macos` |
 | iOS, App Store, Xcode, TestFlight, Swift, Capacitor | `apps/capacitor-film-lab-ios/CLAUDE.md` | `bun run verify:ios` |
 | color math, presets, LUT, schema, Swift payload | `packages/film-lab-core/` | `bun run build:core` and relevant package tests |
 | renderer, WebGL, WebGPU, shader parity | `packages/film-lab-renderer/` | `bun run build:renderer` |
@@ -52,10 +53,11 @@ Portfolio is the public web window. It consumes this repo through
 
 Use the 2-layer model for long-running product lanes. For each project, propose
 the placement first. For Filmtone Native Desktop v2, the canonical placement is
-the dedicated worktree:
+now this repository; the former dedicated worktree was retired after the
+Desktop v1.4 replacement cutover:
 
 ```text
-/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-native-desktop-plan/docs/filmtone/desktop/native-desktop-v2/
+/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone/docs/filmtone/desktop/native-desktop-v2/
 ├── strategy.md
 ├── active.md
 ├── paused/
@@ -77,7 +79,7 @@ Documents:
 Rules:
 
 - Start Native Desktop v2 sessions by reading `strategy.md`, then `active.md` in
-  the dedicated worktree if present. If `active.md` is missing, propose the next
+  this repository if present. If `active.md` is missing, propose the next
   subtask and wait.
 - Do not implement without an `active.md`, and do not mix multiple subtasks into
   one `active.md`.
@@ -223,8 +225,7 @@ future chat needs.
 Preferred locations:
 
 - Desktop: `docs/filmtone/desktop/`
-- Native Desktop v2:
-  `/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-native-desktop-plan/docs/filmtone/desktop/native-desktop-v2/`
+- Native Desktop v2: `docs/filmtone/desktop/native-desktop-v2/`
 - iOS: `docs/filmtone/ios/`
 - Cross-cutting Filmtone docs: `docs/filmtone/`
 - life-level strategy or route docs:

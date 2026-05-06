@@ -30,9 +30,9 @@ prepare it for review/commit. Do not add new rendering features in this task.
 ## Read-Only References
 
 - `docs/filmtone/desktop/native-desktop-v2/strategy.md`
-- `docs/filmtone/desktop/native-desktop-transition-plan-2026-05-03-jst/01-current-state-and-decision.md`
-- `docs/filmtone/desktop/native-desktop-transition-plan-2026-05-03-jst/04-phase-plan.md`
-- `docs/filmtone/desktop/native-desktop-transition-plan-2026-05-03-jst/06-quality-gates-risks.md`
+- `docs/filmtone/desktop/archive/native-desktop-v2-legacy-2026-05-03/native-desktop-transition-plan-2026-05-03-jst/01-current-state-and-decision.md`
+- `docs/filmtone/desktop/archive/native-desktop-v2-legacy-2026-05-03/native-desktop-transition-plan-2026-05-03-jst/04-phase-plan.md`
+- `docs/filmtone/desktop/archive/native-desktop-v2-legacy-2026-05-03/native-desktop-transition-plan-2026-05-03-jst/06-quality-gates-risks.md`
 - iOS canonical color/optics sources under `apps/capacitor-film-lab-ios/ios/App/App/`
 - Desktop Look Unification status in the main checkout
 
@@ -65,10 +65,10 @@ session + new v2 docs untracked):
  M apps/filmtone-desktop-macos/FilmtoneDesktop/Export/FilmtoneStillExporter.swift
  M apps/filmtone-desktop-macos/FilmtoneDesktop/Export/FilmtoneVideoExporter.swift
  M apps/filmtone-desktop-macos/FilmtoneDesktop/UI/PreviewSurface.swift
- M docs/filmtone/desktop/filmtone-native-desktop-transition-plan-2026-05-03-jst.md
- M docs/filmtone/desktop/native-desktop-transition-plan-2026-05-03-jst/01-current-state-and-decision.md
- M docs/filmtone/desktop/native-desktop-transition-plan-2026-05-03-jst/04-phase-plan.md
- M docs/filmtone/desktop/native-desktop-transition-plan-2026-05-03-jst/06-quality-gates-risks.md
+ M docs/filmtone/desktop/archive/native-desktop-v2-legacy-2026-05-03/filmtone-native-desktop-transition-plan-2026-05-03-jst.md
+ M docs/filmtone/desktop/archive/native-desktop-v2-legacy-2026-05-03/native-desktop-transition-plan-2026-05-03-jst/01-current-state-and-decision.md
+ M docs/filmtone/desktop/archive/native-desktop-v2-legacy-2026-05-03/native-desktop-transition-plan-2026-05-03-jst/04-phase-plan.md
+ M docs/filmtone/desktop/archive/native-desktop-v2-legacy-2026-05-03/native-desktop-transition-plan-2026-05-03-jst/06-quality-gates-risks.md
 ?? docs/filmtone/desktop/native-desktop-v2/
 ```
 

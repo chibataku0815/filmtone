@@ -38,14 +38,14 @@ historical evidence; it is superseded by this final clean release.
 
 ## Final Truth
 
-Truth scripts run on 2026-05-05:
+Truth scripts latest rechecked on 2026-05-06:
 
 - Public Desktop latest: `1.4` from update metadata.
 - Native Desktop release version: `1.4`.
 - Local Native Desktop Bundle ID: `com.chibatakumi.film-lab-desktop`.
 - Local Native Desktop product name: `Filmtone`.
 - iOS public version: `1.4`.
-- iOS local marketing version: `1.4`.
+- iOS local Xcode candidate: `1.5` build `4`.
 
 The root `package.json` version belongs to the legacy Electron workspace and is
 not the Native Desktop release version source. Native Desktop release version is
@@ -55,7 +55,8 @@ read from `apps/filmtone-desktop-macos/FilmtoneDesktop.xcodeproj/project.pbxproj
 
 - Native Desktop v2 replaces the Electron Desktop product lane for macOS 26+
   users.
-- Electron Desktop `1.0.4` remains frozen legacy access for pre-macOS-26 users.
+- Legacy Electron Desktop source remains frozen for pre-macOS-26 access and
+  emergency rollback; it is not the current Desktop release version source.
 - The fixed public download page stays
   `https://www.chibatakumi.studio/film-lab/download`.
 - The fixed update metadata pathname stays
@@ -146,7 +147,7 @@ bun run release:upload-update-meta -- --confirm-prod --sync-vercel-env
 Then rerun:
 
 ```bash
-/Volumes/SamsungPortableSSDX5001/documents/life/scripts/check-filmtone-release-truth.sh /Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-native-desktop-plan
+/Volumes/SamsungPortableSSDX5001/documents/life/scripts/check-filmtone-release-truth.sh /Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone
 ```
 
 Actual after cutover:

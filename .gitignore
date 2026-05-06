@@ -43,6 +43,7 @@ apps/filmtone-desktop-macos/build/
 
 # Local agent / browser tooling (never commit)
 .playwright-cli/
+.claude/settings.local.json
 
 # Nested `git worktree` checkouts under this repo (do not add to parent index)
 .worktrees/

@@ -6,7 +6,8 @@ M5 lane (`docs/filmtone/desktop/native-desktop-v2/`) と並列で動く独立 la
 **Cutover direction (2026-05-04 確定)**: Native Desktop v2 は Electron Desktop
 (`apps/desktop-film-lab-batch`) の **単一置換後継**、並走しない。Bundle ID は
 `com.chibatakumi.film-lab-desktop` (Electron と同一、drop-in upgrade)、version
-は iOS と合わせて `1.4` から start (Electron 1.0.4 を semver で超える)。詳細決定 + Open
+は当時の public iOS generation に合わせて `1.4` から start。現在の iOS local
+candidate は truth script で別軸として確認する。詳細決定 + Open
 Questions: [`cutover-architecture.md`](cutover-architecture.md) (persistent
 reference doc、本 lane の決定 SSOT)。
 
@@ -52,7 +53,8 @@ Completion Log に短く反映する (本 lane の archive 経由で参照)。
 ## Operating rules
 
 - 本 lane の active.md は singleton (本 lane 内)。M5 lane の active.md と並走可。
-- 本 chat が commit を行う (user 委任、INV-7 はこの lane では override)。
+- Do not stage, commit, push, notarize, or bump the portfolio submodule unless
+  the user explicitly asks in the current session.
 - archive は `archive/YYYY-MM-DD-{slug}.md`。
 - 本質に効かない外殻提案は user 明示要求時のみ採用。
 - Apple Developer 環境依存事項 (証明書、ASC API key、notarytool) で blocker に
@@ -77,9 +79,10 @@ Completion Log に短く反映する (本 lane の archive 経由で参照)。
 
 ## Release version 方針
 
-- **公開 release version は `1.4` から start** (iOS public/local version と揃え、
-  Electron Desktop 1.0.4 を semver で超え、既存 user の update path で自動着地、
-  cutover-architecture decision B)。
+- **公開 release version は `1.4` から start** (2026-05-05 時点の public iOS
+  generation と揃え、既存 user の update path で自動着地、
+  cutover-architecture decision B)。現在の iOS public/local state は truth
+  script で別軸として確認する。
 - `0.1.0` は Phase 5 で smoke 専用 build (notarize 経路の検証用)。**公開しない**。
 - Phase 6 当初の `MARKETING_VERSION = 2.0.0` は user 明示決定で supersede。current
   pbxproj は `MARKETING_VERSION = 1.4`。次の release run は
@@ -98,7 +101,7 @@ export ASC_KEY_ID=TM2BK9269B
 export ASC_ISSUER_ID=<App Store Connect の Users and Access > Keys で確認できる UUID>
 export ASC_KEY_PATH=~/.appstoreconnect/private_keys/AuthKey_TM2BK9269B.p8
 
-cd /Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-native-desktop-plan
+cd /Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone
 
 # 0. Read-only preflight. This must not write public state.
 bun run release:cutover-preflight

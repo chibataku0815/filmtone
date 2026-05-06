@@ -187,8 +187,8 @@ No new files → no pbxproj edit required.
     (paramLabels + advanced* labels — drift detector source)
 - Backlight Veil reference (read-only):
   - `packages/film-lab-core/src/optical-filter-profiles.ts`
-  - `docs/filmtone/desktop/backlight-veiling-glare-implementation-plan-2026-05-03-jst.md`
-  - `docs/filmtone/ios/backlight-veil-ios-port-next-chat-handoff-2026-05-03-jst.md`
+  - `docs/filmtone/desktop/archive/legacy-handoffs-2026-04-25-to-2026-05-03/backlight-veiling-glare-implementation-plan-2026-05-03-jst.md`
+  - `docs/filmtone/ios/archive/legacy-handoffs-2026-04-20-to-2026-05-03/backlight-veil-ios-port-next-chat-handoff-2026-05-03-jst.md`
 
 ## Done conditions
 

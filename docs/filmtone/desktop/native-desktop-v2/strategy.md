@@ -1,7 +1,7 @@
 # Filmtone Native Desktop v2 Strategy
 
 Date opened: 2026-05-04 JST
-Last updated: 2026-05-05 JST
+Last updated: 2026-05-06 JST
 
 This file is the compact source of truth for the Native Desktop v2 lane.
 Implementation logs, chat handoffs, and detailed verification records belong in
@@ -13,11 +13,11 @@ Replace the legacy Electron Desktop product lane with a macOS 26 native
 SwiftUI/AppKit app that follows the iOS Filmtone product model and ships as
 Desktop v1.4.
 
-Native Desktop v2 is a single-product cutover, not a parallel product. Electron
-Desktop remains frozen as the public legacy rail at 1.0.4 for pre-macOS-26
-users; the native app takes over the Desktop Bundle ID
+Native Desktop v2 is a single-product cutover, not a parallel product. The
+legacy Electron Desktop source remains frozen for pre-macOS-26 access and
+emergency rollback; the native app now owns the Desktop Bundle ID
 `com.chibatakumi.film-lab-desktop` and the fixed Desktop download/update rail
-when v1.4 is released.
+after the v1.4 release.
 
 Apple Liquid Glass is the primary material for control surfaces: toolbar,
 sidebar, inspector, picker, menus, scrub bar, and editing panels. The preview
@@ -52,15 +52,19 @@ content layer stays glass-free so color judgment is not compromised.
 
 ## Current Strategic State
 
-- Branch: `feature/native-desktop-plan`
+- Canonical implementation branch: `main` in this repository. The old
+  `feature/native-desktop-plan` dedicated worktree is retired after Desktop
+  v1.4 replacement and M5-M closure.
 - Current integrated code HEAD for the public artifact: `4f2e5eba`
   (`Merge remote-tracking branch 'origin/main' into feature/native-desktop-plan`)
 - Integration base before M5-K1/K2/K3/K4: `0b79861f`
 - No M5-K product `active.md` should remain open. If `active.md` exists during
   DHM / release-cutover interrupts, do not treat it as current M5-K state.
 - Public Desktop latest from truth script: `1.4` via update metadata.
-- iOS public and local marketing version from truth script: `1.4`.
-- Native Desktop v2 public release: Desktop v1.4, aligned with iOS.
+- iOS truth script reports separate public and local axes: public App Store
+  version `1.4`; local Xcode candidate `1.5` build `4`.
+- Native Desktop v2 public release: Desktop v1.4, aligned with the public iOS
+  generation while iOS local candidate work can move independently.
 
 M1 and M2 are closed. M3 and M4 stay open for parity hardening and shared-core
 promotion, but they no longer block M5 UI validation. M5-C P0, M5-G
@@ -178,6 +182,13 @@ docs/filmtone/desktop/release-cutover/
 ## Evidence Index
 
 Use these archives as evidence, not as current truth.
+
+Superseded Phase 1 / Phase 2 transition plans and handoffs from the former
+Native Desktop v2 worktree are archived under:
+
+```text
+docs/filmtone/desktop/archive/native-desktop-v2-legacy-2026-05-03/
+```
 
 ### Current Handoff Evidence
 
@@ -298,9 +309,8 @@ Verification was green (`Verify/run.sh` 97/97, `bun run verify:macos`,
 
 2026-05-05: M5-M Portrait Layout + Backlight Veil + Compact Opening — code
 verification passed (`Verify/run.sh` 111/111, `bun run verify:macos`,
-`git diff --check`); portrait video / still / Backlight Veil cursor visual
-smoke remains user-pending. Lane is open as `active.md`; do not archive
-until the user confirms visual smoke.
+`git diff --check`). Initial visual follow-ups continued into the M5-M.3
+right-rail recovery rounds, now archived after user smoke confirmation.
 
 2026-05-05: M5-M.fixup Look Strength continuous response — landed on
 `feature/native-desktop-look-strength-fix`. The Look Strength slider was
@@ -323,7 +333,8 @@ landscape keeps right-rail `EditorSidebar` (default open). ⌘\\ toggles the
 current surface. `MediaDerivedBackdrop` / `videoBackdropImage` /
 `seedVideoBackdrop` / `VideoBackdropTaskKey` removed from `PreviewSurface`.
 Verify 121/121, `verify:macos` BUILD SUCCEEDED, `git diff --check` clean;
-visual smoke user-pending.
+visual smoke rejected the bottom-sheet posture, which led to the follow-up
+right-rail slide-in.
 
 2026-05-06: M5-M.3 follow-up after bottom-sheet smoke — replaced summoned
 bottom-sheet with right-rail slide-in for portrait. `EditorBottomSheet`
@@ -334,7 +345,8 @@ default true). Scrub bar split to 2 rows (transport + markers); inspector
 bottom inset (`sidebarBottomPadding`) bumped so the rail's bottom edge
 clears the 2-row scrub bar capsule — user can scrub while inspector is
 summoned. Verify 121/121, `verify:macos` BUILD SUCCEEDED, `git diff --check`
-clean; visual smoke user-pending.
+clean; user visual smoke confirmed on 2026-05-06. Archive:
+`archive/2026-05-06-m5-m3-right-rail-slide-in-two-row-scrub.md`.
 
 2026-05-05: M6 clean public release completed after parent-branch correction and
 `origin/main` merge. Native Desktop v1.4 is now the active public Desktop rail;

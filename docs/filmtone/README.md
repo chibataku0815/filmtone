@@ -7,37 +7,39 @@ Filmtone (Desktop / iOS / Web support) のリリース・実装 handoff ドキ�
 
 | サブディレクトリ | 内容 |
 |---|---|
-| [`desktop/`](./desktop/) | Desktop (Electron) リリース・QA・実装 handoff |
-| [`ios/`](./ios/) | iOS (Capacitor + SwiftUI) リリース・parity handoff |
-| [`web/`](./web/) | Web support / privacy ページの deploy handoff |
-| [`ios-v1.1-tasks/`](./ios-v1.1-tasks/) | iOS v1.1 task spec (T1〜T10) |
+| [`desktop/`](./desktop/) | Desktop / Native Desktop v2 リリース・QA・実装 handoff |
+| [`ios/`](./ios/) | iOS (Capacitor + SwiftUI) docs index and archive |
+| [`web/`](./web/) | Web support / LP copy docs index and archive |
 
 ## ルートの cross-cutting docs
 
 | ファイル | 用途 |
 |---|---|
-| [`filmtone-effect-terminology-alignment-handoff-2026-04-26-jst.md`](./filmtone-effect-terminology-alignment-handoff-2026-04-26-jst.md) | Effect terminology alignment chat handoff（SSoT は `packages/film-lab-core/docs/EFFECT_TERMINOLOGY_SSOT.md`） |
+| [`filmtone-copy-quality-harness.md`](./filmtone-copy-quality-harness.md) | Copy quality harness |
 | [`filmtone-release-version-sources.md`](./filmtone-release-version-sources.md) | Filmtone release version の正本ソース一覧 |
+| [`web/filmtone-lp-copy-handoff-2026-05-05-jst.md`](./web/filmtone-lp-copy-handoff-2026-05-05-jst.md) | LP copy discussion handoff; do not implement portfolio LP copy from this without a fresh copy decision |
+| [`archive/cross-cutting-legacy-2026-04-26-to-2026-05-01/`](./archive/cross-cutting-legacy-2026-04-26-to-2026-05-01/) | Older cross-cutting handoffs retained as evidence |
 
 ## Desktop
 
 | ファイル | 内容 |
 |---|---|
-| [`desktop/filmtone-desktop-v1.0.3-qa-handoff-2026-04-24-jst.md`](./desktop/filmtone-desktop-v1.0.3-qa-handoff-2026-04-24-jst.md) | Desktop v1.0.3 QA handoff |
-| [`desktop/filmtone-desktop-export-parity-investigation-handoff-2026-04-25-jst.md`](./desktop/filmtone-desktop-export-parity-investigation-handoff-2026-04-25-jst.md) | Desktop export parity 調査 |
-| [`desktop/filmtone-desktop-hdr-sdr-complete-implementation-handoff-2026-04-25-jst.md`](./desktop/filmtone-desktop-hdr-sdr-complete-implementation-handoff-2026-04-25-jst.md) | Desktop HDR/SDR 実装完了 |
+| [`desktop/README.md`](./desktop/README.md) | Desktop docs index and current routing |
+| [`desktop/native-desktop-v2/strategy.md`](./desktop/native-desktop-v2/strategy.md) | Native Desktop v2 current strategy |
+| [`desktop/filmtone-desktop-v1.0.3-qa-handoff-2026-04-24-jst.md`](./desktop/filmtone-desktop-v1.0.3-qa-handoff-2026-04-24-jst.md) | Legacy Electron Desktop v1.0.3 QA handoff |
 
 ## iOS
 
 | ファイル | 内容 |
 |---|---|
-| [`ios/filmtone-ios-public-release-handoff-2026-04-20-0215-jst.md`](./ios/filmtone-ios-public-release-handoff-2026-04-20-0215-jst.md) | iOS v1.0 public release handoff |
-| [`ios/filmtone-ios-parity-gap-vs-desktop-v1.0.3-2026-04-24-jst.md`](./ios/filmtone-ios-parity-gap-vs-desktop-v1.0.3-2026-04-24-jst.md) | iOS vs Desktop v1.0.3 gap 分析 |
-| [`ios/filmtone-ios-v1.1-parity-plan-2026-04-24-jst.md`](./ios/filmtone-ios-v1.1-parity-plan-2026-04-24-jst.md) | iOS v1.1 parity plan |
-| [`ios/filmtone-ios-v1.1-release-handoff-2026-04-25-jst.md`](./ios/filmtone-ios-v1.1-release-handoff-2026-04-25-jst.md) | iOS v1.1 release handoff |
+| [`ios/README.md`](./ios/README.md) | iOS docs index and truth gate |
+| [`../apps/capacitor-film-lab-ios/CLAUDE.md`](../../apps/capacitor-film-lab-ios/CLAUDE.md) | iOS implementation guide |
+| [`ios/archive/legacy-handoffs-2026-04-20-to-2026-05-03/`](./ios/archive/legacy-handoffs-2026-04-20-to-2026-05-03/) | Older iOS handoffs and v1.1 task specs retained as evidence |
 
 ## Web
 
 | ファイル | 内容 |
 |---|---|
-| [`web/filmtone-web-support-privacy-deploy-handoff-2026-04-20-0300-jst.md`](./web/filmtone-web-support-privacy-deploy-handoff-2026-04-20-0300-jst.md) | Filmtone iOS の Support / Privacy 公開ページを `chibatakumi.studio` にデプロイ |
+| [`web/README.md`](./web/README.md) | Web docs index |
+| [`web/filmtone-lp-copy-handoff-2026-05-05-jst.md`](./web/filmtone-lp-copy-handoff-2026-05-05-jst.md) | LP copy discussion handoff |
+| [`web/archive/`](./web/archive/) | Older Support / Privacy deploy handoff |

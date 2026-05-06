@@ -1,9 +1,11 @@
-# Native Desktop v2 iOS Parity Next Handoff
+# Archived Evidence — Native Desktop v2 iOS Parity Next Handoff
 
 Date: 2026-05-05 JST
-Branch: `feature/native-desktop-plan`
-Current parent worktree:
-`/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-native-desktop-plan`
+Historical branch: `feature/native-desktop-plan`
+
+This handoff is archived evidence. The former dedicated Native Desktop v2
+worktree has been retired; current work starts from
+`docs/filmtone/desktop/native-desktop-v2/strategy.md` in this repository.
 
 ## Current Commit State
 
@@ -300,7 +302,7 @@ bash apps/filmtone-desktop-macos/Verify/run.sh
 bun run verify:macos
 git diff --check
 pkill -x Filmtone 2>/dev/null || true
-open -n /Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-native-desktop-plan/apps/filmtone-desktop-macos/build/Build/Products/Debug/Filmtone.app
+open -n /Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone/apps/filmtone-desktop-macos/build/Build/Products/Debug/Filmtone.app
 ```
 
 Additional verification by slice:
@@ -334,8 +336,8 @@ Additional verification by slice:
 ```text
 You are working on Filmtone Native Desktop v2.
 
-Repository/worktree:
-/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-native-desktop-plan
+Repository:
+/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone
 
 Base branch:
 feature/native-desktop-plan
@@ -350,7 +352,7 @@ Important existing commits:
 First, read:
 1. AGENTS.md
 2. docs/filmtone/desktop/native-desktop-v2/strategy.md
-3. docs/filmtone/desktop/native-desktop-v2/2026-05-05-native-desktop-v2-ios-parity-next-handoff.md
+3. docs/filmtone/desktop/native-desktop-v2/archive/2026-05-05-native-desktop-v2-ios-parity-next-handoff.md
 4. docs/filmtone/desktop/native-desktop-v2/active.md if it exists
 
 Critical process constraints:
@@ -419,7 +421,7 @@ For the first slice you choose:
   git diff --check
 - Launch the Debug app for visual smoke:
   pkill -x Filmtone 2>/dev/null || true
-  open -n /Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-native-desktop-plan/apps/filmtone-desktop-macos/build/Build/Products/Debug/Filmtone.app
+  open -n /Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone/apps/filmtone-desktop-macos/build/Build/Products/Debug/Filmtone.app
 
 When reporting done:
 - State exactly what changed.

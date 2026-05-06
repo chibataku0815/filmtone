@@ -9,12 +9,22 @@ Do not infer Filmtone Desktop's latest or next version from historical `life` ha
 Use these sources, in order:
 
 1. Public update metadata: `https://ehi6m41cp33jiopb.public.blob.vercel-storage.com/film-lab/desktop/update-meta.json`
-2. Git tags in this repo: `desktop-v*`
-3. Desktop package version: `apps/desktop-film-lab-batch/package.json`
-4. Desktop release notes: `apps/desktop-film-lab-batch/RELEASE_NOTES-v<version>.md`
-5. Candidate QA handoff docs: `docs/filmtone/desktop/filmtone-desktop-v*-qa-handoff-*.md`
+2. Native Desktop marketing version:
+   `apps/filmtone-desktop-macos/FilmtoneDesktop.xcodeproj/project.pbxproj`
+   (`MARKETING_VERSION`)
+3. Git tags in this repo: `desktop-v*`
+4. Native Desktop release notes:
+   `apps/filmtone-desktop-macos/RELEASE_NOTES-v<version>.md`
+5. Release cutover docs: `docs/filmtone/desktop/release-cutover/`
+6. Legacy Electron package version, only when discussing the frozen legacy rail:
+   `apps/desktop-film-lab-batch/package.json`
 
 If these sources disagree, report the disagreement explicitly before planning.
+
+After the Native Desktop v1.4 replacement cutover, the Electron package version
+is not the Desktop public release version source. The Electron workspace remains
+in the repo for compatibility, reference, and frozen legacy support; Native
+Desktop release versioning is read from the macOS Xcode project.
 
 ## Quick Check
 

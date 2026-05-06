@@ -29,7 +29,7 @@ preview, export, and sidecar source-profile resolution consistent.
 - `apps/capacitor-film-lab-ios/ios/App/App/SourceProbeService.swift`
 - `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneEditorStore.swift`
 - `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneSourceProfileCatalog.swift`
-- `docs/filmtone/desktop/native-desktop-v2/2026-05-05-native-desktop-v2-ios-parity-next-handoff.md`
+- `docs/filmtone/desktop/native-desktop-v2/archive/2026-05-05-native-desktop-v2-ios-parity-next-handoff.md`
 
 ## Checklist
 
