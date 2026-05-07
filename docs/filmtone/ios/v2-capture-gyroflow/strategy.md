@@ -264,3 +264,8 @@ Dependency:
   `hardwareCost = 0.5`; the master `.mov` is ProRes 422 HQ (`apch`),
   3840x2160, 30 fps, 6.166667s; VDO delivered `x422` timing samples
   (191 frames, 0 dropped). M3 motion-only recorder smoke can proceed.
+- 2026-05-07: M3 motion-only recorder smoke **passed** on iPhone 17 Pro /
+  iOS 26.4.2 (no `AVCaptureSession` running). Raw `startGyroUpdates` +
+  `startAccelerometerUpdates` (fused not started); both streams 1048
+  samples / coverage 10.479s / effectiveHz 99.92 / maxGap 10.0ms /
+  gapCountOver50/100/200ms = 0/0/0. M4 combined timing smoke can proceed.

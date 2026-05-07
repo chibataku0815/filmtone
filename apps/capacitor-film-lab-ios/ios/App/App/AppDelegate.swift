@@ -8,8 +8,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         #if DEBUG
-        runM1CapabilityProbeOnLaunch()
-        runM2BCoexistenceSmokeOnLaunch()
+        runFilmtoneSmokeIfRequested()
         #endif
 
         do {
@@ -76,12 +75,42 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     #if DEBUG
-    /// V2 capture / Gyroflow lane M1: writes the capability probe JSON once
-    /// per Debug launch (synchronously) so a single Xcode Run on a real device
-    /// produces the artifact that M1 Done Conditions require. Release builds
-    /// skip this path entirely (`#if DEBUG`). Synchronous so the artifact
-    /// exists before the SwiftUI bootstrap runs and before the app can be
-    /// suspended by an out-of-foreground devicectl launch.
+    /// V2 capture / Gyroflow lane smoke dispatcher. Selects at most one
+    /// smoke per Debug launch via the `FILMTONE_SMOKE_LANE` environment
+    /// variable so M1 / M2-B / M3 evidence stays mutually exclusive (M3
+    /// in particular must be motion-only — no AVCaptureSession may be
+    /// running on the device while it records). Default (env var unset)
+    /// runs nothing, so day-to-day Xcode Debug launches stay clean.
+    ///
+    /// Trigger from devicectl with the JSON-dictionary form:
+    ///   xcrun devicectl device process launch --device <udid> \
+    ///     --environment-variables '{"FILMTONE_SMOKE_LANE":"m3"}' \
+    ///     com.chibatakumi.film.lab.ios
+    /// Fallback if the JSON form fails to propagate:
+    ///   DEVICECTL_CHILD_FILMTONE_SMOKE_LANE=m3 xcrun devicectl …
+    private func runFilmtoneSmokeIfRequested() {
+        let lane = ProcessInfo.processInfo.environment["FILMTONE_SMOKE_LANE"]?
+            .lowercased()
+        switch lane {
+        case "m1":
+            runM1CapabilityProbeOnLaunch()
+        case "m2b":
+            runM2BCoexistenceSmokeOnLaunch()
+        case "m3":
+            runM3MotionOnlySmokeOnLaunch()
+        case .some(let other):
+            NSLog("[FilmtoneSmoke] FILMTONE_SMOKE_LANE=%@ unrecognised; no smoke runs.", other)
+        case .none:
+            break
+        }
+    }
+
+    /// V2 capture / Gyroflow lane M1: writes the capability probe JSON
+    /// once per Debug launch (synchronously) so a single Xcode Run on a
+    /// real device produces the artifact that M1 Done Conditions require.
+    /// Synchronous so the artifact exists before the SwiftUI bootstrap
+    /// runs and before the app can be suspended by an out-of-foreground
+    /// devicectl launch.
     private func runM1CapabilityProbeOnLaunch() {
         do {
             let result = try FilmtoneCaptureCapabilityProbe.run()
@@ -94,12 +123,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     /// V2 capture / Gyroflow lane M2-B: Path C dual-output coexistence
     /// smoke. Drives one AVCaptureSession with AVCaptureMovieFileOutput
     /// (ProRes 422 HQ Apple Log 2 master) and AVCaptureVideoDataOutput
-    /// (timing / diagnostics side-band) attached together. Synchronous
-    /// wrapper, async session inside (permission → startRunning →
-    /// startRecording → duration timer → stopRecording → finalize).
+    /// (timing / diagnostics side-band) attached together.
     /// Writes m2b-master.mov, m2b-coexistence-smoke.json, and
-    /// m2b-debug.log to Library/Caches/Filmtone/captures/. Release builds
-    /// skip this path.
+    /// m2b-debug.log to Library/Caches/Filmtone/captures/.
     private func runM2BCoexistenceSmokeOnLaunch() {
         NSLog("[FilmtoneM2BSmoke] starting Path C dual-output coexistence smoke (async)…")
         FilmtoneCaptureWriter.runSmoke(duration: 6.0) { result in
@@ -109,6 +135,25 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                 NSLog("[FilmtoneM2BSmoke] OK json=%@", output.jsonURL.path)
             case .failure(let error):
                 NSLog("[FilmtoneM2BSmoke] FAIL: %@", error.localizedDescription)
+            }
+        }
+    }
+
+    /// V2 capture / Gyroflow lane M3: motion-only Core Motion smoke. No
+    /// AVCaptureSession is started. Raw startGyroUpdates /
+    /// startAccelerometerUpdates only — fused startDeviceMotionUpdates is
+    /// not called (Gyroflow data must be raw per strategy). Writes
+    /// m3-motion-only-smoke.json and m3-debug.log to
+    /// Library/Caches/Filmtone/captures/.
+    private func runM3MotionOnlySmokeOnLaunch() {
+        NSLog("[FilmtoneM3Smoke] starting motion-only smoke (async)…")
+        FilmtoneMotionRecorder.runSmoke(duration: 10.0) { result in
+            switch result {
+            case .success(let output):
+                NSLog("[FilmtoneM3Smoke] OK json=%@", output.jsonURL.path)
+                NSLog("[FilmtoneM3Smoke] OK log=%@", output.debugLogURL.path)
+            case .failure(let error):
+                NSLog("[FilmtoneM3Smoke] FAIL: %@", error.localizedDescription)
             }
         }
     }
