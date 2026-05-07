@@ -7,6 +7,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     private var store: FilmtoneEditorStore?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        #if DEBUG
+        runM1CapabilityProbeOnLaunch()
+        #endif
+
         do {
             if try FilmtoneHelpAssetGenerator.runIfRequested() {
                 exit(0)
@@ -69,5 +73,22 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func applicationWillTerminate(_ application: UIApplication) {
         // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
     }
+
+    #if DEBUG
+    /// V2 capture / Gyroflow lane M1: writes the capability probe JSON once
+    /// per Debug launch (synchronously) so a single Xcode Run on a real device
+    /// produces the artifact that M1 Done Conditions require. Release builds
+    /// skip this path entirely (`#if DEBUG`). Synchronous so the artifact
+    /// exists before the SwiftUI bootstrap runs and before the app can be
+    /// suspended by an out-of-foreground devicectl launch.
+    private func runM1CapabilityProbeOnLaunch() {
+        do {
+            let result = try FilmtoneCaptureCapabilityProbe.run()
+            NSLog("[FilmtoneM1Probe] capability JSON written: %@", result.fileURL.path)
+        } catch {
+            NSLog("[FilmtoneM1Probe] capability probe failed: %@", error.localizedDescription)
+        }
+    }
+    #endif
 
 }

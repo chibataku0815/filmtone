@@ -298,6 +298,14 @@ enum FilmtoneCaptureCapabilityProbe {
 
     // MARK: - M2 recommendation
 
+    /// Picks the format M2's video-only writer should lock. Scoring uses the
+    /// format's pixel layout (the canonical signal at the format level —
+    /// ProRes vs HEVC is chosen at AVAssetWriter time, not here):
+    /// - `x422` (10-bit 4:2:2) → ProRes 422 / 422 HQ writer candidate
+    /// - `x420` (10-bit 4:2:0) → HEVC 10-bit Log writer candidate
+    /// Combined with the strongest color space the format actually reports
+    /// (Apple Log 2 > Apple Log > HLG > default), 4K-class resolution, and
+    /// a frame-rate range that includes 30fps.
     private static func recommendM2Mode(devices: [AVCaptureDevice]) -> [String: Any] {
         let backDevices = devices.filter { $0.position == .back }
         var best: (score: Int, payload: [String: Any], reasoning: String)?
@@ -315,24 +323,17 @@ enum FilmtoneCaptureCapabilityProbe {
                 guard supportsThirty else { continue }
 
                 let subType = CMFormatDescriptionGetMediaSubType(format.formatDescription)
-                let codecScore: Int
-                let codecName: String
-                switch codecLabel(forMediaSubType: subType) {
-                case "ProRes422HQ":
-                    codecScore = 1000
-                    codecName = "ProRes422HQ"
-                case "ProRes4444", "ProRes4444XQ":
-                    codecScore = 900
-                    codecName = "ProRes4444"
-                case "ProRes422":
-                    codecScore = 700
-                    codecName = "ProRes422"
-                case "ProRes422LT":
-                    codecScore = 400
-                    codecName = "ProRes422LT"
-                case "HEVC":
-                    codecScore = 200
-                    codecName = "HEVC"
+                let subTypeFourCC = fourCC(subType)
+
+                let pixelScore: Int
+                let writerCandidate: String
+                switch subTypeFourCC {
+                case "x422":
+                    pixelScore = 1000
+                    writerCandidate = "ProRes422HQ"
+                case "x420":
+                    pixelScore = 400
+                    writerCandidate = "HEVC10bitLog"
                 default:
                     continue
                 }
@@ -354,21 +355,32 @@ enum FilmtoneCaptureCapabilityProbe {
                     colorName = "default"
                 }
 
-                let resolutionScore = min((width * height) / 200_000, 50)
-                let totalScore = codecScore + colorScore + resolutionScore
+                let isFourK = (width == 3840 && height == 2160)
+                let resolutionScore: Int
+                if isFourK {
+                    resolutionScore = 100
+                } else if width > 3840 {
+                    resolutionScore = 50
+                } else {
+                    resolutionScore = max(0, (width * height) / 200_000)
+                }
+
+                let nonWideAnglePenalty = device.deviceType == .builtInWideAngleCamera ? 0 : -25
+                let totalScore = pixelScore + colorScore + resolutionScore + nonWideAnglePenalty
 
                 let payload: [String: Any] = [
                     "deviceUniqueID": device.uniqueID,
                     "deviceLocalizedName": device.localizedName,
                     "deviceType": device.deviceType.rawValue,
                     "formatIndex": index,
-                    "codec": codecName,
+                    "pixelFormat": subTypeFourCC,
+                    "writerCandidate": writerCandidate,
                     "colorSpace": colorName,
                     "dimensions": ["width": width, "height": height],
                     "fps": 30,
                     "score": totalScore,
                 ]
-                let reasoning = "codec=\(codecName)(+\(codecScore)) color=\(colorName)(+\(colorScore)) res=\(width)x\(height)(+\(resolutionScore)) fps30=ok"
+                let reasoning = "pixel=\(subTypeFourCC)(+\(pixelScore)) color=\(colorName)(+\(colorScore)) res=\(width)x\(height)(+\(resolutionScore)) wideAngle=\(nonWideAnglePenalty == 0)"
 
                 if best == nil || totalScore > best!.score {
                     best = (totalScore, payload, reasoning)
@@ -384,7 +396,7 @@ enum FilmtoneCaptureCapabilityProbe {
         }
         return [
             "candidate": NSNull(),
-            "reasoning": "No back-camera format >=1080p with a recognized codec and 30fps in range was reported.",
+            "reasoning": "No back-camera format with x422 / x420 pixel format and 30fps in range was reported.",
         ]
     }
 

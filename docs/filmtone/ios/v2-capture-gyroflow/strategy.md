@@ -225,3 +225,7 @@ Dependency:
 
 - 2026-05-07: Created iOS V2 capture / Gyroflow 2-layer operating structure and
   scoped the first active task to M1 Capability Probe.
+- 2026-05-07: M1 done. Real-device JSON pulled from iPhone 17 Pro / iOS 26.4.2;
+  Apple Log 2 confirmed runtime-reported on all 7 rear cameras. M2 candidate
+  locked: BuiltInWideAngleCamera formatIndex 56, pixelFormat `x422`, Apple Log 2,
+  3840×2160@30, writer = ProRes 422 HQ.

@@ -87,21 +87,72 @@ record video yet.
   - `bun run build` (tsc --noEmit + vite build): PASS.
   - `xcodebuild ... iOS Simulator Debug build CODE_SIGNING_ALLOWED=NO`:
     `** BUILD SUCCEEDED **` (log: `/tmp/m1-xcodebuild.log`).
-- [ ] Run the probe on the real device and save or inspect the JSON.
-  - Pending real-device run (user-driven, single Xcode Run).
-  - `FilmtoneMediaPlugin.load()` now contains a `#if DEBUG` launch trigger
-    (`runM1CapabilityProbeOnLaunch`) that calls
-    `FilmtoneCaptureCapabilityProbe.run()` once per Debug launch, so a single
-    Xcode Run on the iPhone produces the JSON without needing a JS bridge
-    call. Release builds skip this path entirely.
-  - Output path: `Library/Caches/Filmtone/diagnostics/m1-capability-probe.json`
-    inside the app sandbox.
-  - Pull from device:
-    `xcrun devicectl device copy from --device <UDID> --domain-type appDataContainer --domain-identifier com.chibatakumi.film.lab.ios --source 'Library/Caches/Filmtone/diagnostics/m1-capability-probe.json' --destination apps/capacitor-film-lab-ios/diagnostics/m1-capability-probe.json`.
-  - Manual JS path is also still available:
-    `await window.Capacitor.Plugins.FilmtoneMedia.probeCaptureCapabilities()`.
-- [ ] Record pass/fail notes in this file.
-  - To be appended after the real-device run lands the JSON.
+- [x] Run the probe on the real device and save or inspect the JSON.
+  - Real-device run completed 2026-05-07 ~12:02 JST on iPhone 17 Pro
+    (iPhone18,1) iOS 26.4.2 (paired UDID
+    `3A2A3A66-D092-5F87-8CE7-9A1EBD238FE9`).
+  - Trigger: `AppDelegate.application(_:didFinishLaunchingWithOptions:)` runs
+    a synchronous `runM1CapabilityProbeOnLaunch()` under `#if DEBUG` before
+    SwiftUI bootstrap. The original plan to hook into
+    `FilmtoneMediaPlugin.load()` was abandoned because this app uses a
+    SwiftUI `FilmtoneRootHostingController` as `rootViewController`, not a
+    `CAPBridgeViewController` — so the Capacitor plugin's `load()` never
+    fires (the bridge is only instantiated lazily for plugin calls). Logged
+    in Unexpected.
+  - Output path on device:
+    `Library/Caches/Filmtone/diagnostics/m1-capability-probe.json`
+    (resolved through `FileManager.default.url(for: .cachesDirectory)`).
+  - Pulled to host via:
+    `xcrun devicectl device copy from --device 3A2A3A66-D092-5F87-8CE7-9A1EBD238FE9 --domain-type appDataContainer --domain-identifier com.chibatakumi.film.lab.ios --source 'Library/Caches/Filmtone/diagnostics/m1-capability-probe.json' --destination apps/capacitor-film-lab-ios/diagnostics/m1-capability-probe.json`.
+  - Local artifact: `apps/capacitor-film-lab-ios/diagnostics/m1-capability-probe.json`
+    (916 KB).
+- [x] Record pass/fail notes in this file.
+  - See "Real-device findings" below.
+
+## Real-device findings (2026-05-07, iPhone 17 Pro / iOS 26.4.2)
+
+- 10 devices total; 7 rear cameras: WideAngle / UltraWide / Telephoto /
+  Dual / DualWide / Triple / LiDAR.
+- All 7 rear cameras runtime-report **both** Apple Log (rawValue 3) and
+  Apple Log 2 (rawValue 4) on enough formats to lock a video-only writer
+  in M2.
+- Pixel layouts present at the format level on the rear cameras:
+  - `x422` — 10-bit 4:2:2 (the ProRes 422 / 422 HQ writer pairing)
+  - `x420` — 10-bit 4:2:0 (HEVC 10-bit Log writer pairing)
+  - `420v` / `420f` — 8-bit 4:2:0 (preview / non-Log capture)
+  - `btp2` — Bayer pattern 10-bit (raw stills, not video)
+- Resolutions on the rear WideAngle camera include 4K UHD (3840×2160),
+  4K square sensor (4032×3024), and 4224×2240 / 4224×3024 high-res still.
+- The recommendation logic was corrected once on a real device: the format
+  level reports the **pixel format** (`x422` / `x420`), not the encoded
+  codec (`ap4h` / `apch`). The encoded codec is selected at
+  `AVAssetWriter` time. The probe's first run produced
+  `m2Recommendation.candidate = null` because of this; the second run
+  scored by pixel format and produced the candidate below.
+
+### M2 video-only writer candidate (locked by this probe)
+
+```jsonc
+{
+  "deviceUniqueID":      "com.apple.avfoundation.avcapturedevice.built-in_video:0",
+  "deviceLocalizedName": "背面カメラ",
+  "deviceType":          "AVCaptureDeviceTypeBuiltInWideAngleCamera",
+  "formatIndex":         56,
+  "pixelFormat":         "x422",
+  "writerCandidate":     "ProRes422HQ",
+  "colorSpace":          "appleLog2",
+  "dimensions":          { "width": 3840, "height": 2160 },
+  "fps":                 30,
+  "score":               1300
+}
+```
+
+M2 should configure the capture session with:
+- `device.activeFormat = device.formats[56]` on the BuiltInWideAngleCamera
+  (uniqueID above).
+- `device.activeColorSpace = .appleLog2`.
+- An `AVAssetWriter` video input with codec type `.proRes422HQ`,
+  10-bit 4:2:2 source pixel format, 3840×2160 @ 30 fps.
 
 ## Verification
 
@@ -120,17 +171,28 @@ record video yet.
 
 ## Done Conditions
 
-- [ ] `capture-capabilities.json` or equivalent returned JSON exists from a
+- [x] `capture-capabilities.json` or equivalent returned JSON exists from a
   real device run.
-- [ ] JSON includes at least one rear-camera video mode.
-- [ ] Apple Log / Apple Log 2 support is present only when runtime-reported.
-- [ ] Unsupported modes are represented as absent or disabled, not inferred.
-- [ ] The result is specific enough to choose the M2 video-only writer mode.
-
-All Done Conditions remain unchecked until the real-device JSON is in hand.
-The implementation is structured to satisfy them by construction (no
-inference, raw-value-keyed color spaces, M2 recommendation derived from
-runtime data only), but evidence is required.
+  - `apps/capacitor-film-lab-ios/diagnostics/m1-capability-probe.json` (916 KB,
+    written by AppDelegate launch trigger and pulled via devicectl).
+- [x] JSON includes at least one rear-camera video mode.
+  - 7 rear cameras × dozens of formats each. WideAngle reports 70 formats.
+- [x] Apple Log / Apple Log 2 support is present only when runtime-reported.
+  - rawValue 3 (`appleLog`) and rawValue 4 (`appleLog2`) appear only on
+    formats whose `format.supportedColorSpaces` actually contains them.
+    Names are mapped from raw values; unknown raw values are emitted as
+    `{rawValue: N}` only — never inferred. Confirmed on iPhone 17 Pro:
+    both Apple Log and Apple Log 2 are present on rear cameras.
+- [x] Unsupported modes are represented as absent or disabled, not inferred.
+  - The probe iterates `device.formats` and copies what the runtime reports.
+    No filling-in, no defaulted color spaces, no synthesized stabilization
+    modes (each is probed via `format.isVideoStabilizationModeSupported(_:)`).
+- [x] The result is specific enough to choose the M2 video-only writer mode.
+  - `m2Recommendation.candidate` returns concrete
+    `{ deviceUniqueID, formatIndex, pixelFormat: "x422",
+       writerCandidate: "ProRes422HQ", colorSpace: "appleLog2",
+       dimensions: 3840×2160, fps: 30 }` — enough for M2 to lock
+    `device.activeFormat` and configure `AVAssetWriter` deterministically.
 
 ## Stop Conditions
 
@@ -161,3 +223,16 @@ runtime data only), but evidence is required.
 - Capacitor `call.resolve(with:)` requires `Encodable`. M1 uses
   `[String: Any]` so the positional `call.resolve(_:)` overload is the right
   call. Recorded in case M2 adds another bridge entry.
+- This app is not a typical Capacitor-first app: `AppDelegate.application(_:didFinishLaunchingWithOptions:)`
+  installs a SwiftUI `FilmtoneRootHostingController` as `rootViewController`
+  rather than the storyboard-referenced `FilmtoneBridgeViewController`. The
+  Capacitor bridge therefore never wakes on app start, and `FilmtoneMediaPlugin.load()`
+  is not called during a cold launch. The launch-time M1 trigger lives in
+  `AppDelegate` instead. M2 work that wants any pre-UI bridge state should
+  hook into AppDelegate, not the plugin's `load()`.
+- Format-level `mediaSubType` reports the **pixel format**, not the encoded
+  codec. iOS rear-camera formats use `x422` (10-bit 4:2:2) / `x420` (10-bit
+  4:2:0) / `420v` / `420f` — the encoded codec (ProRes vs HEVC) is chosen at
+  `AVAssetWriter` time. M2 recommendation logic must score by pixel layout,
+  not by codec FourCC. This was caught and fixed mid-M1 after the first
+  device run produced `m2Recommendation.candidate = null`.
