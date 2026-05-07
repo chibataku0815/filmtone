@@ -279,3 +279,24 @@ Dependency:
   `vdoPTSMinusAccelTSSeconds = -58.06ms`. `session.synchronizationClock` is
   `HostTimeClock` so VDO PTS, MovieFile startPTS, and `CMLogItem.timestamp`
   share a single `mach_absolute_time` axis — M5 `.gcsv` proof can proceed.
+- 2026-05-07: M5-A Gyroflow `.gcsv` proof (on-device writer + package)
+  **passed** on iPhone 17 Pro / iOS 26.4.2 (Run #2,
+  `m5-package-a8ca4b0a-7f8e-4747-833b-9921a56ade4f`). Strategy C
+  combined-on-gyro-timeline writer + boundary-trim policy: `accelDroppedRowCount
+  = 0` (in-range tolerance gate), `gyroAccelTrimDurationTotalSeconds = 5.003ms
+  ≤ 20ms` (boundary trim within `max(1.5 × gyroMedianInterval, 20ms)`),
+  reconciliation `exactRow 3170 + interpRow 18 + droppedRow 0 + outOfRangeTotal
+  1 = 3189 = gyroSampleCount` and `gcsv.rowCount = 3188 = gyroSampleCount -
+  outOfRangeTotal - droppedRow`. Master ProRes 422 HQ Apple Log 2 30.567s /
+  2.7 GB; `movieFile.startPTSSeconds = 143361.71016770799` (M4 startPTS gate
+  not regressed); VDO 958 / 29.999 fps; gyro/accel 3189/3189 / 99.93 Hz / 0
+  gaps; M4 baseline drift gate within ±200ms (Δ23.2 / 28.2 ms). Run-local
+  M5-B sync seed `runLocalMovieStartToGyroOffsetSeconds = +141.81ms`
+  (PRIMARY). Strategy C exact-match rate 99.4% (3170/3188) confirms gyro and
+  accel CoreMotion handlers share the same scheduling cadence on this device.
+  Run #1 pre-revision FAIL drove the writer split between in-range drops
+  (`accelDroppedRowCount`) and boundary trim (`accelOutOfRange*Count` /
+  `gyroAccelTrimDuration*`); revised writer + smoke evidence in
+  `apps/capacitor-film-lab-ios/diagnostics/m5-combined-timing.json /
+  m5-motion.gcsv / m5-debug.log`. M5-B (Gyroflow desktop validation) and
+  M5-C (RS calibration) are deferred to separate active scopes.

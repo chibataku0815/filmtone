@@ -1,0 +1,29 @@
+[1778155784.193277] M5 gcsv smoke begin uuid=a8ca4b0a-7f8e-4747-833b-9921a56ade4f
+[1778155784.202461] start() requesting camera authorization (status=3)
+[1778155784.2026181] isGyroAvailable=true isAccelerometerAvailable=true isDeviceMotionAvailable=true
+[1778155784.2029262] requestAccess granted=true
+[1778155784.203326] configureSession() — locating wide rear camera…
+[1778155784.256674] wide=背面カメラ formats=70
+[1778155784.256927] formats[56].supportedColorSpaces (raw)=0,2,3,4
+[1778155784.2570639] session.sessionPreset=.inputPriority, autoWideColor=false
+[1778155784.260892] session.addInput(wide) OK
+[1778155784.261547] activeFormat=formats[56], activeColorSpace=appleLog2, fps=30 applied
+[1778155784.263655] session.addOutput(movieFileOutput) OK
+[1778155784.2641659] movieOutput.availableVideoCodecTypes=apch,apcn,apcs,apco
+[1778155784.288097] movieOutput.setOutputSettings(proRes422HQ) OK
+[1778155784.28897] session.addOutput(videoDataOutput) OK
+[1778155784.291106] commitConfiguration done. preset=AVCaptureSessionPresetInputPriority hardwareCost=0.5
+[1778155784.291338] session.synchronizationClock=FigClock[HostTimeClock]: 0x1065a10a0 retainCount: 20 allocator: 0x1f82cc310 current time: {143361423463291/1000000000 = 143361.423} = 143361.423463 seconds
+[1778155784.29162] configureSession OK, starting session…
+[1778155784.291716] session.startRunning() …
+[1778155784.433226] session.isRunning=true
+[1778155784.433364] anchor: machAbsolute=3440677571129 bootUptime=143361.56546458334 tb=125/3; motion updates issued
+[1778155784.43717] movieOutput.startRecording(to: m5-master.mov) requested
+[1778155784.603815] movieFileOutput didStartRecordingTo (startPTS) m5-master.mov startPTSSeconds=143361.710167708
+[1778155815.193447] requestStop: recordedDuration snapshot=30.567326875s
+[1778155815.295991] movieFileOutput didFinishRecordingTo m5-master.mov OK
+[1778155815.2964501] finalizeAndComplete() begin
+[1778155816.36431] motion snapshot finished. gyroCount=3189 accelCount=3189 stopBootTime=143393.49629979167
+[1778155816.4879909] session.stopRunning() done. vdoCount=958
+[1778155816.536896] gcsv written: m5-motion.gcsv rowCount=3188 headerBytes=166 drop=0
+[1778155816.537226] master mov exists=true size=2690295147 startPTSSeconds=143361.710167708

@@ -77,17 +77,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     #if DEBUG
     /// V2 capture / Gyroflow lane smoke dispatcher. Selects at most one
     /// smoke per Debug launch via the `FILMTONE_SMOKE_LANE` environment
-    /// variable so M1 / M2-B / M3 / M4 evidence stays mutually exclusive
-    /// (M3 in particular must be motion-only — no AVCaptureSession may
-    /// be running on the device while it records). Default (env var
-    /// unset) runs nothing, so day-to-day Xcode Debug launches stay clean.
+    /// variable so M1 / M2-B / M3 / M4 / M5 evidence stays mutually
+    /// exclusive (M3 in particular must be motion-only — no
+    /// AVCaptureSession may be running on the device while it records).
+    /// Default (env var unset) runs nothing, so day-to-day Xcode Debug
+    /// launches stay clean.
     ///
     /// Trigger from devicectl with the JSON-dictionary form:
     ///   xcrun devicectl device process launch --device <udid> \
-    ///     --environment-variables '{"FILMTONE_SMOKE_LANE":"m4"}' \
+    ///     --environment-variables '{"FILMTONE_SMOKE_LANE":"m5"}' \
     ///     com.chibatakumi.film.lab.ios
     /// Fallback if the JSON form fails to propagate:
-    ///   DEVICECTL_CHILD_FILMTONE_SMOKE_LANE=m4 xcrun devicectl …
+    ///   DEVICECTL_CHILD_FILMTONE_SMOKE_LANE=m5 xcrun devicectl …
     private func runFilmtoneSmokeIfRequested() {
         let lane = ProcessInfo.processInfo.environment["FILMTONE_SMOKE_LANE"]?
             .lowercased()
@@ -100,6 +101,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             runM3MotionOnlySmokeOnLaunch()
         case "m4":
             runM4CombinedTimingSmokeOnLaunch()
+        case "m5":
+            runM5GcsvSmokeOnLaunch()
         case .some(let other):
             NSLog("[FilmtoneSmoke] FILMTONE_SMOKE_LANE=%@ unrecognised; no smoke runs.", other)
         case .none:
@@ -178,6 +181,30 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                 NSLog("[FilmtoneM4Smoke] OK log=%@", output.debugLogURL.path)
             case .failure(let error):
                 NSLog("[FilmtoneM4Smoke] FAIL: %@", error.localizedDescription)
+            }
+        }
+    }
+
+    /// V2 capture / Gyroflow lane M5-A: Gyroflow `.gcsv` proof smoke.
+    /// Forks M4's combined-timing scaffolding and adds Strategy C
+    /// resampling onto the gyro timeline plus a `m5-package-<UUID>/`
+    /// directory containing {`m5-master.mov`, `m5-motion.gcsv`,
+    /// `m5-combined-timing.json`, `m5-debug.log`}. Run-local sync
+    /// offsets (computed from THIS run's anchors) are recorded as
+    /// the M5-B Gyroflow sync seeds — M4 offsets serve only as the
+    /// `±200ms` drift gate.
+    private func runM5GcsvSmokeOnLaunch() {
+        NSLog("[FilmtoneM5Smoke] starting gcsv proof smoke (async)…")
+        FilmtoneGcsvSmoke.runSmoke(duration: 30.0, motionMargin: 1.0) { result in
+            switch result {
+            case .success(let output):
+                NSLog("[FilmtoneM5Smoke] OK package=%@", output.packageDirURL.path)
+                NSLog("[FilmtoneM5Smoke] OK mov=%@", output.movURL.path)
+                NSLog("[FilmtoneM5Smoke] OK gcsv=%@", output.gcsvURL.path)
+                NSLog("[FilmtoneM5Smoke] OK json=%@", output.jsonURL.path)
+                NSLog("[FilmtoneM5Smoke] OK log=%@", output.debugLogURL.path)
+            case .failure(let error):
+                NSLog("[FilmtoneM5Smoke] FAIL: %@", error.localizedDescription)
             }
         }
     }

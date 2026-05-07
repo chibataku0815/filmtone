@@ -1,0 +1,225 @@
+{
+  "anchor" : {
+    "machTimebaseDenom" : 3,
+    "machTimebaseNumer" : 125,
+    "startBootUptimeSeconds" : 143361.56546458334,
+    "startMachAbsolute" : 3440677571129
+  },
+  "baselineExpectedRange" : {
+    "driftToleranceSeconds" : 0.20000000000000001,
+    "purpose" : "drift gate only — NOT the M5-B sync seed",
+    "source" : "M4 PASS commit f8e7db15",
+    "vdoFirstPtsToAccelOffsetWithinM4DriftTolerance" : true,
+    "vdoFirstPtsToGyroOffsetWithinM4DriftTolerance" : true,
+    "vdoPTSMinusAccelTSSeconds_M4" : -0.058061834017280489,
+    "vdoPTSMinusGyroTSSeconds_M4" : -0.048054834012873471
+  },
+  "captureDevice" : {
+    "deviceType" : "AVCaptureDeviceTypeBuiltInWideAngleCamera",
+    "localizedName" : "背面カメラ",
+    "uniqueID" : "com.apple.avfoundation.avcapturedevice.built-in_video:0"
+  },
+  "device" : {
+    "machine" : "iPhone18,1",
+    "model" : "iPhone",
+    "name" : "iPhone",
+    "systemName" : "iOS",
+    "systemVersion" : "26.4.2"
+  },
+  "duration" : {
+    "elapsedSeconds" : 31.9308352083317,
+    "motionMarginSeconds" : 1,
+    "requestedSeconds" : 30
+  },
+  "gcsv" : {
+    "accelDroppedRowCount" : 0,
+    "accelExactRowCount" : 3170,
+    "accelInterpolatedRowCount" : 18,
+    "accelOutOfRangeEndCount" : 0,
+    "accelOutOfRangeStartCount" : 1,
+    "accelOutOfRangeTotalCount" : 1,
+    "accelResamplingToleranceSeconds" : 0.01,
+    "accelToGyroMaxDeltaSeconds" : 0.005003000027500093,
+    "accelToGyroMedianDeltaSeconds" : 0,
+    "accelUnit" : "g",
+    "ascale" : 1,
+    "axisConvention" : {
+      "mode" : "sensor-native",
+      "orientation" : "XYZ",
+      "rawSensorFrameNote" : "Core Motion raw rotationRate (rad\/s) and acceleration (g) emitted unchanged. M5-B verifies against rotated .mov; orientation may be overridden if desktop evidence requires image-frame remap.",
+      "remapApplied" : false
+    },
+    "fileSizeBytes" : 269275,
+    "gscale" : 1,
+    "gyroAccelTrimDurationEndSeconds" : 0,
+    "gyroAccelTrimDurationLimitSeconds" : 0.02,
+    "gyroAccelTrimDurationStartSeconds" : 0.0050029999983962625,
+    "gyroAccelTrimDurationTotalSeconds" : 0.0050029999983962625,
+    "gyroAccelTrimDurationWithinLimit" : true,
+    "gyroMedianIntervalSeconds" : 0.010007000004407018,
+    "gyroUnit" : "rad\/s",
+    "headerBytes" : 166,
+    "imuEffectiveHz" : 99.930048921715439,
+    "imuRequestedHz" : 200,
+    "lastPathComponent" : "m5-motion.gcsv",
+    "path" : "\/var\/mobile\/Containers\/Data\/Application\/1DACA6FB-8F1B-40E9-98B1-74B8F51D9578\/Library\/Caches\/Filmtone\/captures\/m5-staging-a8ca4b0a-7f8e-4747-833b-9921a56ade4f\/m5-motion.gcsv",
+    "rowConstructionStrategy" : "C",
+    "rowConstructionStrategyName" : "combined-on-gyro-timeline",
+    "rowCount" : 3188,
+    "timestampBasis" : "motion-relative",
+    "tscale" : 9.9999999999999995e-07,
+    "written" : true
+  },
+  "lane" : "v2-capture-gyroflow",
+  "mapping" : {
+    "firstAccelTSSeconds" : 143361.57335791667,
+    "firstGyroTSSeconds" : 143361.56835491667,
+    "firstVdoPTSSeconds" : 143361.54349683301,
+    "vdoPTSMinusAccelTSSeconds" : -0.029861083661671728,
+    "vdoPTSMinusGyroTSSeconds" : -0.024858083663275465
+  },
+  "milestone" : "M5-A",
+  "motion" : {
+    "accel" : {
+      "coverageSeconds" : 31.902480708347866,
+      "effectiveHz" : 99.930048921715439,
+      "firstTS" : 143361.57335791667,
+      "intervals" : {
+        "gapCountOver50ms" : 0,
+        "gapCountOver100ms" : 0,
+        "gapCountOver200ms" : 0,
+        "maxGapSeconds" : 0.010008000012021512,
+        "medianSeconds" : 0.010007000004407018,
+        "p99Seconds" : 0.010008000012021512
+      },
+      "lastTS" : 143393.47583862502,
+      "sampleCount" : 3189
+    },
+    "coreMotion" : {
+      "fusedDeviceMotionStarted" : false,
+      "isAccelerometerAvailable" : true,
+      "isDeviceMotionAvailable" : true,
+      "isGyroAvailable" : true,
+      "requestedAccelIntervalSeconds" : 0.0050000000000000001,
+      "requestedGyroIntervalSeconds" : 0.0050000000000000001,
+      "requestedHz" : 200
+    },
+    "gyro" : {
+      "coverageSeconds" : 31.907483708346263,
+      "effectiveHz" : 99.930048921715439,
+      "firstTS" : 143361.56835491667,
+      "intervals" : {
+        "gapCountOver50ms" : 0,
+        "gapCountOver100ms" : 0,
+        "gapCountOver200ms" : 0,
+        "maxGapSeconds" : 0.015010000002803281,
+        "medianSeconds" : 0.010007000004407018,
+        "p99Seconds" : 0.010008000012021512
+      },
+      "lastTS" : 143393.47583862502,
+      "sampleCount" : 3189
+    }
+  },
+  "package" : {
+    "finalDirectoryPath" : "\/var\/mobile\/Containers\/Data\/Application\/1DACA6FB-8F1B-40E9-98B1-74B8F51D9578\/Library\/Caches\/Filmtone\/captures\/m5-package-a8ca4b0a-7f8e-4747-833b-9921a56ade4f",
+    "gcsvFileSizeBytes" : 269275,
+    "movFileSizeBytes" : 2690295147,
+    "renamedToFinal" : false,
+    "stagingDirectoryPath" : "\/var\/mobile\/Containers\/Data\/Application\/1DACA6FB-8F1B-40E9-98B1-74B8F51D9578\/Library\/Caches\/Filmtone\/captures\/m5-staging-a8ca4b0a-7f8e-4747-833b-9921a56ade4f",
+    "uuid" : "a8ca4b0a-7f8e-4747-833b-9921a56ade4f"
+  },
+  "runLocalSyncOffsets" : {
+    "firstAccelCmLogTimestampSeconds" : 143361.57335791667,
+    "firstGyroCmLogTimestampSeconds" : 143361.56835491667,
+    "firstVdoPTSSeconds" : 143361.54349683301,
+    "movieStartPTSSeconds" : 143361.71016770799,
+    "primarySeedKey" : "runLocalMovieStartToGyroOffsetSeconds",
+    "runLocalMovieStartToAccelOffsetSeconds" : 0.13680979132186621,
+    "runLocalMovieStartToGyroOffsetSeconds" : 0.14181279132026248,
+    "runLocalVdoFirstPtsToAccelOffsetSeconds" : -0.029861083661671728,
+    "runLocalVdoFirstPtsToGyroOffsetSeconds" : -0.024858083663275465
+  },
+  "schemaVersion" : 1,
+  "session" : {
+    "automaticallyConfiguresCaptureDeviceForWideColor" : false,
+    "hardwareCostAfterCommit" : 0.5,
+    "presetAfterCommit" : "AVCaptureSessionPresetInputPriority",
+    "synchronizationClock" : "FigClock[HostTimeClock]: 0x1065a10a0 retainCount: 20 allocator: 0x1f82cc310 current time: {143361423463291\/1000000000 = 143361.423} = 143361.423463 seconds"
+  },
+  "smokeError" : null,
+  "smokeLaneEnvVar" : "m5",
+  "timestamps" : {
+    "configuredAtBootTime" : 143361.33544749999,
+    "startedAtBootTime" : 143361.56546458334,
+    "stoppedAtBootTime" : 143393.49629979167
+  },
+  "video" : {
+    "format" : {
+      "colorSpace" : "AppleLog2",
+      "colorSpaceRawValue" : 4,
+      "dimensions" : [
+        3840,
+        2160
+      ],
+      "formatIndex" : 56,
+      "fps" : 30,
+      "pixelFormat" : "x422"
+    },
+    "movieFile" : {
+      "didFinish" : true,
+      "didStart" : true,
+      "finishError" : null,
+      "movFileSizeBytes" : 2690295147,
+      "outputPath" : "\/var\/mobile\/Containers\/Data\/Application\/1DACA6FB-8F1B-40E9-98B1-74B8F51D9578\/Library\/Caches\/Filmtone\/captures\/m5-staging-a8ca4b0a-7f8e-4747-833b-9921a56ade4f\/m5-master.mov",
+      "outputURL" : "\/var\/mobile\/Containers\/Data\/Application\/1DACA6FB-8F1B-40E9-98B1-74B8F51D9578\/Library\/Caches\/Filmtone\/captures\/m5-staging-a8ca4b0a-7f8e-4747-833b-9921a56ade4f\/m5-master.mov",
+      "recordedDurationSeconds" : 30.567326874999999,
+      "startPTSSeconds" : 143361.71016770799
+    },
+    "movieRotation" : {
+      "applied" : true,
+      "appliedAngle" : 90
+    },
+    "movieStabilization" : {
+      "applied" : "off",
+      "appliedRaw" : 0
+    },
+    "vdo" : {
+      "coverageSeconds" : 31.900690582988318,
+      "effectiveFps" : 29.999325331339438,
+      "firstPTSSeconds" : 143361.54349683301,
+      "intervals" : {
+        "gapCountOver50ms" : 0,
+        "gapCountOver100ms" : 0,
+        "gapCountOver200ms" : 0,
+        "maxGapSeconds" : 0.033334250008920208,
+        "medianSeconds" : 0.033334082982037216,
+        "p99Seconds" : 0.033334208012092859
+      },
+      "lastPTSSeconds" : 143393.444187416,
+      "rotation" : {
+        "applied" : true,
+        "appliedAngle" : 90
+      },
+      "sampleCount" : 958,
+      "stabilization" : {
+        "applied" : "off",
+        "appliedRaw" : 0
+      }
+    },
+    "writer" : {
+      "availableVideoCodecTypes" : [
+        "apch",
+        "apcn",
+        "apcs",
+        "apco"
+      ],
+      "codec" : "apch",
+      "movFileExists" : true,
+      "movFileSizeBytes" : 2690295147,
+      "vdoFirstSampleDimensions" : {
+        "height" : 3840,
+        "width" : 2160
+      }
+    }
+  }
+}
