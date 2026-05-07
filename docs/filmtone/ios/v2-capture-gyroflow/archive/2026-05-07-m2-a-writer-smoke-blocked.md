@@ -1,5 +1,8 @@
 # Active: M2-A Video-Only Writer Smoke — BLOCKED on Frozen Inputs
 
+Archive result: **BLOCKED, not completed.** This active is archived to clear
+the current lane for a writer-path design review. Do not treat M2-A as passing.
+
 Status: **BLOCKED 2026-05-07 JST.** Frozen Inputs broken by device truth.
 Stop here. Do not pivot to BGRA / MovieFileOutput / mystery-FourCC in this
 active.md — `feedback_no_silent_stream_redefine` says lane re-scope must

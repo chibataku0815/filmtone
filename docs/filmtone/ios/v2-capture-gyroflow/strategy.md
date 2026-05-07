@@ -213,18 +213,22 @@ Dependency:
 - Which rear-camera format should be the first real recording mode on the owner
   device?
 - Does the owner device runtime-report Apple Log 2 for the desired mode?
-- Can `AVCaptureVideoDataOutput + AVAssetWriter` produce stable PTS for this
-  use case? **(2026-05-07: VDO cannot deliver `x422` / `x420` for the M1
-  candidate format on iPhone 17 Pro / iOS 26.4 — see Completion Log entry.
-  Path needs redesign before M2 can proceed.)**
+- ~~Can `AVCaptureVideoDataOutput + AVAssetWriter` produce stable PTS for this
+  use case?~~ **Closed 2026-05-07**: VDO rejected as the sole product master
+  writer path (Path C selected — see Completion Log). VDO is retained as a
+  timing / diagnostics side-band only.
 - Does Core Motion sampling remain stable while the selected video mode records?
 - Can Core Motion boot-time timestamps and video PTS be mapped cleanly enough
   for Gyroflow?
 - Which stabilization / lens path makes gyro data agree with the image path?
 - Does capture-time preview need Metal earlier than expected?
-- **New 2026-05-07**: Can dual-output (`AVCaptureMovieFileOutput` master +
-  `AVCaptureVideoDataOutput` for timing) attach to one session on iOS 26,
-  and do their timestamps align for M3+ Gyroflow mapping?
+- **Open 2026-05-07 (Path C verification)**: Can `AVCaptureMovieFileOutput`
+  (ProRes Apple Log 2 master) and `AVCaptureVideoDataOutput` (timing
+  side-band) coexist on the same `AVCaptureSession` at 4K Apple Log 2 on
+  iPhone 17 Pro / iOS 26.4? Required: `canAddOutput` true for both,
+  `hardwareCost` ≤ 1.0, master `.mov` color tagging consistent with Apple
+  Log 2, VDO PTS derivable from `AVCaptureSession.synchronizationClock` for
+  M3+ Gyroflow mapping.
 
 ## Completion Log
 
@@ -243,3 +247,18 @@ Dependency:
   Frozen Inputs need redesign before M2 can resume — see active.md
   "Scope Review Required". Next active.md is a design review, not a
   continuation of M2-A.
+- 2026-05-07: M2 writer path **decided — Path C (Quality-first dual-output)**.
+  `AVCaptureMovieFileOutput` writes the ProRes Apple Log 2 master;
+  `AVCaptureVideoDataOutput` runs as a timing / diagnostics side-band.
+  VDO is rejected as the sole product master writer for M2 product capture.
+  Decision evidence: Apple TN3121 (`availableVideoPixelFormatTypes` is
+  "connected to" semantics), Apple `.inputPriority` preset documentation
+  (auto-switch on `activeFormat` change), Apple Forum thread 769888
+  (4K60 ProRes Log uses `AVCaptureMovieFileOutput`), iPhoneOS 26.4 SDK
+  `CVPixelBuffer.h` (all 9 M2-A deliverable FourCCs decoded as 8-bit). A
+  parallel observation: M2-A's `availableVideoPixelFormatTypes` was queried
+  before VDO was attached to the session (TN3121 connected-to semantics),
+  so M2-A's blocker may reflect ordering rather than an Apple Log 2 +
+  VDO 10-bit limitation. That ordering question is intentionally not
+  resolved in this active because Path C is preferred regardless. See
+  next active proposal "M2-B Path C Dual-Output Coexistence Smoke".
