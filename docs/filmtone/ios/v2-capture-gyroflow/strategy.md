@@ -222,13 +222,10 @@ Dependency:
   for Gyroflow?
 - Which stabilization / lens path makes gyro data agree with the image path?
 - Does capture-time preview need Metal earlier than expected?
-- **Open 2026-05-07 (Path C verification)**: Can `AVCaptureMovieFileOutput`
-  (ProRes Apple Log 2 master) and `AVCaptureVideoDataOutput` (timing
-  side-band) coexist on the same `AVCaptureSession` at 4K Apple Log 2 on
-  iPhone 17 Pro / iOS 26.4? Required: `canAddOutput` true for both,
-  `hardwareCost` ≤ 1.0, master `.mov` color tagging consistent with Apple
-  Log 2, VDO PTS derivable from `AVCaptureSession.synchronizationClock` for
-  M3+ Gyroflow mapping.
+- ~~Can `AVCaptureMovieFileOutput` (ProRes Apple Log 2 master) and
+  `AVCaptureVideoDataOutput` (timing side-band) coexist on the same
+  `AVCaptureSession` at 4K Apple Log 2 on iPhone 17 Pro / iOS 26.4?~~
+  **Closed 2026-05-07**: M2-B passed on iPhone 17 Pro / iOS 26.4.2.
 
 ## Completion Log
 
@@ -262,3 +259,8 @@ Dependency:
   VDO 10-bit limitation. That ordering question is intentionally not
   resolved in this active because Path C is preferred regardless. See
   next active proposal "M2-B Path C Dual-Output Coexistence Smoke".
+- 2026-05-07: M2-B Path C dual-output coexistence smoke **passed** on
+  iPhone 17 Pro / iOS 26.4.2. `AVCaptureMovieFileOutput` + VDO coexisted at
+  `hardwareCost = 0.5`; the master `.mov` is ProRes 422 HQ (`apch`),
+  3840x2160, 30 fps, 6.166667s; VDO delivered `x422` timing samples
+  (191 frames, 0 dropped). M3 motion-only recorder smoke can proceed.
