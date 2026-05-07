@@ -9,6 +9,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         #if DEBUG
         runM1CapabilityProbeOnLaunch()
+        runM2AWriterSmokeOnLaunch()
         #endif
 
         do {
@@ -87,6 +88,25 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             NSLog("[FilmtoneM1Probe] capability JSON written: %@", result.fileURL.path)
         } catch {
             NSLog("[FilmtoneM1Probe] capability probe failed: %@", error.localizedDescription)
+        }
+    }
+
+    /// V2 capture / Gyroflow lane M2-A: kicks off the video-only writer
+    /// smoke once per Debug cold launch. Synchronous wrapper, async session
+    /// inside (camera permission → AVCaptureSession.startRunning →
+    /// duration timer → finishWriting). The smoke runs in the background
+    /// and writes both the .mov and the diagnostics JSON to
+    /// Library/Caches/Filmtone/captures/. Release builds skip this path.
+    private func runM2AWriterSmokeOnLaunch() {
+        NSLog("[FilmtoneM2Smoke] starting writer smoke (async)…")
+        FilmtoneCaptureWriter.runSmoke(duration: 6.0) { result in
+            switch result {
+            case .success(let output):
+                NSLog("[FilmtoneM2Smoke] OK mov=%@", output.movURL.path)
+                NSLog("[FilmtoneM2Smoke] OK json=%@", output.jsonURL.path)
+            case .failure(let error):
+                NSLog("[FilmtoneM2Smoke] FAIL: %@", error.localizedDescription)
+            }
         }
     }
     #endif

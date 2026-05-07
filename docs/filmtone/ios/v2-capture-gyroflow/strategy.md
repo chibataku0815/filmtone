@@ -214,12 +214,17 @@ Dependency:
   device?
 - Does the owner device runtime-report Apple Log 2 for the desired mode?
 - Can `AVCaptureVideoDataOutput + AVAssetWriter` produce stable PTS for this
-  use case?
+  use case? **(2026-05-07: VDO cannot deliver `x422` / `x420` for the M1
+  candidate format on iPhone 17 Pro / iOS 26.4 — see Completion Log entry.
+  Path needs redesign before M2 can proceed.)**
 - Does Core Motion sampling remain stable while the selected video mode records?
 - Can Core Motion boot-time timestamps and video PTS be mapped cleanly enough
   for Gyroflow?
 - Which stabilization / lens path makes gyro data agree with the image path?
 - Does capture-time preview need Metal earlier than expected?
+- **New 2026-05-07**: Can dual-output (`AVCaptureMovieFileOutput` master +
+  `AVCaptureVideoDataOutput` for timing) attach to one session on iOS 26,
+  and do their timestamps align for M3+ Gyroflow mapping?
 
 ## Completion Log
 
@@ -229,3 +234,12 @@ Dependency:
   Apple Log 2 confirmed runtime-reported on all 7 rear cameras. M2 candidate
   locked: BuiltInWideAngleCamera formatIndex 56, pixelFormat `x422`, Apple Log 2,
   3840×2160@30, writer = ProRes 422 HQ.
+- 2026-05-07: M2-A (Video-Only Writer Smoke) **blocked**.
+  `AVCaptureVideoDataOutput.availableVideoPixelFormatTypes` on iPhone 17 Pro /
+  iOS 26.4 does not include `x422` or `x420` for the M1 candidate format —
+  only `420v`, `420f`, `BGRA`, plus 6 lossless/lossy compressed 8-bit
+  variants (`&8v0`, `-8v0`, `&8f0`, `-8f0`, `&BGA`, `-BGA`). The M1-locked
+  ProRes 422 HQ + Apple Log 2 master cannot be built directly through VDO.
+  Frozen Inputs need redesign before M2 can resume — see active.md
+  "Scope Review Required". Next active.md is a design review, not a
+  continuation of M2-A.
