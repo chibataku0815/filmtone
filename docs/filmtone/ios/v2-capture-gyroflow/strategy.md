@@ -269,3 +269,13 @@ Dependency:
   `startAccelerometerUpdates` (fused not started); both streams 1048
   samples / coverage 10.479s / effectiveHz 99.92 / maxGap 10.0ms /
   gapCountOver50/100/200ms = 0/0/0. M4 combined timing smoke can proceed.
+- 2026-05-07: M4 combined timing smoke **passed** on iPhone 17 Pro /
+  iOS 26.4.2 with one `AVCaptureSession` driving Path C dual output (ProRes
+  422 HQ Apple Log 2 master + VDO timing side-band) alongside raw gyro +
+  accel. 30s run; `video.movieFile.startPTSSeconds = 139121.811449` (finite —
+  startPTS gate satisfied), VDO 957 samples / 29.999 fps, gyro 3183 / accel
+  3182 (both 99.92 Hz; 200 Hz request capped by iOS 26.4 IMU), all gap
+  counters 0, `mapping.vdoPTSMinusGyroTSSeconds = -48.05ms`,
+  `vdoPTSMinusAccelTSSeconds = -58.06ms`. `session.synchronizationClock` is
+  `HostTimeClock` so VDO PTS, MovieFile startPTS, and `CMLogItem.timestamp`
+  share a single `mach_absolute_time` axis — M5 `.gcsv` proof can proceed.

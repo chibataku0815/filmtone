@@ -77,17 +77,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     #if DEBUG
     /// V2 capture / Gyroflow lane smoke dispatcher. Selects at most one
     /// smoke per Debug launch via the `FILMTONE_SMOKE_LANE` environment
-    /// variable so M1 / M2-B / M3 evidence stays mutually exclusive (M3
-    /// in particular must be motion-only — no AVCaptureSession may be
-    /// running on the device while it records). Default (env var unset)
-    /// runs nothing, so day-to-day Xcode Debug launches stay clean.
+    /// variable so M1 / M2-B / M3 / M4 evidence stays mutually exclusive
+    /// (M3 in particular must be motion-only — no AVCaptureSession may
+    /// be running on the device while it records). Default (env var
+    /// unset) runs nothing, so day-to-day Xcode Debug launches stay clean.
     ///
     /// Trigger from devicectl with the JSON-dictionary form:
     ///   xcrun devicectl device process launch --device <udid> \
-    ///     --environment-variables '{"FILMTONE_SMOKE_LANE":"m3"}' \
+    ///     --environment-variables '{"FILMTONE_SMOKE_LANE":"m4"}' \
     ///     com.chibatakumi.film.lab.ios
     /// Fallback if the JSON form fails to propagate:
-    ///   DEVICECTL_CHILD_FILMTONE_SMOKE_LANE=m3 xcrun devicectl …
+    ///   DEVICECTL_CHILD_FILMTONE_SMOKE_LANE=m4 xcrun devicectl …
     private func runFilmtoneSmokeIfRequested() {
         let lane = ProcessInfo.processInfo.environment["FILMTONE_SMOKE_LANE"]?
             .lowercased()
@@ -98,6 +98,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             runM2BCoexistenceSmokeOnLaunch()
         case "m3":
             runM3MotionOnlySmokeOnLaunch()
+        case "m4":
+            runM4CombinedTimingSmokeOnLaunch()
         case .some(let other):
             NSLog("[FilmtoneSmoke] FILMTONE_SMOKE_LANE=%@ unrecognised; no smoke runs.", other)
         case .none:
@@ -154,6 +156,28 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                 NSLog("[FilmtoneM3Smoke] OK log=%@", output.debugLogURL.path)
             case .failure(let error):
                 NSLog("[FilmtoneM3Smoke] FAIL: %@", error.localizedDescription)
+            }
+        }
+    }
+
+    /// V2 capture / Gyroflow lane M4: combined timing smoke. One
+    /// AVCaptureSession (M2-B Path C ProRes 422 HQ Apple Log 2 master +
+    /// VDO timing side-band) runs simultaneously with raw Core Motion
+    /// gyro + accelerometer. Records a `mach_absolute_time` /
+    /// `systemUptime` anchor pair captured at session start so M5 can
+    /// map video PTS to Core Motion `CMLogItem.timestamp` without
+    /// guessing. Writes m4-master.mov, m4-combined-timing-smoke.json,
+    /// and m4-debug.log to Library/Caches/Filmtone/captures/.
+    private func runM4CombinedTimingSmokeOnLaunch() {
+        NSLog("[FilmtoneM4Smoke] starting combined timing smoke (async)…")
+        FilmtoneCombinedTimingSmoke.runSmoke(duration: 30.0, motionMargin: 1.0) { result in
+            switch result {
+            case .success(let output):
+                NSLog("[FilmtoneM4Smoke] OK mov=%@", output.movURL.path)
+                NSLog("[FilmtoneM4Smoke] OK json=%@", output.jsonURL.path)
+                NSLog("[FilmtoneM4Smoke] OK log=%@", output.debugLogURL.path)
+            case .failure(let error):
+                NSLog("[FilmtoneM4Smoke] FAIL: %@", error.localizedDescription)
             }
         }
     }

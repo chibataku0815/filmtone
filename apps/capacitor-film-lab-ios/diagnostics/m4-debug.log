@@ -1,0 +1,28 @@
+[1778151544.3119612] M4 combined timing smoke begin
+[1778151544.317381] start() requesting camera authorization (status=3)
+[1778151544.3175368] isGyroAvailable=true isAccelerometerAvailable=true isDeviceMotionAvailable=true
+[1778151544.317937] requestAccess granted=true
+[1778151544.318243] configureSession() — locating wide rear camera…
+[1778151544.3673592] wide=背面カメラ formats=70
+[1778151544.369166] formats[56].supportedColorSpaces (raw)=0,2,3,4
+[1778151544.369741] session.sessionPreset=.inputPriority, autoWideColor=false
+[1778151544.373631] session.addInput(wide) OK
+[1778151544.374428] activeFormat=formats[56], activeColorSpace=appleLog2, fps=30 applied
+[1778151544.3755488] session.addOutput(movieFileOutput) OK
+[1778151544.376142] movieOutput.availableVideoCodecTypes=apch,apcn,apcs,apco
+[1778151544.403785] movieOutput.setOutputSettings(proRes422HQ) OK
+[1778151544.408581] session.addOutput(videoDataOutput) OK
+[1778151544.4114718] commitConfiguration done. preset=AVCaptureSessionPresetInputPriority hardwareCost=0.5
+[1778151544.411607] session.synchronizationClock=FigClock[HostTimeClock]: 0x1068d3800 retainCount: 20 allocator: 0x1f82cc310 current time: {139121523606583/1000000000 = 139121.524} = 139121.523607 seconds
+[1778151544.41214] configureSession OK, starting session…
+[1778151544.412235] session.startRunning() …
+[1778151544.574778] session.isRunning=true
+[1778151544.574939] anchor: machAbsolute=3338920485861 bootUptime=139121.68691195833 tb=125/3; motion updates issued
+[1778151544.579043] movieOutput.startRecording(to: m4-master.mov) requested
+[1778151544.730671] movieFileOutput didStartRecordingTo (startPTS) m4-master.mov startPTSSeconds=139121.811448625
+[1778151575.313116] requestStop: recordedDuration snapshot=30.567286208s
+[1778151575.410176] movieFileOutput didFinishRecordingTo m4-master.mov OK
+[1778151575.410727] finalizeAndComplete() begin
+[1778151576.433881] motion snapshot finished. gyroCount=3183 accelCount=3182 stopBootTime=139153.54598379167
+[1778151576.5318298] session.stopRunning() done. vdoCount=957
+[1778151576.7223501] master mov exists=true size=2477204843 startPTSSeconds=139121.811448625

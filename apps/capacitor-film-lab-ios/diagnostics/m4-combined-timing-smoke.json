@@ -1,0 +1,158 @@
+{
+  "anchor" : {
+    "machTimebaseDenom" : 3,
+    "machTimebaseNumer" : 125,
+    "startBootUptimeSeconds" : 139121.68691195833,
+    "startMachAbsolute" : 3338920485861
+  },
+  "captureDevice" : {
+    "deviceType" : "AVCaptureDeviceTypeBuiltInWideAngleCamera",
+    "localizedName" : "背面カメラ",
+    "uniqueID" : "com.apple.avfoundation.avcapturedevice.built-in_video:0"
+  },
+  "device" : {
+    "machine" : "iPhone18,1",
+    "model" : "iPhone",
+    "name" : "iPhone",
+    "systemName" : "iOS",
+    "systemVersion" : "26.4.2"
+  },
+  "duration" : {
+    "elapsedSeconds" : 31.859071833343478,
+    "motionMarginSeconds" : 1,
+    "requestedSeconds" : 30
+  },
+  "lane" : "v2-capture-gyroflow",
+  "mapping" : {
+    "firstAccelTSSeconds" : 139121.70284000001,
+    "firstGyroTSSeconds" : 139121.69283300001,
+    "firstVdoPTSSeconds" : 139121.644778166,
+    "vdoPTSMinusAccelTSSeconds" : -0.058061834017280489,
+    "vdoPTSMinusGyroTSSeconds" : -0.048054834012873471
+  },
+  "milestone" : "M4",
+  "motion" : {
+    "accel" : {
+      "coverageSeconds" : 31.834143499989295,
+      "effectiveHz" : 99.920064119391128,
+      "firstTS" : 139121.70284000001,
+      "intervals" : {
+        "gapCountOver50ms" : 0,
+        "gapCountOver100ms" : 0,
+        "gapCountOver200ms" : 0,
+        "maxGapSeconds" : 0.010008666664361954,
+        "medianSeconds" : 0.010007999982917681,
+        "p99Seconds" : 0.010008000012021512
+      },
+      "lastTS" : 139153.5369835,
+      "sampleCount" : 3182
+    },
+    "coreMotion" : {
+      "fusedDeviceMotionStarted" : false,
+      "isAccelerometerAvailable" : true,
+      "isDeviceMotionAvailable" : true,
+      "isGyroAvailable" : true,
+      "requestedAccelIntervalSeconds" : 0.0050000000000000001,
+      "requestedGyroIntervalSeconds" : 0.0050000000000000001,
+      "requestedHz" : 200
+    },
+    "gyro" : {
+      "coverageSeconds" : 31.844150499993702,
+      "effectiveHz" : 99.920064119391128,
+      "firstTS" : 139121.69283300001,
+      "intervals" : {
+        "gapCountOver50ms" : 0,
+        "gapCountOver100ms" : 0,
+        "gapCountOver200ms" : 0,
+        "maxGapSeconds" : 0.010008666664361954,
+        "medianSeconds" : 0.010007999982917681,
+        "p99Seconds" : 0.010008000012021512
+      },
+      "lastTS" : 139153.5369835,
+      "sampleCount" : 3183
+    }
+  },
+  "schemaVersion" : 1,
+  "session" : {
+    "automaticallyConfiguresCaptureDeviceForWideColor" : false,
+    "hardwareCostAfterCommit" : 0.5,
+    "presetAfterCommit" : "AVCaptureSessionPresetInputPriority",
+    "synchronizationClock" : "FigClock[HostTimeClock]: 0x1068d3800 retainCount: 20 allocator: 0x1f82cc310 current time: {139121523606583\/1000000000 = 139121.524} = 139121.523607 seconds"
+  },
+  "smokeError" : null,
+  "smokeLaneEnvVar" : "m4",
+  "timestamps" : {
+    "configuredAtBootTime" : 139121.43024000002,
+    "startedAtBootTime" : 139121.68691195833,
+    "stoppedAtBootTime" : 139153.54598379167
+  },
+  "video" : {
+    "format" : {
+      "colorSpace" : "AppleLog2",
+      "colorSpaceRawValue" : 4,
+      "dimensions" : [
+        3840,
+        2160
+      ],
+      "formatIndex" : 56,
+      "fps" : 30,
+      "pixelFormat" : "x422"
+    },
+    "movieFile" : {
+      "didFinish" : true,
+      "didStart" : true,
+      "finishError" : null,
+      "movFileSizeBytes" : 2477204843,
+      "outputPath" : "\/var\/mobile\/Containers\/Data\/Application\/56E36AB9-DF9C-4B6C-92EA-0CDDF10ADA00\/Library\/Caches\/Filmtone\/captures\/m4-master.mov",
+      "outputURL" : "\/var\/mobile\/Containers\/Data\/Application\/56E36AB9-DF9C-4B6C-92EA-0CDDF10ADA00\/Library\/Caches\/Filmtone\/captures\/m4-master.mov",
+      "recordedDurationSeconds" : 30.567286207999999,
+      "startPTSSeconds" : 139121.811448625
+    },
+    "movieRotation" : {
+      "applied" : true,
+      "appliedAngle" : 90
+    },
+    "movieStabilization" : {
+      "applied" : "off",
+      "appliedRaw" : 0
+    },
+    "vdo" : {
+      "coverageSeconds" : 31.867312709015096,
+      "effectiveFps" : 29.999363126831653,
+      "firstPTSSeconds" : 139121.644778166,
+      "intervals" : {
+        "gapCountOver50ms" : 0,
+        "gapCountOver100ms" : 0,
+        "gapCountOver200ms" : 0,
+        "maxGapSeconds" : 0.033334291016217321,
+        "medianSeconds" : 0.033334040985209867,
+        "p99Seconds" : 0.033334166975691915
+      },
+      "lastPTSSeconds" : 139153.51209087501,
+      "rotation" : {
+        "applied" : true,
+        "appliedAngle" : 90
+      },
+      "sampleCount" : 957,
+      "stabilization" : {
+        "applied" : "off",
+        "appliedRaw" : 0
+      }
+    },
+    "writer" : {
+      "availableVideoCodecTypes" : [
+        "apch",
+        "apcn",
+        "apcs",
+        "apco"
+      ],
+      "codec" : "apch",
+      "movFileExists" : true,
+      "movFileSizeBytes" : 2477204843,
+      "vdoFirstSampleDimensions" : {
+        "height" : 3840,
+        "width" : 2160
+      }
+    }
+  }
+}
