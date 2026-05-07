@@ -326,3 +326,27 @@ Dependency:
   need rewording when the Filmtone-optimized motion library lane
   opens — deferred to that active. Findings recorded in
   `archive/2026-05-07-m5-b-gyroflow-desktop-proof.md`.
+- 2026-05-07: M6 AVFoundation stabilization smoke **passed** on iPhone 17 Pro /
+  iOS 26.4.2. `AVCaptureConnection.preferredVideoStabilizationMode =
+  .cinematicExtendedEnhanced` (raw 5) on the M5-A locked format
+  (formatIndex 56 / x422 / Apple Log 2 / 3840x2160@30 / writer ProRes
+  422 HQ) clears all four Stop Conditions: active resolves to
+  requested (no silent `.off` fallback), Apple Log 2 preserved
+  (`colorSpaceRaw=4`), no format swap
+  (`activeFormatMatchesLockedAfterRecordStart=true`), and the recorded
+  `.mov` first video track FourCC reads `apch` via `AVURLAsset` (no
+  ProRes 422 HQ → HEVC writer downgrade — direct file evidence, not
+  the constant `writer.codec` field). Per-format probe of the full
+  iOS 26 candidate set (`off, standard, cinematic, cinematicExtended,
+  previewOptimized, cinematicExtendedEnhanced, lowLatency, auto`)
+  empirically reports `previewOptimized (raw 4)` and `lowLatency
+  (raw 6)` as NOT supported on formatIndex 56. Owner visual A/B
+  (run #2, handheld pan + light shake) judged the on-clip acceptable
+  at owner-quality bar with no visible Apple Log 2 tonal-range
+  downgrade. Implication: the Filmtone-optimized motion /
+  stabilization library lane that M5-B BLOCKED implied is **not
+  required for capture-time stabilization** — re-scope to
+  "post-capture motion-data uses AVFoundation cannot do" or
+  deprioritisation is **proposed** in the archived active and held
+  for owner review (not applied here). Findings recorded in
+  `archive/2026-05-07-m6-avfoundation-stabilization-smoke.md`.

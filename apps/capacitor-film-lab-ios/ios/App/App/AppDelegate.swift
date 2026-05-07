@@ -77,7 +77,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     #if DEBUG
     /// V2 capture / Gyroflow lane smoke dispatcher. Selects at most one
     /// smoke per Debug launch via the `FILMTONE_SMOKE_LANE` environment
-    /// variable so M1 / M2-B / M3 / M4 / M5 evidence stays mutually
+    /// variable so M1 / M2-B / M3 / M4 / M5 / M6 evidence stays mutually
     /// exclusive (M3 in particular must be motion-only — no
     /// AVCaptureSession may be running on the device while it records).
     /// Default (env var unset) runs nothing, so day-to-day Xcode Debug
@@ -85,10 +85,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     ///
     /// Trigger from devicectl with the JSON-dictionary form:
     ///   xcrun devicectl device process launch --device <udid> \
-    ///     --environment-variables '{"FILMTONE_SMOKE_LANE":"m5"}' \
+    ///     --environment-variables '{"FILMTONE_SMOKE_LANE":"m6","FILMTONE_M6_STABILIZATION_MODE":"cinematicExtended"}' \
     ///     com.chibatakumi.film.lab.ios
     /// Fallback if the JSON form fails to propagate:
-    ///   DEVICECTL_CHILD_FILMTONE_SMOKE_LANE=m5 xcrun devicectl …
+    ///   DEVICECTL_CHILD_FILMTONE_SMOKE_LANE=m6 \
+    ///   DEVICECTL_CHILD_FILMTONE_M6_STABILIZATION_MODE=cinematicExtended \
+    ///   xcrun devicectl …
     private func runFilmtoneSmokeIfRequested() {
         let lane = ProcessInfo.processInfo.environment["FILMTONE_SMOKE_LANE"]?
             .lowercased()
@@ -103,6 +105,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             runM4CombinedTimingSmokeOnLaunch()
         case "m5":
             runM5GcsvSmokeOnLaunch()
+        case "m6":
+            runM6StabilizationSmokeOnLaunch()
         case .some(let other):
             NSLog("[FilmtoneSmoke] FILMTONE_SMOKE_LANE=%@ unrecognised; no smoke runs.", other)
         case .none:
@@ -205,6 +209,35 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                 NSLog("[FilmtoneM5Smoke] OK log=%@", output.debugLogURL.path)
             case .failure(let error):
                 NSLog("[FilmtoneM5Smoke] FAIL: %@", error.localizedDescription)
+            }
+        }
+    }
+
+    /// V2 capture / Gyroflow lane M6: AVFoundation stabilization smoke.
+    /// Forks M5-A's `.gcsv` scaffolding and ONLY changes stabilization
+    /// wiring + diagnostics. Reads `FILMTONE_M6_STABILIZATION_MODE`
+    /// (off|standard|cinematic|cinematicExtended|previewOptimized|
+    /// cinematicExtendedEnhanced|auto). Default unset = `.off` (M5-A
+    /// baseline parity). Probes per-format supported modes, applies the
+    /// requested mode to the MovieFileOutput connection, and re-reads
+    /// `activeVideoStabilizationMode` after `didStartRecordingTo` so
+    /// AVFoundation's resolution is observable. Stop Conditions: env
+    /// requested non-`.off` but active resolved to `.off`; or Apple
+    /// Log 2 silently downgraded after stabilization engaged. Writes
+    /// m6-master.mov / m6-motion.gcsv / m6-combined-timing.json /
+    /// m6-debug.log to Library/Caches/Filmtone/captures/m6-package-<UUID>/.
+    private func runM6StabilizationSmokeOnLaunch() {
+        NSLog("[FilmtoneM6Smoke] starting stabilization smoke (async)…")
+        FilmtoneStabilizationSmoke.runSmoke(duration: 30.0, motionMargin: 1.0) { result in
+            switch result {
+            case .success(let output):
+                NSLog("[FilmtoneM6Smoke] OK package=%@", output.packageDirURL.path)
+                NSLog("[FilmtoneM6Smoke] OK mov=%@", output.movURL.path)
+                NSLog("[FilmtoneM6Smoke] OK gcsv=%@", output.gcsvURL.path)
+                NSLog("[FilmtoneM6Smoke] OK json=%@", output.jsonURL.path)
+                NSLog("[FilmtoneM6Smoke] OK log=%@", output.debugLogURL.path)
+            case .failure(let error):
+                NSLog("[FilmtoneM6Smoke] FAIL: %@", error.localizedDescription)
             }
         }
     }
