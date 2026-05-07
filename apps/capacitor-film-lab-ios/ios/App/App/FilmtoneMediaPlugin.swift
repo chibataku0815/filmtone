@@ -17,6 +17,7 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "cancelExport", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "cacheInventory", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "releaseCache", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "probeCaptureCapabilities", returnType: CAPPluginReturnPromise),
     ]
 
     private var assetPickerService: AssetPickerService?
@@ -65,7 +66,28 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
             name: UIApplication.didReceiveMemoryWarningNotification,
             object: nil
         )
+
+        #if DEBUG
+        runM1CapabilityProbeOnLaunch()
+        #endif
     }
+
+    #if DEBUG
+    /// V2 capture / Gyroflow lane M1: writes the capability probe JSON once
+    /// per Debug launch so that a single Xcode Run on a real device produces
+    /// the artifact that M1 Done Conditions require. Release builds skip this
+    /// path entirely (`#if DEBUG`).
+    private func runM1CapabilityProbeOnLaunch() {
+        Task.detached(priority: .utility) {
+            do {
+                let result = try FilmtoneCaptureCapabilityProbe.run()
+                CAPLog.print("[FilmtoneM1Probe] capability JSON written:", result.fileURL.path)
+            } catch {
+                CAPLog.print("[FilmtoneM1Probe] capability probe failed:", error.localizedDescription)
+            }
+        }
+    }
+    #endif
 
     deinit {
         NotificationCenter.default.removeObserver(self)
@@ -346,6 +368,28 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
             call.resolve(with: result)
         } catch {
             reject(call, with: error)
+        }
+    }
+
+    @objc func probeCaptureCapabilities(_ call: CAPPluginCall) {
+        Task.detached(priority: .userInitiated) {
+            do {
+                let result = try FilmtoneCaptureCapabilityProbe.run()
+                let response: [String: Any] = [
+                    "schemaVersion": FilmtoneCaptureCapabilityProbe.schemaVersion,
+                    "filePath": result.fileURL.path,
+                    "fileURI": result.fileURL.absoluteString,
+                    "json": result.jsonString,
+                    "payload": result.payload,
+                ]
+                await MainActor.run {
+                    call.resolve(response)
+                }
+            } catch {
+                await MainActor.run {
+                    self.reject(call, with: error)
+                }
+            }
         }
     }
 

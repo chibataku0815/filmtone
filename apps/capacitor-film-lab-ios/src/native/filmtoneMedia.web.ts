@@ -9,6 +9,7 @@ import type {
 import type {
   CacheInventory,
   CacheReleaseResult,
+  CaptureCapabilityProbeResult,
   FilmtoneMediaPlugin,
   PickedLutFile,
 } from "./filmtoneMedia";
@@ -288,6 +289,12 @@ export class FilmtoneMediaWeb extends WebPlugin implements FilmtoneMediaPlugin {
       removedBytes: 0,
       retainedBytes: 0,
     };
+  }
+
+  async probeCaptureCapabilities(): Promise<CaptureCapabilityProbeResult> {
+    throw new Error(
+      "probeCaptureCapabilities is iOS-only (V2 capture lane M1). The web shim cannot enumerate AVCaptureDevice formats.",
+    );
   }
 
   private async stepProgress(
