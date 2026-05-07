@@ -1,27 +1,30 @@
-// Filmtone V2 capture / Gyroflow lane — M2-A Video-Only Writer Smoke.
+// Filmtone V2 capture / Gyroflow lane — M2-B Path C Dual-Output Coexistence Smoke.
 //
-// Wires AVCaptureSession + AVCaptureDeviceInput (rear wide) +
-// AVCaptureVideoDataOutput + AVAssetWriter using the M1-locked candidate:
+// Records a ProRes 422 HQ Apple Log 2 master via AVCaptureMovieFileOutput
+// while running AVCaptureVideoDataOutput as a timing / diagnostics side-band.
+// Both outputs coexist on one AVCaptureSession (.inputPriority preset).
 //
+// Locked configuration (from M1):
 //   - device       : AVCaptureDeviceTypeBuiltInWideAngleCamera (rear)
-//   - format       : device.formats[56]   (10-bit 4:2:2, x422)
+//   - format       : device.formats[56]
 //   - colorSpace   : .appleLog2 (raw 4)
 //   - dimensions   : 3840 x 2160 @ 30 fps
-//   - writer codec : AVVideoCodecType.proRes422HQ
+//   - master codec : AVVideoCodecType.proRes422HQ via AVCaptureMovieFileOutput
 //
-// Records ~5-7 seconds of silent video to the internal sandbox
-// (Library/Caches/Filmtone/captures/m2a-smoke.mov), and writes a minimal
-// diagnostics JSON next to it covering all M2 Done Conditions:
-// writer status / first-last PTS / frame count / dropped count / selected
-// format / colorSpace / fps / dimensions / orientation / requested-applied
-// stabilization.
+// VDO is timing-only. It does NOT write a file. Per-sample PTS is captured
+// for M3/M4 timing-mapping work, and availableVideoPixelFormatTypes is
+// recorded AFTER addOutput so the M2-A "connected to" ordering bug is
+// resolved (TN3121).
 //
-// Hard invariants (M2-A boundary):
+// Path B (VDO + AVAssetWriter as the sole product master writer) is
+// rejected — see archive/2026-05-07-m2-writer-path-decision.md.
+//
+// Hard invariants (M2-B boundary):
 //   - DEBUG-only entry. AppDelegate runs runSmoke() under #if DEBUG only.
-//   - No silent fallback. activeFormat / activeColorSpace selection failures
-//     abort the smoke loudly with a logged reason.
+//   - No silent fallback. Permission, format, colorSpace, codec, and
+//     output-attach failures abort the smoke loudly with a logged reason.
 //   - No audio track (strategy.md: M1-M4 produce silent video).
-//   - No JS bridge / UI surface in M2-A.
+//   - No JS bridge / UI surface in M2-B.
 //   - Internal sandbox output only.
 
 import AVFoundation
@@ -31,7 +34,7 @@ import Foundation
 #if os(iOS)
 
 final class FilmtoneCaptureWriter: NSObject {
-    static let schemaVersion = 1
+    static let schemaVersion = 2
 
     enum SmokeError: Error, LocalizedError {
         case permissionDenied
@@ -39,12 +42,12 @@ final class FilmtoneCaptureWriter: NSObject {
         case formatIndexOutOfRange(have: Int, want: Int)
         case appleLog2NotSupported(supportedRaw: [Int])
         case appleLog2EnumUnavailable
-        case pixelFormatNotAvailable(want: String, available: [String])
         case cannotAddInput
-        case cannotAddOutput
-        case writerSetupFailed(String)
-        case writerFinishedWithFailure(status: Int, message: String)
-        case noSamplesCaptured
+        case cannotAddMovieOutput
+        case cannotAddVideoDataOutput
+        case proRes422HQNotAvailable(available: [String])
+        case movieRecordingFinishedWithFailure(message: String)
+        case movieRecordingProducedNoFile
 
         var errorDescription: String? {
             switch self {
@@ -58,18 +61,18 @@ final class FilmtoneCaptureWriter: NSObject {
                 return "appleLog2 (raw=4) not in supportedColorSpaces \(raw)."
             case .appleLog2EnumUnavailable:
                 return "AVCaptureColorSpace(rawValue: 4) returned nil on this OS."
-            case .pixelFormatNotAvailable(let want, let available):
-                return "Wanted pixel format \(want) not in available \(available)."
             case .cannotAddInput:
                 return "AVCaptureSession.canAddInput returned false."
-            case .cannotAddOutput:
-                return "AVCaptureSession.canAddOutput returned false."
-            case .writerSetupFailed(let msg):
-                return "AVAssetWriter setup failed: \(msg)"
-            case .writerFinishedWithFailure(let status, let message):
-                return "AVAssetWriter finished status=\(status) error=\(message)"
-            case .noSamplesCaptured:
-                return "No video samples were captured during the smoke window."
+            case .cannotAddMovieOutput:
+                return "AVCaptureSession.canAddOutput(movieFileOutput) returned false."
+            case .cannotAddVideoDataOutput:
+                return "AVCaptureSession.canAddOutput(videoDataOutput) returned false."
+            case .proRes422HQNotAvailable(let available):
+                return "AVVideoCodecType.proRes422HQ not in availableVideoCodecTypes \(available)."
+            case .movieRecordingFinishedWithFailure(let message):
+                return "AVCaptureMovieFileOutput finished with error: \(message)"
+            case .movieRecordingProducedNoFile:
+                return "AVCaptureMovieFileOutput finished without producing a .mov file."
             }
         }
     }
@@ -81,8 +84,9 @@ final class FilmtoneCaptureWriter: NSObject {
 
     // MARK: - Public entry
 
-    /// Run the M2-A smoke once. Camera permission is requested if not
-    /// already granted. Returns through `completion` on the main thread.
+    /// Run the M2-B Path C coexistence smoke once. Camera permission is
+    /// requested if not already granted. Returns through `completion` on
+    /// the main thread.
     static func runSmoke(duration: TimeInterval = 6.0,
                          completion: @escaping (Result<SmokeResult, Error>) -> Void) {
         let writer = FilmtoneCaptureWriter()
@@ -99,36 +103,56 @@ final class FilmtoneCaptureWriter: NSObject {
     private static let lockedWidth: Int32 = 3840
     private static let lockedHeight: Int32 = 2160
     private static let lockedFPS: Double = 30
-    private static let lockedPixelFormat: OSType = kCVPixelFormatType_422YpCbCr10BiPlanarVideoRange  // 'x422'
     private static let lockedRotationAngle: CGFloat = 90  // portrait pin
 
     // MARK: - State
 
-    private let sessionQueue = DispatchQueue(label: "filmtone.m2a.session")
-    private let writerQueue = DispatchQueue(label: "filmtone.m2a.writer")
+    private let sessionQueue = DispatchQueue(label: "filmtone.m2b.session")
+    private let vdoQueue = DispatchQueue(label: "filmtone.m2b.vdo")
 
     private let session = AVCaptureSession()
     private var device: AVCaptureDevice?
     private var input: AVCaptureDeviceInput?
-    private var videoOutput: AVCaptureVideoDataOutput?
-    private var assetWriter: AVAssetWriter?
-    private var assetWriterInput: AVAssetWriterInput?
+    private var movieOutput: AVCaptureMovieFileOutput?
+    private var videoDataOutput: AVCaptureVideoDataOutput?
 
     private var movURL: URL?
     private var jsonURL: URL?
 
-    private var firstPTS: CMTime?
-    private var lastPTS: CMTime?
-    private var frameCount: Int = 0
-    private var droppedFrameCount: Int = 0
-    private var appendErrorCount: Int = 0
-    private var notReadyCount: Int = 0
+    // VDO side-band timing
+    private var vdoFirstPTS: CMTime?
+    private var vdoLastPTS: CMTime?
+    private var vdoFrameCount: Int = 0
+    private var vdoDroppedFrameCount: Int = 0
+    private var vdoFirstSamplePixelFormat: String?
+    private var vdoFirstSampleDimensions: CMVideoDimensions?
 
+    // Movie output state
+    private var movieDidStart: Bool = false
+    private var movieDidFinish: Bool = false
+    private var movieFinishError: Error?
+    private var movieFinishedURL: URL?
+    private var movieRecordingStartedAt: TimeInterval = 0
+    private var movieRecordingStoppedAt: TimeInterval = 0
+    private var movieDidStartSyncClockTime: CMTime?
+    private var movieStopRequestedSyncClockTime: CMTime?
+
+    // Connection state captured at startSession time
     private var requestedStabilizationRaw: Int = AVCaptureVideoStabilizationMode.off.rawValue
-    private var appliedStabilizationRaw: Int = -999
+    private var appliedStabilizationMovieRaw: Int = -999
+    private var appliedStabilizationVdoRaw: Int = -999
     private var requestedRotation: CGFloat = 0
-    private var appliedRotation: CGFloat = 0
-    private var rotationApplied: Bool = false
+    private var appliedMovieRotation: CGFloat = 0
+    private var appliedVdoRotation: CGFloat = 0
+    private var movieRotationApplied: Bool = false
+    private var vdoRotationApplied: Bool = false
+
+    // Session-level diagnostics
+    private var hardwareCostAfterCommit: Float = -1
+    private var synchronizationClockDescription: String = "(none)"
+    private var availableMovieCodecTypes: [String] = []
+    private var availableVideoPixelFormatTypesAfterAdd: [String] = []
+    private var sessionPresetAfterCommit: String = ""
 
     private var configuredAtBootTime: TimeInterval = 0
     private var startedAtBootTime: TimeInterval = 0
@@ -143,7 +167,7 @@ final class FilmtoneCaptureWriter: NSObject {
     /// when configureSession() throws before jsonURL is set. Best-effort —
     /// failures here are silently ignored.
     private func dlog(_ message: String) {
-        NSLog("[FilmtoneM2Smoke] %@", message)
+        NSLog("[FilmtoneM2BSmoke] %@", message)
         guard let url = debugLogURL else { return }
         let line = "[\(Date().timeIntervalSince1970)] \(message)\n"
         if let data = line.data(using: .utf8) {
@@ -164,12 +188,10 @@ final class FilmtoneCaptureWriter: NSObject {
         self.completion = completion
         self.requestedDuration = duration
 
-        // Open the persistent debug log immediately so any later failure has
-        // a paper trail. We create captures/ here too, so makeCaptureDir() in
-        // configureSession() is idempotent.
         if let dir = try? Self.makeCaptureDir() {
-            let logURL = dir.appendingPathComponent("m2a-debug.log", isDirectory: false)
-            try? "[\(Date().timeIntervalSince1970)] M2-A smoke begin\n".data(using: .utf8)?
+            let logURL = dir.appendingPathComponent("m2b-debug.log", isDirectory: false)
+            try? "[\(Date().timeIntervalSince1970)] M2-B Path C smoke begin\n"
+                .data(using: .utf8)?
                 .write(to: logURL, options: .atomic)
             self.debugLogURL = logURL
         }
@@ -208,31 +230,26 @@ final class FilmtoneCaptureWriter: NSObject {
         let lockedFormat = wide.formats[Self.lockedFormatIndex]
         let supportedRaw = lockedFormat.supportedColorSpaces.map { $0.rawValue }
         let rawJoined = supportedRaw.map { String($0) }.joined(separator: ",")
-        dlog("formats[56].supportedColorSpaces (raw)=\(rawJoined)")
+        dlog("formats[\(Self.lockedFormatIndex)].supportedColorSpaces (raw)=\(rawJoined)")
         guard supportedRaw.contains(4) else {
             throw SmokeError.appleLog2NotSupported(supportedRaw: supportedRaw)
         }
         guard let appleLog2 = AVCaptureColorSpace(rawValue: 4) else {
             throw SmokeError.appleLog2EnumUnavailable
         }
-
-        try wide.lockForConfiguration()
-        wide.activeFormat = lockedFormat
-        wide.activeColorSpace = appleLog2
-        dlog("activeFormat + activeColorSpace=appleLog2 applied")
-        let frameDuration = CMTime(value: 1, timescale: 30)
-        if lockedFormat.videoSupportedFrameRateRanges.contains(where: {
-            $0.minFrameRate <= Self.lockedFPS && Self.lockedFPS <= $0.maxFrameRate
-        }) {
-            wide.activeVideoMinFrameDuration = frameDuration
-            wide.activeVideoMaxFrameDuration = frameDuration
-        }
-        wide.unlockForConfiguration()
         self.device = wide
 
+        // ---- session-level configuration ----------------------------------
         session.beginConfiguration()
+        session.sessionPreset = .inputPriority
         session.automaticallyConfiguresCaptureDeviceForWideColor = false
+        dlog("session.sessionPreset=.inputPriority, autoWideColor=false")
 
+        // Step: add input BEFORE setting activeFormat / activeColorSpace.
+        // Apple TN3121: availableVideoPixelFormatTypes is "dynamic, and
+        // depends on the activeFormat of the capture device that the
+        // AVCaptureVideoDataOutput is connected to". The "connected to"
+        // chain only exists once the device's input is on the session.
         let input = try AVCaptureDeviceInput(device: wide)
         guard session.canAddInput(input) else {
             session.commitConfiguration()
@@ -240,79 +257,128 @@ final class FilmtoneCaptureWriter: NSObject {
         }
         session.addInput(input)
         self.input = input
+        dlog("session.addInput(wide) OK")
 
-        let videoOutput = AVCaptureVideoDataOutput()
-        let availableTypes = videoOutput.availableVideoPixelFormatTypes
+        // ---- device-level configuration -----------------------------------
+        // Apple `.inputPriority` doc: "When you change the device's format,
+        // the session preset automatically changes to this value." We set
+        // .inputPriority explicitly above too, so the eventual preset is
+        // unambiguous.
+        try wide.lockForConfiguration()
+        wide.activeFormat = lockedFormat
+        wide.activeColorSpace = appleLog2
+        dlog("activeFormat=formats[\(Self.lockedFormatIndex)], activeColorSpace=appleLog2 applied")
+        let frameDuration = CMTime(value: 1, timescale: 30)
+        if lockedFormat.videoSupportedFrameRateRanges.contains(where: {
+            $0.minFrameRate <= Self.lockedFPS && Self.lockedFPS <= $0.maxFrameRate
+        }) {
+            wide.activeVideoMinFrameDuration = frameDuration
+            wide.activeVideoMaxFrameDuration = frameDuration
+            dlog("activeVideoMin/MaxFrameDuration=1/30 applied")
+        }
+        wide.unlockForConfiguration()
+
+        // ---- AVCaptureMovieFileOutput as ProRes Apple Log 2 master --------
+        let movieOutput = AVCaptureMovieFileOutput()
+        guard session.canAddOutput(movieOutput) else {
+            session.commitConfiguration()
+            throw SmokeError.cannotAddMovieOutput
+        }
+        session.addOutput(movieOutput)
+        self.movieOutput = movieOutput
+        dlog("session.addOutput(movieFileOutput) OK")
+
+        // Movie codec: ProRes 422 HQ. availableVideoCodecTypes is dynamic
+        // and only valid AFTER addOutput when the connection exists.
+        let movieConnection = movieOutput.connection(with: .video)
+        let availableCodecs = movieOutput.availableVideoCodecTypes.map { $0.rawValue }
+        availableMovieCodecTypes = availableCodecs
+        dlog("movieOutput.availableVideoCodecTypes=\(availableCodecs.joined(separator: ","))")
+        guard availableCodecs.contains(AVVideoCodecType.proRes422HQ.rawValue) else {
+            session.commitConfiguration()
+            throw SmokeError.proRes422HQNotAvailable(available: availableCodecs)
+        }
+        if let movieConnection {
+            movieOutput.setOutputSettings(
+                [AVVideoCodecKey: AVVideoCodecType.proRes422HQ],
+                for: movieConnection
+            )
+            dlog("movieOutput.setOutputSettings(proRes422HQ) OK")
+        }
+
+        // ---- AVCaptureVideoDataOutput as timing / diagnostics side-band --
+        let vdo = AVCaptureVideoDataOutput()
+        // Leave videoSettings = nil so VDO uses the device's native delivery
+        // (no transcode). We're not writing through VDO; we only need PTS
+        // and a record of what the device actually delivers under
+        // .appleLog2 + format[\(Self.lockedFormatIndex)] post-addOutput.
+        vdo.alwaysDiscardsLateVideoFrames = false
+        vdo.setSampleBufferDelegate(self, queue: vdoQueue)
+        guard session.canAddOutput(vdo) else {
+            session.commitConfiguration()
+            throw SmokeError.cannotAddVideoDataOutput
+        }
+        session.addOutput(vdo)
+        self.videoDataOutput = vdo
+        dlog("session.addOutput(videoDataOutput) OK")
+
+        // Step: query availableVideoPixelFormatTypes ONLY AFTER addOutput.
+        // M2-A queried before addOutput, so it saw a stale (pre-connection)
+        // list. Per TN3121 this is the correct ordering. We log the result
+        // as observation; this smoke does not fail on it because VDO is
+        // timing-only.
+        let availableTypes = vdo.availableVideoPixelFormatTypes
+        availableVideoPixelFormatTypesAfterAdd = availableTypes.map { Self.fourCC($0) }
         let availableHex = availableTypes
             .map { String(format: "%@(0x%08x)", Self.fourCC($0), $0) }
             .joined(separator: ",")
-        dlog("availableVideoPixelFormatTypes=\(availableHex)")
-        guard availableTypes.contains(Self.lockedPixelFormat) else {
-            session.commitConfiguration()
-            throw SmokeError.pixelFormatNotAvailable(
-                want: Self.fourCC(Self.lockedPixelFormat),
-                available: availableTypes.map { Self.fourCC($0) }
-            )
-        }
-        videoOutput.videoSettings = [
-            kCVPixelBufferPixelFormatTypeKey as String: NSNumber(value: Self.lockedPixelFormat),
-        ]
-        videoOutput.alwaysDiscardsLateVideoFrames = false
-        videoOutput.setSampleBufferDelegate(self, queue: writerQueue)
-        guard session.canAddOutput(videoOutput) else {
-            session.commitConfiguration()
-            throw SmokeError.cannotAddOutput
-        }
-        session.addOutput(videoOutput)
-        self.videoOutput = videoOutput
+        dlog("[post-addOutput] vdo.availableVideoPixelFormatTypes=\(availableHex)")
 
-        if let connection = videoOutput.connection(with: .video) {
-            requestedRotation = Self.lockedRotationAngle
-            if connection.isVideoRotationAngleSupported(Self.lockedRotationAngle) {
-                connection.videoRotationAngle = Self.lockedRotationAngle
-                rotationApplied = true
+        // ---- per-connection rotation + stabilization ----------------------
+        // Both outputs share the same physical pipeline, but each has its
+        // own AVCaptureConnection. Configure them symmetrically.
+        requestedRotation = Self.lockedRotationAngle
+        requestedStabilizationRaw = AVCaptureVideoStabilizationMode.off.rawValue
+
+        if let movieConnection {
+            if movieConnection.isVideoRotationAngleSupported(Self.lockedRotationAngle) {
+                movieConnection.videoRotationAngle = Self.lockedRotationAngle
+                movieRotationApplied = true
             }
-            requestedStabilizationRaw = AVCaptureVideoStabilizationMode.off.rawValue
-            if connection.isVideoStabilizationSupported {
-                connection.preferredVideoStabilizationMode = .off
+            if movieConnection.isVideoStabilizationSupported {
+                movieConnection.preferredVideoStabilizationMode = .off
+            }
+        }
+        if let vdoConnection = vdo.connection(with: .video) {
+            if vdoConnection.isVideoRotationAngleSupported(Self.lockedRotationAngle) {
+                vdoConnection.videoRotationAngle = Self.lockedRotationAngle
+                vdoRotationApplied = true
+            }
+            if vdoConnection.isVideoStabilizationSupported {
+                vdoConnection.preferredVideoStabilizationMode = .off
             }
         }
 
         session.commitConfiguration()
+        sessionPresetAfterCommit = session.sessionPreset.rawValue
+        hardwareCostAfterCommit = session.hardwareCost
+        dlog("commitConfiguration done. preset=\(sessionPresetAfterCommit) hardwareCost=\(hardwareCostAfterCommit)")
 
-        // Writer
+        if let syncClock = session.synchronizationClock {
+            synchronizationClockDescription = String(describing: syncClock)
+        } else {
+            synchronizationClockDescription = "(synchronizationClock=nil)"
+        }
+        dlog("session.synchronizationClock=\(synchronizationClockDescription)")
+
+        // ---- prepare master file path -------------------------------------
         let captureDir = try Self.makeCaptureDir()
-        let movURL = captureDir.appendingPathComponent("m2a-smoke.mov", isDirectory: false)
-        let jsonURL = captureDir.appendingPathComponent("m2a-writer-smoke.json", isDirectory: false)
+        let movURL = captureDir.appendingPathComponent("m2b-master.mov", isDirectory: false)
+        let jsonURL = captureDir.appendingPathComponent("m2b-coexistence-smoke.json", isDirectory: false)
         try? FileManager.default.removeItem(at: movURL)
         try? FileManager.default.removeItem(at: jsonURL)
         self.movURL = movURL
         self.jsonURL = jsonURL
-
-        do {
-            let writer = try AVAssetWriter(outputURL: movURL, fileType: .mov)
-            let outputSettings: [String: Any] = [
-                AVVideoCodecKey: AVVideoCodecType.proRes422HQ,
-                AVVideoWidthKey: Int(Self.lockedWidth),
-                AVVideoHeightKey: Int(Self.lockedHeight),
-            ]
-            let writerInput = AVAssetWriterInput(
-                mediaType: .video,
-                outputSettings: outputSettings,
-                sourceFormatHint: lockedFormat.formatDescription
-            )
-            writerInput.expectsMediaDataInRealTime = true
-            guard writer.canAdd(writerInput) else {
-                throw SmokeError.writerSetupFailed("writer.canAdd(input) returned false.")
-            }
-            writer.add(writerInput)
-            self.assetWriter = writer
-            self.assetWriterInput = writerInput
-        } catch let error as SmokeError {
-            throw error
-        } catch {
-            throw SmokeError.writerSetupFailed(error.localizedDescription)
-        }
     }
 
     private func startSession() {
@@ -321,64 +387,101 @@ final class FilmtoneCaptureWriter: NSObject {
         session.startRunning()
         dlog("session.isRunning=\(session.isRunning)")
 
-        if let connection = videoOutput?.connection(with: .video) {
-            appliedStabilizationRaw = connection.activeVideoStabilizationMode.rawValue
-            appliedRotation = connection.videoRotationAngle
+        if let movieConn = movieOutput?.connection(with: .video) {
+            appliedStabilizationMovieRaw = movieConn.activeVideoStabilizationMode.rawValue
+            appliedMovieRotation = movieConn.videoRotationAngle
+        }
+        if let vdoConn = videoDataOutput?.connection(with: .video) {
+            appliedStabilizationVdoRaw = vdoConn.activeVideoStabilizationMode.rawValue
+            appliedVdoRotation = vdoConn.videoRotationAngle
         }
 
+        guard let movieOutput, let movURL else {
+            fail(error: SmokeError.cannotAddMovieOutput)
+            return
+        }
+        movieRecordingStartedAt = ProcessInfo.processInfo.systemUptime
+        movieOutput.startRecording(to: movURL, recordingDelegate: self)
+        dlog("movieOutput.startRecording(to: \(movURL.lastPathComponent)) requested")
+
         sessionQueue.asyncAfter(deadline: .now() + requestedDuration) { [weak self] in
-            self?.stop()
+            self?.requestStop()
         }
     }
 
-    private func stop() {
+    private func requestStop() {
+        guard !didFinish else { return }
+        movieRecordingStoppedAt = ProcessInfo.processInfo.systemUptime
+        if let syncClock = session.synchronizationClock {
+            movieStopRequestedSyncClockTime = CMClockGetTime(syncClock)
+        }
+        dlog("movieOutput.stopRecording() requested at sysUptime=\(movieRecordingStoppedAt)")
+        movieOutput?.stopRecording()
+        // didFinishRecordingTo delegate will fire and triggers finalizeAndComplete().
+    }
+
+    private func finalizeAndComplete() {  // not `finalize` — collides with NSObject.finalize
         guard !didFinish else { return }
         didFinish = true
         stoppedAtBootTime = ProcessInfo.processInfo.systemUptime
         session.stopRunning()
-        writerQueue.async { [weak self] in
-            self?.finishWriting()
-        }
-    }
+        // Flush in-flight VDO sample callbacks before reading their state.
+        // session.stopRunning() prevents new buffers from being delivered;
+        // vdoQueue.sync { } drains any callback already enqueued. Without
+        // this, vdoFirstPTS / vdoLastPTS / vdoFrameCount /
+        // vdoFirstSampleDimensions are read on sessionQueue while still
+        // being mutated on vdoQueue (CMVideoDimensions is a 2-word struct,
+        // so torn reads are possible).
+        vdoQueue.sync { }
+        dlog("session.stopRunning() + vdoQueue drain done. finalize.")
 
-    private func finishWriting() {
-        guard let writer = assetWriter, let writerInput = assetWriterInput else {
-            fail(error: SmokeError.noSamplesCaptured)
-            return
-        }
-        guard frameCount > 0 else {
-            writer.cancelWriting()
-            fail(error: SmokeError.noSamplesCaptured)
-            return
-        }
-        writerInput.markAsFinished()
-        writer.finishWriting { [weak self] in
-            guard let self else { return }
-            let status = writer.status
-            let writerError = writer.error
-            self.writeDiagnostics(status: status, error: writerError)
-            switch status {
-            case .completed:
-                if let movURL = self.movURL, let jsonURL = self.jsonURL {
-                    self.completion?(.success(SmokeResult(movURL: movURL, jsonURL: jsonURL)))
-                } else {
-                    self.completion?(.failure(SmokeError.writerFinishedWithFailure(
-                        status: status.rawValue,
-                        message: "missing output URL"
-                    )))
-                }
-            default:
-                self.completion?(.failure(SmokeError.writerFinishedWithFailure(
-                    status: status.rawValue,
-                    message: writerError?.localizedDescription ?? "unknown writer error"
-                )))
+        let resolvedError: SmokeError?
+        if let movieFinishError {
+            // AVCaptureFileOutputRecordingDelegate reports an error even on
+            // graceful stopRecording when the file is fully usable, with
+            // userInfo[AVErrorRecordingSuccessfullyFinishedKey] = true. We
+            // only treat hard failures as fatal here.
+            let nsError = movieFinishError as NSError
+            let userInfo = nsError.userInfo
+            let succeededFlag = userInfo[AVErrorRecordingSuccessfullyFinishedKey] as? Bool
+            if succeededFlag == true {
+                resolvedError = nil
+            } else {
+                resolvedError = .movieRecordingFinishedWithFailure(message: nsError.localizedDescription)
             }
+        } else {
+            resolvedError = nil
         }
+
+        let movieURLOnDisk = movieFinishedURL ?? movURL
+        let movieExists: Bool
+        let movieSize: Int64
+        if let movieURLOnDisk,
+           let attrs = try? FileManager.default.attributesOfItem(atPath: movieURLOnDisk.path) {
+            movieExists = true
+            movieSize = (attrs[.size] as? NSNumber)?.int64Value ?? 0
+        } else {
+            movieExists = false
+            movieSize = 0
+        }
+        dlog("master mov exists=\(movieExists) size=\(movieSize)")
+
+        writeDiagnostics(movieExists: movieExists, movieSize: movieSize, resolvedError: resolvedError)
+
+        if let resolvedError {
+            completion?(.failure(resolvedError))
+            return
+        }
+        guard movieExists, let jsonURL, let movieURLOnDisk else {
+            completion?(.failure(SmokeError.movieRecordingProducedNoFile))
+            return
+        }
+        completion?(.success(SmokeResult(movURL: movieURLOnDisk, jsonURL: jsonURL)))
     }
 
     private func fail(error: Error) {
         // Best-effort diagnostics on early failures.
-        writeDiagnostics(status: .failed, error: error)
+        writeDiagnostics(movieExists: false, movieSize: 0, resolvedError: error)
         completion?(.failure(error))
     }
 
@@ -396,9 +499,9 @@ final class FilmtoneCaptureWriter: NSObject {
         return dir
     }
 
-    private func writeDiagnostics(status: AVAssetWriter.Status, error: Error?) {
+    private func writeDiagnostics(movieExists: Bool, movieSize: Int64, resolvedError: Error?) {
         guard let jsonURL else { return }
-        let payload = makeDiagnosticsPayload(status: status, error: error)
+        let payload = makeDiagnosticsPayload(movieExists: movieExists, movieSize: movieSize, resolvedError: resolvedError)
         do {
             let data = try JSONSerialization.data(
                 withJSONObject: payload,
@@ -410,58 +513,102 @@ final class FilmtoneCaptureWriter: NSObject {
         }
     }
 
-    private func makeDiagnosticsPayload(status: AVAssetWriter.Status, error: Error?) -> [String: Any] {
-        var payload: [String: Any] = [
-            "schemaVersion": Self.schemaVersion,
-            "lane": "v2-capture-gyroflow",
-            "milestone": "M2-A",
-            "outputPath": movURL?.path ?? "",
-            "writerStatus": Self.writerStatusName(status),
-            "writerError": error?.localizedDescription ?? NSNull(),
-            "frameCount": frameCount,
-            "droppedFrameCount": droppedFrameCount,
-            "appendErrorCount": appendErrorCount,
-            "notReadyCount": notReadyCount,
-            "fps": Self.lockedFPS,
+    private func makeDiagnosticsPayload(movieExists: Bool, movieSize: Int64, resolvedError: Error?) -> [String: Any] {
+        // Built incrementally to keep the Swift type checker fast — one big
+        // nested dict literal trips "compiler is unable to type-check this
+        // expression in reasonable time".
+        let sessionDict: [String: Any] = [
+            "presetAfterCommit": sessionPresetAfterCommit,
+            "hardwareCostAfterCommit": hardwareCostAfterCommit,
+            "synchronizationClock": synchronizationClockDescription,
+            "automaticallyConfiguresCaptureDeviceForWideColor": false,
+        ]
+        let selectedFormatDict: [String: Any] = [
+            "formatIndex": Self.lockedFormatIndex,
             "dimensions": [
                 "width": Self.lockedWidth,
                 "height": Self.lockedHeight,
             ],
-            "selectedFormat": [
-                "formatIndex": Self.lockedFormatIndex,
-                "fourCC": Self.fourCC(Self.lockedPixelFormat),
-                "dimensions": [
-                    "width": Self.lockedWidth,
-                    "height": Self.lockedHeight,
-                ],
-                "fps": Self.lockedFPS,
-            ],
+            "fps": Self.lockedFPS,
             "colorSpace": "appleLog2",
             "colorSpaceRawValue": 4,
-            "orientation": [
-                "requestedRotationAngle": requestedRotation,
-                "appliedRotationAngle": appliedRotation,
-                "rotationApplied": rotationApplied,
-            ],
-            "stabilization": [
-                "requested": Self.stabilizationName(requestedStabilizationRaw),
-                "requestedRaw": requestedStabilizationRaw,
-                "applied": Self.stabilizationName(appliedStabilizationRaw),
-                "appliedRaw": appliedStabilizationRaw,
-            ],
-            "duration": [
-                "requestedSeconds": requestedDuration,
-                "elapsedSeconds": stoppedAtBootTime > startedAtBootTime
-                    ? stoppedAtBootTime - startedAtBootTime
-                    : 0,
-            ],
-            "timestamps": [
-                "configuredAtBootTime": configuredAtBootTime,
-                "startedAtBootTime": startedAtBootTime,
-                "stoppedAtBootTime": stoppedAtBootTime,
-            ],
-            "firstSamplePTS": firstPTS.map(Self.ptsToDict) ?? NSNull(),
-            "lastSamplePTS": lastPTS.map(Self.ptsToDict) ?? NSNull(),
+        ]
+        let movieRotation: [String: Any] = [
+            "requestedAngle": requestedRotation,
+            "appliedAngle": appliedMovieRotation,
+            "applied": movieRotationApplied,
+        ]
+        let movieStabilization: [String: Any] = [
+            "requested": Self.stabilizationName(requestedStabilizationRaw),
+            "requestedRaw": requestedStabilizationRaw,
+            "applied": Self.stabilizationName(appliedStabilizationMovieRaw),
+            "appliedRaw": appliedStabilizationMovieRaw,
+        ]
+        let movieDict: [String: Any] = [
+            "outputPath": movURL?.path ?? "",
+            "outputURL": movieFinishedURL?.path ?? movURL?.path ?? "",
+            "fileExists": movieExists,
+            "fileSizeBytes": movieSize,
+            "didStart": movieDidStart,
+            "didFinish": movieDidFinish,
+            "finishError": movieFinishError?.localizedDescription ?? NSNull(),
+            "availableVideoCodecTypes": availableMovieCodecTypes,
+            "selectedCodec": AVVideoCodecType.proRes422HQ.rawValue,
+            "didStartSyncClockTime": movieDidStartSyncClockTime.map(Self.ptsToDict) ?? NSNull(),
+            "stopRequestedSyncClockTime": movieStopRequestedSyncClockTime.map(Self.ptsToDict) ?? NSNull(),
+            "recordingStartedAtBootTime": movieRecordingStartedAt,
+            "recordingStoppedAtBootTime": movieRecordingStoppedAt,
+            "rotation": movieRotation,
+            "stabilization": movieStabilization,
+        ]
+        let vdoRotation: [String: Any] = [
+            "requestedAngle": requestedRotation,
+            "appliedAngle": appliedVdoRotation,
+            "applied": vdoRotationApplied,
+        ]
+        let vdoStabilization: [String: Any] = [
+            "requested": Self.stabilizationName(requestedStabilizationRaw),
+            "requestedRaw": requestedStabilizationRaw,
+            "applied": Self.stabilizationName(appliedStabilizationVdoRaw),
+            "appliedRaw": appliedStabilizationVdoRaw,
+        ]
+        let firstSampleDimsAny: Any = vdoFirstSampleDimensions.map {
+            ["width": Int($0.width), "height": Int($0.height)] as [String: Any]
+        } ?? NSNull()
+        let vdoDict: [String: Any] = [
+            "frameCount": vdoFrameCount,
+            "droppedFrameCount": vdoDroppedFrameCount,
+            "firstSamplePTS": vdoFirstPTS.map(Self.ptsToDict) ?? NSNull(),
+            "lastSamplePTS": vdoLastPTS.map(Self.ptsToDict) ?? NSNull(),
+            "firstSamplePixelFormat": vdoFirstSamplePixelFormat ?? NSNull(),
+            "firstSampleDimensions": firstSampleDimsAny,
+            "availableVideoPixelFormatTypesAfterAdd": availableVideoPixelFormatTypesAfterAdd,
+            "rotation": vdoRotation,
+            "stabilization": vdoStabilization,
+        ]
+        let durationDict: [String: Any] = [
+            "requestedSeconds": requestedDuration,
+            "elapsedSeconds": stoppedAtBootTime > startedAtBootTime
+                ? stoppedAtBootTime - startedAtBootTime
+                : 0,
+        ]
+        let timestampsDict: [String: Any] = [
+            "configuredAtBootTime": configuredAtBootTime,
+            "startedAtBootTime": startedAtBootTime,
+            "stoppedAtBootTime": stoppedAtBootTime,
+        ]
+        var payload: [String: Any] = [
+            "schemaVersion": Self.schemaVersion,
+            "lane": "v2-capture-gyroflow",
+            "milestone": "M2-B",
+            "writerPath": "Path C — AVCaptureMovieFileOutput master + AVCaptureVideoDataOutput timing side-band",
+            "session": sessionDict,
+            "selectedFormat": selectedFormatDict,
+            "movieFileOutput": movieDict,
+            "videoDataOutputSideBand": vdoDict,
+            "duration": durationDict,
+            "timestamps": timestampsDict,
+            "smokeError": resolvedError?.localizedDescription ?? NSNull(),
         ]
         if let device {
             payload["device"] = [
@@ -481,19 +628,7 @@ final class FilmtoneCaptureWriter: NSObject {
         ]
     }
 
-    private static func writerStatusName(_ status: AVAssetWriter.Status) -> String {
-        switch status {
-        case .unknown: return "unknown"
-        case .writing: return "writing"
-        case .completed: return "completed"
-        case .failed: return "failed"
-        case .cancelled: return "cancelled"
-        @unknown default: return "unknown(\(status.rawValue))"
-        }
-    }
-
     private static func stabilizationName(_ raw: Int) -> String {
-        // Cover the full known iOS 26 range. Any unknown value falls through.
         switch raw {
         case -1: return "auto"
         case 0: return "off"
@@ -521,41 +656,62 @@ final class FilmtoneCaptureWriter: NSObject {
     }
 }
 
-// MARK: - Sample buffer delegate
+// MARK: - VDO sample buffer delegate (timing side-band)
 
 extension FilmtoneCaptureWriter: AVCaptureVideoDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput,
                        didOutput sampleBuffer: CMSampleBuffer,
                        from connection: AVCaptureConnection) {
-        guard let writer = assetWriter, let writerInput = assetWriterInput else { return }
         guard CMSampleBufferDataIsReady(sampleBuffer) else { return }
         let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-        if writer.status == .unknown {
-            if !writer.startWriting() {
-                dlog("startWriting failed: \(writer.error?.localizedDescription ?? "nil")")
-                return
+        if vdoFirstPTS == nil {
+            vdoFirstPTS = pts
+            if let formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer) {
+                let pf = CMFormatDescriptionGetMediaSubType(formatDescription)
+                vdoFirstSamplePixelFormat = Self.fourCC(pf)
+                vdoFirstSampleDimensions = CMVideoFormatDescriptionGetDimensions(formatDescription)
             }
-            writer.startSession(atSourceTime: pts)
-            firstPTS = pts
+            dlog("vdo first sample pts=\(CMTimeGetSeconds(pts)) pixelFormat=\(vdoFirstSamplePixelFormat ?? "?")")
         }
-        guard writer.status == .writing else { return }
-        if writerInput.isReadyForMoreMediaData {
-            if writerInput.append(sampleBuffer) {
-                frameCount += 1
-                lastPTS = pts
-            } else {
-                appendErrorCount += 1
-            }
-        } else {
-            notReadyCount += 1
-            droppedFrameCount += 1
-        }
+        vdoLastPTS = pts
+        vdoFrameCount += 1
     }
 
     func captureOutput(_ output: AVCaptureOutput,
                        didDrop sampleBuffer: CMSampleBuffer,
                        from connection: AVCaptureConnection) {
-        droppedFrameCount += 1
+        vdoDroppedFrameCount += 1
+    }
+}
+
+// MARK: - MovieFileOutput recording delegate
+
+extension FilmtoneCaptureWriter: AVCaptureFileOutputRecordingDelegate {
+    func fileOutput(_ output: AVCaptureFileOutput,
+                    didStartRecordingTo fileURL: URL,
+                    from connections: [AVCaptureConnection]) {
+        movieDidStart = true
+        if let syncClock = session.synchronizationClock {
+            movieDidStartSyncClockTime = CMClockGetTime(syncClock)
+        }
+        dlog("movieFileOutput didStartRecordingTo \(fileURL.lastPathComponent)")
+    }
+
+    func fileOutput(_ output: AVCaptureFileOutput,
+                    didFinishRecordingTo outputFileURL: URL,
+                    from connections: [AVCaptureConnection],
+                    error: Error?) {
+        movieDidFinish = true
+        movieFinishError = error
+        movieFinishedURL = outputFileURL
+        if let error {
+            dlog("movieFileOutput didFinishRecordingTo \(outputFileURL.lastPathComponent) error=\(error.localizedDescription)")
+        } else {
+            dlog("movieFileOutput didFinishRecordingTo \(outputFileURL.lastPathComponent) OK")
+        }
+        sessionQueue.async { [weak self] in
+            self?.finalizeAndComplete()
+        }
     }
 }
 

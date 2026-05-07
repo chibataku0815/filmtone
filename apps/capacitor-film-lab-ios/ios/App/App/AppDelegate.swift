@@ -9,7 +9,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         #if DEBUG
         runM1CapabilityProbeOnLaunch()
-        runM2AWriterSmokeOnLaunch()
+        runM2BCoexistenceSmokeOnLaunch()
         #endif
 
         do {
@@ -91,21 +91,24 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         }
     }
 
-    /// V2 capture / Gyroflow lane M2-A: kicks off the video-only writer
-    /// smoke once per Debug cold launch. Synchronous wrapper, async session
-    /// inside (camera permission → AVCaptureSession.startRunning →
-    /// duration timer → finishWriting). The smoke runs in the background
-    /// and writes both the .mov and the diagnostics JSON to
-    /// Library/Caches/Filmtone/captures/. Release builds skip this path.
-    private func runM2AWriterSmokeOnLaunch() {
-        NSLog("[FilmtoneM2Smoke] starting writer smoke (async)…")
+    /// V2 capture / Gyroflow lane M2-B: Path C dual-output coexistence
+    /// smoke. Drives one AVCaptureSession with AVCaptureMovieFileOutput
+    /// (ProRes 422 HQ Apple Log 2 master) and AVCaptureVideoDataOutput
+    /// (timing / diagnostics side-band) attached together. Synchronous
+    /// wrapper, async session inside (permission → startRunning →
+    /// startRecording → duration timer → stopRecording → finalize).
+    /// Writes m2b-master.mov, m2b-coexistence-smoke.json, and
+    /// m2b-debug.log to Library/Caches/Filmtone/captures/. Release builds
+    /// skip this path.
+    private func runM2BCoexistenceSmokeOnLaunch() {
+        NSLog("[FilmtoneM2BSmoke] starting Path C dual-output coexistence smoke (async)…")
         FilmtoneCaptureWriter.runSmoke(duration: 6.0) { result in
             switch result {
             case .success(let output):
-                NSLog("[FilmtoneM2Smoke] OK mov=%@", output.movURL.path)
-                NSLog("[FilmtoneM2Smoke] OK json=%@", output.jsonURL.path)
+                NSLog("[FilmtoneM2BSmoke] OK mov=%@", output.movURL.path)
+                NSLog("[FilmtoneM2BSmoke] OK json=%@", output.jsonURL.path)
             case .failure(let error):
-                NSLog("[FilmtoneM2Smoke] FAIL: %@", error.localizedDescription)
+                NSLog("[FilmtoneM2BSmoke] FAIL: %@", error.localizedDescription)
             }
         }
     }
