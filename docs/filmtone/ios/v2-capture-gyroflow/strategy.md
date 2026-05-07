@@ -482,3 +482,12 @@ loop is closed.
   unchanged (no stop affordance, M7 owner-locked design). xcodebuild
   PASS; owner device acceptance pending. Details in
   `archive/2026-05-08-m8-native-recording-product-flow.md`.
+- 2026-05-08: M9 (Native Recording Export Completion) **landed** —
+  closes record → edit → preset → export → save/share product loop
+  on the output side. S1 confirmed CTA hierarchy + save-destination
+  feedback already existed; S3 added `toastShareSuccess`; S4 routed
+  export/save failures through the existing toast surface (mirrors
+  `toastShareFailed`, no new UI binding). S5 owner walk PASS on
+  iPhone 17 Pro / iOS 26.4.2. Polish observed during the walk is
+  deferred to a separate UI/UX lane. Details in
+  `archive/2026-05-08-m9-native-recording-export-completion.md`.

@@ -6,7 +6,13 @@ starts; do not start on the M6 worktree branch — that lane is closed)
 Base: `main` after the M6 → main merge (`6bc3eda0`) + Lane A
 (`0448c484`)
 
-Status: **scoped for implementation — start at S1**
+Status: **LANDED — S5 owner walk PASS on iPhone 17 Pro / iOS 26.4.2 (2026-05-08)**
+
+Closeout: implementation = `138ac7ba` (worktree branch
+`worktree-feature+ios-m9-recording-export-completion`). S5 acceptance
+criterion ("録画した動画を、迷わず保存または共有できるか") confirmed by
+owner. UI/UX polish observed during the walk is deferred — out of scope
+for M9 (出口可視化 lane); a separate polish lane will pick that up.
 
 ## Why this active exists
 
@@ -201,4 +207,25 @@ not extend the closed M6 worktree branch.
 
 ## Outcome
 
-(filled in at archive time after S5 acceptance)
+S5 owner walk on iPhone 17 Pro / iOS 26.4.2 (2026-05-08) confirmed the
+single acceptance criterion: 録画した動画を迷わず保存または共有できる。
+record → edit → preset → export → save 一周通った。
+
+Implementation summary (commit `138ac7ba` on
+`worktree-feature+ios-m9-recording-export-completion`):
+
+- S1 read-only sweep showed the panel CTA hierarchy (Save primary,
+  Share secondary), save-success destination feedback (chip + button
+  flip + MetricCard + `toastSaveSuccess`), and recording-source
+  export parity already existed. No changes needed there.
+- S2 deleted (CTA hierarchy already correct).
+- S3 added `toastShareSuccess` ("共有しました" / "Shared") +
+  `filmtone.toast.share.success` xcstring; emit on
+  `shareOutput()` `completed == true`.
+- S4 routed `export()` and `saveExportResultToPhotos` failures
+  through `presentToast(userMessage(...), .error)` (mirrors the
+  existing `toastShareFailed` pattern, no new UI binding).
+
+Out-of-scope-for-M9 polish noted during the walk is deferred to a
+separate UI/UX polish lane — this lane was scoped to the 出口可視化
+gap, which closed.
