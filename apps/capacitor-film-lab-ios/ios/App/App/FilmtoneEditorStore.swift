@@ -225,6 +225,18 @@ struct FilmtoneSourceLoadState {
     }
 }
 
+/// In-progress AVCaptureMovieFileOutput recording snapshot. Set by
+/// `FilmtoneEditorStore.recordProductClip(durationSeconds:)` when the
+/// capture call begins and cleared the moment it returns; nil at any
+/// other time. The view uses `startedAt` against `TimelineView`'s tick
+/// to compute the visible countdown. Capture surface itself is locked
+/// to fixed-duration (M7 owner-locked design) — there is no stop
+/// affordance in M8.
+struct FilmtoneRecordingUIState: Equatable {
+    let startedAt: Date
+    let durationSeconds: Double
+}
+
 @MainActor
 final class FilmtoneVideoPreviewSession {
     let sourceURI: String
@@ -450,6 +462,17 @@ final class FilmtoneEditorStore: ObservableObject {
     @Published var isBusy = false
     @Published var notice: String?
     @Published var error: String?
+    /// Live during the AVCaptureMovieFileOutput phase of `recordProductClip`
+    /// only. Drives the recording-in-progress overlay (ring + countdown +
+    /// label). Cleared the moment capture returns — the post-capture
+    /// probe / applyProbe phase is covered by `sourceLoadState` instead.
+    @Published var recordingState: FilmtoneRecordingUIState?
+    /// Localized detail of the most recent product-capture failure. Bound
+    /// to a `.alert` in `FilmtoneRootView`; cleared when the user
+    /// dismisses the alert or starts a new recording. Distinct from the
+    /// generic `error` bag so the recording surface alert never picks up
+    /// pickSource / export / library errors.
+    @Published var recordingError: String?
     /// Set true when the user picks a video longer than the iOS source
     /// duration cap (`PHASE0_MAX_SOURCE_DURATION_SEC`, 300s). Surfaces a
     /// dedicated Desktop handoff sheet instead of routing the clip through
@@ -952,7 +975,12 @@ final class FilmtoneEditorStore: ObservableObject {
         isBusy = true
         notice = strings.recordProductClipRunning
         error = nil
+        recordingError = nil
         sourceLoadState = nil
+        recordingState = FilmtoneRecordingUIState(
+            startedAt: Date(),
+            durationSeconds: durationSeconds
+        )
 
         let capture = FilmtoneProductCapture()
         do {
@@ -961,6 +989,8 @@ final class FilmtoneEditorStore: ObservableObject {
                     continuation.resume(with: result)
                 }
             }
+
+            recordingState = nil
 
             let recordedSource = SourceInfoDTO(
                 uri: result.movURL.absoluteString,
@@ -985,6 +1015,7 @@ final class FilmtoneEditorStore: ObservableObject {
             reclaimCacheForCurrentState()
             schedulePreviewRender()
         } catch {
+            recordingState = nil
             isBusy = false
             sourceLoadState = nil
             notice = nil
@@ -994,7 +1025,7 @@ final class FilmtoneEditorStore: ObservableObject {
             } else {
                 detail = (error as NSError).localizedDescription
             }
-            self.error = "\(strings.recordProductClipFailed): \(detail)"
+            self.recordingError = detail
         }
     }
 

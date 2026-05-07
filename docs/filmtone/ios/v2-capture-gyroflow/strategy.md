@@ -449,3 +449,11 @@ Dependency:
   dead in launch path. Findings recorded in
   `archive/2026-05-08-m7-product-capture-stabilization.md`. Follow-up
   lane: React/Capacitor purge from `apps/capacitor-film-lab-ios`.
+- 2026-05-08: M8 (Native Recording Product Flow) **landed** — fixed
+  5s product capture surfaced via SwiftUI: `FilmtoneRootView`
+  recording overlay (TimelineView countdown ring + integer seconds +
+  pulsing red dot + localized label) and `.alert` bound to a
+  dedicated `recordingError` state. Capture surface contract
+  unchanged (no stop affordance, M7 owner-locked design). xcodebuild
+  PASS; owner device acceptance pending. Details in
+  `archive/2026-05-08-m8-native-recording-product-flow.md`.

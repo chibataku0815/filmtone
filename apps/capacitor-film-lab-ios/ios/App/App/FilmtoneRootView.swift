@@ -54,6 +54,8 @@ struct FilmtoneRootView: View {
             }
 
             adjustmentHelpOverlay
+
+            recordingOverlay
         }
         // Backward-compat alias for XCUITest snapshot suite which uses
         // `filmtone.root.scroll` as a "main app loaded" sentinel. The legacy
@@ -61,6 +63,28 @@ struct FilmtoneRootView: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("filmtone.root.scroll")
         .animation(.spring(response: 0.36, dampingFraction: 0.88), value: activeHelpTopic?.id)
+        .animation(.easeInOut(duration: 0.2), value: store.recordingState != nil)
+        .alert(
+            store.strings.recordProductClipFailed,
+            isPresented: Binding(
+                get: { store.recordingError != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        store.recordingError = nil
+                    }
+                }
+            ),
+            presenting: store.recordingError
+        ) { _ in
+            Button(role: .cancel) {
+                store.recordingError = nil
+            } label: {
+                Text("OK")
+            }
+            .accessibilityIdentifier("filmtone.recording.alert.dismiss")
+        } message: { detail in
+            Text(detail)
+        }
         .sheet(isPresented: $sourceSheetPresented) {
             FilmtoneSourceProfileSheet(
                 store: store,
@@ -183,6 +207,72 @@ struct FilmtoneRootView: View {
                 .accessibilityIdentifier("filmtone.library.look.delete.confirm")
             }
             Button(store.strings.savedLookSheetCancel, role: .cancel) {}
+        }
+    }
+
+    // MARK: Recording overlay (M8 — fixed-duration product capture feedback)
+
+    /// Owner-visible recording surface for `recordProductClip`. Shows a
+    /// translucent backdrop, a circular progress ring driven by elapsed
+    /// time vs `durationSeconds`, the integer seconds remaining, and a
+    /// pulsing red dot with the localized "recording…" label. Mounted
+    /// above every other view in `body` so picker CTAs underneath are
+    /// occluded for the recording window. The capture surface is
+    /// fixed-duration (M7 owner-locked), so this overlay intentionally
+    /// has no stop button.
+    @ViewBuilder
+    private var recordingOverlay: some View {
+        if let state = store.recordingState {
+            ZStack {
+                Color.black.opacity(0.62)
+                    .ignoresSafeArea()
+
+                TimelineView(.periodic(from: state.startedAt, by: 0.05)) { context in
+                    let elapsed = max(0, context.date.timeIntervalSince(state.startedAt))
+                    let total = max(0.001, state.durationSeconds)
+                    let progress = min(1, elapsed / total)
+                    let remaining = max(0, state.durationSeconds - elapsed)
+                    let secondsLabel = "\(Int(ceil(remaining)))"
+                    let pulseOpacity = 0.45 + 0.55 * abs(sin(elapsed * .pi))
+
+                    VStack(spacing: 22) {
+                        ZStack {
+                            Circle()
+                                .stroke(Color.white.opacity(0.18), lineWidth: 5)
+                            Circle()
+                                .trim(from: 0, to: progress)
+                                .stroke(
+                                    Color(red: 0.96, green: 0.32, blue: 0.32),
+                                    style: StrokeStyle(lineWidth: 5, lineCap: .round)
+                                )
+                                .rotationEffect(.degrees(-90))
+                            Text(secondsLabel)
+                                .font(.system(size: 56, weight: .semibold, design: .rounded))
+                                .monospacedDigit()
+                                .foregroundStyle(.white)
+                                .accessibilityIdentifier("filmtone.recording.countdown")
+                        }
+                        .frame(width: 132, height: 132)
+
+                        HStack(spacing: 10) {
+                            Circle()
+                                .fill(Color(red: 0.96, green: 0.32, blue: 0.32))
+                                .frame(width: 10, height: 10)
+                                .opacity(pulseOpacity)
+                            Text(store.strings.recordProductClipRunning)
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(.white.opacity(0.92))
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel(
+                            "\(store.strings.recordProductClipRunning) \(secondsLabel)"
+                        )
+                    }
+                }
+            }
+            .transition(.opacity)
+            .accessibilityIdentifier("filmtone.recording.overlay")
+            .zIndex(30)
         }
     }
 
