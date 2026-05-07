@@ -232,22 +232,44 @@ Dependency:
 - M7 so capture-time preview operates against the same stabilized image
   path as the recorded master.
 
-### M9 - Owner Clip Trial
+### M9 - Native Recording Export Completion
 
 Goal:
 
-Decide whether this actually replaces the stock camera for the target personal
-use case.
+Close the product loop so a recorded clip can be edited and shipped as a
+Filmtone artifact. Owner reaches "撮る → 映画調にする → 書き出す → 保存・共有"
+in a single uninterrupted flow.
 
 Done:
 
-- Three real owner clips complete capture -> edit -> export or capture ->
-  Gyroflow handoff.
-- Any fallback to the stock camera is recorded with a concrete reason.
+- Recording-derived source runs the existing export path end to end on
+  iPhone 17 Pro / iOS 26.4.2 with the same surface treatment as Photo
+  Library / Files sources (no record-only branch).
+- Post-export state is unambiguous: Photos save / Files share / app-internal
+  destination is decided, exposed, and the user can tell where the artifact
+  landed.
+- Sidecar / metadata / filename handling does not break for capture-package
+  sources (no missing provenance, no duplicate-name collisions, no orphan
+  asset references).
+- Every failure path (export error, Photos auth denial, share cancel, write
+  error) surfaces a localized user-visible message; no silent swallowing,
+  no stuck `isBusy`.
 
 Dependency:
 
-- M8.
+- M8 (recorded clip already lands in the editor as the active source).
+
+Out of scope (handled in later lanes):
+
+- React/Capacitor stack purge, capture-time honest preview (was strategy
+  M8's preview half — not shipped, deferred), preview/preset polish,
+  multi-device acceptance matrix, doc cleanup, recording-stop gesture
+  changes.
+
+Note: the previous M9 ("Owner Clip Trial — three clips deciding stock-camera
+replacement") is folded into post-M9 ad-hoc owner usage. The product
+completion bar is the right next gate; the trial verdict comes after the
+loop is closed.
 
 ## Known Constraints
 
@@ -449,6 +471,9 @@ Dependency:
   dead in launch path. Findings recorded in
   `archive/2026-05-08-m7-product-capture-stabilization.md`. Follow-up
   lane: React/Capacitor purge from `apps/capacitor-film-lab-ios`.
+- 2026-05-08: M9 redefined — "Owner Clip Trial" → "Native Recording
+  Export Completion" (close record → edit → export → save/share). Trial
+  verdict folds into post-M9 ad-hoc usage.
 - 2026-05-08: M8 (Native Recording Product Flow) **landed** — fixed
   5s product capture surfaced via SwiftUI: `FilmtoneRootView`
   recording overlay (TimelineView countdown ring + integer seconds +
