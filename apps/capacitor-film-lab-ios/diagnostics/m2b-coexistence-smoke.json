@@ -1,0 +1,114 @@
+{
+  "device" : {
+    "deviceType" : "AVCaptureDeviceTypeBuiltInWideAngleCamera",
+    "localizedName" : "背面カメラ",
+    "uniqueID" : "com.apple.avfoundation.avcapturedevice.built-in_video:0"
+  },
+  "duration" : {
+    "elapsedSeconds" : 6.5067968750081491,
+    "requestedSeconds" : 6
+  },
+  "lane" : "v2-capture-gyroflow",
+  "milestone" : "M2-B",
+  "movieFileOutput" : {
+    "availableVideoCodecTypes" : [
+      "apch",
+      "apcn",
+      "apcs",
+      "apco"
+    ],
+    "didFinish" : true,
+    "didStart" : true,
+    "didStartSyncClockTime" : {
+      "seconds" : 125314.8470415,
+      "timescale" : 1000000000,
+      "value" : 125314847041500
+    },
+    "fileExists" : true,
+    "fileSizeBytes" : 486823385,
+    "finishError" : null,
+    "outputPath" : "\/var\/mobile\/Containers\/Data\/Application\/F2D12075-1EB0-4529-9225-7E81673A4282\/Library\/Caches\/Filmtone\/captures\/m2b-master.mov",
+    "outputURL" : "\/var\/mobile\/Containers\/Data\/Application\/F2D12075-1EB0-4529-9225-7E81673A4282\/Library\/Caches\/Filmtone\/captures\/m2b-master.mov",
+    "recordingStartedAtBootTime" : 125314.66944775001,
+    "recordingStoppedAtBootTime" : 125320.94244879167,
+    "rotation" : {
+      "applied" : true,
+      "appliedAngle" : 90,
+      "requestedAngle" : 90
+    },
+    "selectedCodec" : "apch",
+    "stabilization" : {
+      "applied" : "off",
+      "appliedRaw" : 0,
+      "requested" : "off",
+      "requestedRaw" : 0
+    },
+    "stopRequestedSyncClockTime" : {
+      "seconds" : 125320.942454291,
+      "timescale" : 1000000000,
+      "value" : 125320942454291
+    }
+  },
+  "schemaVersion" : 2,
+  "selectedFormat" : {
+    "colorSpace" : "appleLog2",
+    "colorSpaceRawValue" : 4,
+    "dimensions" : {
+      "height" : 2160,
+      "width" : 3840
+    },
+    "formatIndex" : 56,
+    "fps" : 30
+  },
+  "session" : {
+    "automaticallyConfiguresCaptureDeviceForWideColor" : false,
+    "hardwareCostAfterCommit" : 0.5,
+    "presetAfterCommit" : "AVCaptureSessionPresetInputPriority",
+    "synchronizationClock" : "FigClock[HostTimeClock]: 0x10a8bf100 retainCount: 20 allocator: 0x1f82cc310 current time: {125314527306416\/1000000000 = 125314.527} = 125314.527306 seconds"
+  },
+  "smokeError" : null,
+  "timestamps" : {
+    "configuredAtBootTime" : 125314.49889508334,
+    "startedAtBootTime" : 125314.52818083334,
+    "stoppedAtBootTime" : 125321.03497770835
+  },
+  "videoDataOutputSideBand" : {
+    "availableVideoPixelFormatTypesAfterAdd" : [
+      "x422",
+      "x420",
+      "&xv2",
+      "-xv2",
+      "&xv0",
+      "-xv0"
+    ],
+    "droppedFrameCount" : 0,
+    "firstSampleDimensions" : {
+      "height" : 3840,
+      "width" : 2160
+    },
+    "firstSamplePixelFormat" : "x422",
+    "firstSamplePTS" : {
+      "seconds" : 125314.648812375,
+      "timescale" : 1000000000,
+      "value" : 125314648812375
+    },
+    "frameCount" : 191,
+    "lastSamplePTS" : {
+      "seconds" : 125320.982291416,
+      "timescale" : 1000000000,
+      "value" : 125320982291416
+    },
+    "rotation" : {
+      "applied" : true,
+      "appliedAngle" : 90,
+      "requestedAngle" : 90
+    },
+    "stabilization" : {
+      "applied" : "off",
+      "appliedRaw" : 0,
+      "requested" : "off",
+      "requestedRaw" : 0
+    }
+  },
+  "writerPath" : "Path C — AVCaptureMovieFileOutput master + AVCaptureVideoDataOutput timing side-band"
+}

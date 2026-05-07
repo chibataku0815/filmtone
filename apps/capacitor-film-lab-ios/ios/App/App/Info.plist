@@ -22,6 +22,10 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Filmtone records video from the rear camera so you can capture footage and finish it inside Filmtone without exporting to another app.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Filmtone reads gyroscope and accelerometer samples while you record so it can stabilize the footage and align timing during editing.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Filmtone saves exported photo and video media to your photo library when you choose Export &amp; Save or Save to Photos.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

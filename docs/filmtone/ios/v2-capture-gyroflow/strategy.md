@@ -1,0 +1,459 @@
+# Filmtone iOS V2 Capture / Gyroflow Strategy
+
+Date: 2026-05-07 JST
+
+## Placement
+
+This directory is the current source of truth for the Filmtone iOS V2
+capture / Gyroflow lane:
+
+```text
+docs/filmtone/ios/v2-capture-gyroflow/
+├── strategy.md
+├── active.md
+└── archive/
+```
+
+Archived feasibility evidence remains read-only:
+
+```text
+docs/filmtone/ios/archive/legacy-handoffs-2026-04-20-to-2026-05-03/filmtone-v2-capture-gyroflow-realtime-preview-feasibility-2026-05-01-jst.md
+```
+
+## Final Goal
+
+Make Filmtone useful enough for the owner to capture, grade, stabilize, finish,
+and reuse in a real personal workflow.
+
+This is not an App Store acquisition lane. Growth work is optional and
+downstream. The core product work is capture truth, motion-data truth,
+color-preview truth, and fast finishing.
+
+## Measurable Done Conditions
+
+V2 is done when the owner can repeatedly complete this loop:
+
+1. Record a 30-60 second rear-camera clip inside Filmtone.
+2. Use Apple Log or Apple Log 2 only when the device proves support for it.
+3. Record gyro and accelerometer samples across the full clip duration.
+4. Export `.mov`, `.gcsv`, and Filmtone sidecar files together.
+5. Load `.mov + .gcsv` in Gyroflow and align sync without a new manual guess
+   for every clip.
+6. Open the same clip immediately in the existing Filmtone editor.
+7. Apply Source Profile, Look, optical effects, quick adjustments, and export.
+8. Confirm preview and export are close enough that preview decisions are not
+   misleading.
+9. Finish at least three owner clips that would otherwise have been shot
+   outside Filmtone.
+
+## Milestones
+
+### M1 - Capability Probe
+
+Goal:
+
+Enumerate the owner device's real capture capabilities before building any
+recording path.
+
+Done:
+
+- A capability JSON is produced from a real device.
+- At least one rear-camera video mode is visible.
+- Apple Log / Apple Log 2 support is shown only when runtime-reported.
+- Unsupported modes are absent or disabled, not inferred.
+- The probe does not start recording and does not add privacy keys unless the
+  runtime path proves permission is required.
+
+### M2 - Video-Only Writer Smoke
+
+Goal:
+
+Prove Filmtone can write one short video in the selected mode before motion or
+Gyroflow work exists.
+
+Done:
+
+- A 5-10 second `.mov` opens normally.
+- Video diagnostics include first / last PTS, frame count, dropped-frame count,
+  selected format, selected color space, fps, dimensions, and writer status.
+- `NSCameraUsageDescription` exists before any capture session is started.
+- The selected codec follows the codec policy in Known Constraints.
+- Rotation/orientation is pinned and recorded in diagnostics.
+- Video stabilization is forced off when controllable and recorded when not.
+
+Dependency:
+
+- M1.
+
+### M3 - Motion-Only Recorder Smoke
+
+Goal:
+
+Prove Core Motion sample delivery is stable enough before combining it with
+video recording.
+
+Done:
+
+- A 10 second motion diagnostic file is produced.
+- Gyro and accelerometer samples cover the requested duration.
+- Median interval and max timestamp gap are visible.
+- `NSMotionUsageDescription` exists before motion recording is requested.
+- Raw gyro and raw accelerometer APIs are used; fused device-motion samples are
+  not used for Gyroflow data.
+
+Dependency:
+
+- M1.
+
+### M4 - Combined Timing Smoke
+
+Goal:
+
+Collect video PTS and Core Motion timestamps in the same recording session with
+enough metadata to attempt mapping.
+
+Done:
+
+- A 30 second `.mov` and combined diagnostics are produced.
+- Motion samples cover the full video duration plus a small margin.
+- First / last video PTS and first / last motion timestamps are present.
+- Offset mapping is explicit enough to start `.gcsv` generation.
+- Diagnostics include the timestamp anchor needed to map video PTS and Core
+  Motion timestamps.
+
+Dependencies:
+
+- M2.
+- M3.
+
+### M5 - Gyroflow `.gcsv` Proof
+
+Goal:
+
+Prove captured motion data can become a Gyroflow-readable sidecar.
+
+Done:
+
+- Package folder contains `.mov`, `.gcsv`, and diagnostics.
+- Gyroflow loads the video and sidecar.
+- A basic sync / optical-flow check can align the clip.
+- One simple handheld pan stabilizes without obvious phase error.
+- Rolling-shutter coefficient is recorded as device-once package metadata once
+  it is dialed in.
+
+Dependency:
+
+- M4.
+
+### M6 - AVFoundation Stabilization Smoke
+
+Goal:
+
+Decide whether AVFoundation built-in video stabilization is acceptable as
+Filmtone capture-time stabilization on the M5-A locked format, before
+committing to a custom Filmtone stabilization library.
+
+Done:
+
+- The M5-A locked format survives mode probing — `formatIndex`, `pixelFormat`,
+  `colorSpace`, `dimensions`, `fps`, and writer codec are unchanged after a
+  non-`.off` `preferredVideoStabilizationMode` is set.
+- Diagnostics include the supported-modes set probed against the full iOS 26
+  `AVCaptureVideoStabilizationMode` enum, the chosen preferred mode, and the
+  observed active mode after `startRecording`.
+- `activeVideoStabilizationMode != .off` is asserted as a smoke gate when the
+  requested mode was non-`.off`. No silent fallback.
+- The recorded `.mov` first video track FourCC is read from the file via
+  `AVURLAsset` and matches the requested writer codec. No silent ProRes →
+  HEVC writer downgrade.
+- Apple Log 2 is preserved (`activeColorSpace.rawValue == 4`) after recording.
+- Owner visual A/B (off vs. on, single 30s pan or handheld walk) judged at
+  owner-quality bar.
+
+Dependency:
+
+- M5.
+
+(Outcome: PASS on iPhone 17 Pro / iOS 26.4.2; commit `3968eafd`; findings
+in `archive/2026-05-07-m6-avfoundation-stabilization-smoke.md`.
+`cinematicExtendedEnhanced` accepted on the M5-A locked format.)
+
+### M7 - Product Capture Stabilization Integration
+
+Goal:
+
+Integrate the M6 PASS stabilization mode into the real Filmtone capture
+surface so owner clips are recorded with stabilization as the default product
+behavior, not via a smoke-only build.
+
+Done:
+
+- The non-smoke product capture path (not `Filmtone*Smoke.swift`) sets
+  `connection.preferredVideoStabilizationMode = .cinematicExtendedEnhanced`
+  by default on the M5-A locked format.
+- A runtime guard falls back to the highest supported mode the M6 probe
+  recorded when `.cinematicExtendedEnhanced` is not supported on a given
+  format, and the chosen mode is recorded in the export sidecar.
+- The recorded `.mov` carries the same Stop Condition guarantees as M6
+  (active != .off when requested non-.off, Apple Log 2 preserved, no format
+  swap, writer codec verified by AVURLAsset post-write).
+- Product capture diagnostics expose the chosen and active stabilization
+  modes alongside the M5-A baseline diagnostics already recorded.
+- Owner records at least one real clip through the product surface (not the
+  smoke build) with stabilization on and confirms parity with the M6 visual
+  bar.
+
+Dependency:
+
+- M6.
+
+### M8 - Editor Handoff And Honest Preview
+
+Goal:
+
+Make captured clips useful inside Filmtone, then make capture-time preview good
+enough for shooting decisions.
+
+Done:
+
+- A captured clip opens in the existing editor.
+- Matching Source Profile is preselected or attached.
+- Export sidecar references capture package metadata.
+- Capture preview is close enough for exposure, framing, and Look choice.
+- Any omitted preview effect classes are explicitly labeled during development.
+- Capture preview reuses the existing Filmtone grade graph through a
+  `AVCaptureVideoDataOutput` -> `CIImage` -> `CIContext` -> `MTKView` style
+  path unless a later active task records why that is not viable.
+
+Dependency:
+
+- M4 for editor handoff.
+- M5 before public Gyroflow-facing claims.
+- M7 so capture-time preview operates against the same stabilized image
+  path as the recorded master.
+
+### M9 - Owner Clip Trial
+
+Goal:
+
+Decide whether this actually replaces the stock camera for the target personal
+use case.
+
+Done:
+
+- Three real owner clips complete capture -> edit -> export or capture ->
+  Gyroflow handoff.
+- Any fallback to the stock camera is recorded with a concrete reason.
+
+Dependency:
+
+- M8.
+
+## Known Constraints
+
+- No implementation starts without `active.md`.
+- Only one current `active.md` may exist for this lane.
+- No silent capture fallback. Apple Log / Apple Log 2, ProRes, HEVC, lens, fps,
+  stabilization, and storage choices must be explicit.
+- No fake preview. Preview may be partial, but it must not claim more than it
+  shows.
+- Video capture defaults to ProRes 422 or 422 HQ when runtime writer support is
+  available. HEVC 10-bit is an explicit fallback. HEVC 8-bit plus Log is not an
+  acceptable capture mode.
+- Capture diagnostics must record orientation, stabilization state, OIS/EIS
+  limits, codec, color space, fps, dimensions, and timestamp anchors.
+- M1-M4 use internal sandbox output only. External SSD / security-scoped output
+  is deferred until owner workflow polish unless an active task explicitly
+  expands scope.
+- M1-M4 produce silent video. Audio capture and `NSMicrophoneUsageDescription`
+  are deferred until owner workflow polish.
+- The first device target is the owner device.
+- Broad device coverage, App Store copy, screenshots, and marketing wait until
+  the owner workflow works.
+- "Gyro recorded" is not the same as "Gyroflow-quality stabilization."
+- The Filmtone-optimized motion / stabilization library lane that M5-B
+  BLOCKED implied is **deprioritized for capture-time stabilization**: M6
+  PASS shows AVFoundation built-in `cinematicExtendedEnhanced` is
+  acceptable on the M5-A locked format. If the lane survives at all,
+  scope narrows to "post-capture motion-data uses AVFoundation cannot
+  handle" (e.g. honest preview overlay, exporter metadata, off-device
+  Gyroflow-equivalent integrations) and is not a milestone in this
+  strategy.
+
+## Open Questions
+
+- Which rear-camera format should be the first real recording mode on the owner
+  device?
+- Does the owner device runtime-report Apple Log 2 for the desired mode?
+- ~~Can `AVCaptureVideoDataOutput + AVAssetWriter` produce stable PTS for this
+  use case?~~ **Closed 2026-05-07**: VDO rejected as the sole product master
+  writer path (Path C selected — see Completion Log). VDO is retained as a
+  timing / diagnostics side-band only.
+- Does Core Motion sampling remain stable while the selected video mode records?
+- Can Core Motion boot-time timestamps and video PTS be mapped cleanly enough
+  for Gyroflow?
+- ~~Which stabilization / lens path makes gyro data agree with the image
+  path?~~ **Closed 2026-05-07**: M6 PASS — AVFoundation
+  `cinematicExtendedEnhanced` on the M5-A locked format is the
+  capture-time stabilization path. Gyro / image-path agreement for
+  desktop stabilization lives downstream of capture and is not a
+  capture-pipeline milestone.
+- Does capture-time preview need Metal earlier than expected?
+- ~~Can `AVCaptureMovieFileOutput` (ProRes Apple Log 2 master) and
+  `AVCaptureVideoDataOutput` (timing side-band) coexist on the same
+  `AVCaptureSession` at 4K Apple Log 2 on iPhone 17 Pro / iOS 26.4?~~
+  **Closed 2026-05-07**: M2-B passed on iPhone 17 Pro / iOS 26.4.2.
+
+## Completion Log
+
+- 2026-05-07: Created iOS V2 capture / Gyroflow 2-layer operating structure and
+  scoped the first active task to M1 Capability Probe.
+- 2026-05-07: M1 done. Real-device JSON pulled from iPhone 17 Pro / iOS 26.4.2;
+  Apple Log 2 confirmed runtime-reported on all 7 rear cameras. M2 candidate
+  locked: BuiltInWideAngleCamera formatIndex 56, pixelFormat `x422`, Apple Log 2,
+  3840×2160@30, writer = ProRes 422 HQ.
+- 2026-05-07: M2-A (Video-Only Writer Smoke) **blocked**.
+  `AVCaptureVideoDataOutput.availableVideoPixelFormatTypes` on iPhone 17 Pro /
+  iOS 26.4 does not include `x422` or `x420` for the M1 candidate format —
+  only `420v`, `420f`, `BGRA`, plus 6 lossless/lossy compressed 8-bit
+  variants (`&8v0`, `-8v0`, `&8f0`, `-8f0`, `&BGA`, `-BGA`). The M1-locked
+  ProRes 422 HQ + Apple Log 2 master cannot be built directly through VDO.
+  Frozen Inputs need redesign before M2 can resume — see active.md
+  "Scope Review Required". Next active.md is a design review, not a
+  continuation of M2-A.
+- 2026-05-07: M2 writer path **decided — Path C (Quality-first dual-output)**.
+  `AVCaptureMovieFileOutput` writes the ProRes Apple Log 2 master;
+  `AVCaptureVideoDataOutput` runs as a timing / diagnostics side-band.
+  VDO is rejected as the sole product master writer for M2 product capture.
+  Decision evidence: Apple TN3121 (`availableVideoPixelFormatTypes` is
+  "connected to" semantics), Apple `.inputPriority` preset documentation
+  (auto-switch on `activeFormat` change), Apple Forum thread 769888
+  (4K60 ProRes Log uses `AVCaptureMovieFileOutput`), iPhoneOS 26.4 SDK
+  `CVPixelBuffer.h` (all 9 M2-A deliverable FourCCs decoded as 8-bit). A
+  parallel observation: M2-A's `availableVideoPixelFormatTypes` was queried
+  before VDO was attached to the session (TN3121 connected-to semantics),
+  so M2-A's blocker may reflect ordering rather than an Apple Log 2 +
+  VDO 10-bit limitation. That ordering question is intentionally not
+  resolved in this active because Path C is preferred regardless. See
+  next active proposal "M2-B Path C Dual-Output Coexistence Smoke".
+- 2026-05-07: M2-B Path C dual-output coexistence smoke **passed** on
+  iPhone 17 Pro / iOS 26.4.2. `AVCaptureMovieFileOutput` + VDO coexisted at
+  `hardwareCost = 0.5`; the master `.mov` is ProRes 422 HQ (`apch`),
+  3840x2160, 30 fps, 6.166667s; VDO delivered `x422` timing samples
+  (191 frames, 0 dropped). M3 motion-only recorder smoke can proceed.
+- 2026-05-07: M3 motion-only recorder smoke **passed** on iPhone 17 Pro /
+  iOS 26.4.2 (no `AVCaptureSession` running). Raw `startGyroUpdates` +
+  `startAccelerometerUpdates` (fused not started); both streams 1048
+  samples / coverage 10.479s / effectiveHz 99.92 / maxGap 10.0ms /
+  gapCountOver50/100/200ms = 0/0/0. M4 combined timing smoke can proceed.
+- 2026-05-07: M4 combined timing smoke **passed** on iPhone 17 Pro /
+  iOS 26.4.2 with one `AVCaptureSession` driving Path C dual output (ProRes
+  422 HQ Apple Log 2 master + VDO timing side-band) alongside raw gyro +
+  accel. 30s run; `video.movieFile.startPTSSeconds = 139121.811449` (finite —
+  startPTS gate satisfied), VDO 957 samples / 29.999 fps, gyro 3183 / accel
+  3182 (both 99.92 Hz; 200 Hz request capped by iOS 26.4 IMU), all gap
+  counters 0, `mapping.vdoPTSMinusGyroTSSeconds = -48.05ms`,
+  `vdoPTSMinusAccelTSSeconds = -58.06ms`. `session.synchronizationClock` is
+  `HostTimeClock` so VDO PTS, MovieFile startPTS, and `CMLogItem.timestamp`
+  share a single `mach_absolute_time` axis — M5 `.gcsv` proof can proceed.
+- 2026-05-07: M5-A Gyroflow `.gcsv` proof (on-device writer + package)
+  **passed** on iPhone 17 Pro / iOS 26.4.2 (Run #2,
+  `m5-package-a8ca4b0a-7f8e-4747-833b-9921a56ade4f`). Strategy C
+  combined-on-gyro-timeline writer + boundary-trim policy: `accelDroppedRowCount
+  = 0` (in-range tolerance gate), `gyroAccelTrimDurationTotalSeconds = 5.003ms
+  ≤ 20ms` (boundary trim within `max(1.5 × gyroMedianInterval, 20ms)`),
+  reconciliation `exactRow 3170 + interpRow 18 + droppedRow 0 + outOfRangeTotal
+  1 = 3189 = gyroSampleCount` and `gcsv.rowCount = 3188 = gyroSampleCount -
+  outOfRangeTotal - droppedRow`. Master ProRes 422 HQ Apple Log 2 30.567s /
+  2.7 GB; `movieFile.startPTSSeconds = 143361.71016770799` (M4 startPTS gate
+  not regressed); VDO 958 / 29.999 fps; gyro/accel 3189/3189 / 99.93 Hz / 0
+  gaps; M4 baseline drift gate within ±200ms (Δ23.2 / 28.2 ms). Run-local
+  M5-B sync seed `runLocalMovieStartToGyroOffsetSeconds = +141.81ms`
+  (PRIMARY). Strategy C exact-match rate 99.4% (3170/3188) confirms gyro and
+  accel CoreMotion handlers share the same scheduling cadence on this device.
+  Run #1 pre-revision FAIL drove the writer split between in-range drops
+  (`accelDroppedRowCount`) and boundary trim (`accelOutOfRange*Count` /
+  `gyroAccelTrimDuration*`); revised writer + smoke evidence in
+  `apps/capacitor-film-lab-ios/diagnostics/m5-combined-timing.json /
+  m5-motion.gcsv / m5-debug.log`. M5-B (Gyroflow desktop validation) and
+  M5-C (RS calibration) are deferred to separate active scopes.
+- 2026-05-07: M5-B Gyroflow desktop validation **closed as BLOCKED**
+  (not PASS, not FAIL). Gyroflow v1.6.3 (macOS) loaded `m5-master.mov`
+  + `m5-motion.gcsv` cleanly: `.gcsv` recognized as
+  `filmtone filmtone ios m5`, gyro X/Y/Z waveforms render finite over
+  full 30s, `Max rotation Pitch 4.8° / Yaw 4.9° / Roll 2.6°`,
+  stabilization preview pipeline became active. **Auto sync produced
+  no sync points** — clip is gentle handheld over bright laptop screen
+  content (low optical-flow feature density, ~5° max rotation),
+  `OpenCV (DIS)` + `findEssentialMat` + `rs-sync` did not converge.
+  `Rough gyro offset` field clamped to 0.1s precision in v1.6.3 GUI;
+  entered `0.1` (true M5-A seed `+0.14181`, gap 41.8ms — within
+  ±100ms Done tolerance, so not the blocker). **Owner observed visual
+  axis inversion** when stabilization preview engaged — sensor-frame
+  IMU (`axisConvention.mode = sensor-native`, `orientation = XYZ`)
+  fed into Gyroflow's pipeline that expects image-frame, with
+  `.mov` carrying `appliedAngle 90` / Gyroflow display rotation 270°.
+  Decision: **M5-A writer stays sensor-native** (raw Core Motion is
+  the honest capture truth; image-frame remap would bake a downstream
+  consumer's convention into Filmtone). **Gyroflow is not the
+  long-term motion consumer**; Filmtone will build an iPhone-optimized
+  stabilization / motion-data library in a separate lane (not defined
+  in this active). M5-A code at `d0e847e1` is unchanged. Strategy
+  `M5` Done conditions referencing Gyroflow stabilization quality may
+  need rewording when the Filmtone-optimized motion library lane
+  opens — deferred to that active. Findings recorded in
+  `archive/2026-05-07-m5-b-gyroflow-desktop-proof.md`.
+- 2026-05-07: M6 AVFoundation stabilization smoke **passed** on iPhone 17 Pro /
+  iOS 26.4.2. `AVCaptureConnection.preferredVideoStabilizationMode =
+  .cinematicExtendedEnhanced` (raw 5) on the M5-A locked format
+  (formatIndex 56 / x422 / Apple Log 2 / 3840x2160@30 / writer ProRes
+  422 HQ) clears all four Stop Conditions: active resolves to
+  requested (no silent `.off` fallback), Apple Log 2 preserved
+  (`colorSpaceRaw=4`), no format swap
+  (`activeFormatMatchesLockedAfterRecordStart=true`), and the recorded
+  `.mov` first video track FourCC reads `apch` via `AVURLAsset` (no
+  ProRes 422 HQ → HEVC writer downgrade — direct file evidence, not
+  the constant `writer.codec` field). Per-format probe of the full
+  iOS 26 candidate set (`off, standard, cinematic, cinematicExtended,
+  previewOptimized, cinematicExtendedEnhanced, lowLatency, auto`)
+  empirically reports `previewOptimized (raw 4)` and `lowLatency
+  (raw 6)` as NOT supported on formatIndex 56. Owner visual A/B
+  (run #2, handheld pan + light shake) judged the on-clip acceptable
+  at owner-quality bar with no visible Apple Log 2 tonal-range
+  downgrade. Implication: the Filmtone-optimized motion /
+  stabilization library lane that M5-B BLOCKED implied is **not
+  required for capture-time stabilization** — re-scope to
+  "post-capture motion-data uses AVFoundation cannot do" or
+  deprioritisation is **proposed** in the archived active and held
+  for owner review (not applied here). Findings recorded in
+  `archive/2026-05-07-m6-avfoundation-stabilization-smoke.md`.
+- 2026-05-07: Strategy realigned — M6 redefined as "AVFoundation
+  Stabilization Smoke" (PASS), new M7 = "Product Capture Stabilization
+  Integration", old M6 / M7 renumbered to M8 / M9 with deps updated,
+  Filmtone-optimized motion library lane deprioritized for capture-time
+  stabilization (Known Constraints bullet added). M1-M6 prior history
+  untouched. Realignment scope: numbering + deps + lane note only.
+- 2026-05-08: M7 Product Capture Stabilization Integration **passed**
+  on iPhone 17 Pro / iOS 26.4.2. Owner-tapped third CTA on
+  `FilmtoneEmptyView` ("録画する / Record") triggered
+  `FilmtoneEditorStore.recordProductClip()` →
+  `FilmtoneProductCapture.recordClip(durationSeconds: 5)` directly
+  (no Capacitor plugin bridge); resulting `clip.mov` auto-loaded into
+  the editor as the active source. Mid-implementation discovery: the
+  React/Capacitor MobilePhase0Editor is **not the live UI** —
+  `AppDelegate` boots a native SwiftUI tree via
+  `FilmtoneRootHostingController` + `FilmtoneRootView`. The earlier
+  React-side wiring (MobilePhase0Editor.tsx record button + JS bridge
+  + Capacitor plugin method) never rendered. Outcome: M7 product
+  surface shipped as native SwiftUI; React/Capacitor stack confirmed
+  dead in launch path. Findings recorded in
+  `archive/2026-05-08-m7-product-capture-stabilization.md`. Follow-up
+  lane: React/Capacitor purge from `apps/capacitor-film-lab-ios`.
+- 2026-05-08: M8 (Native Recording Product Flow) **landed** — fixed
+  5s product capture surfaced via SwiftUI: `FilmtoneRootView`
+  recording overlay (TimelineView countdown ring + integer seconds +
+  pulsing red dot + localized label) and `.alert` bound to a
+  dedicated `recordingError` state. Capture surface contract
+  unchanged (no stop affordance, M7 owner-locked design). xcodebuild
+  PASS; owner device acceptance pending. Details in
+  `archive/2026-05-08-m8-native-recording-product-flow.md`.

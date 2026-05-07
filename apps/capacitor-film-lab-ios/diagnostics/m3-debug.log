@@ -1,0 +1,6 @@
+[1778134609.638834] M3 motion-only smoke begin
+[1778134609.640407] starting motion-only smoke duration=10.0 requestedInterval=0.005
+[1778134609.6405392] isGyroAvailable=true isAccelerometerAvailable=true isDeviceMotionAvailable=true
+[1778134609.64061] startGyroUpdates + startAccelerometerUpdates issued at sysUptime=128403.624324125
+[1778134620.130408] finalizeAndComplete() begin (workerQueue, requesting snapshot on handlerQueue)
+[1778134620.14102] snapshot finished. gyroCount=1048 accelCount=1048 stopBootTime=128414.12473012501

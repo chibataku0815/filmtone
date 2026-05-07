@@ -1,0 +1,62 @@
+{
+  "accel" : {
+    "coverageSeconds" : 10.478757958335336,
+    "effectiveHz" : 99.920063974104522,
+    "firstTS" : 128403.63089204168,
+    "intervals" : {
+      "gapCountOver50ms" : 0,
+      "gapCountOver100ms" : 0,
+      "gapCountOver200ms" : 0,
+      "maxGapSeconds" : 0.010009499994339421,
+      "medianSeconds" : 0.010007999997469597,
+      "p99Seconds" : 0.01000900000508409
+    },
+    "lastTS" : 128414.10965000001,
+    "sampleCount" : 1048
+  },
+  "coreMotion" : {
+    "fusedDeviceMotionStarted" : false,
+    "isAccelerometerAvailable" : true,
+    "isDeviceMotionAvailable" : true,
+    "isGyroAvailable" : true,
+    "requestedAccelIntervalSeconds" : 0.0050000000000000001,
+    "requestedGyroIntervalSeconds" : 0.0050000000000000001,
+    "requestedHz" : 200
+  },
+  "device" : {
+    "machine" : "iPhone18,1",
+    "model" : "iPhone",
+    "name" : "iPhone",
+    "systemName" : "iOS",
+    "systemVersion" : "26.4.2"
+  },
+  "duration" : {
+    "elapsedSeconds" : 10.500406000006478,
+    "requestedSeconds" : 10
+  },
+  "gyro" : {
+    "coverageSeconds" : 10.478757958335336,
+    "effectiveHz" : 99.920063974104522,
+    "firstTS" : 128403.62588804167,
+    "intervals" : {
+      "gapCountOver50ms" : 0,
+      "gapCountOver100ms" : 0,
+      "gapCountOver200ms" : 0,
+      "maxGapSeconds" : 0.010009500008891337,
+      "medianSeconds" : 0.010007999997469597,
+      "p99Seconds" : 0.01000900000508409
+    },
+    "lastTS" : 128414.10464600001,
+    "sampleCount" : 1048
+  },
+  "lane" : "v2-capture-gyroflow",
+  "milestone" : "M3",
+  "schemaVersion" : 1,
+  "smokeError" : null,
+  "smokeLaneEnvVar" : "m3",
+  "timestamps" : {
+    "configuredAtBootTime" : 128403.62422241668,
+    "startedAtBootTime" : 128403.624324125,
+    "stoppedAtBootTime" : 128414.12473012501
+  }
+}

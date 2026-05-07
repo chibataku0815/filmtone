@@ -1,0 +1,27 @@
+[1778131505.228442] M2-B Path C smoke begin
+[1778131505.229858] start() requesting camera authorization (status=3)
+[1778131505.230414] requestAccess granted=true
+[1778131505.230535] configureSession() — locating wide rear camera…
+[1778131505.230711] wide=背面カメラ formats=70
+[1778131505.230789] formats[56].supportedColorSpaces (raw)=0,2,3,4
+[1778131505.230864] session.sessionPreset=.inputPriority, autoWideColor=false
+[1778131505.2328029] session.addInput(wide) OK
+[1778131505.233041] activeFormat=formats[56], activeColorSpace=appleLog2 applied
+[1778131505.233108] activeVideoMin/MaxFrameDuration=1/30 applied
+[1778131505.2337809] session.addOutput(movieFileOutput) OK
+[1778131505.233862] movieOutput.availableVideoCodecTypes=apch,apcn,apcs,apco
+[1778131505.2570791] movieOutput.setOutputSettings(proRes422HQ) OK
+[1778131505.257761] session.addOutput(videoDataOutput) OK
+[1778131505.2578878] [post-addOutput] vdo.availableVideoPixelFormatTypes=x422(0x78343232),x420(0x78343230),&xv2(0x26787632),-xv2(0x2d787632),&xv0(0x26787630),-xv0(0x2d787630)
+[1778131505.258792] commitConfiguration done. preset=AVCaptureSessionPresetInputPriority hardwareCost=0.5
+[1778131505.258946] session.synchronizationClock=FigClock[HostTimeClock]: 0x10a8bf100 retainCount: 20 allocator: 0x1f82cc310 current time: {125314527306416/1000000000 = 125314.527} = 125314.527306 seconds
+[1778131505.259764] configureSession OK, starting session…
+[1778131505.259821] session.startRunning() …
+[1778131505.4009562] session.isRunning=true
+[1778131505.4024081] movieOutput.startRecording(to: m2b-master.mov) requested
+[1778131505.419153] vdo first sample pts=125314.648812375 pixelFormat=x422
+[1778131505.5787091] movieFileOutput didStartRecordingTo m2b-master.mov
+[1778131511.6741571] movieOutput.stopRecording() requested at sysUptime=125320.94244879167
+[1778131511.766109] movieFileOutput didFinishRecordingTo m2b-master.mov OK
+[1778131511.888396] session.stopRunning() + vdoQueue drain done. finalize.
+[1778131511.890116] master mov exists=true size=486823385

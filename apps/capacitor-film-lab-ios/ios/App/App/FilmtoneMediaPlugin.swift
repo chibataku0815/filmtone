@@ -17,6 +17,7 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "cancelExport", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "cacheInventory", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "releaseCache", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "probeCaptureCapabilities", returnType: CAPPluginReturnPromise),
     ]
 
     private var assetPickerService: AssetPickerService?
@@ -346,6 +347,28 @@ final class FilmtoneMediaPlugin: CAPPlugin, CAPBridgedPlugin {
             call.resolve(with: result)
         } catch {
             reject(call, with: error)
+        }
+    }
+
+    @objc func probeCaptureCapabilities(_ call: CAPPluginCall) {
+        Task.detached(priority: .userInitiated) {
+            do {
+                let result = try FilmtoneCaptureCapabilityProbe.run()
+                let response: [String: Any] = [
+                    "schemaVersion": FilmtoneCaptureCapabilityProbe.schemaVersion,
+                    "filePath": result.fileURL.path,
+                    "fileURI": result.fileURL.absoluteString,
+                    "json": result.jsonString,
+                    "payload": result.payload,
+                ]
+                await MainActor.run {
+                    call.resolve(response)
+                }
+            } catch {
+                await MainActor.run {
+                    self.reject(call, with: error)
+                }
+            }
         }
     }
 

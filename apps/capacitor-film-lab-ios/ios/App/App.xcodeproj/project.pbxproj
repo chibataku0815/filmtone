@@ -75,6 +75,14 @@
 		D2000001000000000000002B /* FilmtoneEmptyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000002B /* FilmtoneEmptyView.swift */; };
 		D2000001000000000000002D /* FilmtoneSourceProfileSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000002D /* FilmtoneSourceProfileSheet.swift */; };
 		D2000001000000000000002E /* FilmtoneMetalOpticsRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000002E /* FilmtoneMetalOpticsRenderer.swift */; };
+		D2000001000000000000002F /* FilmtoneCaptureCapabilityProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000002F /* FilmtoneCaptureCapabilityProbe.swift */; };
+		D20000010000000000000030 /* FilmtoneCaptureWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000030 /* FilmtoneCaptureWriter.swift */; };
+		D20000010000000000000031 /* FilmtoneMotionRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000031 /* FilmtoneMotionRecorder.swift */; };
+		D20000010000000000000041 /* FilmtoneCombinedTimingSmoke.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000041 /* FilmtoneCombinedTimingSmoke.swift */; };
+		D20000010000000000000051 /* FilmtoneGcsvSmoke.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000051 /* FilmtoneGcsvSmoke.swift */; };
+		D20000010000000000000061 /* FilmtoneStabilizationSmoke.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000061 /* FilmtoneStabilizationSmoke.swift */; };
+		D20000010000000000000071 /* FilmtoneProductCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000071 /* FilmtoneProductCapture.swift */; };
+		D20000010000000000000052 /* FilmtoneGcsvWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000052 /* FilmtoneGcsvWriter.swift */; };
 		D20000010000000000000001 /* FormatExtensionReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000001 /* FormatExtensionReader.swift */; };
 		D20000010000000000000002 /* SourceColorMetadataNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000002 /* SourceColorMetadataNormalizer.swift */; };
 		D20000010000000000000003 /* SourceColorClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000003 /* SourceColorClassifier.swift */; };
@@ -205,6 +213,14 @@
 		C2000001000000000000002B /* FilmtoneEmptyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneEmptyView.swift; sourceTree = "<group>"; };
 		C2000001000000000000002D /* FilmtoneSourceProfileSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneSourceProfileSheet.swift; sourceTree = "<group>"; };
 		C2000001000000000000002E /* FilmtoneMetalOpticsRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneMetalOpticsRenderer.swift; sourceTree = "<group>"; };
+		C2000001000000000000002F /* FilmtoneCaptureCapabilityProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCaptureCapabilityProbe.swift; sourceTree = "<group>"; };
+		C20000010000000000000030 /* FilmtoneCaptureWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCaptureWriter.swift; sourceTree = "<group>"; };
+		C20000010000000000000031 /* FilmtoneMotionRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneMotionRecorder.swift; sourceTree = "<group>"; };
+		C20000010000000000000041 /* FilmtoneCombinedTimingSmoke.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCombinedTimingSmoke.swift; sourceTree = "<group>"; };
+		C20000010000000000000051 /* FilmtoneGcsvSmoke.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneGcsvSmoke.swift; sourceTree = "<group>"; };
+		C20000010000000000000061 /* FilmtoneStabilizationSmoke.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneStabilizationSmoke.swift; sourceTree = "<group>"; };
+		C20000010000000000000071 /* FilmtoneProductCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneProductCapture.swift; sourceTree = "<group>"; };
+		C20000010000000000000052 /* FilmtoneGcsvWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneGcsvWriter.swift; sourceTree = "<group>"; };
 		C20000010000000000000001 /* FormatExtensionReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormatExtensionReader.swift; sourceTree = "<group>"; };
 		C20000010000000000000002 /* SourceColorMetadataNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceColorMetadataNormalizer.swift; sourceTree = "<group>"; };
 		C20000010000000000000003 /* SourceColorClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceColorClassifier.swift; sourceTree = "<group>"; };
@@ -348,6 +364,14 @@
 				C2000001000000000000002B /* FilmtoneEmptyView.swift */,
 				C2000001000000000000002D /* FilmtoneSourceProfileSheet.swift */,
 				C2000001000000000000002E /* FilmtoneMetalOpticsRenderer.swift */,
+				C2000001000000000000002F /* FilmtoneCaptureCapabilityProbe.swift */,
+				C20000010000000000000030 /* FilmtoneCaptureWriter.swift */,
+				C20000010000000000000031 /* FilmtoneMotionRecorder.swift */,
+				C20000010000000000000041 /* FilmtoneCombinedTimingSmoke.swift */,
+				C20000010000000000000051 /* FilmtoneGcsvSmoke.swift */,
+				C20000010000000000000061 /* FilmtoneStabilizationSmoke.swift */,
+				C20000010000000000000071 /* FilmtoneProductCapture.swift */,
+				C20000010000000000000052 /* FilmtoneGcsvWriter.swift */,
 				C20000010000000000000001 /* FormatExtensionReader.swift */,
 				C20000010000000000000002 /* SourceColorMetadataNormalizer.swift */,
 				C20000010000000000000003 /* SourceColorClassifier.swift */,
@@ -647,6 +671,14 @@
 				D2000001000000000000002B /* FilmtoneEmptyView.swift in Sources */,
 				D2000001000000000000002D /* FilmtoneSourceProfileSheet.swift in Sources */,
 				D2000001000000000000002E /* FilmtoneMetalOpticsRenderer.swift in Sources */,
+				D2000001000000000000002F /* FilmtoneCaptureCapabilityProbe.swift in Sources */,
+				D20000010000000000000030 /* FilmtoneCaptureWriter.swift in Sources */,
+				D20000010000000000000031 /* FilmtoneMotionRecorder.swift in Sources */,
+				D20000010000000000000041 /* FilmtoneCombinedTimingSmoke.swift in Sources */,
+				D20000010000000000000051 /* FilmtoneGcsvSmoke.swift in Sources */,
+				D20000010000000000000061 /* FilmtoneStabilizationSmoke.swift in Sources */,
+				D20000010000000000000071 /* FilmtoneProductCapture.swift in Sources */,
+				D20000010000000000000052 /* FilmtoneGcsvWriter.swift in Sources */,
 				D20000010000000000000001 /* FormatExtensionReader.swift in Sources */,
 				D20000010000000000000002 /* SourceColorMetadataNormalizer.swift in Sources */,
 				D20000010000000000000003 /* SourceColorClassifier.swift in Sources */,

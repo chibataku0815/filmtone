@@ -225,6 +225,18 @@ struct FilmtoneSourceLoadState {
     }
 }
 
+/// In-progress AVCaptureMovieFileOutput recording snapshot. Set by
+/// `FilmtoneEditorStore.recordProductClip(durationSeconds:)` when the
+/// capture call begins and cleared the moment it returns; nil at any
+/// other time. The view uses `startedAt` against `TimelineView`'s tick
+/// to compute the visible countdown. Capture surface itself is locked
+/// to fixed-duration (M7 owner-locked design) — there is no stop
+/// affordance in M8.
+struct FilmtoneRecordingUIState: Equatable {
+    let startedAt: Date
+    let durationSeconds: Double
+}
+
 @MainActor
 final class FilmtoneVideoPreviewSession {
     let sourceURI: String
@@ -450,6 +462,17 @@ final class FilmtoneEditorStore: ObservableObject {
     @Published var isBusy = false
     @Published var notice: String?
     @Published var error: String?
+    /// Live during the AVCaptureMovieFileOutput phase of `recordProductClip`
+    /// only. Drives the recording-in-progress overlay (ring + countdown +
+    /// label). Cleared the moment capture returns — the post-capture
+    /// probe / applyProbe phase is covered by `sourceLoadState` instead.
+    @Published var recordingState: FilmtoneRecordingUIState?
+    /// Localized detail of the most recent product-capture failure. Bound
+    /// to a `.alert` in `FilmtoneRootView`; cleared when the user
+    /// dismisses the alert or starts a new recording. Distinct from the
+    /// generic `error` bag so the recording surface alert never picks up
+    /// pickSource / export / library errors.
+    @Published var recordingError: String?
     /// Set true when the user picks a video longer than the iOS source
     /// duration cap (`PHASE0_MAX_SOURCE_DURATION_SEC`, 300s). Surfaces a
     /// dedicated Desktop handoff sheet instead of routing the clip through
@@ -940,6 +963,69 @@ final class FilmtoneEditorStore: ObservableObject {
             isBusy = false
             sourceLoadState = nil
             self.error = strings.userMessage(for: error, context: .pickSource)
+        }
+    }
+
+    /// Records one fixed-duration ProRes 422 HQ Apple Log 2 clip with
+    /// AVFoundation `cinematicExtendedEnhanced` stabilization, then adopts
+    /// the resulting `clip.mov` as the active source — same downstream
+    /// pipeline as `pickSource` (probe → applyProbe → persist → reclaim →
+    /// schedulePreviewRender).
+    func recordProductClip(durationSeconds: Double = 5.0) async {
+        isBusy = true
+        notice = strings.recordProductClipRunning
+        error = nil
+        recordingError = nil
+        sourceLoadState = nil
+        recordingState = FilmtoneRecordingUIState(
+            startedAt: Date(),
+            durationSeconds: durationSeconds
+        )
+
+        let capture = FilmtoneProductCapture()
+        do {
+            let result: FilmtoneProductCapture.RecordClipResult = try await withCheckedThrowingContinuation { continuation in
+                capture.recordClip(durationSeconds: durationSeconds) { result in
+                    continuation.resume(with: result)
+                }
+            }
+
+            recordingState = nil
+
+            let recordedSource = SourceInfoDTO(
+                uri: result.movURL.absoluteString,
+                filename: result.movURL.lastPathComponent,
+                kind: .video,
+                mimeType: "video/quicktime"
+            )
+
+            sourceLoadState = .init(
+                stage: .probing,
+                route: .photoLibrary,
+                message: strings.probePending,
+                progress: nil,
+                isDeterminate: false
+            )
+            let probe = try facade.probeSource(recordedSource)
+            applyProbe(source: recordedSource, probe: probe)
+            isBusy = false
+            sourceLoadState = nil
+            notice = nil
+            persist()
+            reclaimCacheForCurrentState()
+            schedulePreviewRender()
+        } catch {
+            recordingState = nil
+            isBusy = false
+            sourceLoadState = nil
+            notice = nil
+            let detail: String
+            if let recordError = error as? FilmtoneProductCapture.RecordClipError {
+                detail = recordError.errorDescription ?? String(describing: recordError)
+            } else {
+                detail = (error as NSError).localizedDescription
+            }
+            self.recordingError = detail
         }
     }
 
