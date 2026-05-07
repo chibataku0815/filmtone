@@ -300,3 +300,29 @@ Dependency:
   `apps/capacitor-film-lab-ios/diagnostics/m5-combined-timing.json /
   m5-motion.gcsv / m5-debug.log`. M5-B (Gyroflow desktop validation) and
   M5-C (RS calibration) are deferred to separate active scopes.
+- 2026-05-07: M5-B Gyroflow desktop validation **closed as BLOCKED**
+  (not PASS, not FAIL). Gyroflow v1.6.3 (macOS) loaded `m5-master.mov`
+  + `m5-motion.gcsv` cleanly: `.gcsv` recognized as
+  `filmtone filmtone ios m5`, gyro X/Y/Z waveforms render finite over
+  full 30s, `Max rotation Pitch 4.8° / Yaw 4.9° / Roll 2.6°`,
+  stabilization preview pipeline became active. **Auto sync produced
+  no sync points** — clip is gentle handheld over bright laptop screen
+  content (low optical-flow feature density, ~5° max rotation),
+  `OpenCV (DIS)` + `findEssentialMat` + `rs-sync` did not converge.
+  `Rough gyro offset` field clamped to 0.1s precision in v1.6.3 GUI;
+  entered `0.1` (true M5-A seed `+0.14181`, gap 41.8ms — within
+  ±100ms Done tolerance, so not the blocker). **Owner observed visual
+  axis inversion** when stabilization preview engaged — sensor-frame
+  IMU (`axisConvention.mode = sensor-native`, `orientation = XYZ`)
+  fed into Gyroflow's pipeline that expects image-frame, with
+  `.mov` carrying `appliedAngle 90` / Gyroflow display rotation 270°.
+  Decision: **M5-A writer stays sensor-native** (raw Core Motion is
+  the honest capture truth; image-frame remap would bake a downstream
+  consumer's convention into Filmtone). **Gyroflow is not the
+  long-term motion consumer**; Filmtone will build an iPhone-optimized
+  stabilization / motion-data library in a separate lane (not defined
+  in this active). M5-A code at `d0e847e1` is unchanged. Strategy
+  `M5` Done conditions referencing Gyroflow stabilization quality may
+  need rewording when the Filmtone-optimized motion library lane
+  opens — deferred to that active. Findings recorded in
+  `archive/2026-05-07-m5-b-gyroflow-desktop-proof.md`.
