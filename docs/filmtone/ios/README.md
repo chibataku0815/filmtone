@@ -24,6 +24,18 @@ Report public App Store state and local implementation state separately.
 - Native bridge / Swift surfaces: open the exact Swift or TypeScript target
   named by the task.
 
+## Current Product Plans
+
+- [`v2-capture-gyroflow/strategy.md`](./v2-capture-gyroflow/strategy.md)
+  is the current strategy for the owner-first V2 capture / Gyroflow lane.
+- [`v2-capture-gyroflow/active.md`](./v2-capture-gyroflow/active.md)
+  is the only current active task for that lane.
+
+## Idea Notes
+
+- [`ideas/2026-05-07-multicam-apple-log-new-app-feasibility-handoff.md`](./ideas/2026-05-07-multicam-apple-log-new-app-feasibility-handoff.md)
+  is a separate new-app feasibility handoff for MultiCam Apple Log capture.
+
 ## Copy And Metadata Gates
 
 - Run `bun run check:filmtone-copy` after App Store metadata, public web copy,

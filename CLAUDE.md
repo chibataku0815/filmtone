@@ -43,13 +43,16 @@ Filmtone — 独立モノレポ Claude Code 協業ガイド
 | life `docs/guides/2026-05-01-filmtone-standalone-product-repo-migration-handoff.md` | 移行経緯の参照。現在状態の正本にはしない |
 | life `docs/guides/film-lab-current-index.md` | live エントリ doc(read order・active lanes) |
 
-## 4.5 Native Desktop v2 2-layer 運用
+## 4.5 2-layer 運用
 
 詳細なルールは `AGENTS.md` の "Long-Running Task Model" に置く。Claude
 固有の運用は以下だけ:
 
 - Native Desktop v2 では開始時に `strategy.md` を読み、`active.md` があれば
   その範囲だけ作業する。
+- iOS V2 capture / Gyroflow では
+  `docs/filmtone/ios/v2-capture-gyroflow/strategy.md` を読み、
+  `active.md` があればその範囲だけ作業する。
 - `active.md` がなければ次の 30 分以内粒度のサブタスク案を作り、実装は
   開始しない。
 - 完了時は `active.md` を archive へ移動し、`strategy.md` には 1〜3 行だけ
