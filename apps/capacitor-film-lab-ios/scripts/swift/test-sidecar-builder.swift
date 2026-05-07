@@ -35,6 +35,7 @@ struct TestSidecarBuilder {
         try runImageJobDerivation()
         try runSavedLookProvenance()
         try runCameraProfileProvenance()
+        try runOpticalFilterProvenance()
         try runHighlightMarkersSidecarBlock()
         try runHighlightReelSegmentContract()
         try runConnectPackageUriOrdering()
@@ -1179,6 +1180,72 @@ struct TestSidecarBuilder {
         )
     }
 
+    // MARK: - v1.4 Backlight Veil provenance
+
+    static func runOpticalFilterProvenance() throws {
+        let request = Phase0ExportRequestDTO(
+            sourceUri: "file:///tmp/phase0-source.mp4",
+            sourceKind: .video,
+            sourceProbe: nil,
+            output: Phase0OutputProfileDTO(
+                longEdge: 1920,
+                fps: 24,
+                codec: "h264",
+                container: "mp4",
+                preserveAudio: true
+            ),
+            grade: Phase0GradeDTO(
+                presetName: "iphone",
+                presetVersion: "v1",
+                quickState: Phase0QuickStateDTO(filmCharacter: 0, era: 0, dynamics: 0),
+                params: zeroParams()
+            ),
+            lut: nil,
+            inputLut: nil,
+            creativeLut: nil,
+            renderMode: nil,
+            depthEnabled: nil,
+            depthRenderer: nil,
+            opticalFilterProfileId: "backlightVeil-1-4"
+        )
+        let inputs = SidecarBuildInputs(
+            request: request,
+            sourceProbe: nil,
+            hdrPolicy: nil,
+            degradedDecodePath: false,
+            outputURL: URL(fileURLWithPath: "/tmp/phase0-out.mp4"),
+            outputSize: CGSize(width: 1920, height: 1080),
+            fileSizeBytes: 1_024,
+            elapsedMs: 1_000,
+            realtimeRatio: 1.0,
+            audioPreserved: true,
+            identity: SidecarDeviceIdentity(
+                appVersion: "1.4.0",
+                buildNumber: "1",
+                deviceModel: "iPhone16,2",
+                iosVersion: "17.5",
+                exportedAtIso: "2026-05-06T00:00:00Z"
+            ),
+            renderMode: "quality",
+            mezzanineUsedVariant: nil,
+            mezzanineProfileVersion: nil,
+            colorPipeline: FilmtoneColorPipeline.defaultOutputContract(
+                sourceMetadata: nil,
+                sourceColorClass: nil
+            ),
+            package: nil,
+            depth: nil,
+            appliedSavedLook: nil,
+            cameraProfile: nil
+        )
+        let data = try FilmtoneExportSidecarBuilder.build(inputs)
+        let parsed = try JSONDecoder().decode(ParsedSidecar.self, from: data)
+        try expect(
+            parsed.opticalFilterProfileId == "backlightVeil-1-4",
+            "sidecar should preserve Backlight Veil profile id"
+        )
+    }
+
     // MARK: - Helpers
 
     static func zeroParams() -> Phase0ParamsDTO {
@@ -1216,6 +1283,7 @@ private struct ParsedSidecar: Decodable {
     let lutRefs: ParsedLutRefs
     let output: ParsedOutput
     let package: ParsedPackage?
+    let opticalFilterProfileId: String?
 }
 
 private struct ParsedDevice: Decodable {

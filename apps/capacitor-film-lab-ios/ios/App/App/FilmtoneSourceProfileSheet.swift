@@ -64,7 +64,7 @@ struct FilmtoneSourceProfileSheet: View {
         FilmtoneLutControls.profileRow(
             title: store.strings.cameraLabel,
             value: store.cameraProfileLabel,
-            menuTitle: store.strings.cameraImport,
+            menuTitle: store.strings.cameraChange,
             systemImage: "camera.filters",
             menuIdentifier: "filmtone.lut.input.menu"
         ) {

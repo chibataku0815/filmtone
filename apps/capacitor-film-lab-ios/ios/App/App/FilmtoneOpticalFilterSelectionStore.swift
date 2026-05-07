@@ -1,17 +1,10 @@
 import Foundation
 
-/// Singleton for the currently-selected optical filter family id (e.g.
-/// `"backlightVeil-1-2"` or nil = OFF). Decoupled from `Phase0ExportRequestDTO`
-/// and `FilmtonePhase0Project` because the optical filter is iOS-side runtime
-/// state, not a project-persisted parameter.
+/// Legacy singleton for the currently-selected optical filter family id.
 ///
-/// Written by `FilmtoneEditorStore.setOpticalFilterId(_:)` from the @MainActor
-/// editor UI; read by `FilmtoneExportSession.currentBacklightVeilOptical()` at
-/// composite time on the AVFoundation CIFilter dispatch queue. NSLock guards
-/// concurrent access.
-///
-/// In-memory only — app restart resets to nil. Persistence across launches is
-/// a follow-on (would need a project schema bump).
+/// Backlight Veil now travels through `FilmtoneProjectState` and
+/// `Phase0ExportRequestDTO`; this type stays in the target only for
+/// backward-compatible source stability while older call sites are removed.
 final class FilmtoneOpticalFilterSelectionStore: @unchecked Sendable {
     static let shared = FilmtoneOpticalFilterSelectionStore()
 

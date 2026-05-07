@@ -106,6 +106,7 @@ struct VerifyPhase0Contract {
         )
         try runLutClearRequestContracts(decoder: decoder, encoder: encoder)
         try runLutIntensityContracts()
+        try runOpticalFilterRequestContract(decoder: decoder, encoder: encoder)
 
         // --- Hidden defaults SSOT (CONTRACT_DEFAULTS 19 keys) ---
         // Confirms that the generated Swift block matches the TS source of
@@ -255,6 +256,27 @@ struct VerifyPhase0Contract {
         try expect(
             abs((creativeChangedRequest.creativeLut?.intensity ?? -1) - 0.42) < 0.0001,
             "creative intensity should transport to request.creativeLut"
+        )
+    }
+
+    static func runOpticalFilterRequestContract(
+        decoder: JSONDecoder,
+        encoder: JSONEncoder
+    ) throws {
+        var project = FilmtonePhase0Math.createProjectState()
+        project.opticalFilterProfileId = "backlightVeil-1-4"
+
+        let request = try makeRequest(project: project)
+        try expect(
+            request.opticalFilterProfileId == "backlightVeil-1-4",
+            "Backlight Veil profile id should transport to export request"
+        )
+
+        let encoded = try encoder.encode(project)
+        let decoded = try decoder.decode(FilmtoneProjectState.self, from: encoded)
+        try expect(
+            decoded.opticalFilterProfileId == "backlightVeil-1-4",
+            "Backlight Veil profile id should persist in project state"
         )
     }
 

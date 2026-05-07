@@ -336,6 +336,23 @@
         }
       }
     },
+    "filmtone.camera.change" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Change"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "変更"
+          }
+        }
+      }
+    },
     "filmtone.camera.clear" : {
       "extractionState" : "stale",
       "localizations" : {

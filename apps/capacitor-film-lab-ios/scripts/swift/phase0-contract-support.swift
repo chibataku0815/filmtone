@@ -319,4 +319,5 @@ struct Phase0ExportRequestDTO: Codable {
     let depthEnabled: Bool?
     let depthRenderer: String?
     var connectPackage: Bool? = nil
+    var opticalFilterProfileId: String? = nil
 }

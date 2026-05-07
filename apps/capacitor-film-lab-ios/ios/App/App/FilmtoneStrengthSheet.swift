@@ -160,8 +160,8 @@ struct FilmtoneStrengthSheet: View {
     /// Backlight Veil Phase 1c — segmented Picker for the optical filter
     /// family. OFF / 1/8 / 1/4 / 1/2 (Desktop canonical curve, no
     /// interpolation). Mutates `FilmtoneEditorStore.selectedOpticalFilterId`,
-    /// which mirrors to `FilmtoneOpticalFilterSelectionStore.shared` so the
-    /// composite kernel picks up the new branch on the next preview frame.
+    /// which mirrors to the project/request so the composite kernel picks up
+    /// the new branch on the next preview frame.
     private var backlightVeilSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {

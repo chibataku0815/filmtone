@@ -501,10 +501,9 @@ final class FilmtoneEditorStore: ObservableObject {
     private(set) var appliedSavedLookId: UUID?
 
     /// Backlight Veil Phase 1c — currently selected optical filter family id
-    /// (e.g. `"backlightVeil-1-2"`) or nil = OFF. Mirrored to
-    /// `FilmtoneOpticalFilterSelectionStore.shared` so
-    /// `FilmtoneExportSession.currentBacklightVeilOptical()` can pick it up
-    /// at composite time. In-memory only — app restart resets to nil.
+    /// (e.g. `"backlightVeil-1-2"`) or nil = OFF. Mirrors
+    /// `project.opticalFilterProfileId` for SwiftUI observation; render paths
+    /// consume the persisted project value through `Phase0ExportRequestDTO`.
     @Published private(set) var selectedOpticalFilterId: String?
 
     let strings: FilmtoneStrings
@@ -536,6 +535,7 @@ final class FilmtoneEditorStore: ObservableObject {
             self.source = nil
             self.probe = nil
         }
+        self.selectedOpticalFilterId = self.project.opticalFilterProfileId
 
         if let source, !facade.fileExists(uri: source.uri) {
             self.source = nil
@@ -1050,16 +1050,15 @@ final class FilmtoneEditorStore: ObservableObject {
     }
 
     /// Backlight Veil Phase 1c — segmented Picker writes a profile id (or
-    /// nil = OFF). The runtime singleton is the SSOT consumed by the
-    /// composite kernel; `selectedOpticalFilterId` mirrors it for SwiftUI
-    /// observation. `recomputeProjectParams()` reschedules the preview so
-    /// the new kernel branch picks up on the next frame.
+    /// nil = OFF) into the project/request state. `recomputeProjectParams()`
+    /// reschedules the preview so the new kernel branch picks up on the next
+    /// frame without dirtying the currently-applied Saved Look provenance.
     func setOpticalFilterId(_ id: String?) {
         guard selectedOpticalFilterId != id else {
             return
         }
         selectedOpticalFilterId = id
-        FilmtoneOpticalFilterSelectionStore.shared.setCurrentId(id)
+        project.opticalFilterProfileId = id
         recomputeProjectParams()
     }
 

@@ -489,7 +489,7 @@ struct FilmtoneFullscreenLutEditor: View {
     //
     // Two-segment top chrome (CD-confirmed IA): upperChrome holds back +
     // compare segment (video only) + active preset title + hide + save +
-    // export. lowerChrome holds the two sheet triggers (Source / Adjust)
+    // export. lowerChrome holds the two sheet triggers (Camera / Adjust)
     // — Recipe was removed when preset chips were folded into the bottom
     // Look carousel. Each segment is its own GlassEffectContainer so glass
     // cohesion stays within a row — `glass cannot sample glass`, so we
@@ -616,7 +616,7 @@ struct FilmtoneFullscreenLutEditor: View {
         return store.strings.displayName(for: entry)
     }
 
-    // MARK: Lower chrome (Source / Advanced sheet triggers)
+    // MARK: Lower chrome (Camera / Advanced sheet triggers)
     //
     // Recipe trigger was removed when the Recipe concept was absorbed into
     // Look. The preset catalog still exists at the data layer (each Look
@@ -627,11 +627,7 @@ struct FilmtoneFullscreenLutEditor: View {
         let ja = store.strings.usesJapaneseTypography
         return GlassGroup(spacing: 6) {
             HStack(spacing: 6) {
-                triggerButton(
-                    label: "LUT",
-                    systemImage: "square.stack.3d.up",
-                    identifier: "filmtone.fullscreen.trigger.source"
-                ) {
+                cameraTriggerButton {
                     onSourceTap()
                 }
 
@@ -645,6 +641,39 @@ struct FilmtoneFullscreenLutEditor: View {
             }
         }
         .accessibilityIdentifier("filmtone.fullscreen.lowerChrome")
+    }
+
+    private var hasManualCameraProfile: Bool {
+        store.project.inputLut != nil || store.project.cameraProfile != .auto
+    }
+
+    private func cameraTriggerButton(action: @escaping () -> Void) -> some View {
+        GlassActionButton(
+            isProminent: hasManualCameraProfile,
+            controlSize: .regular
+        ) {
+            VStack(spacing: 2) {
+                HStack(spacing: 6) {
+                    Image(systemName: "camera.filters")
+                        .font(.caption.weight(.semibold))
+                    Text(store.strings.cameraLabel)
+                        .font(.caption.weight(.semibold))
+                        .lineLimit(1)
+                }
+
+                Text(store.cameraProfileLabel)
+                    .font(.caption2.weight(.medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                    .truncationMode(.tail)
+                    .opacity(0.78)
+            }
+            .frame(maxWidth: .infinity, minHeight: 34)
+        } action: {
+            action()
+        }
+        .accessibilityLabel(Text("\(store.strings.cameraLabel): \(store.cameraProfileLabel)"))
+        .accessibilityIdentifier("filmtone.fullscreen.trigger.source")
     }
 
     private func triggerButton(

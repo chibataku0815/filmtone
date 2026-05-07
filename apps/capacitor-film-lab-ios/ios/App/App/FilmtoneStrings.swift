@@ -160,6 +160,7 @@ struct FilmtoneStrings {
     let cameraSLog3: String
     let cameraRec709: String
     let cameraCustom: String
+    let cameraChange: String
     let cameraImport: String
     let inputLutAmountLabel: String
     let lookLabel: String
@@ -1250,6 +1251,11 @@ extension FilmtoneStrings {
             "filmtone.camera.custom",
             defaultValue: "Custom",
             comment: "Camera profile state when a custom input LUT is selected."
+        )
+        cameraChange = filmtoneLocalized(
+            "filmtone.camera.change",
+            defaultValue: prefersJapanese ? "変更" : "Change",
+            comment: "Action label to open the camera profile picker."
         )
         cameraImport = filmtoneLocalized(
             "filmtone.camera.import",

@@ -124,6 +124,10 @@ struct FilmtoneExportSidecarV1: Encodable {
     /// normalization for this export. Additive optional V1 field; nil
     /// preserves the v1.2-shaped sidecar.
     let cameraProfile: SidecarCameraProfile?
+    /// v1.4 Backlight Veil identity selected for this render request. The
+    /// visible spatial values are resolved at render time; this additive field
+    /// keeps downstream tools from losing the user's Look + Veil combination.
+    let opticalFilterProfileId: String?
     /// v1.5 additive wall-clock stage totals used to identify export bottlenecks.
     let performance: SidecarPerformance?
     /// Source-relative marker intent for DaVinci / Desktop round-trip. Additive
@@ -590,6 +594,7 @@ enum FilmtoneExportSidecarBuilder {
             depth: depth,
             savedLook: inputs.appliedSavedLook,
             cameraProfile: inputs.cameraProfile,
+            opticalFilterProfileId: request.opticalFilterProfileId,
             performance: inputs.performance,
             highlightMarkers: inputs.highlightMarkers
         )

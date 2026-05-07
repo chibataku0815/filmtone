@@ -476,6 +476,10 @@ struct Phase0ExportRequestDTO: Codable {
     /// (`FilmtonePhase0Math.swift`, `FilmtoneHelpAssetGenerator.swift`,
     /// `scripts/swift/test-sidecar-builder.swift`) don't need updates.
     var connectPackage: Bool? = nil
+    /// v1.4 Backlight Veil — active optical filter profile id, or nil = OFF.
+    /// Kept in the render request so preview, export, and sidecar construction
+    /// consume the same Look + Veil state snapshot.
+    var opticalFilterProfileId: String? = nil
 }
 
 struct Phase0ExportProgressDTO: Encodable {

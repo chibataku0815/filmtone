@@ -1827,15 +1827,13 @@ final class FilmtoneExportSession {
         return current
     }
 
-    /// Backlight Veil Phase 1c — resolves the currently-selected profile
-    /// (6 optical + 12 spatial keys) from
-    /// `FilmtoneOpticalFilterSelectionStore.shared.currentId`. Returns nil
-    /// when OFF, in which case the legacy composite path runs unchanged.
-    /// In-memory singleton, not persisted.
+    /// Backlight Veil Phase 1c — resolves the request-selected profile
+    /// (6 optical + 12 spatial keys) from `Phase0ExportRequestDTO`. Returns
+    /// nil when OFF, in which case the legacy composite path runs unchanged.
     private func currentBacklightVeilProfile()
         -> FilmtoneOpticalFiltersGenerated.Profile? {
         guard
-            let filterId = FilmtoneOpticalFilterSelectionStore.shared.currentId,
+            let filterId = request.opticalFilterProfileId,
             let profile = FilmtoneOpticalFiltersGenerated.backlightVeilProfiles
                 .first(where: { $0.id == filterId })
         else {

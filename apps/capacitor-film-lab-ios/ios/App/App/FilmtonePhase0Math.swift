@@ -127,6 +127,10 @@ struct FilmtoneProjectState: Codable {
     /// for fresh projects so existing behavior is byte-identical until the
     /// user picks a Camera Profile from the new picker (Phase F).
     var cameraProfile: CameraProfileSelection
+    /// v1.4 Backlight Veil — active optical filter profile id, or nil = OFF.
+    /// Stored in the project so Look + Veil survives preview/export request
+    /// rebuilds instead of relying on process-global render state.
+    var opticalFilterProfileId: String?
 
     init(
         schemaVersion: Int = FilmtonePhase0Math.projectSchemaVersion,
@@ -142,7 +146,8 @@ struct FilmtoneProjectState: Codable {
         inputLut: ParsedCubeLutDTO?,
         creativeLut: ParsedCubeLutDTO?,
         output: Phase0OutputProfileDTO,
-        cameraProfile: CameraProfileSelection = .auto
+        cameraProfile: CameraProfileSelection = .auto,
+        opticalFilterProfileId: String? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.projectId = projectId
@@ -158,6 +163,7 @@ struct FilmtoneProjectState: Codable {
         self.creativeLut = creativeLut
         self.output = output
         self.cameraProfile = cameraProfile
+        self.opticalFilterProfileId = opticalFilterProfileId
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -175,6 +181,7 @@ struct FilmtoneProjectState: Codable {
         case creativeLut
         case output
         case cameraProfile
+        case opticalFilterProfileId
     }
 
     init(from decoder: Decoder) throws {
@@ -211,6 +218,8 @@ struct FilmtoneProjectState: Codable {
         // v1.3 Camera Profiles Phase A — additive optional. v1.2 saves
         // (without this key) decode as `.auto`, preserving prior behavior.
         cameraProfile = try container.decodeIfPresent(CameraProfileSelection.self, forKey: .cameraProfile) ?? .auto
+        // v1.4 Backlight Veil — additive optional. Older saves decode as OFF.
+        opticalFilterProfileId = try container.decodeIfPresent(String.self, forKey: .opticalFilterProfileId)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -228,6 +237,7 @@ struct FilmtoneProjectState: Codable {
         try container.encodeIfPresent(creativeLut, forKey: .creativeLut)
         try container.encode(output, forKey: .output)
         try container.encode(cameraProfile, forKey: .cameraProfile)
+        try container.encodeIfPresent(opticalFilterProfileId, forKey: .opticalFilterProfileId)
     }
 }
 
@@ -465,7 +475,8 @@ enum FilmtonePhase0Math {
             // = true. Native callers that pre-date Stream 4 stay on the v1.2-
             // identical depth-off path.
             depthEnabled: nil,
-            depthRenderer: nil
+            depthRenderer: nil,
+            opticalFilterProfileId: project.opticalFilterProfileId
             // v1.3 Camera Profiles Phase E: cameraProfile travels OUTSIDE
             // the wire DTO (separate parameter on facade.runExport(...))
             // because it's iOS-internal state — not a value the JS bridge
