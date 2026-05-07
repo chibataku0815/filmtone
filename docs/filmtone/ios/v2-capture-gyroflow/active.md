@@ -111,12 +111,51 @@ S5 — **Owner closing-loop acceptance** (≈15 min, no code)
    single failing observation reopens the relevant Sn — do not expand
    into a 4-path failure matrix.
 
-## Implementation notes (filled during S1)
+## Implementation notes (S1 current-state, 2026-05-08)
 
-(filled at S1 completion with a 5-line "current state" note: which
-of `export()` / `exportAndSave()` / `saveToPhotos()` / `shareOutput()`
-already wires the desired primary/secondary hierarchy, and which
-specifically needs editing.)
+S1 read confirms most of the surface already exists; the real M9 work
+is narrower than S2-S4 originally implied:
+
+1. **Save = primary / Share = secondary already wired**
+   (`FilmtoneExportPanel:210-224` via `FilmtonePrimaryButtonStyle` vs
+   `FilmtoneSecondaryButtonStyle`). S2 needs no Swift edit.
+2. **Save-success destination feedback already complete** — amber chip
+   (`FilmtoneExportPanel:199-208`), button label flip
+   (`:277-281`), `MetricCard` (`:237`), and
+   `presentToast(toastSaveSuccess, .success)`
+   (`FilmtoneEditorStore:1745`). S3 save side: no edit.
+3. **Real S3 gap = share success has no user-visible signal**.
+   `shareOutput()` (`FilmtoneEditorStore:1752-1771`) on `completed`
+   only `notice=nil; error=nil`. Cancel-vs-success indistinguishable.
+   Fix: add `presentToast(strings.toastShareSuccess, .success)`; add
+   `toastShareSuccess` to `FilmtoneStrings` (parity with
+   `toastShareFailed:208`).
+4. **Real S4 gap = `store.error` is unbound to UI**. No
+   `.alert($store.error)` anywhere; only `recordingError` is bound
+   (`FilmtoneRootView:67-84`). Save failure relies on red chip alone;
+   export failure has no surface at all (success has
+   `toastExportComplete:1657`, failure path at `:1663` only sets
+   `store.error`). Fix: route `export()` and `saveToPhotos()` failures
+   through `presentToast(userMessage(...), .error)`, mirroring the
+   existing `toastShareFailed` pattern. No new alert binding needed.
+5. **Recording-source parity**: `FilmtoneExportSession` shows no
+   record-only branch in `exportVideo` (no `clip.mov` /
+   `packageDirectory` special-case). Capture-package source threads
+   through the same `request.sourceUri` path as Photo Library / Files.
+   Sidecar provenance verification deferred to S5 owner walk; S4 alone
+   doesn't depend on it.
+
+Side-finding: `exportAndSave()` (`:1666`) is defined and localized
+(`exportAndSave:131`) but **unused by any view**. Out of scope for M9
+(don't wire, don't delete — no orphan churn).
+
+**Revised S2-S4 surface**:
+- S2 → no-op (already wired). Skip directly to S3.
+- S3 → add `toastShareSuccess` string + 1-line
+  `presentToast(strings.toastShareSuccess, .success)` in
+  `shareOutput()` `completed == true` branch.
+- S4 → add `presentToast(userMessage(...), .error)` to two failure
+  catches (`export()` `:1663`, `saveExportResultToPhotos` `:1747`).
 
 ## Acceptance
 

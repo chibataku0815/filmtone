@@ -205,6 +205,7 @@ struct FilmtoneStrings {
     // MARK: - Toast UX (T1 v1.1 portrait optics + toast fix)
     let toastSaveSuccess: String
     let toastExportComplete: String
+    let toastShareSuccess: String
     let toastShareFailed: String
     // MARK: - LUT library + Saved Looks (Item 3, v1.3 candidate)
     let librarySavedLutsTitle: String
@@ -1468,6 +1469,11 @@ extension FilmtoneStrings {
             "filmtone.toast.export.complete",
             defaultValue: prefersJapanese ? "書き出し完了" : "Export complete",
             comment: "Toast shown when an export run finishes successfully."
+        )
+        toastShareSuccess = filmtoneLocalized(
+            "filmtone.toast.share.success",
+            defaultValue: prefersJapanese ? "共有しました" : "Shared",
+            comment: "Toast shown when the share sheet completes successfully (user picked a destination, not cancelled)."
         )
         toastShareFailed = filmtoneLocalized(
             "filmtone.toast.share.failed",

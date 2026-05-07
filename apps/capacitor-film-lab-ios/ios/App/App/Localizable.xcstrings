@@ -3654,6 +3654,23 @@
         }
       }
     },
+    "filmtone.toast.share.success" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shared"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共有しました"
+          }
+        }
+      }
+    },
     "Save" : {
 
     }

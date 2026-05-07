@@ -1659,7 +1659,9 @@ final class FilmtoneEditorStore: ObservableObject {
             isBusy = false
             exportProgress = nil
             isSavingToPhotos = false
-            self.error = strings.userMessage(for: error, context: .export)
+            let message = strings.userMessage(for: error, context: .export)
+            self.error = message
+            presentToast(message, kind: .error)
         }
     }
 
@@ -1745,7 +1747,9 @@ final class FilmtoneEditorStore: ObservableObject {
             presentToast(strings.toastSaveSuccess, kind: .success)
         } catch {
             saveToPhotosState = .failed
-            self.error = strings.userMessage(for: error, context: .saveToPhotos)
+            let message = strings.userMessage(for: error, context: .saveToPhotos)
+            self.error = message
+            presentToast(message, kind: .error)
         }
     }
 
@@ -1763,6 +1767,7 @@ final class FilmtoneEditorStore: ObservableObject {
             if completed {
                 notice = nil
                 error = nil
+                presentToast(strings.toastShareSuccess, kind: .success)
             }
         } catch {
             self.error = strings.userMessage(for: error, context: .share)
