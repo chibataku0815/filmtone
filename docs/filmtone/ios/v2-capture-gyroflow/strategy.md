@@ -145,7 +145,69 @@ Dependency:
 
 - M4.
 
-### M6 - Editor Handoff And Honest Preview
+### M6 - AVFoundation Stabilization Smoke
+
+Goal:
+
+Decide whether AVFoundation built-in video stabilization is acceptable as
+Filmtone capture-time stabilization on the M5-A locked format, before
+committing to a custom Filmtone stabilization library.
+
+Done:
+
+- The M5-A locked format survives mode probing — `formatIndex`, `pixelFormat`,
+  `colorSpace`, `dimensions`, `fps`, and writer codec are unchanged after a
+  non-`.off` `preferredVideoStabilizationMode` is set.
+- Diagnostics include the supported-modes set probed against the full iOS 26
+  `AVCaptureVideoStabilizationMode` enum, the chosen preferred mode, and the
+  observed active mode after `startRecording`.
+- `activeVideoStabilizationMode != .off` is asserted as a smoke gate when the
+  requested mode was non-`.off`. No silent fallback.
+- The recorded `.mov` first video track FourCC is read from the file via
+  `AVURLAsset` and matches the requested writer codec. No silent ProRes →
+  HEVC writer downgrade.
+- Apple Log 2 is preserved (`activeColorSpace.rawValue == 4`) after recording.
+- Owner visual A/B (off vs. on, single 30s pan or handheld walk) judged at
+  owner-quality bar.
+
+Dependency:
+
+- M5.
+
+(Outcome: PASS on iPhone 17 Pro / iOS 26.4.2; commit `3968eafd`; findings
+in `archive/2026-05-07-m6-avfoundation-stabilization-smoke.md`.
+`cinematicExtendedEnhanced` accepted on the M5-A locked format.)
+
+### M7 - Product Capture Stabilization Integration
+
+Goal:
+
+Integrate the M6 PASS stabilization mode into the real Filmtone capture
+surface so owner clips are recorded with stabilization as the default product
+behavior, not via a smoke-only build.
+
+Done:
+
+- The non-smoke product capture path (not `Filmtone*Smoke.swift`) sets
+  `connection.preferredVideoStabilizationMode = .cinematicExtendedEnhanced`
+  by default on the M5-A locked format.
+- A runtime guard falls back to the highest supported mode the M6 probe
+  recorded when `.cinematicExtendedEnhanced` is not supported on a given
+  format, and the chosen mode is recorded in the export sidecar.
+- The recorded `.mov` carries the same Stop Condition guarantees as M6
+  (active != .off when requested non-.off, Apple Log 2 preserved, no format
+  swap, writer codec verified by AVURLAsset post-write).
+- Product capture diagnostics expose the chosen and active stabilization
+  modes alongside the M5-A baseline diagnostics already recorded.
+- Owner records at least one real clip through the product surface (not the
+  smoke build) with stabilization on and confirms parity with the M6 visual
+  bar.
+
+Dependency:
+
+- M6.
+
+### M8 - Editor Handoff And Honest Preview
 
 Goal:
 
@@ -167,8 +229,10 @@ Dependency:
 
 - M4 for editor handoff.
 - M5 before public Gyroflow-facing claims.
+- M7 so capture-time preview operates against the same stabilized image
+  path as the recorded master.
 
-### M7 - Owner Clip Trial
+### M9 - Owner Clip Trial
 
 Goal:
 
@@ -183,7 +247,7 @@ Done:
 
 Dependency:
 
-- M6.
+- M8.
 
 ## Known Constraints
 
@@ -207,6 +271,14 @@ Dependency:
 - Broad device coverage, App Store copy, screenshots, and marketing wait until
   the owner workflow works.
 - "Gyro recorded" is not the same as "Gyroflow-quality stabilization."
+- The Filmtone-optimized motion / stabilization library lane that M5-B
+  BLOCKED implied is **deprioritized for capture-time stabilization**: M6
+  PASS shows AVFoundation built-in `cinematicExtendedEnhanced` is
+  acceptable on the M5-A locked format. If the lane survives at all,
+  scope narrows to "post-capture motion-data uses AVFoundation cannot
+  handle" (e.g. honest preview overlay, exporter metadata, off-device
+  Gyroflow-equivalent integrations) and is not a milestone in this
+  strategy.
 
 ## Open Questions
 
@@ -220,7 +292,12 @@ Dependency:
 - Does Core Motion sampling remain stable while the selected video mode records?
 - Can Core Motion boot-time timestamps and video PTS be mapped cleanly enough
   for Gyroflow?
-- Which stabilization / lens path makes gyro data agree with the image path?
+- ~~Which stabilization / lens path makes gyro data agree with the image
+  path?~~ **Closed 2026-05-07**: M6 PASS — AVFoundation
+  `cinematicExtendedEnhanced` on the M5-A locked format is the
+  capture-time stabilization path. Gyro / image-path agreement for
+  desktop stabilization lives downstream of capture and is not a
+  capture-pipeline milestone.
 - Does capture-time preview need Metal earlier than expected?
 - ~~Can `AVCaptureMovieFileOutput` (ProRes Apple Log 2 master) and
   `AVCaptureVideoDataOutput` (timing side-band) coexist on the same
@@ -350,3 +427,25 @@ Dependency:
   deprioritisation is **proposed** in the archived active and held
   for owner review (not applied here). Findings recorded in
   `archive/2026-05-07-m6-avfoundation-stabilization-smoke.md`.
+- 2026-05-07: Strategy realigned — M6 redefined as "AVFoundation
+  Stabilization Smoke" (PASS), new M7 = "Product Capture Stabilization
+  Integration", old M6 / M7 renumbered to M8 / M9 with deps updated,
+  Filmtone-optimized motion library lane deprioritized for capture-time
+  stabilization (Known Constraints bullet added). M1-M6 prior history
+  untouched. Realignment scope: numbering + deps + lane note only.
+- 2026-05-08: M7 Product Capture Stabilization Integration **passed**
+  on iPhone 17 Pro / iOS 26.4.2. Owner-tapped third CTA on
+  `FilmtoneEmptyView` ("録画する / Record") triggered
+  `FilmtoneEditorStore.recordProductClip()` →
+  `FilmtoneProductCapture.recordClip(durationSeconds: 5)` directly
+  (no Capacitor plugin bridge); resulting `clip.mov` auto-loaded into
+  the editor as the active source. Mid-implementation discovery: the
+  React/Capacitor MobilePhase0Editor is **not the live UI** —
+  `AppDelegate` boots a native SwiftUI tree via
+  `FilmtoneRootHostingController` + `FilmtoneRootView`. The earlier
+  React-side wiring (MobilePhase0Editor.tsx record button + JS bridge
+  + Capacitor plugin method) never rendered. Outcome: M7 product
+  surface shipped as native SwiftUI; React/Capacitor stack confirmed
+  dead in launch path. Findings recorded in
+  `archive/2026-05-08-m7-product-capture-stabilization.md`. Follow-up
+  lane: React/Capacitor purge from `apps/capacitor-film-lab-ios`.

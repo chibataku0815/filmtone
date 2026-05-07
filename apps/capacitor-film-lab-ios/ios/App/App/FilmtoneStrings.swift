@@ -52,6 +52,9 @@ struct FilmtoneStrings {
     let sourcePickerTitle: String
     let pickFromPhotoLibrary: String
     let pickFromFiles: String
+    let recordProductClip: String
+    let recordProductClipRunning: String
+    let recordProductClipFailed: String
     let onboardingNext: String
     let onboardingSkip: String
     let onboardingPickMedia: String
@@ -697,6 +700,21 @@ extension FilmtoneStrings {
             "filmtone.source.files",
             defaultValue: "Files",
             comment: "Source picker option for the Files app."
+        )
+        recordProductClip = filmtoneLocalized(
+            "filmtone.source.record_product_clip",
+            defaultValue: prefersJapanese ? "録画する" : "Record",
+            comment: "Source picker option that records a stabilized clip with the rear camera."
+        )
+        recordProductClipRunning = filmtoneLocalized(
+            "filmtone.source.record_product_clip.running",
+            defaultValue: prefersJapanese ? "手ぶれ補正付きで録画しています…" : "Recording stabilized clip…",
+            comment: "Notice shown while a stabilized product clip is being recorded."
+        )
+        recordProductClipFailed = filmtoneLocalized(
+            "filmtone.source.record_product_clip.failed",
+            defaultValue: prefersJapanese ? "録画に失敗しました" : "Recording failed",
+            comment: "Error prefix shown when the stabilized clip recording fails."
         )
         onboardingNext = filmtoneLocalized(
             "filmtone.onboarding.next",

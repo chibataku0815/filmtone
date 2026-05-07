@@ -943,6 +943,61 @@ final class FilmtoneEditorStore: ObservableObject {
         }
     }
 
+    /// Records one fixed-duration ProRes 422 HQ Apple Log 2 clip with
+    /// AVFoundation `cinematicExtendedEnhanced` stabilization, then adopts
+    /// the resulting `clip.mov` as the active source — same downstream
+    /// pipeline as `pickSource` (probe → applyProbe → persist → reclaim →
+    /// schedulePreviewRender).
+    func recordProductClip(durationSeconds: Double = 5.0) async {
+        isBusy = true
+        notice = strings.recordProductClipRunning
+        error = nil
+        sourceLoadState = nil
+
+        let capture = FilmtoneProductCapture()
+        do {
+            let result: FilmtoneProductCapture.RecordClipResult = try await withCheckedThrowingContinuation { continuation in
+                capture.recordClip(durationSeconds: durationSeconds) { result in
+                    continuation.resume(with: result)
+                }
+            }
+
+            let recordedSource = SourceInfoDTO(
+                uri: result.movURL.absoluteString,
+                filename: result.movURL.lastPathComponent,
+                kind: .video,
+                mimeType: "video/quicktime"
+            )
+
+            sourceLoadState = .init(
+                stage: .probing,
+                route: .photoLibrary,
+                message: strings.probePending,
+                progress: nil,
+                isDeterminate: false
+            )
+            let probe = try facade.probeSource(recordedSource)
+            applyProbe(source: recordedSource, probe: probe)
+            isBusy = false
+            sourceLoadState = nil
+            notice = nil
+            persist()
+            reclaimCacheForCurrentState()
+            schedulePreviewRender()
+        } catch {
+            isBusy = false
+            sourceLoadState = nil
+            notice = nil
+            let detail: String
+            if let recordError = error as? FilmtoneProductCapture.RecordClipError {
+                detail = recordError.errorDescription ?? String(describing: recordError)
+            } else {
+                detail = (error as NSError).localizedDescription
+            }
+            self.error = "\(strings.recordProductClipFailed): \(detail)"
+        }
+    }
+
     func selectPreset(_ presetName: String) {
         appliedSavedLookId = nil
         project.presetName = presetName

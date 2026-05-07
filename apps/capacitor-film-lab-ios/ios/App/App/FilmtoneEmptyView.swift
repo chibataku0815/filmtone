@@ -9,6 +9,7 @@ struct FilmtoneEmptyView: View {
     @ObservedObject var store: FilmtoneEditorStore
     let onPickPhotoLibrary: () -> Void
     let onPickFiles: () -> Void
+    let onRecordProductClip: () -> Void
     var onPickWithLook: (SavedLookEntry) -> Void = { _ in }
 
     var body: some View {
@@ -114,6 +115,14 @@ struct FilmtoneEmptyView: View {
                 }
                 .buttonStyle(.glass)
                 .accessibilityIdentifier("filmtone.empty.files")
+
+                Button(action: onRecordProductClip) {
+                    Label(store.strings.recordProductClip, systemImage: "video.fill")
+                        .font(.footnote.weight(.medium))
+                }
+                .buttonStyle(.glass)
+                .disabled(store.isBusy)
+                .accessibilityIdentifier("filmtone.empty.recordProductClip")
             }
         }
     }

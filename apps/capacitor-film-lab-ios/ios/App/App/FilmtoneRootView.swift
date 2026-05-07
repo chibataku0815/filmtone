@@ -27,6 +27,7 @@ struct FilmtoneRootView: View {
                     store: store,
                     onPickPhotoLibrary: { Task { await store.pickSource(route: .photoLibrary) } },
                     onPickFiles: { Task { await store.pickSource(route: .files) } },
+                    onRecordProductClip: { Task { await store.recordProductClip() } },
                     onPickWithLook: { entry in
                         pendingLookOnPickComplete = entry
                         Task { await store.pickSource(route: .photoLibrary) }
