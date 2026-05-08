@@ -17,6 +17,8 @@ struct FilmtoneEmptyView: View {
     let onPickPhotoLibrary: () -> Void
     let onPickFiles: () -> Void
     let onRecordProductClip: () -> Void
+    var isRecordProductClipSupported: Bool = true
+    var recordProductClipUnsupportedMessage: String? = nil
     var onPickWithLook: (SavedLookEntry) -> Void = { _ in }
 
     var body: some View {
@@ -120,9 +122,20 @@ struct FilmtoneEmptyView: View {
                     title: store.strings.recordProductClip,
                     systemImage: "video.fill",
                     identifier: "filmtone.empty.recordProductClip",
-                    isDisabled: store.isBusy,
+                    isDisabled: store.isBusy || !isRecordProductClipSupported,
                     action: onRecordProductClip
                 )
+                if !isRecordProductClipSupported,
+                   let recordProductClipUnsupportedMessage {
+                    Text(recordProductClipUnsupportedMessage)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.primary.opacity(0.62))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.82)
+                        .padding(.horizontal, 14)
+                        .accessibilityIdentifier("filmtone.empty.recordProductClip.unsupported")
+                }
             }
         }
     }

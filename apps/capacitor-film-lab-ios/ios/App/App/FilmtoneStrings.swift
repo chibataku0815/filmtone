@@ -53,6 +53,7 @@ struct FilmtoneStrings {
     let pickFromPhotoLibrary: String
     let pickFromFiles: String
     let recordProductClip: String
+    let recordProductClipUnsupported: String
     let recordProductClipRunning: String
     let recordProductClipFailed: String
     let onboardingNext: String
@@ -709,6 +710,13 @@ extension FilmtoneStrings {
             "filmtone.source.record_product_clip",
             defaultValue: prefersJapanese ? "録画する" : "Record",
             comment: "Source picker option that records a stabilized clip with the rear camera."
+        )
+        recordProductClipUnsupported = filmtoneLocalized(
+            "filmtone.source.record_product_clip.unsupported",
+            defaultValue: prefersJapanese
+                ? "録画はApple Log 2対応のiPhone 17 Pro以降で利用できます。"
+                : "Recording requires an Apple Log 2 capable iPhone 17 Pro or later.",
+            comment: "Explanation shown when native recording is unavailable on the current device."
         )
         recordProductClipRunning = filmtoneLocalized(
             "filmtone.source.record_product_clip.running",

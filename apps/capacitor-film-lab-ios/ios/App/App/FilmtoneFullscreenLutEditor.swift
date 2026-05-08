@@ -263,6 +263,8 @@ struct FilmtoneFullscreenLutEditor: View {
     var onSourceTap: () -> Void = {}
     var onAdvancedTap: () -> Void = {}
     var onRecord: () -> Void = {}
+    var isRecordSupported: Bool = true
+    var recordUnsupportedMessage: String? = nil
 
     @State private var controlsHidden = false
     @StateObject private var videoController = FullscreenVideoController()
@@ -579,10 +581,14 @@ struct FilmtoneFullscreenLutEditor: View {
                 ) {
                     Image(systemName: "video.badge.plus")
                 } action: {
+                    guard isRecordSupported else { return }
                     onRecord()
                 }
                 .accessibilityLabel(Text(store.strings.recordProductClip))
+                .accessibilityHint(Text(recordUnsupportedMessage ?? ""))
                 .accessibilityIdentifier("filmtone.fullscreen.action.record")
+                .disabled(!isRecordSupported)
+                .opacity(isRecordSupported ? 1 : 0.38)
 
                 if let videoPreview = store.videoPreviewState {
                     GlassActionButton(

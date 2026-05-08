@@ -1043,3 +1043,9 @@ Dependency:
   refinements landed all M13 + M14-A/B + M15 work as one unit.
   Strategy lane returns to **M14-C (sidecar provenance)** as the
   next active.
+- 2026-05-09: Interrupt **PASS** — native recording entry points now
+  disable on devices that do not runtime-report the current Filmtone
+  capture contract (4K24 / Apple Log 2 raw=4 /
+  cinematicExtendedEnhanced). No Apple Log / HDR / SDR fallback was
+  added; unsupported devices can still use Photo Library / Files
+  editing.
