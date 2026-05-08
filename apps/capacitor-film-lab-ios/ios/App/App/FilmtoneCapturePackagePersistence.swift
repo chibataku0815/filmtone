@@ -44,6 +44,13 @@ struct FilmtoneCapturePackageSnapshotV1: Codable {
     /// diagnostic banners ("recorded at …") without changing the
     /// capture pipeline.
     var writtenAtISO8601: String
+    /// S8-B: rear lens identity for the run.  Optional in the V1 schema
+    /// so pre-S8-B `capture-package.json` snapshots continue to decode
+    /// cleanly (older runs simply have nil lens).  All new runs set
+    /// these three fields together.
+    var lensIdentifier: String?
+    var lensDisplayName: String?
+    var lensDeviceType: String?
 
     static let currentSchemaVersion = 1
 }
@@ -130,7 +137,10 @@ enum FilmtoneCapturePackagePersistence {
             parametersCodec: package.parameters.codec,
             parametersColorSpace: package.parameters.colorSpace,
             parametersStabilization: package.parameters.stabilization,
-            writtenAtISO8601: ISO8601DateFormatter().string(from: Date())
+            writtenAtISO8601: ISO8601DateFormatter().string(from: Date()),
+            lensIdentifier: package.lens?.identifier,
+            lensDisplayName: package.lens?.displayName,
+            lensDeviceType: package.lens?.deviceType
         )
     }
 
@@ -156,6 +166,23 @@ enum FilmtoneCapturePackagePersistence {
             colorSpace: snapshot.parametersColorSpace,
             stabilization: snapshot.parametersStabilization
         )
+        // Lens fields are tri-required: rebuild the record only when all
+        // three are present.  Any missing field means the snapshot was
+        // either pre-S8-B or partially-written; treat it as "lens
+        // unknown" and let downstream code deal with nil rather than
+        // fabricating an identity.
+        let lens: FilmtoneCaptureLensRecord?
+        if let identifier = snapshot.lensIdentifier,
+           let displayName = snapshot.lensDisplayName,
+           let deviceType = snapshot.lensDeviceType {
+            lens = FilmtoneCaptureLensRecord(
+                identifier: identifier,
+                displayName: displayName,
+                deviceType: deviceType
+            )
+        } else {
+            lens = nil
+        }
         return FilmtoneCapturePackage(
             captureId: snapshot.captureId,
             storagePolicy: storagePolicy,
@@ -164,7 +191,8 @@ enum FilmtoneCapturePackagePersistence {
             packageDirURL: URL(fileURLWithPath: snapshot.packageDirURLPath),
             durationLimitSeconds: snapshot.durationLimitSeconds,
             recordedDurationSeconds: snapshot.recordedDurationSeconds,
-            parameters: parameters
+            parameters: parameters,
+            lens: lens
         )
     }
 

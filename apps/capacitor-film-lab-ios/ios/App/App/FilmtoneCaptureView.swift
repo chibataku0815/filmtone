@@ -18,8 +18,31 @@ import SwiftUI
 import AVFoundation
 import UniformTypeIdentifiers
 
+/// S8-D: snapshot of the editor's current Look state passed into the
+/// capture surface so a small reference thumbnail can show the owner
+/// the active color direction *before* recording.  The live preview
+/// itself remains the raw `AVCaptureVideoPreviewLayer` — applying the
+/// grade to the live frame would require `AVCaptureVideoDataOutput`,
+/// which is incompatible with the ProRes 422 HQ + Apple Log 2 +
+/// cinematicEE record pipeline (M2-A: iOS 26.4 does not deliver 10-bit
+/// `x422`/`x420` from VDO under `.appleLog2`).  We deliberately stop
+/// at the reference strip and label the live image ungraded.
+struct FilmtoneCaptureLookReference: Equatable {
+    /// `file://` URI of the editor's currently graded still poster, or
+    /// nil when the editor has no source / the preview is mid-render
+    /// / the source is a video without a baked graded poster.  Nil
+    /// hides the reference panel.
+    let displayURI: String?
+    /// Owner-friendly Look name — `creativeLut.title` when a creative
+    /// LUT is applied, otherwise `strings.lookFilmtone` (the default
+    /// Filmtone label).  Also nilable so callers without a meaningful
+    /// label can pass nil and the panel falls back to "Editor reference".
+    let lookLabel: String?
+}
+
 struct FilmtoneCaptureView: View {
 
+    let lookReference: FilmtoneCaptureLookReference?
     let onCompleted: (FilmtoneCapturePackage) -> Void
     let onCancelled: () -> Void
     let onFailed: (FilmtoneCaptureFailure) -> Void
@@ -30,6 +53,21 @@ struct FilmtoneCaptureView: View {
     @State private var preflightWarnings: [String] = []
     @State private var preflightError: String?
     @State private var heldExternalFolderURL: URL?
+    /// S8-B: rear lenses that satisfy the M10 capture contract,
+    /// resolved once on `.task` from `FilmtoneCaptureLensCatalog`.
+    @State private var lenses: [FilmtoneCaptureLens] = []
+    /// S8-B: lens currently configured on the session.  Default = wide
+    /// (`FilmtoneCaptureLensCatalog.defaultLens(in:)`).  Tapping a
+    /// different pill triggers `selectLens(_:)` which tears down the
+    /// session and re-prepares against the chosen lens.
+    @State private var selectedLens: FilmtoneCaptureLens?
+    /// Guards re-entrant `selectLens(_:)` taps while a teardown +
+    /// re-prepare is in flight.
+    @State private var lensSwitchInFlight: Bool = false
+    /// S8-D: cached UIImage decoded from `lookReference.displayURI`.
+    /// Loaded once on `.task(id:)` so SwiftUI recomputes during
+    /// recording state ticks do not redecode the file every frame.
+    @State private var lookReferenceImage: UIImage?
 
     var body: some View {
         ZStack {
@@ -53,6 +91,23 @@ struct FilmtoneCaptureView: View {
         }
         .task {
             await prepareSession()
+        }
+        .task(id: lookReference?.displayURI) {
+            // S8-D: decode the editor's graded poster once per URI so
+            // SwiftUI body recomputes during recording (state ticks
+            // every ~0.1s while .recording) do not redecode the file.
+            // Decoding off the main thread keeps the capture session
+            // setup unaffected.
+            guard let uri = lookReference?.displayURI else {
+                lookReferenceImage = nil
+                return
+            }
+            let decoded = await Task.detached(priority: .utility) {
+                Self.decodeReferenceImage(from: uri)
+            }.value
+            await MainActor.run {
+                lookReferenceImage = decoded
+            }
         }
         .onChange(of: session.state) { newState in
             switch newState {
@@ -110,7 +165,7 @@ struct FilmtoneCaptureView: View {
     // MARK: - Top bar (close + storage pill)
 
     private var topBar: some View {
-        HStack(spacing: 12) {
+        HStack(alignment: .top, spacing: 12) {
             Button(action: dismissCapture) {
                 Image(systemName: "xmark")
                     .font(.system(size: 16, weight: .semibold))
@@ -123,7 +178,15 @@ struct FilmtoneCaptureView: View {
 
             Spacer(minLength: 8)
 
-            storagePill
+            // S8-D: stack the storage pill on top of the look-reference
+            // panel along the right edge.  This anchors all "decisions
+            // for this take" — destination, duration cap, color
+            // direction — in a single glanceable column without
+            // crowding the bottom controls deck.
+            VStack(alignment: .trailing, spacing: 8) {
+                storagePill
+                lookReferencePanel
+            }
         }
     }
 
@@ -151,12 +214,77 @@ struct FilmtoneCaptureView: View {
     }
 
     private var storagePillLabel: String {
+        let cap = Int(session.currentDurationLimit())
         switch session.storagePolicy {
         case .internalDocumentsCapped:
-            return "Internal · 10s"
+            return "Internal master · \(cap)s cap"
         case .externalSecurityScopedFolder(let url):
-            return "SSD: \(url.lastPathComponent)"
+            return "External master · \(url.lastPathComponent) · \(cap)s cap"
         }
+    }
+
+    // MARK: - Look reference panel (S8-D)
+
+    /// Compact reference strip showing the editor's currently graded
+    /// poster, the active Look name, and an explicit "Live ungraded"
+    /// disclaimer.  Goal: let the owner judge color direction *before*
+    /// pressing record without misleading them into thinking the live
+    /// preview is graded.  Hidden when the editor has no source / the
+    /// graded poster is mid-render / the source is a video without a
+    /// baked still poster.
+    @ViewBuilder
+    private var lookReferencePanel: some View {
+        if let image = lookReferenceImage {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("LOOK REFERENCE")
+                    .font(.system(size: 9, weight: .semibold))
+                    .tracking(0.6)
+                    .foregroundStyle(.white.opacity(0.55))
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 120, height: 90)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .accessibilityIdentifier("filmtone.capture.lookReference.image")
+                Text(resolvedLookLabel)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: 120, alignment: .leading)
+                Text("Live ungraded")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.55))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(
+                Color.black.opacity(0.45),
+                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            )
+            .accessibilityIdentifier("filmtone.capture.lookReference")
+        }
+    }
+
+    /// Falls back to "Editor reference" when the caller passed nil or
+    /// an empty Look label.  `nilIfEmpty` lives on `FilmtoneEditorStore`
+    /// as `fileprivate`, so we inline the trim-and-empty check here
+    /// rather than widen the access level just for this one read.
+    private var resolvedLookLabel: String {
+        let trimmed = (lookReference?.lookLabel ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Editor reference" : trimmed
+    }
+
+    /// `nonisolated` so the off-main `Task.detached` in `.task(id:)`
+    /// can call it without an actor hop.  Pure file IO + `UIImage`
+    /// init — no UI side effects — and `UIImage` carries cleanly
+    /// across actors.
+    nonisolated private static func decodeReferenceImage(
+        from uri: String
+    ) -> UIImage? {
+        guard let url = URL(string: uri), url.isFileURL else { return nil }
+        return UIImage(contentsOfFile: url.path)
     }
 
     // MARK: - Bottom deck (status, ssd picker, record button)
@@ -180,7 +308,11 @@ struct FilmtoneCaptureView: View {
                 }
             }
 
-            specLine
+            if lenses.count > 1 {
+                lensSelector
+            }
+
+            contractBanner
 
             statusLine
 
@@ -194,30 +326,86 @@ struct FilmtoneCaptureView: View {
         }
     }
 
-    /// Display-only readout of the capture parameters pinned to the
-    /// `FilmtoneCaptureParameters.baseline` quality contract.  M10 does
-    /// not expose camera knobs (resolution / fps / codec / colorspace /
-    /// stabilization) — the product directive is "make recording the
-    /// entry surface", not "expose every knob".  This label keeps the
-    /// owner honest about what is being recorded without inviting a
-    /// settings page that would dilute the lane.
-    private var specLine: some View {
+    // MARK: - Lens selector (S8-B)
+
+    /// Horizontal pill row of qualifying rear lenses.  Hidden when only
+    /// one (or zero) lens passes the M10 contract — the spec line
+    /// already names the active lens, so the selector only adds value
+    /// when there is something to switch between.  Disabled while
+    /// recording/stopping or while a teardown + re-prepare is in flight.
+    private var lensSelector: some View {
+        HStack(spacing: 8) {
+            ForEach(lenses) { lens in
+                Button {
+                    selectLens(lens)
+                } label: {
+                    Text(lens.displayName)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            lens == selectedLens
+                                ? Color.white.opacity(0.28)
+                                : Color.black.opacity(0.42),
+                            in: Capsule()
+                        )
+                }
+                .accessibilityIdentifier("filmtone.capture.lens.\(lens.deviceTypeRaw)")
+                .accessibilityAddTraits(lens == selectedLens ? .isSelected : [])
+                .disabled(
+                    isRecordingOrStopping
+                        || lensSwitchInFlight
+                        || lens == selectedLens
+                )
+            }
+        }
+        .accessibilityIdentifier("filmtone.capture.lensSelector")
+    }
+
+    /// S8-C: display-only readout of the locked M10 capture contract.
+    /// Surfaces the five fixed contract items the owner must see at
+    /// record time — 4K24 / ProRes 422 HQ / Apple Log 2 / cinematic
+    /// stabilization (EE) / proxy → editor handoff — using the
+    /// `FilmtoneCaptureParameters.baseline` strings as source of
+    /// truth.  M10 does not expose camera knobs; this banner keeps
+    /// the owner honest about what is being recorded without
+    /// inviting a settings page that would dilute the lane.
+    ///
+    /// Duration cap is owned by the storage pill (top-right) since
+    /// the cap is mode-dependent (internal 10s vs SSD 60s).  The
+    /// lens prefix appears here only when the lens selector pill row
+    /// is hidden — i.e. when there is at most one qualifying rear
+    /// lens — so the active lens name does not duplicate the pill
+    /// row above.  The view leaves the area between this banner and
+    /// the controls cluster open so S8-D's look-applied preview can
+    /// expand into a thumbnail strip without restructuring the deck.
+    private var contractBanner: some View {
         let p = FilmtoneCaptureParameters.baseline
         // Nearest-K rounding so 3840 reads as the conventional "4K"
-        // (UHD), not the integer-truncated "3K".  The product baseline
-        // is 3840×2160 24fps (cinematic 24p); the readout is
-        // owner-visible truth.
+        // (UHD), not the integer-truncated "3K".
         let kRounded = (p.widthPx + 500) / 1000
         let resolution = "\(kRounded)K\(Int(p.frameRate))"
-        let durationCap = Int(session.currentDurationLimit())
-        return Text(
-            "\(resolution) · \(p.codec) · \(p.colorSpace) · \(p.stabilization) · \(durationCap)s cap"
-        )
-        .font(.system(size: 11, weight: .medium))
-        .foregroundStyle(.white.opacity(0.55))
-        .lineLimit(1)
-        .minimumScaleFactor(0.75)
-        .accessibilityIdentifier("filmtone.capture.specLine")
+        // "Cinematic EE" is the compact owner label for
+        // `cinematicExtendedEnhanced`; the parameter string remains
+        // verbatim in capture-package.json for downstream audit.
+        let segments: [String] = [
+            resolution,
+            p.codec,
+            p.colorSpace,
+            "Cinematic EE",
+            "Proxy → Editor",
+        ]
+        let shouldShowLensPrefix = lenses.count <= 1
+        let lensPrefix = shouldShowLensPrefix
+            ? (selectedLens.map { "\($0.displayName) · " } ?? "")
+            : ""
+        return Text(lensPrefix + segments.joined(separator: " · "))
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(.white.opacity(0.78))
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
+            .accessibilityIdentifier("filmtone.capture.contractBanner")
     }
 
     private var statusLine: some View {
@@ -369,12 +557,58 @@ struct FilmtoneCaptureView: View {
     }
 
     private func prepareSession() async {
+        // S8-B: enumerate rear lenses on first call; on subsequent
+        // calls (after a lens swap) reuse the existing list.  The
+        // catalog is cheap (it walks AVCaptureDevice.DiscoverySession),
+        // but rerunning it would re-resolve `device` references and
+        // invalidate `selectedLens` Equatable comparisons.
+        if lenses.isEmpty {
+            let discovered = FilmtoneCaptureLensCatalog.availableRearLenses()
+            lenses = discovered
+            selectedLens = FilmtoneCaptureLensCatalog.defaultLens(in: discovered)
+        }
+        guard let lens = selectedLens else {
+            // No rear lens passed the M10 contract.  Surface as the
+            // existing `.noWideCamera` failure (semantically: "no
+            // qualifying rear camera"), which the failure overlay
+            // already routes correctly.
+            prepareError = .noWideCamera
+            return
+        }
         do {
-            try await session.prepare()
+            try await session.prepare(lens: lens)
         } catch let failure as FilmtoneCaptureFailure {
             prepareError = failure
         } catch {
             prepareError = .unexpected(reason: error.localizedDescription)
+        }
+    }
+
+    /// S8-B: switch the active rear lens.  Tears down the current
+    /// session graph and re-prepares against the chosen lens.  The
+    /// `lensSwitchInFlight` guard prevents re-entrant taps from
+    /// interleaving teardown + prepare on a half-configured session.
+    private func selectLens(_ lens: FilmtoneCaptureLens) {
+        guard lens != selectedLens, !lensSwitchInFlight else { return }
+        lensSwitchInFlight = true
+        let previous = selectedLens
+        selectedLens = lens
+        prepareError = nil
+        Task {
+            await session.teardown()
+            do {
+                try await session.prepare(lens: lens)
+            } catch let failure as FilmtoneCaptureFailure {
+                // Roll back the selection so the spec line / pill row
+                // do not lie about which lens is active when prepare()
+                // failed.  The failure overlay surfaces the reason.
+                selectedLens = previous
+                prepareError = failure
+            } catch {
+                selectedLens = previous
+                prepareError = .unexpected(reason: error.localizedDescription)
+            }
+            lensSwitchInFlight = false
         }
     }
 

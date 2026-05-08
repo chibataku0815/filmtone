@@ -262,6 +262,7 @@ struct FilmtoneFullscreenLutEditor: View {
     var onExport: () -> Void = {}
     var onSourceTap: () -> Void = {}
     var onAdvancedTap: () -> Void = {}
+    var onRecord: () -> Void = {}
 
     @State private var controlsHidden = false
     @StateObject private var videoController = FullscreenVideoController()
@@ -563,6 +564,25 @@ struct FilmtoneFullscreenLutEditor: View {
                 // chrome (compare/save/export) so it reads as part of the
                 // playback state, never obstructing the preview area.
                 boostChip
+
+                // Re-record entry. Sits inside the right-edge action cluster
+                // (between the boost chip and compare/save/export), well clear
+                // of the chevron-back affordance on the left so it does not
+                // read as "back" or "close" — it is an explicit Record action.
+                // Reuses the existing `recordProductClip` string ("録画する" /
+                // "Record"). On tap, presents the M10 capture surface; cancel
+                // returns to this editor without disturbing the current
+                // source (handled in `FilmtoneRootView`'s capture cover).
+                GlassActionButton(
+                    isProminent: false,
+                    controlSize: .regular
+                ) {
+                    Image(systemName: "video.badge.plus")
+                } action: {
+                    onRecord()
+                }
+                .accessibilityLabel(Text(store.strings.recordProductClip))
+                .accessibilityIdentifier("filmtone.fullscreen.action.record")
 
                 if let videoPreview = store.videoPreviewState {
                     GlassActionButton(

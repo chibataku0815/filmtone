@@ -41,7 +41,13 @@ struct FilmtoneRootView: View {
                     onSaveLook: { savedLookSheet = .createCurrentLook },
                     onExport: { exportSheetPresented = true },
                     onSourceTap: { sourceSheetPresented = true },
-                    onAdvancedTap: { advancedSheetPresented = true }
+                    onAdvancedTap: { advancedSheetPresented = true },
+                    // S8-A: re-record entry from the editor. Cancel keeps the
+                    // current source (existing `.fullScreenCover` cancel
+                    // handler only flips the cover state); success replaces
+                    // the source via `adoptCaptureResult`. Old package /
+                    // unsaved-edit confirmation are out of scope for S8-A.
+                    onRecord: { captureSurfacePresented = true }
                 )
             }
 
@@ -114,7 +120,18 @@ struct FilmtoneRootView: View {
             }
         }
         .fullScreenCover(isPresented: $captureSurfacePresented) {
+            // S8-D: snapshot the editor's current Look state at the
+            // moment the capture surface is presented.  The capture
+            // surface is a fullScreenCover so editor controls are not
+            // reachable while it is up — a single snapshot is correct
+            // and avoids re-binding to a published store inside the
+            // capture view (which would couple recording UI ticks to
+            // editor publishers).
             FilmtoneCaptureView(
+                lookReference: FilmtoneCaptureLookReference(
+                    displayURI: store.selectedPreviewURI,
+                    lookLabel: store.lookProfileLabel
+                ),
                 onCompleted: { package in
                     captureSurfacePresented = false
                     Task { await store.adoptCaptureResult(package) }

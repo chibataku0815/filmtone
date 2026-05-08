@@ -87,16 +87,58 @@ Modified:
   でvisible failure 化、editor は実 file 存在保証時のみ ref を set
 - **F2** M10 contract を 30fps → **24fps** に変更 (cinematic 24p)
 
-## S7 owner walk (PENDING)
+## S7 owner walk (BLOCKED on S8 product-surface gaps)
 
-Hardware: iPhone 17 Pro / iOS 26.4.2. Owner-visible end-to-end run.
+Hardware: iPhone 17 Pro / iOS 26.4.2. Two paths to land:
 
-1. **No-SSD path** — record (10s cap hit) → editor → preset → export → save
+1. **No-SSD path** — record (10s cap) → editor → preset → export → save
 2. **SSD path** — record (≥10s, ≤60s) → editor → preset → export → save
 
 Acceptance: both paths land an artifact the owner can open in Photos
-without seeing a stuck `isBusy`, silent failure, or stabilization /
-codec / colorspace downgrade banner.
+without a stuck `isBusy`, silent failure, or stabilization / codec /
+colorspace downgrade banner.  Resumes at S8-E once S8-A..D have shipped.
+
+## S8 — capture surface product completion
+
+- [x] **S8-A** Re-record entry from editor (Record button in editor chrome).
+- [x] **S8-B** Rear lens selector — runtime enumeration + 4K24 /
+  Apple Log 2 / cinematicEE format-level gate, default = wide,
+  capture package records lens identifier / display name / device type.
+- [x] **S8-C** Capture parameter operate / readout UI — locked
+  contract banner (4K24 / ProRes 422 HQ / Apple Log 2 / Cinematic EE
+  / Proxy → Editor) + storage pill with cap (`Internal master · 10s
+  cap` / `External master · <folder> · 60s cap`); operable surface
+  remains lens · storage target · record/stop, no exposure / WB /
+  focus / zoom.
+- [x] **S8-D** Look-applied preview on capture surface — reference
+  thumbnail strip route. Capture surface receives a snapshot of the
+  editor's current Look state (`FilmtoneCaptureLookReference =
+  selectedPreviewURI + lookProfileLabel`) at fullScreenCover
+  present time and renders a small "LOOK REFERENCE" panel below
+  the storage pill: graded poster thumbnail (120×90) + look label
+  + "Live ungraded" disclaimer. Owner can judge color direction
+  before recording without coupling capture loop to editor
+  publishers. Decode runs on `Task.detached(.utility)` keyed by
+  `displayURI` so recording state ticks do not redecode.
+  Omitted (recorded as out-of-scope for M10):
+    - **Live frame grading** — applying the grade to the
+      `AVCaptureVideoPreviewLayer` would require swapping it for a
+      `AVCaptureVideoDataOutput` + CIFilter compositor, which
+      conflicts with the ProRes 422 HQ + Apple Log 2 + cinematicEE
+      record pipeline (M2-A: iOS 26.4 does not deliver 10-bit
+      `x422`/`x420` from VDO under `.appleLog2`). Live preview
+      remains the raw camera pass-through; this is labelled "Live
+      ungraded" in the panel.
+    - **Reference for video sources without a baked still poster** —
+      `FilmtonePreviewState.video` exposes an `AVPlayer`, not a
+      file URI; `selectedPreviewURI` returns nil there and the
+      panel is hidden. Falling back to a player-frame snapshot
+      would re-introduce a CIFilter pass and was not pursued.
+    - **Reference for editor mid-render** — when the editor
+      preview is rendering at the moment Record is tapped,
+      `selectedPreviewURI` is nil and the panel is hidden until
+      the next session.
+- [ ] **S8-E** S7 owner walk resume (no-SSD + SSD).
 
 ## Outcome
 

@@ -88,6 +88,7 @@
 		D20000010000000000000083 /* FilmtoneProxyGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000083 /* FilmtoneProxyGenerator.swift */; };
 		D20000010000000000000084 /* FilmtoneCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000084 /* FilmtoneCaptureView.swift */; };
 		D20000010000000000000085 /* FilmtoneCapturePackagePersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000085 /* FilmtoneCapturePackagePersistence.swift */; };
+		D20000010000000000000086 /* FilmtoneCaptureLensCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000086 /* FilmtoneCaptureLensCatalog.swift */; };
 		D20000010000000000000052 /* FilmtoneGcsvWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000052 /* FilmtoneGcsvWriter.swift */; };
 		D20000010000000000000001 /* FormatExtensionReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000001 /* FormatExtensionReader.swift */; };
 		D20000010000000000000002 /* SourceColorMetadataNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000002 /* SourceColorMetadataNormalizer.swift */; };
@@ -232,6 +233,7 @@
 		C20000010000000000000083 /* FilmtoneProxyGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneProxyGenerator.swift; sourceTree = "<group>"; };
 		C20000010000000000000084 /* FilmtoneCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCaptureView.swift; sourceTree = "<group>"; };
 		C20000010000000000000085 /* FilmtoneCapturePackagePersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCapturePackagePersistence.swift; sourceTree = "<group>"; };
+		C20000010000000000000086 /* FilmtoneCaptureLensCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCaptureLensCatalog.swift; sourceTree = "<group>"; };
 		C20000010000000000000052 /* FilmtoneGcsvWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneGcsvWriter.swift; sourceTree = "<group>"; };
 		C20000010000000000000001 /* FormatExtensionReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormatExtensionReader.swift; sourceTree = "<group>"; };
 		C20000010000000000000002 /* SourceColorMetadataNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceColorMetadataNormalizer.swift; sourceTree = "<group>"; };
@@ -389,6 +391,7 @@
 				C20000010000000000000083 /* FilmtoneProxyGenerator.swift */,
 				C20000010000000000000084 /* FilmtoneCaptureView.swift */,
 				C20000010000000000000085 /* FilmtoneCapturePackagePersistence.swift */,
+				C20000010000000000000086 /* FilmtoneCaptureLensCatalog.swift */,
 				C20000010000000000000052 /* FilmtoneGcsvWriter.swift */,
 				C20000010000000000000001 /* FormatExtensionReader.swift */,
 				C20000010000000000000002 /* SourceColorMetadataNormalizer.swift */,
@@ -702,6 +705,7 @@
 				D20000010000000000000083 /* FilmtoneProxyGenerator.swift in Sources */,
 				D20000010000000000000084 /* FilmtoneCaptureView.swift in Sources */,
 				D20000010000000000000085 /* FilmtoneCapturePackagePersistence.swift in Sources */,
+				D20000010000000000000086 /* FilmtoneCaptureLensCatalog.swift in Sources */,
 				D20000010000000000000052 /* FilmtoneGcsvWriter.swift in Sources */,
 				D20000010000000000000001 /* FormatExtensionReader.swift in Sources */,
 				D20000010000000000000002 /* SourceColorMetadataNormalizer.swift in Sources */,

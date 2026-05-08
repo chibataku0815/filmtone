@@ -30,13 +30,19 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
 
     // MARK: - Locked baseline
     //
-    // Format index / dimensions / rotation / colorspace are inherited
-    // from `FilmtoneProductCapture` (M5-A / M7 walks), but **M10 ships
-    // at 4K 24 fps** — cinematic 24p, not the 30 fps used by the older
-    // recordClip path.  The locked format's frame-rate range is wide
-    // enough to cover both, so the format-level lock still holds; only
-    // the active min/maxFrameDuration changes.
-    private static let lockedFormatIndex: Int = 56
+    // Dimensions / rotation / colorspace / fps are inherited from
+    // `FilmtoneProductCapture` (M5-A / M7 walks), but **M10 ships at
+    // 4K 24 fps** — cinematic 24p, not the 30 fps used by the older
+    // recordClip path.  The format-level lock still holds; only the
+    // active min/maxFrameDuration changes.
+    //
+    // S8-B: the per-lens format index is no longer hardcoded to 56.
+    // `FilmtoneCaptureLensCatalog` enumerates rear lenses and resolves
+    // a contract-matching format index per device, so non-wide lenses
+    // (ultra wide / telephoto) can satisfy the same contract on
+    // devices where the matching format sits at a different index.
+    // The wide-camera index 56 coincidence is preserved by the
+    // catalog's contract scan; we just no longer wire it as a constant.
     private static let lockedWidth: Int32 = 3840
     private static let lockedHeight: Int32 = 2160
     private static let lockedFPS: Double = 24
@@ -85,6 +91,11 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     private let sessionQueue = DispatchQueue(label: "filmtone.capture.session.queue")
 
     private var device: AVCaptureDevice?
+    /// Rear lens that prepare(lens:) configured the session against.
+    /// Nil before prepare(); reset by teardown().  Captured into the
+    /// FilmtoneCapturePackage at recording-finished time so the
+    /// editor / export pipelines can carry the lens identity.
+    private var activeLens: FilmtoneCaptureLens?
     private var movieOutput: AVCaptureMovieFileOutput?
 
     private var captureId: String = UUID().uuidString.lowercased()
@@ -108,7 +119,16 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     /// device lookup failure, or format-lock mismatch — the capture view
     /// surfaces these as a failure banner instead of mounting a dead
     /// preview.
-    func prepare() async throws {
+    ///
+    /// S8-B: caller passes a `FilmtoneCaptureLens` resolved by
+    /// `FilmtoneCaptureLensCatalog.availableRearLenses()`.  The catalog
+    /// has already verified format-level contract compliance; we
+    /// re-check inside `prepare(lens:)` defensively because the format
+    /// index could in theory be stale (e.g. if a future lens swap
+    /// happens between enumeration and prepare), and because the
+    /// per-format ProRes 422 HQ availability is only knowable after the
+    /// session has the input + output wired.
+    func prepare(lens: FilmtoneCaptureLens) async throws {
         state = .configuring
 
         let permission = await Self.requestCameraPermission()
@@ -119,24 +139,20 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
             throw failure
         }
 
-        guard let wide = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
-            let failure = FilmtoneCaptureFailure.noWideCamera
-            state = .failed(failure)
-            throw failure
-        }
+        let captureDevice = lens.device
 
-        guard wide.formats.indices.contains(Self.lockedFormatIndex) else {
+        guard captureDevice.formats.indices.contains(lens.formatIndex) else {
             let failure = FilmtoneCaptureFailure.formatLockMismatch(
-                reason: "device.formats has \(wide.formats.count) entries, need index \(Self.lockedFormatIndex)"
+                reason: "lens \(lens.displayName) (\(lens.deviceTypeRaw)) formats has \(captureDevice.formats.count) entries, need index \(lens.formatIndex)"
             )
             state = .failed(failure)
             throw failure
         }
-        let format = wide.formats[Self.lockedFormatIndex]
+        let format = captureDevice.formats[lens.formatIndex]
         let supportedRaw = format.supportedColorSpaces.map { $0.rawValue }
         guard supportedRaw.contains(Self.appleLog2ColorSpaceRaw) else {
             let failure = FilmtoneCaptureFailure.formatLockMismatch(
-                reason: "formats[\(Self.lockedFormatIndex)].supportedColorSpaces missing appleLog2 raw=4; have \(supportedRaw)"
+                reason: "lens \(lens.displayName) formats[\(lens.formatIndex)].supportedColorSpaces missing appleLog2 raw=4; have \(supportedRaw)"
             )
             state = .failed(failure)
             throw failure
@@ -144,7 +160,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         let dim = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
         guard dim.width == Self.lockedWidth, dim.height == Self.lockedHeight else {
             let failure = FilmtoneCaptureFailure.formatLockMismatch(
-                reason: "formats[\(Self.lockedFormatIndex)] dims \(dim.width)x\(dim.height); need \(Self.lockedWidth)x\(Self.lockedHeight)"
+                reason: "lens \(lens.displayName) formats[\(lens.formatIndex)] dims \(dim.width)x\(dim.height); need \(Self.lockedWidth)x\(Self.lockedHeight)"
             )
             state = .failed(failure)
             throw failure
@@ -154,14 +170,26 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
             state = .failed(failure)
             throw failure
         }
-        self.device = wide
+        self.device = captureDevice
+        self.activeLens = lens
 
         do {
             session.beginConfiguration()
+            // Idempotent reconfigure: drop any input / output left over
+            // from a prior prepare(lens:) call so S8-B lens swaps reuse
+            // the same AVCaptureSession instance without duplicating
+            // inputs.  teardown() only stops the session — it does not
+            // remove inputs/outputs.
+            for existingInput in session.inputs {
+                session.removeInput(existingInput)
+            }
+            for existingOutput in session.outputs {
+                session.removeOutput(existingOutput)
+            }
             session.sessionPreset = .inputPriority
             session.automaticallyConfiguresCaptureDeviceForWideColor = false
 
-            let input = try AVCaptureDeviceInput(device: wide)
+            let input = try AVCaptureDeviceInput(device: captureDevice)
             guard session.canAddInput(input) else {
                 session.commitConfiguration()
                 let failure = FilmtoneCaptureFailure.writerSetupFailed(
@@ -172,13 +200,13 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
             }
             session.addInput(input)
 
-            try wide.lockForConfiguration()
-            wide.activeFormat = format
-            wide.activeColorSpace = appleLog2
+            try captureDevice.lockForConfiguration()
+            captureDevice.activeFormat = format
+            captureDevice.activeColorSpace = appleLog2
             let frameDuration = CMTime(value: 1, timescale: CMTimeScale(Self.lockedFPS))
-            wide.activeVideoMinFrameDuration = frameDuration
-            wide.activeVideoMaxFrameDuration = frameDuration
-            wide.unlockForConfiguration()
+            captureDevice.activeVideoMinFrameDuration = frameDuration
+            captureDevice.activeVideoMaxFrameDuration = frameDuration
+            captureDevice.unlockForConfiguration()
 
             let output = AVCaptureMovieFileOutput()
             guard session.canAddOutput(output) else {
@@ -340,6 +368,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         }
         previewLayer = nil
         recordingDelegate = nil
+        activeLens = nil
         if case .ready = state {
             state = .idle
         }
@@ -450,6 +479,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         let parameters: FilmtoneCaptureParameters = .baseline
         let storagePolicy = self.storagePolicy
         let captureId = self.captureId
+        let lensRecord = self.activeLens?.toRecord()
 
         // Kick off proxy generation off-main; flip state when complete.
         Task.detached(priority: .userInitiated) { [weak self] in
@@ -469,7 +499,8 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
                         packageDirURL: packageDirURL,
                         durationLimitSeconds: durationLimit,
                         recordedDurationSeconds: recordedDuration,
-                        parameters: parameters
+                        parameters: parameters,
+                        lens: lensRecord
                     )
                     // Master/proxy linkage is the M10 deliverable; if we
                     // can't write `capture-package.json` next to the

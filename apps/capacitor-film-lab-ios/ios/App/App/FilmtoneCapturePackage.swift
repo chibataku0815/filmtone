@@ -33,6 +33,22 @@ enum FilmtoneCaptureStoragePolicy: Equatable {
     }
 }
 
+/// Owner-visible identity of the rear lens used for a capture run.
+/// Carries only fields that round-trip through `capture-package.json`;
+/// the runtime `AVCaptureDevice` reference lives on
+/// `FilmtoneCaptureLens` (the catalog-side struct) and is not
+/// persisted.  S8-B introduces this so rear-lens selection (M10) and
+/// the upcoming capture-parameter readouts (S8-C) can refer to the
+/// same lens identity that the catalog enumerated.
+struct FilmtoneCaptureLensRecord: Equatable, Codable {
+    /// `AVCaptureDevice.uniqueID` of the lens used for the run.
+    let identifier: String
+    /// Owner-visible display name ("Main" / "Ultra Wide" / "Telephoto").
+    let displayName: String
+    /// `AVCaptureDevice.DeviceType.rawValue` of the lens.
+    let deviceType: String
+}
+
 /// Capture parameters resolved for a given run.  M10 ships the
 /// 4K 24 fps Apple Log 2 ProRes 422 HQ + cinematicExtendedEnhanced
 /// cinematic baseline — kept as a struct so future capture-time
@@ -158,6 +174,10 @@ struct FilmtoneCapturePackage: Equatable {
     let recordedDurationSeconds: Double
     /// Capture parameters used.  Pinned to `.baseline` for M10.
     let parameters: FilmtoneCaptureParameters
+    /// Rear lens used for the run.  Optional only because pre-S8-B
+    /// `capture-package.json` snapshots have no lens fields and decode
+    /// with `nil`; new runs always set it.
+    let lens: FilmtoneCaptureLensRecord?
 }
 
 #endif
