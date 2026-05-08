@@ -699,3 +699,25 @@ Out of scope (handled in later lanes):
   Probe with `file://` URI)を 2 件 fix。live preview 切替遅延は
   post-M11 polish 候補として保留。Details in
   `archive/2026-05-08-m11-capture-look-selection.md`.
+- 2026-05-08: M12 (Advanced Capture Controls) **PASS with
+  product-sufficient evidence**: advanced controls landed, wide-auto
+  master truth passed, manual ISO/shutter package persisted; broad
+  lens matrix deferred as non-blocking. S12-A〜E が landed
+  (commits `a6b94e99` / `db36328e` / `1f206596` / `b0b33c2e`):
+  S12-B lens magnification label refactor + package 永続化、S12-C
+  EV bias slider + tap-to-focus / tap-to-meter + reticle、S12-D
+  WB auto/locked segmented + locked 時のみ R/G/B gains を persist、
+  S12-E manual ISO/shutter mode + 24fps shutter cap + 180° marker +
+  inheritedFromAuto flag + manual 中は EV/tap-to-meter no-op /
+  tap-to-focus 残す。schemaVersion 2 維持(全 M12 field は additive
+  optional、pre-M12 snapshot は forward-compat decode)。S12-F は
+  実機 iPhone 17 Pro #7 / iOS 26.4 で partial PASS:wide-auto は
+  full master truth(`apch` / `yuv422p10le` / 3840×2160 / 24/1)+
+  全 package field が `scripts/verify-m12-capture-master.sh
+  wide-auto` で PASS、wide-manual は package side に
+  `manualISO=1212.92` / `manualShutterDurationSeconds≈0.025003s` /
+  `manualInheritedFromAuto=true` が persist されている事を確認
+  (master は SSD userfsd マウント中で Mac 不可視 / WB Locked は
+  operator miss)、tele-auto / ultraWide-auto は M10 baseline の
+  S8-B lens swap 既存検証範囲なので deferred。Details in
+  `archive/2026-05-08-m12-advanced-capture-controls.md`.

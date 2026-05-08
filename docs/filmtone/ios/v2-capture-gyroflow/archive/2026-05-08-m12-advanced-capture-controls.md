@@ -1,7 +1,96 @@
 # Active — M12 Advanced Capture Controls
 
-Status: **S12-A 設計ロック / S12-B 着手前**
+Status: **S12-A〜E PASS / S12-F partial PASS — product-sufficient evidence で M12 closeout**
 (2026-05-08 JST)
+
+S12-A 設計ロック → S12-B lens label refactor → S12-C EV bias / tap
+focus+meter / reticle → S12-D WB lock → S12-E manual ISO/shutter +
+180° marker → S12-F partial device verify(wide-auto full PASS、
+wide-manual package field PASS、tele/ultraWide deferred as non-blocking)。
+M12 closeout 実施。
+
+## S12-F Outcome(2026-05-08, partial PASS / product sufficient)
+
+実機 iPhone 17 Pro #7(`3A2A3A66-D092-5F87-8CE7-9A1EBD238FE9`) /
+iOS 26.4 で device build → install 後、owner 操作で 4-profile matrix
+を試行。広範な lens 網羅検証を取りにいくのは外殻寄りで、product
+として M12 が壊れていないかの本質シグナルが取れた段階で closeout 判断
+(owner 明示)。
+
+| profile | 取得状態 | gate |
+|---|---|---|
+| `wide-auto` (`c4c8ef93`, 8.33s, Stone Look, internal storage) | master.mov を sandbox 経由で pull、`scripts/verify-m12-capture-master.sh wide-auto` 全 OK | **PASS** — codec=`apch` / pix_fmt=`yuv422p10le` / 3840×2160 / 24/1、package field 全項目 expected |
+| `wide-manual` (`95272ca2`, 2.96s, external SSD) | package 取得 — `manualISO=1212.92` / `manualShutterDurationSeconds≈0.025003s (≈1/40s, 24fps cap 内)` / `manualInheritedFromAuto=true`。WB を Locked に切替忘れ(operator miss)、master は SSD 上 / iPhone userfsd マウント中で Mac 不可視 | **partial — manual ISO/shutter package persist は evidenced**、master truth と WB locked は未 evidence |
+| `tele-auto` | 未録画 | **deferred(non-blocking)** |
+| `ultraWide-auto` | 未録画 | **deferred(non-blocking)** |
+
+### Closeout 判断(owner 明示)
+
+> M12 PASS with product-sufficient evidence: advanced controls landed,
+> wide-auto master truth passed, manual ISO/shutter package persisted;
+> broad lens matrix deferred as non-blocking.
+
+理由:
+
+- M12 lens swap plumbing は **S8-B(M10)既存** で、S12-B は表示
+  ラベル(`magnificationLabel(for:device:)`)と package 永続化
+  (`lensMagnificationLabel` / `lensFormatIndex`)を足しただけ。
+  lens 切替経路自体は M10 baseline で実機検証済 — `tele-auto` /
+  `ultraWide-auto` は再検証 scope 外で OK
+- wide-auto で master truth(`apch` / Apple Log 2 / 4K24 /
+  cinematicEE)が M10 baseline 維持されている事を実機 ffprobe で
+  確認済。M12 制御 stack を積んでも codec / colorspace / fps /
+  pix_fmt は壊れない、という最重要シグナルは取れた
+- wide-manual の master が SSD 上で Mac から read できないのは
+  iOS userfsd の挙動(同時マウント不可)で、M12 product としては
+  blocker ではない
+- WB を Locked にしなかったのは UI bug ではなく operator miss
+
+## S12-E Outcome(2026-05-08, commit `b0b33c2e`)
+
+manual exposure (ISO + shutter) を実装、auto/manual segmented で
+切替。manual 切替時は直前の auto reading
+(`device.iso` / `device.exposureDuration`) を inherit、
+`setExposureModeCustom(duration:iso:)` で ISO + shutter duration を
+直接制御。slider range は active format
+(`minISO..maxISO` / `minExposureDuration..maxExposureDuration`)から
+動的、24fps cap で `min(format.maxExposureDuration, 1.0/24)` を
+shutter 上限に固定。180° shutter (1/48s) は黄色 tick marker で表示
+(±1ms 以内で readout も yellow 化)。manual 中は EV slider /
+tap-to-meter を hide / no-op、tap-to-focus は残す。`inheritedFromAuto`
+flag で「auto 値そのままロック」と「明示的に追い込み」を区別、
+`enterManualExposure` は idempotent。capture-package に `manualISO` /
+`manualShutterDurationSeconds` / `manualInheritedFromAuto` を additive
+optional で追加(schemaVersion 2 維持)。xcodebuild iOS Simulator
+Debug = `BUILD SUCCEEDED` 0 warning / 0 error。実機 verify は S12-F
+で wide-manual package side が PASS(master/WB は上記の通り未 evidence)。
+
+## S12-D Outcome(2026-05-08, commit `1f206596`)
+
+WB の auto / locked segmented を追加。Locked 切替時に
+`device.deviceWhiteBalanceGains` を sample →
+`setWhiteBalanceModeLocked(with:)`。auto 復帰で
+`.continuousAutoWhiteBalance`。**判断**: locked 時の R/G/B gains だけを
+package に永続化、auto 時の瞬間 gains は drift するので persist しない
+(memory `feedback_check_ios_canonical_for_veil_look_parity` 路線)。
+schemaVersion 2 維持(WB 4 field は additive optional)。
+
+## S12-C Outcome(2026-05-08, commit `db36328e`)
+
+EV bias slider(±3 stop、`setExposureTargetBias(_:)`)、tap-to-focus
+(focus point 常時)、tap-to-meter(exposure point は auto 時のみ)、
+64pt reticle(0.6s fade-out)を実装。focus / metering / EV bias を
+capture-package に永続化。
+
+## S12-B Outcome(2026-05-08, commit `a6b94e99`)
+
+lens 表示を `0.5× / 1× / 2× / 5×` の倍率主体に refactor。
+`magnificationLabel(for:device:)` + `canonicalSubtext(for:)` を新設、
+`displayName(for:)` は legacy 用に残置。capture-package に
+`lensMagnificationLabel` / `lensFormatIndex` を additive optional で
+追加。
+
+## S12-A — 着手前に固定した判断(全部 ロック済)
 
 M11 archive 後の次 milestone。short-form review 形式 — 長い検討 doc は
 書かず、code に入れる判断だけを残す。
