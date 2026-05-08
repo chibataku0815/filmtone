@@ -13,7 +13,7 @@
 | **本質優先 / 外殻最小** | 製品挙動を直接動かす変更(Swift native / UI wiring / sidecar / Profile / fastlane / shader) = 本質。XCTest 6 並列・formal QA 手順書・過剰 i18n 化・装飾 banner = 外殻。**user が「QA 希望」と明示した時のみ**着手 |
 | **保守的ヘッジを優先しない** | 「念のため fallback」「安全側でスキップ」「v1.x 後回し」のような逃げを取らない |
 | **思考は sequential-thinking** | 設計判断・lane 衝突・不変条件 gate 評価は `mcp__sequential-thinking`。記憶ベースで断言しない |
-| **不確かなら検索** | API / ASC / Capacitor / iOS SDK が曖昧な場合は `gemini-search` → `WebSearch`。記憶ベース推測は `feedback_no_guessing_davinci_plugins` / `feedback_verify_before_documenting` 違反 |
+| **不確かなら検索** | API / ASC / iOS SDK が曖昧な場合は `gemini-search` → `WebSearch`。記憶ベース推測は `feedback_no_guessing_davinci_plugins` / `feedback_verify_before_documenting` 違反 |
 | **handoff は鵜呑みにしない** | 旧 chat の handoff doc 引用前に現行 surface (`grep` / Swift / pbxproj) と突き合わせて live/frozen を確認 (`feedback_verify_before_quoting_handoff`) |
 | **並列 stream の silent 縮退禁止** | 複数 chat / Agent Teams で stream を割った時、残タスク silent 省略 / lane の chat 独断 redefine は禁止。完了時 handoff §8.5 4 セクション(Plan Compliance / Cross-Stream Visibility / Scope Diff / 残タスク enumeration) を機構化 (`feedback_no_silent_stream_redefine`) |
 

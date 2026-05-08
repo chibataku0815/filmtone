@@ -84,3 +84,16 @@ Autonomous Claude Code session in worktree
 `.claude/worktrees/feature-ios-react-capacitor-purge` on branch
 `worktree-feature-ios-react-capacitor-purge`. Owner picks up at
 PR / merge time.
+
+---
+
+## Completion log
+
+- 2026-05-09: **Lane PASS** — Stages A → E all landed in this worktree
+  branch. Owner pre-merge verification (especially the fastlane
+  archive lane against the trimmed Podfile) deferred to the release
+  chat per the user's stated split. `grep import Capacitor|CAPPlugin`
+  returns 0 across `apps/capacitor-film-lab-ios/` (excluding
+  `node_modules/`); .ipa no longer embeds Capacitor.framework.
+  Directory rename (`capacitor-film-lab-ios/` → `film-lab-ios/`)
+  remains out of scope per the strategy.
