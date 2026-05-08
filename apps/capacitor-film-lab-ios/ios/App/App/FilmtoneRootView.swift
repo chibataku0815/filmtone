@@ -19,6 +19,7 @@ struct FilmtoneRootView: View {
     @State private var exportSheetPresented = false
     @State private var pendingLookOnPickComplete: SavedLookEntry?
     @State private var activeHelpTopic: FilmtoneAdjustmentHelpTopic?
+    @State private var captureSurfacePresented = false
 
     var body: some View {
         ZStack {
@@ -27,7 +28,7 @@ struct FilmtoneRootView: View {
                     store: store,
                     onPickPhotoLibrary: { Task { await store.pickSource(route: .photoLibrary) } },
                     onPickFiles: { Task { await store.pickSource(route: .files) } },
-                    onRecordProductClip: { Task { await store.recordProductClip() } },
+                    onRecordProductClip: { captureSurfacePresented = true },
                     onPickWithLook: { entry in
                         pendingLookOnPickComplete = entry
                         Task { await store.pickSource(route: .photoLibrary) }
@@ -111,6 +112,21 @@ struct FilmtoneRootView: View {
             FilmtoneDesktopHandoffSheet(strings: store.strings) {
                 store.desktopHandoffPromptPresented = false
             }
+        }
+        .fullScreenCover(isPresented: $captureSurfacePresented) {
+            FilmtoneCaptureView(
+                onCompleted: { package in
+                    captureSurfacePresented = false
+                    Task { await store.adoptCaptureResult(package) }
+                },
+                onCancelled: {
+                    captureSurfacePresented = false
+                },
+                onFailed: { failure in
+                    captureSurfacePresented = false
+                    store.recordingError = failure.displayMessage
+                }
+            )
         }
         .fullScreenCover(isPresented: $onboardingPresented, onDismiss: openSourcePickerIfNeeded) {
             FilmtoneOnboardingView(

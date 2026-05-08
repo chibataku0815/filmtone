@@ -271,6 +271,53 @@ replacement") is folded into post-M9 ad-hoc owner usage. The product
 completion bar is the right next gate; the trial verdict comes after the
 loop is closed.
 
+### M10 - Native Camera Capture Surface + Proxy Workflow
+
+Goal:
+
+Make recording the entry surface for the iOS app — a native SwiftUI
+capture view that records a high-quality master, generates an editor
+proxy, and hands the proxy to the existing editor pipeline. Replaces
+the React/Capacitor `recordClip` route as the primary owner flow.
+
+Pinned capture contract (M10 baseline):
+
+- 3840×2160 **24 fps** (cinematic 24p) — `FilmtoneCaptureSession.lockedFPS = 24`
+- ProRes 422 HQ (`apch` FourCC verified post-finalize via `AVURLAsset`)
+- Apple Log 2 colorspace (rawValue 4) verified active before record start
+- `cinematicExtendedEnhanced` stabilization, exact-match gate (no downgrade)
+- Single-cam rear `builtInWideAngleCamera`, format index 56
+- SSD mode: external security-scoped folder, soft 60s ceiling
+- No-SSD mode: local Caches package dir, hard 10s product cap
+- Proxy generated next to package, used as the editor source
+- `capture-package.json` persisted next to proxy + mirrored into
+  external folder (best-effort) for relaunch reconnect
+
+Done:
+
+- Native `FilmtoneCaptureView` is the entry surface; the React
+  `recordClip` UI is no longer the primary path.
+- Storage policy + duration cap are derived from preflight (10 GB free
+  + capacity-divergence hard reject for "On My iPhone" misclassification).
+- Master truth gate fails loudly on stabilization downgrade, Apple Log 2
+  downgrade, and ProRes downgrade (FourCC ≠ `apch`).
+- `capture-package.json` write failure is a visible capture failure
+  (`packagePersistenceFailed`), not a silent skip.
+- Editor adopts the proxy via `adoptCaptureResult(_:)`; master URL +
+  package linkage survive a relaunch through `currentCapturePackageRef`.
+- Spec readout (`<K>K<fps> · <codec> · <colorspace> · <stabilization> · <cap>s cap`)
+  is display-only — M10 does not expose camera knobs.
+
+Dependency:
+
+- M9 (export completion loop closed for any source).
+
+Out of scope (handled in later lanes):
+
+- Capture-time honest preview, preview/preset polish, multi-device
+  acceptance matrix, audio capture, exposure / focus / WB knobs,
+  Gyroflow handoff (separate library lane), variable-fps capture.
+
 ## Known Constraints
 
 - No implementation starts without `active.md`.

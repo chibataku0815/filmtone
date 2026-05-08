@@ -5,6 +5,13 @@ struct FilmtonePersistenceSnapshot: Codable {
     var project: FilmtoneProjectState
     var source: SourceInfoDTO?
     var probe: SourceProbeDTO?
+    /// Local filesystem path to a `capture-package.json` written by the
+    /// M10 native capture surface for the **currently-adopted** source.
+    /// Decoupled from `SourceInfoDTO` so the source identity stays a
+    /// pure media-input concept and the capture provenance / master
+    /// linkage rides on its own field.  Decoded as `nil` for snapshots
+    /// written before M10 (additive Codable field).
+    var currentCapturePackageRef: String?
 }
 
 enum FilmtonePersistence {
@@ -25,13 +32,15 @@ enum FilmtonePersistence {
     static func save(
         project: FilmtoneProjectState,
         source: SourceInfoDTO?,
-        probe: SourceProbeDTO?
+        probe: SourceProbeDTO?,
+        currentCapturePackageRef: String?
     ) {
         let snapshot = FilmtonePersistenceSnapshot(
             schemaVersion: FilmtonePhase0Math.projectSchemaVersion,
             project: project,
             source: source,
-            probe: probe
+            probe: probe,
+            currentCapturePackageRef: currentCapturePackageRef
         )
 
         guard let data = try? JSONEncoder().encode(snapshot) else {
