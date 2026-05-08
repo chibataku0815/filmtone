@@ -369,6 +369,95 @@ Out of scope (handled in later lanes):
 - camera profile picker(capture 中は固定、editor で変更)
 - Look chip strip の sort / favorite / search
 
+### M12 - Advanced Capture Controls
+
+Goal:
+
+撮影画面で owner が **露出補正・focus 点・WB lock・lens 切替・manual
+ISO/shutter** を制御できるようにし、明暗・寄り絵・色被り・画角条件下
+でも owner-quality な master を撮れる capture surface に押し上げる。
+M10 baseline(4K24 / ProRes 422 HQ / Apple Log 2 /
+cinematicExtendedEnhanced)と M11 capture-Look 選択は **selected lens
+上で** 維持され、silent downgrade を起こさない。
+
+Pinned capture contract (M10 / M11 baseline — lens-aware):
+
+- master.mov は selected lens でも ProRes 422 HQ (`apch`) / Apple Log 2
+  (rawValue 4) / 3840×2160@24 / cinematicExtendedEnhanced を満たす
+- lens 切替時は M1 capability probe(`m1-capability.json`)で確認済の
+  対応 format index に lock。M10 baseline contract を満たさない lens
+  / format への silent fallback 禁止 — 該当 lens は UI で明示 disable
+- lens swap は session pre-record 状態のみ。録画中の lens swap は
+  禁止(録画中ボタンは disable)
+- 露出補正 / tap-to-focus / tap-to-meter は exposure auto モード時のみ
+  有効、manual モード時は対象 control 自体を hide / disable
+- M11 capture-Look chip strip / live preview rebuild は変更しない
+
+Done:
+
+- **lens 切替**: 利用可能な rear lens(builtInUltraWide /
+  builtInWideAngle / builtInTelephoto / 5× tele 等)を pill /
+  segmented row で表示。各 lens の M1 probe 上 4K24 / Apple Log 2 /
+  ProRes 422 HQ / cinematicExtendedEnhanced 全部を満たす format index
+  を pre-resolve、満たさない lens は disable + 理由 tooltip。
+  AVCaptureDevice 切替時は format / colorspace / stabilization を
+  選択済 format 値で再 lock し、master truth gate を全 lens で
+  PASS させる
+- **露出補正(EV)**: `setExposureTargetBias(_:)` で ±3 stop。
+  exposure auto モード時のみ有効。slider / stepper、capture 中の
+  調整可
+- **tap-to-focus / tap-to-meter**: capture preview tap を AVCaptureDevice
+  正規化 focusPointOfInterest / exposurePointOfInterest に変換、
+  `focusMode = .autoFocus` / `exposureMode = .autoExpose`、tap 位置に
+  短時間 reticle 表示。exposure auto モード時のみ
+- **WB lock**: 「auto / locked-at-tap」の 2 モード。lock 時は現在の
+  `deviceWhiteBalanceGains` を `setWhiteBalanceModeLocked(with:)` で
+  固定、auto 戻しで `.continuousAutoWhiteBalance` に復帰
+- **manual exposure (ISO + shutter)**: auto / manual トグル。manual 時
+  は `setExposureModeCustom(duration:iso:)` で ISO + shutter duration
+  を直接制御。slider range は active format の
+  `minISO..maxISO` / `minExposureDuration..maxExposureDuration` から
+  動的生成、24fps capture の shutter は 1/24s 上限で cap(物理
+  最大 = 1 frame 露光)。180° shutter (1/48s) は marker / preset 表示。
+  manual モード入りで EV bias / tap-to-meter は無効化、tap-to-focus
+  のみ残る
+- **制御値の package 永続化**: `capture-package.json` に
+  schemaVersion bump で以下を追加(forward-compat decode、
+  pre-M12 package は全 field 欠落で OK):
+  - `selectedLens: { deviceTypeRaw, localizedName, formatIndex }`
+  - `exposureMode: "auto" | "manual"`
+  - `exposureBiasEV: Double` (auto 時)
+  - `manualISO: Double?` / `manualShutterDurationSeconds: Double?`
+    (manual 時)
+  - `focusPointNormalized: {x, y}?` /
+    `exposurePointNormalized: {x, y}?` (auto 時の tap)
+  - `whiteBalanceLock: {mode, redGain, greenGain, blueGain}?`
+- **editor は触らない**: 制御値は capture surface 内 ephemeral、
+  `adoptCaptureResult` でも editor state に書き戻さない(capture
+  metadata は package に永続化、editor 自動適用しない)
+- **master truth gate**: M11 verify script を全 lens × auto/manual の
+  代表 4 通り(wide-auto / wide-manual / tele-auto / ultraWide-auto)で
+  PASS — codec `apch` / colorspace Apple Log 2 / 3840×2160 / 24 fps /
+  pix_fmt yuv422p10le
+
+Dependency:
+
+- M11 (capture surface に Look chip / live preview rebuild が
+  既に存在する状態で制御 row を重ねる)
+
+Out of scope (handled in later lanes):
+
+- audio capture / mic input(`NSMicrophoneUsageDescription` を
+  含む)
+- variable-fps / slow-motion(M10 24p locking を動かす)
+- focus peaking / exposure zebra overlay(honest preview lane で
+  別途検討)
+- 録画中の lens swap / 録画中の auto↔manual mode switch(pre-record
+  fix policy)
+- exposure / focus / WB の RAW metadata sidecar(Filmtone editor
+  側で読み戻す要件が出てから)
+- AE/AWB lock + AF lock の 1-button "AE/AF Lock" 統合 UI(別 lane)
+
 ## Known Constraints
 
 - No implementation starts without `active.md`.
