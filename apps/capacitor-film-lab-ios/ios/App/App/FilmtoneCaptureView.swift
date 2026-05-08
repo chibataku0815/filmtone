@@ -581,18 +581,28 @@ struct FilmtoneCaptureView: View {
                 Button {
                     selectLens(lens)
                 } label: {
-                    Text(lens.displayName)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(
-                            lens == selectedLens
-                                ? Color.white.opacity(0.28)
-                                : Color.black.opacity(0.42),
-                            in: Capsule()
-                        )
+                    VStack(spacing: 1) {
+                        Text(lens.magnificationLabel)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
+                        if !lens.canonicalSubtext.isEmpty {
+                            Text(lens.canonicalSubtext)
+                                .font(.system(size: 9, weight: .regular))
+                                .foregroundStyle(.white.opacity(0.72))
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 4)
+                    .background(
+                        lens == selectedLens
+                            ? Color.white.opacity(0.28)
+                            : Color.black.opacity(0.42),
+                        in: Capsule()
+                    )
                 }
+                .accessibilityLabel(
+                    Text("\(lens.magnificationLabel) \(lens.canonicalSubtext)")
+                )
                 .accessibilityIdentifier("filmtone.capture.lens.\(lens.deviceTypeRaw)")
                 .accessibilityAddTraits(lens == selectedLens ? .isSelected : [])
                 .disabled(
@@ -681,7 +691,7 @@ struct FilmtoneCaptureView: View {
         ]
         let shouldShowLensPrefix = lenses.count <= 1
         let lensPrefix = shouldShowLensPrefix
-            ? (selectedLens.map { "\($0.displayName) · " } ?? "")
+            ? (selectedLens.map { "\($0.magnificationLabel) · " } ?? "")
             : ""
         return Text(lensPrefix + segments.joined(separator: " · "))
             .font(.system(size: 12, weight: .medium))

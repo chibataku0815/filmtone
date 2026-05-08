@@ -43,10 +43,24 @@ enum FilmtoneCaptureStoragePolicy: Equatable {
 struct FilmtoneCaptureLensRecord: Equatable, Codable {
     /// `AVCaptureDevice.uniqueID` of the lens used for the run.
     let identifier: String
-    /// Owner-visible display name ("Main" / "Ultra Wide" / "Telephoto").
+    /// Legacy canonical display name ("Main" / "Ultra Wide" /
+    /// "Telephoto").  Kept verbatim for backward compatibility with
+    /// pre-M12 `capture-package.json` consumers; the M12 capture-time
+    /// label lives on `magnificationLabel`.
     let displayName: String
     /// `AVCaptureDevice.DeviceType.rawValue` of the lens.
     let deviceType: String
+    /// M12 / S12-B: owner-visible magnification label ("0.5×" / "1×" /
+    /// "2×" / "5×").  Optional so pre-M12 packages decode cleanly with
+    /// `magnificationLabel = nil`; new runs always set this together
+    /// with `formatIndex`.
+    let magnificationLabel: String?
+    /// M12 / S12-B: index into the lens device's `formats` array of
+    /// the contract-matching format selected at `prepare(lens:)` time.
+    /// Persisted so a relaunch reading the package can verify which
+    /// format the master was actually written through (the M10
+    /// truth-gate verifier uses this to assert per-lens parity).
+    let formatIndex: Int?
 }
 
 /// M11 / S11-D: capture-time Look chip recorded with a successful

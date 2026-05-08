@@ -31,8 +31,24 @@ struct FilmtoneCaptureLens: Identifiable, Equatable {
     /// SwiftUI `Identifiable.id` for the selector row and recorded
     /// verbatim into `FilmtoneCaptureLensRecord` for the capture package.
     let id: String
-    /// Owner-facing label ("Main" / "Ultra Wide" / "Telephoto").
+    /// Legacy canonical label ("Main" / "Ultra Wide" / "Telephoto").
+    /// Kept as the JSON-stable identity for `capture-package.json` —
+    /// the M12 magnification label lives on `magnificationLabel`
+    /// instead so existing downstream readers keep parsing the field
+    /// they were designed against.
     let displayName: String
+    /// M12: capture-time UI primary label ("0.5×" / "1×" / "2×" / "5×").
+    /// Ultra wide / wide are hardcoded at canonical 0.5× / 1×; tele is
+    /// computed from the wide reference's `videoFieldOfView` so iPhone
+    /// 17 Pro reads "5×", iPhone 15 Pro reads "3×", older Pros "2×",
+    /// without per-model tables.
+    let magnificationLabel: String
+    /// M12: capture-time UI subtext ("Ultra Wide" / "Wide" / "Tele").
+    /// Slightly different vocabulary than `displayName` ("Wide" not
+    /// "Main", "Tele" not "Telephoto") so the subtext reads as a hint
+    /// next to the magnification rather than as a name with its own
+    /// weight.  Empty string for unrecognized device types.
+    let canonicalSubtext: String
     /// `AVCaptureDevice.DeviceType.rawValue` of the underlying device.
     let deviceTypeRaw: String
     /// Index into `device.formats` of the contract-matching format.
@@ -59,7 +75,9 @@ extension FilmtoneCaptureLens {
         FilmtoneCaptureLensRecord(
             identifier: id,
             displayName: displayName,
-            deviceType: deviceTypeRaw
+            deviceType: deviceTypeRaw,
+            magnificationLabel: magnificationLabel,
+            formatIndex: formatIndex
         )
     }
 }
@@ -76,6 +94,12 @@ enum FilmtoneCaptureLensCatalog {
     /// include an entry satisfying the M10 contract.  Sorted with the
     /// wide lens first so it can be picked as the default in the
     /// selector row.
+    ///
+    /// M12 / S12-B: enumerate in two passes so the wide lens's contract
+    /// format `videoFieldOfView` can be used as the magnification
+    /// baseline for tele labels.  Without the baseline, tele's "5×"
+    /// vs "3×" vs "2×" cannot be derived from runtime alone — and a
+    /// per-model lookup table would drift for every new iPhone.
     static func availableRearLenses() -> [FilmtoneCaptureLens] {
         let candidateTypes: [AVCaptureDevice.DeviceType] = [
             .builtInWideAngleCamera,
@@ -87,15 +111,37 @@ enum FilmtoneCaptureLensCatalog {
             mediaType: .video,
             position: .back
         )
-        var entries: [FilmtoneCaptureLens] = []
+        // Pass 1: collect (device, contractFormatIndex) for qualifying
+        // lenses.  We materialise this into an array up-front so the
+        // wide-lens FOV baseline can be discovered before label
+        // generation runs in pass 2.
+        var qualified: [(device: AVCaptureDevice, formatIndex: Int)] = []
         for device in session.devices {
             guard let formatIndex = findContractFormatIndex(on: device) else {
                 continue
             }
+            qualified.append((device, formatIndex))
+        }
+        let wideBaselineFOV: Float? = qualified.first(where: {
+            $0.device.deviceType == .builtInWideAngleCamera
+        }).map { $0.device.formats[$0.formatIndex].videoFieldOfView }
+
+        // Pass 2: build entries with magnification labels resolved
+        // against the wide baseline (when available) and canonical
+        // subtexts assigned per device type.
+        var entries: [FilmtoneCaptureLens] = []
+        for (device, formatIndex) in qualified {
+            let magLabel = magnificationLabel(
+                for: device,
+                formatIndex: formatIndex,
+                wideBaselineFOV: wideBaselineFOV
+            )
             entries.append(
                 FilmtoneCaptureLens(
                     id: device.uniqueID,
-                    displayName: displayName(for: device.deviceType),
+                    displayName: legacyDisplayName(for: device.deviceType),
+                    magnificationLabel: magLabel,
+                    canonicalSubtext: canonicalSubtext(for: device.deviceType),
                     deviceTypeRaw: device.deviceType.rawValue,
                     formatIndex: formatIndex,
                     device: device
@@ -145,12 +191,73 @@ enum FilmtoneCaptureLensCatalog {
         return nil
     }
 
-    private static func displayName(for type: AVCaptureDevice.DeviceType) -> String {
+    /// Legacy canonical name written into `capture-package.json`'s
+    /// `lensDisplayName` since S8-B.  Kept verbatim so existing
+    /// downstream readers that key off "Main" / "Ultra Wide" /
+    /// "Telephoto" continue to match.  The owner-facing capture-time
+    /// label lives on `FilmtoneCaptureLens.magnificationLabel` /
+    /// `canonicalSubtext` and is not the same string.
+    private static func legacyDisplayName(
+        for type: AVCaptureDevice.DeviceType
+    ) -> String {
         switch type {
         case .builtInWideAngleCamera: return "Main"
         case .builtInUltraWideCamera: return "Ultra Wide"
         case .builtInTelephotoCamera: return "Telephoto"
         default: return type.rawValue
+        }
+    }
+
+    /// M12 / S12-B: capture-time pill primary label.  Ultra-wide and
+    /// wide are pinned to consumer-conventional labels (0.5× / 1×) —
+    /// computing them from FOV would round to 0.6× / 1.0× and confuse
+    /// the owner.  Telephoto magnification is computed from the wide
+    /// lens's `videoFieldOfView` as `wideFOV / teleFOV` and rounded to
+    /// the nearest integer when within 0.3 of it (typical iPhone tele
+    /// magnifications are 2× / 3× / 5× — fractional outputs round to
+    /// the nearest 0.5×).  Falls back to the canonical name when the
+    /// baseline is missing or the format reports a non-positive FOV.
+    private static func magnificationLabel(
+        for device: AVCaptureDevice,
+        formatIndex: Int,
+        wideBaselineFOV: Float?
+    ) -> String {
+        switch device.deviceType {
+        case .builtInUltraWideCamera:
+            return "0.5×"
+        case .builtInWideAngleCamera:
+            return "1×"
+        case .builtInTelephotoCamera:
+            guard let baseline = wideBaselineFOV, baseline > 0 else {
+                return canonicalSubtext(for: device.deviceType)
+            }
+            let teleFOV = device.formats[formatIndex].videoFieldOfView
+            guard teleFOV > 0 else {
+                return canonicalSubtext(for: device.deviceType)
+            }
+            let ratio = baseline / teleFOV
+            let rounded = ratio.rounded()
+            if abs(ratio - rounded) <= 0.3 {
+                return "\(Int(rounded))×"
+            }
+            return String(format: "%.1f×", ratio)
+        default:
+            return device.localizedName
+        }
+    }
+
+    /// M12 / S12-B: capture-time pill subtext.  Slightly different
+    /// vocabulary than `legacyDisplayName` ("Wide" not "Main", "Tele"
+    /// not "Telephoto") so the subtext reads as a hint next to the
+    /// magnification rather than competing with it for weight.
+    private static func canonicalSubtext(
+        for type: AVCaptureDevice.DeviceType
+    ) -> String {
+        switch type {
+        case .builtInWideAngleCamera: return "Wide"
+        case .builtInUltraWideCamera: return "Ultra Wide"
+        case .builtInTelephotoCamera: return "Tele"
+        default: return ""
         }
     }
 

@@ -51,6 +51,13 @@ struct FilmtoneCapturePackageSnapshotV1: Codable {
     var lensIdentifier: String?
     var lensDisplayName: String?
     var lensDeviceType: String?
+    /// M12 / S12-B: capture-time owner-visible label ("0.5×" / "1×" /
+    /// "2×" / "5×") and the format index used for the run.  Optional
+    /// so pre-M12 snapshots decode with `magnificationLabel = nil` /
+    /// `formatIndex = nil` on the rebuilt record.  No schemaVersion
+    /// bump — the M11 schema already permitted optional additions.
+    var lensMagnificationLabel: String?
+    var lensFormatIndex: Int?
     /// S11-D (schemaVersion 2): capture-time Look chip recorded with
     /// the run.  All four are tri-required (UUID + name + intensity);
     /// missing any of them means the snapshot was either pre-M11 or
@@ -155,6 +162,8 @@ enum FilmtoneCapturePackagePersistence {
             lensIdentifier: package.lens?.identifier,
             lensDisplayName: package.lens?.displayName,
             lensDeviceType: package.lens?.deviceType,
+            lensMagnificationLabel: package.lens?.magnificationLabel,
+            lensFormatIndex: package.lens?.formatIndex,
             selectedLookCanonicalUUID: package.selectedLook?.canonicalUUID.uuidString,
             selectedLookSlug: package.selectedLook?.slug,
             selectedLookEnglishName: package.selectedLook?.englishName,
@@ -196,7 +205,9 @@ enum FilmtoneCapturePackagePersistence {
             lens = FilmtoneCaptureLensRecord(
                 identifier: identifier,
                 displayName: displayName,
-                deviceType: deviceType
+                deviceType: deviceType,
+                magnificationLabel: snapshot.lensMagnificationLabel,
+                formatIndex: snapshot.lensFormatIndex
             )
         } else {
             lens = nil
