@@ -80,6 +80,13 @@ struct SidecarBuildInputs {
     /// nil preserves the previous sidecar shape; an empty marker list should
     /// be omitted by callers.
     var highlightMarkers: FilmtoneHighlightMarkers? = nil
+    /// M14-C (2026-05-09): capture-package master/proxy provenance.
+    /// `var ... = nil` so the synthesized memberwise init exposes the
+    /// field with a default — legacy fixtures and tests stay
+    /// compilable. Production call site
+    /// `FilmtoneExportSession.writeExportSidecar` populates from the
+    /// session's `captureProvenance` property when present.
+    var captureProvenance: SidecarCaptureProvenance? = nil
 }
 
 // MARK: - Sidecar schema (filmtone-ios-export-session-v1)
@@ -133,6 +140,10 @@ struct FilmtoneExportSidecarV1: Encodable {
     /// Source-relative marker intent for DaVinci / Desktop round-trip. Additive
     /// optional V1 field; absence means no marker intent.
     let highlightMarkers: FilmtoneHighlightMarkers?
+    /// M14-C (2026-05-09): which capture-package file the export read
+    /// from — master or proxy fallback. Additive optional V1 field;
+    /// nil omits the block (Photos / Files non-capture edits).
+    let captureProvenance: SidecarCaptureProvenance?
 }
 
 struct SidecarDevice: Encodable {
@@ -378,6 +389,54 @@ struct SidecarMezzanine: Encodable {
     let validationStatus: String?
 }
 
+/// M14-C (2026-05-09): records whether the export pipeline read from
+/// the capture-package master or the proxy fallback, and why.
+///
+/// Emitted only when a capture-package was the source of this export
+/// (the editor adopted via `FilmtoneEditorStore.adoptCaptureResult`).
+/// Photos / Files non-capture edits omit the field entirely.
+///
+/// Field semantics:
+///   - `mode` — `"master"` when the export read the master file;
+///     `"proxy"` when the master was unreachable + the export fell
+///     back to the proxy.
+///   - `reason` — present only on `mode == "proxy"`. Values are
+///     `"masterFileMissing"` (the file did not exist at the
+///     package's `masterURL.path`) or
+///     `"masterProbeFailed:<NSError-localized>"` (the file existed
+///     but the probe could not read it, typically a security-scoped
+///     access denial).
+///   - `masterUriUsed` — file URI of the master that was either
+///     successfully read OR was *intended* and fell back. Present
+///     for both master + proxy modes so DaVinci importers can see
+///     the originally-targeted master regardless of the outcome.
+///   - `proxyUriUsed` — file URI of the proxy file. Present only
+///     on `mode == "proxy"` so importers can distinguish the
+///     fallback artifact from the intended master.
+///
+/// All fields except `mode` are `Optional` and emit via
+/// `encodeIfPresent` — sidecar JSON omits nil fields so the master
+/// path produces `{ "mode": "master", "masterUriUsed": "..." }`
+/// without superfluous nulls.
+struct SidecarCaptureProvenance: Encodable {
+    let mode: String
+    let reason: String?
+    let masterUriUsed: String?
+    let proxyUriUsed: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case mode, reason, masterUriUsed, proxyUriUsed
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(mode, forKey: .mode)
+        try container.encodeIfPresent(reason, forKey: .reason)
+        try container.encodeIfPresent(masterUriUsed, forKey: .masterUriUsed)
+        try container.encodeIfPresent(proxyUriUsed, forKey: .proxyUriUsed)
+    }
+}
+
 struct SidecarPackageLuts: Encodable {
     let combinedColor: String
     let preOpticalColor: String?
@@ -596,7 +655,8 @@ enum FilmtoneExportSidecarBuilder {
             cameraProfile: inputs.cameraProfile,
             opticalFilterProfileId: request.opticalFilterProfileId,
             performance: inputs.performance,
-            highlightMarkers: inputs.highlightMarkers
+            highlightMarkers: inputs.highlightMarkers,
+            captureProvenance: inputs.captureProvenance
         )
     }
 

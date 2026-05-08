@@ -2230,6 +2230,52 @@ final class FilmtoneEditorStore: ObservableObject {
         }
     }
 
+    /// M14-C (2026-05-09): map the M14-A `ExportSourceDecision` into
+    /// the sidecar's `SidecarCaptureProvenance` block. Returns nil
+    /// when the export source is not a capture package (Photos /
+    /// Files edits) — sidecar omits the block entirely in that case.
+    ///
+    /// The `lastCapturePackage` parameter is captured from the store's
+    /// in-memory state at export-trigger time so we can record both
+    /// the master URI (always, even on proxy fallback so DaVinci
+    /// importers can see what was *intended*) and the proxy URI (only
+    /// on fallback so consumers can identify the actual artifact).
+    private func sidecarCaptureProvenance(
+        from decision: ExportSourceDecision,
+        package: FilmtoneCapturePackage?
+    ) -> SidecarCaptureProvenance? {
+        guard let package else {
+            return nil
+        }
+        let masterURI = package.masterURL.absoluteString
+        let proxyURI = package.proxyURL.absoluteString
+        switch decision {
+        case .noCapturePackage:
+            return nil
+        case .usingMaster:
+            return SidecarCaptureProvenance(
+                mode: "master",
+                reason: nil,
+                masterUriUsed: masterURI,
+                proxyUriUsed: nil
+            )
+        case .usingProxyMasterMissing:
+            return SidecarCaptureProvenance(
+                mode: "proxy",
+                reason: "masterFileMissing",
+                masterUriUsed: masterURI,
+                proxyUriUsed: proxyURI
+            )
+        case .usingProxyMasterUnreadable(let reason):
+            return SidecarCaptureProvenance(
+                mode: "proxy",
+                reason: "masterProbeFailed:\(reason)",
+                masterUriUsed: masterURI,
+                proxyUriUsed: proxyURI
+            )
+        }
+    }
+
     func export() async {
         guard !isBusy && !isSavingToPhotos else {
             return
@@ -2276,12 +2322,20 @@ final class FilmtoneEditorStore: ObservableObject {
             saveToPhotosState = .notRun
 
             let cacheProtection = protectedCacheURIs
+            // M14-C: emit the master/proxy decision into the sidecar
+            // so DaVinci importers can distinguish a master-quality
+            // artifact from a proxy fallback.
+            let sidecarProvenance = sidecarCaptureProvenance(
+                from: resolved.decision,
+                package: lastCapturePackage
+            )
             let result = try await facade.runExport(
                 request: request,
                 protectedCacheURIs: cacheProtection,
                 appliedSavedLook: resolvedSavedLook,
                 cameraProfile: cameraProfileSelection,
-                highlightMarkers: exportHighlightMarkers
+                highlightMarkers: exportHighlightMarkers,
+                captureProvenance: sidecarProvenance
             ) { [weak self] progress in
                 self?.exportProgress = progress
             }
@@ -2334,12 +2388,19 @@ final class FilmtoneEditorStore: ObservableObject {
             saveToPhotosState = .notRun
 
             let cacheProtection = protectedCacheURIs
+            // M14-C: same provenance as `export()` — see
+            // sidecarCaptureProvenance(...) for the mapping rationale.
+            let sidecarProvenance = sidecarCaptureProvenance(
+                from: resolved.decision,
+                package: lastCapturePackage
+            )
             let result = try await facade.runExport(
                 request: request,
                 protectedCacheURIs: cacheProtection,
                 appliedSavedLook: resolvedSavedLook,
                 cameraProfile: cameraProfileSelection,
-                highlightMarkers: exportHighlightMarkers
+                highlightMarkers: exportHighlightMarkers,
+                captureProvenance: sidecarProvenance
             ) { [weak self] progress in
                 self?.exportProgress = progress
             }

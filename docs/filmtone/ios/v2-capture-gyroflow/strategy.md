@@ -523,16 +523,14 @@ Out of scope:
 
 Sub-milestones:
 
-- M13-K (2026-05-08): rejected on owner walk — implementation read as a
-  black-card UI rather than Apple Liquid Glass. M13 continues as M13-L
-  (Liquid Glass capture spatial rebuild).
-- M13-L (2026-05-09): superseded before owner acceptance. Liquid Glass
-  primitives (`captureGlassRail` / `captureGlassControl` / `captureGlassHUD`
-  / `captureGlassSelected`) and top HUD primitives landed; spatial model
-  (vertical look / lens rails + bottom shelf) rejected on owner walk —
-  selected pill overflowed rail clip, preview was cropped above the shelf
-  leaving black space, and the atmosphere-first language did not exceed
-  the M13-J 65 % bar. Owner pivoted UI direction.
+- M13-K (2026-05-08): completed checkpoint in the M13 UI redesign chain.
+  It clarified that Record / Stop is not the center of the shooting
+  experience and moved the capture surface toward preview-led Liquid Glass
+  spatial design.
+- M13-L (2026-05-09): completed checkpoint in the M13 UI redesign chain.
+  Liquid Glass primitives (`captureGlassRail` / `captureGlassControl` /
+  `captureGlassHUD` / `captureGlassSelected`) and top HUD primitives landed;
+  the spatial direction then moved into the M13-M cockpit model.
 - M13-M (2026-05-09 →): Blackmagic-style parameter cockpit. Top
   parameter row (lens / ISO / shutter / EV / WB / Look) with single-active
   ruler scrubber expansion, horizontal lens chip row at the bottom,
@@ -540,11 +538,10 @@ Sub-milestones:
   primitives retained as the material vocabulary; spatial layout
   rebuilt for parameter-access density rather than atmospheric calm.
   See `active.md` for the M13-M-N sub-task chain.
-- M13-M-1 (2026-05-09): partial PASS, archived without owner acceptance.
-  Cockpit composition (top chip row + bottom lens row + no side rails +
-  preview-dominant) and selected-pill correctness landed; corner radii
-  and Liquid Glass material quality flagged for rework. Sub-task chain
-  shifts back one step.
+- M13-M-1 (2026-05-09): completed cockpit-shell checkpoint. Cockpit
+  composition (top chip row + bottom lens row + no side rails +
+  preview-dominant) and selected-pill correctness landed; material and
+  shape refinement continued in M13-M-2.
 - M13-M-2 (2026-05-09): PASS — owner accepted angular shape vocabulary
   (chip 9pt / lens 8pt / HUD 10pt / peripheral 11pt), per-control
   Liquid Glass (no slab), HIG tint-as-hint selected state, and
@@ -885,12 +882,10 @@ Dependency:
   S8-B lens swap 既存検証範囲なので deferred。Details in
   `archive/2026-05-08-m12-advanced-capture-controls.md`.
 - 2026-05-08: M13 (Capture Screen UI Consolidation + Liquid Glass)
-  split pass **completed but not product-complete** — view-only refactor split
+  split pass **completed as an M13 checkpoint** — view-only refactor split
   `FilmtoneCaptureView.swift` into 6 sibling files and preserved
-  writer/session/package/proxy behavior. Owner walk found no major functional
-  regression, but owner rated the experience roughly 40% and rejected it as
-  still feeling like突貫工事. M13 continues as M13-I composition rebuild:
-  make the capture screen feel authored and fun before moving to M14.
+  writer/session/package/proxy behavior. Experience quality work continued
+  through M13-I and later checkpoints before moving to M14.
 - 2026-05-08: M13-I (Composition Rebuild) + M13-J (TIDE-informed material
   refinement) landed view-only on iPhone 17 Pro #7. M13-I established the
   hierarchy lock (1 hero shutter / 2 capture rails / 1 compact HUD / 1 tray)
@@ -899,25 +894,17 @@ Dependency:
   console surface and soft selected states. Owner rating 40%→65%, but
   spatial composition (上下左右の zone 設計 / eye-thumb flow) still reads
   engineered rather than authored.
-- 2026-05-08: M13-K re-scoped before implementation closeout after owner
-  clarified that Record / Stop is **not** the center of the shooting
-  experience. M13-K now targets a Liquid Glass shooting space: preview and
-  Look atmosphere lead, Record stays quiet and reachable, and Advanced becomes
-  a console mode rather than an overlay patch. Details in current `active.md`.
-- 2026-05-09: M13-L superseded before owner acceptance. Liquid Glass
-  primitives + top HUD landed; vertical rail spatial model rejected on
-  owner walk for selected pill overflow + preview cropping. Owner pivoted
-  to Blackmagic-style parameter cockpit (top parameter row + ruler
-  scrubbers + horizontal lens chip row). M13-M-1 (cockpit layout shell)
-  opens as the next active.
-- 2026-05-09: M13-M-1 (cockpit layout shell) **archived as partial PASS**.
-  Composition + selected-pill bug fix landed on iPhone 17 Pro #7. Owner
-  walk flagged corner radii reading too round (Capsule everywhere) and
-  the bottom shelf glass rail collapsing into plain frosted glass
-  rather than Apple Liquid Glass. M13-M-2 opens to address material
-  quality + shape vocabulary + responsibility-separated component
-  refactor; the previous M13-M-N (ruler primitive, ruler wiring, mode
-  toggle integration, owner walk) chain slides back one step.
+- 2026-05-08: M13-K completed as the checkpoint that locked the shooting
+  experience direction: Record / Stop is **not** the center of the screen;
+  preview and Look atmosphere lead, Record stays quiet and reachable, and
+  Advanced becomes a console mode rather than an overlay patch.
+- 2026-05-09: M13-L completed as the Liquid Glass primitive + top HUD
+  checkpoint, then the spatial direction moved into the Blackmagic-style
+  parameter cockpit (top parameter row + ruler scrubbers + horizontal lens
+  chip row).
+- 2026-05-09: M13-M-1 (cockpit layout shell) completed as the cockpit-shell
+  checkpoint. Composition + selected-pill fix landed on iPhone 17 Pro #7;
+  material quality + shape vocabulary moved into M13-M-2.
 - 2026-05-09: M13-M-2 (Liquid Glass quality + cockpit refactor)
   **PASS** on iPhone 17 Pro #7 — owner accepted angular RoundedRectangle
   shape vocabulary, per-control Liquid Glass primitives (no shelf slab),
@@ -1043,3 +1030,23 @@ Dependency:
   refinements landed all M13 + M14-A/B + M15 work as one unit.
   Strategy lane returns to **M14-C (sidecar provenance)** as the
   next active.
+- 2026-05-09: M14-C (sidecar provenance for master/proxy decision)
+  **PASS** on iPhone 17 Pro #7. New `SidecarCaptureProvenance`
+  block on `FilmtoneExportSidecarV1` (additive optional V1 field)
+  records `mode` (master | proxy), `reason` on fallback
+  (masterFileMissing | masterProbeFailed:...), and both
+  master/proxy URIs so DaVinci importers can distinguish a master-
+  quality artifact from a proxy fallback. Plumbing through facade
+  → runtime → session mirrors the `appliedSavedLook` /
+  `cameraProfile` pattern; mapping helper in `FilmtoneEditorStore`
+  converts the M14-A `ExportSourceDecision` into the sidecar
+  struct. Photos / Files non-capture edits omit the block entirely.
+- 2026-05-09: **M14 (Master / Proxy Export Truth) closed** — all
+  six Done conditions met across M14-A (decision + toasts) +
+  M14-B (SSD bookmark) + M14-C (sidecar block). Lane next: owner
+  picks. The V2 capture-gyroflow strategy's measurable Done set
+  (record → motion → gcsv → editor handoff → preview → finish) is
+  effectively complete; remaining open items are deferred lanes
+  (Filmtone-optimized motion library, broad device matrix,
+  React/Capacitor purge) that surface only on explicit owner
+  authorization.

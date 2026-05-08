@@ -117,7 +117,8 @@ final class FilmtoneMediaRuntime {
         sourceURL: URL? = nil,
         appliedSavedLook: SavedLookEntry? = nil,
         cameraProfile: CameraProfileSelection? = nil,
-        highlightMarkers: FilmtoneHighlightMarkers? = nil
+        highlightMarkers: FilmtoneHighlightMarkers? = nil,
+        captureProvenance: SidecarCaptureProvenance? = nil
     ) throws -> FilmtoneExportSession {
         let resolvedSourceURL = try sourceURL ?? resolveFileURL(request.sourceUri)
         return try FilmtoneExportSession(
@@ -127,7 +128,8 @@ final class FilmtoneMediaRuntime {
             mezzanineService: mezzanineService,
             appliedSavedLook: appliedSavedLook,
             cameraProfile: cameraProfile,
-            highlightMarkers: highlightMarkers
+            highlightMarkers: highlightMarkers,
+            captureProvenance: captureProvenance
         )
     }
 
@@ -265,6 +267,7 @@ final class FilmtoneMediaRuntime {
         appliedSavedLook: SavedLookEntry? = nil,
         cameraProfile: CameraProfileSelection? = nil,
         highlightMarkers: FilmtoneHighlightMarkers? = nil,
+        captureProvenance: SidecarCaptureProvenance? = nil,
         onProgress: @escaping (Phase0ExportProgressDTO) -> Void
     ) async throws -> Phase0ExportResultDTO {
         let resolvedSourceURL = try sourceURL ?? resolveFileURL(request.sourceUri)
@@ -274,7 +277,8 @@ final class FilmtoneMediaRuntime {
             sourceURL: resolvedSourceURL,
             appliedSavedLook: appliedSavedLook,
             cameraProfile: cameraProfile,
-            highlightMarkers: highlightMarkers
+            highlightMarkers: highlightMarkers,
+            captureProvenance: captureProvenance
         )
         let benchmarkCollector = collector ?? makeBenchmarkCollector(request: request)
 

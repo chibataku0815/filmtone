@@ -32,6 +32,14 @@ final class FilmtoneExportSession {
     /// session only writes it into the sidecar; media pixels and Photos save
     /// remain unchanged.
     private let highlightMarkers: FilmtoneHighlightMarkers?
+    /// M14-C (2026-05-09): capture-package master/proxy provenance,
+    /// resolved by the caller (typically `FilmtoneEditorStore.export`)
+    /// from the M14-A `ExportSourceDecision`. Photos / Files non-
+    /// capture edits pass nil → sidecar block omitted. The session
+    /// itself does not look this up — keeping the dependency-injection
+    /// edge here means `FilmtoneExportSession` stays free of
+    /// `FilmtoneCapturePackage` references.
+    private let captureProvenance: SidecarCaptureProvenance?
     private(set) var didUseMezzanineVariant: ProfileVariant?
     /// v1.4 sidecar telemetry: route validation outcome for the consumed
     /// mezzanine. "valid" when the routed-to URL passed isValidMezzanine right
@@ -184,7 +192,8 @@ final class FilmtoneExportSession {
         mezzanineService: MezzanineService? = nil,
         appliedSavedLook: SavedLookEntry? = nil,
         cameraProfile: CameraProfileSelection? = nil,
-        highlightMarkers: FilmtoneHighlightMarkers? = nil
+        highlightMarkers: FilmtoneHighlightMarkers? = nil,
+        captureProvenance: SidecarCaptureProvenance? = nil
     ) throws {
         self.request = request
         self.sourceURL = sourceURL
@@ -193,6 +202,7 @@ final class FilmtoneExportSession {
         self.appliedSavedLook = appliedSavedLook
         self.cameraProfileSelection = cameraProfile
         self.highlightMarkers = highlightMarkers?.isEmpty == false ? highlightMarkers : nil
+        self.captureProvenance = captureProvenance
         self.disableGlowFamilyForExport = Self.environmentFlagEnabled("FILMTONE_EXPORT_DISABLE_GLOW_FAMILY")
         self.useMetalOpticsForExport = Self.environmentFlagEnabled("FILMTONE_EXPORT_METAL_OPTICS")
         self.outputURL = try cacheStore.temporaryExportURL(pathExtension: request.output.container)
@@ -559,7 +569,8 @@ final class FilmtoneExportSession {
             appliedSavedLook: savedLookRef,
             cameraProfile: cameraProfileBlock,
             performance: performance,
-            highlightMarkers: highlightMarkers
+            highlightMarkers: highlightMarkers,
+            captureProvenance: captureProvenance
         )
 
         let sidecarURL = FilmtoneExportSidecarBuilder.sidecarURL(for: outputURL)
