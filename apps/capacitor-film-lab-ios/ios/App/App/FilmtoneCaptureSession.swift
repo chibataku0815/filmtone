@@ -166,6 +166,59 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         case locked
     }
     @Published private(set) var whiteBalanceMode: WhiteBalanceMode = .auto
+
+    /// M12 / S12-E: exposure mode toggle.  `.auto` = continuous-auto
+    /// exposure (EV bias slider active, tap-to-meter active); `.manual`
+    /// = `setExposureModeCustom` with sampled ISO + shutter (EV bias
+    /// has no effect, tap-to-meter no-ops; tap-to-focus stays active).
+    /// Resets to `.auto` on every `prepare(lens:)` and `teardown()` so
+    /// a lens swap or fresh present drops back to the auto baseline.
+    enum ExposureMode: String, Equatable {
+        case auto
+        case manual
+    }
+    @Published private(set) var exposureMode: ExposureMode = .auto
+    /// M12 / S12-E: ISO held when `exposureMode == .manual`.  Updated
+    /// from `enterManualExposure()` (inherited from auto) or from
+    /// `setManualISO(_:)` (slider drag).  Clamped at apply-time to
+    /// `isoRange`; clamping is an apply-time concern because the
+    /// device-side bounds can in theory shift across format changes
+    /// even when the slider's binding is mid-drag.
+    @Published private(set) var manualISO: Float = 100
+    /// M12 / S12-E: shutter duration in seconds held when
+    /// `exposureMode == .manual`.  Apply-time clamp to
+    /// `shutterDurationRange` (24-fps cap on the slow side).
+    @Published private(set) var manualShutterSeconds: Double = 1.0/48
+    /// M12 / S12-E: usable ISO range for the slider, derived from the
+    /// active format's `minISO` / `maxISO`.  iPhone wide @ 4K24 Apple
+    /// Log 2 reports a wide range (~30 … ~6400); narrower formats may
+    /// report tighter ranges.  Empty range (`min == max`) means the
+    /// slider hides — the UI guards on `range.upperBound >
+    /// range.lowerBound` to avoid SwiftUI Slider NaN on a degenerate
+    /// `0...0` interval.
+    @Published private(set) var isoRange: ClosedRange<Float> = 100...3200
+    /// M12 / S12-E: usable shutter duration range in seconds.  Lower
+    /// bound = `activeFormat.minExposureDuration` (fastest shutter);
+    /// upper bound = `min(activeFormat.maxExposureDuration, 1/24 s)`
+    /// (24-fps cap from `lockedFPS`).  The cap is intentional: a
+    /// shutter slower than 1/24 s would either drop frames or stop
+    /// being a real exposure choice on a 24-fps capture, so we never
+    /// expose it in the slider regardless of what the format reports.
+    @Published private(set) var shutterDurationRange: ClosedRange<Double> = (1.0/8000)...(1.0/24)
+    /// M12 / S12-E: 180° shutter marker position (1/48 s) used by the
+    /// view to pin a yellow tick on the shutter slider as a visual
+    /// reference.  Nil when the marker would fall outside
+    /// `shutterDurationRange` — no shipping iPhone trips this; the
+    /// guard keeps the marker honest if a future format excludes
+    /// 1/48 s.
+    @Published private(set) var shutterDuration180Degrees: Double?
+    /// M12 / S12-E: tracks whether the active manual exposure was
+    /// entered by inheriting auto exposure (`true`) versus the owner
+    /// adjusting a slider after entry (`false`).  Persisted on the
+    /// capture package so downstream consumers can distinguish
+    /// "owner set ISO/shutter deliberately" from "owner just locked
+    /// the auto reading".
+    @Published private(set) var manualInheritedFromAuto: Bool = false
     /// M12 / S12-D: gains sampled at the moment the owner tapped
     /// Locked.  Held internally so the record-stop snapshot can carry
     /// them into the capture package; not exposed for UI tweaks
@@ -323,6 +376,39 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
             self.exposureBiasEV = 0
             self.lastFocusPointNormalized = nil
             self.lastMeteringPointNormalized = nil
+            // M12 / S12-E: snapshot ISO + shutter ranges from the
+            // active format and pre-seed the manual-mode published
+            // values to the 180° baseline.  enterManualExposure() will
+            // overwrite these with live device readings on the toggle
+            // moment; the pre-seed exists so a degenerate (e.g.
+            // mid-prepare) read of `manualISO` / `manualShutterSeconds`
+            // before any toggle still returns sensible numbers.
+            let isoLower = format.minISO
+            let isoUpper = format.maxISO
+            self.isoRange = isoLower <= isoUpper
+                ? isoLower...isoUpper
+                : isoLower...isoLower
+            let minDur = CMTimeGetSeconds(format.minExposureDuration)
+            let maxDurFromFormat = CMTimeGetSeconds(format.maxExposureDuration)
+            let cap24fps = 1.0 / Self.lockedFPS
+            let upperShutter = min(maxDurFromFormat, cap24fps)
+            self.shutterDurationRange = minDur < upperShutter
+                ? minDur...upperShutter
+                : minDur...minDur
+            let m180 = 1.0 / 48.0
+            self.shutterDuration180Degrees =
+                (m180 >= self.shutterDurationRange.lowerBound
+                    && m180 <= self.shutterDurationRange.upperBound)
+                ? m180 : nil
+            self.exposureMode = .auto
+            self.manualInheritedFromAuto = false
+            self.manualISO = min(
+                max(captureDevice.iso, self.isoRange.lowerBound),
+                self.isoRange.upperBound
+            )
+            let seedShutter = self.shutterDuration180Degrees
+                ?? self.shutterDurationRange.upperBound
+            self.manualShutterSeconds = seedShutter
             // M12 / S12-D: snapshot WB lock capability per active
             // device + format.  All shipping iPhone rear lenses
             // satisfy both predicates; the guard exists for future
@@ -461,8 +547,15 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     /// silently leaves the published value at its previous reading
     /// rather than fabricating a phantom apply — the slider snaps
     /// back on the next state observation.
+    ///
+    /// S12-E: no-op when `exposureMode == .manual`.  EV bias has no
+    /// effect on a `setExposureModeCustom` exposure (the device-level
+    /// bias does not feed into the locked ISO/shutter pair) and the
+    /// view hides the slider in manual mode anyway; the guard exists
+    /// for defensive callers that did not consult the gate.
     func setExposureBias(_ ev: Float) {
         guard let device else { return }
+        guard exposureMode == .auto else { return }
         let clamped = min(
             max(ev, exposureBiasRange.lowerBound),
             exposureBiasRange.upperBound
@@ -490,12 +583,19 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     }
 
     /// Apply tap-to-focus + tap-to-meter at a normalized AVCaptureDevice
-    /// POI point.  M12 / S12-C only — caller has already converted from
-    /// view-local tap coordinates via
+    /// POI point.  Caller has already converted from view-local tap
+    /// coordinates via
     /// `previewLayer.captureDevicePointConverted(fromLayerPoint:)`.
-    /// Both POIs land on the same point because the S12-A lock keeps
-    /// tap-to-focus and tap-to-meter bound together in auto exposure;
-    /// S12-E will split metering off when manual exposure lands.
+    ///
+    /// S12-C / S12-E: tap-to-focus runs in both auto and manual
+    /// exposure (focusing without re-metering is a routine ask).
+    /// Tap-to-meter only runs when `exposureMode == .auto`; manual
+    /// exposure deliberately skips the metering POI because the
+    /// `setExposureModeCustom` lock holds ISO/shutter regardless of
+    /// what the device's auto-meter would compute, and writing the POI
+    /// would produce metadata (`lastMeteringPointNormalized`) that
+    /// suggests a meter was honored when it was not.
+    ///
     /// Best-effort on lock failure (same rationale as
     /// `setExposureBias(_:)`).
     func applyTapToFocusAndMeter(devicePoint: CGPoint) {
@@ -508,7 +608,8 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
                 device.focusMode = .autoFocus
                 lastFocusPointNormalized = devicePoint
             }
-            if device.isExposurePointOfInterestSupported,
+            if exposureMode == .auto,
+               device.isExposurePointOfInterestSupported,
                device.isExposureModeSupported(.autoExpose) {
                 device.exposurePointOfInterest = devicePoint
                 device.exposureMode = .autoExpose
@@ -571,6 +672,130 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
             self.whiteBalanceMode = .auto
         } catch {
             // Lock contention — leave state where it was.
+        }
+    }
+
+    // MARK: - M12 / S12-E manual exposure
+
+    /// Switch to manual exposure by inheriting the device's current
+    /// auto ISO + shutter duration.  Clamped to the format-derived
+    /// `isoRange` / `shutterDurationRange` so a transient auto
+    /// reading just outside the slider bounds (e.g. an auto-meter
+    /// blip) does not push the device into a setter that
+    /// `setExposureModeCustom` would reject.  Idempotent: a second
+    /// call while already in `.manual` is a no-op (the contract is
+    /// "enter manual" not "re-sample"; explicit re-sample requires
+    /// exit + enter).
+    func enterManualExposure() {
+        guard let device else { return }
+        guard exposureMode != .manual else { return }
+        do {
+            try device.lockForConfiguration()
+            let inheritedISO = min(
+                max(device.iso, isoRange.lowerBound),
+                isoRange.upperBound
+            )
+            let liveDurSec = CMTimeGetSeconds(device.exposureDuration)
+            let inheritedDur = min(
+                max(liveDurSec, shutterDurationRange.lowerBound),
+                shutterDurationRange.upperBound
+            )
+            let durCM = CMTime(
+                seconds: inheritedDur,
+                preferredTimescale: 1_000_000
+            )
+            device.setExposureModeCustom(
+                duration: durCM,
+                iso: inheritedISO,
+                completionHandler: nil
+            )
+            device.unlockForConfiguration()
+            manualISO = inheritedISO
+            manualShutterSeconds = inheritedDur
+            manualInheritedFromAuto = true
+            exposureMode = .manual
+        } catch {
+            // Lock contention — leave on auto; the UI segment will
+            // resync from `exposureMode`.  Owner can tap Manual again.
+        }
+    }
+
+    /// Switch back to continuous-auto exposure.  Drops
+    /// `manualInheritedFromAuto` because it only has meaning while in
+    /// manual.  Idempotent.
+    func exitManualExposure() {
+        guard let device else { return }
+        guard exposureMode != .auto else { return }
+        do {
+            try device.lockForConfiguration()
+            if device.isExposureModeSupported(.continuousAutoExposure) {
+                device.exposureMode = .continuousAutoExposure
+            }
+            device.unlockForConfiguration()
+            exposureMode = .auto
+            manualInheritedFromAuto = false
+        } catch {
+            // Lock contention — leave state where it was.
+        }
+    }
+
+    /// Apply a new ISO inside manual exposure.  Holds the current
+    /// `manualShutterSeconds` constant — the slider is "ISO at fixed
+    /// shutter".  No-op outside `.manual` because
+    /// `setExposureModeCustom` from auto would jump the exposure
+    /// without inheritance bookkeeping; callers go through
+    /// `enterManualExposure()` to land in manual.
+    func setManualISO(_ iso: Float) {
+        guard let device, exposureMode == .manual else { return }
+        let clamped = min(
+            max(iso, isoRange.lowerBound),
+            isoRange.upperBound
+        )
+        do {
+            try device.lockForConfiguration()
+            let durCM = CMTime(
+                seconds: manualShutterSeconds,
+                preferredTimescale: 1_000_000
+            )
+            device.setExposureModeCustom(
+                duration: durCM,
+                iso: clamped,
+                completionHandler: nil
+            )
+            device.unlockForConfiguration()
+            manualISO = clamped
+            manualInheritedFromAuto = false
+        } catch {
+            // Lock contention — drop the apply silently; the slider
+            // will resync from `manualISO` on the next render.
+        }
+    }
+
+    /// Apply a new shutter duration inside manual exposure.  Holds the
+    /// current `manualISO` constant — the slider is "shutter at fixed
+    /// ISO".  Same `.manual`-gate as `setManualISO(_:)`.
+    func setManualShutter(_ seconds: Double) {
+        guard let device, exposureMode == .manual else { return }
+        let clamped = min(
+            max(seconds, shutterDurationRange.lowerBound),
+            shutterDurationRange.upperBound
+        )
+        do {
+            try device.lockForConfiguration()
+            let durCM = CMTime(
+                seconds: clamped,
+                preferredTimescale: 1_000_000
+            )
+            device.setExposureModeCustom(
+                duration: durCM,
+                iso: manualISO,
+                completionHandler: nil
+            )
+            device.unlockForConfiguration()
+            manualShutterSeconds = clamped
+            manualInheritedFromAuto = false
+        } catch {
+            // Lock contention — same rationale as `setManualISO(_:)`.
         }
     }
 
@@ -677,6 +902,16 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         whiteBalanceMode = .auto
         lockedWhiteBalanceGains = nil
         canLockWhiteBalance = true
+        // M12 / S12-E: drop manual-exposure state so a fresh prepare
+        // starts on continuous-auto exposure.  The ranges and 180°
+        // marker get overwritten on the next prepare(lens:) anyway, so
+        // we leave them holding their last values rather than reset to
+        // the type defaults — anything that observes them between
+        // teardown and the next prepare will at least see the previous
+        // run's bounds, which are far closer to the next likely
+        // bounds than the type defaults.
+        exposureMode = .auto
+        manualInheritedFromAuto = false
         if case .ready = state {
             state = .idle
         }
@@ -816,20 +1051,25 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         let captureId = self.captureId
         let lensRecord = self.activeLens?.toRecord()
         let selectedLook = self.pendingSelectedLook
-        // M12 / S12-C: snapshot exposure / focus / metering at
-        // record-stop time.  M12 is auto-only; S12-E will widen `mode`
-        // and add the manual-only fields.  We always emit the record
+        // M12 / S12-C+E: snapshot exposure / focus / metering at
+        // record-stop time.  Auto-mode runs persist nil for the
+        // manual-only fields; manual-mode runs persist the held ISO /
+        // shutter / inheritance flag.  We always emit the record
         // (even at the all-default state) so the package distinguishes
         // "M12 capture, owner did not touch the controls" from "pre-M12
         // capture decoded from disk" — both decode shapes mattered for
         // S12-F's truth-gate verifier.
+        let isManual = self.exposureMode == .manual
         let exposureControl = FilmtoneCaptureExposureControlRecord(
-            mode: "auto",
+            mode: self.exposureMode.rawValue,
             biasEV: Double(self.exposureBiasEV),
             focusPointX: self.lastFocusPointNormalized.map { Double($0.x) },
             focusPointY: self.lastFocusPointNormalized.map { Double($0.y) },
             meteringPointX: self.lastMeteringPointNormalized.map { Double($0.x) },
-            meteringPointY: self.lastMeteringPointNormalized.map { Double($0.y) }
+            meteringPointY: self.lastMeteringPointNormalized.map { Double($0.y) },
+            manualISO: isManual ? Double(self.manualISO) : nil,
+            manualShutterDurationSeconds: isManual ? self.manualShutterSeconds : nil,
+            inheritedFromAuto: isManual ? self.manualInheritedFromAuto : nil
         )
         // M12 / S12-D: WB lock state at record-stop.  Auto-mode
         // snapshots store the gains as nil (see record doc); locked

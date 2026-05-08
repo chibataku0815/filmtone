@@ -96,6 +96,16 @@ struct FilmtoneCapturePackageSnapshotV1: Codable {
     var whiteBalanceRedGain: Double?
     var whiteBalanceGreenGain: Double?
     var whiteBalanceBlueGain: Double?
+    /// M12 / S12-E: manual exposure fields (ISO + shutter duration)
+    /// recorded only when `exposureMode == "manual"`.  Auto-mode and
+    /// pre-S12-E snapshots leave all three nil.  The two reading
+    /// fields and the inheritance flag travel together so a partial-
+    /// write (e.g. ISO present, shutter missing) decodes as a manual
+    /// run with whichever fields the snapshot carried — the truth-
+    /// gate verifier in S12-F asserts the field set per mode.
+    var manualISO: Double?
+    var manualShutterDurationSeconds: Double?
+    var manualInheritedFromAuto: Bool?
 
     /// Bumped to 2 in S11-D.  Schema-version 1 snapshots written by
     /// M10 / S8-B continue to decode because every S11-D field is
@@ -204,7 +214,10 @@ enum FilmtoneCapturePackagePersistence {
             whiteBalanceMode: package.whiteBalance?.mode,
             whiteBalanceRedGain: package.whiteBalance?.redGain,
             whiteBalanceGreenGain: package.whiteBalance?.greenGain,
-            whiteBalanceBlueGain: package.whiteBalance?.blueGain
+            whiteBalanceBlueGain: package.whiteBalance?.blueGain,
+            manualISO: package.exposureControl?.manualISO,
+            manualShutterDurationSeconds: package.exposureControl?.manualShutterDurationSeconds,
+            manualInheritedFromAuto: package.exposureControl?.inheritedFromAuto
         )
     }
 
@@ -270,16 +283,19 @@ enum FilmtoneCapturePackagePersistence {
         } else {
             selectedLook = nil
         }
-        // S12-C: rebuild the exposure-control record only when
-        // `exposureMode` is present — that is the M12 sentinel field
-        // that pre-M12 snapshots lack.  When the trigger is set, we
-        // default `biasEV` to 0.0 if absent (treating "explicit zero"
-        // as the floor), and the focus / metering points stay
+        // S12-C / S12-E: rebuild the exposure-control record only
+        // when `exposureMode` is present — that is the M12 sentinel
+        // field that pre-M12 snapshots lack.  When the trigger is set,
+        // we default `biasEV` to 0.0 if absent (treating "explicit
+        // zero" as the floor), and the focus / metering points stay
         // independently optional because a run that never tapped
-        // leaves them nil.  Partial captures (e.g. the device
-        // reported a `manual` mode but no biasEV) are still rebuilt;
-        // the truth-gate verifier in S12-F asserts the field set per
-        // mode rather than failing decode here.
+        // leaves them nil.  Manual-only fields (`manualISO` /
+        // `manualShutterDurationSeconds` / `manualInheritedFromAuto`)
+        // pass through verbatim — auto-mode runs leave them nil and
+        // we do not synthesize values for them on a manual snapshot
+        // that is missing one (S12-F's truth-gate verifier catches
+        // partial-write states; decode stays permissive so a flaky
+        // write does not corrupt the package linkage).
         let exposureControl: FilmtoneCaptureExposureControlRecord?
         if let mode = snapshot.exposureMode {
             exposureControl = FilmtoneCaptureExposureControlRecord(
@@ -288,7 +304,10 @@ enum FilmtoneCapturePackagePersistence {
                 focusPointX: snapshot.focusPointNormalizedX,
                 focusPointY: snapshot.focusPointNormalizedY,
                 meteringPointX: snapshot.meteringPointNormalizedX,
-                meteringPointY: snapshot.meteringPointNormalizedY
+                meteringPointY: snapshot.meteringPointNormalizedY,
+                manualISO: snapshot.manualISO,
+                manualShutterDurationSeconds: snapshot.manualShutterDurationSeconds,
+                inheritedFromAuto: snapshot.manualInheritedFromAuto
             )
         } else {
             exposureControl = nil

@@ -63,46 +63,74 @@ struct FilmtoneCaptureLensRecord: Equatable, Codable {
     let formatIndex: Int?
 }
 
-/// M12 / S12-C: capture-time exposure / focus / metering control state
+/// M12 / S12-C+E: capture-time exposure / focus / metering control state
 /// snapshotted at record-stop time.  All values reflect the resolved
 /// state on `AVCaptureDevice` at the moment recording finished — not
 /// any in-flight tap that arrived after `stop()` was called.
 ///
-/// `mode` is `"auto"` for M12; S12-E will widen it to `"manual"` and
-/// add the `manualISO` / `manualShutterDurationSeconds` fields next to
-/// it (they live on this same record so downstream consumers ignore the
-/// owner-mode distinction when they only care about "was a manual
-/// exposure used").
+/// `mode` is `"auto"` for continuous-auto runs (EV bias slider active,
+/// tap-to-meter active) and `"manual"` for runs locked to a fixed ISO
+/// + shutter duration (`setExposureModeCustom` since S12-E).  The
+/// manual-only fields (`manualISO` / `manualShutterDurationSeconds` /
+/// `inheritedFromAuto`) ride on this same record so downstream
+/// consumers can switch on `mode` without reaching into a separate
+/// nested record.
 ///
 /// Focus / metering points are normalized to AVCaptureDevice POI
 /// coordinates (landscape sensor space; (0,0) = top-left when held in
 /// the M10-locked landscape sensor orientation).  Nil = continuous-auto
 /// from session start, never tapped.  Auto-mode metering point follows
 /// focus point on a tap; in manual exposure the metering point stays
-/// nil because the M12 lock keeps tap-to-meter auto-only.
+/// nil because the M12 lock keeps tap-to-meter auto-only — even though
+/// tap-to-focus continues to fire in manual.
 struct FilmtoneCaptureExposureControlRecord: Equatable, Codable {
-    /// `"auto"` for M12 / S12-C runs.  Reserved for `"manual"` in
-    /// S12-E once the manual exposure lane lands.
+    /// `"auto"` (continuous-auto) or `"manual"` (S12-E
+    /// `setExposureModeCustom` lock with sampled ISO + shutter).
     let mode: String
     /// EV bias at record-stop time, clamped at apply-time to
     /// `[-2, +2]` ∩ `device.minExposureTargetBias …
     /// device.maxExposureTargetBias`.  Always written (including the
     /// 0.0 baseline) so the package distinguishes "explicit zero" from
-    /// "field absent on a pre-M12 snapshot".
+    /// "field absent on a pre-M12 snapshot".  Manual-mode runs persist
+    /// whatever bias was held at the moment of switch (the device-level
+    /// bias has no effect on a `setExposureModeCustom` exposure, but
+    /// dropping the field would lose the "owner had biased before
+    /// flipping to manual" signal).
     let biasEV: Double
     /// Last tap-to-focus point, normalized to AVCaptureDevice POI
     /// coordinates.  Nil = no tap during the run (focus stayed on
-    /// continuous-auto from prepare(lens:)).
+    /// continuous-auto from prepare(lens:)).  Active in both auto and
+    /// manual exposure modes — S12-A explicitly keeps tap-to-focus
+    /// available under manual exposure.
     let focusPointX: Double?
     let focusPointY: Double?
     /// Last tap-to-meter point, normalized to AVCaptureDevice POI
     /// coordinates.  Nil = either no tap during the run, or the run
     /// was in manual exposure (metering POI is auto-only by S12-A
-    /// lock).  M12 / S12-C runs always set this to the same value as
+    /// lock).  Auto-mode runs always set this to the same value as
     /// `focusPoint*` because tap-to-focus and tap-to-meter are bound
-    /// together in auto mode.
+    /// together in auto mode; manual-mode runs leave it nil because
+    /// the metering POI has no consumer once exposure is locked.
     let meteringPointX: Double?
     let meteringPointY: Double?
+    /// S12-E: ISO sampled at record-stop time when `mode == "manual"`.
+    /// Nil for auto-mode runs because the device's auto-ISO drifts
+    /// continuously and persisting a snapshot value would invite the
+    /// same misreading the auto-WB-gains decision flagged (see
+    /// `FilmtoneCaptureWhiteBalanceRecord`).
+    let manualISO: Double?
+    /// S12-E: shutter duration in seconds when `mode == "manual"`,
+    /// clamped at apply-time to the active format's
+    /// `min/maxExposureDuration` ∩ 24-fps cap (1/24 s).  Nil for
+    /// auto-mode runs.
+    let manualShutterDurationSeconds: Double?
+    /// S12-E: `true` when the manual exposure was entered by inheriting
+    /// the auto-exposure state at the toggle moment and the owner did
+    /// not subsequently move either the ISO or shutter slider.  `false`
+    /// when the owner adjusted at least one of the two (the current
+    /// values are deliberate, not just whatever auto reported at lock
+    /// time).  Nil for auto-mode runs — the question does not apply.
+    let inheritedFromAuto: Bool?
 }
 
 /// M12 / S12-D: capture-time white balance lock state.  M12 ships

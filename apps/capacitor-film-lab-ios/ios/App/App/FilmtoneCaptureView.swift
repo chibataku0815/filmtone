@@ -571,8 +571,17 @@ struct FilmtoneCaptureView: View {
             // first record success).
             captureLookStrip
 
+            if showsExposureModeRow {
+                exposureModeRow
+            }
+
             if showsEVSlider {
                 evSliderRow
+            }
+
+            if showsManualExposureRows {
+                isoSliderRow
+                shutterSliderRow
             }
 
             if showsWhiteBalanceRow {
@@ -975,12 +984,16 @@ struct FilmtoneCaptureView: View {
     }
 
     private var showsEVSlider: Bool {
+        // S12-E: EV bias has no effect on a `setExposureModeCustom`
+        // exposure (the device-level bias does not feed into the
+        // locked ISO/shutter pair), so the slider is hidden whenever
+        // the session is in manual exposure.  In auto, the only
+        // remaining gate is "is the device-derived range non-degenerate"
+        // — SwiftUI `Slider(value:in:)` requires a non-empty range,
+        // and a future lens reporting `min == max` would emit NaN on
+        // drag.
+        guard session.exposureMode == .auto else { return false }
         let range = session.exposureBiasRange
-        // SwiftUI `Slider(value:in:)` requires a non-empty range; a
-        // device that exposes no bias range (e.g. a future lens that
-        // reports `min == max`) would produce a degenerate slider that
-        // emits NaN on drag.  Guard here rather than in the body so
-        // the EV row simply hides on such hardware.
         guard range.upperBound > range.lowerBound else { return false }
         switch session.state {
         case .ready, .recording, .stopping: return true
@@ -998,6 +1011,255 @@ struct FilmtoneCaptureView: View {
             return "0.0 EV"
         }
         return String(format: "%+.1f EV", v)
+    }
+
+    // MARK: - Exposure mode + manual sliders (M12 / S12-E)
+
+    /// Compact 2-segment Auto / Manual control with a manual-mode
+    /// readout (`ISO · 1/Xs`) trailing the segments so the active
+    /// state is glanceable without expanding into the slider rows.
+    /// Lives as a sibling of `evSliderRow` / `whiteBalanceRow` so the
+    /// capture surface never fans out into a settings-style panel
+    /// (S12-A's "撮影画面が設定パネル化しないように" framing).
+    /// Disabled while recording / stopping (`AVCaptureDevice.lock
+    /// ForConfiguration()` mid-record contention avoidance + the
+    /// "auto ↔ manual mode toggle: 不可" rule from S12-A).
+    private var exposureModeRow: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "camera.aperture")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.white.opacity(0.85))
+            Text("Exposure")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.85))
+            exposureModeSegmentedControl
+                .accessibilityIdentifier("filmtone.capture.exposureModeControl")
+            if session.exposureMode == .manual {
+                Text(manualReadoutLabel)
+                    .font(.system(size: 11, weight: .medium).monospacedDigit())
+                    .foregroundStyle(.yellow)
+                    .lineLimit(1)
+                    .accessibilityIdentifier("filmtone.capture.manualReadout")
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+        .background(Color.black.opacity(0.45), in: Capsule())
+        .accessibilityIdentifier("filmtone.capture.exposureModeRow")
+        .disabled(isRecordingOrStopping)
+        .opacity(isRecordingOrStopping ? 0.5 : 1.0)
+    }
+
+    /// Local 2-pill segmented control mirroring `whiteBalanceSegmented
+    /// Control` so the Auto/Manual + Auto/Locked rows read as a
+    /// matching pair.  Same rationale as the WB control — `Picker
+    /// (.segmented)` UISegmentedControl appearance fights the dark
+    /// translucent capsule treatment.
+    private var exposureModeSegmentedControl: some View {
+        HStack(spacing: 0) {
+            exposureModeSegment(.auto, label: "Auto")
+            exposureModeSegment(.manual, label: "Manual")
+        }
+        .padding(2)
+        .background(Color.white.opacity(0.12), in: Capsule())
+        .frame(width: 156)
+    }
+
+    @ViewBuilder
+    private func exposureModeSegment(
+        _ mode: FilmtoneCaptureSession.ExposureMode,
+        label: String
+    ) -> some View {
+        let isActive = session.exposureMode == mode
+        Button {
+            applyExposureMode(mode)
+        } label: {
+            Text(label)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(
+                    isActive ? Color.black : .white.opacity(0.85)
+                )
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 5)
+                .background(
+                    isActive ? Color.white.opacity(0.95) : Color.clear,
+                    in: Capsule()
+                )
+        }
+        .accessibilityIdentifier("filmtone.capture.exposureMode.\(mode.rawValue)")
+        .accessibilityAddTraits(isActive ? .isSelected : [])
+    }
+
+    private func applyExposureMode(
+        _ mode: FilmtoneCaptureSession.ExposureMode
+    ) {
+        guard !isRecordingOrStopping else { return }
+        guard session.exposureMode != mode else { return }
+        switch mode {
+        case .auto:
+            session.exitManualExposure()
+        case .manual:
+            session.enterManualExposure()
+        }
+    }
+
+    private var showsExposureModeRow: Bool {
+        switch session.state {
+        case .ready, .recording, .stopping: return true
+        default: return false
+        }
+    }
+
+    private var showsManualExposureRows: Bool {
+        guard session.exposureMode == .manual else { return false }
+        switch session.state {
+        case .ready, .recording, .stopping: return true
+        default: return false
+        }
+    }
+
+    /// Linear ISO slider over the active format's `[minISO, maxISO]`.
+    /// Linear (rather than log) is the conventional camera surface
+    /// idiom — owners read ISO as discrete stops 100/200/400/...,
+    /// which a linear slider already approximates because most rear
+    /// formats expose ranges close to a power-of-two count.  Yellow
+    /// tint matches the EV slider's "deviation from neutral" cue.
+    private var isoSliderRow: some View {
+        let range = session.isoRange
+        return HStack(spacing: 10) {
+            Text("ISO")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.85))
+                .frame(width: 28, alignment: .leading)
+            Slider(
+                value: Binding(
+                    get: { Double(session.manualISO) },
+                    set: { session.setManualISO(Float($0)) }
+                ),
+                in: Double(range.lowerBound)...Double(range.upperBound)
+            )
+            .tint(.yellow)
+            .frame(maxWidth: 200)
+            .accessibilityIdentifier("filmtone.capture.isoSlider.control")
+            Text("\(Int(session.manualISO.rounded()))")
+                .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                .foregroundStyle(.yellow)
+                .frame(width: 56, alignment: .trailing)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+        .background(Color.black.opacity(0.45), in: Capsule())
+        .accessibilityIdentifier("filmtone.capture.isoSlider")
+        .disabled(isRecordingOrStopping || !isoRangeUsable)
+        .opacity(isRecordingOrStopping ? 0.5 : 1.0)
+    }
+
+    /// Log10 shutter slider — duration spans ~3 orders of magnitude
+    /// (1/8000 s → 1/24 s) so a linear slider would bias the active
+    /// range toward the slow end.  The 180° marker (1/48 s) is pinned
+    /// behind the slider as a yellow tick at its log10 position.
+    /// Display label is "1/Xs" rounded to the nearest integer
+    /// denominator for the conventional camera readout.
+    private var shutterSliderRow: some View {
+        let range = session.shutterDurationRange
+        let logMin = log10(range.lowerBound)
+        let logMax = log10(range.upperBound)
+        let span = max(logMax - logMin, .ulpOfOne)
+        return HStack(spacing: 10) {
+            Image(systemName: "timer")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.white.opacity(0.85))
+                .frame(width: 18, alignment: .leading)
+            ZStack(alignment: .leading) {
+                GeometryReader { geo in
+                    if let m180 = session.shutterDuration180Degrees {
+                        let pos = (log10(m180) - logMin) / span
+                        let clamped = min(max(pos, 0), 1)
+                        Rectangle()
+                            .fill(Color.yellow.opacity(0.85))
+                            .frame(width: 2, height: 14)
+                            .position(
+                                x: geo.size.width * CGFloat(clamped),
+                                y: geo.size.height / 2
+                            )
+                            .accessibilityIdentifier("filmtone.capture.shutter180Marker")
+                    }
+                }
+                Slider(
+                    value: Binding(
+                        get: {
+                            let v = log10(session.manualShutterSeconds)
+                            return min(max((v - logMin) / span, 0), 1)
+                        },
+                        set: { normalized in
+                            let logVal = logMin + Double(normalized) * span
+                            session.setManualShutter(pow(10, logVal))
+                        }
+                    ),
+                    in: 0...1
+                )
+                .tint(.yellow)
+                .accessibilityIdentifier("filmtone.capture.shutterSlider.control")
+            }
+            .frame(width: 200)
+            Text(shutterDisplayLabel)
+                .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                .foregroundStyle(shutterIsNear180 ? .yellow : .white)
+                .frame(width: 56, alignment: .trailing)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+        .background(Color.black.opacity(0.45), in: Capsule())
+        .accessibilityIdentifier("filmtone.capture.shutterSlider")
+        .disabled(isRecordingOrStopping || !shutterRangeUsable)
+        .opacity(isRecordingOrStopping ? 0.5 : 1.0)
+    }
+
+    /// True when the active format's ISO range is non-degenerate.
+    /// A degenerate range (`min == max`) would produce a slider that
+    /// emits NaN on drag — the row stays mounted but the slider goes
+    /// disabled so the readout still shows the locked ISO.
+    private var isoRangeUsable: Bool {
+        session.isoRange.upperBound > session.isoRange.lowerBound
+    }
+
+    /// Same guard for shutter — see `isoRangeUsable`.
+    private var shutterRangeUsable: Bool {
+        session.shutterDurationRange.upperBound
+            > session.shutterDurationRange.lowerBound
+    }
+
+    /// "1/48s" / "1/24s" — rounded to the nearest integer denominator.
+    /// Falls back to the seconds form ("0.04s") only on a sub-1
+    /// denominator (which the 24-fps cap precludes today, but keeps
+    /// the label honest if the cap ever changes).
+    private var shutterDisplayLabel: String {
+        let s = session.manualShutterSeconds
+        guard s > 0 else { return "—" }
+        let denom = 1.0 / s
+        if denom >= 1 {
+            return "1/\(Int(denom.rounded()))s"
+        }
+        return String(format: "%.2fs", s)
+    }
+
+    /// Within ±1 ms of 1/48 s — the "180° tolerance" from S12-A's
+    /// design lock.  Drives the yellow color cue on the readout when
+    /// the slider is sitting close to the marker.
+    private var shutterIsNear180: Bool {
+        guard let m180 = session.shutterDuration180Degrees else {
+            return false
+        }
+        return abs(session.manualShutterSeconds - m180) < 0.001
+    }
+
+    /// Combined readout shown next to the Auto/Manual segmented
+    /// control when Manual is active.  Format mirrors a camera HUD
+    /// (`ISO · 1/Xs`) for fast scan; the slider rows below carry the
+    /// drag affordance + 180° marker.
+    private var manualReadoutLabel: String {
+        "\(Int(session.manualISO.rounded())) · \(shutterDisplayLabel)"
     }
 
     // MARK: - White balance row (M12 / S12-D)
