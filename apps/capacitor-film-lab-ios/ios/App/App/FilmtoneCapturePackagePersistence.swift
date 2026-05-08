@@ -69,6 +69,22 @@ struct FilmtoneCapturePackageSnapshotV1: Codable {
     var selectedLookSlug: String?
     var selectedLookEnglishName: String?
     var selectedLookIntensity: Double?
+    /// M12 / S12-C: exposure / focus / metering control state at
+    /// record-stop time.  `exposureMode` ("auto" | reserved "manual")
+    /// is the trigger field — when present, the snapshot rebuilds a
+    /// `FilmtoneCaptureExposureControlRecord` using the EV bias plus
+    /// the focus / metering points (which are independently optional
+    /// inside the record because a run that never tapped leaves them
+    /// nil).  Pre-M12 snapshots have `exposureMode = nil` and decode
+    /// to `exposureControl = nil` on the package.  No `schemaVersion`
+    /// bump — schemaVersion 2's contract is "additive optional fields
+    /// allowed" and these are.
+    var exposureMode: String?
+    var exposureBiasEV: Double?
+    var focusPointNormalizedX: Double?
+    var focusPointNormalizedY: Double?
+    var meteringPointNormalizedX: Double?
+    var meteringPointNormalizedY: Double?
 
     /// Bumped to 2 in S11-D.  Schema-version 1 snapshots written by
     /// M10 / S8-B continue to decode because every S11-D field is
@@ -167,7 +183,13 @@ enum FilmtoneCapturePackagePersistence {
             selectedLookCanonicalUUID: package.selectedLook?.canonicalUUID.uuidString,
             selectedLookSlug: package.selectedLook?.slug,
             selectedLookEnglishName: package.selectedLook?.englishName,
-            selectedLookIntensity: package.selectedLook?.intensity
+            selectedLookIntensity: package.selectedLook?.intensity,
+            exposureMode: package.exposureControl?.mode,
+            exposureBiasEV: package.exposureControl?.biasEV,
+            focusPointNormalizedX: package.exposureControl?.focusPointX,
+            focusPointNormalizedY: package.exposureControl?.focusPointY,
+            meteringPointNormalizedX: package.exposureControl?.meteringPointX,
+            meteringPointNormalizedY: package.exposureControl?.meteringPointY
         )
     }
 
@@ -233,6 +255,29 @@ enum FilmtoneCapturePackagePersistence {
         } else {
             selectedLook = nil
         }
+        // S12-C: rebuild the exposure-control record only when
+        // `exposureMode` is present — that is the M12 sentinel field
+        // that pre-M12 snapshots lack.  When the trigger is set, we
+        // default `biasEV` to 0.0 if absent (treating "explicit zero"
+        // as the floor), and the focus / metering points stay
+        // independently optional because a run that never tapped
+        // leaves them nil.  Partial captures (e.g. the device
+        // reported a `manual` mode but no biasEV) are still rebuilt;
+        // the truth-gate verifier in S12-F asserts the field set per
+        // mode rather than failing decode here.
+        let exposureControl: FilmtoneCaptureExposureControlRecord?
+        if let mode = snapshot.exposureMode {
+            exposureControl = FilmtoneCaptureExposureControlRecord(
+                mode: mode,
+                biasEV: snapshot.exposureBiasEV ?? 0.0,
+                focusPointX: snapshot.focusPointNormalizedX,
+                focusPointY: snapshot.focusPointNormalizedY,
+                meteringPointX: snapshot.meteringPointNormalizedX,
+                meteringPointY: snapshot.meteringPointNormalizedY
+            )
+        } else {
+            exposureControl = nil
+        }
         return FilmtoneCapturePackage(
             captureId: snapshot.captureId,
             storagePolicy: storagePolicy,
@@ -243,7 +288,8 @@ enum FilmtoneCapturePackagePersistence {
             recordedDurationSeconds: snapshot.recordedDurationSeconds,
             parameters: parameters,
             lens: lens,
-            selectedLook: selectedLook
+            selectedLook: selectedLook,
+            exposureControl: exposureControl
         )
     }
 

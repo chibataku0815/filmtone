@@ -131,6 +131,31 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     /// teardown) so SwiftUI body recomputes pick the change up.
     var hasLivePreview: Bool { previewVideoDataOutput != nil }
 
+    /// M12 / S12-C: current EV bias applied to the active device.
+    /// Resets to 0 on every `prepare(lens:)` so a lens swap drops back
+    /// to neutral exposure (the new lens's auto-exposure baseline is
+    /// the right place to re-judge from).  Updated by
+    /// `setExposureBias(_:)`; clamped at apply-time to
+    /// `exposureBiasRange`.
+    @Published private(set) var exposureBiasEV: Float = 0
+    /// M12 / S12-C: usable EV range for the slider, clamped to
+    /// `[-2, +2]` ∩ `device.minExposureTargetBias …
+    /// device.maxExposureTargetBias`.  iPhone wide / tele cameras
+    /// typically expose ±8 EV at the device level — the M12 cap keeps
+    /// the slider conservative ("もしものため") so an accidental drag
+    /// cannot blow the exposure across stops.
+    @Published private(set) var exposureBiasRange: ClosedRange<Float> = -2...2
+    /// M12 / S12-C: last tap-to-focus point in normalized
+    /// AVCaptureDevice POI coordinates ((0,0) = top-left landscape
+    /// sensor).  Nil before the first tap; reset to nil on
+    /// `prepare(lens:)` so a lens swap drops back to continuous-auto.
+    @Published private(set) var lastFocusPointNormalized: CGPoint?
+    /// M12 / S12-C: last tap-to-meter point.  Auto-mode runs always
+    /// keep this equal to `lastFocusPointNormalized` (a tap binds
+    /// focus + metering together by S12-A lock); reserved for nil in
+    /// S12-E manual exposure where metering POI does not move.
+    @Published private(set) var lastMeteringPointNormalized: CGPoint?
+
     private var captureId: String = UUID().uuidString.lowercased()
     private var packageDirURL: URL?
     private var masterURL: URL?
@@ -239,7 +264,35 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
             let frameDuration = CMTime(value: 1, timescale: CMTimeScale(Self.lockedFPS))
             captureDevice.activeVideoMinFrameDuration = frameDuration
             captureDevice.activeVideoMaxFrameDuration = frameDuration
+            // M12 / S12-C: reset EV bias + auto-exposure / auto-focus
+            // so a lens swap (or first prepare) drops back to neutral.
+            // The bias setter is a no-op when the device cannot move
+            // off its current target, but calling it inside the
+            // already-held configuration lock is the cheapest correct
+            // way to re-zero across swaps without a second lock cycle.
+            captureDevice.setExposureTargetBias(0, completionHandler: nil)
+            if captureDevice.isFocusModeSupported(.continuousAutoFocus) {
+                captureDevice.focusMode = .continuousAutoFocus
+            }
+            if captureDevice.isExposureModeSupported(.continuousAutoExposure) {
+                captureDevice.exposureMode = .continuousAutoExposure
+            }
             captureDevice.unlockForConfiguration()
+            // Capture the device-reported bias range and intersect with
+            // the M12 `[-2, +2]` cap so the slider exposes only the
+            // usable subset.  iPhone wide / tele typically report ±8 EV
+            // at the device level — we take the tighter of "device
+            // says it can" and "M12 cap allows".
+            let deviceMin = captureDevice.minExposureTargetBias
+            let deviceMax = captureDevice.maxExposureTargetBias
+            let lowerBound = max(deviceMin, Float(-2))
+            let upperBound = min(deviceMax, Float(2))
+            self.exposureBiasRange = lowerBound <= upperBound
+                ? lowerBound...upperBound
+                : Float(0)...Float(0)
+            self.exposureBiasEV = 0
+            self.lastFocusPointNormalized = nil
+            self.lastMeteringPointNormalized = nil
 
             let output = AVCaptureMovieFileOutput()
             guard session.canAddOutput(output) else {
@@ -356,6 +409,77 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         pendingSelectedLook = record
     }
 
+    // MARK: - M12 / S12-C exposure / focus / metering
+
+    /// Apply an EV bias to the active device.  Clamped at apply-time
+    /// to `exposureBiasRange` so a slider that drifts past the cap
+    /// (e.g. between a lens swap that narrowed the device range and
+    /// the next slider repaint) does not push the device past what it
+    /// will accept.  Best-effort: a `lockForConfiguration()` failure
+    /// silently leaves the published value at its previous reading
+    /// rather than fabricating a phantom apply — the slider snaps
+    /// back on the next state observation.
+    func setExposureBias(_ ev: Float) {
+        guard let device else { return }
+        let clamped = min(
+            max(ev, exposureBiasRange.lowerBound),
+            exposureBiasRange.upperBound
+        )
+        do {
+            try device.lockForConfiguration()
+            device.setExposureTargetBias(clamped, completionHandler: nil)
+            device.unlockForConfiguration()
+            exposureBiasEV = clamped
+        } catch {
+            // Lock contention (e.g. a synchronous reconfigure on
+            // another path) — drop the apply silently; the slider
+            // will resync from `exposureBiasEV` on the next render.
+        }
+    }
+
+    /// Reset EV bias to 0.  Wired to the slider's tap-and-hold gesture
+    /// (S12-A lock).  Goes through the same clamp + apply path as a
+    /// regular set so a 0 reset on a device that cannot represent
+    /// exactly 0 (none of the M10-supported lenses fall in this case
+    /// today, but the API does not promise it) still produces a clean
+    /// apply.
+    func resetExposureBias() {
+        setExposureBias(0)
+    }
+
+    /// Apply tap-to-focus + tap-to-meter at a normalized AVCaptureDevice
+    /// POI point.  M12 / S12-C only — caller has already converted from
+    /// view-local tap coordinates via
+    /// `previewLayer.captureDevicePointConverted(fromLayerPoint:)`.
+    /// Both POIs land on the same point because the S12-A lock keeps
+    /// tap-to-focus and tap-to-meter bound together in auto exposure;
+    /// S12-E will split metering off when manual exposure lands.
+    /// Best-effort on lock failure (same rationale as
+    /// `setExposureBias(_:)`).
+    func applyTapToFocusAndMeter(devicePoint: CGPoint) {
+        guard let device else { return }
+        do {
+            try device.lockForConfiguration()
+            if device.isFocusPointOfInterestSupported,
+               device.isFocusModeSupported(.autoFocus) {
+                device.focusPointOfInterest = devicePoint
+                device.focusMode = .autoFocus
+                lastFocusPointNormalized = devicePoint
+            }
+            if device.isExposurePointOfInterestSupported,
+               device.isExposureModeSupported(.autoExpose) {
+                device.exposurePointOfInterest = devicePoint
+                device.exposureMode = .autoExpose
+                lastMeteringPointNormalized = devicePoint
+            }
+            device.unlockForConfiguration()
+        } catch {
+            // Lock contention — drop the tap silently; the user can
+            // tap again.  Reticle will already have appeared and
+            // will fade out on its own timer.
+        }
+    }
+
     /// Caller-supplied external folder URL.  Caller owns the
     /// security-scoped lifetime; we only store the URL and adjust the
     /// resolved policy.  Pass `nil` to clear back to internal mode.
@@ -449,6 +573,12 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         previewVideoDataOutput = nil
         previewSampleDelegate = nil
         previewFrameSink.clear()
+        // M12 / S12-C: drop tap state so a fresh prepare() starts on
+        // continuous-auto rather than carrying a stale POI from the
+        // previous lens / session.
+        exposureBiasEV = 0
+        lastFocusPointNormalized = nil
+        lastMeteringPointNormalized = nil
         if case .ready = state {
             state = .idle
         }
@@ -588,6 +718,21 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         let captureId = self.captureId
         let lensRecord = self.activeLens?.toRecord()
         let selectedLook = self.pendingSelectedLook
+        // M12 / S12-C: snapshot exposure / focus / metering at
+        // record-stop time.  M12 is auto-only; S12-E will widen `mode`
+        // and add the manual-only fields.  We always emit the record
+        // (even at the all-default state) so the package distinguishes
+        // "M12 capture, owner did not touch the controls" from "pre-M12
+        // capture decoded from disk" — both decode shapes mattered for
+        // S12-F's truth-gate verifier.
+        let exposureControl = FilmtoneCaptureExposureControlRecord(
+            mode: "auto",
+            biasEV: Double(self.exposureBiasEV),
+            focusPointX: self.lastFocusPointNormalized.map { Double($0.x) },
+            focusPointY: self.lastFocusPointNormalized.map { Double($0.y) },
+            meteringPointX: self.lastMeteringPointNormalized.map { Double($0.x) },
+            meteringPointY: self.lastMeteringPointNormalized.map { Double($0.y) }
+        )
 
         // Kick off proxy generation off-main; flip state when complete.
         Task.detached(priority: .userInitiated) { [weak self] in
@@ -609,7 +754,8 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
                         recordedDurationSeconds: recordedDuration,
                         parameters: parameters,
                         lens: lensRecord,
-                        selectedLook: selectedLook
+                        selectedLook: selectedLook,
+                        exposureControl: exposureControl
                     )
                     // Master/proxy linkage is the M10 deliverable; if we
                     // can't write `capture-package.json` next to the

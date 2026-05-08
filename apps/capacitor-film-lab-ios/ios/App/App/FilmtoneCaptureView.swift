@@ -232,12 +232,29 @@ struct FilmtoneCaptureView: View {
     /// Updated alongside it so the F3-R overlay stays consistent with
     /// the chain currently feeding the renderer.
     @State private var activeLiveDiagnostics: FilmtoneLivePreviewDiagnostics?
+    /// M12 / S12-C: last view-local tap location for the focus / meter
+    /// reticle.  Lives in the SwiftUI body's coordinate space (the
+    /// `GeometryReader` wrapping the tap-interaction layer); paired
+    /// with `reticleVisible` for the fade-out animation.
+    @State private var reticleViewPoint: CGPoint?
+    /// M12 / S12-C: visible state for the reticle.  Goes true on a tap
+    /// (with a brief ease-in fade), then back to false 0.6 s later
+    /// (with a longer ease-out fade).  Token-guarded so a second tap
+    /// inside the fade window restarts the timer cleanly without
+    /// blinking the previous reticle off and on.
+    @State private var reticleVisible: Bool = false
+    /// M12 / S12-C: monotonically-incrementing token used by the
+    /// fade-out task to abandon itself when a newer tap supersedes it.
+    /// Wraps via `&+`; the absolute value never matters, only equality.
+    @State private var reticleFadeToken: Int = 0
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
 
             previewLayer
+
+            previewTapInteractionLayer
 
             VStack(spacing: 0) {
                 topBar
@@ -554,6 +571,10 @@ struct FilmtoneCaptureView: View {
             // first record success).
             captureLookStrip
 
+            if showsEVSlider {
+                evSliderRow
+            }
+
             contractBanner
 
             statusLine
@@ -804,6 +825,175 @@ struct FilmtoneCaptureView: View {
                     .frame(width: 64, height: 56)
             }
         }
+    }
+
+    // MARK: - Tap-to-focus interaction layer (M12 / S12-C)
+
+    /// Transparent overlay that catches taps in the dead area between
+    /// the top bar and the bottom deck and routes them to the session
+    /// as tap-to-focus + tap-to-meter.  The reticle floats inside the
+    /// same `GeometryReader` so its position uses the gesture's local
+    /// coordinate space directly — no second conversion.
+    ///
+    /// Hit-testing is disabled while recording / stopping so the owner
+    /// cannot drag the focus / metering POI mid-take (S12-A's
+    /// "通常状態を複雑にしない" / "もしものため" framing — keep the
+    /// active record path on whatever was set at start).  The tap
+    /// layer is always frontmost relative to `previewLayer` so taps on
+    /// blank areas do not pass through to the raw
+    /// `AVCaptureVideoPreviewLayer`; controls in the `topBar` /
+    /// `bottomDeck` `VStack` render above this layer (ZStack child
+    /// order) so button hits still win.
+    @ViewBuilder
+    private var previewTapInteractionLayer: some View {
+        GeometryReader { geo in
+            ZStack {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .gesture(
+                        SpatialTapGesture()
+                            .onEnded { value in
+                                handlePreviewTap(at: value.location, in: geo.size)
+                            }
+                    )
+                    .allowsHitTesting(canAcceptPreviewTap)
+
+                if let pos = reticleViewPoint {
+                    focusReticle
+                        .position(pos)
+                        .opacity(reticleVisible ? 1.0 : 0.0)
+                        .allowsHitTesting(false)
+                        .accessibilityIdentifier("filmtone.capture.focusReticle")
+                }
+            }
+        }
+        .ignoresSafeArea()
+    }
+
+    /// 64 pt yellow viewfinder reticle.  Single SF Symbol so the visual
+    /// matches Apple Camera's reticle without bringing in custom assets;
+    /// `.position()` aligns it to the tap location.  `weight: .light`
+    /// keeps the stroke thin so the reticle does not bury the subject.
+    private var focusReticle: some View {
+        Image(systemName: "viewfinder")
+            .font(.system(size: 44, weight: .light))
+            .foregroundStyle(.yellow)
+            .frame(width: 64, height: 64)
+            .shadow(color: .black.opacity(0.45), radius: 1, x: 0, y: 1)
+    }
+
+    private var canAcceptPreviewTap: Bool {
+        if isRecordingOrStopping { return false }
+        switch session.state {
+        case .ready: return true
+        default: return false
+        }
+    }
+
+    private func handlePreviewTap(at location: CGPoint, in viewSize: CGSize) {
+        guard canAcceptPreviewTap else { return }
+        guard let layer = session.previewLayer else { return }
+        // The Metal preview path renders the frames; the
+        // AVCaptureVideoPreviewLayer is created and configured during
+        // `prepare(lens:)` but is only attached to the view hierarchy
+        // when `hasLivePreview == false`.  `captureDevicePointConverted
+        // (fromLayerPoint:)` does the conversion math from `bounds` +
+        // `videoGravity` + connection rotation, so synthesizing the
+        // bounds inline (matching the visible view's size) gives a
+        // valid POI even when the layer is not on screen.
+        layer.bounds = CGRect(origin: .zero, size: viewSize)
+        let devicePoint = layer.captureDevicePointConverted(fromLayerPoint: location)
+        session.applyTapToFocusAndMeter(devicePoint: devicePoint)
+
+        reticleViewPoint = location
+        let token = reticleFadeToken &+ 1
+        reticleFadeToken = token
+        withAnimation(.easeIn(duration: 0.08)) {
+            reticleVisible = true
+        }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 600_000_000)
+            // A newer tap (or a state transition that hid the reticle)
+            // bumped the token — abandon this fade so the reticle does
+            // not blink off in the middle of the new one.
+            guard reticleFadeToken == token else { return }
+            withAnimation(.easeOut(duration: 0.25)) {
+                reticleVisible = false
+            }
+        }
+    }
+
+    // MARK: - EV slider (M12 / S12-C)
+
+    /// Horizontal EV bias slider.  Conservative range — `[-2, +2]` ∩
+    /// device range (most iPhone wide / tele expose ±8 EV at the
+    /// device level, but a slider that wide invites accidental
+    /// blow-out drags; "もしものため" keeps the cap tight).  Sun icon
+    /// is purely visual; tapping the EV value resets to 0 (S12-A's
+    /// tap-and-hold-to-reset adapted to a discoverable tap target on
+    /// the horizontal layout).  Disabled while recording / stopping
+    /// so the active record cannot be re-exposed mid-take.
+    private var evSliderRow: some View {
+        let range = session.exposureBiasRange
+        return HStack(spacing: 10) {
+            Image(systemName: "sun.max")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.white.opacity(0.85))
+            Slider(
+                value: Binding(
+                    get: { Double(session.exposureBiasEV) },
+                    set: { session.setExposureBias(Float($0)) }
+                ),
+                in: Double(range.lowerBound)...Double(range.upperBound)
+            )
+            .tint(session.exposureBiasEV == 0 ? .white : .yellow)
+            .frame(maxWidth: 220)
+            .accessibilityIdentifier("filmtone.capture.evSlider.control")
+            Button(action: { session.resetExposureBias() }) {
+                Text(evDisplayLabel)
+                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(
+                        session.exposureBiasEV == 0
+                            ? .white.opacity(0.7)
+                            : .yellow
+                    )
+                    .frame(width: 56, alignment: .trailing)
+            }
+            .accessibilityIdentifier("filmtone.capture.evSlider.reset")
+            .accessibilityLabel(Text("Reset exposure"))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(Color.black.opacity(0.45), in: Capsule())
+        .accessibilityIdentifier("filmtone.capture.evSlider")
+        .disabled(isRecordingOrStopping)
+        .opacity(isRecordingOrStopping ? 0.5 : 1.0)
+    }
+
+    private var showsEVSlider: Bool {
+        let range = session.exposureBiasRange
+        // SwiftUI `Slider(value:in:)` requires a non-empty range; a
+        // device that exposes no bias range (e.g. a future lens that
+        // reports `min == max`) would produce a degenerate slider that
+        // emits NaN on drag.  Guard here rather than in the body so
+        // the EV row simply hides on such hardware.
+        guard range.upperBound > range.lowerBound else { return false }
+        switch session.state {
+        case .ready, .recording, .stopping: return true
+        default: return false
+        }
+    }
+
+    /// Compact "+0.7 EV" / "0.0 EV" string for the reset button label.
+    /// Magnitude clamp on the rounding boundary so a value of -0.04
+    /// reads as "0.0 EV" rather than "-0.0 EV" (the unary minus in
+    /// `%+.1f` would otherwise leak through).
+    private var evDisplayLabel: String {
+        let v = session.exposureBiasEV
+        if abs(v) < 0.05 {
+            return "0.0 EV"
+        }
+        return String(format: "%+.1f EV", v)
     }
 
     // MARK: - Failure overlay

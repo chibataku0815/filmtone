@@ -63,6 +63,48 @@ struct FilmtoneCaptureLensRecord: Equatable, Codable {
     let formatIndex: Int?
 }
 
+/// M12 / S12-C: capture-time exposure / focus / metering control state
+/// snapshotted at record-stop time.  All values reflect the resolved
+/// state on `AVCaptureDevice` at the moment recording finished — not
+/// any in-flight tap that arrived after `stop()` was called.
+///
+/// `mode` is `"auto"` for M12; S12-E will widen it to `"manual"` and
+/// add the `manualISO` / `manualShutterDurationSeconds` fields next to
+/// it (they live on this same record so downstream consumers ignore the
+/// owner-mode distinction when they only care about "was a manual
+/// exposure used").
+///
+/// Focus / metering points are normalized to AVCaptureDevice POI
+/// coordinates (landscape sensor space; (0,0) = top-left when held in
+/// the M10-locked landscape sensor orientation).  Nil = continuous-auto
+/// from session start, never tapped.  Auto-mode metering point follows
+/// focus point on a tap; in manual exposure the metering point stays
+/// nil because the M12 lock keeps tap-to-meter auto-only.
+struct FilmtoneCaptureExposureControlRecord: Equatable, Codable {
+    /// `"auto"` for M12 / S12-C runs.  Reserved for `"manual"` in
+    /// S12-E once the manual exposure lane lands.
+    let mode: String
+    /// EV bias at record-stop time, clamped at apply-time to
+    /// `[-2, +2]` ∩ `device.minExposureTargetBias …
+    /// device.maxExposureTargetBias`.  Always written (including the
+    /// 0.0 baseline) so the package distinguishes "explicit zero" from
+    /// "field absent on a pre-M12 snapshot".
+    let biasEV: Double
+    /// Last tap-to-focus point, normalized to AVCaptureDevice POI
+    /// coordinates.  Nil = no tap during the run (focus stayed on
+    /// continuous-auto from prepare(lens:)).
+    let focusPointX: Double?
+    let focusPointY: Double?
+    /// Last tap-to-meter point, normalized to AVCaptureDevice POI
+    /// coordinates.  Nil = either no tap during the run, or the run
+    /// was in manual exposure (metering POI is auto-only by S12-A
+    /// lock).  M12 / S12-C runs always set this to the same value as
+    /// `focusPoint*` because tap-to-focus and tap-to-meter are bound
+    /// together in auto mode.
+    let meteringPointX: Double?
+    let meteringPointY: Double?
+}
+
 /// M11 / S11-D: capture-time Look chip recorded with a successful
 /// run.  Stone / Urban populate this record so the editor adoption
 /// path (S11-E) can re-apply the same Look against the proxy without
@@ -226,6 +268,12 @@ struct FilmtoneCapturePackage: Equatable {
     /// editor adoption path (S11-E) can re-apply the same Look against
     /// the proxy.
     let selectedLook: FilmtoneSelectedLookRecord?
+    /// M12 / S12-C: exposure / focus / metering state at record-stop
+    /// time.  `nil` for pre-M12 captures decoded from disk; new runs
+    /// always populate this with at least the M12 baseline (`mode:
+    /// "auto"`, `biasEV: 0.0`, focus / metering points nil if the run
+    /// stayed on continuous-auto throughout).
+    let exposureControl: FilmtoneCaptureExposureControlRecord?
 }
 
 #endif
