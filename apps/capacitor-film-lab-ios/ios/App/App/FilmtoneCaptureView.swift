@@ -18,114 +18,8 @@ import SwiftUI
 import AVFoundation
 import UniformTypeIdentifiers
 
-/// S8-D: snapshot of the editor's current Look state passed into the
-/// capture surface so a small reference thumbnail can show the owner
-/// the active color direction *before* recording.  The live preview
-/// itself remains the raw `AVCaptureVideoPreviewLayer` — applying the
-/// grade to the live frame would require `AVCaptureVideoDataOutput`,
-/// which is incompatible with the ProRes 422 HQ + Apple Log 2 +
-/// cinematicEE record pipeline (M2-A: iOS 26.4 does not deliver 10-bit
-/// `x422`/`x420` from VDO under `.appleLog2`).  We deliberately stop
-/// at the reference strip and label the live image ungraded.
-struct FilmtoneCaptureLookReference: Equatable {
-    /// `file://` URI of the editor's currently graded still poster, or
-    /// nil when the editor has no source / the preview is mid-render
-    /// / the source is a video without a baked graded poster.  Nil
-    /// hides the reference panel.
-    let displayURI: String?
-    /// Owner-friendly Look name — `creativeLut.title` when a creative
-    /// LUT is applied, otherwise `strings.lookFilmtone` (the default
-    /// Filmtone label).  Also nilable so callers without a meaningful
-    /// label can pass nil and the panel falls back to "Editor reference".
-    let lookLabel: String?
-}
-
-/// M11 / S11-B: Look option exposed in the capture-time chip strip.
-///
-/// Three fixed chips: `filmtone` (default — `creativeLut == nil`,
-/// Filmtone signature ungraded baseline), `stone`, and `urban`.  Stone
-/// and Urban resolve their `canonicalUUID` from
-/// `FilmtoneBuiltInCatalog.allLooks` by slug so the canonical bundled-Look
-/// UUIDs stay single-sourced in the catalog file (no duplication of
-/// hard-coded UUIDs here).  The default chip's UUID is `nil` because
-/// "Filmtone (no creative LUT)" is not a saved-Look entry; the
-/// `applySavedLook` route is never invoked for it.
-struct FilmtoneCaptureLook: Identifiable, Equatable {
-    let id: String
-    let displayName: String
-    /// `BuiltInLook.canonicalUUID` for Stone / Urban; `nil` for the
-    /// Filmtone default chip (which represents "no Look applied").
-    let canonicalUUID: UUID?
-    /// `BuiltInLook.slug` for Stone / Urban; `nil` for the Filmtone
-    /// default chip.  Recorded into `FilmtoneSelectedLookRecord.slug`
-    /// so the persisted capture-package retains a bundled-only
-    /// secondary identifier (S11-D).
-    let slug: String?
-
-    static let filmtone = FilmtoneCaptureLook(
-        id: "filmtone",
-        displayName: "Filmtone",
-        canonicalUUID: nil,
-        slug: nil
-    )
-
-    static let stone: FilmtoneCaptureLook = {
-        let slug = "filmtone-creative-pack-01-stone"
-        let entry = FilmtoneBuiltInCatalog.allLooks.first { $0.slug == slug }
-        return FilmtoneCaptureLook(
-            id: "stone",
-            displayName: entry?.englishName ?? "Stone",
-            canonicalUUID: entry?.canonicalUUID,
-            slug: slug
-        )
-    }()
-
-    static let urban: FilmtoneCaptureLook = {
-        let slug = "filmtone-creative-pack-01-urban"
-        let entry = FilmtoneBuiltInCatalog.allLooks.first { $0.slug == slug }
-        return FilmtoneCaptureLook(
-            id: "urban",
-            displayName: entry?.englishName ?? "Urban",
-            canonicalUUID: entry?.canonicalUUID,
-            slug: slug
-        )
-    }()
-
-    /// Fixed chip-strip order: default → Stone → Urban.  v1.4 only
-    /// ships these two bundled Creative LUTs (M11 strategy doc §
-    /// "M11 Out of scope" defers saved Looks to a later lane).
-    static let allCases: [FilmtoneCaptureLook] = [.filmtone, .stone, .urban]
-
-    /// Resolve a chip from a saved-Look canonical UUID (e.g. the editor's
-    /// `appliedSavedLookId` at capture-present time).  Returns
-    /// `.filmtone` when no UUID is set or the UUID does not belong to
-    /// one of the M11 chips — saved Looks outside the chip strip
-    /// fall back to default rather than being silently selected.
-    static func resolve(from canonicalUUID: UUID?) -> FilmtoneCaptureLook {
-        guard let uuid = canonicalUUID else { return .filmtone }
-        return allCases.first { $0.canonicalUUID == uuid } ?? .filmtone
-    }
-
-    /// S11-D: project a chip onto the persisted capture-package shape.
-    /// Filmtone default → `nil` (selectedLook absent → editor preserves
-    /// pre-capture state on adoption per S11-A Design Locks).  Stone /
-    /// Urban → record with stable identity so S11-E's adoptCaptureResult
-    /// can call `applySavedLook(id: canonicalUUID)`.  M11 ships
-    /// intensity = 1.0 (slider lane is out-of-scope).
-    func toSelectedLookRecord() -> FilmtoneSelectedLookRecord? {
-        guard let canonicalUUID else { return nil }
-        return FilmtoneSelectedLookRecord(
-            canonicalUUID: canonicalUUID,
-            slug: slug,
-            englishName: displayName,
-            intensity: 1.0
-        )
-    }
-}
-
 struct FilmtoneCaptureView: View {
 
-    let lookReference: FilmtoneCaptureLookReference?
     /// S8-F F3: editor's current grade chain captured at fullScreenCover
     /// present time (snapshot — not bound to publishers).  When non-nil,
     /// the live preview applies it on every VDO sample so the surface
@@ -161,7 +55,6 @@ struct FilmtoneCaptureView: View {
     let onFailed: (FilmtoneCaptureFailure) -> Void
 
     init(
-        lookReference: FilmtoneCaptureLookReference?,
         liveGradeProcessor: FilmtoneSharedGradeProcessor?,
         liveDiagnostics: FilmtoneLivePreviewDiagnostics?,
         initialCaptureLook: FilmtoneCaptureLook = .filmtone,
@@ -170,7 +63,6 @@ struct FilmtoneCaptureView: View {
         onCancelled: @escaping () -> Void,
         onFailed: @escaping (FilmtoneCaptureFailure) -> Void
     ) {
-        self.lookReference = lookReference
         self.liveGradeProcessor = liveGradeProcessor
         self.liveDiagnostics = liveDiagnostics
         self.initialCaptureLook = initialCaptureLook
@@ -208,10 +100,6 @@ struct FilmtoneCaptureView: View {
     /// Guards re-entrant `selectLens(_:)` taps while a teardown +
     /// re-prepare is in flight.
     @State private var lensSwitchInFlight: Bool = false
-    /// S8-D: cached UIImage decoded from `lookReference.displayURI`.
-    /// Loaded once on `.task(id:)` so SwiftUI recomputes during
-    /// recording state ticks do not redecode the file every frame.
-    @State private var lookReferenceImage: UIImage?
     /// M11 / S11-B: ephemeral capture-time Look chip selection.  Lives
     /// only inside the capture surface — `onCancelled` does NOT propagate
     /// it so cancelling preserves the editor's pre-capture Look state
@@ -247,6 +135,22 @@ struct FilmtoneCaptureView: View {
     /// fade-out task to abandon itself when a newer tap supersedes it.
     /// Wraps via `&+`; the absolute value never matters, only equality.
     @State private var reticleFadeToken: Int = 0
+    /// M13-M-2: which parameter chip in the top row is currently
+    /// active. Owned by this orchestrator; passed down to
+    /// `FilmtoneCaptureCockpitTopBar` as a `Binding`. `.iso` / `.shutter`
+    /// / `.ev` open a ruler region beneath the chip row (stub today,
+    /// real ruler in M13-M-3). `.wb` toggles auto/locked directly.
+    /// `.look` opens the picker sheet. `nil` = no scrubber row.
+    @State private var activeParameterChip: CaptureParameterChip?
+    /// M13-M-2: presentation flag for the Look picker sheet, bound to
+    /// `.sheet(isPresented:)`.
+    @State private var showLookPicker: Bool = false
+    /// M13-M-3: tracks whether the active manual exposure was entered
+    /// via a parameter chip tap. When true, tapping the same chip
+    /// again exits manual back to auto. False if the manual mode was
+    /// entered through some other path (none today; M13-M-4 simplifies
+    /// when the dormant drawer code is deleted).
+    @State private var manualEntryViaChipTap: Bool = false
 
     var body: some View {
         ZStack {
@@ -254,16 +158,30 @@ struct FilmtoneCaptureView: View {
 
             previewLayer
 
-            previewTapInteractionLayer
+            FilmtoneCaptureInteractionOverlay(
+                canAcceptTap: canAcceptPreviewTap,
+                reticlePoint: reticleViewPoint,
+                reticleVisible: reticleVisible,
+                onTap: handlePreviewTap
+            )
 
-            VStack(spacing: 0) {
-                topBar
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                Spacer()
-                bottomDeck
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 28)
+            // M13-M-2: cockpit composition. Top zone holds HUD bar +
+            // parameter chip row + ruler region (component-owned); bottom
+            // zone holds lens chip row + compact shutter cluster. The
+            // single GlassEffectContainer lets adjacent Liquid Glass
+            // shapes merge as one material instead of stacking
+            // translucencies. Each control owns its own glass primitive
+            // — there is no longer a single shelf slab.
+            GlassEffectContainer(spacing: 8) {
+                VStack(spacing: 0) {
+                    cockpitTopBar
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
+                    Spacer()
+                    bottomZone
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 18)
+                }
             }
 
             if let prepareError {
@@ -293,23 +211,6 @@ struct FilmtoneCaptureView: View {
             // mode (the helper clears the bookmark on its own).
             restorePersistedExternalFolderIfPossible()
             await prepareSession()
-        }
-        .task(id: lookReference?.displayURI) {
-            // S8-D: decode the editor's graded poster once per URI so
-            // SwiftUI body recomputes during recording (state ticks
-            // every ~0.1s while .recording) do not redecode the file.
-            // Decoding off the main thread keeps the capture session
-            // setup unaffected.
-            guard let uri = lookReference?.displayURI else {
-                lookReferenceImage = nil
-                return
-            }
-            let decoded = await Task.detached(priority: .utility) {
-                Self.decodeReferenceImage(from: uri)
-            }.value
-            await MainActor.run {
-                lookReferenceImage = decoded
-            }
         }
         .onChange(of: captureLookSelection) { newLook in
             // S11-D: push the chip's selected-Look record into the
@@ -374,6 +275,12 @@ struct FilmtoneCaptureView: View {
         ) { result in
             handleFolderPick(result: result)
         }
+        .sheet(isPresented: $showLookPicker) {
+            FilmtoneCaptureLookSheet(
+                selection: $captureLookSelection,
+                onDismiss: { showLookPicker = false }
+            )
+        }
         .accessibilityIdentifier("filmtone.capture.surface")
     }
 
@@ -402,49 +309,7 @@ struct FilmtoneCaptureView: View {
         }
     }
 
-    // MARK: - Top bar (close + storage pill)
-
-    private var topBar: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Button(action: dismissCapture) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 36, height: 36)
-                    .background(Color.black.opacity(0.45), in: Circle())
-            }
-            .accessibilityIdentifier("filmtone.capture.close")
-            .disabled(isRecordingOrStopping)
-
-            Spacer(minLength: 8)
-
-            // S8-D: stack the storage pill on top of the look-reference
-            // panel along the right edge.  This anchors all "decisions
-            // for this take" — destination, duration cap, color
-            // direction — in a single glanceable column without
-            // crowding the bottom controls deck.
-            VStack(alignment: .trailing, spacing: 8) {
-                storagePill
-                lookReferencePanel
-            }
-        }
-    }
-
-    private var storagePill: some View {
-        HStack(spacing: 8) {
-            Image(systemName: storagePillIcon)
-                .font(.system(size: 13, weight: .medium))
-            Text(storagePillLabel)
-                .font(.system(size: 13, weight: .medium))
-                .lineLimit(1)
-                .truncationMode(.middle)
-        }
-        .foregroundStyle(.white)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color.black.opacity(0.45), in: Capsule())
-        .accessibilityIdentifier("filmtone.capture.storagePill")
-    }
+    // MARK: - HUD readout sources
 
     private var storagePillIcon: String {
         switch session.storagePolicy {
@@ -457,295 +322,151 @@ struct FilmtoneCaptureView: View {
         let cap = Int(session.currentDurationLimit())
         switch session.storagePolicy {
         case .internalDocumentsCapped:
-            return "Internal master · \(cap)s cap"
-        case .externalSecurityScopedFolder(let url):
-            return "External master · \(url.lastPathComponent) · \(cap)s cap"
+            return "Internal \(cap)s"
+        case .externalSecurityScopedFolder:
+            return "External master"
         }
     }
 
-    // MARK: - Look reference panel (S8-D)
+    // MARK: - Quality contract / manual summary chips (S13-C)
 
-    /// Compact reference strip showing the editor's currently graded
-    /// poster, the active Look name, and an explicit "Live ungraded"
-    /// disclaimer.  Goal: let the owner judge color direction *before*
-    /// pressing record without misleading them into thinking the live
-    /// preview is graded.  Hidden when the editor has no source / the
-    /// graded poster is mid-render / the source is a video without a
-    /// baked still poster.
-    @ViewBuilder
-    private var lookReferencePanel: some View {
-        if let image = lookReferenceImage {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("LOOK REFERENCE")
-                    .font(.system(size: 9, weight: .semibold))
-                    .tracking(0.6)
-                    .foregroundStyle(.white.opacity(0.55))
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 120, height: 90)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .accessibilityIdentifier("filmtone.capture.lookReference.image")
-                Text(resolvedLookLabel)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .frame(maxWidth: 120, alignment: .leading)
-                // S8-F F3: when the live preview is being graded by the
-                // editor's chain, the disclaimer is misleading — drop
-                // it so the panel reads as a comparison thumbnail
-                // (still poster vs. live framing) instead of a "look
-                // not yet applied" warning.  When the grade chain
-                // could not be built (no source loaded etc.) we keep
-                // the disclaimer so the owner isn't tricked into
-                // thinking the unlooked feed already reflects color.
-                if activeGradeProcessor == nil {
-                    Text("Live ungraded")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.55))
-                }
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(
-                Color.black.opacity(0.45),
-                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-            )
-            .accessibilityIdentifier("filmtone.capture.lookReference")
-        }
-    }
-
-    /// Falls back to "Editor reference" when the caller passed nil or
-    /// an empty Look label.  `nilIfEmpty` lives on `FilmtoneEditorStore`
-    /// as `fileprivate`, so we inline the trim-and-empty check here
-    /// rather than widen the access level just for this one read.
-    private var resolvedLookLabel: String {
-        let trimmed = (lookReference?.lookLabel ?? "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? "Editor reference" : trimmed
-    }
-
-    /// `nonisolated` so the off-main `Task.detached` in `.task(id:)`
-    /// can call it without an actor hop.  Pure file IO + `UIImage`
-    /// init — no UI side effects — and `UIImage` carries cleanly
-    /// across actors.
-    nonisolated private static func decodeReferenceImage(
-        from uri: String
-    ) -> UIImage? {
-        guard let url = URL(string: uri), url.isFileURL else { return nil }
-        return UIImage(contentsOfFile: url.path)
-    }
-
-    // MARK: - Bottom deck (status, ssd picker, record button)
-
-    private var bottomDeck: some View {
-        VStack(spacing: 16) {
-            if let preflightError {
-                Text(preflightError)
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(Color(red: 0.96, green: 0.32, blue: 0.32))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 12)
-            }
-
-            if !preflightWarnings.isEmpty {
-                ForEach(preflightWarnings, id: \.self) { line in
-                    Text(line)
-                        .font(.caption2)
-                        .foregroundStyle(.white.opacity(0.7))
-                        .multilineTextAlignment(.center)
-                }
-            }
-
-            if lenses.count > 1 {
-                lensSelector
-            }
-
-            // M11 / S11-B: capture-time Look chip strip.  Visually
-            // identical pill row to `lensSelector` so the two
-            // capture-time selectors read as siblings.  Disabled while
-            // recording / stopping — owner cannot change Look mid-take
-            // (live preview rebuild would visibly tear, and the
-            // selectedLook-on-completion semantic only commits on the
-            // first record success).
-            captureLookStrip
-
-            if showsExposureModeRow {
-                exposureModeRow
-            }
-
-            if showsEVSlider {
-                evSliderRow
-            }
-
-            if showsManualExposureRows {
-                isoSliderRow
-                shutterSliderRow
-            }
-
-            if showsWhiteBalanceRow {
-                whiteBalanceRow
-            }
-
-            contractBanner
-
-            statusLine
-
-            HStack(spacing: 12) {
-                pickFolderButton
-                Spacer(minLength: 4)
-                recordButton
-                Spacer(minLength: 4)
-                modeToggle
-            }
-        }
-    }
-
-    // MARK: - Lens selector (S8-B)
-
-    /// Horizontal pill row of qualifying rear lenses.  Hidden when only
-    /// one (or zero) lens passes the M10 contract — the spec line
-    /// already names the active lens, so the selector only adds value
-    /// when there is something to switch between.  Disabled while
-    /// recording/stopping or while a teardown + re-prepare is in flight.
-    private var lensSelector: some View {
-        HStack(spacing: 8) {
-            ForEach(lenses) { lens in
-                Button {
-                    selectLens(lens)
-                } label: {
-                    VStack(spacing: 1) {
-                        Text(lens.magnificationLabel)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.white)
-                        if !lens.canonicalSubtext.isEmpty {
-                            Text(lens.canonicalSubtext)
-                                .font(.system(size: 9, weight: .regular))
-                                .foregroundStyle(.white.opacity(0.72))
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 4)
-                    .background(
-                        lens == selectedLens
-                            ? Color.white.opacity(0.28)
-                            : Color.black.opacity(0.42),
-                        in: Capsule()
-                    )
-                }
-                .accessibilityLabel(
-                    Text("\(lens.magnificationLabel) \(lens.canonicalSubtext)")
-                )
-                .accessibilityIdentifier("filmtone.capture.lens.\(lens.deviceTypeRaw)")
-                .accessibilityAddTraits(lens == selectedLens ? .isSelected : [])
-                .disabled(
-                    isRecordingOrStopping
-                        || lensSwitchInFlight
-                        || lens == selectedLens
-                )
-            }
-        }
-        .accessibilityIdentifier("filmtone.capture.lensSelector")
-    }
-
-    // MARK: - Capture-time Look chip strip (M11 / S11-B)
-
-    /// Horizontal pill row of three Look chips: Filmtone (default —
-    /// no creative LUT) / Stone / Urban.  Mirrors `lensSelector` so the
-    /// capture-time selectors read as siblings.  S11-B keeps the tap
-    /// handler local-state-only (updates `captureLookSelection` and
-    /// nothing else) — S11-C wires the live preview rebuild and S11-D
-    /// commits the selection into the capture package on
-    /// `.completed`.  Disabled while recording / stopping so the
-    /// rebuild path cannot tear the active VDO chain mid-write.
-    private var captureLookStrip: some View {
-        HStack(spacing: 8) {
-            ForEach(FilmtoneCaptureLook.allCases) { look in
-                Button {
-                    captureLookSelection = look
-                } label: {
-                    Text(look.displayName)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(
-                            look == captureLookSelection
-                                ? Color.white.opacity(0.28)
-                                : Color.black.opacity(0.42),
-                            in: Capsule()
-                        )
-                }
-                .accessibilityIdentifier("filmtone.capture.look.\(look.id)")
-                .accessibilityAddTraits(
-                    look == captureLookSelection ? .isSelected : []
-                )
-                .disabled(
-                    isRecordingOrStopping
-                        || look == captureLookSelection
-                )
-            }
-        }
-        .accessibilityIdentifier("filmtone.capture.lookStrip")
-    }
-
-    /// S8-C: display-only readout of the locked M10 capture contract.
-    /// Surfaces the five fixed contract items the owner must see at
-    /// record time — 4K24 / ProRes 422 HQ / Apple Log 2 / cinematic
-    /// stabilization (EE) / proxy → editor handoff — using the
-    /// `FilmtoneCaptureParameters.baseline` strings as source of
-    /// truth.  M10 does not expose camera knobs; this banner keeps
-    /// the owner honest about what is being recorded without
-    /// inviting a settings page that would dilute the lane.
-    ///
-    /// Duration cap is owned by the storage pill (top-right) since
-    /// the cap is mode-dependent (internal 10s vs SSD 60s).  The
-    /// lens prefix appears here only when the lens selector pill row
-    /// is hidden — i.e. when there is at most one qualifying rear
-    /// lens — so the active lens name does not duplicate the pill
-    /// row above.  The view leaves the area between this banner and
-    /// the controls cluster open so S8-D's look-applied preview can
-    /// expand into a thumbnail strip without restructuring the deck.
-    private var contractBanner: some View {
+    private var qualityContractText: String {
         let p = FilmtoneCaptureParameters.baseline
-        // Nearest-K rounding so 3840 reads as the conventional "4K"
-        // (UHD), not the integer-truncated "3K".
         let kRounded = (p.widthPx + 500) / 1000
         let resolution = "\(kRounded)K\(Int(p.frameRate))"
-        // "Cinematic EE" is the compact owner label for
-        // `cinematicExtendedEnhanced`; the parameter string remains
-        // verbatim in capture-package.json for downstream audit.
         let segments: [String] = [
             resolution,
-            p.codec,
-            p.colorSpace,
-            "Cinematic EE",
-            "Proxy → Editor",
+            "Log2",
+            "ProRes",
         ]
         let shouldShowLensPrefix = lenses.count <= 1
         let lensPrefix = shouldShowLensPrefix
             ? (selectedLens.map { "\($0.magnificationLabel) · " } ?? "")
             : ""
-        return Text(lensPrefix + segments.joined(separator: " · "))
-            .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(.white.opacity(0.78))
-            .lineLimit(1)
-            .minimumScaleFactor(0.6)
-            .accessibilityIdentifier("filmtone.capture.contractBanner")
+        return lensPrefix + segments.joined(separator: " · ")
     }
 
-    private var statusLine: some View {
-        HStack(spacing: 8) {
-            if isRecordingOrStopping {
-                Circle()
-                    .fill(Color(red: 0.96, green: 0.32, blue: 0.32))
-                    .frame(width: 9, height: 9)
+    // MARK: - Bottom deck (status, ssd picker, record button)
+
+    private var bottomDeck: some View {
+        FilmtoneCaptureBottomDeck(
+            preflightError: preflightError,
+            preflightWarnings: preflightWarnings,
+            statusText: statusText,
+            isRecordingOrStopping: isRecordingOrStopping,
+            canToggleRecord: canToggleRecord,
+            pickFolderIcon: pickFolderIcon,
+            pickFolderLabel: pickFolderLabel,
+            showsExternalClear: isExternalFolderSelected,
+            onPickFolder: { showFolderImporter = true },
+            onToggleRecord: toggleRecord,
+            onClearFolder: clearExternalFolder
+        )
+    }
+
+    // MARK: - M13-M-2 cockpit zones (composition-only — chip / ruler /
+    //         lens-row / look-sheet rendering live in their own files)
+
+    /// Top zone: HUD bar + parameter chip row + ruler region. All
+    /// internals live in `FilmtoneCaptureCockpitTopBar`; the orchestrator
+    /// only forwards session state, ranges, and chip-tap / scrub
+    /// callbacks. Auto↔manual mode entry on chip tap is owned here so
+    /// the cockpit layer stays UI-only.
+    private var cockpitTopBar: some View {
+        FilmtoneCaptureCockpitTopBar(
+            isCloseDisabled: isRecordingOrStopping,
+            storageIcon: storagePillIcon,
+            storageLabel: storagePillLabel,
+            qualityContractText: qualityContractText,
+            onClose: dismissCapture,
+            exposureMode: session.exposureMode,
+            manualISO: session.manualISO,
+            manualShutterSeconds: session.manualShutterSeconds,
+            exposureBiasEV: session.exposureBiasEV,
+            whiteBalanceMode: session.whiteBalanceMode,
+            captureLookSelection: captureLookSelection,
+            isRecordingOrStopping: isRecordingOrStopping,
+            isoRange: session.isoRange,
+            shutterDurationRange: session.shutterDurationRange,
+            exposureBiasRange: session.exposureBiasRange,
+            activeChip: $activeParameterChip,
+            onChipTap: handleParameterChipTap,
+            onScrubISO: { session.setManualISO($0) },
+            onScrubShutter: { session.setManualShutter($0) },
+            onScrubEV: { session.setExposureBias($0) }
+        )
+    }
+
+    /// Bottom zone: lens chip horizontal row above the compact shutter
+    /// cluster. Lens row hides itself when only one lens qualifies.
+    private var bottomZone: some View {
+        VStack(spacing: 10) {
+            if lenses.count > 1 {
+                FilmtoneCaptureLensChipRow(
+                    lenses: lenses,
+                    selectedLens: selectedLens,
+                    isRecordingOrStopping: isRecordingOrStopping,
+                    lensSwitchInFlight: lensSwitchInFlight,
+                    onSelect: selectLens
+                )
             }
-            Text(statusText)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.white.opacity(0.92))
-                .accessibilityIdentifier("filmtone.capture.status")
+            bottomDeck
+        }
+    }
+
+    /// Routes a parameter chip tap. Handles the auto↔manual exposure
+    /// mode entry pattern (Blackmagic-style one-tap mode entry):
+    ///
+    /// - `.iso` / `.shutter`:
+    ///     - Tap when active → exit scrubber. If we entered manual via
+    ///       this chip, also exit manual back to auto.
+    ///     - Tap when inactive in auto → enter manual + open scrubber.
+    ///     - Tap when inactive in manual → just switch the active
+    ///       scrubber to this chip; stay in manual.
+    /// - `.ev`: open / close scrubber. Auto-only chip; never appears
+    ///   in manual (cockpit filters it out).
+    /// - `.wb`: toggle auto / locked.
+    /// - `.look`: present the Look picker sheet.
+    private func handleParameterChipTap(_ chip: CaptureParameterChip) {
+        switch chip {
+        case .iso, .shutter:
+            handleManualModeChipTap(chip)
+        case .ev:
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
+                activeParameterChip = (activeParameterChip == chip) ? nil : chip
+            }
+        case .wb:
+            let next: FilmtoneCaptureSession.WhiteBalanceMode =
+                session.whiteBalanceMode == .locked ? .auto : .locked
+            applyWhiteBalanceMode(next)
+        case .look:
+            showLookPicker = true
+        }
+    }
+
+    private func handleManualModeChipTap(_ chip: CaptureParameterChip) {
+        guard !isRecordingOrStopping else { return }
+        if activeParameterChip == chip {
+            // Tap the active chip → close scrubber, and if we entered
+            // manual via the chip, exit back to auto.
+            if manualEntryViaChipTap {
+                session.exitManualExposure()
+                manualEntryViaChipTap = false
+            }
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
+                activeParameterChip = nil
+            }
+        } else {
+            // Tap a non-active scrubber chip. Auto → manual entry,
+            // inheriting the auto reading. Manual → stay; just swap
+            // active scrubber.
+            if session.exposureMode == .auto {
+                session.enterManualExposure()
+                manualEntryViaChipTap = true
+            }
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
+                activeParameterChip = chip
+            }
         }
     }
 
@@ -765,22 +486,6 @@ struct FilmtoneCaptureView: View {
         }
     }
 
-    private var pickFolderButton: some View {
-        Button(action: { showFolderImporter = true }) {
-            VStack(spacing: 4) {
-                Image(systemName: pickFolderIcon)
-                    .font(.system(size: 22, weight: .medium))
-                Text(pickFolderLabel)
-                    .font(.system(size: 11, weight: .medium))
-            }
-            .foregroundStyle(.white)
-            .frame(width: 64, height: 56)
-            .background(Color.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        }
-        .disabled(isRecordingOrStopping)
-        .accessibilityIdentifier("filmtone.capture.pickFolder")
-    }
-
     private var pickFolderIcon: String {
         if case .externalSecurityScopedFolder = session.storagePolicy {
             return "externaldrive.fill"
@@ -795,105 +500,14 @@ struct FilmtoneCaptureView: View {
         return "SSD"
     }
 
-    private var recordButton: some View {
-        Button(action: toggleRecord) {
-            ZStack {
-                Circle()
-                    .stroke(Color.white.opacity(0.85), lineWidth: 4)
-                    .frame(width: 84, height: 84)
-                if isRecordingOrStopping {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color(red: 0.96, green: 0.32, blue: 0.32))
-                        .frame(width: 36, height: 36)
-                } else {
-                    Circle()
-                        .fill(Color(red: 0.96, green: 0.32, blue: 0.32))
-                        .frame(width: 68, height: 68)
-                }
-            }
+    private var isExternalFolderSelected: Bool {
+        if case .externalSecurityScopedFolder = session.storagePolicy {
+            return true
         }
-        .disabled(!canToggleRecord)
-        .accessibilityIdentifier("filmtone.capture.record")
-        .accessibilityLabel(isRecordingOrStopping ? "Stop recording" : "Start recording")
-    }
-
-    private var modeToggle: some View {
-        VStack(spacing: 4) {
-            if case .externalSecurityScopedFolder = session.storagePolicy {
-                Button(action: clearExternalFolder) {
-                    VStack(spacing: 4) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 22, weight: .medium))
-                        Text("Clear")
-                            .font(.system(size: 11, weight: .medium))
-                    }
-                    .foregroundStyle(.white)
-                    .frame(width: 64, height: 56)
-                    .background(Color.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                }
-                .accessibilityIdentifier("filmtone.capture.clearFolder")
-                .disabled(isRecordingOrStopping)
-            } else {
-                Color.clear
-                    .frame(width: 64, height: 56)
-            }
-        }
+        return false
     }
 
     // MARK: - Tap-to-focus interaction layer (M12 / S12-C)
-
-    /// Transparent overlay that catches taps in the dead area between
-    /// the top bar and the bottom deck and routes them to the session
-    /// as tap-to-focus + tap-to-meter.  The reticle floats inside the
-    /// same `GeometryReader` so its position uses the gesture's local
-    /// coordinate space directly — no second conversion.
-    ///
-    /// Hit-testing is disabled while recording / stopping so the owner
-    /// cannot drag the focus / metering POI mid-take (S12-A's
-    /// "通常状態を複雑にしない" / "もしものため" framing — keep the
-    /// active record path on whatever was set at start).  The tap
-    /// layer is always frontmost relative to `previewLayer` so taps on
-    /// blank areas do not pass through to the raw
-    /// `AVCaptureVideoPreviewLayer`; controls in the `topBar` /
-    /// `bottomDeck` `VStack` render above this layer (ZStack child
-    /// order) so button hits still win.
-    @ViewBuilder
-    private var previewTapInteractionLayer: some View {
-        GeometryReader { geo in
-            ZStack {
-                Color.clear
-                    .contentShape(Rectangle())
-                    .gesture(
-                        SpatialTapGesture()
-                            .onEnded { value in
-                                handlePreviewTap(at: value.location, in: geo.size)
-                            }
-                    )
-                    .allowsHitTesting(canAcceptPreviewTap)
-
-                if let pos = reticleViewPoint {
-                    focusReticle
-                        .position(pos)
-                        .opacity(reticleVisible ? 1.0 : 0.0)
-                        .allowsHitTesting(false)
-                        .accessibilityIdentifier("filmtone.capture.focusReticle")
-                }
-            }
-        }
-        .ignoresSafeArea()
-    }
-
-    /// 64 pt yellow viewfinder reticle.  Single SF Symbol so the visual
-    /// matches Apple Camera's reticle without bringing in custom assets;
-    /// `.position()` aligns it to the tap location.  `weight: .light`
-    /// keeps the stroke thin so the reticle does not bury the subject.
-    private var focusReticle: some View {
-        Image(systemName: "viewfinder")
-            .font(.system(size: 44, weight: .light))
-            .foregroundStyle(.yellow)
-            .frame(width: 64, height: 64)
-            .shadow(color: .black.opacity(0.45), radius: 1, x: 0, y: 1)
-    }
 
     private var canAcceptPreviewTap: Bool {
         if isRecordingOrStopping { return false }
@@ -936,423 +550,6 @@ struct FilmtoneCaptureView: View {
         }
     }
 
-    // MARK: - EV slider (M12 / S12-C)
-
-    /// Horizontal EV bias slider.  Conservative range — `[-2, +2]` ∩
-    /// device range (most iPhone wide / tele expose ±8 EV at the
-    /// device level, but a slider that wide invites accidental
-    /// blow-out drags; "もしものため" keeps the cap tight).  Sun icon
-    /// is purely visual; tapping the EV value resets to 0 (S12-A's
-    /// tap-and-hold-to-reset adapted to a discoverable tap target on
-    /// the horizontal layout).  Disabled while recording / stopping
-    /// so the active record cannot be re-exposed mid-take.
-    private var evSliderRow: some View {
-        let range = session.exposureBiasRange
-        return HStack(spacing: 10) {
-            Image(systemName: "sun.max")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.white.opacity(0.85))
-            Slider(
-                value: Binding(
-                    get: { Double(session.exposureBiasEV) },
-                    set: { session.setExposureBias(Float($0)) }
-                ),
-                in: Double(range.lowerBound)...Double(range.upperBound)
-            )
-            .tint(session.exposureBiasEV == 0 ? .white : .yellow)
-            .frame(maxWidth: 220)
-            .accessibilityIdentifier("filmtone.capture.evSlider.control")
-            Button(action: { session.resetExposureBias() }) {
-                Text(evDisplayLabel)
-                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(
-                        session.exposureBiasEV == 0
-                            ? .white.opacity(0.7)
-                            : .yellow
-                    )
-                    .frame(width: 56, alignment: .trailing)
-            }
-            .accessibilityIdentifier("filmtone.capture.evSlider.reset")
-            .accessibilityLabel(Text("Reset exposure"))
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(Color.black.opacity(0.45), in: Capsule())
-        .accessibilityIdentifier("filmtone.capture.evSlider")
-        .disabled(isRecordingOrStopping)
-        .opacity(isRecordingOrStopping ? 0.5 : 1.0)
-    }
-
-    private var showsEVSlider: Bool {
-        // S12-E: EV bias has no effect on a `setExposureModeCustom`
-        // exposure (the device-level bias does not feed into the
-        // locked ISO/shutter pair), so the slider is hidden whenever
-        // the session is in manual exposure.  In auto, the only
-        // remaining gate is "is the device-derived range non-degenerate"
-        // — SwiftUI `Slider(value:in:)` requires a non-empty range,
-        // and a future lens reporting `min == max` would emit NaN on
-        // drag.
-        guard session.exposureMode == .auto else { return false }
-        let range = session.exposureBiasRange
-        guard range.upperBound > range.lowerBound else { return false }
-        switch session.state {
-        case .ready, .recording, .stopping: return true
-        default: return false
-        }
-    }
-
-    /// Compact "+0.7 EV" / "0.0 EV" string for the reset button label.
-    /// Magnitude clamp on the rounding boundary so a value of -0.04
-    /// reads as "0.0 EV" rather than "-0.0 EV" (the unary minus in
-    /// `%+.1f` would otherwise leak through).
-    private var evDisplayLabel: String {
-        let v = session.exposureBiasEV
-        if abs(v) < 0.05 {
-            return "0.0 EV"
-        }
-        return String(format: "%+.1f EV", v)
-    }
-
-    // MARK: - Exposure mode + manual sliders (M12 / S12-E)
-
-    /// Compact 2-segment Auto / Manual control with a manual-mode
-    /// readout (`ISO · 1/Xs`) trailing the segments so the active
-    /// state is glanceable without expanding into the slider rows.
-    /// Lives as a sibling of `evSliderRow` / `whiteBalanceRow` so the
-    /// capture surface never fans out into a settings-style panel
-    /// (S12-A's "撮影画面が設定パネル化しないように" framing).
-    /// Disabled while recording / stopping (`AVCaptureDevice.lock
-    /// ForConfiguration()` mid-record contention avoidance + the
-    /// "auto ↔ manual mode toggle: 不可" rule from S12-A).
-    private var exposureModeRow: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "camera.aperture")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.white.opacity(0.85))
-            Text("Exposure")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.85))
-            exposureModeSegmentedControl
-                .accessibilityIdentifier("filmtone.capture.exposureModeControl")
-            if session.exposureMode == .manual {
-                Text(manualReadoutLabel)
-                    .font(.system(size: 11, weight: .medium).monospacedDigit())
-                    .foregroundStyle(.yellow)
-                    .lineLimit(1)
-                    .accessibilityIdentifier("filmtone.capture.manualReadout")
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 6)
-        .background(Color.black.opacity(0.45), in: Capsule())
-        .accessibilityIdentifier("filmtone.capture.exposureModeRow")
-        .disabled(isRecordingOrStopping)
-        .opacity(isRecordingOrStopping ? 0.5 : 1.0)
-    }
-
-    /// Local 2-pill segmented control mirroring `whiteBalanceSegmented
-    /// Control` so the Auto/Manual + Auto/Locked rows read as a
-    /// matching pair.  Same rationale as the WB control — `Picker
-    /// (.segmented)` UISegmentedControl appearance fights the dark
-    /// translucent capsule treatment.
-    private var exposureModeSegmentedControl: some View {
-        HStack(spacing: 0) {
-            exposureModeSegment(.auto, label: "Auto")
-            exposureModeSegment(.manual, label: "Manual")
-        }
-        .padding(2)
-        .background(Color.white.opacity(0.12), in: Capsule())
-        .frame(width: 156)
-    }
-
-    @ViewBuilder
-    private func exposureModeSegment(
-        _ mode: FilmtoneCaptureSession.ExposureMode,
-        label: String
-    ) -> some View {
-        let isActive = session.exposureMode == mode
-        Button {
-            applyExposureMode(mode)
-        } label: {
-            Text(label)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(
-                    isActive ? Color.black : .white.opacity(0.85)
-                )
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 5)
-                .background(
-                    isActive ? Color.white.opacity(0.95) : Color.clear,
-                    in: Capsule()
-                )
-        }
-        .accessibilityIdentifier("filmtone.capture.exposureMode.\(mode.rawValue)")
-        .accessibilityAddTraits(isActive ? .isSelected : [])
-    }
-
-    private func applyExposureMode(
-        _ mode: FilmtoneCaptureSession.ExposureMode
-    ) {
-        guard !isRecordingOrStopping else { return }
-        guard session.exposureMode != mode else { return }
-        switch mode {
-        case .auto:
-            session.exitManualExposure()
-        case .manual:
-            session.enterManualExposure()
-        }
-    }
-
-    private var showsExposureModeRow: Bool {
-        switch session.state {
-        case .ready, .recording, .stopping: return true
-        default: return false
-        }
-    }
-
-    private var showsManualExposureRows: Bool {
-        guard session.exposureMode == .manual else { return false }
-        switch session.state {
-        case .ready, .recording, .stopping: return true
-        default: return false
-        }
-    }
-
-    /// Linear ISO slider over the active format's `[minISO, maxISO]`.
-    /// Linear (rather than log) is the conventional camera surface
-    /// idiom — owners read ISO as discrete stops 100/200/400/...,
-    /// which a linear slider already approximates because most rear
-    /// formats expose ranges close to a power-of-two count.  Yellow
-    /// tint matches the EV slider's "deviation from neutral" cue.
-    private var isoSliderRow: some View {
-        let range = session.isoRange
-        return HStack(spacing: 10) {
-            Text("ISO")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.85))
-                .frame(width: 28, alignment: .leading)
-            Slider(
-                value: Binding(
-                    get: { Double(session.manualISO) },
-                    set: { session.setManualISO(Float($0)) }
-                ),
-                in: Double(range.lowerBound)...Double(range.upperBound)
-            )
-            .tint(.yellow)
-            .frame(maxWidth: 200)
-            .accessibilityIdentifier("filmtone.capture.isoSlider.control")
-            Text("\(Int(session.manualISO.rounded()))")
-                .font(.system(size: 12, weight: .semibold).monospacedDigit())
-                .foregroundStyle(.yellow)
-                .frame(width: 56, alignment: .trailing)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 6)
-        .background(Color.black.opacity(0.45), in: Capsule())
-        .accessibilityIdentifier("filmtone.capture.isoSlider")
-        .disabled(isRecordingOrStopping || !isoRangeUsable)
-        .opacity(isRecordingOrStopping ? 0.5 : 1.0)
-    }
-
-    /// Log10 shutter slider — duration spans ~3 orders of magnitude
-    /// (1/8000 s → 1/24 s) so a linear slider would bias the active
-    /// range toward the slow end.  The 180° marker (1/48 s) is pinned
-    /// behind the slider as a yellow tick at its log10 position.
-    /// Display label is "1/Xs" rounded to the nearest integer
-    /// denominator for the conventional camera readout.
-    private var shutterSliderRow: some View {
-        let range = session.shutterDurationRange
-        let logMin = log10(range.lowerBound)
-        let logMax = log10(range.upperBound)
-        let span = max(logMax - logMin, .ulpOfOne)
-        return HStack(spacing: 10) {
-            Image(systemName: "timer")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.white.opacity(0.85))
-                .frame(width: 18, alignment: .leading)
-            ZStack(alignment: .leading) {
-                GeometryReader { geo in
-                    if let m180 = session.shutterDuration180Degrees {
-                        let pos = (log10(m180) - logMin) / span
-                        let clamped = min(max(pos, 0), 1)
-                        Rectangle()
-                            .fill(Color.yellow.opacity(0.85))
-                            .frame(width: 2, height: 14)
-                            .position(
-                                x: geo.size.width * CGFloat(clamped),
-                                y: geo.size.height / 2
-                            )
-                            .accessibilityIdentifier("filmtone.capture.shutter180Marker")
-                    }
-                }
-                Slider(
-                    value: Binding(
-                        get: {
-                            let v = log10(session.manualShutterSeconds)
-                            return min(max((v - logMin) / span, 0), 1)
-                        },
-                        set: { normalized in
-                            let logVal = logMin + Double(normalized) * span
-                            session.setManualShutter(pow(10, logVal))
-                        }
-                    ),
-                    in: 0...1
-                )
-                .tint(.yellow)
-                .accessibilityIdentifier("filmtone.capture.shutterSlider.control")
-            }
-            .frame(width: 200)
-            Text(shutterDisplayLabel)
-                .font(.system(size: 12, weight: .semibold).monospacedDigit())
-                .foregroundStyle(shutterIsNear180 ? .yellow : .white)
-                .frame(width: 56, alignment: .trailing)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 6)
-        .background(Color.black.opacity(0.45), in: Capsule())
-        .accessibilityIdentifier("filmtone.capture.shutterSlider")
-        .disabled(isRecordingOrStopping || !shutterRangeUsable)
-        .opacity(isRecordingOrStopping ? 0.5 : 1.0)
-    }
-
-    /// True when the active format's ISO range is non-degenerate.
-    /// A degenerate range (`min == max`) would produce a slider that
-    /// emits NaN on drag — the row stays mounted but the slider goes
-    /// disabled so the readout still shows the locked ISO.
-    private var isoRangeUsable: Bool {
-        session.isoRange.upperBound > session.isoRange.lowerBound
-    }
-
-    /// Same guard for shutter — see `isoRangeUsable`.
-    private var shutterRangeUsable: Bool {
-        session.shutterDurationRange.upperBound
-            > session.shutterDurationRange.lowerBound
-    }
-
-    /// "1/48s" / "1/24s" — rounded to the nearest integer denominator.
-    /// Falls back to the seconds form ("0.04s") only on a sub-1
-    /// denominator (which the 24-fps cap precludes today, but keeps
-    /// the label honest if the cap ever changes).
-    private var shutterDisplayLabel: String {
-        let s = session.manualShutterSeconds
-        guard s > 0 else { return "—" }
-        let denom = 1.0 / s
-        if denom >= 1 {
-            return "1/\(Int(denom.rounded()))s"
-        }
-        return String(format: "%.2fs", s)
-    }
-
-    /// Within ±1 ms of 1/48 s — the "180° tolerance" from S12-A's
-    /// design lock.  Drives the yellow color cue on the readout when
-    /// the slider is sitting close to the marker.
-    private var shutterIsNear180: Bool {
-        guard let m180 = session.shutterDuration180Degrees else {
-            return false
-        }
-        return abs(session.manualShutterSeconds - m180) < 0.001
-    }
-
-    /// Combined readout shown next to the Auto/Manual segmented
-    /// control when Manual is active.  Format mirrors a camera HUD
-    /// (`ISO · 1/Xs`) for fast scan; the slider rows below carry the
-    /// drag affordance + 180° marker.
-    private var manualReadoutLabel: String {
-        "\(Int(session.manualISO.rounded())) · \(shutterDisplayLabel)"
-    }
-
-    // MARK: - White balance row (M12 / S12-D)
-
-    /// Compact 2-segment WB control: Auto (continuous) ⇄ Locked
-    /// (sampled-gains hold).  Stays a sibling of the EV slider rather
-    /// than fanning out into a settings panel — S12-A's "撮影画面が
-    /// 設定パネル化しないように" framing.  Disabled while recording /
-    /// stopping (`AVCaptureDevice.lockForConfiguration()` mid-record
-    /// contention avoidance, same rationale as the EV slider).  When
-    /// the active lens reports lock unsupported (no shipping iPhone
-    /// rear lens trips this, but a future / specialty lens could),
-    /// the Locked segment is disabled in place and an italic note
-    /// explains the reason without forcing a sheet.
-    private var whiteBalanceRow: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "thermometer.sun")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.white.opacity(0.85))
-            Text("WB")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.85))
-            whiteBalanceSegmentedControl
-                .accessibilityIdentifier("filmtone.capture.wbControl")
-            if !session.canLockWhiteBalance {
-                Text("Lock unavailable on this lens")
-                    .font(.system(size: 10, weight: .regular))
-                    .italic()
-                    .foregroundStyle(.white.opacity(0.55))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 6)
-        .background(Color.black.opacity(0.45), in: Capsule())
-        .accessibilityIdentifier("filmtone.capture.wbRow")
-        .disabled(isRecordingOrStopping)
-        .opacity(isRecordingOrStopping ? 0.5 : 1.0)
-    }
-
-    /// Custom 2-pill segmented control.  Built locally rather than
-    /// using SwiftUI `Picker(.segmented)` because the segmented Picker
-    /// uses UISegmentedControl appearance which fights the dark
-    /// translucent capsule treatment that anchors all M12 capture
-    /// controls (`Color.black.opacity(0.45)`).  Visual contract:
-    /// - Active segment: white pill background, black text
-    /// - Inactive: clear background, white text, ~60% opacity
-    /// - Outer capsule binds them as one control
-    private var whiteBalanceSegmentedControl: some View {
-        HStack(spacing: 0) {
-            whiteBalanceSegment(.auto, label: "Auto")
-            whiteBalanceSegment(.locked, label: "Locked")
-        }
-        .padding(2)
-        .background(Color.white.opacity(0.12), in: Capsule())
-        .frame(width: 156)
-    }
-
-    @ViewBuilder
-    private func whiteBalanceSegment(
-        _ mode: FilmtoneCaptureSession.WhiteBalanceMode,
-        label: String
-    ) -> some View {
-        let isActive = session.whiteBalanceMode == mode
-        let isLockedAndUnavailable = (
-            mode == .locked && !session.canLockWhiteBalance
-        )
-        Button {
-            applyWhiteBalanceMode(mode)
-        } label: {
-            Text(label)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(
-                    isActive
-                        ? Color.black
-                        : .white.opacity(isLockedAndUnavailable ? 0.35 : 0.85)
-                )
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 5)
-                .background(
-                    isActive
-                        ? Color.white.opacity(0.95)
-                        : Color.clear,
-                    in: Capsule()
-                )
-        }
-        .accessibilityIdentifier("filmtone.capture.wb.\(mode.rawValue)")
-        .accessibilityAddTraits(isActive ? .isSelected : [])
-        .disabled(isLockedAndUnavailable)
-    }
-
     private func applyWhiteBalanceMode(
         _ mode: FilmtoneCaptureSession.WhiteBalanceMode
     ) {
@@ -1367,13 +564,6 @@ struct FilmtoneCaptureView: View {
             // before the seg button visually flashes a press.
             guard session.canLockWhiteBalance else { return }
             session.lockWhiteBalance()
-        }
-    }
-
-    private var showsWhiteBalanceRow: Bool {
-        switch session.state {
-        case .ready, .recording, .stopping: return true
-        default: return false
         }
     }
 

@@ -1,10 +1,17 @@
 import SwiftUI
 
-/// Pre-load entry surface (`store.source == nil`). The wordmark + tagline
-/// hero was rejected by CD as cheap brand surface; tagline was deleted at
-/// the source-of-truth level. The current land hosts a CD-supplied symbol
-/// image (`FilmtoneSymbol01`) as the sole hero, over a quiet near-black
-/// substrate. Saved Looks teaser + photo / files CTAs preserve prior wiring.
+/// Pre-load entry surface (`store.source == nil`).
+///
+/// **M15-final v3 (2026-05-09)**: drops the sphere mask entirely
+/// after owner clarified 「mask 自体が必要ない / 球体は求めていない /
+/// 複数 blob が混ざり合うアニメーション」. The shader now renders
+/// 5 pastel blobs drifting across the full screen as the empty-view
+/// backdrop; Liquid Glass UI (saved-Looks chips + action capsule
+/// stack) sits on top and refracts the fluid color underneath.
+///
+/// Filmtone editor effects integrated in the backdrop:
+/// chromatic aberration, film grain, glow halation. The empty view
+/// is the product previewing what Filmtone does to user clips.
 struct FilmtoneEmptyView: View {
     @ObservedObject var store: FilmtoneEditorStore
     let onPickPhotoLibrary: () -> Void
@@ -14,69 +21,54 @@ struct FilmtoneEmptyView: View {
 
     var body: some View {
         ZStack {
-            backgroundLayer
+            substrate
                 .ignoresSafeArea()
+
+            FilmtoneFluidSphere()
+                .ignoresSafeArea()
+                .accessibilityIdentifier("filmtone.empty.fluidBackdrop")
 
             VStack(spacing: 0) {
                 Spacer(minLength: 0)
 
-                symbolHero
-
-                Spacer(minLength: 24)
-
                 if !store.library.looks.isEmpty {
                     savedLooksTeaser
                         .padding(.horizontal, 16)
-                        .padding(.top, 8)
+                        .padding(.bottom, 16)
                 }
 
-                Spacer(minLength: 0)
-
-                ctaBlock
-                    .padding(.horizontal, 32)
-                    .padding(.bottom, 32)
+                actionStack
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 28)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        // v6: empty view is the only light-themed surface in an
+        // otherwise dark editor app — flip the local color scheme
+        // so `.primary` foreground colors and the system status bar
+        // adapt to the cream substrate without breaking the rest of
+        // the app's dark theme. `.preferredColorScheme` only affects
+        // the receiver subtree.
+        .preferredColorScheme(.light)
         .accessibilityIdentifier("filmtone.empty")
     }
 
-    // MARK: Background
+    // MARK: Substrate
 
-    /// Quiet near-black substrate. A faint center-warm radial gives Liquid
-    /// Glass a minimal substrate variation to refract without competing with
-    /// the symbol hero. The amber/teal hero gradients of the rejected design
-    /// are intentionally absent.
-    private var backgroundLayer: some View {
-        ZStack {
-            Color.black
-
-            RadialGradient(
-                colors: [
-                    Color.white.opacity(0.04),
-                    Color.black.opacity(0.0),
-                    Color.black.opacity(0.45),
-                ],
-                center: .center,
-                startRadius: 80,
-                endRadius: 620
-            )
-        }
+    /// Cream warm-pastel substrate (matches shader BASE_COLOR). v6
+    /// commits to a genuinely light bg matching reference images
+    /// #7 / #8 instead of the previous near-black "warm bias" cuts
+    /// that read as black to the eye.
+    private var substrate: some View {
+        Color(red: 0.86, green: 0.82, blue: 0.78)
     }
 
-    // MARK: Symbol hero
+    // MARK: Saved Looks teaser
 
-    private var symbolHero: some View {
-        Image("FilmtoneSymbol01")
-            .resizable()
-            .aspectRatio(contentMode: .fit)
-            .frame(maxWidth: 140, maxHeight: 140)
-            .accessibilityIdentifier("filmtone.empty.symbol")
-            .accessibilityLabel(store.strings.appName)
-    }
-
-    // MARK: Saved Looks teaser (≥1 件)
-
+    /// Existing `FilmtoneSavedLooksStrip` (post-M15-bis chip re-tune
+    /// — neutral Liquid Glass, amber survives only on the camera-
+    /// aperture icon and the favorite star). Rendered only when the
+    /// owner has at least one saved Look.
     private var savedLooksTeaser: some View {
         GlassEffectContainer(spacing: 10) {
             FilmtoneSavedLooksStrip(
@@ -94,36 +86,84 @@ struct FilmtoneEmptyView: View {
         .accessibilityIdentifier("filmtone.empty.savedLooks")
     }
 
-    // MARK: CTA pickers
+    // MARK: Action stack — Apple Liquid Glass capsule buttons
 
-    private var ctaBlock: some View {
-        GlassEffectContainer(spacing: 8) {
-            VStack(spacing: 8) {
-                Button(action: onPickPhotoLibrary) {
-                    Label(
-                        store.strings.pickFromPhotoLibrary,
-                        systemImage: "photo.on.rectangle.angled"
+    /// Three glass capsule buttons inside a single
+    /// `GlassEffectContainer` so adjacent capsules merge as one
+    /// material instead of stacking translucencies. The fluid sphere
+    /// drifting / breathing above gives the capsules an actual
+    /// pastel atmosphere to refract — that is the Liquid Glass
+    /// signature the surface had been missing through M15-ter.
+    ///
+    /// Layout: 2-up Photo Library / Files (compact) above a
+    /// full-width Record (wide). Wide row lightly emphasizes the
+    /// Filmtone-authored capture path; equal material grammar binds
+    /// the three actions into one CTA stack.
+    private var actionStack: some View {
+        GlassEffectContainer(spacing: 10) {
+            VStack(spacing: 10) {
+                HStack(spacing: 10) {
+                    glassCTA(
+                        title: store.strings.pickFromPhotoLibrary,
+                        systemImage: "photo.on.rectangle.angled",
+                        identifier: "filmtone.empty.photoLibrary",
+                        action: onPickPhotoLibrary
                     )
-                    .font(.footnote.weight(.medium))
+                    glassCTA(
+                        title: store.strings.pickFromFiles,
+                        systemImage: "folder",
+                        identifier: "filmtone.empty.files",
+                        action: onPickFiles
+                    )
                 }
-                .buttonStyle(.glassProminent)
-                .accessibilityIdentifier("filmtone.empty.photoLibrary")
-
-                Button(action: onPickFiles) {
-                    Label(store.strings.pickFromFiles, systemImage: "folder")
-                        .font(.footnote.weight(.medium))
-                }
-                .buttonStyle(.glass)
-                .accessibilityIdentifier("filmtone.empty.files")
-
-                Button(action: onRecordProductClip) {
-                    Label(store.strings.recordProductClip, systemImage: "video.fill")
-                        .font(.footnote.weight(.medium))
-                }
-                .buttonStyle(.glass)
-                .disabled(store.isBusy)
-                .accessibilityIdentifier("filmtone.empty.recordProductClip")
+                glassCTA(
+                    title: store.strings.recordProductClip,
+                    systemImage: "video.fill",
+                    identifier: "filmtone.empty.recordProductClip",
+                    isDisabled: store.isBusy,
+                    action: onRecordProductClip
+                )
             }
         }
+    }
+
+    @ViewBuilder
+    private func glassCTA(
+        title: String,
+        systemImage: String,
+        identifier: String,
+        isDisabled: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        // v6: text/icon use `.primary` and rim uses `Color.primary`
+        // so this capsule adapts to the surrounding color scheme.
+        // On the empty view (`.preferredColorScheme(.light)`) → black
+        // text on cream-glass. On any other surface (dark scheme) →
+        // white text. No hard-coded white that would disappear on
+        // the new cream substrate.
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: systemImage)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.primary.opacity(0.86))
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary.opacity(0.92))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+            }
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 6)
+            .glassEffect(.regular.interactive(), in: Capsule())
+            .overlay(
+                Capsule().strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5)
+            )
+            .opacity(isDisabled ? 0.45 : 1)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(isDisabled)
+        .accessibilityIdentifier(identifier)
     }
 }

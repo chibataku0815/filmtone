@@ -329,6 +329,15 @@ struct FilmtoneCapturePackage: Equatable {
     /// distinguishes "M12 capture, owner stayed on auto-WB" from
     /// "pre-M12 capture, no WB metadata exists".
     let whiteBalance: FilmtoneCaptureWhiteBalanceRecord?
+    /// M14-B: security-scoped bookmark for `masterURL`, generated at
+    /// capture-finalize time when `storagePolicy ==
+    /// .externalSecurityScopedFolder`. Editor uses this at export
+    /// start to re-acquire scope on the master file across capture-
+    /// view dismissal and app relaunch. `nil` for internal-Documents
+    /// masters (no scope needed) and for pre-M14-B captures decoded
+    /// from disk (resolveExportSource falls back to fileExists +
+    /// proxy fallback per M14-A).
+    let masterBookmark: Data?
 }
 
 #endif

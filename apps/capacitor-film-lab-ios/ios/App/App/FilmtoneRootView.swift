@@ -155,10 +155,6 @@ struct FilmtoneRootView: View {
                 )
             }
             FilmtoneCaptureView(
-                lookReference: FilmtoneCaptureLookReference(
-                    displayURI: store.selectedPreviewURI,
-                    lookLabel: store.lookProfileLabel
-                ),
                 liveGradeProcessor: liveBundle?.processor,
                 liveDiagnostics: liveBundle?.diagnostics,
                 initialCaptureLook: initialCaptureLook,

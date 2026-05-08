@@ -2077,15 +2077,177 @@ final class FilmtoneEditorStore: ObservableObject {
         }
     }
 
+    /// M14-A: which file the export pipeline ended up sourcing from.
+    /// Used to drive the post-export toast wording so the owner can
+    /// tell whether the artifact is the high-quality master path or
+    /// the proxy fallback.
+    enum ExportSourceDecision: Equatable {
+        /// No capture package in play (Photos / Files edit). The
+        /// existing `source` + `probe` are used unchanged. Toast keeps
+        /// the legacy "Export complete" wording so non-capture flows
+        /// do not pick up master / proxy language.
+        case noCapturePackage
+        /// Capture package master is reachable + probed cleanly. Export
+        /// runs from the master. Toast: "Exported from master".
+        case usingMaster
+        /// Capture package master file is missing on disk. Falls back
+        /// to proxy. Toast: "Exported from proxy — master not reachable".
+        case usingProxyMasterMissing
+        /// Capture package master file exists but cannot be probed
+        /// (permission denied, malformed file, security-scoped resource
+        /// access not held). Falls back to proxy.
+        case usingProxyMasterUnreadable(reason: String)
+    }
+
+    /// M14-A resolution result. The export pipeline consumes
+    /// `(source, probe)`; the `decision` drives toast wording.
+    ///
+    /// M14-B: also carries a `scopedURL` for the case where the
+    /// resolver acquired security-scope on a SSD master file via the
+    /// package's `masterBookmark`. The export call site MUST defer
+    /// `release()` so scope is dropped on every exit path.
+    struct ResolvedExportSource {
+        let source: SourceInfoDTO?
+        let probe: SourceProbeDTO?
+        let decision: ExportSourceDecision
+        /// URL we currently hold a security-scoped resource access on.
+        /// `nil` for internal masters and proxy fallbacks.
+        fileprivate let scopedURL: URL?
+
+        /// Drop the held security scope. Idempotent — calling
+        /// `release()` more than once or on a `.scopedURL == nil`
+        /// instance is a no-op. Always paired with a `defer` at the
+        /// call site so abnormal exits do not leak scope.
+        func release() {
+            scopedURL?.stopAccessingSecurityScopedResource()
+        }
+    }
+
+    /// M14-A + M14-B: pick master vs proxy at export time. Photos /
+    /// Files edits pass through unchanged via `.noCapturePackage`.
+    /// Capture-package edits prefer the master when reachable.
+    ///
+    /// Resolution order:
+    /// 1. **Bookmark resolution + scope acquire** (M14-B). If the
+    ///    package carries a `masterBookmark`, resolve it and start
+    ///    scoped access. On failure (stale bookmark, scope denied),
+    ///    fall through with no scope held.
+    /// 2. **fileExists** — catches deleted-internal and unmounted-SSD
+    ///    cases.
+    /// 3. **facade.probeSource(masterSource)** — catches
+    ///    permission-denied (no scope held + iOS sandbox refusing
+    ///    read), malformed-file, codec-not-supported.
+    ///
+    /// Every fallback branch drops the bookmark scope before returning
+    /// (we only retain scope on `.usingMaster` because that's the only
+    /// branch where the export pipeline will actually read the file).
+    /// The `release()` defer at the call site handles the success
+    /// branch.
+    private func resolveExportSource() -> ResolvedExportSource {
+        guard let package = lastCapturePackage, let proxyProbe = probe else {
+            return ResolvedExportSource(
+                source: source,
+                probe: probe,
+                decision: .noCapturePackage,
+                scopedURL: nil
+            )
+        }
+
+        // M14-B: if the package carries a bookmark, try to resolve +
+        // acquire scope before any reachability check. This is what
+        // unlocks SSD master export across capture-view dismissal and
+        // app relaunch.
+        var heldScopeURL: URL?
+        if let bookmark = package.masterBookmark,
+           let resolvedURL = FilmtoneSecurityScopedBookmark.resolve(bookmark) {
+            if resolvedURL.startAccessingSecurityScopedResource() {
+                heldScopeURL = resolvedURL
+                NSLog(
+                    "[M14-B] master bookmark resolved + scope acquired at %@",
+                    resolvedURL.path
+                )
+            } else {
+                NSLog(
+                    "[M14-B] bookmark resolved at %@ but scope acquire denied — falling back",
+                    resolvedURL.path
+                )
+            }
+        }
+
+        let masterURL = package.masterURL
+        guard FileManager.default.fileExists(atPath: masterURL.path) else {
+            heldScopeURL?.stopAccessingSecurityScopedResource()
+            NSLog("[M14-A] master missing at %@ — falling back to proxy export", masterURL.path)
+            return ResolvedExportSource(
+                source: source,
+                probe: proxyProbe,
+                decision: .usingProxyMasterMissing,
+                scopedURL: nil
+            )
+        }
+
+        let masterSource = SourceInfoDTO(
+            uri: masterURL.absoluteString,
+            filename: masterURL.lastPathComponent,
+            kind: .video,
+            mimeType: "video/quicktime"
+        )
+
+        do {
+            let masterProbe = try facade.probeSource(masterSource)
+            NSLog("[M14-A] master reachable + probed at %@ — exporting from master", masterURL.path)
+            return ResolvedExportSource(
+                source: masterSource,
+                probe: masterProbe,
+                decision: .usingMaster,
+                scopedURL: heldScopeURL
+            )
+        } catch {
+            heldScopeURL?.stopAccessingSecurityScopedResource()
+            let reason = (error as NSError).localizedDescription
+            NSLog("[M14-A] master probe failed (%@) — falling back to proxy export", reason)
+            return ResolvedExportSource(
+                source: source,
+                probe: proxyProbe,
+                decision: .usingProxyMasterUnreadable(reason: reason),
+                scopedURL: nil
+            )
+        }
+    }
+
+    /// M14-A: maps the export-source decision to the right localized
+    /// success toast. Non-capture sources keep the legacy
+    /// "Export complete" wording so the master / proxy language only
+    /// appears where it is meaningful.
+    private func toastForDecision(_ decision: ExportSourceDecision) -> String {
+        switch decision {
+        case .noCapturePackage:
+            return strings.toastExportComplete
+        case .usingMaster:
+            return strings.toastExportUsedMaster
+        case .usingProxyMasterMissing, .usingProxyMasterUnreadable:
+            return strings.toastExportUsedProxyMasterUnavailable
+        }
+    }
+
     func export() async {
         guard !isBusy && !isSavingToPhotos else {
             return
         }
 
+        // M14-A / M14-B: pick master vs proxy at export time.
+        // `resolveExportSource()` may have acquired security-scope on
+        // an SSD master via the package's bookmark — `defer release()`
+        // drops scope on every exit path (success, throw, early
+        // return). Captured outside `do` so even a build-request throw
+        // releases scope.
+        let resolved = resolveExportSource()
+        defer { resolved.release() }
+
         do {
             let request = try FilmtonePhase0Math.buildExportRequest(
-                source: source,
-                probe: probe,
+                source: resolved.source,
+                probe: resolved.probe,
                 project: project
             )
 
@@ -2129,7 +2291,7 @@ final class FilmtoneEditorStore: ObservableObject {
             exportResult = result
             exportLocalAvailability = .available
             reclaimCacheForCurrentState()
-            presentToast(strings.toastExportComplete, kind: .success)
+            presentToast(toastForDecision(resolved.decision), kind: .success)
         } catch {
             isBusy = false
             exportProgress = nil
@@ -2145,10 +2307,15 @@ final class FilmtoneEditorStore: ObservableObject {
             return
         }
 
+        // M14-A / M14-B: see `export()` for the resolved + defer
+        // rationale.
+        let resolved = resolveExportSource()
+        defer { resolved.release() }
+
         do {
             let request = try FilmtonePhase0Math.buildExportRequest(
-                source: source,
-                probe: probe,
+                source: resolved.source,
+                probe: resolved.probe,
                 project: project
             )
 
@@ -2182,6 +2349,9 @@ final class FilmtoneEditorStore: ObservableObject {
             exportResult = result
             exportLocalAvailability = .available
             reclaimCacheForCurrentState()
+            // Surface the master/proxy decision before saveToPhotos
+            // runs its own toast, so the owner sees both signals.
+            presentToast(toastForDecision(resolved.decision), kind: .success)
             await saveExportResultToPhotos(result)
         } catch {
             isBusy = false

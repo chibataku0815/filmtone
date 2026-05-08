@@ -106,6 +106,14 @@ struct FilmtoneCapturePackageSnapshotV1: Codable {
     var manualISO: Double?
     var manualShutterDurationSeconds: Double?
     var manualInheritedFromAuto: Bool?
+    /// M14-B: security-scoped bookmark for the master file URL.
+    /// Optional, additive — pre-M14-B snapshots decode with nil and
+    /// the editor falls back to the M14-A fileExists + proxy path.
+    /// `Data` round-trips as base64 in JSON, so the field is human-
+    /// inspectable (long opaque blob) without decoder shenanigans.
+    /// No schemaVersion bump — schema-version 2's contract is
+    /// "additive optional fields allowed."
+    var masterBookmark: Data?
 
     /// Bumped to 2 in S11-D.  Schema-version 1 snapshots written by
     /// M10 / S8-B continue to decode because every S11-D field is
@@ -217,7 +225,8 @@ enum FilmtoneCapturePackagePersistence {
             whiteBalanceBlueGain: package.whiteBalance?.blueGain,
             manualISO: package.exposureControl?.manualISO,
             manualShutterDurationSeconds: package.exposureControl?.manualShutterDurationSeconds,
-            manualInheritedFromAuto: package.exposureControl?.inheritedFromAuto
+            manualInheritedFromAuto: package.exposureControl?.inheritedFromAuto,
+            masterBookmark: package.masterBookmark
         )
     }
 
@@ -344,7 +353,8 @@ enum FilmtoneCapturePackagePersistence {
             lens: lens,
             selectedLook: selectedLook,
             exposureControl: exposureControl,
-            whiteBalance: whiteBalance
+            whiteBalance: whiteBalance,
+            masterBookmark: snapshot.masterBookmark
         )
     }
 

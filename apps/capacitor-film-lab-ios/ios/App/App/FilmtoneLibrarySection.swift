@@ -159,15 +159,21 @@ struct FilmtoneSavedLooksStrip: View {
 
 extension SavedLookEntry: Identifiable {}
 
-/// Compact pill used for both Recent LUT and Saved Look entries. Favorite
-/// items get a subtle amber star to match the existing `Color.filmtoneAmber`
-/// accent system — no new colors introduced.
+/// Compact pill used for both Recent LUT and Saved Look entries.
+/// Favorite items get a subtle amber star to match the existing
+/// `Color.filmtoneAmber` accent system — no new colors introduced.
 ///
-/// `isBundled` (v1.4) tints the chip background with the existing amber
-/// accent at low alpha to mark built-in catalog entries. v1.3 also drew a
-/// "FILMTONE" caption pill in the top-right; that was dropped in v1.4
-/// because it overlapped the chip title at common widths and was visually
-/// redundant with the amber tint + amber stroke.
+/// **M15-bis (2026-05-09)**: redesign after M15 was rejected at 20点.
+/// Dropped the amber background tint (the M15 0.10 alpha still washed
+/// the chip into opaque brown on the dark substrate). `isBundled`
+/// status is now communicated through the **icon color** (amber
+/// camera-aperture symbol) and the favorite star — the chip-shape
+/// material itself is always plain `.regular.interactive()`. The
+/// hairline rim is white-only so refraction at the rim reads as
+/// silvery-clear glass, not tinted leather. Glass is applied
+/// directly on the padded HStack — no `Color.clear.glassEffect`
+/// background trick (which diffused labels in the rejected M15
+/// implementation).
 struct FilmtoneLibraryChip: View {
     let title: String
     let systemImage: String
@@ -175,7 +181,11 @@ struct FilmtoneLibraryChip: View {
     var isBundled: Bool = false
 
     var body: some View {
-        HStack(spacing: 8) {
+        let shape = RoundedRectangle(
+            cornerRadius: filmtoneControlCornerRadius,
+            style: .continuous
+        )
+        return HStack(spacing: 8) {
             Image(systemName: systemImage)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(Color.filmtoneAmber.opacity(0.86))
@@ -184,7 +194,7 @@ struct FilmtoneLibraryChip: View {
 
             Text(title)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.white.opacity(0.92))
+                .foregroundStyle(.primary.opacity(0.92))
                 .lineLimit(1)
                 .truncationMode(.tail)
 
@@ -197,18 +207,15 @@ struct FilmtoneLibraryChip: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
-        .background(
-            RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
-                .fill(isBundled ? Color.filmtoneAmber.opacity(0.18) : Color.white.opacity(0.05))
-        )
+        .glassEffect(.regular.interactive(), in: shape)
         .overlay(
-            RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
-                .stroke(
-                    isBundled ? Color.filmtoneAmber.opacity(0.32) : Color.white.opacity(0.08),
-                    lineWidth: 1
-                )
+            // v6: was `Color.white.opacity(0.10)` (invisible on cream).
+            // `.primary` adapts to the surrounding color scheme so the
+            // rim is white-on-dark in library section, dark-on-cream
+            // in the empty view.
+            shape.strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5)
         )
-        .contentShape(Rectangle())
+        .contentShape(shape)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityLabel(Text(accessibilityLabel))

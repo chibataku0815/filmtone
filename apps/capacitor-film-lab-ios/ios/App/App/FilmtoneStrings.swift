@@ -205,6 +205,8 @@ struct FilmtoneStrings {
     // MARK: - Toast UX (T1 v1.1 portrait optics + toast fix)
     let toastSaveSuccess: String
     let toastExportComplete: String
+    let toastExportUsedMaster: String
+    let toastExportUsedProxyMasterUnavailable: String
     let toastShareSuccess: String
     let toastShareFailed: String
     // MARK: - LUT library + Saved Looks (Item 3, v1.3 candidate)
@@ -1469,6 +1471,18 @@ extension FilmtoneStrings {
             "filmtone.toast.export.complete",
             defaultValue: prefersJapanese ? "書き出し完了" : "Export complete",
             comment: "Toast shown when an export run finishes successfully."
+        )
+        toastExportUsedMaster = filmtoneLocalized(
+            "filmtone.toast.export.used_master",
+            defaultValue: prefersJapanese ? "マスターから書き出しました" : "Exported from master",
+            comment: "Toast shown when a capture-package edit was exported from the high-quality master file (ProRes 422 HQ Apple Log 2) rather than the lower-quality proxy."
+        )
+        toastExportUsedProxyMasterUnavailable = filmtoneLocalized(
+            "filmtone.toast.export.used_proxy_master_unavailable",
+            defaultValue: prefersJapanese
+                ? "プロキシから書き出し(マスターが見つかりません)"
+                : "Exported from proxy — master not reachable",
+            comment: "Toast shown when a capture-package edit fell back to proxy export because the master file was unreachable (external SSD unplugged, etc.). Surfaces the fallback explicitly so the owner knows the artifact is the proxy quality."
         )
         toastShareSuccess = filmtoneLocalized(
             "filmtone.toast.share.success",

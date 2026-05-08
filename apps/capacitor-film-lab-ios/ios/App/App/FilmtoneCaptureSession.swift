@@ -1102,6 +1102,21 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
                 guard let self else { return }
                 switch proxyResult {
                 case .success:
+                    // M14-B: snapshot a security-scoped bookmark for the
+                    // master file URL when the storage policy is external.
+                    // The capture surface still holds folder scope at this
+                    // moment (releaseExternalFolderScope runs from the view's
+                    // dismiss / .completed branch, which is downstream of
+                    // this MainActor.run). Internal masters do not need a
+                    // bookmark — the path lives in app Documents and
+                    // remains reachable without scope.
+                    let masterBookmark: Data?
+                    switch storagePolicy {
+                    case .externalSecurityScopedFolder:
+                        masterBookmark = FilmtoneSecurityScopedBookmark.make(for: masterURL)
+                    case .internalDocumentsCapped:
+                        masterBookmark = nil
+                    }
                     let pkg = FilmtoneCapturePackage(
                         captureId: captureId,
                         storagePolicy: storagePolicy,
@@ -1114,7 +1129,8 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
                         lens: lensRecord,
                         selectedLook: selectedLook,
                         exposureControl: exposureControl,
-                        whiteBalance: whiteBalance
+                        whiteBalance: whiteBalance,
+                        masterBookmark: masterBookmark
                     )
                     // Master/proxy linkage is the M10 deliverable; if we
                     // can't write `capture-package.json` next to the

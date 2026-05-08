@@ -91,6 +91,18 @@
 		D20000010000000000000086 /* FilmtoneCaptureLensCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000086 /* FilmtoneCaptureLensCatalog.swift */; };
 		D20000010000000000000087 /* FilmtoneCaptureLivePreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000087 /* FilmtoneCaptureLivePreview.swift */; };
 		D20000010000000000000088 /* FilmtoneExternalFolderBookmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000088 /* FilmtoneExternalFolderBookmark.swift */; };
+		D20000010000000000000089 /* FilmtoneCaptureLookModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000089 /* FilmtoneCaptureLookModel.swift */; };
+		D2000001000000000000008A /* FilmtoneCaptureChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000008A /* FilmtoneCaptureChrome.swift */; };
+		D2000001000000000000008B /* FilmtoneCaptureTopStatusBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000008B /* FilmtoneCaptureTopStatusBar.swift */; };
+		D2000001000000000000008C /* FilmtoneCaptureBottomDeck.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000008C /* FilmtoneCaptureBottomDeck.swift */; };
+		D2000001000000000000008E /* FilmtoneCaptureInteractionOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000008E /* FilmtoneCaptureInteractionOverlay.swift */; };
+		D2000001000000000000008F /* FilmtoneCaptureCockpitTopBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000008F /* FilmtoneCaptureCockpitTopBar.swift */; };
+		D20000010000000000000090 /* FilmtoneCaptureLensChipRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000090 /* FilmtoneCaptureLensChipRow.swift */; };
+		D20000010000000000000091 /* FilmtoneCaptureLookSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000091 /* FilmtoneCaptureLookSheet.swift */; };
+		D20000010000000000000092 /* FilmtoneCaptureRulerScrubber.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000092 /* FilmtoneCaptureRulerScrubber.swift */; };
+		D20000010000000000000093 /* FilmtoneSecurityScopedBookmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000093 /* FilmtoneSecurityScopedBookmark.swift */; };
+		D20000010000000000000094 /* FilmtoneFluidSphere.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000094 /* FilmtoneFluidSphere.swift */; };
+		D20000010000000000000095 /* FilmtoneFluidSphere.metal in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000095 /* FilmtoneFluidSphere.metal */; };
 		D20000010000000000000052 /* FilmtoneGcsvWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000052 /* FilmtoneGcsvWriter.swift */; };
 		D20000010000000000000001 /* FormatExtensionReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000001 /* FormatExtensionReader.swift */; };
 		D20000010000000000000002 /* SourceColorMetadataNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000002 /* SourceColorMetadataNormalizer.swift */; };
@@ -238,6 +250,18 @@
 		C20000010000000000000086 /* FilmtoneCaptureLensCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCaptureLensCatalog.swift; sourceTree = "<group>"; };
 		C20000010000000000000087 /* FilmtoneCaptureLivePreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCaptureLivePreview.swift; sourceTree = "<group>"; };
 		C20000010000000000000088 /* FilmtoneExternalFolderBookmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneExternalFolderBookmark.swift; sourceTree = "<group>"; };
+		C20000010000000000000089 /* FilmtoneCaptureLookModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCaptureLookModel.swift; sourceTree = "<group>"; };
+		C2000001000000000000008A /* FilmtoneCaptureChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCaptureChrome.swift; sourceTree = "<group>"; };
+		C2000001000000000000008B /* FilmtoneCaptureTopStatusBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCaptureTopStatusBar.swift; sourceTree = "<group>"; };
+		C2000001000000000000008C /* FilmtoneCaptureBottomDeck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCaptureBottomDeck.swift; sourceTree = "<group>"; };
+		C2000001000000000000008E /* FilmtoneCaptureInteractionOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCaptureInteractionOverlay.swift; sourceTree = "<group>"; };
+		C2000001000000000000008F /* FilmtoneCaptureCockpitTopBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCaptureCockpitTopBar.swift; sourceTree = "<group>"; };
+		C20000010000000000000090 /* FilmtoneCaptureLensChipRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCaptureLensChipRow.swift; sourceTree = "<group>"; };
+		C20000010000000000000091 /* FilmtoneCaptureLookSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCaptureLookSheet.swift; sourceTree = "<group>"; };
+		C20000010000000000000092 /* FilmtoneCaptureRulerScrubber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCaptureRulerScrubber.swift; sourceTree = "<group>"; };
+		C20000010000000000000093 /* FilmtoneSecurityScopedBookmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneSecurityScopedBookmark.swift; sourceTree = "<group>"; };
+		C20000010000000000000094 /* FilmtoneFluidSphere.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneFluidSphere.swift; sourceTree = "<group>"; };
+		C20000010000000000000095 /* FilmtoneFluidSphere.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = FilmtoneFluidSphere.metal; sourceTree = "<group>"; };
 		C20000010000000000000052 /* FilmtoneGcsvWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneGcsvWriter.swift; sourceTree = "<group>"; };
 		C20000010000000000000001 /* FormatExtensionReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormatExtensionReader.swift; sourceTree = "<group>"; };
 		C20000010000000000000002 /* SourceColorMetadataNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceColorMetadataNormalizer.swift; sourceTree = "<group>"; };
@@ -398,6 +422,18 @@
 				C20000010000000000000086 /* FilmtoneCaptureLensCatalog.swift */,
 				C20000010000000000000087 /* FilmtoneCaptureLivePreview.swift */,
 				C20000010000000000000088 /* FilmtoneExternalFolderBookmark.swift */,
+				C20000010000000000000089 /* FilmtoneCaptureLookModel.swift */,
+				C2000001000000000000008A /* FilmtoneCaptureChrome.swift */,
+				C2000001000000000000008B /* FilmtoneCaptureTopStatusBar.swift */,
+				C2000001000000000000008C /* FilmtoneCaptureBottomDeck.swift */,
+				C2000001000000000000008E /* FilmtoneCaptureInteractionOverlay.swift */,
+				C2000001000000000000008F /* FilmtoneCaptureCockpitTopBar.swift */,
+				C20000010000000000000090 /* FilmtoneCaptureLensChipRow.swift */,
+				C20000010000000000000091 /* FilmtoneCaptureLookSheet.swift */,
+				C20000010000000000000092 /* FilmtoneCaptureRulerScrubber.swift */,
+				C20000010000000000000093 /* FilmtoneSecurityScopedBookmark.swift */,
+				C20000010000000000000094 /* FilmtoneFluidSphere.swift */,
+				C20000010000000000000095 /* FilmtoneFluidSphere.metal */,
 				C20000010000000000000052 /* FilmtoneGcsvWriter.swift */,
 				C20000010000000000000001 /* FormatExtensionReader.swift */,
 				C20000010000000000000002 /* SourceColorMetadataNormalizer.swift */,
@@ -714,6 +750,18 @@
 				D20000010000000000000086 /* FilmtoneCaptureLensCatalog.swift in Sources */,
 				D20000010000000000000087 /* FilmtoneCaptureLivePreview.swift in Sources */,
 				D20000010000000000000088 /* FilmtoneExternalFolderBookmark.swift in Sources */,
+				D20000010000000000000089 /* FilmtoneCaptureLookModel.swift in Sources */,
+				D2000001000000000000008A /* FilmtoneCaptureChrome.swift in Sources */,
+				D2000001000000000000008B /* FilmtoneCaptureTopStatusBar.swift in Sources */,
+				D2000001000000000000008C /* FilmtoneCaptureBottomDeck.swift in Sources */,
+				D2000001000000000000008E /* FilmtoneCaptureInteractionOverlay.swift in Sources */,
+				D2000001000000000000008F /* FilmtoneCaptureCockpitTopBar.swift in Sources */,
+				D20000010000000000000090 /* FilmtoneCaptureLensChipRow.swift in Sources */,
+				D20000010000000000000091 /* FilmtoneCaptureLookSheet.swift in Sources */,
+				D20000010000000000000092 /* FilmtoneCaptureRulerScrubber.swift in Sources */,
+				D20000010000000000000093 /* FilmtoneSecurityScopedBookmark.swift in Sources */,
+				D20000010000000000000094 /* FilmtoneFluidSphere.swift in Sources */,
+				D20000010000000000000095 /* FilmtoneFluidSphere.metal in Sources */,
 				D20000010000000000000052 /* FilmtoneGcsvWriter.swift in Sources */,
 				D20000010000000000000001 /* FormatExtensionReader.swift in Sources */,
 				D20000010000000000000002 /* SourceColorMetadataNormalizer.swift in Sources */,

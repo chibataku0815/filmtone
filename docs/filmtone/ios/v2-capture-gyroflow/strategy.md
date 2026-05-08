@@ -262,7 +262,7 @@ Dependency:
 Out of scope (handled in later lanes):
 
 - React/Capacitor stack purge, capture-time honest preview (was strategy
-  M8's preview half — not shipped, deferred), preview/preset polish,
+  M8's preview half — not shipped, deferred), preview / Look polish,
   multi-device acceptance matrix, doc cleanup, recording-stop gesture
   changes.
 
@@ -314,7 +314,7 @@ Dependency:
 
 Out of scope (handled in later lanes):
 
-- Capture-time honest preview, preview/preset polish, multi-device
+- Capture-time honest preview, preview / Look polish, multi-device
   acceptance matrix, audio capture, exposure / focus / WB knobs,
   Gyroflow handoff (separate library lane), variable-fps capture.
 
@@ -418,7 +418,7 @@ Done:
   を直接制御。slider range は active format の
   `minISO..maxISO` / `minExposureDuration..maxExposureDuration` から
   動的生成、24fps capture の shutter は 1/24s 上限で cap(物理
-  最大 = 1 frame 露光)。180° shutter (1/48s) は marker / preset 表示。
+  最大 = 1 frame 露光)。180° shutter (1/48s) は marker 表示。
   manual モード入りで EV bias / tap-to-meter は無効化、tap-to-focus
   のみ残る
 - **制御値の package 永続化**: `capture-package.json` に
@@ -457,6 +457,169 @@ Out of scope (handled in later lanes):
 - exposure / focus / WB の RAW metadata sidecar(Filmtone editor
   側で読み戻す要件が出てから)
 - AE/AWB lock + AF lock の 1-button "AE/AF Lock" 統合 UI(別 lane)
+
+### M13 - Capture Screen UI Consolidation + Liquid Glass
+
+Goal:
+
+M10〜M12で増えた撮影画面の操作を、実際に撮る時に迷わない UI に整理する。
+Apple Liquid Glass は装飾ではなく、live preview を邪魔しない control layer
+として使う。機能追加ではなく、優先順位・配置・状態表示・操作性の lane。
+
+Experience bar:
+
+- M13 is not complete when controls are merely split or restyled. The capture
+  screen must read as an authored camera surface in a frozen screenshot: live
+  preview and the active Look atmosphere as the stage, quiet reachable shutter
+  control, compact camera HUD, and secondary controls arranged as intentional
+  rails / instrument mode.
+- Avoid equal-weight capsule piles. Liquid Glass should create hierarchy and
+  tactility, not a collection of unrelated translucent buttons.
+- Owner-provided Halide / Mobbin screenshots are reference evidence for
+  structure only: preview-dominant stage, bottom camera console, compact
+  instrument values, and a distinct advanced tray. Do not copy branding or
+  literal iconography. Do not infer that Record / Stop must be the emotional
+  center.
+- TIDE iOS Mar 2026 screenshots are reference evidence for visual language:
+  soft atmospheric sheets, low-contrast glass, calm selected states, sparse
+  typography, and one coherent material system. Do not copy TIDE content or
+  navigation.
+- If owner reaction is "突貫工事" or below product bar, continue M13 rather
+  than close it as a documentation success.
+
+Done:
+
+- Record / Stop は静かで上質、かつ確実に到達できる。録画中は停止状態が明確で、
+  危険な操作は disabled。
+- live preview と active Look atmosphere が画面の主役として読める。
+- Look / lens / storage / duration が常用操作として整理され、撮影前に迷わず触れる。
+- Advanced controls(EV / WB / ISO / shutter / focus / meter)は cockpit chip row
+  に畳まれ、tap で必要時だけ ruler scrubber を出す(drawer は M13-M-4 で撤去)。
+- manual active 状態は chip 表示で読める。ISO / SHUTTER chip が "Auto" → 数値、
+  WB chip が "Auto" → "Lock" になる。Auto / Manual の状態が消えない。
+- Liquid Glass は top status / bottom deck / drawer など control layer にのみ適用し、
+  live preview content には使わない。
+- `GlassEffectContainer` / `glassEffect` を使える箇所は使い、glass-on-glass やカード入れ子は避ける。
+- Flat black translucent cards are not acceptable as the final M13 answer.
+  Control-layer chrome must be Liquid Glass first, darkened/tinted only when
+  needed for readability.
+- master writer / proxy generation / capture package / Look preview / manual control behavior は維持。
+- owner が片手で no-SSD recording、Look switch、lens switch、Advanced drawer open/close、
+  manual active 確認、record/stop を一周できる。
+
+Dependencies:
+
+- M12 (Look / lens / storage / Advanced controls が揃っている状態).
+- Read-only evidence:
+  `2026-05-08-ios-camera-preview-liquid-glass-research.md`.
+
+Out of scope:
+
+- New capture features.
+- Master/proxy export truth.
+- Full camera monitoring tools(waveform / false color / focus peaking / zebra).
+- React/Capacitor cleanup.
+- Broad QA matrix.
+
+Sub-milestones:
+
+- M13-K (2026-05-08): rejected on owner walk — implementation read as a
+  black-card UI rather than Apple Liquid Glass. M13 continues as M13-L
+  (Liquid Glass capture spatial rebuild).
+- M13-L (2026-05-09): superseded before owner acceptance. Liquid Glass
+  primitives (`captureGlassRail` / `captureGlassControl` / `captureGlassHUD`
+  / `captureGlassSelected`) and top HUD primitives landed; spatial model
+  (vertical look / lens rails + bottom shelf) rejected on owner walk —
+  selected pill overflowed rail clip, preview was cropped above the shelf
+  leaving black space, and the atmosphere-first language did not exceed
+  the M13-J 65 % bar. Owner pivoted UI direction.
+- M13-M (2026-05-09 →): Blackmagic-style parameter cockpit. Top
+  parameter row (lens / ISO / shutter / EV / WB / Look) with single-active
+  ruler scrubber expansion, horizontal lens chip row at the bottom,
+  quiet shutter + folder buttons on the bottom shelf. Liquid Glass
+  primitives retained as the material vocabulary; spatial layout
+  rebuilt for parameter-access density rather than atmospheric calm.
+  See `active.md` for the M13-M-N sub-task chain.
+- M13-M-1 (2026-05-09): partial PASS, archived without owner acceptance.
+  Cockpit composition (top chip row + bottom lens row + no side rails +
+  preview-dominant) and selected-pill correctness landed; corner radii
+  and Liquid Glass material quality flagged for rework. Sub-task chain
+  shifts back one step.
+- M13-M-2 (2026-05-09): PASS — owner accepted angular shape vocabulary
+  (chip 9pt / lens 8pt / HUD 10pt / peripheral 11pt), per-control
+  Liquid Glass (no slab), HIG tint-as-hint selected state, and
+  cockpit-component split (`FilmtoneCaptureView.swift` 1170 → 847).
+- M13-M-3 (2026-05-09): PASS — owner accepted Canvas-rendered
+  `FilmtoneCaptureRulerScrubber` primitive (center-pinned amber
+  indicator, major/minor ticks, drag-clamped to range, per-tick
+  selection haptics), session wiring through `setExposureBias` /
+  `setManualISO` / `setManualShutter`, and the Blackmagic-style
+  auto→manual one-tap entry pattern (ISO / Shutter chip tap in
+  `.auto` enters manual + opens scrubber; tap again exits to auto).
+- M13-M-4 (2026-05-09): PASS — drawer cleanup absorbed into the
+  M13-M-3 cycle. `FilmtoneCaptureAdvancedDrawer.swift` deleted +
+  4 pbxproj entries deregistered; `FilmtoneCaptureBottomDeck` no
+  longer generic over `AdvancedContent`. The chip cockpit is the
+  only remaining path into manual exposure / WB lock / Look pick.
+- **M13 closed (2026-05-09)** — cockpit + Liquid Glass + ruler
+  scrubber + auto↔manual chip-tap = authored capture surface owner
+  accepted. Implementation work moves to M14 (master / proxy export
+  truth).
+
+### M15 - Editor Empty View + Library Chip Liquid Glass parity
+
+Goal:
+
+Bring the editor's empty-load surface (the screen the owner sees when
+`store.source == nil`) and the Saved Looks / Saved LUTs library chips
+into the same Apple Liquid Glass vocabulary the capture cockpit
+adopted in M13. The pre-M13 surfaces still use opaque
+`.background(RoundedRectangle.fill).overlay(stroke)` chrome and
+`.glassProminent` system blue button styles, which read as cheap
+consumer chrome alongside the cockpit's authored Liquid Glass.
+
+Done:
+
+- Saved Looks chips in `FilmtoneEmptyView` and `FilmtoneLibrarySection`
+  render as Liquid Glass (refraction visible at the rim, amber tint as
+  hint not fill, no opaque RoundedRectangle background).
+- Empty-view CTA stack (Photo Library / Files / Record) reads as a
+  single coherent Filmtone-amber accent system instead of the system-
+  blue prominent CTA + neutral glass stack.
+- The editor's other surfaces that share `FilmtoneLibraryChip` (LUT
+  library, Saved Looks panel) inherit the new chip vocabulary by
+  construction.
+- No regressions to capture cockpit Liquid Glass quality.
+
+Dependencies:
+
+- M13 (capture cockpit Liquid Glass landed).
+- M14-A / M14-B (separate concern; empty-view lane is orthogonal).
+
+Out of scope:
+
+- Editor chrome refactor beyond the chip + CTA touchpoints.
+- Sidecar provenance (M14-C, separate lane).
+- New illustration / hero work.
+
+### M14 - Master/Proxy Export Truth
+
+Goal:
+
+capture package の master/proxy linkage を export pipeline が理解し、最終成果物の品質と保存先を曖昧にしない。
+
+Done:
+
+- editor は proxy で軽く動く。
+- export 時に master が available なら master を使う。
+- external master が unavailable なら明示的に reconnect / unavailable を出す。
+- proxy export になる場合は明示する。
+- large master を local iPhone storage に silent copy しない。
+- sidecar / export metadata に master/proxy provenance を残す。
+
+Dependency:
+
+- M13 so capture UI is stable before export-truth work resumes.
 
 ## Known Constraints
 
@@ -535,7 +698,7 @@ Out of scope (handled in later lanes):
   `AVCaptureVideoDataOutput` runs as a timing / diagnostics side-band.
   VDO is rejected as the sole product master writer for M2 product capture.
   Decision evidence: Apple TN3121 (`availableVideoPixelFormatTypes` is
-  "connected to" semantics), Apple `.inputPriority` preset documentation
+  "connected to" semantics), Apple `.inputPriority` documentation
   (auto-switch on `activeFormat` change), Apple Forum thread 769888
   (4K60 ProRes Log uses `AVCaptureMovieFileOutput`), iPhoneOS 26.4 SDK
   `CVPixelBuffer.h` (all 9 M2-A deliverable FourCCs decoded as 8-bit). A
@@ -670,7 +833,7 @@ Out of scope (handled in later lanes):
   PASS; owner device acceptance pending. Details in
   `archive/2026-05-08-m8-native-recording-product-flow.md`.
 - 2026-05-08: M9 (Native Recording Export Completion) **landed** —
-  closes record → edit → preset → export → save/share product loop
+  closes record → edit → Look / adjustment → export → save/share product loop
   on the output side. S1 confirmed CTA hierarchy + save-destination
   feedback already existed; S3 added `toastShareSuccess`; S4 routed
   export/save failures through the existing toast surface (mirrors
@@ -721,3 +884,150 @@ Out of scope (handled in later lanes):
   operator miss)、tele-auto / ultraWide-auto は M10 baseline の
   S8-B lens swap 既存検証範囲なので deferred。Details in
   `archive/2026-05-08-m12-advanced-capture-controls.md`.
+- 2026-05-08: M13 (Capture Screen UI Consolidation + Liquid Glass)
+  split pass **completed but not product-complete** — view-only refactor split
+  `FilmtoneCaptureView.swift` into 6 sibling files and preserved
+  writer/session/package/proxy behavior. Owner walk found no major functional
+  regression, but owner rated the experience roughly 40% and rejected it as
+  still feeling like突貫工事. M13 continues as M13-I composition rebuild:
+  make the capture screen feel authored and fun before moving to M14.
+- 2026-05-08: M13-I (Composition Rebuild) + M13-J (TIDE-informed material
+  refinement) landed view-only on iPhone 17 Pro #7. M13-I established the
+  hierarchy lock (1 hero shutter / 2 capture rails / 1 compact HUD / 1 tray)
+  and unified the rails into single glass capsules with internal segments;
+  M13-J replaced equal-weight capsule polish with one TIDE-style translucent
+  console surface and soft selected states. Owner rating 40%→65%, but
+  spatial composition (上下左右の zone 設計 / eye-thumb flow) still reads
+  engineered rather than authored.
+- 2026-05-08: M13-K re-scoped before implementation closeout after owner
+  clarified that Record / Stop is **not** the center of the shooting
+  experience. M13-K now targets a Liquid Glass shooting space: preview and
+  Look atmosphere lead, Record stays quiet and reachable, and Advanced becomes
+  a console mode rather than an overlay patch. Details in current `active.md`.
+- 2026-05-09: M13-L superseded before owner acceptance. Liquid Glass
+  primitives + top HUD landed; vertical rail spatial model rejected on
+  owner walk for selected pill overflow + preview cropping. Owner pivoted
+  to Blackmagic-style parameter cockpit (top parameter row + ruler
+  scrubbers + horizontal lens chip row). M13-M-1 (cockpit layout shell)
+  opens as the next active.
+- 2026-05-09: M13-M-1 (cockpit layout shell) **archived as partial PASS**.
+  Composition + selected-pill bug fix landed on iPhone 17 Pro #7. Owner
+  walk flagged corner radii reading too round (Capsule everywhere) and
+  the bottom shelf glass rail collapsing into plain frosted glass
+  rather than Apple Liquid Glass. M13-M-2 opens to address material
+  quality + shape vocabulary + responsibility-separated component
+  refactor; the previous M13-M-N (ruler primitive, ruler wiring, mode
+  toggle integration, owner walk) chain slides back one step.
+- 2026-05-09: M13-M-2 (Liquid Glass quality + cockpit refactor)
+  **PASS** on iPhone 17 Pro #7 — owner accepted angular RoundedRectangle
+  shape vocabulary, per-control Liquid Glass primitives (no shelf slab),
+  HIG tint-as-hint selected state. `FilmtoneCaptureView.swift`
+  1170 → 847 lines via `Cockpit / Lens / Look` sibling extraction.
+  M13-M-3 opens for ruler scrubber primitive + session wiring + the
+  auto↔manual tap pattern (decision: ISO/Shutter chip tap in `.auto`
+  enters manual exposure + opens scrubber, tap again exits to auto —
+  Blackmagic-style one-tap mode entry rather than a separate Auto/Manual
+  toggle).
+- 2026-05-09: M13-M-3 (RulerScrubber primitive + session wiring +
+  auto↔manual tap pattern) and M13-M-4 (drawer cleanup addendum)
+  **PASS** on iPhone 17 Pro #7. New `FilmtoneCaptureRulerScrubber.swift`
+  Canvas primitive landed; cockpit chip row scrubs `session.setExposureBias`
+  / `setManualISO` / `setManualShutter` with per-tick selection haptics;
+  ISO / Shutter chip tap auto-enters manual exposure inheriting the
+  current auto reading. `FilmtoneCaptureAdvancedDrawer.swift` deleted
+  (4 pbxproj entries deregistered, `FilmtoneCaptureBottomDeck` no longer
+  generic over `AdvancedContent`).
+- 2026-05-09: **M13 (Capture Screen UI Consolidation + Liquid Glass)
+  closed** after the M13-K → M13-L → M13-M-1 → M13-M-2 → M13-M-3 + M13-M-4
+  iteration chain. Owner-accepted authored capture surface =
+  preview-dominant stage, parameter chip cockpit (ISO / Shutter / EV /
+  WB / Look) with one-tap manual entry, ruler scrubber per active chip,
+  horizontal lens chip row, compact shutter cluster with quiet record
+  button, all in angular RoundedRectangle Liquid Glass vocabulary.
+  M14 (Master / Proxy Export Truth) opens next.
+- 2026-05-09: M14-A (Master Availability + Master/Proxy Decision)
+  **PASS** on iPhone 17 Pro #7. New `ExportSourceDecision` enum +
+  `resolveExportSource()` two-gate detection (fileExists →
+  facade.probeSource), decision-aware success toasts
+  (`toastExportUsedMaster` / `toastExportUsedProxyMasterUnavailable` /
+  legacy `toastExportComplete` for non-capture sources). Internal-
+  Documents masters export from master; SSD-mounted master export
+  still falls back to proxy at this step because no security-scoped
+  resource is held at editor time — addressed in M14-B. Photos /
+  Files edits unchanged.
+- 2026-05-09: M14-B (security-scoped bookmark for SSD masters) opens.
+  New stateless `FilmtoneSecurityScopedBookmark` helper, additive
+  optional `masterBookmark: Data?` on `FilmtoneCapturePackage` +
+  `FilmtoneCapturePackageSnapshotV1` (no schemaVersion bump per
+  existing additive-optional convention). Capture session writes the
+  bookmark when storagePolicy is external; editor resolves at export
+  start, calls `startAccessingSecurityScopedResource()`, releases
+  scope via `ResolvedExportSource.release()` deferred from the
+  export call site. App-relaunch SSD master export becomes the new
+  default outcome.
+- 2026-05-09: M14-B **PASS** on iPhone 17 Pro #7. Owner accepted
+  bookmark write at capture finalize + scope acquire-and-release at
+  editor export. SSD same-session, SSD new-session, and SSD
+  post-relaunch master exports all land on the master path; SSD-
+  unmounted falls back to proxy with the existing M14-A toast.
+  Internal-Documents and Photos / Files paths unchanged.
+- 2026-05-09: **M15 (Editor Empty View + Library Chip Liquid Glass)
+  opens** as a parallel lane to M14-C. Owner-supplied screenshot
+  flagged the empty-load surface (Stone / Urban Saved-Look chips and
+  the bottom CTA stack) as still using pre-M13 opaque
+  RoundedRectangle chrome + `.glassProminent` system blue button.
+  Scope: lift `FilmtoneLibraryChip` to `glassEffect`-based Liquid
+  Glass (amber tint hint for bundled, neutral for unbundled), add
+  `FilmtoneEmptyCTAButtonStyle` with primary/secondary tint
+  hierarchy in the Filmtone-amber accent system, harmonize empty-view
+  CTA stack. M14-C (sidecar provenance) deferred until M15 lands.
+- 2026-05-09: M15 **REJECTED** at 20点. Mechanical flaw:
+  `.background(Color.clear.glassEffect(...))` pattern in the custom
+  button style rendered the label behind the material → diffuse
+  unreadable text. Design flaw: amber tint at 0.18 saturated to opaque
+  brown on the dark substrate, three stacked equal-weight CTAs gave
+  no hierarchy, no atmospheric substrate for Liquid Glass refraction.
+  M15-bis opens to redesign the page from scratch using owner's
+  TIDE iOS Mar 2026 reference (silvery clear glass cards, single
+  dominant primary, atmospheric layout).
+- 2026-05-09: M15-bis (Editor Empty View — TIDE-inspired card grid)
+  opens. New `FilmtoneEmptySourceCard` view component (replaces the
+  rejected `FilmtoneEmptyCTAButtonStyle`). Glass via direct
+  `.glassEffect(_:in:)` on the padded content (no Color.clear
+  background trick). No amber tint on material — amber stays as
+  icon / favorite-star accent only. Library chip drops amber bg
+  tint entirely; bundled status communicated by icon color +
+  hairline white rim. Card grid: 2-up Photo Library / Files row +
+  full-width Record row. Subtle vertical gradient backdrop gives
+  Liquid Glass refraction substrate.
+- 2026-05-09: M15-bis **REJECTED at 30点** (up from M15's 20). Owner
+  critique: (1) hex symbol / wordmark / tagline not mandatory and is
+  stealing visual budget; (2) the M15-bis near-black backdrop gives
+  Liquid Glass nothing to refract — the chips and cards still read
+  as flat translucent rectangles; (3) reference is **grunge fluid
+  gradient** (vibrant amber / coral / pink / purple meshed blobs
+  filling the screen) per owner-supplied images. M15-ter opens to
+  drop the hero block and rebuild the backdrop as a `MeshGradient`
+  fluid gradient that lets Liquid Glass actually refract. Cards +
+  chips from M15-bis stay (the mechanical glass implementation was
+  correct; only the substrate behind it was wrong).
+- 2026-05-09: M15-ter **REJECTED ≤20点**. Owner observed (a) three
+  "redesign" rounds had produced iteration not redesign — the core
+  structure (cards + chips + some-kind-of-background) had never been
+  questioned at the design level; (b) card sizes were copied from
+  TIDE references without earning their footprint with content; (c)
+  MeshGradient 3×3 + blur + vignette produced a low-quality muddy
+  substrate, not the polished pastel sphere of reference Image #8.
+  Owner committed to direction A (single-sphere hero, Image #8) under
+  the bar 「**最高レベルの美しい流体グランジアニメーション**」.
+- 2026-05-09: **M15-final** opens. Metal-shader-driven fluid sphere
+  (`FilmtoneFluidSphere.metal` + `.swift`). SwiftUI's `colorEffect`
+  + `[[stitchable]]` shader function does single-pass GPU rendering:
+  inverse-distance-weighted pastel-blob mixing (ice blue / coral /
+  soft amber / soft pink) with sin/cos drift, soft specular at
+  upper-left, hash-based procedural grain, smooth edge falloff.
+  TimelineView feeds the time uniform per frame. Empty view body
+  drops the card grid in favor of a single primary text-link
+  ("フォトライブラリから始める") + inline secondary
+  ("ファイル · 録画する") so nothing competes with the sphere as
+  visual hero. M14-C deferred until empty view lands.
