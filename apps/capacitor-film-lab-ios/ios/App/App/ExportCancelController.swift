@@ -3,7 +3,7 @@ import Foundation
 /// Reasons an export can be cancelled. Recorded for telemetry / debugging.
 ///
 /// Entry points (v1.3 = 3, v1.4 candidate adds BGContinuedProcessingTask):
-///   - `userViaUI`: WebView UI → ``FilmtoneMediaPlugin/cancelExport(_:)``
+///   - `userViaUI`: SwiftUI UI → `FilmtoneEditorStore.cancelExport()`
 ///   - `userViaLiveActivity`: Live Activity Cancel button → `CancelExportIntent.perform`
 ///   - `backgroundTaskExpiration`: `UIApplication.beginBackgroundTask` expirationHandler
 ///     (writing-tail protection)
@@ -31,7 +31,7 @@ public protocol ExportCancelable: AnyObject {
 ///     expiration) cannot double-cancel or write to a stale session reference.
 ///
 /// The reference to the session is `weak` to avoid extending its lifetime
-/// beyond ``FilmtoneMediaPlugin/currentExportSession``. ``detach()`` is called
+/// beyond the runtime's local export-session handle. ``detach()`` is called
 /// from the runtime in success/error paths for predictability; the weak ref
 /// would clear on its own otherwise.
 public actor ExportCancelController {

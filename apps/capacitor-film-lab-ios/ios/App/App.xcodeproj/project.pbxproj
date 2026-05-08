@@ -27,9 +27,7 @@
 		F40000010000000000000001 /* FilmLabSwiftCore in Frameworks */ = {isa = PBXBuildFile; productRef = F40000010000000000000020 /* FilmLabSwiftCore */; };
 		A10000010000000000000001 /* AssetPickerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000001 /* AssetPickerService.swift */; };
 		A10000010000000000000002 /* CacheStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000002 /* CacheStore.swift */; };
-		A10000010000000000000003 /* FilmtoneBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000003 /* FilmtoneBridgeViewController.swift */; };
 		A10000010000000000000004 /* FilmtoneExportSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000004 /* FilmtoneExportSession.swift */; };
-		A10000010000000000000005 /* FilmtoneMediaPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000005 /* FilmtoneMediaPlugin.swift */; };
 		A10000010000000000000006 /* FilmtoneMediaTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000006 /* FilmtoneMediaTypes.swift */; };
 		A10000010000000000000007 /* PhotoLibraryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000007 /* PhotoLibraryService.swift */; };
 		A10000010000000000000008 /* ShareSheetService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000008 /* ShareSheetService.swift */; };
@@ -157,9 +155,7 @@
 		AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.release.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig"; sourceTree = "<group>"; };
 		B10000010000000000000001 /* AssetPickerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetPickerService.swift; sourceTree = "<group>"; };
 		B10000010000000000000002 /* CacheStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CacheStore.swift; sourceTree = "<group>"; };
-		B10000010000000000000003 /* FilmtoneBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneBridgeViewController.swift; sourceTree = "<group>"; };
 		B10000010000000000000004 /* FilmtoneExportSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneExportSession.swift; sourceTree = "<group>"; };
-		B10000010000000000000005 /* FilmtoneMediaPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneMediaPlugin.swift; sourceTree = "<group>"; };
 		B10000010000000000000006 /* FilmtoneMediaTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneMediaTypes.swift; sourceTree = "<group>"; };
 		B10000010000000000000007 /* PhotoLibraryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoLibraryService.swift; sourceTree = "<group>"; };
 		B10000010000000000000008 /* ShareSheetService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareSheetService.swift; sourceTree = "<group>"; };
@@ -299,8 +295,6 @@
 			children = (
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
-				B10000010000000000000003 /* FilmtoneBridgeViewController.swift */,
-				B10000010000000000000005 /* FilmtoneMediaPlugin.swift */,
 				B10000010000000000000004 /* FilmtoneExportSession.swift */,
 				B10000010000000000000009 /* SourceProbeService.swift */,
 				B10000010000000000000001 /* AssetPickerService.swift */,
@@ -600,9 +594,7 @@
 			files = (
 				A10000010000000000000001 /* AssetPickerService.swift in Sources */,
 				A10000010000000000000002 /* CacheStore.swift in Sources */,
-				A10000010000000000000003 /* FilmtoneBridgeViewController.swift in Sources */,
 				A10000010000000000000004 /* FilmtoneExportSession.swift in Sources */,
-				A10000010000000000000005 /* FilmtoneMediaPlugin.swift in Sources */,
 				A10000010000000000000006 /* FilmtoneMediaTypes.swift in Sources */,
 				A10000010000000000000007 /* PhotoLibraryService.swift in Sources */,
 				A10000010000000000000008 /* ShareSheetService.swift in Sources */,

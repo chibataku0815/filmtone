@@ -237,11 +237,10 @@ final class FilmtoneExportSession {
 
     /// Flips the internal cancellation flag. Should normally be reached via
     /// ``ExportCancelController/cancel(reason:)`` so the cancel propagates
-    /// once across all entry points (WebView UI, Live Activity intent,
-    /// background-task expiration). Direct callers exist only as a defensive
-    /// mirror in ``FilmtoneMediaPlugin/cancelExport(_:)`` — the operation is
-    /// idempotent at the session level (single Bool write), so the duplicate
-    /// is harmless.
+    /// once across all entry points (SwiftUI UI, Live Activity intent,
+    /// background-task expiration). The operation is idempotent at the
+    /// session level (single Bool write), so duplicate invocations from
+    /// different entry points are harmless.
     func cancel() {
         cancelled = true
     }
