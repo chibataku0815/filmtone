@@ -49,6 +49,34 @@ struct FilmtoneCaptureLensRecord: Equatable, Codable {
     let deviceType: String
 }
 
+/// M11 / S11-D: capture-time Look chip recorded with a successful
+/// run.  Stone / Urban populate this record so the editor adoption
+/// path (S11-E) can re-apply the same Look against the proxy without
+/// re-asking the owner.  The Filmtone (default) chip leaves
+/// `FilmtoneCapturePackage.selectedLook` as `nil` — that is the
+/// "no Look applied / preserve editor's pre-capture state" semantics
+/// agreed in S11-A's Design Locks.  Master encoding is unaffected;
+/// this is only metadata next to the proxy.
+struct FilmtoneSelectedLookRecord: Equatable, Codable {
+    /// `BuiltInLook.canonicalUUID` of the chip's Look.  Required so
+    /// `applySavedLook(id:)` (S11-E) routes through the existing
+    /// catalog-resolution path without reopening the materialization
+    /// logic.
+    let canonicalUUID: UUID
+    /// `BuiltInLook.slug` for diagnostics / future bundled-only
+    /// resolution paths (e.g. `filmtone-creative-pack-01-stone`).
+    /// Optional only because future non-bundled Looks may not have a
+    /// slug.
+    let slug: String?
+    /// Owner-readable name carried alongside the UUID so a stale /
+    /// removed catalog entry still produces a labeled badge in the
+    /// editor instead of an opaque UUID.
+    let englishName: String
+    /// M11 ships `1.0`.  Reserved for the intensity slider lane noted
+    /// in active.md "Out of scope".
+    let intensity: Double
+}
+
 /// Capture parameters resolved for a given run.  M10 ships the
 /// 4K 24 fps Apple Log 2 ProRes 422 HQ + cinematicExtendedEnhanced
 /// cinematic baseline — kept as a struct so future capture-time
@@ -178,6 +206,12 @@ struct FilmtoneCapturePackage: Equatable {
     /// `capture-package.json` snapshots have no lens fields and decode
     /// with `nil`; new runs always set it.
     let lens: FilmtoneCaptureLensRecord?
+    /// M11 / S11-D: capture-time Look chip selected at record-stop time.
+    /// `nil` for the Filmtone default chip (no override) and for pre-M11
+    /// captures decoded from disk.  Stone / Urban populate this so the
+    /// editor adoption path (S11-E) can re-apply the same Look against
+    /// the proxy.
+    let selectedLook: FilmtoneSelectedLookRecord?
 }
 
 #endif

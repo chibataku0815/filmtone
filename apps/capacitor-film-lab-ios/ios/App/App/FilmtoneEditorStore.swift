@@ -515,7 +515,26 @@ final class FilmtoneEditorStore: ObservableObject {
     /// project mutation. Read by the export pipeline so the sidecar can
     /// record which Saved Look produced the export. (Sidecar field-set is
     /// MVP-deferred — see Item 3 plan §"Sidecar V1 Additions".)
-    private(set) var appliedSavedLookId: UUID?
+    ///
+    /// `didSet` clears `appliedSavedLookEntryCache` when reset to `nil`;
+    /// non-nil assignments must also populate the cache at the apply
+    /// site so M10 live preview (`makeLivePreviewGradeProcessor()`,
+    /// synchronous) can read the resolved entry without async I/O.
+    private(set) var appliedSavedLookId: UUID? {
+        didSet {
+            if appliedSavedLookId == nil {
+                appliedSavedLookEntryCache = nil
+            }
+        }
+    }
+
+    /// Live mirror of the resolved `SavedLookEntry` for the currently
+    /// applied Saved Look. Populated alongside `appliedSavedLookId` at
+    /// apply paths and cleared via the `didSet` above. Lets the
+    /// synchronous live-preview entrypoint forward the entry without
+    /// awaiting `resolveAppliedSavedLookForExport` (which runs async I/O
+    /// on the library actor).
+    private var appliedSavedLookEntryCache: SavedLookEntry?
 
     /// Backlight Veil Phase 1c — currently selected optical filter family id
     /// (e.g. `"backlightVeil-1-2"`) or nil = OFF. Mirrors
@@ -860,6 +879,329 @@ final class FilmtoneEditorStore: ObservableObject {
             .nilIfEmpty ?? strings.lookCustom
     }
 
+    /// Live capture preview grade applier (M10 / S8-F F3).
+    ///
+    /// Build a `FilmtoneSharedGradeProcessor` pinned to the editor's
+    /// current request + source URL so the capture surface can apply
+    /// byte-parity grading to live VDO frames.  Returns `nil` when:
+    ///
+    /// - no source is loaded (entering capture from empty state — there
+    ///   is nothing for the grade chain to anchor its stable seed
+    ///   against, and the look-reference panel will already be hidden
+    ///   for the same reason in S8-D),
+    /// - the request DTO can't be built (probe / project state in an
+    ///   intermediate edit), or
+    /// - the runtime can't open the source URL (deleted / unreachable).
+    ///
+    /// Failure is silent — the live preview falls back to ungraded
+    /// pass-through, which matches the F2 behavior the user already
+    /// validated.  This is `feedback_no_fallback_bug_hotbed`-compatible
+    /// because the absence of grading on the live preview is never
+    /// confused with a successful grade: the surface displays without
+    /// the user thinking "the export will look like this," because
+    /// captured masters still go through the editor on adopt and the
+    /// editor reapplies the canonical grade for export.
+    func makeLivePreviewGradeProcessor() -> FilmtoneLivePreviewBundle? {
+        guard source != nil else { return nil }
+        do {
+            let request = try FilmtonePhase0Math.buildExportRequest(
+                source: source,
+                probe: probe,
+                project: project
+            )
+            // F3-Fix #1: forward Saved Look entry + camera profile so the
+            // live preview's `FilmtoneExportSession` matches the export
+            // path's input-LUT auto-injection and Saved Look provenance.
+            // Saved Look entry is read sync from `appliedSavedLookEntryCache`,
+            // populated at the two apply paths (`saveLookFromCurrentState` /
+            // `applySavedLook`); the export path uses the async resolver,
+            // but live preview cannot await without restructuring the
+            // fullScreenCover capture path.
+            let savedLookEntry = appliedSavedLookEntryCache
+            let cameraProfile = project.cameraProfile
+            let processor = try facade.makeLivePreviewGradeProcessor(
+                request: request,
+                appliedSavedLook: savedLookEntry,
+                cameraProfile: cameraProfile
+            )
+            let diagnostics = makeLivePreviewDiagnostics(
+                request: request,
+                forwardedSavedLook: savedLookEntry,
+                forwardedCameraProfile: cameraProfile
+            )
+            return FilmtoneLivePreviewBundle(
+                processor: processor,
+                diagnostics: diagnostics
+            )
+        } catch {
+            return nil
+        }
+    }
+
+    /// M11 / S11-C: live capture preview with a chip-strip override.
+    ///
+    /// `nil` defers to the argument-less variant — the chip-strip's
+    /// "Filmtone" entry maps to nil so tapping it shows the editor's
+    /// current pre-capture grade (custom adjustments, applied saved
+    /// Look, etc.) without forcing a reset to a clean baseline.
+    ///
+    /// A non-nil built-in (Stone / Urban) builds a transient
+    /// `FilmtoneProjectState` carrying the catalog entry's
+    /// `presetName` / `strength` / `quickState` / `paramOverrides` /
+    /// `creativeLut` and forwards the materialized `SavedLookEntry` so
+    /// `FilmtoneSharedGradeProcessor` runs the same 3-layer wiring
+    /// (`appliedSavedLook` + camera profile) the export path uses.
+    ///
+    /// The store's persisted state is intentionally untouched —
+    /// capture-time chip changes only mutate the editor on
+    /// `adoptCaptureResult` (S11-E).  Cancelling capture leaves the
+    /// editor's pre-capture Look intact (M11 cancel-preservation).
+    func makeLivePreviewGradeProcessor(
+        overridingBuiltInLook builtIn: FilmtoneBuiltInCatalog.BuiltInLook?
+    ) -> FilmtoneLivePreviewBundle? {
+        guard let builtIn else {
+            return makeLivePreviewGradeProcessor()
+        }
+        // Cold-start capture surface: the editor has no loaded source
+        // yet (owner walked into capture before picking / recording),
+        // but the live VDO frames are well-known by the M10 contract
+        // — 4K24 ProRes 422 HQ Apple Log 2.  Synthesize a source +
+        // probe describing exactly that stream so the chip-strip's
+        // Stone / Urban grade chain can still be built and applied to
+        // the live preview without forcing a record-first round trip.
+        // The Filmtone default chip path (`builtIn == nil` above)
+        // intentionally keeps the original nil-return because that
+        // chip means "no Look applied" — falling back to raw camera
+        // is the correct semantic there.
+        let effectiveSource: SourceInfoDTO
+        let effectiveProbe: SourceProbeDTO?
+        if let source {
+            effectiveSource = source
+            effectiveProbe = probe
+        } else {
+            let synthetic = Self.liveCaptureSyntheticSource()
+            effectiveSource = synthetic.source
+            effectiveProbe = synthetic.probe
+        }
+        do {
+            var transient = project
+            transient.presetName = FilmtonePhase0Math.safePresetName(builtIn.presetName)
+            transient.presetVersion = FilmtonePhase0Math.presetVersion
+            transient.strength = FilmtonePhase0Math.clampStrength(builtIn.strength)
+            transient.quickState = builtIn.quickState.clamped()
+
+            var paramOverrides = builtIn.paramOverrides
+            var resolvedCreativeLut: ParsedCubeLutDTO?
+            if case let .bundled(slug, filename, pinnedSha256, intensity) = builtIn.creativeLut {
+                resolvedCreativeLut = FilmtoneEditorStore.loadBundledCreativeLut(
+                    slug: slug,
+                    filename: filename,
+                    pinnedSha256: pinnedSha256,
+                    intensity: intensity,
+                    packId: builtIn.packId ?? FilmtoneBuiltInCatalog.creativePack01Id
+                )
+            }
+            if let adaptation = FilmtoneCreativePack01Adaptation.resolve(
+                slug: builtIn.slug,
+                descriptor: effectiveProbe?.sourceToneDescriptor
+            ) {
+                for (key, value) in adaptation.paramOverrides.values {
+                    paramOverrides.values[key] = value
+                }
+                if let cube = resolvedCreativeLut {
+                    resolvedCreativeLut = cube.withIntensity(adaptation.intensity)
+                }
+            }
+            transient.paramOverrides = paramOverrides
+            let base = FilmtonePhase0Math.deriveParams(
+                presetName: transient.presetName,
+                strength: transient.strength,
+                quickState: transient.quickState
+            )
+            transient.params = base.applyingPatch(paramOverrides)
+            transient.creativeLut = resolvedCreativeLut
+
+            let request = try FilmtonePhase0Math.buildExportRequest(
+                source: effectiveSource,
+                probe: effectiveProbe,
+                project: transient
+            )
+            let savedLookEntry = FilmtoneBuiltInCatalog.materializeAsSavedLookEntry(
+                builtIn,
+                favoriteOverride: false,
+                asOf: Date()
+            )
+            let cameraProfile = project.cameraProfile
+            let processor = try facade.makeLivePreviewGradeProcessor(
+                request: request,
+                appliedSavedLook: savedLookEntry,
+                cameraProfile: cameraProfile
+            )
+            let diagnostics = makeLivePreviewDiagnostics(
+                request: request,
+                forwardedSavedLook: savedLookEntry,
+                forwardedCameraProfile: cameraProfile
+            )
+            return FilmtoneLivePreviewBundle(
+                processor: processor,
+                diagnostics: diagnostics
+            )
+        } catch {
+            return nil
+        }
+    }
+
+    /// Source / probe descriptor for the live capture VDO stream when
+    /// the editor has no loaded source (cold-start chip preview).
+    ///
+    /// Hard-coded against the M10 capture contract — the live VDO
+    /// frames are guaranteed to be 4K24 ProRes 422 HQ Apple Log 2 by
+    /// `FilmtoneCaptureSession.prepare(lens:)` (locked codec + Apple
+    /// Log 2 colorSpace + 24fps device format), so the descriptor can
+    /// be a static fixture instead of probing at runtime.  The grade
+    /// chain only needs `inputTransformPolicy.strategy =
+    /// .appleLog2ToRec709` to wire the correct input LUT — every
+    /// other field is filled in to a defensible default so
+    /// `Phase0ExportRequestDTO` and downstream sidecar/diagnostic
+    /// readers don't trip on nil branches that never fire for real
+    /// editor sources.  The placeholder uri uses a `file://` scheme
+    /// (not a custom `filmtone://`) because `FilmtoneMediaRuntime.
+    /// resolveFileURL` returns any URL whose `isFileURL == true`
+    /// directly without an existence check — and the
+    /// `FilmtoneSharedGradeProcessor.applyForLivePreview` path never
+    /// reads from disk (frames come from the live VDO sink), so the
+    /// path itself is irrelevant.  A custom scheme would throw inside
+    /// `resolveFileURL` and silently nil out the chip preview.
+    private static func liveCaptureSyntheticSource() -> (
+        source: SourceInfoDTO,
+        probe: SourceProbeDTO
+    ) {
+        let inputPolicy = SourceInputTransformPolicyDTO(
+            strategy: .appleLog2ToRec709,
+            reason: "source-is-apple-log2",
+            requiresFixtureValidation: false,
+            warning: nil
+        )
+        let display = SourceDisplayGeometryDTO(
+            rawWidth: 3840,
+            rawHeight: 2160,
+            displayWidth: 3840,
+            displayHeight: 2160,
+            rotationDeg: 0,
+            source: "raw"
+        )
+        let color = SourceColorMetadataDTO(
+            colorRange: "tv",
+            colorSpace: "bt2020nc",
+            colorTransfer: "smpte2084",
+            colorPrimaries: "bt2020",
+            logTransferFunction: .appleLog2,
+            hasMasteringDisplayMetadata: false,
+            hasContentLightMetadata: false
+        )
+        let videoMetadata = SourceVideoMetadataDTO(
+            display: display,
+            color: color,
+            colorClass: .appleLog2,
+            hdrPreparationPolicy: nil,
+            timing: SourceVideoTimingMetadataDTO(
+                nominalFrameRate: 24.0,
+                estimatedFrameRate: nil,
+                sourceFrameRateTrusted: true,
+                trustReason: "nominal-only"
+            ),
+            codecFamily: .prores422,
+            logTransferFunction: .appleLog2,
+            inputTransformPolicy: inputPolicy
+        )
+        let probe = SourceProbeDTO(
+            uri: "file:///filmtone-capture-live-preview.mov",
+            filename: "capture-live-preview.mov",
+            kind: .video,
+            mimeType: "video/quicktime",
+            width: 3840,
+            height: 2160,
+            durationSec: 0,
+            fileSizeBytes: 0,
+            codec: "apch",
+            codecFamily: .prores422,
+            frameRate: 24.0,
+            logTransferFunction: .appleLog2,
+            inputTransformPolicy: inputPolicy,
+            cameraOptics: nil,
+            sourceVideoMetadata: videoMetadata,
+            sourceToneDescriptor: nil
+        )
+        let source = SourceInfoDTO(
+            uri: "file:///filmtone-capture-live-preview.mov",
+            filename: "capture-live-preview.mov",
+            kind: .video,
+            mimeType: "video/quicktime",
+            mezzanineStatus: nil,
+            hasDepth: false
+        )
+        return (source, probe)
+    }
+
+    /// S8-F F3-R / F3-Fix #1: snapshot the editor's grade chain inputs
+    /// at the moment the capture surface presents.
+    ///
+    /// `forwardedSavedLook` / `forwardedCameraProfile` are the values
+    /// actually handed to `facade.makeLivePreviewGradeProcessor` —
+    /// reflecting whether the wiring carried them through (post-fix:
+    /// always `true` for camera profile; `true` for Saved Look iff one
+    /// is currently applied and its entry resolved into the cache).
+    /// Pre-fix these were hard-coded `false`; the chip's red `[!]
+    /// camProf:N savedLook:N` warning was the F3-R wiring-gap signal.
+    private func makeLivePreviewDiagnostics(
+        request: Phase0ExportRequestDTO,
+        forwardedSavedLook: SavedLookEntry?,
+        forwardedCameraProfile: CameraProfileSelection?
+    ) -> FilmtoneLivePreviewDiagnostics {
+        let creative = request.creativeLut
+        // Mirrors the auto-detection path inside
+        // `FilmtoneExportSession.makeAutomaticInputLut(for:)`: when
+        // the runtime falls back to `.auto` (which it does for live
+        // preview because cameraProfile isn't passed), the input LUT
+        // is built from `probe?.inputTransformPolicy.strategy`.
+        let detectedTransform =
+            probe?.inputTransformPolicy?.strategy.rawValue
+            ?? probe?.sourceVideoMetadata?.inputTransformPolicy?.strategy.rawValue
+
+        let inputLutWillApply: Bool = {
+            if request.inputLut != nil { return true }
+            switch detectedTransform {
+            case "appleLogToRec709", "appleLog2ToRec709":
+                return true
+            default:
+                return false
+            }
+        }()
+
+        let savedLookIdShort: String? = appliedSavedLookId.map {
+            String($0.uuidString.prefix(8).lowercased())
+        }
+
+        return FilmtoneLivePreviewDiagnostics(
+            lookLabel: lookProfileLabel,
+            creativeLutPresent: creative != nil,
+            creativeLutSize: creative?.size,
+            creativeLutIntensity: creative?.intensity,
+            creativeLutBundledSlug: creative?.bundledSlug,
+            cameraProfileLabel: cameraProfileLabel,
+            cameraProfilePassedToProcessor: forwardedCameraProfile != nil,
+            savedLookId: savedLookIdShort,
+            savedLookPassedToProcessor: forwardedSavedLook != nil,
+            detectedInputTransform: detectedTransform,
+            inputLutWillApply: inputLutWillApply,
+            presetVersion: request.grade.presetVersion,
+            exposure: request.grade.params.exposure,
+            contrast: request.grade.params.contrast,
+            saturation: request.grade.params.saturation,
+            temperature: request.grade.params.temperature
+        )
+    }
+
     /// Current HDR preparation policy derived from the active source probe.
     ///
     /// Field path: `probe?.sourceVideoMetadata?.hdrPreparationPolicy`.
@@ -1117,6 +1459,34 @@ final class FilmtoneEditorStore: ObservableObject {
                 currentCapturePackageRef = localJSONURL.path
             } else {
                 currentCapturePackageRef = nil
+            }
+            // S11-E: re-apply the capture-time Look chip against the
+            // proxy so the editor opens in the same chain the live
+            // preview rendered during capture.  Stone / Urban
+            // `canonicalUUID`s resolve through `libraryStore.loadLook(id:)`
+            // → `FilmtoneBuiltInCatalog.materializeAsSavedLookEntry`,
+            // routing through the same `.bundled` cube +
+            // `FilmtoneCreativePack01Adaptation` wiring as the chip
+            // strip and the editor's library sheet — one source of
+            // truth (audit_layer_fit_before_placing_new_files).
+            //
+            // Filmtone default chip / pre-M11 packages have
+            // `selectedLook == nil` and fall through unchanged, so the
+            // editor preserves whatever Look / adjustments were in
+            // place before capture (S11-A Design Lock).  Cancel never
+            // reaches this branch — `adoptCaptureResult` is only
+            // entered on `.completed(package)` (FilmtoneCaptureView
+            // routes `.cancelled` to `onCancelled` without calling us).
+            //
+            // `applySavedLook` surfaces its own `self.error` /
+            // `presentToast` on bundled-cube SHA-256 mismatch or
+            // missing resource (libraryLutMissingOnApply); we do not
+            // add a second error path here, but `await` blocks
+            // adoption until the apply settles so a follow-up
+            // `schedulePreviewRender()` reflects the Look state
+            // rather than the pre-Look state.
+            if let canonicalUUID = package.selectedLook?.canonicalUUID {
+                await applySavedLook(id: canonicalUUID)
             }
             isBusy = false
             sourceLoadState = nil
@@ -1406,6 +1776,7 @@ final class FilmtoneEditorStore: ObservableObject {
             )
             await refreshLibrarySnapshot()
             appliedSavedLookId = entry.id
+            appliedSavedLookEntryCache = entry
             presentToast(
                 String(format: strings.lookSavedToastFormat, entry.name),
                 kind: .success
@@ -1549,6 +1920,7 @@ final class FilmtoneEditorStore: ObservableObject {
             }
             recomputeProjectParamsPreservingOpticsGlow()
             appliedSavedLookId = entry.id
+            appliedSavedLookEntryCache = entry
             await refreshLibrarySnapshot()
 
             if lutMissingForApply {

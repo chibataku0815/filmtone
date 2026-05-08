@@ -6,9 +6,12 @@
 // FileProvider mounts return 0 from the volume capacity APIs even when
 // writes succeed), and reports a low-bar capacity gate.
 //
-// Filmtone product loop only needs single-launch security scope, so we
-// do NOT persist a bookmark.  The caller (capture view) holds the URL
-// for the run window and releases scope on dismiss / completion.
+// Filmtone holds the security-scoped URL only for the run window
+// (capture view acquires on present and releases on dismiss /
+// completion / failure).  Cross-launch persistence of the picked
+// folder is owned by `FilmtoneExternalFolderBookmark`, which stores
+// a minimal bookmark in UserDefaults and re-runs this preflight on
+// the resolved URL before committing the auto-restore.
 
 import Foundation
 

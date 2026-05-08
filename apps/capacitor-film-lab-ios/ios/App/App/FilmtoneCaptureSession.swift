@@ -98,6 +98,39 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     private var activeLens: FilmtoneCaptureLens?
     private var movieOutput: AVCaptureMovieFileOutput?
 
+    /// S8-F preview-only VDO.  8-bit BGRA frames for live Look preview;
+    /// the record path stays on `movieOutput` (ProRes 422 HQ + Apple
+    /// Log 2 + cinematicEE).  M2-A constraint (`.appleLog2` does not
+    /// deliver 10-bit `x422`/`x420` from VDO on iOS 26.4) is sidestepped
+    /// because we only ask BGRA here — the device internally tonemaps
+    /// to 8-bit for the VDO connection while the Movie connection keeps
+    /// 10-bit Apple Log 2.  Nil if `canAddOutput` rejects coexistence at
+    /// `prepare(lens:)` time; in that case live preview falls back to
+    /// the raw `AVCaptureVideoPreviewLayer` and the reference thumbnail
+    /// strip remains the only graded affordance.
+    private var previewVideoDataOutput: AVCaptureVideoDataOutput?
+    private var previewSampleDelegate: PreviewSampleDelegate?
+    private let previewSampleQueue = DispatchQueue(
+        label: "filmtone.capture.preview.vdo.queue",
+        qos: .userInteractive
+    )
+
+    /// S8-F F2: shared sink between the VDO delegate (writer) and the
+    /// SwiftUI `MTKView` live-preview renderer (reader).  Lives on the
+    /// session for the session's lifetime so the same sink survives
+    /// lens swaps; `teardown()` clears the cached frame so the next
+    /// prepare(lens:) starts blank rather than briefly painting a
+    /// stale frame from the previous lens.
+    let previewFrameSink = FilmtonePreviewFrameSink()
+
+    /// True when `prepare(lens:)` successfully attached the preview
+    /// VDO.  Read by `FilmtoneCaptureView` to decide whether to render
+    /// the Metal-backed live preview or fall back to the raw
+    /// `AVCaptureVideoPreviewLayer`.  Toggles together with `state`
+    /// transitions (`.ready` after a successful prepare, `.idle` after
+    /// teardown) so SwiftUI body recomputes pick the change up.
+    var hasLivePreview: Bool { previewVideoDataOutput != nil }
+
     private var captureId: String = UUID().uuidString.lowercased()
     private var packageDirURL: URL?
     private var masterURL: URL?
@@ -249,6 +282,34 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
                     throw failure
                 }
             }
+
+            // S8-F F1: attach preview-only VDO for live Look preview.
+            // Best-effort: if the session refuses coexistence we leave
+            // `previewVideoDataOutput` nil and the capture view falls
+            // back to the raw `AVCaptureVideoPreviewLayer`.  This is
+            // intentionally graceful — we do NOT fail prepare(lens:)
+            // here because the record path is the product, not preview
+            // grading.
+            let vdo = AVCaptureVideoDataOutput()
+            vdo.videoSettings = [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
+            ]
+            vdo.alwaysDiscardsLateVideoFrames = true
+            if session.canAddOutput(vdo) {
+                session.addOutput(vdo)
+                let delegate = PreviewSampleDelegate(sink: previewFrameSink)
+                vdo.setSampleBufferDelegate(delegate, queue: previewSampleQueue)
+                if let vdoConnection = vdo.connection(with: .video),
+                   vdoConnection.isVideoRotationAngleSupported(Self.lockedRotationAngle) {
+                    vdoConnection.videoRotationAngle = Self.lockedRotationAngle
+                }
+                self.previewVideoDataOutput = vdo
+                self.previewSampleDelegate = delegate
+            } else {
+                self.previewVideoDataOutput = nil
+                self.previewSampleDelegate = nil
+            }
+
             session.commitConfiguration()
         } catch let failure as FilmtoneCaptureFailure {
             state = .failed(failure)
@@ -277,6 +338,22 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         }
 
         state = .ready
+    }
+
+    /// M11 / S11-D: capture-time Look chip recorded with the run.
+    /// Set by `FilmtoneCaptureView` whenever the chip selection
+    /// changes (and seeded once on view appear) so the
+    /// `FilmtoneCapturePackage` built at record-stop time carries
+    /// `selectedLook` without the session knowing about chip UI.
+    /// `nil` = Filmtone default chip (no Look) or pre-M11 callers.
+    private var pendingSelectedLook: FilmtoneSelectedLookRecord?
+
+    /// View-side setter for the capture-time Look chip.  Idempotent;
+    /// safe to call before `prepare(lens:)` and at any point during
+    /// `.ready` / `.recording` (the value is only consumed at
+    /// record-stop time when the package is built).
+    func setSelectedLook(_ record: FilmtoneSelectedLookRecord?) {
+        pendingSelectedLook = record
     }
 
     /// Caller-supplied external folder URL.  Caller owns the
@@ -369,6 +446,9 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         previewLayer = nil
         recordingDelegate = nil
         activeLens = nil
+        previewVideoDataOutput = nil
+        previewSampleDelegate = nil
+        previewFrameSink.clear()
         if case .ready = state {
             state = .idle
         }
@@ -380,6 +460,33 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
             return Self.internalDurationCapSeconds
         case .externalSecurityScopedFolder:
             return Self.externalDurationCapSeconds
+        }
+    }
+
+    // MARK: - Preview VDO delegate (F2 sink writer)
+
+    /// S8-F F2: pushes BGRA sample buffers into `previewFrameSink` as
+    /// `CIImage` so the SwiftUI live-preview MTKView can pull them on
+    /// the display tick.  Drops buffers with no image buffer (e.g.
+    /// audio or sentinel frames — `AVCaptureVideoDataOutput` should
+    /// not deliver these but we guard defensively).  F3 will reuse
+    /// the same sink and apply the editor's grade chain at the
+    /// reader side; this writer stays pass-through.
+    private final class PreviewSampleDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
+        let sink: FilmtonePreviewFrameSink
+
+        init(sink: FilmtonePreviewFrameSink) {
+            self.sink = sink
+            super.init()
+        }
+
+        func captureOutput(_ output: AVCaptureOutput,
+                           didOutput sampleBuffer: CMSampleBuffer,
+                           from connection: AVCaptureConnection) {
+            guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
+                return
+            }
+            sink.push(CIImage(cvPixelBuffer: pixelBuffer))
         }
     }
 
@@ -480,6 +587,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         let storagePolicy = self.storagePolicy
         let captureId = self.captureId
         let lensRecord = self.activeLens?.toRecord()
+        let selectedLook = self.pendingSelectedLook
 
         // Kick off proxy generation off-main; flip state when complete.
         Task.detached(priority: .userInitiated) { [weak self] in
@@ -500,7 +608,8 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
                         durationLimitSeconds: durationLimit,
                         recordedDurationSeconds: recordedDuration,
                         parameters: parameters,
-                        lens: lensRecord
+                        lens: lensRecord,
+                        selectedLook: selectedLook
                     )
                     // Master/proxy linkage is the M10 deliverable; if we
                     // can't write `capture-package.json` next to the

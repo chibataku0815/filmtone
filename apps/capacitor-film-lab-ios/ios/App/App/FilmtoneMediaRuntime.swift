@@ -133,11 +133,15 @@ final class FilmtoneMediaRuntime {
 
     func makeSharedGradeProcessor(
         request: Phase0ExportRequestDTO,
-        sourceURL: URL? = nil
+        sourceURL: URL? = nil,
+        appliedSavedLook: SavedLookEntry? = nil,
+        cameraProfile: CameraProfileSelection? = nil
     ) throws -> FilmtoneSharedGradeProcessor {
         try makeExportSession(
             request: request,
-            sourceURL: sourceURL
+            sourceURL: sourceURL,
+            appliedSavedLook: appliedSavedLook,
+            cameraProfile: cameraProfile
         ).makeSharedGradeProcessor()
     }
 

@@ -40,12 +40,156 @@ struct FilmtoneCaptureLookReference: Equatable {
     let lookLabel: String?
 }
 
+/// M11 / S11-B: Look option exposed in the capture-time chip strip.
+///
+/// Three fixed chips: `filmtone` (default — `creativeLut == nil`,
+/// Filmtone signature ungraded baseline), `stone`, and `urban`.  Stone
+/// and Urban resolve their `canonicalUUID` from
+/// `FilmtoneBuiltInCatalog.allLooks` by slug so the canonical bundled-Look
+/// UUIDs stay single-sourced in the catalog file (no duplication of
+/// hard-coded UUIDs here).  The default chip's UUID is `nil` because
+/// "Filmtone (no creative LUT)" is not a saved-Look entry; the
+/// `applySavedLook` route is never invoked for it.
+struct FilmtoneCaptureLook: Identifiable, Equatable {
+    let id: String
+    let displayName: String
+    /// `BuiltInLook.canonicalUUID` for Stone / Urban; `nil` for the
+    /// Filmtone default chip (which represents "no Look applied").
+    let canonicalUUID: UUID?
+    /// `BuiltInLook.slug` for Stone / Urban; `nil` for the Filmtone
+    /// default chip.  Recorded into `FilmtoneSelectedLookRecord.slug`
+    /// so the persisted capture-package retains a bundled-only
+    /// secondary identifier (S11-D).
+    let slug: String?
+
+    static let filmtone = FilmtoneCaptureLook(
+        id: "filmtone",
+        displayName: "Filmtone",
+        canonicalUUID: nil,
+        slug: nil
+    )
+
+    static let stone: FilmtoneCaptureLook = {
+        let slug = "filmtone-creative-pack-01-stone"
+        let entry = FilmtoneBuiltInCatalog.allLooks.first { $0.slug == slug }
+        return FilmtoneCaptureLook(
+            id: "stone",
+            displayName: entry?.englishName ?? "Stone",
+            canonicalUUID: entry?.canonicalUUID,
+            slug: slug
+        )
+    }()
+
+    static let urban: FilmtoneCaptureLook = {
+        let slug = "filmtone-creative-pack-01-urban"
+        let entry = FilmtoneBuiltInCatalog.allLooks.first { $0.slug == slug }
+        return FilmtoneCaptureLook(
+            id: "urban",
+            displayName: entry?.englishName ?? "Urban",
+            canonicalUUID: entry?.canonicalUUID,
+            slug: slug
+        )
+    }()
+
+    /// Fixed chip-strip order: default → Stone → Urban.  v1.4 only
+    /// ships these two bundled Creative LUTs (M11 strategy doc §
+    /// "M11 Out of scope" defers saved Looks to a later lane).
+    static let allCases: [FilmtoneCaptureLook] = [.filmtone, .stone, .urban]
+
+    /// Resolve a chip from a saved-Look canonical UUID (e.g. the editor's
+    /// `appliedSavedLookId` at capture-present time).  Returns
+    /// `.filmtone` when no UUID is set or the UUID does not belong to
+    /// one of the M11 chips — saved Looks outside the chip strip
+    /// fall back to default rather than being silently selected.
+    static func resolve(from canonicalUUID: UUID?) -> FilmtoneCaptureLook {
+        guard let uuid = canonicalUUID else { return .filmtone }
+        return allCases.first { $0.canonicalUUID == uuid } ?? .filmtone
+    }
+
+    /// S11-D: project a chip onto the persisted capture-package shape.
+    /// Filmtone default → `nil` (selectedLook absent → editor preserves
+    /// pre-capture state on adoption per S11-A Design Locks).  Stone /
+    /// Urban → record with stable identity so S11-E's adoptCaptureResult
+    /// can call `applySavedLook(id: canonicalUUID)`.  M11 ships
+    /// intensity = 1.0 (slider lane is out-of-scope).
+    func toSelectedLookRecord() -> FilmtoneSelectedLookRecord? {
+        guard let canonicalUUID else { return nil }
+        return FilmtoneSelectedLookRecord(
+            canonicalUUID: canonicalUUID,
+            slug: slug,
+            englishName: displayName,
+            intensity: 1.0
+        )
+    }
+}
+
 struct FilmtoneCaptureView: View {
 
     let lookReference: FilmtoneCaptureLookReference?
+    /// S8-F F3: editor's current grade chain captured at fullScreenCover
+    /// present time (snapshot — not bound to publishers).  When non-nil,
+    /// the live preview applies it on every VDO sample so the surface
+    /// shows the editor's current Look + adjustments before recording.
+    /// Nil falls back to F2 ungraded pass-through.
+    let liveGradeProcessor: FilmtoneSharedGradeProcessor?
+    /// S8-F F3-R: diagnostic snapshot captured at the same moment as
+    /// `liveGradeProcessor`.  When non-nil, the capture surface
+    /// renders a top-left overlay showing the editor inputs flowing
+    /// into the grade chain so we can compare against the editor
+    /// preview without rebuilding both pipelines blind.  Removed in
+    /// F3-Fix once parity is verified.
+    let liveDiagnostics: FilmtoneLivePreviewDiagnostics?
+    /// M11 / S11-B: initial chip selection for the capture-time Look
+    /// strip.  Caller resolves from the editor's `appliedSavedLookId`
+    /// via `FilmtoneCaptureLook.resolve(from:)` so re-entering capture
+    /// after applying Stone / Urban in the editor surfaces the same
+    /// Look as the active chip.  Defaults to `.filmtone` (no Look) so
+    /// callers without M11 wiring still compile; S11-C will couple
+    /// chip changes to live preview rebuild.
+    let initialCaptureLook: FilmtoneCaptureLook
+    /// M11 / S11-C: closure handed in by `FilmtoneRootView` that calls
+    /// `FilmtoneEditorStore.makeLivePreviewGradeProcessor(overridingBuiltInLook:)`
+    /// for a given chip selection.  `.filmtone` maps to `nil` override
+    /// (no rebuild against the editor's pre-capture state); Stone / Urban
+    /// map to their `BuiltInLook` so the live preview reruns the 3-layer
+    /// wiring (`appliedSavedLook` + camera profile) against the chip's
+    /// catalog params.  Optional so test surfaces / preview targets that
+    /// do not need rebuild can pass `nil`.
+    let makeGradeProcessor: ((FilmtoneCaptureLook) -> FilmtoneLivePreviewBundle?)?
     let onCompleted: (FilmtoneCapturePackage) -> Void
     let onCancelled: () -> Void
     let onFailed: (FilmtoneCaptureFailure) -> Void
+
+    init(
+        lookReference: FilmtoneCaptureLookReference?,
+        liveGradeProcessor: FilmtoneSharedGradeProcessor?,
+        liveDiagnostics: FilmtoneLivePreviewDiagnostics?,
+        initialCaptureLook: FilmtoneCaptureLook = .filmtone,
+        makeGradeProcessor: ((FilmtoneCaptureLook) -> FilmtoneLivePreviewBundle?)? = nil,
+        onCompleted: @escaping (FilmtoneCapturePackage) -> Void,
+        onCancelled: @escaping () -> Void,
+        onFailed: @escaping (FilmtoneCaptureFailure) -> Void
+    ) {
+        self.lookReference = lookReference
+        self.liveGradeProcessor = liveGradeProcessor
+        self.liveDiagnostics = liveDiagnostics
+        self.initialCaptureLook = initialCaptureLook
+        self.makeGradeProcessor = makeGradeProcessor
+        self.onCompleted = onCompleted
+        self.onCancelled = onCancelled
+        self.onFailed = onFailed
+        // `_captureLookSelection` initialized to the caller-resolved
+        // initial Look so a cold open into capture surfaces the same
+        // chip the editor has applied.  See `resolve(from:)` for the
+        // fallback rule when an active saved Look is not in the chip
+        // strip (saved Look outside Stone/Urban → `.filmtone`).
+        self._captureLookSelection = State(initialValue: initialCaptureLook)
+        // S11-C: seed the active grade chain from the props so the
+        // first frame after present matches the editor's pre-capture
+        // grade.  Chip taps then swap these via `makeGradeProcessor`.
+        self._activeGradeProcessor = State(initialValue: liveGradeProcessor)
+        self._activeLiveDiagnostics = State(initialValue: liveDiagnostics)
+    }
 
     @StateObject private var session = FilmtoneCaptureSession()
     @State private var prepareError: FilmtoneCaptureFailure?
@@ -68,6 +212,26 @@ struct FilmtoneCaptureView: View {
     /// Loaded once on `.task(id:)` so SwiftUI recomputes during
     /// recording state ticks do not redecode the file every frame.
     @State private var lookReferenceImage: UIImage?
+    /// M11 / S11-B: ephemeral capture-time Look chip selection.  Lives
+    /// only inside the capture surface — `onCancelled` does NOT propagate
+    /// it so cancelling preserves the editor's pre-capture Look state
+    /// (M11 cancel-preservation invariant).  S11-C wires this to live
+    /// preview rebuild via `makeGradeProcessor`; S11-D will persist it
+    /// on `.completed(package)` via `selectedLook` on
+    /// `FilmtoneCapturePackage`.  Initialized in `init(...)` from
+    /// `initialCaptureLook` so a cold open into capture mirrors the
+    /// editor's currently applied Look.
+    @State private var captureLookSelection: FilmtoneCaptureLook
+    /// M11 / S11-C: active grade processor driving the live preview.
+    /// Seeded from `liveGradeProcessor` at init and swapped by the
+    /// chip-tap rebuild closure.  Holding it as `@State` lets a chip
+    /// change rebuild without going through the editor store, keeping
+    /// the editor's persisted state untouched until the user records.
+    @State private var activeGradeProcessor: FilmtoneSharedGradeProcessor?
+    /// M11 / S11-C: diagnostic snapshot paired with `activeGradeProcessor`.
+    /// Updated alongside it so the F3-R overlay stays consistent with
+    /// the chain currently feeding the renderer.
+    @State private var activeLiveDiagnostics: FilmtoneLivePreviewDiagnostics?
 
     var body: some View {
         ZStack {
@@ -88,8 +252,29 @@ struct FilmtoneCaptureView: View {
             if let prepareError {
                 failureOverlay(prepareError)
             }
+
+            if let activeLiveDiagnostics {
+                diagnosticOverlay(activeLiveDiagnostics)
+            }
         }
         .task {
+            if let activeLiveDiagnostics {
+                logLiveDiagnostics(activeLiveDiagnostics)
+            } else {
+                NSLog("[F3R] live preview diagnostics: nil (capture entered without source / build failed)")
+            }
+            // S11-D: seed the session's pending capture-Look record
+            // from the initial chip selection so a record without a
+            // chip change still persists `selectedLook` (or nil for
+            // Filmtone).  Subsequent chip changes update via .onChange.
+            session.setSelectedLook(captureLookSelection.toSelectedLookRecord())
+            // Auto-restore previously picked SSD folder so the owner
+            // does not have to re-pick on every capture-view present.
+            // Runs before prepareSession so the storage pill shows the
+            // right destination when the surface first paints.  Stale
+            // bookmark / SSD disconnected → silent fallback to internal
+            // mode (the helper clears the bookmark on its own).
+            restorePersistedExternalFolderIfPossible()
             await prepareSession()
         }
         .task(id: lookReference?.displayURI) {
@@ -107,6 +292,30 @@ struct FilmtoneCaptureView: View {
             }.value
             await MainActor.run {
                 lookReferenceImage = decoded
+            }
+        }
+        .onChange(of: captureLookSelection) { newLook in
+            // S11-D: push the chip's selected-Look record into the
+            // session so the package built at record-stop time carries
+            // the right `selectedLook` (or nil for Filmtone).  Done
+            // before the live-preview rebuild so a record that races
+            // an in-flight chip change still observes the latest pick.
+            session.setSelectedLook(newLook.toSelectedLookRecord())
+            // S11-C: a chip tap rebuilds the live preview's grade chain
+            // off the new Look without touching the editor store.  The
+            // closure resolves Stone / Urban to a built-in catalog
+            // entry and Filmtone to nil (no override) — see
+            // FilmtoneEditorStore.makeLivePreviewGradeProcessor(overridingBuiltInLook:).
+            // Disabled while recording (chip strip itself blocks the
+            // tap), so the swap can never happen mid-write.
+            guard let make = makeGradeProcessor else { return }
+            let bundle = make(newLook)
+            activeGradeProcessor = bundle?.processor
+            activeLiveDiagnostics = bundle?.diagnostics
+            if let bundle {
+                logLiveDiagnostics(bundle.diagnostics)
+            } else {
+                NSLog("[F3R] live preview rebuild for chip=\(newLook.id) returned nil")
             }
         }
         .onChange(of: session.state) { newState in
@@ -155,7 +364,21 @@ struct FilmtoneCaptureView: View {
 
     @ViewBuilder
     private var previewLayer: some View {
-        if let layer = session.previewLayer {
+        // S8-F F2: render the Metal-backed live preview when the
+        // session attached a preview-only VDO.  When canAddOutput
+        // rejected the VDO at prepare(lens:) time, fall back to the
+        // raw `AVCaptureVideoPreviewLayer` so the surface still shows
+        // a viewfinder — graceful degrade keeps the record path
+        // available even on hardware where VDO + MovieFileOutput
+        // coexistence is refused.
+        if session.hasLivePreview {
+            FilmtoneCaptureLivePreview(
+                sink: session.previewFrameSink,
+                gradeProcessor: activeGradeProcessor
+            )
+                .ignoresSafeArea()
+                .accessibilityIdentifier("filmtone.capture.preview")
+        } else if let layer = session.previewLayer {
             FilmtoneCapturePreview(previewLayer: layer)
                 .ignoresSafeArea()
                 .accessibilityIdentifier("filmtone.capture.preview")
@@ -252,9 +475,19 @@ struct FilmtoneCaptureView: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .frame(maxWidth: 120, alignment: .leading)
-                Text("Live ungraded")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.55))
+                // S8-F F3: when the live preview is being graded by the
+                // editor's chain, the disclaimer is misleading — drop
+                // it so the panel reads as a comparison thumbnail
+                // (still poster vs. live framing) instead of a "look
+                // not yet applied" warning.  When the grade chain
+                // could not be built (no source loaded etc.) we keep
+                // the disclaimer so the owner isn't tricked into
+                // thinking the unlooked feed already reflects color.
+                if activeGradeProcessor == nil {
+                    Text("Live ungraded")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.55))
+                }
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
@@ -312,6 +545,15 @@ struct FilmtoneCaptureView: View {
                 lensSelector
             }
 
+            // M11 / S11-B: capture-time Look chip strip.  Visually
+            // identical pill row to `lensSelector` so the two
+            // capture-time selectors read as siblings.  Disabled while
+            // recording / stopping — owner cannot change Look mid-take
+            // (live preview rebuild would visibly tear, and the
+            // selectedLook-on-completion semantic only commits on the
+            // first record success).
+            captureLookStrip
+
             contractBanner
 
             statusLine
@@ -361,6 +603,47 @@ struct FilmtoneCaptureView: View {
             }
         }
         .accessibilityIdentifier("filmtone.capture.lensSelector")
+    }
+
+    // MARK: - Capture-time Look chip strip (M11 / S11-B)
+
+    /// Horizontal pill row of three Look chips: Filmtone (default —
+    /// no creative LUT) / Stone / Urban.  Mirrors `lensSelector` so the
+    /// capture-time selectors read as siblings.  S11-B keeps the tap
+    /// handler local-state-only (updates `captureLookSelection` and
+    /// nothing else) — S11-C wires the live preview rebuild and S11-D
+    /// commits the selection into the capture package on
+    /// `.completed`.  Disabled while recording / stopping so the
+    /// rebuild path cannot tear the active VDO chain mid-write.
+    private var captureLookStrip: some View {
+        HStack(spacing: 8) {
+            ForEach(FilmtoneCaptureLook.allCases) { look in
+                Button {
+                    captureLookSelection = look
+                } label: {
+                    Text(look.displayName)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            look == captureLookSelection
+                                ? Color.white.opacity(0.28)
+                                : Color.black.opacity(0.42),
+                            in: Capsule()
+                        )
+                }
+                .accessibilityIdentifier("filmtone.capture.look.\(look.id)")
+                .accessibilityAddTraits(
+                    look == captureLookSelection ? .isSelected : []
+                )
+                .disabled(
+                    isRecordingOrStopping
+                        || look == captureLookSelection
+                )
+            }
+        }
+        .accessibilityIdentifier("filmtone.capture.lookStrip")
     }
 
     /// S8-C: display-only readout of the locked M10 capture contract.
@@ -540,6 +823,99 @@ struct FilmtoneCaptureView: View {
         .padding(.horizontal, 28)
     }
 
+    // MARK: - F3-R diagnostic overlay
+
+    /// Top-left diagnostic chip showing the editor inputs flowing into
+    /// the live grade chain.  Removed in F3-Fix once parity gaps are
+    /// closed.  Anchored to `.topLeading` and pushed past the close X
+    /// button so it doesn't overlap the controls.  `allowsHitTesting`
+    /// is off so the chip never intercepts a tap on the close button
+    /// even if its frame grows.
+    private func diagnosticOverlay(
+        _ diag: FilmtoneLivePreviewDiagnostics
+    ) -> some View {
+        VStack {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("F3-R DIAG")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.yellow)
+                    Text("Look: \(diag.lookLabel)")
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    Text("Profile: \(diag.cameraProfileLabel)")
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    if let intensity = diag.creativeLutIntensity, diag.creativeLutPresent {
+                        Text("LUT: ON x \(String(format: "%.2f", intensity))")
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    } else {
+                        Text("LUT: OFF")
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    }
+                    Text("InputLUT: \(diag.inputLutWillApply ? "WILL APPLY (\(diag.detectedInputTransform ?? "auto"))" : "off")")
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundStyle(diag.inputLutWillApply ? .red : .white)
+                    // F3-Fix #1 post-fix interpretation:
+                    //   camProf:N is now a genuine wiring regression
+                    //     (post-fix `project.cameraProfile` is always at
+                    //     least `.auto`) → red `[!]` alarm.
+                    //   savedLook:N is informational — most edits don't
+                    //     have a Saved Look applied → neutral white text.
+                    Group {
+                        if !diag.cameraProfilePassedToProcessor {
+                            Text("[!] wiring camProf:N savedLook:\(diag.savedLookPassedToProcessor ? "Y" : "N")")
+                                .foregroundStyle(.red)
+                        } else {
+                            Text("wiring camProf:Y savedLook:\(diag.savedLookPassedToProcessor ? "Y" : "N")")
+                                .foregroundStyle(.white.opacity(0.8))
+                        }
+                    }
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    Text(String(
+                        format: "E:%+.2f C:%.2f S:%.2f T:%+.2f",
+                        diag.exposure, diag.contrast, diag.saturation, diag.temperature
+                    ))
+                        .font(.system(size: 10, weight: .regular, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.8))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background(
+                    Color.black.opacity(0.65),
+                    in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                )
+                .accessibilityIdentifier("filmtone.capture.f3rDiag")
+                Spacer()
+            }
+            .padding(.leading, 60)
+            .padding(.top, 8)
+            Spacer()
+        }
+        .allowsHitTesting(false)
+    }
+
+    private func logLiveDiagnostics(_ diag: FilmtoneLivePreviewDiagnostics) {
+        NSLog(
+            "[F3R] live preview diagnostics: look=%@ profile=%@ camProfPassed=%@ savedLookPassed=%@ savedLookId=%@ creativeLut=%@ size=%@ intensity=%@ slug=%@ inputLutWillApply=%@ detectedTransform=%@ presetVersion=%@ E=%+.3f C=%.3f S=%.3f T=%+.3f",
+            diag.lookLabel,
+            diag.cameraProfileLabel,
+            diag.cameraProfilePassedToProcessor ? "Y" : "N",
+            diag.savedLookPassedToProcessor ? "Y" : "N",
+            diag.savedLookId ?? "nil",
+            diag.creativeLutPresent ? "ON" : "OFF",
+            diag.creativeLutSize.map(String.init) ?? "nil",
+            diag.creativeLutIntensity.map { String(format: "%.3f", $0) } ?? "nil",
+            diag.creativeLutBundledSlug ?? "nil",
+            diag.inputLutWillApply ? "Y" : "N",
+            diag.detectedInputTransform ?? "nil",
+            diag.presetVersion,
+            diag.exposure,
+            diag.contrast,
+            diag.saturation,
+            diag.temperature
+        )
+    }
+
     // MARK: - Behaviors
 
     private var isRecordingOrStopping: Bool {
@@ -663,6 +1039,37 @@ struct FilmtoneCaptureView: View {
         preflightError = nil
         preflightWarnings = outcome.warnings
         session.useExternalFolder(url)
+        // Persist so the next capture-view present auto-resolves the
+        // same SSD folder without forcing the owner through the Files
+        // importer again.  Stored only after preflight passes so we
+        // never bookmark an internal / no-capacity path.
+        FilmtoneExternalFolderBookmark.save(url: url)
+    }
+
+    /// Auto-restore on `.task`: pull the saved bookmark, run the same
+    /// preflight + security-scope acquire path as `applyPickedFolder`,
+    /// and only commit when both gates pass.  Anything failing
+    /// silently clears the bookmark and leaves the surface in internal
+    /// mode — the SSD button is still available so the owner can
+    /// re-pick if they reconnected the drive after launch.
+    private func restorePersistedExternalFolderIfPossible() {
+        guard let url = FilmtoneExternalFolderBookmark.loadAndResolve() else {
+            return
+        }
+        guard url.startAccessingSecurityScopedResource() else {
+            FilmtoneExternalFolderBookmark.clear()
+            return
+        }
+        let outcome = FilmtoneCapturePreflight.preflight(folderURL: url)
+        if !outcome.passed {
+            url.stopAccessingSecurityScopedResource()
+            FilmtoneExternalFolderBookmark.clear()
+            return
+        }
+        heldExternalFolderURL = url
+        preflightError = nil
+        preflightWarnings = outcome.warnings
+        session.useExternalFolder(url)
     }
 
     private func clearExternalFolder() {
@@ -670,6 +1077,9 @@ struct FilmtoneCaptureView: View {
         preflightWarnings = []
         preflightError = nil
         session.useExternalFolder(nil)
+        // Clear the saved bookmark so the next capture-view present
+        // does not re-attach the same SSD the owner just dismissed.
+        FilmtoneExternalFolderBookmark.clear()
     }
 
     private func releaseExternalFolderScope() {

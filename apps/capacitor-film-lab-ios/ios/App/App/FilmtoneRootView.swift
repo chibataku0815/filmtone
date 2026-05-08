@@ -127,11 +127,42 @@ struct FilmtoneRootView: View {
             // and avoids re-binding to a published store inside the
             // capture view (which would couple recording UI ticks to
             // editor publishers).
+            let liveBundle = store.makeLivePreviewGradeProcessor()
+            // M11 / S11-B: resolve the chip-strip's initial selection
+            // from the editor's currently applied saved Look.  When the
+            // editor has Stone or Urban applied, the capture chip
+            // matches it; otherwise (no saved Look, or a saved Look
+            // outside the chip strip) we fall back to .filmtone — the
+            // chip strip is intentionally narrow (M11 out-of-scope:
+            // surfacing arbitrary saved Looks in capture).
+            let initialCaptureLook = FilmtoneCaptureLook.resolve(
+                from: store.appliedSavedLookId
+            )
+            // S11-C: closure that maps a chip selection to a freshly
+            // built grade processor + diagnostics pair.  Filmtone (no
+            // override) defers to the existing `makeLivePreviewGradeProcessor()`
+            // path, preserving the editor's pre-capture custom adjustments;
+            // Stone / Urban resolve to a catalog `BuiltInLook` and
+            // build through the override variant so the live preview
+            // matches the chip without touching the editor's persisted
+            // state until `adoptCaptureResult` (S11-E).
+            let makeGradeProcessor: (FilmtoneCaptureLook) -> FilmtoneLivePreviewBundle? = { chip in
+                let builtIn = chip.canonicalUUID.flatMap {
+                    FilmtoneBuiltInCatalog.look(matching: $0)
+                }
+                return store.makeLivePreviewGradeProcessor(
+                    overridingBuiltInLook: builtIn
+                )
+            }
             FilmtoneCaptureView(
                 lookReference: FilmtoneCaptureLookReference(
                     displayURI: store.selectedPreviewURI,
                     lookLabel: store.lookProfileLabel
                 ),
+                liveGradeProcessor: liveBundle?.processor,
+                liveDiagnostics: liveBundle?.diagnostics,
+                initialCaptureLook: initialCaptureLook,
+                makeGradeProcessor: makeGradeProcessor,
                 onCompleted: { package in
                     captureSurfacePresented = false
                     Task { await store.adoptCaptureResult(package) }

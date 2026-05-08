@@ -129,6 +129,36 @@ final class FilmtoneEditorFacade {
         try await runtime.makeGradedPreviewItem(request: request)
     }
 
+    /// Live capture preview entrypoint (M10 / S8-F F3 / F3-Fix #1).
+    /// Build a grade processor pinned to the editor's current request +
+    /// source so the capture surface can apply byte-parity grading to
+    /// live VDO frames.  Synchronous because callers want the closure
+    /// available before presenting the capture surface — same constraint
+    /// as `lookReference` in S8-D.  `sourceURL` is optional; when `nil`
+    /// the runtime resolves it from `request.sourceUri` via the same
+    /// `resolveFileURL` path used by every other media operation.
+    ///
+    /// `appliedSavedLook` and `cameraProfile` are forwarded to the
+    /// underlying `FilmtoneExportSession` so live preview matches the
+    /// export grade chain's input-LUT auto-injection
+    /// (`FilmtoneExportSession.makeActiveInputLut(for:probe:)`) and Saved
+    /// Look provenance.  Without these, live preview silently downgrades
+    /// to `cameraProfile = .auto` and an unresolved Saved Look — which
+    /// the F3-R diagnostic surfaces as `[!] camProf:N savedLook:N`.
+    func makeLivePreviewGradeProcessor(
+        request: Phase0ExportRequestDTO,
+        sourceURL: URL? = nil,
+        appliedSavedLook: SavedLookEntry? = nil,
+        cameraProfile: CameraProfileSelection? = nil
+    ) throws -> FilmtoneSharedGradeProcessor {
+        try runtime.makeSharedGradeProcessor(
+            request: request,
+            sourceURL: sourceURL,
+            appliedSavedLook: appliedSavedLook,
+            cameraProfile: cameraProfile
+        )
+    }
+
     func makeGradedPreviewComposition(
         request: Phase0ExportRequestDTO,
         asset: AVAsset

@@ -51,8 +51,22 @@ struct FilmtoneCapturePackageSnapshotV1: Codable {
     var lensIdentifier: String?
     var lensDisplayName: String?
     var lensDeviceType: String?
+    /// S11-D (schemaVersion 2): capture-time Look chip recorded with
+    /// the run.  All four are tri-required (UUID + name + intensity);
+    /// missing any of them means the snapshot was either pre-M11 or
+    /// the Filmtone default chip was selected — both decode to
+    /// `selectedLook = nil`.  `selectedLookSlug` is independently
+    /// optional even when the others are present (future non-bundled
+    /// Looks).
+    var selectedLookCanonicalUUID: String?
+    var selectedLookSlug: String?
+    var selectedLookEnglishName: String?
+    var selectedLookIntensity: Double?
 
-    static let currentSchemaVersion = 1
+    /// Bumped to 2 in S11-D.  Schema-version 1 snapshots written by
+    /// M10 / S8-B continue to decode because every S11-D field is
+    /// optional (`Codable` populates them with `nil` on absence).
+    static let currentSchemaVersion = 2
 }
 
 enum FilmtoneCapturePackagePersistence {
@@ -140,7 +154,11 @@ enum FilmtoneCapturePackagePersistence {
             writtenAtISO8601: ISO8601DateFormatter().string(from: Date()),
             lensIdentifier: package.lens?.identifier,
             lensDisplayName: package.lens?.displayName,
-            lensDeviceType: package.lens?.deviceType
+            lensDeviceType: package.lens?.deviceType,
+            selectedLookCanonicalUUID: package.selectedLook?.canonicalUUID.uuidString,
+            selectedLookSlug: package.selectedLook?.slug,
+            selectedLookEnglishName: package.selectedLook?.englishName,
+            selectedLookIntensity: package.selectedLook?.intensity
         )
     }
 
@@ -183,6 +201,27 @@ enum FilmtoneCapturePackagePersistence {
         } else {
             lens = nil
         }
+        // S11-D: rebuild the selected-Look record only when the three
+        // required identity fields (UUID + name + intensity) round-trip
+        // cleanly.  Filmtone-default and pre-M11 snapshots have all of
+        // them nil and decode to `selectedLook = nil`.  A partially-
+        // written record (e.g. UUID present but name missing) is
+        // treated as "look unknown" rather than fabricated, mirroring
+        // the lens-record policy above.
+        let selectedLook: FilmtoneSelectedLookRecord?
+        if let uuidString = snapshot.selectedLookCanonicalUUID,
+           let uuid = UUID(uuidString: uuidString),
+           let englishName = snapshot.selectedLookEnglishName,
+           let intensity = snapshot.selectedLookIntensity {
+            selectedLook = FilmtoneSelectedLookRecord(
+                canonicalUUID: uuid,
+                slug: snapshot.selectedLookSlug,
+                englishName: englishName,
+                intensity: intensity
+            )
+        } else {
+            selectedLook = nil
+        }
         return FilmtoneCapturePackage(
             captureId: snapshot.captureId,
             storagePolicy: storagePolicy,
@@ -192,7 +231,8 @@ enum FilmtoneCapturePackagePersistence {
             durationLimitSeconds: snapshot.durationLimitSeconds,
             recordedDurationSeconds: snapshot.recordedDurationSeconds,
             parameters: parameters,
-            lens: lens
+            lens: lens,
+            selectedLook: selectedLook
         )
     }
 

@@ -318,6 +318,57 @@ Out of scope (handled in later lanes):
   acceptance matrix, audio capture, exposure / focus / WB knobs,
   Gyroflow handoff (separate library lane), variable-fps capture.
 
+### M11 - Capture-Time Look Selection
+
+Goal:
+
+撮影画面で Look を選び、その場で live preview に反映し、録画後の
+editor 初期状態にもその Look が引き継がれる。owner が「Look を選ぶ
+ために素材を読み込む」遠回りを撤廃する。
+
+Pinned capture contract (M10 baseline 不変):
+
+- master file は ProRes 422 HQ (`apch`) / Apple Log 2 (rawValue 4) /
+  3840×2160@24 / cinematicExtendedEnhanced のまま保持
+- Look は **master に焼き込まない** — capture-package.json の
+  `selectedLook` field と editor 初期状態にのみ反映
+- live preview は M10 / S8-F F3-Fix #1 の VDO grade chain
+  (`FilmtoneSharedGradeProcessor` + `appliedSavedLook` /
+  `cameraProfile` 3-layer wiring) を再利用
+
+Done:
+
+- capture surface 内に compact Look chip strip(bundled Stone /
+  Urban + 標準 Filmtone)が表示される。詳細 picker は外殻、必要なら
+  別 lane
+- Look chip タップで live preview が即反映される(VDO sample tick
+  単位、再 prepare なし)
+- editor から capture に入った場合: 現在の Look(`appliedSavedLookId`
+  または default Filmtone)が初期選択
+- empty から capture に入った場合: 最後に使った capture-Look、なければ
+  default Filmtone
+- `capture-package.json` schemaVersion を bump し `selectedLook`
+  field を永続化(`canonicalUUID` + `slug` + `intensity`)
+- `adoptCaptureResult(_:)` 内で `selectedLook` を editor store に適用
+  (既存 `applySavedLook` 経路を通す — 二重実装しない)
+- cancel した場合: 既存 editor の `appliedSavedLookId` /
+  `creativeLut` / `quickState` / `paramOverrides` は破壊されない
+  (capture-Look 状態は capture surface 内 ephemeral)
+- master file FourCC `apch` / Apple Log 2 / cinematicEE は M10
+  truth gate と同じ結果を返す
+
+Dependency:
+
+- M10 (live preview grade chain + capture-package persistence).
+
+Out of scope (handled in later lanes):
+
+- Library full Look picker(library sheet は editor 側のまま)
+- saved Look の作成 / 削除 / 名称変更(library 経由)
+- intensity slider(まず固定 intensity、必要なら別 lane)
+- camera profile picker(capture 中は固定、editor で変更)
+- Look chip strip の sort / favorite / search
+
 ## Known Constraints
 
 - No implementation starts without `active.md`.
@@ -538,3 +589,24 @@ Out of scope (handled in later lanes):
   iPhone 17 Pro / iOS 26.4.2. Polish observed during the walk is
   deferred to a separate UI/UX lane. Details in
   `archive/2026-05-08-m9-native-recording-export-completion.md`.
+- 2026-05-08: M10 (Native Camera Capture Surface + Proxy Workflow)
+  **landed** — S8-F sub-stages F1〜F4 全 PASS。VDO+MovieFileOutput
+  共存 live preview に F3-Fix #1 で `cameraProfile`/`appliedSavedLook`
+  3-layer wiring を通し、Stone/Urban で diagnostic chip
+  `wiring camProf:Y savedLook:Y` を device verify。F4 で master.mov
+  を ffprobe/mp4dump/mediainfo + 自前 colr parser で精査 — ProRes
+  422 HQ `apch`/4K24 CFR/10-bit yuv422p10le/BT.2020 NC + Gyroflow
+  用 `mebx` track。capture-package.json `parameters*` も
+  Apple Log 2/cinematicExtendedEnhanced/24/3840×2160 全保持。
+  Details in `archive/2026-05-08-m10-native-camera-capture-surface.md`.
+- 2026-05-08: M11 (Capture-Time Look Selection) **landed** — capture
+  surface に Filmtone / Stone / Urban の固定 3-chip strip、live preview
+  rebuild closure 経由 + record success → editor `applySavedLook` で
+  cancel-preserving な Look handoff。実機 iPhone 17 Pro / iOS 26.4.2
+  で chip 切替 → live preview 反映 / record → editor 反映 / cancel →
+  editor 不変 / master truth M10 baseline 維持を verify。closeout 中
+  に SSD bookmark 永続化(`FilmtoneExternalFolderBookmark`)と
+  cold-start chip preview structural gap(synthetic SourceInfoDTO /
+  Probe with `file://` URI)を 2 件 fix。live preview 切替遅延は
+  post-M11 polish 候補として保留。Details in
+  `archive/2026-05-08-m11-capture-look-selection.md`.
