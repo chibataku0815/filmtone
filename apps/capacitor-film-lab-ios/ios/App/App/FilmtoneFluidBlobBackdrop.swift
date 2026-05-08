@@ -1,24 +1,20 @@
-// Filmtone editor empty-view fluid blob backdrop — SwiftUI wrapper
-// (M15-final v4 — dynamic glow + plusLighter halation).
+// Filmtone editor empty-view fluid blob backdrop — SwiftUI wrapper.
 //
-// The shader now covers the full screen at α=1 with a dark-warm base
-// + blob composite + film grain. The wrapper adds the グロー /
-// halation pass: a blurred copy with `.blendMode(.plusLighter)`
-// composites additively over the sharp pass, brightening blob
-// regions and bleeding their color outward into the substrate. Blur
-// radius pulses on a slow sin so the glow itself is also a dynamic
-// effect (matching the user direction "効果自体もランダムアニメー
-// ションで変化させる").
-//
-// Filename "FluidSphere" is legacy from the v1/v2 sphere
-// implementation; the file rename is deferred to keep the iteration
-// focused on the visual result.
+// The shader (`FilmtoneFluidBlobBackdrop.metal`) covers the full
+// screen at α=1 with a warm cream base + animated 8-blob pastel
+// composite + chromatic aberration + film grain. The wrapper adds
+// the グロー / halation pass: a blurred copy with
+// `.blendMode(.plusLighter)` composites additively over the sharp
+// pass, brightening blob regions and bleeding their color outward
+// into the substrate. Blur radius pulses on a slow sin so the glow
+// itself is also a dynamic effect (matching the user direction
+// "効果自体もランダムアニメーションで変化させる").
 
 import SwiftUI
 
 #if os(iOS)
 
-struct FilmtoneFluidSphere: View {
+struct FilmtoneFluidBlobBackdrop: View {
     var body: some View {
         TimelineView(.animation) { context in
             let t = context.date.timeIntervalSinceReferenceDate
@@ -57,7 +53,7 @@ struct FilmtoneFluidSphere: View {
             Rectangle()
                 .fill(.white)
                 .colorEffect(
-                    ShaderLibrary.filmtoneFluidSphere(
+                    ShaderLibrary.filmtoneFluidBlobBackdrop(
                         .float2(Float(geometry.size.width),
                                 Float(geometry.size.height)),
                         .float(time)

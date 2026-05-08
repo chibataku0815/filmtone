@@ -24,7 +24,7 @@ struct FilmtoneEmptyView: View {
             substrate
                 .ignoresSafeArea()
 
-            FilmtoneFluidSphere()
+            FilmtoneFluidBlobBackdrop()
                 .ignoresSafeArea()
                 .accessibilityIdentifier("filmtone.empty.fluidBackdrop")
 

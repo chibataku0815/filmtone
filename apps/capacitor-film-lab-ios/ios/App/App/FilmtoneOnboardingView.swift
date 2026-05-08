@@ -54,7 +54,7 @@ private struct FilmtoneOnboardingSlide: Identifiable {
 
 /// Onboarding pre-shown before the empty view. Aligned 2026-05-09 to
 /// the empty-view's M15-final v6 visual language: cream substrate +
-/// `FilmtoneFluidSphere` Metal-shader fluid blob backdrop +
+/// `FilmtoneFluidBlobBackdrop` Metal-shader fluid blob backdrop +
 /// `.preferredColorScheme(.light)` so adaptive `.primary` colors
 /// flip to dark text on the light substrate. Liquid Glass primary
 /// CTA + text-link secondary mirrors the empty-view action stack
@@ -101,7 +101,7 @@ struct FilmtoneOnboardingView: View {
             substrate
                 .ignoresSafeArea()
 
-            FilmtoneFluidSphere()
+            FilmtoneFluidBlobBackdrop()
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {

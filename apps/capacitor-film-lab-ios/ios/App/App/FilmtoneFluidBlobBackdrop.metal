@@ -138,7 +138,7 @@ static BlobMix sampleBlobs(float2 uv, float time) {
     return mix;
 }
 
-[[ stitchable ]] half4 filmtoneFluidSphere(
+[[ stitchable ]] half4 filmtoneFluidBlobBackdrop(
     float2 position,
     half4 color,
     float2 size,

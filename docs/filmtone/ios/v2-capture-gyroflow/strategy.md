@@ -1050,3 +1050,7 @@ Dependency:
   (Filmtone-optimized motion library, broad device matrix,
   React/Capacitor purge) that surface only on explicit owner
   authorization.
+- 2026-05-09: Hygiene rename completed — legacy
+  `FilmtoneFluidSphere.{swift,metal}` / `filmtoneFluidSphere` naming
+  replaced with `FilmtoneFluidBlobBackdrop.{swift,metal}` /
+  `filmtoneFluidBlobBackdrop`. No behavior change.
