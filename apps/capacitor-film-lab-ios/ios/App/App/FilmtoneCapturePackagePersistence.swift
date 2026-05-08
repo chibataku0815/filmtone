@@ -85,6 +85,17 @@ struct FilmtoneCapturePackageSnapshotV1: Codable {
     var focusPointNormalizedY: Double?
     var meteringPointNormalizedX: Double?
     var meteringPointNormalizedY: Double?
+    /// M12 / S12-D: white balance lock state.  `whiteBalanceMode`
+    /// ("auto" | "locked") is the trigger field; locked snapshots
+    /// also carry the three gain channels.  Auto snapshots leave the
+    /// gains nil — see the `FilmtoneCaptureWhiteBalanceRecord` doc
+    /// for why auto-mode gains are not persisted.  Pre-M12 snapshots
+    /// have `whiteBalanceMode = nil` and decode to
+    /// `whiteBalance = nil` on the package.
+    var whiteBalanceMode: String?
+    var whiteBalanceRedGain: Double?
+    var whiteBalanceGreenGain: Double?
+    var whiteBalanceBlueGain: Double?
 
     /// Bumped to 2 in S11-D.  Schema-version 1 snapshots written by
     /// M10 / S8-B continue to decode because every S11-D field is
@@ -189,7 +200,11 @@ enum FilmtoneCapturePackagePersistence {
             focusPointNormalizedX: package.exposureControl?.focusPointX,
             focusPointNormalizedY: package.exposureControl?.focusPointY,
             meteringPointNormalizedX: package.exposureControl?.meteringPointX,
-            meteringPointNormalizedY: package.exposureControl?.meteringPointY
+            meteringPointNormalizedY: package.exposureControl?.meteringPointY,
+            whiteBalanceMode: package.whiteBalance?.mode,
+            whiteBalanceRedGain: package.whiteBalance?.redGain,
+            whiteBalanceGreenGain: package.whiteBalance?.greenGain,
+            whiteBalanceBlueGain: package.whiteBalance?.blueGain
         )
     }
 
@@ -278,6 +293,26 @@ enum FilmtoneCapturePackagePersistence {
         } else {
             exposureControl = nil
         }
+        // S12-D: rebuild the white-balance record only when
+        // `whiteBalanceMode` is present (the M12 sentinel field).
+        // Auto-mode snapshots are stored with the gains nil — that is
+        // intentional, see `FilmtoneCaptureWhiteBalanceRecord` doc —
+        // so we do NOT require the gains to be present to rebuild.
+        // Locked-mode snapshots that are missing one or more gains
+        // are still rebuilt here (the truth-gate verifier in S12-F
+        // catches partial-write states).  Pre-M12 snapshots leave
+        // `whiteBalance = nil` on the package.
+        let whiteBalance: FilmtoneCaptureWhiteBalanceRecord?
+        if let mode = snapshot.whiteBalanceMode {
+            whiteBalance = FilmtoneCaptureWhiteBalanceRecord(
+                mode: mode,
+                redGain: snapshot.whiteBalanceRedGain,
+                greenGain: snapshot.whiteBalanceGreenGain,
+                blueGain: snapshot.whiteBalanceBlueGain
+            )
+        } else {
+            whiteBalance = nil
+        }
         return FilmtoneCapturePackage(
             captureId: snapshot.captureId,
             storagePolicy: storagePolicy,
@@ -289,7 +324,8 @@ enum FilmtoneCapturePackagePersistence {
             parameters: parameters,
             lens: lens,
             selectedLook: selectedLook,
-            exposureControl: exposureControl
+            exposureControl: exposureControl,
+            whiteBalance: whiteBalance
         )
     }
 

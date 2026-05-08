@@ -575,6 +575,10 @@ struct FilmtoneCaptureView: View {
                 evSliderRow
             }
 
+            if showsWhiteBalanceRow {
+                whiteBalanceRow
+            }
+
             contractBanner
 
             statusLine
@@ -994,6 +998,121 @@ struct FilmtoneCaptureView: View {
             return "0.0 EV"
         }
         return String(format: "%+.1f EV", v)
+    }
+
+    // MARK: - White balance row (M12 / S12-D)
+
+    /// Compact 2-segment WB control: Auto (continuous) ⇄ Locked
+    /// (sampled-gains hold).  Stays a sibling of the EV slider rather
+    /// than fanning out into a settings panel — S12-A's "撮影画面が
+    /// 設定パネル化しないように" framing.  Disabled while recording /
+    /// stopping (`AVCaptureDevice.lockForConfiguration()` mid-record
+    /// contention avoidance, same rationale as the EV slider).  When
+    /// the active lens reports lock unsupported (no shipping iPhone
+    /// rear lens trips this, but a future / specialty lens could),
+    /// the Locked segment is disabled in place and an italic note
+    /// explains the reason without forcing a sheet.
+    private var whiteBalanceRow: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "thermometer.sun")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.white.opacity(0.85))
+            Text("WB")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.85))
+            whiteBalanceSegmentedControl
+                .accessibilityIdentifier("filmtone.capture.wbControl")
+            if !session.canLockWhiteBalance {
+                Text("Lock unavailable on this lens")
+                    .font(.system(size: 10, weight: .regular))
+                    .italic()
+                    .foregroundStyle(.white.opacity(0.55))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+        .background(Color.black.opacity(0.45), in: Capsule())
+        .accessibilityIdentifier("filmtone.capture.wbRow")
+        .disabled(isRecordingOrStopping)
+        .opacity(isRecordingOrStopping ? 0.5 : 1.0)
+    }
+
+    /// Custom 2-pill segmented control.  Built locally rather than
+    /// using SwiftUI `Picker(.segmented)` because the segmented Picker
+    /// uses UISegmentedControl appearance which fights the dark
+    /// translucent capsule treatment that anchors all M12 capture
+    /// controls (`Color.black.opacity(0.45)`).  Visual contract:
+    /// - Active segment: white pill background, black text
+    /// - Inactive: clear background, white text, ~60% opacity
+    /// - Outer capsule binds them as one control
+    private var whiteBalanceSegmentedControl: some View {
+        HStack(spacing: 0) {
+            whiteBalanceSegment(.auto, label: "Auto")
+            whiteBalanceSegment(.locked, label: "Locked")
+        }
+        .padding(2)
+        .background(Color.white.opacity(0.12), in: Capsule())
+        .frame(width: 156)
+    }
+
+    @ViewBuilder
+    private func whiteBalanceSegment(
+        _ mode: FilmtoneCaptureSession.WhiteBalanceMode,
+        label: String
+    ) -> some View {
+        let isActive = session.whiteBalanceMode == mode
+        let isLockedAndUnavailable = (
+            mode == .locked && !session.canLockWhiteBalance
+        )
+        Button {
+            applyWhiteBalanceMode(mode)
+        } label: {
+            Text(label)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(
+                    isActive
+                        ? Color.black
+                        : .white.opacity(isLockedAndUnavailable ? 0.35 : 0.85)
+                )
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 5)
+                .background(
+                    isActive
+                        ? Color.white.opacity(0.95)
+                        : Color.clear,
+                    in: Capsule()
+                )
+        }
+        .accessibilityIdentifier("filmtone.capture.wb.\(mode.rawValue)")
+        .accessibilityAddTraits(isActive ? .isSelected : [])
+        .disabled(isLockedAndUnavailable)
+    }
+
+    private func applyWhiteBalanceMode(
+        _ mode: FilmtoneCaptureSession.WhiteBalanceMode
+    ) {
+        guard !isRecordingOrStopping else { return }
+        guard session.whiteBalanceMode != mode else { return }
+        switch mode {
+        case .auto:
+            session.unlockWhiteBalance()
+        case .locked:
+            // The `canLockWhiteBalance` gate is also enforced inside
+            // the session, but checking here lets the UI short-circuit
+            // before the seg button visually flashes a press.
+            guard session.canLockWhiteBalance else { return }
+            session.lockWhiteBalance()
+        }
+    }
+
+    private var showsWhiteBalanceRow: Bool {
+        switch session.state {
+        case .ready, .recording, .stopping: return true
+        default: return false
+        }
     }
 
     // MARK: - Failure overlay

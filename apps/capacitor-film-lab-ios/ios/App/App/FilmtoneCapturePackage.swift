@@ -105,6 +105,27 @@ struct FilmtoneCaptureExposureControlRecord: Equatable, Codable {
     let meteringPointY: Double?
 }
 
+/// M12 / S12-D: capture-time white balance lock state.  M12 ships
+/// only the two-mode contract (auto-continuous vs locked-with-sampled-
+/// gains); custom Kelvin / tint sliders are out-of-scope (active.md
+/// "Out of scope").  When `mode == "locked"`, all three gains are
+/// required and reflect what the device reported via
+/// `deviceWhiteBalanceGains` at the moment the owner tapped Locked —
+/// not what was applied later if the device's auto-WB had drifted.
+/// `mode == "auto"` snapshots leave gains nil (the gains the device
+/// happened to have at record-stop are not stable enough to be useful
+/// as metadata, and including them would invite consumers to treat
+/// auto runs as "captured at gains x/y/z" which is misleading).
+struct FilmtoneCaptureWhiteBalanceRecord: Equatable, Codable {
+    /// `"auto"` — continuous-auto WB, owner did not lock.
+    /// `"locked"` — owner held a fixed reference set at lock time.
+    let mode: String
+    /// Sampled gains at lock time.  Nil when `mode == "auto"`.
+    let redGain: Double?
+    let greenGain: Double?
+    let blueGain: Double?
+}
+
 /// M11 / S11-D: capture-time Look chip recorded with a successful
 /// run.  Stone / Urban populate this record so the editor adoption
 /// path (S11-E) can re-apply the same Look against the proxy without
@@ -274,6 +295,12 @@ struct FilmtoneCapturePackage: Equatable {
     /// "auto"`, `biasEV: 0.0`, focus / metering points nil if the run
     /// stayed on continuous-auto throughout).
     let exposureControl: FilmtoneCaptureExposureControlRecord?
+    /// M12 / S12-D: white balance lock state at record-stop time.
+    /// `nil` for pre-M12 captures decoded from disk; new runs always
+    /// populate this with at least `mode: "auto"` so the package
+    /// distinguishes "M12 capture, owner stayed on auto-WB" from
+    /// "pre-M12 capture, no WB metadata exists".
+    let whiteBalance: FilmtoneCaptureWhiteBalanceRecord?
 }
 
 #endif

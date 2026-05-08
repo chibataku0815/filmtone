@@ -156,6 +156,30 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     /// S12-E manual exposure where metering POI does not move.
     @Published private(set) var lastMeteringPointNormalized: CGPoint?
 
+    /// M12 / S12-D: white balance mode for the active session.  Resets
+    /// to `.auto` on every `prepare(lens:)` so a lens swap drops back
+    /// to continuous auto-WB (the new lens's auto baseline is the
+    /// right place to re-judge a lock from).  Updated by
+    /// `lockWhiteBalance()` / `unlockWhiteBalance()`.
+    enum WhiteBalanceMode: String, Equatable {
+        case auto
+        case locked
+    }
+    @Published private(set) var whiteBalanceMode: WhiteBalanceMode = .auto
+    /// M12 / S12-D: gains sampled at the moment the owner tapped
+    /// Locked.  Held internally so the record-stop snapshot can carry
+    /// them into the capture package; not exposed for UI tweaks
+    /// (S12-D does not ship a Kelvin / tint slider — those are
+    /// out-of-scope per active.md).  Nil while in `.auto`.
+    @Published private(set) var lockedWhiteBalanceGains: AVCaptureDevice.WhiteBalanceGains?
+    /// M12 / S12-D: whether the active device + format combination
+    /// can lock white balance with custom device gains.  Read at
+    /// `prepare(lens:)` from `device.isLockingWhiteBalanceWithCustomDeviceGainsSupported`
+    /// AND `device.isWhiteBalanceModeSupported(.locked)`.  False
+    /// disables the Locked segment in the UI with a visible reason
+    /// rather than failing silently when the owner taps Locked.
+    @Published private(set) var canLockWhiteBalance: Bool = true
+
     private var captureId: String = UUID().uuidString.lowercased()
     private var packageDirURL: URL?
     private var masterURL: URL?
@@ -277,6 +301,12 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
             if captureDevice.isExposureModeSupported(.continuousAutoExposure) {
                 captureDevice.exposureMode = .continuousAutoExposure
             }
+            // M12 / S12-D: reset white balance to continuous-auto so
+            // a lens swap drops a previously-locked WB.  Calling this
+            // inside the same lock cycle as the EV / focus reset.
+            if captureDevice.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
+                captureDevice.whiteBalanceMode = .continuousAutoWhiteBalance
+            }
             captureDevice.unlockForConfiguration()
             // Capture the device-reported bias range and intersect with
             // the M12 `[-2, +2]` cap so the slider exposes only the
@@ -293,6 +323,18 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
             self.exposureBiasEV = 0
             self.lastFocusPointNormalized = nil
             self.lastMeteringPointNormalized = nil
+            // M12 / S12-D: snapshot WB lock capability per active
+            // device + format.  All shipping iPhone rear lenses
+            // satisfy both predicates; the guard exists for future
+            // hardware where a lens reports `.locked` unsupported
+            // (e.g. a yet-unseen specialty front-facing camera) so
+            // the UI can disable Locked with a visible reason rather
+            // than failing the apply silently.
+            self.canLockWhiteBalance =
+                captureDevice.isLockingWhiteBalanceWithCustomDeviceGainsSupported
+                && captureDevice.isWhiteBalanceModeSupported(.locked)
+            self.whiteBalanceMode = .auto
+            self.lockedWhiteBalanceGains = nil
 
             let output = AVCaptureMovieFileOutput()
             guard session.canAddOutput(output) else {
@@ -480,6 +522,58 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         }
     }
 
+    /// M12 / S12-D: hold WB at the device's current
+    /// `deviceWhiteBalanceGains`.  No-op when the active lens did not
+    /// report lock support at `prepare(lens:)` time — the UI gates the
+    /// tap on `canLockWhiteBalance`, but the guard here keeps the
+    /// session safe to call from any caller that did not consult the
+    /// gate.  Best-effort on lock contention (same rationale as
+    /// `setExposureBias(_:)`).
+    func lockWhiteBalance() {
+        guard let device, canLockWhiteBalance else { return }
+        do {
+            try device.lockForConfiguration()
+            let currentGains = device.deviceWhiteBalanceGains
+            // The device must accept these gains as "in range" for
+            // `setWhiteBalanceModeLocked(with:)` to succeed; clamp to
+            // `[1.0, maxWhiteBalanceGain]` per channel because the
+            // sampled `deviceWhiteBalanceGains` can theoretically
+            // sit at exactly `maxWhiteBalanceGain` on edge-case
+            // exposures, and the setter rejects anything above.
+            let maxGain = device.maxWhiteBalanceGain
+            let clamped = AVCaptureDevice.WhiteBalanceGains(
+                redGain: min(max(currentGains.redGain, 1.0), maxGain),
+                greenGain: min(max(currentGains.greenGain, 1.0), maxGain),
+                blueGain: min(max(currentGains.blueGain, 1.0), maxGain)
+            )
+            device.setWhiteBalanceModeLocked(with: clamped, completionHandler: nil)
+            device.unlockForConfiguration()
+            self.lockedWhiteBalanceGains = clamped
+            self.whiteBalanceMode = .locked
+        } catch {
+            // Lock contention — leave state on .auto; the UI segment
+            // will resync from `whiteBalanceMode` and the owner can
+            // tap Locked again.
+        }
+    }
+
+    /// M12 / S12-D: return WB to continuous-auto.  Idempotent; safe
+    /// to call when already on `.auto`.
+    func unlockWhiteBalance() {
+        guard let device else { return }
+        do {
+            try device.lockForConfiguration()
+            if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
+                device.whiteBalanceMode = .continuousAutoWhiteBalance
+            }
+            device.unlockForConfiguration()
+            self.lockedWhiteBalanceGains = nil
+            self.whiteBalanceMode = .auto
+        } catch {
+            // Lock contention — leave state where it was.
+        }
+    }
+
     /// Caller-supplied external folder URL.  Caller owns the
     /// security-scoped lifetime; we only store the URL and adjust the
     /// resolved policy.  Pass `nil` to clear back to internal mode.
@@ -579,6 +673,10 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         exposureBiasEV = 0
         lastFocusPointNormalized = nil
         lastMeteringPointNormalized = nil
+        // M12 / S12-D: drop WB lock state for the same reason.
+        whiteBalanceMode = .auto
+        lockedWhiteBalanceGains = nil
+        canLockWhiteBalance = true
         if case .ready = state {
             state = .idle
         }
@@ -733,6 +831,26 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
             meteringPointX: self.lastMeteringPointNormalized.map { Double($0.x) },
             meteringPointY: self.lastMeteringPointNormalized.map { Double($0.y) }
         )
+        // M12 / S12-D: WB lock state at record-stop.  Auto-mode
+        // snapshots store the gains as nil (see record doc); locked
+        // snapshots carry the sampled gains the device was holding.
+        let whiteBalance: FilmtoneCaptureWhiteBalanceRecord
+        switch self.whiteBalanceMode {
+        case .auto:
+            whiteBalance = FilmtoneCaptureWhiteBalanceRecord(
+                mode: "auto",
+                redGain: nil,
+                greenGain: nil,
+                blueGain: nil
+            )
+        case .locked:
+            whiteBalance = FilmtoneCaptureWhiteBalanceRecord(
+                mode: "locked",
+                redGain: self.lockedWhiteBalanceGains.map { Double($0.redGain) },
+                greenGain: self.lockedWhiteBalanceGains.map { Double($0.greenGain) },
+                blueGain: self.lockedWhiteBalanceGains.map { Double($0.blueGain) }
+            )
+        }
 
         // Kick off proxy generation off-main; flip state when complete.
         Task.detached(priority: .userInitiated) { [weak self] in
@@ -755,7 +873,8 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
                         parameters: parameters,
                         lens: lensRecord,
                         selectedLook: selectedLook,
-                        exposureControl: exposureControl
+                        exposureControl: exposureControl,
+                        whiteBalance: whiteBalance
                     )
                     // Master/proxy linkage is the M10 deliverable; if we
                     // can't write `capture-package.json` next to the
