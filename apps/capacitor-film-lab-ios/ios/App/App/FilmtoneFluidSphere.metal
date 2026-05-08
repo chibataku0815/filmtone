@@ -50,14 +50,40 @@ struct BlobMix {
     half intensity;
 };
 
-// 8 blobs anchored at well-spread positions (corners + mid-edges +
-// center). Each anchor has its own drift amplitude (0.18-0.24) and
-// frequency pair so the local motion stays near the anchor and the
-// global composition is always evenly populated.
+// Anisotropic Gaussian weight at uv given a blob center and per-axis
+// σ. σx ≠ σy → the blob is an ellipse (stretched horizontally or
+// vertically); σx = σy → the blob is round. This is the morphing
+// shape mechanism: each blob's σx and σy pulse on independent
+// frequencies so the silhouette never freezes as a circle.
+static half blobWeight(float2 uv, float2 center, float sigmaX, float sigmaY) {
+    float2 d = uv - center;
+    float exponent = (d.x * d.x) / (sigmaX * sigmaX)
+                   + (d.y * d.y) / (sigmaY * sigmaY);
+    return half(exp(-exponent));
+}
+
+// Per-blob size + shape pulse. σ_min = 0.20 (current floor — owner
+// requirement: 「現状の大きさを最小値として下さい」). σ_max = 0.28
+// (1.4× growth ceiling — beyond this the blobs swell so far they
+// stop leaving cream-substrate gaps in the layout, killing the
+// substrate breathing the v6 redesign delivered).
 //
-// σ = 0.20 — wider than v5's 0.13 (which made blobs tightly small)
-// but tighter than the v4 single-sphere 0.42. Each blob has visible
-// identity AND territory.
+// Pulse formula: `σ = σ_min + amp * (sin(t·f) * 0.5 + 0.5)` so the
+// minimum is the FLOOR (sin can never push σ below 0.20). Each blob
+// has independent freq seeds for x and y axes so the blob morphs
+// through round → ellipse-h → round → ellipse-v → ... organically.
+constant float SIGMA_MIN = 0.20;
+constant float SIGMA_AMP = 0.08;
+
+static float pulseSigma(float time, float freq, float phase) {
+    float s = sin(time * freq + phase) * 0.5 + 0.5;  // [0, 1]
+    return SIGMA_MIN + SIGMA_AMP * s;                 // [0.20, 0.28]
+}
+
+// 8 blobs anchored at well-spread positions (corners + mid-edges +
+// center). Drift frequencies for position are kept from v6; the new
+// σ_x / σ_y frequencies are unique to each (blob, axis) so size +
+// shape morph never re-syncs across blobs.
 static BlobMix sampleBlobs(float2 uv, float time) {
     float2 b1 = float2(0.16 + 0.18 * sin(time * 0.131),
                        0.20 + 0.20 * cos(time * 0.097));   // top-left
@@ -76,15 +102,28 @@ static BlobMix sampleBlobs(float2 uv, float time) {
     float2 b8 = float2(0.85 + 0.20 * sin(time * 0.119),
                        0.78 + 0.22 * cos(time * 0.083));   // bot-right
 
-    float sigmaSq = 0.20 * 0.20;
-    half w1 = half(exp(-dot(uv - b1, uv - b1) / sigmaSq));
-    half w2 = half(exp(-dot(uv - b2, uv - b2) / sigmaSq));
-    half w3 = half(exp(-dot(uv - b3, uv - b3) / sigmaSq));
-    half w4 = half(exp(-dot(uv - b4, uv - b4) / sigmaSq));
-    half w5 = half(exp(-dot(uv - b5, uv - b5) / sigmaSq));
-    half w6 = half(exp(-dot(uv - b6, uv - b6) / sigmaSq));
-    half w7 = half(exp(-dot(uv - b7, uv - b7) / sigmaSq));
-    half w8 = half(exp(-dot(uv - b8, uv - b8) / sigmaSq));
+    // Per-blob anisotropic σ pulses. Each (blob, axis) gets a unique
+    // (freq, phase) seed. Phases are non-zero so different blobs do
+    // not pass through their σ_min simultaneously — at any moment
+    // some blobs are growing, some shrinking, some round, some
+    // elongated.
+    float sx1 = pulseSigma(time, 0.061, 0.0);   float sy1 = pulseSigma(time, 0.083, 1.7);
+    float sx2 = pulseSigma(time, 0.077, 2.3);   float sy2 = pulseSigma(time, 0.059, 0.4);
+    float sx3 = pulseSigma(time, 0.069, 4.1);   float sy3 = pulseSigma(time, 0.091, 2.9);
+    float sx4 = pulseSigma(time, 0.053, 1.1);   float sy4 = pulseSigma(time, 0.073, 3.5);
+    float sx5 = pulseSigma(time, 0.087, 5.2);   float sy5 = pulseSigma(time, 0.063, 0.7);
+    float sx6 = pulseSigma(time, 0.071, 2.7);   float sy6 = pulseSigma(time, 0.085, 4.6);
+    float sx7 = pulseSigma(time, 0.057, 3.8);   float sy7 = pulseSigma(time, 0.079, 1.3);
+    float sx8 = pulseSigma(time, 0.093, 0.9);   float sy8 = pulseSigma(time, 0.067, 5.1);
+
+    half w1 = blobWeight(uv, b1, sx1, sy1);
+    half w2 = blobWeight(uv, b2, sx2, sy2);
+    half w3 = blobWeight(uv, b3, sx3, sy3);
+    half w4 = blobWeight(uv, b4, sx4, sy4);
+    half w5 = blobWeight(uv, b5, sx5, sy5);
+    half w6 = blobWeight(uv, b6, sx6, sy6);
+    half w7 = blobWeight(uv, b7, sx7, sy7);
+    half w8 = blobWeight(uv, b8, sx8, sy8);
 
     half intensity = w1 + w2 + w3 + w4 + w5 + w6 + w7 + w8;
     half3 color = half3(0.0);

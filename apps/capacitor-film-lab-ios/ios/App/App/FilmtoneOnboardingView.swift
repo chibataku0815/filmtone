@@ -52,6 +52,13 @@ private struct FilmtoneOnboardingSlide: Identifiable {
     let symbolName: String
 }
 
+/// Onboarding pre-shown before the empty view. Aligned 2026-05-09 to
+/// the empty-view's M15-final v6 visual language: cream substrate +
+/// `FilmtoneFluidSphere` Metal-shader fluid blob backdrop +
+/// `.preferredColorScheme(.light)` so adaptive `.primary` colors
+/// flip to dark text on the light substrate. Liquid Glass primary
+/// CTA + text-link secondary mirrors the empty-view action stack
+/// hierarchy.
 struct FilmtoneOnboardingView: View {
     let strings: FilmtoneStrings
     let onSkip: () -> Void
@@ -79,11 +86,7 @@ struct FilmtoneOnboardingView: View {
                 body: strings.onboardingFinishBody,
                 symbolName: "square.and.arrow.up"
             ),
-            // v1.3 Item 3 follow-up: 4th slide pitches the reuse loop. Sits
-            // after the export slide because the narrative beat is "you've
-            // shipped your first piece — and now the same look survives to
-            // the next one." Symbol is `square.stack.fill` for the library
-            // metaphor (saved LUTs + saved Looks stack together).
+            // v1.3 Item 3 follow-up: 4th slide pitches the reuse loop.
             .init(
                 id: 3,
                 title: strings.onboardingReuseTitle,
@@ -95,13 +98,17 @@ struct FilmtoneOnboardingView: View {
 
     var body: some View {
         ZStack {
-            onboardingBackground
+            substrate
+                .ignoresSafeArea()
+
+            FilmtoneFluidSphere()
+                .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 HStack {
                     Text(strings.appName)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.72))
+                        .foregroundStyle(.primary.opacity(0.78))
                         .lineLimit(1)
 
                     Spacer()
@@ -123,68 +130,56 @@ struct FilmtoneOnboardingView: View {
                 controls
             }
         }
+        .preferredColorScheme(.light)
         .ignoresSafeArea(.container, edges: .bottom)
     }
 
-    private var onboardingBackground: some View {
-        ZStack {
-            Color.filmtoneBackground
-
-            LinearGradient(
-                colors: [
-                    Color.filmtoneAmber.opacity(0.16),
-                    Color.black.opacity(0.0),
-                    Color.black.opacity(0.78),
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-
-            LinearGradient(
-                colors: [
-                    Color.clear,
-                    Color.black.opacity(0.34),
-                    Color.black.opacity(0.82),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        }
-        .ignoresSafeArea()
+    /// Cream warm-pastel substrate matching the empty view's
+    /// `FilmtoneEmptyView.substrate` so the two surfaces feel like one
+    /// continuous environment instead of two separate themes.
+    private var substrate: some View {
+        Color(red: 0.86, green: 0.82, blue: 0.78)
     }
 
     private var controls: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             Button {
                 performPrimaryAction()
             } label: {
                 Text(primaryActionLabel)
-                    .frame(maxWidth: .infinity)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary.opacity(0.94))
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 6)
+                    .glassEffect(
+                        .regular.tint(Color.filmtoneAmber.opacity(0.20)).interactive(),
+                        in: Capsule()
+                    )
+                    .overlay(
+                        Capsule().strokeBorder(
+                            Color.filmtoneAmber.opacity(0.32),
+                            lineWidth: 0.6
+                        )
+                    )
+                    .contentShape(Capsule())
             }
-            .buttonStyle(FilmtonePrimaryButtonStyle())
+            .buttonStyle(.plain)
             .accessibilityIdentifier(isLastPage ? "filmtone.onboarding.pickMedia" : "filmtone.onboarding.next")
 
             Button(action: onSkip) {
                 Text(strings.onboardingSkip)
-                    .frame(maxWidth: .infinity)
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(.primary.opacity(0.55))
+                    .frame(maxWidth: .infinity, minHeight: 32)
+                    .contentShape(Rectangle())
             }
-            .buttonStyle(FilmtoneSecondaryButtonStyle())
+            .buttonStyle(.plain)
             .accessibilityIdentifier("filmtone.onboarding.skip")
         }
         .padding(.horizontal, 24)
-        .padding(.top, 16)
+        .padding(.top, 12)
         .padding(.bottom, 26)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color.black.opacity(0.0),
-                    Color.black.opacity(0.78),
-                    Color.black.opacity(0.94),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
     }
 
     private var isLastPage: Bool {
@@ -218,13 +213,13 @@ private struct FilmtoneOnboardingPage: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Text(slide.title)
                         .font(.system(size: 34, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                         .lineLimit(3)
                         .fixedSize(horizontal: false, vertical: true)
 
                     Text(slide.body)
                         .font(.body)
-                        .foregroundStyle(.white.opacity(0.74))
+                        .foregroundStyle(.primary.opacity(0.74))
                         .lineSpacing(3)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -238,17 +233,22 @@ private struct FilmtoneOnboardingPage: View {
     }
 }
 
+/// Per-slide stylized preview card. Aligned 2026-05-09 to the empty-
+/// view Liquid Glass language: glass material body + adaptive
+/// `.primary` text bars + amber accent kept for the per-slide
+/// "active meter" indicator (amber works on both light and dark
+/// substrates). The card no longer paints its own opaque white-low-
+/// opacity fill that previously read as a flat gray box on the
+/// cream substrate.
 private struct FilmtoneOnboardingPreviewCard: View {
     let slide: FilmtoneOnboardingSlide
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: filmtonePreviewCornerRadius, style: .continuous)
-                .fill(Color.white.opacity(0.035))
-
-            RoundedRectangle(cornerRadius: filmtonePreviewCornerRadius, style: .continuous)
-                .stroke(Color.filmtoneAmber.opacity(0.16), lineWidth: 1)
-
+        let shape = RoundedRectangle(
+            cornerRadius: filmtonePreviewCornerRadius,
+            style: .continuous
+        )
+        return ZStack {
             VStack(alignment: .leading, spacing: 22) {
                 HStack(alignment: .center, spacing: 16) {
                     Image(systemName: slide.symbolName)
@@ -263,13 +263,13 @@ private struct FilmtoneOnboardingPreviewCard: View {
 
                     VStack(alignment: .leading, spacing: 10) {
                         Capsule()
-                            .fill(Color.white.opacity(0.30))
+                            .fill(Color.primary.opacity(0.32))
                             .frame(width: 96, height: 9)
                         Capsule()
-                            .fill(Color.white.opacity(0.16))
+                            .fill(Color.primary.opacity(0.22))
                             .frame(width: 118, height: 9)
                         Capsule()
-                            .fill(Color.white.opacity(0.10))
+                            .fill(Color.primary.opacity(0.14))
                             .frame(width: 76, height: 9)
                     }
                 }
@@ -278,15 +278,17 @@ private struct FilmtoneOnboardingPreviewCard: View {
                     ForEach(0..<3, id: \.self) { index in
                         HStack(spacing: 10) {
                             Capsule()
-                                .fill(Color.white.opacity(0.12))
+                                .fill(Color.primary.opacity(0.18))
                                 .frame(width: 42, height: 8)
 
                             GeometryReader { proxy in
                                 ZStack(alignment: .leading) {
                                     Capsule()
-                                        .fill(Color.white.opacity(0.08))
+                                        .fill(Color.primary.opacity(0.10))
                                     Capsule()
-                                        .fill(index == slide.id ? Color.filmtoneAmber.opacity(0.86) : Color.white.opacity(0.24))
+                                        .fill(index == slide.id
+                                              ? Color.filmtoneAmber.opacity(0.86)
+                                              : Color.primary.opacity(0.28))
                                         .frame(width: proxy.size.width * meterWidth(for: index))
                                 }
                             }
@@ -298,7 +300,11 @@ private struct FilmtoneOnboardingPreviewCard: View {
             .padding(22)
         }
         .aspectRatio(1.18, contentMode: .fit)
-        .shadow(color: Color.black.opacity(0.32), radius: 24, x: 0, y: 16)
+        .glassEffect(.regular.interactive(), in: shape)
+        .overlay(
+            shape.strokeBorder(Color.filmtoneAmber.opacity(0.22), lineWidth: 0.6)
+        )
+        .shadow(color: Color.black.opacity(0.18), radius: 24, x: 0, y: 16)
         .accessibilityHidden(true)
     }
 

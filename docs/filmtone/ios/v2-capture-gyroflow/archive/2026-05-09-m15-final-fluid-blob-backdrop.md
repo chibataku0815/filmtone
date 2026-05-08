@@ -1,8 +1,89 @@
-# Active: M15-final — Metal-Shader Fluid Grunge Sphere Hero
+# Archived: M15-final — Empty View Fluid Blob Backdrop (PASS after v1→v8 iteration)
+
+Status: **PASS** — owner accepted v6 「かなり良くなりました」, v7
+delivered dynamic σ pulse, v8 propagated the visual language to the
+onboarding view. Single commit landed all M13 + M14-A/B + M15
+iteration as `d851b5d8 feat(ios): land M13 capture cockpit + M14
+export truth + M15 fluid empty view` (35 files / +6297 / -1096).
+
+## v1 → v8 iteration log (2026-05-09)
+
+The original M15-final scope below targeted a single sphere hero. It
+was rejected at the implementation level when owner walked the device
+and surfaced bugs and design failures. Each subsequent revision
+addressed a specific axis:
+
+- **v1**: sphere not rendering. Cause: `Rectangle().fill(.clear)`
+  caused the SwiftUI rasterizer to skip the layer so `colorEffect`
+  never invoked the shader. Fix: `.fill(.white)` so opaque pixels
+  exist for the shader to operate on.
+- **v2**: Apple Liquid Glass UI was removed from action triplet
+  (replaced with text-links). Owner caught: 「なんで Apple Liquid
+  Glass の UI なくなるの？」 Fix: restored 3 Liquid Glass capsule
+  buttons (2-up Photo Library / Files + full-width Record) inside a
+  `GlassEffectContainer`. Plus shader smoothing: Gaussian (σ=0.42)
+  weighting in place of harsh inverse-square peaks; grain stepped
+  at 6 Hz with ±0.025 amplitude instead of 60 Hz hash noise.
+- **v3**: still read as a fixed sphere with stuff inside. Owner:
+  「球体と流体って違いわかってる？」 Fix: dropped the sphere mask
+  entirely. Shader renders 5 (later 8) drifting blobs across the
+  full screen; alpha gating based on blob density gives an
+  amorphous silhouette that flows.
+- **v4**: blobs visible but background pure black, no atmosphere →
+  cold contrast with warm pastel blobs. Effects (chromatic
+  aberration / film grain / glow) were also static. Fix: shader
+  covers full screen at α=1, dark-warm base color, dynamic pulses on
+  chroma intensity / grain amp / glow blur radius (independent low
+  frequencies).
+- **v5**: still failing because tightening σ (0.18 → 0.13) shrank
+  blob size while increasing count. Owner: 「blob のサイズが小さく
+  なるのはだめ」 Fix: σ back to 0.20 wider, kept 8 blobs, muted
+  palette so overlap doesn't blow out.
+- **v6**: addressed 「黒があってない」 directly. Honest review
+  acknowledged that 0.052 → 0.062 dark-warm bias tweaks were
+  cosmetic — anything ≤ 0.10 lightness reads as black. References
+  Image #7 / #8 are clearly LIGHT cream pastel substrate.
+  **Substrate switched to warm cream `(0.86, 0.82, 0.78)`** + blob
+  palette restored to vibrant pastel + `.preferredColorScheme(.light)`
+  on the empty view + `Color.primary` for adaptive text/rim across
+  shared chip components. **Owner accepted: 「かなり良くなりました」.**
+- **v7** (post-acceptance refinement): per-blob anisotropic σ pulse.
+  σx and σy each drift independently on unique freq+phase seeds,
+  range [0.20, 0.28] with the v6 0.20 as the absolute floor. Shape
+  morphs through round → ellipse-h → round → ellipse-v organically.
+- **v8** (onboarding alignment): `FilmtoneOnboardingView.swift`
+  rewritten to mirror the empty-view visual language so the two
+  surfaces feel like one continuous environment. Cream substrate,
+  `FilmtoneFluidSphere` backdrop, `.preferredColorScheme(.light)`,
+  `Color.primary` adaptive text, Liquid Glass capsule primary CTA
+  with amber tint, text-link Skip secondary, preview card uses
+  `glassEffect` instead of opaque RoundedRectangle fill.
+
+## Files landed in this lane
+
+- `apps/.../FilmtoneFluidSphere.metal` — Metal `[[stitchable]]`
+  color-effect shader. Anisotropic Gaussian blob mixing (8 blobs,
+  σ pulse [0.20, 0.28]), 3-channel UV-offset chromatic aberration,
+  per-channel hash film grain, full-screen α=1 cream-base composite.
+- `apps/.../FilmtoneFluidSphere.swift` — SwiftUI wrapper. Time
+  uniform via `TimelineView(.animation)`; sharp + plusLighter
+  blurred copy for halation glow.
+- `apps/.../FilmtoneEmptyView.swift` — cream substrate + FluidSphere
+  backdrop + Liquid Glass action capsules + `.preferredColorScheme
+  (.light)`.
+- `apps/.../FilmtoneLibrarySection.swift` — `FilmtoneLibraryChip`
+  text + rim use `.primary` for adaptive cross-surface behavior.
+- `apps/.../FilmtoneOnboardingView.swift` — aligned to same
+  vocabulary (v8).
+
+Filename `FluidSphere` is a legacy from the v1 sphere attempt; the
+behavior is now "FluidBlobBackdrop". Rename deferred — not blocking.
+
+## Original active.md content follows for traceability
 
 Date: 2026-05-09 JST
 Branch: `worktree-feature+ios-m9-recording-export-completion`
-Status: **installed on iPhone 17 Pro #7, ready for owner walk** — autonomous execution complete 2026-05-09 02:45 JST
+Status (at active time): scoped — owner committed to direction A under "最高レベルの美しい流体グランジアニメーション" bar 2026-05-09
 
 ## Why this active exists
 

@@ -1031,3 +1031,15 @@ Dependency:
   ("フォトライブラリから始める") + inline secondary
   ("ファイル · 録画する") so nothing competes with the sphere as
   visual hero. M14-C deferred until empty view lands.
+- 2026-05-09: **M15 PASS** after a v1 → v8 iteration chain (sphere
+  display bug fix, Apple Liquid Glass UI restored, sphere mask
+  dropped for free-floating blobs, full-screen α=1 substrate
+  composite, 8 blobs at σ=0.20 floor, palette + substrate switched
+  to vibrant pastel + warm cream `(0.86, 0.82, 0.78)`,
+  `.preferredColorScheme(.light)` on the empty view, `.primary`-
+  based adaptive text on shared chips, anisotropic σ pulse for
+  size + shape morph, onboarding alignment). Owner accepted v6
+  「かなり良くなりました」. Single commit `d851b5d8` + the v7/v8
+  refinements landed all M13 + M14-A/B + M15 work as one unit.
+  Strategy lane returns to **M14-C (sidecar provenance)** as the
+  next active.
