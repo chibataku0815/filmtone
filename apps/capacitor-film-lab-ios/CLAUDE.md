@@ -13,7 +13,7 @@
 | **本質優先 / 外殻最小** | 製品挙動を直接動かす変更(Swift native / UI wiring / sidecar / Profile / fastlane / shader) = 本質。XCTest 6 並列・formal QA 手順書・過剰 i18n 化・装飾 banner = 外殻。**user が「QA 希望」と明示した時のみ**着手 |
 | **保守的ヘッジを優先しない** | 「念のため fallback」「安全側でスキップ」「v1.x 後回し」のような逃げを取らない |
 | **思考は sequential-thinking** | 設計判断・lane 衝突・不変条件 gate 評価は `mcp__sequential-thinking`。記憶ベースで断言しない |
-| **不確かなら検索** | API / ASC / Capacitor / iOS SDK が曖昧な場合は `gemini-search` → `WebSearch`。記憶ベース推測は `feedback_no_guessing_davinci_plugins` / `feedback_verify_before_documenting` 違反 |
+| **不確かなら検索** | API / ASC / iOS SDK が曖昧な場合は `gemini-search` → `WebSearch`。記憶ベース推測は `feedback_no_guessing_davinci_plugins` / `feedback_verify_before_documenting` 違反 |
 | **handoff は鵜呑みにしない** | 旧 chat の handoff doc 引用前に現行 surface (`grep` / Swift / pbxproj) と突き合わせて live/frozen を確認 (`feedback_verify_before_quoting_handoff`) |
 | **並列 stream の silent 縮退禁止** | 複数 chat / Agent Teams で stream を割った時、残タスク silent 省略 / lane の chat 独断 redefine は禁止。完了時 handoff §8.5 4 セクション(Plan Compliance / Cross-Stream Visibility / Scope Diff / 残タスク enumeration) を機構化 (`feedback_no_silent_stream_redefine`) |
 
@@ -27,7 +27,7 @@
 | TeamID | `C3G77H8NM6` |
 | Workspace | `ios/App/App.xcworkspace`、Scheme `App` |
 | Signing | Xcode automatic(`match` 不使用) |
-| Capacitor | `7.4.3`(`@capacitor/core` / `@capacitor/ios` / `@capacitor/cli`) |
+| UI stack | **Native SwiftUI** (`FilmtoneRootView`)。React/Capacitor stack は 2026-05-09 に purge 済み(残骸なし) |
 
 バージョンは Xcode build settings の `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` から `Info.plist` に注入。**plist 直接編集禁止**。
 
@@ -35,13 +35,10 @@
 
 ## 3. Commit gate(全部 green になってから commit)
 
-1. `bun run build`(tsc --noEmit + vite build)が通る
-2. `xcodebuild -workspace ios/App/App.xcworkspace -scheme App -destination 'generic/platform=iOS Simulator' -configuration Debug build CODE_SIGNING_ALLOWED=NO` が `** BUILD SUCCEEDED **`
-3. 該当する web 側テスト(Phase 0 を触ったなら `bun test src/lib/phase0-state.test.ts`、Swift contract なら `bun run verify:swift-contract`)が通る
-4. 新規 `.swift` を追加したら `project.pbxproj` の **4 セクション** すべてに登録(`PBXBuildFile` / `PBXFileReference` / `PBXSourcesBuildPhase` / `PBXGroup`)。`grep '<新ファイル名>' ios/App/App.xcodeproj/project.pbxproj | wc -l` が 4 以上で OK
-5. Agent Teams で複数 stream を merge した直後は **必ず独立 deep pass**(kernel math dry run + pbxproj 4-section grep + フル xcodebuild) — `feedback_review_release_blockers_deep_pass`
-
-**よくある事故**: Swift だけ書き換えて web 側を sync しないまま archive → Capacitor bridge 経由のメソッド名がずれてランタイム崩れる。bridge を触ったら `bun run cap:sync:ios`。`cap sync` は `ios/App/App/public` を上書きするので public 配下を手で編集しない。
+1. `xcodebuild -workspace ios/App/App.xcworkspace -scheme App -destination 'generic/platform=iOS Simulator' -configuration Debug build CODE_SIGNING_ALLOWED=NO` が `** BUILD SUCCEEDED **`
+2. Swift contract を触ったなら `bun run verify:swift-contract`(scripts/verify-phase0-contract.sh)が通る
+3. 新規 `.swift` を追加したら `project.pbxproj` の **4 セクション** すべてに登録(`PBXBuildFile` / `PBXFileReference` / `PBXSourcesBuildPhase` / `PBXGroup`)。`grep '<新ファイル名>' ios/App/App.xcodeproj/project.pbxproj | wc -l` が 4 以上で OK
+4. Agent Teams で複数 stream を merge した直後は **必ず独立 deep pass**(kernel math dry run + pbxproj 4-section grep + フル xcodebuild) — `feedback_review_release_blockers_deep_pass`
 
 ユーザー承認なしの自動 commit / push 禁止(life CLAUDE.md §11)。
 
@@ -62,8 +59,7 @@
 
 ## 5. コードマップ(grep で済む詳細は書かない)
 
-- Swift 本体: `ios/App/App/*.swift`(export pipeline / depth / color-profile / Live Activity / optics / state / capacitor bridge / SwiftUI が同居)
-- Capacitor plugin surface: `FilmtoneMediaPlugin.swift`(TS 側ペアは `src/native/filmtoneMedia.ts` — bridge 増設は **必ず両側を同一 PR**)
+- Swift 本体: `ios/App/App/*.swift`(export pipeline / depth / color-profile / Live Activity / optics / state / SwiftUI が同居)
 - 自動生成: `FilmtonePhase0Generated.swift` は手動編集禁止
 - 新ファイル追加時の pbxproj 4-section 登録は §3 Commit gate に従う
 

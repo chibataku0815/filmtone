@@ -1,24 +1,22 @@
-require_relative '../../../../node_modules/.bun/@capacitor+ios@7.4.3+432680dd63c9cc05/node_modules/@capacitor/ios/scripts/pods_helpers'
+# 2026-05-09 React/Capacitor purge: Capacitor + CapacitorCordova pods
+# removed. The App target no longer links any third-party iOS framework
+# via CocoaPods. Podfile + workspace stay in place because fastlane
+# `Fastfile` / `Snapfile` and `scripts/generate-help-comparison-assets.sh`
+# hard-reference `App.xcworkspace`; converting to a project-only setup
+# would touch the release pipeline and is deferred.
+#
+# Add new third-party iOS deps here (or preferably via SwiftPM directly
+# in the Xcode project — Capacitor was the only reason CocoaPods was
+# in the loop).
 
 platform :ios, '17.0'
 use_frameworks!
 
-# workaround to avoid Xcode caching of Pods that requires
-# Product -> Clean Build Folder after new Cordova plugins installed
-# Requires CocoaPods 1.6 or newer
+# Workaround retained from the prior Capacitor era — harmless without
+# pods, kept so re-introducing pods later does not trip the legacy
+# Cordova plugin caching pitfall.
 install! 'cocoapods', :disable_input_output_paths => true
 
-def capacitor_pods
-  pod 'Capacitor', :path => '../../../../node_modules/.bun/@capacitor+ios@7.4.3+432680dd63c9cc05/node_modules/@capacitor/ios'
-  pod 'CapacitorCordova', :path => '../../../../node_modules/.bun/@capacitor+ios@7.4.3+432680dd63c9cc05/node_modules/@capacitor/ios'
-
-end
-
 target 'App' do
-  capacitor_pods
-  # Add your Pods here
-end
-
-post_install do |installer|
-  assertDeploymentTarget(installer)
+  # No third-party pods. Add `pod '...'` here if a dep requires CocoaPods.
 end
