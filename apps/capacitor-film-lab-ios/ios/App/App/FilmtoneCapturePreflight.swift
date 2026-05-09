@@ -239,6 +239,21 @@ enum FilmtoneCapturePreflight {
 
     // MARK: - Capacity
 
+    struct CapacitySnapshot: Equatable {
+        let availableBytes: Int64?
+        let totalBytes: Int64?
+    }
+
+    static func capacitySnapshot(folderURL: URL) -> CapacitySnapshot {
+        let capacity = readCapacity(folderURL: folderURL)
+        return CapacitySnapshot(
+            availableBytes: capacity.availableForImportantUsage
+                ?? capacity.freeCapacity
+                ?? statfsFree(folderURL: folderURL),
+            totalBytes: capacity.totalCapacity
+        )
+    }
+
     private struct Capacity {
         let availableForImportantUsage: Int64?
         let totalCapacity: Int64?

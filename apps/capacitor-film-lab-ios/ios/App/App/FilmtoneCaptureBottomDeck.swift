@@ -20,6 +20,7 @@ import SwiftUI
 struct FilmtoneCaptureBottomDeck: View {
     let preflightError: String?
     let preflightWarnings: [String]
+    let storagePressure: FilmtoneCaptureStoragePressure?
     let statusText: String
     let isRecordingOrStopping: Bool
     let canToggleRecord: Bool
@@ -35,6 +36,10 @@ struct FilmtoneCaptureBottomDeck: View {
     var body: some View {
         VStack(spacing: 8) {
             preflightSection
+
+            if isRecordingOrStopping, let storagePressure {
+                storagePressurePill(storagePressure)
+            }
 
             if isRecordingOrStopping {
                 statusPill
@@ -65,6 +70,87 @@ struct FilmtoneCaptureBottomDeck: View {
                     .multilineTextAlignment(.center)
             }
         }
+    }
+
+    // MARK: Recording storage pressure
+
+    private func storagePressurePill(
+        _ pressure: FilmtoneCaptureStoragePressure
+    ) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: storagePressureIcon(pressure))
+                .font(.system(size: 11, weight: .bold))
+            Text(storagePressureText(pressure))
+                .font(.system(size: 11, weight: .heavy, design: .rounded).monospacedDigit())
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+        }
+        .foregroundStyle(storagePressureColor(pressure))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .captureGlassHUD(in: Capsule())
+        .accessibilityIdentifier("filmtone.capture.storagePressure")
+        .accessibilityLabel(Text(storagePressureAccessibilityText(pressure)))
+        .transition(.opacity.combined(with: .move(edge: .bottom)))
+    }
+
+    private func storagePressureIcon(
+        _ pressure: FilmtoneCaptureStoragePressure
+    ) -> String {
+        switch pressure.level {
+        case .warning:
+            return "externaldrive.badge.exclamationmark"
+        case .critical:
+            return "exclamationmark.triangle.fill"
+        case .unreadable:
+            return "questionmark.folder.fill"
+        }
+    }
+
+    private func storagePressureColor(
+        _ pressure: FilmtoneCaptureStoragePressure
+    ) -> Color {
+        switch pressure.level {
+        case .warning, .unreadable:
+            return .yellow.opacity(0.95)
+        case .critical:
+            return FilmtoneCaptureChrome.recordRed
+        }
+    }
+
+    private func storagePressureText(
+        _ pressure: FilmtoneCaptureStoragePressure
+    ) -> String {
+        switch pressure.level {
+        case .warning:
+            return "Storage low · \(formatBytes(pressure.availableBytes)) left"
+        case .critical:
+            return "Storage critical · \(formatBytes(pressure.availableBytes)) left"
+        case .unreadable:
+            return "Storage unknown"
+        }
+    }
+
+    private func storagePressureAccessibilityText(
+        _ pressure: FilmtoneCaptureStoragePressure
+    ) -> String {
+        switch pressure.level {
+        case .warning:
+            return "Storage space is getting low. \(formatBytes(pressure.availableBytes)) available."
+        case .critical:
+            return "Storage space is critical. \(formatBytes(pressure.availableBytes)) available."
+        case .unreadable:
+            return "Storage space cannot be read while recording."
+        }
+    }
+
+    private func formatBytes(_ bytes: Int64?) -> String {
+        guard let bytes else { return "?" }
+        let gib = Double(bytes) / 1_073_741_824.0
+        if gib >= 10 {
+            return String(format: "%.0f GB", gib)
+        }
+        return String(format: "%.1f GB", gib)
     }
 
     // MARK: Status timecode pill

@@ -25,6 +25,20 @@ import CoreMedia
 import UIKit
 import QuartzCore
 
+struct FilmtoneCaptureStoragePressure: Equatable {
+    enum Level: Equatable {
+        case warning
+        case critical
+        case unreadable
+    }
+
+    let level: Level
+    let availableBytes: Int64?
+    let projectedNeedBytes: Int64?
+    let secondsRemaining: Double
+    let measuredRate: Bool
+}
+
 @MainActor
 final class FilmtoneCaptureSession: NSObject, ObservableObject {
 
@@ -62,6 +76,11 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     /// existing `writerInterrupted` failure surface routes any AV
     /// thermal abort visibly to the banner.
     static let externalDurationCapSeconds: Double = 300.0
+    private static let fallbackProResBytesPerSecond: Double = 82.0 * 1024.0 * 1024.0
+    private static let storageCriticalHeadroomBytes: Int64 = 1 * 1024 * 1024 * 1024
+    private static let storageWarningHeadroomBytes: Int64 = 3 * 1024 * 1024 * 1024
+    private static let storageFinalizeHeadroomBytes: Int64 = 2 * 1024 * 1024 * 1024
+    private static let storageUnreadableGraceSamples = 3
 
     // MARK: - Public API
 
@@ -88,6 +107,11 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     /// `.internalDocumentsCapped` until the caller hands us an
     /// external folder URL via `useExternalFolder`.
     @Published private(set) var storagePolicy: FilmtoneCaptureStoragePolicy = .internalDocumentsCapped
+
+    /// Recording-time capacity warning for the volume receiving the
+    /// active master.  Nil means either not recording or current free
+    /// space is safely above the projected remaining write budget.
+    @Published private(set) var storagePressure: FilmtoneCaptureStoragePressure?
 
     /// Preview layer the capture view embeds via UIViewRepresentable.
     /// `nil` until `prepare()` succeeds.
@@ -261,6 +285,8 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
 
     private var elapsedTimer: Timer?
     private var autoStopTask: Task<Void, Never>?
+    private var storagePressureTask: Task<Void, Never>?
+    private var storagePressureUnreadableSamples: Int = 0
 
     private var recordingDelegate: MovieDelegate?
 
@@ -883,6 +909,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         } else {
             storagePolicy = .internalDocumentsCapped
         }
+        storagePressure = nil
     }
 
     /// Begin recording.  Auto-stops at `durationLimit` for the resolved
@@ -932,6 +959,11 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         state = .recording(startedAt: Date())
         startElapsedTimer()
         startAutoStop(after: durationLimit)
+        startStoragePressureMonitor(
+            volumeURL: masterURL.deletingLastPathComponent(),
+            masterURL: masterURL,
+            durationLimit: durationLimit
+        )
 
         movieOutput.startRecording(to: masterURL, recordingDelegate: delegate)
     }
@@ -944,6 +976,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         state = .stopping
         cancelAutoStop()
         stopElapsedTimer()
+        cancelStoragePressureMonitor(clear: true)
         if let movieOutput {
             recordedDurationSnapshot = CMTimeGetSeconds(movieOutput.recordedDuration)
             movieOutput.stopRecording()
@@ -965,6 +998,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         recordedDurationSnapshot = 0
         pendingFailure = nil
         elapsedSeconds = 0
+        storagePressure = nil
         recordingDelegate = nil
         state = .ready
     }
@@ -974,6 +1008,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     func teardown() async {
         cancelAutoStop()
         stopElapsedTimer()
+        cancelStoragePressureMonitor(clear: true)
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             sessionQueue.async { [session] in
                 if session.isRunning { session.stopRunning() }
@@ -1081,6 +1116,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     }
 
     private func handleMovieFinished(failure: FilmtoneCaptureFailure?) {
+        cancelStoragePressureMonitor(clear: true)
         recordingDelegate = nil
 
         if let failure {
@@ -1365,6 +1401,126 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     private func cancelAutoStop() {
         autoStopTask?.cancel()
         autoStopTask = nil
+    }
+
+    private func startStoragePressureMonitor(
+        volumeURL: URL,
+        masterURL: URL,
+        durationLimit: Double
+    ) {
+        cancelStoragePressureMonitor(clear: true)
+        updateStoragePressure(
+            volumeURL: volumeURL,
+            masterURL: masterURL,
+            durationLimit: durationLimit
+        )
+        storagePressureTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                await MainActor.run { [weak self] in
+                    guard let self else { return }
+                    guard case .recording = self.state else {
+                        self.cancelStoragePressureMonitor(clear: true)
+                        return
+                    }
+                    self.updateStoragePressure(
+                        volumeURL: volumeURL,
+                        masterURL: masterURL,
+                        durationLimit: durationLimit
+                    )
+                }
+            }
+        }
+    }
+
+    private func cancelStoragePressureMonitor(clear: Bool) {
+        storagePressureTask?.cancel()
+        storagePressureTask = nil
+        storagePressureUnreadableSamples = 0
+        if clear {
+            storagePressure = nil
+        }
+    }
+
+    private func updateStoragePressure(
+        volumeURL: URL,
+        masterURL: URL,
+        durationLimit: Double
+    ) {
+        guard case .recording(let startedAt) = state else {
+            storagePressure = nil
+            return
+        }
+        let elapsed = max(0, Date().timeIntervalSince(startedAt))
+        let secondsRemaining = max(0, durationLimit - elapsed)
+        guard secondsRemaining > 0 else {
+            storagePressure = nil
+            return
+        }
+
+        let snapshot = FilmtoneCapturePreflight.capacitySnapshot(folderURL: volumeURL)
+        guard let availableBytes = snapshot.availableBytes else {
+            storagePressureUnreadableSamples += 1
+            if storagePressureUnreadableSamples >= Self.storageUnreadableGraceSamples {
+                storagePressure = FilmtoneCaptureStoragePressure(
+                    level: .unreadable,
+                    availableBytes: nil,
+                    projectedNeedBytes: nil,
+                    secondsRemaining: secondsRemaining,
+                    measuredRate: false
+                )
+            }
+            return
+        }
+        storagePressureUnreadableSamples = 0
+
+        let rate = estimatedMasterWriteRate(masterURL: masterURL, elapsed: elapsed)
+        let projectedMasterBytes = Int64((rate.bytesPerSecond * secondsRemaining).rounded(.up))
+        let projectedNeedBytes = projectedMasterBytes + Self.storageFinalizeHeadroomBytes
+        let criticalThreshold = projectedNeedBytes + Self.storageCriticalHeadroomBytes
+        let warningThreshold = projectedNeedBytes + Self.storageWarningHeadroomBytes
+
+        if availableBytes <= criticalThreshold {
+            storagePressure = FilmtoneCaptureStoragePressure(
+                level: .critical,
+                availableBytes: availableBytes,
+                projectedNeedBytes: projectedNeedBytes,
+                secondsRemaining: secondsRemaining,
+                measuredRate: rate.measured
+            )
+        } else if availableBytes <= warningThreshold {
+            storagePressure = FilmtoneCaptureStoragePressure(
+                level: .warning,
+                availableBytes: availableBytes,
+                projectedNeedBytes: projectedNeedBytes,
+                secondsRemaining: secondsRemaining,
+                measuredRate: rate.measured
+            )
+        } else {
+            storagePressure = nil
+        }
+    }
+
+    private func estimatedMasterWriteRate(
+        masterURL: URL,
+        elapsed: Double
+    ) -> (bytesPerSecond: Double, measured: Bool) {
+        guard elapsed >= 3,
+              let fileSize = Self.fileSize(at: masterURL),
+              fileSize >= 64 * 1024 * 1024 else {
+            return (Self.fallbackProResBytesPerSecond, false)
+        }
+        let measuredRate = Double(fileSize) / max(elapsed, 1)
+        return (max(measuredRate, Self.fallbackProResBytesPerSecond), true)
+    }
+
+    private static func fileSize(at url: URL) -> Int64? {
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let value = attrs[.size] as? NSNumber else {
+            return nil
+        }
+        let bytes = value.int64Value
+        return bytes > 0 ? bytes : nil
     }
 
     // MARK: - Package paths

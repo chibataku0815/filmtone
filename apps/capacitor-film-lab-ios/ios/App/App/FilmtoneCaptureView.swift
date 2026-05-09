@@ -460,6 +460,7 @@ struct FilmtoneCaptureView: View {
         FilmtoneCaptureBottomDeck(
             preflightError: preflightError,
             preflightWarnings: preflightWarnings,
+            storagePressure: session.storagePressure,
             statusText: statusText,
             isRecordingOrStopping: isRecordingOrStopping,
             canToggleRecord: canToggleRecord,
