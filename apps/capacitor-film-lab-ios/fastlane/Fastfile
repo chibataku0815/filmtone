@@ -127,6 +127,24 @@ def privacy_url_for(locale)
   localized_url("FILMTONE_PRIVACY_URL", locale, "#{base_url}#{default_path}")
 end
 
+def localized_url_options(&resolver)
+  METADATA_LOCALES.each_with_object({}) do |locale, memo|
+    memo[locale] = resolver.call(locale)
+  end
+end
+
+def localized_support_urls
+  localized_url_options { |locale| support_url_for(locale) }
+end
+
+def localized_marketing_urls
+  localized_url_options { |locale| marketing_url_for(locale) }
+end
+
+def localized_privacy_urls
+  localized_url_options { |locale| privacy_url_for(locale) }
+end
+
 def read_text_if_present(path)
   return nil unless File.exist?(path)
 
@@ -393,18 +411,9 @@ platform :ios do
       force: true,
       precheck_include_in_app_purchases: false,
       copyright: File.read(File.join(METADATA_TEMPLATE_PATH, "copyright.txt")).strip,
-      support_url: {
-        "ja" => support_url_for("ja"),
-        "en-US" => support_url_for("en-US"),
-      },
-      marketing_url: {
-        "ja" => marketing_url_for("ja"),
-        "en-US" => marketing_url_for("en-US"),
-      },
-      privacy_url: {
-        "ja" => privacy_url_for("ja"),
-        "en-US" => privacy_url_for("en-US"),
-      },
+      support_url: localized_support_urls,
+      marketing_url: localized_marketing_urls,
+      privacy_url: localized_privacy_urls,
       app_review_information: app_review_information!,
       submission_information: {
         export_compliance_uses_encryption: false,
@@ -446,18 +455,9 @@ platform :ios do
       force: true,
       precheck_include_in_app_purchases: false,
       copyright: File.read(File.join(METADATA_TEMPLATE_PATH, "copyright.txt")).strip,
-      support_url: {
-        "ja" => support_url_for("ja"),
-        "en-US" => support_url_for("en-US"),
-      },
-      marketing_url: {
-        "ja" => marketing_url_for("ja"),
-        "en-US" => marketing_url_for("en-US"),
-      },
-      privacy_url: {
-        "ja" => privacy_url_for("ja"),
-        "en-US" => privacy_url_for("en-US"),
-      },
+      support_url: localized_support_urls,
+      marketing_url: localized_marketing_urls,
+      privacy_url: localized_privacy_urls,
       app_review_information: app_review_information!,
       submission_information: {
         export_compliance_uses_encryption: false,
@@ -494,18 +494,9 @@ platform :ios do
       force: true,
       precheck_include_in_app_purchases: false,
       copyright: File.read(File.join(METADATA_TEMPLATE_PATH, "copyright.txt")).strip,
-      support_url: {
-        "ja" => support_url_for("ja"),
-        "en-US" => support_url_for("en-US"),
-      },
-      marketing_url: {
-        "ja" => marketing_url_for("ja"),
-        "en-US" => marketing_url_for("en-US"),
-      },
-      privacy_url: {
-        "ja" => privacy_url_for("ja"),
-        "en-US" => privacy_url_for("en-US"),
-      },
+      support_url: localized_support_urls,
+      marketing_url: localized_marketing_urls,
+      privacy_url: localized_privacy_urls,
       app_review_information: app_review_information!,
       submission_information: {
         export_compliance_uses_encryption: false,

@@ -1,9 +1,9 @@
-This update adds the foundation for highlight marker export flows, making it easier to carry selected moments into the next editing step.
+This release adds a native iPhone recording flow for moving from capture into film-style grading without leaving Filmtone. The capture screen records 4K24 ProRes 422 HQ in Apple Log 2 with stabilization, then hands the clip into the editor.
 
-Videos longer than five minutes now show a Desktop handoff sheet, so longer footage can move toward the Mac workflow when it needs a larger editing surface.
+When an external SSD is selected, Filmtone keeps the high-quality master on the SSD and creates a local proxy for editing on iPhone. This keeps large files out of local storage while still letting you review the Look, adjust the image, and export from the phone. Without an SSD, Filmtone uses a short internal recording mode and makes that state visible.
 
-Cache management has been improved with a user-initiated cache release action and proactive low-disk cleanup for older temporary files.
+The capture screen has also been redesigned. Look, lens, ISO, shutter, exposure compensation, and white balance are organized as a camera cockpit so the common choices stay close while detailed values only appear when needed. Stone, Urban, and the current Look direction can be previewed while shooting and are carried back into the editor after recording.
 
-Look and Backlight Veil energy merging now follows the same max-merge behavior as the macOS version, keeping color direction and veiling light more stable when both are active.
+Export sidecars now record whether an export used the capture master or the proxy fallback. This makes it easier to understand what was handed to the next step, especially when a master lives on an external SSD.
 
-App Store metadata has also been reorganized for film grade, LUT, color, photo, and video discovery with less repetition across title, subtitle, and keyword fields.
+The empty state and onboarding surfaces were also updated toward the Apple Liquid Glass direction, with clearer entry points for Photo Library, Files, and Recording.

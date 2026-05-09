@@ -1,1 +1,9 @@
-This update adds highlight marker export flow foundations, a Desktop handoff sheet for videos longer than five minutes, user-initiated cache release, proactive low-disk cleanup, Look and Backlight Veil max-merge parity with macOS, and reorganised App Store metadata for film grade, LUT, colour, photo, and video discovery.
+This release adds a native iPhone recording flow for moving from capture into film-style grading without leaving Filmtone. The capture screen records 4K24 ProRes 422 HQ in Apple Log 2 with stabilisation, then hands the clip into the editor.
+
+When an external SSD is selected, Filmtone keeps the high-quality master on the SSD and creates a local proxy for editing on iPhone. This keeps large files out of local storage while still letting you review the Look, adjust the image, and export from the phone. Without an SSD, Filmtone uses a short internal recording mode and makes that state visible.
+
+The capture screen has also been redesigned. Look, lens, ISO, shutter, exposure compensation, and white balance are organised as a camera cockpit so the common choices stay close while detailed values only appear when needed. Stone, Urban, and the current Look direction can be previewed while shooting and are carried back into the editor after recording.
+
+Export sidecars now record whether an export used the capture master or the proxy fallback. This makes it easier to understand what was handed to the next step, especially when a master lives on an external SSD.
+
+The empty state and onboarding surfaces were also updated towards the Apple Liquid Glass direction, with clearer entry points for Photo Library, Files, and Recording.
