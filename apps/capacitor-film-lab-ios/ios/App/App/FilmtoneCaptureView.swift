@@ -216,7 +216,21 @@ struct FilmtoneCaptureView: View {
             if let prepareError {
                 failureOverlay(prepareError)
             }
+
+            if showTakePicker {
+                FilmtoneCaptureTakePickerOverlay(
+                    packages: capturedPackages,
+                    onPick: commitTake,
+                    onCancel: {
+                        FilmtoneCaptureHaptics.selection()
+                        showTakePicker = false
+                    }
+                )
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .zIndex(10)
+            }
         }
+        .animation(.spring(response: 0.34, dampingFraction: 0.88), value: showTakePicker)
         .task {
             if let activeLiveDiagnostics {
                 logLiveDiagnostics(activeLiveDiagnostics)
@@ -307,13 +321,6 @@ struct FilmtoneCaptureView: View {
             FilmtoneCaptureLookSheet(
                 selection: $captureLookSelection,
                 onDismiss: { showLookPicker = false }
-            )
-        }
-        .sheet(isPresented: $showTakePicker) {
-            FilmtoneCaptureTakePickerSheet(
-                packages: capturedPackages,
-                onPick: commitTake,
-                onCancel: { showTakePicker = false }
             )
         }
         .accessibilityIdentifier("filmtone.capture.surface")
@@ -928,43 +935,102 @@ struct FilmtoneCaptureView: View {
 
 // MARK: - Take picker
 
-private struct FilmtoneCaptureTakePickerSheet: View {
+private struct FilmtoneCaptureTakePickerOverlay: View {
     let packages: [FilmtoneCapturePackage]
     let onPick: (Int) -> Void
     let onCancel: () -> Void
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    ForEach(Array(packages.indices.reversed()), id: \.self) { index in
-                        Button {
-                            FilmtoneCaptureHaptics.selection()
-                            onPick(index)
-                        } label: {
-                            FilmtoneCaptureTakePickerRow(
-                                package: packages[index],
-                                takeNumber: index + 1,
-                                isLatest: index == packages.indices.last
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("filmtone.capture.takePicker.take\(index + 1)")
-                    }
-                }
-            }
-            .listStyle(.insetGrouped)
-            .navigationTitle("Choose take")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Cancel", action: onCancel)
-                        .accessibilityIdentifier("filmtone.capture.takePicker.cancel")
-                }
+        GeometryReader { proxy in
+            ZStack(alignment: .bottom) {
+                Color.black.opacity(0.20)
+                    .ignoresSafeArea()
+                    .onTapGesture(perform: onCancel)
+
+                panel
+                    .frame(maxHeight: min(proxy.size.height * 0.74, 660))
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, max(proxy.safeAreaInsets.bottom + 12, 18))
             }
         }
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
+        .ignoresSafeArea(.container, edges: .bottom)
+        .accessibilityIdentifier("filmtone.capture.takePicker")
+    }
+
+    private var panel: some View {
+        let shape = RoundedRectangle(cornerRadius: 28, style: .continuous)
+        let ordered = Array(packages.indices.reversed())
+
+        return GlassEffectContainer(spacing: 8) {
+            VStack(spacing: 0) {
+                Capsule()
+                    .fill(.white.opacity(0.28))
+                    .frame(width: 54, height: 5)
+                    .padding(.top, 10)
+                    .padding(.bottom, 14)
+                    .accessibilityHidden(true)
+
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Choose take")
+                            .font(.system(size: 22, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.96))
+                        Text("\(packages.count) takes")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.62))
+                    }
+
+                    Spacer(minLength: 0)
+
+                    Button(action: onCancel) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 15, weight: .bold))
+                            .frame(width: 34, height: 34)
+                    }
+                    .buttonStyle(.glass)
+                    .foregroundStyle(.white)
+                    .accessibilityLabel("Cancel")
+                    .accessibilityIdentifier("filmtone.capture.takePicker.cancel")
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
+
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(ordered, id: \.self) { index in
+                            Button {
+                                FilmtoneCaptureHaptics.selection()
+                                onPick(index)
+                            } label: {
+                                FilmtoneCaptureTakePickerRow(
+                                    package: packages[index],
+                                    takeNumber: index + 1,
+                                    isLatest: index == packages.indices.last
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("filmtone.capture.takePicker.take\(index + 1)")
+
+                            if index != ordered.last {
+                                Rectangle()
+                                    .fill(.white.opacity(0.12))
+                                    .frame(height: 0.5)
+                                    .padding(.horizontal, 16)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 14)
+                }
+                .scrollIndicators(.hidden)
+            }
+            .padding(.top, 2)
+            .glassEffect(.clear.tint(.white.opacity(0.055)), in: shape)
+            .overlay(
+                shape.strokeBorder(.white.opacity(0.20), lineWidth: 0.7)
+            )
+            .shadow(color: .black.opacity(0.34), radius: 32, x: 0, y: 18)
+        }
     }
 }
 
@@ -974,41 +1040,52 @@ private struct FilmtoneCaptureTakePickerRow: View {
     let isLatest: Bool
 
     var body: some View {
-        HStack(spacing: 12) {
-            FilmtoneCaptureTakeThumbnail(package: package)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 7) {
+                Text("Take \(takeNumber)")
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.96))
 
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Text("Take \(takeNumber)")
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    if isLatest {
-                        Text("Latest")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.secondary.opacity(0.14), in: Capsule())
-                    }
+                if isLatest {
+                    Text("Latest")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.78))
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .glassEffect(.clear.tint(.white.opacity(0.07)), in: Capsule())
                 }
 
-                Text(metadataLine)
-                    .font(.system(size: 12, weight: .medium, design: .rounded).monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                Spacer(minLength: 0)
+
+                Text(formatRecordedDuration(package.recordedDurationSeconds))
+                    .font(.system(size: 13, weight: .semibold, design: .rounded).monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.64))
             }
 
-            Spacer(minLength: 0)
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.tertiary)
+            FilmtoneCaptureTakeContactStrip(package: package)
+
+            HStack(spacing: 8) {
+                Text(detailLine)
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.62))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.42))
+            }
         }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 12)
         .contentShape(Rectangle())
         .accessibilityLabel(Text(accessibilityLabel))
     }
 
-    private var metadataLine: String {
-        var parts = [formatRecordedDuration(package.recordedDurationSeconds)]
+    private var detailLine: String {
+        var parts: [String] = []
         if let lens = package.lens?.magnificationLabel {
             parts.append(lens)
         }
@@ -1022,63 +1099,92 @@ private struct FilmtoneCaptureTakePickerRow: View {
 
     private var accessibilityLabel: String {
         let latest = isLatest ? ", latest" : ""
-        return "Take \(takeNumber)\(latest), \(metadataLine)"
+        return "Take \(takeNumber)\(latest), \(formatRecordedDuration(package.recordedDurationSeconds)), \(detailLine)"
     }
 
     private func formatRecordedDuration(_ seconds: Double) -> String {
         guard seconds.isFinite, seconds > 0 else { return "0.0s" }
-        return String(format: "%.1fs", seconds)
+        if seconds < 10 {
+            return String(format: "%.1fs", seconds)
+        }
+        let total = Int(seconds.rounded(.down))
+        return String(format: "%d:%02d", total / 60, total % 60)
     }
 }
 
-private struct FilmtoneCaptureTakeThumbnail: View {
+private struct FilmtoneCaptureTakeContactStrip: View {
     let package: FilmtoneCapturePackage
 
-    @State private var image: UIImage?
+    private static let sampleFractions: [Double] = [0.12, 0.38, 0.62, 0.88]
+
+    @State private var images: [UIImage?] = Array(
+        repeating: nil,
+        count: FilmtoneCaptureTakeContactStrip.sampleFractions.count
+    )
 
     var body: some View {
-        ZStack {
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-            } else {
-                Rectangle()
-                    .fill(.secondary.opacity(0.18))
-                Image(systemName: "video")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.secondary)
+        HStack(spacing: 6) {
+            ForEach(Self.sampleFractions.indices, id: \.self) { index in
+                frameSlot(image: images[index])
             }
         }
-        .frame(width: 96, height: 96)
-        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .frame(height: 112)
         .task(id: package.captureId) {
-            image = await Self.thumbnail(for: package.proxyURL)
+            images = await Self.frames(for: package.proxyURL)
         }
         .accessibilityHidden(true)
     }
 
-    private static func thumbnail(for url: URL) async -> UIImage? {
+    @ViewBuilder
+    private func frameSlot(image: UIImage?) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        ZStack {
+            shape.fill(.black.opacity(0.18))
+
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                Image(systemName: "video")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.44))
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .clipShape(shape)
+        .overlay(shape.strokeBorder(.white.opacity(0.10), lineWidth: 0.5))
+    }
+
+    private static func frames(for url: URL) async -> [UIImage?] {
         await Task.detached(priority: .userInitiated) {
             let asset = AVURLAsset(url: url)
             let generator = AVAssetImageGenerator(asset: asset)
             generator.appliesPreferredTrackTransform = true
-            generator.maximumSize = CGSize(width: 320, height: 320)
+            generator.maximumSize = CGSize(width: 240, height: 240)
 
             let durationTime = try? await asset.load(.duration)
             let duration = durationTime.map(CMTimeGetSeconds) ?? 0
-            let seconds: Double
-            if duration.isFinite, duration > 0.4 {
-                seconds = min(duration * 0.35, duration - 0.15)
-            } else {
-                seconds = 0
+
+            var results: [UIImage?] = []
+            for fraction in sampleFractions {
+                let seconds: Double
+                if duration.isFinite, duration > 0.4 {
+                    seconds = min(duration * fraction, duration - 0.12)
+                } else {
+                    seconds = 0
+                }
+
+                let time = CMTime(seconds: max(0, seconds), preferredTimescale: 600)
+                guard let frame = try? await generator.image(at: time) else {
+                    results.append(nil)
+                    continue
+                }
+                results.append(UIImage(cgImage: frame.image))
             }
 
-            let time = CMTime(seconds: max(0, seconds), preferredTimescale: 600)
-            guard let frame = try? await generator.image(at: time) else {
-                return nil
-            }
-            return UIImage(cgImage: frame.image)
+            return results
         }.value
     }
 }
