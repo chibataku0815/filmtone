@@ -16,6 +16,7 @@ import SwiftUI
 #if os(iOS)
 
 import AVFoundation
+import UIKit
 import UniformTypeIdentifiers
 
 struct FilmtoneCaptureView: View {
@@ -308,19 +309,12 @@ struct FilmtoneCaptureView: View {
                 onDismiss: { showLookPicker = false }
             )
         }
-        .confirmationDialog(
-            "Open editor",
-            isPresented: $showTakePicker,
-            titleVisibility: .visible
-        ) {
-            ForEach(Array(capturedPackages.indices.reversed()), id: \.self) { index in
-                Button(takeCommitLabel(for: index)) {
-                    commitTake(at: index)
-                }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Choose one take to open. All takes remain saved on disk.")
+        .sheet(isPresented: $showTakePicker) {
+            FilmtoneCaptureTakePickerSheet(
+                packages: capturedPackages,
+                onPick: commitTake,
+                onCancel: { showTakePicker = false }
+            )
         }
         .accessibilityIdentifier("filmtone.capture.surface")
     }
@@ -851,19 +845,6 @@ struct FilmtoneCaptureView: View {
         }
     }
 
-    private func takeCommitLabel(for index: Int) -> String {
-        guard capturedPackages.indices.contains(index) else { return "Take" }
-        let package = capturedPackages[index]
-        let ordinal = index + 1
-        let latest = index == capturedPackages.indices.last ? " · Latest" : ""
-        return "Take \(ordinal)\(latest) · \(formatRecordedDuration(package.recordedDurationSeconds))"
-    }
-
-    private func formatRecordedDuration(_ seconds: Double) -> String {
-        guard seconds.isFinite, seconds > 0 else { return "0.0s" }
-        return String(format: "%.1fs", seconds)
-    }
-
     // MARK: - Folder picker
 
     private func handleFolderPick(result: Result<[URL], Error>) {
@@ -942,6 +923,163 @@ struct FilmtoneCaptureView: View {
             url.stopAccessingSecurityScopedResource()
         }
         heldExternalFolderURL = nil
+    }
+}
+
+// MARK: - Take picker
+
+private struct FilmtoneCaptureTakePickerSheet: View {
+    let packages: [FilmtoneCapturePackage]
+    let onPick: (Int) -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    ForEach(Array(packages.indices.reversed()), id: \.self) { index in
+                        Button {
+                            FilmtoneCaptureHaptics.selection()
+                            onPick(index)
+                        } label: {
+                            FilmtoneCaptureTakePickerRow(
+                                package: packages[index],
+                                takeNumber: index + 1,
+                                isLatest: index == packages.indices.last
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("filmtone.capture.takePicker.take\(index + 1)")
+                    }
+                }
+            }
+            .listStyle(.insetGrouped)
+            .navigationTitle("Choose take")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Cancel", action: onCancel)
+                        .accessibilityIdentifier("filmtone.capture.takePicker.cancel")
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+}
+
+private struct FilmtoneCaptureTakePickerRow: View {
+    let package: FilmtoneCapturePackage
+    let takeNumber: Int
+    let isLatest: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            FilmtoneCaptureTakeThumbnail(package: package)
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text("Take \(takeNumber)")
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    if isLatest {
+                        Text("Latest")
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(.secondary.opacity(0.14), in: Capsule())
+                    }
+                }
+
+                Text(metadataLine)
+                    .font(.system(size: 12, weight: .medium, design: .rounded).monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .contentShape(Rectangle())
+        .accessibilityLabel(Text(accessibilityLabel))
+    }
+
+    private var metadataLine: String {
+        var parts = [formatRecordedDuration(package.recordedDurationSeconds)]
+        if let lens = package.lens?.magnificationLabel {
+            parts.append(lens)
+        }
+        if let look = package.selectedLook?.englishName {
+            parts.append(look)
+        } else {
+            parts.append("Filmtone")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private var accessibilityLabel: String {
+        let latest = isLatest ? ", latest" : ""
+        return "Take \(takeNumber)\(latest), \(metadataLine)"
+    }
+
+    private func formatRecordedDuration(_ seconds: Double) -> String {
+        guard seconds.isFinite, seconds > 0 else { return "0.0s" }
+        return String(format: "%.1fs", seconds)
+    }
+}
+
+private struct FilmtoneCaptureTakeThumbnail: View {
+    let package: FilmtoneCapturePackage
+
+    @State private var image: UIImage?
+
+    var body: some View {
+        ZStack {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                Rectangle()
+                    .fill(.secondary.opacity(0.18))
+                Image(systemName: "video")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: 96, height: 96)
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .task(id: package.captureId) {
+            image = await Self.thumbnail(for: package.proxyURL)
+        }
+        .accessibilityHidden(true)
+    }
+
+    private static func thumbnail(for url: URL) async -> UIImage? {
+        await Task.detached(priority: .userInitiated) {
+            let asset = AVURLAsset(url: url)
+            let generator = AVAssetImageGenerator(asset: asset)
+            generator.appliesPreferredTrackTransform = true
+            generator.maximumSize = CGSize(width: 320, height: 320)
+
+            let durationTime = try? await asset.load(.duration)
+            let duration = durationTime.map(CMTimeGetSeconds) ?? 0
+            let seconds: Double
+            if duration.isFinite, duration > 0.4 {
+                seconds = min(duration * 0.35, duration - 0.15)
+            } else {
+                seconds = 0
+            }
+
+            let time = CMTime(seconds: max(0, seconds), preferredTimescale: 600)
+            guard let frame = try? await generator.image(at: time) else {
+                return nil
+            }
+            return UIImage(cgImage: frame.image)
+        }.value
     }
 }
 

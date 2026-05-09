@@ -4,14 +4,14 @@ Date: 2026-05-09 JST
 Status: Paused — code-complete, pending owner-device smoke
 
 Paused reason: All coder-side S3 work (auto-rearm session, captured-
-takes accumulator, persistent commit pill, explicit take chooser for
+takes accumulator, persistent commit pill, and visual take chooser for
 multi-take sessions) is landed and verified (`xcodebuild` BUILD
 SUCCEEDED, `verify:swift-contract` green, pbxproj 4-section count = 4
 for the new file). The remaining done conditions are owner-device
-smoke checks (3+ takes in one session, chosen take opens in editor,
-earlier takes survive on disk). S4 - External SSD 5-Minute Capture
-Ceiling proceeds in parallel because it depends only on S3's session
-lifecycle, which is now in place code-side.
+smoke checks (3+ takes in one session, thumbnail-backed chosen take
+opens in editor, earlier takes survive on disk). S4 - External SSD
+5-Minute Capture Ceiling proceeds in parallel because it depends only
+on S3's session lifecycle, which is now in place code-side.
 
 ## Milestone
 
@@ -30,7 +30,8 @@ editor" — that is the chosen direction.
   session re-arms for the next take immediately.
 - After 3+ takes the owner can open the editor with a chosen take via
   an explicit, persistent commit pill in the cockpit. One take opens
-  directly; multiple takes present an explicit take chooser.
+  directly; multiple takes present a visual chooser with one proxy
+  thumbnail per take.
 - Earlier takes are not lost: each `capture-package.json` lands on
   disk and the relaunch reconnect path can rediscover it.
 - "All takes live" means all packages persist on disk. The editor is
@@ -81,6 +82,9 @@ editor" — that is the chosen direction.
 - [x] Owner-smoke revision: when multiple takes exist, present an
   explicit take chooser so take 2 can be committed even after take 3
   exists.
+- [x] Owner-smoke revision: make that chooser visual by generating
+  lazy thumbnails from each take's proxy, with take number, latest
+  badge, duration, lens, and Look metadata.
 - [x] Owner-smoke revision: move LOOK out of the crowded top parameter
   row into the bottom-right capture control; the top row stays five
   chips (ISO / SHUTTER / EV / WB / STAB).
@@ -111,10 +115,10 @@ Owner-device smoke before declaring product PASS:
    every `stop`.
 2. Confirm the commit pill increments to "Editor · 3 takes" and is
    tappable when not recording.
-3. Tap the pill; confirm a chooser appears. Pick take 2 and confirm
-   the editor opens take 2, not the latest take, and that
-   `capture-package.json` records the correct master / proxy linkage
-   for that clip.
+3. Tap the pill; confirm a visual chooser appears with a thumbnail
+   for each take. Pick take 2 by its image and confirm the editor
+   opens take 2, not the latest take, and that `capture-package.json`
+   records the correct master / proxy linkage for that clip.
 4. Inspect `~/Documents/captures/` (internal mode) or the SSD
    destination (external mode) and confirm earlier-take packages exist
    intact on disk.
@@ -198,6 +202,14 @@ Stop and report if any of these fires:
   - `bun run verify:swift-contract` → all sub-tests pass.
   - Owner-device smoke (take 2 selection, all packages retained,
     bottom-right LOOK placement/no top-row wrap) pending.
+- 2026-05-09 JST — Visual take-picker revision:
+  - Multi-take chooser now renders proxy-backed thumbnails plus take
+    number, Latest badge, duration, lens, and Look metadata so the
+    owner can identify the actual image before committing.
+  - `xcodebuild ... build CODE_SIGNING_ALLOWED=NO` →
+    `** BUILD SUCCEEDED **`.
+  - Owner-device smoke (thumbnail loads for each take and chosen
+    thumbnail opens the matching editor clip) pending.
 
 ## Implementation Notes
 
@@ -213,10 +225,11 @@ Stop and report if any of these fires:
   `.completed(pkg)` appends and calls `session.rearm()` instead of
   the prior auto teardown + `onCompleted(pkg)` pair.
 - `commitTakes()` is the explicit terminal action. One take commits
-  directly; multiple takes present a SwiftUI confirmation dialog with
-  one row per take. `commitTake(at:)` tears down the session, releases
-  the security-scoped folder bookmark (when external mode is in use),
-  and calls `onCompleted(selectedPackage)`.
+  directly; multiple takes present `FilmtoneCaptureTakePickerSheet`,
+  a proxy-thumbnail-backed sheet with one visual row per take.
+  `commitTake(at:)` tears down the session, releases the
+  security-scoped folder bookmark (when external mode is in use), and
+  calls `onCompleted(selectedPackage)`.
 - `FilmtoneCapturePostRecordChoice` is a pure SwiftUI view: take
   count + isDisabled + onCommit closure. Lives in its own file so
   the orchestrator does not also own the take-readout chrome. The

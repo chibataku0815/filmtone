@@ -335,10 +335,12 @@ asks for that level of confidence.
   new persistent commit pill (`FilmtoneCapturePostRecordChoice`,
   registered in pbxproj 4 sections) carries the explicit "Open
   editor" affordance. Owner-smoke revision added an explicit take
-  chooser for multi-take sessions and moved LOOK to the bottom-right
-  capture control so the top row stays five chips. xcodebuild +
-  verify:swift-contract green. Owner-device smoke (3-take session,
-  chosen take opens, earlier survive on disk) pending before archive.
+  chooser for multi-take sessions, then revised it to show proxy
+  thumbnails so the owner can identify the actual image. LOOK moved
+  to the bottom-right capture control so the top row stays five chips.
+  xcodebuild + verify:swift-contract green. Owner-device smoke
+  (3-take session, chosen thumbnail opens, earlier survive on disk)
+  pending before archive.
   S4 - External SSD 5min ceiling now active.
 - 2026-05-09: S4 implementation landed —
   `externalDurationCapSeconds` raised 60 s → 300 s,
