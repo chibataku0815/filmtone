@@ -2,7 +2,7 @@
 //
 // Owns the top zone of the parameter cockpit: the existing close /
 // storage HUD bar, the parameter chip row (ISO / Shutter / EV / WB /
-// Look), and the conditional ruler region that expands beneath the
+// STAB), and the conditional ruler region that expands beneath the
 // active scrubber chip.
 //
 // Why this lives in its own file:
@@ -28,8 +28,14 @@ import SwiftUI
 #if os(iOS)
 
 /// One chip in the top parameter row.
+///
+/// S1 (2026-05-09) added `.stab` for the capture-time stabilization
+/// On/Off toggle.  It is a one-shot toggle (same shape as `.wb`) so
+/// `isScrubberChip == false` and tapping does not open a ruler.
+/// LOOK moved to the bottom-right capture control after owner smoke
+/// showed the six-chip row forced SHUTTER to wrap on hardware.
 enum CaptureParameterChip: String, CaseIterable, Identifiable {
-    case iso, shutter, ev, wb, look
+    case iso, shutter, ev, wb, stab
 
     var id: String { rawValue }
 
@@ -39,7 +45,7 @@ enum CaptureParameterChip: String, CaseIterable, Identifiable {
         case .shutter: return "SHUTTER"
         case .ev: return "EV"
         case .wb: return "WB"
-        case .look: return "LOOK"
+        case .stab: return "STAB"
         }
     }
 
@@ -47,11 +53,12 @@ enum CaptureParameterChip: String, CaseIterable, Identifiable {
     /// performs a one-shot action (false). M13-M-3: `.iso` / `.shutter`
     /// also enter manual exposure on first tap when in `.auto` —
     /// orchestrator handles that wiring; the chip-row layer just
-    /// reports the tap.
+    /// reports the tap.  `.stab` is a one-shot On/Off toggle (same
+    /// shape as `.wb`).
     var isScrubberChip: Bool {
         switch self {
         case .iso, .shutter, .ev: return true
-        case .wb, .look: return false
+        case .wb, .stab: return false
         }
     }
 }
@@ -68,6 +75,10 @@ struct FilmtoneCaptureCockpitTopBar: View {
     let storageLabel: String
     let qualityContractText: String
     let onClose: () -> Void
+    /// S3: take-commit pill state forwarded to the top status bar.
+    let takeCount: Int
+    let isCommitDisabled: Bool
+    let onCommitTakes: () -> Void
 
     // MARK: Chip-row inputs — value sources
     let exposureMode: FilmtoneCaptureSession.ExposureMode
@@ -75,7 +86,7 @@ struct FilmtoneCaptureCockpitTopBar: View {
     let manualShutterSeconds: Double
     let exposureBiasEV: Float
     let whiteBalanceMode: FilmtoneCaptureSession.WhiteBalanceMode
-    let captureLookSelection: FilmtoneCaptureLook
+    let requestedStabilization: FilmtoneRequestedStabilization
     let isRecordingOrStopping: Bool
 
     // MARK: Chip-row inputs — scrubber ranges
@@ -97,7 +108,10 @@ struct FilmtoneCaptureCockpitTopBar: View {
                 storageIcon: storageIcon,
                 storageLabel: storageLabel,
                 qualityContractText: qualityContractText,
-                onClose: onClose
+                onClose: onClose,
+                takeCount: takeCount,
+                isCommitDisabled: isCommitDisabled,
+                onCommitTakes: onCommitTakes
             )
 
             parameterChipRow
@@ -156,8 +170,20 @@ struct FilmtoneCaptureCockpitTopBar: View {
         }
         .disabled(isRecordingOrStopping)
         .accessibilityIdentifier("filmtone.capture.chip.\(chip.id)")
-        .accessibilityLabel(Text("\(chip.label) \(chipValue(chip))"))
+        .accessibilityLabel(Text(accessibilityLabel(for: chip)))
         .accessibilityAddTraits(isActive ? .isSelected : [])
+    }
+
+    /// Spell-out a11y label.  `.stab` reads as "Stabilization On / Off"
+    /// rather than the four-letter cockpit shorthand so VoiceOver users
+    /// hear the same word the docs and shooting guide use.
+    private func accessibilityLabel(for chip: CaptureParameterChip) -> String {
+        switch chip {
+        case .stab:
+            return "Stabilization \(chipValue(chip))"
+        default:
+            return "\(chip.label) \(chipValue(chip))"
+        }
     }
 
     /// Live value string shown beneath the chip label.
@@ -175,8 +201,8 @@ struct FilmtoneCaptureCockpitTopBar: View {
                 : "—"
         case .wb:
             return whiteBalanceMode == .locked ? "Lock" : "Auto"
-        case .look:
-            return captureLookSelection.displayName
+        case .stab:
+            return requestedStabilization.displayName
         }
     }
 
@@ -248,7 +274,7 @@ struct FilmtoneCaptureCockpitTopBar: View {
                 onChange: { onScrubEV(Float($0)) }
             )
             .accessibilityIdentifier("filmtone.capture.scrubber.ev")
-        case .wb, .look:
+        case .wb, .stab:
             // Defensive: these chips never enter the active-scrubber
             // branch (`isScrubberChip == false`), but the switch needs
             // exhaustive coverage.

@@ -182,28 +182,85 @@ struct FilmtoneSelectedLookRecord: Equatable, Codable {
     let intensity: Double
 }
 
+/// S1 - Capture Stabilization Toggle: owner-visible request.  `.on`
+/// drives `cinematicExtendedEnhanced` exact, `.off` drives `.off`
+/// exact.  No fallback / silent degrade: post-record gate fails loudly
+/// when the active mode does not match the request (see
+/// `FilmtoneCaptureFailure.stabilizationDowngraded`).  Default for new
+/// runs is `.on` so handheld continues to ship at the cinematicEE
+/// baseline established in M5-A / M7 owner walks.
+enum FilmtoneRequestedStabilization: String, Equatable, Codable {
+    case on
+    case off
+
+    /// Owner-visible label for the capture chip / accessibility line.
+    var displayName: String {
+        switch self {
+        case .on: return "On"
+        case .off: return "Off"
+        }
+    }
+
+    /// Name persisted on `FilmtoneCaptureParameters.stabilization` and
+    /// emitted into `capture-package.json`.  Mirrors the
+    /// `AVCaptureVideoStabilizationMode` casename so downstream
+    /// importers (sidecar, DaVinci) read a familiar token rather than
+    /// `on` / `off`.
+    var canonicalModeName: String {
+        switch self {
+        case .on: return "cinematicExtendedEnhanced"
+        case .off: return "off"
+        }
+    }
+}
+
 /// Capture parameters resolved for a given run.  M10 ships the
 /// 4K 24 fps Apple Log 2 ProRes 422 HQ + cinematicExtendedEnhanced
-/// cinematic baseline — kept as a struct so future capture-time
-/// toggles slot in here without rewriting the package shape.  The
-/// locked format index is inherited from `FilmtoneProductCapture`
-/// (M5-A / M7 walks); only the frame rate departs from that path.
+/// cinematic baseline.  S1 (2026-05-09) adds
+/// `requestedStabilization` so handheld (On = cinematicEE) and gimbal
+/// (Off = .off) shooting both ship through the same parameters
+/// shape; the `stabilization` field continues to carry the canonical
+/// AVFoundation mode name so existing importers do not need to read
+/// the new field to recover the request.
 struct FilmtoneCaptureParameters: Equatable {
     var widthPx: Int
     var heightPx: Int
     var frameRate: Double
     var codec: String
     var colorSpace: String
+    /// AVFoundation-style canonical name for the requested mode
+    /// (`cinematicExtendedEnhanced` when On, `off` when Off).  Kept as
+    /// a string so pre-S1 importers continue to consume it without a
+    /// rebuild.  Always equals `requestedStabilization.canonicalModeName`.
     var stabilization: String
+    /// S1: structured request for the run.  Default `.on` preserves the
+    /// handheld baseline.  `.off` skips electronic stabilization
+    /// entirely so gimbal footage records without AVFoundation crop /
+    /// temporal smoothing.
+    var requestedStabilization: FilmtoneRequestedStabilization
 
-    static let baseline: FilmtoneCaptureParameters = .init(
-        widthPx: 3840,
-        heightPx: 2160,
-        frameRate: 24,
-        codec: "ProRes 422 HQ",
-        colorSpace: "Apple Log 2",
-        stabilization: "cinematicExtendedEnhanced"
+    static let baseline: FilmtoneCaptureParameters = .baseline(
+        requestedStabilization: .on
     )
+
+    /// S1: factory used by the capture session to build a parameter
+    /// snapshot for the requested mode.  The struct stays Equatable
+    /// over both the canonical name and the structured request so an
+    /// older snapshot decoded without `requestedStabilization` is not
+    /// silently equal to a new On/Off request.
+    static func baseline(
+        requestedStabilization: FilmtoneRequestedStabilization
+    ) -> FilmtoneCaptureParameters {
+        .init(
+            widthPx: 3840,
+            heightPx: 2160,
+            frameRate: 24,
+            codec: "ProRes 422 HQ",
+            colorSpace: "Apple Log 2",
+            stabilization: requestedStabilization.canonicalModeName,
+            requestedStabilization: requestedStabilization
+        )
+    }
 }
 
 /// Loud-fail reasons surfaced from the capture pipeline.  These are not
@@ -216,7 +273,13 @@ enum FilmtoneCaptureFailure: Error, Equatable {
     case noWideCamera
     case formatLockMismatch(reason: String)
     case appleLog2Unavailable
-    case stabilizationDowngraded(active: String)
+    /// S1: post-record stabilization gate failed.  `requested` is the
+    /// canonical mode name the owner asked for (cinematicExtendedEnhanced
+    /// when On, off when Off); `active` is what AVFoundation reported on
+    /// the connection at record-finish time.  Carrying both makes the
+    /// banner honest about which gate fired ("Off was requested but
+    /// active = cinematic" reads very differently from "On rejected").
+    case stabilizationDowngraded(requested: String, active: String)
     case colorSpaceDowngraded(expectedRaw: Int, observedRaw: Int)
     case codecDowngraded(observed: String?)
     case writerSetupFailed(stage: String, reason: String)
@@ -247,8 +310,8 @@ enum FilmtoneCaptureFailure: Error, Equatable {
             return "Capture format mismatch: \(reason)"
         case .appleLog2Unavailable:
             return "Apple Log 2 colorspace is unavailable on this OS."
-        case .stabilizationDowngraded(let active):
-            return "cinematicExtendedEnhanced was rejected; active mode = \(active)."
+        case .stabilizationDowngraded(let requested, let active):
+            return "Stabilization \(requested) was rejected; active mode = \(active)."
         case .colorSpaceDowngraded(let expected, let observed):
             return "Apple Log 2 (raw=\(expected)) was downgraded to raw=\(observed) at capture."
         case .codecDowngraded(let observed):
@@ -338,6 +401,16 @@ struct FilmtoneCapturePackage: Equatable {
     /// from disk (resolveExportSource falls back to fileExists +
     /// proxy fallback per M14-A).
     let masterBookmark: Data?
+    /// S1 (2026-05-09): canonical AVFoundation mode name observed on
+    /// the movie connection at record-finish time.  Equals the
+    /// requested mode (`parameters.stabilization`) on a clean run; the
+    /// post-record gate would have failed the run if they diverged, so
+    /// in practice this is always equal.  Persisting it explicitly
+    /// keeps the package + sidecar honest about both halves of
+    /// "requested vs observed" instead of inferring the observed value
+    /// from the absence of a failure.  `nil` for pre-S1 captures
+    /// decoded from disk.
+    let observedStabilization: String?
 }
 
 #endif

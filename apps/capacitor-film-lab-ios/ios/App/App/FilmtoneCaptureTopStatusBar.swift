@@ -15,6 +15,12 @@ struct FilmtoneCaptureTopStatusBar: View {
     let storageLabel: String
     let qualityContractText: String
     let onClose: () -> Void
+    /// S3 (2026-05-09): take-commit pill state.  `takeCount == 0`
+    /// renders the pill at zero opacity so the layout stays stable
+    /// between the first record and the first .completed transition.
+    let takeCount: Int
+    let isCommitDisabled: Bool
+    let onCommitTakes: () -> Void
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
@@ -27,6 +33,12 @@ struct FilmtoneCaptureTopStatusBar: View {
             }
             .accessibilityIdentifier("filmtone.capture.close")
             .disabled(isCloseDisabled)
+
+            FilmtoneCapturePostRecordChoice(
+                takeCount: takeCount,
+                isDisabled: isCommitDisabled,
+                onCommit: onCommitTakes
+            )
 
             Spacer(minLength: 8)
 

@@ -52,10 +52,16 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     /// Internal-mode product cap.  Explicit, not a hidden fallback.
     static let internalDurationCapSeconds: Double = 10.0
 
-    /// External-mode soft ceiling.  Matches `FilmtoneProductCapture.maxDurationSeconds`
-    /// so internal sandbox writes do not blow past the verified ProRes
-    /// thermal envelope.
-    static let externalDurationCapSeconds: Double = 60.0
+    /// External-mode soft ceiling.  S4 (2026-05-09) raised this from
+    /// 60 s to 300 s so the V2 capture surface supports a real 5 min
+    /// take on a connected SSD.  No longer keyed to
+    /// `FilmtoneProductCapture.maxDurationSeconds` (the legacy
+    /// fixed-duration evidence path stays at 60 s; the two paths
+    /// intentionally diverge).  ProRes 422 HQ Apple Log 2 thermal
+    /// envelope is the owner's responsibility past this ceiling — the
+    /// existing `writerInterrupted` failure surface routes any AV
+    /// thermal abort visibly to the banner.
+    static let externalDurationCapSeconds: Double = 300.0
 
     // MARK: - Public API
 
@@ -232,6 +238,17 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     /// disables the Locked segment in the UI with a visible reason
     /// rather than failing silently when the owner taps Locked.
     @Published private(set) var canLockWhiteBalance: Bool = true
+
+    /// S1 (2026-05-09): owner-requested stabilization for the next
+    /// run.  Default `.on` preserves the M10 / M5-A handheld baseline
+    /// (`cinematicExtendedEnhanced`).  `.off` records gimbal-friendly
+    /// footage with AVFoundation electronic stabilization fully
+    /// disabled.  Mutated only via `setRequestedStabilization(_:)` so
+    /// the value is gated on `state == .ready` and applied through
+    /// `beginConfiguration` / `commitConfiguration` rather than a raw
+    /// connection write that the running session might ignore until
+    /// the next configure pass.
+    @Published private(set) var requestedStabilization: FilmtoneRequestedStabilization = .on
 
     private var captureId: String = UUID().uuidString.lowercased()
     private var packageDirURL: URL?
@@ -452,15 +469,26 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
                 if connection.isVideoRotationAngleSupported(Self.lockedRotationAngle) {
                     connection.videoRotationAngle = Self.lockedRotationAngle
                 }
-                if connection.isVideoStabilizationSupported {
-                    connection.preferredVideoStabilizationMode = .cinematicExtendedEnhanced
-                }
-                let supported = format.isVideoStabilizationModeSupported(.cinematicExtendedEnhanced)
-                if !supported {
+                // S1 (2026-05-09): apply the owner's requested mode
+                // exactly.  `.off` is always supported by an
+                // AVCaptureDevice.Format, so the format-supported
+                // guard only needs to fire on `.on`
+                // (`cinematicExtendedEnhanced`).  No fallback —
+                // unsupported on this format means the run cannot
+                // start at the requested mode, period.
+                let preferredMode = Self.avMode(for: requestedStabilization)
+                if requestedStabilization == .on,
+                   !format.isVideoStabilizationModeSupported(preferredMode) {
                     session.commitConfiguration()
-                    let failure = FilmtoneCaptureFailure.stabilizationDowngraded(active: "unsupported-on-format")
+                    let failure = FilmtoneCaptureFailure.stabilizationDowngraded(
+                        requested: requestedStabilization.canonicalModeName,
+                        active: "unsupported-on-format"
+                    )
                     state = .failed(failure)
                     throw failure
+                }
+                if connection.isVideoStabilizationSupported {
+                    connection.preferredVideoStabilizationMode = preferredMode
                 }
             }
 
@@ -799,6 +827,53 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         }
     }
 
+    // MARK: - S1 stabilization
+
+    /// S1 (2026-05-09): change the requested stabilization mode for
+    /// the next run.  Allowed only while `.ready` so the value cannot
+    /// change mid-recording (the capture UI also disables the toggle
+    /// while recording, but the gate here keeps the session honest if
+    /// a defensive caller missed the UI guard).  When the session is
+    /// already configured we re-apply `preferredVideoStabilizationMode`
+    /// inside a `beginConfiguration` / `commitConfiguration` window so
+    /// the active mode flips before the next `start()` lands; pre-
+    /// `prepare(lens:)` callers just stash the value so the first
+    /// configure picks it up.
+    ///
+    /// `.on` requires the active format to support
+    /// `cinematicExtendedEnhanced` — the M10 contract format index
+    /// already does, but if a future format swap loses support the
+    /// call surfaces `.stabilizationDowngraded(requested:, active:)`
+    /// loudly instead of silently downshifting to a different mode.
+    /// `.off` is universally supported by an AVCaptureDevice.Format,
+    /// so the format-supported guard only fires on `.on`.
+    @discardableResult
+    func setRequestedStabilization(
+        _ mode: FilmtoneRequestedStabilization
+    ) -> Bool {
+        guard case .ready = state else { return false }
+        guard mode != requestedStabilization else { return true }
+        let preferredMode = Self.avMode(for: mode)
+        if mode == .on,
+           let device,
+           !device.activeFormat.isVideoStabilizationModeSupported(preferredMode) {
+            state = .failed(.stabilizationDowngraded(
+                requested: mode.canonicalModeName,
+                active: "unsupported-on-format"
+            ))
+            return false
+        }
+        if let movieOutput,
+           let connection = movieOutput.connection(with: .video),
+           connection.isVideoStabilizationSupported {
+            session.beginConfiguration()
+            connection.preferredVideoStabilizationMode = preferredMode
+            session.commitConfiguration()
+        }
+        requestedStabilization = mode
+        return true
+    }
+
     /// Caller-supplied external folder URL.  Caller owns the
     /// security-scoped lifetime; we only store the URL and adjust the
     /// resolved policy.  Pass `nil` to clear back to internal mode.
@@ -873,6 +948,25 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
             recordedDurationSnapshot = CMTimeGetSeconds(movieOutput.recordedDuration)
             movieOutput.stopRecording()
         }
+    }
+
+    /// S3 (2026-05-09): re-arm the live AVCaptureSession for another
+    /// take after a `.completed` run.  The session graph (input,
+    /// movieOutput, preview VDO, exposure / WB / focus / stab choices)
+    /// is intentionally kept hot — only the per-run scratch state
+    /// (master / proxy / package URLs, recording duration snapshot,
+    /// pending failure) is cleared and `state` returns to `.ready` so
+    /// the next `start()` can run.  Does nothing outside `.completed`.
+    func rearm() {
+        guard case .completed = state else { return }
+        masterURL = nil
+        proxyURL = nil
+        packageDirURL = nil
+        recordedDurationSnapshot = 0
+        pendingFailure = nil
+        elapsedSeconds = 0
+        recordingDelegate = nil
+        state = .ready
     }
 
     /// Tear down the session graph + release the preview layer.  Caller
@@ -1019,15 +1113,29 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
                 return
             }
         }
-        if let movieOutput,
-           let connection = movieOutput.connection(with: .video) {
-            let activeMode = connection.activeVideoStabilizationMode
-            if activeMode != .cinematicExtendedEnhanced {
-                state = .failed(.stabilizationDowngraded(
-                    active: Self.stabilizationDescription(activeMode)
-                ))
-                return
-            }
+        // S1 (2026-05-09): exact-mode gate against the run's
+        // requested stabilization.  No fallback / silent degrade —
+        // each request has exactly one acceptable observed mode, and
+        // a missing AV connection is itself a loud failure rather
+        // than an "assume requested" pass.
+        let observedStabilizationName: String
+        guard let movieOutput,
+              let connection = movieOutput.connection(with: .video) else {
+            state = .failed(.stabilizationDowngraded(
+                requested: requestedStabilization.canonicalModeName,
+                active: "connection-unavailable"
+            ))
+            return
+        }
+        let activeMode = connection.activeVideoStabilizationMode
+        let expectedMode = Self.avMode(for: requestedStabilization)
+        observedStabilizationName = Self.stabilizationDescription(activeMode)
+        if activeMode != expectedMode {
+            state = .failed(.stabilizationDowngraded(
+                requested: requestedStabilization.canonicalModeName,
+                active: observedStabilizationName
+            ))
+            return
         }
 
         // Verify the actual encoded master FourCC.  The connection-level
@@ -1046,7 +1154,14 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
 
         let durationLimit = currentDurationLimit()
         let recordedDuration = recordedDurationSnapshot
-        let parameters: FilmtoneCaptureParameters = .baseline
+        // S1 (2026-05-09): parameters now reflect the owner's
+        // requested stabilization for the run that just finished.
+        // `.baseline(...)` keeps the codec / resolution / fps locked
+        // and only swaps the stabilization slot.
+        let parameters: FilmtoneCaptureParameters = .baseline(
+            requestedStabilization: requestedStabilization
+        )
+        let observedStabilization = observedStabilizationName
         let storagePolicy = self.storagePolicy
         let captureId = self.captureId
         let lensRecord = self.activeLens?.toRecord()
@@ -1130,7 +1245,8 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
                         selectedLook: selectedLook,
                         exposureControl: exposureControl,
                         whiteBalance: whiteBalance,
-                        masterBookmark: masterBookmark
+                        masterBookmark: masterBookmark,
+                        observedStabilization: observedStabilization
                     )
                     // Master/proxy linkage is the M10 deliverable; if we
                     // can't write `capture-package.json` next to the
@@ -1183,10 +1299,23 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         return String(chars)
     }
 
+    /// S1 (2026-05-09): map the structured request onto the
+    /// AVFoundation enum.  No fallback case — the enum is exhaustive
+    /// over what S1 ships, and adding a third request mode is an
+    /// active explicit decision (out of scope for S1).
+    private static func avMode(
+        for request: FilmtoneRequestedStabilization
+    ) -> AVCaptureVideoStabilizationMode {
+        switch request {
+        case .on: return .cinematicExtendedEnhanced
+        case .off: return .off
+        }
+    }
+
     /// Compact label for AVCaptureVideoStabilizationMode.  Used by the
-    /// `.stabilizationDowngraded(active:)` failure to give the owner a
-    /// concrete signal (cinematic / standard / off / auto) instead of
-    /// "<some integer>".
+    /// `.stabilizationDowngraded(requested:active:)` failure to give
+    /// the owner a concrete signal (cinematic / standard / off / auto)
+    /// instead of "<some integer>".
     private static func stabilizationDescription(_ mode: AVCaptureVideoStabilizationMode) -> String {
         switch mode {
         case .off: return "off"

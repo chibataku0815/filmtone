@@ -114,10 +114,24 @@ struct FilmtoneCapturePackageSnapshotV1: Codable {
     /// No schemaVersion bump — schema-version 2's contract is
     /// "additive optional fields allowed."
     var masterBookmark: Data?
+    /// S1 (2026-05-09): structured request the owner made before the
+    /// run started.  `"on"` -> cinematicExtendedEnhanced exact, `"off"`
+    /// -> .off exact.  Optional / additive so pre-S1 snapshots decode
+    /// with nil and the rebuilt parameters fall back to the
+    /// `parametersStabilization` legacy string (which itself records
+    /// the canonical AVFoundation name).
+    var parametersRequestedStabilization: String?
+    /// S1: AVFoundation mode name observed on the movie connection at
+    /// record-finish time.  Persisted alongside the request so a
+    /// future audit can verify both halves of the truth.  Optional;
+    /// nil on pre-S1 snapshots.
+    var observedStabilization: String?
 
     /// Bumped to 2 in S11-D.  Schema-version 1 snapshots written by
     /// M10 / S8-B continue to decode because every S11-D field is
     /// optional (`Codable` populates them with `nil` on absence).
+    /// S1 (2026-05-09) added two more optional fields under the same
+    /// "additive only" rule — schemaVersion stays 2.
     static let currentSchemaVersion = 2
 }
 
@@ -226,7 +240,9 @@ enum FilmtoneCapturePackagePersistence {
             manualISO: package.exposureControl?.manualISO,
             manualShutterDurationSeconds: package.exposureControl?.manualShutterDurationSeconds,
             manualInheritedFromAuto: package.exposureControl?.inheritedFromAuto,
-            masterBookmark: package.masterBookmark
+            masterBookmark: package.masterBookmark,
+            parametersRequestedStabilization: package.parameters.requestedStabilization.rawValue,
+            observedStabilization: package.observedStabilization
         )
     }
 
@@ -244,13 +260,31 @@ enum FilmtoneCapturePackagePersistence {
         default:
             storagePolicy = .internalDocumentsCapped
         }
+        // S1 (2026-05-09): rebuild the structured request from the new
+        // optional field; pre-S1 snapshots fall back to inferring On
+        // from the legacy `parametersStabilization` string ("off"
+        // becomes Off, every other value — including the historic
+        // `cinematicExtendedEnhanced` — becomes On).  The fallback
+        // mirrors the M10 baseline rather than introducing a third
+        // "unknown" state that downstream consumers would have to
+        // handle.
+        let requestedStabilization: FilmtoneRequestedStabilization
+        if let raw = snapshot.parametersRequestedStabilization,
+           let mode = FilmtoneRequestedStabilization(rawValue: raw) {
+            requestedStabilization = mode
+        } else if snapshot.parametersStabilization.lowercased() == "off" {
+            requestedStabilization = .off
+        } else {
+            requestedStabilization = .on
+        }
         let parameters = FilmtoneCaptureParameters(
             widthPx: snapshot.parametersWidthPx,
             heightPx: snapshot.parametersHeightPx,
             frameRate: snapshot.parametersFrameRate,
             codec: snapshot.parametersCodec,
             colorSpace: snapshot.parametersColorSpace,
-            stabilization: snapshot.parametersStabilization
+            stabilization: snapshot.parametersStabilization,
+            requestedStabilization: requestedStabilization
         )
         // Lens fields are tri-required: rebuild the record only when all
         // three are present.  Any missing field means the snapshot was
@@ -354,7 +388,8 @@ enum FilmtoneCapturePackagePersistence {
             selectedLook: selectedLook,
             exposureControl: exposureControl,
             whiteBalance: whiteBalance,
-            masterBookmark: snapshot.masterBookmark
+            masterBookmark: snapshot.masterBookmark,
+            observedStabilization: snapshot.observedStabilization
         )
     }
 

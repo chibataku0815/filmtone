@@ -31,13 +31,19 @@ enum FilmtoneCapturePreflight {
         case notExternal
     }
 
-    /// Free-capacity gate.  M5-A measured ProRes 422 HQ at 3840×2160 30 fps
-    /// Apple Log 2 at ≈ 2.5–2.7 GB / 30 s, i.e. ≈ 5–5.4 GB / 60 s on the
-    /// `externalDurationCapSeconds` ceiling.  Add proxy-export staging
-    /// (~1 GB) and finalize headroom; 10 GB keeps the gate honest under
-    /// real ProRes write rates and avoids the "5 GB passed → ENOSPC mid-
-    /// recording" brittleness flagged in the M10 review.
-    static let minimumFreeBytes: Int64 = 10 * 1024 * 1024 * 1024
+    /// Free-capacity gate.  M5-A measured ProRes 422 HQ at 3840×2160
+    /// 30 fps Apple Log 2 at ≈ 2.5–2.7 GB / 30 s; the V2 capture
+    /// surface ships at 24 fps, so per-second master rate scales by
+    /// 24/30 ≈ 0.8 — i.e. roughly 4.0–4.3 GB / 60 s.  S4 (2026-05-09)
+    /// raised the external recording ceiling from 60 s to 300 s, so a
+    /// single 5 min ProRes 422 HQ Apple Log 2 master measures at
+    /// ≈ 20–22 GB.  Add ≈ 1 GB proxy export staging and a few GB of
+    /// finalize / mov-atom write headroom.  30 GB keeps the gate
+    /// honest at the new ceiling and preserves the ≈ 1.5× safety
+    /// margin the prior 10 GB / 60 s gate held against the same
+    /// "passed → ENOSPC mid-recording" failure mode flagged in the
+    /// M10 review.
+    static let minimumFreeBytes: Int64 = 30 * 1024 * 1024 * 1024
 
     /// Tolerance for `volumeTotalCapacity` match against Documents.  iOS
     /// Files-picker URLs that resolve to the iPhone's NAND (e.g.

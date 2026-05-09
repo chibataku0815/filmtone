@@ -17,19 +17,26 @@ Report public App Store state and local implementation state separately.
 
 ## Current Implementation Entry
 
-- App guide: `apps/capacitor-film-lab-ios/CLAUDE.md`
+- App guide: `apps/capacitor-film-lab-ios/CLAUDE.md` (UI stack is now
+  Native SwiftUI; the React + Capacitor stack was purged 2026-05-09)
 - App source: `apps/capacitor-film-lab-ios/`
 - App Store metadata: `apps/capacitor-film-lab-ios/fastlane/metadata/`
 - Screenshot notes: `apps/capacitor-film-lab-ios/fastlane/screenshots/README.md`
-- Native bridge / Swift surfaces: open the exact Swift or TypeScript target
-  named by the task.
+- Native Swift surfaces: open the exact Swift target named by the task.
 
-## Current Product Plans
+## Lane Index
 
-- [`v2-capture-gyroflow/strategy.md`](./v2-capture-gyroflow/strategy.md)
-  is the current strategy for the owner-first V2 capture / Gyroflow lane.
-- [`v2-capture-gyroflow/active.md`](./v2-capture-gyroflow/active.md)
-  is the only current active task for that lane.
+Each lane keeps a `strategy.md` (long-running goal + log) and, when
+work is in flight, an `active.md` (≤ 30-min sub-tasks). Closed lanes
+keep `strategy.md` as the canonical record; their per-task notes
+move to `<lane>/archive/`.
+
+| Lane | Status | Strategy | Notes |
+|---|---|---|---|
+| Capture Practicality | **Coder-side S1-S5 advanced — owner smoke pending** | [`capture-practicality/strategy.md`](./capture-practicality/strategy.md) | S1 stabilization, S2 lens visibility, S3 continuous capture, S4 SSD 5-minute cap, and S5 preview scoping are paused under `capture-practicality/paused/` until owner-device smoke / dominant-defect pick. |
+| V2 Capture / Gyroflow | **Closed at M14 + M15 PASS (2026-05-09)** | [`v2-capture-gyroflow/strategy.md`](./v2-capture-gyroflow/strategy.md) | No `active.md` — lane awaits owner pick of next sub-lane (Filmtone-optimized motion library, broad device matrix). M9–M15 archives in [`v2-capture-gyroflow/archive/`](./v2-capture-gyroflow/archive/) |
+| React / Capacitor purge | **Closed + merged into main as `47a1d76d` (2026-05-09)** | [`react-capacitor-purge/strategy.md`](./react-capacitor-purge/strategy.md) | Stages A → E archived. Worktree + branch removed post-merge. |
+| Meta Before/After DaVinci shell | Asset directory, not a lane | [`meta-before-after-davinci-shell/README.md`](./meta-before-after-davinci-shell/README.md) | Placeholder Resolve project + Lua helpers for ad production. Not active product work. |
 
 ## Idea Notes
 
@@ -52,3 +59,6 @@ Report public App Store state and local implementation state separately.
   specs as evidence.
 - Treat archived release-state notes as historical only. Do not use them as
   current release truth without the truth script and live source checks.
+- Per-lane archives (`<lane>/archive/`) record sub-task PASS/REJECT logs
+  for that lane only. The lane's `strategy.md` Completion Log is the
+  index into them.

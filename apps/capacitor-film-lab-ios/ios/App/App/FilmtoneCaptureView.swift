@@ -140,7 +140,8 @@ struct FilmtoneCaptureView: View {
     /// `FilmtoneCaptureCockpitTopBar` as a `Binding`. `.iso` / `.shutter`
     /// / `.ev` open a ruler region beneath the chip row (stub today,
     /// real ruler in M13-M-3). `.wb` toggles auto/locked directly.
-    /// `.look` opens the picker sheet. `nil` = no scrubber row.
+    /// LOOK lives in the bottom-right capture control so the top row
+    /// stays at five chips on hardware. `nil` = no scrubber row.
     @State private var activeParameterChip: CaptureParameterChip?
     /// M13-M-2: presentation flag for the Look picker sheet, bound to
     /// `.sheet(isPresented:)`.
@@ -151,6 +152,25 @@ struct FilmtoneCaptureView: View {
     /// entered through some other path (none today; M13-M-4 simplifies
     /// when the dormant drawer code is deleted).
     @State private var manualEntryViaChipTap: Bool = false
+    /// S3 (2026-05-09): completed packages accumulated within the
+    /// current capture session.  After every successful `.completed`
+    /// the session auto-rearms (see `.onChange(of: session.state)`),
+    /// the latest package is appended here, and the cockpit's commit
+    /// pill becomes tappable.  Tapping it adopts a chosen take into
+    /// the editor via `onCompleted(_:)` and dismisses the surface.
+    /// Earlier takes are not lost — each has its own
+    /// `capture-package.json` on disk; the relaunch reconnect path
+    /// can find them.  When multiple takes exist, a chooser avoids
+    /// silently treating the latest take as the only keeper.
+    @State private var capturedPackages: [FilmtoneCapturePackage] = []
+    /// S3: guards re-entrant taps on the commit pill while the
+    /// teardown + adopt path is in flight.  The pill is also disabled
+    /// during recording so a stop-into-commit double-tap cannot
+    /// race the proxy export's `.completed` transition.
+    @State private var commitInFlight: Bool = false
+    /// S3 owner-smoke revision: multiple takes require an explicit
+    /// owner choice because the editor is a single-source surface.
+    @State private var showTakePicker: Bool = false
 
     var body: some View {
         ZStack {
@@ -177,6 +197,14 @@ struct FilmtoneCaptureView: View {
                     cockpitTopBar
                         .padding(.horizontal, 16)
                         .padding(.top, 8)
+                    if isUngradedPreviewFallback {
+                        HStack {
+                            ungradedPreviewBadge
+                            Spacer()
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
+                    }
                     Spacer()
                     bottomZone
                         .padding(.horizontal, 20)
@@ -186,10 +214,6 @@ struct FilmtoneCaptureView: View {
 
             if let prepareError {
                 failureOverlay(prepareError)
-            }
-
-            if let activeLiveDiagnostics {
-                diagnosticOverlay(activeLiveDiagnostics)
             }
         }
         .task {
@@ -239,13 +263,16 @@ struct FilmtoneCaptureView: View {
         .onChange(of: session.state) { newState in
             switch newState {
             case .completed(let pkg):
-                Task {
-                    await session.teardown()
-                    await MainActor.run {
-                        releaseExternalFolderScope()
-                        onCompleted(pkg)
-                    }
-                }
+                // S3 (2026-05-09): no longer auto-routes to the
+                // editor.  Accumulate the package, immediately
+                // re-arm the live AVCaptureSession for the next
+                // take, and let the cockpit's commit pill carry
+                // the explicit "open editor" affordance.  The
+                // session state ticks `.completed` → `.ready` in
+                // one main-actor hop so the cockpit never paints
+                // a frozen post-record screen.
+                capturedPackages.append(pkg)
+                session.rearm()
             case .failed(let failure):
                 Task {
                     await session.teardown()
@@ -281,6 +308,20 @@ struct FilmtoneCaptureView: View {
                 onDismiss: { showLookPicker = false }
             )
         }
+        .confirmationDialog(
+            "Open editor",
+            isPresented: $showTakePicker,
+            titleVisibility: .visible
+        ) {
+            ForEach(Array(capturedPackages.indices.reversed()), id: \.self) { index in
+                Button(takeCommitLabel(for: index)) {
+                    commitTake(at: index)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Choose one take to open. All takes remain saved on disk.")
+        }
         .accessibilityIdentifier("filmtone.capture.surface")
     }
 
@@ -295,6 +336,13 @@ struct FilmtoneCaptureView: View {
         // a viewfinder — graceful degrade keeps the record path
         // available even on hardware where VDO + MovieFileOutput
         // coexistence is refused.
+        //
+        // S5 (2026-05-09): the fallback path now drives an explicit
+        // "Ungraded" badge in the cockpit overlay so the owner does
+        // not mistake the raw preview for a graded preview.  The Look
+        // chip and the master record path still apply the chosen Look
+        // at record time — only the live preview cannot show it on
+        // this hardware.
         if session.hasLivePreview {
             FilmtoneCaptureLivePreview(
                 sink: session.previewFrameSink,
@@ -309,6 +357,30 @@ struct FilmtoneCaptureView: View {
         }
     }
 
+    private var isUngradedPreviewFallback: Bool {
+        !session.hasLivePreview && session.previewLayer != nil
+    }
+
+    /// S5 (2026-05-09): explicit "Ungraded" badge for the fallback
+    /// preview path.  It lives in the cockpit overlay flow, directly
+    /// below the top controls, so S3's take-commit pill and the
+    /// quality-contract HUD cannot visually collide with it.
+    /// `allowsHitTesting(false)` prevents the badge from intercepting
+    /// taps that should reach the preview's tap-to-focus /
+    /// tap-to-meter surface.
+    private var ungradedPreviewBadge: some View {
+        Text("Ungraded preview")
+            .font(.system(size: 10, weight: .heavy, design: .rounded))
+            .tracking(0.4)
+            .foregroundStyle(.white.opacity(0.92))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .captureGlassHUD(in: FilmtoneCaptureChrome.hudShape())
+            .allowsHitTesting(false)
+            .accessibilityIdentifier("filmtone.capture.ungradedPreviewBadge")
+            .accessibilityLabel(Text("Ungraded preview"))
+    }
+
     // MARK: - HUD readout sources
 
     private var storagePillIcon: String {
@@ -320,12 +392,32 @@ struct FilmtoneCaptureView: View {
 
     private var storagePillLabel: String {
         let cap = Int(session.currentDurationLimit())
+        let formatted = formatDurationCap(cap)
         switch session.storagePolicy {
         case .internalDocumentsCapped:
-            return "Internal \(cap)s"
+            return "Internal \(formatted)"
         case .externalSecurityScopedFolder:
-            return "External master"
+            // S4 (2026-05-09): the external pill now carries the
+            // resolved cap rather than a static "External master"
+            // string so the owner sees the same readout shape on both
+            // storage policies and can verify the 5 min ceiling at a
+            // glance.
+            return "External \(formatted)"
         }
+    }
+
+    /// S4 (2026-05-09): owner-visible duration-cap formatter.  Caps
+    /// under 60 s render as `"10s"`; ≥ 60 s collapses to minutes
+    /// (`"5m"`) and adds a residual seconds token only when the cap
+    /// is not a whole minute (`"1m30s"`).  Keeps the storage pill
+    /// readable across the existing `Internal 10s` / `External 5m`
+    /// product-policy spread and any future intermediate ceilings.
+    private func formatDurationCap(_ seconds: Int) -> String {
+        if seconds < 60 { return "\(seconds)s" }
+        let minutes = seconds / 60
+        let residual = seconds % 60
+        if residual == 0 { return "\(minutes)m" }
+        return "\(minutes)m\(residual)s"
     }
 
     // MARK: - Quality contract / manual summary chips (S13-C)
@@ -339,10 +431,14 @@ struct FilmtoneCaptureView: View {
             "Log2",
             "ProRes",
         ]
-        let shouldShowLensPrefix = lenses.count <= 1
-        let lensPrefix = shouldShowLensPrefix
-            ? (selectedLens.map { "\($0.magnificationLabel) · " } ?? "")
-            : ""
+        // S2 (2026-05-09): the active lens magnification belongs on the
+        // canonical contract line for every topology — single-lens
+        // devices have no chip row at all, and multi-lens devices need
+        // a text readout that does not rely on the chip row's
+        // selected-state styling alone.  The chip row's tint + rim +
+        // bold-weight selection signal remains the control affordance;
+        // this string is its readable companion.
+        let lensPrefix = selectedLens.map { "\($0.magnificationLabel) · " } ?? ""
         return lensPrefix + segments.joined(separator: " · ")
     }
 
@@ -357,10 +453,12 @@ struct FilmtoneCaptureView: View {
             canToggleRecord: canToggleRecord,
             pickFolderIcon: pickFolderIcon,
             pickFolderLabel: pickFolderLabel,
+            lookLabel: captureLookSelection.displayName,
             showsExternalClear: isExternalFolderSelected,
             onPickFolder: { showFolderImporter = true },
             onToggleRecord: toggleRecord,
-            onClearFolder: clearExternalFolder
+            onClearFolder: clearExternalFolder,
+            onPickLook: { showLookPicker = true }
         )
     }
 
@@ -379,12 +477,15 @@ struct FilmtoneCaptureView: View {
             storageLabel: storagePillLabel,
             qualityContractText: qualityContractText,
             onClose: dismissCapture,
+            takeCount: capturedPackages.count,
+            isCommitDisabled: isRecordingOrStopping || commitInFlight,
+            onCommitTakes: commitTakes,
             exposureMode: session.exposureMode,
             manualISO: session.manualISO,
             manualShutterSeconds: session.manualShutterSeconds,
             exposureBiasEV: session.exposureBiasEV,
             whiteBalanceMode: session.whiteBalanceMode,
-            captureLookSelection: captureLookSelection,
+            requestedStabilization: session.requestedStabilization,
             isRecordingOrStopping: isRecordingOrStopping,
             isoRange: session.isoRange,
             shutterDurationRange: session.shutterDurationRange,
@@ -426,7 +527,7 @@ struct FilmtoneCaptureView: View {
     /// - `.ev`: open / close scrubber. Auto-only chip; never appears
     ///   in manual (cockpit filters it out).
     /// - `.wb`: toggle auto / locked.
-    /// - `.look`: present the Look picker sheet.
+    /// LOOK is handled by the bottom-right capture control.
     private func handleParameterChipTap(_ chip: CaptureParameterChip) {
         switch chip {
         case .iso, .shutter:
@@ -439,8 +540,16 @@ struct FilmtoneCaptureView: View {
             let next: FilmtoneCaptureSession.WhiteBalanceMode =
                 session.whiteBalanceMode == .locked ? .auto : .locked
             applyWhiteBalanceMode(next)
-        case .look:
-            showLookPicker = true
+        case .stab:
+            // S1 (2026-05-09): owner toggles stabilization between
+            // On (cinematicExtendedEnhanced) and Off (.off).  The
+            // chip itself is disabled while recording (cockpit
+            // applies `.disabled(isRecordingOrStopping)`); the
+            // session also gates `setRequestedStabilization` on
+            // `state == .ready` for defensive callers.
+            let next: FilmtoneRequestedStabilization =
+                session.requestedStabilization == .on ? .off : .on
+            session.setRequestedStabilization(next)
         }
     }
 
@@ -594,77 +703,6 @@ struct FilmtoneCaptureView: View {
         .padding(.horizontal, 28)
     }
 
-    // MARK: - F3-R diagnostic overlay
-
-    /// Top-left diagnostic chip showing the editor inputs flowing into
-    /// the live grade chain.  Removed in F3-Fix once parity gaps are
-    /// closed.  Anchored to `.topLeading` and pushed past the close X
-    /// button so it doesn't overlap the controls.  `allowsHitTesting`
-    /// is off so the chip never intercepts a tap on the close button
-    /// even if its frame grows.
-    private func diagnosticOverlay(
-        _ diag: FilmtoneLivePreviewDiagnostics
-    ) -> some View {
-        VStack {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("F3-R DIAG")
-                        .font(.system(size: 9, weight: .bold, design: .monospaced))
-                        .foregroundStyle(.yellow)
-                    Text("Look: \(diag.lookLabel)")
-                        .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    Text("Profile: \(diag.cameraProfileLabel)")
-                        .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    if let intensity = diag.creativeLutIntensity, diag.creativeLutPresent {
-                        Text("LUT: ON x \(String(format: "%.2f", intensity))")
-                            .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    } else {
-                        Text("LUT: OFF")
-                            .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    }
-                    Text("InputLUT: \(diag.inputLutWillApply ? "WILL APPLY (\(diag.detectedInputTransform ?? "auto"))" : "off")")
-                        .font(.system(size: 11, weight: .medium, design: .monospaced))
-                        .foregroundStyle(diag.inputLutWillApply ? .red : .white)
-                    // F3-Fix #1 post-fix interpretation:
-                    //   camProf:N is now a genuine wiring regression
-                    //     (post-fix `project.cameraProfile` is always at
-                    //     least `.auto`) → red `[!]` alarm.
-                    //   savedLook:N is informational — most edits don't
-                    //     have a Saved Look applied → neutral white text.
-                    Group {
-                        if !diag.cameraProfilePassedToProcessor {
-                            Text("[!] wiring camProf:N savedLook:\(diag.savedLookPassedToProcessor ? "Y" : "N")")
-                                .foregroundStyle(.red)
-                        } else {
-                            Text("wiring camProf:Y savedLook:\(diag.savedLookPassedToProcessor ? "Y" : "N")")
-                                .foregroundStyle(.white.opacity(0.8))
-                        }
-                    }
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    Text(String(
-                        format: "E:%+.2f C:%.2f S:%.2f T:%+.2f",
-                        diag.exposure, diag.contrast, diag.saturation, diag.temperature
-                    ))
-                        .font(.system(size: 10, weight: .regular, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.8))
-                }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .background(
-                    Color.black.opacity(0.65),
-                    in: RoundedRectangle(cornerRadius: 6, style: .continuous)
-                )
-                .accessibilityIdentifier("filmtone.capture.f3rDiag")
-                Spacer()
-            }
-            .padding(.leading, 60)
-            .padding(.top, 8)
-            Spacer()
-        }
-        .allowsHitTesting(false)
-    }
-
     private func logLiveDiagnostics(_ diag: FilmtoneLivePreviewDiagnostics) {
         NSLog(
             "[F3R] live preview diagnostics: look=%@ profile=%@ camProfPassed=%@ savedLookPassed=%@ savedLookId=%@ creativeLut=%@ size=%@ intensity=%@ slug=%@ inputLutWillApply=%@ detectedTransform=%@ presetVersion=%@ E=%+.3f C=%.3f S=%.3f T=%+.3f",
@@ -778,6 +816,52 @@ struct FilmtoneCaptureView: View {
                 onCancelled()
             }
         }
+    }
+
+    /// S3 owner-smoke revision: one take opens directly; multiple
+    /// takes require an explicit pick so the second take can be the
+    /// keeper even if the owner recorded a third one afterwards.  All
+    /// packages stay on disk regardless; the editor itself remains
+    /// single-source, so "all takes" is a persistence guarantee here,
+    /// not a batch-import action.
+    private func commitTakes() {
+        guard !commitInFlight else { return }
+        switch capturedPackages.count {
+        case 0:
+            return
+        case 1:
+            commitTake(at: 0)
+        default:
+            showTakePicker = true
+        }
+    }
+
+    private func commitTake(at index: Int) {
+        guard capturedPackages.indices.contains(index) else { return }
+        guard !commitInFlight else { return }
+        let package = capturedPackages[index]
+        commitInFlight = true
+        showTakePicker = false
+        Task {
+            await session.teardown()
+            await MainActor.run {
+                releaseExternalFolderScope()
+                onCompleted(package)
+            }
+        }
+    }
+
+    private func takeCommitLabel(for index: Int) -> String {
+        guard capturedPackages.indices.contains(index) else { return "Take" }
+        let package = capturedPackages[index]
+        let ordinal = index + 1
+        let latest = index == capturedPackages.indices.last ? " · Latest" : ""
+        return "Take \(ordinal)\(latest) · \(formatRecordedDuration(package.recordedDurationSeconds))"
+    }
+
+    private func formatRecordedDuration(_ seconds: Double) -> String {
+        guard seconds.isFinite, seconds > 0 else { return "0.0s" }
+        return String(format: "%.1fs", seconds)
     }
 
     // MARK: - Folder picker

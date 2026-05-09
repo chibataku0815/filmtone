@@ -25,10 +25,12 @@ struct FilmtoneCaptureBottomDeck: View {
     let canToggleRecord: Bool
     let pickFolderIcon: String
     let pickFolderLabel: String
+    let lookLabel: String
     let showsExternalClear: Bool
     let onPickFolder: () -> Void
     let onToggleRecord: () -> Void
     let onClearFolder: () -> Void
+    let onPickLook: () -> Void
 
     var body: some View {
         VStack(spacing: 8) {
@@ -87,13 +89,29 @@ struct FilmtoneCaptureBottomDeck: View {
 
     private var shutterCluster: some View {
         HStack(alignment: .center, spacing: 0) {
-            pickFolderButton
+            storageButtonCluster
             Spacer(minLength: 0)
             recordButton
             Spacer(minLength: 0)
-            clearFolderButton
+            lookButton
         }
         .padding(.top, 4)
+    }
+
+    private var sideControlWidth: CGFloat {
+        72
+    }
+
+    private var storageButtonCluster: some View {
+        ZStack(alignment: .topTrailing) {
+            pickFolderButton
+
+            if showsExternalClear {
+                clearFolderButton
+                    .offset(x: 5, y: -5)
+            }
+        }
+        .frame(width: sideControlWidth, height: FilmtoneCaptureChrome.peripheralButtonSize)
     }
 
     private var pickFolderButton: some View {
@@ -116,33 +134,46 @@ struct FilmtoneCaptureBottomDeck: View {
         .accessibilityLabel(Text(pickFolderLabel))
     }
 
-    @ViewBuilder
     private var clearFolderButton: some View {
-        if showsExternalClear {
-            Button {
-                FilmtoneCaptureHaptics.softImpact()
-                onClearFolder()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.86))
-                    .frame(
-                        width: FilmtoneCaptureChrome.peripheralButtonSize,
-                        height: FilmtoneCaptureChrome.peripheralButtonSize
-                    )
-                    .captureGlassControl(in: FilmtoneCaptureChrome.peripheralShape())
-            }
-            .accessibilityIdentifier("filmtone.capture.clearFolder")
-            .accessibilityLabel(Text("Clear external storage"))
-            .disabled(isRecordingOrStopping)
-            .opacity(isRecordingOrStopping ? 0.45 : 1)
-        } else {
-            Color.clear
-                .frame(
-                    width: FilmtoneCaptureChrome.peripheralButtonSize,
-                    height: FilmtoneCaptureChrome.peripheralButtonSize
-                )
+        Button {
+            FilmtoneCaptureHaptics.softImpact()
+            onClearFolder()
+        } label: {
+            Image(systemName: "xmark")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(.white.opacity(0.9))
+                .frame(width: 22, height: 22)
+                .captureGlassControl(in: Circle())
         }
+        .accessibilityIdentifier("filmtone.capture.clearFolder")
+        .accessibilityLabel(Text("Clear external storage"))
+        .disabled(isRecordingOrStopping)
+        .opacity(isRecordingOrStopping ? 0.45 : 1)
+    }
+
+    private var lookButton: some View {
+        Button {
+            FilmtoneCaptureHaptics.softImpact()
+            onPickLook()
+        } label: {
+            VStack(spacing: 2) {
+                Text("LOOK")
+                    .font(.system(size: 8, weight: .semibold, design: .rounded))
+                    .tracking(0.5)
+                    .foregroundStyle(.white.opacity(0.62))
+                Text(lookLabel)
+                    .font(.system(size: 11, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.92))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.62)
+            }
+            .frame(width: sideControlWidth, height: FilmtoneCaptureChrome.peripheralButtonSize)
+            .captureGlassControl(in: FilmtoneCaptureChrome.peripheralShape())
+        }
+        .disabled(isRecordingOrStopping)
+        .opacity(isRecordingOrStopping ? 0.45 : 1)
+        .accessibilityIdentifier("filmtone.capture.lookButton")
+        .accessibilityLabel(Text("Look \(lookLabel)"))
     }
 
     private var recordButton: some View {

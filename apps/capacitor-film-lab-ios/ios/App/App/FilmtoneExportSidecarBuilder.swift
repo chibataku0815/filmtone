@@ -423,9 +423,37 @@ struct SidecarCaptureProvenance: Encodable {
     let reason: String?
     let masterUriUsed: String?
     let proxyUriUsed: String?
+    /// S1 (2026-05-09): owner-requested stabilization for the source
+    /// run.  `"on"` -> cinematicExtendedEnhanced was preferred, `"off"`
+    /// -> stabilization was deliberately disabled (gimbal capture).
+    /// Optional / additive — pre-S1 sidecars omit the field and
+    /// pre-S1 readers ignore it.
+    let requestedStabilization: String?
+    /// S1: AVFoundation mode name observed on the movie connection at
+    /// record-finish time.  Equals the canonical name of the requested
+    /// mode on a clean run; the post-record gate would have failed the
+    /// run if they diverged.  Optional / additive.
+    let observedStabilization: String?
+
+    init(
+        mode: String,
+        reason: String?,
+        masterUriUsed: String?,
+        proxyUriUsed: String?,
+        requestedStabilization: String? = nil,
+        observedStabilization: String? = nil
+    ) {
+        self.mode = mode
+        self.reason = reason
+        self.masterUriUsed = masterUriUsed
+        self.proxyUriUsed = proxyUriUsed
+        self.requestedStabilization = requestedStabilization
+        self.observedStabilization = observedStabilization
+    }
 
     private enum CodingKeys: String, CodingKey {
         case mode, reason, masterUriUsed, proxyUriUsed
+        case requestedStabilization, observedStabilization
     }
 
     func encode(to encoder: Encoder) throws {
@@ -434,6 +462,12 @@ struct SidecarCaptureProvenance: Encodable {
         try container.encodeIfPresent(reason, forKey: .reason)
         try container.encodeIfPresent(masterUriUsed, forKey: .masterUriUsed)
         try container.encodeIfPresent(proxyUriUsed, forKey: .proxyUriUsed)
+        try container.encodeIfPresent(
+            requestedStabilization, forKey: .requestedStabilization
+        )
+        try container.encodeIfPresent(
+            observedStabilization, forKey: .observedStabilization
+        )
     }
 }
 

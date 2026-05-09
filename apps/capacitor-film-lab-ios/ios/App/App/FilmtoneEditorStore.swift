@@ -2249,6 +2249,16 @@ final class FilmtoneEditorStore: ObservableObject {
         }
         let masterURI = package.masterURL.absoluteString
         let proxyURI = package.proxyURL.absoluteString
+        // S1 (2026-05-09): carry the requested + observed
+        // stabilization truth into every capture-sourced sidecar so a
+        // future audit can reconstruct what the owner asked for and
+        // what AVFoundation actually delivered.  Pre-S1 packages
+        // decoded from disk infer `.on` from the legacy
+        // `parameters.stabilization` string and leave
+        // `observedStabilization` nil; the encoder omits absent fields
+        // (`encodeIfPresent`) so older sidecars stay byte-identical.
+        let requested = package.parameters.requestedStabilization.rawValue
+        let observed = package.observedStabilization
         switch decision {
         case .noCapturePackage:
             return nil
@@ -2257,21 +2267,27 @@ final class FilmtoneEditorStore: ObservableObject {
                 mode: "master",
                 reason: nil,
                 masterUriUsed: masterURI,
-                proxyUriUsed: nil
+                proxyUriUsed: nil,
+                requestedStabilization: requested,
+                observedStabilization: observed
             )
         case .usingProxyMasterMissing:
             return SidecarCaptureProvenance(
                 mode: "proxy",
                 reason: "masterFileMissing",
                 masterUriUsed: masterURI,
-                proxyUriUsed: proxyURI
+                proxyUriUsed: proxyURI,
+                requestedStabilization: requested,
+                observedStabilization: observed
             )
         case .usingProxyMasterUnreadable(let reason):
             return SidecarCaptureProvenance(
                 mode: "proxy",
                 reason: "masterProbeFailed:\(reason)",
                 masterUriUsed: masterURI,
-                proxyUriUsed: proxyURI
+                proxyUriUsed: proxyURI,
+                requestedStabilization: requested,
+                observedStabilization: observed
             )
         }
     }
