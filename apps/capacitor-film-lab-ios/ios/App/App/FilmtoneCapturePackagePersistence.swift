@@ -126,6 +126,11 @@ struct FilmtoneCapturePackageSnapshotV1: Codable {
     /// future audit can verify both halves of the truth.  Optional;
     /// nil on pre-S1 snapshots.
     var observedStabilization: String?
+    /// S6 (2026-05-10): movie-connection `videoRotationAngle`
+    /// selected at record start and observed at record finish.  Both
+    /// are optional/additive so pre-S6 snapshots decode cleanly.
+    var requestedCaptureRotationDegrees: Double?
+    var observedCaptureRotationDegrees: Double?
 
     /// Bumped to 2 in S11-D.  Schema-version 1 snapshots written by
     /// M10 / S8-B continue to decode because every S11-D field is
@@ -242,7 +247,9 @@ enum FilmtoneCapturePackagePersistence {
             manualInheritedFromAuto: package.exposureControl?.inheritedFromAuto,
             masterBookmark: package.masterBookmark,
             parametersRequestedStabilization: package.parameters.requestedStabilization.rawValue,
-            observedStabilization: package.observedStabilization
+            observedStabilization: package.observedStabilization,
+            requestedCaptureRotationDegrees: package.requestedCaptureRotationDegrees,
+            observedCaptureRotationDegrees: package.observedCaptureRotationDegrees
         )
     }
 
@@ -389,7 +396,9 @@ enum FilmtoneCapturePackagePersistence {
             exposureControl: exposureControl,
             whiteBalance: whiteBalance,
             masterBookmark: snapshot.masterBookmark,
-            observedStabilization: snapshot.observedStabilization
+            observedStabilization: snapshot.observedStabilization,
+            requestedCaptureRotationDegrees: snapshot.requestedCaptureRotationDegrees,
+            observedCaptureRotationDegrees: snapshot.observedCaptureRotationDegrees
         )
     }
 

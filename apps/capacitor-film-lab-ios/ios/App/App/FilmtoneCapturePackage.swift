@@ -282,6 +282,7 @@ enum FilmtoneCaptureFailure: Error, Equatable {
     case stabilizationDowngraded(requested: String, active: String)
     case colorSpaceDowngraded(expectedRaw: Int, observedRaw: Int)
     case codecDowngraded(observed: String?)
+    case captureRotationRejected(requested: Double, active: Double?)
     case writerSetupFailed(stage: String, reason: String)
     case writerInterrupted(reason: String)
     case durationLimitExceeded(limitSeconds: Double)
@@ -316,6 +317,9 @@ enum FilmtoneCaptureFailure: Error, Equatable {
             return "Apple Log 2 (raw=\(expected)) was downgraded to raw=\(observed) at capture."
         case .codecDowngraded(let observed):
             return "ProRes 422 HQ was downgraded to \(observed ?? "<unread>")."
+        case .captureRotationRejected(let requested, let active):
+            let activeText = active.map { String(format: "%.3f", $0) } ?? "<unread>"
+            return "Capture rotation \(String(format: "%.3f", requested))° was rejected; active angle = \(activeText)°."
         case .writerSetupFailed(let stage, let reason):
             return "\(stage): \(reason)"
         case .writerInterrupted(let reason):
@@ -411,6 +415,14 @@ struct FilmtoneCapturePackage: Equatable {
     /// from the absence of a failure.  `nil` for pre-S1 captures
     /// decoded from disk.
     let observedStabilization: String?
+    /// S6 (2026-05-10): movie-connection rotation angle selected at
+    /// record start, in AVFoundation `videoRotationAngle` degrees.
+    /// `nil` for pre-S6 captures decoded from disk.
+    let requestedCaptureRotationDegrees: Double?
+    /// S6: movie-connection rotation angle observed at record-finish
+    /// time.  The post-record gate fails if this differs from the
+    /// requested value, so clean S6 runs carry matching values.
+    let observedCaptureRotationDegrees: Double?
 }
 
 #endif

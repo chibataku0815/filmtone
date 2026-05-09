@@ -118,6 +118,8 @@
 		D20000010000000000000094 /* FilmtoneFluidBlobBackdrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000094 /* FilmtoneFluidBlobBackdrop.swift */; };
 		D20000010000000000000095 /* FilmtoneFluidBlobBackdrop.metal in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000095 /* FilmtoneFluidBlobBackdrop.metal */; };
 		D20000010000000000000096 /* FilmtoneCapturePostRecordChoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000096 /* FilmtoneCapturePostRecordChoice.swift */; };
+		D20000010000000000000097 /* FilmtoneInterfaceOrientationLock.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000097 /* FilmtoneInterfaceOrientationLock.swift */; };
+		D20000010000000000000098 /* FilmtoneCaptureOrientation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000098 /* FilmtoneCaptureOrientation.swift */; };
 		D40000010000000000000002 /* CreativeLuts in Resources */ = {isa = PBXBuildFile; fileRef = D40000010000000000000001 /* CreativeLuts */; };
 		D588A95BF7748786256BD9E2 /* CancelExportIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B14DB40995D16C85F10AC9F5 /* CancelExportIntent.swift */; };
 		E10000010000000000000001 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = F10000010000000000000001 /* Localizable.xcstrings */; };
@@ -274,6 +276,8 @@
 		C20000010000000000000094 /* FilmtoneFluidBlobBackdrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneFluidBlobBackdrop.swift; sourceTree = "<group>"; };
 		C20000010000000000000095 /* FilmtoneFluidBlobBackdrop.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = FilmtoneFluidBlobBackdrop.metal; sourceTree = "<group>"; };
 		C20000010000000000000096 /* FilmtoneCapturePostRecordChoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCapturePostRecordChoice.swift; sourceTree = "<group>"; };
+		C20000010000000000000097 /* FilmtoneInterfaceOrientationLock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneInterfaceOrientationLock.swift; sourceTree = "<group>"; };
+		C20000010000000000000098 /* FilmtoneCaptureOrientation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCaptureOrientation.swift; sourceTree = "<group>"; };
 		D40000010000000000000001 /* CreativeLuts */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CreativeLuts; path = Resources/CreativeLuts; sourceTree = "<group>"; };
 		E92BBC4019AD97D40A52D6E1 /* FilmtoneExportAttributes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtoneExportAttributes.swift; sourceTree = "<group>"; };
 		F10000010000000000000001 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
@@ -424,6 +428,8 @@
 				C20000010000000000000094 /* FilmtoneFluidBlobBackdrop.swift */,
 				C20000010000000000000095 /* FilmtoneFluidBlobBackdrop.metal */,
 				C20000010000000000000096 /* FilmtoneCapturePostRecordChoice.swift */,
+				C20000010000000000000097 /* FilmtoneInterfaceOrientationLock.swift */,
+				C20000010000000000000098 /* FilmtoneCaptureOrientation.swift */,
 				C20000010000000000000052 /* FilmtoneGcsvWriter.swift */,
 				C20000010000000000000001 /* FormatExtensionReader.swift */,
 				C20000010000000000000002 /* SourceColorMetadataNormalizer.swift */,
@@ -730,6 +736,8 @@
 				D20000010000000000000094 /* FilmtoneFluidBlobBackdrop.swift in Sources */,
 				D20000010000000000000095 /* FilmtoneFluidBlobBackdrop.metal in Sources */,
 				D20000010000000000000096 /* FilmtoneCapturePostRecordChoice.swift in Sources */,
+				D20000010000000000000097 /* FilmtoneInterfaceOrientationLock.swift in Sources */,
+				D20000010000000000000098 /* FilmtoneCaptureOrientation.swift in Sources */,
 				D20000010000000000000052 /* FilmtoneGcsvWriter.swift in Sources */,
 				D20000010000000000000001 /* FormatExtensionReader.swift in Sources */,
 				D20000010000000000000002 /* SourceColorMetadataNormalizer.swift in Sources */,

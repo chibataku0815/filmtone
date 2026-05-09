@@ -434,6 +434,11 @@ struct SidecarCaptureProvenance: Encodable {
     /// mode on a clean run; the post-record gate would have failed the
     /// run if they diverged.  Optional / additive.
     let observedStabilization: String?
+    /// S6: AVFoundation `videoRotationAngle` selected at record start
+    /// and observed at record finish. Optional / additive; pre-S6
+    /// capture sidecars omit both keys.
+    let requestedCaptureRotationDegrees: Double?
+    let observedCaptureRotationDegrees: Double?
 
     init(
         mode: String,
@@ -441,7 +446,9 @@ struct SidecarCaptureProvenance: Encodable {
         masterUriUsed: String?,
         proxyUriUsed: String?,
         requestedStabilization: String? = nil,
-        observedStabilization: String? = nil
+        observedStabilization: String? = nil,
+        requestedCaptureRotationDegrees: Double? = nil,
+        observedCaptureRotationDegrees: Double? = nil
     ) {
         self.mode = mode
         self.reason = reason
@@ -449,11 +456,14 @@ struct SidecarCaptureProvenance: Encodable {
         self.proxyUriUsed = proxyUriUsed
         self.requestedStabilization = requestedStabilization
         self.observedStabilization = observedStabilization
+        self.requestedCaptureRotationDegrees = requestedCaptureRotationDegrees
+        self.observedCaptureRotationDegrees = observedCaptureRotationDegrees
     }
 
     private enum CodingKeys: String, CodingKey {
         case mode, reason, masterUriUsed, proxyUriUsed
         case requestedStabilization, observedStabilization
+        case requestedCaptureRotationDegrees, observedCaptureRotationDegrees
     }
 
     func encode(to encoder: Encoder) throws {
@@ -467,6 +477,12 @@ struct SidecarCaptureProvenance: Encodable {
         )
         try container.encodeIfPresent(
             observedStabilization, forKey: .observedStabilization
+        )
+        try container.encodeIfPresent(
+            requestedCaptureRotationDegrees, forKey: .requestedCaptureRotationDegrees
+        )
+        try container.encodeIfPresent(
+            observedCaptureRotationDegrees, forKey: .observedCaptureRotationDegrees
         )
     }
 }

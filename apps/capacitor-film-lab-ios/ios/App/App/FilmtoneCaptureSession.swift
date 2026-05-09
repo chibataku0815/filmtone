@@ -1,6 +1,6 @@
 // Filmtone V2 native camera capture — session pipeline (M10).
 //
-// Single-camera (rear builtInWideAngleCamera) AVCaptureSession with
+// Single-camera AVCaptureSession with
 // AVCaptureMovieFileOutput driving ProRes 422 HQ Apple Log 2 at the
 // FilmtoneProductCapture-locked format index 56 + cinematicExtendedEnhanced
 // stabilization.  Manual start / stop, variable duration capped by the
@@ -51,9 +51,9 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     // active min/maxFrameDuration changes.
     //
     // S8-B: the per-lens format index is no longer hardcoded to 56.
-    // `FilmtoneCaptureLensCatalog` enumerates rear lenses and resolves
-    // a contract-matching format index per device, so non-wide lenses
-    // (ultra wide / telephoto) can satisfy the same contract on
+    // `FilmtoneCaptureLensCatalog` enumerates capture lenses and resolves
+    // a contract-matching format index per device, so non-wide/front lenses
+    // can satisfy the same contract on
     // devices where the matching format sits at a different index.
     // The wide-camera index 56 coincidence is preserved by the
     // catalog's contract scan; we just no longer wire it as a constant.
@@ -113,6 +113,10 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     /// space is safely above the projected remaining write budget.
     @Published private(set) var storagePressure: FilmtoneCaptureStoragePressure?
 
+    /// S6: current preview/capture rotation angles supplied by
+    /// `AVCaptureDevice.RotationCoordinator`.
+    @Published private(set) var orientationState: FilmtoneCaptureOrientationState = .portraitPinned
+
     /// Preview layer the capture view embeds via UIViewRepresentable.
     /// `nil` until `prepare()` succeeds.
     private(set) var previewLayer: AVCaptureVideoPreviewLayer?
@@ -140,6 +144,11 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     /// strip remains the only graded affordance.
     private var previewVideoDataOutput: AVCaptureVideoDataOutput?
     private var previewSampleDelegate: PreviewSampleDelegate?
+    private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
+    private var rotationObservations: [NSKeyValueObservation] = []
+    private var latestPreviewRotation: FilmtoneCaptureVideoRotation = .portraitPinned
+    private var latestCaptureRotation: FilmtoneCaptureVideoRotation = .portraitPinned
+    private var recordingCaptureRotation: FilmtoneCaptureVideoRotation?
     private let previewSampleQueue = DispatchQueue(
         label: "filmtone.capture.preview.vdo.queue",
         qos: .userInteractive
@@ -299,7 +308,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     /// preview.
     ///
     /// S8-B: caller passes a `FilmtoneCaptureLens` resolved by
-    /// `FilmtoneCaptureLensCatalog.availableRearLenses()`.  The catalog
+    /// `FilmtoneCaptureLensCatalog.availableCaptureLenses()`.  The catalog
     /// has already verified format-level contract compliance; we
     /// re-check inside `prepare(lens:)` defensively because the format
     /// index could in theory be stale (e.g. if a future lens swap
@@ -453,10 +462,10 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
                 ?? self.shutterDurationRange.upperBound
             self.manualShutterSeconds = seedShutter
             // M12 / S12-D: snapshot WB lock capability per active
-            // device + format.  All shipping iPhone rear lenses
-            // satisfy both predicates; the guard exists for future
-            // hardware where a lens reports `.locked` unsupported
-            // (e.g. a yet-unseen specialty front-facing camera) so
+            // device + format.  All shipping lenses that have passed
+            // the Filmtone contract should satisfy both predicates;
+            // the guard exists for future hardware where a lens
+            // reports `.locked` unsupported so
             // the UI can disable Locked with a visible reason rather
             // than failing the apply silently.
             self.canLockWhiteBalance =
@@ -534,10 +543,6 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
                 session.addOutput(vdo)
                 let delegate = PreviewSampleDelegate(sink: previewFrameSink)
                 vdo.setSampleBufferDelegate(delegate, queue: previewSampleQueue)
-                if let vdoConnection = vdo.connection(with: .video),
-                   vdoConnection.isVideoRotationAngleSupported(Self.lockedRotationAngle) {
-                    vdoConnection.videoRotationAngle = Self.lockedRotationAngle
-                }
                 self.previewVideoDataOutput = vdo
                 self.previewSampleDelegate = delegate
             } else {
@@ -562,6 +567,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
             connection.videoRotationAngle = Self.lockedRotationAngle
         }
         self.previewLayer = preview
+        installRotationCoordinator(device: captureDevice, previewLayer: preview)
 
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             sessionQueue.async { [session] in
@@ -913,8 +919,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     }
 
     /// Begin recording.  Auto-stops at `durationLimit` for the resolved
-    /// policy (10 s internal, 60 s external) so the user cannot blow
-    /// past the verified ProRes thermal envelope.
+    /// policy so the owner cannot blow past the current product ceiling.
     func start() async {
         guard case .ready = state else {
             assertionFailure("FilmtoneCaptureSession.start() called outside .ready (state=\(state))")
@@ -956,6 +961,17 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         elapsedSeconds = 0
 
         let durationLimit = currentDurationLimit()
+        let captureRotation = latestCaptureRotation
+        guard applyMovieRotation(captureRotation, failOnUnsupported: true) else {
+            state = .failed(.captureRotationRejected(
+                requested: captureRotation.degrees,
+                active: currentMovieRotation()?.degrees
+            ))
+            return
+        }
+        recordingCaptureRotation = captureRotation
+        orientationState.captureRotation = captureRotation
+
         state = .recording(startedAt: Date())
         startElapsedTimer()
         startAutoStop(after: durationLimit)
@@ -1000,6 +1016,8 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         elapsedSeconds = 0
         storagePressure = nil
         recordingDelegate = nil
+        recordingCaptureRotation = nil
+        applyLatestRotationIfUnlocked()
         state = .ready
     }
 
@@ -1020,6 +1038,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         activeLens = nil
         previewVideoDataOutput = nil
         previewSampleDelegate = nil
+        clearRotationCoordinator()
         previewFrameSink.clear()
         // M12 / S12-C: drop tap state so a fresh prepare() starts on
         // continuous-auto rather than carrying a stale POI from the
@@ -1053,6 +1072,136 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         case .externalSecurityScopedFolder:
             return Self.externalDurationCapSeconds
         }
+    }
+
+    // MARK: - Capture orientation
+
+    private var isOrientationFrozenForRecording: Bool {
+        switch state {
+        case .recording, .stopping:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func installRotationCoordinator(
+        device: AVCaptureDevice,
+        previewLayer: AVCaptureVideoPreviewLayer
+    ) {
+        clearRotationCoordinator(resetState: false)
+        let coordinator = AVCaptureDevice.RotationCoordinator(
+            device: device,
+            previewLayer: previewLayer
+        )
+        rotationCoordinator = coordinator
+
+        let previewObservation = coordinator.observe(
+            \.videoRotationAngleForHorizonLevelPreview,
+             options: [.initial, .new]
+        ) { [weak self] coordinator, _ in
+            let rotation = FilmtoneCaptureVideoRotation(
+                degrees: coordinator.videoRotationAngleForHorizonLevelPreview
+            )
+            Task { @MainActor [weak self] in
+                self?.receivePreviewRotation(rotation)
+            }
+        }
+
+        let captureObservation = coordinator.observe(
+            \.videoRotationAngleForHorizonLevelCapture,
+             options: [.initial, .new]
+        ) { [weak self] coordinator, _ in
+            let rotation = FilmtoneCaptureVideoRotation(
+                degrees: coordinator.videoRotationAngleForHorizonLevelCapture
+            )
+            Task { @MainActor [weak self] in
+                self?.receiveCaptureRotation(rotation)
+            }
+        }
+
+        rotationObservations = [previewObservation, captureObservation]
+    }
+
+    private func clearRotationCoordinator(resetState: Bool = true) {
+        for observation in rotationObservations {
+            observation.invalidate()
+        }
+        rotationObservations.removeAll()
+        rotationCoordinator = nil
+        if resetState {
+            latestPreviewRotation = .portraitPinned
+            latestCaptureRotation = .portraitPinned
+            recordingCaptureRotation = nil
+            orientationState = .portraitPinned
+        }
+    }
+
+    private func receivePreviewRotation(_ rotation: FilmtoneCaptureVideoRotation) {
+        latestPreviewRotation = rotation
+        guard !isOrientationFrozenForRecording else { return }
+        orientationState.previewRotation = rotation
+        applyPreviewRotation(rotation)
+    }
+
+    private func receiveCaptureRotation(_ rotation: FilmtoneCaptureVideoRotation) {
+        latestCaptureRotation = rotation
+        guard !isOrientationFrozenForRecording else { return }
+        orientationState.captureRotation = rotation
+        _ = applyMovieRotation(rotation, failOnUnsupported: false)
+    }
+
+    private func applyLatestRotationIfUnlocked() {
+        guard !isOrientationFrozenForRecording else { return }
+        orientationState = FilmtoneCaptureOrientationState(
+            previewRotation: latestPreviewRotation,
+            captureRotation: latestCaptureRotation
+        )
+        applyPreviewRotation(latestPreviewRotation)
+        _ = applyMovieRotation(latestCaptureRotation, failOnUnsupported: false)
+    }
+
+    private func applyPreviewRotation(_ rotation: FilmtoneCaptureVideoRotation) {
+        if let connection = previewLayer?.connection {
+            apply(rotation, to: connection, label: "previewLayer")
+        }
+    }
+
+    @discardableResult
+    private func applyMovieRotation(
+        _ rotation: FilmtoneCaptureVideoRotation,
+        failOnUnsupported: Bool
+    ) -> Bool {
+        guard let connection = movieOutput?.connection(with: .video) else {
+            return !failOnUnsupported
+        }
+        return apply(rotation, to: connection, label: "movieOutput")
+    }
+
+    private func currentMovieRotation() -> FilmtoneCaptureVideoRotation? {
+        guard let connection = movieOutput?.connection(with: .video) else {
+            return nil
+        }
+        return FilmtoneCaptureVideoRotation(degrees: connection.videoRotationAngle)
+    }
+
+    @discardableResult
+    private func apply(
+        _ rotation: FilmtoneCaptureVideoRotation,
+        to connection: AVCaptureConnection,
+        label: String
+    ) -> Bool {
+        let angle = rotation.avFoundationAngle
+        guard connection.isVideoRotationAngleSupported(angle) else {
+            NSLog(
+                "[S6][Orientation] %@ rejected videoRotationAngle=%.3f",
+                label,
+                rotation.degrees
+            )
+            return false
+        }
+        connection.videoRotationAngle = angle
+        return true
     }
 
     // MARK: - Preview VDO delegate (F2 sink writer)
@@ -1173,6 +1322,17 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
             ))
             return
         }
+        let observedCaptureRotation = FilmtoneCaptureVideoRotation(
+            degrees: connection.videoRotationAngle
+        )
+        if let requested = recordingCaptureRotation,
+           observedCaptureRotation != requested {
+            state = .failed(.captureRotationRejected(
+                requested: requested.degrees,
+                active: observedCaptureRotation.degrees
+            ))
+            return
+        }
 
         // Verify the actual encoded master FourCC.  The connection-level
         // codec request can be silently honored by the encoder yet the
@@ -1198,6 +1358,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
             requestedStabilization: requestedStabilization
         )
         let observedStabilization = observedStabilizationName
+        let requestedCaptureRotation = recordingCaptureRotation
         let storagePolicy = self.storagePolicy
         let captureId = self.captureId
         let lensRecord = self.activeLens?.toRecord()
@@ -1282,7 +1443,9 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
                         exposureControl: exposureControl,
                         whiteBalance: whiteBalance,
                         masterBookmark: masterBookmark,
-                        observedStabilization: observedStabilization
+                        observedStabilization: observedStabilization,
+                        requestedCaptureRotationDegrees: requestedCaptureRotation?.degrees,
+                        observedCaptureRotationDegrees: observedCaptureRotation.degrees
                     )
                     // Master/proxy linkage is the M10 deliverable; if we
                     // can't write `capture-package.json` next to the

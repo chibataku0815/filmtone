@@ -242,9 +242,16 @@ Out of scope:
 
 ## Current Active
 
-No active task. The S1-S5 lane is fully advanced from the coder side;
-the next live work is owner-device smoke (or, for S5, the
-dominant-defect pick that selects the next S5 active).
+S6 - Capture Orientation Contract.
+
+`active.md` owns the current live work. It starts from the containment
+hotfix commit `12978262 Lock iOS capture surface orientation` and turns
+iPhone rotation into an explicit capture contract covering preview
+orientation, chrome layout, tap-to-focus coordinates, recorded master/proxy
+truth, and sidecar provenance.
+
+The S1-S5 lane remains fully advanced from the coder side; owner-device smoke
+for those paused lanes is still pending.
 
 Paused (code-complete, awaiting owner-device smoke):
 
@@ -364,3 +371,9 @@ asks for that level of confidence.
   "Ungraded preview" badge into the cockpit overlay flow below the
   top controls so it cannot collide with the S3 take-commit pill.
   xcodebuild + verify:swift-contract green.
+- 2026-05-10: S6 opened after owner-device smoke exposed iPhone
+  rotation problems in the capture preview/chrome. The immediate
+  containment hotfix (`12978262`) locks the capture surface to
+  portrait while preserving the existing `videoRotationAngle = 90`
+  master/proxy contract; `active.md` now tracks the full orientation
+  contract lane.

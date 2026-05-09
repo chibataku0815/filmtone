@@ -144,15 +144,28 @@ struct FilmtoneCaptureLivePreview: UIViewRepresentable {
     /// chain to every VDO frame before render.  When nil the
     /// preview is the F2 ungraded pass-through.
     let gradeProcessor: FilmtoneSharedGradeProcessor?
+    /// S6: preview compensation from `AVCaptureDevice.RotationCoordinator`.
+    /// The session deliberately leaves the VDO connection unrotated; this
+    /// renderer applies the preview transform so grading keeps using raw
+    /// camera buffers without paying the capture-output rotation cost.
+    let previewRotation: FilmtoneCaptureVideoRotation
 
     func makeUIView(context: Context) -> RendererView {
         let view = RendererView()
-        view.attach(sink: sink, gradeProcessor: gradeProcessor)
+        view.attach(
+            sink: sink,
+            gradeProcessor: gradeProcessor,
+            previewRotation: previewRotation
+        )
         return view
     }
 
     func updateUIView(_ uiView: RendererView, context: Context) {
-        uiView.attach(sink: sink, gradeProcessor: gradeProcessor)
+        uiView.attach(
+            sink: sink,
+            gradeProcessor: gradeProcessor,
+            previewRotation: previewRotation
+        )
     }
 
     final class RendererView: MTKView, MTKViewDelegate {
@@ -172,6 +185,7 @@ struct FilmtoneCaptureLivePreview: UIViewRepresentable {
         /// with the master export the editor will run on adopt.
         private var fallbackCIContext: CIContext?
         private var commandQueue: MTLCommandQueue?
+        private var previewRotation: FilmtoneCaptureVideoRotation = .portraitPinned
         private let renderColorSpace = CGColorSpaceCreateDeviceRGB()
         /// S8-F F3-R: log the first VDO frame's CIImage color space tag
         /// once so we can compare against the editor's `sourceImageOptions`
@@ -222,10 +236,12 @@ struct FilmtoneCaptureLivePreview: UIViewRepresentable {
         /// processor reference must replace any prior one.
         func attach(
             sink: FilmtonePreviewFrameSink,
-            gradeProcessor: FilmtoneSharedGradeProcessor?
+            gradeProcessor: FilmtoneSharedGradeProcessor?,
+            previewRotation: FilmtoneCaptureVideoRotation
         ) {
             attachedSink = sink
             self.gradeProcessor = gradeProcessor
+            self.previewRotation = previewRotation
             sink.setOnFrameCallback { [weak self] in
                 // Drive `draw()` directly instead of `setNeedsDisplay()`
                 // so the render-and-present commit fires immediately on
@@ -288,7 +304,8 @@ struct FilmtoneCaptureLivePreview: UIViewRepresentable {
                 )
             }
 
-            let graded = processor?.applyForLivePreview(rawImage) ?? rawImage
+            let orientedRawImage = orient(rawImage, rotation: previewRotation)
+            let graded = processor?.applyForLivePreview(orientedRawImage) ?? orientedRawImage
 
             let drawableSize = view.drawableSize
             let extent = graded.extent
@@ -328,6 +345,24 @@ struct FilmtoneCaptureLivePreview: UIViewRepresentable {
             )
             commandBuffer.present(drawable)
             commandBuffer.commit()
+        }
+
+        private func orient(
+            _ image: CIImage,
+            rotation: FilmtoneCaptureVideoRotation
+        ) -> CIImage {
+            let radians = CGFloat(rotation.degrees * .pi / 180)
+            let rotated = image.transformed(
+                by: CGAffineTransform(rotationAngle: radians)
+            )
+            let extent = rotated.extent
+            guard extent.origin != .zero else { return rotated }
+            return rotated.transformed(
+                by: CGAffineTransform(
+                    translationX: -extent.origin.x,
+                    y: -extent.origin.y
+                )
+            )
         }
     }
 }

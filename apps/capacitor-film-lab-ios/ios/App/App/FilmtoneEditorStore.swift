@@ -2259,6 +2259,8 @@ final class FilmtoneEditorStore: ObservableObject {
         // (`encodeIfPresent`) so older sidecars stay byte-identical.
         let requested = package.parameters.requestedStabilization.rawValue
         let observed = package.observedStabilization
+        let requestedRotation = package.requestedCaptureRotationDegrees
+        let observedRotation = package.observedCaptureRotationDegrees
         switch decision {
         case .noCapturePackage:
             return nil
@@ -2269,7 +2271,9 @@ final class FilmtoneEditorStore: ObservableObject {
                 masterUriUsed: masterURI,
                 proxyUriUsed: nil,
                 requestedStabilization: requested,
-                observedStabilization: observed
+                observedStabilization: observed,
+                requestedCaptureRotationDegrees: requestedRotation,
+                observedCaptureRotationDegrees: observedRotation
             )
         case .usingProxyMasterMissing:
             return SidecarCaptureProvenance(
@@ -2278,7 +2282,9 @@ final class FilmtoneEditorStore: ObservableObject {
                 masterUriUsed: masterURI,
                 proxyUriUsed: proxyURI,
                 requestedStabilization: requested,
-                observedStabilization: observed
+                observedStabilization: observed,
+                requestedCaptureRotationDegrees: requestedRotation,
+                observedCaptureRotationDegrees: observedRotation
             )
         case .usingProxyMasterUnreadable(let reason):
             return SidecarCaptureProvenance(
@@ -2287,7 +2293,9 @@ final class FilmtoneEditorStore: ObservableObject {
                 masterUriUsed: masterURI,
                 proxyUriUsed: proxyURI,
                 requestedStabilization: requested,
-                observedStabilization: observed
+                observedStabilization: observed,
+                requestedCaptureRotationDegrees: requestedRotation,
+                observedCaptureRotationDegrees: observedRotation
             )
         }
     }
