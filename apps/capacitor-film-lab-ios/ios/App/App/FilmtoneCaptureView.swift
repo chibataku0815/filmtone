@@ -231,6 +231,16 @@ struct FilmtoneCaptureView: View {
             }
         }
         .animation(.spring(response: 0.34, dampingFraction: 0.88), value: showTakePicker)
+        .onAppear {
+            // Capture connections are intentionally portrait-pinned
+            // (`videoRotationAngle = 90`) to preserve the existing
+            // master / proxy / motion contract. Keep the full-screen
+            // capture surface portrait too; otherwise rotating the
+            // iPhone lets SwiftUI relayout in landscape while the
+            // camera pipeline remains portrait, making the preview's
+            // up/down direction appear wrong.
+            FilmtoneInterfaceOrientationLock.lockToPortrait()
+        }
         .task {
             if let activeLiveDiagnostics {
                 logLiveDiagnostics(activeLiveDiagnostics)
@@ -305,6 +315,7 @@ struct FilmtoneCaptureView: View {
             // by gesture / system-driven dismissal without going through
             // dismissCapture() or the .completed / .failed branches.
             // FilmtoneCaptureSession.teardown() is idempotent.
+            FilmtoneInterfaceOrientationLock.restoreDefault()
             Task { [session] in
                 await session.teardown()
             }
