@@ -59,8 +59,9 @@ enum FilmtoneBuiltInCatalog {
     /// `...000001` – `...000004` are deprecated and intentionally not reused
     /// (see `BuiltInLookUUID`).
     ///
-    /// Active catalog: two Creative LUTs. Stone is the Palermo Reference
-    /// base; Urban is the Palermo Green Density derivative.
+    /// Active catalog: three Creative LUTs. Stone is the Palermo Reference
+    /// base; Urban is the Palermo Green Density derivative; Noir is a toned
+    /// print monochrome recipe.
     static let allLooks: [BuiltInLook] = [
         // MARK: - Creative LUT Pack 01
         //
@@ -72,9 +73,9 @@ enum FilmtoneBuiltInCatalog {
         //   2. Lens-filter spatial overrides (rgbShift / halation / bloom /
         //      diffusion / lensSoftness / grain / vignette) provide the
         //      Filmtone optical signature around the cube. rgbShift (chromatic
-        //      aberration) is a Filmtone signature effect — both built-in
-        //      Looks pin a restrained value so the lens character is visible
-        //      without crossing into novelty fringing.
+        //      aberration) is a Filmtone signature effect — color Looks pin a
+        //      restrained value, while Noir keeps it off to avoid colored edge
+        //      artifacts in a near-monochrome print.
         //
         // SHA-256 is pinned from `bun run scripts/build-creative-luts.ts
         // --regenerate` and mirrored in
@@ -107,6 +108,22 @@ enum FilmtoneBuiltInCatalog {
                 slug: "filmtone-creative-pack-01-urban",
                 filename: "filmtone-creative-pack-01-urban.cube",
                 sha256: "fefd48a796ff724fb23b2741ac14ed0c4453b24215ca7535680ad4ca043aaa44",
+                intensity: 1.0
+            ),
+            packId: FilmtoneBuiltInCatalog.creativePack01Id
+        ),
+        BuiltInLook(
+            slug: "filmtone-creative-pack-01-noir",
+            canonicalUUID: BuiltInLookUUID.creativePack01Noir,
+            englishName: "Noir",
+            presetName: "reset",
+            strength: 1.0,
+            quickState: .zero,
+            paramOverrides: FilmtoneBuiltInCatalog.creativePack01NoirPatch,
+            creativeLut: .bundled(
+                slug: "filmtone-creative-pack-01-noir",
+                filename: "filmtone-creative-pack-01-noir.cube",
+                sha256: "29309e03244e7d3d1b328f0308549935d4937da0eadc6b3c6144be13fce57873",
                 intensity: 1.0
             ),
             packId: FilmtoneBuiltInCatalog.creativePack01Id
@@ -168,6 +185,26 @@ enum FilmtoneBuiltInCatalog {
         values["grainIntensity"] = 0.0045
         values["grainSize"] = 0.13
         values["vignette"] = 0.06
+        return FilmtonePhase0ParamsPatch(values: values)
+    }()
+
+    /// Noir — generated 65³ toned print monochrome cube plus a denser optical
+    /// baseline. The cube carries a visible olive print tone instead of
+    /// forcing RGB-equal grayscale.
+    static let creativePack01NoirPatch: FilmtonePhase0ParamsPatch = {
+        var values = creativePack01ColorOpNeutralEntries
+        values["rgbShift"] = 0
+        values["bloomThreshold"] = 0.56
+        values["bloomStrength"] = 0.2
+        values["bloomRadius"] = 0.64
+        values["halationIntensity"] = 0.028
+        values["halationHue"] = 36
+        values["diffusion"] = 0.13
+        values["lensSoftness"] = 0.16
+        values["grainRadialMix"] = 0.9
+        values["grainIntensity"] = 0.075
+        values["grainSize"] = 0.48
+        values["vignette"] = 0.16
         return FilmtonePhase0ParamsPatch(values: values)
     }()
 
@@ -259,4 +296,5 @@ private enum BuiltInLookUUID {
     // removal of the weak sampler entries.
     static let creativePack01Stone = UUID(uuidString: "FB1A0001-0000-4000-8000-000000000006")!
     static let creativePack01Urban = UUID(uuidString: "FB1A0001-0000-4000-8000-000000000007")!
+    static let creativePack01Noir = UUID(uuidString: "FB1A0001-0000-4000-8000-000000000010")!
 }

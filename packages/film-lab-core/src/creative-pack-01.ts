@@ -76,14 +76,15 @@ export function buildLookParamOverrides(
 
 /**
  * Pack 01 Look catalog. Stone is the Palermo Reference base; Urban is the
- * Palermo Green Density derivative. External reference cubes are build-only
- * inputs; the exported product catalog carries the generated Filmtone recipe
- * and never direct reference cube paths.
+ * Palermo Green Density derivative; Noir is Filmtone's toned print
+ * monochrome recipe. External reference cubes are build-only inputs; the
+ * exported product catalog carries the generated Filmtone recipe and never
+ * direct reference cube paths.
  *
- * `colorParams` remains identity because the color expression is carried by
- * the generated 65³ cube. Runtime `paramOverrides` still neutralizes the host
- * color ops so the bundled cube is the sole color expression, while Filmtone's
- * optical controls carry the product signature.
+ * `colorParams` is baked into the generated 65³ cube. Runtime
+ * `paramOverrides` still neutralizes the host color ops so the bundled cube is
+ * the sole color expression, while Filmtone's optical controls carry the
+ * product signature.
  */
 export const CREATIVE_PACK_01_LOOKS: readonly CreativePackLook[] = [
   {
@@ -155,6 +156,41 @@ export const CREATIVE_PACK_01_LOOKS: readonly CreativePackLook[] = [
     }),
     strength: 1.0,
     sourceCubeTransform: CREATIVE_PACK_01_URBAN_TRANSFORM,
+  },
+  {
+    slug: "filmtone-creative-pack-01-noir",
+    englishName: "Noir",
+    canonicalUUID: "FB1A0001-0000-4000-8000-000000000010",
+    basePreset: "reset",
+    colorParams: {
+      exposure: -0.24,
+      contrast: 1.9,
+      saturation: 0.012,
+      temperature: 0.015,
+      tint: -0.055,
+      fade: 0.022,
+      compressionAmount: 0.38,
+      compressionRange: 0.56,
+      printContrast: 0.86,
+      cyan: 0.075,
+      magenta: -0.052,
+      yellow: 0.3,
+    },
+    paramOverrides: buildLookParamOverrides({
+      rgbShift: 0,
+      bloomThreshold: 0.56,
+      bloomStrength: 0.2,
+      bloomRadius: 0.64,
+      halationIntensity: 0.028,
+      halationHue: 36,
+      diffusion: 0.13,
+      lensSoftness: 0.16,
+      grainRadialMix: 0.9,
+      grainIntensity: 0.075,
+      grainSize: 0.48,
+      vignette: 0.16,
+    }),
+    strength: 1.0,
   },
 ] as const;
 

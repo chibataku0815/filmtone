@@ -2434,14 +2434,15 @@ interface CreativePackLook {
 declare function buildLookParamOverrides(spatial: Partial<Record<Phase0ParamKey, number>>): Partial<Record<Phase0ParamKey, number>>;
 /**
  * Pack 01 Look catalog. Stone is the Palermo Reference base; Urban is the
- * Palermo Green Density derivative. External reference cubes are build-only
- * inputs; the exported product catalog carries the generated Filmtone recipe
- * and never direct reference cube paths.
+ * Palermo Green Density derivative; Noir is Filmtone's toned print
+ * monochrome recipe. External reference cubes are build-only inputs; the
+ * exported product catalog carries the generated Filmtone recipe and never
+ * direct reference cube paths.
  *
- * `colorParams` remains identity because the color expression is carried by
- * the generated 65³ cube. Runtime `paramOverrides` still neutralizes the host
- * color ops so the bundled cube is the sole color expression, while Filmtone's
- * optical controls carry the product signature.
+ * `colorParams` is baked into the generated 65³ cube. Runtime
+ * `paramOverrides` still neutralizes the host color ops so the bundled cube is
+ * the sole color expression, while Filmtone's optical controls carry the
+ * product signature.
  */
 declare const CREATIVE_PACK_01_LOOKS: readonly CreativePackLook[];
 declare function findCreativePack01Look(slug: string): CreativePackLook | undefined;

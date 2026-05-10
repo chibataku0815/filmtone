@@ -13,10 +13,13 @@ echo "==> generated swift contract (drift check)"
 bun run generate:ios-swift --check
 
 echo "==> ios build"
-bun run --cwd "$APP_DIR" build
-
-echo "==> ios cap sync"
-bun run --cwd "$APP_DIR" cap:sync:ios
+xcodebuild -quiet \
+  -workspace "$APP_DIR/ios/App/App.xcworkspace" \
+  -scheme App \
+  -destination 'generic/platform=iOS Simulator' \
+  -configuration Debug \
+  build \
+  CODE_SIGNING_ALLOWED=NO
 
 echo "==> ios swift contract"
 bun run --cwd "$APP_DIR" verify:swift-contract

@@ -3134,6 +3134,41 @@ var CREATIVE_PACK_01_LOOKS = [
     }),
     strength: 1,
     sourceCubeTransform: CREATIVE_PACK_01_URBAN_TRANSFORM
+  },
+  {
+    slug: "filmtone-creative-pack-01-noir",
+    englishName: "Noir",
+    canonicalUUID: "FB1A0001-0000-4000-8000-000000000010",
+    basePreset: "reset",
+    colorParams: {
+      exposure: -0.24,
+      contrast: 1.9,
+      saturation: 0.012,
+      temperature: 0.015,
+      tint: -0.055,
+      fade: 0.022,
+      compressionAmount: 0.38,
+      compressionRange: 0.56,
+      printContrast: 0.86,
+      cyan: 0.075,
+      magenta: -0.052,
+      yellow: 0.3
+    },
+    paramOverrides: buildLookParamOverrides({
+      rgbShift: 0,
+      bloomThreshold: 0.56,
+      bloomStrength: 0.2,
+      bloomRadius: 0.64,
+      halationIntensity: 0.028,
+      halationHue: 36,
+      diffusion: 0.13,
+      lensSoftness: 0.16,
+      grainRadialMix: 0.9,
+      grainIntensity: 0.075,
+      grainSize: 0.48,
+      vignette: 0.16
+    }),
+    strength: 1
   }
 ];
 function findCreativePack01Look(slug) {

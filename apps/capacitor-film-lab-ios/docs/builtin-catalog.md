@@ -15,7 +15,7 @@
   既存ユーザーの favorites に残っていても silent skip。新規 Look に同一 UUID を割り当てない。
 - **`immutable: true`** の built-in は不変。ユーザー編集は新規 user look として保存される。
 - **`paramOverrides` の構造**: color-only ops は cube が SSOT なので neutral pin。lens-filter optics (`rgbShift` / `bloom` / `halation` / `diffusion` / `lensSoftness` / `grain` / `vignette`) のみ override。
-- **`rgbShift` は Filmtone signature optical effect**。Stone=0.0032 / Urban=0.0028 は Adjust-sheet "Default"=0.0038 より **小さい** — ユーザーが Default を上から押しても visible step up になる方向で設計されている。逆転させない。
+- **`rgbShift` は Filmtone signature optical effect**。Stone=0.0032 / Urban=0.0028 は Adjust-sheet "Default"=0.0038 より **小さい** — ユーザーが Default を上から押しても visible step up になる方向で設計されている。逆転させない。モノクロ Look は色フリンジを避けるため `rgbShift=0` を許容する。
 - **保存 Look の densify**: `FilmtonePhase0ParamsPatch.densifyingOpticsGlow` で 14 個の optics+glow keys を埋める。schema は `[String: Double]` のまま、bump 不要。
 
 ### Creative Pack 01 cube SHA-256 pin

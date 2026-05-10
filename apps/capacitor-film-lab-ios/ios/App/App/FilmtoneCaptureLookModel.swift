@@ -40,7 +40,18 @@ struct FilmtoneCaptureLook: Identifiable, Equatable {
         )
     }()
 
-    static let allCases: [FilmtoneCaptureLook] = [.filmtone, .stone, .urban]
+    static let noir: FilmtoneCaptureLook = {
+        let slug = "filmtone-creative-pack-01-noir"
+        let entry = FilmtoneBuiltInCatalog.allLooks.first { $0.slug == slug }
+        return FilmtoneCaptureLook(
+            id: "noir",
+            displayName: entry?.englishName ?? "Noir",
+            canonicalUUID: entry?.canonicalUUID,
+            slug: slug
+        )
+    }()
+
+    static let allCases: [FilmtoneCaptureLook] = [.filmtone, .stone, .urban, .noir]
 
     static func resolve(from canonicalUUID: UUID?) -> FilmtoneCaptureLook {
         guard let uuid = canonicalUUID else { return .filmtone }

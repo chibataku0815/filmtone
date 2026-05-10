@@ -257,6 +257,7 @@ struct FilmtoneStrings {
     // Current catalog exposes Creative LUT Pack 01.
     let builtInLookCreativePack01Stone: String
     let builtInLookCreativePack01Urban: String
+    let builtInLookCreativePack01Noir: String
 
     // MARK: - Desktop handoff (>5min video prompt)
     //
@@ -298,6 +299,8 @@ extension FilmtoneStrings {
             return builtInLookCreativePack01Stone
         case "filmtone-creative-pack-01-urban":
             return builtInLookCreativePack01Urban
+        case "filmtone-creative-pack-01-noir":
+            return builtInLookCreativePack01Noir
         default:                   return nil
         }
     }
@@ -708,7 +711,7 @@ extension FilmtoneStrings {
         recordProductClip = filmtoneLocalized(
             "filmtone.source.record_product_clip",
             defaultValue: prefersJapanese ? "録画する" : "Record",
-            comment: "Source picker option that records a stabilized clip with the rear camera."
+            comment: "Source picker option that records a stabilized clip with the selected camera."
         )
         recordProductClipRunning = filmtoneLocalized(
             "filmtone.source.record_product_clip.running",
@@ -1622,6 +1625,11 @@ extension FilmtoneStrings {
             "filmtone.builtin_look.creative_pack_01.urban",
             defaultValue: "Urban",
             comment: "Built-in Look name: Pack 01 Palermo Green Density derivative creative LUT."
+        )
+        builtInLookCreativePack01Noir = filmtoneLocalized(
+            "filmtone.builtin_look.creative_pack_01.noir",
+            defaultValue: "Noir",
+            comment: "Built-in Look name: Pack 01 toned print monochrome creative LUT."
         )
         fullscreenTitle = filmtoneLocalized(
             "filmtone.fullscreen.title",

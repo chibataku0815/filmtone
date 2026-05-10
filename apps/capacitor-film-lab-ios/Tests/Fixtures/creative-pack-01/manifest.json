@@ -3,8 +3,8 @@
   "packId": "creative-pack-01",
   "bakerVersion": "1.4.0-stone-urban-distinct",
   "cubeSize": 65,
-  "generatedAtIso": "2026-05-01T15:48:31.200Z",
-  "generatedFromCommit": "3c50527778b08f0340ef3ff0228c49a514b995f8",
+  "generatedAtIso": "2026-05-10T02:12:50.239Z",
+  "generatedFromCommit": "8fd6d50b4ac2f526bd7efd46576947e5b73721f4",
   "bakeMode": "real",
   "looks": [
     {
@@ -118,6 +118,61 @@
       "bakeMode": "real",
       "sourceCubePath": "/Volumes/SamsungPortableSSDX5001/filmtone/Palermo_Powergrade & LUTs/Palermo Standalone LUTs/LUT + Extras/Palermo + Colour Density + Green Density.cube",
       "sourceCubeTransform": "filmtone-urban-palermo-green-density-v1"
+    },
+    {
+      "slug": "filmtone-creative-pack-01-noir",
+      "englishName": "Noir",
+      "canonicalUUID": "FB1A0001-0000-4000-8000-000000000010",
+      "basePreset": "reset",
+      "cubeRelPath": "apps/capacitor-film-lab-ios/ios/App/App/Resources/CreativeLuts/filmtone-creative-pack-01-noir.cube",
+      "cubeSize": 65,
+      "cubeSha256": "29309e03244e7d3d1b328f0308549935d4937da0eadc6b3c6144be13fce57873",
+      "cubeBytes": 7415079,
+      "diagonalMaxDelta": 0.21132045984268188,
+      "colorParams": {
+        "exposure": -0.24,
+        "contrast": 1.9,
+        "saturation": 0.012,
+        "temperature": 0.015,
+        "tint": -0.055,
+        "fade": 0.022,
+        "compressionAmount": 0.38,
+        "compressionRange": 0.56,
+        "printContrast": 0.86,
+        "cyan": 0.075,
+        "magenta": -0.052,
+        "yellow": 0.3
+      },
+      "paramOverrides": {
+        "rgbShift": 0,
+        "bloomThreshold": 0.56,
+        "bloomStrength": 0.2,
+        "bloomRadius": 0.64,
+        "halationIntensity": 0.028,
+        "halationHue": 36,
+        "diffusion": 0.13,
+        "lensSoftness": 0.16,
+        "grainRadialMix": 0.9,
+        "grainIntensity": 0.075,
+        "grainSize": 0.48,
+        "vignette": 0.16,
+        "exposure": 0,
+        "contrast": 1,
+        "saturation": 1,
+        "temperature": 0,
+        "tint": 0,
+        "fade": 0,
+        "compressionAmount": 0,
+        "compressionRange": 0.5,
+        "printContrast": 0,
+        "cyan": 0,
+        "magenta": 0,
+        "yellow": 0,
+        "shadowTone": 0,
+        "highlightTone": 0
+      },
+      "strength": 1,
+      "bakeMode": "real"
     }
   ]
 }

@@ -20,6 +20,10 @@ const URBAN_CUBE_PATH = resolve(
   REPO_ROOT,
   "apps/capacitor-film-lab-ios/ios/App/App/Resources/CreativeLuts/filmtone-creative-pack-01-urban.cube",
 );
+const NOIR_CUBE_PATH = resolve(
+  REPO_ROOT,
+  "apps/capacitor-film-lab-ios/ios/App/App/Resources/CreativeLuts/filmtone-creative-pack-01-noir.cube",
+);
 const PALERMO_REFERENCE_SOURCE =
   "/Volumes/SamsungPortableSSDX5001/filmtone/Palermo_Powergrade & LUTs/Palermo Standalone LUTs/DJI_DLOG-M-Palermo.cube";
 const PALERMO_GREEN_DENSITY_SOURCE =
@@ -65,19 +69,22 @@ function luma(rgb: SamplePoint): number {
 }
 
 describe("Creative LUT Pack 01 — runtime color neutralization", () => {
-  test("ships Stone base and Urban green-density Looks", () => {
-    expect(CREATIVE_PACK_01_LOOKS).toHaveLength(2);
+  test("ships Stone, Urban, and Noir Looks", () => {
+    expect(CREATIVE_PACK_01_LOOKS).toHaveLength(3);
     expect(CREATIVE_PACK_01_LOOKS.map((look) => look.slug)).toEqual([
       "filmtone-creative-pack-01-stone",
       "filmtone-creative-pack-01-urban",
+      "filmtone-creative-pack-01-noir",
     ]);
     expect(CREATIVE_PACK_01_LOOKS.map((look) => look.englishName)).toEqual([
       "Stone",
       "Urban",
+      "Noir",
     ]);
     expect(CREATIVE_PACK_01_LOOKS.map((look) => look.canonicalUUID)).toEqual([
       "FB1A0001-0000-4000-8000-000000000006",
       "FB1A0001-0000-4000-8000-000000000007",
+      "FB1A0001-0000-4000-8000-000000000010",
     ]);
   });
 
@@ -93,7 +100,7 @@ describe("Creative LUT Pack 01 — runtime color neutralization", () => {
 });
 
 describe("Creative LUT Pack 01 — generated cubes", () => {
-  test("generated cube is originalized, not a Palermo byte copy", () => {
+  test("source-derived generated cubes are originalized, not Palermo byte copies", () => {
     const cases = [
       {
         cubePath: STONE_CUBE_PATH,
@@ -190,5 +197,52 @@ describe("Creative LUT Pack 01 — generated cubes", () => {
     const meanAbs = totalAbs / (points.length * 3);
     expect(meanAbs).toBeGreaterThan(0.025);
     expect(maxDelta).toBeGreaterThan(0.05);
+  });
+
+  test("Noir is a toned print monochrome cube with bounded residual chroma", () => {
+    const noir = parseCube(readFileSync(NOIR_CUBE_PATH, "utf8"));
+    const points: readonly SamplePoint[] = [
+      [0.08, 0.08, 0.08],
+      [0.18, 0.18, 0.18],
+      [0.45, 0.45, 0.45],
+      [0.72, 0.72, 0.72],
+      [0.62, 0.45, 0.36],
+      [0.30, 0.45, 0.70],
+      [0.85, 0.65, 0.40],
+    ];
+
+    let totalLumaDelta = 0;
+    let maxSpread = 0;
+    let maxResidualSpread = 0;
+    for (const point of points) {
+      const actual = sampleCube(noir, point);
+      const spread = Math.max(...actual) - Math.min(...actual);
+      expect(spread).toBeLessThanOrEqual(0.08);
+      maxSpread = Math.max(maxSpread, spread);
+      if (spread > 0.0001) {
+        maxResidualSpread = Math.max(maxResidualSpread, spread);
+      }
+      totalLumaDelta += Math.abs(luma(actual) - luma(point));
+    }
+
+    const gray18 = sampleCube(noir, [0.18, 0.18, 0.18]);
+    const mid = sampleCube(noir, [0.45, 0.45, 0.45]);
+    const high = sampleCube(noir, [0.72, 0.72, 0.72]);
+    const white = sampleCube(noir, [1, 1, 1]);
+    const skin = sampleCube(noir, [0.62, 0.45, 0.36]);
+
+    expect(luma(gray18)).toBeGreaterThanOrEqual(0.075);
+    expect(luma(gray18)).toBeLessThanOrEqual(0.10);
+    expect(luma(mid)).toBeGreaterThanOrEqual(0.27);
+    expect(luma(mid)).toBeLessThanOrEqual(0.31);
+    expect(luma(high)).toBeGreaterThanOrEqual(0.69);
+    expect(luma(high)).toBeLessThanOrEqual(0.73);
+    expect(luma(white)).toBeLessThanOrEqual(0.93);
+    expect(mid[1] - mid[2]).toBeGreaterThanOrEqual(0.045);
+    expect(high[1] - high[2]).toBeGreaterThanOrEqual(0.05);
+    expect(skin[1] - skin[2]).toBeGreaterThanOrEqual(0.05);
+    expect(maxResidualSpread).toBeGreaterThanOrEqual(0.055);
+    expect(maxSpread).toBeLessThanOrEqual(0.08);
+    expect(totalLumaDelta / points.length).toBeGreaterThan(0.06);
   });
 });

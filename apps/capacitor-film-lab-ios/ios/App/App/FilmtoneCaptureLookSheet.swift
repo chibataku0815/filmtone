@@ -1,7 +1,7 @@
 // Filmtone V2 native camera capture — Look picker sheet (M13-M-2).
 //
 // Sheet presented when the LOOK chip is tapped. Lists the built-in
-// catalog (Filmtone / Stone / Urban) today; the sheet container is the
+// catalog (Filmtone / Stone / Urban / Noir) today; the sheet container is the
 // long-term home for saved Looks and user-loaded LUT entries — those
 // will append as additional sections without rewriting the picker.
 
