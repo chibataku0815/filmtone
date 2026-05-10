@@ -132,16 +132,15 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     private var activeLens: FilmtoneCaptureLens?
     private var movieOutput: AVCaptureMovieFileOutput?
 
-    /// S8-F preview-only VDO.  8-bit BGRA frames for live Look preview;
-    /// the record path stays on `movieOutput` (ProRes 422 HQ + Apple
-    /// Log 2 + cinematicEE).  M2-A constraint (`.appleLog2` does not
-    /// deliver 10-bit `x422`/`x420` from VDO on iOS 26.4) is sidestepped
-    /// because we only ask BGRA here — the device internally tonemaps
-    /// to 8-bit for the VDO connection while the Movie connection keeps
-    /// 10-bit Apple Log 2.  Nil if `canAddOutput` rejects coexistence at
-    /// `prepare(lens:)` time; in that case live preview falls back to
-    /// the raw `AVCaptureVideoPreviewLayer` and the reference thumbnail
-    /// strip remains the only graded affordance.
+    /// S8-F / S5 preview-only VDO. The record path stays on
+    /// `movieOutput` (ProRes 422 HQ + Apple Log 2 + requested
+    /// stabilization); this output is only a monitor source for the
+    /// live preview renderer.  S5 configures it as native / preview-sized
+    /// where AVFoundation allows, then keeps VDO stabilization explicitly
+    /// off so movie stabilization does not also tax the preview stream.
+    /// Nil if `canAddOutput` rejects coexistence at `prepare(lens:)`
+    /// time; in that case live preview falls back to the raw
+    /// `AVCaptureVideoPreviewLayer`.
     private var previewVideoDataOutput: AVCaptureVideoDataOutput?
     private var previewSampleDelegate: PreviewSampleDelegate?
     private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
@@ -169,6 +168,47 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     /// transitions (`.ready` after a successful prepare, `.idle` after
     /// teardown) so SwiftUI body recomputes pick the change up.
     var hasLivePreview: Bool { previewVideoDataOutput != nil }
+
+    @Published private(set) var livePreviewTelemetry: FilmtoneLivePreviewTelemetry = .unavailable
+
+    private static func configurePreviewVideoDataOutput(
+        _ output: AVCaptureVideoDataOutput
+    ) {
+        output.alwaysDiscardsLateVideoFrames = true
+        output.videoSettings = [:]
+        if #available(iOS 13.0, *) {
+            output.automaticallyConfiguresOutputBufferDimensions = false
+            output.deliversPreviewSizedOutputBuffers = true
+        }
+    }
+
+    private static func logPreviewVideoOutputConfiguration(
+        _ output: AVCaptureVideoDataOutput
+    ) {
+        #if DEBUG
+        let settings = output.videoSettings ?? [:]
+        let previewSized: String
+        if #available(iOS 13.0, *) {
+            previewSized = output.deliversPreviewSizedOutputBuffers ? "Y" : "N"
+        } else {
+            previewSized = "unavailable"
+        }
+        NSLog(
+            "[S5][LivePreview] VDO configured videoSettings=%@ previewSized=%@ discardsLate=%@",
+            String(describing: settings),
+            previewSized,
+            output.alwaysDiscardsLateVideoFrames ? "Y" : "N"
+        )
+        #endif
+    }
+
+    private func setLivePreviewTelemetry(_ telemetry: FilmtoneLivePreviewTelemetry) {
+        guard livePreviewTelemetry != telemetry else { return }
+        livePreviewTelemetry = telemetry
+        #if DEBUG
+        NSLog("[S5][LivePreview] VDO telemetry %@", telemetry.diagnosticSummary)
+        #endif
+    }
 
     /// M12 / S12-C: current EV bias applied to the active device.
     /// Resets to 0 on every `prepare(lens:)` so a lens swap drops back
@@ -535,19 +575,33 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
             // here because the record path is the product, not preview
             // grading.
             let vdo = AVCaptureVideoDataOutput()
-            vdo.videoSettings = [
-                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
-            ]
-            vdo.alwaysDiscardsLateVideoFrames = true
+            Self.configurePreviewVideoDataOutput(vdo)
             if session.canAddOutput(vdo) {
                 session.addOutput(vdo)
-                let delegate = PreviewSampleDelegate(sink: previewFrameSink)
+                let delegate = PreviewSampleDelegate(
+                    sink: previewFrameSink,
+                    onTelemetry: { [weak self] telemetry in
+                        Task { @MainActor in
+                            self?.setLivePreviewTelemetry(telemetry)
+                        }
+                    }
+                )
                 vdo.setSampleBufferDelegate(delegate, queue: previewSampleQueue)
+                if let vdoConnection = vdo.connection(with: .video) {
+                    if vdoConnection.isVideoRotationAngleSupported(Self.lockedRotationAngle) {
+                        vdoConnection.videoRotationAngle = Self.lockedRotationAngle
+                    }
+                    if vdoConnection.isVideoStabilizationSupported {
+                        vdoConnection.preferredVideoStabilizationMode = .off
+                    }
+                }
                 self.previewVideoDataOutput = vdo
                 self.previewSampleDelegate = delegate
+                Self.logPreviewVideoOutputConfiguration(vdo)
             } else {
                 self.previewVideoDataOutput = nil
                 self.previewSampleDelegate = nil
+                self.livePreviewTelemetry = .unavailable
             }
 
             session.commitConfiguration()
@@ -567,7 +621,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
             connection.videoRotationAngle = Self.lockedRotationAngle
         }
         self.previewLayer = preview
-        installRotationCoordinator(device: captureDevice, previewLayer: preview)
+        pinOrientationToPortrait()
 
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             sessionQueue.async { [session] in
@@ -970,7 +1024,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         elapsedSeconds = 0
 
         let durationLimit = currentDurationLimit()
-        let captureRotation = latestCaptureRotation
+        let captureRotation = FilmtoneCaptureVideoRotation.portraitPinned
         guard applyMovieRotation(captureRotation, failOnUnsupported: true) else {
             state = .failed(.captureRotationRejected(
                 requested: captureRotation.degrees,
@@ -979,7 +1033,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
             return
         }
         recordingCaptureRotation = captureRotation
-        orientationState.captureRotation = captureRotation
+        orientationState = .portraitPinned
 
         state = .recording(startedAt: Date())
         startElapsedTimer()
@@ -1026,7 +1080,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         storagePressure = nil
         recordingDelegate = nil
         recordingCaptureRotation = nil
-        applyLatestRotationIfUnlocked()
+        pinOrientationToPortrait()
         state = .ready
     }
 
@@ -1047,6 +1101,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         activeLens = nil
         previewVideoDataOutput = nil
         previewSampleDelegate = nil
+        livePreviewTelemetry = .unavailable
         clearRotationCoordinator()
         previewFrameSink.clear()
         // M12 / S12-C: drop tap state so a fresh prepare() starts on
@@ -1084,6 +1139,16 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     }
 
     // MARK: - Capture orientation
+
+    private func pinOrientationToPortrait() {
+        clearRotationCoordinator(resetState: false)
+        latestPreviewRotation = .portraitPinned
+        latestCaptureRotation = .portraitPinned
+        recordingCaptureRotation = nil
+        orientationState = .portraitPinned
+        applyPreviewRotation(.portraitPinned)
+        _ = applyMovieRotation(.portraitPinned, failOnUnsupported: false)
+    }
 
     private var isOrientationFrozenForRecording: Bool {
         switch state {
@@ -1213,20 +1278,23 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         return true
     }
 
-    // MARK: - Preview VDO delegate (F2 sink writer)
+    // MARK: - Preview VDO delegate (monitor sink writer)
 
-    /// S8-F F2: pushes BGRA sample buffers into `previewFrameSink` as
-    /// `CIImage` so the SwiftUI live-preview MTKView can pull them on
-    /// the display tick.  Drops buffers with no image buffer (e.g.
-    /// audio or sentinel frames — `AVCaptureVideoDataOutput` should
-    /// not deliver these but we guard defensively).  F3 will reuse
-    /// the same sink and apply the editor's grade chain at the
-    /// reader side; this writer stays pass-through.
+    /// S5: pushes preview-only VDO sample buffers into `previewFrameSink`.
+    /// The delegate owns no grading and no persistence; it only converts the
+    /// current monitor buffer to `CIImage`, reports the actual buffer format
+    /// once it is known, and lets the sink drop stale frames under load.
     private final class PreviewSampleDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
-        let sink: FilmtonePreviewFrameSink
+        private let sink: FilmtonePreviewFrameSink
+        private let onTelemetry: (FilmtoneLivePreviewTelemetry) -> Void
+        private var lastTelemetry: FilmtoneLivePreviewTelemetry?
 
-        init(sink: FilmtonePreviewFrameSink) {
+        init(
+            sink: FilmtonePreviewFrameSink,
+            onTelemetry: @escaping (FilmtoneLivePreviewTelemetry) -> Void
+        ) {
             self.sink = sink
+            self.onTelemetry = onTelemetry
             super.init()
         }
 
@@ -1236,7 +1304,40 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
             guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
                 return
             }
+            reportTelemetryIfNeeded(
+                output: output,
+                pixelBuffer: pixelBuffer,
+                connection: connection
+            )
             sink.push(CIImage(cvPixelBuffer: pixelBuffer))
+        }
+
+        private func reportTelemetryIfNeeded(
+            output: AVCaptureOutput,
+            pixelBuffer: CVPixelBuffer,
+            connection: AVCaptureConnection
+        ) {
+            let vdo = output as? AVCaptureVideoDataOutput
+            let previewSized: Bool
+            if #available(iOS 13.0, *) {
+                previewSized = vdo?.deliversPreviewSizedOutputBuffers ?? false
+            } else {
+                previewSized = false
+            }
+            let pixelFormat = CVPixelBufferGetPixelFormatType(pixelBuffer)
+            let telemetry = FilmtoneLivePreviewTelemetry(
+                pixelFormat: FilmtoneCaptureSession.fourccString(pixelFormat) ?? "0x\(String(pixelFormat, radix: 16))",
+                width: CVPixelBufferGetWidth(pixelBuffer),
+                height: CVPixelBufferGetHeight(pixelBuffer),
+                deliversPreviewSizedBuffers: previewSized,
+                nativeVideoSettingsRequested: vdo?.videoSettings.isEmpty ?? false,
+                activeStabilization: FilmtoneCaptureSession.stabilizationDescription(
+                    connection.activeVideoStabilizationMode
+                )
+            )
+            guard telemetry != lastTelemetry else { return }
+            lastTelemetry = telemetry
+            onTelemetry(telemetry)
         }
     }
 
@@ -1500,7 +1601,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
 
     /// Pretty-print a FourCC for the failure banner (e.g., 0x68766331
     /// → "hvc1").  Returns "<unread>" on the sentinel `0`.
-    private static func fourccString(_ code: CMVideoCodecType) -> String? {
+    nonisolated private static func fourccString(_ code: CMVideoCodecType) -> String? {
         if code == 0 { return nil }
         let chars: [Character] = (0..<4).map { i in
             let byte = UInt8(truncatingIfNeeded: (UInt32(code) >> ((3 - i) * 8)) & 0xFF)
@@ -1526,7 +1627,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     /// `.stabilizationDowngraded(requested:active:)` failure to give
     /// the owner a concrete signal (cinematic / standard / off / auto)
     /// instead of "<some integer>".
-    private static func stabilizationDescription(_ mode: AVCaptureVideoStabilizationMode) -> String {
+    nonisolated private static func stabilizationDescription(_ mode: AVCaptureVideoStabilizationMode) -> String {
         switch mode {
         case .off: return "off"
         case .standard: return "standard"
@@ -1534,6 +1635,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         case .cinematicExtended: return "cinematicExtended"
         case .cinematicExtendedEnhanced: return "cinematicExtendedEnhanced"
         case .previewOptimized: return "previewOptimized"
+        case .lowLatency: return "lowLatency"
         case .auto: return "auto"
         @unknown default: return "unknown(\(mode.rawValue))"
         }

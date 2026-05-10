@@ -1096,6 +1096,103 @@ final class FilmtoneEditorStore: ObservableObject {
         }
     }
 
+    /// S3 take-picker preview: build a lightweight processor against the
+    /// recorded proxy itself, then apply the capture-time Look metadata to
+    /// thumbnail samples. This keeps the chooser visually aligned with the
+    /// editor adoption path without putting AVPlayers in every take row.
+    #if os(iOS)
+    func makeCapturePackagePreviewGradeProcessor(
+        _ package: FilmtoneCapturePackage
+    ) async -> FilmtoneSharedGradeProcessor? {
+        guard package.selectedLook != nil || package.customLut != nil else {
+            return nil
+        }
+
+        let proxySource = SourceInfoDTO(
+            uri: package.proxyURL.absoluteString,
+            filename: package.proxyURL.lastPathComponent,
+            kind: .video,
+            mimeType: "video/quicktime"
+        )
+
+        do {
+            let probe = try facade.probeSource(proxySource)
+            var transient = project
+            var savedLookEntry: SavedLookEntry?
+
+            if let canonicalUUID = package.selectedLook?.canonicalUUID,
+               let builtIn = FilmtoneBuiltInCatalog.look(matching: canonicalUUID) {
+                transient.presetName = FilmtonePhase0Math.safePresetName(builtIn.presetName)
+                transient.presetVersion = FilmtonePhase0Math.presetVersion
+                transient.strength = FilmtonePhase0Math.clampStrength(builtIn.strength)
+                transient.quickState = builtIn.quickState.clamped()
+
+                var paramOverrides = builtIn.paramOverrides
+                var resolvedCreativeLut: ParsedCubeLutDTO?
+                if case let .bundled(slug, filename, pinnedSha256, intensity) = builtIn.creativeLut {
+                    resolvedCreativeLut = FilmtoneEditorStore.loadBundledCreativeLut(
+                        slug: slug,
+                        filename: filename,
+                        pinnedSha256: pinnedSha256,
+                        intensity: intensity,
+                        packId: builtIn.packId ?? FilmtoneBuiltInCatalog.creativePack01Id
+                    )
+                }
+                if let adaptation = FilmtoneCreativePack01Adaptation.resolve(
+                    slug: builtIn.slug,
+                    descriptor: probe.sourceToneDescriptor
+                ) {
+                    for (key, value) in adaptation.paramOverrides.values {
+                        paramOverrides.values[key] = value
+                    }
+                    if let cube = resolvedCreativeLut {
+                        resolvedCreativeLut = cube.withIntensity(adaptation.intensity)
+                    }
+                }
+                transient.paramOverrides = paramOverrides
+                let base = FilmtonePhase0Math.deriveParams(
+                    presetName: transient.presetName,
+                    strength: transient.strength,
+                    quickState: transient.quickState
+                )
+                transient.params = base.applyingPatch(paramOverrides)
+                transient.creativeLut = resolvedCreativeLut
+
+                if let libraryStore,
+                   let loaded = try? await libraryStore.loadLook(id: canonicalUUID) {
+                    savedLookEntry = loaded
+                } else {
+                    savedLookEntry = FilmtoneBuiltInCatalog.materializeAsSavedLookEntry(
+                        builtIn,
+                        favoriteOverride: false,
+                        asOf: Date()
+                    )
+                }
+            } else if let customLut = package.customLut,
+                      let libraryId = customLut.libraryId,
+                      let libraryStore {
+                let parsed = try await libraryStore.loadLut(id: libraryId)
+                transient.creativeLut = parsed.withIntensity(customLut.intensity)
+            } else {
+                return nil
+            }
+
+            let request = try FilmtonePhase0Math.buildExportRequest(
+                source: proxySource,
+                probe: probe,
+                project: transient
+            )
+            return try facade.makeLivePreviewGradeProcessor(
+                request: request,
+                appliedSavedLook: savedLookEntry,
+                cameraProfile: project.cameraProfile
+            )
+        } catch {
+            return nil
+        }
+    }
+    #endif
+
     /// Source / probe descriptor for the live capture VDO stream when
     /// the editor has no loaded source (cold-start chip preview).
     ///

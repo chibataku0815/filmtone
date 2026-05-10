@@ -7,7 +7,7 @@ M5 lane (`docs/filmtone/desktop/native-desktop-v2/`) と並列で動く独立 la
 (`apps/desktop-film-lab-batch`) の **単一置換後継**、並走しない。Bundle ID は
 `com.chibatakumi.film-lab-desktop` (Electron と同一、drop-in upgrade)、version
 は当時の public iOS generation に合わせて `1.4` から start。現在の iOS local
-candidate は truth script で別軸として確認する。詳細決定 + Open
+candidate と public App Store state は truth script で別軸として確認する。詳細決定 + Open
 Questions: [`cutover-architecture.md`](cutover-architecture.md) (persistent
 reference doc、本 lane の決定 SSOT)。
 
@@ -317,18 +317,17 @@ Electron 1.0.4 install を上書きできる identity を持つ `Filmtone.app` (
 + stapled、`Filmtone-1.4.dmg`) を produce する。
 
 2026-05-05 に一度 Phase 9 を実行したが、その後 user が「親ブランチを正しい
-形にしてから `main` merge、その後 release」という順序を明示したため、public
-switch は rollback 済み。Source Auto / Conversion LUT parity、Backlight Veil、
-Advanced recipe chip discoverability は clean release 前の product follow-up /
-explicit defer 判断として残す。
+形にしてから `main` merge、その後 release」という順序を明示したため、いったん
+public switch は rollback した。その rollback は後続の clean Phase 9 release で
+supersede 済み。現在の public Desktop truth は `latestVersion: "1.4"`。
+Source Auto / Conversion LUT parity、Backlight Veil、Advanced recipe chip
+discoverability は clean release 前に thin follow-up として landed。
 
-次フェーズ (user trigger):
+フェーズ状態:
 
-- **Phase 8** (M5 chat scope): product parity follow-ups / explicit defer
-  decision (Source Auto / Conversion LUT parity + Backlight Veil + Advanced
-  recipe chip discoverability)
-- **Phase 9**: pending — clean 1.4 public release run after parent branch
-  correction and `main` merge
+- **Phase 8** (M5 chat scope): closed by product parity follow-ups.
+- **Phase 9**: closed by clean 1.4 public release run after parent branch
+  correction and `origin/main` merge.
 - **Phase 10**: Electron 1.0.4 deprecation notice + workspace archived status
   is closed as source policy: `apps/desktop-film-lab-batch/` stays in the repo
   for emergency rollback and pre-macOS-26 access, but new Desktop product work

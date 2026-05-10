@@ -1,0 +1,12 @@
+{
+	"appId": "com.chibatakumi.film.lab.ios",
+	"appName": "Filmtone",
+	"webDir": "dist",
+	"ios": {
+		"contentInset": "automatic"
+	},
+	"server": {
+		"androidScheme": "https"
+	},
+	"packageClassList": []
+}

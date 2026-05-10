@@ -1682,6 +1682,34 @@ final class FilmtoneExportSession {
         return current.cropped(to: image.extent)
     }
 
+    fileprivate func applyLivePreviewGrade(
+        to image: CIImage,
+        timeSeconds: Double,
+        mode: FilmtoneLivePreviewRenderMode
+    ) -> CIImage {
+        switch mode {
+        case .fullPreview:
+            return applyGrade(to: image, timeSeconds: timeSeconds)
+        case .recordingMonitor:
+            return applyRecordingMonitorGrade(to: image)
+        }
+    }
+
+    private func applyRecordingMonitorGrade(to image: CIImage) -> CIImage {
+        let params = request.grade.params
+        let presetVersion = request.grade.presetVersion
+        var current = image
+
+        metalVignetteAppliedThisFrame = false
+        current = applyInputLutStage(to: current)
+        current = applyBaseGradeStage(to: current, params: params, presetVersion: presetVersion)
+        current = applyToneCompressionStage(to: current, params: params, presetVersion: presetVersion)
+        current = applyCreativeLutStage(to: current)
+        current = applyPrintStage(to: current, params: params)
+
+        return current.cropped(to: image.extent)
+    }
+
     fileprivate var outputFrameRate: Int {
         request.output.fps
     }
@@ -4103,8 +4131,11 @@ final class FilmtoneSharedGradeProcessor {
     /// `ciContext` is reused from the underlying session so the live
     /// preview render path is byte-parity compatible with the master
     /// export when the same input pixels are fed.
-    func applyForLivePreview(_ image: CIImage) -> CIImage {
-        session.applyGrade(to: image, timeSeconds: 0)
+    func applyForLivePreview(
+        _ image: CIImage,
+        mode: FilmtoneLivePreviewRenderMode = .fullPreview
+    ) -> CIImage {
+        session.applyLivePreviewGrade(to: image, timeSeconds: 0, mode: mode)
     }
 
     /// Reuse the session's CIContext for the live preview renderer so

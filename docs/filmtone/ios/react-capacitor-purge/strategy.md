@@ -97,3 +97,20 @@ PR / merge time.
   `node_modules/`); .ipa no longer embeds Capacitor.framework.
   Directory rename (`capacitor-film-lab-ios/` → `film-lab-ios/`)
   remains out of scope per the strategy.
+- 2026-05-09: **Lane MERGED into main** as commit `47a1d76d`
+  (`Merge branch 'worktree-feature-ios-react-capacitor-purge'`,
+  `--no-ff`). Conflict resolution surfaced during the merge:
+  pbxproj diverged because main had absorbed M9 / M13 / M14 / M15
+  work after the purge branched, so resolution = take main's
+  pbxproj and strip the 5 Capacitor file UUIDs (≈ 20 lines across
+  4 pbxproj sections). Modify/delete conflicts on
+  `FilmtoneMediaPlugin.swift` + `src/native/filmtoneMedia{,.web}.ts`
+  resolved by keeping the deletion (purge intent stands).
+  Post-merge `pod install` was required because `Pods/` is
+  gitignored — the working-tree pods were still Capacitor-shaped
+  until reinstall. Simulator build PASS after `pod install`.
+  Worktree + branch removed. Details in
+  [`archive/2026-05-09-stage-e-docs-cleanup.md`](./archive/2026-05-09-stage-e-docs-cleanup.md)
+  under "Post-merge follow-up". Push to `origin/main` deferred —
+  main is currently 36 commits ahead of origin and carries
+  in-flight macOS Desktop work in its dirty state.

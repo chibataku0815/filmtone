@@ -1,8 +1,7 @@
-// Filmtone V2 native camera capture — rear lens enumeration (M10 / S8-B).
+// Filmtone V2 native camera capture — lens enumeration (M10 / S8-B).
 //
-// Probes the rear-facing physical lenses (ultra wide / wide / telephoto) and
-// filters them down to those that expose a format[] entry satisfying the M10
-// capture contract:
+// Probes physical camera lenses and filters them down to those that expose a
+// format[] entry satisfying the M10 capture contract:
 //
 //   - 3840×2160 dimensions
 //   - 24 fps inside the format's videoSupportedFrameRateRanges
@@ -23,7 +22,7 @@ import Foundation
 import AVFoundation
 import CoreMedia
 
-/// Owner-visible record of a rear lens that satisfies the M10 capture
+/// Owner-visible record of a camera lens that satisfies the M10 capture
 /// contract.  Held in @State on the capture surface; the selected entry
 /// drives `FilmtoneCaptureSession.prepare(lens:)`.
 struct FilmtoneCaptureLens: Identifiable, Equatable {
@@ -31,19 +30,19 @@ struct FilmtoneCaptureLens: Identifiable, Equatable {
     /// SwiftUI `Identifiable.id` for the selector row and recorded
     /// verbatim into `FilmtoneCaptureLensRecord` for the capture package.
     let id: String
-    /// Legacy canonical label ("Main" / "Ultra Wide" / "Telephoto").
+    /// Legacy canonical label ("Main" / "Ultra Wide" / "Telephoto" / "Front").
     /// Kept as the JSON-stable identity for `capture-package.json` —
     /// the M12 magnification label lives on `magnificationLabel`
     /// instead so existing downstream readers keep parsing the field
     /// they were designed against.
     let displayName: String
-    /// M12: capture-time UI primary label ("0.5×" / "1×" / "2×" / "5×").
+    /// M12: capture-time UI primary label ("0.5×" / "1×" / "2×" / "5×" / "Front").
     /// Ultra wide / wide are hardcoded at canonical 0.5× / 1×; tele is
     /// computed from the wide reference's `videoFieldOfView` so iPhone
     /// 17 Pro reads "5×", iPhone 15 Pro reads "3×", older Pros "2×",
     /// without per-model tables.
     let magnificationLabel: String
-    /// M12: capture-time UI subtext ("Ultra Wide" / "Wide" / "Tele").
+    /// M12: capture-time UI subtext ("Ultra Wide" / "Wide" / "Tele" / "Selfie").
     /// Slightly different vocabulary than `displayName` ("Wide" not
     /// "Main", "Tele" not "Telephoto") so the subtext reads as a hint
     /// next to the magnification rather than as a name with its own
@@ -90,7 +89,7 @@ enum FilmtoneCaptureLensCatalog {
     private static let lockedFPS: Double = 24
     private static let appleLog2ColorSpaceRaw: Int = 4
 
-    /// Discover rear lenses and return only those whose `formats[]`
+    /// Discover lenses and return only those whose `formats[]`
     /// include an entry satisfying the M10 contract.  Sorted with the
     /// wide lens first so it can be picked as the default in the
     /// selector row.
@@ -100,35 +99,16 @@ enum FilmtoneCaptureLensCatalog {
     /// baseline for tele labels.  Without the baseline, tele's "5×"
     /// vs "3×" vs "2×" cannot be derived from runtime alone — and a
     /// per-model lookup table would drift for every new iPhone.
-    static func availableRearLenses() -> [FilmtoneCaptureLens] {
-        let candidateTypes: [AVCaptureDevice.DeviceType] = [
-            .builtInWideAngleCamera,
-            .builtInUltraWideCamera,
-            .builtInTelephotoCamera,
-        ]
-        let session = AVCaptureDevice.DiscoverySession(
-            deviceTypes: candidateTypes,
-            mediaType: .video,
-            position: .back
-        )
-        // Pass 1: collect (device, contractFormatIndex) for qualifying
-        // lenses.  We materialise this into an array up-front so the
-        // wide-lens FOV baseline can be discovered before label
-        // generation runs in pass 2.
-        var qualified: [(device: AVCaptureDevice, formatIndex: Int)] = []
-        for device in session.devices {
-            guard let formatIndex = findContractFormatIndex(on: device) else {
-                continue
-            }
-            qualified.append((device, formatIndex))
-        }
+    static func availableCaptureLenses() -> [FilmtoneCaptureLens] {
+        let qualified = qualifiedDevices()
         let wideBaselineFOV: Float? = qualified.first(where: {
-            $0.device.deviceType == .builtInWideAngleCamera
+            $0.device.position == .back
+                && $0.device.deviceType == .builtInWideAngleCamera
         }).map { $0.device.formats[$0.formatIndex].videoFieldOfView }
 
         // Pass 2: build entries with magnification labels resolved
-        // against the wide baseline (when available) and canonical
-        // subtexts assigned per device type.
+        // against the rear wide baseline (when available) and
+        // canonical subtexts assigned per device.
         var entries: [FilmtoneCaptureLens] = []
         for (device, formatIndex) in qualified {
             let magLabel = magnificationLabel(
@@ -139,9 +119,9 @@ enum FilmtoneCaptureLensCatalog {
             entries.append(
                 FilmtoneCaptureLens(
                     id: device.uniqueID,
-                    displayName: legacyDisplayName(for: device.deviceType),
+                    displayName: legacyDisplayName(for: device),
                     magnificationLabel: magLabel,
-                    canonicalSubtext: canonicalSubtext(for: device.deviceType),
+                    canonicalSubtext: canonicalSubtext(for: device),
                     deviceTypeRaw: device.deviceType.rawValue,
                     formatIndex: formatIndex,
                     device: device
@@ -149,18 +129,25 @@ enum FilmtoneCaptureLensCatalog {
             )
         }
         return entries.sorted { lhs, rhs in
-            order(lhs.deviceTypeRaw) < order(rhs.deviceTypeRaw)
+            order(lhs) < order(rhs)
         }
     }
 
-    /// Default lens for a freshly-presented capture surface.  Wide if
+    /// Backward-compatible rear-only surface for smoke helpers or
+    /// older call sites that explicitly need the historical subset.
+    static func availableRearLenses() -> [FilmtoneCaptureLens] {
+        availableCaptureLenses().filter { $0.device.position == .back }
+    }
+
+    /// Default lens for a freshly-presented capture surface.  Rear wide if
     /// present (the M5-A / M7 validated path), otherwise the first
-    /// qualified entry.  Returns nil only when zero rear lenses pass
-    /// the contract — the capture surface treats that as
-    /// `.noWideCamera` and surfaces a failure overlay.
+    /// qualified entry.  Returns nil only when zero lenses pass the
+    /// contract — the capture surface treats that as `.noWideCamera`
+    /// and surfaces a failure overlay.
     static func defaultLens(in lenses: [FilmtoneCaptureLens]) -> FilmtoneCaptureLens? {
         if let wide = lenses.first(where: {
-            $0.deviceTypeRaw == AVCaptureDevice.DeviceType.builtInWideAngleCamera.rawValue
+            $0.device.position == .back
+                && $0.deviceTypeRaw == AVCaptureDevice.DeviceType.builtInWideAngleCamera.rawValue
         }) {
             return wide
         }
@@ -168,6 +155,71 @@ enum FilmtoneCaptureLensCatalog {
     }
 
     // MARK: - Helpers
+
+    private static func qualifiedDevices() -> [(device: AVCaptureDevice, formatIndex: Int)] {
+        let backCandidateTypes: [AVCaptureDevice.DeviceType] = [
+            .builtInWideAngleCamera,
+            .builtInUltraWideCamera,
+            .builtInTelephotoCamera,
+        ]
+        let frontCandidateTypes: [AVCaptureDevice.DeviceType] = [
+            .builtInWideAngleCamera,
+            .builtInTrueDepthCamera,
+        ]
+        let candidateDevices =
+            discoverDevices(deviceTypes: backCandidateTypes, position: .back)
+            + discoverDevices(deviceTypes: frontCandidateTypes, position: .front)
+
+        // Pass 1: collect (device, contractFormatIndex) for qualifying
+        // lenses.  We materialise this into an array up-front so the
+        // rear wide-lens FOV baseline can be discovered before label
+        // generation runs.  The same contract filter is applied to
+        // front candidates, so a front camera appears only when the
+        // device's active format can actually carry Apple Log 2 under
+        // Filmtone's baseline.
+        var qualified: [(device: AVCaptureDevice, formatIndex: Int)] = []
+        var seenIDs = Set<String>()
+        for device in candidateDevices where !seenIDs.contains(device.uniqueID) {
+            seenIDs.insert(device.uniqueID)
+            guard let formatIndex = findContractFormatIndex(on: device) else {
+                continue
+            }
+            qualified.append((device, formatIndex))
+        }
+        let rearQualified = qualified.filter { $0.device.position == .back }
+        let frontQualified = qualified.filter { $0.device.position == .front }
+        if let front = preferredFrontLens(from: frontQualified) {
+            return rearQualified + [front]
+        }
+        return rearQualified
+    }
+
+    private static func discoverDevices(
+        deviceTypes: [AVCaptureDevice.DeviceType],
+        position: AVCaptureDevice.Position
+    ) -> [AVCaptureDevice] {
+        AVCaptureDevice.DiscoverySession(
+            deviceTypes: deviceTypes,
+            mediaType: .video,
+            position: position
+        ).devices
+    }
+
+    private static func preferredFrontLens(
+        from qualified: [(device: AVCaptureDevice, formatIndex: Int)]
+    ) -> (device: AVCaptureDevice, formatIndex: Int)? {
+        qualified.sorted {
+            frontPriority($0.device) < frontPriority($1.device)
+        }.first
+    }
+
+    private static func frontPriority(_ device: AVCaptureDevice) -> Int {
+        switch device.deviceType {
+        case .builtInTrueDepthCamera: return 0
+        case .builtInWideAngleCamera: return 1
+        default: return 9
+        }
+    }
 
     private static func findContractFormatIndex(
         on device: AVCaptureDevice
@@ -194,17 +246,21 @@ enum FilmtoneCaptureLensCatalog {
     /// Legacy canonical name written into `capture-package.json`'s
     /// `lensDisplayName` since S8-B.  Kept verbatim so existing
     /// downstream readers that key off "Main" / "Ultra Wide" /
-    /// "Telephoto" continue to match.  The owner-facing capture-time
-    /// label lives on `FilmtoneCaptureLens.magnificationLabel` /
+    /// "Telephoto" continue to match.  Front is additive.  The
+    /// owner-facing capture-time label lives on
+    /// `FilmtoneCaptureLens.magnificationLabel` /
     /// `canonicalSubtext` and is not the same string.
     private static func legacyDisplayName(
-        for type: AVCaptureDevice.DeviceType
+        for device: AVCaptureDevice
     ) -> String {
-        switch type {
+        if device.position == .front {
+            return "Front"
+        }
+        switch device.deviceType {
         case .builtInWideAngleCamera: return "Main"
         case .builtInUltraWideCamera: return "Ultra Wide"
         case .builtInTelephotoCamera: return "Telephoto"
-        default: return type.rawValue
+        default: return device.deviceType.rawValue
         }
     }
 
@@ -222,6 +278,9 @@ enum FilmtoneCaptureLensCatalog {
         formatIndex: Int,
         wideBaselineFOV: Float?
     ) -> String {
+        if device.position == .front {
+            return "Front"
+        }
         switch device.deviceType {
         case .builtInUltraWideCamera:
             return "0.5×"
@@ -229,11 +288,11 @@ enum FilmtoneCaptureLensCatalog {
             return "1×"
         case .builtInTelephotoCamera:
             guard let baseline = wideBaselineFOV, baseline > 0 else {
-                return canonicalSubtext(for: device.deviceType)
+                return canonicalSubtext(for: device)
             }
             let teleFOV = device.formats[formatIndex].videoFieldOfView
             guard teleFOV > 0 else {
-                return canonicalSubtext(for: device.deviceType)
+                return canonicalSubtext(for: device)
             }
             let ratio = baseline / teleFOV
             let rounded = ratio.rounded()
@@ -250,10 +309,11 @@ enum FilmtoneCaptureLensCatalog {
     /// vocabulary than `legacyDisplayName` ("Wide" not "Main", "Tele"
     /// not "Telephoto") so the subtext reads as a hint next to the
     /// magnification rather than competing with it for weight.
-    private static func canonicalSubtext(
-        for type: AVCaptureDevice.DeviceType
-    ) -> String {
-        switch type {
+    private static func canonicalSubtext(for device: AVCaptureDevice) -> String {
+        if device.position == .front {
+            return "Selfie"
+        }
+        switch device.deviceType {
         case .builtInWideAngleCamera: return "Wide"
         case .builtInUltraWideCamera: return "Ultra Wide"
         case .builtInTelephotoCamera: return "Tele"
@@ -261,11 +321,14 @@ enum FilmtoneCaptureLensCatalog {
         }
     }
 
-    private static func order(_ deviceTypeRaw: String) -> Int {
-        switch deviceTypeRaw {
-        case AVCaptureDevice.DeviceType.builtInWideAngleCamera.rawValue: return 0
-        case AVCaptureDevice.DeviceType.builtInUltraWideCamera.rawValue: return 1
-        case AVCaptureDevice.DeviceType.builtInTelephotoCamera.rawValue: return 2
+    private static func order(_ lens: FilmtoneCaptureLens) -> Int {
+        if lens.device.position == .front {
+            return 3
+        }
+        switch lens.device.deviceType {
+        case .builtInWideAngleCamera: return 0
+        case .builtInUltraWideCamera: return 1
+        case .builtInTelephotoCamera: return 2
         default: return 99
         }
     }

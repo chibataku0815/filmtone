@@ -135,7 +135,7 @@ struct FilmtoneRootView: View {
             let liveBundle = store.makeLivePreviewGradeProcessor()
             // M11 / S11-B: resolve the chip-strip's initial selection
             // from the editor's currently applied saved Look.  When the
-            // editor has Stone or Urban applied, the capture chip
+            // editor has a bundled Look applied, the capture chip
             // matches it; otherwise (no saved Look, or a saved Look
             // outside the chip strip) we fall back to .filmtone — the
             // chip strip is intentionally narrow (M11 out-of-scope:
@@ -147,7 +147,7 @@ struct FilmtoneRootView: View {
             // built grade processor + diagnostics pair.  Filmtone (no
             // override) defers to the existing `makeLivePreviewGradeProcessor()`
             // path, preserving the editor's pre-capture custom adjustments;
-            // Stone / Urban resolve to a catalog `BuiltInLook` and
+            // Bundled Looks resolve to a catalog `BuiltInLook` and
             // build through the override variant so the live preview
             // matches the chip without touching the editor's persisted
             // state until `adoptCaptureResult` (S11-E).
@@ -175,6 +175,9 @@ struct FilmtoneRootView: View {
                 },
                 loadUserLut: { entry in
                     await store.loadCaptureUserLut(entry: entry)
+                },
+                makeTakePreviewGradeProcessor: { package in
+                    await store.makeCapturePackagePreviewGradeProcessor(package)
                 },
                 onCompleted: { package in
                     captureSurfacePresented = false

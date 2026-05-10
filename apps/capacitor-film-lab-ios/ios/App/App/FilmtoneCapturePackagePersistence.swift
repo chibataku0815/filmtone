@@ -44,7 +44,7 @@ struct FilmtoneCapturePackageSnapshotV1: Codable {
     /// diagnostic banners ("recorded at …") without changing the
     /// capture pipeline.
     var writtenAtISO8601: String
-    /// S8-B: rear lens identity for the run.  Optional in the V1 schema
+    /// S8-B: lens identity for the run.  Optional in the V1 schema
     /// so pre-S8-B `capture-package.json` snapshots continue to decode
     /// cleanly (older runs simply have nil lens).  All new runs set
     /// these three fields together.

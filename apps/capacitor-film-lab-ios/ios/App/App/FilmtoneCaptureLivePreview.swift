@@ -25,6 +25,7 @@ import AVFoundation
 import CoreImage
 import Metal
 import MetalKit
+import QuartzCore
 import UIKit
 
 /// S8-F F3-R: snapshot of the inputs the editor's grade chain is
@@ -71,6 +72,73 @@ struct FilmtoneLivePreviewBundle {
     let diagnostics: FilmtoneLivePreviewDiagnostics
 }
 
+enum FilmtoneLivePreviewRenderMode: Equatable {
+    case fullPreview
+    case recordingMonitor
+
+    var usesLightweightLook: Bool {
+        self == .recordingMonitor
+    }
+
+    var minimumFrameInterval: CFTimeInterval {
+        switch self {
+        case .fullPreview:
+            return 0
+        case .recordingMonitor:
+            return 1.0 / 12.0
+        }
+    }
+
+    var diagnosticName: String {
+        switch self {
+        case .fullPreview:
+            return "fullPreview"
+        case .recordingMonitor:
+            return "recordingMonitor"
+        }
+    }
+}
+
+struct FilmtoneLivePreviewPerformancePolicy: Equatable {
+    let renderMode: FilmtoneLivePreviewRenderMode
+
+    static func resolve(
+        isRecordingOrStopping: Bool,
+        requestedStabilization: FilmtoneRequestedStabilization,
+        hasGradeProcessor: Bool
+    ) -> FilmtoneLivePreviewPerformancePolicy {
+        guard isRecordingOrStopping,
+              requestedStabilization == .on,
+              hasGradeProcessor
+        else {
+            return FilmtoneLivePreviewPerformancePolicy(renderMode: .fullPreview)
+        }
+        return FilmtoneLivePreviewPerformancePolicy(renderMode: .recordingMonitor)
+    }
+}
+
+struct FilmtoneLivePreviewTelemetry: Equatable {
+    let pixelFormat: String
+    let width: Int
+    let height: Int
+    let deliversPreviewSizedBuffers: Bool
+    let nativeVideoSettingsRequested: Bool
+    let activeStabilization: String
+
+    static let unavailable = FilmtoneLivePreviewTelemetry(
+        pixelFormat: "unavailable",
+        width: 0,
+        height: 0,
+        deliversPreviewSizedBuffers: false,
+        nativeVideoSettingsRequested: false,
+        activeStabilization: "unavailable"
+    )
+
+    var diagnosticSummary: String {
+        "\(pixelFormat) \(width)x\(height) previewSized=\(deliversPreviewSizedBuffers ? "Y" : "N") native=\(nativeVideoSettingsRequested ? "Y" : "N") vdoStab=\(activeStabilization)"
+    }
+}
+
 /// Single-slot, lock-protected sink shared between the capture
 /// session's VDO sample-buffer delegate (writer, on
 /// `previewSampleQueue`) and the SwiftUI `MTKView` renderer (reader,
@@ -87,7 +155,10 @@ final class FilmtonePreviewFrameSink: @unchecked Sendable {
 
     private let lock = NSLock()
     private var stored: CIImage?
-    private var onFrame: (@Sendable () -> Void)?
+    private var onFrame: (@MainActor @Sendable () -> Void)?
+    private var callbackPending = false
+    private var lastCallbackTime: CFTimeInterval = 0
+    private var minimumCallbackInterval: CFTimeInterval = 0
 
     /// Latest CIImage pushed by the VDO delegate, or nil when no frame
     /// has arrived yet (or after `clear()` post-teardown).
@@ -100,21 +171,40 @@ final class FilmtonePreviewFrameSink: @unchecked Sendable {
     /// Register a callback that will be dispatched on the main queue
     /// each time a new frame is pushed.  The renderer view uses this
     /// to drive `setNeedsDisplay()`.  Pass `nil` to detach.
-    func setOnFrameCallback(_ callback: (@Sendable () -> Void)?) {
+    func setOnFrameCallback(
+        _ callback: (@MainActor @Sendable () -> Void)?,
+        minimumInterval: CFTimeInterval = 0
+    ) {
         lock.lock()
         onFrame = callback
+        callbackPending = false
+        lastCallbackTime = 0
+        minimumCallbackInterval = max(0, minimumInterval)
         lock.unlock()
     }
 
     /// Writer entry point.  Called from `previewSampleQueue` at ~24 fps.
     func push(_ image: CIImage) {
+        let now = CACurrentMediaTime()
         lock.lock()
         stored = image
-        let callback = onFrame
+        guard let callback = onFrame else {
+            lock.unlock()
+            return
+        }
+        if callbackPending ||
+            (minimumCallbackInterval > 0 && now - lastCallbackTime < minimumCallbackInterval) {
+            lock.unlock()
+            return
+        }
+        callbackPending = true
+        lastCallbackTime = now
         lock.unlock()
-        guard let callback else { return }
-        DispatchQueue.main.async {
-            callback()
+        DispatchQueue.main.async { [weak self] in
+            MainActor.assumeIsolated {
+                callback()
+            }
+            self?.completeFrameCallback()
         }
     }
 
@@ -124,6 +214,14 @@ final class FilmtonePreviewFrameSink: @unchecked Sendable {
     func clear() {
         lock.lock()
         stored = nil
+        callbackPending = false
+        lastCallbackTime = 0
+        lock.unlock()
+    }
+
+    private func completeFrameCallback() {
+        lock.lock()
+        callbackPending = false
         lock.unlock()
     }
 }
@@ -149,13 +247,15 @@ struct FilmtoneCaptureLivePreview: UIViewRepresentable {
     /// renderer applies the preview transform so grading keeps using raw
     /// camera buffers without paying the capture-output rotation cost.
     let previewRotation: FilmtoneCaptureVideoRotation
+    let renderMode: FilmtoneLivePreviewRenderMode
 
     func makeUIView(context: Context) -> RendererView {
         let view = RendererView()
         view.attach(
             sink: sink,
             gradeProcessor: gradeProcessor,
-            previewRotation: previewRotation
+            previewRotation: previewRotation,
+            renderMode: renderMode
         )
         return view
     }
@@ -164,7 +264,8 @@ struct FilmtoneCaptureLivePreview: UIViewRepresentable {
         uiView.attach(
             sink: sink,
             gradeProcessor: gradeProcessor,
-            previewRotation: previewRotation
+            previewRotation: previewRotation,
+            renderMode: renderMode
         )
     }
 
@@ -186,6 +287,7 @@ struct FilmtoneCaptureLivePreview: UIViewRepresentable {
         private var fallbackCIContext: CIContext?
         private var commandQueue: MTLCommandQueue?
         private var previewRotation: FilmtoneCaptureVideoRotation = .portraitPinned
+        private var renderMode: FilmtoneLivePreviewRenderMode = .fullPreview
         private let renderColorSpace = CGColorSpaceCreateDeviceRGB()
         /// S8-F F3-R: log the first VDO frame's CIImage color space tag
         /// once so we can compare against the editor's `sourceImageOptions`
@@ -237,12 +339,14 @@ struct FilmtoneCaptureLivePreview: UIViewRepresentable {
         func attach(
             sink: FilmtonePreviewFrameSink,
             gradeProcessor: FilmtoneSharedGradeProcessor?,
-            previewRotation: FilmtoneCaptureVideoRotation
+            previewRotation: FilmtoneCaptureVideoRotation,
+            renderMode: FilmtoneLivePreviewRenderMode
         ) {
             attachedSink = sink
             self.gradeProcessor = gradeProcessor
             self.previewRotation = previewRotation
-            sink.setOnFrameCallback { [weak self] in
+            self.renderMode = renderMode
+            sink.setOnFrameCallback({ [weak self] in
                 // Drive `draw()` directly instead of `setNeedsDisplay()`
                 // so the render-and-present commit fires immediately on
                 // the same main-thread tick that received the camera
@@ -252,7 +356,7 @@ struct FilmtoneCaptureLivePreview: UIViewRepresentable {
                 // path was visible as residual judder even after the
                 // free-running 24 fps timer was removed.
                 self?.draw()
-            }
+            }, minimumInterval: renderMode.minimumFrameInterval)
             // Repaint immediately if a frame is already cached so the
             // surface doesn't flash black on first attach.
             draw()
@@ -299,13 +403,14 @@ struct FilmtoneCaptureLivePreview: UIViewRepresentable {
                 }
                 let extent = rawImage.extent
                 NSLog(
-                    "[F3R][LivePreview] first frame: extent=%.0fx%.0f input.colorSpace=%@ gradeProcessor=%@",
-                    extent.width, extent.height, csName, processor == nil ? "nil" : "attached"
+                    "[S5][LivePreview] first frame: extent=%.0fx%.0f input.colorSpace=%@ gradeProcessor=%@ renderMode=%@",
+                    extent.width, extent.height, csName, processor == nil ? "nil" : "attached",
+                    renderMode.diagnosticName
                 )
             }
 
             let orientedRawImage = orient(rawImage, rotation: previewRotation)
-            let graded = processor?.applyForLivePreview(orientedRawImage) ?? orientedRawImage
+            let graded = processor?.applyForLivePreview(orientedRawImage, mode: renderMode) ?? orientedRawImage
 
             let drawableSize = view.drawableSize
             let extent = graded.extent

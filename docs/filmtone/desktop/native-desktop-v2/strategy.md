@@ -415,6 +415,14 @@ on the scrub HStack rather than a `Color.clear` sibling because
 expand the row to fill the window height, re-centering the scrub bar
 vertically.
 
+## Interrupt / Decision Log
+
+2026-05-06: Paused the M8 Empty CTA Physical Click task for the Native Desktop
+v1.6 release interrupt. User approved including the working-tree UI deltas
+(`PreviewSurface` empty-state strip-down / loaded backdrop and
+`QuickAdjustControls` conditional Intensity row) in v1.6 alongside the M8
+right-rail fixes.
+
 ## Constraints
 
 - macOS target is macOS 26 only.

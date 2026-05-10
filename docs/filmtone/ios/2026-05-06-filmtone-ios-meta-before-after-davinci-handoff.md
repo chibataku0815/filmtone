@@ -56,43 +56,38 @@ Follow the repository rules in `AGENTS.md`:
 
 Latest checks in this conversation:
 
-- `git status --short --branch` on 2026-05-06 14:10 JST:
+- `git status --short --branch` on 2026-05-06 15:12 JST:
 
 ```text
-## main...origin/main [ahead 34]
+## main...origin/main
 ```
 
-- Latest iOS truth script on 2026-05-06 14:10 JST reported:
+- Latest iOS truth script on 2026-05-06 15:12 JST reported:
 
 ```text
-branch/head: main @ 9053cf98
-commits_ahead_of_upstream: 34
+branch/head: main @ 4f772587
+commits_ahead_of_upstream: 0
 commits_behind_upstream: 0
 xcode_marketing_versions: 1.5
 xcode_build_versions: 4
 ios_deployment_targets: 26.0
 public_trackName: Filmtone - iPhoneでフィルムの世界観へ
 public_bundleId: com.chibatakumi.film.lab.ios
-public_version: 1.4
+public_version: 1.5
 public_minimumOsVersion: 26.0
+public_currentVersionReleaseDate: 2026-05-06T04:31:38Z
 public_formattedPrice: 無料
 public_primaryGenreName: Photo & Video
 ```
 
-Important: an earlier truth-script run in the same conversation reported public
-version `1.5`, but the latest run reported public version `1.4`. Treat this as
-temporally unstable App Store truth. The next chat must rerun the truth script
-before stating any public version.
+Important: earlier runs in this conversation temporarily disagreed while App
+Store state was propagating. The latest clean truth-script run reports public
+version `1.5`. The next chat must still rerun the truth script before stating
+any public version.
 
 Local iOS commits not in upstream from the latest truth script:
 
 ```text
-9053cf98 docs: archive legacy filmtone handoffs
-2f2281b5 chore(ios): refresh app store metadata
-774085dc fix(ios): Look × Veil energy max-merge port from macOS
-34b8e9c9 feat(ios): user-initiated cache release UI + low-disk proactive prune
-a27d901e feat(ios): add Desktop handoff sheet for >5min videos
-575a3942 feat: add marker highlight reel
 ```
 
 ## Filmtone Product Facts To Keep In Mind

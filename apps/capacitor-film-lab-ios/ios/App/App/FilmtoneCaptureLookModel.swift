@@ -59,7 +59,10 @@ struct FilmtoneCaptureLook: Identifiable, Equatable {
             id: "noir",
             displayName: entry?.englishName ?? "Noir",
             canonicalUUID: entry?.canonicalUUID,
-            slug: slug
+            slug: slug,
+            libraryLutId: nil,
+            parsedCreativeLut: nil,
+            customLutRecord: nil
         )
     }()
 

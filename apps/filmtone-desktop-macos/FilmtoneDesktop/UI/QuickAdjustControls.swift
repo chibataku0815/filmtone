@@ -104,29 +104,34 @@ struct QuickAdjustControls: View {
                     opticalFilterChip(option)
                 }
             }
-            // M5-M (CC-B): continuous intensity cursor (0…1).
-            // Disabled and dimmed when chip is None (no profile selected).
-            // At 1.0 the effect matches the M5-L3 chip-only behavior.
-            let intensityActive = state.opticalFilterProfileId != nil
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text("Intensity")
-                        .font(.callout)
-                        .foregroundStyle(intensityActive ? .white : .white.opacity(0.35))
-                    Spacer()
-                    Text(intensityPercent(state.opticalFilterIntensity))
-                        .font(.callout.monospacedDigit())
-                        .foregroundStyle(intensityActive ? .white.opacity(0.7) : .white.opacity(0.25))
+            // M5-M (CC-B) / M8 follow-up: continuous intensity cursor (0…1).
+            // Only mounted when a profile chip (1/8 / 1/4 / 1/2) is selected.
+            // Earlier behavior kept the row visible-but-disabled when None
+            // was selected; the dim slider read as broken hardware (visible
+            // 100% number with an unmovable track). Removing the row when
+            // there is nothing to scale leaves the panel with no inactive
+            // widgets — chips alone communicate "off" by selection state.
+            if state.opticalFilterProfileId != nil {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Intensity")
+                            .font(.callout)
+                            .foregroundStyle(.white)
+                        Spacer()
+                        Text(intensityPercent(state.opticalFilterIntensity))
+                            .font(.callout.monospacedDigit())
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+                    FilmtoneGlassSlider(
+                        value: $state.opticalFilterIntensity,
+                        range: 0...1,
+                        step: 0.01
+                    )
                 }
-                FilmtoneGlassSlider(
-                    value: $state.opticalFilterIntensity,
-                    range: 0...1,
-                    step: 0.01
-                )
-                .disabled(!intensityActive)
-                .opacity(intensityActive ? 1 : 0.35)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
+        .animation(.easeInOut(duration: 0.18), value: state.opticalFilterProfileId)
     }
 
     private func intensityPercent(_ value: Double) -> String {

@@ -241,11 +241,8 @@ struct RootWindowView: View {
     // The floating scrub bar capsule shrinks horizontally when the
     // inspector is open so the rail and scrub bar live side-by-side
     // instead of stacking vertically — the user can scrub while every
-    // panel including Export is reachable.
-    // Window aspect is locked to source aspect for both, so the only pixels
-    // the loaded backdrop ever covers are the rare letterbox residual from
-    // the snap-to-aspect resize, filled by `PreviewSurface`'s solid
-    // `Color.black` backdrop (iOS canonical recipe).
+    // panel including Export is reachable. `PreviewSurface` owns the loaded
+    // backdrop posture behind the aspect-fit preview.
     @ViewBuilder
     private var editorOverlayLayout: some View {
         ZStack(alignment: .topTrailing) {

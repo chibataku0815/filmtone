@@ -375,9 +375,14 @@ struct FilmtoneCaptureView: View {
         FilmtoneCaptureChromeScaffold {
             cockpitTopBar
         } badge: {
-            if isUngradedPreviewFallback {
-                HStack {
-                    ungradedPreviewBadge
+            if isUngradedPreviewFallback || isLightweightLivePreview {
+                HStack(spacing: 8) {
+                    if isUngradedPreviewFallback {
+                        ungradedPreviewBadge
+                    }
+                    if isLightweightLivePreview {
+                        lightweightPreviewBadge
+                    }
                     Spacer()
                 }
                 .padding(.horizontal, 16)
@@ -455,7 +460,8 @@ struct FilmtoneCaptureView: View {
             FilmtoneCaptureLivePreview(
                 sink: session.previewFrameSink,
                 gradeProcessor: activeGradeProcessor,
-                previewRotation: .identity
+                previewRotation: .identity,
+                renderMode: livePreviewPerformancePolicy.renderMode
             )
                 .ignoresSafeArea()
                 .accessibilityIdentifier("filmtone.capture.preview")
@@ -469,6 +475,18 @@ struct FilmtoneCaptureView: View {
     private var isUngradedPreviewFallback: Bool {
         (!session.hasLivePreview && session.previewLayer != nil)
             || (session.hasLivePreview && isLiveGradeFallback)
+    }
+
+    private var livePreviewPerformancePolicy: FilmtoneLivePreviewPerformancePolicy {
+        FilmtoneLivePreviewPerformancePolicy.resolve(
+            isRecordingOrStopping: isRecordingOrStopping,
+            requestedStabilization: session.requestedStabilization,
+            hasGradeProcessor: activeGradeProcessor != nil
+        )
+    }
+
+    private var isLightweightLivePreview: Bool {
+        session.hasLivePreview && livePreviewPerformancePolicy.renderMode.usesLightweightLook
     }
 
     /// S5 (2026-05-09): explicit "Ungraded" badge for the fallback
@@ -489,6 +507,19 @@ struct FilmtoneCaptureView: View {
             .allowsHitTesting(false)
             .accessibilityIdentifier("filmtone.capture.ungradedPreviewBadge")
             .accessibilityLabel(Text("Ungraded preview"))
+    }
+
+    private var lightweightPreviewBadge: some View {
+        Text("Live Look · Light")
+            .font(.system(size: 10, weight: .heavy, design: .rounded))
+            .tracking(0.4)
+            .foregroundStyle(.white.opacity(0.92))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .captureGlassHUD(in: FilmtoneCaptureChrome.hudShape())
+            .allowsHitTesting(false)
+            .accessibilityIdentifier("filmtone.capture.lightPreviewBadge")
+            .accessibilityLabel(Text("Live Look light preview, \(session.livePreviewTelemetry.diagnosticSummary)"))
     }
 
     // MARK: - HUD readout sources

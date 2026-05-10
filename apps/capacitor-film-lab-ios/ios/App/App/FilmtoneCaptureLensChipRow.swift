@@ -1,6 +1,6 @@
 // Filmtone V2 native camera capture — bottom-zone lens chip row (M13-M-2).
 //
-// Horizontal pill row of available rear lenses. Each chip is its own
+// Horizontal pill row of available capture lenses. Each chip is its own
 // Liquid Glass surface inside the parent's `GlassEffectContainer`, so
 // adjacent chips merge as one material and the selected highlight
 // uses the same clip path as the chip itself (no overflow).
@@ -57,9 +57,18 @@ struct FilmtoneCaptureLensChipRow: View {
                 )
         }
         .disabled(isRecordingOrStopping || lensSwitchInFlight || isSelected)
-        .accessibilityIdentifier("filmtone.capture.lens.\(lens.deviceTypeRaw)")
+        .accessibilityIdentifier("filmtone.capture.lens.\(accessibilityPosition(for: lens)).\(lens.deviceTypeRaw)")
         .accessibilityLabel(Text("\(lens.magnificationLabel) \(lens.canonicalSubtext)"))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private func accessibilityPosition(for lens: FilmtoneCaptureLens) -> String {
+        switch lens.device.position {
+        case .back: return "back"
+        case .front: return "front"
+        case .unspecified: return "unspecified"
+        @unknown default: return "unknown"
+        }
     }
 }
 

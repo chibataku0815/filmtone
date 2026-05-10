@@ -123,6 +123,8 @@
 		D20000010000000000000099 /* FilmtoneCaptureTransformLutClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000099 /* FilmtoneCaptureTransformLutClassifier.swift */; };
 		D2000001000000000000009A /* FilmtoneCaptureTakePickerOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000009A /* FilmtoneCaptureTakePickerOverlay.swift */; };
 		D2000001000000000000009B /* FilmtoneCapturePreviewLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000009B /* FilmtoneCapturePreviewLayer.swift */; };
+		D2000001000000000000009C /* FilmtoneCaptureTakePreviewLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000009C /* FilmtoneCaptureTakePreviewLoader.swift */; };
+		D2000001000000000000009D /* FilmtoneCaptureTakePreviewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000009D /* FilmtoneCaptureTakePreviewModel.swift */; };
 		D40000010000000000000002 /* CreativeLuts in Resources */ = {isa = PBXBuildFile; fileRef = D40000010000000000000001 /* CreativeLuts */; };
 		D588A95BF7748786256BD9E2 /* CancelExportIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B14DB40995D16C85F10AC9F5 /* CancelExportIntent.swift */; };
 		E10000010000000000000001 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = F10000010000000000000001 /* Localizable.xcstrings */; };
@@ -284,6 +286,8 @@
 		C20000010000000000000099 /* FilmtoneCaptureTransformLutClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCaptureTransformLutClassifier.swift; sourceTree = "<group>"; };
 		C2000001000000000000009A /* FilmtoneCaptureTakePickerOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCaptureTakePickerOverlay.swift; sourceTree = "<group>"; };
 		C2000001000000000000009B /* FilmtoneCapturePreviewLayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCapturePreviewLayer.swift; sourceTree = "<group>"; };
+		C2000001000000000000009C /* FilmtoneCaptureTakePreviewLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCaptureTakePreviewLoader.swift; sourceTree = "<group>"; };
+		C2000001000000000000009D /* FilmtoneCaptureTakePreviewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCaptureTakePreviewModel.swift; sourceTree = "<group>"; };
 		D40000010000000000000001 /* CreativeLuts */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CreativeLuts; path = Resources/CreativeLuts; sourceTree = "<group>"; };
 		E92BBC4019AD97D40A52D6E1 /* FilmtoneExportAttributes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtoneExportAttributes.swift; sourceTree = "<group>"; };
 		F10000010000000000000001 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
@@ -439,6 +443,8 @@
 				C20000010000000000000099 /* FilmtoneCaptureTransformLutClassifier.swift */,
 				C2000001000000000000009A /* FilmtoneCaptureTakePickerOverlay.swift */,
 				C2000001000000000000009B /* FilmtoneCapturePreviewLayer.swift */,
+				C2000001000000000000009C /* FilmtoneCaptureTakePreviewLoader.swift */,
+				C2000001000000000000009D /* FilmtoneCaptureTakePreviewModel.swift */,
 				C20000010000000000000052 /* FilmtoneGcsvWriter.swift */,
 				C20000010000000000000001 /* FormatExtensionReader.swift */,
 				C20000010000000000000002 /* SourceColorMetadataNormalizer.swift */,
@@ -750,6 +756,8 @@
 				D20000010000000000000099 /* FilmtoneCaptureTransformLutClassifier.swift in Sources */,
 				D2000001000000000000009A /* FilmtoneCaptureTakePickerOverlay.swift in Sources */,
 				D2000001000000000000009B /* FilmtoneCapturePreviewLayer.swift in Sources */,
+				D2000001000000000000009C /* FilmtoneCaptureTakePreviewLoader.swift in Sources */,
+				D2000001000000000000009D /* FilmtoneCaptureTakePreviewModel.swift in Sources */,
 				D20000010000000000000052 /* FilmtoneGcsvWriter.swift in Sources */,
 				D20000010000000000000001 /* FormatExtensionReader.swift in Sources */,
 				D20000010000000000000002 /* SourceColorMetadataNormalizer.swift in Sources */,

@@ -47,9 +47,6 @@ struct PreviewSurface: View {
     /// sources read this through `FilmtoneDesktopVideoRenderInputs`
     /// instead.
     let compareEnabled: Bool
-    /// M5-I.4a: empty-state CTA entry point. RootWindowView owns the
-    /// platform file picker; PreviewSurface only renders the open affordance.
-    let onOpenRequested: () -> Void
 
     @State private var renderedFrames: RenderedFrames?
     /// M5-H.1.2: identity of the source that produced `renderedFrames`.
@@ -64,31 +61,28 @@ struct PreviewSurface: View {
 
     var body: some View {
         ZStack {
-            // M5-M.3: iOS-canonical posture. Empty launch keeps the
-            // branded clear Liquid Glass field. Loaded media renders
-            // aspect-fit on top of a solid `Color.black` backdrop —
-            // matching the iOS card recipe (`bg-black .squircle-xl` +
-            // `Image.scaledToFit()` / AVPlayer `videoGravity = .resizeAspect`).
-            // The window itself is locked to source aspect, so the only
-            // pixels Color.black ever covers are the rare letterbox
-            // residual from the snap-to-aspect resize. No blurred /
-            // saturated / dimmed media-derived fill — that path was
-            // visually rejected by the user (recovery rounds 1+2).
+            // Backdrop posture. Empty launch keeps the branded clear
+            // Liquid Glass field. Loaded media uses a media-derived
+            // blurred backdrop (`scaledToFill + blur + dim`) so the
+            // toolbar's Liquid Glass refraction samples a coherent
+            // continuation of the foreground frame instead of a flat
+            // matte that visibly seams against the in-frame `scaledToFit`
+            // media. Pure `Color.black` was rejected because the toolbar
+            // zone refracted black while the body zone refracted media,
+            // producing the offset the user reported. Fallback (no
+            // graded image yet, or video before the first composition
+            // frame) is a near-neutral dark wash so a brief transition
+            // never exposes pure desktop or pure black.
             if sourceURL == nil {
                 PreviewBackdrop(mode: .empty)
                     .backgroundExtensionEffect()
             } else {
-                Color.black
+                MediaDerivedBackdrop(image: renderedFrames?.graded)
+                    .backgroundExtensionEffect()
             }
             if sourceURL == nil {
-                // M5-M: `.fixedSize()` pins the plate to its intrinsic
-                // compact size regardless of the window width/height. The
-                // surrounding `BrandedOpeningBackdrop` still fills the
-                // window; only the labeled plate stays compact. Keeps
-                // K1's bounded luminous-field readability without regressing
-                // to a stretching marketing-page posture on wide windows.
-                EmptyPreviewLabel(onOpenRequested: onOpenRequested)
-                    .fixedSize()
+                EmptyPreviewLabel()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 // M5-I.2: video sources mount the AVPlayer view as soon as
                 // `state.videoSession` lands. The session probes the asset
@@ -528,71 +522,59 @@ private struct PreviewBackdrop: View {
     }
 }
 
-// M5-I.4a + M5-K1: branded Liquid Glass empty-state + Open CTA. Uses the
-// runtime AppIcon so the launch state anchors on the same mark shown in
-// Dock / Finder. K1 wraps the brand stack and CTA in a bounded luminous
-// field so icon / title / subtitle / Open button stay readable over
-// arbitrary desktop backgrounds (the surrounding `BrandedOpeningBackdrop`
-// keeps clear-glass posture and cannot guarantee contrast on bright
-// desktops by itself). The plate is intentionally bounded — not a full
-// opaque card — so the launch state still reads as app-first Liquid Glass
-// rather than a marketing landing page.
+// Media-derived blurred backdrop for the loaded state. Renders the
+// graded still as `scaledToFill + blur + dim` so the area outside the
+// in-frame `scaledToFit` media (and the toolbar's Liquid Glass
+// refraction zone) reads as a coherent continuation of the foreground
+// instead of a flat matte. `dim` matches the prior `0.42` ratio called
+// out in the no-black-matte feedback. Fallback is a near-neutral dark
+// wash — never pure black, never pure desktop — for the brief window
+// between `setSource` and the first graded frame, and for video before
+// a poster thumbnail is wired through.
+private struct MediaDerivedBackdrop: View {
+    let image: NSImage?
+
+    var body: some View {
+        ZStack {
+            Color(white: 0.06)
+            if let image {
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .blur(radius: 60, opaque: true)
+                    .overlay(Color.black.opacity(0.42))
+            }
+        }
+        .clipped()
+        .allowsHitTesting(false)
+    }
+}
+
+// M5-I.4a + M8: branded opening state. Visual only — no click handling.
+// SwiftUI `.buttonStyle(.glass)` and full-surface AppKit click catchers
+// both failed user smoke on macOS 26's transparent Liquid Glass window;
+// users open material via the toolbar `Open` action or `⌘O`.
 private struct EmptyPreviewLabel: View {
-    let onOpenRequested: () -> Void
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        GlassEffectContainer(spacing: 18) {
-            VStack(spacing: 22) {
-                VStack(spacing: 16) {
-                    if let icon = NSApp.applicationIconImage {
-                        Image(nsImage: icon)
-                            .resizable()
-                            .interpolation(.high)
-                            .frame(width: 92, height: 92)
-                            .opacity(0.96)
-                    }
-                    Text("Filmtone")
-                        .font(.system(size: 28, weight: .light))
-                        .tracking(4)
-                        .foregroundStyle(primaryTextStyle)
-                    Text("素材を開いて始めましょう")
-                        .font(.callout)
-                        .foregroundStyle(secondaryTextStyle)
-                }
-                .padding(.horizontal, 56)
-                .padding(.vertical, 32)
-
-                Button {
-                    onOpenRequested()
-                } label: {
-                    Label("素材を開く", systemImage: "folder")
-                        .font(.headline)
-                }
-                .buttonStyle(.glass)
-                .controlSize(.large)
-                .help("Open a still image or video")
+        VStack(spacing: 28) {
+            if let icon = NSApp.applicationIconImage {
+                Image(nsImage: icon)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 92, height: 92)
+                    .opacity(0.96)
             }
-            .padding(.horizontal, 28)
-            .padding(.vertical, 28)
-            .background {
-                // Bounded luminous field. Subtle dark wash + ultraThin
-                // material gives the central content a readable surface
-                // without becoming an opaque marketing slab. Soft inner
-                // highlight on top picks up the Liquid Glass feel.
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .fill(plateWash)
-                    .background(
-                        RoundedRectangle(cornerRadius: 28, style: .continuous)
-                            .fill(.ultraThinMaterial)
-                            .opacity(colorScheme == .light ? 0.55 : 0.42)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 28, style: .continuous)
-                            .stroke(plateStroke, lineWidth: 0.5)
-                    )
-            }
+            Text("Filmtone")
+                .font(.system(size: 28, weight: .light))
+                .tracking(4)
+                .foregroundStyle(primaryTextStyle)
+            Text("素材を開いて始めましょう")
+                .font(.callout)
+                .foregroundStyle(secondaryTextStyle)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var primaryTextStyle: some ShapeStyle {
@@ -601,18 +583,6 @@ private struct EmptyPreviewLabel: View {
 
     private var secondaryTextStyle: some ShapeStyle {
         colorScheme == .light ? Color.black.opacity(0.62) : Color.white.opacity(0.72)
-    }
-
-    private var plateWash: Color {
-        colorScheme == .light
-            ? Color.white.opacity(0.32)
-            : Color.black.opacity(0.32)
-    }
-
-    private var plateStroke: Color {
-        colorScheme == .light
-            ? Color.black.opacity(0.06)
-            : Color.white.opacity(0.10)
     }
 }
 
@@ -627,43 +597,35 @@ private struct BrandedOpeningBackdrop: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        GlassEffectContainer(spacing: 0) {
-            ZStack {
-                Color.clear
-                Rectangle()
-                    .fill(baseNeutralWash)
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(colorScheme == .light ? 0.10 : 0.045),
-                        Color.white.opacity(colorScheme == .light ? 0.020 : 0.008),
-                        Color.clear
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                RadialGradient(
-                    colors: [
-                        Color.white.opacity(colorScheme == .light ? 0.085 : 0.050),
-                        Color.clear
-                    ],
-                    center: .center,
-                    startRadius: 80,
-                    endRadius: 620
-                )
-                .blendMode(.screen)
-            }
-            .glassEffect(.clear, in: Rectangle())
+        ZStack {
+            backgroundBase
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(colorScheme == .light ? 0.18 : 0.060),
+                    Color.white.opacity(colorScheme == .light ? 0.060 : 0.018),
+                    Color.clear
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            RadialGradient(
+                colors: [
+                    Color.white.opacity(colorScheme == .light ? 0.16 : 0.070),
+                    Color.clear
+                ],
+                center: .center,
+                startRadius: 80,
+                endRadius: 620
+            )
+            .blendMode(.screen)
         }
+        .allowsHitTesting(false)
     }
 
-    // K1: was `.white.opacity(0.022/0.010)` — too transparent over bright
-    // desktops. Move to a neutral dark wash in dark mode and a soft white
-    // wash in light mode, raising contrast for brand/CTA readability while
-    // keeping the field clear enough to feel native Liquid Glass.
-    private var baseNeutralWash: Color {
+    private var backgroundBase: Color {
         colorScheme == .light
-            ? Color.white.opacity(0.10)
-            : Color.black.opacity(0.18)
+            ? Color(nsColor: .windowBackgroundColor)
+            : Color.black.opacity(0.86)
     }
 }
 
@@ -681,8 +643,7 @@ private struct BrandedOpeningBackdrop: View {
         paramOverrides: .empty,
         opticalFilterProfileId: nil,
         opticalFilterIntensity: 1.0,
-        compareEnabled: false,
-        onOpenRequested: {}
+        compareEnabled: false
     )
     .frame(width: 600, height: 400)
 }

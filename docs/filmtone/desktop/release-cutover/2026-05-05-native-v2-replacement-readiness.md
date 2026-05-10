@@ -44,7 +44,8 @@ Truth scripts latest rechecked on 2026-05-06:
 - Native Desktop release version: `1.4`.
 - Local Native Desktop Bundle ID: `com.chibatakumi.film-lab-desktop`.
 - Local Native Desktop product name: `Filmtone`.
-- iOS public version: `1.4`.
+- iOS public version at the original readiness check: `1.4`.
+- iOS public version from the 2026-05-06 15:12 JST truth refresh: `1.5`.
 - iOS local Xcode candidate: `1.5` build `4`.
 
 The root `package.json` version belongs to the legacy Electron workspace and is
@@ -168,8 +169,11 @@ If failure happens before `update-meta.json` is switched, users should not see a
 new update prompt. Restore the download URL env if it was changed.
 
 If failure happens after `update-meta.json` is switched, immediately upload a
-rollback metadata body with `latestVersion: "1.0.4"` and the previous download
-page / release notes values. Then redeploy portfolio if env values changed.
+rollback metadata body with the previous public Desktop latest version and the
+previous download page / release notes values. For the M7 v1.5 lane, the
+rollback target is currently `latestVersion: "1.4"`; for the original v1.4
+cutover it was `latestVersion: "1.0.4"`. Then redeploy portfolio if env values
+changed.
 
 ## Non-Goals
 

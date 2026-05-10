@@ -311,17 +311,18 @@ Out of scope:
 
 ## Current Active
 
-S6 - Capture Orientation Contract.
+S5 - Recording Preview Performance.
 
-`active.md` owns the current live work. It starts from the containment
-hotfix commit `12978262 Lock iOS capture surface orientation` and turns
-iPhone rotation into an explicit capture contract covering preview
-orientation, chrome layout, tap-to-focus coordinates, recorded master/proxy
-truth, and sidecar provenance.
+`active.md` owns the current live work. It targets the dominant preview defect
+identified by owner smoke: Look-applied recording becomes too heavy, and
+stabilization On is the worst case. The selected product tradeoff is
+Lightweight Look monitoring during recording while preserving full-quality
+master, editor, and export behavior.
 
-The S1-S5 lane remains fully advanced from the coder side; owner-device smoke
-for those paused lanes is still pending. S7 code-side work is also complete
-and paused for owner-device smoke.
+The previous S6 active file was paused at
+`paused/2026-05-10-s6-capture-orientation-contract-paused.md`. Existing S6,
+S3, and S7 code-side changes remain part of the dirty worktree and must not be
+reverted by this S5 performance task.
 
 Paused (code-complete, awaiting owner-device smoke):
 
@@ -442,6 +443,32 @@ asks for that level of confidence.
   "Ungraded preview" badge into the cockpit overlay flow below the
   top controls so it cannot collide with the S3 take-commit pill.
   xcodebuild + verify:swift-contract green.
+- 2026-05-10: S3 owner-smoke take-picker revision — replaced the fixed
+  four-frame contact strip with a lightweight still-frame scrubber:
+  12 bounded low-resolution proxy samples per visible take, a larger
+  selected still for inspection, nearest-keyframe image generation, and an
+  explicit Open button so scrub gestures never accidentally commit a take.
+  xcodebuild + verify:swift-contract green.
+- 2026-05-10: S3 take-picker owner-smoke fix — scrubber frames now render
+  through the captured package's selected Look / custom LUT when available,
+  selected stills use a full-strength foreground over blurred fill, and scrub
+  timing uses `recordedDurationSeconds` package truth. generic xcodebuild,
+  verify:swift-contract, device build, and device install green.
+- 2026-05-10: S3 take-picker layout correction — compact-height presentation now
+  clips to the Liquid Glass panel, uses more of the available short height, and
+  switches take rows to a lower horizontal layout with a shorter scrub strip.
+  generic xcodebuild, device build, and device install green.
+- 2026-05-10: S3 take-picker performance/layout revision — frame sampling,
+  caching, and lazy selected-still Look rendering now live in
+  `FilmtoneCaptureTakePreviewLoader`; compact-height rows use an in-preview
+  scrub rail instead of an external thumbnail strip. generic xcodebuild,
+  verify:swift-contract, device build, and device install green.
+- 2026-05-10: S3 take-picker focused-inspector rebuild — replaced multi-row
+  rich take previews with one focused inspector plus a lightweight take
+  selector. Preview state now lives in `FilmtoneCaptureTakePreviewModel`, rail
+  frames use readable display stills, and exact Look / custom-LUT rendering is
+  limited to the selected large still. generic xcodebuild,
+  verify:swift-contract, device build, and device install green.
 - 2026-05-10: S6 opened after owner-device smoke exposed iPhone
   rotation problems in the capture preview/chrome. The immediate
   containment hotfix (`12978262`) locks the capture surface to

@@ -33,18 +33,18 @@ enum FilmtoneCaptureStoragePolicy: Equatable {
     }
 }
 
-/// Owner-visible identity of the rear lens used for a capture run.
+/// Owner-visible identity of the lens used for a capture run.
 /// Carries only fields that round-trip through `capture-package.json`;
 /// the runtime `AVCaptureDevice` reference lives on
 /// `FilmtoneCaptureLens` (the catalog-side struct) and is not
-/// persisted.  S8-B introduces this so rear-lens selection (M10) and
+/// persisted.  S8-B introduces this so lens selection (M10) and
 /// the upcoming capture-parameter readouts (S8-C) can refer to the
 /// same lens identity that the catalog enumerated.
 struct FilmtoneCaptureLensRecord: Equatable, Codable {
     /// `AVCaptureDevice.uniqueID` of the lens used for the run.
     let identifier: String
     /// Legacy canonical display name ("Main" / "Ultra Wide" /
-    /// "Telephoto").  Kept verbatim for backward compatibility with
+    /// "Telephoto" / "Front").  Kept verbatim for backward compatibility with
     /// pre-M12 `capture-package.json` consumers; the M12 capture-time
     /// label lives on `magnificationLabel`.
     let displayName: String
@@ -333,7 +333,7 @@ enum FilmtoneCaptureFailure: Error, Equatable {
         case .multiCamUnsupported:
             return "MultiCam capture is not supported on this device."
         case .noWideCamera:
-            return "No rear builtInWideAngleCamera available."
+            return "No camera satisfies the Filmtone capture contract."
         case .formatLockMismatch(let reason):
             return "Capture format mismatch: \(reason)"
         case .appleLog2Unavailable:

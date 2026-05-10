@@ -1,9 +1,9 @@
 /**
- * @file Native Desktop v2 replacement cutover preflight.
- * @description Read-only checks for the Filmtone Desktop v1.4 cutover. This
- *              script does not notarize, upload, mutate Vercel env, or write
- *              update-meta.json. It exists so the final production switch can
- *              be rehearsed without touching public state.
+ * @file Native Desktop v2 release preflight.
+ * @description Read-only checks for the current Filmtone Desktop release
+ *              candidate. This script does not notarize, upload, mutate Vercel
+ *              env, or write update-meta.json. It exists so production
+ *              releases can be rehearsed without touching public state.
  */
 
 import fsPromises from "node:fs/promises";
@@ -15,7 +15,6 @@ import {
   resolvePortfolioRootPath,
 } from "./release-artifact-meta.mjs";
 
-const EXPECTED_VERSION = "1.4";
 const EXPECTED_PRODUCT_NAME = "Filmtone";
 const EXPECTED_BUNDLE_ID = "com.chibatakumi.film-lab-desktop";
 const EXPECTED_PUBLIC_LEGACY_VERSION = "1.0.4";
@@ -43,6 +42,29 @@ function unique(values) {
   return [...new Set(values)];
 }
 
+function compareDottedVersions(a, b) {
+  const aParts = String(a)
+    .split(".")
+    .map((part) => Number.parseInt(part, 10));
+  const bParts = String(b)
+    .split(".")
+    .map((part) => Number.parseInt(part, 10));
+  if (
+    aParts.some((part) => Number.isNaN(part)) ||
+    bParts.some((part) => Number.isNaN(part))
+  ) {
+    return null;
+  }
+  const length = Math.max(aParts.length, bParts.length);
+  for (let i = 0; i < length; i += 1) {
+    const av = aParts[i] ?? 0;
+    const bv = bParts[i] ?? 0;
+    if (av < bv) return -1;
+    if (av > bv) return 1;
+  }
+  return 0;
+}
+
 function pass(label, detail = "") {
   checks.push({ level: "pass", label, detail });
 }
@@ -68,7 +90,7 @@ async function readText(filePath) {
   return fsPromises.readFile(filePath, "utf8");
 }
 
-async function fetchPublicUpdateMeta() {
+async function fetchPublicUpdateMeta(expectedVersion) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 5_000);
   try {
@@ -92,16 +114,31 @@ async function fetchPublicUpdateMeta() {
       );
       return;
     }
-    if (latestVersion === EXPECTED_VERSION) {
+    if (latestVersion === expectedVersion) {
       warn(
-        "Public update-meta already points at Native Desktop",
+        "Public update-meta already points at this release candidate",
         `latestVersion=${latestVersion}; do not re-cut unless this is intentional`,
       );
       return;
     }
+    const ordering = compareDottedVersions(latestVersion, expectedVersion);
+    if (ordering === -1) {
+      pass(
+        "Public update-meta is still before this release candidate",
+        `latestVersion=${latestVersion || "(missing)"} target=${expectedVersion}`,
+      );
+      return;
+    }
+    if (ordering === 1) {
+      warn(
+        "Public update-meta is newer than this release candidate",
+        `latestVersion=${latestVersion} target=${expectedVersion}`,
+      );
+      return;
+    }
     warn(
-      "Public update-meta latestVersion is unexpected",
-      `latestVersion=${latestVersion || "(missing)"}`,
+      "Public update-meta latestVersion is not comparable",
+      `latestVersion=${latestVersion || "(missing)"} target=${expectedVersion}`,
     );
   } catch (error) {
     warn("Public update-meta fetch", String(error));
@@ -111,10 +148,11 @@ async function fetchPublicUpdateMeta() {
 }
 
 async function main() {
-  console.log("Filmtone Native Desktop v2 cutover preflight");
+  console.log("Filmtone Native Desktop v2 release preflight");
   console.log(`repo: ${repoRootPath}`);
 
   const releaseMeta = await readDesktopReleaseMeta();
+  const expectedVersion = releaseMeta.version;
   const projectPath = path.join(
     desktopRootPath,
     "FilmtoneDesktop.xcodeproj",
@@ -125,12 +163,12 @@ async function main() {
   const marketingVersions = unique(
     collectBuildSettings(projectText, "MARKETING_VERSION"),
   );
-  if (marketingVersions.length === 1 && marketingVersions[0] === EXPECTED_VERSION) {
+  if (marketingVersions.length === 1 && marketingVersions[0] === expectedVersion) {
     pass("MARKETING_VERSION", marketingVersions[0]);
   } else {
     fail(
       "MARKETING_VERSION",
-      `expected only ${EXPECTED_VERSION}; found ${marketingVersions.join(", ")}`,
+      `expected only ${expectedVersion}; found ${marketingVersions.join(", ")}`,
     );
   }
 
@@ -169,9 +207,9 @@ async function main() {
   }
 
   if (
-    releaseMeta.version === EXPECTED_VERSION &&
+    releaseMeta.version === expectedVersion &&
     releaseMeta.productName === EXPECTED_PRODUCT_NAME &&
-    releaseMeta.dmgFileName === `${EXPECTED_PRODUCT_NAME}-${EXPECTED_VERSION}.dmg`
+    releaseMeta.dmgFileName === `${EXPECTED_PRODUCT_NAME}-${expectedVersion}.dmg`
   ) {
     pass(
       "Release artifact metadata",
@@ -248,7 +286,7 @@ async function main() {
     warn("Portfolio root", "not found; set PORTFOLIO_ROOT before public upload");
   }
 
-  await fetchPublicUpdateMeta();
+  await fetchPublicUpdateMeta(expectedVersion);
 
   for (const check of checks) {
     const prefix =

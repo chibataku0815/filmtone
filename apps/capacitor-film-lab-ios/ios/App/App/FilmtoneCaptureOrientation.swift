@@ -16,6 +16,7 @@ struct FilmtoneCaptureVideoRotation: Equatable, Codable {
     /// precision so KVO noise does not churn package/sidecar truth.
     let degrees: Double
 
+    static let identity = FilmtoneCaptureVideoRotation(degrees: Double(0))
     static let portraitPinned = FilmtoneCaptureVideoRotation(degrees: Double(90))
 
     init(degrees: CGFloat) {
