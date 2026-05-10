@@ -15,7 +15,6 @@ import SwiftUI
 
 #if os(iOS)
 
-import AVFoundation
 import UIKit
 import UniformTypeIdentifiers
 
@@ -37,7 +36,7 @@ struct FilmtoneCaptureView: View {
     /// M11 / S11-B: initial chip selection for the capture-time Look
     /// strip.  Caller resolves from the editor's `appliedSavedLookId`
     /// via `FilmtoneCaptureLook.resolve(from:)` so re-entering capture
-    /// after applying Stone / Urban in the editor surfaces the same
+    /// after applying a built-in Look in the editor surfaces the same
     /// Look as the active chip.  Defaults to `.filmtone` (no Look) so
     /// callers without M11 wiring still compile; S11-C will couple
     /// chip changes to live preview rebuild.
@@ -45,7 +44,7 @@ struct FilmtoneCaptureView: View {
     /// M11 / S11-C: closure handed in by `FilmtoneRootView` that calls
     /// `FilmtoneEditorStore.makeLivePreviewGradeProcessor(overridingBuiltInLook:)`
     /// for a given chip selection.  `.filmtone` maps to `nil` override
-    /// (no rebuild against the editor's pre-capture state); Stone / Urban
+    /// (no rebuild against the editor's pre-capture state); built-in Looks
     /// map to their `BuiltInLook` so the live preview reruns the 3-layer
     /// wiring (`appliedSavedLook` + camera profile) against the chip's
     /// catalog params.  Optional so test surfaces / preview targets that
@@ -54,6 +53,7 @@ struct FilmtoneCaptureView: View {
     let userLutEntries: [LutLibraryEntry]
     let importUserLut: (() async -> FilmtoneCaptureLook?)?
     let loadUserLut: ((LutLibraryEntry) async -> FilmtoneCaptureLook?)?
+    let makeTakePreviewGradeProcessor: ((FilmtoneCapturePackage) async -> FilmtoneSharedGradeProcessor?)?
     let onCompleted: (FilmtoneCapturePackage) -> Void
     let onCancelled: () -> Void
     let onFailed: (FilmtoneCaptureFailure) -> Void
@@ -66,6 +66,7 @@ struct FilmtoneCaptureView: View {
         userLutEntries: [LutLibraryEntry] = [],
         importUserLut: (() async -> FilmtoneCaptureLook?)? = nil,
         loadUserLut: ((LutLibraryEntry) async -> FilmtoneCaptureLook?)? = nil,
+        makeTakePreviewGradeProcessor: ((FilmtoneCapturePackage) async -> FilmtoneSharedGradeProcessor?)? = nil,
         onCompleted: @escaping (FilmtoneCapturePackage) -> Void,
         onCancelled: @escaping () -> Void,
         onFailed: @escaping (FilmtoneCaptureFailure) -> Void
@@ -77,6 +78,7 @@ struct FilmtoneCaptureView: View {
         self.userLutEntries = userLutEntries
         self.importUserLut = importUserLut
         self.loadUserLut = loadUserLut
+        self.makeTakePreviewGradeProcessor = makeTakePreviewGradeProcessor
         self.onCompleted = onCompleted
         self.onCancelled = onCancelled
         self.onFailed = onFailed
@@ -84,7 +86,7 @@ struct FilmtoneCaptureView: View {
         // initial Look so a cold open into capture surfaces the same
         // chip the editor has applied.  See `resolve(from:)` for the
         // fallback rule when an active saved Look is not in the chip
-        // strip (saved Look outside Stone/Urban → `.filmtone`).
+        // strip (saved Look outside the capture picker → `.filmtone`).
         self._captureLookSelection = State(initialValue: initialCaptureLook)
         // S11-C: seed the active grade chain from the props so the
         // first frame after present matches the editor's pre-capture
@@ -100,7 +102,7 @@ struct FilmtoneCaptureView: View {
     @State private var preflightWarnings: [String] = []
     @State private var preflightError: String?
     @State private var heldExternalFolderURL: URL?
-    /// S8-B: rear lenses that satisfy the M10 capture contract,
+    /// S8-B: lenses that satisfy the M10 capture contract,
     /// resolved once on `.task` from `FilmtoneCaptureLensCatalog`.
     @State private var lenses: [FilmtoneCaptureLens] = []
     /// S8-B: lens currently configured on the session.  Default = wide
@@ -188,6 +190,11 @@ struct FilmtoneCaptureView: View {
     /// S3 owner-smoke revision: multiple takes require an explicit
     /// owner choice because the editor is a single-source surface.
     @State private var showTakePicker: Bool = false
+    /// S6 owner-smoke revision: capture/video stays portrait-pinned,
+    /// but the chrome must still remain readable when the device is
+    /// physically held sideways. This is UI-only device orientation,
+    /// separate from AVFoundation rotation.
+    @State private var chromeOrientation: FilmtoneCaptureChromeOrientation = .portrait
 
     var body: some View {
         ZStack {
@@ -202,31 +209,8 @@ struct FilmtoneCaptureView: View {
                 onTap: handlePreviewTap
             )
 
-            // M13-M-2: cockpit composition. Top zone holds HUD bar +
-            // parameter chip row + ruler region (component-owned); bottom
-            // zone holds lens chip row + compact shutter cluster. The
-            // single GlassEffectContainer lets adjacent Liquid Glass
-            // shapes merge as one material instead of stacking
-            // translucencies. Each control owns its own glass primitive
-            // — there is no longer a single shelf slab.
-            GlassEffectContainer(spacing: 8) {
-                VStack(spacing: 0) {
-                    cockpitTopBar
-                        .padding(.horizontal, 16)
-                        .padding(.top, 8)
-                    if isUngradedPreviewFallback {
-                        HStack {
-                            ungradedPreviewBadge
-                            Spacer()
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 8)
-                    }
-                    Spacer()
-                    bottomZone
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 18)
-                }
+            FilmtoneCaptureChromeOverlay(orientation: chromeOrientation) {
+                chromeContent
             }
 
             if let prepareError {
@@ -236,6 +220,7 @@ struct FilmtoneCaptureView: View {
             if showTakePicker {
                 FilmtoneCaptureTakePickerOverlay(
                     packages: capturedPackages,
+                    makeGradeProcessor: makeTakePreviewGradeProcessor,
                     onPick: commitTake,
                     onCancel: {
                         FilmtoneCaptureHaptics.selection()
@@ -248,11 +233,17 @@ struct FilmtoneCaptureView: View {
         }
         .animation(.spring(response: 0.34, dampingFraction: 0.88), value: showTakePicker)
         .onAppear {
-            // S6: capture now owns orientation through
-            // AVCaptureDevice.RotationCoordinator inside
-            // FilmtoneCaptureSession. The scene is allowed to rotate;
-            // video connections carry the preview/capture truth.
-            FilmtoneInterfaceOrientationLock.allowDefaultOrientations()
+            // S6 owner-smoke revision: dynamic scene rotation broke
+            // portrait capture/preview and could strand the cockpit in
+            // landscape. Keep video portrait-pinned, then lay out the
+            // chrome in a landscape-sized overlay when the device is
+            // physically sideways.
+            FilmtoneInterfaceOrientationLock.lockToPortrait()
+            UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+            updateChromeOrientation(from: UIDevice.current.orientation)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
+            updateChromeOrientation(from: UIDevice.current.orientation)
         }
         .task {
             if let activeLiveDiagnostics {
@@ -283,7 +274,7 @@ struct FilmtoneCaptureView: View {
             syncSessionLookRecords(newLook)
             // S11-C: a chip tap rebuilds the live preview's grade chain
             // off the new Look without touching the editor store.  The
-            // closure resolves Stone / Urban to a built-in catalog
+            // closure resolves bundled Looks to a built-in catalog
             // entry and Filmtone to nil (no override) — see
             // FilmtoneEditorStore.makeLivePreviewGradeProcessor(overridingBuiltInLook:).
             // Disabled while recording (chip strip itself blocks the
@@ -330,6 +321,7 @@ struct FilmtoneCaptureView: View {
             // dismissCapture() or the .completed / .failed branches.
             // FilmtoneCaptureSession.teardown() is idempotent.
             FilmtoneInterfaceOrientationLock.restoreDefault()
+            UIDevice.current.endGeneratingDeviceOrientationNotifications()
             Task { [session] in
                 await session.teardown()
             }
@@ -372,6 +364,28 @@ struct FilmtoneCaptureView: View {
             Text(look.customLutRecord?.transformWarningReason ?? "FilmtoneはApple Log 2からの変換を先に行います。このLUTがLog変換用の場合、二重変換になり色が破綻する可能性があります。")
         }
         .accessibilityIdentifier("filmtone.capture.surface")
+    }
+
+    // MARK: - Chrome overlay
+
+    /// S6: lay the entire cockpit out against landscape dimensions before
+    /// rotating it. This keeps chips, HUD pills, and buttons as normal
+    /// horizontal controls instead of turning each card vertical in place.
+    private var chromeContent: some View {
+        FilmtoneCaptureChromeScaffold {
+            cockpitTopBar
+        } badge: {
+            if isUngradedPreviewFallback {
+                HStack {
+                    ungradedPreviewBadge
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+            }
+        } bottomContent: {
+            bottomZone
+        }
     }
 
     private func syncSessionLookRecords(_ look: FilmtoneCaptureLook) {
@@ -441,7 +455,7 @@ struct FilmtoneCaptureView: View {
             FilmtoneCaptureLivePreview(
                 sink: session.previewFrameSink,
                 gradeProcessor: activeGradeProcessor,
-                previewRotation: session.orientationState.previewRotation
+                previewRotation: .identity
             )
                 .ignoresSafeArea()
                 .accessibilityIdentifier("filmtone.capture.preview")
@@ -773,6 +787,16 @@ struct FilmtoneCaptureView: View {
         }
     }
 
+    private func updateChromeOrientation(from deviceOrientation: UIDeviceOrientation) {
+        guard let next = FilmtoneCaptureChromeOrientation(deviceOrientation: deviceOrientation) else {
+            return
+        }
+        guard next != chromeOrientation else { return }
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+            chromeOrientation = next
+        }
+    }
+
     // MARK: - Failure overlay
 
     private func failureOverlay(_ failure: FilmtoneCaptureFailure) -> some View {
@@ -839,21 +863,20 @@ struct FilmtoneCaptureView: View {
     }
 
     private func prepareSession() async {
-        // S8-B: enumerate rear lenses on first call; on subsequent
+        // S8-B: enumerate capture lenses on first call; on subsequent
         // calls (after a lens swap) reuse the existing list.  The
         // catalog is cheap (it walks AVCaptureDevice.DiscoverySession),
         // but rerunning it would re-resolve `device` references and
         // invalidate `selectedLens` Equatable comparisons.
         if lenses.isEmpty {
-            let discovered = FilmtoneCaptureLensCatalog.availableRearLenses()
+            let discovered = FilmtoneCaptureLensCatalog.availableCaptureLenses()
             lenses = discovered
             selectedLens = FilmtoneCaptureLensCatalog.defaultLens(in: discovered)
         }
         guard let lens = selectedLens else {
-            // No rear lens passed the M10 contract.  Surface as the
-            // existing `.noWideCamera` failure (semantically: "no
-            // qualifying rear camera"), which the failure overlay
-            // already routes correctly.
+            // No lens passed the M10 contract.  Surface as the
+            // existing `.noWideCamera` failure, which the failure
+            // overlay already routes correctly.
             prepareError = .noWideCamera
             return
         }
@@ -866,7 +889,7 @@ struct FilmtoneCaptureView: View {
         }
     }
 
-    /// S8-B: switch the active rear lens.  Tears down the current
+    /// S8-B: switch the active capture lens.  Tears down the current
     /// session graph and re-prepares against the chosen lens.  The
     /// `lensSwitchInFlight` guard prevents re-entrant taps from
     /// interleaving teardown + prepare on a half-configured session.
@@ -1026,299 +1049,6 @@ struct FilmtoneCaptureView: View {
             url.stopAccessingSecurityScopedResource()
         }
         heldExternalFolderURL = nil
-    }
-}
-
-// MARK: - Take picker
-
-private struct FilmtoneCaptureTakePickerOverlay: View {
-    let packages: [FilmtoneCapturePackage]
-    let onPick: (Int) -> Void
-    let onCancel: () -> Void
-
-    var body: some View {
-        GeometryReader { proxy in
-            ZStack(alignment: .bottom) {
-                Color.black.opacity(0.20)
-                    .ignoresSafeArea()
-                    .onTapGesture(perform: onCancel)
-
-                panel
-                    .frame(maxHeight: min(proxy.size.height * 0.74, 660))
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, max(proxy.safeAreaInsets.bottom + 12, 18))
-            }
-        }
-        .ignoresSafeArea(.container, edges: .bottom)
-        .accessibilityIdentifier("filmtone.capture.takePicker")
-    }
-
-    private var panel: some View {
-        let shape = RoundedRectangle(cornerRadius: 28, style: .continuous)
-        let ordered = Array(packages.indices.reversed())
-
-        return GlassEffectContainer(spacing: 8) {
-            VStack(spacing: 0) {
-                Capsule()
-                    .fill(.white.opacity(0.28))
-                    .frame(width: 54, height: 5)
-                    .padding(.top, 10)
-                    .padding(.bottom, 14)
-                    .accessibilityHidden(true)
-
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Choose take")
-                            .font(.system(size: 22, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.96))
-                        Text("\(packages.count) takes")
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.62))
-                    }
-
-                    Spacer(minLength: 0)
-
-                    Button(action: onCancel) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 15, weight: .bold))
-                            .frame(width: 34, height: 34)
-                    }
-                    .buttonStyle(.glass)
-                    .foregroundStyle(.white)
-                    .accessibilityLabel("Cancel")
-                    .accessibilityIdentifier("filmtone.capture.takePicker.cancel")
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 8)
-
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(ordered, id: \.self) { index in
-                            Button {
-                                FilmtoneCaptureHaptics.selection()
-                                onPick(index)
-                            } label: {
-                                FilmtoneCaptureTakePickerRow(
-                                    package: packages[index],
-                                    takeNumber: index + 1,
-                                    isLatest: index == packages.indices.last
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("filmtone.capture.takePicker.take\(index + 1)")
-
-                            if index != ordered.last {
-                                Rectangle()
-                                    .fill(.white.opacity(0.12))
-                                    .frame(height: 0.5)
-                                    .padding(.horizontal, 16)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 14)
-                }
-                .scrollIndicators(.hidden)
-            }
-            .padding(.top, 2)
-            .glassEffect(.clear.tint(.white.opacity(0.055)), in: shape)
-            .overlay(
-                shape.strokeBorder(.white.opacity(0.20), lineWidth: 0.7)
-            )
-            .shadow(color: .black.opacity(0.34), radius: 32, x: 0, y: 18)
-        }
-    }
-}
-
-private struct FilmtoneCaptureTakePickerRow: View {
-    let package: FilmtoneCapturePackage
-    let takeNumber: Int
-    let isLatest: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline, spacing: 7) {
-                Text("Take \(takeNumber)")
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.96))
-
-                if isLatest {
-                    Text("Latest")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.78))
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .glassEffect(.clear.tint(.white.opacity(0.07)), in: Capsule())
-                }
-
-                Spacer(minLength: 0)
-
-                Text(formatRecordedDuration(package.recordedDurationSeconds))
-                    .font(.system(size: 13, weight: .semibold, design: .rounded).monospacedDigit())
-                    .foregroundStyle(.white.opacity(0.64))
-            }
-
-            FilmtoneCaptureTakeContactStrip(package: package)
-
-            HStack(spacing: 8) {
-                Text(detailLine)
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.62))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-
-                Spacer(minLength: 0)
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.42))
-            }
-        }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 12)
-        .contentShape(Rectangle())
-        .accessibilityLabel(Text(accessibilityLabel))
-    }
-
-    private var detailLine: String {
-        var parts: [String] = []
-        if let lens = package.lens?.magnificationLabel {
-            parts.append(lens)
-        }
-        if let look = package.selectedLook?.englishName {
-            parts.append(look)
-        } else if let customLut = package.customLut {
-            parts.append(customLut.displayName)
-        } else {
-            parts.append("Filmtone")
-        }
-        return parts.joined(separator: " · ")
-    }
-
-    private var accessibilityLabel: String {
-        let latest = isLatest ? ", latest" : ""
-        return "Take \(takeNumber)\(latest), \(formatRecordedDuration(package.recordedDurationSeconds)), \(detailLine)"
-    }
-
-    private func formatRecordedDuration(_ seconds: Double) -> String {
-        guard seconds.isFinite, seconds > 0 else { return "0.0s" }
-        if seconds < 10 {
-            return String(format: "%.1fs", seconds)
-        }
-        let total = Int(seconds.rounded(.down))
-        return String(format: "%d:%02d", total / 60, total % 60)
-    }
-}
-
-private struct FilmtoneCaptureTakeContactStrip: View {
-    let package: FilmtoneCapturePackage
-
-    private static let sampleFractions: [Double] = [0.12, 0.38, 0.62, 0.88]
-
-    @State private var images: [UIImage?] = Array(
-        repeating: nil,
-        count: FilmtoneCaptureTakeContactStrip.sampleFractions.count
-    )
-
-    var body: some View {
-        HStack(spacing: 6) {
-            ForEach(Self.sampleFractions.indices, id: \.self) { index in
-                frameSlot(image: images[index])
-            }
-        }
-        .frame(height: 112)
-        .task(id: package.captureId) {
-            images = await Self.frames(for: package.proxyURL)
-        }
-        .accessibilityHidden(true)
-    }
-
-    @ViewBuilder
-    private func frameSlot(image: UIImage?) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
-        ZStack {
-            shape.fill(.black.opacity(0.18))
-
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                Image(systemName: "video")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.44))
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .clipShape(shape)
-        .overlay(shape.strokeBorder(.white.opacity(0.10), lineWidth: 0.5))
-    }
-
-    private static func frames(for url: URL) async -> [UIImage?] {
-        await Task.detached(priority: .userInitiated) {
-            let asset = AVURLAsset(url: url)
-            let generator = AVAssetImageGenerator(asset: asset)
-            generator.appliesPreferredTrackTransform = true
-            generator.maximumSize = CGSize(width: 240, height: 240)
-
-            let durationTime = try? await asset.load(.duration)
-            let duration = durationTime.map(CMTimeGetSeconds) ?? 0
-
-            var results: [UIImage?] = []
-            for fraction in sampleFractions {
-                let seconds: Double
-                if duration.isFinite, duration > 0.4 {
-                    seconds = min(duration * fraction, duration - 0.12)
-                } else {
-                    seconds = 0
-                }
-
-                let time = CMTime(seconds: max(0, seconds), preferredTimescale: 600)
-                guard let frame = try? await generator.image(at: time) else {
-                    results.append(nil)
-                    continue
-                }
-                results.append(UIImage(cgImage: frame.image))
-            }
-
-            return results
-        }.value
-    }
-}
-
-// MARK: - Preview layer wrapper
-
-private struct FilmtoneCapturePreview: UIViewRepresentable {
-    let previewLayer: AVCaptureVideoPreviewLayer
-
-    func makeUIView(context: Context) -> PreviewContainer {
-        let v = PreviewContainer()
-        v.attach(layer: previewLayer)
-        return v
-    }
-
-    func updateUIView(_ uiView: PreviewContainer, context: Context) {
-        uiView.attach(layer: previewLayer)
-    }
-
-    final class PreviewContainer: UIView {
-        private var attachedLayer: AVCaptureVideoPreviewLayer?
-
-        override class var layerClass: AnyClass { CALayer.self }
-
-        func attach(layer: AVCaptureVideoPreviewLayer) {
-            if attachedLayer === layer { return }
-            attachedLayer?.removeFromSuperlayer()
-            self.attachedLayer = layer
-            layer.frame = bounds
-            self.layer.addSublayer(layer)
-        }
-
-        override func layoutSubviews() {
-            super.layoutSubviews()
-            attachedLayer?.frame = bounds
-        }
     }
 }
 

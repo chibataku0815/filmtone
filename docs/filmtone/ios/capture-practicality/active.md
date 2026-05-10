@@ -16,6 +16,11 @@ existing `videoRotationAngle = 90` capture pipeline. S6 is the real lane.
 
 - No leaf-only text/icon rotation. The previous attempt made cockpit labels
   vertical, clipped HUD text, and caused overlapping controls.
+- Owner-smoke revision: dynamic AVFoundation / scene orientation is disabled
+  in S6 because it broke the core portrait capture/preview path. Capture video
+  stays portrait-pinned, while whole chrome controls rotate from
+  `UIDeviceOrientation` so parameter labels remain readable when the phone is
+  held sideways.
 - Use `AVCaptureConnection.videoRotationAngle`; do not add new
   `videoOrientation` usage.
 - Ignore transient `faceUp`, `faceDown`, and `unknown` device orientation.
@@ -54,6 +59,15 @@ implementation log.
 - [x] Decide whether movie output should remain portrait-pinned or adopt the
   start-of-record orientation; if dynamic, add package + sidecar truth before
   shipping the change.
+- [x] Restore portrait-pinned capture after owner smoke showed dynamic
+  orientation breaks vertical preview and can strand the UI after one
+  landscape rotation.
+- [x] Restore chrome readability on physical landscape without touching
+  preview/movie rotation: rotate whole chips, HUD pills, lens chips, SSD, and
+  LOOK controls instead of rotating leaf text/icons.
+- [x] Owner-requested S3 take-picker revision: replace the fixed four-frame
+  contact strip with a lightweight still-frame scrubber so long SSD takes can be
+  inspected before choosing which take opens in the editor.
 - [ ] Add a landscape chrome layout only if needed after preview/master
   orientation is correct. Do not rotate individual text leaves.
 - [x] Run minimal verification after each meaningful step.
@@ -75,15 +89,17 @@ Coder-side:
 Owner-device smoke:
 
 1. Open capture in portrait; preview upright, controls readable.
-2. Rotate to landscape left before recording; preview upright for framing,
-   controls not overlapping.
-3. Rotate to landscape right before recording; same checks.
-4. Tap-to-focus in each orientation; reticle and focus point match the tapped
-   subject area.
-5. Record a short landscape-left clip and a short landscape-right clip.
-6. Adopt each into the editor; proxy orientation and preview match capture.
-7. Run short export; master/proxy/package/sidecar orientation truth matches
-   the selected S6 contract.
+2. Rotate the physical device left/right; preview remains upright and the
+   parameter chips / HUD / lens chips / SSD / LOOK controls rotate as whole
+   readable controls, not clipped vertical text.
+3. Rotate back upright; chrome returns to portrait and preview is not stranded
+   in landscape.
+4. Tap-to-focus in portrait; reticle and focus point match the tapped subject
+   area.
+5. Record a short portrait clip.
+6. Adopt it into the editor; proxy orientation and preview match capture.
+7. Run short export; master/proxy/package/sidecar orientation truth records
+   the portrait-pinned 90 degree contract.
 
 ## Implementation Notes
 
@@ -104,6 +120,47 @@ Owner-device smoke:
 - 2026-05-10: `capture-package.json` and export sidecar provenance now carry
   `requestedCaptureRotationDegrees` and `observedCaptureRotationDegrees`
   additively for S6 captures.
+- 2026-05-10: Owner smoke found the dynamic path breaks the core vertical
+  product path: portrait preview is wrong and once the device goes landscape
+  it cannot recover to portrait. S6 now explicitly returns to portrait-pinned
+  capture: scene mask locked to portrait, VDO/fallback/movie connections use
+  the proven 90 degree baseline, Metal preview does not add an extra renderer
+  rotation, and package/sidecar truth still records requested/observed 90.
+- 2026-05-10: Owner then correctly rejected the first recovery because it also
+  removed physical-landscape chrome feedback. Added UI-only chrome orientation:
+  capture/video remains portrait-pinned, but whole control surfaces rotate from
+  `UIDeviceOrientation` via a dedicated environment modifier. This avoids the
+  previous failed leaf-only text/icon rotation that clipped labels and left
+  card shapes unrotated.
+- 2026-05-10: Owner smoke rejected that chrome revision too: rotating each
+  control surface in-place still produced vertical card-in-card shapes and
+  overlapping badges. Removed the per-control rotation path. The revised
+  approach lays out the entire cockpit overlay against landscape dimensions
+  first, then rotates the full chrome overlay as one unit while leaving preview
+  and movie capture portrait-pinned.
+- 2026-05-10: Responsibility follow-up after owner flagged
+  `FilmtoneCaptureView.swift` size: moved the S6 overlay rotation/sizing
+  responsibility into `FilmtoneCaptureChromeOverlay` in
+  `FilmtoneCaptureChrome.swift`. `FilmtoneCaptureView` now only supplies
+  chrome content and the current chrome orientation.
+- 2026-05-10: Owner requested the take picker move beyond static thumbnails
+  because 1-minute SSD takes can look indistinguishable from a single thumbnail.
+  The planned revision is still-image based, not multi-`AVPlayer`: each visible
+  take gets a bounded low-resolution proxy frame set, a scrub indicator, and an
+  explicit Open control so inspection gestures cannot accidentally commit a
+  take.
+- 2026-05-10: Implemented the S3 take-picker scrubber in
+  `FilmtoneCaptureView.swift`: each visible take now samples 12 low-resolution
+  proxy frames with nearest-keyframe `AVAssetImageGenerator` tolerance, shows a
+  larger selected still plus a compact scrub strip, and commits only through the
+  row's explicit Open button.
+- 2026-05-10: Owner flagged `FilmtoneCaptureView.swift` as still too large.
+  Split completed-take inspection into
+  `FilmtoneCaptureTakePickerOverlay.swift`, moved the fallback
+  `AVCaptureVideoPreviewLayer` bridge into `FilmtoneCapturePreviewLayer.swift`,
+  and moved the chrome slot layout into `FilmtoneCaptureChromeScaffold` so
+  `FilmtoneCaptureView` is back to capture orchestration instead of owning
+  every overlay implementation.
 
 ## Verification Log
 
@@ -131,11 +188,46 @@ Owner-device smoke:
   iPhone (7), `xcrun devicectl device install app ... App.app` succeeded,
   and `xcrun devicectl device process launch ... com.chibatakumi.film.lab.ios`
   launched the app.
+- 2026-05-10: Portrait-pinned recovery pass after owner smoke rejection:
+  `git diff --check` clean on S6-owned files;
+  `xcodebuild ... generic/platform=iOS ... CODE_SIGNING_ALLOWED=NO`
+  succeeded; `bun run --cwd apps/capacitor-film-lab-ios
+  verify:swift-contract` passed; `xcodebuild ... -destination
+  id=3A2A3A66-D092-5F87-8CE7-9A1EBD238FE9 -derivedDataPath
+  /tmp/filmtone-s6-portrait-pin-device-build build` succeeded. No install or
+  launch was run for this revision.
+- 2026-05-10: Chrome-readable revision after owner rejected the
+  portrait-only recovery: `git diff --check` clean on touched S6/sidecar
+  files; conflict-marker grep clean across the iOS Swift surface;
+  `bun run --cwd apps/capacitor-film-lab-ios verify:swift-contract`
+  passed; `xcodebuild ... generic/platform=iOS ... CODE_SIGNING_ALLOWED=NO`
+  succeeded; `xcodebuild ... -destination
+  id=3A2A3A66-D092-5F87-8CE7-9A1EBD238FE9 -derivedDataPath
+  /tmp/filmtone-s6-chrome-device-build build` succeeded. No install or launch
+  was run for this revision.
+- 2026-05-10: S3 take-picker scrubber revision:
+  `git diff --check` clean on touched files;
+  `xcodebuild ... generic/platform=iOS ... CODE_SIGNING_ALLOWED=NO` succeeded
+  after removing the new Swift 6 actor-isolation warning from detached frame
+  generation; `bun run --cwd apps/capacitor-film-lab-ios
+  verify:swift-contract` passed.
+- 2026-05-10: Capture-view responsibility split:
+  `git diff --check` clean on touched files; pbxproj grep count is 4 for both
+  new Swift files (`FilmtoneCaptureTakePickerOverlay.swift` and
+  `FilmtoneCapturePreviewLayer.swift`); `xcodebuild ... generic/platform=iOS
+  ... CODE_SIGNING_ALLOWED=NO` succeeded. No install or launch was run.
+- 2026-05-10: Owner requested device install after the responsibility split:
+  `xcodebuild ... -destination id=3A2A3A66-D092-5F87-8CE7-9A1EBD238FE9
+  -derivedDataPath /tmp/filmtone-capture-refactor-device-build build`
+  succeeded, then `xcrun devicectl device install app ... App.app` installed
+  bundle `com.chibatakumi.film.lab.ios`. No launch was run.
 
 ## Current State
 
-Coder-side S6 core is green and installed/launched on iPhone (7). Remaining
-risk is visual/behavioral and needs owner-device smoke: preview uprightness in
-landscape left/right, cockpit layout density after real scene rotation,
-tap-to-focus coordinate correctness, and editor/export orientation truth for
-short landscape clips.
+Dynamic AVFoundation / scene rotation is rejected by owner smoke. The current
+code-side S6 revision keeps preview/movie portrait-pinned and restores
+physical-landscape chrome readability by rotating whole controls from
+`UIDeviceOrientation`. It is green on Swift contract, generic iOS build, and
+iPhone (7) device build. It has not been installed or launched after this
+chrome-readable revision; owner-device smoke is still required before
+archiving.

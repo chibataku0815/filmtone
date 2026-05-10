@@ -23,6 +23,52 @@ import UIKit
 
 #if os(iOS)
 
+enum FilmtoneCaptureChromeOrientation: Equatable {
+    case portrait
+    case landscapeLeft
+    case landscapeRight
+    case portraitUpsideDown
+
+    init?(deviceOrientation: UIDeviceOrientation) {
+        switch deviceOrientation {
+        case .portrait:
+            self = .portrait
+        case .landscapeLeft:
+            self = .landscapeLeft
+        case .landscapeRight:
+            self = .landscapeRight
+        case .portraitUpsideDown:
+            self = .portraitUpsideDown
+        case .faceUp, .faceDown, .unknown:
+            return nil
+        @unknown default:
+            return nil
+        }
+    }
+
+    var readableRotation: Angle {
+        switch self {
+        case .portrait:
+            return .zero
+        case .landscapeLeft:
+            return .degrees(90)
+        case .landscapeRight:
+            return .degrees(-90)
+        case .portraitUpsideDown:
+            return .degrees(180)
+        }
+    }
+
+    var usesLandscapeLayout: Bool {
+        switch self {
+        case .landscapeLeft, .landscapeRight:
+            return true
+        case .portrait, .portraitUpsideDown:
+            return false
+        }
+    }
+}
+
 enum FilmtoneCaptureChrome {
     // TIDE accent — kept for future warm-state usage.
     static let amber = Color(red: 0.88, green: 0.80, blue: 0.56)
@@ -115,6 +161,69 @@ enum FilmtoneCaptureHaptics {
 
     static func recordImpact() {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+    }
+}
+
+struct FilmtoneCaptureChromeOverlay<Content: View>: View {
+    let orientation: FilmtoneCaptureChromeOrientation
+    private let content: () -> Content
+
+    init(
+        orientation: FilmtoneCaptureChromeOrientation,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        self.orientation = orientation
+        self.content = content
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            let size = proxy.size
+            let chromeSize = orientation.usesLandscapeLayout
+                ? CGSize(width: size.height, height: size.width)
+                : size
+
+            content()
+                .frame(width: chromeSize.width, height: chromeSize.height)
+                .rotationEffect(orientation.readableRotation)
+                .frame(width: size.width, height: size.height)
+                .position(x: size.width / 2, y: size.height / 2)
+        }
+        .animation(.spring(response: 0.28, dampingFraction: 0.86), value: orientation)
+    }
+}
+
+struct FilmtoneCaptureChromeScaffold<TopContent: View, Badge: View, BottomContent: View>: View {
+    private let topContent: () -> TopContent
+    private let badge: () -> Badge
+    private let bottomContent: () -> BottomContent
+
+    init(
+        @ViewBuilder topContent: @escaping () -> TopContent,
+        @ViewBuilder badge: @escaping () -> Badge,
+        @ViewBuilder bottomContent: @escaping () -> BottomContent
+    ) {
+        self.topContent = topContent
+        self.badge = badge
+        self.bottomContent = bottomContent
+    }
+
+    var body: some View {
+        GlassEffectContainer(spacing: 8) {
+            VStack(spacing: 0) {
+                topContent()
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+
+                badge()
+
+                Spacer()
+
+                bottomContent()
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 18)
+            }
+        }
     }
 }
 
