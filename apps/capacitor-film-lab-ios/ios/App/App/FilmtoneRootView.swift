@@ -20,6 +20,7 @@ struct FilmtoneRootView: View {
     @State private var pendingLookOnPickComplete: SavedLookEntry?
     @State private var activeHelpTopic: FilmtoneAdjustmentHelpTopic?
     @State private var captureSurfacePresented = false
+    @State private var captureAvailability = FilmtoneCaptureAvailability.evaluate()
 
     var body: some View {
         ZStack {
@@ -28,7 +29,9 @@ struct FilmtoneRootView: View {
                     store: store,
                     onPickPhotoLibrary: { Task { await store.pickSource(route: .photoLibrary) } },
                     onPickFiles: { Task { await store.pickSource(route: .files) } },
-                    onRecordProductClip: { captureSurfacePresented = true },
+                    onRecordProductClip: presentCaptureSurfaceIfSupported,
+                    isRecordProductClipSupported: captureAvailability.isSupported,
+                    recordProductClipUnsupportedMessage: store.strings.recordProductClipUnsupported,
                     onPickWithLook: { entry in
                         pendingLookOnPickComplete = entry
                         Task { await store.pickSource(route: .photoLibrary) }
@@ -47,7 +50,9 @@ struct FilmtoneRootView: View {
                     // handler only flips the cover state); success replaces
                     // the source via `adoptCaptureResult`. Old package /
                     // unsaved-edit confirmation are out of scope for S8-A.
-                    onRecord: { captureSurfacePresented = true }
+                    onRecord: presentCaptureSurfaceIfSupported,
+                    isRecordSupported: captureAvailability.isSupported,
+                    recordUnsupportedMessage: store.strings.recordProductClipUnsupported
                 )
             }
 
@@ -180,6 +185,7 @@ struct FilmtoneRootView: View {
             )
         }
         .onAppear {
+            captureAvailability = FilmtoneCaptureAvailability.evaluate()
             FilmtoneOnboardingState.applyLaunchArgumentsIfNeeded()
             presentOnboardingIfNeeded()
         }
@@ -268,6 +274,15 @@ struct FilmtoneRootView: View {
             }
             Button(store.strings.savedLookSheetCancel, role: .cancel) {}
         }
+    }
+
+    private func presentCaptureSurfaceIfSupported() {
+        captureAvailability = FilmtoneCaptureAvailability.evaluate()
+        guard captureAvailability.isSupported else {
+            store.recordingError = store.strings.recordProductClipUnsupported
+            return
+        }
+        captureSurfacePresented = true
     }
 
     // MARK: Recording overlay (M8 — fixed-duration product capture feedback)

@@ -271,4 +271,14 @@ enum FilmtoneCaptureLensCatalog {
     }
 }
 
+struct FilmtoneCaptureAvailability: Equatable {
+    let isSupported: Bool
+
+    static func evaluate() -> FilmtoneCaptureAvailability {
+        FilmtoneCaptureAvailability(
+            isSupported: !FilmtoneCaptureLensCatalog.availableRearLenses().isEmpty
+        )
+    }
+}
+
 #endif
