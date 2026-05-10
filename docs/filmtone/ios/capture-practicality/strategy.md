@@ -42,6 +42,9 @@ The priority order is:
    internal recording capped.
 6. Improve recording preview behavior last, because preview work can expand
    into render cadence, color honesty, and performance.
+7. Let capture use owner-imported creative LUTs, with app-owned input
+   conversion and visible warning when a loaded LUT looks like a technical
+   transform LUT rather than a creative Look LUT.
 
 ## Execution Bias
 
@@ -70,6 +73,9 @@ This lane is done when the owner can repeatedly:
    judgment, and Look choice.
 7. Complete the existing capture loop: master/proxy package, editor handoff,
    master-quality export when available, and sidecar provenance.
+8. Import a `.cube` Look LUT from the capture surface, preview it during
+   recording, and have the chosen LUT travel with the take into editor and
+   export provenance without silently double-transforming Apple Log footage.
 
 ## Milestones
 
@@ -240,11 +246,78 @@ Out of scope:
 - Replacing the export pipeline.
 - App Store assets and public copy.
 
+### S7 - Capture Custom LUT Intake
+
+Goal:
+
+Let the owner apply an arbitrary user-imported creative LUT while recording,
+without making them understand capture-source conversion. Filmtone owns the
+Apple Log 2 input conversion; imported LUTs in this lane are treated as
+creative Look LUTs. If a loaded LUT appears to be a technical transform LUT,
+the UI must warn that the image may break because the app already handles the
+conversion stage.
+
+Product direction:
+
+- Capture master remains the strict ProRes 422 HQ / Apple Log 2 source unless
+  a future lane explicitly chooses a baked-writer path.
+- The LUT affects live monitoring, selected-take identity, editor adoption,
+  and export render/provenance through the existing non-destructive Look
+  pipeline.
+- User-imported capture LUTs should reuse the existing `.cube` parser,
+  library store, `CreativeLutBinding`, `FilmtoneSharedGradeProcessor`, and
+  sidecar creative-LUT reference wherever possible.
+- Transform-LUT detection is a warning contract, not a perfect classifier:
+  use filename/title/profile keywords and simple cube-shape heuristics to flag
+  likely input/conversion LUTs, then let the owner either cancel or use anyway.
+
+Done:
+
+- The capture Look picker exposes a compact User LUT import / selection path
+  without adding a broad library-management surface.
+- Imported `.cube` files are parsed, normalized, deduplicated, and stored via
+  the existing LUT library with `preferredSlot = .creative`.
+- Capture live preview applies the app-owned Apple Log 2 input conversion
+  before the selected creative LUT, including cold-start capture with no
+  editor source loaded.
+- Built-in Looks and user LUT Looks share one capture selection model so the
+  LOOK chip, take picker metadata, package, editor adoption, and export path do
+  not disagree.
+- `capture-package.json` records enough custom-LUT truth to recover the Look:
+  stable library id when available, title, size, source hash or embedded
+  fallback, intensity, conversion policy, and whether a transform-LUT warning
+  was shown / accepted.
+- Export sidecar provenance identifies the capture-time custom LUT and the
+  app-owned input-conversion policy.
+- If the imported LUT is likely a transform / input / Log-to-Rec709 LUT, the
+  owner sees a clear warning before applying it in capture.
+- No silent fallback: parser failure, missing LUT blob, unsupported cube size,
+  or preview-grade build failure must be visible as ungraded or failed
+  capture-LUT state, not presented as a successful graded preview.
+
+Dependency:
+
+- S6 orientation contract should land first unless the owner explicitly
+  chooses to switch active work. Custom LUT preview quality is hard to judge if
+  the capture preview can rotate incorrectly.
+
+Out of scope:
+
+- Baking the custom LUT into the recorded ProRes master.
+- Treating user LUTs as replacement input transforms inside the capture path.
+- Full LUT library management, folders, tags, batch import, marketplace, or
+  cloud sync.
+- Supporting non-`.cube` LUT formats in this lane.
+
 ## Current Active
 
-No active task. The S1-S5 lane is fully advanced from the coder side;
-the next live work is owner-device smoke (or, for S5, the
-dominant-defect pick that selects the next S5 active).
+S7 - Capture Custom LUT Intake is active in the isolated worktree
+`worktree-feature+ios-s7-capture-custom-lut-plan`.
+
+Code-side implementation is complete. Remaining live work is owner-device
+smoke for `.cube` import, live capture preview, package / sidecar truth,
+editor adoption, export provenance, and the transform-LUT warning acceptance
+path.
 
 Paused (code-complete, awaiting owner-device smoke):
 
@@ -364,3 +437,8 @@ asks for that level of confidence.
   "Ungraded preview" badge into the cockpit overlay flow below the
   top controls so it cannot collide with the S3 take-commit pill.
   xcodebuild + verify:swift-contract green.
+- 2026-05-10: S7 code-side implementation landed in isolated worktree —
+  capture LOOK sheet imports / selects user `.cube` creative LUTs, warns on
+  likely transform LUTs, carries custom-LUT truth through package, editor
+  adoption, and export sidecar provenance. `git diff --check`, xcodebuild,
+  and app-level `verify:swift-contract` green. Owner-device smoke pending.

@@ -434,6 +434,18 @@ struct SidecarCaptureProvenance: Encodable {
     /// mode on a clean run; the post-record gate would have failed the
     /// run if they diverged.  Optional / additive.
     let observedStabilization: String?
+    /// S7: custom capture LUT provenance. These fields are nil when the
+    /// capture used a built-in Look or Filmtone default.
+    let customLutTitle: String?
+    let customLutLibraryId: String?
+    let customLutSourceHash: String?
+    let customLutSize: Int?
+    let customLutIntensity: Double?
+    let customLutConversionPolicy: String?
+    let customLutTransformWarningAccepted: Bool?
+    let customLutTransformWarningReason: String?
+    let customLutTransformWarningKind: String?
+    let customLutTransformWarningSignal: String?
 
     init(
         mode: String,
@@ -441,7 +453,17 @@ struct SidecarCaptureProvenance: Encodable {
         masterUriUsed: String?,
         proxyUriUsed: String?,
         requestedStabilization: String? = nil,
-        observedStabilization: String? = nil
+        observedStabilization: String? = nil,
+        customLutTitle: String? = nil,
+        customLutLibraryId: String? = nil,
+        customLutSourceHash: String? = nil,
+        customLutSize: Int? = nil,
+        customLutIntensity: Double? = nil,
+        customLutConversionPolicy: String? = nil,
+        customLutTransformWarningAccepted: Bool? = nil,
+        customLutTransformWarningReason: String? = nil,
+        customLutTransformWarningKind: String? = nil,
+        customLutTransformWarningSignal: String? = nil
     ) {
         self.mode = mode
         self.reason = reason
@@ -449,11 +471,25 @@ struct SidecarCaptureProvenance: Encodable {
         self.proxyUriUsed = proxyUriUsed
         self.requestedStabilization = requestedStabilization
         self.observedStabilization = observedStabilization
+        self.customLutTitle = customLutTitle
+        self.customLutLibraryId = customLutLibraryId
+        self.customLutSourceHash = customLutSourceHash
+        self.customLutSize = customLutSize
+        self.customLutIntensity = customLutIntensity
+        self.customLutConversionPolicy = customLutConversionPolicy
+        self.customLutTransformWarningAccepted = customLutTransformWarningAccepted
+        self.customLutTransformWarningReason = customLutTransformWarningReason
+        self.customLutTransformWarningKind = customLutTransformWarningKind
+        self.customLutTransformWarningSignal = customLutTransformWarningSignal
     }
 
     private enum CodingKeys: String, CodingKey {
         case mode, reason, masterUriUsed, proxyUriUsed
         case requestedStabilization, observedStabilization
+        case customLutTitle, customLutLibraryId, customLutSourceHash
+        case customLutSize, customLutIntensity, customLutConversionPolicy
+        case customLutTransformWarningAccepted, customLutTransformWarningReason
+        case customLutTransformWarningKind, customLutTransformWarningSignal
     }
 
     func encode(to encoder: Encoder) throws {
@@ -467,6 +503,30 @@ struct SidecarCaptureProvenance: Encodable {
         )
         try container.encodeIfPresent(
             observedStabilization, forKey: .observedStabilization
+        )
+        try container.encodeIfPresent(customLutTitle, forKey: .customLutTitle)
+        try container.encodeIfPresent(customLutLibraryId, forKey: .customLutLibraryId)
+        try container.encodeIfPresent(customLutSourceHash, forKey: .customLutSourceHash)
+        try container.encodeIfPresent(customLutSize, forKey: .customLutSize)
+        try container.encodeIfPresent(customLutIntensity, forKey: .customLutIntensity)
+        try container.encodeIfPresent(
+            customLutConversionPolicy, forKey: .customLutConversionPolicy
+        )
+        try container.encodeIfPresent(
+            customLutTransformWarningAccepted,
+            forKey: .customLutTransformWarningAccepted
+        )
+        try container.encodeIfPresent(
+            customLutTransformWarningReason,
+            forKey: .customLutTransformWarningReason
+        )
+        try container.encodeIfPresent(
+            customLutTransformWarningKind,
+            forKey: .customLutTransformWarningKind
+        )
+        try container.encodeIfPresent(
+            customLutTransformWarningSignal,
+            forKey: .customLutTransformWarningSignal
         )
     }
 }

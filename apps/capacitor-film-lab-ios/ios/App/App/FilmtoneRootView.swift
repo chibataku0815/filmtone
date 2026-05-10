@@ -147,6 +147,11 @@ struct FilmtoneRootView: View {
             // matches the chip without touching the editor's persisted
             // state until `adoptCaptureResult` (S11-E).
             let makeGradeProcessor: (FilmtoneCaptureLook) -> FilmtoneLivePreviewBundle? = { chip in
+                if let lut = chip.parsedCreativeLut {
+                    return store.makeLivePreviewGradeProcessor(
+                        captureCreativeLut: lut
+                    )
+                }
                 let builtIn = chip.canonicalUUID.flatMap {
                     FilmtoneBuiltInCatalog.look(matching: $0)
                 }
@@ -159,6 +164,13 @@ struct FilmtoneRootView: View {
                 liveDiagnostics: liveBundle?.diagnostics,
                 initialCaptureLook: initialCaptureLook,
                 makeGradeProcessor: makeGradeProcessor,
+                userLutEntries: store.library.recentLuts,
+                importUserLut: {
+                    await store.importCaptureUserLut()
+                },
+                loadUserLut: { entry in
+                    await store.loadCaptureUserLut(entry: entry)
+                },
                 onCompleted: { package in
                     captureSurfacePresented = false
                     Task { await store.adoptCaptureResult(package) }

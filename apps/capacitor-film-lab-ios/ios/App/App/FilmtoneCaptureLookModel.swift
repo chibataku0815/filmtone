@@ -10,12 +10,18 @@ struct FilmtoneCaptureLook: Identifiable, Equatable {
     let displayName: String
     let canonicalUUID: UUID?
     let slug: String?
+    let libraryLutId: UUID?
+    let parsedCreativeLut: ParsedCubeLutDTO?
+    let customLutRecord: FilmtoneCaptureCustomLutRecord?
 
     static let filmtone = FilmtoneCaptureLook(
         id: "filmtone",
         displayName: "Filmtone",
         canonicalUUID: nil,
-        slug: nil
+        slug: nil,
+        libraryLutId: nil,
+        parsedCreativeLut: nil,
+        customLutRecord: nil
     )
 
     static let stone: FilmtoneCaptureLook = {
@@ -25,7 +31,10 @@ struct FilmtoneCaptureLook: Identifiable, Equatable {
             id: "stone",
             displayName: entry?.englishName ?? "Stone",
             canonicalUUID: entry?.canonicalUUID,
-            slug: slug
+            slug: slug,
+            libraryLutId: nil,
+            parsedCreativeLut: nil,
+            customLutRecord: nil
         )
     }()
 
@@ -36,7 +45,10 @@ struct FilmtoneCaptureLook: Identifiable, Equatable {
             id: "urban",
             displayName: entry?.englishName ?? "Urban",
             canonicalUUID: entry?.canonicalUUID,
-            slug: slug
+            slug: slug,
+            libraryLutId: nil,
+            parsedCreativeLut: nil,
+            customLutRecord: nil
         )
     }()
 
@@ -55,6 +67,77 @@ struct FilmtoneCaptureLook: Identifiable, Equatable {
             englishName: displayName,
             intensity: 1.0
         )
+    }
+
+    func toCustomLutRecord() -> FilmtoneCaptureCustomLutRecord? {
+        customLutRecord
+    }
+
+    var needsTransformWarningAcceptance: Bool {
+        customLutRecord?.transformWarningReason != nil
+            && customLutRecord?.transformWarningAccepted == false
+    }
+
+    func acceptingTransformWarning() -> FilmtoneCaptureLook {
+        guard let record = customLutRecord else { return self }
+        let accepted = FilmtoneCaptureCustomLutRecord(
+            libraryId: record.libraryId,
+            title: record.title,
+            size: record.size,
+            sourceHash: record.sourceHash,
+            intensity: record.intensity,
+            conversionPolicy: record.conversionPolicy,
+            transformWarningReason: record.transformWarningReason,
+            transformWarningKind: record.transformWarningKind,
+            transformWarningSignal: record.transformWarningSignal,
+            transformWarningAccepted: true
+        )
+        return FilmtoneCaptureLook(
+            id: id,
+            displayName: displayName,
+            canonicalUUID: canonicalUUID,
+            slug: slug,
+            libraryLutId: libraryLutId,
+            parsedCreativeLut: parsedCreativeLut,
+            customLutRecord: accepted
+        )
+    }
+
+    static func userLut(
+        entry: LutLibraryEntry,
+        parsedLut: ParsedCubeLutDTO
+    ) -> FilmtoneCaptureLook {
+        let warning = FilmtoneCaptureTransformLutClassifier.warning(
+            title: entry.title,
+            originalFilename: entry.originalFilename,
+            size: parsedLut.size,
+            data: parsedLut.data
+        )
+        let record = FilmtoneCaptureCustomLutRecord(
+            libraryId: entry.id,
+            title: entry.title,
+            size: entry.size,
+            sourceHash: entry.sourceHash,
+            intensity: parsedLut.intensity,
+            conversionPolicy: FilmtoneCaptureCustomLutRecord.captureConversionPolicy,
+            transformWarningReason: warning?.message,
+            transformWarningKind: warning?.kind.rawValue,
+            transformWarningSignal: warning?.matchedSignal,
+            transformWarningAccepted: false
+        )
+        return FilmtoneCaptureLook(
+            id: "user-lut-\(entry.id.uuidString.lowercased())",
+            displayName: entry.title,
+            canonicalUUID: nil,
+            slug: nil,
+            libraryLutId: entry.id,
+            parsedCreativeLut: parsedLut,
+            customLutRecord: record
+        )
+    }
+
+    static func == (lhs: FilmtoneCaptureLook, rhs: FilmtoneCaptureLook) -> Bool {
+        lhs.id == rhs.id
     }
 }
 

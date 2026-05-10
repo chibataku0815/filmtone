@@ -188,6 +188,9 @@ actor LibraryStoreActor {
             if !parsedLut.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 existing.title = parsedLut.title
             }
+            if existing.originalFilename == nil {
+                existing.originalFilename = originalFilename
+            }
             try saveLutEntry(existing)
             luts[existing.id] = existing
             rebuildRecentLuts()

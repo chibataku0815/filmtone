@@ -106,6 +106,20 @@ if [ -f "$CUBE_PARSER_SCRIPT" ] && [ -f "$CUBE_PARSER_SRC" ]; then
   "$CUBE_PARSER_BIN"
 fi
 
+# --- S7: capture transform-LUT warning classifier ---
+CAPTURE_TRANSFORM_LUT_CLASSIFIER_SCRIPT="$SCRIPT_DIR/swift/test-capture-transform-lut-classifier.swift"
+CAPTURE_TRANSFORM_LUT_CLASSIFIER_SRC="$APP_DIR/ios/App/App/FilmtoneCaptureTransformLutClassifier.swift"
+if [ -f "$CAPTURE_TRANSFORM_LUT_CLASSIFIER_SCRIPT" ] && [ -f "$CAPTURE_TRANSFORM_LUT_CLASSIFIER_SRC" ]; then
+  echo "==> capture transform LUT classifier test"
+  CAPTURE_TRANSFORM_LUT_CLASSIFIER_BIN=$(mktemp "${TMPDIR:-/tmp}/phase0-capture-transform-lut-classifier-check.XXXXXX")
+  CLEANUP_FILES="$CLEANUP_FILES $CAPTURE_TRANSFORM_LUT_CLASSIFIER_BIN"
+  xcrun swiftc \
+    -o "$CAPTURE_TRANSFORM_LUT_CLASSIFIER_BIN" \
+    "$CAPTURE_TRANSFORM_LUT_CLASSIFIER_SRC" \
+    "$CAPTURE_TRANSFORM_LUT_CLASSIFIER_SCRIPT"
+  "$CAPTURE_TRANSFORM_LUT_CLASSIFIER_BIN"
+fi
+
 # --- Cache store retention / cleanup policy test ---
 CACHE_STORE_SCRIPT="$SCRIPT_DIR/swift/test-cache-store.swift"
 CACHE_STORE_SRC="$APP_DIR/ios/App/App/CacheStore.swift"

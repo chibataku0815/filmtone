@@ -55,7 +55,7 @@ struct LutLibraryEntry: Codable, Equatable, Sendable {
     let dataRef: String
     /// `FilmtoneLibraryConstants.lutDataFormat` at write time.
     let dataFormat: String
-    let originalFilename: String?
+    var originalFilename: String?
     var defaultIntensity: Double
     var preferredSlot: SlotHint
     /// True when this entry ships with the app bundle as part of
