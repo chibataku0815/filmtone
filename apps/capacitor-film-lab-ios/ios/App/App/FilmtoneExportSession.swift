@@ -4784,6 +4784,54 @@ float grainFineNoise(vec2 p, float seed) {
     return n1 * 0.58 + n2 * 0.42;
 }
 
+vec4 grainSignal(vec2 pixelCoord, float grainFrame, float sourceSeed, float size, float coarseBlend) {
+    float fineSeed = grainFrame * 1.7 + sourceSeed * 13.0;
+    vec2 fineWarp = vec2(
+        grainValueNoise(pixelCoord / 96.0 + vec2(sourceSeed * 0.013, grainFrame * 0.17), fineSeed + 5.0),
+        grainValueNoise(pixelCoord / 113.0 + vec2(sourceSeed * 0.019 + 9.0, grainFrame * 0.11), fineSeed + 11.0)
+    );
+    float fineScale = mix(1.34, 0.90, smoothstep(0.0, 0.25, size));
+    vec2 fineCoord = pixelCoord * fineScale + fineWarp * 2.35;
+    float fineLuma = grainFineNoise(fineCoord, fineSeed);
+    float fineChromaR = grainFineNoise(fineCoord + vec2(37.2, 11.4), fineSeed + 101.0);
+    float fineChromaB = grainFineNoise(fineCoord + vec2(7.6, 53.8), fineSeed + 211.0);
+
+    float grainDiameter = mix(1.55, 6.40, pow(size, 0.68));
+    vec2 grainCoord = pixelCoord / grainDiameter;
+    vec2 grainCell = floor(grainCoord);
+    float pixelLuma = grainPixelHash(pixelCoord, fineSeed + 3.0);
+    float cellHard = grainPixelHash(grainCell, fineSeed);
+    float cellSoft = grainValueNoise(
+        grainCoord * mix(1.15, 0.72, size) + vec2(sourceSeed * 0.004, grainFrame * 0.031),
+        fineSeed + 17.0
+    );
+    float coarseCore = mix(cellHard, cellSoft, 0.58);
+    float coarseLuma = mix(pixelLuma, coarseCore, mix(0.34, 0.84, size));
+    float lumaGrain = mix(fineLuma, coarseLuma, coarseBlend);
+
+    float neighborScale = mix(1.25, grainDiameter * 0.74, coarseBlend);
+    float neighborA = grainValueNoise((pixelCoord + vec2(neighborScale, 0.0)) / neighborScale, fineSeed + 29.0) - 0.5;
+    float neighborB = grainValueNoise((pixelCoord + vec2(0.0, neighborScale)) / (neighborScale * 1.07), fineSeed + 37.0) - 0.5;
+    float arMix = mix(0.10, 0.22, coarseBlend);
+    lumaGrain = mix(lumaGrain, lumaGrain * 0.78 + (neighborA + neighborB) * 0.11, arMix);
+
+    float coarseChromaR = grainValueNoise(grainCoord * 0.86 + vec2(5.0, sourceSeed * 0.01), fineSeed + 503.0) - 0.5;
+    float coarseChromaB = grainValueNoise(grainCoord * 0.91 + vec2(sourceSeed * 0.008, 7.0), fineSeed + 1009.0) - 0.5;
+    float chromaR = mix(fineChromaR, coarseChromaR, coarseBlend);
+    float chromaB = mix(fineChromaB, coarseChromaB, coarseBlend);
+
+    float clumpScale = mix(140.0, 24.0, size);
+    float clump = grainClumpNoise((pixelCoord / clumpScale) + vec2(grainFrame * 0.43 + sourceSeed * 0.1, sourceSeed * 0.07));
+    float fineDensity = mix(
+        0.92,
+        1.08,
+        grainClumpNoise(pixelCoord / 170.0 + vec2(sourceSeed * 0.021 + 3.0, grainFrame * 0.09))
+    );
+    float coarseDensity = mix(1.0, 0.34 + clump * 1.32, size * 0.80);
+    float densityMod = mix(fineDensity, coarseDensity, coarseBlend);
+    return vec4(lumaGrain, chromaR, chromaB, densityMod);
+}
+
 kernel vec4 grain(__sample image, float intensity, float radialMix, float grainSize, float timeSeconds, float sourceSeed, vec2 extentOrigin, vec2 extentSize) {
     vec4 color = image;
     vec2 uv = (destCoord() - extentOrigin) / extentSize;
@@ -4795,50 +4843,35 @@ kernel vec4 grain(__sample image, float intensity, float radialMix, float grainS
     float grainRadialWeight = mix(0.76, 1.42, pow(grainRadial, 1.35));
     float grainRadialEffective = mix(1.0, grainRadialWeight, clamp(radialMix, 0.0, 1.0));
 
-    float grainFrame = floor(max(timeSeconds, 0.0) * 3.0);
     vec2 pixelCoord = uv * extentSize;
-    float fineSeed = grainFrame * 1.7 + sourceSeed * 13.0;
-    vec2 fineWarp = vec2(
-        grainValueNoise(pixelCoord / 96.0 + vec2(sourceSeed * 0.013, grainFrame * 0.17), fineSeed + 5.0),
-        grainValueNoise(pixelCoord / 113.0 + vec2(sourceSeed * 0.019 + 9.0, grainFrame * 0.11), fineSeed + 11.0)
-    );
-    float fineScale = mix(1.30, 0.92, smoothstep(0.0, 0.25, size));
-    vec2 fineCoord = pixelCoord * fineScale + fineWarp * 2.15;
-    float fineLuma = grainFineNoise(fineCoord, fineSeed);
-    float fineChromaAmount = mix(0.035, 0.12, coarseBlend);
-    float fineChromaR = grainFineNoise(fineCoord + vec2(37.2, 11.4), fineSeed + 101.0) * fineChromaAmount;
-    float fineChromaB = grainFineNoise(fineCoord + vec2(7.6, 53.8), fineSeed + 211.0) * fineChromaAmount;
-
-    float grainDiameter = mix(1.7, 6.2, pow(size, 0.70));
-    vec2 grainCell = floor(pixelCoord / grainDiameter);
-    float pixelLuma = grainPixelHash(pixelCoord, fineSeed + 3.0);
-    float cellLuma = grainPixelHash(grainCell, fineSeed);
-    float coarseLuma = mix(pixelLuma, cellLuma, mix(0.36, 0.82, size));
-    float coarseChromaR = grainPixelHash(grainCell, grainFrame * 2.3 + 500.0 + sourceSeed * 7.0) * 0.18;
-    float coarseChromaB = grainPixelHash(grainCell, grainFrame * 3.1 + 1000.0 + sourceSeed * 5.0) * 0.18;
-
-    float lumaGrain = mix(fineLuma, coarseLuma, coarseBlend);
-    float chromaR = mix(fineChromaR, coarseChromaR, coarseBlend);
-    float chromaB = mix(fineChromaB, coarseChromaB, coarseBlend);
-
-    float chromaSpread = max(max(abs(color.r - color.g), abs(color.r - color.b)), abs(color.g - color.b));
-    float chromaGate = mix(0.35, 1.0, smoothstep(0.02, 0.18, chromaSpread));
-    chromaR *= chromaGate;
-    chromaB *= chromaGate;
-
-    float clumpScale = mix(120.0, 24.0, size);
-    float clump = grainClumpNoise((pixelCoord / clumpScale) + vec2(grainFrame * 0.43 + sourceSeed * 0.1, sourceSeed * 0.07));
-    float fineDensity = mix(
-        0.90,
-        1.10,
-        grainClumpNoise(pixelCoord / 160.0 + vec2(sourceSeed * 0.021 + 3.0, grainFrame * 0.09))
-    );
-    float coarseDensity = mix(1.0, 0.32 + clump * 1.36, size * 0.78);
-    float densityMod = mix(fineDensity, coarseDensity, coarseBlend);
     float luma = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
-    float lumaVisibility = mix(1.14, 0.76, smoothstep(0.16, 0.92, luma));
+    float chromaSpread = max(max(abs(color.r - color.g), abs(color.r - color.b)), abs(color.g - color.b));
 
-    float weight = intensity * mix(0.92, 1.05, coarseBlend) * grainRadialEffective * densityMod * lumaVisibility;
+    float grainClock = max(timeSeconds, 0.0) * mix(1.85, 2.75, coarseBlend);
+    float grainFrameA = floor(grainClock);
+    float grainPhase = smoothstep(0.0, 1.0, fract(grainClock));
+    vec4 signalA = grainSignal(pixelCoord, grainFrameA, sourceSeed, size, coarseBlend);
+    vec4 signalB = grainSignal(pixelCoord, grainFrameA + 1.0, sourceSeed, size, coarseBlend);
+    float phaseVariance = (1.0 - grainPhase) * (1.0 - grainPhase) + grainPhase * grainPhase;
+    float phaseGain = min(1.28, 1.0 / sqrt(max(phaseVariance, 0.001)));
+    vec4 signal = mix(signalA, signalB, grainPhase);
+
+    float lumaGrain = signal.x * phaseGain;
+    float densityMod = signal.w;
+    float deepShadowGate = smoothstep(0.025, 0.11, luma);
+    float shadowPresence = mix(0.86, 1.18, smoothstep(0.08, 0.36, luma));
+    float highlightGuard = mix(1.0, 0.58, smoothstep(0.58, 0.96, luma));
+    float lumaVisibility = deepShadowGate * shadowPresence * highlightGuard;
+
+    float monochromeChromaGate = mix(0.08, 1.0, smoothstep(0.025, 0.18, chromaSpread));
+    float highlightChromaGate = mix(1.0, 0.38, smoothstep(0.52, 0.92, luma));
+    float chromaGate = monochromeChromaGate * highlightChromaGate;
+    float independentChroma = mix(0.050, 0.16, coarseBlend);
+    float chromaCouple = mix(0.035, 0.11, coarseBlend);
+    float chromaR = (signal.y * phaseGain * independentChroma + lumaGrain * chromaCouple) * chromaGate;
+    float chromaB = (signal.z * phaseGain * independentChroma - lumaGrain * chromaCouple * 0.70) * chromaGate;
+
+    float weight = intensity * mix(0.94, 1.08, coarseBlend) * grainRadialEffective * densityMod * lumaVisibility;
     color.r += (lumaGrain + chromaR) * weight;
     color.g += lumaGrain * weight;
     color.b += (lumaGrain + chromaB) * weight;

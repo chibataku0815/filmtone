@@ -48,19 +48,19 @@ expect(
 
 const expectedRecipeValues = {
   fine: {
-    grainIntensity: "0.018",
-    grainSize: "0.12",
-    grainRadialMix: "0.65",
+    grainIntensity: "0.017",
+    grainSize: "0.10",
+    grainRadialMix: "0.60",
   },
   classic: {
-    grainIntensity: "0.035",
-    grainSize: "0.32",
-    grainRadialMix: "0.90",
+    grainIntensity: "0.034",
+    grainSize: "0.30",
+    grainRadialMix: "0.85",
   },
   push: {
-    grainIntensity: "0.060",
-    grainSize: "0.58",
-    grainRadialMix: "1.00",
+    grainIntensity: "0.064",
+    grainSize: "0.62",
+    grainRadialMix: "0.95",
   },
 };
 
