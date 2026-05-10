@@ -142,8 +142,8 @@ kernel vec4 vignette(__sample image, float intensity, vec2 extentOrigin, vec2 ex
 }
 """)
 
-    // Grain kernel verbatim from iOS OpticalKernels (FilmtoneExportSession
-    // line 4350-4403). `timeSeconds` advances grain frame stochastically
+    // Grain kernel verbatim from iOS OpticalKernels. `timeSeconds` advances
+    // grain frame stochastically
     // (floor(t * 3.0) → 3 grain refresh per second of source); for still
     // export pass 0. `sourceSeed` is a per-source salt; Phase 2 C5d wires
     // `FilmtoneGradePipeline.makeStableSourceSeed(from: sourceURL.absoluteString)`
@@ -152,6 +152,17 @@ kernel vec4 vignette(__sample image, float intensity, vec2 extentOrigin, vec2 ex
     static let grain: CIColorKernel? = CIColorKernel(source: """
 float grainPixelHash(vec2 p, float seed) {
     return fract(sin(dot(p + vec2(seed, seed * 0.73), vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
+}
+
+float grainValueNoise(vec2 p, float seed) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float a = grainPixelHash(i, seed);
+    float b = grainPixelHash(i + vec2(1.0, 0.0), seed);
+    float c = grainPixelHash(i + vec2(0.0, 1.0), seed);
+    float d = grainPixelHash(i + vec2(1.0, 1.0), seed);
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
 float grainClumpHash(vec2 p) {
@@ -169,10 +180,25 @@ float grainClumpNoise(vec2 p) {
     return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
+vec2 grainRotate(vec2 p, float angle) {
+    float s = sin(angle);
+    float c = cos(angle);
+    return vec2(c * p.x - s * p.y, s * p.x + c * p.y);
+}
+
+float grainFineNoise(vec2 p, float seed) {
+    vec2 a = grainRotate(p * 1.07, 0.73 + seed * 0.011);
+    vec2 b = grainRotate(p * 0.61 + vec2(13.7, 2.1), -0.52 + seed * 0.007);
+    float n1 = grainPixelHash(floor(a), seed * 1.21 + 19.0);
+    float n2 = grainValueNoise(b, seed * 0.83 + 47.0);
+    return n1 * 0.58 + n2 * 0.42;
+}
+
 kernel vec4 grain(__sample image, float intensity, float radialMix, float grainSize, float timeSeconds, float sourceSeed, vec2 extentOrigin, vec2 extentSize) {
     vec4 color = image;
     vec2 uv = (destCoord() - extentOrigin) / extentSize;
     float size = clamp(grainSize, 0.0, 1.0);
+    float coarseBlend = smoothstep(0.12, 0.42, size);
     vec2 grainDelta = uv - vec2(0.5, 0.5);
     grainDelta.x *= extentSize.x / max(extentSize.y, 1.0);
     float grainRadial = clamp(length(grainDelta) * 2.0, 0.0, 1.0);
@@ -181,21 +207,48 @@ kernel vec4 grain(__sample image, float intensity, float radialMix, float grainS
 
     float grainFrame = floor(max(timeSeconds, 0.0) * 3.0);
     vec2 pixelCoord = uv * extentSize;
-    float grainDiameter = mix(1.6, 5.6, pow(size, 0.72));
+    float fineSeed = grainFrame * 1.7 + sourceSeed * 13.0;
+    vec2 fineWarp = vec2(
+        grainValueNoise(pixelCoord / 96.0 + vec2(sourceSeed * 0.013, grainFrame * 0.17), fineSeed + 5.0),
+        grainValueNoise(pixelCoord / 113.0 + vec2(sourceSeed * 0.019 + 9.0, grainFrame * 0.11), fineSeed + 11.0)
+    );
+    float fineScale = mix(1.30, 0.92, smoothstep(0.0, 0.25, size));
+    vec2 fineCoord = pixelCoord * fineScale + fineWarp * 2.15;
+    float fineLuma = grainFineNoise(fineCoord, fineSeed);
+    float fineChromaAmount = mix(0.035, 0.12, coarseBlend);
+    float fineChromaR = grainFineNoise(fineCoord + vec2(37.2, 11.4), fineSeed + 101.0) * fineChromaAmount;
+    float fineChromaB = grainFineNoise(fineCoord + vec2(7.6, 53.8), fineSeed + 211.0) * fineChromaAmount;
+
+    float grainDiameter = mix(1.7, 6.2, pow(size, 0.70));
     vec2 grainCell = floor(pixelCoord / grainDiameter);
-    float fineLuma = grainPixelHash(pixelCoord, grainFrame * 1.7 + sourceSeed * 13.0);
-    float cellLuma = grainPixelHash(grainCell, grainFrame * 1.7 + sourceSeed * 13.0);
-    float lumaGrain = mix(fineLuma, cellLuma, mix(0.28, 0.76, size));
-    float chromaR = grainPixelHash(grainCell, grainFrame * 2.3 + 500.0 + sourceSeed * 7.0) * 0.22;
-    float chromaB = grainPixelHash(grainCell, grainFrame * 3.1 + 1000.0 + sourceSeed * 5.0) * 0.22;
+    float pixelLuma = grainPixelHash(pixelCoord, fineSeed + 3.0);
+    float cellLuma = grainPixelHash(grainCell, fineSeed);
+    float coarseLuma = mix(pixelLuma, cellLuma, mix(0.36, 0.82, size));
+    float coarseChromaR = grainPixelHash(grainCell, grainFrame * 2.3 + 500.0 + sourceSeed * 7.0) * 0.18;
+    float coarseChromaB = grainPixelHash(grainCell, grainFrame * 3.1 + 1000.0 + sourceSeed * 5.0) * 0.18;
 
-    float clumpScale = mix(80.0, 20.0, size);
-    float clump = grainClumpNoise((uv * extentSize / clumpScale) + vec2(grainFrame * 0.5 + sourceSeed * 0.1, sourceSeed * 0.07));
-    float densityMod = mix(1.0, 0.3 + clump * 1.4, size * 0.7);
+    float lumaGrain = mix(fineLuma, coarseLuma, coarseBlend);
+    float chromaR = mix(fineChromaR, coarseChromaR, coarseBlend);
+    float chromaB = mix(fineChromaB, coarseChromaB, coarseBlend);
+
+    float chromaSpread = max(max(abs(color.r - color.g), abs(color.r - color.b)), abs(color.g - color.b));
+    float chromaGate = mix(0.35, 1.0, smoothstep(0.02, 0.18, chromaSpread));
+    chromaR *= chromaGate;
+    chromaB *= chromaGate;
+
+    float clumpScale = mix(120.0, 24.0, size);
+    float clump = grainClumpNoise((pixelCoord / clumpScale) + vec2(grainFrame * 0.43 + sourceSeed * 0.1, sourceSeed * 0.07));
+    float fineDensity = mix(
+        0.90,
+        1.10,
+        grainClumpNoise(pixelCoord / 160.0 + vec2(sourceSeed * 0.021 + 3.0, grainFrame * 0.09))
+    );
+    float coarseDensity = mix(1.0, 0.32 + clump * 1.36, size * 0.78);
+    float densityMod = mix(fineDensity, coarseDensity, coarseBlend);
     float luma = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
-    float lumaVisibility = mix(1.12, 0.78, smoothstep(0.18, 0.92, luma));
+    float lumaVisibility = mix(1.14, 0.76, smoothstep(0.16, 0.92, luma));
 
-    float weight = intensity * 1.08 * grainRadialEffective * densityMod * lumaVisibility;
+    float weight = intensity * mix(0.92, 1.05, coarseBlend) * grainRadialEffective * densityMod * lumaVisibility;
     color.r += (lumaGrain + chromaR) * weight;
     color.g += lumaGrain * weight;
     color.b += (lumaGrain + chromaB) * weight;

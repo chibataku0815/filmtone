@@ -6,10 +6,9 @@ import Foundation
 //
 // M5-H.2 brought labels in line with iOS `FilmtoneStrings.paramLabels`
 // (the user-facing name a slider should carry on either platform) and
-// added per-group `Recipe` chips matching the iOS
-// `standardAdvancedRecipes` shape — so a Look saved on either platform
-// reads sensibly and a user can apply the canonical Default / Strong
-// preset stamps without dragging each slider individually.
+// added per-group `Recipe` chips matching the iOS catalog shape — so a
+// Look saved on either platform reads sensibly and a user can apply
+// canonical recipe stamps without dragging each slider individually.
 //
 // M5-I.1 lifted every user-facing string out of this file into the
 // `FilmtoneDesktopStrings` layer so JA/EN copy resolves the same way iOS
@@ -218,23 +217,7 @@ enum AdvancedAdjustCatalog {
                     .init(key: "grainRadialMix",  label: strings.paramLabel(for: "grainRadialMix"),  range: 0...1, digits: 2),
                 ],
                 videoOnly: false,
-                recipes: standardAdvancedRecipes(
-                    strings: strings,
-                    defaultValues: { base in
-                        [
-                            "grainIntensity": max(base.grainIntensity, 0.025),
-                            "grainSize": max(base.grainSize, 0.30),
-                            "grainRadialMix": 1.0,
-                        ]
-                    },
-                    strongValues: { base in
-                        [
-                            "grainIntensity": max(base.grainIntensity, 0.045),
-                            "grainSize": max(base.grainSize, 0.38),
-                            "grainRadialMix": 1.0,
-                        ]
-                    }
-                )
+                recipes: grainRecipes(strings: strings)
             ),
             .init(
                 id: "motion",
@@ -288,7 +271,7 @@ enum AdvancedAdjustCatalog {
 
     /// Mirror of iOS `standardAdvancedRecipes(defaultValues:strongValues:)` —
     /// the 3-chip pattern (`なし` / `標準` / `強め`) reused by every non-
-    /// basic group except `process`.
+    /// basic group except `process` and `grain`.
     private static func standardAdvancedRecipes(
         strings: FilmtoneDesktopStrings,
         defaultValues: @escaping @Sendable (FilmtonePhase0Params) -> [String: Double],
@@ -298,6 +281,35 @@ enum AdvancedAdjustCatalog {
             .init(id: "none", label: strings.presetNone, kind: .none) { _ in [:] },
             .init(id: "default", label: strings.presetDefault, kind: .stamp, values: defaultValues),
             .init(id: "strong", label: strings.presetStrong, kind: .stamp, values: strongValues),
+        ]
+    }
+
+    /// Mirror of iOS `grainAdvancedRecipes`: UI-only recipes that stamp the
+    /// existing grain params without adding a saved grain-type identity.
+    private static func grainRecipes(strings: FilmtoneDesktopStrings) -> [Recipe] {
+        [
+            .init(id: "none", label: strings.presetNone, kind: .none) { _ in [:] },
+            .init(id: "fine", label: strings.grainFine, kind: .stamp) { _ in
+                [
+                    "grainIntensity": 0.018,
+                    "grainSize": 0.12,
+                    "grainRadialMix": 0.65,
+                ]
+            },
+            .init(id: "classic", label: strings.grainClassic, kind: .stamp) { _ in
+                [
+                    "grainIntensity": 0.035,
+                    "grainSize": 0.32,
+                    "grainRadialMix": 0.90,
+                ]
+            },
+            .init(id: "push", label: strings.grainPush, kind: .stamp) { _ in
+                [
+                    "grainIntensity": 0.060,
+                    "grainSize": 0.58,
+                    "grainRadialMix": 1.00,
+                ]
+            },
         ]
     }
 

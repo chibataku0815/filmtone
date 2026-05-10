@@ -1,7 +1,7 @@
 # Filmtone Native Desktop v2 Strategy
 
 Date opened: 2026-05-04 JST
-Last updated: 2026-05-06 JST
+Last updated: 2026-05-10 JST
 
 This file is the compact source of truth for the Native Desktop v2 lane.
 Implementation logs, chat handoffs, and detailed verification records belong in
@@ -67,9 +67,19 @@ content layer stays glass-free so color judgment is not compromised.
 - Native Desktop v2 public release remains Desktop v1.4. Desktop release truth
   and iOS App Store truth are now separate public axes; rerun truth scripts
   before making release/version claims.
-- Active Desktop task: M7 Native Desktop v1.5 Release. Local release prep and
-  verification are green; external signing/notarization/upload/public switch
-  have not been run.
+- Active Desktop task: M8 Native Desktop v1.6 Release. Local signing,
+  notarization, DMG packaging, and verification are complete; public DMG upload
+  and update metadata mutation remain to finish the release.
+
+## Interrupt / Decision Log
+
+- 2026-05-10 JST: User-directed interrupt from v1.6 release publication to
+  cross-platform grain quality. The v1.6 release task was paused before public
+  upload/update-meta, and the new active scope is limited to the shared native
+  grain kernel, grain recipe chips, and verification coverage.
+- 2026-05-10 JST: Cross-platform grain quality completed and archived at
+  `archive/2026-05-10-cross-platform-grain-quality.md`; v1.6 release active was
+  restored for public upload/update-meta completion.
 
 M1 and M2 are closed. M3 and M4 stay open for parity hardening and shared-core
 promotion, but they no longer block M5 UI validation. M5-C P0, M5-G

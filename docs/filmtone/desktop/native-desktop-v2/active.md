@@ -102,3 +102,16 @@ the fixed Desktop download rail, with update metadata reporting `1.6`.
 ## Unexpected / Blockers
 
 None.
+
+## Paused
+
+2026-05-10 JST: Paused before public DMG upload and update metadata mutation
+because the current user request switches to cross-platform grain quality.
+Completed release work remains packaged and verified; remaining items are the
+explicitly gated public upload/update steps and final release-truth confirmation.
+
+## Resumed
+
+2026-05-10 JST: Restored after completing and archiving the cross-platform grain
+quality interrupt. Public DMG upload and update metadata mutation remain gated
+and were not touched during the grain task.

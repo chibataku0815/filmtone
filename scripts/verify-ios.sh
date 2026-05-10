@@ -21,5 +21,8 @@ xcodebuild -quiet \
   build \
   CODE_SIGNING_ALLOWED=NO
 
+echo "==> ios grain catalog"
+node scripts/check-ios-grain-catalog.mjs
+
 echo "==> ios swift contract"
 bun run --cwd "$APP_DIR" verify:swift-contract

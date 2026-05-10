@@ -108,6 +108,9 @@ struct FilmtoneStrings {
     let advancedOpticsLabel: String
     let advancedGlowLabel: String
     let advancedGrainLabel: String
+    let advancedGrainFineLabel: String
+    let advancedGrainClassicLabel: String
+    let advancedGrainPushLabel: String
     let advancedMotionLabel: String
     let advancedToneLabel: String
     let advancedPresetNoneLabel: String
@@ -977,6 +980,21 @@ extension FilmtoneStrings {
             "filmtone.advanced.group.grain",
             defaultValue: "Grain",
             comment: "Group title for grain advanced params."
+        )
+        advancedGrainFineLabel = filmtoneLocalized(
+            "filmtone.advanced.grain.fine",
+            defaultValue: prefersJapanese ? "微粒子" : "Fine",
+            comment: "Grain recipe chip for fine restrained grain."
+        )
+        advancedGrainClassicLabel = filmtoneLocalized(
+            "filmtone.advanced.grain.classic",
+            defaultValue: prefersJapanese ? "標準粒子" : "Classic",
+            comment: "Grain recipe chip for standard classic film grain."
+        )
+        advancedGrainPushLabel = filmtoneLocalized(
+            "filmtone.advanced.grain.push",
+            defaultValue: prefersJapanese ? "粗粒子" : "Push",
+            comment: "Grain recipe chip for coarser pushed film grain."
         )
         advancedMotionLabel = filmtoneLocalized(
             "filmtone.advanced.group.motion",

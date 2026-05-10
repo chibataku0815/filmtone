@@ -170,22 +170,7 @@ extension FilmtoneStrengthSheet {
             .init(
                 id: "grain",
                 title: store.strings.advancedGrainLabel,
-                recipes: standardAdvancedRecipes(
-                    defaultValues: { base in
-                        [
-                            "grainIntensity": max(base.grainIntensity, 0.025),
-                            "grainSize": max(base.grainSize, 0.30),
-                            "grainRadialMix": 1.0,
-                        ]
-                    },
-                    strongValues: { base in
-                        [
-                            "grainIntensity": max(base.grainIntensity, 0.045),
-                            "grainSize": max(base.grainSize, 0.38),
-                            "grainRadialMix": 1.0,
-                        ]
-                    }
-                ),
+                recipes: grainAdvancedRecipes,
                 controls: [
                     control("grainIntensity", range: 0...FilmtonePhase0Generated.grainIntensityMax),
                     control("grainSize", range: 0...1),
@@ -257,6 +242,35 @@ extension FilmtoneStrengthSheet {
                     "printContrast": 0.09,
                     "compressionAmount": 0.08,
                     "compressionRange": 0.58,
+                ]
+            },
+        ]
+    }
+
+    var grainAdvancedRecipes: [FilmtoneAdvancedParamRecipe] {
+        [
+            recipe("none", store.strings.advancedPresetNoneLabel) { _ in
+                [:]
+            },
+            recipe("fine", store.strings.advancedGrainFineLabel) { _ in
+                [
+                    "grainIntensity": 0.018,
+                    "grainSize": 0.12,
+                    "grainRadialMix": 0.65,
+                ]
+            },
+            recipe("classic", store.strings.advancedGrainClassicLabel) { _ in
+                [
+                    "grainIntensity": 0.035,
+                    "grainSize": 0.32,
+                    "grainRadialMix": 0.90,
+                ]
+            },
+            recipe("push", store.strings.advancedGrainPushLabel) { _ in
+                [
+                    "grainIntensity": 0.060,
+                    "grainSize": 0.58,
+                    "grainRadialMix": 1.00,
                 ]
             },
         ]

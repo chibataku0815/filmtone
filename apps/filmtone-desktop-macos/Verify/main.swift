@@ -1191,6 +1191,89 @@ runner.test("Tone recipes ship the iOS canonical 4-chip set") {
     try assertEqual(ids, ["standard", "airy", "sunset", "depth"], "tone recipe order")
 }
 
+runner.test("Grain recipes ship the cross-platform UI-only 4-chip set") {
+    guard let grain = AdvancedAdjustCatalog.allGroups(strings: .english).first(where: { $0.id == "grain" }) else {
+        throw AssertionError(description: "grain group missing")
+    }
+    try assertEqual(
+        grain.recipes.map(\.id),
+        ["none", "fine", "classic", "push"],
+        "grain recipe order"
+    )
+    try assertEqual(
+        grain.recipes.map(\.label),
+        ["None", "Fine", "Classic", "Push"],
+        "EN grain recipe labels"
+    )
+
+    let baseParams = FilmtonePresetCatalog.params(
+        for: FilmtonePresetCatalog.defaultName,
+        strength: 1.0
+    )
+    let expected: [String: [String: Double]] = [
+        "fine": [
+            "grainIntensity": 0.018,
+            "grainSize": 0.12,
+            "grainRadialMix": 0.65,
+        ],
+        "classic": [
+            "grainIntensity": 0.035,
+            "grainSize": 0.32,
+            "grainRadialMix": 0.90,
+        ],
+        "push": [
+            "grainIntensity": 0.060,
+            "grainSize": 0.58,
+            "grainRadialMix": 1.00,
+        ],
+    ]
+
+    for recipe in grain.recipes where recipe.kind == .stamp {
+        guard let expectedValues = expected[recipe.id] else {
+            throw AssertionError(description: "unexpected grain recipe id '\(recipe.id)'")
+        }
+        let actual = recipe.values(baseParams)
+        try assertEqual(
+            actual.keys.sorted(),
+            ["grainIntensity", "grainRadialMix", "grainSize"],
+            "grain recipe '\(recipe.id)' stamped keys"
+        )
+        for (key, value) in expectedValues {
+            try assertClose(actual[key] ?? .nan, value, eps: 1e-9, "grain recipe '\(recipe.id)' \(key)")
+        }
+    }
+}
+
+runner.test("Grain catalog stays on existing Phase0 params and max clamp") {
+    guard let grain = AdvancedAdjustCatalog.allGroups(strings: .english).first(where: { $0.id == "grain" }) else {
+        throw AssertionError(description: "grain group missing")
+    }
+    try assertEqual(
+        grain.controls.map(\.key).sorted(),
+        ["grainIntensity", "grainRadialMix", "grainSize"],
+        "grain controls must stay on existing params"
+    )
+
+    let generatedKeys = Set(FilmtonePhase0Generated.paramKeys)
+    try assertEqual(generatedKeys.contains("grainType"), false, "grainType must not enter generated paramKeys")
+    try assertEqual(
+        generatedKeys.filter { $0.hasPrefix("grain") }.sorted(),
+        ["grainIntensity", "grainRadialMix", "grainSize"],
+        "generated grain param keys"
+    )
+    try assertClose(
+        FilmtonePhase0Generated.grainIntensityMax,
+        0.1,
+        eps: 1e-12,
+        "generated grainIntensityMax"
+    )
+    try assertClose(
+        AdvancedAdjustCatalog.clamp(1, for: "grainIntensity"),
+        FilmtonePhase0Generated.grainIntensityMax,
+        "grainIntensity clamp tracks generated max"
+    )
+}
+
 runner.test("Recipe stamp + Quick does not double-apply Quick on stamped key") {
     // M5-H.2 P2 regression test. Pre-fix Desktop applied override then
     // Quick, so a recipe stamp like `bloomStrength=0.34` rendered at
@@ -1529,6 +1612,15 @@ runner.test("FilmtoneDesktopStrings preset chips match iOS defaults (None/なし
     try assertEqual(FilmtoneDesktopStrings.japanese.presetStrong, "強め", "japanese presetStrong")
 }
 
+runner.test("FilmtoneDesktopStrings grain recipe chips match iOS defaults") {
+    try assertEqual(FilmtoneDesktopStrings.english.grainFine, "Fine", "english grainFine")
+    try assertEqual(FilmtoneDesktopStrings.english.grainClassic, "Classic", "english grainClassic")
+    try assertEqual(FilmtoneDesktopStrings.english.grainPush, "Push", "english grainPush")
+    try assertEqual(FilmtoneDesktopStrings.japanese.grainFine, "微粒子", "japanese grainFine")
+    try assertEqual(FilmtoneDesktopStrings.japanese.grainClassic, "標準粒子", "japanese grainClassic")
+    try assertEqual(FilmtoneDesktopStrings.japanese.grainPush, "粗粒子", "japanese grainPush")
+}
+
 runner.test("FilmtoneDesktopStrings tone recipe chips match iOS defaults (Standard/標準, Airy/爽やか, Sunset/夕景, Depth/深み)") {
     try assertEqual(FilmtoneDesktopStrings.english.toneStandard, "Standard", "english toneStandard")
     try assertEqual(FilmtoneDesktopStrings.english.toneAiry, "Airy", "english toneAiry")
@@ -1582,6 +1674,11 @@ runner.test("AdvancedAdjustCatalog with .japanese surfaces 階調 + tone JA reci
     }
     let glowRecipeLabels = glow.recipes.map(\.label)
     try assertEqual(glowRecipeLabels, ["なし", "標準", "強め"], "JA standard recipe labels")
+    guard let grain = groups.first(where: { $0.id == "grain" }) else {
+        throw AssertionError(description: "grain group missing under .japanese")
+    }
+    let grainRecipeLabels = grain.recipes.map(\.label)
+    try assertEqual(grainRecipeLabels, ["なし", "微粒子", "標準粒子", "粗粒子"], "JA grain recipe labels")
 }
 
 runner.test("AdvancedAdjustCatalog with .japanese translates motion params, leaves the rest at iOS default") {

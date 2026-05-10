@@ -30,6 +30,9 @@ struct FilmtoneDesktopStrings: Sendable {
     let presetNone: String
     let presetDefault: String
     let presetStrong: String
+    let grainFine: String
+    let grainClassic: String
+    let grainPush: String
     let toneStandard: String
     let toneAiry: String
     let toneSunset: String
@@ -65,6 +68,9 @@ struct FilmtoneDesktopStrings: Sendable {
         presetNone: "None",
         presetDefault: "Default",
         presetStrong: "Strong",
+        grainFine: "Fine",
+        grainClassic: "Classic",
+        grainPush: "Push",
         toneStandard: "Standard",
         toneAiry: "Airy",
         toneSunset: "Sunset",
@@ -75,8 +81,8 @@ struct FilmtoneDesktopStrings: Sendable {
     // iOS canonical (`FilmtoneStrings.swift:894-1021`) only branches a
     // subset of labels on `prefersJapanese`. Mirror that subset exactly
     // so cross-platform copy parity is line-by-line traceable: groups
-    // / presets / tone chips / motion params translate; everything else
-    // keeps the iOS default English even on JA hosts.
+    // / presets / grain chips / tone chips / motion params translate;
+    // everything else keeps the iOS default English even on JA hosts.
     static let japanese: FilmtoneDesktopStrings = .init(
         advancedTitle: "詳細調整",
         advancedActiveBadgeFormat: { active, total in
@@ -102,6 +108,9 @@ struct FilmtoneDesktopStrings: Sendable {
         presetNone: "なし",
         presetDefault: "標準",
         presetStrong: "強め",
+        grainFine: "微粒子",
+        grainClassic: "標準粒子",
+        grainPush: "粗粒子",
         toneStandard: "標準",
         toneAiry: "爽やか",
         toneSunset: "夕景",
