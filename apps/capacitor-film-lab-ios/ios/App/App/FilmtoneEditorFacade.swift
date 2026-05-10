@@ -89,14 +89,22 @@ final class FilmtoneEditorFacade {
         )
     }
 
-    func pickCubeLut() async throws -> ParsedCubeLutDTO? {
+    func pickCubeLutFile() async throws -> (lut: ParsedCubeLutDTO, originalFilename: String)? {
         guard let host = topPresentingViewController else {
             throw FilmtoneMediaError.bridgeUnavailable
         }
         guard let picked = try await assetPickerService.pickLutFile(presenting: host) else {
             return nil
         }
-        return try FilmtoneCubeParser.parse(text: picked.text, defaultTitle: picked.filename)
+        let lut = try FilmtoneCubeParser.parse(text: picked.text, defaultTitle: picked.filename)
+        return (lut: lut, originalFilename: picked.filename)
+    }
+
+    func pickCubeLut() async throws -> ParsedCubeLutDTO? {
+        guard let picked = try await pickCubeLutFile() else {
+            return nil
+        }
+        return picked.lut
     }
 
     func pickInputLut() async throws -> ParsedCubeLutDTO? {

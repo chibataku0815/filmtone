@@ -1051,6 +1051,51 @@ final class FilmtoneEditorStore: ObservableObject {
         }
     }
 
+    /// S7: live capture preview for an owner-imported creative LUT.
+    /// The LUT is treated as a creative Look LUT; source conversion
+    /// remains app-owned through the synthetic Apple Log 2 capture
+    /// source / probe when capture starts without an editor source.
+    func makeLivePreviewGradeProcessor(
+        captureCreativeLut lut: ParsedCubeLutDTO
+    ) -> FilmtoneLivePreviewBundle? {
+        let effectiveSource: SourceInfoDTO
+        let effectiveProbe: SourceProbeDTO?
+        if let source {
+            effectiveSource = source
+            effectiveProbe = probe
+        } else {
+            let synthetic = Self.liveCaptureSyntheticSource()
+            effectiveSource = synthetic.source
+            effectiveProbe = synthetic.probe
+        }
+        do {
+            var transient = project
+            transient.creativeLut = lut
+            let request = try FilmtonePhase0Math.buildExportRequest(
+                source: effectiveSource,
+                probe: effectiveProbe,
+                project: transient
+            )
+            let cameraProfile = project.cameraProfile
+            let processor = try facade.makeLivePreviewGradeProcessor(
+                request: request,
+                appliedSavedLook: nil,
+                cameraProfile: cameraProfile
+            )
+            let diagnostics = makeLivePreviewDiagnostics(
+                request: request,
+                forwardedSavedLook: nil,
+                forwardedCameraProfile: cameraProfile
+            )
+            return FilmtoneLivePreviewBundle(
+                processor: processor,
+                diagnostics: diagnostics
+            )
+        } catch {
+            return nil
+        }
+    }
+
     /// Source / probe descriptor for the live capture VDO stream when
     /// the editor has no loaded source (cold-start chip preview).
     ///
@@ -1487,6 +1532,8 @@ final class FilmtoneEditorStore: ObservableObject {
             // rather than the pre-Look state.
             if let canonicalUUID = package.selectedLook?.canonicalUUID {
                 await applySavedLook(id: canonicalUUID)
+            } else if let customLut = package.customLut {
+                await applyCaptureCustomLut(customLut)
             }
             isBusy = false
             sourceLoadState = nil
@@ -1688,6 +1735,62 @@ final class FilmtoneEditorStore: ObservableObject {
             } else {
                 self.error = strings.userMessage(for: error, context: .importCreativeLut)
             }
+        }
+    }
+
+    /// S7: capture-surface import path. Unlike `importCreativeLut()`,
+    /// this does not mutate the editor project immediately. It persists
+    /// the cube into the LUT library and returns a capture Look record
+    /// the capture surface can preview and stamp into the package.
+    func importCaptureUserLut() async -> FilmtoneCaptureLook? {
+        do {
+            guard let picked = try await facade.pickCubeLutFile() else {
+                return nil
+            }
+            guard let libraryStore else {
+                self.error = strings.userMessage(
+                    for: FilmtoneMediaError.bridgeUnavailable,
+                    context: .importCreativeLut
+                )
+                return nil
+            }
+            let result = try await libraryStore.importLut(
+                parsedLut: picked.lut,
+                originalFilename: picked.originalFilename,
+                preferredSlot: .creative
+            )
+            let parsed = try await libraryStore.loadLut(id: result.entry.id)
+            await refreshLibrarySnapshot()
+            return FilmtoneCaptureLook.userLut(
+                entry: result.entry,
+                parsedLut: parsed
+            )
+        } catch {
+            if let mediaError = error as? FilmtoneMediaError,
+               mediaError.code == "UNSUPPORTED_SOURCE" {
+                self.error = strings.lookLutParseError
+            } else if let storeError = error as? LibraryStoreActor.StoreError,
+                      case .quotaExceeded = storeError {
+                self.error = strings.libraryQuotaExceeded
+            } else {
+                self.error = strings.userMessage(for: error, context: .importCreativeLut)
+            }
+            return nil
+        }
+    }
+
+    func loadCaptureUserLut(entry: LutLibraryEntry) async -> FilmtoneCaptureLook? {
+        guard let libraryStore else {
+            return nil
+        }
+        do {
+            let parsed = try await libraryStore.loadLut(id: entry.id)
+            await libraryStore.touchLutLastUsed(id: entry.id)
+            await refreshLibrarySnapshot()
+            return FilmtoneCaptureLook.userLut(entry: entry, parsedLut: parsed)
+        } catch {
+            self.error = strings.libraryLutMissingOnApply
+            return nil
         }
     }
 
@@ -1933,6 +2036,27 @@ final class FilmtoneEditorStore: ObservableObject {
             }
         } catch {
             self.error = strings.userMessage(for: error, context: .importCreativeLut)
+        }
+    }
+
+    func applyCaptureCustomLut(_ record: FilmtoneCaptureCustomLutRecord) async {
+        guard let libraryStore, let libraryId = record.libraryId else {
+            self.error = strings.libraryLutMissingOnApply
+            return
+        }
+        do {
+            let parsed = try await libraryStore.loadLut(
+                id: libraryId,
+                intensity: record.intensity
+            )
+            await libraryStore.touchLutLastUsed(id: libraryId)
+            await refreshLibrarySnapshot()
+            appliedSavedLookId = nil
+            applyLutMutation { state in
+                state.creativeLut = parsed
+            }
+        } catch {
+            self.error = strings.libraryLutMissingOnApply
         }
     }
 
@@ -2261,41 +2385,57 @@ final class FilmtoneEditorStore: ObservableObject {
         let observed = package.observedStabilization
         let requestedRotation = package.requestedCaptureRotationDegrees
         let observedRotation = package.observedCaptureRotationDegrees
+        let customLut = package.customLut
+        func makeProvenance(
+            mode: String,
+            reason: String?,
+            masterUriUsed: String?,
+            proxyUriUsed: String?
+        ) -> SidecarCaptureProvenance {
+            SidecarCaptureProvenance(
+                mode: mode,
+                reason: reason,
+                masterUriUsed: masterUriUsed,
+                proxyUriUsed: proxyUriUsed,
+                requestedStabilization: requested,
+                observedStabilization: observed,
+                requestedCaptureRotationDegrees: requestedRotation,
+                observedCaptureRotationDegrees: observedRotation,
+                customLutTitle: customLut?.title,
+                customLutLibraryId: customLut?.libraryId?.uuidString,
+                customLutSourceHash: customLut?.sourceHash,
+                customLutSize: customLut?.size,
+                customLutIntensity: customLut?.intensity,
+                customLutConversionPolicy: customLut?.conversionPolicy,
+                customLutTransformWarningAccepted: customLut?.transformWarningAccepted,
+                customLutTransformWarningReason: customLut?.transformWarningReason,
+                customLutTransformWarningKind: customLut?.transformWarningKind,
+                customLutTransformWarningSignal: customLut?.transformWarningSignal
+            )
+        }
         switch decision {
         case .noCapturePackage:
             return nil
         case .usingMaster:
-            return SidecarCaptureProvenance(
+            return makeProvenance(
                 mode: "master",
                 reason: nil,
                 masterUriUsed: masterURI,
-                proxyUriUsed: nil,
-                requestedStabilization: requested,
-                observedStabilization: observed,
-                requestedCaptureRotationDegrees: requestedRotation,
-                observedCaptureRotationDegrees: observedRotation
+                proxyUriUsed: nil
             )
         case .usingProxyMasterMissing:
-            return SidecarCaptureProvenance(
+            return makeProvenance(
                 mode: "proxy",
                 reason: "masterFileMissing",
                 masterUriUsed: masterURI,
-                proxyUriUsed: proxyURI,
-                requestedStabilization: requested,
-                observedStabilization: observed,
-                requestedCaptureRotationDegrees: requestedRotation,
-                observedCaptureRotationDegrees: observedRotation
+                proxyUriUsed: proxyURI
             )
         case .usingProxyMasterUnreadable(let reason):
-            return SidecarCaptureProvenance(
+            return makeProvenance(
                 mode: "proxy",
                 reason: "masterProbeFailed:\(reason)",
                 masterUriUsed: masterURI,
-                proxyUriUsed: proxyURI,
-                requestedStabilization: requested,
-                observedStabilization: observed,
-                requestedCaptureRotationDegrees: requestedRotation,
-                observedCaptureRotationDegrees: observedRotation
+                proxyUriUsed: proxyURI
             )
         }
     }

@@ -51,6 +51,9 @@ struct FilmtoneCaptureView: View {
     /// catalog params.  Optional so test surfaces / preview targets that
     /// do not need rebuild can pass `nil`.
     let makeGradeProcessor: ((FilmtoneCaptureLook) -> FilmtoneLivePreviewBundle?)?
+    let userLutEntries: [LutLibraryEntry]
+    let importUserLut: (() async -> FilmtoneCaptureLook?)?
+    let loadUserLut: ((LutLibraryEntry) async -> FilmtoneCaptureLook?)?
     let onCompleted: (FilmtoneCapturePackage) -> Void
     let onCancelled: () -> Void
     let onFailed: (FilmtoneCaptureFailure) -> Void
@@ -60,6 +63,9 @@ struct FilmtoneCaptureView: View {
         liveDiagnostics: FilmtoneLivePreviewDiagnostics?,
         initialCaptureLook: FilmtoneCaptureLook = .filmtone,
         makeGradeProcessor: ((FilmtoneCaptureLook) -> FilmtoneLivePreviewBundle?)? = nil,
+        userLutEntries: [LutLibraryEntry] = [],
+        importUserLut: (() async -> FilmtoneCaptureLook?)? = nil,
+        loadUserLut: ((LutLibraryEntry) async -> FilmtoneCaptureLook?)? = nil,
         onCompleted: @escaping (FilmtoneCapturePackage) -> Void,
         onCancelled: @escaping () -> Void,
         onFailed: @escaping (FilmtoneCaptureFailure) -> Void
@@ -68,6 +74,9 @@ struct FilmtoneCaptureView: View {
         self.liveDiagnostics = liveDiagnostics
         self.initialCaptureLook = initialCaptureLook
         self.makeGradeProcessor = makeGradeProcessor
+        self.userLutEntries = userLutEntries
+        self.importUserLut = importUserLut
+        self.loadUserLut = loadUserLut
         self.onCompleted = onCompleted
         self.onCancelled = onCancelled
         self.onFailed = onFailed
@@ -82,6 +91,7 @@ struct FilmtoneCaptureView: View {
         // grade.  Chip taps then swap these via `makeGradeProcessor`.
         self._activeGradeProcessor = State(initialValue: liveGradeProcessor)
         self._activeLiveDiagnostics = State(initialValue: liveDiagnostics)
+        self._isLiveGradeFallback = State(initialValue: liveGradeProcessor == nil)
     }
 
     @StateObject private var session = FilmtoneCaptureSession()
@@ -121,6 +131,10 @@ struct FilmtoneCaptureView: View {
     /// Updated alongside it so the F3-R overlay stays consistent with
     /// the chain currently feeding the renderer.
     @State private var activeLiveDiagnostics: FilmtoneLivePreviewDiagnostics?
+    /// S7: the VDO path is active but the selected Look / user LUT could
+    /// not build a grade processor. Show the existing ungraded badge
+    /// instead of silently presenting pass-through video as graded.
+    @State private var isLiveGradeFallback: Bool
     /// M12 / S12-C: last view-local tap location for the focus / meter
     /// reticle.  Lives in the SwiftUI body's coordinate space (the
     /// `GeometryReader` wrapping the tap-interaction layer); paired
@@ -147,6 +161,8 @@ struct FilmtoneCaptureView: View {
     /// M13-M-2: presentation flag for the Look picker sheet, bound to
     /// `.sheet(isPresented:)`.
     @State private var showLookPicker: Bool = false
+    @State private var isImportingUserLut: Bool = false
+    @State private var pendingTransformWarningLook: FilmtoneCaptureLook?
     /// M13-M-3: tracks whether the active manual exposure was entered
     /// via a parameter chip tap. When true, tapping the same chip
     /// again exits manual back to auto. False if the manual mode was
@@ -248,7 +264,7 @@ struct FilmtoneCaptureView: View {
             // from the initial chip selection so a record without a
             // chip change still persists `selectedLook` (or nil for
             // Filmtone).  Subsequent chip changes update via .onChange.
-            session.setSelectedLook(captureLookSelection.toSelectedLookRecord())
+            syncSessionLookRecords(captureLookSelection)
             // Auto-restore previously picked SSD folder so the owner
             // does not have to re-pick on every capture-view present.
             // Runs before prepareSession so the storage pill shows the
@@ -264,7 +280,7 @@ struct FilmtoneCaptureView: View {
             // the right `selectedLook` (or nil for Filmtone).  Done
             // before the live-preview rebuild so a record that races
             // an in-flight chip change still observes the latest pick.
-            session.setSelectedLook(newLook.toSelectedLookRecord())
+            syncSessionLookRecords(newLook)
             // S11-C: a chip tap rebuilds the live preview's grade chain
             // off the new Look without touching the editor store.  The
             // closure resolves Stone / Urban to a built-in catalog
@@ -276,6 +292,7 @@ struct FilmtoneCaptureView: View {
             let bundle = make(newLook)
             activeGradeProcessor = bundle?.processor
             activeLiveDiagnostics = bundle?.diagnostics
+            isLiveGradeFallback = bundle?.processor == nil
             if let bundle {
                 logLiveDiagnostics(bundle.diagnostics)
             } else {
@@ -328,10 +345,78 @@ struct FilmtoneCaptureView: View {
         .sheet(isPresented: $showLookPicker) {
             FilmtoneCaptureLookSheet(
                 selection: $captureLookSelection,
+                userLuts: userLutEntries,
+                isImportingUserLut: isImportingUserLut,
+                onImportUserLut: importUserLutFromPicker,
+                onSelectUserLut: selectUserLutFromPicker,
                 onDismiss: { showLookPicker = false }
             )
         }
+        .alert(
+            "トランスフォームLUTの可能性があります",
+            isPresented: Binding(
+                get: { pendingTransformWarningLook != nil },
+                set: { if !$0 { pendingTransformWarningLook = nil } }
+            ),
+            presenting: pendingTransformWarningLook
+        ) { look in
+            Button("キャンセル", role: .cancel) {
+                pendingTransformWarningLook = nil
+            }
+            Button("そのまま使う") {
+                let accepted = look.acceptingTransformWarning()
+                pendingTransformWarningLook = nil
+                applyCaptureLookSelection(accepted)
+            }
+        } message: { look in
+            Text(look.customLutRecord?.transformWarningReason ?? "FilmtoneはApple Log 2からの変換を先に行います。このLUTがLog変換用の場合、二重変換になり色が破綻する可能性があります。")
+        }
         .accessibilityIdentifier("filmtone.capture.surface")
+    }
+
+    private func syncSessionLookRecords(_ look: FilmtoneCaptureLook) {
+        session.setSelectedLook(look.toSelectedLookRecord())
+        session.setCustomLut(look.toCustomLutRecord())
+    }
+
+    private func importUserLutFromPicker() {
+        guard !isImportingUserLut, let importUserLut else { return }
+        isImportingUserLut = true
+        Task {
+            let look = await importUserLut()
+            await MainActor.run {
+                isImportingUserLut = false
+                guard let look else { return }
+                selectLookFromPicker(look)
+            }
+        }
+    }
+
+    private func selectUserLutFromPicker(_ entry: LutLibraryEntry) {
+        guard !isImportingUserLut, let loadUserLut else { return }
+        isImportingUserLut = true
+        Task {
+            let look = await loadUserLut(entry)
+            await MainActor.run {
+                isImportingUserLut = false
+                guard let look else { return }
+                selectLookFromPicker(look)
+            }
+        }
+    }
+
+    private func selectLookFromPicker(_ look: FilmtoneCaptureLook) {
+        showLookPicker = false
+        if look.needsTransformWarningAcceptance {
+            pendingTransformWarningLook = look
+        } else {
+            applyCaptureLookSelection(look)
+        }
+    }
+
+    private func applyCaptureLookSelection(_ look: FilmtoneCaptureLook) {
+        FilmtoneCaptureHaptics.selection()
+        captureLookSelection = look
     }
 
     // MARK: - Preview
@@ -368,7 +453,8 @@ struct FilmtoneCaptureView: View {
     }
 
     private var isUngradedPreviewFallback: Bool {
-        !session.hasLivePreview && session.previewLayer != nil
+        (!session.hasLivePreview && session.previewLayer != nil)
+            || (session.hasLivePreview && isLiveGradeFallback)
     }
 
     /// S5 (2026-05-09): explicit "Ungraded" badge for the fallback
@@ -1101,6 +1187,8 @@ private struct FilmtoneCaptureTakePickerRow: View {
         }
         if let look = package.selectedLook?.englishName {
             parts.append(look)
+        } else if let customLut = package.customLut {
+            parts.append(customLut.displayName)
         } else {
             parts.append("Filmtone")
         }

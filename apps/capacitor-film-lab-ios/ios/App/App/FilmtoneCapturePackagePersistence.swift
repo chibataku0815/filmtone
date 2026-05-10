@@ -69,6 +69,18 @@ struct FilmtoneCapturePackageSnapshotV1: Codable {
     var selectedLookSlug: String?
     var selectedLookEnglishName: String?
     var selectedLookIntensity: Double?
+    /// S7: user-imported capture creative LUT. Additive fields so
+    /// pre-S7 packages continue to decode as `customLut = nil`.
+    var customLutLibraryId: String?
+    var customLutTitle: String?
+    var customLutSize: Int?
+    var customLutSourceHash: String?
+    var customLutIntensity: Double?
+    var customLutConversionPolicy: String?
+    var customLutTransformWarningReason: String?
+    var customLutTransformWarningKind: String?
+    var customLutTransformWarningSignal: String?
+    var customLutTransformWarningAccepted: Bool?
     /// M12 / S12-C: exposure / focus / metering control state at
     /// record-stop time.  `exposureMode` ("auto" | reserved "manual")
     /// is the trigger field — when present, the snapshot rebuilds a
@@ -232,6 +244,16 @@ enum FilmtoneCapturePackagePersistence {
             selectedLookSlug: package.selectedLook?.slug,
             selectedLookEnglishName: package.selectedLook?.englishName,
             selectedLookIntensity: package.selectedLook?.intensity,
+            customLutLibraryId: package.customLut?.libraryId?.uuidString,
+            customLutTitle: package.customLut?.title,
+            customLutSize: package.customLut?.size,
+            customLutSourceHash: package.customLut?.sourceHash,
+            customLutIntensity: package.customLut?.intensity,
+            customLutConversionPolicy: package.customLut?.conversionPolicy,
+            customLutTransformWarningReason: package.customLut?.transformWarningReason,
+            customLutTransformWarningKind: package.customLut?.transformWarningKind,
+            customLutTransformWarningSignal: package.customLut?.transformWarningSignal,
+            customLutTransformWarningAccepted: package.customLut?.transformWarningAccepted,
             exposureMode: package.exposureControl?.mode,
             exposureBiasEV: package.exposureControl?.biasEV,
             focusPointNormalizedX: package.exposureControl?.focusPointX,
@@ -333,6 +355,26 @@ enum FilmtoneCapturePackagePersistence {
         } else {
             selectedLook = nil
         }
+        let customLut: FilmtoneCaptureCustomLutRecord?
+        if let title = snapshot.customLutTitle,
+           let size = snapshot.customLutSize,
+           let intensity = snapshot.customLutIntensity,
+           let conversionPolicy = snapshot.customLutConversionPolicy {
+            customLut = FilmtoneCaptureCustomLutRecord(
+                libraryId: snapshot.customLutLibraryId.flatMap(UUID.init(uuidString:)),
+                title: title,
+                size: size,
+                sourceHash: snapshot.customLutSourceHash,
+                intensity: intensity,
+                conversionPolicy: conversionPolicy,
+                transformWarningReason: snapshot.customLutTransformWarningReason,
+                transformWarningKind: snapshot.customLutTransformWarningKind,
+                transformWarningSignal: snapshot.customLutTransformWarningSignal,
+                transformWarningAccepted: snapshot.customLutTransformWarningAccepted ?? false
+            )
+        } else {
+            customLut = nil
+        }
         // S12-C / S12-E: rebuild the exposure-control record only
         // when `exposureMode` is present — that is the M12 sentinel
         // field that pre-M12 snapshots lack.  When the trigger is set,
@@ -393,6 +435,7 @@ enum FilmtoneCapturePackagePersistence {
             parameters: parameters,
             lens: lens,
             selectedLook: selectedLook,
+            customLut: customLut,
             exposureControl: exposureControl,
             whiteBalance: whiteBalance,
             masterBookmark: snapshot.masterBookmark,

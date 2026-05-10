@@ -588,6 +588,11 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     /// `selectedLook` without the session knowing about chip UI.
     /// `nil` = Filmtone default chip (no Look) or pre-M11 callers.
     private var pendingSelectedLook: FilmtoneSelectedLookRecord?
+    /// S7: user-imported creative LUT selected in the capture LOOK
+    /// sheet. Mutually exclusive with `pendingSelectedLook` in normal
+    /// UI flows; kept as a separate record because built-in Looks and
+    /// library LUTs have different durable identities.
+    private var pendingCustomLut: FilmtoneCaptureCustomLutRecord?
 
     /// View-side setter for the capture-time Look chip.  Idempotent;
     /// safe to call before `prepare(lens:)` and at any point during
@@ -595,6 +600,10 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     /// record-stop time when the package is built).
     func setSelectedLook(_ record: FilmtoneSelectedLookRecord?) {
         pendingSelectedLook = record
+    }
+
+    func setCustomLut(_ record: FilmtoneCaptureCustomLutRecord?) {
+        pendingCustomLut = record
     }
 
     // MARK: - M12 / S12-C exposure / focus / metering
@@ -1363,6 +1372,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         let captureId = self.captureId
         let lensRecord = self.activeLens?.toRecord()
         let selectedLook = self.pendingSelectedLook
+        let customLut = self.pendingCustomLut
         // M12 / S12-C+E: snapshot exposure / focus / metering at
         // record-stop time.  Auto-mode runs persist nil for the
         // manual-only fields; manual-mode runs persist the held ISO /
@@ -1440,6 +1450,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
                         parameters: parameters,
                         lens: lensRecord,
                         selectedLook: selectedLook,
+                        customLut: customLut,
                         exposureControl: exposureControl,
                         whiteBalance: whiteBalance,
                         masterBookmark: masterBookmark,

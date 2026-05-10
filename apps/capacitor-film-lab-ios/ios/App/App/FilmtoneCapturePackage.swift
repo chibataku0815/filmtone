@@ -182,6 +182,33 @@ struct FilmtoneSelectedLookRecord: Equatable, Codable {
     let intensity: Double
 }
 
+/// S7 - Capture Custom LUT Intake: user-imported creative LUT selected
+/// from the capture LOOK sheet. This is intentionally separate from
+/// `FilmtoneSelectedLookRecord`, whose UUID path is for built-in /
+/// saved Look records. Capture custom LUTs use the library LUT as SSOT
+/// and carry enough identity to audit conversion and warning state
+/// without embedding the large cube payload into every package.
+struct FilmtoneCaptureCustomLutRecord: Equatable, Codable {
+    static let captureConversionPolicy = "apple-log2-to-rec709-before-creative-lut"
+
+    let libraryId: UUID?
+    let title: String
+    let size: Int
+    let sourceHash: String?
+    let intensity: Double
+    let conversionPolicy: String
+    let transformWarningReason: String?
+    let transformWarningKind: String?
+    let transformWarningSignal: String?
+    let transformWarningAccepted: Bool
+
+    var displayName: String {
+        title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "Custom LUT"
+            : title
+    }
+}
+
 /// S1 - Capture Stabilization Toggle: owner-visible request.  `.on`
 /// drives `cinematicExtendedEnhanced` exact, `.off` drives `.off`
 /// exact.  No fallback / silent degrade: post-record gate fails loudly
@@ -384,6 +411,9 @@ struct FilmtoneCapturePackage: Equatable {
     /// editor adoption path (S11-E) can re-apply the same Look against
     /// the proxy.
     let selectedLook: FilmtoneSelectedLookRecord?
+    /// S7: user-imported capture creative LUT. Nil for built-in Looks,
+    /// Filmtone default, and pre-S7 captures.
+    let customLut: FilmtoneCaptureCustomLutRecord?
     /// M12 / S12-C: exposure / focus / metering state at record-stop
     /// time.  `nil` for pre-M12 captures decoded from disk; new runs
     /// always populate this with at least the M12 baseline (`mode:
