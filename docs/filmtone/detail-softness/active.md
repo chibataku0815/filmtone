@@ -1,7 +1,7 @@
-# Phase 2-B: macOS Native Pilot — Detail Softness Render Pass
+# Phase 2-B/2-C: Native Detail Softness Render Pass
 
 Date opened: 2026-05-12 JST
-Phase: 2 of 5 (sub-stage 2-B; see `strategy.md` and
+Phase: 2 of 5 (sub-stages 2-B/2-C; see `strategy.md` and
 `archive/2026-05-12-phase-2a-research-charter.md`)
 
 ## Gating
@@ -28,16 +28,18 @@ prototype.
   control lands).
 - **Working colorspace**: verify during prototype; failure adjusts luma
   weights, not the algorithm shape.
+- **Intermediate visual A/B**: owner moved it to final QA. Do not block
+  native renderer progress on the macOS-only A/B checkpoint.
 
 ## Goal
 
-Implement the Detail Softness render pass on the macOS native pipeline as
-the pilot renderer. Validate:
+Implement the Detail Softness render pass on the native macOS + iOS export
+pipelines before moving to web renderer parity. Validate:
 
 1. `effectiveDetailSoftness == 0` is bitwise neutral (identity-at-0).
-2. `effectiveDetailSoftness ∈ {0.18, 0.30}` produces visible softening on
-   the A/B still set without obvious skin waxiness, smeared hair / foliage,
-   or unreadable text.
+2. `effectiveDetailSoftness ∈ {0.18, 0.30}` produces visible softening
+   without obvious skin waxiness, smeared hair / foliage, or unreadable text
+   in final visual QA.
 3. The Phase 2-A skeleton is the right shape; if it fails edge / skin
    quality on the pilot still set, halt and reopen algorithm review per
    owner's "spike if pilot fails" clause.
@@ -91,10 +93,9 @@ the pilot renderer. Validate:
   or BT.2020 primaries are in play, adjust luma weights and document under
   Completion Log.
 
-### Out of scope for 2-B
+### Out of scope for native pass
 
-- WebGPU shader, iOS export kernel, WebGL shader, cross-renderer parity
-  test → Phase 2-C / 2-D.
+- WebGPU shader, WebGL shader, cross-renderer parity test → next pass.
 - Phase 4 source-bias resolver, Phase 3 UI exposure, Phase 5 visual tuning
   matrix.
 - `AdvancedAdjustCatalog.swift` Veil intensity max-merge decision (deferred
@@ -107,6 +108,7 @@ bun run build:core
 bun run --cwd packages/film-lab-core test    # new detail-softness.test.ts passes; baseline-waived ios-swift-payload failures unchanged
 bun run build:smart-look                     # .d.ts re-export check
 bun run verify:macos                         # macOS pipeline compiles
+bun run verify:ios                           # iOS export pipeline compiles
 swift test --package-path packages/film-lab-swift-core   # contract tests still green
 bun run check:filmtone-context               # this active.md declares Copy / History Impact below
 git diff --check
@@ -136,9 +138,11 @@ Use the standard A/B still set listed in plan §Visual Tuning Reference:
   constants byte-match the TS helper.
 - macOS native pipeline carries `applyDetailSoftnessStage` between
   `filmCompressionV2` and `edgeOptics`.
-- Identity at `0` proven on the A/B still set (screenshot diff = 0).
-- Visible softening at `0.18` and `0.30` confirmed without obvious skin
-  waxiness, smeared hair, or unreadable text.
+- Native macOS + iOS export pipelines carry the pass after tone compression
+  and before edge optics / glow.
+- Final visual QA still checks identity at `0` and visible softening at
+  `0.18` / `0.30` without obvious skin waxiness, smeared hair, or unreadable
+  text.
 - Working colorspace verified at insertion point; luma weights confirmed or
   adjusted with the change documented under Completion Log.
 - `bun run verify:macos` and `film-lab-core` tests green; baseline-waived
@@ -157,9 +161,8 @@ implementation-history claim changes — UI exposure lands in Phase 3.
 
 - Phase 2-B render source is about to start from a HEAD before `033a335f`.
   Halt and rebase / switch to the committed Phase 1 base first.
-- Identity at `0` fails (any pixel differs). Pause and diagnose before any
-  uniform / kernel change ships.
-- Macroscopic skin waxiness or smeared hair on the A/B set at `0.18`.
+- Identity short-circuit is removed or bypassed in any renderer.
+- Final visual QA shows macroscopic skin waxiness or smeared hair at `0.18`.
   Reopen algorithm review per owner's "spike if pilot fails" clause.
 - Working colorspace at insertion point is not Rec.709 (Display P3 or
   BT.2020). Pause to adjust luma weights; document under Completion Log.
@@ -171,29 +174,30 @@ implementation-history claim changes — UI exposure lands in Phase 3.
 
 - [x] **(Precondition)** Phase 1 commit landed on
       `feature/detail-softness-contract` at `033a335f`.
-- [ ] `packages/film-lab-core/src/detail-softness.ts` added with helper +
+- [x] `packages/film-lab-core/src/detail-softness.ts` added with helper +
       `DetailSoftnessUniforms` type + `DETAIL_SOFTNESS_EFFECTIVE_MAX`
       constant.
-- [ ] `packages/film-lab-core/src/detail-softness.test.ts` added covering
+- [x] `packages/film-lab-core/src/detail-softness.test.ts` added covering
       identity, clamps, monotonicity, bias.
-- [ ] `packages/film-lab-core/src/index.ts` re-exports the helper, type,
+- [x] `packages/film-lab-core/src/index.ts` re-exports the helper, type,
       and constant.
-- [ ] Swift mirror in `FilmtonePhase0Math.swift` matches the TS derivation;
-      constants in lockstep.
-- [ ] `FilmtoneGradeKernels.swift` `detailSoftnessKernel` added with
+- [x] Swift mirror in `FilmLabSwiftCore` matches the TS derivation; constants
+      in lockstep.
+- [x] `FilmtoneGradeKernels.swift` `detailSoftnessKernel` added with
       identity short-circuit at `effectiveDetailSoftness == 0`.
-- [ ] `FilmtoneGradePipeline.swift` `applyDetailSoftnessStage` inserted
+- [x] `FilmtoneGradePipeline.swift` `applyDetailSoftnessStage` inserted
       between `filmCompressionV2` and `edgeOptics`.
-- [ ] Working colorspace at insertion point verified; luma weights
+- [x] iOS export `GradeRenderPipeline` + `OpticalKernels` carry the same
+      detail softness pass after tone compression and before edge optics.
+- [x] Working colorspace at insertion point verified; luma weights
       confirmed (or adjusted with rationale).
-- [ ] Identity-at-0 manual screenshot diff is 0 on the A/B set.
-- [ ] Visible softening at `0.18` / `0.30` confirmed on the A/B set without
-      quality regressions.
+- [ ] Final visual QA confirms identity-at-0 and visible softening at
+      `0.18` / `0.30` without quality regressions.
 - [ ] All verify commands green (build:core / film-lab-core test /
-      build:smart-look / verify:macos / swift test / check:filmtone-context
-      / git diff --check).
+      build:smart-look / verify:macos / verify:ios / swift test /
+      check:filmtone-context / git diff --check).
 - [ ] `active.md` archived to
-      `archive/2026-05-12-phase-2b-macos-native-pilot.md`;
+      `archive/2026-05-12-phase-2b-2c-native-render-pass.md`;
       `strategy.md` gets a 1–3 line completion note.
 
 ## Read-only references
@@ -206,11 +210,10 @@ implementation-history claim changes — UI exposure lands in Phase 3.
 
 ## Implementation Log
 
-### 2026-05-12 JST — implementation landed (pending visual A/B)
+### 2026-05-12 JST — macOS implementation landed
 
 Source landed on `feature/detail-softness-contract` after the Phase 1
-commit `033a335f`. Visual A/B on the standard still set is the remaining
-gate before archive; that step is owner-run.
+commit `033a335f`.
 
 **Files added / changed**
 
@@ -257,27 +260,49 @@ directly at the insertion point. **No luma-weight adjustment needed.**
 | `bun run build:smart-look` | OK; `.d.ts` widened to re-export the helper / type / constant. |
 | `swift test --package-path packages/film-lab-swift-core` | 44 / 44 pass (37 baseline + 7 new `DetailSoftnessUniformsTests`). |
 | `bun run verify:macos` | **BUILD SUCCEEDED**. |
+| `bun run verify:ios` | PASS after iOS export port. |
 | `bun run check:filmtone-context` | PASS — this Implementation Log carries the Copy / History Impact marker for the new source files. |
 | `git diff --check` | Clean. |
 
-**Pending owner action — visual A/B**
+### 2026-05-12 JST — owner moved visual A/B to final QA; iOS port continued
 
-The Visual A/B procedure in §Verification has not been run because it
-requires a still-export through the macOS app on a curated set. Owner
-runs the 4-image set at `detailSoftness ∈ {0.00, 0.18, 0.30}` and reports
-back:
+Owner direction: do not block core renderer progress on the intermediate
+macOS-only A/B gate. The final visual QA pass still checks identity at
+`0.00` and visible softening at `0.18` / `0.30`, but native iOS export port
+continues now.
+
+**iOS export port**
+
+- `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/OpticalKernels.swift`
+  — added the same `detailSoftness` CIKernel skeleton as macOS.
+- `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/GradeRenderPipeline.swift`
+  — added `applyDetailSoftnessStage(to:params:)`, deriving uniforms from
+  `FilmLabSwiftCore.FilmtoneDetailSoftness`.
+- `apps/capacitor-film-lab-ios/ios/App/App/Export/FilmtoneExportSession.swift`
+  — inserted the pass after `applyToneCompressionStage` and before
+  `OpticsCompositor.applyEdgeOpticsStage`.
+- `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportMetrics.swift`
+  — added a `DetailSoftness` render substage so export profiling keeps the
+  new native pass visible.
+
+**Final owner action — visual A/B**
+
+The Visual A/B procedure in §Verification is deferred to final QA because it
+requires curated still exports through the native apps. Owner runs the
+4-image set at `detailSoftness ∈ {0.00, 0.18, 0.30}` and reports back:
 
 - Identity at `0.00` — screenshot diff vs pre-Phase-2-B baseline must be 0.
 - Visible softening at `0.18` / `0.30` without obvious skin waxiness,
   smeared hair / foliage, or unreadable text on the standard still set.
 
-If the algorithm shape holds, Phase 2-B archives to
-`archive/2026-05-12-phase-2b-macos-native-pilot.md`. If quality fails,
-reopen algorithm review per Phase 2-A's "spike if pilot fails" clause.
+If the algorithm shape holds, this native pass archives after automated gates.
+If final quality fails, reopen algorithm review per Phase 2-A's
+"spike if pilot fails" clause.
 
 ## Copy / History Impact (restated for Implementation Log)
 
-No copy / history impact: Phase 2-B is an internal render pass + a shared
-derivation helper. No user-visible label, help text, App Store metadata,
-or implementation-history claim changes — UI exposure lands in Phase 3.
+No copy / history impact: Phase 2-B/2-C is an internal native render pass +
+a shared derivation helper. No user-visible label, help text, App Store
+metadata, or implementation-history claim changes — UI exposure lands in
+Phase 3.
 `bun run check:filmtone-context` must pass on this declaration.

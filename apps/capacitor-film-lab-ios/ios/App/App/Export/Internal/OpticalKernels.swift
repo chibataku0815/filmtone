@@ -142,6 +142,56 @@ kernel vec4 filmCompressionV2(__sample image, float amount, float range) {
 }
 """)
 
+    static let detailSoftness = CIKernel(source: """
+kernel vec4 detailSoftness(
+    sampler image,
+    float effectiveDetailSoftness,
+    float kernelRadiusPx,
+    float chromaAttenScale,
+    float edgeGuardLo,
+    float edgeGuardHi,
+    float highlightBias
+) {
+    vec2 coord = destCoord();
+    vec4 center = sample(image, samplerTransform(image, coord));
+    if (effectiveDetailSoftness < 1e-4) {
+        return center;
+    }
+
+    float r = max(kernelRadiusPx, 0.0001);
+    vec3 lumaWeights = vec3(0.2126, 0.7152, 0.0722);
+
+    vec3 srcRGB = center.rgb;
+    vec3 nR = sample(image, samplerTransform(image, coord + vec2( r,  0.0))).rgb;
+    vec3 nL = sample(image, samplerTransform(image, coord + vec2(-r,  0.0))).rgb;
+    vec3 nU = sample(image, samplerTransform(image, coord + vec2( 0.0,  r))).rgb;
+    vec3 nD = sample(image, samplerTransform(image, coord + vec2( 0.0, -r))).rgb;
+
+    vec3 localRef = (srcRGB + nR + nL + nU + nD) * 0.2;
+    vec3 detail = srcRGB - localRef;
+
+    float lumaCenter = dot(srcRGB, lumaWeights);
+    float lumaR = dot(nR, lumaWeights);
+    float lumaL = dot(nL, lumaWeights);
+    float lumaU = dot(nU, lumaWeights);
+    float lumaD = dot(nD, lumaWeights);
+    float lumaGrad = abs(lumaR - lumaL) * 0.5 + abs(lumaU - lumaD) * 0.5;
+
+    float edgeGuard = 1.0 - smoothstep(edgeGuardLo, edgeGuardHi, lumaGrad);
+    float highlightWeight = mix(1.0, highlightBias, smoothstep(0.6, 0.9, lumaCenter));
+
+    float lumaAtten = effectiveDetailSoftness * edgeGuard * highlightWeight;
+    float chromaAtten = lumaAtten * chromaAttenScale;
+
+    float detailLuma = dot(detail, lumaWeights);
+    vec3 detailLumaVec = detailLuma * lumaWeights;
+    vec3 detailChroma = detail - detailLumaVec;
+
+    vec3 softened = srcRGB - (detailLumaVec * lumaAtten) - (detailChroma * chromaAtten);
+    return vec4(softened, center.a);
+}
+""")
+
     static let printStage = CIColorKernel(source: """
 vec3 applyPrintContrast(vec3 rgb, float amount) {
     if (amount < 0.001) {

@@ -916,6 +916,8 @@ final class FilmtoneExportSession {
         profileRenderSubstage(.baseGrade, image: current, outputSize: stageProfilingOutputSize)
         current = gradeRenderPipeline.applyToneCompressionStage(to: current, params: params, presetVersion: presetVersion)
         profileRenderSubstage(.toneCompression, image: current, outputSize: stageProfilingOutputSize)
+        current = gradeRenderPipeline.applyDetailSoftnessStage(to: current, params: params)
+        profileRenderSubstage(.detailSoftness, image: current, outputSize: stageProfilingOutputSize)
         current = opticsCompositor.applyEdgeOpticsStage(to: current, params: params)
         profileRenderSubstage(.edgeOptics, image: current, outputSize: stageProfilingOutputSize)
         current = opticsCompositor.applyGlowFamilyStage(
