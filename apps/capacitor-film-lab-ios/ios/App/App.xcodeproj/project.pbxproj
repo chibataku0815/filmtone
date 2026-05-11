@@ -72,6 +72,9 @@
 		C30000010000000000000009 /* EditorProjectMutationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000008 /* EditorProjectMutationCoordinator.swift */; };
 		C3000001000000000000000B /* EditorExportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3000001000000000000000A /* EditorExportCoordinator.swift */; };
 		C3000001000000000000000D /* EditorCaptureRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3000001000000000000000C /* EditorCaptureRelay.swift */; };
+		C30000010000000000000023 /* CaptureDeviceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000022 /* CaptureDeviceManager.swift */; };
+		C30000010000000000000025 /* RecordingStateController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000024 /* RecordingStateController.swift */; };
+		C30000010000000000000027 /* CapturePackageAssembler.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000026 /* CapturePackageAssembler.swift */; };
 		D10000010000000000000001 /* FilmtoneRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000001 /* FilmtoneRootView.swift */; };
 		D10000010000000000000002 /* FilmtoneEditorStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000002 /* FilmtoneEditorStore.swift */; };
 		D10000010000000000000003 /* FilmtoneEditorFacade.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000003 /* FilmtoneEditorFacade.swift */; };
@@ -259,6 +262,9 @@
 		C30000010000000000000008 /* EditorProjectMutationCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorProjectMutationCoordinator.swift; sourceTree = "<group>"; };
 		C3000001000000000000000A /* EditorExportCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorExportCoordinator.swift; sourceTree = "<group>"; };
 		C3000001000000000000000C /* EditorCaptureRelay.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorCaptureRelay.swift; sourceTree = "<group>"; };
+		C30000010000000000000022 /* CaptureDeviceManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CaptureDeviceManager.swift; sourceTree = "<group>"; };
+		C30000010000000000000024 /* RecordingStateController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecordingStateController.swift; sourceTree = "<group>"; };
+		C30000010000000000000026 /* CapturePackageAssembler.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CapturePackageAssembler.swift; sourceTree = "<group>"; };
 		B20000010000000000000001 /* MezzanineColorProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MezzanineColorProbe.swift; sourceTree = "<group>"; };
 		B20000010000000000000020 /* DepthSourceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthSourceService.swift; sourceTree = "<group>"; };
 		B20000010000000000000021 /* FilmtoneDepthMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneDepthMap.swift; sourceTree = "<group>"; };
@@ -589,9 +595,21 @@
 				C20000010000000000000052 /* FilmtoneGcsvWriter.swift */,
 				C20000010000000000000031 /* FilmtoneMotionRecorder.swift */,
 				C20000010000000000000071 /* FilmtoneProductCapture.swift */,
+				C30000010000000000000020 /* Internal */,
 			);
 			name = Capture;
 			path = Capture;
+			sourceTree = "<group>";
+		};
+		C30000010000000000000020 /* Internal */ = {
+			isa = PBXGroup;
+			children = (
+				C30000010000000000000022 /* CaptureDeviceManager.swift */,
+				C30000010000000000000024 /* RecordingStateController.swift */,
+				C30000010000000000000026 /* CapturePackageAssembler.swift */,
+			);
+			name = Internal;
+			path = Internal;
 			sourceTree = "<group>";
 		};
 		7F8756D8B27F46E3366F6CEA /* Pods */ = {
@@ -1028,6 +1046,9 @@
 				C30000010000000000000009 /* EditorProjectMutationCoordinator.swift in Sources */,
 				C3000001000000000000000B /* EditorExportCoordinator.swift in Sources */,
 				C3000001000000000000000D /* EditorCaptureRelay.swift in Sources */,
+				C30000010000000000000023 /* CaptureDeviceManager.swift in Sources */,
+				C30000010000000000000025 /* RecordingStateController.swift in Sources */,
+				C30000010000000000000027 /* CapturePackageAssembler.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

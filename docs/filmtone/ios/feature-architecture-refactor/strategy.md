@@ -433,3 +433,16 @@ product-boundary turns, not 10+ helper-sized turns.
   stayed unchanged; pbxproj 4-section grep = 4; `bun run verify:ios`
   green; `git diff --check` clean. See
   `archive/2026-05-11-phase-3c-editor-capture-relay-closeout.md`.
+- 2026-05-11 JST — Phase 4A (CaptureSession large split) completed in
+  the feature worktree. New `CaptureDeviceManager`,
+  `RecordingStateController`, and `CapturePackageAssembler` split
+  device/format/manual-control state, recording state/timers/storage
+  pressure, and package assembly/persistence out of
+  `FilmtoneCaptureSession`. The facade keeps singular ownership of
+  `AVCaptureSession` + `sessionQueue` + movie output + preview VDO, with
+  collaborator `objectWillChange` bridged into the session. Session size
+  reduced from 1849 → 880 lines (−969), landing in the 600-900 target
+  band; SwiftUI view files stayed unchanged; pbxproj 4-section grep = 4
+  for all 3 files; `bun run verify:ios` green; `git diff --check`
+  clean. See
+  `archive/2026-05-11-phase-4a-capturesession-large-split.md`.

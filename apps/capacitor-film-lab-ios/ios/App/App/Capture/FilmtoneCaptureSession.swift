@@ -1,12 +1,12 @@
-// Filmtone V2 native camera capture — session pipeline (M10).
+// Filmtone V2 native camera capture — session pipeline facade (M10, Phase 4A).
 //
-// Single-camera AVCaptureSession with
-// AVCaptureMovieFileOutput driving ProRes 422 HQ Apple Log 2 at the
-// FilmtoneProductCapture-locked format index 56 + cinematicExtendedEnhanced
-// stabilization.  Manual start / stop, variable duration capped by the
-// resolved storage policy.  Master output routes to the security-scoped
-// external folder when one is selected; otherwise to the local package
-// directory under Caches.
+// Single-camera AVCaptureSession with AVCaptureMovieFileOutput driving
+// ProRes 422 HQ Apple Log 2 at the FilmtoneProductCapture-locked format
+// per-lens-resolved index + cinematicExtendedEnhanced stabilization.
+// Manual start / stop, variable duration capped by the resolved storage
+// policy.  Master output routes to the security-scoped external folder
+// when one is selected; otherwise to the local package directory under
+// Caches.
 //
 // Quality invariants are pinned to the `FilmtoneProductCapture` baseline
 // validated in M5-A / M7 owner walks.  This file mirrors the same
@@ -14,6 +14,21 @@
 // downgrade, ProRes downgrade) and lifts them to the typed
 // `FilmtoneCaptureFailure` enum so the capture view can route specific
 // failures to specific affordances.
+//
+// Phase 4A split: the facade owns the AVCaptureSession + sessionQueue +
+// movieOutput + preview VDO + preview layer + rotation coordinator +
+// pending Look chip; the three `Capture/Internal/` collaborators own:
+//
+//   * `CaptureDeviceManager` — device + lens, EV / focus / WB / manual
+//     exposure state and setters, format-derived range snapshots.
+//   * `RecordingStateController` — state machine, elapsed timer, auto
+//     stop, storage policy + pressure monitor, requested stabilization,
+//     per-run scratch state (capture id, package URLs, duration
+//     snapshot, recording capture rotation).
+//   * `CapturePackageAssembler` — post-record invariant gates (color
+//     space / stabilization / rotation / codec FourCC), package
+//     construction, security-scoped bookmark, persistence write,
+//     proxy export orchestration.
 
 import Foundation
 
@@ -51,103 +66,119 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     // active min/maxFrameDuration changes.
     //
     // S8-B: the per-lens format index is no longer hardcoded to 56.
-    // `FilmtoneCaptureLensCatalog` enumerates capture lenses and resolves
-    // a contract-matching format index per device, so non-wide/front lenses
-    // can satisfy the same contract on
-    // devices where the matching format sits at a different index.
-    // The wide-camera index 56 coincidence is preserved by the
-    // catalog's contract scan; we just no longer wire it as a constant.
+    // `FilmtoneCaptureLensCatalog` enumerates capture lenses and
+    // resolves a contract-matching format index per device.
     private static let lockedWidth: Int32 = 3840
     private static let lockedHeight: Int32 = 2160
     private static let lockedFPS: Double = 24
     private static let lockedRotationAngle: CGFloat = 90
     private static let appleLog2ColorSpaceRaw: Int = 4
 
-    /// Internal-mode product cap.  Explicit, not a hidden fallback.
-    static let internalDurationCapSeconds: Double = 10.0
+    /// Internal-mode product cap.  Forwarded from
+    /// `RecordingStateController` to preserve the existing
+    /// `FilmtoneCaptureSession.internalDurationCapSeconds` qualified
+    /// path for any external caller that references it.
+    static let internalDurationCapSeconds: Double = RecordingStateController.internalDurationCapSeconds
+    static let externalDurationCapSeconds: Double = RecordingStateController.externalDurationCapSeconds
 
-    /// External-mode soft ceiling.  S4 (2026-05-09) raised this from
-    /// 60 s to 300 s so the V2 capture surface supports a real 5 min
-    /// take on a connected SSD.  No longer keyed to
-    /// `FilmtoneProductCapture.maxDurationSeconds` (the legacy
-    /// fixed-duration evidence path stays at 60 s; the two paths
-    /// intentionally diverge).  ProRes 422 HQ Apple Log 2 thermal
-    /// envelope is the owner's responsibility past this ceiling — the
-    /// existing `writerInterrupted` failure surface routes any AV
-    /// thermal abort visibly to the banner.
-    static let externalDurationCapSeconds: Double = 300.0
-    private static let fallbackProResBytesPerSecond: Double = 82.0 * 1024.0 * 1024.0
-    private static let storageCriticalHeadroomBytes: Int64 = 1 * 1024 * 1024 * 1024
-    private static let storageWarningHeadroomBytes: Int64 = 3 * 1024 * 1024 * 1024
-    private static let storageFinalizeHeadroomBytes: Int64 = 2 * 1024 * 1024 * 1024
-    private static let storageUnreadableGraceSamples = 3
+    // MARK: - Public type aliases
+    //
+    // Phase 4A: the enums moved to the collaborators that primarily own
+    // them.  These aliases preserve the qualified path used by the
+    // view files (`FilmtoneCaptureSession.SessionState`,
+    // `FilmtoneCaptureSession.WhiteBalanceMode`,
+    // `FilmtoneCaptureSession.ExposureMode`) so SwiftUI view code did
+    // not need to change in this bundle.
 
-    // MARK: - Public API
+    typealias SessionState = RecordingStateController.SessionState
+    typealias WhiteBalanceMode = CaptureDeviceManager.WhiteBalanceMode
+    typealias ExposureMode = CaptureDeviceManager.ExposureMode
 
-    enum SessionState: Equatable {
-        case idle
-        case configuring
-        case ready
-        case recording(startedAt: Date)
-        case stopping
-        case completed(FilmtoneCapturePackage)
-        case failed(FilmtoneCaptureFailure)
-    }
+    // MARK: - Collaborators
+
+    let recordingState = RecordingStateController()
+    let deviceManager = CaptureDeviceManager()
+    private(set) lazy var packageAssembler = CapturePackageAssembler(stateController: recordingState)
+    private var collaboratorCancellables: Set<AnyCancellable> = []
+
+    // MARK: - Public @Published forwards
+    //
+    // SwiftUI observation: collaborator changes are bridged into this
+    // facade's `objectWillChange` so a single `@StateObject var session`
+    // declaration in `FilmtoneCaptureView` continues to repaint on any
+    // state mutation.  Concrete property values are forwarded as
+    // computed reads from the collaborator that owns the storage.
 
     /// Owner-visible session state.  The capture view reads this on
-    /// every transition and renders the record / stop / status pill
-    /// accordingly.
-    @Published private(set) var state: SessionState = .idle
+    /// every transition.  Storage on `RecordingStateController`.
+    var state: SessionState { recordingState.state }
 
-    /// Live elapsed seconds while `state == .recording`.  Updated on a
-    /// timer for the countdown / progress ring.
-    @Published private(set) var elapsedSeconds: Double = 0
+    /// Live elapsed seconds while `state == .recording`.
+    var elapsedSeconds: Double { recordingState.elapsedSeconds }
 
-    /// Storage policy resolved at start-of-run.  Pinned to
-    /// `.internalDocumentsCapped` until the caller hands us an
-    /// external folder URL via `useExternalFolder`.
-    @Published private(set) var storagePolicy: FilmtoneCaptureStoragePolicy = .internalDocumentsCapped
+    /// Storage policy resolved at start-of-run.  Storage on
+    /// `RecordingStateController`.
+    var storagePolicy: FilmtoneCaptureStoragePolicy { recordingState.storagePolicy }
 
     /// Recording-time capacity warning for the volume receiving the
-    /// active master.  Nil means either not recording or current free
-    /// space is safely above the projected remaining write budget.
-    @Published private(set) var storagePressure: FilmtoneCaptureStoragePressure?
+    /// active master.  Storage on `RecordingStateController`.
+    var storagePressure: FilmtoneCaptureStoragePressure? { recordingState.storagePressure }
+
+    /// S1: owner-requested stabilization for the next run.  Storage on
+    /// `RecordingStateController`; AV reapply lives on the facade
+    /// (`setRequestedStabilization(_:)`).
+    var requestedStabilization: FilmtoneRequestedStabilization { recordingState.requestedStabilization }
 
     /// S6: current preview/capture rotation angles supplied by
-    /// `AVCaptureDevice.RotationCoordinator`.
+    /// `AVCaptureDevice.RotationCoordinator`.  Stayed on the facade in
+    /// Phase 4A because the rotation apply path touches both
+    /// `previewLayer` (facade-owned) and `movieOutput.connection`
+    /// (facade-owned).
     @Published private(set) var orientationState: FilmtoneCaptureOrientationState = .portraitPinned
+
+    // Exposure / focus / WB / manual exposure — storage on
+    // `CaptureDeviceManager`.
+    var exposureBiasEV: Float { deviceManager.exposureBiasEV }
+    var exposureBiasRange: ClosedRange<Float> { deviceManager.exposureBiasRange }
+    var lastFocusPointNormalized: CGPoint? { deviceManager.lastFocusPointNormalized }
+    var lastMeteringPointNormalized: CGPoint? { deviceManager.lastMeteringPointNormalized }
+    var whiteBalanceMode: WhiteBalanceMode { deviceManager.whiteBalanceMode }
+    var lockedWhiteBalanceGains: AVCaptureDevice.WhiteBalanceGains? { deviceManager.lockedWhiteBalanceGains }
+    var canLockWhiteBalance: Bool { deviceManager.canLockWhiteBalance }
+    var exposureMode: ExposureMode { deviceManager.exposureMode }
+    var manualISO: Float { deviceManager.manualISO }
+    var manualShutterSeconds: Double { deviceManager.manualShutterSeconds }
+    var isoRange: ClosedRange<Float> { deviceManager.isoRange }
+    var shutterDurationRange: ClosedRange<Double> { deviceManager.shutterDurationRange }
+    var shutterDuration180Degrees: Double? { deviceManager.shutterDuration180Degrees }
+    var manualInheritedFromAuto: Bool { deviceManager.manualInheritedFromAuto }
 
     /// Preview layer the capture view embeds via UIViewRepresentable.
     /// `nil` until `prepare()` succeeds.
     private(set) var previewLayer: AVCaptureVideoPreviewLayer?
 
+    /// True when `prepare(lens:)` successfully attached the preview VDO.
+    /// Read by `FilmtoneCaptureView` to decide whether to render the
+    /// Metal-backed live preview or fall back to the raw
+    /// `AVCaptureVideoPreviewLayer`.
+    var hasLivePreview: Bool { previewVideoDataOutput != nil }
+
+    @Published private(set) var livePreviewTelemetry: FilmtoneLivePreviewTelemetry = .unavailable
+
+    // MARK: - AVFoundation graph (facade-owned)
+
     private let session = AVCaptureSession()
     private let sessionQueue = DispatchQueue(label: "filmtone.capture.session.queue")
 
-    private var device: AVCaptureDevice?
-    /// Rear lens that prepare(lens:) configured the session against.
-    /// Nil before prepare(); reset by teardown().  Captured into the
-    /// FilmtoneCapturePackage at recording-finished time so the
-    /// editor / export pipelines can carry the lens identity.
-    private var activeLens: FilmtoneCaptureLens?
     private var movieOutput: AVCaptureMovieFileOutput?
+    private var recordingDelegate: MovieDelegate?
 
-    /// S8-F / S5 preview-only VDO. The record path stays on
+    /// S8-F / S5 preview-only VDO.  The record path stays on
     /// `movieOutput` (ProRes 422 HQ + Apple Log 2 + requested
     /// stabilization); this output is only a monitor source for the
-    /// live preview renderer.  S5 configures it as native / preview-sized
-    /// where AVFoundation allows, then keeps VDO stabilization explicitly
-    /// off so movie stabilization does not also tax the preview stream.
-    /// Nil if `canAddOutput` rejects coexistence at `prepare(lens:)`
-    /// time; in that case live preview falls back to the raw
-    /// `AVCaptureVideoPreviewLayer`.
+    /// live preview renderer.
     private var previewVideoDataOutput: AVCaptureVideoDataOutput?
     private var previewSampleDelegate: PreviewSampleDelegate?
-    private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
-    private var rotationObservations: [NSKeyValueObservation] = []
-    private var latestPreviewRotation: FilmtoneCaptureVideoRotation = .portraitPinned
-    private var latestCaptureRotation: FilmtoneCaptureVideoRotation = .portraitPinned
-    private var recordingCaptureRotation: FilmtoneCaptureVideoRotation?
     private let previewSampleQueue = DispatchQueue(
         label: "filmtone.capture.preview.vdo.queue",
         qos: .userInteractive
@@ -161,15 +192,51 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     /// stale frame from the previous lens.
     let previewFrameSink = FilmtonePreviewFrameSink()
 
-    /// True when `prepare(lens:)` successfully attached the preview
-    /// VDO.  Read by `FilmtoneCaptureView` to decide whether to render
-    /// the Metal-backed live preview or fall back to the raw
-    /// `AVCaptureVideoPreviewLayer`.  Toggles together with `state`
-    /// transitions (`.ready` after a successful prepare, `.idle` after
-    /// teardown) so SwiftUI body recomputes pick the change up.
-    var hasLivePreview: Bool { previewVideoDataOutput != nil }
+    // MARK: - Rotation coordinator
 
-    @Published private(set) var livePreviewTelemetry: FilmtoneLivePreviewTelemetry = .unavailable
+    private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
+    private var rotationObservations: [NSKeyValueObservation] = []
+    private var latestPreviewRotation: FilmtoneCaptureVideoRotation = .portraitPinned
+    private var latestCaptureRotation: FilmtoneCaptureVideoRotation = .portraitPinned
+
+    // MARK: - Pending Look chip / Custom LUT
+
+    /// M11 / S11-D: capture-time Look chip recorded with the run.
+    /// Set by `FilmtoneCaptureView` whenever the chip selection changes
+    /// (and seeded once on view appear) so the `FilmtoneCapturePackage`
+    /// built at record-stop time carries `selectedLook` without the
+    /// session knowing about chip UI.  `nil` = Filmtone default chip
+    /// (no Look) or pre-M11 callers.
+    private var pendingSelectedLook: FilmtoneSelectedLookRecord?
+    /// S7: user-imported creative LUT selected in the capture LOOK
+    /// sheet.  Mutually exclusive with `pendingSelectedLook` in normal
+    /// UI flows; kept as a separate record because built-in Looks and
+    /// library LUTs have different durable identities.
+    private var pendingCustomLut: FilmtoneCaptureCustomLutRecord?
+
+    // MARK: - Init
+
+    override init() {
+        super.init()
+        wireCollaboratorObservers()
+    }
+
+    private func wireCollaboratorObservers() {
+        // Collaborators publish `@Published` mutations independently;
+        // bridge their `objectWillChange` into this facade so a single
+        // `@StateObject var session` declaration in
+        // `FilmtoneCaptureView` repaints on any collaborator-side
+        // change.  Same pattern as Phase 3A / 3B / 3C in the editor
+        // refactor.
+        recordingState.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &collaboratorCancellables)
+        deviceManager.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &collaboratorCancellables)
+    }
+
+    // MARK: - Preview VDO config
 
     private static func configurePreviewVideoDataOutput(
         _ output: AVCaptureVideoDataOutput
@@ -210,135 +277,6 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         #endif
     }
 
-    /// M12 / S12-C: current EV bias applied to the active device.
-    /// Resets to 0 on every `prepare(lens:)` so a lens swap drops back
-    /// to neutral exposure (the new lens's auto-exposure baseline is
-    /// the right place to re-judge from).  Updated by
-    /// `setExposureBias(_:)`; clamped at apply-time to
-    /// `exposureBiasRange`.
-    @Published private(set) var exposureBiasEV: Float = 0
-    /// M12 / S12-C: usable EV range for the slider, clamped to
-    /// `[-2, +2]` ∩ `device.minExposureTargetBias …
-    /// device.maxExposureTargetBias`.  iPhone wide / tele cameras
-    /// typically expose ±8 EV at the device level — the M12 cap keeps
-    /// the slider conservative ("もしものため") so an accidental drag
-    /// cannot blow the exposure across stops.
-    @Published private(set) var exposureBiasRange: ClosedRange<Float> = -2...2
-    /// M12 / S12-C: last tap-to-focus point in normalized
-    /// AVCaptureDevice POI coordinates ((0,0) = top-left landscape
-    /// sensor).  Nil before the first tap; reset to nil on
-    /// `prepare(lens:)` so a lens swap drops back to continuous-auto.
-    @Published private(set) var lastFocusPointNormalized: CGPoint?
-    /// M12 / S12-C: last tap-to-meter point.  Auto-mode runs always
-    /// keep this equal to `lastFocusPointNormalized` (a tap binds
-    /// focus + metering together by S12-A lock); reserved for nil in
-    /// S12-E manual exposure where metering POI does not move.
-    @Published private(set) var lastMeteringPointNormalized: CGPoint?
-
-    /// M12 / S12-D: white balance mode for the active session.  Resets
-    /// to `.auto` on every `prepare(lens:)` so a lens swap drops back
-    /// to continuous auto-WB (the new lens's auto baseline is the
-    /// right place to re-judge a lock from).  Updated by
-    /// `lockWhiteBalance()` / `unlockWhiteBalance()`.
-    enum WhiteBalanceMode: String, Equatable {
-        case auto
-        case locked
-    }
-    @Published private(set) var whiteBalanceMode: WhiteBalanceMode = .auto
-
-    /// M12 / S12-E: exposure mode toggle.  `.auto` = continuous-auto
-    /// exposure (EV bias slider active, tap-to-meter active); `.manual`
-    /// = `setExposureModeCustom` with sampled ISO + shutter (EV bias
-    /// has no effect, tap-to-meter no-ops; tap-to-focus stays active).
-    /// Resets to `.auto` on every `prepare(lens:)` and `teardown()` so
-    /// a lens swap or fresh present drops back to the auto baseline.
-    enum ExposureMode: String, Equatable {
-        case auto
-        case manual
-    }
-    @Published private(set) var exposureMode: ExposureMode = .auto
-    /// M12 / S12-E: ISO held when `exposureMode == .manual`.  Updated
-    /// from `enterManualExposure()` (inherited from auto) or from
-    /// `setManualISO(_:)` (slider drag).  Clamped at apply-time to
-    /// `isoRange`; clamping is an apply-time concern because the
-    /// device-side bounds can in theory shift across format changes
-    /// even when the slider's binding is mid-drag.
-    @Published private(set) var manualISO: Float = 100
-    /// M12 / S12-E: shutter duration in seconds held when
-    /// `exposureMode == .manual`.  Apply-time clamp to
-    /// `shutterDurationRange` (24-fps cap on the slow side).
-    @Published private(set) var manualShutterSeconds: Double = 1.0/48
-    /// M12 / S12-E: usable ISO range for the slider, derived from the
-    /// active format's `minISO` / `maxISO`.  iPhone wide @ 4K24 Apple
-    /// Log 2 reports a wide range (~30 … ~6400); narrower formats may
-    /// report tighter ranges.  Empty range (`min == max`) means the
-    /// slider hides — the UI guards on `range.upperBound >
-    /// range.lowerBound` to avoid SwiftUI Slider NaN on a degenerate
-    /// `0...0` interval.
-    @Published private(set) var isoRange: ClosedRange<Float> = 100...3200
-    /// M12 / S12-E: usable shutter duration range in seconds.  Lower
-    /// bound = `activeFormat.minExposureDuration` (fastest shutter);
-    /// upper bound = `min(activeFormat.maxExposureDuration, 1/24 s)`
-    /// (24-fps cap from `lockedFPS`).  The cap is intentional: a
-    /// shutter slower than 1/24 s would either drop frames or stop
-    /// being a real exposure choice on a 24-fps capture, so we never
-    /// expose it in the slider regardless of what the format reports.
-    @Published private(set) var shutterDurationRange: ClosedRange<Double> = (1.0/8000)...(1.0/24)
-    /// M12 / S12-E: 180° shutter marker position (1/48 s) used by the
-    /// view to pin a yellow tick on the shutter slider as a visual
-    /// reference.  Nil when the marker would fall outside
-    /// `shutterDurationRange` — no shipping iPhone trips this; the
-    /// guard keeps the marker honest if a future format excludes
-    /// 1/48 s.
-    @Published private(set) var shutterDuration180Degrees: Double?
-    /// M12 / S12-E: tracks whether the active manual exposure was
-    /// entered by inheriting auto exposure (`true`) versus the owner
-    /// adjusting a slider after entry (`false`).  Persisted on the
-    /// capture package so downstream consumers can distinguish
-    /// "owner set ISO/shutter deliberately" from "owner just locked
-    /// the auto reading".
-    @Published private(set) var manualInheritedFromAuto: Bool = false
-    /// M12 / S12-D: gains sampled at the moment the owner tapped
-    /// Locked.  Held internally so the record-stop snapshot can carry
-    /// them into the capture package; not exposed for UI tweaks
-    /// (S12-D does not ship a Kelvin / tint slider — those are
-    /// out-of-scope per active.md).  Nil while in `.auto`.
-    @Published private(set) var lockedWhiteBalanceGains: AVCaptureDevice.WhiteBalanceGains?
-    /// M12 / S12-D: whether the active device + format combination
-    /// can lock white balance with custom device gains.  Read at
-    /// `prepare(lens:)` from `device.isLockingWhiteBalanceWithCustomDeviceGainsSupported`
-    /// AND `device.isWhiteBalanceModeSupported(.locked)`.  False
-    /// disables the Locked segment in the UI with a visible reason
-    /// rather than failing silently when the owner taps Locked.
-    @Published private(set) var canLockWhiteBalance: Bool = true
-
-    /// S1 (2026-05-09): owner-requested stabilization for the next
-    /// run.  Default `.on` preserves the M10 / M5-A handheld baseline
-    /// (`cinematicExtendedEnhanced`).  `.off` records gimbal-friendly
-    /// footage with AVFoundation electronic stabilization fully
-    /// disabled.  Mutated only via `setRequestedStabilization(_:)` so
-    /// the value is gated on `state == .ready` and applied through
-    /// `beginConfiguration` / `commitConfiguration` rather than a raw
-    /// connection write that the running session might ignore until
-    /// the next configure pass.
-    @Published private(set) var requestedStabilization: FilmtoneRequestedStabilization = .on
-
-    private var captureId: String = UUID().uuidString.lowercased()
-    private var packageDirURL: URL?
-    private var masterURL: URL?
-    private var proxyURL: URL?
-
-    private var startedAtBootTime: TimeInterval = 0
-    private var recordedDurationSnapshot: Double = 0
-    private var pendingFailure: FilmtoneCaptureFailure?
-
-    private var elapsedTimer: Timer?
-    private var autoStopTask: Task<Void, Never>?
-    private var storagePressureTask: Task<Void, Never>?
-    private var storagePressureUnreadableSamples: Int = 0
-
-    private var recordingDelegate: MovieDelegate?
-
     // MARK: - Setup
 
     /// Configures the session graph + acquires the preview layer.  Must
@@ -346,23 +284,14 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     /// device lookup failure, or format-lock mismatch — the capture view
     /// surfaces these as a failure banner instead of mounting a dead
     /// preview.
-    ///
-    /// S8-B: caller passes a `FilmtoneCaptureLens` resolved by
-    /// `FilmtoneCaptureLensCatalog.availableCaptureLenses()`.  The catalog
-    /// has already verified format-level contract compliance; we
-    /// re-check inside `prepare(lens:)` defensively because the format
-    /// index could in theory be stale (e.g. if a future lens swap
-    /// happens between enumeration and prepare), and because the
-    /// per-format ProRes 422 HQ availability is only knowable after the
-    /// session has the input + output wired.
     func prepare(lens: FilmtoneCaptureLens) async throws {
-        state = .configuring
+        recordingState.setState(.configuring)
 
         let permission = await Self.requestCameraPermission()
         guard permission == .authorized else {
             let failure: FilmtoneCaptureFailure = (permission == .denied || permission == .restricted)
                 ? .permissionDenied : .permissionDenied
-            state = .failed(failure)
+            recordingState.setState(.failed(failure))
             throw failure
         }
 
@@ -372,7 +301,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
             let failure = FilmtoneCaptureFailure.formatLockMismatch(
                 reason: "lens \(lens.displayName) (\(lens.deviceTypeRaw)) formats has \(captureDevice.formats.count) entries, need index \(lens.formatIndex)"
             )
-            state = .failed(failure)
+            recordingState.setState(.failed(failure))
             throw failure
         }
         let format = captureDevice.formats[lens.formatIndex]
@@ -381,7 +310,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
             let failure = FilmtoneCaptureFailure.formatLockMismatch(
                 reason: "lens \(lens.displayName) formats[\(lens.formatIndex)].supportedColorSpaces missing appleLog2 raw=4; have \(supportedRaw)"
             )
-            state = .failed(failure)
+            recordingState.setState(.failed(failure))
             throw failure
         }
         let dim = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
@@ -389,16 +318,14 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
             let failure = FilmtoneCaptureFailure.formatLockMismatch(
                 reason: "lens \(lens.displayName) formats[\(lens.formatIndex)] dims \(dim.width)x\(dim.height); need \(Self.lockedWidth)x\(Self.lockedHeight)"
             )
-            state = .failed(failure)
+            recordingState.setState(.failed(failure))
             throw failure
         }
         guard let appleLog2 = AVCaptureColorSpace(rawValue: Self.appleLog2ColorSpaceRaw) else {
             let failure = FilmtoneCaptureFailure.appleLog2Unavailable
-            state = .failed(failure)
+            recordingState.setState(.failed(failure))
             throw failure
         }
-        self.device = captureDevice
-        self.activeLens = lens
 
         do {
             session.beginConfiguration()
@@ -416,103 +343,13 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
             session.sessionPreset = .inputPriority
             session.automaticallyConfiguresCaptureDeviceForWideColor = false
 
-            let input = try AVCaptureDeviceInput(device: captureDevice)
-            guard session.canAddInput(input) else {
-                session.commitConfiguration()
-                let failure = FilmtoneCaptureFailure.writerSetupFailed(
-                    stage: "INPUT_ADD", reason: "session.canAddInput returned false"
-                )
-                state = .failed(failure)
-                throw failure
-            }
-            session.addInput(input)
-
-            try captureDevice.lockForConfiguration()
-            captureDevice.activeFormat = format
-            captureDevice.activeColorSpace = appleLog2
-            let frameDuration = CMTime(value: 1, timescale: CMTimeScale(Self.lockedFPS))
-            captureDevice.activeVideoMinFrameDuration = frameDuration
-            captureDevice.activeVideoMaxFrameDuration = frameDuration
-            // M12 / S12-C: reset EV bias + auto-exposure / auto-focus
-            // so a lens swap (or first prepare) drops back to neutral.
-            // The bias setter is a no-op when the device cannot move
-            // off its current target, but calling it inside the
-            // already-held configuration lock is the cheapest correct
-            // way to re-zero across swaps without a second lock cycle.
-            captureDevice.setExposureTargetBias(0, completionHandler: nil)
-            if captureDevice.isFocusModeSupported(.continuousAutoFocus) {
-                captureDevice.focusMode = .continuousAutoFocus
-            }
-            if captureDevice.isExposureModeSupported(.continuousAutoExposure) {
-                captureDevice.exposureMode = .continuousAutoExposure
-            }
-            // M12 / S12-D: reset white balance to continuous-auto so
-            // a lens swap drops a previously-locked WB.  Calling this
-            // inside the same lock cycle as the EV / focus reset.
-            if captureDevice.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
-                captureDevice.whiteBalanceMode = .continuousAutoWhiteBalance
-            }
-            captureDevice.unlockForConfiguration()
-            // Capture the device-reported bias range and intersect with
-            // the M12 `[-2, +2]` cap so the slider exposes only the
-            // usable subset.  iPhone wide / tele typically report ±8 EV
-            // at the device level — we take the tighter of "device
-            // says it can" and "M12 cap allows".
-            let deviceMin = captureDevice.minExposureTargetBias
-            let deviceMax = captureDevice.maxExposureTargetBias
-            let lowerBound = max(deviceMin, Float(-2))
-            let upperBound = min(deviceMax, Float(2))
-            self.exposureBiasRange = lowerBound <= upperBound
-                ? lowerBound...upperBound
-                : Float(0)...Float(0)
-            self.exposureBiasEV = 0
-            self.lastFocusPointNormalized = nil
-            self.lastMeteringPointNormalized = nil
-            // M12 / S12-E: snapshot ISO + shutter ranges from the
-            // active format and pre-seed the manual-mode published
-            // values to the 180° baseline.  enterManualExposure() will
-            // overwrite these with live device readings on the toggle
-            // moment; the pre-seed exists so a degenerate (e.g.
-            // mid-prepare) read of `manualISO` / `manualShutterSeconds`
-            // before any toggle still returns sensible numbers.
-            let isoLower = format.minISO
-            let isoUpper = format.maxISO
-            self.isoRange = isoLower <= isoUpper
-                ? isoLower...isoUpper
-                : isoLower...isoLower
-            let minDur = CMTimeGetSeconds(format.minExposureDuration)
-            let maxDurFromFormat = CMTimeGetSeconds(format.maxExposureDuration)
-            let cap24fps = 1.0 / Self.lockedFPS
-            let upperShutter = min(maxDurFromFormat, cap24fps)
-            self.shutterDurationRange = minDur < upperShutter
-                ? minDur...upperShutter
-                : minDur...minDur
-            let m180 = 1.0 / 48.0
-            self.shutterDuration180Degrees =
-                (m180 >= self.shutterDurationRange.lowerBound
-                    && m180 <= self.shutterDurationRange.upperBound)
-                ? m180 : nil
-            self.exposureMode = .auto
-            self.manualInheritedFromAuto = false
-            self.manualISO = min(
-                max(captureDevice.iso, self.isoRange.lowerBound),
-                self.isoRange.upperBound
+            try deviceManager.attach(
+                lens: lens,
+                onto: session,
+                format: format,
+                appleLog2: appleLog2,
+                lockedFPS: Self.lockedFPS
             )
-            let seedShutter = self.shutterDuration180Degrees
-                ?? self.shutterDurationRange.upperBound
-            self.manualShutterSeconds = seedShutter
-            // M12 / S12-D: snapshot WB lock capability per active
-            // device + format.  All shipping lenses that have passed
-            // the Filmtone contract should satisfy both predicates;
-            // the guard exists for future hardware where a lens
-            // reports `.locked` unsupported so
-            // the UI can disable Locked with a visible reason rather
-            // than failing the apply silently.
-            self.canLockWhiteBalance =
-                captureDevice.isLockingWhiteBalanceWithCustomDeviceGainsSupported
-                && captureDevice.isWhiteBalanceModeSupported(.locked)
-            self.whiteBalanceMode = .auto
-            self.lockedWhiteBalanceGains = nil
 
             let output = AVCaptureMovieFileOutput()
             guard session.canAddOutput(output) else {
@@ -520,7 +357,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
                 let failure = FilmtoneCaptureFailure.writerSetupFailed(
                     stage: "MOVIE_OUTPUT_ADD", reason: "session.canAddOutput returned false"
                 )
-                state = .failed(failure)
+                recordingState.setState(.failed(failure))
                 throw failure
             }
             session.addOutput(output)
@@ -534,7 +371,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
                         stage: "PRORES_AVAIL",
                         reason: "AVVideoCodecType.proRes422HQ not in availableVideoCodecTypes: \(availableCodecs)"
                     )
-                    state = .failed(failure)
+                    recordingState.setState(.failed(failure))
                     throw failure
                 }
                 output.setOutputSettings(
@@ -551,15 +388,16 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
                 // (`cinematicExtendedEnhanced`).  No fallback —
                 // unsupported on this format means the run cannot
                 // start at the requested mode, period.
-                let preferredMode = Self.avMode(for: requestedStabilization)
-                if requestedStabilization == .on,
+                let requested = recordingState.requestedStabilization
+                let preferredMode = CapturePackageAssembler.avMode(for: requested)
+                if requested == .on,
                    !format.isVideoStabilizationModeSupported(preferredMode) {
                     session.commitConfiguration()
                     let failure = FilmtoneCaptureFailure.stabilizationDowngraded(
-                        requested: requestedStabilization.canonicalModeName,
+                        requested: requested.canonicalModeName,
                         active: "unsupported-on-format"
                     )
-                    state = .failed(failure)
+                    recordingState.setState(.failed(failure))
                     throw failure
                 }
                 if connection.isVideoStabilizationSupported {
@@ -606,11 +444,11 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
 
             session.commitConfiguration()
         } catch let failure as FilmtoneCaptureFailure {
-            state = .failed(failure)
+            recordingState.setState(.failed(failure))
             throw failure
         } catch {
             let failure = FilmtoneCaptureFailure.unexpected(reason: error.localizedDescription)
-            state = .failed(failure)
+            recordingState.setState(.failed(failure))
             throw failure
         }
 
@@ -632,21 +470,8 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
             }
         }
 
-        state = .ready
+        recordingState.setState(.ready)
     }
-
-    /// M11 / S11-D: capture-time Look chip recorded with the run.
-    /// Set by `FilmtoneCaptureView` whenever the chip selection
-    /// changes (and seeded once on view appear) so the
-    /// `FilmtoneCapturePackage` built at record-stop time carries
-    /// `selectedLook` without the session knowing about chip UI.
-    /// `nil` = Filmtone default chip (no Look) or pre-M11 callers.
-    private var pendingSelectedLook: FilmtoneSelectedLookRecord?
-    /// S7: user-imported creative LUT selected in the capture LOOK
-    /// sheet. Mutually exclusive with `pendingSelectedLook` in normal
-    /// UI flows; kept as a separate record because built-in Looks and
-    /// library LUTs have different durable identities.
-    private var pendingCustomLut: FilmtoneCaptureCustomLutRecord?
 
     /// View-side setter for the capture-time Look chip.  Idempotent;
     /// safe to call before `prepare(lens:)` and at any point during
@@ -660,267 +485,17 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         pendingCustomLut = record
     }
 
-    // MARK: - M12 / S12-C exposure / focus / metering
+    // MARK: - M12 / S12-C / D / E exposure / focus / WB / manual forwards
 
-    /// Apply an EV bias to the active device.  Clamped at apply-time
-    /// to `exposureBiasRange` so a slider that drifts past the cap
-    /// (e.g. between a lens swap that narrowed the device range and
-    /// the next slider repaint) does not push the device past what it
-    /// will accept.  Best-effort: a `lockForConfiguration()` failure
-    /// silently leaves the published value at its previous reading
-    /// rather than fabricating a phantom apply — the slider snaps
-    /// back on the next state observation.
-    ///
-    /// S12-E: no-op when `exposureMode == .manual`.  EV bias has no
-    /// effect on a `setExposureModeCustom` exposure (the device-level
-    /// bias does not feed into the locked ISO/shutter pair) and the
-    /// view hides the slider in manual mode anyway; the guard exists
-    /// for defensive callers that did not consult the gate.
-    func setExposureBias(_ ev: Float) {
-        guard let device else { return }
-        guard exposureMode == .auto else { return }
-        let clamped = min(
-            max(ev, exposureBiasRange.lowerBound),
-            exposureBiasRange.upperBound
-        )
-        do {
-            try device.lockForConfiguration()
-            device.setExposureTargetBias(clamped, completionHandler: nil)
-            device.unlockForConfiguration()
-            exposureBiasEV = clamped
-        } catch {
-            // Lock contention (e.g. a synchronous reconfigure on
-            // another path) — drop the apply silently; the slider
-            // will resync from `exposureBiasEV` on the next render.
-        }
-    }
-
-    /// Reset EV bias to 0.  Wired to the slider's tap-and-hold gesture
-    /// (S12-A lock).  Goes through the same clamp + apply path as a
-    /// regular set so a 0 reset on a device that cannot represent
-    /// exactly 0 (none of the M10-supported lenses fall in this case
-    /// today, but the API does not promise it) still produces a clean
-    /// apply.
-    func resetExposureBias() {
-        setExposureBias(0)
-    }
-
-    /// Apply tap-to-focus + tap-to-meter at a normalized AVCaptureDevice
-    /// POI point.  Caller has already converted from view-local tap
-    /// coordinates via
-    /// `previewLayer.captureDevicePointConverted(fromLayerPoint:)`.
-    ///
-    /// S12-C / S12-E: tap-to-focus runs in both auto and manual
-    /// exposure (focusing without re-metering is a routine ask).
-    /// Tap-to-meter only runs when `exposureMode == .auto`; manual
-    /// exposure deliberately skips the metering POI because the
-    /// `setExposureModeCustom` lock holds ISO/shutter regardless of
-    /// what the device's auto-meter would compute, and writing the POI
-    /// would produce metadata (`lastMeteringPointNormalized`) that
-    /// suggests a meter was honored when it was not.
-    ///
-    /// Best-effort on lock failure (same rationale as
-    /// `setExposureBias(_:)`).
-    func applyTapToFocusAndMeter(devicePoint: CGPoint) {
-        guard let device else { return }
-        do {
-            try device.lockForConfiguration()
-            if device.isFocusPointOfInterestSupported,
-               device.isFocusModeSupported(.autoFocus) {
-                device.focusPointOfInterest = devicePoint
-                device.focusMode = .autoFocus
-                lastFocusPointNormalized = devicePoint
-            }
-            if exposureMode == .auto,
-               device.isExposurePointOfInterestSupported,
-               device.isExposureModeSupported(.autoExpose) {
-                device.exposurePointOfInterest = devicePoint
-                device.exposureMode = .autoExpose
-                lastMeteringPointNormalized = devicePoint
-            }
-            device.unlockForConfiguration()
-        } catch {
-            // Lock contention — drop the tap silently; the user can
-            // tap again.  Reticle will already have appeared and
-            // will fade out on its own timer.
-        }
-    }
-
-    /// M12 / S12-D: hold WB at the device's current
-    /// `deviceWhiteBalanceGains`.  No-op when the active lens did not
-    /// report lock support at `prepare(lens:)` time — the UI gates the
-    /// tap on `canLockWhiteBalance`, but the guard here keeps the
-    /// session safe to call from any caller that did not consult the
-    /// gate.  Best-effort on lock contention (same rationale as
-    /// `setExposureBias(_:)`).
-    func lockWhiteBalance() {
-        guard let device, canLockWhiteBalance else { return }
-        do {
-            try device.lockForConfiguration()
-            let currentGains = device.deviceWhiteBalanceGains
-            // The device must accept these gains as "in range" for
-            // `setWhiteBalanceModeLocked(with:)` to succeed; clamp to
-            // `[1.0, maxWhiteBalanceGain]` per channel because the
-            // sampled `deviceWhiteBalanceGains` can theoretically
-            // sit at exactly `maxWhiteBalanceGain` on edge-case
-            // exposures, and the setter rejects anything above.
-            let maxGain = device.maxWhiteBalanceGain
-            let clamped = AVCaptureDevice.WhiteBalanceGains(
-                redGain: min(max(currentGains.redGain, 1.0), maxGain),
-                greenGain: min(max(currentGains.greenGain, 1.0), maxGain),
-                blueGain: min(max(currentGains.blueGain, 1.0), maxGain)
-            )
-            device.setWhiteBalanceModeLocked(with: clamped, completionHandler: nil)
-            device.unlockForConfiguration()
-            self.lockedWhiteBalanceGains = clamped
-            self.whiteBalanceMode = .locked
-        } catch {
-            // Lock contention — leave state on .auto; the UI segment
-            // will resync from `whiteBalanceMode` and the owner can
-            // tap Locked again.
-        }
-    }
-
-    /// M12 / S12-D: return WB to continuous-auto.  Idempotent; safe
-    /// to call when already on `.auto`.
-    func unlockWhiteBalance() {
-        guard let device else { return }
-        do {
-            try device.lockForConfiguration()
-            if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
-                device.whiteBalanceMode = .continuousAutoWhiteBalance
-            }
-            device.unlockForConfiguration()
-            self.lockedWhiteBalanceGains = nil
-            self.whiteBalanceMode = .auto
-        } catch {
-            // Lock contention — leave state where it was.
-        }
-    }
-
-    // MARK: - M12 / S12-E manual exposure
-
-    /// Switch to manual exposure by inheriting the device's current
-    /// auto ISO + shutter duration.  Clamped to the format-derived
-    /// `isoRange` / `shutterDurationRange` so a transient auto
-    /// reading just outside the slider bounds (e.g. an auto-meter
-    /// blip) does not push the device into a setter that
-    /// `setExposureModeCustom` would reject.  Idempotent: a second
-    /// call while already in `.manual` is a no-op (the contract is
-    /// "enter manual" not "re-sample"; explicit re-sample requires
-    /// exit + enter).
-    func enterManualExposure() {
-        guard let device else { return }
-        guard exposureMode != .manual else { return }
-        do {
-            try device.lockForConfiguration()
-            let inheritedISO = min(
-                max(device.iso, isoRange.lowerBound),
-                isoRange.upperBound
-            )
-            let liveDurSec = CMTimeGetSeconds(device.exposureDuration)
-            let inheritedDur = min(
-                max(liveDurSec, shutterDurationRange.lowerBound),
-                shutterDurationRange.upperBound
-            )
-            let durCM = CMTime(
-                seconds: inheritedDur,
-                preferredTimescale: 1_000_000
-            )
-            device.setExposureModeCustom(
-                duration: durCM,
-                iso: inheritedISO,
-                completionHandler: nil
-            )
-            device.unlockForConfiguration()
-            manualISO = inheritedISO
-            manualShutterSeconds = inheritedDur
-            manualInheritedFromAuto = true
-            exposureMode = .manual
-        } catch {
-            // Lock contention — leave on auto; the UI segment will
-            // resync from `exposureMode`.  Owner can tap Manual again.
-        }
-    }
-
-    /// Switch back to continuous-auto exposure.  Drops
-    /// `manualInheritedFromAuto` because it only has meaning while in
-    /// manual.  Idempotent.
-    func exitManualExposure() {
-        guard let device else { return }
-        guard exposureMode != .auto else { return }
-        do {
-            try device.lockForConfiguration()
-            if device.isExposureModeSupported(.continuousAutoExposure) {
-                device.exposureMode = .continuousAutoExposure
-            }
-            device.unlockForConfiguration()
-            exposureMode = .auto
-            manualInheritedFromAuto = false
-        } catch {
-            // Lock contention — leave state where it was.
-        }
-    }
-
-    /// Apply a new ISO inside manual exposure.  Holds the current
-    /// `manualShutterSeconds` constant — the slider is "ISO at fixed
-    /// shutter".  No-op outside `.manual` because
-    /// `setExposureModeCustom` from auto would jump the exposure
-    /// without inheritance bookkeeping; callers go through
-    /// `enterManualExposure()` to land in manual.
-    func setManualISO(_ iso: Float) {
-        guard let device, exposureMode == .manual else { return }
-        let clamped = min(
-            max(iso, isoRange.lowerBound),
-            isoRange.upperBound
-        )
-        do {
-            try device.lockForConfiguration()
-            let durCM = CMTime(
-                seconds: manualShutterSeconds,
-                preferredTimescale: 1_000_000
-            )
-            device.setExposureModeCustom(
-                duration: durCM,
-                iso: clamped,
-                completionHandler: nil
-            )
-            device.unlockForConfiguration()
-            manualISO = clamped
-            manualInheritedFromAuto = false
-        } catch {
-            // Lock contention — drop the apply silently; the slider
-            // will resync from `manualISO` on the next render.
-        }
-    }
-
-    /// Apply a new shutter duration inside manual exposure.  Holds the
-    /// current `manualISO` constant — the slider is "shutter at fixed
-    /// ISO".  Same `.manual`-gate as `setManualISO(_:)`.
-    func setManualShutter(_ seconds: Double) {
-        guard let device, exposureMode == .manual else { return }
-        let clamped = min(
-            max(seconds, shutterDurationRange.lowerBound),
-            shutterDurationRange.upperBound
-        )
-        do {
-            try device.lockForConfiguration()
-            let durCM = CMTime(
-                seconds: clamped,
-                preferredTimescale: 1_000_000
-            )
-            device.setExposureModeCustom(
-                duration: durCM,
-                iso: manualISO,
-                completionHandler: nil
-            )
-            device.unlockForConfiguration()
-            manualShutterSeconds = clamped
-            manualInheritedFromAuto = false
-        } catch {
-            // Lock contention — same rationale as `setManualISO(_:)`.
-        }
-    }
+    func setExposureBias(_ ev: Float) { deviceManager.setExposureBias(ev) }
+    func resetExposureBias() { deviceManager.resetExposureBias() }
+    func applyTapToFocusAndMeter(devicePoint: CGPoint) { deviceManager.applyTapToFocusAndMeter(devicePoint: devicePoint) }
+    func lockWhiteBalance() { deviceManager.lockWhiteBalance() }
+    func unlockWhiteBalance() { deviceManager.unlockWhiteBalance() }
+    func enterManualExposure() { deviceManager.enterManualExposure() }
+    func exitManualExposure() { deviceManager.exitManualExposure() }
+    func setManualISO(_ iso: Float) { deviceManager.setManualISO(iso) }
+    func setManualShutter(_ seconds: Double) { deviceManager.setManualShutter(seconds) }
 
     // MARK: - S1 stabilization
 
@@ -946,16 +521,16 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     func setRequestedStabilization(
         _ mode: FilmtoneRequestedStabilization
     ) -> Bool {
-        guard case .ready = state else { return false }
-        guard mode != requestedStabilization else { return true }
-        let preferredMode = Self.avMode(for: mode)
+        guard case .ready = recordingState.state else { return false }
+        guard mode != recordingState.requestedStabilization else { return true }
+        let preferredMode = CapturePackageAssembler.avMode(for: mode)
         if mode == .on,
-           let device,
+           let device = deviceManager.device,
            !device.activeFormat.isVideoStabilizationModeSupported(preferredMode) {
-            state = .failed(.stabilizationDowngraded(
+            recordingState.setState(.failed(.stabilizationDowngraded(
                 requested: mode.canonicalModeName,
                 active: "unsupported-on-format"
-            ))
+            )))
             return false
         }
         if let movieOutput,
@@ -965,7 +540,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
             connection.preferredVideoStabilizationMode = preferredMode
             session.commitConfiguration()
         }
-        requestedStabilization = mode
+        recordingState.setRequestedStabilization(mode)
         return true
     }
 
@@ -973,41 +548,35 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     /// security-scoped lifetime; we only store the URL and adjust the
     /// resolved policy.  Pass `nil` to clear back to internal mode.
     func useExternalFolder(_ folderURL: URL?) {
-        if let folderURL {
-            storagePolicy = .externalSecurityScopedFolder(folderURL)
-        } else {
-            storagePolicy = .internalDocumentsCapped
-        }
-        storagePressure = nil
+        recordingState.useExternalFolder(folderURL)
     }
 
+    // MARK: - Recording lifecycle
+
     /// Begin recording.  Auto-stops at `durationLimit` for the resolved
-    /// policy so the owner cannot blow past the current product ceiling.
+    /// policy so the owner cannot blow past the current product
+    /// ceiling.
     func start() async {
-        guard case .ready = state else {
-            assertionFailure("FilmtoneCaptureSession.start() called outside .ready (state=\(state))")
+        guard case .ready = recordingState.state else {
+            assertionFailure("FilmtoneCaptureSession.start() called outside .ready (state=\(recordingState.state))")
             return
         }
 
-        captureId = UUID().uuidString.lowercased()
+        let prepared: (master: URL, proxy: URL, packageDir: URL, captureId: String, durationLimit: Double)
         do {
-            let (dir, master, proxy) = try Self.makePackagePaths(
-                captureId: captureId,
-                storagePolicy: storagePolicy
+            prepared = try recordingState.prepareForStart(
+                makePaths: CapturePackageAssembler.makePackagePaths
             )
-            self.packageDirURL = dir
-            self.masterURL = master
-            self.proxyURL = proxy
         } catch {
             let failure = FilmtoneCaptureFailure.packageDirCreationFailed(
                 reason: error.localizedDescription
             )
-            state = .failed(failure)
+            recordingState.setState(.failed(failure))
             return
         }
 
-        guard let movieOutput, let masterURL else {
-            state = .failed(.writerSetupFailed(stage: "INTERNAL", reason: "missing movieOutput / masterURL"))
+        guard let movieOutput else {
+            recordingState.setState(.failed(.writerSetupFailed(stage: "INTERNAL", reason: "missing movieOutput / masterURL")))
             return
         }
 
@@ -1018,48 +587,38 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         }
         self.recordingDelegate = delegate
 
-        startedAtBootTime = ProcessInfo.processInfo.systemUptime
-        recordedDurationSnapshot = 0
-        pendingFailure = nil
-        elapsedSeconds = 0
-
-        let durationLimit = currentDurationLimit()
         let captureRotation = FilmtoneCaptureVideoRotation.portraitPinned
         guard applyMovieRotation(captureRotation, failOnUnsupported: true) else {
-            state = .failed(.captureRotationRejected(
+            recordingState.setState(.failed(.captureRotationRejected(
                 requested: captureRotation.degrees,
                 active: currentMovieRotation()?.degrees
-            ))
+            )))
             return
         }
-        recordingCaptureRotation = captureRotation
+        recordingState.setRecordingCaptureRotation(captureRotation)
         orientationState = .portraitPinned
 
-        state = .recording(startedAt: Date())
-        startElapsedTimer()
-        startAutoStop(after: durationLimit)
-        startStoragePressureMonitor(
-            volumeURL: masterURL.deletingLastPathComponent(),
-            masterURL: masterURL,
-            durationLimit: durationLimit
+        recordingState.beginRecording(at: Date())
+        recordingState.startAutoStop(after: prepared.durationLimit) { [weak self] in
+            self?.stop()
+        }
+        recordingState.startStoragePressureMonitor(
+            volumeURL: prepared.master.deletingLastPathComponent(),
+            masterURL: prepared.master,
+            durationLimit: prepared.durationLimit
         )
 
-        movieOutput.startRecording(to: masterURL, recordingDelegate: delegate)
+        movieOutput.startRecording(to: prepared.master, recordingDelegate: delegate)
     }
 
     /// User-driven stop.  Idempotent; safe to call once recording has
     /// already auto-stopped.  Returns immediately; the capture view
     /// observes `state` for the resulting `.completed(_)` / `.failed(_)`.
     func stop() {
-        guard case .recording = state else { return }
-        state = .stopping
-        cancelAutoStop()
-        stopElapsedTimer()
-        cancelStoragePressureMonitor(clear: true)
-        if let movieOutput {
-            recordedDurationSnapshot = CMTimeGetSeconds(movieOutput.recordedDuration)
-            movieOutput.stopRecording()
-        }
+        guard case .recording = recordingState.state else { return }
+        let recordedDuration = movieOutput.map { CMTimeGetSeconds($0.recordedDuration) } ?? 0
+        recordingState.markStopping(recordedDuration: recordedDuration)
+        movieOutput?.stopRecording()
     }
 
     /// S3 (2026-05-09): re-arm the live AVCaptureSession for another
@@ -1070,26 +629,16 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     /// pending failure) is cleared and `state` returns to `.ready` so
     /// the next `start()` can run.  Does nothing outside `.completed`.
     func rearm() {
-        guard case .completed = state else { return }
-        masterURL = nil
-        proxyURL = nil
-        packageDirURL = nil
-        recordedDurationSnapshot = 0
-        pendingFailure = nil
-        elapsedSeconds = 0
-        storagePressure = nil
+        guard case .completed = recordingState.state else { return }
         recordingDelegate = nil
-        recordingCaptureRotation = nil
+        recordingState.resetForRearm()
         pinOrientationToPortrait()
-        state = .ready
     }
 
     /// Tear down the session graph + release the preview layer.  Caller
     /// invokes on capture view dismiss.  Safe to call from any state.
     func teardown() async {
-        cancelAutoStop()
-        stopElapsedTimer()
-        cancelStoragePressureMonitor(clear: true)
+        recordingState.resetForTeardown()
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             sessionQueue.async { [session] in
                 if session.isRunning { session.stopRunning() }
@@ -1098,44 +647,16 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         }
         previewLayer = nil
         recordingDelegate = nil
-        activeLens = nil
         previewVideoDataOutput = nil
         previewSampleDelegate = nil
         livePreviewTelemetry = .unavailable
         clearRotationCoordinator()
         previewFrameSink.clear()
-        // M12 / S12-C: drop tap state so a fresh prepare() starts on
-        // continuous-auto rather than carrying a stale POI from the
-        // previous lens / session.
-        exposureBiasEV = 0
-        lastFocusPointNormalized = nil
-        lastMeteringPointNormalized = nil
-        // M12 / S12-D: drop WB lock state for the same reason.
-        whiteBalanceMode = .auto
-        lockedWhiteBalanceGains = nil
-        canLockWhiteBalance = true
-        // M12 / S12-E: drop manual-exposure state so a fresh prepare
-        // starts on continuous-auto exposure.  The ranges and 180°
-        // marker get overwritten on the next prepare(lens:) anyway, so
-        // we leave them holding their last values rather than reset to
-        // the type defaults — anything that observes them between
-        // teardown and the next prepare will at least see the previous
-        // run's bounds, which are far closer to the next likely
-        // bounds than the type defaults.
-        exposureMode = .auto
-        manualInheritedFromAuto = false
-        if case .ready = state {
-            state = .idle
-        }
+        deviceManager.resetForTeardown()
     }
 
     func currentDurationLimit() -> Double {
-        switch storagePolicy {
-        case .internalDocumentsCapped:
-            return Self.internalDurationCapSeconds
-        case .externalSecurityScopedFolder:
-            return Self.externalDurationCapSeconds
-        }
+        recordingState.currentDurationLimit()
     }
 
     // MARK: - Capture orientation
@@ -1144,57 +665,19 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         clearRotationCoordinator(resetState: false)
         latestPreviewRotation = .portraitPinned
         latestCaptureRotation = .portraitPinned
-        recordingCaptureRotation = nil
+        recordingState.setRecordingCaptureRotation(nil)
         orientationState = .portraitPinned
         applyPreviewRotation(.portraitPinned)
         _ = applyMovieRotation(.portraitPinned, failOnUnsupported: false)
     }
 
     private var isOrientationFrozenForRecording: Bool {
-        switch state {
+        switch recordingState.state {
         case .recording, .stopping:
             return true
         default:
             return false
         }
-    }
-
-    private func installRotationCoordinator(
-        device: AVCaptureDevice,
-        previewLayer: AVCaptureVideoPreviewLayer
-    ) {
-        clearRotationCoordinator(resetState: false)
-        let coordinator = AVCaptureDevice.RotationCoordinator(
-            device: device,
-            previewLayer: previewLayer
-        )
-        rotationCoordinator = coordinator
-
-        let previewObservation = coordinator.observe(
-            \.videoRotationAngleForHorizonLevelPreview,
-             options: [.initial, .new]
-        ) { [weak self] coordinator, _ in
-            let rotation = FilmtoneCaptureVideoRotation(
-                degrees: coordinator.videoRotationAngleForHorizonLevelPreview
-            )
-            Task { @MainActor [weak self] in
-                self?.receivePreviewRotation(rotation)
-            }
-        }
-
-        let captureObservation = coordinator.observe(
-            \.videoRotationAngleForHorizonLevelCapture,
-             options: [.initial, .new]
-        ) { [weak self] coordinator, _ in
-            let rotation = FilmtoneCaptureVideoRotation(
-                degrees: coordinator.videoRotationAngleForHorizonLevelCapture
-            )
-            Task { @MainActor [weak self] in
-                self?.receiveCaptureRotation(rotation)
-            }
-        }
-
-        rotationObservations = [previewObservation, captureObservation]
     }
 
     private func clearRotationCoordinator(resetState: Bool = true) {
@@ -1206,33 +689,9 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         if resetState {
             latestPreviewRotation = .portraitPinned
             latestCaptureRotation = .portraitPinned
-            recordingCaptureRotation = nil
+            recordingState.setRecordingCaptureRotation(nil)
             orientationState = .portraitPinned
         }
-    }
-
-    private func receivePreviewRotation(_ rotation: FilmtoneCaptureVideoRotation) {
-        latestPreviewRotation = rotation
-        guard !isOrientationFrozenForRecording else { return }
-        orientationState.previewRotation = rotation
-        applyPreviewRotation(rotation)
-    }
-
-    private func receiveCaptureRotation(_ rotation: FilmtoneCaptureVideoRotation) {
-        latestCaptureRotation = rotation
-        guard !isOrientationFrozenForRecording else { return }
-        orientationState.captureRotation = rotation
-        _ = applyMovieRotation(rotation, failOnUnsupported: false)
-    }
-
-    private func applyLatestRotationIfUnlocked() {
-        guard !isOrientationFrozenForRecording else { return }
-        orientationState = FilmtoneCaptureOrientationState(
-            previewRotation: latestPreviewRotation,
-            captureRotation: latestCaptureRotation
-        )
-        applyPreviewRotation(latestPreviewRotation)
-        _ = applyMovieRotation(latestCaptureRotation, failOnUnsupported: false)
     }
 
     private func applyPreviewRotation(_ rotation: FilmtoneCaptureVideoRotation) {
@@ -1326,12 +785,12 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
             }
             let pixelFormat = CVPixelBufferGetPixelFormatType(pixelBuffer)
             let telemetry = FilmtoneLivePreviewTelemetry(
-                pixelFormat: FilmtoneCaptureSession.fourccString(pixelFormat) ?? "0x\(String(pixelFormat, radix: 16))",
+                pixelFormat: CapturePackageAssembler.fourccString(pixelFormat) ?? "0x\(String(pixelFormat, radix: 16))",
                 width: CVPixelBufferGetWidth(pixelBuffer),
                 height: CVPixelBufferGetHeight(pixelBuffer),
                 deliversPreviewSizedBuffers: previewSized,
                 nativeVideoSettingsRequested: vdo?.videoSettings.isEmpty ?? false,
-                activeStabilization: FilmtoneCaptureSession.stabilizationDescription(
+                activeStabilization: CapturePackageAssembler.stabilizationDescription(
                     connection.activeVideoStabilizationMode
                 )
             )
@@ -1375,463 +834,35 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     }
 
     private func handleMovieFinished(failure: FilmtoneCaptureFailure?) {
-        cancelStoragePressureMonitor(clear: true)
-        recordingDelegate = nil
-
-        if let failure {
-            state = .failed(failure)
-            return
-        }
-
-        guard let masterURL, let proxyURL, let packageDirURL else {
-            state = .failed(.unexpected(reason: "missing URLs after movie finish"))
-            return
-        }
-
-        // Verify master existence before kicking off proxy.
-        guard FileManager.default.fileExists(atPath: masterURL.path) else {
-            state = .failed(.masterFileMissing)
-            return
-        }
-
-        // Verify post-recording invariants (Apple Log 2 + ProRes 422 HQ
-        // + cinematicExtendedEnhanced).  Strict equality — any downgrade
-        // surfaces as an explicit failure rather than silently producing
-        // a master that violates the M5-A / M7 quality baseline.
-        if let device {
-            let observedRaw = device.activeColorSpace.rawValue
-            if observedRaw != Self.appleLog2ColorSpaceRaw {
-                state = .failed(.colorSpaceDowngraded(
-                    expectedRaw: Self.appleLog2ColorSpaceRaw,
-                    observedRaw: observedRaw
-                ))
-                return
-            }
-        }
-        // S1 (2026-05-09): exact-mode gate against the run's
-        // requested stabilization.  No fallback / silent degrade —
-        // each request has exactly one acceptable observed mode, and
-        // a missing AV connection is itself a loud failure rather
-        // than an "assume requested" pass.
-        let observedStabilizationName: String
-        guard let movieOutput,
-              let connection = movieOutput.connection(with: .video) else {
-            state = .failed(.stabilizationDowngraded(
-                requested: requestedStabilization.canonicalModeName,
-                active: "connection-unavailable"
-            ))
-            return
-        }
-        let activeMode = connection.activeVideoStabilizationMode
-        let expectedMode = Self.avMode(for: requestedStabilization)
-        observedStabilizationName = Self.stabilizationDescription(activeMode)
-        if activeMode != expectedMode {
-            state = .failed(.stabilizationDowngraded(
-                requested: requestedStabilization.canonicalModeName,
-                active: observedStabilizationName
-            ))
-            return
-        }
-        let observedCaptureRotation = FilmtoneCaptureVideoRotation(
-            degrees: connection.videoRotationAngle
+        let exposureSnapshot = CapturePackageAssembler.ExposureSnapshot(
+            mode: deviceManager.exposureMode,
+            biasEV: deviceManager.exposureBiasEV,
+            focusPoint: deviceManager.lastFocusPointNormalized,
+            meteringPoint: deviceManager.lastMeteringPointNormalized,
+            manualISO: deviceManager.manualISO,
+            manualShutterSeconds: deviceManager.manualShutterSeconds,
+            manualInheritedFromAuto: deviceManager.manualInheritedFromAuto
         )
-        if let requested = recordingCaptureRotation,
-           observedCaptureRotation != requested {
-            state = .failed(.captureRotationRejected(
-                requested: requested.degrees,
-                active: observedCaptureRotation.degrees
-            ))
-            return
-        }
-
-        // Verify the actual encoded master FourCC.  The connection-level
-        // codec request can be silently honored by the encoder yet the
-        // resulting file rewritten with a different subtype on certain
-        // OS / thermal states, so we open the finalized .mov and read the
-        // video track's CMFormatDescription mediaSubType.  ProRes 422 HQ
-        // FourCC = 'apch' (kCMVideoCodecType_AppleProRes422HQ).
-        let observedSubtype = Self.readVideoMediaSubtype(from: masterURL)
-        if observedSubtype != kCMVideoCodecType_AppleProRes422HQ {
-            state = .failed(.codecDowngraded(
-                observed: Self.fourccString(observedSubtype)
-            ))
-            return
-        }
-
-        let durationLimit = currentDurationLimit()
-        let recordedDuration = recordedDurationSnapshot
-        // S1 (2026-05-09): parameters now reflect the owner's
-        // requested stabilization for the run that just finished.
-        // `.baseline(...)` keeps the codec / resolution / fps locked
-        // and only swaps the stabilization slot.
-        let parameters: FilmtoneCaptureParameters = .baseline(
-            requestedStabilization: requestedStabilization
+        let whiteBalanceSnapshot = CapturePackageAssembler.WhiteBalanceSnapshot(
+            mode: deviceManager.whiteBalanceMode,
+            lockedGains: deviceManager.lockedWhiteBalanceGains
         )
-        let observedStabilization = observedStabilizationName
-        let requestedCaptureRotation = recordingCaptureRotation
-        let storagePolicy = self.storagePolicy
-        let captureId = self.captureId
-        let lensRecord = self.activeLens?.toRecord()
-        let selectedLook = self.pendingSelectedLook
-        let customLut = self.pendingCustomLut
-        // M12 / S12-C+E: snapshot exposure / focus / metering at
-        // record-stop time.  Auto-mode runs persist nil for the
-        // manual-only fields; manual-mode runs persist the held ISO /
-        // shutter / inheritance flag.  We always emit the record
-        // (even at the all-default state) so the package distinguishes
-        // "M12 capture, owner did not touch the controls" from "pre-M12
-        // capture decoded from disk" — both decode shapes mattered for
-        // S12-F's truth-gate verifier.
-        let isManual = self.exposureMode == .manual
-        let exposureControl = FilmtoneCaptureExposureControlRecord(
-            mode: self.exposureMode.rawValue,
-            biasEV: Double(self.exposureBiasEV),
-            focusPointX: self.lastFocusPointNormalized.map { Double($0.x) },
-            focusPointY: self.lastFocusPointNormalized.map { Double($0.y) },
-            meteringPointX: self.lastMeteringPointNormalized.map { Double($0.x) },
-            meteringPointY: self.lastMeteringPointNormalized.map { Double($0.y) },
-            manualISO: isManual ? Double(self.manualISO) : nil,
-            manualShutterDurationSeconds: isManual ? self.manualShutterSeconds : nil,
-            inheritedFromAuto: isManual ? self.manualInheritedFromAuto : nil
-        )
-        // M12 / S12-D: WB lock state at record-stop.  Auto-mode
-        // snapshots store the gains as nil (see record doc); locked
-        // snapshots carry the sampled gains the device was holding.
-        let whiteBalance: FilmtoneCaptureWhiteBalanceRecord
-        switch self.whiteBalanceMode {
-        case .auto:
-            whiteBalance = FilmtoneCaptureWhiteBalanceRecord(
-                mode: "auto",
-                redGain: nil,
-                greenGain: nil,
-                blueGain: nil
-            )
-        case .locked:
-            whiteBalance = FilmtoneCaptureWhiteBalanceRecord(
-                mode: "locked",
-                redGain: self.lockedWhiteBalanceGains.map { Double($0.redGain) },
-                greenGain: self.lockedWhiteBalanceGains.map { Double($0.greenGain) },
-                blueGain: self.lockedWhiteBalanceGains.map { Double($0.blueGain) }
-            )
-        }
-
-        // Kick off proxy generation off-main; flip state when complete.
-        Task.detached(priority: .userInitiated) { [weak self] in
-            let proxyResult = await FilmtoneProxyGenerator.export(
-                masterURL: masterURL,
-                proxyURL: proxyURL
-            )
-            await MainActor.run {
+        packageAssembler.handleMovieFinished(
+            failure: failure,
+            device: deviceManager.device,
+            movieOutputConnection: movieOutput?.connection(with: .video),
+            appleLog2ColorSpaceRaw: Self.appleLog2ColorSpaceRaw,
+            lensRecord: deviceManager.activeLens?.toRecord(),
+            selectedLook: pendingSelectedLook,
+            customLut: pendingCustomLut,
+            exposure: exposureSnapshot,
+            whiteBalance: whiteBalanceSnapshot,
+            onCleanup: { [weak self] in
                 guard let self else { return }
-                switch proxyResult {
-                case .success:
-                    // M14-B: snapshot a security-scoped bookmark for the
-                    // master file URL when the storage policy is external.
-                    // The capture surface still holds folder scope at this
-                    // moment (releaseExternalFolderScope runs from the view's
-                    // dismiss / .completed branch, which is downstream of
-                    // this MainActor.run). Internal masters do not need a
-                    // bookmark — the path lives in app Documents and
-                    // remains reachable without scope.
-                    let masterBookmark: Data?
-                    switch storagePolicy {
-                    case .externalSecurityScopedFolder:
-                        masterBookmark = FilmtoneSecurityScopedBookmark.make(for: masterURL)
-                    case .internalDocumentsCapped:
-                        masterBookmark = nil
-                    }
-                    let pkg = FilmtoneCapturePackage(
-                        captureId: captureId,
-                        storagePolicy: storagePolicy,
-                        masterURL: masterURL,
-                        proxyURL: proxyURL,
-                        packageDirURL: packageDirURL,
-                        durationLimitSeconds: durationLimit,
-                        recordedDurationSeconds: recordedDuration,
-                        parameters: parameters,
-                        lens: lensRecord,
-                        selectedLook: selectedLook,
-                        customLut: customLut,
-                        exposureControl: exposureControl,
-                        whiteBalance: whiteBalance,
-                        masterBookmark: masterBookmark,
-                        observedStabilization: observedStabilization,
-                        requestedCaptureRotationDegrees: requestedCaptureRotation?.degrees,
-                        observedCaptureRotationDegrees: observedCaptureRotation.degrees
-                    )
-                    // Master/proxy linkage is the M10 deliverable; if we
-                    // can't write `capture-package.json` next to the
-                    // proxy, the relaunch reconnect path is silently
-                    // broken.  Surface as a loud failure rather than
-                    // letting the editor receive a .completed state with
-                    // no on-disk linkage to back it.
-                    guard let writtenJSONURL = FilmtoneCapturePackagePersistence
-                        .write(package: pkg),
-                        FileManager.default.fileExists(atPath: writtenJSONURL.path) else {
-                        self.state = .failed(
-                            .packagePersistenceFailed(
-                                reason: "capture-package.json write failed at \(packageDirURL.path)"
-                            )
-                        )
-                        return
-                    }
-                    self.state = .completed(pkg)
-                case .failure(let reason):
-                    self.state = .failed(.proxyExportFailed(reason: reason))
-                }
+                self.recordingState.cancelStoragePressureMonitor(clear: true)
+                self.recordingDelegate = nil
             }
-        }
-    }
-
-    /// Reads the first video track's CMFormatDescription mediaSubType
-    /// (FourCC) from a finalized .mov.  Returns `0` if the asset has no
-    /// readable video track / format description; the caller treats `0`
-    /// as a downgrade since `apch` is the only acceptable subtype.
-    private static func readVideoMediaSubtype(from url: URL) -> CMVideoCodecType {
-        let asset = AVURLAsset(url: url)
-        let tracks = asset.tracks(withMediaType: .video)
-        guard let track = tracks.first else { return 0 }
-        let descriptions = track.formatDescriptions
-        guard let cm = descriptions.first else { return 0 }
-        // formatDescriptions on AVAssetTrack is `[Any]` of CMFormatDescription
-        // bridged from Obj-C; cast to the typed CMVideoFormatDescription.
-        let fd = cm as! CMFormatDescription
-        return CMFormatDescriptionGetMediaSubType(fd)
-    }
-
-    /// Pretty-print a FourCC for the failure banner (e.g., 0x68766331
-    /// → "hvc1").  Returns "<unread>" on the sentinel `0`.
-    nonisolated private static func fourccString(_ code: CMVideoCodecType) -> String? {
-        if code == 0 { return nil }
-        let chars: [Character] = (0..<4).map { i in
-            let byte = UInt8(truncatingIfNeeded: (UInt32(code) >> ((3 - i) * 8)) & 0xFF)
-            return Character(UnicodeScalar(byte))
-        }
-        return String(chars)
-    }
-
-    /// S1 (2026-05-09): map the structured request onto the
-    /// AVFoundation enum.  No fallback case — the enum is exhaustive
-    /// over what S1 ships, and adding a third request mode is an
-    /// active explicit decision (out of scope for S1).
-    private static func avMode(
-        for request: FilmtoneRequestedStabilization
-    ) -> AVCaptureVideoStabilizationMode {
-        switch request {
-        case .on: return .cinematicExtendedEnhanced
-        case .off: return .off
-        }
-    }
-
-    /// Compact label for AVCaptureVideoStabilizationMode.  Used by the
-    /// `.stabilizationDowngraded(requested:active:)` failure to give
-    /// the owner a concrete signal (cinematic / standard / off / auto)
-    /// instead of "<some integer>".
-    nonisolated private static func stabilizationDescription(_ mode: AVCaptureVideoStabilizationMode) -> String {
-        switch mode {
-        case .off: return "off"
-        case .standard: return "standard"
-        case .cinematic: return "cinematic"
-        case .cinematicExtended: return "cinematicExtended"
-        case .cinematicExtendedEnhanced: return "cinematicExtendedEnhanced"
-        case .previewOptimized: return "previewOptimized"
-        case .lowLatency: return "lowLatency"
-        case .auto: return "auto"
-        @unknown default: return "unknown(\(mode.rawValue))"
-        }
-    }
-
-    // MARK: - Helpers
-
-    private func startElapsedTimer() {
-        elapsedTimer?.invalidate()
-        let timer = Timer(timeInterval: 0.05, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                guard case .recording(let startedAt) = self.state else { return }
-                self.elapsedSeconds = max(0, Date().timeIntervalSince(startedAt))
-            }
-        }
-        elapsedTimer = timer
-        RunLoop.main.add(timer, forMode: .common)
-    }
-
-    private func stopElapsedTimer() {
-        elapsedTimer?.invalidate()
-        elapsedTimer = nil
-    }
-
-    private func startAutoStop(after seconds: Double) {
-        autoStopTask?.cancel()
-        autoStopTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
-            await MainActor.run {
-                guard let self else { return }
-                if case .recording = self.state {
-                    self.stop()
-                }
-            }
-        }
-    }
-
-    private func cancelAutoStop() {
-        autoStopTask?.cancel()
-        autoStopTask = nil
-    }
-
-    private func startStoragePressureMonitor(
-        volumeURL: URL,
-        masterURL: URL,
-        durationLimit: Double
-    ) {
-        cancelStoragePressureMonitor(clear: true)
-        updateStoragePressure(
-            volumeURL: volumeURL,
-            masterURL: masterURL,
-            durationLimit: durationLimit
         )
-        storagePressureTask = Task { [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
-                await MainActor.run { [weak self] in
-                    guard let self else { return }
-                    guard case .recording = self.state else {
-                        self.cancelStoragePressureMonitor(clear: true)
-                        return
-                    }
-                    self.updateStoragePressure(
-                        volumeURL: volumeURL,
-                        masterURL: masterURL,
-                        durationLimit: durationLimit
-                    )
-                }
-            }
-        }
-    }
-
-    private func cancelStoragePressureMonitor(clear: Bool) {
-        storagePressureTask?.cancel()
-        storagePressureTask = nil
-        storagePressureUnreadableSamples = 0
-        if clear {
-            storagePressure = nil
-        }
-    }
-
-    private func updateStoragePressure(
-        volumeURL: URL,
-        masterURL: URL,
-        durationLimit: Double
-    ) {
-        guard case .recording(let startedAt) = state else {
-            storagePressure = nil
-            return
-        }
-        let elapsed = max(0, Date().timeIntervalSince(startedAt))
-        let secondsRemaining = max(0, durationLimit - elapsed)
-        guard secondsRemaining > 0 else {
-            storagePressure = nil
-            return
-        }
-
-        let snapshot = FilmtoneCapturePreflight.capacitySnapshot(folderURL: volumeURL)
-        guard let availableBytes = snapshot.availableBytes else {
-            storagePressureUnreadableSamples += 1
-            if storagePressureUnreadableSamples >= Self.storageUnreadableGraceSamples {
-                storagePressure = FilmtoneCaptureStoragePressure(
-                    level: .unreadable,
-                    availableBytes: nil,
-                    projectedNeedBytes: nil,
-                    secondsRemaining: secondsRemaining,
-                    measuredRate: false
-                )
-            }
-            return
-        }
-        storagePressureUnreadableSamples = 0
-
-        let rate = estimatedMasterWriteRate(masterURL: masterURL, elapsed: elapsed)
-        let projectedMasterBytes = Int64((rate.bytesPerSecond * secondsRemaining).rounded(.up))
-        let projectedNeedBytes = projectedMasterBytes + Self.storageFinalizeHeadroomBytes
-        let criticalThreshold = projectedNeedBytes + Self.storageCriticalHeadroomBytes
-        let warningThreshold = projectedNeedBytes + Self.storageWarningHeadroomBytes
-
-        if availableBytes <= criticalThreshold {
-            storagePressure = FilmtoneCaptureStoragePressure(
-                level: .critical,
-                availableBytes: availableBytes,
-                projectedNeedBytes: projectedNeedBytes,
-                secondsRemaining: secondsRemaining,
-                measuredRate: rate.measured
-            )
-        } else if availableBytes <= warningThreshold {
-            storagePressure = FilmtoneCaptureStoragePressure(
-                level: .warning,
-                availableBytes: availableBytes,
-                projectedNeedBytes: projectedNeedBytes,
-                secondsRemaining: secondsRemaining,
-                measuredRate: rate.measured
-            )
-        } else {
-            storagePressure = nil
-        }
-    }
-
-    private func estimatedMasterWriteRate(
-        masterURL: URL,
-        elapsed: Double
-    ) -> (bytesPerSecond: Double, measured: Bool) {
-        guard elapsed >= 3,
-              let fileSize = Self.fileSize(at: masterURL),
-              fileSize >= 64 * 1024 * 1024 else {
-            return (Self.fallbackProResBytesPerSecond, false)
-        }
-        let measuredRate = Double(fileSize) / max(elapsed, 1)
-        return (max(measuredRate, Self.fallbackProResBytesPerSecond), true)
-    }
-
-    private static func fileSize(at url: URL) -> Int64? {
-        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
-              let value = attrs[.size] as? NSNumber else {
-            return nil
-        }
-        let bytes = value.int64Value
-        return bytes > 0 ? bytes : nil
-    }
-
-    // MARK: - Package paths
-
-    private static func makePackagePaths(
-        captureId: String,
-        storagePolicy: FilmtoneCaptureStoragePolicy
-    ) throws -> (packageDir: URL, master: URL, proxy: URL) {
-        let caches = try FileManager.default.url(
-            for: .cachesDirectory,
-            in: .userDomainMask,
-            appropriateFor: nil,
-            create: true
-        )
-        let captures = caches.appendingPathComponent("Filmtone/captures", isDirectory: true)
-        try FileManager.default.createDirectory(at: captures, withIntermediateDirectories: true)
-        let packageDir = captures.appendingPathComponent("v2-capture-\(captureId)", isDirectory: true)
-        try? FileManager.default.removeItem(at: packageDir)
-        try FileManager.default.createDirectory(at: packageDir, withIntermediateDirectories: true)
-        let proxyURL = packageDir.appendingPathComponent("proxy.mov", isDirectory: false)
-
-        let masterURL: URL
-        switch storagePolicy {
-        case .internalDocumentsCapped:
-            masterURL = packageDir.appendingPathComponent("master.mov", isDirectory: false)
-        case .externalSecurityScopedFolder(let folderURL):
-            // Caller has already started security-scoped access on the
-            // folder URL.  Filename includes the captureId so multiple
-            // runs to the same folder do not collide.
-            masterURL = folderURL.appendingPathComponent(
-                "filmtone-master-\(captureId).mov",
-                isDirectory: false
-            )
-        }
-        return (packageDir, masterURL, proxyURL)
     }
 
     // MARK: - Permission
