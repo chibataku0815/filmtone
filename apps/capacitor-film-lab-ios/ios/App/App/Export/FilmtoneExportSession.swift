@@ -676,77 +676,35 @@ final class FilmtoneExportSession {
         }
         writer.startSession(atSourceTime: .zero)
 
-        var renderedFrames = 0
-        let completionLock = NSLock()
-        let failureLock = NSLock()
-        let dispatchGroup = DispatchGroup()
         let videoQueue = DispatchQueue(label: "FilmtoneExportSession.video")
         let audioQueue = DispatchQueue(label: "FilmtoneExportSession.audio")
-        var videoInputFinished = false
-        var audioInputFinished = audioInput == nil
-        var capturedError: Error?
-
-        func finishVideoInput(markAsFinished: Bool) {
-            completionLock.lock()
-            defer { completionLock.unlock() }
-            guard !videoInputFinished else {
-                return
-            }
-            if markAsFinished {
-                videoInput.markAsFinished()
-            }
-            videoInputFinished = true
-            dispatchGroup.leave()
-        }
-
-        func finishAudioInput(markAsFinished: Bool) {
-            guard let audioInput else {
-                return
-            }
-
-            completionLock.lock()
-            defer { completionLock.unlock() }
-            guard !audioInputFinished else {
-                return
-            }
-            if markAsFinished {
-                audioInput.markAsFinished()
-            }
-            audioInputFinished = true
-            dispatchGroup.leave()
-        }
-
-        func failExport(_ error: Error) {
-            failureLock.lock()
-            let shouldStore = capturedError == nil
-            if shouldStore {
-                capturedError = error
-            }
-            failureLock.unlock()
-
-            guard shouldStore else {
-                return
-            }
-
-            reader.cancelReading()
-            writer.cancelWriting()
-            finishVideoInput(markAsFinished: true)
-            finishAudioInput(markAsFinished: true)
-        }
+        // Phase 2B-10C: dispatch group / completion / failure lifecycle
+        // live in `ExportVideoCompletionCoordinator`. The video queue body
+        // (sample decode, lookahead selection, output frame loop, per-frame
+        // progress emission) lives in `ExportVideoFramePump`. The audio
+        // queue body lives in `ExportVideoAudioPump`. The session keeps
+        // owning reader / writer setup, `appendOutputFrame(...)`, depth
+        // preparation, motion blur reset, render stage order, sidecar
+        // assembly, and the audio preservation gate.
+        let completionCoordinator = ExportVideoCompletionCoordinator(
+            reader: reader,
+            writer: writer,
+            videoInput: videoInput,
+            audioInput: audioInput
+        )
+        let videoFramePump = ExportVideoFramePump(
+            videoInput: videoInput,
+            videoOutput: videoOutput,
+            reader: reader,
+            videoQueue: videoQueue,
+            timeline: videoTimeline,
+            completion: completionCoordinator,
+            performanceMetrics: performanceMetrics,
+            signposter: signposter
+        )
 
         progress(.init(stage: .reading, progress: 0.11, currentFrame: 0, totalFrames: videoTimeline.outputFrameCount, message: "Reading source"))
 
-        // v1.3 Phase B: depth-track cursor state and the per-frame pull loop
-        // live in `ExportVideoDepthMatcher` (Phase 2B-10A). Video timeline
-        // math (output frame count, source lookup time, source-time-offset
-        // normalization, segment index, rendering progress) lives in
-        // `ExportVideoTimeline` (Phase 2B-10B). The session keeps owning
-        // telemetry assignment from the matcher's `MatchResult` and the
-        // decode / lookahead / append orchestration around the timeline.
-        var previousVideoSample: ExportVideoTimeline.TimedSample?
-        var lookaheadVideoSample: ExportVideoTimeline.TimedSample?
-        var sourceReaderExhausted = false
-        var nextOutputFrameIndex = 0
         let mediaPipelineStartedNs = DispatchTime.now().uptimeNanoseconds
 
         func prepareDepthForSourceTime(at sourceLookupTime: CMTime) {
@@ -772,29 +730,24 @@ final class FilmtoneExportSession {
         }
         var renderedHighlightSegmentIndex: Int?
 
-        func appendOutputFrame(
-            using sample: ExportVideoTimeline.TimedSample,
-            at outputPresentationTime: CMTime,
-            sourceLookupTime: CMTime,
-            sourceSegmentIndex: Int?
-        ) throws {
-            prepareDepthForSourceTime(at: sourceLookupTime)
-            if let sourceSegmentIndex,
+        func appendOutputFrame(_ request: ExportVideoFramePump.AppendRequest) throws {
+            prepareDepthForSourceTime(at: request.sourceLookupTime)
+            if let sourceSegmentIndex = request.sourceSegmentIndex,
                sourceSegmentIndex != renderedHighlightSegmentIndex {
                 exportMotionBlurAccumulator.reset()
                 renderedHighlightSegmentIndex = sourceSegmentIndex
             }
-            let outputTimeSec = CMTimeGetSeconds(outputPresentationTime)
-            let sourceTimeSec = CMTimeGetSeconds(sourceLookupTime)
+            let outputTimeSec = CMTimeGetSeconds(request.outputPresentationTime)
+            let sourceTimeSec = CMTimeGetSeconds(request.sourceLookupTime)
             let appendedFrame = try frameAppender.appendVideoSample(
-                sample.buffer,
+                request.sample.buffer,
                 videoInput: videoInput,
                 writer: writer,
                 reader: reader,
                 adaptor: adaptor,
                 videoTrack: videoTrack,
                 outputSize: outputSize,
-                outputPresentationTime: outputPresentationTime,
+                outputPresentationTime: request.outputPresentationTime,
                 renderTimeSeconds: sourceTimeSec.isFinite ? sourceTimeSec : (outputTimeSec.isFinite ? outputTimeSec : 0),
                 waitForReady: false,
                 checkCancelled: checkCancelled,
@@ -810,170 +763,48 @@ final class FilmtoneExportSession {
             guard appendedFrame else {
                 throw FilmtoneMediaError.exportFailed("The decoded video sample did not contain an image buffer.")
             }
-
-            renderedFrames += 1
-            nextOutputFrameIndex += 1
-            if renderedFrames == 1 || renderedFrames % 12 == 0 {
-                let normalizedProgress = videoTimeline.renderingProgress(presentationTime: outputPresentationTime)
-                progress(.init(
-                    stage: .rendering,
-                    progress: min(0.9, normalizedProgress),
-                    currentFrame: renderedFrames,
-                    totalFrames: videoTimeline.outputFrameCount,
-                    message: "Rendering frames"
-                ))
-            }
         }
 
-        dispatchGroup.enter()
-        videoInput.requestMediaDataWhenReady(on: videoQueue) { [self] in
-            while videoInput.isReadyForMoreMediaData {
-                if capturedError != nil {
-                    finishVideoInput(markAsFinished: true)
-                    return
-                }
-
-                do {
-                    try checkCancelled()
-                    guard nextOutputFrameIndex < videoTimeline.outputFrameCount else {
-                        finishVideoInput(markAsFinished: true)
-                        return
-                    }
-
-                    if previousVideoSample == nil {
-                        let decodedSample = performanceMetrics.measure(.decode) {
-                            signposter.withIntervalSignpost("decode") {
-                                videoOutput.copyNextSampleBuffer()
-                            }
-                        }
-                        guard let sampleBuffer = decodedSample else {
-                            if reader.status == .failed {
-                                throw FilmtoneMediaError.exportFailed(reader.error?.localizedDescription ?? "Video read failed.")
-                            }
-                            finishVideoInput(markAsFinished: true)
-                            return
-                        }
-                        previousVideoSample = videoTimeline.makeTimedSample(sampleBuffer)
-                        continue
-                    }
-
-                    if !sourceReaderExhausted && lookaheadVideoSample == nil {
-                        let decodedSample = performanceMetrics.measure(.decode) {
-                            signposter.withIntervalSignpost("decode") {
-                                videoOutput.copyNextSampleBuffer()
-                            }
-                        }
-                        guard let sampleBuffer = decodedSample else {
-                            if reader.status == .failed {
-                                throw FilmtoneMediaError.exportFailed(reader.error?.localizedDescription ?? "Video read failed.")
-                            }
-                            sourceReaderExhausted = true
-                            continue
-                        }
-                        lookaheadVideoSample = videoTimeline.makeTimedSample(sampleBuffer)
-                        continue
-                    }
-
-                    if let lookahead = lookaheadVideoSample {
-                        let outputTime = videoTimeline.outputPresentationTime(for: nextOutputFrameIndex)
-                        let sourceTime = videoTimeline.sourceLookupTime(for: nextOutputFrameIndex)
-                        if CMTimeCompare(sourceTime, lookahead.timelineTime) < 0 {
-                            guard let previous = previousVideoSample else {
-                                throw FilmtoneMediaError.exportFailed("The first decoded video frame was unavailable.")
-                            }
-                            let previousDelta = ExportMediaWriter.absoluteSecondsBetween(
-                                previous.timelineTime,
-                                sourceTime
-                            )
-                            let lookaheadDelta = ExportMediaWriter.absoluteSecondsBetween(
-                                lookahead.timelineTime,
-                                sourceTime
-                            )
-                            let selectedSample = previousDelta <= lookaheadDelta ? previous : lookahead
-                            try appendOutputFrame(
-                                using: selectedSample,
-                                at: outputTime,
-                                sourceLookupTime: sourceTime,
-                                sourceSegmentIndex: videoTimeline.sourceSegmentIndex(for: nextOutputFrameIndex)
-                            )
-                        } else {
-                            previousVideoSample = lookahead
-                            lookaheadVideoSample = nil
-                        }
-                        continue
-                    }
-
-                    if sourceReaderExhausted, let previous = previousVideoSample {
-                        let outputTime = videoTimeline.outputPresentationTime(for: nextOutputFrameIndex)
-                        try appendOutputFrame(
-                            using: previous,
-                            at: outputTime,
-                            sourceLookupTime: videoTimeline.sourceLookupTime(for: nextOutputFrameIndex),
-                            sourceSegmentIndex: videoTimeline.sourceSegmentIndex(for: nextOutputFrameIndex)
-                        )
-                        continue
-                    }
-                } catch {
-                    failExport(error)
-                    return
-                }
+        completionCoordinator.enterVideo()
+        videoFramePump.start(
+            progress: progress,
+            checkCancelled: checkCancelled,
+            appendFrame: { request in
+                try appendOutputFrame(request)
             }
-        }
+        )
 
         if let audioInput, let audioOutput {
-            dispatchGroup.enter()
-            audioInput.requestMediaDataWhenReady(on: audioQueue) { [self] in
-                while audioInput.isReadyForMoreMediaData {
-                    if capturedError != nil {
-                        finishAudioInput(markAsFinished: true)
-                        return
-                    }
-
-                    do {
-                        try checkCancelled()
-                        guard let sampleBuffer = audioOutput.copyNextSampleBuffer() else {
-                            if reader.status == .failed {
-                                throw FilmtoneMediaError.exportFailed(reader.error?.localizedDescription ?? "Audio read failed.")
-                            }
-                            finishAudioInput(markAsFinished: true)
-                            return
-                        }
-
-                        try mediaWriter.appendAudioSample(
-                            sampleBuffer,
-                            audioInput: audioInput,
-                            writer: writer,
-                            reader: reader,
-                            waitForReady: false,
-                            checkCancelled: checkCancelled
-                        )
-                    } catch {
-                        failExport(error)
-                        return
-                    }
-                }
-            }
+            completionCoordinator.enterAudio()
+            let audioPump = ExportVideoAudioPump(
+                audioInput: audioInput,
+                audioOutput: audioOutput,
+                reader: reader,
+                writer: writer,
+                audioQueue: audioQueue,
+                mediaWriter: mediaWriter,
+                completion: completionCoordinator
+            )
+            audioPump.start(checkCancelled: checkCancelled)
         }
 
-        dispatchGroup.wait()
+        completionCoordinator.wait()
         performanceMetrics.recordMediaPipeline(elapsedSince: mediaPipelineStartedNs)
 
-        if let capturedError {
-            throw capturedError
-        }
+        try completionCoordinator.throwCapturedErrorIfNeeded()
 
         if reader.status == .failed {
             throw FilmtoneMediaError.exportFailed(reader.error?.localizedDescription ?? "Video read failed.")
         }
 
-        progress(.init(stage: .writing, progress: 0.92, currentFrame: renderedFrames, totalFrames: videoTimeline.outputFrameCount, message: "Writing output"))
+        progress(.init(stage: .writing, progress: 0.92, currentFrame: videoFramePump.renderedFrames, totalFrames: videoTimeline.outputFrameCount, message: "Writing output"))
         try performanceMetrics.measure(.writerFinish) {
             try mediaWriter.finish(writer: writer, checkCancelled: checkCancelled)
         }
 
         return CompletedExport(
             outputSize: outputSize,
-            frameCount: renderedFrames,
+            frameCount: videoFramePump.renderedFrames,
             sourceDurationSec: videoTimeline.outputDurationSec.isFinite ? videoTimeline.outputDurationSec : nil,
             audioPreserved: audioInput != nil
         )

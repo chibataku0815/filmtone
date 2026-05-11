@@ -61,6 +61,9 @@
 		B1E10001000000000000B21B /* ExportPreviewRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B21C /* ExportPreviewRenderer.swift */; };
 		B1E10001000000000000B21D /* ExportVideoDepthMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B21E /* ExportVideoDepthMatcher.swift */; };
 		B1E10001000000000000B21F /* ExportVideoTimeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B220 /* ExportVideoTimeline.swift */; };
+		B1E10001000000000000B221 /* ExportVideoCompletionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B222 /* ExportVideoCompletionCoordinator.swift */; };
+		B1E10001000000000000B223 /* ExportVideoFramePump.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B224 /* ExportVideoFramePump.swift */; };
+		B1E10001000000000000B225 /* ExportVideoAudioPump.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B226 /* ExportVideoAudioPump.swift */; };
 		D10000010000000000000001 /* FilmtoneRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000001 /* FilmtoneRootView.swift */; };
 		D10000010000000000000002 /* FilmtoneEditorStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000002 /* FilmtoneEditorStore.swift */; };
 		D10000010000000000000003 /* FilmtoneEditorFacade.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000003 /* FilmtoneEditorFacade.swift */; };
@@ -237,6 +240,9 @@
 		B1E10001000000000000B21C /* ExportPreviewRenderer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportPreviewRenderer.swift; sourceTree = "<group>"; };
 		B1E10001000000000000B21E /* ExportVideoDepthMatcher.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportVideoDepthMatcher.swift; sourceTree = "<group>"; };
 		B1E10001000000000000B220 /* ExportVideoTimeline.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportVideoTimeline.swift; sourceTree = "<group>"; };
+		B1E10001000000000000B222 /* ExportVideoCompletionCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportVideoCompletionCoordinator.swift; sourceTree = "<group>"; };
+		B1E10001000000000000B224 /* ExportVideoFramePump.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportVideoFramePump.swift; sourceTree = "<group>"; };
+		B1E10001000000000000B226 /* ExportVideoAudioPump.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportVideoAudioPump.swift; sourceTree = "<group>"; };
 		B20000010000000000000001 /* MezzanineColorProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MezzanineColorProbe.swift; sourceTree = "<group>"; };
 		B20000010000000000000020 /* DepthSourceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthSourceService.swift; sourceTree = "<group>"; };
 		B20000010000000000000021 /* FilmtoneDepthMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneDepthMap.swift; sourceTree = "<group>"; };
@@ -437,6 +443,9 @@
 				B1E10001000000000000B21C /* ExportPreviewRenderer.swift */,
 				B1E10001000000000000B21E /* ExportVideoDepthMatcher.swift */,
 				B1E10001000000000000B220 /* ExportVideoTimeline.swift */,
+				B1E10001000000000000B222 /* ExportVideoCompletionCoordinator.swift */,
+				B1E10001000000000000B224 /* ExportVideoFramePump.swift */,
+				B1E10001000000000000B226 /* ExportVideoAudioPump.swift */,
 			);
 			name = Internal;
 			path = Internal;
@@ -975,6 +984,9 @@
 				B1E10001000000000000B21B /* ExportPreviewRenderer.swift in Sources */,
 				B1E10001000000000000B21D /* ExportVideoDepthMatcher.swift in Sources */,
 				B1E10001000000000000B21F /* ExportVideoTimeline.swift in Sources */,
+				B1E10001000000000000B221 /* ExportVideoCompletionCoordinator.swift in Sources */,
+				B1E10001000000000000B223 /* ExportVideoFramePump.swift in Sources */,
+				B1E10001000000000000B225 /* ExportVideoAudioPump.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
