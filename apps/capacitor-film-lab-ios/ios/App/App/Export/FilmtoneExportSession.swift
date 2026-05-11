@@ -755,7 +755,10 @@ final class FilmtoneExportSession {
         // disable). When depth was requested but the asset has no track, we
         // throw `depthUnsupportedForVideoSource` so the WebView sees the same
         // contract violation it saw in Phase A.
-        let depthReader = try resolveVideoDepthReader(asset: asset)
+        let depthReader = try ExportDepthPayloadManager.resolveReader(
+            asset: asset,
+            depthEnabled: request.depthEnabled ?? false
+        )
         defer { depthReader?.cancel() }
         if depthReader != nil {
             videoDepthSourceLabel = "AVDepthDataTrack"
@@ -956,7 +959,7 @@ final class FilmtoneExportSession {
                 if let pf = pendingDepthFrame {
                     lastDepthFrame = pf
                 }
-                switch pullNextVideoDepthFrame(reader: reader) {
+                switch ExportDepthPayloadManager.pullNextFrame(reader: reader) {
                 case .frame(let next):
                     pendingDepthFrame = next
                 case .endOfStream:
@@ -2781,93 +2784,6 @@ final class FilmtoneExportSession {
                 throw FilmtoneMediaError.exportFailed(writer.error?.localizedDescription ?? "Audio samples could not be appended.")
             }
         }
-    }
-
-    // MARK: - v1.3 Phase B video depth helpers
-
-    /// Sync-bridges `VideoDepthSourceService` for the (sync) video export
-    /// pipeline. Returns nil when the caller didn't opt in OR the asset has no
-    /// depth track AND depth wasn't requested. Throws
-    /// `depthUnsupportedForVideoSource` when depth WAS requested but no track
-    /// exists, and `depthUnsupportedFormat` when a track exists but the reader
-    /// can't be wired (propagated from `VideoDepthSourceService`).
-    private func resolveVideoDepthReader(asset: AVAsset) throws -> VideoDepthFrameReader? {
-        guard request.depthEnabled ?? false else {
-            return nil
-        }
-        // Defense-in-depth fast-path: skip the asset-side depth track probe and
-        // reader bring-up when every depth gain in the active profile is zero.
-        // Mirrors `FilmtoneDepthPrefilter.apply`'s own short-circuit at lines
-        // 74-80 (`depthGain <= 0 && rayAngleGain <= 0` → input unchanged) and
-        // the still-image gating comment at lines 1127-1133 (current contract
-        // `hiddenDefaults.depthMistGain == depthGlowGain == 0`). Becomes a
-        // meaningful win once D5.5 (CD承認) flips those gains; today it just
-        // makes the dark-code path explicit instead of relying on the per-stage
-        // prefilter early return.
-        let hidden = FilmtonePhase0Generated.hiddenDefaults
-        if hidden.depthMistGain == 0 && hidden.depthGlowGain == 0 {
-            NSLog("FilmtoneExportSession: video depth track decode skipped (all profile depth gains zero)")
-            return nil
-        }
-        let service = VideoDepthSourceService()
-        let semaphore = DispatchSemaphore(value: 0)
-        var hasTrack = false
-        var probeError: Error?
-        Task.detached(priority: .userInitiated) {
-            defer { semaphore.signal() }
-            hasTrack = await service.hasDepthTrack(in: asset)
-        }
-        semaphore.wait()
-        guard hasTrack else {
-            throw FilmtoneMediaError.depthUnsupportedForVideoSource
-        }
-        var reader: VideoDepthFrameReader?
-        let openSemaphore = DispatchSemaphore(value: 0)
-        Task.detached(priority: .userInitiated) {
-            defer { openSemaphore.signal() }
-            do {
-                reader = try await service.makeReader(for: asset)
-            } catch {
-                probeError = error
-            }
-        }
-        openSemaphore.wait()
-        if let probeError {
-            throw probeError
-        }
-        return reader
-    }
-
-    /// Sync-bridges `VideoDepthFrameReader.nextFrame` for the per-frame loop on
-    /// `videoQueue`. The result is a tri-state instead of `throws` because
-    /// callers want to distinguish "stream ended" from "transient failure" so
-    /// they can apply the per-source recovery contract from Phase A.
-    private enum VideoDepthFramePullResult {
-        case frame((presentationTime: CMTime, depthMap: FilmtoneDepthMap))
-        case endOfStream
-        case failure(Error)
-    }
-
-    private func pullNextVideoDepthFrame(reader: VideoDepthFrameReader) -> VideoDepthFramePullResult {
-        let semaphore = DispatchSemaphore(value: 0)
-        var pulled: (presentationTime: CMTime, depthMap: FilmtoneDepthMap)?
-        var pullError: Error?
-        Task.detached(priority: .userInitiated) {
-            defer { semaphore.signal() }
-            do {
-                pulled = try await reader.nextFrame()
-            } catch {
-                pullError = error
-            }
-        }
-        semaphore.wait()
-        if let pullError {
-            return .failure(pullError)
-        }
-        guard let pulled else {
-            return .endOfStream
-        }
-        return .frame(pulled)
     }
 
     private func finish(writer: AVAssetWriter) throws {
