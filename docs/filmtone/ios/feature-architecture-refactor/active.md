@@ -1,125 +1,125 @@
-# Active - Phase 2B-10B ExportVideoTimeline Extraction
+# Active - Phase 2B-10C ExportVideoCompletionCoordinator Extraction
 
 Date: 2026-05-11 JST
 Phase: Phase 2B - ExportSession public-surface split
-Milestone: Move video output/source timeline math out of
+Milestone: Move video export completion / failure lifecycle out of
 `FilmtoneExportSession.exportVideo`.
 
 ## Owner Directive
 
 - Essence first: keep shrinking `FilmtoneExportSession` toward a thin
   export orchestrator. This is implementation work, not inventory.
-- Product quality is the bar: highlight-reel timeline mapping, source
-  sample time normalization, progress cadence, audio-preservation gating,
-  and depth lookup offsets must stay equivalent.
+- Product quality is the bar: dispatch-group balance, writer/input
+  finishing, cancellation-on-first-failure, captured-error precedence,
+  and audio/video queue shutdown semantics must stay equivalent.
 - Outer shell minimal: no new XCTest, simulator smoke, PNG/PSNR fixture,
   or formal QA matrix in this sub-stage. Run the focused gates below.
 - No extension-only split. The target is an independent
-  `ExportVideoTimeline` type under `Export/Internal/`.
+  `ExportVideoCompletionCoordinator` type under `Export/Internal/`.
 
 ## Goal
 
-Create `Export/Internal/ExportVideoTimeline.swift` and move the pure video
-timeline / timing helpers out of `exportVideo(...)`.
+Create `Export/Internal/ExportVideoCompletionCoordinator.swift` and move
+the local completion / failure lifecycle helpers out of
+`exportVideo(...)`.
 
-This is not the full video loop extraction. Keep reader/writer setup,
-dispatch queues, sample decode, lookahead selection, frame append,
-audio append, completion/failure locks, and `ExportVideoDepthMatcher`
-ownership in `FilmtoneExportSession` for now. The new timeline helper
-should own only output frame count / duration, source lookup mapping,
-source-time-offset normalization, per-sample timeline time, segment index,
-and rendering progress math.
+This is not the full video loop extraction. Keep writer/reader setup,
+video sample decode, lookahead selection, depth matching, timeline
+mapping, frame append, audio append body, and render stage order on
+`FilmtoneExportSession` for now. The new coordinator should own only the
+dispatch group, completion/failure locks, finished flags, captured error,
+input finishing, reader/writer cancellation on first failure, waiting,
+and captured-error throw handoff.
 
-## Current Boundary As Of 2B-10A
+## Current Boundary As Of 2B-10B
 
-Inside `exportVideo(...)`, timeline responsibility currently includes:
+Inside `exportVideo(...)`, completion responsibility currently includes:
 
-- local `highlightTimeline` from `highlightSegments`
-- local `outputFrameCount`
-- local `outputDurationSec`
-- local `typealias TimedVideoSample`
-- local `sourceTimeOffset`
+- local state:
+  - `completionLock`
+  - `failureLock`
+  - `dispatchGroup`
+  - `videoInputFinished`
+  - `audioInputFinished`
+  - `capturedError`
 - local helpers:
-  - `outputPresentationTime(for:)`
-  - `sourceLookupTime(for:)`
-  - `sourceSegmentIndex(for:)`
-  - `makeTimedVideoSample(_:)`
-- class helper:
-  - `private func renderingProgress(presentationTime:sourceDurationSec:)`
+  - `finishVideoInput(markAsFinished:)`
+  - `finishAudioInput(markAsFinished:)`
+  - `failExport(_:)`
 - call-site dependencies:
-  - audio preservation is disabled when `highlightTimeline != nil`
-  - depth matcher receives the same `sourceTimeOffset`
-  - frame append receives the same output presentation time, source lookup
-    time, and source segment index
+  - both media queues check `capturedError != nil`
+  - video queue calls `finishVideoInput(markAsFinished: true)`
+  - audio queue calls `finishAudioInput(markAsFinished: true)`
+  - catch blocks call `failExport(error)`
+  - after queue registration, session calls `dispatchGroup.wait()`
+  - after waiting, session throws `capturedError` if present
 
-Move the timing math and source-time-offset state. Keep sample decode,
-lookahead selection, and append scheduling on the session.
+Move the lifecycle state and helper bodies. Keep the queue bodies and
+their sample work on the session.
 
 ## Intended Implementation Shape
 
 Add:
 
 ```swift
-final class ExportVideoTimeline {
-    struct TimedSample {
-        let buffer: CMSampleBuffer
-        let rawTime: CMTime
-        let timelineTime: CMTime
-    }
-
+final class ExportVideoCompletionCoordinator {
     init(
-        highlightTimeline: FilmtoneHighlightReelFrameTimeline?,
-        outputFPS: Int,
-        sourceDurationSec: Double
+        reader: AVAssetReader,
+        writer: AVAssetWriter,
+        videoInput: AVAssetWriterInput,
+        audioInput: AVAssetWriterInput?
     )
 
-    var outputFrameCount: Int { get }
-    var outputDurationSec: Double { get }
-    var sourceTimeOffset: CMTime? { get }
+    var hasCapturedError: Bool { get }
 
-    func outputPresentationTime(for frameIndex: Int) -> CMTime
-    func sourceLookupTime(for frameIndex: Int) -> CMTime
-    func sourceSegmentIndex(for frameIndex: Int) -> Int?
-    func makeTimedSample(_ sampleBuffer: CMSampleBuffer) -> TimedSample
-    func renderingProgress(presentationTime: CMTime) -> Double
+    func enterVideo()
+    func enterAudio()
+    func finishVideoInput(markAsFinished: Bool)
+    func finishAudioInput(markAsFinished: Bool)
+    func failExport(_ error: Error)
+    func wait()
+    func throwCapturedErrorIfNeeded() throws
 }
 ```
 
-Use the existing `ExportMediaWriter.validPresentationTime(for:)`,
-`ExportMediaWriter.nonNegativeTime(_:)`, and
-`ExportMediaWriter.absoluteSecondsBetween(_:_:)` primitives as-is. Do not
-move or rename those writer helpers in this sub-stage.
+Implementation notes:
+
+- `enterVideo()` / `enterAudio()` should be thin wrappers over the same
+  `DispatchGroup.enter()` calls that currently live in the session.
+- `finishVideoInput(markAsFinished:)` must keep the exact lock /
+  already-finished guard / optional `markAsFinished()` / finished flag /
+  `dispatchGroup.leave()` ordering.
+- `finishAudioInput(markAsFinished:)` must keep the exact `guard let
+  audioInput else { return }` behavior before locking.
+- `failExport(_:)` must keep first-error-wins semantics:
+  lock failure, set captured error only when nil, unlock, return if this
+  was not the first error, then cancel reader/writer and finish both
+  inputs with `markAsFinished: true`.
+- `hasCapturedError` may lock around the read, but it must remain a
+  read-only predicate used by the queue loops.
 
 In `FilmtoneExportSession`:
 
-- construct `let videoTimeline = ExportVideoTimeline(...)` after
-  `sourceDurationSec` and `highlightTimeline` are available.
-- replace `outputFrameCount` / `outputDurationSec` local constants with
-  `videoTimeline.outputFrameCount` / `videoTimeline.outputDurationSec`
-  or local lets sourced from the helper.
-- replace `TimedVideoSample` with `ExportVideoTimeline.TimedSample`.
-- replace `makeTimedVideoSample(...)` call sites with
-  `videoTimeline.makeTimedSample(...)`.
-- replace `outputPresentationTime(for:)`,
-  `sourceLookupTime(for:)`, `sourceSegmentIndex(for:)`, and
-  `renderingProgress(...)` call sites with timeline delegates.
-- pass `videoTimeline.sourceTimeOffset` into
-  `depthMatcher.matchDepthFrame(...)` through
-  `prepareDepthForSourceTime(at:)`.
-- keep `highlightTimeline == nil && request.output.preserveAudio` as the
-  audio gating expression, or replace it with an equivalently named
-  timeline property only if doing so avoids duplicated state.
+- replace local completion state and helper declarations with
+  `let completionCoordinator = ExportVideoCompletionCoordinator(...)`.
+- replace `dispatchGroup.enter()` with coordinator enter calls.
+- replace `capturedError != nil` checks with
+  `completionCoordinator.hasCapturedError`.
+- replace `finishVideoInput`, `finishAudioInput`, `failExport`,
+  `dispatchGroup.wait()`, and captured-error throw sites with the
+  coordinator API.
+- do not move decode, append, audio sample, or reader/writer construction
+  into this coordinator.
 
 ## Edit Targets
 
 - `apps/capacitor-film-lab-ios/ios/App/App/Export/FilmtoneExportSession.swift`
-  - remove local timeline helper declarations from `exportVideo`
-  - remove `private func renderingProgress(...)`
-  - delegate timeline math to `ExportVideoTimeline`
-- `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportVideoTimeline.swift`
+  - remove local lifecycle state / helpers from `exportVideo`
+  - delegate lifecycle calls to `ExportVideoCompletionCoordinator`
+- `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportVideoCompletionCoordinator.swift`
   - new file
 - `apps/capacitor-film-lab-ios/ios/App/App.xcodeproj/project.pbxproj`
-  - 4-section registration for `ExportVideoTimeline.swift`
+  - 4-section registration for `ExportVideoCompletionCoordinator.swift`
 - `docs/filmtone/ios/feature-architecture-refactor/active.md`
   - update checklist and unexpected notes as implementation proceeds
 
@@ -129,34 +129,33 @@ In `FilmtoneExportSession`:
   - commit gate and 4-section pbxproj rule
 - `docs/filmtone/ios/feature-architecture-refactor/strategy.md`
   - Phase 2B / 2C milestones
-- `docs/filmtone/ios/feature-architecture-refactor/archive/2026-05-11-phase-2b-10a-export-video-depth-matcher-extraction.md`
+- `docs/filmtone/ios/feature-architecture-refactor/archive/2026-05-11-phase-2b-10b-export-video-timeline-extraction.md`
   - latest extraction precedent
-- `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportVideoDepthMatcher.swift`
-  - depth matcher dependency on `sourceTimeOffset`
-- `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportSessionModels.swift`
-  - `FilmtoneHighlightReelFrameTimeline` mapping contract
+- `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportMediaWriter.swift`
+  - writer/finish primitive, read-only in this sub-stage
+- `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportVideoTimeline.swift`
+  - timeline state, read-only in this sub-stage
 
 ## Checklist
 
-- [ ] Create `Export/Internal/ExportVideoTimeline.swift` with imports
-  needed by the moved timing code (`AVFoundation`, `CoreMedia`,
-  `Foundation` as required).
-- [ ] Move `TimedVideoSample` shape into `ExportVideoTimeline.TimedSample`
-  without changing field names or meaning.
-- [ ] Move `sourceTimeOffset` state and `makeTimedVideoSample(_:)` logic
-  into the timeline helper.
-- [ ] Move `outputFrameCount`, `outputDurationSec`,
-  `outputPresentationTime(for:)`, `sourceLookupTime(for:)`,
-  `sourceSegmentIndex(for:)`, and `renderingProgress(...)` math into the
-  timeline helper.
-- [ ] Rewire `exportVideo(...)` call sites to `videoTimeline`.
-- [ ] Preserve audio gating semantics for highlight exports.
-- [ ] Preserve depth matcher offset semantics by passing the helper's
-  current `sourceTimeOffset`.
-- [ ] Register `ExportVideoTimeline.swift` in pbxproj 4 sections.
+- [ ] Create `Export/Internal/ExportVideoCompletionCoordinator.swift`
+  with `AVFoundation` / `Foundation` imports as needed.
+- [ ] Move `completionLock`, `failureLock`, `dispatchGroup`,
+  `videoInputFinished`, `audioInputFinished`, and `capturedError` into
+  the coordinator.
+- [ ] Move `finishVideoInput(markAsFinished:)`,
+  `finishAudioInput(markAsFinished:)`, and `failExport(_:)` bodies into
+  the coordinator without changing ordering.
+- [ ] Add queue-safe `hasCapturedError`, `enterVideo`, `enterAudio`,
+  `wait`, and `throwCapturedErrorIfNeeded` wrappers.
+- [ ] Rewire video queue call sites to the coordinator.
+- [ ] Rewire audio queue call sites to the coordinator.
+- [ ] Preserve first-error-wins cancellation semantics.
+- [ ] Register `ExportVideoCompletionCoordinator.swift` in pbxproj 4
+  sections.
 - [ ] Verify declaration-removal grep returns 0 hits:
-  `rg -n "typealias TimedVideoSample|var sourceTimeOffset|func outputPresentationTime|func sourceLookupTime|func sourceSegmentIndex|func makeTimedVideoSample|private func renderingProgress" apps/capacitor-film-lab-ios/ios/App/App/Export/FilmtoneExportSession.swift`
-- [ ] `grep -c 'ExportVideoTimeline.swift' apps/capacitor-film-lab-ios/ios/App/App.xcodeproj/project.pbxproj`
+  `rg -n "completionLock|failureLock|dispatchGroup|videoInputFinished|audioInputFinished|capturedError|func finishVideoInput|func finishAudioInput|func failExport" apps/capacitor-film-lab-ios/ios/App/App/Export/FilmtoneExportSession.swift`
+- [ ] `grep -c 'ExportVideoCompletionCoordinator.swift' apps/capacitor-film-lab-ios/ios/App/App.xcodeproj/project.pbxproj`
   is 4.
 - [ ] `bun run verify:ios` passes.
 - [ ] `git diff --check` passes.
@@ -165,53 +164,50 @@ In `FilmtoneExportSession`:
 
 Minimum gates for this sub-stage:
 
-- pbxproj 4-section grep for `ExportVideoTimeline.swift`
-- timeline helper declarations removed from `FilmtoneExportSession`
+- pbxproj 4-section grep for `ExportVideoCompletionCoordinator.swift`
+- lifecycle helper declarations removed from `FilmtoneExportSession`
 - `bun run verify:ios`
 - `git diff --check`
 
 Do not add simulator smoke, sidecar canonical fixtures, or PNG byte-diff
-fixtures in 2B-10B unless implementation changes behavior beyond
+fixtures in 2B-10C unless implementation changes behavior beyond
 extraction.
 
 ## Done Conditions
 
-- Output frame count / duration computation lives in
-  `ExportVideoTimeline`.
-- Output presentation time remains
-  `CMTime(value: CMTimeValue(frameIndex), timescale: CMTimeScale(max(1, request.output.fps)))`.
-- Source lookup time still uses
-  `highlightTimeline.sourceTimeSec(forOutputFrameIndex:)` when present,
-  otherwise output presentation time.
-- Source segment index still comes from
-  `highlightTimeline.segmentIndex(forOutputFrameIndex:)`.
-- Source sample timeline normalization still sets `sourceTimeOffset` from
-  the first valid raw sample time and uses
-  `ExportMediaWriter.nonNegativeTime(CMTimeSubtract(rawTime, offset))`.
-- Depth matching receives the same offset value as before.
-- Rendering progress still uses
-  `0.12 + min(max(seconds / max(duration, 0.001), 0), 1) * 0.78`.
-- Audio preservation remains disabled for highlight-reel exports.
-- Reader/writer setup, dispatch group, decode loop, lookahead sample
-  selection, depth preparation order, motion blur reset order, frame
-  append, audio append, public API, sidecar schema, and UI call sites are
-  unchanged.
+- Dispatch group ownership lives in `ExportVideoCompletionCoordinator`.
+- Video and audio input finishing still leave the dispatch group exactly
+  once per entered queue.
+- `finishAudioInput(markAsFinished:)` still returns immediately when
+  `audioInput` is nil.
+- First captured error still wins; later failures do not overwrite it.
+- Reader cancel + writer cancel still run only for the first failure.
+- First failure still finishes both inputs with `markAsFinished: true`.
+- Queue loops still stop when a captured error exists.
+- The session still waits for the same group before checking reader
+  status and finishing the writer.
+- The session still throws the captured error before reader-status
+  failure handling.
+- Reader/writer setup, decode loop, lookahead selection, timeline math,
+  depth preparation order, motion blur reset order, frame append, audio
+  append, public API, sidecar schema, and UI call sites are unchanged.
 
 ## Stop Conditions
 
 - Done conditions are met.
 - `bun run verify:ios` fails 3 consecutive times for the same issue.
-- Moving timeline math forces changes to writer/reader setup, decode loop,
-  lookahead selection policy, audio pipeline, depth matcher behavior,
-  render stage order, or sidecar fields. Stop and record the blocker
-  instead of widening scope.
+- Moving completion lifecycle forces changes to decode loop policy,
+  sample selection, audio pipeline creation, writer/reader setup, frame
+  append, depth matcher behavior, render stage order, or sidecar fields.
+  Stop and record the blocker instead of widening scope.
 
 ## Out Of Scope
 
 - Full `exportVideo` loop extraction.
-- Dispatch group / lock / failure lifecycle extraction.
-- Video sample decode and lookahead selection changes.
+- Video sample decode / lookahead selection extraction.
+- Audio append body extraction.
 - `ExportMediaWriter` helper changes.
+- `ExportVideoTimeline` behavior changes.
 - `ExportVideoDepthMatcher` behavior changes.
 - Motion blur, grade, optics, sidecar, connect package, preview, still
   export, or mezzanine routing changes.

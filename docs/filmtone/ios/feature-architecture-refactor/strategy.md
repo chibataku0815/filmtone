@@ -344,3 +344,16 @@ Total: 11-13 working days.
   `videoDepthFramesProcessed`, and `depthResolution`. pbxproj 4-section
   grep = 4; `bun run verify:ios` green; `git diff --check` clean. See
   `archive/2026-05-11-phase-2b-10a-export-video-depth-matcher-extraction.md`.
+- 2026-05-11 JST — Phase 2B-10B (ExportVideoTimeline extraction)
+  committed as `40d24fdd`. New `final class ExportVideoTimeline` at
+  `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportVideoTimeline.swift`
+  (88 lines) now owns output frame count / duration, presentation time,
+  source lookup time, source segment index, lazy source-time-offset
+  normalization, timed sample shape, and rendering progress math.
+  `FilmtoneExportSession.swift` reduced from 1334 → 1296 lines (−38);
+  decode / lookahead / append orchestration remains session-owned.
+  The live rendering-progress multiplier remains `0.74`; the 10B active
+  doc corrected an earlier `0.78` planning typo before commit. pbxproj
+  4-section grep = 4; `bun run verify:ios` green; `git diff --check`
+  clean. See
+  `archive/2026-05-11-phase-2b-10b-export-video-timeline-extraction.md`.
