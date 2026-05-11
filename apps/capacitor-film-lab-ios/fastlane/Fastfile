@@ -61,6 +61,16 @@ def app_store_version_number!
   versions.first
 end
 
+def app_store_build_number!
+  explicit_build = normalized_env("BUILD_NUMBER")
+  return explicit_build if explicit_build
+
+  builds = File.read(IOS_PROJECT).scan(/CURRENT_PROJECT_VERSION = ([^;]+);/).flatten.uniq
+  UI.user_error!("Expected one CURRENT_PROJECT_VERSION in #{IOS_PROJECT}, found #{builds.join(', ')}") unless builds.one?
+
+  builds.first
+end
+
 def asc_api_key_configured?
   normalized_env("ASC_KEY_ID") &&
     normalized_env("ASC_ISSUER_ID") &&
@@ -169,6 +179,49 @@ end
 def localized_build_release_notes
   localized_release_note_texts.each_with_object({}) do |(locale, notes), memo|
     memo[locale] = { whats_new: notes }
+  end
+end
+
+def target_app_store_version!(version_string)
+  app = Spaceship::ConnectAPI::App.find(APP_IDENTIFIER)
+  UI.user_error!("Could not find App Store Connect app #{APP_IDENTIFIER}") unless app
+
+  versions = app.get_app_store_versions(
+    filter: { platform: Spaceship::ConnectAPI::Platform::IOS },
+    includes: nil
+  )
+  version = versions.find { |candidate| candidate.version_string == version_string }
+
+  unless version
+    available = versions
+      .sort_by { |candidate| Gem::Version.new(candidate.version_string) }
+      .map { |candidate| "#{candidate.version_string}(#{candidate.app_version_state})" }
+      .join(", ")
+    UI.user_error!("Could not find iOS App Store version #{version_string}. Available: #{available}")
+  end
+
+  version
+end
+
+def sync_release_notes_only!(version:)
+  notes_by_locale = localized_release_note_texts
+  UI.user_error!("No localized release_notes.txt files found under #{METADATA_TEMPLATE_PATH}") if notes_by_locale.empty?
+
+  localizations = version.get_app_store_version_localizations
+  notes_by_locale.each do |locale, notes|
+    localization = localizations.find { |candidate| candidate.locale == locale }
+
+    if localization
+      if localization.whats_new.to_s == notes
+        UI.message("Release notes already match for #{locale}")
+      else
+        localization.update(attributes: { whats_new: notes })
+        UI.message("Updated release notes for #{locale}")
+      end
+    else
+      version.create_app_store_version_localization(attributes: { locale: locale, whatsNew: notes })
+      UI.message("Created release notes localization for #{locale}")
+    end
   end
 end
 
@@ -419,6 +472,62 @@ platform :ios do
         export_compliance_uses_encryption: false,
       },
       **localized_store_metadata_options
+    )
+  end
+
+  desc "Upload only localized What's New release notes"
+  lane :release_notes do
+    load_asc_api_key!
+    version = target_app_store_version!(app_store_version_number!)
+    UI.message("Updating only What's New for #{APP_IDENTIFIER} #{version.version_string} (#{version.app_version_state})")
+    sync_release_notes_only!(version: version)
+  end
+
+  desc "Upload only the App Store binary without metadata or screenshots"
+  lane :release_binary do |options|
+    ipa_path = explicit_ipa_path!(options, lane: "release_binary")
+    upload_to_app_store(
+      api_key: load_asc_api_key!,
+      app_identifier: APP_IDENTIFIER,
+      app_version: app_store_version_number!,
+      ipa: ipa_path,
+      platform: "ios",
+      skip_binary_upload: false,
+      skip_metadata: true,
+      skip_screenshots: true,
+      submit_for_review: false,
+      force: true,
+      precheck_include_in_app_purchases: false,
+      submission_information: {
+        export_compliance_uses_encryption: false,
+      }
+    )
+  end
+
+  desc "Submit the current build after syncing only What's New release notes"
+  lane :submit_review_release_notes do
+    api_key = load_asc_api_key!
+    version = target_app_store_version!(app_store_version_number!)
+    UI.message("Syncing only What's New before review submission for #{APP_IDENTIFIER} #{version.version_string}")
+    sync_release_notes_only!(version: version)
+
+    upload_to_app_store(
+      api_key: api_key,
+      app_identifier: APP_IDENTIFIER,
+      app_version: app_store_version_number!,
+      build_number: app_store_build_number!,
+      platform: "ios",
+      skip_binary_upload: true,
+      skip_metadata: true,
+      skip_screenshots: true,
+      submit_for_review: true,
+      automatic_release: truthy_env?("AUTOMATIC_RELEASE"),
+      force: true,
+      precheck_include_in_app_purchases: false,
+      app_review_information: app_review_information!,
+      submission_information: {
+        export_compliance_uses_encryption: false,
+      }
     )
   end
 

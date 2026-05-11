@@ -17,8 +17,11 @@
     "release:archive": "./scripts/bundle.sh exec fastlane ios archive",
     "release:screenshots": "./scripts/bundle.sh exec fastlane ios screenshots",
     "release:metadata": "./scripts/bundle.sh exec fastlane ios metadata",
+    "release:release-notes": "./scripts/bundle.sh exec fastlane ios release_notes",
+    "release:appstore-binary": "./scripts/bundle.sh exec fastlane ios release_binary",
     "release:beta": "./scripts/bundle.sh exec fastlane ios beta",
     "release:appstore": "./scripts/bundle.sh exec fastlane ios release",
+    "release:submit-review-notes": "./scripts/bundle.sh exec fastlane ios submit_review_release_notes",
     "release:submit-review": "./scripts/bundle.sh exec fastlane ios submit_review"
   }
 }

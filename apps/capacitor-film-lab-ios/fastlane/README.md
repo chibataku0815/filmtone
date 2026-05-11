@@ -39,6 +39,30 @@ Capture App Store screenshots with a deterministic UI test rail
 
 Upload localized App Store metadata and review info
 
+### ios release_notes
+
+```sh
+[bundle exec] fastlane ios release_notes
+```
+
+Upload only localized What's New release notes
+
+### ios release_binary
+
+```sh
+[bundle exec] fastlane ios release_binary
+```
+
+Upload only the App Store binary without metadata or screenshots
+
+### ios submit_review_release_notes
+
+```sh
+[bundle exec] fastlane ios submit_review_release_notes
+```
+
+Submit the current build after syncing only What's New release notes
+
 ### ios beta
 
 ```sh

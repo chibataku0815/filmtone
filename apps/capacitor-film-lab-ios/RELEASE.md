@@ -81,8 +81,11 @@ bun run release:env:check
 bun run release:archive
 bun run release:screenshots
 bun run release:metadata
+bun run release:release-notes
+bun run release:appstore-binary
 bun run release:beta
 bun run release:appstore
+bun run release:submit-review-notes
 bun run release:submit-review
 ```
 
@@ -114,6 +117,13 @@ bun run release:screenshots
 REVIEW_PHONE='+81-90-0000-0000' bun run release:metadata
 ```
 
+To upload only the localized "What's New" text without touching title,
+subtitle, screenshots, descriptions, URLs, review info, or binary:
+
+```sh
+bun run release:release-notes
+```
+
 5. Upload a TestFlight build. `IPA_PATH` can come from `.env.local`, an exported shell variable, or the command line:
 
 ```sh
@@ -142,6 +152,16 @@ To submit an already uploaded build without touching the binary or screenshots:
 
 ```sh
 APP_VERSION=1.2 BUILD_NUMBER=1 REVIEW_PHONE='+81-90-0000-0000' bun run release:submit-review
+```
+
+When the release must not touch title, subtitle, screenshots, or public
+metadata other than "What's New", upload the binary and notes through the
+narrow lanes:
+
+```sh
+IPA_PATH=build/fastlane/Filmtone.ipa bun run release:appstore-binary
+bun run release:release-notes
+REVIEW_PHONE='+81-90-0000-0000' bun run release:submit-review-notes
 ```
 
 ## Notes

@@ -1,9 +1,7 @@
-This release adds a native iPhone recording flow for moving from capture into film-style grading without leaving Filmtone. The capture screen records 4K24 ProRes 422 HQ in Apple Log 2 with stabilisation, then hands the clip into the editor.
+This release improves the native capture flow for real shooting sessions. You can keep recording multiple takes, then choose the take to open in the editor with a focused preview instead of being forced out of capture after each clip.
 
-When an external SSD is selected, Filmtone keeps the high-quality master on the SSD and creates a local proxy for editing on iPhone. This keeps large files out of local storage while still letting you review the Look, adjust the image, and export from the phone. Without an SSD, Filmtone uses a short internal recording mode and makes that state visible.
+Recording preview is lighter in the hot path. When stabilisation and a Look are active together, Filmtone uses a visible lightweight monitor mode for capture while preserving the full-quality rendering path for editing and export.
 
-The capture screen has also been redesigned. Look, lens, ISO, shutter, exposure compensation, and white balance are organised as a camera cockpit so the common choices stay close while detailed values only appear when needed. Stone, Urban, and the current Look direction can be previewed while shooting and are carried back into the editor after recording.
+Stone, Urban, Noir, and imported .cube creative LUTs can now be selected from the capture screen. LUTs that look like technical transform LUTs are flagged, and the selected direction carries through capture, editing, and export provenance.
 
-Export sidecars now record whether an export used the capture master or the proxy fallback. This makes it easier to understand what was handed to the next step, especially when a master lives on an external SSD.
-
-The empty state and onboarding surfaces were also updated towards the Apple Liquid Glass direction, with clearer entry points for Photo Library, Files, and Recording.
+This update also tightens capture orientation handling, storage-pressure warnings, and package stability.
