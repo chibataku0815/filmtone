@@ -39,6 +39,7 @@ export {
   filmlabFragmentWgsl,
   blitFragmentWgsl,
   compositeFragmentWgsl,
+  detailSoftnessFragmentWgsl,
   bloomPrefilterFragmentWgsl,
   halationPrefilterFragmentWgsl,
   downsampleFragmentWgsl,

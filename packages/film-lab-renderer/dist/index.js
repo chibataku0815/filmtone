@@ -10,6 +10,7 @@ import * as THREE3 from "three";
 import {
   chromaUnitFromHueDegrees,
   clampGrainIntensity,
+  deriveDetailSoftnessUniforms,
   FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
   FILM_LAB_DEFAULT_SHADOW_HUE,
   LEGACY_HIGHLIGHT_TONE_MAGNITUDE,
@@ -86,6 +87,65 @@ void main() {
 
   vec3 halation = color.rgb * contribution * uHalationColor;
   fragColor = vec4(halation, 1.0);
+}
+`
+);
+
+// src/webgl/shaders/detail-softness.frag.ts
+var detailSoftnessFragmentShader = (
+  /* glsl */
+  `
+precision highp float;
+
+uniform sampler2D uSource;
+uniform vec2 uTexelSize;
+uniform float uEffectiveDetailSoftness;
+uniform float uKernelRadiusPx;
+uniform float uChromaAttenScale;
+uniform float uEdgeGuardLo;
+uniform float uEdgeGuardHi;
+uniform float uHighlightBias;
+
+in vec2 vUv;
+out vec4 fragColor;
+
+float luma709(vec3 rgb) {
+  return dot(rgb, vec3(0.2126, 0.7152, 0.0722));
+}
+
+void main() {
+  vec4 center = texture(uSource, vUv);
+  if (uEffectiveDetailSoftness < 0.0001) {
+    fragColor = center;
+    return;
+  }
+
+  float r = max(uKernelRadiusPx, 0.0001);
+  vec2 d = uTexelSize * r;
+  vec3 srcRGB = center.rgb;
+  vec3 nR = texture(uSource, vUv + vec2( d.x, 0.0)).rgb;
+  vec3 nL = texture(uSource, vUv + vec2(-d.x, 0.0)).rgb;
+  vec3 nU = texture(uSource, vUv + vec2(0.0,  d.y)).rgb;
+  vec3 nD = texture(uSource, vUv + vec2(0.0, -d.y)).rgb;
+
+  vec3 localRef = (srcRGB + nR + nL + nU + nD) * 0.2;
+  vec3 detail = srcRGB - localRef;
+
+  vec3 lumaWeights = vec3(0.2126, 0.7152, 0.0722);
+  float lumaCenter = luma709(srcRGB);
+  float lumaGrad =
+    abs(luma709(nR) - luma709(nL)) * 0.5 +
+    abs(luma709(nU) - luma709(nD)) * 0.5;
+  float edgeGuard = 1.0 - smoothstep(uEdgeGuardLo, uEdgeGuardHi, lumaGrad);
+  float highlightWeight = mix(1.0, uHighlightBias, smoothstep(0.6, 0.9, lumaCenter));
+
+  float lumaAtten = uEffectiveDetailSoftness * edgeGuard * highlightWeight;
+  float chromaAtten = lumaAtten * uChromaAttenScale;
+  float detailLuma = dot(detail, lumaWeights);
+  vec3 detailLumaVec = detailLuma * lumaWeights;
+  vec3 detailChroma = detail - detailLumaVec;
+  vec3 softened = srcRGB - (detailLumaVec * lumaAtten) - (detailChroma * chromaAtten);
+  fragColor = vec4(softened, center.a);
 }
 `
 );
@@ -1211,11 +1271,13 @@ var WebGLBackend = class _WebGLBackend {
   // Post-processing materials
   bloomPrefilterMaterial;
   halationPrefilterMaterial;
+  detailSoftnessMaterial;
   downsampleMaterial;
   upsampleMaterial;
   compositeMaterial;
   // RenderTargets (lazy)
   rtColorGraded = null;
+  rtDetailSoftened = null;
   static BLOOM_MIP_LEVELS = 5;
   static HALATION_MIP_LEVELS = 6;
   static DIFFUSION_MIP_LEVELS = 3;
@@ -1249,6 +1311,7 @@ var WebGLBackend = class _WebGLBackend {
    * composite の径方向グレイン混色（0=一様、1=周辺強め）。カラーパスには無く合成パスのみ。
    */
   grainRadialMix = 1;
+  detailSoftness = 0;
   // --- Motion Blur: N-frame Ring Buffer (Post-composite #97) ---
   static MOTION_BLUR_RING_SIZE = 8;
   shutterAngle = 0;
@@ -1406,6 +1469,21 @@ var WebGLBackend = class _WebGLBackend {
         uFlipY: { value: 0 }
       }
     });
+    this.detailSoftnessMaterial = new THREE3.ShaderMaterial({
+      glslVersion: THREE3.GLSL3,
+      vertexShader: filmlabVertexShader,
+      fragmentShader: detailSoftnessFragmentShader,
+      uniforms: {
+        uSource: { value: null },
+        uTexelSize: { value: new THREE3.Vector2() },
+        uEffectiveDetailSoftness: { value: 0 },
+        uKernelRadiusPx: { value: 0.55 },
+        uChromaAttenScale: { value: 0.85 },
+        uEdgeGuardLo: { value: 0.04 },
+        uEdgeGuardHi: { value: 0.2 },
+        uHighlightBias: { value: 1.18 }
+      }
+    });
     this.downsampleMaterial = new THREE3.ShaderMaterial({
       glslVersion: THREE3.GLSL3,
       vertexShader: filmlabVertexShader,
@@ -1476,6 +1554,7 @@ var WebGLBackend = class _WebGLBackend {
     const w = this.width;
     const h = this.height;
     this.rtColorGraded = new THREE3.WebGLRenderTarget(w, h, RT_OPTIONS);
+    this.rtDetailSoftened = new THREE3.WebGLRenderTarget(w, h, RT_OPTIONS);
     this.rtCompareComposite = new THREE3.WebGLRenderTarget(w, h, RT_OPTIONS);
     this.rtBloomMips = [];
     for (let i = 0; i < _WebGLBackend.BLOOM_MIP_LEVELS; i++) {
@@ -1494,6 +1573,7 @@ var WebGLBackend = class _WebGLBackend {
     if (!this.rtColorGraded) return;
     if (w <= 0 || h <= 0) return;
     this.rtColorGraded.setSize(w, h);
+    this.rtDetailSoftened?.setSize(w, h);
     this.rtCompareComposite?.setSize(w, h);
     for (let i = 0; i < this.rtBloomMips.length; i++) {
       const mw = Math.max(1, Math.floor(w / Math.pow(2, i + 1)));
@@ -1894,6 +1974,7 @@ var WebGLBackend = class _WebGLBackend {
   renderBasePipeline(renderer, scene, camera) {
     renderer.setRenderTarget(this.rtColorGraded);
     renderer.render(scene, camera);
+    this.renderDetailSoftness(renderer);
     const bloomOn = this.bloomStrength > 0;
     const halationOn = this.halationIntensity > 0;
     const hardModeActive = this.crossFilterStrength > 0 && this.crossFilterHardMode >= 0.5;
@@ -1907,6 +1988,30 @@ var WebGLBackend = class _WebGLBackend {
     if (diffusionOn) {
       this.renderDiffusion(renderer);
     }
+  }
+  opticalSourceTexture() {
+    const uniforms = deriveDetailSoftnessUniforms(this.detailSoftness);
+    return uniforms.effectiveDetailSoftness > 1e-4 && this.rtDetailSoftened ? this.rtDetailSoftened.texture : this.rtColorGraded.texture;
+  }
+  renderDetailSoftness(renderer) {
+    if (!this.rtDetailSoftened || !this.rtColorGraded) return;
+    const uniforms = deriveDetailSoftnessUniforms(this.detailSoftness);
+    if (uniforms.effectiveDetailSoftness < 1e-4) return;
+    const du = this.detailSoftnessMaterial.uniforms;
+    du.uSource.value = this.rtColorGraded.texture;
+    du.uTexelSize.value.set(
+      1 / this.rtColorGraded.width,
+      1 / this.rtColorGraded.height
+    );
+    du.uEffectiveDetailSoftness.value = uniforms.effectiveDetailSoftness;
+    du.uKernelRadiusPx.value = uniforms.kernelRadiusPx;
+    du.uChromaAttenScale.value = uniforms.chromaAttenScale;
+    du.uEdgeGuardLo.value = uniforms.edgeGuardLo;
+    du.uEdgeGuardHi.value = uniforms.edgeGuardHi;
+    du.uHighlightBias.value = uniforms.highlightBias;
+    this.postMesh.material = this.detailSoftnessMaterial;
+    renderer.setRenderTarget(this.rtDetailSoftened);
+    renderer.render(this.postScene, this.postCamera);
   }
   /**
    * Pass 8 の合成を 1 箇所へまとめる。
@@ -1928,7 +2033,7 @@ var WebGLBackend = class _WebGLBackend {
     const halationOn = this.halationIntensity > 0;
     const hardModeActive = this.crossFilterStrength > 0 && this.crossFilterHardMode >= 0.5;
     const diffusionOn = this.diffusion > 0 && !hardModeActive;
-    cu.uSource.value = this.rtColorGraded.texture;
+    cu.uSource.value = this.opticalSourceTexture();
     cu.uBloomTexture.value = bloomOn ? this.rtBloomMips[0].texture : black;
     cu.uHalationTexture.value = halationOn ? this.rtHalationMips[0].texture : black;
     cu.uDiffusionTexture.value = diffusionOn && this.rtDiffusionMips.length > 0 ? this.rtDiffusionMips[0].texture : black;
@@ -2413,7 +2518,7 @@ var WebGLBackend = class _WebGLBackend {
   renderBloom(renderer) {
     const mips = this.rtBloomMips;
     const bu = this.bloomPrefilterMaterial.uniforms;
-    bu.uSource.value = this.rtColorGraded.texture;
+    bu.uSource.value = this.opticalSourceTexture();
     bu.uThreshold.value = this.bloomThreshold;
     bu.uKnee.value = this.bloomSoftKnee;
     this.postMesh.material = this.bloomPrefilterMaterial;
@@ -2448,7 +2553,7 @@ var WebGLBackend = class _WebGLBackend {
   renderHalation(renderer) {
     const mips = this.rtHalationMips;
     const hu = this.halationPrefilterMaterial.uniforms;
-    hu.uSource.value = this.rtColorGraded.texture;
+    hu.uSource.value = this.opticalSourceTexture();
     hu.uHalationColor.value.copy(this.halationColor);
     hu.uThreshold.value = this.halationThreshold;
     hu.uKnee.value = this.halationSoftKnee;
@@ -2490,7 +2595,7 @@ var WebGLBackend = class _WebGLBackend {
     const mips = this.rtDiffusionMips;
     if (mips.length === 0) return;
     const du = this.downsampleMaterial.uniforms;
-    du.uSource.value = this.rtColorGraded.texture;
+    du.uSource.value = this.opticalSourceTexture();
     du.uTexelSize.value.set(
       1 / this.rtColorGraded.width,
       1 / this.rtColorGraded.height
@@ -3037,6 +3142,8 @@ var WebGLBackend = class _WebGLBackend {
       this.setGrainSize(params.grainSize);
     if (params.lensSoftness !== void 0)
       this.setLensSoftness(params.lensSoftness);
+    if (params.detailSoftness !== void 0)
+      this.detailSoftness = params.detailSoftness;
     if (params.vignette !== void 0)
       this.setVignette(params.vignette);
     if (params.fade !== void 0) this.setFade(params.fade);
@@ -3152,10 +3259,12 @@ var WebGLBackend = class _WebGLBackend {
     this.postGeometry.dispose();
     this.bloomPrefilterMaterial.dispose();
     this.halationPrefilterMaterial.dispose();
+    this.detailSoftnessMaterial.dispose();
     this.downsampleMaterial.dispose();
     this.upsampleMaterial.dispose();
     this.compositeMaterial.dispose();
     this.rtColorGraded?.dispose();
+    this.rtDetailSoftened?.dispose();
     for (const rt of this.rtBloomMips) rt.dispose();
     for (const rt of this.rtHalationMips) rt.dispose();
     for (const rt of this.rtDiffusionMips) rt.dispose();
@@ -3520,7 +3629,7 @@ var Viewport = class _Viewport {
           "[Viewport] WebGPU is required but not supported in this environment"
         );
       }
-      const { WebGPUBackend } = await import("./WebGPUBackend-M2BXSFLX.js");
+      const { WebGPUBackend } = await import("./WebGPUBackend-ZWXPWBXF.js");
       const backend = await WebGPUBackend.create(canvas);
       backend.setResolution(width, height);
       return new _Viewport(null, backend);
@@ -4184,6 +4293,7 @@ export {
   crossFilterPeakFragmentShader,
   crossFilterStreakDensityFragmentShader,
   crossFilterStreakFragmentShader,
+  detailSoftnessFragmentShader,
   downsampleFragmentShader,
   dustFragmentShader,
   filmlabFragmentShader,

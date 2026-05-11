@@ -15,6 +15,7 @@ import * as THREE from "three";
 import {
   chromaUnitFromHueDegrees,
   clampGrainIntensity,
+  deriveDetailSoftnessUniforms,
   FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
   FILM_LAB_DEFAULT_SHADOW_HUE,
   LEGACY_HIGHLIGHT_TONE_MAGNITUDE,
@@ -23,6 +24,7 @@ import {
 import { filmlabVertexShader } from "./shaders/filmlab.vert";
 import { bloomPrefilterFragmentShader } from "./shaders/bloom-prefilter.frag";
 import { halationPrefilterFragmentShader } from "./shaders/halation-prefilter.frag";
+import { detailSoftnessFragmentShader } from "./shaders/detail-softness.frag";
 import { downsampleFragmentShader } from "./shaders/downsample.frag";
 import { upsampleFragmentShader } from "./shaders/upsample.frag";
 import { compositeFragmentShader } from "./shaders/composite.frag";
@@ -171,12 +173,14 @@ export class WebGLBackend implements RenderBackend {
   // Post-processing materials
   private bloomPrefilterMaterial: THREE.ShaderMaterial;
   private halationPrefilterMaterial: THREE.ShaderMaterial;
+  private detailSoftnessMaterial: THREE.ShaderMaterial;
   private downsampleMaterial: THREE.ShaderMaterial;
   private upsampleMaterial: THREE.ShaderMaterial;
   private compositeMaterial: THREE.ShaderMaterial;
 
   // RenderTargets (lazy)
   private rtColorGraded: THREE.WebGLRenderTarget | null = null;
+  private rtDetailSoftened: THREE.WebGLRenderTarget | null = null;
   private static readonly BLOOM_MIP_LEVELS = 5;
   private static readonly HALATION_MIP_LEVELS = 6;
   private static readonly DIFFUSION_MIP_LEVELS = 3;
@@ -214,6 +218,7 @@ export class WebGLBackend implements RenderBackend {
    * composite の径方向グレイン混色（0=一様、1=周辺強め）。カラーパスには無く合成パスのみ。
    */
   private grainRadialMix = 1.0;
+  private detailSoftness = 0.0;
 
   // --- Motion Blur: N-frame Ring Buffer (Post-composite #97) ---
   private static readonly MOTION_BLUR_RING_SIZE = 8;
@@ -388,6 +393,22 @@ export class WebGLBackend implements RenderBackend {
       },
     });
 
+    this.detailSoftnessMaterial = new THREE.ShaderMaterial({
+      glslVersion: THREE.GLSL3,
+      vertexShader: filmlabVertexShader,
+      fragmentShader: detailSoftnessFragmentShader,
+      uniforms: {
+        uSource: { value: null },
+        uTexelSize: { value: new THREE.Vector2() },
+        uEffectiveDetailSoftness: { value: 0.0 },
+        uKernelRadiusPx: { value: 0.55 },
+        uChromaAttenScale: { value: 0.85 },
+        uEdgeGuardLo: { value: 0.04 },
+        uEdgeGuardHi: { value: 0.2 },
+        uHighlightBias: { value: 1.18 },
+      },
+    });
+
     // Downsample material (shared for bloom + halation mip chain)
     this.downsampleMaterial = new THREE.ShaderMaterial({
       glslVersion: THREE.GLSL3,
@@ -468,6 +489,7 @@ export class WebGLBackend implements RenderBackend {
     const h = this.height;
 
     this.rtColorGraded = new THREE.WebGLRenderTarget(w, h, RT_OPTIONS);
+    this.rtDetailSoftened = new THREE.WebGLRenderTarget(w, h, RT_OPTIONS);
     this.rtCompareComposite = new THREE.WebGLRenderTarget(w, h, RT_OPTIONS);
 
     // Bloom mip chain (5 levels: W/2 .. W/32)
@@ -492,6 +514,7 @@ export class WebGLBackend implements RenderBackend {
     if (w <= 0 || h <= 0) return;
 
     this.rtColorGraded.setSize(w, h);
+    this.rtDetailSoftened?.setSize(w, h);
     this.rtCompareComposite?.setSize(w, h);
 
     for (let i = 0; i < this.rtBloomMips.length; i++) {
@@ -947,6 +970,7 @@ export class WebGLBackend implements RenderBackend {
   ): void {
     renderer.setRenderTarget(this.rtColorGraded);
     renderer.render(scene, camera);
+    this.renderDetailSoftness(renderer);
 
     const bloomOn = this.bloomStrength > 0;
     const halationOn = this.halationIntensity > 0;
@@ -966,6 +990,35 @@ export class WebGLBackend implements RenderBackend {
     if (diffusionOn) {
       this.renderDiffusion(renderer);
     }
+  }
+
+  private opticalSourceTexture(): THREE.Texture {
+    const uniforms = deriveDetailSoftnessUniforms(this.detailSoftness);
+    return uniforms.effectiveDetailSoftness > 0.0001 && this.rtDetailSoftened
+      ? this.rtDetailSoftened.texture
+      : this.rtColorGraded!.texture;
+  }
+
+  private renderDetailSoftness(renderer: THREE.WebGLRenderer): void {
+    if (!this.rtDetailSoftened || !this.rtColorGraded) return;
+    const uniforms = deriveDetailSoftnessUniforms(this.detailSoftness);
+    if (uniforms.effectiveDetailSoftness < 0.0001) return;
+
+    const du = this.detailSoftnessMaterial.uniforms;
+    du.uSource!.value = this.rtColorGraded.texture;
+    du.uTexelSize!.value.set(
+      1.0 / this.rtColorGraded.width,
+      1.0 / this.rtColorGraded.height,
+    );
+    du.uEffectiveDetailSoftness!.value = uniforms.effectiveDetailSoftness;
+    du.uKernelRadiusPx!.value = uniforms.kernelRadiusPx;
+    du.uChromaAttenScale!.value = uniforms.chromaAttenScale;
+    du.uEdgeGuardLo!.value = uniforms.edgeGuardLo;
+    du.uEdgeGuardHi!.value = uniforms.edgeGuardHi;
+    du.uHighlightBias!.value = uniforms.highlightBias;
+    this.postMesh.material = this.detailSoftnessMaterial;
+    renderer.setRenderTarget(this.rtDetailSoftened);
+    renderer.render(this.postScene, this.postCamera);
   }
 
   /**
@@ -996,7 +1049,7 @@ export class WebGLBackend implements RenderBackend {
     // Phase 6: Hard Mode は global diffusion を抑制。フィールド値は不変、composite uniform のみ 0 化。
     const hardModeActive = this.crossFilterStrength > 0 && this.crossFilterHardMode >= 0.5;
     const diffusionOn = this.diffusion > 0 && !hardModeActive;
-    cu.uSource!.value = this.rtColorGraded!.texture;
+    cu.uSource!.value = this.opticalSourceTexture();
     cu.uBloomTexture!.value = bloomOn ? this.rtBloomMips[0]!.texture : black;
     cu.uHalationTexture!.value = halationOn ? this.rtHalationMips[0]!.texture : black;
     cu.uDiffusionTexture!.value = diffusionOn && this.rtDiffusionMips.length > 0
@@ -1647,7 +1700,7 @@ export class WebGLBackend implements RenderBackend {
 
     // Step 1: Prefilter into mip[0]
     const bu = this.bloomPrefilterMaterial.uniforms;
-    bu.uSource!.value = this.rtColorGraded!.texture;
+    bu.uSource!.value = this.opticalSourceTexture();
     bu.uThreshold!.value = this.bloomThreshold;
     bu.uKnee!.value = this.bloomSoftKnee;
     this.postMesh.material = this.bloomPrefilterMaterial;
@@ -1691,7 +1744,7 @@ export class WebGLBackend implements RenderBackend {
 
     // Step 1: Prefilter + tint into mip[0]
     const hu = this.halationPrefilterMaterial.uniforms;
-    hu.uSource!.value = this.rtColorGraded!.texture;
+    hu.uSource!.value = this.opticalSourceTexture();
     hu.uHalationColor!.value.copy(this.halationColor);
     hu.uThreshold!.value = this.halationThreshold;
     hu.uKnee!.value = this.halationSoftKnee;
@@ -1738,9 +1791,9 @@ export class WebGLBackend implements RenderBackend {
     const mips = this.rtDiffusionMips;
     if (mips.length === 0) return;
 
-    // Step 1: First downsample from rtColorGraded (NO prefilter — full image)
+    // Step 1: First downsample from optical source (NO prefilter — full image)
     const du = this.downsampleMaterial.uniforms;
-    du.uSource!.value = this.rtColorGraded!.texture;
+    du.uSource!.value = this.opticalSourceTexture();
     du.uTexelSize!.value.set(
       1.0 / this.rtColorGraded!.width,
       1.0 / this.rtColorGraded!.height,
@@ -2382,6 +2435,8 @@ export class WebGLBackend implements RenderBackend {
       this.setGrainSize(params.grainSize as number);
     if (params.lensSoftness !== undefined)
       this.setLensSoftness(params.lensSoftness as number);
+    if (params.detailSoftness !== undefined)
+      this.detailSoftness = params.detailSoftness as number;
     if (params.vignette !== undefined)
       this.setVignette(params.vignette as number);
     if (params.fade !== undefined) this.setFade(params.fade as number);
@@ -2506,10 +2561,12 @@ export class WebGLBackend implements RenderBackend {
     this.postGeometry.dispose();
     this.bloomPrefilterMaterial.dispose();
     this.halationPrefilterMaterial.dispose();
+    this.detailSoftnessMaterial.dispose();
     this.downsampleMaterial.dispose();
     this.upsampleMaterial.dispose();
     this.compositeMaterial.dispose();
     this.rtColorGraded?.dispose();
+    this.rtDetailSoftened?.dispose();
     for (const rt of this.rtBloomMips) rt.dispose();
     for (const rt of this.rtHalationMips) rt.dispose();
     for (const rt of this.rtDiffusionMips) rt.dispose();

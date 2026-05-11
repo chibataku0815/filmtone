@@ -1,7 +1,7 @@
 # Filmtone Detail Softness Strategy
 
 Date opened: 2026-05-12 JST
-Last updated: 2026-05-12 JST (Phase 2-A research charter closed; Phase 2-B macOS pilot charter drafted, gated on Phase 1 commit landing)
+Last updated: 2026-05-12 JST (Phase 2 granularity adjusted; iOS stays inside renderer parity)
 
 This file is the compact source of truth for the Detail Softness lane.
 Implementation logs, chat handoffs, and detailed verification records belong in
@@ -49,7 +49,7 @@ branched from `main @ 95f1be03` so it never collides with the in-flight
 | ID | Phase | Status | Done Condition |
 |---|---|---|---|
 | Phase 1 | Contract & Neutral Plumbing | Complete (2026-05-12 JST) | `detailSoftness` plumbed in every contract layer with default `0`; in-scope verify commands green; 2 pre-existing `ios-swift-payload.test.ts` failures explicitly waived as baseline drift unrelated to `detailSoftness`; no render code changes. |
-| Phase 2 | Real Render Pass | In progress (2-A archived 2026-05-12 JST; 2-B macOS pilot charter ready, gated on Phase 1 commit landing) | Local-reference / high-frequency detail reduction with edge guard and luma-vs-chroma weighting, placed before glow and grain. Renderer parity across WebGL, WebGPU, macOS native, iOS. |
+| Phase 2 | Real Render Pass | In progress (2-A archived; 2-B/2-C native passes committed; 2-D WebGPU + WebGL parity active in `active.md`) | Local-reference / high-frequency detail reduction with edge guard and luma-vs-chroma weighting, placed before glow and grain. Renderer parity across WebGL, WebGPU, macOS native, iOS. |
 | Phase 3 | UI Exposure & Recipe Decision | Not started | Advanced control + harness-approved copy; decision recorded on whether optical recipes auto-apply `detailSoftness`. |
 | Phase 4 | Source Detail Compensation | Not started | Conservative metadata-driven bias resolver; `sourceDetailBias` stays out of saved Look identity; visible only in debug / sidecar. |
 | Phase 5 | Visual Tuning Matrix | Not started | iPhone SDR HEVC, iPhone Apple Log / ProRes, DJI / action camera Rec.709, Sony / Canon / Panasonic Log, low-light noisy clips, hair / foliage / brick / text, strong practical lights all judged. |
@@ -63,7 +63,7 @@ branched from `main @ 95f1be03` so it never collides with the in-flight
   stale `apps/capacitor-film-lab-ios/.../FilmtonePhase0Generated.swift` test
   path was repointed to the canonical Swift package emit. Closeout artifact:
   `archive/2026-05-12-phase-1-contract-neutral-plumbing.md`. Phase 2 (real
-  render pass) has not started.
+  render pass) is in progress.
 - `feature/export-audio-preservation` runs in a sibling worktree. Phase 1
   must not touch the in-flight export-audio files there.
 - `FilmtonePhase0Params` Codable is synthesized; full-param JSON missing
@@ -77,8 +77,9 @@ branched from `main @ 95f1be03` so it never collides with the in-flight
   native as pilot renderer, separate Phase 1 commit before Phase 2-B
   render source touches, `effectiveMax = 0.34` hard-coded for Phase 2,
   and a working-colorspace verification step during the macOS prototype.
-  Sub-stage 2-B (macOS native pilot) charter lives in `active.md`. Render
-  source touches are gated on Phase 1 commit landing on this branch.
+  Native macOS + iOS export passes are committed. `active.md` now tracks the
+  renderer-parity unit through Phase 2-D, with WebGPU + WebGL landing
+  together and final visual A/B deferred until all renderers are wired.
 
 ## Interrupt / Decision Log
 
@@ -139,9 +140,18 @@ branched from `main @ 95f1be03` so it never collides with the in-flight
   (e) verify the working colorspace at the insertion point during the
   macOS prototype and adjust luma weights if not Rec.709. Phase 2-A
   artifact archived to
-  `archive/2026-05-12-phase-2a-research-charter.md`. Phase 2-B charter
-  drafted in `active.md`; render source touches gated on Phase 1 commit
-  landing.
+  `archive/2026-05-12-phase-2a-research-charter.md`. Phase 2-B charter was
+  drafted in `active.md`; render source touches were gated until the
+  Phase 1 commit landed.
+- 2026-05-12 JST: Owner changed Phase 2 execution posture after native
+  passes landed: prioritize core renderer progress, defer intermediate
+  visual A/B to final QA, and treat WebGPU + WebGL as one Phase 2-D
+  renderer-parity unit rather than separate planning checkpoints.
+- 2026-05-12 JST: iOS planning granularity adjusted. Phase 2-C iOS export
+  stays inside the native renderer unit and is not reopened as a separate
+  iOS active while Web parity is in flight. Future iOS-only Detail Softness
+  work splits by product surface (export, editor/preview UI,
+  capture/source metadata, release/copy), not by file mechanics.
 
 ## Constraints
 

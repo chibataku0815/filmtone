@@ -149,6 +149,11 @@ var GpuContext = class _GpuContext {
   }
 };
 
+// src/webgpu/WebGPUBackend.ts
+import {
+  deriveDetailSoftnessUniforms
+} from "film-lab-core";
+
 // src/webgpu/MediaTexture.ts
 var DEFAULT_MEDIA_USAGE = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT;
 var MediaTexture = class {
@@ -2372,6 +2377,70 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
 `
 );
 
+// src/webgpu/shaders/detail-softness.frag.wgsl.ts
+var detailSoftnessFragmentWgsl = (
+  /* wgsl */
+  `
+struct DetailSoftnessUniforms {
+  // x: effectiveDetailSoftness, y: kernelRadiusPx,
+  // z: chromaAttenScale, w: edgeGuardLo
+  p0: vec4f,
+  // x: edgeGuardHi, y: highlightBias,
+  // z: inverse width, w: inverse height
+  p1: vec4f,
+};
+
+@group(1) @binding(0) var<uniform> uParams: DetailSoftnessUniforms;
+@group(1) @binding(1) var uSource: texture_2d<f32>;
+@group(1) @binding(2) var uSampler: sampler;
+
+fn luma709(rgb: vec3f) -> f32 {
+  return dot(rgb, vec3f(0.2126, 0.7152, 0.0722));
+}
+
+@fragment
+fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
+  let center = textureSampleLevel(uSource, uSampler, uv, 0.0);
+  let effective = uParams.p0.x;
+  if (effective < 0.0001) {
+    return center;
+  }
+
+  let r = max(uParams.p0.y, 0.0001);
+  let chromaAttenScale = uParams.p0.z;
+  let edgeGuardLo = uParams.p0.w;
+  let edgeGuardHi = uParams.p1.x;
+  let highlightBias = uParams.p1.y;
+  let texel = vec2f(uParams.p1.z, uParams.p1.w) * r;
+  let lumaWeights = vec3f(0.2126, 0.7152, 0.0722);
+
+  let srcRGB = center.rgb;
+  let nR = textureSampleLevel(uSource, uSampler, uv + vec2f(texel.x, 0.0), 0.0).rgb;
+  let nL = textureSampleLevel(uSource, uSampler, uv - vec2f(texel.x, 0.0), 0.0).rgb;
+  let nU = textureSampleLevel(uSource, uSampler, uv + vec2f(0.0, texel.y), 0.0).rgb;
+  let nD = textureSampleLevel(uSource, uSampler, uv - vec2f(0.0, texel.y), 0.0).rgb;
+
+  let localRef = (srcRGB + nR + nL + nU + nD) * 0.2;
+  let detail = srcRGB - localRef;
+
+  let lumaCenter = luma709(srcRGB);
+  let lumaGrad =
+    abs(luma709(nR) - luma709(nL)) * 0.5 +
+    abs(luma709(nU) - luma709(nD)) * 0.5;
+  let edgeGuard = 1.0 - smoothstep(edgeGuardLo, edgeGuardHi, lumaGrad);
+  let highlightWeight = mix(1.0, highlightBias, smoothstep(0.6, 0.9, lumaCenter));
+
+  let lumaAtten = effective * edgeGuard * highlightWeight;
+  let chromaAtten = lumaAtten * chromaAttenScale;
+  let detailLuma = dot(detail, lumaWeights);
+  let detailLumaVec = detailLuma * lumaWeights;
+  let detailChroma = detail - detailLumaVec;
+  let softened = srcRGB - (detailLumaVec * lumaAtten) - (detailChroma * chromaAtten);
+  return vec4f(softened, center.a);
+}
+`
+);
+
 // src/webgpu/shaders/motionblur-feedback.frag.wgsl.ts
 var motionblurFeedbackFragmentWgsl = (
   /* wgsl */
@@ -3319,6 +3388,7 @@ var HALATION_LEVELS = 6;
 var DIFFUSION_LEVELS = 3;
 var BLOOM_PARAMS_BYTES = 16;
 var HALATION_PARAMS_BYTES = 32;
+var DETAIL_SOFTNESS_PARAMS_BYTES = 32;
 var PYRAMID_LEVEL_UNIFORM_BYTES = 16;
 var MOTIONBLUR_FEEDBACK_UNIFORM_BYTES = 16;
 var MOTIONBLUR_BLEND_UNIFORM_BYTES = 48;
@@ -3407,6 +3477,7 @@ var WebGPUBackend = class _WebGPUBackend {
   crossFilterFlagsBindGroup;
   gradeBuffer;
   compositeBuffer;
+  detailSoftnessBuffer;
   bloomParamsBuffer;
   halationParamsBuffer;
   diffusionDepthPrefilterBuffer;
@@ -3435,6 +3506,7 @@ var WebGPUBackend = class _WebGPUBackend {
   depthTexture;
   gradeScratch = new Float32Array(GRADE_UNIFORM_FLOATS);
   compositeScratch = new Float32Array(COMPOSITE_UNIFORM_FLOATS);
+  detailSoftnessScratch = new Float32Array(DETAIL_SOFTNESS_PARAMS_BYTES / 4);
   bloomParamsScratch = new Float32Array(BLOOM_PARAMS_BYTES / 4);
   halationParamsScratch = new Float32Array(HALATION_PARAMS_BYTES / 4);
   motionblurFeedbackScratch = new Float32Array(4);
@@ -3478,7 +3550,7 @@ var WebGPUBackend = class _WebGPUBackend {
   lastCrossFilterStrength = 0;
   lastCrossFilterHardMode = 0;
   lastCrossFilterMinSpacing = 0;
-  constructor(ctx, modules, pool, pipelines, layouts, displayFlagsBuffer, offscreenFlagsBuffer, crossFilterFlagsBuffer, displayFlagsBindGroup, offscreenFlagsBindGroup, crossFilterFlagsBindGroup, gradeBuffer, compositeBuffer, bloomParamsBuffer, halationParamsBuffer, bloomPyramid, halationPyramid, diffusionPyramid, centralBloomPyramid, motionblurFeedbackBuffer, motionblurBlendBuffer, crossFilter, lightShafts, haloPrism, sampler, grainSampler, grainTexture, lut1Texture, lut2Texture, ringBuffer, compareSourceBuffer) {
+  constructor(ctx, modules, pool, pipelines, layouts, displayFlagsBuffer, offscreenFlagsBuffer, crossFilterFlagsBuffer, displayFlagsBindGroup, offscreenFlagsBindGroup, crossFilterFlagsBindGroup, gradeBuffer, compositeBuffer, detailSoftnessBuffer, bloomParamsBuffer, halationParamsBuffer, bloomPyramid, halationPyramid, diffusionPyramid, centralBloomPyramid, motionblurFeedbackBuffer, motionblurBlendBuffer, crossFilter, lightShafts, haloPrism, sampler, grainSampler, grainTexture, lut1Texture, lut2Texture, ringBuffer, compareSourceBuffer) {
     this.ctx = ctx;
     this.capabilities = ctx.capabilities;
     this.modules = modules;
@@ -3493,6 +3565,7 @@ var WebGPUBackend = class _WebGPUBackend {
     this.crossFilterFlagsBindGroup = crossFilterFlagsBindGroup;
     this.gradeBuffer = gradeBuffer;
     this.compositeBuffer = compositeBuffer;
+    this.detailSoftnessBuffer = detailSoftnessBuffer;
     this.bloomParamsBuffer = bloomParamsBuffer;
     this.halationParamsBuffer = halationParamsBuffer;
     this.bloomPyramid = bloomPyramid;
@@ -3580,6 +3653,7 @@ var WebGPUBackend = class _WebGPUBackend {
       blit: await make("blit.frag", blitFragmentWgsl),
       compareSource: await make("compare-source.frag", compareSourceFragmentWgsl),
       composite: await make("composite.frag", compositeFragmentWgsl),
+      detailSoftness: await make("detail-softness.frag", detailSoftnessFragmentWgsl),
       bloomPrefilter: await make("bloom-prefilter.frag", bloomPrefilterFragmentWgsl),
       halationPrefilter: await make("halation-prefilter.frag", halationPrefilterFragmentWgsl),
       diffusionDepthPrefilter: await make(
@@ -3819,6 +3893,19 @@ var WebGPUBackend = class _WebGPUBackend {
         vertex: { module: modules.vert, entryPoint: "vs_main" },
         fragment: {
           module: modules.halationPrefilter,
+          entryPoint: "fs_main",
+          targets: [{ format: "rgba16float" }]
+        },
+        primitive: { topology: "triangle-list" }
+      })
+    );
+    const detailSoftnessPipeline = await ctx.withValidationScope(
+      () => device.createRenderPipeline({
+        label: "detail-softness.fullres",
+        layout: pyramidPipelineLayout,
+        vertex: { module: modules.vert, entryPoint: "vs_main" },
+        fragment: {
+          module: modules.detailSoftness,
           entryPoint: "fs_main",
           targets: [{ format: "rgba16float" }]
         },
@@ -4166,6 +4253,11 @@ var WebGPUBackend = class _WebGPUBackend {
       size: COMPOSITE_UNIFORM_BYTES,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
     });
+    const detailSoftnessBuffer = device.createBuffer({
+      label: "detail-softness.uniforms",
+      size: DETAIL_SOFTNESS_PARAMS_BYTES,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    });
     const bloomParamsBuffer = device.createBuffer({
       label: "bloom.prefilter.params",
       size: BLOOM_PARAMS_BYTES,
@@ -4338,6 +4430,7 @@ var WebGPUBackend = class _WebGPUBackend {
         filmlab: filmlabPipeline,
         bloomPrefilter: bloomPrefilterPipeline,
         halationPrefilter: halationPrefilterPipeline,
+        detailSoftness: detailSoftnessPipeline,
         diffusionDepthPrefilter: diffusionDepthPrefilterPipeline,
         bloomDepthPrefilter: bloomDepthPrefilterPipeline,
         halationDepthPrefilter: halationDepthPrefilterPipeline,
@@ -4385,6 +4478,7 @@ var WebGPUBackend = class _WebGPUBackend {
       crossFilterFlagsBindGroup,
       gradeBuffer,
       compositeBuffer,
+      detailSoftnessBuffer,
       bloomParamsBuffer,
       halationParamsBuffer,
       bloomPyramid,
@@ -6298,6 +6392,58 @@ var WebGPUBackend = class _WebGPUBackend {
       pass.end();
     }
     const colorGradedView = rtColorGraded.createView();
+    const detailSoftnessUniforms = deriveDetailSoftnessUniforms(
+      this.paramNumber("detailSoftness", 0)
+    );
+    let opticalSourceView = colorGradedView;
+    if (detailSoftnessUniforms.effectiveDetailSoftness > 1e-4) {
+      const rtDetailSoftened = this.pool.get("rt.detailSoftened", {
+        width: this._width,
+        height: this._height,
+        format: "rgba16float"
+      });
+      this.detailSoftnessScratch[0] = detailSoftnessUniforms.effectiveDetailSoftness;
+      this.detailSoftnessScratch[1] = detailSoftnessUniforms.kernelRadiusPx;
+      this.detailSoftnessScratch[2] = detailSoftnessUniforms.chromaAttenScale;
+      this.detailSoftnessScratch[3] = detailSoftnessUniforms.edgeGuardLo;
+      this.detailSoftnessScratch[4] = detailSoftnessUniforms.edgeGuardHi;
+      this.detailSoftnessScratch[5] = detailSoftnessUniforms.highlightBias;
+      this.detailSoftnessScratch[6] = 1 / Math.max(1, this._width);
+      this.detailSoftnessScratch[7] = 1 / Math.max(1, this._height);
+      device.queue.writeBuffer(
+        this.detailSoftnessBuffer,
+        0,
+        this.detailSoftnessScratch.buffer,
+        this.detailSoftnessScratch.byteOffset,
+        this.detailSoftnessScratch.byteLength
+      );
+      const detailSoftnessBg = device.createBindGroup({
+        label: "detail-softness.bg",
+        layout: this.layouts.pyramid,
+        entries: [
+          { binding: 0, resource: { buffer: this.detailSoftnessBuffer } },
+          { binding: 1, resource: colorGradedView },
+          { binding: 2, resource: this.sampler }
+        ]
+      });
+      const pass = encoder.beginRenderPass({
+        label: "detail-softness.pass",
+        colorAttachments: [
+          {
+            view: rtDetailSoftened.createView(),
+            loadOp: "clear",
+            storeOp: "store",
+            clearValue: { r: 0, g: 0, b: 0, a: 1 }
+          }
+        ]
+      });
+      pass.setPipeline(this.pipelines.detailSoftness);
+      pass.setBindGroup(0, this.offscreenFlagsBindGroup);
+      pass.setBindGroup(1, detailSoftnessBg);
+      pass.draw(3, 1, 0, 0);
+      pass.end();
+      opticalSourceView = rtDetailSoftened.createView();
+    }
     const depthMistGain = this.paramNumber("depthMistGain", 0);
     const depthGlowGain = this.paramNumber("depthGlowGain", 0);
     const depthMistActive = depthMistGain > 0 && depthMistGain < 1.5;
@@ -6365,7 +6511,7 @@ var WebGPUBackend = class _WebGPUBackend {
     const bloomRadius = this.paramNumber("bloomRadius", DEFAULT_BLOOM_RADIUS);
     const bloomSourceView = depthGlowActive ? this.renderBloomDepthPrefilter(
       encoder,
-      colorGradedView,
+      opticalSourceView,
       depthGlowGain,
       depthBloomRayAngleGain,
       depthRayAngleGamma,
@@ -6373,7 +6519,7 @@ var WebGPUBackend = class _WebGPUBackend {
       depthBloomFieldPsfGain,
       depthBloomFieldPsfRadiusPx,
       rayAngleOptics
-    ) : colorGradedView;
+    ) : opticalSourceView;
     const bloomTop = this.renderPyramidChain(
       encoder,
       "bloom",
@@ -6387,7 +6533,7 @@ var WebGPUBackend = class _WebGPUBackend {
     const halationRadius = this.paramNumber("halationRadius", DEFAULT_HALATION_RADIUS);
     const halationSourceView = depthGlowActive ? this.renderHalationDepthPrefilter(
       encoder,
-      colorGradedView,
+      opticalSourceView,
       depthGlowGain,
       depthHalationRayAngleGain,
       depthRayAngleGamma,
@@ -6395,7 +6541,7 @@ var WebGPUBackend = class _WebGPUBackend {
       depthHalationFieldPsfGain,
       depthHalationFieldPsfRadiusPx,
       rayAngleOptics
-    ) : colorGradedView;
+    ) : opticalSourceView;
     const halationTop = this.renderPyramidChain(
       encoder,
       "halation",
@@ -6411,7 +6557,7 @@ var WebGPUBackend = class _WebGPUBackend {
       const diffusionLevels = this.ensurePyramidLevels("rt.diffusion", DIFFUSION_LEVELS);
       const pyramidInputView = depthMistActive ? this.renderDiffusionDepthPrefilter(
         encoder,
-        colorGradedView,
+        opticalSourceView,
         depthMistGain,
         depthMistRayAngleGain,
         depthRayAngleGamma,
@@ -6419,7 +6565,7 @@ var WebGPUBackend = class _WebGPUBackend {
         depthMistFieldPsfGain,
         depthMistFieldPsfRadiusPx,
         rayAngleOptics
-      ) : colorGradedView;
+      ) : opticalSourceView;
       diffusionView = this.renderDiffusionPyramid(
         encoder,
         pyramidInputView,
@@ -6431,7 +6577,7 @@ var WebGPUBackend = class _WebGPUBackend {
       layout: this.layouts.composite,
       entries: [
         { binding: 0, resource: { buffer: this.compositeBuffer } },
-        { binding: 1, resource: colorGradedView },
+        { binding: 1, resource: opticalSourceView },
         { binding: 2, resource: bloomTop.createView() },
         { binding: 3, resource: halationTop.createView() },
         { binding: 4, resource: diffusionView },
@@ -6751,6 +6897,7 @@ var WebGPUBackend = class _WebGPUBackend {
     this.crossFilterFlagsBuffer.destroy();
     this.gradeBuffer.destroy();
     this.compositeBuffer.destroy();
+    this.detailSoftnessBuffer.destroy();
     this.bloomParamsBuffer.destroy();
     this.halationParamsBuffer.destroy();
     this.motionblurFeedbackBuffer.destroy();
@@ -6821,6 +6968,7 @@ export {
   filmlabFragmentWgsl,
   blitFragmentWgsl,
   compositeFragmentWgsl,
+  detailSoftnessFragmentWgsl,
   motionblurFeedbackFragmentWgsl,
   motionblurBlendFragmentWgsl,
   GRADE_UNIFORM_FLOATS,

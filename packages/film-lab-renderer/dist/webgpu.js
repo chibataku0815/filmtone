@@ -24,6 +24,7 @@ import {
   bloomPrefilterFragmentWgsl,
   compositeFragmentWgsl,
   computeCrossFilterTemporalDecay,
+  detailSoftnessFragmentWgsl,
   downsampleFragmentWgsl,
   dustFragmentWgsl,
   effectiveDiffusionAmount,
@@ -42,7 +43,7 @@ import {
   resolveRayAngleOptics,
   shouldResetCrossFilterHistory,
   upsampleFragmentWgsl
-} from "./chunk-O332CRPY.js";
+} from "./chunk-4HJJHD2Y.js";
 import "./chunk-LWXP5MLO.js";
 export {
   BlueNoiseTile,
@@ -70,6 +71,7 @@ export {
   bloomPrefilterFragmentWgsl,
   compositeFragmentWgsl,
   computeCrossFilterTemporalDecay,
+  detailSoftnessFragmentWgsl,
   downsampleFragmentWgsl,
   dustFragmentWgsl,
   effectiveDiffusionAmount,
