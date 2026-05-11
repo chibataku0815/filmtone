@@ -277,3 +277,15 @@ Total: 11-13 working days.
   deleted. pbxproj 4-section grep = 4; `bun run verify:ios` green;
   `git diff --check` clean. See
   `archive/2026-05-11-phase-2b-8a-export-source-image-normalizer-extraction.md`.
+- 2026-05-11 JST — Phase 2B-8B (ExportConnectPackageAssembler
+  extraction) committed as `774ba264`. New `final class
+  ExportConnectPackageAssembler` at
+  `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportConnectPackageAssembler.swift`
+  (151 lines) now owns Filmtone Connect source-media copy, combined /
+  pre-optical / post-optical cube writes, DCTL write, reference-after
+  path orchestration via a session closure, `SidecarPackage` payload, and
+  ordered package-file URI construction. `FilmtoneExportSession.swift`
+  reduced from 1896 → 1805 lines (−91); `writeExportSidecar` and
+  reference-after JPEG rendering stay on the session. pbxproj 4-section
+  grep = 4; `bun run verify:ios` green; `git diff --check` clean. See
+  `archive/2026-05-11-phase-2b-8b-export-connect-package-assembler-extraction.md`.
