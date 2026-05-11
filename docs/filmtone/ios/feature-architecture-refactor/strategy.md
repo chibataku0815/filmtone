@@ -182,3 +182,36 @@ Total: 11-13 working days.
   `fileprivate` remains by design. pbxproj 4-section grep = 4 each;
   `bun run verify:ios` green; `git diff --check` clean. See
   `archive/2026-05-11-phase-2b-4-shared-grade-motion-blur-optical-kernels-bundle.md`.
+- 2026-05-11 JST — Phase 2B-5A (optics resampling pure-helper extraction)
+  is complete in the feature worktree. New `enum` namespace
+  `OpticsResampling` at
+  `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/OpticsResampling.swift`
+  (234 lines) now owns the 15 optics constants and 14 pure helpers
+  (`buildMipPyramid` / `downsampledImage` / `upsampledImage` /
+  `tentDownsampledImage` / `tentUpsampledImage` / `scaledImage` /
+  `weightedImage` / `addImages` / `blackImage` / `extentOriginVector` /
+  `extentSizeVector` / `computeMipWeights` / `halationColor` /
+  `aberrationEdgeSoften`) lifted out of `FilmtoneExportSession.swift`.
+  Bodies copied verbatim; 42 `Self.<name>` call sites rewritten to
+  `OpticsResampling.<name>`; `Self.clamp` (10 sites), `Self.lerp`
+  (1 site), and `Self.makeStableSourceSeed` (1 site) preserved per 5A
+  scope (clamp has 30+ non-optics call sites on `FilmtoneExportSession`,
+  so a 2-arg fallback is duplicated as `private static func` inside
+  `OpticsResampling`). Metal flag stored properties
+  (`useMetalOpticsForExport` / `metalOpticsRenderer` /
+  `metalOpticsActiveOnce` / `metalVignetteActiveOnce` /
+  `metalVignetteAppliedThisFrame` / `loadedDepthMap`) and the 10
+  optics-touching instance methods (`applyEdgeOpticsStage` /
+  `applyGlowFamilyStage` / `applyVignetteStage` / `vignetteFrameParams` /
+  `currentBacklightVeilProfile` / `applyBacklightVeilSpatialOverrides` /
+  `extractHighlightPlate` / `applyRadialRGBShift` / `applyEdgeSoftness` /
+  `buildMipBlurComposite`) remain on `FilmtoneExportSession` for Phase
+  2B-5B `OpticsCompositor`. One out-of-spec 1-line text edit in
+  `Optics/FilmtoneMetalOpticsRenderer.swift:832` (mirror-pointer
+  comment `Mirrors FilmtoneExportSession.halationColor` →
+  `Mirrors OpticsResampling.halationColor`) flagged in archive
+  Unexpected/Follow-up per `feedback_no_sweeping_diff_claims`.
+  `FilmtoneExportSession.swift` reduced from 3189 → 2984 lines (−205).
+  pbxproj 4-section grep = 4; `bun run verify:ios` green;
+  `git diff --check` clean. See
+  `archive/2026-05-11-phase-2b-5a-optics-resampling-extraction.md`.
