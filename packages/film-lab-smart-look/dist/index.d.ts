@@ -61,6 +61,7 @@ declare const filmLabSmartLookRequestSchema: z.ZodObject<{
         tint: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         rgbShift: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         lensSoftness: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        detailSoftness: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         grainIntensity: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         grainRadialMix: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         grainSize: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;

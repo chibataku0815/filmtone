@@ -16,6 +16,7 @@ extension FilmtonePhase0Params {
             tint: tint,
             rgbShift: rgbShift,
             lensSoftness: lensSoftness,
+            detailSoftness: detailSoftness,
             grainRadialMix: grainRadialMix,
             grainSize: grainSize,
             bloomThreshold: bloomThreshold,
@@ -527,6 +528,7 @@ enum FilmtonePhase0Math {
         case "grainIntensity":
             return max(0, min(FilmtonePhase0Generated.grainIntensityMax, value))
         case "lensSoftness",
+             "detailSoftness",
              "grainRadialMix",
              "grainSize",
              "bloomThreshold",

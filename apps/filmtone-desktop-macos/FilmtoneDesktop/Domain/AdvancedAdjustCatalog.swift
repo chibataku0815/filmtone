@@ -339,6 +339,7 @@ enum AdvancedAdjustCatalog {
         case "grainIntensity":
             return max(0, min(FilmtonePhase0Generated.grainIntensityMax, value))
         case "lensSoftness",
+             "detailSoftness",
              "grainRadialMix",
              "grainSize",
              "bloomThreshold",

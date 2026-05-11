@@ -6,7 +6,7 @@ import FilmLabSwiftCore
 /// or accidental hand-edits of the generated Swift artifact.
 final class GeneratedLandmarkTests: XCTestCase {
     func testParamKeysCountAndOrder() {
-        XCTAssertEqual(FilmtonePhase0Generated.paramKeys.count, 35)
+        XCTAssertEqual(FilmtonePhase0Generated.paramKeys.count, 36)
         XCTAssertEqual(FilmtonePhase0Generated.paramKeys.first, "exposure")
         XCTAssertEqual(FilmtonePhase0Generated.paramKeys.last, "grainIntensity")
 
@@ -17,6 +17,17 @@ final class GeneratedLandmarkTests: XCTestCase {
         XCTAssertTrue(FilmtonePhase0Generated.paramKeys.contains("bloomStrength"))
         XCTAssertTrue(FilmtonePhase0Generated.paramKeys.contains("halationIntensity"))
         XCTAssertTrue(FilmtonePhase0Generated.paramKeys.contains("vignette"))
+
+        // detailSoftness lands immediately after lensSoftness in the canonical
+        // ordering so user-authored optical creative intent rides with the
+        // existing optics group through Look identity round-trip.
+        let lensIndex = FilmtonePhase0Generated.paramKeys.firstIndex(of: "lensSoftness")
+        let detailIndex = FilmtonePhase0Generated.paramKeys.firstIndex(of: "detailSoftness")
+        XCTAssertNotNil(lensIndex)
+        XCTAssertNotNil(detailIndex)
+        if let lensIndex, let detailIndex {
+            XCTAssertEqual(detailIndex, lensIndex + 1)
+        }
     }
 
     func testQuickAxisLandmarks() {

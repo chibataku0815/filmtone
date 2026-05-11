@@ -8,6 +8,8 @@ var PARAM_KEYS = [
   "rgbShift",
   /** 周辺ほど等方ブラーを足すレンズの柔らかさ（0〜1、Pro）。中心固定。 */
   "lensSoftness",
+  /** ハードな微細ディテール（デジタル acutance）を弱める柔らかさ（0〜1）。lensSoftness とは別 param で、画面中心も対象。Phase 1 では neutral plumbing のみで renderer は未参照。 */
+  "detailSoftness",
   "grainIntensity",
   // 0=一様、1=周辺強め（既定1で後方互換）
   "grainRadialMix",
@@ -283,6 +285,7 @@ var RAW_PRESETS = {
     tint: 0,
     rgbShift: 0,
     lensSoftness: 0,
+    detailSoftness: 0,
     grainIntensity: 0,
     grainRadialMix: 1,
     grainSize: 0.3,
@@ -343,6 +346,7 @@ var RAW_PRESETS = {
     tint: 0,
     rgbShift: 2e-3,
     lensSoftness: 0,
+    detailSoftness: 0,
     grainIntensity: 0.05,
     grainRadialMix: 1,
     grainSize: 0.32,
@@ -399,6 +403,7 @@ var RAW_PRESETS = {
     tint: 0,
     rgbShift: 0,
     lensSoftness: 0,
+    detailSoftness: 0,
     grainIntensity: 0.08,
     grainRadialMix: 1,
     grainSize: 0.32,
@@ -455,6 +460,7 @@ var RAW_PRESETS = {
     tint: 0,
     rgbShift: 12e-4,
     lensSoftness: 0,
+    detailSoftness: 0,
     grainIntensity: 0.07,
     grainRadialMix: 1,
     grainSize: 0.28,
@@ -511,6 +517,7 @@ var RAW_PRESETS = {
     tint: 0,
     rgbShift: 0,
     lensSoftness: 0,
+    detailSoftness: 0,
     grainIntensity: 0.04,
     grainRadialMix: 1,
     grainSize: 0.25,
@@ -567,6 +574,7 @@ var RAW_PRESETS = {
     tint: 0,
     rgbShift: 0,
     lensSoftness: 0,
+    detailSoftness: 0,
     grainIntensity: 0.1,
     grainRadialMix: 1,
     grainSize: 0.43,
@@ -623,6 +631,7 @@ var RAW_PRESETS = {
     tint: 0,
     rgbShift: 0,
     lensSoftness: 0,
+    detailSoftness: 0,
     grainIntensity: 0.03,
     grainRadialMix: 1,
     grainSize: 0.12,
@@ -679,6 +688,7 @@ var RAW_PRESETS = {
     tint: 0,
     rgbShift: 0,
     lensSoftness: 0,
+    detailSoftness: 0,
     grainIntensity: 0.065,
     grainRadialMix: 1,
     grainSize: 0.4,
@@ -735,6 +745,7 @@ var RAW_PRESETS = {
     tint: 0,
     rgbShift: 115e-5,
     lensSoftness: 0,
+    detailSoftness: 0,
     grainIntensity: 0.08,
     grainRadialMix: 1,
     grainSize: 0.58,
@@ -796,6 +807,7 @@ var RAW_PRESETS = {
     tint: 0,
     rgbShift: 0,
     lensSoftness: 0,
+    detailSoftness: 0,
     grainIntensity: 0.01,
     grainRadialMix: 1,
     grainSize: 0.08,
@@ -905,7 +917,7 @@ var LOOK_ID_BY_PRESET = {
 // src/schema.ts
 import { z } from "zod";
 function schemaForParamKey(key) {
-  return key === "grainIntensity" ? z.number().min(0).transform(clampGrainIntensity) : key === "grainRadialMix" ? z.number().min(0).max(1).default(1) : key === "grainSize" ? z.number().min(0).max(1).default(0.3) : key === "diffusion" ? z.number().min(0).max(1).default(0) : key === "depthMistGain" || key === "depthGlowGain" ? z.number().min(0).max(1).default(0) : key === "depthRayAngleGamma" ? z.number().min(0.1).max(4).default(1.4) : key === "depthRayAngleInnerThreshold" ? z.number().min(0).max(0.8).default(0.1) : key === "depthMistRayAngleGain" ? z.number().min(0).max(1).default(0.35) : key === "depthBloomRayAngleGain" ? z.number().min(0).max(1).default(0.25) : key === "depthHalationRayAngleGain" ? z.number().min(0).max(1).default(0.18) : key === "depthMistFieldPsfGain" || key === "depthBloomFieldPsfGain" || key === "depthHalationFieldPsfGain" ? z.number().min(0).max(1).default(1) : key === "depthMistFieldPsfRadiusPx" ? z.number().min(0).max(64).default(18) : key === "depthBloomFieldPsfRadiusPx" ? z.number().min(0).max(64).default(9) : key === "depthHalationFieldPsfRadiusPx" ? z.number().min(0).max(64).default(12) : key === "lensSoftness" ? z.number().min(0).max(1).default(0) : key === "opticalDirectTransmission" ? z.number().min(0).max(1).default(1) : key === "opticalBlackRetention" ? z.number().min(0).max(1).default(1) : key === "opticalScatterStrength" || key === "opticalHighlightReactivity" || key === "opticalWarmScatter" || key === "opticalSpectralTail" ? z.number().min(0).max(1).default(0) : key === "compressionRange" ? z.number().min(0).max(1).default(0.5) : key === "compressionAmount" || key === "printContrast" ? z.number().min(0).max(1).default(0) : key === "cyan" || key === "magenta" || key === "yellow" ? z.number().min(-1).max(1).default(0) : key === "shutterAngle" ? z.number().min(0).max(720).default(0) : key === "trailIntensity" ? z.number().min(0).max(0.95).default(0) : key === "motionBlurAmount" || key === "dustAmount" || key === "scratchAmount" ? z.number().min(0).max(1).default(0) : key === "shaftIntensity" ? z.number().min(0).max(1).default(0) : key === "shaftDecay" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginX" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginY" ? z.number().min(0).max(1).default(0.15) : key === "crossFilterStrength" ? z.number().min(0).max(1).default(0) : key === "crossFilterSpikes" ? z.number().min(4).max(8).default(4) : key === "crossFilterAngle" ? z.number().min(0).max(360).default(0) : key === "crossFilterLength" ? z.number().min(0).max(1).default(0.4) : key === "crossFilterThreshold" ? z.number().min(0).max(1).default(0.92) : key === "crossFilterChromatic" ? z.number().min(0).max(1).default(0.3) : key === "crossFilterSizeLimit" ? z.number().min(0).max(1).default(0) : key === "crossFilterRandomness" ? z.number().min(0).max(1).default(1) : key === "crossFilterHardMode" ? z.number().min(0).max(1).default(1) : key === "crossFilterMinSpacing" ? z.number().min(0).max(2).default(1) : key === "crossFilterDepthGain" ? z.number().min(0).max(1).default(0.25) : key === "crossFilterAngleGain" ? z.number().min(0).max(1).default(0.35) : key === "crossFilterAngleGamma" ? z.number().min(0.1).max(4).default(1.4) : key === "crossFilterAngleInnerThreshold" ? z.number().min(0).max(0.8).default(0.1) : key === "crossFilterEdgeLengthGain" ? z.number().min(0).max(1).default(0.45) : key === "crossFilterEdgeStrengthGain" ? z.number().min(0).max(1).default(0.25) : key === "haloPrismStrength" ? z.number().min(0).max(1).default(0) : key === "haloPrismRadius" ? z.number().min(0).max(1).default(0.62) : key === "haloPrismWidth" ? z.number().min(0).max(1).default(0.22) : key === "haloPrismChromatic" ? z.number().min(0).max(1).default(0.65) : key === "haloPrismThreshold" ? z.number().min(0).max(1).default(0.9) : key === "haloPrismSplit" ? z.number().min(0).max(1).default(0.7) : key === "haloPrismAngle" ? z.number().min(0).max(360).default(0) : key === "haloPrismSourceReactivity" ? z.number().min(0).max(1).default(0.85) : z.number();
+  return key === "grainIntensity" ? z.number().min(0).transform(clampGrainIntensity) : key === "grainRadialMix" ? z.number().min(0).max(1).default(1) : key === "grainSize" ? z.number().min(0).max(1).default(0.3) : key === "diffusion" ? z.number().min(0).max(1).default(0) : key === "depthMistGain" || key === "depthGlowGain" ? z.number().min(0).max(1).default(0) : key === "depthRayAngleGamma" ? z.number().min(0.1).max(4).default(1.4) : key === "depthRayAngleInnerThreshold" ? z.number().min(0).max(0.8).default(0.1) : key === "depthMistRayAngleGain" ? z.number().min(0).max(1).default(0.35) : key === "depthBloomRayAngleGain" ? z.number().min(0).max(1).default(0.25) : key === "depthHalationRayAngleGain" ? z.number().min(0).max(1).default(0.18) : key === "depthMistFieldPsfGain" || key === "depthBloomFieldPsfGain" || key === "depthHalationFieldPsfGain" ? z.number().min(0).max(1).default(1) : key === "depthMistFieldPsfRadiusPx" ? z.number().min(0).max(64).default(18) : key === "depthBloomFieldPsfRadiusPx" ? z.number().min(0).max(64).default(9) : key === "depthHalationFieldPsfRadiusPx" ? z.number().min(0).max(64).default(12) : key === "lensSoftness" ? z.number().min(0).max(1).default(0) : key === "detailSoftness" ? z.number().min(0).max(1).default(0) : key === "opticalDirectTransmission" ? z.number().min(0).max(1).default(1) : key === "opticalBlackRetention" ? z.number().min(0).max(1).default(1) : key === "opticalScatterStrength" || key === "opticalHighlightReactivity" || key === "opticalWarmScatter" || key === "opticalSpectralTail" ? z.number().min(0).max(1).default(0) : key === "compressionRange" ? z.number().min(0).max(1).default(0.5) : key === "compressionAmount" || key === "printContrast" ? z.number().min(0).max(1).default(0) : key === "cyan" || key === "magenta" || key === "yellow" ? z.number().min(-1).max(1).default(0) : key === "shutterAngle" ? z.number().min(0).max(720).default(0) : key === "trailIntensity" ? z.number().min(0).max(0.95).default(0) : key === "motionBlurAmount" || key === "dustAmount" || key === "scratchAmount" ? z.number().min(0).max(1).default(0) : key === "shaftIntensity" ? z.number().min(0).max(1).default(0) : key === "shaftDecay" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginX" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginY" ? z.number().min(0).max(1).default(0.15) : key === "crossFilterStrength" ? z.number().min(0).max(1).default(0) : key === "crossFilterSpikes" ? z.number().min(4).max(8).default(4) : key === "crossFilterAngle" ? z.number().min(0).max(360).default(0) : key === "crossFilterLength" ? z.number().min(0).max(1).default(0.4) : key === "crossFilterThreshold" ? z.number().min(0).max(1).default(0.92) : key === "crossFilterChromatic" ? z.number().min(0).max(1).default(0.3) : key === "crossFilterSizeLimit" ? z.number().min(0).max(1).default(0) : key === "crossFilterRandomness" ? z.number().min(0).max(1).default(1) : key === "crossFilterHardMode" ? z.number().min(0).max(1).default(1) : key === "crossFilterMinSpacing" ? z.number().min(0).max(2).default(1) : key === "crossFilterDepthGain" ? z.number().min(0).max(1).default(0.25) : key === "crossFilterAngleGain" ? z.number().min(0).max(1).default(0.35) : key === "crossFilterAngleGamma" ? z.number().min(0.1).max(4).default(1.4) : key === "crossFilterAngleInnerThreshold" ? z.number().min(0).max(0.8).default(0.1) : key === "crossFilterEdgeLengthGain" ? z.number().min(0).max(1).default(0.45) : key === "crossFilterEdgeStrengthGain" ? z.number().min(0).max(1).default(0.25) : key === "haloPrismStrength" ? z.number().min(0).max(1).default(0) : key === "haloPrismRadius" ? z.number().min(0).max(1).default(0.62) : key === "haloPrismWidth" ? z.number().min(0).max(1).default(0.22) : key === "haloPrismChromatic" ? z.number().min(0).max(1).default(0.65) : key === "haloPrismThreshold" ? z.number().min(0).max(1).default(0.9) : key === "haloPrismSplit" ? z.number().min(0).max(1).default(0.7) : key === "haloPrismAngle" ? z.number().min(0).max(360).default(0) : key === "haloPrismSourceReactivity" ? z.number().min(0).max(1).default(0.85) : z.number();
 }
 var paramShape = Object.fromEntries(
   PARAM_KEYS.map((key) => [key, schemaForParamKey(key)])
@@ -1158,6 +1170,7 @@ function clampParamValue(key, value) {
     case "vignette":
     case "fade":
     case "lensSoftness":
+    case "detailSoftness":
     case "grainRadialMix":
     case "grainSize":
     case "halationIntensity":
@@ -1226,6 +1239,7 @@ var PHASE0_PARAM_KEYS = [
   "tint",
   "rgbShift",
   "lensSoftness",
+  "detailSoftness",
   "grainRadialMix",
   "grainSize",
   "bloomThreshold",
@@ -1280,6 +1294,7 @@ var phase0ParamsSchema = z3.object({
   tint: z3.number().min(-1).max(1).default(PRESETS.reset.tint),
   rgbShift: phase0RgbShiftSchema.default(PRESETS.reset.rgbShift),
   lensSoftness: z3.number().min(0).max(1).default(PRESETS.reset.lensSoftness),
+  detailSoftness: z3.number().min(0).max(1).default(PRESETS.reset.detailSoftness),
   grainRadialMix: z3.number().min(0).max(1).default(PRESETS.reset.grainRadialMix),
   grainSize: z3.number().min(0).max(1).default(PRESETS.reset.grainSize),
   bloomThreshold: z3.number().min(0).max(1).default(PRESETS.reset.bloomThreshold),
@@ -1317,6 +1332,7 @@ var phase0ParamsPatchSchema = z3.object({
   tint: z3.number().min(-1).max(1).optional(),
   rgbShift: phase0RgbShiftSchema.optional(),
   lensSoftness: z3.number().min(0).max(1).optional(),
+  detailSoftness: z3.number().min(0).max(1).optional(),
   grainRadialMix: z3.number().min(0).max(1).optional(),
   grainSize: z3.number().min(0).max(1).optional(),
   bloomThreshold: z3.number().min(0).max(1).optional(),

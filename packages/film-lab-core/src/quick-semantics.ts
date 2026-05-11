@@ -21,6 +21,7 @@ export interface Phase0QuickTarget {
   tint: number;
   rgbShift: number;
   lensSoftness: number;
+  detailSoftness: number;
   fade: number;
   vignette: number;
   grainIntensity: number;
@@ -151,6 +152,7 @@ function clampParamValue(key: string, value: number): number {
     case "vignette":
     case "fade":
     case "lensSoftness":
+    case "detailSoftness":
     case "grainRadialMix":
     case "grainSize":
     case "halationIntensity":

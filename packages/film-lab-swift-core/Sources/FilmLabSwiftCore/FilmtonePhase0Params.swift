@@ -8,6 +8,7 @@ public struct FilmtonePhase0Params: Codable, Equatable, Hashable, Sendable {
     public var tint: Double
     public var rgbShift: Double
     public var lensSoftness: Double
+    public var detailSoftness: Double
     public var grainRadialMix: Double
     public var grainSize: Double
     public var bloomThreshold: Double
@@ -45,6 +46,7 @@ public struct FilmtonePhase0Params: Codable, Equatable, Hashable, Sendable {
         tint: Double,
         rgbShift: Double,
         lensSoftness: Double,
+        detailSoftness: Double,
         grainRadialMix: Double,
         grainSize: Double,
         bloomThreshold: Double,
@@ -81,6 +83,7 @@ public struct FilmtonePhase0Params: Codable, Equatable, Hashable, Sendable {
         self.tint = tint
         self.rgbShift = rgbShift
         self.lensSoftness = lensSoftness
+        self.detailSoftness = detailSoftness
         self.grainRadialMix = grainRadialMix
         self.grainSize = grainSize
         self.bloomThreshold = bloomThreshold
@@ -123,6 +126,7 @@ public struct FilmtonePhase0Params: Codable, Equatable, Hashable, Sendable {
         "tint": \.tint,
         "rgbShift": \.rgbShift,
         "lensSoftness": \.lensSoftness,
+        "detailSoftness": \.detailSoftness,
         "grainRadialMix": \.grainRadialMix,
         "grainSize": \.grainSize,
         "bloomThreshold": \.bloomThreshold,

@@ -159,6 +159,7 @@ final class OpticsCompositor {
             tint: params.tint,
             rgbShift: max(params.rgbShift, s.rgbShift),
             lensSoftness: max(params.lensSoftness, s.lensSoftness),
+            detailSoftness: params.detailSoftness,
             grainRadialMix: params.grainRadialMix,
             grainSize: params.grainSize,
             bloomThreshold: s.bloomThreshold,

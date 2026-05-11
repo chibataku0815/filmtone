@@ -51,7 +51,7 @@ public struct FilmtonePhase0ParamsPatch: Codable, Equatable, Hashable, Sendable 
     /// Look's optical signature is preserved regardless of which preset it
     /// later lands on.
     public static let opticsGlowKeys: [String] = [
-        "rgbShift", "lensSoftness", "vignette",
+        "rgbShift", "lensSoftness", "detailSoftness", "vignette",
         "bloomThreshold", "bloomStrength", "bloomRadius", "bloomSoftKnee",
         "halationIntensity", "halationSpread", "halationHue",
         "halationThreshold", "halationRadius", "halationSoftKnee",

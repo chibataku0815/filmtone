@@ -10,6 +10,8 @@ export const PARAM_KEYS = [
   "rgbShift",
   /** 周辺ほど等方ブラーを足すレンズの柔らかさ（0〜1、Pro）。中心固定。 */
   "lensSoftness",
+  /** ハードな微細ディテール（デジタル acutance）を弱める柔らかさ（0〜1）。lensSoftness とは別 param で、画面中心も対象。Phase 1 では neutral plumbing のみで renderer は未参照。 */
+  "detailSoftness",
   "grainIntensity",
   // 0=一様、1=周辺強め（既定1で後方互換）
   "grainRadialMix",
@@ -170,6 +172,8 @@ export interface Params {
   rgbShift: number;
   /** レンズ周辺のソフトネス（0〜1）。色収差の周辺ソフトとは別 param。 */
   lensSoftness: number;
+  /** ハードな微細ディテール（デジタル acutance）を弱める柔らかさ（0〜1）。lensSoftness とは別 param で、画面中心も対象。Phase 1 では neutral plumbing のみ。 */
+  detailSoftness: number;
   grainIntensity: number;
   /** グレインの周辺比重（0〜1）。0 で径方向マスクなし、1 で現行の周辺強め。 */
   grainRadialMix: number;

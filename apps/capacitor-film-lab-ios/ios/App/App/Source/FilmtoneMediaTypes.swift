@@ -289,6 +289,7 @@ struct Phase0ParamsDTO: Codable {
     let tint: Double
     let rgbShift: Double
     let lensSoftness: Double
+    let detailSoftness: Double
     let grainRadialMix: Double
     let grainSize: Double
     let bloomThreshold: Double

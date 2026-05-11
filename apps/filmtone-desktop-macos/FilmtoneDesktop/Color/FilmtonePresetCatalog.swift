@@ -229,6 +229,7 @@ enum FilmtonePresetCatalog {
             tint: mix(reset.tint, target.tint, t),
             rgbShift: mix(reset.rgbShift, target.rgbShift, t),
             lensSoftness: mix(reset.lensSoftness, target.lensSoftness, t),
+            detailSoftness: mix(reset.detailSoftness, target.detailSoftness, t),
             grainRadialMix: mix(reset.grainRadialMix, target.grainRadialMix, t),
             grainSize: mix(reset.grainSize, target.grainSize, t),
             bloomThreshold: mix(reset.bloomThreshold, target.bloomThreshold, t),

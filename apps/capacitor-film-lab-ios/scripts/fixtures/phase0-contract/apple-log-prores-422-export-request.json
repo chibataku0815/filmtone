@@ -96,6 +96,7 @@
       "tint": -0.02,
       "rgbShift": 0.001,
       "lensSoftness": 0.05,
+      "detailSoftness": 0,
       "grainRadialMix": 1,
       "grainSize": 0.32,
       "bloomThreshold": 0.78,
