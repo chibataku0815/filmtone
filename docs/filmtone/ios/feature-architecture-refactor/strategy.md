@@ -144,3 +144,19 @@ Total: 11-13 working days.
   Editor/Source files. pbxproj 4-section grep = 4 each; `bun run verify:ios`
   green; `git diff --check` clean. See
   `archive/2026-05-11-phase-2b-2-source-profile-input-lut-helpers-extraction.md`.
+- 2026-05-11 JST — Phase 2B-3 (depth payload manager extraction)
+  committed as `205f2b54`. New `enum` namespace
+  `ExportDepthPayloadManager` at
+  `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportDepthPayloadManager.swift`
+  (99 lines) now owns the video-depth reader probe + per-frame pull
+  sync-bridge. `request.depthEnabled` lifted to a parameter so the
+  helper is stateless; `DispatchSemaphore` byte-identical to pre-move.
+  `FilmtoneExportSession.swift` reduced from 4178 → 4094 lines (−84);
+  two call sites rewritten (`resolveVideoDepthReader` →
+  `ExportDepthPayloadManager.resolveReader(asset:depthEnabled:)`,
+  `pullNextVideoDepthFrame` → `ExportDepthPayloadManager.pullNextFrame`);
+  `PullResult` case names (`.frame` / `.endOfStream` / `.failure`)
+  unchanged so the frame-loop `switch` body needed no per-case edit.
+  pbxproj 4-section grep = 4; `bun run verify:ios` green;
+  `git diff --check` clean. See
+  `archive/2026-05-11-phase-2b-3-depth-payload-manager-extraction.md`.
