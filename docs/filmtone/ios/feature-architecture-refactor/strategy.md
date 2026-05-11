@@ -252,3 +252,15 @@ Total: 11-13 working days.
   `estimatedVideoFrameRate(for:)` helper was deleted. pbxproj 4-section
   grep = 4; `bun run verify:ios` green; `git diff --check` clean. See
   `archive/2026-05-11-phase-2b-7a-export-media-writer-primitives.md`.
+- 2026-05-11 JST — Phase 2B-7B (ExportFrameAppender extraction)
+  committed as `c1c236f4`. New `final class ExportFrameAppender` at
+  `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportFrameAppender.swift`
+  (122 lines) now owns per-frame writer readiness wait,
+  pixel-buffer-pool allocation, CI render, output color metadata
+  application, adaptor append, and matching wait/build/render/append
+  signposts + performance metrics. `FilmtoneExportSession.swift`
+  reduced from 2080 → 2031 lines (−49); `renderableImage` stays on the
+  session through a render closure so grade / motion / depth order is
+  unchanged. pbxproj 4-section grep = 4; `bun run verify:ios` green;
+  `git diff --check` clean. See
+  `archive/2026-05-11-phase-2b-7b-export-frame-appender-extraction.md`.
