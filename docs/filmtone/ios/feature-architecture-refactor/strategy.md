@@ -334,3 +334,13 @@ Total: 11-13 working days.
   via closure. pbxproj 4-section grep = 4; `bun run verify:ios` green;
   `git diff --check` clean. See
   `archive/2026-05-11-phase-2b-9c-export-preview-renderer-extraction.md`.
+- 2026-05-11 JST — Phase 2B-10A (ExportVideoDepthMatcher extraction)
+  committed as `33551dae`. New `final class ExportVideoDepthMatcher` at
+  `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportVideoDepthMatcher.swift`
+  (80 lines) now owns per-frame video depth cursor state and the
+  depth-track pull loop. `FilmtoneExportSession.swift` reduced from
+  1361 → 1334 lines (−27); session still owns depth telemetry assignment
+  and updates `loadedDepthMap`, `videoDepthDecodeMs`,
+  `videoDepthFramesProcessed`, and `depthResolution`. pbxproj 4-section
+  grep = 4; `bun run verify:ios` green; `git diff --check` clean. See
+  `archive/2026-05-11-phase-2b-10a-export-video-depth-matcher-extraction.md`.
