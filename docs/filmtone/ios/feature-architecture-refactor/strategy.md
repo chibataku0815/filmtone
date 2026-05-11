@@ -323,3 +323,14 @@ Total: 11-13 working days.
   and sidecar property storage. pbxproj 4-section grep = 4; `bun run
   verify:ios` green; `git diff --check` clean. See
   `archive/2026-05-11-phase-2b-9b-export-mezzanine-router-extraction.md`.
+- 2026-05-11 JST — Phase 2B-9C (ExportPreviewRenderer extraction)
+  committed as `9d50b705`. New `final class ExportPreviewRenderer` at
+  `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportPreviewRenderer.swift`
+  (183 lines) now owns still/video preview rendering, poster-time
+  selection, preview CGImage tolerance fallback, preview JPEG writing, and
+  Connect reference-after JPEG writing. `FilmtoneExportSession.swift`
+  reduced from 1457 → 1361 lines (−96); public `renderPreviewFrame()`
+  stays as a cache-clearing facade and `applyGrade` stays session-owned
+  via closure. pbxproj 4-section grep = 4; `bun run verify:ios` green;
+  `git diff --check` clean. See
+  `archive/2026-05-11-phase-2b-9c-export-preview-renderer-extraction.md`.
