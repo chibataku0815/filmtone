@@ -1,0 +1,40 @@
+[mode] --dry-run
+[repo] <repo>
+
+== Plan summary ==
+Files to move: 109
+Groups to create under App/: ["Capture", "Editor", "Export", "Look", "Optics", "Root", "Services", "Smoke", "Source", "Strings"]
+App target source count (pre): 109
+ExportActivity target source count (pre): 6
+
+== Per-file plan (first 20) ==
+  AppDelegate.swift -> App/Root/
+  FilmtoneRootView.swift -> App/Root/
+  FilmtoneRootChrome.swift -> App/Root/
+  FilmtoneEmptyView.swift -> App/Root/
+  FilmtoneOnboardingView.swift -> App/Root/
+  FilmtoneInterfaceOrientationLock.swift -> App/Root/
+  FilmtoneCameraOpticsFormatter.swift -> App/Capture/
+  FilmtoneCaptureBottomDeck.swift -> App/Capture/
+  FilmtoneCaptureCapabilityProbe.swift -> App/Capture/
+  FilmtoneCaptureChrome.swift -> App/Capture/
+  FilmtoneCaptureCockpitTopBar.swift -> App/Capture/
+  FilmtoneCaptureInteractionOverlay.swift -> App/Capture/
+  FilmtoneCaptureLensCatalog.swift -> App/Capture/
+  FilmtoneCaptureLensChipRow.swift -> App/Capture/
+  FilmtoneCaptureLivePreview.swift -> App/Capture/
+  FilmtoneCaptureLookModel.swift -> App/Capture/
+  FilmtoneCaptureLookSheet.swift -> App/Capture/
+  FilmtoneCaptureOrientation.swift -> App/Capture/
+  FilmtoneCapturePackage.swift -> App/Capture/
+  FilmtoneCapturePackagePersistence.swift -> App/Capture/
+  ... (89 more)
+
+== Verifications that --apply will run after ==
+  - App target source count == 109 (no add/remove)
+  - ExportActivity target source count == 6
+  - Every moved ref.real_path.exist? after filesystem move
+  - Every moved ref.path is unchanged (bare filename)
+  - Parent group path == target folder name
+
+(dry-run: project.pbxproj NOT modified)

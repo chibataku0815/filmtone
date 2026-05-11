@@ -8,11 +8,11 @@ IMPORTER="$SCRIPT_DIR/filmtone_connect_import_package.lua"
 DEFAULT_SIDECAR="$REPO_ROOT/packages/film-lab-swift-core/Tests/Fixtures/highlight-markers/C0061.filmtone-ios-export-session-v1.json"
 HLG_FIXTURE="$APP_DIR/scripts/fixtures/phase0-contract/hlg-export-request.json"
 SWIFT_SUPPORT="$APP_DIR/scripts/swift/phase0-contract-support.swift"
-SOURCE_PROFILE_SCHEMA="$APP_DIR/ios/App/App/FilmtoneSourceProfileSchema.swift"
+SOURCE_PROFILE_SCHEMA="$APP_DIR/ios/App/App/Source/FilmtoneSourceProfileSchema.swift"
 SWIFT_CORE_DIR="$REPO_ROOT/packages/film-lab-swift-core/Sources/FilmLabSwiftCore"
 SIDECAR_BUILDER_SCRIPT="$APP_DIR/scripts/swift/test-sidecar-builder.swift"
-SIDECAR_SRC="$APP_DIR/ios/App/App/FilmtoneExportSidecarBuilder.swift"
-LUT_BLOB_CODEC_SRC="$APP_DIR/ios/App/App/FilmtoneLutBlobCodec.swift"
+SIDECAR_SRC="$APP_DIR/ios/App/App/Export/FilmtoneExportSidecarBuilder.swift"
+LUT_BLOB_CODEC_SRC="$APP_DIR/ios/App/App/Look/FilmtoneLutBlobCodec.swift"
 FUSCRIPT="${FUSCRIPT:-/Applications/DaVinci Resolve/DaVinci Resolve.app/Contents/Libraries/Fusion/fuscript}"
 FFMPEG="${FFMPEG:-$(command -v ffmpeg || true)}"
 PROJECT_NAME="Filmtone Highlight Marker Smoke $(date +%Y%m%d-%H%M%S)"
@@ -124,7 +124,7 @@ build_app_generated_sidecar() {
     -o "$sidecar_bin" \
     "$SWIFT_SUPPORT" \
     "$SOURCE_PROFILE_SCHEMA" \
-    "$APP_DIR/ios/App/App/FilmtoneColorPipeline.swift" \
+    "$APP_DIR/ios/App/App/Look/FilmtoneColorPipeline.swift" \
     "$LUT_BLOB_CODEC_SRC" \
     "$SIDECAR_SRC" \
     "$SIDECAR_BUILDER_SCRIPT"

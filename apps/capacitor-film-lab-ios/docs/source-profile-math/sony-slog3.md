@@ -2,7 +2,7 @@
 
 This document is the SSOT for Filmtone's S-Log3 decoding and
 S-Gamut3.Cine → Rec.709 conversion. The math is implemented in
-`apps/capacitor-film-lab-ios/ios/App/App/FilmtoneSourceProfileMath.swift`
+`apps/capacitor-film-lab-ios/ios/App/App/Source/FilmtoneSourceProfileMath.swift`
 and verified against the calibrated fixture under
 `apps/capacitor-film-lab-ios/Tests/Fixtures/source-profile/sony-slog3/`
 via `scripts/swift/test-source-profile-math.swift`.

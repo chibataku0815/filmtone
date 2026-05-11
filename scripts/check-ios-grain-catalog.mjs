@@ -5,8 +5,8 @@ import path from "node:path";
 const repoRoot = process.cwd();
 
 const files = {
-  strengthData: "apps/capacitor-film-lab-ios/ios/App/App/FilmtoneStrengthSheetData.swift",
-  strings: "apps/capacitor-film-lab-ios/ios/App/App/FilmtoneStrings.swift",
+  strengthData: "apps/capacitor-film-lab-ios/ios/App/App/Editor/FilmtoneStrengthSheetData.swift",
+  strings: "apps/capacitor-film-lab-ios/ios/App/App/Strings/FilmtoneStrings.swift",
   localizable: "apps/capacitor-film-lab-ios/ios/App/App/Localizable.xcstrings",
   generated: "packages/film-lab-swift-core/Sources/FilmLabSwiftCore/Generated/FilmtonePhase0Generated.swift",
 };

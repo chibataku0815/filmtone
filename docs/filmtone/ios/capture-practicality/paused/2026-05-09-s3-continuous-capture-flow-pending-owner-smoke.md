@@ -48,11 +48,11 @@ editor" — that is the chosen direction.
 
 ## Edit Targets (this lane)
 
-- `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneCaptureSession.swift`
-- `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneCaptureView.swift`
-- `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneCaptureCockpitTopBar.swift`
-- `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneCaptureTopStatusBar.swift`
-- `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneCapturePostRecordChoice.swift` (new)
+- `apps/capacitor-film-lab-ios/ios/App/App/Capture/FilmtoneCaptureSession.swift`
+- `apps/capacitor-film-lab-ios/ios/App/App/Capture/FilmtoneCaptureView.swift`
+- `apps/capacitor-film-lab-ios/ios/App/App/Capture/FilmtoneCaptureCockpitTopBar.swift`
+- `apps/capacitor-film-lab-ios/ios/App/App/Capture/FilmtoneCaptureTopStatusBar.swift`
+- `apps/capacitor-film-lab-ios/ios/App/App/Capture/FilmtoneCapturePostRecordChoice.swift` (new)
 - `apps/capacitor-film-lab-ios/ios/App/App.xcodeproj/project.pbxproj`
   (4-section registration of the new file)
 

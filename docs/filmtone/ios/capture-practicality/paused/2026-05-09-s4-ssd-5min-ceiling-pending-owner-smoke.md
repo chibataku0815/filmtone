@@ -41,9 +41,9 @@ was in effect.
 
 ## Edit Targets
 
-- `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneCaptureSession.swift`
-- `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneCapturePreflight.swift`
-- `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneCaptureView.swift`
+- `apps/capacitor-film-lab-ios/ios/App/App/Capture/FilmtoneCaptureSession.swift`
+- `apps/capacitor-film-lab-ios/ios/App/App/Capture/FilmtoneCapturePreflight.swift`
+- `apps/capacitor-film-lab-ios/ios/App/App/Capture/FilmtoneCaptureView.swift`
 
 `FilmtoneProductCapture.swift` is intentionally untouched — it is the
 legacy fixed-duration product-capture evidence path noted in

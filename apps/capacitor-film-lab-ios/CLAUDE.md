@@ -59,8 +59,11 @@
 
 ## 5. コードマップ(grep で済む詳細は書かない)
 
-- Swift 本体: `ios/App/App/*.swift`(export pipeline / depth / color-profile / Live Activity / optics / state / SwiftUI が同居)
-- 自動生成: `FilmtonePhase0Generated.swift` は手動編集禁止
+- Swift 本体: `ios/App/App/{Root,Capture,Editor,Export,Look,Optics,Source,Services,Smoke,Strings}/*.swift`
+  と `ios/App/App/FilmtoneExportActivity/*.swift`
+- 自動生成: `ios/App/App/Optics/FilmtoneOpticalFiltersGenerated.swift` は手動編集禁止。
+  共有 core の `packages/film-lab-swift-core/Sources/FilmLabSwiftCore/Generated/FilmtonePhase0Generated.swift`
+  も `bun run generate:ios-swift` で再生成する
 - 新ファイル追加時の pbxproj 4-section 登録は §3 Commit gate に従う
 
 Built-in Look / Source Profile catalog の不変条件は `docs/builtin-catalog.md`。

@@ -12,7 +12,7 @@ canonical 値は `packages/film-lab-core/src/optical-filter-profiles.ts` を一�
 
 - **canonical 値 SSOT**: `packages/film-lab-core/src/optical-filter-profiles.ts` の `family === "backlightVeil"` 3 entry (`backlightVeil-1-8 / -1-4 / -1-2`)。Desktop と 1:1。
 - **iOS payload**: `packages/film-lab-core/src/ios-optical-filter-payload.ts` が 12 spatial + 6 optical keys × 3 density を抽出。`packages/film-lab-core/src/ios-optical-filter-payload.test.ts` が値ドリフトを CI で fail させる。
-- **codegen 出力**: `bun run generate:ios-swift` が `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneOpticalFiltersGenerated.swift` を生成。`enum FilmtoneOpticalFiltersGenerated.backlightVeilProfiles: [Profile]` として 3 entry。**手動編集禁止**。
+- **codegen 出力**: `bun run generate:ios-swift` が `apps/capacitor-film-lab-ios/ios/App/App/Optics/FilmtoneOpticalFiltersGenerated.swift` を生成。`enum FilmtoneOpticalFiltersGenerated.backlightVeilProfiles: [Profile]` として 3 entry。**手動編集禁止**。
 - **CI fallback kernel**: `FilmtoneExportSession.swift:OpticalKernels.glowCompositeBacklightVeil` ─ WGSL §4.4 (`composite.frag.wgsl.ts:288-316`) の verbatim CIKernel port。`__sample base/bloom/halation/diffusionImage` + 3 spatial floats + 6 optical floats。
 - **Metal kernel**: `FilmtoneMetalOpticsRenderer.swift:filmtoneGlowCompositeBacklightVeil` ─ 同 math の MSL port。`fmtGlowShoulder` / `kFilmtoneLumaWeights` を既存 helper として reuse。
 - **renderer dispatch**: `FilmtoneMetalOpticsRenderer.GlowFrameParams` に `opticalScatter: OpticalScatterParams?` を追加。**nil = 既存 path** (legacy `filmtoneGlowComposite` kernel)、**non-nil = 新 path** (Backlight Veil kernel)。`renderOpticsChain` 側で nil 切替。

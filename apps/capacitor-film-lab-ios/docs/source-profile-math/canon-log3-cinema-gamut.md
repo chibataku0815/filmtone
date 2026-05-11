@@ -2,7 +2,7 @@
 
 This document is the SSOT for Filmtone's Canon Log 3 + Cinema Gamut
 decoding. The math is implemented in
-`apps/capacitor-film-lab-ios/ios/App/App/FilmtoneSourceProfileMath.swift`
+`apps/capacitor-film-lab-ios/ios/App/App/Source/FilmtoneSourceProfileMath.swift`
 and verified against the calibrated fixture under
 `apps/capacitor-film-lab-ios/Tests/Fixtures/source-profile/canon-log3-cinema-gamut/`
 via `scripts/swift/test-source-profile-math.swift`.

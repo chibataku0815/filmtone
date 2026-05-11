@@ -1,0 +1,266 @@
+# Filmtone iOS Feature-Based Architecture Refactor — File Mapping
+#
+# Phase 1A artifact. Read by migrate-pbxproj.rb and the path-repair sed script.
+# All paths are relative to apps/capacitor-film-lab-ios/ios/App/App/.
+# Source of truth for what the refactor moves where.
+#
+# Categorization is explicit per-file (not regex-based) so review can be
+# line-by-line. The mapping moves the former flat root set: 108 .swift +
+# 1 .metal = 109 entries. ExportActivity/ (3 files) is left in place and
+# not listed here.
+
+source_root: apps/capacitor-film-lab-ios/ios/App/App
+
+folders:
+  Root:
+    description: App entry surfaces — AppDelegate, root router, root chrome, empty view, onboarding, orientation lock. Named Root/ (not App/) because the pbxproj parent group is already named "App" and double-nesting App/App/ is confusing on disk and in git paths.
+    files:
+      - AppDelegate.swift
+      - FilmtoneRootView.swift
+      - FilmtoneRootChrome.swift
+      - FilmtoneEmptyView.swift
+      - FilmtoneOnboardingView.swift
+      - FilmtoneInterfaceOrientationLock.swift
+
+  Capture:
+    description: AVCaptureSession, recording, lens, motion recorder, capture UI
+    files:
+      - FilmtoneCameraOpticsFormatter.swift
+      - FilmtoneCaptureBottomDeck.swift
+      - FilmtoneCaptureCapabilityProbe.swift
+      - FilmtoneCaptureChrome.swift
+      - FilmtoneCaptureCockpitTopBar.swift
+      - FilmtoneCaptureInteractionOverlay.swift
+      - FilmtoneCaptureLensCatalog.swift
+      - FilmtoneCaptureLensChipRow.swift
+      - FilmtoneCaptureLivePreview.swift
+      - FilmtoneCaptureLookModel.swift
+      - FilmtoneCaptureLookSheet.swift
+      - FilmtoneCaptureOrientation.swift
+      - FilmtoneCapturePackage.swift
+      - FilmtoneCapturePackagePersistence.swift
+      - FilmtoneCapturePostRecordChoice.swift
+      - FilmtoneCapturePreflight.swift
+      - FilmtoneCapturePreviewLayer.swift
+      - FilmtoneCaptureRulerScrubber.swift
+      - FilmtoneCaptureSession.swift
+      - FilmtoneCaptureTakePickerOverlay.swift
+      - FilmtoneCaptureTakePreviewLoader.swift
+      - FilmtoneCaptureTakePreviewModel.swift
+      - FilmtoneCaptureTopStatusBar.swift
+      - FilmtoneCaptureTransformLutClassifier.swift
+      - FilmtoneCaptureView.swift
+      - FilmtoneCaptureWriter.swift
+      - FilmtoneGcsvWriter.swift
+      - FilmtoneMotionRecorder.swift
+      - FilmtoneProductCapture.swift
+
+  Editor:
+    description: Editor store + facade, Fullscreen LUT editor, sheets, adjustment UI
+    files:
+      - FilmtoneAdjustmentHelpSheet.swift
+      - FilmtoneAdvancedParamsModel.swift
+      - FilmtoneDisclosureSection.swift
+      - FilmtoneEditorFacade.swift
+      - FilmtoneEditorStore.swift
+      - FilmtoneFullscreenLutEditor.swift
+      - FilmtoneHelpAssetGenerator.swift
+      - FilmtoneLibrarySection.swift
+      - FilmtoneLutControls.swift
+      - FilmtonePreviewPlayerView.swift
+      - FilmtonePreviewView.swift
+      - FilmtoneSavedLookSheet.swift
+      - FilmtoneSavedLookSheetMode.swift
+      - FilmtoneSliderRow.swift
+      - FilmtoneStrengthSheet.swift
+      - FilmtoneStrengthSheetData.swift
+      - FilmtoneStrengthSheetStyles.swift
+      - FilmtoneTermHelpSheet.swift
+
+  Export:
+    description: Export pipeline, sidecar, panel, live activity glue, HDR policy
+    files:
+      - CancelExportIntent.swift
+      - ExportCancelController.swift
+      - FilmtoneExportAttributes.swift
+      - FilmtoneExportLiveActivity.swift
+      - FilmtoneExportNotification.swift
+      - FilmtoneExportPanel.swift
+      - FilmtoneExportSession.swift
+      - FilmtoneExportSession+Cancelable.swift
+      - FilmtoneExportSidecarBuilder.swift
+      - FilmtoneHdrPolicyNotice.swift
+      - HdrPreparationPolicyDeriver.swift
+
+  Look:
+    description: Built-in catalog, library store, color pipeline, LUT/cube codec
+    files:
+      - FilmtoneBuiltInCatalog.swift
+      - FilmtoneColorPipeline.swift
+      - FilmtoneCubeParser.swift
+      - FilmtoneLibrarySchema.swift
+      - FilmtoneLibraryStore.swift
+      - FilmtoneLutBlobCodec.swift
+      - FilmtonePresetCatalog.swift
+
+  Optics:
+    description: Metal optics renderer, depth, ray angle, fluid blob, motion blur
+    files:
+      - FilmtoneDepthMap.swift
+      - FilmtoneDepthPrefilter.swift
+      - FilmtoneFluidBlobBackdrop.metal
+      - FilmtoneFluidBlobBackdrop.swift
+      - FilmtoneMetalOpticsRenderer.swift
+      - FilmtoneMotionBlurMath.swift
+      - FilmtoneOpticalFilterSelectionStore.swift
+      - FilmtoneOpticalFiltersGenerated.swift
+      - FilmtoneRayAngleOptics.swift
+
+  Source:
+    description: Source profile, source probe, format reader, media types
+    files:
+      - FilmtoneMediaRuntime.swift
+      - FilmtoneMediaTypes.swift
+      - FilmtonePhase0Math.swift
+      - FilmtoneSourceProfileCatalog.swift
+      - FilmtoneSourceProfileMath.swift
+      - FilmtoneSourceProfileSchema.swift
+      - FilmtoneSourceProfileSheet.swift
+      - FormatExtensionReader.swift
+      - SourceColorClassifier.swift
+      - SourceColorMetadataNormalizer.swift
+      - SourceProbeService.swift
+
+  Services:
+    description: Top-level utility services (asset picker, mezzanine, photo, persistence, bookmarks, proxy)
+    files:
+      - AssetPickerService.swift
+      - BenchmarkCollector.swift
+      - CacheStore.swift
+      - DepthSourceService.swift
+      - FilmtoneExternalFolderBookmark.swift
+      - FilmtonePersistence.swift
+      - FilmtoneProxyGenerator.swift
+      - FilmtoneSecurityScopedBookmark.swift
+      - MezzanineColorProbe.swift
+      - MezzanineService.swift
+      - PhotoLibraryService.swift
+      - ShareSheetService.swift
+      - VideoDepthSourceService.swift
+
+  Smoke:
+    description: Test fixtures, snapshot support
+    files:
+      - FilmtoneCombinedTimingSmoke.swift
+      - FilmtoneGcsvSmoke.swift
+      - FilmtoneSnapshotSupport.swift
+      - FilmtoneStabilizationSmoke.swift
+
+  Strings:
+    description: Localized strings
+    files:
+      - FilmtoneStrings.swift
+
+# Files left in place (not migrated)
+untouched:
+  description: ExportActivity target source folder is already grouped; do not move
+  files:
+    - FilmtoneExportActivity/DynamicIslandViews.swift
+    - FilmtoneExportActivity/FilmtoneExportActivity.swift
+    - FilmtoneExportActivity/LockScreenView.swift
+
+# Path repairs in non-pbxproj files
+# Each repair is `file:line` → swap the listed source filename with its new
+# folder path. Build-relevant repairs are MUST. Documentation repairs are
+# SHOULD (keeps paused lane resumption clean). Anything not listed is
+# either archive content (handoffs, closed lanes) or already-broken state
+# unrelated to this refactor (e.g. stale test reference to nonexistent
+# FilmtonePhase0Generated.swift in apps/capacitor-film-lab-ios/, which
+# actually lives in packages/film-lab-swift-core/Sources/...).
+path_repairs:
+  must_repair_active_scripts:
+    - file: scripts/generate-filmtone-swift.ts
+      line: 41
+      from: ios/App/App/FilmtoneOpticalFiltersGenerated.swift
+      to: ios/App/App/Optics/FilmtoneOpticalFiltersGenerated.swift
+    - file: scripts/check-ios-grain-catalog.mjs
+      line: 8
+      from: ios/App/App/FilmtoneStrengthSheetData.swift
+      to: ios/App/App/Editor/FilmtoneStrengthSheetData.swift
+    - file: scripts/check-ios-grain-catalog.mjs
+      line: 9
+      from: ios/App/App/FilmtoneStrings.swift
+      to: ios/App/App/Strings/FilmtoneStrings.swift
+    - file: apps/capacitor-film-lab-ios/scripts/verify-phase0-contract.sh
+      lines: [11, 12, 18, 97, 111, 125, 148, 149, 150, 151, 158, 175, 202, 203, 221]
+      mappings:
+        FilmtonePhase0Math.swift: Source/FilmtonePhase0Math.swift
+        FilmtoneMotionBlurMath.swift: Optics/FilmtoneMotionBlurMath.swift
+        FilmtoneSourceProfileSchema.swift: Source/FilmtoneSourceProfileSchema.swift
+        FilmtoneCubeParser.swift: Look/FilmtoneCubeParser.swift
+        FilmtoneCaptureTransformLutClassifier.swift: Capture/FilmtoneCaptureTransformLutClassifier.swift
+        CacheStore.swift: Services/CacheStore.swift
+        SourceColorMetadataNormalizer.swift: Source/SourceColorMetadataNormalizer.swift
+        SourceColorClassifier.swift: Source/SourceColorClassifier.swift
+        FilmtoneColorPipeline.swift: Look/FilmtoneColorPipeline.swift
+        HdrPreparationPolicyDeriver.swift: Export/HdrPreparationPolicyDeriver.swift
+        FilmtoneRayAngleOptics.swift: Optics/FilmtoneRayAngleOptics.swift
+        FilmtoneSourceProfileMath.swift: Source/FilmtoneSourceProfileMath.swift
+        FilmtoneExportSidecarBuilder.swift: Export/FilmtoneExportSidecarBuilder.swift
+        FilmtoneLutBlobCodec.swift: Look/FilmtoneLutBlobCodec.swift
+    - file: apps/capacitor-film-lab-ios/scripts/davinci/verify-highlight-marker-import.sh
+      lines: [11, 14, 15, 127]
+      mappings:
+        FilmtoneSourceProfileSchema.swift: Source/FilmtoneSourceProfileSchema.swift
+        FilmtoneExportSidecarBuilder.swift: Export/FilmtoneExportSidecarBuilder.swift
+        FilmtoneLutBlobCodec.swift: Look/FilmtoneLutBlobCodec.swift
+        FilmtoneColorPipeline.swift: Look/FilmtoneColorPipeline.swift
+
+  should_repair_paused_lane_docs:
+    - file: docs/filmtone/ios/capture-practicality/paused/2026-05-09-s1-stabilization-toggle-pending-owner-smoke.md
+      mapping_target: Capture
+    - file: docs/filmtone/ios/capture-practicality/paused/2026-05-09-s2-active-lens-visibility-pending-owner-smoke.md
+      mapping_target: Capture
+    - file: docs/filmtone/ios/capture-practicality/paused/2026-05-09-s3-continuous-capture-flow-pending-owner-smoke.md
+      mapping_target: Capture
+    - file: docs/filmtone/ios/capture-practicality/paused/2026-05-09-s4-ssd-5min-ceiling-pending-owner-smoke.md
+      mapping_target: Capture
+    - file: docs/filmtone/ios/capture-practicality/paused/2026-05-09-s5-preview-scoping-pending-owner-defect-pick.md
+      mapping_target: Capture
+
+  out_of_scope:
+    - reason: Closed lanes / archived handoffs — references are historical
+      files:
+        - docs/filmtone/ios/react-capacitor-purge/strategy.md
+        - docs/guides/2026-04-26-filmtone-ios-code-residual-handoff.md
+        - docs/guides/2026-04-30-filmtone-ios-creative-lut-export-feasibility-handoff.md
+        - docs/guides/2026-04-30-filmtone-ios-look-tonal-identity-v2-handoff.md
+        - docs/guides/2026-04-30-filmtone-ios-v1.3-built-in-pack-camera-profiles-handoff.md
+    - reason: Generated dist (regenerates on build)
+      files:
+        - packages/film-lab-core/dist/index.d.ts
+    - reason: Illustrative comments in copy harness data, not consumed by build
+      files:
+        - messages/en.json
+        - messages/ja.json
+    - reason: Already-broken pre-existing reference to nonexistent file (separate bug)
+      files:
+        - packages/film-lab-core/src/ios-swift-payload.test.ts
+        - AGENTS.md
+    - reason: Other illustrative or historical references
+      files:
+        - .claude/knowledge/patterns/2026-04-30-source-profile-fixture-pipeline.md
+        - packages/film-lab-core/src/bake-color-only.ts
+        - packages/film-lab-core/src/creative-pack-01.test.ts
+        - scripts/build-creative-luts.ts
+
+# Sanity totals — verified before commit
+# Pre-migration app source set = 108 .swift in App/ root + 1 .metal +
+# 3 .swift in ExportActivity/. This mapping moves the 109 former root files.
+# ExportActivity/ (3) stays in place.
+totals:
+  expected_swift_moved: 108
+  expected_metal_moved: 1
+  expected_total_moved: 109
+  exportactivity_untouched: 3
+  app_target_total_check: 112
