@@ -90,6 +90,12 @@ final class FilmtoneExportSession {
     /// grade, tone compression, print) plus LUT application. Stage
     /// ordering and `applyGrade` orchestration still live on the session.
     private let gradeRenderPipeline: GradeRenderPipeline
+    /// Phase 2B-7A: media writer / reader primitive collaborator. Owns
+    /// writer construction, video input / reader-output settings, audio
+    /// pipeline setup, audio append, finish/wait, and CMTime helpers.
+    /// `exportVideo`, `exportStillImage`, and `appendVideoSample` still
+    /// live on the session and forward `checkCancelled` into the writer.
+    private let mediaWriter: ExportMediaWriter
     private let sourceSeed: Double
     private let outputColorSpace: CGColorSpace
     private var degradedDecodePath = false
@@ -184,7 +190,8 @@ final class FilmtoneExportSession {
         self.captureProvenance = captureProvenance
         let disableGlowFamilyForExport = Self.environmentFlagEnabled("FILMTONE_EXPORT_DISABLE_GLOW_FAMILY")
         let useMetalOpticsForExport = Self.environmentFlagEnabled("FILMTONE_EXPORT_METAL_OPTICS")
-        self.outputURL = try cacheStore.temporaryExportURL(pathExtension: request.output.container)
+        let outputURL = try cacheStore.temporaryExportURL(pathExtension: request.output.container)
+        self.outputURL = outputURL
         let colorPipeline = FilmtoneColorPipeline.defaultOutputContract(
             sourceMetadata: request.sourceProbe?.sourceVideoMetadata?.color,
             sourceColorClass: request.sourceProbe?.sourceVideoMetadata?.colorClass
@@ -227,6 +234,11 @@ final class FilmtoneExportSession {
             preparedInputLut: preparedInputLut,
             preparedCreativeLut: preparedCreativeLut,
             outputColorSpace: outputColorSpace
+        )
+        self.mediaWriter = ExportMediaWriter(
+            outputURL: outputURL,
+            outputFPS: request.output.fps,
+            colorPipeline: colorPipeline
         )
         self.sourceSeed = Self.makeStableSourceSeed(from: sourceURL.absoluteString)
         if disableGlowFamilyForExport {
@@ -755,8 +767,8 @@ final class FilmtoneExportSession {
             )
         }
         let outputSize = Self.scaledSize(for: videoTrack, longEdge: request.output.longEdge)
-        let writer = try makeWriter(outputSize: outputSize)
-        let videoInput = makeVideoInput(outputSize: outputSize)
+        let writer = try mediaWriter.makeWriter(outputSize: outputSize)
+        let videoInput = mediaWriter.makeVideoInput(outputSize: outputSize)
         let adaptor = AVAssetWriterInputPixelBufferAdaptor(
             assetWriterInput: videoInput,
             sourcePixelBufferAttributes: [
@@ -777,7 +789,7 @@ final class FilmtoneExportSession {
         let audioInput: AVAssetWriterInput?
         let audioOutput: AVAssetReaderTrackOutput?
         if let audioTrack {
-            let pair = makeAudioPipeline(for: audioTrack)
+            let pair = mediaWriter.makeAudioPipeline(for: audioTrack)
             audioInput = pair.input
             audioOutput = pair.output
             if let audioInput, writer.canAdd(audioInput) {
@@ -789,7 +801,7 @@ final class FilmtoneExportSession {
         }
 
         let reader = try AVAssetReader(asset: asset)
-        let videoOutputSelection = makeVideoReaderOutput(
+        let videoOutputSelection = mediaWriter.makeVideoReaderOutput(
             for: videoTrack,
             reader: reader,
             codecFamily: request.sourceProbe?.codecFamily ?? request.sourceProbe?.sourceVideoMetadata?.codecFamily
@@ -913,11 +925,11 @@ final class FilmtoneExportSession {
         }
 
         func makeTimedVideoSample(_ sampleBuffer: CMSampleBuffer) -> TimedVideoSample {
-            let rawTime = Self.validPresentationTime(for: sampleBuffer)
+            let rawTime = ExportMediaWriter.validPresentationTime(for: sampleBuffer)
             if sourceTimeOffset == nil {
                 sourceTimeOffset = rawTime
             }
-            let timelineTime = Self.nonNegativeTime(
+            let timelineTime = ExportMediaWriter.nonNegativeTime(
                 CMTimeSubtract(rawTime, sourceTimeOffset ?? .zero)
             )
             return (sampleBuffer, rawTime, timelineTime)
@@ -1071,11 +1083,11 @@ final class FilmtoneExportSession {
                             guard let previous = previousVideoSample else {
                                 throw FilmtoneMediaError.exportFailed("The first decoded video frame was unavailable.")
                             }
-                            let previousDelta = Self.absoluteSecondsBetween(
+                            let previousDelta = ExportMediaWriter.absoluteSecondsBetween(
                                 previous.timelineTime,
                                 sourceTime
                             )
-                            let lookaheadDelta = Self.absoluteSecondsBetween(
+                            let lookaheadDelta = ExportMediaWriter.absoluteSecondsBetween(
                                 lookahead.timelineTime,
                                 sourceTime
                             )
@@ -1129,12 +1141,13 @@ final class FilmtoneExportSession {
                             return
                         }
 
-                        try appendAudioSample(
+                        try mediaWriter.appendAudioSample(
                             sampleBuffer,
                             audioInput: audioInput,
                             writer: writer,
                             reader: reader,
-                            waitForReady: false
+                            waitForReady: false,
+                            checkCancelled: checkCancelled
                         )
                     } catch {
                         failExport(error)
@@ -1157,7 +1170,7 @@ final class FilmtoneExportSession {
 
         progress(.init(stage: .writing, progress: 0.92, currentFrame: renderedFrames, totalFrames: outputFrameCount, message: "Writing output"))
         try performanceMetrics.measure(.writerFinish) {
-            try finish(writer: writer)
+            try mediaWriter.finish(writer: writer, checkCancelled: checkCancelled)
         }
 
         return CompletedExport(
@@ -1210,8 +1223,8 @@ final class FilmtoneExportSession {
         }
 
         let outputSize = Self.scaledSize(for: image.extent.size, longEdge: request.output.longEdge)
-        let writer = try makeWriter(outputSize: outputSize)
-        let videoInput = makeVideoInput(outputSize: outputSize)
+        let writer = try mediaWriter.makeWriter(outputSize: outputSize)
+        let videoInput = mediaWriter.makeVideoInput(outputSize: outputSize)
         let adaptor = AVAssetWriterInputPixelBufferAdaptor(
             assetWriterInput: videoInput,
             sourcePixelBufferAttributes: [
@@ -1240,7 +1253,7 @@ final class FilmtoneExportSession {
         for frameIndex in 0..<frameCount {
             try checkCancelled()
             try autoreleasepool {
-                try waitUntilReadyForMoreMediaData(videoInput, writer: writer, label: "video")
+                try mediaWriter.waitUntilReadyForMoreMediaData(videoInput, writer: writer, label: "video", checkCancelled: checkCancelled)
 
                 var renderedBuffer: CVPixelBuffer?
                 let creationStatus = CVPixelBufferPoolCreatePixelBuffer(nil, pixelBufferPool, &renderedBuffer)
@@ -1276,7 +1289,7 @@ final class FilmtoneExportSession {
 
         videoInput.markAsFinished()
         progress(.init(stage: .writing, progress: 0.92, currentFrame: frameCount, totalFrames: frameCount, message: "Writing output"))
-        try finish(writer: writer)
+        try mediaWriter.finish(writer: writer, checkCancelled: checkCancelled)
 
         return CompletedExport(
             outputSize: outputSize,
@@ -1356,92 +1369,6 @@ final class FilmtoneExportSession {
         generator.requestedTimeToleranceBefore = tolerance
         generator.requestedTimeToleranceAfter = tolerance
         return generator
-    }
-
-    private func makeWriter(outputSize: CGSize) throws -> AVAssetWriter {
-        let writer = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
-        writer.movieFragmentInterval = .invalid
-        return writer
-    }
-
-    private func makeVideoInput(outputSize: CGSize) -> AVAssetWriterInput {
-        let width = Int(outputSize.width.rounded())
-        let height = Int(outputSize.height.rounded())
-        let bitRate = max(width * height * 6, 3_000_000)
-        let settings: [String: Any] = [
-            AVVideoCodecKey: AVVideoCodecType.h264,
-            AVVideoWidthKey: width,
-            AVVideoHeightKey: height,
-            AVVideoCompressionPropertiesKey: [
-                AVVideoAverageBitRateKey: bitRate,
-                AVVideoExpectedSourceFrameRateKey: request.output.fps,
-                AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
-                AVVideoAllowFrameReorderingKey: false,
-            ],
-            AVVideoColorPropertiesKey: colorPipeline.writerColorProperties,
-        ]
-        let input = AVAssetWriterInput(mediaType: .video, outputSettings: settings)
-        input.expectsMediaDataInRealTime = false
-        input.transform = .identity
-        return input
-    }
-
-    private func makeVideoReaderOutput(
-        for track: AVAssetTrack,
-        reader: AVAssetReader,
-        codecFamily: SourceCodecFamilyDTO?
-    ) -> (output: AVAssetReaderTrackOutput, degradedDecodePath: Bool)? {
-        let candidates: [(pixelFormat: OSType, degraded: Bool)]
-        if codecFamily == .prores422 {
-            candidates = [
-                (kCVPixelFormatType_422YpCbCr16, false),
-                (kCVPixelFormatType_64RGBAHalf, true),
-                (kCVPixelFormatType_32BGRA, true),
-            ]
-        } else {
-            candidates = [
-                (kCVPixelFormatType_32BGRA, false),
-            ]
-        }
-
-        for candidate in candidates {
-            let output = AVAssetReaderTrackOutput(
-                track: track,
-                outputSettings: colorPipeline.videoReaderOutputSettings(pixelFormat: candidate.pixelFormat)
-            )
-            output.alwaysCopiesSampleData = false
-            if reader.canAdd(output) {
-                return (output, candidate.degraded)
-            }
-        }
-
-        return nil
-    }
-
-    private func makeAudioPipeline(
-        for track: AVAssetTrack
-    ) -> (input: AVAssetWriterInput, output: AVAssetReaderTrackOutput) {
-        let output = AVAssetReaderTrackOutput(
-            track: track,
-            outputSettings: [
-                AVFormatIDKey: kAudioFormatLinearPCM,
-                AVLinearPCMIsFloatKey: false,
-                AVLinearPCMBitDepthKey: 16,
-                AVLinearPCMIsBigEndianKey: false,
-                AVLinearPCMIsNonInterleaved: false,
-            ]
-        )
-        let input = AVAssetWriterInput(
-            mediaType: .audio,
-            outputSettings: [
-                AVFormatIDKey: kAudioFormatMPEG4AAC,
-                AVEncoderBitRateKey: 128_000,
-                AVNumberOfChannelsKey: 2,
-                AVSampleRateKey: 44_100,
-            ]
-        )
-        input.expectsMediaDataInRealTime = false
-        return (input, output)
     }
 
     private func renderableImage(
@@ -1783,7 +1710,7 @@ final class FilmtoneExportSession {
             if waitForReady {
                 try performanceMetrics.measure(.waitEncoder) {
                     try signposter.withIntervalSignpost("wait-encoder") {
-                        try waitUntilReadyForMoreMediaData(videoInput, writer: writer, reader: reader, label: "video")
+                        try mediaWriter.waitUntilReadyForMoreMediaData(videoInput, writer: writer, reader: reader, label: "video", checkCancelled: checkCancelled)
                     }
                 }
             }
@@ -1795,7 +1722,7 @@ final class FilmtoneExportSession {
                 throw FilmtoneMediaError.exportFailed("Pixel buffer pool is unavailable.")
             }
 
-            let sourcePresentationTime = Self.validPresentationTime(for: sampleBuffer)
+            let sourcePresentationTime = ExportMediaWriter.validPresentationTime(for: sampleBuffer)
             let outputTime = outputPresentationTime ?? sourcePresentationTime
             let presentationTimeSec = renderTimeSeconds ?? CMTimeGetSeconds(sourcePresentationTime)
             let frameImage = performanceMetrics.measure(.buildGraph) {
@@ -1841,75 +1768,6 @@ final class FilmtoneExportSession {
         }
     }
 
-    private func appendAudioSample(
-        _ sampleBuffer: CMSampleBuffer,
-        audioInput: AVAssetWriterInput,
-        writer: AVAssetWriter,
-        reader: AVAssetReader,
-        waitForReady: Bool = true
-    ) throws {
-        try autoreleasepool {
-            if waitForReady {
-                try waitUntilReadyForMoreMediaData(audioInput, writer: writer, reader: reader, label: "audio")
-            }
-
-            if !audioInput.append(sampleBuffer) {
-                throw FilmtoneMediaError.exportFailed(writer.error?.localizedDescription ?? "Audio samples could not be appended.")
-            }
-        }
-    }
-
-    private func finish(writer: AVAssetWriter) throws {
-        try checkCancelled()
-
-        let semaphore = DispatchSemaphore(value: 0)
-        writer.finishWriting {
-            semaphore.signal()
-        }
-        let waitResult = semaphore.wait(timeout: .now() + 30)
-        if waitResult == .timedOut {
-            writer.cancelWriting()
-            throw FilmtoneMediaError.exportFailed("The writer did not finish output within the expected time.")
-        }
-
-        try checkCancelled()
-
-        guard writer.status == .completed else {
-            throw FilmtoneMediaError.exportFailed(writer.error?.localizedDescription ?? "The export did not complete.")
-        }
-    }
-
-    private static func validPresentationTime(for sampleBuffer: CMSampleBuffer) -> CMTime {
-        let time = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-        guard time.isValid, time.isNumeric else {
-            return .zero
-        }
-        return time
-    }
-
-    private static func nonNegativeTime(_ time: CMTime) -> CMTime {
-        guard time.isValid, time.isNumeric else {
-            return .zero
-        }
-        return CMTimeCompare(time, .zero) < 0 ? .zero : time
-    }
-
-    private static func absoluteSecondsBetween(_ lhs: CMTime, _ rhs: CMTime) -> Double {
-        let seconds = abs(CMTimeGetSeconds(CMTimeSubtract(lhs, rhs)))
-        return seconds.isFinite ? seconds : Double.greatestFiniteMagnitude
-    }
-
-    private func estimatedVideoFrameRate(for track: AVAssetTrack) -> Double {
-        if let frameRate = request.sourceProbe?.frameRate, frameRate.isFinite, frameRate > 0 {
-            return frameRate
-        }
-        let nominalFrameRate = Double(track.nominalFrameRate)
-        if nominalFrameRate.isFinite, nominalFrameRate > 0 {
-            return nominalFrameRate
-        }
-        return Double(request.output.fps)
-    }
-
     private func renderingProgress(
         presentationTime: CMTime,
         sourceDurationSec: Double
@@ -1931,46 +1789,6 @@ final class FilmtoneExportSession {
         }
         let candidate = sourceDurationSec * 0.25
         return min(max(candidate, 0), sourceDurationSec)
-    }
-
-    private func waitUntilReadyForMoreMediaData(
-        _ input: AVAssetWriterInput,
-        writer: AVAssetWriter,
-        reader: AVAssetReader? = nil,
-        label: String
-    ) throws {
-        let startedWaitingAt = Date()
-        while !input.isReadyForMoreMediaData {
-            try checkCancelled()
-
-            if let reader {
-                switch reader.status {
-                case .failed:
-                    throw FilmtoneMediaError.exportFailed(reader.error?.localizedDescription ?? "The reader failed while waiting for media data.")
-                case .cancelled:
-                    throw FilmtoneMediaError.exportCancelled
-                default:
-                    break
-                }
-            }
-
-            switch writer.status {
-            case .failed:
-                throw FilmtoneMediaError.exportFailed(writer.error?.localizedDescription ?? "The writer failed while waiting for media data.")
-            case .cancelled:
-                throw FilmtoneMediaError.exportCancelled
-            case .completed:
-                throw FilmtoneMediaError.exportFailed("The writer completed before all media data was appended.")
-            default:
-                break
-            }
-
-            if Date().timeIntervalSince(startedWaitingAt) >= 15 {
-                throw FilmtoneMediaError.exportFailed("The \(label) writer input stopped accepting media data.")
-            }
-
-            Thread.sleep(forTimeInterval: 0.002)
-        }
     }
 
     private func checkCancelled() throws {
