@@ -159,7 +159,7 @@ final class FilmtoneMediaRuntime {
                     guard let videoTrack = asset.tracks(withMediaType: .video).first else {
                         throw FilmtoneMediaError.unsupportedSource("No video track was found in the selected source.")
                     }
-                    let outputSize = FilmtoneExportSession.scaledSize(
+                    let outputSize = ExportGeometry.scaledSize(
                         for: videoTrack,
                         longEdge: request.output.longEdge
                     )
@@ -190,7 +190,7 @@ final class FilmtoneMediaRuntime {
                     guard let videoTrack = asset.tracks(withMediaType: .video).first else {
                         throw FilmtoneMediaError.unsupportedSource("No video track was found in the selected source.")
                     }
-                    let outputSize = FilmtoneExportSession.scaledSize(
+                    let outputSize = ExportGeometry.scaledSize(
                         for: videoTrack,
                         longEdge: request.output.longEdge
                     )
@@ -231,7 +231,7 @@ final class FilmtoneMediaRuntime {
                     guard let videoTrack = asset.tracks(withMediaType: .video).first else {
                         throw FilmtoneMediaError.unsupportedSource("No video track was found in the selected source.")
                     }
-                    let outputSize = FilmtoneExportSession.scaledSize(
+                    let outputSize = ExportGeometry.scaledSize(
                         for: videoTrack,
                         longEdge: request.output.longEdge
                     )

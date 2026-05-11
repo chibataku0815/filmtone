@@ -14,8 +14,8 @@ import Foundation
 /// site that uses the session's CI context + output color space.
 ///
 /// `FilmtoneExportSession` keeps `applyGrade(...)`,
-/// `renderableStillImage(...)`, `renderablePreviewVideoImage(...)`,
-/// and `scaledSize(...)` so the grade / optics / grain stage order stays
+/// `renderableStillImage(...)`, and `renderablePreviewVideoImage(...)`
+/// so the grade / optics / grain stage order stays
 /// session-owned in this sub-stage. The session passes an `applyGrade`
 /// closure into `renderPreviewFrame(applyGrade:)` and the renderer calls
 /// it at the same points the in-place helpers did, preserving the
@@ -87,7 +87,7 @@ final class ExportPreviewRenderer {
             throw FilmtoneMediaError.unsupportedSource("The selected image could not be loaded.")
         }
 
-        let outputSize = FilmtoneExportSession.scaledSize(for: image.extent.size, longEdge: request.output.longEdge)
+        let outputSize = ExportGeometry.scaledSize(for: image.extent.size, longEdge: request.output.longEdge)
         let original = sourceImageNormalizer.scaledStillSourceImage(image, outputSize: outputSize)
         let graded = applyGrade(original, 0).cropped(to: original.extent)
 
@@ -118,7 +118,7 @@ final class ExportPreviewRenderer {
 
         let sourceDurationSec = CMTimeGetSeconds(asset.duration)
         let posterTimeSec = makePreviewPosterTime(sourceDurationSec: sourceDurationSec)
-        let outputSize = FilmtoneExportSession.scaledSize(for: videoTrack, longEdge: request.output.longEdge)
+        let outputSize = ExportGeometry.scaledSize(for: videoTrack, longEdge: request.output.longEdge)
 
         let posterTime = CMTime(seconds: posterTimeSec, preferredTimescale: 600)
         let cgImage = try copyPreviewCGImage(for: asset, at: posterTime)

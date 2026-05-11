@@ -64,6 +64,8 @@
 		B1E10001000000000000B221 /* ExportVideoCompletionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B222 /* ExportVideoCompletionCoordinator.swift */; };
 		B1E10001000000000000B223 /* ExportVideoFramePump.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B224 /* ExportVideoFramePump.swift */; };
 		B1E10001000000000000B225 /* ExportVideoAudioPump.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B226 /* ExportVideoAudioPump.swift */; };
+		B1E10001000000000000B227 /* ExportGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B228 /* ExportGeometry.swift */; };
+		B1E10001000000000000B229 /* ExportVideoIOBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B22A /* ExportVideoIOBuilder.swift */; };
 		D10000010000000000000001 /* FilmtoneRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000001 /* FilmtoneRootView.swift */; };
 		D10000010000000000000002 /* FilmtoneEditorStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000002 /* FilmtoneEditorStore.swift */; };
 		D10000010000000000000003 /* FilmtoneEditorFacade.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000003 /* FilmtoneEditorFacade.swift */; };
@@ -243,6 +245,8 @@
 		B1E10001000000000000B222 /* ExportVideoCompletionCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportVideoCompletionCoordinator.swift; sourceTree = "<group>"; };
 		B1E10001000000000000B224 /* ExportVideoFramePump.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportVideoFramePump.swift; sourceTree = "<group>"; };
 		B1E10001000000000000B226 /* ExportVideoAudioPump.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportVideoAudioPump.swift; sourceTree = "<group>"; };
+		B1E10001000000000000B228 /* ExportGeometry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportGeometry.swift; sourceTree = "<group>"; };
+		B1E10001000000000000B22A /* ExportVideoIOBuilder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportVideoIOBuilder.swift; sourceTree = "<group>"; };
 		B20000010000000000000001 /* MezzanineColorProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MezzanineColorProbe.swift; sourceTree = "<group>"; };
 		B20000010000000000000020 /* DepthSourceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthSourceService.swift; sourceTree = "<group>"; };
 		B20000010000000000000021 /* FilmtoneDepthMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneDepthMap.swift; sourceTree = "<group>"; };
@@ -446,6 +450,8 @@
 				B1E10001000000000000B222 /* ExportVideoCompletionCoordinator.swift */,
 				B1E10001000000000000B224 /* ExportVideoFramePump.swift */,
 				B1E10001000000000000B226 /* ExportVideoAudioPump.swift */,
+				B1E10001000000000000B228 /* ExportGeometry.swift */,
+				B1E10001000000000000B22A /* ExportVideoIOBuilder.swift */,
 			);
 			name = Internal;
 			path = Internal;
@@ -987,6 +993,8 @@
 				B1E10001000000000000B221 /* ExportVideoCompletionCoordinator.swift in Sources */,
 				B1E10001000000000000B223 /* ExportVideoFramePump.swift in Sources */,
 				B1E10001000000000000B225 /* ExportVideoAudioPump.swift in Sources */,
+				B1E10001000000000000B227 /* ExportGeometry.swift in Sources */,
+				B1E10001000000000000B229 /* ExportVideoIOBuilder.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

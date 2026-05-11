@@ -153,7 +153,7 @@ final class MezzanineService {
                 let h = max(2, Int(abs(transformed.height).rounded()) / 2 * 2)
                 return CGSize(width: w, height: h)
             }
-            return FilmtoneExportSession.scaledSize(for: track, longEdge: longEdge)
+            return ExportGeometry.scaledSize(for: track, longEdge: longEdge)
         }
 
         /// Quality variants scale base bitrate by output area (4K = 1.0).

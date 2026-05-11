@@ -156,13 +156,21 @@ final class FilmtoneExportSession {
     /// scale, grade-closure invocation, preview JPEG pair), the zero-
     /// tolerance image generator with 0.5s fallback, 25%-clamped poster
     /// time, and CI JPEG writing. `applyGrade(...)`,
-    /// `renderableStillImage(...)`, `renderablePreviewVideoImage(...)`,
-    /// and `scaledSize(...)` stay on the session; `renderPreviewFrame()`
+    /// `renderableStillImage(...)`, and `renderablePreviewVideoImage(...)`
+    /// stay on the session; `renderPreviewFrame()`
     /// is a thin facade that clears CI caches and delegates to the
     /// renderer with an `applyGrade` closure, and the Connect package
     /// reference-after closure now calls
     /// `previewRenderer.writeReferenceAfterImage(...)`.
     private let previewRenderer: ExportPreviewRenderer
+    /// Phase 2B-10D: video export writer / reader / adaptor / audio
+    /// pipeline / reader output / `degradedDecodePath` / writer-start /
+    /// reader-start / `startSession(atSourceTime:)` setup collaborator.
+    /// `exportVideo(...)` keeps mezzanine routing, asset / video-track
+    /// lookup, depth reader setup, timeline construction, queue pump
+    /// orchestration, `appendOutputFrame(...)`, post-wait finish, and
+    /// `CompletedExport` assembly.
+    private let videoIOBuilder: ExportVideoIOBuilder
     private let outputColorSpace: CGColorSpace
     private var degradedDecodePath = false
     private var cancelled = false
@@ -339,6 +347,10 @@ final class FilmtoneExportSession {
             outputColorSpace: outputColorSpace,
             sourceImageNormalizer: self.sourceImageNormalizer,
             mezzanineRouter: mezzanineRouter
+        )
+        self.videoIOBuilder = ExportVideoIOBuilder(
+            request: request,
+            mediaWriter: mediaWriter
         )
         if disableGlowFamilyForExport {
             NSLog("FilmtoneExportSession: GlowFamily disabled by FILMTONE_EXPORT_DISABLE_GLOW_FAMILY")
@@ -617,64 +629,20 @@ final class FilmtoneExportSession {
             outputFPS: request.output.fps,
             sourceDurationSec: sourceDurationSec
         )
-        let outputSize = Self.scaledSize(for: videoTrack, longEdge: request.output.longEdge)
-        let writer = try mediaWriter.makeWriter(outputSize: outputSize)
-        let videoInput = mediaWriter.makeVideoInput(outputSize: outputSize)
-        let adaptor = AVAssetWriterInputPixelBufferAdaptor(
-            assetWriterInput: videoInput,
-            sourcePixelBufferAttributes: [
-                kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA),
-                kCVPixelBufferWidthKey as String: Int(outputSize.width.rounded()),
-                kCVPixelBufferHeightKey as String: Int(outputSize.height.rounded()),
-            ]
+        let io = try videoIOBuilder.makeContext(
+            asset: asset,
+            videoTrack: videoTrack,
+            highlightTimeline: highlightTimeline
         )
-
-        guard writer.canAdd(videoInput) else {
-            throw FilmtoneMediaError.exportFailed("Video writer input could not be added.")
-        }
-        writer.add(videoInput)
-
-        let audioTrack = highlightTimeline == nil && request.output.preserveAudio
-            ? asset.tracks(withMediaType: .audio).first
-            : nil
-        let audioInput: AVAssetWriterInput?
-        let audioOutput: AVAssetReaderTrackOutput?
-        if let audioTrack {
-            let pair = mediaWriter.makeAudioPipeline(for: audioTrack)
-            audioInput = pair.input
-            audioOutput = pair.output
-            if let audioInput, writer.canAdd(audioInput) {
-                writer.add(audioInput)
-            }
-        } else {
-            audioInput = nil
-            audioOutput = nil
-        }
-
-        let reader = try AVAssetReader(asset: asset)
-        let videoOutputSelection = mediaWriter.makeVideoReaderOutput(
-            for: videoTrack,
-            reader: reader,
-            codecFamily: request.sourceProbe?.codecFamily ?? request.sourceProbe?.sourceVideoMetadata?.codecFamily
-        )
-        guard let videoOutputSelection else {
-            throw FilmtoneMediaError.exportFailed("Video reader output could not be added.")
-        }
-        let videoOutput = videoOutputSelection.output
-        degradedDecodePath = videoOutputSelection.degradedDecodePath
-        reader.add(videoOutput)
-
-        if let audioOutput, reader.canAdd(audioOutput) {
-            reader.add(audioOutput)
-        }
-
-        guard writer.startWriting() else {
-            throw FilmtoneMediaError.exportFailed(writer.error?.localizedDescription ?? "The writer failed to start.")
-        }
-        guard reader.startReading() else {
-            throw FilmtoneMediaError.exportFailed(reader.error?.localizedDescription ?? "The reader failed to start.")
-        }
-        writer.startSession(atSourceTime: .zero)
+        let outputSize = io.outputSize
+        let writer = io.writer
+        let videoInput = io.videoInput
+        let adaptor = io.adaptor
+        let audioInput = io.audioInput
+        let audioOutput = io.audioOutput
+        let reader = io.reader
+        let videoOutput = io.videoOutput
+        degradedDecodePath = io.degradedDecodePath
 
         let videoQueue = DispatchQueue(label: "FilmtoneExportSession.video")
         let audioQueue = DispatchQueue(label: "FilmtoneExportSession.audio")
@@ -851,7 +819,7 @@ final class FilmtoneExportSession {
             }
         }
 
-        let outputSize = Self.scaledSize(for: image.extent.size, longEdge: request.output.longEdge)
+        let outputSize = ExportGeometry.scaledSize(for: image.extent.size, longEdge: request.output.longEdge)
         let filteredImage = renderableStillImage(image, outputSize: outputSize, timeSeconds: 0)
         return try stillImageWriter.write(
             filteredImage: filteredImage,
@@ -1101,23 +1069,6 @@ final class FilmtoneExportSession {
         )
     }
 
-    static func scaledSize(for track: AVAssetTrack, longEdge: Int) -> CGSize {
-        let transformed = track.naturalSize.applying(track.preferredTransform)
-        let sourceSize = CGSize(width: abs(transformed.width), height: abs(transformed.height))
-        return scaledSize(for: sourceSize, longEdge: longEdge)
-    }
-
-    static func scaledSize(for sourceSize: CGSize, longEdge: Int) -> CGSize {
-        guard sourceSize.width > 0, sourceSize.height > 0 else {
-            return CGSize(width: longEdge, height: longEdge)
-        }
-
-        let maxEdge = max(sourceSize.width, sourceSize.height)
-        let scale = min(CGFloat(longEdge) / maxEdge, 1.0)
-        let width = max(2, Int((sourceSize.width * scale).rounded()) / 2 * 2)
-        let height = max(2, Int((sourceSize.height * scale).rounded()) / 2 * 2)
-        return CGSize(width: width, height: height)
-    }
 }
 
 func filmtonePreviewCompositionDebugLog(_ message: @autoclosure () -> String) {
