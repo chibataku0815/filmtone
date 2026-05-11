@@ -289,3 +289,15 @@ Total: 11-13 working days.
   reference-after JPEG rendering stay on the session. pbxproj 4-section
   grep = 4; `bun run verify:ios` green; `git diff --check` clean. See
   `archive/2026-05-11-phase-2b-8b-export-connect-package-assembler-extraction.md`.
+- 2026-05-11 JST — Phase 2B-8C (ExportSidecarWriter extraction)
+  committed as `445a0e10`. New `final class ExportSidecarWriter` at
+  `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportSidecarWriter.swift`
+  (193 lines) now owns sidecar identity/depth/Saved Look/Camera Profile
+  block assembly, `SidecarBuildInputs` construction, sidecar URL
+  resolution, atomic write, and nil-on-failure logging. The session
+  passes a write-time `Telemetry` snapshot for mutable decode/depth /
+  mezzanine truth fields. `FilmtoneExportSession.swift` reduced from
+  1805 → 1701 lines (−104); `FilmtoneExportSidecarBuilder.swift`
+  remains untouched. pbxproj 4-section grep = 4; `bun run verify:ios`
+  green; `git diff --check` clean. See
+  `archive/2026-05-11-phase-2b-8c-export-sidecar-writer-extraction.md`.
