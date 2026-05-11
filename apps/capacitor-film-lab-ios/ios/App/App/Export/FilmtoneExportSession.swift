@@ -116,9 +116,10 @@ final class FilmtoneExportSession {
     /// media copy, combined / pre-optical / post-optical cube + DCTL writes,
     /// reference-after JPEG path orchestration via a session-supplied closure,
     /// the eight-field `Companions` value, `SidecarPackage` payload, and the
-    /// ordered package-file URI list. `writeReferenceAfterImage`,
-    /// `makePreviewPosterTime`, `copyPreviewCGImage`, and `writeJPEGImage`
-    /// stay on the session.
+    /// ordered package-file URI list. The reference-after JPEG body itself
+    /// (poster-time, preview CGImage copy, JPEG write) moved to
+    /// `ExportPreviewRenderer` in Phase 2B-9C; the session-supplied closure
+    /// now forwards into `previewRenderer.writeReferenceAfterImage(...)`.
     private let connectPackageAssembler: ExportConnectPackageAssembler
     /// Phase 2B-8C: filmtone-ios-export-session-v1 sidecar writer collaborator.
     /// Owns device-identity assembly, depth / Saved Look / Camera Profile
@@ -150,6 +151,18 @@ final class FilmtoneExportSession {
     /// into session telemetry properties so the sidecar truth-snapshot
     /// timing is unchanged.
     private let mezzanineRouter: ExportMezzanineRouter
+    /// Phase 2B-9C: still / video preview render + reference-after JPEG
+    /// collaborator. Owns the preview-image generation path (source load,
+    /// scale, grade-closure invocation, preview JPEG pair), the zero-
+    /// tolerance image generator with 0.5s fallback, 25%-clamped poster
+    /// time, and CI JPEG writing. `applyGrade(...)`,
+    /// `renderableStillImage(...)`, `renderablePreviewVideoImage(...)`,
+    /// and `scaledSize(...)` stay on the session; `renderPreviewFrame()`
+    /// is a thin facade that clears CI caches and delegates to the
+    /// renderer with an `applyGrade` closure, and the Connect package
+    /// reference-after closure now calls
+    /// `previewRenderer.writeReferenceAfterImage(...)`.
+    private let previewRenderer: ExportPreviewRenderer
     private let outputColorSpace: CGColorSpace
     private var degradedDecodePath = false
     private var cancelled = false
@@ -311,10 +324,21 @@ final class FilmtoneExportSession {
             mediaWriter: mediaWriter,
             outputFPS: request.output.fps
         )
-        self.mezzanineRouter = ExportMezzanineRouter(
+        let mezzanineRouter = ExportMezzanineRouter(
             request: request,
             sourceURL: sourceURL,
             mezzanineService: mezzanineService
+        )
+        self.mezzanineRouter = mezzanineRouter
+        self.previewRenderer = ExportPreviewRenderer(
+            request: request,
+            sourceURL: sourceURL,
+            outputURL: outputURL,
+            cacheStore: cacheStore,
+            ciContext: ciContext,
+            outputColorSpace: outputColorSpace,
+            sourceImageNormalizer: self.sourceImageNormalizer,
+            mezzanineRouter: mezzanineRouter
         )
         if disableGlowFamilyForExport {
             NSLog("FilmtoneExportSession: GlowFamily disabled by FILMTONE_EXPORT_DISABLE_GLOW_FAMILY")
@@ -342,12 +366,8 @@ final class FilmtoneExportSession {
         defer {
             ciContext.clearCaches()
         }
-
-        switch request.sourceKind {
-        case .image:
-            return try renderStillPreview()
-        case .video:
-            return try renderVideoPreview()
+        return try previewRenderer.renderPreviewFrame { [self] image, time in
+            applyGrade(to: image, timeSeconds: time)
         }
     }
 
@@ -440,8 +460,8 @@ final class FilmtoneExportSession {
         if request.connectPackage == true {
             packageCompanions = connectPackageAssembler.makeCompanions(
                 result: result,
-                writeReferenceAfterImage: { [self] url, sourceDurationSec in
-                    try writeReferenceAfterImage(
+                writeReferenceAfterImage: { [previewRenderer] url, sourceDurationSec in
+                    try previewRenderer.writeReferenceAfterImage(
                         to: url,
                         sourceDurationSec: sourceDurationSec
                     )
@@ -1060,78 +1080,6 @@ final class FilmtoneExportSession {
         )
     }
 
-    private func renderStillPreview() throws -> Phase0PreviewRenderResultDTO {
-        guard let image = sourceImageNormalizer.loadedSourceImage(at: sourceURL) else {
-            throw FilmtoneMediaError.unsupportedSource("The selected image could not be loaded.")
-        }
-
-        let outputSize = Self.scaledSize(for: image.extent.size, longEdge: request.output.longEdge)
-        let original = sourceImageNormalizer.scaledStillSourceImage(image, outputSize: outputSize)
-        let graded = applyGrade(to: original, timeSeconds: 0).cropped(to: original.extent)
-
-        let originalURL = try writePreviewImage(original, preferredName: "filmtone-preview-original")
-        let gradedURL = try writePreviewImage(graded, preferredName: "filmtone-preview-graded")
-
-        return Phase0PreviewRenderResultDTO(
-            originalUri: originalURL.absoluteString,
-            gradedUri: gradedURL.absoluteString,
-            width: Int(outputSize.width.rounded()),
-            height: Int(outputSize.height.rounded()),
-            posterTimeSec: nil
-        )
-    }
-
-    private func renderVideoPreview() throws -> Phase0PreviewRenderResultDTO {
-        // v1.4: read from the same effective URL the export will consume so
-        // preview ↔ export bytes stay symmetric within each renderMode. When
-        // the relevant mezzanine variant is missing (still being generated, or
-        // policy declined), this transparently falls back to source.
-        let effectiveSourceURL = mezzanineRouter.resolvedPreviewSourceURL()
-        let asset = AVURLAsset(url: effectiveSourceURL)
-        guard let videoTrack = asset.tracks(withMediaType: .video).first else {
-            throw FilmtoneMediaError.unsupportedSource("No video track was found in the selected source.")
-        }
-
-        let sourceDurationSec = CMTimeGetSeconds(asset.duration)
-        let posterTimeSec = makePreviewPosterTime(sourceDurationSec: sourceDurationSec)
-        let outputSize = Self.scaledSize(for: videoTrack, longEdge: request.output.longEdge)
-
-        let posterTime = CMTime(seconds: posterTimeSec, preferredTimescale: 600)
-        let cgImage = try copyPreviewCGImage(for: asset, at: posterTime)
-        let posterImage = CIImage(cgImage: cgImage)
-        let original = sourceImageNormalizer.scaledStillSourceImage(posterImage, outputSize: outputSize)
-        let graded = applyGrade(to: original, timeSeconds: posterTimeSec).cropped(to: original.extent)
-
-        let originalURL = try writePreviewImage(original, preferredName: "filmtone-preview-original")
-        let gradedURL = try writePreviewImage(graded, preferredName: "filmtone-preview-graded")
-
-        return Phase0PreviewRenderResultDTO(
-            originalUri: originalURL.absoluteString,
-            gradedUri: gradedURL.absoluteString,
-            width: Int(outputSize.width.rounded()),
-            height: Int(outputSize.height.rounded()),
-            posterTimeSec: posterTimeSec
-        )
-    }
-
-    private func copyPreviewCGImage(for asset: AVAsset, at time: CMTime) throws -> CGImage {
-        do {
-            return try configuredPreviewGenerator(asset: asset, tolerance: .zero).copyCGImage(at: time, actualTime: nil)
-        } catch {
-            let fallbackTolerance = CMTime(seconds: 0.5, preferredTimescale: 600)
-            return try configuredPreviewGenerator(asset: asset, tolerance: fallbackTolerance)
-                .copyCGImage(at: time, actualTime: nil)
-        }
-    }
-
-    private func configuredPreviewGenerator(asset: AVAsset, tolerance: CMTime) -> AVAssetImageGenerator {
-        let generator = AVAssetImageGenerator(asset: asset)
-        generator.appliesPreferredTrackTransform = true
-        generator.requestedTimeToleranceBefore = tolerance
-        generator.requestedTimeToleranceAfter = tolerance
-        return generator
-    }
-
     private func renderableImage(
         from imageBuffer: CVPixelBuffer,
         transform: CGAffineTransform,
@@ -1356,54 +1304,10 @@ final class FilmtoneExportSession {
         return 0.12 + (normalized * 0.74)
     }
 
-    private func makePreviewPosterTime(sourceDurationSec: Double) -> Double {
-        guard sourceDurationSec.isFinite, sourceDurationSec > 0 else {
-            return 0
-        }
-        let candidate = sourceDurationSec * 0.25
-        return min(max(candidate, 0), sourceDurationSec)
-    }
-
     private func checkCancelled() throws {
         if cancelled {
             throw FilmtoneMediaError.exportCancelled
         }
-    }
-
-    private func writePreviewImage(_ image: CIImage, preferredName: String) throws -> URL {
-        let url = try cacheStore.temporaryPreviewURL(preferredName: preferredName, pathExtension: "jpg")
-        try writeJPEGImage(image, to: url)
-        return url
-    }
-
-    private func writeReferenceAfterImage(
-        to url: URL,
-        sourceDurationSec: Double?
-    ) throws -> Double {
-        let asset = AVURLAsset(url: outputURL)
-        let assetDuration = CMTimeGetSeconds(asset.duration)
-        let duration = assetDuration.isFinite && assetDuration > 0
-            ? assetDuration
-            : (sourceDurationSec ?? 0)
-        let posterTimeSec = makePreviewPosterTime(sourceDurationSec: duration)
-        let posterTime = CMTime(
-            seconds: posterTimeSec,
-            preferredTimescale: 600
-        )
-        let cgImage = try copyPreviewCGImage(for: asset, at: posterTime)
-        try writeJPEGImage(CIImage(cgImage: cgImage), to: url)
-        return posterTimeSec
-    }
-
-    private func writeJPEGImage(_ image: CIImage, to url: URL) throws {
-        guard let data = ciContext.jpegRepresentation(
-            of: image,
-            colorSpace: outputColorSpace,
-            options: [:]
-        ) else {
-            throw FilmtoneMediaError.exportFailed("JPEG data could not be created.")
-        }
-        try data.write(to: url, options: .atomic)
     }
 
     private static func makeRenderStageProfiler(
