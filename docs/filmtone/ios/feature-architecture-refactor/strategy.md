@@ -357,3 +357,15 @@ Total: 11-13 working days.
   4-section grep = 4; `bun run verify:ios` green; `git diff --check`
   clean. See
   `archive/2026-05-11-phase-2b-10b-export-video-timeline-extraction.md`.
+- 2026-05-11 JST — Phase 2B-10C (video export queue bundle) committed
+  as `90553a4d`. Three queue collaborators landed under
+  `Export/Internal/`: `ExportVideoCompletionCoordinator` (119 lines)
+  owns dispatch-group / first-error lifecycle, `ExportVideoFramePump`
+  (191 lines) owns video sample decode / lookahead / output-frame loop /
+  progress cadence, and `ExportVideoAudioPump` (84 lines) owns the audio
+  queue body. `FilmtoneExportSession.swift` reduced from 1296 → 1127
+  lines (−169); session still owns writer/reader setup, depth prep,
+  render/append closure, and `CompletedExport` assembly. pbxproj
+  4-section grep = 4 for all 3 files; `bun run verify:ios` green;
+  `git diff --check` clean. See
+  `archive/2026-05-11-phase-2b-10c-video-export-queue-bundle.md`.

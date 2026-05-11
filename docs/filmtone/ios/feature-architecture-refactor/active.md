@@ -1,125 +1,137 @@
-# Active - Phase 2B-10C ExportVideoCompletionCoordinator Extraction
+# Active - Phase 2B-10D Video IO Setup Bundle
 
 Date: 2026-05-11 JST
 Phase: Phase 2B - ExportSession public-surface split
-Milestone: Move video export completion / failure lifecycle out of
+Milestone: Move video writer/reader setup and sizing helpers out of
 `FilmtoneExportSession.exportVideo`.
 
 ## Owner Directive
 
-- Essence first: keep shrinking `FilmtoneExportSession` toward a thin
-  export orchestrator. This is implementation work, not inventory.
-- Product quality is the bar: dispatch-group balance, writer/input
-  finishing, cancellation-on-first-failure, captured-error precedence,
-  and audio/video queue shutdown semantics must stay equivalent.
+- Keep the larger bundle grain. This sub-stage should remove the remaining
+  writer/reader setup block from `exportVideo(...)`, not only a tiny
+  helper.
+- Essence first: finish pushing `FilmtoneExportSession` toward the thin
+  orchestrator target before Phase 2C parity. The expected result is
+  roughly 1000-1050 lines, with video export IO setup delegated.
+- Product quality is the bar: writer settings, reader output selection,
+  audio preservation, degraded decode telemetry, start-order, and output
+  sizing must stay equivalent.
 - Outer shell minimal: no new XCTest, simulator smoke, PNG/PSNR fixture,
   or formal QA matrix in this sub-stage. Run the focused gates below.
-- No extension-only split. The target is an independent
-  `ExportVideoCompletionCoordinator` type under `Export/Internal/`.
+- No extension-only split. Use independent helper types under
+  `Export/Internal/`.
 
 ## Goal
 
-Create `Export/Internal/ExportVideoCompletionCoordinator.swift` and move
-the local completion / failure lifecycle helpers out of
-`exportVideo(...)`.
+Create a larger IO setup bundle:
 
-This is not the full video loop extraction. Keep writer/reader setup,
-video sample decode, lookahead selection, depth matching, timeline
-mapping, frame append, audio append body, and render stage order on
-`FilmtoneExportSession` for now. The new coordinator should own only the
-dispatch group, completion/failure locks, finished flags, captured error,
-input finishing, reader/writer cancellation on first failure, waiting,
-and captured-error throw handoff.
+1. `ExportGeometry`
+   - owns the two `scaledSize(...)` helpers currently on
+     `FilmtoneExportSession`.
+   - used by video export, still export, and any cross-file call sites
+     that currently reference `FilmtoneExportSession.scaledSize`.
+2. `ExportVideoIOBuilder`
+   - owns the video export writer/reader setup block:
+     output size, writer, video input, adaptor, audio pipeline, reader,
+     video reader output selection, degraded decode path, input
+     registration, `startWriting`, `startReading`, and
+     `startSession(atSourceTime: .zero)`.
 
-## Current Boundary As Of 2B-10B
-
-Inside `exportVideo(...)`, completion responsibility currently includes:
-
-- local state:
-  - `completionLock`
-  - `failureLock`
-  - `dispatchGroup`
-  - `videoInputFinished`
-  - `audioInputFinished`
-  - `capturedError`
-- local helpers:
-  - `finishVideoInput(markAsFinished:)`
-  - `finishAudioInput(markAsFinished:)`
-  - `failExport(_:)`
-- call-site dependencies:
-  - both media queues check `capturedError != nil`
-  - video queue calls `finishVideoInput(markAsFinished: true)`
-  - audio queue calls `finishAudioInput(markAsFinished: true)`
-  - catch blocks call `failExport(error)`
-  - after queue registration, session calls `dispatchGroup.wait()`
-  - after waiting, session throws `capturedError` if present
-
-Move the lifecycle state and helper bodies. Keep the queue bodies and
-their sample work on the session.
+Keep mezzanine routing, asset/video-track lookup, depth reader setup,
+timeline construction, queue pumps, `appendOutputFrame(...)`, post-wait
+finish, and `CompletedExport` assembly on `FilmtoneExportSession`.
 
 ## Intended Implementation Shape
+
+### 1. ExportGeometry
 
 Add:
 
 ```swift
-final class ExportVideoCompletionCoordinator {
-    init(
-        reader: AVAssetReader,
-        writer: AVAssetWriter,
-        videoInput: AVAssetWriterInput,
-        audioInput: AVAssetWriterInput?
-    )
-
-    var hasCapturedError: Bool { get }
-
-    func enterVideo()
-    func enterAudio()
-    func finishVideoInput(markAsFinished: Bool)
-    func finishAudioInput(markAsFinished: Bool)
-    func failExport(_ error: Error)
-    func wait()
-    func throwCapturedErrorIfNeeded() throws
+enum ExportGeometry {
+    static func scaledSize(for track: AVAssetTrack, longEdge: Int) -> CGSize
+    static func scaledSize(for sourceSize: CGSize, longEdge: Int) -> CGSize
 }
 ```
 
-Implementation notes:
+Move the existing formulas verbatim. Update session call sites from
+`Self.scaledSize(...)` to `ExportGeometry.scaledSize(...)`. If any
+cross-file consumers reference `FilmtoneExportSession.scaledSize`, update
+them to the new namespace without changing arguments.
 
-- `enterVideo()` / `enterAudio()` should be thin wrappers over the same
-  `DispatchGroup.enter()` calls that currently live in the session.
-- `finishVideoInput(markAsFinished:)` must keep the exact lock /
-  already-finished guard / optional `markAsFinished()` / finished flag /
-  `dispatchGroup.leave()` ordering.
-- `finishAudioInput(markAsFinished:)` must keep the exact `guard let
-  audioInput else { return }` behavior before locking.
-- `failExport(_:)` must keep first-error-wins semantics:
-  lock failure, set captured error only when nil, unlock, return if this
-  was not the first error, then cancel reader/writer and finish both
-  inputs with `markAsFinished: true`.
-- `hasCapturedError` may lock around the read, but it must remain a
-  read-only predicate used by the queue loops.
+### 2. ExportVideoIOBuilder
 
-In `FilmtoneExportSession`:
+Add:
 
-- replace local completion state and helper declarations with
-  `let completionCoordinator = ExportVideoCompletionCoordinator(...)`.
-- replace `dispatchGroup.enter()` with coordinator enter calls.
-- replace `capturedError != nil` checks with
-  `completionCoordinator.hasCapturedError`.
-- replace `finishVideoInput`, `finishAudioInput`, `failExport`,
-  `dispatchGroup.wait()`, and captured-error throw sites with the
-  coordinator API.
-- do not move decode, append, audio sample, or reader/writer construction
-  into this coordinator.
+```swift
+final class ExportVideoIOBuilder {
+    struct Context {
+        let outputSize: CGSize
+        let writer: AVAssetWriter
+        let videoInput: AVAssetWriterInput
+        let adaptor: AVAssetWriterInputPixelBufferAdaptor
+        let audioInput: AVAssetWriterInput?
+        let audioOutput: AVAssetReaderTrackOutput?
+        let reader: AVAssetReader
+        let videoOutput: AVAssetReaderTrackOutput
+        let degradedDecodePath: Bool
+    }
+
+    init(
+        request: Phase0ExportRequestDTO,
+        mediaWriter: ExportMediaWriter
+    )
+
+    func makeContext(
+        asset: AVURLAsset,
+        videoTrack: AVAssetTrack,
+        highlightTimeline: FilmtoneHighlightReelFrameTimeline?
+    ) throws -> Context
+}
+```
+
+The builder should preserve the current order:
+
+1. compute `outputSize`
+2. create writer / video input / adaptor
+3. `guard writer.canAdd(videoInput)` with same error string
+4. `writer.add(videoInput)`
+5. resolve audio track only when
+   `highlightTimeline == nil && request.output.preserveAudio`
+6. create audio pipeline and add audio input if possible
+7. create `AVAssetReader(asset:)`
+8. create video reader output using the same codec-family expression
+9. throw same `"Video reader output could not be added."` error if nil
+10. set `degradedDecodePath` from the selection
+11. `reader.add(videoOutput)`
+12. add audio output if reader can add it
+13. `writer.startWriting()` with same failure string
+14. `reader.startReading()` with same failure string
+15. `writer.startSession(atSourceTime: .zero)`
+
+In `FilmtoneExportSession`, build the context and assign:
+
+```swift
+let io = try videoIOBuilder.makeContext(...)
+degradedDecodePath = io.degradedDecodePath
+```
+
+Then pass `io.writer`, `io.reader`, `io.videoInput`, `io.adaptor`,
+`io.videoOutput`, `io.audioInput`, `io.audioOutput`, and
+`io.outputSize` to the existing queue pumps and append closure.
 
 ## Edit Targets
 
 - `apps/capacitor-film-lab-ios/ios/App/App/Export/FilmtoneExportSession.swift`
-  - remove local lifecycle state / helpers from `exportVideo`
-  - delegate lifecycle calls to `ExportVideoCompletionCoordinator`
-- `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportVideoCompletionCoordinator.swift`
+  - remove static `scaledSize` helpers
+  - remove writer/reader setup block from `exportVideo`
+  - delegate to `ExportVideoIOBuilder`
+- `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportGeometry.swift`
+  - new file
+- `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportVideoIOBuilder.swift`
   - new file
 - `apps/capacitor-film-lab-ios/ios/App/App.xcodeproj/project.pbxproj`
-  - 4-section registration for `ExportVideoCompletionCoordinator.swift`
+  - 4-section registration for both files
 - `docs/filmtone/ios/feature-architecture-refactor/active.md`
   - update checklist and unexpected notes as implementation proceeds
 
@@ -129,88 +141,83 @@ In `FilmtoneExportSession`:
   - commit gate and 4-section pbxproj rule
 - `docs/filmtone/ios/feature-architecture-refactor/strategy.md`
   - Phase 2B / 2C milestones
-- `docs/filmtone/ios/feature-architecture-refactor/archive/2026-05-11-phase-2b-10b-export-video-timeline-extraction.md`
+- `docs/filmtone/ios/feature-architecture-refactor/archive/2026-05-11-phase-2b-10c-video-export-queue-bundle.md`
   - latest extraction precedent
 - `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportMediaWriter.swift`
-  - writer/finish primitive, read-only in this sub-stage
-- `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportVideoTimeline.swift`
-  - timeline state, read-only in this sub-stage
+  - writer/reader primitive APIs
+- `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportVideoFramePump.swift`
+  - video queue consumer of IO context
+- `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportVideoAudioPump.swift`
+  - audio queue consumer of IO context
 
 ## Checklist
 
-- [ ] Create `Export/Internal/ExportVideoCompletionCoordinator.swift`
-  with `AVFoundation` / `Foundation` imports as needed.
-- [ ] Move `completionLock`, `failureLock`, `dispatchGroup`,
-  `videoInputFinished`, `audioInputFinished`, and `capturedError` into
-  the coordinator.
-- [ ] Move `finishVideoInput(markAsFinished:)`,
-  `finishAudioInput(markAsFinished:)`, and `failExport(_:)` bodies into
-  the coordinator without changing ordering.
-- [ ] Add queue-safe `hasCapturedError`, `enterVideo`, `enterAudio`,
-  `wait`, and `throwCapturedErrorIfNeeded` wrappers.
-- [ ] Rewire video queue call sites to the coordinator.
-- [ ] Rewire audio queue call sites to the coordinator.
-- [ ] Preserve first-error-wins cancellation semantics.
-- [ ] Register `ExportVideoCompletionCoordinator.swift` in pbxproj 4
-  sections.
-- [ ] Verify declaration-removal grep returns 0 hits:
-  `rg -n "completionLock|failureLock|dispatchGroup|videoInputFinished|audioInputFinished|capturedError|func finishVideoInput|func finishAudioInput|func failExport" apps/capacitor-film-lab-ios/ios/App/App/Export/FilmtoneExportSession.swift`
-- [ ] `grep -c 'ExportVideoCompletionCoordinator.swift' apps/capacitor-film-lab-ios/ios/App/App.xcodeproj/project.pbxproj`
+- [ ] Create `ExportGeometry.swift` and move both scaled-size helpers.
+- [ ] Update all `FilmtoneExportSession.scaledSize` / `Self.scaledSize`
+  call sites to `ExportGeometry.scaledSize`.
+- [ ] Create `ExportVideoIOBuilder.swift` and move writer/reader setup
+  into `makeContext(...)`.
+- [ ] Rewire `exportVideo(...)` to use the IO context values.
+- [ ] Preserve `degradedDecodePath` assignment timing.
+- [ ] Preserve audio preservation gate and audio pipeline add behavior.
+- [ ] Preserve writer/reader start order and error messages.
+- [ ] Register both new Swift files in pbxproj 4 sections.
+- [ ] Verify stale setup grep on `FilmtoneExportSession.swift` is clean:
+  `rg -n "AVAssetWriterInputPixelBufferAdaptor|writer\\.canAdd\\(videoInput\\)|writer\\.add\\(videoInput\\)|makeAudioPipeline|makeVideoReaderOutput|writer\\.startWriting\\(|reader\\.startReading\\(|startSession\\(atSourceTime: \\.zero\\)|static func scaledSize" apps/capacitor-film-lab-ios/ios/App/App/Export/FilmtoneExportSession.swift`
+- [ ] `grep -c 'ExportGeometry.swift' apps/capacitor-film-lab-ios/ios/App/App.xcodeproj/project.pbxproj`
+  is 4.
+- [ ] `grep -c 'ExportVideoIOBuilder.swift' apps/capacitor-film-lab-ios/ios/App/App.xcodeproj/project.pbxproj`
   is 4.
 - [ ] `bun run verify:ios` passes.
 - [ ] `git diff --check` passes.
 
 ## Verification Gates
 
-Minimum gates for this sub-stage:
+Minimum gates for this bundle:
 
-- pbxproj 4-section grep for `ExportVideoCompletionCoordinator.swift`
-- lifecycle helper declarations removed from `FilmtoneExportSession`
+- pbxproj 4-section grep for both new files
+- stale setup grep on `FilmtoneExportSession`
 - `bun run verify:ios`
 - `git diff --check`
 
 Do not add simulator smoke, sidecar canonical fixtures, or PNG byte-diff
-fixtures in 2B-10C unless implementation changes behavior beyond
+fixtures in this sub-stage unless implementation changes behavior beyond
 extraction.
 
 ## Done Conditions
 
-- Dispatch group ownership lives in `ExportVideoCompletionCoordinator`.
-- Video and audio input finishing still leave the dispatch group exactly
-  once per entered queue.
-- `finishAudioInput(markAsFinished:)` still returns immediately when
-  `audioInput` is nil.
-- First captured error still wins; later failures do not overwrite it.
-- Reader cancel + writer cancel still run only for the first failure.
-- First failure still finishes both inputs with `markAsFinished: true`.
-- Queue loops still stop when a captured error exists.
-- The session still waits for the same group before checking reader
-  status and finishing the writer.
-- The session still throws the captured error before reader-status
-  failure handling.
-- Reader/writer setup, decode loop, lookahead selection, timeline math,
-  depth preparation order, motion blur reset order, frame append, audio
-  append, public API, sidecar schema, and UI call sites are unchanged.
+- `FilmtoneExportSession.exportVideo(...)` no longer owns writer/reader
+  setup, adaptor creation, reader output selection, or static sizing math.
+- `ExportVideoIOBuilder` returns a complete context with identical writer
+  settings, reader output choice, audio pipeline behavior, degraded decode
+  flag, and start order.
+- `ExportGeometry` owns the scaled-size formulas and all call sites use
+  that namespace.
+- The session still owns mezzanine routing, asset/video-track lookup,
+  depth reader setup, timeline construction, queue pump orchestration,
+  `appendOutputFrame(...)`, post-wait finish, and `CompletedExport`
+  assembly.
+- Public API, sidecar schema, render stage order, queue behavior, audio
+  preservation, export settings, and UI call sites are unchanged.
 
 ## Stop Conditions
 
 - Done conditions are met.
 - `bun run verify:ios` fails 3 consecutive times for the same issue.
-- Moving completion lifecycle forces changes to decode loop policy,
-  sample selection, audio pipeline creation, writer/reader setup, frame
-  append, depth matcher behavior, render stage order, or sidecar fields.
-  Stop and record the blocker instead of widening scope.
+- Moving IO setup forces changes to queue pump behavior, render stage
+  order, sidecar fields, export settings, timeline math, depth matcher
+  behavior, or public API. Stop and record the blocker instead of
+  widening scope.
 
 ## Out Of Scope
 
-- Full `exportVideo` loop extraction.
-- Video sample decode / lookahead selection extraction.
-- Audio append body extraction.
+- Full video export facade extraction.
+- Mezzanine routing changes.
+- Depth matcher behavior changes.
+- Queue pump behavior changes.
 - `ExportMediaWriter` helper changes.
-- `ExportVideoTimeline` behavior changes.
-- `ExportVideoDepthMatcher` behavior changes.
 - Motion blur, grade, optics, sidecar, connect package, preview, still
-  export, or mezzanine routing changes.
+  export, or capture/editor work.
 - Export parity fixtures, PSNR/PNG comparison, simulator UI smoke, and
   formal QA matrix.
 
