@@ -1,197 +1,195 @@
-# Active — Phase 2B-2 Source-Profile / Input-LUT Helpers Extraction
+# Active — Phase 2B-3 DepthPayloadManager Extraction
 
 Date: 2026-05-11 JST
-Phase: Phase 2B — ExportSession public-surface split (sub-stage 2 of N)
-Milestone: First real god-object decomposition cut. Pull the `private
-static` source-profile / input-LUT helpers out of `FilmtoneExportSession`
-into independent helper types under `Export/Internal/`.
+Phase: Phase 2B — ExportSession public-surface split (sub-stage 3 of N)
+Milestone: Bounded handoff slice. Lift the video-depth reader probe +
+per-frame pull bridge out of `FilmtoneExportSession` into an independent
+helper under `Export/Internal/`, keeping the per-frame loop's depth
+semantics byte-identical.
 
-## Owner directive (2026-05-11 JST)
+## Owner directive (carry-over from 2B-2)
 
-The previous sub-stage (2B-1) lifted `extension ISO8601DateFormatter` —
-acceptable because it is an extension on a Foundation type, not on
-`FilmtoneExportSession`. This sub-stage is different.
-
-**Do not create another `extension FilmtoneExportSession` file.** Splitting
-a god object into a separate file that is still an `extension` of the
-same class keeps the responsibility on the god class and defeats the
-lane's purpose.
-
-Extract the source-profile / input-LUT helpers into **independent
-internal helper types** under `Export/Internal/`. Rewrite the call
-sites inside `FilmtoneExportSession.swift` to call the helper types.
-Public API of `FilmtoneExportSession` is unchanged.
-
-Memory: `feedback_no_extension_only_file_for_god_object_split`.
+The `feedback_no_extension_only_file_for_god_object_split` rule still
+applies. Do **not** create an `extension FilmtoneExportSession` file.
+The depth helpers go into an **independent internal helper type** under
+`Export/Internal/`. Public API of `FilmtoneExportSession` is unchanged.
 
 ## Goal
 
-Reduce `FilmtoneExportSession.swift` from 4488 lines by moving ~330
-lines of `private static` source-profile / input-LUT helpers — currently
-clustered at lines 3064–3372 — into two independent helper types. The
-helpers are pure functions plus one `NSCache`; no instance state and
-no observable side effects beyond cache reuse.
+Move three private members of `FilmtoneExportSession.swift` out:
+
+| Symbol | Current lines | Kind |
+|---|---|---|
+| `private func resolveVideoDepthReader(asset:)` | 2794–2839 (46 lines) | instance fn that gates on `request.depthEnabled` |
+| `private enum VideoDepthFramePullResult` | 2845–2849 (5 lines) | result tri-state |
+| `private func pullNextVideoDepthFrame(reader:)` | 2851–2871 (21 lines) | pure sync bridge of `reader.nextFrame()` |
+
+Total ~72 lines. Two cross-file readers exist today inside the class
+itself only (call sites at `FilmtoneExportSession.swift:758` and `:959`).
+
+Both functions today use only local `DispatchSemaphore`s to sync-bridge
+async work from `VideoDepthSourceService` / `VideoDepthFrameReader`. The
+only instance-state dependency is `request.depthEnabled` inside
+`resolveVideoDepthReader` (line 2795 fast-return).
 
 ## Edit Targets
 
 - `apps/capacitor-film-lab-ios/ios/App/App/Export/FilmtoneExportSession.swift`
-  (delete the ~330 lines, rewrite 4 call sites)
-- `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportInputLutBuilder.swift`
-  (new — input-LUT construction)
-- `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportSourceProfileResolver.swift`
-  (new — camera-profile sidecar provenance)
+  (delete the ~72 lines, rewrite 2 call sites)
+- `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportDepthPayloadManager.swift`
+  (new — sole owner of the three symbols)
 - `apps/capacitor-film-lab-ios/ios/App/App.xcodeproj/project.pbxproj`
-  (4-section registration, one entry per new file)
+  (4-section registration, one entry per new file → +1 to App target)
 - `docs/filmtone/ios/feature-architecture-refactor/active.md` (this file)
 
 ## Read-Only References
 
 - `apps/capacitor-film-lab-ios/CLAUDE.md` (commit gate; §3 4-section grep)
 - `docs/filmtone/ios/feature-architecture-refactor/strategy.md`
+  (Phase 2B target = 6 files; this is sub-stage 3)
 - `docs/filmtone/ios/feature-architecture-refactor/archive/2026-05-11-phase-2b-1-sidecar-formatter-extraction.md`
-  (compatibility table + 2B-2 plan correction)
-- `apps/capacitor-film-lab-ios/ios/App/App/Source/FilmtoneSourceProfileMath.swift`
-  (math primitives the helpers wrap — not modified)
-- `apps/capacitor-film-lab-ios/ios/App/App/Source/FilmtoneSourceProfileCatalog.swift`
-  (catalog the resolver consults — not modified)
+  (Compatibility Table — `DepthPayloadManager` row + Risk Rank #3)
+- `docs/filmtone/ios/feature-architecture-refactor/archive/2026-05-11-phase-2b-2-source-profile-input-lut-helpers-extraction.md`
+  (precedent for independent-helper-type extraction)
+- `apps/capacitor-film-lab-ios/ios/App/App/Source/FilmtoneMediaRuntime.swift`
+  (`VideoDepthSourceService` / `VideoDepthFrameReader` definitions — not modified)
+- `apps/capacitor-film-lab-ios/ios/App/App/Source/FilmtoneDepthMap.swift`
+  (`FilmtoneDepthMap` payload — not modified)
 
 ## Helper type design
 
-### `ExportInputLutBuilder` (Export/Internal/ExportInputLutBuilder.swift)
+### `ExportDepthPayloadManager` (Export/Internal/ExportDepthPayloadManager.swift)
 
-`enum` namespace (no instance state needed; the `NSCache` is a static
-property). All members `static`. Public surface to call sites:
+`enum` namespace (no instance state — the only instance-state read,
+`request.depthEnabled`, is moved to the parameter list). All members
+`static`.
 
-- `static func makePreparedLut(from lut: SerializableLutDTO?) -> PreparedLut?`
-- `static func makeActiveInputLut(for selection: CameraProfileSelection?, probe: SourceProbeDTO?) -> PreparedLut?`
+**Public surface to call sites:**
 
-Private/file-private inside the new file:
+```swift
+enum ExportDepthPayloadManager {
+    /// Tri-state result of `pullNextFrame` so callers can distinguish
+    /// "stream ended" from "transient failure".
+    enum PullResult {
+        case frame((presentationTime: CMTime, depthMap: FilmtoneDepthMap))
+        case endOfStream
+        case failure(Error)
+    }
 
-- `static func makeAutomaticInputLut(for: SourceInputTransformPolicyDTO?)`
-- `static func makeInputLut(forImpl: SourceProfileImpl)`
-- `static func makeSynthesizedInputLut(curve: SourceProfileCurve)`
-- `static func makeAppleLogToRec709Lut(size:rec2020GamutMap:)`
-- `static func appleLogPixelToRec709(red:green:blue:rec2020GamutMap:)`
-- `static func appleLogDecode(_:)`, `rec2020ToRec709(red:green:blue:)`,
-  `filmtoneSdrShoulder(_:)`, `rec709Encode(_:)` (thin wrappers around
-  `FilmtoneSourceProfileMath`; kept as `@inline(__always)`)
-- `static func packRgbToRgbaCubeData(rgb:size:)`, `rgbaCubeData(from:size:)`
-- `private static let synthesizedInputLutCache = NSCache<NSString, NSData>()`
+    /// Probes the video depth track and opens a `VideoDepthFrameReader`.
+    /// Returns nil when depth is disabled by request or when all profile
+    /// depth gains are zero (defense-in-depth fast-path). Throws
+    /// `FilmtoneMediaError.depthUnsupportedForVideoSource` when the asset
+    /// has no depth track despite `depthEnabled == true`.
+    static func resolveReader(
+        asset: AVAsset,
+        depthEnabled: Bool
+    ) throws -> VideoDepthFrameReader?
 
-### `ExportSourceProfileResolver` (Export/Internal/ExportSourceProfileResolver.swift)
+    /// Sync-bridges `VideoDepthFrameReader.nextFrame` for the per-frame
+    /// loop on `videoQueue`.
+    static func pullNextFrame(
+        reader: VideoDepthFrameReader
+    ) -> PullResult
+}
+```
 
-`enum` namespace.
+Method renames (vs current `FilmtoneExportSession.swift`):
 
-- `static func makeCameraProfileSidecar(for selection: CameraProfileSelection?, probeColorClass: SourceColorClassDTO?) -> SidecarCameraProfile?`
-- `private static func implTag(_ impl: SourceProfileImpl) -> String`
+- `resolveVideoDepthReader(asset:)` → `ExportDepthPayloadManager.resolveReader(asset:depthEnabled:)`
+- `pullNextVideoDepthFrame(reader:)` → `ExportDepthPayloadManager.pullNextFrame(reader:)`
+- `VideoDepthFramePullResult` (nested inside class today) → `ExportDepthPayloadManager.PullResult`
 
-These two are coupled (only `makeCameraProfileSidecar` calls `implTag`)
-and have no relation to LUT building beyond sharing the catalog. They
-get their own file.
+The shorter names are unambiguous inside the new namespace and keep the
+two call sites readable. (Method-name preservation was deliberate in
+2B-2 because of 4 call sites + 5 comments; here only 2 call sites
+need updating.)
 
-### Rationale for the split
+### Rationale for the design
 
-- Builder type owns LUT construction including cache and Apple Log math
-  helpers; Resolver type owns sidecar provenance + impl tag. Each is a
-  single responsibility.
-- `enum` namespace (vs `final class`) avoids accidental instantiation
-  and signals "static utility". Matches the convention of existing
-  Filmtone math namespaces (e.g. `FilmtoneSourceProfileMath`).
-- Method names are kept identical to the current `private static` names
-  so call-site diffs are mechanical (`Self.makePreparedLut(...)` →
-  `ExportInputLutBuilder.makePreparedLut(...)`). No public API churn.
+- `enum` namespace (vs `final class`) — no instance state needed; the
+  semaphores are scoped to each call, the gate moved to a parameter.
+- Move `depthEnabled` to the parameter list so the helper does not need
+  `request: Phase0ExportRequestDTO`. The `FilmtonePhase0Generated.hiddenDefaults`
+  fast-path read stays inside the helper since it is module-level state,
+  not session state.
+- `VideoDepthFramePullResult` is renamed to `PullResult` and nested
+  inside the namespace so the public surface is `ExportDepthPayloadManager.PullResult`
+  at the two call sites — clearer than a bare top-level enum sibling.
 
 ## Call-site repair list inside `FilmtoneExportSession.swift`
 
-Four real call sites (the rest are matched by comments only):
-
 | Line (current) | Current call | New call |
 |---|---|---|
-| 230 | `Self.makePreparedLut(from: request.inputLut)` | `ExportInputLutBuilder.makePreparedLut(from: request.inputLut)` |
-| 231 | `Self.makeActiveInputLut(for: request.cameraProfile, probe: request.sourceProbe)` | `ExportInputLutBuilder.makeActiveInputLut(for: request.cameraProfile, probe: request.sourceProbe)` |
-| 238 | `Self.makePreparedLut(from: legacyCreativeLut)` | `ExportInputLutBuilder.makePreparedLut(from: legacyCreativeLut)` |
-| 530 | `Self.makeCameraProfileSidecar(for: …, probeColorClass: …)` | `ExportSourceProfileResolver.makeCameraProfileSidecar(for: …, probeColorClass: …)` |
+| 758 | `let depthReader = try resolveVideoDepthReader(asset: asset)` | `let depthReader = try ExportDepthPayloadManager.resolveReader(asset: asset, depthEnabled: request.depthEnabled ?? false)` |
+| 959 | `switch pullNextVideoDepthFrame(reader: reader)` | `switch ExportDepthPayloadManager.pullNextFrame(reader: reader)` |
 
 (Line numbers will shift as the helpers are removed; the worker reads
 the file fresh at edit time. Use the call expression as the anchor, not
 the line number.)
 
-## Comment updates outside ExportSession (cosmetic, not behavioural)
+The `switch` body uses cases `.frame`, `.endOfStream`, `.failure` — the
+case names are unchanged, so the body needs no per-case edit.
 
-Five files reference the helpers by their old `FilmtoneExportSession.<helper>`
-form **in comments only** (no real calls). Update the comment to point
-at the new helper type:
+## Comment updates outside ExportSession
 
-- `apps/capacitor-film-lab-ios/ios/App/App/Editor/FilmtoneEditorFacade.swift:152`
-  — `FilmtoneExportSession.makeActiveInputLut(for:probe:)` →
-  `ExportInputLutBuilder.makeActiveInputLut(for:probe:)`
-- `apps/capacitor-film-lab-ios/ios/App/App/Editor/FilmtoneEditorStore.swift:1305`
-  — `FilmtoneExportSession.makeAutomaticInputLut(for:)` →
-  `ExportInputLutBuilder.makeAutomaticInputLut(for:)`
-- `apps/capacitor-film-lab-ios/ios/App/App/Source/FilmtoneSourceProfileCatalog.swift:12`
-  — `makeAppleLogToRec709Lut` reference → reference new type path
-- `apps/capacitor-film-lab-ios/ios/App/App/Source/FilmtoneSourceProfileMath.swift:481`
-  — `FilmtoneExportSession.makeAppleLogToRec709Lut` →
-  `ExportInputLutBuilder.makeAppleLogToRec709Lut`
-- `apps/capacitor-film-lab-ios/ios/App/App/Source/FilmtoneSourceProfileSchema.swift:105`
-  — `makeAppleLogToRec709Lut from FilmtoneExportSession` →
-  `from ExportInputLutBuilder`
+None expected. `grep -rn "resolveVideoDepthReader\|pullNextVideoDepthFrame\|VideoDepthFramePullResult"`
+across `apps/capacitor-film-lab-ios/ios/App/App/` is expected to return
+zero non-`FilmtoneExportSession.swift` matches at extraction time
+(verify with grep before the move).
 
 ## Things deliberately *not* moved in this sub-stage
 
-- `FilmtoneExportSidecarBuilder.swift:1078`/`:1157` carries its own
-  `appleLogPixelToRec709` private static. That is a duplicate copy
-  living in a different file. Consolidating the duplicate is a separate
-  concern (potential follow-up); 2B-2 does not touch SidecarBuilder.
+- `lastDepthFrame` state variable (line 904 inside `exportVideo`) — that
+  is per-export-run state owned by the frame loop, not by the depth
+  reader. Stays in the writer/loop boundary which is 2B-7 work.
+- `VideoDepthSourceService`, `VideoDepthFrameReader` (defined in
+  `Source/FilmtoneMediaRuntime.swift`) — already external types; no
+  change.
+- `FilmtoneDepthPrefilter` (the per-pixel depth math) — separate concern.
 - `FilmtoneSharedGradeProcessor`, `FilmtoneMotionBlurAccumulator`,
-  `OpticalKernels` (file-level companions). They go in 2B-4 because
-  their `fileprivate` access ladder must be bumped together.
-- Any kernel-chain (`applyGrade`, `applyInputLutStage`, etc.) — that is
-  2B-6 with the 2C parity gate.
-- `FilmtoneExportSession` public API: signatures, sidecar field order,
-  render math, kernel chain order all stay byte-identical.
+  `OpticalKernels` (2B-4 bundle).
+- `OpticsCompositor` (2B-5) / `GradeRenderPipeline` (2B-6 with 2C
+  parity gate) / `ExportMediaWriter` (2B-7 with 2C).
 
 ## Checklist
 
-- [ ] Create `Export/Internal/ExportInputLutBuilder.swift` containing
-  the LUT helpers as listed above (move, not rewrite).
-- [ ] Create `Export/Internal/ExportSourceProfileResolver.swift` with
-  `makeCameraProfileSidecar` + `implTag`.
-- [ ] Delete the same ~330 lines (3064–3372 in the pre-edit file) from
-  `FilmtoneExportSession.swift`.
-- [ ] Rewrite the 4 call sites in `FilmtoneExportSession.swift`
-  (`Self.<helper>` → `<HelperType>.<helper>`).
-- [ ] Update the 5 cosmetic comments listed above.
-- [ ] Register both new files in `project.pbxproj` (4 sections each).
-- [ ] `grep -c 'ExportInputLutBuilder' project.pbxproj` >= 4.
-- [ ] `grep -c 'ExportSourceProfileResolver' project.pbxproj` >= 4.
+- [ ] Confirm no cross-file readers for the three symbols
+  (`grep -rn "resolveVideoDepthReader\|pullNextVideoDepthFrame\|VideoDepthFramePullResult" apps/capacitor-film-lab-ios/ios/App/App/`).
+- [ ] Create `Export/Internal/ExportDepthPayloadManager.swift` with the
+  three members renamed per the design above.
+- [ ] Delete the ~72 lines (current 2794–2871) from `FilmtoneExportSession.swift`.
+- [ ] Rewrite the 2 call sites in `FilmtoneExportSession.swift`
+  (`resolveVideoDepthReader` → `ExportDepthPayloadManager.resolveReader`,
+   `pullNextVideoDepthFrame` → `ExportDepthPayloadManager.pullNextFrame`).
+- [ ] Register the new file in `project.pbxproj` (4 sections).
+- [ ] `grep -c 'ExportDepthPayloadManager' project.pbxproj` >= 4.
 - [ ] `bun run verify:ios` — PASS.
 - [ ] `git diff --check` — PASS.
 
 ## Verification gates
 
 - pbxproj 4-section registration verified per file
-- `bun run verify:ios` green at every commit (CLAUDE.md §3)
+- `bun run verify:ios` green (CLAUDE.md §3; same gate chain as 2B-1/2B-2)
 - `git diff --check` clean (whitespace)
-- `git diff --stat` shows roughly: −330 in ExportSession.swift,
-  +<helper file sizes> in two new files, +call-site rewrites in
-  ExportSession, +small comment edits
-- No edit to `FilmtoneSourceProfileMath.swift` /
-  `FilmtoneSourceProfileCatalog.swift` /
-  `FilmtoneExportSidecarBuilder.swift` (other than the comment update
-  in catalog/math/schema files)
+- `git diff --stat` shows roughly: −72 in ExportSession.swift,
+  +<helper file size> in one new file, +2 call-site rewrites in
+  ExportSession
+- App target `PBXSourcesBuildPhase` file count changes by exactly +1
+- No edit to `FilmtoneMediaRuntime.swift` / `FilmtoneDepthMap.swift` /
+  `FilmtoneDepthPrefilter.swift`
 
 ## Done Conditions
 
 - `FilmtoneExportSession.swift` no longer contains
-  `makePreparedLut`, `makeCameraProfileSidecar`, `implTag`,
-  `makeAutomaticInputLut`, `makeActiveInputLut`, `makeInputLut`,
-  `makeSynthesizedInputLut`, `makeAppleLogToRec709Lut`,
-  `appleLogPixelToRec709`, `appleLogDecode`, `rec2020ToRec709`,
-  `filmtoneSdrShoulder`, `rec709Encode`, `packRgbToRgbaCubeData`,
-  `rgbaCubeData`, or `synthesizedInputLutCache`.
-- Two new helper types own those symbols; no `extension
-  FilmtoneExportSession` exists in the new files.
+  `resolveVideoDepthReader`, `pullNextVideoDepthFrame`, or
+  `VideoDepthFramePullResult`.
+- `ExportDepthPayloadManager` (`enum` namespace) owns those symbols;
+  no `extension FilmtoneExportSession` exists in the new file.
+- The per-frame depth pull loop in `exportVideo` (around lines 900–971)
+  is unchanged in shape: same case dispatch (`.frame` / `.endOfStream` /
+  `.failure`), same `lastDepthFrame` retention, same `depthMapForThisFrame`
+  source.
 - All gates green.
 - No change to public API, sidecar field order, render math, or kernel
   chain order.
@@ -200,21 +198,23 @@ at the new helper type:
 
 - Stop if the helper move requires changing any `FilmtoneExportSession`
   public/internal-default signature.
-- Stop if the move requires changing the order of fields written by
-  `writeExportSidecar` or the order of LUT preparation in `init` (the
-  `makePreparedLut(...) ?? makeActiveInputLut(...)` fallback pattern
-  must be preserved verbatim at line ~230).
+- Stop if the move requires reordering or guarding the `DispatchSemaphore`
+  wait pattern — the per-frame loop currently relies on synchronous
+  bridging on `videoQueue`, and that contract must stay byte-identical.
+- Stop if the move requires the helper to take a reference to
+  `FilmtonePhase0Generated.hiddenDefaults` from outside (it should keep
+  reading the module-level constant directly).
 - Stop after 3 consecutive build/verification failures.
-- Stop if the App target `PBXSourcesBuildPhase` file count changes by
-  anything other than +2.
+- Stop if the App target's `PBXSourcesBuildPhase` file count changes by
+  anything other than +1.
 
 ## Out Of Scope
 
-- Consolidating the duplicate `appleLogPixelToRec709` inside
-  `FilmtoneExportSidecarBuilder.swift`.
-- Moving any other helper bucket from the 2B-1 inventory.
+- Moving `lastDepthFrame` out of the `exportVideo` frame loop.
+- Consolidating any depth math (Filter / Prefilter) with the reader path.
 - View / Editor / Capture code.
 - New tests, new fixtures.
+- Renaming `VideoDepthFrameReader` / `VideoDepthSourceService`.
 
 ## Unexpected / Follow-up
 

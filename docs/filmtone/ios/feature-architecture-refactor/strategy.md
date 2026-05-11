@@ -132,3 +132,15 @@ Total: 11-13 working days.
   recorded: subsequent extractions (2B-2 onward) must produce independent
   helper types, not extensions on `FilmtoneExportSession`. See
   `archive/2026-05-11-phase-2b-1-sidecar-formatter-extraction.md`.
+- 2026-05-11 JST — Phase 2B-2 (source-profile / input-LUT helpers
+  extraction) committed as `c3a87601`. Two independent `enum`-namespace
+  helper types landed under `Export/Internal/`:
+  `ExportInputLutBuilder.swift` (input-LUT factories + Apple Log math +
+  `synthesizedInputLutCache`) and `ExportSourceProfileResolver.swift`
+  (sidecar provenance + `implTag`). `FilmtoneExportSession.swift`
+  reduced from 4488 → 4178 lines (−310); 4 call sites rewritten from
+  `Self.<helper>` to the new namespaces; `makePreparedLut ?? makeActiveInputLut`
+  fallback preserved verbatim; 5 cosmetic comment updates in
+  Editor/Source files. pbxproj 4-section grep = 4 each; `bun run verify:ios`
+  green; `git diff --check` clean. See
+  `archive/2026-05-11-phase-2b-2-source-profile-input-lut-helpers-extraction.md`.
