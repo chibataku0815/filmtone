@@ -54,6 +54,7 @@
 		B1E10001000000000000B20D /* ExportMediaWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B20E /* ExportMediaWriter.swift */; };
 		B1E10001000000000000B20F /* ExportFrameAppender.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B210 /* ExportFrameAppender.swift */; };
 		B1E10001000000000000B211 /* ExportSourceImageNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B212 /* ExportSourceImageNormalizer.swift */; };
+		B1E10001000000000000B213 /* ExportConnectPackageAssembler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B214 /* ExportConnectPackageAssembler.swift */; };
 		D10000010000000000000001 /* FilmtoneRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000001 /* FilmtoneRootView.swift */; };
 		D10000010000000000000002 /* FilmtoneEditorStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000002 /* FilmtoneEditorStore.swift */; };
 		D10000010000000000000003 /* FilmtoneEditorFacade.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000003 /* FilmtoneEditorFacade.swift */; };
@@ -223,6 +224,7 @@
 		B1E10001000000000000B20E /* ExportMediaWriter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportMediaWriter.swift; sourceTree = "<group>"; };
 		B1E10001000000000000B210 /* ExportFrameAppender.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportFrameAppender.swift; sourceTree = "<group>"; };
 		B1E10001000000000000B212 /* ExportSourceImageNormalizer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportSourceImageNormalizer.swift; sourceTree = "<group>"; };
+		B1E10001000000000000B214 /* ExportConnectPackageAssembler.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportConnectPackageAssembler.swift; sourceTree = "<group>"; };
 		B20000010000000000000001 /* MezzanineColorProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MezzanineColorProbe.swift; sourceTree = "<group>"; };
 		B20000010000000000000020 /* DepthSourceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthSourceService.swift; sourceTree = "<group>"; };
 		B20000010000000000000021 /* FilmtoneDepthMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneDepthMap.swift; sourceTree = "<group>"; };
@@ -416,6 +418,7 @@
 				B1E10001000000000000B20E /* ExportMediaWriter.swift */,
 				B1E10001000000000000B210 /* ExportFrameAppender.swift */,
 				B1E10001000000000000B212 /* ExportSourceImageNormalizer.swift */,
+				B1E10001000000000000B214 /* ExportConnectPackageAssembler.swift */,
 			);
 			name = Internal;
 			path = Internal;
@@ -947,6 +950,7 @@
 				B1E10001000000000000B20D /* ExportMediaWriter.swift in Sources */,
 				B1E10001000000000000B20F /* ExportFrameAppender.swift in Sources */,
 				B1E10001000000000000B211 /* ExportSourceImageNormalizer.swift in Sources */,
+				B1E10001000000000000B213 /* ExportConnectPackageAssembler.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

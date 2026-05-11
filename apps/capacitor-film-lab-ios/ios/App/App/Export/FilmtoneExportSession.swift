@@ -112,6 +112,14 @@ final class FilmtoneExportSession {
     /// the session and delegate only the wrapping / scaling primitives.
     private let sourceImageNormalizer: ExportSourceImageNormalizer
     private let sourceSeed: Double
+    /// Phase 2B-8B: Filmtone Connect package companion assembler. Owns source
+    /// media copy, combined / pre-optical / post-optical cube + DCTL writes,
+    /// reference-after JPEG path orchestration via a session-supplied closure,
+    /// the eight-field `Companions` value, `SidecarPackage` payload, and the
+    /// ordered package-file URI list. `writeReferenceAfterImage`,
+    /// `makePreviewPosterTime`, `copyPreviewCGImage`, `writeJPEGImage`, and
+    /// `writeExportSidecar` stay on the session.
+    private let connectPackageAssembler: ExportConnectPackageAssembler
     private let outputColorSpace: CGColorSpace
     private var degradedDecodePath = false
     private var cancelled = false
@@ -153,12 +161,6 @@ final class FilmtoneExportSession {
     /// exposing the full DTO via a stored property leak.
     var requestSnapshot: Phase0ExportRequestDTO { request }
 
-    private static let connectCubeFilenameSuffix = "combined-color.cube"
-    private static let connectPreOpticalCubeFilenameSuffix = "pre-optical-color.cube"
-    private static let connectPostOpticalCubeFilenameSuffix = "post-optical-color.cube"
-    private static let connectReferenceAfterFilenameSuffix = "reference-after.jpg"
-    private static let connectDctlFilenameSuffix = "filmtone-bridge.dctl"
-
     private static func environmentFlagEnabled(
         _ name: String,
         processInfo: ProcessInfo = .processInfo
@@ -172,17 +174,6 @@ final class FilmtoneExportSession {
         default:
             return false
         }
-    }
-
-    private struct ConnectPackageCompanions {
-        let sourceMediaURL: URL
-        let cubeURL: URL
-        let preOpticalCubeURL: URL
-        let postOpticalCubeURL: URL
-        let dctlURL: URL
-        let referenceAfterURL: URL
-        let referenceAfterTimeSec: Double
-        let sidecarPackage: SidecarPackage
     }
 
     init(
@@ -268,6 +259,12 @@ final class FilmtoneExportSession {
             colorPipeline: colorPipeline
         )
         self.sourceSeed = Self.makeStableSourceSeed(from: sourceURL.absoluteString)
+        self.connectPackageAssembler = ExportConnectPackageAssembler(
+            request: request,
+            sourceURL: sourceURL,
+            outputURL: outputURL,
+            sourceSeed: self.sourceSeed
+        )
         if disableGlowFamilyForExport {
             NSLog("FilmtoneExportSession: GlowFamily disabled by FILMTONE_EXPORT_DISABLE_GLOW_FAMILY")
         }
@@ -388,9 +385,17 @@ final class FilmtoneExportSession {
         // to write a full-size source.mov copy + cubes + DCTL on every export
         // and chewed through Library/Caches headroom (a contributor to the
         // mezzanine-cache eviction story).
-        let packageCompanions: ConnectPackageCompanions?
+        let packageCompanions: ExportConnectPackageAssembler.Companions?
         if request.connectPackage == true {
-            packageCompanions = makeConnectPackageCompanions(result: result)
+            packageCompanions = connectPackageAssembler.makeCompanions(
+                result: result,
+                writeReferenceAfterImage: { [self] url, sourceDurationSec in
+                    try writeReferenceAfterImage(
+                        to: url,
+                        sourceDurationSec: sourceDurationSec
+                    )
+                }
+            )
         } else {
             packageCompanions = nil
         }
@@ -407,7 +412,7 @@ final class FilmtoneExportSession {
             package: packageCompanions?.sidecarPackage,
             performance: performance
         )
-        let packageFileUris = makePackageFileUris(
+        let packageFileUris = connectPackageAssembler.makePackageFileUris(
             sidecarUri: sidecarUri,
             companions: packageCompanions
         )
@@ -604,102 +609,6 @@ final class FilmtoneExportSession {
             )
             return nil
         }
-    }
-
-    private func makeConnectPackageCompanions(
-        result: CompletedExport
-    ) -> ConnectPackageCompanions? {
-        let directoryURL = outputURL.deletingLastPathComponent()
-        let packageStem = outputURL.deletingPathExtension().lastPathComponent
-        let sourceExtension = sourceURL.pathExtension.isEmpty ? "mov" : sourceURL.pathExtension
-        let sourcePackageURL = directoryURL
-            .appendingPathComponent("\(packageStem)-source.\(sourceExtension)")
-        let cubeURL = directoryURL
-            .appendingPathComponent("\(packageStem)-\(Self.connectCubeFilenameSuffix)")
-        let preOpticalCubeURL = directoryURL
-            .appendingPathComponent("\(packageStem)-\(Self.connectPreOpticalCubeFilenameSuffix)")
-        let postOpticalCubeURL = directoryURL
-            .appendingPathComponent("\(packageStem)-\(Self.connectPostOpticalCubeFilenameSuffix)")
-        let dctlURL = directoryURL
-            .appendingPathComponent("\(packageStem)-\(Self.connectDctlFilenameSuffix)")
-        let referenceURL = directoryURL
-            .appendingPathComponent("\(packageStem)-\(Self.connectReferenceAfterFilenameSuffix)")
-
-        do {
-            let fileManager = FileManager.default
-            if fileManager.fileExists(atPath: sourcePackageURL.path) {
-                try fileManager.removeItem(at: sourcePackageURL)
-            }
-            try fileManager.copyItem(at: sourceURL, to: sourcePackageURL)
-            try FilmtoneConnectCubeWriter.writeCombinedColorCube(
-                for: request,
-                to: cubeURL
-            )
-            try FilmtoneConnectCubeWriter.writePreOpticalColorCube(
-                for: request,
-                to: preOpticalCubeURL
-            )
-            try FilmtoneConnectCubeWriter.writePostOpticalColorCube(
-                for: request,
-                to: postOpticalCubeURL
-            )
-            try FilmtoneConnectDctlWriter.writeBridgeDctl(
-                for: request,
-                cubeFilename: cubeURL.lastPathComponent,
-                preOpticalColorFilename: preOpticalCubeURL.lastPathComponent,
-                postOpticalColorFilename: postOpticalCubeURL.lastPathComponent,
-                outputFps: request.output.fps,
-                sourceSeed: sourceSeed,
-                to: dctlURL
-            )
-            let referenceAfterTimeSec = try writeReferenceAfterImage(
-                to: referenceURL,
-                sourceDurationSec: result.sourceDurationSec
-            )
-            return ConnectPackageCompanions(
-                sourceMediaURL: sourcePackageURL,
-                cubeURL: cubeURL,
-                preOpticalCubeURL: preOpticalCubeURL,
-                postOpticalCubeURL: postOpticalCubeURL,
-                dctlURL: dctlURL,
-                referenceAfterURL: referenceURL,
-                referenceAfterTimeSec: referenceAfterTimeSec,
-                sidecarPackage: SidecarPackage(
-                    sourceMediaFilename: sourcePackageURL.lastPathComponent,
-                    renderedMediaFilename: outputURL.lastPathComponent,
-                    referenceAfterFilename: referenceURL.lastPathComponent,
-                    referenceAfterTimeSec: referenceAfterTimeSec,
-                    combinedColorFilename: cubeURL.lastPathComponent,
-                    preOpticalColorFilename: preOpticalCubeURL.lastPathComponent,
-                    postOpticalColorFilename: postOpticalCubeURL.lastPathComponent,
-                    effectsDctlFilename: dctlURL.lastPathComponent
-                )
-            )
-        } catch {
-            filmtonePreviewCompositionDebugLog(
-                "Filmtone Connect package companion write failed: \(error.localizedDescription)"
-            )
-            return nil
-        }
-    }
-
-    private func makePackageFileUris(
-        sidecarUri: String?,
-        companions: ConnectPackageCompanions?
-    ) -> [String]? {
-        guard let sidecarUri, let companions else {
-            return nil
-        }
-        return FilmtoneConnectPackageFiles.orderedPackageFileUris(
-            renderedUri: outputURL.absoluteString,
-            sidecarUri: sidecarUri,
-            sourceMediaUri: companions.sourceMediaURL.absoluteString,
-            preOpticalCubeUri: companions.preOpticalCubeURL.absoluteString,
-            postOpticalCubeUri: companions.postOpticalCubeURL.absoluteString,
-            cubeUri: companions.cubeURL.absoluteString,
-            dctlUri: companions.dctlURL.absoluteString,
-            referenceAfterUri: companions.referenceAfterURL.absoluteString
-        )
     }
 
     private func exportVideo(
