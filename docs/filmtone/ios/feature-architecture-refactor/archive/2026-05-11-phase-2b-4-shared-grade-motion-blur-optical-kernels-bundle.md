@@ -336,4 +336,17 @@ are preserved.
 
 ## Unexpected / Follow-up
 
-(empty — worker fills at completion)
+- 2026-05-11 JST — Worker initially reported "fileprivate 全消滅" in the
+  diff stat. Owner correction: the only `fileprivate` modifiers the
+  sub-stage was required to drop are the 6 listed in the
+  "Visibility relaxation plan" table (`ciContext`, `colorPipeline`,
+  `renderablePreviewVideoImage`, `applyLivePreviewGrade`,
+  `outputFrameRate`, `makeMotionBlurAccumulator`). `applyGrade`
+  (line 1640) remains `fileprivate` by design — none of the moved
+  types reads it across the module boundary, so relaxation was not
+  required and not performed. The phrase "全消滅" was an overclaim;
+  the accurate statement is "all 6 fileprivate members targeted by
+  this sub-stage are dropped, plus the 1 private free function
+  `filmtonePreviewCompositionDebugLog`."
+- Committed as `7ff201c9` "refactor(ios): extract shared grade,
+  motion blur, and optical kernels".

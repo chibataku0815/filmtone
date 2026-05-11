@@ -160,3 +160,25 @@ Total: 11-13 working days.
   pbxproj 4-section grep = 4; `bun run verify:ios` green;
   `git diff --check` clean. See
   `archive/2026-05-11-phase-2b-3-depth-payload-manager-extraction.md`.
+- 2026-05-11 JST — Phase 2B-4 (shared grade processor + motion blur
+  accumulator + optical kernels atomic bundle) committed as `7ff201c9`.
+  Three coupled top-level types lifted out of `FilmtoneExportSession.swift`
+  in one sub-stage because their `fileprivate ↔ private ↔ internal`
+  access ladder had to move atomically:
+  `final class FilmtoneSharedGradeProcessor` →
+  `Look/FilmtoneSharedGradeProcessor.swift` (cross-cutting visual
+  contract; 9 cross-file consumers' diff = 0 because type name preserved);
+  `final class FilmtoneMotionBlurAccumulator` →
+  `Export/Internal/FilmtoneMotionBlurAccumulator.swift`;
+  `enum OpticalKernels` →
+  `Export/Internal/OpticalKernels.swift` (CIKernel/CIColorKernel source
+  strings byte-identical). `FilmtoneExportSession.swift` reduced from
+  4094 → 3189 lines (−905). 6 `fileprivate` modifiers dropped on the
+  exact members the moved types read across the module boundary
+  (`ciContext`, `colorPipeline`, `renderablePreviewVideoImage`,
+  `applyLivePreviewGrade`, `outputFrameRate`,
+  `makeMotionBlurAccumulator`) plus 1 `private` dropped on the free
+  function `filmtonePreviewCompositionDebugLog`; `applyGrade`'s
+  `fileprivate` remains by design. pbxproj 4-section grep = 4 each;
+  `bun run verify:ios` green; `git diff --check` clean. See
+  `archive/2026-05-11-phase-2b-4-shared-grade-motion-blur-optical-kernels-bundle.md`.
