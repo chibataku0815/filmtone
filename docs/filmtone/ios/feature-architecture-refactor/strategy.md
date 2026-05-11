@@ -264,3 +264,16 @@ Total: 11-13 working days.
   unchanged. pbxproj 4-section grep = 4; `bun run verify:ios` green;
   `git diff --check` clean. See
   `archive/2026-05-11-phase-2b-7b-export-frame-appender-extraction.md`.
+- 2026-05-11 JST — Phase 2B-8A (ExportSourceImageNormalizer extraction)
+  committed as `f795eb2b`. New `final class ExportSourceImageNormalizer`
+  at
+  `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportSourceImageNormalizer.swift`
+  (161 lines) now owns still-source loading, video pixel-buffer wrapping
+  with HDR tone-map detection, AVAssetTrack → Core Image orientation
+  transform, still/video/preview scale-crop, and preview extent
+  validation. `FilmtoneExportSession.swift` reduced from 2031 → 1896
+  lines (−135); `MezzanineService` now calls the same transform math via
+  the new namespace. Dead zero-caller `scaledVideoFrameImage(...)` was
+  deleted. pbxproj 4-section grep = 4; `bun run verify:ios` green;
+  `git diff --check` clean. See
+  `archive/2026-05-11-phase-2b-8a-export-source-image-normalizer-extraction.md`.
