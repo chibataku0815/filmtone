@@ -4,6 +4,13 @@ This directory is the current entry point for Filmtone iOS documentation.
 Historical handoffs are archived below so release state and implementation
 entry points stay visible.
 
+## Release State
+
+- Public App Store version: `1.8` as of the 2026-05-12 truth refresh.
+- Local Xcode candidate: `1.8` build `7`.
+- Release handoff for the pre-public submission state:
+  [`2026-05-10-filmtone-ios-1.8-release-handoff.md`](./2026-05-10-filmtone-ios-1.8-release-handoff.md)
+
 ## Current Truth
 
 Before stating public App Store state, local Xcode candidate state, or release
@@ -33,7 +40,7 @@ move to `<lane>/archive/`.
 
 | Lane | Status | Strategy | Notes |
 |---|---|---|---|
-| Capture Practicality | **Coder-side S1-S5 advanced — owner smoke pending** | [`capture-practicality/strategy.md`](./capture-practicality/strategy.md) | S1 stabilization, S2 lens visibility, S3 continuous capture, S4 SSD 5-minute cap, and S5 preview scoping are paused under `capture-practicality/paused/` until owner-device smoke / dominant-defect pick. |
+| Capture Practicality | **1.8 released — no active subtask** | [`capture-practicality/strategy.md`](./capture-practicality/strategy.md) | Completed S5 / take-picker release work is archived in [`capture-practicality/archive/2026-05-10-s5-recording-preview-performance.md`](./capture-practicality/archive/2026-05-10-s5-recording-preview-performance.md). Remaining owner-smoke items stay paused until the next explicit product pick. |
 | V2 Capture / Gyroflow | **Closed at M14 + M15 PASS (2026-05-09)** | [`v2-capture-gyroflow/strategy.md`](./v2-capture-gyroflow/strategy.md) | No `active.md` — lane awaits owner pick of next sub-lane (Filmtone-optimized motion library, broad device matrix). M9–M15 archives in [`v2-capture-gyroflow/archive/`](./v2-capture-gyroflow/archive/) |
 | React / Capacitor purge | **Closed + merged into main as `47a1d76d` (2026-05-09)** | [`react-capacitor-purge/strategy.md`](./react-capacitor-purge/strategy.md) | Stages A → E archived. Worktree + branch removed post-merge. |
 | Meta Before/After DaVinci shell | Asset directory, not a lane | [`meta-before-after-davinci-shell/README.md`](./meta-before-after-davinci-shell/README.md) | Placeholder Resolve project + Lua helpers for ad production. Not active product work. |

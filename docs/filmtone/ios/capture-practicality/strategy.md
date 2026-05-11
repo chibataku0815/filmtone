@@ -10,7 +10,6 @@ capture-practicality lane:
 ```text
 docs/filmtone/ios/capture-practicality/
 ├── strategy.md
-├── active.md
 └── archive/
 ```
 
@@ -45,6 +44,15 @@ The priority order is:
 7. Let capture use owner-imported creative LUTs, with app-owned input
    conversion and visible warning when a loaded LUT looks like a technical
    transform LUT rather than a creative Look LUT.
+
+Current status after the 2026-05-12 truth refresh:
+
+- Filmtone iOS `1.8` build `7` is public on the App Store.
+- There is no current `active.md`; the completed S5 / take-picker release work
+  is archived at
+  `archive/2026-05-10-s5-recording-preview-performance.md`.
+- Remaining paused owner-smoke items are preserved under `paused/` and should
+  be reopened as a single explicit `active.md` only after the next product pick.
 
 ## Execution Bias
 
@@ -480,3 +488,10 @@ asks for that level of confidence.
   likely transform LUTs, carries custom-LUT truth through package, editor
   adoption, and export sidecar provenance. `git diff --check`, xcodebuild,
   and app-level `verify:swift-contract` green. Owner-device smoke pending.
+- 2026-05-10: Filmtone iOS `1.8` build `7` passed App Store review after being
+  submitted with capture-practicality improvements: lightweight recording
+  monitor, focused multi-take picker, SSD/storage-pressure handling,
+  orientation tightening, Noir, and capture custom LUT intake. Completed active
+  work archived; no current `active.md`.
+- 2026-05-12: Truth refresh reports public App Store version `1.8`; local Xcode
+  candidate remains `1.8` build `7`.

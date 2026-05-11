@@ -157,3 +157,20 @@ Owner-device smoke:
   succeeded with `/tmp/filmtone-take-picker-rebuild-device`; `xcrun devicectl
   device install app` installed bundle `com.chibatakumi.film.lab.ios`. No
   launch was run.
+- 2026-05-10: Release-side verification for the shipped candidate succeeded:
+  `git diff --check`, `ruby -c apps/capacitor-film-lab-ios/fastlane/Fastfile`,
+  `bun run verify:ios`, `bun run release:archive`, IPA plist check
+  (`1.8` / build `7` / `com.chibatakumi.film.lab.ios`), binary-only upload,
+  release-notes-only sync, and review submission all passed.
+- 2026-05-10: Post-submission documentation cleanup ran
+  `bun run check:filmtone-copy` and `git diff --check`; adjusted Japanese
+  "What's New" copy was resynced with `bun run release:release-notes` while
+  App Store Connect state was still review-side.
+
+## Closure
+
+- 2026-05-10: Archived after Filmtone iOS `1.8` build `7` was submitted to App
+  Store review. A later same-day ASC check showed `PENDING_DEVELOPER_RELEASE`.
+  Public App Store remains `1.7` until manual release.
+- 2026-05-12 truth refresh: public App Store now reports `1.8`; local Xcode
+  candidate remains `1.8` build `7`.
