@@ -446,3 +446,11 @@ product-boundary turns, not 10+ helper-sized turns.
   for all 3 files; `bun run verify:ios` green; `git diff --check`
   clean. See
   `archive/2026-05-11-phase-4a-capturesession-large-split.md`.
+- 2026-05-12 JST — Phase 4B (capture smoke + lane closeout) completed.
+  `bun run verify:ios` green, truth script green, no stale flat-path
+  refs in `RELEASE.md` or lane docs, device build via
+  `-workspace App.xcworkspace` installed `feature/ios-feature-architecture
+  @ e187e1db` on 千葉工のiPhone (7), owner-confirmed smoke PASS
+  (record -> adopt -> grade -> export, one cycle). **Feature-architecture
+  lane CLOSED.** See
+  `archive/2026-05-12-phase-4b-capture-smoke-and-lane-closeout.md`.

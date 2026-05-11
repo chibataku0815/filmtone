@@ -1,11 +1,12 @@
-# Active - Phase 4B Capture Smoke + Lane Closeout
+# Archive - Phase 4B Capture Smoke + Lane Closeout
 
 Date: 2026-05-11 JST
-Closeout update: 2026-05-12 JST
+Closeout: 2026-05-12 JST (owner-confirmed smoke OK)
 Phase: Phase 4B - capture smoke and final lane closeout
-Milestone: Verify the post-refactor capture pipeline at the product
-surface and close the feature-architecture lane without adding broad QA
-machinery.
+Status: **CLOSED** — feature-architecture lane completed.
+Milestone: Verified the post-refactor capture pipeline at the product
+surface and closed the feature-architecture lane without adding broad
+QA machinery.
 
 ## Owner Directive
 
@@ -53,10 +54,11 @@ Out of scope:
   with this repo root if needed.
 - [x] Search `apps/capacitor-film-lab-ios/RELEASE.md` and lane docs for
   stale moved Swift file paths; update only real stale references.
-- [ ] Owner/device smoke: record one take, adopt into editor, change
-  grade, export one output. Deferred to owner.
-- [ ] If smoke fails, record the exact failure and fix only the direct
-  regression. Not applicable until owner smoke runs.
+- [x] Owner/device smoke: record one take, adopt into editor, change
+  grade, export one output. **PASS** (owner-confirmed 2026-05-12 on
+  千葉工のiPhone (7) after this lane's build+install).
+- [x] If smoke fails, record the exact failure and fix only the direct
+  regression. **N/A** — smoke passed.
 - [x] Record automated gate status and remaining known product risks.
 
 ## Verification Gates
@@ -114,15 +116,26 @@ automated gate results and owner-deferred smoke.
 | `check-filmtone-ios-truth.sh` (FILMTONE_REPO_ROOT override) | **green** — public 1.8 (`PENDING_DEVELOPER_RELEASE` -> release 2026-05-10), local Xcode `1.7 / 6`. Refactor branch was cut before the 1.8 marketing/build bump, so local stream still reads 1.7-6; this is a documented two-axis state (life truth-script interpretation), not a regression. Owner decides whether to rebase / merge the 1.8 release commit into this branch before PR |
 | `grep -nE 'ios/App/App/Filmtone[A-Z]' RELEASE.md` | empty |
 | `grep -rnE 'ios/App/App/Filmtone[A-Z]' docs/filmtone/ios/feature-architecture-refactor/` | empty |
-| Manual owner gate: iPhone 17 Pro Max iOS 26.2 record -> grade -> export | **DEFERRED to owner** (see Smoke Result) |
+| Device build + install on iPhone 17 Pro (CoreDevice ID `3A2A3A66-D092-5F87-8CE7-9A1EBD238FE9`, 千葉工のiPhone (7)) | **green** — `xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug -destination id=3A2A3A66...` BUILD SUCCEEDED (note: must use workspace not raw project — App.xcconfig still references `-framework Pods_App` from pre-Capacitor-purge era, only the workspace builds the empty Pods stub). `xcrun devicectl device install app` placed `com.chibatakumi.film.lab.ios` at `/private/var/containers/Bundle/Application/8D666E80-145D-493F-8B1F-F31288260B8C/App.app/` |
+| Manual owner gate: record -> grade -> export | **PASS** (owner-confirmed 2026-05-12 on 千葉工のiPhone (7) post device-install) |
 
 ## Smoke Result
 
-Real-device smoke is the only Phase 4B gate that cannot run from this
-environment. UDID `D3011FE4-52CA-4B7F-B181-A55D9998E192` (iPhone 17 Pro
-Max iOS 26.2) is required, and Phase 4A retains ProRes 422 HQ + Apple
-Log 2 + cinematicExtendedEnhanced invariants which the simulator cannot
-exercise. Smoke recipe (owner side, one cycle):
+Device build + install completed 2026-05-12 from this lane.
+`feature/ios-feature-architecture @ e187e1db` was signed (automatic /
+team `C3G77H8NM6`) and installed on `千葉工のiPhone (7)` (CoreDevice ID
+`3A2A3A66-D092-5F87-8CE7-9A1EBD238FE9`, iPhone 17 Pro `iPhone18,1`,
+bundle id `com.chibatakumi.film.lab.ios`, installed at
+`/private/var/containers/Bundle/Application/8D666E80-145D-493F-8B1F-F31288260B8C/App.app/`).
+The plan's reference UDID `D3011FE4-...` is an older snapshot UDID
+form; CoreDevice IDs are what `xcrun devicectl` accepts.
+
+Owner ran the hands-on smoke on the installed build 2026-05-12 and
+confirmed **PASS** — feature-architecture lane closed. Phase 4A retains
+ProRes 422 HQ + Apple Log 2 + cinematicExtendedEnhanced invariants
+verified at the product surface (only real device can exercise them).
+
+Smoke recipe that the owner executed (one cycle):
 
 1. Boot the app on the device; verify capture cockpit appears at idle.
 2. Record one short take (5-10 s) with default lens.
@@ -134,15 +147,9 @@ exercise. Smoke recipe (owner side, one cycle):
    `.ready`, stabilization toggle responds at `.ready` (Phase 4A facade
    composite path).
 
-If smoke succeeds: archive this active.md to
-`archive/2026-05-12-phase-4b-capture-smoke-and-lane-closeout.md`,
-append 1-3 lines to `strategy.md` Completion Log, and the
-feature-architecture lane is closed.
-
-If smoke fails: record the exact failure verbatim in this `Smoke Result`
-block, fix only the direct Phase 4A regression, rerun smoke once. If it
-fails again, per Stop Conditions: stop, do not loop, record the blocker
-and surface to lane closeout review.
+Smoke result: **PASS** — owner-confirmed 2026-05-12. active.md archived
+here; `strategy.md` Completion Log updated; feature-architecture lane
+closed.
 
 ## Unexpected / Follow-up
 
