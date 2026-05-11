@@ -47,6 +47,10 @@ This is essence work, not cosmetic reorg:
   banner / i18n decoration unless owner explicitly asks for QA.
 - No conservative hedge: do not defer god-object splits if they are the
   blocker. Do not introduce silent fallbacks during extraction.
+- Bundle grain: default to one product-relevant boundary per commit, not
+  one helper per commit. Use active.md to define boundaries, invariants,
+  stale-grep gates, and stop conditions; add line-level implementation
+  detail only when the current seam proves risky.
 
 ## Measurable Done Conditions
 
@@ -77,27 +81,36 @@ This lane is done when:
 
 ## Milestones
 
-- **Phase 1A** — Lane docs + 111-file mapping + external reference
-  inventory + Ruby pbxproj dry-run. No filesystem changes. ~0.5 day.
-- **Phase 1B** — `git mv` + pbxproj rewrite + path repair on 3 external
-  scripts + `verify:ios` + `git diff --find-renames` gate. ~1 day.
-- **Phase 2A** — Extract top-level private helpers from ExportSession to
-  `Export/Internal/` without changing public surface. ~0.5 day.
-- **Phase 2B** — Public surface split into 6 files, `FilmtoneSharedGrade
-  Processor` moves to `Look/` with API unchanged. ~2 days.
-- **Phase 2C** — Sidecar canonical diff + still PNG byte diff against
-  committed fixture. ~0.5 day.
-- **Phase 3A** — `$store.` and `store.` access inventory across views,
-  compatibility table written into active.md. No code changes. ~0.5 day.
-- **Phase 3B** — Sub-store extraction with bridge strategy per
-  compatibility table. ~3 days.
-- **Phase 3C** — Simulator view-side smoke covering all sheets, library,
-  compare. ~0.5 day.
-- **Phase 4A** — sessionQueue + delegate ownership decisions written into
-  active.md. ~0.5 day.
-- **Phase 4B** — Capture extraction + real-device smoke. ~2 days.
+- **Phase 1 — Source layout migration** — lane docs, mapping,
+  filesystem moves, pbxproj rewrite, path repair, `verify:ios`, and
+  rename-only diff gate. Complete.
+- **Phase 2A/2B — ExportSession split** — already complete through the
+  queue-pump bundle. Current remaining work is larger-grain:
+  - **Phase 2B-10D** — Video IO setup bundle:
+    `ExportGeometry` + `ExportVideoIOBuilder`; writer/reader setup and
+    sizing move out of `FilmtoneExportSession`.
+  - **Phase 2B-11 / 2C** — ExportSession final orchestrator cleanup plus
+    minimal parity gates. Only add sidecar/still fixtures if the final
+    cleanup touches behavior-bearing render or sidecar logic; otherwise
+    keep to `verify:ios`, stale grep, and targeted sidecar/build checks.
+- **Phase 3 — EditorStore split** — three larger bundles:
+  - **Phase 3A/3B-1** — access inventory + `ProjectState` +
+    `LibraryManager` extraction.
+  - **Phase 3B-2** — `PreviewOrchestrator` + `ExportCoordinator`
+    extraction.
+  - **Phase 3B-3 / 3C** — `CaptureRelay`, facade bridge cleanup, and
+    focused UI reactivity verification. View code remains unchanged
+    unless the compatibility table proves a minimal bridge adjustment is
+    necessary.
+- **Phase 4 — CaptureSession split** — two larger bundles:
+  - **Phase 4A/4B-1** — queue/delegate ownership decision +
+    `CaptureDeviceManager` extraction.
+  - **Phase 4B-2** — `RecordingStateController` +
+    `CapturePackageAssembler` extraction, facade cleanup, and real-device
+    record → grade → export smoke.
 
-Total: 11-13 working days.
+Remaining review/commit cycles after Phase 2B-10C: target **5-7**
+product-boundary turns, not 10+ helper-sized turns.
 
 ## Out Of Scope
 
@@ -114,6 +127,11 @@ Total: 11-13 working days.
   not carried into this branch (owner commits when ready; merge strategy
   is straight merge because 1.8 bump touches build settings while refactor
   touches file references — different pbxproj sections).
+- 2026-05-11 JST — Owner directed larger bundle grain after Phase 2B-10C.
+  Planning changed from helper-sized sub-stages to product-boundary
+  bundles. Active docs should name the boundary, invariants, and gates;
+  line-level detail is added only when a seam is risky or verification
+  fails. Target remaining cycles: 5-7.
 
 ## Completion Log
 
@@ -369,3 +387,14 @@ Total: 11-13 working days.
   4-section grep = 4 for all 3 files; `bun run verify:ios` green;
   `git diff --check` clean. See
   `archive/2026-05-11-phase-2b-10c-video-export-queue-bundle.md`.
+- 2026-05-11 JST — Phase 2B-10D (video IO setup bundle) committed as
+  `25a9f0ae`. New `ExportGeometry` (33 lines) owns export output-size
+  math and new `ExportVideoIOBuilder` (140 lines) owns video writer /
+  reader setup, adaptor creation, optional audio pipeline, degraded decode
+  flag, and writer/reader start order. Cross-file `scaledSize` consumers
+  now call `ExportGeometry`. `FilmtoneExportSession.swift` reduced from
+  1127 → 1078 lines (−49); session still owns mezzanine routing, depth
+  setup, queue orchestration, render/append closure, and result assembly.
+  pbxproj 4-section grep = 4 for both files; `bun run verify:ios`
+  green; `git diff --check` clean. See
+  `archive/2026-05-11-phase-2b-10d-video-io-setup-bundle.md`.
