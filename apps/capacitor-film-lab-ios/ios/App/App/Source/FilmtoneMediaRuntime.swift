@@ -646,6 +646,8 @@ final class FilmtoneMediaRuntime {
             // T2 (v1.1): carry the sidecar URI through benchmark reconstruction —
             // without this rebuild preserving it, the UI share chain would lose the JSON URL.
             sidecarUri: result.sidecarUri,
+            audioDiagnosticsUri: result.audioDiagnosticsUri,
+            audioDebugSummary: result.audioDebugSummary,
             packageFileUris: result.packageFileUris
         )
         return result

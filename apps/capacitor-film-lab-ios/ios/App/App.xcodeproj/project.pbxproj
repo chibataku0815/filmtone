@@ -66,6 +66,7 @@
 		B1E10001000000000000B225 /* ExportVideoAudioPump.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B226 /* ExportVideoAudioPump.swift */; };
 		B1E10001000000000000B227 /* ExportGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B228 /* ExportGeometry.swift */; };
 		B1E10001000000000000B229 /* ExportVideoIOBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B22A /* ExportVideoIOBuilder.swift */; };
+		B1E10001000000000000B22B /* ExportAudioDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B22C /* ExportAudioDiagnostics.swift */; };
 		C30000010000000000000003 /* EditorProjectController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000002 /* EditorProjectController.swift */; };
 		C30000010000000000000005 /* EditorLibraryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000004 /* EditorLibraryController.swift */; };
 		C30000010000000000000007 /* EditorPreviewOrchestrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000006 /* EditorPreviewOrchestrator.swift */; };
@@ -75,6 +76,7 @@
 		C30000010000000000000023 /* CaptureDeviceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000022 /* CaptureDeviceManager.swift */; };
 		C30000010000000000000025 /* RecordingStateController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000024 /* RecordingStateController.swift */; };
 		C30000010000000000000027 /* CapturePackageAssembler.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000026 /* CapturePackageAssembler.swift */; };
+		C30000010000000000000028 /* CaptureAudioSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000029 /* CaptureAudioSupport.swift */; };
 		D10000010000000000000001 /* FilmtoneRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000001 /* FilmtoneRootView.swift */; };
 		D10000010000000000000002 /* FilmtoneEditorStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000002 /* FilmtoneEditorStore.swift */; };
 		D10000010000000000000003 /* FilmtoneEditorFacade.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000003 /* FilmtoneEditorFacade.swift */; };
@@ -256,6 +258,7 @@
 		B1E10001000000000000B226 /* ExportVideoAudioPump.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportVideoAudioPump.swift; sourceTree = "<group>"; };
 		B1E10001000000000000B228 /* ExportGeometry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportGeometry.swift; sourceTree = "<group>"; };
 		B1E10001000000000000B22A /* ExportVideoIOBuilder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportVideoIOBuilder.swift; sourceTree = "<group>"; };
+		B1E10001000000000000B22C /* ExportAudioDiagnostics.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportAudioDiagnostics.swift; sourceTree = "<group>"; };
 		C30000010000000000000002 /* EditorProjectController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorProjectController.swift; sourceTree = "<group>"; };
 		C30000010000000000000004 /* EditorLibraryController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorLibraryController.swift; sourceTree = "<group>"; };
 		C30000010000000000000006 /* EditorPreviewOrchestrator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorPreviewOrchestrator.swift; sourceTree = "<group>"; };
@@ -265,6 +268,7 @@
 		C30000010000000000000022 /* CaptureDeviceManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CaptureDeviceManager.swift; sourceTree = "<group>"; };
 		C30000010000000000000024 /* RecordingStateController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecordingStateController.swift; sourceTree = "<group>"; };
 		C30000010000000000000026 /* CapturePackageAssembler.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CapturePackageAssembler.swift; sourceTree = "<group>"; };
+		C30000010000000000000029 /* CaptureAudioSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CaptureAudioSupport.swift; sourceTree = "<group>"; };
 		B20000010000000000000001 /* MezzanineColorProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MezzanineColorProbe.swift; sourceTree = "<group>"; };
 		B20000010000000000000020 /* DepthSourceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthSourceService.swift; sourceTree = "<group>"; };
 		B20000010000000000000021 /* FilmtoneDepthMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneDepthMap.swift; sourceTree = "<group>"; };
@@ -443,6 +447,7 @@
 		4D492DD4BAFDEA237F03D463 /* Internal */ = {
 			isa = PBXGroup;
 			children = (
+				B1E10001000000000000B22C /* ExportAudioDiagnostics.swift */,
 				B1E10001000000000000B206 /* ExportDepthPayloadManager.swift */,
 				B1E10001000000000000B202 /* ExportInputLutBuilder.swift */,
 				0F3FEA9C2799183E1F2B32E4 /* ExportMetrics.swift */,
@@ -604,6 +609,7 @@
 		C30000010000000000000020 /* Internal */ = {
 			isa = PBXGroup;
 			children = (
+				C30000010000000000000029 /* CaptureAudioSupport.swift */,
 				C30000010000000000000022 /* CaptureDeviceManager.swift */,
 				C30000010000000000000024 /* RecordingStateController.swift */,
 				C30000010000000000000026 /* CapturePackageAssembler.swift */,
@@ -1040,6 +1046,7 @@
 				B1E10001000000000000B225 /* ExportVideoAudioPump.swift in Sources */,
 				B1E10001000000000000B227 /* ExportGeometry.swift in Sources */,
 				B1E10001000000000000B229 /* ExportVideoIOBuilder.swift in Sources */,
+				B1E10001000000000000B22B /* ExportAudioDiagnostics.swift in Sources */,
 				C30000010000000000000003 /* EditorProjectController.swift in Sources */,
 				C30000010000000000000005 /* EditorLibraryController.swift in Sources */,
 				C30000010000000000000007 /* EditorPreviewOrchestrator.swift in Sources */,
@@ -1049,6 +1056,7 @@
 				C30000010000000000000023 /* CaptureDeviceManager.swift in Sources */,
 				C30000010000000000000025 /* RecordingStateController.swift in Sources */,
 				C30000010000000000000027 /* CapturePackageAssembler.swift in Sources */,
+				C30000010000000000000028 /* CaptureAudioSupport.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

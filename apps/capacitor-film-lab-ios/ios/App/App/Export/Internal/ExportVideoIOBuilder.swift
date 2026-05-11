@@ -13,7 +13,9 @@ import Foundation
 /// The session keeps owning mezzanine routing, asset / video-track
 /// lookup, depth reader setup, timeline construction, queue pump
 /// orchestration, `appendOutputFrame(...)`, post-wait finish, and
-/// `CompletedExport` assembly. The audio preservation gate
+/// `CompletedExport` assembly. Video may be routed through a mezzanine, but
+/// audio preservation reads from the original source asset so a video-only
+/// mezzanine cannot silently strip source audio. The audio preservation gate
 /// (`highlightTimeline == nil && request.output.preserveAudio`) is
 /// applied here using the highlight timeline value passed in.
 ///
@@ -26,17 +28,18 @@ import Foundation
 /// 5. resolve audio track only when highlight timeline is nil and
 ///    `request.output.preserveAudio` is true
 /// 6. build audio pipeline; add audio input if `writer.canAdd(audioInput)`
-/// 7. `AVAssetReader(asset:)`
-/// 8. `mediaWriter.makeVideoReaderOutput(for:reader:codecFamily:)`
-/// 9. throw `"Video reader output could not be added."` if nil
-/// 10. capture `degradedDecodePath`
-/// 11. `reader.add(videoOutput)`
-/// 12. add audio output when `reader.canAdd(audioOutput)`
+/// 7. create a dedicated audio `AVAssetReader` from the original source asset
+/// 8. `AVAssetReader(asset:)`
+/// 9. `mediaWriter.makeVideoReaderOutput(for:reader:codecFamily:)`
+/// 10. throw `"Video reader output could not be added."` if nil
+/// 11. capture `degradedDecodePath`
+/// 12. `reader.add(videoOutput)`
 /// 13. guard `writer.startWriting()`; throw
 ///     `writer.error?.localizedDescription ?? "The writer failed to start."`
 /// 14. guard `reader.startReading()`; throw
 ///     `reader.error?.localizedDescription ?? "The reader failed to start."`
-/// 15. `writer.startSession(atSourceTime: .zero)`
+/// 15. start the audio reader when present
+/// 16. `writer.startSession(atSourceTime: .zero)`
 final class ExportVideoIOBuilder {
     struct Context {
         let outputSize: CGSize
@@ -45,6 +48,7 @@ final class ExportVideoIOBuilder {
         let adaptor: AVAssetWriterInputPixelBufferAdaptor
         let audioInput: AVAssetWriterInput?
         let audioOutput: AVAssetReaderTrackOutput?
+        let audioReader: AVAssetReader?
         let reader: AVAssetReader
         let videoOutput: AVAssetReaderTrackOutput
         let degradedDecodePath: Bool
@@ -63,6 +67,7 @@ final class ExportVideoIOBuilder {
 
     func makeContext(
         asset: AVURLAsset,
+        audioAsset: AVURLAsset,
         videoTrack: AVAssetTrack,
         highlightTimeline: FilmtoneHighlightReelFrameTimeline?
     ) throws -> Context {
@@ -84,20 +89,33 @@ final class ExportVideoIOBuilder {
         writer.add(videoInput)
 
         let audioTrack = highlightTimeline == nil && request.output.preserveAudio
-            ? asset.tracks(withMediaType: .audio).first
+            ? audioAsset.tracks(withMediaType: .audio).first
             : nil
         let audioInput: AVAssetWriterInput?
         let audioOutput: AVAssetReaderTrackOutput?
+        let audioReader: AVAssetReader?
         if let audioTrack {
             let pair = mediaWriter.makeAudioPipeline(for: audioTrack)
             audioInput = pair.input
             audioOutput = pair.output
-            if let audioInput, writer.canAdd(audioInput) {
-                writer.add(audioInput)
+            guard writer.canAdd(pair.input) else {
+                throw FilmtoneMediaError.exportFailed("Audio writer input could not be added.")
             }
+            writer.add(pair.input)
         } else {
             audioInput = nil
             audioOutput = nil
+        }
+
+        if let audioOutput {
+            let reader = try AVAssetReader(asset: audioAsset)
+            guard reader.canAdd(audioOutput) else {
+                throw FilmtoneMediaError.exportFailed("Audio reader output could not be added.")
+            }
+            reader.add(audioOutput)
+            audioReader = reader
+        } else {
+            audioReader = nil
         }
 
         let reader = try AVAssetReader(asset: asset)
@@ -113,15 +131,20 @@ final class ExportVideoIOBuilder {
         let degradedDecodePath = videoOutputSelection.degradedDecodePath
         reader.add(videoOutput)
 
-        if let audioOutput, reader.canAdd(audioOutput) {
-            reader.add(audioOutput)
-        }
-
         guard writer.startWriting() else {
             throw FilmtoneMediaError.exportFailed(writer.error?.localizedDescription ?? "The writer failed to start.")
         }
         guard reader.startReading() else {
+            audioReader?.cancelReading()
+            writer.cancelWriting()
             throw FilmtoneMediaError.exportFailed(reader.error?.localizedDescription ?? "The reader failed to start.")
+        }
+        if let audioReader {
+            guard audioReader.startReading() else {
+                reader.cancelReading()
+                writer.cancelWriting()
+                throw FilmtoneMediaError.exportFailed(audioReader.error?.localizedDescription ?? "The audio reader failed to start.")
+            }
         }
         writer.startSession(atSourceTime: .zero)
 
@@ -132,6 +155,7 @@ final class ExportVideoIOBuilder {
             adaptor: adaptor,
             audioInput: audioInput,
             audioOutput: audioOutput,
+            audioReader: audioReader,
             reader: reader,
             videoOutput: videoOutput,
             degradedDecodePath: degradedDecodePath

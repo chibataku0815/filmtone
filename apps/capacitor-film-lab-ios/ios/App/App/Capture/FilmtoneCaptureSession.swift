@@ -287,10 +287,14 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     func prepare(lens: FilmtoneCaptureLens) async throws {
         recordingState.setState(.configuring)
 
-        let permission = await Self.requestCameraPermission()
-        guard permission == .authorized else {
-            let failure: FilmtoneCaptureFailure = (permission == .denied || permission == .restricted)
-                ? .permissionDenied : .permissionDenied
+        let permissions = await CaptureSessionPermissions.requestCapturePermissions()
+        guard permissions.video == .authorized else {
+            let failure: FilmtoneCaptureFailure = .permissionDenied
+            recordingState.setState(.failed(failure))
+            throw failure
+        }
+        guard permissions.audio == .authorized else {
+            let failure: FilmtoneCaptureFailure = .microphonePermissionDenied
             recordingState.setState(.failed(failure))
             throw failure
         }
@@ -351,6 +355,13 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
                 lockedFPS: Self.lockedFPS
             )
 
+            do {
+                try CaptureAudioSessionGraph.addMicrophoneInput(to: session)
+            } catch let failure as FilmtoneCaptureFailure {
+                session.commitConfiguration()
+                throw failure
+            }
+
             let output = AVCaptureMovieFileOutput()
             guard session.canAddOutput(output) else {
                 session.commitConfiguration()
@@ -362,6 +373,13 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
             }
             session.addOutput(output)
             self.movieOutput = output
+
+            do {
+                try CaptureAudioSessionGraph.validateAudioConnection(on: output)
+            } catch let failure as FilmtoneCaptureFailure {
+                session.commitConfiguration()
+                throw failure
+            }
 
             if let connection = output.connection(with: .video) {
                 let availableCodecs = output.availableVideoCodecTypes.map { $0.rawValue }
@@ -865,16 +883,6 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         )
     }
 
-    // MARK: - Permission
-
-    private static func requestCameraPermission() async -> AVAuthorizationStatus {
-        let status = AVCaptureDevice.authorizationStatus(for: .video)
-        if status == .notDetermined {
-            let granted = await AVCaptureDevice.requestAccess(for: .video)
-            return granted ? .authorized : .denied
-        }
-        return status
-    }
 }
 
 #endif

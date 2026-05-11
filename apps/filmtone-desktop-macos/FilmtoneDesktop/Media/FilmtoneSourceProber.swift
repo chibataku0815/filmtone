@@ -36,6 +36,7 @@ struct FilmtoneSourceProbeResult: Sendable {
 struct FilmtoneVideoTrackProbe {
     let asset: AVURLAsset
     let track: AVAssetTrack
+    let audioTrack: AVAssetTrack?
     let durationSeconds: Double
     let naturalSize: CGSize
     let preferredTransform: CGAffineTransform
@@ -56,6 +57,7 @@ enum FilmtoneSourceProber {
         guard let track = videoTracks.first else {
             throw FilmtoneSourceProberError.missingVideoTrack(sourceURL)
         }
+        let audioTracks = try await asset.loadTracks(withMediaType: .audio)
 
         // AVAssetTrack is not Sendable; using `async let` here splits track
         // ownership across child tasks and Swift 6 flags it as a data race.
@@ -84,6 +86,7 @@ enum FilmtoneSourceProber {
         return FilmtoneVideoTrackProbe(
             asset: asset,
             track: track,
+            audioTrack: audioTracks.first,
             durationSeconds: durationSec,
             naturalSize: size,
             preferredTransform: transform,

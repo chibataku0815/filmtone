@@ -296,6 +296,7 @@ struct FilmtoneCaptureParameters: Equatable {
 /// retry / picker affordance.
 enum FilmtoneCaptureFailure: Error, Equatable {
     case permissionDenied
+    case microphonePermissionDenied
     case multiCamUnsupported
     case noWideCamera
     case formatLockMismatch(reason: String)
@@ -318,6 +319,7 @@ enum FilmtoneCaptureFailure: Error, Equatable {
     case externalScopeLost
     case packageDirCreationFailed(reason: String)
     case masterFileMissing
+    case masterAudioTrackMissing
     case proxyExportFailed(reason: String)
     case packagePersistenceFailed(reason: String)
     case unexpected(reason: String)
@@ -330,6 +332,8 @@ enum FilmtoneCaptureFailure: Error, Equatable {
         switch self {
         case .permissionDenied:
             return "Camera permission denied."
+        case .microphonePermissionDenied:
+            return "Microphone permission denied."
         case .multiCamUnsupported:
             return "MultiCam capture is not supported on this device."
         case .noWideCamera:
@@ -363,6 +367,8 @@ enum FilmtoneCaptureFailure: Error, Equatable {
             return "Could not create capture package directory: \(reason)"
         case .masterFileMissing:
             return "Recording finished without producing a master file."
+        case .masterAudioTrackMissing:
+            return "Recording finished without an audio track."
         case .proxyExportFailed(let reason):
             return "Proxy generation failed: \(reason)"
         case .packagePersistenceFailed(let reason):
@@ -453,6 +459,10 @@ struct FilmtoneCapturePackage: Equatable {
     /// time.  The post-record gate fails if this differs from the
     /// requested value, so clean S6 runs carry matching values.
     let observedCaptureRotationDegrees: Double?
+    /// Export Audio Restoration B: audio track count observed on the recorded
+    /// master at capture-finalize time. New successful captures require this
+    /// to be at least 1; nil only appears on older decoded packages.
+    let masterAudioTrackCount: Int?
 }
 
 #endif

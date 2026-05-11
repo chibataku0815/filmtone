@@ -12,6 +12,9 @@ final class FilmtoneExportSession {
     private let cacheStore: CacheStore
     private let mezzanineService: MezzanineService?
     private let outputURL: URL
+    private var lastAudioDiagnostics: ExportAudioDiagnostics?
+    private var lastAudioDiagnosticsURI: String?
+    private var lastAudioDebugSummary: String?
     /// v1.3 Item 2 Phase E: the Saved Look that was applied to the editor at
     /// export time, resolved by the caller (typically `FilmtoneEditorStore`)
     /// from `LibraryStoreActor.loadLook(id:)`. The session itself does not
@@ -389,6 +392,9 @@ final class FilmtoneExportSession {
         defer {
             ciContext.clearCaches()
         }
+        lastAudioDiagnostics = nil
+        lastAudioDiagnosticsURI = nil
+        lastAudioDebugSummary = nil
 
         // v1.3 Phase B: video sources with `AVDepthDataTrack` now flow into
         // `exportVideo`, which probes the asset and either wires
@@ -492,6 +498,7 @@ final class FilmtoneExportSession {
             elapsedMs: elapsedMs,
             realtimeRatio: realtimeRatio,
             audioPreserved: result.audioPreserved,
+            audioDiagnostics: lastAudioDiagnostics,
             package: packageCompanions?.sidecarPackage,
             performance: performance,
             telemetry: ExportSidecarWriter.Telemetry(
@@ -524,6 +531,8 @@ final class FilmtoneExportSession {
             audioPreserved: result.audioPreserved,
             benchmarkRecord: nil,
             sidecarUri: sidecarUri,
+            audioDiagnosticsUri: lastAudioDiagnosticsURI,
+            audioDebugSummary: lastAudioDebugSummary,
             packageFileUris: packageFileUris
         )
     }
@@ -587,6 +596,7 @@ final class FilmtoneExportSession {
         mezzanineConsumedURLLastPathComponent = route.consumedURLLastPathComponent
         mezzanineConsumedMetrics = route.consumedMetrics
         let asset = AVURLAsset(url: effectiveSourceURL)
+        let audioSourceAsset = AVURLAsset(url: sourceURL)
         guard let videoTrack = asset.tracks(withMediaType: .video).first else {
             throw FilmtoneMediaError.unsupportedSource("No video track was found in the selected source.")
         }
@@ -631,6 +641,7 @@ final class FilmtoneExportSession {
         )
         let io = try videoIOBuilder.makeContext(
             asset: asset,
+            audioAsset: audioSourceAsset,
             videoTrack: videoTrack,
             highlightTimeline: highlightTimeline
         )
@@ -640,9 +651,11 @@ final class FilmtoneExportSession {
         let adaptor = io.adaptor
         let audioInput = io.audioInput
         let audioOutput = io.audioOutput
+        let audioReader = io.audioReader
         let reader = io.reader
         let videoOutput = io.videoOutput
         degradedDecodePath = io.degradedDecodePath
+        let audioStatsTracker = ExportAudioSampleStatsTracker()
 
         let videoQueue = DispatchQueue(label: "FilmtoneExportSession.video")
         let audioQueue = DispatchQueue(label: "FilmtoneExportSession.audio")
@@ -656,6 +669,7 @@ final class FilmtoneExportSession {
         // assembly, and the audio preservation gate.
         let completionCoordinator = ExportVideoCompletionCoordinator(
             reader: reader,
+            audioReader: audioReader,
             writer: writer,
             videoInput: videoInput,
             audioInput: audioInput
@@ -742,16 +756,17 @@ final class FilmtoneExportSession {
             }
         )
 
-        if let audioInput, let audioOutput {
+        if let audioInput, let audioOutput, let audioReader {
             completionCoordinator.enterAudio()
             let audioPump = ExportVideoAudioPump(
                 audioInput: audioInput,
                 audioOutput: audioOutput,
-                reader: reader,
+                audioReader: audioReader,
                 writer: writer,
                 audioQueue: audioQueue,
                 mediaWriter: mediaWriter,
-                completion: completionCoordinator
+                completion: completionCoordinator,
+                onSampleAppended: audioStatsTracker.record
             )
             audioPump.start(checkCancelled: checkCancelled)
         }
@@ -769,12 +784,45 @@ final class FilmtoneExportSession {
         try performanceMetrics.measure(.writerFinish) {
             try mediaWriter.finish(writer: writer, checkCancelled: checkCancelled)
         }
+        let audioValidation = ExportAudioCompletionValidator.validate(
+            sourceAsset: audioSourceAsset,
+            effectiveVideoAsset: asset,
+            outputURL: outputURL,
+            preserveAudioRequested: request.output.preserveAudio,
+            highlightTimelinePresent: highlightTimeline != nil
+        )
+        let diagnostics = ExportAudioDiagnostics(
+            sourceURL: sourceURL,
+            effectiveVideoURL: effectiveSourceURL,
+            outputURL: outputURL,
+            preserveAudioRequested: request.output.preserveAudio,
+            highlightTimelinePresent: highlightTimeline != nil,
+            mezzanineVariant: didUseMezzanineVariant,
+            validation: audioValidation,
+            audioReaderStarted: audioReader != nil,
+            sampleStats: audioStatsTracker.snapshot()
+        )
+        let diagnosticsURL = diagnostics.writeLatest()
+        lastAudioDiagnostics = diagnostics
+        lastAudioDiagnosticsURI = diagnosticsURL?.absoluteString
+        lastAudioDebugSummary = diagnostics.summary
+        NSLog(
+            "[FilmtoneAudioDebug] %@ source=%@ effective=%@ output=%@ failure=%@",
+            diagnostics.summary,
+            sourceURL.lastPathComponent,
+            effectiveSourceURL.lastPathComponent,
+            outputURL.lastPathComponent,
+            audioValidation.failureReason ?? "nil"
+        )
+        if let reason = audioValidation.failureReason {
+            throw FilmtoneMediaError.exportFailed("Audio preservation failed: \(reason)")
+        }
 
         return CompletedExport(
             outputSize: outputSize,
             frameCount: videoFramePump.renderedFrames,
             sourceDurationSec: videoTimeline.outputDurationSec.isFinite ? videoTimeline.outputDurationSec : nil,
-            audioPreserved: audioInput != nil
+            audioPreserved: audioValidation.audioPreserved
         )
     }
 

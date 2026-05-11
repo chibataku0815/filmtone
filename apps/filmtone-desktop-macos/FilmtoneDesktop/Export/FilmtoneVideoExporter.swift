@@ -69,12 +69,14 @@ struct FilmtoneVideoExportResult: Sendable {
     let processedFrames: Int
     let outputWidth: Int
     let outputHeight: Int
+    let audioPreserved: Bool
 }
 
 enum FilmtoneVideoExportError: Error, LocalizedError {
     case sourceUnreadable(URL)
     case renderFailed(URL)
     case noHighlightMarkers
+    case completedOutputMissingAudio(URL)
 
     var errorDescription: String? {
         switch self {
@@ -84,6 +86,8 @@ enum FilmtoneVideoExportError: Error, LocalizedError {
             return "Could not render video to \(url.lastPathComponent)"
         case .noHighlightMarkers:
             return "No highlight markers are available for this video"
+        case .completedOutputMissingAudio(let url):
+            return "Completed export does not contain audio: \(url.lastPathComponent)"
         }
     }
 }
@@ -206,7 +210,8 @@ enum FilmtoneVideoExporter {
             sidecarURL: nil,
             processedFrames: processed,
             outputWidth: Int(outputSize.width.rounded()),
-            outputHeight: Int(outputSize.height.rounded())
+            outputHeight: Int(outputSize.height.rounded()),
+            audioPreserved: false
         )
     }
 
@@ -233,7 +238,11 @@ enum FilmtoneVideoExporter {
             probedColorClass: probe.colorClass
         )
         _ = FilmtoneSourceInputTransform.prepareCube(for: resolvedProfile?.curve)
-        let reader = try FilmtoneVideoReader(probe: probe, contract: contract)
+        let reader = try FilmtoneVideoReader(
+            probe: probe,
+            contract: contract,
+            preserveAudio: true
+        )
 
         // Display orientation (portrait capture etc. swaps width/height).
         let displaySize = reader.displaySize
@@ -247,7 +256,8 @@ enum FilmtoneVideoExporter {
             outputURL: request.outputURL,
             outputSize: outputSize,
             frameRate: frameRate,
-            contract: contract
+            contract: contract,
+            preserveAudio: reader.hasAudioOutput
         )
 
         try writer.start()
@@ -300,6 +310,11 @@ enum FilmtoneVideoExporter {
         )
 
         var processed = 0
+        let audioTask = reader.hasAudioOutput
+            ? Task.detached(priority: .userInitiated) {
+                try await appendAudioSamples(from: reader, to: writer)
+            }
+            : nil
         do {
             while let pair = try reader.nextSampleBuffer() {
                 try Task.checkCancellation()
@@ -331,12 +346,21 @@ enum FilmtoneVideoExporter {
                 }
             }
 
+            if let audioTask {
+                try await audioTask.value
+            }
             try await writer.finish()
         } catch {
+            audioTask?.cancel()
             reader.cancel()
             writer.cancel()
             throw error
         }
+
+        let audioPreserved = try await validateCompletedAudioPreservation(
+            sourceHasAudio: probe.audioTrack != nil,
+            outputURL: request.outputURL
+        )
 
         var sidecarURL: URL? = nil
         if writeSidecar {
@@ -358,8 +382,33 @@ enum FilmtoneVideoExporter {
             sidecarURL: sidecarURL,
             processedFrames: processed,
             outputWidth: Int(outputSize.width.rounded()),
-            outputHeight: Int(outputSize.height.rounded())
+            outputHeight: Int(outputSize.height.rounded()),
+            audioPreserved: audioPreserved
         )
+    }
+
+    private static func appendAudioSamples(
+        from reader: FilmtoneVideoReader,
+        to writer: FilmtoneVideoWriter
+    ) async throws {
+        while let sampleBuffer = try reader.nextAudioSampleBuffer() {
+            try Task.checkCancellation()
+            try await writer.appendAudio(sampleBuffer: sampleBuffer)
+        }
+    }
+
+    private static func validateCompletedAudioPreservation(
+        sourceHasAudio: Bool,
+        outputURL: URL
+    ) async throws -> Bool {
+        guard sourceHasAudio else {
+            return false
+        }
+        let outputAsset = AVURLAsset(url: outputURL)
+        guard !(try await outputAsset.loadTracks(withMediaType: .audio)).isEmpty else {
+            throw FilmtoneVideoExportError.completedOutputMissingAudio(outputURL)
+        }
+        return true
     }
 
     private static func makeRenderContext(

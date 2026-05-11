@@ -544,6 +544,8 @@ struct Phase0ExportResultDTO: Encodable {
     // v1.1: filmtone-ios-export-session-v1 sidecar JSON URI (app container temp URL).
     //       nil when sidecar write failed or disabled.
     let sidecarUri: String?
+    let audioDiagnosticsUri: String?
+    let audioDebugSummary: String?
     // Filmtone Connect package companions ordered for sharing:
     // rendered media, sidecar, source media copy, combined-color.cube,
     // optional DCTL bridge, reference-after.jpg.
@@ -562,6 +564,8 @@ struct Phase0ExportResultDTO: Encodable {
         audioPreserved: Bool?,
         benchmarkRecord: Phase0ExportBenchmarkRecordDTO?,
         sidecarUri: String? = nil,
+        audioDiagnosticsUri: String? = nil,
+        audioDebugSummary: String? = nil,
         packageFileUris: [String]? = nil
     ) {
         self.outputUri = outputUri
@@ -574,6 +578,8 @@ struct Phase0ExportResultDTO: Encodable {
         self.audioPreserved = audioPreserved
         self.benchmarkRecord = benchmarkRecord
         self.sidecarUri = sidecarUri
+        self.audioDiagnosticsUri = audioDiagnosticsUri
+        self.audioDebugSummary = audioDebugSummary
         self.packageFileUris = packageFileUris
     }
 }

@@ -780,7 +780,10 @@ final class MezzanineService {
             input.expectsMediaDataInRealTime = false
             audioOutput = output
             audioInput = input
-            if writer.canAdd(input) { writer.add(input) }
+            guard writer.canAdd(input) else {
+                throw GenerationError.writerFailed("Audio input could not be added.")
+            }
+            writer.add(input)
         } else {
             audioOutput = nil
             audioInput = nil
@@ -805,7 +808,10 @@ final class MezzanineService {
         }
         reader.add(videoOutput)
 
-        if let audioOutput, reader.canAdd(audioOutput) {
+        if let audioOutput {
+            guard reader.canAdd(audioOutput) else {
+                throw GenerationError.readerFailed("Audio output could not be added.")
+            }
             reader.add(audioOutput)
         }
 

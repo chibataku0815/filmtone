@@ -62,6 +62,7 @@ final class ExportSidecarWriter {
         elapsedMs: Int,
         realtimeRatio: Double?,
         audioPreserved: Bool?,
+        audioDiagnostics: ExportAudioDiagnostics? = nil,
         package: SidecarPackage?,
         performance: SidecarPerformance?,
         telemetry: Telemetry
@@ -175,7 +176,8 @@ final class ExportSidecarWriter {
             cameraProfile: cameraProfileBlock,
             performance: performance,
             highlightMarkers: highlightMarkers,
-            captureProvenance: captureProvenance
+            captureProvenance: captureProvenance,
+            audioDiagnostics: audioDiagnostics?.sidecarDiagnostics
         )
 
         let sidecarURL = FilmtoneExportSidecarBuilder.sidecarURL(for: outputURL)

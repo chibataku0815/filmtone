@@ -7,6 +7,7 @@ import Foundation
 enum FilmtoneVideoReaderError: Error {
     case readerSetupFailed(URL, underlying: Error?)
     case unsupportedPixelFormat(URL)
+    case unsupportedAudioTrack(URL)
     case readerStartFailed(URL, underlying: Error?)
     case readerFailedDuringRead(URL, underlying: Error?)
 }
@@ -37,10 +38,12 @@ final class FilmtoneVideoReader: @unchecked Sendable {
     private let asset: AVURLAsset
     private let reader: AVAssetReader
     private let trackOutput: AVAssetReaderTrackOutput
+    private let audioOutput: AVAssetReaderTrackOutput?
 
     init(
         probe: FilmtoneVideoTrackProbe,
-        contract: FilmtoneColorPipelineContract
+        contract: FilmtoneColorPipelineContract,
+        preserveAudio: Bool = false
     ) throws {
         let sourceURL = probe.asset.url
         let reader: AVAssetReader
@@ -63,10 +66,32 @@ final class FilmtoneVideoReader: @unchecked Sendable {
         }
         reader.add(trackOutput)
 
+        let audioOutput: AVAssetReaderTrackOutput?
+        if preserveAudio, let audioTrack = probe.audioTrack {
+            let output = AVAssetReaderTrackOutput(
+                track: audioTrack,
+                outputSettings: [
+                    AVFormatIDKey: kAudioFormatLinearPCM,
+                    AVLinearPCMIsFloatKey: false,
+                    AVLinearPCMBitDepthKey: 16,
+                    AVLinearPCMIsBigEndianKey: false,
+                    AVLinearPCMIsNonInterleaved: false,
+                ]
+            )
+            guard reader.canAdd(output) else {
+                throw FilmtoneVideoReaderError.unsupportedAudioTrack(sourceURL)
+            }
+            reader.add(output)
+            audioOutput = output
+        } else {
+            audioOutput = nil
+        }
+
         self.sourceURL = sourceURL
         self.asset = probe.asset
         self.reader = reader
         self.trackOutput = trackOutput
+        self.audioOutput = audioOutput
         self.durationSeconds = probe.durationSeconds
         self.naturalSize = probe.naturalSize
         self.preferredTransform = probe.preferredTransform
@@ -103,6 +128,26 @@ final class FilmtoneVideoReader: @unchecked Sendable {
         return (sample, pixelBuffer)
     }
 
+    func nextAudioSampleBuffer() throws -> CMSampleBuffer? {
+        guard let audioOutput else {
+            return nil
+        }
+        guard let sample = audioOutput.copyNextSampleBuffer() else {
+            switch reader.status {
+            case .completed:
+                return nil
+            case .failed, .cancelled:
+                throw FilmtoneVideoReaderError.readerFailedDuringRead(
+                    sourceURL,
+                    underlying: reader.error
+                )
+            default:
+                return nil
+            }
+        }
+        return sample
+    }
+
     func cancel() {
         reader.cancelReading()
     }
@@ -110,6 +155,10 @@ final class FilmtoneVideoReader: @unchecked Sendable {
     var estimatedFrameCount: Int {
         guard durationSeconds > 0, nominalFrameRate > 0 else { return 0 }
         return Int((Double(nominalFrameRate) * durationSeconds).rounded())
+    }
+
+    var hasAudioOutput: Bool {
+        audioOutput != nil
     }
 
     var displaySize: CGSize {

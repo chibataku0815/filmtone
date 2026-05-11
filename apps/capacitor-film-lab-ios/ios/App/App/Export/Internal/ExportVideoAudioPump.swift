@@ -24,28 +24,31 @@ import Foundation
 final class ExportVideoAudioPump {
     private let audioInput: AVAssetWriterInput
     private let audioOutput: AVAssetReaderTrackOutput
-    private let reader: AVAssetReader
+    private let audioReader: AVAssetReader
     private let writer: AVAssetWriter
     private let audioQueue: DispatchQueue
     private let mediaWriter: ExportMediaWriter
     private let completion: ExportVideoCompletionCoordinator
+    private let onSampleAppended: (CMSampleBuffer) -> Void
 
     init(
         audioInput: AVAssetWriterInput,
         audioOutput: AVAssetReaderTrackOutput,
-        reader: AVAssetReader,
+        audioReader: AVAssetReader,
         writer: AVAssetWriter,
         audioQueue: DispatchQueue,
         mediaWriter: ExportMediaWriter,
-        completion: ExportVideoCompletionCoordinator
+        completion: ExportVideoCompletionCoordinator,
+        onSampleAppended: @escaping (CMSampleBuffer) -> Void = { _ in }
     ) {
         self.audioInput = audioInput
         self.audioOutput = audioOutput
-        self.reader = reader
+        self.audioReader = audioReader
         self.writer = writer
         self.audioQueue = audioQueue
         self.mediaWriter = mediaWriter
         self.completion = completion
+        self.onSampleAppended = onSampleAppended
     }
 
     func start(checkCancelled: @escaping () throws -> Void) {
@@ -59,8 +62,8 @@ final class ExportVideoAudioPump {
                 do {
                     try checkCancelled()
                     guard let sampleBuffer = audioOutput.copyNextSampleBuffer() else {
-                        if reader.status == .failed {
-                            throw FilmtoneMediaError.exportFailed(reader.error?.localizedDescription ?? "Audio read failed.")
+                        if audioReader.status == .failed {
+                            throw FilmtoneMediaError.exportFailed(audioReader.error?.localizedDescription ?? "Audio read failed.")
                         }
                         completion.finishAudioInput(markAsFinished: true)
                         return
@@ -70,10 +73,11 @@ final class ExportVideoAudioPump {
                         sampleBuffer,
                         audioInput: audioInput,
                         writer: writer,
-                        reader: reader,
+                        reader: audioReader,
                         waitForReady: false,
                         checkCancelled: checkCancelled
                     )
+                    onSampleAppended(sampleBuffer)
                 } catch {
                     completion.failExport(error)
                     return

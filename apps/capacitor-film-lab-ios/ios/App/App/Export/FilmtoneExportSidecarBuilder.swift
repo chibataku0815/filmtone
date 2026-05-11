@@ -87,6 +87,11 @@ struct SidecarBuildInputs {
     /// `FilmtoneExportSession.writeExportSidecar` populates from the
     /// session's `captureProvenance` property when present.
     var captureProvenance: SidecarCaptureProvenance? = nil
+    /// Export-audio truth captured after writer finish. Optional/additive so
+    /// legacy sidecar fixtures stay source-compatible, while real exported
+    /// packages can explain whether source, effective video, and final output
+    /// had audio tracks.
+    var audioDiagnostics: SidecarAudioDiagnostics? = nil
 }
 
 // MARK: - Sidecar schema (filmtone-ios-export-session-v1)
@@ -144,6 +149,10 @@ struct FilmtoneExportSidecarV1: Encodable {
     /// from — master or proxy fallback. Additive optional V1 field;
     /// nil omits the block (Photos / Files non-capture edits).
     let captureProvenance: SidecarCaptureProvenance?
+    /// Export-audio completed-output truth. Additive optional V1 field; absent
+    /// on older sidecars and non-video exports that did not run audio
+    /// validation.
+    let audioDiagnostics: SidecarAudioDiagnostics?
 }
 
 struct SidecarDevice: Encodable {
@@ -227,6 +236,7 @@ struct SidecarOutput: Encodable {
     let codec: String
     let container: String
     let preserveAudio: Bool
+    let audioPreserved: Bool?
     let degradedDecodePath: Bool
     let outputUri: String
     let outputWidth: Int
@@ -238,6 +248,25 @@ struct SidecarOutput: Encodable {
     let colorPrimaries: String
     let colorTransfer: String
     let colorSpace: String
+}
+
+struct SidecarAudioDiagnostics: Encodable {
+    let createdAtIso: String
+    let sourceURL: String
+    let effectiveVideoURL: String
+    let outputURL: String
+    let preserveAudioRequested: Bool
+    let highlightTimelinePresent: Bool
+    let mezzanineVariant: String?
+    let sourceAudioTrackCount: Int
+    let effectiveVideoAudioTrackCount: Int
+    let outputAudioTrackCount: Int
+    let audioReaderStarted: Bool
+    let audioSamplesAppended: Int
+    let firstAudioPTS: Double?
+    let lastAudioPTS: Double?
+    let audioPreserved: Bool
+    let failureReason: String?
 }
 
 /// v1.5 export bottleneck telemetry. This is intentionally wall-clock based
@@ -696,6 +725,7 @@ enum FilmtoneExportSidecarBuilder {
             codec: request.output.codec,
             container: request.output.container,
             preserveAudio: request.output.preserveAudio,
+            audioPreserved: inputs.audioPreserved,
             degradedDecodePath: inputs.degradedDecodePath,
             outputUri: inputs.outputURL.absoluteString,
             outputWidth: Int(inputs.outputSize.width.rounded()),
@@ -708,8 +738,6 @@ enum FilmtoneExportSidecarBuilder {
             colorTransfer: inputs.colorPipeline.outputColorTransferID,
             colorSpace: inputs.colorPipeline.outputColorSpaceID
         )
-
-        _ = inputs.audioPreserved // currently not surfaced in schema; runtime uses output.preserveAudio
 
         // Mezzanine block is always emitted in v1.2+: used=false carries explicit "no-mezzanine"
         // semantics (vs. absent field which would mean "v1.1 sidecar / unknown"). variant is nil
@@ -766,7 +794,8 @@ enum FilmtoneExportSidecarBuilder {
             opticalFilterProfileId: request.opticalFilterProfileId,
             performance: inputs.performance,
             highlightMarkers: inputs.highlightMarkers,
-            captureProvenance: inputs.captureProvenance
+            captureProvenance: inputs.captureProvenance,
+            audioDiagnostics: inputs.audioDiagnostics
         )
     }
 

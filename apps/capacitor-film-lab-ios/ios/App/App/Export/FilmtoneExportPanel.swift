@@ -235,6 +235,12 @@ struct FilmtoneExportPanel: View {
                 MetricCard(label: store.strings.metricsFileSize, value: store.strings.byteLabel(result.fileSizeBytes))
                     MetricCard(label: store.strings.cameraLabel, value: store.cameraProfileLabel)
                 MetricCard(label: store.strings.metricsSaveToPhotos, value: store.strings.saveStateLabel(store.saveToPhotosState))
+                #if DEBUG
+                if let audioDebugSummary = result.audioDebugSummary {
+                    MetricCard(label: "Audio debug", value: audioDebugSummary)
+                        .accessibilityIdentifier("filmtone.metric.audioDebug.finished")
+                }
+                #endif
                 if let opticsLabel = store.cameraOpticsLabel {
                     MetricCard(label: store.strings.opticsMetricLabel, value: opticsLabel)
                         .accessibilityLabel(store.cameraOpticsAccessibilityLabel ?? opticsLabel)

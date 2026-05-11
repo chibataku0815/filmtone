@@ -18,6 +18,7 @@ import Foundation
 ///   was nil at init, before any lock is acquired
 final class ExportVideoCompletionCoordinator {
     private let reader: AVAssetReader
+    private let audioReader: AVAssetReader?
     private let writer: AVAssetWriter
     private let videoInput: AVAssetWriterInput
     private let audioInput: AVAssetWriterInput?
@@ -31,11 +32,13 @@ final class ExportVideoCompletionCoordinator {
 
     init(
         reader: AVAssetReader,
+        audioReader: AVAssetReader? = nil,
         writer: AVAssetWriter,
         videoInput: AVAssetWriterInput,
         audioInput: AVAssetWriterInput?
     ) {
         self.reader = reader
+        self.audioReader = audioReader
         self.writer = writer
         self.videoInput = videoInput
         self.audioInput = audioInput
@@ -99,6 +102,7 @@ final class ExportVideoCompletionCoordinator {
         }
 
         reader.cancelReading()
+        audioReader?.cancelReading()
         writer.cancelWriting()
         finishVideoInput(markAsFinished: true)
         finishAudioInput(markAsFinished: true)

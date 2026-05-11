@@ -143,6 +143,9 @@ struct FilmtoneCapturePackageSnapshotV1: Codable {
     /// are optional/additive so pre-S6 snapshots decode cleanly.
     var requestedCaptureRotationDegrees: Double?
     var observedCaptureRotationDegrees: Double?
+    /// Export Audio Restoration B: audio track count observed on the recorded
+    /// master. Optional/additive so pre-audio packages decode cleanly.
+    var masterAudioTrackCount: Int?
 
     /// Bumped to 2 in S11-D.  Schema-version 1 snapshots written by
     /// M10 / S8-B continue to decode because every S11-D field is
@@ -271,7 +274,8 @@ enum FilmtoneCapturePackagePersistence {
             parametersRequestedStabilization: package.parameters.requestedStabilization.rawValue,
             observedStabilization: package.observedStabilization,
             requestedCaptureRotationDegrees: package.requestedCaptureRotationDegrees,
-            observedCaptureRotationDegrees: package.observedCaptureRotationDegrees
+            observedCaptureRotationDegrees: package.observedCaptureRotationDegrees,
+            masterAudioTrackCount: package.masterAudioTrackCount
         )
     }
 
@@ -441,7 +445,8 @@ enum FilmtoneCapturePackagePersistence {
             masterBookmark: snapshot.masterBookmark,
             observedStabilization: snapshot.observedStabilization,
             requestedCaptureRotationDegrees: snapshot.requestedCaptureRotationDegrees,
-            observedCaptureRotationDegrees: snapshot.observedCaptureRotationDegrees
+            observedCaptureRotationDegrees: snapshot.observedCaptureRotationDegrees,
+            masterAudioTrackCount: snapshot.masterAudioTrackCount
         )
     }
 

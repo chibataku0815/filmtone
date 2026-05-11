@@ -86,6 +86,10 @@ final class FilmtoneEditorStore: ObservableObject {
     @Published var project: FilmtoneProjectState
     @Published var source: SourceInfoDTO?
     @Published var probe: SourceProbeDTO?
+    #if DEBUG
+    @Published private var sourceAudioDebugLabel: String?
+    private var sourceAudioDebugTask: Task<Void, Never>?
+    #endif
     @Published var highlightMarkers: FilmtoneHighlightMarkers?
     @Published var sourceLoadState: FilmtoneSourceLoadState?
     @Published var isBusy = false
@@ -315,6 +319,10 @@ final class FilmtoneEditorStore: ObservableObject {
             persist()
         }
 
+        #if DEBUG
+        refreshSourceAudioDebugLabel(for: source)
+        #endif
+
         if let source {
             facade.prewarmMezzanines(for: source)
         }
@@ -345,6 +353,9 @@ final class FilmtoneEditorStore: ObservableObject {
     deinit {
         toastDismissTask?.cancel()
         libraryBootstrapTask?.cancel()
+        #if DEBUG
+        sourceAudioDebugTask?.cancel()
+        #endif
     }
 
     private func bootstrapLibraryAsync() {
@@ -490,11 +501,63 @@ final class FilmtoneEditorStore: ObservableObject {
             return preview.posterTimeSec.map(strings.compactDurationLabel)
         }()
 
-        return [dimensions, timing, cameraOpticsLabel]
+        #if DEBUG
+        let audioDebug = sourceAudioDebugLabel
+        #else
+        let audioDebug: String? = nil
+        #endif
+
+        return [dimensions, timing, cameraOpticsLabel, audioDebug]
             .compactMap { $0 }
             .joined(separator: " · ")
             .nilIfEmpty
     }
+
+    #if DEBUG
+    private func refreshSourceAudioDebugLabel(for source: SourceInfoDTO?) {
+        sourceAudioDebugTask?.cancel()
+        sourceAudioDebugLabel = nil
+        guard let source else {
+            return
+        }
+
+        let isVideo = source.kind == .video
+        let filename = source.filename
+        let sourceURI = source.uri
+        sourceAudioDebugTask = Task { @MainActor [weak self] in
+            let label = await Self.makeSourceAudioDebugLabel(
+                isVideo: isVideo,
+                sourceURI: sourceURI
+            )
+            guard !Task.isCancelled else {
+                return
+            }
+            self?.sourceAudioDebugLabel = label
+            NSLog("[FilmtoneAudioDebug] editor source=\(filename) \(label ?? "audio unavailable") uri=\(sourceURI)")
+        }
+    }
+
+    private static func makeSourceAudioDebugLabel(
+        isVideo: Bool,
+        sourceURI: String
+    ) async -> String? {
+        guard isVideo,
+              let sourceURL = URL(string: sourceURI),
+              sourceURL.isFileURL
+        else {
+            return nil
+        }
+
+        do {
+            let audioTrackCount = try await AVURLAsset(url: sourceURL)
+                .loadTracks(withMediaType: .audio)
+                .count
+            return "audio \(audioTrackCount)"
+        } catch {
+            return "audio unreadable"
+        }
+    }
+    #endif
 
     var sourceViolations: [String] {
         FilmtonePhase0Math.sourceCapViolations(for: probe)
@@ -1555,6 +1618,9 @@ final class FilmtoneEditorStore: ObservableObject {
         let isSourceReplacement = self.source?.uri != source.uri
         self.source = source
         self.probe = probe
+        #if DEBUG
+        refreshSourceAudioDebugLabel(for: source)
+        #endif
         // Camera/input LUTs are source-specific. Carrying one across clips can
         // mis-normalize non-log footage when replacing a prior log source.
         if isSourceReplacement, project.inputLut != nil {

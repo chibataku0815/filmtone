@@ -239,6 +239,14 @@ final class CapturePackageAssembler {
             )))
             return
         }
+        let masterAudioTrackCount: Int
+        switch CaptureMasterAudioValidator.validateMasterAudioTrackCount(at: snapshot.masterURL) {
+        case .success(let count):
+            masterAudioTrackCount = count
+        case .failure(let failure):
+            stateController.setState(.failed(failure))
+            return
+        }
 
         // S1 (2026-05-09): parameters reflect the owner's requested
         // stabilization for the run that just finished.
@@ -334,7 +342,8 @@ final class CapturePackageAssembler {
                         masterBookmark: masterBookmark,
                         observedStabilization: observedStabilizationName,
                         requestedCaptureRotationDegrees: snapshot.recordingCaptureRotation?.degrees,
-                        observedCaptureRotationDegrees: observedCaptureRotation.degrees
+                        observedCaptureRotationDegrees: observedCaptureRotation.degrees,
+                        masterAudioTrackCount: masterAudioTrackCount
                     )
                     // Master/proxy linkage is the M10 deliverable; if
                     // we can't write `capture-package.json` next to
@@ -360,6 +369,7 @@ final class CapturePackageAssembler {
             }
         }
     }
+
 }
 
 #endif

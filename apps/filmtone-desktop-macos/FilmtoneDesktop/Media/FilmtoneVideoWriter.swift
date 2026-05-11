@@ -6,8 +6,10 @@ import Foundation
 enum FilmtoneVideoWriterError: Error {
     case writerSetupFailed(URL, underlying: Error?)
     case inputCannotBeAdded(URL)
+    case audioInputCannotBeAdded(URL)
     case writerStartFailed(URL, underlying: Error?)
     case appendFailed(URL, underlying: Error?)
+    case audioAppendFailed(URL, underlying: Error?)
     case waitForReadyTimedOut(URL)
     case finishIncomplete(URL, status: AVAssetWriter.Status, underlying: Error?)
 }
@@ -29,13 +31,15 @@ final class FilmtoneVideoWriter: @unchecked Sendable {
 
     private let writer: AVAssetWriter
     private let videoInput: AVAssetWriterInput
+    private let audioInput: AVAssetWriterInput?
     private let adaptor: AVAssetWriterInputPixelBufferAdaptor
 
     init(
         outputURL: URL,
         outputSize: CGSize,
         frameRate: Int,
-        contract: FilmtoneColorPipelineContract
+        contract: FilmtoneColorPipelineContract,
+        preserveAudio: Bool = false
     ) throws {
         // AVAssetWriter refuses to write if the output URL already exists.
         try? FileManager.default.removeItem(at: outputURL)
@@ -78,6 +82,27 @@ final class FilmtoneVideoWriter: @unchecked Sendable {
         }
         writer.add(videoInput)
 
+        let audioInput: AVAssetWriterInput?
+        if preserveAudio {
+            let input = AVAssetWriterInput(
+                mediaType: .audio,
+                outputSettings: [
+                    AVFormatIDKey: kAudioFormatMPEG4AAC,
+                    AVEncoderBitRateKey: 128_000,
+                    AVNumberOfChannelsKey: 2,
+                    AVSampleRateKey: 44_100,
+                ]
+            )
+            input.expectsMediaDataInRealTime = false
+            guard writer.canAdd(input) else {
+                throw FilmtoneVideoWriterError.audioInputCannotBeAdded(outputURL)
+            }
+            writer.add(input)
+            audioInput = input
+        } else {
+            audioInput = nil
+        }
+
         let adaptor = AVAssetWriterInputPixelBufferAdaptor(
             assetWriterInput: videoInput,
             sourcePixelBufferAttributes: [
@@ -93,6 +118,7 @@ final class FilmtoneVideoWriter: @unchecked Sendable {
         self.contract = contract
         self.writer = writer
         self.videoInput = videoInput
+        self.audioInput = audioInput
         self.adaptor = adaptor
     }
 
@@ -111,14 +137,25 @@ final class FilmtoneVideoWriter: @unchecked Sendable {
     }
 
     func append(buffer: CVPixelBuffer, presentationTime: CMTime) async throws {
-        try await waitForReadyForMoreMediaData()
+        try await waitForReadyForMoreMediaData(videoInput)
         if !adaptor.append(buffer, withPresentationTime: presentationTime) {
             throw FilmtoneVideoWriterError.appendFailed(outputURL, underlying: writer.error)
         }
     }
 
+    func appendAudio(sampleBuffer: CMSampleBuffer) async throws {
+        guard let audioInput else {
+            throw FilmtoneVideoWriterError.audioInputCannotBeAdded(outputURL)
+        }
+        try await waitForReadyForMoreMediaData(audioInput)
+        if !audioInput.append(sampleBuffer) {
+            throw FilmtoneVideoWriterError.audioAppendFailed(outputURL, underlying: writer.error)
+        }
+    }
+
     func finish() async throws {
         videoInput.markAsFinished()
+        audioInput?.markAsFinished()
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             self.scheduleFinishWriting(continuation: continuation)
         }
@@ -143,9 +180,12 @@ final class FilmtoneVideoWriter: @unchecked Sendable {
         writer.cancelWriting()
     }
 
-    private func waitForReadyForMoreMediaData(timeoutSeconds: Double = 15) async throws {
+    private func waitForReadyForMoreMediaData(
+        _ input: AVAssetWriterInput,
+        timeoutSeconds: Double = 15
+    ) async throws {
         let startedAt = Date()
-        while !videoInput.isReadyForMoreMediaData {
+        while !input.isReadyForMoreMediaData {
             try Task.checkCancellation()
             if Date().timeIntervalSince(startedAt) >= timeoutSeconds {
                 throw FilmtoneVideoWriterError.waitForReadyTimedOut(outputURL)
