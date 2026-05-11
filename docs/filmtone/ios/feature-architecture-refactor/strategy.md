@@ -301,3 +301,14 @@ Total: 11-13 working days.
   remains untouched. pbxproj 4-section grep = 4; `bun run verify:ios`
   green; `git diff --check` clean. See
   `archive/2026-05-11-phase-2b-8c-export-sidecar-writer-extraction.md`.
+- 2026-05-11 JST — Phase 2B-9A (ExportStillImageWriter extraction)
+  committed as `3cbeb7f7`. New `final class ExportStillImageWriter` at
+  `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportStillImageWriter.swift`
+  (125 lines) now owns the post-grade still-image writer/adaptor
+  setup, 3-second frame loop, CI render, output metadata, append,
+  progress, finish, and `CompletedExport` assembly. `FilmtoneExportSession.swift`
+  reduced from 1701 → 1646 lines (−55); still source loading, HEIC
+  depth loading, output-size calculation, and `renderableStillImage`
+  remain session-owned. pbxproj 4-section grep = 4; `bun run
+  verify:ios` green; `git diff --check` clean. See
+  `archive/2026-05-11-phase-2b-9a-export-still-image-writer-extraction.md`.
