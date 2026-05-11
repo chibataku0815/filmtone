@@ -52,32 +52,38 @@ This is essence work, not cosmetic reorg:
   stale-grep gates, and stop conditions; add line-level implementation
   detail only when the current seam proves risky.
 
-## Measurable Done Conditions
+## Closed Acceptance
 
-This lane is done when:
+The lane is closed on product-boundary outcomes, not on every helper-sized
+implementation step:
 
-1. Every Swift source file lives in one of 10 feature folders (`Root/`,
-   `Capture/`, `Editor/`, `Export/`, `Look/`, `Optics/`, `Source/`,
-   `Services/`, `Smoke/`, `Strings/`) + the existing `ExportActivity/`
-   target folder. No flat root `.swift` files. Note: `Root/` (not `App/`)
-   houses entry surfaces because the pbxproj parent group is already named
-   `App` and `App/App/` nesting would be confusing.
-2. `FilmtoneExportSession` is a thin orchestrator (~1000 lines) backed by
-   GradeRenderPipeline / OpticsCompositor / ExportMediaWriter /
-   DepthPayloadManager / ExportMetrics. Sidecar canonical diff against a
-   committed fixture is byte-identical. Still-export PNG byte diff is 0
-   (or sidecar parity alone if encoder non-determinism shows up).
-3. `FilmtoneEditorStore` is a thin facade (~500 lines) over ProjectState /
-   LibraryManager / PreviewOrchestrator / ExportCoordinator / CaptureRelay.
-   View files are unchanged except where the Phase 3A inventory ruled
-   minimal adjustments necessary.
-4. `FilmtoneCaptureSession` is a thin facade (~600 lines) over
-   CaptureDeviceManager / RecordingStateController / CapturePackageAssembler
-   with `sessionQueue` ownership decided in Phase 4A.
-5. `bun run verify:ios` is green at every commit.
-6. Real-device (iPhone 17 Pro Max iOS 26.2, UDID
-   `D3011FE4-52CA-4B7F-B181-A55D9998E192`) capture smoke after Phase 4
-   completes one record → grade → export cycle.
+1. Source layout is feature-vertical: 109 former flat-root source files moved
+   into 10 feature folders (`Root/`, `Capture/`, `Editor/`, `Export/`,
+   `Look/`, `Optics/`, `Source/`, `Services/`, `Smoke/`, `Strings/`) plus
+   the existing `ExportActivity/` folder. There are no flat root `.swift`
+   sources. `Root/` is used instead of `App/` to avoid `App/App/` nesting in
+   the Xcode group hierarchy.
+2. Export is no longer a single god object: `FilmtoneExportSession.swift`
+   moved from ~5032 lines to 1078 lines and now coordinates collaborators
+   for grade, optics, media writing, frame appending, source normalization,
+   mezzanine routing, preview rendering, Connect package assembly, sidecar
+   writing, video timing, queue pumps, completion, geometry, and IO setup.
+   `FilmtoneExportSidecarBuilder.swift` remains the schema owner. Formal
+   sidecar/PNG parity fixtures were intentionally not added; parity was
+   guarded by `bun run verify:ios`, pbxproj registration checks, diff checks,
+   and final owner smoke.
+3. Editor state is split behind the existing facade: `FilmtoneEditorStore.swift`
+   moved from 3441 to 1723 lines with project, library, preview, mutation,
+   export/cache, and capture-relay collaborators. View files stayed unchanged;
+   moved published state is bridged through the facade.
+4. Capture is split behind the existing facade: `FilmtoneCaptureSession.swift`
+   moved from 1849 to 880 lines with device, recording-state, and package
+   assembly collaborators. `AVCaptureSession`, `sessionQueue`, movie output,
+   preview VDO, and preview layer remain singularly owned by the facade.
+5. Verification is intentionally minimal but product-relevant: `bun run
+   verify:ios` stayed green across phase commits, `git diff --check` stayed
+   clean, iOS truth script passed at closeout, and the owner-confirmed device
+   smoke completed record -> adopt -> grade -> export.
 
 ## Milestones
 
@@ -98,22 +104,20 @@ This lane is done when:
     unless the compatibility table proves a minimal bridge adjustment is
     necessary.
 - **Phase 4 — CaptureSession split** — one large implementation bundle
-  plus closeout if needed:
+  plus closeout smoke:
   - **Phase 4A** — sessionQueue ownership decision +
     `CaptureDeviceManager`, `RecordingStateController`, and
     `CapturePackageAssembler` extraction.
   - **Phase 4B** — facade closeout and real-device record → grade →
-    export smoke only if Phase 4A leaves product-risk follow-up.
-
-Remaining review/commit cycles after Phase 2B-10C: target **5-7**
-product-boundary turns, not 10+ helper-sized turns.
+    export smoke.
 
 ## Out Of Scope
 
 - View body decomposition (`FilmtoneFullscreenLutEditor` 1262 lines /
   `FilmtoneCaptureView` 1086 lines). SwiftUI body size is structural;
   velocity impact is small relative to god-object splits.
-- XCTest expansion, formal QA matrices, PSNR fixtures beyond Phase 2C.
+- XCTest expansion, formal QA matrices, and PSNR / byte-parity fixtures.
+  The owner accepted the minimal product-relevant gate set for this lane.
 
 ## Interrupt / Decision Log
 
@@ -135,322 +139,63 @@ product-boundary turns, not 10+ helper-sized turns.
 
 ## Completion Log
 
-- 2026-05-11 JST — Phase 1B source layout migration is complete in the
-  feature worktree: 109 former root files moved into 10 feature folders,
-  pbxproj and active script paths repaired, `bun run verify:ios` green.
-- 2026-05-11 JST — Phase 2A helper extraction is complete: export models,
-  render-stage metrics, and prepared LUT helpers moved into
-  `Export/Internal/`; pbxproj registration and `bun run verify:ios` green.
-- 2026-05-11 JST — Phase 2B-1 (sidecar formatter extraction + ExportSession
-  responsibility inventory) is complete in the feature worktree.
-  `extension ISO8601DateFormatter { static let filmtoneSidecar }` moved to
-  `Export/Internal/ExportSidecarDateFormatter.swift`; FilmtoneExportSession.swift
-  reduced from 4498 to 4488 lines; pbxproj 4-section registration verified;
-  `bun run verify:ios` green; `git diff --check` clean. Owner correction
-  recorded: subsequent extractions (2B-2 onward) must produce independent
-  helper types, not extensions on `FilmtoneExportSession`. See
-  `archive/2026-05-11-phase-2b-1-sidecar-formatter-extraction.md`.
-- 2026-05-11 JST — Phase 2B-2 (source-profile / input-LUT helpers
-  extraction) committed as `c3a87601`. Two independent `enum`-namespace
-  helper types landed under `Export/Internal/`:
-  `ExportInputLutBuilder.swift` (input-LUT factories + Apple Log math +
-  `synthesizedInputLutCache`) and `ExportSourceProfileResolver.swift`
-  (sidecar provenance + `implTag`). `FilmtoneExportSession.swift`
-  reduced from 4488 → 4178 lines (−310); 4 call sites rewritten from
-  `Self.<helper>` to the new namespaces; `makePreparedLut ?? makeActiveInputLut`
-  fallback preserved verbatim; 5 cosmetic comment updates in
-  Editor/Source files. pbxproj 4-section grep = 4 each; `bun run verify:ios`
-  green; `git diff --check` clean. See
-  `archive/2026-05-11-phase-2b-2-source-profile-input-lut-helpers-extraction.md`.
-- 2026-05-11 JST — Phase 2B-3 (depth payload manager extraction)
-  committed as `205f2b54`. New `enum` namespace
-  `ExportDepthPayloadManager` at
-  `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportDepthPayloadManager.swift`
-  (99 lines) now owns the video-depth reader probe + per-frame pull
-  sync-bridge. `request.depthEnabled` lifted to a parameter so the
-  helper is stateless; `DispatchSemaphore` byte-identical to pre-move.
-  `FilmtoneExportSession.swift` reduced from 4178 → 4094 lines (−84);
-  two call sites rewritten (`resolveVideoDepthReader` →
-  `ExportDepthPayloadManager.resolveReader(asset:depthEnabled:)`,
-  `pullNextVideoDepthFrame` → `ExportDepthPayloadManager.pullNextFrame`);
-  `PullResult` case names (`.frame` / `.endOfStream` / `.failure`)
-  unchanged so the frame-loop `switch` body needed no per-case edit.
-  pbxproj 4-section grep = 4; `bun run verify:ios` green;
-  `git diff --check` clean. See
-  `archive/2026-05-11-phase-2b-3-depth-payload-manager-extraction.md`.
-- 2026-05-11 JST — Phase 2B-4 (shared grade processor + motion blur
-  accumulator + optical kernels atomic bundle) committed as `7ff201c9`.
-  Three coupled top-level types lifted out of `FilmtoneExportSession.swift`
-  in one sub-stage because their `fileprivate ↔ private ↔ internal`
-  access ladder had to move atomically:
-  `final class FilmtoneSharedGradeProcessor` →
-  `Look/FilmtoneSharedGradeProcessor.swift` (cross-cutting visual
-  contract; 9 cross-file consumers' diff = 0 because type name preserved);
-  `final class FilmtoneMotionBlurAccumulator` →
-  `Export/Internal/FilmtoneMotionBlurAccumulator.swift`;
-  `enum OpticalKernels` →
-  `Export/Internal/OpticalKernels.swift` (CIKernel/CIColorKernel source
-  strings byte-identical). `FilmtoneExportSession.swift` reduced from
-  4094 → 3189 lines (−905). 6 `fileprivate` modifiers dropped on the
-  exact members the moved types read across the module boundary
-  (`ciContext`, `colorPipeline`, `renderablePreviewVideoImage`,
-  `applyLivePreviewGrade`, `outputFrameRate`,
-  `makeMotionBlurAccumulator`) plus 1 `private` dropped on the free
-  function `filmtonePreviewCompositionDebugLog`; `applyGrade`'s
-  `fileprivate` remains by design. pbxproj 4-section grep = 4 each;
-  `bun run verify:ios` green; `git diff --check` clean. See
-  `archive/2026-05-11-phase-2b-4-shared-grade-motion-blur-optical-kernels-bundle.md`.
-- 2026-05-11 JST — Phase 2B-5A (optics resampling pure-helper extraction)
-  is complete in the feature worktree. New `enum` namespace
-  `OpticsResampling` at
-  `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/OpticsResampling.swift`
-  (234 lines) now owns the 15 optics constants and 14 pure helpers
-  (`buildMipPyramid` / `downsampledImage` / `upsampledImage` /
-  `tentDownsampledImage` / `tentUpsampledImage` / `scaledImage` /
-  `weightedImage` / `addImages` / `blackImage` / `extentOriginVector` /
-  `extentSizeVector` / `computeMipWeights` / `halationColor` /
-  `aberrationEdgeSoften`) lifted out of `FilmtoneExportSession.swift`.
-  Bodies copied verbatim; 42 `Self.<name>` call sites rewritten to
-  `OpticsResampling.<name>`; `Self.clamp` (10 sites), `Self.lerp`
-  (1 site), and `Self.makeStableSourceSeed` (1 site) preserved per 5A
-  scope (clamp has 30+ non-optics call sites on `FilmtoneExportSession`,
-  so a 2-arg fallback is duplicated as `private static func` inside
-  `OpticsResampling`). Metal flag stored properties
-  (`useMetalOpticsForExport` / `metalOpticsRenderer` /
-  `metalOpticsActiveOnce` / `metalVignetteActiveOnce` /
-  `metalVignetteAppliedThisFrame` / `loadedDepthMap`) and the 10
-  optics-touching instance methods (`applyEdgeOpticsStage` /
-  `applyGlowFamilyStage` / `applyVignetteStage` / `vignetteFrameParams` /
-  `currentBacklightVeilProfile` / `applyBacklightVeilSpatialOverrides` /
-  `extractHighlightPlate` / `applyRadialRGBShift` / `applyEdgeSoftness` /
-  `buildMipBlurComposite`) remain on `FilmtoneExportSession` for Phase
-  2B-5B `OpticsCompositor`. One out-of-spec 1-line text edit in
-  `Optics/FilmtoneMetalOpticsRenderer.swift:832` (mirror-pointer
-  comment `Mirrors FilmtoneExportSession.halationColor` →
-  `Mirrors OpticsResampling.halationColor`) flagged in archive
-  Unexpected/Follow-up per `feedback_no_sweeping_diff_claims`.
-  `FilmtoneExportSession.swift` reduced from 3189 → 2984 lines (−205).
-  pbxproj 4-section grep = 4; `bun run verify:ios` green;
-  `git diff --check` clean. See
-  `archive/2026-05-11-phase-2b-5a-optics-resampling-extraction.md`.
-- 2026-05-11 JST — Phase 2B-5B (stateful optics compositor extraction)
-  committed as `ca6579a3`. New `final class OpticsCompositor` at
-  `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/OpticsCompositor.swift`
-  (671 lines) now owns the Metal optics gate / renderer lifecycle,
-  once-per-export Metal telemetry flags, per-frame vignette skip flag,
-  Backlight Veil profile resolution, edge optics, glow family, vignette,
-  CI fallback path, and depth-prefilter timing accumulation.
-  `FilmtoneExportSession.swift` reduced from 2984 → 2400 lines (−584)
-  and delegates optics stages through the compositor while keeping
-  `loadedDepthMap` lifetime on the session. Two now-dead private
-  `FilmtoneExportSession.clamp` / `lerp` helpers were deleted after the
-  move left them with zero callers. pbxproj 4-section grep = 4;
-  `bun run verify:ios` green; `git diff --check` clean. See
-  `archive/2026-05-11-phase-2b-5b-optics-compositor-extraction.md`.
-- 2026-05-11 JST — Phase 2B-6A (GradeRenderPipeline color-stage
-  extraction) committed as `4c18c763`. New `final class
-  GradeRenderPipeline` at
-  `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/GradeRenderPipeline.swift`
-  (175 lines) now owns prepared input / creative LUT state and the
-  non-optics color stages: input LUT, base grade, tone compression,
-  creative LUT, print, and LUT application. `FilmtoneExportSession.swift`
-  reduced from 2400 → 2262 lines (−138) while preserving the full
-  `applyGrade` stage order and recording-monitor reduced stage list.
-  pbxproj 4-section grep = 4; `bun run verify:ios` green;
-  `git diff --check` clean. See
-  `archive/2026-05-11-phase-2b-6a-grade-render-pipeline-color-stages.md`.
-- 2026-05-11 JST — Phase 2B-7A (ExportMediaWriter primitive extraction)
-  committed as `0a895169`. New `final class ExportMediaWriter` at
-  `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportMediaWriter.swift`
-  (231 lines) now owns writer setup, video reader-output setup, audio
-  pipeline setup, audio append, finish/wait, and CMTime helpers.
-  `FilmtoneExportSession.swift` reduced from 2262 → 2080 lines (−182);
-  `exportVideo`, `exportStillImage`, and `appendVideoSample` remain on
-  the session for the next frame-append boundary pass. The zero-caller
-  `estimatedVideoFrameRate(for:)` helper was deleted. pbxproj 4-section
-  grep = 4; `bun run verify:ios` green; `git diff --check` clean. See
-  `archive/2026-05-11-phase-2b-7a-export-media-writer-primitives.md`.
-- 2026-05-11 JST — Phase 2B-7B (ExportFrameAppender extraction)
-  committed as `c1c236f4`. New `final class ExportFrameAppender` at
-  `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportFrameAppender.swift`
-  (122 lines) now owns per-frame writer readiness wait,
-  pixel-buffer-pool allocation, CI render, output color metadata
-  application, adaptor append, and matching wait/build/render/append
-  signposts + performance metrics. `FilmtoneExportSession.swift`
-  reduced from 2080 → 2031 lines (−49); `renderableImage` stays on the
-  session through a render closure so grade / motion / depth order is
-  unchanged. pbxproj 4-section grep = 4; `bun run verify:ios` green;
-  `git diff --check` clean. See
-  `archive/2026-05-11-phase-2b-7b-export-frame-appender-extraction.md`.
-- 2026-05-11 JST — Phase 2B-8A (ExportSourceImageNormalizer extraction)
-  committed as `f795eb2b`. New `final class ExportSourceImageNormalizer`
-  at
-  `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportSourceImageNormalizer.swift`
-  (161 lines) now owns still-source loading, video pixel-buffer wrapping
-  with HDR tone-map detection, AVAssetTrack → Core Image orientation
-  transform, still/video/preview scale-crop, and preview extent
-  validation. `FilmtoneExportSession.swift` reduced from 2031 → 1896
-  lines (−135); `MezzanineService` now calls the same transform math via
-  the new namespace. Dead zero-caller `scaledVideoFrameImage(...)` was
-  deleted. pbxproj 4-section grep = 4; `bun run verify:ios` green;
-  `git diff --check` clean. See
-  `archive/2026-05-11-phase-2b-8a-export-source-image-normalizer-extraction.md`.
-- 2026-05-11 JST — Phase 2B-8B (ExportConnectPackageAssembler
-  extraction) committed as `774ba264`. New `final class
-  ExportConnectPackageAssembler` at
-  `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportConnectPackageAssembler.swift`
-  (151 lines) now owns Filmtone Connect source-media copy, combined /
-  pre-optical / post-optical cube writes, DCTL write, reference-after
-  path orchestration via a session closure, `SidecarPackage` payload, and
-  ordered package-file URI construction. `FilmtoneExportSession.swift`
-  reduced from 1896 → 1805 lines (−91); `writeExportSidecar` and
-  reference-after JPEG rendering stay on the session. pbxproj 4-section
-  grep = 4; `bun run verify:ios` green; `git diff --check` clean. See
-  `archive/2026-05-11-phase-2b-8b-export-connect-package-assembler-extraction.md`.
-- 2026-05-11 JST — Phase 2B-8C (ExportSidecarWriter extraction)
-  committed as `445a0e10`. New `final class ExportSidecarWriter` at
-  `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportSidecarWriter.swift`
-  (193 lines) now owns sidecar identity/depth/Saved Look/Camera Profile
-  block assembly, `SidecarBuildInputs` construction, sidecar URL
-  resolution, atomic write, and nil-on-failure logging. The session
-  passes a write-time `Telemetry` snapshot for mutable decode/depth /
-  mezzanine truth fields. `FilmtoneExportSession.swift` reduced from
-  1805 → 1701 lines (−104); `FilmtoneExportSidecarBuilder.swift`
-  remains untouched. pbxproj 4-section grep = 4; `bun run verify:ios`
-  green; `git diff --check` clean. See
-  `archive/2026-05-11-phase-2b-8c-export-sidecar-writer-extraction.md`.
-- 2026-05-11 JST — Phase 2B-9A (ExportStillImageWriter extraction)
-  committed as `3cbeb7f7`. New `final class ExportStillImageWriter` at
-  `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportStillImageWriter.swift`
-  (125 lines) now owns the post-grade still-image writer/adaptor
-  setup, 3-second frame loop, CI render, output metadata, append,
-  progress, finish, and `CompletedExport` assembly. `FilmtoneExportSession.swift`
-  reduced from 1701 → 1646 lines (−55); still source loading, HEIC
-  depth loading, output-size calculation, and `renderableStillImage`
-  remain session-owned. pbxproj 4-section grep = 4; `bun run
-  verify:ios` green; `git diff --check` clean. See
-  `archive/2026-05-11-phase-2b-9a-export-still-image-writer-extraction.md`.
-- 2026-05-11 JST — Phase 2B-9B (ExportMezzanineRouter extraction)
-  committed as `e0ad9cd7`. New `final class ExportMezzanineRouter` at
-  `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportMezzanineRouter.swift`
-  (256 lines) now owns preview/export source routing, quality prewarm,
-  route validation, consumed mezzanine URL/metrics snapshot, and
-  `disabled-on-ios` validation status. `FilmtoneExportSession.swift`
-  reduced from 1646 → 1457 lines (−189); session still owns
-  `AVURLAsset` opening, depth reader, writer/reader setup, frame loop,
-  and sidecar property storage. pbxproj 4-section grep = 4; `bun run
-  verify:ios` green; `git diff --check` clean. See
-  `archive/2026-05-11-phase-2b-9b-export-mezzanine-router-extraction.md`.
-- 2026-05-11 JST — Phase 2B-9C (ExportPreviewRenderer extraction)
-  committed as `9d50b705`. New `final class ExportPreviewRenderer` at
-  `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportPreviewRenderer.swift`
-  (183 lines) now owns still/video preview rendering, poster-time
-  selection, preview CGImage tolerance fallback, preview JPEG writing, and
-  Connect reference-after JPEG writing. `FilmtoneExportSession.swift`
-  reduced from 1457 → 1361 lines (−96); public `renderPreviewFrame()`
-  stays as a cache-clearing facade and `applyGrade` stays session-owned
-  via closure. pbxproj 4-section grep = 4; `bun run verify:ios` green;
-  `git diff --check` clean. See
-  `archive/2026-05-11-phase-2b-9c-export-preview-renderer-extraction.md`.
-- 2026-05-11 JST — Phase 2B-10A (ExportVideoDepthMatcher extraction)
-  committed as `33551dae`. New `final class ExportVideoDepthMatcher` at
-  `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportVideoDepthMatcher.swift`
-  (80 lines) now owns per-frame video depth cursor state and the
-  depth-track pull loop. `FilmtoneExportSession.swift` reduced from
-  1361 → 1334 lines (−27); session still owns depth telemetry assignment
-  and updates `loadedDepthMap`, `videoDepthDecodeMs`,
-  `videoDepthFramesProcessed`, and `depthResolution`. pbxproj 4-section
-  grep = 4; `bun run verify:ios` green; `git diff --check` clean. See
-  `archive/2026-05-11-phase-2b-10a-export-video-depth-matcher-extraction.md`.
-- 2026-05-11 JST — Phase 2B-10B (ExportVideoTimeline extraction)
-  committed as `40d24fdd`. New `final class ExportVideoTimeline` at
-  `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportVideoTimeline.swift`
-  (88 lines) now owns output frame count / duration, presentation time,
-  source lookup time, source segment index, lazy source-time-offset
-  normalization, timed sample shape, and rendering progress math.
-  `FilmtoneExportSession.swift` reduced from 1334 → 1296 lines (−38);
-  decode / lookahead / append orchestration remains session-owned.
-  The live rendering-progress multiplier remains `0.74`; the 10B active
-  doc corrected an earlier `0.78` planning typo before commit. pbxproj
-  4-section grep = 4; `bun run verify:ios` green; `git diff --check`
-  clean. See
-  `archive/2026-05-11-phase-2b-10b-export-video-timeline-extraction.md`.
-- 2026-05-11 JST — Phase 2B-10C (video export queue bundle) committed
-  as `90553a4d`. Three queue collaborators landed under
-  `Export/Internal/`: `ExportVideoCompletionCoordinator` (119 lines)
-  owns dispatch-group / first-error lifecycle, `ExportVideoFramePump`
-  (191 lines) owns video sample decode / lookahead / output-frame loop /
-  progress cadence, and `ExportVideoAudioPump` (84 lines) owns the audio
-  queue body. `FilmtoneExportSession.swift` reduced from 1296 → 1127
-  lines (−169); session still owns writer/reader setup, depth prep,
-  render/append closure, and `CompletedExport` assembly. pbxproj
-  4-section grep = 4 for all 3 files; `bun run verify:ios` green;
-  `git diff --check` clean. See
-  `archive/2026-05-11-phase-2b-10c-video-export-queue-bundle.md`.
-- 2026-05-11 JST — Phase 2B-10D (video IO setup bundle) committed as
-  `25a9f0ae`. New `ExportGeometry` (33 lines) owns export output-size
-  math and new `ExportVideoIOBuilder` (140 lines) owns video writer /
-  reader setup, adaptor creation, optional audio pipeline, degraded decode
-  flag, and writer/reader start order. Cross-file `scaledSize` consumers
-  now call `ExportGeometry`. `FilmtoneExportSession.swift` reduced from
-  1127 → 1078 lines (−49); session still owns mezzanine routing, depth
-  setup, queue orchestration, render/append closure, and result assembly.
-  pbxproj 4-section grep = 4 for both files; `bun run verify:ios`
-  green; `git diff --check` clean. See
-  `archive/2026-05-11-phase-2b-10d-video-io-setup-bundle.md`.
-- 2026-05-11 JST — Phase 2 is closed by owner decision after 2B-10D.
-  The planned 2B-11 / 2C finalization active was archived as skipped;
-  no additional Phase 2 cleanup or parity fixture was run. See
+- **2026-05-11 JST — Phase 1: Feature-folder migration.**
+  109 former flat-root source files moved into 10 feature folders plus
+  the existing `ExportActivity/` target folder. pbxproj file refs and
+  active script paths were repaired; rename-only diff and
+  `bun run verify:ios` were green. Detail:
+  `archive/2026-05-11-phase-1b-feature-folder-migration.md`.
+
+- **2026-05-11 JST — Phase 2: ExportSession split.**
+  The early Phase 2 work was executed too granularly (2B-1 through
+  2B-10D), and those sub-stage archives are retained only as evidence.
+  The product boundary result is the important state: the original
+  ~5032-line export god object is now a 1078-line orchestrator backed by
+  27 `Export/Internal/` collaborators plus cross-cutting extracted types
+  in `Look/` and `Optics/`. Responsibilities now have clear owners:
+  source-profile/input LUT, depth payload + depth matching, optics
+  resampling/composition, grade rendering, media writing + frame append,
+  source normalization, Connect package assembly, sidecar writing, still
+  writing, mezzanine routing, preview rendering, video timeline, video
+  queue pumps, completion coordination, geometry, and video IO setup.
+  `FilmtoneExportSidecarBuilder.swift` stayed schema-owned; render /
+  sidecar / writer invariants were guarded by `bun run verify:ios`,
+  pbxproj 4-section greps, and `git diff --check` at each commit. The
+  planned 2B-11 / 2C final pass was skipped by owner decision because
+  2B-10D left the facade thin enough for Phase 3. Detail archives:
+  `archive/2026-05-11-phase-2a-export-session-helper-extraction.md`
+  through
   `archive/2026-05-11-phase-2b-11-export-finalization-skipped.md`.
-- 2026-05-11 JST — Phase 3A (EditorStore project + library +
-  preview bundle) completed in the feature worktree. New
-  `EditorProjectController`, `EditorLibraryController`, and
-  `EditorPreviewOrchestrator` split project bookkeeping, optional
-  library actor access, and still/video preview lifecycle out of
-  `FilmtoneEditorStore`. Store size reduced from 3441 → 2794 lines
-  (−647); SwiftUI view files stayed unchanged; pbxproj 4-section grep
-  = 4 for all 3 files; `bun run verify:ios` green; `git diff --check`
-  clean. See
-  `archive/2026-05-11-phase-3a-editor-project-library-preview-bundle.md`.
-- 2026-05-11 JST — Phase 3B (EditorStore mutation + export/cache
-  coordination bundle) completed in the feature worktree. New
-  `EditorProjectMutationCoordinator` and `EditorExportCoordinator`
-  split LUT/Saved Look mutation orchestration plus export, Photos-save,
-  share, highlight-reel, and cache lifecycle out of `FilmtoneEditorStore`.
-  Store size reduced from 2794 → 1927 lines (−867), landing inside the
-  1900-2200 target band; SwiftUI view files stayed unchanged; pbxproj
-  4-section grep = 4 for both files; `bun run verify:ios` green;
-  `git diff --check` clean. See
-  `archive/2026-05-11-phase-3b-editor-mutation-export-coordinators.md`.
-- 2026-05-11 JST — Phase 3C (EditorStore capture relay closeout)
-  completed in the feature worktree. New `EditorCaptureRelay` owns
-  recording UI state, capture package refs, package rehydration,
-  product-clip recording, capture result adoption, and capture package
-  preview processor creation. Store size reduced from 1927 → 1723 lines
-  (−204); target band overshoot is recorded because the remaining live
-  preview processor factory crosses non-capture editor labels/cache state
-  and is intentionally not part of capture relay. SwiftUI view files
-  stayed unchanged; pbxproj 4-section grep = 4; `bun run verify:ios`
-  green; `git diff --check` clean. See
-  `archive/2026-05-11-phase-3c-editor-capture-relay-closeout.md`.
-- 2026-05-11 JST — Phase 4A (CaptureSession large split) completed in
-  the feature worktree. New `CaptureDeviceManager`,
-  `RecordingStateController`, and `CapturePackageAssembler` split
-  device/format/manual-control state, recording state/timers/storage
-  pressure, and package assembly/persistence out of
-  `FilmtoneCaptureSession`. The facade keeps singular ownership of
-  `AVCaptureSession` + `sessionQueue` + movie output + preview VDO, with
-  collaborator `objectWillChange` bridged into the session. Session size
-  reduced from 1849 → 880 lines (−969), landing in the 600-900 target
-  band; SwiftUI view files stayed unchanged; pbxproj 4-section grep = 4
-  for all 3 files; `bun run verify:ios` green; `git diff --check`
-  clean. See
+
+- **2026-05-11 JST — Phase 3: EditorStore split.**
+  `FilmtoneEditorStore.swift` moved from 3441 to 1723 lines. Six real
+  collaborators landed under `Editor/Internal/`:
+  `EditorProjectController`, `EditorLibraryController`,
+  `EditorPreviewOrchestrator`, `EditorProjectMutationCoordinator`,
+  `EditorExportCoordinator`, and `EditorCaptureRelay`. View files stayed
+  unchanged; moved `@Published` state is bridged back through the facade
+  with `objectWillChange` forwarding. The only target-band overshoot is
+  documented: remaining live-preview processor factory code spans
+  non-capture labels/cache state and was intentionally not folded into
+  capture relay. Detail:
+  `archive/2026-05-11-phase-3a-editor-project-library-preview-bundle.md`,
+  `archive/2026-05-11-phase-3b-editor-mutation-export-coordinators.md`,
+  and `archive/2026-05-11-phase-3c-editor-capture-relay-closeout.md`.
+
+- **2026-05-11 JST — Phase 4: CaptureSession split.**
+  `FilmtoneCaptureSession.swift` moved from 1849 to 880 lines. Three
+  real collaborators landed under `Capture/Internal/`:
+  `CaptureDeviceManager`, `RecordingStateController`, and
+  `CapturePackageAssembler`. `AVCaptureSession`, `sessionQueue`, movie
+  output, preview VDO, and preview layer remain singularly owned by the
+  facade; collaborator state is bridged back through
+  `objectWillChange`. View files stayed unchanged. Detail:
   `archive/2026-05-11-phase-4a-capturesession-large-split.md`.
-- 2026-05-12 JST — Phase 4B (capture smoke + lane closeout) completed.
-  `bun run verify:ios` green, truth script green, no stale flat-path
-  refs in `RELEASE.md` or lane docs, device build via
-  `-workspace App.xcworkspace` installed `feature/ios-feature-architecture
-  @ e187e1db` on 千葉工のiPhone (7), owner-confirmed smoke PASS
-  (record -> adopt -> grade -> export, one cycle). **Feature-architecture
-  lane CLOSED.** See
+
+- **2026-05-12 JST — Phase 4B / lane closeout.**
+  `bun run verify:ios` green, iOS truth script green, no stale flat-path
+  references in `RELEASE.md` or feature-architecture docs. Device
+  build/install used `-workspace App.xcworkspace` and owner-confirmed
+  smoke PASS on 千葉工のiPhone (7): record -> adopt -> grade -> export,
+  one cycle. **Feature-architecture lane CLOSED.** Detail:
   `archive/2026-05-12-phase-4b-capture-smoke-and-lane-closeout.md`.
