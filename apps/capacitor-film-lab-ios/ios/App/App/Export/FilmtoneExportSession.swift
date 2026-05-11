@@ -117,9 +117,17 @@ final class FilmtoneExportSession {
     /// reference-after JPEG path orchestration via a session-supplied closure,
     /// the eight-field `Companions` value, `SidecarPackage` payload, and the
     /// ordered package-file URI list. `writeReferenceAfterImage`,
-    /// `makePreviewPosterTime`, `copyPreviewCGImage`, `writeJPEGImage`, and
-    /// `writeExportSidecar` stay on the session.
+    /// `makePreviewPosterTime`, `copyPreviewCGImage`, and `writeJPEGImage`
+    /// stay on the session.
     private let connectPackageAssembler: ExportConnectPackageAssembler
+    /// Phase 2B-8C: filmtone-ios-export-session-v1 sidecar writer collaborator.
+    /// Owns device-identity assembly, depth / Saved Look / Camera Profile
+    /// sidecar blocks, builder-inputs construction,
+    /// `FilmtoneExportSidecarBuilder.build` + atomic write, and the
+    /// log-and-return-nil fallback. The session passes a `Telemetry`
+    /// snapshot of mutable state into `write(...)` so an eviction between
+    /// routing and sidecar write cannot drop truth fields.
+    private let sidecarWriter: ExportSidecarWriter
     private let outputColorSpace: CGColorSpace
     private var degradedDecodePath = false
     private var cancelled = false
@@ -265,6 +273,15 @@ final class FilmtoneExportSession {
             outputURL: outputURL,
             sourceSeed: self.sourceSeed
         )
+        self.sidecarWriter = ExportSidecarWriter(
+            request: request,
+            outputURL: outputURL,
+            colorPipeline: colorPipeline,
+            appliedSavedLook: appliedSavedLook,
+            cameraProfileSelection: cameraProfile,
+            highlightMarkers: self.highlightMarkers,
+            captureProvenance: captureProvenance
+        )
         if disableGlowFamilyForExport {
             NSLog("FilmtoneExportSession: GlowFamily disabled by FILMTONE_EXPORT_DISABLE_GLOW_FAMILY")
         }
@@ -403,14 +420,25 @@ final class FilmtoneExportSession {
         // T2 (v1.1): write the filmtone-ios-export-session-v1 sidecar next to the
         // export output. Failure here must NOT fail the export itself — missing
         // sidecar just surfaces as `sidecarUri = nil` downstream.
-        let sidecarUri = writeExportSidecar(
+        let sidecarUri = sidecarWriter.write(
             outputSize: result.outputSize,
             fileSizeBytes: fileSizeBytes,
             elapsedMs: elapsedMs,
             realtimeRatio: realtimeRatio,
             audioPreserved: result.audioPreserved,
             package: packageCompanions?.sidecarPackage,
-            performance: performance
+            performance: performance,
+            telemetry: ExportSidecarWriter.Telemetry(
+                degradedDecodePath: degradedDecodePath,
+                depthResolution: depthResolution,
+                videoDepthFramesProcessed: videoDepthFramesProcessed,
+                videoDepthSourceLabel: videoDepthSourceLabel,
+                didUseMezzanineVariant: didUseMezzanineVariant,
+                mezzanineConsumedURLLastPathComponent: mezzanineConsumedURLLastPathComponent,
+                mezzanineConsumedMetrics: mezzanineConsumedMetrics,
+                mezzanineGeneratedDuringExport: mezzanineGeneratedDuringExport,
+                mezzanineValidationStatus: mezzanineValidationStatus
+            )
         )
         let packageFileUris = connectPackageAssembler.makePackageFileUris(
             sidecarUri: sidecarUri,
@@ -477,138 +505,6 @@ final class FilmtoneExportSession {
             sidecarUri: nil,
             packageFileUris: nil
         )
-    }
-
-    /// Assemble and atomically write the filmtone-ios-export-session-v1 sidecar.
-    /// Returns the sidecar absolute URL string on success, `nil` on any failure.
-    private func writeExportSidecar(
-        outputSize: CGSize,
-        fileSizeBytes: Int?,
-        elapsedMs: Int,
-        realtimeRatio: Double?,
-        audioPreserved: Bool?,
-        package: SidecarPackage?,
-        performance: SidecarPerformance?
-    ) -> String? {
-        let identity = SidecarDeviceIdentity(
-            appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "",
-            buildNumber: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "",
-            deviceModel: UIDevice.current.filmtoneModelIdentifier,
-            iosVersion: UIDevice.current.systemVersion,
-            exportedAtIso: ISO8601DateFormatter.filmtoneSidecar.string(from: Date())
-        )
-
-        let hdrPolicy = request.sourceProbe?.sourceVideoMetadata?.hdrPreparationPolicy
-
-        // v1.3 (D3.5): depth block. Always emitted — `used: false` is the
-        // explicit signal that depth was not consumed (vs. absent field which
-        // would mean "v1.2 sidecar / unknown"). Renderer is "ci" by default
-        // (Phase A ships only the Core Image kernel; the contract reserves
-        // "metal" for Phase B).
-        let depthSidecar: SidecarDepthInfo
-        if let res = depthResolution {
-            depthSidecar = SidecarDepthInfo(
-                used: true,
-                source: "avDepthData",
-                resolutionWidth: res.width,
-                resolutionHeight: res.height,
-                renderer: request.depthRenderer ?? DepthRenderer.ci.rawValue,
-                framesWithDepth: videoDepthFramesProcessed,
-                videoDepthSource: videoDepthSourceLabel
-            )
-        } else {
-            // Video that opened a depth reader but never matched a frame
-            // (asset began before first depth pts, or every pull failed) still
-            // owes the importer `used: false` plus the diagnostic block —
-            // `framesWithDepth: 0` distinguishes "asset had a track" from "no
-            // track at all" (still / no-opt-in path keeps both nil).
-            depthSidecar = SidecarDepthInfo(
-                used: false,
-                source: nil,
-                resolutionWidth: nil,
-                resolutionHeight: nil,
-                renderer: nil,
-                framesWithDepth: videoDepthSourceLabel != nil ? (videoDepthFramesProcessed ?? 0) : nil,
-                videoDepthSource: videoDepthSourceLabel
-            )
-        }
-
-        // v1.3 Item 2 Phase E: convert the resolved Saved Look entry (if any)
-        // into the builder-local `SidecarSavedLookRef`. Built-in entries
-        // surface `bundled: true` + `bundledSlug`; user-saved entries omit
-        // both via `encodeIfPresent`. The sidecar block itself is `nil` when
-        // no Saved Look was applied at export time.
-        let savedLookRef: SidecarSavedLookRef? = appliedSavedLook.map { entry in
-            SidecarSavedLookRef(
-                id: entry.id.uuidString,
-                name: entry.name,
-                updatedAtIso: ISO8601DateFormatter.filmtoneSidecar.string(from: entry.updatedAt),
-                bundled: entry.bundled ? true : nil,
-                bundledSlug: entry.bundledSlug
-            )
-        }
-
-        // v1.3 Camera Profiles Phase G: flatten the active CameraProfileSelection
-        // (+ resolved catalog entry if any) into stringly-typed sidecar
-        // fields. Auto + no probe match → selectionKind="auto", no catalog
-        // entry. Auto + match → catalog id and resolvedFromAutoVia set so
-        // downstream readers can tell user-explicit picks from auto picks.
-        let cameraProfileBlock: SidecarCameraProfile? = ExportSourceProfileResolver.makeCameraProfileSidecar(
-            for: cameraProfileSelection,
-            probeColorClass: request.sourceProbe?.sourceVideoMetadata?.colorClass
-        )
-
-        let inputs = SidecarBuildInputs(
-            request: request,
-            sourceProbe: request.sourceProbe,
-            hdrPolicy: hdrPolicy,
-            degradedDecodePath: degradedDecodePath,
-            outputURL: outputURL,
-            outputSize: outputSize,
-            fileSizeBytes: fileSizeBytes,
-            elapsedMs: elapsedMs,
-            realtimeRatio: realtimeRatio,
-            audioPreserved: audioPreserved,
-            identity: identity,
-            // v1.2: render-mode + mezzanine variant + profile-version for sidecar truth.
-            // Stream D owns the field declarations on SidecarBuildInputs; this call site
-            // populates them per the cross-stream contract.
-            renderMode: (request.renderMode ?? .quality).rawValue,
-            mezzanineUsedVariant: didUseMezzanineVariant?.rawValue,
-            mezzanineProfileVersion: didUseMezzanineVariant != nil ? MezzanineService.Profile.version : nil,
-            // v1.4 truth fields. All nil when no mezzanine was consumed; populated
-            // from the snapshot we captured in exportVideo (so an eviction between
-            // routing and sidecar write cannot strip them).
-            mezzanineUrlLastPathComponent: mezzanineConsumedURLLastPathComponent,
-            mezzanineFileSizeBytes: mezzanineConsumedMetrics?.fileSizeBytes,
-            mezzanineDurationSec: mezzanineConsumedMetrics?.durationSec,
-            mezzanineWidth: mezzanineConsumedMetrics?.width,
-            mezzanineHeight: mezzanineConsumedMetrics?.height,
-            mezzanineCodec: mezzanineConsumedMetrics?.codec,
-            mezzaninePrewarmHit: mezzanineGeneratedDuringExport.map { !$0 },
-            mezzanineGeneratedDuringExport: mezzanineGeneratedDuringExport,
-            mezzanineValidationStatus: mezzanineValidationStatus,
-            colorPipeline: colorPipeline,
-            package: package,
-            depth: depthSidecar,
-            appliedSavedLook: savedLookRef,
-            cameraProfile: cameraProfileBlock,
-            performance: performance,
-            highlightMarkers: highlightMarkers,
-            captureProvenance: captureProvenance
-        )
-
-        let sidecarURL = FilmtoneExportSidecarBuilder.sidecarURL(for: outputURL)
-        do {
-            let payload = try FilmtoneExportSidecarBuilder.build(inputs)
-            try payload.write(to: sidecarURL, options: [.atomic])
-            return sidecarURL.absoluteString
-        } catch {
-            filmtonePreviewCompositionDebugLog(
-                "sidecar write failed at \(sidecarURL.path): \(error.localizedDescription)"
-            )
-            return nil
-        }
     }
 
     private func exportVideo(
