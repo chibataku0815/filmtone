@@ -6,15 +6,14 @@ Phase: 2 of 5 (sub-stage 2-B; see `strategy.md` and
 
 ## Gating
 
-**Phase 2-B render source touches are blocked on Phase 1 commit landing.**
-`feature/detail-softness-contract` HEAD is `95f1be03` (= `main`). Phase 1
-contract plumbing (27 source files + Phase 1 archive doc + this lane's
-`strategy.md`) is uncommitted in this worktree. Per owner direction Phase 1
-must be committed **separately** before any Phase 2-B render source change
-lands — the Phase 1 commit must not bundle render prototype work.
+**Phase 1 commit landed separately before Phase 2-B render source.**
+`feature/detail-softness-contract` HEAD includes `033a335f`
+(`feat(detail-softness): add neutral contract plumbing`), which commits the
+Phase 1 contract plumbing and lane docs without render prototype code. Phase
+2-B render changes may start from this commit and must land in a later commit.
 
-This `active.md` is the Phase 2-B charter only. Once Phase 1 lands, the
-Checklist below sequences the prototype.
+This `active.md` is the Phase 2-B charter. The Checklist below sequences the
+prototype.
 
 ## Owner-confirmed decisions (2026-05-12)
 
@@ -156,8 +155,8 @@ implementation-history claim changes — UI exposure lands in Phase 3.
 
 ## Stop Conditions
 
-- Phase 1 commit has not landed when Phase 2-B is about to start touching
-  render source. Halt; remind owner.
+- Phase 2-B render source is about to start from a HEAD before `033a335f`.
+  Halt and rebase / switch to the committed Phase 1 base first.
 - Identity at `0` fails (any pixel differs). Pause and diagnose before any
   uniform / kernel change ships.
 - Macroscopic skin waxiness or smeared hair on the A/B set at `0.18`.
@@ -170,8 +169,8 @@ implementation-history claim changes — UI exposure lands in Phase 3.
 
 ## Checklist
 
-- [ ] **(Precondition)** Phase 1 commit lands on
-      `feature/detail-softness-contract` (owner-run).
+- [x] **(Precondition)** Phase 1 commit landed on
+      `feature/detail-softness-contract` at `033a335f`.
 - [ ] `packages/film-lab-core/src/detail-softness.ts` added with helper +
       `DetailSoftnessUniforms` type + `DETAIL_SOFTNESS_EFFECTIVE_MAX`
       constant.
