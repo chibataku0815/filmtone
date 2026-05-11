@@ -37,6 +37,7 @@ move to `<lane>/archive/`.
 | V2 Capture / Gyroflow | **Closed at M14 + M15 PASS (2026-05-09)** | [`v2-capture-gyroflow/strategy.md`](./v2-capture-gyroflow/strategy.md) | No `active.md` — lane awaits owner pick of next sub-lane (Filmtone-optimized motion library, broad device matrix). M9–M15 archives in [`v2-capture-gyroflow/archive/`](./v2-capture-gyroflow/archive/) |
 | React / Capacitor purge | **Closed + merged into main as `47a1d76d` (2026-05-09)** | [`react-capacitor-purge/strategy.md`](./react-capacitor-purge/strategy.md) | Stages A → E archived. Worktree + branch removed post-merge. |
 | Meta Before/After DaVinci shell | Asset directory, not a lane | [`meta-before-after-davinci-shell/README.md`](./meta-before-after-davinci-shell/README.md) | Placeholder Resolve project + Lua helpers for ad production. Not active product work. |
+| Feature Architecture Refactor | **Phase 1B complete — commit pending (2026-05-11)** | [`feature-architecture-refactor/strategy.md`](./feature-architecture-refactor/strategy.md) | Reorganized the flat App source root into 10 feature folders; next phase splits ExportSession helpers after the Phase 1B commit. Branch `feature/ios-feature-architecture` based on `main @ dac08c81`. |
 
 ## Idea Notes
 

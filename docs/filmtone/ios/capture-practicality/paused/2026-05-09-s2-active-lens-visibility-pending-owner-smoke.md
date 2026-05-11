@@ -42,10 +42,10 @@ switching behavior, continuous zoom, or per-lens quality renegotiation.
 
 ## Edit Targets
 
-- `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneCaptureView.swift`
-- `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneCaptureChrome.swift`
+- `apps/capacitor-film-lab-ios/ios/App/App/Capture/FilmtoneCaptureView.swift`
+- `apps/capacitor-film-lab-ios/ios/App/App/Capture/FilmtoneCaptureChrome.swift`
   (only if a small pure helper for the contract line lands here)
-- `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneCaptureLensChipRow.swift`
+- `apps/capacitor-film-lab-ios/ios/App/App/Capture/FilmtoneCaptureLensChipRow.swift`
   (only if the selected-state chip needs a clarity tweak)
 
 Only add new Swift files if the existing components become too
@@ -149,7 +149,7 @@ Stop and report if any of these fires:
 
 - 2026-05-09 JST — S2 implementation pass:
   - `git diff --check` clean on
-    `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneCaptureView.swift`.
+    `apps/capacitor-film-lab-ios/ios/App/App/Capture/FilmtoneCaptureView.swift`.
   - `xcodebuild -workspace
     apps/capacitor-film-lab-ios/ios/App/App.xcworkspace -scheme App
     -destination 'generic/platform=iOS Simulator' -configuration

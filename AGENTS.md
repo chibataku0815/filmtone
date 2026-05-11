@@ -195,7 +195,9 @@ Guidance:
   `packages/film-lab-smart-look/dist/` as generated noise. They are intentionally
   tracked so a fresh portfolio submodule checkout can import package exports.
 - Do not hand-edit generated Swift such as
-  `apps/capacitor-film-lab-ios/ios/App/App/FilmtonePhase0Generated.swift`.
+  `apps/capacitor-film-lab-ios/ios/App/App/Optics/FilmtoneOpticalFiltersGenerated.swift`
+  or
+  `packages/film-lab-swift-core/Sources/FilmLabSwiftCore/Generated/FilmtonePhase0Generated.swift`.
   Regenerate via `bun run generate:ios-swift`.
 - Do not commit secrets, signing material, ASC keys, provisioning files, or
   local `.env` files.

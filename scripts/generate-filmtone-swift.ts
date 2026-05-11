@@ -38,7 +38,7 @@ const targets: SwiftTarget[] = [
     id: "ios-optical-filters",
     outputPath: resolve(
       repoRoot,
-      "apps/capacitor-film-lab-ios/ios/App/App/FilmtoneOpticalFiltersGenerated.swift",
+      "apps/capacitor-film-lab-ios/ios/App/App/Optics/FilmtoneOpticalFiltersGenerated.swift",
     ),
     nextContent: renderFilmtoneIosOpticalFiltersSwift(),
   },

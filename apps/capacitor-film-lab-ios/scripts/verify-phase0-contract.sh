@@ -8,14 +8,14 @@ FIXTURE_DIR="$SCRIPT_DIR/fixtures/phase0-contract"
 SWIFT_SUPPORT="$SCRIPT_DIR/swift/phase0-contract-support.swift"
 SWIFT_CHECK="$SCRIPT_DIR/swift/verify-phase0-contract.swift"
 SWIFT_CORE_DIR="$REPO_ROOT/packages/film-lab-swift-core/Sources/FilmLabSwiftCore"
-PHASE0_MATH="$APP_DIR/ios/App/App/FilmtonePhase0Math.swift"
-MOTION_MATH="$APP_DIR/ios/App/App/FilmtoneMotionBlurMath.swift"
+PHASE0_MATH="$APP_DIR/ios/App/App/Source/FilmtonePhase0Math.swift"
+MOTION_MATH="$APP_DIR/ios/App/App/Optics/FilmtoneMotionBlurMath.swift"
 # v1.3 Camera Profiles Phase A — `FilmtoneProjectState.cameraProfile` references
 # `CameraProfileSelection` from this schema file, so the standalone Phase 0
 # compile must pull it in alongside Math/Motion. The schema's dependencies
 # (`SourceInputTransformStrategyDTO`, `SourceColorClassDTO`) are stubbed in
 # `phase0-contract-support.swift` so this stays target-free.
-SOURCE_PROFILE_SCHEMA="$APP_DIR/ios/App/App/FilmtoneSourceProfileSchema.swift"
+SOURCE_PROFILE_SCHEMA="$APP_DIR/ios/App/App/Source/FilmtoneSourceProfileSchema.swift"
 CANONICAL_FIXTURE="$FIXTURE_DIR/canonical-export-request.json"
 LEGACY_FIXTURE="$FIXTURE_DIR/legacy-project-state.json"
 HLG_FIXTURE="$FIXTURE_DIR/hlg-export-request.json"
@@ -94,7 +94,7 @@ fi
 
 # --- Stream C: .cube parser DOMAIN_MIN / DOMAIN_MAX test ---
 CUBE_PARSER_SCRIPT="$SCRIPT_DIR/swift/test-cube-parser.swift"
-CUBE_PARSER_SRC="$APP_DIR/ios/App/App/FilmtoneCubeParser.swift"
+CUBE_PARSER_SRC="$APP_DIR/ios/App/App/Look/FilmtoneCubeParser.swift"
 if [ -f "$CUBE_PARSER_SCRIPT" ] && [ -f "$CUBE_PARSER_SRC" ]; then
   echo "==> cube parser test"
   CUBE_PARSER_BIN=$(mktemp "${TMPDIR:-/tmp}/phase0-cube-parser-check.XXXXXX")
@@ -108,7 +108,7 @@ fi
 
 # --- S7: capture transform-LUT warning classifier ---
 CAPTURE_TRANSFORM_LUT_CLASSIFIER_SCRIPT="$SCRIPT_DIR/swift/test-capture-transform-lut-classifier.swift"
-CAPTURE_TRANSFORM_LUT_CLASSIFIER_SRC="$APP_DIR/ios/App/App/FilmtoneCaptureTransformLutClassifier.swift"
+CAPTURE_TRANSFORM_LUT_CLASSIFIER_SRC="$APP_DIR/ios/App/App/Capture/FilmtoneCaptureTransformLutClassifier.swift"
 if [ -f "$CAPTURE_TRANSFORM_LUT_CLASSIFIER_SCRIPT" ] && [ -f "$CAPTURE_TRANSFORM_LUT_CLASSIFIER_SRC" ]; then
   echo "==> capture transform LUT classifier test"
   CAPTURE_TRANSFORM_LUT_CLASSIFIER_BIN=$(mktemp "${TMPDIR:-/tmp}/phase0-capture-transform-lut-classifier-check.XXXXXX")
@@ -122,7 +122,7 @@ fi
 
 # --- Cache store retention / cleanup policy test ---
 CACHE_STORE_SCRIPT="$SCRIPT_DIR/swift/test-cache-store.swift"
-CACHE_STORE_SRC="$APP_DIR/ios/App/App/CacheStore.swift"
+CACHE_STORE_SRC="$APP_DIR/ios/App/App/Services/CacheStore.swift"
 if [ -f "$CACHE_STORE_SCRIPT" ] && [ -f "$CACHE_STORE_SRC" ]; then
   echo "==> cache store test"
   CACHE_STORE_BIN=$(mktemp "${TMPDIR:-/tmp}/phase0-cache-store-check.XXXXXX")
@@ -145,17 +145,17 @@ if [ -f "$CLASSIFIER_SCRIPT" ]; then
     -I "$HOST_CORE_MODULE_DIR" \
     "$HOST_CORE_LIB" \
     "$SWIFT_SUPPORT" \
-    "$APP_DIR/ios/App/App/SourceColorMetadataNormalizer.swift" \
-    "$APP_DIR/ios/App/App/SourceColorClassifier.swift" \
-    "$APP_DIR/ios/App/App/FilmtoneColorPipeline.swift" \
-    "$APP_DIR/ios/App/App/HdrPreparationPolicyDeriver.swift" \
+    "$APP_DIR/ios/App/App/Source/SourceColorMetadataNormalizer.swift" \
+    "$APP_DIR/ios/App/App/Source/SourceColorClassifier.swift" \
+    "$APP_DIR/ios/App/App/Look/FilmtoneColorPipeline.swift" \
+    "$APP_DIR/ios/App/App/Export/HdrPreparationPolicyDeriver.swift" \
     "$CLASSIFIER_SCRIPT"
   "$CLASSIFIER_BIN" "$HLG_FIXTURE"
 fi
 
 # --- Stream 2: ray-angle optics test (may not exist yet at Wave 2 branch time) ---
 RAYANGLE_SCRIPT="$SCRIPT_DIR/swift/test-ray-angle-optics.swift"
-RAYANGLE_SRC="$APP_DIR/ios/App/App/FilmtoneRayAngleOptics.swift"
+RAYANGLE_SRC="$APP_DIR/ios/App/App/Optics/FilmtoneRayAngleOptics.swift"
 if [ -f "$RAYANGLE_SCRIPT" ] && [ -f "$RAYANGLE_SRC" ]; then
   echo "==> ray-angle optics test"
   RAYANGLE_BIN=$(mktemp "${TMPDIR:-/tmp}/phase0-rayangle-check.XXXXXX")
@@ -172,7 +172,7 @@ fi
 
 # --- v1.3 Camera Profiles Phase B-3 / C: source-profile math accuracy gate ---
 SOURCE_PROFILE_MATH_SCRIPT="$SCRIPT_DIR/swift/test-source-profile-math.swift"
-SOURCE_PROFILE_MATH_SRC="$APP_DIR/ios/App/App/FilmtoneSourceProfileMath.swift"
+SOURCE_PROFILE_MATH_SRC="$APP_DIR/ios/App/App/Source/FilmtoneSourceProfileMath.swift"
 SOURCE_PROFILE_FIXTURES="$APP_DIR/Tests/Fixtures/source-profile"
 if [ -f "$SOURCE_PROFILE_MATH_SCRIPT" ] && [ -f "$SOURCE_PROFILE_MATH_SRC" ] && [ -d "$SOURCE_PROFILE_FIXTURES" ]; then
   echo "==> source profile math test"
@@ -199,8 +199,8 @@ fi
 
 # --- Stream 5: sidecar builder test (may not exist yet at Wave 2 branch time) ---
 SIDECAR_SCRIPT="$SCRIPT_DIR/swift/test-sidecar-builder.swift"
-SIDECAR_SRC="$APP_DIR/ios/App/App/FilmtoneExportSidecarBuilder.swift"
-LUT_BLOB_CODEC_SRC="$APP_DIR/ios/App/App/FilmtoneLutBlobCodec.swift"
+SIDECAR_SRC="$APP_DIR/ios/App/App/Export/FilmtoneExportSidecarBuilder.swift"
+LUT_BLOB_CODEC_SRC="$APP_DIR/ios/App/App/Look/FilmtoneLutBlobCodec.swift"
 if [ -f "$SIDECAR_SCRIPT" ] && [ -f "$SIDECAR_SRC" ]; then
   echo "==> sidecar builder test"
   SIDECAR_BIN=$(mktemp "${TMPDIR:-/tmp}/phase0-sidecar-check.XXXXXX")
@@ -218,7 +218,7 @@ if [ -f "$SIDECAR_SCRIPT" ] && [ -f "$SIDECAR_SRC" ]; then
     "$HOST_CORE_LIB" \
     "$SWIFT_SUPPORT" \
     "$SOURCE_PROFILE_SCHEMA" \
-    "$APP_DIR/ios/App/App/FilmtoneColorPipeline.swift" \
+    "$APP_DIR/ios/App/App/Look/FilmtoneColorPipeline.swift" \
     "$LUT_BLOB_CODEC_SRC" \
     "$SIDECAR_SRC" \
     "$SIDECAR_SCRIPT"

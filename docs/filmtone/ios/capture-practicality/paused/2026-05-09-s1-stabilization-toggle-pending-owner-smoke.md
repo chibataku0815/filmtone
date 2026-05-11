@@ -42,12 +42,12 @@ performance, App Store work, screenshot work, or broad QA.
 
 ## Edit Targets
 
-- `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneCaptureSession.swift`
-- `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneCapturePackage.swift`
-- `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneCapturePackagePersistence.swift`
-- `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneCaptureView.swift`
-- `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneCaptureCockpitTopBar.swift`
-- `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneExportSidecarBuilder.swift`
+- `apps/capacitor-film-lab-ios/ios/App/App/Capture/FilmtoneCaptureSession.swift`
+- `apps/capacitor-film-lab-ios/ios/App/App/Capture/FilmtoneCapturePackage.swift`
+- `apps/capacitor-film-lab-ios/ios/App/App/Capture/FilmtoneCapturePackagePersistence.swift`
+- `apps/capacitor-film-lab-ios/ios/App/App/Capture/FilmtoneCaptureView.swift`
+- `apps/capacitor-film-lab-ios/ios/App/App/Capture/FilmtoneCaptureCockpitTopBar.swift`
+- `apps/capacitor-film-lab-ios/ios/App/App/Export/FilmtoneExportSidecarBuilder.swift`
 
 Only add new Swift files if the existing cockpit components become too crowded.
 If a new Swift file is added, register it in the Xcode project 4-section gate.

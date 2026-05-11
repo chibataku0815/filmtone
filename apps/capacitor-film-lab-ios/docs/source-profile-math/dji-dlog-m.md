@@ -2,7 +2,7 @@
 
 This document is the SSOT for Filmtone's DJI D-Log M decoding. The math
 is implemented in
-`apps/capacitor-film-lab-ios/ios/App/App/FilmtoneSourceProfileMath.swift`
+`apps/capacitor-film-lab-ios/ios/App/App/Source/FilmtoneSourceProfileMath.swift`
 and verified against the calibrated fixture under
 `apps/capacitor-film-lab-ios/Tests/Fixtures/source-profile/dji-dlog-m/`
 via `scripts/swift/test-source-profile-math.swift`.

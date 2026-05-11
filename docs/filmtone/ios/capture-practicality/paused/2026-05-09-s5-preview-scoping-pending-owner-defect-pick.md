@@ -51,7 +51,7 @@ implementation lane for the full preview rewrite. Two outputs:
 
 ## Edit Targets
 
-- `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneCaptureView.swift`
+- `apps/capacitor-film-lab-ios/ios/App/App/Capture/FilmtoneCaptureView.swift`
 
 No new Swift file. The badge is small enough to render inline as a
 private `@ViewBuilder` overlay on the existing `previewLayer`
@@ -61,7 +61,7 @@ composition.
 
 - `docs/filmtone/ios/capture-practicality/strategy.md`
 - `apps/capacitor-film-lab-ios/CLAUDE.md`
-- `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneCaptureLivePreview.swift`
+- `apps/capacitor-film-lab-ios/ios/App/App/Capture/FilmtoneCaptureLivePreview.swift`
 
 ## Checklist
 
@@ -152,7 +152,7 @@ Stop and report if any of these fires:
 
 - 2026-05-09 JST — S5 scoping pass:
   - `git diff --check` clean on
-    `apps/capacitor-film-lab-ios/ios/App/App/FilmtoneCaptureView.swift`.
+    `apps/capacitor-film-lab-ios/ios/App/App/Capture/FilmtoneCaptureView.swift`.
   - `xcodebuild ... build CODE_SIGNING_ALLOWED=NO` →
     `** BUILD SUCCEEDED **`.
   - `bun run verify:swift-contract` not re-run on this lane:
