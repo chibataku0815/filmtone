@@ -606,6 +606,17 @@ final class FilmtoneExportSession {
                 outputFps: request.output.fps
             )
         }
+        // Phase 2B-10B: output frame count / duration, source lookup mapping,
+        // source-time-offset normalization, per-sample timeline time, segment
+        // index, and rendering progress math live in `ExportVideoTimeline`.
+        // The session keeps owning reader / writer setup, dispatch queues,
+        // decode loop, lookahead selection, frame append, audio append,
+        // completion / failure locks, and depth matcher orchestration.
+        let videoTimeline = ExportVideoTimeline(
+            highlightTimeline: highlightTimeline,
+            outputFPS: request.output.fps,
+            sourceDurationSec: sourceDurationSec
+        )
         let outputSize = Self.scaledSize(for: videoTrack, longEdge: request.output.longEdge)
         let writer = try mediaWriter.makeWriter(outputSize: outputSize)
         let videoInput = mediaWriter.makeVideoInput(outputSize: outputSize)
@@ -665,12 +676,6 @@ final class FilmtoneExportSession {
         }
         writer.startSession(atSourceTime: .zero)
 
-        let outputFrameCount = highlightTimeline?.totalFrameCount ?? max(
-            1,
-            Int(floor((sourceDurationSec.isFinite ? sourceDurationSec : 0) * Double(request.output.fps) + 1e-6))
-        )
-        let outputDurationSec = highlightTimeline?.durationSec
-            ?? (sourceDurationSec.isFinite ? sourceDurationSec : 0)
         var renderedFrames = 0
         let completionLock = NSLock()
         let failureLock = NSLock()
@@ -729,45 +734,20 @@ final class FilmtoneExportSession {
             finishAudioInput(markAsFinished: true)
         }
 
-        progress(.init(stage: .reading, progress: 0.11, currentFrame: 0, totalFrames: outputFrameCount, message: "Reading source"))
+        progress(.init(stage: .reading, progress: 0.11, currentFrame: 0, totalFrames: videoTimeline.outputFrameCount, message: "Reading source"))
 
         // v1.3 Phase B: depth-track cursor state and the per-frame pull loop
-        // live in `ExportVideoDepthMatcher` (Phase 2B-10A). The session keeps
-        // owning telemetry assignment from the matcher's `MatchResult`.
-        typealias TimedVideoSample = (buffer: CMSampleBuffer, rawTime: CMTime, timelineTime: CMTime)
-        var sourceTimeOffset: CMTime?
-        var previousVideoSample: TimedVideoSample?
-        var lookaheadVideoSample: TimedVideoSample?
+        // live in `ExportVideoDepthMatcher` (Phase 2B-10A). Video timeline
+        // math (output frame count, source lookup time, source-time-offset
+        // normalization, segment index, rendering progress) lives in
+        // `ExportVideoTimeline` (Phase 2B-10B). The session keeps owning
+        // telemetry assignment from the matcher's `MatchResult` and the
+        // decode / lookahead / append orchestration around the timeline.
+        var previousVideoSample: ExportVideoTimeline.TimedSample?
+        var lookaheadVideoSample: ExportVideoTimeline.TimedSample?
         var sourceReaderExhausted = false
         var nextOutputFrameIndex = 0
         let mediaPipelineStartedNs = DispatchTime.now().uptimeNanoseconds
-
-        func outputPresentationTime(for frameIndex: Int) -> CMTime {
-            CMTime(value: CMTimeValue(frameIndex), timescale: CMTimeScale(max(1, request.output.fps)))
-        }
-
-        func sourceLookupTime(for frameIndex: Int) -> CMTime {
-            guard let highlightTimeline,
-                  let sourceTimeSec = highlightTimeline.sourceTimeSec(forOutputFrameIndex: frameIndex) else {
-                return outputPresentationTime(for: frameIndex)
-            }
-            return CMTime(seconds: sourceTimeSec, preferredTimescale: 60_000)
-        }
-
-        func sourceSegmentIndex(for frameIndex: Int) -> Int? {
-            highlightTimeline?.segmentIndex(forOutputFrameIndex: frameIndex)
-        }
-
-        func makeTimedVideoSample(_ sampleBuffer: CMSampleBuffer) -> TimedVideoSample {
-            let rawTime = ExportMediaWriter.validPresentationTime(for: sampleBuffer)
-            if sourceTimeOffset == nil {
-                sourceTimeOffset = rawTime
-            }
-            let timelineTime = ExportMediaWriter.nonNegativeTime(
-                CMTimeSubtract(rawTime, sourceTimeOffset ?? .zero)
-            )
-            return (sampleBuffer, rawTime, timelineTime)
-        }
 
         func prepareDepthForSourceTime(at sourceLookupTime: CMTime) {
             guard depthMatcher.hasReader else {
@@ -776,7 +756,7 @@ final class FilmtoneExportSession {
             }
             let result = depthMatcher.matchDepthFrame(
                 for: sourceLookupTime,
-                sourceTimeOffset: sourceTimeOffset
+                sourceTimeOffset: videoTimeline.sourceTimeOffset
             )
             videoDepthDecodeMs = (videoDepthDecodeMs ?? 0) + result.decodeMs
             loadedDepthMap = result.depthMap
@@ -793,7 +773,7 @@ final class FilmtoneExportSession {
         var renderedHighlightSegmentIndex: Int?
 
         func appendOutputFrame(
-            using sample: TimedVideoSample,
+            using sample: ExportVideoTimeline.TimedSample,
             at outputPresentationTime: CMTime,
             sourceLookupTime: CMTime,
             sourceSegmentIndex: Int?
@@ -834,15 +814,12 @@ final class FilmtoneExportSession {
             renderedFrames += 1
             nextOutputFrameIndex += 1
             if renderedFrames == 1 || renderedFrames % 12 == 0 {
-                let normalizedProgress = renderingProgress(
-                    presentationTime: outputPresentationTime,
-                    sourceDurationSec: outputDurationSec
-                )
+                let normalizedProgress = videoTimeline.renderingProgress(presentationTime: outputPresentationTime)
                 progress(.init(
                     stage: .rendering,
                     progress: min(0.9, normalizedProgress),
                     currentFrame: renderedFrames,
-                    totalFrames: outputFrameCount,
+                    totalFrames: videoTimeline.outputFrameCount,
                     message: "Rendering frames"
                 ))
             }
@@ -858,7 +835,7 @@ final class FilmtoneExportSession {
 
                 do {
                     try checkCancelled()
-                    guard nextOutputFrameIndex < outputFrameCount else {
+                    guard nextOutputFrameIndex < videoTimeline.outputFrameCount else {
                         finishVideoInput(markAsFinished: true)
                         return
                     }
@@ -876,7 +853,7 @@ final class FilmtoneExportSession {
                             finishVideoInput(markAsFinished: true)
                             return
                         }
-                        previousVideoSample = makeTimedVideoSample(sampleBuffer)
+                        previousVideoSample = videoTimeline.makeTimedSample(sampleBuffer)
                         continue
                     }
 
@@ -893,13 +870,13 @@ final class FilmtoneExportSession {
                             sourceReaderExhausted = true
                             continue
                         }
-                        lookaheadVideoSample = makeTimedVideoSample(sampleBuffer)
+                        lookaheadVideoSample = videoTimeline.makeTimedSample(sampleBuffer)
                         continue
                     }
 
                     if let lookahead = lookaheadVideoSample {
-                        let outputTime = outputPresentationTime(for: nextOutputFrameIndex)
-                        let sourceTime = sourceLookupTime(for: nextOutputFrameIndex)
+                        let outputTime = videoTimeline.outputPresentationTime(for: nextOutputFrameIndex)
+                        let sourceTime = videoTimeline.sourceLookupTime(for: nextOutputFrameIndex)
                         if CMTimeCompare(sourceTime, lookahead.timelineTime) < 0 {
                             guard let previous = previousVideoSample else {
                                 throw FilmtoneMediaError.exportFailed("The first decoded video frame was unavailable.")
@@ -917,7 +894,7 @@ final class FilmtoneExportSession {
                                 using: selectedSample,
                                 at: outputTime,
                                 sourceLookupTime: sourceTime,
-                                sourceSegmentIndex: sourceSegmentIndex(for: nextOutputFrameIndex)
+                                sourceSegmentIndex: videoTimeline.sourceSegmentIndex(for: nextOutputFrameIndex)
                             )
                         } else {
                             previousVideoSample = lookahead
@@ -927,12 +904,12 @@ final class FilmtoneExportSession {
                     }
 
                     if sourceReaderExhausted, let previous = previousVideoSample {
-                        let outputTime = outputPresentationTime(for: nextOutputFrameIndex)
+                        let outputTime = videoTimeline.outputPresentationTime(for: nextOutputFrameIndex)
                         try appendOutputFrame(
                             using: previous,
                             at: outputTime,
-                            sourceLookupTime: sourceLookupTime(for: nextOutputFrameIndex),
-                            sourceSegmentIndex: sourceSegmentIndex(for: nextOutputFrameIndex)
+                            sourceLookupTime: videoTimeline.sourceLookupTime(for: nextOutputFrameIndex),
+                            sourceSegmentIndex: videoTimeline.sourceSegmentIndex(for: nextOutputFrameIndex)
                         )
                         continue
                     }
@@ -989,7 +966,7 @@ final class FilmtoneExportSession {
             throw FilmtoneMediaError.exportFailed(reader.error?.localizedDescription ?? "Video read failed.")
         }
 
-        progress(.init(stage: .writing, progress: 0.92, currentFrame: renderedFrames, totalFrames: outputFrameCount, message: "Writing output"))
+        progress(.init(stage: .writing, progress: 0.92, currentFrame: renderedFrames, totalFrames: videoTimeline.outputFrameCount, message: "Writing output"))
         try performanceMetrics.measure(.writerFinish) {
             try mediaWriter.finish(writer: writer, checkCancelled: checkCancelled)
         }
@@ -997,7 +974,7 @@ final class FilmtoneExportSession {
         return CompletedExport(
             outputSize: outputSize,
             frameCount: renderedFrames,
-            sourceDurationSec: outputDurationSec.isFinite ? outputDurationSec : nil,
+            sourceDurationSec: videoTimeline.outputDurationSec.isFinite ? videoTimeline.outputDurationSec : nil,
             audioPreserved: audioInput != nil
         )
     }
@@ -1260,21 +1237,6 @@ final class FilmtoneExportSession {
             hash &*= 1_099_511_628_211
         }
         return Double(hash % 8_192)
-    }
-
-    private func renderingProgress(
-        presentationTime: CMTime,
-        sourceDurationSec: Double
-    ) -> Double {
-        guard sourceDurationSec.isFinite, sourceDurationSec > 0 else {
-            return 0.12
-        }
-        let presentationSec = CMTimeGetSeconds(presentationTime)
-        guard presentationSec.isFinite else {
-            return 0.12
-        }
-        let normalized = min(max(presentationSec / sourceDurationSec, 0), 1)
-        return 0.12 + (normalized * 0.74)
     }
 
     private func checkCancelled() throws {
