@@ -103,6 +103,14 @@ final class FilmtoneExportSession {
     /// passes a render closure that reuses `renderableImage(...)` so the
     /// grade / motion / depth stage order stays session-owned.
     private let frameAppender: ExportFrameAppender
+    /// Phase 2B-8A: source image normalization collaborator. Owns still
+    /// source loading, video pixel-buffer wrapping with HDR-to-SDR tone-map
+    /// detection, AVAssetTrack→Core Image orientation transform, still /
+    /// video / preview scale-crop normalization, and preview extent
+    /// validation. `renderableImage`, `renderableStillImage`,
+    /// `renderablePreviewVideoImage`, and `applyGrade` keep stage order on
+    /// the session and delegate only the wrapping / scaling primitives.
+    private let sourceImageNormalizer: ExportSourceImageNormalizer
     private let sourceSeed: Double
     private let outputColorSpace: CGColorSpace
     private var degradedDecodePath = false
@@ -255,6 +263,9 @@ final class FilmtoneExportSession {
             performanceMetrics: self.performanceMetrics,
             signposter: self.signposter,
             mediaWriter: mediaWriter
+        )
+        self.sourceImageNormalizer = ExportSourceImageNormalizer(
+            colorPipeline: colorPipeline
         )
         self.sourceSeed = Self.makeStableSourceSeed(from: sourceURL.absoluteString)
         if disableGlowFamilyForExport {
@@ -1209,7 +1220,7 @@ final class FilmtoneExportSession {
     private func exportStillImage(
         progress: @escaping (Phase0ExportProgressDTO) -> Void
     ) throws -> CompletedExport {
-        guard let image = loadedSourceImage(at: sourceURL) else {
+        guard let image = sourceImageNormalizer.loadedSourceImage(at: sourceURL) else {
             throw FilmtoneMediaError.unsupportedSource("The selected image could not be loaded.")
         }
 
@@ -1325,12 +1336,12 @@ final class FilmtoneExportSession {
     }
 
     private func renderStillPreview() throws -> Phase0PreviewRenderResultDTO {
-        guard let image = loadedSourceImage(at: sourceURL) else {
+        guard let image = sourceImageNormalizer.loadedSourceImage(at: sourceURL) else {
             throw FilmtoneMediaError.unsupportedSource("The selected image could not be loaded.")
         }
 
         let outputSize = Self.scaledSize(for: image.extent.size, longEdge: request.output.longEdge)
-        let original = scaledStillSourceImage(image, outputSize: outputSize)
+        let original = sourceImageNormalizer.scaledStillSourceImage(image, outputSize: outputSize)
         let graded = applyGrade(to: original, timeSeconds: 0).cropped(to: original.extent)
 
         let originalURL = try writePreviewImage(original, preferredName: "filmtone-preview-original")
@@ -1363,7 +1374,7 @@ final class FilmtoneExportSession {
         let posterTime = CMTime(seconds: posterTimeSec, preferredTimescale: 600)
         let cgImage = try copyPreviewCGImage(for: asset, at: posterTime)
         let posterImage = CIImage(cgImage: cgImage)
-        let original = scaledStillSourceImage(posterImage, outputSize: outputSize)
+        let original = sourceImageNormalizer.scaledStillSourceImage(posterImage, outputSize: outputSize)
         let graded = applyGrade(to: original, timeSeconds: posterTimeSec).cropped(to: original.extent)
 
         let originalURL = try writePreviewImage(original, preferredName: "filmtone-preview-original")
@@ -1402,8 +1413,8 @@ final class FilmtoneExportSession {
         outputSize: CGSize,
         timeSeconds: Double
     ) -> CIImage {
-        let base = scaledVideoSourceImage(
-            sourceVideoImage(from: imageBuffer),
+        let base = sourceImageNormalizer.scaledVideoSourceImage(
+            sourceImageNormalizer.sourceVideoImage(from: imageBuffer),
             transform: transform,
             outputSize: outputSize
         )
@@ -1429,7 +1440,7 @@ final class FilmtoneExportSession {
         outputSize: CGSize,
         timeSeconds: Double
     ) -> CIImage {
-        let base = scaledStillSourceImage(image, outputSize: outputSize)
+        let base = sourceImageNormalizer.scaledStillSourceImage(image, outputSize: outputSize)
         let graded = applyGrade(to: base, timeSeconds: timeSeconds)
         return graded.cropped(to: CGRect(origin: .zero, size: outputSize))
     }
@@ -1440,8 +1451,8 @@ final class FilmtoneExportSession {
         timeSeconds: Double,
         motionAccumulator: FilmtoneMotionBlurAccumulator? = nil
     ) throws -> CIImage {
-        let base = scaledPreviewVideoSourceImage(
-            sourcePreviewVideoImage(from: image),
+        let base = sourceImageNormalizer.scaledPreviewVideoSourceImage(
+            sourceImageNormalizer.sourcePreviewVideoImage(from: image),
             outputSize: outputSize
         )
         let graded = applyGrade(to: base, timeSeconds: timeSeconds)
@@ -1452,122 +1463,8 @@ final class FilmtoneExportSession {
             outputSize: outputSize,
             accumulator: motionAccumulator
         )
-        try validatePreviewVideoImage(motionApplied, outputSize: outputSize)
+        try sourceImageNormalizer.validatePreviewVideoImage(motionApplied, outputSize: outputSize)
         return motionApplied
-    }
-
-    private func scaledVideoFrameImage(
-        from imageBuffer: CVPixelBuffer,
-        transform: CGAffineTransform,
-        outputSize: CGSize
-    ) -> CIImage {
-        scaledVideoSourceImage(
-            sourceVideoImage(from: imageBuffer),
-            transform: transform,
-            outputSize: outputSize
-        )
-    }
-
-    private func scaledVideoSourceImage(
-        _ image: CIImage,
-        transform: CGAffineTransform,
-        outputSize: CGSize
-    ) -> CIImage {
-        let oriented = image.transformed(by: Self.coreImageVideoTransform(
-            for: transform,
-            sourceExtent: image.extent
-        ))
-        let normalized = oriented.transformed(by: CGAffineTransform(
-            translationX: -oriented.extent.origin.x,
-            y: -oriented.extent.origin.y
-        ))
-
-        let scaleX = outputSize.width / normalized.extent.width
-        let scaleY = outputSize.height / normalized.extent.height
-        return normalized
-            .transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
-            .cropped(to: CGRect(origin: .zero, size: outputSize))
-    }
-
-    private func scaledPreviewVideoSourceImage(_ image: CIImage, outputSize: CGSize) -> CIImage {
-        // AVVideoComposition's CI filtering request already respects track presentation.
-        let normalized = image.transformed(by: CGAffineTransform(
-            translationX: -image.extent.origin.x,
-            y: -image.extent.origin.y
-        ))
-        let scaleX = outputSize.width / normalized.extent.width
-        let scaleY = outputSize.height / normalized.extent.height
-        return normalized
-            .transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
-            .cropped(to: CGRect(origin: .zero, size: outputSize))
-    }
-
-    private func scaledStillSourceImage(_ image: CIImage, outputSize: CGSize) -> CIImage {
-        let normalized = image.transformed(by: CGAffineTransform(
-            translationX: -image.extent.origin.x,
-            y: -image.extent.origin.y
-        ))
-        let scaleX = outputSize.width / normalized.extent.width
-        let scaleY = outputSize.height / normalized.extent.height
-        return normalized
-            .transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
-            .cropped(to: CGRect(origin: .zero, size: outputSize))
-    }
-
-    private func validatePreviewVideoImage(_ image: CIImage, outputSize: CGSize) throws {
-        let extent = image.extent.standardized
-        guard
-            extent.origin.x.isFinite,
-            extent.origin.y.isFinite,
-            extent.size.width.isFinite,
-            extent.size.height.isFinite,
-            !extent.isNull,
-            !extent.isInfinite,
-            extent.size.width > 0.5,
-            extent.size.height > 0.5
-        else {
-            throw FilmtoneMediaError.exportFailed(
-                filmtoneLocalized(
-                    "filmtone.preview.video.invalid_extent",
-                    defaultValue: "The live video preview produced an invalid frame.",
-                    comment: "Error shown when the live video preview frame is invalid."
-                )
-            )
-        }
-
-        let expected = CGRect(origin: .zero, size: outputSize).standardized
-        guard
-            abs(extent.origin.x - expected.origin.x) < 0.5,
-            abs(extent.origin.y - expected.origin.y) < 0.5,
-            abs(extent.size.width - expected.size.width) < 0.5,
-            abs(extent.size.height - expected.size.height) < 0.5
-        else {
-            throw FilmtoneMediaError.exportFailed(
-                filmtoneLocalized(
-                    "filmtone.preview.video.unexpected_extent",
-                    defaultValue: "The live video preview frame size was invalid.",
-                    comment: "Error shown when the live video preview frame extent is unexpected."
-                )
-            )
-        }
-    }
-
-    static func coreImageVideoTransform(
-        for preferredTransform: CGAffineTransform,
-        sourceExtent: CGRect
-    ) -> CGAffineTransform {
-        // AVAssetTrack.preferredTransform is expressed in the track's top-left
-        // coordinate space. Convert it into Core Image's bottom-left space
-        // before rasterizing decoded buffers or portrait clips land 180° off.
-        let sourceRect = CGRect(origin: .zero, size: sourceExtent.size)
-        let displayedRect = sourceRect.applying(preferredTransform).standardized
-        let inputFlip = CGAffineTransform(scaleX: 1, y: -1)
-            .translatedBy(x: 0, y: -sourceRect.height)
-        let outputFlip = CGAffineTransform(scaleX: 1, y: -1)
-            .translatedBy(x: 0, y: -displayedRect.height)
-        return inputFlip
-            .concatenating(preferredTransform)
-            .concatenating(outputFlip)
     }
 
     fileprivate func applyGrade(
@@ -1782,38 +1679,6 @@ final class FilmtoneExportSession {
             throw FilmtoneMediaError.exportFailed("JPEG data could not be created.")
         }
         try data.write(to: url, options: .atomic)
-    }
-
-    private func loadedSourceImage(at url: URL) -> CIImage? {
-        CIImage(contentsOf: url, options: colorPipeline.stillImageOptions())
-    }
-
-    private func sourceVideoImage(from imageBuffer: CVPixelBuffer) -> CIImage {
-        let options = colorPipeline.sourceImageOptions(
-            for: imageBuffer,
-            toneMapHDRToSDR: shouldToneMapHDRToSDR(imageBuffer)
-        )
-        return CIImage(cvPixelBuffer: imageBuffer, options: options)
-    }
-
-    private func sourcePreviewVideoImage(from image: CIImage) -> CIImage {
-        // AVVideoComposition already provides this image in presentation
-        // orientation. Rewrapping its backing pixel buffer drops that transform
-        // and makes portrait clips preview as raw landscape frames.
-        return image
-    }
-
-    private func shouldToneMapHDRToSDR(_ imageBuffer: CVPixelBuffer) -> Bool {
-        guard let transferFunction = CVBufferGetAttachment(
-            imageBuffer,
-            kCVImageBufferTransferFunctionKey,
-            nil
-        )?.takeUnretainedValue() else {
-            return false
-        }
-
-        return CFEqual(transferFunction, kCVImageBufferTransferFunction_ITU_R_2100_HLG) ||
-            CFEqual(transferFunction, kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ)
     }
 
     private func attachOutputColorMetadata(to imageBuffer: CVPixelBuffer) {

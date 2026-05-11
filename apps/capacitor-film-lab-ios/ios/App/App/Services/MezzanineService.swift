@@ -1023,7 +1023,7 @@ final class MezzanineService {
         transform: CGAffineTransform,
         outputSize: CGSize
     ) -> CIImage {
-        let oriented = image.transformed(by: FilmtoneExportSession.coreImageVideoTransform(
+        let oriented = image.transformed(by: ExportSourceImageNormalizer.coreImageVideoTransform(
             for: transform,
             sourceExtent: image.extent
         ))
