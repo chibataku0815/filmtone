@@ -49,27 +49,28 @@ content layer stays glass-free so color judgment is not compromised.
 | M4 | Shared Contract Consolidation | M3 | In progress | Shared Swift ownership is clear and iOS/macOS consume the same canonical contract where practical. |
 | M5 | Native Editing UI | M3 | Validation / thin fixes | Core editing workflows are usable and visually acceptable in the native UI. |
 | M6 | Release Cutover | M5 | Released 2026-05-05 | Public update metadata reports Desktop `1.4`, and the fixed Desktop download rail points to the notarized Native DMG. |
-| M7 | Native Desktop v1.5 Release | M6 | Local prep / external release blocked | Desktop `1.5` release files and local verification are ready; signing, notarization, DMG packaging, upload, and public update-meta switch still require explicit release action. |
+| M7 | Native Desktop v1.5 Release | M6 | Released 2026-05-06 | Public update metadata reports Desktop `1.5`, and the fixed Desktop download rail points to the notarized Native DMG. |
+| M8 | Native Desktop v1.6 Release | M7 | Released 2026-05-10 | Public update metadata reports Desktop `1.6`, and the fixed Desktop download rail points to the notarized Native DMG. |
 
 ## Current Strategic State
 
 - Canonical implementation branch: `main` in this repository. The old
   `feature/native-desktop-plan` dedicated worktree is retired after Desktop
   v1.4 replacement and M5-M closure.
-- Current integrated code HEAD for the public artifact: `4f2e5eba`
-  (`Merge remote-tracking branch 'origin/main' into feature/native-desktop-plan`)
+- Do not infer the current public artifact from a stale plan HEAD. Use the
+  release archive plus truth scripts; the published v1.6 DMG is recorded in
+  `archive/2026-05-10-native-desktop-v1-6-release.md`.
 - Integration base before M5-K1/K2/K3/K4: `0b79861f`
 - No M5-K product `active.md` should remain open. If `active.md` exists during
   DHM / release-cutover interrupts, do not treat it as current M5-K state.
-- Public Desktop latest from truth script: `1.4` via update metadata.
+- Public Desktop latest from truth script: `1.6` via update metadata.
 - iOS truth script reports separate public and local axes: public App Store
-  version `1.5`; local Xcode candidate `1.5` build `4`.
-- Native Desktop v2 public release remains Desktop v1.4. Desktop release truth
-  and iOS App Store truth are now separate public axes; rerun truth scripts
-  before making release/version claims.
-- Active Desktop task: M8 Native Desktop v1.6 Release. Local signing,
-  notarization, DMG packaging, and verification are complete; public DMG upload
-  and update metadata mutation remain to finish the release.
+  version `1.7`; local Xcode candidate `1.8` build `7`.
+- Native Desktop v2 public release is Desktop v1.6. Desktop release truth and
+  iOS App Store truth are separate public axes; rerun truth scripts before
+  making release/version claims.
+- No Native Desktop release `active.md` remains open after the v1.6 release
+  archive.
 
 ## Interrupt / Decision Log
 
@@ -80,6 +81,9 @@ content layer stays glass-free so color judgment is not compromised.
 - 2026-05-10 JST: Cross-platform grain quality completed and archived at
   `archive/2026-05-10-cross-platform-grain-quality.md`; v1.6 release active was
   restored for public upload/update-meta completion.
+- 2026-05-10 JST: M8 Native Desktop v1.6 public release completed and archived;
+  public update metadata reports `latestVersion: "1.6"` and the fixed download
+  page returns `Filmtone-1.6.dmg`.
 
 M1 and M2 are closed. M3 and M4 stay open for parity hardening and shared-core
 promotion, but they no longer block M5 UI validation. M5-C P0, M5-G
@@ -432,6 +436,11 @@ v1.6 release interrupt. User approved including the working-tree UI deltas
 (`PreviewSurface` empty-state strip-down / loaded backdrop and
 `QuickAdjustControls` conditional Intensity row) in v1.6 alongside the M8
 right-rail fixes.
+
+2026-05-10: Cross-platform Grain V2 completed for iOS and Native Desktop.
+The shared CIKL grain now uses temporally blended phases, tone-aware
+luma/chroma gating, softer coarse structure, and retuned UI-only recipes
+without schema or sidecar churn.
 
 ## Constraints
 

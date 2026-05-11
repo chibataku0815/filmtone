@@ -44,12 +44,12 @@ the fixed Desktop download rail, with update metadata reporting `1.6`.
 - [x] Package/sign/notarize/staple `Filmtone-1.6.dmg` with
   `scripts/package-dmg.sh`.
 - [x] Verify DMG checksum and local release truth.
-- [ ] Upload DMG to Vercel Blob and sync the fixed download URL after explicit
+- [x] Upload DMG to Vercel Blob and sync the fixed download URL after explicit
   public-upload confirmation.
-- [ ] Upload update metadata with `latestVersion: "1.6"` after explicit
+- [x] Upload update metadata with `latestVersion: "1.6"` after explicit
   public-update confirmation.
-- [ ] Verify public download/update truth.
-- [ ] Archive this task and append a short completion note to `strategy.md`.
+- [x] Verify public download/update truth.
+- [x] Archive this task and append a short completion note to `strategy.md`.
 
 ## Verification
 
@@ -72,6 +72,31 @@ the fixed Desktop download rail, with update metadata reporting `1.6`.
 - Mounted DMG check passed: `Filmtone.app` exists, Applications symlink exists,
   Bundle ID is `com.chibatakumi.film-lab-desktop`, short version is `1.6`,
   build version is `3`, and the mounted app is Gatekeeper accepted.
+
+2026-05-10 JST:
+
+- Resumed after the cross-platform grain quality interrupt; no repackaging was
+  done for this release task, so the published artifact remains the signed,
+  notarized, stapled 2026-05-06 `Filmtone-1.6.dmg` listed above.
+- `bun run release:upload-dmg -- --confirm-prod --sync-vercel-env` uploaded
+  `https://ehi6m41cp33jiopb.public.blob.vercel-storage.com/filmtone/desktop/Filmtone-1.6.dmg`
+  and synced `FILM_LAB_DESKTOP_DOWNLOAD_URL`.
+- `bun run release:upload-update-meta -- --confirm-prod --sync-vercel-env`
+  uploaded `film-lab/desktop/update-meta.json` with
+  `latestVersion: "1.6"` and synced
+  `FILM_LAB_DESKTOP_UPDATE_CHECK_URL`.
+- Vercel production deploy `dpl_8db3V9Rg5MZzXJLLJSj315UAsrcv` refreshed the
+  fixed download page and update-check environment.
+- Release truth reports local Native Desktop `1.6` build `3`, public Desktop
+  latest `1.6`, latest Desktop tag `desktop-v1.4`, and v1.6 release notes
+  present.
+- `bun run release:cutover-preflight` passed after upload; expected warning
+  only that public update metadata already points at this release candidate.
+- Public update metadata body:
+  `{"schemaVersion":1,"latestVersion":"1.6","downloadPageUrl":"https://www.chibatakumi.studio/film-lab/download"}`.
+- Public download complete page contains `Filmtone-1.6.dmg`.
+- Public DMG HEAD returns `200`, `filename="Filmtone-1.6.dmg"`, and
+  `content-length: 9322418`.
 
 ## Done Conditions
 
