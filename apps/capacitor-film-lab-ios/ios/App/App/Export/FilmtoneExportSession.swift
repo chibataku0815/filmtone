@@ -128,6 +128,15 @@ final class FilmtoneExportSession {
     /// snapshot of mutable state into `write(...)` so an eviction between
     /// routing and sidecar write cannot drop truth fields.
     private let sidecarWriter: ExportSidecarWriter
+    /// Phase 2B-9A: still-image writer / adaptor / render-append loop
+    /// collaborator. Owns the pixel-buffer adaptor setup, the 3-second
+    /// frame loop, per-frame pool allocation, CI render, output color
+    /// metadata application, the adaptor append, rendering / writing
+    /// progress updates, finish handoff, and `CompletedExport` assembly.
+    /// `exportStillImage(progress:)` keeps source-image loading, HEIC
+    /// depth payload loading, output-size calculation, and
+    /// `renderableStillImage(...)` on the session.
+    private let stillImageWriter: ExportStillImageWriter
     private let outputColorSpace: CGColorSpace
     private var degradedDecodePath = false
     private var cancelled = false
@@ -281,6 +290,13 @@ final class FilmtoneExportSession {
             cameraProfileSelection: cameraProfile,
             highlightMarkers: self.highlightMarkers,
             captureProvenance: captureProvenance
+        )
+        self.stillImageWriter = ExportStillImageWriter(
+            ciContext: ciContext,
+            outputColorSpace: outputColorSpace,
+            colorPipeline: colorPipeline,
+            mediaWriter: mediaWriter,
+            outputFPS: request.output.fps
         )
         if disableGlowFamilyForExport {
             NSLog("FilmtoneExportSession: GlowFamily disabled by FILMTONE_EXPORT_DISABLE_GLOW_FAMILY")
@@ -1064,79 +1080,12 @@ final class FilmtoneExportSession {
         }
 
         let outputSize = Self.scaledSize(for: image.extent.size, longEdge: request.output.longEdge)
-        let writer = try mediaWriter.makeWriter(outputSize: outputSize)
-        let videoInput = mediaWriter.makeVideoInput(outputSize: outputSize)
-        let adaptor = AVAssetWriterInputPixelBufferAdaptor(
-            assetWriterInput: videoInput,
-            sourcePixelBufferAttributes: [
-                kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA),
-                kCVPixelBufferWidthKey as String: Int(outputSize.width.rounded()),
-                kCVPixelBufferHeightKey as String: Int(outputSize.height.rounded()),
-            ]
-        )
-
-        guard writer.canAdd(videoInput) else {
-            throw FilmtoneMediaError.exportFailed("Still-image writer input could not be added.")
-        }
-        writer.add(videoInput)
-
-        guard writer.startWriting() else {
-            throw FilmtoneMediaError.exportFailed(writer.error?.localizedDescription ?? "The writer failed to start.")
-        }
-        writer.startSession(atSourceTime: .zero)
-
-        let frameCount = max(request.output.fps * 3, 1)
         let filteredImage = renderableStillImage(image, outputSize: outputSize, timeSeconds: 0)
-        guard let pixelBufferPool = adaptor.pixelBufferPool else {
-            throw FilmtoneMediaError.exportFailed("Pixel buffer pool is unavailable.")
-        }
-
-        for frameIndex in 0..<frameCount {
-            try checkCancelled()
-            try autoreleasepool {
-                try mediaWriter.waitUntilReadyForMoreMediaData(videoInput, writer: writer, label: "video", checkCancelled: checkCancelled)
-
-                var renderedBuffer: CVPixelBuffer?
-                let creationStatus = CVPixelBufferPoolCreatePixelBuffer(nil, pixelBufferPool, &renderedBuffer)
-                guard creationStatus == kCVReturnSuccess, let renderedBuffer else {
-                    throw FilmtoneMediaError.exportFailed("A render pixel buffer could not be created.")
-                }
-
-                ciContext.render(
-                    filteredImage,
-                    to: renderedBuffer,
-                    bounds: CGRect(origin: .zero, size: outputSize),
-                    colorSpace: outputColorSpace
-                )
-                attachOutputColorMetadata(to: renderedBuffer)
-
-                let presentationTime = CMTime(value: CMTimeValue(frameIndex), timescale: CMTimeScale(request.output.fps))
-                if !adaptor.append(renderedBuffer, withPresentationTime: presentationTime) {
-                    throw FilmtoneMediaError.exportFailed(writer.error?.localizedDescription ?? "The still frame could not be appended.")
-                }
-            }
-
-            if frameIndex == 0 || frameIndex % 12 == 0 {
-                let normalizedProgress = 0.12 + (Double(frameIndex + 1) / Double(frameCount)) * 0.74
-                progress(.init(
-                    stage: .rendering,
-                    progress: min(0.9, normalizedProgress),
-                    currentFrame: frameIndex + 1,
-                    totalFrames: frameCount,
-                    message: "Rendering still image"
-                ))
-            }
-        }
-
-        videoInput.markAsFinished()
-        progress(.init(stage: .writing, progress: 0.92, currentFrame: frameCount, totalFrames: frameCount, message: "Writing output"))
-        try mediaWriter.finish(writer: writer, checkCancelled: checkCancelled)
-
-        return CompletedExport(
+        return try stillImageWriter.write(
+            filteredImage: filteredImage,
             outputSize: outputSize,
-            frameCount: frameCount,
-            sourceDurationSec: Double(frameCount) / Double(request.output.fps),
-            audioPreserved: false
+            progress: progress,
+            checkCancelled: checkCancelled
         )
     }
 
@@ -1484,10 +1433,6 @@ final class FilmtoneExportSession {
             throw FilmtoneMediaError.exportFailed("JPEG data could not be created.")
         }
         try data.write(to: url, options: .atomic)
-    }
-
-    private func attachOutputColorMetadata(to imageBuffer: CVPixelBuffer) {
-        colorPipeline.applyOutputMetadata(to: imageBuffer)
     }
 
     private func resolvedVideoSourceURL() -> URL {
