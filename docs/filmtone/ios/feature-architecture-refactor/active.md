@@ -1,138 +1,160 @@
-# Active - Phase 2B-11 / 2C ExportSession Finalization
+# Active - Phase 3B EditorStore Mutation + Export Coordination Bundle
 
 Date: 2026-05-11 JST
-Phase: Phase 2B-11 / 2C - ExportSession final orchestrator pass
-Milestone: Close the ExportSession split and decide whether Phase 2 is
-ready to hand off to EditorStore.
+Phase: Phase 3B - EditorStore split, mutation + export/cache boundaries
+Milestone: Push `FilmtoneEditorStore` from a large facade toward a thin
+orchestrator by extracting project mutation orchestration and export/cache
+lifecycle coordination behind real collaborators.
 
 ## Owner Directive
 
-- Keep product-boundary grain. This is a finalization pass, not another
-  helper-chipping sequence.
-- Essence first: confirm `FilmtoneExportSession` is now a thin enough
-  orchestrator for Gyroflow / V2 capture lanes to work around it.
-- Do not force extra extraction just to hit an exact line number. At 1078
-  lines after 10D, Phase 2 is near the ~1000-line target; move only
-  low-risk leftovers if they clearly reduce responsibility without
-  widening behavior-bearing render or sidecar seams.
-- Outer shell minimal: use existing build/math/sidecar gates unless this
-  pass changes render, sidecar, writer, or queue behavior.
+- Keep the larger-grain pace. Do not stop at pass-through wrappers or a
+  sub-200-line reduction.
+- Product quality and facade compatibility are the priority. View code
+  should remain unchanged.
+- Outer-shell QA stays minimal: `verify:ios`, pbxproj 4-section greps,
+  view-diff gate, stale greps, and `git diff --check`.
 
 ## Goal
 
-Complete Phase 2 by doing a final ExportSession surface pass:
+Continue the Phase 3 split from the post-3A state:
 
-1. Inventory the remaining `FilmtoneExportSession` responsibilities and
-   classify each as:
-   - orchestrator surface to keep
-   - already-delegated collaborator wiring to keep
-   - low-risk cleanup to move or delete now
-   - defer to later Phase 2C/QA only if behavior parity needs a fixture
-2. Apply only low-risk cleanup that does not change render math, sidecar
-   schema, writer/reader behavior, queue behavior, or public API.
-3. Run the minimal Phase 2 closeout gates and record whether Phase 3 can
-   start.
+- Current `FilmtoneEditorStore.swift`: 2794 lines.
+- Target after this bundle: roughly 1900-2200 lines.
+- Extract enough real behavior that the store no longer directly owns the
+  project mutation + export/cache coordination layer.
 
-## Current State
+## Target Design
 
-- `FilmtoneExportSession.swift`: 1078 lines after 10D.
-- Major collaborators now exist for:
-  - source/profile LUT
-  - depth payload + depth matcher
-  - optics resampling + optics compositor
-  - grade render pipeline
-  - media writer + frame appender
-  - source image normalization
-  - connect package assembly
-  - sidecar writing
-  - still image writing
-  - mezzanine routing
-  - preview rendering
-  - video timeline
-  - video completion coordinator
-  - video frame/audio pumps
-  - video IO builder
-  - export geometry
+Add two primary collaborators, and a third only if it falls out cleanly:
 
-Remaining session-owned methods are expected to be mostly facade /
-orchestration plus grade/motion glue required by `FilmtoneSharedGradeProcessor`
-and preview/live monitor call sites.
+- `EditorProjectMutationCoordinator`
+  - New file: `apps/capacitor-film-lab-ios/ios/App/App/Editor/Internal/EditorProjectMutationCoordinator.swift`
+  - Owns project mutation orchestration that currently sprawls across
+    saved looks, LUT import/apply, optical filter selection, and
+    `applyLutMutation`-style update wrappers.
+  - Preferred move candidates:
+    - `applyLutMutation` and related project mutation helpers
+    - `currentCreativeLutBinding`
+    - `saveCurrentLook`
+    - `applySavedLook`
+    - `importInputLut`, `importCreativeLut`, `importCaptureUserLut`
+    - `loadCaptureUserLut`, `applyLibraryLut`, `applyCaptureCustomLut`
+    - optical filter / selected look bookkeeping when it is project-only
 
-## Preferred Work
+- `EditorExportCoordinator`
+  - New file: `apps/capacitor-film-lab-ios/ios/App/App/Editor/Internal/EditorExportCoordinator.swift`
+  - Owns export lifecycle state and calls into `FilmtoneEditorFacade` /
+    `FilmtoneExportSession`.
+  - Preferred move candidates:
+    - `exportProgress`, `exportResult`, `exportLocalAvailability`
+    - export start/cancel/result handling
+    - save-to-Photos state if it naturally follows export result
+    - mezzanine/export validation helpers that do not belong to preview
 
-- Produce a concise remaining-responsibility table in this active file.
-- If obvious zero-risk cleanup exists, implement it in this same bundle.
-  Examples:
-  - stale comments that say a responsibility still lives on the session
-    when it no longer does.
-  - zero-caller private helpers after 10D.
-  - import cleanup if build proves it safe.
-- If a cleanup would move render math, sidecar assembly, queue behavior,
-  or public API, leave it and record "defer by design".
-- Do not add formal XCTest, simulator smoke, PSNR, or PNG fixtures unless
-  this pass changes behavior-bearing logic.
+- Optional `EditorCacheCoordinator`
+  - Add only if it directly reduces coupling in this bundle.
+  - Candidate ownership:
+    - `cacheInventory`
+    - `isReleasingCache`
+    - `loadCacheInventory`
+    - `releaseCache`
+    - protected URI collection if it can depend on existing facade
+      forwards without view changes
+
+## Compatibility Rules
+
+- Preserve `@EnvironmentObject var store: FilmtoneEditorStore` and all
+  view-facing method/property names.
+- Keep SwiftUI view files at 0 diff unless a compatibility exception is
+  recorded before editing.
+- If a `@Published` property is read directly by views, either keep the
+  facade storage or bridge the collaborator's `objectWillChange` exactly
+  as Phase 3A did for preview.
+- Do not modify `EditorPreviewOrchestrator` behavior except for minimal
+  delegate calls needed after project/export mutations.
+- Do not touch `FilmtoneExportSession` in this bundle unless the export
+  coordinator requires a pure call-site namespace update.
+
+## Minimum Inventory
+
+Before edits, record only the access patterns needed for mutation/export
+compatibility:
+
+| Surface | Access pattern | Decision |
+|---|---|---|
+| export progress/result/local availability | pending | facade storage or coordinator storage |
+| save-to-Photos state | pending | move with export or defer |
+| project mutation public methods | pending | move body or keep facade forward |
+| cache inventory/release state | pending | move, defer, or optional coordinator |
+| preview invalidation calls | pending | keep as facade delegate |
 
 ## Edit Targets
 
-- `apps/capacitor-film-lab-ios/ios/App/App/Export/FilmtoneExportSession.swift`
-  - optional low-risk cleanup only
+- `apps/capacitor-film-lab-ios/ios/App/App/Editor/FilmtoneEditorStore.swift`
+- `apps/capacitor-film-lab-ios/ios/App/App/Editor/Internal/EditorProjectMutationCoordinator.swift`
+- `apps/capacitor-film-lab-ios/ios/App/App/Editor/Internal/EditorExportCoordinator.swift`
+- optional: `apps/capacitor-film-lab-ios/ios/App/App/Editor/Internal/EditorCacheCoordinator.swift`
+- `apps/capacitor-film-lab-ios/ios/App/App.xcodeproj/project.pbxproj`
 - `docs/filmtone/ios/feature-architecture-refactor/active.md`
-  - remaining responsibility table, gate results, Phase 3 readiness
-- `docs/filmtone/ios/feature-architecture-refactor/strategy.md`
-  - final Phase 2 completion log after commit/archive
 
 ## Checklist
 
-- [ ] Record remaining `FilmtoneExportSession` responsibility table.
-- [ ] Confirm no zero-caller private helpers remain after 10D, or delete
-  any that are clearly dead.
-- [ ] Confirm stale ExportSession comments are gone or update them.
-- [ ] Confirm public API surface used by views/runtime is unchanged.
-- [ ] Confirm `FilmtoneExportSidecarBuilder.swift` is untouched in this
-  pass unless explicitly justified.
+- [ ] Fill the minimum inventory table.
+- [ ] Add `EditorProjectMutationCoordinator` as a real collaborator.
+- [ ] Add `EditorExportCoordinator` as a real collaborator.
+- [ ] Add `EditorCacheCoordinator` only if it materially reduces the
+  store without widening scope.
+- [ ] Keep all view-facing `FilmtoneEditorStore` API names intact.
+- [ ] Keep SwiftUI view files unchanged, or document the exact exception.
+- [ ] Register every new Swift file in the App target pbxproj.
+- [ ] Run pbxproj 4-section grep for every new Swift file.
 - [ ] Run `bun run verify:ios`.
 - [ ] Run `git diff --check`.
-- [ ] Record Phase 3 readiness decision.
+- [ ] Record line/file deltas, gates, and facade compatibility notes.
 
 ## Verification Gates
 
-Minimum gates:
+Minimum:
 
+- `grep -c 'EditorProjectMutationCoordinator.swift' apps/capacitor-film-lab-ios/ios/App/App.xcodeproj/project.pbxproj` equals `4`
+- `grep -c 'EditorExportCoordinator.swift' apps/capacitor-film-lab-ios/ios/App/App.xcodeproj/project.pbxproj` equals `4`
+- optional cache coordinator grep if added
 - `bun run verify:ios`
 - `git diff --check`
-- targeted stale-comment / zero-caller grep if cleanup is applied
 
-Optional only if behavior changes:
+Targeted:
 
-- sidecar canonical fixture or still PNG/export smoke. Do not add these
-  just because Phase 2 is ending; use them only if this final pass touches
-  sidecar or render behavior.
+- `git diff --name-only -- apps/capacitor-film-lab-ios/ios/App/App | rg '(View|Root|CaptureView|FullscreenLutEditor)'`
+  should be empty unless a compatibility exception is recorded.
+- Stale greps for moved method declarations in `FilmtoneEditorStore.swift`
+  should show only facade forwards.
 
 ## Done Conditions
 
-- Phase 2 remaining responsibilities are documented.
-- Any applied cleanup is low-risk and verified.
-- `FilmtoneExportSession` is accepted as thin enough to move to Phase 3
-  without blocking Gyroflow / V2 capture work.
-- `bun run verify:ios` and `git diff --check` are green.
-- Next active can start Phase 3 EditorStore at larger bundle grain.
+- `FilmtoneEditorStore.swift` is reduced into the 1900-2200 line range,
+  or the active records a concrete blocker for any overshoot.
+- Project mutation orchestration and export/cache coordination are no
+  longer primarily owned by the facade.
+- New files are real collaborators, not extension-only splits.
+- View-facing API and view files are unchanged.
+- `bun run verify:ios`, pbxproj greps, and `git diff --check` are green.
 
 ## Stop Conditions
 
 - Done conditions are met.
 - `bun run verify:ios` fails 3 consecutive times for the same issue.
-- Final cleanup reveals a required behavior-bearing extraction. Stop and
-  record the blocker instead of silently widening scope.
+- Export/cache extraction forces broad view rewrites. Keep facade storage
+  and move behavior, then record the compromise.
+- A required change crosses into CaptureSession behavior. Stop and queue
+  it for Phase 3C or Phase 4.
 
 ## Out Of Scope
 
-- New export behavior.
-- Sidecar schema changes.
-- Render math changes.
-- Writer/reader/queue behavior changes.
-- EditorStore or CaptureSession code changes.
-- Formal QA matrix, simulator smoke, PSNR, PNG fixtures unless triggered
-  by a behavior-bearing cleanup.
+- Capture relay extraction unless it is a tiny delegate needed by export.
+- CaptureSession refactor.
+- SwiftUI view body decomposition.
+- Formal XCTest, simulator smoke, PSNR, or full UI QA matrix.
 
 ## Line / File Deltas
 
@@ -142,7 +164,7 @@ Pending implementation.
 
 Pending implementation.
 
-## Phase 3 Readiness
+## Facade Compatibility Notes
 
 Pending implementation.
 

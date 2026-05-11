@@ -84,21 +84,16 @@ This lane is done when:
 - **Phase 1 — Source layout migration** — lane docs, mapping,
   filesystem moves, pbxproj rewrite, path repair, `verify:ios`, and
   rename-only diff gate. Complete.
-- **Phase 2A/2B — ExportSession split** — already complete through the
-  queue-pump bundle. Current remaining work is larger-grain:
-  - **Phase 2B-10D** — Video IO setup bundle:
-    `ExportGeometry` + `ExportVideoIOBuilder`; writer/reader setup and
-    sizing move out of `FilmtoneExportSession`.
-  - **Phase 2B-11 / 2C** — ExportSession final orchestrator cleanup plus
-    minimal parity gates. Only add sidecar/still fixtures if the final
-    cleanup touches behavior-bearing render or sidecar logic; otherwise
-    keep to `verify:ios`, stale grep, and targeted sidecar/build checks.
+- **Phase 2A/2B — ExportSession split** — accepted after the 2B-10D
+  video IO setup bundle. The planned 2B-11 / 2C final orchestrator pass
+  was skipped by owner decision to keep momentum; `FilmtoneExportSession`
+  is thin enough for Phase 3 at 1078 lines.
 - **Phase 3 — EditorStore split** — three larger bundles:
-  - **Phase 3A/3B-1** — access inventory + `ProjectState` +
-    `LibraryManager` extraction.
-  - **Phase 3B-2** — `PreviewOrchestrator` + `ExportCoordinator`
+  - **Phase 3A** — access inventory + project/library/preview
+    controller extraction.
+  - **Phase 3B** — project mutation + export/cache coordination
     extraction.
-  - **Phase 3B-3 / 3C** — `CaptureRelay`, facade bridge cleanup, and
+  - **Phase 3C** — `CaptureRelay`, facade bridge cleanup, and
     focused UI reactivity verification. View code remains unchanged
     unless the compatibility table proves a minimal bridge adjustment is
     necessary.
@@ -132,6 +127,10 @@ product-boundary turns, not 10+ helper-sized turns.
   bundles. Active docs should name the boundary, invariants, and gates;
   line-level detail is added only when a seam is risky or verification
   fails. Target remaining cycles: 5-7.
+- 2026-05-11 JST — Owner skipped the planned Phase 2B-11 / 2C
+  ExportSession finalization pass. The post-2B-10D ExportSession state
+  is accepted as Phase 2 complete enough for the product lane; move
+  directly to Phase 3 EditorStore extraction.
 
 ## Completion Log
 
@@ -398,3 +397,17 @@ product-boundary turns, not 10+ helper-sized turns.
   pbxproj 4-section grep = 4 for both files; `bun run verify:ios`
   green; `git diff --check` clean. See
   `archive/2026-05-11-phase-2b-10d-video-io-setup-bundle.md`.
+- 2026-05-11 JST — Phase 2 is closed by owner decision after 2B-10D.
+  The planned 2B-11 / 2C finalization active was archived as skipped;
+  no additional Phase 2 cleanup or parity fixture was run. See
+  `archive/2026-05-11-phase-2b-11-export-finalization-skipped.md`.
+- 2026-05-11 JST — Phase 3A (EditorStore project + library +
+  preview bundle) completed in the feature worktree. New
+  `EditorProjectController`, `EditorLibraryController`, and
+  `EditorPreviewOrchestrator` split project bookkeeping, optional
+  library actor access, and still/video preview lifecycle out of
+  `FilmtoneEditorStore`. Store size reduced from 3441 → 2794 lines
+  (−647); SwiftUI view files stayed unchanged; pbxproj 4-section grep
+  = 4 for all 3 files; `bun run verify:ios` green; `git diff --check`
+  clean. See
+  `archive/2026-05-11-phase-3a-editor-project-library-preview-bundle.md`.

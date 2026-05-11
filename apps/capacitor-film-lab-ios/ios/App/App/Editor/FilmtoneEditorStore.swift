@@ -1,167 +1,10 @@
 import AVFoundation
+import Combine
 import CryptoKit
 import FilmLabSwiftCore
 import Foundation
 import SwiftUI
 import UIKit
-
-struct FilmtoneStillPreviewState {
-    var originalPosterURI: String?
-    var gradedPosterURI: String?
-    var width: Int?
-    var height: Int?
-    var posterTimeSec: Double?
-    var isRendering = false
-    var error: String?
-
-    static let empty = FilmtoneStillPreviewState()
-}
-
-struct FilmtoneComparePreviewFrame {
-    let originalURI: String
-    let gradedURI: String
-    let width: Int?
-    let height: Int?
-    let posterTimeSec: Double?
-
-    init?(
-        originalURI: String?,
-        gradedURI: String?,
-        width: Int? = nil,
-        height: Int? = nil,
-        posterTimeSec: Double? = nil
-    ) {
-        guard let originalURI, let gradedURI else {
-            return nil
-        }
-        self.originalURI = originalURI
-        self.gradedURI = gradedURI
-        self.width = width
-        self.height = height
-        self.posterTimeSec = posterTimeSec
-    }
-}
-
-enum FilmtoneVideoCompareMode: String {
-    case graded
-    case original
-}
-
-struct FilmtoneVideoPreviewState {
-    let player: AVPlayer
-    let compareMode: FilmtoneVideoCompareMode
-    let width: Int?
-    let height: Int?
-    let durationSec: Double?
-    let isPreparing: Bool
-    let error: String?
-}
-
-enum FilmtonePreviewState {
-    case empty
-    case still(FilmtoneStillPreviewState)
-    case video(FilmtoneVideoPreviewState)
-
-    var isRendering: Bool {
-        switch self {
-        case .empty:
-            return false
-        case .still(let preview):
-            return preview.isRendering
-        case .video(let preview):
-            return preview.isPreparing
-        }
-    }
-
-    var error: String? {
-        switch self {
-        case .empty:
-            return nil
-        case .still(let preview):
-            return preview.error
-        case .video(let preview):
-            return preview.error
-        }
-    }
-
-    var width: Int? {
-        switch self {
-        case .empty:
-            return nil
-        case .still(let preview):
-            return preview.width
-        case .video(let preview):
-            return preview.width
-        }
-    }
-
-    var height: Int? {
-        switch self {
-        case .empty:
-            return nil
-        case .still(let preview):
-            return preview.height
-        case .video(let preview):
-            return preview.height
-        }
-    }
-
-    var posterTimeSec: Double? {
-        guard case .still(let preview) = self else {
-            return nil
-        }
-        return preview.posterTimeSec
-    }
-
-    var durationSec: Double? {
-        guard case .video(let preview) = self else {
-            return nil
-        }
-        return preview.durationSec
-    }
-
-    var videoState: FilmtoneVideoPreviewState? {
-        guard case .video(let preview) = self else {
-            return nil
-        }
-        return preview
-    }
-
-    var comparePreviewFrame: FilmtoneComparePreviewFrame? {
-        guard case .still(let preview) = self else {
-            return nil
-        }
-        return FilmtoneComparePreviewFrame(
-            originalURI: preview.originalPosterURI,
-            gradedURI: preview.gradedPosterURI,
-            width: preview.width,
-            height: preview.height,
-            posterTimeSec: preview.posterTimeSec
-        )
-    }
-
-    func stillDisplayURI(isComparing: Bool) -> String? {
-        guard case .still(let preview) = self else {
-            return nil
-        }
-        if isComparing {
-            return preview.originalPosterURI ?? preview.gradedPosterURI
-        }
-        return preview.gradedPosterURI ?? preview.originalPosterURI
-    }
-
-    var cacheURIs: [String] {
-        switch self {
-        case .empty, .video:
-            return []
-        case .still(let preview):
-            return [
-                preview.originalPosterURI,
-                preview.gradedPosterURI,
-            ].compactMap { $0 }
-        }
-    }
-}
 
 enum FilmtoneSaveToPhotosState: String {
     case notRun = "not-run"
@@ -237,222 +80,13 @@ struct FilmtoneRecordingUIState: Equatable {
     let durationSeconds: Double
 }
 
-@MainActor
-final class FilmtoneVideoPreviewSession {
-    let sourceURI: String
-    let player: AVPlayer
-
-    private(set) var originalItem: AVPlayerItem
-    private(set) var gradedItem: AVPlayerItem
-    private(set) var compareMode: FilmtoneVideoCompareMode
-    private(set) var currentTimeSec: Double
-    private(set) var isPreparing: Bool
-    private(set) var lastError: String?
-    private(set) var width: Int
-    private(set) var height: Int
-    private(set) var durationSec: Double?
-
-    private var timeObserver: Any?
-    private var transitionGeneration: UInt64 = 0
-    private var pendingPlaybackState: (time: CMTime, shouldPlay: Bool)?
-
-    init(
-        sourceURI: String,
-        original: FilmtonePreparedVideoPreviewItem,
-        graded: FilmtonePreparedVideoPreviewItem
-    ) {
-        self.sourceURI = sourceURI
-        self.player = AVPlayer(playerItem: graded.item)
-        self.originalItem = original.item
-        self.gradedItem = graded.item
-        self.compareMode = .graded
-        self.currentTimeSec = 0
-        self.isPreparing = false
-        self.lastError = nil
-        self.width = graded.width
-        self.height = graded.height
-        self.durationSec = graded.durationSec ?? original.durationSec
-        self.player.actionAtItemEnd = .pause
-        attachTimeObserver()
-    }
-
-    deinit {
-        if let timeObserver {
-            player.removeTimeObserver(timeObserver)
-        }
-    }
-
-    var snapshot: FilmtoneVideoPreviewState {
-        .init(
-            player: player,
-            compareMode: compareMode,
-            width: width,
-            height: height,
-            durationSec: durationSec,
-            isPreparing: isPreparing,
-            error: lastError
-        )
-    }
-
-    func beginPreparing() {
-        isPreparing = true
-    }
-
-    func setError(_ message: String?) {
-        lastError = message
-        isPreparing = false
-    }
-
-    func clearError() {
-        lastError = nil
-    }
-
-    func updatePreparedGradedItem(_ prepared: FilmtonePreparedVideoPreviewItem) async {
-        gradedItem = prepared.item
-        width = prepared.width
-        height = prepared.height
-        durationSec = prepared.durationSec ?? durationSec
-        lastError = nil
-        isPreparing = false
-
-        guard compareMode == .graded else {
-            return
-        }
-
-        let transition = beginTransition()
-        await replaceCurrentItem(
-            prepared.item,
-            preserving: transition.playbackState,
-            generation: transition.generation
-        )
-    }
-
-    func refreshPreparedGradedComposition(_ prepared: FilmtonePreparedVideoPreviewComposition) async {
-        let transition = compareMode == .graded && player.currentItem === gradedItem
-            ? beginTransition()
-            : nil
-
-        width = prepared.width
-        height = prepared.height
-        durationSec = prepared.durationSec ?? durationSec
-        lastError = nil
-        isPreparing = false
-
-        FilmtonePreviewRefreshDebug.log("assigning refreshed graded video composition")
-        gradedItem.videoComposition = prepared.videoComposition
-        gradedItem.seekingWaitsForVideoCompositionRendering = true
-
-        guard let transition else {
-            return
-        }
-
-        FilmtonePreviewRefreshDebug.log(
-            "forcing graded preview redraw at \(CMTimeGetSeconds(transition.playbackState.time).filmtoneSanitizedSeconds)s"
-        )
-        await rerenderCurrentItem(
-            preserving: transition.playbackState,
-            generation: transition.generation
-        )
-    }
-
-    func setCompareMode(_ mode: FilmtoneVideoCompareMode) async {
-        guard compareMode != mode else {
-            return
-        }
-
-        compareMode = mode
-        let transition = beginTransition()
-        await replaceCurrentItem(
-            item(for: mode),
-            preserving: transition.playbackState,
-            generation: transition.generation
-        )
-    }
-
-    private func item(for mode: FilmtoneVideoCompareMode) -> AVPlayerItem {
-        switch mode {
-        case .graded:
-            return gradedItem
-        case .original:
-            return originalItem
-        }
-    }
-
-    private func capturePlaybackState() -> (time: CMTime, shouldPlay: Bool) {
-        let time = player.currentTime()
-        let shouldPlay = player.timeControlStatus == .playing || player.rate > 0
-        return (time: time, shouldPlay: shouldPlay)
-    }
-
-    private func beginTransition() -> (
-        generation: UInt64,
-        playbackState: (time: CMTime, shouldPlay: Bool)
-    ) {
-        transitionGeneration += 1
-        let playbackState = pendingPlaybackState ?? capturePlaybackState()
-        pendingPlaybackState = playbackState
-        return (
-            generation: transitionGeneration,
-            playbackState: playbackState
-        )
-    }
-
-    private func replaceCurrentItem(
-        _ item: AVPlayerItem,
-        preserving playbackState: (time: CMTime, shouldPlay: Bool),
-        generation: UInt64
-    ) async {
-        player.pause()
-        player.replaceCurrentItem(with: item)
-        await player.filmtoneSeek(to: playbackState.time)
-        completeTransition(playbackState, generation: generation)
-    }
-
-    private func rerenderCurrentItem(
-        preserving playbackState: (time: CMTime, shouldPlay: Bool),
-        generation: UInt64
-    ) async {
-        player.pause()
-        await player.filmtoneSeek(to: playbackState.time)
-        completeTransition(playbackState, generation: generation)
-    }
-
-    private func completeTransition(
-        _ playbackState: (time: CMTime, shouldPlay: Bool),
-        generation: UInt64
-    ) {
-        guard generation == transitionGeneration else {
-            return
-        }
-        currentTimeSec = CMTimeGetSeconds(playbackState.time).filmtoneSanitizedSeconds
-        pendingPlaybackState = nil
-        if playbackState.shouldPlay {
-            player.play()
-        }
-    }
-
-    private func attachTimeObserver() {
-        let interval = CMTime(seconds: 0.25, preferredTimescale: 600)
-        timeObserver = player.addPeriodicTimeObserver(
-            forInterval: interval,
-            queue: .main
-        ) { [weak self] time in
-            Task { @MainActor [weak self] in
-                self?.currentTimeSec = CMTimeGetSeconds(time).filmtoneSanitizedSeconds
-            }
-        }
-    }
-}
 
 @MainActor
 final class FilmtoneEditorStore: ObservableObject {
     @Published var project: FilmtoneProjectState
     @Published var source: SourceInfoDTO?
     @Published var probe: SourceProbeDTO?
-    @Published var preview: FilmtonePreviewState = .empty
-    @Published var comparePreviewFrame: FilmtoneComparePreviewFrame?
     @Published var highlightMarkers: FilmtoneHighlightMarkers?
-    @Published var isCompareHeld = false
     @Published var exportProgress: Phase0ExportProgressDTO?
     @Published var exportResult: Phase0ExportResultDTO?
     @Published var exportLocalAvailability: FilmtoneExportLocalAvailability = .none
@@ -516,25 +150,18 @@ final class FilmtoneEditorStore: ObservableObject {
     /// record which Saved Look produced the export. (Sidecar field-set is
     /// MVP-deferred — see Item 3 plan §"Sidecar V1 Additions".)
     ///
-    /// `didSet` clears `appliedSavedLookEntryCache` when reset to `nil`;
-    /// non-nil assignments must also populate the cache at the apply
-    /// site so M10 live preview (`makeLivePreviewGradeProcessor()`,
-    /// synchronous) can read the resolved entry without async I/O.
+    /// `didSet` clears the project controller's cached entry when the id is
+    /// reset to `nil`; non-nil assignments must also populate the cache at
+    /// the apply site so M10 live preview
+    /// (`makeLivePreviewGradeProcessor()`, synchronous) can read the
+    /// resolved entry without async I/O.
     private(set) var appliedSavedLookId: UUID? {
         didSet {
             if appliedSavedLookId == nil {
-                appliedSavedLookEntryCache = nil
+                projectController.clearAppliedSavedLookEntry()
             }
         }
     }
-
-    /// Live mirror of the resolved `SavedLookEntry` for the currently
-    /// applied Saved Look. Populated alongside `appliedSavedLookId` at
-    /// apply paths and cleared via the `didSet` above. Lets the
-    /// synchronous live-preview entrypoint forward the entry without
-    /// awaiting `resolveAppliedSavedLookForExport` (which runs async I/O
-    /// on the library actor).
-    private var appliedSavedLookEntryCache: SavedLookEntry?
 
     /// Backlight Veil Phase 1c — currently selected optical filter family id
     /// (e.g. `"backlightVeil-1-2"`) or nil = OFF. Mirrors
@@ -544,11 +171,25 @@ final class FilmtoneEditorStore: ObservableObject {
 
     let strings: FilmtoneStrings
     private let facade: FilmtoneEditorFacade
-    private let libraryStore: LibraryStoreActor?
-    private var previewTask: Task<Void, Never>?
-    private var videoPreviewSession: FilmtoneVideoPreviewSession?
+    private let projectController: EditorProjectController
+    private let libraryController: EditorLibraryController
+    let previewOrchestrator: EditorPreviewOrchestrator
     private var toastDismissTask: Task<Void, Never>?
     private var libraryBootstrapTask: Task<Void, Never>?
+    private var previewCancellable: AnyCancellable?
+
+    var preview: FilmtonePreviewState {
+        previewOrchestrator.preview
+    }
+
+    var comparePreviewFrame: FilmtoneComparePreviewFrame? {
+        previewOrchestrator.comparePreviewFrame
+    }
+
+    var isCompareHeld: Bool {
+        get { previewOrchestrator.isCompareHeld }
+        set { previewOrchestrator.isCompareHeld = newValue }
+    }
 
     init(
         facade: FilmtoneEditorFacade,
@@ -557,10 +198,13 @@ final class FilmtoneEditorStore: ObservableObject {
     ) {
         self.facade = facade
         self.strings = strings
+        self.projectController = EditorProjectController()
         // Fall back to a library-disabled mode if Application Support is not
         // reachable — the editor still works, the Recent / Saved-Looks UI
         // simply stays empty. We do not hard-fail bootstrap.
-        self.libraryStore = libraryStore ?? (try? LibraryStoreActor())
+        let resolvedLibraryStore = libraryStore ?? (try? LibraryStoreActor())
+        self.libraryController = EditorLibraryController(libraryStore: resolvedLibraryStore)
+        self.previewOrchestrator = EditorPreviewOrchestrator(facade: facade, strings: strings)
 
         if let snapshot = FilmtonePersistence.load() {
             self.project = snapshot.project
@@ -606,6 +250,11 @@ final class FilmtoneEditorStore: ObservableObject {
 
         reclaimCacheForCurrentState()
 
+        previewOrchestrator.attach(self)
+        previewCancellable = previewOrchestrator.objectWillChange.sink { [weak self] in
+            self?.objectWillChange.send()
+        }
+
         if self.source != nil {
             schedulePreviewRender()
         }
@@ -614,34 +263,25 @@ final class FilmtoneEditorStore: ObservableObject {
     }
 
     deinit {
-        previewTask?.cancel()
         toastDismissTask?.cancel()
         libraryBootstrapTask?.cancel()
     }
 
     private func bootstrapLibraryAsync() {
-        guard let libraryStore else {
+        guard libraryController.isAvailable else {
             return
         }
         libraryBootstrapTask?.cancel()
         libraryBootstrapTask = Task { @MainActor [weak self] in
             guard let self else { return }
-            do {
-                let snapshot = try await libraryStore.loadOrRebuild()
-                self.library = snapshot
-            } catch {
-                // Library is non-load-bearing for editor function — keep the
-                // empty snapshot rather than surfacing a setup error.
-                self.library = .empty
-            }
+            self.library = await self.libraryController.loadOrRebuildSnapshot()
         }
     }
 
     private func refreshLibrarySnapshot() async {
-        guard let libraryStore else {
+        guard let snapshot = await libraryController.snapshot() else {
             return
         }
-        let snapshot = await libraryStore.snapshot()
         self.library = snapshot
     }
 
@@ -658,11 +298,11 @@ final class FilmtoneEditorStore: ObservableObject {
     }
 
     var selectedPreviewURI: String? {
-        preview.stillDisplayURI(isComparing: isCompareHeld)
+        previewOrchestrator.selectedPreviewURI
     }
 
     var videoPreviewState: FilmtoneVideoPreviewState? {
-        preview.videoState
+        previewOrchestrator.videoPreviewState
     }
 
     var highlightMarkerList: [FilmtoneHighlightMarker] {
@@ -681,7 +321,7 @@ final class FilmtoneEditorStore: ObservableObject {
     }
 
     var previewError: String? {
-        preview.error
+        previewOrchestrator.previewError
     }
 
     /// Param keys surfaced through the Adjust ("調整") quick section. Slider
@@ -912,12 +552,12 @@ final class FilmtoneEditorStore: ObservableObject {
             // F3-Fix #1: forward Saved Look entry + camera profile so the
             // live preview's `FilmtoneExportSession` matches the export
             // path's input-LUT auto-injection and Saved Look provenance.
-            // Saved Look entry is read sync from `appliedSavedLookEntryCache`,
+            // Saved Look entry is read sync from `projectController.appliedSavedLookEntryCache`,
             // populated at the two apply paths (`saveLookFromCurrentState` /
             // `applySavedLook`); the export path uses the async resolver,
             // but live preview cannot await without restructuring the
             // fullScreenCover capture path.
-            let savedLookEntry = appliedSavedLookEntryCache
+            let savedLookEntry = projectController.appliedSavedLookEntryCache
             let cameraProfile = project.cameraProfile
             let processor = try facade.makeLivePreviewGradeProcessor(
                 request: request,
@@ -1158,8 +798,7 @@ final class FilmtoneEditorStore: ObservableObject {
                 transient.params = base.applyingPatch(paramOverrides)
                 transient.creativeLut = resolvedCreativeLut
 
-                if let libraryStore,
-                   let loaded = try? await libraryStore.loadLook(id: canonicalUUID) {
+                if let loaded = try? await libraryController.loadLook(id: canonicalUUID) {
                     savedLookEntry = loaded
                 } else {
                     savedLookEntry = FilmtoneBuiltInCatalog.materializeAsSavedLookEntry(
@@ -1170,8 +809,7 @@ final class FilmtoneEditorStore: ObservableObject {
                 }
             } else if let customLut = package.customLut,
                       let libraryId = customLut.libraryId,
-                      let libraryStore {
-                let parsed = try await libraryStore.loadLut(id: libraryId)
+                      let parsed = try await libraryController.loadLut(id: libraryId) {
                 transient.creativeLut = parsed.withIntensity(customLut.intensity)
             } else {
                 return nil
@@ -1398,17 +1036,11 @@ final class FilmtoneEditorStore: ObservableObject {
     }
 
     func applySnapshotScene(_ scene: FilmtoneSnapshotScene) {
-        previewTask?.cancel()
-        previewTask = nil
-
         let fixture = FilmtoneSnapshotFixture.make(scene: scene)
         project = fixture.project
         source = fixture.source
         probe = fixture.probe
-        preview = fixture.preview
-        comparePreviewFrame = fixture.preview.comparePreviewFrame
-        videoPreviewSession = nil
-        isCompareHeld = false
+        previewOrchestrator.applyFixture(preview: fixture.preview)
         exportProgress = nil
         exportResult = fixture.exportResult
         exportLocalAvailability = fixture.exportResult == nil ? .none : .available
@@ -1605,7 +1237,7 @@ final class FilmtoneEditorStore: ObservableObject {
             // S11-E: re-apply the capture-time Look chip against the
             // proxy so the editor opens in the same chain the live
             // preview rendered during capture.  Stone / Urban
-            // `canonicalUUID`s resolve through `libraryStore.loadLook(id:)`
+            // `canonicalUUID`s resolve through `libraryController.loadLook(id:)`
             // → `FilmtoneBuiltInCatalog.materializeAsSavedLookEntry`,
             // routing through the same `.bundled` cube +
             // `FilmtoneCreativePack01Adaptation` wiring as the chip
@@ -1740,11 +1372,7 @@ final class FilmtoneEditorStore: ObservableObject {
     }
 
     func setVideoCompareMode(_ mode: FilmtoneVideoCompareMode) async {
-        guard let videoPreviewSession else {
-            return
-        }
-        await videoPreviewSession.setCompareMode(mode)
-        syncPreviewFromVideoSession()
+        await previewOrchestrator.setVideoCompareMode(mode)
     }
 
     func addHighlightMarker(at sourceTimeSec: Double) {
@@ -1844,19 +1472,20 @@ final class FilmtoneEditorStore: ObservableObject {
             guard let picked = try await facade.pickCubeLutFile() else {
                 return nil
             }
-            guard let libraryStore else {
+            guard let result = try await libraryController.importLut(
+                parsedLut: picked.lut,
+                originalFilename: picked.originalFilename,
+                preferredSlot: .creative
+            ) else {
                 self.error = strings.userMessage(
                     for: FilmtoneMediaError.bridgeUnavailable,
                     context: .importCreativeLut
                 )
                 return nil
             }
-            let result = try await libraryStore.importLut(
-                parsedLut: picked.lut,
-                originalFilename: picked.originalFilename,
-                preferredSlot: .creative
-            )
-            let parsed = try await libraryStore.loadLut(id: result.entry.id)
+            guard let parsed = try await libraryController.loadLut(id: result.entry.id) else {
+                return nil
+            }
             await refreshLibrarySnapshot()
             return FilmtoneCaptureLook.userLut(
                 entry: result.entry,
@@ -1877,12 +1506,14 @@ final class FilmtoneEditorStore: ObservableObject {
     }
 
     func loadCaptureUserLut(entry: LutLibraryEntry) async -> FilmtoneCaptureLook? {
-        guard let libraryStore else {
+        guard libraryController.isAvailable else {
             return nil
         }
         do {
-            let parsed = try await libraryStore.loadLut(id: entry.id)
-            await libraryStore.touchLutLastUsed(id: entry.id)
+            guard let parsed = try await libraryController.loadLut(id: entry.id) else {
+                return nil
+            }
+            await libraryController.touchLutLastUsed(id: entry.id)
             await refreshLibrarySnapshot()
             return FilmtoneCaptureLook.userLut(entry: entry, parsedLut: parsed)
         } catch {
@@ -1899,11 +1530,11 @@ final class FilmtoneEditorStore: ObservableObject {
         _ lut: ParsedCubeLutDTO,
         slot: SlotHint
     ) async {
-        guard let libraryStore else {
+        guard libraryController.isAvailable else {
             return
         }
         do {
-            _ = try await libraryStore.importLut(
+            _ = try await libraryController.importLut(
                 parsedLut: lut,
                 originalFilename: nil,
                 preferredSlot: slot
@@ -1928,12 +1559,14 @@ final class FilmtoneEditorStore: ObservableObject {
     /// `lastUsedAt`, and (c) touch the slot's intensity according to the
     /// entry's `defaultIntensity`.
     func applyLibraryLut(libraryId: UUID, slot: SlotHint) async {
-        guard let libraryStore else {
+        guard libraryController.isAvailable else {
             return
         }
         do {
-            let parsed = try await libraryStore.loadLut(id: libraryId)
-            await libraryStore.touchLutLastUsed(id: libraryId)
+            guard let parsed = try await libraryController.loadLut(id: libraryId) else {
+                return
+            }
+            await libraryController.touchLutLastUsed(id: libraryId)
             await refreshLibrarySnapshot()
             appliedSavedLookId = nil
             applyLutMutation { state in
@@ -1954,7 +1587,7 @@ final class FilmtoneEditorStore: ObservableObject {
     /// captured — those are source-locally re-derived per `applyProbe`.
     @discardableResult
     func saveCurrentLook(name: String) async -> SavedLookEntry? {
-        guard let libraryStore else {
+        guard libraryController.isAvailable else {
             return nil
         }
         let creativeBinding = await currentCreativeLutBinding()
@@ -1965,7 +1598,7 @@ final class FilmtoneEditorStore: ObservableObject {
         let densifiedOverrides = project.paramOverrides
             .densifyingOpticsGlow(from: project.params)
         do {
-            let entry = try await libraryStore.saveLook(
+            guard let entry = try await libraryController.saveLook(
                 name: name,
                 presetName: project.presetName,
                 presetVersion: FilmtonePhase0Math.presetVersion,
@@ -1973,10 +1606,12 @@ final class FilmtoneEditorStore: ObservableObject {
                 quickState: project.quickState,
                 paramOverrides: densifiedOverrides,
                 creativeLut: creativeBinding
-            )
+            ) else {
+                return nil
+            }
             await refreshLibrarySnapshot()
             appliedSavedLookId = entry.id
-            appliedSavedLookEntryCache = entry
+            projectController.setAppliedSavedLookEntry(entry)
             presentToast(
                 String(format: strings.lookSavedToastFormat, entry.name),
                 kind: .success
@@ -1996,15 +1631,17 @@ final class FilmtoneEditorStore: ObservableObject {
         guard let creativeLut = project.creativeLut else {
             return nil
         }
-        guard let libraryStore else {
+        guard libraryController.isAvailable else {
             return nil
         }
         do {
-            let result = try await libraryStore.importLut(
+            guard let result = try await libraryController.importLut(
                 parsedLut: creativeLut,
                 originalFilename: nil,
                 preferredSlot: .creative
-            )
+            ) else {
+                return nil
+            }
             // result.entry.id always represents the canonical library entry
             // for this hash — dedup hit reuses the existing one, miss creates.
             if !result.deduped {
@@ -2038,11 +1675,13 @@ final class FilmtoneEditorStore: ObservableObject {
     ///   The source-side normalization is deliberately source-local — the
     ///   look survives source swaps, the camera profile does not.
     func applySavedLook(id: UUID) async {
-        guard let libraryStore else {
+        guard libraryController.isAvailable else {
             return
         }
         do {
-            let entry = try await libraryStore.loadLook(id: id)
+            guard let entry = try await libraryController.loadLook(id: id) else {
+                return
+            }
             var resolvedCreativeLut: ParsedCubeLutDTO?
             var creativePack01Adaptation: FilmtoneCreativePack01Adaptation.Resolved?
             var lutMissingForApply = false
@@ -2051,11 +1690,15 @@ final class FilmtoneEditorStore: ObservableObject {
             case .libraryRef(let lutId, let intensity):
                 if let _ = library.lutEntry(id: lutId) {
                     do {
-                        resolvedCreativeLut = try await libraryStore.loadLut(
+                        resolvedCreativeLut = try await libraryController.loadLut(
                             id: lutId,
                             intensity: intensity
                         )
-                        await libraryStore.touchLutLastUsed(id: lutId)
+                        if resolvedCreativeLut == nil {
+                            lutMissingForApply = true
+                        } else {
+                            await libraryController.touchLutLastUsed(id: lutId)
+                        }
                     } catch {
                         lutMissingForApply = true
                     }
@@ -2120,7 +1763,7 @@ final class FilmtoneEditorStore: ObservableObject {
             }
             recomputeProjectParamsPreservingOpticsGlow()
             appliedSavedLookId = entry.id
-            appliedSavedLookEntryCache = entry
+            projectController.setAppliedSavedLookEntry(entry)
             await refreshLibrarySnapshot()
 
             if lutMissingForApply {
@@ -2137,16 +1780,19 @@ final class FilmtoneEditorStore: ObservableObject {
     }
 
     func applyCaptureCustomLut(_ record: FilmtoneCaptureCustomLutRecord) async {
-        guard let libraryStore, let libraryId = record.libraryId else {
+        guard libraryController.isAvailable, let libraryId = record.libraryId else {
             self.error = strings.libraryLutMissingOnApply
             return
         }
         do {
-            let parsed = try await libraryStore.loadLut(
+            guard let parsed = try await libraryController.loadLut(
                 id: libraryId,
                 intensity: record.intensity
-            )
-            await libraryStore.touchLutLastUsed(id: libraryId)
+            ) else {
+                self.error = strings.libraryLutMissingOnApply
+                return
+            }
+            await libraryController.touchLutLastUsed(id: libraryId)
             await refreshLibrarySnapshot()
             appliedSavedLookId = nil
             applyLutMutation { state in
@@ -2206,18 +1852,12 @@ final class FilmtoneEditorStore: ObservableObject {
     }
 
     func renameSavedLook(id: UUID, name: String) async {
-        guard let libraryStore else {
-            return
-        }
-        try? await libraryStore.renameLook(id: id, name: name)
+        await libraryController.renameLook(id: id, name: name)
         await refreshLibrarySnapshot()
     }
 
     func deleteSavedLook(id: UUID) async {
-        guard let libraryStore else {
-            return
-        }
-        _ = try? await libraryStore.deleteLook(id: id)
+        await libraryController.deleteLook(id: id)
         if appliedSavedLookId == id {
             appliedSavedLookId = nil
         }
@@ -2225,34 +1865,22 @@ final class FilmtoneEditorStore: ObservableObject {
     }
 
     func toggleFavoriteSavedLook(id: UUID) async {
-        guard let libraryStore else {
-            return
-        }
-        try? await libraryStore.toggleFavoriteLook(id: id)
+        await libraryController.toggleFavoriteLook(id: id)
         await refreshLibrarySnapshot()
     }
 
     func renameLibraryLut(id: UUID, title: String) async {
-        guard let libraryStore else {
-            return
-        }
-        try? await libraryStore.renameLut(id: id, title: title)
+        await libraryController.renameLut(id: id, title: title)
         await refreshLibrarySnapshot()
     }
 
     func deleteLibraryLut(id: UUID) async {
-        guard let libraryStore else {
-            return
-        }
-        _ = try? await libraryStore.deleteLut(id: id)
+        await libraryController.deleteLut(id: id)
         await refreshLibrarySnapshot()
     }
 
     func toggleFavoriteLibraryLut(id: UUID) async {
-        guard let libraryStore else {
-            return
-        }
-        try? await libraryStore.toggleFavoriteLut(id: id)
+        await libraryController.toggleFavoriteLut(id: id)
         await refreshLibrarySnapshot()
     }
 
@@ -2882,7 +2510,7 @@ final class FilmtoneEditorStore: ObservableObject {
         return uniqueURIs(uris)
     }
 
-    private func reclaimCacheForCurrentState() {
+    func reclaimCacheForCurrentState() {
         facade.reclaimCache(protecting: protectedCacheURIs)
     }
 
@@ -2895,10 +2523,10 @@ final class FilmtoneEditorStore: ObservableObject {
     /// export). Built-in catalog entries materialize without disk I/O via
     /// `FilmtoneBuiltInCatalog`, so the read is cheap.
     private func resolveAppliedSavedLookForExport() async -> SavedLookEntry? {
-        guard let lookId = appliedSavedLookId, let store = libraryStore else {
-            return nil
-        }
-        return try? await store.loadLook(id: lookId)
+        await projectController.resolveAppliedSavedLook(
+            id: appliedSavedLookId,
+            via: libraryController
+        )
     }
 
     private func discardLocalExportFiles(_ result: Phase0ExportResultDTO) {
@@ -2995,10 +2623,7 @@ final class FilmtoneEditorStore: ObservableObject {
             }
             #endif
         }
-        self.preview = .empty
-        self.comparePreviewFrame = nil
-        self.videoPreviewSession = nil
-        self.isCompareHeld = false
+        previewOrchestrator.reset()
         self.saveToPhotosState = .notRun
         self.isSavingToPhotos = false
         self.error = nil
@@ -3020,12 +2645,7 @@ final class FilmtoneEditorStore: ObservableObject {
     }
 
     private func invalidateRenderedOutputState() {
-        previewTask?.cancel()
-        previewTask = nil
-        preview = .empty
-        comparePreviewFrame = nil
-        videoPreviewSession = nil
-        isCompareHeld = false
+        previewOrchestrator.invalidateForProjectChange()
         exportResult = nil
         exportProgress = nil
         exportLocalAvailability = .none
@@ -3081,274 +2701,7 @@ final class FilmtoneEditorStore: ObservableObject {
     }
 
     private func schedulePreviewRender() {
-        previewTask?.cancel()
-
-        guard let source else {
-            videoPreviewSession = nil
-            preview = .empty
-            comparePreviewFrame = nil
-            return
-        }
-
-        previewTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-
-            let violations = FilmtonePhase0Math.sourceCapViolations(for: self.probe)
-            if !violations.isEmpty {
-                self.videoPreviewSession = nil
-                self.preview = .still(.init(
-                    originalPosterURI: nil,
-                    gradedPosterURI: nil,
-                    width: nil,
-                    height: nil,
-                    posterTimeSec: nil,
-                    isRendering: false,
-                    error: violations.joined(separator: "\n")
-                ))
-                self.comparePreviewFrame = nil
-                return
-            }
-
-            do {
-                try await Task.sleep(nanoseconds: FilmtonePhase0Math.previewRenderDebounceNanoseconds)
-                try Task.checkCancellation()
-
-                let request = try FilmtonePhase0Math.buildExportRequest(
-                    source: self.source,
-                    probe: self.probe,
-                    project: self.project
-                )
-
-                switch source.kind {
-                case .image:
-                    self.videoPreviewSession = nil
-                    self.markStillPreviewRendering()
-                    let result = try await self.facade.renderPreview(request: request)
-                    try Task.checkCancellation()
-                    self.preview = .still(.init(
-                        originalPosterURI: result.originalUri,
-                        gradedPosterURI: result.gradedUri,
-                        width: result.width,
-                        height: result.height,
-                        posterTimeSec: result.posterTimeSec,
-                        isRendering: false,
-                        error: nil
-                    ))
-                    self.comparePreviewFrame = self.makeCompareFrame(from: result)
-                    self.reclaimCacheForCurrentState()
-
-                case .video:
-                    do {
-                        try await self.prepareVideoPreview(request: request, source: source)
-                    } catch is CancellationError {
-                        throw CancellationError()
-                    } catch {
-                        let fallbackError = self.strings.userMessage(for: error, context: .preview)
-                        FilmtonePreviewRefreshDebug.log(
-                            "video preview failed for \(source.filename): \(error.localizedDescription); falling back to still preview"
-                        )
-                        try await self.renderStillFallbackPreview(
-                            request: request,
-                            errorMessage: fallbackError
-                        )
-                    }
-                }
-            } catch is CancellationError {
-                return
-            } catch {
-                self.applyPreviewError(self.strings.userMessage(for: error, context: .preview))
-            }
-        }
-    }
-
-    private func prepareVideoPreview(
-        request: Phase0ExportRequestDTO,
-        source: SourceInfoDTO
-    ) async throws {
-        if let videoPreviewSession, videoPreviewSession.sourceURI == source.uri {
-            try await refreshExistingVideoPreviewSession(videoPreviewSession, request: request)
-            return
-        }
-
-        FilmtonePreviewRefreshDebug.log("creating initial video preview session for \(source.filename)")
-        videoPreviewSession = nil
-        preview = .still(.init(isRendering: true))
-
-        async let originalPrepared = facade.makeOriginalPreviewItem(request: request)
-        async let gradedPrepared = facade.makeGradedPreviewItem(request: request)
-
-        let original = try await originalPrepared
-        let graded = try await gradedPrepared
-        try Task.checkCancellation()
-
-        let session = FilmtoneVideoPreviewSession(
-            sourceURI: source.uri,
-            original: original,
-            graded: graded
-        )
-        videoPreviewSession = session
-        syncPreviewFromVideoSession()
-        try await renderComparePreviewFrame(request: request)
-    }
-
-    private func refreshExistingVideoPreviewSession(
-        _ videoPreviewSession: FilmtoneVideoPreviewSession,
-        request: Phase0ExportRequestDTO
-    ) async throws {
-        FilmtonePreviewRefreshDebug.log("refreshing existing graded video preview item")
-        videoPreviewSession.beginPreparing()
-        videoPreviewSession.clearError()
-        syncPreviewFromVideoSession()
-
-        if FilmtonePreviewRefreshDebug.shouldForceVideoRefreshFailure {
-            FilmtonePreviewRefreshDebug.log("forcing video preview refresh failure via debug flag")
-            throw FilmtoneMediaError.exportFailed("Forced video preview refresh failure.")
-        }
-
-        let composition = try await facade.makeGradedPreviewComposition(
-            request: request,
-            asset: videoPreviewSession.gradedItem.asset
-        )
-        try Task.checkCancellation()
-        await videoPreviewSession.refreshPreparedGradedComposition(composition)
-        syncPreviewFromVideoSession()
-        try await renderComparePreviewFrame(request: request)
-    }
-
-    private func renderStillFallbackPreview(
-        request: Phase0ExportRequestDTO,
-        errorMessage: String
-    ) async throws {
-        let hadDisplayablePreview = hasDisplayablePreviewContent
-        if !hadDisplayablePreview {
-            videoPreviewSession = nil
-            markStillPreviewRendering()
-        }
-
-        do {
-            let result = try await facade.renderPreview(request: request)
-            try Task.checkCancellation()
-            videoPreviewSession = nil
-            preview = .still(.init(
-                originalPosterURI: result.originalUri,
-                gradedPosterURI: result.gradedUri,
-                width: result.width,
-                height: result.height,
-                posterTimeSec: result.posterTimeSec,
-                isRendering: false,
-                error: errorMessage
-            ))
-            comparePreviewFrame = makeCompareFrame(from: result)
-            reclaimCacheForCurrentState()
-        } catch is CancellationError {
-            throw CancellationError()
-        } catch {
-            applyPreviewError(errorMessage)
-        }
-    }
-
-    private func renderComparePreviewFrame(request: Phase0ExportRequestDTO) async throws {
-        do {
-            let result = try await facade.renderPreview(request: request)
-            try Task.checkCancellation()
-            comparePreviewFrame = makeCompareFrame(from: result)
-            reclaimCacheForCurrentState()
-        } catch is CancellationError {
-            throw CancellationError()
-        } catch {
-            FilmtonePreviewRefreshDebug.log(
-                "compare preview frame failed: \(error.localizedDescription)"
-            )
-        }
-    }
-
-    private func makeCompareFrame(
-        from result: Phase0PreviewRenderResultDTO
-    ) -> FilmtoneComparePreviewFrame? {
-        FilmtoneComparePreviewFrame(
-            originalURI: result.originalUri,
-            gradedURI: result.gradedUri,
-            width: result.width,
-            height: result.height,
-            posterTimeSec: result.posterTimeSec
-        )
-    }
-
-    private func syncPreviewFromVideoSession() {
-        if let videoPreviewSession {
-            preview = .video(videoPreviewSession.snapshot)
-        } else if case .video = preview {
-            preview = .empty
-        }
-    }
-
-    private var hasDisplayablePreviewContent: Bool {
-        if comparePreviewFrame != nil {
-            return true
-        }
-
-        switch preview {
-        case .empty:
-            return false
-        case .still(let preview):
-            return preview.originalPosterURI != nil || preview.gradedPosterURI != nil
-        case .video:
-            return true
-        }
-    }
-
-    private func markStillPreviewRendering() {
-        guard case .still(let current) = preview else {
-            preview = .still(.init(isRendering: true))
-            return
-        }
-
-        preview = .still(.init(
-            originalPosterURI: current.originalPosterURI,
-            gradedPosterURI: current.gradedPosterURI,
-            width: current.width,
-            height: current.height,
-            posterTimeSec: current.posterTimeSec,
-            isRendering: true,
-            error: current.error
-        ))
-    }
-
-    private func applyPreviewError(_ message: String) {
-        guard hasDisplayablePreviewContent else {
-            videoPreviewSession = nil
-            preview = .still(.init(
-                originalPosterURI: nil,
-                gradedPosterURI: nil,
-                width: nil,
-                height: nil,
-                posterTimeSec: nil,
-                isRendering: false,
-                error: message
-            ))
-            comparePreviewFrame = nil
-            return
-        }
-
-        if let videoPreviewSession {
-            videoPreviewSession.setError(message)
-            syncPreviewFromVideoSession()
-            return
-        }
-
-        guard case .still(let current) = preview else {
-            return
-        }
-
-        preview = .still(.init(
-            originalPosterURI: current.originalPosterURI,
-            gradedPosterURI: current.gradedPosterURI,
-            width: current.width,
-            height: current.height,
-            posterTimeSec: current.posterTimeSec,
-            isRendering: false,
-            error: message
-        ))
+        previewOrchestrator.schedule()
     }
 
     private func persist() {
@@ -3384,7 +2737,7 @@ private extension ParsedCubeLutDTO {
     }
 }
 
-private extension AVPlayer {
+extension AVPlayer {
     func filmtoneSeek(to time: CMTime) async {
         await withCheckedContinuation { continuation in
             seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { _ in
@@ -3394,7 +2747,7 @@ private extension AVPlayer {
     }
 }
 
-private extension Double {
+extension Double {
     var filmtoneSanitizedSeconds: Double {
         guard isFinite, !isNaN else {
             return 0
@@ -3403,7 +2756,7 @@ private extension Double {
     }
 }
 
-private enum FilmtonePreviewRefreshDebug {
+enum FilmtonePreviewRefreshDebug {
     private static let processParamKeys: Set<String> = [
         "cyan",
         "magenta",
