@@ -1,128 +1,149 @@
-# Active - Phase 2B-6A GradeRenderPipeline Color Stage Extraction
+# Active - Phase 2B-7A ExportMediaWriter Primitive Extraction
 
 Date: 2026-05-11 JST
 Phase: Phase 2B - ExportSession public-surface split
-Milestone: Start the GradeRenderPipeline split by moving the non-optics
-color stages and LUT application out of `FilmtoneExportSession`.
+Milestone: Start the ExportMediaWriter split by moving writer setup,
+reader-output setup, audio append, finish/wait, and CMTime helpers out of
+`FilmtoneExportSession`.
 
 ## Owner Directive
 
 - Essence first: keep shrinking `FilmtoneExportSession` toward a thin
-  orchestrator. Do not turn this into another inventory-only pass.
-- Product quality is the bar: grade math, LUT application, kernel
-  selection, kernel argument order, and stage order must stay equivalent.
-- Outer shell minimal: no new XCTest, simulator smoke, PNG/PSNR fixture, or
-  formal QA matrix in this sub-stage. Run the focused gates below.
+  export orchestrator. This is implementation work, not inventory.
+- Product quality is the bar: writer settings, reader pixel formats,
+  audio settings, cancellation behavior, wait timeouts, and presentation
+  time math must stay equivalent.
+- Outer shell minimal: no new XCTest, simulator smoke, PNG/PSNR fixture,
+  or formal QA matrix in this sub-stage. Run the focused gates below.
 - No extension-only split. The target is an independent
-  `GradeRenderPipeline` type under `Export/Internal/`.
+  `ExportMediaWriter` type under `Export/Internal/`.
 
 ## Goal
 
-Create `Export/Internal/GradeRenderPipeline.swift` and move the pure
-color-stage half of the grade pipeline out of `FilmtoneExportSession`.
+Create `Export/Internal/ExportMediaWriter.swift` and move media writer /
+reader primitives out of `FilmtoneExportSession`.
 
-This is 2B-6A, not the entire GradeRenderPipeline final form. It moves the
-stages that do not need ExportSession decode/write state:
+This is 2B-7A, not the full video-loop extraction. Keep `exportVideo` and
+`exportStillImage` on `FilmtoneExportSession` for now, but route their
+writer setup, reader output setup, audio append, finish/wait, and timing
+helpers through `ExportMediaWriter`.
 
-- input LUT application
-- base grade kernel dispatch
-- tone compression kernel dispatch
-- creative LUT application
-- print stage kernel dispatch
-- shared LUT application helper
-
-`FilmtoneExportSession.applyGrade` keeps the stage ordering for now and
-delegates these color stages to `GradeRenderPipeline`. The optics stages
-remain delegated to `OpticsCompositor`; grain remains on ExportSession in
-this sub-stage because it depends on `sourceSeed` and time.
-
-## Live Inventory As Of 2B-5B
-
-### Fields to move or route
-
-| Member | Current line | 2B-6A owner | Notes |
-|---|---:|---|---|
-| `preparedInputLut` | 88 | `GradeRenderPipeline` | Built in `FilmtoneExportSession.init`, then passed to pipeline init. |
-| `preparedCreativeLut` | 89 | `GradeRenderPipeline` | Same as above. |
-| `outputColorSpace` | 91 | keep on `FilmtoneExportSession`, pass to pipeline | Still used by render profiler, motion blur, sidecar/profile paths. Do not move ownership. |
+## Live Inventory As Of 2B-6A
 
 ### Methods to move
 
 | Method | Current line | New shape |
 |---|---:|---|
-| `applyInputLutStage(to:)` | 1728 | `GradeRenderPipeline.applyInputLutStage(to:)` |
-| `applyBaseGradeStage(to:params:presetVersion:)` | 1735 | `GradeRenderPipeline.applyBaseGradeStage(to:params:presetVersion:)` |
-| `applyToneCompressionStage(to:params:presetVersion:)` | 1797 | `GradeRenderPipeline.applyToneCompressionStage(to:params:presetVersion:)` |
-| `applyCreativeLutStage(to:)` | 1846 | `GradeRenderPipeline.applyCreativeLutStage(to:)` |
-| `applyPrintStage(to:params:)` | 1853 | `GradeRenderPipeline.applyPrintStage(to:params:)` |
-| `applyLut(_:to:)` | 1877 | private helper on `GradeRenderPipeline` |
+| `makeWriter(outputSize:)` | 1361 | `ExportMediaWriter.makeWriter(outputSize:)` |
+| `makeVideoInput(outputSize:)` | 1367 | `ExportMediaWriter.makeVideoInput(outputSize:)` |
+| `makeVideoReaderOutput(for:reader:codecFamily:)` | 1389 | `ExportMediaWriter.makeVideoReaderOutput(for:reader:codecFamily:)` |
+| `makeAudioPipeline(for:)` | 1421 | `ExportMediaWriter.makeAudioPipeline(for:)` |
+| `appendAudioSample(_:audioInput:writer:reader:waitForReady:)` | 1844 | `ExportMediaWriter.appendAudioSample(_:audioInput:writer:reader:waitForReady:checkCancelled:)` |
+| `finish(writer:)` | 1862 | `ExportMediaWriter.finish(writer:checkCancelled:)` |
+| `validPresentationTime(for:)` | 1882 | `ExportMediaWriter.validPresentationTime(for:)` |
+| `nonNegativeTime(_:)` | 1890 | `ExportMediaWriter.nonNegativeTime(_:)` |
+| `absoluteSecondsBetween(_:_:)` | 1897 | `ExportMediaWriter.absoluteSecondsBetween(_:_:)` |
+| `waitUntilReadyForMoreMediaData(_:writer:reader:label:)` | 1936 | `ExportMediaWriter.waitUntilReadyForMoreMediaData(_:writer:reader:label:checkCancelled:)` |
 
-### Methods to keep on ExportSession in 2B-6A
+### Cleanup in scope
+
+`estimatedVideoFrameRate(for:)` currently has zero callers. Verify again
+after the move and delete it in this sub-stage if it remains unused.
+
+### Methods to keep on ExportSession in 2B-7A
 
 | Method | Reason |
 |---|---|
-| `applyGrade(to:timeSeconds:stageProfilingOutputSize:)` | Keeps total stage order while 2B-6A extracts color stages. |
-| `applyLivePreviewGrade(to:timeSeconds:mode:)` | Public/internal surface used by preview/shared grade consumers. |
-| `applyRecordingMonitorGrade(to:)` | Rewire its color stage calls, but keep the method on ExportSession for now. |
-| `applyGrainStage(to:params:timeSeconds:)` | Depends on `sourceSeed` and belongs to a later grade/grain boundary decision. |
-| `profileRenderSubstage` | Profiling lifecycle stays on ExportSession for now. |
+| `exportVideo(progress:highlightSegments:)` | Owns orchestration, depth matching, highlight timeline, progress, and frame loop for now. |
+| `exportStillImage(progress:)` | Owns still export orchestration and still render path for now. |
+| `appendVideoSample(...)` | Still calls `renderableImage`, `ciContext.render`, `attachOutputColorMetadata`, and performance signposts; move in a later writer-loop pass if needed. |
+| `renderableImage` / `scaled*` / `sourceVideoImage` / `attachOutputColorMetadata` | Render pipeline and source image conversion stay on ExportSession for this sub-stage. |
+| `renderingProgress` | Progress policy remains on ExportSession with the video loop for now. |
+| `checkCancelled` | Session cancellation flag remains on ExportSession; pass it as a closure to writer helpers. |
 
 ## Intended Implementation Shape
 
 Add:
 
 ```swift
-final class GradeRenderPipeline {
-    private let preparedInputLut: PreparedLut?
-    private let preparedCreativeLut: PreparedLut?
-    private let outputColorSpace: CGColorSpace
+final class ExportMediaWriter {
+    private let outputURL: URL
+    private let outputFPS: Int
+    private let colorPipeline: FilmtoneColorPipelineContract
 
     init(
-        preparedInputLut: PreparedLut?,
-        preparedCreativeLut: PreparedLut?,
-        outputColorSpace: CGColorSpace
+        outputURL: URL,
+        outputFPS: Int,
+        colorPipeline: FilmtoneColorPipelineContract
     )
 
-    func applyInputLutStage(to image: CIImage) -> CIImage
-    func applyBaseGradeStage(
-        to image: CIImage,
-        params: Phase0ParamsDTO,
-        presetVersion: String
-    ) -> CIImage
-    func applyToneCompressionStage(
-        to image: CIImage,
-        params: Phase0ParamsDTO,
-        presetVersion: String
-    ) -> CIImage
-    func applyCreativeLutStage(to image: CIImage) -> CIImage
-    func applyPrintStage(to image: CIImage, params: Phase0ParamsDTO) -> CIImage
+    func makeWriter(outputSize: CGSize) throws -> AVAssetWriter
+    func makeVideoInput(outputSize: CGSize) -> AVAssetWriterInput
+    func makeVideoReaderOutput(
+        for track: AVAssetTrack,
+        reader: AVAssetReader,
+        codecFamily: SourceCodecFamilyDTO?
+    ) -> (output: AVAssetReaderTrackOutput, degradedDecodePath: Bool)?
+    func makeAudioPipeline(
+        for track: AVAssetTrack
+    ) -> (input: AVAssetWriterInput, output: AVAssetReaderTrackOutput)
+    func appendAudioSample(
+        _ sampleBuffer: CMSampleBuffer,
+        audioInput: AVAssetWriterInput,
+        writer: AVAssetWriter,
+        reader: AVAssetReader,
+        waitForReady: Bool,
+        checkCancelled: () throws -> Void
+    ) throws
+    func finish(
+        writer: AVAssetWriter,
+        checkCancelled: () throws -> Void
+    ) throws
+    func waitUntilReadyForMoreMediaData(
+        _ input: AVAssetWriterInput,
+        writer: AVAssetWriter,
+        reader: AVAssetReader?,
+        label: String,
+        checkCancelled: () throws -> Void
+    ) throws
+
+    static func validPresentationTime(for sampleBuffer: CMSampleBuffer) -> CMTime
+    static func nonNegativeTime(_ time: CMTime) -> CMTime
+    static func absoluteSecondsBetween(_ lhs: CMTime, _ rhs: CMTime) -> Double
 }
 ```
 
-`applyLut(_:,to:)` should become a private helper on the new type.
-
 In `FilmtoneExportSession`:
 
-- replace `preparedInputLut` / `preparedCreativeLut` stored properties
-  with `private let gradeRenderPipeline: GradeRenderPipeline`.
-- keep building prepared LUTs in `init` with the existing
-  `ExportInputLutBuilder` calls and legacy creative LUT fallback. Assign
-  them to local constants and pass them into `GradeRenderPipeline`.
-- replace call sites in `applyGrade` and `applyRecordingMonitorGrade`:
-  `applyInputLutStage` → `gradeRenderPipeline.applyInputLutStage`, etc.
-- keep `outputColorSpace` on `FilmtoneExportSession`; pass it into
-  `GradeRenderPipeline` init.
+- add `private let mediaWriter: ExportMediaWriter`.
+- initialize it after `outputURL`, `colorPipeline`, and `outputColorSpace`
+  are available:
+  `ExportMediaWriter(outputURL: outputURL, outputFPS: request.output.fps,
+  colorPipeline: colorPipeline)`.
+- replace call sites:
+  - `makeWriter` → `mediaWriter.makeWriter`
+  - `makeVideoInput` → `mediaWriter.makeVideoInput`
+  - `makeVideoReaderOutput` → `mediaWriter.makeVideoReaderOutput`
+  - `makeAudioPipeline` → `mediaWriter.makeAudioPipeline`
+  - `appendAudioSample` → `mediaWriter.appendAudioSample(..., checkCancelled: checkCancelled)`
+  - `finish(writer:)` → `mediaWriter.finish(writer: writer, checkCancelled: checkCancelled)`
+  - `waitUntilReadyForMoreMediaData` call sites inside still/video paths →
+    `mediaWriter.waitUntilReadyForMoreMediaData(..., checkCancelled: checkCancelled)`
+  - `Self.validPresentationTime` / `Self.nonNegativeTime` /
+    `Self.absoluteSecondsBetween` → `ExportMediaWriter.<name>`.
+- keep `appendVideoSample` on ExportSession, but route its wait call to
+  `mediaWriter.waitUntilReadyForMoreMediaData`.
 
 ## Edit Targets
 
 - `apps/capacitor-film-lab-ios/ios/App/App/Export/FilmtoneExportSession.swift`
-  - remove moved color-stage methods and prepared LUT storage
-  - add one `gradeRenderPipeline` collaborator
-  - delegate color stage calls from full preview and recording monitor paths
-- `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/GradeRenderPipeline.swift`
+  - add `mediaWriter`
+  - remove moved writer/reader/audio/timing helpers
+  - rewire call sites
+- `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportMediaWriter.swift`
   - new file
 - `apps/capacitor-film-lab-ios/ios/App/App.xcodeproj/project.pbxproj`
-  - 4-section registration for `GradeRenderPipeline.swift`
+  - 4-section registration for `ExportMediaWriter.swift`
 - `docs/filmtone/ios/feature-architecture-refactor/active.md`
   - update checklist and unexpected notes as implementation proceeds
 
@@ -132,38 +153,34 @@ In `FilmtoneExportSession`:
   - commit gate and 4-section pbxproj rule
 - `docs/filmtone/ios/feature-architecture-refactor/strategy.md`
   - Phase 2B / 2C milestones
-- `docs/filmtone/ios/feature-architecture-refactor/archive/2026-05-11-phase-2b-5b-optics-compositor-extraction.md`
-  - precedent for stateful collaborator extraction
+- `docs/filmtone/ios/feature-architecture-refactor/archive/2026-05-11-phase-2b-6a-grade-render-pipeline-color-stages.md`
+  - latest export split precedent
+- `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/GradeRenderPipeline.swift`
+  - grade collaborator, read-only in 2B-7A
 - `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/OpticsCompositor.swift`
-  - current optics collaborator, read-only in 2B-6A
-- `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/OpticalKernels.swift`
-  - kernel definitions, read-only
-- `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportInputLutBuilder.swift`
-  - prepared LUT factory, read-only
+  - optics collaborator, read-only in 2B-7A
 
 ## Checklist
 
-- [ ] Create `Export/Internal/GradeRenderPipeline.swift` with the imports
-  required by moved methods (`CoreGraphics`, `CoreImage`, `FilmLabSwiftCore`
-  if needed for `Phase0ParamsDTO`, `Foundation` only if the compiler needs
-  it).
-- [ ] Move `preparedInputLut` / `preparedCreativeLut` ownership into
-  `GradeRenderPipeline`.
-- [ ] Keep `outputColorSpace` on `FilmtoneExportSession` and pass it into
-  `GradeRenderPipeline`.
-- [ ] Move the six methods listed above into `GradeRenderPipeline`.
-- [ ] Rewire `applyGrade` color stage calls to `gradeRenderPipeline`.
-- [ ] Rewire `applyRecordingMonitorGrade` color stage calls to
-  `gradeRenderPipeline`.
-- [ ] Register `GradeRenderPipeline.swift` in pbxproj 4 sections.
+- [ ] Create `Export/Internal/ExportMediaWriter.swift` with imports needed
+  by moved methods (`AVFoundation`, `CoreGraphics`, `CoreVideo`,
+  `FilmLabSwiftCore`, `Foundation`; trim only if build feedback shows
+  unused import concerns).
+- [ ] Add `private let mediaWriter: ExportMediaWriter` to
+  `FilmtoneExportSession`.
+- [ ] Move the 10 methods listed in "Methods to move" into
+  `ExportMediaWriter`.
+- [ ] Rewire all call sites listed in "Intended Implementation Shape".
+- [ ] Keep `appendVideoSample` on `FilmtoneExportSession` and route only
+  its wait call through `mediaWriter`.
+- [ ] Delete `estimatedVideoFrameRate(for:)` if repeated grep confirms
+  zero callers.
+- [ ] Register `ExportMediaWriter.swift` in pbxproj 4 sections.
 - [ ] Verify
-  `rg -n "private func (applyInputLutStage|applyBaseGradeStage|applyToneCompressionStage|applyCreativeLutStage|applyPrintStage|applyLut)" apps/capacitor-film-lab-ios/ios/App/App/Export/FilmtoneExportSession.swift`
+  `rg -n "private func (makeWriter|makeVideoInput|makeVideoReaderOutput|makeAudioPipeline|appendAudioSample|finish|waitUntilReadyForMoreMediaData|estimatedVideoFrameRate)|private static func (validPresentationTime|nonNegativeTime|absoluteSecondsBetween)" apps/capacitor-film-lab-ios/ios/App/App/Export/FilmtoneExportSession.swift`
   returns 0 hits.
-- [ ] Verify
-  `rg -n "preparedInputLut|preparedCreativeLut" apps/capacitor-film-lab-ios/ios/App/App/Export/FilmtoneExportSession.swift`
-  returns only expected init-local or `GradeRenderPipeline` init argument
-  references, not stored properties.
-- [ ] `grep -c 'GradeRenderPipeline.swift' apps/capacitor-film-lab-ios/ios/App/App.xcodeproj/project.pbxproj`
+- [ ] Verify `appendVideoSample` still exists on ExportSession.
+- [ ] `grep -c 'ExportMediaWriter.swift' apps/capacitor-film-lab-ios/ios/App/App.xcodeproj/project.pbxproj`
   is 4.
 - [ ] `bun run verify:ios` passes.
 - [ ] `git diff --check` passes.
@@ -172,52 +189,59 @@ In `FilmtoneExportSession`:
 
 Minimum gates for this sub-stage:
 
-- pbxproj 4-section grep for `GradeRenderPipeline.swift`
-- moved-method grep shows ExportSession no longer declares the six color
-  stage helpers
-- prepared LUT grep shows ExportSession no longer owns prepared LUT state
+- pbxproj 4-section grep for `ExportMediaWriter.swift`
+- moved writer/timing method grep shows ExportSession no longer declares
+  those helpers
+- `appendVideoSample` still exists on ExportSession
 - `bun run verify:ios`
 - `git diff --check`
 
-Do not add sidecar canonical fixtures, PNG byte-diff fixtures, or
-simulator smoke in 2B-6A unless the implementation changes behavior beyond
-extraction.
+Do not add simulator smoke, sidecar canonical fixtures, or PNG byte-diff
+fixtures in 2B-7A unless implementation changes behavior beyond extraction.
 
 ## Done Conditions
 
-- `FilmtoneExportSession.swift` delegates input LUT, base grade, tone
-  compression, creative LUT, and print stage work to `GradeRenderPipeline`.
-- `GradeRenderPipeline` owns prepared LUT state and LUT application.
-- `outputColorSpace` remains available to ExportSession users that already
-  need it.
-- `applyGrade` stage order remains:
-  input LUT → base grade → tone compression → edge optics → glow family →
-  vignette → grain → creative LUT → print.
-- `applyRecordingMonitorGrade` keeps its current reduced stage list:
-  input LUT → base grade → tone compression → creative LUT → print.
-- Kernel selection for `presetVersion` and kernel argument order remain
-  equivalent.
-- Public API, view code, sidecar schema, and DTO schema are untouched.
+- `FilmtoneExportSession.swift` delegates writer setup, video reader output
+  setup, audio pipeline setup, audio append, finish, wait, and CMTime helper
+  work to `ExportMediaWriter`.
+- Writer output settings remain equivalent:
+  - `.mp4`
+  - H.264 codec
+  - `AVVideoAverageBitRateKey = max(width * height * 6, 3_000_000)`
+  - `AVVideoExpectedSourceFrameRateKey = request.output.fps`
+  - `AVVideoProfileLevelH264HighAutoLevel`
+  - `AVVideoAllowFrameReorderingKey = false`
+  - `colorPipeline.writerColorProperties`
+- Reader output pixel format candidate order remains equivalent:
+  ProRes 422 → `422YpCbCr16`, `64RGBAHalf`, `32BGRA`; non-ProRes →
+  `32BGRA`.
+- Audio output/input settings remain equivalent.
+- Wait timeout remains 15 seconds; finish timeout remains 30 seconds.
+- Cancellation checks still use ExportSession's `checkCancelled`.
+- `exportVideo`, `exportStillImage`, `appendVideoSample`, render image
+  conversion, sidecar schema/order, and public API remain unchanged.
 - `bun run verify:ios` and `git diff --check` are green.
 
 ## Stop Conditions
 
-- Stop if moving these methods requires changing `applyGrade` stage order.
-- Stop if `OpticalKernels` source strings or kernel argument order need to
-  change.
-- Stop if `outputColorSpace` ownership would need to leave ExportSession.
+- Stop if moving primitives requires changing video frame loop order,
+  depth matching, highlight-reel timeline selection, or render timing.
+- Stop if writer/reader settings need to change.
+- Stop if `appendVideoSample` must move in this sub-stage to make the build
+  pass; that is a larger writer-loop extraction and should be scoped
+  separately.
 - Stop if sidecar schema/order or `FilmtoneExportSidecarBuilder` needs to
   change.
 - Stop after 3 consecutive build or `verify:ios` failures.
 
 ## Out Of Scope
 
-- Moving `applyGrade` itself.
-- Moving `applyLivePreviewGrade`.
-- Moving `applyRecordingMonitorGrade` itself.
-- Moving `applyGrainStage`.
-- Changing `OpticsCompositor`.
-- `ExportMediaWriter`.
+- Moving `exportVideo` or `exportStillImage`.
+- Moving `appendVideoSample`.
+- Moving render image conversion (`renderableImage`, `sourceVideoImage`,
+  `attachOutputColorMetadata`, scaled source helpers).
+- Changing `GradeRenderPipeline` or `OpticsCompositor`.
+- Export performance metric redesign.
 - Phase 2C parity fixtures.
 - New XCTest, simulator smoke, or formal QA matrix.
 - Any view code or public DTO/API schema change.
@@ -232,8 +256,8 @@ Article Opportunity: Developer note only after the broader ExportSession
 split is complete, not for this sub-stage alone.
 
 Change-History Opportunity: Mention in the eventual lane summary that
-grade color stages became a separate pipeline after optics state moved to
-`OpticsCompositor`.
+writer/reader primitives became an explicit `ExportMediaWriter` boundary
+before the full video-loop extraction.
 
 ## Unexpected / Follow-up
 

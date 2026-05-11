@@ -229,3 +229,15 @@ Total: 11-13 working days.
   move left them with zero callers. pbxproj 4-section grep = 4;
   `bun run verify:ios` green; `git diff --check` clean. See
   `archive/2026-05-11-phase-2b-5b-optics-compositor-extraction.md`.
+- 2026-05-11 JST — Phase 2B-6A (GradeRenderPipeline color-stage
+  extraction) committed as `4c18c763`. New `final class
+  GradeRenderPipeline` at
+  `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/GradeRenderPipeline.swift`
+  (175 lines) now owns prepared input / creative LUT state and the
+  non-optics color stages: input LUT, base grade, tone compression,
+  creative LUT, print, and LUT application. `FilmtoneExportSession.swift`
+  reduced from 2400 → 2262 lines (−138) while preserving the full
+  `applyGrade` stage order and recording-monitor reduced stage list.
+  pbxproj 4-section grep = 4; `bun run verify:ios` green;
+  `git diff --check` clean. See
+  `archive/2026-05-11-phase-2b-6a-grade-render-pipeline-color-stages.md`.
