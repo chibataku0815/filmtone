@@ -215,3 +215,17 @@ Total: 11-13 working days.
   pbxproj 4-section grep = 4; `bun run verify:ios` green;
   `git diff --check` clean. See
   `archive/2026-05-11-phase-2b-5a-optics-resampling-extraction.md`.
+- 2026-05-11 JST — Phase 2B-5B (stateful optics compositor extraction)
+  committed as `ca6579a3`. New `final class OpticsCompositor` at
+  `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/OpticsCompositor.swift`
+  (671 lines) now owns the Metal optics gate / renderer lifecycle,
+  once-per-export Metal telemetry flags, per-frame vignette skip flag,
+  Backlight Veil profile resolution, edge optics, glow family, vignette,
+  CI fallback path, and depth-prefilter timing accumulation.
+  `FilmtoneExportSession.swift` reduced from 2984 → 2400 lines (−584)
+  and delegates optics stages through the compositor while keeping
+  `loadedDepthMap` lifetime on the session. Two now-dead private
+  `FilmtoneExportSession.clamp` / `lerp` helpers were deleted after the
+  move left them with zero callers. pbxproj 4-section grep = 4;
+  `bun run verify:ios` green; `git diff --check` clean. See
+  `archive/2026-05-11-phase-2b-5b-optics-compositor-extraction.md`.
