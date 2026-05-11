@@ -1,4 +1,4 @@
-Filmtoneは、動画と写真の色をMac上で確認・調整し、ローカルに書き出せるネイティブmacOSアプリです。
+Filmtoneは、動画の色をMac上で確認・調整し、ローカルに書き出せるネイティブmacOSアプリです。静止画も同じ編集画面で扱えます。
 
 Lookを選び、Quick controlsでトーンを整え、必要に応じてSource Profile / Camera Conversionを切り替えられます。Before/Afterの分割比較で色を確かめてから、選択したフォルダへ書き出せます。
 

@@ -65,6 +65,8 @@ const highImpactKeyParts = [
   "og",
 ];
 
+const mechanicsLeadKeyParts = ["hero", "title", "ogtitle"];
+
 const roleWords = [
   "試す",
   "保存",
@@ -181,10 +183,26 @@ const rules = [
       /世界観/,
       /雰囲気/,
       /空気感/,
+      /フィルムの空気/,
       /\bcinematic\b/i,
       /movie[-\s]?like/i,
       /film snapshots/i,
       /\batmosphere\b/i,
+    ],
+  },
+  {
+    id: "overpromise",
+    appliesToKeywords: false,
+    reason: "Overpromised ease or professional result is not supportable copy.",
+    rewrite:
+      "Name the real workflow: start from a Preset or Look, compare, then save/share/export.",
+    patterns: [
+      /誰でも簡単/,
+      /プロ級/,
+      /魔法/,
+      /\bperfect\b/i,
+      /\bbest\b/i,
+      /\bfor everyone\b/i,
     ],
   },
 ];
@@ -226,6 +244,11 @@ function isStyleSkipped(key) {
 function isHighImpact(key) {
   const normalized = key.toLowerCase();
   return highImpactKeyParts.some((part) => normalized.includes(part));
+}
+
+function isMechanicsLeadSurface(key) {
+  const normalized = key.toLowerCase();
+  return mechanicsLeadKeyParts.some((part) => normalized.includes(part));
 }
 
 function hasAny(text, words) {
@@ -275,9 +298,15 @@ function checkRulePatterns({ file, key, text, isKeywords }) {
 function checkCategoryAsValue({ file, key, text, isKeywords }) {
   if (isKeywords || isStyleSkipped(key) || !isHighImpact(key)) return;
   const patterns = [
+    /画像や動画/,
+    /写真動画/,
+    /動画と写真/,
+    /動画や写真/,
     /写真と動画/,
     /写真や動画/,
     /写真・動画/,
+    /images or videos/i,
+    /image or video/i,
     /photos and videos/i,
     /photo and video/i,
     /photo\s*&\s*video/i,
@@ -293,6 +322,31 @@ function checkCategoryAsValue({ file, key, text, isKeywords }) {
         reason: "Media categories are being used as the value proposition.",
         rewrite:
           "Lead with Filmtone's action or decision path instead of category coverage.",
+      });
+    }
+  }
+}
+
+function checkMechanicsFirst({ file, key, text, isKeywords }) {
+  if (isKeywords || isStyleSkipped(key) || !isMechanicsLeadSurface(key)) return;
+  const patterns = [
+    /(^|\n)\s*LUT[でと]/,
+    /(^|\n)\s*Tune color with LUTs/i,
+    /(^|\n)\s*(コーデック|パイプライン|シェーダー|スキーマ|サイドカー|アーキテクチャ)/,
+    /(^|\n)\s*(codec|pipeline|shader|schema|sidecar|architecture)\b/i,
+  ];
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) {
+      addFinding({
+        file,
+        key,
+        rule: "mechanics-first-copy",
+        matched: match[0].trim(),
+        reason:
+          "The line leads with implementation mechanics instead of the reader's desired result.",
+        rewrite:
+          "Lead with the wanted finish or decision, then use LUT/codec/pipeline details only as proof or feature copy.",
       });
     }
   }
@@ -325,12 +379,50 @@ function checkSurfaceWithoutRole({ file, key, text, isKeywords }) {
   });
 }
 
+function checkReversibilityBuffer({ file, key, text, isKeywords }) {
+  if (isKeywords || isStyleSkipped(key) || !isHighImpact(key)) return;
+  const patterns = [
+    /完全に/,
+    /必ず/,
+    /すべての/,
+    /全ての/,
+    /全端末/,
+    /全機種/,
+    /唯一/,
+    /決して/,
+    /保証/,
+    /\balways\b/i,
+    /\bnever\b/i,
+    /\bguaranteed\b/i,
+    /\bperfectly\b/i,
+    /\ball devices\b/i,
+    /\bevery device\b/i,
+  ];
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) {
+      addFinding({
+        file,
+        key,
+        rule: "reversibility-buffer",
+        matched: match[0],
+        reason:
+          "This high-impact copy uses a totalizing or hard-to-correct expression.",
+        rewrite:
+          "Scope the claim with language such as current/public version, supported devices, this release, or easier to verify/use.",
+      });
+    }
+  }
+}
+
 function checkText({ file, key, text, isKeywords = false }) {
   if (!text.trim()) return;
   checkRulePatterns({ file, key, text, isKeywords });
   checkCategoryAsValue({ file, key, text, isKeywords });
+  checkMechanicsFirst({ file, key, text, isKeywords });
   checkFeatureListCopy({ file, key, text, isKeywords });
   checkSurfaceWithoutRole({ file, key, text, isKeywords });
+  checkReversibilityBuffer({ file, key, text, isKeywords });
 }
 
 function walkStrings(value, prefix, visit) {

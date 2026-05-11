@@ -255,7 +255,7 @@
     "closeParamsPanelAria": "Close parameters panel",
     "lp": {
       "heroEyebrow": "Filmtone",
-      "heroTitle": "Tune color with LUTs,\nexport a film look.",
+      "heroTitle": "Start from a look,\nfinish the color.",
       "heroBody": "Filmtone is a LUT and film-look editor for shaping color before export. Start from a preset, adjust brightness, contrast, saturation, and bloom, then compare before/after or judge the grade in playback. Add grain when you want a finer finish, try it in the browser, save/share locally on iPhone, or check and export deeper on Mac.",
       "heroSubtitle": "Start from presets, add soft bloom, compare before/after, then save or share locally.",
       "heroPrimaryCta": "Finish on Mac",
@@ -430,9 +430,9 @@
     },
     "metadata": {
       "title": "Filmtone",
-      "description": "A real-time color grading tool in the browser. Drop images or videos, then adjust exposure, contrast, and LUT with GPU fragment shaders.",
+      "description": "A real-time browser color grading tool for trying presets, Looks, exposure, contrast, and LUT adjustments on your own media.",
       "ogTitle": "Filmtone — Browser Color Grading Tool",
-      "ogDescription": "Drop an image or video and grade it in real-time. Exposure, contrast, LUT, and film presets powered by WebGL2 GPU shaders.",
+      "ogDescription": "Open your media and grade it in real time with exposure, contrast, LUT, and film presets powered by WebGL2 GPU shaders.",
       "ogImageAlt": "Filmtone Color Grading Tool"
     },
     "share": {

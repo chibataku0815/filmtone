@@ -15,6 +15,7 @@
     "dev:ios": "bun run build:core && bun run generate:ios-swift && bun run --cwd apps/capacitor-film-lab-ios dev",
     "open:ios": "./scripts/open-filmtone-ios.sh",
     "check:filmtone-copy": "node scripts/check-filmtone-copy-quality.mjs",
+    "check:filmtone-context": "node scripts/check-filmtone-context-sync.mjs",
     "build:desktop": "bun run --cwd apps/desktop-film-lab-batch build",
     "build:ios": "bun run build:core && bun run generate:ios-swift && bun run --cwd apps/capacitor-film-lab-ios build && bun run --cwd apps/capacitor-film-lab-ios cap:sync:ios",
     "build:core": "bun run --cwd packages/film-lab-core build",

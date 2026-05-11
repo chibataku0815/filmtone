@@ -16,6 +16,8 @@ Filmtone (Desktop / iOS / Web support) のリリース・実装 handoff ドキ�
 | ファイル | 用途 |
 |---|---|
 | [`filmtone-copy-quality-harness.md`](./filmtone-copy-quality-harness.md) | Copy quality harness |
+| [`filmtone-copy-context-sync.md`](./filmtone-copy-context-sync.md) | Implementation changes と copy / history claim の同期ルール |
+| [`filmtone-implementation-history.md`](./filmtone-implementation-history.md) | WebGPU / WebGL → React + Capacitor → native SwiftUI / AVFoundation の実装経緯 |
 | [`filmtone-release-version-sources.md`](./filmtone-release-version-sources.md) | Filmtone release version の正本ソース一覧 |
 | [`web/filmtone-lp-copy-handoff-2026-05-05-jst.md`](./web/filmtone-lp-copy-handoff-2026-05-05-jst.md) | LP copy discussion handoff; do not implement portfolio LP copy from this without a fresh copy decision |
 | [`archive/cross-cutting-legacy-2026-04-26-to-2026-05-01/`](./archive/cross-cutting-legacy-2026-04-26-to-2026-05-01/) | Older cross-cutting handoffs retained as evidence |

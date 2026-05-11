@@ -255,8 +255,8 @@
     "closeParamsPanelAria": "パラメータパネルを閉じる",
     "lp": {
       "heroEyebrow": "Filmtone",
-      "heroTitle": "LUTで色を整え、\nフィルムルックで\n書き出す。",
-      "heroBody": "Filmtone は、素材にフィルム調の色を作るための LUT / ルック編集ツールです。プリセットから始め、明るさ・コントラスト・彩度、光のにじみを調整し、Before/After や再生で確認できます。必要に応じて粒子感も加えながら、ブラウザで試し、iPhone ではローカルに保存・共有、Mac では動画を細かく見て書き出せます。",
+      "heroTitle": "色作りをゼロから始めず、\n動画を\nフィルムルックへ。",
+      "heroBody": "Filmtone は、Preset や Look から始めて、動画の色を再生や Before/After で確かめ、保存・共有・書き出しまで進める仕上げアプリです。光のにじみや粒子感、Source Profile、Creative Look LUT まで必要な深さだけ触れます。",
       "heroSubtitle": "プリセットから選び、光のにじみまで調整。Before/Afterで見比べて保存・共有できます。",
       "heroPrimaryCta": "Macで深く仕上げる",
       "heroPrimaryCtaSubLine": "macOS {minMacos} 以上 ・ Apple Silicon ・ DMG",
@@ -327,7 +327,7 @@
       "metadataTitle": "Filmtone の機能 — ルック確認と書き出し",
       "metadataDescription": "Webで試し、iPhoneで保存・共有し、macOSで再生確認して書き出すための Filmtone 機能ページ。プリセット、Quick調整、比較、LUTをどう使うかを説明します。",
       "heroEyebrow": "Filmtone Features",
-      "heroTitle": "LUTとフィルムルックを、\n使う場所に合わせて仕上げる。",
+      "heroTitle": "動画の色を、\n使う場所に合わせて仕上げる。",
       "heroLead": "Filmtone は、プリセットから色の方向を決め、再生や Before/After で確認し、必要なら LUT や細かい調整へ進める仕上げツールです。ここでは Web、iPhone、Mac でできることを分けて説明します。",
       "heroBackToLpLabel": "Filmtone トップに戻る",
       "surfacesEyebrow": "3 つの面",
@@ -430,9 +430,9 @@
     },
     "metadata": {
       "title": "Filmtone",
-      "description": "ブラウザで動くリアルタイムカラーグレーディングツール。画像や動画をドロップして、露出・コントラスト・LUTをGPUシェーダーでリアルタイムに適用。",
+      "description": "素材を開き、Preset や Look から色を試せるリアルタイムカラーグレーディングツール。露出・コントラスト・LUTをGPUシェーダーで即時反映。",
       "ogTitle": "Filmtone — ブラウザで動くカラーグレーディングツール",
-      "ogDescription": "画像や動画をドロップするだけ。露出・コントラスト・LUTをリアルタイムに適用できるWebGLカラグレツール。",
+      "ogDescription": "素材を開いて、Preset・Look・露出・コントラスト・LUTをリアルタイムに確認できるWebGLカラグレツール。",
       "ogImageAlt": "Filmtone カラーグレーディングツール"
     },
     "share": {

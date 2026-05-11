@@ -123,6 +123,33 @@ Interrupts:
 - Do not silently lower quality for speed. If a shortcut changes product
   quality, state the tradeoff before taking it.
 
+## Copy Authoring
+
+- Before changing public or user-facing copy, read
+  `docs/filmtone/filmtone-copy-quality-harness.md`.
+- Do not start by drafting lines. First classify the surface, reader, desired
+  action, and claim truth; then write the smallest copy change that fits that
+  surface.
+- For implementation-history claims, also read
+  `docs/filmtone/filmtone-implementation-history.md`; do not simplify the
+  WebGPU / WebGL → React + Capacitor → native SwiftUI / AVFoundation history
+  into a generic "native rewrite" story.
+- If the copy includes release, version, App Store, download, platform,
+  privacy, account/cloud, codec/export, or parity claims, run the truth gates
+  below before writing the claim.
+- When implementation changes can affect public copy, release wording, App
+  Store metadata, or implementation-history claims, record `Copy / History
+  Impact` or `No copy/history impact: <reason>` in the relevant lane doc or
+  update the relevant context source. See
+  `docs/filmtone/filmtone-copy-context-sync.md`.
+- In that same impact note, proactively classify `Article Opportunity` as
+  `No story`, `Release-note only`, `Short post`, `Full article`, or
+  `Developer note`. Draft only when the rule says the claim is ready; do not
+  push the article decision back to the owner by default.
+- Also classify `Change-History Opportunity` when the change explains why an
+  approach existed, why it changed, or how future implementation history should
+  be told.
+
 ## Thinking, Research, And Questions
 
 - Use `sequential-thinking` for real design branches, architecture choices,
@@ -168,6 +195,7 @@ bun run verify:desktop
 bun run verify:macos
 bun run verify:ios
 bun run check:filmtone-copy
+bun run check:filmtone-context
 git diff --check
 ```
 
@@ -181,6 +209,8 @@ Guidance:
 - Shared package contract changes: build the package, then verify every affected
   app surface.
 - Copy changes: run `bun run check:filmtone-copy`.
+- Product changes that may affect public wording, release claims, or
+  implementation history: run `bun run check:filmtone-context`.
 - Broader QA is appropriate only after the primary product result is already
   good.
 
@@ -235,5 +265,10 @@ When finishing substantial work, record only:
 
 - what changed
 - current product/release truth if relevant
+- Copy / History Impact, or `No copy/history impact: <reason>`, when product
+  changes can affect public wording or implementation-history claims
+- Article Opportunity classification for substantial product changes
+- Change-History Opportunity classification when the implementation path,
+  source of truth, or product-direction narrative changed
 - verification run
 - known remaining product risks
