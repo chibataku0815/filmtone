@@ -3591,6 +3591,33 @@ function makeVlogToRec709Cube(size = 33) {
 function makeSlog3ToRec709Cube(size = 33) {
   return buildCubeRgba(size, slog3PixelToRec709);
 }
+
+// src/detail-softness.ts
+var DETAIL_SOFTNESS_EFFECTIVE_MAX = 0.34;
+var DETAIL_SOFTNESS_KERNEL_RADIUS_MIN = 0.55;
+var DETAIL_SOFTNESS_KERNEL_RADIUS_MAX = 1.45;
+var DETAIL_SOFTNESS_CHROMA_ATTEN_SCALE = 0.85;
+var DETAIL_SOFTNESS_EDGE_GUARD_LO = 0.04;
+var DETAIL_SOFTNESS_EDGE_GUARD_HI = 0.2;
+var DETAIL_SOFTNESS_HIGHLIGHT_BIAS = 1.18;
+function deriveDetailSoftnessUniforms(detailSoftness, opts = {}) {
+  const bias = opts.sourceDetailBias ?? 0;
+  const combined = detailSoftness + bias;
+  const effective = Math.max(
+    0,
+    Math.min(DETAIL_SOFTNESS_EFFECTIVE_MAX, combined)
+  );
+  const t = effective / DETAIL_SOFTNESS_EFFECTIVE_MAX;
+  const kernelRadiusPx = DETAIL_SOFTNESS_KERNEL_RADIUS_MIN + t * (DETAIL_SOFTNESS_KERNEL_RADIUS_MAX - DETAIL_SOFTNESS_KERNEL_RADIUS_MIN);
+  return {
+    effectiveDetailSoftness: effective,
+    kernelRadiusPx,
+    chromaAttenScale: DETAIL_SOFTNESS_CHROMA_ATTEN_SCALE,
+    edgeGuardLo: DETAIL_SOFTNESS_EDGE_GUARD_LO,
+    edgeGuardHi: DETAIL_SOFTNESS_EDGE_GUARD_HI,
+    highlightBias: DETAIL_SOFTNESS_HIGHLIGHT_BIAS
+  };
+}
 export {
   BAKE_COLOR_IDENTITY,
   BAKE_COLOR_PARAM_KEYS,
@@ -3602,6 +3629,7 @@ export {
   CREATIVE_PACK_01_STONE_TRANSFORM,
   CREATIVE_PACK_01_URBAN_TRANSFORM,
   DEFAULT_QUICK_STATE,
+  DETAIL_SOFTNESS_EFFECTIVE_MAX,
   FILMTONE_DEFAULT_BASE_PRESET,
   FILMTONE_SOFT_FINISH_PATCH,
   FILM_GRAIN_INTENSITY_MAX,
@@ -3666,6 +3694,7 @@ export {
   createFilmtoneDefaultPhase0Params,
   createIosPhase0SerializableLut,
   createPhase0ProjectState,
+  deriveDetailSoftnessUniforms,
   deserializeCubeLutData,
   diagonalMaxDelta,
   filmLabDepthTrackSchema,

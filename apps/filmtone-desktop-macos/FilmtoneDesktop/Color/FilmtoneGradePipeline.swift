@@ -21,7 +21,13 @@ import Foundation
 //   the documented platform divergence (continuous LUT alpha vs preset
 //   lerp).
 //
-//   baseGradeV2 → filmCompressionV2 → edgeOptics → glowFamily → vignette → grain → creativeLut → printStage
+// Phase 2-B Detail Softness: local-reference high-pass attenuation
+//   inserted between filmCompressionV2 and edgeOptics, per
+//   docs/filmtone/detail-softness/archive/2026-05-12-phase-2a-research-charter.md
+//   §Stage insertion points → macOS native. Identity at
+//   `effectiveDetailSoftness == 0` (caller short-circuit + kernel guard).
+//
+//   baseGradeV2 → filmCompressionV2 → detailSoftness → edgeOptics → glowFamily → vignette → grain → creativeLut → printStage
 
 enum FilmtoneGradePipeline {
 
@@ -65,6 +71,7 @@ enum FilmtoneGradePipeline {
         if params.compressionAmount > 0.0001 {
             current = applyFilmCompressionV2(to: current, params: params)
         }
+        current = applyDetailSoftnessStage(to: current, params: params)
         current = applyEdgeOpticsStage(to: current, params: params)
         // M5-M (CC-B): Backlight Veil profiles route through a CIKernel
         // composite that uses the six iOS-canonical optical scatter
@@ -257,6 +264,39 @@ enum FilmtoneGradePipeline {
             origin,
             size,
         ]) ?? image
+    }
+
+    // MARK: — Detail softness (Phase 2-B macOS native pilot)
+
+    // Local-reference high-pass attenuation. Identity at
+    // `effectiveDetailSoftness == 0` — short-circuits before any CIImage
+    // construction, so non-`detailSoftness` renders stay bit-identical to
+    // the pre-Phase-2 pipeline. Inserted between `filmCompressionV2` and
+    // `edgeOptics` per Phase 2-A insertion-point survey.
+    private static func applyDetailSoftnessStage(
+        to image: CIImage,
+        params: FilmtonePhase0Params
+    ) -> CIImage {
+        let uniforms = FilmtoneDetailSoftness.deriveUniforms(detailSoftness: params.detailSoftness)
+        if uniforms.effectiveDetailSoftness < 0.0001 {
+            return image
+        }
+        guard let kernel = FilmtoneGradeKernels.detailSoftness else { return image }
+
+        let padding = CGFloat(ceil(uniforms.kernelRadiusPx) + 1.0)
+        return kernel.apply(
+            extent: image.extent,
+            roiCallback: { _, rect in rect.insetBy(dx: -padding, dy: -padding) },
+            arguments: [
+                image.clampedToExtent(),
+                uniforms.effectiveDetailSoftness,
+                uniforms.kernelRadiusPx,
+                uniforms.chromaAttenScale,
+                uniforms.edgeGuardLo,
+                uniforms.edgeGuardHi,
+                uniforms.highlightBias,
+            ]
+        )?.cropped(to: image.extent) ?? image
     }
 
     // MARK: — Edge optics (C5b A.3 — radialRGBSplit + edgeSoftnessBlend)

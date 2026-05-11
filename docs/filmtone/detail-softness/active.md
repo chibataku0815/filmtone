@@ -203,3 +203,81 @@ implementation-history claim changes — UI exposure lands in Phase 3.
 - Plan: `docs/filmtone/2026-05-11-detail-softness-source-compensation-plan.md`.
 - Phase 1 archive: `archive/2026-05-12-phase-1-contract-neutral-plumbing.md`.
 - `strategy.md` (this lane).
+
+## Implementation Log
+
+### 2026-05-12 JST — implementation landed (pending visual A/B)
+
+Source landed on `feature/detail-softness-contract` after the Phase 1
+commit `033a335f`. Visual A/B on the standard still set is the remaining
+gate before archive; that step is owner-run.
+
+**Files added / changed**
+
+- `packages/film-lab-core/src/detail-softness.ts` — shared derivation
+  helper, uniforms type, `DETAIL_SOFTNESS_EFFECTIVE_MAX = 0.34` constant.
+- `packages/film-lab-core/src/detail-softness.test.ts` — 8 tests covering
+  identity, clamps, default bias, summed bias re-clamp, monotonic kernel
+  radius, parity constants.
+- `packages/film-lab-core/src/index.ts` — re-exports helper, type,
+  constant.
+- `packages/film-lab-core/dist/*` — rebuilt.
+- `packages/film-lab-smart-look/dist/*` — rebuilt (its `.d.ts` re-exports
+  the widened core surface).
+- `packages/film-lab-swift-core/Sources/FilmLabSwiftCore/FilmtoneDetailSoftnessUniforms.swift`
+  — Swift mirror lives in the **shared** Swift package (`FilmLabSwiftCore`)
+  rather than the iOS-app-only `FilmtonePhase0Math.swift` proposed in the
+  Edit Targets section: only the shared package is reachable from both
+  the macOS pilot (this sub-stage) and the iOS export port (Phase 2-C).
+- `packages/film-lab-swift-core/Tests/FilmLabSwiftCoreTests/DetailSoftnessUniformsTests.swift`
+  — 7 tests mirroring the TS suite, locking parity constants.
+- `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtoneGradeKernels.swift`
+  — `detailSoftness` CIKernel (CI Kernel Language, working color space =
+  linear sRGB / Rec.709). Identity short-circuit at
+  `effectiveDetailSoftness < 1e-4`.
+- `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtoneGradePipeline.swift`
+  — `applyDetailSoftnessStage` inserted between `filmCompressionV2` and
+  `applyEdgeOpticsStage` in `apply(...)`. Caller short-circuit before
+  kernel apply means non-`detailSoftness` renders never construct the
+  CIImage for the new stage.
+
+**Working colorspace verdict**
+
+`FilmtoneCIContext.swift` pins working color space to
+`CGColorSpace.linearSRGB` (linear sRGB = Rec.709 primaries). Rec.709 luma
+weights `(0.2126, 0.7152, 0.0722)` used in the Phase 2-A skeleton apply
+directly at the insertion point. **No luma-weight adjustment needed.**
+
+**Verification gates run**
+
+| Gate | Result |
+|---|---|
+| `bun run --cwd packages/film-lab-core test` | 207 pass / 2 fail. **The 2 failures are the same baseline-waived `ios-swift-payload.test.ts` failures from Phase 1, unchanged.** All 8 new `detail-softness.test.ts` tests pass. |
+| `bun run build:core` | OK. |
+| `bun run build:smart-look` | OK; `.d.ts` widened to re-export the helper / type / constant. |
+| `swift test --package-path packages/film-lab-swift-core` | 44 / 44 pass (37 baseline + 7 new `DetailSoftnessUniformsTests`). |
+| `bun run verify:macos` | **BUILD SUCCEEDED**. |
+| `bun run check:filmtone-context` | PASS — this Implementation Log carries the Copy / History Impact marker for the new source files. |
+| `git diff --check` | Clean. |
+
+**Pending owner action — visual A/B**
+
+The Visual A/B procedure in §Verification has not been run because it
+requires a still-export through the macOS app on a curated set. Owner
+runs the 4-image set at `detailSoftness ∈ {0.00, 0.18, 0.30}` and reports
+back:
+
+- Identity at `0.00` — screenshot diff vs pre-Phase-2-B baseline must be 0.
+- Visible softening at `0.18` / `0.30` without obvious skin waxiness,
+  smeared hair / foliage, or unreadable text on the standard still set.
+
+If the algorithm shape holds, Phase 2-B archives to
+`archive/2026-05-12-phase-2b-macos-native-pilot.md`. If quality fails,
+reopen algorithm review per Phase 2-A's "spike if pilot fails" clause.
+
+## Copy / History Impact (restated for Implementation Log)
+
+No copy / history impact: Phase 2-B is an internal render pass + a shared
+derivation helper. No user-visible label, help text, App Store metadata,
+or implementation-history claim changes — UI exposure lands in Phase 3.
+`bun run check:filmtone-context` must pass on this declaration.
