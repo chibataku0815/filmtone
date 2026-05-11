@@ -139,21 +139,7 @@ final class FilmtoneExportSession {
     /// FilmtoneMediaRuntime to pull `depthRenderer` for bench telemetry without
     /// exposing the full DTO via a stored property leak.
     var requestSnapshot: Phase0ExportRequestDTO { request }
-    private static let aberrationEdgeSoftenScale = 32.0
-    private static let aberrationEdgeSoftenMax = 0.52
-    private static let aberrationEdgeSoftenCurve = 1.55
-    private static let aberrationBlurRadiusMin = 1.6
-    private static let aberrationBlurRadiusMax = 6.2
-    private static let aberrationBlurRadiusCap = 7.8
-    private static let lensSoftnessBlurBoost = 1.85
-    private static let glowBaseScale = 0.5
-    private static let bloomSpreadBoost = 1.25
-    private static let halationSpreadDivisor = 12.0
-    private static let diffusionCompositeBase = 0.87
-    private static let bloomMipLevels = 6
-    private static let halationMipLevels = 6
-    private static let diffusionMipLevels = 4
-    private static let glowUpsampleBlurRadius = 1.0
+
     private static let connectCubeFilenameSuffix = "combined-color.cube"
     private static let connectPreOpticalCubeFilenameSuffix = "pre-optical-color.cube"
     private static let connectPostOpticalCubeFilenameSuffix = "post-optical-color.cube"
@@ -1857,7 +1843,7 @@ final class FilmtoneExportSession {
         let rgbShiftNormalized = Self.clamp(
             params.rgbShift / max(FilmtonePhase0Generated.rgbShiftMax, 0.0001)
         )
-        let aberrationSoften = Self.aberrationEdgeSoften(for: rgbShiftNormalized)
+        let aberrationSoften = OpticsResampling.aberrationEdgeSoften(for: rgbShiftNormalized)
         if aberrationSoften > 0.0001 || params.lensSoftness > 0.0001 {
             current = applyEdgeSoftness(
                 to: current,
@@ -1982,20 +1968,20 @@ final class FilmtoneExportSession {
                 bloomThreshold: params.bloomThreshold,
                 bloomSoftKnee: params.bloomSoftKnee,
                 bloomRadius: params.bloomRadius,
-                bloomMipLevels: Self.bloomMipLevels,
-                bloomSpreadBoost: Self.bloomSpreadBoost,
+                bloomMipLevels: OpticsResampling.bloomMipLevels,
+                bloomSpreadBoost: OpticsResampling.bloomSpreadBoost,
                 halationIntensity: params.halationIntensity,
                 halationThreshold: params.halationThreshold,
                 halationSoftKnee: params.halationSoftKnee,
                 halationRadius: params.halationRadius,
                 halationHue: params.halationHue,
-                halationMipLevels: Self.halationMipLevels,
+                halationMipLevels: OpticsResampling.halationMipLevels,
                 halationSpread: params.halationSpread,
-                halationSpreadDivisor: Self.halationSpreadDivisor,
+                halationSpreadDivisor: OpticsResampling.halationSpreadDivisor,
                 diffusion: params.diffusion,
-                diffusionMipLevels: Self.diffusionMipLevels,
-                diffusionCompositeBase: Self.diffusionCompositeBase,
-                glowBaseScale: Self.glowBaseScale,
+                diffusionMipLevels: OpticsResampling.diffusionMipLevels,
+                diffusionCompositeBase: OpticsResampling.diffusionCompositeBase,
+                glowBaseScale: OpticsResampling.glowBaseScale,
                 opticalScatter: opticalScatterParams
             )
             // Phase 2 段階 1: fold the vignette stage into the same Metal
@@ -2026,7 +2012,7 @@ final class FilmtoneExportSession {
         }
 
         let extent = image.extent
-        let black = Self.blackImage(for: extent)
+        let black = OpticsResampling.blackImage(for: extent)
 
         // v1.3 (D3.2): depth × ray-angle prefilter on the glow trio.
         // Gated on `loadedDepthMap != nil`, which is only set in
@@ -2072,8 +2058,8 @@ final class FilmtoneExportSession {
             bloomImage = buildMipBlurComposite(
                 from: bloomPlate,
                 radius: params.bloomRadius,
-                levelCount: Self.bloomMipLevels,
-                spreadMultiplier: Self.bloomSpreadBoost,
+                levelCount: OpticsResampling.bloomMipLevels,
+                spreadMultiplier: OpticsResampling.bloomSpreadBoost,
                 useTentResampling: true
             )
         } else {
@@ -2104,13 +2090,13 @@ final class FilmtoneExportSession {
                 from: halationInput,
                 threshold: params.halationThreshold,
                 knee: params.halationSoftKnee,
-                tintColor: Self.halationColor(for: params.halationHue)
+                tintColor: OpticsResampling.halationColor(for: params.halationHue)
             )
             halationImage = buildMipBlurComposite(
                 from: halationPlate,
                 radius: params.halationRadius,
-                levelCount: Self.halationMipLevels,
-                spreadMultiplier: 1.0 + max(params.halationSpread, 0) / Self.halationSpreadDivisor,
+                levelCount: OpticsResampling.halationMipLevels,
+                spreadMultiplier: 1.0 + max(params.halationSpread, 0) / OpticsResampling.halationSpreadDivisor,
                 useTentResampling: true
             )
         } else {
@@ -2140,7 +2126,7 @@ final class FilmtoneExportSession {
             diffusionImage = buildMipBlurComposite(
                 from: diffusionInput,
                 radius: 0.9,
-                levelCount: Self.diffusionMipLevels,
+                levelCount: OpticsResampling.diffusionMipLevels,
                 spreadMultiplier: 1.15,
                 useTentResampling: true
             )
@@ -2198,7 +2184,7 @@ final class FilmtoneExportSession {
             params.bloomStrength,
             params.halationIntensity,
             params.diffusion,
-            Self.diffusionCompositeBase,
+            OpticsResampling.diffusionCompositeBase,
         ]) ?? image
     }
 
@@ -2278,8 +2264,8 @@ final class FilmtoneExportSession {
         return kernel.apply(extent: image.extent, arguments: [
             image,
             params.vignette,
-            Self.extentOriginVector(for: image.extent),
-            Self.extentSizeVector(for: image.extent),
+            OpticsResampling.extentOriginVector(for: image.extent),
+            OpticsResampling.extentSizeVector(for: image.extent),
             gamma,
             innerThreshold,
             opticsPack,
@@ -2307,8 +2293,8 @@ final class FilmtoneExportSession {
             params.grainSize,
             normalizedTime,
             sourceSeed,
-            Self.extentOriginVector(for: image.extent),
-            Self.extentSizeVector(for: image.extent),
+            OpticsResampling.extentOriginVector(for: image.extent),
+            OpticsResampling.extentSizeVector(for: image.extent),
         ]) ?? image
     }
 
@@ -2371,7 +2357,7 @@ final class FilmtoneExportSession {
         tintColor: CIColor
     ) -> CIImage {
         guard let kernel = OpticalKernels.softKneeHighlight else {
-            return Self.blackImage(for: image.extent)
+            return OpticsResampling.blackImage(for: image.extent)
         }
 
         return kernel.apply(extent: image.extent, arguments: [
@@ -2379,7 +2365,7 @@ final class FilmtoneExportSession {
             Self.clamp(threshold),
             Self.clamp(knee),
             tintColor,
-        ]) ?? Self.blackImage(for: image.extent)
+        ]) ?? OpticsResampling.blackImage(for: image.extent)
     }
 
     private func applyRadialRGBShift(_ amount: Double, to image: CIImage) -> CIImage {
@@ -2396,8 +2382,8 @@ final class FilmtoneExportSession {
             arguments: [
                 image,
                 amount,
-                Self.extentOriginVector(for: image.extent),
-                Self.extentSizeVector(for: image.extent),
+                OpticsResampling.extentOriginVector(for: image.extent),
+                OpticsResampling.extentSizeVector(for: image.extent),
             ]
         ) ?? image
     }
@@ -2409,16 +2395,16 @@ final class FilmtoneExportSession {
     ) -> CIImage {
         let lensDrive = pow(Self.clamp(lensSoftness), 0.78)
         let aberrationDrive = pow(
-            Self.clamp(aberrationSoften / Self.aberrationEdgeSoftenMax),
+            Self.clamp(aberrationSoften / OpticsResampling.aberrationEdgeSoftenMax),
             0.82
         )
         let blurRadius = min(
             Self.lerp(
-                Self.aberrationBlurRadiusMin,
-                Self.aberrationBlurRadiusMax,
+                OpticsResampling.aberrationBlurRadiusMin,
+                OpticsResampling.aberrationBlurRadiusMax,
                 aberrationDrive
-            ) + (lensDrive * Self.lensSoftnessBlurBoost),
-            Self.aberrationBlurRadiusCap
+            ) + (lensDrive * OpticsResampling.lensSoftnessBlurBoost),
+            OpticsResampling.aberrationBlurRadiusCap
         )
         guard blurRadius > 0.0001, let kernel = OpticalKernels.edgeSoftnessBlend else {
             return image
@@ -2439,8 +2425,8 @@ final class FilmtoneExportSession {
                 blurred,
                 Self.clamp(aberrationSoften),
                 Self.clamp(lensSoftness),
-                Self.extentOriginVector(for: image.extent),
-                Self.extentSizeVector(for: image.extent),
+                OpticsResampling.extentOriginVector(for: image.extent),
+                OpticsResampling.extentSizeVector(for: image.extent),
             ]
         ) ?? image
     }
@@ -2454,227 +2440,36 @@ final class FilmtoneExportSession {
     ) -> CIImage {
         let extent = image.extent.integral
         guard levelCount > 0 else {
-            return Self.blackImage(for: extent)
+            return OpticsResampling.blackImage(for: extent)
         }
 
-        var mips = Self.buildMipPyramid(
+        var mips = OpticsResampling.buildMipPyramid(
             from: image,
             levelCount: levelCount,
-            initialScale: Self.glowBaseScale / max(spreadMultiplier, 0.0001),
+            initialScale: OpticsResampling.glowBaseScale / max(spreadMultiplier, 0.0001),
             useTentResampling: useTentResampling
         )
         guard !mips.isEmpty else {
-            return Self.blackImage(for: extent)
+            return OpticsResampling.blackImage(for: extent)
         }
 
-        let weights = Self.computeMipWeights(radius: Self.clamp(radius), levels: mips.count)
+        let weights = OpticsResampling.computeMipWeights(radius: Self.clamp(radius), levels: mips.count)
         if mips.count > 1 {
             for index in stride(from: mips.count - 2, through: 0, by: -1) {
                 let lowRes = mips[index + 1]
                 let highRes = mips[index]
                 let restored = useTentResampling
-                    ? Self.tentUpsampledImage(lowRes, to: highRes.extent)
-                    : Self.upsampledImage(lowRes, to: highRes.extent)
-                let weighted = Self.weightedImage(restored, weight: weights[index + 1])
-                mips[index] = Self.addImages(weighted, highRes).cropped(to: highRes.extent)
+                    ? OpticsResampling.tentUpsampledImage(lowRes, to: highRes.extent)
+                    : OpticsResampling.upsampledImage(lowRes, to: highRes.extent)
+                let weighted = OpticsResampling.weightedImage(restored, weight: weights[index + 1])
+                mips[index] = OpticsResampling.addImages(weighted, highRes).cropped(to: highRes.extent)
             }
         }
 
         let output = useTentResampling
-            ? Self.tentUpsampledImage(mips[0], to: extent)
-            : Self.upsampledImage(mips[0], to: extent)
+            ? OpticsResampling.tentUpsampledImage(mips[0], to: extent)
+            : OpticsResampling.upsampledImage(mips[0], to: extent)
         return output.cropped(to: extent)
-    }
-
-    private static func buildMipPyramid(
-        from image: CIImage,
-        levelCount: Int,
-        initialScale: Double,
-        useTentResampling: Bool = false
-    ) -> [CIImage] {
-        guard levelCount > 0 else {
-            return []
-        }
-
-        var mips: [CIImage] = []
-        var current = useTentResampling
-            ? tentDownsampledImage(image, scale: initialScale)
-            : downsampledImage(image, scale: initialScale)
-        mips.append(current)
-
-        guard levelCount > 1 else {
-            return mips
-        }
-
-        for _ in 1..<levelCount {
-            current = useTentResampling
-                ? tentDownsampledImage(current, scale: 0.5)
-                : downsampledImage(current, scale: 0.5)
-            mips.append(current)
-        }
-
-        return mips
-    }
-
-    private static func downsampledImage(_ image: CIImage, scale: Double) -> CIImage {
-        let safeScale = min(1.0, max(scale, 0.0001))
-        let targetSize = CGSize(
-            width: max(1.0, round(image.extent.width * safeScale)),
-            height: max(1.0, round(image.extent.height * safeScale))
-        )
-        let scaled = scaledImage(image, scale: safeScale)
-        return scaled.cropped(to: CGRect(origin: .zero, size: targetSize))
-    }
-
-    private static func upsampledImage(_ image: CIImage, to extent: CGRect) -> CIImage {
-        guard image.extent.width > 0.0001, image.extent.height > 0.0001 else {
-            return blackImage(for: extent)
-        }
-
-        let scale = extent.width / image.extent.width
-        let upsampled = scaledImage(image, scale: scale).cropped(to: extent)
-        guard scale > 1.0001, glowUpsampleBlurRadius > 0.0001 else {
-            return upsampled
-        }
-
-        return upsampled
-            .clampedToExtent()
-            .applyingFilter("CIGaussianBlur", parameters: [
-                kCIInputRadiusKey: glowUpsampleBlurRadius,
-            ])
-            .cropped(to: extent)
-    }
-
-    private static func tentDownsampledImage(_ image: CIImage, scale: Double) -> CIImage {
-        let safeScale = min(1.0, max(scale, 0.0001))
-        let sourceExtent = image.extent.integral
-        let targetSize = CGSize(
-            width: max(1.0, round(sourceExtent.width * safeScale)),
-            height: max(1.0, round(sourceExtent.height * safeScale))
-        )
-        let targetExtent = CGRect(origin: .zero, size: targetSize)
-
-        guard let kernel = OpticalKernels.tentDownsample else {
-            return downsampledImage(image, scale: scale)
-        }
-
-        return kernel.apply(
-            extent: targetExtent,
-            roiCallback: { _, _ in sourceExtent },
-            arguments: [
-                image,
-                extentOriginVector(for: sourceExtent),
-                extentSizeVector(for: sourceExtent),
-                extentOriginVector(for: targetExtent),
-                CIVector(
-                    x: sourceExtent.width / max(targetExtent.width, 1.0),
-                    y: sourceExtent.height / max(targetExtent.height, 1.0)
-                ),
-            ]
-        ) ?? downsampledImage(image, scale: scale)
-    }
-
-    private static func tentUpsampledImage(_ image: CIImage, to extent: CGRect) -> CIImage {
-        guard image.extent.width > 0.0001, image.extent.height > 0.0001 else {
-            return blackImage(for: extent)
-        }
-        let sourceExtent = image.extent.integral
-        let targetExtent = extent.integral
-
-        guard let kernel = OpticalKernels.tentUpsample else {
-            return upsampledImage(image, to: extent)
-        }
-
-        return kernel.apply(
-            extent: targetExtent,
-            roiCallback: { _, _ in sourceExtent },
-            arguments: [
-                image,
-                extentOriginVector(for: sourceExtent),
-                extentSizeVector(for: sourceExtent),
-                extentOriginVector(for: targetExtent),
-                CIVector(
-                    x: sourceExtent.width / max(targetExtent.width, 1.0),
-                    y: sourceExtent.height / max(targetExtent.height, 1.0)
-                ),
-            ]
-        ) ?? upsampledImage(image, to: extent)
-    }
-
-    private static func scaledImage(_ image: CIImage, scale: Double) -> CIImage {
-        guard abs(scale - 1.0) > 0.0001 else {
-            return image
-        }
-        return image.applyingFilter("CILanczosScaleTransform", parameters: [
-            kCIInputScaleKey: scale,
-            kCIInputAspectRatioKey: 1.0,
-        ])
-    }
-
-    private static func weightedImage(_ image: CIImage, weight: Double) -> CIImage {
-        guard weight > 0 else {
-            return blackImage(for: image.extent)
-        }
-        guard abs(weight - 1.0) > 0.0001 else {
-            return image
-        }
-        let vector = CIVector(x: weight, y: 0, z: 0, w: 0)
-        let zero = CIVector(x: 0, y: 0, z: 0, w: 0)
-        return image.applyingFilter("CIColorMatrix", parameters: [
-            "inputRVector": vector,
-            "inputGVector": CIVector(x: 0, y: weight, z: 0, w: 0),
-            "inputBVector": CIVector(x: 0, y: 0, z: weight, w: 0),
-            "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
-            "inputBiasVector": zero,
-        ])
-    }
-
-    private static func addImages(_ foreground: CIImage, _ background: CIImage) -> CIImage {
-        foreground
-            .applyingFilter("CIAdditionCompositing", parameters: [
-                kCIInputBackgroundImageKey: background,
-            ])
-            .cropped(to: background.extent)
-    }
-
-    private static func blackImage(for extent: CGRect) -> CIImage {
-        CIImage(color: CIColor(red: 0, green: 0, blue: 0, alpha: 1)).cropped(to: extent)
-    }
-
-    private static func extentOriginVector(for extent: CGRect) -> CIVector {
-        CIVector(x: extent.origin.x, y: extent.origin.y)
-    }
-
-    private static func extentSizeVector(for extent: CGRect) -> CIVector {
-        CIVector(x: extent.width, y: extent.height)
-    }
-
-    private static func computeMipWeights(radius: Double, levels: Int) -> [Double] {
-        (0..<levels).map { index in
-            let t = Double(index) / Double(max(levels - 1, 1))
-            let base = exp(-3.0 * (1.0 - radius) * t)
-            let wide = exp(-0.5 * radius * (1.0 - t))
-            return (base * (1.0 - radius)) + (wide * radius)
-        }
-    }
-
-    private static func halationColor(for hue: Double) -> CIColor {
-        let t = clamp(hue / 100.0)
-        let red = (0xe8 + ((0xc8 - 0xe8) * t)) / 255.0
-        let green = (0x10 + ((0x60 - 0x10) * t)) / 255.0
-        let blue = (0x20 + ((0x10 - 0x20) * t)) / 255.0
-        return CIColor(red: red, green: green, blue: blue, alpha: 1)
-    }
-
-    private static func aberrationEdgeSoften(for normalizedRgbShift: Double) -> Double {
-        let normalized = clamp(normalizedRgbShift)
-        guard normalized > 0.0001 else {
-            return 0
-        }
-
-        let linear = normalized * (aberrationEdgeSoftenScale * FilmtonePhase0Generated.rgbShiftMax)
-        let boosted = pow(normalized, aberrationEdgeSoftenCurve) * aberrationEdgeSoftenMax
-        return min(aberrationEdgeSoftenMax, max(linear, boosted))
     }
 
     private static func makeStableSourceSeed(from string: String) -> Double {

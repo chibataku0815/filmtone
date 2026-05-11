@@ -829,7 +829,7 @@ final class FilmtoneMetalOpticsRenderer {
     }
 
     private func halationColor(forHue hue: Double) -> SIMD3<Float> {
-        // Mirrors FilmtoneExportSession.halationColor.
+        // Mirrors OpticsResampling.halationColor.
         let t = clampUnit(hue / 100.0)
         let red = (Double(0xe8) + (Double(0xc8 - 0xe8) * t)) / 255.0
         let green = (Double(0x10) + (Double(0x60 - 0x10) * t)) / 255.0
