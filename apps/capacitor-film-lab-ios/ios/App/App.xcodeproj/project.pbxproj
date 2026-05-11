@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		0BB8A8BD4529447093495AD8 /* LockScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BA722ECF59CA0509BE28D0A /* LockScreenView.swift */; };
 		16AEB7307DB348ECDC7058AC /* ExportRenderHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 544A796C6E480CD796B35227 /* ExportRenderHelpers.swift */; };
+		181852B55B628E07A96EBD40 /* ExportSidecarDateFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C251B271BA66A31B9FDFFFF9 /* ExportSidecarDateFormatter.swift */; };
 		2D4D5561AFFF0125F03894AE /* FilmtoneExportAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E92BBC4019AD97D40A52D6E1 /* FilmtoneExportAttributes.swift */; };
 		33183593451FFC7F6B131F6F /* ExportSessionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A8953B81D88E54A0BD66518 /* ExportSessionModels.swift */; };
 		42D1A00148FB68BB1924A545 /* ExportMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F3FEA9C2799183E1F2B32E4 /* ExportMetrics.swift */; };
@@ -294,6 +295,7 @@
 		C2000001000000000000009B /* FilmtoneCapturePreviewLayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCapturePreviewLayer.swift; sourceTree = "<group>"; };
 		C2000001000000000000009C /* FilmtoneCaptureTakePreviewLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCaptureTakePreviewLoader.swift; sourceTree = "<group>"; };
 		C2000001000000000000009D /* FilmtoneCaptureTakePreviewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCaptureTakePreviewModel.swift; sourceTree = "<group>"; };
+		C251B271BA66A31B9FDFFFF9 /* ExportSidecarDateFormatter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportSidecarDateFormatter.swift; sourceTree = "<group>"; };
 		D40000010000000000000001 /* CreativeLuts */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CreativeLuts; path = Resources/CreativeLuts; sourceTree = "<group>"; };
 		E92BBC4019AD97D40A52D6E1 /* FilmtoneExportAttributes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtoneExportAttributes.swift; sourceTree = "<group>"; };
 		F10000010000000000000001 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
@@ -378,6 +380,7 @@
 				0F3FEA9C2799183E1F2B32E4 /* ExportMetrics.swift */,
 				544A796C6E480CD796B35227 /* ExportRenderHelpers.swift */,
 				3A8953B81D88E54A0BD66518 /* ExportSessionModels.swift */,
+				C251B271BA66A31B9FDFFFF9 /* ExportSidecarDateFormatter.swift */,
 			);
 			name = Internal;
 			path = Internal;
@@ -895,6 +898,7 @@
 				42D1A00148FB68BB1924A545 /* ExportMetrics.swift in Sources */,
 				16AEB7307DB348ECDC7058AC /* ExportRenderHelpers.swift in Sources */,
 				33183593451FFC7F6B131F6F /* ExportSessionModels.swift in Sources */,
+				181852B55B628E07A96EBD40 /* ExportSidecarDateFormatter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

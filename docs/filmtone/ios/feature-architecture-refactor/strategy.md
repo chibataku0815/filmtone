@@ -123,3 +123,12 @@ Total: 11-13 working days.
 - 2026-05-11 JST — Phase 2A helper extraction is complete: export models,
   render-stage metrics, and prepared LUT helpers moved into
   `Export/Internal/`; pbxproj registration and `bun run verify:ios` green.
+- 2026-05-11 JST — Phase 2B-1 (sidecar formatter extraction + ExportSession
+  responsibility inventory) is complete in the feature worktree.
+  `extension ISO8601DateFormatter { static let filmtoneSidecar }` moved to
+  `Export/Internal/ExportSidecarDateFormatter.swift`; FilmtoneExportSession.swift
+  reduced from 4498 to 4488 lines; pbxproj 4-section registration verified;
+  `bun run verify:ios` green; `git diff --check` clean. Owner correction
+  recorded: subsequent extractions (2B-2 onward) must produce independent
+  helper types, not extensions on `FilmtoneExportSession`. See
+  `archive/2026-05-11-phase-2b-1-sidecar-formatter-extraction.md`.
