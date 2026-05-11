@@ -241,3 +241,14 @@ Total: 11-13 working days.
   pbxproj 4-section grep = 4; `bun run verify:ios` green;
   `git diff --check` clean. See
   `archive/2026-05-11-phase-2b-6a-grade-render-pipeline-color-stages.md`.
+- 2026-05-11 JST — Phase 2B-7A (ExportMediaWriter primitive extraction)
+  committed as `0a895169`. New `final class ExportMediaWriter` at
+  `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportMediaWriter.swift`
+  (231 lines) now owns writer setup, video reader-output setup, audio
+  pipeline setup, audio append, finish/wait, and CMTime helpers.
+  `FilmtoneExportSession.swift` reduced from 2262 → 2080 lines (−182);
+  `exportVideo`, `exportStillImage`, and `appendVideoSample` remain on
+  the session for the next frame-append boundary pass. The zero-caller
+  `estimatedVideoFrameRate(for:)` helper was deleted. pbxproj 4-section
+  grep = 4; `bun run verify:ios` green; `git diff --check` clean. See
+  `archive/2026-05-11-phase-2b-7a-export-media-writer-primitives.md`.
