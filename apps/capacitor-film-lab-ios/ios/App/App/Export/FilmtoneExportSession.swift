@@ -591,8 +591,9 @@ final class FilmtoneExportSession {
             asset: asset,
             depthEnabled: request.depthEnabled ?? false
         )
-        defer { depthReader?.cancel() }
-        if depthReader != nil {
+        let depthMatcher = ExportVideoDepthMatcher(reader: depthReader)
+        defer { depthMatcher.cancel() }
+        if depthMatcher.hasReader {
             videoDepthSourceLabel = "AVDepthDataTrack"
             videoDepthFramesProcessed = 0
             videoDepthDecodeMs = 0
@@ -730,15 +731,9 @@ final class FilmtoneExportSession {
 
         progress(.init(stage: .reading, progress: 0.11, currentFrame: 0, totalFrames: outputFrameCount, message: "Reading source"))
 
-        // v1.3 Phase B: depth-track frames seldom share the video track's
-        // cadence (depth tracks are often ~half-rate). We hold the most-recent
-        // depth frame whose pts <= current video pts in `lastDepthFrame`, and
-        // peek one ahead in `pendingDepthFrame`. After a mid-stream pull
-        // failure we keep `lastDepthFrame` (graceful degrade with `last-known
-        // depth`) and stop pulling.
-        var lastDepthFrame: (presentationTime: CMTime, depthMap: FilmtoneDepthMap)? = nil
-        var pendingDepthFrame: (presentationTime: CMTime, depthMap: FilmtoneDepthMap)? = nil
-        var depthReaderExhausted = depthReader == nil
+        // v1.3 Phase B: depth-track cursor state and the per-frame pull loop
+        // live in `ExportVideoDepthMatcher` (Phase 2B-10A). The session keeps
+        // owning telemetry assignment from the matcher's `MatchResult`.
         typealias TimedVideoSample = (buffer: CMSampleBuffer, rawTime: CMTime, timelineTime: CMTime)
         var sourceTimeOffset: CMTime?
         var previousVideoSample: TimedVideoSample?
@@ -775,45 +770,23 @@ final class FilmtoneExportSession {
         }
 
         func prepareDepthForSourceTime(at sourceLookupTime: CMTime) {
-            guard let reader = depthReader else {
+            guard depthMatcher.hasReader else {
                 loadedDepthMap = nil
                 return
             }
-            let lookupTime = CMTimeAdd(sourceLookupTime, sourceTimeOffset ?? .zero)
-            let decodeStart = Date()
-            // Advance until pendingDepthFrame.pts > current output pts (or EOS).
-            // The rendered video sample is resampled to the 24 fps output
-            // timeline, so depth follows that same output timeline rather than
-            // the original source-frame cadence.
-            while !depthReaderExhausted,
-                  pendingDepthFrame == nil
-                    || CMTimeCompare(pendingDepthFrame!.presentationTime, lookupTime) <= 0 {
-                if let pf = pendingDepthFrame {
-                    lastDepthFrame = pf
-                }
-                switch ExportDepthPayloadManager.pullNextFrame(reader: reader) {
-                case .frame(let next):
-                    pendingDepthFrame = next
-                case .endOfStream:
-                    pendingDepthFrame = nil
-                    depthReaderExhausted = true
-                case .failure(let error):
-                    NSLog("FilmtoneExportSession: video depth frame pull failed: \(error). Continuing without depth for remaining frames.")
-                    pendingDepthFrame = nil
-                    depthReaderExhausted = true
-                }
-            }
-            let depthMapForThisFrame = lastDepthFrame?.depthMap
-            let decodeMs = Date().timeIntervalSince(decodeStart) * 1000.0
-            videoDepthDecodeMs = (videoDepthDecodeMs ?? 0) + decodeMs
-            loadedDepthMap = depthMapForThisFrame
-            if let depthMapForThisFrame {
+            let result = depthMatcher.matchDepthFrame(
+                for: sourceLookupTime,
+                sourceTimeOffset: sourceTimeOffset
+            )
+            videoDepthDecodeMs = (videoDepthDecodeMs ?? 0) + result.decodeMs
+            loadedDepthMap = result.depthMap
+            if let depthMap = result.depthMap {
                 videoDepthFramesProcessed = (videoDepthFramesProcessed ?? 0) + 1
                 // depthResolution is the "did the prefilter run?" signal that
                 // both the sidecar and runtime read; setting it on the first
                 // matched frame keeps still / video paths telemetry-aligned.
                 if depthResolution == nil {
-                    depthResolution = (depthMapForThisFrame.width, depthMapForThisFrame.height)
+                    depthResolution = (depthMap.width, depthMap.height)
                 }
             }
         }
