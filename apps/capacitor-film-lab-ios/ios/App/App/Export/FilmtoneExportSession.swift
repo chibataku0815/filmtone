@@ -85,8 +85,11 @@ final class FilmtoneExportSession {
             colorSpace: outputColorSpace,
             metrics: performanceMetrics
         )
-    private let preparedInputLut: PreparedLut?
-    private let preparedCreativeLut: PreparedLut?
+    /// Phase 2B-6A: non-optics color stage collaborator. Owns prepared
+    /// input/creative LUT state and the kernel-based color stages (base
+    /// grade, tone compression, print) plus LUT application. Stage
+    /// ordering and `applyGrade` orchestration still live on the session.
+    private let gradeRenderPipeline: GradeRenderPipeline
     private let sourceSeed: Double
     private let outputColorSpace: CGColorSpace
     private var degradedDecodePath = false
@@ -211,7 +214,7 @@ final class FilmtoneExportSession {
         // `.auto` inside the builder, so v1.2 behavior stays byte-identical
         // when no profile was selected. A user-imported `request.inputLut`
         // always wins (existing precedence).
-        self.preparedInputLut = ExportInputLutBuilder.makePreparedLut(from: request.inputLut)
+        let preparedInputLut = ExportInputLutBuilder.makePreparedLut(from: request.inputLut)
             ?? ExportInputLutBuilder.makeActiveInputLut(
                 for: cameraProfile,
                 probe: request.sourceProbe
@@ -219,7 +222,12 @@ final class FilmtoneExportSession {
         let legacyCreativeLut = request.creativeLut ?? request.lut.map {
             SerializableLutDTO(size: $0.size, data: $0.data, intensity: $0.intensity)
         }
-        self.preparedCreativeLut = ExportInputLutBuilder.makePreparedLut(from: legacyCreativeLut)
+        let preparedCreativeLut = ExportInputLutBuilder.makePreparedLut(from: legacyCreativeLut)
+        self.gradeRenderPipeline = GradeRenderPipeline(
+            preparedInputLut: preparedInputLut,
+            preparedCreativeLut: preparedCreativeLut,
+            outputColorSpace: outputColorSpace
+        )
         self.sourceSeed = Self.makeStableSourceSeed(from: sourceURL.absoluteString)
         if disableGlowFamilyForExport {
             NSLog("FilmtoneExportSession: GlowFamily disabled by FILMTONE_EXPORT_DISABLE_GLOW_FAMILY")
@@ -1631,11 +1639,11 @@ final class FilmtoneExportSession {
         // consumes it to skip the CI path.
         opticsCompositor.resetFrameState()
 
-        current = applyInputLutStage(to: current)
+        current = gradeRenderPipeline.applyInputLutStage(to: current)
         profileRenderSubstage(.inputLut, image: current, outputSize: stageProfilingOutputSize)
-        current = applyBaseGradeStage(to: current, params: params, presetVersion: presetVersion)
+        current = gradeRenderPipeline.applyBaseGradeStage(to: current, params: params, presetVersion: presetVersion)
         profileRenderSubstage(.baseGrade, image: current, outputSize: stageProfilingOutputSize)
-        current = applyToneCompressionStage(to: current, params: params, presetVersion: presetVersion)
+        current = gradeRenderPipeline.applyToneCompressionStage(to: current, params: params, presetVersion: presetVersion)
         profileRenderSubstage(.toneCompression, image: current, outputSize: stageProfilingOutputSize)
         current = opticsCompositor.applyEdgeOpticsStage(to: current, params: params)
         profileRenderSubstage(.edgeOptics, image: current, outputSize: stageProfilingOutputSize)
@@ -1649,9 +1657,9 @@ final class FilmtoneExportSession {
         profileRenderSubstage(.vignette, image: current, outputSize: stageProfilingOutputSize)
         current = applyGrainStage(to: current, params: params, timeSeconds: timeSeconds)
         profileRenderSubstage(.grain, image: current, outputSize: stageProfilingOutputSize)
-        current = applyCreativeLutStage(to: current)
+        current = gradeRenderPipeline.applyCreativeLutStage(to: current)
         profileRenderSubstage(.creativeLut, image: current, outputSize: stageProfilingOutputSize)
-        current = applyPrintStage(to: current, params: params)
+        current = gradeRenderPipeline.applyPrintStage(to: current, params: params)
         profileRenderSubstage(.printStage, image: current, outputSize: stageProfilingOutputSize)
 
         return current.cropped(to: image.extent)
@@ -1676,11 +1684,11 @@ final class FilmtoneExportSession {
         var current = image
 
         opticsCompositor.resetFrameState()
-        current = applyInputLutStage(to: current)
-        current = applyBaseGradeStage(to: current, params: params, presetVersion: presetVersion)
-        current = applyToneCompressionStage(to: current, params: params, presetVersion: presetVersion)
-        current = applyCreativeLutStage(to: current)
-        current = applyPrintStage(to: current, params: params)
+        current = gradeRenderPipeline.applyInputLutStage(to: current)
+        current = gradeRenderPipeline.applyBaseGradeStage(to: current, params: params, presetVersion: presetVersion)
+        current = gradeRenderPipeline.applyToneCompressionStage(to: current, params: params, presetVersion: presetVersion)
+        current = gradeRenderPipeline.applyCreativeLutStage(to: current)
+        current = gradeRenderPipeline.applyPrintStage(to: current, params: params)
 
         return current.cropped(to: image.extent)
     }
@@ -1725,99 +1733,6 @@ final class FilmtoneExportSession {
         renderStageProfiler?.forceRender(stage, image: image, outputSize: outputSize)
     }
 
-    private func applyInputLutStage(to image: CIImage) -> CIImage {
-        guard let preparedInputLut else {
-            return image
-        }
-        return applyLut(preparedInputLut, to: image)
-    }
-
-    private func applyBaseGradeStage(to image: CIImage, params: Phase0ParamsDTO, presetVersion: String) -> CIImage {
-        let epsilon = 0.0001
-        guard
-            abs(params.exposure) > epsilon ||
-            abs(params.contrast - 1.0) > epsilon ||
-            abs(params.saturation - 1.0) > epsilon ||
-            abs(params.temperature) > epsilon ||
-            abs(params.tint) > epsilon ||
-            abs(params.fade) > epsilon ||
-            abs(params.shadowTone) > epsilon ||
-            abs(params.highlightTone) > epsilon
-        else {
-            return image
-        }
-
-        let kernel: CIColorKernel?
-        switch presetVersion {
-        case "v2":
-            kernel = OpticalKernels.baseGradeV2
-        case "v1":
-            kernel = OpticalKernels.baseGrade
-        default:
-            assertionFailure("Unknown presetVersion: \(presetVersion)")
-            kernel = OpticalKernels.baseGradeV2
-        }
-        guard let kernel else {
-            return image
-        }
-
-        // v1 kernel takes the original 7 args; v2 takes 11 (adds shadowTone /
-        // highlightTone / shadowHue / highlightHue for density-dependent
-        // split-tone).
-        let args: [Any]
-        switch presetVersion {
-        case "v1":
-            args = [
-                image,
-                params.exposure,
-                params.contrast,
-                params.saturation,
-                params.temperature,
-                params.tint,
-                params.fade,
-            ]
-        default:
-            args = [
-                image,
-                params.exposure,
-                params.contrast,
-                params.saturation,
-                params.temperature,
-                params.tint,
-                params.fade,
-                params.shadowTone,
-                params.highlightTone,
-                params.shadowHue,
-                params.highlightHue,
-            ]
-        }
-        return kernel.apply(extent: image.extent, arguments: args) ?? image
-    }
-
-    private func applyToneCompressionStage(to image: CIImage, params: Phase0ParamsDTO, presetVersion: String) -> CIImage {
-        guard params.compressionAmount > 0.0001 else {
-            return image
-        }
-        let kernel: CIColorKernel?
-        switch presetVersion {
-        case "v2":
-            kernel = OpticalKernels.filmCompressionV2
-        case "v1":
-            kernel = OpticalKernels.filmCompression
-        default:
-            assertionFailure("Unknown presetVersion: \(presetVersion)")
-            kernel = OpticalKernels.filmCompressionV2
-        }
-        guard let kernel else {
-            return image
-        }
-        return kernel.apply(extent: image.extent, arguments: [
-            image,
-            params.compressionAmount,
-            params.compressionRange,
-        ]) ?? image
-    }
-
     private func applyGrainStage(
         to image: CIImage,
         params: Phase0ParamsDTO,
@@ -1842,59 +1757,6 @@ final class FilmtoneExportSession {
             OpticsResampling.extentSizeVector(for: image.extent),
         ]) ?? image
     }
-
-    private func applyCreativeLutStage(to image: CIImage) -> CIImage {
-        guard let preparedCreativeLut else {
-            return image
-        }
-        return applyLut(preparedCreativeLut, to: image)
-    }
-
-    private func applyPrintStage(to image: CIImage, params: Phase0ParamsDTO) -> CIImage {
-        let epsilon = 0.0001
-        guard
-            params.printContrast > epsilon ||
-            abs(params.cyan) > epsilon ||
-            abs(params.magenta) > epsilon ||
-            abs(params.yellow) > epsilon
-        else {
-            return image
-        }
-
-        guard let kernel = OpticalKernels.printStage else {
-            return image
-        }
-
-        return kernel.apply(extent: image.extent, arguments: [
-            image,
-            params.printContrast,
-            params.cyan,
-            params.magenta,
-            params.yellow,
-        ]) ?? image
-    }
-
-    private func applyLut(_ lut: PreparedLut, to image: CIImage) -> CIImage {
-        let lutImage = image.applyingFilter("CIColorCubeWithColorSpace", parameters: [
-            "inputCubeDimension": lut.size,
-            "inputCubeData": lut.cubeData,
-            "inputColorSpace": outputColorSpace,
-        ])
-
-        guard lut.intensity < 0.999 else {
-            return lutImage
-        }
-
-        let alphaAdjusted = lutImage.applyingFilter("CIColorMatrix", parameters: [
-            "inputAVector": CIVector(x: 0, y: 0, z: 0, w: lut.intensity),
-        ])
-        return alphaAdjusted
-            .applyingFilter("CISourceOverCompositing", parameters: [
-                kCIInputBackgroundImageKey: image,
-            ])
-            .cropped(to: image.extent)
-    }
-
 
     private static func makeStableSourceSeed(from string: String) -> Double {
         var hash: UInt64 = 1_469_598_103_934_665_603

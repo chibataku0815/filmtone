@@ -50,6 +50,7 @@
 		B1E10001000000000000B205 /* ExportDepthPayloadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B206 /* ExportDepthPayloadManager.swift */; };
 		B1E10001000000000000B207 /* OpticsResampling.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B208 /* OpticsResampling.swift */; };
 		B1E10001000000000000B209 /* OpticsCompositor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B20A /* OpticsCompositor.swift */; };
+		B1E10001000000000000B20B /* GradeRenderPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B20C /* GradeRenderPipeline.swift */; };
 		D10000010000000000000001 /* FilmtoneRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000001 /* FilmtoneRootView.swift */; };
 		D10000010000000000000002 /* FilmtoneEditorStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000002 /* FilmtoneEditorStore.swift */; };
 		D10000010000000000000003 /* FilmtoneEditorFacade.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000003 /* FilmtoneEditorFacade.swift */; };
@@ -215,6 +216,7 @@
 		B1E10001000000000000B206 /* ExportDepthPayloadManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportDepthPayloadManager.swift; sourceTree = "<group>"; };
 		B1E10001000000000000B208 /* OpticsResampling.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OpticsResampling.swift; sourceTree = "<group>"; };
 		B1E10001000000000000B20A /* OpticsCompositor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OpticsCompositor.swift; sourceTree = "<group>"; };
+		B1E10001000000000000B20C /* GradeRenderPipeline.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GradeRenderPipeline.swift; sourceTree = "<group>"; };
 		B20000010000000000000001 /* MezzanineColorProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MezzanineColorProbe.swift; sourceTree = "<group>"; };
 		B20000010000000000000020 /* DepthSourceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthSourceService.swift; sourceTree = "<group>"; };
 		B20000010000000000000021 /* FilmtoneDepthMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneDepthMap.swift; sourceTree = "<group>"; };
@@ -404,6 +406,7 @@
 				F866759EC6B64193580EDDE6 /* OpticalKernels.swift */,
 				B1E10001000000000000B208 /* OpticsResampling.swift */,
 				B1E10001000000000000B20A /* OpticsCompositor.swift */,
+				B1E10001000000000000B20C /* GradeRenderPipeline.swift */,
 			);
 			name = Internal;
 			path = Internal;
@@ -931,6 +934,7 @@
 				0F432292C35AA746C1B5029F /* OpticalKernels.swift in Sources */,
 				B1E10001000000000000B207 /* OpticsResampling.swift in Sources */,
 				B1E10001000000000000B209 /* OpticsCompositor.swift in Sources */,
+				B1E10001000000000000B20B /* GradeRenderPipeline.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
