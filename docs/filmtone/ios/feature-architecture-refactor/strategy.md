@@ -120,3 +120,6 @@ Total: 11-13 working days.
 - 2026-05-11 JST — Phase 1B source layout migration is complete in the
   feature worktree: 109 former root files moved into 10 feature folders,
   pbxproj and active script paths repaired, `bun run verify:ios` green.
+- 2026-05-11 JST — Phase 2A helper extraction is complete: export models,
+  render-stage metrics, and prepared LUT helpers moved into
+  `Export/Internal/`; pbxproj registration and `bun run verify:ios` green.

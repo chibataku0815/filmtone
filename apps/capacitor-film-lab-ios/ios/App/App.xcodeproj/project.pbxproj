@@ -8,7 +8,10 @@
 
 /* Begin PBXBuildFile section */
 		0BB8A8BD4529447093495AD8 /* LockScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BA722ECF59CA0509BE28D0A /* LockScreenView.swift */; };
+		16AEB7307DB348ECDC7058AC /* ExportRenderHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 544A796C6E480CD796B35227 /* ExportRenderHelpers.swift */; };
 		2D4D5561AFFF0125F03894AE /* FilmtoneExportAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E92BBC4019AD97D40A52D6E1 /* FilmtoneExportAttributes.swift */; };
+		33183593451FFC7F6B131F6F /* ExportSessionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A8953B81D88E54A0BD66518 /* ExportSessionModels.swift */; };
+		42D1A00148FB68BB1924A545 /* ExportMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F3FEA9C2799183E1F2B32E4 /* ExportMetrics.swift */; };
 		4834B221C07285097FC03D87 /* FilmtoneExportLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 571136E1E02CD259CA471AF1 /* FilmtoneExportLiveActivity.swift */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
@@ -169,14 +172,17 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		0F3FEA9C2799183E1F2B32E4 /* ExportMetrics.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportMetrics.swift; sourceTree = "<group>"; };
 		1CD935F1B2B7F6B8905120A5 /* FilmtoneExportActivity.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = FilmtoneExportActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		27AC4B71358558416D8A1808 /* FilmtoneExportActivity.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtoneExportActivity.swift; sourceTree = "<group>"; };
+		3A8953B81D88E54A0BD66518 /* ExportSessionModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportSessionModels.swift; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		504EC30C1FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		504EC30E1FED79650016851F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		544A796C6E480CD796B35227 /* ExportRenderHelpers.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportRenderHelpers.swift; sourceTree = "<group>"; };
 		571136E1E02CD259CA471AF1 /* FilmtoneExportLiveActivity.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtoneExportLiveActivity.swift; sourceTree = "<group>"; };
 		5DF203A51BB1545086A0BC3B /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		8BA722ECF59CA0509BE28D0A /* LockScreenView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LockScreenView.swift; sourceTree = "<group>"; };
@@ -366,6 +372,17 @@
 			path = Optics;
 			sourceTree = "<group>";
 		};
+		4D492DD4BAFDEA237F03D463 /* Internal */ = {
+			isa = PBXGroup;
+			children = (
+				0F3FEA9C2799183E1F2B32E4 /* ExportMetrics.swift */,
+				544A796C6E480CD796B35227 /* ExportRenderHelpers.swift */,
+				3A8953B81D88E54A0BD66518 /* ExportSessionModels.swift */,
+			);
+			name = Internal;
+			path = Internal;
+			sourceTree = "<group>";
+		};
 		504EC2FB1FED79650016851F = {
 			isa = PBXGroup;
 			children = (
@@ -448,6 +465,7 @@
 				C20000010000000000000008 /* FilmtoneExportSidecarBuilder.swift */,
 				C20000010000000000000006 /* FilmtoneHdrPolicyNotice.swift */,
 				C20000010000000000000004 /* HdrPreparationPolicyDeriver.swift */,
+				4D492DD4BAFDEA237F03D463 /* Internal */,
 			);
 			name = Export;
 			path = Export;
@@ -874,6 +892,9 @@
 				D588A95BF7748786256BD9E2 /* CancelExportIntent.swift in Sources */,
 				4834B221C07285097FC03D87 /* FilmtoneExportLiveActivity.swift in Sources */,
 				80C165763871B1D58ECA7A88 /* FilmtoneExportSession+Cancelable.swift in Sources */,
+				42D1A00148FB68BB1924A545 /* ExportMetrics.swift in Sources */,
+				16AEB7307DB348ECDC7058AC /* ExportRenderHelpers.swift in Sources */,
+				33183593451FFC7F6B131F6F /* ExportSessionModels.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
