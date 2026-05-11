@@ -312,3 +312,14 @@ Total: 11-13 working days.
   remain session-owned. pbxproj 4-section grep = 4; `bun run
   verify:ios` green; `git diff --check` clean. See
   `archive/2026-05-11-phase-2b-9a-export-still-image-writer-extraction.md`.
+- 2026-05-11 JST — Phase 2B-9B (ExportMezzanineRouter extraction)
+  committed as `e0ad9cd7`. New `final class ExportMezzanineRouter` at
+  `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/ExportMezzanineRouter.swift`
+  (256 lines) now owns preview/export source routing, quality prewarm,
+  route validation, consumed mezzanine URL/metrics snapshot, and
+  `disabled-on-ios` validation status. `FilmtoneExportSession.swift`
+  reduced from 1646 → 1457 lines (−189); session still owns
+  `AVURLAsset` opening, depth reader, writer/reader setup, frame loop,
+  and sidecar property storage. pbxproj 4-section grep = 4; `bun run
+  verify:ios` green; `git diff --check` clean. See
+  `archive/2026-05-11-phase-2b-9b-export-mezzanine-router-extraction.md`.
