@@ -1,0 +1,658 @@
+import CoreImage
+import Foundation
+
+/// `CIColorKernel` / `CIKernel` source-string catalog extracted from
+/// `FilmtoneExportSession` during the v1.x feature-architecture refactor
+/// (Phase 2B-4). The kernels themselves — grade, film compression,
+/// print stage, motion blend, glow, vignette, grain, downsample /
+/// upsample tents, edge softness — are byte-identical to the
+/// pre-refactor strings so the export and live-preview render math is
+/// preserved exactly. Internal doc comments (Portrait Optics
+/// physicalization notes, M1 ownership tags, Desktop divergence
+/// warnings) travel with the enum.
+enum OpticalKernels {
+    static let baseGrade = CIColorKernel(source: """
+kernel vec4 baseGrade(__sample image, float exposure, float contrast, float saturation, float temperature, float tint, float fade) {
+    vec4 color = image;
+    color.rgb *= pow(2.0, exposure);
+    color.rgb = (color.rgb - 0.5) * contrast + 0.5;
+    float luma = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+    color.rgb = mix(vec3(luma), color.rgb, saturation);
+    color.r += temperature * 0.1;
+    color.b -= temperature * 0.1;
+    color.r += tint * 0.05;
+    color.g -= tint * 0.08;
+    color.b += tint * 0.05;
+    color.rgb = color.rgb + fade * (1.0 - color.rgb);
+    return color;
+}
+""")
+
+    // v2 (presetVersion="v2"): film-aware tonal grade.
+    //   1) Contrast: 3-piece curve (toe smoothstep / linear mid / shoulder
+    //      smoothstep) — film density-style separation, no Reinhard mush.
+    //   2) Saturation: chroma-scale (luma + chroma * sat) — per-channel hue
+    //      preserved, no Reinhard hue drift.
+    //   3) Temperature/tint: unchanged from v1.
+    //   4) Crosstalk: density-dependent split-tone via shadowHue/shadowTone +
+    //      highlightHue/highlightTone — gives shadow/highlight real *color*
+    //      (cyan/magenta/amber) instead of muddy white-lift.
+    //   5) Fade: shadow-only mask (no highlight bleed) — strong fade only
+    //      lifts the bottom of the curve, keeps highlight punch.
+    static let baseGradeV2 = CIColorKernel(source: """
+kernel vec4 baseGradeV2(__sample image, float exposure, float contrast, float saturation, float temperature, float tint, float fade, float shadowTone, float highlightTone, float shadowHue, float highlightHue) {
+    vec4 color = image;
+
+    // 1. Exposure
+    color.rgb *= pow(2.0, exposure);
+
+    // 2. Contrast — 3-piece film density curve
+    float c = contrast - 1.0;
+    vec3 toeMask = vec3(1.0) - smoothstep(vec3(0.0), vec3(0.18), color.rgb);
+    vec3 shoulderMask = smoothstep(vec3(0.85), vec3(1.0), color.rgb);
+    vec3 linearPart = (color.rgb - vec3(0.5)) * contrast + vec3(0.5);
+    vec3 toePart = color.rgb * (1.0 - 0.35 * c);
+    vec3 shoulderPart = vec3(1.0) - (vec3(1.0) - color.rgb) * (1.0 - 0.35 * c);
+    color.rgb = mix(linearPart, toePart, toeMask);
+    color.rgb = mix(color.rgb, shoulderPart, shoulderMask);
+
+    // 3. Saturation — chroma scale (hue-preserving)
+    float lumaSat = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+    vec3 chroma = color.rgb - vec3(lumaSat);
+    color.rgb = vec3(lumaSat) + chroma * saturation;
+
+    // 4. Temperature / Tint
+    color.r += temperature * 0.1;
+    color.b -= temperature * 0.1;
+    color.r += tint * 0.05;
+    color.g -= tint * 0.08;
+    color.b += tint * 0.05;
+
+    // 5. Crosstalk — density-dependent split-tone with hue/tone fields
+    float lumaCT = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+    float shadowMaskCT = 1.0 - smoothstep(0.0, 0.5, lumaCT);
+    float highlightMaskCT = smoothstep(0.5, 1.0, lumaCT);
+    vec3 shadowChroma = vec3(
+        cos(radians(shadowHue)),
+        cos(radians(shadowHue - 120.0)),
+        cos(radians(shadowHue - 240.0))
+    ) * 0.3;
+    vec3 highlightChroma = vec3(
+        cos(radians(highlightHue)),
+        cos(radians(highlightHue - 120.0)),
+        cos(radians(highlightHue - 240.0))
+    ) * 0.3;
+    color.rgb += shadowMaskCT * shadowTone * shadowChroma;
+    color.rgb += highlightMaskCT * highlightTone * highlightChroma;
+
+    // 6. Fade — shadow-only (no highlight bleed)
+    float lumaFade = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+    float shadowFadeMask = 1.0 - smoothstep(0.0, 0.4, lumaFade);
+    color.rgb = color.rgb + shadowFadeMask * fade * (vec3(1.0) - color.rgb) * 0.6;
+
+    return color;
+}
+""")
+
+    static let filmCompression = CIColorKernel(source: """
+kernel vec4 filmCompression(__sample image, float amount, float range) {
+    vec4 color = image;
+    if (amount < 0.001) {
+        return color;
+    }
+    float r = clamp(range, 0.0, 1.0);
+    float k = mix(5.15, 2.85, r);
+    float rangeSoft = smoothstep(0.82, 1.0, r);
+    float amt = amount * (1.0 - 0.18 * rangeSoft);
+    float luma = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+    float x = clamp(k * (luma - 0.5), -5.5, 5.5);
+    float s = 1.0 / (1.0 + exp(-x));
+    float scale = luma > 0.001 ? mix(luma, s, amt) / luma : 1.0;
+    color.rgb = clamp(color.rgb * scale, 0.0, 1.0);
+    return color;
+}
+""")
+
+    // v2 (presetVersion="v2"): luma-only film latitude compression.
+    //   - Same v1 sigmoid knee at 0.82 (the wider 0.65 knee in the original
+    //     v2 attempt under-compressed mid-range; reverted to 0.82).
+    //   - Highlight squeeze above luma=0.7 is luma-only (single scalar applied
+    //     uniformly to RGB) — preserves hue. The original v2 used per-channel
+    //     `compressed * compressed` quadratic which destroyed hue at strong
+    //     contrast. Squeeze magnitude reduced to 0.10 to avoid micro-banding.
+    static let filmCompressionV2 = CIColorKernel(source: """
+kernel vec4 filmCompressionV2(__sample image, float amount, float range) {
+    vec4 color = image;
+    if (amount < 0.001) {
+        return color;
+    }
+    float r = clamp(range, 0.0, 1.0);
+    float k = mix(5.15, 2.85, r);
+    float rangeSoft = smoothstep(0.82, 1.0, r);
+    float amt = amount * (1.0 - 0.18 * rangeSoft);
+    float luma = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+    float x = clamp(k * (luma - 0.5), -5.5, 5.5);
+    float sigm = 1.0 / (1.0 + exp(-x));
+    float scale = luma > 0.001 ? mix(luma, sigm, amt) / luma : 1.0;
+    vec3 compressed = color.rgb * scale;
+    float hiMask = smoothstep(0.7, 1.0, luma);
+    float squeezeFactor = 1.0 - hiMask * amt * 0.10;
+    color.rgb = clamp(compressed * squeezeFactor, 0.0, 1.0);
+    return color;
+}
+""")
+
+    static let printStage = CIColorKernel(source: """
+vec3 applyPrintContrast(vec3 rgb, float amount) {
+    if (amount < 0.001) {
+        return rgb;
+    }
+    float k = mix(1.0, 5.0, amount);
+    vec3 s = 1.0 / (1.0 + exp(-k * (rgb - 0.5)));
+    return clamp(mix(rgb, s, amount), 0.0, 1.0);
+}
+
+kernel vec4 printStage(__sample image, float printContrast, float cyan, float magenta, float yellow) {
+    vec4 color = image;
+    float cmyScale = 0.15;
+    color.r -= cyan * cmyScale;
+    color.g -= magenta * cmyScale;
+    color.b -= yellow * cmyScale;
+    color.rgb = applyPrintContrast(color.rgb, printContrast);
+    return vec4(clamp(color.rgb, 0.0, 1.0), image.a);
+    }
+""")
+
+    static let motionFeedback = CIColorKernel(source: """
+kernel vec4 motionFeedback(__sample currentFrame, __sample previousFrame, float trailIntensity, float hasPrevious) {
+    float trail = clamp(trailIntensity, 0.0, 0.95) * clamp(hasPrevious, 0.0, 1.0);
+    vec3 rgb = mix(currentFrame.rgb, previousFrame.rgb, trail);
+    return vec4(clamp(rgb, 0.0, 1.0), currentFrame.a);
+}
+""")
+
+    static let motionBlend = CIColorKernel(source: """
+kernel vec4 motionBlend(
+    __sample frame0,
+    __sample frame1,
+    __sample frame2,
+    __sample frame3,
+    __sample frame4,
+    __sample frame5,
+    __sample frame6,
+    __sample frame7,
+    float weight0,
+    float weight1,
+    float weight2,
+    float weight3,
+    float weight4,
+    float weight5,
+    float weight6,
+    float weight7
+) {
+    vec4 color = frame0 * weight0
+        + frame1 * weight1
+        + frame2 * weight2
+        + frame3 * weight3
+        + frame4 * weight4
+        + frame5 * weight5
+        + frame6 * weight6
+        + frame7 * weight7;
+    return vec4(clamp(color.rgb, 0.0, 1.0), clamp(color.a, 0.0, 1.0));
+}
+""")
+
+    static let softKneeHighlight = CIColorKernel(source: """
+kernel vec4 softKneeHighlight(__sample image, float threshold, float knee, __color tintColor) {
+    float luma = dot(image.rgb, vec3(0.2126, 0.7152, 0.0722));
+    float safeThreshold = max(threshold, 1e-4);
+    float safeKnee = max(knee * safeThreshold, 1e-4);
+    float t = clamp((luma - threshold + safeKnee) / (2.0 * safeKnee), 0.0, 1.0);
+    float contribution = t * t * mix(safeKnee, 1.0, t);
+    contribution = max(contribution, max(0.0, luma - threshold));
+    return vec4(image.rgb * contribution * tintColor.rgb, image.a);
+}
+""")
+
+    static let glowComposite = CIColorKernel(source: """
+vec3 glowShoulder(vec3 energy) {
+    return 1.0 - exp(-max(energy, vec3(0.0)));
+}
+
+float glowHeadroom(vec3 baseRgb, float floorValue) {
+    float luma = dot(baseRgb, vec3(0.2126, 0.7152, 0.0722));
+    return mix(floorValue, 1.0, sqrt(clamp(1.0 - luma, 0.0, 1.0)));
+}
+
+kernel vec4 glowComposite(__sample base, __sample bloom, __sample halation, __sample diffusionImage, float bloomStrength, float halationIntensity, float diffusionAmount, float diffusionBase) {
+    vec3 baseRgb = base.rgb;
+    vec3 result = baseRgb;
+    vec3 glowEnergy = bloom.rgb * bloomStrength + halation.rgb * halationIntensity;
+    vec3 glow = glowShoulder(glowEnergy) * glowHeadroom(baseRgb, 0.82);
+    result = result + min(glow, max(vec3(0.0), vec3(1.0) - result));
+
+    if (diffusionAmount > 0.0) {
+        vec3 diffOpacity = glowShoulder(diffusionImage.rgb * diffusionAmount * diffusionBase) * glowHeadroom(baseRgb, 0.88);
+        result = result + min(diffOpacity, max(vec3(0.0), vec3(1.0) - result));
+    }
+
+    return vec4(clamp(result, 0.0, 1.0), base.a);
+}
+""")
+
+    /// Backlight Veil composite — verbatim CI port of the WGSL direct +
+    /// scatter branch at
+    /// `packages/film-lab-renderer/src/webgpu/shaders/composite.frag.wgsl.ts:288-316`.
+    /// Used only when the optical filter family selects Backlight Veil; the
+    /// legacy `glowComposite` kernel above remains the path for every other
+    /// look so existing exports are byte-equivalent. Output is intentionally
+    /// unclamped to mirror WGSL — downstream stages (vignette / final 8-bit
+    /// conversion) handle headroom.
+    static let glowCompositeBacklightVeil = CIColorKernel(source: """
+vec3 glowShoulder(vec3 energy) {
+    return 1.0 - exp(-max(energy, vec3(0.0)));
+}
+
+kernel vec4 glowCompositeBacklightVeil(__sample base, __sample bloom, __sample halation, __sample diffusionImage, float bloomStrength, float halationIntensity, float diffusionAmount, float directTransmission, float blackRetention, float scatterStrength, float highlightReactivity, float warmScatter, float spectralTail) {
+    vec3 luma709 = vec3(0.2126, 0.7152, 0.0722);
+    vec3 baseRgb = base.rgb;
+    vec3 bloomRgb = bloom.rgb * bloomStrength;
+    vec3 halationRgb = halation.rgb * halationIntensity;
+    vec3 diffusedRgb = diffusionImage.rgb;
+
+    float baseLuma = dot(baseRgb, luma709);
+    float shadowHold = 1.0 - smoothstep(0.02, 0.34, baseLuma);
+    float directLoss = (1.0 - directTransmission) * scatterStrength * (1.0 - shadowHold * blackRetention * 0.75);
+    vec3 direct = baseRgb * (1.0 - directLoss);
+
+    float highlightMask = smoothstep(0.42, 1.28, dot(max(baseRgb, vec3(0.0)), luma709));
+    float highlightDrive = mix(1.0, 1.0 + highlightMask * 1.65, highlightReactivity);
+    float blackProtect = mix(1.0, smoothstep(0.04, 0.48, baseLuma), blackRetention);
+    vec3 warmBias = vec3(
+        1.0 + warmScatter * 0.18 + spectralTail * 0.12,
+        1.0 + warmScatter * 0.05,
+        1.0 - warmScatter * 0.10 - spectralTail * 0.08
+    );
+    vec3 scatterEnergy = bloomRgb * 0.82 + halationRgb * 1.08 + diffusedRgb * diffusionAmount * 0.24;
+    vec3 scatter = glowShoulder(scatterEnergy * warmBias * scatterStrength * highlightDrive * blackProtect);
+
+    return vec4(direct + scatter, base.a);
+}
+""")
+
+    // Vignette kernel with optional ray-angle field mask (T3, Stream 2, v1.1).
+    //
+    // `opticsPack` = vec3(tanHalfFovX, tanHalfFovY, referenceIncidence).
+    // `applyMask` is 1.0 only when `cameraOptics.source == "metadata"`;
+    // for `"assumed"` / nil / fallback65 sources it stays 0.0.
+    //
+    // Math note: the mask must modulate the *darkening amount*, not the final
+    // pixel multiplier. At the center `mask = 0` (no edge falloff); applying
+    // that as a final multiplier would drive the center to black. Instead we
+    // fold the mask into `intensity * dist^2` so the center always stays
+    // untouched (`vig = 1.0`) and only the edge falloff is scaled by
+    // optics-aware weight. When `applyMask = 0`, `effectiveMask = 1.0` and
+    // the formula collapses to the original `1 - intensity * dist^2`,
+    // byte-identical with pre-Stream-2 output.
+    //
+    // ── v1.1.1 (Portrait Optics 物理化 / 2026-04-25) ─────────────────────────
+    //
+    // Planned physicalization (M1 owns the math change; T3 left this comment
+    // ahead of the code edit). Three coordinated moves:
+    //
+    //   1. `dist` becomes pixel-circular instead of UV-isotropic.
+    //      Before: `length(uv - 0.5) * 1.414`  (UV circle → pixel ellipse,
+    //              portrait gets a vertically stretched falloff).
+    //      After:  `length((uv - 0.5) * extentSize) / halfDiag`,
+    //              where `halfDiag = length(extentSize * 0.5)`.
+    //      Result: corner = 1.0 regardless of aspect, true circular falloff
+    //              in pixel space, aspect自動追従.
+    //
+    //   2. Ray-angle reference incidence becomes **actual-corner reference**.
+    //      `opticsPack.z` is currently derived from the fixed 65° HFOV
+    //      reference geometry, so portrait input only reaches normalized
+    //      ≈ 0.49 at the corner. M1 will have the call site (kernelArgs in
+    //      FilmtoneRayAngleOptics) compute `refIncidence` directly from the
+    //      *resolved* `tanHalfFovX/Y` so the actual image corner saturates
+    //      at mask = 1.0 for any aspect / FOV combination.
+    //
+    //   3. Center invariance (the v1.1 ray-angle requirement: "image center
+    //      must not be darkened") is preserved by construction:
+    //          uv = (0.5, 0.5)  ⇒  sensor = 0  ⇒  ray = 0  ⇒  incidence = 0
+    //      so `normalized = 0` and `mask = 0` at the center, independent of
+    //      the new reference. Edge-only falloff scaling is unchanged.
+    //
+    // Moving Postcard 哲学的根拠: vignette は「光学中心からの実 pixel 距離」
+    // 基準であるべき (UV 比例ではない)。aspect 不依存の真円グラデーションこそ
+    // フィルム的真実性に整合し、portrait / landscape どちらでもレンズ収差の
+    // 体感が一致する。
+    //
+    // Desktop divergence (Risks 2): `packages/film-lab-renderer/src/webgpu/
+    // shaders/composite.frag.wgsl.ts` および `rayAngleOptics.ts` は Desktop
+    // v1.0.x として **frozen**。本物理化は iOS 単独で先行し、Desktop reconcile
+    // は別 PR / follow-up issue (life ラベル `creative` `tech`) で扱う。
+    // sidecar JSON / DTO (fxPx, fyPx, fovXDeg, fovYDeg) は無変更のため
+    // contract verifier は通過する。
+    //
+    // Implementation owner: **M1 (Phase 2)**. T3 はコメント先行のみで、
+    // この時点では数式 (vec2/vec3/float 計算) は一切変更しない。
+    static let vignette = CIColorKernel(source: """
+kernel vec4 vignette(__sample image, float intensity, vec2 extentOrigin, vec2 extentSize, float rayAngleGamma, float rayAngleInner, vec3 opticsPack, float applyMask) {
+    vec4 color = image;
+    vec2 uv = (destCoord() - extentOrigin) / extentSize;
+    vec2 distPx = (uv - vec2(0.5, 0.5)) * extentSize;
+    float halfDiag = length(extentSize * 0.5);
+    float dist = length(distPx) / max(halfDiag, 1.0);
+
+    vec2 sensor = (uv - vec2(0.5, 0.5)) * 2.0;
+    float rayX = sensor.x * opticsPack.x;
+    float rayY = sensor.y * opticsPack.y;
+    float viewZ = 1.0 / sqrt(rayX * rayX + rayY * rayY + 1.0);
+    float incidence = 1.0 - viewZ;
+    float refIncidence = max(opticsPack.z, 1.0e-5);
+    float normalized = clamp(incidence / refIncidence, 0.0, 1.0);
+    float gammaSafe = max(rayAngleGamma, 0.001);
+    float innerSafe = clamp(rayAngleInner, 0.0, 0.8);
+    float shaped = pow(normalized, gammaSafe);
+    float t = clamp((shaped - innerSafe) / max(1.0 - innerSafe, 1.0e-6), 0.0, 1.0);
+    float mask = t * t * (3.0 - 2.0 * t);
+    float effectiveMask = mix(1.0, mask, clamp(applyMask, 0.0, 1.0));
+
+    float vig = 1.0 - intensity * dist * dist * effectiveMask;
+    color.rgb *= clamp(vig, 0.0, 1.0);
+    return color;
+}
+""")
+
+    // NOTE: aspect 補正は v1.1.1 では vignette / edgeSoftnessBlend のみ pixel-physical 化。grain と radialRGBSplit は v1.2 follow-up（intensity / hue で見た目 dominate しており優先度低い）。
+    static let grain = CIColorKernel(source: """
+float grainPixelHash(vec2 p, float seed) {
+    return fract(sin(dot(p + vec2(seed, seed * 0.73), vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
+}
+
+float grainValueNoise(vec2 p, float seed) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float a = grainPixelHash(i, seed);
+    float b = grainPixelHash(i + vec2(1.0, 0.0), seed);
+    float c = grainPixelHash(i + vec2(0.0, 1.0), seed);
+    float d = grainPixelHash(i + vec2(1.0, 1.0), seed);
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+float grainClumpHash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+float grainClumpNoise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float a = grainClumpHash(i);
+    float b = grainClumpHash(i + vec2(1.0, 0.0));
+    float c = grainClumpHash(i + vec2(0.0, 1.0));
+    float d = grainClumpHash(i + vec2(1.0, 1.0));
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+vec2 grainRotate(vec2 p, float angle) {
+    float s = sin(angle);
+    float c = cos(angle);
+    return vec2(c * p.x - s * p.y, s * p.x + c * p.y);
+}
+
+float grainFineNoise(vec2 p, float seed) {
+    vec2 a = grainRotate(p * 1.07, 0.73 + seed * 0.011);
+    vec2 b = grainRotate(p * 0.61 + vec2(13.7, 2.1), -0.52 + seed * 0.007);
+    float n1 = grainPixelHash(floor(a), seed * 1.21 + 19.0);
+    float n2 = grainValueNoise(b, seed * 0.83 + 47.0);
+    return n1 * 0.58 + n2 * 0.42;
+}
+
+vec4 grainSignal(vec2 pixelCoord, float grainFrame, float sourceSeed, float size, float coarseBlend) {
+    float fineSeed = grainFrame * 1.7 + sourceSeed * 13.0;
+    vec2 fineWarp = vec2(
+        grainValueNoise(pixelCoord / 96.0 + vec2(sourceSeed * 0.013, grainFrame * 0.17), fineSeed + 5.0),
+        grainValueNoise(pixelCoord / 113.0 + vec2(sourceSeed * 0.019 + 9.0, grainFrame * 0.11), fineSeed + 11.0)
+    );
+    float fineScale = mix(1.34, 0.90, smoothstep(0.0, 0.25, size));
+    vec2 fineCoord = pixelCoord * fineScale + fineWarp * 2.35;
+    float fineLuma = grainFineNoise(fineCoord, fineSeed);
+    float fineChromaR = grainFineNoise(fineCoord + vec2(37.2, 11.4), fineSeed + 101.0);
+    float fineChromaB = grainFineNoise(fineCoord + vec2(7.6, 53.8), fineSeed + 211.0);
+
+    float grainDiameter = mix(1.55, 6.40, pow(size, 0.68));
+    vec2 grainCoord = pixelCoord / grainDiameter;
+    vec2 grainCell = floor(grainCoord);
+    float pixelLuma = grainPixelHash(pixelCoord, fineSeed + 3.0);
+    float cellHard = grainPixelHash(grainCell, fineSeed);
+    float cellSoft = grainValueNoise(
+        grainCoord * mix(1.15, 0.72, size) + vec2(sourceSeed * 0.004, grainFrame * 0.031),
+        fineSeed + 17.0
+    );
+    float coarseCore = mix(cellHard, cellSoft, 0.58);
+    float coarseLuma = mix(pixelLuma, coarseCore, mix(0.34, 0.84, size));
+    float lumaGrain = mix(fineLuma, coarseLuma, coarseBlend);
+
+    float neighborScale = mix(1.25, grainDiameter * 0.74, coarseBlend);
+    float neighborA = grainValueNoise((pixelCoord + vec2(neighborScale, 0.0)) / neighborScale, fineSeed + 29.0) - 0.5;
+    float neighborB = grainValueNoise((pixelCoord + vec2(0.0, neighborScale)) / (neighborScale * 1.07), fineSeed + 37.0) - 0.5;
+    float arMix = mix(0.10, 0.22, coarseBlend);
+    lumaGrain = mix(lumaGrain, lumaGrain * 0.78 + (neighborA + neighborB) * 0.11, arMix);
+
+    float coarseChromaR = grainValueNoise(grainCoord * 0.86 + vec2(5.0, sourceSeed * 0.01), fineSeed + 503.0) - 0.5;
+    float coarseChromaB = grainValueNoise(grainCoord * 0.91 + vec2(sourceSeed * 0.008, 7.0), fineSeed + 1009.0) - 0.5;
+    float chromaR = mix(fineChromaR, coarseChromaR, coarseBlend);
+    float chromaB = mix(fineChromaB, coarseChromaB, coarseBlend);
+
+    float clumpScale = mix(140.0, 24.0, size);
+    float clump = grainClumpNoise((pixelCoord / clumpScale) + vec2(grainFrame * 0.43 + sourceSeed * 0.1, sourceSeed * 0.07));
+    float fineDensity = mix(
+        0.92,
+        1.08,
+        grainClumpNoise(pixelCoord / 170.0 + vec2(sourceSeed * 0.021 + 3.0, grainFrame * 0.09))
+    );
+    float coarseDensity = mix(1.0, 0.34 + clump * 1.32, size * 0.80);
+    float densityMod = mix(fineDensity, coarseDensity, coarseBlend);
+    return vec4(lumaGrain, chromaR, chromaB, densityMod);
+}
+
+kernel vec4 grain(__sample image, float intensity, float radialMix, float grainSize, float timeSeconds, float sourceSeed, vec2 extentOrigin, vec2 extentSize) {
+    vec4 color = image;
+    vec2 uv = (destCoord() - extentOrigin) / extentSize;
+    float size = clamp(grainSize, 0.0, 1.0);
+    float coarseBlend = smoothstep(0.12, 0.42, size);
+    vec2 grainDelta = uv - vec2(0.5, 0.5);
+    grainDelta.x *= extentSize.x / max(extentSize.y, 1.0);
+    float grainRadial = clamp(length(grainDelta) * 2.0, 0.0, 1.0);
+    float grainRadialWeight = mix(0.76, 1.42, pow(grainRadial, 1.35));
+    float grainRadialEffective = mix(1.0, grainRadialWeight, clamp(radialMix, 0.0, 1.0));
+
+    vec2 pixelCoord = uv * extentSize;
+    float luma = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+    float chromaSpread = max(max(abs(color.r - color.g), abs(color.r - color.b)), abs(color.g - color.b));
+
+    float grainClock = max(timeSeconds, 0.0) * mix(1.85, 2.75, coarseBlend);
+    float grainFrameA = floor(grainClock);
+    float grainPhase = smoothstep(0.0, 1.0, fract(grainClock));
+    vec4 signalA = grainSignal(pixelCoord, grainFrameA, sourceSeed, size, coarseBlend);
+    vec4 signalB = grainSignal(pixelCoord, grainFrameA + 1.0, sourceSeed, size, coarseBlend);
+    float phaseVariance = (1.0 - grainPhase) * (1.0 - grainPhase) + grainPhase * grainPhase;
+    float phaseGain = min(1.28, 1.0 / sqrt(max(phaseVariance, 0.001)));
+    vec4 signal = mix(signalA, signalB, grainPhase);
+
+    float lumaGrain = signal.x * phaseGain;
+    float densityMod = signal.w;
+    float deepShadowGate = smoothstep(0.025, 0.11, luma);
+    float shadowPresence = mix(0.86, 1.18, smoothstep(0.08, 0.36, luma));
+    float highlightGuard = mix(1.0, 0.58, smoothstep(0.58, 0.96, luma));
+    float lumaVisibility = deepShadowGate * shadowPresence * highlightGuard;
+
+    float monochromeChromaGate = mix(0.08, 1.0, smoothstep(0.025, 0.18, chromaSpread));
+    float highlightChromaGate = mix(1.0, 0.38, smoothstep(0.52, 0.92, luma));
+    float chromaGate = monochromeChromaGate * highlightChromaGate;
+    float independentChroma = mix(0.050, 0.16, coarseBlend);
+    float chromaCouple = mix(0.035, 0.11, coarseBlend);
+    float chromaR = (signal.y * phaseGain * independentChroma + lumaGrain * chromaCouple) * chromaGate;
+    float chromaB = (signal.z * phaseGain * independentChroma - lumaGrain * chromaCouple * 0.70) * chromaGate;
+
+    float weight = intensity * mix(0.94, 1.08, coarseBlend) * grainRadialEffective * densityMod * lumaVisibility;
+    color.r += (lumaGrain + chromaR) * weight;
+    color.g += lumaGrain * weight;
+    color.b += (lumaGrain + chromaB) * weight;
+    color.rgb = clamp(color.rgb, 0.0, 1.0);
+    return color;
+}
+""")
+
+    // NOTE: aspect 補正は v1.1.1 では vignette / edgeSoftnessBlend のみ pixel-physical 化。grain と radialRGBSplit は v1.2 follow-up（intensity / hue で見た目 dominate しており優先度低い）。
+    static let radialRGBSplit = CIKernel(source: """
+kernel vec4 radialRGBSplit(sampler image, float amount, vec2 extentOrigin, vec2 extentSize) {
+    vec2 coord = destCoord();
+    vec2 uv = (coord - extentOrigin) / extentSize;
+    vec2 delta = uv - vec2(0.5, 0.5);
+    delta.x *= extentSize.x / max(extentSize.y, 1.0);
+    float radial = clamp(length(delta) * 2.0, 0.0, 1.0);
+    float weight = pow(radial, 1.65);
+    float amt = amount * weight;
+    vec2 dir = normalize(delta + vec2(1e-5, 1e-5));
+    vec2 offset = vec2(dir.x * amt * extentSize.x, dir.y * amt * extentSize.y);
+    vec4 center = sample(image, samplerTransform(image, coord));
+    float r = sample(image, samplerTransform(image, coord + offset)).r;
+    float b = sample(image, samplerTransform(image, coord - offset)).b;
+    return vec4(r, center.g, b, center.a);
+}
+""")
+
+    static let tentDownsample = CIKernel(source: """
+vec2 mirrorCoord(vec2 coord, vec2 origin, vec2 size) {
+    vec2 safeSize = max(size, vec2(1.0, 1.0));
+    vec2 uv = (coord - origin) / safeSize;
+    vec2 tiled = mod(uv, 2.0);
+    vec2 mirroredUv = 1.0 - abs(tiled - 1.0);
+    return origin + (mirroredUv * safeSize);
+}
+
+vec4 sampleMirror(sampler image, vec2 coord, vec2 origin, vec2 size) {
+    return sample(image, samplerTransform(image, mirrorCoord(coord, origin, size)));
+}
+
+kernel vec4 tentDownsample(sampler image, vec2 sourceOrigin, vec2 sourceSize, vec2 targetOrigin, vec2 sourceStep) {
+    vec2 coord = destCoord();
+    vec2 sourceCoord = sourceOrigin + ((coord - targetOrigin) * sourceStep);
+
+    vec4 a = sampleMirror(image, sourceCoord + vec2(-2.0,  2.0), sourceOrigin, sourceSize);
+    vec4 b = sampleMirror(image, sourceCoord + vec2( 0.0,  2.0), sourceOrigin, sourceSize);
+    vec4 c = sampleMirror(image, sourceCoord + vec2( 2.0,  2.0), sourceOrigin, sourceSize);
+
+    vec4 dd = sampleMirror(image, sourceCoord + vec2(-1.0,  1.0), sourceOrigin, sourceSize);
+    vec4 e  = sampleMirror(image, sourceCoord + vec2( 1.0,  1.0), sourceOrigin, sourceSize);
+
+    vec4 f = sampleMirror(image, sourceCoord + vec2(-2.0, 0.0), sourceOrigin, sourceSize);
+    vec4 g = sampleMirror(image, sourceCoord, sourceOrigin, sourceSize);
+    vec4 h = sampleMirror(image, sourceCoord + vec2( 2.0, 0.0), sourceOrigin, sourceSize);
+
+    vec4 ii = sampleMirror(image, sourceCoord + vec2(-1.0, -1.0), sourceOrigin, sourceSize);
+    vec4 j  = sampleMirror(image, sourceCoord + vec2( 1.0, -1.0), sourceOrigin, sourceSize);
+
+    vec4 k = sampleMirror(image, sourceCoord + vec2(-2.0, -2.0), sourceOrigin, sourceSize);
+    vec4 l = sampleMirror(image, sourceCoord + vec2( 0.0, -2.0), sourceOrigin, sourceSize);
+    vec4 m = sampleMirror(image, sourceCoord + vec2( 2.0, -2.0), sourceOrigin, sourceSize);
+
+    return ((dd + e + ii + j) * 0.125)
+         + (g * 0.125)
+         + ((a + c + k + m) * 0.03125)
+         + ((b + f + h + l) * 0.0625);
+}
+""")
+
+    static let tentUpsample = CIKernel(source: """
+vec2 mirrorCoord(vec2 coord, vec2 origin, vec2 size) {
+    vec2 safeSize = max(size, vec2(1.0, 1.0));
+    vec2 uv = (coord - origin) / safeSize;
+    vec2 tiled = mod(uv, 2.0);
+    vec2 mirroredUv = 1.0 - abs(tiled - 1.0);
+    return origin + (mirroredUv * safeSize);
+}
+
+vec4 sampleMirror(sampler image, vec2 coord, vec2 origin, vec2 size) {
+    return sample(image, samplerTransform(image, mirrorCoord(coord, origin, size)));
+}
+
+kernel vec4 tentUpsample(sampler image, vec2 sourceOrigin, vec2 sourceSize, vec2 targetOrigin, vec2 sourceStep) {
+    vec2 coord = destCoord();
+    vec2 sourceCoord = sourceOrigin + ((coord - targetOrigin) * sourceStep);
+
+    vec4 s  = sampleMirror(image, sourceCoord, sourceOrigin, sourceSize);
+    vec4 s0 = sampleMirror(image, sourceCoord + vec2(-1.0,  1.0), sourceOrigin, sourceSize);
+    vec4 s1 = sampleMirror(image, sourceCoord + vec2( 0.0,  1.0), sourceOrigin, sourceSize);
+    vec4 s2 = sampleMirror(image, sourceCoord + vec2( 1.0,  1.0), sourceOrigin, sourceSize);
+    vec4 s3 = sampleMirror(image, sourceCoord + vec2(-1.0,  0.0), sourceOrigin, sourceSize);
+    vec4 s4 = sampleMirror(image, sourceCoord + vec2( 1.0,  0.0), sourceOrigin, sourceSize);
+    vec4 s5 = sampleMirror(image, sourceCoord + vec2(-1.0, -1.0), sourceOrigin, sourceSize);
+    vec4 s6 = sampleMirror(image, sourceCoord + vec2( 0.0, -1.0), sourceOrigin, sourceSize);
+    vec4 s7 = sampleMirror(image, sourceCoord + vec2( 1.0, -1.0), sourceOrigin, sourceSize);
+
+    vec4 upsampled = (s * 4.0)
+                   + ((s1 + s3 + s4 + s6) * 2.0)
+                   + (s0 + s2 + s5 + s7);
+    return upsampled / 16.0;
+}
+""")
+
+    // ── edgeSoftnessBlend (v1.1.1 Portrait Optics 物理化 / 2026-04-25) ─────
+    //
+    // Known bug (現行 line 内 `edgeDelta.x *= extentSize.x / max(extentSize.y, 1.0)`):
+    // 横長前提の aspect 補正により、portrait 入力では左右エッジの edgeR が
+    // ~0.397 までしか達しない (landscape 左右では 1.0 saturate)。
+    // smoothstep(0.25, 1.0, edgeR) のため左右エッジでレンズソフトが
+    // 視認困難なレベルまで弱まる。
+    //
+    // Planned replacement (M1 owner / Phase 2):
+    //
+    //     vec2 edgePx = (uv - vec2(0.5)) * extentSize;
+    //     float halfDiag = length(extentSize * 0.5);
+    //     float edgeR = clamp(length(edgePx) / max(halfDiag, 1.0), 0.0, 1.0);
+    //
+    // Effect:
+    //   - corner で常に edgeR = 1.0 (aspect 不依存)
+    //   - エッジ中点は短軸 ~0.49 / 長軸 ~0.872、aspect 自動追従
+    //   - portrait 左右 / landscape 左右が同等の lensSoft 強度に到達
+    //
+    // `lensR` (現行 `length(edgeDelta) * 2.0`) も同基準で再導出される予定:
+    //
+    //     float lensR = clamp(length(edgePx) / max(halfDiag, 1.0), 0.0, 1.0);
+    //
+    // (スケール係数は M1 で QA 結果を見て微調整。0.5×halfDiag normalize や
+    // 元の 2.0 ゲインに相当する別係数になる可能性あり。)
+    //
+    // Moving Postcard 哲学: 物理的に「光学中心からの実 pixel 距離」基準で
+    // レンズ収差 (edge softness, aberration soften, lensSoftness) を
+    // 再現する。UV 比例の楕円落ち込みは光学的に意味がない。
+    //
+    // Desktop divergence: Desktop renderer (composite.frag.wgsl.ts) は
+    // v1.0.x frozen。iOS 単独で物理化、reconcile は follow-up issue。
+    //
+    // Implementation owner: **M1 (Phase 2)**. T3 はコメント先行のみ、
+    // 数式に一切手を入れない。
+    static let edgeSoftnessBlend = CIKernel(source: """
+kernel vec4 edgeSoftnessBlend(sampler sharp, sampler blurred, float aberrationSoften, float lensSoftness, vec2 extentOrigin, vec2 extentSize) {
+    vec2 coord = destCoord();
+    vec2 uv = (coord - extentOrigin) / extentSize;
+    vec2 edgePx = (uv - vec2(0.5, 0.5)) * extentSize;
+    float halfDiag = length(extentSize * 0.5);
+    float edgeR = clamp(length(edgePx) / max(halfDiag, 1.0), 0.0, 1.0);
+    float edgeMask = smoothstep(0.25, 1.0, edgeR);
+    float lensR = clamp(length(edgePx) / max(halfDiag, 1.0), 0.0, 1.0);
+    float lensW = pow(lensR, 1.52);
+    float lensDrive = pow(clamp(lensSoftness, 0.0, 1.0), 0.78);
+    float lensWeight = clamp(lensDrive * lensW, 0.0, 1.0);
+    float lensMix = lensWeight * 0.72;
+    float softenAmt = clamp((aberrationSoften * edgeMask) + (lensMix * edgeMask), 0.0, 1.0);
+    vec4 sharpSample = sample(sharp, samplerTransform(sharp, coord));
+    vec4 blurSample = sample(blurred, samplerTransform(blurred, coord));
+    return mix(sharpSample, blurSample, softenAmt);
+}
+""")
+}

@@ -8,11 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		0BB8A8BD4529447093495AD8 /* LockScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BA722ECF59CA0509BE28D0A /* LockScreenView.swift */; };
+		0F432292C35AA746C1B5029F /* OpticalKernels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F866759EC6B64193580EDDE6 /* OpticalKernels.swift */; };
 		16AEB7307DB348ECDC7058AC /* ExportRenderHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 544A796C6E480CD796B35227 /* ExportRenderHelpers.swift */; };
 		181852B55B628E07A96EBD40 /* ExportSidecarDateFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C251B271BA66A31B9FDFFFF9 /* ExportSidecarDateFormatter.swift */; };
-		B1E10001000000000000B201 /* ExportInputLutBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B202 /* ExportInputLutBuilder.swift */; };
-		B1E10001000000000000B203 /* ExportSourceProfileResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B204 /* ExportSourceProfileResolver.swift */; };
-		B1E10001000000000000B205 /* ExportDepthPayloadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B206 /* ExportDepthPayloadManager.swift */; };
 		2D4D5561AFFF0125F03894AE /* FilmtoneExportAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E92BBC4019AD97D40A52D6E1 /* FilmtoneExportAttributes.swift */; };
 		33183593451FFC7F6B131F6F /* ExportSessionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A8953B81D88E54A0BD66518 /* ExportSessionModels.swift */; };
 		42D1A00148FB68BB1924A545 /* ExportMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F3FEA9C2799183E1F2B32E4 /* ExportMetrics.swift */; };
@@ -21,7 +19,9 @@
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
+		5394D3D00FBAC703C6C0C7C0 /* FilmtoneMotionBlurAccumulator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C2BA1AAE89F8EF13CDDD304 /* FilmtoneMotionBlurAccumulator.swift */; };
 		63F888EB39F993E54072124A /* DynamicIslandViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 914659B53876C5363F8AB84A /* DynamicIslandViews.swift */; };
+		7BEB7F8934F9E1F2C9091E9D /* FilmtoneSharedGradeProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFB20542EA38D7520A693144 /* FilmtoneSharedGradeProcessor.swift */; };
 		80C165763871B1D58ECA7A88 /* FilmtoneExportSession+Cancelable.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5389D2AC1264A75C8259AC3 /* FilmtoneExportSession+Cancelable.swift */; };
 		94B98E313D898089A3F2D764 /* FilmtoneExportAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E92BBC4019AD97D40A52D6E1 /* FilmtoneExportAttributes.swift */; };
 		9C5A6BF76EF250FAF3AF63DD /* CancelExportIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B14DB40995D16C85F10AC9F5 /* CancelExportIntent.swift */; };
@@ -45,6 +45,9 @@
 		A20000010000000000000030 /* ExportCancelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000030 /* ExportCancelController.swift */; };
 		A20000010000000000000050 /* FilmtoneExportNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000050 /* FilmtoneExportNotification.swift */; };
 		A9C09CB4FBA0A528C5478E81 /* FilmtoneExportActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27AC4B71358558416D8A1808 /* FilmtoneExportActivity.swift */; };
+		B1E10001000000000000B201 /* ExportInputLutBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B202 /* ExportInputLutBuilder.swift */; };
+		B1E10001000000000000B203 /* ExportSourceProfileResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B204 /* ExportSourceProfileResolver.swift */; };
+		B1E10001000000000000B205 /* ExportDepthPayloadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B206 /* ExportDepthPayloadManager.swift */; };
 		D10000010000000000000001 /* FilmtoneRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000001 /* FilmtoneRootView.swift */; };
 		D10000010000000000000002 /* FilmtoneEditorStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000002 /* FilmtoneEditorStore.swift */; };
 		D10000010000000000000003 /* FilmtoneEditorFacade.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000003 /* FilmtoneEditorFacade.swift */; };
@@ -191,6 +194,7 @@
 		5DF203A51BB1545086A0BC3B /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		8BA722ECF59CA0509BE28D0A /* LockScreenView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LockScreenView.swift; sourceTree = "<group>"; };
 		914659B53876C5363F8AB84A /* DynamicIslandViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DynamicIslandViews.swift; sourceTree = "<group>"; };
+		9C2BA1AAE89F8EF13CDDD304 /* FilmtoneMotionBlurAccumulator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtoneMotionBlurAccumulator.swift; sourceTree = "<group>"; };
 		AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_App.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.release.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig"; sourceTree = "<group>"; };
 		B10000010000000000000001 /* AssetPickerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetPickerService.swift; sourceTree = "<group>"; };
@@ -204,6 +208,9 @@
 		B10000010000000000000011 /* FilmtoneMediaRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneMediaRuntime.swift; sourceTree = "<group>"; };
 		B10000010000000000000012 /* MezzanineService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MezzanineService.swift; sourceTree = "<group>"; };
 		B14DB40995D16C85F10AC9F5 /* CancelExportIntent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CancelExportIntent.swift; sourceTree = "<group>"; };
+		B1E10001000000000000B202 /* ExportInputLutBuilder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportInputLutBuilder.swift; sourceTree = "<group>"; };
+		B1E10001000000000000B204 /* ExportSourceProfileResolver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportSourceProfileResolver.swift; sourceTree = "<group>"; };
+		B1E10001000000000000B206 /* ExportDepthPayloadManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportDepthPayloadManager.swift; sourceTree = "<group>"; };
 		B20000010000000000000001 /* MezzanineColorProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MezzanineColorProbe.swift; sourceTree = "<group>"; };
 		B20000010000000000000020 /* DepthSourceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthSourceService.swift; sourceTree = "<group>"; };
 		B20000010000000000000021 /* FilmtoneDepthMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneDepthMap.swift; sourceTree = "<group>"; };
@@ -298,9 +305,6 @@
 		C2000001000000000000009B /* FilmtoneCapturePreviewLayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCapturePreviewLayer.swift; sourceTree = "<group>"; };
 		C2000001000000000000009C /* FilmtoneCaptureTakePreviewLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCaptureTakePreviewLoader.swift; sourceTree = "<group>"; };
 		C2000001000000000000009D /* FilmtoneCaptureTakePreviewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCaptureTakePreviewModel.swift; sourceTree = "<group>"; };
-		B1E10001000000000000B202 /* ExportInputLutBuilder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportInputLutBuilder.swift; sourceTree = "<group>"; };
-		B1E10001000000000000B204 /* ExportSourceProfileResolver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportSourceProfileResolver.swift; sourceTree = "<group>"; };
-		B1E10001000000000000B206 /* ExportDepthPayloadManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportDepthPayloadManager.swift; sourceTree = "<group>"; };
 		C251B271BA66A31B9FDFFFF9 /* ExportSidecarDateFormatter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportSidecarDateFormatter.swift; sourceTree = "<group>"; };
 		D40000010000000000000001 /* CreativeLuts */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CreativeLuts; path = Resources/CreativeLuts; sourceTree = "<group>"; };
 		E92BBC4019AD97D40A52D6E1 /* FilmtoneExportAttributes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtoneExportAttributes.swift; sourceTree = "<group>"; };
@@ -312,7 +316,9 @@
 		F20000010000000000000003 /* SnapshotHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotHelper.swift; sourceTree = "<group>"; };
 		F20000010000000000000004 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
 		F5389D2AC1264A75C8259AC3 /* FilmtoneExportSession+Cancelable.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "FilmtoneExportSession+Cancelable.swift"; sourceTree = "<group>"; };
+		F866759EC6B64193580EDDE6 /* OpticalKernels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OpticalKernels.swift; sourceTree = "<group>"; };
 		FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.debug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.debug.xcconfig"; sourceTree = "<group>"; };
+		FFB20542EA38D7520A693144 /* FilmtoneSharedGradeProcessor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtoneSharedGradeProcessor.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -390,6 +396,8 @@
 				3A8953B81D88E54A0BD66518 /* ExportSessionModels.swift */,
 				C251B271BA66A31B9FDFFFF9 /* ExportSidecarDateFormatter.swift */,
 				B1E10001000000000000B204 /* ExportSourceProfileResolver.swift */,
+				9C2BA1AAE89F8EF13CDDD304 /* FilmtoneMotionBlurAccumulator.swift */,
+				F866759EC6B64193580EDDE6 /* OpticalKernels.swift */,
 			);
 			name = Internal;
 			path = Internal;
@@ -628,6 +636,7 @@
 				C20000010000000000000014 /* FilmtoneLibraryStore.swift */,
 				C20000010000000000000013 /* FilmtoneLutBlobCodec.swift */,
 				C10000010000000000000009 /* FilmtonePresetCatalog.swift */,
+				FFB20542EA38D7520A693144 /* FilmtoneSharedGradeProcessor.swift */,
 			);
 			name = Look;
 			path = Look;
@@ -911,6 +920,9 @@
 				B1E10001000000000000B201 /* ExportInputLutBuilder.swift in Sources */,
 				B1E10001000000000000B203 /* ExportSourceProfileResolver.swift in Sources */,
 				B1E10001000000000000B205 /* ExportDepthPayloadManager.swift in Sources */,
+				7BEB7F8934F9E1F2C9091E9D /* FilmtoneSharedGradeProcessor.swift in Sources */,
+				5394D3D00FBAC703C6C0C7C0 /* FilmtoneMotionBlurAccumulator.swift in Sources */,
+				0F432292C35AA746C1B5029F /* OpticalKernels.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
