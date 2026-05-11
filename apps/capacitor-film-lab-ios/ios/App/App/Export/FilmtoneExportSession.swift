@@ -93,9 +93,16 @@ final class FilmtoneExportSession {
     /// Phase 2B-7A: media writer / reader primitive collaborator. Owns
     /// writer construction, video input / reader-output settings, audio
     /// pipeline setup, audio append, finish/wait, and CMTime helpers.
-    /// `exportVideo`, `exportStillImage`, and `appendVideoSample` still
-    /// live on the session and forward `checkCancelled` into the writer.
+    /// `exportVideo`, `exportStillImage`, and the render path still live on
+    /// the session and forward `checkCancelled` into the writer.
     private let mediaWriter: ExportMediaWriter
+    /// Phase 2B-7B: per-frame append / rasterize collaborator. Owns the
+    /// writer readiness wait, pixel-buffer-pool allocation, CI render,
+    /// output color metadata application, the adaptor append, and the
+    /// per-frame signpost intervals. `exportVideo` retains the loop and
+    /// passes a render closure that reuses `renderableImage(...)` so the
+    /// grade / motion / depth stage order stays session-owned.
+    private let frameAppender: ExportFrameAppender
     private let sourceSeed: Double
     private let outputColorSpace: CGColorSpace
     private var degradedDecodePath = false
@@ -235,10 +242,19 @@ final class FilmtoneExportSession {
             preparedCreativeLut: preparedCreativeLut,
             outputColorSpace: outputColorSpace
         )
-        self.mediaWriter = ExportMediaWriter(
+        let mediaWriter = ExportMediaWriter(
             outputURL: outputURL,
             outputFPS: request.output.fps,
             colorPipeline: colorPipeline
+        )
+        self.mediaWriter = mediaWriter
+        self.frameAppender = ExportFrameAppender(
+            ciContext: ciContext,
+            outputColorSpace: outputColorSpace,
+            colorPipeline: colorPipeline,
+            performanceMetrics: self.performanceMetrics,
+            signposter: self.signposter,
+            mediaWriter: mediaWriter
         )
         self.sourceSeed = Self.makeStableSourceSeed(from: sourceURL.absoluteString)
         if disableGlowFamilyForExport {
@@ -994,7 +1010,7 @@ final class FilmtoneExportSession {
             }
             let outputTimeSec = CMTimeGetSeconds(outputPresentationTime)
             let sourceTimeSec = CMTimeGetSeconds(sourceLookupTime)
-            let appendedFrame = try appendVideoSample(
+            let appendedFrame = try frameAppender.appendVideoSample(
                 sample.buffer,
                 videoInput: videoInput,
                 writer: writer,
@@ -1004,7 +1020,16 @@ final class FilmtoneExportSession {
                 outputSize: outputSize,
                 outputPresentationTime: outputPresentationTime,
                 renderTimeSeconds: sourceTimeSec.isFinite ? sourceTimeSec : (outputTimeSec.isFinite ? outputTimeSec : 0),
-                waitForReady: false
+                waitForReady: false,
+                checkCancelled: checkCancelled,
+                renderFrameImage: { [self] imageBuffer, transform, outputSize, timeSeconds in
+                    renderableImage(
+                        from: imageBuffer,
+                        transform: transform,
+                        outputSize: outputSize,
+                        timeSeconds: timeSeconds
+                    )
+                }
             )
             guard appendedFrame else {
                 throw FilmtoneMediaError.exportFailed("The decoded video sample did not contain an image buffer.")
@@ -1692,80 +1717,6 @@ final class FilmtoneExportSession {
             hash &*= 1_099_511_628_211
         }
         return Double(hash % 8_192)
-    }
-
-    private func appendVideoSample(
-        _ sampleBuffer: CMSampleBuffer,
-        videoInput: AVAssetWriterInput,
-        writer: AVAssetWriter,
-        reader: AVAssetReader,
-        adaptor: AVAssetWriterInputPixelBufferAdaptor,
-        videoTrack: AVAssetTrack,
-        outputSize: CGSize,
-        outputPresentationTime: CMTime? = nil,
-        renderTimeSeconds: Double? = nil,
-        waitForReady: Bool = true
-    ) throws -> Bool {
-        try autoreleasepool { () throws -> Bool in
-            if waitForReady {
-                try performanceMetrics.measure(.waitEncoder) {
-                    try signposter.withIntervalSignpost("wait-encoder") {
-                        try mediaWriter.waitUntilReadyForMoreMediaData(videoInput, writer: writer, reader: reader, label: "video", checkCancelled: checkCancelled)
-                    }
-                }
-            }
-
-            guard let imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
-                return false
-            }
-            guard let pixelBufferPool = adaptor.pixelBufferPool else {
-                throw FilmtoneMediaError.exportFailed("Pixel buffer pool is unavailable.")
-            }
-
-            let sourcePresentationTime = ExportMediaWriter.validPresentationTime(for: sampleBuffer)
-            let outputTime = outputPresentationTime ?? sourcePresentationTime
-            let presentationTimeSec = renderTimeSeconds ?? CMTimeGetSeconds(sourcePresentationTime)
-            let frameImage = performanceMetrics.measure(.buildGraph) {
-                signposter.withIntervalSignpost("build-graph") {
-                    renderableImage(
-                        from: imageBuffer,
-                        transform: videoTrack.preferredTransform,
-                        outputSize: outputSize,
-                        timeSeconds: presentationTimeSec.isFinite ? presentationTimeSec : 0
-                    )
-                }
-            }
-
-            var renderedBuffer: CVPixelBuffer?
-            let creationStatus = CVPixelBufferPoolCreatePixelBuffer(nil, pixelBufferPool, &renderedBuffer)
-            guard creationStatus == kCVReturnSuccess, let renderedBuffer else {
-                throw FilmtoneMediaError.exportFailed("A render pixel buffer could not be created.")
-            }
-
-            performanceMetrics.measure(.render) {
-                signposter.withIntervalSignpost("render") {
-                    ciContext.render(
-                        frameImage,
-                        to: renderedBuffer,
-                        bounds: CGRect(origin: .zero, size: outputSize),
-                        colorSpace: outputColorSpace
-                    )
-                }
-            }
-            attachOutputColorMetadata(to: renderedBuffer)
-
-            let appended = performanceMetrics.measure(.append) {
-                signposter.withIntervalSignpost("append") {
-                    adaptor.append(renderedBuffer, withPresentationTime: outputTime)
-                }
-            }
-            if !appended {
-                throw FilmtoneMediaError.exportFailed(writer.error?.localizedDescription ?? "The frame could not be appended.")
-            }
-            performanceMetrics.recordRenderedFrame()
-
-            return true
-        }
     }
 
     private func renderingProgress(
