@@ -87,11 +87,6 @@ final class FilmtoneEditorStore: ObservableObject {
     @Published var source: SourceInfoDTO?
     @Published var probe: SourceProbeDTO?
     @Published var highlightMarkers: FilmtoneHighlightMarkers?
-    @Published var exportProgress: Phase0ExportProgressDTO?
-    @Published var exportResult: Phase0ExportResultDTO?
-    @Published var exportLocalAvailability: FilmtoneExportLocalAvailability = .none
-    @Published var saveToPhotosState: FilmtoneSaveToPhotosState = .notRun
-    @Published var isSavingToPhotos = false
     @Published var sourceLoadState: FilmtoneSourceLoadState?
     @Published var isBusy = false
     @Published var notice: String?
@@ -140,11 +135,6 @@ final class FilmtoneEditorStore: ObservableObject {
     /// mutation so SwiftUI redraws the Recent strip / Saved Looks chips
     /// without per-render disk reads.
     @Published var library: LibrarySnapshot = .empty
-    /// Snapshot of bytes held under `cachesDirectory/FilmtonePhase0/`. Loaded
-    /// lazily when the storage section opens; cleared after manual release so
-    /// the UI re-fetches.
-    @Published private(set) var cacheInventory: CacheInventoryDTO?
-    @Published private(set) var isReleasingCache = false
     /// Set when an `applySavedLook` mutation lands; cleared by every other
     /// project mutation. Read by the export pipeline so the sidecar can
     /// record which Saved Look produced the export. (Sidecar field-set is
@@ -155,7 +145,11 @@ final class FilmtoneEditorStore: ObservableObject {
     /// the apply site so M10 live preview
     /// (`makeLivePreviewGradeProcessor()`, synchronous) can read the
     /// resolved entry without async I/O.
-    private(set) var appliedSavedLookId: UUID? {
+    ///
+    /// Phase 3B: writable from `EditorProjectMutationCoordinator` (internal
+    /// access). Views still treat this as read-only — verified by grep that
+    /// no view-side file writes to `store.appliedSavedLookId`.
+    var appliedSavedLookId: UUID? {
         didSet {
             if appliedSavedLookId == nil {
                 projectController.clearAppliedSavedLookEntry()
@@ -174,9 +168,12 @@ final class FilmtoneEditorStore: ObservableObject {
     private let projectController: EditorProjectController
     private let libraryController: EditorLibraryController
     let previewOrchestrator: EditorPreviewOrchestrator
+    let projectMutationCoordinator: EditorProjectMutationCoordinator
+    let exportCoordinator: EditorExportCoordinator
     private var toastDismissTask: Task<Void, Never>?
     private var libraryBootstrapTask: Task<Void, Never>?
     private var previewCancellable: AnyCancellable?
+    private var exportCancellable: AnyCancellable?
 
     var preview: FilmtonePreviewState {
         previewOrchestrator.preview
@@ -191,6 +188,47 @@ final class FilmtoneEditorStore: ObservableObject {
         set { previewOrchestrator.isCompareHeld = newValue }
     }
 
+    // MARK: - Phase 3B export/cache forwards
+    //
+    // Forwarding so view code (`FilmtoneExportPanel`, `FilmtoneSourceProfileSheet`,
+    // `FilmtoneSnapshotSupport`) keeps reading `store.exportResult` etc.
+    // unchanged. `@Published` storage lives on `EditorExportCoordinator`; the
+    // Combine `objectWillChange.sink` bridge in `init` re-emits its change
+    // notifications through this store so SwiftUI redraws fire as before.
+
+    var exportProgress: Phase0ExportProgressDTO? {
+        get { exportCoordinator.exportProgress }
+        set { exportCoordinator.exportProgress = newValue }
+    }
+
+    var exportResult: Phase0ExportResultDTO? {
+        get { exportCoordinator.exportResult }
+        set { exportCoordinator.exportResult = newValue }
+    }
+
+    var exportLocalAvailability: FilmtoneExportLocalAvailability {
+        get { exportCoordinator.exportLocalAvailability }
+        set { exportCoordinator.exportLocalAvailability = newValue }
+    }
+
+    var saveToPhotosState: FilmtoneSaveToPhotosState {
+        get { exportCoordinator.saveToPhotosState }
+        set { exportCoordinator.saveToPhotosState = newValue }
+    }
+
+    var isSavingToPhotos: Bool {
+        get { exportCoordinator.isSavingToPhotos }
+        set { exportCoordinator.isSavingToPhotos = newValue }
+    }
+
+    var cacheInventory: CacheInventoryDTO? {
+        exportCoordinator.cacheInventory
+    }
+
+    var isReleasingCache: Bool {
+        exportCoordinator.isReleasingCache
+    }
+
     init(
         facade: FilmtoneEditorFacade,
         strings: FilmtoneStrings = FilmtoneStringsCatalog.current,
@@ -198,13 +236,27 @@ final class FilmtoneEditorStore: ObservableObject {
     ) {
         self.facade = facade
         self.strings = strings
-        self.projectController = EditorProjectController()
+        let projectController = EditorProjectController()
+        self.projectController = projectController
         // Fall back to a library-disabled mode if Application Support is not
         // reachable — the editor still works, the Recent / Saved-Looks UI
         // simply stays empty. We do not hard-fail bootstrap.
         let resolvedLibraryStore = libraryStore ?? (try? LibraryStoreActor())
-        self.libraryController = EditorLibraryController(libraryStore: resolvedLibraryStore)
+        let libraryController = EditorLibraryController(libraryStore: resolvedLibraryStore)
+        self.libraryController = libraryController
         self.previewOrchestrator = EditorPreviewOrchestrator(facade: facade, strings: strings)
+        self.projectMutationCoordinator = EditorProjectMutationCoordinator(
+            facade: facade,
+            libraryController: libraryController,
+            projectController: projectController,
+            strings: strings
+        )
+        self.exportCoordinator = EditorExportCoordinator(
+            facade: facade,
+            projectController: projectController,
+            libraryController: libraryController,
+            strings: strings
+        )
 
         if let snapshot = FilmtonePersistence.load() {
             self.project = snapshot.project
@@ -254,6 +306,11 @@ final class FilmtoneEditorStore: ObservableObject {
         previewCancellable = previewOrchestrator.objectWillChange.sink { [weak self] in
             self?.objectWillChange.send()
         }
+        projectMutationCoordinator.attach(self)
+        exportCoordinator.attach(self)
+        exportCancellable = exportCoordinator.objectWillChange.sink { [weak self] in
+            self?.objectWillChange.send()
+        }
 
         if self.source != nil {
             schedulePreviewRender()
@@ -278,7 +335,7 @@ final class FilmtoneEditorStore: ObservableObject {
         }
     }
 
-    private func refreshLibrarySnapshot() async {
+    func refreshLibrarySnapshot() async {
         guard let snapshot = await libraryController.snapshot() else {
             return
         }
@@ -1041,11 +1098,10 @@ final class FilmtoneEditorStore: ObservableObject {
         source = fixture.source
         probe = fixture.probe
         previewOrchestrator.applyFixture(preview: fixture.preview)
-        exportProgress = nil
-        exportResult = fixture.exportResult
-        exportLocalAvailability = fixture.exportResult == nil ? .none : .available
-        saveToPhotosState = fixture.saveToPhotosState
-        isSavingToPhotos = false
+        exportCoordinator.applyFixture(
+            exportResult: fixture.exportResult,
+            saveToPhotosState: fixture.saveToPhotosState
+        )
         sourceLoadState = fixture.sourceLoadState
         isBusy = false
         notice = nil
@@ -1423,44 +1479,14 @@ final class FilmtoneEditorStore: ObservableObject {
         invalidateExportPackageState()
     }
 
+    // MARK: - Project mutation forwards (EditorProjectMutationCoordinator)
+
     func importInputLut() async {
-        do {
-            guard let lut = try await facade.pickCubeLut() else {
-                return
-            }
-            await persistImportedLutToLibrary(lut, slot: .input)
-            appliedSavedLookId = nil
-            applyLutMutation {
-                $0.inputLut = lut
-            }
-        } catch {
-            if let mediaError = error as? FilmtoneMediaError,
-               mediaError.code == "UNSUPPORTED_SOURCE" {
-                self.error = strings.lutParseError
-            } else {
-                self.error = strings.userMessage(for: error, context: .importLut)
-            }
-        }
+        await projectMutationCoordinator.importInputLut()
     }
 
     func importCreativeLut() async {
-        do {
-            guard let lut = try await facade.pickCubeLut() else {
-                return
-            }
-            await persistImportedLutToLibrary(lut, slot: .creative)
-            appliedSavedLookId = nil
-            applyLutMutation {
-                $0.creativeLut = lut
-            }
-        } catch {
-            if let mediaError = error as? FilmtoneMediaError,
-               mediaError.code == "UNSUPPORTED_SOURCE" {
-                self.error = strings.lookLutParseError
-            } else {
-                self.error = strings.userMessage(for: error, context: .importCreativeLut)
-            }
-        }
+        await projectMutationCoordinator.importCreativeLut()
     }
 
     /// S7: capture-surface import path. Unlike `importCreativeLut()`,
@@ -1468,339 +1494,28 @@ final class FilmtoneEditorStore: ObservableObject {
     /// the cube into the LUT library and returns a capture Look record
     /// the capture surface can preview and stamp into the package.
     func importCaptureUserLut() async -> FilmtoneCaptureLook? {
-        do {
-            guard let picked = try await facade.pickCubeLutFile() else {
-                return nil
-            }
-            guard let result = try await libraryController.importLut(
-                parsedLut: picked.lut,
-                originalFilename: picked.originalFilename,
-                preferredSlot: .creative
-            ) else {
-                self.error = strings.userMessage(
-                    for: FilmtoneMediaError.bridgeUnavailable,
-                    context: .importCreativeLut
-                )
-                return nil
-            }
-            guard let parsed = try await libraryController.loadLut(id: result.entry.id) else {
-                return nil
-            }
-            await refreshLibrarySnapshot()
-            return FilmtoneCaptureLook.userLut(
-                entry: result.entry,
-                parsedLut: parsed
-            )
-        } catch {
-            if let mediaError = error as? FilmtoneMediaError,
-               mediaError.code == "UNSUPPORTED_SOURCE" {
-                self.error = strings.lookLutParseError
-            } else if let storeError = error as? LibraryStoreActor.StoreError,
-                      case .quotaExceeded = storeError {
-                self.error = strings.libraryQuotaExceeded
-            } else {
-                self.error = strings.userMessage(for: error, context: .importCreativeLut)
-            }
-            return nil
-        }
+        await projectMutationCoordinator.importCaptureUserLut()
     }
 
     func loadCaptureUserLut(entry: LutLibraryEntry) async -> FilmtoneCaptureLook? {
-        guard libraryController.isAvailable else {
-            return nil
-        }
-        do {
-            guard let parsed = try await libraryController.loadLut(id: entry.id) else {
-                return nil
-            }
-            await libraryController.touchLutLastUsed(id: entry.id)
-            await refreshLibrarySnapshot()
-            return FilmtoneCaptureLook.userLut(entry: entry, parsedLut: parsed)
-        } catch {
-            self.error = strings.libraryLutMissingOnApply
-            return nil
-        }
+        await projectMutationCoordinator.loadCaptureUserLut(entry: entry)
     }
 
-    /// Persist a freshly-picked LUT into the library so it shows up in
-    /// Recent. Quota / dedup logic lives in the actor; if persistence fails
-    /// we still apply the LUT to the project — library-disabled mode is a
-    /// degraded but acceptable state, never a hard editor failure.
-    private func persistImportedLutToLibrary(
-        _ lut: ParsedCubeLutDTO,
-        slot: SlotHint
-    ) async {
-        guard libraryController.isAvailable else {
-            return
-        }
-        do {
-            _ = try await libraryController.importLut(
-                parsedLut: lut,
-                originalFilename: nil,
-                preferredSlot: slot
-            )
-            await refreshLibrarySnapshot()
-        } catch let storeError as LibraryStoreActor.StoreError {
-            // Surface quota errors but never block the in-memory LUT apply —
-            // the user can keep working, they just won't see the entry in
-            // Recent until they free up space and re-import.
-            if case .quotaExceeded = storeError {
-                self.error = strings.libraryQuotaExceeded
-            }
-        } catch {
-            // Swallow other library errors (disk write failure etc.); they
-            // are non-load-bearing for the in-memory editor.
-        }
-    }
-
-    /// Apply a LUT from the library to the named slot. Tap-to-apply path on
-    /// the Recent strip routes through here so we (a) reuse the existing
-    /// `applyLutMutation` invalidate/persist path, (b) bump the entry's
-    /// `lastUsedAt`, and (c) touch the slot's intensity according to the
-    /// entry's `defaultIntensity`.
     func applyLibraryLut(libraryId: UUID, slot: SlotHint) async {
-        guard libraryController.isAvailable else {
-            return
-        }
-        do {
-            guard let parsed = try await libraryController.loadLut(id: libraryId) else {
-                return
-            }
-            await libraryController.touchLutLastUsed(id: libraryId)
-            await refreshLibrarySnapshot()
-            appliedSavedLookId = nil
-            applyLutMutation { state in
-                switch slot {
-                case .input:
-                    state.inputLut = parsed
-                case .creative, .any:
-                    state.creativeLut = parsed
-                }
-            }
-        } catch {
-            self.error = strings.libraryLutMissingOnApply
-        }
+        await projectMutationCoordinator.applyLibraryLut(libraryId: libraryId, slot: slot)
     }
 
-    /// Snapshot the current creative state into a Saved Look. Source-side
-    /// (input LUT / source URI / source probe) is intentionally **not**
-    /// captured — those are source-locally re-derived per `applyProbe`.
     @discardableResult
     func saveCurrentLook(name: String) async -> SavedLookEntry? {
-        guard libraryController.isAvailable else {
-            return nil
-        }
-        let creativeBinding = await currentCreativeLutBinding()
-        // Stamp optics + glow into the Look's identity. Built-in Looks
-        // (Stone / Urban) hardcode these; user-saved Looks would otherwise
-        // omit any key the user did not personally tune, leaving the Look's
-        // optical signature dependent on whichever preset baseline applies it.
-        let densifiedOverrides = project.paramOverrides
-            .densifyingOpticsGlow(from: project.params)
-        do {
-            guard let entry = try await libraryController.saveLook(
-                name: name,
-                presetName: project.presetName,
-                presetVersion: FilmtonePhase0Math.presetVersion,
-                strength: project.strength,
-                quickState: project.quickState,
-                paramOverrides: densifiedOverrides,
-                creativeLut: creativeBinding
-            ) else {
-                return nil
-            }
-            await refreshLibrarySnapshot()
-            appliedSavedLookId = entry.id
-            projectController.setAppliedSavedLookEntry(entry)
-            presentToast(
-                String(format: strings.lookSavedToastFormat, entry.name),
-                kind: .success
-            )
-            return entry
-        } catch {
-            self.error = strings.userMessage(for: error, context: .importLut)
-            return nil
-        }
+        await projectMutationCoordinator.saveCurrentLook(name: name)
     }
 
-    /// Find or create the `CreativeLutBinding` that represents the current
-    /// `project.creativeLut`. We prefer a `libraryRef` when the LUT's content
-    /// hash matches an existing library entry; otherwise we register the LUT
-    /// as a new library entry so the look survives delete-from-library.
-    private func currentCreativeLutBinding() async -> CreativeLutBinding? {
-        guard let creativeLut = project.creativeLut else {
-            return nil
-        }
-        guard libraryController.isAvailable else {
-            return nil
-        }
-        do {
-            guard let result = try await libraryController.importLut(
-                parsedLut: creativeLut,
-                originalFilename: nil,
-                preferredSlot: .creative
-            ) else {
-                return nil
-            }
-            // result.entry.id always represents the canonical library entry
-            // for this hash — dedup hit reuses the existing one, miss creates.
-            if !result.deduped {
-                await refreshLibrarySnapshot()
-            }
-            return .libraryRef(id: result.entry.id, intensity: creativeLut.intensity)
-        } catch {
-            // If the import itself failed (quota etc.), embed the data
-            // inline so the look still saves and stays applicable.
-            let hash = (try? FilmtoneLutBlobCodec.sourceHash(
-                data: creativeLut.data,
-                size: creativeLut.size
-            )) ?? ""
-            let embedded = SavedLookEmbeddedLut(
-                title: creativeLut.title,
-                size: creativeLut.size,
-                data: creativeLut.data,
-                sourceHash: hash
-            )
-            return .embedded(lut: embedded, intensity: creativeLut.intensity)
-        }
-    }
-
-    /// Apply a saved Look's creative state to the project.
-    ///
-    /// Per the Item 3 plan §"Apply-Saved-Look Semantics":
-    /// - Overwrites: `presetName`, `strength`, `quickState`, `paramOverrides`
-    ///   (and the resolved `params` derived from them), `creativeLut`,
-    ///   creative-LUT intensity.
-    /// - Does NOT touch: `project.inputLut`, source URI, source probe.
-    ///   The source-side normalization is deliberately source-local — the
-    ///   look survives source swaps, the camera profile does not.
     func applySavedLook(id: UUID) async {
-        guard libraryController.isAvailable else {
-            return
-        }
-        do {
-            guard let entry = try await libraryController.loadLook(id: id) else {
-                return
-            }
-            var resolvedCreativeLut: ParsedCubeLutDTO?
-            var creativePack01Adaptation: FilmtoneCreativePack01Adaptation.Resolved?
-            var lutMissingForApply = false
-
-            switch entry.creativeLut {
-            case .libraryRef(let lutId, let intensity):
-                if let _ = library.lutEntry(id: lutId) {
-                    do {
-                        resolvedCreativeLut = try await libraryController.loadLut(
-                            id: lutId,
-                            intensity: intensity
-                        )
-                        if resolvedCreativeLut == nil {
-                            lutMissingForApply = true
-                        } else {
-                            await libraryController.touchLutLastUsed(id: lutId)
-                        }
-                    } catch {
-                        lutMissingForApply = true
-                    }
-                } else {
-                    lutMissingForApply = true
-                }
-            case .embedded(let lut, let intensity):
-                resolvedCreativeLut = ParsedCubeLutDTO(
-                    title: lut.title,
-                    size: lut.size,
-                    data: lut.data,
-                    intensity: FilmtonePhase0Math.clampLutIntensity(intensity)
-                )
-            case .bundled(let slug, let filename, let pinnedSha256, let intensity):
-                // v1.4 Creative LUT Pack 01: resolve from Bundle.main under
-                // `Resources/CreativeLuts/`. fail-closed — if the resource is
-                // missing or its SHA-256 does not match the pinned value, we
-                // surface the same `lutMissingForApply` toast as for a deleted
-                // library entry rather than silently degrading
-                // (`feedback_no_fallback_bug_hotbed`).
-                if let resolved = FilmtoneEditorStore.loadBundledCreativeLut(
-                    slug: slug,
-                    filename: filename,
-                    pinnedSha256: pinnedSha256,
-                    intensity: intensity,
-                    packId: FilmtoneBuiltInCatalog.creativePack01Id
-                ) {
-                    resolvedCreativeLut = resolved
-                    creativePack01Adaptation = FilmtoneCreativePack01Adaptation.resolve(
-                        slug: slug,
-                        descriptor: probe?.sourceToneDescriptor
-                    )
-                } else {
-                    lutMissingForApply = true
-                }
-            case .none:
-                resolvedCreativeLut = nil
-            }
-
-            applyLutMutation { state in
-                state.presetName = FilmtonePhase0Math.safePresetName(entry.presetName)
-                // v1.4 backward compat — stamp the saved Look's preset version
-                // onto the project so the export pipeline dispatches v1 kernel
-                // for v1 saves and v2 kernel for v2 saves. handoff §10 guard.
-                state.presetVersion = entry.presetVersion
-                state.strength = FilmtonePhase0Math.clampStrength(entry.strength)
-                state.quickState = entry.quickState.clamped()
-                var paramOverrides = entry.paramOverrides
-                if let creativePack01Adaptation {
-                    for (key, value) in creativePack01Adaptation.paramOverrides.values {
-                        paramOverrides.values[key] = value
-                    }
-                }
-                state.paramOverrides = paramOverrides
-                if let creativePack01Adaptation, let resolvedCreativeLut {
-                    state.creativeLut = resolvedCreativeLut.withIntensity(creativePack01Adaptation.intensity)
-                } else {
-                    state.creativeLut = resolvedCreativeLut
-                }
-                // Note: state.inputLut is intentionally untouched — the look
-                // is source-independent. See applySavedLook docs above.
-            }
-            recomputeProjectParamsPreservingOpticsGlow()
-            appliedSavedLookId = entry.id
-            projectController.setAppliedSavedLookEntry(entry)
-            await refreshLibrarySnapshot()
-
-            if lutMissingForApply {
-                self.error = strings.libraryLutMissingOnApply
-            } else {
-                presentToast(
-                    String(format: strings.lookAppliedToastFormat, entry.name),
-                    kind: .info
-                )
-            }
-        } catch {
-            self.error = strings.userMessage(for: error, context: .importCreativeLut)
-        }
+        await projectMutationCoordinator.applySavedLook(id: id)
     }
 
     func applyCaptureCustomLut(_ record: FilmtoneCaptureCustomLutRecord) async {
-        guard libraryController.isAvailable, let libraryId = record.libraryId else {
-            self.error = strings.libraryLutMissingOnApply
-            return
-        }
-        do {
-            guard let parsed = try await libraryController.loadLut(
-                id: libraryId,
-                intensity: record.intensity
-            ) else {
-                self.error = strings.libraryLutMissingOnApply
-                return
-            }
-            await libraryController.touchLutLastUsed(id: libraryId)
-            await refreshLibrarySnapshot()
-            appliedSavedLookId = nil
-            applyLutMutation { state in
-                state.creativeLut = parsed
-            }
-        } catch {
-            self.error = strings.libraryLutMissingOnApply
-        }
+        await projectMutationCoordinator.applyCaptureCustomLut(record)
     }
 
     /// Resolve a `CreativeLutBinding.bundled` payload from the app bundle
@@ -1885,529 +1600,64 @@ final class FilmtoneEditorStore: ObservableObject {
     }
 
     func clearInputLut() {
-        appliedSavedLookId = nil
-        applyLutMutation {
-            $0.inputLut = nil
-        }
+        projectMutationCoordinator.clearInputLut()
     }
 
     func clearCreativeLut() {
-        appliedSavedLookId = nil
-        applyLutMutation {
-            $0.creativeLut = nil
-        }
+        projectMutationCoordinator.clearCreativeLut()
     }
 
     func setInputLutIntensity(_ intensity: Double) {
-        let clampedIntensity = FilmtonePhase0Math.clampLutIntensity(intensity)
-        guard let currentLut = project.inputLut, currentLut.intensity != clampedIntensity else {
-            return
-        }
-        appliedSavedLookId = nil
-        applyLutMutation {
-            guard let lut = $0.inputLut else {
-                return
-            }
-            $0.inputLut = lut.withIntensity(clampedIntensity)
-        }
+        projectMutationCoordinator.setInputLutIntensity(intensity)
     }
 
     func setCreativeLutIntensity(_ intensity: Double) {
-        let clampedIntensity = FilmtonePhase0Math.clampLutIntensity(intensity)
-        guard let currentLut = project.creativeLut, currentLut.intensity != clampedIntensity else {
-            return
-        }
-        appliedSavedLookId = nil
-        applyLutMutation {
-            guard let lut = $0.creativeLut else {
-                return
-            }
-            $0.creativeLut = lut.withIntensity(clampedIntensity)
-        }
+        projectMutationCoordinator.setCreativeLutIntensity(intensity)
     }
 
-    /// M14-A: which file the export pipeline ended up sourcing from.
-    /// Used to drive the post-export toast wording so the owner can
-    /// tell whether the artifact is the high-quality master path or
-    /// the proxy fallback.
-    enum ExportSourceDecision: Equatable {
-        /// No capture package in play (Photos / Files edit). The
-        /// existing `source` + `probe` are used unchanged. Toast keeps
-        /// the legacy "Export complete" wording so non-capture flows
-        /// do not pick up master / proxy language.
-        case noCapturePackage
-        /// Capture package master is reachable + probed cleanly. Export
-        /// runs from the master. Toast: "Exported from master".
-        case usingMaster
-        /// Capture package master file is missing on disk. Falls back
-        /// to proxy. Toast: "Exported from proxy — master not reachable".
-        case usingProxyMasterMissing
-        /// Capture package master file exists but cannot be probed
-        /// (permission denied, malformed file, security-scoped resource
-        /// access not held). Falls back to proxy.
-        case usingProxyMasterUnreadable(reason: String)
-    }
-
-    /// M14-A resolution result. The export pipeline consumes
-    /// `(source, probe)`; the `decision` drives toast wording.
-    ///
-    /// M14-B: also carries a `scopedURL` for the case where the
-    /// resolver acquired security-scope on a SSD master file via the
-    /// package's `masterBookmark`. The export call site MUST defer
-    /// `release()` so scope is dropped on every exit path.
-    struct ResolvedExportSource {
-        let source: SourceInfoDTO?
-        let probe: SourceProbeDTO?
-        let decision: ExportSourceDecision
-        /// URL we currently hold a security-scoped resource access on.
-        /// `nil` for internal masters and proxy fallbacks.
-        fileprivate let scopedURL: URL?
-
-        /// Drop the held security scope. Idempotent — calling
-        /// `release()` more than once or on a `.scopedURL == nil`
-        /// instance is a no-op. Always paired with a `defer` at the
-        /// call site so abnormal exits do not leak scope.
-        func release() {
-            scopedURL?.stopAccessingSecurityScopedResource()
-        }
-    }
-
-    /// M14-A + M14-B: pick master vs proxy at export time. Photos /
-    /// Files edits pass through unchanged via `.noCapturePackage`.
-    /// Capture-package edits prefer the master when reachable.
-    ///
-    /// Resolution order:
-    /// 1. **Bookmark resolution + scope acquire** (M14-B). If the
-    ///    package carries a `masterBookmark`, resolve it and start
-    ///    scoped access. On failure (stale bookmark, scope denied),
-    ///    fall through with no scope held.
-    /// 2. **fileExists** — catches deleted-internal and unmounted-SSD
-    ///    cases.
-    /// 3. **facade.probeSource(masterSource)** — catches
-    ///    permission-denied (no scope held + iOS sandbox refusing
-    ///    read), malformed-file, codec-not-supported.
-    ///
-    /// Every fallback branch drops the bookmark scope before returning
-    /// (we only retain scope on `.usingMaster` because that's the only
-    /// branch where the export pipeline will actually read the file).
-    /// The `release()` defer at the call site handles the success
-    /// branch.
-    private func resolveExportSource() -> ResolvedExportSource {
-        guard let package = lastCapturePackage, let proxyProbe = probe else {
-            return ResolvedExportSource(
-                source: source,
-                probe: probe,
-                decision: .noCapturePackage,
-                scopedURL: nil
-            )
-        }
-
-        // M14-B: if the package carries a bookmark, try to resolve +
-        // acquire scope before any reachability check. This is what
-        // unlocks SSD master export across capture-view dismissal and
-        // app relaunch.
-        var heldScopeURL: URL?
-        if let bookmark = package.masterBookmark,
-           let resolvedURL = FilmtoneSecurityScopedBookmark.resolve(bookmark) {
-            if resolvedURL.startAccessingSecurityScopedResource() {
-                heldScopeURL = resolvedURL
-                NSLog(
-                    "[M14-B] master bookmark resolved + scope acquired at %@",
-                    resolvedURL.path
-                )
-            } else {
-                NSLog(
-                    "[M14-B] bookmark resolved at %@ but scope acquire denied — falling back",
-                    resolvedURL.path
-                )
-            }
-        }
-
-        let masterURL = package.masterURL
-        guard FileManager.default.fileExists(atPath: masterURL.path) else {
-            heldScopeURL?.stopAccessingSecurityScopedResource()
-            NSLog("[M14-A] master missing at %@ — falling back to proxy export", masterURL.path)
-            return ResolvedExportSource(
-                source: source,
-                probe: proxyProbe,
-                decision: .usingProxyMasterMissing,
-                scopedURL: nil
-            )
-        }
-
-        let masterSource = SourceInfoDTO(
-            uri: masterURL.absoluteString,
-            filename: masterURL.lastPathComponent,
-            kind: .video,
-            mimeType: "video/quicktime"
-        )
-
-        do {
-            let masterProbe = try facade.probeSource(masterSource)
-            NSLog("[M14-A] master reachable + probed at %@ — exporting from master", masterURL.path)
-            return ResolvedExportSource(
-                source: masterSource,
-                probe: masterProbe,
-                decision: .usingMaster,
-                scopedURL: heldScopeURL
-            )
-        } catch {
-            heldScopeURL?.stopAccessingSecurityScopedResource()
-            let reason = (error as NSError).localizedDescription
-            NSLog("[M14-A] master probe failed (%@) — falling back to proxy export", reason)
-            return ResolvedExportSource(
-                source: source,
-                probe: proxyProbe,
-                decision: .usingProxyMasterUnreadable(reason: reason),
-                scopedURL: nil
-            )
-        }
-    }
-
-    /// M14-A: maps the export-source decision to the right localized
-    /// success toast. Non-capture sources keep the legacy
-    /// "Export complete" wording so the master / proxy language only
-    /// appears where it is meaningful.
-    private func toastForDecision(_ decision: ExportSourceDecision) -> String {
-        switch decision {
-        case .noCapturePackage:
-            return strings.toastExportComplete
-        case .usingMaster:
-            return strings.toastExportUsedMaster
-        case .usingProxyMasterMissing, .usingProxyMasterUnreadable:
-            return strings.toastExportUsedProxyMasterUnavailable
-        }
-    }
-
-    /// M14-C (2026-05-09): map the M14-A `ExportSourceDecision` into
-    /// the sidecar's `SidecarCaptureProvenance` block. Returns nil
-    /// when the export source is not a capture package (Photos /
-    /// Files edits) — sidecar omits the block entirely in that case.
-    ///
-    /// The `lastCapturePackage` parameter is captured from the store's
-    /// in-memory state at export-trigger time so we can record both
-    /// the master URI (always, even on proxy fallback so DaVinci
-    /// importers can see what was *intended*) and the proxy URI (only
-    /// on fallback so consumers can identify the actual artifact).
-    private func sidecarCaptureProvenance(
-        from decision: ExportSourceDecision,
-        package: FilmtoneCapturePackage?
-    ) -> SidecarCaptureProvenance? {
-        guard let package else {
-            return nil
-        }
-        let masterURI = package.masterURL.absoluteString
-        let proxyURI = package.proxyURL.absoluteString
-        // S1 (2026-05-09): carry the requested + observed
-        // stabilization truth into every capture-sourced sidecar so a
-        // future audit can reconstruct what the owner asked for and
-        // what AVFoundation actually delivered.  Pre-S1 packages
-        // decoded from disk infer `.on` from the legacy
-        // `parameters.stabilization` string and leave
-        // `observedStabilization` nil; the encoder omits absent fields
-        // (`encodeIfPresent`) so older sidecars stay byte-identical.
-        let requested = package.parameters.requestedStabilization.rawValue
-        let observed = package.observedStabilization
-        let requestedRotation = package.requestedCaptureRotationDegrees
-        let observedRotation = package.observedCaptureRotationDegrees
-        let customLut = package.customLut
-        func makeProvenance(
-            mode: String,
-            reason: String?,
-            masterUriUsed: String?,
-            proxyUriUsed: String?
-        ) -> SidecarCaptureProvenance {
-            SidecarCaptureProvenance(
-                mode: mode,
-                reason: reason,
-                masterUriUsed: masterUriUsed,
-                proxyUriUsed: proxyUriUsed,
-                requestedStabilization: requested,
-                observedStabilization: observed,
-                requestedCaptureRotationDegrees: requestedRotation,
-                observedCaptureRotationDegrees: observedRotation,
-                customLutTitle: customLut?.title,
-                customLutLibraryId: customLut?.libraryId?.uuidString,
-                customLutSourceHash: customLut?.sourceHash,
-                customLutSize: customLut?.size,
-                customLutIntensity: customLut?.intensity,
-                customLutConversionPolicy: customLut?.conversionPolicy,
-                customLutTransformWarningAccepted: customLut?.transformWarningAccepted,
-                customLutTransformWarningReason: customLut?.transformWarningReason,
-                customLutTransformWarningKind: customLut?.transformWarningKind,
-                customLutTransformWarningSignal: customLut?.transformWarningSignal
-            )
-        }
-        switch decision {
-        case .noCapturePackage:
-            return nil
-        case .usingMaster:
-            return makeProvenance(
-                mode: "master",
-                reason: nil,
-                masterUriUsed: masterURI,
-                proxyUriUsed: nil
-            )
-        case .usingProxyMasterMissing:
-            return makeProvenance(
-                mode: "proxy",
-                reason: "masterFileMissing",
-                masterUriUsed: masterURI,
-                proxyUriUsed: proxyURI
-            )
-        case .usingProxyMasterUnreadable(let reason):
-            return makeProvenance(
-                mode: "proxy",
-                reason: "masterProbeFailed:\(reason)",
-                masterUriUsed: masterURI,
-                proxyUriUsed: proxyURI
-            )
-        }
-    }
+    // MARK: - Phase 3B export/cache forwards (EditorExportCoordinator)
 
     func export() async {
-        guard !isBusy && !isSavingToPhotos else {
-            return
-        }
-
-        // M14-A / M14-B: pick master vs proxy at export time.
-        // `resolveExportSource()` may have acquired security-scope on
-        // an SSD master via the package's bookmark — `defer release()`
-        // drops scope on every exit path (success, throw, early
-        // return). Captured outside `do` so even a build-request throw
-        // releases scope.
-        let resolved = resolveExportSource()
-        defer { resolved.release() }
-
-        do {
-            let request = try FilmtonePhase0Math.buildExportRequest(
-                source: resolved.source,
-                probe: resolved.probe,
-                project: project
-            )
-
-            // v1.3 Item 2 Phase E: resolve the active Saved Look (if any) so
-            // the sidecar can record provenance. Built-in catalog entries
-            // materialize from `FilmtoneBuiltInCatalog` without disk I/O;
-            // user-saved entries are read from the in-memory actor state.
-            // Resolution failures surface as "no provenance" — never block
-            // the export — because the look might have been deleted between
-            // apply and export, and a missing block is preferable to a hard
-            // export failure (CLAUDE.md §11 `feedback_no_fallback_bug_hotbed`
-            // permits this: provenance absence is explicit, not silent
-            // success-with-degraded-output).
-            let resolvedSavedLook = await resolveAppliedSavedLookForExport()
-            // v1.3 Camera Profiles Phase E: thread the project's selected
-            // Camera Profile through facade.runExport. Stored OFF the wire
-            // DTO because it's iOS-side state, not bridge data.
-            let cameraProfileSelection = project.cameraProfile
-
-            isBusy = true
-            error = nil
-            notice = nil
-            exportResult = nil
-            exportProgress = nil
-            exportLocalAvailability = .none
-            saveToPhotosState = .notRun
-
-            let cacheProtection = protectedCacheURIs
-            // M14-C: emit the master/proxy decision into the sidecar
-            // so DaVinci importers can distinguish a master-quality
-            // artifact from a proxy fallback.
-            let sidecarProvenance = sidecarCaptureProvenance(
-                from: resolved.decision,
-                package: lastCapturePackage
-            )
-            let result = try await facade.runExport(
-                request: request,
-                protectedCacheURIs: cacheProtection,
-                appliedSavedLook: resolvedSavedLook,
-                cameraProfile: cameraProfileSelection,
-                highlightMarkers: exportHighlightMarkers,
-                captureProvenance: sidecarProvenance
-            ) { [weak self] progress in
-                self?.exportProgress = progress
-            }
-
-            isBusy = false
-            exportProgress = nil
-            exportResult = result
-            exportLocalAvailability = .available
-            reclaimCacheForCurrentState()
-            presentToast(toastForDecision(resolved.decision), kind: .success)
-        } catch {
-            isBusy = false
-            exportProgress = nil
-            isSavingToPhotos = false
-            let message = strings.userMessage(for: error, context: .export)
-            self.error = message
-            presentToast(message, kind: .error)
-        }
+        await exportCoordinator.export()
     }
 
     func exportAndSave() async {
-        guard !isBusy && !isSavingToPhotos else {
-            return
-        }
-
-        // M14-A / M14-B: see `export()` for the resolved + defer
-        // rationale.
-        let resolved = resolveExportSource()
-        defer { resolved.release() }
-
-        do {
-            let request = try FilmtonePhase0Math.buildExportRequest(
-                source: resolved.source,
-                probe: resolved.probe,
-                project: project
-            )
-
-            // v1.3 Item 2 Phase E + Camera Profiles Phase E: see `export()`
-            // above for the resolveAppliedSavedLook + cameraProfile rationale.
-            let resolvedSavedLook = await resolveAppliedSavedLookForExport()
-            let cameraProfileSelection = project.cameraProfile
-
-            isBusy = true
-            isSavingToPhotos = false
-            error = nil
-            notice = nil
-            exportResult = nil
-            exportProgress = nil
-            exportLocalAvailability = .none
-            saveToPhotosState = .notRun
-
-            let cacheProtection = protectedCacheURIs
-            // M14-C: same provenance as `export()` — see
-            // sidecarCaptureProvenance(...) for the mapping rationale.
-            let sidecarProvenance = sidecarCaptureProvenance(
-                from: resolved.decision,
-                package: lastCapturePackage
-            )
-            let result = try await facade.runExport(
-                request: request,
-                protectedCacheURIs: cacheProtection,
-                appliedSavedLook: resolvedSavedLook,
-                cameraProfile: cameraProfileSelection,
-                highlightMarkers: exportHighlightMarkers,
-                captureProvenance: sidecarProvenance
-            ) { [weak self] progress in
-                self?.exportProgress = progress
-            }
-
-            isBusy = false
-            exportProgress = nil
-            exportResult = result
-            exportLocalAvailability = .available
-            reclaimCacheForCurrentState()
-            // Surface the master/proxy decision before saveToPhotos
-            // runs its own toast, so the owner sees both signals.
-            presentToast(toastForDecision(resolved.decision), kind: .success)
-            await saveExportResultToPhotos(result)
-        } catch {
-            isBusy = false
-            exportProgress = nil
-            isSavingToPhotos = false
-            self.error = strings.userMessage(for: error, context: .export)
-        }
+        await exportCoordinator.exportAndSave()
     }
 
     func saveToPhotos() async {
-        guard let exportResult,
-              canUseLocalExport,
-              saveToPhotosState != .saved,
-              !isSavingToPhotos else {
-            return
-        }
-
-        await saveExportResultToPhotos(exportResult)
-    }
-
-    private func saveExportResultToPhotos(_ result: Phase0ExportResultDTO) async {
-        guard !isSavingToPhotos else {
-            return
-        }
-
-        isSavingToPhotos = true
-        defer {
-            isSavingToPhotos = false
-        }
-
-        do {
-            try await facade.saveToPhotos(uri: result.outputUri)
-            saveToPhotosState = .saved
-            // Keep the local export package available after Photos save so the
-            // same result can still be shared or inspected from the app cache.
-            notice = strings.saveToPhotosDone
-            error = nil
-            presentToast(strings.toastSaveSuccess, kind: .success)
-        } catch {
-            saveToPhotosState = .failed
-            let message = strings.userMessage(for: error, context: .saveToPhotos)
-            self.error = message
-            presentToast(message, kind: .error)
-        }
+        await exportCoordinator.saveToPhotos()
     }
 
     func shareOutput() async {
-        guard let exportResult, canUseLocalExport else {
-            return
-        }
-
-        do {
-            let completed = try await facade.shareOutput(
-                mediaURI: exportResult.outputUri,
-                sidecarURI: exportResult.sidecarUri,
-                packageFileURIs: exportResult.packageFileUris
-            )
-            if completed {
-                notice = nil
-                error = nil
-                presentToast(strings.toastShareSuccess, kind: .success)
-            }
-        } catch {
-            self.error = strings.userMessage(for: error, context: .share)
-            presentToast(strings.toastShareFailed, kind: .error)
-        }
+        await exportCoordinator.shareOutput()
     }
 
     func exportHighlightReel() async {
-        guard canCreateHighlightReel else {
-            return
-        }
-
-        do {
-            let request = try FilmtonePhase0Math.buildExportRequest(
-                source: source,
-                probe: probe,
-                project: project
-            )
-            let resolvedSavedLook = await resolveAppliedSavedLookForExport()
-            let cameraProfileSelection = project.cameraProfile
-
-            isBusy = true
-            error = nil
-            notice = nil
-            exportProgress = nil
-            let cacheProtection = protectedCacheURIs
-            let result = try await facade.runHighlightReel(
-                request: request,
-                protectedCacheURIs: cacheProtection,
-                appliedSavedLook: resolvedSavedLook,
-                cameraProfile: cameraProfileSelection,
-                highlightMarkers: exportHighlightMarkers
-            ) { [weak self] progress in
-                self?.exportProgress = progress
-            }
-
-            isBusy = false
-            exportProgress = nil
-            _ = try await facade.shareOutput(mediaURI: result.outputUri)
-        } catch {
-            isBusy = false
-            exportProgress = nil
-            self.error = strings.userMessage(for: error, context: .export)
-        }
+        await exportCoordinator.exportHighlightReel()
     }
+
+    func loadCacheInventory() async {
+        await exportCoordinator.loadCacheInventory()
+    }
+
+    func releaseCache() async {
+        await exportCoordinator.releaseCache()
+    }
+
+    func reclaimCacheForBackground() {
+        exportCoordinator.reclaimCacheForBackground()
+    }
+
+    func reclaimCacheForCurrentState() {
+        exportCoordinator.reclaimCacheForCurrentState()
+    }
+
+    var protectedCacheURIs: [String] {
+        exportCoordinator.protectedCacheURIs
+    }
+
+    // MARK: - Toast
 
     /// Show a viewport-level toast.
     ///
@@ -2457,106 +1707,7 @@ final class FilmtoneEditorStore: ObservableObject {
         toast = nil
     }
 
-    func reclaimCacheForBackground() {
-        guard !isBusy && !isSavingToPhotos else {
-            return
-        }
-        reclaimCacheForCurrentState()
-    }
-
-    @MainActor
-    func loadCacheInventory() async {
-        let snapshot = await facade.cacheInventory()
-        cacheInventory = snapshot
-    }
-
-    @MainActor
-    func releaseCache() async {
-        guard !isReleasingCache, !isBusy, !isSavingToPhotos else {
-            return
-        }
-        isReleasingCache = true
-        defer { isReleasingCache = false }
-
-        let result = await facade.releaseCache(protecting: protectedCacheURIs)
-        await loadCacheInventory()
-
-        if let result, result.removedBytes > 0 {
-            let formatted = ByteCountFormatter.string(
-                fromByteCount: result.removedBytes,
-                countStyle: .file
-            )
-            notice = String(
-                format: strings.storageReleasedNotice,
-                locale: Locale.current,
-                formatted
-            )
-        }
-    }
-
-    private var protectedCacheURIs: [String] {
-        var uris: [String] = []
-        if let source {
-            uris.append(source.uri)
-        }
-        if canUseLocalExport, let exportResult {
-            uris.append(contentsOf: localExportURIs(for: exportResult))
-        }
-        uris.append(contentsOf: preview.cacheURIs)
-        if let comparePreviewFrame {
-            uris.append(comparePreviewFrame.originalURI)
-            uris.append(comparePreviewFrame.gradedURI)
-        }
-        return uniqueURIs(uris)
-    }
-
-    func reclaimCacheForCurrentState() {
-        facade.reclaimCache(protecting: protectedCacheURIs)
-    }
-
-    /// v1.3 Item 2 Phase E: resolve `appliedSavedLookId` to a full
-    /// `SavedLookEntry` for sidecar provenance. Returns nil when the project
-    /// has been dirtied since `applySavedLook` (the apply path nils
-    /// `appliedSavedLookId` on every mutation), when no Saved Look was
-    /// applied, when the library actor is unavailable, or when the entry
-    /// fails to load (e.g. user-saved entry deleted between apply and
-    /// export). Built-in catalog entries materialize without disk I/O via
-    /// `FilmtoneBuiltInCatalog`, so the read is cheap.
-    private func resolveAppliedSavedLookForExport() async -> SavedLookEntry? {
-        await projectController.resolveAppliedSavedLook(
-            id: appliedSavedLookId,
-            via: libraryController
-        )
-    }
-
-    private func discardLocalExportFiles(_ result: Phase0ExportResultDTO) {
-        exportLocalAvailability = .removed
-        _ = facade.removeLocalFiles(uris: localExportURIs(for: result))
-        reclaimCacheForCurrentState()
-    }
-
-    private func localExportURIs(for result: Phase0ExportResultDTO) -> [String] {
-        if let packageFileUris = result.packageFileUris, !packageFileUris.isEmpty {
-            return uniqueURIs(packageFileUris)
-        }
-        return [
-            result.outputUri,
-            result.sidecarUri,
-        ].compactMap { $0 }
-    }
-
-    private func uniqueURIs(_ uris: [String]) -> [String] {
-        var seen: Set<String> = []
-        var unique: [String] = []
-        for uri in uris where !uri.isEmpty {
-            guard !seen.contains(uri) else {
-                continue
-            }
-            seen.insert(uri)
-            unique.append(uri)
-        }
-        return unique
-    }
+    // MARK: - Project recompute helpers
 
     private func recomputeProjectParams() {
         project.quickState = project.quickState.clamped()
@@ -2580,7 +1731,7 @@ final class FilmtoneEditorStore: ObservableObject {
     /// happen to align with the active preset's defaults would normalize away
     /// into an empty patch and the user would see "no adjustments" UI even
     /// though the kernel is rendering with the Look's chosen optics values.
-    private func recomputeProjectParamsPreservingOpticsGlow() {
+    func recomputeProjectParamsPreservingOpticsGlow() {
         project.quickState = project.quickState.clamped()
         let base = FilmtonePhase0Math.deriveParams(
             presetName: project.presetName,
@@ -2624,42 +1775,24 @@ final class FilmtoneEditorStore: ObservableObject {
             #endif
         }
         previewOrchestrator.reset()
-        self.saveToPhotosState = .notRun
-        self.isSavingToPhotos = false
+        exportCoordinator.resetForSourceChange()
         self.error = nil
         self.notice = nil
-        self.exportResult = nil
-        self.exportProgress = nil
-        self.exportLocalAvailability = .none
         self.sourceLoadState = nil
         self.highlightMarkers = nil
         facade.prewarmMezzanines(for: source)
     }
 
-    private func applyLutMutation(_ mutate: (inout FilmtoneProjectState) -> Void) {
-        mutate(&project)
-        project.updatedAt = FilmtonePhase0Math.isoTimestamp()
-        invalidateRenderedOutputState()
-        persist()
-        schedulePreviewRender()
-    }
-
-    private func invalidateRenderedOutputState() {
+    func invalidateRenderedOutputState() {
         previewOrchestrator.invalidateForProjectChange()
-        exportResult = nil
-        exportProgress = nil
-        exportLocalAvailability = .none
-        saveToPhotosState = .notRun
+        exportCoordinator.invalidateForProjectChange()
     }
 
     private func invalidateExportPackageState() {
-        exportResult = nil
-        exportProgress = nil
-        exportLocalAvailability = .none
-        saveToPhotosState = .notRun
+        exportCoordinator.invalidateExportPackageState()
     }
 
-    private var exportHighlightMarkers: FilmtoneHighlightMarkers? {
+    var exportHighlightMarkers: FilmtoneHighlightMarkers? {
         guard let highlightMarkers, !highlightMarkers.isEmpty else {
             return nil
         }
@@ -2704,7 +1837,7 @@ final class FilmtoneEditorStore: ObservableObject {
         previewOrchestrator.schedule()
     }
 
-    private func persist() {
+    func persist() {
         #if os(iOS)
         let captureRef = currentCapturePackageRef
         #else
@@ -2724,7 +1857,7 @@ final class FilmtoneEditorStore: ObservableObject {
     }
 }
 
-private extension ParsedCubeLutDTO {
+extension ParsedCubeLutDTO {
     func withIntensity(_ intensity: Double) -> ParsedCubeLutDTO {
         ParsedCubeLutDTO(
             title: title,

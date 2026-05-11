@@ -411,3 +411,13 @@ product-boundary turns, not 10+ helper-sized turns.
   = 4 for all 3 files; `bun run verify:ios` green; `git diff --check`
   clean. See
   `archive/2026-05-11-phase-3a-editor-project-library-preview-bundle.md`.
+- 2026-05-11 JST — Phase 3B (EditorStore mutation + export/cache
+  coordination bundle) completed in the feature worktree. New
+  `EditorProjectMutationCoordinator` and `EditorExportCoordinator`
+  split LUT/Saved Look mutation orchestration plus export, Photos-save,
+  share, highlight-reel, and cache lifecycle out of `FilmtoneEditorStore`.
+  Store size reduced from 2794 → 1927 lines (−867), landing inside the
+  1900-2200 target band; SwiftUI view files stayed unchanged; pbxproj
+  4-section grep = 4 for both files; `bun run verify:ios` green;
+  `git diff --check` clean. See
+  `archive/2026-05-11-phase-3b-editor-mutation-export-coordinators.md`.
