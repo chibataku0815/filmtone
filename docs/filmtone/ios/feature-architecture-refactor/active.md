@@ -1,103 +1,145 @@
-# Active - Phase 3C EditorStore Capture Relay + Facade Closeout
+# Active - Phase 4A CaptureSession Large Split
 
 Date: 2026-05-11 JST
-Phase: Phase 3C - EditorStore split, capture relay and facade cleanup
-Milestone: Close the EditorStore split enough to move into CaptureSession
-refactor without leaving capture/package state trapped in the editor
-facade.
+Phase: Phase 4A - CaptureSession split, device + recording + package
+Milestone: Break `FilmtoneCaptureSession` into real collaborators so
+Gyroflow / V2 capture work can extend device, state, and package behavior
+without threading through one AVCapture monolith.
 
 ## Owner Directive
 
-- Keep the larger-grain pace. This is the EditorStore closeout bundle,
-  not a helper-by-helper cleanup pass.
-- Product velocity and facade compatibility are the priority. SwiftUI
-  view files should remain unchanged.
-- Minimal outer shell: `verify:ios`, pbxproj greps, view-diff gate,
-  targeted stale greps, and `git diff --check`.
+- Keep the larger-grain pace. This phase should not become a sequence of
+  tiny helper extractions.
+- Product quality gates stay strict for capture truth: ProRes 422 HQ,
+  Apple Log 2, 4K24, requested stabilization, rotation, package
+  persistence, and VDO live-preview handshake must remain fail-loud and
+  unchanged.
+- Outer-shell QA stays minimal: `verify:ios`, pbxproj 4-section greps,
+  view-diff gate, stale greps, and `git diff --check`. Real-device smoke
+  is Phase 4B unless this bundle changes a behavior-bearing surface that
+  cannot be trusted by build alone.
 
 ## Goal
 
-Start from the post-3B state:
+Start from the current capture state:
 
-- Current `FilmtoneEditorStore.swift`: 1927 lines.
-- Target after this bundle: roughly 1200-1500 lines.
-- Extract capture relay/package adoption state and remaining facade-only
-  transient state so `FilmtoneEditorStore` becomes a coordinator shell
-  over the internal collaborators.
+- `FilmtoneCaptureSession.swift`: 1849 lines.
+- Target after this bundle: roughly 600-900 lines.
+- Extract the three core responsibilities in one implementation bundle:
+  device/format/lens ownership, recording state/timers/storage policy,
+  and capture package assembly.
 
 ## Target Design
 
-Add one primary collaborator and one optional collaborator:
+Add three primary collaborators:
 
-- `EditorCaptureRelay`
-  - New file: `apps/capacitor-film-lab-ios/ios/App/App/Editor/Internal/EditorCaptureRelay.swift`
-  - Owns capture UI state, package references, package rehydration, and
-    capture result adoption glue.
+- `CaptureDeviceManager`
+  - New file: `apps/capacitor-film-lab-ios/ios/App/App/Capture/Internal/CaptureDeviceManager.swift`
+  - Owns device/lens/format setup and device-facing controls.
   - Preferred move candidates:
-    - `recordingState`
-    - `recordingError`
-    - `lastCapturePackage`
-    - `currentCapturePackageRef`
-    - `desktopHandoffPromptPresented` if it naturally follows source
-      picking/capture handoff
-    - `recordProductClip(durationSeconds:)`
-    - `adoptCaptureResult(_:)`
-    - package rehydration from persisted snapshot
-    - `makeCapturePackagePreviewGradeProcessor(_:)` if it can move
-      without pulling live preview internals back into the facade
+    - `device`
+    - `activeLens`
+    - `previewVideoDataOutput`
+    - `previewSampleDelegate`
+    - rotation coordinator + observations
+    - preview/capture rotation apply helpers
+    - `prepare(lens:)` device/format work, or the device/format subset
+      if `AVCaptureSession` stays on the facade
+    - exposure bias, tap-to-focus/meter, white balance, manual exposure
+      setters and their published ranges/states
+    - live preview VDO setup / telemetry if it remains device-coupled
 
-- Optional `EditorTransientUIController`
-  - Add only if it materially reduces the store and does not create a
-    new pass-through shell.
-  - Candidate ownership:
-    - `sourceLoadState`
-    - `isBusy`
-    - `notice`
-    - `error`
-    - `toast`
-    - `presentToast` / `dismissToast`
+- `RecordingStateController`
+  - New file: `apps/capacitor-film-lab-ios/ios/App/App/Capture/Internal/RecordingStateController.swift`
+  - Owns recording lifecycle state, timers, storage policy, pressure
+    monitoring, and requested stabilization state.
+  - Preferred move candidates:
+    - `state`
+    - `elapsedSeconds`
+    - `storagePolicy`
+    - `storagePressure`
+    - `requestedStabilization`
+    - `captureId`, package/master/proxy URLs, started time, duration
+      snapshot, pending failure
+    - elapsed timer, auto-stop task, storage pressure task
+    - `start()`, `stop()`, `rearm()` body ownership when it can be
+      delegated without changing public API
+    - `currentDurationLimit`, storage write-rate / pressure helpers
+
+- `CapturePackageAssembler`
+  - New file: `apps/capacitor-film-lab-ios/ios/App/App/Capture/Internal/CapturePackageAssembler.swift`
+  - Owns completion-time file/package construction and persistence.
+  - Preferred move candidates:
+    - `handleMovieFinished(failure:)` package assembly body, or the
+      pure assembly section if state controller still owns transition
+    - codec subtype read
+    - package paths creation
+    - `FilmtoneCapturePackagePersistence.write` handoff
+    - final `FilmtoneCapturePackage` construction from recording
+      context
+
+## Queue / Ownership Rule
+
+`sessionQueue` must have a single owner after this bundle.
+
+Preferred first implementation:
+
+- Keep `AVCaptureSession` and `sessionQueue` on `FilmtoneCaptureSession`
+  as the facade-owned AVFoundation boundary.
+- Pass narrowly scoped closures/context objects into collaborators for
+  operations that must run on that queue.
+- Move `sessionQueue` only if one collaborator can own the whole
+  AVFoundation mutation surface without creating cross-queue calls.
+
+Do not create a second capture session queue and do not dispatch from one
+queue into another for session mutation.
 
 ## Compatibility Rules
 
-- Preserve all existing `FilmtoneEditorStore` method/property names used
-  by views and runtime surfaces.
-- Keep SwiftUI view files unchanged unless an exception is recorded
-  before editing.
-- If a moved `@Published` property is view-read, bridge collaborator
-  `objectWillChange` into the store exactly as Phase 3A/3B did.
-- Keep source/project/preview/export collaborator boundaries intact.
-  Do not move code back into the facade to make capture extraction easier.
-- Do not modify `FilmtoneCaptureSession` in this phase. That is Phase 4.
+- Preserve `FilmtoneCaptureSession` public API and view-facing property
+  names.
+- Keep SwiftUI view files unchanged.
+- If moved `@Published` state is read by `FilmtoneCaptureView`, expose a
+  facade computed forward and bridge collaborator `objectWillChange`
+  into the session.
+- Keep `previewFrameSink` stable for the session lifetime.
+- Keep VDO preview handshake unchanged: `hasLivePreview`,
+  `livePreviewTelemetry`, and `FilmtoneCaptureLivePreview` behavior must
+  remain equivalent.
+- Do not modify `EditorCaptureRelay` or `FilmtoneEditorStore` in this
+  phase unless a pure namespace update is required.
 
 ## Minimum Inventory
 
-Before editing, record only the access patterns needed for capture relay
-compatibility:
+Before editing, record only the ownership facts needed to cut the bundle:
 
 | Surface | Access pattern | Decision |
 |---|---|---|
-| recording UI state/error | pending | move or facade storage |
-| capture package refs | pending | move or facade storage |
-| desktop handoff prompt | pending | move with relay or defer |
-| source load/busy/error/notice | pending | optional transient UI controller or defer |
-| capture package preview processor | pending | move or keep facade |
+| `sessionQueue` / `AVCaptureSession` | pending | facade or device manager |
+| device/lens/format controls | pending | move target |
+| recording state/timers/storage pressure | pending | move target |
+| package assembly / persistence | pending | move target |
+| live preview VDO / rotation | pending | move target |
+| public CaptureSession API used by views | pending | facade forward shape |
 
 ## Edit Targets
 
-- `apps/capacitor-film-lab-ios/ios/App/App/Editor/FilmtoneEditorStore.swift`
-- `apps/capacitor-film-lab-ios/ios/App/App/Editor/Internal/EditorCaptureRelay.swift`
-- optional: `apps/capacitor-film-lab-ios/ios/App/App/Editor/Internal/EditorTransientUIController.swift`
+- `apps/capacitor-film-lab-ios/ios/App/App/Capture/FilmtoneCaptureSession.swift`
+- `apps/capacitor-film-lab-ios/ios/App/App/Capture/Internal/CaptureDeviceManager.swift`
+- `apps/capacitor-film-lab-ios/ios/App/App/Capture/Internal/RecordingStateController.swift`
+- `apps/capacitor-film-lab-ios/ios/App/App/Capture/Internal/CapturePackageAssembler.swift`
 - `apps/capacitor-film-lab-ios/ios/App/App.xcodeproj/project.pbxproj`
 - `docs/filmtone/ios/feature-architecture-refactor/active.md`
 
 ## Checklist
 
 - [ ] Fill the minimum inventory table.
-- [ ] Add `EditorCaptureRelay` as a real collaborator.
-- [ ] Add `EditorTransientUIController` only if it materially reduces
-  the store without broadening scope.
-- [ ] Preserve all view-facing `FilmtoneEditorStore` API names.
-- [ ] Keep SwiftUI view files unchanged, or document the exact exception.
+- [ ] Add `Capture/Internal/` if it does not already exist.
+- [ ] Add `CaptureDeviceManager` as a real collaborator.
+- [ ] Add `RecordingStateController` as a real collaborator.
+- [ ] Add `CapturePackageAssembler` as a real collaborator.
+- [ ] Preserve all view-facing `FilmtoneCaptureSession` API names.
+- [ ] Keep SwiftUI view files unchanged, or record the exact exception.
 - [ ] Register every new Swift file in the App target pbxproj.
 - [ ] Run pbxproj 4-section grep for every new Swift file.
 - [ ] Run `bun run verify:ios`.
@@ -108,8 +150,9 @@ compatibility:
 
 Minimum:
 
-- `grep -c 'EditorCaptureRelay.swift' apps/capacitor-film-lab-ios/ios/App/App.xcodeproj/project.pbxproj` equals `4`
-- optional transient UI controller grep if added
+- `grep -c 'CaptureDeviceManager.swift' apps/capacitor-film-lab-ios/ios/App/App.xcodeproj/project.pbxproj` equals `4`
+- `grep -c 'RecordingStateController.swift' apps/capacitor-film-lab-ios/ios/App/App.xcodeproj/project.pbxproj` equals `4`
+- `grep -c 'CapturePackageAssembler.swift' apps/capacitor-film-lab-ios/ios/App/App.xcodeproj/project.pbxproj` equals `4`
 - `bun run verify:ios`
 - `git diff --check`
 
@@ -117,35 +160,36 @@ Targeted:
 
 - `git diff --name-only -- apps/capacitor-film-lab-ios/ios/App/App | rg '(View|Root|CaptureView|FullscreenLutEditor)'`
   should be empty unless a compatibility exception is recorded.
-- Stale greps for moved capture/package declarations in
-  `FilmtoneEditorStore.swift` should show only facade forwards.
+- Stale greps for moved methods/properties in
+  `FilmtoneCaptureSession.swift` should show only facade forwards.
 
 ## Done Conditions
 
-- `FilmtoneEditorStore.swift` is reduced into the 1200-1500 line range,
+- `FilmtoneCaptureSession.swift` is reduced into the 600-900 line range,
   or the active records a concrete blocker for overshoot.
-- Capture relay/package state is no longer primarily owned by the
-  facade.
+- Device/format/lens behavior, recording state/timers/storage pressure,
+  and package assembly are no longer primarily owned by the facade.
+- `sessionQueue` ownership is explicitly documented and singular.
 - New files are real collaborators, not extension-only splits.
 - View-facing API and view files are unchanged.
 - `bun run verify:ios`, pbxproj greps, and `git diff --check` are green.
-- The next active can start Phase 4 CaptureSession split.
 
 ## Stop Conditions
 
 - Done conditions are met.
 - `bun run verify:ios` fails 3 consecutive times for the same issue.
-- Moving capture relay requires changing `FilmtoneCaptureSession`.
-  Stop and leave that for Phase 4.
-- Transient UI extraction becomes a pass-through-only wrapper. Defer it
-  and keep the Phase 3C focus on capture relay.
+- Splitting device manager would require changing capture view API. Keep
+  facade forwards and record the compromise instead.
+- Queue ownership cannot be kept singular with the planned split. Stop
+  and record the smallest safe sub-boundary rather than adding a second
+  queue.
 
 ## Out Of Scope
 
-- CaptureSession refactor.
+- EditorStore changes beyond pure namespace fallout.
 - ExportSession changes.
 - SwiftUI view body decomposition.
-- Formal XCTest, simulator smoke, PSNR, or full UI QA matrix.
+- Formal XCTest, simulator smoke, PSNR, or full QA matrix.
 
 ## Line / File Deltas
 

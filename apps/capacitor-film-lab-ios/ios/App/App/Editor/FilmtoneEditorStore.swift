@@ -91,34 +91,6 @@ final class FilmtoneEditorStore: ObservableObject {
     @Published var isBusy = false
     @Published var notice: String?
     @Published var error: String?
-    /// Live during the AVCaptureMovieFileOutput phase of `recordProductClip`
-    /// only. Drives the recording-in-progress overlay (ring + countdown +
-    /// label). Cleared the moment capture returns — the post-capture
-    /// probe / applyProbe phase is covered by `sourceLoadState` instead.
-    @Published var recordingState: FilmtoneRecordingUIState?
-    /// Localized detail of the most recent product-capture failure. Bound
-    /// to a `.alert` in `FilmtoneRootView`; cleared when the user
-    /// dismisses the alert or starts a new recording. Distinct from the
-    /// generic `error` bag so the recording surface alert never picks up
-    /// pickSource / export / library errors.
-    @Published var recordingError: String?
-    #if os(iOS)
-    /// Most-recent native capture surface (M10) result.  Holds master /
-    /// proxy URLs and the storage policy that produced them.  The editor
-    /// is editing the proxy after `adoptCaptureResult(_:)`; the master
-    /// stays on the security-scoped external folder (or in the local
-    /// package directory for internal mode) and is reachable through
-    /// this property when downstream operations need it.
-    @Published var lastCapturePackage: FilmtoneCapturePackage?
-
-    /// Local filesystem path to the `capture-package.json` written by
-    /// the M10 capture pipeline alongside the proxy.  Persisted on the
-    /// editor snapshot so a relaunch can re-hydrate `lastCapturePackage`
-    /// without depending on a future "reconnect SSD" walkthrough.
-    /// Decoupled from `SourceInfoDTO` so the source identity remains a
-    /// pure media-input concept (B-anchor per M10 review, 2026-05-08).
-    @Published var currentCapturePackageRef: String?
-    #endif
     /// Set true when the user picks a video longer than the iOS source
     /// duration cap (`PHASE0_MAX_SOURCE_DURATION_SEC`, 300s). Surfaces a
     /// dedicated Desktop handoff sheet instead of routing the clip through
@@ -170,10 +142,12 @@ final class FilmtoneEditorStore: ObservableObject {
     let previewOrchestrator: EditorPreviewOrchestrator
     let projectMutationCoordinator: EditorProjectMutationCoordinator
     let exportCoordinator: EditorExportCoordinator
+    let captureRelay: EditorCaptureRelay
     private var toastDismissTask: Task<Void, Never>?
     private var libraryBootstrapTask: Task<Void, Never>?
     private var previewCancellable: AnyCancellable?
     private var exportCancellable: AnyCancellable?
+    private var captureRelayCancellable: AnyCancellable?
 
     var preview: FilmtonePreviewState {
         previewOrchestrator.preview
@@ -229,6 +203,56 @@ final class FilmtoneEditorStore: ObservableObject {
         exportCoordinator.isReleasingCache
     }
 
+    // MARK: - Phase 3C capture relay forwards
+    //
+    // Forwarding so view code (`FilmtoneRootView`'s recording overlay /
+    // `.alert($recordingError)` Binding(get:set:)) and the export
+    // coordinator (`store.lastCapturePackage`) keep their existing access
+    // paths. `@Published` storage lives on `EditorCaptureRelay`; the
+    // Combine `objectWillChange.sink` bridge in `init` re-emits its change
+    // notifications through this store so SwiftUI redraws fire as before.
+
+    /// Live during the AVCaptureMovieFileOutput phase of `recordProductClip`
+    /// only. Drives the recording-in-progress overlay (ring + countdown +
+    /// label) in `FilmtoneRootView`. Cleared the moment capture returns —
+    /// the post-capture probe / applyProbe phase is covered by
+    /// `sourceLoadState` instead.
+    var recordingState: FilmtoneRecordingUIState? {
+        captureRelay.recordingState
+    }
+
+    /// Localized detail of the most recent product-capture failure. Bound
+    /// to a `.alert` in `FilmtoneRootView`; cleared when the user dismisses
+    /// the alert or starts a new recording. Distinct from the generic
+    /// `error` bag so the recording surface alert never picks up
+    /// pickSource / export / library errors.
+    var recordingError: String? {
+        get { captureRelay.recordingError }
+        set { captureRelay.recordingError = newValue }
+    }
+
+    #if os(iOS)
+    /// Most-recent native capture surface (M10) result. Holds master /
+    /// proxy URLs and the storage policy that produced them. The editor is
+    /// editing the proxy after `adoptCaptureResult(_:)`; the master stays
+    /// on the security-scoped external folder (or in the local package
+    /// directory for internal mode) and is reachable through this property
+    /// when downstream operations need it.
+    var lastCapturePackage: FilmtoneCapturePackage? {
+        captureRelay.lastCapturePackage
+    }
+
+    /// Local filesystem path to the `capture-package.json` written by the
+    /// M10 capture pipeline alongside the proxy. Persisted on the editor
+    /// snapshot so a relaunch can re-hydrate `lastCapturePackage` without
+    /// depending on a future "reconnect SSD" walkthrough. Decoupled from
+    /// `SourceInfoDTO` so the source identity remains a pure media-input
+    /// concept (B-anchor per M10 review, 2026-05-08).
+    var currentCapturePackageRef: String? {
+        captureRelay.currentCapturePackageRef
+    }
+    #endif
+
     init(
         facade: FilmtoneEditorFacade,
         strings: FilmtoneStrings = FilmtoneStringsCatalog.current,
@@ -257,41 +281,36 @@ final class FilmtoneEditorStore: ObservableObject {
             libraryController: libraryController,
             strings: strings
         )
+        self.captureRelay = EditorCaptureRelay(
+            facade: facade,
+            libraryController: libraryController,
+            projectController: projectController,
+            strings: strings
+        )
 
+        let snapshotCaptureRef: String?
         if let snapshot = FilmtonePersistence.load() {
             self.project = snapshot.project
             self.source = snapshot.source
             self.probe = snapshot.probe
-            #if os(iOS)
-            self.currentCapturePackageRef = snapshot.currentCapturePackageRef
-            #endif
+            snapshotCaptureRef = snapshot.currentCapturePackageRef
         } else {
             self.project = FilmtonePhase0Math.createProjectState()
             self.source = nil
             self.probe = nil
+            snapshotCaptureRef = nil
         }
         self.selectedOpticalFilterId = self.project.opticalFilterProfileId
 
         #if os(iOS)
-        // Re-hydrate the M10 capture package linkage if the persisted
-        // ref still resolves on disk.  Missing JSON (cache eviction,
-        // user wiped storage) is benign — we just keep the proxy source
-        // as a normal video; the master simply isn't reachable until
-        // the user re-records.
-        if let ref = self.currentCapturePackageRef,
-           let pkg = FilmtoneCapturePackagePersistence.read(localPackageJSONPath: ref) {
-            self.lastCapturePackage = pkg
-        } else if self.currentCapturePackageRef != nil {
-            self.currentCapturePackageRef = nil
-        }
+        captureRelay.rehydrate(currentCapturePackageRef: snapshotCaptureRef)
         #endif
 
         if let source, !facade.fileExists(uri: source.uri) {
             self.source = nil
             self.probe = nil
             #if os(iOS)
-            self.lastCapturePackage = nil
-            self.currentCapturePackageRef = nil
+            captureRelay.clearLinkage()
             #endif
             persist()
         }
@@ -309,6 +328,10 @@ final class FilmtoneEditorStore: ObservableObject {
         projectMutationCoordinator.attach(self)
         exportCoordinator.attach(self)
         exportCancellable = exportCoordinator.objectWillChange.sink { [weak self] in
+            self?.objectWillChange.send()
+        }
+        captureRelay.attach(self)
+        captureRelayCancellable = captureRelay.objectWillChange.sink { [weak self] in
             self?.objectWillChange.send()
         }
 
@@ -801,90 +824,7 @@ final class FilmtoneEditorStore: ObservableObject {
     func makeCapturePackagePreviewGradeProcessor(
         _ package: FilmtoneCapturePackage
     ) async -> FilmtoneSharedGradeProcessor? {
-        guard package.selectedLook != nil || package.customLut != nil else {
-            return nil
-        }
-
-        let proxySource = SourceInfoDTO(
-            uri: package.proxyURL.absoluteString,
-            filename: package.proxyURL.lastPathComponent,
-            kind: .video,
-            mimeType: "video/quicktime"
-        )
-
-        do {
-            let probe = try facade.probeSource(proxySource)
-            var transient = project
-            var savedLookEntry: SavedLookEntry?
-
-            if let canonicalUUID = package.selectedLook?.canonicalUUID,
-               let builtIn = FilmtoneBuiltInCatalog.look(matching: canonicalUUID) {
-                transient.presetName = FilmtonePhase0Math.safePresetName(builtIn.presetName)
-                transient.presetVersion = FilmtonePhase0Math.presetVersion
-                transient.strength = FilmtonePhase0Math.clampStrength(builtIn.strength)
-                transient.quickState = builtIn.quickState.clamped()
-
-                var paramOverrides = builtIn.paramOverrides
-                var resolvedCreativeLut: ParsedCubeLutDTO?
-                if case let .bundled(slug, filename, pinnedSha256, intensity) = builtIn.creativeLut {
-                    resolvedCreativeLut = FilmtoneEditorStore.loadBundledCreativeLut(
-                        slug: slug,
-                        filename: filename,
-                        pinnedSha256: pinnedSha256,
-                        intensity: intensity,
-                        packId: builtIn.packId ?? FilmtoneBuiltInCatalog.creativePack01Id
-                    )
-                }
-                if let adaptation = FilmtoneCreativePack01Adaptation.resolve(
-                    slug: builtIn.slug,
-                    descriptor: probe.sourceToneDescriptor
-                ) {
-                    for (key, value) in adaptation.paramOverrides.values {
-                        paramOverrides.values[key] = value
-                    }
-                    if let cube = resolvedCreativeLut {
-                        resolvedCreativeLut = cube.withIntensity(adaptation.intensity)
-                    }
-                }
-                transient.paramOverrides = paramOverrides
-                let base = FilmtonePhase0Math.deriveParams(
-                    presetName: transient.presetName,
-                    strength: transient.strength,
-                    quickState: transient.quickState
-                )
-                transient.params = base.applyingPatch(paramOverrides)
-                transient.creativeLut = resolvedCreativeLut
-
-                if let loaded = try? await libraryController.loadLook(id: canonicalUUID) {
-                    savedLookEntry = loaded
-                } else {
-                    savedLookEntry = FilmtoneBuiltInCatalog.materializeAsSavedLookEntry(
-                        builtIn,
-                        favoriteOverride: false,
-                        asOf: Date()
-                    )
-                }
-            } else if let customLut = package.customLut,
-                      let libraryId = customLut.libraryId,
-                      let parsed = try await libraryController.loadLut(id: libraryId) {
-                transient.creativeLut = parsed.withIntensity(customLut.intensity)
-            } else {
-                return nil
-            }
-
-            let request = try FilmtonePhase0Math.buildExportRequest(
-                source: proxySource,
-                probe: probe,
-                project: transient
-            )
-            return try facade.makeLivePreviewGradeProcessor(
-                request: request,
-                appliedSavedLook: savedLookEntry,
-                cameraProfile: project.cameraProfile
-            )
-        } catch {
-            return nil
-        }
+        await captureRelay.makeCapturePackagePreviewGradeProcessor(package)
     }
     #endif
 
@@ -1182,155 +1122,20 @@ final class FilmtoneEditorStore: ObservableObject {
     /// pipeline as `pickSource` (probe → applyProbe → persist → reclaim →
     /// schedulePreviewRender).
     func recordProductClip(durationSeconds: Double = 5.0) async {
-        isBusy = true
-        notice = strings.recordProductClipRunning
-        error = nil
-        recordingError = nil
-        sourceLoadState = nil
-        recordingState = FilmtoneRecordingUIState(
-            startedAt: Date(),
-            durationSeconds: durationSeconds
-        )
-
-        let capture = FilmtoneProductCapture()
-        do {
-            let result: FilmtoneProductCapture.RecordClipResult = try await withCheckedThrowingContinuation { continuation in
-                capture.recordClip(durationSeconds: durationSeconds) { result in
-                    continuation.resume(with: result)
-                }
-            }
-
-            recordingState = nil
-
-            let recordedSource = SourceInfoDTO(
-                uri: result.movURL.absoluteString,
-                filename: result.movURL.lastPathComponent,
-                kind: .video,
-                mimeType: "video/quicktime"
-            )
-
-            sourceLoadState = .init(
-                stage: .probing,
-                route: .photoLibrary,
-                message: strings.probePending,
-                progress: nil,
-                isDeterminate: false
-            )
-            let probe = try facade.probeSource(recordedSource)
-            applyProbe(source: recordedSource, probe: probe)
-            isBusy = false
-            sourceLoadState = nil
-            notice = nil
-            persist()
-            reclaimCacheForCurrentState()
-            schedulePreviewRender()
-        } catch {
-            recordingState = nil
-            isBusy = false
-            sourceLoadState = nil
-            notice = nil
-            let detail: String
-            if let recordError = error as? FilmtoneProductCapture.RecordClipError {
-                detail = recordError.errorDescription ?? String(describing: recordError)
-            } else {
-                detail = (error as NSError).localizedDescription
-            }
-            self.recordingError = detail
-        }
+        await captureRelay.recordProductClip(durationSeconds: durationSeconds)
     }
 
     #if os(iOS)
-    /// Adopts a `FilmtoneCapturePackage` produced by the M10 native
-    /// capture surface.  Probes the **proxy** (not the master) and
-    /// applies the resulting probe through the same downstream pipeline
-    /// as `pickSource` / `recordProductClip` (probe → applyProbe →
-    /// persist → reclaim → schedulePreviewRender).  The capture package
-    /// itself is retained on `lastCapturePackage` so downstream
-    /// operations (export-from-master / share-master) can resolve the
-    /// security-scoped external folder URL when needed.
+    /// Adopts a `FilmtoneCapturePackage` produced by the M10 native capture
+    /// surface. Probes the **proxy** (not the master) and applies the
+    /// resulting probe through the same downstream pipeline as `pickSource`
+    /// / `recordProductClip` (probe → applyProbe → persist → reclaim →
+    /// schedulePreviewRender). The capture package itself is retained on
+    /// `lastCapturePackage` so downstream operations (export-from-master /
+    /// share-master) can resolve the security-scoped external folder URL
+    /// when needed.
     func adoptCaptureResult(_ package: FilmtoneCapturePackage) async {
-        isBusy = true
-        notice = nil
-        error = nil
-        recordingError = nil
-        recordingState = nil
-        sourceLoadState = .init(
-            stage: .probing,
-            route: .photoLibrary,
-            message: strings.probePending,
-            progress: nil,
-            isDeterminate: false
-        )
-
-        let proxySource = SourceInfoDTO(
-            uri: package.proxyURL.absoluteString,
-            filename: package.proxyURL.lastPathComponent,
-            kind: .video,
-            mimeType: "video/quicktime"
-        )
-
-        do {
-            let probe = try facade.probeSource(proxySource)
-            applyProbe(source: proxySource, probe: probe)
-            lastCapturePackage = package
-            // Capture session itself writes `capture-package.json` to
-            // the package dir on .completed transition (and hard-fails
-            // the run if that write fails).  Defense in depth: re-write
-            // if the file is somehow missing, and only set the ref when
-            // the file is provably on disk so a relaunch can read it.
-            let localJSONURL = package.packageDirURL.appendingPathComponent(
-                FilmtoneCapturePackagePersistence.snapshotFilename,
-                isDirectory: false
-            )
-            if !FileManager.default.fileExists(atPath: localJSONURL.path) {
-                _ = FilmtoneCapturePackagePersistence.write(package: package)
-            }
-            if FileManager.default.fileExists(atPath: localJSONURL.path) {
-                currentCapturePackageRef = localJSONURL.path
-            } else {
-                currentCapturePackageRef = nil
-            }
-            // S11-E: re-apply the capture-time Look chip against the
-            // proxy so the editor opens in the same chain the live
-            // preview rendered during capture.  Stone / Urban
-            // `canonicalUUID`s resolve through `libraryController.loadLook(id:)`
-            // → `FilmtoneBuiltInCatalog.materializeAsSavedLookEntry`,
-            // routing through the same `.bundled` cube +
-            // `FilmtoneCreativePack01Adaptation` wiring as the chip
-            // strip and the editor's library sheet — one source of
-            // truth (audit_layer_fit_before_placing_new_files).
-            //
-            // Filmtone default chip / pre-M11 packages have
-            // `selectedLook == nil` and fall through unchanged, so the
-            // editor preserves whatever Look / adjustments were in
-            // place before capture (S11-A Design Lock).  Cancel never
-            // reaches this branch — `adoptCaptureResult` is only
-            // entered on `.completed(package)` (FilmtoneCaptureView
-            // routes `.cancelled` to `onCancelled` without calling us).
-            //
-            // `applySavedLook` surfaces its own `self.error` /
-            // `presentToast` on bundled-cube SHA-256 mismatch or
-            // missing resource (libraryLutMissingOnApply); we do not
-            // add a second error path here, but `await` blocks
-            // adoption until the apply settles so a follow-up
-            // `schedulePreviewRender()` reflects the Look state
-            // rather than the pre-Look state.
-            if let canonicalUUID = package.selectedLook?.canonicalUUID {
-                await applySavedLook(id: canonicalUUID)
-            } else if let customLut = package.customLut {
-                await applyCaptureCustomLut(customLut)
-            }
-            isBusy = false
-            sourceLoadState = nil
-            persist()
-            reclaimCacheForCurrentState()
-            schedulePreviewRender()
-        } catch {
-            isBusy = false
-            sourceLoadState = nil
-            let detail = (error as NSError).localizedDescription
-            self.recordingError = detail
-        }
+        await captureRelay.adoptCaptureResult(package)
     }
     #endif
 
@@ -1746,7 +1551,7 @@ final class FilmtoneEditorStore: ObservableObject {
         schedulePreviewRender()
     }
 
-    private func applyProbe(source: SourceInfoDTO, probe: SourceProbeDTO) {
+    func applyProbe(source: SourceInfoDTO, probe: SourceProbeDTO) {
         let isSourceReplacement = self.source?.uri != source.uri
         self.source = source
         self.probe = probe
@@ -1762,16 +1567,7 @@ final class FilmtoneEditorStore: ObservableObject {
         if isSourceReplacement {
             applyCameraProfileSourceChangeRule(probe: probe)
             #if os(iOS)
-            // Source replacement breaks the capture-package linkage: the
-            // new source (PhotoLibrary / Files / a different capture run)
-            // is not the proxy for `lastCapturePackage`.  `adoptCaptureResult`
-            // re-establishes the linkage immediately after this call.
-            // Other source-replacement entry points (`pickSource`, etc.)
-            // legitimately drop the M10 master/proxy linkage here.
-            if lastCapturePackage?.proxyURL.absoluteString != source.uri {
-                lastCapturePackage = nil
-                currentCapturePackageRef = nil
-            }
+            captureRelay.dropLinkageIfNotProxy(of: source)
             #endif
         }
         previewOrchestrator.reset()
@@ -1833,7 +1629,7 @@ final class FilmtoneEditorStore: ObservableObject {
         )
     }
 
-    private func schedulePreviewRender() {
+    func schedulePreviewRender() {
         previewOrchestrator.schedule()
     }
 

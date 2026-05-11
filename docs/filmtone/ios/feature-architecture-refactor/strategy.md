@@ -97,12 +97,13 @@ This lane is done when:
     focused UI reactivity verification. View code remains unchanged
     unless the compatibility table proves a minimal bridge adjustment is
     necessary.
-- **Phase 4 — CaptureSession split** — two larger bundles:
-  - **Phase 4A/4B-1** — queue/delegate ownership decision +
-    `CaptureDeviceManager` extraction.
-  - **Phase 4B-2** — `RecordingStateController` +
-    `CapturePackageAssembler` extraction, facade cleanup, and real-device
-    record → grade → export smoke.
+- **Phase 4 — CaptureSession split** — one large implementation bundle
+  plus closeout if needed:
+  - **Phase 4A** — sessionQueue ownership decision +
+    `CaptureDeviceManager`, `RecordingStateController`, and
+    `CapturePackageAssembler` extraction.
+  - **Phase 4B** — facade closeout and real-device record → grade →
+    export smoke only if Phase 4A leaves product-risk follow-up.
 
 Remaining review/commit cycles after Phase 2B-10C: target **5-7**
 product-boundary turns, not 10+ helper-sized turns.
@@ -421,3 +422,14 @@ product-boundary turns, not 10+ helper-sized turns.
   4-section grep = 4 for both files; `bun run verify:ios` green;
   `git diff --check` clean. See
   `archive/2026-05-11-phase-3b-editor-mutation-export-coordinators.md`.
+- 2026-05-11 JST — Phase 3C (EditorStore capture relay closeout)
+  completed in the feature worktree. New `EditorCaptureRelay` owns
+  recording UI state, capture package refs, package rehydration,
+  product-clip recording, capture result adoption, and capture package
+  preview processor creation. Store size reduced from 1927 → 1723 lines
+  (−204); target band overshoot is recorded because the remaining live
+  preview processor factory crosses non-capture editor labels/cache state
+  and is intentionally not part of capture relay. SwiftUI view files
+  stayed unchanged; pbxproj 4-section grep = 4; `bun run verify:ios`
+  green; `git diff --check` clean. See
+  `archive/2026-05-11-phase-3c-editor-capture-relay-closeout.md`.

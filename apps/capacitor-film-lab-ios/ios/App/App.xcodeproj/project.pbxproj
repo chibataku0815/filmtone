@@ -71,6 +71,7 @@
 		C30000010000000000000007 /* EditorPreviewOrchestrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000006 /* EditorPreviewOrchestrator.swift */; };
 		C30000010000000000000009 /* EditorProjectMutationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000008 /* EditorProjectMutationCoordinator.swift */; };
 		C3000001000000000000000B /* EditorExportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3000001000000000000000A /* EditorExportCoordinator.swift */; };
+		C3000001000000000000000D /* EditorCaptureRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3000001000000000000000C /* EditorCaptureRelay.swift */; };
 		D10000010000000000000001 /* FilmtoneRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000001 /* FilmtoneRootView.swift */; };
 		D10000010000000000000002 /* FilmtoneEditorStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000002 /* FilmtoneEditorStore.swift */; };
 		D10000010000000000000003 /* FilmtoneEditorFacade.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000003 /* FilmtoneEditorFacade.swift */; };
@@ -257,6 +258,7 @@
 		C30000010000000000000006 /* EditorPreviewOrchestrator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorPreviewOrchestrator.swift; sourceTree = "<group>"; };
 		C30000010000000000000008 /* EditorProjectMutationCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorProjectMutationCoordinator.swift; sourceTree = "<group>"; };
 		C3000001000000000000000A /* EditorExportCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorExportCoordinator.swift; sourceTree = "<group>"; };
+		C3000001000000000000000C /* EditorCaptureRelay.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorCaptureRelay.swift; sourceTree = "<group>"; };
 		B20000010000000000000001 /* MezzanineColorProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MezzanineColorProbe.swift; sourceTree = "<group>"; };
 		B20000010000000000000020 /* DepthSourceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthSourceService.swift; sourceTree = "<group>"; };
 		B20000010000000000000021 /* FilmtoneDepthMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneDepthMap.swift; sourceTree = "<group>"; };
@@ -662,6 +664,7 @@
 				C30000010000000000000006 /* EditorPreviewOrchestrator.swift */,
 				C30000010000000000000008 /* EditorProjectMutationCoordinator.swift */,
 				C3000001000000000000000A /* EditorExportCoordinator.swift */,
+				C3000001000000000000000C /* EditorCaptureRelay.swift */,
 			);
 			name = Internal;
 			path = Internal;
@@ -1024,6 +1027,7 @@
 				C30000010000000000000007 /* EditorPreviewOrchestrator.swift in Sources */,
 				C30000010000000000000009 /* EditorProjectMutationCoordinator.swift in Sources */,
 				C3000001000000000000000B /* EditorExportCoordinator.swift in Sources */,
+				C3000001000000000000000D /* EditorCaptureRelay.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
