@@ -10,7 +10,7 @@ import Foundation
 ///
 /// - `(P)` Apple Log → `nativePolicy(.appleLogToRec709)` — reuses the
 ///   existing `makeAppleLogToRec709Lut` Apple Log path in
-///   `FilmtoneExportSession`.
+///   `ExportInputLutBuilder`.
 /// - `(P)` Apple Log 2 → `nativePolicy(.appleLog2ToRec709)` — same path
 ///   under `rec2020GamutMap: true`. Apple Log 2 v1.3 ships with the
 ///   Rec.2020 matrix as a known limitation (D-CP6); v1.4 refines via

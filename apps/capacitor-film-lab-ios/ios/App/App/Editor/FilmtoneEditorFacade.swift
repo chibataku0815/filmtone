@@ -149,7 +149,7 @@ final class FilmtoneEditorFacade {
     /// `appliedSavedLook` and `cameraProfile` are forwarded to the
     /// underlying `FilmtoneExportSession` so live preview matches the
     /// export grade chain's input-LUT auto-injection
-    /// (`FilmtoneExportSession.makeActiveInputLut(for:probe:)`) and Saved
+    /// (`ExportInputLutBuilder.makeActiveInputLut(for:probe:)`) and Saved
     /// Look provenance.  Without these, live preview silently downgrades
     /// to `cameraProfile = .auto` and an unresolved Saved Look — which
     /// the F3-R diagnostic surfaces as `[!] camProf:N savedLook:N`.

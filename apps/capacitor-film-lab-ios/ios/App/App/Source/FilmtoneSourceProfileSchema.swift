@@ -102,7 +102,7 @@ enum SourceProfileCurve: String, Codable, CaseIterable, Sendable {
 ///   the working color space (Rec.709 SDR passthrough).
 /// - `.nativePolicy` — reuse the existing `SourceInputTransformStrategyDTO`
 ///   path. Apple Log / Apple Log 2 ride this lane, sharing
-///   `makeAppleLogToRec709Lut` from `FilmtoneExportSession`.
+///   `makeAppleLogToRec709Lut` from `ExportInputLutBuilder`.
 /// - `.synthesized` — Filmtone-implemented decoder + gamut matrix +
 ///   `filmtoneSdrShoulder` + Rec.709 encode. D-Log, C-Log, V-Log, and S-Log3 ride this
 ///   lane (Camera Profiles Phases B and C). Each (S) curve must ship with

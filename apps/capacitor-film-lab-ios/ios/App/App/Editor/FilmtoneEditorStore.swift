@@ -1302,7 +1302,7 @@ final class FilmtoneEditorStore: ObservableObject {
     ) -> FilmtoneLivePreviewDiagnostics {
         let creative = request.creativeLut
         // Mirrors the auto-detection path inside
-        // `FilmtoneExportSession.makeAutomaticInputLut(for:)`: when
+        // `ExportInputLutBuilder.makeAutomaticInputLut(for:)`: when
         // the runtime falls back to `.auto` (which it does for live
         // preview because cameraProfile isn't passed), the input LUT
         // is built from `probe?.inputTransformPolicy.strategy`.

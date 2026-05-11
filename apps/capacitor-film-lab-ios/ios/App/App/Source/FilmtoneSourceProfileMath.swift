@@ -478,7 +478,7 @@ enum FilmtoneSourceProfileMath {
 
     /// Build a 33³ V-Log → Rec.709 cube, sample-major (R fastest, then G,
     /// then B), packed RGB Float32 for `CIColorCubeWithColorSpace`. Mirrors
-    /// `FilmtoneExportSession.makeAppleLogToRec709Lut` so callers can
+    /// `ExportInputLutBuilder.makeAppleLogToRec709Lut` so callers can
     /// substitute curves without changing their cube-consumption side.
     static func makeVlogToRec709Cube(size: Int = 33) -> [Float] {
         precondition(size >= 2, "cube size must be ≥ 2")
