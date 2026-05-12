@@ -200,40 +200,98 @@ Skip gates (justified):
   systemically wrong for a source class → open a Phase 4-C resolver
   re-tune active.md rather than patching inside Phase 5.
 
-## Phase 5-A Tuning (2026-05-12 JST)
+## Phase 5-A Diagnostic (2026-05-12 JST) — DO NOT SHIP
 
-iOS on-device QA at `0.18` / `0.30` came back too conservative on
-real footage. The fix lives in shared uniform math
-(`packages/film-lab-core/src/detail-softness.ts` + the Swift mirror
-`FilmtoneDetailSoftnessUniforms.swift`), so the four renderers stay
-in lockstep:
+iOS on-device QA at `0.18` / `0.30` / `1.0` slider max came back too
+subtle on real export. A shared-math tuning attempt
+(`effectiveMax 0.45`, `kernelRadiusMax 2.0`, `edgeGuardHi 0.20`,
+`chromaAttenScale 0.70`) was visually invisible on text-heavy
+magazine footage. A further shared-math push (0.75 / 4.0 / 0.40)
+was prepared but rolled back — pushing the shared constants harder
+does not prove the slider value is actually reaching the export
+kernel.
 
-| Constant            | Before | After |
-|---------------------|--------|-------|
-| `effectiveMax`      | 0.34   | 0.45  |
-| `kernelRadiusMin`   | 0.55   | 0.62  |
-| `kernelRadiusMax`   | 1.45   | 2.0   |
-| `chromaAttenScale`  | 0.85   | 0.70  |
-| `edgeGuardLo`       | 0.04   | 0.04  |
-| `edgeGuardHi`       | 0.20   | 0.20  |
-| `highlightBias`     | 1.18   | 1.18  |
+The right next step is plumbing diagnosis, not stronger shared
+tuning. Two structural concerns:
+
+1. `edgeGuard` is designed to protect high-contrast luma edges, so
+   text-heavy footage is a worst case for visible delta — pushing
+   shared constants may not be the right knob.
+2. Even at slider max, paper noise / soft outlines should show a
+   visible delta. They don't, so a plumbing bug between slider and
+   export kernel is not ruled out.
+
+### State of this commit
+
+- Shared math (`packages/film-lab-core/src/detail-softness.ts` +
+  `FilmtoneDetailSoftnessUniforms.swift`) is at the production-
+  baseline values (`effectiveMax 0.45`, `kernelRadiusMax 2.0`,
+  `edgeGuardHi 0.20`, `chromaAttenScale 0.70`). macOS native,
+  WebGPU, and WebGL keep using these.
+- The iOS export `GradeRenderPipeline.applyDetailSoftnessStage`
+  **overrides the shared uniforms** with intentionally extreme
+  values for diagnostic purposes only. Live preview and other
+  renderers are unaffected.
+- On its first non-zero call per pipeline instance, the iOS path
+  emits one `NSLog` line with both the shared and diagnostic
+  uniforms (see "Per-session diagnostic log" below).
+
+| Constant            | Shared math (production baseline) | iOS-export diagnostic override |
+|---------------------|-----------------------------------|--------------------------------|
+| `effectiveMax`      | 0.45                              | **1.0**                        |
+| `kernelRadiusMin`   | 0.62                              | 0.62                           |
+| `kernelRadiusMax`   | 2.0                               | **6.0**                        |
+| `chromaAttenScale`  | 0.70                              | **0.50**                       |
+| `edgeGuardLo`       | 0.04                              | 0.04                           |
+| `edgeGuardHi`       | 0.20                              | **1.0**                        |
+| `highlightBias`     | 1.18                              | 1.18                           |
 
 Identity short-circuit (`effectiveDetailSoftness < 0.0001`) and the
-`sourceDetailBias` model are unchanged. `clampBias` in
-`source-detail-compensation.ts` still pulls its ceiling from
-`DETAIL_SOFTNESS_EFFECTIVE_MAX`, so the wider headroom is available
-to the resolver without re-tuning per-class bias values; existing
-per-class biases (max `0.10`, iPhone SDR HEVC) stay well under the
-new ceiling.
+`sourceDetailBias` model are unchanged. With `edgeGuardHi = 1.0`,
+edgeGuard hardly attenuates softening even on high-contrast text;
+with `kernelRadiusMax = 6.0`, the 4-cardinal-tap localRef samples
+±6 px so the detail signal is wider; with `effectiveMax = 1.0`,
+slider `1.0` plus any positive `sourceDetailBias` yields full-effect
+attenuation.
 
-Tests updated in lockstep: TS `detail-softness.test.ts` and Swift
-`DetailSoftnessUniformsTests.swift` mirror the new constants and
-endpoint radii (`0.62` / `2.0`). Cosmetic init values in
-`WebGLBackend.ts` updated to match (overwritten at runtime by
-`updateDetailSoftnessUniforms`).
+### Per-session diagnostic log
 
-After landing, the matrix re-runs at `0.18` / `0.30` on an iOS build
-reinstalled from the new constants.
+The iOS override emits one `NSLog` line per `GradeRenderPipeline`
+instance on its first non-zero call:
+
+```
+[Filmtone][DetailSoftness][Diagnostic 5-A] input detailSoftness=… sourceDetailBias=… | shared effective=… radius=… edgeGuardHi=… chromaAttenScale=… | diagnostic effective=… radius=… edgeGuardHi=… chromaAttenScale=…
+```
+
+Confirms (a) the slider value arrives in `params.detailSoftness`,
+(b) `sourceDetailBias` arrives non-zero where expected, (c) the
+diagnostic uniforms used by the kernel match the override above.
+
+### Plumbing-test pass / fail
+
+- **Pass (max obviously softer than zero on iOS export, and log
+  shows non-zero `detailSoftness`)** → plumbing confirmed
+  end-to-end. Revert the iOS diagnostic override + this section,
+  then re-tune **shared math** for production. The likely surgery
+  is on `edgeGuardHi` (let softening reach text edges) more than
+  on `effectiveMax` or `kernelRadiusMax`.
+- **Fail, log shows non-zero `detailSoftness` but no visible
+  effect** → kernel is running but not changing output enough,
+  even at max effective. Check `OpticalKernels.detailSoftness`
+  argument order, sampler colorspace, and whether a downstream
+  stage (creative LUT, vignette, print stage) composites the
+  softened output away.
+- **Fail, log shows `detailSoftness = 0` even though slider is at
+  `1.0`** → params not reaching the export call site. Check the
+  Phase0 export request path: `FilmtoneExportSession` build of
+  `Phase0ParamsDTO`, the slider → params binding in the iOS UI,
+  and Look-vs-override resolution.
+- **Fail, log line never appears** → `applyDetailSoftnessStage` is
+  not being called on the export pipeline at all. Check
+  `FilmtoneExportSession.applyGrade` and any build-flag gating.
+
+Phase 5 closeout is **blocked** until max-vs-zero is distinguishable
+on real export and the iOS diagnostic override is reverted.
 
 ## Copy / History Impact
 

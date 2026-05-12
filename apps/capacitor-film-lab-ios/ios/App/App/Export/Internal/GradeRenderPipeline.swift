@@ -18,6 +18,11 @@ final class GradeRenderPipeline {
     private let preparedCreativeLut: PreparedLut?
     private let outputColorSpace: CGColorSpace
 
+    // Phase 5-A diagnostic only (2026-05-12). Logs the first
+    // `applyDetailSoftnessStage` call per pipeline instance so we can
+    // confirm `detailSoftness` reaches the iOS export kernel.
+    private var hasLoggedDetailSoftnessUniforms: Bool = false
+
     init(
         preparedInputLut: PreparedLut?,
         preparedCreativeLut: PreparedLut?,
@@ -126,10 +131,48 @@ final class GradeRenderPipeline {
         params: Phase0ParamsDTO,
         sourceDetailBias: Double = 0
     ) -> CIImage {
-        let uniforms = FilmtoneDetailSoftness.deriveUniforms(
+        let sharedUniforms = FilmtoneDetailSoftness.deriveUniforms(
             detailSoftness: params.detailSoftness,
             sourceDetailBias: sourceDetailBias
         )
+
+        // ===== Phase 5-A diagnostic (2026-05-12) — DO NOT SHIP =====
+        // iOS export only. Replace shared uniforms with intentionally
+        // extreme values to prove the slider value reaches the export
+        // kernel. If max-vs-zero stays visually invisible with these
+        // numbers, the bug is upstream of this method (params not
+        // reaching the call site, or the CIKernel failing silently).
+        // Revert before closeout. Web / WebGPU / macOS native still use
+        // the shared math.
+        let diagnosticEffectiveMax: Double = 1.0
+        let diagnosticKernelRadiusMin: Double = 0.62
+        let diagnosticKernelRadiusMax: Double = 6.0
+        let combined = params.detailSoftness + sourceDetailBias
+        let diagnosticEffective = max(0, min(diagnosticEffectiveMax, combined))
+        let diagnosticT = diagnosticEffective / diagnosticEffectiveMax
+        let diagnosticRadius = diagnosticKernelRadiusMin
+            + diagnosticT * (diagnosticKernelRadiusMax - diagnosticKernelRadiusMin)
+        let uniforms = FilmtoneDetailSoftnessUniforms(
+            effectiveDetailSoftness: diagnosticEffective,
+            kernelRadiusPx: diagnosticRadius,
+            chromaAttenScale: 0.5,
+            edgeGuardLo: 0.04,
+            edgeGuardHi: 1.0,
+            highlightBias: 1.18
+        )
+        if !hasLoggedDetailSoftnessUniforms {
+            hasLoggedDetailSoftnessUniforms = true
+            NSLog(
+                "[Filmtone][DetailSoftness][Diagnostic 5-A] input detailSoftness=%f sourceDetailBias=%f | shared effective=%f radius=%f edgeGuardHi=%f chromaAttenScale=%f | diagnostic effective=%f radius=%f edgeGuardHi=%f chromaAttenScale=%f",
+                params.detailSoftness, sourceDetailBias,
+                sharedUniforms.effectiveDetailSoftness, sharedUniforms.kernelRadiusPx,
+                sharedUniforms.edgeGuardHi, sharedUniforms.chromaAttenScale,
+                uniforms.effectiveDetailSoftness, uniforms.kernelRadiusPx,
+                uniforms.edgeGuardHi, uniforms.chromaAttenScale
+            )
+        }
+        // ===== end Phase 5-A diagnostic =====
+
         if uniforms.effectiveDetailSoftness < 0.0001 {
             return image
         }
