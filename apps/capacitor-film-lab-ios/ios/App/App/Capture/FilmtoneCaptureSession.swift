@@ -213,6 +213,10 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
     /// UI flows; kept as a separate record because built-in Looks and
     /// library LUTs have different durable identities.
     private var pendingCustomLut: FilmtoneCaptureCustomLutRecord?
+    /// Package-local `.lutbin` payload paired with `pendingCustomLut`.
+    /// This is what lets an iOS capture package render the same user LUT on
+    /// Desktop without sharing the iOS app's library store.
+    private var pendingCustomLutPayload: FilmtoneCaptureCustomLutPayload?
 
     // MARK: - Init
 
@@ -499,8 +503,12 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
         pendingSelectedLook = record
     }
 
-    func setCustomLut(_ record: FilmtoneCaptureCustomLutRecord?) {
+    func setCustomLut(
+        _ record: FilmtoneCaptureCustomLutRecord?,
+        payload: FilmtoneCaptureCustomLutPayload?
+    ) {
         pendingCustomLut = record
+        pendingCustomLutPayload = record == nil ? nil : payload
     }
 
     // MARK: - M12 / S12-C / D / E exposure / focus / WB / manual forwards
@@ -873,6 +881,7 @@ final class FilmtoneCaptureSession: NSObject, ObservableObject {
             lensRecord: deviceManager.activeLens?.toRecord(),
             selectedLook: pendingSelectedLook,
             customLut: pendingCustomLut,
+            customLutPayload: pendingCustomLutPayload,
             exposure: exposureSnapshot,
             whiteBalance: whiteBalanceSnapshot,
             onCleanup: { [weak self] in

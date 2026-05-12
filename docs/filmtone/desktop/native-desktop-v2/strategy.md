@@ -453,6 +453,11 @@ The shared CIKL grain now uses temporally blended phases, tone-aware
 luma/chroma gating, softer coarse structure, and retuned UI-only recipes
 without schema or sidecar churn.
 
+2026-05-12: M4/M5 iOS capture package import parity vertical slice closed.
+Native Desktop opens iOS `capture-package.json`/package dirs, preserves
+master/proxy provenance, restores Stone/Urban/Noir, and imports package-local
+custom LUT payloads with explicit metadata-only failure state.
+
 ## Constraints
 
 - macOS target is macOS 26 only.

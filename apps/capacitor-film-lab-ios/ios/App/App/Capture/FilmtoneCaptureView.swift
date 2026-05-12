@@ -395,7 +395,10 @@ struct FilmtoneCaptureView: View {
 
     private func syncSessionLookRecords(_ look: FilmtoneCaptureLook) {
         session.setSelectedLook(look.toSelectedLookRecord())
-        session.setCustomLut(look.toCustomLutRecord())
+        session.setCustomLut(
+            look.toCustomLutRecord(),
+            payload: look.toCustomLutPayload()
+        )
     }
 
     private func importUserLutFromPicker() {

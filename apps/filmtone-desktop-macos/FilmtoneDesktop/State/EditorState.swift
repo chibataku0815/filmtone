@@ -89,6 +89,17 @@ final class EditorState {
             if clamped != opticalFilterIntensity { opticalFilterIntensity = clamped }
         }
     }
+    /// iOS capture package provenance for the currently opened source. Nil
+    /// for normal image/video opens.
+    var capturePackageProvenance: FilmtoneCapturePackageProvenance?
+    /// Package-local custom LUT prepared from an iOS capture package. This is
+    /// source-bound and intentionally separate from the Desktop Saved Look
+    /// library.
+    var packageCreativeLut: PreparedCreativeLut?
+    /// Non-nil when an iOS package references a custom LUT but does not carry
+    /// a readable package-local payload. Export is blocked so the package does
+    /// not silently grade as a different look.
+    var capturePackageCustomLutMissingReason: String?
     var isExporting: Bool = false
     var exportProgress: Double = 0
     var exportProgressMessage: String?
@@ -211,6 +222,9 @@ final class EditorState {
     /// once. strength == 0 gates the cube off so the bareline render is
     /// pure preset-reset (no Look identity bleed). nil otherwise.
     var resolvedCreativeLut: PreparedCreativeLut? {
+        if let packageCreativeLut {
+            return packageCreativeLut
+        }
         guard let lookSlug,
               presetStrength > 0,
               let look = FilmtoneCreativePackCatalog.find(slug: lookSlug) else {
@@ -230,7 +244,11 @@ final class EditorState {
         FilmtonePresetCatalog.presetVersion
     }
 
-    func setSource(_ url: URL?, kind: FilmtoneSourceKind) {
+    func setSource(
+        _ url: URL?,
+        kind: FilmtoneSourceKind,
+        importedCapturePackage: FilmtoneImportedCapturePackage? = nil
+    ) {
         sourceURL = url
         sourceKind = kind
         // M5-A.3: drop any stale scrub state from the previous video and
@@ -268,6 +286,24 @@ final class EditorState {
         lastExportSummary = nil
         exportStartedAt = nil
         exportProgress = 0
+
+        capturePackageProvenance = importedCapturePackage?.provenance
+        packageCreativeLut = importedCapturePackage?.packageCreativeLut
+        capturePackageCustomLutMissingReason = importedCapturePackage?.customLutMissingReason
+        if let importedCapturePackage {
+            sourceProfileSelection = importedCapturePackage.sourceProfileSelection
+            presetName = FilmtonePresetCatalog.defaultName
+            presetStrength = FilmtonePresetCatalog.presetStrengthDefault
+            quickState = .zero
+            paramOverrides = .empty
+            if let slug = importedCapturePackage.selectedLookSlug {
+                lookSlug = slug
+                selectedSavedLookId = importedCapturePackage.selectedLookId
+            } else {
+                lookSlug = nil
+                selectedSavedLookId = nil
+            }
+        }
 
         if let url, kind == .video {
             startVideoDurationProbe(for: url)
@@ -325,6 +361,7 @@ final class EditorState {
             probedColorClass: probedSourceColorClass,
             quickState: quickState,
             paramOverrides: renderParamOverrides,
+            packageCreativeLut: packageCreativeLut,
             compareEnabled: isCompareEnabled,
             compareSplitFraction: compareSplitFraction,
             sourceURL: url ?? sourceURL ?? URL(fileURLWithPath: "/"),
@@ -580,16 +617,21 @@ final class EditorState {
     /// View's ForEach can stay identical even if Desktop later surfaces
     /// multiple violations.
     var sourceCapViolations: [String] {
-        guard sourceURL != nil,
-              let reason = FilmtoneSourceInputTransform.sourceCapReason(
-                probedColorClass: probedSourceColorClass
-              ),
-              FilmtoneSourceInputTransform.sourceExceedsCapacity(
-                selection: sourceProfileSelection,
-                probedColorClass: probedSourceColorClass
-              )
-        else { return [] }
-        return [reason]
+        guard sourceURL != nil else { return [] }
+        var violations: [String] = []
+        if let reason = FilmtoneSourceInputTransform.sourceCapReason(
+            probedColorClass: probedSourceColorClass
+        ),
+           FilmtoneSourceInputTransform.sourceExceedsCapacity(
+            selection: sourceProfileSelection,
+            probedColorClass: probedSourceColorClass
+           ) {
+            violations.append(reason)
+        }
+        if let capturePackageCustomLutMissingReason {
+            violations.append(capturePackageCustomLutMissingReason)
+        }
+        return violations
     }
 
     /// Clear the finished-state snapshot so the inspector returns to
@@ -639,6 +681,8 @@ final class EditorState {
     /// entry's `quickState` and `paramOverrides` so a Look saved with
     /// Quick offsets / per-key overrides round-trips faithfully.
     func applySavedLook(_ entry: SavedLookEntry) {
+        packageCreativeLut = nil
+        capturePackageCustomLutMissingReason = nil
         selectedSavedLookId = entry.id
         presetName = entry.presetName
         presetStrength = entry.strength
@@ -656,6 +700,8 @@ final class EditorState {
     /// Quick state and paramOverrides back to defaults so the next
     /// Save isn't contaminated by a previous Look's offsets.
     func clearSavedLookSelection() {
+        packageCreativeLut = nil
+        capturePackageCustomLutMissingReason = nil
         selectedSavedLookId = nil
         lookSlug = nil
         quickState = .zero

@@ -51,6 +51,7 @@ SOURCES=(
   "$SRC_ROOT/Color/SourceColorClassifier.swift"
   "$SRC_ROOT/Color/FilmtoneSourceProfileCatalog.swift"
   "$SRC_ROOT/Color/FilmtoneCubeParser.swift"
+  "$SRC_ROOT/Color/FilmtoneLutBlobCodec.swift"
   "$SRC_ROOT/Color/FilmtoneCreativeLutLoader.swift"
   "$SRC_ROOT/Export/FilmtoneSidecarTypes.swift"
   "$SRC_ROOT/Export/FilmtoneSidecarWriter.swift"
@@ -58,6 +59,7 @@ SOURCES=(
   "$SRC_ROOT/Media/FormatExtensionReader.swift"
   "$SRC_ROOT/Media/FilmtoneSourceProber.swift"
   "$SRC_ROOT/Media/FilmtoneScrubThumbnailMath.swift"
+  "$SRC_ROOT/State/FilmtoneCapturePackageImport.swift"
   "$HERE/main.swift"
 )
 

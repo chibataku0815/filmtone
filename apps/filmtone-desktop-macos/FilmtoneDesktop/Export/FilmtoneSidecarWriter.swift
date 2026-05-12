@@ -155,7 +155,14 @@ enum FilmtoneSidecarWriter {
         // active and its cube resolves. SHA mismatch / missing resource
         // path returns nil from the loader → block is omitted (OQ-3:
         // attempted-and-failed signal not surfaced in the sidecar).
-        if let lookSlug = request.lookSlug,
+        if let packageCreativeLut = request.packageCreativeLut {
+            payload["creativeLut"] = [
+                "size": packageCreativeLut.size,
+                "intensity": packageCreativeLut.intensity,
+                "sourceHash": packageCreativeLut.sourceHash,
+                "source": "capture-package",
+            ]
+        } else if let lookSlug = request.lookSlug,
            strength > 0,
            let look = FilmtoneCreativePackCatalog.find(slug: lookSlug),
            let prepared = FilmtoneCreativeLutLoader.load(look: look) {
@@ -166,6 +173,73 @@ enum FilmtoneSidecarWriter {
                 "bundledSlug": look.slug,
                 "bundledPackId": look.packId,
             ]
+        }
+        if let capturePackageProvenance = request.capturePackageProvenance {
+            payload["captureProvenance"] = captureProvenanceDictionary(capturePackageProvenance)
+        }
+        return payload
+    }
+
+    private static func captureProvenanceDictionary(
+        _ provenance: FilmtoneCapturePackageProvenance
+    ) -> [String: Any] {
+        var payload: [String: Any] = [
+            "captureId": provenance.captureId,
+            "packageJSONPath": provenance.packageJSONPath,
+            "sourceMode": provenance.sourceMode.rawValue,
+            "masterURLPath": provenance.masterURLPath,
+            "proxyURLPath": provenance.proxyURLPath,
+        ]
+        if let fallbackReason = provenance.fallbackReason {
+            payload["fallbackReason"] = fallbackReason
+        }
+        if let selectedLookSlug = provenance.selectedLookSlug {
+            payload["selectedLookSlug"] = selectedLookSlug
+        }
+        if let selectedLookEnglishName = provenance.selectedLookEnglishName {
+            payload["selectedLookEnglishName"] = selectedLookEnglishName
+        }
+        if let customLutTitle = provenance.customLutTitle {
+            payload["customLutTitle"] = customLutTitle
+        }
+        if let customLutLibraryId = provenance.customLutLibraryId {
+            payload["customLutLibraryId"] = customLutLibraryId
+        }
+        if let customLutSourceHash = provenance.customLutSourceHash {
+            payload["customLutSourceHash"] = customLutSourceHash
+        }
+        if let customLutSize = provenance.customLutSize {
+            payload["customLutSize"] = customLutSize
+        }
+        if let customLutIntensity = provenance.customLutIntensity {
+            payload["customLutIntensity"] = customLutIntensity
+        }
+        if let customLutConversionPolicy = provenance.customLutConversionPolicy {
+            payload["customLutConversionPolicy"] = customLutConversionPolicy
+        }
+        if let customLutPayloadState = provenance.customLutPayloadState {
+            payload["customLutPayloadState"] = customLutPayloadState
+        }
+        if let customLutDataRef = provenance.customLutDataRef {
+            payload["customLutDataRef"] = customLutDataRef
+        }
+        if let customLutDataFormat = provenance.customLutDataFormat {
+            payload["customLutDataFormat"] = customLutDataFormat
+        }
+        if let requestedStabilization = provenance.requestedStabilization {
+            payload["requestedStabilization"] = requestedStabilization
+        }
+        if let observedStabilization = provenance.observedStabilization {
+            payload["observedStabilization"] = observedStabilization
+        }
+        if let requestedCaptureRotationDegrees = provenance.requestedCaptureRotationDegrees {
+            payload["requestedCaptureRotationDegrees"] = requestedCaptureRotationDegrees
+        }
+        if let observedCaptureRotationDegrees = provenance.observedCaptureRotationDegrees {
+            payload["observedCaptureRotationDegrees"] = observedCaptureRotationDegrees
+        }
+        if let masterAudioTrackCount = provenance.masterAudioTrackCount {
+            payload["masterAudioTrackCount"] = masterAudioTrackCount
         }
         return payload
     }

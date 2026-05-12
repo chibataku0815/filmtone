@@ -81,6 +81,11 @@ struct FilmtoneCapturePackageSnapshotV1: Codable {
     var customLutTransformWarningKind: String?
     var customLutTransformWarningSignal: String?
     var customLutTransformWarningAccepted: Bool?
+    /// iOS/Desktop package-local LUT payload. `customLutDataRef` is
+    /// relative to the directory containing this `capture-package.json`.
+    /// Additive optional fields: older packages decode as metadata-only.
+    var customLutDataRef: String?
+    var customLutDataFormat: String?
     /// M12 / S12-C: exposure / focus / metering control state at
     /// record-stop time.  `exposureMode` ("auto" | reserved "manual")
     /// is the trigger field — when present, the snapshot rebuilds a
@@ -166,6 +171,9 @@ enum FilmtoneCapturePackagePersistence {
     /// — failing the mirror does NOT fail the capture.
     @discardableResult
     static func write(package: FilmtoneCapturePackage) -> URL? {
+        guard package.customLut == nil || package.customLutPayload?.blob != nil else {
+            return nil
+        }
         let snapshot = makeSnapshot(from: package)
         guard let data = encode(snapshot: snapshot) else { return nil }
 
@@ -177,6 +185,7 @@ enum FilmtoneCapturePackagePersistence {
                 at: package.packageDirURL,
                 withIntermediateDirectories: true
             )
+            try writeCustomLutPayload(package.customLutPayload, nextTo: localURL)
             try data.write(to: localURL, options: .atomic)
         } catch {
             return nil
@@ -187,6 +196,7 @@ enum FilmtoneCapturePackagePersistence {
                 "filmtone-capture-package-\(package.captureId).json",
                 isDirectory: false
             )
+            try? writeCustomLutPayload(package.customLutPayload, nextTo: mirror)
             try? data.write(to: mirror, options: .atomic)
         }
         return localURL
@@ -257,6 +267,8 @@ enum FilmtoneCapturePackagePersistence {
             customLutTransformWarningKind: package.customLut?.transformWarningKind,
             customLutTransformWarningSignal: package.customLut?.transformWarningSignal,
             customLutTransformWarningAccepted: package.customLut?.transformWarningAccepted,
+            customLutDataRef: package.customLutPayload?.dataRef,
+            customLutDataFormat: package.customLutPayload?.dataFormat,
             exposureMode: package.exposureControl?.mode,
             exposureBiasEV: package.exposureControl?.biasEV,
             focusPointNormalizedX: package.exposureControl?.focusPointX,
@@ -379,6 +391,19 @@ enum FilmtoneCapturePackagePersistence {
         } else {
             customLut = nil
         }
+        let customLutPayload: FilmtoneCaptureCustomLutPayload?
+        if let dataRef = snapshot.customLutDataRef,
+           let dataFormat = snapshot.customLutDataFormat {
+            let payloadURL = URL(fileURLWithPath: snapshot.packageDirURLPath)
+                .appendingPathComponent(dataRef, isDirectory: false)
+            customLutPayload = FilmtoneCaptureCustomLutPayload(
+                dataRef: dataRef,
+                dataFormat: dataFormat,
+                blob: try? Data(contentsOf: payloadURL)
+            )
+        } else {
+            customLutPayload = nil
+        }
         // S12-C / S12-E: rebuild the exposure-control record only
         // when `exposureMode` is present — that is the M12 sentinel
         // field that pre-M12 snapshots lack.  When the trigger is set,
@@ -440,6 +465,7 @@ enum FilmtoneCapturePackagePersistence {
             lens: lens,
             selectedLook: selectedLook,
             customLut: customLut,
+            customLutPayload: customLutPayload,
             exposureControl: exposureControl,
             whiteBalance: whiteBalance,
             masterBookmark: snapshot.masterBookmark,
@@ -456,6 +482,17 @@ enum FilmtoneCapturePackagePersistence {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         return try? encoder.encode(snapshot)
+    }
+
+    private static func writeCustomLutPayload(
+        _ payload: FilmtoneCaptureCustomLutPayload?,
+        nextTo jsonURL: URL
+    ) throws {
+        guard let payload, let blob = payload.blob else { return }
+        let lutURL = jsonURL
+            .deletingLastPathComponent()
+            .appendingPathComponent(payload.dataRef, isDirectory: false)
+        try blob.write(to: lutURL, options: .atomic)
     }
 }
 

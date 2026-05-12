@@ -31,6 +31,8 @@ struct PreviewSurface: View {
     /// M5-C.3a: per-key parameter override patch applied between the
     /// preset/look resolve and the quick-state pass.
     let paramOverrides: FilmtonePhase0ParamsPatch
+    /// Source-bound custom LUT from an imported iOS capture package.
+    let packageCreativeLut: PreparedCreativeLut?
     /// M5-M (CC-B): Backlight Veil profile id + continuous intensity. The
     /// still preview path resolves the optical scatter coefficients in
     /// `FilmtoneGradePipeline.apply` so the live preview matches video /
@@ -148,6 +150,7 @@ struct PreviewSurface: View {
             sourceProfileSelection: sourceProfileSelection,
             quickState: quickState,
             paramOverrides: paramOverrides,
+            packageCreativeLutKey: packageCreativeLut?.identityKey,
             compareEnabled: compareEnabled,
             opticalFilterProfileId: opticalFilterProfileId,
             opticalFilterIntensity: opticalFilterIntensity
@@ -199,6 +202,7 @@ struct PreviewSurface: View {
         let profileSelection = sourceProfileSelection
         let quick = quickState
         let overrides = paramOverrides
+        let packageLut = packageCreativeLut
         let compare = compareEnabled
         let opticalProfileId = opticalFilterProfileId
         let opticalIntensity = opticalFilterIntensity
@@ -222,6 +226,7 @@ struct PreviewSurface: View {
                 probedColorClass: probedColorClass,
                 quickState: quick,
                 paramOverrides: overrides,
+                packageCreativeLut: packageLut,
                 compareEnabled: compare,
                 opticalFilterProfileId: opticalProfileId,
                 opticalFilterIntensity: opticalIntensity,
@@ -251,6 +256,7 @@ struct PreviewSurface: View {
         probedColorClass: SourceColorClassDTO?,
         quickState: FilmtoneQuickState,
         paramOverrides: FilmtonePhase0ParamsPatch,
+        packageCreativeLut: PreparedCreativeLut?,
         compareEnabled: Bool,
         // M5-M (CC-B): Backlight Veil profile + intensity + still-probe
         // camera optics. Threaded from `state.opticalFilterProfileId` /
@@ -291,21 +297,17 @@ struct PreviewSurface: View {
         let sourceSeed = FilmtoneGradePipeline.makeStableSourceSeed(
             from: sourceURL.absoluteString
         )
-        let creativeLut: PreparedCreativeLut?
-        if let lookSlug,
-           presetStrength > 0,
-           let look = FilmtoneCreativePackCatalog.find(slug: lookSlug) {
-            creativeLut = FilmtoneCreativeLutLoader.load(look: look)
-        } else {
-            creativeLut = nil
-        }
+        let creativeLut: PreparedCreativeLut? = packageCreativeLut
+            ?? bundledCreativeLut(lookSlug: lookSlug, strength: presetStrength)
+        let lutIntensity = packageCreativeLut.map { clampLutIntensity($0.intensity) }
+            ?? FilmtonePresetCatalog.clampStrength(presetStrength)
         let graded = FilmtoneGradePipeline.apply(
             to: normalizedSource,
             params: params,
             sourceSeed: sourceSeed,
             cameraOptics: cameraOptics,
             creativeLut: creativeLut,
-            lutIntensity: FilmtonePresetCatalog.clampStrength(presetStrength),
+            lutIntensity: lutIntensity,
             opticalFilterProfileId: opticalFilterProfileId,
             opticalFilterIntensity: opticalFilterIntensity,
             sourceDetailBias: FilmtoneSourceDetailCompensation.resolve(
@@ -338,6 +340,22 @@ struct PreviewSurface: View {
             graded: gradedNSImage,
             sourceForCompare: sourceForCompare
         )
+    }
+
+    nonisolated private static func clampLutIntensity(_ intensity: Double) -> Double {
+        max(0, min(1, intensity.isFinite ? intensity : 1))
+    }
+
+    nonisolated private static func bundledCreativeLut(
+        lookSlug: String?,
+        strength: Double
+    ) -> PreparedCreativeLut? {
+        guard let lookSlug,
+              strength > 0,
+              let look = FilmtoneCreativePackCatalog.find(slug: lookSlug) else {
+            return nil
+        }
+        return FilmtoneCreativeLutLoader.load(look: look)
     }
 
     /// Rasterize a CIImage to NSImage at the canvas extent. When
@@ -386,6 +404,7 @@ private struct PreviewRenderKey: Hashable {
     let sourceProfileSelection: CameraProfileSelection
     let quickState: FilmtoneQuickState
     let paramOverrides: FilmtonePhase0ParamsPatch
+    let packageCreativeLutKey: String?
     let compareEnabled: Bool
     let opticalFilterProfileId: String?
     let opticalFilterIntensity: Double
@@ -649,6 +668,7 @@ private struct BrandedOpeningBackdrop: View {
         sourceProfileSelection: .auto,
         quickState: .zero,
         paramOverrides: .empty,
+        packageCreativeLut: nil,
         opticalFilterProfileId: nil,
         opticalFilterIntensity: 1.0,
         compareEnabled: false

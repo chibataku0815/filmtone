@@ -2,8 +2,7 @@ import FilmLabSwiftCore
 import Foundation
 
 // Hand-port of the iOS Creative LUT Pack 01 catalog
-// (`FilmtoneBuiltInCatalog.swift`). Only the two active built-in Looks are
-// included — Stone and Urban. UUIDs and pinned SHA-256 mirror the iOS
+// (`FilmtoneBuiltInCatalog.swift`). UUIDs and pinned SHA-256 mirror the iOS
 // fixtures manifest at
 // `apps/capacitor-film-lab-ios/Tests/Fixtures/creative-pack-01/manifest.json`,
 // so a Look's identity is stable across iOS / Desktop / sidecar.
@@ -89,6 +88,23 @@ enum FilmtoneCreativePackCatalog {
         return FilmtonePhase0ParamsPatch(values: values)
     }()
 
+    private static let noirPatch: FilmtonePhase0ParamsPatch = {
+        var values = colorOpNeutralEntries
+        values["rgbShift"] = 0
+        values["bloomThreshold"] = 0.56
+        values["bloomStrength"] = 0.2
+        values["bloomRadius"] = 0.64
+        values["halationIntensity"] = 0.028
+        values["halationHue"] = 36
+        values["diffusion"] = 0.13
+        values["lensSoftness"] = 0.16
+        values["grainRadialMix"] = 0.9
+        values["grainIntensity"] = 0.075
+        values["grainSize"] = 0.48
+        values["vignette"] = 0.16
+        return FilmtonePhase0ParamsPatch(values: values)
+    }()
+
     static let all: [BuiltInLook] = [
         BuiltInLook(
             slug: "filmtone-creative-pack-01-stone",
@@ -109,6 +125,16 @@ enum FilmtoneCreativePackCatalog {
             intensity: 1.0,
             packId: packId,
             paramOverridesPatch: urbanPatch
+        ),
+        BuiltInLook(
+            slug: "filmtone-creative-pack-01-noir",
+            canonicalUUID: UUID(uuidString: "FB1A0001-0000-4000-8000-000000000010")!,
+            englishName: "Noir",
+            bundledFilename: "filmtone-creative-pack-01-noir.cube",
+            pinnedSha256: "29309e03244e7d3d1b328f0308549935d4937da0eadc6b3c6144be13fce57873",
+            intensity: 1.0,
+            packId: packId,
+            paramOverridesPatch: noirPatch
         ),
     ]
 
