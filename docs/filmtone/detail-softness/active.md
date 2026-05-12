@@ -200,6 +200,41 @@ Skip gates (justified):
   systemically wrong for a source class → open a Phase 4-C resolver
   re-tune active.md rather than patching inside Phase 5.
 
+## Phase 5-A Tuning (2026-05-12 JST)
+
+iOS on-device QA at `0.18` / `0.30` came back too conservative on
+real footage. The fix lives in shared uniform math
+(`packages/film-lab-core/src/detail-softness.ts` + the Swift mirror
+`FilmtoneDetailSoftnessUniforms.swift`), so the four renderers stay
+in lockstep:
+
+| Constant            | Before | After |
+|---------------------|--------|-------|
+| `effectiveMax`      | 0.34   | 0.45  |
+| `kernelRadiusMin`   | 0.55   | 0.62  |
+| `kernelRadiusMax`   | 1.45   | 2.0   |
+| `chromaAttenScale`  | 0.85   | 0.70  |
+| `edgeGuardLo`       | 0.04   | 0.04  |
+| `edgeGuardHi`       | 0.20   | 0.20  |
+| `highlightBias`     | 1.18   | 1.18  |
+
+Identity short-circuit (`effectiveDetailSoftness < 0.0001`) and the
+`sourceDetailBias` model are unchanged. `clampBias` in
+`source-detail-compensation.ts` still pulls its ceiling from
+`DETAIL_SOFTNESS_EFFECTIVE_MAX`, so the wider headroom is available
+to the resolver without re-tuning per-class bias values; existing
+per-class biases (max `0.10`, iPhone SDR HEVC) stay well under the
+new ceiling.
+
+Tests updated in lockstep: TS `detail-softness.test.ts` and Swift
+`DetailSoftnessUniformsTests.swift` mirror the new constants and
+endpoint radii (`0.62` / `2.0`). Cosmetic init values in
+`WebGLBackend.ts` updated to match (overwritten at runtime by
+`updateDetailSoftnessUniforms`).
+
+After landing, the matrix re-runs at `0.18` / `0.30` on an iOS build
+reinstalled from the new constants.
+
 ## Copy / History Impact
 
 Marker (required for `bun run check:filmtone-context`):

@@ -1477,8 +1477,8 @@ var WebGLBackend = class _WebGLBackend {
         uSource: { value: null },
         uTexelSize: { value: new THREE3.Vector2() },
         uEffectiveDetailSoftness: { value: 0 },
-        uKernelRadiusPx: { value: 0.55 },
-        uChromaAttenScale: { value: 0.85 },
+        uKernelRadiusPx: { value: 0.62 },
+        uChromaAttenScale: { value: 0.7 },
         uEdgeGuardLo: { value: 0.04 },
         uEdgeGuardHi: { value: 0.2 },
         uHighlightBias: { value: 1.18 }

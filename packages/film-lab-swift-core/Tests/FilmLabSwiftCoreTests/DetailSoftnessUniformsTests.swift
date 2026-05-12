@@ -9,8 +9,8 @@ final class DetailSoftnessUniformsTests: XCTestCase {
     func testIdentityAtZero() {
         let u = FilmtoneDetailSoftness.deriveUniforms(detailSoftness: 0)
         XCTAssertEqual(u.effectiveDetailSoftness, 0)
-        XCTAssertGreaterThanOrEqual(u.kernelRadiusPx, 0.55)
-        XCTAssertLessThanOrEqual(u.kernelRadiusPx, 1.45)
+        XCTAssertGreaterThanOrEqual(u.kernelRadiusPx, 0.62)
+        XCTAssertLessThanOrEqual(u.kernelRadiusPx, 2.0)
     }
 
     func testNegativeClampsToZero() {
@@ -45,7 +45,7 @@ final class DetailSoftnessUniformsTests: XCTestCase {
     func testSourceDetailBiasSumsThenClamps() {
         XCTAssertEqual(
             FilmtoneDetailSoftness.deriveUniforms(
-                detailSoftness: 0.2,
+                detailSoftness: 0.3,
                 sourceDetailBias: 0.3
             ).effectiveDetailSoftness,
             FilmtoneDetailSoftness.effectiveMax
@@ -68,7 +68,7 @@ final class DetailSoftnessUniformsTests: XCTestCase {
     }
 
     func testKernelRadiusMonotonic() {
-        let samples = [0.0, 0.05, 0.1, 0.18, 0.24, 0.3, 0.34].map {
+        let samples = [0.0, 0.05, 0.1, 0.18, 0.24, 0.3, 0.34, 0.45].map {
             FilmtoneDetailSoftness.deriveUniforms(detailSoftness: $0)
         }
         for index in 1..<samples.count {
@@ -77,15 +77,15 @@ final class DetailSoftnessUniformsTests: XCTestCase {
                 samples[index - 1].kernelRadiusPx
             )
         }
-        XCTAssertEqual(samples.first!.kernelRadiusPx, 0.55, accuracy: 1e-12)
-        XCTAssertEqual(samples.last!.kernelRadiusPx, 1.45, accuracy: 1e-12)
+        XCTAssertEqual(samples.first!.kernelRadiusPx, 0.62, accuracy: 1e-12)
+        XCTAssertEqual(samples.last!.kernelRadiusPx, 2.0, accuracy: 1e-12)
     }
 
     func testParityConstants() {
         // Any change here is a Phase 5 tuning concern and must update the TS
         // helper, the Swift mirror, and every shader port in lockstep.
         let u = FilmtoneDetailSoftness.deriveUniforms(detailSoftness: 0.18)
-        XCTAssertEqual(u.chromaAttenScale, 0.85)
+        XCTAssertEqual(u.chromaAttenScale, 0.7)
         XCTAssertEqual(u.edgeGuardLo, 0.04)
         XCTAssertEqual(u.edgeGuardHi, 0.2)
         XCTAssertEqual(u.highlightBias, 1.18)

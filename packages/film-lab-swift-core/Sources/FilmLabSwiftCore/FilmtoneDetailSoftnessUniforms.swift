@@ -36,11 +36,11 @@ public struct FilmtoneDetailSoftnessUniforms: Equatable, Sendable {
 }
 
 public enum FilmtoneDetailSoftness {
-    public static let effectiveMax: Double = 0.34
+    public static let effectiveMax: Double = 0.45
 
-    static let kernelRadiusMin: Double = 0.55
-    static let kernelRadiusMax: Double = 1.45
-    static let chromaAttenScale: Double = 0.85
+    static let kernelRadiusMin: Double = 0.62
+    static let kernelRadiusMax: Double = 2.0
+    static let chromaAttenScale: Double = 0.7
     static let edgeGuardLo: Double = 0.04
     static let edgeGuardHi: Double = 0.2
     static let highlightBias: Double = 1.18

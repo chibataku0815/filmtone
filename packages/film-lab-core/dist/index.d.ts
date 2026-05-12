@@ -2507,7 +2507,7 @@ interface BuiltSourceProfileLut {
  */
 declare function buildSourceProfileLut(id: string, size?: number): BuiltSourceProfileLut | null;
 
-declare const DETAIL_SOFTNESS_EFFECTIVE_MAX = 0.34;
+declare const DETAIL_SOFTNESS_EFFECTIVE_MAX = 0.45;
 interface DetailSoftnessUniforms {
     effectiveDetailSoftness: number;
     kernelRadiusPx: number;
